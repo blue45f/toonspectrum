@@ -1,24 +1,26 @@
 /**
  * Studio Pattern Fill Panel
- * 도형 채우기 패턴 인스펙터 — 패턴 스와치 12종 그리드(실제 타일 미리보기) +
+ * 도형 채우기 패턴 인스펙터 — 검색 가능한 패턴 스와치 그리드(실제 타일 미리보기) +
  * 전경/배경색 + 배율 슬라이더 + 해제. studio-pattern-fill의 순수 헬퍼로만 스펙을
  * 만들어 onChange로 돌려주는 상태 없는(fully-controlled) 프레젠테이션 컴포넌트.
  * value=null이면 미적용 상태. 우선순위 규약: 패턴 > 그라데이션 > 단색 채우기.
  */
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Search, X } from "lucide-react";
+import { useId, useState } from "react";
 
 import { PANEL_LABEL_ROW, StudioSliderRow } from "./studio-panel-ui";
 import {
   DEFAULT_PATTERN_SPEC,
   PATTERN_SCALE_RANGE,
-  STUDIO_PATTERNS,
   normalizePatternSpec,
   patternPreviewCss,
+  searchStudioPatterns,
   setPatternBg,
   setPatternFg,
   setPatternId,
   setPatternScale,
   type StudioPatternSpec,
+  type StudioPatternDef,
 } from "./studio-pattern-fill";
 
 import type { ReactElement } from "react";
@@ -41,14 +43,16 @@ export type StudioPatternFillPanelProps = {
  */
 function PatternSwatchGrid({
   current,
+  patterns,
   onChange,
 }: {
   current: StudioPatternSpec | null;
+  patterns: readonly StudioPatternDef[];
   onChange: (spec: StudioPatternSpec) => void;
 }): ReactElement {
   return (
-    <div className="grid grid-cols-3 gap-1.5">
-      {STUDIO_PATTERNS.map((def) => {
+    <div className="grid max-h-72 grid-cols-3 gap-1.5 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin]">
+      {patterns.map((def) => {
         const active = current?.patternId === def.id;
         // 스와치 미리보기는 판독성을 위해 배율 1 고정(배율은 아래 슬라이더가 담당).
         const preview = normalizePatternSpec({
@@ -84,8 +88,11 @@ export function StudioPatternFillPanel({
   onChange,
   title = "패턴 채우기",
 }: StudioPatternFillPanelProps): ReactElement {
+  const searchId = useId();
+  const [query, setQuery] = useState("");
   // 문서(localStorage)에서 온 값일 수 있으므로 항상 정규화해 다룬다 — 컨트롤이 안전한 값만 본다.
   const current = value == null ? null : normalizePatternSpec(value);
+  const visiblePatterns = searchStudioPatterns(query);
 
   return (
     <div className="space-y-2">
@@ -162,8 +169,41 @@ export function StudioPatternFillPanel({
         </>
       )}
 
-      {/* 스와치 12종 — 미적용/적용 상태 양쪽에서 재사용(적용 중엔 종류만 교체) */}
-      <PatternSwatchGrid current={current} onChange={onChange} />
+      <div className="relative">
+        <label htmlFor={searchId} className="sr-only">패턴 검색</label>
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-fg-3" aria-hidden />
+        <input
+          id={searchId}
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="패턴 검색 (하프톤, 속도, 물결…)"
+          className="min-h-10 w-full rounded-lg border border-line bg-card py-1 pl-8 pr-10 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/35 pointer-coarse:min-h-11"
+        />
+        {query ? (
+          <button
+            type="button"
+            aria-label="패턴 검색어 지우기"
+            onClick={() => setQuery("")}
+            className="absolute right-0 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg pointer-coarse:size-11"
+          >
+            <X className="size-3.5" aria-hidden />
+          </button>
+        ) : null}
+      </div>
+
+      <p className="text-[0.62rem] tabular-nums text-fg-3" role="status" aria-live="polite">
+        {query ? `검색 결과 ${visiblePatterns.length}개` : `패턴 ${visiblePatterns.length}개`}
+      </p>
+
+      {visiblePatterns.length > 0 ? (
+        <PatternSwatchGrid current={current} patterns={visiblePatterns} onChange={onChange} />
+      ) : (
+        <div className="rounded-lg border border-dashed border-line px-3 py-4 text-center">
+          <p className="text-xs font-semibold text-fg-2">일치하는 패턴이 없습니다</p>
+          <p className="mt-1 text-[0.62rem] text-fg-3">‘번개’, ‘벽돌’, ‘스파클’처럼 모양으로 찾아보세요.</p>
+        </div>
+      )}
     </div>
   );
 }

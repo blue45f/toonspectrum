@@ -46,7 +46,13 @@ import {
   updateStudioBrushDynamicsTaper,
   updateStudioBrushDynamicsTip,
 } from "./studio-brush-dynamics-editor";
+import {
+  resolveNormalizedStudioBrushDabColor,
+  resolveNormalizedStudioBrushGrainAlphaMultiplier,
+  studioBrushGrainIsActive,
+} from "./studio-brush-material-dynamics";
 import { studioBrushStudioDefaultPresetId } from "./studio-brush-studio-contract";
+import { planNormalizedStudioBrushTipComposition } from "./studio-brush-tip-composition";
 import {
   importStudioBrushTipPng,
   studioBrushTipImportErrorMessage,
@@ -213,43 +219,80 @@ export function StudioBrushDynamicsPreview({
         aria-hidden="true"
       >
         {(() => {
-          const useEllipse = studioBrushTipUsesSolidEllipse(settings.tip);
-          if (useEllipse) {
-            return plan.dabs.map((dab) => {
-              // Canvas draws the clamped circular dab first, then scales its Y axis by roundness.
-              // Keep the SVG preview in that exact order so very thin tips do not gain a false 0.25px ry.
-              const radius = Math.max(0.25, dab.size / 2);
-              return (
-                <ellipse
-                  key={dab.index}
-                  cx={dab.x}
-                  cy={dab.y}
-                  rx={radius}
-                  ry={radius * dab.roundness}
-                  fill={color}
-                  opacity={Math.min(1, Math.max(0.02, dab.opacity * dab.flow))}
-                  transform={`rotate(${dab.angle} ${dab.x} ${dab.y})`}
-                />
-              );
-            });
-          }
-          const alphaMap = buildStudioBrushTipAlphaMap(settings.tip);
-          return plan.dabs.flatMap((dab) =>
-            planStudioBrushTipStampWorldSamples(dab, settings.tip, { alphaMap, grid: 5 }).map((sample, sampleIndex) => (
-              <circle
-                key={`${dab.index}-${sampleIndex}`}
-                cx={sample.x}
-                cy={sample.y}
-                r={sample.radius}
-                fill={color}
-                opacity={Math.min(1, Math.max(0.02, dab.opacity * dab.flow * sample.alpha))}
-              />
-            ))
+          const normalized = plan.settings;
+          const grainActive = studioBrushGrainIsActive(normalized.grain);
+          const tips = [normalized.tip, ...normalized.tipLayers.map((layer) => layer.tip)];
+          const ellipseTips = tips.map((tip) => (
+            !grainActive && studioBrushTipUsesSolidEllipse(tip)
+          ));
+          const alphaMaps = tips.map((tip, tipIndex) => (
+            ellipseTips[tipIndex] ? null : buildStudioBrushTipAlphaMap(tip)
+          ));
+          const strokeOriginX = plan.dabs[0]?.sourceX ?? plan.dabs[0]?.x ?? 0;
+          const strokeOriginY = plan.dabs[0]?.sourceY ?? plan.dabs[0]?.y ?? 0;
+          const grainAt = (x: number, y: number) => (
+            resolveNormalizedStudioBrushGrainAlphaMultiplier({
+              x,
+              y,
+              strokeOriginX,
+              strokeOriginY,
+              strokeSeed: normalized.seed,
+            }, normalized.grain)
           );
+          return plan.dabs.flatMap((dab) => {
+            const dabColor = resolveNormalizedStudioBrushDabColor(
+              color,
+              dab.index,
+              normalized.seed,
+              normalized.colorDynamics
+            );
+            return planNormalizedStudioBrushTipComposition(
+              dab,
+              normalized.tip,
+              normalized.tipLayers
+            ).flatMap((composedTip) => {
+              const composedDab = composedTip.dab;
+              const tipIndex = composedTip.role === "primary" ? 0 : composedTip.layerIndex + 1;
+              const baseOpacity = Math.min(1, Math.max(0.02, composedDab.opacity * composedDab.flow));
+              const alphaMap = alphaMaps[tipIndex] ?? null;
+              if (ellipseTips[tipIndex] || !alphaMap) {
+                const radius = Math.max(0.25, composedDab.size / 2);
+                return [(
+                  <ellipse
+                    key={`${dab.index}-${tipIndex}`}
+                    cx={composedDab.x}
+                    cy={composedDab.y}
+                    rx={radius}
+                    ry={radius * composedDab.roundness}
+                    fill={dabColor}
+                    opacity={Math.min(1, baseOpacity * grainAt(composedDab.x, composedDab.y))}
+                    transform={`rotate(${composedDab.angle} ${composedDab.x} ${composedDab.y})`}
+                  />
+                )];
+              }
+              return planStudioBrushTipStampWorldSamples(
+                composedDab,
+                composedTip.tip,
+                { alphaMap, grid: 5 }
+              ).map((sample, sampleIndex) => (
+                <circle
+                  key={`${dab.index}-${tipIndex}-${sampleIndex}`}
+                  cx={sample.x}
+                  cy={sample.y}
+                  r={sample.radius}
+                  fill={dabColor}
+                  opacity={Math.min(
+                    1,
+                    Math.max(0.001, baseOpacity * sample.alpha * grainAt(sample.x, sample.y))
+                  )}
+                />
+              ));
+            });
+          });
         })()}
       </svg>
       <p className="mt-1.5 text-[0.62rem] leading-relaxed text-fg-3">
-        필압·테이퍼·PNG 알파 팁이 실제 엔진 도장 경로에 반영됩니다.
+        필압·테이퍼·색상·고정 그레인·멀티 팁이 실제 엔진 도장 경로에 반영됩니다.
         {plan.capped ? " 미리보기 도장 수는 256개로 제한했습니다." : ""}
       </p>
     </div>

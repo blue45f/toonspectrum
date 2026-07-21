@@ -163,6 +163,7 @@ describe("Studio rich-hint consumer mappings", () => {
     const source = readStudioSource("StudioSmartFiltersPanel.tsx");
     expect(source).toContain("id: `smart-filter-${entry.engine}`");
     expect(source).toContain('preview: "filter"');
-    expect(source).toContain("아직 캔버스 실시간 미리보기가");
+    expect(source).toContain("모든 계산은 브라우저의 로컬 Worker에서 우선 실행됩니다");
+    expect(source).toContain("원본을 보존한 채 스택에 추가");
   });
 });

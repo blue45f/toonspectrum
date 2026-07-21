@@ -294,12 +294,15 @@ import {
 import { COLOR_WHEEL_LONG_PRESS_MS, clampWheelCenter, shouldCancelLongPress } from "./studio-color-wheel";
 import {
   addStudioCommentReply,
+  addStudioCommentThread,
   createEmptyStudioCommentsDocument,
+  createStudioCommentMessageId,
   normalizeStudioCommentsDocument,
   reopenStudioCommentThread,
   resolveStudioCommentThread,
   STUDIO_COMMENTS_MAX_DISPLAY_NAME_LENGTH,
   studioCommentAnchorsEqual,
+  studioCommentMutationReceiptOwnsDraft,
   type StudioCommentActor,
   type StudioCommentAnchor,
   type StudioCommentsDocument,
@@ -696,6 +699,7 @@ import {
   StudioPublishContextBanner,
   StudioPuppetWarpOverlay,
   StudioRasterCrdtSurface,
+  StudioPointCommentComposer,
   StudioRemoteCursorOverlay,
   StudioSelectionAntsOverlay,
   StudioShapePickerGrid,
@@ -714,6 +718,7 @@ import {
   loadStudioWebtoonGuides,
   preloadStudioAssetMenuPanel,
   preloadStudioCommentsPanelSession,
+  preloadStudioPointCommentComposer,
   preloadStudioReferencePanel,
   preloadStudioTextEditOverlay,
   type StudioComipoAssemblyModule,
@@ -2664,9 +2669,10 @@ function StudioCuttoonEditor() {
   const studioTeamCommentsScopeRef = useRef<string | null>(null);
   const studioTeamCommentActivitySequenceRef = useRef<Map<string, bigint>>(new Map());
   const studioTeamCommentReadSequenceRef = useRef<Map<string, bigint>>(new Map());
-  const setStudioComments = (next: Parameters<typeof setStudioCommentsState>[0]) => {
-    if (!markStudioDocumentChanged()) return;
+  const setStudioComments = (next: Parameters<typeof setStudioCommentsState>[0]): boolean => {
+    if (!markStudioDocumentChanged()) return false;
     setStudioCommentsState(next);
+    return true;
   };
   const [releaseSchedule, setReleaseScheduleState] = useState<StudioReleaseSchedule>(() =>
     createEmptyStudioReleaseScheduleSnapshot()
@@ -7052,6 +7058,7 @@ function StudioCuttoonEditor() {
   function openStudioCommentInbox() {
     preloadStudioCommentsPanelSession();
     setCommentPinArmed(false);
+    setPointCommentComposer(null);
     setTeamPanelOpen(false);
     setCommentsOpen(true);
   }
@@ -7066,23 +7073,43 @@ function StudioCuttoonEditor() {
       announceDrawingShortcut("댓글 핀 배치 취소");
       return;
     }
-    preloadStudioCommentsPanelSession();
+    preloadStudioPointCommentComposer();
     disarmAllPixelTools();
     setTeamPanelOpen(false);
     setCommentsOpen(false);
     setPointCommentAnchor(null);
+    setPointCommentComposer(null);
     setCommentPinArmed(true);
     announceDrawingShortcut("댓글 · 캔버스에서 핀 위치를 선택하세요");
   }
   const [pointCommentAnchor, setPointCommentAnchor] = useState<
     { pageId: string; x: number; y: number } | null
   >(null);
+  const [pointCommentComposer, setPointCommentComposer] = useState<{
+    anchor: Extract<StudioCommentAnchor, { type: "point" }>;
+    commentId: string;
+    screenPoint: { x: number; y: number };
+  } | null>(null);
+  const pointCommentComposerRef = useRef(pointCommentComposer);
+  pointCommentComposerRef.current = pointCommentComposer;
+  function restoreStudioCanvasViewportFocus(): void {
+    globalThis.requestAnimationFrame(() => {
+      wrapRef.current?.focus({ preventScroll: true });
+    });
+  }
+  function cancelStudioPointCommentComposer(): void {
+    setPointCommentComposer(null);
+    setPointCommentAnchor(null);
+    announceDrawingShortcut("위치 댓글 작성 취소");
+    restoreStudioCanvasViewportFocus();
+  }
   useEffect(() => {
     if (
       pointCommentAnchor
       && (selectedId !== null || pointCommentAnchor.pageId !== currentPageId)
     ) {
       setPointCommentAnchor(null);
+      setPointCommentComposer(null);
     }
   }, [currentPageId, pointCommentAnchor, selectedId]);
   const liveDraftVisualRef = useRef<DrawEl | null>(null);
@@ -9057,7 +9084,7 @@ function StudioCuttoonEditor() {
     const nextDocument = normalizeStudioCommentsDocument(value);
     if (!studioTeamCommentsWorkId) {
       if (collaborationDocumentLocked) return false;
-      setStudioComments(nextDocument);
+      if (!setStudioComments(nextDocument)) return false;
       setStudioCommentSyncError(null);
       return true;
     }
@@ -9208,6 +9235,32 @@ function StudioCuttoonEditor() {
     ));
     return true;
   }
+
+  async function submitStudioPointComment(body: string): Promise<boolean> {
+    const composer = pointCommentComposer;
+    if (!composer) return false;
+    const nextDocument = addStudioCommentThread(studioCommentViewDocumentRef.current, {
+      id: composer.commentId,
+      anchor: composer.anchor,
+      author: studioCommentActor,
+      body,
+    });
+    const accepted = await applyStudioCommentsPanelChange(nextDocument);
+    if (!accepted) return false;
+    // A canceled request may settle after the user already armed a different point comment. The
+    // stable mutation id is also the UI generation fence: an old receipt must never close a new
+    // draft or clear its selected anchor.
+    if (!studioCommentMutationReceiptOwnsDraft(
+      pointCommentComposerRef.current?.commentId,
+      composer.commentId
+    )) return true;
+    setPointCommentComposer(null);
+    setPointCommentAnchor(null);
+    announceDrawingShortcut("위치 댓글을 등록했습니다");
+    restoreStudioCanvasViewportFocus();
+    return true;
+  }
+
   async function markStudioCommentThreadRead(threadId: string): Promise<boolean> {
     if (!studioTeamCommentsWorkId || !studioTeamUnreadCommentIds.includes(threadId)) return true;
     try {
@@ -14322,6 +14375,9 @@ function StudioCuttoonEditor() {
           e.preventDefault();
           setCommentPinArmed(false);
           announceDrawingShortcut("댓글 핀 배치 취소");
+        } else if (pointCommentComposer) {
+          e.preventDefault();
+          cancelStudioPointCommentComposer();
         } else if (advancedFillPreview) {
           cancelAdvancedFillPreview();
         } else if (advancedFillActive) {
@@ -17834,6 +17890,50 @@ function StudioCuttoonEditor() {
     return true;
   }
 
+  function handleStudioPointCommentStageDown(
+    e: Konva.KonvaEventObject<MouseEvent | TouchEvent>,
+    stagePointerEvent: PointerEvent,
+  ): boolean {
+    // The body-level compact comment backdrop normally owns this gesture. Keep a Stage-side
+    // generation guard as defense in depth for synthetic events and browsers with unusual portal
+    // retargeting so no draw/select mutation can run behind a visible draft.
+    if (pointCommentComposer) return true;
+    if (!commentPinArmed) return false;
+    // Figma식 자유 위치 댓글 핀: 무장 상태의 첫 캔버스 클릭이 point 앵커를 확정하고 소비된다.
+    if (canvasInteractionBlocked) {
+      setCommentPinArmed(false);
+      announceDrawingShortcut("댓글 핀을 배치할 수 없는 문서 상태입니다");
+      return true;
+    }
+    if (
+      (typeof stagePointerEvent.button === "number" && stagePointerEvent.button !== 0)
+      || stagePointerEvent.isPrimary === false
+    ) return true;
+    const pos = e.target.getStage()?.getRelativePointerPosition();
+    setCommentPinArmed(false);
+    if (pos && canvasH > 0) {
+      const anchor = {
+        type: "point" as const,
+        pageId: activePage.id,
+        x: Math.min(1, Math.max(0, pos.x / CANVAS_W)),
+        y: Math.min(1, Math.max(0, pos.y / canvasH)),
+      };
+      const clientPoint = getClientPointFromKonvaEvent(e.evt) ?? {
+        x: globalThis.innerWidth / 2,
+        y: globalThis.innerHeight / 2,
+      };
+      setPointCommentAnchor({ pageId: anchor.pageId, x: anchor.x, y: anchor.y });
+      setPointCommentComposer({
+        anchor,
+        commentId: createStudioCommentMessageId("comment"),
+        screenPoint: clientPoint,
+      });
+      setSelectedId(null);
+      setCommentsOpen(false);
+    }
+    return true;
+  }
+
   function onStageDown(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     if (
       e.target.name() === "symmetry-handle"
@@ -17850,30 +17950,7 @@ function StudioCuttoonEditor() {
     if (pixelDragRef.current) return;
     // The first contact owns a bubble point drag. A palm/second finger cannot replace its owner.
     if (bubbleShapeDragRef.current) return;
-    // Figma식 자유 위치 댓글 핀: 무장 상태의 첫 캔버스 클릭이 point 앵커를 확정하고 소비된다.
-    if (commentPinArmed) {
-      if (canvasInteractionBlocked) {
-        setCommentPinArmed(false);
-        announceDrawingShortcut("댓글 핀을 배치할 수 없는 문서 상태입니다");
-        return;
-      }
-      if (
-        (typeof stagePointerEvent.button === "number" && stagePointerEvent.button !== 0)
-        || stagePointerEvent.isPrimary === false
-      ) return;
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      setCommentPinArmed(false);
-      if (pos && canvasH > 0) {
-        setPointCommentAnchor({
-          pageId: activePage.id,
-          x: Math.min(1, Math.max(0, pos.x / CANVAS_W)),
-          y: Math.min(1, Math.max(0, pos.y / canvasH)),
-        });
-        setSelectedId(null);
-        setCommentsOpen(true);
-      }
-      return;
-    }
+    if (handleStudioPointCommentStageDown(e, stagePointerEvent)) return;
     // 색상 휠 롱프레스 무장 — 조건을 전부 만족할 때만 타이머를 건다. 이 블록은 return하지
     // 않는다(관찰만 함) — 아래 기존 분기들(스포이드/크롭/드로잉/마퀴 등)은 오늘과 동일하게
     // 그대로 실행된다. 타이머가 실제로 발화(450ms 정지 유지)했을 때만 openColorWheelAt 이
@@ -23520,6 +23597,7 @@ function StudioCuttoonEditor() {
     removeSelected,
     reorder,
     toggleAdvancedFill,
+    toggleStudioCommentPinPlacement,
     undo,
   });
 
@@ -24718,6 +24796,7 @@ function StudioCuttoonEditor() {
           setBg3dOpen={setBg3dOpen}
           setCanvasOnlyMode={setCanvasOnlyMode}
           setCommentPinArmed={setCommentPinArmed}
+          setPointCommentComposer={setPointCommentComposer}
           setCommentsOpen={setCommentsOpen}
           setContextMenu={setContextMenu}
           setCurrentPageId={setCurrentPageId}
@@ -24829,6 +24908,23 @@ function StudioCuttoonEditor() {
           zoomHostRef={zoomHostRef}
           stableHandlers={studioCanvasViewportHandlers}
         />
+
+        {pointCommentComposer ? (
+          <Suspense fallback={null}>
+            <StudioPointCommentComposer
+              key={pointCommentComposer.commentId}
+              anchor={pointCommentComposer.anchor}
+              authorName={studioCommentActor.displayName}
+              screenPoint={pointCommentComposer.screenPoint}
+              onCancel={cancelStudioPointCommentComposer}
+              onOpenReview={() => {
+                setPointCommentComposer(null);
+                openStudioCommentInbox();
+              }}
+              onSubmit={submitStudioPointComment}
+            />
+          </Suspense>
+        ) : null}
 
         {/* 캔버스 ↔ 속성 패널 너비 스플리터(데스크톱) */}
         {visibleRightPanelOpen && (
@@ -25139,6 +25235,7 @@ function StudioCuttoonEditor() {
           brushManagerSheetRef={brushManagerSheetRef}
           brushOpacity={brushOpacity}
           collaborationDocumentLocked={collaborationDocumentLocked}
+          commentPinArmed={commentPinArmed}
           color={color}
           colorBlindPreview={colorBlindPreview}
           colorVisionSheetRef={colorVisionSheetRef}
@@ -25715,6 +25812,11 @@ interface StudioCanvasViewportProps {
   setBg3dOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setCanvasOnlyMode: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setCommentPinArmed: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setPointCommentComposer: import("react").Dispatch<import("react").SetStateAction<{
+    anchor: Extract<StudioCommentAnchor, { type: "point" }>;
+    commentId: string;
+    screenPoint: { x: number; y: number };
+  } | null>>;
   setCommentsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   requestStudioCommentThreadFocus: (threadId: string) => void;
   setContextMenu: import("react").Dispatch<import("react").SetStateAction<{ visible: boolean; x: number; y: number; elId: string | null; }>>;
@@ -25977,6 +26079,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   setBg3dOpen,
   setCanvasOnlyMode,
   setCommentPinArmed,
+  setPointCommentComposer,
   setCommentsOpen,
   requestStudioCommentThreadFocus,
   setContextMenu,
@@ -27574,6 +27677,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 rotation={canvasRotation}
                 onCommentPinClick={(anchor, newestThreadId) => {
                   setCommentPinArmed(false);
+                  setPointCommentComposer(null);
                   selectStudioCommentAnchor(anchor);
                   setTeamPanelOpen(false);
                   setCommentsOpen(true);

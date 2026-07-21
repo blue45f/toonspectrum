@@ -1,4 +1,8 @@
 import {
+  listEnabledStudioAdjustmentOperations,
+  normalizeStudioAdjustmentFilterOperations,
+} from "./studio-adjustment-stack";
+import {
   STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION,
   assertStudioImageFilterImageData,
   studioImageFilterRequestTransfers,
@@ -35,6 +39,14 @@ export interface StudioImageFilterWorkerClientOptions {
 export interface StudioImageFilterWorkerClientResult {
   execution: "worker" | "direct";
   imageData: StudioImageDataLike;
+}
+
+export interface StudioImageFilterWorkerSession {
+  run(
+    request: StudioImageFilterWorkerRunRequest,
+    options?: Pick<StudioImageFilterWorkerClientOptions, "signal">,
+  ): Promise<StudioImageFilterWorkerClientResult>;
+  dispose(): void;
 }
 
 /** Vite statically discovers this exact URL pattern and emits an isolated module-worker chunk. */
@@ -81,6 +93,7 @@ function projectImageFilterFields(el: ImageFilterFields): ImageFilterFields {
     chromatic: finite(el.chromatic),
     posterize: finite(el.posterize),
     noise: finite(el.noise),
+    noiseSeed: finite(el.noiseSeed),
     saturation: finite(el.saturation),
     hue: finite(el.hue),
     temperature: finite(el.temperature),
@@ -118,6 +131,18 @@ function projectImageFilterFields(el: ImageFilterFields): ImageFilterFields {
     light: el.light,
     sketch: el.sketch,
     detail: el.detail,
+    exposureAdjustment: el.exposureAdjustment,
+    unsharpMask: el.unsharpMask,
+    morphology: el.morphology,
+    pixelOffset: el.pixelOffset,
+    convolution: el.convolution,
+    clouds: el.clouds,
+    // The persisted stack can carry disabled/corrupt entries. Send only one normalized ordered
+    // program across the clone boundary so the Worker cannot apply it twice.
+    smartFilters: undefined,
+    smartFilterOperations: el.smartFilterOperations !== undefined
+      ? normalizeStudioAdjustmentFilterOperations(el.smartFilterOperations)
+      : listEnabledStudioAdjustmentOperations(el.smartFilters),
   } satisfies ExhaustiveImageFilterFieldProjection;
 
   return projection;
@@ -292,4 +317,287 @@ export async function runStudioImageFilterWorker(
   }
   if (!worker) return runImageFilterDirect(cloneSafeRequest, options.signal);
   return runImageFilterWithWorker(worker, cloneSafeRequest, options.signal);
+}
+
+type StudioImageFilterSessionTask = {
+  request: StudioImageFilterWorkerRunRequest;
+  signal?: AbortSignal;
+  resolve(result: StudioImageFilterWorkerClientResult): void;
+  reject(error: unknown): void;
+  onAbort: () => void;
+  posted: boolean;
+  settled: boolean;
+};
+
+/**
+ * Reusable serial Worker session for interactive sliders. Protocol v1 has no request id, so one
+ * request is posted at a time while the same ready Worker remains alive across completed ticks.
+ * Pending ticks can be aborted without terminating the Worker; a bounded execution timeout still
+ * recovers from a genuinely wedged runtime.
+ */
+export function createStudioImageFilterWorkerSession(
+  options: Pick<StudioImageFilterWorkerClientOptions, "workerFactory"> = {},
+): StudioImageFilterWorkerSession {
+  const factory = options.workerFactory === undefined
+    ? createStudioImageFilterModuleWorker
+    : options.workerFactory;
+  const queue: StudioImageFilterSessionTask[] = [];
+  let current: StudioImageFilterSessionTask | null = null;
+  let worker: StudioImageFilterWorkerLike | null = null;
+  let ready = false;
+  let directOnly = factory === null;
+  let disposed = false;
+  let readyTimer: ReturnType<typeof setTimeout> | null = null;
+  let runTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const clearTimers = () => {
+    if (readyTimer !== null) clearTimeout(readyTimer);
+    if (runTimer !== null) clearTimeout(runTimer);
+    readyTimer = null;
+    runTimer = null;
+  };
+
+  const detachAbort = (task: StudioImageFilterSessionTask) => {
+    task.signal?.removeEventListener("abort", task.onAbort);
+  };
+
+  const settle = (
+    task: StudioImageFilterSessionTask,
+    callback: () => void,
+  ) => {
+    if (task.settled) return;
+    task.settled = true;
+    detachAbort(task);
+    callback();
+  };
+
+  const closeWorker = () => {
+    clearTimers();
+    if (worker) {
+      worker.onmessage = null;
+      worker.onerror = null;
+      worker.terminate();
+    }
+    worker = null;
+    ready = false;
+  };
+
+  const completeCurrent = (callback?: (task: StudioImageFilterSessionTask) => void) => {
+    const task = current;
+    if (!task) return;
+    if (runTimer !== null) clearTimeout(runTimer);
+    runTimer = null;
+    current = null;
+    callback?.(task);
+    queueMicrotask(pump);
+  };
+
+  const runCurrentDirect = () => {
+    completeCurrent((task) => {
+      if (task.settled) return;
+      try {
+        const result = runImageFilterDirect(task.request, task.signal);
+        settle(task, () => task.resolve(result));
+      } catch (error) {
+        settle(task, () => task.reject(error));
+      }
+    });
+  };
+
+  const switchToDirect = () => {
+    directOnly = true;
+    closeWorker();
+    if (current) runCurrentDirect();
+    else queueMicrotask(pump);
+  };
+
+  const postCurrent = () => {
+    const task = current;
+    if (!task || !worker || !ready || task.posted) return;
+    if (task.signal?.aborted) {
+      settle(task, () => task.reject(createAbortError()));
+      completeCurrent();
+      return;
+    }
+    const message: StudioImageFilterWorkerRunMessage = {
+      type: "studio-image-filter/run",
+      version: STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION,
+      request: task.request,
+    };
+    try {
+      task.posted = true;
+      worker.postMessage(message, studioImageFilterRequestTransfers(message));
+      runTimer = setTimeout(() => {
+        const timedOut = current;
+        if (!timedOut) return;
+        closeWorker();
+        completeCurrent((pending) => settle(
+          pending,
+          () => pending.reject(new Error("이미지 필터 Worker 계산 시간이 초과되었습니다.")),
+        ));
+      }, 30_000);
+    } catch {
+      task.posted = false;
+      switchToDirect();
+    }
+  };
+
+  const attachWorker = (nextWorker: StudioImageFilterWorkerLike) => {
+    worker = nextWorker;
+    ready = false;
+    worker.onmessage = (event) => {
+      const response = event.data;
+      if (
+        !response
+        || typeof response !== "object"
+        || response.version !== STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION
+      ) {
+        const invalid = current;
+        closeWorker();
+        completeCurrent((task) => settle(
+          task,
+          () => task.reject(new Error("이미지 필터 Worker가 알 수 없는 응답을 반환했습니다.")),
+        ));
+        if (!invalid) queueMicrotask(pump);
+        return;
+      }
+      if (response.type === "studio-image-filter/ready") {
+        if (ready) return;
+        if (readyTimer !== null) clearTimeout(readyTimer);
+        readyTimer = null;
+        ready = true;
+        postCurrent();
+        return;
+      }
+      const task = current;
+      if (!task?.posted) {
+        closeWorker();
+        completeCurrent((pending) => settle(
+          pending,
+          () => pending.reject(new Error("이미지 필터 Worker가 준비 전에 결과를 반환했습니다.")),
+        ));
+        return;
+      }
+      if (response.type === "studio-image-filter/failure") {
+        completeCurrent((pending) => settle(
+          pending,
+          () => pending.reject(deserializeWorkerError(response)),
+        ));
+        return;
+      }
+      if (response.type !== "studio-image-filter/success") {
+        completeCurrent((pending) => settle(
+          pending,
+          () => pending.reject(new Error("이미지 필터 Worker가 알 수 없는 응답을 반환했습니다.")),
+        ));
+        return;
+      }
+      try {
+        assertStudioImageFilterImageData(response.imageData, "이미지 필터 Worker 결과");
+      } catch (error) {
+        closeWorker();
+        completeCurrent((pending) => settle(pending, () => pending.reject(error)));
+        return;
+      }
+      completeCurrent((pending) => settle(
+        pending,
+        () => pending.resolve({ execution: "worker", imageData: response.imageData }),
+      ));
+    };
+    worker.onerror = (event) => {
+      event.preventDefault?.();
+      const task = current;
+      const wasPosted = task?.posted === true;
+      const error = event.error instanceof Error
+        ? event.error
+        : new Error(event.message || "이미지 필터 Worker 실행 중 오류가 발생했습니다.");
+      closeWorker();
+      if (!wasPosted) {
+        directOnly = true;
+        if (current) runCurrentDirect();
+        else queueMicrotask(pump);
+        return;
+      }
+      completeCurrent((pending) => settle(pending, () => pending.reject(error)));
+    };
+    readyTimer = setTimeout(switchToDirect, 3_000);
+  };
+
+  const ensureWorker = () => {
+    if (directOnly || worker || disposed || !factory) return;
+    try {
+      const nextWorker = factory();
+      if (!nextWorker) {
+        directOnly = true;
+        queueMicrotask(pump);
+        return;
+      }
+      attachWorker(nextWorker);
+    } catch {
+      directOnly = true;
+      queueMicrotask(pump);
+    }
+  };
+
+  function pump(): void {
+    if (disposed || current) return;
+    while (queue.length > 0) {
+      const task = queue.shift()!;
+      if (task.settled || task.signal?.aborted) {
+        settle(task, () => task.reject(createAbortError()));
+        continue;
+      }
+      current = task;
+      break;
+    }
+    if (!current) return;
+    if (directOnly) {
+      runCurrentDirect();
+      return;
+    }
+    ensureWorker();
+    if (ready) postCurrent();
+  }
+
+  return {
+    run(request, runOptions = {}) {
+      if (disposed) return Promise.reject(createAbortError());
+      let cloneSafeRequest: StudioImageFilterWorkerRunRequest;
+      try {
+        throwIfAborted(runOptions.signal);
+        cloneSafeRequest = cloneSafeWorkerRequest(request);
+      } catch (error) {
+        return Promise.reject(error);
+      }
+      return new Promise((resolve, reject) => {
+        const task = {
+          request: cloneSafeRequest,
+          signal: runOptions.signal,
+          resolve,
+          reject,
+          posted: false,
+          settled: false,
+          onAbort: () => {
+            settle(task, () => reject(createAbortError()));
+            if (current !== task) queueMicrotask(pump);
+          },
+        } satisfies StudioImageFilterSessionTask;
+        task.signal?.addEventListener("abort", task.onAbort, { once: true });
+        queue.push(task);
+        pump();
+      });
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      closeWorker();
+      if (current) {
+        settle(current, () => current?.reject(createAbortError()));
+        current = null;
+      }
+      for (const task of queue.splice(0)) {
+        settle(task, () => task.reject(createAbortError()));
+      }
+    },
+  };
 }

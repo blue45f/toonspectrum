@@ -69,8 +69,14 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     const start = page.indexOf("function onStageDown");
     const end = page.indexOf("// 복구 브러시/도장 호버 커서", start);
     const onStageDown = page.slice(start, end);
+    const pointCommentStart = page.indexOf("function handleStudioPointCommentStageDown");
+    const pointCommentHandler = page.slice(pointCommentStart, start);
 
     expect(page).toContain('from "./studio-draw-pointer-start-plan"');
+    expect(onStageDown).toContain(
+      "if (handleStudioPointCommentStageDown(e, stagePointerEvent)) return;"
+    );
+    expect(onStageDown).not.toContain("setPointCommentComposer({");
     expect(onStageDown).toContain("planStudioDrawPointerStart({");
     expect(onStageDown).toContain("id: uid()");
     expect(onStageDown).toContain("pointer: pointerSample");
@@ -79,6 +85,20 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     expect(onStageDown).not.toContain("const common = {");
     expect(onStageDown).not.toContain("const next: DrawEl =");
     expect(onStageDown.split("\n").length).toBeLessThanOrEqual(780);
+
+    expectTokenOrder(pointCommentHandler, [
+      "if (pointCommentComposer) return true",
+      "if (!commentPinArmed) return false",
+      "if (canvasInteractionBlocked)",
+      "stagePointerEvent.isPrimary === false",
+      "setCommentPinArmed(false)",
+      'type: "point" as const',
+      "x: Math.min(1, Math.max(0, pos.x / CANVAS_W))",
+      "y: Math.min(1, Math.max(0, pos.y / canvasH))",
+      "getClientPointFromKonvaEvent(e.evt)",
+      'commentId: createStudioCommentMessageId("comment")',
+      "screenPoint: clientPoint",
+    ]);
 
     expectTokenOrder(onStageDown, [
       "if (!studioCrdtDocumentRef.current && !beginLiveResourceEdit()) return",

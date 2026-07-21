@@ -10,6 +10,7 @@ import {
   STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
   STUDIO_WORK_ASSET_MAX_BYTES_BY_TYPE,
   STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
+  StudioWorkAssetSmartFiltersSchema,
   studioWorkAssetSourceUri,
   type StudioWorkAssetDescriptor,
   type StudioWorkAssetManifest,
@@ -220,19 +221,38 @@ export function createStudioWorkAssetInitialImageDescriptor(
     type: "image",
   };
   for (const key of STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS) {
+    if (key === "smartFilters") continue;
     const value = element[key];
     if (value !== undefined) descriptorElement[key] = value;
   }
   if (typeof element.name === "string") descriptorElement.name = element.name;
-  // The shared parser is the final exact/bounded authority. In particular, src, frames, masks,
-  // nested filter programs and any caller prototype data can never enter the upload descriptor.
-  return parseStudioWorkAssetDescriptor({
+  // Validate placement/scalar fields independently so they remain fail-closed. Smart filters are
+  // optional reference metadata: only the explicit schema's normalized clone may enter the
+  // descriptor, and an invalid/legacy or descriptor-budget-breaking program is safely omitted.
+  const baseDescriptor = parseStudioWorkAssetDescriptor({
     version: 1,
     element: descriptorElement,
   }, {
     assetId: element.id,
     elementType: "image",
   });
+  const smartFilters = StudioWorkAssetSmartFiltersSchema.safeParse(element.smartFilters);
+  if (!smartFilters.success) return baseDescriptor;
+
+  try {
+    return parseStudioWorkAssetDescriptor({
+      version: 1,
+      element: {
+        ...baseDescriptor.element,
+        smartFilters: smartFilters.data,
+      },
+    }, {
+      assetId: element.id,
+      elementType: "image",
+    });
+  } catch {
+    return baseDescriptor;
+  }
 }
 
 function candidateKey(scopeKey: string, candidate: Pick<AdmissionCandidate, "assetId" | "source">): string {

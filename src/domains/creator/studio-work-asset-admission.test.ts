@@ -113,7 +113,7 @@ describe("studio work asset admission", () => {
     coordinator.dispose();
   });
 
-  it("builds an immutable bounded descriptor without source bytes or nested filter programs", () => {
+  it("builds an immutable bounded descriptor without source bytes or unvalidated filter programs", () => {
     const descriptor = createStudioWorkAssetInitialImageDescriptor(image(
       "image-1",
       "data:image/png;base64,private"
@@ -136,6 +136,40 @@ describe("studio work asset admission", () => {
     expect(descriptor.element).not.toHaveProperty("src");
     expect(descriptor.element).not.toHaveProperty("smartFilters");
     expect(JSON.stringify(descriptor)).not.toContain("base64");
+  });
+
+  it("includes only a normalized bounded smart-filter snapshot", () => {
+    const smartFilters = {
+      version: 1 as const,
+      entries: [{
+        id: "tone-1",
+        engine: "brightness-contrast" as const,
+        enabled: true,
+        params: { brightness: 0.2 },
+      }],
+    };
+    const descriptor = createStudioWorkAssetInitialImageDescriptor({
+      ...image("image-1", "blob:local"),
+      smartFilters,
+    });
+
+    expect(descriptor.element.smartFilters).toEqual(smartFilters);
+    smartFilters.entries[0]!.params.brightness = 0.7;
+    expect(descriptor.element.smartFilters?.entries[0]?.params.brightness).toBe(0.2);
+
+    const overBudget = createStudioWorkAssetInitialImageDescriptor({
+      ...image("image-2", "blob:local"),
+      smartFilters: {
+        version: 1,
+        entries: Array.from({ length: 24 }, (_, index) => ({
+          id: `filter-${index}`,
+          engine: "custom-convolution",
+          enabled: true,
+          params: { payload: "x".repeat(128) },
+        })),
+      },
+    });
+    expect(overBudget.element).not.toHaveProperty("smartFilters");
   });
 
   it("never fetches arbitrary URLs and rejects over-budget Content-Length before allocation", async () => {

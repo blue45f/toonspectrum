@@ -21,6 +21,7 @@ import {
 } from "./studio-brush-tip-stamp";
 
 import type { StudioBrushCatalogSelection } from "./studio-brush-selection";
+import type { StudioBrushTipLayerSettings } from "./studio-brush-tip-composition";
 import type { StudioBrushPreviewStyle } from "./studio-brush-visual";
 import type { StudioBrushMediaGroup } from "./studio-creative-ux";
 
@@ -381,6 +382,113 @@ function angleMappings(flags: number): readonly StudioBrushDynamicsMappingSettin
   return [{ source: "direction", mode: "add", from: 0, to: 360 }];
 }
 
+function colorDynamicsFor(
+  descriptor: StudioBrushPackDescriptor,
+  index: number
+): StudioBrushDynamicsSettings["colorDynamics"] {
+  if (descriptor.category === "foliage") {
+    return {
+      hueJitter: 5 + (index % 4) * 1.5,
+      saturationJitter: 0.035 + (index % 3) * 0.015,
+      valueJitter: 0.055 + (index % 4) * 0.012,
+    };
+  }
+  if (descriptor.category === "pattern" || descriptor.category === "stamp") {
+    return {
+      hueJitter: 2 + (index % 3),
+      saturationJitter: 0.02,
+      valueJitter: 0.035 + (index % 3) * 0.012,
+    };
+  }
+  if (descriptor.category === "paint" || descriptor.category === "marker") {
+    return { valueJitter: 0.018 + (index % 4) * 0.009 };
+  }
+  return undefined;
+}
+
+function grainFor(
+  descriptor: StudioBrushPackDescriptor,
+  index: number
+): StudioBrushDynamicsSettings["grain"] {
+  const textured = descriptor.category === "sketch"
+    || descriptor.category === "chalk"
+    || descriptor.category === "texture"
+    || descriptor.category === "rake";
+  if (!textured) return undefined;
+  return {
+    space: index % 2 === 0 ? "canvas-fixed" : "stroke-fixed",
+    amount: descriptor.category === "texture"
+      ? 0.34 + (index % 4) * 0.055
+      : 0.2 + (index % 4) * 0.045,
+    scale: 2.5 + (index % 7) * 1.15,
+    contrast: 0.38 + (index % 5) * 0.09,
+    seed: (0x6d2b_79f5 + Math.imul(index + 3, 0x85eb_ca6b)) >>> 0,
+  };
+}
+
+function tipLayersFor(
+  descriptor: StudioBrushPackDescriptor,
+  motif: StudioBrushPackTipMotif,
+  index: number
+): readonly StudioBrushTipLayerSettings[] | undefined {
+  if (descriptor.category === "rake") {
+    return [
+      {
+        tip: materializeStudioBrushPackTipSettings(motif, index + 101, 0.12),
+        scale: 0.78,
+        opacity: 0.62,
+        offsetY: -0.48,
+        angle: -3,
+        roundness: 0.82,
+      },
+      {
+        tip: materializeStudioBrushPackTipSettings(motif, index + 211, 0.16),
+        scale: 0.64,
+        opacity: 0.46,
+        offsetY: 0.5,
+        angle: 4,
+        roundness: 0.7,
+      },
+    ];
+  }
+  if (descriptor.category === "foliage") {
+    return [
+      {
+        tip: materializeStudioBrushPackTipSettings("leaf", index + 79, 0.1),
+        scale: 0.7,
+        opacity: 0.68,
+        offsetX: 0.4,
+        offsetY: -0.32,
+        angle: 24,
+        roundness: 0.72,
+      },
+      {
+        tip: materializeStudioBrushPackTipSettings("round", index, 0.18),
+        scale: 0.3,
+        opacity: 0.42,
+        offsetX: -0.42,
+        offsetY: 0.28,
+        angle: -18,
+        roundness: 0.8,
+      },
+    ];
+  }
+  if (
+    descriptor.category === "pattern"
+    && (motif === "oval-stack" || motif === "stripe" || motif === "checker")
+  ) {
+    return [{
+      tip: materializeStudioBrushPackTipSettings(motif, index + 53, 0.14),
+      scale: 0.62,
+      opacity: 0.58,
+      offsetY: 0.52,
+      angle: 12,
+      roundness: 0.78,
+    }];
+  }
+  return undefined;
+}
+
 /** Expand one compact catalogue row into a detached, finite, renderer-ready settings snapshot. */
 export function materializeStudioBrushPackDynamics(
   value: unknown
@@ -421,6 +529,9 @@ export function materializeStudioBrushPackDynamics(
     fallbackPressure: 0.48 + (index % 5) * 0.025,
     maxSpeed: 1.2 + (index % 7) * 0.14,
     tip: materializeStudioBrushPackTipSettings(motif, index, profileSoftness(descriptor, index)),
+    colorDynamics: colorDynamicsFor(descriptor, index),
+    grain: grainFor(descriptor, index),
+    tipLayers: tipLayersFor(descriptor, motif, index),
     taper: {
       ...base.taper,
       enabled: (flags & TAPER) !== 0,

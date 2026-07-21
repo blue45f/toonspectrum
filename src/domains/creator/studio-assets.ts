@@ -47,12 +47,34 @@ function grid(cols: number, rows: number, canvasH: number): FrameSpec[] {
   });
 }
 
+function columns(count: number, canvasH: number): FrameSpec[] {
+  const width = (CANVAS_W - M * (count + 1)) / count;
+  return Array.from({ length: count }, (_, index) => ({
+    x: M + index * (width + M),
+    y: M,
+    width,
+    height: canvasH - M * 2,
+  }));
+}
+
+function insetFrame(canvasH: number, inset = M): FrameSpec[] {
+  return [{
+    x: inset,
+    y: inset,
+    width: CANVAS_W - inset * 2,
+    height: canvasH - inset * 2,
+  }];
+}
+
 export const TEMPLATES: TemplateSpec[] = [
   { id: "blank", label: "빈 캔버스", hint: "처음부터 자유롭게", canvasH: 1080, frames: [] },
+  { id: "webtoon2", label: "세로 웹툰 · 2컷", hint: "짧은 장면 전환", canvasH: 1280, frames: stack(2, 1280) },
   { id: "webtoon3", label: "세로 웹툰 · 3컷", hint: "스크롤 웹툰 기본", canvasH: 1620, frames: stack(3, 1620) },
   { id: "webtoon4", label: "세로 웹툰 · 4컷", hint: "긴 호흡", canvasH: 1920, frames: stack(4, 1920) },
   { id: "webtoon5", label: "세로 웹툰 · 5컷", hint: "긴 스크롤", canvasH: 2400, frames: stack(5, 2400) },
   { id: "webtoon6", label: "세로 웹툰 · 6컷", hint: "연재형 구성", canvasH: 2880, frames: stack(6, 2880) },
+  { id: "webtoon7", label: "세로 웹툰 · 7컷", hint: "대화와 리액션", canvasH: 3240, frames: stack(7, 3240) },
+  { id: "webtoon8", label: "세로 웹툰 · 8컷", hint: "긴 에피소드", canvasH: 3600, frames: stack(8, 3600) },
   { id: "strip4", label: "4컷 만화", hint: "기승전결", canvasH: 1680, frames: stack(4, 1680) },
   {
     id: "grid4",
@@ -73,14 +95,88 @@ export const TEMPLATES: TemplateSpec[] = [
   },
   { id: "grid6", label: "6컷 그리드(2x3)", hint: "2열 3행", canvasH: 1440, frames: grid(2, 3, 1440) },
   { id: "grid8", label: "8컷(2x4)", hint: "2열 4행", canvasH: 1680, frames: grid(2, 4, 1680) },
+  { id: "grid9", label: "9컷 그리드", hint: "3열 3행", canvasH: 1080, frames: grid(3, 3, 1080) },
+  { id: "grid12", label: "12컷 콘택트 시트", hint: "3열 4행", canvasH: 1440, frames: grid(3, 4, 1440) },
+  { id: "storyboard3", label: "스토리보드 · 3장면", hint: "가로 시퀀스", canvasH: 720, frames: columns(3, 720) },
+  { id: "storyboard6", label: "스토리보드 · 6장면", hint: "3열 2행", canvasH: 960, frames: grid(3, 2, 960) },
+  {
+    id: "dynamic-hero-top",
+    label: "히어로 상단 · 3컷",
+    hint: "큰 도입 + 리액션",
+    canvasH: 1200,
+    frames: [
+      { x: M, y: M, width: CANVAS_W - M * 2, height: 700 },
+      { x: M, y: 748, width: (CANVAS_W - M * 3) / 2, height: 428 },
+      { x: M * 2 + (CANVAS_W - M * 3) / 2, y: 748, width: (CANVAS_W - M * 3) / 2, height: 428 },
+    ],
+  },
+  {
+    id: "dynamic-hero-left",
+    label: "히어로 좌측 · 3컷",
+    hint: "인물 강조 구성",
+    canvasH: 1080,
+    frames: [
+      { x: M, y: M, width: 420, height: 1032 },
+      { x: 468, y: M, width: 228, height: 504 },
+      { x: 468, y: 552, width: 228, height: 504 },
+    ],
+  },
+  {
+    id: "dynamic-hero-right",
+    label: "히어로 우측 · 3컷",
+    hint: "대상 강조 구성",
+    canvasH: 1080,
+    frames: [
+      { x: M, y: M, width: 228, height: 504 },
+      { x: M, y: 552, width: 228, height: 504 },
+      { x: 276, y: M, width: 420, height: 1032 },
+    ],
+  },
+  {
+    id: "dynamic-manga-five",
+    label: "만화 리듬 · 5컷",
+    hint: "강약이 다른 컷",
+    canvasH: 1440,
+    frames: [
+      { x: M, y: M, width: CANVAS_W - M * 2, height: 520 },
+      { x: M, y: 568, width: 250, height: 380 },
+      { x: 298, y: 568, width: 398, height: 380 },
+      { x: M, y: 972, width: 398, height: 444 },
+      { x: 446, y: 972, width: 250, height: 444 },
+    ],
+  },
+  {
+    id: "dynamic-dialogue",
+    label: "대화 장면 · 3컷",
+    hint: "투샷 + 표정 교차",
+    canvasH: 1320,
+    frames: [
+      { x: M, y: M, width: CANVAS_W - M * 2, height: 610 },
+      { x: M, y: 658, width: (CANVAS_W - M * 3) / 2, height: 638 },
+      { x: M * 2 + (CANVAS_W - M * 3) / 2, y: 658, width: (CANVAS_W - M * 3) / 2, height: 638 },
+    ],
+  },
+  { id: "cover-square", label: "정사각 커버", hint: "썸네일·SNS", canvasH: 720, frames: insetFrame(720, 36) },
+  { id: "cover-poster", label: "세로 포스터", hint: "표지·키비주얼", canvasH: 1080, frames: insetFrame(1080, 42) },
+  { id: "cover-story", label: "스토리 커버", hint: "긴 세로 프로모션", canvasH: 1280, frames: insetFrame(1280, 36) },
   { id: "single", label: "한 컷", hint: "일러스트·표지", canvasH: 900, frames: stack(1, 900) },
 ];
 
 // 템플릿을 유형별로 묶어 메뉴에서 일관된 우선순위로 보여준다.
-export const TEMPLATE_GROUP_ORDER = ["세로 웹툰", "컷만화·그리드", "기본"] as const;
+export const TEMPLATE_GROUP_ORDER = [
+  "세로 웹툰",
+  "컷만화·그리드",
+  "다이내믹 컷",
+  "스토리보드",
+  "커버·소셜",
+  "기본",
+] as const;
 function templateGroupOf(id: string): string {
   if (id.startsWith("webtoon")) return "세로 웹툰";
   if (id === "strip4" || id.startsWith("grid")) return "컷만화·그리드";
+  if (id.startsWith("dynamic")) return "다이내믹 컷";
+  if (id.startsWith("storyboard")) return "스토리보드";
+  if (id.startsWith("cover")) return "커버·소셜";
   return "기본"; // blank, single
 }
 export function groupTemplates(templates: TemplateSpec[]): { group: string; templates: TemplateSpec[] }[] {

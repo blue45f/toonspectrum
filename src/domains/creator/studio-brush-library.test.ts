@@ -92,6 +92,32 @@ describe("sanitizeBrushSnapshot", () => {
     expect(adjustedFields).toEqual([]);
   });
 
+  it("2차 색상·고정 그레인·멀티 팁 계약을 JSON 저장 왕복 후 보존한다", () => {
+    const brushDynamics = normalizeStudioBrushDynamicsSettings({
+      ...studioBrushDynamicsPresetSettings("dry-media"),
+      colorDynamics: {
+        backgroundColor: "#f4c95d",
+        foregroundBackgroundMix: 0.18,
+        hueJitter: 14,
+        saturationJitter: 0.1,
+        valueJitter: 0.08,
+      },
+      grain: { space: "stroke-fixed", amount: 0.42, scale: 6, contrast: 0.7, seed: 73 },
+      tipLayers: [
+        { tip: { shape: "bristle" }, scale: 0.72, opacity: 0.6, offsetY: -0.4 },
+        { tip: { shape: "grain" }, scale: 0.45, opacity: 0.4, offsetY: 0.5 },
+      ],
+    });
+    const input = JSON.parse(JSON.stringify({ ...validSnapshot, brushDynamics }));
+    const result = sanitizeBrushSnapshot(input);
+
+    expect(result.adjustedFields).toEqual([]);
+    expect(result.snapshot.brushDynamics).toEqual(brushDynamics);
+    expect(result.snapshot.brushDynamics.colorDynamics.backgroundColor).toBe("#f4c95d");
+    expect(result.snapshot.brushDynamics.grain.space).toBe("stroke-fixed");
+    expect(result.snapshot.brushDynamics.tipLayers).toHaveLength(2);
+  });
+
   it("출처 프리셋 메타데이터를 trim하고 코드포인트 기준 상한으로 제한한다", () => {
     const { snapshot, adjustedFields } = sanitizeBrushSnapshot({
       ...validSnapshot,
@@ -319,6 +345,9 @@ describe("sanitizeBrushSnapshot", () => {
 
   it("키 순서가 달라도 이미 정규화된 동역학은 보정된 것으로 표시하지 않는다", () => {
     const reordered = {
+      tipLayers: validSnapshot.brushDynamics.tipLayers,
+      grain: validSnapshot.brushDynamics.grain,
+      colorDynamics: validSnapshot.brushDynamics.colorDynamics,
       tip: validSnapshot.brushDynamics.tip,
       taper: validSnapshot.brushDynamics.taper,
       roundness: validSnapshot.brushDynamics.roundness,
@@ -338,6 +367,23 @@ describe("sanitizeBrushSnapshot", () => {
     const { snapshot, adjustedFields } = sanitizeBrushSnapshot({ ...validSnapshot, brushDynamics: reordered });
     expect(snapshot.brushDynamics).toEqual(validSnapshot.brushDynamics);
     expect(adjustedFields).toEqual([]);
+  });
+
+  it("2차 재질 키가 없는 기존 v1 브러시는 보정 경고 없이 identity 기본값으로 승격한다", () => {
+    const legacyDynamics = Object.fromEntries(
+      Object.entries(validSnapshot.brushDynamics).filter(([key]) => (
+        key !== "colorDynamics" && key !== "grain" && key !== "tipLayers"
+      ))
+    );
+    const { snapshot, adjustedFields } = sanitizeBrushSnapshot({
+      ...validSnapshot,
+      brushDynamics: JSON.parse(JSON.stringify(legacyDynamics)),
+    });
+
+    expect(adjustedFields).toEqual([]);
+    expect(snapshot.brushDynamics.colorDynamics).toEqual(validSnapshot.brushDynamics.colorDynamics);
+    expect(snapshot.brushDynamics.grain).toEqual(validSnapshot.brushDynamics.grain);
+    expect(snapshot.brushDynamics.tipLayers).toEqual([]);
   });
 
   it("무관한 필드에 순환 참조가 있어도 던지거나 멈추지 않는다(필드별 단순 읽기만 하므로 재귀 순회 없음)", () => {

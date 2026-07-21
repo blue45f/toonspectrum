@@ -15,6 +15,19 @@
  */
 
 import {
+  normalizeStudioBrushColorDynamicsSettings,
+  normalizeStudioBrushGrainSettings,
+  type NormalizedStudioBrushColorDynamicsSettings,
+  type NormalizedStudioBrushGrainSettings,
+  type StudioBrushColorDynamicsSettings,
+  type StudioBrushGrainSettings,
+} from "./studio-brush-material-dynamics";
+import {
+  normalizeStudioBrushTipLayers,
+  type NormalizedStudioBrushTipLayerSettings,
+  type StudioBrushTipLayerSettings,
+} from "./studio-brush-tip-composition";
+import {
   normalizeStudioBrushTipSettings,
   type NormalizedStudioBrushTipSettings,
   type StudioBrushTipSettings,
@@ -136,6 +149,12 @@ export interface StudioBrushDynamicsSettings {
   taper?: StudioBrushTaperSettings | null;
   /** PNG-alpha tip stamp shape (procedural or custom alpha map). */
   tip?: StudioBrushTipSettings | null;
+  /** Deterministic foreground/background and HSV colour variation. */
+  colorDynamics?: StudioBrushColorDynamicsSettings | null;
+  /** Document-space texture pinned either to the canvas or to the stroke origin. */
+  grain?: StudioBrushGrainSettings | null;
+  /** Up to two extra transformed tips; the legacy `tip` remains the primary. */
+  tipLayers?: readonly StudioBrushTipLayerSettings[] | null;
   width?: StudioBrushDynamicsPropertySettings;
   size?: StudioBrushDynamicsPropertySettings;
   opacity?: StudioBrushDynamicsPropertySettings;
@@ -213,6 +232,9 @@ export interface NormalizedStudioBrushDynamicsSettings {
   scatterRatio: number | null;
   taper: NormalizedStudioBrushTaperSettings;
   tip: NormalizedStudioBrushTipSettings;
+  colorDynamics: NormalizedStudioBrushColorDynamicsSettings;
+  grain: NormalizedStudioBrushGrainSettings;
+  tipLayers: readonly NormalizedStudioBrushTipLayerSettings[];
   width: NormalizedStudioBrushDynamicsProperty;
   opacity: NormalizedStudioBrushDynamicsProperty;
   flow: NormalizedStudioBrushDynamicsProperty;
@@ -358,6 +380,9 @@ const INTERNAL_DEFAULT_SETTINGS: NormalizedStudioBrushDynamicsSettings = {
   scatterRatio: null,
   taper: { ...INTERNAL_DEFAULT_TAPER },
   tip: normalizeStudioBrushTipSettings(),
+  colorDynamics: normalizeStudioBrushColorDynamicsSettings(),
+  grain: normalizeStudioBrushGrainSettings(),
+  tipLayers: [],
   width: {
     base: 6,
     min: STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS.width.min,
@@ -562,6 +587,12 @@ function cloneTip(tip: NormalizedStudioBrushTipSettings): NormalizedStudioBrushT
   return { ...tip };
 }
 
+function cloneTipLayers(
+  layers: readonly NormalizedStudioBrushTipLayerSettings[]
+): readonly NormalizedStudioBrushTipLayerSettings[] {
+  return layers.map((layer) => ({ ...layer, tip: cloneTip(layer.tip) }));
+}
+
 function cloneNormalizedSettings(
   settings: NormalizedStudioBrushDynamicsSettings
 ): NormalizedStudioBrushDynamicsSettings {
@@ -574,6 +605,9 @@ function cloneNormalizedSettings(
     scatterRatio: settings.scatterRatio,
     taper: cloneTaper(settings.taper),
     tip: cloneTip(settings.tip),
+    colorDynamics: { ...settings.colorDynamics },
+    grain: { ...settings.grain },
+    tipLayers: cloneTipLayers(settings.tipLayers),
     width: cloneProperty(settings.width),
     opacity: cloneProperty(settings.opacity),
     flow: cloneProperty(settings.flow),
@@ -760,6 +794,7 @@ export function normalizeStudioBrushDynamicsSettings(value?: unknown): Normalize
   );
   const spacing = normalizeProperty(source.spacing, INTERNAL_DEFAULT_SETTINGS.spacing, "spacing");
   const scatter = normalizeProperty(source.scatter, INTERNAL_DEFAULT_SETTINGS.scatter, "scatter");
+  const tip = normalizeStudioBrushTipSettings(source.tip);
   return {
     version: STUDIO_BRUSH_DYNAMICS_SETTINGS_VERSION,
     seed: uint32(source.seed, INTERNAL_DEFAULT_SETTINGS.seed),
@@ -768,7 +803,10 @@ export function normalizeStudioBrushDynamicsSettings(value?: unknown): Normalize
     spacingRatio,
     scatterRatio,
     taper: normalizeTaper(source.taper),
-    tip: normalizeStudioBrushTipSettings(source.tip),
+    tip,
+    colorDynamics: normalizeStudioBrushColorDynamicsSettings(source.colorDynamics),
+    grain: normalizeStudioBrushGrainSettings(source.grain),
+    tipLayers: normalizeStudioBrushTipLayers(source.tipLayers, tip),
     width,
     opacity: normalizeProperty(source.opacity, INTERNAL_DEFAULT_SETTINGS.opacity, "opacity"),
     flow: normalizeProperty(source.flow, INTERNAL_DEFAULT_SETTINGS.flow, "flow"),
@@ -1034,6 +1072,8 @@ function mergeStudioBrushDynamicsVariant(
     ...overrides,
     taper: { ...base.taper, ...overrides.taper },
     tip: { ...base.tip, ...overrides.tip },
+    colorDynamics: { ...base.colorDynamics, ...overrides.colorDynamics },
+    grain: { ...base.grain, ...overrides.grain },
     width: mergeProperty(base.width, overrides.width ?? overrides.size),
     opacity: mergeProperty(base.opacity, overrides.opacity),
     flow: mergeProperty(base.flow, overrides.flow),
@@ -1417,6 +1457,9 @@ function settingsForPlan(input: Partial<StudioDynamicBrushPlanInput>): Normalize
     seed: uint32(input.seed, settings.seed),
     taper: cloneTaper(settings.taper),
     tip: cloneTip(settings.tip),
+    colorDynamics: { ...settings.colorDynamics },
+    grain: { ...settings.grain },
+    tipLayers: cloneTipLayers(settings.tipLayers),
     width: { ...settings.width, base: width },
     opacity: { ...settings.opacity, base: opacity },
     spacing: { ...settings.spacing, base: spacing },

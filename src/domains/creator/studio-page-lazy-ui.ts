@@ -46,6 +46,18 @@ const StudioRemoteCursorOverlay = lazyRetry(
   () => import("./StudioLiveCanvasOverlay").then((mod) => ({ default: mod.StudioRemoteCursorOverlay })),
   "StudioRemoteCursorOverlay"
 );
+const studioPointCommentComposerLoader = createStudioIntentLazyLoader(() =>
+  import("./StudioPointCommentComposer").then((mod) => ({
+    default: mod.StudioPointCommentComposer,
+  }))
+);
+const StudioPointCommentComposer = lazyRetry(
+  studioPointCommentComposerLoader.load,
+  "StudioPointCommentComposer"
+);
+function preloadStudioPointCommentComposer(): void {
+  studioPointCommentComposerLoader.preload();
+}
 const StudioPageGradePanel = lazyRetry(
   () => import("./StudioPageGradePanel").then((mod) => ({ default: mod.StudioPageGradePanel })),
   "StudioPageGradePanel"
@@ -746,6 +758,7 @@ export {
   StudioRasterCrdtSurface,
   StudioReferencePanel,
   StudioRemoteCursorOverlay,
+  StudioPointCommentComposer,
   StudioScenarioAutoLayoutPanel,
   StudioScrollPreviewPanel,
   StudioSelectOptionsBar,
@@ -784,6 +797,7 @@ export {
   preloadStudioExportMenuPanel,
   preloadStudioIntegrationsSettingsPanel,
   preloadStudioPaletteLibraryPanel,
+  preloadStudioPointCommentComposer,
   preloadStudioReferencePanel,
   preloadStudioStockImagePanel,
   preloadStudioTextEditOverlay,

@@ -6,6 +6,7 @@ import {
   studioBrushDynamicsPresetSettings,
   type StudioBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
+import { STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET } from "./studio-brush-render-budget";
 import { studioBrushTipAlphaMapToBase64 } from "./studio-brush-tip-stamp";
 import { bubblePathData, doubleBubblePathData } from "./studio-bubble-path";
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
@@ -877,6 +878,69 @@ describe("도형 직렬화", () => {
     expect(first).toContain('fill="#221100"');
   });
 
+  it("2차 브러시 재질 — 색상 변화·고정 그레인·멀티 팁을 같은 결정적 SVG 마크로 내보낸다", () => {
+    const base = studioBrushDynamicsPresetSettings("ink-particle");
+    const phaseTwo = normalizeStudioBrushDynamicsSettings({
+      ...base,
+      taper: { enabled: false },
+      tip: { shape: "round", softness: 0.1 },
+      colorDynamics: {
+        hueJitter: 70,
+        saturationJitter: 0.2,
+        valueJitter: 0.12,
+      },
+      grain: {
+        space: "stroke-fixed",
+        amount: 0.68,
+        scale: 4.5,
+        contrast: 0.72,
+        seed: 57,
+      },
+      tipLayers: [
+        { tip: { shape: "star", softness: 0.15 }, scale: 0.58, opacity: 0.65, offsetY: -0.5 },
+        { tip: { shape: "grain", softness: 0.2 }, scale: 0.38, opacity: 0.45, offsetY: 0.55 },
+      ],
+      spacingRatio: null,
+      spacing: { base: 9, mappings: [] },
+      scatterRatio: null,
+      scatter: { base: 0, mappings: [] },
+    });
+    const stroke = rectEl({
+      id: "phase-two-svg",
+      kind: "freehand",
+      brush: "ink-particle",
+      points: [10, 20, 55, 22],
+      pressures: [0.7, 0.7],
+      stroke: "#356dcc",
+      strokeWidth: 12,
+      brushDynamics: phaseTwo,
+    });
+    const singleTip = {
+      ...stroke,
+      brushDynamics: normalizeStudioBrushDynamicsSettings({ ...phaseTwo, tipLayers: [] }),
+    };
+    const first = exportPageToSvg(page([stroke])).svg;
+    const replay = exportPageToSvg(page([JSON.parse(JSON.stringify(stroke))])).svg;
+    const single = exportPageToSvg(page([singleTip])).svg;
+    const fills = new Set(Array.from(
+      first.matchAll(/<(?:circle|ellipse) [^>]*fill="(#[0-9a-f]{6})"/g),
+      (match) => match[1]
+    ));
+    const opacities = new Set(Array.from(
+      first.matchAll(/<(?:circle|ellipse) [^>]*opacity="([0-9.]+)"/g),
+      (match) => match[1]
+    ));
+
+    expect(first).toBe(replay);
+    // Grain makes even the legacy solid round primary use the world-sampled circle path.
+    expect(first).not.toContain("<ellipse ");
+    expect(fills.size).toBeGreaterThan(2);
+    expect(opacities.size).toBeGreaterThan(5);
+    expect((first.match(/<circle /g) ?? []).length).toBeGreaterThan(
+      (single.match(/<circle /g) ?? []).length * 1.5
+    );
+  });
+
   it("입자 브러시 세로 대칭 — 원본 dab의 산포와 타원 축을 다시 추첨하지 않고 정확히 반사한다", () => {
     const dynamic = rectEl({
       id: "dynamic-vertical-affine",
@@ -1100,6 +1164,44 @@ describe("도형 직렬화", () => {
     const { svg } = exportPageToSvg(page([sym]));
     expect((svg.match(/<rect x="/g) ?? []).length).toBe(2);
     expect(svg).toContain('<rect x="610"'); // 360*2-110 = 610 (미러된 박스 왼쪽)
+  });
+
+  it("손상 문서의 극단 radialCount도 방사 32개·만화경 64개로 제한한다", () => {
+    const radial = exportPageToSvg(page([rectEl({
+      symmetry: { type: "radial", centerX: 360, centerY: 500, radialCount: 1_000_000_000 },
+    })])).svg;
+    const kaleidoscope = exportPageToSvg(page([rectEl({
+      symmetry: { type: "kaleidoscope", centerX: 360, centerY: 500, radialCount: 1_000_000_000 },
+    })])).svg;
+
+    expect((radial.match(/<rect x=/g) ?? []).length).toBe(32);
+    expect((kaleidoscope.match(/<rect x=/g) ?? []).length).toBe(64);
+  });
+
+  it("텍스처 동적 브러시 SVG도 대칭 복사까지 합쳐 공용 committed mark 예산을 넘지 않는다", () => {
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      ...studioBrushDynamicsPresetSettings("ink-particle"),
+      spacing: { base: 0.5, mappings: [] },
+      tip: { shape: "grain", softness: 0.2 },
+    });
+    const result = exportPageToSvg(page([rectEl({
+      id: "bounded-dynamic-svg",
+      kind: "freehand",
+      brush: "ink-particle",
+      points: [0, 0, 100_000, 0],
+      strokeWidth: 12,
+      brushDynamics: dynamics,
+      symmetry: {
+        type: "kaleidoscope",
+        centerX: 360,
+        centerY: 500,
+        radialCount: 1_000_000_000,
+      },
+    })]));
+    const marks = (result.svg.match(/<(?:circle|ellipse) /g) ?? []).length;
+
+    expect(marks).toBeGreaterThan(0);
+    expect(marks).toBeLessThanOrEqual(STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET);
   });
 });
 
@@ -1371,6 +1473,32 @@ describe("프레임·이미지 직렬화", () => {
       page([{ id: "i2", type: "image", src: "data:image/png;base64,AAA", x: 0, y: 0, width: 10, height: 10, rotation: 0, brightness: 0.4 }])
     );
     expect(result.skipped.some((s) => s.id === "i2" && s.label.includes("픽셀 필터"))).toBe(true);
+  });
+
+  it("순서형 스마트 필터 스택도 원본 근사 경고 대상에서 빠지지 않는다", () => {
+    const result = exportPageToSvg(page([{
+      id: "i-smart",
+      type: "image",
+      src: "data:image/png;base64,AAA",
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      rotation: 0,
+      smartFilters: {
+        version: 1,
+        entries: [{
+          id: "tone-a",
+          engine: "brightness-contrast",
+          enabled: true,
+          params: { brightness: 0.2 },
+        }],
+      },
+    }]));
+
+    expect(result.skipped.some((skip) =>
+      skip.id === "i-smart" && skip.label.includes("픽셀 필터")
+    )).toBe(true);
   });
 
   it("외부 URL 이미지는 임베드가 아님을 고지한다", () => {

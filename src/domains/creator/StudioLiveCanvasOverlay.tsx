@@ -12,7 +12,14 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
 
 import {
   studioLivePresenceAlwaysVisible,
@@ -21,6 +28,7 @@ import {
   studioPresenceVisiblePeerCount,
 } from "./studio-commercial-residuals";
 import {
+  planStudioCommentPinPreviewPosition,
   studioLiveParticipantColor,
   type StudioCanvasCommentPin,
 } from "./studio-live-canvas-overlay-model";
@@ -208,6 +216,82 @@ function StudioSyncStatusIcon({ phase }: { phase: StudioLiveSyncPhase }) {
   return <Radio size={14} aria-hidden />;
 }
 
+function StudioCommentPinPreviewPortal({
+  anchor,
+  author,
+  body,
+}: {
+  anchor: HTMLButtonElement;
+  author: string;
+  body: string;
+}) {
+  const tooltipRef = useRef<HTMLSpanElement>(null);
+  const [position, setPosition] = useState<ReturnType<
+    typeof planStudioCommentPinPreviewPosition
+  > | null>(null);
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const anchorRect = anchor.getBoundingClientRect();
+      const tooltipRect = tooltipRef.current?.getBoundingClientRect();
+      const visualViewport = globalThis.visualViewport;
+      setPosition(planStudioCommentPinPreviewPosition({
+        anchor: anchorRect,
+        viewport: {
+          left: visualViewport?.offsetLeft ?? 0,
+          top: visualViewport?.offsetTop ?? 0,
+          width: visualViewport?.width ?? globalThis.innerWidth,
+          height: visualViewport?.height ?? globalThis.innerHeight,
+        },
+        measured: tooltipRect && tooltipRect.width > 0 && tooltipRect.height > 0
+          ? { width: tooltipRect.width, height: tooltipRect.height }
+          : undefined,
+      }));
+    };
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(anchor);
+    if (tooltipRef.current) observer?.observe(tooltipRef.current);
+    globalThis.addEventListener("resize", measure);
+    globalThis.addEventListener("scroll", measure, true);
+    globalThis.visualViewport?.addEventListener("resize", measure);
+    globalThis.visualViewport?.addEventListener("scroll", measure);
+    return () => {
+      observer?.disconnect();
+      globalThis.removeEventListener("resize", measure);
+      globalThis.removeEventListener("scroll", measure, true);
+      globalThis.visualViewport?.removeEventListener("resize", measure);
+      globalThis.visualViewport?.removeEventListener("scroll", measure);
+    };
+  }, [anchor, author, body]);
+
+  if (typeof globalThis.document === "undefined") return null;
+  return createPortal(
+    <span
+      ref={tooltipRef}
+      aria-hidden
+      data-studio-comment-pin-preview="true"
+      data-placement={position?.placement}
+      className="pointer-events-none fixed z-[89] max-h-28 overflow-hidden rounded-xl border border-line-strong bg-panel/98 p-2.5 text-left normal-case tracking-normal text-fg shadow-[0_14px_40px_oklch(0.06_0.02_70/0.52)] backdrop-blur-xl"
+      style={{
+        left: position?.left ?? 0,
+        top: position?.top ?? 0,
+        width: position?.width ?? 224,
+        visibility: position ? "visible" : "hidden",
+      }}
+    >
+      <span className="block truncate text-[0.68rem] font-bold text-fg">{author}</span>
+      <span className="mt-1 block line-clamp-3 text-[0.68rem] font-medium leading-relaxed text-fg-2">
+        {body}
+      </span>
+      <span className="mt-1.5 block text-[0.62rem] font-semibold text-accent">
+        클릭해서 스레드 열기
+      </span>
+    </span>,
+    globalThis.document.body
+  );
+}
+
 export function StudioLiveCanvasOverlay({
   canvasWidth,
   canvasHeight,
@@ -217,6 +301,14 @@ export function StudioLiveCanvasOverlay({
   flipX = false,
   rotation = 0,
 }: StudioLiveCanvasOverlayProps) {
+  const [activeCommentPreviewKey, setActiveCommentPreviewKey] = useState<string | null>(null);
+  const pinButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const activePreviewPin = activeCommentPreviewKey
+    ? commentPins.find((pin) => pin.key === activeCommentPreviewKey)
+    : undefined;
+  const activePreviewAnchor = activeCommentPreviewKey
+    ? pinButtonRefs.current.get(activeCommentPreviewKey)
+    : undefined;
   return (
     <div
       aria-label="공동작업 캔버스 오버레이"
@@ -235,27 +327,42 @@ export function StudioLiveCanvasOverlay({
         return (
           <button
             key={pin.key}
+            ref={(node) => {
+              if (node) pinButtonRefs.current.set(pin.key, node);
+              else pinButtonRefs.current.delete(pin.key);
+            }}
             type="button"
             aria-haspopup="dialog"
             aria-label={`${pin.label}, ${pin.unreadCount ? `읽지 않은 댓글 ${pin.unreadCount}개, ` : ""}열림 댓글 ${pin.count}개`}
             data-studio-comment-pin="true"
             className={cn(
-              "pointer-events-auto absolute grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-[0.65rem] font-black tabular-nums text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-              "[&>span]:transition-transform [&>span]:duration-200 motion-reduce:[&>span]:transition-none hover:[&>span]:scale-110",
-              pin.unreadCount ? "[&>span]:ring-4 [&>span]:ring-accent/30" : null
+              "group pointer-events-auto absolute grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-[0.65rem] font-black tabular-nums text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+              "[&>[data-pin-marker]]:transition-transform [&>[data-pin-marker]]:duration-200 motion-reduce:[&>[data-pin-marker]]:transition-none hover:[&>[data-pin-marker]]:scale-110",
+              pin.unreadCount ? "[&>[data-pin-marker]]:ring-4 [&>[data-pin-marker]]:ring-accent/30" : null
             )}
             style={{
               left: `clamp(1.375rem, calc(${(projected.x * 100).toFixed(4)}% + ${projected.screenOffsetX}px), calc(100% - 1.375rem))`,
               top: `clamp(1.375rem, calc(${(projected.y * 100).toFixed(4)}% + ${projected.screenOffsetY}px), calc(100% - 1.375rem))`,
             }}
-            title={`${pin.label} · ${pin.unreadCount ? `읽지 않음 ${pin.unreadCount}개 · ` : ""}열림 ${pin.count}개`}
+            title={pin.previewBody
+              ? undefined
+              : `${pin.label} · ${pin.unreadCount ? `읽지 않음 ${pin.unreadCount}개 · ` : ""}열림 ${pin.count}개`}
+            onPointerEnter={() => setActiveCommentPreviewKey(pin.key)}
+            onPointerLeave={(event) => {
+              if (event.currentTarget.ownerDocument.activeElement === event.currentTarget) return;
+              setActiveCommentPreviewKey((current) => current === pin.key ? null : current);
+            }}
+            onFocus={() => setActiveCommentPreviewKey(pin.key)}
+            onBlur={() => setActiveCommentPreviewKey((current) => (
+              current === pin.key ? null : current
+            ))}
             onClick={() => onCommentPinClick(
               pin.anchor,
               pin.newestUnreadThreadId ?? pin.newestThreadId,
               pin.threadIds
             )}
           >
-            <span className="relative grid size-8 place-items-center rounded-full border-2 border-panel bg-accent shadow-[0_4px_14px_oklch(0.10_0.02_70/0.42)]">
+            <span data-pin-marker className="relative grid size-8 place-items-center rounded-full border-2 border-panel bg-accent shadow-[0_4px_14px_oklch(0.10_0.02_70/0.42)]">
               {pin.count > 1 ? pin.count : <MessageCircle size={14} aria-hidden />}
               {pin.unreadCount ? (
                 <span
@@ -267,6 +374,14 @@ export function StudioLiveCanvasOverlay({
           </button>
         );
       })}
+
+      {activePreviewPin?.previewBody && activePreviewAnchor ? (
+        <StudioCommentPinPreviewPortal
+          anchor={activePreviewAnchor}
+          author={activePreviewPin.previewAuthor ?? "검토자"}
+          body={activePreviewPin.previewBody}
+        />
+      ) : null}
 
       {cursors.map(({ participant, cursor }) => {
         const color = studioLiveParticipantColor(participant.sessionId);

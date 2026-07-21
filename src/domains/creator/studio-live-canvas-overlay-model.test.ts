@@ -1,14 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addStudioCommentReply,
   addStudioCommentThread,
+  assignStudioCommentThread,
   createEmptyStudioCommentsDocument,
   listStudioCommentThreadsForAnchor,
   type StudioCommentActor,
   type StudioCommentAnchor,
   type StudioCommentsDocument,
 } from "./studio-comments";
-import { projectStudioCanvasCommentPins } from "./studio-live-canvas-overlay-model";
+import {
+  planStudioCommentPinPreviewPosition,
+  projectStudioCanvasCommentPins,
+} from "./studio-live-canvas-overlay-model";
 
 const AUTHOR: StudioCommentActor = { id: "author-1", displayName: "편집자" };
 
@@ -263,7 +268,82 @@ describe("projectStudioCanvasCommentPins", () => {
       unreadCount: 1,
       newestThreadId: "thread-read",
       newestUnreadThreadId: "thread-unread",
+      previewBody: "thread-unread 검토",
     });
     expect(document.threads.every((thread) => !("unread" in thread))).toBe(true);
+  });
+
+  it("previews the clicked thread's latest reply and bounds hidden pin text", () => {
+    const anchor: StudioCommentAnchor = {
+      type: "point", pageId: "page-1", x: 0.5, y: 0.5,
+    };
+    let document = addStudioCommentThread(createEmptyStudioCommentsDocument(), {
+      id: "thread-long",
+      anchor,
+      author: AUTHOR,
+      body: "가".repeat(500),
+    }, new Date("2026-07-18T00:00:00.000Z"));
+    document = addStudioCommentReply(document, "thread-long", {
+      id: "reply-latest",
+      author: { id: "reviewer-2", displayName: "검토자" },
+      body: "최신 답글을 미리 보여 주세요.",
+    }, new Date("2026-07-18T00:01:00.000Z"));
+    document = assignStudioCommentThread(
+      document,
+      "thread-long",
+      { id: "owner-2", displayName: "담당자" },
+      new Date("2026-07-18T00:02:00.000Z")
+    );
+
+    const [pin] = projectStudioCanvasCommentPins({
+      threads: document.threads,
+      pageId: "page-1",
+      canvasWidth: 1_000,
+      canvasHeight: 2_000,
+      boundsByElementId: new Map(),
+    });
+
+    expect(pin).toMatchObject({
+      previewAuthor: "검토자",
+      previewBody: "최신 답글을 미리 보여 주세요.",
+    });
+
+    const longOnly = projectStudioCanvasCommentPins({
+      threads: addStudioCommentThread(createEmptyStudioCommentsDocument(), {
+        id: "thread-root-only",
+        anchor,
+        author: AUTHOR,
+        body: "나".repeat(500),
+      }).threads,
+      pageId: "page-1",
+      canvasWidth: 1_000,
+      canvasHeight: 2_000,
+      boundsByElementId: new Map(),
+    })[0];
+    expect(Array.from(longOnly!.previewBody ?? "")).toHaveLength(280);
+    expect(longOnly!.previewBody).toMatch(/…$/u);
+  });
+});
+
+describe("planStudioCommentPinPreviewPosition", () => {
+  const viewport = { left: 0, top: 0, width: 390, height: 667 };
+
+  it("prefers an open side and clamps the cross axis inside the visual viewport", () => {
+    expect(planStudioCommentPinPreviewPosition({
+      anchor: { left: 22, top: 4, right: 66, bottom: 48, width: 44, height: 44 },
+      viewport,
+    })).toEqual({ left: 74, top: 12, width: 224, placement: "right" });
+
+    expect(planStudioCommentPinPreviewPosition({
+      anchor: { left: 324, top: 620, right: 368, bottom: 664, width: 44, height: 44 },
+      viewport,
+    })).toEqual({ left: 92, top: 547, width: 224, placement: "left" });
+  });
+
+  it("uses above or below when a narrow viewport has no complete side", () => {
+    expect(planStudioCommentPinPreviewPosition({
+      anchor: { left: 138, top: 280, right: 182, bottom: 324, width: 44, height: 44 },
+      viewport: { left: 0, top: 0, width: 320, height: 600 },
+    })).toEqual({ left: 48, top: 164, width: 224, placement: "above" });
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  createStudioImageFilterWorkerSession,
   runStudioImageFilterWorker,
   type StudioImageFilterWorkerLike,
 } from "./studio-image-filter-worker-client";
@@ -274,6 +275,12 @@ describe("runStudioImageFilterWorker", () => {
     const el = {
       brightness: 0.3,
       contrast: 20,
+      exposureAdjustment: { exposure: 1, gamma: 0.9, offset: 0.02 },
+      unsharpMask: { amount: 0.8, radius: 2, threshold: 8 },
+      morphology: { mode: "erode", radius: 1 },
+      pixelOffset: { x: 2, y: -1, edge: "wrap" },
+      convolution: { kernel: [0, -1, 0, -1, 5, -1, 0, -1, 0], divisor: 1, bias: 0 },
+      clouds: { amount: 0.2, scale: 64, seed: 42, mode: "overlay" },
       src: "blob:large-source",
       frames: [{ src: "blob:animation-frame" }],
       scene3d: { render() {} },
@@ -296,7 +303,16 @@ describe("runStudioImageFilterWorker", () => {
     for (const key of ["src", "frames", "scene3d", "vrm", "provenance", "runtimeGraph"]) {
       expect(worker.postedEl).not.toHaveProperty(key);
     }
-    expect(worker.postedEl).toMatchObject({ brightness: 0.3, contrast: 20 });
+    expect(worker.postedEl).toMatchObject({
+      brightness: 0.3,
+      contrast: 20,
+      exposureAdjustment: { exposure: 1, gamma: 0.9, offset: 0.02 },
+      unsharpMask: { amount: 0.8, radius: 2, threshold: 8 },
+      morphology: { mode: "erode", radius: 1 },
+      pixelOffset: { x: 2, y: -1, edge: "wrap" },
+      convolution: { kernel: [0, -1, 0, -1, 5, -1, 0, -1, 0], divisor: 1, bias: 0 },
+      clouds: { amount: 0.2, scale: 64, seed: 42, mode: "overlay" },
+    });
   });
 
   it("falls back to direct execution when postMessage throws synchronously", async () => {
@@ -411,5 +427,41 @@ describe("runStudioImageFilterWorker", () => {
       }),
     ).rejects.toThrow(/취소/);
     expect(constructed).toBe(false);
+  });
+});
+
+describe("createStudioImageFilterWorkerSession", () => {
+  it("reuses one ready Worker across sequential slider ticks until explicit disposal", async () => {
+    const worker = new ApplyingWorker();
+    const factory = vi.fn(() => worker);
+    const session = createStudioImageFilterWorkerSession({ workerFactory: factory });
+
+    const first = await session.run(requestFixture({ brightness: 0.1 }));
+    const second = await session.run(requestFixture({ brightness: 0.2 }));
+
+    expect(first.execution).toBe("worker");
+    expect(second.execution).toBe("worker");
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(worker.terminateCount).toBe(0);
+
+    session.dispose();
+    expect(worker.terminateCount).toBe(1);
+  });
+
+  it("drops an aborted queued tick without terminating the in-flight reusable Worker", async () => {
+    const worker = new HangingWorker();
+    const session = createStudioImageFilterWorkerSession({ workerFactory: () => worker });
+    const first = session.run(requestFixture({ brightness: 0.1 }));
+    await Promise.resolve();
+    const controller = new AbortController();
+    const queued = session.run(requestFixture({ brightness: 0.2 }), { signal: controller.signal });
+    controller.abort();
+
+    await expect(queued).rejects.toThrow(/취소/);
+    expect(worker.terminateCount).toBe(0);
+
+    session.dispose();
+    await expect(first).rejects.toThrow(/취소/);
+    expect(worker.terminateCount).toBe(1);
   });
 });

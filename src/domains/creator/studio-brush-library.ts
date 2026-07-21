@@ -368,6 +368,25 @@ function jsonStructureEqual(
 }
 
 /**
+ * Phase-two material fields are additive identity defaults. A v1 saved brush that predates those
+ * keys is already semantically normalized and should not be reported to the artist as repaired.
+ * Invalid present values still compare against their normalized form and remain visible as fixes.
+ */
+function brushDynamicsComparisonValue(
+  raw: unknown,
+  normalized: NormalizedStudioBrushDynamicsSettings
+): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const source = raw as Record<string, unknown>;
+  return {
+    ...source,
+    ...(source.colorDynamics === undefined ? { colorDynamics: normalized.colorDynamics } : {}),
+    ...(source.grain === undefined ? { grain: normalized.grain } : {}),
+    ...(source.tipLayers === undefined ? { tipLayers: normalized.tipLayers } : {}),
+  };
+}
+
+/**
  * 신뢰할 수 없는 입력(가져오기 파일 등)을 유효한 StudioBrushSnapshot으로 정제한다.
  * 필드가 없거나 타입이 다르거나 범위를 벗어나면 기본값으로 대체/clamp하고 adjustedFields에 그
  * 필드 이름을 기록한다(어떤 값이 보정됐는지 호출부가 사용자에게 알릴 수 있게). 절대 던지지 않는다
@@ -446,7 +465,10 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
     adjustedFields
   );
   const brushDynamics = normalizeStudioBrushDynamicsSettings(o.brushDynamics);
-  if (!jsonStructureEqual(o.brushDynamics, brushDynamics)) adjustedFields.push("brushDynamics");
+  if (!jsonStructureEqual(
+    brushDynamicsComparisonValue(o.brushDynamics, brushDynamics),
+    brushDynamics
+  )) adjustedFields.push("brushDynamics");
   const stampTuning = sanitizeStampTuning(brushId, o.stampTuning, adjustedFields);
 
   let useVelocityPressure: boolean;

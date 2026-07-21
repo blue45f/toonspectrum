@@ -17,6 +17,25 @@ export const STUDIO_COMMENTS_MAX_DISPLAY_NAME_LENGTH = 160;
 export const STUDIO_COMMENTS_MAX_BODY_LENGTH = 4_000;
 export const STUDIO_COMMENTS_MAX_MENTIONS = 20;
 
+/**
+ * Creates one retry-safe local message identifier that is also accepted as a team-comment
+ * mutation id. Callers should keep the returned value for the whole submit/retry lifecycle.
+ */
+export function createStudioCommentMessageId(prefix: "comment" | "reply"): string {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return `${prefix}_${globalThis.crypto.randomUUID()}`;
+  }
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+}
+
+/** Prevents a late mutation receipt from closing a newer comment draft. */
+export function studioCommentMutationReceiptOwnsDraft(
+  currentMessageId: string | null | undefined,
+  receiptMessageId: string
+): boolean {
+  return currentMessageId === receiptMessageId;
+}
+
 const IdSchema = z.string().trim().min(1).max(STUDIO_COMMENTS_MAX_ID_LENGTH);
 const DisplayNameSchema = z
   .string()

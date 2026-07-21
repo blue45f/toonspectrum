@@ -61,9 +61,8 @@ export type StudioWorkAssetReference = z.infer<typeof StudioWorkAssetReferenceSc
 
 /**
  * Small, non-destructive fields that are safe to keep in an immutable upload descriptor and in
- * the realtime reference envelope. Pixel/source data and object-valued filter programs are
- * deliberately excluded: the former belongs in the private asset body and the latter can exceed
- * the bounded scene-operation budget.
+ * the realtime reference envelope. Pixel/source data stays in the private asset body. The sole
+ * object-valued edit field (`smartFilters`) is accepted through an explicit bounded schema below.
  */
 export const STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS = [
   "hidden",
@@ -103,6 +102,7 @@ export const STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS = [
   "height",
   "rotation",
   "opacity",
+  "smartFilters",
   ...STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
   ...Object.keys(STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES),
 ] as const;
@@ -117,6 +117,57 @@ const StudioWorkAssetScalarFiltersSchema = z.object(Object.fromEntries(
 ) as {
   [Key in keyof typeof STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES]: z.ZodOptional<z.ZodNumber>;
 });
+
+const STUDIO_WORK_ASSET_ADJUSTMENT_ENGINE_IDS = [
+  "curves",
+  "levels",
+  "brightness-contrast",
+  "hue-saturation",
+  "color-balance",
+  "channel-mixer",
+  "gradient-map",
+  "blur",
+  "gaussian-blur",
+  "motion-blur",
+  "sharpen",
+  "noise",
+  "invert",
+  "exposure",
+  "unsharp-mask",
+  "morphology",
+  "offset",
+  "custom-convolution",
+  "clouds",
+] as const;
+
+const StudioWorkAssetAdjustmentParamSchema = z.union([
+  z.number().finite(),
+  z.string().max(128),
+  z.boolean(),
+]);
+
+const StudioWorkAssetAdjustmentParamsSchema = z
+  .record(z.string().min(1).max(48), StudioWorkAssetAdjustmentParamSchema)
+  .superRefine((params, context) => {
+    if (Object.keys(params).length > 16) {
+      context.addIssue({
+        code: "custom",
+        message: "스마트 필터 매개변수가 안전 한도를 넘었습니다.",
+      });
+    }
+  });
+
+export const StudioWorkAssetSmartFiltersSchema = z
+  .object({
+    version: z.literal(1),
+    entries: z.array(z.object({
+      id: z.string().min(1).max(80),
+      engine: z.enum(STUDIO_WORK_ASSET_ADJUSTMENT_ENGINE_IDS),
+      enabled: z.boolean(),
+      params: StudioWorkAssetAdjustmentParamsSchema,
+    }).strict()).max(24),
+  })
+  .strict();
 
 export const StudioWorkAssetElementSchema = z
   .object({
@@ -142,9 +193,19 @@ export const StudioWorkAssetElementSchema = z
     screentone: z.boolean().optional(),
     lineart: z.boolean().optional(),
     invert: z.boolean().optional(),
+    smartFilters: StudioWorkAssetSmartFiltersSchema.optional(),
     ...StudioWorkAssetScalarFiltersSchema.shape,
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.type !== "image" && value.smartFilters !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["smartFilters"],
+        message: "스마트 필터는 이미지 에셋에만 사용할 수 있습니다.",
+      });
+    }
+  });
 
 export const StudioWorkAssetDescriptorSchema = z
   .object({

@@ -12,6 +12,18 @@ const studioCommentsPanelSessionSource = readFileSync(
   new URL("./StudioCommentsPanelSession.tsx", import.meta.url),
   "utf8"
 );
+const studioCanvasOverlaySource = readFileSync(
+  new URL("./StudioLiveCanvasOverlay.tsx", import.meta.url),
+  "utf8"
+);
+const studioPointCommentComposerSource = readFileSync(
+  new URL("./StudioPointCommentComposer.tsx", import.meta.url),
+  "utf8"
+);
+const studioPageLazyUiSource = readFileSync(
+  new URL("./studio-page-lazy-ui.ts", import.meta.url),
+  "utf8"
+);
 
 describe("StudioCommentsPanel review rail contract", () => {
   it("coexists with the canvas instead of blocking the viewport as a modal", () => {
@@ -35,6 +47,51 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(source).toContain("aria-labelledby={titleId}");
     expect(source).toContain("aria-describedby={descriptionId}");
     expect(source).toContain('id="studio-comments-review-dialog"');
+  });
+
+  it("opens a compact single-click point composer instead of forcing the full review rail", () => {
+    expect(studioPageSource).toContain("setPointCommentComposer({");
+    expect(studioPageSource).toContain('commentId: createStudioCommentMessageId("comment")');
+    expect(studioPageSource).toContain("setCommentsOpen(false)");
+    expect(studioPageSource).toContain("submitStudioPointComment");
+    expect(studioPointCommentComposerSource).toContain(
+      'data-studio-point-comment-composer="true"'
+    );
+    expect(studioPointCommentComposerSource).toContain(
+      'data-studio-point-comment-backdrop="true"'
+    );
+    expect(studioPointCommentComposerSource).toContain('aria-label="위치 댓글 내용"');
+    expect(studioPointCommentComposerSource).toContain("globalThis.visualViewport");
+    expect(studioPointCommentComposerSource).toContain(
+      "event.currentTarget.form?.requestSubmit()"
+    );
+    expect(studioCanvasOverlaySource).toContain('data-studio-comment-pin-preview="true"');
+    expect(studioPageSource).toContain("studioCommentMutationReceiptOwnsDraft(");
+    expect(studioPageSource).toContain("restoreStudioCanvasViewportFocus");
+    expect(studioPageSource).toContain("if (!setStudioComments(nextDocument)) return false");
+  });
+
+  it("preloads the compact composer without pulling the full review rail into pin placement", () => {
+    const toggleStart = studioPageSource.indexOf("function toggleStudioCommentPinPlacement()");
+    const toggleEnd = studioPageSource.indexOf("const [pointCommentAnchor", toggleStart);
+    const toggleSource = studioPageSource.slice(toggleStart, toggleEnd);
+
+    expect(toggleStart).toBeGreaterThanOrEqual(0);
+    expect(toggleEnd).toBeGreaterThan(toggleStart);
+    expect(studioPageLazyUiSource).toContain(
+      'import("./StudioPointCommentComposer").then((mod) => ({'
+    );
+    expect(studioPageLazyUiSource).toContain("studioPointCommentComposerLoader.load");
+    expect(studioPageLazyUiSource).toContain("studioPointCommentComposerLoader.preload()");
+    expect(studioPageLazyUiSource).not.toContain(
+      'import("./StudioLiveCanvasOverlay").then((mod) => ({ default: mod.StudioPointCommentComposer }))'
+    );
+    expect(studioCanvasOverlaySource).not.toContain("StudioPointCommentComposer");
+    expect(toggleSource).toContain("preloadStudioPointCommentComposer();");
+    expect(toggleSource).not.toContain("preloadStudioCommentsPanelSession();");
+    expect(studioPageSource).toMatch(
+      /function openStudioCommentInbox\(\)[\s\S]*?preloadStudioCommentsPanelSession\(\);/u
+    );
   });
 
   it("exposes one permission-aware desktop inbox trigger tied to the review dialog", () => {

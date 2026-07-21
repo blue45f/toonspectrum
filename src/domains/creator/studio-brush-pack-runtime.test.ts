@@ -10,6 +10,7 @@ import {
   materializeStudioBrushPackTipSettings,
   studioBrushPackRuntimeSignature,
 } from "./studio-brush-pack-runtime";
+import { STUDIO_BRUSH_TIP_LAYER_MAX_COUNT } from "./studio-brush-tip-composition";
 import {
   buildStudioBrushTipAlphaMap,
   decodeStudioBrushTipAlphaMapBase64,
@@ -105,6 +106,34 @@ describe("procedural brush pack runtime", () => {
     expect(new Set(first).size).toBe(67);
     // A unique seed alone must not be the differentiator: every brush has distinct tip physics.
     expect(new Set(physical).size).toBe(67);
+  });
+
+  it("materializes bounded phase-two colour, grain-space and multi-tip contracts", () => {
+    const selections = materializeAllStudioBrushPackSelections();
+    const coloured = selections.filter((selection) => (
+      selection.brushDynamics.colorDynamics.hueJitter > 0
+      || selection.brushDynamics.colorDynamics.saturationJitter > 0
+      || selection.brushDynamics.colorDynamics.valueJitter > 0
+    ));
+    const grained = selections.filter((selection) => selection.brushDynamics.grain.amount > 0);
+    const layered = selections.filter((selection) => selection.brushDynamics.tipLayers.length > 0);
+
+    expect(coloured.length).toBeGreaterThanOrEqual(20);
+    expect(grained.length).toBeGreaterThanOrEqual(20);
+    expect(new Set(grained.map((selection) => selection.brushDynamics.grain.space))).toEqual(
+      new Set(["canvas-fixed", "stroke-fixed"])
+    );
+    expect(layered.length).toBeGreaterThanOrEqual(10);
+    expect(layered.some((selection) => selection.brushDynamics.tipLayers.length === 2)).toBe(true);
+
+    for (const selection of selections) {
+      expect(selection.brushDynamics.tipLayers.length).toBeLessThanOrEqual(
+        STUDIO_BRUSH_TIP_LAYER_MAX_COUNT
+      );
+      // brushDynamics shares the CRDT's 16 KiB metadata envelope with a few small scalar fields.
+      expect(new TextEncoder().encode(JSON.stringify(selection.brushDynamics)).byteLength)
+        .toBeLessThan(14 * 1024);
+    }
   });
 
   it("rejects unknown ids rather than silently selecting a fallback brush", () => {

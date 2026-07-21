@@ -12,6 +12,18 @@ export const STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE_RANGE = { min: 8, max: 64 } as cons
 export const DEFAULT_STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE = 24;
 export const STUDIO_BRUSH_TIP_STAMP_GRID_RANGE = { min: 3, max: 17 } as const;
 export const DEFAULT_STUDIO_BRUSH_TIP_STAMP_GRID = 9;
+/** Largest decoded custom tip accepted at the document boundary (64 x 64 alpha bytes). */
+export const STUDIO_BRUSH_TIP_ALPHA_MAP_MAX_BYTES =
+  STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE_RANGE.max ** 2;
+/** Padded base64 character budget for the largest supported alpha map. */
+export const STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_MAX_CHARS =
+  Math.ceil(STUDIO_BRUSH_TIP_ALPHA_MAP_MAX_BYTES / 3) * 4;
+/**
+ * Raw input guard. A wrapped payload may contain whitespace, but it cannot make the decoder scan
+ * an unbounded string before the compact encoded-length check runs.
+ */
+export const STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_SOURCE_MAX_CHARS =
+  STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_MAX_CHARS * 2;
 /** Bounds decoded/softened tip memory while covering an active pack plus common built-ins. */
 export const STUDIO_BRUSH_TIP_ALPHA_MAP_CACHE_LIMIT = 64;
 
@@ -82,6 +94,7 @@ const DEFAULT_TIP: NormalizedStudioBrushTipSettings = {
 };
 
 const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const STUDIO_BRUSH_TIP_STAMP_ALPHA_THRESHOLD = 0.02;
 const tipAlphaMapCache = new Map<string, StudioBrushTipAlphaMap>();
 
 function finiteNumber(value: unknown, fallback: number): number {
@@ -109,7 +122,9 @@ function studioBrushTipAlphaMapCacheKey(value: unknown): string {
   const softness = typeof source.softness === "number" ? source.softness : "";
   const alphaMapSize = typeof source.alphaMapSize === "number" ? source.alphaMapSize : "";
   const alphaMapBase64 = typeof source.alphaMapBase64 === "string"
-    ? source.alphaMapBase64
+    ? source.alphaMapBase64.length <= STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_SOURCE_MAX_CHARS
+      ? source.alphaMapBase64
+      : `oversized:${source.alphaMapBase64.length}`
     : source.alphaMapBase64 === null ? "null" : "";
   return `${shape}\u0000${softness}\u0000${alphaMapSize}\u0000${alphaMapBase64}`;
 }
@@ -158,10 +173,23 @@ export function encodeStudioBrushTipAlphaMapBase64(bytes: Uint8Array): string {
 
 /** Decode standard base64 (with or without padding) into raw bytes. Invalid input returns null. */
 export function decodeStudioBrushTipAlphaMapBase64(value: unknown): Uint8Array | null {
-  if (typeof value !== "string" || value.length === 0) return null;
+  if (
+    typeof value !== "string"
+    || value.length === 0
+    || value.length > STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_SOURCE_MAX_CHARS
+  ) return null;
   const cleaned = value.replace(/\s+/g, "");
-  if (!/^[A-Za-z0-9+/]+=*$/.test(cleaned) || cleaned.length % 4 !== 0) return null;
-  const output = new Uint8Array((cleaned.length / 4) * 3);
+  if (
+    cleaned.length > STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_MAX_CHARS
+    || !/^[A-Za-z0-9+/]+=*$/.test(cleaned)
+    || cleaned.length % 4 !== 0
+  ) return null;
+  const firstPaddingIndex = cleaned.indexOf("=");
+  const paddingLength = firstPaddingIndex < 0 ? 0 : cleaned.length - firstPaddingIndex;
+  if (paddingLength > 2) return null;
+  const decodedLength = (cleaned.length / 4) * 3 - paddingLength;
+  if (decodedLength > STUDIO_BRUSH_TIP_ALPHA_MAP_MAX_BYTES) return null;
+  const output = new Uint8Array(decodedLength);
   let write = 0;
   for (let index = 0; index < cleaned.length; index += 4) {
     const c0 = BASE64_ALPHABET.indexOf(cleaned[index]!);
@@ -176,7 +204,7 @@ export function decodeStudioBrushTipAlphaMapBase64(value: unknown): Uint8Array |
     if (c2 >= 0) output[write++] = (triple >> 8) & 255;
     if (c3 >= 0) output[write++] = triple & 255;
   }
-  return output.subarray(0, write);
+  return write === output.length ? output : null;
 }
 
 export function normalizeStudioBrushTipSettings(value?: unknown): NormalizedStudioBrushTipSettings {
@@ -446,6 +474,41 @@ export function sampleStudioBrushTipAlphaMap(
   return clamp01(top + (bottom - top) * ty);
 }
 
+function normalizedStudioBrushTipStampGrid(value: unknown): number {
+  const grid = Math.trunc(clamp(
+    finiteNumber(value, DEFAULT_STUDIO_BRUSH_TIP_STAMP_GRID),
+    STUDIO_BRUSH_TIP_STAMP_GRID_RANGE.min,
+    STUDIO_BRUSH_TIP_STAMP_GRID_RANGE.max
+  ));
+  // Prefer odd grids so one sample sits on the tip centre.
+  return grid % 2 === 0 ? grid + 1 : grid;
+}
+
+/** Counts alpha-tip render marks without allocating the stamp geometry used by each live dab. */
+export function countStudioBrushTipStampSamples(
+  tipSettings?: unknown,
+  options?: { grid?: number; alphaMap?: StudioBrushTipAlphaMap | null }
+): number {
+  const tip = normalizeStudioBrushTipSettings(tipSettings);
+  const map = options?.alphaMap ?? buildStudioBrushTipAlphaMap(tip);
+  const grid = normalizedStudioBrushTipStampGrid(options?.grid);
+  const half = (grid - 1) / 2;
+  let samples = 0;
+  for (let gy = -half; gy <= half; gy++) {
+    for (let gx = -half; gx <= half; gx++) {
+      const localX = half === 0 ? 0 : gx / half;
+      const localY = half === 0 ? 0 : gy / half;
+      const mapX = (localX * 0.5 + 0.5) * (map.size - 1);
+      const mapY = (localY * 0.5 + 0.5) * (map.size - 1);
+      if (
+        sampleStudioBrushTipAlphaMap(map, mapX, mapY)
+          > STUDIO_BRUSH_TIP_STAMP_ALPHA_THRESHOLD
+      ) samples += 1;
+    }
+  }
+  return Math.max(1, samples);
+}
+
 /**
  * Convert a planned dab into stamp samples that honor tip alpha, size, angle and roundness.
  * Spacing/scatter are already baked into dab.x/y by the dynamics planner.
@@ -457,13 +520,7 @@ export function planStudioBrushTipStamp(
 ): StudioBrushTipStampPlan {
   const tip = normalizeStudioBrushTipSettings(tipSettings);
   const map = options?.alphaMap ?? buildStudioBrushTipAlphaMap(tip);
-  const grid = Math.trunc(clamp(
-    finiteNumber(options?.grid, DEFAULT_STUDIO_BRUSH_TIP_STAMP_GRID),
-    STUDIO_BRUSH_TIP_STAMP_GRID_RANGE.min,
-    STUDIO_BRUSH_TIP_STAMP_GRID_RANGE.max
-  ));
-  // Prefer odd grids so one sample sits on the tip centre.
-  const oddGrid = grid % 2 === 0 ? grid + 1 : grid;
+  const oddGrid = normalizedStudioBrushTipStampGrid(options?.grid);
   const half = (oddGrid - 1) / 2;
   const radius = Math.max(0.25, finiteNumber(dab.size, 1) / 2);
   const roundness = clamp(
@@ -485,7 +542,7 @@ export function planStudioBrushTipStamp(
       const mapX = (localX * 0.5 + 0.5) * (map.size - 1);
       const mapY = (localY * 0.5 + 0.5) * (map.size - 1);
       const alpha = sampleStudioBrushTipAlphaMap(map, mapX, mapY);
-      if (alpha <= 0.02) continue;
+      if (alpha <= STUDIO_BRUSH_TIP_STAMP_ALPHA_THRESHOLD) continue;
       // Apply elliptical roundness on the tip Y axis before rotation (matches canvas ellipse path).
       const sx = localX * radius;
       const sy = localY * radius * roundness;

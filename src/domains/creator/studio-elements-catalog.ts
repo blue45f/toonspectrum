@@ -4,13 +4,19 @@
  * Stickers/FX remain in existing modules; this catalog is the "Shapes & Decor" tier.
  */
 
+import {
+  STUDIO_ELEMENT_ASSET_PACK_ITEMS,
+  type StudioElementAssetPackCategory,
+} from "./studio-element-asset-packs";
+
 export type StudioElementCategory =
   | "shape"
   | "frame"
   | "arrow"
   | "badge"
   | "line"
-  | "decor";
+  | "decor"
+  | StudioElementAssetPackCategory;
 
 export interface StudioElementItem {
   id: string;
@@ -179,6 +185,8 @@ export const STUDIO_ELEMENT_ITEMS: readonly StudioElementItem[] = Object.freeze(
     `<circle cx="80" cy="80" r="68" fill="${FILL}" stroke="${INK}" stroke-width="7"/><path d="M48 82 L72 106 L116 54" fill="none" stroke="${ACCENT}" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>`),
   item("decor-x", "X 마크", "decor", ["close", "x"], 160, 160,
     `<circle cx="80" cy="80" r="68" fill="${FILL}" stroke="${INK}" stroke-width="7"/><path d="M52 52 L108 108 M108 52 L52 108" fill="none" stroke="${INK}" stroke-width="12" stroke-linecap="round"/>`),
+
+  ...STUDIO_ELEMENT_ASSET_PACK_ITEMS,
 ]);
 
 export const STUDIO_ELEMENT_CATEGORY_CHIPS: readonly {
@@ -187,6 +195,11 @@ export const STUDIO_ELEMENT_CATEGORY_CHIPS: readonly {
 }[] = [
   { id: "all", label: "전체" },
   { id: "shape", label: "도형" },
+  { id: "panel", label: "컷 패널" },
+  { id: "bubble", label: "말풍선" },
+  { id: "sfx", label: "효과음" },
+  { id: "effect", label: "효과선" },
+  { id: "pattern", label: "배경 패턴" },
   { id: "frame", label: "프레임" },
   { id: "arrow", label: "화살표" },
   { id: "badge", label: "배지" },
@@ -198,12 +211,12 @@ export function listStudioElements(
   category: StudioElementCategory | "all" = "all",
   query = ""
 ): StudioElementItem[] {
-  const q = query.trim().toLowerCase();
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   return STUDIO_ELEMENT_ITEMS.filter((el) => {
     if (category !== "all" && el.category !== category) return false;
-    if (!q) return true;
-    if (el.label.toLowerCase().includes(q) || el.id.includes(q)) return true;
-    return el.keywords.some((k) => k.toLowerCase().includes(q));
+    if (terms.length === 0) return true;
+    const searchable = [el.label, el.id, el.category, ...el.keywords].join(" ").toLowerCase();
+    return terms.every((term) => searchable.includes(term));
   });
 }
 

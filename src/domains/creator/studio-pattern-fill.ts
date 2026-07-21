@@ -1,6 +1,6 @@
 /**
  * Studio Pattern Fill — 일러스트레이터급 패턴 채우기(스와치) 엔진.
- * 도형 채우기에 쓰는 "타일링 가능한 SVG 패턴" 12종을 스와치로 제공하고,
+ * 도형 채우기에 쓰는 타일링 가능한 SVG 패턴 카탈로그를 스와치로 제공하고,
  * 전경/배경색 주입 + 배율을 하나의 직렬화 스펙(StudioPatternSpec)으로 다룬다.
  *
  * 산출물 4종(전부 순수 함수, Konva/DOM 무의존):
@@ -28,7 +28,7 @@ import { isHexColor } from "./studio-gradients";
 // 타입·상수
 // ---------------------------------------------------------------------------
 
-/** 패턴 종류 12종 — 스와치 그리드에 노출되는 고정 id 유니언. */
+/** 패턴 종류 — 스와치 그리드에 노출되는 고정 id 유니언. */
 export type StudioPatternId =
   | "dots"
   | "stripes"
@@ -41,7 +41,19 @@ export type StudioPatternId =
   | "sand"
   | "crosshatch"
   | "triangles"
-  | "checker";
+  | "checker"
+  | "polka"
+  | "vertical-stripes"
+  | "waves"
+  | "scallops"
+  | "bricks"
+  | "honeycomb"
+  | "diamonds"
+  | "confetti"
+  | "sparkles"
+  | "clouds"
+  | "lightning"
+  | "speed-lines";
 
 /**
  * 직렬화 패턴 스펙 — 요소(El)에 그대로 저장하는 JSON 호환 형태.
@@ -60,6 +72,7 @@ export type StudioPatternDef = {
   id: StudioPatternId;
   label: string;
   tip: string;
+  keywords?: readonly string[];
   tile: number;
   inner: (fg: string) => string;
 };
@@ -159,7 +172,7 @@ const HERRINGBONE_SEGMENTS: ReadonlyArray<readonly [number, number, number, numb
 ];
 
 // ---------------------------------------------------------------------------
-// 패턴 12종 — 스와치 순서 그대로. 각 타일은 self-contained SVG로 빌드된다.
+// 패턴 스와치 — 기본 기하, 만화 연출, 장식, 재질 순서. 각 타일은 self-contained SVG다.
 // ---------------------------------------------------------------------------
 
 export const STUDIO_PATTERNS: StudioPatternDef[] = [
@@ -256,6 +269,102 @@ export const STUDIO_PATTERNS: StudioPatternDef[] = [
     tile: 16,
     inner: (fg) => `<rect x="0" y="0" width="8" height="8" fill="${fg}"/><rect x="8" y="8" width="8" height="8" fill="${fg}"/>`,
   },
+  {
+    id: "polka",
+    label: "큰 물방울",
+    tip: "여백이 넉넉한 큰 폴카 도트 — 팝아트·레트로 배경.",
+    keywords: ["polka", "pop", "도트", "레트로"],
+    tile: 24,
+    inner: (fg) => `<circle cx="6" cy="6" r="4.4" fill="${fg}"/><circle cx="18" cy="18" r="4.4" fill="${fg}"/>`,
+  },
+  {
+    id: "vertical-stripes",
+    label: "세로 줄무늬",
+    tip: "세로로 길게 이어지는 줄무늬 — 벽지·의상·속도 배경.",
+    keywords: ["vertical", "stripe", "세로", "줄무늬"],
+    tile: 16,
+    inner: (fg) => `<rect x="0" y="0" width="7" height="16" fill="${fg}"/>`,
+  },
+  {
+    id: "waves",
+    label: "물결",
+    tip: "부드럽게 이어지는 사인 곡선 — 물·바람·잔잔한 감정.",
+    keywords: ["wave", "water", "바다", "파동"],
+    tile: 24,
+    inner: (fg) => `<path d="M0 12 C4 4 8 4 12 12 S20 20 24 12" fill="none" stroke="${fg}" stroke-width="2.4"/>`,
+  },
+  {
+    id: "scallops",
+    label: "부채 비늘",
+    tip: "반원 호가 겹치는 세이게이하풍 패턴 — 물결·판타지 의상.",
+    keywords: ["scallop", "scale", "비늘", "부채"],
+    tile: 24,
+    inner: (fg) => `<path d="M0 12 A12 12 0 0 1 24 12 M-12 24 A12 12 0 0 1 12 24 M12 24 A12 12 0 0 1 36 24" fill="none" stroke="${fg}" stroke-width="2"/>`,
+  },
+  {
+    id: "bricks",
+    label: "벽돌",
+    tip: "반 칸씩 어긋난 벽돌 줄눈 — 건물·골목·인더스트리얼 배경.",
+    keywords: ["brick", "wall", "벽", "건물"],
+    tile: 32,
+    inner: (fg) => `<path d="M0 0 H32 V32 H0 Z M0 16 H32 M16 0 V16 M8 16 V32 M24 16 V32" fill="none" stroke="${fg}" stroke-width="2"/>`,
+  },
+  {
+    id: "honeycomb",
+    label: "벌집",
+    tip: "육각 셀이 맞물리는 허니컴 — SF 인터페이스·테크 장면.",
+    keywords: ["honeycomb", "hex", "육각", "테크"],
+    tile: 28,
+    inner: (fg) => `<path d="M7 1 H21 L28 14 L21 27 H7 L0 14 Z M21 1 L28 -12 L35 1 L28 14 Z M21 27 L28 14 L35 27 L28 40 Z" fill="none" stroke="${fg}" stroke-width="2"/>`,
+  },
+  {
+    id: "diamonds",
+    label: "다이아",
+    tip: "마름모가 반복되는 아가일 골격 — 패션·레트로 포스터.",
+    keywords: ["diamond", "argyle", "마름모", "아가일"],
+    tile: 20,
+    inner: (fg) => `<path d="M10 1 L19 10 L10 19 L1 10 Z" fill="none" stroke="${fg}" stroke-width="2.2"/>`,
+  },
+  {
+    id: "confetti",
+    label: "컨페티",
+    tip: "짧은 조각이 흩어진 축하 패턴 — 파티·성공·활기.",
+    keywords: ["confetti", "party", "축하", "조각"],
+    tile: 24,
+    inner: (fg) => `<path d="M3 5 L8 9 M15 3 L13 9 M20 12 L15 15 M5 16 L4 22 M12 19 L18 22" fill="none" stroke="${fg}" stroke-width="2.8" stroke-linecap="round"/>`,
+  },
+  {
+    id: "sparkles",
+    label: "스파클",
+    tip: "크기가 다른 네 갈래 반짝임 — 마법·하이라이트·클린 연출.",
+    keywords: ["sparkle", "shine", "반짝", "마법"],
+    tile: 28,
+    inner: (fg) => `<path d="M8 1 L10 7 L16 9 L10 11 L8 17 L6 11 L0 9 L6 7 Z M21 14 L22.5 18.5 L27 20 L22.5 21.5 L21 26 L19.5 21.5 L15 20 L19.5 18.5 Z" fill="${fg}"/>`,
+  },
+  {
+    id: "clouds",
+    label: "구름",
+    tip: "작은 구름 실루엣이 반복되는 하늘·꿈 장면 패턴.",
+    keywords: ["cloud", "sky", "구름", "꿈"],
+    tile: 36,
+    inner: (fg) => `<path d="M5 24 C1 24 0 18 4 16 C3 10 10 7 14 11 C17 5 27 7 27 14 C34 14 35 24 29 24 Z" fill="${fg}"/>`,
+  },
+  {
+    id: "lightning",
+    label: "번개",
+    tip: "작은 지그재그 번개 — 액션·분노·에너지 배경.",
+    keywords: ["lightning", "electric", "번개", "에너지"],
+    tile: 24,
+    inner: (fg) => `<path d="M14 1 L5 13 H11 L8 23 L20 9 H14 Z" fill="${fg}"/>`,
+  },
+  {
+    id: "speed-lines",
+    label: "속도선",
+    tip: "길이가 다른 가로선이 반복되는 만화식 이동·긴장 배경.",
+    keywords: ["speed", "motion", "속도", "액션"],
+    tile: 32,
+    inner: (fg) => `<path d="M0 5 H26 M8 13 H32 M0 21 H20 M13 29 H32" fill="none" stroke="${fg}" stroke-width="2.4" stroke-linecap="round"/>`,
+  },
 ];
 
 /** 패턴 id 목록(스와치 순서) — 정규화·검증이 공유한다. */
@@ -266,6 +375,21 @@ const PATTERN_BY_ID = new Map<StudioPatternId, StudioPatternDef>(STUDIO_PATTERNS
 /** id → 패턴 정의. 알 수 없는 id는 기본 패턴(도트)으로 폴백한다(구 문서 안전). */
 export function getPatternDef(id: string): StudioPatternDef {
   return PATTERN_BY_ID.get(id as StudioPatternId) ?? STUDIO_PATTERNS[0];
+}
+
+/** Local catalog search for a growing pattern library. Every whitespace-separated term must match. */
+export function searchStudioPatterns(query: string): StudioPatternDef[] {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return STUDIO_PATTERNS;
+  return STUDIO_PATTERNS.filter((definition) => {
+    const searchable = [
+      definition.id,
+      definition.label,
+      definition.tip,
+      ...(definition.keywords ?? []),
+    ].join(" ").toLowerCase();
+    return terms.every((term) => searchable.includes(term));
+  });
 }
 
 // ---------------------------------------------------------------------------

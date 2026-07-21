@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { parseStudioAdvancedRulerDocument } from "./studio-advanced-ruler-document";
+import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
 import {
   StudioCrdtDocument,
   type StudioCrdtPageRecord,
@@ -89,6 +90,47 @@ function pageRecord(
     ...overrides,
   };
 }
+
+describe("phase-two brush CRDT bridge", () => {
+  it("keeps colour, grain-space and multi-tip snapshots inside the existing JSON envelope", () => {
+    const brushDynamics = normalizeStudioBrushDynamicsSettings({
+      colorDynamics: {
+        backgroundColor: "#f0b429",
+        foregroundBackgroundMix: 0.25,
+        hueJitter: 12,
+        saturationJitter: 0.08,
+        valueJitter: 0.06,
+      },
+      grain: { space: "canvas-fixed", amount: 0.5, scale: 7, contrast: 0.6, seed: 91 },
+      tip: { shape: "grain" },
+      tipLayers: [
+        { tip: { shape: "bristle" }, scale: 0.7, opacity: 0.65, offsetY: -0.4 },
+        { tip: { shape: "star" }, scale: 0.35, opacity: 0.4, offsetY: 0.5 },
+      ],
+    });
+    const input = studioDrawElementToCrdtStroke("page-brush", {
+      id: "phase-two-brush",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [1, 2, 20, 24],
+      pressures: [0.4, 0.8],
+      stroke: "#315cdd",
+      strokeWidth: 12,
+      brush: "dry-media",
+      brushDynamics,
+    });
+    const restored = studioCrdtStrokeToDrawElement({
+      ...input,
+      status: "finalized",
+      deleted: false,
+      orderIndex: 0,
+    });
+
+    expect(input.payload.brushDynamics).toEqual(JSON.parse(JSON.stringify(brushDynamics)));
+    expect(normalizeStudioBrushDynamicsSettings(restored.brushDynamics)).toEqual(brushDynamics);
+  });
+});
 
 describe("studio CRDT page bridge", () => {
   it("round-trips the complete drawing metadata and aligns legacy pointer arrays", () => {

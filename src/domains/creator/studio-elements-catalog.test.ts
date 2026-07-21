@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   findStudioElement,
   listStudioElements,
+  STUDIO_ELEMENT_CATEGORY_CHIPS,
   STUDIO_ELEMENT_ITEMS,
 } from "./studio-elements-catalog";
 import {
@@ -13,12 +14,13 @@ import {
 } from "./studio-elements-recent";
 
 describe("studio-elements-catalog", () => {
-  it("ships unique shape/frame/arrow/badge elements with svg markup", () => {
+  it("ships 100+ unique, self-contained vector elements", () => {
     const ids = STUDIO_ELEMENT_ITEMS.map((el) => el.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.length).toBeGreaterThanOrEqual(24);
+    expect(ids.length).toBeGreaterThanOrEqual(100);
     for (const el of STUDIO_ELEMENT_ITEMS) {
       expect(el.svg).toContain("<svg");
+      expect(el.svg).toContain("</svg>");
       expect(el.width).toBeGreaterThan(0);
       expect(el.height).toBeGreaterThan(0);
       expect(el.label.trim().length).toBeGreaterThan(0);
@@ -32,6 +34,31 @@ describe("studio-elements-catalog", () => {
     expect(hearts.some((el) => el.id === "shape-heart")).toBe(true);
     const arrows = listStudioElements("arrow", "오른쪽");
     expect(arrows.some((el) => el.id === "arrow-right")).toBe(true);
+    expect(listStudioElements("shape", "bezier 곡선").map((el) => el.id)).toContain("shape-bezier");
+  });
+
+  it("covers every visible category and exposes the requested production packs", () => {
+    for (const chip of STUDIO_ELEMENT_CATEGORY_CHIPS) {
+      if (chip.id === "all") continue;
+      expect(listStudioElements(chip.id).length, `empty category: ${chip.id}`).toBeGreaterThan(0);
+    }
+
+    const ids = new Set(STUDIO_ELEMENT_ITEMS.map((item) => item.id));
+    for (const id of [
+      "shape-superellipse",
+      "shape-arc",
+      "shape-sector",
+      "shape-donut",
+      "shape-spiral",
+      "shape-bezier",
+      "panel-five-manga",
+      "bubble-shout",
+      "sfx-crash",
+      "effect-focus-corner",
+      "pattern-halftone",
+    ]) {
+      expect(ids.has(id), `missing asset: ${id}`).toBe(true);
+    }
   });
 
   it("finds by id", () => {

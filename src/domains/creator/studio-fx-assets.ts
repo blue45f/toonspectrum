@@ -996,7 +996,87 @@ function cyberNeonGrid(): string {
   `);
 }
 
-// 공개 목록(>= 14개). 라벨은 한글, id는 영문.
+function concentricShockwave(): string {
+  return svg(480, 480, `
+    <g fill="none" stroke="${INK}" stroke-linecap="round">
+      <circle cx="240" cy="240" r="58" stroke-width="12"/>
+      <circle cx="240" cy="240" r="118" stroke-width="9" opacity="0.8"/>
+      <circle cx="240" cy="240" r="184" stroke-width="6" opacity="0.55"/>
+      <circle cx="240" cy="240" r="224" stroke-width="3" opacity="0.35"/>
+    </g>
+  `);
+}
+
+function cornerFocusLines(): string {
+  const lines = Array.from({ length: 34 }, (_, index) => {
+    const angle = -1.48 + (index / 33) * 1.4;
+    const inner = 70 + (index % 4) * 5;
+    const outer = 620 - (index % 5) * 14;
+    const x1 = 24 + Math.cos(angle) * inner;
+    const y1 = 456 + Math.sin(angle) * inner;
+    const x2 = 24 + Math.cos(angle) * outer;
+    const y2 = 456 + Math.sin(angle) * outer;
+    return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${INK}" stroke-width="${(3 + (index % 4)).toFixed(1)}" stroke-linecap="round"/>`;
+  }).join("");
+  return svg(480, 480, lines);
+}
+
+function verticalSpeedFall(): string {
+  const lines = Array.from({ length: 30 }, (_, index) => {
+    const x = 10 + index * 16;
+    const y1 = (index * 47) % 150 - 60;
+    const y2 = 480 - ((index * 29) % 90);
+    return `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="${INK}" stroke-width="${2 + (index % 5)}" stroke-linecap="round"/>`;
+  }).join("");
+  return svg(480, 480, lines);
+}
+
+function diagonalRain(): string {
+  const lines = Array.from({ length: 42 }, (_, index) => {
+    const x = (index * 53) % 560 - 40;
+    const y = (index * 79) % 430 - 80;
+    return `<line x1="${x}" y1="${y}" x2="${x - 42}" y2="${y + 104}" stroke="#67bde8" stroke-width="${2 + (index % 3)}" stroke-linecap="round" opacity="${0.55 + (index % 4) * 0.1}"/>`;
+  }).join("");
+  return svg(480, 480, lines);
+}
+
+function motionArcs(): string {
+  return svg(480, 360, `
+    <path d="M44 252 C102 58 362 28 444 188" fill="none" stroke="${INK}" stroke-width="15" stroke-linecap="round"/>
+    <path d="M74 298 C142 128 348 112 412 232" fill="none" stroke="${INK}" stroke-width="10" stroke-linecap="round" opacity="0.75"/>
+    <path d="M122 330 C184 214 330 202 372 278" fill="none" stroke="${INK}" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+    <path d="M402 142 L458 194 L388 210 Z" fill="${INK}"/>
+  `);
+}
+
+function inkImpactBurst(): string {
+  return svg(480, 480, `
+    <path d="M240 42 L266 176 L354 82 L310 196 L442 148 L326 226 L454 264 L322 278 L412 378 L294 310 L318 446 L256 326 L188 444 L210 308 L88 382 L178 278 L42 256 L176 224 L54 142 L188 194 L134 74 L218 176 Z" fill="${INK}"/>
+    <circle cx="88" cy="92" r="15" fill="${INK}"/><circle cx="402" cy="94" r="10" fill="${INK}"/>
+    <circle cx="420" cy="406" r="18" fill="${INK}"/><circle cx="68" cy="390" r="9" fill="${INK}"/>
+    <circle cx="240" cy="250" r="58" fill="${WHITE}"/>
+  `);
+}
+
+function floatingEmbers(): string {
+  const sparks = Array.from({ length: 30 }, (_, index) => {
+    const x = 22 + ((index * 71) % 438);
+    const y = 24 + ((index * 97) % 430);
+    const radius = 2 + (index % 5);
+    return `<circle cx="${x}" cy="${y}" r="${radius}" fill="${index % 3 === 0 ? "#fff2a8" : "#f47a32"}" opacity="${0.55 + (index % 4) * 0.12}"/>`;
+  }).join("");
+  return svg(480, 480, sparks);
+}
+
+function mangaShockMarks(): string {
+  return svg(420, 300, `
+    <path d="M62 32 L112 150 M206 14 L210 140 M356 38 L306 152" fill="none" stroke="${INK}" stroke-width="20" stroke-linecap="round"/>
+    <path d="M104 190 L132 244 M210 174 L210 250 M314 190 L286 244" fill="none" stroke="${INK}" stroke-width="12" stroke-linecap="round"/>
+    <circle cx="142" cy="270" r="10" fill="${INK}"/><circle cx="210" cy="278" r="10" fill="${INK}"/><circle cx="278" cy="270" r="10" fill="${INK}"/>
+  `);
+}
+
+// 공개 목록. 라벨은 한글, id는 영문.
 export const FX_OVERLAYS: FxOverlay[] = [
   { id: "radial-focus", label: "집중선", svg: radialFocus(), width: 480, height: 480 },
   { id: "speed-lines", label: "속도선", svg: speedLines(), width: 480, height: 200 },
@@ -1023,4 +1103,12 @@ export const FX_OVERLAYS: FxOverlay[] = [
   { id: "gloomy-raincloud", label: "우울한 먹구름", svg: gloomyRaincloud(), width: 480, height: 320 },
   { id: "shock-stress-lines", label: "당황 번개선", svg: shockStressLines(), width: 320, height: 460 },
   { id: "cyber-neon-grid", label: "사이버 네온그리드", svg: cyberNeonGrid(), width: 480, height: 480 },
+  { id: "concentric-shockwave", label: "동심원 충격파", svg: concentricShockwave(), width: 480, height: 480 },
+  { id: "corner-focus-lines", label: "코너 집중선", svg: cornerFocusLines(), width: 480, height: 480 },
+  { id: "vertical-speed-fall", label: "낙하 속도선", svg: verticalSpeedFall(), width: 480, height: 480 },
+  { id: "diagonal-rain", label: "사선 빗줄기", svg: diagonalRain(), width: 480, height: 480 },
+  { id: "motion-arcs", label: "회전 모션 아크", svg: motionArcs(), width: 480, height: 360 },
+  { id: "ink-impact-burst", label: "먹 임팩트 버스트", svg: inkImpactBurst(), width: 480, height: 480 },
+  { id: "floating-embers", label: "흩날리는 불씨", svg: floatingEmbers(), width: 480, height: 480 },
+  { id: "manga-shock-marks", label: "만화 충격 마크", svg: mangaShockMarks(), width: 420, height: 300 },
 ];

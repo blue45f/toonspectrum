@@ -48,6 +48,7 @@ import {
   studioBrushAliasEffectiveDiameter,
 } from "./studio-brush-alias-profile";
 import {
+  DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
   normalizeStudioBrushDynamicsSettings,
   planStudioDynamicBrushDabs,
   resolveStudioBrushDynamicsPresetId,
@@ -57,6 +58,16 @@ import {
   type StudioDynamicBrushDab,
   type StudioBrushDynamicsSettings,
 } from "./studio-brush-dynamics";
+import {
+  resolveNormalizedStudioBrushDabColor,
+  resolveNormalizedStudioBrushGrainAlphaMultiplier,
+  studioBrushGrainIsActive,
+} from "./studio-brush-material-dynamics";
+import {
+  planStudioDynamicBrushRenderBudget,
+  STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
+  type StudioDynamicBrushRenderStampGrid,
+} from "./studio-brush-render-budget";
 import { resolveStudioBrushSinglePointRoute } from "./studio-brush-runtime-contract";
 import {
   planStudioStampBrushDabs,
@@ -69,7 +80,10 @@ import {
 } from "./studio-brush-stamp-engine";
 import {
   studioDynamicBrushDabVariations,
+  studioBrushSymmetryTransforms,
+  transformStudioBrushSymmetryPoint,
 } from "./studio-brush-symmetry";
+import { planNormalizedStudioBrushTipComposition } from "./studio-brush-tip-composition";
 import {
   buildStudioBrushTipAlphaMap,
   planStudioBrushTipStampWorldSamples,
@@ -115,7 +129,6 @@ import {
   studioInkPressureRadius,
   type StudioInkPressureModel,
 } from "./studio-ink-pressure-model";
-import { getKaleidoscopePoints } from "./studio-kaleidoscope";
 import { hasActiveImageFilters, type ImageFilterFields } from "./studio-konva-filter-fields";
 import { isEffectivelyHidden, type LayerGroup } from "./studio-layers";
 import { getPatternDef, normalizePatternSpec, type StudioPatternSpec } from "./studio-pattern-fill";
@@ -539,28 +552,18 @@ function drawBounds(points: readonly number[]): { x: number; y: number; width: n
 
 /** StudioPage getSymmetricPoints 포트 — 대칭 드로잉 변형 좌표열. */
 function getSymmetricPoints(points: number[], symmetry: SvgDrawElLike["symmetry"]): number[][] {
-  if (!symmetry || symmetry.type === "none" || points.length === 0) return [points];
-  const result: number[][] = [points];
-  const cx = symmetry.centerX;
-  const cy = symmetry.centerY;
-  if (symmetry.type === "vertical") {
-    const mirrored: number[] = [];
-    for (let i = 0; i + 1 < points.length; i += 2) mirrored.push(cx * 2 - points[i], points[i + 1]);
-    result.push(mirrored);
-  } else if (symmetry.type === "horizontal") {
-    const mirrored: number[] = [];
-    for (let i = 0; i + 1 < points.length; i += 2) mirrored.push(points[i], cy * 2 - points[i + 1]);
-    result.push(mirrored);
-  } else if (symmetry.type === "radial" || symmetry.type === "kaleidoscope") {
-    const variations = getKaleidoscopePoints(points, {
-      centerX: cx,
-      centerY: cy,
-      radialCount: symmetry.radialCount,
-      mirror: symmetry.type === "kaleidoscope",
-    });
-    result.push(...variations.slice(1));
-  }
-  return result;
+  if (points.length === 0) return [points];
+  return studioBrushSymmetryTransforms(symmetry).map((transform) => {
+    const transformed: number[] = [];
+    for (let index = 0; index + 1 < points.length; index += 2) {
+      transformed.push(...transformStudioBrushSymmetryPoint(
+        points[index]!,
+        points[index + 1]!,
+        transform
+      ));
+    }
+    return transformed;
+  });
 }
 
 /** StudioPage formatVerticalText 포트 — 세로쓰기(열 우→좌, 빈 칸은 전각 공백). */
@@ -786,7 +789,8 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
             ?? studioBrushDynamicsSettingsForBrushId(el.brush)
             ?? studioBrushDynamicsSettingsForBrushId(dynamicBrushId)
         );
-        const baseDabs = planStudioDynamicBrushDabs({
+        const seed = studioBrushDynamicsSeedFromKey(`${el.id}:${dynamics.seed}`);
+        const dabPlanInput = {
           points: el.points,
           pressures: el.pressures,
           tangentialPressures: el.tangentialPressures,
@@ -797,11 +801,28 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
           baseWidth: strokeWidth,
           baseOpacity: dynamics.opacity.base,
           settings: dynamics,
-          seed: studioBrushDynamicsSeedFromKey(`${el.id}:${dynamics.seed}`),
-          maxDabs: 1024,
+          seed,
+        };
+        let baseDabs = planStudioDynamicBrushDabs({
+          ...dabPlanInput,
+          maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
         });
+        const renderBudget = planStudioDynamicBrushRenderBudget({
+          settings: dynamics,
+          dabCount: baseDabs.length,
+          symmetryCount: variations.length,
+          markBudget: STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
+        });
+        if (renderBudget.maxDabsPerVariation < baseDabs.length) {
+          baseDabs = planStudioDynamicBrushDabs({
+            ...dabPlanInput,
+            maxDabs: renderBudget.maxDabsPerVariation,
+          });
+        }
         return {
           dynamics,
+          seed,
+          renderBudget,
           dabVariations: studioDynamicBrushDabVariations(baseDabs, el.symmetry),
         };
       })()
@@ -887,7 +908,9 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
         opacityAttr,
         opacity,
         dynamicDabVariations?.[variationIndex],
-        dynamicPlan?.dynamics
+        dynamicPlan?.dynamics,
+        dynamicPlan?.seed,
+        dynamicPlan?.renderBudget.stampGrid
       ));
     }
   }
@@ -967,7 +990,9 @@ function serializeFreehand(
   opacityAttr: string,
   strokeOpacity: number,
   dynamicDabs?: readonly StudioDynamicBrushDab[],
-  dynamics?: NormalizedStudioBrushDynamicsSettings
+  dynamics?: NormalizedStudioBrushDynamicsSettings,
+  dynamicSeed?: number,
+  dynamicStampGrid: StudioDynamicBrushRenderStampGrid = 7
 ): string {
   const brush = el.brush ?? "pen";
   const brushFamily = resolveStudioBrushRenderFamily(brush);
@@ -1051,36 +1076,81 @@ function serializeFreehand(
   }
 
   if (dynamicBrush && dynamicsPresetId) {
-    const tip = dynamics?.tip ?? normalizeStudioBrushDynamicsSettings(
+    const normalizedDynamics = dynamics ?? normalizeStudioBrushDynamicsSettings(
       el.brushDynamics
         ?? studioBrushDynamicsSettingsForBrushId(brush)
         ?? studioBrushDynamicsSettingsForBrushId(dynamicsPresetId)
-    ).tip;
-    const useEllipse = studioBrushTipUsesSolidEllipse(tip);
-    if (useEllipse) {
-      const ellipses = (dynamicDabs ?? []).map((dab) => {
-        // Canvas renderer applies the toolbar/stroke opacity to every dab. Keep SVG overlap and
-        // accumulation identical instead of applying opacity once to the completed group.
-        const opacity = Math.min(1, Math.max(0, dab.opacity * dab.flow * strokeOpacity));
-        // Canvas first clamps the circular radius and then applies Y scale(roundness). Applying the
-        // minimum independently to ry would turn a thin tilted tip back into a round 0.5px dot.
-        const radius = Math.max(0.25, dab.size / 2);
-        const ry = radius * dab.roundness;
-        return `<ellipse cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" rx="${fmt(radius)}" ry="${fmt(ry)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(opacity)}" transform="rotate(${fmt(dab.angle)} ${fmt(dab.x)} ${fmt(dab.y)})"/>`;
-      }).join("");
-      return `<g>${ellipses}</g>`;
-    }
+    );
+    const strokeSeed = dynamicSeed
+      ?? studioBrushDynamicsSeedFromKey(`${el.id}:${normalizedDynamics.seed}`);
+    const dabs = dynamicDabs ?? [];
+    const grainActive = studioBrushGrainIsActive(normalizedDynamics.grain);
+    const tipDefinitions = [
+      normalizedDynamics.tip,
+      ...normalizedDynamics.tipLayers.map((layer) => layer.tip),
+    ];
+    const tipUsesEllipse = tipDefinitions.map((tip) => (
+      !grainActive && studioBrushTipUsesSolidEllipse(tip)
+    ));
+    const tipAlphaMaps = tipDefinitions.map((tip, tipIndex) => (
+      tipUsesEllipse[tipIndex] ? null : buildStudioBrushTipAlphaMap(tip)
+    ));
+    const strokeOriginX = dabs[0]?.sourceX ?? dabs[0]?.x ?? 0;
+    const strokeOriginY = dabs[0]?.sourceY ?? dabs[0]?.y ?? 0;
+    const marks: string[] = [];
+    const grainAt = (x: number, y: number) => resolveNormalizedStudioBrushGrainAlphaMultiplier({
+      x,
+      y,
+      strokeOriginX,
+      strokeOriginY,
+      strokeSeed,
+    }, normalizedDynamics.grain);
 
-    // PNG-alpha / procedural tip stamp path — same footprint planner as Canvas.
-    const alphaMap = buildStudioBrushTipAlphaMap(tip);
-    const stamps = (dynamicDabs ?? []).flatMap((dab) => {
-      const baseOpacity = Math.min(1, Math.max(0, dab.opacity * dab.flow * strokeOpacity));
-      return planStudioBrushTipStampWorldSamples(dab, tip, { alphaMap, grid: 7 }).map((sample) => {
-        const opacity = Math.min(1, Math.max(0, baseOpacity * sample.alpha));
-        return `<circle cx="${fmt(sample.x)}" cy="${fmt(sample.y)}" r="${fmt(sample.radius)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(opacity)}"/>`;
-      });
-    }).join("");
-    return `<g>${stamps}</g>`;
+    for (const dab of dabs) {
+      const dabColor = escapeXml(resolveNormalizedStudioBrushDabColor(
+        stroke,
+        dab.index,
+        strokeSeed,
+        normalizedDynamics.colorDynamics
+      ));
+      const composed = planNormalizedStudioBrushTipComposition(
+        dab,
+        normalizedDynamics.tip,
+        normalizedDynamics.tipLayers
+      );
+      for (const composedTip of composed) {
+        const composedDab = composedTip.dab;
+        const tipIndex = composedTip.role === "primary" ? 0 : composedTip.layerIndex + 1;
+        const baseOpacity = Math.min(
+          1,
+          Math.max(0, composedDab.opacity * composedDab.flow * strokeOpacity)
+        );
+        const alphaMap = tipAlphaMaps[tipIndex] ?? null;
+        if (tipUsesEllipse[tipIndex] || !alphaMap) {
+          // Canvas clamps the circular radius and then scales its Y axis by roundness.
+          const radius = Math.max(0.25, composedDab.size / 2);
+          const opacity = Math.min(
+            1,
+            Math.max(0, baseOpacity * grainAt(composedDab.x, composedDab.y))
+          );
+          marks.push(`<ellipse cx="${fmt(composedDab.x)}" cy="${fmt(composedDab.y)}" rx="${fmt(radius)}" ry="${fmt(radius * composedDab.roundness)}" fill="${dabColor}" opacity="${fmtDabOpacity(opacity)}" transform="rotate(${fmt(composedDab.angle)} ${fmt(composedDab.x)} ${fmt(composedDab.y)})"/>`);
+          continue;
+        }
+
+        for (const sample of planStudioBrushTipStampWorldSamples(
+          composedDab,
+          composedTip.tip,
+          { alphaMap, grid: dynamicStampGrid }
+        )) {
+          const opacity = Math.min(
+            1,
+            Math.max(0, baseOpacity * sample.alpha * grainAt(sample.x, sample.y))
+          );
+          marks.push(`<circle cx="${fmt(sample.x)}" cy="${fmt(sample.y)}" r="${fmt(sample.radius)}" fill="${dabColor}" opacity="${fmtDabOpacity(opacity)}"/>`);
+        }
+      }
+    }
+    return `<g>${marks.join("")}</g>`;
   }
 
   if (brushFamily === "watercolor") {

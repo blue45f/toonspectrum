@@ -6,7 +6,11 @@ import {
 } from "./studio-brush-dynamics";
 import {
   buildStudioBrushTipAlphaMap,
+  countStudioBrushTipStampSamples,
+  STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_MAX_CHARS,
+  STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_SOURCE_MAX_CHARS,
   STUDIO_BRUSH_TIP_ALPHA_MAP_CACHE_LIMIT,
+  STUDIO_BRUSH_TIP_ALPHA_MAP_MAX_BYTES,
   decodeStudioBrushTipAlphaMapBase64,
   encodeStudioBrushTipAlphaMapBase64,
   normalizeStudioBrushTipSettings,
@@ -57,6 +61,23 @@ describe("studio brush tip alpha maps", () => {
     expect(map.size).toBe(size);
     expect(map.alphas[0]).toBeCloseTo(bytes[0]! / 255, 5);
     expect(map.alphas[bytes.length - 1]).toBeCloseTo(bytes[bytes.length - 1]! / 255, 5);
+  });
+
+  it("rejects oversized encoded alpha maps before allocating decoded output", () => {
+    const maximumBytes = new Uint8Array(STUDIO_BRUSH_TIP_ALPHA_MAP_MAX_BYTES);
+    maximumBytes.fill(255);
+    const maximumPayload = encodeStudioBrushTipAlphaMapBase64(maximumBytes);
+    expect(maximumPayload).toHaveLength(STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_MAX_CHARS);
+    expect(decodeStudioBrushTipAlphaMapBase64(maximumPayload)).toHaveLength(maximumBytes.length);
+
+    const decodedOverflow = `${maximumPayload.slice(0, -4)}AAAA`;
+    expect(decodeStudioBrushTipAlphaMapBase64(decodedOverflow)).toBeNull();
+    expect(decodeStudioBrushTipAlphaMapBase64(
+      "A".repeat(STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_MAX_CHARS + 4)
+    )).toBeNull();
+    expect(decodeStudioBrushTipAlphaMapBase64(
+      " \n".repeat(Math.ceil(STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_SOURCE_MAX_CHARS / 2) + 1)
+    )).toBeNull();
   });
 
   it("reuses decoded and softened alpha maps with a bounded LRU", () => {
@@ -165,6 +186,7 @@ describe("studio brush tip stamp planner", () => {
     const first = planStudioBrushTipStamp(dab, tip, { grid: 7 });
     const second = planStudioBrushTipStamp(dab, tip, { grid: 7 });
     expect(first).toEqual(second);
+    expect(countStudioBrushTipStampSamples(tip, { grid: 7 })).toBe(first.samples.length);
     expect(first.samples.length).toBeGreaterThan(4);
     for (const sample of first.samples) {
       expect(sample.alpha).toBeGreaterThan(0);

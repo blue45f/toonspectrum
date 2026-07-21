@@ -3,6 +3,9 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
+import { STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET } from "./studio-brush-render-budget";
+import { encodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
 import { StudioDrawNode } from "./StudioDrawNode";
 
 import type { DrawEl } from "./studio-element-model";
@@ -15,6 +18,7 @@ interface CapturedKonvaNode {
 
 class StampSceneContext {
   readonly arcs: string[] = [];
+  readonly fills: Array<{ alpha: number; color: string }> = [];
   readonly transforms: string[] = [];
   globalAlpha = 1;
   fillStyle: string | CanvasGradient | CanvasPattern = "";
@@ -22,7 +26,9 @@ class StampSceneContext {
   save(): void {}
   restore(): void {}
   beginPath(): void {}
-  fill(): void {}
+  fill(): void {
+    this.fills.push({ alpha: this.globalAlpha, color: String(this.fillStyle) });
+  }
   arc(x: number, y: number, radius: number): void {
     this.arcs.push(`${x},${y},${radius}`);
   }
@@ -575,6 +581,103 @@ describe("StudioDrawNode orchestration", () => {
     sceneFunc(context as unknown as CanvasRenderingContext2D);
     expect(context.transforms).toEqual(["1,0,0,1,0,0"]);
     expect(context.arcs).toHaveLength(1);
+  });
+
+  it("renders phase-two colour, fixed grain and multi-tip marks on the Canvas path", () => {
+    const brushDynamics = normalizeStudioBrushDynamicsSettings({
+      tip: { shape: "round", softness: 0.1 },
+      colorDynamics: { hueJitter: 65, saturationJitter: 0.2, valueJitter: 0.12 },
+      grain: { space: "canvas-fixed", amount: 0.7, scale: 4, contrast: 0.75, seed: 81 },
+      tipLayers: [
+        { tip: { shape: "star" }, scale: 0.6, opacity: 0.65, offsetY: -0.45 },
+        { tip: { shape: "grain" }, scale: 0.4, opacity: 0.45, offsetY: 0.5 },
+      ],
+      taper: { enabled: false },
+      spacingRatio: null,
+      spacing: { base: 8, mappings: [] },
+      scatterRatio: null,
+      scatter: { base: 0, mappings: [] },
+    });
+    const element = drawEl({
+      id: "phase-two-canvas",
+      brush: "ink-particle",
+      mode: "pen",
+      points: [10, 20, 50, 20],
+      pressures: [0.7, 0.7],
+      stroke: "#356dcc",
+      brushDynamics,
+    });
+    const view = render(<StudioDrawNode el={element} />);
+    const layeredContext = new StampSceneContext();
+    const layeredScene = captured("Shape")[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D
+    ) => void;
+    layeredScene(layeredContext as unknown as CanvasRenderingContext2D);
+
+    view.unmount();
+    konvaCapture.nodes.length = 0;
+    render(<StudioDrawNode el={{
+      ...element,
+      brushDynamics: normalizeStudioBrushDynamicsSettings({ ...brushDynamics, tipLayers: [] }),
+    }} />);
+    const singleContext = new StampSceneContext();
+    const singleScene = captured("Shape")[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D
+    ) => void;
+    singleScene(singleContext as unknown as CanvasRenderingContext2D);
+
+    expect(layeredContext.arcs.length).toBeGreaterThan(singleContext.arcs.length * 1.5);
+    expect(new Set(layeredContext.fills.map((fill) => fill.color)).size).toBeGreaterThan(2);
+    expect(new Set(layeredContext.fills.map((fill) => fill.alpha.toFixed(4))).size).toBeGreaterThan(5);
+    expect(layeredContext.fills.every((fill) => fill.alpha >= 0 && fill.alpha <= 1)).toBe(true);
+  });
+
+  it("keeps pathological live multi-tip kaleidoscope work inside the shared mark budget", () => {
+    const alphaMapSize = 8;
+    const alphaBytes = new Uint8Array(alphaMapSize * alphaMapSize);
+    alphaBytes.fill(255);
+    const tip = {
+      shape: "hard" as const,
+      softness: 0,
+      alphaMapBase64: encodeStudioBrushTipAlphaMapBase64(alphaBytes),
+      alphaMapSize,
+    };
+    const brushDynamics = normalizeStudioBrushDynamicsSettings({
+      tip,
+      tipLayers: [{ tip }, { tip }],
+      taper: { enabled: false },
+      spacingRatio: null,
+      spacing: { base: 0.25, mappings: [] },
+    });
+    render(<StudioDrawNode
+      activeDraft
+      el={drawEl({
+        id: "bounded-live-kaleidoscope",
+        brush: "ink-particle",
+        mode: "pen",
+        points: [0, 0, 5_000, 0],
+        pressures: [0.7, 0.7],
+        brushDynamics,
+        symmetry: {
+          type: "kaleidoscope",
+          centerX: 0,
+          centerY: 0,
+          radialCount: 32,
+        },
+      })}
+    />);
+
+    const shapes = captured("Shape");
+    const context = new StampSceneContext();
+    expect(shapes).toHaveLength(64);
+    for (const shape of shapes) {
+      const sceneFunc = shape.props.sceneFunc as (context: CanvasRenderingContext2D) => void;
+      sceneFunc(context as unknown as CanvasRenderingContext2D);
+    }
+
+    expect(context.arcs.length).toBeGreaterThan(0);
+    expect(context.arcs.length).toBeLessThanOrEqual(STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET);
+    expect(context.fills).toHaveLength(context.arcs.length);
   });
 
   it.each([

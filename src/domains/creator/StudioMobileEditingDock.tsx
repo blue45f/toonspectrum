@@ -7,6 +7,7 @@ import {
   Grid3X3,
   Hand,
   Layers,
+  MessageCircle,
   Minus,
   MousePointer2,
   PaintBucket,
@@ -140,6 +141,7 @@ export interface StudioMobileEditingDockHandlers {
   removeSelected: () => void;
   reorder: (dir: "front" | "back" | "forward" | "backward") => void;
   toggleAdvancedFill: () => void;
+  toggleStudioCommentPinPlacement: () => void;
   undo: () => void;
 }
 
@@ -175,6 +177,7 @@ export interface StudioMobileEditingDockProps {
   brushManagerSheetRef: import("react").RefObject<HTMLDivElement | null>;
   brushOpacity: number;
   collaborationDocumentLocked: boolean;
+  commentPinArmed: boolean;
   color: string;
   colorBlindPreview: CvdMode;
   colorVisionSheetRef: import("react").RefObject<HTMLElement | null>;
@@ -258,6 +261,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   brushManagerSheetRef,
   brushOpacity,
   collaborationDocumentLocked,
+  commentPinArmed,
   color,
   colorBlindPreview,
   colorVisionSheetRef,
@@ -349,6 +353,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     removeSelected,
     reorder,
     toggleAdvancedFill,
+    toggleStudioCommentPinPlacement,
     undo,
   } = stableHandlers;
   const [drawSheetSnap, setDrawSheetSnap] = useState<StudioMobileSheetSnap>("medium");
@@ -1162,6 +1167,20 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               aria-label="작업 공간"
               data-studio-mobile-dock-scroll="secondary"
             >
+              <StudioDockNavButton
+                icon={commentPinArmed ? X : MessageCircle}
+                label={commentPinArmed ? "취소" : "댓글"}
+                active={commentPinArmed}
+                aria-pressed={commentPinArmed}
+                aria-label={commentPinArmed ? "댓글 위치 선택 취소" : "캔버스 위치 댓글"}
+                title={commentPinArmed ? "댓글 위치 선택 취소" : "캔버스 위치 댓글"}
+                data-studio-mobile-comment-trigger="true"
+                className="min-h-11 min-w-11 shrink-0"
+                onClick={() => {
+                  setMobileSheet(null);
+                  toggleStudioCommentPinPlacement();
+                }}
+              />
               {workspaceState.mobileControlSide === "left"
                 ? mobileQuickActionsButton
                 : null}

@@ -34,12 +34,86 @@ export interface StudioCanvasCommentPin {
   newestThreadId?: string;
   /** Most recently active unread thread, preferred when opening a clustered pin. */
   newestUnreadThreadId?: string;
+  /** Most recent message summary shown without opening the full review rail. */
+  previewAuthor?: string;
+  previewBody?: string;
   label: string;
   x: number;
   y: number;
   /** Deterministic screen-pixel nudge for distinct anchors that would otherwise overlap. */
   screenOffsetX?: number;
   screenOffsetY?: number;
+}
+
+export interface StudioCommentPinPreviewPosition {
+  left: number;
+  top: number;
+  width: number;
+  placement: "left" | "right" | "above" | "below";
+}
+
+/** Positions the singleton pin preview in the visual viewport without changing canvas overflow. */
+export function planStudioCommentPinPreviewPosition(options: {
+  anchor: { left: number; top: number; right: number; bottom: number; width: number; height: number };
+  viewport: { left: number; top: number; width: number; height: number };
+  measured?: { width: number; height: number };
+}): StudioCommentPinPreviewPosition {
+  const margin = 12;
+  const gap = 8;
+  const viewportRight = options.viewport.left + Math.max(1, options.viewport.width);
+  const viewportBottom = options.viewport.top + Math.max(1, options.viewport.height);
+  const width = Math.min(
+    Math.max(128, options.measured?.width ?? 224),
+    Math.max(1, options.viewport.width - margin * 2)
+  );
+  const height = Math.min(
+    Math.max(72, options.measured?.height ?? 108),
+    Math.max(1, options.viewport.height - margin * 2)
+  );
+  const spaceLeft = options.anchor.left - options.viewport.left - gap;
+  const spaceRight = viewportRight - options.anchor.right - gap;
+  const spaceAbove = options.anchor.top - options.viewport.top - gap;
+  const spaceBelow = viewportBottom - options.anchor.bottom - gap;
+  const clampLeft = (value: number) => clamp(
+    value,
+    options.viewport.left + margin,
+    Math.max(options.viewport.left + margin, viewportRight - width - margin)
+  );
+  const clampTop = (value: number) => clamp(
+    value,
+    options.viewport.top + margin,
+    Math.max(options.viewport.top + margin, viewportBottom - height - margin)
+  );
+  const centeredLeft = options.anchor.left + options.anchor.width / 2 - width / 2;
+  const centeredTop = options.anchor.top + options.anchor.height / 2 - height / 2;
+
+  if (spaceRight >= width || spaceLeft >= width) {
+    const placement = spaceRight >= width && (spaceRight >= spaceLeft || spaceLeft < width)
+      ? "right"
+      : "left";
+    return {
+      placement,
+      left: placement === "right"
+        ? options.anchor.right + gap
+        : options.anchor.left - gap - width,
+      top: clampTop(centeredTop),
+      width,
+    };
+  }
+
+  const placement = spaceBelow >= height && (spaceBelow >= spaceAbove || spaceAbove < height)
+    ? "below"
+    : "above";
+  return {
+    placement,
+    left: clampLeft(centeredLeft),
+    top: clampTop(
+      placement === "below"
+        ? options.anchor.bottom + gap
+        : options.anchor.top - gap - height
+    ),
+    width,
+  };
 }
 
 function stableHash(value: string): number {
@@ -130,6 +204,31 @@ function anchorTargetId(anchor: StudioCommentAnchor): string | null {
   return null;
 }
 
+function studioCommentThreadPreview(thread: StudioCommentThread): {
+  author: string;
+  body: string;
+} {
+  // `thread.updatedAt` is an aggregate activity timestamp (assignment/reopen included), not the
+  // root message's edit timestamp. Once replies exist, compare replies only so metadata activity
+  // cannot make an old root body masquerade as the latest message.
+  const latestReply = thread.replies.reduce<StudioCommentThread["replies"][number] | null>(
+    (current, reply) => (
+      !current
+      || Date.parse(reply.updatedAt) > Date.parse(current.updatedAt)
+      || (reply.updatedAt === current.updatedAt && reply.id.localeCompare(current.id) > 0)
+        ? reply
+        : current
+    ),
+    null
+  );
+  const latest = latestReply ?? thread;
+  const characters = Array.from(latest.body.trim());
+  const body = characters.length > 280
+    ? `${characters.slice(0, 279).join("")}…`
+    : characters.join("");
+  return { author: latest.author.displayName, body };
+}
+
 /**
  * Projects persisted page/frame/element comment anchors into non-exported DOM pins.
  * Multiple open threads on the same anchor collapse into one numbered pin, matching Figma's
@@ -149,13 +248,18 @@ export function projectStudioCanvasCommentPins(options: {
     threadIds: string[];
     newestThreadId: string;
     newestUpdatedAt: string;
+    previewAuthor: string;
+    previewBody: string;
     newestUnreadThreadId?: string;
     newestUnreadUpdatedAt?: string;
+    newestUnreadPreviewAuthor?: string;
+    newestUnreadPreviewBody?: string;
     unreadCount: number;
   }>();
 
   for (const thread of options.threads) {
     if (thread.resolved || thread.anchor.pageId !== options.pageId) continue;
+    const preview = studioCommentThreadPreview(thread);
     const key = canonicalStudioCommentAnchorKey(thread.anchor);
     const existing = grouped.get(key);
     if (existing) {
@@ -172,6 +276,8 @@ export function projectStudioCanvasCommentPins(options: {
         ) {
           existing.newestUnreadThreadId = thread.id;
           existing.newestUnreadUpdatedAt = thread.updatedAt;
+          existing.newestUnreadPreviewAuthor = preview.author;
+          existing.newestUnreadPreviewBody = preview.body;
         }
       }
       if (
@@ -183,6 +289,8 @@ export function projectStudioCanvasCommentPins(options: {
       ) {
         existing.newestThreadId = thread.id;
         existing.newestUpdatedAt = thread.updatedAt;
+        existing.previewAuthor = preview.author;
+        existing.previewBody = preview.body;
       }
     } else {
       grouped.set(key, {
@@ -190,9 +298,17 @@ export function projectStudioCanvasCommentPins(options: {
         threadIds: [thread.id],
         newestThreadId: thread.id,
         newestUpdatedAt: thread.updatedAt,
+        previewAuthor: preview.author,
+        previewBody: preview.body,
         newestUnreadThreadId: options.unreadThreadIds?.has(thread.id) ? thread.id : undefined,
         newestUnreadUpdatedAt: options.unreadThreadIds?.has(thread.id)
           ? thread.updatedAt
+          : undefined,
+        newestUnreadPreviewAuthor: options.unreadThreadIds?.has(thread.id)
+          ? preview.author
+          : undefined,
+        newestUnreadPreviewBody: options.unreadThreadIds?.has(thread.id)
+          ? preview.body
           : undefined,
         unreadCount: options.unreadThreadIds?.has(thread.id) ? 1 : 0,
       });
@@ -224,6 +340,8 @@ export function projectStudioCanvasCommentPins(options: {
       threadIds: group.threadIds,
       newestThreadId: group.newestThreadId,
       newestUnreadThreadId: group.newestUnreadThreadId,
+      previewAuthor: group.newestUnreadPreviewAuthor ?? group.previewAuthor,
+      previewBody: group.newestUnreadPreviewBody ?? group.previewBody,
       label:
         options.labelForAnchor?.(group.anchor) ??
         (group.anchor.type === "page"

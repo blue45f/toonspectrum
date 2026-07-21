@@ -26,12 +26,16 @@ interface MockDockButtonProps {
   readonly "aria-controls"?: string;
   readonly "aria-expanded"?: boolean;
   readonly "aria-label"?: string;
+  readonly "aria-pressed"?: boolean;
+  readonly "data-studio-mobile-comment-trigger"?: string;
+  readonly className?: string;
   readonly disabled?: boolean;
   readonly hintDescription?: string;
   readonly hintPreview?: string;
   readonly hintPreviewVariant?: string;
   readonly label: string;
   readonly onClick?: () => void;
+  readonly title?: string;
 }
 
 vi.mock("./studio-chrome-ui", () => ({
@@ -65,11 +69,24 @@ vi.mock("./studio-chrome-ui", () => ({
   ),
   StudioDockNavButton: ({
     "aria-label": ariaLabel,
+    "aria-pressed": ariaPressed,
+    "data-studio-mobile-comment-trigger": mobileCommentTrigger,
+    className,
     label,
     disabled,
     onClick,
+    title,
   }: MockDockButtonProps) => (
-    <button type="button" aria-label={ariaLabel ?? label} disabled={disabled} onClick={onClick}>
+    <button
+      type="button"
+      aria-label={ariaLabel ?? label}
+      aria-pressed={ariaPressed}
+      className={className}
+      data-studio-mobile-comment-trigger={mobileCommentTrigger}
+      disabled={disabled}
+      onClick={onClick}
+      title={title}
+    >
       {label}
     </button>
   ),
@@ -108,6 +125,7 @@ function createHandlers(): StudioMobileEditingDockHandlers {
     removeSelected: vi.fn(),
     reorder: vi.fn(),
     toggleAdvancedFill: vi.fn(),
+    toggleStudioCommentPinPlacement: vi.fn(),
     undo: vi.fn(),
   };
 }
@@ -135,6 +153,7 @@ function createProps(
     brushManagerSheetRef: { current: null },
     brushOpacity: 1,
     collaborationDocumentLocked: false,
+    commentPinArmed: false,
     color: "#111111",
     colorBlindPreview: "none",
     colorVisionSheetRef: { current: null },
@@ -251,6 +270,60 @@ describe("StudioMobileEditingDock", () => {
     dock = screen.getByRole("navigation", { name: "스튜디오 모바일 도구막대" });
     expect(within(dock).getByRole<HTMLButtonElement>("button", { name: "실행취소" }).disabled).toBe(true);
     expect(within(dock).getByRole<HTMLButtonElement>("button", { name: "다시실행" }).disabled).toBe(true);
+  });
+
+  it("keeps a 44px canvas-comment action first and visible in the 390px scroll row", () => {
+    const stableHandlers = createHandlers();
+    const setMobileSheet = vi.fn();
+    const view = render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          collaborationDocumentLocked: true,
+          setMobileSheet,
+          stableHandlers,
+          workspaceState: { mobileControlSide: "left" } as StudioWorkspaceState,
+        })}
+      />,
+    );
+
+    const workspace = screen.getByRole("toolbar", { name: "작업 공간" });
+    const comment = within(workspace).getByRole<HTMLButtonElement>("button", {
+      name: "캔버스 위치 댓글",
+    });
+    expect(workspace.className).toContain("overflow-x-auto");
+    expect(workspace.getAttribute("data-studio-mobile-dock-scroll")).toBe("secondary");
+    expect(workspace.firstElementChild).toBe(comment);
+    expect(comment.className).toContain("min-h-11");
+    expect(comment.className).toContain("min-w-11");
+    expect(comment.getAttribute("data-studio-mobile-comment-trigger")).toBe("true");
+    expect(comment.getAttribute("aria-pressed")).toBe("false");
+    expect(comment.title).toBe("캔버스 위치 댓글");
+    expect(comment.disabled).toBe(false);
+
+    fireEvent.click(comment);
+    expect(setMobileSheet).toHaveBeenCalledWith(null);
+    expect(stableHandlers.toggleStudioCommentPinPlacement).toHaveBeenCalledOnce();
+
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          commentPinArmed: true,
+          setMobileSheet,
+          stableHandlers,
+        })}
+      />,
+    );
+    const cancel = within(
+      screen.getByRole("toolbar", { name: "작업 공간" }),
+    ).getByRole<HTMLButtonElement>("button", { name: "댓글 위치 선택 취소" });
+    expect(cancel.textContent).toBe("취소");
+    expect(cancel.getAttribute("aria-pressed")).toBe("true");
+    expect(cancel.title).toBe("댓글 위치 선택 취소");
+
+    fireEvent.click(cancel);
+    expect(stableHandlers.toggleStudioCommentPinPlacement).toHaveBeenCalledTimes(2);
   });
 
   it("preserves the draw and brush-manager dialog contracts through stable handlers", () => {

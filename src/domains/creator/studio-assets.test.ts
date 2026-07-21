@@ -1,6 +1,56 @@
 import { describe, it, expect } from "vitest";
 
-import { filterAssetsByLabel, filterBgSceneSections } from "./studio-assets";
+import {
+  CANVAS_W,
+  TEMPLATES,
+  TEMPLATE_GROUP_ORDER,
+  filterAssetsByLabel,
+  filterBgSceneSections,
+  groupTemplates,
+} from "./studio-assets";
+
+describe("studio canvas template catalog", () => {
+  it("provides 25 unique templates across six production-oriented groups", () => {
+    expect(TEMPLATES).toHaveLength(25);
+    expect(new Set(TEMPLATES.map((template) => template.id)).size).toBe(TEMPLATES.length);
+    expect(groupTemplates(TEMPLATES).map((group) => group.group)).toEqual([
+      ...TEMPLATE_GROUP_ORDER,
+    ]);
+  });
+
+  it("includes webtoon, dynamic manga, storyboard and cover layouts", () => {
+    const ids = new Set(TEMPLATES.map((template) => template.id));
+    for (const id of [
+      "webtoon8",
+      "grid12",
+      "storyboard6",
+      "dynamic-hero-left",
+      "dynamic-manga-five",
+      "cover-square",
+      "cover-story",
+    ]) {
+      expect(ids.has(id), `missing template: ${id}`).toBe(true);
+    }
+  });
+
+  it("keeps every frame finite and inside its canvas", () => {
+    for (const template of TEMPLATES) {
+      expect(template.canvasH).toBeGreaterThan(0);
+      for (const frame of template.frames) {
+        expect(Number.isFinite(frame.x)).toBe(true);
+        expect(Number.isFinite(frame.y)).toBe(true);
+        expect(Number.isFinite(frame.width)).toBe(true);
+        expect(Number.isFinite(frame.height)).toBe(true);
+        expect(frame.x).toBeGreaterThanOrEqual(0);
+        expect(frame.y).toBeGreaterThanOrEqual(0);
+        expect(frame.width).toBeGreaterThan(0);
+        expect(frame.height).toBeGreaterThan(0);
+        expect(frame.x + frame.width, `${template.id}: horizontal overflow`).toBeLessThanOrEqual(CANVAS_W);
+        expect(frame.y + frame.height, `${template.id}: vertical overflow`).toBeLessThanOrEqual(template.canvasH);
+      }
+    }
+  });
+});
 
 describe("studio-assets picker search helpers", () => {
   const stickers = [

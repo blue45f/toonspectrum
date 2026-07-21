@@ -1,5 +1,7 @@
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
   addStudioCommentThread,
@@ -19,6 +21,8 @@ import {
 import type { StudioLiveSyncSnapshot } from "./studio-live-sync-safety";
 
 const noop = () => undefined;
+
+afterEach(() => cleanup());
 
 function syncedSnapshot(
   overrides: Partial<StudioLiveSyncSnapshot> = {}
@@ -99,7 +103,13 @@ describe("StudioLiveCanvasOverlay", () => {
     expect(pins).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ count: 1, x: 24, y: 24 }),
-        expect.objectContaining({ count: 2, x: 420, y: 260 }),
+        expect.objectContaining({
+          count: 2,
+          x: 420,
+          y: 260,
+          previewAuthor: "민지",
+          previewBody: "말풍선 간격 확인",
+        }),
       ])
     );
     expect(document.threads).toHaveLength(3);
@@ -152,6 +162,8 @@ describe("StudioLiveCanvasOverlay", () => {
             anchor: { type: "page", pageId: "page-1" },
             count: 3,
             unreadCount: 2,
+            previewAuthor: "민지",
+            previewBody: "말풍선 간격을 조금 더 넓혀 주세요.",
             label: "1페이지",
             x: 400,
             y: 120,
@@ -171,11 +183,43 @@ describe("StudioLiveCanvasOverlay", () => {
     expect(html).toContain("size-8");
     expect(html).toContain("ring-accent/30");
     expect(html).toContain('data-studio-comment-pin="true"');
+    expect(html).not.toContain('data-studio-comment-pin-preview="true"');
+    expect(html).not.toContain("말풍선 간격을 조금 더 넓혀 주세요.");
     expect(html).not.toContain("border-white");
     expect(html).not.toContain("0.03_270");
     expect(html).toContain("clamp(1.375rem, calc(50.0000% + 0px), calc(100% - 1.375rem))");
     expect(html).not.toContain(privateSessionId);
     expect(html).not.toContain("page:page-1");
+  });
+
+  it("mounts only the active pin preview and removes it after pointer leave", () => {
+    render(
+      <StudioLiveCanvasOverlay
+        canvasWidth={800}
+        canvasHeight={1_200}
+        cursors={[]}
+        commentPins={[{
+          key: "page:page-1",
+          anchor: { type: "page", pageId: "page-1" },
+          count: 1,
+          unreadCount: 0,
+          previewAuthor: "민지",
+          previewBody: "말풍선 간격을 조금 더 넓혀 주세요.",
+          label: "1페이지",
+          x: 400,
+          y: 120,
+        }]}
+        onCommentPinClick={noop}
+      />
+    );
+
+    const pin = screen.getByRole("button", { name: /1페이지/u });
+    expect(document.querySelector('[data-studio-comment-pin-preview="true"]')).toBeNull();
+    fireEvent.pointerEnter(pin);
+    expect(document.querySelector('[data-studio-comment-pin-preview="true"]')?.textContent)
+      .toContain("말풍선 간격을 조금 더 넓혀 주세요.");
+    fireEvent.pointerLeave(pin);
+    expect(document.querySelector('[data-studio-comment-pin-preview="true"]')).toBeNull();
   });
 
   it("mirrors an inward pin collision nudge when the canvas is flipped", () => {

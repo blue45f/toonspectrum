@@ -28,6 +28,7 @@ import {
   addStudioCommentReply,
   addStudioCommentThread,
   assignStudioCommentThread,
+  createStudioCommentMessageId,
   editStudioCommentReply,
   editStudioCommentThread,
   removeStudioCommentReply,
@@ -142,13 +143,6 @@ const DATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   hour: "2-digit",
   minute: "2-digit",
 });
-
-function createCommentId(prefix: "comment" | "reply"): string {
-  if (typeof globalThis.crypto?.randomUUID === "function") {
-    return `${prefix}_${globalThis.crypto.randomUUID()}`;
-  }
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
-}
 
 function formatDate(value: string): string {
   const time = Date.parse(value);
@@ -516,7 +510,7 @@ export function StudioCommentsPanel({
     ]);
     const pendingComment = pendingNewCommentIdRef.current?.payloadSignature === payloadSignature
       ? pendingNewCommentIdRef.current
-      : { commentId: createCommentId("comment"), payloadSignature };
+      : { commentId: createStudioCommentMessageId("comment"), payloadSignature };
     pendingNewCommentIdRef.current = pendingComment;
     const saved = await applyChange(
       () => mergeStudioTeamCommentMutableDocument(
@@ -551,7 +545,7 @@ export function StudioCommentsPanel({
     const pendingReply = pendingReplyIdRef.current?.threadId === threadId
       && pendingReplyIdRef.current.payloadSignature === payloadSignature
       ? pendingReplyIdRef.current
-      : { threadId, replyId: createCommentId("reply"), payloadSignature };
+      : { threadId, replyId: createStudioCommentMessageId("reply"), payloadSignature };
     pendingReplyIdRef.current = pendingReply;
     const saved = await applyChange(
       () => mergeStudioTeamCommentMutableDocument(
@@ -943,10 +937,10 @@ export function StudioCommentsPanel({
                   type="button"
                   onClick={onArmPinPlacement}
                   className={QUIET_BUTTON_CLASS}
-                  title="캔버스에서 댓글을 연결할 위치를 선택합니다"
+                  title="캔버스를 한 번 클릭한 뒤 그 자리에서 바로 댓글을 작성합니다"
                 >
                   <MapPin size={13} aria-hidden />
-                  핀 찍기
+                  캔버스에 바로 댓글
                 </button>
               ) : null}
               <button

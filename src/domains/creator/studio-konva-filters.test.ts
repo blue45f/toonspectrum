@@ -53,10 +53,16 @@ const CUSTOM = [
   "InkThreshold",
   "Duotone",
   "InkWash",
+  "ExposureAdjustment",
+  "UnsharpMask",
+  "Morphology",
+  "PixelOffset",
+  "Convolution",
+  "Clouds",
 ] as const;
 
 describe("registerStudioKonvaFilters", () => {
-  it("커스텀 필터 10종을 함수로 등록한다", () => {
+  it("커스텀 필터를 함수로 등록한다", () => {
     const konva = fakeKonva();
     registerStudioKonvaFilters(konva);
     for (const name of CUSTOM) {
@@ -300,6 +306,119 @@ describe("buildImageFilters", () => {
     expect(hasActiveImageFilters({ inkWash: { strength: 0 } as ImageFilterFields["inkWash"] })).toBe(false);
     expect(buildImageFilters({ inkWash: { strength: 0 } as ImageFilterFields["inkWash"] }, konva).filters).toEqual([]);
   });
+
+  it("신규 고급 필터를 정규화한 attrs와 결정적 실행 순서로 빌드한다", () => {
+    const konva = fakeKonva();
+    registerStudioKonvaFilters(konva);
+    const { filters, attrs } = buildImageFilters({
+      pixelOffset: { x: 4, y: -2, edge: "wrap" },
+      morphology: { mode: "erode", radius: 2 },
+      unsharpMask: { amount: 1.2, radius: 3, threshold: 10 },
+      convolution: { kernel: [0, -1, 0, -1, 5, -1, 0, -1, 0], divisor: 1, bias: 0 },
+      exposureAdjustment: { exposure: 1, gamma: 0.8, offset: 0.05 },
+      clouds: { amount: 0.4, scale: 80, seed: 42, mode: "screen" },
+    }, konva);
+    expect(attrs).toMatchObject({
+      pixelOffsetX: 4,
+      pixelOffsetY: -2,
+      pixelOffsetEdge: "wrap",
+      morphMode: "erode",
+      morphRadius: 2,
+      unsharpAmount: 1.2,
+      unsharpRadius: 3,
+      unsharpThreshold: 10,
+      convKernel: [0, -1, 0, -1, 5, -1, 0, -1, 0],
+      convDivisor: 1,
+      convBias: 0,
+      exposureEv: 1,
+      exposureGamma: 0.8,
+      exposureOffset: 0.05,
+      cloudAmount: 0.4,
+      cloudScale: 80,
+      cloudSeed: 42,
+      cloudMode: "screen",
+    });
+    expect(attrs).not.toHaveProperty("offsetX");
+    expect(attrs).not.toHaveProperty("offsetY");
+    expect(filters.indexOf(konva.Filters.PixelOffset as never))
+      .toBeLessThan(filters.indexOf(konva.Filters.Morphology as never));
+    expect(filters.indexOf(konva.Filters.ExposureAdjustment as never))
+      .toBeLessThan(filters.indexOf(konva.Filters.Clouds as never));
+  });
+
+  it("신규 항등 객체는 필터 모듈과 캐시를 활성화하지 않는다", () => {
+    const konva = fakeKonva();
+    registerStudioKonvaFilters(konva);
+    const identity: ImageFilterFields = {
+      exposureAdjustment: { exposure: 0, gamma: 1, offset: 0 },
+      unsharpMask: { amount: 0, radius: 2, threshold: 0 },
+      morphology: { mode: "dilate", radius: 0 },
+      pixelOffset: { x: 0, y: 0, edge: "wrap" },
+      convolution: { kernel: [0, 0, 0, 0, 1, 0, 0, 0, 0], divisor: 1, bias: 0 },
+      clouds: { amount: 0, scale: 96, seed: 42, mode: "overlay" },
+    };
+    expect(hasActiveImageFilters(identity)).toBe(false);
+    expect(hasLightweightActiveImageFilters(identity)).toBe(false);
+    expect(buildImageFilters(identity, konva).filters).toEqual([]);
+  });
+
+  it("runs smart-filter entries in stored order and retains duplicate engines with private attrs", () => {
+    const konva: KonvaLike = { Filters: {} };
+    registerStudioKonvaFilters(konva);
+    const program = (
+      smartFilters: NonNullable<ImageFilterFields["smartFilters"]>,
+    ): ImageFilterFields => ({ smartFilters });
+    const brightnessThenInvert: ImageFilterFields = program({
+      version: 1,
+      entries: [
+        { id: "bright-a", engine: "brightness-contrast", enabled: true, params: { brightness: 0.1 } },
+        { id: "bright-b", engine: "brightness-contrast", enabled: true, params: { brightness: 0.1 } },
+        { id: "invert", engine: "invert", enabled: true, params: {} },
+      ],
+    });
+    const invertThenBrightness: ImageFilterFields = program({
+      version: 1,
+      entries: [
+        { id: "invert", engine: "invert", enabled: true, params: {} },
+        { id: "bright-a", engine: "brightness-contrast", enabled: true, params: { brightness: 0.1 } },
+        { id: "bright-b", engine: "brightness-contrast", enabled: true, params: { brightness: 0.1 } },
+      ],
+    });
+    const first = solidImage(1, 1, 60, 60, 60);
+    const second = solidImage(1, 1, 60, 60, 60);
+    const firstBuild = buildImageFilters(brightnessThenInvert, konva);
+    const secondBuild = buildImageFilters(invertThenBrightness, konva);
+
+    expect(firstBuild.filters).toHaveLength(3);
+    expect(firstBuild.attrs).toEqual({});
+    applyImageFilters(first, firstBuild.filters, firstBuild.attrs);
+    applyImageFilters(second, secondBuild.filters, secondBuild.attrs);
+
+    expect(first.data[0]).toBe(143);
+    expect(second.data[0]).toBe(246);
+  });
+
+  it("uses a stable scalar-noise seed without consulting Math.random", () => {
+    const konva: KonvaLike = { Filters: {} };
+    registerStudioKonvaFilters(konva);
+    const first = solidImage(8, 1, 128, 128, 128);
+    const second = solidImage(8, 1, 128, 128, 128);
+    const different = solidImage(8, 1, 128, 128, 128);
+    const random = vi.spyOn(Math, "random");
+    try {
+      const seeded = buildImageFilters({ noise: 30, noiseSeed: 42 }, konva);
+      applyImageFilters(first, seeded.filters, seeded.attrs);
+      applyImageFilters(second, seeded.filters, seeded.attrs);
+      const otherSeed = buildImageFilters({ noise: 30, noiseSeed: 43 }, konva);
+      applyImageFilters(different, otherSeed.filters, otherSeed.attrs);
+
+      expect(Array.from(first.data)).toEqual(Array.from(second.data));
+      expect(Array.from(first.data)).not.toEqual(Array.from(different.data));
+      expect(random).not.toHaveBeenCalled();
+    } finally {
+      random.mockRestore();
+    }
+  });
 });
 
 describe("IMAGE_FILTER_PRESETS pixel integration", () => {
@@ -339,6 +458,12 @@ describe("hasActiveImageFilters", () => {
     expect(hasActiveImageFilters({ grayscale: true })).toBe(true);
     expect(hasActiveImageFilters({ hue: -90 })).toBe(true);
     expect(hasActiveImageFilters({ duotoneShadow: "#000", duotoneHighlight: "#fff" })).toBe(true);
+    expect(hasActiveImageFilters({
+      smartFilters: {
+        version: 1,
+        entries: [{ id: "invert", engine: "invert", enabled: true, params: {} }],
+      },
+    })).toBe(true);
   });
 
   it("보정 없음 또는 0/false면 false", () => {
@@ -380,6 +505,26 @@ describe("imageFilterCacheKey", () => {
     expect(imageFilterCacheKey(base)).toBe(imageFilterCacheKey({ blur: 2, brightness: 0.1 }));
     expect(imageFilterCacheKey(base)).not.toBe(imageFilterCacheKey({ blur: 3, brightness: 0.1 }));
     expect(imageFilterCacheKey(base)).not.toBe(imageFilterCacheKey({ blur: 2, brightness: 0.1, grayscale: true }));
+    expect(imageFilterCacheKey(base)).not.toBe(imageFilterCacheKey({
+      ...base,
+      exposureAdjustment: { exposure: 1, gamma: 1, offset: 0 },
+    }));
+    const firstOrder: ImageFilterFields = {
+      smartFilters: {
+        version: 1,
+        entries: [
+          { id: "a", engine: "invert", enabled: true, params: {} },
+          { id: "b", engine: "blur", enabled: true, params: { radius: 2 } },
+        ],
+      },
+    };
+    const secondOrder: ImageFilterFields = {
+      smartFilters: {
+        version: 1,
+        entries: [...firstOrder.smartFilters!.entries].reverse(),
+      },
+    };
+    expect(imageFilterCacheKey(firstOrder)).not.toBe(imageFilterCacheKey(secondOrder));
   });
 
   it("빈 객체와 명시적 undefined는 동일한 키", () => {

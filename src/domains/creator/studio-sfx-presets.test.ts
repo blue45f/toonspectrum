@@ -9,10 +9,11 @@ import {
 } from "./studio-sfx-presets";
 
 describe("SFX_LIBRARY 데이터", () => {
-  it("프리셋이 24개 이상이고 id가 유일하다", () => {
-    expect(SFX_LIBRARY.length).toBeGreaterThanOrEqual(24);
+  it("프리셋이 44개 이상이고 id가 유일하다", () => {
+    expect(SFX_LIBRARY.length).toBeGreaterThanOrEqual(44);
     const ids = SFX_LIBRARY.map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.every((id) => /^sfx-[a-z0-9-]+$/.test(id))).toBe(true);
   });
 
   it("모든 프리셋은 실제 카테고리를 참조하고 텍스트가 비어 있지 않다", () => {
@@ -72,6 +73,12 @@ describe("searchSfx", () => {
 
   it("공백을 무시하고 매칭한다", () => {
     expect(searchSfx(" 쾅 ").some((s) => s.text.includes("쾅"))).toBe(true);
+  });
+
+  it("한글·영문 용도 키워드와 다중 조건으로 검색한다", () => {
+    expect(searchSfx("glass 유리").map((s) => s.id)).toEqual(["sfx-jjaeng"]);
+    expect(searchSfx("digital 기계").map((s) => s.id)).toEqual(["sfx-beep"]);
+    expect(searchSfx("laugh 웃음").map((s) => s.id)).toEqual(["sfx-hehe"]);
   });
 
   it("없는 단어는 빈 배열", () => {

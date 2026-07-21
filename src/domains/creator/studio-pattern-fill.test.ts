@@ -18,6 +18,7 @@ import {
   patternPreviewCss,
   patternSpecsEqual,
   patternTileSvg,
+  searchStudioPatterns,
   setPatternBg,
   setPatternFg,
   setPatternId,
@@ -53,9 +54,9 @@ function makeSyncFakeImage(fail = false): PatternImageLike {
 }
 
 describe("STUDIO_PATTERNS", () => {
-  it("정확히 12종을 제공하고 id가 전부 고유", () => {
-    expect(STUDIO_PATTERNS).toHaveLength(12);
-    expect(new Set(STUDIO_PATTERN_IDS).size).toBe(12);
+  it("24종을 제공하고 id가 전부 고유", () => {
+    expect(STUDIO_PATTERNS).toHaveLength(24);
+    expect(new Set(STUDIO_PATTERN_IDS).size).toBe(24);
     expect(STUDIO_PATTERN_IDS).toEqual(STUDIO_PATTERNS.map((def) => def.id));
   });
 
@@ -82,6 +83,13 @@ describe("STUDIO_PATTERNS", () => {
   it("getPatternDef — 알 수 없는 id는 기본 패턴(도트)으로 폴백", () => {
     expect(getPatternDef("hearts").id).toBe("hearts");
     expect(getPatternDef("no-such-pattern").id).toBe("dots");
+  });
+
+  it("만화 연출·재질 패턴을 한글/영문 다중 키워드로 검색", () => {
+    expect(searchStudioPatterns("속도 motion").map((pattern) => pattern.id)).toContain("speed-lines");
+    expect(searchStudioPatterns("hex 테크").map((pattern) => pattern.id)).toEqual(["honeycomb"]);
+    expect(searchStudioPatterns("   ")).toBe(STUDIO_PATTERNS);
+    expect(searchStudioPatterns("없는패턴xyz")).toEqual([]);
   });
 });
 

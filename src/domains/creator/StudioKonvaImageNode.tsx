@@ -14,8 +14,18 @@ import type { FrameEl, ImageEl } from "./studio-element-model";
 import type Konva from "konva";
 
 const IMAGE_FILTER_BUILD_CACHE_LIMIT = 200;
+const IMAGE_FILTER_WORKER_DEBOUNCE_MS = 80;
+const IMAGE_FILTER_WORKER_RESULT_CACHE_LIMIT = 4;
+// One RGBA input plus transfer/result/intermediate buffers can coexist. Keep interactive filtering
+// at 16 MP / 64 MiB per surface. The Worker protocol independently enforces its broader 64 MP hard
+// boundary; keeping this stricter UI budget local avoids eagerly loading the optional Worker
+// protocol solely to read a constant before the user applies an image filter.
+const IMAGE_FILTER_INTERACTIVE_MAX_PIXELS = 16 * 1024 * 1024;
 type StudioKonvaFiltersModule = typeof import("./studio-konva-filters");
 type StudioImageFilterWorkerClientModule = typeof import("./studio-image-filter-worker-client");
+type StudioImageFilterWorkerSession = ReturnType<
+  StudioImageFilterWorkerClientModule["createStudioImageFilterWorkerSession"]
+>;
 type ImageFilterBuild = ReturnType<StudioKonvaFiltersModule["buildImageFilters"]>;
 const EMPTY_IMAGE_FILTER_BUILD: ImageFilterBuild = { filters: [], attrs: {}, cachePad: 0 };
 const imageFilterBuildCache = new Map<string, ImageFilterBuild>();
@@ -41,6 +51,20 @@ interface WorkerFilteredCanvasState {
   height: number;
   source: CanvasImageSource;
   src: string;
+  width: number;
+}
+
+interface WorkerSourcePixelsState {
+  data: Uint8ClampedArray;
+  height: number;
+  source: CanvasImageSource;
+  width: number;
+}
+
+interface WorkerResultCacheState {
+  canvases: Map<string, HTMLCanvasElement>;
+  height: number;
+  source: CanvasImageSource;
   width: number;
 }
 
@@ -103,7 +127,11 @@ export function StudioKonvaImageNode({
   const [filterModule, setFilterModule] = useState<StudioKonvaFiltersModule | null>(null);
   const [filterWorkerClient, setFilterWorkerClient] = useState<StudioImageFilterWorkerClientModule | null>(null);
   const [workerFilteredCanvas, setWorkerFilteredCanvas] = useState<WorkerFilteredCanvasState>();
+  const [workerFallbackKey, setWorkerFallbackKey] = useState<string>();
   const imageRef = useRef<Konva.Image | null>(null);
+  const filterWorkerSessionRef = useRef<StudioImageFilterWorkerSession | null>(null);
+  const workerSourcePixelsRef = useRef<WorkerSourcePixelsState | null>(null);
+  const workerResultCacheRef = useRef<WorkerResultCacheState | null>(null);
   // 최신 el을 담아두는 ref — 아래 Worker 필터 effect가 좌표 드래그 등 필터와 무관한 el 변경마다
   // 재실행되지 않도록(의존성은 filterCacheKey/width/height만) 최신 값만 읽어들이는 용도.
   const elRef = useRef(el);
@@ -228,13 +256,25 @@ export function StudioKonvaImageNode({
     };
   }, [filterWorkerClient, hasFilters]);
 
+  useEffect(() => () => {
+    filterWorkerSessionRef.current?.dispose();
+    filterWorkerSessionRef.current = null;
+  }, [filterWorkerClient]);
+
   // 보정값 → Konva 필터 배열 + 노드 속성. 캐시 의존성은 직렬화 키로 비교(좌표 드래그 시 재캐시 방지).
   const built = hasFilters && filterModule
     ? cachedBuildImageFilters(el, filterCacheKey, filterModule)
     : EMPTY_IMAGE_FILTER_BUILD;
+  const workerWidth = Math.max(1, Math.round(el.width));
+  const workerHeight = Math.max(1, Math.round(el.height));
+  const workerPixelCount = workerWidth * workerHeight;
+  const workerDimensionsSafe = Number.isSafeInteger(workerWidth)
+    && Number.isSafeInteger(workerHeight)
+    && Number.isSafeInteger(workerPixelCount)
+    && workerPixelCount <= IMAGE_FILTER_INTERACTIVE_MAX_PIXELS;
   // react-konva filters prop 타입(Konva.NodeConfig["filters"])과 맞춘다.
   const filters: NonNullable<Konva.NodeConfig["filters"]> =
-    built.filters as NonNullable<Konva.NodeConfig["filters"]>;
+    (workerDimensionsSafe ? built.filters : []) as NonNullable<Konva.NodeConfig["filters"]>;
   const filterAttrs = built.attrs;
   const cachePad = built.cachePad; // 테두리(outline)가 실루엣 밖으로 자라도록 캐시에 추가할 여백(px).
 
@@ -242,9 +282,10 @@ export function StudioKonvaImageNode({
   // 정확히 복제하기 까다로워 제외하고 기존 Konva 내장 cache+filters 경로로 둔다. 애니메이션 GIF도
   // 기존과 동일하게 필터 미적용(아래 cache effect의 조건과 일치, 새 동작 아님).
   const useWorkerFilterPath =
-    hasFilters && !!filterModule && !!filterWorkerClient && cachePad === 0 && !el.isAnimatedGif;
-  const workerWidth = Math.max(1, Math.round(el.width));
-  const workerHeight = Math.max(1, Math.round(el.height));
+    workerDimensionsSafe
+    && hasFilters && !!filterModule && !!filterWorkerClient && cachePad === 0 && !el.isAnimatedGif;
+  const workerRequestKey = JSON.stringify([el.src, filterCacheKey, workerWidth, workerHeight]);
+  const workerPipelineActive = useWorkerFilterPath && workerFallbackKey !== workerRequestKey;
 
   const currentWorkerFilteredCanvas =
     workerFilteredCanvas?.src === el.src
@@ -255,90 +296,149 @@ export function StudioKonvaImageNode({
       ? workerFilteredCanvas.canvas
       : undefined;
 
-  // 슬라이더 드래그 매 틱마다 픽셀 루프를 메인 스레드에서 도는 대신, 여기서 Worker에 위임한다.
-  // 새 틱이 오면 React의 effect cleanup이 이전 컨트롤러를 abort → 진행 중이던 Worker를 즉시
-  // terminate하므로 항상 최신 요청 하나만 실제로 끝까지 계산된다(오래된 결과가 늦게 도착해 화면을
-  // 덮어쓰는 일이 없다). 첫 틱(아직 워커 결과 없음)은 아래 cache effect가 Konva 내장 경로로
-  // 즉시 필터링해 보여주므로 깜빡임 없이 완료되는 대로 이 캔버스로 자연스럽게 교체된다.
+  // Interactive Worker path: debounce slider bursts, keep one Worker session alive, and cache the
+  // source RGBA snapshot so a parameter-only tick does not redraw/getImageData again. The request
+  // still gets a fresh transferable copy because postMessage detaches ownership by design.
   useEffect(() => {
     if (!useWorkerFilterPath || !displayImg || !filterWorkerClient) {
       setWorkerFilteredCanvas(undefined);
+      setWorkerFallbackKey(undefined);
+      workerSourcePixelsRef.current = null;
+      workerResultCacheRef.current = null;
       return;
     }
-    // effect cleanup보다 render가 먼저 일어나는 경우도 아래 identity 비교가 이전 캔버스를 즉시
-    // 숨긴다. 같은 identity로 effect가 재시작되는 경우에도 준비 실패 뒤 낡은 결과를 남기지 않는다.
-    setWorkerFilteredCanvas(undefined);
     const src = el.src;
     const source = displayImg;
     const filterKey = filterCacheKey;
     const width = workerWidth;
     const height = workerHeight;
-    let imageData: ImageData;
-    try {
-      const sourceCanvas = document.createElement("canvas");
-      sourceCanvas.width = width;
-      sourceCanvas.height = height;
-      const sourceCtx = sourceCanvas.getContext("2d");
-      if (!sourceCtx) return;
-      sourceCtx.drawImage(source, 0, 0, width, height);
-      imageData = sourceCtx.getImageData(0, 0, width, height);
-    } catch (error) {
-      // 오염된 외부 캔버스(SecurityError), 디코딩 중인 이미지, context 손실은 원본+Konva
-      // 필터 경로로 안전하게 폴백한다. 이전 Worker 캔버스는 identity 가드와 위 clear로 숨겨진다.
-      console.error("[studio] image filter canvas preparation failed, using Konva fallback:", error);
-      return;
-    }
-
-    const controller = new AbortController();
+    const requestKey = workerRequestKey;
+    let controller: AbortController | null = null;
     let cancelled = false;
-    filterWorkerClient
-      .runStudioImageFilterWorker({ imageData, el: elRef.current }, { signal: controller.signal })
-      .then((result) => {
-        if (cancelled) return;
-        if (result.imageData.width !== width || result.imageData.height !== height) return;
+    setWorkerFallbackKey((current) => current === requestKey ? undefined : current);
+
+    const timer = setTimeout(() => {
+      let resultCache = workerResultCacheRef.current;
+      if (
+        !resultCache
+        || resultCache.source !== source
+        || resultCache.width !== width
+        || resultCache.height !== height
+      ) {
+        resultCache = { canvases: new Map(), height, source, width };
+        workerResultCacheRef.current = resultCache;
+      }
+      const cachedCanvas = resultCache.canvases.get(filterKey);
+      if (cachedCanvas) {
+        resultCache.canvases.delete(filterKey);
+        resultCache.canvases.set(filterKey, cachedCanvas);
+        setWorkerFilteredCanvas({ canvas: cachedCanvas, filterKey, height, source, src, width });
+        return;
+      }
+
+      let sourcePixels = workerSourcePixelsRef.current;
+      if (
+        !sourcePixels
+        || sourcePixels.source !== source
+        || sourcePixels.width !== width
+        || sourcePixels.height !== height
+      ) {
         try {
-          const outCanvas = document.createElement("canvas");
-          outCanvas.width = result.imageData.width;
-          outCanvas.height = result.imageData.height;
-          const outCtx = outCanvas.getContext("2d");
-          if (!outCtx) return;
-          // ImageData 생성자는 ArrayBuffer 백업 뷰만 받는다 — postMessage 전송은 항상 진짜
-          // ArrayBuffer라 안전하지만(SharedArrayBuffer 아님) 타입상 Uint8ClampedArray<ArrayBufferLike>
-          // 로 넓혀져 있어 새 뷰로 감싸 좁힌다.
-          outCtx.putImageData(
-            new ImageData(
-              new Uint8ClampedArray(result.imageData.data),
-              result.imageData.width,
-              result.imageData.height,
-            ),
-            0,
-            0,
-          );
-          setWorkerFilteredCanvas({ canvas: outCanvas, filterKey, height, source, src, width });
+          const sourceCanvas = document.createElement("canvas");
+          sourceCanvas.width = width;
+          sourceCanvas.height = height;
+          const sourceCtx = sourceCanvas.getContext("2d");
+          if (!sourceCtx) return;
+          sourceCtx.drawImage(source, 0, 0, width, height);
+          const captured = sourceCtx.getImageData(0, 0, width, height);
+          sourcePixels = { data: captured.data, height, source, width };
+          workerSourcePixelsRef.current = sourcePixels;
         } catch (error) {
-          console.error("[studio] image filter canvas commit failed, using Konva fallback:", error);
+          console.error("[studio] image filter canvas preparation failed, using Konva fallback:", error);
+          setWorkerFallbackKey(requestKey);
+          return;
         }
-      })
-      .catch((error) => {
-        if ((error as { name?: string })?.name === "AbortError") return;
-        console.error("[studio] image filter worker failed, using Konva fallback:", error);
-      });
+      }
+
+      controller = new AbortController();
+      if (!filterWorkerSessionRef.current) {
+        const createSession = filterWorkerClient.createStudioImageFilterWorkerSession;
+        if (typeof createSession === "function") {
+          filterWorkerSessionRef.current = createSession();
+        }
+      }
+      const request = {
+        imageData: {
+          data: new Uint8ClampedArray(sourcePixels.data),
+          width,
+          height,
+        },
+        el: elRef.current,
+      };
+      const pending = filterWorkerSessionRef.current
+        ? filterWorkerSessionRef.current.run(request, { signal: controller.signal })
+        : filterWorkerClient.runStudioImageFilterWorker(request, { signal: controller.signal });
+      pending
+        .then((result) => {
+          if (cancelled) return;
+          if (result.imageData.width !== width || result.imageData.height !== height) return;
+          try {
+            const outCanvas = document.createElement("canvas");
+            outCanvas.width = result.imageData.width;
+            outCanvas.height = result.imageData.height;
+            const outCtx = outCanvas.getContext("2d");
+            if (!outCtx) return;
+            outCtx.putImageData(
+              new ImageData(
+                new Uint8ClampedArray(result.imageData.data),
+                result.imageData.width,
+                result.imageData.height,
+              ),
+              0,
+              0,
+            );
+            if (resultCache.canvases.size >= IMAGE_FILTER_WORKER_RESULT_CACHE_LIMIT) {
+              const oldest = resultCache.canvases.keys().next().value;
+              if (oldest) resultCache.canvases.delete(oldest);
+            }
+            resultCache.canvases.set(filterKey, outCanvas);
+            setWorkerFallbackKey((current) => current === requestKey ? undefined : current);
+            setWorkerFilteredCanvas({ canvas: outCanvas, filterKey, height, source, src, width });
+          } catch (error) {
+            console.error("[studio] image filter canvas commit failed, using Konva fallback:", error);
+            setWorkerFallbackKey(requestKey);
+          }
+        })
+        .catch((error) => {
+          if ((error as { name?: string })?.name === "AbortError") return;
+          console.error("[studio] image filter worker failed, using Konva fallback:", error);
+          setWorkerFallbackKey(requestKey);
+        });
+    }, IMAGE_FILTER_WORKER_DEBOUNCE_MS);
 
     return () => {
       cancelled = true;
-      controller.abort();
+      clearTimeout(timer);
+      if (controller !== null) controller.abort();
     };
-  }, [useWorkerFilterPath, displayImg, filterCacheKey, filterWorkerClient, el.src, workerWidth, workerHeight]);
+  }, [useWorkerFilterPath, displayImg, filterCacheKey, filterWorkerClient, el.src, workerWidth, workerHeight, workerRequestKey]);
 
-  const showWorkerCanvas = useWorkerFilterPath && !!currentWorkerFilteredCanvas;
+  const showWorkerCanvas = workerPipelineActive && !!currentWorkerFilteredCanvas;
 
   useEffect(() => {
     const node = imageRef.current;
     if (!node) return;
     if (displayImg) {
       node.clearCache();
-      // Worker 캔버스로 이미 교체됐으면 픽셀이 최종 상태라 Konva 재캐시가 낭비다 — 건너뛴다.
-      if (hasFilters && filterModule && !el.isAnimatedGif && !showWorkerCanvas) {
+      // Worker 경로가 선택된 동안은 pending 상태에서도 동기 full-filter를 중복 실행하지 않는다.
+      // 준비/실행 오류로 fail-closed 된 요청만 기존 Konva 캐시 경로를 사용한다.
+      if (
+        workerDimensionsSafe
+        && hasFilters
+        && filterModule
+        && !el.isAnimatedGif
+        && !workerPipelineActive
+      ) {
         // 테두리가 있으면 offset만큼 캐시 캔버스를 키워 실루엣 바깥에 테두리를 그릴 자리를 만든다.
         // isAnimatedGif는 캐시를 만들지 않는다 — Konva 캐시는 "그 순간의 정적 스냅샷"이라
         // 애니메이션 GIF에 캐시를 씌우면 그 프레임에 멈춘다(필터는 조용히 미적용, 알려진 한계).
@@ -346,7 +446,7 @@ export function StudioKonvaImageNode({
       }
       node.getLayer()?.batchDraw();
     }
-  }, [displayImg, el.width, el.height, filterCacheKey, hasFilters, filterModule, cachePad, el.isAnimatedGif, showWorkerCanvas]);
+  }, [displayImg, el.width, el.height, filterCacheKey, hasFilters, filterModule, cachePad, el.isAnimatedGif, workerPipelineActive, workerDimensionsSafe]);
 
   // 애니메이션 GIF 주기적 리렌더 — 브라우저가 img(HTMLImageElement)를 내부적으로 계속
   // 디코딩·재생하지만(studio-gif-element.ts 헤더 참고), Konva는 그리기 시점의 스냅샷만 캔버스에
@@ -387,8 +487,9 @@ export function StudioKonvaImageNode({
   // Worker가 이미 최종 픽셀을 계산해 뒀으면 그 캔버스를 그대로 그린다(filters/filterAttrs는
   // 비워 Konva가 다시 필터링하지 않게 한다) — 아니면 기존과 동일하게 원본 + Konva 필터.
   const imageSource: CanvasImageSource = showWorkerCanvas ? currentWorkerFilteredCanvas! : displayImg;
-  const activeFilters: Konva.NodeConfig["filters"] = showWorkerCanvas ? undefined : filters;
-  const activeFilterAttrs = showWorkerCanvas ? {} : filterAttrs;
+  const activeFilters: Konva.NodeConfig["filters"] =
+    workerPipelineActive || !workerDimensionsSafe ? undefined : filters;
+  const activeFilterAttrs = workerPipelineActive || !workerDimensionsSafe ? {} : filterAttrs;
 
   return (
     <KImage

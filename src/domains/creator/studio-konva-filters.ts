@@ -11,6 +11,31 @@ import { Grayscale } from "konva/lib/filters/Grayscale";
 import { Invert } from "konva/lib/filters/Invert";
 import { Sepia } from "konva/lib/filters/Sepia";
 
+import {
+  listEnabledStudioAdjustmentOperations,
+  normalizeStudioAdjustmentFilterOperations,
+  studioAdjustmentOperationToFilterFields,
+} from "./studio-adjustment-stack";
+import {
+  cloudsKonvaFilter,
+  convolutionKonvaFilter,
+  exposureAdjustmentKonvaFilter,
+  isIdentityStudioClouds,
+  isIdentityStudioConvolution,
+  isIdentityStudioExposureAdjustment,
+  isIdentityStudioMorphology,
+  isIdentityStudioPixelOffset,
+  isIdentityStudioUnsharpMask,
+  morphologyKonvaFilter,
+  normalizeStudioClouds,
+  normalizeStudioConvolution,
+  normalizeStudioExposureAdjustment,
+  normalizeStudioMorphology,
+  normalizeStudioPixelOffset,
+  normalizeStudioUnsharpMask,
+  pixelOffsetKonvaFilter,
+  unsharpMaskKonvaFilter,
+} from "./studio-advanced-pixel-filters";
 import { autoAdjustKonvaFilter, normalizeAutoAdjust, isIdentityAutoAdjust } from "./studio-auto-adjust";
 import { blurFxKonvaFilter, normalizeBlurFx, isIdentityBlurFx } from "./studio-blur";
 import { channelMixerKonvaFilter, normalizeChannelMixer, isIdentityChannelMixer, channelMixerToFlat } from "./studio-channel-mixer";
@@ -81,6 +106,32 @@ function hasActiveSketch(el: ImageFilterFields): boolean {
 // 디테일/샤픈이 항등(amount0)이 아니면 활성.
 function hasActiveDetail(el: ImageFilterFields): boolean {
   return !!el.detail && !isIdentityDetail(normalizeDetail(el.detail));
+}
+function hasActiveExposureAdjustment(el: ImageFilterFields): boolean {
+  return !!el.exposureAdjustment && !isIdentityStudioExposureAdjustment(el.exposureAdjustment);
+}
+function hasActiveUnsharpMask(el: ImageFilterFields): boolean {
+  return !!el.unsharpMask && !isIdentityStudioUnsharpMask(el.unsharpMask);
+}
+function hasActiveMorphology(el: ImageFilterFields): boolean {
+  return !!el.morphology && !isIdentityStudioMorphology(el.morphology);
+}
+function hasActivePixelOffset(el: ImageFilterFields): boolean {
+  return !!el.pixelOffset && !isIdentityStudioPixelOffset(el.pixelOffset);
+}
+function hasActiveConvolution(el: ImageFilterFields): boolean {
+  return !!el.convolution && !isIdentityStudioConvolution(el.convolution);
+}
+function hasActiveClouds(el: ImageFilterFields): boolean {
+  return !!el.clouds && !isIdentityStudioClouds(el.clouds);
+}
+function smartFilterOperationsOf(el: ImageFilterFields) {
+  return el.smartFilterOperations !== undefined
+    ? normalizeStudioAdjustmentFilterOperations(el.smartFilterOperations)
+    : listEnabledStudioAdjustmentOperations(el.smartFilters);
+}
+function hasActiveSmartFilterProgram(el: ImageFilterFields): boolean {
+  return smartFilterOperationsOf(el).length > 0;
 }
 // 색상 투명화가 항등(strength0)이 아니면 활성.
 function hasActiveColorToAlpha(el: ImageFilterFields): boolean {
@@ -200,6 +251,13 @@ function clampFinite(value: number, min: number, max: number): number {
 
 function isHexColor(value: unknown): value is string {
   return typeof value === "string" && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
+}
+
+function deterministicNoiseUnit(seed: number, pixelIndex: number): number {
+  let hash = Math.imul((Math.trunc(seed) >>> 0) ^ pixelIndex, 0x45d9f3b);
+  hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
+  hash ^= hash >>> 16;
+  return (hash >>> 0) / 4_294_967_295;
 }
 
 /**
@@ -361,8 +419,10 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
     const rawAmount = this.attrs?.noise;
     if (typeof rawAmount !== "number" || !Number.isFinite(rawAmount) || rawAmount <= 0) return;
     const amount = Math.min(100, rawAmount);
+    const rawSeed = this.attrs?.noiseSeed;
+    const seed = typeof rawSeed === "number" && Number.isFinite(rawSeed) ? rawSeed : 1_337;
     for (let i = 0; i < data.length; i += 4) {
-      const noiseVal = (Math.random() - 0.5) * amount * 2.55; // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
+      const noiseVal = (deterministicNoiseUnit(seed, i >>> 2) - 0.5) * amount * 2.55;
       data[i] = Math.min(255, Math.max(0, data[i]! + noiseVal));
       data[i + 1] = Math.min(255, Math.max(0, data[i + 1]! + noiseVal));
       data[i + 2] = Math.min(255, Math.max(0, data[i + 2]! + noiseVal));
@@ -428,6 +488,13 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.Sketch = sketchKonvaFilter;
   // 디테일/샤픈 — this.attrs.dtType/dtAmount/dtRadius 적용(studio-detail).
   F.Detail = detailKonvaFilter;
+  // 결정적·범위 제한 고급 필터 — Konva 캐시와 Worker가 같은 구현을 공유한다.
+  F.ExposureAdjustment = exposureAdjustmentKonvaFilter;
+  F.UnsharpMask = unsharpMaskKonvaFilter;
+  F.Morphology = morphologyKonvaFilter;
+  F.PixelOffset = pixelOffsetKonvaFilter;
+  F.Convolution = convolutionKonvaFilter;
+  F.Clouds = cloudsKonvaFilter;
 }
 
 /** 활성 보정이 하나라도 있으면 true (캐시 on/off 판단용). */
@@ -459,6 +526,13 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActiveLight(el) ||
     hasActiveSketch(el) ||
     hasActiveDetail(el) ||
+    hasActiveExposureAdjustment(el) ||
+    hasActiveUnsharpMask(el) ||
+    hasActiveMorphology(el) ||
+    hasActivePixelOffset(el) ||
+    hasActiveConvolution(el) ||
+    hasActiveClouds(el) ||
+    hasActiveSmartFilterProgram(el) ||
     hasActiveColorToAlpha(el) ||
     isActiveNumber(el.saturation) ||
     isActiveNumber(el.hue) ||
@@ -491,7 +565,14 @@ export function buildImageFilters(
   const filters: Array<(imageData: StudioImageDataLike) => void> = [];
   const attrs: Record<string, number | string | number[]> = {};
 
-  // --- 기하 왜곡 → 흐림을 가장 먼저(원본 형상을 변형·소프트닝한 뒤 색·스타일라이즈) ---
+  // --- 픽셀 이동·기하 왜곡 → 흐림을 가장 먼저 ---
+  if (hasActivePixelOffset(el)) {
+    filters.push(F.PixelOffset!);
+    const offset = normalizeStudioPixelOffset(el.pixelOffset);
+    attrs.pixelOffsetX = offset.x;
+    attrs.pixelOffsetY = offset.y;
+    attrs.pixelOffsetEdge = offset.edge;
+  }
   if (hasActiveDistort(el)) {
     filters.push(F.Distort!);
     const ds = normalizeDistort(el.distort);
@@ -515,7 +596,34 @@ export function buildImageFilters(
     attrs.dtAmount = dt.amount;
     attrs.dtRadius = dt.radius;
   }
+  if (hasActiveMorphology(el)) {
+    filters.push(F.Morphology!);
+    const morphology = normalizeStudioMorphology(el.morphology);
+    attrs.morphMode = morphology.mode;
+    attrs.morphRadius = morphology.radius;
+  }
+  if (hasActiveUnsharpMask(el)) {
+    filters.push(F.UnsharpMask!);
+    const unsharp = normalizeStudioUnsharpMask(el.unsharpMask);
+    attrs.unsharpAmount = unsharp.amount;
+    attrs.unsharpRadius = unsharp.radius;
+    attrs.unsharpThreshold = unsharp.threshold;
+  }
+  if (hasActiveConvolution(el)) {
+    filters.push(F.Convolution!);
+    const convolution = normalizeStudioConvolution(el.convolution);
+    attrs.convKernel = [...convolution.kernel];
+    attrs.convDivisor = convolution.divisor;
+    attrs.convBias = convolution.bias;
+  }
   // --- 색/톤 보정 먼저 ---
+  if (hasActiveExposureAdjustment(el)) {
+    filters.push(F.ExposureAdjustment!);
+    const exposure = normalizeStudioExposureAdjustment(el.exposureAdjustment);
+    attrs.exposureEv = exposure.exposure;
+    attrs.exposureGamma = exposure.gamma;
+    attrs.exposureOffset = exposure.offset;
+  }
   if (isActiveNumber(el.brightness)) {
     filters.push(F.Brighten as (imageData: StudioImageDataLike) => void);
     attrs.brightness = clampFinite(el.brightness!, -0.8, 0.8);
@@ -675,6 +783,9 @@ export function buildImageFilters(
   if (isActivePositive(el.noise)) {
     filters.push(F.Noise!);
     attrs.noise = clampFinite(el.noise!, 0, 100);
+    attrs.noiseSeed = typeof el.noiseSeed === "number" && Number.isFinite(el.noiseSeed)
+      ? Math.trunc(el.noiseSeed) >>> 0
+      : 1_337;
   }
   if (isActivePositive(el.pixelate)) {
     filters.push(F.Pixelate as (imageData: StudioImageDataLike) => void);
@@ -696,6 +807,14 @@ export function buildImageFilters(
     attrs.grainAmount = gr.amount;
     attrs.grainSize = gr.size;
     attrs.grainSeed = gr.seed;
+  }
+  if (hasActiveClouds(el)) {
+    filters.push(F.Clouds!);
+    const clouds = normalizeStudioClouds(el.clouds);
+    attrs.cloudAmount = clouds.amount;
+    attrs.cloudScale = clouds.scale;
+    attrs.cloudSeed = clouds.seed;
+    attrs.cloudMode = clouds.mode;
   }
   // 스타일라이즈(엠보스/외곽선/솔라리/유화) — 톤·질감 위에 얹는 스타일 변환.
   if (hasActiveStylize(el)) {
@@ -740,6 +859,24 @@ export function buildImageFilters(
     attrs.outlineWidth = ol.width;
     attrs.outlineOpacity = ol.opacity;
     cachePad = outlineCachePad(ol); // 테두리가 실루엣 밖으로 자라도록 캐시 offset 패딩.
+  }
+
+  // The ordinary image fields above keep their established category order. The non-destructive
+  // smart-filter stack is then painted bottom → top exactly as stored. Each operation receives a
+  // private attrs bag captured by a wrapper; this is what lets duplicate engines retain distinct
+  // parameters instead of every duplicate reading the final value from one Konva node attrs map.
+  for (const operation of smartFilterOperationsOf(el)) {
+    const operationBuild = buildImageFilters(
+      studioAdjustmentOperationToFilterFields(operation),
+      konva,
+    );
+    const operationAttrs = operationBuild.attrs;
+    for (const operationFilter of operationBuild.filters) {
+      filters.push(function orderedStudioSmartFilter(imageData: StudioImageDataLike): void {
+        operationFilter.call({ attrs: operationAttrs }, imageData);
+      });
+    }
+    cachePad = Math.max(cachePad, operationBuild.cachePad);
   }
 
   return { filters, attrs, cachePad };

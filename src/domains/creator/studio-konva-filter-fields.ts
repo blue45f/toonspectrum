@@ -1,3 +1,16 @@
+import type {
+  StudioAdjustmentEngineId,
+  StudioAdjustmentFilterOperation,
+  StudioAdjustmentStack,
+} from "./studio-adjustment-stack";
+import type {
+  StudioClouds,
+  StudioConvolution,
+  StudioExposureAdjustment,
+  StudioMorphology,
+  StudioPixelOffset,
+  StudioUnsharpMask,
+} from "./studio-advanced-pixel-filters";
 import type { AutoAdjust } from "./studio-auto-adjust";
 import type { BlurFx } from "./studio-blur";
 import type { ChannelMixer } from "./studio-channel-mixer";
@@ -34,6 +47,8 @@ export type ImageFilterFields = {
   chromatic?: number;
   posterize?: number;
   noise?: number;
+  /** Stable seed for the scalar noise filter. */
+  noiseSeed?: number;
   saturation?: number;
   hue?: number;
   temperature?: number;
@@ -72,6 +87,17 @@ export type ImageFilterFields = {
   light?: Light;
   sketch?: Sketch;
   detail?: Detail;
+  /** Worker-first bounded pixel filters exposed through the non-destructive smart-filter stack. */
+  exposureAdjustment?: StudioExposureAdjustment;
+  unsharpMask?: StudioUnsharpMask;
+  morphology?: StudioMorphology;
+  pixelOffset?: StudioPixelOffset;
+  convolution?: StudioConvolution;
+  clouds?: StudioClouds;
+  /** Persisted non-destructive program on Studio image elements. */
+  smartFilters?: StudioAdjustmentStack;
+  /** Normalized Worker projection; preserves exact order and duplicate engines. */
+  smartFilterOperations?: readonly StudioAdjustmentFilterOperation[];
 };
 
 function isActiveNumber(value: number | undefined): boolean {
@@ -109,6 +135,126 @@ function hasActiveInkWashCandidate(value: unknown): boolean {
   return typeof strength === "number" && Number.isFinite(strength) && strength > 0;
 }
 
+function candidateRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function candidateFinite(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function hasActiveExposureCandidate(value: unknown): boolean {
+  const source = candidateRecord(value);
+  if (!source) return false;
+  return (candidateFinite(source.exposure) && source.exposure !== 0)
+    || (candidateFinite(source.gamma) && source.gamma !== 1)
+    || (candidateFinite(source.offset) && source.offset !== 0);
+}
+
+function hasActiveAmountCandidate(value: unknown): boolean {
+  const source = candidateRecord(value);
+  return !!source && candidateFinite(source.amount) && source.amount > 0;
+}
+
+function hasActiveRadiusCandidate(value: unknown): boolean {
+  const source = candidateRecord(value);
+  return !!source && candidateFinite(source.radius) && source.radius > 0;
+}
+
+function hasActivePixelOffsetCandidate(value: unknown): boolean {
+  const source = candidateRecord(value);
+  if (!source) return false;
+  return (candidateFinite(source.x) && source.x !== 0)
+    || (candidateFinite(source.y) && source.y !== 0);
+}
+
+function hasActiveConvolutionCandidate(value: unknown): boolean {
+  const source = candidateRecord(value);
+  if (!source || !Array.isArray(source.kernel) || source.kernel.length !== 9) return false;
+  const identity = [0, 0, 0, 0, 1, 0, 0, 0, 0];
+  const kernelChanged = source.kernel.some((coefficient, index) =>
+    candidateFinite(coefficient) && coefficient !== identity[index]
+  );
+  const divisorChanged = candidateFinite(source.divisor) && source.divisor !== 1;
+  const biasChanged = candidateFinite(source.bias) && source.bias !== 0;
+  return kernelChanged || divisorChanged || biasChanged;
+}
+
+const LIGHTWEIGHT_ADJUSTMENT_ENGINES = new Set<StudioAdjustmentEngineId>([
+  "curves",
+  "levels",
+  "brightness-contrast",
+  "hue-saturation",
+  "color-balance",
+  "channel-mixer",
+  "gradient-map",
+  "blur",
+  "gaussian-blur",
+  "motion-blur",
+  "sharpen",
+  "noise",
+  "invert",
+  "exposure",
+  "unsharp-mask",
+  "morphology",
+  "offset",
+  "custom-convolution",
+  "clouds",
+]);
+
+function lightweightSmartFilterParams(value: unknown): Record<string, number | string | boolean> {
+  const source = candidateRecord(value);
+  if (!source) return {};
+  const params: Record<string, number | string | boolean> = {};
+  for (const [key, raw] of Object.entries(source)) {
+    if (key.length > 48) continue;
+    if (typeof raw === "number" && Number.isFinite(raw)) params[key] = raw;
+    else if (typeof raw === "boolean") params[key] = raw;
+    else if (typeof raw === "string" && raw.length <= 128) params[key] = raw;
+  }
+  return params;
+}
+
+/**
+ * Lightweight mirror of the ordered-operation wire normalization. This module intentionally has
+ * no runtime imports: it is evaluated before the heavyweight filter engine is intent-loaded.
+ */
+function lightweightSmartFilterProgram(value: unknown): readonly StudioAdjustmentFilterOperation[] {
+  const source = candidateRecord(value);
+  const list = Array.isArray(value)
+    ? value
+    : source && Array.isArray(source.entries)
+      ? source.entries
+      : [];
+  const entries: StudioAdjustmentFilterOperation[] = [];
+  const seen = new Set<string>();
+  for (let index = 0; index < list.length && entries.length < 24; index += 1) {
+    const candidate = candidateRecord(list[index]);
+    if (!candidate || typeof candidate.engine !== "string") continue;
+    if (!LIGHTWEIGHT_ADJUSTMENT_ENGINES.has(candidate.engine as StudioAdjustmentEngineId)) continue;
+    let id = typeof candidate.id === "string" && candidate.id.trim().length > 0
+      ? candidate.id.trim().slice(0, 80)
+      : `adj-${index + 1}`;
+    if (seen.has(id)) id = `${id}-${index}`;
+    seen.add(id);
+    entries.push({
+      id,
+      engine: candidate.engine as StudioAdjustmentEngineId,
+      enabled: candidate.enabled !== false,
+      params: lightweightSmartFilterParams(candidate.params),
+    });
+  }
+  return entries.filter((entry) => entry.enabled);
+}
+
+function hasActiveSmartFilterProgram(el: ImageFilterFields): boolean {
+  return lightweightSmartFilterProgram(
+    el.smartFilterOperations !== undefined ? el.smartFilterOperations : el.smartFilters
+  ).length > 0;
+}
+
 /** 가벼운 활성 판정. true면 고급 필터 엔진을 동적 로드하고, 엔진이 최종 identity 여부를 다시 판정한다. */
 export function hasActiveImageFilters(el: ImageFilterFields): boolean {
   return !!(
@@ -140,6 +286,13 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasObjectFilter(el.light) ||
     hasObjectFilter(el.sketch) ||
     hasObjectFilter(el.detail) ||
+    hasActiveExposureCandidate(el.exposureAdjustment) ||
+    hasActiveAmountCandidate(el.unsharpMask) ||
+    hasActiveRadiusCandidate(el.morphology) ||
+    hasActivePixelOffsetCandidate(el.pixelOffset) ||
+    hasActiveConvolutionCandidate(el.convolution) ||
+    hasActiveAmountCandidate(el.clouds) ||
+    hasActiveSmartFilterProgram(el) ||
     hasObjectFilter(el.colorToAlpha) ||
     isActiveNumber(el.saturation) ||
     isActiveNumber(el.hue) ||
@@ -162,6 +315,9 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
  * (StudioPage useEffect deps용) — 모든 보정 필드를 안정적 순서로 직렬화한 문자열.
  */
 export function imageFilterCacheKey(el: ImageFilterFields): string {
+  const smartFilterProgram = lightweightSmartFilterProgram(
+    el.smartFilterOperations !== undefined ? el.smartFilterOperations : el.smartFilters
+  );
   return JSON.stringify([
     el.blur ?? null,
     el.brightness ?? null,
@@ -173,6 +329,7 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.chromatic ?? null,
     el.posterize ?? null,
     el.noise ?? null,
+    el.noiseSeed ?? null,
     el.saturation ?? null,
     el.hue ?? null,
     el.temperature ?? null,
@@ -210,5 +367,12 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.colorToAlpha ?? null,
     el.levelsCh ?? null,
     el.curveCh ?? null,
+    el.exposureAdjustment ?? null,
+    el.unsharpMask ?? null,
+    el.morphology ?? null,
+    el.pixelOffset ?? null,
+    el.convolution ?? null,
+    el.clouds ?? null,
+    smartFilterProgram,
   ]);
 }

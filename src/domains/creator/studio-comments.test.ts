@@ -6,10 +6,12 @@ import {
   assignStudioCommentThread,
   canonicalStudioCommentAnchorKey,
   createEmptyStudioCommentsDocument,
+  createStudioCommentMessageId,
   editStudioCommentReply,
   editStudioCommentThread,
   listStudioCommentThreadsForAnchor,
   normalizeStudioCommentsDocument,
+  studioCommentMutationReceiptOwnsDraft,
   reanchorStudioCommentThread,
   removeStudioCommentReply,
   removeStudioCommentThread,
@@ -35,6 +37,24 @@ const SECOND_AUTHOR: StudioCommentActor = { id: "author-2", displayName: "í•œ ìž
 const PAGE_ANCHOR: StudioCommentAnchor = { type: "page", pageId: "page-1" };
 const CREATED_AT = new Date("2026-07-10T01:00:00.000Z");
 const UPDATED_AT = new Date("2026-07-10T02:00:00.000Z");
+
+describe("studio comment message ids", () => {
+  it("creates bounded retry identifiers for thread and reply mutations", () => {
+    const commentId = createStudioCommentMessageId("comment");
+    const replyId = createStudioCommentMessageId("reply");
+    expect(commentId).toMatch(/^comment_[A-Za-z0-9_-]+$/u);
+    expect(replyId).toMatch(/^reply_[A-Za-z0-9_-]+$/u);
+    expect(commentId.length).toBeLessThanOrEqual(120);
+    expect(replyId.length).toBeLessThanOrEqual(120);
+    expect(commentId).not.toBe(replyId);
+  });
+
+  it("lets only the matching async receipt close the current draft generation", () => {
+    expect(studioCommentMutationReceiptOwnsDraft("comment_new", "comment_old")).toBe(false);
+    expect(studioCommentMutationReceiptOwnsDraft(null, "comment_old")).toBe(false);
+    expect(studioCommentMutationReceiptOwnsDraft("comment_same", "comment_same")).toBe(true);
+  });
+});
 
 function withThread(
   anchor: StudioCommentAnchor = PAGE_ANCHOR,

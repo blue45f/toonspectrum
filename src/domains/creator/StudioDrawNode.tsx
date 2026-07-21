@@ -31,17 +31,31 @@ import {
   studioBrushAliasEffectiveDiameter,
 } from "./studio-brush-alias-profile";
 import {
+  DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
   normalizeStudioBrushDynamicsSettings,
   planStudioDynamicBrushDabs,
   resolveStudioBrushDynamicsPresetId,
   studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsSeedFromKey,
 } from "./studio-brush-dynamics";
+import {
+  resolveNormalizedStudioBrushDabColor,
+  resolveNormalizedStudioBrushGrainAlphaMultiplier,
+} from "./studio-brush-material-dynamics";
+import {
+  planStudioDynamicBrushRenderBudget,
+  STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
+  STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
+} from "./studio-brush-render-budget";
 import { resolveStudioBrushSinglePointRoute } from "./studio-brush-runtime-contract";
 import {
   resolveStudioStampBrushKind,
 } from "./studio-brush-stamp-engine";
-import { studioDynamicBrushDabVariations } from "./studio-brush-symmetry";
+import {
+  studioBrushSymmetryTransforms,
+  studioDynamicBrushDabVariations,
+} from "./studio-brush-symmetry";
+import { planNormalizedStudioBrushTipComposition } from "./studio-brush-tip-composition";
 import {
   buildStudioBrushTipAlphaMap,
   planStudioBrushTipStamp,
@@ -185,7 +199,8 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             ?? studioBrushDynamicsSettingsForBrushId(el.brush)
             ?? studioBrushDynamicsSettingsForBrushId(dynamicBrushId)
         );
-        const baseDabs = planStudioDynamicBrushDabs({
+        const seed = studioBrushDynamicsSeedFromKey(`${el.id}:${dynamics.seed}`);
+        const dabPlanInput = {
           points: el.points,
           pressures: el.pressures,
           tangentialPressures: el.tangentialPressures,
@@ -196,16 +211,55 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           baseWidth: strokeWidth,
           baseOpacity: dynamics.opacity.base,
           settings: dynamics,
-          seed: studioBrushDynamicsSeedFromKey(`${el.id}:${dynamics.seed}`),
-          maxDabs: 1024,
+          seed,
+        };
+        let baseDabs = planStudioDynamicBrushDabs({
+          ...dabPlanInput,
+          maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
         });
+        const renderBudget = planStudioDynamicBrushRenderBudget({
+          settings: dynamics,
+          dabCount: baseDabs.length,
+          symmetryCount: studioBrushSymmetryTransforms(el.symmetry).length,
+          markBudget: activeDraft
+            ? STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET
+            : STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
+        });
+        if (renderBudget.maxDabsPerVariation < baseDabs.length) {
+          // The dynamics planner's bounded pass redistributes these stations across the whole
+          // stroke, retaining both endpoints instead of truncating a dense prefix.
+          baseDabs = planStudioDynamicBrushDabs({
+            ...dabPlanInput,
+            maxDabs: renderBudget.maxDabsPerVariation,
+          });
+        }
         return {
           dynamics,
+          seed,
+          renderBudget,
           dabVariations: studioDynamicBrushDabVariations(baseDabs, el.symmetry),
         };
       })()
     : null;
   const dynamicDabVariations = dynamicBrushPlan?.dabVariations ?? null;
+  const dynamicTipRenderPlan = dynamicBrushPlan
+    ? (() => {
+        const tipDefinitions = [
+          dynamicBrushPlan.dynamics.tip,
+          ...dynamicBrushPlan.dynamics.tipLayers.map((layer) => layer.tip),
+        ];
+        const grainActive = dynamicBrushPlan.dynamics.grain.amount > 0;
+        const tipUsesEllipse = tipDefinitions.map((tip) => (
+          !grainActive && studioBrushTipUsesSolidEllipse(tip)
+        ));
+        return {
+          tipUsesEllipse,
+          tipAlphaMaps: tipDefinitions.map((tip, tipIndex) => (
+            tipUsesEllipse[tipIndex] ? null : buildStudioBrushTipAlphaMap(tip)
+          )),
+        };
+      })()
+    : null;
 
   return (
     <>
@@ -468,41 +522,80 @@ export const StudioDrawNode = memo(function StudioDrawNode({
 
           if (dynamicBrush && el.mode !== "eraser") {
             const dabs = dynamicDabVariations?.[index] ?? dynamicDabVariations?.[0] ?? [];
-            const tip = dynamicBrushPlan?.dynamics.tip;
-            const useEllipse = studioBrushTipUsesSolidEllipse(tip);
-            const tipAlphaMap = useEllipse ? null : buildStudioBrushTipAlphaMap(tip);
+            const dynamics = dynamicBrushPlan!.dynamics;
+            const dynamicSeed = dynamicBrushPlan!.seed;
+            const stampGrid = dynamicBrushPlan!.renderBudget.stampGrid;
+            const tipUsesEllipse = dynamicTipRenderPlan!.tipUsesEllipse;
+            const tipAlphaMaps = dynamicTipRenderPlan!.tipAlphaMaps;
+            const strokeOriginX = dabs[0]?.sourceX ?? dabs[0]?.x ?? 0;
+            const strokeOriginY = dabs[0]?.sourceY ?? dabs[0]?.y ?? 0;
             return (
               <Shape
                 key={index}
                 sceneFunc={(context) => {
                   context.save();
                   const inheritedAlpha = context.globalAlpha;
+                  const grainAt = (x: number, y: number) => (
+                    resolveNormalizedStudioBrushGrainAlphaMultiplier({
+                      x,
+                      y,
+                      strokeOriginX,
+                      strokeOriginY,
+                      strokeSeed: dynamicSeed,
+                    }, dynamics.grain)
+                  );
                   for (const dab of dabs) {
-                    const baseAlpha = inheritedAlpha
-                      * Math.min(1, Math.max(0, dab.opacity * dab.flow * opacity));
-                    if (useEllipse || !tipAlphaMap) {
-                      context.save();
-                      context.globalAlpha = baseAlpha;
-                      context.translate(dab.x, dab.y);
-                      context.rotate(dab.angle * Math.PI / 180);
-                      context.scale(1, dab.roundness);
-                      context.beginPath();
-                      context.arc(0, 0, Math.max(0.25, dab.size / 2), 0, Math.PI * 2);
-                      context.fillStyle = stroke;
-                      context.fill();
-                      context.restore();
-                      continue;
-                    }
-                    // PNG-alpha / procedural tip stamp path: spacing·scatter already live in dab x/y.
-                    const stamp = planStudioBrushTipStamp(dab, tip, { alphaMap: tipAlphaMap, grid: 7 });
-                    for (const sample of stamp.samples) {
-                      context.save();
-                      context.globalAlpha = baseAlpha * sample.alpha;
-                      context.beginPath();
-                      context.arc(dab.x + sample.dx, dab.y + sample.dy, sample.radius, 0, Math.PI * 2);
-                      context.fillStyle = stroke;
-                      context.fill();
-                      context.restore();
+                    const dabColor = resolveNormalizedStudioBrushDabColor(
+                      stroke,
+                      dab.index,
+                      dynamicSeed,
+                      dynamics.colorDynamics
+                    );
+                    const composed = planNormalizedStudioBrushTipComposition(
+                      dab,
+                      dynamics.tip,
+                      dynamics.tipLayers
+                    );
+                    for (const composedTip of composed) {
+                      const composedDab = composedTip.dab;
+                      const tipIndex = composedTip.role === "primary"
+                        ? 0
+                        : composedTip.layerIndex + 1;
+                      const baseAlpha = inheritedAlpha
+                        * Math.min(1, Math.max(0, composedDab.opacity * composedDab.flow * opacity));
+                      const tipAlphaMap = tipAlphaMaps[tipIndex] ?? null;
+                      if (tipUsesEllipse[tipIndex] || !tipAlphaMap) {
+                        context.save();
+                        context.globalAlpha = baseAlpha * grainAt(composedDab.x, composedDab.y);
+                        context.translate(composedDab.x, composedDab.y);
+                        context.rotate(composedDab.angle * Math.PI / 180);
+                        context.scale(1, composedDab.roundness);
+                        context.beginPath();
+                        context.arc(0, 0, Math.max(0.25, composedDab.size / 2), 0, Math.PI * 2);
+                        context.fillStyle = dabColor;
+                        context.fill();
+                        context.restore();
+                        continue;
+                      }
+                      // PNG-alpha/procedural tip path. Grain is sampled in world coordinates after
+                      // multi-tip transforms, so canvas-fixed and stroke-fixed remain distinguishable.
+                      const stamp = planStudioBrushTipStamp(composedDab, composedTip.tip, {
+                        alphaMap: tipAlphaMap,
+                        grid: stampGrid,
+                      });
+                      for (const sample of stamp.samples) {
+                        const sampleX = composedDab.x + sample.dx;
+                        const sampleY = composedDab.y + sample.dy;
+                        context.save();
+                        context.globalAlpha = baseAlpha
+                          * sample.alpha
+                          * grainAt(sampleX, sampleY);
+                        context.beginPath();
+                        context.arc(sampleX, sampleY, sample.radius, 0, Math.PI * 2);
+                        context.fillStyle = dabColor;
+                        context.fill();
+                        context.restore();
+                      }
                     }
                   }
                   context.restore();

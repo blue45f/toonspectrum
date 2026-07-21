@@ -7,6 +7,7 @@ import {
   isStudioWorkAssetImageAdmissionOptedIn,
   STUDIO_WORK_ASSET_ADMISSION_OPT_IN_TOKEN,
   STUDIO_WORK_ASSET_IMAGE_ADMISSION_OPT_IN_TOKEN,
+  STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
   StudioWorkAssetManifestSchema,
   studioWorkAssetReferenceKey,
   studioWorkAssetSourceUri,
@@ -76,6 +77,42 @@ describe("studio work asset wire contract", () => {
       assetId: "asset-1",
       elementType: "image",
     })).toThrow();
+  });
+
+  it("accepts an ordered bounded smart-filter program on image references only", () => {
+    const smartFilters = {
+      version: 1 as const,
+      entries: [
+        { id: "tone-1", engine: "brightness-contrast" as const, enabled: true, params: { brightness: 0.2 } },
+        { id: "tone-2", engine: "brightness-contrast" as const, enabled: true, params: { brightness: -0.1 } },
+      ],
+    };
+    const parsed = parseStudioWorkAssetDescriptor({
+      ...descriptor(),
+      element: { ...descriptor().element, smartFilters },
+    }, { assetId: "asset-1", elementType: "image" });
+
+    expect(STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS).toContain("smartFilters");
+    expect(parsed.element.smartFilters).toEqual(smartFilters);
+    expect(() => parseStudioWorkAssetDescriptor({
+      ...descriptor("asset-1", "vrm"),
+      element: { ...descriptor("asset-1", "vrm").element, smartFilters },
+    }, { assetId: "asset-1", elementType: "vrm" })).toThrow(/이미지/u);
+    expect(() => parseStudioWorkAssetDescriptor({
+      ...descriptor(),
+      element: {
+        ...descriptor().element,
+        smartFilters: {
+          version: 1,
+          entries: Array.from({ length: 25 }, (_, index) => ({
+            id: `filter-${index}`,
+            engine: "blur",
+            enabled: true,
+            params: {},
+          })),
+        },
+      },
+    }, { assetId: "asset-1", elementType: "image" })).toThrow();
   });
 
   it("rejects MIME/type mismatches and over-limit manifests", () => {

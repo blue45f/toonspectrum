@@ -49,7 +49,14 @@ describe("studio-image-filter.worker runtime", () => {
     const { messages, scope } = await loadWorkerHarness();
     const input = imageData();
     const expected = imageData();
-    const el = { brightness: 0.25, saturation: -0.3, temperature: 20 };
+    const el = {
+      brightness: 0.25,
+      saturation: -0.3,
+      temperature: 20,
+      exposureAdjustment: { exposure: 0.5, gamma: 0.9, offset: 0.02 },
+      pixelOffset: { x: 1, y: 0, edge: "wrap" as const },
+      clouds: { amount: 0.2, scale: 32, seed: 42, mode: "overlay" as const },
+    };
     const built = buildImageFilters(el, registry);
     applyImageFilters(expected, built.filters, built.attrs);
 
