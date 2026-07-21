@@ -45,6 +45,11 @@ import {
 } from "./studio-chrome-ui";
 import { type DrawMode, type DrawShapeKind, type StudioMenu, type Tool } from "./studio-editor-tool-model";
 import { type El } from "./studio-element-model";
+import {
+  resolveStudioRailMorePosition,
+  type StudioRailMorePosition,
+  type StudioRailMoreViewport,
+} from "./studio-left-tool-rail-position";
 import { preloadStudioReferencePanel } from "./studio-page-lazy-ui";
 import {
   isSelectionUsable,
@@ -58,6 +63,47 @@ import { cn } from "@/lib/utils";
 
 const REVIEW_LOCK_REASON = "현재 작업면의 검토 잠금을 먼저 해제하세요.";
 const IMAGE_EDIT_LOCK_REASON = "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요.";
+const STUDIO_RAIL_MORE_MAX_HEIGHT_PX = 28 * 16;
+const STUDIO_RAIL_MORE_WIDTH_PX = 13 * 16;
+
+type PositionedStudioRailMore = StudioRailMorePosition & { readonly maxHeight: number };
+
+function currentStudioRailMoreViewport(): StudioRailMoreViewport {
+  const visualViewport = globalThis.visualViewport;
+  return {
+    height: visualViewport?.height ?? globalThis.innerHeight,
+    left: visualViewport?.offsetLeft ?? 0,
+    top: visualViewport?.offsetTop ?? 0,
+    width: visualViewport?.width ?? globalThis.innerWidth,
+  };
+}
+
+function measureStudioRailMorePosition(
+  trigger: Pick<DOMRect, "bottom" | "right">,
+  dialog?: Pick<DOMRect, "height" | "width"> | null
+): PositionedStudioRailMore {
+  const viewport = currentStudioRailMoreViewport();
+  const maxHeight = Math.max(0, Math.min(
+    STUDIO_RAIL_MORE_MAX_HEIGHT_PX,
+    viewport.height - 16
+  ));
+  const measuredHeight = dialog?.height && dialog.height > 0
+    ? Math.min(dialog.height, maxHeight)
+    : maxHeight;
+  const measuredWidth = dialog?.width && dialog.width > 0
+    ? dialog.width
+    : STUDIO_RAIL_MORE_WIDTH_PX;
+
+  return {
+    ...resolveStudioRailMorePosition({
+      popoverHeight: measuredHeight,
+      popoverWidth: measuredWidth,
+      trigger,
+      viewport,
+    }),
+    maxHeight,
+  };
+}
 
 export interface StudioLeftToolRailHandlers {
   fitCanvasToWidth: () => void;
@@ -185,7 +231,11 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   const railMoreTriggerId = `${railMoreDialogId}-trigger`;
   const railMoreTitleId = `${railMoreDialogId}-title`;
   const railMoreDialogRef = useRef<HTMLDivElement>(null);
-  const [railMorePosition, setRailMorePosition] = useState({ bottom: 8, left: 56 });
+  const [railMorePosition, setRailMorePosition] = useState<PositionedStudioRailMore>({
+    left: 56,
+    maxHeight: STUDIO_RAIL_MORE_MAX_HEIGHT_PX,
+    top: 8,
+  });
   const {
     addBubble,
     addText,
@@ -212,10 +262,17 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
       const trigger = document.getElementById(railMoreTriggerId);
       if (!trigger) return;
       const rect = trigger.getBoundingClientRect();
-      setRailMorePosition({
-        bottom: Math.max(8, globalThis.innerHeight - rect.bottom),
-        left: Math.max(8, Math.min(rect.right + 4, globalThis.innerWidth - 216)),
-      });
+      const next = measureStudioRailMorePosition(
+        rect,
+        dialog?.getBoundingClientRect()
+      );
+      setRailMorePosition((current) =>
+        current.left === next.left
+        && current.top === next.top
+        && current.maxHeight === next.maxHeight
+          ? current
+          : next
+      );
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -235,6 +292,8 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     document.addEventListener("pointerdown", handlePointerDown, true);
     globalThis.addEventListener("resize", updatePosition);
     globalThis.addEventListener("scroll", updatePosition, true);
+    globalThis.visualViewport?.addEventListener("resize", updatePosition);
+    globalThis.visualViewport?.addEventListener("scroll", updatePosition);
     const frame = requestAnimationFrame(() => {
       dialog
         ?.querySelector<HTMLElement>('button:not([disabled]), [href], input:not([disabled])')
@@ -246,6 +305,8 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
       document.removeEventListener("pointerdown", handlePointerDown, true);
       globalThis.removeEventListener("resize", updatePosition);
       globalThis.removeEventListener("scroll", updatePosition, true);
+      globalThis.visualViewport?.removeEventListener("resize", updatePosition);
+      globalThis.visualViewport?.removeEventListener("scroll", updatePosition);
     };
   }, [railMoreOpen, railMoreTriggerId, setRailMoreOpen]);
 
@@ -771,10 +832,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                   if (!railMoreOpen) {
                     const rect = document.getElementById(railMoreTriggerId)?.getBoundingClientRect();
                     if (rect) {
-                      setRailMorePosition({
-                        bottom: Math.max(8, globalThis.innerHeight - rect.bottom),
-                        left: Math.max(8, Math.min(rect.right + 4, globalThis.innerWidth - 216)),
-                      });
+                      setRailMorePosition(measureStudioRailMorePosition(rect));
                     }
                   }
                   setRailMoreOpen((v) => !v);
@@ -788,7 +846,11 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                   aria-labelledby={railMoreTitleId}
                   tabIndex={-1}
                   className="fixed z-[80] max-h-[min(28rem,calc(100dvh-1rem))] w-52 overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel p-1.5 shadow-2xl [scrollbar-gutter:stable]"
-                  style={railMorePosition}
+                  style={{
+                    left: railMorePosition.left,
+                    maxHeight: railMorePosition.maxHeight,
+                    top: railMorePosition.top,
+                  }}
                 >
                   <p id={railMoreTitleId} className="px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-fg-3">
                     숨긴 도구
@@ -833,7 +895,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                         <button
                           key={id}
                           type="button"
-                          className="flex min-h-11 w-full items-center rounded-lg px-2 py-2 text-left text-xs text-fg hover:bg-raised sm:min-h-9 sm:py-1.5"
+                          className="flex min-h-11 w-full items-center rounded-lg px-2 py-2 text-left text-xs text-fg hover:bg-raised sm:min-h-9 sm:py-1.5 pointer-coarse:min-h-11 pointer-coarse:py-2"
                           onClick={() => {
                             commitAppSettings({
                               ...appSettings,
@@ -850,7 +912,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                   )}
                   <button
                     type="button"
-                    className="mt-1 flex min-h-11 w-full items-center gap-1 rounded-lg border border-line px-2 py-2 text-left text-xs font-medium text-accent hover:bg-accent-soft sm:min-h-9 sm:py-1.5"
+                    className="mt-1 flex min-h-11 w-full items-center gap-1 rounded-lg border border-line px-2 py-2 text-left text-xs font-medium text-accent hover:bg-accent-soft sm:min-h-9 sm:py-1.5 pointer-coarse:min-h-11 pointer-coarse:py-2"
                     onClick={() => {
                       setRailMoreOpen(false);
                       setAppSettingsInitialTab("toolbar");

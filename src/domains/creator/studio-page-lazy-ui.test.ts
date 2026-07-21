@@ -115,5 +115,11 @@ describe("StudioPage optional UI registry", () => {
     ).toEqual(["./StudioCommentsPanel"]);
     expect(session.dynamicImports).toEqual([]);
     expect(session.valueImports).not.toContain("./studio-page-lazy-ui");
+    expect(registry.source).toContain("studioCommentsPanelSessionLoader.load");
+    expect(registry.source).toContain("studioCommentsPanelSessionLoader.preload()");
+    expect(registry.source).toContain("preloadStudioCommentsPanelSession");
+    expect(moduleEdges("./StudioPage.tsx").source).toContain(
+      "preloadStudioCommentsPanelSession();"
+    );
   });
 });

@@ -1,10 +1,22 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isStudioCanvasInteractionBlocked,
   studioCanvasCursorClassName,
   studioCanvasViewportCursorClassName,
   type StudioCanvasCursorInput,
 } from "./studio-canvas-cursor";
+
+const interactionBase = {
+  activeSurfaceReviewLocked: true,
+  commentPinArmed: true,
+  canCreateStudioComment: true,
+  saving: false,
+  documentReloadRequired: false,
+  sourceHydrationPending: false,
+  workHydrationFailed: false,
+  collaborationDocumentUnavailable: false,
+} as const;
 
 const base: StudioCanvasCursorInput = {
   tool: "select",
@@ -26,6 +38,44 @@ const base: StudioCanvasCursorInput = {
 };
 
 describe("studioCanvasCursorClassName", () => {
+  it("admits only an authorized comment placement through a read-only document lock", () => {
+    const interactionBlocked = isStudioCanvasInteractionBlocked(interactionBase);
+
+    expect(interactionBlocked).toBe(false);
+    expect(studioCanvasCursorClassName({
+      ...base,
+      interactionBlocked,
+      commentPinArmed: true,
+    })).toBe("cursor-crosshair");
+    expect(isStudioCanvasInteractionBlocked({
+      ...interactionBase,
+      commentPinArmed: false,
+    })).toBe(true);
+    expect(isStudioCanvasInteractionBlocked({
+      ...interactionBase,
+      canCreateStudioComment: false,
+    })).toBe(true);
+    expect(isStudioCanvasInteractionBlocked({
+      ...interactionBase,
+      activeSurfaceReviewLocked: false,
+      commentPinArmed: false,
+      canCreateStudioComment: false,
+    })).toBe(false);
+  });
+
+  it.each([
+    "saving",
+    "documentReloadRequired",
+    "sourceHydrationPending",
+    "workHydrationFailed",
+    "collaborationDocumentUnavailable",
+  ] as const)("keeps the %s barrier absolute during comment placement", (barrier) => {
+    expect(isStudioCanvasInteractionBlocked({
+      ...interactionBase,
+      [barrier]: true,
+    })).toBe(true);
+  });
+
   it("distinguishes select, hand and active pan modes", () => {
     expect(studioCanvasCursorClassName(base)).toBe("cursor-default");
     expect(studioCanvasCursorClassName({ ...base, tool: "hand" })).toBe("cursor-grab");

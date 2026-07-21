@@ -493,13 +493,18 @@ const StudioPublicationOperationsPanel = lazyRetry(
     })),
   "StudioPublicationOperationsPanel"
 );
-const StudioCommentsPanelSession = lazyRetry(
-  () =>
-    import("./StudioCommentsPanelSession").then((mod) => ({
+const studioCommentsPanelSessionLoader = createStudioIntentLazyLoader(() =>
+  import("./StudioCommentsPanelSession").then((mod) => ({
       default: mod.StudioCommentsPanelSession,
-    })),
+    }))
+);
+const StudioCommentsPanelSession = lazyRetry(
+  studioCommentsPanelSessionLoader.load,
   "StudioCommentsPanelSession"
 );
+function preloadStudioCommentsPanelSession(): void {
+  studioCommentsPanelSessionLoader.preload();
+}
 
 // Review networking and mutation verification are not part of the first-paint drawing path.
 // Keep them in optional chunks while retaining the lightweight persisted comment model needed
@@ -774,6 +779,7 @@ export {
   loadStudioTeamCommentMutationPlanner,
   loadStudioWebtoonGuides,
   preloadStudioAssetMenuPanel,
+  preloadStudioCommentsPanelSession,
   preloadStudioColorPopover,
   preloadStudioExportMenuPanel,
   preloadStudioIntegrationsSettingsPanel,

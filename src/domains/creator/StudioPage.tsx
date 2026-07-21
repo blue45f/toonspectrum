@@ -23,7 +23,7 @@ import {
   Shapes,
   MessageSquare,
 } from "lucide-react";
-import { Fragment, Profiler, Suspense, lazy, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
+import { Fragment, Profiler, Suspense, lazy, memo, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { Stage, Layer, Rect, Group, Circle as KCircle, Transformer, Shape } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -233,6 +233,7 @@ import {
   removeBubbleShapePoint,
 } from "./studio-bubble-custom-shape";
 import {
+  isStudioCanvasInteractionBlocked,
   studioCanvasCursorClassName,
   studioCanvasViewportCursorClassName,
 } from "./studio-canvas-cursor";
@@ -698,6 +699,7 @@ import {
   loadStudioTeamCommentMutationPlanner,
   loadStudioWebtoonGuides,
   preloadStudioAssetMenuPanel,
+  preloadStudioCommentsPanelSession,
   preloadStudioReferencePanel,
   preloadStudioTextEditOverlay,
   type StudioComipoAssemblyModule,
@@ -2008,6 +2010,9 @@ function StudioCuttoonEditor() {
   );
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
   const [appSettingsInitialTab, setAppSettingsInitialTab] = useState<StudioAppSettingsTab>("general");
+  const [appSettingsPersistenceState, setAppSettingsPersistenceState] = useState<
+    "saved" | "session-only"
+  >("saved");
   const [railMoreOpen, setRailMoreOpen] = useState(false);
   const appSettingsRef = useRef(appSettings);
   appSettingsRef.current = appSettings;
@@ -2018,33 +2023,36 @@ function StudioCuttoonEditor() {
   );
   const [macroSession, setMacroSession] = useState<StudioMacroSession>(() => createStudioMacroSession());
   const [layerMergeBusy, setLayerMergeBusy] = useState(false);
-  function setStudioUiDensity(mode: StudioUiDensityMode) {
-    setUiDensityMode(mode);
-    saveStudioUiDensityState(
-      typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
-      { mode }
-    );
-    setAppSettings((prev) => {
-      if (prev.general.densityMode === mode) return prev;
-      const next = { ...prev, general: { ...prev.general, densityMode: mode } };
-      saveStudioAppSettings(studioAppSettingsStorage(), next);
-      return next;
-    });
-  }
-  function commitAppSettings(next: StudioAppSettings) {
-    setAppSettings(next);
-    saveStudioAppSettings(studioAppSettingsStorage(), next);
-    // Mirror high-impact prefs into existing live state (avoid recursive setStudioUiDensity).
-    setUiDensityMode(next.general.densityMode);
-    saveStudioUiDensityState(
+  function persistAppSettings(next: StudioAppSettings): boolean {
+    const settingsSaved = saveStudioAppSettings(studioAppSettingsStorage(), next);
+    const densitySaved = saveStudioUiDensityState(
       typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
       { mode: next.general.densityMode }
     );
+    const saved = settingsSaved && densitySaved;
+    setAppSettingsPersistenceState(saved ? "saved" : "session-only");
+    return saved;
+  }
+  function setStudioUiDensity(mode: StudioUiDensityMode) {
+    setUiDensityMode(mode);
+    const current = appSettingsRef.current;
+    const next = current.general.densityMode === mode
+      ? current
+      : { ...current, general: { ...current.general, densityMode: mode } };
+    if (next !== current) setAppSettings(next);
+    persistAppSettings(next);
+  }
+  function commitAppSettings(next: StudioAppSettings) {
+    setAppSettings(next);
+    persistAppSettings(next);
+    // Mirror high-impact prefs into existing live state (avoid recursive setStudioUiDensity).
+    setUiDensityMode(next.general.densityMode);
     setShowGrid(next.grids.showPixelGrid);
     setGridSize(next.grids.pixelGridSize);
     setPressureCurve(next.other.pressureCurve);
     if (next.grids.snapToPixelGrid) setSnapEnabled(true);
   }
+  const setStudioUiDensityFromCompanion = useEffectEvent(setStudioUiDensity);
   // useCallback: 좌측 레일 memo 자식에서 렌더 중 호출 — prop 안정성 유지.
   const isRailToolVisible = useCallback(
     (id: StudioRailToolId): boolean => appSettings.toolbar.visibleIds.includes(id),
@@ -2920,7 +2928,13 @@ function StudioCuttoonEditor() {
       return "같은 화면의 원고 연산을 동기화하고 있어요. CRDT 문서와 장면 런타임이 모두 준비되면 편집이 자동으로 열립니다.";
     }
     if (sharedDocument.role === "commenter") {
-      return "검토 전용 권한입니다. 서버 댓글은 다음 단계에서 제공되며, 지금은 원고 열람·스크롤·내보내기만 할 수 있어요.";
+      if (studioTeamCommentCapabilities?.comment === true) {
+        return "검토 전용 권한입니다. 원고 편집은 잠겨 있지만 댓글 도구로 캔버스 위치에 피드백을 남길 수 있어요.";
+      }
+      if (studioTeamCommentCapabilities === null) {
+        return "검토 전용 권한입니다. 원고 편집은 잠겨 있으며 팀 댓글 권한과 기록을 확인하고 있어요.";
+      }
+      return "검토 전용 권한입니다. 원고와 댓글 작성은 읽기 전용이며 기존 피드백을 확인할 수 있어요.";
     }
     if (sharedDocument.role === "viewer") {
       return "열람 전용 권한입니다. 원고 편집과 저장은 할 수 없지만 스크롤과 내보내기는 계속 사용할 수 있어요.";
@@ -2931,6 +2945,7 @@ function StudioCuttoonEditor() {
     sourceHydrationPending,
     workHydrationFailed,
     sharedDocument,
+    studioTeamCommentCapabilities,
     workHydrated,
     collaborationOperationSyncPending,
   ]);
@@ -5370,7 +5385,9 @@ function StudioCuttoonEditor() {
         if (fresh.access !== "edit") {
           setError(
             fresh.role === "commenter"
-              ? "검토 전용 권한으로 변경되었습니다. 서버 댓글은 다음 단계이며, 로컬 변경은 내보낸 뒤 소유자에게 전달해 주세요."
+              ? studioTeamCommentCapabilities?.comment === true
+                ? "검토 전용 권한으로 변경되었습니다. 원고 편집은 잠기지만 댓글 핀과 답글로 피드백을 계속 남길 수 있어요."
+                : "검토 전용 권한으로 변경되었습니다. 원고와 댓글 작성은 읽기 전용이며 기존 피드백만 확인할 수 있어요."
               : "팀 편집 권한이 회수되었습니다. 로컬 변경은 JSON·이미지로 내보낼 수 있지만 서버에는 저장할 수 없어요."
           );
         } else if (revisionChanged) {
@@ -5411,7 +5428,7 @@ function StudioCuttoonEditor() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       documentRevalidateAbortRef.current?.abort();
     };
-  }, [sharedDocument, studioAuthUserId, workHydrated, workId]);
+  }, [sharedDocument, studioAuthUserId, studioTeamCommentCapabilities?.comment, workHydrated, workId]);
 
   // 표시용 스케일(컨테이너 폭에 맞춤).
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -6647,7 +6664,18 @@ function StudioCuttoonEditor() {
   const canCreateStudioComment = workId
     ? studioTeamCommentCapabilities?.comment === true
     : !collaborationDocumentLocked;
+  const canvasInteractionBlocked = isStudioCanvasInteractionBlocked({
+    activeSurfaceReviewLocked,
+    commentPinArmed,
+    canCreateStudioComment,
+    saving,
+    documentReloadRequired,
+    sourceHydrationPending,
+    workHydrationFailed,
+    collaborationDocumentUnavailable,
+  });
   function openStudioCommentInbox() {
+    preloadStudioCommentsPanelSession();
     setCommentPinArmed(false);
     setTeamPanelOpen(false);
     setCommentsOpen(true);
@@ -6663,6 +6691,7 @@ function StudioCuttoonEditor() {
       announceDrawingShortcut("댓글 핀 배치 취소");
       return;
     }
+    preloadStudioCommentsPanelSession();
     disarmAllPixelTools();
     setTeamPanelOpen(false);
     setCommentsOpen(false);
@@ -8312,7 +8341,9 @@ function StudioCuttoonEditor() {
           break;
         case "layers":
           setLeftPanelOpen(true);
-          if (companionUiRef.current.uiDensityMode === "focus") setStudioUiDensity("simple");
+          if (companionUiRef.current.uiDensityMode === "focus") {
+            setStudioUiDensityFromCompanion("simple");
+          }
           break;
         case "ai":
           setMenu("aiAssist");
@@ -10501,7 +10532,7 @@ function StudioCuttoonEditor() {
     if (!tr) return;
     const lookup = new Map<string, El>();
     for (const element of elements) lookup.set(element.id, element);
-    if (collaborationDocumentLocked || tool !== "select") {
+    if (activeSurfaceReviewLocked || tool !== "select") {
       tr.nodes([]);
     } else if (marqueeIds.length > 0) {
       const nodes = marqueeIds
@@ -10519,7 +10550,7 @@ function StudioCuttoonEditor() {
       tr.nodes(node ? [node] : []);
     }
     tr.getLayer()?.batchDraw();
-  }, [collaborationDocumentLocked, selectedId, marqueeIds, tool, elements, groups]);
+  }, [activeSurfaceReviewLocked, selectedId, marqueeIds, tool, elements, groups]);
 
   function publishStudioCrdtSceneTransition(
     previousPages: readonly PageState[],
@@ -17258,6 +17289,15 @@ function StudioCuttoonEditor() {
     if (bubbleShapeDragRef.current) return;
     // Figma식 자유 위치 댓글 핀: 무장 상태의 첫 캔버스 클릭이 point 앵커를 확정하고 소비된다.
     if (commentPinArmed) {
+      if (canvasInteractionBlocked) {
+        setCommentPinArmed(false);
+        announceDrawingShortcut("댓글 핀을 배치할 수 없는 문서 상태입니다");
+        return;
+      }
+      if (
+        (typeof stagePointerEvent.button === "number" && stagePointerEvent.button !== 0)
+        || stagePointerEvent.isPrimary === false
+      ) return;
       const pos = e.target.getStage()?.getRelativePointerPosition();
       setCommentPinArmed(false);
       if (pos && canvasH > 0) {
@@ -23140,6 +23180,7 @@ function StudioCuttoonEditor() {
     clearAdvancedFillTapGesture,
     clearAutosave,
     commitAppSettings,
+    retryAppSettingsPersistence: () => persistAppSettings(appSettingsRef.current),
     commitCoalesced,
     commitEditText,
     commitPages,
@@ -23907,6 +23948,7 @@ function StudioCuttoonEditor() {
           appSettings={appSettings}
           appSettingsInitialTab={appSettingsInitialTab}
           appSettingsOpen={appSettingsOpen}
+          appSettingsPersistenceState={appSettingsPersistenceState}
           authorizedWorkAssetScopeId={authorizedWorkAssetScopeId}
           autosaveRestoreBlockedReason={autosaveRestoreBlockedReason}
           bg={bg}
@@ -23921,6 +23963,7 @@ function StudioCuttoonEditor() {
           canvasRotation={canvasRotation}
           canvasH={canvasH}
           canvasOnlyMode={canvasOnlyMode}
+          canvasInteractionBlocked={canvasInteractionBlocked}
           collaborationDocumentLocked={collaborationDocumentLocked}
           collaborationDocumentUnavailable={collaborationDocumentUnavailable}
           collaborationLockMessage={collaborationLockMessage}
@@ -24794,6 +24837,7 @@ interface StudioCanvasViewportHandlers {
   clearAdvancedFillTapGesture: () => void;
   clearAutosave: () => void;
   commitAppSettings: (next: StudioAppSettings) => void;
+  retryAppSettingsPersistence: () => void;
   commitCoalesced: (nextElements: El[], key: string) => void;
   cancelEditText: () => void;
   commitEditText: (finalValue: string) => void;
@@ -24880,6 +24924,7 @@ interface StudioCanvasViewportProps {
   appSettings: StudioAppSettings;
   appSettingsInitialTab: StudioAppSettingsTab;
   appSettingsOpen: boolean;
+  appSettingsPersistenceState: "saved" | "session-only";
   authorizedWorkAssetScopeId: string | null;
   autosaveRestoreBlockedReason: "legacy-unversioned" | "work-mismatch" | "revision-mismatch" | null;
   bg: string;
@@ -24894,6 +24939,7 @@ interface StudioCanvasViewportProps {
   canvasRotation: StudioViewRotation;
   canvasH: number;
   canvasOnlyMode: boolean;
+  canvasInteractionBlocked: boolean;
   collaborationDocumentLocked: boolean;
   collaborationDocumentUnavailable: boolean;
   collaborationLockMessage: () => string;
@@ -25139,6 +25185,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   appSettings,
   appSettingsInitialTab,
   appSettingsOpen,
+  appSettingsPersistenceState,
   authorizedWorkAssetScopeId,
   autosaveRestoreBlockedReason,
   bg,
@@ -25153,6 +25200,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   canvasRotation,
   canvasH,
   canvasOnlyMode,
+  canvasInteractionBlocked,
   collaborationDocumentLocked,
   collaborationDocumentUnavailable,
   collaborationLockMessage,
@@ -25389,6 +25437,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     clearAdvancedFillTapGesture,
     clearAutosave,
     commitAppSettings,
+    retryAppSettingsPersistence,
     commitCoalesced,
     commitEditText,
     commitPages,
@@ -25476,11 +25525,6 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     canvasRotation: suppressViewTransform ? 0 : canvasRotation,
   });
   const editingUseOverlay = !!editingTarget && !editingFallbackToModal;
-  const canvasInteractionBlocked =
-    activeSurfaceReviewLocked
-    || saving
-    || sourceHydrationPending
-    || collaborationDocumentUnavailable;
   const canvasCursorInput = {
     tool,
     drawMode,
@@ -25858,7 +25902,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
             className={cn(
               "relative rounded-sm shadow-[0_0_0_1px_oklch(0.3_0.012_64/0.55),0_18px_50px_oklch(0.08_0.01_70/0.45)]",
               canvasCursorClassName,
-              (activeSurfaceReviewLocked || saving) && "pointer-events-none select-none",
+              canvasInteractionBlocked && "pointer-events-none select-none",
               (sourceHydrationPending || collaborationDocumentUnavailable) && "invisible absolute inset-0"
             )}
             style={{ width: stageViewLayout.width, height: stageViewLayout.height }}
@@ -25898,6 +25942,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
             onDragEnd={onStageDragEnd}
             onContextMenu={(e) => {
               e.evt.preventDefault();
+              if (canvasInteractionBlocked || commentPinArmed) return;
               const stage = stageRef.current;
               if (!stage) return;
               const pointerPos = stage.getPointerPosition();
@@ -25993,7 +26038,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 // 픽셀 선택/크롭/패널 컷/노드 편집/문지르기/복구브러시 무장 중엔 요소 드래그를 잠근다 — 캔버스 드래그가 도구 조작으로 간다.
                 const draggable =
                   !opts.asMask &&
-                  !collaborationDocumentLocked &&
+                  !activeSurfaceReviewLocked &&
                   tool === "select" &&
                   !locked &&
                   !advancedFillArmed &&
@@ -26014,6 +26059,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 const onSelect = opts.asMask
                   ? () => {}
                   : () =>
+                      !activeSurfaceReviewLocked &&
                       tool === "select" &&
                       !advancedFillArmed &&
                       !pixelToolArmed &&
@@ -26980,6 +27026,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 open={appSettingsOpen}
                 settings={appSettings}
                 initialTab={appSettingsInitialTab}
+                persistenceState={appSettingsPersistenceState}
                 onClose={() => {
                   const restoreMoreToolsFocus = appSettingsInitialTab === "toolbar";
                   setAppSettingsOpen(false);
@@ -26993,6 +27040,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   }
                 }}
                 onChange={commitAppSettings}
+                onRetryPersistence={retryAppSettingsPersistence}
                 onResetAll={() => {
                   const next = resetStudioAppSettings(studioAppSettingsStorage());
                   commitAppSettings(next);

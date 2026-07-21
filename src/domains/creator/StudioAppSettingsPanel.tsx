@@ -54,9 +54,11 @@ export type StudioAppSettingsPanelProps = {
   open: boolean;
   settings: StudioAppSettings;
   initialTab?: StudioAppSettingsTab;
+  persistenceState?: "saved" | "session-only";
   onClose: () => void;
   onChange: (next: StudioAppSettings) => void;
   onResetAll: () => void;
+  onRetryPersistence?: () => void;
 };
 
 function SectionLabel({ children }: { children: string }): ReactElement {
@@ -107,9 +109,11 @@ export function StudioAppSettingsPanel({
   open,
   settings,
   initialTab = "general",
+  persistenceState = "saved",
   onClose,
   onChange,
   onResetAll,
+  onRetryPersistence,
 }: StudioAppSettingsPanelProps): ReactElement | null {
   const titleId = useId();
   const [tab, setTab] = useState<StudioAppSettingsTab>(initialTab);
@@ -239,7 +243,10 @@ export function StudioAppSettingsPanel({
           </div>
           <button
             type="button"
-            className={cn(buttonClass({ size: "sm", variant: "quiet" }), "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8")}
+            className={cn(
+              buttonClass({ size: "sm", variant: "quiet" }),
+              "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+            )}
             onClick={onClose}
             aria-label="설정 닫기"
           >
@@ -258,7 +265,7 @@ export function StudioAppSettingsPanel({
                 type="button"
                 onClick={() => setTab(id)}
                 className={cn(
-                  "min-h-11 shrink-0 rounded-lg px-2.5 py-2 text-left text-xs font-medium transition sm:min-h-8 sm:py-1.5",
+                  "min-h-11 shrink-0 rounded-lg px-2.5 py-2 text-left text-xs font-medium transition sm:min-h-8 sm:py-1.5 pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:py-2",
                   tab === id
                     ? "bg-accent-soft text-accent ring-1 ring-accent/20"
                     : "text-fg-2 hover:bg-raised hover:text-fg"
@@ -535,7 +542,7 @@ export function StudioAppSettingsPanel({
                       value={toolbarQuery}
                       onChange={(event) => setToolbarQuery(event.target.value.slice(0, 80))}
                       placeholder="도구 이름 검색"
-                      className="h-11 w-full rounded-xl border border-line bg-card pl-9 pr-3 text-xs text-fg outline-none transition-colors placeholder:text-fg-3 hover:border-line-strong focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:h-10"
+                      className="h-11 w-full rounded-xl border border-line bg-card pl-9 pr-3 text-xs text-fg outline-none transition-colors placeholder:text-fg-3 hover:border-line-strong focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:h-10 pointer-coarse:h-11 pointer-coarse:min-h-11"
                     />
                   </label>
                 </div>
@@ -554,7 +561,10 @@ export function StudioAppSettingsPanel({
                           <span className="min-w-0 flex-1 truncate">{studioRailToolLabel(id)}</span>
                           <button
                             type="button"
-                            className={cn(buttonClass({ size: "sm", variant: "quiet" }), "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8")}
+                            className={cn(
+                              buttonClass({ size: "sm", variant: "quiet" }),
+                              "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                            )}
                             aria-label={`${studioRailToolLabel(id)} 위로`}
                             disabled={visible.indexOf(id) === 0}
                             onClick={() =>
@@ -567,7 +577,10 @@ export function StudioAppSettingsPanel({
                           </button>
                           <button
                             type="button"
-                            className={cn(buttonClass({ size: "sm", variant: "quiet" }), "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8")}
+                            className={cn(
+                              buttonClass({ size: "sm", variant: "quiet" }),
+                              "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                            )}
                             aria-label={`${studioRailToolLabel(id)} 아래로`}
                             disabled={visible.indexOf(id) === visible.length - 1}
                             onClick={() =>
@@ -580,7 +593,10 @@ export function StudioAppSettingsPanel({
                           </button>
                           <button
                             type="button"
-                            className={cn(buttonClass({ size: "sm", variant: "quiet" }), "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8")}
+                            className={cn(
+                              buttonClass({ size: "sm", variant: "quiet" }),
+                              "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                            )}
                             aria-label={`${studioRailToolLabel(id)} 숨기기`}
                             disabled={visible.length <= 1}
                             onClick={() =>
@@ -617,7 +633,10 @@ export function StudioAppSettingsPanel({
                             <span className="min-w-0 flex-1 truncate">{studioRailToolLabel(id)}</span>
                             <button
                               type="button"
-                              className={cn(buttonClass({ size: "sm", variant: "quiet" }), "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8")}
+                              className={cn(
+                                buttonClass({ size: "sm", variant: "quiet" }),
+                                "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                              )}
                               aria-label={`${studioRailToolLabel(id)} 표시`}
                               onClick={() =>
                                 patch({ toolbar: { visibleIds: showStudioRailTool(visible, id) } })
@@ -632,10 +651,13 @@ export function StudioAppSettingsPanel({
                   </section>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-card/20 p-2.5">
-                  <p className="text-[0.68rem] text-fg-3">순서와 표시 상태는 이 기기에 즉시 저장됩니다.</p>
+                  <p className="text-[0.68rem] text-fg-3">순서와 표시 상태는 즉시 적용됩니다.</p>
                   <button
                     type="button"
-                    className={cn(buttonClass({ size: "sm", variant: "quiet" }), "min-h-11 sm:min-h-8")}
+                    className={cn(
+                      buttonClass({ size: "sm", variant: "quiet" }),
+                      "min-h-11 sm:min-h-8 pointer-coarse:min-h-11"
+                    )}
                     onClick={() =>
                       patch({ toolbar: { visibleIds: [...DEFAULT_STUDIO_RAIL_TOOL_ORDER] } })
                     }
@@ -765,8 +787,36 @@ export function StudioAppSettingsPanel({
           </div>
         </div>
 
-        <footer className="flex items-center justify-end gap-2 border-t border-line px-4 py-3">
-          <button type="button" className={buttonClass({ size: "sm", variant: "outline" })} onClick={onClose}>
+        <footer className="flex items-center gap-2 border-t border-line px-4 py-3">
+          <div className="min-w-0 flex-1" aria-live="polite">
+            {persistenceState === "session-only" ? (
+              <div
+                role="alert"
+                className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.68rem] leading-snug text-warning"
+              >
+                <span>브라우저 저장소에 저장하지 못해 현재 세션에만 적용됩니다.</span>
+                {onRetryPersistence ? (
+                  <button
+                    type="button"
+                    className="min-h-9 rounded-lg px-2 font-semibold underline decoration-warning/50 underline-offset-2 hover:bg-warning/10 pointer-coarse:min-h-11"
+                    onClick={onRetryPersistence}
+                  >
+                    다시 저장
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-[0.68rem] text-fg-3">변경 내용은 이 기기에 자동 저장됩니다.</p>
+            )}
+          </div>
+          <button
+            type="button"
+            className={cn(
+              buttonClass({ size: "sm", variant: "outline" }),
+              "min-h-11 sm:min-h-8 pointer-coarse:min-h-11"
+            )}
+            onClick={onClose}
+          >
             완료
           </button>
         </footer>

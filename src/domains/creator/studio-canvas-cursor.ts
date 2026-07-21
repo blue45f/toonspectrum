@@ -27,10 +27,42 @@ export interface StudioCanvasCursorInput {
   precisionBrushArmed: boolean;
 }
 
+export interface StudioCanvasInteractionBlockInput {
+  activeSurfaceReviewLocked: boolean;
+  commentPinArmed: boolean;
+  canCreateStudioComment: boolean;
+  saving: boolean;
+  documentReloadRequired: boolean;
+  sourceHydrationPending: boolean;
+  workHydrationFailed: boolean;
+  collaborationDocumentUnavailable: boolean;
+}
+
 export type StudioCanvasViewportCursorInput = Pick<
   StudioCanvasCursorInput,
   "tool" | "isSpacePressed" | "isPanning" | "interactionBlocked"
 >;
+
+/**
+ * Keeps read-only document mutation locks intact while admitting exactly one server-authorized
+ * comment placement gesture. Hydration, scope, reload, and save barriers remain absolute because
+ * they mean the canvas being shown is not a safe coordinate authority for a new point anchor.
+ */
+export function isStudioCanvasInteractionBlocked(
+  input: StudioCanvasInteractionBlockInput
+): boolean {
+  if (
+    input.saving
+    || input.documentReloadRequired
+    || input.sourceHydrationPending
+    || input.workHydrationFailed
+    || input.collaborationDocumentUnavailable
+  ) {
+    return true;
+  }
+  if (!input.activeSurfaceReviewLocked) return false;
+  return !(input.commentPinArmed && input.canCreateStudioComment);
+}
 
 /** The scrollable workspace only advertises pan/lock actions that also work outside the paper. */
 export function studioCanvasViewportCursorClassName(

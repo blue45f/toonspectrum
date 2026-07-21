@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { defaultStudioAppSettings } from "./studio-app-settings";
+import {
+  defaultStudioAppSettings,
+  type StudioAppSettings,
+} from "./studio-app-settings";
 import {
   MAX_STUDIO_TOOL_HINT_TOUCH_HOLD_MS,
   MIN_STUDIO_TOOL_HINT_TOUCH_HOLD_MS,
@@ -20,13 +23,16 @@ vi.mock("react-dom", () => ({
 
 const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
 
-function renderSettings(initialTab: "general" | "touch" | "toolbar" = "general") {
+function renderSettings(
+  initialTab: "general" | "touch" | "toolbar" = "general",
+  settings: StudioAppSettings = defaultStudioAppSettings()
+) {
   const body = { nodeName: "BODY" };
   vi.stubGlobal("document", { body });
   const html = renderToStaticMarkup(
     <StudioAppSettingsPanel
       open
-      settings={defaultStudioAppSettings()}
+      settings={settings}
       initialTab={initialTab}
       onClose={() => undefined}
       onChange={() => undefined}
@@ -34,6 +40,18 @@ function renderSettings(initialTab: "general" | "touch" | "toolbar" = "general")
     />
   );
   return { body, html };
+}
+
+function openingButtonTagByAriaLabel(html: string, label: string): string {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return html.match(new RegExp(`<button(?=[^>]*aria-label="${escaped}")[^>]*>`, "u"))?.[0] ?? "";
+}
+
+function openingButtonTagByText(html: string, text: string): string {
+  const button = (html.match(/<button\b[^>]*>[\s\S]*?<\/button>/gu) ?? []).find((markup) =>
+    markup.replace(/<[^>]+>/gu, "").trim() === text
+  );
+  return button?.match(/^<button\b[^>]*>/u)?.[0] ?? "";
 }
 
 describe("StudioAppSettingsPanel", () => {
@@ -84,7 +102,64 @@ describe("StudioAppSettingsPanel", () => {
     expect(html).toContain("표시 중");
     expect(html).toContain("숨김 · 더보기에서 사용");
     expect(html.match(/max-h-\[min\(26rem,50dvh\)\]/g)).toHaveLength(1);
-    expect(html).toContain("순서와 표시 상태는 이 기기에 즉시 저장됩니다.");
+    expect(html).toContain("순서와 표시 상태는 즉시 적용됩니다.");
+    expect(html).toContain("변경 내용은 이 기기에 자동 저장됩니다.");
+  });
+
+  it("브라우저 저장 실패를 세션 한정 상태와 재시도 동작으로 분명히 알린다", () => {
+    const body = { nodeName: "BODY" };
+    vi.stubGlobal("document", { body });
+    const html = renderToStaticMarkup(
+      <StudioAppSettingsPanel
+        open
+        settings={defaultStudioAppSettings()}
+        persistenceState="session-only"
+        onClose={() => undefined}
+        onChange={() => undefined}
+        onResetAll={() => undefined}
+        onRetryPersistence={() => undefined}
+      />
+    );
+
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("브라우저 저장소에 저장하지 못해 현재 세션에만 적용됩니다.");
+    expect(html).toContain("다시 저장");
+    expect(html).not.toContain("변경 내용은 이 기기에 자동 저장됩니다.");
+    expect(studioPageSource).toContain("persistenceState={appSettingsPersistenceState}");
+    expect(studioPageSource).toContain("onRetryPersistence={retryAppSettingsPersistence}");
+  });
+
+  it("가로형 터치 화면에서도 툴바 설정의 모든 핵심 조작을 44px 이상으로 유지한다", () => {
+    const defaults = defaultStudioAppSettings();
+    const settings: StudioAppSettings = {
+      ...defaults,
+      toolbar: { visibleIds: defaults.toolbar.visibleIds.slice(0, -1) },
+    };
+    const { html } = renderSettings("toolbar", settings);
+    const activeToolbarTab = html.match(
+      /<button(?=[^>]*aria-current="page")[^>]*>툴바<\/button>/u
+    )?.[0] ?? "";
+    const search = html.match(/<input(?=[^>]*type="search")[^>]*>/u)?.[0] ?? "";
+
+    expect(openingButtonTagByAriaLabel(html, "설정 닫기")).toContain(
+      "pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+    );
+    expect(activeToolbarTab).toContain("pointer-coarse:min-h-11");
+    expect(activeToolbarTab).toContain("pointer-coarse:min-w-11");
+    expect(search).toContain("pointer-coarse:h-11");
+    for (const label of [
+      "선택 위로",
+      "선택 아래로",
+      "선택 숨기기",
+      "참고 이미지 표시",
+    ]) {
+      const action = openingButtonTagByAriaLabel(html, label);
+      expect(action, label).toContain("pointer-coarse:min-h-11");
+      expect(action, label).toContain("pointer-coarse:min-w-11");
+    }
+    expect(openingButtonTagByText(html, "툴바 기본값")).toContain("pointer-coarse:min-h-11");
+    expect(openingButtonTagByText(html, "완료")).toContain("pointer-coarse:min-h-11");
+    expect(html.match(/max-h-\[min\(26rem,50dvh\)\]/gu)).toHaveLength(2);
   });
 
   it("설정 모달은 단축키 모달 상태와 독립적으로 마운트된다", () => {
