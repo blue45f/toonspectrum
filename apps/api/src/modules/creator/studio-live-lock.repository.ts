@@ -113,14 +113,16 @@ function toRecord(
  * application-node clock skew.
  */
 export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository {
+  constructor(private readonly database: typeof db = db) {}
+
   async withWorkMutation<T>(workId: string, operation: () => Promise<T>): Promise<T> {
-    return db.transaction((transaction) =>
+    return this.database.transaction((transaction) =>
       withStudioLiveLockWorkMutation(transaction, workId, operation)
     );
   }
 
   async acquire(input: AcquireStudioLiveLockInput): Promise<AcquireStudioLiveLockResult> {
-    return db.transaction((transaction) =>
+    return this.database.transaction((transaction) =>
       withStudioLiveLockWorkMutation(transaction, input.workId, async () => {
         await transaction
           .delete(creatorWorkLiveLocks)
@@ -228,7 +230,7 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
   }
 
   async release(input: ReleaseStudioLiveLockInput): Promise<StudioLiveLockRecord | null> {
-    return db.transaction((transaction) =>
+    return this.database.transaction((transaction) =>
       withStudioLiveLockWorkMutation(transaction, input.workId, async () => {
         const [released] = await transaction
           .delete(creatorWorkLiveLocks)
@@ -249,7 +251,7 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
   async rollbackAcquire(
     input: ReleaseStudioLiveLockInput & { acquisitionId: string }
   ): Promise<StudioLiveLockRecord | null> {
-    return db.transaction((transaction) =>
+    return this.database.transaction((transaction) =>
       withStudioLiveLockWorkMutation(transaction, input.workId, async () => {
         const [released] = await transaction
           .delete(creatorWorkLiveLocks)
@@ -272,7 +274,7 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
     workId: string,
     ownerConnectionId: string
   ): Promise<StudioLiveLockRecord[]> {
-    return db.transaction((transaction) =>
+    return this.database.transaction((transaction) =>
       withStudioLiveLockWorkMutation(transaction, workId, async () => {
         const released = await transaction
           .delete(creatorWorkLiveLocks)
@@ -289,7 +291,7 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
   }
 
   async list(workId: string): Promise<StudioLiveLockRecord[]> {
-    const rows = await db
+    const rows = await this.database
       .select()
       .from(creatorWorkLiveLocks)
       .where(
@@ -303,7 +305,7 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
   }
 
   async purgeExpired(): Promise<StudioLiveLockRecord[]> {
-    const rows = await db
+    const rows = await this.database
       .delete(creatorWorkLiveLocks)
       .where(lte(creatorWorkLiveLocks.expiresAt, sql`now()`))
       .returning();

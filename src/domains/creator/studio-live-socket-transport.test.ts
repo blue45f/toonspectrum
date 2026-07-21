@@ -616,6 +616,305 @@ describe("StudioLiveSocketTransport", () => {
     transport.close();
   });
 
+  it("replays exact lock releases received before and after the join ACK", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:join");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const controls: StudioLiveTransportControlEvent[] = [];
+    transport.subscribeControl((event) => controls.push(event));
+    const remoteLock = (resourceId: string, leaseId: string) => ({
+      resourceId,
+      leaseId,
+      ownerConnectionId: remote.connectionId,
+      ownerName: remote.name,
+      expiresAt: new Date(NOW + 15_000).toISOString(),
+    });
+    const releasedBeforeAck = remoteLock("page:before-ack-release", "lease-released-before-ack");
+    const releasedAfterAck = remoteLock("page:after-ack-release", "lease-released-after-ack");
+
+    const connecting = transport.connect();
+    socket.serverEmit("studio:lock:update", {
+      action: "released",
+      resourceId: releasedBeforeAck.resourceId,
+      leaseId: releasedBeforeAck.leaseId,
+    });
+    socket.reply("studio:join", joinSuccess({
+      locks: [releasedBeforeAck, releasedAfterAck],
+    }));
+    await connecting;
+    socket.serverEmit("studio:lock:update", {
+      action: "released",
+      resourceId: releasedAfterAck.resourceId,
+      leaseId: releasedAfterAck.leaseId,
+    });
+    activate(transport);
+
+    const finalClaims = new Map<string, string>();
+    for (const event of controls) {
+      if (event.type !== "lock") continue;
+      if (event.lock.action === "acquired") {
+        finalClaims.set(event.lock.resource, event.lock.claimId);
+      } else if (finalClaims.get(event.lock.resource) === event.lock.claimId) {
+        finalClaims.delete(event.lock.resource);
+      }
+    }
+    expect([...finalClaims.entries()]).toEqual([]);
+    transport.close();
+  });
+
+  it("resyncs instead of letting an ambiguous acquired delta overwrite a newer snapshot fence", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:join");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const controls: StudioLiveTransportControlEvent[] = [];
+    transport.subscribeControl((event) => controls.push(event));
+    const stale = {
+      resourceId: "page:ambiguous-fence",
+      leaseId: "lease-stale-before-snapshot",
+      ownerConnectionId: remote.connectionId,
+      ownerName: remote.name,
+      expiresAt: new Date(NOW + 15_000).toISOString(),
+    };
+    const current = { ...stale, leaseId: "lease-current-in-snapshot" };
+
+    const connecting = transport.connect();
+    socket.serverEmit("studio:lock:update", { action: "acquired", lock: stale });
+    socket.reply("studio:join", joinSuccess({ locks: [current] }));
+    await connecting;
+    activate(transport);
+
+    expect(transport.ready).toBe(false);
+    expect(controls.filter((event) => event.type === "lock")).toEqual([]);
+    await vi.advanceTimersByTimeAsync(500);
+    socket.reply("studio:join", joinSuccess({ locks: [current] }));
+
+    expect(transport.ready).toBe(true);
+    expect(controls.filter((event) => event.type === "lock")).toEqual([{
+      type: "lock",
+      lock: expect.objectContaining({
+        action: "acquired",
+        resource: current.resourceId,
+        claimId: current.leaseId,
+      }),
+    }]);
+    transport.close();
+  });
+
+  it("requests a fresh join snapshot instead of dropping an overflowing lock delta history", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:join");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const controls: StudioLiveTransportControlEvent[] = [];
+    transport.subscribeControl((event) => controls.push(event));
+
+    const connecting = transport.connect();
+    for (let index = 0; index < 513; index += 1) {
+      socket.serverEmit("studio:lock:update", {
+        action: "acquired",
+        lock: {
+          resourceId: `page:overflow-${index}`,
+          leaseId: `lease-overflow-${index}`,
+          ownerConnectionId: remote.connectionId,
+          ownerName: remote.name,
+          expiresAt: new Date(NOW + 15_000).toISOString(),
+        },
+      });
+    }
+    socket.reply("studio:join", joinSuccess());
+    await connecting;
+    activate(transport);
+
+    expect(transport.ready).toBe(false);
+    expect(socket.emitted.filter((entry) => entry.event === "studio:join")).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(499);
+    expect(socket.emitted.filter((entry) => entry.event === "studio:join")).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(socket.emitted.filter((entry) => entry.event === "studio:join")).toHaveLength(2);
+    const freshLock = {
+      resourceId: "page:fresh-after-overflow",
+      leaseId: "lease-fresh-after-overflow",
+      ownerConnectionId: remote.connectionId,
+      ownerName: remote.name,
+      expiresAt: new Date(NOW + 15_000).toISOString(),
+    };
+    socket.reply("studio:join", joinSuccess({ locks: [freshLock] }));
+
+    expect(transport.ready).toBe(true);
+    expect(controls.filter((event) => event.type === "lock")).toEqual([{
+      type: "lock",
+      lock: expect.objectContaining({
+        action: "acquired",
+        resource: freshLock.resourceId,
+        claimId: freshLock.leaseId,
+      }),
+    }]);
+    transport.close();
+  });
+
+  it("keeps reconnect status unready and retries an overflow resync after a recoverable failure", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const statuses: string[] = [];
+    transport.subscribeControl((event) => {
+      if (event.type === "status") statuses.push(event.status.state);
+    });
+    await transport.connect();
+    activate(transport);
+    socket.holdEvents.add("studio:join");
+    socket.serverDisconnect();
+    socket.serverReconnect();
+
+    for (let index = 0; index < 513; index += 1) {
+      socket.serverEmit("studio:lock:update", {
+        action: "acquired",
+        lock: {
+          resourceId: `page:reconnect-overflow-${index}`,
+          leaseId: `lease-reconnect-overflow-${index}`,
+          ownerConnectionId: remote.connectionId,
+          ownerName: remote.name,
+          expiresAt: new Date(NOW + 15_000).toISOString(),
+        },
+      });
+    }
+    socket.reply("studio:join", joinSuccess());
+
+    expect(transport.ready).toBe(false);
+    expect(statuses.at(-1)).toBe("connecting");
+    await vi.advanceTimersByTimeAsync(500);
+    expect(socket.emitted.filter((entry) => entry.event === "studio:join")).toHaveLength(3);
+    socket.reply("studio:join", {
+      ok: false,
+      code: "rate_limited",
+      message: "잠시 후 다시 시도해 주세요.",
+    });
+
+    expect(transport.ready).toBe(false);
+    expect(statuses.at(-1)).toBe("error");
+    await vi.advanceTimersByTimeAsync(59_999);
+    expect(socket.emitted.filter((entry) => entry.event === "studio:join")).toHaveLength(3);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(socket.emitted.filter((entry) => entry.event === "studio:join")).toHaveLength(4);
+    socket.reply("studio:join", joinSuccess());
+
+    expect(transport.ready).toBe(true);
+    expect(statuses.at(-1)).toBe("ready");
+    transport.close();
+  });
+
+  it("rejects an uncorrelated v2 self-lock broadcast without rejecting the join snapshot", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const trustedSnapshotLock = {
+      resourceId: "page:trusted-self-snapshot",
+      leaseId: "lease-trusted-self-snapshot",
+      ownerConnectionId: self.connectionId,
+      ownerName: self.name,
+      expiresAt: new Date(NOW + 15_000).toISOString(),
+    };
+    socket.joinResponse = joinSuccess({
+      lockProtocolVersion: 2,
+      locks: [trustedSnapshotLock],
+    });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const controls: StudioLiveTransportControlEvent[] = [];
+    transport.subscribeControl((event) => controls.push(event));
+    await transport.connect();
+    activate(transport);
+    expect(controls).toContainEqual({
+      type: "lock",
+      lock: expect.objectContaining({
+        action: "acquired",
+        resource: trustedSnapshotLock.resourceId,
+        claimId: trustedSnapshotLock.leaseId,
+      }),
+    });
+    controls.length = 0;
+    const uncorrelatedLeaseId = "lease-uncorrelated-self-broadcast";
+
+    socket.serverEmit("studio:lock:update", {
+      action: "acquired",
+      lock: {
+        resourceId: "page:uncorrelated-self-broadcast",
+        leaseId: uncorrelatedLeaseId,
+        ownerConnectionId: self.connectionId,
+        ownerName: self.name,
+        expiresAt: new Date(NOW + 15_000).toISOString(),
+      },
+    });
+
+    expect(controls).toEqual([]);
+    expect(transport.send(envelope("lock:release", {
+      resource: "page:uncorrelated-self-broadcast",
+      claimId: uncorrelatedLeaseId,
+    }, 2))).toBe(false);
+    transport.close();
+  });
+
+  it("rejects an uncorrelated legacy self-lock broadcast", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const controls: StudioLiveTransportControlEvent[] = [];
+    transport.subscribeControl((event) => controls.push(event));
+    await transport.connect();
+    activate(transport);
+
+    socket.serverEmit("studio:lock:update", {
+      action: "acquired",
+      lock: {
+        resourceId: "page:legacy-uncorrelated-self",
+        leaseId: "lease-legacy-uncorrelated-self",
+        ownerConnectionId: self.connectionId,
+        ownerName: self.name,
+        expiresAt: new Date(NOW + 15_000).toISOString(),
+      },
+    });
+
+    expect(controls.filter((event) => event.type === "lock")).toEqual([]);
+    transport.close();
+  });
+
+  it("does not allow a direct lock request before the initial snapshot is committed", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    await transport.connect();
+
+    await expect(transport.acquireLock({
+      resource: "page:before-initial-snapshot",
+      requestId: "00000000-0000-4000-8000-000000000090",
+      leaseMs: 15_000,
+    })).resolves.toMatchObject({
+      status: "revoked",
+      code: "not_ready",
+    });
+    expect(socket.emitted.filter((entry) => entry.event === "studio:lock:request")).toEqual([]);
+
+    activate(transport);
+    transport.close();
+  });
+
   it("treats a rolling-deploy legacy presence snapshot as merge-only", async () => {
     const socket = new FakeSocket({ sessionToken: TOKEN });
     const transport = new StudioLiveSocketTransport(context(), TOKEN, {
@@ -2279,6 +2578,7 @@ describe("StudioLiveSocketTransport", () => {
       now: () => NOW,
     });
     await transport.connect();
+    activate(transport);
 
     const first = transport.acquireLock({
       resource: "page:deduplicated",

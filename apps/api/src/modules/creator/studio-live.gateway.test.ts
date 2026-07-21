@@ -12,6 +12,7 @@ import { StudioLiveAdapterCleanupService } from "./studio-live-adapter-cleanup.s
 import { StudioLiveCleanupNotificationDispatcher } from "./studio-live-cleanup-notification-dispatcher";
 import { StudioLiveInterServerRelayTransport } from "./studio-live-inter-server-relay-transport";
 import { StudioLiveJoinTransitionSequencer } from "./studio-live-join-transition-sequencer";
+import { STUDIO_LIVE_LOCK_LIMIT_PER_WORK } from "./studio-live-lock.repository";
 import { StudioLiveRoomTransitionCoordinator } from "./studio-live-room-transition-coordinator";
 import { StudioLiveSocketAuthService } from "./studio-live-socket-auth.service";
 import {
@@ -1928,6 +1929,101 @@ describe("StudioLiveGateway", () => {
       message: "편집 잠금을 해제하지 못했습니다.",
       requestId: "00000000-0000-4000-8000-000000000019",
     });
+  });
+
+  it("rate limits lock releases before authorization and storage with an acquisition-independent bucket", async () => {
+    const repository = new MemoryStudioLiveLockRepository();
+    const harness = createHarness(undefined, undefined, undefined, repository);
+    const releaseLimitedSocket = harness.socket("release-limited");
+    await connectAndJoin(harness, releaseLimitedSocket);
+    const release = vi.spyOn(repository, "release");
+    const internals = harness.gateway as unknown as {
+      rateLimits: Map<string, Map<string, { count: number; resetsAt: number }>>;
+    };
+    internals.rateLimits.set(
+      releaseLimitedSocket.id,
+      new Map([[
+        "lock-release",
+        { count: STUDIO_LIVE_LOCK_LIMIT_PER_WORK, resetsAt: Date.now() + 60_000 },
+      ]])
+    );
+    const revalidationsBefore = harness.revalidate.mock.calls.length;
+    const teamReadsBefore = harness.service.getWorkTeam.mock.calls.length;
+
+    await expect(
+      harness.gateway.releaseLock(
+        releaseLimitedSocket as never,
+        {
+          workId: "work-1",
+          resourceId: "page:rate-limited",
+          leaseId: "lease-rate-limited",
+          requestId: "00000000-0000-4000-8000-000000000065",
+        },
+        undefined
+      )
+    ).resolves.toEqual({
+      ok: false,
+      code: "rate_limited",
+      message: "편집 잠금 해제 요청이 너무 많습니다.",
+      requestId: "00000000-0000-4000-8000-000000000065",
+    });
+    expect(release).not.toHaveBeenCalled();
+    expect(harness.revalidate).toHaveBeenCalledTimes(revalidationsBefore);
+    expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsBefore);
+
+    await expect(
+      harness.gateway.requestLock(
+        releaseLimitedSocket as never,
+        {
+          workId: "work-1",
+          resourceId: "page:release-bucket-does-not-block-acquire",
+          protocolVersion: 2,
+          requestId: "00000000-0000-4000-8000-000000000066",
+          leaseMs: 15_000,
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true });
+
+    const acquireLimitedSocket = harness.socket("acquire-limited");
+    await connectAndJoin(harness, acquireLimitedSocket);
+    const acquired = await harness.gateway.requestLock(
+      acquireLimitedSocket as never,
+      {
+        workId: "work-1",
+        resourceId: "page:acquire-bucket-does-not-block-release",
+        protocolVersion: 2,
+        requestId: "00000000-0000-4000-8000-000000000067",
+        leaseMs: 15_000,
+      },
+      undefined
+    );
+    expect(acquired.ok).toBe(true);
+    if (!acquired.ok) throw new Error("lock acquisition failed");
+    internals.rateLimits.set(
+      acquireLimitedSocket.id,
+      new Map([["lock", { count: 60, resetsAt: Date.now() + 60_000 }]])
+    );
+
+    await expect(
+      harness.gateway.releaseLock(
+        acquireLimitedSocket as never,
+        {
+          workId: "work-1",
+          resourceId: acquired.data.lock.resourceId,
+          leaseId: acquired.data.lock.leaseId,
+          requestId: "00000000-0000-4000-8000-000000000068",
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({
+      ok: true,
+      data: {
+        requestId: "00000000-0000-4000-8000-000000000068",
+        released: true,
+      },
+    });
+    expect(release).toHaveBeenCalledTimes(1);
   });
 
   it("grants renewable edit leases and rejects a competing editor", async () => {

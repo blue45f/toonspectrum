@@ -83,9 +83,13 @@ const MAX_SEEN_CRDT_UPDATE_IDS = 4_096;
 const MAX_PENDING_PRESENCE_CONNECTIONS = 2_048;
 const MAX_PENDING_SCREEN_CONNECTIONS = 256;
 const MAX_PENDING_VOICE_CONNECTIONS = 256;
+const MAX_PENDING_LOCK_DELTAS = 512;
 const MAX_PENDING_VOICE_SIGNALS = 256;
 const MAX_ABANDONED_LOCK_ACQUISITIONS = 512;
 const ABANDONED_LOCK_ACQUISITION_TTL_MS = 90_000;
+const JOIN_RESYNC_RETRY_BASE_MS = 500;
+const JOIN_RESYNC_RETRY_MAX_MS = 10_000;
+const JOIN_RATE_LIMIT_RETRY_MS = 60_000;
 
 type PendingPresenceDelta =
   | { kind: "update"; participant: ServerParticipant }
@@ -98,6 +102,16 @@ type PendingVoiceDelta =
 type PendingScreenDelta =
   | { kind: "update"; share: ServerActiveScreenShare }
   | { kind: "stop"; connectionId: string; shareId: string };
+
+type PendingLockDelta =
+  | { kind: "acquired"; lock: ServerLock; requestId?: string }
+  | {
+      kind: "release";
+      action: "released" | "expired" | "revoked";
+      resourceId: string;
+      leaseId: string;
+      releaseRequestId: string | null;
+    };
 
 interface PendingVoiceSignal {
   targetConnectionId: string;
@@ -288,6 +302,8 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private readonly pendingPresenceByConnection = new Map<string, PendingPresenceDelta>();
   private readonly pendingScreenByConnection = new Map<string, PendingScreenDelta>();
   private readonly pendingVoiceByConnection = new Map<string, PendingVoiceDelta>();
+  private readonly pendingLockDeltas: PendingLockDelta[] = [];
+  private pendingLockDeltaOverflowed = false;
   private sessionToken: string | null;
   private selfConnectionId: string | null = null;
   private pendingInitialSnapshot: ServerJoinSnapshot | null = null;
@@ -304,6 +320,8 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private resolveConnect: (() => void) | null = null;
   private rejectConnect: ((error: Error) => void) | null = null;
   private connectTimeout: unknown = null;
+  private joinRetryTimeout: unknown = null;
+  private joinRetryAttempt = 0;
 
   constructor(
     context: StudioLiveTransportContext,
@@ -464,7 +482,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         message: "편집 잠금 요청이 올바르지 않습니다.",
       });
     }
-    if (!this.ready || !this.selfConnectionId) {
+    if (!this.ready || this.pendingInitialSnapshot || !this.selfConnectionId) {
       return Promise.resolve({
         status: "revoked",
         resource: request.resource,
@@ -602,7 +620,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         message: "편집 잠금 해제 요청이 올바르지 않습니다.",
       });
     }
-    if (!this.ready || !this.selfConnectionId) {
+    if (!this.ready || this.pendingInitialSnapshot || !this.selfConnectionId) {
       return Promise.resolve({
         status: "revoked",
         resource: request.resource,
@@ -1073,6 +1091,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.closed = true;
     ++this.joinGeneration;
     this.joined = false;
+    this.clearJoinRetry(true);
     this.clearConnectTimeout();
     this.rejectConnect?.(new Error("팀 공동작업 연결이 종료되었습니다."));
     this.clearConnectDeferred();
@@ -1122,11 +1141,16 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.pendingPresenceByConnection.clear();
     this.pendingScreenByConnection.clear();
     this.pendingVoiceByConnection.clear();
+    this.pendingLockDeltas.length = 0;
+    this.pendingLockDeltaOverflowed = false;
     this.selfConnectionId = null;
   }
 
   private readonly onConnect = () => {
-    if (!this.closed && !this.accessRevoked) this.beginJoin();
+    if (!this.closed && !this.accessRevoked) {
+      this.clearJoinRetry(true);
+      this.beginJoin();
+    }
   };
 
   private readonly onConnectError = (error: unknown) => {
@@ -1150,10 +1174,13 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     ++this.joinGeneration;
     this.accessRevoked = true;
     this.joined = false;
+    this.clearJoinRetry(true);
     this.pendingInitialSnapshot = null;
     this.pendingPresenceByConnection.clear();
     this.pendingScreenByConnection.clear();
     this.pendingVoiceByConnection.clear();
+    this.pendingLockDeltas.length = 0;
+    this.pendingLockDeltaOverflowed = false;
     this.clearConnectTimeout();
     this.rejectConnect?.(new Error(message));
     this.clearConnectDeferred();
@@ -1185,10 +1212,14 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       sendLeave: false,
     });
     this.joined = false;
+    this.clearJoinRetry(true);
     this.selfConnectionId = null;
+    this.pendingInitialSnapshot = null;
     this.pendingPresenceByConnection.clear();
     this.pendingScreenByConnection.clear();
     this.pendingVoiceByConnection.clear();
+    this.pendingLockDeltas.length = 0;
+    this.pendingLockDeltaOverflowed = false;
     this.voiceMemberByConnection.clear();
     this.rejectPendingCrdtOperations(createStudioCrdtRetryableError(
       "disconnected",
@@ -1221,10 +1252,13 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     ++this.joinGeneration;
     this.accessRevoked = true;
     this.joined = false;
+    this.clearJoinRetry(true);
     this.pendingInitialSnapshot = null;
     this.pendingPresenceByConnection.clear();
     this.pendingScreenByConnection.clear();
     this.pendingVoiceByConnection.clear();
+    this.pendingLockDeltas.length = 0;
+    this.pendingLockDeltaOverflowed = false;
     this.clearConnectTimeout();
     this.rejectConnect?.(new Error(message));
     this.clearConnectDeferred();
@@ -1380,6 +1414,19 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     }
   }
 
+  private bufferLockDelta(delta: PendingLockDelta): void {
+    if (this.closed || this.accessRevoked || !this.socket.connected || this.joinGeneration <= 0) {
+      return;
+    }
+    if (this.pendingLockDeltas.length >= MAX_PENDING_LOCK_DELTAS) {
+      // Dropping an earlier fence transition would make the older join snapshot unsafe. Keep the
+      // buffer bounded and request a fresh authoritative snapshot when this generation flushes.
+      this.pendingLockDeltaOverflowed = true;
+      return;
+    }
+    this.pendingLockDeltas.push(delta);
+  }
+
   private replayPendingVoiceForParticipant(participant: ServerParticipant): void {
     const pending = this.pendingVoiceByConnection.get(participant.connectionId);
     if (!pending) return;
@@ -1445,49 +1492,73 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   };
 
   private readonly onLockUpdate = (value: unknown) => {
-    if (!this.ready) return;
     if (!isRecord(value)) return;
+    let delta: PendingLockDelta | null = null;
     if (value.action === "acquired") {
       const lock = parseLock(value.lock);
       const requestId = safeIdentifier(value.requestId, 160) ? value.requestId : undefined;
-      const pending = requestId ? this.pendingLockAcquisitions.get(requestId) : null;
-      if (lock && pending && pending.request.resource === lock.resourceId) {
-        this.completePendingLockAcquisition(pending, {
-          ok: true,
-          data: { decision: "acquired", requestId, lock },
-        });
-      } else if (lock) {
-        this.applyAuthoritativeLock(lock, requestId);
-      }
-      return;
-    }
-    if (
+      if (lock) delta = { kind: "acquired", lock, ...(requestId ? { requestId } : {}) };
+    } else if (
       (value.action === "released" || value.action === "expired" || value.action === "revoked") &&
       safeString(value.resourceId, 200) &&
       safeString(value.leaseId, 80)
     ) {
-      this.applyAuthoritativeRelease(value.resourceId, value.leaseId);
       const releaseRequestId = safeIdentifier(value.releaseRequestId, 160)
         ? value.releaseRequestId
         : null;
-      const pending = this.pendingLockReleases.get(value.resourceId);
-      if (
-        value.action === "released" &&
-        releaseRequestId &&
-        pending?.request.requestId === releaseRequestId &&
-        pending.request.claimId === value.leaseId &&
-        this.removePendingLockRelease(pending)
-      ) {
-        pending.resolve({
-          status: "released",
-          resource: pending.request.resource,
-          requestId: pending.request.requestId,
-          claimId: pending.request.claimId,
-          released: true,
-        });
-      }
+      delta = {
+        kind: "release",
+        action: value.action,
+        resourceId: value.resourceId,
+        leaseId: value.leaseId,
+        releaseRequestId,
+      };
     }
+    if (!delta) return;
+    if (!this.ready || this.pendingInitialSnapshot) {
+      this.bufferLockDelta(delta);
+      return;
+    }
+    this.applyLockDelta(delta);
   };
+
+  private applyLockDelta(delta: PendingLockDelta): void {
+    if (delta.kind === "acquired") {
+      const pending = delta.requestId
+        ? this.pendingLockAcquisitions.get(delta.requestId)
+        : null;
+      if (pending && pending.request.resource === delta.lock.resourceId) {
+        this.completePendingLockAcquisition(pending, {
+          ok: true,
+          data: {
+            decision: "acquired",
+            requestId: delta.requestId,
+            lock: delta.lock,
+          },
+        });
+      } else {
+        this.applyAuthoritativeLock(delta.lock, delta.requestId);
+      }
+      return;
+    }
+    this.applyAuthoritativeRelease(delta.resourceId, delta.leaseId);
+    const pending = this.pendingLockReleases.get(delta.resourceId);
+    if (
+      delta.action === "released" &&
+      delta.releaseRequestId &&
+      pending?.request.requestId === delta.releaseRequestId &&
+      pending.request.claimId === delta.leaseId &&
+      this.removePendingLockRelease(pending)
+    ) {
+      pending.resolve({
+        status: "released",
+        resource: pending.request.resource,
+        requestId: pending.request.requestId,
+        claimId: pending.request.claimId,
+        released: true,
+      });
+    }
+  }
 
   private readonly onSignal = (value: unknown) => {
     if (!this.ready) return;
@@ -2038,11 +2109,15 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
 
   private beginJoin(): void {
     if (this.closed || !this.socket.connected || !this.sessionToken) return;
+    this.clearJoinRetry(false);
     const generation = ++this.joinGeneration;
     this.joined = false;
+    this.pendingInitialSnapshot = null;
     this.pendingPresenceByConnection.clear();
     this.pendingScreenByConnection.clear();
     this.pendingVoiceByConnection.clear();
+    this.pendingLockDeltas.length = 0;
+    this.pendingLockDeltaOverflowed = false;
     this.emitStatus({
       state: "connecting",
       message: "작품 팀 권한을 확인하고 있습니다.",
@@ -2080,6 +2155,10 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     for (const participant of reconciledSnapshot.participants) {
       this.participants.set(participant.connectionId, participant);
     }
+    // A reconnect snapshot must be committed before ready is observable. If its bounded delta
+    // history is unsafe, flushInitialSnapshot starts a new generation and no stale ready event is
+    // allowed to escape after that nested connecting transition.
+    if (wasJoined && !this.flushInitialSnapshot()) return;
     this.clearConnectTimeout();
     this.resolveConnect?.();
     this.clearConnectDeferred();
@@ -2088,7 +2167,6 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       message: wasJoined ? "팀 서버에 다시 연결되었습니다." : "팀 서버 연결이 준비되었습니다.",
       recoverable: true,
     });
-    if (wasJoined) this.flushInitialSnapshot();
   }
 
   private reconcilePendingPresence(snapshot: ServerJoinSnapshot): ServerJoinSnapshot {
@@ -2156,10 +2234,15 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.pendingPresenceByConnection.clear();
     this.pendingScreenByConnection.clear();
     this.pendingVoiceByConnection.clear();
+    this.pendingLockDeltas.length = 0;
+    this.pendingLockDeltaOverflowed = false;
     const state: StudioLiveTransportStatus["state"] = recoverable ? "error" : "revoked";
     this.emitStatus({ state, message, recoverable } as StudioLiveTransportStatus);
     if (!this.everJoined) {
       this.failInitialConnect(message);
+    }
+    if (recoverable && this.everJoined) {
+      this.scheduleJoinRetry(code === "rate_limited" ? JOIN_RATE_LIMIT_RETRY_MS : 0);
     }
     if (!recoverable || (code && isNonRecoverable(code))) {
       this.accessRevoked = true;
@@ -2193,10 +2276,13 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       ++this.joinGeneration;
       this.accessRevoked = true;
       this.joined = false;
+      this.clearJoinRetry(true);
       this.pendingInitialSnapshot = null;
       this.pendingPresenceByConnection.clear();
       this.pendingScreenByConnection.clear();
       this.pendingVoiceByConnection.clear();
+      this.pendingLockDeltas.length = 0;
+      this.pendingLockDeltaOverflowed = false;
       this.scrubCredentials();
       this.socket.disconnect();
     }
@@ -2214,15 +2300,102 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.sessionToken = null;
   }
 
-  private flushInitialSnapshot(): void {
+  private flushInitialSnapshot(): boolean {
     const snapshot = this.pendingInitialSnapshot;
-    if (!snapshot || !this.ready) return;
+    if (!snapshot || !this.ready) return false;
     this.pendingInitialSnapshot = null;
+    if (this.pendingLockDeltaOverflowed) {
+      this.restartJoinAfterUnsafeSnapshot();
+      return false;
+    }
+    const pendingLockDeltas = this.pendingLockDeltas.splice(0);
     const reconciled = this.reconcilePendingPresence(snapshot);
+    if (this.lockDeltasRequireResync(reconciled.locks, pendingLockDeltas)) {
+      this.restartJoinAfterUnsafeSnapshot();
+      return false;
+    }
     this.applyParticipants(reconciled.participants);
     this.applyScreenShareSnapshot(reconciled.screenShares);
     this.applyLockSnapshot(reconciled.locks);
+    for (const delta of pendingLockDeltas) this.applyLockDelta(delta);
     this.applyVoiceSnapshot(reconciled.voiceMembers);
+    this.clearJoinRetry(true);
+    return true;
+  }
+
+  private restartJoinAfterUnsafeSnapshot(): void {
+    ++this.joinGeneration;
+    this.joined = false;
+    this.pendingInitialSnapshot = null;
+    this.pendingPresenceByConnection.clear();
+    this.pendingScreenByConnection.clear();
+    this.pendingVoiceByConnection.clear();
+    this.pendingLockDeltas.length = 0;
+    this.pendingLockDeltaOverflowed = false;
+    this.emitStatus({
+      state: "connecting",
+      message: "편집 잠금 변경이 많아 최신 팀 상태를 다시 확인하고 있습니다.",
+      recoverable: true,
+    });
+    this.scheduleJoinRetry();
+  }
+
+  private lockDeltasRequireResync(
+    snapshotLocks: ServerLock[],
+    deltas: PendingLockDelta[]
+  ): boolean {
+    const locks = new Map(snapshotLocks.map((lock) => [lock.resourceId, lock]));
+    for (const delta of deltas) {
+      if (delta.kind === "acquired") {
+        const current = locks.get(delta.lock.resourceId);
+        // Without a server monotonic event revision, a novel acquire can be either side of the
+        // snapshot barrier on a multi-node adapter. Never guess which fence is authoritative.
+        if (
+          !current ||
+          current.leaseId !== delta.lock.leaseId ||
+          current.ownerConnectionId !== delta.lock.ownerConnectionId
+        ) {
+          return true;
+        }
+        continue;
+      }
+      const current = locks.get(delta.resourceId);
+      if (current?.leaseId === delta.leaseId) locks.delete(delta.resourceId);
+    }
+    return false;
+  }
+
+  private scheduleJoinRetry(minimumDelayMs = 0): void {
+    if (
+      this.joinRetryTimeout !== null ||
+      this.closed ||
+      this.accessRevoked ||
+      !this.everJoined ||
+      !this.socket.connected ||
+      !this.sessionToken
+    ) {
+      return;
+    }
+    const delay = Math.max(
+      minimumDelayMs,
+      Math.min(
+        JOIN_RESYNC_RETRY_MAX_MS,
+        JOIN_RESYNC_RETRY_BASE_MS * 2 ** Math.min(this.joinRetryAttempt, 8)
+      )
+    );
+    this.joinRetryAttempt += 1;
+    const generation = this.joinGeneration;
+    this.joinRetryTimeout = this.scheduleTimeout(() => {
+      this.joinRetryTimeout = null;
+      if (generation !== this.joinGeneration) return;
+      this.beginJoin();
+    }, delay);
+  }
+
+  private clearJoinRetry(resetAttempt: boolean): void {
+    if (this.joinRetryTimeout !== null) this.cancelTimeout(this.joinRetryTimeout);
+    this.joinRetryTimeout = null;
+    if (resetAttempt) this.joinRetryAttempt = 0;
   }
 
   private applyParticipants(nextParticipants: ServerParticipant[]): void {
@@ -2297,7 +2470,9 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         this.applyAuthoritativeRelease(current.resourceId, current.leaseId);
       }
     }
-    for (const lock of locks) this.applyAuthoritativeLock(lock);
+    // The join snapshot is an authenticated, server-authoritative baseline. In particular, it may
+    // restore a self-owned fence after reconnect without carrying per-request broadcast metadata.
+    for (const lock of locks) this.applyAuthoritativeLock(lock, undefined, true);
   }
 
   private applyAuthoritativeLock(
@@ -2339,6 +2514,17 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
           );
       if (abandoned) {
         this.rollbackAbandonedLock(abandoned, lock);
+        return;
+      }
+      if (
+        !allowNewSelfFence &&
+        !requestId &&
+        !pendingRequestId &&
+        !matchesAcceptedFence
+      ) {
+        // A broadcast in any rolling protocol cannot mint a new self-owned capability without
+        // request correlation. Join snapshots and correlated ACKs opt in explicitly; exact
+        // repeats (including legacy stable-lease renewal) remain harmless.
         return;
       }
       if (

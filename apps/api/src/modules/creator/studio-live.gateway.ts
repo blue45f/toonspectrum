@@ -37,6 +37,7 @@ import {
 } from "./studio-live-inter-server-relay-transport";
 import { StudioLiveJoinTransitionSequencer } from "./studio-live-join-transition-sequencer";
 import {
+  STUDIO_LIVE_LOCK_LIMIT_PER_WORK,
   STUDIO_LIVE_LOCK_REPOSITORY,
   createStudioLiveLockAcquisitionId,
   studioLiveLockRequestIdFromAcquisitionId,
@@ -1183,6 +1184,19 @@ export class StudioLiveGateway
           "invalid_payload",
           "편집 잠금 해제 정보가 올바르지 않습니다."
         )
+      );
+    }
+    // A socket can legitimately own the complete per-work lock set. Keep releases in a separate
+    // abuse bucket, but never strand valid leases merely because the user closes a large batch.
+    if (!this.consumeRateLimit(
+      client.id,
+      "lock-release",
+      STUDIO_LIVE_LOCK_LIMIT_PER_WORK,
+      60_000
+    )) {
+      return reply(
+        ack,
+        lockReleaseFailure(requestId, "rate_limited", "편집 잠금 해제 요청이 너무 많습니다.")
       );
     }
     const authorized = await this.runWithAuthorizedParticipant(
