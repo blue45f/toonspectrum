@@ -39,6 +39,7 @@ describe("studio creative visuals", () => {
     expect(html).toContain('data-active="true"');
     expect(html).toContain('data-studio-shape-glyph="line"');
     expect(html).toContain('data-studio-shape-glyph="poly"');
+    expect(html).not.toContain('title="');
   });
 
   it("renders a commercial shape picker grid (glyph-first by default)", () => {
@@ -96,7 +97,13 @@ describe("studio creative visuals", () => {
 
     const meter = renderToStaticMarkup(<StudioPressureHudMeter ratio={0.42} />);
     expect(meter).toContain('data-studio-pressure-meter="true"');
+    expect(meter).toContain('role="meter"');
+    expect(meter).toContain('aria-label="실시간 필압"');
+    expect(meter).toContain('aria-valuemin="0"');
+    expect(meter).toContain('aria-valuemax="100"');
+    expect(meter).toContain('aria-valuenow="42"');
     expect(meter).toContain("42%");
+    expect(meter).not.toContain('title="');
     expect(renderToStaticMarkup(<StudioPressureHudMeter ratio={null} />)).toBe("");
 
     const glyphs = renderToStaticMarkup(

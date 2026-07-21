@@ -542,12 +542,15 @@ export function StudioPressureHudMeter({
   return (
     <span
       data-studio-pressure-meter="true"
-      title={`필압 ${pct}%`}
+      role="meter"
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border border-line/70 bg-card/80 px-1.5 py-0.5",
         className
       )}
-      aria-label={`필압 ${pct}퍼센트`}
+      aria-label="실시간 필압"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={pct}
     >
       <span className="relative h-1.5 w-10 overflow-hidden rounded-full bg-raised ring-1 ring-line/50">
         <span
@@ -857,7 +860,6 @@ export function StudioSmartShapeKindRow({
           <span
             key={kind}
             role="listitem"
-            title={label}
             data-studio-smart-shape-kind={kind}
             data-active={active ? "true" : undefined}
             className={cn(

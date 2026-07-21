@@ -130,7 +130,7 @@ export function StudioLivePressureHudPill({ store }: { store: StudioLivePressure
   const ratio = studioPressureHudRatio(pressure);
   if (ratio === null) return null;
   return (
-    <StudioHudPill title="실시간 필압" accent>
+    <StudioHudPill accent>
       <Suspense fallback={null}>
         <StudioPressureHudMeter ratio={ratio} />
       </Suspense>

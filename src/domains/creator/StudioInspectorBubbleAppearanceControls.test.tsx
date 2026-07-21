@@ -24,16 +24,16 @@ vi.mock("./StudioLazyColorPopover", () => ({
     onChange,
     onLoadRecentColors,
     onUseColor,
-    title,
+    label,
   }: {
     onChange: (color: string) => void;
     onLoadRecentColors: () => void;
     onUseColor: (color: string) => void;
-    title: string;
+    label: string;
   }) => (
     <div>
       <button type="button" onClick={() => onChange("#223344")}>
-        {title}
+        {label}
       </button>
       <button type="button" onClick={onLoadRecentColors}>
         최근 색상 불러오기

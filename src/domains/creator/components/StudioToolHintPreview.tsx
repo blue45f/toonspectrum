@@ -426,6 +426,189 @@ function SamplePreview({ animate }: { animate: boolean }): ReactElement {
   );
 }
 
+const COLOR_PREVIEW_SWATCHES = [
+  "oklch(0.78 0.15 28)",
+  "oklch(0.84 0.13 76)",
+  "oklch(0.74 0.14 151)",
+  "oklch(0.76 0.12 232)",
+  "oklch(0.7 0.16 304)",
+] as const;
+
+/** Palette selection preview shared by the color trigger, palette tabs, and swatches. */
+function ColorPalettePreview({
+  animate,
+  variant,
+}: {
+  animate: boolean;
+  variant: string;
+}): ReactElement {
+  const bubbleFill = previewVariantMatches(variant, "bubble-fill");
+  const paletteFamily = previewVariantMatches(variant, "palette-family");
+  const recentSwatch = previewVariantMatches(variant, "recent-swatch");
+  const paletteSwatch = previewVariantMatches(variant, "palette-swatch");
+  const operation = bubbleFill
+    ? "bubble-fill"
+    : paletteFamily
+      ? "palette-family"
+      : recentSwatch
+        ? "recent-swatch"
+        : paletteSwatch
+          ? "palette-swatch"
+          : "brush-shape";
+  const selectedIndex = bubbleFill ? 4 : paletteFamily ? 2 : recentSwatch ? 1 : paletteSwatch ? 3 : 0;
+  const selectedColor = COLOR_PREVIEW_SWATCHES[selectedIndex];
+  const selectedX = 53 + selectedIndex * 28;
+
+  return (
+    <g data-preview-operation={operation}>
+      {paletteFamily ? (
+        <>
+          {["인물", "배경", "무드"].map((label, index) => (
+            <g key={label} transform={`translate(${45 + index * 48} 22)`}>
+              <rect
+                width="42"
+                height="16"
+                rx="5"
+                fill={index === 1 ? COLOR.accentSoft : COLOR.canvas}
+                stroke={index === 1 ? COLOR.accent : COLOR.lineStrong}
+              />
+              <text
+                x="21"
+                y="11"
+                fill={index === 1 ? COLOR.accent : COLOR.fg3}
+                fontSize="7.5"
+                fontWeight="700"
+                textAnchor="middle"
+              >
+                {label}
+              </text>
+            </g>
+          ))}
+          <rect x="88" y="18" width="42" height="24" rx="7" fill="none" stroke={COLOR.accent} opacity={animate ? ".28" : ".72"}>
+            {animate ? (
+              <animate attributeName="opacity" dur="2.4s" values=".2;.8;.2" repeatCount="indefinite" />
+            ) : null}
+          </rect>
+        </>
+      ) : bubbleFill ? (
+        <path
+          d="M58 23h75c14 0 23 9 23 20v10c0 12-9 20-23 20H98L82 86l3-13H58c-14 0-23-8-23-20V43c0-11 9-20 23-20Z"
+          fill={selectedColor}
+          fillOpacity={animate ? ".18" : ".82"}
+          stroke={COLOR.fg2}
+          strokeWidth="2"
+          strokeLinejoin="round"
+        >
+          {animate ? (
+            <animate attributeName="fill-opacity" dur="2.7s" values=".18;.18;.82;.82" keyTimes="0;.28;.52;1" repeatCount="indefinite" />
+          ) : null}
+        </path>
+      ) : paletteSwatch || recentSwatch ? (
+        <>
+          <rect x="72" y="17" width="72" height="48" rx="9" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
+          <rect
+            x="78"
+            y="23"
+            width="60"
+            height="36"
+            rx="6"
+            fill={selectedColor}
+            opacity={animate ? ".32" : "1"}
+          >
+            {animate ? (
+              <animate attributeName="opacity" dur="2.5s" values=".32;1;1;.32" keyTimes="0;.34;.72;1" repeatCount="indefinite" />
+            ) : null}
+          </rect>
+          {paletteSwatch ? (
+            <path d="m98 41 7 7 14-16" fill="none" stroke={COLOR.fg} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+          ) : (
+            <path d="M91 42h34m-28-8-8 8 8 8" fill="none" stroke={COLOR.fg} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
+          )}
+        </>
+      ) : (
+        <>
+          <path
+            d="M40 39c19-19 34 16 54-3 17-16 30 10 48-8"
+            fill="none"
+            stroke={selectedColor}
+            strokeLinecap="round"
+            strokeWidth="7"
+            opacity={animate ? ".28" : ".96"}
+          >
+            {animate ? (
+              <animate attributeName="opacity" dur="2.6s" values=".28;.28;.96;.96" keyTimes="0;.3;.5;1" repeatCount="indefinite" />
+            ) : null}
+          </path>
+          <rect
+            x="145"
+            y="20"
+            width="31"
+            height="31"
+            rx="5"
+            fill={selectedColor}
+            fillOpacity={animate ? ".16" : ".74"}
+            stroke={selectedColor}
+            strokeWidth="2"
+          >
+            {animate ? (
+              <animate attributeName="fill-opacity" dur="2.6s" values=".16;.16;.74;.74" keyTimes="0;.3;.5;1" repeatCount="indefinite" />
+            ) : null}
+          </rect>
+        </>
+      )}
+
+      <g transform="translate(0 2)">
+        {COLOR_PREVIEW_SWATCHES.map((fill, index) => (
+          <rect
+            key={fill}
+            x={43 + index * 28}
+            y="72"
+            width="20"
+            height="16"
+            rx="4"
+            fill={fill}
+            stroke={index === selectedIndex ? COLOR.fg : COLOR.lineStrong}
+            strokeWidth={index === selectedIndex ? "2" : "1"}
+          />
+        ))}
+        <rect
+          x={selectedX - 12}
+          y="68"
+          width="24"
+          height="24"
+          rx="6"
+          fill="none"
+          stroke={COLOR.accent}
+          strokeWidth="1.5"
+          opacity={animate ? ".25" : ".76"}
+        >
+          {animate ? (
+            <animate attributeName="opacity" dur="1.5s" values=".25;.86;.25" repeatCount="indefinite" />
+          ) : null}
+        </rect>
+      </g>
+      <path
+        d="m164 63 6 17 4-6 7 6 3-3-7-6 7-4Z"
+        fill={COLOR.fg}
+        stroke={COLOR.canvas}
+        strokeLinejoin="round"
+        strokeWidth="1.7"
+      >
+        {animate ? (
+          <animateTransform
+            attributeName="transform"
+            type="translate"
+            dur="2.6s"
+            values={`${selectedX - 164} 9;${selectedX - 164} 9;0 0;0 0;${selectedX - 164} 9`}
+            keyTimes="0;.22;.44;.72;1"
+            repeatCount="indefinite"
+          />
+        ) : null}
+      </path>
+    </g>
+  );
+}
+
 function ShapePreview({ animate }: { animate: boolean }): ReactElement {
   return (
     <>
@@ -3556,6 +3739,8 @@ function renderPreview(
       return <FillPreview animate={animate} />;
     case "sample":
       return <SamplePreview animate={animate} />;
+    case "color-palette":
+      return <ColorPalettePreview animate={animate} variant={variant} />;
     case "shape":
       return <DirectShapePreview animate={animate} variant={variant} />;
     case "smart-shape":

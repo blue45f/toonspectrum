@@ -1,125 +1,300 @@
 /**
- * Closed catalog of motion-coach visuals.
+ * Canonical semantic variants understood by each motion-coach visual.
  *
- * Keeping the runtime list beside the type makes preview coverage auditable:
- * every new kind is automatically exercised by reduced-motion and animation tests.
+ * This object is the single source for both the closed kind catalog and the
+ * kind/variant type contract. An empty tuple means the visual has only its
+ * default presentation. Add a variant here before teaching a renderer or a
+ * consumer about it so invalid cross-family pairings fail during typecheck.
  */
-export const STUDIO_TOOL_HINT_PREVIEW_KINDS = [
-  "select",
-  "transform",
-  "pan",
-  "ink",
-  "pixel-ink",
-  "erase",
-  "fill",
-  "sample",
-  "shape",
-  "smart-shape",
-  "shape-rect",
-  "shape-ellipse",
-  "shape-fill",
-  "text",
-  "bubble",
-  "comment",
-  "image",
-  "reference",
-  "filter",
-  "smudge",
-  "liquify",
-  "lasso",
-  "polygon-lasso",
-  "selection-brush",
-  "selection-add",
-  "selection-subtract",
-  "selection-intersect",
-  "selection-boundary",
-  "selection-history",
-  "selection-marquee-transform",
-  "selection-content-transform",
-  "selection-adjust",
-  "lasso-fill",
-  "marquee-rect",
-  "marquee-ellipse",
-  "crop",
-  "perspective",
-  "rotate-view",
-  "flip-view",
-  "brush-size",
-  "opacity",
-  "stabilizer",
-  "pressure",
-  "symmetry",
-  "zoom-view",
-  "history",
-  "undo",
-  "redo",
-  "layer",
-  "layer-visibility",
-  "layer-lock",
-  "layer-merge",
-  "layer-actions",
-  "layer-duplicate",
-  "layer-reorder-front",
-  "layer-reorder-back",
-  "layer-delete",
-  "timeline",
-  "keyframe",
-  "frame-sequence",
-  "frame-capture",
-  "frame-playback",
-  "frame-reorder",
-  "frame-duplicate",
-  "frame-delete",
-  "onion-skin",
-  "timelapse",
-  "motion-fx",
-  "video-export",
-  "audio",
-  "object-3d",
-  "object-translate",
-  "object-rotate",
-  "object-scale",
-  "object-ground",
-  "object-snap",
-  "pose-3d",
-  "camera-3d",
-  "camera-zoom",
-  "camera-reset",
-  "camera-orbit",
-  "quad-view",
-  "lighting-3d",
-  "line-art",
-  "assets",
-  "panel-layout",
-  "character-3d",
-  "background-library",
-  "style-library",
-  "storyboard-grid",
-  "review-workflow",
-  "team-collaboration",
-  "continuity-check",
-  "vertical-preview",
-  "workspace-focus",
-  "file-workflow",
-  "edit-workflow",
-  "insert-content",
-  "comment-inbox",
-  "draw-workflow",
-  "view-workflow",
-  "export",
-  "export-options",
-  "project",
-  "fullscreen",
-  "settings",
-  "save",
-  "publish",
-  "ai-assist",
-  "brush-library",
-  "brush-favorite",
-  "brush-slot",
-  "brush-studio",
-  "draw-settings",
-] as const;
+export const STUDIO_TOOL_HINT_PREVIEW_VARIANTS = {
+  select: [],
+  transform: [],
+  pan: [],
+  ink: [],
+  "pixel-ink": [],
+  erase: [],
+  fill: [],
+  sample: [],
+  "color-palette": [
+    "brush-shape",
+    "bubble-fill",
+    "recent-swatch",
+    "palette-family",
+    "palette-swatch",
+  ],
+  shape: ["line", "rect", "ellipse", "star", "arrow", "triangle", "polygon"],
+  "smart-shape": ["enable", "disable"],
+  "shape-rect": [],
+  "shape-ellipse": [],
+  "shape-fill": ["enable", "disable"],
+  text: [],
+  bubble: [],
+  comment: [],
+  image: [],
+  reference: [],
+  filter: [
+    "gaussian-blur",
+    "motion-blur",
+    "blur",
+    "curves",
+    "levels",
+    "brightness-contrast",
+    "hue-saturation",
+    "color-balance",
+    "channel-mixer",
+    "gradient-map",
+    "sharpen",
+    "noise",
+    "invert",
+  ],
+  smudge: [],
+  liquify: [],
+  lasso: [],
+  "polygon-lasso": [],
+  "selection-brush": [],
+  "selection-add": [],
+  "selection-subtract": [],
+  "selection-intersect": [],
+  "selection-boundary": [
+    "select-all",
+    "clear",
+    "invert",
+    "remove-last-subpath",
+    "expand",
+    "contract",
+  ],
+  "selection-history": ["undo", "redo"],
+  "selection-marquee-transform": [
+    "rotate-custom",
+    "rotate-cw-90",
+    "rotate-ccw-90",
+    "rotate-180",
+    "flip-x",
+    "flip-y",
+    "scale-up",
+    "scale-down",
+    "translate-left",
+    "translate-right",
+    "translate-up",
+    "translate-down",
+  ],
+  "selection-content-transform": [
+    "apply-scale-rotate",
+    "rotate-cw-90",
+    "flip-x",
+    "flip-y",
+    "delete",
+    "content-aware-fill",
+  ],
+  "selection-adjust": ["brightness", "hue"],
+  "lasso-fill": [],
+  "marquee-rect": [],
+  "marquee-ellipse": [],
+  crop: [],
+  perspective: [],
+  "rotate-view": [],
+  "flip-view": ["flip", "restore"],
+  "brush-size": [],
+  opacity: [],
+  stabilizer: ["standard", "adaptive", "precision", "post-correction"],
+  pressure: ["linear", "soft", "firm"],
+  symmetry: ["none", "vertical", "horizontal", "radial", "kaleidoscope"],
+  "zoom-view": ["zoom-out", "zoom-in", "actual-size", "fit-width", "reset"],
+  history: [],
+  undo: [],
+  redo: [],
+  layer: [],
+  "layer-visibility": [
+    "show",
+    "hide",
+    "batch-show",
+    "batch-hide",
+    "show-layer",
+    "hide-layer",
+  ],
+  "layer-lock": [
+    "lock",
+    "unlock",
+    "batch-lock",
+    "batch-unlock",
+    "lock-layer",
+    "unlock-layer",
+  ],
+  "layer-merge": ["merge-selected", "flatten-visible"],
+  "layer-actions": [],
+  "layer-duplicate": [],
+  "layer-reorder-front": [],
+  "layer-reorder-back": [],
+  "layer-delete": [],
+  timeline: [],
+  keyframe: [],
+  "frame-sequence": [],
+  "frame-capture": [],
+  "frame-playback": [],
+  "frame-reorder": ["reorder", "reorder-previous", "reorder-next"],
+  "frame-duplicate": [],
+  "frame-delete": [],
+  "onion-skin": ["onion-prev-count", "onion-next-count", "onion-opacity", "onion-tint"],
+  timelapse: [],
+  "motion-fx": [],
+  "video-export": [],
+  audio: [],
+  "object-3d": [],
+  "object-translate": [],
+  "object-rotate": [],
+  "object-scale": [],
+  "object-ground": ["ground", "origin-ground"],
+  "object-snap": [],
+  "pose-3d": [],
+  "camera-3d": [],
+  "camera-zoom": ["zoom-in", "zoom-out", "focus-selection"],
+  "camera-reset": [],
+  "camera-orbit": [],
+  "quad-view": [],
+  "lighting-3d": [],
+  "line-art": [],
+  assets: [],
+  "panel-layout": ["add", "split-diagonal", "diagonalize", "straighten"],
+  "character-3d": [],
+  "background-library": [],
+  "style-library": [],
+  "storyboard-grid": [],
+  "review-workflow": [],
+  "team-collaboration": [],
+  "continuity-check": [],
+  "vertical-preview": [],
+  "workspace-focus": ["focus", "restore"],
+  "file-workflow": [],
+  "edit-workflow": [],
+  "insert-content": [],
+  "comment-inbox": [],
+  "draw-workflow": [],
+  "view-workflow": [],
+  export: [],
+  "export-options": [],
+  project: [],
+  fullscreen: [
+    "maximize-window",
+    "restore-window",
+    "fullscreen",
+    "exit-fullscreen",
+    "canvas-only",
+  ],
+  settings: [],
+  save: [],
+  publish: [],
+  "ai-assist": [],
+  "brush-library": [],
+  "brush-favorite": ["add", "remove"],
+  "brush-slot": [],
+  "brush-studio": [],
+  "draw-settings": ["expand", "collapse"],
+} as const satisfies Readonly<Record<string, readonly string[]>>;
 
 export type StudioToolHintPreviewKind =
-  (typeof STUDIO_TOOL_HINT_PREVIEW_KINDS)[number];
+  keyof typeof STUDIO_TOOL_HINT_PREVIEW_VARIANTS;
+
+/**
+ * Runtime catalog kept beside the type contract so every kind is exercised by
+ * the reduced-motion and animation rendering tests.
+ */
+export const STUDIO_TOOL_HINT_PREVIEW_KINDS = Object.freeze(
+  Object.keys(STUDIO_TOOL_HINT_PREVIEW_VARIANTS) as StudioToolHintPreviewKind[]
+);
+
+export type StudioToolHintPreviewCanonicalVariant<
+  Kind extends StudioToolHintPreviewKind,
+> = (typeof STUDIO_TOOL_HINT_PREVIEW_VARIANTS)[Kind][number];
+
+type StudioToolHintPreviewNamespacedVariant<Variant extends string> =
+  | Variant
+  | `${string}:${Variant}`
+  | `${string}/${Variant}`
+  | `${string}-${Variant}`;
+
+/**
+ * Variants accepted by a kind, including the stable namespace suffix formats
+ * supported by the renderer (for example `camera:zoom-out`).
+ */
+export type StudioToolHintPreviewVariant<
+  Kind extends StudioToolHintPreviewKind,
+> = StudioToolHintPreviewNamespacedVariant<
+  StudioToolHintPreviewCanonicalVariant<Kind>
+>;
+
+type StudioToolHintPreviewSpecFor<Kind extends StudioToolHintPreviewKind> =
+  [StudioToolHintPreviewCanonicalVariant<Kind>] extends [never]
+    ? Readonly<{ kind: Kind; variant?: never }>
+    : Readonly<{
+        kind: Kind;
+        variant?: StudioToolHintPreviewVariant<Kind>;
+      }>;
+
+/** Discriminated kind/variant contract; invalid cross-family pairs are rejected. */
+export type StudioToolHintPreviewSpec<
+  Kind extends StudioToolHintPreviewKind = StudioToolHintPreviewKind,
+> = Kind extends StudioToolHintPreviewKind
+  ? StudioToolHintPreviewSpecFor<Kind>
+  : never;
+
+type StudioToolHintPreviewFieldsFor<Kind extends StudioToolHintPreviewKind> =
+  [StudioToolHintPreviewCanonicalVariant<Kind>] extends [never]
+    ? Readonly<{ preview: Kind; previewVariant?: never }>
+    : Readonly<{
+        preview: Kind;
+        previewVariant?: StudioToolHintPreviewVariant<Kind>;
+      }>;
+
+/**
+ * Discriminated form using the existing Studio hint field names. Consumers can
+ * intersect this with their title/description fields without losing pairing.
+ */
+export type StudioToolHintPreviewFields<
+  Kind extends StudioToolHintPreviewKind = StudioToolHintPreviewKind,
+> = Kind extends StudioToolHintPreviewKind
+  ? StudioToolHintPreviewFieldsFor<Kind>
+  : never;
+
+/**
+ * Create a preview contract while inferring the kind only from the first
+ * argument. `NoInfer` prevents TypeScript from widening Kind into a union just
+ * to make an unrelated second argument compile.
+ */
+export function studioToolHintPreviewSpec<
+  const Kind extends StudioToolHintPreviewKind,
+>(
+  kind: Kind,
+  ...variant: [StudioToolHintPreviewCanonicalVariant<Kind>] extends [never]
+    ? []
+    : [variant?: NoInfer<StudioToolHintPreviewVariant<Kind>>]
+): StudioToolHintPreviewSpec<Kind> {
+  const value = (variant as readonly [string?])[0];
+  return (value === undefined ? { kind } : { kind, variant: value }) as
+    StudioToolHintPreviewSpec<Kind>;
+}
+
+function normalizeStudioToolHintPreviewVariant(value: string): string {
+  return value
+    .normalize("NFKC")
+    .trim()
+    .toLocaleLowerCase("ko-KR")
+    .replaceAll("_", "-")
+    .replace(/\s+/gu, "-");
+}
+
+/** Runtime companion for untyped plugin or persisted hint data. */
+export function isStudioToolHintPreviewVariant<
+  Kind extends StudioToolHintPreviewKind,
+>(
+  kind: Kind,
+  value: string
+): value is StudioToolHintPreviewVariant<Kind> {
+  const normalized = normalizeStudioToolHintPreviewVariant(value);
+  return STUDIO_TOOL_HINT_PREVIEW_VARIANTS[kind].some(
+    (candidate) =>
+      normalized === candidate
+      || normalized.endsWith(`:${candidate}`)
+      || normalized.endsWith(`-${candidate}`)
+      || normalized.endsWith(`/${candidate}`)
+  );
+}

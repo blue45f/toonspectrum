@@ -143,7 +143,8 @@ export function StudioInspectorBubbleAppearanceControls({
             recentColors={recentColors}
             onUseColor={onRememberColor}
             onLoadRecentColors={onEnsureRecentColorsLoaded}
-            title="말풍선 색상"
+            label="말풍선 색상"
+            purpose="bubble-fill"
           />
         </span>
       )}

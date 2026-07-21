@@ -1277,7 +1277,8 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             recentColors={recentColors}
             onUseColor={rememberColor}
             onLoadRecentColors={ensureRecentColorsLoaded}
-            title="브러시·도형 색상"
+            label="브러시·도형 색상"
+            purpose="brush-shape"
           />
         </span>
         </StudioToolbarCluster>

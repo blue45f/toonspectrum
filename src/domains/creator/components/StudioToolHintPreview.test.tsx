@@ -85,6 +85,32 @@ describe("StudioToolHintPreview", () => {
     expect(visualSignature("shape")).not.toBe(visualSignature("smart-shape"));
   });
 
+  it("gives every color action its own reduced-motion and animated demonstration", () => {
+    const variants = [
+      "brush-shape",
+      "bubble-fill",
+      "recent-swatch",
+      "palette-family",
+      "palette-swatch",
+    ] as const;
+    const reducedSignatures = variants.map((variant) =>
+      visualSignature("color-palette", variant)
+    );
+    const animatedSignatures = variants.map((variant) =>
+      animatedVisualSignature("color-palette", variant)
+    );
+
+    expect(new Set(reducedSignatures).size).toBe(variants.length);
+    expect(new Set(animatedSignatures).size).toBe(variants.length);
+
+    for (const variant of variants) {
+      const html = renderToStaticMarkup(
+        <StudioToolHintPreview kind="color-palette" variant={variant} reducedMotion />
+      );
+      expect(html).toContain(`data-preview-operation="${variant}"`);
+    }
+  });
+
   it.each([
     ["layer-visibility", ["layer-batch-show", "layer-batch-hide"]],
     ["layer-lock", ["layer-batch-lock", "layer-batch-unlock"]],

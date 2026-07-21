@@ -1,9 +1,11 @@
 import { Suspense, useState } from "react";
 
+import { studioColorPopoverTriggerHint } from "./studio-color-popover-hints";
 import {
   StudioColorPopoverContent,
   preloadStudioColorPopover,
 } from "./studio-page-lazy-ui";
+import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { StudioColorPopoverProps } from "./StudioColorPopover";
 
@@ -16,12 +18,13 @@ export type LazyStudioColorPopoverProps = Omit<
 
 function StudioColorPopoverFallback({
   value,
-  title,
+  label = "색상 선택",
+  purpose = "generic",
   className,
   onWarm,
   onActivate,
   busy = false,
-}: Pick<LazyStudioColorPopoverProps, "value" | "title" | "className"> & {
+}: Pick<LazyStudioColorPopoverProps, "value" | "label" | "purpose" | "className"> & {
   onWarm?: () => void;
   onActivate?: () => void;
   busy?: boolean;
@@ -33,18 +36,22 @@ function StudioColorPopoverFallback({
 
   return (
     <span className={className ? `relative inline-block ${className}` : "relative inline-block"}>
-      <button
-        type="button"
-        aria-label={title ?? "색상 선택"}
-        aria-expanded={false}
-        aria-busy={busy || undefined}
-        title={title ?? "색상 선택"}
-        onClick={onActivate}
-        onFocus={warm}
-        onMouseEnter={warm}
-        className="h-7 w-7 rounded border border-line cursor-pointer"
-        style={{ background: value }}
-      />
+      <StudioToolHintTarget
+        hint={studioColorPopoverTriggerHint(label, purpose)}
+        preferredSide="bottom"
+      >
+        <button
+          type="button"
+          aria-label={label}
+          aria-expanded={false}
+          aria-busy={busy || undefined}
+          onClick={onActivate}
+          onFocus={warm}
+          onMouseEnter={warm}
+          className="h-7 w-7 cursor-pointer rounded border border-line pointer-coarse:size-11"
+          style={{ background: value }}
+        />
+      </StudioToolHintTarget>
     </span>
   );
 }

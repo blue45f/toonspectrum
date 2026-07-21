@@ -13,13 +13,13 @@ vi.mock("./studio-page-lazy-ui", () => ({
   preloadStudioColorPopover: lazyUiMocks.preloadStudioColorPopover,
   StudioColorPopoverContent: ({
     initialOpen,
-    title,
+    label,
   }: {
     initialOpen?: boolean;
-    title?: string;
+    label?: string;
   }) => (
     <div data-testid="loaded-color-popover" data-initial-open={String(initialOpen)}>
-      {title}
+      {label}
     </div>
   ),
 }));
@@ -37,7 +37,8 @@ describe("LazyStudioColorPopover", () => {
         value="#123456"
         onChange={vi.fn()}
         recentColors={[]}
-        title="선 색상"
+        label="선 색상"
+        purpose="brush-shape"
         className="custom-class"
         onLoadRecentColors={onLoadRecentColors}
       />
@@ -45,7 +46,9 @@ describe("LazyStudioColorPopover", () => {
 
     const trigger = screen.getByRole("button", { name: "선 색상" });
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
-    expect(trigger.parentElement?.className).toContain("custom-class");
+    expect(trigger.hasAttribute("title")).toBe(false);
+    expect(trigger.closest('[data-studio-tool-hint-target="true"]')).not.toBeNull();
+    expect(trigger.closest(".custom-class")).not.toBeNull();
 
     fireEvent.mouseEnter(trigger);
     expect(lazyUiMocks.preloadStudioColorPopover).toHaveBeenCalledOnce();
