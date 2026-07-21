@@ -285,7 +285,7 @@ function StudioCommentPinPreviewPortal({
         {body}
       </span>
       <span className="mt-1.5 block text-[0.62rem] font-semibold text-accent">
-        클릭해서 스레드 열기
+        클릭·Enter로 열기 · ←/→ 핀 이동
       </span>
     </span>,
     globalThis.document.body
@@ -309,6 +309,18 @@ export function StudioLiveCanvasOverlay({
   const activePreviewAnchor = activeCommentPreviewKey
     ? pinButtonRefs.current.get(activeCommentPreviewKey)
     : undefined;
+  const focusCommentPin = (currentKey: string, destination: "next" | "previous" | "first" | "last") => {
+    if (commentPins.length === 0) return;
+    const currentIndex = Math.max(0, commentPins.findIndex((pin) => pin.key === currentKey));
+    const nextIndex = destination === "first"
+      ? 0
+      : destination === "last"
+        ? commentPins.length - 1
+        : destination === "next"
+          ? (currentIndex + 1) % commentPins.length
+          : (currentIndex - 1 + commentPins.length) % commentPins.length;
+    pinButtonRefs.current.get(commentPins[nextIndex]!.key)?.focus({ preventScroll: true });
+  };
   return (
     <div
       aria-label="공동작업 캔버스 오버레이"
@@ -333,6 +345,7 @@ export function StudioLiveCanvasOverlay({
             }}
             type="button"
             aria-haspopup="dialog"
+            aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home End Enter"
             aria-label={`${pin.label}, ${pin.unreadCount ? `읽지 않은 댓글 ${pin.unreadCount}개, ` : ""}열림 댓글 ${pin.count}개`}
             data-studio-comment-pin="true"
             className={cn(
@@ -356,6 +369,27 @@ export function StudioLiveCanvasOverlay({
             onBlur={() => setActiveCommentPreviewKey((current) => (
               current === pin.key ? null : current
             ))}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                setActiveCommentPreviewKey(null);
+                return;
+              }
+              const destination = event.key === "Home"
+                ? "first"
+                : event.key === "End"
+                  ? "last"
+                  : event.key === "ArrowRight" || event.key === "ArrowDown"
+                    ? "next"
+                    : event.key === "ArrowLeft" || event.key === "ArrowUp"
+                      ? "previous"
+                      : null;
+              if (!destination) return;
+              event.preventDefault();
+              event.stopPropagation();
+              focusCommentPin(pin.key, destination);
+            }}
             onClick={() => onCommentPinClick(
               pin.anchor,
               pin.newestUnreadThreadId ?? pin.newestThreadId,

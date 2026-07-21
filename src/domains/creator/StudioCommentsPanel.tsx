@@ -1468,6 +1468,10 @@ export function StudioCommentsPanel({
                         {!isReadOnlyArchive && capabilities.resolve ? <button
                           type="button"
                           disabled={saving}
+                          aria-pressed={thread.resolved}
+                          aria-label={thread.resolved
+                            ? `${thread.author.displayName}의 댓글 다시 열기`
+                            : `${thread.author.displayName}의 댓글 해결 처리`}
                           onClick={() => {
                             void applyChange(
                               () => thread.resolved
@@ -1477,7 +1481,9 @@ export function StudioCommentsPanel({
                                 ? "댓글을 다시 열지 못했어요."
                                 : "댓글을 해결 처리하지 못했어요."
                             ).then((saved) => {
-                              if (saved && !thread.resolved) {
+                              if (!saved) return;
+                              focusReviewRail();
+                              if (!thread.resolved) {
                                 setReplyingThreadId(null);
                                 setReplyBody("");
                               }

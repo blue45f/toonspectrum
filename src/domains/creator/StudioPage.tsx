@@ -7039,8 +7039,18 @@ function StudioCuttoonEditor() {
   const liveDraftDirectRef = useRef(false);
   // Figma식 자유 위치 댓글: 무장 → 캔버스 클릭 한 번 → point 앵커 확정(0..1 정규화 좌표).
   const [commentPinArmed, setCommentPinArmed] = useState(false);
+  // Magma처럼 댓글 도구는 한 번 선택하면 여러 위치를 연속 검토할 수 있다. `commentPinArmed`
+  // 는 다음 클릭 대기 상태만 나타내고, 이 ref는 compact composer가 열린 동안에도 도구 세션을
+  // 유지한다. 다른 편집 도구/검토함/Esc 전환은 아래 공통 해제 지점에서 세션까지 종료한다.
+  const commentPlacementSessionRef = useRef(false);
+  function stopStudioCommentPlacementSession(): void {
+    commentPlacementSessionRef.current = false;
+    setCommentPinArmed(false);
+  }
   useEffect(() => {
-    if (viewTool !== null) setCommentPinArmed(false);
+    if (viewTool !== null) {
+      stopStudioCommentPlacementSession();
+    }
   }, [viewTool]);
   const canCreateStudioComment = workId
     ? studioTeamCommentCapabilities?.comment === true
@@ -7057,7 +7067,7 @@ function StudioCuttoonEditor() {
   });
   function openStudioCommentInbox() {
     preloadStudioCommentsPanelSession();
-    setCommentPinArmed(false);
+    stopStudioCommentPlacementSession();
     setPointCommentComposer(null);
     setTeamPanelOpen(false);
     setCommentsOpen(true);
@@ -7068,8 +7078,10 @@ function StudioCuttoonEditor() {
       announceDrawingShortcut("댓글 작성 권한이 없어 검토함을 열었습니다");
       return;
     }
-    if (commentPinArmed) {
-      setCommentPinArmed(false);
+    if (commentPlacementSessionRef.current) {
+      stopStudioCommentPlacementSession();
+      setPointCommentComposer(null);
+      setPointCommentAnchor(null);
       announceDrawingShortcut("댓글 핀 배치 취소");
       return;
     }
@@ -7079,6 +7091,7 @@ function StudioCuttoonEditor() {
     setCommentsOpen(false);
     setPointCommentAnchor(null);
     setPointCommentComposer(null);
+    commentPlacementSessionRef.current = true;
     setCommentPinArmed(true);
     announceDrawingShortcut("댓글 · 캔버스에서 핀 위치를 선택하세요");
   }
@@ -7098,6 +7111,7 @@ function StudioCuttoonEditor() {
     });
   }
   function cancelStudioPointCommentComposer(): void {
+    stopStudioCommentPlacementSession();
     setPointCommentComposer(null);
     setPointCommentAnchor(null);
     announceDrawingShortcut("위치 댓글 작성 취소");
@@ -7108,6 +7122,7 @@ function StudioCuttoonEditor() {
       pointCommentAnchor
       && (selectedId !== null || pointCommentAnchor.pageId !== currentPageId)
     ) {
+      stopStudioCommentPlacementSession();
       setPointCommentAnchor(null);
       setPointCommentComposer(null);
     }
@@ -9256,7 +9271,12 @@ function StudioCuttoonEditor() {
     )) return true;
     setPointCommentComposer(null);
     setPointCommentAnchor(null);
-    announceDrawingShortcut("위치 댓글을 등록했습니다");
+    const continuePlacement = commentPlacementSessionRef.current && canCreateStudioComment;
+    commentPlacementSessionRef.current = continuePlacement;
+    setCommentPinArmed(continuePlacement);
+    announceDrawingShortcut(continuePlacement
+      ? "위치 댓글을 등록했습니다 · 다음 위치를 선택하세요"
+      : "위치 댓글을 등록했습니다");
     restoreStudioCanvasViewportFocus();
     return true;
   }
@@ -11712,7 +11732,7 @@ function StudioCuttoonEditor() {
     setBubbleShapeEditActive(false); // ← 추가(말풍선 커스텀 모양 점 편집)
     setPuppetWarpActive(false); // ← 추가
     setPuppetWarpPins([]); // ← 추가(핀도 함께 폐기 — 다른 도구로 전환 시 세션 종료)
-    setCommentPinArmed(false); // ← 추가(자유 위치 댓글 핀 무장 해제)
+    stopStudioCommentPlacementSession(); // ← 추가(자유 위치 댓글 핀 세션 해제)
   }
 
   /** 다각형 올가미 세션을 선택에 닫아 넣고 초안을 비운다. 점 <3 이면 폐기. */
@@ -14373,7 +14393,7 @@ function StudioCuttoonEditor() {
           setMenu(null);
         } else if (commentPinArmed) {
           e.preventDefault();
-          setCommentPinArmed(false);
+          stopStudioCommentPlacementSession();
           announceDrawingShortcut("댓글 핀 배치 취소");
         } else if (pointCommentComposer) {
           e.preventDefault();
@@ -17901,7 +17921,7 @@ function StudioCuttoonEditor() {
     if (!commentPinArmed) return false;
     // Figma식 자유 위치 댓글 핀: 무장 상태의 첫 캔버스 클릭이 point 앵커를 확정하고 소비된다.
     if (canvasInteractionBlocked) {
-      setCommentPinArmed(false);
+      stopStudioCommentPlacementSession();
       announceDrawingShortcut("댓글 핀을 배치할 수 없는 문서 상태입니다");
       return true;
     }
@@ -17930,6 +17950,9 @@ function StudioCuttoonEditor() {
       });
       setSelectedId(null);
       setCommentsOpen(false);
+    } else {
+      stopStudioCommentPlacementSession();
+      announceDrawingShortcut("댓글 위치를 확인하지 못해 배치를 종료했습니다");
     }
     return true;
   }
@@ -23929,6 +23952,7 @@ function StudioCuttoonEditor() {
     selectDialogueElement,
     selectStudioCommentAnchor,
     markStudioCommentThreadRead,
+    stopStudioCommentPlacementSession,
     setMaster,
     setStudioUiDensity,
     setActualPixelView,
@@ -24795,7 +24819,6 @@ function StudioCuttoonEditor() {
           setAppSettingsOpen={setAppSettingsOpen}
           setBg3dOpen={setBg3dOpen}
           setCanvasOnlyMode={setCanvasOnlyMode}
-          setCommentPinArmed={setCommentPinArmed}
           setPointCommentComposer={setPointCommentComposer}
           setCommentsOpen={setCommentsOpen}
           setContextMenu={setContextMenu}
@@ -25650,6 +25673,7 @@ interface StudioCanvasViewportHandlers {
   selectDialogueElement: (pageId: string, elId: string) => void;
   selectStudioCommentAnchor: (anchor: StudioCommentAnchor) => void;
   markStudioCommentThreadRead: (threadId: string) => Promise<boolean>;
+  stopStudioCommentPlacementSession: () => void;
   setMaster: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<DocumentMaster<El>>>>[0]) => void;
   setStudioUiDensity: (mode: StudioUiDensityMode) => void;
   snapBoundFunc: (pos: { x: number; y: number; }) => { x: number; y: number; };
@@ -25811,7 +25835,6 @@ interface StudioCanvasViewportProps {
   setAppSettingsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setBg3dOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setCanvasOnlyMode: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setCommentPinArmed: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPointCommentComposer: import("react").Dispatch<import("react").SetStateAction<{
     anchor: Extract<StudioCommentAnchor, { type: "point" }>;
     commentId: string;
@@ -26078,7 +26101,6 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   setAppSettingsOpen,
   setBg3dOpen,
   setCanvasOnlyMode,
-  setCommentPinArmed,
   setPointCommentComposer,
   setCommentsOpen,
   requestStudioCommentThreadFocus,
@@ -26256,6 +26278,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     selectDialogueElement,
     selectStudioCommentAnchor,
     markStudioCommentThreadRead,
+    stopStudioCommentPlacementSession,
     setMaster,
     setStudioUiDensity,
     setActualPixelView,
@@ -26660,7 +26683,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   type="button"
                   aria-label="댓글 핀 배치 취소"
                   onClick={() => {
-                    setCommentPinArmed(false);
+                    stopStudioCommentPlacementSession();
                   }}
                   className="inline-flex min-h-11 shrink-0 items-center rounded-lg border border-line bg-card px-3 text-xs font-bold text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
                 >
@@ -27676,7 +27699,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 flipX={canvasFlipH}
                 rotation={canvasRotation}
                 onCommentPinClick={(anchor, newestThreadId) => {
-                  setCommentPinArmed(false);
+                  stopStudioCommentPlacementSession();
                   setPointCommentComposer(null);
                   selectStudioCommentAnchor(anchor);
                   setTeamPanelOpen(false);

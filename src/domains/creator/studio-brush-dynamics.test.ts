@@ -6,6 +6,7 @@ import {
   STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS,
   normalizeStudioBrushDynamicsSample,
   normalizeStudioBrushDynamicsSettings,
+  planNormalizedStudioDynamicBrushDabs,
   planStudioDynamicBrush,
   resolveStudioBrushDynamics,
   serializeStudioBrushDynamicsSettingsCanonical,
@@ -473,6 +474,33 @@ describe("studio brush dynamics settings safety", () => {
 });
 
 describe("studio dynamic brush arc-length dab planner", () => {
+  it("reuses normalized renderer settings without changing deterministic dab output", () => {
+    const settings = normalizeStudioBrushDynamicsSettings({
+      seed: 93,
+      spacingRatio: null,
+      spacing: { base: 2.5, mappings: [{ source: "pressure", from: 1.2, to: 0.8 }] },
+      scatter: { base: 1.5, mappings: [] },
+      tip: { shape: "grain", softness: 0.25 },
+      grain: { amount: 0.4, scale: 7 },
+      tipLayers: [{ tip: { shape: "star" }, opacity: 0.45 }],
+    });
+    const input = {
+      points: [0, 0, 8, 1, 18, 4, 30, 6],
+      pressures: [0.2, 0.45, 0.8, 0.6],
+      baseWidth: 11,
+      baseOpacity: 0.72,
+      seed: 401,
+      maxDabs: 128,
+    } as const;
+    const before = structuredClone(settings);
+
+    const normalized = planNormalizedStudioDynamicBrushDabs(input, settings);
+    const arbitraryInput = planStudioDynamicBrush({ ...input, settings }).dabs;
+
+    expect(normalized).toEqual(arbitraryInput);
+    expect(settings).toEqual(before);
+  });
+
   it("lets plan-level baseWidth and baseOpacity override persisted property bases", () => {
     const plan = planStudioDynamicBrush({
       points: [0, 0],

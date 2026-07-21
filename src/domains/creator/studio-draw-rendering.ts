@@ -15,7 +15,6 @@ import {
 } from "./studio-brush-stamp-engine";
 import {
   studioBrushSymmetryTransforms,
-  transformStudioBrushSymmetryPoint,
 } from "./studio-brush-symmetry";
 import { planStudioCausalInk } from "./studio-causal-ink";
 import { fillStudioCausalInkDabs } from "./studio-causal-ink-canvas";
@@ -91,14 +90,20 @@ export function getSymmetricPoints(
 
   return studioBrushSymmetryTransforms(symmetry).map((transform, transformIndex) => {
     if (transformIndex === 0) return points;
-    const mapped: number[] = [];
+    const mapped = new Array<number>(points.length);
+    let writeIndex = 0;
     for (let i = 0; i < points.length; i += 2) {
       const x = points[i];
       const y = points[i + 1];
       if (x !== undefined && y !== undefined) {
-        mapped.push(...transformStudioBrushSymmetryPoint(x, y, transform));
+        // Apply the affine pair directly. Calling the tuple-returning point helper here allocated
+        // one short array per point, per symmetry copy, on every live draft frame.
+        mapped[writeIndex] = transform.a * x + transform.c * y + transform.e;
+        mapped[writeIndex + 1] = transform.b * x + transform.d * y + transform.f;
+        writeIndex += 2;
       }
     }
+    mapped.length = writeIndex;
     return mapped;
   });
 }

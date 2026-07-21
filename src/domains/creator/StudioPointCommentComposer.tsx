@@ -1,6 +1,7 @@
 import { LoaderCircle, MapPin, Send, X } from "lucide-react";
 import {
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -53,6 +54,10 @@ export function StudioPointCommentComposer({
   onOpenReview,
   onSubmit,
 }: StudioPointCommentComposerProps) {
+  const hintId = useId();
+  const countId = useId();
+  const errorId = useId();
+  const noticeId = useId();
   const cardRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [body, setBody] = useState("");
@@ -60,6 +65,7 @@ export function StudioPointCommentComposer({
   const savingRef = useRef(saving);
   savingRef.current = saving;
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [cardSize, setCardSize] = useState({ width: 336, height: 224 });
   const [, setViewportRevision] = useState(0);
 
@@ -156,20 +162,28 @@ export function StudioPointCommentComposer({
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const message = body.trim();
-    if (!message || saving) return;
+    if (!message || savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     setError(null);
+    setNotice(null);
     try {
       const accepted = await onSubmit(message);
       if (accepted === false) {
         throw new Error("댓글을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.");
       }
-      setSaving(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "댓글을 저장하지 못했어요.");
-      setSaving(false);
       globalThis.requestAnimationFrame(() => textareaRef.current?.focus());
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
+  };
+  const preserveDraftAndRefocus = () => {
+    setError(null);
+    setNotice("작성 중인 댓글은 유지했어요. 등록하거나 Esc 또는 닫기 버튼으로 취소할 수 있어요.");
+    globalThis.requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
   return createPortal(
@@ -180,11 +194,20 @@ export function StudioPointCommentComposer({
         disabled={saving}
         aria-label="위치 댓글 작성창 바깥"
         data-studio-point-comment-backdrop="true"
+        data-studio-point-comment-draft-protected={body.trim() ? "true" : "false"}
         className="fixed inset-0 z-[90] cursor-default touch-none border-0 bg-transparent p-0"
         onPointerDown={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (savingRef.current) return;
+          if (
+            savingRef.current
+            || (typeof event.button === "number" && event.button !== 0)
+            || event.isPrimary === false
+          ) return;
+          if (body.trim()) {
+            preserveDraftAndRefocus();
+            return;
+          }
           onCancel();
         }}
         onContextMenu={(event) => {
@@ -209,6 +232,11 @@ export function StudioPointCommentComposer({
         tabIndex={-1}
         aria-modal="true"
         aria-label="위치 댓글 작성"
+        aria-describedby={error
+          ? `${hintId} ${errorId}`
+          : notice
+            ? `${hintId} ${noticeId}`
+            : hintId}
         aria-busy={saving}
         data-studio-point-comment-composer="true"
         data-studio-shortcut-boundary="true"
@@ -235,7 +263,17 @@ export function StudioPointCommentComposer({
             <button
               type="button"
               disabled={saving}
-              onClick={onOpenReview}
+              onClick={() => {
+                if (body.trim()) {
+                  preserveDraftAndRefocus();
+                  return;
+                }
+                onOpenReview();
+              }}
+              aria-label="댓글 검토함 열기"
+              title={body.trim()
+                ? "작성 중인 댓글을 등록하거나 취소한 뒤 검토함을 열 수 있어요"
+                : "댓글 검토함 열기"}
               className="min-h-10 rounded-lg px-2 text-[0.68rem] font-semibold text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45 pointer-coarse:min-h-11"
             >
               검토함
@@ -247,7 +285,7 @@ export function StudioPointCommentComposer({
             onClick={onCancel}
             aria-label="위치 댓글 작성 취소"
             title="취소 (Esc)"
-            className="grid size-10 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45"
+            className="grid size-10 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45 pointer-coarse:size-11"
           >
             <X size={15} aria-hidden />
           </button>
@@ -261,10 +299,12 @@ export function StudioPointCommentComposer({
             readOnly={saving}
             aria-readonly={saving}
             aria-label="위치 댓글 내용"
+            aria-describedby={`${hintId} ${countId}${error ? ` ${errorId}` : notice ? ` ${noticeId}` : ""}`}
             placeholder="이 위치에서 확인할 점이나 수정 의견을 남겨 주세요."
             onChange={(event) => {
               setBody(event.target.value.slice(0, STUDIO_COMMENTS_MAX_BODY_LENGTH));
               if (error) setError(null);
+              if (notice) setNotice(null);
             }}
             onKeyDown={(event) => {
               if (
@@ -280,23 +320,33 @@ export function StudioPointCommentComposer({
           />
           {error ? (
             <p
+              id={errorId}
               role="alert"
               className="mt-2 rounded-lg border border-bad/35 bg-bad/10 px-2.5 py-2 text-[0.7rem] leading-relaxed text-bad"
             >
               {error}
             </p>
           ) : null}
+          {notice ? (
+            <p
+              id={noticeId}
+              role="status"
+              className="mt-2 rounded-lg border border-cool/35 bg-cool/10 px-2.5 py-2 text-[0.7rem] leading-relaxed text-cool"
+            >
+              {notice}
+            </p>
+          ) : null}
           <footer className="mt-2 flex items-center gap-2">
-            <span className="min-w-0 flex-1 text-[0.65rem] text-fg-3">
+            <span id={hintId} className="min-w-0 flex-1 text-[0.65rem] text-fg-3">
               Esc 취소 · ⌘/Ctrl + Enter 등록
             </span>
-            <span className="text-[0.62rem] tabular-nums text-fg-3">
+            <span id={countId} className="text-[0.62rem] tabular-nums text-fg-3">
               {body.length}/{STUDIO_COMMENTS_MAX_BODY_LENGTH}
             </span>
             <button
               type="submit"
               disabled={saving || !body.trim()}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 pointer-coarse:min-h-11"
             >
               {saving ? (
                 <LoaderCircle

@@ -461,19 +461,27 @@ export function resampleStrokePressures(
   const safeFallback = clamp01(finiteNumber(fallback, 0.5));
   if (!pressures || pressures.length === 0) return Array(count).fill(safeFallback) as number[];
 
-  const safe = pressures.map((pressure) => clamp01(finiteNumber(pressure, safeFallback)));
-  if (count === 1) return [safe[0] ?? safeFallback];
-  if (safe.length === 1) return Array(count).fill(safe[0] ?? safeFallback) as number[];
+  if (count === 1) {
+    return [clamp01(finiteNumber(pressures[0], safeFallback))];
+  }
+  if (pressures.length === 1) {
+    return Array(count).fill(
+      clamp01(finiteNumber(pressures[0], safeFallback))
+    ) as number[];
+  }
 
-  const result: number[] = [];
+  // Clamp only the two source samples needed by each output station. The previous implementation
+  // first allocated a full sanitized copy and then allocated the result, doubling traversal and
+  // transient memory on every retained/live symmetry render of a long pressure stroke.
+  const result = new Array<number>(count);
   for (let index = 0; index < count; index++) {
-    const sourcePosition = (index / (count - 1)) * (safe.length - 1);
+    const sourcePosition = (index / (count - 1)) * (pressures.length - 1);
     const lowerIndex = Math.floor(sourcePosition);
-    const upperIndex = Math.min(safe.length - 1, Math.ceil(sourcePosition));
+    const upperIndex = Math.min(pressures.length - 1, Math.ceil(sourcePosition));
     const amount = sourcePosition - lowerIndex;
-    const lower = safe[lowerIndex] ?? safeFallback;
-    const upper = safe[upperIndex] ?? lower;
-    result.push(clamp01(lower + (upper - lower) * amount));
+    const lower = clamp01(finiteNumber(pressures[lowerIndex], safeFallback));
+    const upper = clamp01(finiteNumber(pressures[upperIndex], lower));
+    result[index] = clamp01(lower + (upper - lower) * amount);
   }
   return result;
 }

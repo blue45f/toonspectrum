@@ -190,4 +190,17 @@ describe("studio draw rendering ownership boundary", () => {
     expect(drawNode.source).toContain('globalCompositeOperation="multiply"');
     expect(drawNode.source).toContain('globalCompositeOperation="lighter"');
   });
+
+  it("keeps dynamic live drafts on the single-normalization bounded-compositor path", () => {
+    const drawNode = moduleEdges("./StudioDrawNode.tsx");
+
+    expect(drawNode.source).toContain("const symmetricVariations = stampBrushKind || dynamicBrushId");
+    expect(drawNode.source).toContain("planNormalizedStudioDynamicBrushDabs(");
+    expect(drawNode.source).not.toContain("planStudioDynamicBrushDabs(");
+    expect(drawNode.source).toContain("dynamicBrushSettingsBySnapshot.get(source)");
+    expect(drawNode.source).toContain("dynamicBrushDefaultSettingsById.get(brushId)");
+    expect(drawNode.source).toContain("studioDynamicBrushDabVariationsFromTransforms(");
+    expect(drawNode.source).toContain("for (const dabs of dabVariations)");
+    expect(drawNode.source).not.toContain("planNormalizedStudioBrushTipComposition(");
+  });
 });

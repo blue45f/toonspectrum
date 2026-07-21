@@ -33,7 +33,7 @@ import {
 import {
   DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
   normalizeStudioBrushDynamicsSettings,
-  planStudioDynamicBrushDabs,
+  planNormalizedStudioDynamicBrushDabs,
   resolveStudioBrushDynamicsPresetId,
   studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsSeedFromKey,
@@ -53,13 +53,17 @@ import {
 } from "./studio-brush-stamp-engine";
 import {
   studioBrushSymmetryTransforms,
-  studioDynamicBrushDabVariations,
+  studioDynamicBrushDabVariationsFromTransforms,
 } from "./studio-brush-symmetry";
-import { planNormalizedStudioBrushTipComposition } from "./studio-brush-tip-composition";
+import {
+  composeNormalizedStudioBrushTipLayerDab,
+  type StudioBrushComposableDab,
+} from "./studio-brush-tip-composition";
 import {
   buildStudioBrushTipAlphaMap,
   planStudioBrushTipStamp,
   studioBrushTipUsesSolidEllipse,
+  type NormalizedStudioBrushTipSettings,
 } from "./studio-brush-tip-stamp";
 import {
   DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
@@ -107,10 +111,46 @@ import {
 import { StudioStampDrawShape } from "./StudioStampDrawShape";
 
 import type { CalligraphyStylusInput } from "./studio-brush";
+import type { NormalizedStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
 import type { DrawEl } from "./studio-element-model";
 import type { StudioPatternSpec } from "./studio-pattern-fill";
 
 const STUDIO_PENCIL_DEFAULT_JITTER_RADIUS = 0.75;
+const dynamicBrushSettingsBySnapshot = new WeakMap<object, NormalizedStudioBrushDynamicsSettings>();
+const dynamicBrushDefaultSettingsById = new Map<string, NormalizedStudioBrushDynamicsSettings>();
+
+/**
+ * Active drafts replace the DrawEl shell while retaining immutable settings snapshots. Normalize
+ * each custom snapshot once; built-in runtime profiles are likewise stable per brush id. This
+ * avoids walking every mapping, tip and alpha payload again on each animation frame.
+ */
+function studioDrawNodeDynamicBrushSettings(
+  el: DrawEl,
+  dynamicBrushId: string
+): NormalizedStudioBrushDynamicsSettings {
+  const source = el.brushDynamics;
+  if (typeof source === "object" && source !== null) {
+    const cached = dynamicBrushSettingsBySnapshot.get(source);
+    if (cached) return cached;
+    const normalized = normalizeStudioBrushDynamicsSettings(source);
+    dynamicBrushSettingsBySnapshot.set(source, normalized);
+    return normalized;
+  }
+  if (source !== undefined && source !== null) {
+    return normalizeStudioBrushDynamicsSettings(source);
+  }
+
+  const brushId = typeof el.brush === "string" && el.brush
+    ? el.brush
+    : dynamicBrushId;
+  const cached = dynamicBrushDefaultSettingsById.get(brushId);
+  if (cached) return cached;
+  const normalized = studioBrushDynamicsSettingsForBrushId(brushId)
+    ?? studioBrushDynamicsSettingsForBrushId(dynamicBrushId)
+    ?? normalizeStudioBrushDynamicsSettings();
+  dynamicBrushDefaultSettingsById.set(brushId, normalized);
+  return normalized;
+}
 
 /**
  * `processPencilPoints` is the frozen legacy 0.75 px graphite texture. Alias profiles scale its
@@ -184,21 +224,17 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   const stampBrushKind = kind === "freehand" && el.mode !== "eraser"
     ? resolveStudioStampBrushKind(el.brush)
     : null;
-  // Stamp symmetry owns its affine fan inside one bounded Shape. Avoid allocating and then
-  // discarding up to 64 complete point-array copies on every active-draft render.
-  const symmetricVariations = stampBrushKind
-    ? [el.points]
-    : getSymmetricPoints(el.points, el.symmetry);
   const dynamicBrushId = kind === "freehand" && el.mode !== "eraser"
     ? resolveStudioBrushDynamicsPresetId(el.brush)
     : null;
+  // Stamp and dynamic-dab renderers own their symmetry fan inside one bounded Shape. Do not build
+  // and discard up to 64 complete transformed source-point arrays on every active-draft frame.
+  const symmetricVariations = stampBrushKind || dynamicBrushId
+    ? [el.points]
+    : getSymmetricPoints(el.points, el.symmetry);
   const dynamicBrushPlan = dynamicBrushId
     ? (() => {
-        const dynamics = normalizeStudioBrushDynamicsSettings(
-          el.brushDynamics
-            ?? studioBrushDynamicsSettingsForBrushId(el.brush)
-            ?? studioBrushDynamicsSettingsForBrushId(dynamicBrushId)
-        );
+        const dynamics = studioDrawNodeDynamicBrushSettings(el, dynamicBrushId);
         const seed = studioBrushDynamicsSeedFromKey(`${el.id}:${dynamics.seed}`);
         const dabPlanInput = {
           points: el.points,
@@ -210,17 +246,17 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           twists: el.twists,
           baseWidth: strokeWidth,
           baseOpacity: dynamics.opacity.base,
-          settings: dynamics,
           seed,
         };
-        let baseDabs = planStudioDynamicBrushDabs({
-          ...dabPlanInput,
-          maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
-        });
+        let baseDabs = planNormalizedStudioDynamicBrushDabs(
+          { ...dabPlanInput, maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS },
+          dynamics
+        );
+        const symmetryTransforms = studioBrushSymmetryTransforms(el.symmetry);
         const renderBudget = planStudioDynamicBrushRenderBudget({
           settings: dynamics,
           dabCount: baseDabs.length,
-          symmetryCount: studioBrushSymmetryTransforms(el.symmetry).length,
+          symmetryCount: symmetryTransforms.length,
           markBudget: activeDraft
             ? STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET
             : STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
@@ -228,16 +264,19 @@ export const StudioDrawNode = memo(function StudioDrawNode({
         if (renderBudget.maxDabsPerVariation < baseDabs.length) {
           // The dynamics planner's bounded pass redistributes these stations across the whole
           // stroke, retaining both endpoints instead of truncating a dense prefix.
-          baseDabs = planStudioDynamicBrushDabs({
-            ...dabPlanInput,
-            maxDabs: renderBudget.maxDabsPerVariation,
-          });
+          baseDabs = planNormalizedStudioDynamicBrushDabs(
+            { ...dabPlanInput, maxDabs: renderBudget.maxDabsPerVariation },
+            dynamics
+          );
         }
         return {
           dynamics,
           seed,
           renderBudget,
-          dabVariations: studioDynamicBrushDabVariations(baseDabs, el.symmetry),
+          dabVariations: studioDynamicBrushDabVariationsFromTransforms(
+            baseDabs,
+            symmetryTransforms
+          ),
         };
       })()
     : null;
@@ -521,48 +560,41 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           }
 
           if (dynamicBrush && el.mode !== "eraser") {
-            const dabs = dynamicDabVariations?.[index] ?? dynamicDabVariations?.[0] ?? [];
+            const dabVariations = dynamicDabVariations ?? [];
             const dynamics = dynamicBrushPlan!.dynamics;
             const dynamicSeed = dynamicBrushPlan!.seed;
             const stampGrid = dynamicBrushPlan!.renderBudget.stampGrid;
             const tipUsesEllipse = dynamicTipRenderPlan!.tipUsesEllipse;
             const tipAlphaMaps = dynamicTipRenderPlan!.tipAlphaMaps;
-            const strokeOriginX = dabs[0]?.sourceX ?? dabs[0]?.x ?? 0;
-            const strokeOriginY = dabs[0]?.sourceY ?? dabs[0]?.y ?? 0;
             return (
               <Shape
                 key={index}
                 sceneFunc={(context) => {
                   context.save();
                   const inheritedAlpha = context.globalAlpha;
-                  const grainAt = (x: number, y: number) => (
-                    resolveNormalizedStudioBrushGrainAlphaMultiplier({
-                      x,
-                      y,
-                      strokeOriginX,
-                      strokeOriginY,
-                      strokeSeed: dynamicSeed,
-                    }, dynamics.grain)
-                  );
-                  for (const dab of dabs) {
-                    const dabColor = resolveNormalizedStudioBrushDabColor(
-                      stroke,
-                      dab.index,
-                      dynamicSeed,
-                      dynamics.colorDynamics
+                  for (const dabs of dabVariations) {
+                    const strokeOriginX = dabs[0]?.sourceX ?? dabs[0]?.x ?? 0;
+                    const strokeOriginY = dabs[0]?.sourceY ?? dabs[0]?.y ?? 0;
+                    const grainAt = (x: number, y: number) => (
+                      resolveNormalizedStudioBrushGrainAlphaMultiplier({
+                        x,
+                        y,
+                        strokeOriginX,
+                        strokeOriginY,
+                        strokeSeed: dynamicSeed,
+                      }, dynamics.grain)
                     );
-                    const composed = planNormalizedStudioBrushTipComposition(
-                      dab,
-                      dynamics.tip,
-                      dynamics.tipLayers
-                    );
-                    for (const composedTip of composed) {
-                      const composedDab = composedTip.dab;
-                      const tipIndex = composedTip.role === "primary"
-                        ? 0
-                        : composedTip.layerIndex + 1;
+                    const renderTipDab = (
+                      composedDab: StudioBrushComposableDab,
+                      tip: NormalizedStudioBrushTipSettings,
+                      tipIndex: number,
+                      dabColor: string
+                    ) => {
                       const baseAlpha = inheritedAlpha
-                        * Math.min(1, Math.max(0, composedDab.opacity * composedDab.flow * opacity));
+                        * Math.min(1, Math.max(
+                          0,
+                          composedDab.opacity * composedDab.flow * opacity
+                        ));
                       const tipAlphaMap = tipAlphaMaps[tipIndex] ?? null;
                       if (tipUsesEllipse[tipIndex] || !tipAlphaMap) {
                         context.save();
@@ -571,15 +603,21 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                         context.rotate(composedDab.angle * Math.PI / 180);
                         context.scale(1, composedDab.roundness);
                         context.beginPath();
-                        context.arc(0, 0, Math.max(0.25, composedDab.size / 2), 0, Math.PI * 2);
+                        context.arc(
+                          0,
+                          0,
+                          Math.max(0.25, composedDab.size / 2),
+                          0,
+                          Math.PI * 2
+                        );
                         context.fillStyle = dabColor;
                         context.fill();
                         context.restore();
-                        continue;
+                        return;
                       }
                       // PNG-alpha/procedural tip path. Grain is sampled in world coordinates after
                       // multi-tip transforms, so canvas-fixed and stroke-fixed remain distinguishable.
-                      const stamp = planStudioBrushTipStamp(composedDab, composedTip.tip, {
+                      const stamp = planStudioBrushTipStamp(composedDab, tip, {
                         alphaMap: tipAlphaMap,
                         grid: stampGrid,
                       });
@@ -595,6 +633,21 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                         context.fillStyle = dabColor;
                         context.fill();
                         context.restore();
+                      }
+                    };
+                    for (const dab of dabs) {
+                      const dabColor = resolveNormalizedStudioBrushDabColor(
+                        stroke,
+                        dab.index,
+                        dynamicSeed,
+                        dynamics.colorDynamics
+                      );
+                      renderTipDab(dab, dynamics.tip, 0, dabColor);
+                      for (const [layerIndex, layer] of dynamics.tipLayers.entries()) {
+                        const composedDab = composeNormalizedStudioBrushTipLayerDab(dab, layer);
+                        if (composedDab) {
+                          renderTipDab(composedDab, layer.tip, layerIndex + 1, dabColor);
+                        }
                       }
                     }
                   }

@@ -71,6 +71,42 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(studioPageSource).toContain("if (!setStudioComments(nextDocument)) return false");
   });
 
+  it("keeps Magma-style comment placement active after success but exits on explicit cancel", () => {
+    const submitStart = studioPageSource.indexOf("async function submitStudioPointComment");
+    const submitEnd = studioPageSource.indexOf(
+      "async function markStudioCommentThreadRead",
+      submitStart
+    );
+    const submitSource = studioPageSource.slice(submitStart, submitEnd);
+    const cancelStart = studioPageSource.indexOf("function cancelStudioPointCommentComposer");
+    const cancelEnd = studioPageSource.indexOf("useEffect(() =>", cancelStart);
+    const cancelSource = studioPageSource.slice(cancelStart, cancelEnd);
+    const disarmStart = studioPageSource.indexOf("function disarmAllPixelTools()");
+    const disarmEnd = studioPageSource.indexOf(
+      "function finishPolyLassoSession()",
+      disarmStart
+    );
+    const disarmSource = studioPageSource.slice(disarmStart, disarmEnd);
+
+    expect(studioPageSource).toContain("commentPlacementSessionRef");
+    expect(studioPageSource).toContain("commentPlacementSessionRef.current = true");
+    expect(studioPageSource).toContain("stopStudioCommentPlacementSession");
+    expect(submitSource).toContain(
+      "commentPlacementSessionRef.current && canCreateStudioComment"
+    );
+    expect(submitSource).toContain("setCommentPinArmed(continuePlacement)");
+    expect(submitSource).toContain("다음 위치를 선택하세요");
+    expect(cancelSource).toContain("stopStudioCommentPlacementSession()");
+    expect(cancelSource).not.toContain("setCommentPinArmed(true)");
+    expect(disarmSource).toContain("stopStudioCommentPlacementSession()");
+    expect(studioPageSource).toMatch(
+      /else if \(commentPinArmed\) \{[\s\S]*?stopStudioCommentPlacementSession\(\)/u
+    );
+    expect(studioPageSource).toMatch(
+      /if \(viewTool !== null\) \{[\s\S]*?stopStudioCommentPlacementSession\(\)/u
+    );
+  });
+
   it("preloads the compact composer without pulling the full review rail into pin placement", () => {
     const toggleStart = studioPageSource.indexOf("function toggleStudioCommentPinPlacement()");
     const toggleEnd = studioPageSource.indexOf("const [pointCommentAnchor", toggleStart);
@@ -162,6 +198,14 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(source).toContain('[data-studio-comment-thread-id]');
     expect(source).toContain('thread.focus({ preventScroll: true })');
     expect(source).toContain('thread.scrollIntoView({ block: "nearest", behavior: "auto" })');
+    expect(studioCanvasOverlaySource).toContain('aria-keyshortcuts="ArrowLeft ArrowRight');
+    expect(studioCanvasOverlaySource).toContain("focusCommentPin(pin.key, destination)");
+  });
+
+  it("restores rail focus after resolve or reopen removes a filtered thread", () => {
+    expect(source).toContain("aria-pressed={thread.resolved}");
+    expect(source).toContain("if (!saved) return;");
+    expect(source).toContain("focusReviewRail();");
   });
 
   it("exposes guarded edit and delete operations for the current actor", () => {

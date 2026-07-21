@@ -65,6 +65,37 @@ export interface StudioBrushComposedTipDab {
   dab: StudioBrushComposableDab;
 }
 
+/** Builds one normalized secondary-tip dab without allocating a composition result array. */
+export function composeNormalizedStudioBrushTipLayerDab(
+  dab: StudioBrushComposableDab,
+  layer: NormalizedStudioBrushTipLayerSettings
+): StudioBrushComposableDab | null {
+  if (layer.opacity <= 0) return null;
+  const angleRadians = dab.angle * Math.PI / 180;
+  const cos = Math.cos(angleRadians);
+  const sin = Math.sin(angleRadians);
+  const radius = Math.max(0.025, finiteNumber(dab.size, 1) / 2);
+  const localX = layer.offsetX * radius;
+  const localY = layer.offsetY * radius;
+  return {
+    x: dab.x + localX * cos - localY * sin,
+    y: dab.y + localX * sin + localY * cos,
+    size: clamp(
+      finiteNumber(dab.size, 1) * layer.scale,
+      0.05,
+      16_384
+    ),
+    angle: normalizeSignedDegrees(finiteNumber(dab.angle, 0) + layer.angle),
+    roundness: clamp(
+      finiteNumber(dab.roundness, 1) * layer.roundness,
+      0.08,
+      1
+    ),
+    opacity: clamp(finiteNumber(dab.opacity, 1) * layer.opacity, 0, 1),
+    flow: clamp(finiteNumber(dab.flow, 1), 0, 1),
+  };
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -169,36 +200,15 @@ export function planNormalizedStudioBrushTipComposition(
     tip: primaryTip,
     dab: { ...dab },
   }];
-  const angleRadians = dab.angle * Math.PI / 180;
-  const cos = Math.cos(angleRadians);
-  const sin = Math.sin(angleRadians);
-  const radius = Math.max(0.025, finiteNumber(dab.size, 1) / 2);
 
   for (const [layerIndex, layer] of layers.entries()) {
-    if (layer.opacity <= 0) continue;
-    const localX = layer.offsetX * radius;
-    const localY = layer.offsetY * radius;
+    const composedDab = composeNormalizedStudioBrushTipLayerDab(dab, layer);
+    if (!composedDab) continue;
     result.push({
       role: "layer",
       layerIndex,
       tip: layer.tip,
-      dab: {
-        x: dab.x + localX * cos - localY * sin,
-        y: dab.y + localX * sin + localY * cos,
-        size: clamp(
-          finiteNumber(dab.size, 1) * layer.scale,
-          0.05,
-          16_384
-        ),
-        angle: normalizeSignedDegrees(finiteNumber(dab.angle, 0) + layer.angle),
-        roundness: clamp(
-          finiteNumber(dab.roundness, 1) * layer.roundness,
-          0.08,
-          1
-        ),
-        opacity: clamp(finiteNumber(dab.opacity, 1) * layer.opacity, 0, 1),
-        flow: clamp(finiteNumber(dab.flow, 1), 0, 1),
-      },
+      dab: composedDab,
     });
   }
   return result;

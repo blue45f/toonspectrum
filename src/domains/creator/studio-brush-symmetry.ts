@@ -101,15 +101,19 @@ export function transformStudioBrushSymmetryPoint(
   ];
 }
 
+function isIdentityStudioBrushSymmetryTransform(
+  transform: StudioBrushSymmetryTransform
+): boolean {
+  return transform.a === 1 && transform.b === 0 && transform.c === 0
+    && transform.d === 1 && transform.e === 0 && transform.f === 0;
+}
+
 /** Transforms the whole dab—including deterministic scatter and the elliptical tip axis. */
 export function transformStudioDynamicBrushDab(
   dab: StudioDynamicBrushDab,
   transform: StudioBrushSymmetryTransform
 ): StudioDynamicBrushDab {
-  if (
-    transform.a === 1 && transform.b === 0 && transform.c === 0
-    && transform.d === 1 && transform.e === 0 && transform.f === 0
-  ) {
+  if (isIdentityStudioBrushSymmetryTransform(transform)) {
     return { ...dab };
   }
   const [sourceX, sourceY] = transformStudioBrushSymmetryPoint(
@@ -128,11 +132,24 @@ export function transformStudioDynamicBrushDab(
 }
 
 /** Builds every exact affine copy from one deterministic base plan. */
+export function studioDynamicBrushDabVariationsFromTransforms(
+  dabs: readonly StudioDynamicBrushDab[],
+  transforms: readonly StudioBrushSymmetryTransform[]
+): Array<readonly StudioDynamicBrushDab[]> {
+  return transforms.map((transform) => (
+    isIdentityStudioBrushSymmetryTransform(transform)
+      ? dabs
+      : dabs.map((dab) => transformStudioDynamicBrushDab(dab, transform))
+  ));
+}
+
+/** Builds every exact affine copy from one deterministic base plan. */
 export function studioDynamicBrushDabVariations(
   dabs: readonly StudioDynamicBrushDab[],
   symmetry?: StudioBrushSymmetrySpec
-): StudioDynamicBrushDab[][] {
-  return studioBrushSymmetryTransforms(symmetry).map((transform) =>
-    dabs.map((dab) => transformStudioDynamicBrushDab(dab, transform))
+): Array<readonly StudioDynamicBrushDab[]> {
+  return studioDynamicBrushDabVariationsFromTransforms(
+    dabs,
+    studioBrushSymmetryTransforms(symmetry)
   );
 }

@@ -134,18 +134,19 @@ class MemoryStudioLiveLockRepository implements StudioLiveLockRepository {
           lock.ownerConnectionId !== input.ownerConnectionId &&
           studioLiveLockResourcesConflict(lock.resourceId, input.resourceId)
       );
-      if (conflicting) return { status: "conflict" as const, lock: conflicting };
       if (
         input.renewLeaseId !== undefined &&
         (!current ||
           current.ownerConnectionId !== input.ownerConnectionId ||
           current.leaseId !== input.renewLeaseId)
       ) {
+        const authoritative = current ?? conflicting;
         return {
           status: "stale" as const,
-          ...(current ? { lock: current } : {}),
+          ...(authoritative ? { lock: authoritative } : {}),
         };
       }
+      if (conflicting) return { status: "conflict" as const, lock: conflicting };
       if (input.rotateLease && input.renewLeaseId === undefined && current) {
         return { status: "stale" as const, lock: current };
       }
@@ -1030,6 +1031,7 @@ describe("StudioLiveGateway", () => {
 
     expect(response.ok).toBe(true);
     if (!response.ok) throw new Error("join failed");
+    expect(response.data.lockProtocolVersion).toBe(2);
     expect(response.data.self).toMatchObject({
       connectionId: "owner",
       clientInstanceId: "client-owner",
@@ -2076,6 +2078,88 @@ describe("StudioLiveGateway", () => {
       requestId: "00000000-0000-4000-8000-000000000019",
     });
     await expect(repository.list("work-1")).resolves.toEqual([]);
+  });
+
+  it("reports a delayed renewal as stale after another owner acquires a conflicting child", async () => {
+    const repository = new MemoryStudioLiveLockRepository();
+    const harness = createHarness(undefined, undefined, undefined, repository);
+    const first = harness.socket("editor-stale-owner");
+    const second = harness.socket("editor-new-owner");
+    await connectAndJoin(harness, first);
+    await connectAndJoin(harness, second);
+
+    const acquired = await harness.gateway.requestLock(
+      first as never,
+      {
+        workId: "work-1",
+        resourceId: "page:owner-changed",
+        protocolVersion: 2,
+        requestId: "00000000-0000-4000-8000-000000000061",
+        leaseMs: 15_000,
+      },
+      undefined
+    );
+    expect(acquired.ok).toBe(true);
+    if (!acquired.ok) throw new Error("initial v2 lock failed");
+
+    await expect(
+      harness.gateway.releaseLock(
+        first as never,
+        {
+          workId: "work-1",
+          resourceId: "page:owner-changed",
+          leaseId: acquired.data.lock.leaseId,
+          requestId: "00000000-0000-4000-8000-000000000062",
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true, data: { released: true } });
+
+    const replacement = await harness.gateway.requestLock(
+      second as never,
+      {
+        workId: "work-1",
+        resourceId: "element:owner-changed:panel-1",
+        protocolVersion: 2,
+        requestId: "00000000-0000-4000-8000-000000000063",
+        leaseMs: 15_000,
+      },
+      undefined
+    );
+    expect(replacement.ok).toBe(true);
+    if (!replacement.ok) throw new Error("replacement v2 lock failed");
+
+    await expect(
+      harness.gateway.requestLock(
+        first as never,
+        {
+          workId: "work-1",
+          resourceId: "page:owner-changed",
+          protocolVersion: 2,
+          requestId: "00000000-0000-4000-8000-000000000064",
+          renewLeaseId: acquired.data.lock.leaseId,
+          leaseMs: 15_000,
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "lock_stale",
+      decision: "denied",
+      requestId: "00000000-0000-4000-8000-000000000064",
+      lock: {
+        resourceId: "element:owner-changed:panel-1",
+        leaseId: replacement.data.lock.leaseId,
+        ownerConnectionId: second.id,
+      },
+    });
+    await expect(repository.list("work-1")).resolves.toEqual([
+      expect.objectContaining({
+        resourceId: "element:owner-changed:panel-1",
+        leaseId: replacement.data.lock.leaseId,
+        ownerConnectionId: second.id,
+      }),
+    ]);
   });
 
   it("allows only one v2 renewal to rotate an observed fence", async () => {

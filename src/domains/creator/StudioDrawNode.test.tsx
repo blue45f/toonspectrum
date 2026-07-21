@@ -669,13 +669,13 @@ describe("StudioDrawNode orchestration", () => {
 
     const shapes = captured("Shape");
     const context = new StampSceneContext();
-    expect(shapes).toHaveLength(64);
-    for (const shape of shapes) {
-      const sceneFunc = shape.props.sceneFunc as (context: CanvasRenderingContext2D) => void;
-      sceneFunc(context as unknown as CanvasRenderingContext2D);
-    }
+    // One bounded Shape owns all 64 affine copies; React/Konva no longer reconcile 64 nodes or
+    // allocate 64 transformed source-point arrays on every active-draft frame.
+    expect(shapes).toHaveLength(1);
+    const sceneFunc = shapes[0]!.props.sceneFunc as (context: CanvasRenderingContext2D) => void;
+    sceneFunc(context as unknown as CanvasRenderingContext2D);
 
-    expect(context.arcs.length).toBeGreaterThan(0);
+    expect(context.arcs).toHaveLength(15_552);
     expect(context.arcs.length).toBeLessThanOrEqual(STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET);
     expect(context.fills).toHaveLength(context.arcs.length);
   });

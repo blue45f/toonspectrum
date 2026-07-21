@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   STUDIO_BRUSH_MAX_RADIAL_SYMMETRY_DIRECTIONS,
   studioDynamicBrushDabVariations,
+  studioDynamicBrushDabVariationsFromTransforms,
   studioBrushSymmetryTransforms,
   transformStudioDynamicBrushDab,
 } from "./studio-brush-symmetry";
@@ -97,12 +98,23 @@ describe("studioBrushSymmetryTransforms", () => {
 
   it("creates every variation from one base dab plan without mutating it", () => {
     const original = structuredClone(dab);
-    const variations = studioDynamicBrushDabVariations([dab], {
-      type: "vertical",
+    const symmetry = {
+      type: "vertical" as const,
       centerX: 10,
       centerY: 0,
+    };
+    const baseDabs = [dab];
+    const variations = studioDynamicBrushDabVariations(baseDabs, {
+      ...symmetry,
     });
+    const fromPrecomputed = studioDynamicBrushDabVariationsFromTransforms(
+      baseDabs,
+      studioBrushSymmetryTransforms(symmetry)
+    );
     expect(variations).toHaveLength(2);
+    expect(variations[0]).toBe(baseDabs);
+    expect(fromPrecomputed[0]).toBe(baseDabs);
+    expect(fromPrecomputed).toEqual(variations);
     expect(variations[0]?.[0]).toEqual(dab);
     expect(variations[1]?.[0]?.x).toBe(7);
     expect(dab).toEqual(original);

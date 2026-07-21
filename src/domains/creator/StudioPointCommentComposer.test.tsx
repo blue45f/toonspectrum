@@ -71,7 +71,7 @@ describe("StudioPointCommentComposer", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "검토함" }));
+    fireEvent.click(screen.getByRole("button", { name: "댓글 검토함 열기" }));
     expect(onOpenReview).toHaveBeenCalledTimes(1);
     fireEvent.keyDown(screen.getByRole("dialog", { name: "위치 댓글 작성" }), {
       key: "Escape",
@@ -96,8 +96,64 @@ describe("StudioPointCommentComposer", () => {
       '[data-studio-point-comment-backdrop="true"]'
     );
     expect(backdrop).not.toBeNull();
-    fireEvent.pointerDown(backdrop!);
+    fireEvent.pointerDown(backdrop!, { button: 0, isPrimary: true });
     expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a non-empty draft when an incidental backdrop or review action is pressed", async () => {
+    const onCancel = vi.fn();
+    const onOpenReview = vi.fn();
+    render(
+      <StudioPointCommentComposer
+        anchor={{ type: "point", pageId: "page-1", x: 0.5, y: 0.5 }}
+        authorName="검토자"
+        screenPoint={{ x: 200, y: 200 }}
+        onCancel={onCancel}
+        onOpenReview={onOpenReview}
+        onSubmit={vi.fn(async () => true)}
+      />
+    );
+
+    const textarea = screen.getByRole<HTMLTextAreaElement>("textbox", {
+      name: "위치 댓글 내용",
+    });
+    fireEvent.change(textarea, { target: { value: "지우면 안 되는 작성 중 피드백" } });
+    const backdrop = document.querySelector<HTMLElement>(
+      '[data-studio-point-comment-backdrop="true"]'
+    );
+    expect(backdrop?.getAttribute("data-studio-point-comment-draft-protected")).toBe("true");
+
+    fireEvent.pointerDown(backdrop!, { button: 0, isPrimary: true });
+    expect(onCancel).not.toHaveBeenCalled();
+    expect((await screen.findByRole("status")).textContent).toContain("작성 중인 댓글은 유지했어요");
+    await waitFor(() => expect(document.activeElement).toBe(textarea));
+
+    fireEvent.click(screen.getByRole("button", { name: "댓글 검토함 열기" }));
+    expect(onOpenReview).not.toHaveBeenCalled();
+    expect(textarea.value).toBe("지우면 안 되는 작성 중 피드백");
+
+    fireEvent.keyDown(textarea, { key: "Escape" });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores secondary or non-primary backdrop pointers", () => {
+    const onCancel = vi.fn();
+    render(
+      <StudioPointCommentComposer
+        anchor={{ type: "point", pageId: "page-1", x: 0.5, y: 0.5 }}
+        authorName="검토자"
+        screenPoint={{ x: 200, y: 200 }}
+        onCancel={onCancel}
+        onSubmit={vi.fn(async () => true)}
+      />
+    );
+
+    const backdrop = document.querySelector<HTMLElement>(
+      '[data-studio-point-comment-backdrop="true"]'
+    );
+    fireEvent.pointerDown(backdrop!, { button: 2 });
+    fireEvent.pointerDown(backdrop!, { button: 0, isPrimary: false });
+    expect(onCancel).not.toHaveBeenCalled();
   });
 
   it("traps Tab focus inside the modal composer", () => {
@@ -112,7 +168,7 @@ describe("StudioPointCommentComposer", () => {
       />
     );
 
-    const review = screen.getByRole("button", { name: "검토함" });
+    const review = screen.getByRole("button", { name: "댓글 검토함 열기" });
     const textarea = screen.getByRole("textbox", { name: "위치 댓글 내용" });
     fireEvent.change(textarea, { target: { value: "포커스 순환 초안" } });
     const submit = screen.getByRole("button", { name: "등록" });
@@ -148,7 +204,7 @@ describe("StudioPointCommentComposer", () => {
       expect(screen.getByRole("dialog", { name: "위치 댓글 작성" }).getAttribute("aria-busy"))
         .toBe("true");
     });
-    expect(screen.getByRole("button", { name: "검토함" })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "댓글 검토함 열기" })).toHaveProperty("disabled", true);
     expect(screen.getByRole("button", { name: "위치 댓글 작성 취소" }))
       .toHaveProperty("disabled", true);
     fireEvent.keyDown(textarea, { key: "Escape" });

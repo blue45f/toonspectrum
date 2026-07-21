@@ -146,23 +146,25 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
             row.ownerConnectionId !== input.ownerConnectionId &&
             studioLiveLockResourcesConflict(row.resourceId, input.resourceId)
         );
-        if (conflicting) {
-          return { status: "conflict", lock: toRecord(conflicting) };
-        }
-
         // A renewal is a compare-and-swap operation, not a new acquisition. If release already
-        // removed the observed fence, or a newer lifecycle rotated it, the delayed heartbeat must
-        // fail closed instead of recreating or replacing the newer lease.
+        // removed the observed fence, a newer lifecycle rotated it, or another owner acquired the
+        // resource, the delayed heartbeat must fail closed as stale. Evaluate this before ordinary
+        // conflicts so a lost owner never mistakes an ownership change for a retryable fresh-lock
+        // conflict.
         if (
           input.renewLeaseId !== undefined &&
           (!existing ||
             existing.ownerConnectionId !== input.ownerConnectionId ||
             existing.leaseId !== input.renewLeaseId)
         ) {
+          const current = existing ?? conflicting;
           return {
             status: "stale",
-            ...(existing ? { lock: toRecord(existing) } : {}),
+            ...(current ? { lock: toRecord(current) } : {}),
           };
+        }
+        if (conflicting) {
+          return { status: "conflict", lock: toRecord(conflicting) };
         }
         // In v2, omission means a fresh lifecycle that expects no row. It must not rotate a newer
         // lifecycle merely because the same socket still owns that resource.
@@ -212,7 +214,14 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
                 expiresAt,
               })
               .returning();
-        if (!stored) throw new Error("studio live lock mutation lost its serialized owner");
+        // The periodic expiry sweep does not take the per-work advisory lock. PostgreSQL normally
+        // rechecks a waited DELETE against the renewed row, but if an expired row disappears after
+        // our read and before this fenced UPDATE, surface the lost CAS as stale rather than an
+        // internal server failure. Inserts still cannot disappear inside this transaction.
+        if (!stored) {
+          if (existing) return { status: "stale" };
+          throw new Error("studio live lock mutation lost its serialized owner");
+        }
         return { status: "acquired", lock: toRecord(stored), created: !existing };
       })
     );

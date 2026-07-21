@@ -1434,8 +1434,11 @@ function sampleForStation(
   };
 }
 
-function settingsForPlan(input: Partial<StudioDynamicBrushPlanInput>): NormalizedStudioBrushDynamicsSettings {
-  const settings = normalizeStudioBrushDynamicsSettings(input.settings);
+function settingsForPlan(
+  input: Partial<StudioDynamicBrushPlanInput>,
+  normalizedSettings?: NormalizedStudioBrushDynamicsSettings
+): NormalizedStudioBrushDynamicsSettings {
+  const settings = normalizedSettings ?? normalizeStudioBrushDynamicsSettings(input.settings);
   const width = clamp(
     finiteNumber(input.baseWidth, INTERNAL_DEFAULT_SETTINGS.width.base),
     settings.width.min,
@@ -1473,11 +1476,11 @@ function settingsForPlan(input: Partial<StudioDynamicBrushPlanInput>): Normalize
  * When maxDabs >= 2, both unscattered source endpoints are retained even if the plan is capped.
  * Scatter intentionally moves rendered x/y; sourceX/sourceY always expose the exact path station.
  */
-export function planStudioDynamicBrush(
-  rawInput?: Partial<StudioDynamicBrushPlanInput> | null
+function planStudioDynamicBrushFromInput(
+  input: Partial<StudioDynamicBrushPlanInput>,
+  normalizedSettings?: NormalizedStudioBrushDynamicsSettings
 ): StudioDynamicBrushPlan {
-  const input = rawInput ?? {};
-  const settings = settingsForPlan(input);
+  const settings = settingsForPlan(input, normalizedSettings);
   const points = sanitizeStrokePoints(input.points);
   if (points.length === 0) {
     return { dabs: [], sourcePointCount: 0, totalLength: 0, capped: false, settings };
@@ -1568,9 +1571,27 @@ export function planStudioDynamicBrush(
   return { dabs, sourcePointCount: points.length, totalLength, capped, settings };
 }
 
+/** Validates arbitrary settings and converts a stroke to deterministic render dabs. */
+export function planStudioDynamicBrush(
+  rawInput?: Partial<StudioDynamicBrushPlanInput> | null
+): StudioDynamicBrushPlan {
+  return planStudioDynamicBrushFromInput(rawInput ?? {});
+}
+
 /** Renderer convenience alias when only dabs are needed. */
 export function planStudioDynamicBrushDabs(
   input?: Partial<StudioDynamicBrushPlanInput> | null
 ): StudioDynamicBrushDab[] {
   return planStudioDynamicBrush(input).dabs;
+}
+
+/**
+ * Hot renderer path for settings that already crossed the normalization boundary. This skips a
+ * second walk over every mapping/tip/grain field while retaining the same detached planner output.
+ */
+export function planNormalizedStudioDynamicBrushDabs(
+  input: Omit<Partial<StudioDynamicBrushPlanInput>, "settings"> | null | undefined,
+  settings: NormalizedStudioBrushDynamicsSettings
+): StudioDynamicBrushDab[] {
+  return planStudioDynamicBrushFromInput(input ?? {}, settings).dabs;
 }

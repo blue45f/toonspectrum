@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   addStudioCommentThread,
@@ -220,6 +220,81 @@ describe("StudioLiveCanvasOverlay", () => {
       .toContain("말풍선 간격을 조금 더 넓혀 주세요.");
     fireEvent.pointerLeave(pin);
     expect(document.querySelector('[data-studio-comment-pin-preview="true"]')).toBeNull();
+  });
+
+  it("moves keyboard focus across nearby pins without opening every thread", async () => {
+    const onCommentPinClick = vi.fn();
+    render(
+      <StudioLiveCanvasOverlay
+        canvasWidth={800}
+        canvasHeight={1_200}
+        cursors={[]}
+        commentPins={[
+          {
+            key: "first",
+            anchor: { type: "point", pageId: "page-1", x: 0.2, y: 0.2 },
+            count: 1,
+            previewAuthor: "민지",
+            previewBody: "첫 번째 댓글",
+            label: "첫 번째 핀",
+            x: 160,
+            y: 240,
+          },
+          {
+            key: "second",
+            anchor: { type: "point", pageId: "page-1", x: 0.4, y: 0.4 },
+            count: 1,
+            previewAuthor: "서윤",
+            previewBody: "두 번째 댓글",
+            label: "두 번째 핀",
+            x: 320,
+            y: 480,
+          },
+          {
+            key: "last",
+            anchor: { type: "point", pageId: "page-1", x: 0.6, y: 0.6 },
+            count: 1,
+            previewAuthor: "지호",
+            previewBody: "마지막 댓글",
+            label: "마지막 핀",
+            x: 480,
+            y: 720,
+          },
+        ]}
+        onCommentPinClick={onCommentPinClick}
+      />
+    );
+
+    const first = screen.getByRole<HTMLButtonElement>("button", { name: /첫 번째 핀/u });
+    const second = screen.getByRole<HTMLButtonElement>("button", { name: /두 번째 핀/u });
+    const last = screen.getByRole<HTMLButtonElement>("button", { name: /마지막 핀/u });
+    expect(first.getAttribute("aria-keyshortcuts")).toContain("ArrowRight");
+
+    first.focus();
+    await waitFor(() => {
+      expect(document.querySelector('[data-studio-comment-pin-preview="true"]')?.textContent)
+        .toContain("첫 번째 댓글");
+    });
+    fireEvent.keyDown(first, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(second);
+    fireEvent.keyDown(second, { key: "End" });
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(last, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(last);
+
+    fireEvent.keyDown(last, { key: "Escape" });
+    expect(document.querySelector('[data-studio-comment-pin-preview="true"]')).toBeNull();
+    expect(document.activeElement).toBe(last);
+    expect(onCommentPinClick).not.toHaveBeenCalled();
+
+    fireEvent.click(last);
+    expect(onCommentPinClick).toHaveBeenCalledWith(
+      { type: "point", pageId: "page-1", x: 0.6, y: 0.6 },
+      undefined,
+      undefined
+    );
   });
 
   it("mirrors an inward pin collision nudge when the canvas is flipped", () => {

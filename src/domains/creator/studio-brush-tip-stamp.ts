@@ -96,6 +96,7 @@ const DEFAULT_TIP: NormalizedStudioBrushTipSettings = {
 const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 const STUDIO_BRUSH_TIP_STAMP_ALPHA_THRESHOLD = 0.02;
 const tipAlphaMapCache = new Map<string, StudioBrushTipAlphaMap>();
+const tipStampSampleCountCache = new WeakMap<StudioBrushTipAlphaMap, Map<number, number>>();
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -489,9 +490,10 @@ export function countStudioBrushTipStampSamples(
   tipSettings?: unknown,
   options?: { grid?: number; alphaMap?: StudioBrushTipAlphaMap | null }
 ): number {
-  const tip = normalizeStudioBrushTipSettings(tipSettings);
-  const map = options?.alphaMap ?? buildStudioBrushTipAlphaMap(tip);
+  const map = options?.alphaMap ?? buildStudioBrushTipAlphaMap(tipSettings);
   const grid = normalizedStudioBrushTipStampGrid(options?.grid);
+  const cached = tipStampSampleCountCache.get(map)?.get(grid);
+  if (cached !== undefined) return cached;
   const half = (grid - 1) / 2;
   let samples = 0;
   for (let gy = -half; gy <= half; gy++) {
@@ -506,7 +508,11 @@ export function countStudioBrushTipStampSamples(
       ) samples += 1;
     }
   }
-  return Math.max(1, samples);
+  const count = Math.max(1, samples);
+  const countsByGrid = tipStampSampleCountCache.get(map) ?? new Map<number, number>();
+  countsByGrid.set(grid, count);
+  tipStampSampleCountCache.set(map, countsByGrid);
+  return count;
 }
 
 /**

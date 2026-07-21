@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   STUDIO_BRUSH_TIP_COMBINED_ALPHA_MAP_BASE64_MAX_CHARS,
   STUDIO_BRUSH_TIP_LAYER_MAX_COUNT,
+  composeNormalizedStudioBrushTipLayerDab,
   normalizeStudioBrushTipLayers,
   planStudioBrushTipComposition,
 } from "./studio-brush-tip-composition";
@@ -37,18 +38,20 @@ describe("studio brush tip composition", () => {
   });
 
   it("rotates tip-local offsets with the base dab and preserves the primary", () => {
+    const dab = { x: 10, y: 20, size: 8, angle: 90, roundness: 0.8, opacity: 0.75, flow: 0.6 };
+    const rawLayer = {
+      tip: { shape: "star" as const, softness: 0.2, alphaMapBase64: null, alphaMapSize: 24 },
+      scale: 0.5,
+      opacity: 0.4,
+      offsetX: 1,
+      offsetY: 0,
+      angle: 30,
+      roundness: 0.5,
+    };
     const composed = planStudioBrushTipComposition(
-      { x: 10, y: 20, size: 8, angle: 90, roundness: 0.8, opacity: 0.75, flow: 0.6 },
+      dab,
       { shape: "hard" },
-      [{
-        tip: { shape: "star", softness: 0.2, alphaMapBase64: null, alphaMapSize: 24 },
-        scale: 0.5,
-        opacity: 0.4,
-        offsetX: 1,
-        offsetY: 0,
-        angle: 30,
-        roundness: 0.5,
-      }]
+      [rawLayer]
     );
     expect(composed).toHaveLength(2);
     expect(composed[0]).toMatchObject({ role: "primary", layerIndex: -1 });
@@ -67,6 +70,10 @@ describe("studio brush tip composition", () => {
       },
     });
     expect(composed[1]?.dab.opacity).toBeCloseTo(0.3, 12);
+    const normalizedLayer = normalizeStudioBrushTipLayers([rawLayer])[0]!;
+    expect(composeNormalizedStudioBrushTipLayerDab(dab, normalizedLayer)).toEqual(
+      composed[1]?.dab
+    );
   });
 
   it("drops only alpha maps that exceed the aggregate CRDT-safe budget", () => {

@@ -375,6 +375,100 @@ describe("studio live distributed lock persistence contract", () => {
     }
   });
 
+  it("classifies a renewal against a replacement owner as stale before ordinary conflict", async () => {
+    const { state, transaction } = createLockPersistenceHarness();
+    vi.spyOn(db, "transaction").mockImplementation(
+      ((callback: (value: object) => Promise<unknown>) => callback(transaction)) as never
+    );
+    const repository = new DrizzleStudioLiveLockRepository();
+    const resource = {
+      workId: "work-owner-change",
+      resourceId: "page:owner-change",
+      ownerName: "서윤",
+      leaseMs: 15_000,
+      rotateLease: true,
+    };
+
+    await repository.acquire({
+      ...resource,
+      ownerConnectionId: "socket-old",
+      requestedLeaseId: "lease-old",
+      acquisitionId: "request-old.nonce-old",
+    });
+    await repository.release({
+      workId: resource.workId,
+      resourceId: resource.resourceId,
+      ownerConnectionId: "socket-old",
+      leaseId: "lease-old",
+    });
+    await repository.acquire({
+      ...resource,
+      ownerConnectionId: "socket-new",
+      requestedLeaseId: "lease-new",
+      acquisitionId: "request-new.nonce-new",
+    });
+
+    await expect(repository.acquire({
+      ...resource,
+      ownerConnectionId: "socket-old",
+      requestedLeaseId: "lease-must-not-store",
+      renewLeaseId: "lease-old",
+      acquisitionId: "request-late.nonce-late",
+    })).resolves.toMatchObject({
+      status: "stale",
+      lock: {
+        ownerConnectionId: "socket-new",
+        leaseId: "lease-new",
+      },
+    });
+    expect(state.row).toMatchObject({
+      ownerConnectionId: "socket-new",
+      leaseId: "lease-new",
+      acquisitionId: "request-new.nonce-new",
+    });
+    expect(state.updateSets).toHaveLength(0);
+  });
+
+  it("returns stale when an expiry sweep removes the observed row before the fenced update", async () => {
+    const { state, transaction } = createLockPersistenceHarness();
+    vi.spyOn(db, "transaction").mockImplementation(
+      ((callback: (value: object) => Promise<unknown>) => callback(transaction)) as never
+    );
+    const repository = new DrizzleStudioLiveLockRepository();
+    const base = {
+      workId: "work-expiry-race",
+      resourceId: "page:expiry-race",
+      ownerConnectionId: "socket-expiry-race",
+      ownerName: "서윤",
+      leaseMs: 15_000,
+      rotateLease: true,
+    };
+
+    await repository.acquire({
+      ...base,
+      requestedLeaseId: "lease-before-expiry",
+      acquisitionId: "request-before.nonce-before",
+    });
+    transaction.update.mockImplementationOnce(() => {
+      state.row = null;
+      return new FakeLockUpdateQuery(state);
+    });
+
+    await expect(repository.acquire({
+      ...base,
+      requestedLeaseId: "lease-after-expiry",
+      renewLeaseId: "lease-before-expiry",
+      acquisitionId: "request-after.nonce-after",
+    })).resolves.toEqual({ status: "stale" });
+    expect(state.row).toBeNull();
+    expect(state.updateConditions[0]?.params).toEqual([
+      base.workId,
+      base.resourceId,
+      base.ownerConnectionId,
+      "lease-before-expiry",
+    ]);
+  });
+
   it("fences authorization rollback by acquisition id and rejects a release-first renewal", async () => {
     const { state, transaction } = createLockPersistenceHarness();
     vi.spyOn(db, "transaction").mockImplementation(
