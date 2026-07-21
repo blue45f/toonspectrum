@@ -1,19 +1,33 @@
 /**
  * Recent brush slots (1–6).
- * Stores brush id + stroke width + opacity for quick recall.
+ * Stores the canonical engine id plus the exact source preset and dynamics for quick recall.
  * Pure model + localStorage helpers.
  */
 
 import { BRUSH_PRESETS } from "./studio-brush";
-import { BRUSH_OPACITY_RANGE, BRUSH_STROKE_WIDTH_RANGE } from "./studio-brush-library";
+import {
+  normalizeStudioBrushDynamicsSettings,
+  studioBrushDynamicsSettingsEqual,
+  type NormalizedStudioBrushDynamicsSettings,
+} from "./studio-brush-dynamics";
+import {
+  BRUSH_OPACITY_RANGE,
+  BRUSH_STROKE_WIDTH_RANGE,
+  normalizeStudioBrushSourcePresetMetadata,
+  type StudioBrushSourcePresetMetadata,
+} from "./studio-brush-library";
 
 export const STUDIO_BRUSH_SLOT_COUNT = 6;
-export const STUDIO_BRUSH_SLOTS_STORAGE_KEY = "toonspectrum-studio-brush-slots:v1";
+export const STUDIO_BRUSH_SLOTS_LEGACY_STORAGE_KEY = "toonspectrum-studio-brush-slots:v1";
+export const STUDIO_BRUSH_SLOTS_STORAGE_KEY = "toonspectrum-studio-brush-slots:v2";
 
-export interface StudioBrushSlot {
+export interface StudioBrushSlot extends StudioBrushSourcePresetMetadata {
+  /** 실제 렌더러는 언제나 설치된 BRUSH_PRESETS id만 사용한다. */
   brushId: string;
   strokeWidth: number;
   brushOpacity: number;
+  /** 팩 프리셋의 압력·산포·팁을 포함한 전체 동역학. v1 슬롯은 이 필드가 없다. */
+  brushDynamics?: NormalizedStudioBrushDynamicsSettings;
 }
 
 export interface StudioBrushSlotsState {
@@ -47,10 +61,16 @@ export function normalizeStudioBrushSlot(value: unknown): StudioBrushSlot | null
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   if (typeof record.brushId !== "string" || !knownBrushId(record.brushId)) return null;
+  const sourcePresetMetadata = normalizeStudioBrushSourcePresetMetadata(record);
+  const brushDynamics = record.brushDynamics === undefined || record.brushDynamics === null
+    ? undefined
+    : normalizeStudioBrushDynamicsSettings(record.brushDynamics);
   return {
+    ...sourcePresetMetadata,
     brushId: record.brushId,
     strokeWidth: clampWidth(Number(record.strokeWidth)),
     brushOpacity: clampOpacity(Number(record.brushOpacity)),
+    ...(brushDynamics ? { brushDynamics } : {}),
   };
 }
 
@@ -68,12 +88,26 @@ export function loadStudioBrushSlotsState(
 ): StudioBrushSlotsState {
   if (!storage) return emptyStudioBrushSlots();
   try {
-    const raw = storage.getItem(STUDIO_BRUSH_SLOTS_STORAGE_KEY);
+    const raw = storage.getItem(STUDIO_BRUSH_SLOTS_STORAGE_KEY)
+      ?? storage.getItem(STUDIO_BRUSH_SLOTS_LEGACY_STORAGE_KEY);
     if (!raw) return emptyStudioBrushSlots();
     return normalizeStudioBrushSlotsState(JSON.parse(raw));
   } catch {
     return emptyStudioBrushSlots();
   }
+}
+
+function studioBrushSlotsEqual(left: StudioBrushSlot, right: StudioBrushSlot): boolean {
+  const dynamicsEqual = left.brushDynamics === undefined && right.brushDynamics === undefined
+    || left.brushDynamics !== undefined
+      && right.brushDynamics !== undefined
+      && studioBrushDynamicsSettingsEqual(left.brushDynamics, right.brushDynamics);
+  return left.brushId === right.brushId
+    && left.strokeWidth === right.strokeWidth
+    && left.brushOpacity === right.brushOpacity
+    && left.sourcePresetId === right.sourcePresetId
+    && left.sourcePresetName === right.sourcePresetName
+    && dynamicsEqual;
 }
 
 export function saveStudioBrushSlotsState(
@@ -99,14 +133,8 @@ export function rememberStudioBrushSlot(
 ): StudioBrushSlotsState {
   const slot = normalizeStudioBrushSlot(next);
   if (!slot) return normalizeStudioBrushSlotsState(state);
-  const rest = state.slots.filter(
-    (item) =>
-      item &&
-      !(
-        item.brushId === slot.brushId &&
-        item.strokeWidth === slot.strokeWidth &&
-        item.brushOpacity === slot.brushOpacity
-      )
+  const rest = normalizeStudioBrushSlotsState(state).slots.filter(
+    (item) => item && !studioBrushSlotsEqual(item, slot)
   );
   return normalizeStudioBrushSlotsState({
     slots: [slot, ...rest].slice(0, STUDIO_BRUSH_SLOT_COUNT),

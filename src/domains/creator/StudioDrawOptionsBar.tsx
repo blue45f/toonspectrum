@@ -63,7 +63,13 @@ export type StudioPressureCurveUi = "soft" | "linear" | "firm";
 
 export interface StudioDrawOptionsBarProps {
   drawMode: StudioDrawModeUi;
+  /** Canonical renderer preset id. It must remain stable even for procedural catalogue brushes. */
   brushId: string;
+  /** User-facing catalogue identity, which may differ from the canonical renderer preset id. */
+  activeCatalogBrushId?: string;
+  activeCatalogBrushName?: string;
+  /** Combined core + procedural catalogue used by the quick tray and active-brush label. */
+  brushCatalogItems?: readonly StudioBrushTrayItem[];
   strokeWidth: number;
   brushOpacity: number;
   stabilizer: number;
@@ -179,6 +185,9 @@ const BRUSH_OPACITY_HINT_VARIANT = {
 export function StudioDrawOptionsBar({
   drawMode,
   brushId,
+  activeCatalogBrushId,
+  activeCatalogBrushName,
+  brushCatalogItems,
   strokeWidth,
   brushOpacity,
   stabilizer,
@@ -235,8 +244,13 @@ export function StudioDrawOptionsBar({
   const rootRef = useRef<HTMLDivElement>(null);
 
   const brushMeta = BRUSH_PRESETS.find((preset) => preset.id === brushId);
-  const brushTrayItem = brushMeta ? studioBrushTrayItem(brushMeta) : null;
-  const isFavorite = favoriteBrushIds.includes(brushId);
+  const catalogBrushId = activeCatalogBrushId ?? brushId;
+  const catalogBrushItem =
+    brushCatalogItems?.find((item) => item.id === catalogBrushId)
+    ?? (brushMeta ? studioBrushTrayItem(brushMeta) : null);
+  const catalogBrushName =
+    activeCatalogBrushName ?? catalogBrushItem?.name ?? brushMeta?.name ?? catalogBrushId;
+  const isFavorite = favoriteBrushIds.includes(catalogBrushId);
   const tipColor = drawMode === "eraser" ? "oklch(0.55 0.02 70)" : color;
   const pixelMode = drawMode === "pixel";
   const safeDockLeft = Math.max(0, Math.round(dockInsets.left));
@@ -426,7 +440,7 @@ export function StudioDrawOptionsBar({
             <StudioToolHintTarget
               className="min-w-0"
               hint={studioToolHintFromLabel(
-                `현재 브러시 · ${brushMeta?.name ?? brushId}`,
+                `현재 브러시 · ${catalogBrushName}`,
                 "기본 프리셋을 열어 촉감·용도별 브러시를 검색하고 바로 교체합니다. 현재 색과 불투명도는 그대로 유지돼요.",
                 undefined,
                 "brush-library"
@@ -437,7 +451,7 @@ export function StudioDrawOptionsBar({
                 onClick={(event) => toggleBrushCatalog(event.currentTarget)}
                 aria-expanded={brushCatalogOpen}
                 aria-haspopup="dialog"
-                aria-label={`현재 브러시 ${brushMeta?.name ?? brushId}, 기본 프리셋 열기`}
+                aria-label={`현재 브러시 ${catalogBrushName}, 기본 프리셋 열기`}
                 data-studio-brush-active-pill="true"
                 data-studio-core-draw-control="brush"
                 className={cn(
@@ -464,7 +478,7 @@ export function StudioDrawOptionsBar({
                   style={{ background: tipColor, opacity: brushOpacity }}
                 />
                 <span className="min-w-0 truncate text-[0.7rem] font-bold leading-none">
-                  {brushTrayItem?.shortName ?? brushMeta?.name?.slice(0, 6) ?? brushId}
+                  {catalogBrushItem?.shortName ?? catalogBrushName.slice(0, 6)}
                 </span>
                 <LayoutGrid size={12} className="shrink-0 opacity-80" aria-hidden />
               </button>
@@ -486,7 +500,7 @@ export function StudioDrawOptionsBar({
                   data-studio-draw-secondary-action="favorite"
                   aria-pressed={isFavorite}
                   aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-                  onClick={() => onToggleFavoriteBrush(brushId)}
+                  onClick={() => onToggleFavoriteBrush(catalogBrushId)}
                   className={cn(
                     iconBtn,
                     "size-8",
@@ -782,7 +796,8 @@ export function StudioDrawOptionsBar({
         >
           {drawMode === "pen" ? (
             <StudioBrushTray
-              activeBrushId={brushId}
+              activeBrushId={catalogBrushId}
+              brushCatalogItems={brushCatalogItems}
               recentBrushIds={recentBrushIds}
               favoriteBrushIds={favoriteBrushIds}
               onSelect={onSelectBrush}

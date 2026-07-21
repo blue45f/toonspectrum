@@ -5,6 +5,10 @@ import {
   type StudioDrawPointerStartInput,
 } from "./studio-draw-pointer-start-plan";
 import {
+  STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH,
+  STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH,
+} from "./studio-element-model";
+import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
 } from "./studio-ink-pressure-model";
@@ -283,6 +287,31 @@ describe("planStudioDrawPointerStart", () => {
     expect(plan.element.twists).toEqual([90]);
     expect(plan.element.speeds).toEqual([0]);
     expect(plan.element.tangentialPressures).toEqual([1]);
+  });
+
+  it("captures a sanitized, bounded catalog identity only for authored pen strokes", () => {
+    const plan = planStudioDrawPointerStart(input({
+      brush: "airbrush",
+      brushCatalogId: ` \u0000pro:${"a".repeat(STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH + 20)} `,
+      brushCatalogName: `\n${"붓".repeat(STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH + 20)}\t`,
+    }));
+
+    expect(plan.element.brush).toBe("airbrush");
+    expect(plan.element.brushCatalogId).toHaveLength(STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH);
+    expect(plan.element.brushCatalogId).toMatch(/^pro:/u);
+    expect(plan.element.brushCatalogName).toBe(
+      "붓".repeat(STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH)
+    );
+
+    for (const drawMode of ["eraser", "pixel", "shape", "lasso-fill"] as const) {
+      const nonPen = planStudioDrawPointerStart(input({
+        drawMode,
+        brushCatalogId: "pro:heart-stamp",
+        brushCatalogName: "하트 스탬프",
+      }));
+      expect(nonPen.element.brushCatalogId).toBeUndefined();
+      expect(nonPen.element.brushCatalogName).toBeUndefined();
+    }
   });
 
   it("versions stamp and watercolor walkers at stroke start", () => {

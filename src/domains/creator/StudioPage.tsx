@@ -191,6 +191,7 @@ import {
   type BrushPreset,
 } from "./studio-brush";
 import { studioBrushAliasEffectiveDiameter } from "./studio-brush-alias-profile";
+import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
 import {
   normalizeStudioBrushDynamicsSettings,
   resolveStudioBrushDynamicsPresetId,
@@ -212,12 +213,18 @@ import {
   type StudioBrushSnapshot,
   type StudioSavedBrush,
 } from "./studio-brush-library";
+import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
+import {
+  studioCoreBrushCatalogSelection,
+  type StudioBrushCatalogSelection,
+} from "./studio-brush-selection";
 import {
   assignStudioBrushSlot,
   loadStudioBrushSlotsState,
   rememberStudioBrushSlot,
   saveStudioBrushSlotsState,
   studioBrushSlotAt,
+  type StudioBrushSlot,
   type StudioBrushSlotsState,
 } from "./studio-brush-slots";
 import {
@@ -4389,6 +4396,12 @@ function StudioCuttoonEditor() {
   const [drawMode, setDrawMode] = useState<DrawMode>("pen");
   const [brushOpacity, setBrushOpacity] = useState(1);
   const [brush, setBrush] = useState<string>("pen");
+  const [activeCatalogBrush, setActiveCatalogBrush] = useState(() => ({
+    id: "pen",
+    name: BRUSH_PRESETS.find((preset) => preset.id === "pen")?.name ?? "펜",
+    sourcePresetId: undefined as string | undefined,
+    sourcePresetName: undefined as string | undefined,
+  }));
   // 스탬프 브러시(잉크붓/정밀에어/그레인연필/물맛붓) 튜닝. 브러시 선택 경로에서 기본값을
   // 명시적으로 적용해, 저장 브러시를 불러온 직후 effect가 사용자 값을 덮어쓰지 않게 한다.
   const [stampTuning, setStampTuning] = useState<StudioBrushStampTuning | null>(null);
@@ -4518,6 +4531,12 @@ function StudioCuttoonEditor() {
 
   const currentBrushSnapshot: StudioBrushSnapshot = {
     brushId: brush,
+    ...(activeCatalogBrush.sourcePresetId
+      ? {
+          sourcePresetId: activeCatalogBrush.sourcePresetId,
+          sourcePresetName: activeCatalogBrush.sourcePresetName ?? activeCatalogBrush.name,
+        }
+      : {}),
     strokeWidth,
     brushOpacity,
     color,
@@ -4549,6 +4568,14 @@ function StudioCuttoonEditor() {
     setTool("draw");
     setDrawMode("pen");
     setBrush(saved.brushId);
+    setActiveCatalogBrush({
+      id: saved.sourcePresetId ?? saved.brushId,
+      name: saved.sourcePresetName
+        ?? BRUSH_PRESETS.find((preset) => preset.id === saved.brushId)?.name
+        ?? saved.name,
+      sourcePresetId: saved.sourcePresetId,
+      sourcePresetName: saved.sourcePresetName,
+    });
     setStampTuning(saved.stampTuning);
     setStrokeWidth(saved.strokeWidth);
     setBrushOpacity(saved.brushOpacity);
@@ -4579,30 +4606,53 @@ function StudioCuttoonEditor() {
     }
   }
 
-  function applyBuiltInBrushPreset(preset: BrushPreset) {
-    // Procreate/CSP: size & opacity locks keep current values when switching brushes.
-    const applied = applyBrushPresetWithLocks(preset, proDrawPrefs, {
+  function applyStudioBrushCatalogSelection(selection: StudioBrushCatalogSelection) {
+    // Catalogue identity remains separate from the canonical renderer id. Extended packs carry a
+    // complete dynamics snapshot, so saved strokes replay without loading the optional catalogue.
+    const applied = applyBrushPresetWithLocks({
+      id: selection.runtimeBrushId,
+      defaultWidth: selection.defaultWidth,
+      defaultOpacity: selection.defaultOpacity,
+      ...(selection.defaultColor ? { defaultColor: selection.defaultColor } : {}),
+    }, proDrawPrefs, {
       strokeWidth,
       brushOpacity,
       color,
     });
+    setTool("draw");
+    setDrawMode("pen");
     setBrush(applied.brushId);
+    const extendedSource = selection.catalogId !== selection.runtimeBrushId;
+    setActiveCatalogBrush({
+      id: selection.catalogId,
+      name: selection.catalogName,
+      sourcePresetId: extendedSource ? selection.catalogId : undefined,
+      sourcePresetName: extendedSource ? selection.catalogName : undefined,
+    });
     setStampTuning(defaultStampTuningForBrushId(applied.brushId));
     setStrokeWidth(applied.strokeWidth);
     setBrushOpacity(applied.brushOpacity);
     if (applied.color !== color) setColor(applied.color);
-    const dynamics = studioBrushDynamicsSettingsForBrushId(preset.id);
-    if (dynamics) {
-      setBrushDynamics(dynamics);
+    if (selection.brushDynamics) {
+      setBrushDynamics(normalizeStudioBrushDynamicsSettings(selection.brushDynamics));
     }
     setProDrawPrefs((prev) => {
-      const next = rememberRecentBrushId(prev, preset.id);
+      const next = rememberRecentBrushId(prev, selection.catalogId);
       saveStudioProDrawPrefs(studioProDrawStorage(), next);
       return next;
     });
     setBrushSlotsState((prev) => {
       const next = rememberStudioBrushSlot(prev, {
         brushId: applied.brushId,
+        ...(extendedSource
+          ? {
+              sourcePresetId: selection.catalogId,
+              sourcePresetName: selection.catalogName,
+            }
+          : {}),
+        ...(selection.brushDynamics
+          ? { brushDynamics: normalizeStudioBrushDynamicsSettings(selection.brushDynamics) }
+          : {}),
         strokeWidth: applied.strokeWidth,
         brushOpacity: applied.brushOpacity,
       });
@@ -4612,6 +4662,10 @@ function StudioCuttoonEditor() {
       );
       return next;
     });
+  }
+
+  function applyBuiltInBrushPreset(preset: BrushPreset) {
+    applyStudioBrushCatalogSelection(studioCoreBrushCatalogSelection(preset));
   }
 
   function toggleBuiltInBrushFavorite(brushId: string) {
@@ -4659,12 +4713,14 @@ function StudioCuttoonEditor() {
     if (wrongSurface) setBrushCatalogSession(null);
   }, [brushCatalogSession, drawMode, isMobile, mobileSheet, tool]);
 
-  function applyBrushSlot(slot: { brushId: string; strokeWidth: number; brushOpacity: number }) {
+  function applyBrushSlot(slot: StudioBrushSlot) {
     const preset = BRUSH_PRESETS.find((p) => p.id === slot.brushId);
     if (preset) {
       setBrush(preset.id);
       setStampTuning(defaultStampTuningForBrushId(preset.id));
-      const dynamics = studioBrushDynamicsSettingsForBrushId(preset.id);
+      const dynamics = slot.brushDynamics
+        ? normalizeStudioBrushDynamicsSettings(slot.brushDynamics)
+        : studioBrushDynamicsSettingsForBrushId(preset.id);
       if (dynamics) {
         setBrushDynamics(dynamics);
       }
@@ -4672,6 +4728,14 @@ function StudioCuttoonEditor() {
       setBrush(slot.brushId);
       setStampTuning(defaultStampTuningForBrushId(slot.brushId));
     }
+    setActiveCatalogBrush({
+      id: slot.sourcePresetId ?? slot.brushId,
+      name: slot.sourcePresetName
+        ?? preset?.name
+        ?? slot.brushId,
+      sourcePresetId: slot.sourcePresetId,
+      sourcePresetName: slot.sourcePresetName,
+    });
     setStrokeWidth(slot.strokeWidth);
     setBrushOpacity(slot.brushOpacity);
     setTool("draw");
@@ -14181,6 +14245,13 @@ function StudioCuttoonEditor() {
         setBrushSlotsState((prev) => {
           const next = assignStudioBrushSlot(prev, index, {
             brushId: brush,
+            ...(activeCatalogBrush.sourcePresetId
+              ? {
+                  sourcePresetId: activeCatalogBrush.sourcePresetId,
+                  sourcePresetName: activeCatalogBrush.sourcePresetName ?? activeCatalogBrush.name,
+                }
+              : {}),
+            brushDynamics,
             strokeWidth,
             brushOpacity,
           });
@@ -18298,8 +18369,8 @@ function StudioCuttoonEditor() {
         strokeWidth,
         brushOpacity,
         brush,
-        stampTuning,
-        brushDynamics,
+        brushCatalogId: activeCatalogBrush.id, brushCatalogName: activeCatalogBrush.name,
+        stampTuning, brushDynamics,
         stabilizer,
         stabilizerMode,
         velocitySensitivity,
@@ -23415,7 +23486,19 @@ function StudioCuttoonEditor() {
     close: closeBuiltInBrushCatalog,
     selectBrushId: (brushId) => {
       const preset = BRUSH_PRESETS.find((candidate) => candidate.id === brushId);
-      if (preset) applyBuiltInBrushPreset(preset);
+      if (preset) {
+        applyBuiltInBrushPreset(preset);
+        return;
+      }
+      if (!isStudioBrushPackCatalogId(brushId)) return;
+      void import("./studio-brush-pack-runtime")
+        .then(({ materializeStudioBrushPackSelection }) => {
+          const selection = materializeStudioBrushPackSelection(brushId);
+          if (selection) applyStudioBrushCatalogSelection(selection);
+        })
+        .catch(() => {
+          announceDrawingShortcut("브러시를 불러오지 못했어요. 앱 브러시에서 다시 선택해 주세요.");
+        });
     },
     toggle: toggleBuiltInBrushCatalog,
     toggleFavorite: toggleBuiltInBrushFavorite,
@@ -23462,6 +23545,13 @@ function StudioCuttoonEditor() {
       setBrushSlotsState((prev) => {
         const next = assignStudioBrushSlot(prev, index, {
           brushId: brush,
+          ...(activeCatalogBrush.sourcePresetId
+            ? {
+                sourcePresetId: activeCatalogBrush.sourcePresetId,
+                sourcePresetName: activeCatalogBrush.sourcePresetName ?? activeCatalogBrush.name,
+              }
+            : {}),
+          brushDynamics,
           strokeWidth,
           brushOpacity,
         });
@@ -23574,7 +23664,10 @@ function StudioCuttoonEditor() {
   const studioOptionsBarsDrawModel = useMemo<StudioOptionsBarsDrawModel>(
     () => ({
       visible: tool === "draw" && !canvasOnlyMode,
+      activeCatalogBrushId: activeCatalogBrush.id,
+      activeCatalogBrushName: activeCatalogBrush.name,
       brushId: brush,
+      brushCatalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
       brushCatalogOpen: brushCatalogSession?.placement === "desktop-dock",
       brushOpacity,
       brushSlots: brushSlotsState.slots,
@@ -23619,6 +23712,8 @@ function StudioCuttoonEditor() {
       symmetryType,
     }),
     [
+      activeCatalogBrush.id,
+      activeCatalogBrush.name,
       brush,
       brushCatalogSession?.placement,
       brushOpacity,
@@ -24114,12 +24209,12 @@ function StudioCuttoonEditor() {
             open
             placement={brushCatalogSession.placement}
             triggerElement={brushCatalogSession.trigger}
-            activeBrushId={brush}
+            activeBrushId={activeCatalogBrush.id}
             favoriteIds={proDrawPrefs.favoriteBrushIds}
             recentIds={proDrawPrefs.recentBrushIds}
             mobileKeyboardInset={mobileKeyboardInset}
             onClose={studioBrushCatalogHandlers.close}
-            onSelect={(item) => studioBrushCatalogHandlers.selectBrushId(item.id)}
+            onSelect={applyStudioBrushCatalogSelection}
             onToggleFavorite={studioBrushCatalogHandlers.toggleFavorite}
           />
         </Suspense>
@@ -24482,6 +24577,7 @@ function StudioCuttoonEditor() {
           liveInkOverlayRenderer={liveInkOverlayRenderer}
           nodeEditActiveHandleIndex={nodeEditActiveHandleIndex}
           activeDialogueLocale={activeDialogueLocale}
+          activeCatalogBrushName={activeCatalogBrush.name}
           activePage={activePage}
           activePageIndex={activePageIndex}
           activeSurfaceReviewLocked={activeSurfaceReviewLocked}
@@ -25029,12 +25125,15 @@ function StudioCuttoonEditor() {
         {isMobile ? (
           <Suspense fallback={null}>
             <StudioMobileEditingDock
+          activeCatalogBrushId={activeCatalogBrush.id}
+          activeCatalogBrushName={activeCatalogBrush.name}
           activeSavedBrushId={activeSavedBrushId}
           activeSurfaceReviewLocked={activeSurfaceReviewLocked}
           advancedFillActive={advancedFillActive}
           advancedFillUnsupportedReason={advancedFillUnsupportedReason}
           brush={brush}
           brushCatalogHandlers={studioBrushCatalogHandlers}
+          brushCatalogItems={STUDIO_ALL_BRUSH_CATALOG_ITEMS}
           brushCatalogOpen={brushCatalogSession?.placement === "mobile-sheet"}
           brushDynamics={brushDynamics}
           brushManagerSheetRef={brushManagerSheetRef}
@@ -25474,6 +25573,7 @@ interface StudioCanvasViewportProps {
   liveDrawPressureStore: StudioLivePressureStore;
   liveInkOverlayRenderer: StudioLiveInkOverlayRenderer;
   nodeEditActiveHandleIndex: number | null;
+  activeCatalogBrushName: string;
   activeDialogueLocale: string;
   activePage: PageState;
   activePageIndex: number;
@@ -25736,6 +25836,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   liveDrawPressureStore,
   liveInkOverlayRenderer,
   nodeEditActiveHandleIndex,
+  activeCatalogBrushName,
   activeDialogueLocale,
   activePage,
   activePageIndex,
@@ -26236,7 +26337,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                           ? { mode: "pixel" }
                         : {
                             mode: "pen",
-                            brushName: BRUSH_PRESETS.find((p) => p.id === brush)?.name ?? brush,
+                            brushName: activeCatalogBrushName,
                             widthPx: strokeWidth,
                             opacity01: brushOpacity,
                           }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
 import {
   adjustStudioBrushOpacity,
   adjustStudioBrushSize,
@@ -41,6 +42,45 @@ describe("studio-draw-ux", () => {
       query: "글리터",
     });
     expect(searched.some((i) => i.id === "glitter")).toBe(true);
+  });
+
+  it("filters the injected 102-brush catalog without losing Pro favorites, recents, or search", () => {
+    const pro = filterStudioBrushLibraryItems({
+      category: "pro",
+      catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+    });
+    expect(pro).toHaveLength(67);
+    expect(new Set(pro.map((item) => item.id))).toHaveProperty("size", 67);
+
+    const favorites = filterStudioBrushLibraryItems({
+      category: "favorites",
+      favoriteIds: ["heart-stamp", "neon", "missing", "checker-grid"],
+      catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+    });
+    expect(favorites.map((item) => item.id)).toEqual([
+      "heart-stamp",
+      "neon",
+      "checker-grid",
+    ]);
+
+    const recent = filterStudioBrushLibraryItems({
+      category: "recent",
+      recentIds: ["hair-fiber", "pen", "footstep-stamp", "hair-fiber"],
+      catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+    });
+    expect(recent.map((item) => item.id)).toEqual([
+      "hair-fiber",
+      "pen",
+      "footstep-stamp",
+      "hair-fiber",
+    ]);
+
+    const searched = filterStudioBrushLibraryItems({
+      category: "all",
+      query: "발자국",
+      catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+    });
+    expect(searched.map((item) => item.id)).toEqual(["footstep-stamp"]);
   });
 
   it("resolves preset by id", () => {

@@ -116,6 +116,8 @@ function createProps(
   overrides: Partial<StudioMobileEditingDockProps> = {},
 ): StudioMobileEditingDockProps {
   return {
+    activeCatalogBrushId: "gpen",
+    activeCatalogBrushName: "G펜",
     activeSavedBrushId: null,
     activeSurfaceReviewLocked: false,
     advancedFillActive: false,
@@ -127,6 +129,7 @@ function createProps(
       toggle: vi.fn(),
       toggleFavorite: vi.fn(),
     },
+    brushCatalogItems: [],
     brushCatalogOpen: false,
     brushDynamics: {} as NormalizedStudioBrushDynamicsSettings,
     brushManagerSheetRef: { current: null },

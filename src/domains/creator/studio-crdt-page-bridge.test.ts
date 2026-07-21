@@ -150,6 +150,47 @@ describe("studio CRDT page bridge", () => {
     expect(decoded.paintModel).toBeUndefined();
   });
 
+  it("round-trips normalized catalog identity without changing the canonical render brush", () => {
+    const element: StudioCrdtCompatibleDrawElement = {
+      id: "catalog-stroke",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [1, 2, 3, 4],
+      pressures: [0.5, 0.8],
+      stroke: "#334455",
+      strokeWidth: 14,
+      brush: "dry-media",
+      brushCatalogId: "  pro67:chalk-rough\u0000 ",
+      brushCatalogName: "\n 거친 초크 \t",
+    };
+
+    const encoded = studioDrawElementToCrdtStroke("page-a", element);
+    expect(encoded.payload).toMatchObject({
+      version: 1,
+      brush: "dry-media",
+      brushCatalogId: "pro67:chalk-rough",
+      brushCatalogName: "거친 초크",
+    });
+
+    const decoded = studioCrdtStrokeToDrawElement({
+      ...record(element.id, "page-a", 0),
+      ...encoded,
+      orderIndex: 0,
+      status: "finalized",
+      deleted: false,
+    });
+    expect(decoded).toMatchObject({
+      brush: "dry-media",
+      brushCatalogId: "pro67:chalk-rough",
+      brushCatalogName: "거친 초크",
+    });
+
+    const legacy = studioCrdtStrokeToDrawElement(record("legacy-catalog", "page-a", 1));
+    expect(legacy.brushCatalogId).toBeUndefined();
+    expect(legacy.brushCatalogName).toBeUndefined();
+  });
+
   it("round-trips layered-flow only for compatible ordinary pen and marker strokes", () => {
     const element: StudioCrdtCompatibleDrawElement = {
       id: "stroke-layered-marker",

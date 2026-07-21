@@ -167,6 +167,8 @@ export function studioCrdtStrokeToDrawElement(
     gradient: payload.gradient,
     pattern: payload.pattern,
     brush: payload.brush,
+    brushCatalogId: payload.brushCatalogId,
+    brushCatalogName: payload.brushCatalogName,
     sampleSpacing: payload.sampleSpacing,
     brushDynamics: payload.brushDynamics,
     brushTip: payload.brushTip,

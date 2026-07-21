@@ -6,6 +6,7 @@ import {
 } from "./studio-brush-dynamics";
 import {
   buildStudioBrushTipAlphaMap,
+  STUDIO_BRUSH_TIP_ALPHA_MAP_CACHE_LIMIT,
   decodeStudioBrushTipAlphaMapBase64,
   encodeStudioBrushTipAlphaMapBase64,
   normalizeStudioBrushTipSettings,
@@ -56,6 +57,36 @@ describe("studio brush tip alpha maps", () => {
     expect(map.size).toBe(size);
     expect(map.alphas[0]).toBeCloseTo(bytes[0]! / 255, 5);
     expect(map.alphas[bytes.length - 1]).toBeCloseTo(bytes[bytes.length - 1]! / 255, 5);
+  });
+
+  it("reuses decoded and softened alpha maps with a bounded LRU", () => {
+    const size = 8;
+    const firstBytes = new Uint8Array(size * size);
+    firstBytes[7] = 255;
+    const firstTip = {
+      shape: "grain" as const,
+      softness: 0.314159,
+      alphaMapSize: size,
+      alphaMapBase64: encodeStudioBrushTipAlphaMapBase64(firstBytes),
+    };
+    const first = buildStudioBrushTipAlphaMap(firstTip);
+    expect(buildStudioBrushTipAlphaMap({ ...firstTip })).toBe(first);
+
+    for (let index = 0; index < STUDIO_BRUSH_TIP_ALPHA_MAP_CACHE_LIMIT; index++) {
+      const bytes = new Uint8Array(size * size);
+      bytes[index % bytes.length] = 192;
+      bytes[(index * 7 + 3) % bytes.length] = index + 1;
+      buildStudioBrushTipAlphaMap({
+        shape: "hard",
+        softness: index / STUDIO_BRUSH_TIP_ALPHA_MAP_CACHE_LIMIT,
+        alphaMapSize: size,
+        alphaMapBase64: encodeStudioBrushTipAlphaMapBase64(bytes),
+      });
+    }
+
+    const rebuilt = buildStudioBrushTipAlphaMap(firstTip);
+    expect(rebuilt).not.toBe(first);
+    expect(Array.from(rebuilt.alphas)).toEqual(Array.from(first.alphas));
   });
 
   it("applies the edge-softness control to imported PNG alpha without mutating its payload", () => {

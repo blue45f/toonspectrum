@@ -36,6 +36,11 @@ import {
   type StudioCrdtSceneElementPayload,
 } from "./studio-crdt-scene-schema";
 import {
+  STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH,
+  STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH,
+  normalizeStudioBrushCatalogIdentityMetadata,
+} from "./studio-element-model";
+import {
   isStudioInkPressureModel,
   studioInkFallbackPressure,
   type StudioInkPressureModel,
@@ -182,11 +187,18 @@ const JSON_PAYLOAD_KEYS = [
   "extensions",
 ] as const;
 
-const OPTIONAL_STRING_PAYLOAD_KEYS = ["fill", "brush", "blendMode"] as const;
+const OPTIONAL_STRING_PAYLOAD_KEYS = [
+  "fill",
+  "brush",
+  "blendMode",
+  "brushCatalogId",
+  "brushCatalogName",
+] as const;
 const STROKE_PAYLOAD_KEYS = [
-  "version", "type", "kind", "mode", "stroke", "strokeWidth", "opacity", "fill",
-  "gradient", "pattern", "brush", "sampleSpacing", "brushDynamics", "brushTip",
-  "strokeStyle", "shapeParams", "symmetry", "blendMode", "extensions", ...SAMPLE_ARRAY_KEYS,
+  "version", "type", "kind", "mode", "stroke", "strokeWidth", "opacity", "sampleSpacing",
+  ...OPTIONAL_STRING_PAYLOAD_KEYS,
+  "gradient", "pattern", "brushDynamics", "brushTip", "strokeStyle", "shapeParams",
+  "symmetry", "extensions", ...SAMPLE_ARRAY_KEYS,
 ] as const;
 
 type StudioCrdtSampleArrayKey = (typeof SAMPLE_ARRAY_KEYS)[number];
@@ -217,6 +229,9 @@ export interface StudioCrdtDrawStrokePayload extends StudioCrdtStrokeSamples {
   gradient?: StudioCrdtJsonObject;
   pattern?: StudioCrdtJsonObject;
   brush?: string;
+  /** Inspector/reselect identity only; rendering continues to use `brush` + `brushDynamics`. */
+  brushCatalogId?: string;
+  brushCatalogName?: string;
   sampleSpacing?: number;
   brushDynamics?: StudioCrdtJsonObject;
   brushTip?: StudioCrdtJsonObject;
@@ -789,9 +804,21 @@ function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty: boole
   }
   for (const key of OPTIONAL_STRING_PAYLOAD_KEYS) {
     const value = payload[key];
-    if (value !== undefined && !exactText(value, 512)) {
+    const maximum = key === "brushCatalogId"
+      ? STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH
+      : key === "brushCatalogName"
+        ? STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH
+        : 512;
+    if (value !== undefined && !exactText(value, maximum)) {
       throw new Error(`${key} 값이 올바르지 않습니다.`);
     }
+  }
+  const normalizedCatalogIdentity = normalizeStudioBrushCatalogIdentityMetadata(payload);
+  if (
+    normalizedCatalogIdentity.brushCatalogId !== payload.brushCatalogId
+    || normalizedCatalogIdentity.brushCatalogName !== payload.brushCatalogName
+  ) {
+    throw new Error("브러시 카탈로그 식별 정보가 올바르지 않습니다.");
   }
   for (const key of JSON_PAYLOAD_KEYS) {
     const value = payload[key];

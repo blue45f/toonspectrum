@@ -1,11 +1,21 @@
+// @vitest-environment jsdom
+
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
 import { StudioBrushTray } from "./StudioBrushTray";
 
-const traySource = readFileSync(new URL("./StudioBrushTray.tsx", import.meta.url), "utf8");
+const traySource = readFileSync(
+  resolve(process.cwd(), "src/domains/creator/StudioBrushTray.tsx"),
+  "utf8"
+);
+
+afterEach(cleanup);
 
 describe("StudioBrushTray", () => {
   it("renders recent and favorite brushes with a single full-library affordance", () => {
@@ -41,5 +51,33 @@ describe("StudioBrushTray", () => {
     // The quick shelf never duplicates the full catalog's category tabs.
     expect(html).not.toContain('role="tablist"');
     expect(traySource).toContain("onOpenLibrary(event.currentTarget)");
+  });
+
+  it("shows and selects injected Pro catalogue identities without collapsing to runtime ids", () => {
+    const onSelect = vi.fn();
+    render(
+      <StudioBrushTray
+        activeBrushId="heart-stamp"
+        brushCatalogItems={STUDIO_ALL_BRUSH_CATALOG_ITEMS}
+        favoriteBrushIds={["heart-stamp"]}
+        recentBrushIds={["hair-fiber", "ink-particle"]}
+        onSelect={onSelect}
+        onOpenLibrary={vi.fn()}
+      />
+    );
+
+    const heart = screen.getByRole("option", { name: /즐겨찾기 브러시 하트 도장/ });
+    const hair = screen.getByRole("option", { name: /최근 사용 브러시 머리카락 결/ });
+    expect(heart.getAttribute("aria-selected")).toBe("true");
+    expect(heart.getAttribute("data-studio-brush-chip")).toBe("heart-stamp");
+    expect(hair.getAttribute("data-studio-brush-chip")).toBe("hair-fiber");
+
+    fireEvent.click(hair);
+    expect(onSelect).toHaveBeenCalledOnce();
+    expect(onSelect.mock.calls[0]?.[0]).toMatchObject({
+      id: "hair-fiber",
+      name: "머리카락 결",
+      quickSource: "recent",
+    });
   });
 });

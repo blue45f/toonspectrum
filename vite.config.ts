@@ -22,9 +22,14 @@ const INITIAL_ICON_MODULES = new Set([
   "star",
 ]);
 const STUDIO_CORE_ICON_MODULES = new Set([
+  "a-large-small",
+  "align-justify",
   "arrow-up-to-line",
+  "asterisk",
+  "blend",
   "bookmark",
   "book-open",
+  "brush",
   "check",
   "chevron-down",
   "chevron-left",
@@ -32,7 +37,12 @@ const STUDIO_CORE_ICON_MODULES = new Set([
   "chevron-up",
   "circle",
   "circle-check",
+  "circle-dashed",
+  "circle-dot",
+  "circle-ellipsis",
   "clipboard-check",
+  "cloud",
+  "cloud-fog",
   "command",
   "copy",
   "credit-card",
@@ -41,17 +51,29 @@ const STUDIO_CORE_ICON_MODULES = new Set([
   "eye",
   "eye-off",
   "eraser",
+  "feather",
+  "fence",
   "film",
+  "flame",
   "flip-horizontal-2",
+  "flower-2",
+  "footprints",
+  "gem",
   "grid-2x2",
+  "grid-3x3",
+  "grip",
   "hand",
+  "heart",
+  "highlighter",
   "history",
   "image",
   "image-plus",
   "images",
   "layers",
+  "layers-3",
   "layout-grid",
   "layout-template",
+  "leaf",
   "loader-circle",
   "lock",
   "lock-open",
@@ -63,13 +85,19 @@ const STUDIO_CORE_ICON_MODULES = new Set([
   "mouse-pointer-2",
   "move",
   "paint-bucket",
+  "paint-roller",
   "paintbrush",
   "palette",
+  "pen",
+  "pen-line",
   "pen-tool",
   "pencil",
   "pipette",
   "plus",
   "redo-2",
+  "rectangle-horizontal",
+  "rectangle-vertical",
+  "rows-3",
   "rotate-ccw",
   "scan-line",
   "scissors",
@@ -80,15 +108,22 @@ const STUDIO_CORE_ICON_MODULES = new Set([
   "smartphone",
   "smile",
   "spline",
+  "spray-can",
   "square",
   "star",
+  "stamp",
+  "sun",
+  "trees",
   "trash-2",
   "type",
   "undo-2",
   "upload",
   "users-round",
   "video",
+  "waves",
   "wand-sparkles",
+  "wheat",
+  "wind",
 ]);
 
 function iconModuleName(id: string) {
@@ -149,9 +184,13 @@ export default defineConfig(({ mode }) => ({
             id.endsWith("/lib/studio-raster-asset-admission.ts")
             || id.endsWith("/src/domains/creator/studio-background-gradient-color-stops.ts")
             || id.endsWith("/src/domains/creator/studio-characters.ts")
+            || id.endsWith("/src/domains/creator/studio-brush-pack-id.ts")
+            || id.endsWith("/src/domains/creator/studio-brush-pack-index.ts")
+            || id.endsWith("/src/domains/creator/studio-brush-selection.ts")
           ) {
-            // These dependency-free contracts are shared by several Studio lazy entries. Keeping
-            // them together avoids three sub-kilobyte HTTP requests on every editor launch.
+            // These lightweight contracts are shared by several Studio lazy entries. Keeping
+            // them together avoids small HTTP requests on every editor launch; the procedural
+            // alpha-tip runtime itself remains behind its explicit dynamic-import boundary.
             return "studio-core-micro-contracts";
           }
           if (

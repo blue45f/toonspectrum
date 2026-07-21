@@ -1,0 +1,86 @@
+/**
+ * Stable catalogue ids for the optional procedural brush pack.
+ *
+ * These ids identify a library tile, not a renderer. The runtime module materializes every entry
+ * onto one of Studio's three durable dynamic-dab engines so saved strokes can replay without this
+ * lazy catalogue chunk.
+ */
+export const STUDIO_BRUSH_PACK_CATALOG_IDS = [
+  "core-round",
+  "crisp-ink",
+  "flex-ink",
+  "cloud-soft",
+  "mist-soft",
+  "powder-sketch",
+  "round-sketch",
+  "fiber-sketch",
+  "precision-pencil",
+  "comfort-pencil",
+  "needle-graphite",
+  "round-shading",
+  "oval-shading",
+  "chalk-powder",
+  "chalk-rough",
+  "chalk-compressed",
+  "vine-stroke",
+  "willow-fiber",
+  "velvet-charcoal",
+  "line-block",
+  "angular-square",
+  "horizontal-blade",
+  "vertical-blade",
+  "clean-flat",
+  "scattered-flat",
+  "rhythm-flat",
+  "directional-flat",
+  "classic-marker",
+  "fiber-marker",
+  "clean-flat-marker",
+  "transparent-flat",
+  "hard-oval",
+  "fabric-texture",
+  "rough-grain",
+  "strong-rough-grain",
+  "heavy-rough-grain",
+  "bleeding-stain",
+  "sand-texture",
+  "plaster-texture",
+  "rock-texture",
+  "cotton-fiber",
+  "bumpy-grain",
+  "round-paint",
+  "paint-ink",
+  "paint-roller",
+  "particle-scatter",
+  "rough-ink",
+  "fine-rake",
+  "wide-rake",
+  "dry-rake",
+  "foliage-texture",
+  "loose-grass",
+  "dense-grass",
+  "fresh-leaf",
+  "long-leaf",
+  "round-leaf",
+  "leaf-cluster",
+  "free-stamp",
+  "scattered-oval",
+  "smooth-oval",
+  "layered-oval",
+  "checker-grid",
+  "hair-fiber",
+  "even-stripe",
+  "rough-stripe",
+  "footstep-stamp",
+  "heart-stamp",
+] as const;
+
+export type StudioBrushPackCatalogId = (typeof STUDIO_BRUSH_PACK_CATALOG_IDS)[number];
+
+const STUDIO_BRUSH_PACK_CATALOG_ID_SET: ReadonlySet<string> = new Set(
+  STUDIO_BRUSH_PACK_CATALOG_IDS
+);
+
+export function isStudioBrushPackCatalogId(value: unknown): value is StudioBrushPackCatalogId {
+  return typeof value === "string" && STUDIO_BRUSH_PACK_CATALOG_ID_SET.has(value);
+}

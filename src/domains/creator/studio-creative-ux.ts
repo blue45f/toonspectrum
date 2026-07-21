@@ -58,6 +58,7 @@ export const STUDIO_EXPRESSIVE_BRUSH_IDS = [
 export type StudioBrushTrayCategory =
   | "beginner"
   | "expressive"
+  | "pro"
   | "line"
   | "marker"
   | "paint"
@@ -92,6 +93,12 @@ export interface StudioQuickBrushTrayItem extends StudioBrushTrayItem {
 }
 
 export interface StudioQuickBrushTrayOptions {
+  /**
+   * Optional caller-owned catalogue. Passing the combined core + procedural catalogue lets the
+   * quick shelf resolve persisted Pro brush identities without eagerly coupling this pure helper
+   * to the pack metadata module.
+   */
+  catalogItems?: readonly StudioBrushTrayItem[];
   favoriteIds?: readonly string[];
   recentIds?: readonly string[];
   limit?: number;
@@ -253,6 +260,7 @@ export function listStudioBrushTrayItems(
   const all = [...beginner, ...expressive, ...extras];
 
   if (category === "beginner") return beginner;
+  if (category === "pro") return [];
   if (category === "expressive") return [...expressive, ...extras];
   if (
     category === "line"
@@ -272,16 +280,18 @@ export function listStudioBrushTrayItems(
  * preferences cannot create empty or repeated affordances.
  */
 export function listStudioQuickBrushTrayItems({
+  catalogItems,
   favoriteIds = [],
   recentIds = [],
   limit = STUDIO_QUICK_BRUSH_LIMIT,
 }: StudioQuickBrushTrayOptions = {}): StudioQuickBrushTrayItem[] {
+  const availableItems = catalogItems ?? listStudioBrushTrayItems("all");
+  const catalog = new Map(availableItems.map((item) => [item.id, item]));
   const safeLimit = Number.isFinite(limit)
-    ? Math.min(BRUSH_PRESETS.length, Math.max(0, Math.floor(limit)))
+    ? Math.min(catalog.size, Math.max(0, Math.floor(limit)))
     : STUDIO_QUICK_BRUSH_LIMIT;
   if (safeLimit === 0) return [];
 
-  const catalog = new Map(listStudioBrushTrayItems("all").map((item) => [item.id, item]));
   const selected: StudioQuickBrushTrayItem[] = [];
   const seen = new Set<string>();
 

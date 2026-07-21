@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { BRUSH_PRESETS } from "./studio-brush";
+import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
 import {
   listStudioBrushTrayItems,
   listStudioQuickBrushTrayItems,
@@ -20,6 +21,11 @@ describe("studio creative ux", () => {
     const all = listStudioBrushTrayItems("all");
     expect(all).toHaveLength(BRUSH_PRESETS.length);
     expect(new Set(all.map((item) => item.id)).size).toBe(BRUSH_PRESETS.length);
+  });
+
+  it("keeps the Pro pack out of the eager core tray so its full dynamics stay lazy", () => {
+    expect(listStudioBrushTrayItems("pro")).toEqual([]);
+    expect(listStudioBrushTrayItems("all")).toHaveLength(35);
   });
 
   it("filters Picsart-style media groups", () => {
@@ -86,6 +92,32 @@ describe("studio creative ux", () => {
       ...STUDIO_BEGINNER_BRUSH_IDS,
     ]);
     expect(listStudioQuickBrushTrayItems({ limit: 0 })).toEqual([]);
+  });
+
+  it("resolves Pro favorites and recent brushes from an injected 102-item catalogue", () => {
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(102);
+
+    const quick = listStudioQuickBrushTrayItems({
+      catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+      favoriteIds: ["heart-stamp"],
+      recentIds: ["hair-fiber", "heart-stamp", "pen"],
+      limit: 4,
+    });
+
+    expect(quick.map((item) => item.id)).toEqual([
+      "heart-stamp",
+      "hair-fiber",
+      "pen",
+      "fineliner",
+    ]);
+    expect(quick.map((item) => item.quickSource)).toEqual([
+      "favorite",
+      "recent",
+      "recent",
+      "starter",
+    ]);
+    expect(quick[0]?.name).toBe("하트 도장");
+    expect(quick[1]?.name).toBe("머리카락 결");
   });
 
   it("exposes drawing-first starter cards without publish marketing", () => {

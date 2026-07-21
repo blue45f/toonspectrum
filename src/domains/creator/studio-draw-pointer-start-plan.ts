@@ -22,6 +22,7 @@ import {
   resolveStudioStampBrushKind,
   type StudioStampBrushTuning,
 } from "./studio-brush-stamp-engine";
+import { normalizeStudioBrushCatalogIdentityMetadata, type DrawEl } from "./studio-element-model";
 import {
   resolveStudioCausalInkInputPlan,
   type StudioCausalInkInputPlan,
@@ -38,7 +39,6 @@ import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 import { STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1 } from "./studio-stroke-paint-model";
 
 import type { DrawMode, DrawShapeKind } from "./studio-editor-tool-model";
-import type { DrawEl } from "./studio-element-model";
 import type { StudioStabilizerMode } from "./studio-stroke-stabilizer";
 
 export interface StudioDrawPointerStartSample {
@@ -62,6 +62,8 @@ export interface StudioDrawPointerStartInput {
   readonly strokeWidth: number;
   readonly brushOpacity: number;
   readonly brush: string;
+  readonly brushCatalogId?: unknown;
+  readonly brushCatalogName?: unknown;
   readonly stampTuning?: StudioStampBrushTuning | null;
   readonly brushDynamics?: unknown;
   readonly stabilizer: number;
@@ -181,6 +183,9 @@ export function planStudioDrawPointerStart(
   const pressure = causalInitialSample?.pressure ?? resolvedPressure;
   const capturePointerDynamics = drawMode === "pen" && hasBrushDynamics;
   const captureStylus = drawMode === "pen" && (brush === "calligraphy" || capturePointerDynamics);
+  const brushCatalogIdentity = drawMode === "pen"
+    ? normalizeStudioBrushCatalogIdentityMetadata(input)
+    : {};
   const common = {
     id: input.id,
     type: "draw" as const,
@@ -192,6 +197,7 @@ export function planStudioDrawPointerStart(
       : drawMode === "pixel"
         ? STUDIO_PIXEL_PENCIL_RENDER_MODE
         : undefined,
+    ...brushCatalogIdentity,
     brushTip: drawMode === "pen" && brush === "calligraphy" ? { ...brushTip } : undefined,
     stamp: drawMode === "pen" && stampTuning && stampKind ? { ...stampTuning } : undefined,
     stampPipeline: drawMode === "pen" && stampKind ? "causal-walker-v2" as const : undefined,

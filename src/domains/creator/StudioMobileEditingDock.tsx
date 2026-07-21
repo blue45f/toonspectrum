@@ -63,6 +63,7 @@ import type {
   StudioSavedBrush,
 } from "./studio-brush-library";
 import type { CvdMode } from "./studio-color-vision-model";
+import type { StudioBrushTrayItem } from "./studio-creative-ux";
 import type {
   DrawMode,
   DrawShapeKind,
@@ -160,12 +161,15 @@ export type StudioMobileSheet =
   | null;
 
 export interface StudioMobileEditingDockProps {
+  activeCatalogBrushId: string;
+  activeCatalogBrushName: string;
   activeSavedBrushId: string | null;
   activeSurfaceReviewLocked: boolean;
   advancedFillActive: boolean;
   advancedFillUnsupportedReason: string | null;
   brush: string;
   brushCatalogHandlers: StudioBrushCatalogHandlers;
+  brushCatalogItems: readonly StudioBrushTrayItem[];
   brushCatalogOpen: boolean;
   brushDynamics: NormalizedStudioBrushDynamicsSettings;
   brushManagerSheetRef: import("react").RefObject<HTMLDivElement | null>;
@@ -240,12 +244,15 @@ export interface StudioMobileEditingDockProps {
 }
 
 export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
+  activeCatalogBrushId,
+  activeCatalogBrushName,
   activeSavedBrushId,
   activeSurfaceReviewLocked,
   advancedFillActive,
   advancedFillUnsupportedReason,
   brush,
   brushCatalogHandlers,
+  brushCatalogItems,
   brushCatalogOpen,
   brushDynamics,
   brushManagerSheetRef,
@@ -676,7 +683,10 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   <Suspense fallback={<div className="h-24 animate-pulse rounded-xl bg-raised/40 motion-reduce:animate-none" aria-hidden />}>
                     <StudioUnifiedBrushPicker
                       activeBrushId={brush}
+                      activeCatalogBrushId={activeCatalogBrushId}
+                      activeCatalogBrushName={activeCatalogBrushName}
                       brushOpacity={brushOpacity}
+                      brushCatalogItems={brushCatalogItems}
                       catalogOpen={brushCatalogOpen}
                       color={color}
                       proDrawPrefs={proDrawPrefs}
@@ -684,6 +694,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                       strokeWidth={strokeWidth}
                       onStampTuningChange={setStampTuning}
                       onSelectBrush={applyBuiltInBrushPreset}
+                      onSelectBrushId={brushCatalogHandlers.selectBrushId}
                       onToggleCatalog={(trigger) =>
                         brushCatalogHandlers.toggle("mobile-sheet", trigger)
                       }

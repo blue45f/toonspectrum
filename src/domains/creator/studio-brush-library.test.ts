@@ -10,6 +10,8 @@ import {
   BRUSH_LIBRARY_KEY,
   BRUSH_LIBRARY_STORAGE_VERSION,
   BRUSH_OPACITY_RANGE,
+  BRUSH_SOURCE_PRESET_ID_MAX_LENGTH,
+  BRUSH_SOURCE_PRESET_NAME_MAX_LENGTH,
   BRUSH_EXPORT_VERSION,
   BRUSH_STAMP_TUNING_RANGE,
   BRUSH_STROKE_WIDTH_RANGE,
@@ -87,6 +89,27 @@ describe("sanitizeBrushSnapshot", () => {
   it("유효한 스냅샷은 그대로 통과시키고 adjustedFields는 비어있다", () => {
     const { snapshot, adjustedFields } = sanitizeBrushSnapshot(validSnapshot);
     expect(snapshot).toEqual(validSnapshot);
+    expect(adjustedFields).toEqual([]);
+  });
+
+  it("출처 프리셋 메타데이터를 trim하고 코드포인트 기준 상한으로 제한한다", () => {
+    const { snapshot, adjustedFields } = sanitizeBrushSnapshot({
+      ...validSnapshot,
+      sourcePresetId: `  ${"a".repeat(BRUSH_SOURCE_PRESET_ID_MAX_LENGTH + 8)}  `,
+      sourcePresetName: `  ${"붓".repeat(BRUSH_SOURCE_PRESET_NAME_MAX_LENGTH + 8)}  `,
+    });
+
+    expect(snapshot.sourcePresetId).toHaveLength(BRUSH_SOURCE_PRESET_ID_MAX_LENGTH);
+    expect(Array.from(snapshot.sourcePresetName ?? "")).toHaveLength(
+      BRUSH_SOURCE_PRESET_NAME_MAX_LENGTH
+    );
+    expect(adjustedFields).toEqual(["sourcePresetId", "sourcePresetName"]);
+  });
+
+  it("누락된 v1 출처 메타데이터는 undefined 키를 새로 만들지 않는다", () => {
+    const { snapshot, adjustedFields } = sanitizeBrushSnapshot(validSnapshot);
+    expect(snapshot).not.toHaveProperty("sourcePresetId");
+    expect(snapshot).not.toHaveProperty("sourcePresetName");
     expect(adjustedFields).toEqual([]);
   });
 
@@ -418,6 +441,26 @@ describe("listBrushes", () => {
     delete legacy.lastUsedAt;
     const s = fakeStorage({ [BRUSH_LIBRARY_KEY]: JSON.stringify([legacy]) });
     expect(listBrushes(s)[0]).toMatchObject({ pinned: false, lastUsedAt: null });
+  });
+
+  it("v1 저장 브러시에는 출처 키를 추가하지 않고 새 출처 메타데이터는 보존한다", () => {
+    const legacy = brush("legacy-source") as Partial<StudioSavedBrush>;
+    delete legacy.sourcePresetId;
+    delete legacy.sourcePresetName;
+    const sourced = {
+      ...brush("sourced"),
+      sourcePresetId: "essentials:rough-pencil",
+      sourcePresetName: "거친 연필",
+    };
+    const s = fakeStorage({
+      [BRUSH_LIBRARY_KEY]: JSON.stringify([legacy, sourced]),
+    });
+
+    expect(listBrushes(s)[0]).not.toHaveProperty("sourcePresetId");
+    expect(listBrushes(s)[1]).toMatchObject({
+      sourcePresetId: "essentials:rough-pencil",
+      sourcePresetName: "거친 연필",
+    });
   });
 
   it("유효하지 않은 선반 메타데이터는 안전한 기본값으로 정규화한다", () => {
@@ -840,6 +883,30 @@ describe("빠른 선반·복제·삭제 취소", () => {
       stampTuning: { flow: 0.5, hardness: 0.12, minSize: 0.75 },
     })).toBe(false);
   });
+
+  it("같은 렌더링 엔진이어도 출처 프리셋 id와 이름이 다르면 정확히 일치하지 않는다", () => {
+    const saved = {
+      ...brush("source-match"),
+      sourcePresetId: "essentials:round-sketch",
+      sourcePresetName: "둥근 스케치",
+    };
+    expect(brushMatchesSnapshot(saved, {
+      ...validSnapshot,
+      sourcePresetId: "essentials:round-sketch",
+      sourcePresetName: "둥근 스케치",
+    })).toBe(true);
+    expect(brushMatchesSnapshot(saved, {
+      ...validSnapshot,
+      sourcePresetId: "essentials:soft-sketch",
+      sourcePresetName: "둥근 스케치",
+    })).toBe(false);
+    expect(brushMatchesSnapshot(saved, {
+      ...validSnapshot,
+      sourcePresetId: "essentials:round-sketch",
+      sourcePresetName: "다른 표시 이름",
+    })).toBe(false);
+    expect(brushMatchesSnapshot(saved, validSnapshot)).toBe(false);
+  });
 });
 
 describe("writeBrushJson / importBrushFromJson 왕복", () => {
@@ -884,6 +951,26 @@ describe("writeBrushJson / importBrushFromJson 왕복", () => {
     expect(imported).toMatchObject({ pinned: false, lastUsedAt: null });
     expect(adjustedFields).toEqual([]);
     expect(imported.id).not.toBe(original.id); // 가져오기는 새 id를 발급한다(같은 id 충돌 방지)
+  });
+
+  it("출처 프리셋 메타데이터를 JSON 내보내기·가져오기에서 손실 없이 왕복한다", () => {
+    const original = {
+      ...brush("source-round-trip"),
+      sourcePresetId: "essentials:textured-marker",
+      sourcePresetName: "텍스처 마커",
+    };
+    const parsed = JSON.parse(writeBrushJson(original));
+    expect(parsed).toMatchObject({
+      sourcePresetId: "essentials:textured-marker",
+      sourcePresetName: "텍스처 마커",
+    });
+
+    const { brush: imported, adjustedFields } = importBrushFromJson(JSON.stringify(parsed));
+    expect(imported).toMatchObject({
+      sourcePresetId: original.sourcePresetId,
+      sourcePresetName: original.sourcePresetName,
+    });
+    expect(adjustedFields).toEqual([]);
   });
 
   it("v1~v3 내보내기처럼 brushDynamics가 없어도 기본값으로 가져온다", () => {

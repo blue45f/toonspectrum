@@ -28,6 +28,10 @@ import {
   encodeStudioCrdtStateVector,
   encodeStudioCrdtSyncChunks,
 } from "./studio-crdt-protocol";
+import {
+  STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH,
+  STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH,
+} from "./studio-element-model";
 
 function payload(
   points: number[] = [10, 20],
@@ -229,6 +233,55 @@ describe("StudioCrdtDocument", () => {
         payload: invalid,
       })).toThrow("페인트 모델과 브러시 합성 모드가 호환되지 않습니다");
     }
+    document.destroy();
+  });
+
+  it("round-trips and patches bounded catalog identity while rejecting non-canonical metadata", () => {
+    const document = new StudioCrdtDocument();
+    const created = document.addStroke({
+      ...stroke("catalog-identity", "page-a"),
+      payload: payload([10, 20, 20, 30], {
+        brush: "ink-particle",
+        brushCatalogId: "pro67:heart-stamp",
+        brushCatalogName: "하트 스탬프",
+      }),
+    });
+    expect(created.payload).toMatchObject({
+      brush: "ink-particle",
+      brushCatalogId: "pro67:heart-stamp",
+      brushCatalogName: "하트 스탬프",
+    });
+
+    const patchedPayload = {
+      ...created.payload,
+      brushCatalogName: "하트 스탬프 · 굵게",
+    };
+    document.patchStroke(created.id, {
+      payload: patchedPayload,
+      changedPayloadKeys: ["brushCatalogName"],
+    });
+    const hydrated = new StudioCrdtDocument(document.encodeStateAsUpdate());
+    expect(hydrated.getStroke(created.id)?.payload).toMatchObject({
+      brush: "ink-particle",
+      brushCatalogId: "pro67:heart-stamp",
+      brushCatalogName: "하트 스탬프 · 굵게",
+    });
+
+    const invalidMetadata: Array<Partial<StudioCrdtDrawStrokePayload>> = [
+      { brushCatalogId: ` ${"a".repeat(20)}` },
+      { brushCatalogId: "pro67:\u0000heart" },
+      { brushCatalogId: "a".repeat(STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH + 1) },
+      { brushCatalogName: "붓".repeat(STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH + 1) },
+    ];
+    for (const [index, metadata] of invalidMetadata.entries()) {
+      expect(() => document.addStroke({
+        ...stroke(`invalid-catalog-${index}`, "page-a"),
+        payload: payload([0, 0], metadata),
+      })).toThrow();
+      expect(document.getStroke(`invalid-catalog-${index}`)).toBeNull();
+    }
+
+    hydrated.destroy();
     document.destroy();
   });
 

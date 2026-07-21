@@ -65,6 +65,48 @@ describe("StudioUnifiedBrushPicker", () => {
     expect(html.match(/class="h-11 w-full cursor-pointer accent-accent"/g)).toHaveLength(3);
   });
 
+  it("keeps a procedural catalogue identity visible and selectable on mobile", () => {
+    const html = renderToStaticMarkup(
+      <StudioUnifiedBrushPicker
+        activeBrushId="ink-particle"
+        activeCatalogBrushId="heart-stamp"
+        activeCatalogBrushName="하트 도장"
+        brushOpacity={0.94}
+        brushCatalogItems={[{
+          id: "heart-stamp",
+          name: "하트 도장",
+          shortName: "하트",
+          hint: "간격이 있는 하트 도장",
+          defaultWidth: 26,
+          defaultOpacity: 0.94,
+          category: "expressive",
+          mediaGroup: "fx",
+          previewWeight: 0.8,
+          previewStyle: "glitter",
+        }]}
+        catalogOpen
+        color="#7c5cfc"
+        proDrawPrefs={{
+          sizeLocked: false,
+          opacityLocked: false,
+          favoriteBrushIds: ["heart-stamp"],
+          recentBrushIds: ["heart-stamp"],
+        }}
+        strokeWidth={26}
+        onSelectBrush={vi.fn()}
+        onSelectBrushId={vi.fn()}
+        onToggleCatalog={vi.fn()}
+        onToggleFavoriteBrush={vi.fn()}
+      />
+    );
+
+    expect(html).toContain("하트 도장");
+    expect(html).toContain('aria-label="하트 도장 즐겨찾기 해제"');
+    expect(html).toContain('data-studio-brush-icon-for="heart-stamp"');
+    expect(html).toContain('aria-selected="true"');
+    expect(pickerSource).toContain("onSelectBrushId(brushId)");
+  });
+
   it("does not own independent dialog or favorite persistence state", () => {
     expect(pickerSource).not.toContain("createPortal");
     expect(pickerSource).not.toContain("StudioBrushLibrarySheet");

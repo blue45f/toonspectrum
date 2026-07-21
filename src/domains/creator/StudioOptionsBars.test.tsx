@@ -3,6 +3,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
 import {
   StudioOptionsBars,
   type StudioOptionsBarsDrawModel,
@@ -33,6 +34,9 @@ vi.mock("./studio-page-lazy-ui", () => ({
 const DRAW_MODEL: StudioOptionsBarsDrawModel = {
   visible: true,
   brushId: "gpen",
+  activeCatalogBrushId: "hair-fiber",
+  activeCatalogBrushName: "머리카락 결",
+  brushCatalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   brushCatalogOpen: true,
   brushOpacity: 0.72,
   brushSlots: [
@@ -174,6 +178,9 @@ describe("StudioOptionsBars", () => {
 
     expect(drawProps.docked).toBe(true);
     expect(drawProps.brushId).toBe("gpen");
+    expect(drawProps.activeCatalogBrushId).toBe("hair-fiber");
+    expect(drawProps.activeCatalogBrushName).toBe("머리카락 결");
+    expect(drawProps.brushCatalogItems).toBe(STUDIO_ALL_BRUSH_CATALOG_ITEMS);
     expect(drawProps.brushCatalogOpen).toBe(true);
     expect(drawProps.brushOpacity).toBe(0.72);
     expect(drawProps.brushSlots).toEqual(DRAW_MODEL.brushSlots);

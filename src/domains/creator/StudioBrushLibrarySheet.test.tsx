@@ -1,8 +1,13 @@
+// @vitest-environment jsdom
+
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
 import { listStudioBrushTrayItems } from "./studio-creative-ux";
 import {
   LargeBrushPreview,
@@ -12,11 +17,25 @@ import {
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
 
 const catalog = new Map(listStudioBrushTrayItems("all").map((item) => [item.id, item]));
-const sheetSource = readFileSync(new URL("./StudioBrushLibrarySheet.tsx", import.meta.url), "utf8");
+const sheetSource = readFileSync(
+  resolve(process.cwd(), "src/domains/creator/StudioBrushLibrarySheet.tsx"),
+  "utf8"
+);
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 function brush(id: string): StudioBrushTrayItem {
   const item = catalog.get(id);
   if (!item) throw new Error(`Missing brush fixture: ${id}`);
+  return item;
+}
+
+function catalogBrush(id: string): StudioBrushTrayItem {
+  const item = STUDIO_ALL_BRUSH_CATALOG_ITEMS.find((candidate) => candidate.id === id);
+  if (!item) throw new Error(`Missing extended brush fixture: ${id}`);
   return item;
 }
 
@@ -41,10 +60,25 @@ describe("StudioBrushLibrarySheet", () => {
     const html = renderSheet();
 
     expect(html).toContain('data-studio-brush-catalog="built-in"');
-    expect(html).toContain("기본 프리셋");
-    expect(html).toContain("앱 제공 브러시 · 내 브러시와 별개");
-    expect(html).toContain('aria-label="기본 프리셋 닫기"');
+    expect(html).toContain("앱 브러시");
+    expect(html).toContain("코어 35 + 프로시저럴 67 · 내 브러시와 별개");
+    expect(html).toContain('aria-label="앱 브러시 닫기"');
     expect(html).not.toContain(">브러시 라이브러리<");
+  });
+
+  it("publishes one unique 102-brush catalog while keeping the 67-profile runtime lazy", () => {
+    const coreItems = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "core");
+    const proItems = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "pro");
+
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(102);
+    expect(coreItems).toHaveLength(35);
+    expect(proItems).toHaveLength(67);
+    expect(new Set(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id))).toHaveProperty(
+      "size",
+      102
+    );
+    expect(sheetSource).toContain('import("./studio-brush-pack-runtime")');
+    expect(sheetSource).not.toMatch(/from\s+["']\.\/studio-brush-pack-runtime["']/);
   });
 
   it("provides one controlled Portal host for desktop and mobile triggers", () => {
@@ -77,13 +111,82 @@ describe("StudioBrushLibrarySheet", () => {
     expect(html).toContain('role="dialog"');
     expect(html).not.toContain('aria-modal="true"');
     expect(html).toContain('role="tablist"');
-    expect(html.match(/role="tab"/g)).toHaveLength(9);
+    expect(html.match(/role="tab"/g)).toHaveLength(10);
     expect(html.match(/role="tab"[^>]*tabindex="0"/g)).toHaveLength(1);
-    expect(html.match(/role="tab"[^>]*tabindex="-1"/g)).toHaveLength(8);
+    expect(html.match(/role="tab"[^>]*tabindex="-1"/g)).toHaveLength(9);
     expect(html).toMatch(/role="tabpanel" aria-labelledby="[^"]+" tabindex="0"/);
     expect(html).toMatch(/aria-label="브러시 검색" aria-controls="[^"]+"/);
     expect(html).toContain('role="status" aria-live="polite"');
     expect(html).toContain("8개의 브러시가 표시됩니다.");
+  });
+
+  it("opens the Pro 67 tab, labels every extended profile, and lazily materializes a durable selection", async () => {
+    const onSelect = vi.fn();
+    const onClose = vi.fn();
+    const { container } = render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={onClose}
+        onSelect={onSelect}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "프로 67" }));
+
+    expect(screen.getByRole("status").textContent).toBe("67개의 브러시가 표시됩니다.");
+    expect(container.querySelectorAll('[data-studio-brush-source="pro"]')).toHaveLength(67);
+    expect(screen.getAllByText("PRO")).toHaveLength(67);
+
+    fireEvent.click(screen.getByRole("button", { name: "하트 도장 선택" }));
+
+    await waitFor(() => expect(onSelect).toHaveBeenCalledTimes(1));
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        catalogId: "heart-stamp",
+        catalogName: "하트 도장",
+        runtimeBrushId: "ink-particle",
+        defaultWidth: 26,
+        defaultOpacity: 0.94,
+        brushDynamics: expect.objectContaining({
+          version: 1,
+          tip: expect.objectContaining({ alphaMapSize: 24 }),
+        }),
+      })
+    );
+    expect(onClose).toHaveBeenCalledWith("selection");
+  });
+
+  it("renders distinct motif details for patterned, foliage, and stamp profiles", () => {
+    const heart = renderToStaticMarkup(
+      <LargeBrushPreview item={catalogBrush("heart-stamp")} active={false} />
+    );
+    const footsteps = renderToStaticMarkup(
+      <LargeBrushPreview item={catalogBrush("footstep-stamp")} active={false} />
+    );
+    const checker = renderToStaticMarkup(
+      <LargeBrushPreview item={catalogBrush("checker-grid")} active={false} />
+    );
+    const leaf = renderToStaticMarkup(
+      <LargeBrushPreview item={catalogBrush("leaf-cluster")} active={false} />
+    );
+    const hair = renderToStaticMarkup(
+      <LargeBrushPreview item={catalogBrush("hair-fiber")} active={false} />
+    );
+
+    expect(heart).toContain("M72 13 C72 8");
+    expect(footsteps).toContain('<ellipse cx="64" cy="20" rx="3.2" ry="6.2"></ellipse>');
+    expect(checker).toContain('<rect x="55" y="10" width="6" height="6"></rect>');
+    expect(leaf).toContain("M0 0 C2.2 -3.4 6.5 -3.1 8 0");
+    expect(hair).toContain("M50 9 C62");
+    expect(new Set([heart, footsteps, checker, leaf, hair])).toHaveProperty("size", 5);
+  });
+
+  it("keeps every procedural preview SVG dimension non-negative", () => {
+    for (const item of STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(({ source }) => source === "pro")) {
+      const html = renderToStaticMarkup(<LargeBrushPreview item={item} active={false} />);
+      expect(html, item.id).not.toMatch(/\b(?:width|height|rx|ry|r)="-/);
+    }
   });
 
   it("marks the active preset and favorite action independently", () => {

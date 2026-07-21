@@ -9,6 +9,7 @@
  */
 
 import { BRUSH_PRESETS } from "./studio-brush";
+import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
 
 export const STUDIO_PRO_DRAW_PREFS_KEY = "toonspectrum-studio-pro-draw-prefs:v1";
 export const STUDIO_RECENT_BRUSH_LIMIT = 6;
@@ -37,6 +38,10 @@ export const DEFAULT_STUDIO_PRO_DRAW_PREFS: StudioProDrawPrefs = {
 
 const KNOWN_BRUSH_IDS = new Set(BRUSH_PRESETS.map((preset) => preset.id));
 
+function isKnownCatalogBrushId(value: string): boolean {
+  return KNOWN_BRUSH_IDS.has(value) || isStudioBrushPackCatalogId(value);
+}
+
 function asBool(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
@@ -46,7 +51,7 @@ function sanitizeBrushIdList(value: unknown, limit: number): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
   for (const entry of value) {
-    if (typeof entry !== "string" || !KNOWN_BRUSH_IDS.has(entry) || seen.has(entry)) continue;
+    if (typeof entry !== "string" || !isKnownCatalogBrushId(entry) || seen.has(entry)) continue;
     seen.add(entry);
     out.push(entry);
     if (out.length >= limit) break;
@@ -111,7 +116,7 @@ export function rememberRecentBrushId(
   prefs: StudioProDrawPrefs,
   brushId: string
 ): StudioProDrawPrefs {
-  if (!KNOWN_BRUSH_IDS.has(brushId)) return prefs;
+  if (!isKnownCatalogBrushId(brushId)) return prefs;
   const next = [brushId, ...prefs.recentBrushIds.filter((id) => id !== brushId)].slice(
     0,
     STUDIO_RECENT_BRUSH_LIMIT
@@ -123,7 +128,7 @@ export function toggleFavoriteBrushId(
   prefs: StudioProDrawPrefs,
   brushId: string
 ): StudioProDrawPrefs {
-  if (!KNOWN_BRUSH_IDS.has(brushId)) return prefs;
+  if (!isKnownCatalogBrushId(brushId)) return prefs;
   const has = prefs.favoriteBrushIds.includes(brushId);
   if (has) {
     return {

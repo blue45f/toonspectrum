@@ -4,6 +4,7 @@
  */
 
 import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
+import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
 import {
   listStudioBrushTrayItems,
   type StudioBrushTrayCategory,
@@ -46,21 +47,33 @@ export function filterStudioBrushLibraryItems(options: {
   query?: string;
   favoriteIds?: readonly string[];
   recentIds?: readonly string[];
+  /** Optional extended catalogue supplied by the lazy library surface. */
+  catalogItems?: readonly StudioBrushTrayItem[];
 }): StudioBrushTrayItem[] {
   const query = (options.query ?? "").trim().toLowerCase();
   const favoriteIds = options.favoriteIds ?? [];
   const recentIds = options.recentIds ?? [];
   const category = options.category ?? "all";
 
+  const allItems = options.catalogItems
+    ? [...options.catalogItems]
+    : listStudioBrushTrayItems("all");
+  const byId = new Map(allItems.map((item) => [item.id, item]));
   let items: StudioBrushTrayItem[];
   if (category === "favorites") {
-    const byId = new Map(listStudioBrushTrayItems("all").map((item) => [item.id, item]));
     items = favoriteIds.map((id) => byId.get(id)).filter((item): item is StudioBrushTrayItem => Boolean(item));
   } else if (category === "recent") {
-    const byId = new Map(listStudioBrushTrayItems("all").map((item) => [item.id, item]));
     items = recentIds.map((id) => byId.get(id)).filter((item): item is StudioBrushTrayItem => Boolean(item));
+  } else if (category === "pro") {
+    items = allItems.filter((item) => isStudioBrushPackCatalogId(item.id));
+  } else if (category === "all" || category === "expressive") {
+    items = category === "all"
+      ? allItems
+      : allItems.filter((item) => item.category === "expressive");
+  } else if (category === "beginner") {
+    items = allItems.filter((item) => item.category === "beginner");
   } else {
-    items = listStudioBrushTrayItems(category === "all" ? "all" : category);
+    items = allItems.filter((item) => item.mediaGroup === category);
   }
 
   if (!query) return items;
@@ -84,6 +97,7 @@ export const STUDIO_BRUSH_LIBRARY_TABS: readonly {
   { id: "favorites", label: "즐겨찾기", title: "즐겨찾기 브러시" },
   { id: "recent", label: "최근", title: "최근 사용한 브러시" },
   { id: "beginner", label: "기본", title: "초보 키트" },
+  { id: "pro", label: "프로 67", title: "프로시저럴 확장 브러시 67종" },
   { id: "line", label: "선", title: "펜·연필·G펜" },
   { id: "marker", label: "마커", title: "마커·형광·네온" },
   { id: "paint", label: "페인트", title: "붓·수채·유화" },

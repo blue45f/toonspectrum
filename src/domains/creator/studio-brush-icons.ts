@@ -2,27 +2,145 @@
  * Brush preset → icon key map (PicsArt/Ibis-style recognition).
  * Pure strings only — Lucide resolution lives in StudioBrushPresetIcon.tsx.
  */
+import type { StudioBrushPackCatalogId } from "./studio-brush-pack-id";
 
 export type StudioBrushIconId =
   | "pen"
   | "pen-line"
+  | "pen-tool"
   | "pencil"
   | "highlighter"
   | "brush"
   | "paintbrush"
+  | "paint-roller"
   | "spray-can"
   | "droplets"
+  | "blend"
+  | "cloud"
+  | "cloud-fog"
   | "sparkles"
   | "star"
   | "sun"
+  | "circle"
+  | "circle-dashed"
+  | "circle-ellipsis"
   | "circle-dot"
+  | "square"
+  | "square-dashed"
+  | "rectangle-horizontal"
+  | "rectangle-vertical"
   | "waves"
   | "flame"
   | "wind"
   | "grid-3x3"
+  | "grid-2x2"
+  | "grip"
+  | "rows"
+  | "align-justify"
+  | "fence"
   | "gem"
+  | "layers"
+  | "spline"
+  | "feather"
+  | "leaf"
+  | "trees"
+  | "wheat"
+  | "flower"
+  | "stamp"
+  | "footprints"
+  | "heart"
+  | "asterisk"
+  | "direction"
   | "a-large-small"
   | "default";
+
+/**
+ * Procedural catalogue icons describe the expected mark, not the three shared render engines.
+ * Keeping this as an exhaustive record makes a newly-added catalogue brush fail type-checking
+ * until it receives a deliberate, user-recognisable icon.
+ */
+export const STUDIO_PROCEDURAL_BRUSH_ICON_BY_ID = {
+  // Ink, soft and sketch tips
+  "core-round": "circle",
+  "crisp-ink": "pen-line",
+  "flex-ink": "pen-tool",
+  "cloud-soft": "cloud",
+  "mist-soft": "cloud-fog",
+  "powder-sketch": "circle-dashed",
+  "round-sketch": "pencil",
+  "fiber-sketch": "feather",
+  "precision-pencil": "pencil",
+  "comfort-pencil": "pencil",
+  "needle-graphite": "pen-line",
+  "round-shading": "circle-dot",
+  "oval-shading": "circle-ellipsis",
+
+  // Chalk and organic linework
+  "chalk-powder": "circle-dashed",
+  "chalk-rough": "grip",
+  "chalk-compressed": "square-dashed",
+  "vine-stroke": "spline",
+  "willow-fiber": "feather",
+  "velvet-charcoal": "blend",
+
+  // Flat and marker tips
+  "line-block": "layers",
+  "angular-square": "square",
+  "horizontal-blade": "rectangle-horizontal",
+  "vertical-blade": "rectangle-vertical",
+  "clean-flat": "rectangle-horizontal",
+  "scattered-flat": "square-dashed",
+  "rhythm-flat": "rows",
+  "directional-flat": "direction",
+  "classic-marker": "highlighter",
+  "fiber-marker": "feather",
+  "clean-flat-marker": "rectangle-horizontal",
+  "transparent-flat": "blend",
+  "hard-oval": "circle-ellipsis",
+
+  // Surface and paint media
+  "fabric-texture": "grid-3x3",
+  "rough-grain": "circle-dashed",
+  "strong-rough-grain": "asterisk",
+  "heavy-rough-grain": "square-dashed",
+  "bleeding-stain": "blend",
+  "sand-texture": "grip",
+  "plaster-texture": "layers",
+  "rock-texture": "gem",
+  "cotton-fiber": "cloud",
+  "bumpy-grain": "circle-dot",
+  "round-paint": "paintbrush",
+  "paint-ink": "brush",
+  "paint-roller": "paint-roller",
+  "particle-scatter": "spray-can",
+  "rough-ink": "pen-tool",
+
+  // Parallel fibres and vegetation
+  "fine-rake": "rows",
+  "wide-rake": "align-justify",
+  "dry-rake": "fence",
+  "foliage-texture": "trees",
+  "loose-grass": "wheat",
+  "dense-grass": "trees",
+  "fresh-leaf": "leaf",
+  "long-leaf": "feather",
+  "round-leaf": "leaf",
+  "leaf-cluster": "flower",
+
+  // Pattern and stamp tips
+  "free-stamp": "stamp",
+  "scattered-oval": "circle-ellipsis",
+  "smooth-oval": "circle",
+  "layered-oval": "layers",
+  "checker-grid": "grid-2x2",
+  "hair-fiber": "feather",
+  "even-stripe": "rows",
+  "rough-stripe": "fence",
+  "footstep-stamp": "footprints",
+  "heart-stamp": "heart",
+} as const satisfies Readonly<
+  Record<StudioBrushPackCatalogId, StudioBrushIconId>
+>;
 
 /** Per-preset icon (commercial brush pickers). Unknown ids → default pen. */
 export const STUDIO_BRUSH_ICON_BY_ID: Readonly<Record<string, StudioBrushIconId>> = {
@@ -66,6 +184,7 @@ export const STUDIO_BRUSH_ICON_BY_ID: Readonly<Record<string, StudioBrushIconId>
   pastel: "waves",
   "ink-particle": "gem",
   screentone: "grid-3x3",
+  ...STUDIO_PROCEDURAL_BRUSH_ICON_BY_ID,
 };
 
 export function studioBrushIconId(brushId: unknown): StudioBrushIconId {

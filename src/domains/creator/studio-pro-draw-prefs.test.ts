@@ -53,6 +53,21 @@ describe("studio pro draw prefs", () => {
     expect(prefs.favoriteBrushIds).not.toContain("watercolor");
   });
 
+  it("keeps optional procedural pack identities in recent and favorites", () => {
+    let prefs = normalizeStudioProDrawPrefs({
+      recentBrushIds: ["heart-stamp", "unknown-pack-brush"],
+      favoriteBrushIds: ["hair-fiber", "not-a-brush"],
+    });
+
+    expect(prefs.recentBrushIds).toEqual(["heart-stamp"]);
+    expect(prefs.favoriteBrushIds).toEqual(["hair-fiber"]);
+
+    prefs = rememberRecentBrushId(prefs, "checker-grid");
+    prefs = toggleFavoriteBrushId(prefs, "footstep-stamp");
+    expect(prefs.recentBrushIds[0]).toBe("checker-grid");
+    expect(prefs.favoriteBrushIds).toContain("footstep-stamp");
+  });
+
   it("cycles SAI/CSP-style stabilizer steps", () => {
     expect(cycleStudioStabilizerStrength(0)).toBe(3);
     expect(cycleStudioStabilizerStrength(3)).toBe(6);

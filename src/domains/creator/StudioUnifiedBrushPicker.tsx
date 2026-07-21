@@ -12,13 +12,17 @@ import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
 import { StudioBrushTray } from "./StudioBrushTray";
 
 import type { StudioBrushStampTuning } from "./studio-brush-library";
+import type { StudioBrushTrayItem } from "./studio-creative-ux";
 import type { StudioProDrawPrefs } from "./studio-pro-draw-prefs";
 
 import { cn } from "@/lib/utils";
 
 export interface StudioUnifiedBrushPickerProps {
   activeBrushId: string;
+  activeCatalogBrushId?: string;
+  activeCatalogBrushName?: string;
   brushOpacity: number;
+  brushCatalogItems?: readonly StudioBrushTrayItem[];
   catalogOpen?: boolean;
   color: string;
   proDrawPrefs: StudioProDrawPrefs;
@@ -26,6 +30,7 @@ export interface StudioUnifiedBrushPickerProps {
   strokeWidth: number;
   onStampTuningChange?: (tuning: StudioBrushStampTuning) => void;
   onSelectBrush: (preset: BrushPreset) => void;
+  onSelectBrushId?: (brushId: string) => void;
   onToggleCatalog: (trigger: HTMLButtonElement) => void;
   onToggleFavoriteBrush: (brushId: string) => void;
 }
@@ -42,7 +47,10 @@ const STAMP_TUNING_CONTROLS = [
  */
 export function StudioUnifiedBrushPicker({
   activeBrushId,
+  activeCatalogBrushId,
+  activeCatalogBrushName,
   brushOpacity,
+  brushCatalogItems,
   catalogOpen = false,
   color,
   proDrawPrefs,
@@ -50,13 +58,23 @@ export function StudioUnifiedBrushPicker({
   strokeWidth,
   onStampTuningChange,
   onSelectBrush,
+  onSelectBrushId,
   onToggleCatalog,
   onToggleFavoriteBrush,
 }: StudioUnifiedBrushPickerProps): ReactElement {
-  const activePreset = BRUSH_PRESETS.find((preset) => preset.id === activeBrushId);
-  const activeName = activePreset?.name ?? activeBrushId;
-  const activeFavorite = proDrawPrefs.favoriteBrushIds.includes(activeBrushId);
+  const catalogBrushId = activeCatalogBrushId ?? activeBrushId;
+  const activePreset = BRUSH_PRESETS.find((preset) => preset.id === catalogBrushId);
+  const catalogItem = brushCatalogItems?.find((item) => item.id === catalogBrushId);
+  const activeName = activeCatalogBrushName
+    ?? catalogItem?.name
+    ?? activePreset?.name
+    ?? catalogBrushId;
+  const activeFavorite = proDrawPrefs.favoriteBrushIds.includes(catalogBrushId);
   const selectBrushId = (brushId: string) => {
+    if (onSelectBrushId) {
+      onSelectBrushId(brushId);
+      return;
+    }
     const preset = BRUSH_PRESETS.find((candidate) => candidate.id === brushId);
     if (preset) onSelectBrush(preset);
   };
@@ -92,7 +110,7 @@ export function StudioUnifiedBrushPicker({
         </span>
         <button
           type="button"
-          onClick={() => onToggleFavoriteBrush(activeBrushId)}
+          onClick={() => onToggleFavoriteBrush(catalogBrushId)}
           aria-label={activeFavorite ? `${activeName} 즐겨찾기 해제` : `${activeName} 즐겨찾기`}
           aria-pressed={activeFavorite}
           title={activeFavorite ? "현재 브러시 즐겨찾기 해제" : "현재 브러시 즐겨찾기"}
@@ -108,7 +126,8 @@ export function StudioUnifiedBrushPicker({
       </div>
 
       <StudioBrushTray
-        activeBrushId={activeBrushId}
+        activeBrushId={catalogBrushId}
+        brushCatalogItems={brushCatalogItems}
         favoriteBrushIds={proDrawPrefs.favoriteBrushIds}
         recentBrushIds={proDrawPrefs.recentBrushIds}
         libraryOpen={catalogOpen}

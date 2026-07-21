@@ -286,7 +286,58 @@ export interface StickerEl {
   skewY?: number; // 세로 기울임(도) — studio-skew 직렬화 규약. 미설정=0.
 }
 
-export interface DrawEl {
+export const STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH = 160;
+export const STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH = 120;
+
+export interface StudioBrushCatalogIdentityMetadata {
+  /** 선택한 카탈로그 항목의 안정적인 ID. 실제 렌더러는 계속 `brush`를 사용한다. */
+  brushCatalogId?: string;
+  /** 카탈로그가 사라져도 inspector에서 표시할 수 있는 선택 당시의 이름. */
+  brushCatalogName?: string;
+}
+
+function boundedStudioBrushCatalogText(
+  value: unknown,
+  maximum: number
+): string | undefined {
+  if (typeof value !== "string") return undefined;
+  let safeText = "";
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    safeText += codePoint <= 31 || (codePoint >= 127 && codePoint <= 159) ? " " : character;
+  }
+  const sanitized = safeText.trim();
+  if (!sanitized) return undefined;
+  if (sanitized.length <= maximum) return sanitized;
+  const truncated = sanitized.slice(0, maximum);
+  // UTF-16 길이 한도를 지키되 surrogate pair 중간에서 자르지 않는다.
+  const tail = truncated.charCodeAt(truncated.length - 1);
+  return tail >= 0xd800 && tail <= 0xdbff ? truncated.slice(0, -1) : truncated;
+}
+
+/**
+ * 브러시 카탈로그 identity를 문서·협업 메타데이터에 안전한 문자열로 정규화한다.
+ * 이 값은 inspector/reselect 전용이며 stroke의 픽셀 결과에는 관여하지 않는다.
+ */
+export function normalizeStudioBrushCatalogIdentityMetadata(
+  raw: unknown
+): StudioBrushCatalogIdentityMetadata {
+  const source = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+  const brushCatalogId = boundedStudioBrushCatalogText(
+    source.brushCatalogId,
+    STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH
+  );
+  const brushCatalogName = boundedStudioBrushCatalogText(
+    source.brushCatalogName,
+    STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH
+  );
+  return {
+    ...(brushCatalogId ? { brushCatalogId } : {}),
+    ...(brushCatalogName ? { brushCatalogName } : {}),
+  };
+}
+
+export interface DrawEl extends StudioBrushCatalogIdentityMetadata {
   id: string;
   type: "draw";
   kind?: "freehand" | DrawShapeKind;

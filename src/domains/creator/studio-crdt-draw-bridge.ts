@@ -2,6 +2,7 @@ import {
   STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
 } from "./studio-crdt-protocol";
+import { normalizeStudioBrushCatalogIdentityMetadata } from "./studio-element-model";
 import {
   isStudioInkPressureModel,
   studioInkFallbackPressure,
@@ -35,6 +36,8 @@ export interface StudioCrdtCompatibleDrawElement {
   gradient?: unknown;
   pattern?: unknown;
   brush?: string;
+  brushCatalogId?: string;
+  brushCatalogName?: string;
   pressures?: number[];
   pressureModel?: StudioInkPressureModel;
   sampleSpacing?: number;
@@ -180,6 +183,7 @@ export function studioDrawElementToCrdtStroke(
     ? Array<number>(sampleCount).fill(pressureFallback)
     : aligned(element.pressures, sampleCount, pressureFallback);
   const extensions = extensionsOf(element);
+  const brushCatalogIdentity = normalizeStudioBrushCatalogIdentityMetadata(element);
   const payload: StudioCrdtDrawStrokePayload = {
     // Keep ordinary strokes on v1 so long-open v1 collaborators continue to render them. Only
     // renderer-significant layered paint semantics require the fail-closed v2 payload.
@@ -204,6 +208,7 @@ export function studioDrawElementToCrdtStroke(
   if (element.opacity !== undefined) payload.opacity = element.opacity;
   if (element.fill !== undefined) payload.fill = element.fill;
   if (element.brush !== undefined) payload.brush = element.brush;
+  Object.assign(payload, brushCatalogIdentity);
   if (element.sampleSpacing !== undefined) payload.sampleSpacing = element.sampleSpacing;
   if (element.blendMode !== undefined) payload.blendMode = element.blendMode;
   payload.gradient = jsonObject(element.gradient);

@@ -28,6 +28,8 @@ import { cn } from "@/lib/utils";
 export interface StudioBrushTrayProps {
   activeBrushId: string;
   onSelect: (item: StudioBrushTrayItem) => void;
+  /** Combined core + procedural catalogue; omitted callers retain the core-only shelf. */
+  brushCatalogItems?: readonly StudioBrushTrayItem[];
   recentBrushIds?: readonly string[];
   favoriteBrushIds?: readonly string[];
   onOpenLibrary: (trigger: HTMLButtonElement) => void;
@@ -168,6 +170,7 @@ function BrushPreviewGlyph({
 export function StudioBrushTray({
   activeBrushId,
   onSelect,
+  brushCatalogItems,
   recentBrushIds = [],
   favoriteBrushIds = [],
   onOpenLibrary,
@@ -176,6 +179,7 @@ export function StudioBrushTray({
   "aria-label": ariaLabel = "빠른 브러시 — 즐겨찾기, 최근 사용, 추천",
 }: StudioBrushTrayProps): ReactElement {
   const visible = listStudioQuickBrushTrayItems({
+    catalogItems: brushCatalogItems,
     favoriteIds: favoriteBrushIds,
     recentIds: recentBrushIds,
   });

@@ -41,7 +41,19 @@ export interface StudioBrushStampTuning {
   minSize: number;
 }
 
-export interface StudioBrushSnapshot {
+export const BRUSH_SOURCE_PRESET_ID_MAX_LENGTH = 160;
+export const BRUSH_SOURCE_PRESET_NAME_MAX_LENGTH = 120;
+
+/**
+ * 원본 카탈로그 프리셋의 안정적인 식별 정보다. `brushId`는 언제나 ToonSpectrum의 실제 렌더링
+ * 엔진(BRUSH_PRESETS)을 가리키고, 이 메타데이터만 팩 안의 세부 프리셋을 구분한다.
+ */
+export interface StudioBrushSourcePresetMetadata {
+  sourcePresetId?: string;
+  sourcePresetName?: string;
+}
+
+export interface StudioBrushSnapshot extends StudioBrushSourcePresetMetadata {
   /** BRUSH_PRESETS[].id (studio-brush.ts). StudioPage의 `brush` state에 대응. */
   brushId: string;
   /** StudioPage의 `strokeWidth` state에 대응. UI 슬라이더 범위와 동일하게 1~80로 clamp. */
@@ -201,6 +213,74 @@ export const DEFAULT_STUDIO_BRUSH_SNAPSHOT: StudioBrushSnapshot = {
 
 const DEFAULT_SNAPSHOT = DEFAULT_STUDIO_BRUSH_SNAPSHOT;
 
+function boundedOptionalText(value: unknown, maxLength: number): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return Array.from(trimmed).slice(0, maxLength).join("");
+}
+
+/**
+ * 외부 팩/내장 확장 프리셋의 출처 문자열을 localStorage와 내보내기에 안전한 크기로 제한한다.
+ * 누락된 필드는 그대로 생략해 v1 라이브러리 레코드와 구조적으로도 호환된다.
+ */
+export function normalizeStudioBrushSourcePresetMetadata(
+  raw: unknown
+): StudioBrushSourcePresetMetadata {
+  const source = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+  const sourcePresetId = boundedOptionalText(
+    source.sourcePresetId,
+    BRUSH_SOURCE_PRESET_ID_MAX_LENGTH
+  );
+  const sourcePresetName = boundedOptionalText(
+    source.sourcePresetName,
+    BRUSH_SOURCE_PRESET_NAME_MAX_LENGTH
+  );
+  return {
+    ...(sourcePresetId ? { sourcePresetId } : {}),
+    ...(sourcePresetName ? { sourcePresetName } : {}),
+  };
+}
+
+function recordSourcePresetAdjustments(
+  source: Record<string, unknown>,
+  normalized: StudioBrushSourcePresetMetadata,
+  adjusted: string[]
+): void {
+  for (const key of ["sourcePresetId", "sourcePresetName"] as const) {
+    if (!(key in source)) continue;
+    if (source[key] !== normalized[key]) adjusted.push(key);
+  }
+}
+
+function replaceBrushSnapshot<T extends StudioBrushSnapshot>(
+  source: T,
+  snapshot: StudioBrushSnapshot
+): Omit<T, keyof StudioBrushSnapshot> & StudioBrushSnapshot {
+  const {
+    sourcePresetId: _sourcePresetId,
+    sourcePresetName: _sourcePresetName,
+    brushId: _brushId,
+    strokeWidth: _strokeWidth,
+    brushOpacity: _brushOpacity,
+    color: _color,
+    stabilizer: _stabilizer,
+    stabilizerMode: _stabilizerMode,
+    postCorrection: _postCorrection,
+    preserveCorners: _preserveCorners,
+    pressureCurve: _pressureCurve,
+    useVelocityPressure: _useVelocityPressure,
+    velocitySensitivity: _velocitySensitivity,
+    tiltEnabled: _tiltEnabled,
+    tipAngle: _tipAngle,
+    tipRoundness: _tipRoundness,
+    brushDynamics: _brushDynamics,
+    stampTuning: _stampTuning,
+    ...metadata
+  } = source;
+  return { ...metadata, ...snapshot };
+}
+
 function clampedNumberField(
   o: Record<string, unknown>,
   key: string,
@@ -296,6 +376,8 @@ function jsonStructureEqual(
 export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnapshot; adjustedFields: string[] } {
   const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const adjustedFields: string[] = [];
+  const sourcePresetMetadata = normalizeStudioBrushSourcePresetMetadata(o);
+  recordSourcePresetAdjustments(o, sourcePresetMetadata, adjustedFields);
 
   const runtime = resolveStudioBrushRuntime(o.brushId);
   const brushId = runtime.resolvedId;
@@ -402,6 +484,7 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
 
   return {
     snapshot: {
+      ...sourcePresetMetadata,
       brushId,
       strokeWidth,
       brushOpacity,
@@ -548,7 +631,7 @@ export function saveBrushWithResult(
   if (readFailure) return { brushes: read.brushes, status: readFailure };
   const current = read.brushes;
   const { snapshot: safeSnapshot } = sanitizeBrushSnapshot(brush);
-  const safeBrush: StudioSavedBrush = { ...brush, ...safeSnapshot };
+  const safeBrush: StudioSavedBrush = replaceBrushSnapshot(brush, safeSnapshot);
   const replacesExisting = current.some((candidate) => candidate.id === brush.id);
   if (!replacesExisting && current.length >= MAX_BRUSHES) {
     return { brushes: current, status: "full" };
@@ -588,7 +671,7 @@ export function saveBrushBatchWithResult(
     if (incomingIds.has(brush.id)) continue;
     incomingIds.add(brush.id);
     const { snapshot } = sanitizeBrushSnapshot(brush);
-    unique.push({ ...brush, ...snapshot });
+    unique.push(replaceBrushSnapshot(brush, snapshot));
   }
   if (unique.length === 0) {
     return { brushes: read.brushes, savedCount: 0, skippedCount: 0, status: "saved" };
@@ -638,7 +721,10 @@ export function updateBrushSnapshotWithResult(
   const existing = read.brushes.find((b) => b.id === id);
   if (!existing) return { brushes: read.brushes, status: "missing" };
   const { snapshot: safe } = sanitizeBrushSnapshot(snapshot);
-  const updated: StudioSavedBrush = { ...existing, ...safe, updatedAt: Date.now() };
+  const updated: StudioSavedBrush = {
+    ...replaceBrushSnapshot(existing, safe),
+    updatedAt: Date.now(),
+  };
   const result = saveBrushWithResult(storage, updated);
   // "full" can't happen here — replacesExisting is always true for an id already found above.
   if (result.status === "storage-error" || result.status === "library-unreadable") {
@@ -865,7 +951,9 @@ export function brushMatchesSnapshot(
   brush: StudioSavedBrush,
   snapshot: StudioBrushSnapshot
 ): boolean {
-  return brush.brushId === snapshot.brushId
+  return brush.sourcePresetId === snapshot.sourcePresetId
+    && brush.sourcePresetName === snapshot.sourcePresetName
+    && brush.brushId === snapshot.brushId
     && brush.strokeWidth === snapshot.strokeWidth
     && brush.brushOpacity === snapshot.brushOpacity
     && brush.color.toLowerCase() === snapshot.color.toLowerCase()
@@ -886,7 +974,7 @@ export function brushMatchesSnapshot(
 // ── JSON 내보내기/가져오기(이 앱 전용 포맷 — 브러시 설정엔 GPL 같은 표준이 없다) ──────
 
 export const BRUSH_EXPORT_KIND = "toonspectrum-studio-brush";
-export const BRUSH_EXPORT_VERSION = 5;
+export const BRUSH_EXPORT_VERSION = 6;
 
 /** StudioSavedBrush → JSON 텍스트(들여쓰기 2칸, 사람이 읽을 수 있게). */
 export function writeBrushJson(brush: StudioSavedBrush): string {
@@ -895,6 +983,7 @@ export function writeBrushJson(brush: StudioSavedBrush): string {
     kind: BRUSH_EXPORT_KIND,
     version: BRUSH_EXPORT_VERSION,
     name: brush.name,
+    ...normalizeStudioBrushSourcePresetMetadata(snapshot),
     brushId: snapshot.brushId,
     strokeWidth: snapshot.strokeWidth,
     brushOpacity: snapshot.brushOpacity,

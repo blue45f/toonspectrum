@@ -33,7 +33,16 @@ const STUDIO_CRDT_STROKE_JSON_KEYS = [
   "symmetry",
   "extensions",
 ] as const;
-const STUDIO_CRDT_STROKE_OPTIONAL_STRING_KEYS = ["fill", "brush", "blendMode"] as const;
+const STUDIO_CRDT_STROKE_OPTIONAL_STRING_LIMITS = {
+  fill: 512,
+  brush: 512,
+  blendMode: 512,
+  brushCatalogId: 160,
+  brushCatalogName: 120,
+} as const;
+const STUDIO_CRDT_STROKE_OPTIONAL_STRING_KEYS = Object.keys(
+  STUDIO_CRDT_STROKE_OPTIONAL_STRING_LIMITS
+) as Array<keyof typeof STUDIO_CRDT_STROKE_OPTIONAL_STRING_LIMITS>;
 const STUDIO_CRDT_STROKE_RECORD_KEYS = new Set([
   "id",
   "pageId",
@@ -1183,7 +1192,13 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
   ) return false;
   for (const key of STUDIO_CRDT_STROKE_OPTIONAL_STRING_KEYS) {
     const value = record.get(key);
-    if (record.has(key) && !boundedExactText(value, 512)) return false;
+    if (
+      record.has(key)
+      && (
+        !boundedExactText(value, STUDIO_CRDT_STROKE_OPTIONAL_STRING_LIMITS[key])
+        || ((key === "brushCatalogId" || key === "brushCatalogName") && value.trim() !== value)
+      )
+    ) return false;
   }
   for (const key of STUDIO_CRDT_STROKE_JSON_KEYS) {
     const value = record.get(key);

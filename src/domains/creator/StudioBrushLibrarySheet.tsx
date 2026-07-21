@@ -2,7 +2,7 @@
  * StudioBrushLibrarySheet — searchable built-in brush catalog popover.
  * Search · category · favorites · recent · render-faithful preview tiles.
  */
-import { Search, Star, X } from "lucide-react";
+import { LoaderCircle, Search, Star, X } from "lucide-react";
 import {
   useEffect,
   useId,
@@ -15,6 +15,9 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
+import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
+import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
 import {
   studioBrushChipSurface,
   studioBrushPreviewDashArray,
@@ -31,6 +34,7 @@ import { planGlowBrushPasses, planNeonBrushPasses } from "./studio-fx-brush";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
 
+import type { StudioBrushCatalogSelection } from "./studio-brush-selection";
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
 
 import { cn } from "@/lib/utils";
@@ -41,7 +45,7 @@ export interface StudioBrushLibrarySheetProps {
   favoriteIds?: readonly string[];
   recentIds?: readonly string[];
   onClose: (reason: StudioBrushCatalogCloseReason) => void;
-  onSelect: (item: StudioBrushTrayItem) => void;
+  onSelect: (selection: StudioBrushCatalogSelection) => void;
   onToggleFavorite?: (brushId: string) => void;
   className?: string;
   style?: CSSProperties;
@@ -63,7 +67,7 @@ export interface StudioBrushCatalogPortalProps {
   recentIds?: readonly string[];
   mobileKeyboardInset?: number;
   onClose: (reason: StudioBrushCatalogCloseReason) => void;
-  onSelect: (item: StudioBrushTrayItem) => void;
+  onSelect: (selection: StudioBrushCatalogSelection) => void;
   onToggleFavorite: (brushId: string) => void;
 }
 
@@ -82,6 +86,131 @@ export type StudioBrushCatalogPreviewKind =
   | "glow"
   | "particle"
   | "tone";
+
+let studioBrushPackRuntimePromise: Promise<typeof import("./studio-brush-pack-runtime")> | null = null;
+
+function loadStudioBrushPackRuntime() {
+  studioBrushPackRuntimePromise ??= import("./studio-brush-pack-runtime").catch((error) => {
+    studioBrushPackRuntimePromise = null;
+    throw error;
+  });
+  return studioBrushPackRuntimePromise;
+}
+
+function studioBrushPreviewHash(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function StudioProceduralBrushPreviewDetail({
+  item,
+  ink,
+  opacity,
+}: {
+  item: StudioBrushTrayItem;
+  ink: string;
+  opacity: number;
+}): ReactElement | null {
+  if (!isStudioBrushPackCatalogId(item.id)) return null;
+  const hash = studioBrushPreviewHash(item.id);
+  const phase = (hash % 17) / 17;
+  const ids = item.id;
+
+  if (ids.includes("heart")) {
+    return (
+      <g fill={ink} opacity={opacity * 0.72} transform={`translate(${phase * 3} 0)`}>
+        <path d="M72 13 C72 8 80 7 81 13 C83 7 91 8 91 13 C91 19 81 24 81 24 C81 24 72 19 72 13Z" />
+        <path d="M58 19 C58 16 63 15 64 19 C65 15 70 16 70 19 C70 23 64 26 64 26 C64 26 58 23 58 19Z" opacity="0.62" />
+      </g>
+    );
+  }
+  if (ids.includes("footstep")) {
+    return (
+      <g fill={ink} opacity={opacity * 0.72} transform={`rotate(${phase * 8 - 4} 75 17)`}>
+        <ellipse cx="64" cy="20" rx="3.2" ry="6.2" />
+        <circle cx="61" cy="12" r="1.5" /><circle cx="64" cy="10.5" r="1.35" /><circle cx="67" cy="11.5" r="1.2" />
+        <ellipse cx="79" cy="14" rx="3.2" ry="6.2" />
+        <circle cx="76" cy="6" r="1.5" /><circle cx="79" cy="4.5" r="1.35" /><circle cx="82" cy="5.5" r="1.2" />
+      </g>
+    );
+  }
+  if (ids.includes("checker")) {
+    return (
+      <g fill={ink} opacity={opacity * 0.58} transform={`translate(${phase * 2} 0)`}>
+        {Array.from({ length: 12 }, (_, index) => {
+          const column = index % 6;
+          const row = Math.floor(index / 6);
+          if ((column + row) % 2 !== 0) return null;
+          return <rect key={index} x={55 + column * 6} y={10 + row * 6} width="6" height="6" />;
+        })}
+      </g>
+    );
+  }
+  if (ids.includes("leaf") || ids.includes("foliage") || ids.includes("grass") || ids.includes("vine") || ids.includes("willow")) {
+    return (
+      <g fill={ink} stroke={ink} strokeWidth="0.7" opacity={opacity * 0.62}>
+        {Array.from({ length: 6 }, (_, index) => {
+          const x = 53 + index * 7 + ((hash >>> (index % 8)) & 3);
+          const y = 10 + ((hash >>> ((index + 3) % 12)) & 11);
+          const rotation = -38 + ((hash >>> ((index + 5) % 16)) & 63);
+          return (
+            <g key={index} transform={`translate(${x} ${y}) rotate(${rotation})`}>
+              <path d="M0 0 C2.2 -3.4 6.5 -3.1 8 0 C5.9 2.7 2.1 2.9 0 0Z" />
+              <path d="M0 0 H7" fill="none" stroke={ink} opacity="0.48" />
+            </g>
+          );
+        })}
+      </g>
+    );
+  }
+  if (ids.includes("rake") || ids.includes("hair") || ids.includes("stripe") || ids.includes("roller")) {
+    const count = 3 + (hash % 4);
+    return (
+      <g fill="none" stroke={ink} strokeLinecap="round" opacity={opacity * 0.62}>
+        {Array.from({ length: count }, (_, index) => (
+          <path
+            key={index}
+            d={`M50 ${9 + index * (15 / Math.max(1, count - 1))} C62 ${7 + index * 3 + phase * 2}, 74 ${23 - index * 2}, 92 ${10 + index * 2.4}`}
+            strokeWidth={0.65 + ((hash >>> index) & 3) * 0.28}
+            strokeDasharray={ids.includes("rough") || ids.includes("dry") ? `${2 + index} ${1.5 + phase}` : undefined}
+          />
+        ))}
+      </g>
+    );
+  }
+  if (ids.includes("square") || ids.includes("blade") || ids.includes("flat") || ids.includes("block") || ids.includes("marker")) {
+    return (
+      <g fill={ink} opacity={opacity * 0.5} transform={`rotate(${phase * 18 - 9} 74 17)`}>
+        <rect x="53" y={9 + phase * 3} width={13 + (hash % 9)} height={4 + ((hash >>> 4) % 6)} rx={ids.includes("square") ? 0 : 1.5} />
+        <rect x={72 + phase * 4} y={16 - phase * 3} width={17 - (hash % 5)} height={3 + ((hash >>> 7) % 5)} rx="1" opacity="0.58" />
+      </g>
+    );
+  }
+  if (ids.includes("oval")) {
+    return (
+      <g fill={ink} opacity={opacity * 0.56} transform={`rotate(${phase * 36 - 18} 74 17)`}>
+        <ellipse cx="60" cy="17" rx={4 + (hash % 4)} ry={2 + ((hash >>> 3) % 3)} />
+        <ellipse cx="75" cy="15" rx={6 + ((hash >>> 5) % 4)} ry={2.5 + ((hash >>> 8) % 3)} opacity="0.72" />
+        <ellipse cx="89" cy="19" rx={3 + ((hash >>> 10) % 3)} ry={2 + ((hash >>> 12) % 2)} opacity="0.48" />
+      </g>
+    );
+  }
+
+  return (
+    <g fill={ink} opacity={opacity * 0.44}>
+      {Array.from({ length: 8 }, (_, index) => {
+        const x = 51 + index * 5.4 + ((hash >>> (index % 16)) & 3);
+        const y = 9 + ((hash >>> ((index + 5) % 19)) & 15);
+        const radius = 0.7 + ((hash >>> ((index + 9) % 21)) & 3) * 0.45;
+        return <circle key={index} cx={x} cy={y} r={radius} />;
+      })}
+    </g>
+  );
+}
 
 /**
  * Keep preview semantics aligned with the actual renderer rather than relying only on a decorative
@@ -332,6 +461,7 @@ export function LargeBrushPreview({
       />
       <path d={`M5 ${h - 5.5} H${w - 5}`} stroke={active ? "currentColor" : surface.paper} strokeWidth={0.5} opacity={0.35} />
       {brushSample}
+      <StudioProceduralBrushPreviewDetail item={item} ink={ink} opacity={opacity} />
     </svg>
   );
 }
@@ -353,10 +483,13 @@ export function StudioBrushLibrarySheet({
   const tabListRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<(typeof STUDIO_BRUSH_LIBRARY_TABS)[number]["id"]>("beginner");
+  const [pendingSelectionId, setPendingSelectionId] = useState<string | null>(null);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
   const panelId = `${tabsId}-panel`;
 
   useEffect(() => {
     if (!open) return;
+    setSelectionError(null);
     const t = globalThis.setTimeout(() => searchRef.current?.focus(), 30);
     return () => globalThis.clearTimeout(t);
   }, [open]);
@@ -380,7 +513,36 @@ export function StudioBrushLibrarySheet({
     query,
     favoriteIds,
     recentIds,
+    catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   });
+
+  async function selectCatalogItem(item: StudioBrushTrayItem): Promise<void> {
+    if (pendingSelectionId) return;
+    setSelectionError(null);
+    setPendingSelectionId(item.id);
+    try {
+      const selection = isStudioBrushPackCatalogId(item.id)
+        ? (await loadStudioBrushPackRuntime()).materializeStudioBrushPackSelection(item.id)
+        : studioCoreBrushCatalogSelection({
+            id: item.id,
+            name: item.name,
+            defaultWidth: item.defaultWidth,
+            defaultOpacity: item.defaultOpacity,
+            ...(item.defaultColor ? { defaultColor: item.defaultColor } : {}),
+          });
+      if (!selection) throw new Error("브러시 프로필을 찾을 수 없습니다.");
+      onSelect(selection);
+      onClose("selection");
+    } catch (error) {
+      setSelectionError(
+        error instanceof Error && error.message
+          ? error.message
+          : "브러시를 불러오지 못했습니다. 다시 시도해 주세요."
+      );
+    } finally {
+      setPendingSelectionId(null);
+    }
+  }
 
   function onTabKeyDown(
     event: ReactKeyboardEvent<HTMLButtonElement>,
@@ -423,16 +585,16 @@ export function StudioBrushLibrarySheet({
       <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
         <div className="min-w-0">
           <p id={titleId} className="text-sm font-bold text-fg">
-            기본 프리셋
+            앱 브러시
           </p>
           <p id={`${titleId}-description`} className="text-[0.62rem] text-fg-3">
-            앱 제공 브러시 · 내 브러시와 별개 · {items.length}개 표시
+            코어 35 + 프로시저럴 67 · 내 브러시와 별개 · {items.length}개 표시
           </p>
         </div>
         <button
           type="button"
           onClick={() => onClose("explicit")}
-          aria-label="기본 프리셋 닫기"
+          aria-label="앱 브러시 닫기"
           className={cn(
             "grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised hover:text-fg",
             STUDIO_FOCUS_RING
@@ -498,6 +660,14 @@ export function StudioBrushLibrarySheet({
         tabIndex={0}
         className="min-h-0 flex-1 overflow-y-auto p-2 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
       >
+        {selectionError ? (
+          <div
+            role="alert"
+            className="mb-2 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-[0.68rem] font-medium text-danger"
+          >
+            {selectionError}
+          </div>
+        ) : null}
         <p role="status" aria-live="polite" className="sr-only">
           {items.length}개의 브러시가 표시됩니다.
         </p>
@@ -519,8 +689,9 @@ export function StudioBrushLibrarySheet({
               return (
                 <div
                   key={item.id}
+                  data-studio-brush-source={isStudioBrushPackCatalogId(item.id) ? "pro" : "core"}
                   className={cn(
-                    "group relative flex flex-col rounded-xl border p-1.5",
+                    "group relative flex flex-col rounded-xl border p-1.5 [contain-intrinsic-size:7.25rem] [content-visibility:auto]",
                     STUDIO_EASE,
                     active
                       ? "border-accent bg-accent text-on-accent shadow-[0_2px_10px_oklch(0.72_0.185_42/0.25)]"
@@ -529,14 +700,26 @@ export function StudioBrushLibrarySheet({
                 >
                   <button
                     type="button"
-                    onClick={() => {
-                      onSelect(item);
-                      onClose("selection");
+                    onPointerEnter={() => {
+                      if (isStudioBrushPackCatalogId(item.id)) {
+                        void loadStudioBrushPackRuntime().catch(() => undefined);
+                      }
                     }}
+                    onFocus={() => {
+                      if (isStudioBrushPackCatalogId(item.id)) {
+                        void loadStudioBrushPackRuntime().catch(() => undefined);
+                      }
+                    }}
+                    onClick={() => void selectCatalogItem(item)}
                     title={item.hint}
                     aria-label={`${item.name} 선택`}
                     aria-pressed={active}
-                    className={cn("flex flex-col items-stretch gap-1 text-left", STUDIO_FOCUS_RING, "rounded-lg")}
+                    aria-busy={pendingSelectionId === item.id || undefined}
+                    disabled={pendingSelectionId !== null}
+                    className={cn(
+                      "flex flex-col items-stretch gap-1 rounded-lg text-left disabled:cursor-wait disabled:opacity-70",
+                      STUDIO_FOCUS_RING
+                    )}
                   >
                     <LargeBrushPreview item={item} active={active} />
                     <span className="flex min-w-0 items-center gap-1 pr-5">
@@ -547,6 +730,13 @@ export function StudioBrushLibrarySheet({
                         className={active ? "text-on-accent" : "text-fg-2"}
                       />
                       <span className="truncate text-[0.68rem] font-bold leading-tight">{item.name}</span>
+                      {pendingSelectionId === item.id ? (
+                        <LoaderCircle size={12} className="ml-auto shrink-0 animate-spin motion-reduce:animate-none" aria-hidden />
+                      ) : isStudioBrushPackCatalogId(item.id) ? (
+                        <span className="ml-auto shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[0.48rem] font-black text-accent">
+                          PRO
+                        </span>
+                      ) : null}
                     </span>
                     <span
                       className={cn(

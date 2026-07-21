@@ -2284,6 +2284,34 @@ describe("StudioCrdtService", () => {
     source.destroy();
   });
 
+  it("admits only canonical bounded brush catalog identity metadata", () => {
+    const valid = createStrokeDocument();
+    const validStroke = valid.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+    validStroke.set("brush", "ink-particle");
+    validStroke.set("brushCatalogId", "pro67:heart-stamp");
+    validStroke.set("brushCatalogName", "하트 스탬프");
+    expect(hasValidStudioCrdtRootSchema(valid)).toBe(true);
+    valid.destroy();
+
+    const invalidCases: Array<[key: string, value: unknown]> = [
+      ["brushCatalogId", " pro67:heart-stamp"],
+      ["brushCatalogId", "pro67:\u0000heart-stamp"],
+      ["brushCatalogId", "a".repeat(161)],
+      ["brushCatalogName", "붓".repeat(121)],
+      ["brushCatalogName", 42],
+    ];
+    for (const [key, value] of invalidCases) {
+      const invalid = createStrokeDocument();
+      invalid.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!.set(key, value);
+      expect(hasValidStudioCrdtRootSchema(invalid), key).toBe(false);
+      invalid.destroy();
+    }
+
+    const legacy = createStrokeDocument();
+    expect(hasValidStudioCrdtRootSchema(legacy)).toBe(true);
+    legacy.destroy();
+  });
+
   it("admits versioned layered-flow strokes and rejects incompatible paint semantics", () => {
     const valid = createStrokeDocument();
     const validStroke = valid.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;

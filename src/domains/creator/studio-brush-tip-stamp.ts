@@ -12,6 +12,8 @@ export const STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE_RANGE = { min: 8, max: 64 } as cons
 export const DEFAULT_STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE = 24;
 export const STUDIO_BRUSH_TIP_STAMP_GRID_RANGE = { min: 3, max: 17 } as const;
 export const DEFAULT_STUDIO_BRUSH_TIP_STAMP_GRID = 9;
+/** Bounds decoded/softened tip memory while covering an active pack plus common built-ins. */
+export const STUDIO_BRUSH_TIP_ALPHA_MAP_CACHE_LIMIT = 64;
 
 export const STUDIO_BRUSH_TIP_SHAPE_IDS = [
   "round",
@@ -80,6 +82,7 @@ const DEFAULT_TIP: NormalizedStudioBrushTipSettings = {
 };
 
 const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const tipAlphaMapCache = new Map<string, StudioBrushTipAlphaMap>();
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -97,6 +100,39 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function studioBrushTipAlphaMapCacheKey(value: unknown): string {
+  const source = asRecord(value);
+  if (!source) return "default";
+  const shape = typeof source.shape === "string" ? source.shape : "";
+  const softness = typeof source.softness === "number" ? source.softness : "";
+  const alphaMapSize = typeof source.alphaMapSize === "number" ? source.alphaMapSize : "";
+  const alphaMapBase64 = typeof source.alphaMapBase64 === "string"
+    ? source.alphaMapBase64
+    : source.alphaMapBase64 === null ? "null" : "";
+  return `${shape}\u0000${softness}\u0000${alphaMapSize}\u0000${alphaMapBase64}`;
+}
+
+function cachedStudioBrushTipAlphaMap(key: string): StudioBrushTipAlphaMap | null {
+  const cached = tipAlphaMapCache.get(key);
+  if (!cached) return null;
+  // Map insertion order is the LRU queue. Alpha maps are immutable renderer inputs.
+  tipAlphaMapCache.delete(key);
+  tipAlphaMapCache.set(key, cached);
+  return cached;
+}
+
+function cacheStudioBrushTipAlphaMap(
+  key: string,
+  map: StudioBrushTipAlphaMap
+): StudioBrushTipAlphaMap {
+  if (tipAlphaMapCache.size >= STUDIO_BRUSH_TIP_ALPHA_MAP_CACHE_LIMIT) {
+    const oldestKey = tipAlphaMapCache.keys().next().value;
+    if (oldestKey !== undefined) tipAlphaMapCache.delete(oldestKey);
+  }
+  tipAlphaMapCache.set(key, map);
+  return map;
 }
 
 export function isStudioBrushTipShapeId(value: unknown): value is StudioBrushTipShapeId {
@@ -354,6 +390,11 @@ function buildCustomAlphaMap(
 
 /** Build a reusable tip alpha map (procedural or custom PNG-alpha payload). */
 export function buildStudioBrushTipAlphaMap(value?: unknown): StudioBrushTipAlphaMap {
+  // Check the raw, stable input before normalization: normalizing a custom payload validates and
+  // canonicalizes base64, which was previously repeated for every live-draft React render.
+  const cacheKey = studioBrushTipAlphaMapCacheKey(value);
+  const cached = cachedStudioBrushTipAlphaMap(cacheKey);
+  if (cached) return cached;
   const tip = normalizeStudioBrushTipSettings(value);
   if (tip.alphaMapBase64) {
     const custom = buildCustomAlphaMap(
@@ -362,22 +403,22 @@ export function buildStudioBrushTipAlphaMap(value?: unknown): StudioBrushTipAlph
       tip.softness
     );
     if (custom) {
-      return {
+      return cacheStudioBrushTipAlphaMap(cacheKey, {
         size: tip.alphaMapSize,
         alphas: custom,
         shape: tip.shape,
         softness: tip.softness,
         custom: true,
-      };
+      });
     }
   }
-  return {
+  return cacheStudioBrushTipAlphaMap(cacheKey, {
     size: tip.alphaMapSize,
     alphas: buildProceduralAlphaMap(tip.shape, tip.softness, tip.alphaMapSize),
     shape: tip.shape,
     softness: tip.softness,
     custom: false,
-  };
+  });
 }
 
 /** Sample map alpha at continuous pixel coords with bilinear filtering. */

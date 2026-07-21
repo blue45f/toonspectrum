@@ -7,6 +7,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
 import { StudioBrushLibrarySheet } from "./StudioBrushLibrarySheet";
 import { StudioDrawOptionsBar } from "./StudioDrawOptionsBar";
 
@@ -85,6 +86,55 @@ describe("StudioDrawOptionsBar", () => {
     );
     expect(html).toContain("기본 프리셋");
     expect(html).toContain("네온");
+  });
+
+  it("keeps a Pro catalogue identity visible and favoriteable while rendering canonically", () => {
+    const onToggleFavoriteBrush = vi.fn();
+    const onSelectBrush = vi.fn();
+    render(
+      <StudioDrawOptionsBar
+        drawMode="pen"
+        brushId="ink-particle"
+        activeCatalogBrushId="heart-stamp"
+        activeCatalogBrushName="하트 도장"
+        brushCatalogItems={STUDIO_ALL_BRUSH_CATALOG_ITEMS}
+        strokeWidth={26}
+        brushOpacity={0.94}
+        stabilizer={4}
+        color="#cc3366"
+        quickShapeActive={false}
+        favoriteBrushIds={["heart-stamp"]}
+        recentBrushIds={["hair-fiber", "ink-particle"]}
+        onSelectBrush={onSelectBrush}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+        onToggleFavoriteBrush={onToggleFavoriteBrush}
+      />
+    );
+
+    const activePill = screen.getByRole("button", {
+      name: "현재 브러시 하트 도장, 기본 프리셋 열기",
+    });
+    expect(activePill.textContent).toContain("하트");
+    // Icon/raster routing stays on the canonical renderer id, never the catalogue id.
+    expect(activePill.querySelector('[data-studio-brush-icon-for="ink-particle"]')).toBeTruthy();
+    expect(activePill.querySelector('[data-studio-brush-icon-for="heart-stamp"]')).toBeNull();
+
+    const favorite = screen.getByRole("button", { name: "즐겨찾기 해제" });
+    expect(favorite.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(favorite);
+    expect(onToggleFavoriteBrush).toHaveBeenCalledWith("heart-stamp");
+
+    fireEvent.click(screen.getByRole("button", { name: "세부 옵션 펼치기" }));
+    const activeQuickBrush = screen.getByRole("option", {
+      name: /즐겨찾기 브러시 하트 도장/,
+    });
+    expect(activeQuickBrush.getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(screen.getByRole("option", { name: /최근 사용 브러시 머리카락 결/ }));
+    expect(onSelectBrush.mock.calls[0]?.[0]).toMatchObject({ id: "hair-fiber" });
   });
 
   it("uses the StudioPage-owned catalog session instead of mounting a second sheet", () => {

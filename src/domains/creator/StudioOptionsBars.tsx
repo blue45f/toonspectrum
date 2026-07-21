@@ -8,6 +8,7 @@ import {
 
 import type { StudioBrushStampTuning } from "./studio-brush-library";
 import type { StudioBrushSlot } from "./studio-brush-slots";
+import type { StudioBrushTrayItem } from "./studio-creative-ux";
 import type { DrawShapeKind } from "./studio-editor-tool-model";
 import type {
   StudioDrawModeUi,
@@ -18,7 +19,12 @@ import type {
 
 export interface StudioOptionsBarsDrawModel {
   visible: boolean;
+  /** Canonical renderer brush id. */
   brushId: string;
+  /** Optional user-facing catalogue identity for procedural brushes. */
+  activeCatalogBrushId?: string;
+  activeCatalogBrushName?: string;
+  brushCatalogItems?: readonly StudioBrushTrayItem[];
   brushCatalogOpen: boolean;
   brushOpacity: number;
   brushSlots: readonly (StudioBrushSlot | null)[];
@@ -114,6 +120,9 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
             dockInsets={draw.dockInsets}
             drawMode={draw.drawMode}
             brushId={draw.brushId}
+            activeCatalogBrushId={draw.activeCatalogBrushId}
+            activeCatalogBrushName={draw.activeCatalogBrushName}
+            brushCatalogItems={draw.brushCatalogItems}
             strokeWidth={draw.strokeWidth}
             brushOpacity={draw.brushOpacity}
             stabilizer={draw.stabilizer}
