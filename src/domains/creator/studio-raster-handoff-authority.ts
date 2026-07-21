@@ -14,6 +14,8 @@ export interface StudioRasterHandoffCandidate {
   readonly baseKey: string;
   readonly generation: number;
   readonly operationIds: readonly string[];
+  /** Exact raster event frontier proven by the replay frame. */
+  readonly rasterLogSha256: string;
 }
 
 export interface StudioRasterHandoffBaseKeyInput {
@@ -101,12 +103,14 @@ export function createStudioRasterHandoffBaseKey(
 export function createStudioRasterHandoffAuthorityKey(input: {
   readonly baseKey: string;
   readonly generation: number;
+  readonly rasterLogSha256: string;
   readonly sourceOperations: readonly StudioRasterOverlaySourceOperation[];
 }): string {
   return canonicalStudioRasterJson({
     version: 1,
     baseKey: input.baseKey,
     generation: input.generation,
+    rasterLogSha256: input.rasterLogSha256,
     sourceOperations: input.sourceOperations.map((operation) => ({
       operationId: operation.operationId,
       semanticParameters: operation.semanticParameters,
@@ -117,12 +121,17 @@ export function createStudioRasterHandoffAuthorityKey(input: {
 export function isStudioRasterHandoffCandidateAuthorized(input: {
   readonly candidate: StudioRasterHandoffCandidate | null;
   readonly currentBaseKey: string;
+  /** SHA-256 captured only after the same raster frontier crossed a server ACK barrier. */
+  readonly authorizedRasterLogSha256: string | null;
   readonly blocked: boolean;
 }): boolean {
   const candidate = input.candidate;
   if (
     input.blocked || !candidate || candidate.baseKey !== input.currentBaseKey ||
-    candidate.authorityKey.length === 0 || !Number.isSafeInteger(candidate.generation) ||
+    candidate.authorityKey.length === 0 ||
+    !/^[a-f0-9]{64}$/u.test(candidate.rasterLogSha256) ||
+    candidate.rasterLogSha256 !== input.authorizedRasterLogSha256 ||
+    !Number.isSafeInteger(candidate.generation) ||
     candidate.generation < 1 || candidate.operationIds.length === 0
   ) {
     return false;
@@ -135,6 +144,7 @@ export function isStudioRasterHandoffCandidateAuthorized(input: {
 export function studioRasterAuthorizedOperationIds(input: {
   readonly candidate: StudioRasterHandoffCandidate | null;
   readonly currentBaseKey: string;
+  readonly authorizedRasterLogSha256: string | null;
   readonly blocked: boolean;
 }): ReadonlySet<string> {
   return isStudioRasterHandoffCandidateAuthorized(input)

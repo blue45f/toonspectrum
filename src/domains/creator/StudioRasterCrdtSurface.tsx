@@ -198,7 +198,8 @@ export function StudioRasterCrdtSurface({
       import("./studio-crdt-raster-replay-runtime"),
       import("./studio-raster-asset-client"),
       import("./studio-crdt-raster-ui-bridge"),
-    ]).then(async ([log, runtime, assetClient, bridge]) => {
+      import("./studio-raster-server-authority"),
+    ]).then(async ([log, runtime, assetClient, bridge, serverAuthority]) => {
       if (!log) return;
       const planned = handoffSnapshot
         ? bridge.planStudioRasterOverlayHandoff({
@@ -233,17 +234,20 @@ export function StudioRasterCrdtSurface({
           visibleRect
         );
       });
-      const result = await runtime.replayStudioRasterCrdtPixels({
-        workId,
-        log,
-        signal: controller.signal,
-        visibleTileFilter: (tile) =>
-          studioRasterTileIntersectsDocumentRect(tile, visibleRect, log.surface.tileSize),
-      }, {
-        download: async (reference, signal) => (
-          await assetClient.downloadStudioRasterAsset(workId, reference, signal)
-        ).bytes,
-      });
+      const [result, rasterLogSha256] = await Promise.all([
+        runtime.replayStudioRasterCrdtPixels({
+          workId,
+          log,
+          signal: controller.signal,
+          visibleTileFilter: (tile) =>
+            studioRasterTileIntersectsDocumentRect(tile, visibleRect, log.surface.tileSize),
+        }, {
+          download: async (reference, signal) => (
+            await assetClient.downloadStudioRasterAsset(workId, reference, signal)
+          ).bytes,
+        }),
+        serverAuthority.sha256StudioRasterOperationLogAuthority(log, controller.signal),
+      ]);
       if (result.conflictedOperationIds.length > 0) {
         if (!active || controller.signal.aborted || generationRef.current !== generation) return;
         callbacksRef.current.onConflict?.(result.conflictedOperationIds);
@@ -290,9 +294,11 @@ export function StudioRasterCrdtSurface({
         baseKey,
         generation,
         operationIds: Object.freeze([...result.appliedOperationIds]),
+        rasterLogSha256,
         authorityKey: createStudioRasterHandoffAuthorityKey({
           baseKey,
           generation,
+          rasterLogSha256,
           sourceOperations: visibleSourceSnapshot,
         }),
       };

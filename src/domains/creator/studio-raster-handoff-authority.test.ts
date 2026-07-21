@@ -46,13 +46,16 @@ function baseKey(overrides: Partial<Parameters<typeof createStudioRasterHandoffB
 
 function candidate(key: string): StudioRasterHandoffCandidate {
   const sourceOperations = [{ operationId: "draw-a", semanticParameters: "{\"a\":1}" }];
+  const rasterLogSha256 = "a".repeat(64);
   return {
     baseKey: key,
     generation: 3,
     operationIds: ["draw-a"],
+    rasterLogSha256,
     authorityKey: createStudioRasterHandoffAuthorityKey({
       baseKey: key,
       generation: 3,
+      rasterLogSha256,
       sourceOperations,
     }),
   };
@@ -114,26 +117,37 @@ describe("studio raster handoff authority", () => {
     expect(isStudioRasterHandoffCandidateAuthorized({
       candidate: ready,
       currentBaseKey: key,
+      authorizedRasterLogSha256: ready.rasterLogSha256,
       blocked: false,
     })).toBe(true);
     expect(isStudioRasterHandoffCandidateAuthorized({
       candidate: ready,
       currentBaseKey: baseKey({ gates: { editActive: true } }),
+      authorizedRasterLogSha256: ready.rasterLogSha256,
       blocked: false,
     })).toBe(false);
     expect(isStudioRasterHandoffCandidateAuthorized({
       candidate: ready,
       currentBaseKey: key,
+      authorizedRasterLogSha256: ready.rasterLogSha256,
       blocked: true,
     })).toBe(false);
     expect(isStudioRasterHandoffCandidateAuthorized({
       candidate: { ...ready, operationIds: [] },
       currentBaseKey: key,
+      authorizedRasterLogSha256: ready.rasterLogSha256,
       blocked: false,
     })).toBe(false);
     expect(isStudioRasterHandoffCandidateAuthorized({
       candidate: { ...ready, operationIds: ["draw-a", "draw-a"] },
       currentBaseKey: key,
+      authorizedRasterLogSha256: ready.rasterLogSha256,
+      blocked: false,
+    })).toBe(false);
+    expect(isStudioRasterHandoffCandidateAuthorized({
+      candidate: ready,
+      currentBaseKey: key,
+      authorizedRasterLogSha256: "b".repeat(64),
       blocked: false,
     })).toBe(false);
   });
@@ -144,11 +158,13 @@ describe("studio raster handoff authority", () => {
     expect([...studioRasterAuthorizedOperationIds({
       candidate: ready,
       currentBaseKey: key,
+      authorizedRasterLogSha256: ready.rasterLogSha256,
       blocked: false,
     })]).toEqual(["draw-a"]);
     expect(studioRasterAuthorizedOperationIds({
       candidate: ready,
       currentBaseKey: `${key}:stale`,
+      authorizedRasterLogSha256: ready.rasterLogSha256,
       blocked: false,
     }).size).toBe(0);
   });

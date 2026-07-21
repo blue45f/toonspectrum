@@ -1208,6 +1208,7 @@ import type {
   StudioPublishPreflightInput,
   StudioPublishProfile,
 } from "./studio-publish-preflight";
+import type { StudioRasterServerAuthoritySnapshot } from "./studio-raster-server-authority";
 import type { StudioReleaseSchedule } from "./studio-release-schedule";
 import type { SceneTemplate } from "./studio-scene-templates";
 import type { SfxPreset } from "./studio-sfx-presets";
@@ -1953,6 +1954,8 @@ function StudioCuttoonEditor() {
   const studioLiveRoomRef = useRef<StudioLiveRoom | null>(null);
   const studioCrdtAuthoritativeSaveBarrierRef =
     useRef<StudioCrdtAuthoritativeSaveBarrier | null>(null);
+  const [studioCrdtAuthoritativeBarrierGeneration, setStudioCrdtAuthoritativeBarrierGeneration] =
+    useState(0);
   const studioCrdtDocumentRef = useRef<StudioCrdtDocument | null>(null);
   const studioCrdtSceneRuntimeRef = useRef<StudioCrdtSceneGraphRuntime | null>(null);
   const publishStudioCrdtSceneTransitionRef = useRef<(
@@ -2284,6 +2287,9 @@ function StudioCuttoonEditor() {
     barrier: StudioCrdtAuthoritativeSaveBarrier | null
   ) => {
     studioCrdtAuthoritativeSaveBarrierRef.current = barrier;
+    // The command is ref-backed to avoid subscription churn, while this rare generation change
+    // restarts fail-closed raster authority after reconnect, revocation or room replacement.
+    setStudioCrdtAuthoritativeBarrierGeneration((generation) => generation + 1);
   }, []);
   const handleStudioCrdtDocumentChange = useCallback((
     document: StudioCrdtDocument | null,
@@ -6746,6 +6752,8 @@ function StudioCuttoonEditor() {
   const pendingGpuStrokesRef = useRef<StudioGpuStroke[]>([]);
   const [studioRasterHandoffCandidate, setStudioRasterHandoffCandidate] =
     useState<StudioRasterHandoffCandidate | null>(null);
+  const [studioRasterServerAuthority, setStudioRasterServerAuthority] =
+    useState<StudioRasterServerAuthoritySnapshot>(() => Object.freeze([]));
   const studioRasterHandoffCandidateRef = useRef<StudioRasterHandoffCandidate | null>(null);
   studioRasterHandoffCandidateRef.current = studioRasterHandoffCandidate;
 
@@ -6753,6 +6761,97 @@ function StudioCuttoonEditor() {
     if (!studioRasterHandoffCandidateRef.current) return;
     flushSync(() => setStudioRasterHandoffCandidate(null));
   };
+  useLayoutEffect(() => {
+    if (
+      !STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED ||
+      !authorizedWorkAssetScopeId || !studioAuthUserId || !studioCrdtDocument ||
+      !studioCrdtOperationSyncReady || collaborationDocumentLocked
+    ) {
+      setStudioRasterServerAuthority((current) => current.length === 0
+        ? current
+        : Object.freeze([]));
+      setStudioRasterHandoffCandidate(null);
+      return;
+    }
+    // A new room/barrier generation must never reuse proof from the previous durable frontier.
+    setStudioRasterServerAuthority((current) => current.length === 0
+      ? current
+      : Object.freeze([]));
+    setStudioRasterHandoffCandidate(null);
+    let active = true;
+    let coordinator: import("./studio-raster-server-authority")
+      .StudioRasterServerAuthorityCoordinator | null = null;
+    const document = studioCrdtDocument;
+    const workScope = authorizedWorkAssetScopeId;
+    const authScope = studioAuthUserId;
+    let unsubscribe: (() => void) | null = null;
+
+    void import("./studio-raster-server-authority").then(({ StudioRasterServerAuthorityCoordinator }) => {
+      if (!active) return;
+      coordinator = new StudioRasterServerAuthorityCoordinator({
+        readLogs: () => document.getRasterOperationLogs(),
+        waitForAuthoritativeAck: async () => {
+          const access = collaborationAccessRef.current;
+          const barrier = studioCrdtAuthoritativeSaveBarrierRef.current;
+          if (
+            !active || !barrier || access.locked || access.workId !== workScope ||
+            access.authScopeKey !== authScope || studioCrdtDocumentRef.current !== document
+          ) {
+            throw new DOMException("래스터 서버 승인 범위가 변경되었습니다.", "AbortError");
+          }
+          return barrier(10_000);
+        },
+        onAuthorityChange: (snapshot) => {
+          if (
+            !active || studioCrdtDocumentRef.current !== document ||
+            collaborationAccessRef.current.workId !== workScope ||
+            collaborationAccessRef.current.authScopeKey !== authScope
+          ) return;
+          setStudioRasterServerAuthority(snapshot);
+          if (snapshot.length === 0) setStudioRasterHandoffCandidate(null);
+        },
+        // Publication is experimental and the vector fallback is already safe. Transport errors
+        // remain visible in the collaboration status rather than duplicating a per-stroke toast.
+        debounceMs: 80,
+      });
+      unsubscribe = document.subscribeChanges(() => coordinator?.invalidate(), {
+        includeOrigin: () => true,
+        includeChange: ({
+          changedRasterSurfaceIds,
+          changedRasterOperationIds,
+          changedRasterUndoOperationIds,
+          changedRasterUndoAcknowledgementIds,
+          changedRasterCheckpointIds,
+        }) =>
+          changedRasterSurfaceIds.size > 0 ||
+          changedRasterOperationIds.size > 0 ||
+          changedRasterUndoOperationIds.size > 0 ||
+          changedRasterUndoAcknowledgementIds.size > 0 ||
+          changedRasterCheckpointIds.size > 0,
+        snapshotFields: [] as const,
+      });
+      coordinator.start();
+    }).catch(() => {
+      if (!active) return;
+      setStudioRasterServerAuthority((current) => current.length === 0
+        ? current
+        : Object.freeze([]));
+      setStudioRasterHandoffCandidate(null);
+    });
+
+    return () => {
+      active = false;
+      unsubscribe?.();
+      coordinator?.close();
+    };
+  }, [
+    authorizedWorkAssetScopeId,
+    collaborationDocumentLocked,
+    studioAuthUserId,
+    studioCrdtAuthoritativeBarrierGeneration,
+    studioCrdtDocument,
+    studioCrdtOperationSyncReady,
+  ]);
   const draftRafRef = useRef<number | null>(null);
   const pendingDraftRef = useRef<DrawEl | null>(null);
   const marqueeRafRef = useRef<number | null>(null);
@@ -22592,9 +22691,14 @@ function StudioCuttoonEditor() {
     !authorizedWorkAssetScopeId || !studioCrdtDocument ||
     sourceHydrationPending || collaborationDocumentUnavailable ||
     webGpuViewportSurface === null || studioRasterVisibleDocumentRect === null;
+  const studioRasterSurfaceId = `raster:${activePage.id}:ink`;
+  const studioRasterAuthorizedLogSha256 = studioRasterServerAuthority.find(
+    ({ surfaceId }) => surfaceId === studioRasterSurfaceId
+  )?.logSha256 ?? null;
   const studioRasterHiddenOperationIds = studioRasterAuthorizedOperationIds({
     candidate: studioRasterHandoffCandidate,
     currentBaseKey: studioRasterHandoffBaseKey,
+    authorizedRasterLogSha256: studioRasterAuthorizedLogSha256,
     blocked: studioRasterHandoffBlocked,
   });
   const studioRasterAuthorizedAuthorityKey = studioRasterHiddenOperationIds.size > 0

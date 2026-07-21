@@ -45,6 +45,9 @@ describe("automatic raster publication feature gate", () => {
     expect(source).toContain("<StudioRasterCrdtSurface");
     expect(source).toContain("studioRasterHiddenOperationIds.has(el.id)");
     expect(source).toContain("authorizedAuthorityKey={studioRasterAuthorizedAuthorityKey}");
+    expect(source).toContain("StudioRasterServerAuthorityCoordinator");
+    expect(source).toContain("authorizedRasterLogSha256: studioRasterAuthorizedLogSha256");
+    expect(source).toContain("return barrier(10_000)");
     expect(source).toContain("revokeStudioRasterHandoffRef.current()");
     expect(source).toContain("projectStudioRasterOverlayElements({");
     expect(source).toContain("resolveStudioRasterHandoffProjection({");
