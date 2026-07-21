@@ -418,7 +418,10 @@ export function StudioToolHintTarget({
     coordinator.markPending(tipId);
     showTimer.current = globalThis.setTimeout(() => {
       showTimer.current = 0;
-      coordinator.clearPending(tipId);
+      // A newer target may have claimed the exclusive hint lane while this
+      // hover delay was running. `claim()` clears older pending intents; only
+      // the still-current intent is allowed to reveal itself.
+      if (!coordinator.clearPending(tipId)) return;
       if (coordinator.getDismissEpoch() !== intentEpoch) return;
       reveal(false);
     }, SHOW_DELAY_MS) as unknown as number;

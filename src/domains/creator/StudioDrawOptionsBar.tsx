@@ -431,7 +431,8 @@ export function StudioDrawOptionsBar({
                     ? "현재 브러시를 즐겨찾기 선반에서 제거합니다. 브러시 자체 설정과 최근 사용 기록은 유지돼요."
                     : "현재 브러시를 즐겨찾기 선반에 고정해 다음 작업에서도 빠르게 다시 꺼냅니다.",
                   undefined,
-                  "brush-favorite"
+                  "brush-favorite",
+                  isFavorite ? "remove" : "add"
                 )}
               >
                 <button
@@ -483,7 +484,8 @@ export function StudioDrawOptionsBar({
                       ? "도형 내부를 비워 윤곽선만 그립니다."
                       : "새 도형의 내부를 현재 주 색으로 채웁니다. 윤곽선과 채움은 함께 유지돼요.",
                   undefined,
-                  "shape-fill"
+                  "shape-fill",
+                  shapeFill ? "disable" : "enable"
                 )}
               >
                 <button
@@ -604,7 +606,8 @@ export function StudioDrawOptionsBar({
                 ? "브러시 프리셋·보정·필압·대칭·빠른 슬롯 행을 접어 캔버스 공간을 되찾습니다."
                 : "브러시 프리셋·손떨림 보정·필압 곡선·대칭·빠른 슬롯을 한 줄에서 정밀 조정합니다.",
               undefined,
-              "draw-settings"
+              "draw-settings",
+              advancedOpen ? "collapse" : "expand"
             )}
           >
             <button
@@ -634,7 +637,8 @@ export function StudioDrawOptionsBar({
                   ? "작업 캔버스를 원래 방향으로 되돌립니다. 데이터는 바뀌지 않아 비율과 실루엣을 점검할 때 안전해요."
                   : "캔버스를 거울처럼 좌우로 보여 비율·기울기 오류를 새 눈으로 확인합니다. 작품 데이터 자체는 뒤집히지 않아요.",
                 undefined,
-                "flip-view"
+                "flip-view",
+                canvasFlipH ? "restore" : "flip"
               )}
             >
               <button
@@ -684,7 +688,8 @@ export function StudioDrawOptionsBar({
                   ? "자유선 자동 정리를 끕니다. 이후 획은 브러시의 손맛 그대로 남아요."
                   : "선을 긋고 끝에서 잠시 멈추면 낙서를 직선·원·사각형처럼 매끈한 도형으로 자동 정리합니다.",
                 undefined,
-                "smart-shape"
+                "smart-shape",
+                quickShapeActive ? "disable" : "enable"
               )}
             >
               <button

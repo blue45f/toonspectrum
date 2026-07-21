@@ -2,7 +2,7 @@ export type StudioToolHintCoordinator = {
   claim: (hintId: string) => string | null;
   release: (hintId: string) => boolean;
   markPending: (hintId: string) => void;
-  clearPending: (hintId: string) => void;
+  clearPending: (hintId: string) => boolean;
   dismissAll: () => number;
   getActiveHintId: () => string | null;
   getDismissEpoch: () => number;
@@ -27,7 +27,10 @@ export function createStudioToolHintCoordinator(): StudioToolHintCoordinator {
   return {
     claim(hintId) {
       const previousHintId = activeHintId;
-      pendingHintIds.delete(hintId);
+      // An explicit claim is newer than every delayed hover intent. Clear the
+      // whole pending lane so an older target cannot wake up after keyboard
+      // focus (or another immediate reveal) has already taken ownership.
+      pendingHintIds.clear();
       if (previousHintId === hintId) return previousHintId;
       activeHintId = hintId;
       emit();
@@ -43,7 +46,7 @@ export function createStudioToolHintCoordinator(): StudioToolHintCoordinator {
       pendingHintIds.add(hintId);
     },
     clearPending(hintId) {
-      pendingHintIds.delete(hintId);
+      return pendingHintIds.delete(hintId);
     },
     dismissAll() {
       if (activeHintId === null && pendingHintIds.size === 0) return dismissEpoch;

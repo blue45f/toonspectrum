@@ -46,4 +46,14 @@ describe("Studio tool hint coordinator", () => {
     expect(coordinator.dismissAll()).toBe(1);
     expect(coordinator.getDismissEpoch()).toBe(1);
   });
+
+  it("invalidates every older pending intent when a newer target claims the lane", () => {
+    const coordinator = createStudioToolHintCoordinator();
+    coordinator.markPending("hovered-pen");
+
+    coordinator.claim("focused-eraser");
+
+    expect(coordinator.getActiveHintId()).toBe("focused-eraser");
+    expect(coordinator.clearPending("hovered-pen")).toBe(false);
+  });
 });

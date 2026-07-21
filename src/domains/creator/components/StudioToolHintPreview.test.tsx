@@ -20,6 +20,17 @@ function visualSignature(
     .replace(/studio-tool-preview-[^"#)]+/gu, "studio-tool-preview-id");
 }
 
+function animatedVisualSignature(
+  kind: (typeof PREVIEW_KINDS)[number],
+  variant?: string
+): string {
+  return renderToStaticMarkup(
+    <StudioToolHintPreview kind={kind} variant={variant} reducedMotion={false} />
+  )
+    .replace(/\sdata-(?:studio-tool-hint-preview|preview-kind|preview-variant|preview-operation)="[^"]*"/gu, "")
+    .replace(/studio-tool-preview-[^"#)]+/gu, "studio-tool-preview-id");
+}
+
 describe("StudioToolHintPreview", () => {
   it.each(PREVIEW_KINDS)("renders the %s micro-demo with stable integration hooks", (kind) => {
     const html = renderToStaticMarkup(
@@ -41,6 +52,12 @@ describe("StudioToolHintPreview", () => {
 
     expect(html).toContain('data-motion="animated"');
     expect(html).toContain("<animate");
+  });
+
+  it("keeps every default preview kind visually distinct", () => {
+    const signatures = PREVIEW_KINDS.map((kind) => visualSignature(kind));
+
+    expect(new Set(signatures).size).toBe(PREVIEW_KINDS.length);
   });
 
   it("gives formerly over-shared actions different visual signatures", () => {
@@ -78,9 +95,96 @@ describe("StudioToolHintPreview", () => {
     ["stabilizer", ["stabilizer-standard", "stabilizer-adaptive", "stabilizer-precision", "post-correction"]],
     ["pressure", ["pressure-soft", "pressure-linear", "pressure-firm"]],
     ["symmetry", ["symmetry-none", "symmetry-vertical", "symmetry-horizontal", "symmetry-radial", "symmetry-kaleidoscope"]],
+    ["shape", ["shape-picker-line", "shape-picker-rect", "shape-picker-ellipse", "shape-picker-star", "shape-picker-arrow", "shape-picker-triangle", "shape-picker-polygon"]],
+    ["selection-boundary", ["select-all", "clear", "invert", "remove-last-subpath", "expand", "contract"]],
+    ["selection-history", ["undo", "redo"]],
+    ["selection-marquee-transform", ["rotate-custom", "rotate-cw-90", "rotate-ccw-90", "rotate-180", "flip-x", "flip-y", "translate-left", "translate-right", "translate-up", "translate-down", "scale-up", "scale-down"]],
+    ["selection-content-transform", ["apply-scale-rotate", "rotate-cw-90", "flip-x", "flip-y", "delete", "content-aware-fill"]],
+    ["selection-adjust", ["brightness", "hue"]],
+    ["panel-layout", ["add", "split-diagonal", "diagonalize", "straighten"]],
+    ["zoom-view", ["zoom-out", "zoom-in", "actual-size", "fit-width", "reset"]],
+    ["fullscreen", ["maximize-window", "restore-window", "fullscreen", "exit-fullscreen", "canvas-only"]],
+    ["workspace-focus", ["focus", "restore"]],
+    ["brush-favorite", ["add", "remove"]],
+    ["shape-fill", ["enable", "disable"]],
+    ["draw-settings", ["expand", "collapse"]],
+    ["flip-view", ["flip", "restore"]],
+    ["smart-shape", ["enable", "disable"]],
   ] as const)("specializes the %s family by stable action identity", (kind, variants) => {
     const signatures = variants.map((variant) => visualSignature(kind, variant));
     expect(new Set(signatures).size).toBe(variants.length);
+  });
+
+  it.each([
+    ["brush-favorite", ["add", "remove"]],
+    ["shape-fill", ["enable", "disable"]],
+    ["draw-settings", ["expand", "collapse"]],
+    ["flip-view", ["flip", "restore"]],
+    ["smart-shape", ["enable", "disable"]],
+    ["fullscreen", ["fullscreen", "exit-fullscreen"]],
+    ["workspace-focus", ["focus", "restore"]],
+  ] as const)("animates opposite %s actions with different directions", (kind, variants) => {
+    const signatures = variants.map((variant) => animatedVisualSignature(kind, variant));
+    expect(new Set(signatures).size).toBe(variants.length);
+  });
+
+  it("reverses the canvas frame direction for zoom-out", () => {
+    const zoomIn = animatedVisualSignature("zoom-view", "zoom-in");
+    const zoomOut = animatedVisualSignature("zoom-view", "zoom-out");
+
+    expect(zoomIn).toContain('attributeName="width" dur="2.8s" values="82;112;112;82"');
+    expect(zoomOut).toContain('attributeName="width" dur="2.8s" values="112;82;82;112"');
+  });
+
+  it.each([
+    ["shape-picker-rect", "M58 30 158 76"],
+    ["shape-picker-ellipse", "M58 26 158 80"],
+    ["shape-picker-star", "M74 20 142 79"],
+    ["shape-picker-arrow", "M54 29 163 77"],
+    ["shape-picker-triangle", "M54 21 162 79"],
+    ["shape-picker-polygon", "M64 20 162 84"],
+  ] as const)("demonstrates %s as the editor's bounding-box drag gesture", (variant, path) => {
+    const html = animatedVisualSignature("shape", variant);
+
+    expect(html).toContain(`path="${path}"`);
+    expect(html).toContain('values=".04 .04;1 1;1 1;.04 .04"');
+  });
+
+  it("keeps arrow drawing unfilled because the editor disables arrow fill", () => {
+    const html = renderToStaticMarkup(
+      <StudioToolHintPreview kind="shape" variant="shape-picker-arrow" reducedMotion />
+    );
+
+    expect(html).toMatch(/data-preview-operation="shape-arrow"[^>]*fill="none"/u);
+  });
+
+  it("keeps selection scale and scale-rotate animation centered on the selection", () => {
+    const marqueeScale = animatedVisualSignature("selection-marquee-transform", "scale-up");
+    const contentTransform = animatedVisualSignature("selection-content-transform", "apply-scale-rotate");
+
+    expect(marqueeScale).toContain('transform="translate(108 53)"');
+    expect(marqueeScale).toContain('transform="translate(-108 -53)"');
+    expect(contentTransform).toContain('values="1;1.18;1.18;1"');
+    expect(contentTransform).toContain('values="0;12;12;0"');
+    expect(contentTransform).toContain('transform="translate(-108 -53)"');
+  });
+
+  it("keeps high-value toolbelt workflows visually distinct", () => {
+    const workflowKinds = [
+      "panel-layout",
+      "character-3d",
+      "background-library",
+      "style-library",
+      "storyboard-grid",
+      "review-workflow",
+      "team-collaboration",
+      "continuity-check",
+      "vertical-preview",
+      "workspace-focus",
+    ] as const;
+    const signatures = workflowKinds.map((kind) => visualSignature(kind));
+
+    expect(new Set(signatures).size).toBe(workflowKinds.length);
   });
 
   it("shows object snapping at a grid intersection", () => {

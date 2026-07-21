@@ -71,6 +71,19 @@ describe("Studio rich-hint consumer mappings", () => {
     }
   });
 
+  it("maps drawing-dock toggle previews to the next action instead of only the current state", () => {
+    const source = readStudioSource("StudioDrawOptionsBar.tsx");
+    for (const [anchor, variantExpression] of [
+      ["브러시 즐겨찾기 해제", 'isFavorite ? "remove" : "add"'],
+      ["도형 채우기 끄기", 'shapeFill ? "disable" : "enable"'],
+      ["세부 그리기 옵션 접기", 'advancedOpen ? "collapse" : "expand"'],
+      ["캔버스 좌우 반전", 'canvasFlipH ? "restore" : "flip"'],
+      ["스마트 도형 끄기", 'quickShapeActive ? "disable" : "enable"'],
+    ]) {
+      expectNearby(source, anchor, variantExpression, 1_200);
+    }
+  });
+
   it("distinguishes mobile direct shapes, export settings, file workflows, insertion, and comments", () => {
     const mobile = readStudioSource("StudioMobileEditingDock.tsx");
     const menubar = readStudioSource("StudioMenubarContent.tsx");

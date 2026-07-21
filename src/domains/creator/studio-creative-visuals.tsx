@@ -4,9 +4,10 @@
  */
 /* eslint-disable react-refresh/only-export-components -- shape kind maps + picker kinds shared with StudioPage / options bar */
 import { STUDIO_DRAW_SHAPE_PICKER_KINDS as DRAW_SHAPE_PICKER_KINDS } from "./studio-draw-hud";
+import { StudioToolHintTarget } from "./StudioToolHint";
 
+import type { StudioToolHintSpec } from "./studio-tool-hints";
 import type { ReactElement } from "react";
-
 
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,55 @@ export type StudioShapeKindVisual =
   | "star"
   | "arrow"
   | "ellipse";
+
+export type StudioShapePickerItem = {
+  readonly kind: string;
+  readonly label: string;
+  readonly disabled?: boolean;
+  readonly unavailableReason?: string;
+};
+
+const SHAPE_PICKER_DESCRIPTION_BY_KIND: Readonly<Record<string, string>> = {
+  line: "시작점에서 끝점까지 드래그해 곧은 선을 그립니다. Shift를 누르면 수평·수직·45° 방향으로 고정해요.",
+  rect: "한 모서리에서 반대 모서리까지 드래그해 사각형을 만듭니다. Shift를 누르면 정사각형으로 고정해요.",
+  ellipse: "바깥 영역을 드래그해 타원을 만듭니다. Shift를 누르면 가로세로 비율이 같은 정원으로 고정해요.",
+  star: "대각선으로 드래그해 별의 위치와 크기를 정합니다. 별 꼭짓점과 안쪽 반경은 도형 속성에서 다듬을 수 있어요.",
+  arrow: "시작점에서 가리킬 곳까지 드래그해 방향 화살표를 만듭니다. 드래그 방향이 화살촉의 방향이 돼요.",
+  triangle: "대각선으로 드래그해 삼각형의 바깥 영역을 정합니다. Shift를 누르면 균형 잡힌 비율로 고정해요.",
+  polygon: "대각선으로 드래그해 정다각형의 위치와 크기를 정합니다. 변의 수는 도형 속성에서 바꿀 수 있어요.",
+};
+
+const SHAPE_PICKER_TIP_BY_KIND: Readonly<Record<string, string>> = {
+  line: "투시·아이소메트릭 자가 켜져 있으면 선이 활성 가이드에 맞춰집니다.",
+  rect: "채우기를 켜면 외곽선과 내부 색을 함께 만들 수 있어요.",
+  ellipse: "정원이 필요할 때는 드래그하는 동안 Shift를 유지하세요.",
+  star: "별의 뾰족함은 안쪽 반경 값을 낮출수록 강해집니다.",
+  arrow: "화살표는 채우기 없이 선 색과 굵기를 그대로 사용합니다.",
+  triangle: "채우기를 켠 뒤 드래그하면 내부가 닫힌 도형으로 생성됩니다.",
+  polygon: "변 수를 먼저 정하면 반복 배경과 소품 형태를 빠르게 만들 수 있어요.",
+};
+
+const SHAPE_PICKER_DEFAULT_UNAVAILABLE_REASON =
+  "현재 작업 상태에서는 이 도형을 사용할 수 없습니다.";
+
+function shapePickerUnavailableReason(item: StudioShapePickerItem): string | undefined {
+  if (!item.disabled) return undefined;
+  return item.unavailableReason ?? SHAPE_PICKER_DEFAULT_UNAVAILABLE_REASON;
+}
+
+/** Shared semantic contract for both the inspector grid and compact shape strip. */
+export function studioShapePickerHint(item: Pick<StudioShapePickerItem, "kind" | "label">): StudioToolHintSpec {
+  return {
+    id: `shape-picker-${item.kind}`,
+    title: `${item.label} 도형`,
+    description:
+      SHAPE_PICKER_DESCRIPTION_BY_KIND[item.kind]
+      ?? `${item.label} 도형을 선택하고 캔버스에서 드래그해 위치와 크기를 정합니다.`,
+    preview: "shape",
+    previewVariant: `shape-picker-${item.kind}`,
+    tip: SHAPE_PICKER_TIP_BY_KIND[item.kind],
+  };
+}
 
 /** Map StudioPage DrawShapeKind → glyph id. */
 export function studioDrawShapeToGlyph(
@@ -157,12 +207,12 @@ export function StudioShapePickerGrid({
   showLabels = false,
   className,
 }: {
-  kinds?: readonly { kind: string; label: string }[];
+  kinds?: readonly StudioShapePickerItem[];
   activeKind: string;
   onSelect: (kind: string) => void;
   /** Preview glyphs with soft fill (when shape fill is on). */
   filled?: boolean;
-  /** Prefer glyph-only; labels live in title/aria. */
+  /** Prefer glyph-only; labels remain available through ARIA and the rich hint. */
   showLabels?: boolean;
   className?: string;
 }): ReactElement {
@@ -180,39 +230,50 @@ export function StudioShapePickerGrid({
         const active = activeKind === item.kind;
         const glyph = studioDrawShapeToGlyph(item.kind);
         const canFill = item.kind !== "line" && item.kind !== "arrow";
+        const hint = studioShapePickerHint(item);
+        const unavailableReason = shapePickerUnavailableReason(item);
         return (
-          <button
+          <StudioToolHintTarget
             key={item.kind}
-            type="button"
-            role="option"
-            aria-selected={active}
-            aria-label={item.label}
-            title={item.label}
-            onClick={() => onSelect(item.kind)}
-            className={cn(
-              "flex flex-col items-center gap-1 rounded-xl border transition-[background,border-color,box-shadow,transform] duration-150",
-              "hover:-translate-y-px hover:shadow-sm",
-              showLabels ? "px-1 py-1.5" : "aspect-square place-items-center p-1.5",
-              active
-                ? "border-accent/55 bg-accent-soft/50 text-fg shadow-sm ring-1 ring-accent/20"
-                : "border-line/70 bg-card/90 text-fg-2 hover:border-line hover:bg-raised"
-            )}
+            hint={hint}
+            preferredSide="left"
+            unavailableReason={unavailableReason}
+            className="w-full"
           >
-            <span
+            <button
+              type="button"
+              role="option"
+              aria-selected={active}
+              aria-label={item.label}
+              aria-disabled={item.disabled || undefined}
+              onClick={() => {
+                if (!item.disabled) onSelect(item.kind);
+              }}
               className={cn(
-                "grid place-items-center rounded-lg border",
-                showLabels ? "size-8" : "size-9",
+                "flex w-full flex-col items-center gap-1 rounded-xl border transition-[background,border-color,box-shadow,transform] duration-150",
+                "hover:-translate-y-px hover:shadow-sm aria-disabled:cursor-not-allowed aria-disabled:opacity-45 aria-disabled:hover:translate-y-0 aria-disabled:hover:shadow-none",
+                showLabels ? "px-1 py-1.5" : "aspect-square place-items-center p-1.5",
                 active
-                  ? "border-accent/40 bg-canvas/50 text-accent"
-                  : "border-line/50 bg-canvas/40"
+                  ? "border-accent/55 bg-accent-soft/50 text-fg shadow-sm ring-1 ring-accent/20"
+                  : "border-line/70 bg-card/90 text-fg-2 hover:border-line hover:bg-raised"
               )}
             >
-              <StudioShapeKindGlyph kind={glyph} active={active} filled={filled && canFill} />
-            </span>
-            {showLabels ? (
-              <span className="text-[0.58rem] font-bold leading-none tracking-tight">{item.label}</span>
-            ) : null}
-          </button>
+              <span
+                className={cn(
+                  "grid place-items-center rounded-lg border",
+                  showLabels ? "size-8" : "size-9",
+                  active
+                    ? "border-accent/40 bg-canvas/50 text-accent"
+                    : "border-line/50 bg-canvas/40"
+                )}
+              >
+                <StudioShapeKindGlyph kind={glyph} active={active} filled={filled && canFill} />
+              </span>
+              {showLabels ? (
+                <span className="text-[0.58rem] font-bold leading-none tracking-tight">{item.label}</span>
+              ) : null}
+            </button>
+          </StudioToolHintTarget>
         );
       })}
     </div>
@@ -231,7 +292,7 @@ export function StudioShapePickerStrip({
   showLabels = false,
   className,
 }: {
-  kinds?: readonly { kind: string; label: string }[];
+  kinds?: readonly StudioShapePickerItem[];
   activeKind: string;
   onSelect: (kind: string) => void;
   filled?: boolean;
@@ -252,34 +313,45 @@ export function StudioShapePickerStrip({
         const active = activeKind === item.kind;
         const glyph = studioDrawShapeToGlyph(item.kind);
         const canFill = item.kind !== "line" && item.kind !== "arrow";
+        const hint = studioShapePickerHint(item);
+        const unavailableReason = shapePickerUnavailableReason(item);
         return (
-          <button
+          <StudioToolHintTarget
             key={item.kind}
-            type="button"
-            role="option"
-            aria-selected={active}
-            aria-label={item.label}
-            title={item.label}
-            onClick={() => onSelect(item.kind)}
-            className={cn(
-              "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border transition-[background,border-color,box-shadow,transform] duration-150",
-              "hover:-translate-y-px",
-              showLabels ? "px-1.5 text-[0.62rem] font-bold" : "w-8 justify-center px-0",
-              active
-                ? "border-accent/55 bg-accent-soft/55 text-fg shadow-sm ring-1 ring-accent/20"
-                : "border-line/70 bg-card/90 text-fg-2 hover:border-line hover:bg-raised"
-            )}
+            hint={hint}
+            preferredSide="top"
+            unavailableReason={unavailableReason}
+            className="shrink-0"
           >
-            <span
+            <button
+              type="button"
+              role="option"
+              aria-selected={active}
+              aria-label={item.label}
+              aria-disabled={item.disabled || undefined}
+              onClick={() => {
+                if (!item.disabled) onSelect(item.kind);
+              }}
               className={cn(
-                "grid size-6 place-items-center rounded-md",
-                active ? "bg-canvas/40 text-accent" : "text-current"
+                "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border transition-[background,border-color,box-shadow,transform] duration-150",
+                "hover:-translate-y-px aria-disabled:cursor-not-allowed aria-disabled:opacity-45 aria-disabled:hover:translate-y-0",
+                showLabels ? "px-1.5 text-[0.62rem] font-bold" : "w-8 justify-center px-0",
+                active
+                  ? "border-accent/55 bg-accent-soft/55 text-fg shadow-sm ring-1 ring-accent/20"
+                  : "border-line/70 bg-card/90 text-fg-2 hover:border-line hover:bg-raised"
               )}
             >
-              <StudioShapeKindGlyph kind={glyph} active={active} filled={filled && canFill} />
-            </span>
-            {showLabels ? <span className="pr-0.5">{item.label}</span> : null}
-          </button>
+              <span
+                className={cn(
+                  "grid size-6 place-items-center rounded-md",
+                  active ? "bg-canvas/40 text-accent" : "text-current"
+                )}
+              >
+                <StudioShapeKindGlyph kind={glyph} active={active} filled={filled && canFill} />
+              </span>
+              {showLabels ? <span className="pr-0.5">{item.label}</span> : null}
+            </button>
+          </StudioToolHintTarget>
         );
       })}
     </div>

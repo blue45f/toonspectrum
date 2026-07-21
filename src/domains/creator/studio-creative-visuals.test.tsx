@@ -15,6 +15,7 @@ import {
   StudioStarterCardArt,
   StudioSymmetryGlyph,
   STUDIO_DRAW_SHAPE_PICKER_KINDS,
+  studioShapePickerHint,
 } from "./studio-creative-visuals";
 
 describe("studio creative visuals", () => {
@@ -55,8 +56,27 @@ describe("studio creative visuals", () => {
     expect(html).toContain('data-studio-shape-picker="true"');
     expect(html).toContain('aria-selected="true"');
     expect(html).toContain('aria-label="사각형"');
+    expect(html.match(/data-studio-tool-hint-target="true"/gu)).toHaveLength(3);
+    expect(html).not.toContain('title="');
     // Default is icon-first — no visible text label node for kinds
     expect(html).not.toMatch(/>사각형</);
+  });
+
+  it("assigns every canonical shape a distinct, explicit motion-coach variant", () => {
+    const hints = STUDIO_DRAW_SHAPE_PICKER_KINDS.map(studioShapePickerHint);
+
+    expect(hints.map((hint) => hint.preview)).toEqual(Array(7).fill("shape"));
+    expect(hints.map((hint) => hint.previewVariant)).toEqual([
+      "shape-picker-line",
+      "shape-picker-rect",
+      "shape-picker-ellipse",
+      "shape-picker-star",
+      "shape-picker-arrow",
+      "shape-picker-triangle",
+      "shape-picker-polygon",
+    ]);
+    expect(new Set(hints.map((hint) => hint.description))).toHaveProperty("size", 7);
+    expect(new Set(hints.map((hint) => hint.id))).toHaveProperty("size", 7);
   });
 
   it("renders compact shape strip, pressure meter, and draw glyphs", () => {
@@ -70,6 +90,8 @@ describe("studio creative visuals", () => {
     );
     expect(strip).toContain('data-studio-shape-strip="true"');
     expect(strip).toContain('data-studio-shape-glyph="ellipse"');
+    expect(strip.match(/data-studio-tool-hint-target="true"/gu)).toHaveLength(7);
+    expect(strip).not.toContain('title="');
     expect(STUDIO_DRAW_SHAPE_PICKER_KINDS.length).toBeGreaterThanOrEqual(7);
 
     const meter = renderToStaticMarkup(<StudioPressureHudMeter ratio={0.42} />);

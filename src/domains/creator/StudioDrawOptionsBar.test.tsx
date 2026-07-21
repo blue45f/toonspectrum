@@ -182,6 +182,20 @@ describe("StudioDrawOptionsBar", () => {
     expect(drawOptionsSource).not.toContain("title={`대칭:");
   });
 
+  it("describes the next stateful drawing-dock action with an exact preview variant", () => {
+    for (const [preview, variantExpression] of [
+      ["brush-favorite", 'isFavorite ? "remove" : "add"'],
+      ["shape-fill", 'shapeFill ? "disable" : "enable"'],
+      ["draw-settings", 'advancedOpen ? "collapse" : "expand"'],
+      ["flip-view", 'canvasFlipH ? "restore" : "flip"'],
+      ["smart-shape", 'quickShapeActive ? "disable" : "enable"'],
+    ]) {
+      const previewIndex = drawOptionsSource.indexOf(`"${preview}"`);
+      expect(previewIndex, `missing preview family: ${preview}`).toBeGreaterThanOrEqual(0);
+      expect(drawOptionsSource.slice(previewIndex, previewIndex + 180)).toContain(variantExpression);
+    }
+  });
+
   it("keeps symmetry and slots behind the advanced disclosure", () => {
     const html = renderToStaticMarkup(
       <StudioDrawOptionsBar
