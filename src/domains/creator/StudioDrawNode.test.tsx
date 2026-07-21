@@ -31,6 +31,35 @@ class StampSceneContext {
   }
 }
 
+class AliasSceneContext {
+  readonly arcs: Array<{ alpha: number; radius: number; x: number; y: number }> = [];
+  readonly strokeWidths: number[] = [];
+  fillStyle: string | CanvasGradient | CanvasPattern = "";
+  globalAlpha = 1;
+  lineCap: CanvasLineCap = "butt";
+  lineJoin: CanvasLineJoin = "miter";
+  lineWidth = 1;
+  strokeStyle: string | CanvasGradient | CanvasPattern = "";
+
+  save(): void {}
+  restore(): void {}
+  beginPath(): void {}
+  closePath(): void {}
+  fill(): void {}
+  moveTo(): void {}
+  lineTo(): void {}
+  quadraticCurveTo(): void {}
+  stroke(): void {
+    this.strokeWidths.push(this.lineWidth);
+  }
+  arc(x: number, y: number, radius: number): void {
+    this.arcs.push({ alpha: this.globalAlpha, radius, x, y });
+  }
+  createRadialGradient(): CanvasGradient {
+    return { addColorStop: () => undefined } as unknown as CanvasGradient;
+  }
+}
+
 const konvaCapture = vi.hoisted(() => ({
   nodes: [] as CapturedKonvaNode[],
 }));
@@ -44,7 +73,21 @@ const patternLoader = vi.hoisted(() => ({
 }));
 
 const watercolorCapture = vi.hoisted(() => ({
-  causalPlan: vi.fn(() => []),
+  causalPlan: vi.fn((
+    _input?: {
+      baseWidth?: number;
+      pressures?: readonly number[];
+      spacing?: number;
+      [key: string]: unknown;
+    },
+    _finalize?: boolean,
+  ): Array<{
+      opacity: number;
+      radius: number;
+      role: "core" | "diffuse";
+      x: number;
+      y: number;
+    }> => []),
 }));
 
 vi.mock("react-konva/lib/ReactKonvaCore", async () => {
@@ -293,6 +336,169 @@ describe("StudioDrawNode orchestration", () => {
       fill: "#16100c",
       globalCompositeOperation: "destination-out",
     });
+  });
+
+  it("makes equal-size fineliner and bold-marker taps visibly distinct through alias profiles", () => {
+    const fineliner = render(
+      <StudioDrawNode
+        el={drawEl({ brush: "fineliner", points: [4, 7], pressures: [0] })}
+      />,
+    );
+    expect(captured("Circle")[0]!.props.radius).toBeCloseTo(3.408);
+
+    fineliner.unmount();
+    konvaCapture.nodes.length = 0;
+    render(
+      <StudioDrawNode
+        el={drawEl({ brush: "marker-bold", points: [4, 7], pressures: [0] })}
+      />,
+    );
+    expect(captured("Circle")[0]!.props.radius).toBeCloseTo(11.91);
+  });
+
+  it("applies alias diameter and pressure curves to causal pen/marker retained dabs", () => {
+    const renderRadii = (brush: "fineliner" | "marker-bold") => {
+      const view = render(
+        <StudioDrawNode
+          el={drawEl({
+            brush,
+            mode: "pen",
+            points: [0, 0, 12, 0],
+            pressures: [0.5, 0.5],
+            pressureModel: "linear-residual-path-v3",
+            sampleSpacing: 1,
+          })}
+        />,
+      );
+      const context = new AliasSceneContext();
+      const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+        context: CanvasRenderingContext2D
+      ) => void;
+      sceneFunc(context as unknown as CanvasRenderingContext2D);
+      view.unmount();
+      konvaCapture.nodes.length = 0;
+      return context.arcs.map((arc) => arc.radius);
+    };
+
+    const fineliner = renderRadii("fineliner");
+    const boldMarker = renderRadii("marker-bold");
+    expect(fineliner.length).toBeGreaterThan(0);
+    expect(boldMarker.length).toBeGreaterThan(0);
+    expect(Math.max(...boldMarker)).toBeGreaterThan(Math.max(...fineliner) * 3);
+  });
+
+  it("keeps liner narrower than G-pen at full pressure in committed segment rendering", () => {
+    const renderWidths = (brush: "gpen" | "liner") => {
+      const view = render(
+        <StudioDrawNode
+          el={drawEl({
+            brush,
+            mode: "pen",
+            points: [0, 0, 10, 0, 20, 0, 30, 0, 40, 0],
+            pressures: [1, 1, 1, 1, 1],
+          })}
+        />,
+      );
+      const context = new AliasSceneContext();
+      const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+        context: CanvasRenderingContext2D
+      ) => void;
+      sceneFunc(context as unknown as CanvasRenderingContext2D);
+      view.unmount();
+      konvaCapture.nodes.length = 0;
+      return context.strokeWidths;
+    };
+
+    const gpen = renderWidths("gpen");
+    const liner = renderWidths("liner");
+    expect(gpen.length).toBeGreaterThan(0);
+    expect(liner.length).toBeGreaterThan(0);
+    expect(Math.max(...liner)).toBeLessThan(Math.max(...gpen));
+  });
+
+  it("applies ink-wash spacing, pressure, and material scales to retained watercolor", () => {
+    watercolorCapture.causalPlan.mockReturnValueOnce([
+      { x: 1, y: 2, radius: 10, opacity: 0.6, role: "core" },
+      { x: 3, y: 4, radius: 12, opacity: 0.2, role: "diffuse" },
+    ]);
+    render(
+      <StudioDrawNode
+        el={drawEl({
+          brush: "ink-wash",
+          mode: "pen",
+          points: [0, 0, 8, 0],
+          pressures: [0.5, 0.5],
+          strokeWidth: 20,
+          watercolorPipeline: "causal-walker-v2",
+        })}
+      />,
+    );
+
+    const [planInput, finalize] = watercolorCapture.causalPlan.mock.calls[0]!;
+    expect(planInput?.baseWidth).toBeCloseTo(17.6);
+    expect(planInput?.spacing).toBeCloseTo(3.872);
+    expect(planInput?.pressures).toEqual([
+      expect.any(Number),
+      expect.any(Number),
+    ]);
+    expect(planInput?.pressures?.[0]).toBeGreaterThan(0.5);
+    expect(finalize).toBe(true);
+    const context = new AliasSceneContext();
+    const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D
+    ) => void;
+    sceneFunc(context as unknown as CanvasRenderingContext2D);
+    expect(context.arcs).toHaveLength(2);
+    expect(context.arcs[0]).toMatchObject({ x: 1, y: 2 });
+    expect(context.arcs[0]!.radius).toBeCloseTo(7.8);
+    expect(context.arcs[0]!.alpha).toBeCloseTo(0.93);
+    expect(context.arcs[1]).toMatchObject({ x: 3, y: 4 });
+    expect(context.arcs[1]!.radius).toBeCloseTo(18.6);
+    expect(context.arcs[1]!.alpha).toBeCloseTo(0.124);
+  });
+
+  it("renders soft pencil as a pale wide skirt plus a rough core", () => {
+    const standard = render(
+      <StudioDrawNode
+        el={drawEl({ brush: "pencil", mode: "pen", points: [0, 0, 10, 0] })}
+      />,
+    );
+    expect(captured("Line")).toHaveLength(1);
+    expect(captured("Line")[0]!.props).toMatchObject({ opacity: 1, strokeWidth: 10 });
+
+    standard.unmount();
+    konvaCapture.nodes.length = 0;
+    render(
+      <StudioDrawNode
+        el={drawEl({ brush: "soft-pencil", mode: "pen", points: [0, 0, 10, 0] })}
+      />,
+    );
+    expect(captured("Line")).toHaveLength(2);
+    expect(captured("Line").map(({ props }) => ({
+      opacity: props.opacity,
+      strokeWidth: props.strokeWidth,
+    }))).toEqual([
+      { opacity: 0.18, strokeWidth: 24.32 },
+      { opacity: 0.72, strokeWidth: 12.8 },
+    ]);
+    expect(captured("Line")[0]!.props.points).not.toEqual(captured("Line")[1]!.props.points);
+  });
+
+  it("keeps the soft-pencil two-pass material on a one-point tap", () => {
+    render(
+      <StudioDrawNode
+        el={drawEl({ brush: "soft-pencil", mode: "pen", points: [4, 7] })}
+      />,
+    );
+
+    expect(captured("Circle")).toHaveLength(2);
+    expect(captured("Circle").map(({ props }) => ({
+      opacity: props.opacity,
+      radius: props.radius,
+    }))).toEqual([
+      { opacity: 0.18, radius: 12.16 },
+      { opacity: 0.72, radius: 6.4 },
+    ]);
   });
 
   it.each([

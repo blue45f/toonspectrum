@@ -41,7 +41,7 @@ const BASE_STATE: StudioMainMenuBuilderState = {
   canvasFlipH: false,
   canvasRotation: 0,
   fullscreen: false,
-  grayscaleView: false,
+  colorVisionMode: "none",
   referencePanelOpen: false,
   pageSequenceOpen: false,
   hasSavedView: false,
@@ -79,7 +79,7 @@ function createEditorActions(): StudioMainMenuEditorActions {
     fitCanvasToWidth: vi.fn(),
     setActualPixelView: vi.fn(),
     toggleFullscreen: vi.fn(),
-    toggleGrayscaleView: vi.fn(),
+    setColorVisionMode: vi.fn(),
     saveCurrentStudioView: vi.fn(),
     restoreSavedStudioView: vi.fn(),
     togglePerspectiveGuideView: vi.fn(),
@@ -219,7 +219,11 @@ describe("buildStudioMainMenuGroups", () => {
         "fit",
         "actual-pixels",
         "fullscreen",
-        "grayscale",
+        "color-vision-original",
+        "color-vision-grayscale",
+        "color-vision-protanopia",
+        "color-vision-deuteranopia",
+        "color-vision-tritanopia",
         "reference-window",
         "page-sequence",
         "save-current-view",
@@ -268,7 +272,7 @@ describe("buildStudioMainMenuGroups", () => {
       canvasFlipH: true,
       canvasRotation: 90,
       fullscreen: true,
-      grayscaleView: true,
+      colorVisionMode: "deuteranopia",
       referencePanelOpen: true,
       pageSequenceOpen: true,
       hasSavedView: true,
@@ -321,10 +325,25 @@ describe("buildStudioMainMenuGroups", () => {
       checked: true,
       disabled: true,
     });
-    expect(menuItem(groups, "view", "grayscale")).toMatchObject({
+    expect(menuItem(groups, "view", "color-vision-deuteranopia")).toMatchObject({
       checked: true,
       disabled: true,
+      selectionRole: "radio",
+      hintKey: "color-vision:deuteranopia",
     });
+    expect(menuItem(groups, "view", "color-vision-original").checked).toBe(false);
+    for (const [id, previewVariant] of [
+      ["original", "none"],
+      ["grayscale", "grayscale"],
+      ["protanopia", "protanopia"],
+      ["deuteranopia", "deuteranopia"],
+      ["tritanopia", "tritanopia"],
+    ] as const) {
+      expect(menuItem(groups, "view", `color-vision-${id}`)).toMatchObject({
+        selectionRole: "radio",
+        hintKey: `color-vision:${previewVariant}`,
+      });
+    }
     expect(menuItem(groups, "view", "reference-window").checked).toBe(true);
     expect(menuItem(groups, "view", "page-sequence")).toMatchObject({
       label: "페이지 시퀀스 닫기",
@@ -391,6 +410,7 @@ describe("buildStudioMainMenuGroups", () => {
     menuItem(groups, "view", "zoom-in").onSelect();
     menuItem(groups, "view", "zoom-out").onSelect();
     menuItem(groups, "view", "rotate-left").onSelect();
+    menuItem(groups, "view", "color-vision-tritanopia").onSelect();
     menuItem(groups, "view", "density-focus").onSelect();
     menuItem(groups, "view", "density-full").onSelect();
     menuItem(groups, "view", "tools-companion").onSelect();
@@ -402,6 +422,7 @@ describe("buildStudioMainMenuGroups", () => {
     expect(ui.stepZoom).toHaveBeenNthCalledWith(1, 1);
     expect(ui.stepZoom).toHaveBeenNthCalledWith(2, -1);
     expect(editor.rotateCanvasView).toHaveBeenCalledWith("left");
+    expect(editor.setColorVisionMode).toHaveBeenCalledWith("tritanopia");
     expect(editor.setStudioUiDensity).toHaveBeenNthCalledWith(1, "focus");
     expect(ui.collapseSidePanels).toHaveBeenCalledOnce();
     expect(editor.setStudioUiDensity).toHaveBeenNthCalledWith(2, "full");

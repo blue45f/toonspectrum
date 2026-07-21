@@ -18,8 +18,11 @@ const STUDIO_ACTION_PREVIEW_BY_ID: Readonly<Record<string, StudioToolHintPreview
   "advanced-fill": "fill",
   eyedropper: "sample",
   "smart-shape": "smart-shape",
-  "shape-rect": "shape-rect",
-  "shape-ellipse": "shape-ellipse",
+  // Direct rail shapes use the bounding-box drawing coach. The legacy
+  // shape-specific kinds demonstrate smart correction and are intentionally
+  // not used for these stable action identities.
+  "shape-rect": "shape",
+  "shape-ellipse": "shape",
   perspective: "perspective",
   shape: "shape",
   text: "text",

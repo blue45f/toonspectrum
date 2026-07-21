@@ -148,6 +148,13 @@ export interface StudioBrushDynamicsSettings {
 
 export type StudioBrushDynamicsPresetId = "ink-particle" | "airbrush" | "dry-media";
 
+export type StudioBrushDynamicsBrushId = StudioBrushDynamicsPresetId
+  | "soft-brush"
+  | "spray"
+  | "crayon"
+  | "chalk"
+  | "charcoal";
+
 /** Runtime/type guard shared by the editor, persistence and export paths. */
 export function isStudioBrushDynamicsPresetId(value: unknown): value is StudioBrushDynamicsPresetId {
   return value === "ink-particle" || value === "airbrush" || value === "dry-media";
@@ -792,6 +799,271 @@ export function studioBrushDynamicsPresetSettings(
   const preset = STUDIO_BRUSH_DYNAMICS_PRESETS.find((candidate) => candidate.id === id)
     ?? STUDIO_BRUSH_DYNAMICS_PRESETS[0]!;
   return normalizeStudioBrushDynamicsSettings(preset.settings);
+}
+
+interface StudioBrushDynamicsVariant {
+  presetId: StudioBrushDynamicsPresetId;
+  overrides: StudioBrushDynamicsSettings;
+}
+
+/**
+ * Physical variants for toolbar brush ids that share a persisted canonical dynamics preset.
+ *
+ * Saved strokes keep their existing `brush` id and canonical preset ids remain unchanged. Runtime
+ * consumers can opt into this helper to make each commercial alias visibly distinct without a
+ * document migration. Every call normalizes into a detached value, so UI edits cannot mutate the
+ * variant catalogue or the canonical preset.
+ */
+const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamicsVariant>> = {
+  "soft-brush": {
+    presetId: "airbrush",
+    overrides: {
+      seed: 211,
+      maxSpeed: 1.4,
+      tip: { shape: "round", softness: 0.94 },
+      width: {
+        base: 36,
+        mappings: [{ source: "pressure", from: 0.82, to: 1.18 }],
+        jitter: { mode: "multiply", amount: 0.015 },
+      },
+      opacity: { base: 0.52, mappings: [{ source: "pressure", from: 0.55, to: 1 }] },
+      flow: {
+        base: 0.36,
+        mappings: [{ source: "pressure", from: 0.5, to: 0.9 }],
+        jitter: null,
+      },
+      spacingRatio: 0.105,
+      spacing: {
+        mappings: [{ source: "speed", from: 0.92, to: 1.12 }],
+        jitter: null,
+      },
+      scatterRatio: 0.035,
+      scatter: {
+        mappings: [{ source: "pressure", from: 1, to: 0.65 }],
+        jitter: null,
+      },
+      angle: { base: 0, mappings: [], jitter: null },
+      roundness: {
+        base: 0.93,
+        mappings: [{ source: "tilt-magnitude", from: 0.98, to: 0.85 }],
+        jitter: null,
+      },
+    },
+  },
+  spray: {
+    presetId: "airbrush",
+    overrides: {
+      seed: 223,
+      taper: { enabled: false },
+      tip: { shape: "flake", softness: 0.18 },
+      width: {
+        base: 16,
+        mappings: [{ source: "pressure", from: 0.85, to: 1.12 }],
+        jitter: { mode: "multiply", amount: 0.45 },
+      },
+      opacity: {
+        base: 0.42,
+        mappings: [{ source: "pressure", from: 0.55, to: 1 }],
+        jitter: { mode: "multiply", amount: 0.22 },
+      },
+      flow: {
+        base: 0.24,
+        mappings: [{ source: "pressure", from: 0.7, to: 1 }],
+        jitter: { mode: "multiply", amount: 0.18 },
+      },
+      spacingRatio: 0.46,
+      spacing: {
+        mappings: [{ source: "speed", from: 0.75, to: 1.7 }],
+        jitter: { mode: "multiply", amount: 0.18 },
+      },
+      scatterRatio: 1.15,
+      scatter: {
+        mappings: [{ source: "pressure", from: 1.6, to: 0.75 }],
+        jitter: { mode: "multiply", amount: 0.35 },
+      },
+      angle: { base: 0, mappings: [], jitter: { mode: "add", amount: 180 } },
+      roundness: {
+        base: 0.74,
+        mappings: [],
+        jitter: { mode: "multiply", amount: 0.22 },
+      },
+    },
+  },
+  crayon: {
+    presetId: "dry-media",
+    overrides: {
+      seed: 307,
+      tip: { shape: "hard", softness: 0.38 },
+      width: {
+        base: 10,
+        mappings: [{ source: "pressure", from: 0.35, to: 1.25 }],
+        jitter: { mode: "multiply", amount: 0.1 },
+      },
+      opacity: {
+        base: 0.9,
+        mappings: [{ source: "pressure", from: 0.7, to: 1 }],
+        jitter: { mode: "multiply", amount: 0.1 },
+      },
+      flow: {
+        base: 0.72,
+        mappings: [{ source: "pressure", from: 0.75, to: 1 }],
+        jitter: { mode: "multiply", amount: 0.06 },
+      },
+      spacingRatio: 0.13,
+      spacing: {
+        mappings: [{ source: "speed", from: 0.9, to: 1.3 }],
+        jitter: { mode: "multiply", amount: 0.05 },
+      },
+      scatterRatio: 0.075,
+      scatter: {
+        mappings: [{ source: "speed", from: 0.7, to: 1.2 }],
+        jitter: { mode: "multiply", amount: 0.04 },
+      },
+      angle: {
+        base: 0,
+        mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
+        jitter: { mode: "add", amount: 5 },
+      },
+      roundness: {
+        base: 0.66,
+        mappings: [{ source: "tilt-magnitude", from: 1, to: 0.62 }],
+        jitter: { mode: "multiply", amount: 0.06 },
+      },
+    },
+  },
+  chalk: {
+    presetId: "dry-media",
+    overrides: {
+      seed: 311,
+      tip: { shape: "sponge", softness: 0.48 },
+      width: {
+        base: 14,
+        mappings: [{ source: "pressure", from: 0.55, to: 1.18 }],
+        jitter: { mode: "multiply", amount: 0.24 },
+      },
+      opacity: {
+        base: 0.78,
+        mappings: [{ source: "pressure", from: 0.45, to: 1 }],
+        jitter: { mode: "multiply", amount: 0.34 },
+      },
+      flow: {
+        base: 0.44,
+        mappings: [{ source: "pressure", from: 0.6, to: 1 }],
+        jitter: { mode: "multiply", amount: 0.2 },
+      },
+      spacingRatio: 0.29,
+      spacing: {
+        mappings: [{ source: "speed", from: 0.72, to: 1.8 }],
+        jitter: { mode: "multiply", amount: 0.22 },
+      },
+      scatterRatio: 0.36,
+      scatter: {
+        mappings: [{ source: "speed", from: 0.65, to: 1.6 }],
+        jitter: { mode: "multiply", amount: 0.3 },
+      },
+      angle: {
+        base: 0,
+        mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
+        jitter: { mode: "add", amount: 18 },
+      },
+      roundness: {
+        base: 0.5,
+        mappings: [{ source: "tilt-magnitude", from: 1, to: 0.42 }],
+        jitter: { mode: "multiply", amount: 0.14 },
+      },
+    },
+  },
+  charcoal: {
+    presetId: "dry-media",
+    overrides: {
+      seed: 317,
+      tip: { shape: "bristle", softness: 0.58 },
+      width: {
+        base: 18,
+        mappings: [{ source: "pressure", from: 0.28, to: 1.38 }],
+        jitter: { mode: "multiply", amount: 0.32 },
+      },
+      opacity: {
+        base: 0.82,
+        mappings: [{ source: "pressure", from: 0.32, to: 1 }],
+        jitter: { mode: "multiply", amount: 0.38 },
+      },
+      flow: {
+        base: 0.62,
+        mappings: [{ source: "pressure", from: 0.4, to: 1 }],
+        jitter: { mode: "multiply", amount: 0.28 },
+      },
+      spacingRatio: 0.165,
+      spacing: {
+        mappings: [{ source: "speed", from: 0.85, to: 1.55 }],
+        jitter: { mode: "multiply", amount: 0.15 },
+      },
+      scatterRatio: 0.52,
+      scatter: {
+        mappings: [{ source: "speed", from: 0.55, to: 1.75 }],
+        jitter: { mode: "multiply", amount: 0.4 },
+      },
+      angle: {
+        base: 0,
+        mappings: [
+          { source: "direction", mode: "add", from: 0, to: 360 },
+          { source: "tilt-azimuth", mode: "add", from: 0, to: 360, amount: 0.15 },
+        ],
+        jitter: { mode: "add", amount: 28 },
+      },
+      roundness: {
+        base: 0.24,
+        mappings: [{ source: "tilt-magnitude", from: 1, to: 0.24 }],
+        jitter: { mode: "multiply", amount: 0.18 },
+      },
+    },
+  },
+};
+
+function mergeStudioBrushDynamicsVariant(
+  base: NormalizedStudioBrushDynamicsSettings,
+  overrides: StudioBrushDynamicsSettings
+): NormalizedStudioBrushDynamicsSettings {
+  const mergeProperty = (
+    property: NormalizedStudioBrushDynamicsProperty,
+    override: StudioBrushDynamicsPropertySettings | undefined
+  ): StudioBrushDynamicsPropertySettings => ({ ...property, ...override });
+
+  return normalizeStudioBrushDynamicsSettings({
+    ...base,
+    ...overrides,
+    taper: { ...base.taper, ...overrides.taper },
+    tip: { ...base.tip, ...overrides.tip },
+    width: mergeProperty(base.width, overrides.width ?? overrides.size),
+    opacity: mergeProperty(base.opacity, overrides.opacity),
+    flow: mergeProperty(base.flow, overrides.flow),
+    spacing: mergeProperty(base.spacing, overrides.spacing),
+    scatter: mergeProperty(base.scatter, overrides.scatter),
+    angle: mergeProperty(base.angle, overrides.angle),
+    roundness: mergeProperty(base.roundness, overrides.roundness),
+  });
+}
+
+/**
+ * Resolve the exact runtime dynamics for a toolbar brush id.
+ *
+ * Unlike `resolveStudioBrushDynamicsPresetId`, this keeps related brushes on the same persistence
+ * pipeline while returning different tip physics for rendering. Unknown/non-dynamic brushes return
+ * null so callers can retain their existing ordinary line renderer.
+ */
+export function studioBrushDynamicsSettingsForBrushId(
+  brushId: unknown
+): NormalizedStudioBrushDynamicsSettings | null {
+  if (typeof brushId !== "string") return null;
+  const variant = STUDIO_BRUSH_DYNAMICS_VARIANTS[brushId];
+  if (variant) {
+    return mergeStudioBrushDynamicsVariant(
+      studioBrushDynamicsPresetSettings(variant.presetId),
+      variant.overrides
+    );
+  }
+  const presetId = resolveStudioBrushDynamicsPresetId(brushId);
+  return presetId ? studioBrushDynamicsPresetSettings(presetId) : null;
 }
 
 /** Normalizes browser/serialized pointer data without mutating the source object. */

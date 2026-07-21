@@ -67,6 +67,39 @@ describe("createStudioWebGpuCommittedHandoff", () => {
     }]);
   });
 
+  it("keeps fineliner diameter and pressure identity distinct from the default pen", () => {
+    const handoff = createStudioWebGpuCommittedHandoff({
+      elements: [
+        draw("pen", { strokeWidth: 10, pressures: [0.2, 0.4, 0.8, 1] }),
+        draw("fineliner", {
+          brush: "fineliner",
+          strokeWidth: 10,
+          pressures: [0.2, 0.4, 0.8, 1],
+        }),
+      ],
+    });
+
+    expect(handoff.strokes[0]).toMatchObject({
+      id: "pen",
+      size: 10,
+      pressures: [0.2, 0.4, 0.8, 1],
+    });
+    expect(handoff.strokes[1]).toMatchObject({
+      id: "fineliner",
+      size: 4.8,
+    });
+    const expectedFinelinerPressures = [
+      0.8 + 0.2 * Math.pow(0.2, 0.72),
+      0.8 + 0.2 * Math.pow(0.4, 0.72),
+      0.8 + 0.2 * Math.pow(0.8, 0.72),
+      1,
+    ];
+    expect(handoff.strokes[1]?.pressures).toHaveLength(expectedFinelinerPressures.length);
+    expectedFinelinerPressures.forEach((pressure, index) => {
+      expect(handoff.strokes[1]?.pressures?.[index]).toBeCloseTo(pressure, 12);
+    });
+  });
+
   it("carries an explicit linear pressure model without changing legacy handoffs", () => {
     const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1;
     const linear = createStudioWebGpuCommittedHandoff({

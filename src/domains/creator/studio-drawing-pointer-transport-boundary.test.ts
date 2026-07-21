@@ -108,4 +108,26 @@ describe("studio drawing pointer transport ownership boundary", () => {
     expect(page).toContain("requireStudioDrawingPointerTransport(drawingPointerTransportRef).release()");
     expect(page).toContain("requireStudioDrawingPointerTransport(drawingPointerTransportRef).dispose()");
   });
+
+  it("restores the authoritative fixed-rate clock after previewing future pen samples", () => {
+    const page = moduleFacts("./StudioPage.tsx").source;
+    const predictionStart = page.indexOf("const authoritativePerspectiveRay =");
+    const predictionEnd = page.indexOf("drawingVelocityRef.current = authoritativeVelocity", predictionStart);
+    const predictionBlock = page.slice(predictionStart, predictionEnd);
+
+    expect(predictionStart).toBeGreaterThan(-1);
+    expect(predictionBlock).toContain(
+      "const authoritativeFixedRateFilter = drawingFixedRateFilterRef.current"
+    );
+    expect(predictionBlock).toContain("for (const sample of batch.predicted)");
+    expect(predictionBlock).toContain(
+      "drawingFixedRateFilterRef.current = authoritativeFixedRateFilter"
+    );
+    expect(predictionBlock.indexOf("const authoritativeFixedRateFilter")).toBeLessThan(
+      predictionBlock.indexOf("for (const sample of batch.predicted)")
+    );
+    expect(predictionBlock.indexOf("for (const sample of batch.predicted)")).toBeLessThan(
+      predictionBlock.indexOf("drawingFixedRateFilterRef.current = authoritativeFixedRateFilter")
+    );
+  });
 });

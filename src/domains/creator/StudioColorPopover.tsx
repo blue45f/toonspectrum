@@ -349,7 +349,7 @@ export function StudioColorPopover({
                   {palettes.map((p) => (
                     <StudioToolHintTarget
                       key={p.id}
-                      hint={studioPaletteFamilyHint(p.label, p.tip)}
+                      hint={studioPaletteFamilyHint(p.label, p.tip, p.id)}
                       preferredSide="bottom"
                     >
                       <button

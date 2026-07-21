@@ -171,12 +171,20 @@ export function StudioAnimTimelinePanel({
               disabled={Boolean(playbackDisabledReason)}
               unavailableReason={playbackDisabledReason}
               preferredSide="bottom"
-              hint={{
+              hint={playing ? {
+                id: "timeline-playback-pause",
+                title: "타임라인 정지",
+                description: "공유 재생헤드를 현재 프레임에 멈춰 모든 레이어의 키프레임 상태를 함께 확인합니다.",
+                preview: "timeline",
+                previewVariant: "pause",
+                tip: "정지한 뒤 눈금이나 빈 프레임 칸을 눌러 원하는 위치로 스크럽할 수 있어요.",
+              } : {
                 id: "timeline-playback",
                 title: "타임라인 재생",
                 description: "공유 재생헤드를 움직여 모든 레이어의 키프레임을 같은 시간축에서 미리 봅니다.",
                 preview: "timeline",
-                tip: "정지한 뒤 눈금이나 빈 프레임 칸을 눌러 원하는 위치로 스크럽할 수 있어요.",
+                previewVariant: "play",
+                tip: "재생 중에는 여러 레이어의 타이밍과 겹침을 한 번에 검토할 수 있어요.",
               }}
             >
               <button

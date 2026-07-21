@@ -22,7 +22,11 @@ import {
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
-import type { StudioToolHintPreviewKind } from "./studio-tool-hint-preview-kind";
+import type {
+  StudioToolHintPreviewKind,
+  StudioToolHintPreviewVariant,
+} from "./studio-tool-hint-preview-kind";
+import type { StudioToolHintSpec } from "./studio-tool-hints";
 import type { ReactElement } from "react";
 
 import { cn } from "@/lib/utils";
@@ -48,6 +52,7 @@ function Action({
   label,
   description,
   preview,
+  previewVariant,
   tip,
   danger,
   showLabel,
@@ -58,6 +63,7 @@ function Action({
   label: string;
   description: string;
   preview: StudioToolHintPreviewKind;
+  previewVariant?: StudioToolHintPreviewVariant<"bubble">;
   tip?: string;
   danger?: boolean;
   showLabel?: boolean;
@@ -71,8 +77,9 @@ function Action({
         title: label,
         description,
         preview,
+        previewVariant,
         tip,
-      }}
+      } as StudioToolHintSpec}
     >
       <button
         type="button"
@@ -169,6 +176,7 @@ export function StudioSelectOptionsBar({
           label="텍스트 맞춤"
           description="대사 길이에 맞춰 말풍선 높이를 자동으로 조절합니다."
           preview="bubble"
+          previewVariant="fit-text"
           tip="긴 대사를 붙여넣은 뒤 한 번 눌러 여백을 정돈하세요."
           onClick={onFitBubble}
         />

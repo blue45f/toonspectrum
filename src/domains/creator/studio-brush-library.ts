@@ -175,15 +175,17 @@ export const BRUSH_STAMP_TUNING_RANGE = [0, 1] as const;
 /**
  * 새 캔버스와 누락 필드를 가진 레거시 브러시가 공유하는 기본 필기감.
  *
- * 비교 보드의 기본 안정기 34를 내부 0..10 눈금의 3.4로 환산한다. 이 값은 5ms 고정 주기와
- * 10단 cascade 응답을 사용하며, 후보정은 꺼서 접촉 중 확정된 prefix를 다시 움직이지 않는다.
+ * 새 획은 코얼레스트 하드웨어 입력을 즉시 반영한다. 안정화는 선화 성격에 따라 작가가 명시적으로
+ * 켜는 opt-in 설정이다. 이전 3.4 기본값은 5ms·10단 cascade만으로 t90 약 60ms의 trailing을
+ * 만들어 입력 처리 자체가 빠른 기기에서도 펜 끝이 무겁게 느껴졌다. 저장된 사용자 브러시의 값은
+ * 그대로 유지하며, 신규/누락 필드만 저지연 기본값을 사용한다.
  */
 export const DEFAULT_STUDIO_BRUSH_SNAPSHOT: StudioBrushSnapshot = {
   brushId: "pen",
   strokeWidth: 6,
   brushOpacity: 1,
   color: "#7c5cfc",
-  stabilizer: 3.4,
+  stabilizer: 0,
   stabilizerMode: "standard",
   postCorrection: 0,
   preserveCorners: true,

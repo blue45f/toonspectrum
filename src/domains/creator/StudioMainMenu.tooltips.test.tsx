@@ -97,4 +97,56 @@ describe("StudioMainMenu tooltips", () => {
     expect(screen.getByRole("menu", { name: "편집" })).not.toBeNull();
     expect(screen.queryByRole("tooltip")).toBeNull();
   });
+
+  it("exposes exclusive color-vision choices as radio menuitems with exact coaches", () => {
+    render(
+      <StudioToolHintPreferencesProvider
+        mode="compact"
+        touchHoldDelayMs={640}
+        reduceMotion
+      >
+        <StudioMainMenu
+          groups={[
+            {
+              id: "view",
+              label: "보기",
+              items: [
+                {
+                  id: "color-original",
+                  label: "색각 검수 · 원본",
+                  checked: false,
+                  selectionRole: "radio",
+                  hintKey: "color-vision:none",
+                  onSelect: vi.fn(),
+                },
+                {
+                  id: "color-grayscale",
+                  label: "색각 검수 · 흑백 명암",
+                  checked: true,
+                  selectionRole: "radio",
+                  hintKey: "color-vision:grayscale",
+                  disabled: true,
+                  unavailableReason: "보기 변환이 잠겨 있습니다.",
+                  onSelect: vi.fn(),
+                },
+              ],
+            },
+          ]}
+        />
+      </StudioToolHintPreferencesProvider>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "보기" }));
+    const choices = screen.getAllByRole("menuitemradio");
+    expect(choices).toHaveLength(2);
+    expect(choices[0]?.getAttribute("aria-checked")).toBe("false");
+    expect(choices[1]?.getAttribute("aria-checked")).toBe("true");
+    expect(choices[1]?.getAttribute("aria-disabled")).toBe("true");
+    expect(choices[1]?.hasAttribute("disabled")).toBe(false);
+    expect(choices[1]?.closest('[data-studio-tool-hint-target="true"]')).not.toBeNull();
+
+    fireEvent.focus(choices[1]!);
+    expect(screen.getByRole("tooltip").textContent).toContain("명암 대비");
+    expect(screen.getByRole("tooltip").textContent).toContain("보기 변환이 잠겨 있습니다.");
+  });
 });

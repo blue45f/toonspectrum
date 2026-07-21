@@ -61,6 +61,9 @@ describe("StudioFrameAnimationPanel motion coach", () => {
     expect(source).toContain('id: "frame-onion-skin"');
     expect(source).toContain('preview: "frame-capture"');
     expect(source).toContain('preview: "frame-playback"');
+    expect(source).toContain('title: "프레임 애니메이션 정지"');
+    expect(source).toContain('previewVariant: "play"');
+    expect(source).toContain('previewVariant: "pause"');
     expect(source).toContain('preview: "frame-reorder"');
     expect(source).toContain('preview: "frame-duplicate"');
     expect(source).toContain('preview: "frame-delete"');

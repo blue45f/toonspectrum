@@ -11,7 +11,7 @@ import {
 } from "./studio-draw-hud";
 
 describe("studio draw HUD labels", () => {
-  it("formats pen / eraser / shape / select tool strings", () => {
+  it("formats pen / pixel / eraser / shape / select tool strings", () => {
     expect(
       studioDrawHudToolLabel({
         mode: "pen",
@@ -20,6 +20,9 @@ describe("studio draw HUD labels", () => {
         opacity01: 0.85,
       })
     ).toBe("펜(매끈) · 8px · 85%");
+    expect(studioDrawHudToolLabel({ mode: "pixel" })).toBe(
+      "픽셀 펜 · 1px · HARD · RAW"
+    );
     expect(studioDrawHudToolLabel({ mode: "eraser", widthPx: 12 })).toBe("지우개 12px");
     expect(studioDrawHudToolLabel({ mode: "shape", shapeLabel: "타원" })).toBe("도형 · 타원");
     expect(studioDrawHudToolLabel({ mode: "select", selectionLabel: null })).toBe("선택");

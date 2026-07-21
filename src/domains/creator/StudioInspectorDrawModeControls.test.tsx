@@ -1,0 +1,57 @@
+// @vitest-environment jsdom
+
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { StudioInspectorDrawModeControls } from "./StudioInspectorDrawModeControls";
+
+afterEach(cleanup);
+
+describe("StudioInspectorDrawModeControls", () => {
+  it("explains the fixed pixel contract without showing it for ordinary pen mode", () => {
+    const props = {
+      onDrawModeChange: vi.fn(),
+      onDrawShapeChange: vi.fn(),
+      onStrokeWidthChange: vi.fn(),
+      onSymmetryChange: vi.fn(),
+    };
+    const { rerender } = render(
+      <StudioInspectorDrawModeControls drawMode="pen" {...props} />
+    );
+    expect(screen.queryByRole("region", { name: "픽셀 펜 특성" })).toBeNull();
+
+    rerender(<StudioInspectorDrawModeControls drawMode="pixel" {...props} />);
+    const pixelContract = screen.getByRole("region", { name: "픽셀 펜 특성" });
+    expect(pixelContract.textContent).toContain("1 PX");
+    expect(pixelContract.textContent).toContain("HARD");
+    expect(pixelContract.textContent).toContain("RAW");
+    expect(
+      screen.getByRole("button", { name: "픽셀 펜" }).getAttribute("aria-pressed")
+    ).toBe("true");
+  });
+
+  it("normalizes fixed pixel settings and initializes shape mode", () => {
+    const onDrawModeChange = vi.fn();
+    const onDrawShapeChange = vi.fn();
+    const onStrokeWidthChange = vi.fn();
+    const onSymmetryChange = vi.fn();
+    render(
+      <StudioInspectorDrawModeControls
+        drawMode="pen"
+        onDrawModeChange={onDrawModeChange}
+        onDrawShapeChange={onDrawShapeChange}
+        onStrokeWidthChange={onStrokeWidthChange}
+        onSymmetryChange={onSymmetryChange}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "픽셀 펜" }));
+    expect(onDrawModeChange).toHaveBeenLastCalledWith("pixel");
+    expect(onStrokeWidthChange).toHaveBeenCalledWith(1);
+    expect(onSymmetryChange).toHaveBeenCalledWith("none");
+
+    fireEvent.click(screen.getByRole("button", { name: "도형" }));
+    expect(onDrawModeChange).toHaveBeenLastCalledWith("shape");
+    expect(onDrawShapeChange).toHaveBeenCalledWith("line");
+  });
+});

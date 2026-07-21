@@ -3,21 +3,28 @@
  * Pure data for StudioToolHint / rail buttons. No brand clones.
  */
 
-import type { StudioToolHintPreviewKind } from "./studio-tool-hint-preview-kind";
+import type {
+  StudioToolHintPreviewFields,
+  StudioToolHintPreviewCanonicalVariant,
+  StudioToolHintPreviewKind,
+  StudioToolHintPreviewVariant,
+} from "./studio-tool-hint-preview-kind";
 
-export type StudioToolHintSpec = {
+type StudioToolHintCopy = {
   id: string;
   title: string;
   /** Longer description shown under the title (tooltip body). */
   description: string;
   shortcut?: string;
-  /** Purpose-built animated visual that demonstrates the tool rather than decorating it. */
-  preview?: StudioToolHintPreviewKind;
-  /** Stable state/direction inside a preview family (for example zoom-out or layer-unlock). */
-  previewVariant?: string;
   /** One concise workflow hint shown below the visual. */
   tip?: string;
 };
+
+/** Preview kind and variant are one discriminated contract, so cross-family pairs fail typecheck. */
+export type StudioToolHintSpec = StudioToolHintCopy & (
+  | Readonly<{ preview?: undefined; previewVariant?: never }>
+  | StudioToolHintPreviewFields
+);
 
 const HINTS: Record<string, StudioToolHintSpec> = {
   select: {
@@ -71,13 +78,15 @@ const HINTS: Record<string, StudioToolHintSpec> = {
     id: "shape-rect",
     title: "사각형 도형",
     description: "드래그로 사각형을 그립니다. Shift를 누르면 정사각형으로 맞출 수 있어요.",
-    preview: "shape-rect",
+    preview: "shape",
+    previewVariant: "rect",
   },
   "shape-ellipse": {
     id: "shape-ellipse",
     title: "타원 도형",
     description: "드래그로 타원을 그립니다. Shift를 누르면 정원으로 맞출 수 있어요.",
-    preview: "shape-ellipse",
+    preview: "shape",
+    previewVariant: "ellipse",
   },
   text: {
     id: "text",
@@ -91,6 +100,7 @@ const HINTS: Record<string, StudioToolHintSpec> = {
     title: "말풍선",
     description: "만화 말풍선을 넣습니다. 꼬리 위치·스타일 프리셋은 말풍선 패널에서 바꿀 수 있어요.",
     preview: "bubble",
+    previewVariant: "add",
     tip: "말풍선을 배치한 뒤 캔버스에서 꼬리 끝을 화자 쪽으로 끌어보세요.",
   },
   image: {
@@ -215,6 +225,22 @@ export function normalizeStudioToolHintStableId(value: string): string {
 export function studioToolHintFromLabel(
   title: string,
   description: string,
+  shortcut?: string
+): StudioToolHintSpec;
+export function studioToolHintFromLabel<
+  const Kind extends StudioToolHintPreviewKind,
+>(
+  title: string,
+  description: string,
+  shortcut: string | undefined,
+  preview: Kind,
+  ...variant: [StudioToolHintPreviewCanonicalVariant<Kind>] extends [never]
+    ? []
+    : [previewVariant?: NoInfer<StudioToolHintPreviewVariant<Kind>>]
+): StudioToolHintSpec;
+export function studioToolHintFromLabel(
+  title: string,
+  description: string,
   shortcut?: string,
   preview?: StudioToolHintPreviewKind,
   previewVariant?: string
@@ -238,5 +264,5 @@ export function studioToolHintFromLabel(
     preview: preview ?? registered?.preview,
     previewVariant: previewVariant ?? registered?.previewVariant,
     tip: registered?.tip,
-  };
+  } as StudioToolHintSpec;
 }

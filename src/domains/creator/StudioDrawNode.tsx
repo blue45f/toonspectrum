@@ -23,10 +23,18 @@ import {
   strokeRenderDistance,
 } from "./studio-brush";
 import {
+  applyStudioBrushAliasWatercolorMaterial,
+  mapStudioBrushAliasPressure,
+  mapStudioBrushAliasPressureSamples,
+  resolveStudioBrushAliasPencilPasses,
+  resolveStudioBrushAliasWatercolorPlanSettings,
+  studioBrushAliasEffectiveDiameter,
+} from "./studio-brush-alias-profile";
+import {
   normalizeStudioBrushDynamicsSettings,
   planStudioDynamicBrushDabs,
   resolveStudioBrushDynamicsPresetId,
-  studioBrushDynamicsPresetSettings,
+  studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsSeedFromKey,
 } from "./studio-brush-dynamics";
 import { resolveStudioBrushSinglePointRoute } from "./studio-brush-runtime-contract";
@@ -58,11 +66,17 @@ import {
   planPastelBrushDabs,
 } from "./studio-fx-brush";
 import { konvaGradientProps } from "./studio-gradient-engine";
+import { studioInkFallbackPressure } from "./studio-ink-pressure-model";
 import {
   konvaPatternProps,
   loadPatternTileImage,
   patternDataUrl,
 } from "./studio-pattern-fill";
+import {
+  fillStudioPixelPencilCells,
+  isStudioPixelPencilRenderMode,
+  planStudioPixelPencilCells,
+} from "./studio-pixel-pencil";
 import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
 import {
   effectiveCornerRadius,
@@ -81,6 +95,26 @@ import { StudioStampDrawShape } from "./StudioStampDrawShape";
 import type { CalligraphyStylusInput } from "./studio-brush";
 import type { DrawEl } from "./studio-element-model";
 import type { StudioPatternSpec } from "./studio-pattern-fill";
+
+const STUDIO_PENCIL_DEFAULT_JITTER_RADIUS = 0.75;
+
+/**
+ * `processPencilPoints` is the frozen legacy 0.75 px graphite texture. Alias profiles scale its
+ * deterministic offsets instead of introducing another random source, so collaboration replay and
+ * retained rendering keep identical pixels while each pencil pass can have its own grain spread.
+ */
+function processStudioPencilAliasPassPoints(
+  points: number[],
+  jitterRadius: number,
+): number[] {
+  const jittered = processPencilPoints(points);
+  if (jitterRadius === STUDIO_PENCIL_DEFAULT_JITTER_RADIUS) return jittered;
+  const scale = jitterRadius / STUDIO_PENCIL_DEFAULT_JITTER_RADIUS;
+  return jittered.map((value, coordinateIndex) => {
+    const source = points[coordinateIndex];
+    return source === undefined ? value : source + (value - source) * scale;
+  });
+}
 
 // 패턴 채우기 타일 이미지 훅 — 패턴 스펙의 SVG 타일(data URL)을 HTMLImage로 비동기 로드한다.
 // UrlImage의 effect 로드 방식을 훅으로 컴포넌트화한 것. 타일 src는 patternId/색에만
@@ -147,7 +181,9 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   const dynamicBrushPlan = dynamicBrushId
     ? (() => {
         const dynamics = normalizeStudioBrushDynamicsSettings(
-          el.brushDynamics ?? studioBrushDynamicsPresetSettings(dynamicBrushId)
+          el.brushDynamics
+            ?? studioBrushDynamicsSettingsForBrushId(el.brush)
+            ?? studioBrushDynamicsSettingsForBrushId(dynamicBrushId)
         );
         const baseDabs = planStudioDynamicBrushDabs({
           points: el.points,
@@ -318,6 +354,13 @@ export const StudioDrawNode = memo(function StudioDrawNode({
         if (kind === "freehand") {
           const brush = el.brush ?? "pen";
           const brushFamily = resolveStudioBrushRenderFamily(brush);
+          const pixelPencil = isStudioPixelPencilRenderMode(brush);
+          const aliasStrokeWidth = el.mode === "eraser"
+            ? strokeWidth
+            : studioBrushAliasEffectiveDiameter(brush, strokeWidth);
+          const aliasPencilPasses = el.mode === "eraser"
+            ? []
+            : resolveStudioBrushAliasPencilPasses(brush);
           const stampKind = stampBrushKind;
           const dynamicBrush = dynamicBrushId !== null;
           const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
@@ -331,19 +374,65 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               el.sampleSpacing !== undefined || el.pressureModel !== undefined,
           });
 
+          if (pixelPencil && el.mode !== "eraser") {
+            const pixelPlan = planStudioPixelPencilCells({ points });
+            if (!pixelPlan.complete) return null;
+            return (
+              <Shape
+                key={index}
+                sceneFunc={(context) => {
+                  context.save();
+                  context.fillStyle = stroke;
+                  fillStudioPixelPencilCells(context, pixelPlan.cells);
+                  context.restore();
+                }}
+                opacity={opacity}
+                globalCompositeOperation={composite}
+                listening={false}
+                perfectDrawEnabled={false}
+              />
+            );
+          }
+
+          if (
+            points.length === 2
+            && singlePointRoute === "generic-dot"
+            && aliasPencilPasses.length > 0
+          ) {
+            return (
+              <Group key={index} opacity={opacity} listening={false}>
+                {aliasPencilPasses.map((pass) => (
+                  <KCircle
+                    key={pass.role}
+                    x={points[0]}
+                    y={points[1]}
+                    radius={Math.max(0.35, aliasStrokeWidth * pass.widthScale / 2)}
+                    fill={stroke}
+                    opacity={pass.opacityScale}
+                    globalCompositeOperation={composite}
+                    listening={false}
+                  />
+                ))}
+              </Group>
+            );
+          }
+
           if (
             points.length === 2 &&
             singlePointRoute === "generic-dot"
           ) {
-            const pressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
+            const sourcePressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
+            const pressure = el.mode === "eraser"
+              ? sourcePressure
+              : mapStudioBrushAliasPressure(brush, sourcePressure, 0.5);
             const pressureAware = el.mode === "eraser"
               || brushFamily === "pen"
               || brushFamily === "gpen"
               || brushFamily === "calligraphy"
               || brushFamily === "marker";
             const width = pressureAware
-              ? strokeWidth * (0.3 + pressure * 1.4)
-              : strokeWidth;
+              ? aliasStrokeWidth * (0.3 + pressure * 1.4)
+              : aliasStrokeWidth;
             return (
               <KCircle
                 key={index}
@@ -519,6 +608,16 @@ export const StudioDrawNode = memo(function StudioDrawNode({
 
           if (brushFamily === "watercolor" && el.mode !== "eraser") {
             const causalWatercolor = el.watercolorPipeline === "causal-walker-v2";
+            const aliasPlanSettings = resolveStudioBrushAliasWatercolorPlanSettings(
+              brush,
+              strokeWidth,
+            );
+            const watercolorPressures = mapStudioBrushAliasPressureSamples(
+              brush,
+              el.pressures,
+              Math.floor(points.length / 2),
+              0.55,
+            );
             // Legacy documents retain their fitted whole-stroke stations. New strokes use raw,
             // already-accepted samples and a residual arc-length cursor, so extending a prefix can
             // append pigment but can never move pigment that was already visible.
@@ -526,8 +625,9 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               points: causalWatercolor
                 ? points
                 : processFreehandPoints(points, renderSampleDistance),
-              pressures: el.pressures,
-              baseWidth: strokeWidth,
+              pressures: watercolorPressures,
+              baseWidth: aliasPlanSettings?.baseWidth ?? strokeWidth,
+              spacing: aliasPlanSettings?.spacing,
               seed: watercolorBrushSeedFromKey(el.id),
               // Causal stations do not redistribute at the cap, so they need the larger shared
               // bound. Legacy documents keep their historical 512-dab fit and exact old pixels.
@@ -535,9 +635,10 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 ? DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS
                 : 512,
             };
-            const dabs = causalWatercolor
+            const plannedDabs = causalWatercolor
               ? planCausalWatercolorBrushDabs(watercolorInput, !activeDraft)
               : planWatercolorBrushDabs(watercolorInput);
+            const dabs = applyStudioBrushAliasWatercolorMaterial(brush, plannedDabs);
             return (
               <Shape
                 key={index}
@@ -580,9 +681,14 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             // G펜: 필압(또는 속도 기반 의사 필압)에 따라 굵기가 변하고 양 끝이 가늘어지는 만화 잉크 선.
             const smoothed = processFreehandPoints(points, renderSampleDistance);
             const segmentCount = Math.floor(smoothed.length / 2);
-            const rawPressures = el.pressures ?? [];
-            const sampled = resampleStrokePressures(rawPressures, segmentCount, 0.6);
-            const widths = gpenSegmentWidths(sampled, strokeWidth);
+            const aliasPressures = mapStudioBrushAliasPressureSamples(
+              brush,
+              el.pressures,
+              Math.floor(points.length / 2),
+              0.6,
+            );
+            const sampled = resampleStrokePressures(aliasPressures, segmentCount, 0.6);
+            const widths = gpenSegmentWidths(sampled, aliasStrokeWidth);
             return (
               <Shape
                 key={index}
@@ -607,7 +713,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                     const y0 = smoothed[i - 1]!;
                     const x1 = smoothed[i]!;
                     const y1 = smoothed[i + 1]!;
-                    const w = widths[Math.floor(i / 2)] ?? strokeWidth;
+                    const w = widths[Math.floor(i / 2)] ?? aliasStrokeWidth;
                     const bucket = Math.round(w / WIDTH_BUCKET_PX) * WIDTH_BUCKET_PX;
                     if (bucket !== bucketWidth) {
                       flush();
@@ -658,6 +764,29 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               legacyMinDistance: renderSampleDistance,
               legacyTension: 0.2,
             });
+            if (aliasPencilPasses.length > 0) {
+              return (
+                <Group key={index} opacity={opacity} listening={false}>
+                  {aliasPencilPasses.map((pass) => (
+                    <Line
+                      key={pass.role}
+                      points={processStudioPencilAliasPassPoints(
+                        renderPath.points,
+                        pass.jitterRadius,
+                      )}
+                      stroke={stroke}
+                      strokeWidth={Math.max(0.5, aliasStrokeWidth * pass.widthScale)}
+                      opacity={pass.opacityScale}
+                      lineCap="round"
+                      lineJoin="round"
+                      tension={renderPath.tension}
+                      globalCompositeOperation={composite}
+                      listening={false}
+                    />
+                  ))}
+                </Group>
+              );
+            }
             const jittered = processPencilPoints(renderPath.points);
             return (
               <Line
@@ -896,6 +1025,14 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           // 현재 색으로 채운다. 라이브 초안도 같은 경로를 지나므로 그리는 동안 채움이 미리 보인다.
           const freehandFill = el.mode !== "eraser" ? el.fill : undefined;
           if ((el.sampleSpacing !== undefined || el.pressureModel !== undefined) && !freehandFill) {
+            const causalPressures = el.mode === "eraser"
+              ? el.pressures
+              : mapStudioBrushAliasPressureSamples(
+                  brush,
+                  el.pressures,
+                  Math.floor(points.length / 2),
+                  studioInkFallbackPressure(el.pressureModel),
+                );
             return (
               <Shape
                 key={index}
@@ -903,9 +1040,9 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                   drawStudioCausalInkDabs(
                     context,
                     points,
-                    el.pressures,
+                    causalPressures,
                     stroke,
-                    strokeWidth,
+                    aliasStrokeWidth,
                     el.sampleSpacing ?? 0,
                     el.pressureModel,
                     isStudioStrokePaintModelCompatible(el) ? el.paintModel : undefined
@@ -927,7 +1064,18 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           const smoothed = renderPath.points;
           const pressures = el.pressures;
           if (pressures && pressures.length > 0 && smoothed.length >= 4) {
-            const sampledPressures = resampleStrokePressures(pressures, Math.floor(smoothed.length / 2));
+            const aliasPressures = el.mode === "eraser"
+              ? pressures
+              : mapStudioBrushAliasPressureSamples(
+                  brush,
+                  pressures,
+                  Math.floor(points.length / 2),
+                  0.5,
+                );
+            const sampledPressures = resampleStrokePressures(
+              aliasPressures,
+              Math.floor(smoothed.length / 2),
+            );
             return (
               <Shape
                 key={index}
@@ -944,7 +1092,13 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                     context.fill();
                   }
                   // 중점 이차곡선 보간 — 다이렉트 라이브 초안과 같은 래스터라이저를 공유한다.
-                  drawFreehandPenSegments(context, smoothed, sampledPressures, stroke, strokeWidth);
+                  drawFreehandPenSegments(
+                    context,
+                    smoothed,
+                    sampledPressures,
+                    stroke,
+                    aliasStrokeWidth,
+                  );
                 }}
                 opacity={opacity}
                 globalCompositeOperation={composite}
@@ -960,7 +1114,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               key={index}
               points={smoothed}
               stroke={stroke}
-              strokeWidth={strokeWidth}
+              strokeWidth={aliasStrokeWidth}
               opacity={opacity}
               lineCap="round"
               lineJoin="round"

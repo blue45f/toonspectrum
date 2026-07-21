@@ -5,6 +5,7 @@ import {
   planStudioDrawPointerRelease,
   type StudioDrawPointerReleasePlanInput,
 } from "./studio-draw-pointer-release-plan";
+import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 
 import type { DrawEl } from "./studio-element-model";
 
@@ -167,6 +168,11 @@ describe("planStudioDrawPointerRelease", () => {
     {
       label: "geometric shape",
       stroke: stroke({ kind: "rect", points: [0, 0, 80, 40] }),
+      postCorrection: {},
+    },
+    {
+      label: "hard-grid pixel pencil",
+      stroke: stroke({ brush: STUDIO_PIXEL_PENCIL_RENDER_MODE, strokeWidth: 1 }),
       postCorrection: {},
     },
   ])("does not double-correct $label", ({ stroke: completed, postCorrection }) => {

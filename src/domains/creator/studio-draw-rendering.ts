@@ -4,6 +4,11 @@ import {
   resolveStudioBrushRenderFamily,
   strokeRenderDistance,
 } from "./studio-brush";
+import {
+  mapStudioBrushAliasPressure,
+  mapStudioBrushAliasPressureSamples,
+  studioBrushAliasEffectiveDiameter,
+} from "./studio-brush-alias-profile";
 import { resolveStudioBrushDynamicsPresetId } from "./studio-brush-dynamics";
 import {
   resolveStudioStampBrushKind,
@@ -14,6 +19,12 @@ import {
 } from "./studio-brush-symmetry";
 import { planStudioCausalInk } from "./studio-causal-ink";
 import { fillStudioCausalInkDabs } from "./studio-causal-ink-canvas";
+import { studioInkFallbackPressure } from "./studio-ink-pressure-model";
+import {
+  fillStudioPixelPencilCells,
+  isStudioPixelPencilRenderMode,
+  planStudioPixelPencilCells,
+} from "./studio-pixel-pencil";
 import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
 
 import type { StudioBrushSymmetrySpec } from "./studio-brush-symmetry";
@@ -30,6 +41,44 @@ export function drawBounds(points: number[]) {
     width: Math.abs(x2 - x1),
     height: Math.abs(y2 - y1),
   };
+}
+
+/**
+ * Resolves the artist-facing brush name into the live renderer's exact document-pixel diameter.
+ * Erasers intentionally retain their selected width even when the previously selected pen is an
+ * alias: changing from a bold marker to the eraser must not silently resize the eraser footprint.
+ */
+export function studioLiveBrushEffectiveDiameter(el: DrawEl): number {
+  const selectedDiameter = Math.max(1, el.strokeWidth);
+  return el.mode === "eraser"
+    ? selectedDiameter
+    : studioBrushAliasEffectiveDiameter(el.brush, selectedDiameter);
+}
+
+/** Maps one raw source pressure at the live boundary without changing persisted stroke samples. */
+export function studioLiveBrushPressure(el: DrawEl, pressure: unknown): number {
+  return mapStudioBrushAliasPressure(
+    el.mode === "eraser" ? null : el.brush,
+    pressure,
+    studioInkFallbackPressure(el.pressureModel)
+  );
+}
+
+/**
+ * Aligns and maps live pressure samples once for the requested source-point count. The returned
+ * array is renderer-owned; the DrawEl pressure history stays raw so retained/export renderers can
+ * apply the same versioned alias profile independently.
+ */
+export function studioLiveBrushPressureSamples(
+  el: DrawEl,
+  sourcePointCount = Math.floor(el.points.length / 2)
+): number[] {
+  return mapStudioBrushAliasPressureSamples(
+    el.mode === "eraser" ? null : el.brush,
+    el.pressures,
+    sourcePointCount,
+    studioInkFallbackPressure(el.pressureModel)
+  );
 }
 
 export function getSymmetricPoints(
@@ -133,6 +182,7 @@ export function drawStudioCausalInkDabs(
 export function isDirectLiveDraftEl(el: DrawEl): boolean {
   if ((el.kind ?? "freehand") !== "freehand") return false;
   if (el.mode === "eraser") return true;
+  if (isStudioPixelPencilRenderMode(el.brush)) return true;
   const family = resolveStudioBrushRenderFamily(el.brush ?? "pen");
   if (family !== "pen" && family !== "marker") return false;
   return resolveStudioBrushDynamicsPresetId(el.brush) === null;
@@ -152,18 +202,27 @@ export function isDirectLiveStampDraftEl(el: DrawEl): boolean {
 export function drawLiveFreehandDraftToContext(context: Konva.Context, el: DrawEl): void {
   const isEraser = el.mode === "eraser";
   const strokeColor = isEraser ? "#16100c" : el.stroke;
-  const strokeWidth = Math.max(1, el.strokeWidth);
+  const strokeWidth = studioLiveBrushEffectiveDiameter(el);
   const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
   const variations = getSymmetricPoints(el.points, el.symmetry);
+  const sourcePointCount = Math.floor(el.points.length / 2);
+  const livePressures = studioLiveBrushPressureSamples(el, sourcePointCount);
   context.save();
   context.globalAlpha = Math.min(1, Math.max(0, el.opacity ?? 1));
   context.globalCompositeOperation = isEraser ? "destination-out" : "source-over";
   for (const points of variations) {
+    if (!isEraser && isStudioPixelPencilRenderMode(el.brush)) {
+      const pixelPlan = planStudioPixelPencilCells({ points });
+      if (!pixelPlan.complete) continue;
+      context.fillStyle = strokeColor;
+      fillStudioPixelPencilCells(context, pixelPlan.cells);
+      continue;
+    }
     if ((el.sampleSpacing !== undefined || el.pressureModel !== undefined) && !el.fill) {
       drawStudioCausalInkDabs(
         context,
         points,
-        el.pressures,
+        livePressures,
         strokeColor,
         strokeWidth,
         el.sampleSpacing ?? 0,
@@ -173,7 +232,7 @@ export function drawLiveFreehandDraftToContext(context: Konva.Context, el: DrawE
       continue;
     }
     if (points.length === 2) {
-      const pressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
+      const pressure = livePressures[0] ?? studioLiveBrushPressure(el, undefined);
       const width = strokeWidth * (0.3 + pressure * 1.4);
       context.beginPath();
       context.arc(points[0]!, points[1]!, Math.max(0.35, width / 2), 0, Math.PI * 2);
@@ -193,9 +252,8 @@ export function drawLiveFreehandDraftToContext(context: Konva.Context, el: DrawE
       context.fillStyle = fill;
       context.fill();
     }
-    const pressures = el.pressures;
-    const sampledPressures = pressures && pressures.length > 0 && smoothed.length >= 4
-      ? resampleStrokePressures(pressures, Math.floor(smoothed.length / 2))
+    const sampledPressures = livePressures.length > 0 && smoothed.length >= 4
+      ? resampleStrokePressures(livePressures, Math.floor(smoothed.length / 2))
       : null;
     drawFreehandPenSegments(context, smoothed, sampledPressures, strokeColor, strokeWidth);
   }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_VIEW_ZOOM_MAX,
+  STUDIO_VIEW_ZOOM_MIN,
+  clampStudioViewZoomGestureAnchor,
   captureStudioView,
   clampStudioViewZoom,
   fitStudioViewToWidth,
@@ -9,6 +12,7 @@ import {
   planStudioViewRotationTransition,
   planStudioViewScrollToDocumentPoint,
   planStudioViewStageLayout,
+  planStudioViewZoomGestureFrame,
   projectStudioDocumentPointToView,
   projectStudioDocumentRectToViewRect,
   projectStudioViewPointToDocument,
@@ -17,6 +21,7 @@ import {
   rotateStudioViewLeft,
   rotateStudioViewRight,
   stepStudioViewZoom,
+  stepStudioViewWheelZoom,
 } from "./studio-view-controls";
 
 describe("studio view shortcuts", () => {
@@ -67,6 +72,240 @@ describe("studio view zoom", () => {
     expect(fitStudioViewToWidth(720, 720, 2.5)).toBe(1);
     expect(fitStudioViewToWidth(1800, 720, 2.5)).toBe(2.5);
     expect(fitStudioViewToWidth(36, 720, 2.5)).toBe(0.1);
+  });
+
+  it("uses the same clamped canvas point for pasteboard zoom preview and settlement", () => {
+    expect(clampStudioViewZoomGestureAnchor(
+      { left: 100, top: 200, right: 500, bottom: 800 },
+      40,
+      920
+    )).toEqual({
+      clientX: 100,
+      clientY: 800,
+      originX: 0,
+      originY: 600,
+    });
+    expect(clampStudioViewZoomGestureAnchor(
+      { left: 100, top: 200, right: 500, bottom: 800 },
+      275,
+      450
+    )).toEqual({
+      clientX: 275,
+      clientY: 450,
+      originX: 175,
+      originY: 250,
+    });
+  });
+
+  it("scales wheel zoom by physical delta instead of jumping on every trackpad tick", () => {
+    expect(stepStudioViewWheelZoom(1, -1, 0)).toBeCloseTo(1.002002, 5);
+    expect(stepStudioViewWheelZoom(1, -60, 0)).toBeCloseTo(1.127497, 5);
+    expect(stepStudioViewWheelZoom(1, -3, 1)).toBeCloseTo(1.100759, 5);
+    expect(stepStudioViewWheelZoom(1, -60, 0, true)).toBeCloseTo(0.88692, 5);
+    expect(stepStudioViewWheelZoom(4.9, -10_000, 0)).toBe(5);
+  });
+
+  it("accumulates fractional trackpad ticks without fixed-step quantization", () => {
+    const accumulated = Array.from({ length: 100 }).reduce<number>(
+      (current) => stepStudioViewWheelZoom(current, -0.25, 0),
+      1
+    );
+    expect(accumulated).toBeCloseTo(stepStudioViewWheelZoom(1, -25, 0), 12);
+    expect(accumulated).toBeGreaterThan(1);
+  });
+
+  it("makes the transient frame equal the achievable settled scroll at canvas boundaries", () => {
+    const frame = planStudioViewZoomGestureFrame({
+      baseZoom: 1,
+      targetZoom: 0.85,
+      originX: 800,
+      originY: 400,
+      originClientX: 800,
+      originClientY: 400,
+      clientX: 800,
+      clientY: 400,
+      baseLeft: 0,
+      baseTop: 0,
+      baseWidth: 1_200,
+      baseHeight: 1_800,
+      wrapLeft: 0,
+      wrapTop: 0,
+      viewportWidth: 1_200,
+      viewportHeight: 800,
+    });
+
+    expect(frame.scale).toBe(0.85);
+    expect(frame.targetScrollLeft).toBe(0);
+    expect(frame.translateX).toBeCloseTo(-120, 6);
+    // CSS scaling would move the left edge +120px; the correction cancels it to the same x=0
+    // position the settled, non-negative native scroll can actually represent.
+    expect(800 * (1 - frame.scale) + frame.translateX).toBeCloseTo(0, 6);
+  });
+
+  it("preserves a moving pinch centroid when native scroll has room", () => {
+    const frame = planStudioViewZoomGestureFrame({
+      baseZoom: 1,
+      targetZoom: 1,
+      originX: 500,
+      originY: 400,
+      originClientX: 300,
+      originClientY: 250,
+      clientX: 350,
+      clientY: 280,
+      baseLeft: -200,
+      baseTop: -150,
+      baseWidth: 1_200,
+      baseHeight: 1_800,
+      wrapLeft: 0,
+      wrapTop: 0,
+      viewportWidth: 800,
+      viewportHeight: 600,
+    });
+
+    expect(frame.targetScrollLeft).toBe(150);
+    expect(frame.targetScrollTop).toBe(120);
+    expect(frame.translateX).toBe(50);
+    expect(frame.translateY).toBe(30);
+  });
+
+  it("keeps the compositor frame inert when zoom requests overshoot either product bound", () => {
+    const maximum = planStudioViewZoomGestureFrame({
+      baseZoom: STUDIO_VIEW_ZOOM_MAX,
+      targetZoom: 99,
+      originX: 650,
+      originY: 550,
+      originClientX: 350,
+      originClientY: 310,
+      clientX: 350,
+      clientY: 310,
+      baseLeft: -300,
+      baseTop: -240,
+      baseWidth: 1_200,
+      baseHeight: 1_000,
+      wrapLeft: 100,
+      wrapTop: 60,
+      viewportWidth: 800,
+      viewportHeight: 700,
+    });
+    expect(maximum).toEqual({
+      scale: 1,
+      translateX: 0,
+      translateY: 0,
+      targetScrollLeft: 400,
+      targetScrollTop: 300,
+    });
+
+    const minimum = planStudioViewZoomGestureFrame({
+      baseZoom: STUDIO_VIEW_ZOOM_MIN,
+      targetZoom: -1,
+      originX: 100,
+      originY: 120,
+      originClientX: 200,
+      originClientY: 180,
+      clientX: 200,
+      clientY: 180,
+      baseLeft: 100,
+      baseTop: 60,
+      baseWidth: 240,
+      baseHeight: 300,
+      wrapLeft: 100,
+      wrapTop: 60,
+      viewportWidth: 800,
+      viewportHeight: 700,
+    });
+    expect(minimum).toEqual({
+      scale: 1,
+      translateX: 0,
+      translateY: 0,
+      targetScrollLeft: 0,
+      targetScrollTop: 0,
+    });
+  });
+
+  it.each([
+    [0, false],
+    [90, false],
+    [180, false],
+    [270, false],
+    [0, true],
+    [90, true],
+    [180, true],
+    [270, true],
+  ] as const)(
+    "matches preview and settled cursor anchors for rotation=%s flipH=%s",
+    (canvasRotation, canvasFlipH) => {
+      const layout = planStudioViewStageLayout({
+        documentWidth: 720,
+        documentHeight: 1_280,
+        scale: 0.75,
+        canvasFlipH,
+        canvasRotation,
+      });
+      const wrapLeft = 80;
+      const wrapTop = 50;
+      const scrollLeft = Math.min(210, Math.max(0, layout.width - 640));
+      const scrollTop = Math.min(160, Math.max(0, layout.height - 480));
+      const baseLeft = wrapLeft - scrollLeft;
+      const baseTop = wrapTop - scrollTop;
+      const clientX = 390;
+      const clientY = 260;
+      const originX = Math.min(layout.width, Math.max(0, clientX - baseLeft));
+      const originY = Math.min(layout.height, Math.max(0, clientY - baseTop));
+      const frame = planStudioViewZoomGestureFrame({
+        baseZoom: 1,
+        targetZoom: 1.37,
+        originX,
+        originY,
+        originClientX: baseLeft + originX,
+        originClientY: baseTop + originY,
+        clientX: baseLeft + originX,
+        clientY: baseTop + originY,
+        baseLeft,
+        baseTop,
+        baseWidth: layout.width,
+        baseHeight: layout.height,
+        wrapLeft,
+        wrapTop,
+        viewportWidth: 640,
+        viewportHeight: 480,
+      });
+
+      // CSS preview: the transform-origin point only receives the returned translation.
+      const previewX = baseLeft + originX + frame.translateX;
+      const previewY = baseTop + originY + frame.translateY;
+      // Settled layout: the same view-local point is scaled and offset by native scrolling.
+      const settledX = wrapLeft - frame.targetScrollLeft + originX * frame.scale;
+      const settledY = wrapTop - frame.targetScrollTop + originY * frame.scale;
+      expect(previewX).toBeCloseTo(settledX, 10);
+      expect(previewY).toBeCloseTo(settledY, 10);
+    }
+  );
+
+  it("contains malformed client and host coordinates instead of emitting a NaN transform", () => {
+    expect(planStudioViewZoomGestureFrame({
+      baseZoom: Number.NaN,
+      targetZoom: Number.POSITIVE_INFINITY,
+      originX: Number.POSITIVE_INFINITY,
+      originY: Number.NaN,
+      originClientX: Number.NaN,
+      originClientY: Number.NaN,
+      clientX: Number.NaN,
+      clientY: Number.NaN,
+      baseLeft: Number.NaN,
+      baseTop: Number.NaN,
+      baseWidth: 1_000,
+      baseHeight: 800,
+      wrapLeft: Number.NaN,
+      wrapTop: Number.NaN,
+      viewportWidth: 600,
+      viewportHeight: 500,
+    })).toEqual({
+      scale: 1,
+      translateX: 0,
+      translateY: 0,
+      targetScrollLeft: 0,
+      targetScrollTop: 0,
+    });
   });
 });
 

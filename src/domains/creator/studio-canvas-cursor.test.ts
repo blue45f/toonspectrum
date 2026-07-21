@@ -103,6 +103,7 @@ describe("studioCanvasCursorClassName", () => {
     expect(studioCanvasCursorClassName({ ...base, pixelToolArmed: true })).toBe("cursor-crosshair");
     expect(studioCanvasCursorClassName({ ...base, cropArmed: true })).toBe("cursor-crosshair");
     expect(studioCanvasCursorClassName({ ...base, tool: "draw", drawMode: "shape" })).toBe("cursor-crosshair");
+    expect(studioCanvasCursorClassName({ ...base, tool: "draw", drawMode: "pixel" })).toBe("cursor-crosshair");
   });
 
   it("lets precision brush rings replace the obscuring system pointer", () => {

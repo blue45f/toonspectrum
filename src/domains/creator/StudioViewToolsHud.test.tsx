@@ -44,20 +44,38 @@ describe("StudioViewToolsHud", () => {
     expect(html).toContain("40%");
     expect(html).toContain('aria-label="캔버스 축소"');
     expect(html).toContain('aria-label="캔버스 확대"');
-    expect(html).toContain('aria-label="캔버스 화면 맞춤"');
+    expect(html).toContain('aria-label="캔버스 너비에 맞춤"');
     expect(html).toContain('aria-label="캔버스 실제 픽셀 100%"');
     expect(html).toContain('aria-label="캔버스 좌우 반전"');
     expect(html).toContain('aria-pressed="false"');
     expect(html.match(/size-11/g)?.length ?? 0).toBe(7);
     expect(html.match(/focus-visible:outline-accent/g)?.length ?? 0).toBe(7);
+    expect(html.match(/data-studio-tool-hint-target="true"/g)?.length ?? 0).toBe(7);
+    expect(html).not.toContain(" title=");
     expect(html).not.toContain("왼쪽으로 90도 회전");
   });
 
-  it("disables zoom controls at their configured bounds", () => {
-    render(<StudioViewToolsHud {...props({ canZoomIn: false, canZoomOut: false })} />);
+  it("keeps bounded zoom controls discoverable while blocking their commands", () => {
+    const onZoomIn = vi.fn();
+    const onZoomOut = vi.fn();
+    render(
+      <StudioViewToolsHud
+        {...props({ canZoomIn: false, canZoomOut: false, onZoomIn, onZoomOut })}
+      />
+    );
 
-    expect((screen.getByRole("button", { name: "캔버스 축소" }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: "캔버스 확대" }) as HTMLButtonElement).disabled).toBe(true);
+    const zoomOut = screen.getByRole("button", { name: "캔버스 축소" });
+    const zoomIn = screen.getByRole("button", { name: "캔버스 확대" });
+
+    expect(zoomOut.getAttribute("aria-disabled")).toBe("true");
+    expect(zoomIn.getAttribute("aria-disabled")).toBe("true");
+    expect((zoomOut as HTMLButtonElement).disabled).toBe(false);
+    expect((zoomIn as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(zoomOut);
+    fireEvent.click(zoomIn);
+    expect(onZoomOut).not.toHaveBeenCalled();
+    expect(onZoomIn).not.toHaveBeenCalled();
   });
 
   it("auto-focuses the first action and supports roving Arrow/Home/End navigation", async () => {

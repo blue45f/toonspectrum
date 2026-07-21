@@ -243,9 +243,32 @@ if (!fs.existsSync(manifestPath)) {
       );
     }
 
+    const eagerColorVisionCoach = matchingEntries(
+      studioKeys,
+      /(?:studio-color-vision-coach|StudioColorBlindPreviewToggle)/,
+    );
+    if (eagerColorVisionCoach.length > 0) {
+      fail(
+        `optional color-vision coach UI returned to the Studio static graph: ${eagerColorVisionCoach.join(", ")}`,
+      );
+    }
+
+    const standaloneColorVisionModel = matchingEntries(
+      studioIncrementalKeys,
+      /studio-color-vision-model/,
+    );
+    if (standaloneColorVisionModel.length > 0) {
+      fail(
+        `live color-vision model became an extra Studio request: ${standaloneColorVisionModel.join(", ")}`,
+      );
+    }
+
     const optionalUiBoundaries = [
+      ["deferred Studio inspector", /src\/domains\/creator\/StudioInspectorAside\.tsx/],
       ["optional comments session", /src\/domains\/creator\/StudioCommentsPanelSession\.tsx/],
       ["optional Studio menubar commands", /src\/domains\/creator\/StudioMenubarContent\.tsx/],
+      ["optional mobile editing dock", /src\/domains\/creator\/StudioMobileEditingDock\.tsx/],
+      ["optional view tools HUD", /src\/domains\/creator\/StudioViewToolsHud\.tsx/],
       ["optional workspace manager", /src\/domains\/creator\/StudioWorkspaceMenu\.tsx/],
       ["optional color palette", /src\/domains\/creator\/StudioColorPalettePanel\.tsx/],
       ["optional flood fill panel", /src\/domains\/creator\/StudioFloodFillPanel\.tsx/],

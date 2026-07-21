@@ -3,6 +3,10 @@ import {
   resampleStrokePressures,
   strokeRenderDistance,
 } from "./studio-brush";
+import {
+  mapStudioBrushAliasPressureSamples,
+  studioBrushAliasEffectiveDiameter,
+} from "./studio-brush-alias-profile";
 import { selectStudioCausalInkSamples } from "./studio-causal-ink";
 import {
   studioInkFallbackPressure,
@@ -65,7 +69,7 @@ function committedElementToGpuStroke(
         [...sourcePoints],
         strokeRenderDistance(element.sampleSpacing)
       );
-  const pressures = causalSamples
+  const resolvedPressures = causalSamples
     ? causalSamples.map(({ pressure }) => pressure)
     : resampleStrokePressures(
         pressureModel === undefined
@@ -78,6 +82,12 @@ function committedElementToGpuStroke(
         points.length / 2,
         studioInkFallbackPressure(pressureModel)
       );
+  const pressures = mapStudioBrushAliasPressureSamples(
+    element.brush,
+    resolvedPressures,
+    points.length / 2,
+    studioInkFallbackPressure(pressureModel)
+  );
 
   return {
     id: element.id,
@@ -85,7 +95,10 @@ function committedElementToGpuStroke(
     pressures,
     color: element.stroke as string,
     // StudioDrawNode clamps legacy sub-pixel widths to one logical pixel before pressure scaling.
-    size: Math.max(1, element.strokeWidth as number),
+    size: studioBrushAliasEffectiveDiameter(
+      element.brush,
+      Math.max(1, element.strokeWidth as number)
+    ),
     ...(pressureModel === undefined
       ? {}
       : { pressureModel }),

@@ -424,7 +424,6 @@ export function StudioSelectionToolsPanel({
                 title: tool.label,
                 description: tool.tip,
                 preview: TOOL_PREVIEWS[tool.id],
-                previewVariant: `tool-${tool.id}`,
                 tip:
                   tool.id === "poly-lasso"
                     ? "Enter 또는 더블클릭으로 닫고, Esc로 그리던 경로를 취소할 수 있어요."
@@ -475,7 +474,6 @@ export function StudioSelectionToolsPanel({
                 title: mode.label,
                 description: mode.tip,
                 preview: COMBINE_PREVIEWS[mode.id],
-                previewVariant: `combine-${mode.id}`,
                 tip:
                   mode.id === "add"
                     ? "새 영역을 기존 선택에 더하려면 ‘합치기’ 결합 모드 버튼을 선택하세요."

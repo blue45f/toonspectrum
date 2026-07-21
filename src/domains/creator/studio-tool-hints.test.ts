@@ -47,6 +47,8 @@ describe("studio tool hints (rich hover copy)", () => {
     ["pen-pressure", "pressure"],
     ["symmetry", "symmetry"],
     ["zoom-fit", "zoom-view"],
+    ["shape-rect", "shape"],
+    ["shape-ellipse", "shape"],
     ["undo", "undo"],
     ["add-layer", "layer"],
     ["poly-lasso", "polygon-lasso"],
@@ -108,11 +110,22 @@ describe("studio tool hints (rich hover copy)", () => {
       "모바일 도크에서는 보정 도형이 아니라 직접 벡터 도형을 그립니다.",
       undefined,
       "shape",
-      "mobile-dock-shape"
+      "shape-picker-arrow"
     );
 
     expect(hint.preview).toBe("shape");
-    expect(hint.previewVariant).toBe("mobile-dock-shape");
+    expect(hint.previewVariant).toBe("shape-picker-arrow");
+  });
+
+  it("rejects cross-family overrides at the public label helper", () => {
+    const compileTimeInvalidOverride = (): void => {
+      // @ts-expect-error pause belongs to playback previews, not direct shapes.
+      studioToolHintFromLabel("도형", "설명", undefined, "shape", "pause");
+      // @ts-expect-error default-only ink previews do not accept variants.
+      studioToolHintFromLabel("펜", "설명", "B", "ink", "line");
+    };
+
+    expect(compileTimeInvalidOverride).toBeTypeOf("function");
   });
 
   it.each([
@@ -137,8 +150,8 @@ describe("studio tool hints (rich hover copy)", () => {
     ["보기 회전 (R)", "rotate-view"],
     ["보기 반전", "flip-view"],
     ["스마트 도형", "smart-shape"],
-    ["사각형 도형", "shape-rect"],
-    ["타원 도형", "shape-ellipse"],
+    ["사각형 도형", "shape"],
+    ["타원 도형", "shape"],
     ["텍스트 추가", "text"],
     ["말풍선 추가", "bubble"],
     ["이미지 추가", "image"],
@@ -149,6 +162,31 @@ describe("studio tool hints (rich hover copy)", () => {
     expect(studioToolHintPreview(studioToolHintFromLabel(label, "도구 설명"))).toBe(
       expectedPreview
     );
+  });
+
+  it("routes direct rail shapes to bounding-box drag coaches instead of smart correction", () => {
+    expect(studioToolHintFromLabel("사각형 도형", "도구 설명")).toMatchObject({
+      preview: "shape",
+      previewVariant: "rect",
+    });
+    expect(studioToolHintFromLabel("타원 도형", "도구 설명")).toMatchObject({
+      preview: "shape",
+      previewVariant: "ellipse",
+    });
+    expect(
+      studioToolHintPreview({
+        id: "shape-rect",
+        title: "사각형 도형",
+        description: "ID만 전달된 직접 도형",
+      })
+    ).toBe("shape");
+    expect(
+      studioToolHintPreview({
+        id: "shape-ellipse",
+        title: "타원 도형",
+        description: "ID만 전달된 직접 도형",
+      })
+    ).toBe("shape");
   });
 
   it("catalogs blur and tone filters with groups", () => {

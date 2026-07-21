@@ -43,6 +43,7 @@ describe("studio draw pointer-release planning ownership boundary", () => {
     expect(planner.imports).toEqual([
       "./studio-brush",
       "./studio-draw-completion",
+      "./studio-pixel-pencil",
       "./studio-quickshape",
       "./studio-stroke-shapes",
       "./studio-element-model",

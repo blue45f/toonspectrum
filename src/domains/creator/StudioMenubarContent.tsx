@@ -98,6 +98,7 @@ const MENUBAR_HINTS = {
     title: "말풍선",
     description: "말풍선 라이브러리를 열어 형태를 고르고 현재 장면에 배치합니다.",
     preview: "bubble",
+    previewVariant: "open-library",
     tip: "배치 후 우측 속성에서 꼬리, 테두리, 여백과 대사를 정교하게 다듬을 수 있어요.",
   },
   download: {
@@ -125,6 +126,14 @@ const MENUBAR_HINTS = {
     title: "전체 화면 드로잉",
     description: "사이트 헤더와 보조 UI를 숨기고 모바일 화면을 캔버스 작업에 집중합니다.",
     preview: "fullscreen",
+    previewVariant: "fullscreen",
+  },
+  immersiveExit: {
+    id: "menubar-immersive-exit",
+    title: "전체 화면 드로잉 종료",
+    description: "캔버스 집중 화면을 닫고 사이트 헤더와 모바일 창작 메뉴가 보이는 일반 작업 화면으로 돌아갑니다.",
+    preview: "fullscreen",
+    previewVariant: "exit-fullscreen",
   },
   draft: {
     id: "menubar-save-draft",
@@ -507,7 +516,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           )}
         >
           {isMobile ? (
-            <StudioToolHintTarget hint={MENUBAR_HINTS.immersive} preferredSide="bottom">
+            <StudioToolHintTarget
+              hint={mobileImmersive ? MENUBAR_HINTS.immersiveExit : MENUBAR_HINTS.immersive}
+              preferredSide="bottom"
+            >
               <button
                 type="button"
                 onClick={() => changeMobileImmersiveMode(!mobileImmersive)}

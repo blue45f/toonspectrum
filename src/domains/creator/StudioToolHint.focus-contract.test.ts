@@ -64,8 +64,11 @@ describe("StudioToolHint focus takeover contract", () => {
     );
     expect(source).toContain("aria-disabled={disabled ? true : undefined}");
     expect(source).toContain("tabIndex={disabled ? 0 : undefined}");
-    expect(source).toContain('role={disabled ? "button" : undefined}');
-    expect(source).toContain("aria-label={disabled ? hint.title : undefined}");
+    expect(source).toContain('role={disabled ? disabledChildProps?.role ?? "button" : undefined}');
+    expect(source).toContain("aria-label={disabled ? childAccessibleLabel ?? hint.title : undefined}");
+    expect(source).toContain('aria-pressed={disabledChildProps?.["aria-pressed"]}');
+    expect(source).toContain('aria-expanded={disabledChildProps?.["aria-expanded"]}');
+    expect(source).toContain('aria-controls={disabledChildProps?.["aria-controls"]}');
     expect(source).toContain("focus-visible:outline-accent");
     expect(source).toContain('"aria-hidden": true');
     expect(source).toContain("tabIndex: -1");

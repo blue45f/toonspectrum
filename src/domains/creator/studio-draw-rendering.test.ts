@@ -11,7 +11,11 @@ import {
   getSymmetricPoints,
   isDirectLiveDraftEl,
   isDirectLiveStampDraftEl,
+  studioLiveBrushEffectiveDiameter,
+  studioLiveBrushPressure,
+  studioLiveBrushPressureSamples,
 } from "./studio-draw-rendering";
+import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 import {
   drawStudioStampStrokeWithSymmetry,
   planStudioStampSymmetryRender,
@@ -39,6 +43,10 @@ class RecordingContext {
   set fillStyle(value: string | CanvasGradient | CanvasPattern) {
     this.currentFillStyle = value;
     this.operations.push(`fillStyle:${String(value)}`);
+  }
+
+  fillRect(x: number, y: number, width: number, height: number): void {
+    this.operations.push(`fillRect:${x},${y},${width},${height}`);
   }
 
   get globalAlpha(): number {
@@ -540,6 +548,7 @@ describe("direct-live eligibility", () => {
     ["default freehand pen", drawEl(), true],
     ["explicit fineliner", drawEl({ brush: "fineliner", mode: "pen" }), true],
     ["marker", drawEl({ brush: "marker", mode: "pen" }), true],
+    ["pixel pencil", drawEl({ brush: STUDIO_PIXEL_PENCIL_RENDER_MODE, mode: "pen" }), true],
     ["eraser ignores specialty family", drawEl({ brush: "watercolor", mode: "eraser" }), true],
     ["shape", drawEl({ kind: "rect", mode: "pen" }), false],
     ["dynamic alias", drawEl({ brush: "spray", mode: "pen" }), false],
@@ -575,6 +584,85 @@ describe("direct-live eligibility", () => {
 });
 
 describe("live freehand Canvas2D fixtures", () => {
+  it("uses the same alias diameter and pressure mapping for live pen families", () => {
+    const fineliner = drawEl({
+      mode: "pen",
+      brush: "fineliner",
+      points: [4, 7],
+      pressures: [0],
+    });
+    const markerBold = drawEl({
+      mode: "pen",
+      brush: "marker-bold",
+      points: [4, 7],
+      pressures: [0],
+    });
+
+    expect(studioLiveBrushEffectiveDiameter(fineliner)).toBe(4.8);
+    expect(studioLiveBrushPressure(fineliner, 0)).toBe(0.8);
+    expect(studioLiveBrushPressureSamples(fineliner)).toEqual([0.8]);
+    expect(studioLiveBrushEffectiveDiameter(markerBold)).toBe(15);
+    expect(studioLiveBrushPressure(markerBold, 0)).toBe(0.92);
+
+    const fineContext = new RecordingContext();
+    drawLiveFreehandDraftToContext(asKonvaContext(fineContext), fineliner);
+    const boldContext = new RecordingContext();
+    drawLiveFreehandDraftToContext(asKonvaContext(boldContext), markerBold);
+
+    expect(fineContext.operations).toContain(`arc:4,7,3.408,0,${Math.PI * 2}`);
+    expect(boldContext.operations).toContain(`arc:4,7,11.91,0,${Math.PI * 2}`);
+    expect(fineContext.operations).not.toEqual(boldContext.operations);
+  });
+
+  it("keeps eraser diameter independent from the previously selected alias", () => {
+    const eraser = drawEl({
+      mode: "eraser",
+      brush: "marker-bold",
+      strokeWidth: 10,
+      points: [0, 0, 2, 0],
+      pressures: [0, 1],
+    });
+
+    expect(studioLiveBrushEffectiveDiameter(eraser)).toBe(10);
+    expect(studioLiveBrushPressureSamples(eraser)).toEqual([0, 1]);
+  });
+
+  it("maps omitted live samples with the persisted pressure-model fallback", () => {
+    const liner = drawEl({
+      mode: "pen",
+      brush: "liner",
+      pressureModel: "linear-residual-path-v3",
+      points: [0, 0, 2, 0],
+      pressures: undefined,
+    });
+
+    expect(studioLiveBrushPressureSamples(liner)).toEqual([0.92, 0.92]);
+  });
+
+  it("renders pixel-pencil samples as de-duplicated integer fillRect cells", () => {
+    const context = new RecordingContext();
+    drawLiveFreehandDraftToContext(asKonvaContext(context), drawEl({
+      brush: STUDIO_PIXEL_PENCIL_RENDER_MODE,
+      points: [0.8, 2.2, 3.9, 2.7, 1.1, 2.1],
+      pressures: [1, 1, 1],
+      stroke: "#123456",
+      strokeWidth: 1,
+      opacity: 0.7,
+    }));
+
+    expect(context.operations).toEqual([
+      "save",
+      "alpha:0.7",
+      "composite:source-over",
+      "fillStyle:#123456",
+      "fillRect:0,2,1,1",
+      "fillRect:1,2,1,1",
+      "fillRect:2,2,1,1",
+      "fillRect:3,2,1,1",
+      "restore",
+    ]);
+  });
+
   it("wraps a one-point pen dab with clamped alpha and source-over state", () => {
     const context = new RecordingContext();
     drawLiveFreehandDraftToContext(asKonvaContext(context), drawEl({

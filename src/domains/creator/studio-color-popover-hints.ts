@@ -56,16 +56,37 @@ export const STUDIO_COLOR_EYEDROPPER_HINT: StudioToolHintSpec = {
   tip: "브라우저가 화면 색상 선택을 지원할 때만 표시됩니다.",
 };
 
+const STUDIO_PALETTE_HINT_VARIANT_BY_ID = {
+  "skin-natural": "palette-skin-natural",
+  "hair-natural": "palette-hair-natural",
+  "hair-vivid": "palette-hair-vivid",
+  "sky-hours": "palette-sky-hours",
+  "nature-green": "palette-nature-green",
+  "pastel-mood": "palette-pastel-mood",
+  "neon-cyber": "palette-neon-cyber",
+  "vintage-sepia": "palette-vintage-sepia",
+  "mono-ink": "palette-mono-ink",
+  "romance-pink": "palette-romance-pink",
+  "autumn-fall": "palette-autumn-fall",
+  "dark-fantasy": "palette-dark-fantasy",
+} as const satisfies Readonly<
+  Record<string, StudioToolHintPreviewVariant<"color-palette">>
+>;
+
 export function studioPaletteFamilyHint(
   label: string,
-  description: string
+  description: string,
+  paletteId?: string,
 ): StudioToolHintSpec {
+  const previewVariant = paletteId
+    ? STUDIO_PALETTE_HINT_VARIANT_BY_ID[paletteId as keyof typeof STUDIO_PALETTE_HINT_VARIANT_BY_ID]
+    : undefined;
   return {
     id: `color-popover:palette:${label}`,
     title: `${label} 팔레트`,
     description,
     preview: "color-palette",
-    previewVariant: "palette-family",
+    previewVariant: previewVariant ?? "palette-family",
     tip: "팔레트를 고른 뒤 아래 색상 칩을 선택하세요.",
   };
 }

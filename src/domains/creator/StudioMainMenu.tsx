@@ -19,12 +19,14 @@ import {
 import { createPortal } from "react-dom";
 
 import { StudioKbdBadge } from "./studio-chrome-ui";
+import { STUDIO_COLOR_VISION_HINTS } from "./studio-color-vision-coach";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { STUDIO_Z } from "./studio-z-index";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type {
   StudioMainMenuGroup,
+  StudioMainMenuHintKey,
   StudioMainMenuItem,
   StudioMainMenuProps,
 } from "./studio-main-menu-model";
@@ -94,6 +96,14 @@ const MAIN_MENU_HINTS: Readonly<Record<string, StudioToolHintSpec>> = {
   },
 };
 
+const MAIN_MENU_ITEM_HINTS: Readonly<Record<StudioMainMenuHintKey, StudioToolHintSpec>> = {
+  "color-vision:none": STUDIO_COLOR_VISION_HINTS.none,
+  "color-vision:grayscale": STUDIO_COLOR_VISION_HINTS.grayscale,
+  "color-vision:protanopia": STUDIO_COLOR_VISION_HINTS.protanopia,
+  "color-vision:deuteranopia": STUDIO_COLOR_VISION_HINTS.deuteranopia,
+  "color-vision:tritanopia": STUDIO_COLOR_VISION_HINTS.tritanopia,
+};
+
 function resolveMainMenuHint(group: StudioMainMenuGroup): StudioToolHintSpec {
   return MAIN_MENU_HINTS[group.id] ?? {
     id: `main-menu-${group.id}`,
@@ -102,7 +112,7 @@ function resolveMainMenuHint(group: StudioMainMenuGroup): StudioToolHintSpec {
   };
 }
 
-/** Pure APG roving-index resolver; enabled items wrap while disabled items are never targeted. */
+/** Pure APG roving-index resolver; disabled commands remain discoverable by arrow navigation. */
 // This colocated export is intentional: the parent task limits the APG change to this component
 // and its test, while the pure resolver keeps disabled-item navigation independently verifiable.
 // eslint-disable-next-line react-refresh/only-export-components
@@ -111,24 +121,16 @@ export function resolveStudioMainMenuItemIndex(
   currentIndex: number,
   command: StudioMainMenuNavigationCommand,
 ): number {
-  const enabledIndexes: number[] = [];
-  for (let index = 0; index < items.length; index += 1) {
-    if (!items[index]?.disabled) enabledIndexes.push(index);
-  }
-  if (enabledIndexes.length === 0) return -1;
-  if (command === "first") return enabledIndexes[0] ?? -1;
-  if (command === "last") return enabledIndexes.at(-1) ?? -1;
-  const enabledPosition = enabledIndexes.indexOf(currentIndex);
-  if (enabledPosition < 0) {
-    return command === "previous"
-      ? (enabledIndexes.at(-1) ?? -1)
-      : (enabledIndexes[0] ?? -1);
-  }
+  if (items.length === 0) return -1;
+  if (command === "first") return 0;
+  if (command === "last") return items.length - 1;
+  const currentPosition = currentIndex >= 0 && currentIndex < items.length
+    ? currentIndex
+    : command === "previous"
+      ? 0
+      : -1;
   const offset = command === "next" ? 1 : -1;
-  const targetPosition = (
-    enabledPosition + offset + enabledIndexes.length
-  ) % enabledIndexes.length;
-  return enabledIndexes[targetPosition] ?? -1;
+  return (currentPosition + offset + items.length) % items.length;
 }
 
 function measureTrigger(btn: HTMLButtonElement | null): MenuCoords {
@@ -319,50 +321,62 @@ function MenuDropdown({
           >
             {group.items.map((item, itemIndex) => {
               const Icon = item.icon;
+              const hint = item.hint ?? (item.hintKey ? MAIN_MENU_ITEM_HINTS[item.hintKey] : undefined);
               return (
                 <div key={item.id}>
-                  <button
-                    ref={(node) => {
-                      itemRefs.current[itemIndex] = node;
-                    }}
-                    type="button"
-                    role={item.checked === undefined ? "menuitem" : "menuitemcheckbox"}
-                    aria-checked={item.checked === undefined ? undefined : item.checked}
-                    disabled={item.disabled}
-                    tabIndex={item.disabled || itemIndex !== activeItemIndex ? -1 : 0}
-                    data-studio-main-menu-item-index={itemIndex}
-                    onFocus={() => {
-                      if (!item.disabled) setActiveItemIndex(itemIndex);
-                    }}
-                    onClick={() => {
-                      if (item.disabled) return;
-                      try {
-                        item.onSelect();
-                      } finally {
-                        closeMenu();
-                      }
-                    }}
-                    className={cn(
-                      "mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[0.78rem] font-medium",
-                      STUDIO_EASE,
-                      STUDIO_FOCUS_RING,
-                      item.danger && "text-bad",
-                      item.disabled
-                        ? "cursor-not-allowed opacity-40"
-                        : "text-fg-2 hover:bg-raised hover:text-fg"
-                    )}
+                  <StudioToolHintTarget
+                    hint={hint}
+                    unavailableReason={item.unavailableReason}
+                    preferredSide="right"
+                    className="flex w-full"
                   >
-                    {Icon ? (
-                      <Icon size={15} strokeWidth={1.75} aria-hidden className="shrink-0 opacity-80" />
-                    ) : (
-                      <span aria-hidden className="size-[15px] shrink-0" />
-                    )}
-                    <span className="min-w-0 flex-1 truncate tracking-tight">{item.label}</span>
-                    {item.checked ? (
-                      <Check size={13} strokeWidth={2.25} aria-hidden className="shrink-0 text-accent" />
-                    ) : null}
-                    {item.shortcut ? <StudioKbdBadge>{item.shortcut}</StudioKbdBadge> : null}
-                  </button>
+                    <button
+                      ref={(node) => {
+                        itemRefs.current[itemIndex] = node;
+                      }}
+                      type="button"
+                      role={
+                        item.checked === undefined
+                          ? "menuitem"
+                          : item.selectionRole === "radio"
+                            ? "menuitemradio"
+                            : "menuitemcheckbox"
+                      }
+                      aria-checked={item.checked === undefined ? undefined : item.checked}
+                      aria-disabled={item.disabled || undefined}
+                      tabIndex={itemIndex !== activeItemIndex ? -1 : 0}
+                      data-studio-main-menu-item-index={itemIndex}
+                      onFocus={() => setActiveItemIndex(itemIndex)}
+                      onClick={() => {
+                        if (item.disabled) return;
+                        try {
+                          item.onSelect();
+                        } finally {
+                          closeMenu();
+                        }
+                      }}
+                      className={cn(
+                        "mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[0.78rem] font-medium",
+                        STUDIO_EASE,
+                        STUDIO_FOCUS_RING,
+                        item.danger && "text-bad",
+                        item.disabled
+                          ? "cursor-not-allowed opacity-40"
+                          : "text-fg-2 hover:bg-raised hover:text-fg"
+                      )}
+                    >
+                      {Icon ? (
+                        <Icon size={15} strokeWidth={1.75} aria-hidden className="shrink-0 opacity-80" />
+                      ) : (
+                        <span aria-hidden className="size-[15px] shrink-0" />
+                      )}
+                      <span className="min-w-0 flex-1 truncate tracking-tight">{item.label}</span>
+                      {item.checked ? (
+                        <Check size={13} strokeWidth={2.25} aria-hidden className="shrink-0 text-accent" />
+                      ) : null}
+                      {item.shortcut ? <StudioKbdBadge>{item.shortcut}</StudioKbdBadge> : null}
+                    </button>
+                  </StudioToolHintTarget>
                   {item.separatorAfter ? (
                     <div role="separator" className="mx-3 my-1.5 h-px bg-line/60" />
                   ) : null}

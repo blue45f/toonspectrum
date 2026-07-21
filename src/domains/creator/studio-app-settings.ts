@@ -58,7 +58,7 @@ export const STUDIO_RAIL_TOOL_CATALOG = [
   { id: "comment", label: "댓글", defaultShortcut: "" },
   { id: "perspective", label: "투시도", defaultShortcut: "" },
   { id: "zoom", label: "보기 확대·축소", defaultShortcut: "Z" },
-  { id: "zoom-fit", label: "화면 맞춤", defaultShortcut: "Mod+0" },
+  { id: "zoom-fit", label: "너비에 맞춤", defaultShortcut: "Home" },
   { id: "rotate-view", label: "보기 회전", defaultShortcut: "R" },
   { id: "frame-anim", label: "프레임 애니", defaultShortcut: "" },
   { id: "reference", label: "참고 이미지", defaultShortcut: "" },

@@ -33,6 +33,7 @@ import type { El } from "./studio-element-model";
 import type { DocumentMaster } from "./studio-master-page";
 import type { StudioPageDnd } from "./studio-page-dnd";
 import type { PageState } from "./studio-page-state";
+import type { StudioMobileSheet } from "./StudioMobileEditingDock";
 import type { Resizable } from "@/components/use-resizable";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 
@@ -67,7 +68,7 @@ export interface StudioPageListPaneProps {
   masterPanelOpen: boolean;
   metaEditPageId: string | null;
   mobileKeyboardInset: number;
-  mobileSheet: "pages" | "props" | "draw" | "brushes" | null;
+  mobileSheet: StudioMobileSheet;
   pageDnd: StudioPageDnd;
   pages: PageState[];
   pagesSheetRef: RefObject<HTMLDivElement | null>;
@@ -76,7 +77,7 @@ export interface StudioPageListPaneProps {
   setLeftPanelOpen: Dispatch<SetStateAction<boolean>>;
   setMasterPanelOpen: Dispatch<SetStateAction<boolean>>;
   setMetaEditPageId: Dispatch<SetStateAction<string | null>>;
-  setMobileSheet: Dispatch<SetStateAction<"pages" | "props" | "draw" | "brushes" | null>>;
+  setMobileSheet: Dispatch<SetStateAction<StudioMobileSheet>>;
   visibleLeftPanelOpen: boolean;
   stableHandlers: StudioPageListPaneHandlers;
 }

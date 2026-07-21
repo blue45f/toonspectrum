@@ -158,6 +158,49 @@ export interface StudioViewRotationTransitionPlan extends StudioViewScrollPlan {
   documentPoint: StudioViewPoint;
 }
 
+export interface StudioViewClientRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+export interface StudioViewZoomGestureAnchor {
+  /** Client-space point used for the final scroll anchor. */
+  clientX: number;
+  clientY: number;
+  /** Host-local transform-origin point. */
+  originX: number;
+  originY: number;
+}
+
+export interface StudioViewZoomGestureFrameInput {
+  baseZoom: number;
+  targetZoom: number;
+  originX: number;
+  originY: number;
+  originClientX: number;
+  originClientY: number;
+  clientX: number;
+  clientY: number;
+  baseLeft: number;
+  baseTop: number;
+  baseWidth: number;
+  baseHeight: number;
+  wrapLeft: number;
+  wrapTop: number;
+  viewportWidth: number;
+  viewportHeight: number;
+}
+
+export interface StudioViewZoomGestureFrame {
+  scale: number;
+  translateX: number;
+  translateY: number;
+  targetScrollLeft: number;
+  targetScrollTop: number;
+}
+
 function finitePositive(value: number, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
@@ -169,6 +212,135 @@ function finiteNonNegative(value: number): number {
 function clampFinite(value: number, minimum: number, maximum: number): number {
   const safe = Number.isFinite(value) ? value : minimum;
   return Math.min(maximum, Math.max(minimum, safe));
+}
+
+/**
+ * Keep wheel/pinch zoom anchored to a real point on the canvas host.
+ *
+ * The viewport is intentionally larger than the document at low zoom. A wheel event can therefore
+ * originate on the surrounding pasteboard. CSS accepts a transform origin outside the element,
+ * but the document projection clamps that point later; using those two different anchors makes the
+ * canvas jump when the preview transform settles. Clamp once up front so preview and committed
+ * scroll math share the exact same point.
+ */
+export function clampStudioViewZoomGestureAnchor(
+  rect: StudioViewClientRect,
+  clientX: number,
+  clientY: number
+): StudioViewZoomGestureAnchor {
+  const left = Number.isFinite(rect.left) ? rect.left : 0;
+  const top = Number.isFinite(rect.top) ? rect.top : 0;
+  const right = Math.max(left, Number.isFinite(rect.right) ? rect.right : left);
+  const bottom = Math.max(top, Number.isFinite(rect.bottom) ? rect.bottom : top);
+  const anchoredClientX = clampFinite(clientX, left, right);
+  const anchoredClientY = clampFinite(clientY, top, bottom);
+  return {
+    clientX: anchoredClientX,
+    clientY: anchoredClientY,
+    originX: anchoredClientX - left,
+    originY: anchoredClientY - top,
+  };
+}
+
+/**
+ * Smooth, magnitude-aware wheel zoom.
+ *
+ * Trackpads can emit sub-pixel deltas while a mouse wheel usually emits line/page-sized deltas.
+ * Treating every event as one fixed 15 percentage-point jump makes even a tiny accidental touch
+ * move the document. Normalize the unit and use a bounded multiplicative step so the same physical
+ * gesture feels consistent at 25% and 400% zoom.
+ */
+export function stepStudioViewWheelZoom(
+  currentZoom: number,
+  deltaY: number,
+  deltaMode: number,
+  reverse = false,
+  pageSize = 800
+): number {
+  const modeScale = deltaMode === 1
+    ? 16
+    : deltaMode === 2
+      ? finitePositive(pageSize, 800)
+      : 1;
+  const pixels = (Number.isFinite(deltaY) ? deltaY : 0) * modeScale * (reverse ? -1 : 1);
+  const current = clampFinite(
+    Number.isFinite(currentZoom) ? currentZoom : 1,
+    STUDIO_VIEW_ZOOM_MIN,
+    STUDIO_VIEW_ZOOM_MAX
+  );
+  if (pixels === 0) return current;
+  const exponent = clampFinite(-pixels * 0.002, -0.18, 0.18);
+  return clampFinite(
+    current * Math.exp(exponent),
+    STUDIO_VIEW_ZOOM_MIN,
+    STUDIO_VIEW_ZOOM_MAX
+  );
+}
+
+/**
+ * Plan the transient CSS frame and its eventual scroll position from one shared boundary model.
+ * This removes the fit-or-smaller snap where CSS can scale around an off-axis cursor but native
+ * scroll cannot represent the negative offset required to preserve that cursor anchor.
+ */
+export function planStudioViewZoomGestureFrame(
+  input: StudioViewZoomGestureFrameInput
+): StudioViewZoomGestureFrame {
+  // Keep the compositor preview on the exact same product bounds as the committed React state.
+  // A caller normally clamps first, but pinch ratios and accumulated fractional wheel deltas can
+  // briefly overshoot. Previewing that overshoot and clamping only on settlement moves the point
+  // under the cursor twice, which feels like a late anchor jump at 20%/500%.
+  const baseZoom = clampFinite(
+    finitePositive(input.baseZoom, 1),
+    STUDIO_VIEW_ZOOM_MIN,
+    STUDIO_VIEW_ZOOM_MAX
+  );
+  const targetZoom = clampFinite(
+    finitePositive(input.targetZoom, baseZoom),
+    STUDIO_VIEW_ZOOM_MIN,
+    STUDIO_VIEW_ZOOM_MAX
+  );
+  const scale = targetZoom / baseZoom;
+  const baseWidth = finiteNonNegative(input.baseWidth);
+  const baseHeight = finiteNonNegative(input.baseHeight);
+  const viewportWidth = finiteNonNegative(input.viewportWidth);
+  const viewportHeight = finiteNonNegative(input.viewportHeight);
+  const originX = clampFinite(input.originX, 0, baseWidth);
+  const originY = clampFinite(input.originY, 0, baseHeight);
+  const baseLeft = Number.isFinite(input.baseLeft) ? input.baseLeft : 0;
+  const baseTop = Number.isFinite(input.baseTop) ? input.baseTop : 0;
+  const wrapLeft = Number.isFinite(input.wrapLeft) ? input.wrapLeft : baseLeft;
+  const wrapTop = Number.isFinite(input.wrapTop) ? input.wrapTop : baseTop;
+  const originClientX = Number.isFinite(input.originClientX)
+    ? input.originClientX
+    : baseLeft + originX;
+  const originClientY = Number.isFinite(input.originClientY)
+    ? input.originClientY
+    : baseTop + originY;
+  const clientX = Number.isFinite(input.clientX) ? input.clientX : originClientX;
+  const clientY = Number.isFinite(input.clientY) ? input.clientY : originClientY;
+  const translateX = clientX - originClientX;
+  const translateY = clientY - originClientY;
+  const maximumScrollLeft = Math.max(0, baseWidth * scale - viewportWidth);
+  const maximumScrollTop = Math.max(0, baseHeight * scale - viewportHeight);
+  const targetScrollLeft = clampFinite(
+    originX * scale - (clientX - wrapLeft),
+    0,
+    maximumScrollLeft
+  );
+  const targetScrollTop = clampFinite(
+    originY * scale - (clientY - wrapTop),
+    0,
+    maximumScrollTop
+  );
+  const naturalLeft = baseLeft + originX * (1 - scale) + translateX;
+  const naturalTop = baseTop + originY * (1 - scale) + translateY;
+  return {
+    scale,
+    translateX: translateX + wrapLeft - targetScrollLeft - naturalLeft,
+    translateY: translateY + wrapTop - targetScrollTop - naturalTop,
+    targetScrollLeft,
+    targetScrollTop,
+  };
 }
 
 /**

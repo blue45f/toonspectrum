@@ -467,11 +467,19 @@ export function StudioFrameAnimationPanel({
                 disabled={Boolean(playbackDisabledReason)}
                 unavailableReason={playbackDisabledReason}
                 preferredSide="left"
-                hint={{
+                hint={playing ? {
+                  id: "frame-playback-pause",
+                  title: "프레임 애니메이션 정지",
+                  description: "현재 플립북 미리보기를 멈추고 재생헤드를 지금 확인 중인 프레임에 유지합니다.",
+                  preview: "frame-playback",
+                  previewVariant: "pause",
+                  tip: "정지한 프레임에서 그림이나 개별 표시 시간을 바로 다듬을 수 있어요.",
+                } : {
                   id: "frame-playback",
                   title: "프레임 애니메이션 재생",
                   description: "필름스트립을 프레임별 시간과 FPS 설정에 맞춰 플립북처럼 미리 재생합니다.",
                   preview: "frame-playback",
+                  previewVariant: "play",
                   tip: "각 프레임에 개별 시간을 입력하면 강조할 동작만 더 오래 보여줄 수 있어요.",
                 }}
               >

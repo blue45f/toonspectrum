@@ -13,7 +13,15 @@ import {
   Settings2,
   X,
 } from "lucide-react";
-import { useEffect, useId, useRef, useState, type ReactElement } from "react";
+import {
+  useEffect,
+  useEffectEvent,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
 import { createPortal } from "react-dom";
 
 import {
@@ -46,6 +54,7 @@ import {
   type StudioUiDensityMode,
 } from "./studio-ui-density";
 import { StudioPressureCurveGraph } from "./StudioPressureCurveGraph";
+import { activateStudioModalSheet } from "./useStudioModalSheet";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
@@ -120,6 +129,13 @@ export function StudioAppSettingsPanel({
   const [recordingAction, setRecordingAction] = useState<StudioShortcutActionId | null>(null);
   const [toolbarQuery, setToolbarQuery] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
+  const dismissModal = useEffectEvent(() => {
+    if (recordingAction) {
+      setRecordingAction(null);
+      return;
+    }
+    onClose();
+  });
 
   useEffect(() => {
     if (open) {
@@ -129,78 +145,57 @@ export function StudioAppSettingsPanel({
   }, [open, initialTab]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !recordingAction) return;
     const onKey = (e: KeyboardEvent) => {
-      if (recordingAction) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.key === "Escape") {
-          setRecordingAction(null);
-          return;
-        }
-        if (e.key === "Backspace" || e.key === "Delete") {
-          onChange({
-            ...settings,
-            shortcuts: { ...settings.shortcuts, [recordingAction]: "" },
-          });
-          setRecordingAction(null);
-          return;
-        }
-        const parts: string[] = [];
-        if (e.metaKey || e.ctrlKey) parts.push("Mod");
-        if (e.shiftKey) parts.push("Shift");
-        if (e.altKey) parts.push("Alt");
-        let key = "";
-        if (e.code === "BracketLeft") key = "[";
-        else if (e.code === "BracketRight") key = "]";
-        else if (e.code === "Tab") key = "Tab";
-        else if (e.key === "?") key = "?";
-        else if (e.key.length === 1) key = e.key.toUpperCase();
-        else if (e.key !== "Escape" && e.key !== "Control" && e.key !== "Meta" && e.key !== "Shift" && e.key !== "Alt") {
-          key = e.key;
-        }
-        if (!key) return;
-        parts.push(key);
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === "Escape") {
+        setRecordingAction(null);
+        return;
+      }
+      if (e.key === "Backspace" || e.key === "Delete") {
         onChange({
           ...settings,
-          shortcuts: { ...settings.shortcuts, [recordingAction]: parts.join("+") },
+          shortcuts: { ...settings.shortcuts, [recordingAction]: "" },
         });
         setRecordingAction(null);
         return;
       }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-        return;
+      const parts: string[] = [];
+      if (e.metaKey || e.ctrlKey) parts.push("Mod");
+      if (e.shiftKey) parts.push("Shift");
+      if (e.altKey) parts.push("Alt");
+      let key = "";
+      if (e.code === "BracketLeft") key = "[";
+      else if (e.code === "BracketRight") key = "]";
+      else if (e.code === "Tab") key = "Tab";
+      else if (e.key === "?") key = "?";
+      else if (e.key.length === 1) key = e.key.toUpperCase();
+      else if (e.key !== "Control" && e.key !== "Meta" && e.key !== "Shift" && e.key !== "Alt") {
+        key = e.key;
       }
-      if (e.key === "Tab") {
-        const focusable = Array.from(
-          dialogRef.current?.querySelectorAll<HTMLElement>(
-            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-          ) ?? []
-        ).filter((element) => element.getAttribute("aria-hidden") !== "true");
-        if (focusable.length === 0) return;
-        const first = focusable[0];
-        const last = focusable.at(-1);
-        const active = document.activeElement;
-        if (e.shiftKey && (active === first || !dialogRef.current?.contains(active))) {
-          e.preventDefault();
-          last?.focus();
-        } else if (!e.shiftKey && (active === last || !dialogRef.current?.contains(active))) {
-          e.preventDefault();
-          first?.focus();
-        }
-      }
+      if (!key) return;
+      parts.push(key);
+      onChange({
+        ...settings,
+        shortcuts: { ...settings.shortcuts, [recordingAction]: parts.join("+") },
+      });
+      setRecordingAction(null);
     };
     globalThis.addEventListener("keydown", onKey, true);
     return () => globalThis.removeEventListener("keydown", onKey, true);
-  }, [open, recordingAction, settings, onChange, onClose]);
+  }, [open, recordingAction, settings, onChange]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
-    const prev = document.activeElement as HTMLElement | null;
-    dialogRef.current?.querySelector<HTMLElement>("button, [href], input, select")?.focus();
-    return () => prev?.focus?.();
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    return activateStudioModalSheet({
+      dialog,
+      document: dialog.ownerDocument,
+      onDismiss: dismissModal,
+      root: dialog.ownerDocument.body,
+    });
   }, [open]);
 
   if (!open || typeof document === "undefined") return null;
@@ -229,6 +224,7 @@ export function StudioAppSettingsPanel({
         aria-modal="true"
         aria-labelledby={titleId}
         data-studio-shortcut-boundary="true"
+        tabIndex={-1}
         className="flex max-h-[min(92dvh,44rem)] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-line bg-panel shadow-2xl sm:rounded-2xl"
       >
         <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
@@ -265,7 +261,7 @@ export function StudioAppSettingsPanel({
                 type="button"
                 onClick={() => setTab(id)}
                 className={cn(
-                  "min-h-11 shrink-0 rounded-lg px-2.5 py-2 text-left text-xs font-medium transition sm:min-h-8 sm:py-1.5 pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:py-2",
+                  "min-h-11 min-w-11 shrink-0 rounded-lg px-2.5 py-2 text-left text-xs font-medium transition sm:min-h-8 sm:min-w-0 sm:py-1.5 pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:py-2",
                   tab === id
                     ? "bg-accent-soft text-accent ring-1 ring-accent/20"
                     : "text-fg-2 hover:bg-raised hover:text-fg"
@@ -360,7 +356,7 @@ export function StudioAppSettingsPanel({
                           type="button"
                           className={cn(
                             buttonClass({ size: "sm", variant: recording ? "outline" : "quiet" }),
-                            "min-w-[5.5rem] font-mono text-[0.7rem]",
+                            "min-h-11 min-w-[5.5rem] font-mono text-[0.7rem] sm:min-h-8 pointer-coarse:min-h-11",
                             recording && "ring-2 ring-accent/40"
                           )}
                           onClick={() => setRecordingAction(recording ? null : action.id)}
@@ -373,7 +369,10 @@ export function StudioAppSettingsPanel({
                 </ul>
                 <button
                   type="button"
-                  className={buttonClass({ size: "sm", variant: "quiet" })}
+                  className={cn(
+                    buttonClass({ size: "sm", variant: "quiet" }),
+                    "min-h-11 sm:min-h-8 pointer-coarse:min-h-11"
+                  )}
                   onClick={() =>
                     patch({
                       shortcuts: Object.fromEntries(
@@ -509,7 +508,7 @@ export function StudioAppSettingsPanel({
                           },
                         })
                       }
-                      className="h-2 w-28 accent-accent"
+                      className="min-h-11 w-28 accent-accent sm:min-h-8 pointer-coarse:min-h-11"
                       aria-label="도구 도움말 길게 누르기 시간"
                     />
                     <output className="min-w-12 tabular-nums text-fg-3">
@@ -692,7 +691,7 @@ export function StudioAppSettingsPanel({
                         grids: { ...settings.grids, pixelGridSize: Number(e.target.value) },
                       })
                     }
-                    className="rounded-md border border-line bg-card px-2 py-1 text-xs text-fg"
+                    className="min-h-11 rounded-md border border-line bg-card px-2 py-1 text-xs text-fg sm:min-h-8 pointer-coarse:min-h-11"
                   >
                     {STUDIO_PIXEL_GRID_SIZE_OPTIONS.map((sz) => (
                       <option key={sz} value={sz}>
@@ -767,7 +766,10 @@ export function StudioAppSettingsPanel({
                   </p>
                   <button
                     type="button"
-                    className={cn(buttonClass({ size: "sm", variant: "quiet" }), "mt-2 text-bad")}
+                    className={cn(
+                      buttonClass({ size: "sm", variant: "quiet" }),
+                      "mt-2 min-h-11 text-bad sm:min-h-8 pointer-coarse:min-h-11"
+                    )}
                     onClick={() => {
                       if (
                         globalThis.confirm?.(
@@ -798,7 +800,7 @@ export function StudioAppSettingsPanel({
                 {onRetryPersistence ? (
                   <button
                     type="button"
-                    className="min-h-9 rounded-lg px-2 font-semibold underline decoration-warning/50 underline-offset-2 hover:bg-warning/10 pointer-coarse:min-h-11"
+                    className="min-h-11 rounded-lg px-2 font-semibold underline decoration-warning/50 underline-offset-2 hover:bg-warning/10 sm:min-h-9 pointer-coarse:min-h-11"
                     onClick={onRetryPersistence}
                   >
                     다시 저장

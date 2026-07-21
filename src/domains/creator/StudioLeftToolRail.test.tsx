@@ -16,7 +16,10 @@ interface MockRailButtonProps {
   readonly "aria-controls"?: string;
   readonly "aria-expanded"?: boolean;
   readonly active?: boolean;
+  readonly description?: string;
   readonly disabled?: boolean;
+  readonly hintPreview?: string;
+  readonly hintPreviewVariant?: string;
   readonly id?: string;
   readonly label: string;
   readonly onClick?: () => void;
@@ -28,7 +31,10 @@ vi.mock("./studio-chrome-ui", () => ({
     "aria-controls": ariaControls,
     "aria-expanded": ariaExpanded,
     active,
+    description,
     disabled,
+    hintPreview,
+    hintPreviewVariant,
     id,
     label,
     onClick,
@@ -40,6 +46,9 @@ vi.mock("./studio-chrome-ui", () => ({
       aria-expanded={ariaExpanded}
       aria-label={label}
       aria-pressed={active}
+      data-hint-description={description}
+      data-hint-preview={hintPreview}
+      data-hint-preview-variant={hintPreviewVariant}
       disabled={disabled}
       onClick={onClick}
     >
@@ -158,7 +167,24 @@ function createProps(overrides: Partial<RailProps> = {}): RailProps {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
+
+function stubAnimationFrame(): void {
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    callback(0);
+    return 1;
+  });
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+}
+
+function hiddenToolSettings(): ReturnType<typeof defaultStudioAppSettings> {
+  const defaults = defaultStudioAppSettings();
+  return {
+    ...defaults,
+    toolbar: { visibleIds: ["select"] },
+  };
+}
 
 describe("StudioLeftToolRail", () => {
   it("wires core draw, insertion, image, and view actions to their single owners", () => {
@@ -187,13 +213,58 @@ describe("StudioLeftToolRail", () => {
     });
     expect(props.stableHandlers.onPickImage).toHaveBeenCalledOnce();
 
-    fireEvent.click(screen.getByRole("button", { name: "화면 맞춤" }));
+    fireEvent.click(screen.getByRole("button", { name: "너비에 맞춤 (Home)" }));
     expect(props.stableHandlers.fitCanvasToWidth).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "보기 확대·축소 (Z)" }));
     expect(props.setViewTool).toHaveBeenCalledOnce();
     const zoomAction = vi.mocked(props.setViewTool).mock.calls.at(-1)?.[0];
     expect(typeof zoomAction).toBe("function");
     expect(typeof zoomAction === "function" ? zoomAction(null) : null).toBe("zoom");
+  });
+
+  it("keeps remapped and unbound view shortcut labels synchronized with app settings", () => {
+    const appSettings = defaultStudioAppSettings();
+    appSettings.shortcuts = {
+      ...appSettings.shortcuts,
+      "tool-zoom": "Shift+Z",
+      "tool-rotate-view": "",
+    };
+
+    render(<StudioLeftToolRail {...createProps({ appSettings })} />);
+
+    expect(screen.getByRole("button", { name: "보기 확대·축소 (⇧·Z)" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "보기 회전" })).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "보기 회전 (R)" })).toBeNull();
+  });
+
+  it("previews opening and closing each view HUD instead of implying a direct canvas transform", () => {
+    const base = createProps();
+    const view = render(<StudioLeftToolRail {...base} />);
+
+    const closedZoom = screen.getByRole("button", { name: "보기 확대·축소 (Z)" });
+    expect(closedZoom.getAttribute("aria-expanded")).toBe("false");
+    expect(closedZoom.getAttribute("aria-controls")).toBe("studio-view-tools-hud-zoom");
+    expect(closedZoom.getAttribute("data-hint-preview")).toBe("view-hud");
+    expect(closedZoom.getAttribute("data-hint-preview-variant")).toBe("zoom-open");
+    expect(closedZoom.getAttribute("data-hint-description")).toContain("HUD를 열어");
+    const closedRotate = screen.getByRole("button", { name: "보기 회전 (R)" });
+    expect(closedRotate.getAttribute("data-hint-preview")).toBe("view-hud");
+    expect(closedRotate.getAttribute("data-hint-preview-variant")).toBe("rotate-open");
+
+    view.rerender(<StudioLeftToolRail {...createProps({ viewTool: "zoom" })} />);
+    const openZoom = screen.getByRole("button", { name: "확대·축소 HUD 닫기 (Z)" });
+    expect(openZoom.getAttribute("aria-expanded")).toBe("true");
+    expect(openZoom.getAttribute("data-hint-preview")).toBe("view-hud");
+    expect(openZoom.getAttribute("data-hint-preview-variant")).toBe("zoom-close");
+    expect(openZoom.getAttribute("data-hint-description")).toContain("HUD를 닫고");
+
+    view.rerender(<StudioLeftToolRail {...createProps({ viewTool: "rotate" })} />);
+    const openRotate = screen.getByRole("button", { name: "회전 HUD 닫기 (R)" });
+    expect(openRotate.getAttribute("aria-expanded")).toBe("true");
+    expect(openRotate.getAttribute("aria-controls")).toBe("studio-view-tools-hud-rotate");
+    expect(openRotate.getAttribute("data-hint-preview")).toBe("view-hud");
+    expect(openRotate.getAttribute("data-hint-preview-variant")).toBe("rotate-close");
+    expect(openRotate.getAttribute("data-hint-description")).toContain("회전 HUD를 닫고");
   });
 
   it("activates perspective as a usable pen workflow instead of preserving an eraser or pixel gesture", () => {
@@ -217,7 +288,10 @@ describe("StudioLeftToolRail", () => {
     const base = createProps({ selected: IMAGE });
     const view = render(<StudioLeftToolRail {...base} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "올가미 선택" }));
+    const inactiveLasso = screen.getByRole("button", { name: "올가미 선택" });
+    expect(inactiveLasso.getAttribute("data-hint-preview")).toBe("lasso");
+    expect(inactiveLasso.getAttribute("data-hint-description")).toContain("자유 곡선");
+    fireEvent.click(inactiveLasso);
     expect(base.setPixelTool).toHaveBeenCalledWith("lasso");
     expect(base.stableHandlers.disarmAllPixelTools).toHaveBeenCalledOnce();
 
@@ -228,9 +302,13 @@ describe("StudioLeftToolRail", () => {
       stableHandlers: base.stableHandlers,
     });
     view.rerender(<StudioLeftToolRail {...free} />);
-    fireEvent.click(screen.getByRole("button", {
+    const freeLasso = screen.getByRole("button", {
       name: "자유 올가미 · 다시 누르면 다각형 올가미",
-    }));
+    });
+    expect(freeLasso.getAttribute("data-hint-preview")).toBe("polygon-lasso");
+    expect(freeLasso.getAttribute("data-hint-preview-variant")).toBeNull();
+    expect(freeLasso.getAttribute("data-hint-description")).toContain("다각형 올가미로 전환");
+    fireEvent.click(freeLasso);
     expect(base.setPixelTool).toHaveBeenCalledWith("poly-lasso");
 
     const polygon = createProps({
@@ -240,9 +318,12 @@ describe("StudioLeftToolRail", () => {
       stableHandlers: base.stableHandlers,
     });
     view.rerender(<StudioLeftToolRail {...polygon} />);
-    fireEvent.click(screen.getByRole("button", {
+    const polygonLasso = screen.getByRole("button", {
       name: "다각형 올가미 · 다시 누르면 끄기",
-    }));
+    });
+    expect(polygonLasso.getAttribute("data-hint-preview")).toBe("dismiss");
+    expect(polygonLasso.getAttribute("data-hint-description")).toContain("선택 도구를 끕니다");
+    fireEvent.click(polygonLasso);
     expect(base.setPixelTool).toHaveBeenCalledWith(null);
   });
 
@@ -261,7 +342,7 @@ describe("StudioLeftToolRail", () => {
       "지우개 (E)",
       "라쏘 필",
       "투시도",
-      "스마트 도형",
+      "스마트 도형 켜기",
       "사각형 도형",
       "타원 도형",
       "텍스트 추가",
@@ -273,5 +354,78 @@ describe("StudioLeftToolRail", () => {
       expect(screen.getByRole<HTMLButtonElement>("button", { name }).disabled).toBe(true);
     }
     expect(screen.getByLabelText<HTMLInputElement>("이미지 추가").disabled).toBe(true);
+  });
+
+  it("ports the More dialog to the body and restores focus after choosing a hidden tool", () => {
+    stubAnimationFrame();
+    const props = createProps({
+      appSettings: hiddenToolSettings(),
+      isRailToolVisible: (id) => id === "select",
+      railMoreOpen: true,
+    });
+
+    render(<StudioLeftToolRail {...props} />);
+
+    const dialog = screen.getByRole("dialog", { name: "숨긴 도구" });
+    expect(dialog.parentElement).toBe(document.body);
+    expect(dialog.getAttribute("aria-modal")).toBe("false");
+    expect(dialog.className).toContain("fixed");
+    expect(dialog.className).toContain("overflow-y-auto");
+
+    fireEvent.click(screen.getByRole("button", { name: "핸드(팬)" }));
+
+    expect(props.stableHandlers.commitAppSettings).toHaveBeenCalledWith({
+      ...props.appSettings,
+      toolbar: { visibleIds: ["select", "hand"] },
+    });
+    expect(props.setRailMoreOpen).toHaveBeenCalledWith(false);
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "더보기 · 툴바 설정" })
+    );
+  });
+
+  it("opens the toolbar settings tab while preserving the More trigger as modal return focus", () => {
+    stubAnimationFrame();
+    const props = createProps({
+      appSettings: hiddenToolSettings(),
+      isRailToolVisible: (id) => id === "select",
+      railMoreOpen: true,
+    });
+
+    render(<StudioLeftToolRail {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: "애플리케이션 설정" }));
+
+    expect(props.setRailMoreOpen).toHaveBeenCalledWith(false);
+    expect(props.setAppSettingsInitialTab).toHaveBeenCalledWith("toolbar");
+    expect(props.setAppSettingsOpen).toHaveBeenCalledWith(true);
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "더보기 · 툴바 설정" })
+    );
+  });
+
+  it("closes More with Escape or an outside pointer without trapping the canvas chrome", () => {
+    stubAnimationFrame();
+    const escapeProps = createProps({
+      appSettings: hiddenToolSettings(),
+      isRailToolVisible: (id) => id === "select",
+      railMoreOpen: true,
+    });
+    const view = render(<StudioLeftToolRail {...escapeProps} />);
+
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "숨긴 도구" }), { key: "Escape" });
+    expect(escapeProps.setRailMoreOpen).toHaveBeenCalledWith(false);
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "더보기 · 툴바 설정" })
+    );
+
+    const outsideProps = createProps({
+      appSettings: hiddenToolSettings(),
+      isRailToolVisible: (id) => id === "select",
+      railMoreOpen: true,
+    });
+    view.rerender(<StudioLeftToolRail {...outsideProps} />);
+    fireEvent.pointerDown(document.body);
+
+    expect(outsideProps.setRailMoreOpen).toHaveBeenCalledWith(false);
   });
 });

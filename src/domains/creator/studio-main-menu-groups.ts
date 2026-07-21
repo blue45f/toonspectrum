@@ -61,6 +61,7 @@ import {
 
 import { STUDIO_EDIT_MENU_COMMANDS } from "./studio-edit-controls";
 
+import type { CvdMode } from "./studio-color-vision-model";
 import type { DrawMode, StudioMenu } from "./studio-editor-tool-model";
 import type {
   StudioFilterDraft,
@@ -104,7 +105,7 @@ export interface StudioMainMenuBuilderState {
   canvasFlipH: boolean;
   canvasRotation: StudioViewRotation;
   fullscreen: boolean;
-  grayscaleView: boolean;
+  colorVisionMode: CvdMode;
   referencePanelOpen: boolean;
   pageSequenceOpen: boolean;
   hasSavedView: boolean;
@@ -141,7 +142,7 @@ export interface StudioMainMenuEditorActions {
   fitCanvasToWidth: () => unknown;
   setActualPixelView: () => unknown;
   toggleFullscreen: () => unknown;
-  toggleGrayscaleView: () => unknown;
+  setColorVisionMode: (mode: CvdMode) => unknown;
   saveCurrentStudioView: () => unknown;
   restoreSavedStudioView: () => unknown;
   togglePerspectiveGuideView: () => unknown;
@@ -641,17 +642,31 @@ export function buildStudioMainMenuGroups({
             editor.toggleFullscreen();
           },
         },
-        {
-          id: "grayscale",
-          label: "흑백으로 표시",
+        ...(
+          [
+            { id: "original", label: "색각 검수 · 원본", mode: "none" as const },
+            { id: "grayscale", label: "색각 검수 · 흑백 명암", mode: "grayscale" as const, shortcut: "Q" },
+            { id: "protanopia", label: "색각 검수 · 1형 적록", mode: "protanopia" as const },
+            { id: "deuteranopia", label: "색각 검수 · 2형 적록", mode: "deuteranopia" as const },
+            { id: "tritanopia", label: "색각 검수 · 3형 청황", mode: "tritanopia" as const },
+          ] as const
+        ).map(({ id, label, mode, ...shortcut }) => ({
+          id: `color-vision-${id}`,
+          label,
           icon: Palette,
-          shortcut: "Q",
-          checked: state.grayscaleView,
+          hintKey: `color-vision:${mode}` as const,
+          ...shortcut,
+          checked: state.colorVisionMode === mode,
+          selectionRole: "radio" as const,
           disabled: state.viewTransformSuppressed,
+          unavailableReason: state.viewTransformSuppressed
+            ? "보기 변환이 잠긴 동안에는 색각 검수 모드를 바꿀 수 없습니다."
+            : undefined,
+          separatorAfter: mode === "tritanopia",
           onSelect: () => {
-            editor.toggleGrayscaleView();
+            editor.setColorVisionMode(mode);
           },
-        },
+        })),
         {
           id: "reference-window",
           label: "참고 이미지 창 열기",

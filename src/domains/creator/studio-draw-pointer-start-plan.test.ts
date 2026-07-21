@@ -8,6 +8,7 @@ import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
 } from "./studio-ink-pressure-model";
+import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 import { STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1 } from "./studio-stroke-paint-model";
 
 function input(
@@ -103,6 +104,22 @@ describe("planStudioDrawPointerStart", () => {
     expect(plan.element.sampleSpacing).toBe(0);
   });
 
+  it("keeps eraser input immediate even when the previously selected pen has dynamics", () => {
+    const plan = planStudioDrawPointerStart(input({
+      brush: "airbrush",
+      drawMode: "eraser",
+      stabilizer: 0,
+    }));
+
+    expect(plan.causalInputPlan).toEqual({
+      mode: "immediate",
+      sampleSpacing: 0,
+      usesFixedRateClock: false,
+      quantizeImmediately: true,
+    });
+    expect(plan.capturePointerDynamics).toBe(false);
+  });
+
   it("persists symmetry while keeping mirrored translucent ink out of layered-flow paint", () => {
     const plan = planStudioDrawPointerStart(input({
       brushOpacity: 0.5,
@@ -181,11 +198,36 @@ describe("planStudioDrawPointerStart", () => {
     expect(plan.element.pressures).toEqual([expectedPressure]);
     expect(plan.element.sampleSpacing).toBe(expectedSpacing);
     expect(plan.element.fill).toBe(expectedFill);
-    if (mode === "eraser" || mode === "pixel") {
+    if (mode === "eraser") {
       expect(plan.element.pressureModel).toBe(STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1);
     } else {
       expect(plan.element.pressureModel).toBeUndefined();
     }
+    expect(plan.element.brush).toBe(
+      mode === "pixel" ? STUDIO_PIXEL_PENCIL_RENDER_MODE : undefined
+    );
+  });
+
+  it("stores pixel pencil as a versioned hard-grid stroke without pen dynamics or symmetry", () => {
+    const plan = planStudioDrawPointerStart(input({
+      drawMode: "pixel",
+      brush: "airbrush",
+      brushOpacity: 0.65,
+      symmetry: { type: "radial", centerX: 10, centerY: 20, radialCount: 12 },
+    }));
+
+    expect(plan.causalInputPlan.mode).toBe("legacy");
+    expect(plan.capturePointerDynamics).toBe(false);
+    expect(plan.element).toMatchObject({
+      brush: STUDIO_PIXEL_PENCIL_RENDER_MODE,
+      strokeWidth: 1,
+      pressures: [1],
+      opacity: 0.65,
+      sampleSpacing: 1,
+    });
+    expect(plan.element.pressureModel).toBeUndefined();
+    expect(plan.element.brushDynamics).toBeUndefined();
+    expect(plan.element.symmetry).toBeUndefined();
   });
 
   it("snapshots pen tilt for calligraphy without mistaking mouse tilt for stylus input", () => {

@@ -137,6 +137,15 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks(id) {
           if (
+            id.endsWith("/src/domains/creator/studio-tool-hints.ts")
+            || id.endsWith("/src/domains/creator/studio-view-action-hints.ts")
+            || id.endsWith("/src/domains/creator/studio-inspector-layout.ts")
+          ) {
+            // The view HUD, always-visible rails and inspector shell share this small UI
+            // vocabulary. Co-locating it avoids an extra HTTP request on every Studio launch.
+            return "studio-tool-hints";
+          }
+          if (
             id.endsWith("/lib/studio-raster-asset-admission.ts")
             || id.endsWith("/src/domains/creator/studio-background-gradient-color-stops.ts")
             || id.endsWith("/src/domains/creator/studio-characters.ts")

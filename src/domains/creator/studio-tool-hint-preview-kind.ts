@@ -21,6 +21,18 @@ export const STUDIO_TOOL_HINT_PREVIEW_VARIANTS = {
     "recent-swatch",
     "palette-family",
     "palette-swatch",
+    "palette-skin-natural",
+    "palette-hair-natural",
+    "palette-hair-vivid",
+    "palette-sky-hours",
+    "palette-nature-green",
+    "palette-pastel-mood",
+    "palette-neon-cyber",
+    "palette-vintage-sepia",
+    "palette-mono-ink",
+    "palette-romance-pink",
+    "palette-autumn-fall",
+    "palette-dark-fantasy",
     "primary-color",
     "secondary-color",
     "swap-colors",
@@ -31,7 +43,7 @@ export const STUDIO_TOOL_HINT_PREVIEW_VARIANTS = {
   "shape-ellipse": [],
   "shape-fill": ["enable", "disable"],
   text: [],
-  bubble: [],
+  bubble: ["add", "open-library", "fit-text"],
   comment: [],
   image: [],
   reference: [],
@@ -106,7 +118,7 @@ export const STUDIO_TOOL_HINT_PREVIEW_VARIANTS = {
   "marquee-ellipse": [],
   crop: [],
   perspective: [],
-  "rotate-view": [],
+  "rotate-view": ["rotate-left", "rotate-right"],
   "flip-view": ["flip", "restore"],
   "brush-size": [
     "preset-xs",
@@ -131,37 +143,26 @@ export const STUDIO_TOOL_HINT_PREVIEW_VARIANTS = {
   pressure: ["linear", "soft", "firm"],
   symmetry: ["none", "vertical", "horizontal", "radial", "kaleidoscope"],
   "zoom-view": ["zoom-out", "zoom-in", "actual-size", "fit-width", "reset"],
+  "view-hud": ["zoom-open", "zoom-close", "rotate-open", "rotate-close"],
+  "color-vision": ["original", "grayscale", "protanopia", "deuteranopia", "tritanopia"],
+  dismiss: [],
   history: [],
   undo: [],
   redo: [],
   layer: [],
-  "layer-visibility": [
-    "show",
-    "hide",
-    "batch-show",
-    "batch-hide",
-    "show-layer",
-    "hide-layer",
-  ],
-  "layer-lock": [
-    "lock",
-    "unlock",
-    "batch-lock",
-    "batch-unlock",
-    "lock-layer",
-    "unlock-layer",
-  ],
+  "layer-visibility": ["show", "hide", "batch-show", "batch-hide"],
+  "layer-lock": ["lock", "unlock", "batch-lock", "batch-unlock"],
   "layer-merge": ["merge-selected", "flatten-visible"],
   "layer-actions": [],
   "layer-duplicate": [],
   "layer-reorder-front": [],
   "layer-reorder-back": [],
   "layer-delete": [],
-  timeline: [],
+  timeline: ["play", "pause"],
   keyframe: [],
   "frame-sequence": [],
   "frame-capture": [],
-  "frame-playback": [],
+  "frame-playback": ["play", "pause"],
   "frame-reorder": ["reorder", "reorder-previous", "reorder-next"],
   "frame-duplicate": [],
   "frame-delete": [],
@@ -175,15 +176,15 @@ export const STUDIO_TOOL_HINT_PREVIEW_VARIANTS = {
   "object-rotate": [],
   "object-scale": [],
   "object-ground": ["ground", "origin-ground"],
-  "object-snap": [],
+  "object-snap": ["enable", "disable"],
   "pose-3d": [],
   "camera-3d": [],
   "camera-zoom": ["zoom-in", "zoom-out", "focus-selection"],
   "camera-reset": [],
-  "camera-orbit": [],
-  "quad-view": [],
+  "camera-orbit": ["start", "stop"],
+  "quad-view": ["open", "close"],
   "lighting-3d": [],
-  "line-art": [],
+  "line-art": ["enable", "disable"],
   assets: [],
   "panel-layout": ["add", "split-diagonal", "diagonalize", "straighten"],
   "character-3d": [],
@@ -286,6 +287,29 @@ export type StudioToolHintPreviewFields<
   ? StudioToolHintPreviewFieldsFor<Kind>
   : never;
 
+type StudioToolHintConsumerPreviewFieldsFor<
+  Kind extends StudioToolHintPreviewKind,
+> = [StudioToolHintPreviewCanonicalVariant<Kind>] extends [never]
+  ? Readonly<{ hintPreview: Kind; hintPreviewVariant?: never }>
+  : Readonly<{
+      hintPreview: Kind;
+      hintPreviewVariant?: StudioToolHintPreviewVariant<Kind>;
+    }>;
+
+/**
+ * Discriminated preview fields used by reusable Studio chrome controls.
+ *
+ * The explicit no-preview branch keeps both fields optional for ordinary
+ * buttons while preventing a variant from being supplied on its own.
+ */
+export type StudioToolHintConsumerPreviewFields<
+  Kind extends StudioToolHintPreviewKind = StudioToolHintPreviewKind,
+> =
+  | Readonly<{ hintPreview?: undefined; hintPreviewVariant?: never }>
+  | (Kind extends StudioToolHintPreviewKind
+      ? StudioToolHintConsumerPreviewFieldsFor<Kind>
+      : never);
+
 /**
  * Create a preview contract while inferring the kind only from the first
  * argument. `NoInfer` prevents TypeScript from widening Kind into a union just
@@ -313,6 +337,58 @@ function normalizeStudioToolHintPreviewVariant(value: string): string {
     .replace(/\s+/gu, "-");
 }
 
+const STUDIO_TOOL_HINT_RUNTIME_VARIANT_ALIASES: Readonly<
+  Partial<Record<StudioToolHintPreviewKind, Readonly<Record<string, string>>>>
+> = {
+  "zoom-view": { "zoom-fit": "fit-width" },
+  "layer-visibility": {
+    "show-layer": "show",
+    "hide-layer": "hide",
+  },
+  "layer-lock": {
+    "lock-layer": "lock",
+    "unlock-layer": "unlock",
+  },
+};
+
+function matchesStudioToolHintVariantToken(value: string, token: string): boolean {
+  return value === token
+    || value.endsWith(`:${token}`)
+    || value.endsWith(`-${token}`)
+    || value.endsWith(`/${token}`);
+}
+
+/** Resolve persisted/plugin aliases to one canonical, visually testable action. */
+export function studioToolHintPreviewCanonicalVariantFromRuntime<
+  Kind extends StudioToolHintPreviewKind,
+>(
+  kind: Kind,
+  value: string,
+): StudioToolHintPreviewVariant<Kind> | undefined {
+  const normalized = normalizeStudioToolHintPreviewVariant(value);
+  const candidates = STUDIO_TOOL_HINT_PREVIEW_VARIANTS[kind];
+  const canonical = candidates.find((candidate) => normalized === candidate)
+    ?? [...candidates]
+      .sort((left, right) => right.length - left.length)
+      .find((candidate) =>
+        normalized.endsWith(`:${candidate}`)
+        || normalized.endsWith(`-${candidate}`)
+        || normalized.endsWith(`/${candidate}`)
+      );
+  if (canonical !== undefined) {
+    return canonical as StudioToolHintPreviewVariant<Kind>;
+  }
+
+  const aliases = STUDIO_TOOL_HINT_RUNTIME_VARIANT_ALIASES[kind];
+  if (!aliases) return undefined;
+  for (const [alias, replacement] of Object.entries(aliases)) {
+    if (matchesStudioToolHintVariantToken(normalized, alias)) {
+      return replacement as StudioToolHintPreviewVariant<Kind>;
+    }
+  }
+  return undefined;
+}
+
 /** Runtime companion for untyped plugin or persisted hint data. */
 export function isStudioToolHintPreviewVariant<
   Kind extends StudioToolHintPreviewKind,
@@ -321,11 +397,27 @@ export function isStudioToolHintPreviewVariant<
   value: string
 ): value is StudioToolHintPreviewVariant<Kind> {
   const normalized = normalizeStudioToolHintPreviewVariant(value);
-  return STUDIO_TOOL_HINT_PREVIEW_VARIANTS[kind].some(
-    (candidate) =>
-      normalized === candidate
-      || normalized.endsWith(`:${candidate}`)
-      || normalized.endsWith(`-${candidate}`)
-      || normalized.endsWith(`/${candidate}`)
+  return STUDIO_TOOL_HINT_PREVIEW_VARIANTS[kind].some((candidate) =>
+    matchesStudioToolHintVariantToken(normalized, candidate)
   );
+}
+
+/**
+ * Validate untyped persisted/plugin identity before it reaches the renderer.
+ * Invalid values deliberately degrade to that family's authored default.
+ */
+export function studioToolHintPreviewSpecFromRuntime(
+  kind: StudioToolHintPreviewKind,
+  variant?: string
+): StudioToolHintPreviewSpec {
+  if (variant !== undefined) {
+    const canonicalVariant = studioToolHintPreviewCanonicalVariantFromRuntime(
+      kind,
+      variant,
+    );
+    if (canonicalVariant !== undefined) {
+      return { kind, variant: canonicalVariant } as StudioToolHintPreviewSpec;
+    }
+  }
+  return { kind } as StudioToolHintPreviewSpec;
 }

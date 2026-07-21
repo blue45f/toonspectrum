@@ -4,7 +4,9 @@ import {
   STUDIO_TOOL_HINT_PREVIEW_KINDS,
   STUDIO_TOOL_HINT_PREVIEW_VARIANTS,
   isStudioToolHintPreviewVariant,
+  studioToolHintPreviewCanonicalVariantFromRuntime,
   studioToolHintPreviewSpec,
+  studioToolHintPreviewSpecFromRuntime,
   type StudioToolHintPreviewCanonicalVariant,
   type StudioToolHintPreviewFields,
   type StudioToolHintPreviewKind,
@@ -19,7 +21,7 @@ describe("Studio tool hint preview kind/variant contract", () => {
     ) as StudioToolHintPreviewKind[];
 
     expect(STUDIO_TOOL_HINT_PREVIEW_KINDS).toEqual(catalogKinds);
-    expect(STUDIO_TOOL_HINT_PREVIEW_KINDS).toHaveLength(116);
+    expect(STUDIO_TOOL_HINT_PREVIEW_KINDS).toHaveLength(119);
     expect(new Set(STUDIO_TOOL_HINT_PREVIEW_KINDS).size).toBe(
       STUDIO_TOOL_HINT_PREVIEW_KINDS.length
     );
@@ -27,10 +29,10 @@ describe("Studio tool hint preview kind/variant contract", () => {
       Object.values(STUDIO_TOOL_HINT_PREVIEW_VARIANTS).filter(
         (variants) => variants.length > 0
       )
-    ).toHaveLength(30);
+    ).toHaveLength(40);
     expect(
       Object.values(STUDIO_TOOL_HINT_PREVIEW_VARIANTS).flat()
-    ).toHaveLength(144);
+    ).toHaveLength(178);
 
     for (const kind of STUDIO_TOOL_HINT_PREVIEW_KINDS) {
       expect(studioToolHintPreviewSpec(kind)).toEqual({ kind });
@@ -56,16 +58,60 @@ describe("Studio tool hint preview kind/variant contract", () => {
     expect(isStudioToolHintPreviewVariant("ink", "line")).toBe(false);
   });
 
-  it("normalizes persisted and plugin namespace variants like the renderer", () => {
+  it("accepts namespaced canonical actions while keeping legacy aliases out of the type guard", () => {
     expect(
       isStudioToolHintPreviewVariant("camera-zoom", "VRM:Camera:Zoom_Out")
     ).toBe(true);
     expect(
       isStudioToolHintPreviewVariant("layer-lock", "plugin/layer/unlock-layer")
-    ).toBe(true);
+    ).toBe(false);
     expect(
       isStudioToolHintPreviewVariant("color-palette", "Studio:Palette_Family")
     ).toBe(true);
+    expect(
+      isStudioToolHintPreviewVariant("layer-lock", "plugin/layer/unlock")
+    ).toBe(true);
+  });
+
+  it.each([
+    ["zoom-view", "zoom-fit", "fit-width"],
+    ["zoom-view", "persisted/view/zoom-fit", "fit-width"],
+    ["layer-visibility", "show-layer", "show"],
+    ["layer-visibility", "plugin/layer/hide-layer", "hide"],
+    ["layer-lock", "lock-layer", "lock"],
+    ["layer-lock", "plugin/layer/unlock-layer", "unlock"],
+  ] as const)(
+    "canonicalizes the legacy %s runtime value %s to %s",
+    (kind, runtimeValue, canonicalVariant) => {
+      expect(
+        studioToolHintPreviewCanonicalVariantFromRuntime(kind, runtimeValue)
+      ).toBe(canonicalVariant);
+      expect(studioToolHintPreviewSpecFromRuntime(kind, runtimeValue)).toEqual({
+        kind,
+        variant: canonicalVariant,
+      });
+    }
+  );
+
+  it("prefers exact and longest canonical actions over shorter suffixes", () => {
+    expect(
+      studioToolHintPreviewCanonicalVariantFromRuntime(
+        "layer-visibility",
+        "layer/batch-show"
+      )
+    ).toBe("batch-show");
+    expect(
+      studioToolHintPreviewCanonicalVariantFromRuntime(
+        "object-ground",
+        "bg3d/object/origin-ground"
+      )
+    ).toBe("origin-ground");
+    expect(
+      studioToolHintPreviewCanonicalVariantFromRuntime(
+        "fullscreen",
+        "workspace/exit-fullscreen"
+      )
+    ).toBe("exit-fullscreen");
   });
 
   it("preserves precise inferred types for valid default and stateful specs", () => {
@@ -121,6 +167,10 @@ describe("Studio tool hint preview kind/variant contract", () => {
       studioToolHintPreviewSpec("color-palette", "#ff8844");
       // @ts-expect-error eyedropper uses the dedicated sample preview, not the palette family.
       studioToolHintPreviewSpec("color-palette", "eyedropper");
+      // @ts-expect-error zoom-fit is a persisted ID alias; authored hints use fit-width.
+      studioToolHintPreviewSpec("zoom-view", "zoom-fit");
+      // @ts-expect-error unlock-layer is a legacy plugin alias; authored hints use unlock.
+      studioToolHintPreviewSpec("layer-lock", "plugin/layer/unlock-layer");
 
       // @ts-expect-error remove belongs to brush-favorite, not zoom-view.
       const invalidSpec: StudioToolHintPreviewSpec = {
@@ -137,5 +187,17 @@ describe("Studio tool hint preview kind/variant contract", () => {
     };
 
     expect(compileTimeInvalidPairings).toBeTypeOf("function");
+  });
+
+  it("drops an invalid runtime pairing instead of leaking it to the renderer", () => {
+    expect(studioToolHintPreviewSpecFromRuntime("shape", "pause")).toEqual({
+      kind: "shape",
+    });
+    expect(
+      studioToolHintPreviewSpecFromRuntime("camera-zoom", "plugin/camera/zoom-out")
+    ).toEqual({
+      kind: "camera-zoom",
+      variant: "zoom-out",
+    });
   });
 });

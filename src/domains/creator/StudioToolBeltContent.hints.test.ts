@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_VIEW_ACTION_HINTS } from "./studio-view-action-hints";
+
 const sourceUrl = new URL("./StudioToolBeltContent.tsx", import.meta.url);
 const source = readFileSync(sourceUrl, "utf8");
 const file = ts.createSourceFile(
@@ -127,11 +129,6 @@ describe("Studio ToolBelt rich hint coverage", () => {
       ["team", "team-collaboration", null],
       ["continuity", "continuity-check", null],
       ["scrollPreview", "vertical-preview", null],
-      ["zoomOut", "zoom-view", "zoom-out"],
-      ["zoomIn", "zoom-view", "zoom-in"],
-      ["actualSize", "zoom-view", "actual-size"],
-      ["fitWidth", "zoom-view", "fit-width"],
-      ["resetView", "zoom-view", "reset"],
       ["workspaceFocus", "workspace-focus", null],
       ["maximizeWindow", "fullscreen", "maximize-window"],
       ["restoreWindow", "fullscreen", "restore-window"],
@@ -144,6 +141,22 @@ describe("Studio ToolBelt rich hint coverage", () => {
       const entry = source.slice(entryStart, source.indexOf("\n  ),", entryStart) + 5);
       expect(entry).toContain(`"${preview}"`);
       if (variant) expect(entry).toContain(`"${variant}"`);
+    }
+
+    for (const [toolBeltKey, sharedKey, previewVariant] of [
+      ["zoomOut", "zoomOut", "zoom-out"],
+      ["zoomIn", "zoomIn", "zoom-in"],
+      ["actualSize", "actualSize", "actual-size"],
+      ["fitWidth", "fitWidth", "fit-width"],
+      ["resetView", "reset", "reset"],
+    ] as const) {
+      expect(source).toContain(
+        `${toolBeltKey}: STUDIO_VIEW_ACTION_HINTS.${sharedKey}`
+      );
+      expect(STUDIO_VIEW_ACTION_HINTS[sharedKey]).toMatchObject({
+        preview: "zoom-view",
+        previewVariant,
+      });
     }
   });
 });

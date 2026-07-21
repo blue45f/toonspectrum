@@ -34,6 +34,7 @@ import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
 } from "./studio-ink-pressure-model";
+import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 import { STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1 } from "./studio-stroke-paint-model";
 
 import type { DrawMode, DrawShapeKind } from "./studio-editor-tool-model";
@@ -119,7 +120,11 @@ export function planStudioDrawPointerStart(
   const brushFamily = resolveStudioBrushRenderFamily(brush);
   const stampKind = drawMode === "pen" ? resolveStudioStampBrushKind(brush) : null;
   const causalWatercolor = drawMode === "pen" && brushFamily === "watercolor";
-  const hasBrushDynamics = resolveStudioBrushDynamicsPresetId(brush) !== null;
+  // Eraser/pixel input contracts do not carry the currently selected pen's whole-stroke dynamics.
+  // Letting that unrelated brush id affect eligibility sent the eraser through the slower legacy
+  // stabilizer whenever an artist happened to switch from a dynamics brush.
+  const hasBrushDynamics = drawMode === "pen"
+    && resolveStudioBrushDynamicsPresetId(brush) !== null;
   const causalInputPlan = resolveStudioCausalInkInputPlan({
     stabilizerMode: input.stabilizerMode,
     stabilizerStrength: input.stabilizer,
@@ -131,7 +136,6 @@ export function planStudioDrawPointerStart(
   });
   const linearPressureEligible =
     drawMode === "eraser"
-    || drawMode === "pixel"
     || (drawMode === "pen" && (brushFamily === "pen" || brushFamily === "marker"));
   const residualPressureEligible =
     drawMode === "pen" && (brushFamily === "pen" || brushFamily === "marker");
@@ -183,7 +187,11 @@ export function planStudioDrawPointerStart(
     stroke: color,
     strokeWidth,
     opacity: brushOpacity,
-    brush: drawMode === "pen" ? brush : undefined,
+    brush: drawMode === "pen"
+      ? brush
+      : drawMode === "pixel"
+        ? STUDIO_PIXEL_PENCIL_RENDER_MODE
+        : undefined,
     brushTip: drawMode === "pen" && brush === "calligraphy" ? { ...brushTip } : undefined,
     stamp: drawMode === "pen" && stampTuning && stampKind ? { ...stampTuning } : undefined,
     stampPipeline: drawMode === "pen" && stampKind ? "causal-walker-v2" as const : undefined,
@@ -191,7 +199,7 @@ export function planStudioDrawPointerStart(
     brushDynamics: capturePointerDynamics
       ? normalizeStudioBrushDynamicsSettings(input.brushDynamics)
       : undefined,
-    symmetry: symmetry.type === "none"
+    symmetry: drawMode === "pixel" || symmetry.type === "none"
       ? undefined
       : {
           type: symmetry.type,

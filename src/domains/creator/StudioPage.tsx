@@ -6,6 +6,7 @@ import {
   Eraser,
   BookOpen,
   FlipHorizontal2,
+  Grid3X3,
   Lock,
   MessageCircle,
   UsersRound,
@@ -189,9 +190,11 @@ import {
   strokeSampleDistanceForScale,
   type BrushPreset,
 } from "./studio-brush";
+import { studioBrushAliasEffectiveDiameter } from "./studio-brush-alias-profile";
 import {
   normalizeStudioBrushDynamicsSettings,
   resolveStudioBrushDynamicsPresetId,
+  studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsPresetSettings,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioBrushDynamicsPresetId,
@@ -385,6 +388,9 @@ import {
   drawLiveFreehandDraftToContext,
   isDirectLiveDraftEl,
   isDirectLiveStampDraftEl,
+  studioLiveBrushEffectiveDiameter,
+  studioLiveBrushPressure,
+  studioLiveBrushPressureSamples,
 } from "./studio-draw-rendering";
 import {
   areStudioDrawingAssistDocumentsEqual,
@@ -494,6 +500,7 @@ import { createCanvasImageElement } from "./studio-image-placement";
 import {
   studioInkFallbackPressure,
 } from "./studio-ink-pressure-model";
+import { LazyStudioInspectorAside } from "./studio-inspector-aside-loader";
 import {
   navigateStudioInspector,
   type StudioInspectorLayout,
@@ -766,6 +773,10 @@ import {
   type VanishingPoint,
 } from "./studio-perspective-guide";
 import {
+  isStudioPixelPencilRenderMode,
+  shouldAppendStudioPixelPencilSample,
+} from "./studio-pixel-pencil";
+import {
   bindPixelSelectionHistory,
   canRedoPixelSelectionHistory,
   canUndoPixelSelectionHistory,
@@ -1002,22 +1013,27 @@ import {
   studioUiDensityLabel,
   type StudioUiDensityMode,
 } from "./studio-ui-density";
+import { STUDIO_VIEW_ACTION_HINTS } from "./studio-view-action-hints";
 import {
   captureStudioView,
+  clampStudioViewZoomGestureAnchor,
   fitStudioViewToWidth,
   planStudioViewRestore,
   planStudioViewRotationTransition,
   planStudioViewScrollToDocumentPoint,
   planStudioViewStageLayout,
+  planStudioViewZoomGestureFrame,
   projectStudioDocumentPointToView,
   projectStudioViewPointToDocument,
   resolveStudioViewShortcut,
   rotateStudioViewLeft,
   rotateStudioViewRight,
   stepStudioViewZoom,
+  stepStudioViewWheelZoom,
   type StudioViewRotation,
   type StudioViewSnapshot,
 } from "./studio-view-controls";
+import { StudioViewToolsHud } from "./studio-view-tools-hud-loader";
 import {
   DEFAULT_WATERMARK,
   normalizeWatermark,
@@ -1092,10 +1108,6 @@ import {
 } from "./StudioColorBlindPreview";
 import { StudioDraftPreviewLayers } from "./StudioDraftPreviewLayers";
 import { StudioDrawNode } from "./StudioDrawNode";
-import {
-  StudioInspectorAside,
-  type StudioInspectorAsideHandlers,
-} from "./StudioInspectorAside";
 import { StudioKonvaBubbleNode } from "./StudioKonvaBubbleNode";
 import { StudioKonvaImageNode } from "./StudioKonvaImageNode";
 import {
@@ -1149,7 +1161,6 @@ import {
   StudioToolHintPreferencesProvider,
   StudioToolHintTarget,
 } from "./StudioToolHint";
-import { StudioViewToolsHud } from "./StudioViewToolsHud";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import type { StudioBackground3DInsertResult } from "./studio-3d-insert-contract";
@@ -1230,12 +1241,14 @@ import type {
   StudioAssetSortOrder,
   StudioAssetTab,
 } from "./StudioAssetMenuPanel";
+import type { StudioInspectorAsideHandlers } from "./StudioInspectorAside";
 import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import type { StudioLivePressureStore } from "./StudioLiveInkHosts";
 import type { StudioMenubarContentHandlers } from "./StudioMenubarContent";
 import type {
   StudioBrushCatalogHandlers,
   StudioMobileEditingDockHandlers,
+  StudioMobileSheet,
   StudioMobileEditingDockUi,
 } from "./StudioMobileEditingDock";
 import type { PublishContext } from "./StudioPublishContextBanner";
@@ -1265,6 +1278,39 @@ const LazyStudioMenubarContent = lazy(() =>
     default: StudioMenubarContent,
   }))
 );
+
+function StudioInspectorAsideFallback({
+  isMobile,
+  keyboardInset,
+  visible,
+  width,
+}: {
+  isMobile: boolean;
+  keyboardInset: number;
+  visible: boolean;
+  width: number;
+}) {
+  return (
+    <aside
+      aria-busy="true"
+      aria-label="속성 패널 불러오는 중"
+      className={cn(
+        "flex min-h-0 flex-col gap-3 overflow-hidden border-line bg-panel/50 p-3",
+        "fixed inset-x-0 bottom-0 z-[60] rounded-t-3xl border shadow-2xl",
+        "lg:static lg:z-auto lg:flex-none lg:self-stretch lg:rounded-none lg:border-y-0 lg:border-r-0 lg:shadow-none",
+        !visible && "lg:hidden"
+      )}
+      style={isMobile
+        ? { bottom: Math.max(0, keyboardInset), height: "min(62dvh, 32rem)" }
+        : { minWidth: 240, width }}
+    >
+      <div className="h-5 w-24 animate-pulse rounded bg-raised motion-reduce:animate-none" />
+      <div className="h-10 animate-pulse rounded-xl bg-raised/80 motion-reduce:animate-none" />
+      <div className="h-28 animate-pulse rounded-xl bg-raised/60 motion-reduce:animate-none" />
+      <div className="h-20 animate-pulse rounded-xl bg-raised/40 motion-reduce:animate-none" />
+    </aside>
+  );
+}
 
 const STUDIO_MOBILE_EDITING_DOCK_UI: StudioMobileEditingDockUi = {
   StudioBrushLibraryPanel,
@@ -1553,11 +1599,14 @@ function studioElementIdOf(node: Konva.Node | null): string | null {
 }
 
 const QUICK_START_DISMISSED_KEY = "toonspectrum-studio-quick-start-dismissed";
-// Production defaults to capability-driven WebGPU. The engine is warmed before the first stroke,
-// while unsupported devices, styles, and the runtime receipt probe retain the Canvas2D path.
-const STUDIO_VISIBLE_LIVE_INK_PREFERENCE = resolveStudioLiveInkBackendPreference(
-  import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND
-);
+// Pointer contact defaults to the exact suffix-only Canvas2D overlay. The current WebGPU recovery
+// contract retains a full immutable fallback stroke, so a growing live stroke can otherwise repeat
+// full-prefix planning/copies. WebGPU remains active for 3D, FX and settled composition; an explicit
+// rollout flag can still opt the live path in after the GPU-owned chunk feed is deployed.
+const STUDIO_VISIBLE_LIVE_INK_PREFERENCE =
+  resolveStudioLiveInkBackendPreference(import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND) === "webgpu"
+    ? "webgpu"
+    : "canvas2d";
 // Native browser predictions stay on a physically separate, replaceable canvas and are admitted
 // only for pen sessions. Unsupported/reduced-motion environments retain coalesced hardware input.
 const STUDIO_POINTER_PREDICTION_ENABLED = supportsStudioPointerPrediction(
@@ -1781,7 +1830,8 @@ const ZOOM_MAX = 5;
 const EMPTY_STUDIO_GPU_STROKES: readonly StudioGpuStroke[] = Object.freeze([]);
 
 function clampZoom(z: number) {
-  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 20) / 20));
+  const safe = Number.isFinite(z) ? z : 1;
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, safe));
 }
 
 function isStudioViewToolsHudEventTarget(target: EventTarget | null): boolean {
@@ -3094,6 +3144,8 @@ function StudioCuttoonEditor() {
   // 줌/팬 드래그 상태
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+  const isPanningRef = useRef(isPanning);
+  isPanningRef.current = isPanning;
   const panStartRef = useRef({ scrollLeft: 0, scrollTop: 0, clientX: 0, clientY: 0 });
 
   // 색맹 시뮬레이션 미리보기 — Stage 에만 SVG feColorMatrix filter 로 라이브 근사(el 데이터 변경 없음).
@@ -3531,7 +3583,7 @@ function StudioCuttoonEditor() {
     };
   }, [isMobile]);
   // 모바일에서 열려 있는 바텀시트(페이지 / 속성 / 빠른 브러시 / 브러시 관리). null=캔버스 전체.
-  const [mobileSheet, setMobileSheet] = useState<null | "pages" | "props" | "draw" | "brushes">(null);
+  const [mobileSheet, setMobileSheet] = useState<StudioMobileSheet>(null);
   function dismissActiveMobileSheet() {
     // 브러시 관리는 브러시 설정에서 한 단계 들어온 화면이므로 모든 닫기 경로가 설정으로
     // 돌아간다. 나머지 시트는 곧바로 캔버스로 복귀한다.
@@ -3550,6 +3602,7 @@ function StudioCuttoonEditor() {
   const propsSheetRef = useRef<HTMLElement>(null);
   const drawSheetRef = useRef<HTMLDivElement>(null);
   const brushManagerSheetRef = useRef<HTMLDivElement>(null);
+  const colorVisionSheetRef = useRef<HTMLElement>(null);
   const brushManagerReturnFocusRef = useRef<HTMLButtonElement>(null);
   const mobileBrushDockButtonRef = useRef<HTMLButtonElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -3603,7 +3656,9 @@ function StudioCuttoonEditor() {
       ? pagesSheetRef
       : modalMobileSheet === "brushes"
         ? brushManagerSheetRef
-        : propsSheetRef;
+        : modalMobileSheet === "color-vision"
+          ? colorVisionSheetRef
+          : propsSheetRef;
   useStudioModalSheet({
     activeKey: modalMobileSheet,
     dialogRef: modalMobileSheetRef,
@@ -3619,6 +3674,11 @@ function StudioCuttoonEditor() {
       return preferredTarget ?? dialog.querySelector<HTMLElement>("[data-autofocus]");
     },
     resolveReturnFocus: () => {
+      if (modalMobileSheet === "color-vision") {
+        return studioRootRef.current?.querySelector<HTMLElement>(
+          '[data-studio-color-vision-trigger="true"]'
+        ) ?? null;
+      }
       if (modalMobileSheet !== "brushes") return null;
       const rememberedLauncher = brushManagerReturnFocusRef.current;
       if (rememberedLauncher?.isConnected) return rememberedLauncher;
@@ -4531,9 +4591,9 @@ function StudioCuttoonEditor() {
     setStrokeWidth(applied.strokeWidth);
     setBrushOpacity(applied.brushOpacity);
     if (applied.color !== color) setColor(applied.color);
-    const dynamicsId = resolveStudioBrushDynamicsPresetId(preset.id);
-    if (dynamicsId) {
-      setBrushDynamics(studioBrushDynamicsPresetSettings(dynamicsId));
+    const dynamics = studioBrushDynamicsSettingsForBrushId(preset.id);
+    if (dynamics) {
+      setBrushDynamics(dynamics);
     }
     setProDrawPrefs((prev) => {
       const next = rememberRecentBrushId(prev, preset.id);
@@ -4604,9 +4664,9 @@ function StudioCuttoonEditor() {
     if (preset) {
       setBrush(preset.id);
       setStampTuning(defaultStampTuningForBrushId(preset.id));
-      const dynamicsId = resolveStudioBrushDynamicsPresetId(preset.id);
-      if (dynamicsId) {
-        setBrushDynamics(studioBrushDynamicsPresetSettings(dynamicsId));
+      const dynamics = studioBrushDynamicsSettingsForBrushId(preset.id);
+      if (dynamics) {
+        setBrushDynamics(dynamics);
       }
     } else {
       setBrush(slot.brushId);
@@ -5439,6 +5499,45 @@ function StudioCuttoonEditor() {
 
   // 표시용 스케일(컨테이너 폭에 맞춤).
   const wrapRef = useRef<HTMLDivElement>(null);
+  const lastNonViewHudFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    function rememberViewToolOpener(event: FocusEvent) {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (target.closest("[data-studio-view-tools-hud]")) return;
+      lastNonViewHudFocusRef.current = target;
+    }
+    document.addEventListener("focusin", rememberViewToolOpener);
+    return () => document.removeEventListener("focusin", rememberViewToolOpener);
+  }, []);
+  function closeViewToolWithFocus(options: { preferCanvas?: boolean } = {}) {
+    const activeElement = document.activeElement;
+    const focusOwnedByHud = activeElement instanceof HTMLElement
+      && activeElement.closest("[data-studio-view-tools-hud]") !== null;
+    const canvas = wrapRef.current
+      ?? document.querySelector<HTMLElement>("[data-studio-canvas-viewport]");
+    const remembered = lastNonViewHudFocusRef.current;
+    const rememberedAvailable = remembered?.isConnected
+      && remembered.closest('[aria-disabled="true"], [inert], [hidden]') === null;
+    const currentModeTrigger = viewTool
+      ? document.querySelector<HTMLElement>(`[data-studio-view-tool-trigger="${viewTool}"]`)
+      : null;
+    const triggerAvailable = currentModeTrigger?.isConnected
+      && currentModeTrigger.closest('[aria-disabled="true"], [inert], [hidden]') === null;
+    const restoreTarget = options.preferCanvas
+      ? canvas
+      : rememberedAvailable
+        ? remembered
+        : triggerAvailable
+          ? currentModeTrigger
+          : canvas;
+
+    setViewTool(null);
+    if (!focusOwnedByHud || !restoreTarget) return;
+    globalThis.requestAnimationFrame(() => restoreTarget.focus({ preventScroll: true }));
+  }
+  const closeViewToolWithFocusRef = useRef(closeViewToolWithFocus);
+  closeViewToolWithFocusRef.current = closeViewToolWithFocus;
   const [scale, setScale] = useState(1);
   const studioViewDocumentWidth = canvasRotation === 90 || canvasRotation === 270
     ? canvasH
@@ -5484,14 +5583,24 @@ function StudioCuttoonEditor() {
   // 에디터 전체가 틱당 한 번씩 다시 그려져 연속 휠이 초 단위로 밀리는 것을 계측으로 확인했다.
   const zoomHostRef = useRef<HTMLDivElement | null>(null);
   const viewTransformSuppressedRef = useRef(false);
+  const touchViewPanActiveRef = useRef(false);
   const zoomGestureRef = useRef<{
     baseZoom: number;
     targetZoom: number;
+    originClientX: number;
+    originClientY: number;
     originX: number;
     originY: number;
     clientX: number;
     clientY: number;
+    baseLeft: number;
+    baseTop: number;
     baseWidth: number;
+    baseHeight: number;
+    wrapLeft: number;
+    wrapTop: number;
+    viewportWidth: number;
+    viewportHeight: number;
     raf: number;
     settleTimer: ReturnType<typeof setTimeout> | null;
   } | null>(null);
@@ -5503,7 +5612,16 @@ function StudioCuttoonEditor() {
   } | null>(null);
   const settleZoomGestureRef = useRef<() => void>(() => {});
   const stepZoomGestureRef = useRef<
-    (nextTarget: (target: number) => number, clientX: number, clientY: number) => void
+    (
+      nextTarget: (target: number) => number,
+      clientX: number,
+      clientY: number,
+      options?: {
+        followClient?: boolean;
+        originClientX?: number;
+        originClientY?: number;
+      }
+    ) => void
   >(() => {});
   useEffect(() => {
     settleZoomGestureRef.current = () => {
@@ -5513,7 +5631,9 @@ function StudioCuttoonEditor() {
       if (gesture.raf) globalThis.cancelAnimationFrame(gesture.raf);
       if (gesture.settleTimer) globalThis.clearTimeout(gesture.settleTimer);
       const host = zoomHostRef.current;
-      if (gesture.targetZoom === gesture.baseZoom) {
+      const translated = gesture.clientX !== gesture.originClientX
+        || gesture.clientY !== gesture.originClientY;
+      if (gesture.targetZoom === gesture.baseZoom && !translated) {
         if (host) {
           host.style.transform = "";
           host.style.willChange = "";
@@ -5531,7 +5651,7 @@ function StudioCuttoonEditor() {
             y: gesture.originY / effBase,
           })
         : null;
-      zoomSettleAnchorRef.current = documentPoint
+      const settleAnchor = documentPoint
         ? {
             docX: documentPoint.x,
             docY: documentPoint.y,
@@ -5539,9 +5659,46 @@ function StudioCuttoonEditor() {
             clientY: gesture.clientY,
           }
         : null;
+      zoomSettleAnchorRef.current = settleAnchor;
+      if (gesture.targetZoom === gesture.baseZoom) {
+        if (host) {
+          host.style.transform = "";
+          host.style.willChange = "";
+        }
+        const wrap = wrapRef.current;
+        if (!settleAnchor || !host || !wrap) {
+          zoomSettleAnchorRef.current = null;
+          return;
+        }
+        const effNow = host.clientWidth / studioViewDocumentWidth;
+        if (!(effNow > 0)) {
+          zoomSettleAnchorRef.current = null;
+          return;
+        }
+        const wrapRect = wrap.getBoundingClientRect();
+        const projected = projectStudioDocumentPointToView({
+          documentWidth: CANVAS_W,
+          documentHeight: canvasH,
+          canvasFlipH,
+          canvasRotation,
+          x: settleAnchor.docX,
+          y: settleAnchor.docY,
+        });
+        wrap.scrollLeft = Math.max(
+          0,
+          projected.x * effNow - (settleAnchor.clientX - wrapRect.left)
+        );
+        wrap.scrollTop = Math.max(
+          0,
+          projected.y * effNow - (settleAnchor.clientY - wrapRect.top)
+        );
+        zoomSettleAnchorRef.current = null;
+        updateScrollPosRef.current();
+        return;
+      }
       setZoom(clampZoom(gesture.targetZoom));
     };
-    stepZoomGestureRef.current = (nextTarget, clientX, clientY) => {
+    stepZoomGestureRef.current = (nextTarget, clientX, clientY, options) => {
       const host = zoomHostRef.current;
       if (!host) {
         setZoom((z) => clampZoom(nextTarget(z)));
@@ -5550,19 +5707,39 @@ function StudioCuttoonEditor() {
       let gesture = zoomGestureRef.current;
       if (!gesture) {
         const rect = host.getBoundingClientRect();
+        const wrap = wrapRef.current;
+        const wrapRect = wrap?.getBoundingClientRect() ?? rect;
         const baseZoom = zoomRef.current;
+        const anchor = clampStudioViewZoomGestureAnchor(
+          rect,
+          options?.originClientX ?? clientX,
+          options?.originClientY ?? clientY
+        );
         gesture = {
           baseZoom,
           targetZoom: baseZoom,
-          originX: clientX - rect.left,
-          originY: clientY - rect.top,
-          clientX,
-          clientY,
+          originClientX: anchor.clientX,
+          originClientY: anchor.clientY,
+          originX: anchor.originX,
+          originY: anchor.originY,
+          clientX: anchor.clientX,
+          clientY: anchor.clientY,
+          baseLeft: rect.left,
+          baseTop: rect.top,
           baseWidth: rect.width,
+          baseHeight: rect.height,
+          wrapLeft: wrapRect.left,
+          wrapTop: wrapRect.top,
+          viewportWidth: wrap?.clientWidth ?? rect.width,
+          viewportHeight: wrap?.clientHeight ?? rect.height,
           raf: 0,
           settleTimer: null,
         };
         zoomGestureRef.current = gesture;
+      }
+      if (options?.followClient) {
+        gesture.clientX = Number.isFinite(clientX) ? clientX : gesture.clientX;
+        gesture.clientY = Number.isFinite(clientY) ? clientY : gesture.clientY;
       }
       gesture.targetZoom = clampZoom(nextTarget(gesture.targetZoom));
       if (!gesture.raf) {
@@ -5572,9 +5749,13 @@ function StudioCuttoonEditor() {
           if (!active) return;
           active.raf = 0;
           if (!activeHost) return;
-          const k = active.targetZoom / active.baseZoom;
+          const frame = planStudioViewZoomGestureFrame(active);
           activeHost.style.transformOrigin = `${active.originX}px ${active.originY}px`;
-          activeHost.style.transform = k === 1 ? "" : `scale(${k})`;
+          activeHost.style.transform = frame.scale === 1
+              && frame.translateX === 0
+              && frame.translateY === 0
+            ? ""
+            : `translate(${frame.translateX}px, ${frame.translateY}px) scale(${frame.scale})`;
           activeHost.style.willChange = "transform";
         });
       }
@@ -5633,6 +5814,27 @@ function StudioCuttoonEditor() {
     const snappedLocalY = Math.round(localPos.y / gridSize) * gridSize;
     return stage.getAbsoluteTransform().point({ x: snappedLocalX, y: snappedLocalY });
   };
+  const canvasPointerGestureIsOwned = () => Boolean(
+    drawingRef.current
+    || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()
+    || isPanningRef.current
+    || touchViewPanActiveRef.current
+    || KonvaRuntime.isDragging()
+    || KonvaRuntime.isTransforming()
+    || groupDragRef.current
+    || marqueeStartRef.current
+    || advancedFillTapGestureRef.current
+    || liquifyDragRef.current
+    || smudgeDragRef.current
+    || pixelDragRef.current
+    || cropDragRef.current
+    || panelSplitDragRef.current
+    || nodeEditDragRef.current
+    || bubbleShapeDragRef.current
+    || healCloneDragRef.current
+    || historyBrushDragRef.current
+    || layerMaskDragRef.current
+  );
   // 휠 동작 — 마우스 휠 설정: 줌 / 팬 / 브러시 크기 (+ 기존 ⌘휠 줌).
   useEffect(() => {
     const node = wrapRef.current;
@@ -5640,14 +5842,30 @@ function StudioCuttoonEditor() {
     const onWheel = (e: WheelEvent) => {
       if (viewTransformSuppressedRef.current) return;
       if (isStudioViewToolsHudEventTarget(e.target)) return;
+      // A contact-owned edit must see an immutable view transform from pointerdown to pointerup.
+      // Trackpad/wheel noise during pen contact otherwise changes both the visual anchor and the
+      // document coordinate scale midway through one stroke. Consume it without scrolling.
+      if (canvasPointerGestureIsOwned()) {
+        e.preventDefault();
+        return;
+      }
       const prefs = appSettingsRef.current.mouse;
       const modZoom = e.ctrlKey || e.metaKey;
       const wheelMode = modZoom ? "zoom" : prefs.wheel;
       if (wheelMode === "zoom") {
         e.preventDefault();
-        const dir = (e.deltaY < 0 ? 1 : -1) * (prefs.reverseWheel ? -1 : 1);
         // 틱마다 리렌더하지 않는다 — 제스처 transform 으로 즉시 반응하고 정착 시 한 번만 커밋.
-        stepZoomGestureRef.current((target) => target + dir * 0.15, e.clientX, e.clientY);
+        stepZoomGestureRef.current(
+          (target) => stepStudioViewWheelZoom(
+            target,
+            e.deltaY,
+            e.deltaMode,
+            prefs.reverseWheel,
+            node.clientHeight
+          ),
+          e.clientX,
+          e.clientY
+        );
         return;
       }
       if (wheelMode === "brush-size") {
@@ -5673,10 +5891,26 @@ function StudioCuttoonEditor() {
     if (!node) return;
     let pinchStartDist = 0;
     let pinchStartZoom = 1;
+    let pinchStartCenter = { x: 0, y: 0 };
+    let pinchGestureActive = false;
+    let oneFingerPan: {
+      identifier: number;
+      lastX: number;
+      lastY: number;
+    } | null = null;
+    const clearOneFingerPan = () => {
+      oneFingerPan = null;
+      touchViewPanActiveRef.current = false;
+    };
     const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const center = (t: TouchList) => ({
+      x: (t[0].clientX + t[1].clientX) / 2,
+      y: (t[0].clientY + t[1].clientY) / 2,
+    });
     // 정확히 두 손가락일 때만 기준선을 잡는다. 손가락 수가 바뀌면(예: 2→3→2) 기준선을 버려
     // 다음 두-손가락 프레임에서 새로 잡게 해 줌이 튀지 않도록 한다.
     const arm = (e: TouchEvent) => {
+      if (e.touches.length !== 1) clearOneFingerPan();
       if (viewTransformSuppressedRef.current) {
         pinchStartDist = 0;
         return;
@@ -5685,21 +5919,71 @@ function StudioCuttoonEditor() {
         pinchStartDist = 0;
         return;
       }
-      if (e.touches.length === 2 && !stageRef.current?.isDragging()) {
+      if (
+        e.touches.length === 1
+        && appSettingsRef.current.touch.oneFingerDrag === "pan"
+        && !canvasPointerGestureIsOwned()
+      ) {
+        const touch = e.touches[0]!;
+        oneFingerPan = {
+          identifier: touch.identifier,
+          lastX: touch.clientX,
+          lastY: touch.clientY,
+        };
+        touchViewPanActiveRef.current = true;
+        pinchStartDist = 0;
+        return;
+      }
+      if (appSettingsRef.current.touch.twoFinger !== "pan-zoom") {
+        pinchStartDist = 0;
+        return;
+      }
+      if (canvasPointerGestureIsOwned()) {
+        pinchStartDist = 0;
+        return;
+      }
+      if (e.touches.length === 2) {
         pinchStartDist = dist(e.touches);
         pinchStartZoom = zoomGestureRef.current?.targetZoom ?? zoomRef.current;
+        pinchStartCenter = center(e.touches);
       } else {
         pinchStartDist = 0;
       }
     };
     const onTouchStart = arm;
     const onTouchMove = (e: TouchEvent) => {
+      if (oneFingerPan) {
+        const touch = Array.from(e.touches).find(
+          (candidate) => candidate.identifier === oneFingerPan?.identifier
+        );
+        if (e.touches.length === 1 && touch) {
+          e.preventDefault();
+          const deltaX = touch.clientX - oneFingerPan.lastX;
+          const deltaY = touch.clientY - oneFingerPan.lastY;
+          oneFingerPan.lastX = touch.clientX;
+          oneFingerPan.lastY = touch.clientY;
+          node.scrollLeft -= deltaX;
+          node.scrollTop -= deltaY;
+          updateScrollPosRef.current();
+          return;
+        }
+        clearOneFingerPan();
+      }
       if (viewTransformSuppressedRef.current) {
         pinchStartDist = 0;
         return;
       }
       if (isStudioViewToolsHudEventTarget(e.target)) return;
-      if (e.touches.length !== 2 || stageRef.current?.isDragging()) {
+      if (appSettingsRef.current.touch.twoFinger !== "pan-zoom") {
+        pinchStartDist = 0;
+        return;
+      }
+      if (canvasPointerGestureIsOwned()) {
+        pinchStartDist = 0;
+        e.preventDefault();
+        return;
+      }
+      if (e.touches.length !== 2) {
         pinchStartDist = 0; // 요소 드래그 중이거나 두 손가락이 아니면 핀치 비활성
         return;
       }
@@ -5707,29 +5991,49 @@ function StudioCuttoonEditor() {
         // 두 손가락이 막 모인 첫 프레임 — 기준선만 잡고 이번 프레임은 줌하지 않는다.
         pinchStartDist = dist(e.touches);
         pinchStartZoom = zoomGestureRef.current?.targetZoom ?? zoomRef.current;
+        pinchStartCenter = center(e.touches);
         return;
       }
       e.preventDefault(); // 브라우저 페이지 줌 차단
       const target = clampZoom(pinchStartZoom * (dist(e.touches) / pinchStartDist));
-      const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      // 프레임마다 리렌더하지 않는다 — 휠 줌과 같은 제스처 transform 경로로 흐른다.
-      stepZoomGestureRef.current(() => target, centerX, centerY);
+      const currentCenter = center(e.touches);
+      // 프레임마다 리렌더하지 않는다. 거리 변화는 줌, 중심점 이동은 두 손가락 팬으로 같은
+      // transform에 합쳐 실제 pan-zoom 설정과 경쟁 드로잉 앱의 제스처를 일치시킨다.
+      stepZoomGestureRef.current(() => target, currentCenter.x, currentCenter.y, {
+        followClient: true,
+        originClientX: pinchStartCenter.x,
+        originClientY: pinchStartCenter.y,
+      });
+      pinchGestureActive = true;
     };
     const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length === 0) clearOneFingerPan();
       if (e.touches.length !== 2) {
         pinchStartDist = 0;
-        // 손가락이 떨어지면 바로 정착시켜 흐릿한 transform 프리뷰를 즉시 크리스프하게 만든다.
-        settleZoomGestureRef.current();
+        if (pinchGestureActive) {
+          pinchGestureActive = false;
+          // 손가락이 떨어지면 바로 정착시켜 흐릿한 transform 프리뷰를 즉시 크리스프하게 만든다.
+          settleZoomGestureRef.current();
+        }
       }
+    };
+    const onTouchCancel = () => {
+      clearOneFingerPan();
+      pinchStartDist = 0;
+      if (!pinchGestureActive) return;
+      pinchGestureActive = false;
+      settleZoomGestureRef.current();
     };
     node.addEventListener("touchstart", onTouchStart, { passive: true });
     node.addEventListener("touchmove", onTouchMove, { passive: false });
     node.addEventListener("touchend", onTouchEnd, { passive: true });
+    node.addEventListener("touchcancel", onTouchCancel, { passive: true });
     return () => {
+      clearOneFingerPan();
       node.removeEventListener("touchstart", onTouchStart);
       node.removeEventListener("touchmove", onTouchMove);
       node.removeEventListener("touchend", onTouchEnd);
+      node.removeEventListener("touchcancel", onTouchCancel);
     };
   }, []);
 
@@ -6731,6 +7035,55 @@ function StudioCuttoonEditor() {
   liveInkOverlayRendererRef.current ??= new StudioLiveInkOverlayRenderer();
   const liveInkPredictionRendererRef = useRef<StudioLiveInkPredictionRenderer>(null as never);
   liveInkPredictionRendererRef.current ??= new StudioLiveInkPredictionRenderer();
+  // The Canvas append path mutates one pressure array for the duration of a stroke. Cache the
+  // alias-mapped prefix and extend only its new suffix, otherwise remapping the full history on
+  // every pointer frame would reintroduce O(N²) work for long fineliner/marker strokes.
+  const liveBrushPressureCacheRef = useRef<{
+    readonly strokeId: string;
+    readonly brush: DrawEl["brush"];
+    readonly mode: DrawEl["mode"];
+    readonly pressureModel: DrawEl["pressureModel"];
+    readonly source: readonly number[] | undefined;
+    sourceLength: number;
+    pointCount: number;
+    readonly mapped: number[];
+  } | null>(null);
+  const liveBrushPressureSamplesFor = (
+    el: DrawEl,
+    sourcePointCount = Math.floor(el.points.length / 2)
+  ): number[] => {
+    const cache = liveBrushPressureCacheRef.current;
+    const sourceLength = el.pressures?.length ?? 0;
+    if (
+      cache
+      && cache.strokeId === el.id
+      && cache.brush === el.brush
+      && cache.mode === el.mode
+      && cache.pressureModel === el.pressureModel
+      && cache.source === el.pressures
+      && sourcePointCount >= cache.pointCount
+      && sourceLength >= cache.sourceLength
+    ) {
+      for (let index = cache.pointCount; index < sourcePointCount; index += 1) {
+        cache.mapped.push(studioLiveBrushPressure(el, el.pressures?.[index]));
+      }
+      cache.sourceLength = sourceLength;
+      cache.pointCount = sourcePointCount;
+      return cache.mapped;
+    }
+    const mapped = studioLiveBrushPressureSamples(el, sourcePointCount);
+    liveBrushPressureCacheRef.current = {
+      strokeId: el.id,
+      brush: el.brush,
+      mode: el.mode,
+      pressureModel: el.pressureModel,
+      source: el.pressures,
+      sourceLength,
+      pointCount: sourcePointCount,
+      mapped,
+    };
+    return mapped;
+  };
   const predictedInkTailStateRef = useRef<StudioPredictedInkTailState | null>(null);
   const causalPostCorrectionStateRef = useRef<StudioCausalPostCorrectionState | null>(null);
   const liveInkOverlayClearGenRef = useRef(0);
@@ -6879,7 +7232,7 @@ function StudioCuttoonEditor() {
   };
   const liveInkStyleFor = (el: DrawEl): StudioLiveInkStrokeStyle => ({
     color: el.stroke,
-    strokeWidthDoc: Math.max(1, el.strokeWidth),
+    strokeWidthDoc: studioLiveBrushEffectiveDiameter(el),
     pressureModel: el.pressureModel,
     paintModel: el.paintModel,
     opacity: el.opacity ?? 1,
@@ -6898,7 +7251,7 @@ function StudioCuttoonEditor() {
           }
         : { kind: "clear" },
       liveInkStyleFor(el),
-      el.pressures
+      liveBrushPressureSamplesFor(el)
     );
   };
   const appendCausalPostCorrectionState = (el: DrawEl, startPointIndex: number) => {
@@ -6912,7 +7265,7 @@ function StudioCuttoonEditor() {
     if (transition.settledSpan.points.length > 0) {
       liveInkOverlayRendererRef.current.appendSettledSpan(
         transition.settledSpan.points,
-        el.pressures,
+        liveBrushPressureSamplesFor(el),
         transition.settledSpan.startSampleIndex
       );
     }
@@ -6948,7 +7301,7 @@ function StudioCuttoonEditor() {
           }
         : { kind: "clear" },
       liveInkStyleFor(el),
-      el.pressures
+      liveBrushPressureSamplesFor(el)
     );
   };
   const sealCausalPostCorrectionState = (el: DrawEl): DrawEl => {
@@ -6960,14 +7313,14 @@ function StudioCuttoonEditor() {
     if (transition.settledSpan.points.length > 0) {
       liveInkOverlayRendererRef.current.appendSettledSpan(
         transition.settledSpan.points,
-        el.pressures,
+        liveBrushPressureSamplesFor(el),
         transition.settledSpan.startSampleIndex
       );
     }
     liveInkPredictionRendererRef.current.applyPointTail(
       transition.tailSurface,
       liveInkStyleFor(el),
-      el.pressures
+      liveBrushPressureSamplesFor(el)
     );
     return transition.finalPoints
       ? { ...el, points: [...transition.finalPoints] }
@@ -6989,7 +7342,7 @@ function StudioCuttoonEditor() {
     causalPostCorrectionStateRef.current = null;
     const initial = appendStudioAuthoritativeInk(createStudioPredictedInkTailState(), {
       points: el.points.slice(0, 2),
-      pressures: el.pressures?.slice(0, 1),
+      pressures: liveBrushPressureSamplesFor(el, 1),
     });
     predictedInkTailStateRef.current = initial.state;
     liveInkPredictionRendererRef.current.apply(initial.predictionSurface, liveInkStyleFor(el));
@@ -6999,7 +7352,7 @@ function StudioCuttoonEditor() {
     if (!state) return;
     const transition = appendStudioAuthoritativeInk(state, {
       points: el.points.slice(startPointIndex * 2),
-      pressures: el.pressures?.slice(startPointIndex),
+      pressures: liveBrushPressureSamplesFor(el).slice(startPointIndex),
     });
     predictedInkTailStateRef.current = transition.state;
     liveInkPredictionRendererRef.current.apply(
@@ -7012,7 +7365,7 @@ function StudioCuttoonEditor() {
     if (!state) return;
     const transition = replaceStudioPredictedInkTail(state, {
       points: el.points.slice(authoritativePointCount * 2),
-      pressures: el.pressures?.slice(authoritativePointCount),
+      pressures: liveBrushPressureSamplesFor(el).slice(authoritativePointCount),
     });
     predictedInkTailStateRef.current = transition.state;
     liveInkPredictionRendererRef.current.apply(
@@ -7069,15 +7422,17 @@ function StudioCuttoonEditor() {
       // 입력 단계에서 이미 거리 필터·스태빌라이저를 통과했다. 라이브 GPU 경계에서 다시
       // smoothing/resampling하면 새 점 하나가 과거 좌표와 필압을 바꿔 전체 texture rebuild가 된다.
       points: samples.flatMap(({ x, y }) => [x, y]),
-      pressures: samples.map(({ pressure }) => pressure),
+      pressures: samples.map(({ pressure }) => studioLiveBrushPressure(el, pressure)),
       ...(correctedSamples
         ? {
             correctedPoints: correctedSamples.flatMap(({ x, y }) => [x, y]),
-            correctedPressures: correctedSamples.map(({ pressure }) => pressure),
+            correctedPressures: correctedSamples.map(({ pressure }) =>
+              studioLiveBrushPressure(options.correctedEl ?? el, pressure)
+            ),
           }
         : {}),
       color: el.stroke,
-      size: Math.max(1, el.strokeWidth),
+      size: studioLiveBrushEffectiveDiameter(el),
       pressureModel: el.pressureModel,
       opacity: el.opacity ?? 1,
       composite: el.mode === "eraser" ? "erase" : "normal",
@@ -7102,9 +7457,9 @@ function StudioCuttoonEditor() {
       // The drawing model replaces these arrays rather than mutating them. The explicit suffix
       // feed validates only the new range and retains this object solely as a recovery fallback.
       points: el.points,
-      pressures: el.pressures,
+      pressures: liveBrushPressureSamplesFor(el, pointCount),
       color: el.stroke,
-      size: Math.max(1, el.strokeWidth),
+      size: studioLiveBrushEffectiveDiameter(el),
       pressureModel: el.pressureModel,
       opacity: el.opacity ?? 1,
       composite: el.mode === "eraser" ? "erase" : "normal",
@@ -7147,7 +7502,7 @@ function StudioCuttoonEditor() {
     if (overlay.isActive && next.mode !== "eraser" && !next.fill) {
       liveDraftVisualRef.current = next;
       if (causalPostCorrectionStateRef.current) return;
-      overlay.appendFrom(next.points, next.pressures);
+      overlay.appendFrom(next.points, liveBrushPressureSamplesFor(next));
       return;
     }
     // retained GPU texture는 권위 샘플의 strict prefix만 받는다. 후보정은 펜을 놓은 뒤의
@@ -8213,7 +8568,9 @@ function StudioCuttoonEditor() {
     viewTransformSuppressedRef.current = viewTransformSuppressed;
   }, [viewTransformSuppressed]);
   useEffect(() => {
-    if (viewTransformSuppressed) setViewTool(null);
+    if (viewTransformSuppressed) {
+      closeViewToolWithFocusRef.current({ preferCanvas: true });
+    }
   }, [viewTransformSuppressed]);
   useLayoutEffect(() => {
     if (viewTransformSuppressed) return;
@@ -13046,8 +13403,17 @@ function StudioCuttoonEditor() {
       setMobileSheet(null);
     }
   }
-  const mobileHistoryGestureRef = useRef({ undo, redo });
-  mobileHistoryGestureRef.current = { undo, redo };
+  const mobileHistoryGestureRef = useRef<{ undo: () => void; toggleUi: () => void }>({
+    undo,
+    toggleUi: () => undefined,
+  });
+  mobileHistoryGestureRef.current = {
+    undo,
+    toggleUi: () => {
+      if (canvasOnlyMode) setCanvasOnlyMode(false);
+      else enterCanvasOnlyMode();
+    },
+  };
   useEffect(() => {
     const node = wrapRef.current;
     if (!isMobile || !node) return;
@@ -13062,7 +13428,19 @@ function StudioCuttoonEditor() {
         candidate = null;
         return;
       }
+      if (canvasPointerGestureIsOwned()) {
+        candidate = null;
+        return;
+      }
       if (event.touches.length !== 2 && event.touches.length !== 3) {
+        candidate = null;
+        return;
+      }
+      const touchPrefs = appSettingsRef.current.touch;
+      if (
+        (event.touches.length === 2 && touchPrefs.twoFinger !== "undo-redo")
+        || (event.touches.length === 3 && touchPrefs.threeFinger === "none")
+      ) {
         candidate = null;
         return;
       }
@@ -13099,8 +13477,16 @@ function StudioCuttoonEditor() {
       candidate = null;
       if (!completed) return;
       event.preventDefault();
-      if (count === 2) mobileHistoryGestureRef.current.undo();
-      else mobileHistoryGestureRef.current.redo();
+      const touchPrefs = appSettingsRef.current.touch;
+      if (count === 2 && touchPrefs.twoFinger === "undo-redo") {
+        mobileHistoryGestureRef.current.undo();
+      } else if (count === 3 && touchPrefs.threeFinger === "undo") {
+        mobileHistoryGestureRef.current.undo();
+      } else if (count === 3 && touchPrefs.threeFinger === "toggle-ui") {
+        mobileHistoryGestureRef.current.toggleUi();
+      } else {
+        return;
+      }
       if (typeof globalThis.navigator?.vibrate === "function") globalThis.navigator.vibrate(8);
     };
     const onTouchCancel = () => {
@@ -13374,7 +13760,7 @@ function StudioCuttoonEditor() {
       const mod = e.metaKey || e.ctrlKey;
       if (e.key === "Escape" && viewTool) {
         e.preventDefault();
-        setViewTool(null);
+        closeViewToolWithFocus();
         return;
       }
       if (
@@ -13505,7 +13891,8 @@ function StudioCuttoonEditor() {
       if (matchStudioShortcut(sc["tool-zoom"], e)) {
         e.preventDefault();
         if (!viewTransformSuppressed) {
-          setViewTool((current) => current === "zoom" ? null : "zoom");
+          if (viewTool === "zoom") closeViewToolWithFocus();
+          else setViewTool("zoom");
           announceDrawingShortcut("보기 확대·축소 도구");
         }
         return;
@@ -13513,7 +13900,8 @@ function StudioCuttoonEditor() {
       if (matchStudioShortcut(sc["tool-rotate-view"], e)) {
         e.preventDefault();
         if (!viewTransformSuppressed) {
-          setViewTool((current) => current === "rotate" ? null : "rotate");
+          if (viewTool === "rotate") closeViewToolWithFocus();
+          else setViewTool("rotate");
           announceDrawingShortcut("보기 회전 도구");
         }
         return;
@@ -13657,13 +14045,17 @@ function StudioCuttoonEditor() {
         if (!activeSurfaceReviewLocked) reorder("backward");
       } else if (mod && (e.key === "=" || e.key === "+")) {
         e.preventDefault();
-        setZoom((z) => clampZoom(z + 0.25));
+        if (!viewTransformSuppressed) {
+          setZoom((current) => stepStudioViewZoom(current, 1));
+        }
       } else if (mod && e.key === "-") {
         e.preventDefault();
-        setZoom((z) => clampZoom(z - 0.25));
+        if (!viewTransformSuppressed) {
+          setZoom((current) => stepStudioViewZoom(current, -1));
+        }
       } else if (mod && e.key === "0") {
         e.preventDefault();
-        setZoom(1);
+        if (!viewTransformSuppressed) setZoom(1);
       } else if (drawingShortcut) {
         const targetEl = e.target instanceof HTMLElement ? e.target : null;
         const inField = Boolean(
@@ -17835,6 +18227,13 @@ function StudioCuttoonEditor() {
         }
         return;
       }
+      if (zoomGestureRef.current) {
+        // A wheel/pinch preview owns a temporary CSS transform for up to 170ms. Commit that view
+        // synchronously before reading the stroke origin so the transform cannot settle halfway
+        // through this contact and change the captured document coordinate system.
+        flushSync(() => settleZoomGestureRef.current());
+        stageRef.current?.setPointersPositions(pointerSample);
+      }
       const pendingBatch = pendingStrokeCommitsRef.current;
       if (
         pendingBatch
@@ -17939,14 +18338,10 @@ function StudioCuttoonEditor() {
         return;
       }
       drawingImmediateCausalInputRef.current = causalInputPlan.quantizeImmediately;
-      // Pixel pencil has no stabilizer. Positive standard strength uses the exact 5ms cascade;
-      // strength zero bypasses both sampler and low-pass and is normalized in appendFreehand.
+      // Pixel pencil bypasses stabilizers; positive standard strength keeps the exact 5ms cascade.
       drawingFixedRateFilterRef.current = causalInputPlan.usesFixedRateClock
-          ? createFixedRateStrokeFilter({
-              x: strokeOrigin.x,
-              y: strokeOrigin.y,
-              positionScale: effScale,
-              pressure,
+        ? createFixedRateStrokeFilter({
+            x: strokeOrigin.x, y: strokeOrigin.y, positionScale: effScale, pressure,
             tiltX: causalInitialSample?.tiltX ?? stylus.tiltX,
             tiltY: causalInitialSample?.tiltY ?? stylus.tiltY,
             timeStamp: pointerSample.timeStamp,
@@ -17999,14 +18394,17 @@ function StudioCuttoonEditor() {
         // Pointer contact always shows the raw append-only stroke. The fixed-lag engine remains
         // gated for future experiments, while production post-correction runs once on release.
         // Translucent/specialty paths stay isolated because retained overlap can flash alpha.
-        const causalPostCorrectionEligible = studioPostCorrectionRunsDuringPointerContact()
+        const pixelDirect = isStudioPixelPencilRenderMode(next.brush);
+        const causalPostCorrectionEligible = !pixelDirect
+          && studioPostCorrectionRunsDuringPointerContact()
           && isDirectLiveDraftEl(next)
           && postCorrection > 0
           && (next.opacity ?? 1) === 1
           && next.mode !== "eraser"
           && !next.fill
           && (next.symmetry?.type ?? "none") === "none";
-        const overlayDirect = isDirectLiveDraftEl(next)
+        const overlayDirect = !pixelDirect
+          && isDirectLiveDraftEl(next)
           && (next.opacity ?? 1) === 1
           && studioLiveInkFastOverlaySupportsStyle(liveInkStyleFor(next));
         const stampKind = resolveStudioStampBrushKind(next.brush);
@@ -18032,7 +18430,7 @@ function StudioCuttoonEditor() {
         // 도착하지 않으면(조용히 실패하는 GPU 환경) 같은 스트로크 안에서 Konva 로 인계된다.
         // (미드스트로크 스크린샷 검증 완료 — drawImage 기반 픽셀 판정은 WebGPU 캔버스에서
         // 위음성을 내므로 합성 스크린샷/영수증으로만 판정한다.)
-        const gpuStartPlan = isDirectLiveDraftEl(next)
+        const gpuStartPlan = !pixelDirect && isDirectLiveDraftEl(next)
           ? buildGpuLiveStrokePlan(next)
           : null;
         const liveInkBackendDecision = decideStudioLiveInkBackend({
@@ -18049,7 +18447,7 @@ function StudioCuttoonEditor() {
           preparedStroke: gpuStartPlan?.preparation,
         });
         const gpuPin = liveInkBackendDecision.backend === "webgpu";
-        const direct = overlayDirect || gpuPin;
+        const direct = pixelDirect || overlayDirect || gpuPin;
         liveDraftDirectRef.current = direct;
         liveStampDraftDirectRef.current = stampDirect;
         if (!stampDirect) liveStampOverlayRendererRef.current.resetActive();
@@ -18089,7 +18487,7 @@ function StudioCuttoonEditor() {
               liveInkStyle,
               next.points[0] ?? strokeOrigin.x,
               next.points[1] ?? strokeOrigin.y,
-              next.pressures?.[0] ?? studioInkFallbackPressure(next.pressureModel)
+              studioLiveBrushPressure(next, next.pressures?.[0])
             );
           }
         } else {
@@ -18917,7 +19315,9 @@ function StudioCuttoonEditor() {
       appendFixedRateStrokeSamples(transition.emitted, pointerSample, velocitySample.speed);
       return;
     }
-    if (!drawingImmediateCausalInputRef.current) {
+    // Pixel pencil is a raw grid tool: stabilizer strength must never bend or trail its cells.
+    // `null` at pointerdown means intentionally disabled for pixel, not "lazy-create on move".
+    if (drawMode !== "pixel" && !drawingImmediateCausalInputRef.current) {
       const liveStabilizerState = drawingStabilizerRef.current
         ?? createStudioStrokeStabilizerState({
           x: rawLastX,
@@ -18944,17 +19344,25 @@ function StudioCuttoonEditor() {
     // Repeated browser samples that collapse to the same 1/16 coordinate and 10-bit pressure add
     // no information. A pressure-only change is retained so the incremental dab walker can update
     // interpolation state without repainting the stationary prefix.
-    if (!shouldAppendStudioCausalInkSample({
-      lastX,
-      lastY,
-      lastPressure,
-      nextX: targetX,
-      nextY: targetY,
-      nextPressure: pressure,
-      minDistance: current.sampleSpacing
-        ?? strokeSampleDistanceForScale(inputSettings?.coordinateScale ?? effScale),
-      pressureModel: current.pressureModel,
-    })) return;
+    const shouldAppend = isStudioPixelPencilRenderMode(current.brush)
+      ? shouldAppendStudioPixelPencilSample({
+          lastX,
+          lastY,
+          nextX: targetX,
+          nextY: targetY,
+        })
+      : shouldAppendStudioCausalInkSample({
+          lastX,
+          lastY,
+          lastPressure,
+          nextX: targetX,
+          nextY: targetY,
+          nextPressure: pressure,
+          minDistance: current.sampleSpacing
+            ?? strokeSampleDistanceForScale(inputSettings?.coordinateScale ?? effScale),
+          pressureModel: current.pressureModel,
+        });
+    if (!shouldAppend) return;
     const capturePointerDynamics = current.mode === "pen" && resolveStudioBrushDynamicsPresetId(current.brush) !== null;
     const captureStylus = current.mode === "pen" && (current.brush === "calligraphy" || capturePointerDynamics);
     const previousPointCount = Math.floor(current.points.length / 2);
@@ -18984,6 +19392,7 @@ function StudioCuttoonEditor() {
     // 전체 points/pressure 복사(O(N²))를 없앤다. GPU/예측/비다이렉트 경로는 immutable 유지.
     const canAppendDirectly = (
       (liveDraftDirectRef.current && liveInkOverlayRendererRef.current.isActive)
+      || (liveDraftDirectRef.current && isStudioPixelPencilRenderMode(current.brush))
       || (liveStampDraftDirectRef.current && liveStampOverlayRendererRef.current.isActive)
       || (
         drawingImmediateBatchMutationRef.current
@@ -19147,6 +19556,7 @@ function StudioCuttoonEditor() {
         const authoritativePerspectiveRay = perspectiveRayRef.current;
         const authoritativeIsometricRay = isometricAxisRayRef.current;
         const authoritativeAdvancedRulerSnap = advancedRulerSnapRef.current;
+        const authoritativeFixedRateFilter = drawingFixedRateFilterRef.current;
         const authoritativeStabilizer = drawingStabilizerRef.current;
         const authoritativeVelocity = drawingVelocityRef.current;
         try {
@@ -19173,6 +19583,10 @@ function StudioCuttoonEditor() {
           perspectiveRayRef.current = authoritativePerspectiveRay;
           isometricAxisRayRef.current = authoritativeIsometricRay;
           advancedRulerSnapRef.current = authoritativeAdvancedRulerSnap;
+          // Predicted timestamps are in the future by definition. They may draw only on the
+          // replaceable preview surface and must never advance the authoritative 5ms filter clock,
+          // otherwise the following real samples are clamped to that future tick and visibly stall.
+          drawingFixedRateFilterRef.current = authoritativeFixedRateFilter;
           drawingStabilizerRef.current = authoritativeStabilizer;
           drawingVelocityRef.current = authoritativeVelocity;
         }
@@ -20946,7 +21360,7 @@ function StudioCuttoonEditor() {
           canvasFlipH,
           canvasRotation,
           fullscreen: isFullscreen,
-          grayscaleView: colorBlindPreview === "grayscale",
+          colorVisionMode: colorBlindPreview,
           referencePanelOpen,
           pageSequenceOpen,
           hasSavedView: menuHasSavedView,
@@ -20982,7 +21396,7 @@ function StudioCuttoonEditor() {
           fitCanvasToWidth: studioMainMenuActions.fitCanvasToWidth,
           setActualPixelView: studioMainMenuActions.setActualPixelView,
           toggleFullscreen: studioMainMenuActions.toggleFullscreen,
-          toggleGrayscaleView: studioMainMenuActions.toggleGrayscaleView,
+          setColorVisionMode: setColorBlindPreview,
           saveCurrentStudioView: studioMainMenuActions.saveCurrentStudioView,
           restoreSavedStudioView: studioMainMenuActions.restoreSavedStudioView,
           togglePerspectiveGuideView: studioMainMenuActions.togglePerspectiveGuideView,
@@ -22846,6 +23260,7 @@ function StudioCuttoonEditor() {
     enterCanvasOnlyMode,
     executeSuggestColorPalette,
     executeSuggestDialogueLines,
+    fitCanvasToWidth,
     insertAiCompositionNote,
     insertClip,
     insertDialogueSuggestionToSelected,
@@ -22868,6 +23283,7 @@ function StudioCuttoonEditor() {
     resetView,
     saveSelectionAsClip,
     saveSuggestedPaletteToLibrary,
+    setActualPixelView,
     setCanvasH,
     settleTrackedTextAiOperation,
     toggleAdvancedFill,
@@ -23098,6 +23514,7 @@ function StudioCuttoonEditor() {
     setDrawMode: (mode) => {
       setTool("draw");
       setDrawMode(mode);
+      if (mode === "pixel") setStrokeWidth(1);
       setEyedropperActive(false);
     },
     setDrawShape,
@@ -23177,7 +23594,14 @@ function StudioCuttoonEditor() {
             ? 0
             : 32,
       },
-      drawMode: drawMode === "shape" ? "shape" : drawMode === "eraser" ? "eraser" : "pen",
+      drawMode:
+        drawMode === "shape"
+          ? "shape"
+          : drawMode === "eraser"
+            ? "eraser"
+            : drawMode === "pixel"
+              ? "pixel"
+              : "pen",
       drawShape,
       favoriteBrushIds: proDrawPrefs.favoriteBrushIds,
       opacityLocked: proDrawPrefs.opacityLocked,
@@ -23771,7 +24195,6 @@ function StudioCuttoonEditor() {
           collaborationDocumentLocked={collaborationDocumentLocked}
           collaborationLockMessage={collaborationLockMessage}
           color={color}
-          colorBlindPreview={colorBlindPreview}
           commentsOpen={commentsOpen}
           configuredServerAiProviders={configuredServerAiProviders}
           continuityOpen={continuityOpen}
@@ -23858,7 +24281,6 @@ function StudioCuttoonEditor() {
           setBgSceneGenreFilter={setBgSceneGenreFilter}
           setBgSceneSearchQuery={setBgSceneSearchQuery}
           setColor={setColor}
-          setColorBlindPreview={setColorBlindPreview}
           setCommentsOpen={setCommentsOpen}
           setContinuityOpen={setContinuityOpen}
           setDialogueBatchOpen={setDialogueBatchOpen}
@@ -24093,6 +24515,7 @@ function StudioCuttoonEditor() {
           collaborationDocumentLocked={collaborationDocumentLocked}
           collaborationDocumentUnavailable={collaborationDocumentUnavailable}
           collaborationLockMessage={collaborationLockMessage}
+          closeViewToolWithFocus={closeViewToolWithFocus}
           color={color}
           colorBlindPreview={colorBlindPreview}
           commentPinArmed={commentPinArmed}
@@ -24234,7 +24657,6 @@ function StudioCuttoonEditor() {
           setTimelinePlayhead={setTimelinePlayhead}
           setTimelinePlaying={setTimelinePlaying}
           setTool={setTool}
-          setViewTool={setViewTool}
           setTranslateDraft={setTranslateDraft}
           setTranslateGlossary={setTranslateGlossary}
           setTranslateTargetLocale={setTranslateTargetLocale}
@@ -24285,6 +24707,7 @@ function StudioCuttoonEditor() {
           title={title}
           tool={tool}
           viewTool={viewTool}
+          viewTransformSuppressed={viewTransformSuppressed}
           translateBusy={translateBusy}
           translateDraft={translateDraft}
           translateError={translateError}
@@ -24326,7 +24749,18 @@ function StudioCuttoonEditor() {
             title="속성 패널 펼치기"
           />
         )}
-        <StudioInspectorAside
+        {!isMobile || mobileSheet === "props" ? (
+          <Suspense
+            fallback={(
+              <StudioInspectorAsideFallback
+                isMobile={isMobile}
+                keyboardInset={mobileKeyboardInset}
+                visible={visibleRightPanelOpen}
+                width={rightResize.width}
+              />
+            )}
+          >
+          <LazyStudioInspectorAside
           activeSavedBrushId={activeSavedBrushId}
           advancedRulers={advancedRulers}
           activeSurfaceReviewLocked={activeSurfaceReviewLocked}
@@ -24587,8 +25021,10 @@ function StudioCuttoonEditor() {
           wandTolerance={wandTolerance}
           webtoonGuides={webtoonGuides}
           webtoonTheme={webtoonTheme}
-          stableHandlers={studioInspectorAsideHandlers}
-        />
+            stableHandlers={studioInspectorAsideHandlers}
+          />
+          </Suspense>
+        ) : null}
 
         {isMobile ? (
           <Suspense fallback={null}>
@@ -24605,6 +25041,8 @@ function StudioCuttoonEditor() {
           brushOpacity={brushOpacity}
           collaborationDocumentLocked={collaborationDocumentLocked}
           color={color}
+          colorBlindPreview={colorBlindPreview}
+          colorVisionSheetRef={colorVisionSheetRef}
           currentBrushSnapshot={currentBrushSnapshot}
           drawMode={drawMode}
           drawShape={drawShape}
@@ -24628,6 +25066,7 @@ function StudioCuttoonEditor() {
           setBrushDynamics={setBrushDynamics}
           setBrushOpacity={setBrushOpacity}
           setColor={setColor}
+          setColorBlindPreview={setColorBlindPreview}
           setDrawMode={setDrawMode}
           setDrawShape={setDrawShape}
           setMarqueeIds={setMarqueeIds}
@@ -25069,6 +25508,7 @@ interface StudioCanvasViewportProps {
   collaborationDocumentLocked: boolean;
   collaborationDocumentUnavailable: boolean;
   collaborationLockMessage: () => string;
+  closeViewToolWithFocus: (options?: { preferCanvas?: boolean }) => void;
   color: string;
   colorBlindPreview: CvdMode;
   commentPinArmed: boolean;
@@ -25211,7 +25651,6 @@ interface StudioCanvasViewportProps {
   setTimelinePlayhead: import("react").Dispatch<import("react").SetStateAction<number>>;
   setTimelinePlaying: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setTool: import("react").Dispatch<import("react").SetStateAction<Tool>>;
-  setViewTool: import("react").Dispatch<import("react").SetStateAction<"zoom" | "rotate" | null>>;
   setTranslateDraft: import("react").Dispatch<import("react").SetStateAction<Map<string, string> | null>>;
   setTranslateGlossary: import("react").Dispatch<import("react").SetStateAction<string>>;
   setTranslateTargetLocale: import("react").Dispatch<import("react").SetStateAction<string>>;
@@ -25262,6 +25701,7 @@ interface StudioCanvasViewportProps {
   title: string;
   tool: Tool;
   viewTool: "zoom" | "rotate" | null;
+  viewTransformSuppressed: boolean;
   translateBusy: boolean;
   translateDraft: Map<string, string> | null;
   translateError: string | null;
@@ -25330,6 +25770,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   collaborationDocumentLocked,
   collaborationDocumentUnavailable,
   collaborationLockMessage,
+  closeViewToolWithFocus,
   color,
   colorBlindPreview,
   commentPinArmed,
@@ -25471,7 +25912,6 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   setTimelinePlayhead,
   setTimelinePlaying,
   setTool,
-  setViewTool,
   setTranslateDraft,
   setTranslateGlossary,
   setTranslateTargetLocale,
@@ -25522,6 +25962,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   title,
   tool,
   viewTool,
+  viewTransformSuppressed,
   translateBusy,
   translateDraft,
   translateError,
@@ -25676,6 +26117,13 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   } as const;
   const viewportCursorClassName = studioCanvasViewportCursorClassName(canvasCursorInput);
   const canvasCursorClassName = studioCanvasCursorClassName(canvasCursorInput);
+  const zoomOutAtLimit = stepStudioViewZoom(zoom, -1) === zoom;
+  const zoomInAtLimit = stepStudioViewZoom(zoom, 1) === zoom;
+  const viewBusyReason = viewTransformSuppressed
+    ? "내보내기·저장·타임랩스 캡처가 끝난 뒤 보기를 조절하세요."
+    : undefined;
+  const zoomOutUnavailableReason = viewBusyReason ?? (zoomOutAtLimit ? "최소 축소 배율에 도달했습니다." : undefined);
+  const zoomInUnavailableReason = viewBusyReason ?? (zoomInAtLimit ? "최대 확대 배율에 도달했습니다." : undefined);
   return (
         <div
           className={cn(
@@ -25716,26 +26164,54 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 mobileImmersive && "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]"
               )}
             >
-              <StudioHudPill title="배율">
-                <button
-                  type="button"
-                  className="grid size-5 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg"
-                  aria-label="축소"
-                  onClick={() => setZoom((z) => clampZoom(z - 0.1))}
+              <StudioHudPill>
+                <StudioToolHintTarget
+                  hint={STUDIO_VIEW_ACTION_HINTS.zoomOut}
+                  unavailableReason={zoomOutUnavailableReason}
+                  preferredSide="top"
                 >
-                  −
-                </button>
+                  <button
+                    type="button"
+                    className={cn(
+                      "grid size-7 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg",
+                      (viewTransformSuppressed || zoomOutAtLimit) && "cursor-not-allowed opacity-40"
+                    )}
+                    aria-label="축소"
+                    aria-disabled={viewTransformSuppressed || zoomOutAtLimit ? true : undefined}
+                    onClick={() => {
+                      if (!viewTransformSuppressed && !zoomOutAtLimit) {
+                        setZoom((current) => stepStudioViewZoom(current, -1));
+                      }
+                    }}
+                  >
+                    −
+                  </button>
+                </StudioToolHintTarget>
                 <span className="min-w-[2.4rem] text-center tabular-nums text-fg">
                   {Math.round(zoom * scale * 100)}%
                 </span>
-                <button
-                  type="button"
-                  className="grid size-5 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg"
-                  aria-label="확대"
-                  onClick={() => setZoom((z) => clampZoom(z + 0.1))}
+                <StudioToolHintTarget
+                  hint={STUDIO_VIEW_ACTION_HINTS.zoomIn}
+                  unavailableReason={zoomInUnavailableReason}
+                  preferredSide="top"
                 >
-                  +
-                </button>
+                  <button
+                    type="button"
+                    className={cn(
+                      "grid size-7 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg",
+                      (viewTransformSuppressed || zoomInAtLimit) && "cursor-not-allowed opacity-40"
+                    )}
+                    aria-label="확대"
+                    aria-disabled={viewTransformSuppressed || zoomInAtLimit ? true : undefined}
+                    onClick={() => {
+                      if (!viewTransformSuppressed && !zoomInAtLimit) {
+                        setZoom((current) => stepStudioViewZoom(current, 1));
+                      }
+                    }}
+                  >
+                    +
+                  </button>
+                </StudioToolHintTarget>
               </StudioHudPill>
               <StudioHudPill title={pageDisplayName(activePage, activePageIndex)} className="max-w-[7rem] truncate">
                 <button
@@ -25756,6 +26232,8 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       ? { mode: "eraser", widthPx: strokeWidth }
                       : drawMode === "shape"
                         ? { mode: "shape", shapeLabel: studioShapeKindLabel(drawShape) }
+                        : drawMode === "pixel"
+                          ? { mode: "pixel" }
                         : {
                             mode: "pen",
                             brushName: BRUSH_PRESETS.find((p) => p.id === brush)?.name ?? brush,
@@ -25775,6 +26253,8 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   <Eraser size={12} strokeWidth={1.75} aria-hidden />
                 ) : tool === "draw" && drawMode === "shape" ? (
                   <Shapes size={12} strokeWidth={1.75} aria-hidden />
+                ) : tool === "draw" && drawMode === "pixel" ? (
+                  <Grid3X3 size={12} strokeWidth={1.75} aria-hidden />
                 ) : tool === "draw" ? (
                   <Pencil size={12} strokeWidth={1.75} aria-hidden />
                 ) : tool === "select" ? (
@@ -25784,7 +26264,11 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 )}
                 {tool === "draw" ? (
                   <span className="tabular-nums">
-                    {drawMode === "shape" ? studioShapeKindLabel(drawShape) : `${strokeWidth}px`}
+                    {drawMode === "shape"
+                      ? studioShapeKindLabel(drawShape)
+                      : drawMode === "pixel"
+                        ? "1px"
+                        : `${strokeWidth}px`}
                   </span>
                 ) : null}
               </StudioHudPill>
@@ -25809,7 +26293,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   <PaintBucket size={12} strokeWidth={1.75} aria-hidden />
                 </StudioHudPill>
               ) : null}
-              {tool === "draw" && symmetryType !== "none" ? (
+              {tool === "draw" && drawMode !== "pixel" && symmetryType !== "none" ? (
                 <StudioHudPill accent title={studioSymmetryHudLabel(symmetryType) ?? "대칭"}>
                   <FlipHorizontal2 size={12} strokeWidth={1.75} aria-hidden />
                 </StudioHudPill>
@@ -25845,14 +26329,25 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   </button>
                 ))}
               </div>
-              <button
-                type="button"
-                onClick={fitCanvasToWidth}
-                className="rounded-full px-1.5 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
-                title="너비에 맞춤"
+              <StudioToolHintTarget
+                hint={STUDIO_VIEW_ACTION_HINTS.fitWidth}
+                unavailableReason={viewBusyReason}
+                preferredSide="top"
               >
-                맞춤
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!viewTransformSuppressed) fitCanvasToWidth();
+                  }}
+                  aria-disabled={viewTransformSuppressed ? true : undefined}
+                  className={cn(
+                    "min-h-7 rounded-full px-2 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg",
+                    viewTransformSuppressed && "cursor-not-allowed opacity-40"
+                  )}
+                >
+                  맞춤
+                </button>
+              </StudioToolHintTarget>
               <button
                 type="button"
                 onClick={() => {
@@ -25921,24 +26416,26 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
           </div>
           {viewTool ? (
             <div className="pointer-events-none sticky top-2 z-[44] flex h-0 items-start justify-center px-2">
-              <StudioViewToolsHud
-                className="!relative !left-auto !top-auto !max-w-full !translate-x-0"
-                mode={viewTool}
-                magnification={effScale}
-                canZoomIn={stepStudioViewZoom(zoom, 1) !== zoom}
-                canZoomOut={stepStudioViewZoom(zoom, -1) !== zoom}
-                rotation={canvasRotation}
-                flipped={canvasFlipH}
-                onZoomIn={() => setZoom((current) => stepStudioViewZoom(current, 1))}
-                onZoomOut={() => setZoom((current) => stepStudioViewZoom(current, -1))}
-                onFit={fitCanvasToWidth}
-                onActual={setActualPixelView}
-                onRotateLeft={() => rotateCanvasView("left")}
-                onRotateRight={() => rotateCanvasView("right")}
-                onToggleFlip={toggleHorizontalCanvasView}
-                onReset={resetView}
-                onClose={() => setViewTool(null)}
-              />
+              <Suspense fallback={null}>
+                <StudioViewToolsHud
+                  className="!relative !left-auto !top-auto !max-w-full !translate-x-0"
+                  mode={viewTool}
+                  magnification={effScale}
+                  canZoomIn={stepStudioViewZoom(zoom, 1) !== zoom}
+                  canZoomOut={stepStudioViewZoom(zoom, -1) !== zoom}
+                  rotation={canvasRotation}
+                  flipped={canvasFlipH}
+                  onZoomIn={() => setZoom((current) => stepStudioViewZoom(current, 1))}
+                  onZoomOut={() => setZoom((current) => stepStudioViewZoom(current, -1))}
+                  onFit={fitCanvasToWidth}
+                  onActual={setActualPixelView}
+                  onRotateLeft={() => rotateCanvasView("left")}
+                  onRotateRight={() => rotateCanvasView("right")}
+                  onToggleFlip={toggleHorizontalCanvasView}
+                  onReset={resetView}
+                  onClose={closeViewToolWithFocus}
+                />
+              </Suspense>
             </div>
           ) : null}
           {commentPinArmed ? (
@@ -26618,13 +27115,20 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               store={draftPreviewStore}
             />
             {/* 브러시 커서 프리뷰: 드로잉 모드에서 포인터를 따라다니는 브러시 크기 원 */}
-            {!isExporting && tool === "draw" && (
+            {!isExporting && tool === "draw" && drawMode !== "pixel" && (
               <Layer listening={false}>
                 {/* CSP/Procreate-style size disc: soft fill + crisp ring */}
                 <KCircle
                   ref={brushCursorRef}
                   visible={false}
-                  radius={Math.max(1.5, (drawMode === "shape" ? 6 : strokeWidth) / 2)}
+                  radius={Math.max(
+                    1.5,
+                    (drawMode === "shape"
+                      ? 6
+                      : drawMode === "pen"
+                        ? studioBrushAliasEffectiveDiameter(brush, strokeWidth)
+                        : strokeWidth) / 2
+                  )}
                   fill={drawMode === "eraser" ? "#a1a1aa" : color}
                   fillEnabled={drawMode !== "shape"}
                   fillOpacity={drawMode === "eraser" ? 0.12 : 0.14}
@@ -27378,37 +27882,77 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
             onClose={() => setPageSequenceOpen(false)}
           />
 
-          {/* 캔버스 줌 컨트롤 — ⌘± / ⌘0 단축키 또는 ⌘+휠과 동일 동작 (모바일은 하단 도구막대로 대체) */}
-          <div className="absolute bottom-3 left-3 z-30 hidden items-center gap-0.5 rounded-full border border-line bg-panel/95 p-0.5 shadow-lg backdrop-blur lg:flex">
-            <button
-              type="button"
-              onClick={() => setZoom((z) => clampZoom(z - 0.25))}
-              disabled={zoom <= ZOOM_MIN}
-              className="grid size-7 place-items-center rounded-full text-fg-2 transition-colors hover:bg-raised disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-              aria-label="축소"
-              title="축소 (⌘−)"
+          {/* 캔버스 보기 컨트롤 — −/=, End 및 Ctrl/Cmd+휠과 같은 보기 상태를 공유한다. */}
+          <div
+            className={cn(
+              "absolute bottom-3 left-3 z-30 hidden items-center gap-0.5 rounded-full border border-line bg-panel/95 p-0.5 shadow-lg backdrop-blur",
+              canvasOnlyMode && "lg:flex"
+            )}
+          >
+            <StudioToolHintTarget
+              hint={STUDIO_VIEW_ACTION_HINTS.zoomOut}
+              unavailableReason={zoomOutUnavailableReason}
+              preferredSide="top"
             >
-              <Minus className="size-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setZoom(1)}
-              className="min-w-[3.25rem] rounded-full px-1 text-center text-xs font-semibold tabular-nums text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-              aria-label="확대·축소 100%로 맞춤"
-              title="100%로 맞춤 (⌘0)"
+              <button
+                type="button"
+                onClick={() => {
+                  if (!viewTransformSuppressed && !zoomOutAtLimit) {
+                    setZoom((current) => stepStudioViewZoom(current, -1));
+                  }
+                }}
+                aria-disabled={viewTransformSuppressed || zoomOutAtLimit ? true : undefined}
+                className={cn(
+                  "grid size-7 place-items-center rounded-full text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+                  (viewTransformSuppressed || zoomOutAtLimit) && "cursor-not-allowed opacity-40"
+                )}
+                aria-label="축소"
+              >
+                <Minus className="size-3.5" aria-hidden />
+              </button>
+            </StudioToolHintTarget>
+            <StudioToolHintTarget
+              hint={STUDIO_VIEW_ACTION_HINTS.actualSize}
+              unavailableReason={viewBusyReason}
+              preferredSide="top"
             >
-              {Math.round(zoom * 100)}%
-            </button>
-            <button
-              type="button"
-              onClick={() => setZoom((z) => clampZoom(z + 0.25))}
-              disabled={zoom >= ZOOM_MAX}
-              className="grid size-7 place-items-center rounded-full text-fg-2 transition-colors hover:bg-raised disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-              aria-label="확대"
-              title="확대 (⌘+)"
+              <button
+                type="button"
+                onClick={() => {
+                  if (!viewTransformSuppressed) setActualPixelView();
+                }}
+                aria-disabled={viewTransformSuppressed ? true : undefined}
+                className={cn(
+                  "min-h-7 min-w-[3.25rem] rounded-full px-1 text-center text-xs font-semibold tabular-nums text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+                  viewTransformSuppressed && "cursor-not-allowed opacity-40"
+                )}
+                aria-label="실제 픽셀 100% 보기"
+              >
+                {Math.round(effScale * 100)}%
+              </button>
+            </StudioToolHintTarget>
+            <StudioToolHintTarget
+              hint={STUDIO_VIEW_ACTION_HINTS.zoomIn}
+              unavailableReason={zoomInUnavailableReason}
+              preferredSide="top"
             >
-              <Plus className="size-3.5" />
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!viewTransformSuppressed && !zoomInAtLimit) {
+                    setZoom((current) => stepStudioViewZoom(current, 1));
+                  }
+                }}
+                aria-disabled={viewTransformSuppressed || zoomInAtLimit ? true : undefined}
+                className={cn(
+                  "grid size-7 place-items-center rounded-full text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+                  (viewTransformSuppressed || zoomInAtLimit) && "cursor-not-allowed opacity-40"
+                )}
+                aria-label="확대"
+              >
+                <Plus className="size-3.5" aria-hidden />
+              </button>
+            </StudioToolHintTarget>
           </div>
 
           {/* 텍스트 인라인 편집 — canvasFlipH(거울상)나 세로쓰기 요소는 캔버스 실시간 오버레이가

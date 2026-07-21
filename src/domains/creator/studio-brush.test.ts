@@ -30,6 +30,7 @@ import {
   strokeRenderDistance,
   strokeSampleDistanceForScale,
 } from "./studio-brush";
+import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 
 describe("BRUSH_PRESETS", () => {
   it("includes G-pen, tilt calligraphy, watercolor and commercial Canva/Express/Picsart aliases", () => {
@@ -116,6 +117,7 @@ describe("BRUSH_PRESETS", () => {
     expect(resolveStudioBrushRenderFamily("oil")).toBe("oil");
     expect(resolveStudioBrushRenderFamily("pastel")).toBe("pastel");
     expect(resolveStudioBrushRenderFamily("ink-wash")).toBe("watercolor");
+    expect(resolveStudioBrushRenderFamily(STUDIO_PIXEL_PENCIL_RENDER_MODE)).toBe("pixel");
     expect(resolveStudioBrushRenderFamily("unknown-tool")).toBe("pen");
   });
 

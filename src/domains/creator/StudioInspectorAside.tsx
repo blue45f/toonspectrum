@@ -16,7 +16,6 @@ import {
   ChevronRight,
   ChevronUp,
   Copy,
-  Eraser,
   FlipHorizontal2,
   FlipVertical2,
   Italic,
@@ -24,9 +23,7 @@ import {
   MousePointer2,
   PaintBucket,
   Paintbrush,
-  Pencil,
   Pipette,
-  Shapes,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -164,6 +161,7 @@ import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
 import { StudioInspectorBubbleAppearanceControls } from "./StudioInspectorBubbleAppearanceControls";
 import { StudioInspectorBubbleShapeControls } from "./StudioInspectorBubbleShapeControls";
 import { StudioInspectorCanvasControls } from "./StudioInspectorCanvasControls";
+import { StudioInspectorDrawModeControls } from "./StudioInspectorDrawModeControls";
 import { StudioInspectorFocusSpeedFrameControls } from "./StudioInspectorFocusSpeedFrameControls";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
@@ -179,6 +177,7 @@ import type {
   StudioAdvancedRulerDocument,
 } from "./studio-advanced-ruler-document";
 import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
+import type { StudioMobileSheet } from "./StudioMobileEditingDock";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
@@ -356,7 +355,7 @@ interface StudioInspectorAsideProps {
   marqueeIds: string[];
   masterEditMode: boolean;
   mobileKeyboardInset: number;
-  mobileSheet: "draw" | "pages" | "props" | "brushes" | null;
+  mobileSheet: StudioMobileSheet;
   nodeEditHandles: NodeEditHandle[];
   nodeEditTool: NodeEditTool | null;
   nodeSmoothStrength: number;
@@ -435,7 +434,7 @@ interface StudioInspectorAsideProps {
   setLiquifyStrength: import("react").Dispatch<import("react").SetStateAction<number>>;
   setMagicResizeStrategy: import("react").Dispatch<import("react").SetStateAction<MagicResizeStrategy>>;
   setMenu: import("react").Dispatch<import("react").SetStateAction<StudioMenu | null>>;
-  setMobileSheet: import("react").Dispatch<import("react").SetStateAction<"draw" | "pages" | "props" | "brushes" | null>>;
+  setMobileSheet: import("react").Dispatch<import("react").SetStateAction<StudioMobileSheet>>;
   setNodeEditTool: import("react").Dispatch<import("react").SetStateAction<NodeEditTool | null>>;
   setNodeSmoothStrength: import("react").Dispatch<import("react").SetStateAction<number>>;
   setPageGradePanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -2405,40 +2404,13 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               hidden={inspectorLayout.primary !== "properties"}
               className="space-y-3 rounded-xl border border-line bg-panel/40 p-3"
             >
-              <p className="text-xs font-semibold text-fg-3">그리기 도구 설정</p>
-              
-              {/* 모드 선택: 펜 / 지우개 / 도형 — icon-first */}
-              <div className="flex gap-1 rounded-lg border border-line bg-card p-0.5" role="group" aria-label="그리기 모드">
-                {(
-                  [
-                    { label: "펜", v: "pen" as const, Icon: Pencil },
-                    { label: "지우개", v: "eraser" as const, Icon: Eraser },
-                    { label: "도형", v: "shape" as const, Icon: Shapes },
-                  ] as const
-                ).map((mode) => (
-                  <button
-                    key={mode.v}
-                    type="button"
-                    title={mode.label}
-                    aria-label={mode.label}
-                    aria-pressed={drawMode === mode.v}
-                    onClick={() => {
-                      setDrawMode(mode.v);
-                      if (mode.v === "shape") {
-                        setDrawShape("line");
-                      }
-                    }}
-                    className={cn(
-                      "grid min-h-11 flex-1 place-items-center rounded-md transition-colors lg:min-h-9",
-                      drawMode === mode.v
-                        ? "bg-accent text-on-accent"
-                        : "text-fg-2 hover:bg-raised"
-                    )}
-                  >
-                    <mode.Icon size={15} strokeWidth={1.75} aria-hidden />
-                  </button>
-                ))}
-              </div>
+              <StudioInspectorDrawModeControls
+                drawMode={drawMode}
+                onDrawModeChange={setDrawMode}
+                onDrawShapeChange={setDrawShape}
+                onStrokeWidthChange={setStrokeWidth}
+                onSymmetryChange={setSymmetryType}
+              />
 
               {/* 기본 프리셋 탐색은 하단 도크 한 곳에만 둔다. 인스펙터는 현재 상태와
                   사용자 저장 브러시·고급 동역학에 집중해 긴 중복 메뉴를 만들지 않는다. */}
@@ -2579,20 +2551,22 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
 
               {/* 크기 슬라이더 */}
               <div className="space-y-1.5 pt-1.5 border-t border-line/35">
-                <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                  <span>크기</span>
-                  <span className="flex items-center gap-1.5">
-                    <input
-                      type="range"
-                      min={STUDIO_BRUSH_SIZE_RANGE.min}
-                      max={STUDIO_BRUSH_SIZE_RANGE.max}
-                      value={strokeWidth}
-                      onChange={(e) => setStrokeWidth(Number(e.target.value))}
-                      className="w-24 accent-accent cursor-pointer"
-                    />
-                    <span className="w-8 text-right text-xs tabular-nums text-fg-3">{strokeWidth}px</span>
-                  </span>
-                </label>
+                {drawMode !== "pixel" ? (
+                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                    <span>크기</span>
+                    <span className="flex items-center gap-1.5">
+                      <input
+                        type="range"
+                        min={STUDIO_BRUSH_SIZE_RANGE.min}
+                        max={STUDIO_BRUSH_SIZE_RANGE.max}
+                        value={strokeWidth}
+                        onChange={(e) => setStrokeWidth(Number(e.target.value))}
+                        className="w-24 accent-accent cursor-pointer"
+                      />
+                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{strokeWidth}px</span>
+                    </span>
+                  </label>
+                ) : null}
 
                 {/* 투명도 슬라이더 */}
                 <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
@@ -2612,7 +2586,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 </label>
 
                 {/* 스탬프 브러시 세부 조절(흐름·경도·최소 굵기) — 스탬프 계열 선택 시에만 노출 */}
-                {stampTuning
+                {drawMode !== "pixel" && stampTuning
                   ? (
                     [
                       { key: "flow", label: "흐름" },
@@ -2647,16 +2621,18 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   ))
                   : null}
 
-                <StudioLineCorrectionControls
-                  stabilizer={stabilizer}
-                  onStabilizerChange={setStabilizer}
-                  mode={stabilizerMode}
-                  onModeChange={setStabilizerMode}
-                  postCorrection={postCorrection}
-                  onPostCorrectionChange={setPostCorrection}
-                  preserveCorners={preserveCorners}
-                  onPreserveCornersChange={setPreserveCorners}
-                />
+                {drawMode !== "pixel" ? (
+                  <StudioLineCorrectionControls
+                    stabilizer={stabilizer}
+                    onStabilizerChange={setStabilizer}
+                    mode={stabilizerMode}
+                    onModeChange={setStabilizerMode}
+                    postCorrection={postCorrection}
+                    onPostCorrectionChange={setPostCorrection}
+                    preserveCorners={preserveCorners}
+                    onPreserveCornersChange={setPreserveCorners}
+                  />
+                ) : null}
 
                 {drawMode === "pen" && (
                   <Suspense fallback={null}>
@@ -2685,7 +2661,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   </Suspense>
                 )}
 
-                {drawMode !== "shape" ? (
+                {drawMode !== "shape" && drawMode !== "pixel" ? (
                   <Suspense fallback={<div className="h-40 animate-pulse rounded-xl bg-raised/35 motion-reduce:animate-none" aria-hidden />}>
                     <StudioBrushStudio
                       brushId={brush}
@@ -2710,8 +2686,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   </Suspense>
                 ) : null}
 
-                {/* 대칭 그리기 자 (Symmetry Ruler) */}
-                <div className="pt-2.5 border-t border-line/35 space-y-2">
+                {/* 대칭 그리기 자 (Symmetry Ruler) — RAW 픽셀 입력에는 적용하지 않는다. */}
+                {drawMode !== "pixel" ? (
+                  <div className="pt-2.5 border-t border-line/35 space-y-2">
                   <p className="text-xs font-semibold text-fg-3">대칭 자 (Symmetry)</p>
                   
                   <div className="grid grid-cols-5 gap-1">
@@ -2790,7 +2767,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       </button>
                     </div>
                   )}
-                </div>
+                  </div>
+                ) : null}
                 <Suspense fallback={null}>
                   <StudioPerspectivePanel
                     active={perspectiveRulerActive}

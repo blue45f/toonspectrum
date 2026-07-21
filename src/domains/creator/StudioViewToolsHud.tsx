@@ -18,7 +18,13 @@ import {
   STUDIO_EASE,
   STUDIO_FOCUS_RING,
 } from "./studio-panel-ui";
+import {
+  STUDIO_VIEW_ACTION_HINTS,
+  studioViewFlipHint,
+} from "./studio-view-action-hints";
+import { StudioToolHintTarget } from "./StudioToolHint";
 
+import type { StudioToolHintSpec } from "./studio-tool-hints";
 import type { StudioViewRotation } from "./studio-view-controls";
 import type { LucideIcon } from "lucide-react";
 import type { KeyboardEvent, ReactElement, ReactNode } from "react";
@@ -56,37 +62,48 @@ const HUD_ACTION_CLASS = cn(
 
 function HudAction({
   label,
+  hint,
   onClick,
   icon: Icon,
   pressed,
   children,
   disabled,
+  unavailableReason,
 }: {
   label: string;
+  hint: StudioToolHintSpec;
   onClick: () => void;
   icon?: LucideIcon;
   pressed?: boolean;
   children?: ReactNode;
   disabled?: boolean;
+  unavailableReason?: string;
 }): ReactElement {
   return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={pressed}
-      title={label}
-      onClick={onClick}
-      disabled={disabled}
-      tabIndex={-1}
-      data-studio-view-action={label}
-      className={cn(
-        HUD_ACTION_CLASS,
-        pressed && "border-accent/50 bg-accent-soft text-accent hover:border-accent/65 hover:bg-accent-soft",
-        disabled && "cursor-not-allowed opacity-35 hover:border-transparent hover:bg-transparent hover:text-fg-2"
-      )}
+    <StudioToolHintTarget
+      hint={hint}
+      unavailableReason={disabled ? unavailableReason : undefined}
+      preferredSide="bottom"
     >
-      {Icon ? <Icon size={16} strokeWidth={1.75} aria-hidden /> : children}
-    </button>
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={pressed}
+        aria-disabled={disabled ? true : undefined}
+        onClick={() => {
+          if (!disabled) onClick();
+        }}
+        tabIndex={-1}
+        data-studio-view-action={label}
+        className={cn(
+          HUD_ACTION_CLASS,
+          pressed && "border-accent/50 bg-accent-soft text-accent hover:border-accent/65 hover:bg-accent-soft",
+          disabled && "cursor-not-allowed opacity-35 hover:border-transparent hover:bg-transparent hover:text-fg-2"
+        )}
+      >
+        {Icon ? <Icon size={16} strokeWidth={1.75} aria-hidden /> : children}
+      </button>
+    </StudioToolHintTarget>
   );
 }
 
@@ -117,7 +134,7 @@ export function StudioViewToolsHud({
   useEffect(() => {
     if (mode === null) return;
     const buttons = Array.from(
-      toolbarRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []
+      toolbarRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? []
     );
     buttons.forEach((button, index) => {
       button.tabIndex = index === 0 ? 0 : -1;
@@ -153,7 +170,7 @@ export function StudioViewToolsHud({
     }
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     const buttons = Array.from(
-      toolbarRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []
+      toolbarRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? []
     );
     if (buttons.length === 0) return;
     event.preventDefault();
@@ -213,17 +230,31 @@ export function StudioViewToolsHud({
 
       {isZoom ? (
         <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="확대 및 축소">
-          <HudAction label="캔버스 축소" icon={Minus} onClick={onZoomOut} disabled={!canZoomOut} />
-          <HudAction label="캔버스 확대" icon={Plus} onClick={onZoomIn} disabled={!canZoomIn} />
-          <HudAction label="캔버스 화면 맞춤" icon={ScanLine} onClick={onFit} />
-          <HudAction label="캔버스 실제 픽셀 100%" onClick={onActual}>
+          <HudAction
+            label="캔버스 축소"
+            hint={STUDIO_VIEW_ACTION_HINTS.zoomOut}
+            icon={Minus}
+            onClick={onZoomOut}
+            disabled={!canZoomOut}
+            unavailableReason="최소 축소 배율에 도달했습니다."
+          />
+          <HudAction
+            label="캔버스 확대"
+            hint={STUDIO_VIEW_ACTION_HINTS.zoomIn}
+            icon={Plus}
+            onClick={onZoomIn}
+            disabled={!canZoomIn}
+            unavailableReason="최대 확대 배율에 도달했습니다."
+          />
+          <HudAction label="캔버스 너비에 맞춤" hint={STUDIO_VIEW_ACTION_HINTS.fitWidth} icon={ScanLine} onClick={onFit} />
+          <HudAction label="캔버스 실제 픽셀 100%" hint={STUDIO_VIEW_ACTION_HINTS.actualSize} onClick={onActual}>
             <span className="text-[0.68rem] font-black tabular-nums" aria-hidden>1:1</span>
           </HudAction>
         </div>
       ) : (
         <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="캔버스 회전">
-          <HudAction label="캔버스 왼쪽으로 90도 회전" icon={RotateCcw} onClick={onRotateLeft} />
-          <HudAction label="캔버스 오른쪽으로 90도 회전" icon={RotateCw} onClick={onRotateRight} />
+          <HudAction label="캔버스 왼쪽으로 90도 회전" hint={STUDIO_VIEW_ACTION_HINTS.rotateLeft} icon={RotateCcw} onClick={onRotateLeft} />
+          <HudAction label="캔버스 오른쪽으로 90도 회전" hint={STUDIO_VIEW_ACTION_HINTS.rotateRight} icon={RotateCw} onClick={onRotateRight} />
         </div>
       )}
 
@@ -232,12 +263,13 @@ export function StudioViewToolsHud({
       <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="공통 보기 작업">
         <HudAction
           label={flipped ? "캔버스 좌우 반전 해제" : "캔버스 좌우 반전"}
+          hint={studioViewFlipHint(flipped)}
           icon={FlipHorizontal2}
           pressed={flipped}
           onClick={onToggleFlip}
         />
-        <HudAction label="캔버스 보기 초기화" icon={RotateCcw} onClick={onReset} />
-        <HudAction label="보기 도구 닫기" icon={X} onClick={restoreFocusAndClose} />
+        <HudAction label="캔버스 보기 초기화" hint={STUDIO_VIEW_ACTION_HINTS.reset} icon={RotateCcw} onClick={onReset} />
+        <HudAction label="보기 도구 닫기" hint={STUDIO_VIEW_ACTION_HINTS.close} icon={X} onClick={restoreFocusAndClose} />
       </div>
     </div>
   );

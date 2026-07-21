@@ -11,6 +11,7 @@ import {
   serializeStudioBrushDynamicsSettingsCanonical,
   studioBrushDynamicsSeedFromKey,
   studioBrushDynamicsPresetSettings,
+  studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsSettingsEqual,
   studioBrushTaperFactors,
   type StudioBrushDynamicsRecipe,
@@ -312,6 +313,101 @@ describe("studio brush dynamics settings safety", () => {
     const first = studioBrushDynamicsPresetSettings("ink-particle");
     first.width.base = 99;
     expect(studioBrushDynamicsPresetSettings("ink-particle").width.base).toBe(8);
+  });
+
+  it("gives every air and dry-media toolbar brush a distinct physical execution signature", () => {
+    const brushIds = [
+      "airbrush",
+      "soft-brush",
+      "spray",
+      "dry-media",
+      "crayon",
+      "chalk",
+      "charcoal",
+    ] as const;
+    const settings = brushIds.map((brushId) => {
+      const value = studioBrushDynamicsSettingsForBrushId(brushId);
+      expect(value).not.toBeNull();
+      return value!;
+    });
+
+    const jitterSignature = (value: (typeof settings)[number]) => JSON.stringify({
+      width: value.width.jitter,
+      opacity: value.opacity.jitter,
+      flow: value.flow.jitter,
+      spacing: value.spacing.jitter,
+      scatter: value.scatter.jitter,
+      angle: value.angle.jitter,
+      roundness: value.roundness.jitter,
+    });
+    const executionSignature = (value: (typeof settings)[number]) => JSON.stringify({
+      tip: value.tip,
+      spacingRatio: value.spacingRatio,
+      scatterRatio: value.scatterRatio,
+      flow: value.flow,
+      jitter: jitterSignature(value),
+      roundness: value.roundness,
+      recipes: [0, 5, 11].map((stampIndex) => {
+        const recipe = resolveStudioBrushDynamics(
+          {
+            pressure: 0.68,
+            speed: 0.9,
+            direction: 32,
+            tiltX: 38,
+            tiltY: 12,
+            twist: 57,
+            stampIndex,
+          },
+          { ...value, seed: 0x5eed_1234 }
+        );
+        return {
+          spacing: recipe.spacing,
+          scatter: recipe.scatter,
+          scatterOffsetX: recipe.scatterOffsetX,
+          scatterOffsetY: recipe.scatterOffsetY,
+          flow: recipe.flow,
+          angle: recipe.angle,
+          roundness: recipe.roundness,
+        };
+      }),
+    });
+
+    // Each axis is deliberately independent so future tuning cannot accidentally collapse two
+    // toolbar choices back into cosmetic aliases of the same engine preset.
+    expect(new Set(settings.map((value) => value.tip.shape)).size).toBe(brushIds.length);
+    expect(new Set(settings.map((value) => value.spacingRatio)).size).toBe(brushIds.length);
+    expect(new Set(settings.map((value) => value.scatterRatio)).size).toBe(brushIds.length);
+    expect(new Set(settings.map((value) => JSON.stringify(value.flow))).size).toBe(brushIds.length);
+    expect(new Set(settings.map(jitterSignature)).size).toBe(brushIds.length);
+    expect(new Set(settings.map((value) => JSON.stringify(value.roundness))).size).toBe(brushIds.length);
+    expect(new Set(settings.map(executionSignature)).size).toBe(brushIds.length);
+
+    for (const value of settings) {
+      expect(JSON.parse(JSON.stringify(value))).toEqual(value);
+      expectFiniteRecipe(resolveStudioBrushDynamics({ pressure: 0.5, stampIndex: 3 }, value));
+    }
+  });
+
+  it("keeps canonical presets compatible and returns detached alias settings", () => {
+    for (const id of ["ink-particle", "airbrush", "dry-media"] as const) {
+      expect(studioBrushDynamicsSettingsForBrushId(id)).toEqual(
+        studioBrushDynamicsPresetSettings(id)
+      );
+    }
+    expect(studioBrushDynamicsSettingsForBrushId("pencil")).toBeNull();
+    expect(studioBrushDynamicsSettingsForBrushId(null)).toBeNull();
+
+    const first = studioBrushDynamicsSettingsForBrushId("spray")!;
+    first.tip.softness = 1;
+    first.flow.base = 1;
+    expect(studioBrushDynamicsSettingsForBrushId("spray")).toMatchObject({
+      tip: { shape: "flake", softness: 0.18 },
+      flow: { base: 0.24 },
+    });
+    expect(studioBrushDynamicsPresetSettings("airbrush")).toMatchObject({
+      tip: { shape: "soft", softness: 0.85 },
+      flow: { base: 0.48 },
+    });
   });
 
   it("keeps airbrush aliases visible on mouse taps without making long strokes opaque", () => {

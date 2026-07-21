@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   StudioAppMenubar,
   StudioDockButton,
+  type StudioDockButtonProps,
   StudioDockNavButton,
   StudioEdgeRailButton,
   StudioHudPill,
@@ -16,6 +17,7 @@ import {
   StudioMenuSubtabs,
   StudioQuickActionsBar,
   StudioRailToolButton,
+  type StudioRailToolButtonProps,
   StudioStatusBar,
   StudioFloatingToolPopover,
   StudioToolBelt,
@@ -136,6 +138,28 @@ describe("studio chrome UI", () => {
     expect(html).toContain('data-studio-tool-hint-target="true"');
     expect(html).toContain("min-w-11 flex-1");
     expect(html).toContain("min-h-11");
+  });
+
+  it("rejects cross-family preview props on reusable chrome controls", () => {
+    const compileTimeInvalidChromeProps = (): void => {
+      // @ts-expect-error pause is not a shape preview variant.
+      const invalidDock: StudioDockButtonProps = {
+        label: "도형",
+        hintPreview: "shape",
+        hintPreviewVariant: "pause",
+      };
+      const invalidRail: StudioRailToolButtonProps = {
+        icon: Pencil,
+        label: "올가미",
+        hintPreview: "lasso",
+        // @ts-expect-error zoom-in is not a lasso preview variant.
+        hintPreviewVariant: "zoom-in",
+      };
+      expect(invalidDock).toBeUndefined();
+      expect(invalidRail).toBeUndefined();
+    };
+
+    expect(compileTimeInvalidChromeProps).toBeTypeOf("function");
   });
 
   it("keeps secondary mobile navigation targets at least 44px in both axes", () => {

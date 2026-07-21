@@ -16,7 +16,7 @@ const onionSkin = {
 
 function renderTimeline(
   frameCount: number,
-  options: { locked?: boolean; playhead?: number; track?: StudioAnimKeyframe[] } = {}
+  options: { locked?: boolean; playhead?: number; playing?: boolean; track?: StudioAnimKeyframe[] } = {}
 ): string {
   const track = options.track ?? [];
   return renderToStaticMarkup(
@@ -30,7 +30,7 @@ function renderTimeline(
         locked: options.locked ?? true,
       }]}
       playhead={options.playhead ?? 0}
-      playing={false}
+      playing={options.playing ?? false}
       focusedTrackId="locked-image"
       onionSkin={onionSkin}
       onClose={vi.fn()}
@@ -59,9 +59,20 @@ describe("StudioAnimTimelinePanel motion coach", () => {
     expect(source).toContain('id: "timeline-keyframe-add"');
     expect(source).toContain('id: "timeline-onion-skin"');
     expect(source).toContain('preview: "timeline"');
+    expect(source).toContain('previewVariant: "play"');
+    expect(source).toContain('previewVariant: "pause"');
     expect(source).toContain('preview: "keyframe"');
     expect(source).toContain('preview: "onion-skin"');
     expect(source).not.toContain('title="현재 재생헤드 위치에 이 레이어의 키프레임을 캡처합니다."');
+  });
+
+  it("describes the next playback action when the timeline is already running", () => {
+    const html = renderTimeline(2, { playing: true });
+
+    expect(html).toContain("lucide-pause");
+    expect(html).toContain(">정지</button>");
+    expect(source).toContain('title: "타임라인 정지"');
+    expect(source).toContain("공유 재생헤드를 현재 프레임에 멈춰");
   });
 
   it("keeps rich coach targets constant instead of wrapping every generated grid cell", () => {

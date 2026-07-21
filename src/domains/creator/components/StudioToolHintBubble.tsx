@@ -15,6 +15,7 @@ import {
   planStudioToolHintPosition,
   type StudioToolHintSide,
 } from "../studio-tool-hint-position";
+import { studioToolHintPreviewSpecFromRuntime } from "../studio-tool-hint-preview-kind";
 import { studioToolHintPreview } from "../studio-tool-hint-preview-routing";
 
 import type { StudioToolHintSpec } from "../studio-tool-hints";
@@ -160,6 +161,10 @@ export function StudioToolHintBubble({
     viewportPadding: 10,
   });
   const preview = studioToolHintPreview(hint);
+  const previewSpec = studioToolHintPreviewSpecFromRuntime(
+    preview,
+    hint.previewVariant ?? hint.id
+  );
 
   useEffect(() => {
     if (!richCoachAvailable) return;
@@ -256,13 +261,12 @@ export function StudioToolHintBubble({
             fallback={(
               <StudioToolHintPreviewFallback
                 preview={preview}
-                variant={hint.previewVariant ?? hint.id}
+                variant={previewSpec.variant ?? previewSpec.kind}
               />
             )}
           >
             <LazyStudioToolHintPreview
-              kind={preview}
-              variant={hint.previewVariant ?? hint.id}
+              {...previewSpec}
               reducedMotion={reducedMotion ? true : undefined}
             />
           </Suspense>

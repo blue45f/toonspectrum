@@ -220,6 +220,40 @@ describe("StudioToolHint", () => {
     expect(bubbleHtml).toContain("먼저 편집할 레이어를 선택하세요.");
   });
 
+  it("promotes state and popup relationships when a native disabled control needs a focusable coach", () => {
+    const html = renderToStaticMarkup(
+      <StudioToolHintTarget
+        disabled
+        unavailableReason="선택 영역을 만드는 동안에는 설정을 바꿀 수 없어요."
+        hint={{ id: "locked-lasso", title: "올가미 설정", description: "선택 방식을 바꿉니다." }}
+      >
+        <button
+          type="button"
+          disabled
+          aria-label="올가미 설정"
+          aria-pressed="true"
+          aria-expanded="true"
+          aria-haspopup="dialog"
+          aria-controls="lasso-settings"
+          aria-keyshortcuts="L"
+        >
+          설정
+        </button>
+      </StudioToolHintTarget>
+    );
+
+    expect(html).toContain('role="button"');
+    expect(html).toContain('aria-label="올가미 설정"');
+    expect(html).toContain('aria-disabled="true"');
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain('aria-haspopup="dialog"');
+    expect(html).toContain('aria-controls="lasso-settings"');
+    expect(html).toContain('aria-keyshortcuts="L"');
+    expect(html).toContain('tabindex="0"');
+    expect(html).toContain('aria-hidden="true"');
+  });
+
   it("does not add wrapper keyboard semantics to active controls or no-hint fallbacks", () => {
     const activeHtml = renderToStaticMarkup(
       <StudioToolHintTarget

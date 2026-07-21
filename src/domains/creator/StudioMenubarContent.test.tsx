@@ -8,6 +8,7 @@ import {
   type StudioMenubarContentHandlers,
   type StudioMenubarContentProps,
 } from "./StudioMenubarContent";
+import { StudioToolHintPreferencesProvider } from "./StudioToolHint";
 
 import type { StudioAiProvenanceDocument } from "./studio-ai-provenance";
 import type { StudioCharacterBible } from "./studio-character-bible";
@@ -233,6 +234,27 @@ describe("StudioMenubarContent", () => {
     expect(stableHandlers.changeMobileImmersiveMode).toHaveBeenCalledWith(true);
     expect(stableHandlers.handleSave).toHaveBeenNthCalledWith(1, "draft");
     expect(stableHandlers.handleSave).toHaveBeenNthCalledWith(2, "published");
+  });
+
+  it("switches the mobile immersive coach from entering to exiting", () => {
+    const view = render(
+      <StudioToolHintPreferencesProvider mode="compact" touchHoldDelayMs={640} reduceMotion>
+        <StudioMenubarContent {...createProps({ isMobile: true })} />
+      </StudioToolHintPreferencesProvider>
+    );
+
+    fireEvent.focus(screen.getByRole("button", { name: "전체 화면 드로잉" }));
+    expect(screen.getByRole("tooltip").textContent).toContain("캔버스 작업에 집중");
+
+    view.rerender(
+      <StudioToolHintPreferencesProvider mode="compact" touchHoldDelayMs={640} reduceMotion>
+        <StudioMenubarContent
+          {...createProps({ isMobile: true, mobileImmersive: true })}
+        />
+      </StudioToolHintPreferencesProvider>
+    );
+    fireEvent.focus(screen.getByRole("button", { name: "전체 화면 드로잉 종료" }));
+    expect(screen.getByRole("tooltip").textContent).toContain("일반 작업 화면으로 돌아갑니다");
   });
 
   it("preloads the asset surface before delegating the desktop insert shortcut", () => {

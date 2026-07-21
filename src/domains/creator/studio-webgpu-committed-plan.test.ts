@@ -143,6 +143,7 @@ describe("planStudioWebGpuCommittedSuffix", () => {
     ["malformed symmetry", { symmetry: null }, "symmetry"],
     ["unknown brush", { brush: "future-super-brush" }, "unsupported-brush"],
     ["dynamic brush", { brush: "ink-particle" }, "unsupported-brush"],
+    ["pixel pencil", { brush: "pixel-grid-v1" }, "unsupported-brush"],
     ["unknown pressure model", { pressureModel: "linear-full-v2" }, "unsupported-pressure-model"],
     ["layered paint model", { paintModel: "layered-flow-v1", sampleSpacing: 0 }, "paint-model"],
     ["layered marker paint model", { brush: "marker", paintModel: "layered-flow-v1", sampleSpacing: 0 }, "paint-model"],

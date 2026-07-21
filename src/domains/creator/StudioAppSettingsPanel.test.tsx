@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   defaultStudioAppSettings,
   type StudioAppSettings,
+  type StudioAppSettingsTab,
 } from "./studio-app-settings";
 import {
   MAX_STUDIO_TOOL_HINT_TOUCH_HOLD_MS,
@@ -22,9 +23,13 @@ vi.mock("react-dom", () => ({
 }));
 
 const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const appSettingsPanelSource = readFileSync(
+  new URL("./StudioAppSettingsPanel.tsx", import.meta.url),
+  "utf8"
+);
 
 function renderSettings(
-  initialTab: "general" | "touch" | "toolbar" = "general",
+  initialTab: StudioAppSettingsTab = "general",
   settings: StudioAppSettings = defaultStudioAppSettings()
 ) {
   const body = { nodeName: "BODY" };
@@ -86,11 +91,37 @@ describe("StudioAppSettingsPanel", () => {
 
   it("터치 탭에서 조절 가능한 Motion Coach 길게 누르기 시간을 제공한다", () => {
     const { html } = renderSettings("touch");
+    const range = html.match(
+      /<input(?=[^>]*aria-label="도구 도움말 길게 누르기 시간")[^>]*>/u
+    )?.[0] ?? "";
 
     expect(html).toContain('aria-label="도구 도움말 길게 누르기 시간"');
     expect(html).toContain(`min="${MIN_STUDIO_TOOL_HINT_TOUCH_HOLD_MS}"`);
     expect(html).toContain(`max="${MAX_STUDIO_TOOL_HINT_TOUCH_HOLD_MS}"`);
     expect(html).toContain("480ms");
+    expect(range).toContain("min-h-11");
+    expect(range).toContain("pointer-coarse:min-h-11");
+  });
+
+  it("공용 모달 계약으로 배경 격리·포커스 순환·Escape·복귀를 한 곳에서 관리한다", () => {
+    expect(appSettingsPanelSource).toContain('import { activateStudioModalSheet } from "./useStudioModalSheet";');
+    expect(appSettingsPanelSource).toContain("return activateStudioModalSheet({");
+    expect(appSettingsPanelSource).toContain("root: dialog.ownerDocument.body");
+    expect(appSettingsPanelSource).toContain("onDismiss: dismissModal");
+    expect(appSettingsPanelSource).toContain("tabIndex={-1}");
+    expect(appSettingsPanelSource).not.toContain("const focusable = Array.from(");
+  });
+
+  it("단축키·그리드·초기화 조작도 좁은 화면에서 44px 높이를 유지한다", () => {
+    const shortcuts = renderSettings("shortcuts").html;
+    const grids = renderSettings("grids").html;
+    const other = renderSettings("other").html;
+    const gridSelect = grids.match(/<select\b[^>]*>/u)?.[0] ?? "";
+
+    expect(openingButtonTagByText(shortcuts, "V")).toContain("min-h-11");
+    expect(openingButtonTagByText(shortcuts, "단축키 기본값")).toContain("min-h-11");
+    expect(gridSelect).toContain("min-h-11");
+    expect(openingButtonTagByText(other, "기본값으로 재설정")).toContain("min-h-11");
   });
 
   it("툴바 설정을 검색 가능한 두 개의 독립 스크롤 목록으로 제공한다", () => {

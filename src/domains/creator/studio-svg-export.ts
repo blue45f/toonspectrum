@@ -40,10 +40,18 @@ import {
   type CalligraphyTipSettings,
 } from "./studio-brush";
 import {
+  applyStudioBrushAliasWatercolorMaterial,
+  mapStudioBrushAliasPressure,
+  mapStudioBrushAliasPressureSamples,
+  resolveStudioBrushAliasPencilPasses,
+  resolveStudioBrushAliasWatercolorPlanSettings,
+  studioBrushAliasEffectiveDiameter,
+} from "./studio-brush-alias-profile";
+import {
   normalizeStudioBrushDynamicsSettings,
   planStudioDynamicBrushDabs,
   resolveStudioBrushDynamicsPresetId,
-  studioBrushDynamicsPresetSettings,
+  studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsSeedFromKey,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioDynamicBrushDab,
@@ -111,6 +119,10 @@ import { getKaleidoscopePoints } from "./studio-kaleidoscope";
 import { hasActiveImageFilters, type ImageFilterFields } from "./studio-konva-filter-fields";
 import { isEffectivelyHidden, type LayerGroup } from "./studio-layers";
 import { getPatternDef, normalizePatternSpec, type StudioPatternSpec } from "./studio-pattern-fill";
+import {
+  isStudioPixelPencilRenderMode,
+  planStudioPixelPencilCells,
+} from "./studio-pixel-pencil";
 import { skewDegToKonva, type SkewFields } from "./studio-skew";
 import {
   isStudioStrokePaintModelCompatible,
@@ -770,7 +782,9 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
   const dynamicPlan = dynamicBrushId
     ? (() => {
         const dynamics = normalizeStudioBrushDynamicsSettings(
-          el.brushDynamics ?? studioBrushDynamicsPresetSettings(dynamicBrushId)
+          el.brushDynamics
+            ?? studioBrushDynamicsSettingsForBrushId(el.brush)
+            ?? studioBrushDynamicsSettingsForBrushId(dynamicBrushId)
         );
         const baseDabs = planStudioDynamicBrushDabs({
           points: el.points,
@@ -928,6 +942,21 @@ function serializeStampBrushDabs(
   return `<g data-stamp-brush="${style.kind}">${marks}</g>`;
 }
 
+const STUDIO_PENCIL_DEFAULT_JITTER_RADIUS = 0.75;
+
+function scaledPencilJitterPoints(
+  points: number[],
+  jitterRadius: number
+): number[] {
+  const jittered = processPencilPoints(points);
+  if (jitterRadius === STUDIO_PENCIL_DEFAULT_JITTER_RADIUS) return jittered;
+  const scale = jitterRadius / STUDIO_PENCIL_DEFAULT_JITTER_RADIUS;
+  return jittered.map((value, coordinateIndex) => {
+    const source = points[coordinateIndex];
+    return source === undefined ? value : source + (value - source) * scale;
+  });
+}
+
 /** 자유곡선(브러시별) — 캔버스 렌더 경로와 같은 지오메트리 소스(studio-brush)를 쓴다. */
 function serializeFreehand(
   ctx: ExportCtx,
@@ -946,24 +975,52 @@ function serializeFreehand(
   const dynamicBrush = dynamicsPresetId !== null;
   const stampKind = resolveStudioStampBrushKind(brush);
   const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
+  const aliasStrokeWidth = studioBrushAliasEffectiveDiameter(brush, strokeWidth);
   const singlePointRoute = resolveStudioBrushSinglePointRoute({
     brushId: brush,
     mode: el.mode,
     causalInkEnabled: el.sampleSpacing !== undefined || el.pressureModel !== undefined,
   });
 
+  if (isStudioPixelPencilRenderMode(brush) && el.mode !== "eraser") {
+    const pixelPlan = planStudioPixelPencilCells({ points });
+    if (!pixelPlan.complete) {
+      addSkip(ctx, el, "skipped", "픽셀 펜 셀 예산을 초과해 SVG에서 안전하게 제외했어요.");
+      return "";
+    }
+    const path = pixelPlan.cells
+      .map((cell) => `M${cell.x} ${cell.y}h1v1h-1Z`)
+      .join("");
+    return path
+      ? `<path d="${path}" fill="${escapeXml(stroke)}" shape-rendering="crispEdges"${opacityAttr}/>`
+      : "";
+  }
+
   if (
     points.length === 2 &&
     singlePointRoute === "generic-dot"
   ) {
-    const pressure = resolveStudioInkPressure(el.pressures?.[0], el.pressureModel);
+    const pencilPasses = resolveStudioBrushAliasPencilPasses(brush);
+    if (brushFamily === "pencil" && pencilPasses.length > 0) {
+      const circles = pencilPasses.map((pass) => (
+        `<circle data-pencil-pass="${pass.role}" cx="${fmt(points[0])}" cy="${fmt(points[1])}" r="${fmt(Math.max(0.35, aliasStrokeWidth * pass.widthScale / 2))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(strokeOpacity * pass.opacityScale)}"/>`
+      ));
+      return `<g data-brush-alias="${escapeXml(brush)}">${circles.join("")}</g>`;
+    }
+    const pressure = mapStudioBrushAliasPressure(
+      brush,
+      resolveStudioInkPressure(el.pressures?.[0], el.pressureModel),
+      studioInkFallbackPressure(el.pressureModel)
+    );
     const pressureAware = brushFamily === "pen"
       || brushFamily === "gpen"
       || brushFamily === "calligraphy"
       || brushFamily === "marker";
-    const width = pressureAware ? strokeWidth * (0.3 + pressure * 1.4) : strokeWidth;
+    const width = pressureAware
+      ? aliasStrokeWidth * (0.3 + pressure * 1.4)
+      : aliasStrokeWidth;
     const radius = pressureAware && el.pressureModel !== undefined
-      ? studioInkPressureRadius(strokeWidth, pressure, el.pressureModel)
+      ? studioInkPressureRadius(aliasStrokeWidth, pressure, el.pressureModel)
       : Math.max(0.35, width / 2);
     return `<circle cx="${fmt(points[0])}" cy="${fmt(points[1])}" r="${fmt(radius)}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
   }
@@ -995,7 +1052,9 @@ function serializeFreehand(
 
   if (dynamicBrush && dynamicsPresetId) {
     const tip = dynamics?.tip ?? normalizeStudioBrushDynamicsSettings(
-      el.brushDynamics ?? studioBrushDynamicsPresetSettings(dynamicsPresetId)
+      el.brushDynamics
+        ?? studioBrushDynamicsSettingsForBrushId(brush)
+        ?? studioBrushDynamicsSettingsForBrushId(dynamicsPresetId)
     ).tip;
     const useEllipse = studioBrushTipUsesSolidEllipse(tip);
     if (useEllipse) {
@@ -1025,21 +1084,34 @@ function serializeFreehand(
   }
 
   if (brushFamily === "watercolor") {
-    const dabs = el.watercolorPipeline === "causal-walker-v2"
+    const watercolorSettings = resolveStudioBrushAliasWatercolorPlanSettings(
+      brush,
+      strokeWidth
+    ) ?? { baseWidth: strokeWidth, spacing: Math.max(0.25, strokeWidth * 0.34) };
+    const watercolorPressures = mapStudioBrushAliasPressureSamples(
+      brush,
+      el.pressures,
+      Math.floor(points.length / 2),
+      0.55
+    );
+    const plannedDabs = el.watercolorPipeline === "causal-walker-v2"
       ? planCausalWatercolorBrushDabs({
           points,
-          pressures: el.pressures,
-          baseWidth: strokeWidth,
+          pressures: watercolorPressures,
+          baseWidth: watercolorSettings.baseWidth,
+          spacing: watercolorSettings.spacing,
           seed: watercolorBrushSeedFromKey(el.id),
           maxDabs: DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
         }, true)
       : planWatercolorBrushDabs({
           points: processFreehandPoints(points, renderSampleDistance),
-          pressures: el.pressures,
-          baseWidth: strokeWidth,
+          pressures: watercolorPressures,
+          baseWidth: watercolorSettings.baseWidth,
+          spacing: watercolorSettings.spacing,
           seed: watercolorBrushSeedFromKey(el.id),
           maxDabs: 512,
         });
+    const dabs = applyStudioBrushAliasWatercolorMaterial(brush, plannedDabs);
     if (dabs.length === 0) return "";
     const diffuseId = nextId(ctx, "sw");
     ctx.defs.push(
@@ -1112,11 +1184,16 @@ function serializeFreehand(
     const smoothed = processFreehandPoints(points, renderSampleDistance);
     const segmentCount = Math.floor(smoothed.length / 2);
     const rawPressures = el.pressures ?? [];
-    const sampled = resampleStrokePressures(rawPressures, segmentCount, 0.6);
-    const widths = gpenSegmentWidths(sampled, strokeWidth);
+    const sampled = mapStudioBrushAliasPressureSamples(
+      brush,
+      resampleStrokePressures(rawPressures, segmentCount, 0.6),
+      segmentCount,
+      0.6
+    );
+    const widths = gpenSegmentWidths(sampled, aliasStrokeWidth);
     const segs: string[] = [];
     for (let i = 2; i < smoothed.length; i += 2) {
-      const w = widths[Math.floor(i / 2)] ?? strokeWidth;
+      const w = widths[Math.floor(i / 2)] ?? aliasStrokeWidth;
       segs.push(
         `<path d="M ${fmt(smoothed[i - 2])} ${fmt(smoothed[i - 1])} L ${fmt(smoothed[i])} ${fmt(smoothed[i + 1])}" stroke="${escapeXml(stroke)}" stroke-width="${fmt(w)}" stroke-linecap="round" fill="none"/>`
       );
@@ -1144,8 +1221,15 @@ function serializeFreehand(
       legacyMinDistance: renderSampleDistance,
       legacyTension: 0.2,
     });
-    const jittered = processPencilPoints(renderPath.points);
-    return `<path d="${tensionPathD(jittered, renderPath.tension)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeWidth)}" stroke-linecap="round" stroke-linejoin="round"${opacityAttr}/>`;
+    const configuredPasses = resolveStudioBrushAliasPencilPasses(brush);
+    const passes = configuredPasses.length > 0
+      ? configuredPasses
+      : [{ role: "core" as const, widthScale: 1, opacityScale: 1, jitterRadius: 0.75 }];
+    const paths = passes.map((pass) => {
+      const jittered = scaledPencilJitterPoints(renderPath.points, pass.jitterRadius);
+      return `<path d="${tensionPathD(jittered, renderPath.tension)}" fill="none" stroke="${escapeXml(stroke)}" data-pencil-pass="${pass.role}" stroke-width="${fmt(aliasStrokeWidth * pass.widthScale)}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmtDabOpacity(strokeOpacity * pass.opacityScale)}"/>`;
+    });
+    return `<g data-brush-alias="${escapeXml(brush)}">${paths.join("")}</g>`;
   }
 
   if (brushFamily === "highlighter") {
@@ -1260,10 +1344,15 @@ function serializeFreehand(
   ) {
     const plan = planStudioCausalInk({
       points,
-      pressures: el.pressures,
+      pressures: mapStudioBrushAliasPressureSamples(
+        brush,
+        el.pressures,
+        Math.floor(points.length / 2),
+        studioInkFallbackPressure(el.pressureModel)
+      ),
       pressureModel: el.pressureModel,
       minDistance: el.sampleSpacing ?? 0,
-      size: strokeWidth,
+      size: aliasStrokeWidth,
     });
     const layeredOpacity = isStudioStrokePaintModelCompatible({
       paintModel: el.paintModel,
@@ -1308,8 +1397,13 @@ function serializeFreehand(
   const smoothed = processFreehandPoints(points, renderSampleDistance);
   const pressures = el.pressures;
   if (pressures && pressures.length > 0 && smoothed.length >= 4) {
-    const sampledPressures = resampleStrokePressures(
-      pressures,
+    const sampledPressures = mapStudioBrushAliasPressureSamples(
+      brush,
+      resampleStrokePressures(
+        pressures,
+        Math.floor(smoothed.length / 2),
+        studioInkFallbackPressure(el.pressureModel)
+      ),
       Math.floor(smoothed.length / 2),
       studioInkFallbackPressure(el.pressureModel)
     );
@@ -1320,15 +1414,15 @@ function serializeFreehand(
         el.pressureModel
       );
       const w = el.pressureModel === undefined
-        ? Math.max(0.5, strokeWidth * (0.3 + p * 1.4))
-        : studioInkPressureDiameter(strokeWidth, p, el.pressureModel);
+        ? Math.max(0.5, aliasStrokeWidth * (0.3 + p * 1.4))
+        : studioInkPressureDiameter(aliasStrokeWidth, p, el.pressureModel);
       segs.push(
         `<path d="M ${fmt(smoothed[i - 2])} ${fmt(smoothed[i - 1])} L ${fmt(smoothed[i])} ${fmt(smoothed[i + 1])}" stroke="${escapeXml(stroke)}" stroke-width="${fmt(w)}" stroke-linecap="round" fill="none"/>`
       );
     }
     return `<g${opacityAttr}>${segs.join("")}</g>`;
   }
-  return `<path d="${tensionPathD(smoothed, 0.4)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeWidth)}" stroke-linecap="round" stroke-linejoin="round"${opacityAttr}/>`;
+  return `<path d="${tensionPathD(smoothed, 0.4)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(aliasStrokeWidth)}" stroke-linecap="round" stroke-linejoin="round"${opacityAttr}/>`;
 }
 
 function serializeText(ctx: ExportCtx, el: SvgTextElLike): string {

@@ -68,13 +68,13 @@ describe("studio creative visuals", () => {
 
     expect(hints.map((hint) => hint.preview)).toEqual(Array(7).fill("shape"));
     expect(hints.map((hint) => hint.previewVariant)).toEqual([
-      "shape-picker-line",
-      "shape-picker-rect",
-      "shape-picker-ellipse",
-      "shape-picker-star",
-      "shape-picker-arrow",
-      "shape-picker-triangle",
-      "shape-picker-polygon",
+      "line",
+      "rect",
+      "ellipse",
+      "star",
+      "arrow",
+      "triangle",
+      "polygon",
     ]);
     expect(new Set(hints.map((hint) => hint.description))).toHaveProperty("size", 7);
     expect(new Set(hints.map((hint) => hint.id))).toHaveProperty("size", 7);

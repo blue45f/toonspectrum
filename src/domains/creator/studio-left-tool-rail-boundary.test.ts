@@ -104,16 +104,21 @@ describe("Studio left tool rail module boundary", () => {
     expect(rail.source).toContain("aria-expanded={railMoreOpen}");
     expect(rail.source).toContain("aria-controls={railMoreOpen ? railMoreDialogId : undefined}");
     expect(rail.source).toContain('role="dialog"');
+    expect(rail.source).toContain('aria-modal="false"');
     expect(rail.source).toContain("aria-labelledby={railMoreTitleId}");
     expect(rail.source).toContain("createPortal((");
     expect(rail.source).toContain('className="fixed z-[80]');
     expect(rail.valueImports).toContain("./studio-left-tool-rail-position");
     expect(rail.source).toContain("resolveStudioRailMorePosition({");
+    expect(rail.source).toContain(
+      "availableOnRight < measuredWidth && availableOnLeft >= measuredWidth"
+    );
     expect(rail.source).toContain("top: railMorePosition.top");
     expect(rail.source).toContain("maxHeight: railMorePosition.maxHeight");
     expect(rail.source).toContain('globalThis.visualViewport?.addEventListener("resize", updatePosition)');
     expect(rail.source).toContain('document.addEventListener("pointerdown", handlePointerDown, true)');
     expect(rail.source).toContain('setAppSettingsInitialTab("toolbar")');
+    expect(rail.source).toContain("?.focus({ preventScroll: true })");
     expect(rail.source).toContain("max-h-[min(28rem,calc(100dvh-1rem))]");
     expect(rail.source).toContain('if (event.key !== "Escape") return;');
     expect(rail.source).toContain("closeRailMoreAndRestoreFocus()");

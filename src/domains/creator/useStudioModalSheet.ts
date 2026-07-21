@@ -240,24 +240,47 @@ export function useStudioModalSheet({
 
   useLayoutEffect(() => {
     if (!activeKey) return;
-    const dialog = dialogRef.current;
     const root = rootRef.current;
-    if (!dialog || !root) return;
+    if (!root) return;
     const requestedReturnFocus = resolveReturnFocusFromEffect();
+    const ownerDocument = root.ownerDocument;
+    const returnFocus = canRestoreFocusLater(requestedReturnFocus)
+      ? requestedReturnFocus
+      : canRestoreFocusLater(ownerDocument.activeElement)
+        ? ownerDocument.activeElement
+        : fallbackReturnFocusRef?.current;
+    let activeDialog: HTMLElement | null = null;
+    let deactivate: (() => void) | null = null;
 
-    return activateStudioModalSheet({
-      dialog,
-      document: dialog.ownerDocument,
-      fallbackReturnFocus: fallbackReturnFocusRef?.current,
-      initialFocus: resolveInitialFocusFromEffect(dialog),
-      onDismiss: dismissFromEffect,
-      returnFocus:
-        canRestoreFocusLater(requestedReturnFocus)
-          ? requestedReturnFocus
-          : canRestoreFocusLater(dialog.ownerDocument.activeElement)
-          ? dialog.ownerDocument.activeElement
-          : fallbackReturnFocusRef?.current,
-      root,
-    });
+    const synchronizeDialog = () => {
+      const dialog = dialogRef.current;
+      if (!dialog || dialog === activeDialog) return;
+      deactivate?.();
+      activeDialog = dialog;
+      deactivate = activateStudioModalSheet({
+        dialog,
+        document: dialog.ownerDocument,
+        fallbackReturnFocus: fallbackReturnFocusRef?.current,
+        initialFocus: resolveInitialFocusFromEffect(dialog),
+        onDismiss: dismissFromEffect,
+        returnFocus,
+        root,
+      });
+    };
+
+    synchronizeDialog();
+    // A retryable Suspense boundary can replace a loading shell with the real dialog after this
+    // layout effect. Rebind the modal contract to the new node instead of leaving focus ownership
+    // attached to a detached fallback.
+    const Observer = ownerDocument.defaultView?.MutationObserver ?? globalThis.MutationObserver;
+    const observer = Observer ? new Observer(synchronizeDialog) : null;
+    observer?.observe(root, { childList: true, subtree: true });
+    const frame = ownerDocument.defaultView?.requestAnimationFrame?.(synchronizeDialog);
+
+    return () => {
+      if (frame !== undefined) ownerDocument.defaultView?.cancelAnimationFrame?.(frame);
+      observer?.disconnect();
+      deactivate?.();
+    };
   }, [activeKey, dialogRef, fallbackReturnFocusRef, rootRef]);
 }

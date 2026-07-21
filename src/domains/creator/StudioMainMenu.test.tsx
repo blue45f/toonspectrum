@@ -176,7 +176,7 @@ describe("StudioMainMenu", () => {
     expect(html).toContain("min-w-max shrink-0");
   });
 
-  it("resolves the first and last enabled APG menuitems", () => {
+  it("keeps disabled APG menuitems discoverable at the first and last positions", () => {
     const items = [
       { disabled: true },
       { disabled: false },
@@ -185,11 +185,11 @@ describe("StudioMainMenu", () => {
       { disabled: true },
     ];
 
-    expect(resolveStudioMainMenuItemIndex(items, -1, "first")).toBe(1);
-    expect(resolveStudioMainMenuItemIndex(items, -1, "last")).toBe(3);
+    expect(resolveStudioMainMenuItemIndex(items, -1, "first")).toBe(0);
+    expect(resolveStudioMainMenuItemIndex(items, -1, "last")).toBe(4);
   });
 
-  it("skips disabled menuitems and wraps ArrowUp/ArrowDown roving navigation", () => {
+  it("includes disabled menuitems while wrapping ArrowUp/ArrowDown roving navigation", () => {
     const items = [
       {},
       { disabled: true },
@@ -198,25 +198,25 @@ describe("StudioMainMenu", () => {
       {},
     ];
 
-    expect(resolveStudioMainMenuItemIndex(items, 0, "next")).toBe(2);
-    expect(resolveStudioMainMenuItemIndex(items, 2, "next")).toBe(4);
+    expect(resolveStudioMainMenuItemIndex(items, 0, "next")).toBe(1);
+    expect(resolveStudioMainMenuItemIndex(items, 2, "next")).toBe(3);
     expect(resolveStudioMainMenuItemIndex(items, 4, "next")).toBe(0);
     expect(resolveStudioMainMenuItemIndex(items, 0, "previous")).toBe(4);
-    expect(resolveStudioMainMenuItemIndex(items, 4, "previous")).toBe(2);
+    expect(resolveStudioMainMenuItemIndex(items, 4, "previous")).toBe(3);
   });
 
-  it("recovers from a disabled or missing active item and handles all-disabled menus", () => {
+  it("recovers from a missing active item and traverses all-disabled menus", () => {
     const mixedItems = [{ disabled: true }, {}, { disabled: true }, {}];
 
     expect(resolveStudioMainMenuItemIndex(mixedItems, 0, "next")).toBe(1);
     expect(resolveStudioMainMenuItemIndex(mixedItems, 0, "previous")).toBe(3);
-    expect(resolveStudioMainMenuItemIndex(mixedItems, 99, "next")).toBe(1);
+    expect(resolveStudioMainMenuItemIndex(mixedItems, 99, "next")).toBe(0);
     expect(resolveStudioMainMenuItemIndex(mixedItems, 99, "previous")).toBe(3);
     expect(resolveStudioMainMenuItemIndex(
       [{ disabled: true }, { disabled: true }],
       -1,
       "first",
-    )).toBe(-1);
+    )).toBe(0);
   });
 
   it("does not steal focus back from a control clicked outside an open menu", () => {

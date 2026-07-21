@@ -9,6 +9,7 @@
 
 import { smoothStrokePoints } from "./studio-brush";
 import { isStudioImmediateFreehandCommit } from "./studio-draw-completion";
+import { isStudioPixelPencilRenderMode } from "./studio-pixel-pencil";
 import {
   promoteFreehandQuickShapeOnRelease,
   trimQuickShapeDwellTail,
@@ -77,6 +78,7 @@ export function planStudioDrawPointerRelease(
   if (
     input.quickShape.active
     && stroke.mode !== "eraser"
+    && !isStudioPixelPencilRenderMode(stroke.brush)
     && (stroke.kind ?? "freehand") === "freehand"
   ) {
     const heldRecognitionPoints = input.quickShape.elapsed > 0
@@ -131,6 +133,7 @@ export function planStudioDrawPointerRelease(
   let postCorrectionApplied = false;
   if (
     (stroke.kind ?? "freehand") === "freehand"
+    && !isStudioPixelPencilRenderMode(stroke.brush)
     && input.postCorrection.strength > 0
     && stroke.stampPipeline !== "causal-walker-v2"
     && stroke.watercolorPipeline !== "causal-walker-v2"

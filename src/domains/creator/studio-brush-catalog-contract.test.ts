@@ -7,7 +7,10 @@ import {
   STUDIO_BRUSH_RENDER_FAMILY,
   resolveStudioBrushRenderFamily,
 } from "./studio-brush";
-import { resolveStudioBrushDynamicsPresetId } from "./studio-brush-dynamics";
+import {
+  resolveStudioBrushDynamicsPresetId,
+  studioBrushDynamicsSettingsForBrushId,
+} from "./studio-brush-dynamics";
 import {
   STUDIO_BRUSH_RUNTIME_CONTRACT,
   resolveStudioBrushRuntimeContract,
@@ -82,7 +85,15 @@ describe("35-preset brush catalog contract", () => {
         expect(stampKind, `${preset.id}: undeclared stamp route`).toBeNull();
       }
       if (runtime?.engine === "dynamic-dabs") {
-        expect(dynamicsId, `${preset.id}: dynamics variant drift`).toBe(runtime.engineVariant);
+        expect(
+          studioBrushDynamicsSettingsForBrushId(preset.id),
+          `${preset.id}: missing exact dynamics profile`
+        ).not.toBeNull();
+        if (runtime.distinctness === "unique") {
+          expect(dynamicsId, `${preset.id}: canonical dynamics variant drift`).toBe(
+            runtime.engineVariant
+          );
+        }
       } else {
         expect(dynamicsId, `${preset.id}: undeclared dynamics route`).toBeNull();
       }
@@ -99,11 +110,10 @@ describe("35-preset brush catalog contract", () => {
     }
   });
 
-  it("declares every exact renderer duplicate as a canonical parameter variant", () => {
+  it("declares every renderer alias as a canonical profile or engine variant", () => {
     const contracts = new Map(
       STUDIO_BRUSH_RUNTIME_CONTRACT.map((contract) => [contract.id, contract])
     );
-    const presets = new Map(BRUSH_PRESETS.map((preset) => [preset.id, preset]));
     const canonicalBySignature = new Map<string, string>();
 
     for (const contract of STUDIO_BRUSH_RUNTIME_CONTRACT) {
@@ -122,19 +132,9 @@ describe("35-preset brush catalog contract", () => {
 
       if (contract.distinctness === "unique") {
         expect(contract.canonicalId).toBe(contract.id);
-      } else if (contract.distinctness === "parameter-variant") {
+      } else if (contract.distinctness === "profile-variant") {
         expect(contract.canonicalId).not.toBe(contract.id);
         expect(studioBrushRuntimeExecutionSignature(canonical!)).toBe(signature);
-        const preset = presets.get(contract.id)!;
-        const canonicalPreset = presets.get(contract.canonicalId)!;
-        expect(
-          [preset.defaultWidth, preset.defaultOpacity, preset.defaultColor],
-          `${contract.id}: parameter alias must actually change a catalogue default`
-        ).not.toEqual([
-          canonicalPreset.defaultWidth,
-          canonicalPreset.defaultOpacity,
-          canonicalPreset.defaultColor,
-        ]);
       } else {
         expect(contract.canonicalId).not.toBe(contract.id);
         expect(canonical?.engine).toBe(contract.engine);
@@ -219,8 +219,8 @@ describe("35-preset brush catalog contract", () => {
     }
 
     for (const runtime of STUDIO_BRUSH_RUNTIME_CONTRACT) {
-      if (runtime.distinctness === "parameter-variant") {
-        expect(svgById.get(runtime.id), `${runtime.id}: normalized alias output drift`).toBe(
+      if (runtime.distinctness === "profile-variant") {
+        expect(svgById.get(runtime.id), `${runtime.id}: exact-id profile collapsed`).not.toBe(
           svgById.get(runtime.canonicalId)
         );
       } else if (runtime.distinctness === "engine-variant") {

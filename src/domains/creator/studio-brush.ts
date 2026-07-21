@@ -5,6 +5,8 @@
  * 전부 순수 함수 — StudioPage 캔버스 로직과 단위 테스트가 공유한다.
  */
 
+import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
+
 // 브러시 프리셋 데이터(드로잉 툴바/우측 패널 공용).
 export interface BrushPreset {
   id: string;
@@ -37,10 +39,12 @@ export type StudioBrushRenderFamily =
   | "dry-media"
   | "pencil"
   | "screentone"
-  | "stamp";
+  | "stamp"
+  | "pixel";
 
 /** Map preset id → render family (unknown ids fall back to pen). */
 export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRenderFamily>> = {
+  [STUDIO_PIXEL_PENCIL_RENDER_MODE]: "pixel",
   pen: "pen",
   fineliner: "pen",
   ballpoint: "pen",

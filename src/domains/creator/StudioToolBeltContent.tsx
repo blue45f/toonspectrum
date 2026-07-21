@@ -31,7 +31,6 @@ import {
 } from "lucide-react";
 import { Suspense, memo, type ComponentProps } from "react";
 
-import { CANVAS_W } from "./studio-assets";
 import {
   StudioFloatingToolPopover,
   StudioQuickActionsBar,
@@ -58,15 +57,12 @@ import {
 } from "./studio-tool-belt-lazy-ui";
 import { studioToolHintFromLabel, type StudioToolHintSpec } from "./studio-tool-hints";
 import { studioUiDensityAllows } from "./studio-ui-density";
+import { STUDIO_VIEW_ACTION_HINTS } from "./studio-view-action-hints";
 import {
   STUDIO_VIEW_ZOOM_MAX,
   STUDIO_VIEW_ZOOM_MIN,
-  clampStudioViewZoom,
+  stepStudioViewZoom,
 } from "./studio-view-controls";
-import {
-  StudioColorBlindPreviewToggle,
-  type CvdMode,
-} from "./StudioColorBlindPreview";
 import { LazyStudioColorPopover } from "./StudioLazyColorPopover";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 import { StudioToolHintTarget } from "./StudioToolHint";
@@ -262,7 +258,10 @@ const TOOL_BELT_HINTS = {
   ),
   bubble: studioToolHintFromLabel(
     "말풍선",
-    "말풍선 라이브러리에서 형태를 골라 대사와 함께 캔버스에 배치합니다."
+    "말풍선 라이브러리에서 형태를 골라 대사와 함께 캔버스에 배치합니다.",
+    undefined,
+    "bubble",
+    "open-library",
   ),
   image: studioToolHintFromLabel(
     "이미지 추가",
@@ -310,41 +309,11 @@ const TOOL_BELT_HINTS = {
     undefined,
     "timeline"
   ),
-  zoomOut: studioToolHintFromLabel(
-    "축소",
-    "캔버스 보기를 한 단계 축소해 더 넓은 작업 범위를 확인합니다.",
-    "−",
-    "zoom-view",
-    "zoom-out"
-  ),
-  zoomIn: studioToolHintFromLabel(
-    "확대",
-    "캔버스 보기를 한 단계 확대해 세부 작업을 확인합니다.",
-    "=",
-    "zoom-view",
-    "zoom-in"
-  ),
-  actualSize: studioToolHintFromLabel(
-    "100% 보기",
-    "캔버스 배율을 100%로 되돌려 원본 픽셀 크기로 확인합니다.",
-    "End",
-    "zoom-view",
-    "actual-size"
-  ),
-  fitWidth: studioToolHintFromLabel(
-    "너비에 맞춤",
-    "현재 작업 영역 너비에 맞게 캔버스 배율을 자동 조정합니다.",
-    "Home",
-    "zoom-view",
-    "fit-width"
-  ),
-  resetView: studioToolHintFromLabel(
-    "화면 리셋",
-    "줌, 좌우 반전과 스크롤 위치를 기본 보기 상태로 되돌립니다.",
-    "⇧0",
-    "zoom-view",
-    "reset"
-  ),
+  zoomOut: STUDIO_VIEW_ACTION_HINTS.zoomOut,
+  zoomIn: STUDIO_VIEW_ACTION_HINTS.zoomIn,
+  actualSize: STUDIO_VIEW_ACTION_HINTS.actualSize,
+  fitWidth: STUDIO_VIEW_ACTION_HINTS.fitWidth,
+  resetView: STUDIO_VIEW_ACTION_HINTS.reset,
   workspaceFocus: studioToolHintFromLabel(
     "집중 모드",
     "좌우 속성 패널을 함께 접어 캔버스를 더 넓게 사용합니다.",
@@ -500,6 +469,7 @@ export interface StudioToolBeltContentHandlers {
   enterCanvasOnlyMode: () => void;
   executeSuggestColorPalette: () => Promise<void>;
   executeSuggestDialogueLines: () => Promise<void>;
+  fitCanvasToWidth: () => void;
   handleRenameAsset: (id: string) => Promise<void>;
   insertAiCompositionNote: (text: string) => void;
   insertClip: (clip: StudioClip) => void;
@@ -523,6 +493,7 @@ export interface StudioToolBeltContentHandlers {
   rememberColor: (c: string) => void;
   removeEmeresUnderlays: () => void;
   resetView: () => void;
+  setActualPixelView: () => void;
   saveSelectionAsClip: () => Promise<void>;
   saveSuggestedPaletteToLibrary: (suggestion: PaletteSuggestion) => void;
   setCanvasH: (newH: number | ((prev: number) => number)) => void;
@@ -589,7 +560,6 @@ export interface StudioToolBeltContentProps {
   collaborationDocumentLocked: boolean;
   collaborationLockMessage: () => string;
   color: string;
-  colorBlindPreview: CvdMode;
   commentsOpen: boolean;
   configuredServerAiProviders: { id: import("./studio-server-ai-client").StudioServerAiProvider; label: string; configured: boolean; model: string; }[];
   continuityOpen: boolean;
@@ -676,7 +646,6 @@ export interface StudioToolBeltContentProps {
   setBgSceneGenreFilter: import("react").Dispatch<import("react").SetStateAction<string>>;
   setBgSceneSearchQuery: import("react").Dispatch<import("react").SetStateAction<string>>;
   setColor: import("react").Dispatch<import("react").SetStateAction<string>>;
-  setColorBlindPreview: import("react").Dispatch<import("react").SetStateAction<CvdMode>>;
   setCommentsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setContinuityOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setDialogueBatchOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -757,7 +726,6 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     collaborationDocumentLocked,
     collaborationLockMessage,
     color,
-    colorBlindPreview,
     commentsOpen,
     continuityOpen,
     drawMode,
@@ -782,7 +750,6 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     rightPanelOpen,
     selected,
     setColor,
-    setColorBlindPreview,
     setCommentsOpen,
     setContinuityOpen,
     setDrawMode,
@@ -793,7 +760,6 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     setPoserVrmOpen,
     setReferencePanelOpen,
     setRightPanelOpen,
-    setScale,
     setScrollPreviewOpen,
     setStoryboardGridOpen,
     setTeamPanelOpen,
@@ -808,7 +774,6 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     uiDensityMode,
     visibleLeftPanelOpen,
     visibleRightPanelOpen,
-    wrapRef,
     zoom,
     stableHandlers,
   } = props;
@@ -818,10 +783,12 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     addText,
     ensureRecentColorsLoaded,
     enterCanvasOnlyMode,
+    fitCanvasToWidth,
     onPickImage,
     redo,
     rememberColor,
     resetView,
+    setActualPixelView,
     toggleAdvancedFill,
     toggleFullscreen,
     toggleMaximize,
@@ -1435,7 +1402,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
           >
             <button
               type="button"
-              onClick={() => setZoom((z) => clampStudioViewZoom(z - 0.1))}
+              onClick={() => setZoom((current) => stepStudioViewZoom(current, -1))}
               disabled={zoom <= STUDIO_VIEW_ZOOM_MIN}
               className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
               aria-label="축소"
@@ -1453,7 +1420,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
           >
             <button
               type="button"
-              onClick={() => setZoom((z) => clampStudioViewZoom(z + 0.1))}
+              onClick={() => setZoom((current) => stepStudioViewZoom(current, 1))}
               disabled={zoom >= STUDIO_VIEW_ZOOM_MAX}
               className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
               aria-label="확대"
@@ -1464,10 +1431,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
           <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.actualSize}>
             <button
               type="button"
-              onClick={() => {
-                setScale(1);
-                setZoom(1);
-              }}
+              onClick={setActualPixelView}
               className={cn(toolBtn(false), "h-8 px-1.5 text-[0.62rem] font-semibold")}
             >
               100%
@@ -1476,14 +1440,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
           <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.fitWidth}>
             <button
               type="button"
-              onClick={() => {
-                const wrap = wrapRef.current;
-                if (wrap) {
-                  const w = wrap.clientWidth;
-                  setScale(Math.min(isFullscreen ? 4 : 2.5, Math.max(0.1, w / CANVAS_W)));
-                  setZoom(1);
-                }
-              }}
+              onClick={fitCanvasToWidth}
               className={cn(toolBtn(false), "h-8 px-1.5 text-[0.62rem] font-semibold")}
             >
               맞춤
@@ -1563,7 +1520,6 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
               <Minimize2 size={13} strokeWidth={1.75} aria-hidden /> 캔버스
             </button>
           </StudioToolBeltHintTarget>
-          <StudioColorBlindPreviewToggle value={colorBlindPreview} onChange={setColorBlindPreview} />
         </StudioToolbarCluster>
     </>
   );

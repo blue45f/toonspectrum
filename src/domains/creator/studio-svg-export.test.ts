@@ -8,6 +8,7 @@ import {
 } from "./studio-brush-dynamics";
 import { studioBrushTipAlphaMapToBase64 } from "./studio-brush-tip-stamp";
 import { bubblePathData, doubleBubblePathData } from "./studio-bubble-path";
+import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 import {
   SVG_EXPORT_MIME,
   escapeXml,
@@ -278,6 +279,30 @@ describe("도형 직렬화", () => {
     expect(svg).toContain('stroke-linecap="round"');
   });
 
+  it("픽셀 펜 — 정수 1px 셀과 crispEdges를 보존하고 중복 셀을 합친다", () => {
+    const pixel = rectEl({
+      id: "pixel-1",
+      kind: "freehand",
+      mode: "pen",
+      brush: STUDIO_PIXEL_PENCIL_RENDER_MODE,
+      points: [0.8, 2.2, 3.9, 2.7, 1.1, 2.1],
+      stroke: "#123456",
+      strokeWidth: 1,
+      fill: undefined,
+      opacity: 0.7,
+      pressures: [1, 1, 1],
+    });
+
+    const { svg, skipped } = exportPageToSvg(page([pixel]));
+
+    expect(skipped).toEqual([]);
+    expect(svg).toContain('shape-rendering="crispEdges"');
+    expect(svg).toContain('fill="#123456"');
+    expect(svg).toContain('opacity="0.7"');
+    expect(svg).toContain('d="M0 2h1v1h-1ZM1 2h1v1h-1ZM2 2h1v1h-1ZM3 2h1v1h-1Z"');
+    expect(svg).not.toContain("<circle");
+  });
+
   it("한 점 탭 — 필압 굵기의 원으로 보존한다", () => {
     const dot = rectEl({
       id: "dot-1",
@@ -292,6 +317,49 @@ describe("도형 직렬화", () => {
     expect(svg).toContain('fill="#123456"');
     expect(svg).toContain('r="6.75"');
     expect(skipped).toEqual([]);
+  });
+
+  it("같은 크기에서도 펜·파인라이너·마커 별칭의 실제 탭 지름이 구분된다", () => {
+    const renderTap = (brush: "pen" | "fineliner" | "marker") =>
+      exportPageToSvg(page([rectEl({
+        id: `alias-tap-${brush}`,
+        kind: "freehand",
+        brush,
+        points: [12, 34],
+        pressures: [0.5],
+        stroke: "#123456",
+        strokeWidth: 10,
+        fill: undefined,
+      })])).svg;
+    const radius = (svg: string) => Number(/<circle[^>]* r="([^"]+)"/.exec(svg)?.[1]);
+
+    const penRadius = radius(renderTap("pen"));
+    const finelinerRadius = radius(renderTap("fineliner"));
+    const markerRadius = radius(renderTap("marker"));
+
+    expect(finelinerRadius).toBeLessThan(penRadius);
+    expect(markerRadius).toBeGreaterThan(penRadius);
+  });
+
+  it("소프트 연필은 코어 하나인 연필과 달리 부드러운 하부 패스를 함께 내보낸다", () => {
+    const render = (brush: "pencil" | "soft-pencil") => exportPageToSvg(page([rectEl({
+      id: `alias-pencil-${brush}`,
+      kind: "freehand",
+      brush,
+      points: [0, 0, 10, 10, 20, 4],
+      stroke: "#30241d",
+      strokeWidth: 8,
+      fill: undefined,
+      sampleSpacing: 1,
+    })])).svg;
+
+    const pencil = render("pencil");
+    const softPencil = render("soft-pencil");
+    expect(pencil.match(/data-pencil-pass=/g)).toHaveLength(1);
+    expect(softPencil.match(/data-pencil-pass=/g)).toHaveLength(2);
+    expect(softPencil).toContain('data-pencil-pass="soft-edge"');
+    expect(softPencil).toContain('data-pencil-pass="core"');
+    expect(softPencil).not.toBe(pencil);
   });
 
   it("새 기본 펜 — 라이브/WebGPU와 같은 causal round-dab 시퀀스로 보존한다", () => {
@@ -333,7 +401,7 @@ describe("도형 직렬화", () => {
     const { svg, skipped } = exportPageToSvg(page([marker]));
     const layeredPath = /<path d="([^"]+)" fill="rgba\(171, 51, 68, 0\.4\)" opacity="0\.6"\/>/.exec(svg);
 
-    expect(layeredPath?.[1]).toContain("M -8 0 A 8 8 0 1 0 8 0 A 8 8 0 1 0 -8 0 Z");
+    expect(layeredPath?.[1]).toContain("M -9.28 0 A 9.28 9.28 0 1 0 9.28 0 A 9.28 9.28 0 1 0 -9.28 0 Z");
     expect(layeredPath?.[1].match(/M /g)?.length).toBeGreaterThan(1);
     expect(svg).not.toContain("<circle");
     expect(svg.match(/fill="rgba\(171, 51, 68, 0\.4\)"/g)).toHaveLength(1);
@@ -359,8 +427,8 @@ describe("도형 직렬화", () => {
     });
     const { svg } = exportPageToSvg(page([invalidLayeredSymmetry]));
 
-    expect(svg).toContain('<circle cx="0" cy="0" r="8" fill="#ab3344" opacity="0.6"/>');
-    expect(svg).not.toContain('<path d="M -8 0 A 8 8');
+    expect(svg).toContain('<circle cx="0" cy="0" r="9.28" fill="#ab3344" opacity="0.6"/>');
+    expect(svg).not.toContain('<path d="M -9.28 0 A 9.28 9.28');
   });
 
   it("linear-full-v1 기본 펜 — 압력 0/.5/1을 지름 0/.5x/1x로 내보낸다", () => {

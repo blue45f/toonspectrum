@@ -34,6 +34,10 @@ describe("studio-app-settings", () => {
     expect(d.shortcuts["toggle-chrome"]).toBe("`");
     expect(d.shortcuts["flip-canvas"]).toBe("H");
     expect(STUDIO_RAIL_TOOL_CATALOG.find(({ id }) => id === "hand")?.defaultShortcut).toBe("Space");
+    expect(STUDIO_RAIL_TOOL_CATALOG.find(({ id }) => id === "zoom-fit")).toMatchObject({
+      label: "너비에 맞춤",
+      defaultShortcut: "Home",
+    });
     expect(d.general.toolHintMode).toBe("rich");
     expect(d.touch.toolHintHoldMs).toBe(480);
     expect(d.mouse.wheel).toBe("zoom");

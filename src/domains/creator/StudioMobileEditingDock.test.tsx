@@ -23,8 +23,13 @@ import type { StudioProDrawPrefs } from "./studio-pro-draw-prefs";
 import type { StudioWorkspaceState } from "./studio-workspaces";
 
 interface MockDockButtonProps {
+  readonly "aria-controls"?: string;
+  readonly "aria-expanded"?: boolean;
   readonly "aria-label"?: string;
   readonly disabled?: boolean;
+  readonly hintDescription?: string;
+  readonly hintPreview?: string;
+  readonly hintPreviewVariant?: string;
   readonly label: string;
   readonly onClick?: () => void;
 }
@@ -34,12 +39,27 @@ vi.mock("./studio-chrome-ui", () => ({
     <button type="button" disabled={disabled} onClick={onClick}>{label}</button>
   ),
   StudioDockButton: ({
+    "aria-controls": ariaControls,
+    "aria-expanded": ariaExpanded,
     "aria-label": ariaLabel,
     label,
     disabled,
+    hintDescription,
+    hintPreview,
+    hintPreviewVariant,
     onClick,
   }: MockDockButtonProps) => (
-    <button type="button" aria-label={ariaLabel ?? label} disabled={disabled} onClick={onClick}>
+    <button
+      type="button"
+      aria-controls={ariaControls}
+      aria-expanded={ariaExpanded}
+      aria-label={ariaLabel ?? label}
+      data-hint-description={hintDescription}
+      data-hint-preview={hintPreview}
+      data-hint-preview-variant={hintPreviewVariant}
+      disabled={disabled}
+      onClick={onClick}
+    >
       {label}
     </button>
   ),
@@ -113,6 +133,8 @@ function createProps(
     brushOpacity: 1,
     collaborationDocumentLocked: false,
     color: "#111111",
+    colorBlindPreview: "none",
+    colorVisionSheetRef: { current: null },
     currentBrushSnapshot: {} as StudioBrushSnapshot,
     drawMode: "pen",
     drawShape: "rect",
@@ -136,6 +158,7 @@ function createProps(
     setBrushDynamics: vi.fn(),
     setBrushOpacity: vi.fn(),
     setColor: vi.fn(),
+    setColorBlindPreview: vi.fn(),
     setDrawMode: vi.fn(),
     setDrawShape: vi.fn(),
     setMarqueeIds: vi.fn(),
@@ -258,6 +281,112 @@ describe("StudioMobileEditingDock", () => {
     expect(brushManager.style.bottom).toBe("22px");
     within(brushManager).getByRole("button", { name: "브러시 관리 닫기" }).click();
     expect(stableHandlers.dismissBrushManager).toHaveBeenCalledOnce();
+  });
+
+  it("announces each mobile draw control's next settings-sheet action", () => {
+    const view = render(
+      <StudioMobileEditingDock
+        {...createProps({ isMobile: true, tool: "select", drawMode: "pen" })}
+      />,
+    );
+    const drawingTools = () => within(
+      screen.getByRole("toolbar", { name: "드로잉 도구" }),
+    );
+
+    const inactivePen = drawingTools().getByRole("button", { name: "펜" });
+    expect(inactivePen.getAttribute("data-hint-preview")).toBe("ink");
+    expect(inactivePen.getAttribute("aria-expanded")).toBeNull();
+    expect(inactivePen.getAttribute("aria-controls")).toBeNull();
+
+    const inactiveShape = drawingTools().getByRole("button", { name: "도형" });
+    expect(inactiveShape.getAttribute("data-hint-preview")).toBe("shape");
+    expect(inactiveShape.getAttribute("data-hint-preview-variant")).toBe("rect");
+
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({ isMobile: true, tool: "draw", drawMode: "pen", mobileSheet: null })}
+      />,
+    );
+    const closedPen = drawingTools().getByRole("button", { name: "펜" });
+    expect(closedPen.getAttribute("aria-expanded")).toBe("false");
+    expect(closedPen.getAttribute("aria-controls")).toBe("studio-mobile-draw-settings");
+    expect(closedPen.getAttribute("data-hint-preview")).toBe("draw-settings");
+    expect(closedPen.getAttribute("data-hint-preview-variant")).toBe("expand");
+    expect(closedPen.getAttribute("data-hint-description")).toContain("설정을 열어");
+
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({ isMobile: true, tool: "draw", drawMode: "pen", mobileSheet: "draw" })}
+      />,
+    );
+    const openPen = drawingTools().getByRole("button", { name: "펜" });
+    expect(openPen.getAttribute("aria-expanded")).toBe("true");
+    expect(openPen.getAttribute("data-hint-preview-variant")).toBe("collapse");
+    expect(openPen.getAttribute("data-hint-description")).toContain("설정을 닫고");
+
+    const openBrush = drawingTools().getByRole("button", { name: "브러시 설정 (굵기·색·프리셋)" });
+    expect(openBrush.getAttribute("aria-expanded")).toBe("true");
+    expect(openBrush.getAttribute("aria-controls")).toBe("studio-mobile-draw-settings");
+    expect(openBrush.getAttribute("data-hint-preview-variant")).toBe("collapse");
+
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({ isMobile: true, tool: "draw", drawMode: "shape", mobileSheet: null })}
+      />,
+    );
+    const closedShape = drawingTools().getByRole("button", { name: "도형" });
+    expect(closedShape.getAttribute("aria-expanded")).toBe("false");
+    expect(closedShape.getAttribute("aria-controls")).toBe("studio-mobile-draw-settings");
+    expect(closedShape.getAttribute("data-hint-preview")).toBe("draw-settings");
+    expect(closedShape.getAttribute("data-hint-preview-variant")).toBe("expand");
+
+    const closedBrush = drawingTools().getByRole("button", { name: "브러시 설정 (굵기·색·프리셋)" });
+    expect(closedBrush.getAttribute("aria-expanded")).toBe("false");
+    expect(closedBrush.getAttribute("data-hint-preview-variant")).toBe("expand");
+
+    expect(document.getElementById("studio-mobile-draw-settings")).not.toBeNull();
+  });
+
+  it("exposes all color-vision coaches from the actual mobile dock", () => {
+    const setColorBlindPreview = vi.fn();
+    const setMobileSheet = vi.fn();
+    const view = render(
+      <StudioMobileEditingDock
+        {...createProps({ isMobile: true, setColorBlindPreview, setMobileSheet })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "색각·명암 검수" }));
+    expect(setMobileSheet).toHaveBeenCalledOnce();
+
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          mobileSheet: "color-vision",
+          setColorBlindPreview,
+          setMobileSheet,
+        })}
+      />,
+    );
+    const dialog = screen.getByRole("dialog", { name: "색각 검수" });
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(dialog.getAttribute("data-studio-mobile-sheet")).toBe("true");
+    expect(dialog.getAttribute("data-studio-shortcut-boundary")).toBe("true");
+    expect(dialog.tabIndex).toBe(-1);
+    expect(within(dialog).getAllByRole("radio")).toHaveLength(5);
+
+    fireEvent.click(within(dialog).getByRole("radio", { name: "흑백 명암 미리보기" }));
+    expect(setColorBlindPreview).toHaveBeenCalledWith("grayscale");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "색각 검수 닫기" }));
+    expect(setMobileSheet).toHaveBeenLastCalledWith(null);
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({ isMobile: true, setColorBlindPreview, setMobileSheet })}
+      />,
+    );
+    expect(screen.queryByRole("dialog", { name: "색각 검수" })).toBeNull();
   });
 
   it("cycles draw sheet sizes, clamps keyboard resize at compact, and closes explicitly", () => {

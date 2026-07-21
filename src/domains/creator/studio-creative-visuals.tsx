@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 
 /** Re-export pure kind list for pickers (SSOT: studio-draw-hud). */
 export const STUDIO_DRAW_SHAPE_PICKER_KINDS = DRAW_SHAPE_PICKER_KINDS;
+export type StudioShapePickerKind = (typeof STUDIO_DRAW_SHAPE_PICKER_KINDS)[number]["kind"];
 
 export type StudioShapeKindVisual =
   | "line"
@@ -25,7 +26,7 @@ export type StudioShapeKindVisual =
   | "ellipse";
 
 export type StudioShapePickerItem = {
-  readonly kind: string;
+  readonly kind: StudioShapePickerKind;
   readonly label: string;
   readonly disabled?: boolean;
   readonly unavailableReason?: string;
@@ -68,7 +69,7 @@ export function studioShapePickerHint(item: Pick<StudioShapePickerItem, "kind" |
       SHAPE_PICKER_DESCRIPTION_BY_KIND[item.kind]
       ?? `${item.label} 도형을 선택하고 캔버스에서 드래그해 위치와 크기를 정합니다.`,
     preview: "shape",
-    previewVariant: `shape-picker-${item.kind}`,
+    previewVariant: item.kind,
     tip: SHAPE_PICKER_TIP_BY_KIND[item.kind],
   };
 }

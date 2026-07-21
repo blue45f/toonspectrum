@@ -99,7 +99,9 @@ export function studioCanvasCursorClassName(
     return "cursor-crosshair";
   }
   if (input.tool === "draw") {
-    return input.drawMode === "shape" || input.drawMode === "lasso-fill"
+    return input.drawMode === "shape"
+      || input.drawMode === "lasso-fill"
+      || input.drawMode === "pixel"
       ? "cursor-crosshair"
       : "cursor-none";
   }

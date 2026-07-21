@@ -171,6 +171,7 @@ describe("Studio mobile editing dock module boundary", () => {
     for (const controllerContract of [
       "const drawSheetRef = useRef",
       "const brushManagerSheetRef = useRef",
+      "const colorVisionSheetRef = useRef",
       "const mobileBrushDockButtonRef = useRef",
       "useStudioModalSheet({",
       "function dismissBrushManagerToDraw()",

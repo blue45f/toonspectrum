@@ -651,9 +651,10 @@ const VRM_VIEWPORT_HINTS = {
   },
   turntable: {
     id: "vrm:camera:turntable",
-    title: "턴테이블 회전",
-    description: "카메라가 캐릭터 주위를 자동으로 돌아가며 포즈와 소품 결합을 모든 방향에서 보여줍니다.",
+    title: "턴테이블 회전 시작",
+    description: "다음 클릭으로 카메라가 캐릭터 주위를 자동으로 돌며 포즈와 소품 결합을 모든 방향에서 보여줍니다.",
     preview: "camera-orbit",
+    previewVariant: "start",
     tip: "의상 관통이나 뒤쪽 소품 정렬을 빠르게 점검할 때 사용하세요.",
   },
 } satisfies Record<string, StudioToolHintSpec>;
@@ -2387,6 +2388,16 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const [jointHandleStatus, setJointHandleStatus] = useState("");
   // 뷰포트 오버레이 컨트롤 — 줌/시점초기화/턴테이블/드래그 힌트.
   const [turntable, setTurntable] = useState(false);
+  const turntableHint: StudioToolHintSpec = turntable
+    ? {
+        ...VRM_VIEWPORT_HINTS.turntable,
+        title: "턴테이블 회전 중지",
+        description: "다음 클릭으로 캐릭터 주위를 도는 자동 카메라를 멈추고 현재 시점에서 수동 조작을 이어갑니다.",
+        preview: "camera-orbit",
+        previewVariant: "stop",
+        tip: "필요할 때 같은 버튼으로 현재 시점부터 자동 회전을 다시 시작할 수 있어요.",
+      }
+    : VRM_VIEWPORT_HINTS.turntable;
   const [viewResetNonce, setViewResetNonce] = useState(0);
   const [viewportHinted, setViewportHinted] = useState(false);
   const viewportApiRef = useRef<ViewportApi | null>(null);
@@ -6468,10 +6479,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                           <Maximize2 size={16} aria-hidden />
                         </button>
                       </StudioToolHintTarget>
-                      <StudioToolHintTarget hint={VRM_VIEWPORT_HINTS.turntable} preferredSide="left">
+                      <StudioToolHintTarget hint={turntableHint} preferredSide="left">
                         <button
                           type="button"
-                          aria-label="턴테이블 회전"
+                          aria-label={turntable ? "턴테이블 회전 중지" : "턴테이블 회전 시작"}
                           aria-pressed={turntable}
                           className={cx(VIEWPORT_BTN, turntable && "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent")}
                           onClick={() => {

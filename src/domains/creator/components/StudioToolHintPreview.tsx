@@ -5,7 +5,16 @@ import {
   type SVGProps,
 } from "react";
 
-import type { StudioToolHintPreviewKind } from "../studio-tool-hint-preview-kind";
+import { STUDIO_PALETTES } from "../studio-color-palettes";
+import {
+  STUDIO_COLOR_VISION_COACH_GRAYSCALE_SATURATION,
+  STUDIO_COLOR_VISION_COACH_MATRIX,
+} from "../studio-color-vision-coach";
+
+import type {
+  StudioToolHintPreviewKind,
+  StudioToolHintPreviewSpec,
+} from "../studio-tool-hint-preview-kind";
 
 /**
  * Small, semantic tool demonstrations used by the Studio's rich hints.
@@ -17,11 +26,8 @@ export type { StudioToolHintPreviewKind } from "../studio-tool-hint-preview-kind
 
 export type StudioToolHintPreviewProps = Omit<
   SVGProps<SVGSVGElement>,
-  "children" | "viewBox"
-> & {
-  kind: StudioToolHintPreviewKind;
-  /** Stable action/state identity used to specialize direction within a visual family. */
-  variant?: string;
+  "children" | "viewBox" | "kind"
+> & StudioToolHintPreviewSpec & {
   /** Overrides the operating-system preference. Useful for deterministic tests. */
   reducedMotion?: boolean;
 };
@@ -442,6 +448,40 @@ function ColorPalettePreview({
   animate: boolean;
   variant: string;
 }): ReactElement {
+  const builtInPalette = STUDIO_PALETTES.find((palette) =>
+    previewVariantMatches(variant, `palette-${palette.id}`)
+  );
+  if (builtInPalette) {
+    const swatches = [0, 2, 4, 6, 8, builtInPalette.colors.length - 1]
+      .map((index) => builtInPalette.colors[index])
+      .filter((color): color is string => color !== undefined);
+    return (
+      <g data-preview-operation={`palette-${builtInPalette.id}`}>
+        <rect x="35" y="13" width="146" height="78" rx="10" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeWidth="1.5" />
+        <text x="46" y="29" fill={COLOR.fg} fontSize="9" fontWeight="800">
+          {builtInPalette.label}
+        </text>
+        <g transform="translate(46 36)">
+          <rect width="124" height="30" rx="7" fill={swatches[0]} opacity=".92" />
+          <path d="M0 30 29 9l19 13L67 6l30 24Z" fill={swatches[3]} opacity=".9" />
+          <circle cx="103" cy="11" r="8" fill={swatches[4]} />
+          <path d="M0 30h124" stroke={swatches[5]} strokeWidth="3" />
+        </g>
+        <g transform="translate(46 73)">
+          {swatches.map((color, index) => (
+            <g key={`${color}-${index}`} transform={`translate(${index * 21} 0)`}>
+              <rect width="17" height="11" rx="3" fill={color} stroke={index === 3 ? COLOR.fg : COLOR.lineStrong} strokeWidth={index === 3 ? "1.8" : "1"} />
+              {index === 3 ? (
+                <rect width="17" height="11" rx="3" fill="none" stroke={COLOR.accent} opacity={animate ? ".28" : ".9"}>
+                  {animate ? <animate attributeName="opacity" dur="1.8s" values=".25;1;.25" repeatCount="indefinite" /> : null}
+                </rect>
+              ) : null}
+            </g>
+          ))}
+        </g>
+      </g>
+    );
+  }
   const primaryColor = previewVariantMatches(variant, "primary-color");
   const secondaryColor = previewVariantMatches(variant, "secondary-color");
   const swapColors = previewVariantMatches(variant, "swap-colors");
@@ -1051,9 +1091,58 @@ function TextPreview({ animate, clipId }: { animate: boolean; clipId: string }):
   );
 }
 
-function BubblePreview({ animate }: { animate: boolean }): ReactElement {
+function BubblePreview({ animate, variant }: { animate: boolean; variant: string }): ReactElement {
+  const openLibrary = previewVariantMatches(variant, "open-library");
+  const fitText = previewVariantMatches(variant, "fit-text");
+  if (openLibrary) {
+    return (
+      <g data-preview-operation="bubble-open-library">
+        <rect x="34" y="14" width="148" height="77" rx="9" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeWidth="1.5" />
+        <path d="M45 28h56M45 35h37" stroke={COLOR.fg3} strokeLinecap="round" strokeWidth="2" />
+        {[
+          "M45 49h34c5 0 8 3 8 7v7c0 4-3 7-8 7H63l-8 8 2-8H45c-5 0-8-3-8-7v-7c0-4 3-7 8-7Z",
+          "M98 47h31c7 0 11 5 11 11s-4 11-11 11h-13l-9 9 2-9H98c-7 0-11-5-11-11s4-11 11-11Z",
+          "M148 49h22c6 0 10 4 10 10v3c0 6-4 10-10 10h-8l-7 7 1-7h-8c-6 0-10-4-10-10v-3c0-6 4-10 10-10Z",
+        ].map((path, index) => (
+          <path
+            key={path}
+            d={path}
+            fill={index === 1 ? COLOR.accentSoft : COLOR.card}
+            stroke={index === 1 ? COLOR.accent : COLOR.fg2}
+            strokeWidth={index === 1 ? "2" : "1.4"}
+            opacity={animate && index === 1 ? ".42" : "1"}
+          >
+            {animate && index === 1 ? <animate attributeName="opacity" dur="1.8s" values=".4;1;.4" repeatCount="indefinite" /> : null}
+          </path>
+        ))}
+        <path d="M166 20v15m-7-7 7 7 7-7" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
+      </g>
+    );
+  }
+  if (fitText) {
+    return (
+      <g data-preview-operation="bubble-fit-text">
+        <path
+          d="M48 25h120c8 0 14 6 14 14v35c0 8-6 14-14 14H101L82 99l5-11H48c-8 0-14-6-14-14V39c0-8 6-14 14-14Z"
+          fill={COLOR.canvas}
+          stroke={COLOR.fg3}
+          strokeDasharray="4 3"
+          strokeWidth="1.5"
+          opacity=".42"
+        />
+        <g transform={animate ? undefined : "translate(0 10) scale(1 .78)"}>
+          <path d="M48 25h120c8 0 14 6 14 14v35c0 8-6 14-14 14H101L82 99l5-11H48c-8 0-14-6-14-14V39c0-8 6-14 14-14Z" fill={COLOR.card} stroke={COLOR.accent} strokeWidth="2">
+            {animate ? <animateTransform attributeName="transform" type="translate" dur="2.8s" values="0 0;0 10;0 10;0 0" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
+          </path>
+          {animate ? <animateTransform attributeName="transform" type="scale" additive="sum" dur="2.8s" values="1 1;1 .78;1 .78;1 1" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
+        </g>
+        <path d="M64 43h82M64 54h69M64 65h78" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="2.4" />
+        <path d="M190 31v48m0-48-6 7m6-7 6 7m-6 41-6-7m6 7 6-7" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
+      </g>
+    );
+  }
   return (
-    <>
+    <g data-preview-operation="bubble-add">
       <path
         d="M44 31c0-9 8-16 18-16h87c11 0 19 7 19 16v27c0 9-8 16-19 16H94L76 86l4-12H62c-10 0-18-7-18-16Z"
         fill={COLOR.fg}
@@ -1093,7 +1182,7 @@ function BubblePreview({ animate }: { animate: boolean }): ReactElement {
         ))}
       </g>
       <path d="M177 22v11M171.5 27.5h11" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="2" />
-    </>
+    </g>
   );
 }
 
@@ -1658,71 +1747,144 @@ function SymmetryPreview({
 function ZoomViewPreview({
   animate,
   variant,
+  clipId,
 }: {
   animate: boolean;
   variant: string;
+  clipId: string;
 }): ReactElement {
   const zoomOut = previewVariantMatches(variant, "zoom-out");
   const zoomIn = previewVariantMatches(variant, "zoom-in");
   const actualSize = previewVariantMatches(variant, "actual-size");
-  const fitWidth = previewVariantMatches(variant, "fit-width");
+  // `zoom-fit` is the persisted/rail action identity. Treat it as the exact
+  // fit-width operation when a hint has no authored previewVariant.
+  const fitWidth = previewVariantMatches(variant, "fit-width", "zoom-fit");
   const reset = previewVariantMatches(variant, "reset");
-  const directionalZoom = zoomOut || zoomIn;
-  const startFrame = zoomOut
-    ? { x: 48, y: 18, width: 112, height: 68 }
-    : { x: 63, y: 29, width: 82, height: 47 };
-  const endFrame = zoomOut
-    ? { x: 63, y: 29, width: 82, height: 47 }
-    : { x: 48, y: 18, width: 112, height: 68 };
-  const staticFrame = directionalZoom
-    ? endFrame
-    : { x: 52, y: 20, width: 104, height: 64 };
+
+  if (actualSize) {
+    return (
+      <g data-preview-operation="actual-size">
+        <rect x="31" y="13" width="154" height="78" rx="7" fill={COLOR.card} stroke={COLOR.lineStrong} strokeWidth="1.5" />
+        <rect x="59" y="24" width="98" height="56" rx="4" fill={COLOR.canvas} stroke={COLOR.fg2} strokeWidth="2" />
+        <path d="M59 38h98M59 52h98M59 66h98M73 24v56M87 24v56M101 24v56M115 24v56M129 24v56M143 24v56" stroke={COLOR.line} strokeWidth="1" opacity={animate ? ".15" : ".72"}>
+          {animate ? <animate attributeName="opacity" dur="2.8s" values=".15;.15;.72;.72;.15" keyTimes="0;.28;.48;.78;1" repeatCount="indefinite" /> : null}
+        </path>
+        <path d="m70 69 21-22 17 15 13-11 25 18" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" />
+        <circle cx="80" cy="38" r="5" fill={COLOR.cool} />
+        <rect x="132" y="67" width="52" height="24" rx="8" fill={COLOR.raised} stroke={COLOR.fg} strokeWidth="1.8" />
+        <text x="158" y="83" fill={COLOR.accent} fontSize="11" fontWeight="800" textAnchor="middle">1:1</text>
+        {animate ? (
+          <path d="M42 28h10m-10 0 6-6m-6 6 6 6M174 76h-10m10 0-6-6m6 6-6 6" fill="none" stroke={COLOR.fg2} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
+            <animate attributeName="opacity" dur="2.8s" values=".18;.9;.9;.18" keyTimes="0;.4;.72;1" repeatCount="indefinite" />
+          </path>
+        ) : null}
+      </g>
+    );
+  }
+
+  if (fitWidth) {
+    return (
+      <g data-preview-operation="fit-width">
+        <defs>
+          <clipPath id={clipId}>
+            <rect x="31" y="14" width="154" height="76" rx="7" />
+          </clipPath>
+        </defs>
+        <rect x="31" y="14" width="154" height="76" rx="7" fill={COLOR.card} stroke={COLOR.lineStrong} strokeWidth="1.5" />
+        <g clipPath={`url(#${clipId})`}>
+          <g transform={animate ? undefined : "translate(43 -32.5)"}>
+            {animate ? <animateTransform attributeName="transform" type="translate" dur="2.8s" values="83 19.5;43 -32.5;43 -32.5;83 19.5" keyTimes="0;.4;.74;1" repeatCount="indefinite" /> : null}
+            <g transform={animate ? undefined : "scale(2.6)"}>
+              {animate ? <animateTransform attributeName="transform" type="scale" dur="2.8s" values="1;2.6;2.6;1" keyTimes="0;.4;.74;1" repeatCount="indefinite" /> : null}
+              <rect width="50" height="65" rx="3" fill={COLOR.canvas} stroke={COLOR.accent} strokeWidth="1.5" />
+              <circle cx="13" cy="14" r="5" fill={COLOR.cool} />
+              <path d="M5 54 17 35l10 10 7-8 11 17" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+            </g>
+          </g>
+        </g>
+        <path d="M43 20v64M173 20v64" stroke={COLOR.fg2} strokeDasharray="3 3" strokeWidth="1.5" />
+        <path d="M43 94h130m-130 0 8-6m-8 6 8 6m122-6-8-6m8 6-8 6" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
+      </g>
+    );
+  }
+
+  if (reset) {
+    return (
+      <g data-preview-operation="reset-view">
+        <path d="M108 13v78" stroke={COLOR.cool} strokeDasharray="3 4" strokeWidth="1.2" opacity=".55" />
+        <g transform={animate ? undefined : "rotate(0 108 52)"}>
+          <rect x="55" y="24" width="106" height="58" rx="5" fill={COLOR.canvas} stroke={COLOR.fg2} strokeWidth="2" />
+          <circle cx="79" cy="42" r="6" fill={COLOR.accent} />
+          <path d="m62 73 24-22 17 14 14-11 36 19" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+          {animate ? (
+            <animateTransform attributeName="transform" type="rotate" dur="3s" values="-18 108 52;0 108 52;0 108 52;-18 108 52" keyTimes="0;.42;.74;1" repeatCount="indefinite" />
+          ) : null}
+        </g>
+        <circle cx="166" cy="72" r="18" fill={COLOR.card} stroke={COLOR.fg} strokeWidth="2" />
+        <path d="M156 70a11 11 0 1 1 3 9m-3-9-1-8m1 8 8-2" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.3" />
+        <path d="M40 30v-12h12M164 18h12v12M176 74v12h-12M52 86H40V74" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="2" opacity=".78" />
+      </g>
+    );
+  }
+
+  const zoomScaleValues = zoomOut ? "1;.75;.75;1" : ".75;1;1;.75";
+  const staticScale = zoomOut ? .75 : 1;
   return (
-    <>
-      <rect
-        x={animate ? startFrame.x : staticFrame.x}
-        y={animate ? startFrame.y : staticFrame.y}
-        width={animate ? startFrame.width : staticFrame.width}
-        height={animate ? startFrame.height : staticFrame.height}
-        rx="5"
-        fill={COLOR.canvas}
-        stroke={COLOR.fg2}
-        strokeWidth="2"
-      >
+    <g data-preview-operation={zoomOut ? "zoom-out" : zoomIn ? "zoom-in" : "zoom-view"}>
+      <g transform="translate(104 52)">
+        <g transform={animate ? undefined : `scale(${staticScale})`}>
+          {animate ? <animateTransform attributeName="transform" type="scale" dur="2.8s" values={zoomScaleValues} keyTimes="0;.38;.72;1" repeatCount="indefinite" /> : null}
+          <rect x="-56" y="-34" width="112" height="68" rx="5" fill={COLOR.canvas} stroke={COLOR.fg2} strokeWidth="2" />
+          <path d="M-32 15-13-6 3 8 17-3 39 16" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+          <circle cx="-23" cy="-10" r="6" fill={COLOR.cool} />
+        </g>
+      </g>
+      <circle cx="158" cy="71" r="17" fill={COLOR.card} stroke={COLOR.fg} strokeWidth="2" />
+      <path d={zoomOut ? "M170 83l13 9M151 71h14" : "M170 83l13 9M151 71h14M158 64v14"} stroke={COLOR.fg} strokeLinecap="round" strokeWidth="2.5" />
+      <path d="M42 31V17h14M160 17h14v14M174 73v14h-14M56 87H42V73" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="2" opacity=".75" />
+    </g>
+  );
+}
+
+function ViewHudPreview({ animate, variant }: { animate: boolean; variant: string }): ReactElement {
+  const rotate = previewVariantMatches(variant, "rotate-open", "rotate-close");
+  const close = previewVariantMatches(variant, "zoom-close", "rotate-close");
+  const operation = `${rotate ? "rotate" : "zoom"}-${close ? "close" : "open"}`;
+  const collapsedTransform = "translate(0 27) scale(1 .18)";
+  return (
+    <g data-preview-operation={`view-hud-${operation}`}>
+      <rect x="93" y="81" width="30" height="14" rx="7" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="1.5" />
+      {rotate ? (
+        <path d="M102 88a7 7 0 0 1 12-4m0 0-1-5m1 5-5-1" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" />
+      ) : (
+        <><circle cx="107" cy="87" r="4" fill="none" stroke={COLOR.accent} strokeWidth="1.5" /><path d="m110 90 5 4M104 87h6M107 84v6" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="1.4" /></>
+      )}
+      <path d={close ? "M108 74v-9m0 9-5-5m5 5 5-5" : "M108 65v9m0-9-5 5m5-5 5 5"} fill="none" stroke={COLOR.fg2} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+      <g transform={!animate ? (close ? collapsedTransform : undefined) : undefined} opacity={!animate && close ? ".28" : "1"}>
+        <rect x="42" y="20" width="132" height="39" rx="12" fill={COLOR.card} stroke={COLOR.lineStrong} strokeWidth="1.6" />
+        {[58, 88, 128, 158].map((x, index) => (
+          <rect key={x} x={x - 11} y="28" width={index === 1 ? "38" : "22"} height="22" rx="7" fill={index === 1 ? COLOR.accentSoft : COLOR.canvas} stroke={index === 1 ? COLOR.accent : COLOR.lineStrong} />
+        ))}
+        {rotate ? (
+          <>
+            <path d="M54 40a6 6 0 0 1 10-4m0 0-1-4m1 4-4-1M151 40a6 6 0 0 0 10 4m0 0-1 4m1-4-4 1" fill="none" stroke={COLOR.fg2} strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
+            <text x="107" y="43.5" fill={COLOR.accent} fontSize="8" fontWeight="800" textAnchor="middle">0°</text>
+          </>
+        ) : (
+          <>
+            <path d="M53 39h10M153 39h10m-5-5v10" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="1.7" />
+            <text x="107" y="43.5" fill={COLOR.accent} fontSize="8" fontWeight="800" textAnchor="middle">100%</text>
+          </>
+        )}
         {animate ? (
           <>
-            <animate attributeName="x" dur="2.8s" values={`${startFrame.x};${endFrame.x};${endFrame.x};${startFrame.x}`} keyTimes="0;.38;.72;1" repeatCount="indefinite" />
-            <animate attributeName="y" dur="2.8s" values={`${startFrame.y};${endFrame.y};${endFrame.y};${startFrame.y}`} keyTimes="0;.38;.72;1" repeatCount="indefinite" />
-            <animate attributeName="width" dur="2.8s" values={`${startFrame.width};${endFrame.width};${endFrame.width};${startFrame.width}`} keyTimes="0;.38;.72;1" repeatCount="indefinite" />
-            <animate attributeName="height" dur="2.8s" values={`${startFrame.height};${endFrame.height};${endFrame.height};${startFrame.height}`} keyTimes="0;.38;.72;1" repeatCount="indefinite" />
+            <animateTransform attributeName="transform" type="translate" dur="2.6s" values={close ? "0 0;0 27;0 27;0 0" : "0 27;0 0;0 0;0 27"} keyTimes="0;.4;.76;1" repeatCount="indefinite" />
+            <animateTransform attributeName="transform" type="scale" additive="sum" dur="2.6s" values={close ? "1 1;1 .18;1 .18;1 1" : "1 .18;1 1;1 1;1 .18"} keyTimes="0;.4;.76;1" repeatCount="indefinite" />
+            <animate attributeName="opacity" dur="2.6s" values={close ? "1;.2;.2;1" : ".2;1;1;.2"} keyTimes="0;.4;.76;1" repeatCount="indefinite" />
           </>
         ) : null}
-      </rect>
-      <path d="M72 67 91 46l16 14 14-11 22 19" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
-      <circle cx="81" cy="42" r="6" fill={COLOR.cool} />
-      {actualSize ? (
-        <>
-          <rect x="139" y="58" width="51" height="25" rx="8" fill={COLOR.card} stroke={COLOR.fg} strokeWidth="2" />
-          <text x="164.5" y="75" fill={COLOR.accent} fontSize="12" fontWeight="800" textAnchor="middle">100%</text>
-        </>
-      ) : fitWidth ? (
-        <>
-          <path d="M139 57h48v27h-48Z" fill={COLOR.card} stroke={COLOR.fg} strokeWidth="2" />
-          <path d="M142 70h42m-42 0 8-7m-8 7 8 7m34-7-8-7m8 7-8 7" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
-        </>
-      ) : reset ? (
-        <>
-          <circle cx="160" cy="70" r="18" fill={COLOR.card} stroke={COLOR.fg} strokeWidth="2" />
-          <path d="M150 69a11 11 0 1 1 3 8m-3-8-1-8m1 8 8-2" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.3" />
-        </>
-      ) : (
-        <>
-          <circle cx="158" cy="71" r="17" fill={COLOR.card} stroke={COLOR.fg} strokeWidth="2" />
-          <path d={zoomOut ? "M170 83l13 9M151 71h14" : "M170 83l13 9M151 71h14M158 64v14"} stroke={COLOR.fg} strokeLinecap="round" strokeWidth="2.5" />
-        </>
-      )}
-      <path d="M42 31V17h14M160 17h14v14M174 73v14h-14M56 87H42V73" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="2" opacity=".75" />
-    </>
+      </g>
+    </g>
   );
 }
 
@@ -1776,8 +1938,9 @@ function LayerPreview({ animate }: { animate: boolean }): ReactElement {
   );
 }
 
-function TimelinePreview({ animate }: { animate: boolean }): ReactElement {
-  const playheadX = animate ? 64 : 142;
+function TimelinePreview({ animate, variant }: { animate: boolean; variant: string }): ReactElement {
+  const pause = previewVariantMatches(variant, "pause");
+  const playheadX = animate ? 64 : pause ? 112 : 142;
 
   return (
     <>
@@ -1815,16 +1978,20 @@ function TimelinePreview({ animate }: { animate: boolean }): ReactElement {
             attributeName="transform"
             type="translate"
             dur="3s"
-            values="64 0;142 0;142 0;64 0"
-            keyTimes="0;.58;.76;1"
+            values={pause ? "64 0;112 0;112 0;64 0" : "64 0;142 0;142 0;64 0"}
+            keyTimes={pause ? "0;.3;.82;1" : "0;.58;.76;1"}
             repeatCount="indefinite"
           />
         ) : null}
       </g>
-      <path d="m91 91 10-6v12Z" fill={COLOR.fg} opacity=".9" />
+      {pause ? (
+        <path d="M92 85v12M101 85v12" stroke={COLOR.fg} strokeLinecap="round" strokeWidth="3" />
+      ) : (
+        <path d="m91 91 10-6v12Z" fill={COLOR.fg} opacity=".9" />
+      )}
       <rect x="108" y="87" width="54" height="7" rx="3.5" fill={COLOR.raised} />
-      <rect x="108" y="87" width={animate ? "18" : "42"} height="7" rx="3.5" fill={COLOR.accent}>
-        {animate ? <animate attributeName="width" dur="3s" values="0;54;54;0" keyTimes="0;.58;.76;1" repeatCount="indefinite" /> : null}
+      <rect x="108" y="87" width={animate ? "18" : pause ? "32" : "42"} height="7" rx="3.5" fill={COLOR.accent}>
+        {animate ? <animate attributeName="width" dur="3s" values={pause ? "0;32;32;0" : "0;54;54;0"} keyTimes={pause ? "0;.3;.82;1" : "0;.58;.76;1"} repeatCount="indefinite" /> : null}
       </rect>
     </>
   );
@@ -2994,19 +3161,44 @@ function PerspectivePreview({ animate }: { animate: boolean }): ReactElement {
   );
 }
 
-function RotateViewPreview({ animate }: { animate: boolean }): ReactElement {
+function RotateViewPreview({
+  animate,
+  variant,
+}: {
+  animate: boolean;
+  variant: string;
+}): ReactElement {
+  const rotateLeft = previewVariantMatches(variant, "rotate-left");
+  const rotateRight = previewVariantMatches(variant, "rotate-right");
+  const endRotation = rotateLeft ? -90 : rotateRight ? 90 : 18;
+  const rotationValues = rotateLeft
+    ? "0;-90;-90;0"
+    : rotateRight
+      ? "0;90;90;0"
+      : "-15;18;18;-15";
   return (
-    <>
+    <g data-preview-operation={rotateLeft ? "rotate-left" : rotateRight ? "rotate-right" : "rotate-view"}>
       <g transform="translate(108 52)">
-        <g transform={animate ? undefined : "rotate(18)"}>
+        <g transform={animate ? undefined : `rotate(${endRotation})`}>
           <rect x="-46" y="-28" width="92" height="56" rx="5" fill={COLOR.canvas} stroke={COLOR.fg2} strokeWidth="2" />
           <circle cx="-24" cy="-10" r="7" fill={COLOR.accent} />
           <path d="m-40 20 24-21L1 14l13-11 25 17" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
-          {animate ? <animateTransform attributeName="transform" type="rotate" dur="3s" values="-15;18;18;-15" keyTimes="0;.45;.72;1" repeatCount="indefinite" /> : null}
+          {animate ? <animateTransform attributeName="transform" type="rotate" dur="3s" values={rotationValues} keyTimes="0;.45;.72;1" repeatCount="indefinite" /> : null}
         </g>
       </g>
-      <path d="M51 32a66 66 0 0 1 104-9m0 0-13-1m13 1-4 12M165 72a66 66 0 0 1-104 9m0 0 13 1m-13-1 4-12" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
-    </>
+      <path
+        d={rotateLeft
+          ? "M68 22a62 62 0 0 0-17 69m0 0-2-13m2 13 12-5"
+          : rotateRight
+            ? "M148 22a62 62 0 0 1 17 69m0 0 2-13m-2 13-12-5"
+            : "M51 32a66 66 0 0 1 104-9m0 0-13-1m13 1-4 12M165 72a66 66 0 0 1-104 9m0 0 13 1m-13-1 4-12"}
+        fill="none"
+        stroke={COLOR.accent}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2.2"
+      />
+    </g>
   );
 }
 
@@ -3043,6 +3235,113 @@ function FlipViewPreview({
         </g>
       </g>
       <path d={restore ? "M48 52h38m0 0-9-8m9 8-9 8M168 52h-38m0 0 9-8m-9 8 9 8" : "M86 52H48m0 0 9-8m-9 8 9 8M130 52h38m0 0-9-8m9 8-9 8"} fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
+    </g>
+  );
+}
+
+type ColorVisionPreviewMode =
+  | "original"
+  | "grayscale"
+  | "protanopia"
+  | "deuteranopia"
+  | "tritanopia";
+
+const COLOR_VISION_ORIGINAL = [
+  "oklch(0.72 0.185 42)",
+  "oklch(0.8 0.15 150)",
+  "oklch(0.76 0.13 245)",
+  "oklch(0.84 0.14 90)",
+] as const;
+
+function colorVisionModeFromVariant(variant: string): ColorVisionPreviewMode {
+  if (previewVariantMatches(variant, "grayscale")) return "grayscale";
+  if (previewVariantMatches(variant, "protanopia")) return "protanopia";
+  if (previewVariantMatches(variant, "deuteranopia")) return "deuteranopia";
+  if (previewVariantMatches(variant, "tritanopia")) return "tritanopia";
+  return "original";
+}
+
+function ColorVisionScene({
+  x,
+  palette,
+  filterId,
+}: {
+  x: number;
+  palette: readonly string[];
+  filterId?: string;
+}): ReactElement {
+  return (
+    <g transform={`translate(${x} 18)`} filter={filterId ? `url(#${filterId})` : undefined}>
+      <rect width="68" height="68" rx="7" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeWidth="1.5" />
+      <circle cx="20" cy="20" r="8" fill={palette[0]} />
+      <path d="M9 53 27 34l13 12 9-8 11 15" fill={palette[2]} fillOpacity=".3" stroke={palette[2]} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+      <rect x="8" y="57" width="12" height="5" rx="2" fill={palette[0]} />
+      <rect x="22" y="57" width="12" height="5" rx="2" fill={palette[1]} />
+      <rect x="36" y="57" width="12" height="5" rx="2" fill={palette[2]} />
+      <rect x="50" y="57" width="10" height="5" rx="2" fill={palette[3]} />
+    </g>
+  );
+}
+
+function ColorVisionPreview({
+  animate,
+  variant,
+  filterId,
+}: {
+  animate: boolean;
+  variant: string;
+  filterId: string;
+}): ReactElement {
+  const mode = colorVisionModeFromVariant(variant);
+  const restoreOriginal = mode === "original";
+  const matrixMode = mode === "protanopia" || mode === "deuteranopia" || mode === "tritanopia"
+    ? mode
+    : null;
+  const sourceFilterId = restoreOriginal ? filterId : undefined;
+  const resultFilterId = restoreOriginal ? undefined : filterId;
+  return (
+    <g data-preview-operation={`color-vision-${mode}`}>
+      {sourceFilterId || resultFilterId ? (
+        <defs>
+          <filter id={filterId} colorInterpolationFilters="linearRGB">
+            {mode === "grayscale" || restoreOriginal ? (
+              <feColorMatrix type="saturate" values={STUDIO_COLOR_VISION_COACH_GRAYSCALE_SATURATION} />
+            ) : matrixMode ? (
+              <feColorMatrix type="matrix" values={STUDIO_COLOR_VISION_COACH_MATRIX[matrixMode]} />
+            ) : null}
+          </filter>
+        </defs>
+      ) : null}
+      <ColorVisionScene x={25} palette={COLOR_VISION_ORIGINAL} filterId={sourceFilterId} />
+      <path d="M98 52h19m-6-6 6 6-6 6" fill="none" stroke={COLOR.fg2} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
+        {animate ? <animate attributeName="opacity" dur="2.6s" values=".28;1;1;.28" keyTimes="0;.35;.72;1" repeatCount="indefinite" /> : null}
+      </path>
+      <g opacity={animate ? ".28" : "1"}>
+        <ColorVisionScene x={123} palette={COLOR_VISION_ORIGINAL} filterId={resultFilterId} />
+        {animate ? <animate attributeName="opacity" dur="2.6s" values=".28;.28;1;1;.28" keyTimes="0;.22;.48;.78;1" repeatCount="indefinite" /> : null}
+      </g>
+      <rect x="137" y="8" width="40" height="17" rx="7" fill={COLOR.raised} stroke={mode === "original" ? COLOR.accent : COLOR.fg2} strokeWidth="1.2" />
+      <text x="157" y="19.5" fill={mode === "original" ? COLOR.accent : COLOR.fg2} fontSize="8" fontWeight="800" textAnchor="middle">
+        {mode === "original" ? "ORIGINAL" : mode === "grayscale" ? "VALUE" : `CVD ${mode === "protanopia" ? "P" : mode === "deuteranopia" ? "D" : "T"}`}
+      </text>
+    </g>
+  );
+}
+
+function DismissPreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <g data-preview-operation="dismiss">
+      <rect x="31" y="25" width="154" height="54" rx="14" fill={COLOR.card} stroke={COLOR.lineStrong} strokeWidth="1.5" opacity={animate ? "1" : ".28"}>
+        {animate ? <animate attributeName="opacity" dur="2.5s" values="1;1;.2;.2;1" keyTimes="0;.38;.58;.82;1" repeatCount="indefinite" /> : null}
+      </rect>
+      <path d="M52 52h22M85 52h22M118 52h22" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="5" opacity={animate ? ".82" : ".2"}>
+        {animate ? <animate attributeName="opacity" dur="2.5s" values=".82;.82;.15;.15;.82" keyTimes="0;.38;.58;.82;1" repeatCount="indefinite" /> : null}
+      </path>
+      <circle cx="163" cy="52" r="13" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="1.8" />
+      <path d="m157 46 12 12m0-12-12 12" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="2.4" />
+      <path d="M108 88v-17m0 17-7-7m7 7 7-7" fill="none" stroke={COLOR.fg2} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" opacity={animate ? ".25" : ".85"}>
+        {animate ? <animate attributeName="opacity" dur="2.5s" values=".25;.25;.9;.9;.25" keyTimes="0;.38;.58;.82;1" repeatCount="indefinite" /> : null}
+      </path>
     </g>
   );
 }
@@ -3767,23 +4066,33 @@ function LayerActionPreview({
   action: "visibility" | "lock" | "merge" | "actions";
   variant: string;
 }): ReactElement {
-  const hidden = previewVariantMatches(variant, "hide", "batch-hide", "hide-layer");
-  const shown = previewVariantMatches(variant, "show", "batch-show", "show-layer");
-  const unlocked = previewVariantMatches(variant, "unlock", "batch-unlock", "unlock-layer");
+  const hidden = previewVariantMatches(variant, "hide", "batch-hide");
+  const shown = previewVariantMatches(variant, "show", "batch-show");
+  const batchVisibility = previewVariantMatches(variant, "batch-show", "batch-hide");
+  const unlocked = previewVariantMatches(variant, "unlock", "batch-unlock");
+  const batchLock = previewVariantMatches(variant, "batch-lock", "batch-unlock");
   const flattenVisible = previewVariantMatches(variant, "flatten-visible");
   return (
     <g
       data-preview-operation={
         action === "visibility"
-          ? hidden
-            ? "hide"
-            : shown
-              ? "show"
-              : "visibility"
+          ? batchVisibility
+            ? hidden
+              ? "batch-hide"
+              : "batch-show"
+            : hidden
+              ? "hide"
+              : shown
+                ? "show"
+                : "visibility"
           : action === "lock"
-            ? unlocked
-              ? "unlock"
-              : "lock"
+            ? batchLock
+              ? unlocked
+                ? "batch-unlock"
+                : "batch-lock"
+              : unlocked
+                ? "unlock"
+                : "lock"
             : action === "merge"
               ? flattenVisible
                 ? "flatten-visible"
@@ -3798,35 +4107,55 @@ function LayerActionPreview({
       ))}
       {action === "visibility" ? (
         <>
-          <path d="M160 37c9-9 22-9 31 0-9 9-22 9-31 0Z" fill="none" stroke={COLOR.fg2} strokeWidth="2" />
-          <circle cx="176" cy="37" r="4" fill={COLOR.accent} opacity={hidden ? ".25" : "1"}>
-            {animate ? <animate attributeName="opacity" dur="1.5s" values={hidden ? "1;.12;.12;1" : ".15;1;1;.15"} keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
-          </circle>
-          {hidden ? <path d="m158 25 36 25" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="2.5" /> : null}
+          {(batchVisibility ? [28, 52, 76] : [37]).map((y) => (
+            <g key={y}>
+              <path d={`M160 ${y}c9-9 22-9 31 0-9 9-22 9-31 0Z`} fill="none" stroke={COLOR.fg2} strokeWidth={batchVisibility ? "1.5" : "2"} />
+              <circle cx="176" cy={y} r={batchVisibility ? "3" : "4"} fill={COLOR.accent} opacity={hidden ? ".25" : "1"}>
+                {animate ? <animate attributeName="opacity" dur="1.5s" values={hidden ? "1;.12;.12;1" : ".15;1;1;.15"} keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
+              </circle>
+              {hidden ? <path d={`m158 ${y - 12} 36 25`} stroke={COLOR.accent} strokeLinecap="round" strokeWidth={batchVisibility ? "2" : "2.5"} /> : null}
+            </g>
+          ))}
+          {batchVisibility ? (
+            <g>
+              <rect x="166" y="87" width="26" height="14" rx="6" fill={COLOR.raised} stroke={COLOR.accent} strokeWidth="1.2" />
+              <text x="179" y="97" fill={COLOR.accent} fontSize="8" fontWeight="800" textAnchor="middle">ALL</text>
+            </g>
+          ) : null}
         </>
       ) : null}
       {action === "lock" ? (
-        <g transform="translate(174 52)">
-          <rect x="-12" y="-2" width="24" height="20" rx="4" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />
-          <path
-            d={unlocked ? "M-7-2v-7a7 7 0 0 1 12-5v7" : "M-7-2v-7a7 7 0 0 1 14 0v7"}
-            fill="none"
-            stroke={COLOR.fg}
-            strokeWidth="2"
-          >
-            {animate ? (
-              <animate
-                attributeName="d"
-                dur="2.5s"
-                values={unlocked
-                  ? "M-7-2v-7a7 7 0 0 1 14 0v7;M-7-2v-7a7 7 0 0 1 12-5v7;M-7-2v-7a7 7 0 0 1 12-5v7;M-7-2v-7a7 7 0 0 1 14 0v7"
-                  : "M-7-2v-7a7 7 0 0 1 12-5v7;M-7-2v-7a7 7 0 0 1 14 0v7;M-7-2v-7a7 7 0 0 1 14 0v7;M-7-2v-7a7 7 0 0 1 12-5v7"}
-                keyTimes="0;.42;.72;1"
-                repeatCount="indefinite"
-              />
-            ) : null}
-          </path>
-        </g>
+        <>
+          {(batchLock ? [28, 52, 76] : [52]).map((y) => (
+            <g key={y} transform={`translate(174 ${y})${batchLock ? " scale(.72)" : ""}`}>
+              <rect x="-12" y="-2" width="24" height="20" rx="4" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />
+              <path
+                d={unlocked ? "M-7-2v-7a7 7 0 0 1 12-5v7" : "M-7-2v-7a7 7 0 0 1 14 0v7"}
+                fill="none"
+                stroke={COLOR.fg}
+                strokeWidth="2"
+              >
+                {animate ? (
+                  <animate
+                    attributeName="d"
+                    dur="2.5s"
+                    values={unlocked
+                      ? "M-7-2v-7a7 7 0 0 1 14 0v7;M-7-2v-7a7 7 0 0 1 12-5v7;M-7-2v-7a7 7 0 0 1 12-5v7;M-7-2v-7a7 7 0 0 1 14 0v7"
+                      : "M-7-2v-7a7 7 0 0 1 12-5v7;M-7-2v-7a7 7 0 0 1 14 0v7;M-7-2v-7a7 7 0 0 1 14 0v7;M-7-2v-7a7 7 0 0 1 12-5v7"}
+                    keyTimes="0;.42;.72;1"
+                    repeatCount="indefinite"
+                  />
+                ) : null}
+              </path>
+            </g>
+          ))}
+          {batchLock ? (
+            <g>
+              <rect x="161" y="87" width="26" height="14" rx="6" fill={COLOR.raised} stroke={COLOR.accent} strokeWidth="1.2" />
+              <text x="174" y="97" fill={COLOR.accent} fontSize="8" fontWeight="800" textAnchor="middle">ALL</text>
+            </g>
+          ) : null}
+        </>
       ) : null}
       {action === "actions" ? <g>{[76, 108, 140].map((x, index) => <circle key={x} cx={x} cy="90" r="5" fill={index === 1 ? COLOR.accent : COLOR.fg2}>{animate && index === 1 ? <animate attributeName="r" dur="1.4s" values="4;7;4" repeatCount="indefinite" /> : null}</circle>)}</g> : null}
       {action === "merge" ? (
@@ -3910,6 +4239,20 @@ function LayerSelectionActionPreview({
   );
 }
 
+function ObjectCubeShape({ ghost = false }: { ghost?: boolean }): ReactElement {
+  return (
+    <g
+      data-preview-object={ghost ? "ghost" : "live"}
+      opacity={ghost ? ".24" : "1"}
+      strokeDasharray={ghost ? "4 3" : undefined}
+    >
+      <path d="m108 25 35 18-35 18-35-18Z" fill={ghost ? "none" : COLOR.accentSoft} stroke={ghost ? COLOR.fg3 : COLOR.accent} strokeLinejoin="round" strokeWidth="2" />
+      <path d="m73 43 35 18 35-18v34l-35 18-35-18Z" fill={ghost ? "none" : COLOR.canvas} stroke={ghost ? COLOR.fg3 : COLOR.fg2} strokeLinejoin="round" strokeWidth="2" />
+      <path d="M108 61v34" fill="none" stroke={ghost ? COLOR.fg3 : COLOR.lineStrong} strokeWidth="1.4" />
+    </g>
+  );
+}
+
 function ObjectTransformActionPreview({
   animate,
   action,
@@ -3920,39 +4263,124 @@ function ObjectTransformActionPreview({
   variant: string;
 }): ReactElement {
   const originGround = previewVariantMatches(variant, "origin-ground");
+  if (originGround) {
+    return (
+      <g data-preview-operation="origin-ground">
+        <ObjectCubeShape />
+        <path
+          d="m43 91 65-18 65 18-65 13Z"
+          data-preview-ground-plane="live"
+          fill={COLOR.accentSoft}
+          fillOpacity={animate ? ".12" : ".58"}
+          stroke={COLOR.accent}
+          strokeLinejoin="round"
+          strokeWidth="1.5"
+        >
+          {animate ? (
+            <animate
+              attributeName="fill-opacity"
+              dur="2.7s"
+              values=".12;.12;.58;.58;.12"
+              keyTimes="0;.36;.5;.78;1"
+              repeatCount="indefinite"
+            />
+          ) : null}
+        </path>
+        <path d="M43 91h130" stroke={COLOR.accent} strokeDasharray="5 4" strokeWidth="2" />
+        <g data-preview-object-origin="ghost" opacity=".42">
+          <path d="M108 48v26M95 61h26M99 70l18-18" stroke={COLOR.fg3} strokeDasharray="3 2" strokeLinecap="round" strokeWidth="1.5" />
+          <circle cx="108" cy="61" r="5" fill={COLOR.canvas} stroke={COLOR.fg3} strokeWidth="1.5" />
+        </g>
+        <path
+          d="M108 66v20"
+          data-preview-origin-guide="ground"
+          stroke={COLOR.cool}
+          strokeDasharray="3 3"
+          strokeWidth="1.5"
+        >
+          {animate ? (
+            <animate attributeName="stroke-dashoffset" dur=".7s" values="0;-12" repeatCount="indefinite" />
+          ) : null}
+        </path>
+        <g transform={animate ? undefined : "translate(0 30)"} data-preview-object-origin="live">
+          <path d="M108 48v26M95 61h26M99 70l18-18" stroke={COLOR.cool} strokeLinecap="round" strokeWidth="2" />
+          <path d="m108 48-4 7h8ZM121 61l-7-4v8ZM117 52l-8 2 6 5Z" fill={COLOR.cool} />
+          <circle cx="108" cy="61" r="5" fill={COLOR.canvas} stroke={COLOR.cool} strokeWidth="2" />
+          {animate ? <animateTransform attributeName="transform" type="translate" dur="2.7s" values="0 0;0 30;0 30;0 0" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
+        </g>
+      </g>
+    );
+  }
+
+  const liveObject = action === "translate" ? (
+    <g transform={animate ? undefined : "translate(18 -9)"} data-preview-object-transform="translate">
+      <ObjectCubeShape />
+      {animate ? <animateTransform attributeName="transform" type="translate" dur="2.7s" values="0 0;18 -9;18 -9;0 0" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
+    </g>
+  ) : action === "rotate" ? (
+    <g transform="translate(108 60)" data-preview-object-transform="rotate">
+      <g transform={animate ? undefined : "rotate(28)"}>
+        <g transform="translate(-108 -60)"><ObjectCubeShape /></g>
+        {animate ? <animateTransform attributeName="transform" type="rotate" dur="2.7s" values="0;28;28;0" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
+      </g>
+    </g>
+  ) : action === "scale" ? (
+    <g transform="translate(108 60)" data-preview-object-transform="scale">
+      <g transform={animate ? undefined : "scale(1.18)"}>
+        <g transform="translate(-108 -60)"><ObjectCubeShape /></g>
+        {animate ? <animateTransform attributeName="transform" type="scale" dur="2.7s" values=".86;1.18;1.18;.86" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
+      </g>
+    </g>
+  ) : (
+    <g transform={animate ? undefined : "translate(0 0)"} data-preview-object-transform="ground">
+      <ObjectCubeShape />
+      {animate ? <animateTransform attributeName="transform" type="translate" dur="2.7s" values="0 -18;0 0;0 0;0 -18" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
+    </g>
+  );
+
   return (
-    <>
-      <path d="m108 25 35 18-35 18-35-18Z" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeLinejoin="round" strokeWidth="2" />
-      <path d="m73 43 35 18 35-18v34l-35 18-35-18Z" fill={COLOR.canvas} stroke={COLOR.fg2} strokeLinejoin="round" strokeWidth="2" />
-      {action === "translate" ? <g transform={animate ? undefined : "translate(18 -9)"}><path d="M108 20V6m0 0-5 7m5-7 5 7M148 48h18m0 0-7-5m7 5-7 5" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />{animate ? <animateTransform attributeName="transform" type="translate" dur="2.7s" values="0 0;18 -9;18 -9;0 0" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}</g> : null}
-      {action === "rotate" ? <path d="M61 52a51 30 0 0 0 96 0m0 0-11 3m11-3-4-10" fill="none" stroke={COLOR.accent} strokeDasharray={animate ? "150" : undefined} strokeDashoffset={animate ? "150" : undefined} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5">{animate ? <animate attributeName="stroke-dashoffset" dur="2.5s" values="150;0;0" keyTimes="0;.7;1" repeatCount="indefinite" /> : null}</path> : null}
-      {action === "scale" ? <g transform={animate ? undefined : "translate(15 -10) scale(1.12)"}><path d="M65 31 51 17m0 0 11 2m-11-2 2 11M151 75l14 14m0 0-11-2m11 2-2-11" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />{animate ? <animateTransform attributeName="transform" type="scale" dur="2.7s" values=".88;1.12;1.12;.88" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}</g> : null}
-      {action === "ground" ? <><path d="M43 91h130" stroke={COLOR.accent} strokeDasharray="5 4" strokeWidth="2" />{originGround ? <><path d="M108 80v22M97 91h22" stroke={COLOR.cool} strokeLinecap="round" strokeWidth="2" /><circle cx="108" cy="91" r="5" fill={COLOR.canvas} stroke={COLOR.cool} strokeWidth="2">{animate ? <animate attributeName="r" dur="1.4s" values="3;7;3" repeatCount="indefinite" /> : null}</circle></> : <g transform={animate ? undefined : "translate(0 0)"}><path d="M164 54v25m0 0-7-8m7 8 7-8" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />{animate ? <animateTransform attributeName="transform" type="translate" dur="2.7s" values="0 -18;0 0;0 0;0 -18" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}</g>}</> : null}
-    </>
+    <g data-preview-operation={`object-${action}`}>
+      <ObjectCubeShape ghost />
+      {liveObject}
+      {action === "translate" ? <path d="M108 20V6m0 0-5 7m5-7 5 7M148 48h18m0 0-7-5m7 5-7 5" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" /> : null}
+      {action === "rotate" ? <path d="M61 52a51 30 0 0 0 96 0m0 0-11 3m11-3-4-10" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" /> : null}
+      {action === "scale" ? <path d="M65 31 51 17m0 0 11 2m-11-2 2 11M151 75l14 14m0 0-11-2m11 2-2-11" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" /> : null}
+      {action === "ground" ? <><path d="M43 91h130" stroke={COLOR.accent} strokeDasharray="5 4" strokeWidth="2" /><path d="M164 54v25m0 0-7-8m7 8 7-8" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" /></> : null}
+    </g>
   );
 }
 
-function ObjectSnapPreview({ animate }: { animate: boolean }): ReactElement {
+function ObjectSnapPreview({ animate, variant }: { animate: boolean; variant: string }): ReactElement {
+  const disable = previewVariantMatches(variant, "disable");
   return (
-    <g data-preview-operation="object-snap">
-      {[48, 78, 108, 138, 168].map((x) => <path key={`x-${x}`} d={`M${x} 15v74`} stroke={x === 108 ? COLOR.cool : COLOR.lineStrong} strokeWidth={x === 108 ? "1.4" : "1"} opacity={x === 108 ? ".7" : ".45"} />)}
-      {[22, 52, 82].map((y) => <path key={`y-${y}`} d={`M34 ${y}h148`} stroke={y === 52 ? COLOR.cool : COLOR.lineStrong} strokeWidth={y === 52 ? "1.4" : "1"} opacity={y === 52 ? ".7" : ".45"} />)}
+    <g data-preview-operation={disable ? "object-snap-disable" : "object-snap-enable"}>
+      {[48, 78, 108, 138, 168].map((x) => <path key={`x-${x}`} d={`M${x} 15v74`} stroke={x === 108 ? COLOR.cool : COLOR.lineStrong} strokeWidth={x === 108 ? "1.4" : "1"} opacity={disable ? ".2" : x === 108 ? ".7" : ".45"} />)}
+      {[22, 52, 82].map((y) => <path key={`y-${y}`} d={`M34 ${y}h148`} stroke={y === 52 ? COLOR.cool : COLOR.lineStrong} strokeWidth={y === 52 ? "1.4" : "1"} opacity={disable ? ".2" : y === 52 ? ".7" : ".45"} />)}
       <rect x="58" y="27" width="42" height="30" rx="5" fill="none" stroke={COLOR.fg3} strokeDasharray="4 3" strokeWidth="1.5" opacity=".56" />
-      <g transform={animate ? undefined : "translate(0 0)"}>
+      <g transform={animate ? undefined : disable ? "translate(29 -10)" : "translate(0 0)"}>
         <rect x="87" y="37" width="42" height="30" rx="5" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />
         <circle cx="108" cy="52" r="4" fill={COLOR.accent} stroke={COLOR.canvas} strokeWidth="1.5" />
-        {animate ? <animateTransform attributeName="transform" type="translate" dur="2.8s" values="-29 -10;0 0;0 0;-29 -10" keyTimes="0;.42;.74;1" repeatCount="indefinite" /> : null}
+        {animate ? <animateTransform attributeName="transform" type="translate" dur="2.8s" values={disable ? "0 0;29 -10;29 -10;0 0" : "-29 -10;0 0;0 0;-29 -10"} keyTimes="0;.42;.74;1" repeatCount="indefinite" /> : null}
       </g>
-      <circle cx="108" cy="52" r={animate ? "4" : "9"} fill="none" stroke={COLOR.cool} strokeWidth="2" opacity={animate ? ".9" : ".78"}>
+      <circle cx="108" cy="52" r={animate ? "4" : disable ? "5" : "9"} fill="none" stroke={disable ? COLOR.fg3 : COLOR.cool} strokeWidth="2" opacity={animate ? ".9" : disable ? ".3" : ".78"}>
         {animate ? (
           <>
             <animate attributeName="r" dur="2.8s" values="3;3;13;3" keyTimes="0;.4;.56;1" repeatCount="indefinite" />
-            <animate attributeName="opacity" dur="2.8s" values="0;0;1;0" keyTimes="0;.38;.48;1" repeatCount="indefinite" />
+            <animate attributeName="opacity" dur="2.8s" values={disable ? "1;1;.12;1" : "0;0;1;0"} keyTimes="0;.38;.56;1" repeatCount="indefinite" />
           </>
         ) : null}
       </circle>
-      <path d="M138 67h28m0 0-8-6m8 6-8 6" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.3" />
-      <path d="M102 46h12M108 40v24" stroke={COLOR.fg} strokeLinecap="round" strokeWidth="1.2" opacity=".7" />
+      <path d={disable ? "M166 37h-28m0 0 8-6m-8 6 8 6" : "M138 67h28m0 0-8-6m8 6-8 6"} fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.3" />
+      <path d={disable ? "M101 45l14 14m0-14-14 14" : "M102 46h12M108 40v24"} stroke={disable ? COLOR.accent : COLOR.fg} strokeLinecap="round" strokeWidth={disable ? "2" : "1.2"} opacity=".8" />
+    </g>
+  );
+}
+
+function CameraSceneShape({ ghost = false }: { ghost?: boolean }): ReactElement {
+  return (
+    <g data-preview-camera-scene={ghost ? "ghost" : "live"} opacity={ghost ? ".22" : "1"}>
+      <circle cx="108" cy="52" r="25" fill={ghost ? "none" : COLOR.accentSoft} stroke={ghost ? COLOR.fg3 : COLOR.accent} strokeDasharray={ghost ? "4 3" : undefined} strokeWidth="2" />
+      <path d="M98 72v-16h20v16M101 56v-12h14v12M108 44V33" fill="none" stroke={ghost ? COLOR.fg3 : COLOR.fg2} strokeLinejoin="round" strokeWidth="2" />
     </g>
   );
 }
@@ -3968,34 +4396,189 @@ function CameraActionPreview({
 }): ReactElement {
   const zoomOut = previewVariantMatches(variant, "zoom-out");
   const focusSelection = previewVariantMatches(variant, "focus-selection");
+  const stopOrbit = action === "orbit" && previewVariantMatches(variant, "stop");
   if (action === "quad") {
+    const closeQuad = previewVariantMatches(variant, "close");
+    const panes = [
+      { x: 48, y: 19, label: "정", scene: "M58 43h36M76 27v20M64 35h24" },
+      { x: 109, y: 19, label: "측", scene: "M122 44h30l-8-11h-14Z" },
+      { x: 48, y: 55, label: "상", scene: "M61 77h30V62H61Zm8-15v15m14-15v15" },
+      { x: 109, y: 55, label: "원", scene: "m118 78 12-14 9 8 8-7 9 13" },
+    ] as const;
     return (
-      <>
-        {[0, 1, 2, 3].map((index) => <rect key={index} x={48 + (index % 2) * 61} y={19 + Math.floor(index / 2) * 36} width="56" height="31" rx="4" fill={index === 0 ? COLOR.accentSoft : COLOR.canvas} stroke={index === 0 ? COLOR.accent : COLOR.lineStrong} />)}
-        <circle cx={animate ? "76" : "137"} cy={animate ? "35" : "71"} r="5" fill={COLOR.accent}>{animate ? <><animate attributeName="cx" dur="2.8s" values="76;137;137;76" keyTimes="0;.45;.72;1" repeatCount="indefinite" /><animate attributeName="cy" dur="2.8s" values="35;71;71;35" keyTimes="0;.45;.72;1" repeatCount="indefinite" /></> : null}</circle>
-      </>
+      <g data-preview-operation={closeQuad ? "quad-view-close" : "quad-view-open"}>
+        {animate || closeQuad ? (
+          <rect
+            x={animate ? (closeQuad ? "48" : "36") : "36"}
+            y={animate ? (closeQuad ? "19" : "13") : "13"}
+            width={animate ? (closeQuad ? "56" : "144") : "144"}
+            height={animate ? (closeQuad ? "31" : "78") : "78"}
+            rx="5"
+            data-preview-camera-layout={closeQuad ? "quad-to-single" : "single-to-quad"}
+            fill={COLOR.accentSoft}
+            stroke={COLOR.accent}
+            strokeWidth="1.8"
+          >
+            {animate ? (
+              <>
+                <animate attributeName="x" dur="2.8s" values={closeQuad ? "48;36;36;48" : "36;48;48;36"} keyTimes="0;.42;.76;1" repeatCount="indefinite" />
+                <animate attributeName="y" dur="2.8s" values={closeQuad ? "19;13;13;19" : "13;19;19;13"} keyTimes="0;.42;.76;1" repeatCount="indefinite" />
+                <animate attributeName="width" dur="2.8s" values={closeQuad ? "56;144;144;56" : "144;56;56;144"} keyTimes="0;.42;.76;1" repeatCount="indefinite" />
+                <animate attributeName="height" dur="2.8s" values={closeQuad ? "31;78;78;31" : "78;31;31;78"} keyTimes="0;.42;.76;1" repeatCount="indefinite" />
+              </>
+            ) : null}
+          </rect>
+        ) : null}
+        <g
+          data-preview-camera-layout="quad"
+          opacity={animate ? (closeQuad ? "1" : ".08") : closeQuad ? "0" : "1"}
+        >
+          {animate ? (
+            <animate
+              attributeName="opacity"
+              dur="2.8s"
+              values={closeQuad ? "1;1;.08;.08;1" : ".08;.08;1;1;.08"}
+              keyTimes="0;.34;.5;.76;1"
+              repeatCount="indefinite"
+            />
+          ) : null}
+          {panes.map((pane, index) => (
+            <g key={pane.label} data-preview-quad-pane={pane.label}>
+              <rect
+                x={pane.x}
+                y={pane.y}
+                width="56"
+                height="31"
+                rx="4"
+                fill={index === 0 ? COLOR.accentSoft : COLOR.canvas}
+                stroke={index === 0 ? COLOR.accent : COLOR.lineStrong}
+                strokeWidth="1.4"
+              />
+              <path d={pane.scene} fill="none" stroke={index === 0 ? COLOR.accent : COLOR.fg2} strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" />
+              <text x={pane.x + 5} y={pane.y + 9} fill={COLOR.fg3} fontSize="6.5" fontWeight="800">{pane.label}</text>
+            </g>
+          ))}
+          <path d="M106.5 19v67M48 52.5h117" stroke={COLOR.cool} strokeWidth="1.5" />
+        </g>
+        {closeQuad ? (
+          <g opacity={animate ? ".08" : "1"}>
+            <circle cx="78" cy="38" r="8" fill={COLOR.cool} />
+            <path d="m49 78 31-25 22 17 19-14 45 22" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+            {animate ? <animate attributeName="opacity" dur="2.8s" values=".08;1;1;.08" keyTimes="0;.48;.76;1" repeatCount="indefinite" /> : null}
+          </g>
+        ) : null}
+      </g>
     );
   }
+
+  if (action === "zoom") {
+    const operation = focusSelection ? "focus-selection" : zoomOut ? "zoom-out" : "zoom-in";
+    const scaleValues = focusSelection
+      ? ".76;1.32;1.32;.76"
+      : zoomOut
+        ? "1.25;.72;.72;1.25"
+        : ".76;1.28;1.28;.76";
+    const staticScale = focusSelection ? 1.32 : zoomOut ? .72 : 1.28;
+    return (
+      <g data-preview-operation={operation}>
+        <CameraSceneShape ghost />
+        <g transform={focusSelection && !animate ? "translate(0 0)" : undefined}>
+          {focusSelection && animate ? <animateTransform attributeName="transform" type="translate" dur="2.7s" values="18 8;0 0;0 0;18 8" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
+          <g transform="translate(108 52)" data-preview-camera-transform={operation}>
+            <g transform={animate ? undefined : `scale(${staticScale})`}>
+              <g transform="translate(-108 -52)"><CameraSceneShape /></g>
+              {animate ? <animateTransform attributeName="transform" type="scale" dur="2.7s" values={scaleValues} keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
+            </g>
+          </g>
+        </g>
+        {focusSelection ? (
+          <g opacity={animate ? ".35" : "1"}>
+            <rect x="93" y="31" width="30" height="44" rx="4" fill="none" stroke={COLOR.cool} strokeDasharray="4 3" strokeWidth="2" />
+            <path d="M88 52h8m24 0h8M108 26v8m0 36v8" stroke={COLOR.cool} strokeLinecap="round" strokeWidth="2" />
+            {animate ? <animate attributeName="opacity" dur="2.7s" values=".25;1;1;.25" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
+          </g>
+        ) : null}
+        <circle cx="160" cy="75" r="14" fill={COLOR.card} stroke={COLOR.fg} strokeWidth="2" />
+        {focusSelection ? (
+          <><circle cx="160" cy="75" r="6" fill="none" stroke={COLOR.accent} strokeWidth="2" /><path d="M160 64v5M160 81v5M149 75h5M166 75h5" stroke={COLOR.fg} strokeLinecap="round" strokeWidth="2" /></>
+        ) : (
+          <path d={zoomOut ? "M154 75h12" : "M154 75h12M160 69v12"} stroke={COLOR.fg} strokeLinecap="round" strokeWidth="2.3" />
+        )}
+        <path d="M170 85l10 10" stroke={COLOR.fg} strokeLinecap="round" strokeWidth="2.3" />
+      </g>
+    );
+  }
+
+  if (action === "reset") {
+    return (
+      <g data-preview-operation="camera-reset">
+        <g transform="translate(108 52)">
+          <g transform={animate ? undefined : "scale(1)"}>
+            <g transform="translate(-108 -52)"><CameraSceneShape /></g>
+            {animate ? <animateTransform attributeName="transform" type="scale" dur="2.8s" values="1.22;1;1;1.22" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
+          </g>
+        </g>
+        <path d="M72 38a42 42 0 1 1-1 31m1-31-13 1m13-1-5-12" fill="none" stroke={COLOR.accent} strokeDasharray={animate ? "190" : undefined} strokeDashoffset={animate ? "190" : undefined} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5">{animate ? <animate attributeName="stroke-dashoffset" dur="2.8s" values="190;0;0" keyTimes="0;.72;1" repeatCount="indefinite" /> : null}</path>
+      </g>
+    );
+  }
+
   return (
-    <>
-      <circle cx="108" cy="52" r="25" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />
-      <path d="M98 72v-16h20v16M101 56v-12h14v12M108 44V33" fill="none" stroke={COLOR.fg2} strokeLinejoin="round" strokeWidth="2" />
-      {action === "zoom" ? <g transform={animate ? undefined : zoomOut ? "translate(0 0)" : "translate(-22 -13)"} data-preview-operation={focusSelection ? "focus-selection" : zoomOut ? "zoom-out" : "zoom-in"}><circle cx="142" cy="68" r="15" fill={COLOR.card} stroke={COLOR.fg} strokeWidth="2" />{focusSelection ? <><circle cx="142" cy="68" r="7" fill="none" stroke={COLOR.accent} strokeWidth="2" /><path d="M142 55v6M142 75v6M129 68h6M149 68h6" stroke={COLOR.fg} strokeLinecap="round" strokeWidth="2" /></> : <path d={zoomOut ? "M136 68h12" : "M136 68h12M142 62v12"} stroke={COLOR.fg} strokeLinecap="round" strokeWidth="2.3" />}<path d="M153 79l11 10" stroke={COLOR.fg} strokeLinecap="round" strokeWidth="2.3" />{animate ? <animateTransform attributeName="transform" type="translate" dur="2.7s" values={zoomOut ? "-22 -13;0 0;0 0;-22 -13" : "0 0;-22 -13;-22 -13;0 0"} keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}</g> : null}
-      {action === "reset" ? <path d="M72 38a42 42 0 1 1-1 31m1-31-13 1m13-1-5-12" fill="none" stroke={COLOR.accent} strokeDasharray={animate ? "190" : undefined} strokeDashoffset={animate ? "190" : undefined} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5">{animate ? <animate attributeName="stroke-dashoffset" dur="2.8s" values="190;0;0" keyTimes="0;.72;1" repeatCount="indefinite" /> : null}</path> : null}
-      {action === "orbit" ? <><ellipse cx="108" cy="52" rx="65" ry="32" fill="none" stroke={COLOR.fg3} strokeDasharray="4 4" />{animate ? <circle r="7" fill={COLOR.accent}><animateMotion dur="2.8s" path="M43 52a65 32 0 1 0 130 0 65 32 0 1 0-130 0" repeatCount="indefinite" /></circle> : <circle cx="173" cy="52" r="7" fill={COLOR.accent} />}</> : null}
-    </>
+    <g data-preview-operation={stopOrbit ? "camera-orbit-stop" : "camera-orbit-start"}>
+      <CameraSceneShape />
+      <ellipse cx="108" cy="52" rx="65" ry="32" fill="none" stroke={stopOrbit ? COLOR.fg3 : COLOR.cool} strokeDasharray={stopOrbit ? "3 8" : "4 4"} opacity={stopOrbit ? ".45" : ".8"} />
+      <path d="M43 52c10-15 27-25 47-30M173 52c-10 15-27 25-47 30" fill="none" stroke={COLOR.cool} strokeDasharray="3 4" strokeWidth="1.2" opacity=".55" />
+      <g
+        data-preview-camera={stopOrbit ? "stopping" : "orbiting"}
+        transform={animate ? (stopOrbit ? "translate(160 35) rotate(110)" : undefined) : stopOrbit ? "translate(160 35) rotate(110)" : "translate(173 52) rotate(90)"}
+      >
+        <g transform="rotate(90)">
+          <rect x="-11" y="-8" width="22" height="16" rx="4" fill={COLOR.raised} stroke={COLOR.fg} strokeWidth="1.6" />
+          <path d="m11-5 9-5v20l-9-5Z" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeLinejoin="round" strokeWidth="1.5" />
+          <circle cx="-3" cy="0" r="4" fill={COLOR.canvas} stroke={COLOR.cool} strokeWidth="1.4" />
+        </g>
+        {animate && !stopOrbit ? (
+          <animateMotion
+            dur="2.8s"
+            path="M43 52a65 32 0 1 0 130 0 65 32 0 1 0-130 0"
+            rotate="auto"
+            repeatCount="indefinite"
+          />
+        ) : animate ? (
+          <animateTransform attributeName="transform" type="translate" additive="sum" dur="2.8s" values="-14 8;0 0;0 0;-14 8" keyTimes="0;.3;.82;1" repeatCount="indefinite" />
+        ) : null}
+      </g>
+      {stopOrbit ? (
+        <g transform="translate(169 78)">
+          <circle r="13" fill={COLOR.card} stroke={COLOR.accent} strokeWidth="1.8" />
+          <path d="M-4-6V6M4-6V6" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="3" />
+          {animate ? <animate attributeName="opacity" dur="2.8s" values=".2;.2;1;1;.2" keyTimes="0;.28;.42;.82;1" repeatCount="indefinite" /> : null}
+        </g>
+      ) : null}
+    </g>
   );
 }
 
-function LineArtPreview({ animate }: { animate: boolean }): ReactElement {
+function LineArtPreview({ animate, variant }: { animate: boolean; variant: string }): ReactElement {
+  const disable = previewVariantMatches(variant, "disable");
   return (
-    <>
-      <path d="m108 20 48 25-48 25-48-25Z" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeLinejoin="round" strokeWidth="2" />
-      <path d="m60 45 48 25 48-25v34l-48 25-48-25Z" fill={COLOR.canvas} stroke={COLOR.fg2} strokeLinejoin="round" strokeWidth="2" />
-      <path d="M108 70V35M60 45l48-10 48 10M60 79l48-9 48 9" fill="none" stroke={COLOR.fg} strokeDasharray={animate ? "160" : undefined} strokeDashoffset={animate ? "160" : undefined} strokeWidth="1.7">
-        {animate ? <animate attributeName="stroke-dashoffset" dur="2.8s" values="160;0;0" keyTimes="0;.72;1" repeatCount="indefinite" /> : null}
-      </path>
-    </>
+    <g data-preview-operation={disable ? "line-art-disable" : "line-art-enable"}>
+      <g opacity={animate ? (disable ? ".18" : "1") : disable ? "1" : ".18"}>
+        <path d="m108 20 48 25-48 25-48-25Z" fill={COLOR.accent} stroke={COLOR.accent} strokeLinejoin="round" strokeWidth="2" />
+        <path d="m60 45 48 25 48-25v34l-48 25-48-25Z" fill={COLOR.cool} fillOpacity=".72" stroke={COLOR.fg2} strokeLinejoin="round" strokeWidth="2" />
+        {animate ? <animate attributeName="opacity" dur="2.8s" values={disable ? ".18;1;1;.18" : "1;.18;.18;1"} keyTimes="0;.42;.76;1" repeatCount="indefinite" /> : null}
+      </g>
+      <g opacity={animate ? (disable ? "1" : ".15") : disable ? ".15" : "1"}>
+        <path d="m108 20 48 25-48 25-48-25Z" fill={COLOR.card} stroke={COLOR.fg} strokeLinejoin="round" strokeWidth="2" />
+        <path d="m60 45 48 25 48-25v34l-48 25-48-25Z" fill={COLOR.canvas} stroke={COLOR.fg} strokeLinejoin="round" strokeWidth="2" />
+        <path d="M108 70V35M60 45l48-10 48 10M60 79l48-9 48 9" fill="none" stroke={COLOR.fg} strokeDasharray={animate ? "160" : undefined} strokeDashoffset={animate ? "160" : undefined} strokeWidth="1.7">
+          {animate ? <animate attributeName="stroke-dashoffset" dur="2.8s" values={disable ? "0;0;160;0" : "160;0;0;160"} keyTimes="0;.42;.76;1" repeatCount="indefinite" /> : null}
+        </path>
+        {animate ? <animate attributeName="opacity" dur="2.8s" values={disable ? "1;.15;.15;1" : ".15;1;1;.15"} keyTimes="0;.42;.76;1" repeatCount="indefinite" /> : null}
+      </g>
+      <rect x="143" y="15" width="42" height="17" rx="7" fill={COLOR.raised} stroke={disable ? COLOR.cool : COLOR.accent} strokeWidth="1.2" />
+      <text x="164" y="26.5" fill={disable ? COLOR.cool : COLOR.accent} fontSize="7.5" fontWeight="800" textAnchor="middle">{disable ? "COLOR" : "LINE"}</text>
+    </g>
   );
 }
 
@@ -4010,6 +4593,7 @@ function FrameActionPreview({
 }): ReactElement {
   const reorderPrevious = previewVariantMatches(variant, "reorder-previous");
   const reorderNext = previewVariantMatches(variant, "reorder-next");
+  const pausePlayback = action === "playback" && previewVariantMatches(variant, "pause");
   const cards = [52, 92, 132];
   return (
     <>
@@ -4024,7 +4608,7 @@ function FrameActionPreview({
         </g>
       ))}
       {action === "capture" ? <><rect x="75" y="74" width="66" height="18" rx="6" fill={COLOR.raised} stroke={COLOR.fg2} /><circle cx="108" cy="83" r="6" fill={COLOR.accent}>{animate ? <animate attributeName="r" dur="1.5s" values="4;7;4" repeatCount="indefinite" /> : null}</circle></> : null}
-      {action === "playback" ? <><path d="m93 76 17 10-17 10Z" fill={COLOR.accent} /><path d="M55 88h104" stroke={COLOR.fg3} strokeLinecap="round" strokeWidth="2" /><circle cx={animate ? "58" : "145"} cy="88" r="5" fill={COLOR.accent}>{animate ? <animate attributeName="cx" dur="2.6s" values="58;158;158;58" keyTimes="0;.68;.78;1" repeatCount="indefinite" /> : null}</circle></> : null}
+      {action === "playback" ? <>{pausePlayback ? <path d="M94 76v20M108 76v20" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="4" /> : <path d="m93 76 17 10-17 10Z" fill={COLOR.accent} />}<path d="M55 88h104" stroke={COLOR.fg3} strokeLinecap="round" strokeWidth="2" /><circle cx={animate ? "58" : pausePlayback ? "118" : "145"} cy="88" r="5" fill={COLOR.accent}>{animate ? <animate attributeName="cx" dur="2.6s" values={pausePlayback ? "58;118;118;58" : "58;158;158;58"} keyTimes={pausePlayback ? "0;.3;.82;1" : "0;.68;.78;1"} repeatCount="indefinite" /> : null}</circle></> : null}
       {action === "reorder" ? <path data-preview-operation={reorderPrevious ? "previous" : reorderNext ? "next" : "reorder"} d={reorderPrevious ? "M113 18H63m0 0 9-7m-9 7 9 7" : reorderNext ? "M103 18h50m0 0-9-7m9 7-9 7" : "M73 18h70m0 0-8-6m8 6-8 6M143 80H73m0 0 8-6m-8 6 8 6"} fill="none" stroke={COLOR.accent} strokeDasharray={animate ? "9 5" : undefined} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2">{animate ? <animate attributeName="stroke-dashoffset" dur="1.1s" values="0;-28" repeatCount="indefinite" /> : null}</path> : null}
       {action === "duplicate" ? <g transform={animate ? undefined : "translate(0 0)"}><rect x="88" y="22" width="32" height="43" rx="5" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />{animate ? <animateTransform attributeName="transform" type="translate" dur="2.6s" values="0 0;40 6;40 6;0 0" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}</g> : null}
       {action === "delete" ? <path d="M94 78h28m-23 0 2 15h14l2-15m-14-5h10" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">{animate ? <animate attributeName="opacity" dur="1.4s" values=".35;1;.35" repeatCount="indefinite" /> : null}</path> : null}
@@ -4070,7 +4654,7 @@ function renderPreview(
     case "text":
       return <TextPreview animate={animate} clipId={`${id}-text-clip`} />;
     case "bubble":
-      return <BubblePreview animate={animate} />;
+      return <BubblePreview animate={animate} variant={variant} />;
     case "comment":
       return <CommentPreview animate={animate} />;
     case "image":
@@ -4118,7 +4702,7 @@ function renderPreview(
     case "perspective":
       return <PerspectivePreview animate={animate} />;
     case "rotate-view":
-      return <RotateViewPreview animate={animate} />;
+      return <RotateViewPreview animate={animate} variant={variant} />;
     case "flip-view":
       return <FlipViewPreview animate={animate} variant={variant} />;
     case "brush-size":
@@ -4132,7 +4716,13 @@ function renderPreview(
     case "symmetry":
       return <SymmetryPreview animate={animate} variant={variant} />;
     case "zoom-view":
-      return <ZoomViewPreview animate={animate} variant={variant} />;
+      return <ZoomViewPreview animate={animate} variant={variant} clipId={`${id}-zoom-fit-clip`} />;
+    case "view-hud":
+      return <ViewHudPreview animate={animate} variant={variant} />;
+    case "color-vision":
+      return <ColorVisionPreview animate={animate} variant={variant} filterId={`${id}-color-vision`} />;
+    case "dismiss":
+      return <DismissPreview animate={animate} />;
     case "history":
       return <HistoryPreview animate={animate} />;
     case "undo":
@@ -4158,7 +4748,7 @@ function renderPreview(
     case "layer-delete":
       return <LayerSelectionActionPreview animate={animate} action="delete" />;
     case "timeline":
-      return <TimelinePreview animate={animate} />;
+      return <TimelinePreview animate={animate} variant={variant} />;
     case "keyframe":
       return <KeyframePreview animate={animate} />;
     case "frame-sequence":
@@ -4194,7 +4784,7 @@ function renderPreview(
     case "object-ground":
       return <ObjectTransformActionPreview animate={animate} action="ground" variant={variant} />;
     case "object-snap":
-      return <ObjectSnapPreview animate={animate} />;
+      return <ObjectSnapPreview animate={animate} variant={variant} />;
     case "pose-3d":
       return <Pose3dPreview animate={animate} />;
     case "camera-3d":
@@ -4210,7 +4800,7 @@ function renderPreview(
     case "lighting-3d":
       return <Lighting3dPreview animate={animate} />;
     case "line-art":
-      return <LineArtPreview animate={animate} />;
+      return <LineArtPreview animate={animate} variant={variant} />;
     case "assets":
       return <WorkspaceActionPreview animate={animate} kind="assets" />;
     case "panel-layout":
@@ -4272,6 +4862,9 @@ function renderPreview(
     case "draw-settings":
       return <SettingsSlidersPreview animate={animate} variant={variant} />;
   }
+
+  const exhaustiveKind: never = kind;
+  throw new Error(`Unsupported Studio tool hint preview: ${exhaustiveKind}`);
 }
 
 /**

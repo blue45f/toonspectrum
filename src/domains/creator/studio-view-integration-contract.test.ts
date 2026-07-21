@@ -5,6 +5,10 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
 const inspectorSource = readFileSync(new URL("./StudioInspectorAside.tsx", import.meta.url), "utf8");
 const leftToolRailSource = readFileSync(new URL("./StudioLeftToolRail.tsx", import.meta.url), "utf8");
+const viewHudLoaderSource = readFileSync(
+  new URL("./studio-view-tools-hud-loader.ts", import.meta.url),
+  "utf8",
+);
 
 describe("StudioPage view integration contract", () => {
   it("wires the quarter-turn Stage and transformed collaboration overlay together", () => {
@@ -38,6 +42,35 @@ describe("StudioPage view integration contract", () => {
     expect(source).toContain("magnification={effScale}");
     expect(leftToolRailSource).toContain('aria-controls="studio-view-tools-hud-zoom"');
     expect(leftToolRailSource).toContain('data-studio-view-tool-trigger="rotate"');
+  });
+
+  it("keeps the legacy canvas zoom cluster out of the full editor dock", () => {
+    expect(source).toMatch(
+      /absolute bottom-3 left-3[\s\S]*?canvasOnlyMode && "lg:flex"[\s\S]*?aria-label="실제 픽셀 100% 보기"/u,
+    );
+    expect(source).not.toContain('"absolute bottom-3 left-3 z-30 hidden lg:flex');
+  });
+
+  it("loads the optional view HUD only after a zoom or rotate intent", () => {
+    expect(source).toContain(
+      'import { StudioViewToolsHud } from "./studio-view-tools-hud-loader";',
+    );
+    expect(source).not.toContain(
+      'import { StudioViewToolsHud } from "./StudioViewToolsHud";',
+    );
+    expect(viewHudLoaderSource).toContain('import("./StudioViewToolsHud")');
+    expect(source).toMatch(/\{viewTool \? \([\s\S]*?<Suspense fallback=\{null\}>[\s\S]*?<StudioViewToolsHud/u);
+  });
+
+  it("restores focus when shortcut or capture state closes a focused view HUD", () => {
+    expect(source).toContain("lastNonViewHudFocusRef");
+    expect(source).toContain('target.closest("[data-studio-view-tools-hud]")');
+    expect(source).toContain("if (!focusOwnedByHud || !restoreTarget) return;");
+    expect(source).toContain("restoreTarget.focus({ preventScroll: true })");
+    expect(source).toContain("closeViewToolWithFocusRef.current({ preferCanvas: true })");
+    expect(source).toContain('if (viewTool === "zoom") closeViewToolWithFocus();');
+    expect(source).toContain('if (viewTool === "rotate") closeViewToolWithFocus();');
+    expect(source).toContain("onClose={closeViewToolWithFocus}");
   });
 
   it("keeps configurable flip dispatch before the hard-coded view resolver", () => {

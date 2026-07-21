@@ -26,7 +26,7 @@ import {
 import { studioToolHintFromLabel } from "./studio-tool-hints";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
-import type { StudioToolHintPreviewKind } from "./studio-tool-hint-preview-kind";
+import type { StudioToolHintConsumerPreviewFields } from "./studio-tool-hint-preview-kind";
 import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -423,9 +423,7 @@ export function StudioEdgeRailButton({
 }
 
 /** Mobile dock / contextual toolbar control — icon over caption. */
-export const StudioDockButton = forwardRef<
-  HTMLButtonElement,
-  {
+type StudioDockButtonBaseProps = {
     active?: boolean;
     icon?: LucideIcon;
     label: string;
@@ -433,11 +431,16 @@ export const StudioDockButton = forwardRef<
     swatch?: ReactNode;
     className?: string;
     hintDescription?: string;
-    hintPreview?: StudioToolHintPreviewKind;
-    hintPreviewVariant?: string;
     hintShortcut?: string;
     hintUnavailableReason?: string;
-  } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children">
+  } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children">;
+
+export type StudioDockButtonProps = StudioDockButtonBaseProps
+  & StudioToolHintConsumerPreviewFields;
+
+export const StudioDockButton = forwardRef<
+  HTMLButtonElement,
+  StudioDockButtonProps
 >(function StudioDockButton(
   {
     active = false,
@@ -488,6 +491,15 @@ export const StudioDockButton = forwardRef<
   );
 
   if (!hintDescription) return button;
+  const hint = hintPreview === undefined
+    ? studioToolHintFromLabel(label, hintDescription, hintShortcut)
+    : studioToolHintFromLabel(
+        label,
+        hintDescription,
+        hintShortcut,
+        hintPreview,
+        hintPreviewVariant
+      );
   return (
     <StudioToolHintTarget
       disabled={disabled}
@@ -498,13 +510,7 @@ export const StudioDockButton = forwardRef<
       }
       preferredSide="top"
       className="min-w-11 flex-1"
-      hint={studioToolHintFromLabel(
-        label,
-        hintDescription,
-        hintShortcut,
-        hintPreview,
-        hintPreviewVariant
-      )}
+      hint={hint}
     >
       {button}
     </StudioToolHintTarget>
@@ -722,23 +728,22 @@ export function StudioHudPill({
   );
 }
 
-export interface StudioRailToolButtonProps
-  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
+type StudioRailToolButtonBaseProps =
+  Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   active?: boolean;
   icon: LucideIcon;
   label: string;
   /** Longer body for the rich hover tooltip (shown with StudioToolHintTarget). */
   description?: string;
-  /** Exact motion-coach visual when a dynamic label cannot be inferred safely. */
-  hintPreview?: StudioToolHintPreviewKind;
-  /** Stable state inside a shared preview family. */
-  hintPreviewVariant?: string;
   /** Group indicator (long-press / alternate tools exist). */
   grouped?: boolean;
   accented?: boolean;
   /** Why the underlying tool is unavailable; remains discoverable from the disabled coach. */
   unavailableReason?: string;
-}
+};
+
+export type StudioRailToolButtonProps = StudioRailToolButtonBaseProps
+  & StudioToolHintConsumerPreviewFields;
 
 /** Icon-only tool on the left Ibis-style rail. */
 export function StudioRailToolButton({
@@ -798,6 +803,19 @@ export function StudioRailToolButton({
   );
 
   if (!description) return button;
+  const hint = hintPreview === undefined
+    ? studioToolHintFromLabel(
+        label,
+        description,
+        label.match(/\(([^)]+)\)\s*$/u)?.[1]
+      )
+    : studioToolHintFromLabel(
+        label,
+        description,
+        label.match(/\(([^)]+)\)\s*$/u)?.[1],
+        hintPreview,
+        hintPreviewVariant
+      );
   return (
     <StudioToolHintTarget
       disabled={disabled}
@@ -806,13 +824,7 @@ export function StudioRailToolButton({
           ? unavailableReason ?? (typeof title === "string" ? title : "선택 항목과 편집 권한 조건을 확인하세요.")
           : undefined
       }
-      hint={studioToolHintFromLabel(
-        label,
-        description,
-        label.match(/\(([^)]+)\)\s*$/u)?.[1],
-        hintPreview,
-        hintPreviewVariant
-      )}
+      hint={hint}
     >
       {button}
     </StudioToolHintTarget>

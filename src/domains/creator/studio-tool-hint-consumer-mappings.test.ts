@@ -34,10 +34,13 @@ describe("Studio rich-hint consumer mappings", () => {
     }
   });
 
-  it("keeps the dynamic left-rail polygon lasso on its polygon preview", () => {
+  it("maps the dynamic left-rail lasso coach to the next click", () => {
     const source = readStudioSource("StudioLeftToolRail.tsx");
-    expectNearby(source, 'pixelTool === "poly-lasso"', 'hintPreview={pixelTool === "poly-lasso" ? "polygon-lasso" : "lasso"}', 1_200);
-    expectNearby(source, 'hintPreview={pixelTool === "poly-lasso"', 'hintPreviewVariant={pixelTool === "poly-lasso" ? "rail-polygon-lasso" : "rail-free-lasso"}');
+    expectNearby(source, "const lassoToolHintProps", 'pixelTool === "lasso"', 600);
+    expectNearby(source, "const lassoToolHintProps", '{ hintPreview: "polygon-lasso" as const }', 600);
+    expectNearby(source, "const lassoToolHintProps", '{ hintPreview: "dismiss" as const }', 600);
+    expectNearby(source, "const lassoToolHintProps", '{ hintPreview: "lasso" as const }', 600);
+    expectNearby(source, 'label={\n                pixelTool === "lasso"', "{...lassoToolHintProps}", 1_200);
   });
 
   it("maps selection actions to their actual edit result", () => {
@@ -53,6 +56,26 @@ describe("Studio rich-hint consumer mappings", () => {
     ]) {
       expectNearby(source, `id=${action.startsWith("locked") ? `{${action}}` : `"${action}"`}`, `preview="${preview}"`);
     }
+    expectNearby(source, 'id="fit-bubble"', 'previewVariant="fit-text"');
+  });
+
+  it("maps each view HUD toggle to the next open or close action", () => {
+    const source = readStudioSource("StudioLeftToolRail.tsx");
+
+    expectNearby(source, "const zoomViewToolHintProps", 'hintPreview: "view-hud" as const', 800);
+    expectNearby(source, "const zoomViewToolHintProps", 'hintPreviewVariant: "zoom-close" as const', 800);
+    expectNearby(source, "const zoomViewToolHintProps", 'hintPreviewVariant: "zoom-open" as const', 800);
+    expectNearby(source, "const rotateViewToolHintProps", 'hintPreviewVariant: "rotate-close" as const', 800);
+    expectNearby(source, "const rotateViewToolHintProps", 'hintPreviewVariant: "rotate-open" as const', 800);
+  });
+
+  it("opens the bubble library from menus while preserving fit-to-text on selection", () => {
+    const menubar = readStudioSource("StudioMenubarContent.tsx");
+    const toolBelt = readStudioSource("StudioToolBeltContent.tsx");
+
+    expectNearby(menubar, "bubbles: {", 'preview: "bubble"');
+    expectNearby(menubar, "bubbles: {", 'previewVariant: "open-library"');
+    expectNearby(toolBelt, "bubble: studioToolHintFromLabel(", '"bubble",\n    "open-library"');
   });
 
   it("uses purpose-built previews for the drawing dock instead of generic ink and rotation", () => {
@@ -84,21 +107,56 @@ describe("Studio rich-hint consumer mappings", () => {
     }
   });
 
+  it("maps rail toggles to the action that the next click performs", () => {
+    const source = readStudioSource("StudioLeftToolRail.tsx");
+    const hintCatalog = readStudioSource("studio-tool-hints.ts");
+
+    expectNearby(source, "댓글 핀 배치 취소", 'commentPinArmed ? "dismiss" : "comment"', 1_000);
+    expectNearby(source, "스마트 도형 끄기", 'quickShapeActive ? "disable" : "enable"', 1_000);
+    expectNearby(hintCatalog, '"shape-rect":', 'previewVariant: "rect"', 600);
+    expectNearby(hintCatalog, '"shape-ellipse":', 'previewVariant: "ellipse"', 600);
+  });
+
   it("distinguishes mobile direct shapes, export settings, file workflows, insertion, and comments", () => {
     const mobile = readStudioSource("StudioMobileEditingDock.tsx");
     const menubar = readStudioSource("StudioMenubarContent.tsx");
     const studioPage = readStudioSource("StudioPage.tsx");
     const toolBelt = readStudioSource("StudioToolBeltContent.tsx");
 
-    expectNearby(mobile, 'label="도형"', 'hintPreview="shape"');
-    expectNearby(mobile, 'label="도형"', 'hintPreviewVariant="mobile-direct-shape"');
+    expectNearby(mobile, "const shapeHintPreviewProps", 'hintPreview: "shape" as const');
+    expectNearby(mobile, "const shapeHintPreviewProps", "hintPreviewVariant: drawShape");
+    expectNearby(mobile, "const shapeHintPreviewProps", 'hintPreview: "draw-settings" as const');
+    expectNearby(mobile, 'label="도형"', "{...shapeHintPreviewProps}");
     expectNearby(mobile, 'label="브러시"', 'hintPreview="draw-settings"');
-    expectNearby(mobile, 'label="브러시"', 'hintPreviewVariant="mobile-brush-settings"');
+    expectNearby(mobile, 'label="브러시"', 'hintPreviewVariant={drawSettingsOpen ? "collapse" : "expand"}');
     expectNearby(menubar, "assets: {", 'preview: "assets"');
     expectNearby(menubar, "exportOptions: {", 'preview: "export-options"');
     expectNearby(menubar, "project: {", 'preview: "project"');
     expectNearby(studioPage, 'id: "menubar-comment-inbox"', 'preview: "comment-inbox"');
     expectNearby(toolBelt, 'id: "toolbelt-comment-inbox"', 'preview: "comment-inbox"');
+  });
+
+  it("passes each palette identity into its palette-specific preview mapper", () => {
+    const popover = readStudioSource("StudioColorPopover.tsx");
+    const hints = readStudioSource("studio-color-popover-hints.ts");
+
+    expect(popover).toContain("studioPaletteFamilyHint(p.label, p.tip, p.id)");
+    for (const paletteId of [
+      "skin-natural",
+      "hair-natural",
+      "hair-vivid",
+      "sky-hours",
+      "nature-green",
+      "pastel-mood",
+      "neon-cyber",
+      "vintage-sepia",
+      "mono-ink",
+      "romance-pink",
+      "autumn-fall",
+      "dark-fantasy",
+    ]) {
+      expect(hints).toContain(`"${paletteId}": "palette-${paletteId}"`);
+    }
   });
 
   it("preserves unique smart-filter identities for engine-specific renderer variants", () => {

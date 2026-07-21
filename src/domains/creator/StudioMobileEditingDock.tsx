@@ -4,6 +4,7 @@ import {
   Copy,
   Eraser,
   Files,
+  Grid3X3,
   Hand,
   Layers,
   Minus,
@@ -46,6 +47,7 @@ import {
   type StudioMobileSheetSnap,
 } from "./studio-mobile-sheet-snap";
 import { STUDIO_EASE } from "./studio-panel-ui";
+import { StudioColorBlindPreviewToggle } from "./StudioColorBlindPreviewToggle";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
 import { StudioSavedBrushShelf } from "./StudioSavedBrushShelf";
 
@@ -60,6 +62,7 @@ import type {
   StudioBrushStampTuning,
   StudioSavedBrush,
 } from "./studio-brush-library";
+import type { CvdMode } from "./studio-color-vision-model";
 import type {
   DrawMode,
   DrawShapeKind,
@@ -81,6 +84,7 @@ import { cn } from "@/lib/utils";
 
 const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 5;
+const MOBILE_DRAW_SETTINGS_ID = "studio-mobile-draw-settings";
 
 type StudioDrawSheetStyle = CSSProperties & {
   "--studio-draw-sheet-height": string;
@@ -147,6 +151,14 @@ export interface StudioMobileEditingDockUi {
   loadStudioBrushStudio: typeof import("./studio-page-lazy-ui").loadStudioBrushStudio;
 }
 
+export type StudioMobileSheet =
+  | "draw"
+  | "pages"
+  | "props"
+  | "brushes"
+  | "color-vision"
+  | null;
+
 export interface StudioMobileEditingDockProps {
   activeSavedBrushId: string | null;
   activeSurfaceReviewLocked: boolean;
@@ -160,6 +172,8 @@ export interface StudioMobileEditingDockProps {
   brushOpacity: number;
   collaborationDocumentLocked: boolean;
   color: string;
+  colorBlindPreview: CvdMode;
+  colorVisionSheetRef: import("react").RefObject<HTMLElement | null>;
   currentBrushSnapshot: StudioBrushSnapshot;
   drawMode: DrawMode;
   drawShape: DrawShapeKind;
@@ -172,7 +186,7 @@ export interface StudioMobileEditingDockProps {
   mobileBrushDockButtonRef: import("react").RefObject<HTMLButtonElement | null>;
   mobileKeyboardInset: number;
   mobileQuickActionsButton: ReactNode;
-  mobileSheet: "draw" | "pages" | "props" | "brushes" | null;
+  mobileSheet: StudioMobileSheet;
   postCorrection: number;
   preserveCorners: boolean;
   pressureCurve: number;
@@ -183,11 +197,12 @@ export interface StudioMobileEditingDockProps {
   setBrushDynamics: import("react").Dispatch<import("react").SetStateAction<NormalizedStudioBrushDynamicsSettings>>;
   setBrushOpacity: import("react").Dispatch<import("react").SetStateAction<number>>;
   setColor: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setColorBlindPreview: import("react").Dispatch<import("react").SetStateAction<CvdMode>>;
   setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
   setDrawShape: import("react").Dispatch<import("react").SetStateAction<DrawShapeKind>>;
   setMarqueeIds: import("react").Dispatch<import("react").SetStateAction<string[]>>;
   setMenu: import("react").Dispatch<import("react").SetStateAction<StudioMenu | null>>;
-  setMobileSheet: import("react").Dispatch<import("react").SetStateAction<"draw" | "pages" | "props" | "brushes" | null>>;
+  setMobileSheet: import("react").Dispatch<import("react").SetStateAction<StudioMobileSheet>>;
   setPostCorrection: import("react").Dispatch<import("react").SetStateAction<number>>;
   setPreserveCorners: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPressureCurve: import("react").Dispatch<import("react").SetStateAction<number>>;
@@ -237,6 +252,8 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   brushOpacity,
   collaborationDocumentLocked,
   color,
+  colorBlindPreview,
+  colorVisionSheetRef,
   currentBrushSnapshot,
   drawMode,
   drawShape,
@@ -260,6 +277,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   setBrushDynamics,
   setBrushOpacity,
   setColor,
+  setColorBlindPreview,
   setDrawMode,
   setDrawShape,
   setMarqueeIds,
@@ -329,9 +347,29 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   const [drawSheetSnap, setDrawSheetSnap] = useState<StudioMobileSheetSnap>("medium");
   const [brushManagerSheetSnap, setBrushManagerSheetSnap] =
     useState<StudioMobileSheetSnap>("medium");
+  const colorVisionOpen = mobileSheet === "color-vision";
   const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
     ? Math.max(0, Math.round(mobileKeyboardInset))
     : 0;
+  const drawSettingsOpen = mobileSheet === "draw";
+  const penModeActive = tool === "draw" && drawMode === "pen";
+  const pixelModeActive = tool === "draw" && drawMode === "pixel";
+  const shapeModeActive = tool === "draw" && drawMode === "shape";
+  const penHintPreviewProps = penModeActive
+    ? {
+        hintPreview: "draw-settings" as const,
+        hintPreviewVariant: drawSettingsOpen ? "collapse" as const : "expand" as const,
+      }
+    : { hintPreview: "ink" as const };
+  const shapeHintPreviewProps = shapeModeActive
+    ? {
+        hintPreview: "draw-settings" as const,
+        hintPreviewVariant: drawSettingsOpen ? "collapse" as const : "expand" as const,
+      }
+    : {
+        hintPreview: "shape" as const,
+        hintPreviewVariant: drawShape,
+      };
   return (
     <>
         {/* Photoshop Mobile식 선택 문맥 작업바. 속성 패널까지 왕복하지 않고 가장 빈번한 후속 행동을
@@ -441,7 +479,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             <div className="min-w-0 flex-1">
               <p className="text-[0.8rem] font-semibold text-fg">한 손으로 그려보세요</p>
               <p className="mt-0.5 text-[0.72rem] leading-snug text-fg-3">
-                아래 막대에서 <span className="font-medium text-fg-2">펜·지우개·도형</span>을 고르고,{" "}
+                아래 막대에서 <span className="font-medium text-fg-2">펜·픽셀 펜·지우개·도형</span>을 고르고,{" "}
                 <span className="font-medium text-fg-2">브러시</span>를 눌러 굵기·색을 바꿔요. 두 손가락으로
                 이동·확대하고, 짧게 두 손가락 톡은 되돌리기·세 손가락 톡은 다시 실행이에요.
               </p>
@@ -522,6 +560,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             도크(z-55)는 가리지 않게 그 위쪽에 앉히고, 캔버스는 계속 보이게 반투명 배경. 데스크톱엔 인라인 브러시 바가 있으므로 모바일 전용. */}
         {isMobile && (
           <div
+            id={MOBILE_DRAW_SETTINGS_ID}
             ref={drawSheetRef}
             role="dialog"
             aria-label="브러시 설정"
@@ -553,7 +592,13 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               />
               <div className="flex min-h-12 items-center justify-between">
                 <p className="text-sm font-semibold text-fg">
-                  {drawMode === "eraser" ? "지우개" : drawMode === "shape" ? "도형" : "브러시"} 설정
+                  {drawMode === "eraser"
+                    ? "지우개"
+                    : drawMode === "shape"
+                      ? "도형"
+                      : drawMode === "pixel"
+                        ? "픽셀 펜"
+                        : "브러시"} 설정
                 </p>
                 <button
                   type="button"
@@ -567,10 +612,11 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               </div>
             </div>
 
-            {/* 모드 전환 — icon-first (펜↔지우개↔도형) */}
-            <div className="mb-2.5 grid grid-cols-3 gap-1 rounded-xl border border-line bg-card/60 p-1" role="group" aria-label="그리기 모드">
+            {/* 모드 전환 — 일반 브러시와 1px raw 픽셀 도구를 같은 것으로 오인하지 않게 분리한다. */}
+            <div className="mb-2.5 grid grid-cols-4 gap-1 rounded-xl border border-line bg-card/60 p-1" role="group" aria-label="그리기 모드">
               {([
                 { v: "pen" as const, label: "펜", icon: Pencil },
+                { v: "pixel" as const, label: "픽셀 펜", icon: Grid3X3 },
                 { v: "eraser" as const, label: "지우개", icon: Eraser },
                 { v: "shape" as const, label: "도형", icon: Shapes },
               ]).map((m) => {
@@ -583,6 +629,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     onClick={() => {
                       setTool("draw");
                       setDrawMode(m.v);
+                      if (m.v === "pixel") setStrokeWidth(1);
                     }}
                     aria-pressed={active}
                     aria-label={m.label}
@@ -597,6 +644,24 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 );
               })}
             </div>
+
+            {drawMode === "pixel" ? (
+              <div
+                data-studio-mobile-pixel-pencil-identity="true"
+                role="status"
+                className="mb-2.5 flex items-center gap-3 rounded-2xl border border-accent/40 bg-accent-soft/30 p-3"
+              >
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/12 text-accent" aria-hidden>
+                  <Grid3X3 size={20} strokeWidth={2} />
+                </span>
+                <span className="min-w-0">
+                  <strong className="block text-xs font-extrabold text-fg">픽셀 펜 · 1px 고정</strong>
+                  <span className="mt-1 block text-[0.68rem] leading-relaxed text-fg-3">
+                    격자 정렬 · 안티앨리어싱 없음 · 필압 없음 · 선 보정 없음
+                  </span>
+                </span>
+              </div>
+            ) : null}
 
             {/* 펜 프리셋 — 데스크톱과 같은 현재/빠른 선반/전체 카탈로그 구조 */}
             {drawMode === "pen" && mobileSheet === "draw" && (
@@ -670,7 +735,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
 
             {/* 굵기 + 투명도 — 큰 터치 슬라이더 */}
             <div className="space-y-2.5">
-              <div>
+              {drawMode !== "pixel" ? <div>
                 <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
                   <span>{drawMode === "eraser" ? "지우개 굵기" : "굵기"}</span>
                   <span className="tabular-nums text-fg-2">{strokeWidth}px</span>
@@ -715,7 +780,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     초기화
                   </button>
                 </div>
-              </div>
+              </div> : null}
               {drawMode !== "eraser" && (
                 <div>
                   <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
@@ -768,7 +833,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               )}
             </div>
 
-            {drawMode !== "shape" ? (
+            {drawMode !== "shape" && drawMode !== "pixel" ? (
               <>
                 <StudioLineCorrectionControls
                   density="touch"
@@ -849,6 +914,43 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
           </div>
         )}
 
+        {isMobile && colorVisionOpen ? (
+          <section
+            ref={colorVisionSheetRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="색각 검수"
+            tabIndex={-1}
+            data-studio-mobile-sheet="true"
+            data-studio-shortcut-boundary="true"
+            className="fixed inset-x-2 z-[60] mx-auto max-w-[32rem] rounded-2xl border border-line bg-panel/98 p-3 shadow-2xl backdrop-blur lg:hidden"
+            style={{
+              bottom: `calc(var(--studio-canvas-bottom-inset, 7rem) + 0.5rem + ${mobileKeyboardInset}px)`,
+            }}
+          >
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-[0.8rem] font-bold text-fg">색각·명암 검수</h2>
+                <p className="text-[0.68rem] text-fg-3">원고를 바꾸지 않고 화면 표시만 전환합니다.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileSheet(null)}
+                className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-2 hover:bg-raised"
+                aria-label="색각 검수 닫기"
+              >
+                <X size={17} aria-hidden />
+              </button>
+            </div>
+            <div className="overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <StudioColorBlindPreviewToggle
+                value={colorBlindPreview}
+                onChange={setColorBlindPreview}
+              />
+            </div>
+          </section>
+        ) : null}
+
         {/* 모바일 하단 드로잉 도크 — 한 손으로 그리기 위한 핵심 도구를 thumb 사정권에.
             1행: 그리기 도구(선택·펜·지우개·도형·실행취소·다시·브러시). 2행: 보조 내비(페이지·추가·속성·줌). */}
         {isMobile && (
@@ -882,13 +984,18 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               <StudioDockButton
                 icon={Pencil}
                 label="펜"
-                hintDescription="필압과 보정이 적용되는 자유선을 그립니다. 다시 누르면 브러시 설정이 열립니다."
+                hintDescription={penModeActive
+                  ? drawSettingsOpen
+                    ? "열려 있는 브러시 설정을 닫고 펜으로 그리던 캔버스로 돌아갑니다."
+                    : "펜은 유지하고 브러시 설정을 열어 굵기·색·필압·보정을 조절합니다."
+                  : "필압과 보정이 적용되는 자유선을 그립니다. 선택한 뒤 다시 누르면 브러시 설정을 열 수 있어요."}
+                {...penHintPreviewProps}
                 hintShortcut="B"
-                active={tool === "draw" && drawMode === "pen"}
+                active={penModeActive}
                 disabled={activeSurfaceReviewLocked}
                 title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요" : "펜 (B)"}
                 onClick={() => {
-                  if (tool === "draw" && drawMode === "pen") {
+                  if (penModeActive) {
                     setMobileSheet((s) => (s === "draw" ? null : "draw"));
                     return;
                   }
@@ -897,7 +1004,37 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   setMenu(null);
                   setMobileSheet(null);
                 }}
-                aria-pressed={tool === "draw" && drawMode === "pen"}
+                aria-pressed={penModeActive}
+                aria-expanded={penModeActive ? drawSettingsOpen : undefined}
+                aria-controls={penModeActive ? MOBILE_DRAW_SETTINGS_ID : undefined}
+              />
+              <StudioDockButton
+                icon={Grid3X3}
+                label="픽셀"
+                hintDescription={pixelModeActive
+                  ? drawSettingsOpen
+                    ? "픽셀 펜 설정을 닫고 1px 도트 작업으로 돌아갑니다."
+                    : "픽셀 펜은 유지하고 색과 불투명도 설정을 엽니다."
+                  : "안티앨리어싱·필압·선 보정 없이 격자에 1px 하드 픽셀을 찍습니다."}
+                hintPreview="pixel-ink"
+                hintShortcut="P"
+                active={pixelModeActive}
+                disabled={activeSurfaceReviewLocked}
+                title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 픽셀 펜을 사용할 수 있어요" : "픽셀 펜 (P)"}
+                onClick={() => {
+                  if (pixelModeActive) {
+                    setMobileSheet((sheet) => (sheet === "draw" ? null : "draw"));
+                    return;
+                  }
+                  setTool("draw");
+                  setDrawMode("pixel");
+                  setStrokeWidth(1);
+                  setMenu(null);
+                  setMobileSheet(null);
+                }}
+                aria-pressed={pixelModeActive}
+                aria-expanded={pixelModeActive ? drawSettingsOpen : undefined}
+                aria-controls={pixelModeActive ? MOBILE_DRAW_SETTINGS_ID : undefined}
               />
               <StudioDockButton
                 icon={Eraser}
@@ -918,14 +1055,17 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               <StudioDockButton
                 icon={Square}
                 label="도형"
-                hintDescription="선·사각형·타원·화살표를 정돈된 벡터 도형으로 빠르게 배치합니다."
-                hintPreview="shape"
-                hintPreviewVariant="mobile-direct-shape"
-                active={tool === "draw" && drawMode === "shape"}
+                hintDescription={shapeModeActive
+                  ? drawSettingsOpen
+                    ? "열려 있는 도형 설정을 닫고 캔버스로 돌아가 현재 도형을 계속 배치합니다."
+                    : "도형 모드는 유지하고 설정을 열어 종류·채우기·선 굵기를 조절합니다."
+                  : "선·사각형·타원·화살표를 정돈된 벡터 도형으로 빠르게 배치합니다."}
+                {...shapeHintPreviewProps}
+                active={shapeModeActive}
                 disabled={activeSurfaceReviewLocked}
                 title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 도형을 사용할 수 있어요" : "도형"}
                 onClick={() => {
-                  if (tool === "draw" && drawMode === "shape") {
+                  if (shapeModeActive) {
                     setMobileSheet((s) => (s === "draw" ? null : "draw"));
                     return;
                   }
@@ -934,7 +1074,9 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   setMenu(null);
                   setMobileSheet(null);
                 }}
-                aria-pressed={tool === "draw" && drawMode === "shape"}
+                aria-pressed={shapeModeActive}
+                aria-expanded={shapeModeActive ? drawSettingsOpen : undefined}
+                aria-controls={shapeModeActive ? MOBILE_DRAW_SETTINGS_ID : undefined}
               />
               <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
               <StudioDockButton
@@ -971,11 +1113,15 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               <StudioDockButton
                 ref={mobileBrushDockButtonRef}
                 label="브러시"
-                hintDescription="굵기·불투명도·색·보정·프리셋을 한곳에서 조절합니다."
+                hintDescription={drawSettingsOpen
+                  ? "열려 있는 브러시 설정을 닫고 캔버스로 돌아갑니다."
+                  : "브러시 설정을 열어 굵기·불투명도·색·보정·프리셋을 한곳에서 조절합니다."}
                 hintPreview="draw-settings"
-                hintPreviewVariant="mobile-brush-settings"
+                hintPreviewVariant={drawSettingsOpen ? "collapse" : "expand"}
                 active={mobileSheet === "draw" || mobileSheet === "brushes"}
                 aria-pressed={mobileSheet === "draw" || mobileSheet === "brushes"}
+                aria-expanded={drawSettingsOpen}
+                aria-controls={MOBILE_DRAW_SETTINGS_ID}
                 aria-label="브러시 설정 (굵기·색·프리셋)"
                 onPointerEnter={() => void loadStudioBrushStudio()}
                 onFocus={() => void loadStudioBrushStudio()}
@@ -1038,6 +1184,17 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   openInspectorRoute({ primary: selected ? "properties" : "layers" });
                   setMobileSheet("props");
                 }}
+              />
+              <StudioDockNavButton
+                icon={Palette}
+                label="색각"
+                aria-label="색각·명암 검수"
+                active={colorVisionOpen || colorBlindPreview !== "none"}
+                aria-pressed={colorVisionOpen}
+                data-studio-color-vision-trigger="true"
+                onClick={() => setMobileSheet((sheet) =>
+                  sheet === "color-vision" ? null : "color-vision"
+                )}
               />
               <div className="flex w-[8.25rem] flex-none items-center justify-center">
                 <button

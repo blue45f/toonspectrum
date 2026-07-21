@@ -17,6 +17,8 @@ import {
   useState,
   useSyncExternalStore,
   type CSSProperties,
+  type AriaAttributes,
+  type AriaRole,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
@@ -193,10 +195,21 @@ const LazyStudioToolHintBubble = lazy(async () => ({
   default: (await loadStudioToolHintBubbleModule()).StudioToolHintBubble,
 }));
 
-type DescribedChildProps = {
-  "aria-describedby"?: string;
-  "aria-hidden"?: boolean;
-  "aria-label"?: string;
+type DescribedChildProps = Pick<
+  AriaAttributes,
+  | "aria-checked"
+  | "aria-controls"
+  | "aria-current"
+  | "aria-describedby"
+  | "aria-expanded"
+  | "aria-haspopup"
+  | "aria-hidden"
+  | "aria-keyshortcuts"
+  | "aria-label"
+  | "aria-pressed"
+  | "aria-selected"
+> & {
+  role?: AriaRole;
   tabIndex?: number;
   title?: string;
 };
@@ -680,12 +693,15 @@ export function StudioToolHintTarget({
   }
 
   const canDescribeChild = isValidElement<DescribedChildProps>(children) && children.type !== Fragment;
+  const disabledChildProps = disabled && canDescribeChild ? children.props : null;
+  const childAccessibleLabel = canDescribeChild
+    ? children.props["aria-label"] ?? children.props.title
+    : undefined;
   let describedChildren = children;
   if (canDescribeChild) {
-    const preservedAccessibleLabel = children.props["aria-label"] ?? children.props.title;
     describedChildren = cloneElement(children, {
       title: undefined,
-      "aria-label": preservedAccessibleLabel,
+      "aria-label": childAccessibleLabel,
       ...(disabled
         ? {
             "aria-hidden": true,
@@ -721,10 +737,18 @@ export function StudioToolHintTarget({
       onClickCapture={handleClickCapture}
       onFocus={handleFocus}
       onBlur={handleBlur}
-      role={disabled ? "button" : undefined}
-      aria-label={disabled ? hint.title : undefined}
+      role={disabled ? disabledChildProps?.role ?? "button" : undefined}
+      aria-label={disabled ? childAccessibleLabel ?? hint.title : undefined}
       aria-disabled={disabled ? true : undefined}
+      aria-checked={disabledChildProps?.["aria-checked"]}
+      aria-controls={disabledChildProps?.["aria-controls"]}
+      aria-current={disabledChildProps?.["aria-current"]}
       aria-describedby={needsWrapperDescription ? tipId : undefined}
+      aria-expanded={disabledChildProps?.["aria-expanded"]}
+      aria-haspopup={disabledChildProps?.["aria-haspopup"]}
+      aria-keyshortcuts={disabledChildProps?.["aria-keyshortcuts"]}
+      aria-pressed={disabledChildProps?.["aria-pressed"]}
+      aria-selected={disabledChildProps?.["aria-selected"]}
       tabIndex={disabled ? 0 : undefined}
     >
       {describedChildren}

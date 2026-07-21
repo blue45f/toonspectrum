@@ -77,15 +77,17 @@ function moduleShape(relativePath: string): ModuleShape {
 }
 
 describe("Studio inspector module boundary", () => {
-  it("keeps StudioPage as the static owner without reverse imports", () => {
+  it("keeps StudioPage as the orchestration owner while deferring the heavy inspector surface", () => {
     const page = moduleShape("./StudioPage.tsx");
     const inspector = moduleShape("./StudioInspectorAside.tsx");
+    const loader = moduleShape("./studio-inspector-aside-loader.ts");
     const registry = moduleShape("./studio-page-lazy-ui.ts");
 
-    expect(page.valueImports.filter((specifier) => specifier === "./StudioInspectorAside")).toEqual([
-      "./StudioInspectorAside",
-    ]);
+    expect(page.valueImports).not.toContain("./StudioInspectorAside");
+    expect(page.allImports).toContain("./StudioInspectorAside");
+    expect(page.valueImports).toContain("./studio-inspector-aside-loader");
     expect(page.dynamicImports).not.toContain("./StudioInspectorAside");
+    expect(loader.dynamicImports).toEqual(["./StudioInspectorAside"]);
     expect(inspector.allImports).not.toContain("./StudioPage");
     expect(inspector.dynamicImports).not.toContain("./StudioPage");
     expect(registry.allImports).not.toContain("./StudioInspectorAside");
@@ -102,7 +104,9 @@ describe("Studio inspector module boundary", () => {
     expect(page.topLevelDeclarations).not.toContain("StudioInspectorAsideHandlers");
     expect(page.topLevelDeclarations).not.toContain("StudioInspectorAsideProps");
     expect(page.topLevelDeclarations).not.toContain("StudioInspectorAside");
-    expect(page.source).toContain("<StudioInspectorAside");
+    expect(page.source).toContain("<LazyStudioInspectorAside");
+    expect(page.source).toContain('mobileSheet === "props"');
+    expect(page.source).toContain("<StudioInspectorAsideFallback");
   });
 
   it("keeps the inspector presentation-only and delegates optional loading to the registry", () => {

@@ -13,7 +13,7 @@ import {
   Move,
   PaintBucket,
   Paintbrush,
-  PenTool,
+  Grid3X3,
   Pencil,
   PictureInPicture2,
   Pipette,
@@ -32,6 +32,7 @@ import { createPortal } from "react-dom";
 
 import {
   DEFAULT_STUDIO_RAIL_TOOL_ORDER,
+  formatStudioShortcutChord,
   studioRailToolLabel,
   type StudioAppSettings,
   type StudioAppSettingsTab,
@@ -63,6 +64,8 @@ import { cn } from "@/lib/utils";
 
 const REVIEW_LOCK_REASON = "현재 작업면의 검토 잠금을 먼저 해제하세요.";
 const IMAGE_EDIT_LOCK_REASON = "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요.";
+const STUDIO_RAIL_MORE_GAP_PX = 4;
+const STUDIO_RAIL_MORE_MARGIN_PX = 8;
 const STUDIO_RAIL_MORE_MAX_HEIGHT_PX = 28 * 16;
 const STUDIO_RAIL_MORE_WIDTH_PX = 13 * 16;
 
@@ -79,7 +82,7 @@ function currentStudioRailMoreViewport(): StudioRailMoreViewport {
 }
 
 function measureStudioRailMorePosition(
-  trigger: Pick<DOMRect, "bottom" | "right">,
+  trigger: Pick<DOMRect, "bottom" | "left" | "right">,
   dialog?: Pick<DOMRect, "height" | "width"> | null
 ): PositionedStudioRailMore {
   const viewport = currentStudioRailMoreViewport();
@@ -94,13 +97,24 @@ function measureStudioRailMorePosition(
     ? dialog.width
     : STUDIO_RAIL_MORE_WIDTH_PX;
 
+  const resolved = resolveStudioRailMorePosition({
+    popoverHeight: measuredHeight,
+    popoverWidth: measuredWidth,
+    trigger,
+    viewport,
+  });
+  const viewportLeft = viewport.left ?? 0;
+  const viewportRight = viewportLeft + viewport.width;
+  const availableOnRight = viewportRight - STUDIO_RAIL_MORE_MARGIN_PX
+    - trigger.right - STUDIO_RAIL_MORE_GAP_PX;
+  const availableOnLeft = trigger.left - viewportLeft
+    - STUDIO_RAIL_MORE_MARGIN_PX - STUDIO_RAIL_MORE_GAP_PX;
+
   return {
-    ...resolveStudioRailMorePosition({
-      popoverHeight: measuredHeight,
-      popoverWidth: measuredWidth,
-      trigger,
-      viewport,
-    }),
+    ...resolved,
+    left: availableOnRight < measuredWidth && availableOnLeft >= measuredWidth
+      ? trigger.left - STUDIO_RAIL_MORE_GAP_PX - measuredWidth
+      : resolved.left,
     maxHeight,
   };
 }
@@ -230,6 +244,35 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   const railMoreDialogId = useId();
   const railMoreTriggerId = `${railMoreDialogId}-trigger`;
   const railMoreTitleId = `${railMoreDialogId}-title`;
+  const zoomShortcut = appSettings.shortcuts["tool-zoom"];
+  const rotateViewShortcut = appSettings.shortcuts["tool-rotate-view"];
+  const zoomViewToolOpen = viewTool === "zoom";
+  const rotateViewToolOpen = viewTool === "rotate";
+  const zoomViewToolLabel = zoomViewToolOpen
+    ? zoomShortcut
+      ? `확대·축소 HUD 닫기 (${formatStudioShortcutChord(zoomShortcut)})`
+      : "확대·축소 HUD 닫기"
+    : zoomShortcut
+      ? `보기 확대·축소 (${formatStudioShortcutChord(zoomShortcut)})`
+      : "보기 확대·축소";
+  const rotateViewToolLabel = rotateViewToolOpen
+    ? rotateViewShortcut
+      ? `회전 HUD 닫기 (${formatStudioShortcutChord(rotateViewShortcut)})`
+      : "회전 HUD 닫기"
+    : rotateViewShortcut
+      ? `보기 회전 (${formatStudioShortcutChord(rotateViewShortcut)})`
+      : "보기 회전";
+  const lassoToolHintProps = pixelTool === "lasso"
+    ? { hintPreview: "polygon-lasso" as const }
+    : pixelTool === "poly-lasso"
+      ? { hintPreview: "dismiss" as const }
+      : { hintPreview: "lasso" as const };
+  const zoomViewToolHintProps = zoomViewToolOpen
+    ? { hintPreview: "view-hud" as const, hintPreviewVariant: "zoom-close" as const }
+    : { hintPreview: "view-hud" as const, hintPreviewVariant: "zoom-open" as const };
+  const rotateViewToolHintProps = rotateViewToolOpen
+    ? { hintPreview: "view-hud" as const, hintPreviewVariant: "rotate-close" as const }
+    : { hintPreview: "view-hud" as const, hintPreviewVariant: "rotate-open" as const };
   const railMoreDialogRef = useRef<HTMLDivElement>(null);
   const [railMorePosition, setRailMorePosition] = useState<PositionedStudioRailMore>({
     left: 56,
@@ -441,7 +484,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             ) : null}
             {isRailToolVisible("pixel-pencil") ? (
             <StudioRailToolButton
-              icon={PenTool}
+              icon={Grid3X3}
               label="픽셀 펜 (P)"
               description="1px 하드 픽셀 펜으로 그립니다. 안티앨리어스·필압 없이 또렷한 선을 남깁니다."
               active={tool === "draw" && drawMode === "pixel"}
@@ -558,9 +601,14 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                       ? "다각형 올가미 · 다시 누르면 끄기"
                       : "올가미 선택"
               }
-              description="이미지 픽셀을 자유 올가미(드래그) 또는 다각형 올가미(클릭)로 선택합니다."
-              hintPreview={pixelTool === "poly-lasso" ? "polygon-lasso" : "lasso"}
-              hintPreviewVariant={pixelTool === "poly-lasso" ? "rail-polygon-lasso" : "rail-free-lasso"}
+              description={
+                pixelTool === "lasso"
+                  ? "다시 누르면 클릭한 꼭짓점을 연결하는 다각형 올가미로 전환합니다."
+                  : pixelTool === "poly-lasso"
+                    ? "다시 누르면 다각형 올가미와 작성 중인 꼭짓점을 지우고 선택 도구를 끕니다."
+                    : "다음 클릭부터 드래그한 자유 곡선 안쪽의 이미지 픽셀을 선택합니다."
+              }
+              {...lassoToolHintProps}
               active={(pixelTool === "lasso" || pixelTool === "poly-lasso") && !pixelForceCircle}
               disabled={selected?.type !== "image" || selectedContentMutationLocked}
               unavailableReason={
@@ -596,7 +644,10 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             <StudioRailToolButton
               icon={MessageSquare}
               label={commentPinArmed ? "댓글 핀 배치 취소" : "댓글 핀 배치"}
-              description="캔버스의 정확한 위치를 클릭해 댓글을 남깁니다. 댓글 검토함은 상단 댓글 버튼에서 열 수 있어요."
+              description={commentPinArmed
+                ? "댓글 핀 배치를 취소하고 이전 편집 도구로 돌아갑니다."
+                : "캔버스의 정확한 위치를 클릭해 댓글을 남깁니다. 댓글 검토함은 상단 댓글 버튼에서 열 수 있어요."}
+              hintPreview={commentPinArmed ? "dismiss" : "comment"}
               active={commentsOpen || commentPinArmed}
               onClick={toggleStudioCommentPinPlacement}
             />
@@ -628,8 +679,10 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             {isRailToolVisible("zoom-fit") ? (
             <StudioRailToolButton
               icon={ScanLine}
-              label="화면 맞춤"
+              label="너비에 맞춤 (Home)"
               description="캔버스 폭에 맞춰 확대·축소합니다."
+              hintPreview="zoom-view"
+              hintPreviewVariant="fit-width"
               disabled={viewTransformSuppressed}
               unavailableReason={viewTransformSuppressed ? "내보내기·저장이 끝난 뒤 보기를 조절하세요." : undefined}
               onClick={fitCanvasToWidth}
@@ -638,12 +691,15 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             {isRailToolVisible("zoom") ? (
             <StudioRailToolButton
               icon={Search}
-              label="보기 확대·축소 (Z)"
-              description="확대·축소 HUD를 열어 배율·화면 맞춤·100% 보기를 빠르게 조절합니다."
-              active={viewTool === "zoom"}
+              label={zoomViewToolLabel}
+              description={zoomViewToolOpen
+                ? "현재 확대·축소 HUD를 닫고 적용한 보기 배율은 그대로 유지합니다."
+                : "확대·축소 HUD를 열어 배율·화면 맞춤·100% 보기를 빠르게 조절합니다."}
+              {...zoomViewToolHintProps}
+              active={zoomViewToolOpen}
               disabled={viewTransformSuppressed}
               unavailableReason={viewTransformSuppressed ? "내보내기·저장이 끝난 뒤 보기를 조절하세요." : undefined}
-              aria-expanded={viewTool === "zoom"}
+              aria-expanded={zoomViewToolOpen}
               aria-controls="studio-view-tools-hud-zoom"
               data-studio-view-tool-trigger="zoom"
               onClick={() => setViewTool((current) => current === "zoom" ? null : "zoom")}
@@ -652,12 +708,15 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             {isRailToolVisible("rotate-view") ? (
             <StudioRailToolButton
               icon={RotateCw}
-              label="보기 회전 (R)"
-              description="회전 HUD를 열어 캔버스를 좌·우 90°로 돌리거나 수평 반전합니다. 문서와 내보내기는 바뀌지 않아요."
-              active={viewTool === "rotate"}
+              label={rotateViewToolLabel}
+              description={rotateViewToolOpen
+                ? "현재 회전 HUD를 닫고 적용한 보기 회전·반전 상태는 그대로 유지합니다."
+                : "회전 HUD를 열어 캔버스를 좌·우 90°로 돌리거나 수평 반전합니다. 문서와 내보내기는 바뀌지 않아요."}
+              {...rotateViewToolHintProps}
+              active={rotateViewToolOpen}
               disabled={viewTransformSuppressed}
               unavailableReason={viewTransformSuppressed ? "내보내기·저장이 끝난 뒤 보기를 조절하세요." : undefined}
-              aria-expanded={viewTool === "rotate"}
+              aria-expanded={rotateViewToolOpen}
               aria-controls="studio-view-tools-hud-rotate"
               data-studio-view-tool-trigger="rotate"
               onClick={() => setViewTool((current) => current === "rotate" ? null : "rotate")}
@@ -666,8 +725,12 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             {isRailToolVisible("smart-shape") ? (
             <StudioRailToolButton
               icon={Shapes}
-              label="스마트 도형"
-              description="낙서를 잠시 멈추면 선·원·사각형 등 깔끔한 도형으로 자동 다듬어요."
+              label={quickShapeActive ? "스마트 도형 끄기" : "스마트 도형 켜기"}
+              description={quickShapeActive
+                ? "자동 도형 보정을 끄고 입력한 획을 그대로 유지합니다."
+                : "낙서를 잠시 멈추면 선·원·사각형 등 깔끔한 도형으로 자동 다듬어요."}
+              hintPreview="smart-shape"
+              hintPreviewVariant={quickShapeActive ? "disable" : "enable"}
               active={quickShapeActive}
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
@@ -845,6 +908,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                   ref={railMoreDialogRef}
                   id={railMoreDialogId}
                   role="dialog"
+                  aria-modal="false"
                   aria-labelledby={railMoreTitleId}
                   tabIndex={-1}
                   className="fixed z-[80] max-h-[min(28rem,calc(100dvh-1rem))] w-52 overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel p-1.5 shadow-2xl [scrollbar-gutter:stable]"
@@ -916,6 +980,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                     type="button"
                     className="mt-1 flex min-h-11 w-full items-center gap-1 rounded-lg border border-line px-2 py-2 text-left text-xs font-medium text-accent hover:bg-accent-soft sm:min-h-9 sm:py-1.5 pointer-coarse:min-h-11 pointer-coarse:py-2"
                     onClick={() => {
+                      document.getElementById(railMoreTriggerId)?.focus({ preventScroll: true });
                       setRailMoreOpen(false);
                       setAppSettingsInitialTab("toolbar");
                       setAppSettingsOpen(true);

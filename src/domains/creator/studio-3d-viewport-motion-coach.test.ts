@@ -13,6 +13,10 @@ function sliceBetween(source: string, startToken: string, endToken: string): str
   return source.slice(start, end);
 }
 
+function expectPreviewVariant(source: string, preview: string, variant: string): void {
+  expect(source).toMatch(new RegExp(`preview: "${preview}",\\s+previewVariant: "${variant}"`, "u"));
+}
+
 describe("Studio 3D viewport Motion Coach integration", () => {
   it("gives every background viewport action an explicit stable semantic ID", () => {
     for (const id of [
@@ -92,6 +96,36 @@ describe("Studio 3D viewport Motion Coach integration", () => {
     expect(backgroundSource).toContain("· ${snapSettingsSummary}");
   });
 
+  it("previews the next background toggle action instead of the current state", () => {
+    const idleHints = sliceBetween(
+      backgroundSource,
+      "const BG3D_VIEWPORT_HINTS =",
+      "const ADD_BUTTONS:"
+    );
+    const statefulHints = sliceBetween(
+      backgroundSource,
+      "const quadViewHint: StudioToolHintSpec = isQuadView",
+      "const layerListItems: StudioBg3dLayerListItem[]"
+    );
+    expect(backgroundSource).toContain("const quadViewHint: StudioToolHintSpec = isQuadView");
+    expect(backgroundSource).toContain('title: "단일 뷰로 복귀"');
+    expectPreviewVariant(idleHints, "quad-view", "open");
+    expectPreviewVariant(statefulHints, "quad-view", "close");
+    expect(backgroundSource).toContain("const snapToggleHint: StudioToolHintSpec = snapSettings.enabled");
+    expect(backgroundSource).toContain('title: "변형 스냅 끄기"');
+    expectPreviewVariant(idleHints, "object-snap", "enable");
+    expectPreviewVariant(statefulHints, "object-snap", "disable");
+    expect(backgroundSource).toContain("const lineArtPreviewHint: StudioToolHintSpec = lineArtPreview");
+    expect(backgroundSource).toContain('title: "선화 미리보기 끄기"');
+    expectPreviewVariant(idleHints, "line-art", "enable");
+    expectPreviewVariant(statefulHints, "line-art", "disable");
+    expect(statefulHints).not.toContain('preview: "dismiss"');
+    expect(backgroundSource).toContain('aria-label={isQuadView ? "단일 뷰로 복귀" : "4분할 뷰 열기"}');
+    expect(backgroundSource).toContain(
+      'aria-label={lineArtPreview ? "선화 미리보기 끄기" : "선화 미리보기 켜기"}'
+    );
+  });
+
   it("gives the VRM viewport history and camera controls their own coach actions", () => {
     for (const id of [
       "vrm:history:undo",
@@ -114,9 +148,26 @@ describe("Studio 3D viewport Motion Coach integration", () => {
       "{!viewportHinted ?"
     );
     expect(toolbar).toContain("VRM_VIEWPORT_HINTS.undo");
-    expect(toolbar).toContain("VRM_VIEWPORT_HINTS.turntable");
+    expect(toolbar).toContain("hint={turntableHint}");
     expect(toolbar).not.toContain("title=");
     expect(toolbar).toContain('unavailableReason={!canUndo ? "되돌릴 캐릭터 변경이 없습니다."');
     expect(toolbar).toContain('unavailableReason={!canRedo ? "다시 적용할 캐릭터 변경이 없습니다."');
+  });
+
+  it("switches the active turntable coach to the stop action", () => {
+    const idleHints = sliceBetween(vrmSource, "const VRM_VIEWPORT_HINTS =", "const HEX_COLOR_PATTERN");
+    const activeHint = sliceBetween(
+      vrmSource,
+      "const turntableHint: StudioToolHintSpec = turntable",
+      "const [viewResetNonce"
+    );
+    expect(vrmSource).toContain("const turntableHint: StudioToolHintSpec = turntable");
+    expect(vrmSource).toContain('title: "턴테이블 회전 중지"');
+    expectPreviewVariant(idleHints, "camera-orbit", "start");
+    expectPreviewVariant(activeHint, "camera-orbit", "stop");
+    expect(activeHint).not.toContain('preview: "timeline"');
+    expect(vrmSource).toContain(
+      'aria-label={turntable ? "턴테이블 회전 중지" : "턴테이블 회전 시작"}'
+    );
   });
 });

@@ -780,9 +780,10 @@ const TRANSFORM_MODES: Array<{
 const BG3D_VIEWPORT_HINTS = {
   quad: {
     id: "bg3d:view:quad",
-    title: "4분할 뷰",
-    description: "원근·위·앞·오른쪽 시점을 동시에 열어 객체의 깊이와 정렬을 확인합니다.",
+    title: "4분할 뷰 열기",
+    description: "다음 클릭으로 원근·위·앞·오른쪽 시점을 함께 열어 객체의 깊이와 정렬을 확인합니다.",
     preview: "quad-view",
+    previewVariant: "open",
     tip: "정면과 측면을 함께 보면서 배치하면 원근 화면에서 생기는 겹침을 줄일 수 있어요.",
   },
   undo: {
@@ -801,9 +802,10 @@ const BG3D_VIEWPORT_HINTS = {
   },
   snap: {
     id: "bg3d:transform:snap",
-    title: "변형 스냅",
-    description: "이동과 회전을 설정한 간격에 맞춰 붙여 배경 구조를 반듯하게 정렬합니다.",
+    title: "변형 스냅 켜기",
+    description: "다음 클릭으로 이동과 회전을 설정한 간격에 맞춰 붙여 배경 구조를 반듯하게 정렬합니다.",
     preview: "object-snap",
+    previewVariant: "enable",
     tip: "세부 간격과 적용 축은 도형 패널의 변형 스냅에서 바꿀 수 있어요.",
   },
   ground: {
@@ -845,9 +847,10 @@ const BG3D_VIEWPORT_HINTS = {
   },
   linePreview: {
     id: "bg3d:view:line-preview",
-    title: "선화 미리보기",
-    description: "재질색 대신 외곽선 중심으로 장면을 표시해 웹툰 배경 선화의 밀도를 미리 확인합니다.",
+    title: "선화 미리보기 켜기",
+    description: "다음 클릭으로 재질색 대신 외곽선 중심의 장면을 표시해 웹툰 배경 선화 밀도를 확인합니다.",
     preview: "line-art",
+    previewVariant: "enable",
     tip: "최종 레이어 분리는 LT 탭의 선화·컬러·톤 설정을 사용합니다.",
   },
 } satisfies Record<string, StudioToolHintSpec>;
@@ -5170,6 +5173,39 @@ export function StudioBackground3D({
                 ? "선택한 객체의 지오메트리를 준비하는 중입니다."
                 : undefined;
   const snapSettingsSummary = studioBg3dSnapSettingsSummary(snapSettings);
+  const quadViewHint: StudioToolHintSpec = isQuadView
+    ? {
+        ...BG3D_VIEWPORT_HINTS.quad,
+        title: "단일 뷰로 복귀",
+        description: "다음 클릭으로 4분할 화면을 닫고 원근 단일 뷰로 돌아가 장면 편집 공간을 넓힙니다.",
+        preview: "quad-view",
+        previewVariant: "close",
+        tip: "필요할 때 같은 버튼을 다시 누르면 네 시점을 함께 열 수 있어요.",
+      }
+    : BG3D_VIEWPORT_HINTS.quad;
+  const snapToggleHint: StudioToolHintSpec = snapSettings.enabled
+    ? {
+        ...BG3D_VIEWPORT_HINTS.snap,
+        title: "변형 스냅 끄기",
+        description: `다음 클릭으로 이동·회전 스냅을 끕니다. 현재 설정: ${snapSettingsSummary}.`,
+        preview: "object-snap",
+        previewVariant: "disable",
+        tip: "다시 켜면 현재 간격과 축 설정을 그대로 이어서 사용할 수 있어요.",
+      }
+    : {
+        ...BG3D_VIEWPORT_HINTS.snap,
+        description: `${BG3D_VIEWPORT_HINTS.snap.description} 현재 설정: ${snapSettingsSummary}.`,
+      };
+  const lineArtPreviewHint: StudioToolHintSpec = lineArtPreview
+    ? {
+        ...BG3D_VIEWPORT_HINTS.linePreview,
+        title: "선화 미리보기 끄기",
+        description: "다음 클릭으로 외곽선 중심 미리보기를 끄고 재질색과 조명이 적용된 컬러 장면으로 돌아갑니다.",
+        preview: "line-art",
+        previewVariant: "disable",
+        tip: "필요할 때 같은 버튼으로 외곽선 미리보기를 다시 켤 수 있어요.",
+      }
+    : BG3D_VIEWPORT_HINTS.linePreview;
   const layerListItems: StudioBg3dLayerListItem[] = [
     ...primitives.map((prim, index) => {
       const kindCountBefore = primitives.slice(0, index).filter((p) => p.kind === prim.kind).length;
@@ -6061,10 +6097,10 @@ export function StudioBackground3D({
                       );
                     })}
                   </div>
-                  <StudioToolHintTarget hint={BG3D_VIEWPORT_HINTS.quad} preferredSide="right">
+                  <StudioToolHintTarget hint={quadViewHint} preferredSide="right">
                     <button
                       type="button"
-                      aria-label="4분할 뷰 토글"
+                      aria-label={isQuadView ? "단일 뷰로 복귀" : "4분할 뷰 열기"}
                       aria-pressed={isQuadView}
                       disabled={physicsInteractionLocked}
                       className={cx(
@@ -6109,10 +6145,7 @@ export function StudioBackground3D({
                     </button>
                   </StudioToolHintTarget>
                   <StudioToolHintTarget
-                    hint={{
-                      ...BG3D_VIEWPORT_HINTS.snap,
-                      description: `${BG3D_VIEWPORT_HINTS.snap.description} 현재 설정: ${snapSettingsSummary}.`,
-                    }}
+                    hint={snapToggleHint}
                     preferredSide="right"
                   >
                     <button
@@ -6222,10 +6255,10 @@ export function StudioBackground3D({
                       <Maximize2 size={16} aria-hidden />
                     </button>
                   </StudioToolHintTarget>
-                  <StudioToolHintTarget hint={BG3D_VIEWPORT_HINTS.linePreview} preferredSide="left">
+                  <StudioToolHintTarget hint={lineArtPreviewHint} preferredSide="left">
                     <button
                       type="button"
-                      aria-label="선화로 보기"
+                      aria-label={lineArtPreview ? "선화 미리보기 끄기" : "선화 미리보기 켜기"}
                       aria-pressed={lineArtPreview}
                       className={cx(VIEWPORT_BTN, lineArtPreview && "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent")}
                       onClick={() => setLineArtPreview((v) => !v)}
