@@ -442,6 +442,105 @@ function ColorPalettePreview({
   animate: boolean;
   variant: string;
 }): ReactElement {
+  const primaryColor = previewVariantMatches(variant, "primary-color");
+  const secondaryColor = previewVariantMatches(variant, "secondary-color");
+  const swapColors = previewVariantMatches(variant, "swap-colors");
+  if (primaryColor || secondaryColor || swapColors) {
+    const operation = primaryColor
+      ? "primary-color"
+      : secondaryColor
+        ? "secondary-color"
+        : "swap-colors";
+    const primaryFill = COLOR_PREVIEW_SWATCHES[0];
+    const secondaryFill = COLOR_PREVIEW_SWATCHES[3];
+    const shouldSwap = swapColors && animate;
+
+    return (
+      <g data-preview-operation={operation}>
+        <rect x="47" y="20" width="122" height="65" rx="10" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
+        <g>
+          <rect
+            x="69"
+            y="31"
+            width="49"
+            height="42"
+            rx="8"
+            fill={primaryFill}
+            stroke={primaryColor ? COLOR.fg : COLOR.lineStrong}
+            strokeWidth={primaryColor ? "3" : "1.5"}
+          />
+          {shouldSwap ? (
+            <animateTransform
+              attributeName="transform"
+              type="translate"
+              dur="2.8s"
+              values="0 0;42 19;42 19;0 0"
+              keyTimes="0;.42;.72;1"
+              repeatCount="indefinite"
+            />
+          ) : null}
+        </g>
+        <g>
+          <rect
+            x="111"
+            y="50"
+            width="49"
+            height="42"
+            rx="8"
+            fill={secondaryFill}
+            stroke={secondaryColor ? COLOR.fg : COLOR.lineStrong}
+            strokeWidth={secondaryColor ? "3" : "1.5"}
+          />
+          {shouldSwap ? (
+            <animateTransform
+              attributeName="transform"
+              type="translate"
+              dur="2.8s"
+              values="0 0;-42 -19;-42 -19;0 0"
+              keyTimes="0;.42;.72;1"
+              repeatCount="indefinite"
+            />
+          ) : null}
+        </g>
+        {swapColors ? (
+          <g fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5">
+            <path d="M61 70c-8-13-5-29 6-39m0 0-1 10m1-10-10 2" />
+            <path d="M173 42c8 13 5 29-6 39m0 0 1-10m-1 10 10-2" />
+            {animate ? (
+              <animate attributeName="stroke-dasharray" dur="1.4s" values="1 7;9 3;1 7" repeatCount="indefinite" />
+            ) : null}
+          </g>
+        ) : (
+          <>
+            <circle
+              cx={primaryColor ? "94" : "136"}
+              cy={primaryColor ? "52" : "71"}
+              r="29"
+              fill="none"
+              stroke={COLOR.accent}
+              strokeWidth="2"
+              opacity={animate ? ".25" : ".78"}
+            >
+              {animate ? (
+                <animate attributeName="r" dur="2s" values="24;31;24" repeatCount="indefinite" />
+              ) : null}
+            </circle>
+            <text
+              x={primaryColor ? "94" : "136"}
+              y={primaryColor ? "56" : "75"}
+              fill={COLOR.fg}
+              fontSize="10"
+              fontWeight="800"
+              textAnchor="middle"
+            >
+              {primaryColor ? "주" : "보조"}
+            </text>
+          </>
+        )}
+      </g>
+    );
+  }
+
   const bubbleFill = previewVariantMatches(variant, "bubble-fill");
   const paletteFamily = previewVariantMatches(variant, "palette-family");
   const recentSwatch = previewVariantMatches(variant, "recent-swatch");
@@ -1145,12 +1244,84 @@ function FilterPreview({ animate, clipId, variant }: { animate: boolean; clipId:
   );
 }
 
-function BrushSizePreview({ animate }: { animate: boolean }): ReactElement {
+const BRUSH_SIZE_PRESET_RADIUS = {
+  "preset-xs": 4,
+  "preset-s": 7,
+  "preset-m": 11,
+  "preset-l": 16,
+  "preset-xl": 21,
+  "preset-xxl": 26,
+} as const;
+
+function PreviewLock({
+  animate,
+  locked,
+  metric,
+}: {
+  animate: boolean;
+  locked: boolean;
+  metric: "size" | "opacity";
+}): ReactElement {
+  const metricMark = metric === "size" ? "↔" : "%";
   return (
-    <>
-      <circle cx="75" cy="50" r="25" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeWidth="1.5" />
-      <circle cx="75" cy="50" r={animate ? "7" : "17"} fill={COLOR.accent} opacity=".88">
+    <g data-preview-operation={`${metric}-${locked ? "lock" : "unlock"}`}>
+      <rect x="52" y="20" width="112" height="70" rx="12" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
+      <circle cx="81" cy="55" r="19" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="1.8" />
+      <text x="81" y="61" fill={COLOR.accent} fontSize="18" fontWeight="800" textAnchor="middle">
+        {metricMark}
+      </text>
+      <g transform={locked ? "translate(119 51)" : "translate(119 52)"}>
+        <rect x="-17" y="-1" width="34" height="29" rx="6" fill={COLOR.raised} stroke={COLOR.fg} strokeWidth="2" />
+        <path
+          d={locked ? "M-10-1v-9a10 10 0 0 1 20 0v9" : "M-10-1v-9a10 10 0 0 1 18-6"}
+          fill="none"
+          stroke={COLOR.fg}
+          strokeLinecap="round"
+          strokeWidth="3"
+        />
+        <circle cx="0" cy="12" r="3" fill={COLOR.accent}>
+          {animate ? (
+            <animate attributeName="opacity" dur={locked ? "1.6s" : "2.1s"} values=".25;1;.25" repeatCount="indefinite" />
+          ) : null}
+        </circle>
         {animate ? (
+          <animateTransform
+            attributeName="transform"
+            additive="sum"
+            type="translate"
+            dur="2.4s"
+            values={locked ? "0 0;0 0;0 0" : "0 0;5 -2;5 -2;0 0"}
+            keyTimes="0;.4;.7;1"
+            repeatCount="indefinite"
+          />
+        ) : null}
+      </g>
+    </g>
+  );
+}
+
+function BrushSizePreview({
+  animate,
+  variant,
+}: {
+  animate: boolean;
+  variant: string;
+}): ReactElement {
+  if (previewVariantMatches(variant, "lock", "unlock")) {
+    return <PreviewLock animate={animate} locked={previewVariantMatches(variant, "lock")} metric="size" />;
+  }
+
+  const preset = Object.keys(BRUSH_SIZE_PRESET_RADIUS).find((candidate) =>
+    previewVariantMatches(variant, candidate)
+  ) as keyof typeof BRUSH_SIZE_PRESET_RADIUS | undefined;
+  const presetRadius = preset ? BRUSH_SIZE_PRESET_RADIUS[preset] : null;
+  const radius = presetRadius ?? (animate ? 7 : 17);
+  const chipIndex = preset ? Object.keys(BRUSH_SIZE_PRESET_RADIUS).indexOf(preset) : -1;
+  return (
+    <g data-preview-operation={preset ?? "brush-size-slider"}>
+      <circle cx="75" cy="50" r="25" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeWidth="1.5" />
+      <circle cx="75" cy="50" r={radius} fill={COLOR.accent} opacity=".88">
+        {animate && presetRadius === null ? (
           <animate
             attributeName="r"
             dur="2.7s"
@@ -1160,34 +1331,59 @@ function BrushSizePreview({ animate }: { animate: boolean }): ReactElement {
             keySplines=".16 1 .3 1; .16 1 .3 1; .16 1 .3 1"
             repeatCount="indefinite"
           />
+        ) : animate ? (
+          <animate attributeName="opacity" dur="1.8s" values=".45;.95;.45" repeatCount="indefinite" />
         ) : null}
       </circle>
       <path d="M119 68h62" stroke={COLOR.fg3} strokeLinecap="round" strokeWidth="3" />
-      <path d={animate ? "M119 68h8" : "M119 68h38"} stroke={COLOR.accent} strokeLinecap="round" strokeWidth="3">
-        {animate ? (
+      <path
+        d={preset ? `M119 68h${8 + chipIndex * 9}` : animate ? "M119 68h8" : "M119 68h38"}
+        stroke={COLOR.accent}
+        strokeLinecap="round"
+        strokeWidth="3"
+      >
+        {animate && !preset ? (
           <animate attributeName="d" dur="2.7s" values="M119 68h8;M119 68h54;M119 68h54;M119 68h8" keyTimes="0;.38;.68;1" repeatCount="indefinite" />
         ) : null}
       </path>
-      <circle cx={animate ? "127" : "157"} cy="68" r="6" fill={COLOR.fg} stroke={COLOR.canvas} strokeWidth="2">
-        {animate ? (
+      <circle cx={preset ? 127 + chipIndex * 9 : animate ? "127" : "157"} cy="68" r="6" fill={COLOR.fg} stroke={COLOR.canvas} strokeWidth="2">
+        {animate && !preset ? (
           <animate attributeName="cx" dur="2.7s" values="127;173;173;127" keyTimes="0;.38;.68;1" repeatCount="indefinite" />
         ) : null}
       </circle>
-      <path d="M124 34h52M124 42h32" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="2" opacity=".74" />
-      <circle cx="178" cy="34" r="3" fill={COLOR.accent} />
-    </>
+      {preset ? (
+        <text x="150" y="39" fill={COLOR.fg2} fontSize="10" fontWeight="800" textAnchor="middle">
+          {preset.replace("preset-", "").toUpperCase()}
+        </text>
+      ) : (
+        <>
+          <path d="M124 34h52M124 42h32" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="2" opacity=".74" />
+          <circle cx="178" cy="34" r="3" fill={COLOR.accent} />
+        </>
+      )}
+    </g>
   );
 }
 
 function OpacityPreview({
   animate,
   patternId,
+  variant,
 }: {
   animate: boolean;
   patternId: string;
+  variant: string;
 }): ReactElement {
+  if (previewVariantMatches(variant, "lock", "unlock")) {
+    return <PreviewLock animate={animate} locked={previewVariantMatches(variant, "lock")} metric="opacity" />;
+  }
+
+  const opacityPreset = [20, 40, 60, 80, 100].find((value) =>
+    previewVariantMatches(variant, `preset-${value}`)
+  );
+  const opacity = opacityPreset === undefined ? null : opacityPreset / 100;
   return (
-    <>
+    <g data-preview-operation={opacityPreset === undefined ? "opacity-slider" : `preset-${opacityPreset}`}>
       <defs>
         <pattern id={patternId} width="12" height="12" patternUnits="userSpaceOnUse">
           <rect width="12" height="12" fill={COLOR.canvas} />
@@ -1195,20 +1391,27 @@ function OpacityPreview({
         </pattern>
       </defs>
       <rect x="42" y="21" width="74" height="62" rx="7" fill={`url(#${patternId})`} stroke={COLOR.lineStrong} />
-      <circle cx="79" cy="52" r="22" fill={COLOR.accent} opacity={animate ? ".24" : ".72"}>
-        {animate ? (
+      <circle cx="79" cy="52" r="22" fill={COLOR.accent} opacity={opacity ?? (animate ? ".24" : ".72")}>
+        {animate && opacity === null ? (
           <animate attributeName="opacity" dur="2.8s" values=".22;.9;.9;.22" keyTimes="0;.4;.68;1" repeatCount="indefinite" />
+        ) : animate ? (
+          <animate attributeName="r" dur="1.8s" values="20;23;20" repeatCount="indefinite" />
         ) : null}
       </circle>
       <path d="M135 34h45M135 52h45M135 70h45" stroke={COLOR.fg3} strokeLinecap="round" strokeWidth="2" />
       <circle cx="165" cy="34" r="4" fill={COLOR.fg2} />
-      <circle cx={animate ? "145" : "166"} cy="52" r="5" fill={COLOR.accent} stroke={COLOR.canvas} strokeWidth="2">
-        {animate ? (
+      <circle cx={opacityPreset === undefined ? (animate ? "145" : "166") : 135 + (opacity ?? 0) * 45} cy="52" r="5" fill={COLOR.accent} stroke={COLOR.canvas} strokeWidth="2">
+        {animate && opacity === null ? (
           <animate attributeName="cx" dur="2.8s" values="145;176;176;145" keyTimes="0;.4;.68;1" repeatCount="indefinite" />
         ) : null}
       </circle>
       <circle cx="151" cy="70" r="4" fill={COLOR.fg2} />
-    </>
+      {opacityPreset === undefined ? null : (
+        <text x="158" y="29" fill={COLOR.fg2} fontSize="9" fontWeight="800" textAnchor="middle">
+          {opacityPreset}%
+        </text>
+      )}
+    </g>
   );
 }
 
@@ -2469,6 +2672,119 @@ function SelectionAdjustPreview({
         </>
       )}
     </>
+  );
+}
+
+function SelectionLayoutPreview({
+  animate,
+  variant,
+}: {
+  animate: boolean;
+  variant: string;
+}): ReactElement {
+  const operations = [
+    "group",
+    "align-left",
+    "align-hcenter",
+    "align-right",
+    "align-top",
+    "align-vcenter",
+    "align-bottom",
+    "distribute-horizontal",
+    "distribute-vertical",
+  ] as const;
+  const operation =
+    operations.find((candidate) => previewVariantMatches(variant, candidate)) ?? "group";
+  const source = [
+    { x: 55, y: 24, width: 25, height: 17 },
+    { x: 96, y: 43, width: 32, height: 23 },
+    { x: 141, y: 57, width: 20, height: 29 },
+  ] as const;
+  const targets = source.map((item, index) => {
+    if (operation === "align-left") return { x: 55, y: item.y };
+    if (operation === "align-hcenter") return { x: 108 - item.width / 2, y: item.y };
+    if (operation === "align-right") return { x: 161 - item.width, y: item.y };
+    if (operation === "align-top") return { x: item.x, y: 24 };
+    if (operation === "align-vcenter") return { x: item.x, y: 55 - item.height / 2 };
+    if (operation === "align-bottom") return { x: item.x, y: 86 - item.height };
+    if (operation === "distribute-horizontal") {
+      return { x: [45, 94.5, 151][index] ?? item.x, y: item.y };
+    }
+    if (operation === "distribute-vertical") {
+      return { x: item.x, y: [17, 35.5, 60][index] ?? item.y };
+    }
+    return { x: item.x, y: item.y };
+  });
+  const verticalGuide = ["align-left", "align-hcenter", "align-right"].includes(operation);
+  const horizontalGuide = ["align-top", "align-vcenter", "align-bottom"].includes(operation);
+  const guideX = operation === "align-left" ? 55 : operation === "align-right" ? 161 : 108;
+  const guideY = operation === "align-top" ? 24 : operation === "align-bottom" ? 86 : 55;
+
+  return (
+    <g data-preview-operation={operation}>
+      <rect x="38" y="13" width="140" height="79" rx="9" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
+      {verticalGuide ? (
+        <path d={`M${guideX} 18v69`} stroke={COLOR.accent} strokeDasharray="4 3" strokeWidth="1.6" />
+      ) : null}
+      {horizontalGuide ? (
+        <path d={`M43 ${guideY}h130`} stroke={COLOR.accent} strokeDasharray="4 3" strokeWidth="1.6" />
+      ) : null}
+      {operation === "distribute-horizontal" ? (
+        <path d="M45 18h126m-126 0 6-4m-6 4 6 4m120-4-6-4m6 4-6 4" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+      ) : null}
+      {operation === "distribute-vertical" ? (
+        <path d="M171 17v72m0-72-4 6m4-6 4 6m-4 66-4-6m4 6 4-6" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+      ) : null}
+      {source.map((item, index) => {
+        const target = targets[index] ?? item;
+        return (
+          <rect
+            key={index}
+            x={animate && operation !== "group" ? item.x : target.x}
+            y={animate && operation !== "group" ? item.y : target.y}
+            width={item.width}
+            height={item.height}
+            rx="4"
+            fill={index === 1 ? COLOR.accentSoft : COLOR.raised}
+            stroke={index === 1 ? COLOR.accent : COLOR.fg2}
+            strokeWidth="1.7"
+          >
+            {animate && operation !== "group" ? (
+              <>
+                <animate
+                  attributeName="x"
+                  dur="2.8s"
+                  values={`${item.x};${target.x};${target.x};${item.x}`}
+                  keyTimes="0;.42;.72;1"
+                  repeatCount="indefinite"
+                />
+                <animate
+                  attributeName="y"
+                  dur="2.8s"
+                  values={`${item.y};${target.y};${target.y};${item.y}`}
+                  keyTimes="0;.42;.72;1"
+                  repeatCount="indefinite"
+                />
+              </>
+            ) : null}
+          </rect>
+        );
+      })}
+      {operation === "group" ? (
+        <>
+          <rect x="47" y="17" width="122" height="72" rx="7" fill="none" stroke={COLOR.accent} strokeDasharray="6 4" strokeWidth="2">
+            {animate ? (
+              <animate attributeName="stroke-dashoffset" dur="1.2s" values="0;-20" repeatCount="indefinite" />
+            ) : null}
+          </rect>
+          <path d="M178 36h12v31h-12m-140-31H26v31h12" fill="none" stroke={COLOR.fg} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
+        </>
+      ) : animate ? (
+        <circle cx={verticalGuide ? guideX : 108} cy={horizontalGuide ? guideY : 52} r="5" fill={COLOR.accent} opacity=".35">
+          <animate attributeName="r" dur="1.7s" values="3;7;3" repeatCount="indefinite" />
+        </circle>
+      ) : null}
+    </g>
   );
 }
 
@@ -3789,6 +4105,8 @@ function renderPreview(
       return <SelectionContentTransformPreview animate={animate} variant={variant} />;
     case "selection-adjust":
       return <SelectionAdjustPreview animate={animate} variant={variant} />;
+    case "selection-layout":
+      return <SelectionLayoutPreview animate={animate} variant={variant} />;
     case "lasso-fill":
       return <LassoFillPreview animate={animate} />;
     case "marquee-rect":
@@ -3804,9 +4122,9 @@ function renderPreview(
     case "flip-view":
       return <FlipViewPreview animate={animate} variant={variant} />;
     case "brush-size":
-      return <BrushSizePreview animate={animate} />;
+      return <BrushSizePreview animate={animate} variant={variant} />;
     case "opacity":
-      return <OpacityPreview animate={animate} patternId={`${id}-opacity-checker`} />;
+      return <OpacityPreview animate={animate} patternId={`${id}-opacity-checker`} variant={variant} />;
     case "stabilizer":
       return <StabilizerPreview animate={animate} variant={variant} />;
     case "pressure":

@@ -31,7 +31,6 @@ import {
   nearestStudioBrushOpacityChip,
   nearestStudioBrushSizeChip,
 } from "./studio-brush";
-import { StudioDualColorWell } from "./studio-chrome-ui";
 import { studioBrushTrayItem } from "./studio-creative-ux";
 import {
   StudioOpacityGlyph,
@@ -48,6 +47,7 @@ import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { studioToolHintFromLabel } from "./studio-tool-hints";
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
 import { StudioBrushTray } from "./StudioBrushTray";
+import { StudioDualColorWell } from "./StudioDualColorWell";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { StudioBrushSlot } from "./studio-brush-slots";
@@ -134,7 +134,6 @@ function SizePreview({
       aria-hidden
       data-studio-size-preview="true"
       className="relative grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-line/80 bg-canvas/90 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.06)]"
-      title={`크기 ${size}px · ${Math.round(opacity * 100)}%`}
     >
       <span
         className="absolute rounded-full opacity-25 blur-[1.5px]"
@@ -158,6 +157,23 @@ const iconBtn = cn(
   STUDIO_EASE,
   STUDIO_FOCUS_RING
 );
+
+const BRUSH_SIZE_HINT_VARIANT = {
+  xs: "preset-xs",
+  s: "preset-s",
+  m: "preset-m",
+  l: "preset-l",
+  xl: "preset-xl",
+  xxl: "preset-xxl",
+} as const satisfies Record<(typeof STUDIO_BRUSH_SIZE_CHIPS)[number]["id"], string>;
+
+const BRUSH_OPACITY_HINT_VARIANT = {
+  o20: "preset-20",
+  o40: "preset-40",
+  o60: "preset-60",
+  o80: "preset-80",
+  o100: "preset-100",
+} as const satisfies Record<(typeof STUDIO_BRUSH_OPACITY_CHIPS)[number]["id"], string>;
 
 export function StudioDrawOptionsBar({
   drawMode,
@@ -745,39 +761,59 @@ export function StudioDrawOptionsBar({
             {STUDIO_BRUSH_SIZE_CHIPS.map((chip) => {
               const active = nearestStudioBrushSizeChip(strokeWidth) === chip.id;
               return (
-                <button
+                <StudioToolHintTarget
                   key={chip.id}
-                  type="button"
-                  title={`${chip.label} · ${chip.width}px`}
-                  aria-label={`브러시 크기 ${chip.label} ${chip.width}픽셀`}
-                  aria-pressed={active}
-                  onClick={() => onStrokeWidthChange(chip.width)}
-                  className={cn(
-                    "grid size-7 place-items-center rounded-lg",
-                    STUDIO_EASE,
-                    STUDIO_FOCUS_RING,
-                    active ? "bg-accent text-on-accent" : "text-fg-3 hover:bg-raised hover:text-fg"
+                  hint={studioToolHintFromLabel(
+                    `브러시 크기 · ${chip.label}`,
+                    `획 굵기를 정확히 ${chip.width}px로 설정합니다. 이후 새로 그리는 획부터 이 크기가 적용돼요.`,
+                    undefined,
+                    "brush-size",
+                    BRUSH_SIZE_HINT_VARIANT[chip.id]
                   )}
                 >
-                  <StudioSizeChipGlyph widthPx={Math.min(chip.width, 40)} />
-                </button>
+                  <button
+                    type="button"
+                    aria-label={`브러시 크기 ${chip.label} ${chip.width}픽셀`}
+                    aria-pressed={active}
+                    onClick={() => onStrokeWidthChange(chip.width)}
+                    className={cn(
+                      "grid size-7 place-items-center rounded-lg",
+                      STUDIO_EASE,
+                      STUDIO_FOCUS_RING,
+                      active ? "bg-accent text-on-accent" : "text-fg-3 hover:bg-raised hover:text-fg"
+                    )}
+                  >
+                    <StudioSizeChipGlyph widthPx={Math.min(chip.width, 40)} />
+                  </button>
+                </StudioToolHintTarget>
               );
             })}
             {onToggleSizeLock ? (
-              <button
-                type="button"
-                title={sizeLocked ? "크기 잠금 해제" : "크기 잠금"}
-                aria-pressed={sizeLocked}
-                aria-label="브러시 크기 잠금"
-                onClick={onToggleSizeLock}
-                className={cn(
-                  iconBtn,
-                  "size-7 border-transparent",
-                  sizeLocked ? "bg-accent-soft text-accent" : "text-fg-3 hover:bg-raised"
+              <StudioToolHintTarget
+                hint={studioToolHintFromLabel(
+                  sizeLocked ? "브러시 크기 잠금 해제" : "브러시 크기 잠금",
+                  sizeLocked
+                    ? `잠금을 풀어 다음에 브러시 프리셋을 선택할 때 해당 프리셋의 기본 크기를 적용합니다. 현재 ${strokeWidth}px 값은 즉시 바뀌지 않아요.`
+                    : `현재 ${strokeWidth}px을 고정해 다른 브러시 프리셋을 선택해도 그 프리셋의 기본 크기로 바뀌지 않게 합니다.`,
+                  undefined,
+                  "brush-size",
+                  sizeLocked ? "unlock" : "lock"
                 )}
               >
-                {sizeLocked ? <Lock size={12} aria-hidden /> : <LockOpen size={12} aria-hidden />}
-              </button>
+                <button
+                  type="button"
+                  aria-pressed={sizeLocked}
+                  aria-label={sizeLocked ? "브러시 크기 잠금 해제" : "브러시 크기 잠금"}
+                  onClick={onToggleSizeLock}
+                  className={cn(
+                    iconBtn,
+                    "size-7 border-transparent",
+                    sizeLocked ? "bg-accent-soft text-accent" : "text-fg-3 hover:bg-raised"
+                  )}
+                >
+                  {sizeLocked ? <Lock size={12} aria-hidden /> : <LockOpen size={12} aria-hidden />}
+                </button>
+              </StudioToolHintTarget>
             ) : null}
           </div>
 
@@ -826,39 +862,61 @@ export function StudioDrawOptionsBar({
             {STUDIO_BRUSH_OPACITY_CHIPS.map((chip) => {
               const active = nearestStudioBrushOpacityChip(brushOpacity) === chip.id;
               return (
-                <button
+                <StudioToolHintTarget
                   key={chip.id}
-                  type="button"
-                  title={`불투명도 ${chip.label}`}
-                  aria-label={`브러시 불투명도 ${chip.label}`}
-                  aria-pressed={active}
-                  onClick={() => onOpacityChange(chip.opacity)}
-                  className={cn(
-                    "min-w-7 rounded-lg px-1 py-1 text-[0.62rem] font-bold tabular-nums",
-                    STUDIO_EASE,
-                    STUDIO_FOCUS_RING,
-                    active ? "bg-accent text-on-accent" : "text-fg-3 hover:bg-raised hover:text-fg"
+                  hint={studioToolHintFromLabel(
+                    `브러시 불투명도 · ${chip.label}`,
+                    `현재 브러시의 획 불투명도를 정확히 ${chip.label}로 설정합니다. 이후 새로 그리는 획부터 이 농도가 적용돼요.`,
+                    undefined,
+                    "opacity",
+                    BRUSH_OPACITY_HINT_VARIANT[chip.id]
                   )}
                 >
-                  {Math.round(chip.opacity * 100)}
-                </button>
+                  <button
+                    type="button"
+                    aria-label={`브러시 불투명도 ${chip.label}`}
+                    aria-pressed={active}
+                    onClick={() => onOpacityChange(chip.opacity)}
+                    className={cn(
+                      "min-w-7 rounded-lg px-1 py-1 text-[0.62rem] font-bold tabular-nums",
+                      STUDIO_EASE,
+                      STUDIO_FOCUS_RING,
+                      active ? "bg-accent text-on-accent" : "text-fg-3 hover:bg-raised hover:text-fg"
+                    )}
+                  >
+                    {Math.round(chip.opacity * 100)}
+                  </button>
+                </StudioToolHintTarget>
               );
             })}
             {onToggleOpacityLock ? (
-              <button
-                type="button"
-                title={opacityLocked ? "불투명도 잠금 해제" : "불투명도 잠금"}
-                aria-pressed={opacityLocked}
-                aria-label="브러시 불투명도 잠금"
-                onClick={onToggleOpacityLock}
-                className={cn(
-                  iconBtn,
-                  "size-7 border-transparent",
-                  opacityLocked ? "bg-accent-soft text-accent" : "text-fg-3 hover:bg-raised"
+              <StudioToolHintTarget
+                hint={studioToolHintFromLabel(
+                  opacityLocked ? "브러시 불투명도 잠금 해제" : "브러시 불투명도 잠금",
+                  opacityLocked
+                    ? `잠금을 풀어 다음에 브러시 프리셋을 선택할 때 해당 프리셋의 기본 불투명도를 적용합니다. 현재 ${Math.round(brushOpacity * 100)}% 값은 즉시 바뀌지 않아요.`
+                    : `현재 ${Math.round(brushOpacity * 100)}%를 고정해 다른 브러시 프리셋을 선택해도 그 프리셋의 기본 불투명도로 바뀌지 않게 합니다.`,
+                  undefined,
+                  "opacity",
+                  opacityLocked ? "unlock" : "lock"
                 )}
               >
-                <Droplets size={12} strokeWidth={1.75} aria-hidden />
-              </button>
+                <button
+                  type="button"
+                  aria-pressed={opacityLocked}
+                  aria-label={
+                    opacityLocked ? "브러시 불투명도 잠금 해제" : "브러시 불투명도 잠금"
+                  }
+                  onClick={onToggleOpacityLock}
+                  className={cn(
+                    iconBtn,
+                    "size-7 border-transparent",
+                    opacityLocked ? "bg-accent-soft text-accent" : "text-fg-3 hover:bg-raised"
+                  )}
+                >
+                  <Droplets size={12} strokeWidth={1.75} aria-hidden />
+                </button>
+              </StudioToolHintTarget>
             ) : null}
           </div>
 

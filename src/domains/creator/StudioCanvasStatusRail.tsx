@@ -7,7 +7,86 @@ import {
   PaintBucket,
 } from "lucide-react";
 
+import { StudioToolHintTarget } from "./StudioToolHint";
+
+import type { ReactNode } from "react";
+
 import { cn } from "@/lib/utils";
+
+const SELECTION_LAYOUT_HINTS = {
+  group: {
+    id: "selection-layout-group",
+    title: "선택 요소 그룹화",
+    description: "선택한 요소 2개 이상을 새 레이어 그룹으로 묶고 현재 선택을 해제합니다.",
+    preview: "selection-layout",
+    previewVariant: "group",
+    tip: "그룹은 레이어 패널에서 이름을 바꾸거나 다시 해제할 수 있어요.",
+  },
+  left: {
+    id: "selection-layout-align-left",
+    title: "왼쪽 정렬",
+    description:
+      "하나만 선택하면 포함 패널(없으면 캔버스)의 왼쪽에, 여러 개면 선택 범위의 왼쪽 끝에 맞춥니다.",
+    preview: "selection-layout",
+    previewVariant: "align-left",
+  },
+  hcenter: {
+    id: "selection-layout-align-hcenter",
+    title: "가로 가운데 정렬",
+    description:
+      "하나만 선택하면 포함 패널(없으면 캔버스)의 가로 중앙에, 여러 개면 선택 범위의 가로 중앙에 맞춥니다.",
+    preview: "selection-layout",
+    previewVariant: "align-hcenter",
+  },
+  right: {
+    id: "selection-layout-align-right",
+    title: "오른쪽 정렬",
+    description:
+      "하나만 선택하면 포함 패널(없으면 캔버스)의 오른쪽에, 여러 개면 선택 범위의 오른쪽 끝에 맞춥니다.",
+    preview: "selection-layout",
+    previewVariant: "align-right",
+  },
+  top: {
+    id: "selection-layout-align-top",
+    title: "위쪽 정렬",
+    description:
+      "하나만 선택하면 포함 패널(없으면 캔버스)의 위쪽에, 여러 개면 선택 범위의 위쪽 끝에 맞춥니다.",
+    preview: "selection-layout",
+    previewVariant: "align-top",
+  },
+  vcenter: {
+    id: "selection-layout-align-vcenter",
+    title: "세로 가운데 정렬",
+    description:
+      "하나만 선택하면 포함 패널(없으면 캔버스)의 세로 중앙에, 여러 개면 선택 범위의 세로 중앙에 맞춥니다.",
+    preview: "selection-layout",
+    previewVariant: "align-vcenter",
+  },
+  bottom: {
+    id: "selection-layout-align-bottom",
+    title: "아래쪽 정렬",
+    description:
+      "하나만 선택하면 포함 패널(없으면 캔버스)의 아래쪽에, 여러 개면 선택 범위의 아래쪽 끝에 맞춥니다.",
+    preview: "selection-layout",
+    previewVariant: "align-bottom",
+  },
+  distributeH: {
+    id: "selection-layout-distribute-horizontal",
+    title: "가로 균등 분배",
+    description:
+      "3개 이상 선택했을 때 양 끝 요소의 중심은 고정하고, 사이 요소의 중심을 같은 가로 간격으로 배치합니다.",
+    preview: "selection-layout",
+    previewVariant: "distribute-horizontal",
+  },
+  distributeV: {
+    id: "selection-layout-distribute-vertical",
+    title: "세로 균등 분배",
+    description:
+      "3개 이상 선택했을 때 위·아래 끝 요소의 중심은 고정하고, 사이 요소의 중심을 같은 세로 간격으로 배치합니다.",
+    preview: "selection-layout",
+    previewVariant: "distribute-vertical",
+  },
+} as const;
 
 export type StudioCanvasSelectionAlignment =
   | "left"
@@ -18,6 +97,47 @@ export type StudioCanvasSelectionAlignment =
   | "bottom"
   | "distributeH"
   | "distributeV";
+
+type SelectionLayoutHint = (typeof SELECTION_LAYOUT_HINTS)[keyof typeof SELECTION_LAYOUT_HINTS];
+
+const HORIZONTAL_ALIGNMENT_ACTIONS = [
+  ["left", "선택 요소 왼쪽 정렬", SELECTION_LAYOUT_HINTS.left, AlignLeft],
+  ["hcenter", "선택 요소 가로 가운데 정렬", SELECTION_LAYOUT_HINTS.hcenter, AlignCenter],
+  ["right", "선택 요소 오른쪽 정렬", SELECTION_LAYOUT_HINTS.right, AlignRight],
+] as const;
+
+const VERTICAL_ALIGNMENT_ACTIONS = [
+  ["top", "선택 요소 위쪽 정렬", SELECTION_LAYOUT_HINTS.top, "상"],
+  ["vcenter", "선택 요소 세로 가운데 정렬", SELECTION_LAYOUT_HINTS.vcenter, "중"],
+  ["bottom", "선택 요소 아래쪽 정렬", SELECTION_LAYOUT_HINTS.bottom, "하"],
+] as const;
+
+const DISTRIBUTION_ACTIONS = [
+  ["distributeH", "선택 요소 가로 균등 분배", SELECTION_LAYOUT_HINTS.distributeH, "가로 분배"],
+  ["distributeV", "선택 요소 세로 균등 분배", SELECTION_LAYOUT_HINTS.distributeV, "세로 분배"],
+] as const;
+
+function SelectionLayoutAction({
+  hint,
+  label,
+  onClick,
+  className,
+  children,
+}: {
+  hint: SelectionLayoutHint;
+  label: string;
+  onClick: () => void;
+  className: string;
+  children: ReactNode;
+}) {
+  return (
+    <StudioToolHintTarget hint={hint} preferredSide="top">
+      <button type="button" onClick={onClick} className={className} aria-label={label}>
+        {children}
+      </button>
+    </StudioToolHintTarget>
+  );
+}
 
 export interface StudioCanvasStatusRailProps {
   mobileImmersive: boolean;
@@ -119,87 +239,68 @@ export function StudioCanvasStatusRail({
           <span className="text-fg-3">· 방향키로 이동 · 모서리로 크기·회전</span>
           <div className="ml-auto flex flex-wrap items-center gap-1.5">
             {selectionCount >= 2 && (
-              <button
-                type="button"
+              <SelectionLayoutAction
+                hint={SELECTION_LAYOUT_HINTS.group}
+                label="선택 요소 그룹화"
                 onClick={onGroupSelection}
                 className="flex cursor-pointer items-center gap-1 rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
-                title="그룹화"
               >
-                <FolderPlus size={13} />
+                <FolderPlus size={13} aria-hidden />
                 <span>그룹화</span>
-              </button>
+              </SelectionLayoutAction>
             )}
             <div className="mx-1 h-4 w-px bg-line/60" />
-            <div className="inline-flex gap-0.5 rounded-md border border-line bg-card/50 p-0.5">
-              <button
-                type="button"
-                onClick={() => onAlignSelection("left")}
-                className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
-                title="왼쪽 정렬"
-              >
-                <AlignLeft size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onAlignSelection("hcenter")}
-                className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
-                title="가로 가운데 정렬"
-              >
-                <AlignCenter size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onAlignSelection("right")}
-                className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
-                title="오른쪽 정렬"
-              >
-                <AlignRight size={13} />
-              </button>
+            <div
+              className="inline-flex gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
+              role="group"
+              aria-label="가로 정렬"
+            >
+              {HORIZONTAL_ALIGNMENT_ACTIONS.map(([mode, label, hint, Icon]) => (
+                <SelectionLayoutAction
+                  key={mode}
+                  hint={hint}
+                  label={label}
+                  onClick={() => onAlignSelection(mode)}
+                  className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
+                >
+                  <Icon size={13} aria-hidden />
+                </SelectionLayoutAction>
+              ))}
             </div>
-            <div className="inline-flex gap-0.5 rounded-md border border-line bg-card/50 p-0.5">
-              <button
-                type="button"
-                onClick={() => onAlignSelection("top")}
-                className="cursor-pointer rounded px-1.5 py-0.5 text-[0.66rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
-                title="위쪽 정렬"
-              >
-                상
-              </button>
-              <button
-                type="button"
-                onClick={() => onAlignSelection("vcenter")}
-                className="cursor-pointer rounded px-1.5 py-0.5 text-[0.66rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
-                title="세로 가운데 정렬"
-              >
-                중
-              </button>
-              <button
-                type="button"
-                onClick={() => onAlignSelection("bottom")}
-                className="cursor-pointer rounded px-1.5 py-0.5 text-[0.66rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
-                title="아래쪽 정렬"
-              >
-                하
-              </button>
+            <div
+              className="inline-flex gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
+              role="group"
+              aria-label="세로 정렬"
+            >
+              {VERTICAL_ALIGNMENT_ACTIONS.map(([mode, label, hint, text]) => (
+                <SelectionLayoutAction
+                  key={mode}
+                  hint={hint}
+                  label={label}
+                  onClick={() => onAlignSelection(mode)}
+                  className="cursor-pointer rounded px-1.5 py-0.5 text-[0.66rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
+                >
+                  {text}
+                </SelectionLayoutAction>
+              ))}
             </div>
             {selectionCount >= 3 && (
-              <div className="inline-flex gap-0.5 rounded-md border border-line bg-card/50 p-0.5">
-                <button
-                  type="button"
-                  onClick={() => onAlignSelection("distributeH")}
-                  className="cursor-pointer rounded px-1.5 py-0.5 text-[0.66rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
-                  title="가로 간격 동일하게 정렬"
-                >
-                  가로 분배
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onAlignSelection("distributeV")}
-                  className="cursor-pointer rounded px-1.5 py-0.5 text-[0.66rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
-                  title="세로 간격 동일하게 정렬"
-                >
-                  세로 분배
-                </button>
+              <div
+                className="inline-flex gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
+                role="group"
+                aria-label="균등 분배"
+              >
+                {DISTRIBUTION_ACTIONS.map(([mode, label, hint, text]) => (
+                  <SelectionLayoutAction
+                    key={mode}
+                    hint={hint}
+                    label={label}
+                    onClick={() => onAlignSelection(mode)}
+                    className="cursor-pointer rounded px-1.5 py-0.5 text-[0.66rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
+                  >
+                    {text}
+                  </SelectionLayoutAction>
+                ))}
               </div>
             )}
             <div className="mx-1 h-4 w-px bg-line/60" />

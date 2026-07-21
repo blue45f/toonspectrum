@@ -19,7 +19,7 @@ describe("Studio tool hint preview kind/variant contract", () => {
     ) as StudioToolHintPreviewKind[];
 
     expect(STUDIO_TOOL_HINT_PREVIEW_KINDS).toEqual(catalogKinds);
-    expect(STUDIO_TOOL_HINT_PREVIEW_KINDS).toHaveLength(115);
+    expect(STUDIO_TOOL_HINT_PREVIEW_KINDS).toHaveLength(116);
     expect(new Set(STUDIO_TOOL_HINT_PREVIEW_KINDS).size).toBe(
       STUDIO_TOOL_HINT_PREVIEW_KINDS.length
     );
@@ -27,10 +27,10 @@ describe("Studio tool hint preview kind/variant contract", () => {
       Object.values(STUDIO_TOOL_HINT_PREVIEW_VARIANTS).filter(
         (variants) => variants.length > 0
       )
-    ).toHaveLength(27);
+    ).toHaveLength(30);
     expect(
       Object.values(STUDIO_TOOL_HINT_PREVIEW_VARIANTS).flat()
-    ).toHaveLength(117);
+    ).toHaveLength(144);
 
     for (const kind of STUDIO_TOOL_HINT_PREVIEW_KINDS) {
       expect(studioToolHintPreviewSpec(kind)).toEqual({ kind });

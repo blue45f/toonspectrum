@@ -92,6 +92,9 @@ describe("StudioToolHintPreview", () => {
       "recent-swatch",
       "palette-family",
       "palette-swatch",
+      "primary-color",
+      "secondary-color",
+      "swap-colors",
     ] as const;
     const reducedSignatures = variants.map((variant) =>
       visualSignature("color-palette", variant)
@@ -127,6 +130,7 @@ describe("StudioToolHintPreview", () => {
     ["selection-marquee-transform", ["rotate-custom", "rotate-cw-90", "rotate-ccw-90", "rotate-180", "flip-x", "flip-y", "translate-left", "translate-right", "translate-up", "translate-down", "scale-up", "scale-down"]],
     ["selection-content-transform", ["apply-scale-rotate", "rotate-cw-90", "flip-x", "flip-y", "delete", "content-aware-fill"]],
     ["selection-adjust", ["brightness", "hue"]],
+    ["selection-layout", ["group", "align-left", "align-hcenter", "align-right", "align-top", "align-vcenter", "align-bottom", "distribute-horizontal", "distribute-vertical"]],
     ["panel-layout", ["add", "split-diagonal", "diagonalize", "straighten"]],
     ["zoom-view", ["zoom-out", "zoom-in", "actual-size", "fit-width", "reset"]],
     ["fullscreen", ["maximize-window", "restore-window", "fullscreen", "exit-fullscreen", "canvas-only"]],
@@ -136,9 +140,25 @@ describe("StudioToolHintPreview", () => {
     ["draw-settings", ["expand", "collapse"]],
     ["flip-view", ["flip", "restore"]],
     ["smart-shape", ["enable", "disable"]],
+    ["brush-size", ["preset-xs", "preset-s", "preset-m", "preset-l", "preset-xl", "preset-xxl", "lock", "unlock"]],
+    ["opacity", ["preset-20", "preset-40", "preset-60", "preset-80", "preset-100", "lock", "unlock"]],
   ] as const)("specializes the %s family by stable action identity", (kind, variants) => {
     const signatures = variants.map((variant) => visualSignature(kind, variant));
     expect(new Set(signatures).size).toBe(variants.length);
+  });
+
+  it.each([
+    ["color-palette", ["primary-color", "secondary-color", "swap-colors"]],
+    ["brush-size", ["preset-xs", "preset-s", "preset-m", "preset-l", "preset-xl", "preset-xxl", "lock", "unlock"]],
+    ["opacity", ["preset-20", "preset-40", "preset-60", "preset-80", "preset-100", "lock", "unlock"]],
+    ["selection-layout", ["group", "align-left", "align-hcenter", "align-right", "align-top", "align-vcenter", "align-bottom", "distribute-horizontal", "distribute-vertical"]],
+  ] as const)("keeps every exact %s state distinct with and without motion", (kind, variants) => {
+    expect(new Set(variants.map((variant) => visualSignature(kind, variant))).size).toBe(
+      variants.length
+    );
+    expect(
+      new Set(variants.map((variant) => animatedVisualSignature(kind, variant))).size
+    ).toBe(variants.length);
   });
 
   it.each([

@@ -1,13 +1,22 @@
-import { readFileSync } from "node:fs";
+// @vitest-environment jsdom
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioBrushLibrarySheet } from "./StudioBrushLibrarySheet";
 import { StudioDrawOptionsBar } from "./StudioDrawOptionsBar";
 
-const drawOptionsSource = readFileSync(new URL("./StudioDrawOptionsBar.tsx", import.meta.url), "utf8");
-const studioGlobalsSource = readFileSync(new URL("../../styles/globals.css", import.meta.url), "utf8");
+const drawOptionsSource = readFileSync(
+  resolve(process.cwd(), "src/domains/creator/StudioDrawOptionsBar.tsx"),
+  "utf8"
+);
+const studioGlobalsSource = readFileSync(resolve(process.cwd(), "src/styles/globals.css"), "utf8");
+
+afterEach(cleanup);
 
 describe("StudioDrawOptionsBar", () => {
   it("renders a compact primary dock with continuous size, opacity, and smart-shape controls", () => {
@@ -194,6 +203,88 @@ describe("StudioDrawOptionsBar", () => {
       expect(previewIndex, `missing preview family: ${preview}`).toBeGreaterThanOrEqual(0);
       expect(drawOptionsSource.slice(previewIndex, previewIndex + 180)).toContain(variantExpression);
     }
+  });
+
+  it("uses exact rich previews for every size and opacity preset without native titles", () => {
+    for (const sizeVariant of ["xs", "s", "m", "l", "xl", "xxl"]) {
+      expect(drawOptionsSource).toContain(`preset-${sizeVariant}`);
+    }
+    for (const opacityVariant of [20, 40, 60, 80, 100]) {
+      expect(drawOptionsSource).toContain(`preset-${opacityVariant}`);
+    }
+    expect(drawOptionsSource).toContain("BRUSH_SIZE_HINT_VARIANT[chip.id]");
+    expect(drawOptionsSource).toContain("BRUSH_OPACITY_HINT_VARIANT[chip.id]");
+    expect(drawOptionsSource).toContain('sizeLocked ? "unlock" : "lock"');
+    expect(drawOptionsSource).toContain('opacityLocked ? "unlock" : "lock"');
+    expect(drawOptionsSource).not.toContain("title=");
+    expect(drawOptionsSource).toContain("이후 새로 그리는 획부터 이 크기가 적용돼요.");
+    expect(drawOptionsSource).toContain("브러시 프리셋을 선택할 때 해당 프리셋의 기본 크기");
+    expect(drawOptionsSource).toContain("브러시 프리셋을 선택할 때 해당 프리셋의 기본 불투명도");
+  });
+
+  it("keeps advanced size and opacity presets keyboard-named, stateful, and actionable", () => {
+    const onStrokeWidthChange = vi.fn();
+    const onOpacityChange = vi.fn();
+    const onToggleSizeLock = vi.fn();
+    const onToggleOpacityLock = vi.fn();
+
+    render(
+      <StudioDrawOptionsBar
+        drawMode="pen"
+        brushId="pen"
+        strokeWidth={24}
+        brushOpacity={0.8}
+        stabilizer={4}
+        color="#112233"
+        quickShapeActive={false}
+        sizeLocked
+        opacityLocked={false}
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={onStrokeWidthChange}
+        onOpacityChange={onOpacityChange}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+        onToggleSizeLock={onToggleSizeLock}
+        onToggleOpacityLock={onToggleOpacityLock}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "세부 옵션 펼치기" }));
+
+    const sizeGroup = screen.getByRole("group", { name: "브러시 크기 프리셋" });
+    const activeSize = within(sizeGroup).getByRole("button", {
+      name: "브러시 크기 L 24픽셀",
+    });
+    expect(activeSize.getAttribute("aria-pressed")).toBe("true");
+    expect(activeSize.hasAttribute("title")).toBe(false);
+    fireEvent.click(within(sizeGroup).getByRole("button", { name: "브러시 크기 XS 2픽셀" }));
+    expect(onStrokeWidthChange).toHaveBeenCalledWith(2);
+
+    const sizeUnlock = within(sizeGroup).getByRole("button", {
+      name: "브러시 크기 잠금 해제",
+    });
+    expect(sizeUnlock.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(sizeUnlock);
+    expect(onToggleSizeLock).toHaveBeenCalledOnce();
+
+    const opacityGroup = screen.getByRole("group", { name: "브러시 불투명도 프리셋" });
+    const activeOpacity = within(opacityGroup).getByRole("button", {
+      name: "브러시 불투명도 80%",
+    });
+    expect(activeOpacity.getAttribute("aria-pressed")).toBe("true");
+    expect(activeOpacity.hasAttribute("title")).toBe(false);
+    fireEvent.click(
+      within(opacityGroup).getByRole("button", { name: "브러시 불투명도 20%" })
+    );
+    expect(onOpacityChange).toHaveBeenCalledWith(0.2);
+
+    const opacityLock = within(opacityGroup).getByRole("button", {
+      name: "브러시 불투명도 잠금",
+    });
+    expect(opacityLock.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(opacityLock);
+    expect(onToggleOpacityLock).toHaveBeenCalledOnce();
   });
 
   it("keeps symmetry and slots behind the advanced disclosure", () => {

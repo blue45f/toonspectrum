@@ -8,6 +8,32 @@ import {
   type StudioCanvasStatusRailProps,
 } from "./StudioCanvasStatusRail";
 
+import type { ReactNode } from "react";
+
+vi.mock("./StudioToolHint", () => ({
+  StudioToolHintTarget: ({
+    hint,
+    children,
+  }: {
+    hint: {
+      id: string;
+      description: string;
+      preview?: string;
+      previewVariant?: string;
+    };
+    children: ReactNode;
+  }) => (
+    <span
+      data-testid={`hint-${hint.id}`}
+      data-hint-description={hint.description}
+      data-hint-preview={hint.preview}
+      data-hint-preview-variant={hint.previewVariant}
+    >
+      {children}
+    </span>
+  ),
+}));
+
 afterEach(cleanup);
 
 function createProps(
@@ -64,31 +90,77 @@ describe("StudioCanvasStatusRail", () => {
     expect(screen.queryByRole("button", { name: "JSON 백업" })).toBeNull();
   });
 
-  it("preserves selection thresholds and alignment meanings", () => {
-    const props = createProps({ selectionCount: 2 });
+  it("preserves selection thresholds and every semantic layout callback", () => {
+    const props = createProps({ selectionCount: 1 });
     const { rerender } = render(<StudioCanvasStatusRail {...props} />);
 
-    expect(screen.getByRole("button", { name: "그룹화" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "가로 분배" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "선택 요소 그룹화" })).toBeNull();
+    expect(screen.getByRole("button", { name: "선택 요소 왼쪽 정렬" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "선택 요소 가로 균등 분배" })).toBeNull();
+
+    rerender(<StudioCanvasStatusRail {...props} selectionCount={2} />);
+    expect(screen.getByRole("button", { name: "선택 요소 그룹화" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "선택 요소 가로 균등 분배" })).toBeNull();
 
     rerender(<StudioCanvasStatusRail {...props} selectionCount={3} />);
-    fireEvent.click(screen.getByRole("button", { name: "그룹화" }));
-    fireEvent.click(screen.getByTitle("왼쪽 정렬"));
-    fireEvent.click(screen.getByTitle("세로 가운데 정렬"));
-    fireEvent.click(screen.getByRole("button", { name: "가로 분배" }));
-    fireEvent.click(screen.getByRole("button", { name: "세로 분배" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 요소 그룹화" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 요소 왼쪽 정렬" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 요소 가로 가운데 정렬" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 요소 오른쪽 정렬" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 요소 위쪽 정렬" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 요소 세로 가운데 정렬" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 요소 아래쪽 정렬" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 요소 가로 균등 분배" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 요소 세로 균등 분배" }));
     fireEvent.click(screen.getByRole("button", { name: "복제" }));
     fireEvent.click(screen.getByRole("button", { name: "삭제" }));
     fireEvent.click(screen.getByRole("button", { name: "해제" }));
 
     expect(props.onGroupSelection).toHaveBeenCalledOnce();
     expect(props.onAlignSelection).toHaveBeenNthCalledWith(1, "left");
-    expect(props.onAlignSelection).toHaveBeenNthCalledWith(2, "vcenter");
-    expect(props.onAlignSelection).toHaveBeenNthCalledWith(3, "distributeH");
-    expect(props.onAlignSelection).toHaveBeenNthCalledWith(4, "distributeV");
+    expect(props.onAlignSelection).toHaveBeenNthCalledWith(2, "hcenter");
+    expect(props.onAlignSelection).toHaveBeenNthCalledWith(3, "right");
+    expect(props.onAlignSelection).toHaveBeenNthCalledWith(4, "top");
+    expect(props.onAlignSelection).toHaveBeenNthCalledWith(5, "vcenter");
+    expect(props.onAlignSelection).toHaveBeenNthCalledWith(6, "bottom");
+    expect(props.onAlignSelection).toHaveBeenNthCalledWith(7, "distributeH");
+    expect(props.onAlignSelection).toHaveBeenNthCalledWith(8, "distributeV");
     expect(props.onDuplicateSelection).toHaveBeenCalledOnce();
     expect(props.onRemoveSelection).toHaveBeenCalledOnce();
     expect(props.onClearSelection).toHaveBeenCalledOnce();
+  });
+
+  it("registers one exact rich preview per layout action without native titles", () => {
+    const { container } = render(
+      <StudioCanvasStatusRail {...createProps({ selectionCount: 3 })} />
+    );
+
+    expect(container.querySelector("[title]")).toBeNull();
+
+    const previewTargets = [
+      ...container.querySelectorAll<HTMLElement>('[data-hint-preview="selection-layout"]'),
+    ];
+    expect(previewTargets).toHaveLength(9);
+    expect(previewTargets.map((target) => target.dataset.hintPreviewVariant)).toEqual([
+      "group",
+      "align-left",
+      "align-hcenter",
+      "align-right",
+      "align-top",
+      "align-vcenter",
+      "align-bottom",
+      "distribute-horizontal",
+      "distribute-vertical",
+    ]);
+    expect(screen.getByTestId("hint-selection-layout-group").dataset.hintDescription).toContain(
+      "2개 이상"
+    );
+    expect(
+      screen.getByTestId("hint-selection-layout-distribute-horizontal").dataset.hintDescription
+    ).toContain("3개 이상");
+    expect(
+      screen.getByTestId("hint-selection-layout-distribute-vertical").dataset.hintDescription
+    ).toContain("3개 이상");
   });
 
   it("keeps advanced-fill cancellation and preview application distinct", () => {
