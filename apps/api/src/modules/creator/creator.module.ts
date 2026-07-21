@@ -35,6 +35,7 @@ import {
   studioRemoteReferenceHttpRequesterProvider,
 } from "./studio-remote-reference-image.network";
 import { StudioRemoteReferenceImageService } from "./studio-remote-reference-image.service";
+import { StudioTeamCommentLivePublisher } from "./studio-team-comment-live.publisher";
 import { StudioTeamCommentController } from "./studio-team-comment.controller";
 import { studioTeamCommentRepositoryProvider } from "./studio-team-comment.repository";
 import { StudioTeamCommentService } from "./studio-team-comment.service";
@@ -73,6 +74,7 @@ import { StudioWorkAssetService } from "./studio-work-asset.service";
     CreatorService,
     StudioRasterAssetService,
     StudioRemoteReferenceImageService,
+    StudioTeamCommentLivePublisher,
     StudioTeamCommentService,
     StudioVoiceIcePolicyService,
     StudioWorkAssetService,

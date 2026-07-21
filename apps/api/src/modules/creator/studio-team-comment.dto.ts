@@ -50,6 +50,10 @@ const StudioTeamCommentSequenceSchema = z
   .refine((value) => BigInt(value) <= BigInt("9223372036854775807"), {
     message: "댓글 activity sequence가 PostgreSQL bigint 범위를 벗어났습니다.",
   });
+export const StudioTeamCommentExpectedActivitySequenceSchema =
+  StudioTeamCommentSequenceSchema.refine((value) => BigInt(value) > BigInt(0), {
+    message: "댓글의 예상 activity sequence는 1 이상이어야 합니다.",
+  });
 const StudioTeamCommentCursorSchema = z
   .string()
   .min(1)
@@ -121,6 +125,12 @@ export const ListStudioTeamCommentsQuerySchema = z
     }
   });
 
+export const GetStudioTeamCommentThreadQuerySchema = z
+  .object({
+    messageLimit: z.coerce.number().int().min(1).max(51).default(51),
+  })
+  .strict();
+
 export const CreateStudioTeamCommentThreadSchema = z
   .object({
     // Optional during the rolling-deploy window: new clients send Idempotency-Key while cached
@@ -134,6 +144,21 @@ export const CreateStudioTeamCommentThreadSchema = z
 export const AddStudioTeamCommentReplySchema = CreateStudioTeamCommentThreadSchema
   .pick({ mutationId: true, body: true })
   .strict();
+
+export const ReanchorStudioTeamCommentThreadSchema = z
+  .object({
+    // Header/body reconciliation happens in the controller. Unlike the rolling create/reply
+    // endpoints, a re-anchor command must have one retry key before it reaches the service.
+    mutationId: StudioTeamCommentMutationIdSchema.optional(),
+    anchor: StudioTeamCommentAnchorSchema,
+    expectedActivitySequence: StudioTeamCommentExpectedActivitySequenceSchema,
+  })
+  .strict();
+
+export const ReanchorStudioTeamCommentCommandSchema =
+  ReanchorStudioTeamCommentThreadSchema.extend({
+    mutationId: StudioTeamCommentMutationIdSchema,
+  }).strict();
 
 export const StudioTeamCommentUserSchema = z
   .object({
@@ -213,6 +238,9 @@ export const StudioTeamCommentCapabilitiesSchema = z
     view: z.literal(true),
     comment: z.boolean(),
     resolve: z.boolean(),
+    // Optional only for a rolling deployment with an older API. New repository responses always
+    // include it. `true` means the actor may move any thread; authors may still move their own.
+    reanchor: z.boolean().optional(),
   })
   .strict();
 
@@ -244,6 +272,15 @@ export const TransitionStudioTeamCommentResponseSchema = z
   })
   .strict();
 
+export const ReanchorStudioTeamCommentResponseSchema = z
+  .object({
+    threadId: StudioTeamCommentOpaqueIdSchema,
+    anchor: StudioTeamCommentAnchorSchema,
+    updatedAt: StudioTeamCommentDateTimeSchema,
+    latestActivitySequence: StudioTeamCommentExpectedActivitySequenceSchema,
+  })
+  .strict();
+
 export const ReadStudioTeamCommentResponseSchema = z
   .object({
     threadId: StudioTeamCommentOpaqueIdSchema,
@@ -269,11 +306,17 @@ export class StudioTeamCommentThreadParamsDto extends createZodDto(
 export class ListStudioTeamCommentsQueryDto extends createZodDto(
   ListStudioTeamCommentsQuerySchema
 ) {}
+export class GetStudioTeamCommentThreadQueryDto extends createZodDto(
+  GetStudioTeamCommentThreadQuerySchema
+) {}
 export class CreateStudioTeamCommentThreadDto extends createZodDto(
   CreateStudioTeamCommentThreadSchema
 ) {}
 export class AddStudioTeamCommentReplyDto extends createZodDto(
   AddStudioTeamCommentReplySchema
+) {}
+export class ReanchorStudioTeamCommentThreadDto extends createZodDto(
+  ReanchorStudioTeamCommentThreadSchema
 ) {}
 
 export type StudioTeamCommentAnchor = z.infer<typeof StudioTeamCommentAnchorSchema>;
@@ -287,6 +330,12 @@ export type StudioTeamCommentReplyResponse = z.infer<
 >;
 export type StudioTeamCommentTransitionResponse = z.infer<
   typeof TransitionStudioTeamCommentResponseSchema
+>;
+export type ReanchorStudioTeamCommentCommand = z.infer<
+  typeof ReanchorStudioTeamCommentCommandSchema
+>;
+export type StudioTeamCommentReanchorResponse = z.infer<
+  typeof ReanchorStudioTeamCommentResponseSchema
 >;
 export type StudioTeamCommentReadResponse = z.infer<
   typeof ReadStudioTeamCommentResponseSchema

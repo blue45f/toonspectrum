@@ -86,6 +86,48 @@ function commentsFixture() {
   );
 }
 
+function movablePointPin(overrides: Partial<{
+  key: string;
+  x: number;
+  y: number;
+  anchorX: number;
+  anchorY: number;
+  count: number;
+  threadIds: readonly string[];
+}> = {}) {
+  return {
+    key: overrides.key ?? "point-pin",
+    anchor: {
+      type: "point" as const,
+      pageId: "page-1",
+      x: overrides.anchorX ?? 0.25,
+      y: overrides.anchorY ?? 0.25,
+    },
+    count: overrides.count ?? 1,
+    threadIds: overrides.threadIds ?? ["thread-point"],
+    newestThreadId: "thread-point",
+    previewAuthor: "민지",
+    previewBody: "이 위치를 확인해 주세요.",
+    label: "검토 위치",
+    x: overrides.x ?? 200,
+    y: overrides.y ?? 300,
+  };
+}
+
+function mockOverlayRect(
+  overlay: HTMLElement,
+  rect: { left: number; top: number; width: number; height: number }
+): void {
+  vi.spyOn(overlay, "getBoundingClientRect").mockReturnValue({
+    x: rect.left,
+    y: rect.top,
+    right: rect.left + rect.width,
+    bottom: rect.top + rect.height,
+    ...rect,
+    toJSON: () => ({}),
+  });
+}
+
 describe("StudioLiveCanvasOverlay", () => {
   it("groups unresolved threads by anchor and follows element bounds without changing comment data", () => {
     const document = commentsFixture();
@@ -355,6 +397,460 @@ describe("StudioLiveCanvasOverlay", () => {
     });
   });
 
+  it("exposes drag and keyboard movement only for one unclustered point thread", async () => {
+    const onCommentPinReanchor = vi.fn();
+    render(
+      <StudioLiveCanvasOverlay
+        canvasWidth={800}
+        canvasHeight={1_200}
+        cursors={[]}
+        commentPins={[
+          movablePointPin(),
+          movablePointPin({
+            key: "cluster",
+            count: 2,
+            threadIds: ["thread-a", "thread-b"],
+            x: 400,
+          }),
+          {
+            key: "element",
+            anchor: { type: "element", pageId: "page-1", elementId: "bubble-1" },
+            count: 1,
+            threadIds: ["thread-element"],
+            label: "말풍선 댓글",
+            x: 600,
+            y: 300,
+          },
+        ]}
+        onCommentPinClick={noop}
+        onCommentPinReanchor={onCommentPinReanchor}
+      />
+    );
+
+    const point = screen.getByRole<HTMLButtonElement>("button", { name: /댓글 핀 1\/3/u });
+    const cluster = screen.getByRole<HTMLButtonElement>("button", { name: /댓글 핀 2\/3/u });
+    const element = screen.getByRole<HTMLButtonElement>("button", { name: /말풍선 댓글/u });
+
+    expect(point.getAttribute("data-studio-comment-pin-reanchorable")).toBe("true");
+    expect(point.getAttribute("aria-roledescription")).toBe("이동 가능한 위치 댓글 핀");
+    expect(point.getAttribute("aria-keyshortcuts")).toContain("Alt+ArrowLeft");
+    expect(point.getAttribute("aria-keyshortcuts")).toContain("Alt+Shift+ArrowDown");
+    expect(point.getAttribute("aria-label")).toContain("드래그 또는 Alt와 방향키로 위치 이동.");
+    expect(point.title).toContain("드래그 또는 Alt+방향키로 위치 이동");
+    expect(point.className).toContain("size-11");
+    expect(point.className).toContain("touch-none");
+    expect(cluster.getAttribute("data-studio-comment-pin-reanchorable")).toBeNull();
+    expect(cluster.getAttribute("aria-keyshortcuts")).not.toContain("Alt+");
+    expect(element.getAttribute("data-studio-comment-pin-reanchorable")).toBeNull();
+
+    fireEvent.focus(point);
+    await waitFor(() => {
+      expect(document.querySelector('[data-studio-comment-pin-preview="true"]')?.textContent)
+        .toContain("드래그·Alt+방향키로 위치 이동");
+    });
+  });
+
+  it("keeps a sub-threshold press as an ordinary click and uses pointer capture safely", () => {
+    const onCommentPinClick = vi.fn();
+    const onCommentPinReanchor = vi.fn();
+    render(
+      <StudioLiveCanvasOverlay
+        canvasWidth={800}
+        canvasHeight={1_200}
+        cursors={[]}
+        commentPins={[movablePointPin()]}
+        onCommentPinClick={onCommentPinClick}
+        onCommentPinReanchor={onCommentPinReanchor}
+      />
+    );
+    const overlay = screen.getByRole("group", { name: "공동작업 캔버스 오버레이" });
+    mockOverlayRect(overlay, { left: 100, top: 50, width: 400, height: 600 });
+    const pin = screen.getByRole<HTMLButtonElement>("button", { name: /검토 위치/u });
+    const setPointerCapture = vi.fn();
+    const releasePointerCapture = vi.fn();
+    Object.defineProperties(pin, {
+      setPointerCapture: { configurable: true, value: setPointerCapture },
+      hasPointerCapture: { configurable: true, value: vi.fn(() => true) },
+      releasePointerCapture: { configurable: true, value: releasePointerCapture },
+    });
+
+    fireEvent.pointerDown(pin, {
+      pointerId: 7,
+      button: 0,
+      isPrimary: true,
+      clientX: 200,
+      clientY: 200,
+    });
+    fireEvent.pointerMove(pin, { pointerId: 7, clientX: 203, clientY: 202 });
+    expect(document.querySelector('[data-studio-comment-pin-drag-origin="true"]')).toBeNull();
+    fireEvent.pointerUp(pin, { pointerId: 7, clientX: 203, clientY: 202 });
+    fireEvent.click(pin);
+
+    expect(setPointerCapture).toHaveBeenCalledWith(7);
+    expect(releasePointerCapture).toHaveBeenCalledWith(7);
+    expect(onCommentPinReanchor).not.toHaveBeenCalled();
+    expect(onCommentPinClick).toHaveBeenCalledOnce();
+  });
+
+  it("previews a pointer drag, clamps the drop, commits once, and suppresses its trailing click", () => {
+    const onCommentPinClick = vi.fn();
+    const onCommentPinReanchor = vi.fn();
+    render(
+      <StudioLiveCanvasOverlay
+        canvasWidth={800}
+        canvasHeight={1_200}
+        cursors={[]}
+        commentPins={[movablePointPin()]}
+        onCommentPinClick={onCommentPinClick}
+        onCommentPinReanchor={onCommentPinReanchor}
+      />
+    );
+    const overlay = screen.getByRole("group", { name: "공동작업 캔버스 오버레이" });
+    mockOverlayRect(overlay, { left: 100, top: 50, width: 400, height: 600 });
+    const pin = screen.getByRole<HTMLButtonElement>("button", { name: /검토 위치/u });
+
+    fireEvent.pointerDown(pin, {
+      pointerId: 11,
+      button: 0,
+      isPrimary: true,
+      clientX: 200,
+      clientY: 200,
+    });
+    fireEvent.pointerMove(pin, { pointerId: 11, clientX: 360, clientY: 410 });
+
+    expect(pin.getAttribute("data-studio-comment-pin-reanchoring")).toBe("true");
+    expect(pin.getAttribute("aria-label")).toContain("댓글 위치 이동 중.");
+    expect(pin.getAttribute("data-studio-comment-pin-anchor-x")).toBe("0.6500");
+    expect(pin.getAttribute("data-studio-comment-pin-anchor-y")).toBe("0.6000");
+    expect(document.querySelector('[data-studio-comment-pin-drag-origin="true"]')).not.toBeNull();
+    expect(screen.getByRole("status").textContent).toContain("댓글 위치 이동 중");
+
+    fireEvent.pointerUp(pin, { pointerId: 11, clientX: -5_000, clientY: 5_000 });
+    fireEvent.pointerUp(pin, { pointerId: 11, clientX: 300, clientY: 300 });
+    fireEvent.click(pin);
+
+    expect(onCommentPinReanchor).toHaveBeenCalledOnce();
+    expect(onCommentPinReanchor).toHaveBeenCalledWith({
+      pinKey: "point-pin",
+      threadId: "thread-point",
+      anchor: { type: "point", pageId: "page-1", x: 0, y: 1 },
+      source: "pointer",
+    });
+    expect(onCommentPinClick).not.toHaveBeenCalled();
+    expect(pin.getAttribute("data-studio-comment-pin-reanchoring")).toBeNull();
+    expect(document.querySelector('[data-studio-comment-pin-drag-origin="true"]')).toBeNull();
+    expect(screen.getByRole("status").textContent).toContain("댓글 위치를 옮겼습니다");
+
+    fireEvent.click(pin);
+    expect(onCommentPinClick).toHaveBeenCalledOnce();
+  });
+
+  it("continues and finishes a pin drag through the window when pointer capture is unavailable", () => {
+    const onCommentPinClick = vi.fn();
+    const onCommentPinReanchor = vi.fn();
+    render(
+      <StudioLiveCanvasOverlay
+        canvasWidth={800}
+        canvasHeight={1_200}
+        cursors={[]}
+        commentPins={[movablePointPin()]}
+        onCommentPinClick={onCommentPinClick}
+        onCommentPinReanchor={onCommentPinReanchor}
+      />
+    );
+    const overlay = screen.getByRole("group", { name: "공동작업 캔버스 오버레이" });
+    mockOverlayRect(overlay, { left: 100, top: 50, width: 400, height: 600 });
+    const pin = screen.getByRole<HTMLButtonElement>("button", { name: /검토 위치/u });
+    Object.defineProperty(pin, "setPointerCapture", {
+      configurable: true,
+      value: vi.fn(() => {
+        throw new DOMException("Pointer capture is unavailable");
+      }),
+    });
+
+    fireEvent.pointerDown(pin, {
+      pointerId: 31,
+      button: 0,
+      isPrimary: true,
+      clientX: 200,
+      clientY: 200,
+    });
+    fireEvent.pointerMove(window, { pointerId: 31, clientX: 360, clientY: 410 });
+
+    expect(pin.getAttribute("data-studio-comment-pin-reanchoring")).toBe("true");
+    expect(pin.getAttribute("data-studio-comment-pin-anchor-x")).toBe("0.6500");
+    expect(pin.getAttribute("data-studio-comment-pin-anchor-y")).toBe("0.6000");
+
+    fireEvent.pointerUp(window, { pointerId: 31, clientX: 480, clientY: 620 });
+    fireEvent.click(pin);
+
+    expect(onCommentPinReanchor).toHaveBeenCalledOnce();
+    expect(onCommentPinReanchor).toHaveBeenCalledWith({
+      pinKey: "point-pin",
+      threadId: "thread-point",
+      anchor: { type: "point", pageId: "page-1", x: 0.95, y: 0.95 },
+      source: "pointer",
+    });
+    expect(onCommentPinClick).not.toHaveBeenCalled();
+    expect(pin.getAttribute("data-studio-comment-pin-reanchoring")).toBeNull();
+    expect(document.querySelector('[data-studio-comment-pin-drag-origin="true"]')).toBeNull();
+    expect(screen.getByRole("status").textContent).toContain("댓글 위치를 옮겼습니다");
+  });
+
+  it("preserves the grab offset when an edge pin is visually clamped inward", () => {
+    const onCommentPinReanchor = vi.fn();
+    render(
+      <StudioLiveCanvasOverlay
+        canvasWidth={800}
+        canvasHeight={1_200}
+        cursors={[]}
+        commentPins={[movablePointPin({ anchorX: 0, anchorY: 0.5, x: 0, y: 600 })]}
+        onCommentPinClick={noop}
+        onCommentPinReanchor={onCommentPinReanchor}
+      />
+    );
+    const overlay = screen.getByRole("group", { name: "공동작업 캔버스 오버레이" });
+    mockOverlayRect(overlay, { left: 100, top: 50, width: 400, height: 600 });
+    const pin = screen.getByRole<HTMLButtonElement>("button", { name: /검토 위치/u });
+
+    // The logical x=0 pin is visually clamped to 22px from the edge. A 10px drag should move
+    // only 10px in document space instead of jumping by the clamp inset.
+    fireEvent.pointerDown(pin, {
+      pointerId: 37,
+      button: 0,
+      isPrimary: true,
+      clientX: 122,
+      clientY: 350,
+    });
+    fireEvent.pointerMove(pin, { pointerId: 37, clientX: 132, clientY: 350 });
+    fireEvent.pointerUp(pin, { pointerId: 37, clientX: 132, clientY: 350 });
+
+    expect(onCommentPinReanchor).toHaveBeenCalledWith({
+      pinKey: "point-pin",
+      threadId: "thread-point",
+      anchor: { type: "point", pageId: "page-1", x: 0.025, y: 0.5 },
+      source: "pointer",
+    });
+  });
+
+  it("cancels an active drag without moving or opening the thread", () => {
+    const onCommentPinClick = vi.fn();
+    const onCommentPinReanchor = vi.fn();
+    render(
+      <StudioLiveCanvasOverlay
+        canvasWidth={800}
+        canvasHeight={1_200}
+        cursors={[]}
+        commentPins={[movablePointPin()]}
+        onCommentPinClick={onCommentPinClick}
+        onCommentPinReanchor={onCommentPinReanchor}
+      />
+    );
+    const overlay = screen.getByRole("group", { name: "공동작업 캔버스 오버레이" });
+    mockOverlayRect(overlay, { left: 0, top: 0, width: 800, height: 1_200 });
+    const pin = screen.getByRole<HTMLButtonElement>("button", { name: /검토 위치/u });
+
+    fireEvent.pointerDown(pin, {
+      pointerId: 13,
+      button: 0,
+      isPrimary: true,
+      clientX: 200,
+      clientY: 300,
+    });
+    fireEvent.pointerMove(pin, { pointerId: 13, clientX: 300, clientY: 400 });
+    expect(document.querySelector('[data-studio-comment-pin-drag-origin="true"]')).not.toBeNull();
+    fireEvent.pointerCancel(pin, { pointerId: 13 });
+
+    expect(onCommentPinReanchor).not.toHaveBeenCalled();
+    expect(onCommentPinClick).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-studio-comment-pin-drag-origin="true"]')).toBeNull();
+    expect(screen.getByRole("status").textContent).toContain("이동을 취소했습니다");
+
+    fireEvent.pointerDown(pin, {
+      pointerId: 14,
+      button: 0,
+      isPrimary: true,
+      clientX: 200,
+      clientY: 300,
+    });
+    fireEvent.pointerMove(pin, { pointerId: 14, clientX: 360, clientY: 480 });
+    expect(document.querySelector('[data-studio-comment-pin-drag-origin="true"]')).not.toBeNull();
+    fireEvent.keyDown(pin, { key: "Escape" });
+    expect(onCommentPinReanchor).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-studio-comment-pin-drag-origin="true"]')).toBeNull();
+    expect(screen.getByRole("status").textContent).toContain("이동을 취소했습니다");
+  });
+
+  it("projects a pointer drop through canvas rotation and horizontal flip", () => {
+    const onCommentPinReanchor = vi.fn();
+    render(
+      <StudioLiveCanvasOverlay
+        canvasWidth={1_200}
+        canvasHeight={600}
+        cursors={[]}
+        commentPins={[movablePointPin({ anchorX: 0.5, anchorY: 0.5, x: 600, y: 300 })]}
+        flipX
+        rotation={90}
+        onCommentPinClick={noop}
+        onCommentPinReanchor={onCommentPinReanchor}
+      />
+    );
+    const overlay = screen.getByRole("group", { name: "공동작업 캔버스 오버레이" });
+    mockOverlayRect(overlay, { left: 100, top: 50, width: 600, height: 300 });
+    const pin = screen.getByRole<HTMLButtonElement>("button", { name: /검토 위치/u });
+
+    fireEvent.pointerDown(pin, {
+      pointerId: 17,
+      button: 0,
+      isPrimary: true,
+      clientX: 400,
+      clientY: 200,
+    });
+    fireEvent.pointerMove(pin, { pointerId: 17, clientX: 250, clientY: 275 });
+    fireEvent.pointerUp(pin, { pointerId: 17, clientX: 250, clientY: 275 });
+
+    expect(onCommentPinReanchor).toHaveBeenCalledWith({
+      pinKey: "point-pin",
+      threadId: "thread-point",
+      anchor: { type: "point", pageId: "page-1", x: 0.75, y: 0.25 },
+      source: "pointer",
+    });
+  });
+
+  it("uses screen-relative fine and coarse Alt+Arrow nudges without breaking plain Arrow navigation", () => {
+    const onCommentPinReanchor = vi.fn();
+    render(
+      <StudioLiveCanvasOverlay
+        canvasWidth={800}
+        canvasHeight={400}
+        cursors={[]}
+        commentPins={[
+          movablePointPin({ anchorX: 0.5, anchorY: 0.5, x: 400, y: 200 }),
+          movablePointPin({ key: "second-point", anchorX: 0.7, anchorY: 0.5, x: 560, y: 200 }),
+        ]}
+        flipX
+        rotation={90}
+        onCommentPinClick={noop}
+        onCommentPinReanchor={onCommentPinReanchor}
+      />
+    );
+    const first = screen.getByRole<HTMLButtonElement>("button", { name: /댓글 핀 1\/2/u });
+    const second = screen.getByRole<HTMLButtonElement>("button", { name: /댓글 핀 2\/2/u });
+
+    fireEvent.keyDown(first, { key: "ArrowRight", altKey: true });
+    fireEvent.keyDown(first, { key: "ArrowDown", altKey: true, shiftKey: true });
+    expect(onCommentPinReanchor).toHaveBeenCalledTimes(2);
+    expect(onCommentPinReanchor.mock.calls[0]?.[0]).toEqual({
+      pinKey: "point-pin",
+      threadId: "thread-point",
+      anchor: { type: "point", pageId: "page-1", x: 0.5, y: 0.505 },
+      source: "keyboard",
+    });
+    expect(onCommentPinReanchor.mock.calls[1]?.[0]).toEqual({
+      pinKey: "point-pin",
+      threadId: "thread-point",
+      anchor: { type: "point", pageId: "page-1", x: 0.525, y: 0.505 },
+      source: "keyboard",
+    });
+    expect(screen.getByRole("status").textContent).toContain("크게 옮겼습니다");
+
+    first.focus();
+    fireEvent.keyDown(first, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(second);
+    expect(onCommentPinReanchor).toHaveBeenCalledTimes(2);
+  });
+
+  it("applies per-thread move authority while keeping other users' pins openable", () => {
+    const onCommentPinClick = vi.fn();
+    const onCommentPinReanchor = vi.fn();
+    render(
+      <StudioLiveCanvasOverlay
+        canvasWidth={800}
+        canvasHeight={1_200}
+        cursors={[]}
+        commentPins={[
+          movablePointPin({ key: "owned", threadIds: ["thread-owned"] }),
+          movablePointPin({
+            key: "other",
+            threadIds: ["thread-other"],
+            anchorX: 0.65,
+            x: 520,
+          }),
+        ]}
+        onCommentPinClick={onCommentPinClick}
+        onCommentPinReanchor={onCommentPinReanchor}
+        commentPinReanchorableThreadIds={new Set(["thread-owned"])}
+        commentPinReanchorDisabledReason="본인이 작성한 댓글만 옮길 수 있어요."
+      />
+    );
+    const owned = screen.getByRole<HTMLButtonElement>("button", { name: /댓글 핀 1\/2/u });
+    const other = screen.getByRole<HTMLButtonElement>("button", { name: /댓글 핀 2\/2/u });
+
+    expect(owned.getAttribute("data-studio-comment-pin-reanchorable")).toBe("true");
+    expect(owned.getAttribute("aria-keyshortcuts")).toContain("Alt+ArrowRight");
+    expect(other.getAttribute("data-studio-comment-pin-reanchorable")).toBeNull();
+    expect(other.getAttribute("aria-keyshortcuts")).not.toContain("Alt+");
+    expect(other.getAttribute("aria-label")).toContain("본인이 작성한 댓글만 옮길 수 있어요");
+
+    fireEvent.keyDown(owned, { key: "ArrowRight", altKey: true });
+    expect(onCommentPinReanchor).toHaveBeenCalledOnce();
+    expect(onCommentPinReanchor.mock.calls[0]?.[0].threadId).toBe("thread-owned");
+    fireEvent.keyDown(other, { key: "ArrowRight", altKey: true });
+    expect(onCommentPinReanchor).toHaveBeenCalledOnce();
+    expect(screen.getByRole("status").textContent).toContain("본인이 작성한 댓글만 옮길 수 있어요");
+
+    fireEvent.click(other);
+    expect(onCommentPinClick).toHaveBeenCalledOnce();
+    expect(onCommentPinClick.mock.calls[0]?.[0].pinKey).toBe("other");
+  });
+
+  it("explains a disabled move while preserving comment opening and cluster safety", () => {
+    const onCommentPinClick = vi.fn();
+    const onCommentPinReanchor = vi.fn();
+    render(
+      <StudioLiveCanvasOverlay
+        canvasWidth={800}
+        canvasHeight={1_200}
+        cursors={[]}
+        commentPins={[
+          movablePointPin(),
+          movablePointPin({
+            key: "cluster",
+            count: 2,
+            threadIds: ["thread-a", "thread-b"],
+            x: 400,
+          }),
+        ]}
+        onCommentPinClick={onCommentPinClick}
+        onCommentPinReanchor={onCommentPinReanchor}
+        commentPinReanchorDisabledReason="동기화가 끝난 뒤 이동할 수 있어요."
+      />
+    );
+    const point = screen.getByRole<HTMLButtonElement>("button", { name: /댓글 핀 1\/2/u });
+    const cluster = screen.getByRole<HTMLButtonElement>("button", { name: /댓글 핀 2\/2/u });
+
+    expect(point.getAttribute("data-studio-comment-pin-reanchorable")).toBeNull();
+    expect(point.getAttribute("aria-label")).toContain("위치 이동 불가 동기화가 끝난 뒤 이동할 수 있어요.");
+    expect(point.title).toContain("위치 이동 불가");
+    fireEvent.keyDown(point, { key: "ArrowLeft", altKey: true });
+    expect(onCommentPinReanchor).not.toHaveBeenCalled();
+    expect(screen.getByRole("status").textContent).toContain("동기화가 끝난 뒤 이동할 수 있어요");
+
+    fireEvent.pointerDown(cluster, {
+      pointerId: 21,
+      button: 0,
+      isPrimary: true,
+      clientX: 400,
+      clientY: 300,
+    });
+    fireEvent.pointerMove(cluster, { pointerId: 21, clientX: 500, clientY: 400 });
+    fireEvent.pointerUp(cluster, { pointerId: 21, clientX: 500, clientY: 400 });
+    expect(onCommentPinReanchor).not.toHaveBeenCalled();
+
+    fireEvent.click(point);
+    expect(onCommentPinClick).toHaveBeenCalledOnce();
+  });
+
   it("keeps exactly one surviving comment pin in the tab order as pins change", async () => {
     const firstPin = {
       key: "first",
@@ -522,6 +1018,7 @@ describe("StudioLiveCanvasOverlay", () => {
             key: "point",
             anchor: { type: "point", pageId: "page-1", x: 0.25, y: 0.25 },
             count: 1,
+            threadIds: ["thread-point"],
             label: "검토 핀",
             x: 200,
             y: 100,
@@ -532,11 +1029,15 @@ describe("StudioLiveCanvasOverlay", () => {
         rotation={90}
         flipX
         onCommentPinClick={noop}
+        onCommentPinReanchor={noop}
+        commentPinReanchorableThreadIds={new Set(["thread-point"])}
       />
     );
 
     expect(html).toContain("left:clamp(1.375rem, calc(25.0000% + 8px)");
     expect(html).toContain("top:clamp(1.375rem, calc(25.0000% + 12px)");
+    expect(html).toContain('data-studio-comment-pin-reanchorable="true"');
+    expect(html).toContain("Alt+Shift+ArrowDown");
   });
 
   it("uses deterministic participant colors and exposes Figma-style follow controls", () => {

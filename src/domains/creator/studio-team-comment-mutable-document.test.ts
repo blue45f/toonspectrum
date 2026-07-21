@@ -7,6 +7,7 @@ import {
   type StudioCommentsDocument,
 } from "./studio-comments";
 import {
+  applyStudioTeamCommentReanchorReceipt,
   mergeStudioTeamCommentMutableDocument,
   partitionStudioTeamCommentMutableDocument,
 } from "./studio-team-comment-mutable-document";
@@ -65,5 +66,31 @@ describe("team comment mutable document partition", () => {
       mutationId: "remote-new",
       body: "새 팀 댓글",
     });
+  });
+
+  it("applies an accepted re-anchor receipt without replacing thread content", () => {
+    const source = addStudioCommentThread({ version: 1, threads: [] }, {
+      id: "thread-1",
+      anchor: { type: "page", pageId: "page-1" },
+      author: ACTOR,
+      body: "본문 유지",
+    }, new Date("2026-07-18T00:00:00.000Z"));
+    const moved = applyStudioTeamCommentReanchorReceipt(source, {
+      threadId: "thread-1",
+      anchor: { type: "point", pageId: "page-1", x: 0.25, y: 0.75 },
+      updatedAt: "2026-07-18T00:01:00.000Z",
+    });
+
+    expect(moved.threads[0]).toMatchObject({
+      id: "thread-1",
+      anchor: { type: "point", pageId: "page-1", x: 0.25, y: 0.75 },
+      body: "본문 유지",
+      updatedAt: "2026-07-18T00:01:00.000Z",
+    });
+    expect(applyStudioTeamCommentReanchorReceipt(source, {
+      threadId: "thread-1",
+      anchor: { type: "page", pageId: "page-2" },
+      updatedAt: "not-a-time",
+    })).toBe(source);
   });
 });

@@ -973,6 +973,40 @@ describe("studio live protocol", () => {
 });
 
 describe("StudioLiveGateway", () => {
+  it("publishes the exact comment invalidation through the adapter-backed work room", () => {
+    const harness = createHarness();
+    const change = {
+      version: 1 as const,
+      workId: "work-1",
+      threadId: "thread-1",
+      activitySequence: "42",
+      kind: "reanchored" as const,
+    };
+
+    expect(harness.gateway.publishTeamCommentChanged(change)).toBe(true);
+    expect(harness.emissions).toEqual([
+      {
+        target: "studio-live:work-1",
+        event: "studio:comment:changed",
+        payload: change,
+      },
+    ]);
+  });
+
+  it("reports an unavailable comment invalidation seam before gateway initialization", () => {
+    const harness = createHarness();
+    Reflect.deleteProperty(harness.gateway, "server");
+
+    expect(harness.gateway.publishTeamCommentChanged({
+      version: 1,
+      workId: "work-1",
+      threadId: "thread-1",
+      activitySequence: "42",
+      kind: "created",
+    })).toBe(false);
+    expect(harness.emissions).toEqual([]);
+  });
+
   it("completes namespace authentication before admitting the socket", async () => {
     let resolveAuthentication: ((principal: StudioLiveAuthPrincipal | null) => void) | null = null;
     const authentication = new Promise<StudioLiveAuthPrincipal | null>((resolve) => {

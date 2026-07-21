@@ -43,6 +43,10 @@ export interface StudioCommentThreadPopoverProps {
   thread: StudioCommentThread;
   /** Viewport-space center of the selected canvas pin. */
   screenPoint: { x: number; y: number };
+  /** Optional live pin element. Its viewport-space center wins over the screenPoint fallback. */
+  anchorElement?: HTMLElement | null;
+  /** Optional live anchor reader for transformed or virtualized canvas pins. */
+  getScreenPoint?: () => { x: number; y: number } | null;
   unread?: boolean;
   capabilities?: Partial<StudioCommentThreadPopoverCapabilities>;
   /** Shared explanation for permission, offline, quota, or read-only restrictions. */
@@ -85,7 +89,7 @@ interface StudioCommentThreadPopoverPosition {
   top: number;
   width: number;
   maxHeight: number;
-  placement: "left" | "right";
+  placement: "bottom" | "left" | "right";
 }
 
 type PopoverMutation = "reply" | "resolve" | null;
@@ -113,15 +117,6 @@ const FULL_DATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   hour: "2-digit",
   minute: "2-digit",
 });
-
-const FOCUSABLE_SELECTOR = [
-  "button:not([disabled])",
-  "textarea:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  "a[href]",
-  "[tabindex]:not([tabindex='-1'])",
-].join(",");
 
 function clamp(value: number, minimum: number, maximum: number): number {
   if (maximum < minimum) return minimum;
@@ -186,6 +181,55 @@ function planStudioCommentThreadPopoverPosition(
   };
 }
 
+function planStudioCommentThreadBottomSheetPosition(
+  viewport: StudioCommentThreadPopoverViewport,
+  measured: { width: number; height: number }
+): StudioCommentThreadPopoverPosition {
+  const width = Math.max(0, Math.min(480, viewport.width));
+  const maxHeight = Math.max(0, viewport.height);
+  const height = Math.min(maxHeight, finiteOr(measured.height, 500));
+
+  return {
+    left: viewport.left + (viewport.width - width) / 2,
+    top: viewport.top + viewport.height - height,
+    width,
+    maxHeight,
+    placement: "bottom",
+  };
+}
+
+function studioCommentThreadUsesBottomSheet(
+  viewport: StudioCommentThreadPopoverViewport
+): boolean {
+  return viewport.width < 640
+    || (typeof globalThis.matchMedia === "function"
+      && globalThis.matchMedia("(pointer: coarse)").matches);
+}
+
+function sameStudioCommentThreadViewport(
+  left: StudioCommentThreadPopoverViewport | null,
+  right: StudioCommentThreadPopoverViewport
+): boolean {
+  return left !== null
+    && left.left === right.left
+    && left.top === right.top
+    && left.width === right.width
+    && left.height === right.height;
+}
+
+function sameScreenPoint(
+  left: StudioCommentThreadPopoverProps["screenPoint"],
+  right: StudioCommentThreadPopoverProps["screenPoint"]
+): boolean {
+  return Math.abs(left.x - right.x) < 0.1 && Math.abs(left.y - right.y) < 0.1;
+}
+
+function finiteScreenPoint(
+  point: StudioCommentThreadPopoverProps["screenPoint"] | null | undefined
+): StudioCommentThreadPopoverProps["screenPoint"] | null {
+  return point && Number.isFinite(point.x) && Number.isFinite(point.y) ? point : null;
+}
+
 function actorInitial(actor: StudioCommentActor): string {
   return Array.from(actor.displayName.trim())[0]?.toLocaleUpperCase("ko-KR") ?? "?";
 }
@@ -220,6 +264,8 @@ function recentThreadMessages(thread: StudioCommentThread): {
 export function StudioCommentThreadPopover({
   thread,
   screenPoint,
+  anchorElement,
+  getScreenPoint,
   unread = false,
   capabilities: capabilityOverrides,
   mutationDisabledReason,
@@ -259,12 +305,18 @@ export function StudioCommentThreadPopover({
   );
   const fallbackFocusTargetRef = useRef(fallbackFocusTarget);
   fallbackFocusTargetRef.current = fallbackFocusTarget;
+  const fallbackScreenPointRef = useRef(screenPoint);
+  fallbackScreenPointRef.current = screenPoint;
+  const shouldRestoreFocusRef = useRef(true);
   const pendingMutationRef = useRef<PopoverMutation>(null);
   const mutationRevisionRef = useRef(0);
   const [pendingMutation, setPendingMutation] = useState<PopoverMutation>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [cardSize, setCardSize] = useState({ width: 360, height: 500 });
+  const [liveScreenPoint, setLiveScreenPoint] = useState(screenPoint);
+  const viewportRef = useRef<StudioCommentThreadPopoverViewport | null>(null);
+  const coarsePointerRef = useRef<boolean | null>(null);
   const [, setViewportRevision] = useState(0);
   const capabilities: StudioCommentThreadPopoverCapabilities = {
     reply: capabilityOverrides?.reply ?? DEFAULT_CAPABILITIES.reply,
@@ -314,19 +366,91 @@ export function StudioCommentThreadPopover({
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    const update = () => setViewportRevision((revision) => revision + 1);
-    globalThis.addEventListener("resize", update);
-    globalThis.addEventListener("scroll", update, true);
-    globalThis.visualViewport?.addEventListener("resize", update);
-    globalThis.visualViewport?.addEventListener("scroll", update);
-    return () => {
-      globalThis.removeEventListener("resize", update);
-      globalThis.removeEventListener("scroll", update, true);
-      globalThis.visualViewport?.removeEventListener("resize", update);
-      globalThis.visualViewport?.removeEventListener("scroll", update);
+  useLayoutEffect(() => {
+    let animationFrame = 0;
+    let disposed = false;
+    const coarsePointer = typeof globalThis.matchMedia === "function"
+      ? globalThis.matchMedia("(pointer: coarse)")
+      : null;
+    const passiveCapture = { capture: true, passive: true } as const;
+
+    const readLiveScreenPoint = () => {
+      if (getScreenPoint) {
+        try {
+          const suppliedPoint = finiteScreenPoint(getScreenPoint());
+          if (suppliedPoint) return suppliedPoint;
+        } catch {
+          // A transient canvas teardown should fall back to the last projected point.
+        }
+      }
+      if (anchorElement?.isConnected) {
+        const rect = anchorElement.getBoundingClientRect();
+        const elementPoint = finiteScreenPoint({
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+        });
+        if (elementPoint) return elementPoint;
+      }
+      return finiteScreenPoint(fallbackScreenPointRef.current) ?? { x: 0, y: 0 };
     };
-  }, []);
+
+    const refreshPosition = () => {
+      animationFrame = 0;
+      if (disposed) return;
+      const nextViewport = studioCommentThreadPopoverViewport();
+      const nextCoarsePointer = coarsePointer?.matches ?? false;
+      if (
+        !sameStudioCommentThreadViewport(viewportRef.current, nextViewport)
+        || coarsePointerRef.current !== nextCoarsePointer
+      ) {
+        viewportRef.current = nextViewport;
+        coarsePointerRef.current = nextCoarsePointer;
+        setViewportRevision((revision) => revision + 1);
+      }
+
+      if (!anchorElement && !getScreenPoint) return;
+      const nextPoint = readLiveScreenPoint();
+      setLiveScreenPoint((currentPoint) => (
+        sameScreenPoint(currentPoint, nextPoint) ? currentPoint : nextPoint
+      ));
+    };
+
+    const schedulePositionRefresh = () => {
+      if (disposed || animationFrame !== 0) return;
+      animationFrame = globalThis.requestAnimationFrame(refreshPosition);
+    };
+
+    schedulePositionRefresh();
+    const observer = anchorElement && typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(schedulePositionRefresh)
+      : null;
+    if (anchorElement) observer?.observe(anchorElement);
+    globalThis.addEventListener("resize", schedulePositionRefresh, passiveCapture);
+    globalThis.addEventListener("scroll", schedulePositionRefresh, passiveCapture);
+    globalThis.addEventListener("wheel", schedulePositionRefresh, passiveCapture);
+    globalThis.addEventListener("pointermove", schedulePositionRefresh, passiveCapture);
+    globalThis.addEventListener("pointerup", schedulePositionRefresh, passiveCapture);
+    globalThis.addEventListener("click", schedulePositionRefresh, passiveCapture);
+    globalThis.addEventListener("keydown", schedulePositionRefresh, true);
+    globalThis.visualViewport?.addEventListener("resize", schedulePositionRefresh);
+    globalThis.visualViewport?.addEventListener("scroll", schedulePositionRefresh);
+    coarsePointer?.addEventListener("change", schedulePositionRefresh);
+    return () => {
+      disposed = true;
+      if (animationFrame !== 0) globalThis.cancelAnimationFrame(animationFrame);
+      observer?.disconnect();
+      globalThis.removeEventListener("resize", schedulePositionRefresh, passiveCapture);
+      globalThis.removeEventListener("scroll", schedulePositionRefresh, passiveCapture);
+      globalThis.removeEventListener("wheel", schedulePositionRefresh, passiveCapture);
+      globalThis.removeEventListener("pointermove", schedulePositionRefresh, passiveCapture);
+      globalThis.removeEventListener("pointerup", schedulePositionRefresh, passiveCapture);
+      globalThis.removeEventListener("click", schedulePositionRefresh, passiveCapture);
+      globalThis.removeEventListener("keydown", schedulePositionRefresh, true);
+      globalThis.visualViewport?.removeEventListener("resize", schedulePositionRefresh);
+      globalThis.visualViewport?.removeEventListener("scroll", schedulePositionRefresh);
+      coarsePointer?.removeEventListener("change", schedulePositionRefresh);
+    };
+  }, [anchorElement, getScreenPoint, screenPoint.x, screenPoint.y, thread.updatedAt]);
 
   useEffect(() => {
     const frame = globalThis.requestAnimationFrame(() => {
@@ -340,6 +464,7 @@ export function StudioCommentThreadPopover({
   useEffect(() => {
     const returnTarget = returnFocusRef.current;
     return () => {
+      if (!shouldRestoreFocusRef.current) return;
       if (returnTarget?.isConnected) {
         returnTarget.focus({ preventScroll: true });
         return;
@@ -359,60 +484,64 @@ export function StudioCommentThreadPopover({
   }, [thread.id]);
 
   useEffect(() => {
-    const containKeyboard = (event: KeyboardEvent) => {
+    const handleKeyboard = (event: KeyboardEvent) => {
       if (event.isComposing) return;
       if (event.key === "Escape") {
         if (pendingMutationRef.current || syncing || submitting) return;
         event.preventDefault();
         event.stopPropagation();
+        shouldRestoreFocusRef.current = true;
         onClose("escape");
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-        .filter((element) => element.tabIndex >= 0 && !element.hasAttribute("aria-hidden"));
-      if (focusable.length === 0) {
-        event.preventDefault();
-        dialog.focus();
-        return;
-      }
-      const first = focusable[0]!;
-      const last = focusable[focusable.length - 1]!;
-      const active = dialog.ownerDocument.activeElement;
-      if (event.shiftKey && (active === first || !dialog.contains(active))) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
-        event.preventDefault();
-        first.focus();
       }
     };
-    globalThis.document?.addEventListener("keydown", containKeyboard, true);
-    return () => globalThis.document?.removeEventListener("keydown", containKeyboard, true);
-  }, [onClose, submitting, syncing]);
+    const handleOutsidePointer = (event: PointerEvent) => {
+      const dialog = dialogRef.current;
+      const target = event.target;
+      if (
+        !dialog
+        || !(target instanceof Node)
+        || dialog.contains(target)
+        || pendingMutationRef.current
+        || syncing
+        || submitting
+        || event.button !== 0
+        || event.isPrimary === false
+      ) return;
+      if (replyBody.trim()) {
+        setNotice("작성 중인 답글은 유지했어요. 캔버스 작업을 계속하거나 답글을 등록할 수 있어요.");
+        return;
+      }
+      shouldRestoreFocusRef.current = false;
+      onClose("outside-pointer");
+    };
+    globalThis.document?.addEventListener("keydown", handleKeyboard, true);
+    globalThis.document?.addEventListener("pointerdown", handleOutsidePointer, true);
+    return () => {
+      globalThis.document?.removeEventListener("keydown", handleKeyboard, true);
+      globalThis.document?.removeEventListener("pointerdown", handleOutsidePointer, true);
+    };
+  }, [onClose, replyBody, submitting, syncing]);
 
   if (typeof globalThis.document === "undefined") return null;
 
   const viewport = studioCommentThreadPopoverViewport();
+  const anchorPoint = anchorElement || getScreenPoint ? liveScreenPoint : screenPoint;
   const visiblePoint = {
     x: clamp(
-      finiteOr(screenPoint.x, viewport.left + viewport.width / 2),
+      finiteOr(anchorPoint.x, viewport.left + viewport.width / 2),
       viewport.left,
       viewport.left + viewport.width
     ),
     y: clamp(
-      finiteOr(screenPoint.y, viewport.top + viewport.height / 2),
+      finiteOr(anchorPoint.y, viewport.top + viewport.height / 2),
       viewport.top,
       viewport.top + viewport.height
     ),
   };
-  const position = planStudioCommentThreadPopoverPosition(
-    visiblePoint,
-    viewport,
-    cardSize
-  );
+  const bottomSheet = studioCommentThreadUsesBottomSheet(viewport);
+  const position = bottomSheet
+    ? planStudioCommentThreadBottomSheetPosition(viewport, cardSize)
+    : planStudioCommentThreadPopoverPosition(visiblePoint, viewport, cardSize);
   const describedBy = [
     descriptionId,
     error || syncError ? errorId : null,
@@ -420,12 +549,6 @@ export function StudioCommentThreadPopover({
     replyRestriction ? restrictionId : null,
     uniqueResolveRestriction ? resolveRestrictionId : null,
   ].filter(Boolean).join(" ");
-
-  const preserveDraftAndRefocus = () => {
-    setError(null);
-    setNotice("작성 중인 답글은 유지했어요. 등록하거나 Esc 또는 닫기 버튼으로 취소할 수 있어요.");
-    globalThis.requestAnimationFrame(() => textareaRef.current?.focus());
-  };
 
   const submitReply = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -489,39 +612,6 @@ export function StudioCommentThreadPopover({
 
   return createPortal(
     <>
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-label="댓글 대화창 바깥"
-        data-studio-comment-thread-backdrop="true"
-        data-studio-comment-thread-draft-protected={replyBody.trim() ? "true" : "false"}
-        className="fixed inset-0 z-[92] cursor-default touch-none border-0 bg-transparent p-0"
-        onPointerDown={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          if (
-            pendingMutationRef.current
-            || syncing
-            || submitting
-            || (typeof event.button === "number" && event.button !== 0)
-            || event.isPrimary === false
-          ) return;
-          if (replyBody.trim()) {
-            preserveDraftAndRefocus();
-            return;
-          }
-          onClose("outside-pointer");
-        }}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-        }}
-        onWheel={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-        }}
-      />
-
       <span
         aria-hidden
         data-studio-comment-thread-active-pin="true"
@@ -533,14 +623,19 @@ export function StudioCommentThreadPopover({
         ref={dialogRef}
         role="dialog"
         tabIndex={-1}
-        aria-modal="true"
+        aria-modal="false"
         aria-labelledby={titleId}
         aria-describedby={describedBy}
         aria-busy={busy}
         data-studio-comment-thread-popover="true"
         data-studio-shortcut-boundary="true"
         data-placement={position.placement}
-        className="fixed z-[94] flex overflow-hidden rounded-2xl border border-line-strong bg-panel/98 text-fg shadow-[0_24px_74px_oklch(0.06_0.02_70/0.62)] backdrop-blur-xl motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 [transform-origin:var(--studio-comment-popover-origin)]"
+        data-presentation={bottomSheet ? "bottom-sheet" : "anchored-popover"}
+        className={`fixed z-[94] flex overflow-hidden border border-line-strong bg-panel/98 text-fg backdrop-blur-xl motion-safe:animate-in motion-safe:fade-in motion-reduce:transition-none ${
+          bottomSheet
+            ? "rounded-t-2xl border-b-0 shadow-[0_-18px_58px_oklch(0.06_0.02_70/0.5)] motion-safe:slide-in-from-bottom-3"
+            : "rounded-2xl shadow-[0_24px_74px_oklch(0.06_0.02_70/0.62)] motion-safe:zoom-in-95 [transform-origin:var(--studio-comment-popover-origin)]"
+        }`}
         style={{
           left: position.left,
           top: position.top,
@@ -552,6 +647,11 @@ export function StudioCommentThreadPopover({
         }}
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {bottomSheet ? (
+            <div aria-hidden className="flex h-5 shrink-0 items-center justify-center">
+              <span className="h-1 w-10 rounded-full bg-line-strong" />
+            </div>
+          ) : null}
           <header className="flex min-w-0 items-start gap-2.5 border-b border-line px-3 py-2.5">
             <span
               aria-hidden
@@ -605,8 +705,11 @@ export function StudioCommentThreadPopover({
               disabled={busy}
               aria-label="전체 댓글 검토함에서 열기"
               title="작성 중인 답글을 유지하고 전체 댓글 검토함에서 열기"
-              onClick={() => onOpenReview(thread.id)}
-              className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-40 motion-reduce:transition-none sm:size-10"
+              onClick={() => {
+                shouldRestoreFocusRef.current = false;
+                onOpenReview(thread.id);
+              }}
+              className={`grid shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-40 motion-reduce:transition-none ${bottomSheet ? "size-11" : "size-10"}`}
             >
               <Inbox size={15} aria-hidden />
             </button>
@@ -618,8 +721,11 @@ export function StudioCommentThreadPopover({
                 ? "답글 초안을 버리고 댓글 대화창 닫기"
                 : "댓글 대화창 닫기"}
               title={replyBody.trim() ? "초안을 버리고 닫기 (Esc)" : "닫기 (Esc)"}
-              onClick={() => onClose("explicit")}
-              className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-40 motion-reduce:transition-none sm:size-10"
+              onClick={() => {
+                shouldRestoreFocusRef.current = true;
+                onClose("explicit");
+              }}
+              className={`grid shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-40 motion-reduce:transition-none ${bottomSheet ? "size-11" : "size-10"}`}
             >
               <X size={15} aria-hidden />
             </button>
@@ -641,7 +747,7 @@ export function StudioCommentThreadPopover({
                   aria-label="이전 위치 댓글"
                   title={replyBody.trim() ? "작성 중인 답글을 먼저 마무리해 주세요." : "이전 댓글"}
                   onClick={() => onNavigateCluster(-1)}
-                  className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-2 transition-colors duration-150 hover:bg-card hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none sm:size-9"
+                  className={`grid shrink-0 place-items-center rounded-lg text-fg-2 transition-colors duration-150 hover:bg-card hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none ${bottomSheet ? "size-11" : "size-9"}`}
                 >
                   <ChevronLeft size={15} aria-hidden />
                 </button>
@@ -661,7 +767,7 @@ export function StudioCommentThreadPopover({
                   aria-label="다음 위치 댓글"
                   title={replyBody.trim() ? "작성 중인 답글을 먼저 마무리해 주세요." : "다음 댓글"}
                   onClick={() => onNavigateCluster(1)}
-                  className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-2 transition-colors duration-150 hover:bg-card hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none sm:size-9"
+                  className={`grid shrink-0 place-items-center rounded-lg text-fg-2 transition-colors duration-150 hover:bg-card hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none ${bottomSheet ? "size-11" : "size-9"}`}
                 >
                   <ChevronRight size={15} aria-hidden />
                 </button>
@@ -713,7 +819,9 @@ export function StudioCommentThreadPopover({
 
             <form
               onSubmit={submitReply}
-              className="sticky bottom-0 z-10 border-t border-line bg-card px-3 py-2.5"
+              className={`sticky bottom-0 z-10 border-t border-line bg-card px-3 py-2.5 ${
+                bottomSheet ? "pb-[max(0.625rem,env(safe-area-inset-bottom))]" : ""
+              }`}
             >
               <div className="flex items-center justify-between gap-2">
                 <label htmlFor={replyId} className="inline-flex items-center gap-1.5 text-[0.7rem] font-bold text-fg-2">

@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   StudioTeamCommentCursorError,
+  StudioTeamCommentActivityConflictError,
   StudioTeamCommentForbiddenError,
   StudioTeamCommentMutationConflictError,
   StudioTeamCommentNotFoundError,
@@ -41,10 +42,12 @@ const thread = {
 
 const repository = {
   list: vi.fn(),
+  getThread: vi.fn(),
   createThread: vi.fn(),
   addReply: vi.fn(),
   resolve: vi.fn(),
   reopen: vi.fn(),
+  reanchor: vi.fn(),
   markRead: vi.fn(),
   markAllRead: vi.fn(),
 };
@@ -68,9 +71,16 @@ describe("StudioTeamCommentService", () => {
       nextCursor: null,
     });
     repository.createThread.mockResolvedValue(thread);
+    repository.getThread.mockResolvedValue(thread);
     repository.addReply.mockResolvedValue({
       threadId: "thread-1",
       message,
+      latestActivitySequence: "2",
+    });
+    repository.reanchor.mockResolvedValue({
+      threadId: "thread-1",
+      anchor: { type: "point", pageId: "page-1", x: 0.75, y: 0.8 },
+      updatedAt: at,
       latestActivitySequence: "2",
     });
     const instance = service();
@@ -95,6 +105,22 @@ describe("StudioTeamCommentService", () => {
       "thread-1",
       { mutationId: "  mutation-reply  ", body: "  반영했습니다.  " }
     )).resolves.toMatchObject({ threadId: "thread-1" });
+    await expect(instance.getThread(
+      "artist-1",
+      "work-1",
+      "thread-1",
+      51
+    )).resolves.toEqual(thread);
+    await expect(instance.reanchor(
+      "artist-1",
+      "work-1",
+      "thread-1",
+      {
+        mutationId: "  mutation-reanchor  ",
+        anchor: { type: "point", pageId: "page-1", x: 0.75, y: 0.8 },
+        expectedActivitySequence: "1",
+      }
+    )).resolves.toMatchObject({ threadId: "thread-1", latestActivitySequence: "2" });
 
     expect(repository.createThread).toHaveBeenCalledWith("artist-1", "work-1", {
       mutationId: "mutation-create",
@@ -106,6 +132,22 @@ describe("StudioTeamCommentService", () => {
       "work-1",
       "thread-1",
       { mutationId: "mutation-reply", body: "반영했습니다." }
+    );
+    expect(repository.getThread).toHaveBeenCalledWith(
+      "artist-1",
+      "work-1",
+      "thread-1",
+      51
+    );
+    expect(repository.reanchor).toHaveBeenCalledWith(
+      "artist-1",
+      "work-1",
+      "thread-1",
+      {
+        mutationId: "mutation-reanchor",
+        anchor: { type: "point", pageId: "page-1", x: 0.75, y: 0.8 },
+        expectedActivitySequence: "1",
+      }
     );
 
     repository.createThread.mockResolvedValue({ ...thread, serverSecret: "must-not-leak" });
@@ -204,6 +246,40 @@ describe("StudioTeamCommentService", () => {
       { mutationId: "mutation-work-quota", body: "답글" }
     )).rejects.toMatchObject({
       response: { message: "이 작품에 저장할 수 있는 팀 검수 메시지 수를 초과했습니다." },
+    });
+
+    repository.reanchor.mockRejectedValueOnce(
+      new StudioTeamCommentForbiddenError("reanchor")
+    );
+    await expect(instance.reanchor(
+      "viewer",
+      "work-1",
+      "thread-1",
+      {
+        mutationId: "mutation-reanchor-forbidden",
+        anchor: thread.anchor,
+        expectedActivitySequence: "1",
+      }
+    )).rejects.toMatchObject({
+      response: { message: "이 댓글의 위치를 변경할 권한이 없습니다." },
+    });
+
+    repository.reanchor.mockRejectedValueOnce(
+      new StudioTeamCommentActivityConflictError("1", "2")
+    );
+    await expect(instance.reanchor(
+      "artist-1",
+      "work-1",
+      "thread-1",
+      {
+        mutationId: "mutation-reanchor-stale",
+        anchor: thread.anchor,
+        expectedActivitySequence: "1",
+      }
+    )).rejects.toMatchObject({
+      response: {
+        message: "댓글이 다른 작업으로 변경되었습니다. 최신 댓글을 불러온 뒤 위치를 다시 옮겨 주세요.",
+      },
     });
 
     repository.addReply.mockRejectedValueOnce(

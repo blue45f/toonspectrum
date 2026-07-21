@@ -2,6 +2,7 @@ import {
   addStudioCommentReply,
   addStudioCommentThread,
   reopenStudioCommentThread,
+  reanchorStudioCommentThread,
   resolveStudioCommentThread,
   StudioCommentsDocumentSchema,
   type StudioCommentAnchor,
@@ -13,6 +14,14 @@ export type StudioTeamCommentMutationPlan =
   | { kind: "reply"; mutationId: string; threadId: string; body: string }
   | { kind: "resolve"; threadId: string }
   | { kind: "reopen"; threadId: string };
+
+export interface StudioTeamCommentReanchorMutationPlan {
+  kind: "reanchor";
+  mutationId: string;
+  threadId: string;
+  anchor: StudioCommentAnchor;
+  expectedActivitySequence: string;
+}
 
 function documentsEqual(
   left: StudioCommentsDocument,
@@ -131,4 +140,69 @@ export function planStudioTeamCommentMutation(
     return null;
   }
   return null;
+}
+
+/**
+ * Plans the one server-backed mutation that cannot be inferred from local v1 alone.
+ *
+ * The local document intentionally does not persist the server activity frontier or retry key, so
+ * callers must supply both from their authoritative thread projection/session. Keeping this plan
+ * separate avoids accidentally executing a re-anchor without compare-and-swap protection.
+ */
+export function planStudioTeamCommentReanchorMutation(
+  previousValue: StudioCommentsDocument,
+  nextValue: StudioCommentsDocument,
+  command: {
+    mutationId: string;
+    expectedActivitySequence: string;
+  }
+): StudioTeamCommentReanchorMutationPlan | null {
+  const previous = StudioCommentsDocumentSchema.safeParse(previousValue);
+  const next = StudioCommentsDocumentSchema.safeParse(nextValue);
+  if (!previous.success || !next.success) return null;
+  if (previous.data.threads.length !== next.data.threads.length) return null;
+  if (!/^(?:[1-9]\d{0,18})$/u.test(command.expectedActivitySequence)) return null;
+  if (BigInt(command.expectedActivitySequence) > BigInt("9223372036854775807")) return null;
+  const mutationId = command.mutationId.trim();
+  if (
+    mutationId.length < 1
+    || mutationId.length > 160
+    || [...mutationId].some((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint <= 31 || (codePoint >= 127 && codePoint <= 159);
+    })
+  ) return null;
+
+  let changedThreadId: string | null = null;
+  let changedAnchor: StudioCommentAnchor | null = null;
+  for (const previousThread of previous.data.threads) {
+    const nextThread = next.data.threads.find((thread) => thread.id === previousThread.id);
+    if (!nextThread) return null;
+    if (documentsEqual(
+      { version: 1, threads: [previousThread] },
+      { version: 1, threads: [nextThread] }
+    )) continue;
+    if (changedThreadId) return null;
+    try {
+      const replayed = reanchorStudioCommentThread(
+        previous.data,
+        previousThread.id,
+        nextThread.anchor,
+        new Date(nextThread.updatedAt)
+      );
+      if (!documentsEqual(replayed, next.data)) return null;
+    } catch {
+      return null;
+    }
+    changedThreadId = previousThread.id;
+    changedAnchor = nextThread.anchor;
+  }
+  if (!changedThreadId || !changedAnchor) return null;
+  return {
+    kind: "reanchor",
+    mutationId,
+    threadId: changedThreadId,
+    anchor: changedAnchor,
+    expectedActivitySequence: command.expectedActivitySequence,
+  };
 }

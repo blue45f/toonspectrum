@@ -63,6 +63,31 @@ function centerDistance(
 }
 
 describe("projectStudioCanvasCommentPins", () => {
+  it("keeps a single-thread pin identity stable when its point anchor moves", () => {
+    const before = addThread(createEmptyStudioCommentsDocument(), "thread-stable", {
+      type: "point",
+      pageId: "page-1",
+      x: 0.2,
+      y: 0.3,
+    }, "2026-07-18T00:00:00.000Z");
+    const after = addThread(createEmptyStudioCommentsDocument(), "thread-stable", {
+      type: "point",
+      pageId: "page-1",
+      x: 0.8,
+      y: 0.7,
+    }, "2026-07-18T00:01:00.000Z");
+    const project = (document: StudioCommentsDocument) => projectStudioCanvasCommentPins({
+      threads: document.threads,
+      pageId: "page-1",
+      canvasWidth: 1_000,
+      canvasHeight: 2_000,
+      boundsByElementId: new Map(),
+    })[0];
+
+    expect(project(before)?.key).toBe("thread:thread-stable");
+    expect(project(after)?.key).toBe(project(before)?.key);
+  });
+
   it("keeps clustered point pins and exact-location filtering on the same canonical identity", () => {
     const firstAnchor: StudioCommentAnchor = {
       type: "point",

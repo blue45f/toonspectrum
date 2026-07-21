@@ -8,12 +8,14 @@ import {
 import {
   addStudioTeamCommentReply,
   createStudioTeamCommentThread,
+  getStudioTeamCommentThread,
   isStudioTeamCommentResponseContractError,
   listAllStudioTeamComments,
   listStudioTeamComments,
   markAllStudioTeamCommentsRead,
   markStudioTeamCommentRead,
   reopenStudioTeamCommentThread,
+  reanchorStudioTeamCommentThread,
   resolveStudioTeamCommentThread,
   studioCommentAnchorToTeamCommentAnchor,
   studioTeamCommentsOrLocalFallback,
@@ -261,6 +263,89 @@ describe("Studio team comment API client", () => {
         headers: { "Idempotency-Key": "mutation-reply-1" },
       }
     );
+  });
+
+  it("loads one bounded thread and re-anchors it with a retry key and activity CAS", async () => {
+    const movedAnchor = { type: "point" as const, pageId: "page-1", x: 0.75, y: 0.8 };
+    apiGet.mockResolvedValueOnce(openThread());
+    apiPost.mockResolvedValueOnce({
+      threadId: "thread/한글",
+      anchor: movedAnchor,
+      updatedAt: RESOLVED_AT,
+      latestActivitySequence: "3",
+    });
+    const controller = new AbortController();
+
+    await expect(getStudioTeamCommentThread(
+      "work/한글",
+      "thread-1",
+      { messageLimit: 17 },
+      controller.signal
+    )).resolves.toMatchObject({ id: "thread-1" });
+    await expect(reanchorStudioTeamCommentThread(
+      "work/한글",
+      "thread/한글",
+      {
+        mutationId: "mutation-reanchor-1",
+        anchor: movedAnchor,
+        expectedActivitySequence: "2",
+      },
+      controller.signal
+    )).resolves.toEqual({
+      threadId: "thread/한글",
+      anchor: movedAnchor,
+      updatedAt: RESOLVED_AT,
+      latestActivitySequence: "3",
+    });
+
+    expect(apiGet).toHaveBeenCalledWith(
+      "/creator/works/work%2F%ED%95%9C%EA%B8%80/team/comments/thread-1",
+      { params: { messageLimit: 17 }, signal: controller.signal }
+    );
+    expect(apiPost).toHaveBeenCalledWith(
+      "/creator/works/work%2F%ED%95%9C%EA%B8%80/team/comments/thread%2F%ED%95%9C%EA%B8%80/reanchor",
+      { anchor: movedAnchor, expectedActivitySequence: "2" },
+      {
+        signal: controller.signal,
+        headers: { "Idempotency-Key": "mutation-reanchor-1" },
+      }
+    );
+  });
+
+  it("fails closed on invalid detail bounds, anchors, activity frontiers, and re-anchor scope", async () => {
+    await expect(getStudioTeamCommentThread(
+      "work-1",
+      "thread-1",
+      { messageLimit: 52 }
+    )).rejects.toThrow("댓글 상세 조회 조건이 올바르지 않습니다");
+    await expect(reanchorStudioTeamCommentThread("work-1", "thread-1", {
+      mutationId: "mutation-reanchor-invalid-point",
+      anchor: { type: "point", pageId: "page-1", x: -0.01, y: 0.5 },
+      expectedActivitySequence: "2",
+    })).rejects.toThrow("댓글의 새 위치 또는 변경 기준이 올바르지 않습니다");
+    await expect(reanchorStudioTeamCommentThread("work-1", "thread-1", {
+      mutationId: "mutation-reanchor-invalid-sequence",
+      anchor: PAGE_ANCHOR,
+      expectedActivitySequence: "0",
+    })).rejects.toThrow("댓글의 새 위치 또는 변경 기준이 올바르지 않습니다");
+    expect(apiGet).not.toHaveBeenCalled();
+    expect(apiPost).not.toHaveBeenCalled();
+
+    apiGet.mockResolvedValueOnce(openThread({ workId: "work-other" }));
+    await expect(getStudioTeamCommentThread("work/한글", "thread-1"))
+      .rejects.toBeInstanceOf(StudioTeamCommentResponseContractError);
+
+    apiPost.mockResolvedValueOnce({
+      threadId: "thread-other",
+      anchor: PAGE_ANCHOR,
+      updatedAt: RESOLVED_AT,
+      latestActivitySequence: "3",
+    });
+    await expect(reanchorStudioTeamCommentThread("work-1", "thread-1", {
+      mutationId: "mutation-reanchor-wrong-scope",
+      anchor: PAGE_ANCHOR,
+      expectedActivitySequence: "2",
+    })).rejects.toBeInstanceOf(StudioTeamCommentResponseContractError);
   });
 
   it("adds a cryptographically random retry key when no local mutation id is available", async () => {

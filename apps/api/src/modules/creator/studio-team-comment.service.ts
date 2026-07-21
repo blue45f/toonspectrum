@@ -14,15 +14,19 @@ import {
   AddStudioTeamCommentReplySchema,
   AddStudioTeamCommentReplyResponseSchema,
   CreateStudioTeamCommentThreadSchema,
+  GetStudioTeamCommentThreadQuerySchema,
   ListStudioTeamCommentsQuerySchema,
   ListStudioTeamCommentsResponseSchema,
   ReadAllStudioTeamCommentsResponseSchema,
   ReadStudioTeamCommentResponseSchema,
+  ReanchorStudioTeamCommentCommandSchema,
+  ReanchorStudioTeamCommentResponseSchema,
   StudioTeamCommentThreadSchema,
   TransitionStudioTeamCommentResponseSchema,
 } from "./studio-team-comment.dto";
 import {
   STUDIO_TEAM_COMMENT_REPOSITORY,
+  StudioTeamCommentActivityConflictError,
   StudioTeamCommentCursorError,
   StudioTeamCommentForbiddenError,
   StudioTeamCommentMutationConflictError,
@@ -35,9 +39,11 @@ import type {
   AddStudioTeamCommentReplyDto,
   CreateStudioTeamCommentThreadDto,
   ListStudioTeamCommentsQueryDto,
+  ReanchorStudioTeamCommentCommand,
   StudioTeamCommentListResponse,
   StudioTeamCommentReadAllResponse,
   StudioTeamCommentReadResponse,
+  StudioTeamCommentReanchorResponse,
   StudioTeamCommentReplyResponse,
   StudioTeamCommentThread,
   StudioTeamCommentTransitionResponse,
@@ -59,6 +65,22 @@ export class StudioTeamCommentService {
     const input = ListStudioTeamCommentsQuerySchema.parse(query);
     const response = await this.run(() => this.repository.list(actorUserId, workId, input));
     return ListStudioTeamCommentsResponseSchema.parse(response);
+  }
+
+  async getThread(
+    actorUserId: string,
+    workId: string,
+    threadId: string,
+    messageLimit: number
+  ): Promise<StudioTeamCommentThread> {
+    const query = GetStudioTeamCommentThreadQuerySchema.parse({ messageLimit });
+    const response = await this.run(() => this.repository.getThread(
+      actorUserId,
+      workId,
+      threadId,
+      query.messageLimit
+    ));
+    return StudioTeamCommentThreadSchema.parse(response);
   }
 
   async createThread(
@@ -108,6 +130,22 @@ export class StudioTeamCommentService {
     return TransitionStudioTeamCommentResponseSchema.parse(response);
   }
 
+  async reanchor(
+    actorUserId: string,
+    workId: string,
+    threadId: string,
+    body: ReanchorStudioTeamCommentCommand
+  ): Promise<StudioTeamCommentReanchorResponse> {
+    const input = ReanchorStudioTeamCommentCommandSchema.parse(body);
+    const response = await this.run(() => this.repository.reanchor(
+      actorUserId,
+      workId,
+      threadId,
+      input
+    ));
+    return ReanchorStudioTeamCommentResponseSchema.parse(response);
+  }
+
   async markRead(
     actorUserId: string,
     workId: string,
@@ -144,8 +182,15 @@ export class StudioTeamCommentService {
           ? "이 작품의 팀 검수 댓글을 볼 권한이 없습니다."
           : error.operation === "comment"
             ? "이 작품에 팀 검수 댓글을 작성할 권한이 없습니다."
-            : "이 작품의 팀 검수 댓글을 해결하거나 다시 열 권한이 없습니다.";
+            : error.operation === "resolve"
+              ? "이 작품의 팀 검수 댓글을 해결하거나 다시 열 권한이 없습니다."
+              : "이 댓글의 위치를 변경할 권한이 없습니다.";
         throw new ForbiddenException(message);
+      }
+      if (error instanceof StudioTeamCommentActivityConflictError) {
+        throw new ConflictException(
+          "댓글이 다른 작업으로 변경되었습니다. 최신 댓글을 불러온 뒤 위치를 다시 옮겨 주세요."
+        );
       }
       if (error instanceof StudioTeamCommentStateConflictError) {
         throw new ConflictException(

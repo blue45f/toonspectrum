@@ -22,6 +22,8 @@ export interface StudioPointCommentComposerProps {
   anchor: Extract<StudioCommentAnchor, { type: "point" }>;
   authorName: string;
   screenPoint: { x: number; y: number };
+  /** Reprojects the document anchor while the canvas pans or zooms. `screenPoint` remains fallback. */
+  getScreenPoint?: () => { x: number; y: number } | null;
   onCancel: () => void;
   onOpenReview?: () => void;
   onSubmit: (body: string) => Promise<boolean | void>;
@@ -45,11 +47,23 @@ function studioPointCommentViewport(): StudioPointCommentViewportBounds {
   };
 }
 
+function sameStudioPointCommentViewport(
+  left: StudioPointCommentViewportBounds | null,
+  right: StudioPointCommentViewportBounds
+): boolean {
+  return left !== null
+    && left.left === right.left
+    && left.top === right.top
+    && left.width === right.width
+    && left.height === right.height;
+}
+
 /** Magma/Figma-style single-click composer rendered beside the exact canvas click. */
 export function StudioPointCommentComposer({
   anchor,
   authorName,
   screenPoint,
+  getScreenPoint,
   onCancel,
   onOpenReview,
   onSubmit,
@@ -67,6 +81,10 @@ export function StudioPointCommentComposer({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [cardSize, setCardSize] = useState({ width: 336, height: 224 });
+  const liveScreenPointRef = useRef<{ x: number; y: number } | null>(null);
+  const [liveScreenPoint, setLiveScreenPoint] = useState<{ x: number; y: number } | null>(null);
+  const viewportRef = useRef<StudioPointCommentViewportBounds | null>(null);
+  const coarsePointerRef = useRef<boolean | null>(null);
   const [, setViewportRevision] = useState(0);
 
   useLayoutEffect(() => {
@@ -91,65 +109,102 @@ export function StudioPointCommentComposer({
   }, []);
 
   useEffect(() => {
-    const update = () => setViewportRevision((revision) => revision + 1);
-    globalThis.addEventListener("resize", update);
-    globalThis.visualViewport?.addEventListener("resize", update);
-    globalThis.visualViewport?.addEventListener("scroll", update);
-    return () => {
-      globalThis.removeEventListener("resize", update);
-      globalThis.visualViewport?.removeEventListener("resize", update);
-      globalThis.visualViewport?.removeEventListener("scroll", update);
+    let frame = 0;
+    let disposed = false;
+    const coarsePointer = globalThis.matchMedia?.("(pointer: coarse)") ?? null;
+    const passiveCapture = { capture: true, passive: true } as const;
+
+    const refreshPosition = () => {
+      frame = 0;
+      if (disposed) return;
+
+      const nextViewport = studioPointCommentViewport();
+      const nextCoarsePointer = coarsePointer?.matches ?? false;
+      if (
+        !sameStudioPointCommentViewport(viewportRef.current, nextViewport)
+        || coarsePointerRef.current !== nextCoarsePointer
+      ) {
+        viewportRef.current = nextViewport;
+        coarsePointerRef.current = nextCoarsePointer;
+        setViewportRevision((revision) => revision + 1);
+      }
+
+      if (!getScreenPoint) return;
+      let sampled: { x: number; y: number } | null = null;
+      try {
+        const projected = getScreenPoint();
+        sampled = projected && Number.isFinite(projected.x) && Number.isFinite(projected.y)
+          ? projected
+          : null;
+      } catch {
+        // Canvas teardown can briefly invalidate the projection reader; keep the click fallback.
+      }
+      const previous = liveScreenPointRef.current;
+      if (previous?.x === sampled?.x && previous?.y === sampled?.y) return;
+      liveScreenPointRef.current = sampled;
+      setLiveScreenPoint(sampled);
     };
-  }, []);
+
+    const schedulePositionRefresh = () => {
+      if (disposed || frame !== 0) return;
+      frame = globalThis.requestAnimationFrame(refreshPosition);
+    };
+
+    schedulePositionRefresh();
+    globalThis.addEventListener("resize", schedulePositionRefresh, passiveCapture);
+    globalThis.addEventListener("scroll", schedulePositionRefresh, passiveCapture);
+    globalThis.addEventListener("wheel", schedulePositionRefresh, passiveCapture);
+    globalThis.addEventListener("pointermove", schedulePositionRefresh, passiveCapture);
+    globalThis.addEventListener("pointerup", schedulePositionRefresh, passiveCapture);
+    globalThis.addEventListener("click", schedulePositionRefresh, passiveCapture);
+    globalThis.addEventListener("keydown", schedulePositionRefresh, true);
+    globalThis.visualViewport?.addEventListener("resize", schedulePositionRefresh);
+    globalThis.visualViewport?.addEventListener("scroll", schedulePositionRefresh);
+    coarsePointer?.addEventListener("change", schedulePositionRefresh);
+
+    return () => {
+      disposed = true;
+      if (frame !== 0) globalThis.cancelAnimationFrame(frame);
+      globalThis.removeEventListener("resize", schedulePositionRefresh, passiveCapture);
+      globalThis.removeEventListener("scroll", schedulePositionRefresh, passiveCapture);
+      globalThis.removeEventListener("wheel", schedulePositionRefresh, passiveCapture);
+      globalThis.removeEventListener("pointermove", schedulePositionRefresh, passiveCapture);
+      globalThis.removeEventListener("pointerup", schedulePositionRefresh, passiveCapture);
+      globalThis.removeEventListener("click", schedulePositionRefresh, passiveCapture);
+      globalThis.removeEventListener("keydown", schedulePositionRefresh, true);
+      globalThis.visualViewport?.removeEventListener("resize", schedulePositionRefresh);
+      globalThis.visualViewport?.removeEventListener("scroll", schedulePositionRefresh);
+      coarsePointer?.removeEventListener("change", schedulePositionRefresh);
+    };
+  }, [getScreenPoint, screenPoint.x, screenPoint.y]);
 
   useEffect(() => {
-    const containComposerKeyboard = (event: KeyboardEvent) => {
+    const handleComposerKeyboard = (event: KeyboardEvent) => {
       if (event.isComposing) return;
       if (event.key === "Escape") {
         if (savingRef.current) return;
         event.preventDefault();
         event.stopPropagation();
         onCancel();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const card = cardRef.current;
-      if (!card) return;
-      const focusable = Array.from(card.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [href]'
-      )).filter((element) => element.tabIndex >= 0);
-      if (focusable.length === 0) {
-        event.preventDefault();
-        card.focus();
-        return;
-      }
-      const first = focusable[0]!;
-      const last = focusable[focusable.length - 1]!;
-      const active = card.ownerDocument.activeElement;
-      if (event.shiftKey && (active === first || !card.contains(active))) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && (active === last || !card.contains(active))) {
-        event.preventDefault();
-        first.focus();
       }
     };
-    globalThis.document?.addEventListener("keydown", containComposerKeyboard, true);
-    return () => globalThis.document?.removeEventListener("keydown", containComposerKeyboard, true);
+    globalThis.document?.addEventListener("keydown", handleComposerKeyboard, true);
+    return () => globalThis.document?.removeEventListener("keydown", handleComposerKeyboard, true);
   }, [onCancel]);
 
   if (typeof globalThis.document === "undefined") return null;
   const viewport = studioPointCommentViewport();
+  const trackedScreenPoint = getScreenPoint ? liveScreenPoint ?? screenPoint : screenPoint;
   const horizontalInset = Math.min(16, Math.max(0, viewport.width / 2));
   const verticalInset = Math.min(16, Math.max(0, viewport.height / 2));
   const visiblePoint = {
     x: clamp(
-      screenPoint.x,
+      trackedScreenPoint.x,
       viewport.left + horizontalInset,
       viewport.left + viewport.width - horizontalInset
     ),
     y: clamp(
-      screenPoint.y,
+      trackedScreenPoint.y,
       viewport.top + verticalInset,
       viewport.top + viewport.height - verticalInset
     ),
@@ -158,6 +213,7 @@ export function StudioPointCommentComposer({
     point: visiblePoint,
     viewport,
     measuredCard: cardSize,
+    coarsePointer: globalThis.matchMedia?.("(pointer: coarse)").matches ?? false,
   });
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -188,39 +244,9 @@ export function StudioPointCommentComposer({
 
   return createPortal(
     <>
-      <button
-        type="button"
-        tabIndex={-1}
-        disabled={saving}
-        aria-label="위치 댓글 작성창 바깥"
-        data-studio-point-comment-backdrop="true"
-        data-studio-point-comment-draft-protected={body.trim() ? "true" : "false"}
-        className="fixed inset-0 z-[90] cursor-default touch-none border-0 bg-transparent p-0"
-        onPointerDown={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          if (
-            savingRef.current
-            || (typeof event.button === "number" && event.button !== 0)
-            || event.isPrimary === false
-          ) return;
-          if (body.trim()) {
-            preserveDraftAndRefocus();
-            return;
-          }
-          onCancel();
-        }}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-        }}
-        onWheel={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-        }}
-      />
       <span
         aria-hidden
+        data-studio-point-comment-pin="true"
         className="pointer-events-none fixed z-[91] grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-panel bg-accent text-on-accent shadow-[0_4px_18px_oklch(0.10_0.03_70/0.5)]"
         style={{ left: visiblePoint.x, top: visiblePoint.y }}
       >
@@ -230,8 +256,8 @@ export function StudioPointCommentComposer({
         ref={cardRef}
         role="dialog"
         tabIndex={-1}
-        aria-modal="true"
         aria-label="위치 댓글 작성"
+        aria-modal={false}
         aria-describedby={error
           ? `${hintId} ${errorId}`
           : notice
@@ -239,17 +265,23 @@ export function StudioPointCommentComposer({
             : hintId}
         aria-busy={saving}
         data-studio-point-comment-composer="true"
+        data-studio-point-comment-layout={position.mode}
+        data-presentation={position.mode === "sheet" ? "bottom-sheet" : "anchored-popover"}
         data-studio-shortcut-boundary="true"
         onSubmit={submit}
-        className="fixed z-[92] overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-line-strong bg-panel/98 text-fg shadow-[0_22px_70px_oklch(0.06_0.02_70/0.58)] backdrop-blur-xl [scrollbar-width:thin]"
+        className={`fixed z-[92] flex flex-col overflow-hidden border border-line-strong bg-panel/98 text-fg backdrop-blur-xl [scrollbar-width:thin] motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none ${position.mode === "sheet"
+          ? "rounded-t-2xl border-b-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] shadow-[0_-18px_54px_oklch(0.06_0.02_70/0.5)] motion-safe:slide-in-from-bottom-4"
+          : "rounded-lg shadow-[0_22px_70px_oklch(0.06_0.02_70/0.58)] motion-safe:zoom-in-95"
+        }`}
         style={{
           left: position.left,
           top: position.top,
           width: position.width,
           maxHeight: position.maxHeight,
+          boxSizing: "border-box",
         }}
       >
-        <header className="flex items-center gap-2 border-b border-line px-3 py-2.5">
+        <header className="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2.5">
           <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft text-xs font-black text-accent">
             {initial(authorName)}
           </span>
@@ -271,10 +303,11 @@ export function StudioPointCommentComposer({
                 onOpenReview();
               }}
               aria-label="댓글 검토함 열기"
+              aria-disabled={body.trim() ? true : undefined}
               title={body.trim()
                 ? "작성 중인 댓글을 등록하거나 취소한 뒤 검토함을 열 수 있어요"
                 : "댓글 검토함 열기"}
-              className="min-h-10 rounded-lg px-2 text-[0.68rem] font-semibold text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45 pointer-coarse:min-h-11"
+              className="min-h-11 rounded-lg px-2 text-[0.68rem] font-semibold text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45"
             >
               검토함
             </button>
@@ -285,12 +318,12 @@ export function StudioPointCommentComposer({
             onClick={onCancel}
             aria-label="위치 댓글 작성 취소"
             title="취소 (Esc)"
-            className="grid size-10 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45 pointer-coarse:size-11"
+            className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45"
           >
             <X size={15} aria-hidden />
           </button>
         </header>
-        <div className="p-3">
+        <div className="min-h-0 overflow-y-auto overscroll-contain p-3">
           <textarea
             ref={textareaRef}
             value={body}
@@ -341,12 +374,12 @@ export function StudioPointCommentComposer({
               Esc 취소 · ⌘/Ctrl + Enter 등록
             </span>
             <span id={countId} className="text-[0.62rem] tabular-nums text-fg-3">
-              {body.length}/{STUDIO_COMMENTS_MAX_BODY_LENGTH}
+              {body.length.toLocaleString("ko-KR")}/{STUDIO_COMMENTS_MAX_BODY_LENGTH.toLocaleString("ko-KR")}
             </span>
             <button
               type="submit"
               disabled={saving || !body.trim()}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 pointer-coarse:min-h-11"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
             >
               {saving ? (
                 <LoaderCircle

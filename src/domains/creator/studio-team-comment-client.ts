@@ -70,6 +70,8 @@ const StudioTeamCommentSequenceSchema = z
   .string()
   .regex(/^(?:0|[1-9]\d{0,18})$/u)
   .refine((value) => BigInt(value) <= BigInt("9223372036854775807"));
+const StudioTeamCommentExpectedActivitySequenceSchema =
+  StudioTeamCommentSequenceSchema.refine((value) => BigInt(value) > BigInt(0));
 const StudioTeamCommentCursorSchema = z
   .string()
   .min(1)
@@ -177,6 +179,7 @@ const StudioTeamCommentCapabilitiesSchema = z
     view: z.literal(true),
     comment: z.boolean(),
     resolve: z.boolean(),
+    reanchor: z.boolean().optional(),
   })
   .strict();
 
@@ -251,6 +254,15 @@ const TransitionStudioTeamCommentResponseSchema = z
     }
   });
 
+const ReanchorStudioTeamCommentResponseSchema = z
+  .object({
+    threadId: StudioTeamCommentOpaqueIdSchema,
+    anchor: StudioCommentAnchorSchema,
+    updatedAt: StudioTeamCommentDateTimeSchema,
+    latestActivitySequence: StudioTeamCommentExpectedActivitySequenceSchema,
+  })
+  .strict();
+
 const ReadStudioTeamCommentResponseSchema = z
   .object({
     threadId: StudioTeamCommentOpaqueIdSchema,
@@ -285,6 +297,12 @@ const ListStudioTeamCommentsOptionsSchema = z
     }
   });
 
+const GetStudioTeamCommentThreadOptionsSchema = z
+  .object({
+    messageLimit: z.number().int().min(1).max(MAX_MESSAGE_LIMIT).default(MAX_MESSAGE_LIMIT),
+  })
+  .strict();
+
 const CreateStudioTeamCommentThreadInputSchema = z
   .object({
     mutationId: StudioTeamCommentMutationIdSchema.optional(),
@@ -297,6 +315,14 @@ const AddStudioTeamCommentReplyInputSchema = z
   .object({
     mutationId: StudioTeamCommentMutationIdSchema.optional(),
     body: StudioTeamCommentBodySchema,
+  })
+  .strict();
+
+const ReanchorStudioTeamCommentThreadInputSchema = z
+  .object({
+    mutationId: StudioTeamCommentMutationIdSchema.optional(),
+    anchor: StudioCommentAnchorSchema,
+    expectedActivitySequence: StudioTeamCommentExpectedActivitySequenceSchema,
   })
   .strict();
 
@@ -316,6 +342,9 @@ export type StudioTeamCommentReplyResponse = z.infer<
 export type StudioTeamCommentTransitionResponse = z.infer<
   typeof TransitionStudioTeamCommentResponseSchema
 >;
+export type StudioTeamCommentReanchorResponse = z.infer<
+  typeof ReanchorStudioTeamCommentResponseSchema
+>;
 export type StudioTeamCommentReadResponse = z.infer<
   typeof ReadStudioTeamCommentResponseSchema
 >;
@@ -324,6 +353,9 @@ export type StudioTeamCommentReadAllResponse = z.infer<
 >;
 export type StudioTeamCommentListOptions = z.input<
   typeof ListStudioTeamCommentsOptionsSchema
+>;
+export type StudioTeamCommentThreadOptions = z.input<
+  typeof GetStudioTeamCommentThreadOptionsSchema
 >;
 export interface StudioTeamCommentCompleteSnapshot {
   workId: string;
@@ -336,6 +368,9 @@ export type CreateStudioTeamCommentThreadInput = z.input<
 >;
 export type AddStudioTeamCommentReplyInput = z.input<
   typeof AddStudioTeamCommentReplyInputSchema
+>;
+export type ReanchorStudioTeamCommentThreadInput = z.input<
+  typeof ReanchorStudioTeamCommentThreadInputSchema
 >;
 
 export class StudioTeamCommentResponseContractError extends Error {
@@ -474,6 +509,38 @@ export async function listStudioTeamComments(
   return response;
 }
 
+export async function getStudioTeamCommentThread(
+  workIdValue: string,
+  threadIdValue: string,
+  optionsValue: StudioTeamCommentThreadOptions = {},
+  signal?: AbortSignal
+): Promise<StudioTeamCommentThread> {
+  const workId = canonicalWorkId(workIdValue);
+  const threadId = canonicalThreadId(threadIdValue);
+  const options = parseInput(
+    GetStudioTeamCommentThreadOptionsSchema,
+    optionsValue,
+    "댓글 상세 조회 조건이 올바르지 않습니다."
+  );
+  const response = await requestStudioTeamComment({
+    run: () => api.get<unknown>(commentThreadPath(workId, threadId), {
+      params: { messageLimit: options.messageLimit },
+      signal,
+    }),
+    schema: StudioTeamCommentThreadSchema,
+    validateScope: (thread) => thread.workId === workId && thread.id === threadId,
+    fallback: "팀 댓글을 불러오지 못했습니다.",
+    contractMessage: "팀 댓글 상세 응답 형식이 올바르지 않습니다.",
+    signal,
+  });
+  if (response.messages.length > options.messageLimit) {
+    throw new StudioTeamCommentResponseContractError(
+      "요청한 댓글 메시지 범위를 벗어난 응답을 받았습니다."
+    );
+  }
+  return response;
+}
+
 /**
  * Reads every bounded team-comment page with full per-thread history.
  *
@@ -505,7 +572,8 @@ export async function listAllStudioTeamComments(
     if (
       capabilities
       && (capabilities.comment !== page.capabilities.comment
-        || capabilities.resolve !== page.capabilities.resolve)
+        || capabilities.resolve !== page.capabilities.resolve
+        || (capabilities.reanchor ?? false) !== (page.capabilities.reanchor ?? false))
     ) {
       throw new StudioTeamCommentResponseContractError(
         "댓글 목록을 불러오는 동안 팀 권한이 변경되었습니다."
@@ -616,6 +684,36 @@ export async function addStudioTeamCommentReply(
     validateScope: (response) => response.threadId === threadId,
     fallback: "팀 댓글에 답글을 등록하지 못했습니다.",
     contractMessage: "팀 댓글 답글 응답 형식이 올바르지 않습니다.",
+    signal,
+  });
+}
+
+export async function reanchorStudioTeamCommentThread(
+  workIdValue: string,
+  threadIdValue: string,
+  inputValue: ReanchorStudioTeamCommentThreadInput,
+  signal?: AbortSignal
+): Promise<StudioTeamCommentReanchorResponse> {
+  const workId = canonicalWorkId(workIdValue);
+  const threadId = canonicalThreadId(threadIdValue);
+  const input = parseInput(
+    ReanchorStudioTeamCommentThreadInputSchema,
+    inputValue,
+    "댓글의 새 위치 또는 변경 기준이 올바르지 않습니다."
+  );
+  const mutationId = input.mutationId ?? createStudioTeamCommentMutationId();
+  return requestStudioTeamComment({
+    run: () => api.post<unknown>(`${commentThreadPath(workId, threadId)}/reanchor`, {
+      anchor: input.anchor,
+      expectedActivitySequence: input.expectedActivitySequence,
+    }, {
+      signal,
+      headers: { "Idempotency-Key": mutationId },
+    }),
+    schema: ReanchorStudioTeamCommentResponseSchema,
+    validateScope: (response) => response.threadId === threadId,
+    fallback: "팀 댓글 위치를 변경하지 못했습니다.",
+    contractMessage: "팀 댓글 위치 변경 응답 형식이 올바르지 않습니다.",
     signal,
   });
 }

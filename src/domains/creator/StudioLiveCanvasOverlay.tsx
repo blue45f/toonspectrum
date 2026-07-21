@@ -13,14 +13,20 @@ import {
   X,
 } from "lucide-react";
 import {
+  Fragment,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 
+import {
+  nudgeStudioCommentPointAnchor,
+  projectStudioCommentPointerToPointAnchor,
+} from "./studio-comment-pin-reanchor";
 import {
   studioLivePresenceAlwaysVisible,
   studioPresenceConnectionLabel,
@@ -64,12 +70,25 @@ export interface StudioCommentPinClickPayload {
   trigger: HTMLButtonElement;
 }
 
+export interface StudioCommentPinReanchorPayload {
+  pinKey: string;
+  threadId: string;
+  anchor: Extract<StudioCommentAnchor, { type: "point" }>;
+  source: "pointer" | "keyboard";
+}
+
 export interface StudioLiveCanvasOverlayProps {
   canvasWidth: number;
   canvasHeight: number;
   cursors: readonly StudioLiveCanvasCursor[];
   commentPins: readonly StudioCanvasCommentPin[];
   onCommentPinClick: (payload: StudioCommentPinClickPayload) => void;
+  /** Moves one unclustered point comment; persistence and authorization remain parent-owned. */
+  onCommentPinReanchor?: (payload: StudioCommentPinReanchorPayload) => void;
+  /** Optional per-thread authority set; omitted keeps the callback-based legacy permission rule. */
+  commentPinReanchorableThreadIds?: ReadonlySet<string>;
+  /** Explains a temporary permission/sync lock without disabling ordinary comment opening. */
+  commentPinReanchorDisabledReason?: string;
   /** Warms the quick-reply chunk on pointer or keyboard intent. */
   onCommentQuickReplyPreload?: () => void;
   /** Keeps the lightweight preview from competing with an active quick-reply surface. */
@@ -99,6 +118,9 @@ export interface StudioRemoteCursorOverlayProps {
   hidden?: boolean;
   commentPins: readonly StudioCanvasCommentPin[];
   onCommentPinClick: (payload: StudioCommentPinClickPayload) => void;
+  onCommentPinReanchor?: (payload: StudioCommentPinReanchorPayload) => void;
+  commentPinReanchorableThreadIds?: ReadonlySet<string>;
+  commentPinReanchorDisabledReason?: string;
   onCommentQuickReplyPreload?: () => void;
   commentQuickReplyActive?: boolean;
   flipX?: boolean;
@@ -124,6 +146,34 @@ interface StudioLiveOverlayProjection {
   screenOffsetX: number;
   screenOffsetY: number;
 }
+
+interface StudioCommentPinDragSession {
+  pinKey: string;
+  threadId: string;
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  startPointerAnchor: Extract<StudioCommentAnchor, { type: "point" }>;
+  initialAnchor: Extract<StudioCommentAnchor, { type: "point" }>;
+  moved: boolean;
+  latestAnchor: Extract<StudioCommentAnchor, { type: "point" }>;
+  trigger: HTMLButtonElement;
+}
+
+interface StudioCommentPinDragPreview {
+  pinKey: string;
+  anchor: Extract<StudioCommentAnchor, { type: "point" }>;
+}
+
+interface StudioCommentPinGlobalDragHandlers {
+  move: (event: PointerEvent, stopPropagation?: boolean) => void;
+  finish: (event: PointerEvent, stopPropagation?: boolean) => void;
+  cancel: (event: PointerEvent, stopPropagation?: boolean) => void;
+}
+
+const STUDIO_COMMENT_PIN_DRAG_THRESHOLD_PX = 4;
+const STUDIO_COMMENT_PIN_KEYBOARD_FINE_FRACTION = 0.005;
+const STUDIO_COMMENT_PIN_KEYBOARD_COARSE_FRACTION = 0.025;
 
 /** Project document-local coordinates into the axis-aligned quarter-turned view box. */
 function projectStudioLiveOverlayPoint(
@@ -194,10 +244,28 @@ function summarizeCommentPinBody(body: string): string {
     : normalized;
 }
 
+function studioCommentPinReanchorTarget(pin: StudioCanvasCommentPin): {
+  anchor: Extract<StudioCommentAnchor, { type: "point" }>;
+  threadId: string;
+} | null {
+  if (
+    pin.count !== 1
+    || pin.anchor.type !== "point"
+    || pin.threadIds?.length !== 1
+    || !pin.threadIds[0]
+  ) return null;
+  return { anchor: pin.anchor, threadId: pin.threadIds[0] };
+}
+
 function commentPinAccessibleLabel(
   pin: StudioCanvasCommentPin,
   index: number,
-  total: number
+  total: number,
+  options: {
+    reanchorable: boolean;
+    reanchoring: boolean;
+    reanchorDisabledReason?: string;
+  }
 ): string {
   const parts = [pin.label, `댓글 핀 ${index + 1}/${total}`];
   const author = pin.previewAuthor?.trim();
@@ -206,6 +274,13 @@ function commentPinAccessibleLabel(
   if (body) parts.push(`최근 댓글 ${body}`);
   parts.push(`미해결 대화 ${pin.count}개`);
   parts.push(pin.unreadCount ? `읽지 않은 대화 ${pin.unreadCount}개` : "모두 읽음");
+  if (options.reanchoring) {
+    parts.push("댓글 위치 이동 중");
+  } else if (options.reanchorable) {
+    parts.push("드래그 또는 Alt와 방향키로 위치 이동");
+  } else if (options.reanchorDisabledReason) {
+    parts.push(`위치 이동 불가 ${options.reanchorDisabledReason}`);
+  }
   parts.push("Enter 키로 대화 열기");
   return parts
     .map((part) => /[.!?…。！？]$/u.test(part) ? part : `${part}.`)
@@ -252,10 +327,12 @@ function StudioCommentPinPreviewPortal({
   anchor,
   author,
   body,
+  reanchorable,
 }: {
   anchor: HTMLButtonElement;
   author: string;
   body: string;
+  reanchorable: boolean;
 }) {
   const tooltipRef = useRef<HTMLSpanElement>(null);
   const [position, setPosition] = useState<ReturnType<
@@ -317,7 +394,9 @@ function StudioCommentPinPreviewPortal({
         {body}
       </span>
       <span className="mt-1.5 block text-[0.62rem] font-semibold text-accent">
-        클릭·Enter로 열기 · ←/→ 핀 이동
+        {reanchorable
+          ? "드래그·Alt+방향키로 위치 이동 · 클릭·Enter로 열기"
+          : "클릭·Enter로 열기 · ←/→ 핀 이동"}
       </span>
     </span>,
     globalThis.document.body
@@ -330,16 +409,29 @@ export function StudioLiveCanvasOverlay({
   cursors,
   commentPins,
   onCommentPinClick,
+  onCommentPinReanchor,
+  commentPinReanchorableThreadIds,
+  commentPinReanchorDisabledReason,
   onCommentQuickReplyPreload,
   commentQuickReplyActive = false,
   flipX = false,
   rotation = 0,
 }: StudioLiveCanvasOverlayProps) {
+  const overlayRef = useRef<HTMLDivElement>(null);
   const [activeCommentPreviewKey, setActiveCommentPreviewKey] = useState<string | null>(null);
   const [preferredCommentPinKey, setPreferredCommentPinKey] = useState<string | null>(
     () => commentPins[0]?.key ?? null
   );
   const pinButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const dragSessionRef = useRef<StudioCommentPinDragSession | null>(null);
+  const globalDragHandlersRef = useRef<StudioCommentPinGlobalDragHandlers | null>(null);
+  const keyboardReanchorAnchorRef = useRef(
+    new Map<string, Extract<StudioCommentAnchor, { type: "point" }>>()
+  );
+  const suppressedClickPinKeyRef = useRef<string | null>(null);
+  const suppressedClickTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
+  const [dragPreview, setDragPreview] = useState<StudioCommentPinDragPreview | null>(null);
+  const [reanchorAnnouncement, setReanchorAnnouncement] = useState("");
   const tabbableCommentPinKey = preferredCommentPinKey
     && commentPins.some((pin) => pin.key === preferredCommentPinKey)
     ? preferredCommentPinKey
@@ -347,6 +439,9 @@ export function StudioLiveCanvasOverlay({
   const activePreviewPin = !commentQuickReplyActive && activeCommentPreviewKey
     ? commentPins.find((pin) => pin.key === activeCommentPreviewKey)
     : undefined;
+  const activePreviewReanchorTarget = activePreviewPin
+    ? studioCommentPinReanchorTarget(activePreviewPin)
+    : null;
   const activePreviewAnchor = !commentQuickReplyActive && activeCommentPreviewKey
     ? pinButtonRefs.current.get(activeCommentPreviewKey)
     : undefined;
@@ -360,6 +455,36 @@ export function StudioLiveCanvasOverlay({
         : commentPins[0]?.key ?? null
     ));
   }, [commentPins]);
+  useEffect(() => {
+    const activeKeys = new Set<string>();
+    for (const pin of commentPins) {
+      const target = studioCommentPinReanchorTarget(pin);
+      if (!target) continue;
+      activeKeys.add(pin.key);
+      keyboardReanchorAnchorRef.current.set(pin.key, target.anchor);
+    }
+    for (const key of keyboardReanchorAnchorRef.current.keys()) {
+      if (!activeKeys.has(key)) keyboardReanchorAnchorRef.current.delete(key);
+    }
+  }, [commentPins]);
+  useEffect(() => () => {
+    if (suppressedClickTimerRef.current !== null) {
+      globalThis.clearTimeout(suppressedClickTimerRef.current);
+    }
+    const session = dragSessionRef.current;
+    if (
+      session
+      && typeof session.trigger.releasePointerCapture === "function"
+      && session.trigger.hasPointerCapture?.(session.pointerId)
+    ) {
+      try {
+        session.trigger.releasePointerCapture(session.pointerId);
+      } catch {
+        // Pointer capture may already be released while the overlay is unmounting.
+      }
+    }
+    dragSessionRef.current = null;
+  }, []);
   const previewCommentPin = (pinKey: string) => {
     onCommentQuickReplyPreload?.();
     if (!commentQuickReplyActive) setActiveCommentPreviewKey(pinKey);
@@ -378,15 +503,242 @@ export function StudioLiveCanvasOverlay({
     setPreferredCommentPinKey(nextKey);
     pinButtonRefs.current.get(nextKey)?.focus({ preventScroll: true });
   };
+  const projectPointerAnchor = (
+    pageId: string,
+    clientX: number,
+    clientY: number
+  ): Extract<StudioCommentAnchor, { type: "point" }> | null => {
+    const overlay = overlayRef.current;
+    if (!overlay) return null;
+    const rect = overlay.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    return projectStudioCommentPointerToPointAnchor({
+      pageId,
+      clientX,
+      clientY,
+      viewportRect: rect,
+      canvasWidth,
+      canvasHeight,
+      canvasFlipH: flipX,
+      canvasRotation: rotation,
+    });
+  };
+  const releasePinPointerCapture = (session: StudioCommentPinDragSession) => {
+    if (
+      typeof session.trigger.releasePointerCapture !== "function"
+      || !session.trigger.hasPointerCapture?.(session.pointerId)
+    ) return;
+    try {
+      session.trigger.releasePointerCapture(session.pointerId);
+    } catch {
+      // A pointercancel/lostcapture race may release it before React receives this event.
+    }
+  };
+  const suppressNextPinClick = (pinKey: string) => {
+    suppressedClickPinKeyRef.current = pinKey;
+    if (suppressedClickTimerRef.current !== null) {
+      globalThis.clearTimeout(suppressedClickTimerRef.current);
+    }
+    suppressedClickTimerRef.current = globalThis.setTimeout(() => {
+      if (suppressedClickPinKeyRef.current === pinKey) {
+        suppressedClickPinKeyRef.current = null;
+      }
+      suppressedClickTimerRef.current = null;
+    }, 250);
+  };
+  const beginPinDrag = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    pin: StudioCanvasCommentPin,
+    target: NonNullable<ReturnType<typeof studioCommentPinReanchorTarget>>
+  ) => {
+    if (
+      !onCommentPinReanchor
+      || event.isPrimary === false
+      || event.button !== 0
+    ) return;
+    event.stopPropagation();
+    setPreferredCommentPinKey(pin.key);
+    setActiveCommentPreviewKey(null);
+    dragSessionRef.current = {
+      pinKey: pin.key,
+      threadId: target.threadId,
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startPointerAnchor: projectPointerAnchor(
+        target.anchor.pageId,
+        event.clientX,
+        event.clientY
+      ) ?? target.anchor,
+      initialAnchor: target.anchor,
+      moved: false,
+      latestAnchor: target.anchor,
+      trigger: event.currentTarget,
+    };
+    event.currentTarget.focus({ preventScroll: true });
+    if (typeof event.currentTarget.setPointerCapture === "function") {
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        // Some embedded WebViews expose Pointer Events without functional capture.
+      }
+    }
+  };
+  const projectPinDragAnchor = (
+    session: StudioCommentPinDragSession,
+    clientX: number,
+    clientY: number
+  ): Extract<StudioCommentAnchor, { type: "point" }> | null => {
+    const pointerAnchor = projectPointerAnchor(
+      session.initialAnchor.pageId,
+      clientX,
+      clientY
+    );
+    if (!pointerAnchor) return null;
+    return {
+      type: "point",
+      pageId: session.initialAnchor.pageId,
+      x: clamp(
+        session.initialAnchor.x + pointerAnchor.x - session.startPointerAnchor.x,
+        0,
+        1
+      ),
+      y: clamp(
+        session.initialAnchor.y + pointerAnchor.y - session.startPointerAnchor.y,
+        0,
+        1
+      ),
+    };
+  };
+  const movePinDrag = (
+    event: ReactPointerEvent<HTMLButtonElement> | PointerEvent,
+    stopPropagation = true
+  ) => {
+    const session = dragSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    const distance = Math.hypot(
+      event.clientX - session.startClientX,
+      event.clientY - session.startClientY
+    );
+    if (!session.moved && distance < STUDIO_COMMENT_PIN_DRAG_THRESHOLD_PX) return;
+    const anchor = projectPinDragAnchor(session, event.clientX, event.clientY);
+    if (!anchor) return;
+    event.preventDefault();
+    if (stopPropagation) event.stopPropagation();
+    if (!session.moved) {
+      session.moved = true;
+      setReanchorAnnouncement("댓글 위치 이동 중입니다. 손가락이나 포인터를 놓으면 저장합니다.");
+    }
+    session.latestAnchor = anchor;
+    setDragPreview((current) => (
+      current?.pinKey === session.pinKey
+      && current.anchor.x === anchor.x
+      && current.anchor.y === anchor.y
+        ? current
+        : { pinKey: session.pinKey, anchor }
+    ));
+  };
+  const finishPinDrag = (
+    event: ReactPointerEvent<HTMLButtonElement> | PointerEvent,
+    stopPropagation = true
+  ) => {
+    const session = dragSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    dragSessionRef.current = null;
+    const droppedAnchor = session.moved
+      ? projectPinDragAnchor(session, event.clientX, event.clientY)
+        ?? session.latestAnchor
+      : session.latestAnchor;
+    releasePinPointerCapture(session);
+    setDragPreview(null);
+    if (!session.moved || !onCommentPinReanchor) return;
+    event.preventDefault();
+    if (stopPropagation) event.stopPropagation();
+    suppressNextPinClick(session.pinKey);
+    onCommentPinReanchor({
+      pinKey: session.pinKey,
+      threadId: session.threadId,
+      anchor: droppedAnchor,
+      source: "pointer",
+    });
+    setReanchorAnnouncement("댓글 위치를 옮겼습니다.");
+  };
+  const cancelPinDrag = (
+    event: ReactPointerEvent<HTMLButtonElement> | PointerEvent,
+    stopPropagation = true
+  ) => {
+    const session = dragSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    dragSessionRef.current = null;
+    releasePinPointerCapture(session);
+    setDragPreview(null);
+    if (session.moved) {
+      event.preventDefault();
+      if (stopPropagation) event.stopPropagation();
+      setReanchorAnnouncement("댓글 위치 이동을 취소했습니다.");
+    }
+  };
+  globalDragHandlersRef.current = {
+    move: movePinDrag,
+    finish: finishPinDrag,
+    cancel: cancelPinDrag,
+  };
+  useEffect(() => {
+    const ownerWindow = overlayRef.current?.ownerDocument.defaultView;
+    if (!ownerWindow) return undefined;
+    const handlePointerMove = (event: PointerEvent) => {
+      globalDragHandlersRef.current?.move(event, false);
+    };
+    const handlePointerUp = (event: PointerEvent) => {
+      globalDragHandlersRef.current?.finish(event, false);
+    };
+    const handlePointerCancel = (event: PointerEvent) => {
+      globalDragHandlersRef.current?.cancel(event, false);
+    };
+    ownerWindow.addEventListener("pointermove", handlePointerMove, {
+      capture: true,
+      passive: false,
+    });
+    ownerWindow.addEventListener("pointerup", handlePointerUp, { capture: true });
+    ownerWindow.addEventListener("pointercancel", handlePointerCancel, { capture: true });
+    return () => {
+      ownerWindow.removeEventListener("pointermove", handlePointerMove, { capture: true });
+      ownerWindow.removeEventListener("pointerup", handlePointerUp, { capture: true });
+      ownerWindow.removeEventListener("pointercancel", handlePointerCancel, { capture: true });
+    };
+  }, []);
   return (
     <div
+      ref={overlayRef}
       aria-label="공동작업 캔버스 오버레이"
       role="group"
       className="pointer-events-none absolute inset-0 z-20 overflow-hidden"
       data-studio-live-canvas-overlay
     >
+      <span aria-atomic="true" aria-live="polite" className="sr-only" role="status">
+        {reanchorAnnouncement}
+      </span>
       {commentPins.map((pin, index) => {
-        const projected = projectStudioLiveOverlayPoint(
+        const reanchorTarget = studioCommentPinReanchorTarget(pin);
+        const allowedByThreadAuthority = !reanchorTarget
+          || commentPinReanchorableThreadIds === undefined
+          || commentPinReanchorableThreadIds.has(reanchorTarget.threadId);
+        const blockedByReanchorPolicy = commentPinReanchorableThreadIds === undefined
+          ? Boolean(commentPinReanchorDisabledReason)
+          : !allowedByThreadAuthority;
+        const reanchorDisabledReason = reanchorTarget
+          && onCommentPinReanchor
+          && blockedByReanchorPolicy
+          ? commentPinReanchorDisabledReason ?? "이 댓글 위치를 옮길 권한이 없어요."
+          : undefined;
+        const reanchorable = Boolean(
+          reanchorTarget
+          && onCommentPinReanchor
+          && allowedByThreadAuthority
+          && !reanchorDisabledReason
+        );
+        const reanchoring = dragPreview?.pinKey === pin.key;
+        const originalProjected = projectStudioLiveOverlayPoint(
           pin.x / canvasWidth,
           pin.y / canvasHeight,
           pin.screenOffsetX ?? 0,
@@ -394,90 +746,207 @@ export function StudioLiveCanvasOverlay({
           flipX,
           rotation
         );
+        const projected = reanchoring && dragPreview
+          ? projectStudioLiveOverlayPoint(
+              dragPreview.anchor.x,
+              dragPreview.anchor.y,
+              0,
+              0,
+              flipX,
+              rotation
+            )
+          : originalProjected;
+        const keyboardShortcuts = reanchorable
+          ? "ArrowLeft ArrowRight ArrowUp ArrowDown Home End Enter Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown Alt+Shift+ArrowLeft Alt+Shift+ArrowRight Alt+Shift+ArrowUp Alt+Shift+ArrowDown"
+          : "ArrowLeft ArrowRight ArrowUp ArrowDown Home End Enter";
         return (
-          <button
-            key={pin.key}
-            ref={(node) => {
-              if (node) pinButtonRefs.current.set(pin.key, node);
-              else pinButtonRefs.current.delete(pin.key);
-            }}
-            type="button"
-            aria-haspopup="dialog"
-            aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home End Enter"
-            aria-label={commentPinAccessibleLabel(pin, index, commentPins.length)}
-            data-studio-comment-pin="true"
-            tabIndex={pin.key === tabbableCommentPinKey ? 0 : -1}
-            className={cn(
-              "group pointer-events-auto absolute grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-[0.65rem] font-black tabular-nums text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-              "[&>[data-pin-marker]]:transition-transform [&>[data-pin-marker]]:duration-200 motion-reduce:[&>[data-pin-marker]]:transition-none hover:[&>[data-pin-marker]]:scale-110",
-              pin.unreadCount ? "[&>[data-pin-marker]]:ring-4 [&>[data-pin-marker]]:ring-accent/30" : null
-            )}
-            style={{
-              left: `clamp(1.375rem, calc(${(projected.x * 100).toFixed(4)}% + ${projected.screenOffsetX}px), calc(100% - 1.375rem))`,
-              top: `clamp(1.375rem, calc(${(projected.y * 100).toFixed(4)}% + ${projected.screenOffsetY}px), calc(100% - 1.375rem))`,
-            }}
-            title={pin.previewBody
-              ? undefined
-              : `${pin.label} · ${pin.unreadCount ? `읽지 않음 ${pin.unreadCount}개 · ` : ""}열림 ${pin.count}개`}
-            onPointerEnter={() => previewCommentPin(pin.key)}
-            onPointerLeave={(event) => {
-              if (event.currentTarget.ownerDocument.activeElement === event.currentTarget) return;
-              setActiveCommentPreviewKey((current) => current === pin.key ? null : current);
-            }}
-            onFocus={() => {
-              setPreferredCommentPinKey(pin.key);
-              previewCommentPin(pin.key);
-            }}
-            onBlur={() => setActiveCommentPreviewKey((current) => (
-              current === pin.key ? null : current
-            ))}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
+          <Fragment key={pin.key}>
+            {reanchoring ? (
+              <span
+                aria-hidden
+                data-studio-comment-pin-drag-origin="true"
+                className="pointer-events-none absolute grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full"
+                style={{
+                  left: `clamp(1.375rem, calc(${(originalProjected.x * 100).toFixed(4)}% + ${originalProjected.screenOffsetX}px), calc(100% - 1.375rem))`,
+                  top: `clamp(1.375rem, calc(${(originalProjected.y * 100).toFixed(4)}% + ${originalProjected.screenOffsetY}px), calc(100% - 1.375rem))`,
+                }}
+              >
+                <span className="size-8 rounded-full border-2 border-dashed border-accent/65 bg-panel/35 shadow-sm" />
+              </span>
+            ) : null}
+            <button
+              ref={(node) => {
+                if (node) pinButtonRefs.current.set(pin.key, node);
+                else pinButtonRefs.current.delete(pin.key);
+              }}
+              type="button"
+              aria-haspopup="dialog"
+              aria-keyshortcuts={keyboardShortcuts}
+              aria-label={commentPinAccessibleLabel(pin, index, commentPins.length, {
+                reanchorable,
+                reanchoring,
+                reanchorDisabledReason,
+              })}
+              aria-roledescription={reanchorable ? "이동 가능한 위치 댓글 핀" : undefined}
+              data-studio-comment-pin="true"
+              data-studio-comment-pin-reanchorable={reanchorable ? "true" : undefined}
+              data-studio-comment-pin-reanchoring={reanchoring ? "true" : undefined}
+              data-studio-comment-pin-anchor-x={reanchoring && dragPreview
+                ? dragPreview.anchor.x.toFixed(4)
+                : undefined}
+              data-studio-comment-pin-anchor-y={reanchoring && dragPreview
+                ? dragPreview.anchor.y.toFixed(4)
+                : undefined}
+              tabIndex={pin.key === tabbableCommentPinKey ? 0 : -1}
+              className={cn(
+                "group pointer-events-auto absolute grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-[0.65rem] font-black tabular-nums text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                "[&>[data-pin-marker]]:transition-transform [&>[data-pin-marker]]:duration-200 motion-reduce:[&>[data-pin-marker]]:transition-none hover:[&>[data-pin-marker]]:scale-110",
+                reanchorable ? "touch-none cursor-grab active:cursor-grabbing" : null,
+                reanchoring ? "z-10 cursor-grabbing [&>[data-pin-marker]]:scale-110 [&>[data-pin-marker]]:ring-4 [&>[data-pin-marker]]:ring-accent/35" : null,
+                pin.unreadCount ? "[&>[data-pin-marker]]:ring-4 [&>[data-pin-marker]]:ring-accent/30" : null
+              )}
+              style={{
+                left: `clamp(1.375rem, calc(${(projected.x * 100).toFixed(4)}% + ${projected.screenOffsetX}px), calc(100% - 1.375rem))`,
+                top: `clamp(1.375rem, calc(${(projected.y * 100).toFixed(4)}% + ${projected.screenOffsetY}px), calc(100% - 1.375rem))`,
+              }}
+              title={reanchorable
+                ? `${pin.label} · 드래그 또는 Alt+방향키로 위치 이동 · 클릭으로 열기`
+                : reanchorDisabledReason
+                  ? `${pin.label} · 위치 이동 불가: ${reanchorDisabledReason} · 클릭으로 열기`
+                  : pin.previewBody
+                    ? undefined
+                    : `${pin.label} · ${pin.unreadCount ? `읽지 않음 ${pin.unreadCount}개 · ` : ""}열림 ${pin.count}개`}
+              onPointerEnter={() => {
+                if (dragSessionRef.current?.pinKey !== pin.key) previewCommentPin(pin.key);
+              }}
+              onPointerLeave={(event) => {
+                if (event.currentTarget.ownerDocument.activeElement === event.currentTarget) return;
+                setActiveCommentPreviewKey((current) => current === pin.key ? null : current);
+              }}
+              onPointerDown={(event) => {
+                if (reanchorable && reanchorTarget) beginPinDrag(event, pin, reanchorTarget);
+              }}
+              onPointerMove={movePinDrag}
+              onPointerUp={finishPinDrag}
+              onPointerCancel={cancelPinDrag}
+              onLostPointerCapture={cancelPinDrag}
+              onFocus={() => {
+                setPreferredCommentPinKey(pin.key);
+                if (dragSessionRef.current?.pinKey !== pin.key) previewCommentPin(pin.key);
+              }}
+              onBlur={() => setActiveCommentPreviewKey((current) => (
+                current === pin.key ? null : current
+              ))}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  const dragSession = dragSessionRef.current;
+                  if (dragSession?.pinKey === pin.key) {
+                    dragSessionRef.current = null;
+                    releasePinPointerCapture(dragSession);
+                    setDragPreview(null);
+                    setReanchorAnnouncement("댓글 위치 이동을 취소했습니다.");
+                  }
+                  setActiveCommentPreviewKey(null);
+                  return;
+                }
+                const direction = event.key === "ArrowRight"
+                  ? { x: 1 as const, y: 0 as const }
+                  : event.key === "ArrowLeft"
+                    ? { x: -1 as const, y: 0 as const }
+                    : event.key === "ArrowDown"
+                      ? { x: 0 as const, y: 1 as const }
+                      : event.key === "ArrowUp"
+                        ? { x: 0 as const, y: -1 as const }
+                        : null;
+                if (event.altKey && direction) {
+                  if (reanchorable && reanchorTarget && onCommentPinReanchor) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const keyboardBaseAnchor =
+                      keyboardReanchorAnchorRef.current.get(pin.key) ?? reanchorTarget.anchor;
+                    const nextAnchor = nudgeStudioCommentPointAnchor({
+                      anchor: keyboardBaseAnchor,
+                      directionX: direction.x,
+                      directionY: direction.y,
+                      viewFraction: event.shiftKey
+                        ? STUDIO_COMMENT_PIN_KEYBOARD_COARSE_FRACTION
+                        : STUDIO_COMMENT_PIN_KEYBOARD_FINE_FRACTION,
+                      canvasWidth,
+                      canvasHeight,
+                      canvasFlipH: flipX,
+                      canvasRotation: rotation,
+                    });
+                    keyboardReanchorAnchorRef.current.set(pin.key, nextAnchor);
+                    setActiveCommentPreviewKey(null);
+                    onCommentPinReanchor({
+                      pinKey: pin.key,
+                      threadId: reanchorTarget.threadId,
+                      anchor: nextAnchor,
+                      source: "keyboard",
+                    });
+                    setReanchorAnnouncement(event.shiftKey
+                      ? "댓글 위치를 크게 옮겼습니다."
+                      : "댓글 위치를 조금 옮겼습니다.");
+                  } else if (reanchorDisabledReason) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setReanchorAnnouncement(`댓글 위치를 옮길 수 없습니다. ${reanchorDisabledReason}`);
+                  }
+                  return;
+                }
+                const destination = event.key === "Home"
+                  ? "first"
+                  : event.key === "End"
+                    ? "last"
+                    : event.key === "ArrowRight" || event.key === "ArrowDown"
+                      ? "next"
+                      : event.key === "ArrowLeft" || event.key === "ArrowUp"
+                        ? "previous"
+                        : null;
+                if (!destination) return;
                 event.preventDefault();
                 event.stopPropagation();
+                focusCommentPin(pin.key, destination);
+              }}
+              onClick={(event) => {
+                if (suppressedClickPinKeyRef.current === pin.key) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  suppressedClickPinKeyRef.current = null;
+                  if (suppressedClickTimerRef.current !== null) {
+                    globalThis.clearTimeout(suppressedClickTimerRef.current);
+                    suppressedClickTimerRef.current = null;
+                  }
+                  return;
+                }
+                setPreferredCommentPinKey(pin.key);
                 setActiveCommentPreviewKey(null);
-                return;
-              }
-              const destination = event.key === "Home"
-                ? "first"
-                : event.key === "End"
-                  ? "last"
-                  : event.key === "ArrowRight" || event.key === "ArrowDown"
-                    ? "next"
-                    : event.key === "ArrowLeft" || event.key === "ArrowUp"
-                      ? "previous"
-                      : null;
-              if (!destination) return;
-              event.preventDefault();
-              event.stopPropagation();
-              focusCommentPin(pin.key, destination);
-            }}
-            onClick={(event) => {
-              setPreferredCommentPinKey(pin.key);
-              setActiveCommentPreviewKey(null);
-              onCommentPinClick({
-                pinKey: pin.key,
-                anchor: pin.anchor,
-                preferredThreadId: pin.newestUnreadThreadId ?? pin.newestThreadId,
-                threadIds: pin.threadIds ?? [],
-                trigger: event.currentTarget,
-              });
-            }}
-          >
-            <span data-pin-marker className="relative grid size-8 place-items-center rounded-full border-2 border-panel bg-accent shadow-[0_4px_14px_oklch(0.10_0.02_70/0.42)]">
-              {pin.count > 1
-                ? pin.count
-                : pin.previewAuthor
-                  ? <span aria-hidden>{initial(pin.previewAuthor)}</span>
-                  : <MessageCircle size={14} aria-hidden />}
-              {pin.unreadCount ? (
-                <span
-                  aria-hidden
-                  className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-panel bg-warn shadow-sm"
-                />
-              ) : null}
-            </span>
-          </button>
+                onCommentPinClick({
+                  pinKey: pin.key,
+                  anchor: pin.anchor,
+                  preferredThreadId: pin.newestUnreadThreadId ?? pin.newestThreadId,
+                  threadIds: pin.threadIds ?? [],
+                  trigger: event.currentTarget,
+                });
+              }}
+            >
+              <span data-pin-marker className="relative grid size-8 place-items-center rounded-full border-2 border-panel bg-accent shadow-[0_4px_14px_oklch(0.10_0.02_70/0.42)]">
+                {pin.count > 1
+                  ? pin.count
+                  : pin.previewAuthor
+                    ? <span aria-hidden>{initial(pin.previewAuthor)}</span>
+                    : <MessageCircle size={14} aria-hidden />}
+                {pin.unreadCount ? (
+                  <span
+                    aria-hidden
+                    className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-panel bg-warn shadow-sm"
+                  />
+                ) : null}
+              </span>
+            </button>
+          </Fragment>
         );
       })}
 
@@ -486,6 +955,13 @@ export function StudioLiveCanvasOverlay({
           anchor={activePreviewAnchor}
           author={activePreviewPin.previewAuthor ?? "검토자"}
           body={activePreviewPin.previewBody}
+          reanchorable={Boolean(
+            activePreviewReanchorTarget
+            && onCommentPinReanchor
+            && (commentPinReanchorableThreadIds === undefined
+              ? !commentPinReanchorDisabledReason
+              : commentPinReanchorableThreadIds.has(activePreviewReanchorTarget.threadId))
+          )}
         />
       ) : null}
 
@@ -541,6 +1017,9 @@ export function StudioRemoteCursorOverlay({
   hidden = false,
   commentPins,
   onCommentPinClick,
+  onCommentPinReanchor,
+  commentPinReanchorableThreadIds,
+  commentPinReanchorDisabledReason,
   onCommentQuickReplyPreload,
   commentQuickReplyActive = false,
   flipX = false,
@@ -639,6 +1118,9 @@ export function StudioRemoteCursorOverlay({
       cursors={cursors.filter((value) => value.cursor.pageId === pageId)}
       commentPins={commentPins}
       onCommentPinClick={onCommentPinClick}
+      onCommentPinReanchor={onCommentPinReanchor}
+      commentPinReanchorableThreadIds={commentPinReanchorableThreadIds}
+      commentPinReanchorDisabledReason={commentPinReanchorDisabledReason}
       onCommentQuickReplyPreload={onCommentQuickReplyPreload}
       commentQuickReplyActive={commentQuickReplyActive}
       flipX={flipX}

@@ -37,6 +37,10 @@ import {
   type StudioLiveTransportMode,
   type StudioLiveTransportStatus,
 } from "./studio-live-collaboration-transport";
+import {
+  parseStudioTeamCommentLiveEvent,
+  type StudioTeamCommentLiveEvent,
+} from "./studio-team-comment-live-event";
 
 import type {
   StudioCrdtSyncRequest,
@@ -147,6 +151,7 @@ export type StudioLiveRoomEvent =
   | { type: "locks"; locks: StudioLiveLock[] }
   | { type: "chat"; message: StudioLiveChatMessage }
   | { type: "signal"; envelope: StudioLiveSignalEnvelope }
+  | { type: "comment-changed"; change: StudioTeamCommentLiveEvent }
   | { type: "transport-status"; status: StudioLiveTransportStatus }
   | { type: "transport-error"; message: string };
 
@@ -1505,6 +1510,13 @@ export class StudioLiveRoom {
         reason: event.reason,
         message: event.message,
       });
+      return;
+    }
+    if (event.type === "comment-changed") {
+      if (!this.ready) return;
+      const change = parseStudioTeamCommentLiveEvent(event.change, this.workId);
+      if (!change) return;
+      this.emit({ type: "comment-changed", change });
       return;
     }
     // Socket ACKs and broadcasts can already be queued when access is revoked or the connection

@@ -1146,13 +1146,13 @@ export const creatorWorkTeamCommentActivities = pgTable(
     ),
     check(
       "creator_work_team_comment_activity_action_check",
-      sql`${t.action} in ('thread_created', 'reply_added', 'resolved', 'reopened')`
+      sql`${t.action} in ('thread_created', 'reply_added', 'resolved', 'reopened', 'reanchored')`
     ),
     check(
       "creator_work_team_comment_activity_message_state_check",
       sql`(
         (${t.action} in ('thread_created', 'reply_added') and ${t.messageId} is not null)
-        or (${t.action} in ('resolved', 'reopened') and ${t.messageId} is null)
+        or (${t.action} in ('resolved', 'reopened', 'reanchored') and ${t.messageId} is null)
       )`
     ),
   ]
@@ -1194,10 +1194,11 @@ export const creatorWorkTeamCommentReads = pgTable(
   ]
 );
 
-// 댓글 생성/답글 추가의 네트워크 재시도를 정확히 한 번의 논리 mutation으로 수렴시키는 영수증.
+// 댓글 생성/답글 추가/위치 이동의 네트워크 재시도를 정확히 한 번의 논리 mutation으로 수렴시키는 영수증.
 // work 행을 먼저 잠그는 repository 규약과 복합 PK가 같은 작품 안의 동시 재시도를 직렬화하며,
 // requestHash가 같은 mutationId를 다른 payload에 재사용하는 것을 거부한다. response는 최초 커밋
-// 결과를 그대로 재생하기 위한 서버 응답 snapshot이고, thread/message 삭제 시 함께 정리된다.
+// 결과를 그대로 재생하기 위한 서버 응답 snapshot이다. 위치 이동 영수증에는 새 메시지가 없으므로
+// messageId가 null이며, thread 삭제 시 함께 정리된다.
 export const creatorWorkTeamCommentMutations = pgTable(
   "creator_work_team_comment_mutation",
   {
@@ -1207,7 +1208,7 @@ export const creatorWorkTeamCommentMutations = pgTable(
     operation: text("operation").notNull(),
     requestHash: text("requestHash").notNull(),
     threadId: text("threadId").notNull(),
-    messageId: text("messageId").notNull(),
+    messageId: text("messageId"),
     response: jsonb("response").$type<unknown>().notNull(),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
       .notNull()
@@ -1257,7 +1258,14 @@ export const creatorWorkTeamCommentMutations = pgTable(
     ),
     check(
       "creator_work_team_comment_mutation_operation_check",
-      sql`${t.operation} in ('thread_create', 'reply_add')`
+      sql`${t.operation} in ('thread_create', 'reply_add', 'thread_reanchor')`
+    ),
+    check(
+      "creator_work_team_comment_mutation_message_state_check",
+      sql`(
+        (${t.operation} in ('thread_create', 'reply_add') and ${t.messageId} is not null)
+        or (${t.operation} = 'thread_reanchor' and ${t.messageId} is null)
+      )`
     ),
     check(
       "creator_work_team_comment_mutation_request_hash_check",

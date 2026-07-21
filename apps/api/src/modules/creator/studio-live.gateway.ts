@@ -118,6 +118,7 @@ import type {
   StudioLiveVoiceStateInput,
   StudioLiveFailureCode,
 } from "./studio-live.protocol";
+import type { StudioTeamCommentLiveEvent } from "../../../../../lib/studio-team-comment-live-event";
 import type { Namespace } from "socket.io";
 
 export {
@@ -460,6 +461,15 @@ export class StudioLiveGateway
     this.socketAuthentication.clearAll();
     this.voiceMembershipBySocket.clear();
     this.deliveredInterServerVoiceSignals.clear();
+  }
+
+  /** Emits one tiny invalidation through the configured Socket.IO adapter-backed work room. */
+  publishTeamCommentChanged(change: StudioTeamCommentLiveEvent): boolean {
+    if (!this.server) return false;
+    this.server
+      .to(studioLiveRoom(change.workId))
+      .emit("studio:comment:changed", change);
+    return true;
   }
 
   async handleConnection(client: StudioLiveSocket): Promise<void> {

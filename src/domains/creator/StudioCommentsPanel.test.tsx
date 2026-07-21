@@ -59,9 +59,13 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(studioPointCommentComposerSource).toContain(
       'data-studio-point-comment-composer="true"'
     );
-    expect(studioPointCommentComposerSource).toContain(
+    expect(studioPointCommentComposerSource).not.toContain(
       'data-studio-point-comment-backdrop="true"'
     );
+    expect(studioPointCommentComposerSource).toContain(
+      "data-studio-point-comment-layout={position.mode}"
+    );
+    expect(studioPointCommentComposerSource).not.toContain('aria-modal="true"');
     expect(studioPointCommentComposerSource).toContain('aria-label="위치 댓글 내용"');
     expect(studioPointCommentComposerSource).toContain("globalThis.visualViewport");
     expect(studioPointCommentComposerSource).toContain(
@@ -115,6 +119,61 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(studioPageSource).toContain(
       'if (!e.repeat && matchStudioShortcut(sc["tool-comment"], e))'
     );
+  });
+
+  it("moves a single point pin directly with permission and activity-sequence fences", () => {
+    const reanchorStart = studioPageSource.indexOf("async function reanchorStudioCommentPin");
+    const reanchorEnd = studioPageSource.indexOf(
+      "function openStudioCommentThreadPopover",
+      reanchorStart
+    );
+    const reanchorSource = studioPageSource.slice(reanchorStart, reanchorEnd);
+
+    expect(reanchorStart).toBeGreaterThanOrEqual(0);
+    expect(reanchorEnd).toBeGreaterThan(reanchorStart);
+    expect(studioCanvasOverlaySource).toContain("projectStudioCommentPointerToPointAnchor");
+    expect(studioCanvasOverlaySource).toContain("nudgeStudioCommentPointAnchor");
+    expect(studioCanvasOverlaySource).toContain("setPointerCapture");
+    expect(studioCanvasOverlaySource).toContain("Alt+Shift+ArrowLeft");
+    expect(studioCanvasOverlaySource).toContain(
+      'data-studio-comment-pin-reanchorable={reanchorable ? "true" : undefined}'
+    );
+    expect(studioPageSource).toContain("studioCommentPinReanchorableThreadIds");
+    expect(reanchorSource).toContain("studioTeamCommentCapabilities?.reanchor !== true");
+    expect(reanchorSource).toContain("expectedActivitySequence: expectedSequence.toString()");
+    expect(reanchorSource).toContain("mergeStudioTeamCommentMutationReceipt(");
+    expect(reanchorSource).toContain("applyStudioTeamCommentReanchorReceipt(");
+    expect(reanchorSource).toContain("studioTeamCommentReanchorQueueRef.current.set");
+    expect(reanchorSource).toContain("previousUpdatedAt");
+    expect(reanchorSource).toContain("void reanchorStudioCommentPin(queued)");
+    expect(studioPageSource).toContain(
+      "studioCommentThreadPopoverScreenProjectionHandlers.getScreenPoint"
+    );
+  });
+
+  it("refreshes only the changed live thread instead of polling every comment", () => {
+    const refreshStart = studioPageSource.indexOf(
+      "function queueStudioTeamCommentLiveRefresh"
+    );
+    const refreshEnd = studioPageSource.indexOf(
+      "studioLiveCommentEventHandlerRef.current = queueStudioTeamCommentLiveRefresh",
+      refreshStart
+    );
+    const refreshSource = studioPageSource.slice(refreshStart, refreshEnd);
+
+    expect(refreshStart).toBeGreaterThanOrEqual(0);
+    expect(refreshEnd).toBeGreaterThan(refreshStart);
+    expect(studioPageSource).toContain('event.type !== "comment-changed"');
+    expect(refreshSource).toContain("studioTeamCommentLiveTargetSequenceRef");
+    expect(refreshSource).toContain("studioTeamCommentLiveRefreshFlightRef");
+    expect(refreshSource).toContain("getStudioTeamCommentThread(");
+    expect(refreshSource).toContain("{ messageLimit: 51 }");
+    expect(refreshSource).toContain("decideStudioTeamCommentLiveResponse");
+    expect(refreshSource).toContain("targetSequence: latestTarget");
+    expect(refreshSource).toContain('liveDecision.status === "retry"');
+    expect(refreshSource).toContain("liveDecision.remainsUnread");
+    expect(refreshSource).not.toContain("listAllStudioTeamComments(");
+    expect(refreshSource).not.toContain("setInterval(");
   });
 
   it("preloads the compact composer without pulling the full review rail into pin placement", () => {
@@ -211,7 +270,10 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(source).toContain('[data-studio-comment-thread-id]');
     expect(source).toContain('thread.focus({ preventScroll: true })');
     expect(source).toContain('thread.scrollIntoView({ block: "nearest", behavior: "auto" })');
-    expect(studioCanvasOverlaySource).toContain('aria-keyshortcuts="ArrowLeft ArrowRight');
+    expect(studioCanvasOverlaySource).toContain("aria-keyshortcuts={keyboardShortcuts}");
+    expect(studioCanvasOverlaySource).toContain(
+      '"ArrowLeft ArrowRight ArrowUp ArrowDown Home End Enter"'
+    );
     expect(studioCanvasOverlaySource).toContain("focusCommentPin(pin.key, destination)");
   });
 

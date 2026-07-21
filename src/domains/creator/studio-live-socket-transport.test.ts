@@ -159,6 +159,17 @@ function context(): StudioLiveTransportContext {
   return { workId: "work-1", roomName: "unused-server-room", participant: localParticipant };
 }
 
+function commentChanged(overrides: Record<string, unknown> = {}) {
+  return {
+    version: 1,
+    workId: "work-1",
+    threadId: "thread-1",
+    activitySequence: "42",
+    kind: "replied",
+    ...overrides,
+  };
+}
+
 function envelope<K extends StudioLiveMessageKind>(
   kind: K,
   payload: StudioLivePayloadMap[K],
@@ -227,6 +238,113 @@ describe("StudioLiveSocketTransport", () => {
     expect(
       (transport as unknown as { sessionToken: string | null }).sessionToken
     ).toBeNull();
+  });
+
+  it("delivers a valid current-work team comment invalidation after the join ACL succeeds", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const controls: StudioLiveTransportControlEvent[] = [];
+    transport.subscribeControl((event) => controls.push(event));
+    await transport.connect();
+
+    socket.serverEmit("studio:comment:changed", commentChanged());
+
+    expect(controls.filter((event) => event.type === "comment-changed")).toEqual([{
+      type: "comment-changed",
+      change: commentChanged(),
+    }]);
+    transport.close();
+  });
+
+  it("ignores team comment invalidations before join and rejects malformed or cross-work payloads", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:join");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const controls: StudioLiveTransportControlEvent[] = [];
+    transport.subscribeControl((event) => controls.push(event));
+
+    const connecting = transport.connect();
+    socket.serverEmit("studio:comment:changed", commentChanged({ activitySequence: "41" }));
+    socket.reply("studio:join", joinSuccess());
+    await connecting;
+    socket.serverEmit("studio:comment:changed", commentChanged({ workId: "work-other" }));
+    socket.serverEmit("studio:comment:changed", commentChanged({ activitySequence: "not-a-sequence" }));
+    socket.serverEmit("studio:comment:changed", { ...commentChanged(), extra: true });
+
+    expect(controls.filter((event) => event.type === "comment-changed")).toEqual([]);
+    transport.close();
+  });
+
+  it("ignores late team comment invalidations after disconnect, access revocation, or close", async () => {
+    const scenarios = [
+      {
+        finish: (socket: FakeSocket, transport: StudioLiveSocketTransport) => {
+          socket.serverDisconnect();
+          expect(transport.ready).toBe(false);
+        },
+      },
+      {
+        finish: (socket: FakeSocket, transport: StudioLiveSocketTransport) => {
+          socket.serverEmit("studio:access:revoked", {
+            workId: "work-1",
+            message: "팀 권한이 회수되었습니다.",
+          });
+          expect(transport.ready).toBe(false);
+        },
+      },
+      {
+        finish: (_socket: FakeSocket, transport: StudioLiveSocketTransport) => {
+          transport.close();
+          expect(transport.ready).toBe(false);
+        },
+      },
+    ];
+
+    for (const { finish } of scenarios) {
+      const socket = new FakeSocket({ sessionToken: TOKEN });
+      const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+        createSocket: () => socket,
+        now: () => NOW,
+      });
+      const controls: StudioLiveTransportControlEvent[] = [];
+      transport.subscribeControl((event) => controls.push(event));
+      await transport.connect();
+      finish(socket, transport);
+      controls.length = 0;
+
+      socket.serverEmit("studio:comment:changed", commentChanged());
+
+      expect(controls).toEqual([]);
+      transport.close();
+    }
+  });
+
+  it("removes only its exact team comment listener when closed", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const externalCommentListener = vi.fn();
+    socket.on("studio:comment:changed", externalCommentListener);
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    await transport.connect();
+
+    expect(socket.listeners.get("studio:comment:changed")?.size).toBe(2);
+    expect(socket.listeners.get("studio:cursor")?.size).toBe(1);
+    transport.close();
+
+    expect(socket.listeners.get("studio:comment:changed")).toEqual(
+      new Set([externalCommentListener])
+    );
+    expect(socket.listeners.get("studio:cursor")?.size).toBe(0);
+    socket.serverEmit("studio:comment:changed", commentChanged());
+    expect(externalCommentListener).toHaveBeenCalledOnce();
   });
 
   it("replays active screen shares from the authoritative join snapshot", async () => {

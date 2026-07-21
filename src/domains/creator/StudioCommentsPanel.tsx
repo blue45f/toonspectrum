@@ -27,6 +27,8 @@ import { createPortal } from "react-dom";
 import {
   addStudioCommentReply,
   addStudioCommentThread,
+  mergeStudioTeamCommentMutableDocument,
+  partitionStudioTeamCommentMutableDocument,
   assignStudioCommentThread,
   createStudioCommentMessageId,
   editStudioCommentReply,
@@ -46,10 +48,6 @@ import {
   type StudioCommentAnchor,
   type StudioCommentsDocument,
 } from "./studio-comments";
-import {
-  mergeStudioTeamCommentMutableDocument,
-  partitionStudioTeamCommentMutableDocument,
-} from "./studio-team-comment-mutable-document";
 
 export interface StudioCommentAnchorOption {
   anchor: StudioCommentAnchor;

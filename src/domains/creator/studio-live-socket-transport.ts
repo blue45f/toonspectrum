@@ -60,6 +60,7 @@ import {
   type ServerParticipant,
   type ServerVoiceMember,
 } from "./studio-live-socket-wire";
+import { parseStudioTeamCommentLiveEvent } from "./studio-team-comment-live-event";
 
 import type {
   StudioLiveAuthoritativeLockEvent,
@@ -351,6 +352,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.socket.on("studio:voice:leave", this.onVoiceLeave);
     this.socket.on("studio:voice:signal", this.onVoiceSignal);
     this.socket.on("studio:chat:message", this.onChatMessage);
+    this.socket.on("studio:comment:changed", this.onTeamCommentChanged);
     this.socket.on("studio:crdt:sync", this.onCrdtSync);
     this.socket.on("studio:crdt:update", this.onCrdtUpdate);
   }
@@ -1095,6 +1097,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.socket.off("studio:voice:leave", this.onVoiceLeave);
     this.socket.off("studio:voice:signal", this.onVoiceSignal);
     this.socket.off("studio:chat:message", this.onChatMessage);
+    this.socket.off("studio:comment:changed", this.onTeamCommentChanged);
     this.socket.off("studio:crdt:sync", this.onCrdtSync);
     this.socket.off("studio:crdt:update", this.onCrdtUpdate);
     this.rejectPendingCrdtOperations(createStudioCrdtRetryableError(
@@ -2005,6 +2008,13 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       messageId: value.messageId,
       text: value.text,
     });
+  };
+
+  private readonly onTeamCommentChanged = (value: unknown) => {
+    if (!this.ready || this.accessRevoked) return;
+    const change = parseStudioTeamCommentLiveEvent(value, this.context.workId);
+    if (!change) return;
+    this.emitControl({ type: "comment-changed", change });
   };
 
   private readonly onCrdtSync = (value: unknown) => {

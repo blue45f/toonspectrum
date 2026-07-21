@@ -11,6 +11,7 @@ import {
 import {
   StudioBroadcastChannelTransport,
   type StudioBroadcastChannelLike,
+  type StudioLiveTransportControlEvent,
 } from "./studio-live-collaboration-transport";
 
 class FakeBroadcastChannel implements StudioBroadcastChannelLike {
@@ -88,7 +89,28 @@ function makeTransport(
   );
 }
 
-describe("StudioBroadcastChannelTransport CRDT surface", () => {
+describe("StudioBroadcastChannelTransport", () => {
+  it("keeps typed comment invalidation on the optional server control plane", () => {
+    const change: Extract<StudioLiveTransportControlEvent, { type: "comment-changed" }> = {
+      type: "comment-changed",
+      change: {
+        version: 1,
+        workId: "work-1",
+        threadId: "thread-1",
+        activitySequence: "42",
+        kind: "replied",
+      },
+    };
+    const local = makeTransport(new FakeBroadcastHub(), "alice");
+
+    expect(change).toEqual({
+      type: "comment-changed",
+      change: expect.objectContaining({ workId: "work-1", threadId: "thread-1" }),
+    });
+    expect("subscribeControl" in local).toBe(false);
+    local.close();
+  });
+
   it("keeps durable messages off the ephemeral listener", async () => {
     const hub = new FakeBroadcastHub();
     const alice = makeTransport(hub, "alice");

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "../../../../../lib/db";
 import {
+  creatorWorkCollaborators,
   creatorWorks,
   creatorWorkTeamCommentActivities,
   creatorWorkTeamCommentMessages,
@@ -24,6 +25,8 @@ import {
   STUDIO_TEAM_COMMENT_MAX_MESSAGES_PER_WORK,
   STUDIO_TEAM_COMMENT_MAX_THREADS_PER_WORK,
   StudioTeamCommentCursorError,
+  StudioTeamCommentActivityConflictError,
+  StudioTeamCommentForbiddenError,
   StudioTeamCommentMutationConflictError,
   studioTeamCommentRepositoryProvider,
 } from "./studio-team-comment.repository";
@@ -41,6 +44,7 @@ interface CommentMutationHarnessState {
   readonly threads: Map<string, FakeRow>;
   readonly messages: Map<string, FakeRow>;
   readonly receipts: Map<string, FakeRow>;
+  readonly activities: FakeRow[];
   readonly locks: string[];
   threadInsertions: number;
   messageInsertions: number;
@@ -147,6 +151,10 @@ class FakeUpdateQuery implements PromiseLike<void> {
     return this;
   }
 
+  returning(..._arguments: unknown[]): Promise<FakeRow[]> {
+    return Promise.resolve([{ id: "thread-1" }]);
+  }
+
   then<TResult1 = void, TResult2 = never>(
     onfulfilled?: ((value: void) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
@@ -157,12 +165,17 @@ class FakeUpdateQuery implements PromiseLike<void> {
 
 function createCommentMutationHarness(
   initialThread: FakeRow | null = null,
-  initialMessage: FakeRow | null = null
+  initialMessage: FakeRow | null = null,
+  options: {
+    membership?: { userId: string; role: string; status: string };
+    detailMessages?: FakeRow[];
+  } = {}
 ): { transaction: object; state: CommentMutationHarnessState } {
   const state: CommentMutationHarnessState = {
     threads: new Map(),
     messages: new Map(),
     receipts: new Map(),
+    activities: [],
     locks: [],
     threadInsertions: 0,
     messageInsertions: 0,
@@ -179,6 +192,9 @@ function createCommentMutationHarness(
     if (table === users) {
       return [{ userId: "owner", name: "작가", status: "active" }];
     }
+    if (table === creatorWorkCollaborators) {
+      return options.membership ? [options.membership] : [];
+    }
     if (table === creatorWorkTeamCommentMutations) {
       const receipt = state.receipts.values().next().value as FakeRow | undefined;
       return receipt ? [receipt] : [];
@@ -191,6 +207,9 @@ function createCommentMutationHarness(
       return thread ? [thread] : [];
     }
     if (table === creatorWorkTeamCommentMessages) {
+      if (selection && Object.hasOwn(selection, "activitySequence")) {
+        return options.detailMessages ?? [];
+      }
       return [{ value: state.messages.size }];
     }
     return [];
@@ -206,6 +225,7 @@ function createCommentMutationHarness(
         state.messageInsertions += 1;
       } else if (table === creatorWorkTeamCommentActivities) {
         sequence += BigInt(1);
+        state.activities.push({ ...row, sequence });
       } else if (table === creatorWorkTeamCommentMutations) {
         const key = `${String(row.workId)}:${String(row.actorUserId)}:${String(row.mutationId)}`;
         state.receipts.set(key, { ...row });
@@ -317,6 +337,7 @@ describe("Studio team comment persistence contract", () => {
     ]);
     expect(names(mutations.checks)).toEqual([
       "creator_work_team_comment_mutation_id_check",
+      "creator_work_team_comment_mutation_message_state_check",
       "creator_work_team_comment_mutation_operation_check",
       "creator_work_team_comment_mutation_request_hash_check",
       "creator_work_team_comment_mutation_response_check",
@@ -330,27 +351,27 @@ describe("Studio team comment persistence contract", () => {
     expect(resolveStudioTeamCommentAccess({
       actorUserId: "owner",
       ownerUserId: "owner",
-    })).toEqual({ view: true, comment: true, resolve: true });
+    })).toEqual({ view: true, comment: true, resolve: true, reanchor: true });
     expect(resolveStudioTeamCommentAccess({
       actorUserId: "commenter",
       ownerUserId: "owner",
       membership: { userId: "commenter", role: "commenter", status: "active" },
-    })).toEqual({ view: true, comment: true, resolve: false });
+    })).toEqual({ view: true, comment: true, resolve: false, reanchor: false });
     expect(resolveStudioTeamCommentAccess({
       actorUserId: "viewer",
       ownerUserId: "owner",
       membership: { userId: "viewer", role: "viewer", status: "active" },
-    })).toEqual({ view: true, comment: false, resolve: false });
+    })).toEqual({ view: true, comment: false, resolve: false, reanchor: false });
     expect(resolveStudioTeamCommentAccess({
       actorUserId: "pending",
       ownerUserId: "owner",
       membership: { userId: "pending", role: "editor", status: "pending" },
-    })).toEqual({ view: false, comment: false, resolve: false });
+    })).toEqual({ view: false, comment: false, resolve: false, reanchor: false });
     expect(resolveStudioTeamCommentAccess({
       actorUserId: "intruder",
       ownerUserId: "owner",
       membership: { userId: "other", role: "admin", status: "active" },
-    })).toEqual({ view: false, comment: false, resolve: false });
+    })).toEqual({ view: false, comment: false, resolve: false, reanchor: false });
   });
 
   it("redacts soft-deleted and missing comment identities", () => {
@@ -384,7 +405,7 @@ describe("Studio team comment persistence contract", () => {
     )).toThrow(StudioTeamCommentCursorError);
   });
 
-  it("fingerprints normalized create/reply payload scope without including the retry key", () => {
+  it("fingerprints normalized mutation scope without including the retry key", () => {
     const createInput = {
       operation: "thread_create" as const,
       anchor: { type: "point" as const, pageId: "page-1", x: 0.25, y: 0.75 },
@@ -400,12 +421,94 @@ describe("Studio team comment persistence contract", () => {
       threadId: "thread-1",
       body: "검수",
     })).not.toBe(createHash);
+    const reanchorHash = hashStudioTeamCommentMutation({
+      operation: "thread_reanchor",
+      threadId: "thread-1",
+      anchor: { type: "point", pageId: "page-1", x: 0.25, y: 0.75 },
+      expectedActivitySequence: "7",
+    });
+    expect(reanchorHash).toMatch(/^[0-9a-f]{64}$/u);
+    expect(hashStudioTeamCommentMutation({
+      operation: "thread_reanchor",
+      threadId: "thread-1",
+      anchor: { type: "point", pageId: "page-1", x: 0.25, y: 0.75 },
+      expectedActivitySequence: "8",
+    })).not.toBe(reanchorHash);
   });
 
   it("exposes a swappable production repository provider", () => {
     expect(studioTeamCommentRepositoryProvider.provide).toBe(STUDIO_TEAM_COMMENT_REPOSITORY);
     expect(studioTeamCommentRepositoryProvider.useFactory())
       .toBeInstanceOf(DrizzleStudioTeamCommentRepository);
+  });
+
+  it("loads one permission-checked thread with a bounded newest-message window", async () => {
+    const createdAt = new Date("2026-07-18T01:00:00.000Z");
+    const repliedAt = new Date("2026-07-18T01:01:00.000Z");
+    const { transaction } = createCommentMutationHarness({
+      id: "thread-1",
+      workId: "work-1",
+      anchor: { type: "point", pageId: "page-1", x: 0.2, y: 0.3 },
+      status: "open",
+      createdBy: "owner",
+      createdByUserId: "owner",
+      createdByName: "작가",
+      createdByStatus: "active",
+      resolvedBy: null,
+      resolvedByUserId: null,
+      resolvedByName: null,
+      resolvedByStatus: null,
+      resolvedAt: null,
+      createdAt,
+      updatedAt: repliedAt,
+      lastActivitySequence: BigInt(2),
+      latestActivitySequence: BigInt(2),
+      lastReadActivitySequence: BigInt(1),
+      messageCount: 3,
+    }, null, {
+      detailMessages: [
+        {
+          id: "message-3",
+          authorUserId: "owner",
+          authorName: "작가",
+          authorStatus: "active",
+          body: "셋째",
+          createdAt: repliedAt,
+          activitySequence: BigInt(3),
+        },
+        {
+          id: "message-2",
+          authorUserId: "owner",
+          authorName: "작가",
+          authorStatus: "active",
+          body: "둘째",
+          createdAt: repliedAt,
+          activitySequence: BigInt(2),
+        },
+      ],
+    });
+    installSerializedCommentTransactions(transaction);
+    const repository = new DrizzleStudioTeamCommentRepository();
+
+    await expect(repository.getThread("owner", "work-1", "thread-1", 2)).resolves.toEqual({
+      id: "thread-1",
+      workId: "work-1",
+      anchor: { type: "point", pageId: "page-1", x: 0.2, y: 0.3 },
+      status: "open",
+      createdBy: { userId: "owner", name: "작가" },
+      resolvedBy: null,
+      resolvedAt: null,
+      createdAt: createdAt.toISOString(),
+      updatedAt: repliedAt.toISOString(),
+      latestActivitySequence: "2",
+      unread: true,
+      messageCount: 3,
+      messages: [
+        { id: "message-2", author: { userId: "owner", name: "작가" }, body: "둘째", createdAt: repliedAt.toISOString() },
+        { id: "message-3", author: { userId: "owner", name: "작가" }, body: "셋째", createdAt: repliedAt.toISOString() },
+      ],
+      messagesTruncated: true,
+    });
   });
 
   it("acknowledges every thread frontier with one deterministic bulk upsert", async () => {
@@ -577,5 +680,112 @@ describe("Studio team comment persistence contract", () => {
       ...input,
     })).rejects.toBeInstanceOf(StudioTeamCommentMutationConflictError);
     expect(state.messageInsertions).toBe(1);
+  });
+
+  it("atomically re-anchors once, replays retries, and rejects a stale activity frontier", async () => {
+    const createdAt = new Date("2026-07-18T01:00:00.000Z");
+    const now = new Date("2026-07-18T01:02:03.456Z");
+    const { transaction, state } = createCommentMutationHarness({
+      id: "thread-1",
+      workId: "work-1",
+      anchor: { type: "page", pageId: "page-1" },
+      createdBy: "owner",
+      status: "open",
+      resolvedBy: null,
+      resolvedAt: null,
+      createdAt,
+      updatedAt: createdAt,
+      lastActivitySequence: BigInt(1),
+    });
+    installSerializedCommentTransactions(transaction);
+    let activityIds = 1;
+    const repository = new DrizzleStudioTeamCommentRepository({
+      now: () => now,
+      createActivityId: () => `activity-${activityIds += 1}`,
+    });
+    const input = {
+      mutationId: "mutation-reanchor-1",
+      anchor: { type: "point" as const, pageId: "page-1", x: 0.25, y: 0.75 },
+      expectedActivitySequence: "1",
+    };
+
+    const [first, retried] = await Promise.all([
+      repository.reanchor("owner", "work-1", "thread-1", input),
+      repository.reanchor("owner", "work-1", "thread-1", input),
+    ]);
+    expect(retried).toEqual(first);
+    expect(first).toEqual({
+      threadId: "thread-1",
+      anchor: input.anchor,
+      updatedAt: now.toISOString(),
+      latestActivitySequence: "2",
+    });
+    expect(state.activities).toEqual([expect.objectContaining({
+      action: "reanchored",
+      messageId: null,
+      threadId: "thread-1",
+      sequence: BigInt(2),
+    })]);
+    expect(state.receiptInsertions).toBe(1);
+    expect(state.threads.get("thread-1")).toMatchObject({
+      anchor: input.anchor,
+      lastActivitySequence: BigInt(2),
+    });
+
+    const storedReceipt = state.receipts.values().next().value as FakeRow | undefined;
+    state.receipts.clear();
+    await expect(repository.reanchor("owner", "work-1", "thread-1", {
+      ...input,
+      mutationId: "mutation-reanchor-stale",
+    })).rejects.toBeInstanceOf(StudioTeamCommentActivityConflictError);
+    if (!storedReceipt) throw new Error("missing fake re-anchor receipt");
+    state.receipts.set("work-1:owner:mutation-reanchor-1", storedReceipt);
+    await expect(repository.reanchor("owner", "work-1", "thread-1", {
+      ...input,
+      anchor: { type: "page", pageId: "page-other" },
+    })).rejects.toBeInstanceOf(StudioTeamCommentMutationConflictError);
+    expect(state.activities).toHaveLength(1);
+  });
+
+  it("allows an original author or comment manager to re-anchor but rejects another viewer", async () => {
+    const createdAt = new Date("2026-07-18T01:00:00.000Z");
+    const baseThread = {
+      id: "thread-1",
+      workId: "work-1",
+      anchor: { type: "page", pageId: "page-1" },
+      createdBy: "author",
+      status: "open",
+      resolvedBy: null,
+      resolvedAt: null,
+      createdAt,
+      updatedAt: createdAt,
+      lastActivitySequence: BigInt(1),
+    };
+    const authorHarness = createCommentMutationHarness(baseThread, null, {
+      membership: { userId: "author", role: "viewer", status: "active" },
+    });
+    installSerializedCommentTransactions(authorHarness.transaction);
+    const repository = new DrizzleStudioTeamCommentRepository({
+      now: () => new Date("2026-07-18T01:01:00.000Z"),
+      createActivityId: () => "activity-author",
+    });
+    await expect(repository.reanchor("author", "work-1", "thread-1", {
+      mutationId: "mutation-author",
+      anchor: { type: "frame", pageId: "page-1", frameId: "frame-1" },
+      expectedActivitySequence: "1",
+    })).resolves.toMatchObject({ latestActivitySequence: "2" });
+
+    vi.restoreAllMocks();
+    const viewerHarness = createCommentMutationHarness(baseThread, null, {
+      membership: { userId: "viewer", role: "viewer", status: "active" },
+    });
+    installSerializedCommentTransactions(viewerHarness.transaction);
+    const viewerRepository = new DrizzleStudioTeamCommentRepository();
+    await expect(viewerRepository.reanchor("viewer", "work-1", "thread-1", {
+      mutationId: "mutation-viewer",
+      anchor: { type: "frame", pageId: "page-1", frameId: "frame-1" },
+      expectedActivitySequence: "1",
+    })).rejects.toBeInstanceOf(StudioTeamCommentForbiddenError);
+    expect(viewerHarness.state.activities).toHaveLength(0);
   });
 });

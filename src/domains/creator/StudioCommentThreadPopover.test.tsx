@@ -80,8 +80,9 @@ describe("StudioCommentThreadPopover", () => {
     const { rerender } = render(<ControlledPopover {...baseProps({ unread: true })} />);
 
     const dialog = screen.getByRole("dialog", { name: "민지 작가" });
-    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(dialog.getAttribute("aria-modal")).toBe("false");
     expect(dialog.getAttribute("data-studio-shortcut-boundary")).toBe("true");
+    expect(dialog.getAttribute("data-presentation")).toBe("anchored-popover");
     expect(dialog.getAttribute("data-placement")).toBe("right");
     expect(dialog.style.left).toBe("136px");
     expect(screen.getByText("검토 중")).toBeTruthy();
@@ -208,9 +209,13 @@ describe("StudioCommentThreadPopover", () => {
     expect(screen.getByRole("button", { name: "답글" })).toHaveProperty("disabled", false);
   });
 
-  it("preserves a non-empty draft on incidental backdrop and carries it into the review inbox", async () => {
+  it("keeps the canvas interactive while protecting a draft on incidental outside input", async () => {
     const onClose = vi.fn();
     const onOpenReview = vi.fn();
+    const canvasControl = document.createElement("button");
+    const onCanvasPointerDown = vi.fn();
+    canvasControl.addEventListener("pointerdown", onCanvasPointerDown);
+    document.body.append(canvasControl);
     render(
       <ControlledPopover
         {...baseProps({ onClose, onOpenReview })}
@@ -219,38 +224,37 @@ describe("StudioCommentThreadPopover", () => {
 
     const textarea = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "빠른 답글" });
     fireEvent.change(textarea, { target: { value: "사라지면 안 되는 초안" } });
-    const backdrop = document.querySelector<HTMLElement>(
-      '[data-studio-comment-thread-backdrop="true"]'
-    );
-    expect(backdrop?.getAttribute("data-studio-comment-thread-draft-protected")).toBe("true");
+    expect(document.querySelector('[data-studio-comment-thread-backdrop="true"]')).toBeNull();
 
-    fireEvent.pointerDown(backdrop!, { button: 0, isPrimary: true });
+    canvasControl.focus();
+    fireEvent.pointerDown(canvasControl, { button: 0, isPrimary: true });
+    expect(onCanvasPointerDown).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
     expect((await screen.findByRole("status")).textContent).toContain("작성 중인 답글은 유지했어요");
     expect(screen.getByRole("button", {
       name: "답글 초안을 버리고 댓글 대화창 닫기",
     })).toBeTruthy();
-    await waitFor(() => expect(document.activeElement).toBe(textarea));
+    expect(document.activeElement).toBe(canvasControl);
 
     fireEvent.click(screen.getByRole("button", { name: "전체 댓글 검토함에서 열기" }));
     expect(onOpenReview).toHaveBeenCalledWith("thread-1");
     expect(textarea.value).toBe("사라지면 안 되는 초안");
+    canvasControl.remove();
   });
 
   it("closes on an empty outside click or Escape, ignores secondary pointers, and opens review by id", () => {
     const onClose = vi.fn();
     const onOpenReview = vi.fn();
+    const canvasControl = document.createElement("button");
+    document.body.append(canvasControl);
     const { rerender } = render(
       <ControlledPopover
         {...baseProps({ onClose, onOpenReview })}
       />
     );
-    const backdrop = document.querySelector<HTMLElement>(
-      '[data-studio-comment-thread-backdrop="true"]'
-    );
 
-    fireEvent.pointerDown(backdrop!, { button: 2 });
-    fireEvent.pointerDown(backdrop!, { button: 0, isPrimary: false });
+    fireEvent.pointerDown(canvasControl, { button: 2 });
+    fireEvent.pointerDown(canvasControl, { button: 0, isPrimary: false });
     expect(onClose).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "전체 댓글 검토함에서 열기" }));
@@ -259,13 +263,12 @@ describe("StudioCommentThreadPopover", () => {
     expect(onClose).toHaveBeenCalledWith("escape");
 
     rerender(<ControlledPopover {...baseProps({ onClose, onOpenReview })} />);
-    fireEvent.pointerDown(document.querySelector(
-      '[data-studio-comment-thread-backdrop="true"]'
-    )!, { button: 0, isPrimary: true });
+    fireEvent.pointerDown(canvasControl, { button: 0, isPrimary: true });
     expect(onClose).toHaveBeenLastCalledWith("outside-pointer");
 
     fireEvent.click(screen.getByRole("button", { name: "댓글 대화창 닫기" }));
     expect(onClose).toHaveBeenLastCalledWith("explicit");
+    canvasControl.remove();
   });
 
   it("returns focus to the canvas when resolving removes the source pin", () => {
@@ -386,18 +389,24 @@ describe("StudioCommentThreadPopover", () => {
       .toHaveProperty("disabled", true);
   });
 
-  it("traps focus, restores the opening control, fits a mobile viewport, and opts out of motion", async () => {
+  it("uses a keyboard-safe non-modal bottom sheet on mobile without trapping focus", async () => {
     const originalViewport = globalThis.visualViewport;
+    const viewportListeners = new Set<EventListenerOrEventListenerObject>();
+    const mobileViewport = {
+      offsetLeft: 0,
+      offsetTop: 20,
+      width: 320,
+      height: 300,
+      addEventListener: vi.fn((type: string, listener: EventListenerOrEventListenerObject) => {
+        if (type === "resize" || type === "scroll") viewportListeners.add(listener);
+      }),
+      removeEventListener: vi.fn((type: string, listener: EventListenerOrEventListenerObject) => {
+        if (type === "resize" || type === "scroll") viewportListeners.delete(listener);
+      }),
+    };
     Object.defineProperty(globalThis, "visualViewport", {
       configurable: true,
-      value: {
-        offsetLeft: 0,
-        offsetTop: 20,
-        width: 320,
-        height: 300,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      },
+      value: mobileViewport,
     });
     const trigger = document.createElement("button");
     trigger.textContent = "댓글 핀";
@@ -409,23 +418,41 @@ describe("StudioCommentThreadPopover", () => {
       const dialog = screen.getByRole("dialog", { name: "민지 작가" });
       const textarea = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "빠른 답글" });
       await waitFor(() => expect(document.activeElement).toBe(textarea));
-      expect(dialog.style.width).toBe("296px");
-      expect(dialog.style.maxHeight).toBe("276px");
+      expect(dialog.getAttribute("aria-modal")).toBe("false");
+      expect(dialog.getAttribute("data-presentation")).toBe("bottom-sheet");
+      expect(dialog.getAttribute("data-placement")).toBe("bottom");
+      expect(dialog.style.left).toBe("0px");
+      expect(dialog.style.top).toBe("20px");
+      expect(dialog.style.width).toBe("320px");
+      expect(dialog.style.maxHeight).toBe("300px");
       expect(dialog.className).toContain("motion-safe:animate-in");
+      expect(dialog.className).toContain("motion-safe:slide-in-from-bottom-3");
 
       fireEvent.change(textarea, { target: { value: "포커스 순환" } });
       const submit = screen.getByRole("button", { name: "답글" });
       const first = screen.getByRole("button", { name: "전체 댓글 검토함에서 열기" });
       submit.focus();
-      fireEvent.keyDown(submit, { key: "Tab" });
-      expect(document.activeElement).toBe(first);
-      first.focus();
-      fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
+      expect(fireEvent.keyDown(submit, { key: "Tab" })).toBe(true);
       expect(document.activeElement).toBe(submit);
 
       expect(first.className).toContain("size-11");
       expect(submit.className).toContain("min-h-11");
       expect(submit.className).toContain("motion-reduce:transition-none");
+      expect(submit.closest("form")?.className).toContain("safe-area-inset-bottom");
+
+      mobileViewport.offsetTop = 36;
+      mobileViewport.height = 244;
+      act(() => {
+        const event = new Event("resize");
+        viewportListeners.forEach((listener) => {
+          if (typeof listener === "function") listener(event);
+          else listener.handleEvent(event);
+        });
+      });
+      await waitFor(() => {
+        expect(dialog.style.top).toBe("36px");
+        expect(dialog.style.maxHeight).toBe("244px");
+      });
 
       view.unmount();
       expect(document.activeElement).toBe(trigger);
@@ -434,6 +461,234 @@ describe("StudioCommentThreadPopover", () => {
       Object.defineProperty(globalThis, "visualViewport", {
         configurable: true,
         value: originalViewport,
+      });
+    }
+  });
+
+  it("keeps every bottom-sheet action at least 44px on a wide coarse-pointer device", () => {
+    const originalViewport = globalThis.visualViewport;
+    const originalMatchMedia = globalThis.matchMedia;
+    const coarsePointer = new EventTarget() as MediaQueryList;
+    Object.defineProperties(coarsePointer, {
+      matches: { configurable: true, value: true },
+      media: { configurable: true, value: "(pointer: coarse)" },
+      onchange: { configurable: true, value: null, writable: true },
+      addListener: { configurable: true, value: vi.fn() },
+      removeListener: { configurable: true, value: vi.fn() },
+    });
+    const wideViewport = new EventTarget();
+    Object.assign(wideViewport, {
+      offsetLeft: 0,
+      offsetTop: 0,
+      width: 1_024,
+      height: 768,
+    });
+    Object.defineProperty(globalThis, "visualViewport", {
+      configurable: true,
+      value: wideViewport,
+    });
+    Object.defineProperty(globalThis, "matchMedia", {
+      configurable: true,
+      value: vi.fn(() => coarsePointer),
+    });
+
+    try {
+      const view = render(
+        <ControlledPopover
+          {...baseProps({
+            clusterCount: 2,
+            onNavigateCluster: vi.fn(),
+          })}
+        />
+      );
+      const dialog = screen.getByRole("dialog", { name: "민지 작가" });
+      expect(dialog.getAttribute("data-presentation")).toBe("bottom-sheet");
+      expect(dialog.style.left).toBe("272px");
+      expect(dialog.style.width).toBe("480px");
+
+      const squareActions = [
+        screen.getByRole("button", { name: "전체 댓글 검토함에서 열기" }),
+        screen.getByRole("button", { name: "댓글 대화창 닫기" }),
+        screen.getByRole("button", { name: "이전 위치 댓글" }),
+        screen.getByRole("button", { name: "다음 위치 댓글" }),
+      ];
+      squareActions.forEach((action) => {
+        expect(action.className).toContain("size-11");
+        expect(action.className).not.toContain("size-10");
+        expect(action.className).not.toContain("size-9");
+      });
+      expect(screen.getByRole("button", { name: "민지 작가의 댓글 해결 처리" }).className)
+        .toContain("min-h-11");
+      expect(screen.getByRole("button", { name: "답글" }).className)
+        .toContain("min-h-11");
+      view.unmount();
+    } finally {
+      Object.defineProperty(globalThis, "visualViewport", {
+        configurable: true,
+        value: originalViewport,
+      });
+      Object.defineProperty(globalThis, "matchMedia", {
+        configurable: true,
+        value: originalMatchMedia,
+      });
+    }
+  });
+
+  it("tracks a live pin once per dirty frame without idle bounding-box polling", () => {
+    const originalResizeObserver = globalThis.ResizeObserver;
+    const observers: Array<{
+      callback: ResizeObserverCallback;
+      targets: Set<Element>;
+    }> = [];
+    class ResizeObserverMock {
+      readonly callback: ResizeObserverCallback;
+      readonly targets = new Set<Element>();
+
+      constructor(callback: ResizeObserverCallback) {
+        this.callback = callback;
+        observers.push(this);
+      }
+
+      observe(target: Element): void {
+        this.targets.add(target);
+      }
+
+      unobserve(target: Element): void {
+        this.targets.delete(target);
+      }
+
+      disconnect(): void {
+        this.targets.clear();
+      }
+    }
+    Object.defineProperty(globalThis, "ResizeObserver", {
+      configurable: true,
+      value: ResizeObserverMock,
+    });
+    let frameId = 0;
+    const frames = new Map<number, FrameRequestCallback>();
+    vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((callback) => {
+      frameId += 1;
+      frames.set(frameId, callback);
+      return frameId;
+    });
+    vi.spyOn(globalThis, "cancelAnimationFrame").mockImplementation((id) => {
+      frames.delete(id);
+    });
+    const flushFrames = () => {
+      const pending = [...frames.values()];
+      frames.clear();
+      act(() => pending.forEach((callback) => callback(0)));
+    };
+    const anchor = document.createElement("button");
+    let rect = {
+      left: 180,
+      top: 120,
+      width: 40,
+      height: 40,
+      right: 220,
+      bottom: 160,
+      x: 180,
+      y: 120,
+      toJSON: () => ({}),
+    };
+    const readAnchorRect = vi.fn(() => rect);
+    anchor.getBoundingClientRect = readAnchorRect;
+    document.body.append(anchor);
+
+    try {
+      const view = render(
+        <ControlledPopover
+          {...baseProps({
+            anchorElement: anchor,
+            screenPoint: { x: 12, y: 24 },
+          })}
+        />
+      );
+
+      const dialog = screen.getByRole("dialog", { name: "민지 작가" });
+      const activePin = document.querySelector<HTMLElement>(
+        '[data-studio-comment-thread-active-pin="true"]'
+      );
+      expect(readAnchorRect).not.toHaveBeenCalled();
+      flushFrames();
+      expect(readAnchorRect).toHaveBeenCalledTimes(1);
+      expect(activePin?.style.left).toBe("200px");
+      expect(activePin?.style.top).toBe("140px");
+      expect(dialog.style.left).toBe("216px");
+      expect(frames.size).toBe(0);
+
+      rect = {
+        ...rect,
+        left: 680,
+        top: 280,
+        right: 720,
+        bottom: 320,
+        x: 680,
+        y: 280,
+      };
+      fireEvent.scroll(window);
+      fireEvent.pointerMove(window, { clientX: 80, clientY: 90 });
+      fireEvent.wheel(window, { deltaY: 60 });
+      expect(readAnchorRect).toHaveBeenCalledTimes(1);
+      expect(frames.size).toBe(1);
+      flushFrames();
+      expect(readAnchorRect).toHaveBeenCalledTimes(2);
+      expect(activePin?.style.left).toBe("700px");
+      expect(activePin?.style.top).toBe("300px");
+      expect(dialog.getAttribute("data-placement")).toBe("left");
+      expect(dialog.style.left).toBe("324px");
+      expect(frames.size).toBe(0);
+
+      rect = {
+        ...rect,
+        left: 520,
+        right: 560,
+        x: 520,
+      };
+      const anchorObserver = observers.find((observer) => observer.targets.has(anchor));
+      expect(anchorObserver).toBeTruthy();
+      act(() => anchorObserver?.callback([], anchorObserver as unknown as ResizeObserver));
+      expect(frames.size).toBe(1);
+      expect(readAnchorRect).toHaveBeenCalledTimes(2);
+      flushFrames();
+      expect(readAnchorRect).toHaveBeenCalledTimes(3);
+      expect(activePin?.style.left).toBe("540px");
+      expect(frames.size).toBe(0);
+
+      rect = {
+        ...rect,
+        left: 600,
+        right: 640,
+        x: 600,
+      };
+      view.rerender(
+        <ControlledPopover
+          {...baseProps({
+            anchorElement: anchor,
+            screenPoint: { x: 12, y: 24 },
+            thread: thread({ updatedAt: "2026-07-22T04:01:00.000Z" }),
+          })}
+        />
+      );
+      expect(frames.size).toBe(1);
+      flushFrames();
+      expect(readAnchorRect).toHaveBeenCalledTimes(4);
+      expect(activePin?.style.left).toBe("620px");
+
+      anchor.remove();
+      fireEvent.scroll(window);
+      flushFrames();
+      expect(activePin?.style.left).toBe("12px");
+      expect(activePin?.style.top).toBe("24px");
+      expect(readAnchorRect).toHaveBeenCalledTimes(4);
+      view.unmount();
+      expect(frames.size).toBe(0);
+    } finally {
+      anchor.remove();
+      Object.defineProperty(globalThis, "ResizeObserver", {
+        configurable: true,
+        value: originalResizeObserver,
       });
     }
   });

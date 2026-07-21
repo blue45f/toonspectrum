@@ -332,8 +332,11 @@ export function projectStudioCanvasCommentPins(options: {
       : bounds
         ? bounds.y
         : 24 + pagePinOffset;
+    const stablePinKey = group.threadIds.length === 1
+      ? `thread:${group.threadIds[0]}`
+      : key;
     pins.push({
-      key,
+      key: stablePinKey,
       anchor: group.anchor,
       count: group.threadIds.length,
       unreadCount: group.unreadCount,

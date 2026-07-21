@@ -21,6 +21,7 @@ import type {
   StudioLiveParticipant,
   StudioLiveLockRequest,
 } from "./studio-live-collaboration-protocol";
+import type { StudioTeamCommentLiveEvent } from "./studio-team-comment-live-event";
 
 export type StudioLiveTransportMode = "local" | "server";
 
@@ -52,6 +53,7 @@ export type StudioLiveAuthoritativeLockEvent =
 export type StudioLiveTransportControlEvent =
   | { type: "status"; status: StudioLiveTransportStatus }
   | { type: "lock"; lock: StudioLiveAuthoritativeLockEvent }
+  | { type: "comment-changed"; change: StudioTeamCommentLiveEvent }
   | {
       type: "voice-removed";
       callId: string;

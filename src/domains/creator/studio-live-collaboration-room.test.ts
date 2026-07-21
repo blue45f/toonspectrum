@@ -298,6 +298,67 @@ describe("StudioLiveRoom", () => {
     serverRoom.close();
   });
 
+  it("forwards only same-work comment invalidation from a ready server control plane", async () => {
+    const test = harness("server");
+    const room = test.room(alice);
+    const received: Extract<StudioLiveRoomEvent, { type: "comment-changed" }>[] = [];
+    room.subscribe((event) => {
+      if (event.type === "comment-changed") received.push(event);
+    });
+    await room.start();
+
+    test.hub.transports[0]?.receiveControl({
+      type: "comment-changed",
+      change: {
+        version: 1,
+        workId: "work-1",
+        threadId: "thread-1",
+        activitySequence: "42",
+        kind: "replied",
+      },
+    });
+    test.hub.transports[0]?.receiveControl({
+      type: "comment-changed",
+      change: {
+        version: 1,
+        workId: "work-2",
+        threadId: "thread-cross-work",
+        activitySequence: "43",
+        kind: "resolved",
+      },
+    });
+
+    expect(received).toEqual([
+      {
+        type: "comment-changed",
+        change: {
+          version: 1,
+          workId: "work-1",
+          threadId: "thread-1",
+          activitySequence: "42",
+          kind: "replied",
+        },
+      },
+    ]);
+
+    test.hub.transports[0]?.receiveControl({
+      type: "status",
+      status: { state: "disconnected", message: "network lost", recoverable: true },
+    });
+    test.hub.transports[0]?.receiveControl({
+      type: "comment-changed",
+      change: {
+        version: 1,
+        workId: "work-1",
+        threadId: "thread-after-disconnect",
+        activitySequence: "44",
+        kind: "reopened",
+      },
+    });
+    expect(received).toHaveLength(1);
+    room.close();
+  });
+
   it("keeps local v1 presence exact-key compatible while publishing tools to server presence", async () => {
     const local = harness("local");
     const localRoom = local.room(alice);
