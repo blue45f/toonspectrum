@@ -384,9 +384,6 @@ export function StudioCommentsPanel({
     if (panelWasOpenRef.current) return;
     panelWasOpenRef.current = true;
     if (sharedReply?.threadId) setDismissedSharedReplyThreadId(null);
-    const hasThreadAtAnchor = activeAnchor
-      ? document.threads.some((thread) => studioCommentAnchorsEqual(thread.anchor, activeAnchor))
-      : false;
     const preserveReplyDraft = Boolean(
       ownedReplyThreadId
       && ownedReplyBody.trim()
@@ -401,12 +398,9 @@ export function StudioCommentsPanel({
       setComposerAnchorLabelSnapshot(
         activeAnchor ? getAnchorLabel(activeAnchor, anchorOptions) : null
       );
-      setComposerExpanded(
-        !preserveReplyDraft
-        && capabilities.create
-        && Boolean(activeAnchor)
-        && !hasThreadAtAnchor
-      );
+      // "댓글 검토함"은 항상 review rail로 열린다. 댓글이 없는 위치에서도 일반 page
+      // composer를 자동으로 덮지 않아야 정확한 "캔버스에 바로 댓글" 진입점이 보인다.
+      setComposerExpanded(false);
       setComposerLocationPickerOpen(false);
     }
     if (!sharedReply && !preserveReplyDraft) {

@@ -50,6 +50,7 @@ describe("studio-app-settings", () => {
       { railId: "liquify", actionId: "tool-liquify", label: "리퀴파이", shortcut: "J" },
       { railId: "marquee-circle", actionId: "tool-marquee-circle", label: "원형 선택", shortcut: "Shift+M" },
       { railId: "crop", actionId: "tool-crop", label: "자르기", shortcut: "C" },
+      { railId: "comment", actionId: "tool-comment", label: "위치 댓글", shortcut: "Alt+C" },
       { railId: "zoom", actionId: "tool-zoom", label: "보기 확대·축소", shortcut: "Z" },
       { railId: "rotate-view", actionId: "tool-rotate-view", label: "보기 회전", shortcut: "R" },
     ] as const;
@@ -98,6 +99,14 @@ describe("studio-app-settings", () => {
       defaultKeys: "T",
     });
     expect(defaults.shortcuts["tool-lettering"]).toBe("T");
+    expect(
+      matchStudioShortcut(defaults.shortcuts["tool-comment"], {
+        key: "ç",
+        code: "KeyC",
+        altKey: true,
+      })
+    ).toBe(true);
+    expect(matchStudioShortcut("B", { key: "x", code: "KeyB" })).toBe(false);
   });
 
   it("adds new shortcut defaults when normalizing a legacy shortcut payload", () => {
@@ -109,6 +118,7 @@ describe("studio-app-settings", () => {
       "tool-pen": "K",
       "tool-marquee-circle": "Shift+M",
       "tool-crop": "C",
+      "tool-comment": "Alt+C",
       "tool-blend": "N",
       "tool-liquify": "J",
       "tool-lettering": "T",

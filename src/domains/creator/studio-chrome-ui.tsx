@@ -758,6 +758,7 @@ export function StudioRailToolButton({
   unavailableReason,
   className,
   disabled,
+  "aria-keyshortcuts": ariaKeyShortcuts,
   type = "button",
   title,
   ...rest
@@ -769,6 +770,7 @@ export function StudioRailToolButton({
       type={type}
       disabled={disabled}
       aria-label={label}
+      aria-keyshortcuts={ariaKeyShortcuts}
       title={nativeTitle}
       data-studio-tool-description={description ? "true" : undefined}
       aria-pressed={active}

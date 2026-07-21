@@ -178,13 +178,14 @@ describe("StudioLiveCanvasOverlay", () => {
     expect(html).toContain("top:75%");
     expect(html).toContain("서윤 · 이 탭");
     expect(html).toContain("· pen");
-    expect(html).toContain("1페이지, 읽지 않은 댓글 2개, 열림 댓글 3개");
+    expect(html).toContain(
+      "1페이지. 댓글 핀 1/1. 최근 작성자 민지. 최근 댓글 말풍선 간격을 조금 더 넓혀 주세요. 미해결 대화 3개. 읽지 않은 대화 2개. Enter 키로 대화 열기."
+    );
     expect(html).toContain("size-11");
     expect(html).toContain("size-8");
     expect(html).toContain("ring-accent/30");
     expect(html).toContain('data-studio-comment-pin="true"');
     expect(html).not.toContain('data-studio-comment-pin-preview="true"');
-    expect(html).not.toContain("말풍선 간격을 조금 더 넓혀 주세요.");
     expect(html).not.toContain("border-white");
     expect(html).not.toContain("0.03_270");
     expect(html).toContain("clamp(1.375rem, calc(50.0000% + 0px), calc(100% - 1.375rem))");
@@ -316,6 +317,9 @@ describe("StudioLiveCanvasOverlay", () => {
     const second = screen.getByRole<HTMLButtonElement>("button", { name: /두 번째 핀/u });
     const last = screen.getByRole<HTMLButtonElement>("button", { name: /마지막 핀/u });
     expect(first.getAttribute("aria-keyshortcuts")).toContain("ArrowRight");
+    expect(first.getAttribute("tabindex")).toBe("0");
+    expect(second.getAttribute("tabindex")).toBe("-1");
+    expect(last.getAttribute("tabindex")).toBe("-1");
 
     first.focus();
     await waitFor(() => {
@@ -324,12 +328,17 @@ describe("StudioLiveCanvasOverlay", () => {
     });
     fireEvent.keyDown(first, { key: "ArrowRight" });
     expect(document.activeElement).toBe(second);
+    expect(first.getAttribute("tabindex")).toBe("-1");
+    expect(second.getAttribute("tabindex")).toBe("0");
     fireEvent.keyDown(second, { key: "End" });
     expect(document.activeElement).toBe(last);
+    expect(second.getAttribute("tabindex")).toBe("-1");
+    expect(last.getAttribute("tabindex")).toBe("0");
     fireEvent.keyDown(last, { key: "ArrowRight" });
     expect(document.activeElement).toBe(first);
     fireEvent.keyDown(first, { key: "ArrowLeft" });
     expect(document.activeElement).toBe(last);
+    expect(last.getAttribute("tabindex")).toBe("0");
 
     fireEvent.keyDown(last, { key: "Escape" });
     expect(document.querySelector('[data-studio-comment-pin-preview="true"]')).toBeNull();
@@ -344,6 +353,54 @@ describe("StudioLiveCanvasOverlay", () => {
       threadIds: ["thread-old", "thread-unread"],
       trigger: last,
     });
+  });
+
+  it("keeps exactly one surviving comment pin in the tab order as pins change", async () => {
+    const firstPin = {
+      key: "first",
+      anchor: { type: "point" as const, pageId: "page-1", x: 0.2, y: 0.2 },
+      count: 1,
+      previewAuthor: "민지",
+      previewBody: "  줄바꿈이\n있는   최근 댓글  ",
+      label: "첫 번째 핀",
+      x: 160,
+      y: 240,
+    };
+    const secondPin = {
+      key: "second",
+      anchor: { type: "point" as const, pageId: "page-1", x: 0.4, y: 0.4 },
+      count: 2,
+      unreadCount: 1,
+      previewAuthor: "서윤",
+      previewBody: "두 번째 댓글",
+      label: "두 번째 핀",
+      x: 320,
+      y: 480,
+    };
+    const props = {
+      canvasWidth: 800,
+      canvasHeight: 1_200,
+      cursors: [],
+      onCommentPinClick: noop,
+    };
+    const { rerender } = render(
+      <StudioLiveCanvasOverlay {...props} commentPins={[firstPin, secondPin]} />
+    );
+    const first = screen.getByRole<HTMLButtonElement>("button", { name: /첫 번째 핀/u });
+    const second = screen.getByRole<HTMLButtonElement>("button", { name: /두 번째 핀/u });
+
+    expect(first.textContent).toContain("민");
+    expect(first.getAttribute("aria-label")).toContain("최근 댓글 줄바꿈이 있는 최근 댓글.");
+    expect(first.getAttribute("aria-label")).toContain("모두 읽음.");
+    second.focus();
+    await waitFor(() => {
+      expect(first.getAttribute("tabindex")).toBe("-1");
+      expect(second.getAttribute("tabindex")).toBe("0");
+    });
+
+    rerender(<StudioLiveCanvasOverlay {...props} commentPins={[firstPin]} />);
+    await waitFor(() => expect(first.getAttribute("tabindex")).toBe("0"));
+    expect(document.querySelectorAll('[data-studio-comment-pin][tabindex="0"]')).toHaveLength(1);
   });
 
   it("mirrors an inward pin collision nudge when the canvas is flipped", () => {

@@ -33,6 +33,8 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(source).toContain("bottom-[calc(7rem+env(safe-area-inset-bottom))]");
     expect(source).not.toContain('aria-modal="true"');
     expect(source).not.toContain("body.style.overflow");
+    expect(source).toContain('setComposerExpanded(false);');
+    expect(source).not.toContain("hasThreadAtAnchor");
     expect(source).not.toContain("FOCUSABLE_SELECTOR");
   });
 
@@ -88,27 +90,35 @@ describe("StudioCommentsPanel review rail contract", () => {
     );
     const disarmSource = studioPageSource.slice(disarmStart, disarmEnd);
 
-    expect(studioPageSource).toContain("commentPlacementSessionRef");
-    expect(studioPageSource).toContain("commentPlacementSessionRef.current = true");
+    expect(studioPageSource).toContain("commentPlacementPhaseRef");
+    expect(studioPageSource).toContain('const commentPlacementActive = commentPlacementPhase !== "idle"');
+    expect(studioPageSource.match(/commentPinArmed=\{commentPlacementActive\}/gu)).toHaveLength(2);
+    expect(studioPageSource).toContain('setStudioCommentPlacementPhase("placing")');
+    expect(studioPageSource).toContain('setStudioCommentPlacementPhase("composing")');
     expect(studioPageSource).toContain("stopStudioCommentPlacementSession");
     expect(submitSource).toContain(
-      "commentPlacementSessionRef.current && canCreateStudioComment"
+      'commentPlacementPhaseRef.current === "composing"'
     );
-    expect(submitSource).toContain("setCommentPinArmed(continuePlacement)");
+    expect(submitSource).toContain(
+      'setStudioCommentPlacementPhase(continuePlacement ? "placing" : "idle")'
+    );
     expect(submitSource).toContain("다음 위치를 선택하세요");
     expect(cancelSource).toContain("stopStudioCommentPlacementSession()");
-    expect(cancelSource).not.toContain("setCommentPinArmed(true)");
+    expect(cancelSource).not.toContain('setStudioCommentPlacementPhase("placing")');
     expect(disarmSource).toContain("stopStudioCommentPlacementSession()");
     expect(studioPageSource).toMatch(
       /else if \(commentPinArmed\) \{[\s\S]*?stopStudioCommentPlacementSession\(\)/u
     );
     expect(studioPageSource).toMatch(
-      /if \(viewTool !== null\) \{[\s\S]*?stopStudioCommentPlacementSession\(\)/u
+      /if \(viewTool !== null\) \{[\s\S]*?stopStudioCommentPlacementEffect\(\)/u
+    );
+    expect(studioPageSource).toContain(
+      'if (!e.repeat && matchStudioShortcut(sc["tool-comment"], e))'
     );
   });
 
   it("preloads the compact composer without pulling the full review rail into pin placement", () => {
-    const toggleStart = studioPageSource.indexOf("function toggleStudioCommentPinPlacement()");
+    const toggleStart = studioPageSource.indexOf("function startStudioCommentPlacementSession()");
     const toggleEnd = studioPageSource.indexOf("const [pointCommentAnchor", toggleStart);
     const toggleSource = studioPageSource.slice(toggleStart, toggleEnd);
 
@@ -273,7 +283,7 @@ describe("StudioCommentsPanel review rail contract", () => {
   it("cancels pin placement explicitly and never marks an entire clustered pin as read", () => {
     expect(studioPageSource).toContain('announceDrawingShortcut("댓글 핀 배치 취소")');
     expect(studioPageSource).toContain("studioCommentFocusRequestSequenceRef");
-    expect(studioPageSource).toContain("setCommentPinArmed(false)");
+    expect(studioPageSource).toContain('setStudioCommentPlacementPhase("idle")');
     expect(studioPageSource).toContain(
       "void markStudioCommentThreadRead(selection.selected.id)"
     );

@@ -11,7 +11,6 @@ import type {
 type StudioCommentsPanelSessionHandlers = Pick<
   StudioLazyPanelStackHandlers,
   | "applyStudioCommentsPanelChange"
-  | "disarmAllPixelTools"
   | "markAllStudioCommentThreadsRead"
   | "markStudioCommentThreadRead"
   | "refreshStudioTeamComments"
@@ -24,7 +23,6 @@ export type StudioCommentsPanelSessionProps = Pick<
   | "collaborationDocumentLocked"
   | "commentsOpen"
   | "isStudioCommentAnchorValid"
-  | "setCommentPinArmed"
   | "setCommentsOpen"
   | "setStudioCommentFocusRequest"
   | "setStudioCommentPinsHidden"
@@ -41,6 +39,7 @@ export type StudioCommentsPanelSessionProps = Pick<
   | "studioTeamUnreadCommentIdSet"
   | "workId"
 > & {
+  onArmCommentPinPlacement: () => void;
   stableHandlers: StudioCommentsPanelSessionHandlers;
   /** Shared with the pin quick-reply when the parent enables controlled reply ownership. */
   sharedReply?: StudioCommentsPanelSharedReplyController;
@@ -56,7 +55,7 @@ export function StudioCommentsPanelSession({
   collaborationDocumentLocked,
   commentsOpen,
   isStudioCommentAnchorValid,
-  setCommentPinArmed,
+  onArmCommentPinPlacement,
   setCommentsOpen,
   setStudioCommentFocusRequest,
   setStudioCommentPinsHidden,
@@ -77,7 +76,6 @@ export function StudioCommentsPanelSession({
 }: StudioCommentsPanelSessionProps) {
   const {
     applyStudioCommentsPanelChange,
-    disarmAllPixelTools,
     markAllStudioCommentThreadsRead,
     markStudioCommentThreadRead,
     refreshStudioTeamComments,
@@ -102,10 +100,10 @@ export function StudioCommentsPanelSession({
           : current);
       }}
       onArmPinPlacement={() => {
-        // Close the rail, then arm exactly one canvas click for a point anchor.
-        disarmAllPixelTools();
+        // The page-level controller owns every entry path so rail, mobile, and review panel
+        // share the same continuous placement/composer lifecycle.
         setCommentsOpen(false);
-        setCommentPinArmed(true);
+        onArmCommentPinPlacement();
       }}
       capabilities={workId
         ? {

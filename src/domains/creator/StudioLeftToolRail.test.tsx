@@ -15,6 +15,7 @@ import type { ComponentProps, ReactNode } from "react";
 interface MockRailButtonProps {
   readonly "aria-controls"?: string;
   readonly "aria-expanded"?: boolean;
+  readonly "aria-keyshortcuts"?: string;
   readonly active?: boolean;
   readonly description?: string;
   readonly disabled?: boolean;
@@ -30,6 +31,7 @@ vi.mock("./studio-chrome-ui", () => ({
   StudioRailToolButton: ({
     "aria-controls": ariaControls,
     "aria-expanded": ariaExpanded,
+    "aria-keyshortcuts": ariaKeyShortcuts,
     active,
     description,
     disabled,
@@ -44,6 +46,7 @@ vi.mock("./studio-chrome-ui", () => ({
       type="button"
       aria-controls={ariaControls}
       aria-expanded={ariaExpanded}
+      aria-keyshortcuts={ariaKeyShortcuts}
       aria-label={label}
       aria-pressed={active}
       data-hint-description={description}
@@ -119,7 +122,6 @@ function createProps(overrides: Partial<RailProps> = {}): RailProps {
     appSettings: defaultStudioAppSettings(),
     appSettingsOpen: false,
     canvasOnlyMode: false,
-    commentsOpen: false,
     commentPinArmed: false,
     cropActive: false,
     drawMode: "pen",
@@ -168,6 +170,28 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
+});
+
+it("shows the configured comment shortcut in the placement tool and preserves the toggle action", () => {
+  const props = createProps();
+  render(<StudioLeftToolRail {...props} />);
+
+  const comment = screen.getByRole("button", { name: "댓글 핀 배치 (⌥·C)" });
+  expect(comment.getAttribute("aria-keyshortcuts")).toBe("Alt+C");
+  expect(comment.getAttribute("aria-pressed")).toBe("false");
+  expect(comment.getAttribute("data-hint-description")).toContain("⌥·C로 바로 시작");
+  expect(comment.getAttribute("data-hint-description")).toContain("⇧·C로 핀을 숨길");
+
+  fireEvent.click(comment);
+  expect(props.stableHandlers.toggleStudioCommentPinPlacement).toHaveBeenCalledOnce();
+
+  const unboundSettings = defaultStudioAppSettings();
+  unboundSettings.shortcuts["tool-comment"] = "";
+  cleanup();
+  render(<StudioLeftToolRail {...createProps({ appSettings: unboundSettings })} />);
+  const unboundComment = screen.getByRole("button", { name: "댓글 핀 배치" });
+  expect(unboundComment.getAttribute("aria-keyshortcuts")).toBeNull();
+
 });
 
 function stubAnimationFrame(): void {

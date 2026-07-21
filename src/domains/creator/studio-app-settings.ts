@@ -55,7 +55,7 @@ export const STUDIO_RAIL_TOOL_CATALOG = [
   { id: "text", label: "텍스트", defaultShortcut: "T" },
   { id: "bubble", label: "말풍선", defaultShortcut: "T" },
   { id: "image", label: "이미지", defaultShortcut: "" },
-  { id: "comment", label: "댓글", defaultShortcut: "" },
+  { id: "comment", label: "위치 댓글", defaultShortcut: "Alt+C" },
   { id: "perspective", label: "투시도", defaultShortcut: "" },
   { id: "zoom", label: "보기 확대·축소", defaultShortcut: "Z" },
   { id: "zoom-fit", label: "너비에 맞춤", defaultShortcut: "Home" },
@@ -84,6 +84,7 @@ export const STUDIO_SHORTCUT_ACTIONS = [
   { id: "tool-marquee-circle", label: "원형 선택", defaultKeys: "Shift+M" },
   { id: "tool-transform", label: "변형", defaultKeys: "Shift+T" },
   { id: "tool-crop", label: "자르기", defaultKeys: "C" },
+  { id: "tool-comment", label: "위치 댓글", defaultKeys: "Alt+C" },
   { id: "tool-blend", label: "혼합(스머지)", defaultKeys: "N" },
   { id: "tool-liquify", label: "리퀴파이", defaultKeys: "J" },
   { id: "tool-lettering", label: "레터링(텍스트·말풍선)", defaultKeys: "T" },
@@ -362,7 +363,16 @@ export function matchStudioShortcut(
   if (parsed.key === "?") return key === "?" || (!!event.shiftKey && (key === "/" || code === "Slash"));
   if (parsed.key === "Tab") return code === "Tab" || key === "Tab";
   if (parsed.key.length === 1) {
-    return key.toUpperCase() === parsed.key.toUpperCase();
+    const expected = parsed.key.toUpperCase();
+    const physicalCode = /^[A-Z]$/u.test(expected)
+      ? `Key${expected}`
+      : /^[0-9]$/u.test(expected)
+        ? `Digit${expected}`
+        : null;
+    // Option/Alt can transform printable `event.key` values (`Alt+C` → `ç` on macOS).
+    // Limit the physical-key fallback to Alt chords so other shortcuts stay layout-aware.
+    return key.toUpperCase() === expected
+      || (parsed.alt && physicalCode !== null && code === physicalCode);
   }
   return key === parsed.key || code === parsed.key;
 }

@@ -91,11 +91,11 @@ describe("studio draw pointer-start planning ownership boundary", () => {
       "if (!commentPinArmed) return false",
       "if (canvasInteractionBlocked)",
       "stagePointerEvent.isPrimary === false",
-      "setCommentPinArmed(false)",
       'type: "point" as const',
       "x: Math.min(1, Math.max(0, pos.x / CANVAS_W))",
       "y: Math.min(1, Math.max(0, pos.y / canvasH))",
       "getClientPointFromKonvaEvent(e.evt)",
+      'setStudioCommentPlacementPhase("composing")',
       'commentId: createStudioCommentMessageId("comment")',
       "screenPoint: clientPoint",
     ]);

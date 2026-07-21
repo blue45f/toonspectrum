@@ -18,7 +18,6 @@ export function createStudioCommentsPanelSessionProps(
   const activeCommentAnchor = { type: "page", pageId: "page-1" } as const;
   const stableHandlers: StudioCommentsPanelSessionProps["stableHandlers"] = {
     applyStudioCommentsPanelChange: vi.fn(async () => true),
-    disarmAllPixelTools: vi.fn(),
     markAllStudioCommentThreadsRead: vi.fn(async () => true),
     markStudioCommentThreadRead: vi.fn(async () => true),
     refreshStudioTeamComments: vi.fn(),
@@ -31,7 +30,7 @@ export function createStudioCommentsPanelSessionProps(
     collaborationDocumentLocked: false,
     commentsOpen: true,
     isStudioCommentAnchorValid: vi.fn(() => true),
-    setCommentPinArmed: vi.fn(),
+    onArmCommentPinPlacement: vi.fn(),
     setCommentsOpen: vi.fn(),
     setStudioCommentFocusRequest: vi.fn(),
     setStudioCommentPinsHidden: vi.fn(),

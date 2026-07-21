@@ -7101,19 +7101,30 @@ function StudioCuttoonEditor() {
   // 무장, 커밋은 아래 지연 파이프라인이 유휴 시 한 번만 동기화한다. 30k 라인 컴포넌트 본문
   // 렌더(수백 ms)가 스트로크 시작/종료마다 끼어들던 것이 필기감 저하의 마지막 원인이었다.
   const liveDraftDirectRef = useRef(false);
-  // Figma식 자유 위치 댓글: 무장 → 캔버스 클릭 한 번 → point 앵커 확정(0..1 정규화 좌표).
-  const [commentPinArmed, setCommentPinArmed] = useState(false);
-  // Magma처럼 댓글 도구는 한 번 선택하면 여러 위치를 연속 검토할 수 있다. `commentPinArmed`
-  // 는 다음 클릭 대기 상태만 나타내고, 이 ref는 compact composer가 열린 동안에도 도구 세션을
-  // 유지한다. 다른 편집 도구/검토함/Esc 전환은 아래 공통 해제 지점에서 세션까지 종료한다.
-  const commentPlacementSessionRef = useRef(false);
-  function stopStudioCommentPlacementSession(): void {
-    commentPlacementSessionRef.current = false;
-    setCommentPinArmed(false);
+  // Figma/Magma식 자유 위치 댓글: 한 상태 기계가 레일, 모바일 도크, 리뷰 패널과 compact
+  // composer를 함께 소유한다. 작성 창이 열렸을 때 버튼만 비활성처럼 보이거나 리뷰 패널에서
+  // 시작한 배치만 일회성으로 끝나는 이중 boolean/ref 상태를 만들지 않는다.
+  const [commentPlacementPhase, setCommentPlacementPhaseState] = useState<
+    "idle" | "placing" | "composing"
+  >("idle");
+  const commentPlacementPhaseRef = useRef(commentPlacementPhase);
+  function setStudioCommentPlacementPhase(
+    phase: "idle" | "placing" | "composing"
+  ): void {
+    commentPlacementPhaseRef.current = phase;
+    setCommentPlacementPhaseState(phase);
   }
+  const commentPinArmed = commentPlacementPhase === "placing";
+  const commentPlacementActive = commentPlacementPhase !== "idle";
+  function stopStudioCommentPlacementSession(): void {
+    setStudioCommentPlacementPhase("idle");
+  }
+  const stopStudioCommentPlacementEffect = useEffectEvent(
+    stopStudioCommentPlacementSession
+  );
   useEffect(() => {
     if (viewTool !== null) {
-      stopStudioCommentPlacementSession();
+      stopStudioCommentPlacementEffect();
     }
   }, [viewTool]);
   const canCreateStudioComment = workId
@@ -7147,18 +7158,11 @@ function StudioCuttoonEditor() {
     setTeamPanelOpen(false);
     setCommentsOpen(true);
   }
-  function toggleStudioCommentPinPlacement() {
+  function startStudioCommentPlacementSession(): void {
     setStudioCommentInteractionNotice(null);
     if (!canCreateStudioComment) {
       openStudioCommentInbox();
       announceDrawingShortcut("댓글 작성 권한이 없어 검토함을 열었습니다");
-      return;
-    }
-    if (commentPlacementSessionRef.current) {
-      stopStudioCommentPlacementSession();
-      setPointCommentComposer(null);
-      setPointCommentAnchor(null);
-      announceDrawingShortcut("댓글 핀 배치 취소");
       return;
     }
     preloadStudioPointCommentComposer();
@@ -7169,9 +7173,21 @@ function StudioCuttoonEditor() {
     dispatchStudioCommentThreadSession({ type: "session.close", reason: "tool-switch" });
     setPointCommentAnchor(null);
     setPointCommentComposer(null);
-    commentPlacementSessionRef.current = true;
-    setCommentPinArmed(true);
+    setStudioCommentPlacementPhase("placing");
     announceDrawingShortcut("댓글 · 캔버스에서 핀 위치를 선택하세요");
+  }
+  function toggleStudioCommentPinPlacement(): void {
+    setStudioCommentInteractionNotice(null);
+    if (commentPlacementPhaseRef.current !== "idle") {
+      const wasComposing = commentPlacementPhaseRef.current === "composing";
+      stopStudioCommentPlacementSession();
+      setPointCommentComposer(null);
+      setPointCommentAnchor(null);
+      announceDrawingShortcut(wasComposing ? "위치 댓글 작성 취소" : "댓글 핀 배치 취소");
+      if (wasComposing) restoreStudioCanvasViewportFocus();
+      return;
+    }
+    startStudioCommentPlacementSession();
   }
   const [pointCommentAnchor, setPointCommentAnchor] = useState<
     { pageId: string; x: number; y: number } | null
@@ -7200,7 +7216,7 @@ function StudioCuttoonEditor() {
       pointCommentAnchor
       && (selectedId !== null || pointCommentAnchor.pageId !== currentPageId)
     ) {
-      stopStudioCommentPlacementSession();
+      stopStudioCommentPlacementEffect();
       setPointCommentAnchor(null);
       setPointCommentComposer(null);
     }
@@ -9501,9 +9517,9 @@ function StudioCuttoonEditor() {
     )) return true;
     setPointCommentComposer(null);
     setPointCommentAnchor(null);
-    const continuePlacement = commentPlacementSessionRef.current && canCreateStudioComment;
-    commentPlacementSessionRef.current = continuePlacement;
-    setCommentPinArmed(continuePlacement);
+    const continuePlacement = commentPlacementPhaseRef.current === "composing"
+      && canCreateStudioComment;
+    setStudioCommentPlacementPhase(continuePlacement ? "placing" : "idle");
     announceDrawingShortcut(continuePlacement
       ? "위치 댓글을 등록했습니다 · 다음 위치를 선택하세요"
       : "위치 댓글을 등록했습니다");
@@ -14572,6 +14588,11 @@ function StudioCuttoonEditor() {
         openSelectedLayerCrop();
         return;
       }
+      if (!e.repeat && matchStudioShortcut(sc["tool-comment"], e)) {
+        e.preventDefault();
+        toggleStudioCommentPinPlacement();
+        return;
+      }
       if (matchStudioShortcut(sc["tool-blend"], e)) {
         e.preventDefault();
         toggleSmudgeTool();
@@ -18509,7 +18530,6 @@ function StudioCuttoonEditor() {
       || stagePointerEvent.isPrimary === false
     ) return true;
     const pos = e.target.getStage()?.getRelativePointerPosition();
-    setCommentPinArmed(false);
     if (pos && canvasH > 0) {
       const anchor = {
         type: "point" as const,
@@ -18522,6 +18542,7 @@ function StudioCuttoonEditor() {
         y: globalThis.innerHeight / 2,
       };
       setPointCommentAnchor({ pageId: anchor.pageId, x: anchor.x, y: anchor.y });
+      setStudioCommentPlacementPhase("composing");
       setPointCommentComposer({
         anchor,
         commentId: createStudioCommentMessageId("comment"),
@@ -25204,8 +25225,7 @@ function StudioCuttoonEditor() {
           appSettings={appSettings}
           appSettingsOpen={appSettingsOpen}
           canvasOnlyMode={canvasOnlyMode}
-          commentsOpen={commentsOpen}
-          commentPinArmed={commentPinArmed}
+          commentPinArmed={commentPlacementActive}
           cropActive={cropRect !== null}
           drawMode={drawMode}
           drawShape={drawShape}
@@ -25887,7 +25907,7 @@ function StudioCuttoonEditor() {
           brushManagerSheetRef={brushManagerSheetRef}
           brushOpacity={brushOpacity}
           collaborationDocumentLocked={collaborationDocumentLocked}
-          commentPinArmed={commentPinArmed}
+          commentPinArmed={commentPlacementActive}
           color={color}
           colorBlindPreview={colorBlindPreview}
           colorVisionSheetRef={colorVisionSheetRef}
@@ -26069,7 +26089,7 @@ function StudioCuttoonEditor() {
           setCheckpointPanelOpen={setCheckpointPanelOpen}
           setColor={setColor}
           setColorWheelOpen={setColorWheelOpen}
-          setCommentPinArmed={setCommentPinArmed}
+          onArmCommentPinPlacement={startStudioCommentPlacementSession}
           setCommentsOpen={setCommentsOpen}
           isStudioCommentAnchorValid={isStudioCommentAnchorValid}
           setStudioCommentFocusRequest={setStudioCommentFocusRequest}
@@ -27369,6 +27389,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
           <div
             ref={zoomHostRef}
             data-studio-canvas-cursor={canvasCursorClassName.replace("cursor-", "")}
+            data-studio-comment-placement-active={commentPinArmed ? "true" : undefined}
             className={cn(
               "relative rounded-sm shadow-[0_0_0_1px_oklch(0.3_0.012_64/0.55),0_18px_50px_oklch(0.08_0.01_70/0.45)]",
               canvasCursorClassName,

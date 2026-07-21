@@ -186,6 +186,32 @@ function roleLabel(role: StudioLiveParticipant["role"]): string {
   return "열람자";
 }
 
+function summarizeCommentPinBody(body: string): string {
+  const normalized = body.replace(/\s+/gu, " ").trim();
+  const characters = Array.from(normalized);
+  return characters.length > 96
+    ? `${characters.slice(0, 95).join("")}…`
+    : normalized;
+}
+
+function commentPinAccessibleLabel(
+  pin: StudioCanvasCommentPin,
+  index: number,
+  total: number
+): string {
+  const parts = [pin.label, `댓글 핀 ${index + 1}/${total}`];
+  const author = pin.previewAuthor?.trim();
+  const body = pin.previewBody ? summarizeCommentPinBody(pin.previewBody) : "";
+  if (author) parts.push(`최근 작성자 ${author}`);
+  if (body) parts.push(`최근 댓글 ${body}`);
+  parts.push(`미해결 대화 ${pin.count}개`);
+  parts.push(pin.unreadCount ? `읽지 않은 대화 ${pin.unreadCount}개` : "모두 읽음");
+  parts.push("Enter 키로 대화 열기");
+  return parts
+    .map((part) => /[.!?…。！？]$/u.test(part) ? part : `${part}.`)
+    .join(" ");
+}
+
 function syncToneClass(tone: ReturnType<typeof presentStudioLiveSyncSnapshot>["tone"]): string {
   if (tone === "good") return "border-good/40 bg-good/10 text-good";
   if (tone === "warn") return "border-warn/45 bg-warn/10 text-warn";
@@ -310,7 +336,14 @@ export function StudioLiveCanvasOverlay({
   rotation = 0,
 }: StudioLiveCanvasOverlayProps) {
   const [activeCommentPreviewKey, setActiveCommentPreviewKey] = useState<string | null>(null);
+  const [preferredCommentPinKey, setPreferredCommentPinKey] = useState<string | null>(
+    () => commentPins[0]?.key ?? null
+  );
   const pinButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const tabbableCommentPinKey = preferredCommentPinKey
+    && commentPins.some((pin) => pin.key === preferredCommentPinKey)
+    ? preferredCommentPinKey
+    : commentPins[0]?.key ?? null;
   const activePreviewPin = !commentQuickReplyActive && activeCommentPreviewKey
     ? commentPins.find((pin) => pin.key === activeCommentPreviewKey)
     : undefined;
@@ -320,6 +353,13 @@ export function StudioLiveCanvasOverlay({
   useEffect(() => {
     if (commentQuickReplyActive) setActiveCommentPreviewKey(null);
   }, [commentQuickReplyActive]);
+  useEffect(() => {
+    setPreferredCommentPinKey((current) => (
+      current && commentPins.some((pin) => pin.key === current)
+        ? current
+        : commentPins[0]?.key ?? null
+    ));
+  }, [commentPins]);
   const previewCommentPin = (pinKey: string) => {
     onCommentQuickReplyPreload?.();
     if (!commentQuickReplyActive) setActiveCommentPreviewKey(pinKey);
@@ -334,15 +374,18 @@ export function StudioLiveCanvasOverlay({
         : destination === "next"
           ? (currentIndex + 1) % commentPins.length
           : (currentIndex - 1 + commentPins.length) % commentPins.length;
-    pinButtonRefs.current.get(commentPins[nextIndex]!.key)?.focus({ preventScroll: true });
+    const nextKey = commentPins[nextIndex]!.key;
+    setPreferredCommentPinKey(nextKey);
+    pinButtonRefs.current.get(nextKey)?.focus({ preventScroll: true });
   };
   return (
     <div
       aria-label="공동작업 캔버스 오버레이"
+      role="group"
       className="pointer-events-none absolute inset-0 z-20 overflow-hidden"
       data-studio-live-canvas-overlay
     >
-      {commentPins.map((pin) => {
+      {commentPins.map((pin, index) => {
         const projected = projectStudioLiveOverlayPoint(
           pin.x / canvasWidth,
           pin.y / canvasHeight,
@@ -361,8 +404,9 @@ export function StudioLiveCanvasOverlay({
             type="button"
             aria-haspopup="dialog"
             aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home End Enter"
-            aria-label={`${pin.label}, ${pin.unreadCount ? `읽지 않은 댓글 ${pin.unreadCount}개, ` : ""}열림 댓글 ${pin.count}개`}
+            aria-label={commentPinAccessibleLabel(pin, index, commentPins.length)}
             data-studio-comment-pin="true"
+            tabIndex={pin.key === tabbableCommentPinKey ? 0 : -1}
             className={cn(
               "group pointer-events-auto absolute grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-[0.65rem] font-black tabular-nums text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
               "[&>[data-pin-marker]]:transition-transform [&>[data-pin-marker]]:duration-200 motion-reduce:[&>[data-pin-marker]]:transition-none hover:[&>[data-pin-marker]]:scale-110",
@@ -380,7 +424,10 @@ export function StudioLiveCanvasOverlay({
               if (event.currentTarget.ownerDocument.activeElement === event.currentTarget) return;
               setActiveCommentPreviewKey((current) => current === pin.key ? null : current);
             }}
-            onFocus={() => previewCommentPin(pin.key)}
+            onFocus={() => {
+              setPreferredCommentPinKey(pin.key);
+              previewCommentPin(pin.key);
+            }}
             onBlur={() => setActiveCommentPreviewKey((current) => (
               current === pin.key ? null : current
             ))}
@@ -406,6 +453,7 @@ export function StudioLiveCanvasOverlay({
               focusCommentPin(pin.key, destination);
             }}
             onClick={(event) => {
+              setPreferredCommentPinKey(pin.key);
               setActiveCommentPreviewKey(null);
               onCommentPinClick({
                 pinKey: pin.key,
@@ -417,7 +465,11 @@ export function StudioLiveCanvasOverlay({
             }}
           >
             <span data-pin-marker className="relative grid size-8 place-items-center rounded-full border-2 border-panel bg-accent shadow-[0_4px_14px_oklch(0.10_0.02_70/0.42)]">
-              {pin.count > 1 ? pin.count : <MessageCircle size={14} aria-hidden />}
+              {pin.count > 1
+                ? pin.count
+                : pin.previewAuthor
+                  ? <span aria-hidden>{initial(pin.previewAuthor)}</span>
+                  : <MessageCircle size={14} aria-hidden />}
               {pin.unreadCount ? (
                 <span
                   aria-hidden

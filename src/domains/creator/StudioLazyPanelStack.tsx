@@ -312,7 +312,7 @@ export interface StudioLazyPanelStackProps {
   setCheckpointPanelOpen: Dispatch<SetStateAction<boolean>>;
   setColor: Dispatch<SetStateAction<string>>;
   setColorWheelOpen: Dispatch<SetStateAction<boolean>>;
-  setCommentPinArmed: Dispatch<SetStateAction<boolean>>;
+  onArmCommentPinPlacement: () => void;
   setCommentsOpen: Dispatch<SetStateAction<boolean>>;
   isStudioCommentAnchorValid: (anchor: StudioCommentAnchor) => boolean;
   setStudioCommentFocusRequest: Dispatch<SetStateAction<{ threadId: string; requestId: number } | null>>;
@@ -477,7 +477,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   setCheckpointPanelOpen,
   setColor,
   setColorWheelOpen,
-  setCommentPinArmed,
+  onArmCommentPinPlacement,
   setCommentsOpen,
   isStudioCommentAnchorValid,
   setStudioCommentFocusRequest,
@@ -621,7 +621,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
             collaborationDocumentLocked={collaborationDocumentLocked}
             commentsOpen={commentsOpen}
             isStudioCommentAnchorValid={isStudioCommentAnchorValid}
-            setCommentPinArmed={setCommentPinArmed}
+            onArmCommentPinPlacement={onArmCommentPinPlacement}
             setCommentsOpen={setCommentsOpen}
             setStudioCommentFocusRequest={setStudioCommentFocusRequest}
             setStudioCommentPinsHidden={setStudioCommentPinsHidden}

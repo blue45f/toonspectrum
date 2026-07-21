@@ -219,26 +219,22 @@ describe("StudioCommentsPanelSession", () => {
     );
   });
 
-  it("preserves focus guards and disarm-close-arm pin placement order", () => {
+  it("preserves focus guards and delegates pin placement to the shared controller", () => {
     const order: string[] = [];
-    const setCommentPinArmed = vi.fn((value: SetStateAction<boolean>) => {
-      if (value === true) order.push("arm");
-    });
+    const onArmCommentPinPlacement = vi.fn(() => order.push("arm"));
     const setCommentsOpen = vi.fn((value: SetStateAction<boolean>) => {
       if (value === false) order.push("close");
     });
     const props = createStudioCommentsPanelSessionProps({
-      setCommentPinArmed,
+      onArmCommentPinPlacement,
       setCommentsOpen,
-      stableHandlers: {
-        disarmAllPixelTools: vi.fn(() => order.push("disarm")),
-      },
       studioCommentFocusRequest: { threadId: "thread-1", requestId: 7 },
     });
     render(<StudioCommentsPanelSession {...props} />);
 
     currentPanelProps().onArmPinPlacement?.();
-    expect(order).toEqual(["disarm", "close", "arm"]);
+    expect(order).toEqual(["close", "arm"]);
+    expect(onArmCommentPinPlacement).toHaveBeenCalledOnce();
 
     currentPanelProps().onFocusRequestHandled?.(7);
     const focusUpdater = vi.mocked(props.setStudioCommentFocusRequest).mock.calls[0]?.[0];

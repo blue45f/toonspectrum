@@ -149,7 +149,6 @@ interface StudioLeftToolRailProps {
   appSettings: StudioAppSettings;
   appSettingsOpen: boolean;
   canvasOnlyMode: boolean;
-  commentsOpen: boolean;
   commentPinArmed: boolean;
   cropActive: boolean;
   drawMode: DrawMode;
@@ -199,7 +198,6 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   appSettings,
   appSettingsOpen,
   canvasOnlyMode,
-  commentsOpen,
   commentPinArmed,
   cropActive,
   drawMode,
@@ -246,6 +244,10 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   const railMoreTitleId = `${railMoreDialogId}-title`;
   const zoomShortcut = appSettings.shortcuts["tool-zoom"];
   const rotateViewShortcut = appSettings.shortcuts["tool-rotate-view"];
+  const commentShortcut = appSettings.shortcuts["tool-comment"];
+  const formattedCommentShortcut = commentShortcut
+    ? formatStudioShortcutChord(commentShortcut)
+    : null;
   const zoomViewToolOpen = viewTool === "zoom";
   const rotateViewToolOpen = viewTool === "rotate";
   const zoomViewToolLabel = zoomViewToolOpen
@@ -643,12 +645,17 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             {isRailToolVisible("comment") ? (
             <StudioRailToolButton
               icon={MessageSquare}
-              label={commentPinArmed ? "댓글 핀 배치 취소" : "댓글 핀 배치"}
+              label={commentPinArmed
+                ? "댓글 핀 배치 취소"
+                : formattedCommentShortcut
+                  ? `댓글 핀 배치 (${formattedCommentShortcut})`
+                  : "댓글 핀 배치"}
               description={commentPinArmed
                 ? "댓글 핀 배치를 취소하고 이전 편집 도구로 돌아갑니다."
-                : "캔버스의 정확한 위치를 클릭해 댓글을 남깁니다. 댓글 검토함은 상단 댓글 버튼에서 열 수 있어요."}
+                : `캔버스의 정확한 위치를 클릭해 댓글을 남깁니다. ${formattedCommentShortcut ? `${formattedCommentShortcut}로 바로 시작하고, ` : ""}⇧·C로 핀을 숨길 수 있어요.`}
+              aria-keyshortcuts={commentShortcut || undefined}
               hintPreview={commentPinArmed ? "dismiss" : "comment"}
-              active={commentsOpen || commentPinArmed}
+              active={commentPinArmed}
               onClick={toggleStudioCommentPinPlacement}
             />
             ) : null}
