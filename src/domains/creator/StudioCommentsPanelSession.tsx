@@ -1,4 +1,7 @@
-import { StudioCommentsPanel } from "./StudioCommentsPanel";
+import {
+  StudioCommentsPanel,
+  type StudioCommentsPanelSharedReplyController,
+} from "./StudioCommentsPanel";
 
 import type {
   StudioLazyPanelStackHandlers,
@@ -39,6 +42,8 @@ export type StudioCommentsPanelSessionProps = Pick<
   | "workId"
 > & {
   stableHandlers: StudioCommentsPanelSessionHandlers;
+  /** Shared with the pin quick-reply when the parent enables controlled reply ownership. */
+  sharedReply?: StudioCommentsPanelSharedReplyController;
 };
 
 /**
@@ -55,6 +60,7 @@ export function StudioCommentsPanelSession({
   setCommentsOpen,
   setStudioCommentFocusRequest,
   setStudioCommentPinsHidden,
+  sharedReply,
   stableHandlers,
   studioCommentActor,
   studioCommentAnchorOptions,
@@ -137,6 +143,7 @@ export function StudioCommentsPanelSession({
       onMarkAllRead={studioTeamCommentsWorkId && studioTeamCommentCapabilities?.view
         ? markAllStudioCommentThreadsRead
         : undefined}
+      {...(sharedReply ? { sharedReply } : {})}
     />
   );
 }

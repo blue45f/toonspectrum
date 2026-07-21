@@ -99,6 +99,7 @@ import type {
   StudioWriterRoomStage,
 } from "./studio-writer-room";
 import type { StudioWriterRoomCanvasProjectionResult } from "./studio-writer-room-canvas-projection";
+import type { StudioCommentsPanelSharedReplyController } from "./StudioCommentsPanel";
 import type {
   WorkDetail,
   WorkRevisionSummary,
@@ -232,6 +233,7 @@ export interface StudioLazyPanelStackProps {
   commentsOpen: boolean;
   commentsPanelMounted: boolean;
   studioCommentFocusRequest: { threadId: string; requestId: number } | null;
+  studioCommentSharedReply?: StudioCommentsPanelSharedReplyController;
   studioCommentSyncError: string | null;
   studioCommentPinsHidden: boolean;
   studioLegacyCommentThreadIdSet: ReadonlySet<string>;
@@ -396,6 +398,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   commentsOpen,
   commentsPanelMounted,
   studioCommentFocusRequest,
+  studioCommentSharedReply,
   studioCommentSyncError,
   studioCommentPinsHidden,
   studioLegacyCommentThreadIdSet,
@@ -622,6 +625,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
             setCommentsOpen={setCommentsOpen}
             setStudioCommentFocusRequest={setStudioCommentFocusRequest}
             setStudioCommentPinsHidden={setStudioCommentPinsHidden}
+            {...(studioCommentSharedReply ? { sharedReply: studioCommentSharedReply } : {})}
             stableHandlers={stableHandlers}
             studioCommentActor={studioCommentActor}
             studioCommentAnchorOptions={studioCommentAnchorOptions}

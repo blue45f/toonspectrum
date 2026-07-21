@@ -177,6 +177,10 @@ describe("Studio lazy panel stack boundary", () => {
     expect(page).toContain(
       "const studioLazyPanelStackHandlers = useStudioStableHandlers<StudioLazyPanelStackHandlers>({"
     );
+    expect(page).toContain(
+      "const studioCommentSharedReplyHandlers = useStudioStableHandlers<Pick<"
+    );
+    expect(page).toContain("const studioCommentSharedReplyController = useMemo<");
     expect(page).toContain("stableHandlers={studioLazyPanelStackHandlers}");
     expect(page).toContain("setCurrentPageId,");
     expect(stackUse).not.toContain("setCurrentPageId={setCurrentPageId}");

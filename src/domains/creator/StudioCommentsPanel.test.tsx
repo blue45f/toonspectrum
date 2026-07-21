@@ -126,7 +126,7 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(toggleSource).toContain("preloadStudioPointCommentComposer();");
     expect(toggleSource).not.toContain("preloadStudioCommentsPanelSession();");
     expect(studioPageSource).toMatch(
-      /function openStudioCommentInbox\(\)[\s\S]*?preloadStudioCommentsPanelSession\(\);/u
+      /function openStudioCommentInbox\([^)]*\)[\s\S]*?preloadStudioCommentsPanelSession\(\);/u
     );
   });
 
@@ -154,8 +154,10 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(source).toContain("anchor: composerAnchor");
     expect(source).toContain("선택한 피드백 위치");
     expect(source).toContain("위치 변경");
-    expect(source).toContain('setFilter(activeAnchor ? "current" : "all")');
-    expect(source).toContain("setComposerExpanded(capabilities.create && Boolean(activeAnchor)");
+    expect(source).toContain(
+      'setFilter(preserveReplyDraft ? "all" : activeAnchor ? "current" : "all")'
+    );
+    expect(source).toContain("!preserveReplyDraft");
     expect(source).toContain("flex min-w-0 items-start gap-2");
   });
 
@@ -178,7 +180,8 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(source).toContain('pendingReplyIdRef.current?.threadId === threadId');
     expect(source).toContain("pendingReplyIdRef.current.payloadSignature === payloadSignature");
     expect(source).toContain("preserveReplyDraft");
-    expect(source).toContain("thread.id === replyingThreadId && !thread.resolved");
+    expect(source).toContain("activeReplyThreadId === thread.id");
+    expect(source).toContain("&& !thread.resolved");
     expect(source).toContain("id: pendingReply.replyId");
   });
 
@@ -271,7 +274,10 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(studioPageSource).toContain('announceDrawingShortcut("댓글 핀 배치 취소")');
     expect(studioPageSource).toContain("studioCommentFocusRequestSequenceRef");
     expect(studioPageSource).toContain("setCommentPinArmed(false)");
-    expect(studioPageSource).toContain("if (newestThreadId)");
+    expect(studioPageSource).toContain(
+      "void markStudioCommentThreadRead(selection.selected.id)"
+    );
+    expect(studioPageSource).toContain("void markStudioCommentThreadRead(nextThread.id)");
     expect(studioPageSource).not.toContain("Promise.all(threadIds.map");
   });
 

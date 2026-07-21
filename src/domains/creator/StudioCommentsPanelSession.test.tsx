@@ -74,6 +74,34 @@ describe("StudioCommentsPanelSession", () => {
     expect(reopenedPanel?.getAttribute("data-comments-panel-instance")).toBe("1");
   });
 
+  it("forwards one controlled reply controller unchanged across rail close and reopen", () => {
+    const sharedReply = {
+      threadId: "thread-1",
+      body: "핀에서 작성한 초안",
+      mutationId: "reply-stable-1",
+      submitting: true,
+      onThreadChange: vi.fn(),
+      onBodyChange: vi.fn(),
+      onDiscard: vi.fn(),
+      onSubmit: vi.fn(async () => true),
+    };
+    const props = createStudioCommentsPanelSessionProps({ sharedReply });
+    const view = render(<StudioCommentsPanelSession {...props} />);
+
+    expect(currentPanelProps().sharedReply).toBe(sharedReply);
+    expect(currentPanelProps().sharedReply).toMatchObject({
+      threadId: "thread-1",
+      body: "핀에서 작성한 초안",
+      mutationId: "reply-stable-1",
+      submitting: true,
+    });
+
+    view.rerender(<StudioCommentsPanelSession {...props} commentsOpen={false} />);
+    expect(currentPanelProps().sharedReply).toBe(sharedReply);
+    view.rerender(<StudioCommentsPanelSession {...props} commentsOpen />);
+    expect(currentPanelProps().sharedReply).toBe(sharedReply);
+  });
+
   it("projects document and team permissions without exposing unsupported mutations", () => {
     const props = createStudioCommentsPanelSessionProps();
     const view = render(<StudioCommentsPanelSession {...props} />);

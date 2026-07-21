@@ -24,7 +24,7 @@ import {
   Shapes,
   MessageSquare,
 } from "lucide-react";
-import { Fragment, Profiler, Suspense, lazy, memo, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
+import { Fragment, Profiler, Suspense, lazy, memo, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { Stage, Layer, Rect, Group, Circle as KCircle, Transformer, Shape } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -293,6 +293,16 @@ import {
 } from "./studio-chrome-ui";
 import { COLOR_WHEEL_LONG_PRESS_MS, clampWheelCenter, shouldCancelLongPress } from "./studio-color-wheel";
 import {
+  createStudioCommentThreadSessionState,
+  projectStudioCommentThreadSession,
+  reduceStudioCommentThreadSession,
+  selectStudioCommentThreadSessionSourceThreads,
+  studioCommentThreadSessionCloseDiscardsDraft,
+  studioCommentThreadSessionDraftBlocksResolutionChange,
+  studioCommentThreadSessionMutationId,
+  type StudioCommentThreadSessionCloseReason,
+} from "./studio-comment-thread-session";
+import {
   addStudioCommentReply,
   addStudioCommentThread,
   createEmptyStudioCommentsDocument,
@@ -305,6 +315,7 @@ import {
   studioCommentMutationReceiptOwnsDraft,
   type StudioCommentActor,
   type StudioCommentAnchor,
+  type StudioCommentThread,
   type StudioCommentsDocument,
 } from "./studio-comments";
 import {
@@ -699,6 +710,7 @@ import {
   StudioPublishContextBanner,
   StudioPuppetWarpOverlay,
   StudioRasterCrdtSurface,
+  StudioCommentThreadPopover,
   StudioPointCommentComposer,
   StudioRemoteCursorOverlay,
   StudioSelectionAntsOverlay,
@@ -718,6 +730,7 @@ import {
   loadStudioWebtoonGuides,
   preloadStudioAssetMenuPanel,
   preloadStudioCommentsPanelSession,
+  preloadStudioCommentThreadPopover,
   preloadStudioPointCommentComposer,
   preloadStudioReferencePanel,
   preloadStudioTextEditOverlay,
@@ -1006,6 +1019,7 @@ import {
   mergeStudioTeamCommentReadReceipt,
 } from "./studio-team-comment-frontier";
 import { partitionStudioTeamCommentMutableDocument } from "./studio-team-comment-mutable-document";
+import { StudioTeamCommentOperationScopeRegistry } from "./studio-team-comment-operation-scope";
 import {
   createStudioTeamCommentRefreshSession,
   type StudioTeamCommentRefreshSession,
@@ -1135,6 +1149,7 @@ import {
 import {
   StudioLazyPanelStack,
   type StudioLazyPanelStackHandlers,
+  type StudioLazyPanelStackProps,
 } from "./StudioLazyPanelStack";
 import { StudioRouteLoading } from "./StudioLazySurfaceFallback";
 import {
@@ -1241,6 +1256,7 @@ import type { StudioStockPhoto } from "./studio-stock-image-client";
 import type { ScenarioBeatType } from "./studio-story-beats";
 import type { SvgExportEl, SvgExportResult } from "./studio-svg-export";
 import type { StudioTeamCommentCapabilities } from "./studio-team-comment-client";
+import type { StudioTeamCommentMutationPlan } from "./studio-team-comment-mutation-plan";
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type { StudioGpuBackend } from "./studio-webgpu-frame-contract";
 import type {
@@ -1255,6 +1271,7 @@ import type {
 } from "./StudioAssetMenuPanel";
 import type { StudioInspectorAsideHandlers } from "./StudioInspectorAside";
 import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
+import type { StudioCommentPinClickPayload } from "./StudioLiveCanvasOverlay";
 import type { StudioLivePressureStore } from "./StudioLiveInkHosts";
 import type { StudioMenubarContentHandlers } from "./StudioMenubarContent";
 import type {
@@ -2662,13 +2679,33 @@ function StudioCuttoonEditor() {
   const [studioTeamCommentCapabilities, setStudioTeamCommentCapabilities] =
     useState<StudioTeamCommentCapabilities | null>(null);
   const [studioCommentSyncError, setStudioCommentSyncError] = useState<string | null>(null);
+  const [studioCommentInteractionNotice, setStudioCommentInteractionNotice] = useState<string | null>(
+    null
+  );
   const [studioTeamCommentsSyncing, setStudioTeamCommentsSyncing] = useState(false);
   const [studioTeamUnreadCommentIds, setStudioTeamUnreadCommentIds] = useState<string[]>([]);
+  const studioTeamCommentCapabilitiesRef = useRef(studioTeamCommentCapabilities);
+  studioTeamCommentCapabilitiesRef.current = studioTeamCommentCapabilities;
+  const studioTeamUnreadCommentIdsRef = useRef(studioTeamUnreadCommentIds);
+  studioTeamUnreadCommentIdsRef.current = studioTeamUnreadCommentIds;
   const studioTeamCommentsLoadGenerationRef = useRef(0);
   const studioTeamCommentRefreshSessionRef = useRef<StudioTeamCommentRefreshSession | null>(null);
   const studioTeamCommentsScopeRef = useRef<string | null>(null);
   const studioTeamCommentActivitySequenceRef = useRef<Map<string, bigint>>(new Map());
   const studioTeamCommentReadSequenceRef = useRef<Map<string, bigint>>(new Map());
+  const studioTeamCommentOperationScopeRegistryRef = useRef(
+    new StudioTeamCommentOperationScopeRegistry()
+  );
+  const studioTeamCommentMutationFlightRef = useRef(new Map<
+    string,
+    { signature: string; promise: Promise<boolean> }
+  >());
+  const studioTeamCommentReadFlightRef = useRef(new Map<string, Promise<boolean>>());
+  useEffect(() => () => {
+    studioTeamCommentOperationScopeRegistryRef.current.abortAll();
+    studioTeamCommentMutationFlightRef.current.clear();
+    studioTeamCommentReadFlightRef.current.clear();
+  }, []);
   const setStudioComments = (next: Parameters<typeof setStudioCommentsState>[0]): boolean => {
     if (!markStudioDocumentChanged()) return false;
     setStudioCommentsState(next);
@@ -3254,10 +3291,26 @@ function StudioCuttoonEditor() {
   const [pageReviewOpen, setPageReviewOpen] = useState(false);
   const [commentsOpen, setCommentsOpenState] = useState(false);
   const [commentsPanelMounted, setCommentsPanelMounted] = useState(false);
+  const [studioCommentThreadSession, dispatchStudioCommentThreadSession] = useReducer(
+    reduceStudioCommentThreadSession,
+    undefined,
+    createStudioCommentThreadSessionState
+  );
+  const studioCommentThreadSessionRef = useRef(studioCommentThreadSession);
+  studioCommentThreadSessionRef.current = studioCommentThreadSession;
+  const [studioCommentThreadPopoverTarget, setStudioCommentThreadPopoverTarget] = useState<{
+    pinKey: string;
+    anchor: StudioCommentAnchor;
+    screenPoint: { x: number; y: number };
+  } | null>(null);
   const setCommentsOpen = useCallback((next: Parameters<typeof setCommentsOpenState>[0]) => {
     // Keep the lazy rail mounted after its first open so failed request ids and drafts survive a
     // close/reopen cycle. A direct `false` before first use still avoids loading the chunk.
     if (typeof next === "function" || next) setCommentsPanelMounted(true);
+    if (next === false) {
+      setStudioCommentThreadPopoverTarget(null);
+      dispatchStudioCommentThreadSession({ type: "session.close", reason: "explicit" });
+    }
     setCommentsOpenState(next);
   }, []);
   const [studioCommentFocusRequest, setStudioCommentFocusRequest] = useState<{
@@ -3322,6 +3375,14 @@ function StudioCuttoonEditor() {
     );
   }, [studioComments.threads, studioTeamComments.threads, studioTeamCommentsWorkId]);
   useEffect(() => {
+    // Comment mutations and read receipts are scoped to one hydrated work generation. Abort and
+    // forget every previous flight before changing the authoritative work/comment frontier.
+    const operationRegistry = studioTeamCommentOperationScopeRegistryRef.current;
+    const mutationFlights = studioTeamCommentMutationFlightRef.current;
+    const readFlights = studioTeamCommentReadFlightRef.current;
+    operationRegistry.abortAll();
+    mutationFlights.clear();
+    readFlights.clear();
     const generation = studioTeamCommentsLoadGenerationRef.current + 1;
     studioTeamCommentsLoadGenerationRef.current = generation;
     studioTeamCommentRefreshSessionRef.current = null;
@@ -3434,6 +3495,9 @@ function StudioCuttoonEditor() {
     });
     studioTeamCommentRefreshSessionRef.current = refreshSession;
     return () => {
+      operationRegistry.abortAll();
+      mutationFlights.clear();
+      readFlights.clear();
       if (studioTeamCommentRefreshSessionRef.current === refreshSession) {
         studioTeamCommentRefreshSessionRef.current = null;
       }
@@ -7065,14 +7129,26 @@ function StudioCuttoonEditor() {
     workHydrationFailed,
     collaborationDocumentUnavailable,
   });
-  function openStudioCommentInbox() {
+  function openStudioCommentInbox(options: { preserveThreadSession?: boolean } = {}) {
     preloadStudioCommentsPanelSession();
+    setStudioCommentInteractionNotice(null);
     stopStudioCommentPlacementSession();
     setPointCommentComposer(null);
+    setStudioCommentThreadPopoverTarget(null);
+    if (!options.preserveThreadSession) {
+      dispatchStudioCommentThreadSession({
+        type: "session.open",
+        surface: "review-panel",
+        reason: "review-panel",
+        threads: studioCommentViewDocumentRef.current.threads,
+        unreadThreadIds: new Set(studioTeamUnreadCommentIdsRef.current),
+      });
+    }
     setTeamPanelOpen(false);
     setCommentsOpen(true);
   }
   function toggleStudioCommentPinPlacement() {
+    setStudioCommentInteractionNotice(null);
     if (!canCreateStudioComment) {
       openStudioCommentInbox();
       announceDrawingShortcut("댓글 작성 권한이 없어 검토함을 열었습니다");
@@ -7089,6 +7165,8 @@ function StudioCuttoonEditor() {
     disarmAllPixelTools();
     setTeamPanelOpen(false);
     setCommentsOpen(false);
+    setStudioCommentThreadPopoverTarget(null);
+    dispatchStudioCommentThreadSession({ type: "session.close", reason: "tool-switch" });
     setPointCommentAnchor(null);
     setPointCommentComposer(null);
     commentPlacementSessionRef.current = true;
@@ -9093,6 +9171,280 @@ function StudioCuttoonEditor() {
     }),
     [studioAuthUserId, studioCommentActorName]
   );
+  function currentStudioTeamCommentOperationContext() {
+    return {
+      workId: studioTeamCommentsScopeRef.current,
+      generation: studioTeamCommentsLoadGenerationRef.current,
+      mounted: editorMountedRef.current,
+    };
+  }
+
+  function studioTeamCommentMutationFlightKey(
+    workIdValue: string,
+    plan: StudioTeamCommentMutationPlan
+  ): string {
+    return plan.kind === "create"
+      ? `${workIdValue}:create:${plan.mutationId}`
+      : `${workIdValue}:thread:${plan.threadId}`;
+  }
+
+  async function executeStudioTeamCommentMutationPlan(
+    plan: StudioTeamCommentMutationPlan,
+    expectedScope?: { workId: string; generation: number }
+  ): Promise<boolean> {
+    const workIdValue = expectedScope?.workId ?? studioTeamCommentsScopeRef.current;
+    const generation = expectedScope?.generation ?? studioTeamCommentsLoadGenerationRef.current;
+    if (
+      !workIdValue
+      || studioTeamCommentsScopeRef.current !== workIdValue
+      || studioTeamCommentsLoadGenerationRef.current !== generation
+      || !editorMountedRef.current
+    ) return false;
+
+    const capabilities = studioTeamCommentCapabilitiesRef.current;
+    if ((plan.kind === "create" || plan.kind === "reply") && capabilities?.comment !== true) {
+      throw new Error("현재 팀 역할로는 댓글을 작성할 수 없어요.");
+    }
+    if ((plan.kind === "resolve" || plan.kind === "reopen") && capabilities?.resolve !== true) {
+      throw new Error("해결 상태는 소유자·관리자·편집자만 변경할 수 있어요.");
+    }
+    if (plan.kind !== "create") {
+      const currentThread = studioCommentViewDocumentRef.current.threads.find(
+        (thread) => thread.id === plan.threadId
+      );
+      if (!currentThread) throw new Error("댓글을 현재 문서에서 찾을 수 없어요.");
+      if (studioLegacyCommentThreadIdSet.has(plan.threadId)) {
+        throw new Error("이전 문서에 보관된 댓글은 전체 검토함에서 읽기 전용으로 확인할 수 있어요.");
+      }
+      if (plan.kind === "reply" && currentThread.resolved) {
+        throw new Error("이미 해결된 댓글에는 답글을 남길 수 없어요. 먼저 다시 열어 주세요.");
+      }
+      if (plan.kind === "resolve" && currentThread.resolved) return true;
+      if (plan.kind === "reopen" && !currentThread.resolved) return true;
+    }
+
+    const flightKey = studioTeamCommentMutationFlightKey(workIdValue, plan);
+    const signature = JSON.stringify(plan);
+    const existingFlight = studioTeamCommentMutationFlightRef.current.get(flightKey);
+    if (existingFlight) {
+      if (existingFlight.signature === signature) return existingFlight.promise;
+      throw new Error("이 댓글의 다른 변경을 저장하고 있어요. 완료된 뒤 다시 시도해 주세요.");
+    }
+
+    const pending = (async (): Promise<boolean> => {
+      const registry = studioTeamCommentOperationScopeRegistryRef.current;
+      const ticket = registry.begin(workIdValue, generation);
+      let admitted = false;
+      try {
+        const commentClient = await loadStudioTeamCommentClient();
+        if (!registry.isCurrent(ticket, currentStudioTeamCommentOperationContext())) {
+          registry.invalidate(ticket);
+          return false;
+        }
+
+        if (plan.kind === "create") {
+          const remoteThread = await commentClient.createStudioTeamCommentThread(workIdValue, {
+            mutationId: plan.mutationId,
+            anchor: plan.anchor,
+            body: plan.body,
+          }, ticket.signal);
+          admitted = registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
+          registry.finish(ticket);
+          if (!admitted) return false;
+          const receipt = mergeStudioTeamCommentMutationReceipt(
+            studioTeamCommentActivitySequenceRef.current,
+            studioTeamCommentReadSequenceRef.current,
+            remoteThread.id,
+            BigInt(remoteThread.latestActivitySequence)
+          );
+          if (!receipt.stale) {
+            const localThread = commentClient.studioTeamCommentThreadToLocalThread(remoteThread);
+            if (!localThread) {
+              throw new Error("등록된 팀 댓글을 화면에 안전하게 반영하지 못했어요.");
+            }
+            setStudioTeamCommentsState((current) => normalizeStudioCommentsDocument({
+              version: 1,
+              threads: current.threads.some((thread) =>
+                thread.id === localThread.id
+                || thread.replies.some((reply) => reply.id === localThread.id)
+              )
+                ? current.threads
+                : [localThread, ...current.threads],
+            }));
+            setStudioTeamUnreadCommentIds((current) => remoteThread.unread
+              ? current.includes(localThread.id)
+                ? current
+                : [...current, localThread.id].sort()
+              : current.filter((threadId) => threadId !== localThread.id));
+          }
+          setStudioCommentSyncError(null);
+          return true;
+        }
+
+        if (plan.kind === "reply") {
+          const response = await commentClient.addStudioTeamCommentReply(
+            workIdValue,
+            plan.threadId,
+            { mutationId: plan.mutationId, body: plan.body },
+            ticket.signal
+          );
+          admitted = registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
+          registry.finish(ticket);
+          if (!admitted) return false;
+          const receipt = mergeStudioTeamCommentMutationReceipt(
+            studioTeamCommentActivitySequenceRef.current,
+            studioTeamCommentReadSequenceRef.current,
+            plan.threadId,
+            BigInt(response.latestActivitySequence)
+          );
+          if (!receipt.stale) {
+            const reply = commentClient.studioTeamCommentMessageToLocalReply(response.message);
+            if (!reply) throw new Error("등록된 팀 답글을 화면에 안전하게 반영하지 못했어요.");
+            setStudioTeamCommentsState((current) => {
+              const alreadyProjected = current.threads.some((thread) =>
+                thread.id === reply.id
+                || thread.replies.some((candidate) => candidate.id === reply.id)
+              );
+              return alreadyProjected
+                ? current
+                : addStudioCommentReply(current, plan.threadId, {
+                    id: reply.id,
+                    author: reply.author,
+                    body: reply.body,
+                    mentions: reply.mentions,
+                  }, new Date(reply.createdAt));
+            });
+            setStudioTeamUnreadCommentIds((current) => current.filter(
+              (threadId) => threadId !== plan.threadId
+            ));
+          }
+          setStudioCommentSyncError(null);
+          return true;
+        }
+
+        if (plan.kind === "resolve") {
+          const response = await commentClient.resolveStudioTeamCommentThread(
+            workIdValue,
+            plan.threadId,
+            ticket.signal
+          );
+          admitted = registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
+          registry.finish(ticket);
+          if (!admitted) return false;
+          const receipt = mergeStudioTeamCommentMutationReceipt(
+            studioTeamCommentActivitySequenceRef.current,
+            studioTeamCommentReadSequenceRef.current,
+            plan.threadId,
+            BigInt(response.latestActivitySequence)
+          );
+          if (!receipt.stale) {
+            const resolver = response.resolvedBy
+              ? commentClient.studioTeamCommentUserToLocalActor(response.resolvedBy)
+              : null;
+            const resolvedAt = response.resolvedAt;
+            if (!resolver || !resolvedAt) {
+              throw new Error("팀 댓글 해결 정보를 화면에 안전하게 반영하지 못했어요.");
+            }
+            setStudioTeamCommentsState((current) => resolveStudioCommentThread(
+              current,
+              plan.threadId,
+              resolver,
+              new Date(resolvedAt)
+            ));
+            setStudioTeamUnreadCommentIds((current) => current.filter(
+              (threadId) => threadId !== plan.threadId
+            ));
+          }
+          setStudioCommentSyncError(null);
+          return true;
+        }
+
+        const response = await commentClient.reopenStudioTeamCommentThread(
+          workIdValue,
+          plan.threadId,
+          ticket.signal
+        );
+        admitted = registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
+        registry.finish(ticket);
+        if (!admitted) return false;
+        const receipt = mergeStudioTeamCommentMutationReceipt(
+          studioTeamCommentActivitySequenceRef.current,
+          studioTeamCommentReadSequenceRef.current,
+          plan.threadId,
+          BigInt(response.latestActivitySequence)
+        );
+        if (!receipt.stale) {
+          setStudioTeamCommentsState((current) => reopenStudioCommentThread(
+            current,
+            plan.threadId,
+            new Date(response.updatedAt)
+          ));
+          setStudioTeamUnreadCommentIds((current) => current.filter(
+            (threadId) => threadId !== plan.threadId
+          ));
+        }
+        setStudioCommentSyncError(null);
+        return true;
+      } catch (cause) {
+        const shouldReport = admitted
+          || registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
+        registry.invalidate(ticket);
+        if (!shouldReport) return false;
+        const message = cause instanceof Error
+          ? cause.message
+          : "팀 댓글 변경을 저장하지 못했어요.";
+        setStudioCommentSyncError(message);
+        throw new Error(message, { cause });
+      }
+    })();
+
+    studioTeamCommentMutationFlightRef.current.set(flightKey, { signature, promise: pending });
+    try {
+      return await pending;
+    } finally {
+      const current = studioTeamCommentMutationFlightRef.current.get(flightKey);
+      if (current?.promise === pending) studioTeamCommentMutationFlightRef.current.delete(flightKey);
+    }
+  }
+
+  function executeLocalStudioCommentMutationPlan(
+    plan: StudioTeamCommentMutationPlan
+  ): boolean {
+    if (collaborationDocumentLocked) return false;
+    const current = studioCommentViewDocumentRef.current;
+    const now = new Date();
+    const next = plan.kind === "create"
+      ? addStudioCommentThread(current, {
+          id: plan.mutationId,
+          anchor: plan.anchor,
+          author: studioCommentActor,
+          body: plan.body,
+        }, now)
+      : plan.kind === "reply"
+        ? addStudioCommentReply(current, plan.threadId, {
+            id: plan.mutationId,
+            author: studioCommentActor,
+            body: plan.body,
+          }, now)
+        : plan.kind === "resolve"
+          ? resolveStudioCommentThread(current, plan.threadId, studioCommentActor, now)
+          : reopenStudioCommentThread(current, plan.threadId, now);
+    if (!setStudioComments(next)) return false;
+    setStudioCommentSyncError(null);
+    return true;
+  }
+
+  async function executeStudioCommentMutationPlan(
+    plan: StudioTeamCommentMutationPlan
+  ): Promise<boolean> {
+    return studioTeamCommentsWorkId
+      ? executeStudioTeamCommentMutationPlan(plan, {
+          workId: studioTeamCommentsWorkId,
+          generation: studioTeamCommentsLoadGenerationRef.current,
+        })
+      : executeLocalStudioCommentMutationPlan(plan);
+  }
+
   async function applyStudioCommentsPanelChange(
     value: StudioCommentsDocument
   ): Promise<boolean> {
@@ -9104,7 +9456,16 @@ function StudioCuttoonEditor() {
       return true;
     }
 
+    const requestedScope = {
+      workId: studioTeamCommentsWorkId,
+      generation: studioTeamCommentsLoadGenerationRef.current,
+    };
     const { planStudioTeamCommentMutation } = await loadStudioTeamCommentMutationPlanner();
+    if (
+      studioTeamCommentsScopeRef.current !== requestedScope.workId
+      || studioTeamCommentsLoadGenerationRef.current !== requestedScope.generation
+      || !editorMountedRef.current
+    ) return false;
     const previousMutableDocument = partitionStudioTeamCommentMutableDocument(
       studioCommentViewDocumentRef.current,
       studioLegacyCommentThreadIdSet
@@ -9113,142 +9474,11 @@ function StudioCuttoonEditor() {
       nextDocument,
       studioLegacyCommentThreadIdSet
     ).mutableDocument;
-    const plan = planStudioTeamCommentMutation(
-      previousMutableDocument,
-      nextMutableDocument
-    );
+    const plan = planStudioTeamCommentMutation(previousMutableDocument, nextMutableDocument);
     if (!plan) {
       throw new Error("팀 댓글에서 아직 지원하지 않는 변경이에요. 새 댓글·답글·해결 상태만 동기화할 수 있어요.");
     }
-    const canComment = studioTeamCommentCapabilities?.comment === true;
-    if ((plan.kind === "create" || plan.kind === "reply") && !canComment) {
-      throw new Error("현재 팀 역할로는 댓글을 작성할 수 없어요.");
-    }
-    if ((plan.kind === "resolve" || plan.kind === "reopen") && !studioTeamCommentCapabilities?.resolve) {
-      throw new Error("해결 상태는 소유자·관리자·편집자만 변경할 수 있어요.");
-    }
-    const commentClient = await loadStudioTeamCommentClient();
-
-    if (plan.kind === "create") {
-      const remoteThread = await commentClient.createStudioTeamCommentThread(studioTeamCommentsWorkId, {
-        mutationId: plan.mutationId,
-        anchor: plan.anchor,
-        body: plan.body,
-      });
-      const receipt = mergeStudioTeamCommentMutationReceipt(
-        studioTeamCommentActivitySequenceRef.current,
-        studioTeamCommentReadSequenceRef.current,
-        remoteThread.id,
-        BigInt(remoteThread.latestActivitySequence)
-      );
-      // A replayed creation receipt can arrive after polling already accepted newer replies.
-      // Keep the newer projection and unread state instead of applying the old response snapshot.
-      if (receipt.stale) return true;
-      const localThread = commentClient.studioTeamCommentThreadToLocalThread(remoteThread);
-      if (!localThread) throw new Error("등록된 팀 댓글을 화면에 안전하게 반영하지 못했어요.");
-      setStudioTeamCommentsState((current) => normalizeStudioCommentsDocument({
-        version: 1,
-        threads: current.threads.some((thread) =>
-          thread.id === localThread.id
-          || thread.replies.some((reply) => reply.id === localThread.id)
-        )
-          ? current.threads
-          : [localThread, ...current.threads],
-      }));
-      setStudioTeamUnreadCommentIds((current) => remoteThread.unread
-        ? current.includes(localThread.id)
-          ? current
-          : [...current, localThread.id].sort()
-        : current.filter((threadId) => threadId !== localThread.id));
-      return true;
-    }
-
-    if (plan.kind === "reply") {
-      const response = await commentClient.addStudioTeamCommentReply(
-        studioTeamCommentsWorkId,
-        plan.threadId,
-        { mutationId: plan.mutationId, body: plan.body }
-      );
-      const receipt = mergeStudioTeamCommentMutationReceipt(
-        studioTeamCommentActivitySequenceRef.current,
-        studioTeamCommentReadSequenceRef.current,
-        plan.threadId,
-        BigInt(response.latestActivitySequence)
-      );
-      if (receipt.stale) return true;
-      const reply = commentClient.studioTeamCommentMessageToLocalReply(response.message);
-      if (!reply) throw new Error("등록된 팀 답글을 화면에 안전하게 반영하지 못했어요.");
-      setStudioTeamCommentsState((current) => {
-        // Polling snapshot can win the race with this POST response. Treat the server message ID
-        // as an idempotency key so a duplicate immutable insert never escapes a React updater.
-        const alreadyProjected = current.threads.some((thread) =>
-          thread.id === reply.id || thread.replies.some((candidate) => candidate.id === reply.id)
-        );
-        return alreadyProjected
-          ? current
-          : addStudioCommentReply(current, plan.threadId, {
-              id: reply.id,
-              author: reply.author,
-              body: reply.body,
-              mentions: reply.mentions,
-            }, new Date(reply.createdAt));
-      });
-      setStudioTeamUnreadCommentIds((current) => current.filter(
-        (threadId) => threadId !== plan.threadId
-      ));
-      return true;
-    }
-
-    if (plan.kind === "resolve") {
-      const response = await commentClient.resolveStudioTeamCommentThread(
-        studioTeamCommentsWorkId,
-        plan.threadId
-      );
-      const receipt = mergeStudioTeamCommentMutationReceipt(
-        studioTeamCommentActivitySequenceRef.current,
-        studioTeamCommentReadSequenceRef.current,
-        plan.threadId,
-        BigInt(response.latestActivitySequence)
-      );
-      if (receipt.stale) return true;
-      const resolver = response.resolvedBy
-        ? commentClient.studioTeamCommentUserToLocalActor(response.resolvedBy)
-        : null;
-      if (!resolver || !response.resolvedAt) {
-        throw new Error("팀 댓글 해결 정보를 화면에 안전하게 반영하지 못했어요.");
-      }
-      setStudioTeamCommentsState((current) => resolveStudioCommentThread(
-        current,
-        plan.threadId,
-        resolver,
-        new Date(response.resolvedAt as string)
-      ));
-      setStudioTeamUnreadCommentIds((current) => current.filter(
-        (threadId) => threadId !== plan.threadId
-      ));
-      return true;
-    }
-
-    const response = await commentClient.reopenStudioTeamCommentThread(
-      studioTeamCommentsWorkId,
-      plan.threadId
-    );
-    const receipt = mergeStudioTeamCommentMutationReceipt(
-      studioTeamCommentActivitySequenceRef.current,
-      studioTeamCommentReadSequenceRef.current,
-      plan.threadId,
-      BigInt(response.latestActivitySequence)
-    );
-    if (receipt.stale) return true;
-    setStudioTeamCommentsState((current) => reopenStudioCommentThread(
-      current,
-      plan.threadId,
-      new Date(response.updatedAt)
-    ));
-    setStudioTeamUnreadCommentIds((current) => current.filter(
-      (threadId) => threadId !== plan.threadId
-    ));
-    return true;
+    return executeStudioTeamCommentMutationPlan(plan, requestedScope);
   }
 
   async function submitStudioPointComment(body: string): Promise<boolean> {
@@ -9282,64 +9512,124 @@ function StudioCuttoonEditor() {
   }
 
   async function markStudioCommentThreadRead(threadId: string): Promise<boolean> {
-    if (!studioTeamCommentsWorkId || !studioTeamUnreadCommentIds.includes(threadId)) return true;
-    try {
-      const commentClient = await loadStudioTeamCommentClient();
-      const response = await commentClient.markStudioTeamCommentRead(
-        studioTeamCommentsWorkId,
-        threadId
-      );
-      const receipt = mergeStudioTeamCommentReadReceipt(
-        studioTeamCommentActivitySequenceRef.current,
-        studioTeamCommentReadSequenceRef.current,
-        threadId,
-        BigInt(response.lastReadActivitySequence)
-      );
-      if (receipt.fullyRead) {
-        setStudioTeamUnreadCommentIds((current) => current.filter(
-          (candidate) => candidate !== threadId
-        ));
-      }
-      setStudioCommentSyncError(null);
-      return true;
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "댓글을 읽음 처리하지 못했어요.";
-      setStudioCommentSyncError(message);
-      throw new Error(message, { cause });
-    }
-  }
-  async function markAllStudioCommentThreadsRead(): Promise<boolean> {
-    if (!studioTeamCommentsWorkId || studioTeamUnreadCommentIds.length === 0) return true;
-    try {
-      const commentClient = await loadStudioTeamCommentClient();
-      // The bulk endpoint does not return per-thread clocks. Capture the conservative frontier
-      // that is definitely visible before sending; activity first observed while the request is
-      // in flight may have committed after the server receipt and must remain unread.
-      const requestActivityFrontier = new Map(studioTeamCommentActivitySequenceRef.current);
-      await commentClient.markAllStudioTeamCommentsRead(studioTeamCommentsWorkId);
-      for (const [threadId, sequence] of requestActivityFrontier) {
-        mergeStudioTeamCommentReadReceipt(
+    const workIdValue = studioTeamCommentsScopeRef.current;
+    if (!workIdValue || !studioTeamUnreadCommentIdsRef.current.includes(threadId)) return true;
+    const generation = studioTeamCommentsLoadGenerationRef.current;
+    const flightKey = `${workIdValue}:thread:${threadId}`;
+    const existingFlight = studioTeamCommentReadFlightRef.current.get(flightKey);
+    if (existingFlight) return existingFlight;
+
+    const pending = (async (): Promise<boolean> => {
+      const registry = studioTeamCommentOperationScopeRegistryRef.current;
+      const ticket = registry.begin(workIdValue, generation);
+      let admitted = false;
+      try {
+        const commentClient = await loadStudioTeamCommentClient();
+        if (!registry.isCurrent(ticket, currentStudioTeamCommentOperationContext())) {
+          registry.invalidate(ticket);
+          return false;
+        }
+        const response = await commentClient.markStudioTeamCommentRead(
+          workIdValue,
+          threadId,
+          ticket.signal
+        );
+        admitted = registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
+        registry.finish(ticket);
+        if (!admitted) return false;
+        const receipt = mergeStudioTeamCommentReadReceipt(
           studioTeamCommentActivitySequenceRef.current,
           studioTeamCommentReadSequenceRef.current,
           threadId,
-          sequence
+          BigInt(response.lastReadActivitySequence)
         );
+        if (receipt.fullyRead) {
+          setStudioTeamUnreadCommentIds((current) => current.filter(
+            (candidate) => candidate !== threadId
+          ));
+        }
+        setStudioCommentSyncError(null);
+        return true;
+      } catch (cause) {
+        const shouldReport = admitted
+          || registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
+        registry.invalidate(ticket);
+        if (!shouldReport) return false;
+        const message = cause instanceof Error ? cause.message : "댓글을 읽음 처리하지 못했어요.";
+        setStudioCommentSyncError(message);
+        throw new Error(message, { cause });
       }
-      setStudioTeamUnreadCommentIds((current) => current.filter((threadId) => {
-        const requestedSequence = requestActivityFrontier.get(threadId);
-        const currentSequence = studioTeamCommentActivitySequenceRef.current.get(threadId);
-        return requestedSequence === undefined
-          || currentSequence === undefined
-          || currentSequence > requestedSequence;
-      }));
-      setStudioCommentSyncError(null);
-      return true;
-    } catch (cause) {
-      const message = cause instanceof Error
-        ? cause.message
-        : "모든 팀 댓글을 읽음 처리하지 못했어요.";
-      setStudioCommentSyncError(message);
-      throw new Error(message, { cause });
+    })();
+    studioTeamCommentReadFlightRef.current.set(flightKey, pending);
+    try {
+      return await pending;
+    } finally {
+      if (studioTeamCommentReadFlightRef.current.get(flightKey) === pending) {
+        studioTeamCommentReadFlightRef.current.delete(flightKey);
+      }
+    }
+  }
+  async function markAllStudioCommentThreadsRead(): Promise<boolean> {
+    const workIdValue = studioTeamCommentsScopeRef.current;
+    if (!workIdValue || studioTeamUnreadCommentIdsRef.current.length === 0) return true;
+    const generation = studioTeamCommentsLoadGenerationRef.current;
+    const flightKey = `${workIdValue}:all`;
+    const existingFlight = studioTeamCommentReadFlightRef.current.get(flightKey);
+    if (existingFlight) return existingFlight;
+
+    const pending = (async (): Promise<boolean> => {
+      const registry = studioTeamCommentOperationScopeRegistryRef.current;
+      const ticket = registry.begin(workIdValue, generation);
+      let admitted = false;
+      try {
+        const commentClient = await loadStudioTeamCommentClient();
+        if (!registry.isCurrent(ticket, currentStudioTeamCommentOperationContext())) {
+          registry.invalidate(ticket);
+          return false;
+        }
+        // The bulk endpoint does not return per-thread clocks. Capture only the activity already
+        // visible at request time so concurrent new replies remain unread after this receipt.
+        const requestActivityFrontier = new Map(studioTeamCommentActivitySequenceRef.current);
+        await commentClient.markAllStudioTeamCommentsRead(workIdValue, ticket.signal);
+        admitted = registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
+        registry.finish(ticket);
+        if (!admitted) return false;
+        for (const [threadId, sequence] of requestActivityFrontier) {
+          mergeStudioTeamCommentReadReceipt(
+            studioTeamCommentActivitySequenceRef.current,
+            studioTeamCommentReadSequenceRef.current,
+            threadId,
+            sequence
+          );
+        }
+        setStudioTeamUnreadCommentIds((current) => current.filter((threadId) => {
+          const requestedSequence = requestActivityFrontier.get(threadId);
+          const currentSequence = studioTeamCommentActivitySequenceRef.current.get(threadId);
+          return requestedSequence === undefined
+            || currentSequence === undefined
+            || currentSequence > requestedSequence;
+        }));
+        setStudioCommentSyncError(null);
+        return true;
+      } catch (cause) {
+        const shouldReport = admitted
+          || registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
+        registry.invalidate(ticket);
+        if (!shouldReport) return false;
+        const message = cause instanceof Error
+          ? cause.message
+          : "모든 팀 댓글을 읽음 처리하지 못했어요.";
+        setStudioCommentSyncError(message);
+        throw new Error(message, { cause });
+      }
+    })();
+    studioTeamCommentReadFlightRef.current.set(flightKey, pending);
+    try {
+      return await pending;
+    } finally {
+      if (studioTeamCommentReadFlightRef.current.get(flightKey) === pending) {
+        studioTeamCommentReadFlightRef.current.delete(flightKey);
+      }
     }
   }
   const openStudioCommentCount = studioCommentViewDocument.threads
@@ -9490,6 +9780,295 @@ function StudioCuttoonEditor() {
                 : "요소 댓글"),
       })
     : [], [studioOpenCanvasThreads, activePage.id, canvasH, studioCanvasCommentBounds, studioCommentAnchorOptions, studioTeamUnreadCommentIdSet]);
+  const studioCommentThreadSessionThreads = useMemo(
+    () => selectStudioCommentThreadSessionSourceThreads(
+      studioCommentThreadSession.surface,
+      studioCommentThreadSession.selectedThreadId,
+      studioCommentThreadSession.draft?.threadId ?? null,
+      studioCommentViewDocument.threads
+    ),
+    [
+      studioCommentThreadSession.surface,
+      studioCommentThreadSession.selectedThreadId,
+      studioCommentThreadSession.draft?.threadId,
+      studioCommentViewDocument.threads,
+    ]
+  );
+  const studioCommentThreadSessionView = projectStudioCommentThreadSession(
+    studioCommentThreadSession,
+    studioCommentThreadSessionThreads,
+    studioTeamUnreadCommentIdSet
+  );
+  useEffect(() => {
+    dispatchStudioCommentThreadSession({
+      type: "threads.reconcile",
+      threads: studioCommentThreadSessionThreads,
+      unreadThreadIds: studioTeamUnreadCommentIdSet,
+    });
+  }, [studioCommentThreadSessionThreads, studioTeamUnreadCommentIdSet]);
+  useEffect(() => {
+    if (studioCommentThreadSession.surface !== "pin-quick-reply") {
+      setStudioCommentThreadPopoverTarget(null);
+    }
+  }, [studioCommentThreadSession.surface]);
+
+  function compareStudioCommentThreadActivity(
+    left: StudioCommentThread,
+    right: StudioCommentThread
+  ): number {
+    return Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
+      || right.id.localeCompare(left.id);
+  }
+
+  function selectStudioCommentPinThread(
+    payload: StudioCommentPinClickPayload
+  ): { selected: StudioCommentThread; cluster: StudioCommentThread[] } | null {
+    const payloadThreadIds = new Set(payload.threadIds);
+    const candidates = studioCommentViewDocumentRef.current.threads.filter((thread) =>
+      payloadThreadIds.has(thread.id)
+      && !thread.resolved
+      && studioCommentAnchorsEqual(thread.anchor, payload.anchor)
+    );
+    if (candidates.length === 0) return null;
+    const mutableCandidates = studioTeamCommentsScopeRef.current
+      ? candidates.filter((thread) => !studioLegacyCommentThreadIdSet.has(thread.id))
+      : candidates;
+    const cluster = (mutableCandidates.length > 0 ? mutableCandidates : candidates)
+      .sort((left, right) => {
+        const unreadDifference = Number(studioTeamUnreadCommentIdSet.has(right.id))
+          - Number(studioTeamUnreadCommentIdSet.has(left.id));
+        return unreadDifference || compareStudioCommentThreadActivity(left, right);
+      });
+    const currentDraft = studioCommentThreadSessionRef.current.draft;
+    const selected = currentDraft?.body.trim()
+      ? cluster.find((thread) => thread.id === currentDraft.threadId) ?? cluster[0]
+      : cluster[0];
+    return selected ? { selected, cluster } : null;
+  }
+
+  function openStudioCommentThreadPopover(payload: StudioCommentPinClickPayload): void {
+    const selection = selectStudioCommentPinThread(payload);
+    if (!selection) {
+      refreshStudioTeamComments();
+      announceDrawingShortcut("댓글 위치가 변경되어 목록을 다시 확인합니다");
+      return;
+    }
+    const currentDraft = studioCommentThreadSessionRef.current.draft;
+    if (
+      currentDraft?.body.trim()
+      && !selection.cluster.some((thread) => thread.id === currentDraft.threadId)
+    ) {
+      setStudioCommentInteractionNotice("작성 중인 빠른 답글이 있어요. 기존 핀에서 등록하거나 내용을 비운 뒤 다른 핀을 열어 주세요.");
+      announceDrawingShortcut("작성 중인 답글을 먼저 확인하세요");
+      return;
+    }
+    const triggerBounds = payload.trigger.getBoundingClientRect();
+    const screenPoint = {
+      x: triggerBounds.left + triggerBounds.width / 2,
+      y: triggerBounds.top + triggerBounds.height / 2,
+    };
+    preloadStudioCommentThreadPopover();
+    setStudioCommentInteractionNotice(null);
+    stopStudioCommentPlacementSession();
+    setPointCommentComposer(null);
+    setTeamPanelOpen(false);
+    setCommentsOpen(false);
+    selectStudioCommentAnchor(payload.anchor);
+    setStudioCommentThreadPopoverTarget({
+      pinKey: payload.pinKey,
+      anchor: payload.anchor,
+      screenPoint,
+    });
+    dispatchStudioCommentThreadSession({
+      type: "session.open",
+      surface: "pin-quick-reply",
+      reason: "canvas-pin",
+      threads: studioCommentViewDocumentRef.current.threads.filter((thread) => !thread.resolved),
+      preferredThreadId: selection.selected.id,
+      unreadThreadIds: studioTeamUnreadCommentIdSet,
+      clusterThreadIds: selection.cluster.map((thread) => thread.id),
+    });
+    void markStudioCommentThreadRead(selection.selected.id).catch(() => false);
+  }
+
+  function closeStudioCommentThreadPopover(
+    reason: Exclude<StudioCommentThreadSessionCloseReason, "thread-disappeared">
+  ): void {
+    setStudioCommentThreadPopoverTarget(null);
+    setStudioCommentInteractionNotice(null);
+    dispatchStudioCommentThreadSession({
+      type: "session.close",
+      reason,
+      // Incidental outside clicks are blocked by the popover while a draft exists. X and Escape
+      // are explicit cancel actions, so they must not leave an invisible draft that blocks every
+      // other canvas pin after the popover disappears.
+      discardDraft: studioCommentThreadSessionCloseDiscardsDraft(reason),
+    });
+  }
+
+  function openStudioCommentThreadInReview(threadId: string): void {
+    setStudioCommentThreadPopoverTarget(null);
+    setStudioCommentInteractionNotice(null);
+    dispatchStudioCommentThreadSession({
+      type: "session.open",
+      surface: "review-panel",
+      reason: "review-panel",
+      threads: studioCommentViewDocumentRef.current.threads,
+      preferredThreadId: threadId,
+      unreadThreadIds: studioTeamUnreadCommentIdSet,
+    });
+    requestStudioCommentThreadFocus(threadId);
+    openStudioCommentInbox({ preserveThreadSession: true });
+    void markStudioCommentThreadRead(threadId).catch(() => false);
+  }
+
+  function changeStudioCommentThreadReplyDraft(threadId: string, body: string): void {
+    setStudioCommentInteractionNotice(null);
+    dispatchStudioCommentThreadSession({ type: "draft.change", threadId, body });
+  }
+
+  async function submitStudioCommentThreadReply(
+    threadId: string,
+    body: string
+  ): Promise<boolean> {
+    const session = studioCommentThreadSessionRef.current;
+    if (session.selectedThreadId !== threadId) return false;
+    const mutationId = session.draft?.threadId === threadId
+      && session.draft.body.trim() === body.trim()
+      && session.draft.mutationId
+        ? session.draft.mutationId
+        : createStudioCommentMessageId("reply");
+    const plan: StudioTeamCommentMutationPlan = {
+      kind: "reply",
+      mutationId,
+      threadId,
+      body: body.trim(),
+    };
+    dispatchStudioCommentThreadSession({ type: "mutation.start", plan });
+    try {
+      const accepted = await executeStudioCommentMutationPlan(plan);
+      if (!accepted) {
+        dispatchStudioCommentThreadSession({ type: "mutation.failure", mutationId });
+        return false;
+      }
+      dispatchStudioCommentThreadSession({ type: "mutation.receipt", plan });
+      return true;
+    } catch (cause) {
+      dispatchStudioCommentThreadSession({ type: "mutation.failure", mutationId });
+      throw cause;
+    }
+  }
+
+  async function changeStudioCommentThreadResolution(
+    threadId: string,
+    resolved: boolean
+  ): Promise<boolean> {
+    const session = studioCommentThreadSessionRef.current;
+    if (session.selectedThreadId !== threadId) return false;
+    if (studioCommentThreadSessionDraftBlocksResolutionChange(session, threadId, resolved)) {
+      throw new Error("작성 중인 답글을 등록하거나 내용을 비운 뒤 해결 상태를 변경해 주세요.");
+    }
+    const plan = resolved
+      ? { kind: "resolve" as const, threadId }
+      : { kind: "reopen" as const, threadId };
+    const operationId = createStudioCommentMessageId("reply");
+    const mutationId = studioCommentThreadSessionMutationId(plan, operationId);
+    dispatchStudioCommentThreadSession({ type: "mutation.start", plan, operationId });
+    try {
+      const accepted = await executeStudioCommentMutationPlan(plan);
+      if (!accepted) {
+        dispatchStudioCommentThreadSession({ type: "mutation.failure", mutationId });
+        return false;
+      }
+      dispatchStudioCommentThreadSession({ type: "mutation.receipt", plan, operationId });
+      if (resolved) closeStudioCommentThreadPopover("explicit");
+      return true;
+    } catch (cause) {
+      dispatchStudioCommentThreadSession({ type: "mutation.failure", mutationId });
+      throw cause;
+    }
+  }
+
+  function navigateStudioCommentPinCluster(direction: -1 | 1): void {
+    const view = studioCommentThreadSessionView;
+    if (view.clusterThreads.length < 2 || view.selectedClusterIndex < 0) return;
+    if (view.selectedDraft?.body.trim()) {
+      setStudioCommentInteractionNotice("작성 중인 답글을 등록하거나 내용을 비운 뒤 다른 댓글로 이동해 주세요.");
+      return;
+    }
+    const nextIndex = (
+      view.selectedClusterIndex + direction + view.clusterThreads.length
+    ) % view.clusterThreads.length;
+    const nextThread = view.clusterThreads[nextIndex];
+    if (!nextThread) return;
+    dispatchStudioCommentThreadSession({
+      type: "thread.select",
+      threadId: nextThread.id,
+      threads: studioCommentThreadSessionThreads,
+      reason: "canvas-pin",
+      clusterThreadIds: view.clusterThreads.map((thread) => thread.id),
+    });
+    setStudioCommentInteractionNotice(null);
+    void markStudioCommentThreadRead(nextThread.id).catch(() => false);
+  }
+  function selectStudioCommentSharedReplyThread(threadId: string): void {
+    const currentDraft = studioCommentThreadSessionRef.current.draft;
+    if (currentDraft?.body.trim() && currentDraft.threadId !== threadId) {
+      setStudioCommentInteractionNotice("다른 댓글에 작성 중인 답글이 있어요. 기존 초안을 등록하거나 내용을 비운 뒤 이동해 주세요.");
+      requestStudioCommentThreadFocus(currentDraft.threadId);
+      return;
+    }
+    setStudioCommentInteractionNotice(null);
+    dispatchStudioCommentThreadSession({
+      type: "session.open",
+      surface: "review-panel",
+      reason: "focus-request",
+      threads: studioCommentViewDocumentRef.current.threads,
+      preferredThreadId: threadId,
+      unreadThreadIds: studioTeamUnreadCommentIdSet,
+    });
+    void markStudioCommentThreadRead(threadId).catch(() => false);
+  }
+  const studioCommentSharedReplyHandlers = useStudioStableHandlers<Pick<
+    NonNullable<StudioLazyPanelStackProps["studioCommentSharedReply"]>,
+    "onThreadChange" | "onBodyChange" | "onDiscard" | "onSubmit"
+  >>({
+    onThreadChange: selectStudioCommentSharedReplyThread,
+    onBodyChange: changeStudioCommentThreadReplyDraft,
+    onDiscard: (threadId: string) => {
+      dispatchStudioCommentThreadSession({
+        type: "draft.discard",
+        // A selected fallback row must never silently delete an orphaned draft owned by another
+        // thread. Only the reply editor that owns the draft may explicitly discard it.
+        threadId,
+      });
+    },
+    onSubmit: ({ threadId, body }: { threadId: string; body: string }) =>
+      submitStudioCommentThreadReply(threadId, body),
+  });
+  const studioCommentSharedReplyBody =
+    studioCommentThreadSession.draft?.threadId === studioCommentThreadSession.selectedThreadId
+      ? studioCommentThreadSession.draft.body
+      : "";
+  const studioCommentSharedReplyMutationId =
+    studioCommentThreadSession.draft?.threadId === studioCommentThreadSession.selectedThreadId
+      ? studioCommentThreadSession.draft.mutationId
+      : null;
+  const studioCommentSharedReplyController = useMemo<
+    NonNullable<StudioLazyPanelStackProps["studioCommentSharedReply"]>
+  >(() => ({
+    threadId: studioCommentThreadSession.selectedThreadId,
+    body: studioCommentSharedReplyBody,
+    mutationId: studioCommentSharedReplyMutationId,
+    submitting: studioCommentThreadSession.submittingMutationId !== null,
+    ...studioCommentSharedReplyHandlers,
+  }), [
+    studioCommentSharedReplyBody,
+    studioCommentSharedReplyHandlers,
+    studioCommentSharedReplyMutationId,
+    studioCommentThreadSession.selectedThreadId,
+    studioCommentThreadSession.submittingMutationId,
+  ]);
   const advancedFillRasterLayers: StudioFillReferenceLayer[] = elements
     .filter((element): element is ImageEl & El => element.type === "image")
     .map((element) => ({
@@ -23950,8 +24529,7 @@ function StudioCuttoonEditor() {
     resetView,
     rotateCanvasView,
     selectDialogueElement,
-    selectStudioCommentAnchor,
-    markStudioCommentThreadRead,
+    openStudioCommentThreadPopover,
     stopStudioCommentPlacementSession,
     setMaster,
     setStudioUiDensity,
@@ -24717,7 +25295,10 @@ function StudioCuttoonEditor() {
           color={color}
           colorBlindPreview={colorBlindPreview}
           commentPinArmed={commentPinArmed}
-          requestStudioCommentThreadFocus={requestStudioCommentThreadFocus}
+          commentQuickReplyActive={
+            studioCommentThreadSession.surface === "pin-quick-reply"
+            && studioCommentThreadPopoverTarget !== null
+          }
           cropArmed={cropArmed}
           cropRect={cropRect}
           dialogueBatchOpen={dialogueBatchOpen}
@@ -24819,8 +25400,6 @@ function StudioCuttoonEditor() {
           setAppSettingsOpen={setAppSettingsOpen}
           setBg3dOpen={setBg3dOpen}
           setCanvasOnlyMode={setCanvasOnlyMode}
-          setPointCommentComposer={setPointCommentComposer}
-          setCommentsOpen={setCommentsOpen}
           setContextMenu={setContextMenu}
           setCurrentPageId={setCurrentPageId}
           setDialogueBatchOpen={setDialogueBatchOpen}
@@ -24945,6 +25524,56 @@ function StudioCuttoonEditor() {
                 openStudioCommentInbox();
               }}
               onSubmit={submitStudioPointComment}
+            />
+          </Suspense>
+        ) : null}
+
+        {studioCommentThreadPopoverTarget
+        && studioCommentThreadSession.surface === "pin-quick-reply"
+        && studioCommentThreadSessionView.selectedThread ? (
+          <Suspense fallback={null}>
+            <StudioCommentThreadPopover
+              key={studioCommentThreadPopoverTarget.pinKey}
+              thread={studioCommentThreadSessionView.selectedThread}
+              screenPoint={studioCommentThreadPopoverTarget.screenPoint}
+              fallbackFocusTarget={wrapRef.current}
+              unread={studioCommentThreadSessionView.selectedUnread}
+              replyBody={studioCommentThreadSessionView.selectedDraft?.body ?? ""}
+              submitting={studioCommentThreadSession.submittingMutationId !== null}
+              syncing={studioTeamCommentsSyncing}
+              syncError={studioCommentInteractionNotice ?? studioCommentSyncError}
+              capabilities={{
+                reply: studioTeamCommentsWorkId
+                  ? studioTeamCommentCapabilities?.comment === true
+                    && !studioLegacyCommentThreadIdSet.has(
+                      studioCommentThreadSessionView.selectedThread.id
+                    )
+                  : !collaborationDocumentLocked,
+                resolve: studioTeamCommentsWorkId
+                  ? studioTeamCommentCapabilities?.resolve === true
+                    && !studioLegacyCommentThreadIdSet.has(
+                      studioCommentThreadSessionView.selectedThread.id
+                    )
+                  : !collaborationDocumentLocked,
+              }}
+              mutationDisabledReason={
+                studioLegacyCommentThreadIdSet.has(
+                  studioCommentThreadSessionView.selectedThread.id
+                )
+                  ? "이전 문서에 보관된 댓글이라 전체 검토함에서 읽기 전용으로 확인할 수 있어요."
+                  : studioCommentThreadSessionView.replyBlockedReason === "draft-target-mismatch"
+                    ? "다른 댓글에 작성 중인 답글이 있어요. 해당 핀에서 먼저 마무리해 주세요."
+                    : undefined
+              }
+              clusterIndex={studioCommentThreadSessionView.selectedClusterIndex}
+              clusterCount={studioCommentThreadSessionView.clusterThreads.length}
+              unreadClusterCount={studioCommentThreadSessionView.unreadClusterCount}
+              onNavigateCluster={navigateStudioCommentPinCluster}
+              onReplyBodyChange={changeStudioCommentThreadReplyDraft}
+              onSubmitReply={submitStudioCommentThreadReply}
+              onResolveChange={changeStudioCommentThreadResolution}
+              onOpenReview={openStudioCommentThreadInReview}
+              onClose={closeStudioCommentThreadPopover}
             />
           </Suspense>
         ) : null}
@@ -25361,7 +25990,8 @@ function StudioCuttoonEditor() {
           commentsOpen={commentsOpen}
           commentsPanelMounted={commentsPanelMounted}
           studioCommentFocusRequest={studioCommentFocusRequest}
-          studioCommentSyncError={studioCommentSyncError}
+          studioCommentSharedReply={studioCommentSharedReplyController}
+          studioCommentSyncError={studioCommentInteractionNotice ?? studioCommentSyncError}
           studioCommentPinsHidden={studioCommentPinsHidden}
           studioLegacyCommentThreadIdSet={studioLegacyCommentThreadIdSet}
           studioTeamCommentCapabilities={studioTeamCommentCapabilities}
@@ -25671,8 +26301,7 @@ interface StudioCanvasViewportHandlers {
   resetView: () => void;
   rotateCanvasView: (direction: "left" | "right") => void;
   selectDialogueElement: (pageId: string, elId: string) => void;
-  selectStudioCommentAnchor: (anchor: StudioCommentAnchor) => void;
-  markStudioCommentThreadRead: (threadId: string) => Promise<boolean>;
+  openStudioCommentThreadPopover: (payload: StudioCommentPinClickPayload) => void;
   stopStudioCommentPlacementSession: () => void;
   setMaster: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<DocumentMaster<El>>>>[0]) => void;
   setStudioUiDensity: (mode: StudioUiDensityMode) => void;
@@ -25728,6 +26357,7 @@ interface StudioCanvasViewportProps {
   canvasInteractionBlocked: boolean;
   collaborationDocumentLocked: boolean;
   collaborationDocumentUnavailable: boolean;
+  commentQuickReplyActive: boolean;
   collaborationLockMessage: () => string;
   closeViewToolWithFocus: (options?: { preferCanvas?: boolean }) => void;
   color: string;
@@ -25835,13 +26465,6 @@ interface StudioCanvasViewportProps {
   setAppSettingsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setBg3dOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setCanvasOnlyMode: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setPointCommentComposer: import("react").Dispatch<import("react").SetStateAction<{
-    anchor: Extract<StudioCommentAnchor, { type: "point" }>;
-    commentId: string;
-    screenPoint: { x: number; y: number };
-  } | null>>;
-  setCommentsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  requestStudioCommentThreadFocus: (threadId: string) => void;
   setContextMenu: import("react").Dispatch<import("react").SetStateAction<{ visible: boolean; x: number; y: number; elId: string | null; }>>;
   setCurrentPageId: (value: import("react").SetStateAction<string>) => boolean;
   setDialogueBatchOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -26000,6 +26623,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   color,
   colorBlindPreview,
   commentPinArmed,
+  commentQuickReplyActive,
   cropArmed,
   cropRect,
   dialogueBatchOpen,
@@ -26101,9 +26725,6 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   setAppSettingsOpen,
   setBg3dOpen,
   setCanvasOnlyMode,
-  setPointCommentComposer,
-  setCommentsOpen,
-  requestStudioCommentThreadFocus,
   setContextMenu,
   setCurrentPageId,
   setDialogueBatchOpen,
@@ -26276,8 +26897,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     resetView,
     rotateCanvasView,
     selectDialogueElement,
-    selectStudioCommentAnchor,
-    markStudioCommentThreadRead,
+    openStudioCommentThreadPopover,
     stopStudioCommentPlacementSession,
     setMaster,
     setStudioUiDensity,
@@ -27698,20 +28318,9 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 commentPins={studioCanvasCommentPins}
                 flipX={canvasFlipH}
                 rotation={canvasRotation}
-                onCommentPinClick={(anchor, newestThreadId) => {
-                  stopStudioCommentPlacementSession();
-                  setPointCommentComposer(null);
-                  selectStudioCommentAnchor(anchor);
-                  setTeamPanelOpen(false);
-                  setCommentsOpen(true);
-                  // A clustered pin is an inbox, not evidence that every represented thread was
-                  // read. Mark only the most recently active thread that the user is taken to;
-                  // the remaining rows keep their independent unread frontiers until opened.
-                  if (newestThreadId) {
-                    requestStudioCommentThreadFocus(newestThreadId);
-                    void markStudioCommentThreadRead(newestThreadId).catch(() => false);
-                  }
-                }}
+                commentQuickReplyActive={commentQuickReplyActive}
+                onCommentQuickReplyPreload={preloadStudioCommentThreadPopover}
+                onCommentPinClick={openStudioCommentThreadPopover}
               />
             </Suspense>
           ) : null}

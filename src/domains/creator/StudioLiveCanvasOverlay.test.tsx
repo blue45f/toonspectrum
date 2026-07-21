@@ -193,6 +193,7 @@ describe("StudioLiveCanvasOverlay", () => {
   });
 
   it("mounts only the active pin preview and removes it after pointer leave", () => {
+    const onCommentQuickReplyPreload = vi.fn();
     render(
       <StudioLiveCanvasOverlay
         canvasWidth={800}
@@ -210,16 +211,59 @@ describe("StudioLiveCanvasOverlay", () => {
           y: 120,
         }]}
         onCommentPinClick={noop}
+        onCommentQuickReplyPreload={onCommentQuickReplyPreload}
       />
     );
 
     const pin = screen.getByRole("button", { name: /1페이지/u });
     expect(document.querySelector('[data-studio-comment-pin-preview="true"]')).toBeNull();
     fireEvent.pointerEnter(pin);
+    expect(onCommentQuickReplyPreload).toHaveBeenCalledOnce();
     expect(document.querySelector('[data-studio-comment-pin-preview="true"]')?.textContent)
       .toContain("말풍선 간격을 조금 더 넓혀 주세요.");
     fireEvent.pointerLeave(pin);
     expect(document.querySelector('[data-studio-comment-pin-preview="true"]')).toBeNull();
+    fireEvent.focus(pin);
+    expect(onCommentQuickReplyPreload).toHaveBeenCalledTimes(2);
+  });
+
+  it("suppresses the hover preview while a controlled quick reply is active", () => {
+    const onCommentQuickReplyPreload = vi.fn();
+    const props = {
+      canvasWidth: 800,
+      canvasHeight: 1_200,
+      cursors: [],
+      commentPins: [{
+        key: "page:page-1",
+        anchor: { type: "page" as const, pageId: "page-1" },
+        count: 1,
+        previewAuthor: "민지",
+        previewBody: "빠른 답글과 겹치지 않아야 합니다.",
+        label: "1페이지",
+        x: 400,
+        y: 120,
+      }],
+      onCommentPinClick: noop,
+      onCommentQuickReplyPreload,
+    };
+    const { rerender } = render(<StudioLiveCanvasOverlay {...props} />);
+    const pin = screen.getByRole<HTMLButtonElement>("button", { name: /1페이지/u });
+
+    fireEvent.pointerEnter(pin);
+    expect(document.querySelector('[data-studio-comment-pin-preview="true"]')).not.toBeNull();
+
+    rerender(<StudioLiveCanvasOverlay {...props} commentQuickReplyActive />);
+    expect(document.querySelector('[data-studio-comment-pin-preview="true"]')).toBeNull();
+    fireEvent.pointerEnter(pin);
+    fireEvent.focus(pin);
+    expect(onCommentQuickReplyPreload).toHaveBeenCalledTimes(3);
+    expect(document.querySelector('[data-studio-comment-pin-preview="true"]')).toBeNull();
+
+    rerender(<StudioLiveCanvasOverlay {...props} commentQuickReplyActive={false} />);
+    expect(document.querySelector('[data-studio-comment-pin-preview="true"]')).toBeNull();
+    fireEvent.pointerEnter(pin);
+    expect(document.querySelector('[data-studio-comment-pin-preview="true"]')?.textContent)
+      .toContain("빠른 답글과 겹치지 않아야 합니다.");
   });
 
   it("moves keyboard focus across nearby pins without opening every thread", async () => {
@@ -254,6 +298,9 @@ describe("StudioLiveCanvasOverlay", () => {
             key: "last",
             anchor: { type: "point", pageId: "page-1", x: 0.6, y: 0.6 },
             count: 1,
+            threadIds: ["thread-old", "thread-unread"],
+            newestThreadId: "thread-old",
+            newestUnreadThreadId: "thread-unread",
             previewAuthor: "지호",
             previewBody: "마지막 댓글",
             label: "마지막 핀",
@@ -290,11 +337,13 @@ describe("StudioLiveCanvasOverlay", () => {
     expect(onCommentPinClick).not.toHaveBeenCalled();
 
     fireEvent.click(last);
-    expect(onCommentPinClick).toHaveBeenCalledWith(
-      { type: "point", pageId: "page-1", x: 0.6, y: 0.6 },
-      undefined,
-      undefined
-    );
+    expect(onCommentPinClick).toHaveBeenCalledWith({
+      pinKey: "last",
+      anchor: { type: "point", pageId: "page-1", x: 0.6, y: 0.6 },
+      preferredThreadId: "thread-unread",
+      threadIds: ["thread-old", "thread-unread"],
+      trigger: last,
+    });
   });
 
   it("mirrors an inward pin collision nudge when the canvas is flipped", () => {

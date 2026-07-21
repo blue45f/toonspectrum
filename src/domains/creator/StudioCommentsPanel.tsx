@@ -56,6 +56,28 @@ export interface StudioCommentAnchorOption {
   label: string;
 }
 
+export interface StudioCommentsPanelSharedReplySubmission {
+  readonly threadId: string;
+  readonly body: string;
+  /** Stable retry ID owned by the parent comment-thread session, when already prepared. */
+  readonly mutationId: string | null;
+}
+
+/** Optional controlled reply state shared by the canvas pin popover and this review rail. */
+export interface StudioCommentsPanelSharedReplyController {
+  readonly threadId: string | null;
+  readonly body: string;
+  readonly mutationId: string | null;
+  readonly submitting: boolean;
+  readonly onThreadChange: (threadId: string) => void;
+  readonly onBodyChange: (threadId: string, body: string) => void;
+  /** Explicit reply cancellation discards the draft; rail close and mode switches preserve it. */
+  readonly onDiscard: (threadId: string) => void;
+  readonly onSubmit: (
+    submission: StudioCommentsPanelSharedReplySubmission
+  ) => void | boolean | Promise<void | boolean>;
+}
+
 export interface StudioCommentsPanelProps {
   open: boolean;
   onClose: () => void;
@@ -86,6 +108,8 @@ export interface StudioCommentsPanelProps {
   onMarkAllRead?: () => void | boolean | Promise<void | boolean>;
   focusRequest?: { threadId: string; requestId: number } | null;
   onFocusRequestHandled?: (requestId: number) => void;
+  /** When present, reply draft and mutation ownership move to the shared parent session. */
+  sharedReply?: StudioCommentsPanelSharedReplyController;
 }
 
 export interface StudioCommentsPanelCapabilities {
@@ -213,6 +237,7 @@ export function StudioCommentsPanel({
   onMarkAllRead,
   focusRequest = null,
   onFocusRequestHandled,
+  sharedReply,
 }: StudioCommentsPanelProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -234,6 +259,7 @@ export function StudioCommentsPanel({
     replyId: string;
     payloadSignature: string;
   } | null>(null);
+  const replySubmitInFlightRef = useRef(false);
   const [filter, setFilter] = useState<CommentFilter>("current");
   const [sort, setSort] = useState<CommentSort>("recent");
   const [composerExpanded, setComposerExpanded] = useState(false);
@@ -243,6 +269,9 @@ export function StudioCommentsPanel({
   const [newComment, setNewComment] = useState("");
   const [replyingThreadId, setReplyingThreadId] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState("");
+  const [dismissedSharedReplyThreadId, setDismissedSharedReplyThreadId] = useState<string | null>(
+    null
+  );
   const [assigningThreadId, setAssigningThreadId] = useState<string | null>(null);
   const [assigneeName, setAssigneeName] = useState("");
   const [editingMessage, setEditingMessage] = useState<CommentMessageTarget | null>(null);
@@ -255,6 +284,39 @@ export function StudioCommentsPanel({
   const capabilities: StudioCommentsPanelCapabilities = {
     ...DEFAULT_CAPABILITIES,
     ...capabilityOverrides,
+  };
+  const activeReplyThreadId = sharedReply
+    ? sharedReply.threadId === dismissedSharedReplyThreadId
+      ? null
+      : sharedReply.threadId
+    : replyingThreadId;
+  const ownedReplyThreadId = sharedReply?.threadId ?? replyingThreadId;
+  const ownedReplyBody = sharedReply?.body ?? replyBody;
+  const activeReplyBody = sharedReply?.threadId === activeReplyThreadId
+    ? sharedReply.body
+    : replyBody;
+  const closeReplyEditor = (
+    options: { protectDraft?: boolean } = {}
+  ): boolean => {
+    // The submit request is already authoritative once it enters the shared controller. Hiding
+    // or discarding its draft while that request is in flight would make a successful receipt
+    // look canceled and would remove the stable retry payload after a failure.
+    if (replySubmitInFlightRef.current || sharedReply?.submitting || saving) return false;
+    if (options.protectDraft && ownedReplyBody.trim()) {
+      setError("작성 중인 답글을 등록하거나 취소한 뒤 다른 작업을 진행해 주세요.");
+      if (sharedReply?.threadId) setDismissedSharedReplyThreadId(null);
+      globalThis.requestAnimationFrame(() => replyEditorRef.current?.focus());
+      return false;
+    }
+    if (sharedReply?.threadId) {
+      sharedReply.onDiscard(sharedReply.threadId);
+      setDismissedSharedReplyThreadId(sharedReply.threadId);
+      return true;
+    }
+    setReplyingThreadId(null);
+    setReplyBody("");
+    pendingReplyIdRef.current = null;
+    return true;
   };
   const composerAnchorValid = composerAnchor !== null && isAnchorValid(composerAnchor);
   const focusReviewRail = () => {
@@ -304,14 +366,14 @@ export function StudioCommentsPanel({
   useEffect(() => {
     if (!open || typeof globalThis.document === "undefined") return;
     const animationFrame = globalThis.requestAnimationFrame(() => {
-      if (replyingThreadId) replyEditorRef.current?.focus();
+      if (activeReplyThreadId) replyEditorRef.current?.focus();
       else if (assigningThreadId) assigneeEditorRef.current?.focus();
       else if (editingMessage) editEditorRef.current?.focus();
       else if (pendingDelete) deleteConfirmRef.current?.focus();
       else if (composerExpanded) composerRef.current?.focus();
     });
     return () => globalThis.cancelAnimationFrame(animationFrame);
-  }, [assigningThreadId, composerExpanded, editingMessage, open, pendingDelete, replyingThreadId]);
+  }, [activeReplyThreadId, assigningThreadId, composerExpanded, editingMessage, open, pendingDelete]);
 
   useEffect(() => {
     if (!open) {
@@ -321,26 +383,33 @@ export function StudioCommentsPanel({
     }
     if (panelWasOpenRef.current) return;
     panelWasOpenRef.current = true;
+    if (sharedReply?.threadId) setDismissedSharedReplyThreadId(null);
     const hasThreadAtAnchor = activeAnchor
       ? document.threads.some((thread) => studioCommentAnchorsEqual(thread.anchor, activeAnchor))
       : false;
-    setFilter(activeAnchor ? "current" : "all");
+    const preserveReplyDraft = Boolean(
+      ownedReplyThreadId
+      && ownedReplyBody.trim()
+      && document.threads.some(
+        (thread) => thread.id === ownedReplyThreadId
+      )
+    );
+    setFilter(preserveReplyDraft ? "all" : activeAnchor ? "current" : "all");
+    if (preserveReplyDraft) setQuery("");
     if (!newComment.trim()) {
       setComposerAnchor(activeAnchor);
       setComposerAnchorLabelSnapshot(
         activeAnchor ? getAnchorLabel(activeAnchor, anchorOptions) : null
       );
-      setComposerExpanded(capabilities.create && Boolean(activeAnchor) && !hasThreadAtAnchor);
+      setComposerExpanded(
+        !preserveReplyDraft
+        && capabilities.create
+        && Boolean(activeAnchor)
+        && !hasThreadAtAnchor
+      );
       setComposerLocationPickerOpen(false);
     }
-    const preserveReplyDraft = Boolean(
-      replyingThreadId
-      && replyBody.trim()
-      && document.threads.some(
-        (thread) => thread.id === replyingThreadId && !thread.resolved
-      )
-    );
-    if (!preserveReplyDraft) {
+    if (!sharedReply && !preserveReplyDraft) {
       setReplyingThreadId(null);
       setReplyBody("");
       pendingReplyIdRef.current = null;
@@ -356,8 +425,9 @@ export function StudioCommentsPanel({
     document.threads,
     newComment,
     open,
-    replyBody,
-    replyingThreadId,
+    ownedReplyBody,
+    ownedReplyThreadId,
+    sharedReply,
   ]);
 
   useEffect(() => {
@@ -377,14 +447,16 @@ export function StudioCommentsPanel({
       setComposerAnchor(null);
       setComposerAnchorLabelSnapshot(null);
     }
-    setReplyingThreadId(null);
-    setReplyBody("");
-    pendingReplyIdRef.current = null;
+    if (!sharedReply) {
+      setReplyingThreadId(null);
+      setReplyBody("");
+      pendingReplyIdRef.current = null;
+    }
     setAssigningThreadId(null);
     setEditingMessage(null);
     setPendingDelete(null);
     setError(null);
-  }, [focusRequest, newComment, onFocusRequestHandled, open]);
+  }, [focusRequest, newComment, onFocusRequestHandled, open, sharedReply]);
 
   useEffect(() => {
     if (!open || !pendingFocusThreadIdRef.current) return;
@@ -537,32 +609,54 @@ export function StudioCommentsPanel({
 
   const submitReply = async (event: FormEvent<HTMLFormElement>, threadId: string) => {
     event.preventDefault();
+    if (replySubmitInFlightRef.current || sharedReply?.submitting) return;
     if (!capabilities.reply) {
       setError(mutationDisabledReason ?? "현재 권한으로는 답글을 남길 수 없어요.");
       return;
     }
-    const payloadSignature = JSON.stringify([threadId, replyBody.trim()]);
-    const pendingReply = pendingReplyIdRef.current?.threadId === threadId
-      && pendingReplyIdRef.current.payloadSignature === payloadSignature
-      ? pendingReplyIdRef.current
-      : { threadId, replyId: createStudioCommentMessageId("reply"), payloadSignature };
-    pendingReplyIdRef.current = pendingReply;
-    const saved = await applyChange(
-      () => mergeStudioTeamCommentMutableDocument(
-        addStudioCommentReply(mutableDocument, threadId, {
-          id: pendingReply.replyId,
-          author: currentActor,
-          body: replyBody,
-        }),
-        readOnlyThreads
-      ),
-      "답글을 저장하지 못했어요."
-    );
-    if (saved) {
-      focusReviewRail();
-      setReplyBody("");
-      setReplyingThreadId(null);
-      pendingReplyIdRef.current = null;
+    const body = sharedReply?.threadId === threadId ? sharedReply.body : replyBody;
+    if (!body.trim()) return;
+    replySubmitInFlightRef.current = true;
+    try {
+      if (sharedReply) {
+        const accepted = await sharedReply.onSubmit({
+          threadId,
+          body: body.trim(),
+          mutationId: sharedReply.mutationId,
+        });
+        if (accepted === false) throw new Error("답글을 저장하지 못했어요.");
+        setError(null);
+        focusReviewRail();
+        return;
+      }
+
+      const payloadSignature = JSON.stringify([threadId, body.trim()]);
+      const pendingReply = pendingReplyIdRef.current?.threadId === threadId
+        && pendingReplyIdRef.current.payloadSignature === payloadSignature
+        ? pendingReplyIdRef.current
+        : { threadId, replyId: createStudioCommentMessageId("reply"), payloadSignature };
+      pendingReplyIdRef.current = pendingReply;
+      const saved = await applyChange(
+        () => mergeStudioTeamCommentMutableDocument(
+          addStudioCommentReply(mutableDocument, threadId, {
+            id: pendingReply.replyId,
+            author: currentActor,
+            body,
+          }),
+          readOnlyThreads
+        ),
+        "답글을 저장하지 못했어요."
+      );
+      if (saved) {
+        focusReviewRail();
+        setReplyBody("");
+        setReplyingThreadId(null);
+        pendingReplyIdRef.current = null;
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "답글을 저장하지 못했어요.");
+    } finally {
+      replySubmitInFlightRef.current = false;
     }
   };
 
@@ -609,10 +703,10 @@ export function StudioCommentsPanel({
   };
 
   const beginEditing = (target: CommentMessageTarget, body: string) => {
+    if (!closeReplyEditor({ protectDraft: true })) return;
     setEditingMessage(target);
     setEditBody(body);
     setPendingDelete(null);
-    setReplyingThreadId(null);
     setAssigningThreadId(null);
     setError(null);
   };
@@ -713,7 +807,7 @@ export function StudioCommentsPanel({
       ref={dialogRef}
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
-      aria-busy={saving || readMutation !== null || syncing}
+      aria-busy={saving || sharedReply?.submitting || readMutation !== null || syncing}
       tabIndex={-1}
       data-studio-comments-rail="true"
       onKeyDown={(event) => {
@@ -725,11 +819,14 @@ export function StudioCommentsPanel({
           setPendingDelete(null);
         } else if (editingMessage) {
           cancelEditing();
-        } else if (replyingThreadId) {
+        } else if (activeReplyThreadId) {
+          if (replySubmitInFlightRef.current || sharedReply?.submitting || saving) return;
           focusReviewRail();
-          setReplyingThreadId(null);
-          setReplyBody("");
-          pendingReplyIdRef.current = null;
+          closeReplyEditor();
+        } else if (ownedReplyThreadId && ownedReplyBody.trim()) {
+          setError("보존 중인 답글을 등록하거나 취소한 뒤 검토함을 닫아 주세요.");
+          if (sharedReply?.threadId) setDismissedSharedReplyThreadId(null);
+          globalThis.requestAnimationFrame(() => replyEditorRef.current?.focus());
         } else if (assigningThreadId) {
           focusReviewRail();
           setAssigningThreadId(null);
@@ -791,7 +888,9 @@ export function StudioCommentsPanel({
             type="button"
             onClick={onClose}
             aria-label={composerExpanded ? "댓글 작성 닫기" : "검토 댓글 닫기"}
-            title="닫기 (Esc)"
+            title={ownedReplyThreadId && ownedReplyBody.trim()
+              ? "닫기 · 작성 중인 답글은 유지됩니다"
+              : "닫기 (Esc)"}
             className="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-9"
           >
             <X size={16} aria-hidden />
@@ -935,7 +1034,10 @@ export function StudioCommentsPanel({
               {onArmPinPlacement && capabilities.create ? (
                 <button
                   type="button"
-                  onClick={onArmPinPlacement}
+                  onClick={() => {
+                    if (!closeReplyEditor({ protectDraft: true })) return;
+                    onArmPinPlacement();
+                  }}
                   className={QUIET_BUTTON_CLASS}
                   title="캔버스를 한 번 클릭한 뒤 그 자리에서 바로 댓글을 작성합니다"
                 >
@@ -947,6 +1049,7 @@ export function StudioCommentsPanel({
                 type="button"
                 disabled={!activeAnchor || !canAddThread}
                 onClick={() => {
+                  if (!closeReplyEditor({ protectDraft: true })) return;
                   setComposerAnchor(activeAnchor);
                   setComposerAnchorLabelSnapshot(
                     activeAnchor ? getAnchorLabel(activeAnchor, anchorOptions) : null
@@ -1112,10 +1215,11 @@ export function StudioCommentsPanel({
                   !isReadOnlyArchive
                   && capabilities.reply
                   && !saving
+                  && !sharedReply?.submitting
                   && !thread.resolved
                   && thread.replies.length < STUDIO_COMMENTS_MAX_REPLIES_PER_THREAD
                   && mutableTotalMessages < STUDIO_COMMENTS_MAX_TOTAL_MESSAGES;
-                const isReplying = !isReadOnlyArchive && replyingThreadId === thread.id;
+                const isReplying = !isReadOnlyArchive && activeReplyThreadId === thread.id;
                 const isAssigning = !isReadOnlyArchive && assigningThreadId === thread.id;
                 const threadTarget: CommentMessageTarget = { threadId: thread.id };
                 const ownsThread = actorsRepresentSamePerson(thread.author, currentActor);
@@ -1206,10 +1310,10 @@ export function StudioCommentsPanel({
                               aria-label={`${thread.author.displayName}의 댓글 삭제`}
                               title="댓글 삭제"
                               onClick={() => {
+                                if (!closeReplyEditor({ protectDraft: true })) return;
                                 setPendingDelete(isDeletingThread ? null : threadTarget);
                                 setEditingMessage(null);
                                 setEditBody("");
-                                setReplyingThreadId(null);
                                 setAssigningThreadId(null);
                               }}
                               className="grid size-11 place-items-center rounded-md text-fg-3 transition-colors hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-8"
@@ -1331,10 +1435,10 @@ export function StudioCommentsPanel({
                                           {canDeleteReply ? <button
                                             type="button"
                                             onClick={() => {
+                                              if (!closeReplyEditor({ protectDraft: true })) return;
                                               setPendingDelete(isDeletingReply ? null : replyTarget);
                                               setEditingMessage(null);
                                               setEditBody("");
-                                              setReplyingThreadId(null);
                                               setAssigningThreadId(null);
                                             }}
                                             aria-expanded={isDeletingReply}
@@ -1434,9 +1538,24 @@ export function StudioCommentsPanel({
                           disabled={!canReply}
                           title={thread.resolved ? "다시 열면 답글을 남길 수 있어요." : undefined}
                           onClick={() => {
-                            setReplyingThreadId(isReplying ? null : thread.id);
-                            setReplyBody("");
-                            pendingReplyIdRef.current = null;
+                            if (sharedReply) {
+                              if (isReplying && sharedReply.body.trim()) {
+                                setError("작성 중인 답글을 등록하거나 취소하면 답글 편집기를 접을 수 있어요.");
+                                globalThis.requestAnimationFrame(() => replyEditorRef.current?.focus());
+                                return;
+                              } else if (isReplying) {
+                                setDismissedSharedReplyThreadId(thread.id);
+                              } else {
+                                setDismissedSharedReplyThreadId(null);
+                                if (sharedReply.threadId !== thread.id) {
+                                  sharedReply.onThreadChange(thread.id);
+                                }
+                              }
+                            } else {
+                              setReplyingThreadId(isReplying ? null : thread.id);
+                              setReplyBody("");
+                              pendingReplyIdRef.current = null;
+                            }
                             setAssigningThreadId(null);
                             setEditingMessage(null);
                             setEditBody("");
@@ -1452,9 +1571,9 @@ export function StudioCommentsPanel({
                           type="button"
                           aria-expanded={isAssigning}
                           onClick={() => {
+                            if (!closeReplyEditor({ protectDraft: true })) return;
                             setAssigningThreadId(isAssigning ? null : thread.id);
                             setAssigneeName(thread.assignee?.displayName ?? "");
-                            setReplyingThreadId(null);
                             setEditingMessage(null);
                             setEditBody("");
                             setPendingDelete(null);
@@ -1473,6 +1592,10 @@ export function StudioCommentsPanel({
                             ? `${thread.author.displayName}의 댓글 다시 열기`
                             : `${thread.author.displayName}의 댓글 해결 처리`}
                           onClick={() => {
+                            if (
+                              !thread.resolved
+                              && !closeReplyEditor({ protectDraft: true })
+                            ) return;
                             void applyChange(
                               () => thread.resolved
                                 ? reopenStudioCommentThread(document, thread.id)
@@ -1483,10 +1606,6 @@ export function StudioCommentsPanel({
                             ).then((saved) => {
                               if (!saved) return;
                               focusReviewRail();
-                              if (!thread.resolved) {
-                                setReplyingThreadId(null);
-                                setReplyBody("");
-                              }
                             });
                           }}
                           className={`${QUIET_BUTTON_CLASS} ${
@@ -1508,12 +1627,15 @@ export function StudioCommentsPanel({
                           <textarea
                             ref={replyEditorRef}
                             id={`${titleId}-reply-${thread.id}`}
-                            value={replyBody}
+                            value={activeReplyBody}
                             maxLength={STUDIO_COMMENTS_MAX_BODY_LENGTH}
                             rows={2}
-                            onChange={(event) =>
-                              setReplyBody(event.target.value.slice(0, STUDIO_COMMENTS_MAX_BODY_LENGTH))
-                            }
+                            disabled={!canReply}
+                            onChange={(event) => {
+                              const body = event.target.value.slice(0, STUDIO_COMMENTS_MAX_BODY_LENGTH);
+                              if (sharedReply) sharedReply.onBodyChange(thread.id, body);
+                              else setReplyBody(body);
+                            }}
                             onKeyDown={(event) => {
                               if (
                                 !event.nativeEvent.isComposing
@@ -1529,24 +1651,23 @@ export function StudioCommentsPanel({
                           />
                           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                             <span className="text-[0.65rem] text-fg-3">
-                              {replyBody.length.toLocaleString("ko-KR")}/{STUDIO_COMMENTS_MAX_BODY_LENGTH.toLocaleString("ko-KR")}
+                              {activeReplyBody.length.toLocaleString("ko-KR")}/{STUDIO_COMMENTS_MAX_BODY_LENGTH.toLocaleString("ko-KR")}
                             </span>
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
+                                disabled={saving || sharedReply?.submitting}
                                 onClick={() => {
                                   focusReviewRail();
-                                  setReplyingThreadId(null);
-                                  setReplyBody("");
-                                  pendingReplyIdRef.current = null;
+                                  closeReplyEditor();
                                 }}
-                                className={QUIET_BUTTON_CLASS}
+                                className={`${QUIET_BUTTON_CLASS} disabled:cursor-wait disabled:opacity-40`}
                               >
                                 취소
                               </button>
                               <button
                                 type="submit"
-                                disabled={!replyBody.trim()}
+                                disabled={!canReply || !activeReplyBody.trim()}
                                 className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
                               >
                                 <Send size={12} aria-hidden />

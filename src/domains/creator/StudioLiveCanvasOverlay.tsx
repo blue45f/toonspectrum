@@ -56,16 +56,24 @@ export interface StudioLiveCanvasCursor {
   updatedAt: number;
 }
 
+export interface StudioCommentPinClickPayload {
+  pinKey: string;
+  anchor: StudioCommentAnchor;
+  preferredThreadId: string | undefined;
+  threadIds: readonly string[];
+  trigger: HTMLButtonElement;
+}
+
 export interface StudioLiveCanvasOverlayProps {
   canvasWidth: number;
   canvasHeight: number;
   cursors: readonly StudioLiveCanvasCursor[];
   commentPins: readonly StudioCanvasCommentPin[];
-  onCommentPinClick: (
-    anchor: StudioCommentAnchor,
-    newestThreadId?: string,
-    threadIds?: readonly string[]
-  ) => void;
+  onCommentPinClick: (payload: StudioCommentPinClickPayload) => void;
+  /** Warms the quick-reply chunk on pointer or keyboard intent. */
+  onCommentQuickReplyPreload?: () => void;
+  /** Keeps the lightweight preview from competing with an active quick-reply surface. */
+  commentQuickReplyActive?: boolean;
   flipX?: boolean;
   /** View-only clockwise quarter turn; horizontal flip remains relative to the visible screen. */
   rotation?: 0 | 90 | 180 | 270;
@@ -90,11 +98,9 @@ export interface StudioRemoteCursorOverlayProps {
   canvasHeight: number;
   hidden?: boolean;
   commentPins: readonly StudioCanvasCommentPin[];
-  onCommentPinClick: (
-    anchor: StudioCommentAnchor,
-    newestThreadId?: string,
-    threadIds?: readonly string[]
-  ) => void;
+  onCommentPinClick: (payload: StudioCommentPinClickPayload) => void;
+  onCommentQuickReplyPreload?: () => void;
+  commentQuickReplyActive?: boolean;
   flipX?: boolean;
   /** View-only clockwise quarter turn; horizontal flip remains relative to the visible screen. */
   rotation?: 0 | 90 | 180 | 270;
@@ -298,17 +304,26 @@ export function StudioLiveCanvasOverlay({
   cursors,
   commentPins,
   onCommentPinClick,
+  onCommentQuickReplyPreload,
+  commentQuickReplyActive = false,
   flipX = false,
   rotation = 0,
 }: StudioLiveCanvasOverlayProps) {
   const [activeCommentPreviewKey, setActiveCommentPreviewKey] = useState<string | null>(null);
   const pinButtonRefs = useRef(new Map<string, HTMLButtonElement>());
-  const activePreviewPin = activeCommentPreviewKey
+  const activePreviewPin = !commentQuickReplyActive && activeCommentPreviewKey
     ? commentPins.find((pin) => pin.key === activeCommentPreviewKey)
     : undefined;
-  const activePreviewAnchor = activeCommentPreviewKey
+  const activePreviewAnchor = !commentQuickReplyActive && activeCommentPreviewKey
     ? pinButtonRefs.current.get(activeCommentPreviewKey)
     : undefined;
+  useEffect(() => {
+    if (commentQuickReplyActive) setActiveCommentPreviewKey(null);
+  }, [commentQuickReplyActive]);
+  const previewCommentPin = (pinKey: string) => {
+    onCommentQuickReplyPreload?.();
+    if (!commentQuickReplyActive) setActiveCommentPreviewKey(pinKey);
+  };
   const focusCommentPin = (currentKey: string, destination: "next" | "previous" | "first" | "last") => {
     if (commentPins.length === 0) return;
     const currentIndex = Math.max(0, commentPins.findIndex((pin) => pin.key === currentKey));
@@ -360,12 +375,12 @@ export function StudioLiveCanvasOverlay({
             title={pin.previewBody
               ? undefined
               : `${pin.label} · ${pin.unreadCount ? `읽지 않음 ${pin.unreadCount}개 · ` : ""}열림 ${pin.count}개`}
-            onPointerEnter={() => setActiveCommentPreviewKey(pin.key)}
+            onPointerEnter={() => previewCommentPin(pin.key)}
             onPointerLeave={(event) => {
               if (event.currentTarget.ownerDocument.activeElement === event.currentTarget) return;
               setActiveCommentPreviewKey((current) => current === pin.key ? null : current);
             }}
-            onFocus={() => setActiveCommentPreviewKey(pin.key)}
+            onFocus={() => previewCommentPin(pin.key)}
             onBlur={() => setActiveCommentPreviewKey((current) => (
               current === pin.key ? null : current
             ))}
@@ -390,11 +405,16 @@ export function StudioLiveCanvasOverlay({
               event.stopPropagation();
               focusCommentPin(pin.key, destination);
             }}
-            onClick={() => onCommentPinClick(
-              pin.anchor,
-              pin.newestUnreadThreadId ?? pin.newestThreadId,
-              pin.threadIds
-            )}
+            onClick={(event) => {
+              setActiveCommentPreviewKey(null);
+              onCommentPinClick({
+                pinKey: pin.key,
+                anchor: pin.anchor,
+                preferredThreadId: pin.newestUnreadThreadId ?? pin.newestThreadId,
+                threadIds: pin.threadIds ?? [],
+                trigger: event.currentTarget,
+              });
+            }}
           >
             <span data-pin-marker className="relative grid size-8 place-items-center rounded-full border-2 border-panel bg-accent shadow-[0_4px_14px_oklch(0.10_0.02_70/0.42)]">
               {pin.count > 1 ? pin.count : <MessageCircle size={14} aria-hidden />}
@@ -469,6 +489,8 @@ export function StudioRemoteCursorOverlay({
   hidden = false,
   commentPins,
   onCommentPinClick,
+  onCommentQuickReplyPreload,
+  commentQuickReplyActive = false,
   flipX = false,
   rotation = 0,
 }: StudioRemoteCursorOverlayProps) {
@@ -565,6 +587,8 @@ export function StudioRemoteCursorOverlay({
       cursors={cursors.filter((value) => value.cursor.pageId === pageId)}
       commentPins={commentPins}
       onCommentPinClick={onCommentPinClick}
+      onCommentQuickReplyPreload={onCommentQuickReplyPreload}
+      commentQuickReplyActive={commentQuickReplyActive}
       flipX={flipX}
       rotation={rotation}
     />

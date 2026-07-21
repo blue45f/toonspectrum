@@ -58,6 +58,18 @@ const StudioPointCommentComposer = lazyRetry(
 function preloadStudioPointCommentComposer(): void {
   studioPointCommentComposerLoader.preload();
 }
+const studioCommentThreadPopoverLoader = createStudioIntentLazyLoader(() =>
+  import("./StudioCommentThreadPopover").then((mod) => ({
+    default: mod.StudioCommentThreadPopover,
+  }))
+);
+const StudioCommentThreadPopover = lazyRetry(
+  studioCommentThreadPopoverLoader.load,
+  "StudioCommentThreadPopover"
+);
+function preloadStudioCommentThreadPopover(): void {
+  studioCommentThreadPopoverLoader.preload();
+}
 const StudioPageGradePanel = lazyRetry(
   () => import("./StudioPageGradePanel").then((mod) => ({ default: mod.StudioPageGradePanel })),
   "StudioPageGradePanel"
@@ -759,6 +771,7 @@ export {
   StudioReferencePanel,
   StudioRemoteCursorOverlay,
   StudioPointCommentComposer,
+  StudioCommentThreadPopover,
   StudioScenarioAutoLayoutPanel,
   StudioScrollPreviewPanel,
   StudioSelectOptionsBar,
@@ -797,6 +810,7 @@ export {
   preloadStudioExportMenuPanel,
   preloadStudioIntegrationsSettingsPanel,
   preloadStudioPaletteLibraryPanel,
+  preloadStudioCommentThreadPopover,
   preloadStudioPointCommentComposer,
   preloadStudioReferencePanel,
   preloadStudioStockImagePanel,
