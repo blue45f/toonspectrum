@@ -68,6 +68,7 @@ import {
 } from "./StudioColorBlindPreview";
 import { LazyStudioColorPopover } from "./StudioLazyColorPopover";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
+import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type {
   StudioAiAssistToolId,
@@ -988,35 +989,49 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
         >
           <ClipboardCheck size={14} />
         </button>
-        <button
-          type="button"
-          onClick={() => {
-            setTeamPanelOpen(false);
-            setCommentsOpen((current) => !current);
-          }}
+        <StudioToolHintTarget
+          preferredSide="bottom"
           disabled={collaborationDocumentLocked && !sharedDocument?.capabilities.view}
-          aria-expanded={commentsOpen}
-          aria-haspopup="dialog"
-          aria-controls="studio-comments-review-dialog"
-          aria-label={`문서 댓글${openStudioCommentCount > 0 ? `, 열림 ${openStudioCommentCount}개` : ""}`}
-          className={cn(toolBtn(commentsOpen), "relative disabled:cursor-not-allowed disabled:opacity-50")}
-          title={
+          unavailableReason={
             collaborationDocumentLocked && !sharedDocument?.capabilities.view
               ? collaborationLockMessage()
-              : sharedDocument?.access === "view"
-                ? `팀 댓글 열람 · 위치 이동${openStudioCommentCount > 0 ? ` · 열림 ${openStudioCommentCount}개` : ""}`
-                : `페이지·컷·요소에 ${sharedDocument ? "팀 댓글 남기기 · 서버 동기화" : "문서 댓글 남기기 · 프로젝트 저장"}${
-                  openStudioCommentCount > 0 ? ` · 열림 ${openStudioCommentCount}개` : ""
-                }`
+              : undefined
           }
+          hint={{
+            id: "toolbelt-comment-inbox",
+            title: "문서 댓글",
+            description:
+              sharedDocument?.access === "view"
+                ? "팀 댓글을 읽고 연결된 페이지·컷·요소 위치로 바로 이동합니다."
+                : `페이지·컷·요소에 ${sharedDocument ? "팀 댓글을 남기고 서버로 동기화합니다." : "댓글을 남겨 프로젝트와 함께 저장합니다."}`,
+            preview: "comment-inbox",
+            tip:
+              openStudioCommentCount > 0
+                ? `아직 해결되지 않은 댓글이 ${openStudioCommentCount}개 있어요.`
+                : "캔버스 위치를 지정해 댓글을 남기면 검토자가 맥락을 바로 이해할 수 있어요.",
+          }}
         >
-          <MessageCircle size={14} />
-          {openStudioCommentCount > 0 ? (
-            <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-accent px-1 text-[0.58rem] font-bold leading-4 text-on-accent">
-              {openStudioCommentCount > 99 ? "99+" : openStudioCommentCount}
-            </span>
-          ) : null}
-        </button>
+          <button
+            type="button"
+            onClick={() => {
+              setTeamPanelOpen(false);
+              setCommentsOpen((current) => !current);
+            }}
+            disabled={collaborationDocumentLocked && !sharedDocument?.capabilities.view}
+            aria-expanded={commentsOpen}
+            aria-haspopup="dialog"
+            aria-controls="studio-comments-review-dialog"
+            aria-label={`문서 댓글${openStudioCommentCount > 0 ? `, 열림 ${openStudioCommentCount}개` : ""}`}
+            className={cn(toolBtn(commentsOpen), "relative disabled:cursor-not-allowed disabled:opacity-50")}
+          >
+            <MessageCircle size={14} />
+            {openStudioCommentCount > 0 ? (
+              <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-accent px-1 text-[0.58rem] font-bold leading-4 text-on-accent">
+                {openStudioCommentCount > 99 ? "99+" : openStudioCommentCount}
+              </span>
+            ) : null}
+          </button>
+        </StudioToolHintTarget>
         <button
           type="button"
           onClick={() => {

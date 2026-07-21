@@ -45,6 +45,7 @@ const EXPAND_DELAY_MS = 620;
 // Long enough to cross the visual gap from the target into the portal bubble.
 // Entering the bubble cancels this timer, satisfying hoverable-content accessibility.
 const HIDE_DELAY_MS = 280;
+const TOUCH_HOLD_MOVE_TOLERANCE_PX = 10;
 const FALLBACK_WIDTH = 240;
 const FALLBACK_HEIGHT = 92;
 const FALLBACK_GAP = 10;
@@ -128,6 +129,7 @@ export function StudioToolHintPreferencesProvider({
       globalThis.removeEventListener("pointerdown", onPointerDown, true);
       globalThis.removeEventListener("pointerover", onPointerOver, true);
       globalThis.removeEventListener("focusin", onFocusIn, true);
+      clearPointerSuppression();
     };
   }, [coordinator]);
 
@@ -241,6 +243,7 @@ function StudioToolHintCompactFallback({
   anchor,
   unavailableReason,
   preferredSide,
+  reducedMotion = false,
   onMouseEnter,
   onMouseLeave,
 }: Pick<
@@ -252,7 +255,7 @@ function StudioToolHintCompactFallback({
   | "preferredSide"
   | "onMouseEnter"
   | "onMouseLeave"
->): ReactElement {
+> & { reducedMotion?: boolean }): ReactElement {
   return (
     <div
       id={id}
@@ -261,7 +264,10 @@ function StudioToolHintCompactFallback({
       data-studio-tool-hint-expanded="false"
       data-studio-tool-hint-loading="true"
       className="studio-tool-hint-compact"
-      style={compactFallbackStyle(anchor as DOMRect, preferredSide, Boolean(unavailableReason))}
+      style={{
+        ...compactFallbackStyle(anchor as DOMRect, preferredSide, Boolean(unavailableReason)),
+        animation: reducedMotion ? "none" : undefined,
+      }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
@@ -325,6 +331,11 @@ export function StudioToolHintTarget({
   const expandTimer = useRef<number>(0);
   const hideTimer = useRef<number>(0);
   const touchHoldTimer = useRef<number>(0);
+  const touchHoldStart = useRef<Readonly<{
+    pointerId: number;
+    x: number;
+    y: number;
+  }> | null>(null);
   const touchHoldOpened = useRef(false);
   const pointerDismissed = useRef(false);
   const describedFocusTarget = useRef<HTMLElement | null>(null);
@@ -341,6 +352,7 @@ export function StudioToolHintTarget({
     expandTimer.current = 0;
     hideTimer.current = 0;
     touchHoldTimer.current = 0;
+    touchHoldStart.current = null;
   }
 
   function hideRenderedTooltipImmediately(hintId = tipId) {
@@ -460,6 +472,11 @@ export function StudioToolHintTarget({
 
     clearTimers();
     dismissCoordinatedHintsImmediately();
+    touchHoldStart.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+    };
     pointerDismissed.current = true;
     armPointerSuppression(event.clientX, event.clientY);
     touchHoldOpened.current = false;
@@ -471,6 +488,7 @@ export function StudioToolHintTarget({
       touchHoldTimer.current = 0;
       coordinator.clearPending(tipId);
       if (coordinator.getDismissEpoch() !== intentEpoch) return;
+      touchHoldStart.current = null;
       touchHoldOpened.current = true;
       pointerDismissed.current = false;
       clearPointerSuppression();
@@ -478,8 +496,25 @@ export function StudioToolHintTarget({
     }, preferences.touchHoldDelayMs) as unknown as number;
   }
 
+  function handlePointerMoveCapture(event: ReactPointerEvent<HTMLSpanElement>) {
+    if (event.pointerType !== "touch" || !touchHoldTimer.current) return;
+    const start = touchHoldStart.current;
+    if (!start || start.pointerId !== event.pointerId) return;
+    if (
+      Math.hypot(event.clientX - start.x, event.clientY - start.y)
+      <= TOUCH_HOLD_MOVE_TOLERANCE_PX
+    ) {
+      return;
+    }
+    globalThis.clearTimeout(touchHoldTimer.current);
+    touchHoldTimer.current = 0;
+    touchHoldStart.current = null;
+    coordinator.clearPending(tipId);
+  }
+
   function handlePointerUpCapture(event: ReactPointerEvent<HTMLSpanElement>) {
     if (event.pointerType !== "touch") return;
+    touchHoldStart.current = null;
     if (touchHoldTimer.current) {
       globalThis.clearTimeout(touchHoldTimer.current);
       touchHoldTimer.current = 0;
@@ -512,6 +547,7 @@ export function StudioToolHintTarget({
     clearTimers();
     dismissCoordinatedHintsImmediately();
     touchHoldOpened.current = false;
+    touchHoldStart.current = null;
     pointerDismissed.current = false;
     clearPointerSuppression();
     setExpanded(false);
@@ -676,6 +712,7 @@ export function StudioToolHintTarget({
       onMouseEnter={scheduleShow}
       onMouseLeave={handleMouseLeave}
       onPointerDownCapture={handlePointerDownCapture}
+      onPointerMoveCapture={handlePointerMoveCapture}
       onPointerUpCapture={handlePointerUpCapture}
       onPointerCancelCapture={handlePointerCancelCapture}
       onClickCapture={handleClickCapture}
@@ -698,6 +735,7 @@ export function StudioToolHintTarget({
                   anchor={anchor}
                   unavailableReason={unavailableReason}
                   preferredSide={preferredSide}
+                  reducedMotion={preferences.reduceMotion}
                   onMouseEnter={keepOpenFromBubble}
                   onMouseLeave={leaveBubble}
                 />

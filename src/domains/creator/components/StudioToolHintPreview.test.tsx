@@ -9,6 +9,17 @@ import {
 
 const PREVIEW_KINDS = STUDIO_TOOL_HINT_PREVIEW_KINDS;
 
+function visualSignature(
+  kind: (typeof PREVIEW_KINDS)[number],
+  variant?: string
+): string {
+  return renderToStaticMarkup(
+    <StudioToolHintPreview kind={kind} variant={variant} reducedMotion />
+  )
+    .replace(/\sdata-(?:studio-tool-hint-preview|preview-kind|preview-variant|preview-operation)="[^"]*"/gu, "")
+    .replace(/studio-tool-preview-[^"#)]+/gu, "studio-tool-preview-id");
+}
+
 describe("StudioToolHintPreview", () => {
   it.each(PREVIEW_KINDS)("renders the %s micro-demo with stable integration hooks", (kind) => {
     const html = renderToStaticMarkup(
@@ -48,11 +59,89 @@ describe("StudioToolHintPreview", () => {
       "frame-duplicate",
       "frame-delete",
     ] as const;
-    const signatures = actionKinds.map((kind) =>
-      renderToStaticMarkup(<StudioToolHintPreview kind={kind} reducedMotion />)
-    );
+    const signatures = actionKinds.map((kind) => visualSignature(kind));
 
     expect(new Set(signatures).size).toBe(actionKinds.length);
+  });
+
+  it("keeps direct shape drawing visually distinct from smart-shape correction", () => {
+    expect(visualSignature("shape")).not.toBe(visualSignature("smart-shape"));
+  });
+
+  it.each([
+    ["layer-visibility", ["layer-batch-show", "layer-batch-hide"]],
+    ["layer-lock", ["layer-batch-lock", "layer-batch-unlock"]],
+    ["layer-merge", ["layer-batch-merge-selected", "layer-batch-flatten-visible"]],
+    ["camera-zoom", ["bg3d:camera:zoom-in", "bg3d:camera:zoom-out", "bg3d:camera:focus-selection"]],
+    ["frame-reorder", ["frame-reorder-previous", "frame-reorder-next"]],
+    ["onion-skin", ["frame-onion-skin", "frame-onion-prev-count", "frame-onion-next-count", "frame-onion-opacity", "frame-onion-tint"]],
+    ["stabilizer", ["stabilizer-standard", "stabilizer-adaptive", "stabilizer-precision", "post-correction"]],
+    ["pressure", ["pressure-soft", "pressure-linear", "pressure-firm"]],
+    ["symmetry", ["symmetry-none", "symmetry-vertical", "symmetry-horizontal", "symmetry-radial", "symmetry-kaleidoscope"]],
+  ] as const)("specializes the %s family by stable action identity", (kind, variants) => {
+    const signatures = variants.map((variant) => visualSignature(kind, variant));
+    expect(new Set(signatures).size).toBe(variants.length);
+  });
+
+  it("shows object snapping at a grid intersection", () => {
+    const html = renderToStaticMarkup(
+      <StudioToolHintPreview kind="object-snap" reducedMotion />
+    );
+
+    expect(html).toContain('data-preview-kind="object-snap"');
+    expect(html).toContain('data-preview-operation="object-snap"');
+    expect(html).toContain('data-motion="reduced"');
+  });
+
+  it("keeps the edit workflow distinct from file, insert, draw, and history flows", () => {
+    const workflowKinds = [
+      "edit-workflow",
+      "file-workflow",
+      "insert-content",
+      "draw-workflow",
+      "history",
+    ] as const;
+    const signatures = workflowKinds.map((kind) => visualSignature(kind));
+
+    expect(new Set(signatures).size).toBe(workflowKinds.length);
+  });
+
+  it("specializes slash-namespaced action variants", () => {
+    const html = renderToStaticMarkup(
+      <StudioToolHintPreview
+        kind="layer-lock"
+        variant="plugin/layer/unlock-layer"
+        reducedMotion
+      />
+    );
+
+    expect(html).toContain('data-preview-operation="unlock"');
+    expect(html).toContain("M-7-2v-7a7 7 0 0 1 12-5v7");
+  });
+
+  it("renders filter engines as distinct controls instead of one generic wipe", () => {
+    const variants = [
+      "filter-curves",
+      "filter-gradient-map",
+      "filter-channel-mixer",
+      "filter-invert",
+    ] as const;
+    const signatures = variants.map((variant) => visualSignature("filter", variant));
+
+    expect(new Set(signatures).size).toBe(variants.length);
+  });
+
+  it("normalizes and exposes the preview variant without leaking it as an SVG prop", () => {
+    const html = renderToStaticMarkup(
+      <StudioToolHintPreview
+        kind="camera-zoom"
+        variant="VRM:Camera:Zoom_Out"
+        reducedMotion
+      />
+    );
+
+    expect(html).toContain('data-preview-variant="vrm:camera:zoom-out"');
+    expect(html).not.toContain(' variant="');
   });
 
   it("is decorative by default and can become a named image", () => {

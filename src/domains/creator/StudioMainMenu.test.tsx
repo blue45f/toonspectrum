@@ -322,4 +322,20 @@ describe("StudioMainMenu", () => {
       })
     );
   });
+
+  it("maps broad application menus to result-focused rich previews", () => {
+    for (const [group, preview] of [
+      ["file", "file-workflow"],
+      ["edit", "edit-workflow"],
+      ["insert", "insert-content"],
+      ["view", "view-workflow"],
+      ["draw", "draw-workflow"],
+    ]) {
+      const groupStart = mainMenuSource.indexOf(`  ${group}: {`);
+      expect(groupStart, `missing ${group} menu hint`).toBeGreaterThanOrEqual(0);
+      expect(mainMenuSource.slice(groupStart, groupStart + 600)).toContain(
+        `preview: "${preview}"`,
+      );
+    }
+  });
 });

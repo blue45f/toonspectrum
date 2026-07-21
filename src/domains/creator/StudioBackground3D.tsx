@@ -803,7 +803,7 @@ const BG3D_VIEWPORT_HINTS = {
     id: "bg3d:transform:snap",
     title: "변형 스냅",
     description: "이동과 회전을 설정한 간격에 맞춰 붙여 배경 구조를 반듯하게 정렬합니다.",
-    preview: "object-3d",
+    preview: "object-snap",
     tip: "세부 간격과 적용 축은 도형 패널의 변형 스냅에서 바꿀 수 있어요.",
   },
   ground: {

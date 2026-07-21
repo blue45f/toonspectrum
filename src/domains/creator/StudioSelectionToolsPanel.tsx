@@ -49,6 +49,7 @@ import {
 } from "./studio-selection-tools";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
+import type { StudioToolHintPreviewKind } from "./studio-tool-hint-preview-kind";
 import type { ReactElement } from "react";
 
 import { buttonClass } from "@/components/ui/button-utils";
@@ -61,6 +62,20 @@ const TOOL_ICONS: Record<SelectionToolKind, typeof Square> = {
   "poly-lasso": Pentagon,
   brush: Paintbrush,
 };
+
+const TOOL_PREVIEWS = {
+  rect: "marquee-rect",
+  ellipse: "marquee-ellipse",
+  lasso: "lasso",
+  "poly-lasso": "polygon-lasso",
+  brush: "selection-brush",
+} satisfies Record<SelectionToolKind, StudioToolHintPreviewKind>;
+
+const COMBINE_PREVIEWS = {
+  add: "selection-add",
+  subtract: "selection-subtract",
+  intersect: "selection-intersect",
+} satisfies Record<SelectionCombineMode, StudioToolHintPreviewKind>;
 
 export type StudioSelectionToolsPanelProps = {
   selection: PixelSelection | null;
@@ -191,7 +206,7 @@ export function StudioSelectionToolsPanel({
                 id: `pixel-selection-${tool.id}`,
                 title: tool.label,
                 description: tool.tip,
-                preview: "lasso",
+                preview: TOOL_PREVIEWS[tool.id],
                 tip:
                   tool.id === "poly-lasso"
                     ? "Enter 또는 더블클릭으로 닫고, Esc로 그리던 경로를 취소할 수 있어요."
@@ -236,7 +251,7 @@ export function StudioSelectionToolsPanel({
                 id: `pixel-selection-combine-${mode.id}`,
                 title: mode.label,
                 description: mode.tip,
-                preview: "select",
+                preview: COMBINE_PREVIEWS[mode.id],
                 tip:
                   mode.id === "add"
                     ? "새 영역을 기존 선택에 더하려면 ‘합치기’ 결합 모드 버튼을 선택하세요."

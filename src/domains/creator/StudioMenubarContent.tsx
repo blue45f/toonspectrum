@@ -111,7 +111,7 @@ const MENUBAR_HINTS = {
     id: "menubar-export-options",
     title: "내보내기 옵션",
     description: "배율, 파일 형식, 투명 배경, 워터마크와 플랫폼 프리셋을 설정합니다.",
-    preview: "export",
+    preview: "export-options",
   },
   project: {
     id: "menubar-project",

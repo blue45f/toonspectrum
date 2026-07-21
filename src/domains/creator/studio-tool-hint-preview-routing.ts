@@ -40,14 +40,14 @@ const STUDIO_ACTION_PREVIEW_BY_ID: Readonly<Record<string, StudioToolHintPreview
   blend: "smudge",
   smudge: "smudge",
   lasso: "lasso",
-  "poly-lasso": "lasso",
+  "poly-lasso": "polygon-lasso",
   "pixel-select": "lasso",
   "marquee-rect": "marquee-rect",
   "marquee-circle": "marquee-ellipse",
   rect: "marquee-rect",
   ellipse: "marquee-ellipse",
   "lasso-fill": "lasso-fill",
-  "brush-settings": "brush-size",
+  "brush-settings": "draw-settings",
   "brush-size": "brush-size",
   "stroke-width": "brush-size",
   opacity: "opacity",
@@ -65,7 +65,7 @@ const STUDIO_ACTION_PREVIEW_BY_ID: Readonly<Record<string, StudioToolHintPreview
   "zoom-fit": "zoom-view",
   "fit-width": "zoom-view",
   "rotate-view": "rotate-view",
-  "flip-view": "rotate-view",
+  "flip-view": "flip-view",
   hand: "pan",
   pan: "pan",
   history: "history",
@@ -74,7 +74,7 @@ const STUDIO_ACTION_PREVIEW_BY_ID: Readonly<Record<string, StudioToolHintPreview
   layer: "layer",
   layers: "layer",
   "add-layer": "layer",
-  "duplicate-layer": "layer",
+  "duplicate-layer": "layer-duplicate",
   "show-layer": "layer-visibility",
   "hide-layer": "layer-visibility",
   "lock-layer": "layer-lock",
@@ -163,7 +163,8 @@ function previewFromIdentityTokens(tokens: ReadonlySet<string>): StudioToolHintP
   if (tokensIncludeAny(tokens, ["리퀴파이", "액체화", "liquify"])) return "liquify";
   if (tokensIncludeAny(tokens, ["스머지", "혼합", "smudge", "blend"])) return "smudge";
   if (tokensIncludeAny(tokens, ["핸드", "이동보기", "hand", "pan"])) return "pan";
-  if (tokensIncludeAny(tokens, ["회전", "반전", "rotate", "flip"])) return "rotate-view";
+  if (tokensIncludeAny(tokens, ["반전", "뒤집기", "flip"])) return "flip-view";
+  if (tokensIncludeAny(tokens, ["회전", "rotate"])) return "rotate-view";
   if (tokensIncludeAny(tokens, ["설정", "settings"])) return "settings";
   if (tokensIncludeAny(tokens, ["저장", "임시저장", "save", "draft"])) return "save";
   if (tokensIncludeAny(tokens, ["게시", "발행", "publish"])) return "publish";

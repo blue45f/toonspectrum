@@ -383,7 +383,7 @@ export function StudioDrawOptionsBar({
                 `현재 브러시 · ${brushMeta?.name ?? brushId}`,
                 "기본 프리셋을 열어 촉감·용도별 브러시를 검색하고 바로 교체합니다. 현재 색과 불투명도는 그대로 유지돼요.",
                 undefined,
-                "ink"
+                "brush-library"
               )}
             >
               <button
@@ -431,7 +431,7 @@ export function StudioDrawOptionsBar({
                     ? "현재 브러시를 즐겨찾기 선반에서 제거합니다. 브러시 자체 설정과 최근 사용 기록은 유지돼요."
                     : "현재 브러시를 즐겨찾기 선반에 고정해 다음 작업에서도 빠르게 다시 꺼냅니다.",
                   undefined,
-                  "ink"
+                  "brush-favorite"
                 )}
               >
                 <button
@@ -483,7 +483,7 @@ export function StudioDrawOptionsBar({
                       ? "도형 내부를 비워 윤곽선만 그립니다."
                       : "새 도형의 내부를 현재 주 색으로 채웁니다. 윤곽선과 채움은 함께 유지돼요.",
                   undefined,
-                  "shape"
+                  "shape-fill"
                 )}
               >
                 <button
@@ -604,7 +604,7 @@ export function StudioDrawOptionsBar({
                 ? "브러시 프리셋·보정·필압·대칭·빠른 슬롯 행을 접어 캔버스 공간을 되찾습니다."
                 : "브러시 프리셋·손떨림 보정·필압 곡선·대칭·빠른 슬롯을 한 줄에서 정밀 조정합니다.",
               undefined,
-              "stabilizer"
+              "draw-settings"
             )}
           >
             <button
@@ -634,7 +634,7 @@ export function StudioDrawOptionsBar({
                   ? "작업 캔버스를 원래 방향으로 되돌립니다. 데이터는 바뀌지 않아 비율과 실루엣을 점검할 때 안전해요."
                   : "캔버스를 거울처럼 좌우로 보여 비율·기울기 오류를 새 눈으로 확인합니다. 작품 데이터 자체는 뒤집히지 않아요.",
                 undefined,
-                "rotate-view"
+                "flip-view"
               )}
             >
               <button
@@ -661,7 +661,7 @@ export function StudioDrawOptionsBar({
                 "브러시 스튜디오",
                 "현재 브러시의 필압 곡선·도장 간격·촉 회전·질감을 세밀하게 편집하고 재사용 프리셋으로 저장합니다.",
                 undefined,
-                "pressure"
+                "brush-studio"
               )}
             >
               <button
@@ -684,7 +684,7 @@ export function StudioDrawOptionsBar({
                   ? "자유선 자동 정리를 끕니다. 이후 획은 브러시의 손맛 그대로 남아요."
                   : "선을 긋고 끝에서 잠시 멈추면 낙서를 직선·원·사각형처럼 매끈한 도형으로 자동 정리합니다.",
                 undefined,
-                "shape"
+                "smart-shape"
               )}
             >
               <button
@@ -882,7 +882,8 @@ export function StudioDrawOptionsBar({
                             ? "중심을 둘러싼 여러 방향으로 획을 복제해 장식·효과선을 만듭니다."
                             : "회전과 반사를 함께 반복해 만화경처럼 연속된 무늬를 만듭니다.",
                     undefined,
-                    "symmetry"
+                    "symmetry",
+                    `symmetry-${item.id}`
                   )}
                 >
                   <button
@@ -927,7 +928,7 @@ export function StudioDrawOptionsBar({
                           ? "비어 있는 빠른 슬롯입니다. 클릭하면 현재 브러시·크기·불투명도를 저장해 다음에 한 번에 불러올 수 있어요."
                           : "비어 있는 빠른 슬롯입니다. 슬롯 저장 기능이 연결되면 현재 브러시 설정을 보관할 수 있어요.",
                       `${index + 1}`,
-                      "ink"
+                      "brush-slot"
                     )}
                   >
                     <button
@@ -975,7 +976,8 @@ export function StudioDrawOptionsBar({
               "손떨림 보정",
               `현재 강도 ${stabilizer}/10입니다. 값이 높을수록 입력을 더 오래 평균내 매끈한 선을 만들지만 펜을 따라오는 느낌은 느려질 수 있어요.`,
               "S",
-              "stabilizer"
+              "stabilizer",
+              `stabilizer-${stabilizerMode}`
             )}
           >
             <label className="flex shrink-0 items-center gap-1 text-fg-3">
@@ -1028,7 +1030,8 @@ export function StudioDrawOptionsBar({
                         ? "그리는 속도에 맞춰 보정량을 바꿉니다. 빠른 제스처와 느린 곡선을 함께 쓸 때 균형이 좋아요."
                         : "입력을 더 길게 분석해 긴 곡선과 깨끗한 윤곽을 정밀하게 다듬습니다.",
                     undefined,
-                    "stabilizer"
+                    "stabilizer",
+                    `stabilizer-${item.id}`
                   )}
                 >
                   <button
@@ -1058,7 +1061,8 @@ export function StudioDrawOptionsBar({
                 "획 후처리 보정",
                 `현재 강도 ${postCorrection}/10입니다. 펜을 뗀 뒤 완성된 획의 작은 꺾임과 불필요한 점을 정리하며 원본 제스처는 유지합니다.`,
                 undefined,
-                "stabilizer"
+                "stabilizer",
+                "post-correction"
               )}
             >
               <label className="flex shrink-0 items-center gap-1 text-fg-3">
@@ -1098,7 +1102,8 @@ export function StudioDrawOptionsBar({
                         ? "펜 압력과 굵기·농도를 균일하게 대응시켜 예측 가능한 기본 반응을 만듭니다."
                         : "더 강하게 눌러야 굵기와 농도가 올라갑니다. 힘 있는 선과 세밀한 초입 제어에 좋아요.",
                     undefined,
-                    "pressure"
+                    "pressure",
+                    `pressure-${item.id}`
                   )}
                 >
                   <button

@@ -59,11 +59,18 @@ const LazyStudioToolHintPreview = lazy(async () => ({
   default: (await loadStudioToolHintPreviewModule()).StudioToolHintPreview,
 }));
 
-function StudioToolHintPreviewFallback({ preview }: { preview: string }): ReactElement {
+function StudioToolHintPreviewFallback({
+  preview,
+  variant,
+}: {
+  preview: string;
+  variant: string;
+}): ReactElement {
   return (
     <svg
       data-studio-tool-hint-preview={preview}
       data-preview-kind={preview}
+      data-preview-variant={variant}
       data-motion="loading"
       viewBox="0 0 216 104"
       preserveAspectRatio="xMidYMid meet"
@@ -127,39 +134,55 @@ export function StudioToolHintBubble({
   const bubbleRef = useRef<HTMLDivElement>(null);
   const viewportWidth = typeof globalThis.innerWidth === "number" ? globalThis.innerWidth : 1280;
   const viewportHeight = typeof globalThis.innerHeight === "number" ? globalThis.innerHeight : 800;
-  const coachExpanded =
-    richPreviewEnabled && expanded && viewportHeight >= MIN_RICH_COACH_VIEWPORT_HEIGHT;
-  const [measuredSize, setMeasuredSize] = useState({
-    width: coachExpanded ? COACH_WIDTH : COMPACT_WIDTH,
-    height: coachExpanded
+  const richCoachAvailable =
+    richPreviewEnabled && viewportHeight >= MIN_RICH_COACH_VIEWPORT_HEIGHT;
+  const coachExpanded = richCoachAvailable && expanded;
+  const expectedWidth = Math.min(
+    coachExpanded ? COACH_WIDTH : COMPACT_WIDTH,
+    Math.max(1, viewportWidth - 20)
+  );
+  const [measuredHeight, setMeasuredHeight] = useState(
+    coachExpanded
       ? COACH_HEIGHT + (unavailableReason ? 40 : 0)
-      : COMPACT_HEIGHT + (unavailableReason ? 40 : 0),
-  });
+      : COMPACT_HEIGHT + (unavailableReason ? 40 : 0)
+  );
   const resolvedPreferredSide = preferredSide ?? (anchor.bottom > viewportHeight * 0.72 ? "top" : "right");
   const position = planStudioToolHintPosition({
     anchor,
     viewportWidth,
     viewportHeight,
-    popupWidth: measuredSize.width,
-    popupHeight: measuredSize.height,
+    // Width is a deterministic state value. Using the previous measured width
+    // for this render leaves the 304px coach at the compact 240px coordinate
+    // until its CSS transition ends, clipping exactly 54px at the right edge.
+    popupWidth: expectedWidth,
+    popupHeight: measuredHeight,
     preferredSide: resolvedPreferredSide,
     viewportPadding: 10,
   });
   const preview = studioToolHintPreview(hint);
 
   useEffect(() => {
-    if (!richPreviewEnabled) return;
+    if (!richCoachAvailable) return;
     void loadStudioToolHintPreviewModule();
-  }, [richPreviewEnabled]);
+  }, [richCoachAvailable]);
 
   useLayoutEffect(() => {
-    const rect = bubbleRef.current?.getBoundingClientRect();
-    if (!rect || rect.width <= 0 || rect.height <= 0) return;
-    setMeasuredSize((current) =>
-      Math.abs(current.width - rect.width) < 0.5 && Math.abs(current.height - rect.height) < 0.5
-        ? current
-        : { width: rect.width, height: rect.height }
-    );
+    const bubble = bubbleRef.current;
+    if (!bubble) return;
+
+    const measure = () => {
+      const rect = bubble.getBoundingClientRect();
+      if (rect.height <= 0) return;
+      setMeasuredHeight((current) =>
+        Math.abs(current - rect.height) < 0.5 ? current : rect.height
+      );
+    };
+
+    measure();
+    if (typeof ResizeObserver !== "function") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(bubble);
+    return () => observer.disconnect();
   }, [coachExpanded, hint.description, hint.tip, unavailableReason]);
 
   return (
@@ -168,19 +191,28 @@ export function StudioToolHintBubble({
       role="tooltip"
       data-studio-tool-hint="true"
       data-studio-tool-hint-expanded={coachExpanded ? "true" : "false"}
-      data-studio-tool-hint-condensed={expanded && !coachExpanded ? "true" : undefined}
+      data-studio-tool-hint-condensed={
+        richPreviewEnabled && expanded && !richCoachAvailable ? "true" : undefined
+      }
+      data-studio-tool-hint-reduced-motion={reducedMotion ? "true" : undefined}
       data-side={position.side}
       id={id ?? defaultHintId(hint)}
       className={cn(
         "pointer-events-auto fixed z-[200] max-h-[calc(100vh-1.25rem)] overflow-hidden rounded-lg border border-line/80",
         "bg-panel/98 p-2.5 text-left shadow-[0_20px_56px_oklch(0.06_0.01_70/0.66)] backdrop-blur-xl",
-        "transition-[width] duration-150 ease-out motion-reduce:transition-none",
+        reducedMotion
+          ? "transition-none"
+          : "transition-[width] duration-150 ease-out motion-reduce:transition-none",
         coachExpanded
           ? "w-[min(19rem,calc(100vw-1.25rem))]"
           : "w-[min(15rem,calc(100vw-1.25rem))]",
         className
       )}
-      style={{ left: position.left, top: position.top }}
+      style={{
+        left: position.left,
+        top: position.top,
+        animation: reducedMotion ? "none" : undefined,
+      }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
@@ -197,7 +229,7 @@ export function StudioToolHintBubble({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-[0.8125rem] font-bold leading-tight text-fg">{hint.title}</p>
-          {richPreviewEnabled ? (
+          {richCoachAvailable ? (
             <span className="mt-1 inline-flex items-center gap-1 text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-accent">
               <Sparkles size={10} strokeWidth={1.8} aria-hidden />
               {coachExpanded ? "동작 미리보기" : "잠시 머물러 미리보기"}
@@ -218,10 +250,19 @@ export function StudioToolHintBubble({
         <div
           data-studio-tool-hint-preview-frame="true"
           className="mt-2 overflow-hidden rounded-md border border-line/60 bg-canvas/70 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.04)]"
+          style={{ animation: reducedMotion ? "none" : undefined }}
         >
-          <Suspense fallback={<StudioToolHintPreviewFallback preview={preview} />}>
+          <Suspense
+            fallback={(
+              <StudioToolHintPreviewFallback
+                preview={preview}
+                variant={hint.previewVariant ?? hint.id}
+              />
+            )}
+          >
             <LazyStudioToolHintPreview
               kind={preview}
+              variant={hint.previewVariant ?? hint.id}
               reducedMotion={reducedMotion ? true : undefined}
             />
           </Suspense>

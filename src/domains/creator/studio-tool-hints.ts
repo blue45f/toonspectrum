@@ -13,6 +13,8 @@ export type StudioToolHintSpec = {
   shortcut?: string;
   /** Purpose-built animated visual that demonstrates the tool rather than decorating it. */
   preview?: StudioToolHintPreviewKind;
+  /** Stable state/direction inside a preview family (for example zoom-out or layer-unlock). */
+  previewVariant?: string;
   /** One concise workflow hint shown below the visual. */
   tip?: string;
 };
@@ -123,7 +125,7 @@ const HINTS: Record<string, StudioToolHintSpec> = {
     id: "poly-lasso",
     title: "다각형 올가미",
     description: "클릭으로 꼭짓점을 찍고, 더블클릭 또는 Enter로 닫습니다. Esc로 초안을 취소해요.",
-    preview: "lasso",
+    preview: "polygon-lasso",
   },
   "pixel-select": {
     id: "pixel-select",
@@ -191,7 +193,7 @@ const REGISTERED_HINT_ID_BY_LABEL: Readonly<Record<string, string>> = {
   "보기 회전": "rotate-view",
   "더보기 · 툴바 설정": "settings",
   "화면 맞춤": "zoom-view",
-  "보기 반전": "rotate-view",
+  "보기 반전": "flip-view",
   확대: "zoom-view",
   축소: "zoom-view",
   되돌리기: "undo",
@@ -214,7 +216,8 @@ export function studioToolHintFromLabel(
   title: string,
   description: string,
   shortcut?: string,
-  preview?: StudioToolHintPreviewKind
+  preview?: StudioToolHintPreviewKind,
+  previewVariant?: string
 ): StudioToolHintSpec {
   const cleanTitle = title.replace(/(?:\s*\([^)]*\))+\s*$/u, "").trim() || title;
   const normalizedLabel = cleanTitle.normalize("NFKC").trim().toLocaleLowerCase("ko-KR");
@@ -233,6 +236,7 @@ export function studioToolHintFromLabel(
     description,
     shortcut: shortcut ?? registered?.shortcut,
     preview: preview ?? registered?.preview,
+    previewVariant: previewVariant ?? registered?.previewVariant,
     tip: registered?.tip,
   };
 }

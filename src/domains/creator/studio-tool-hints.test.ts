@@ -49,6 +49,9 @@ describe("studio tool hints (rich hover copy)", () => {
     ["zoom-fit", "zoom-view"],
     ["undo", "undo"],
     ["add-layer", "layer"],
+    ["poly-lasso", "polygon-lasso"],
+    ["flip-view", "flip-view"],
+    ["duplicate-layer", "layer-duplicate"],
   ] as const)("resolves the stable %s action id before prose", (id, expected) => {
     expect(
       studioToolHintPreview({
@@ -75,7 +78,8 @@ describe("studio tool hints (rich hover copy)", () => {
 
   it.each([
     ["펜 (B)", "pen", "ink"],
-    ["브러시", "brush-settings", "brush-size"],
+    ["브러시", "brush-settings", "draw-settings"],
+    ["브러시 설정", "brush-settings", "draw-settings"],
     ["불투명도", "opacity", "opacity"],
     ["화면 맞춤", "zoom-view", "zoom-view"],
     ["되돌리기", "undo", "undo"],
@@ -98,6 +102,19 @@ describe("studio tool hints (rich hover copy)", () => {
     );
   });
 
+  it("lets a contextual dock override a registered label with its exact action preview", () => {
+    const hint = studioToolHintFromLabel(
+      "도형",
+      "모바일 도크에서는 보정 도형이 아니라 직접 벡터 도형을 그립니다.",
+      undefined,
+      "shape",
+      "mobile-dock-shape"
+    );
+
+    expect(hint.preview).toBe("shape");
+    expect(hint.previewVariant).toBe("mobile-dock-shape");
+  });
+
   it.each([
     ["선택 (V)", "select"],
     ["핸드 (팬)", "pan"],
@@ -118,6 +135,7 @@ describe("studio tool hints (rich hover copy)", () => {
     ["투시도", "perspective"],
     ["보기 확대·축소 (Z)", "zoom-view"],
     ["보기 회전 (R)", "rotate-view"],
+    ["보기 반전", "flip-view"],
     ["스마트 도형", "smart-shape"],
     ["사각형 도형", "shape-rect"],
     ["타원 도형", "shape-ellipse"],

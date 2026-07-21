@@ -1147,6 +1147,7 @@ import {
 } from "./StudioToolBeltContent";
 import {
   StudioToolHintPreferencesProvider,
+  StudioToolHintTarget,
 } from "./StudioToolHint";
 import { StudioViewToolsHud } from "./StudioViewToolsHud";
 import { useStudioModalSheet } from "./useStudioModalSheet";
@@ -23532,44 +23533,65 @@ function StudioCuttoonEditor() {
             stableHandlers={studioMenubarContentHandlers}
           />
         </Suspense>
-        <button
-          type="button"
-          data-studio-comments-inbox="true"
-          onClick={() => {
-            if (commentsOpen) {
-              setCommentsOpen(false);
-              return;
-            }
-            openStudioCommentInbox();
-          }}
+        <StudioToolHintTarget
+          preferredSide="bottom"
+          className="hidden shrink-0 lg:inline-flex"
           disabled={collaborationDocumentLocked && !sharedDocument?.capabilities.view}
-          aria-expanded={commentsOpen}
-          aria-haspopup="dialog"
-          aria-controls="studio-comments-review-dialog"
-          aria-label={`댓글 검토함${openStudioCommentCount > 0 ? `, 열린 댓글 ${openStudioCommentCount}개` : ""}`}
-          className={cn(
-            buttonClass({ size: "sm", variant: commentsOpen ? "solid" : "quiet" }),
-            "relative hidden min-h-9 shrink-0 gap-1.5 px-2.5 text-[0.72rem] disabled:cursor-not-allowed disabled:opacity-50 lg:inline-flex"
-          )}
-          title={
+          unavailableReason={
             collaborationDocumentLocked && !sharedDocument?.capabilities.view
               ? collaborationLockMessage()
-              : commentsOpen
-                ? "댓글 검토함 닫기"
-                : "댓글 검토함 열기 · 검색, 필터, 읽음 상태 관리"
+              : undefined
           }
+          hint={{
+            id: "menubar-comment-inbox",
+            title: "댓글 검토함",
+            description: "문서 댓글을 검색·필터링하고 읽음·해결 상태를 관리하며 연결된 캔버스 위치로 이동합니다.",
+            preview: "comment-inbox",
+            tip:
+              openStudioCommentCount > 0
+                ? `아직 해결되지 않은 댓글이 ${openStudioCommentCount}개 있어요.`
+                : "댓글 핀을 남기면 검토자가 정확한 페이지·컷·요소 맥락을 바로 확인할 수 있어요.",
+          }}
         >
-          <MessageCircle size={14} aria-hidden />
-          <span className="max-xl:sr-only">댓글</span>
-          {openStudioCommentCount > 0 ? (
-            <span
-              aria-hidden
-              className="inline-flex min-w-5 items-center justify-center rounded-full bg-accent px-1.5 py-0.5 text-[0.6rem] font-bold tabular-nums text-on-accent"
-            >
-              {openStudioCommentCount > 99 ? "99+" : openStudioCommentCount}
-            </span>
-          ) : null}
-        </button>
+          <button
+            type="button"
+            data-studio-comments-inbox="true"
+            onClick={() => {
+              if (commentsOpen) {
+                setCommentsOpen(false);
+                return;
+              }
+              openStudioCommentInbox();
+            }}
+            disabled={collaborationDocumentLocked && !sharedDocument?.capabilities.view}
+            aria-expanded={commentsOpen}
+            aria-haspopup="dialog"
+            aria-controls="studio-comments-review-dialog"
+            aria-label={`댓글 검토함${openStudioCommentCount > 0 ? `, 열린 댓글 ${openStudioCommentCount}개` : ""}`}
+            className={cn(
+              buttonClass({ size: "sm", variant: commentsOpen ? "solid" : "quiet" }),
+              "relative min-h-9 shrink-0 gap-1.5 px-2.5 text-[0.72rem] disabled:cursor-not-allowed disabled:opacity-50"
+            )}
+            title={
+              collaborationDocumentLocked && !sharedDocument?.capabilities.view
+                ? collaborationLockMessage()
+                : commentsOpen
+                  ? "댓글 검토함 닫기"
+                  : "댓글 검토함 열기 · 검색, 필터, 읽음 상태 관리"
+            }
+          >
+            <MessageCircle size={14} aria-hidden />
+            <span className="max-xl:sr-only">댓글</span>
+            {openStudioCommentCount > 0 ? (
+              <span
+                aria-hidden
+                className="inline-flex min-w-5 items-center justify-center rounded-full bg-accent px-1.5 py-0.5 text-[0.6rem] font-bold tabular-nums text-on-accent"
+              >
+                {openStudioCommentCount > 99 ? "99+" : openStudioCommentCount}
+              </span>
+            ) : null}
+          </button>
+        </StudioToolHintTarget>
       </StudioAppMenubar>
 
       <div

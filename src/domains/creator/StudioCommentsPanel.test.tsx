@@ -44,7 +44,9 @@ describe("StudioCommentsPanel review rail contract", () => {
       "disabled={collaborationDocumentLocked && !sharedDocument?.capabilities.view}"
     );
     expect(studioPageSource).toContain("lg:inline-flex");
-    expect(studioPageSource).toContain('commentsOpen\n                ? "댓글 검토함 닫기"');
+    expect(studioPageSource).toMatch(/commentsOpen\s*\?\s*"댓글 검토함 닫기"/u);
+    expect(studioPageSource).toContain('id: "menubar-comment-inbox"');
+    expect(studioPageSource).toContain('preview: "comment-inbox"');
     expect(studioPageSource).toContain('openStudioCommentCount > 99 ? "99+" : openStudioCommentCount');
   });
 

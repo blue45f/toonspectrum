@@ -559,6 +559,8 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                       : "올가미 선택"
               }
               description="이미지 픽셀을 자유 올가미(드래그) 또는 다각형 올가미(클릭)로 선택합니다."
+              hintPreview={pixelTool === "poly-lasso" ? "polygon-lasso" : "lasso"}
+              hintPreviewVariant={pixelTool === "poly-lasso" ? "rail-polygon-lasso" : "rail-free-lasso"}
               active={(pixelTool === "lasso" || pixelTool === "poly-lasso") && !pixelForceCircle}
               disabled={selected?.type !== "image" || selectedContentMutationLocked}
               unavailableReason={

@@ -22,6 +22,7 @@ import {
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
+import type { StudioToolHintPreviewKind } from "./studio-tool-hint-preview-kind";
 import type { ReactElement } from "react";
 
 import { cn } from "@/lib/utils";
@@ -46,6 +47,7 @@ function Action({
   icon: Icon,
   label,
   description,
+  preview,
   tip,
   danger,
   showLabel,
@@ -55,6 +57,7 @@ function Action({
   icon: LucideIcon;
   label: string;
   description: string;
+  preview: StudioToolHintPreviewKind;
   tip?: string;
   danger?: boolean;
   showLabel?: boolean;
@@ -67,7 +70,7 @@ function Action({
         id: `selection-action-${id}`,
         title: label,
         description,
-        preview: "layer",
+        preview,
         tip,
       }}
     >
@@ -153,6 +156,7 @@ export function StudioSelectOptionsBar({
           icon={MessageSquareText}
           label={textEditLabel}
           description="선택한 레터링을 캔버스 위에서 바로 수정합니다. 기본 문구는 곧바로 덮어쓸 수 있어요."
+          preview="text"
           tip="T를 눌러도 선택한 말풍선이나 글자를 즉시 편집할 수 있어요."
           showLabel
           onClick={onEditText}
@@ -164,6 +168,7 @@ export function StudioSelectOptionsBar({
           icon={ScanText}
           label="텍스트 맞춤"
           description="대사 길이에 맞춰 말풍선 높이를 자동으로 조절합니다."
+          preview="bubble"
           tip="긴 대사를 붙여넣은 뒤 한 번 눌러 여백을 정돈하세요."
           onClick={onFitBubble}
         />
@@ -174,6 +179,7 @@ export function StudioSelectOptionsBar({
           icon={Copy}
           label="복제"
           description="선택한 요소를 같은 위치에 복제해 즉시 이동하거나 변형할 수 있게 합니다."
+          preview="layer-duplicate"
           tip="복제 직후 방향키로 살짝 이동하면 원본과 겹치지 않게 배치할 수 있어요."
           onClick={onDuplicate}
         />
@@ -182,6 +188,7 @@ export function StudioSelectOptionsBar({
           icon={ArrowUpToLine}
           label="맨 앞"
           description="선택한 요소를 현재 페이지의 가장 앞쪽으로 올립니다."
+          preview="layer-reorder-front"
           tip="말풍선과 효과음처럼 항상 보여야 하는 요소를 정리할 때 유용해요."
           onClick={onBringFront}
         />
@@ -190,6 +197,7 @@ export function StudioSelectOptionsBar({
           icon={ArrowDownToLine}
           label="맨 뒤"
           description="선택한 요소를 현재 페이지의 가장 뒤쪽으로 보냅니다."
+          preview="layer-reorder-back"
           tip="배경이나 톤 소재를 다른 모든 요소 뒤로 정리할 때 사용하세요."
           onClick={onSendBack}
         />
@@ -203,6 +211,7 @@ export function StudioSelectOptionsBar({
                 ? "선택 요소의 잠금을 풀어 다시 이동·변형·편집할 수 있게 합니다."
                 : "선택 요소를 고정해 실수로 이동하거나 편집하지 않도록 보호합니다."
             }
+            preview="layer-lock"
             onClick={onToggleLock}
           />
         ) : null}
@@ -212,6 +221,7 @@ export function StudioSelectOptionsBar({
         icon={Trash2}
         label="삭제"
         description="현재 선택한 요소를 페이지에서 제거합니다. 실행취소로 되돌릴 수 있어요."
+        preview="layer-delete"
         tip="여러 요소를 선택했다면 모두 한 번에 삭제됩니다."
         danger
         onClick={onDelete}

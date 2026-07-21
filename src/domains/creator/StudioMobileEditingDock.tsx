@@ -919,6 +919,8 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 icon={Square}
                 label="도형"
                 hintDescription="선·사각형·타원·화살표를 정돈된 벡터 도형으로 빠르게 배치합니다."
+                hintPreview="shape"
+                hintPreviewVariant="mobile-direct-shape"
                 active={tool === "draw" && drawMode === "shape"}
                 disabled={activeSurfaceReviewLocked}
                 title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 도형을 사용할 수 있어요" : "도형"}
@@ -970,6 +972,8 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 ref={mobileBrushDockButtonRef}
                 label="브러시"
                 hintDescription="굵기·불투명도·색·보정·프리셋을 한곳에서 조절합니다."
+                hintPreview="draw-settings"
+                hintPreviewVariant="mobile-brush-settings"
                 active={mobileSheet === "draw" || mobileSheet === "brushes"}
                 aria-pressed={mobileSheet === "draw" || mobileSheet === "brushes"}
                 aria-label="브러시 설정 (굵기·색·프리셋)"

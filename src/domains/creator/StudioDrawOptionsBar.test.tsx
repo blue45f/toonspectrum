@@ -147,17 +147,29 @@ describe("StudioDrawOptionsBar", () => {
   it("assigns semantic animated previews across advanced drawing workflows", () => {
     for (const preview of [
       "brush-size",
+      "brush-library",
+      "brush-favorite",
+      "brush-slot",
+      "brush-studio",
+      "draw-settings",
+      "flip-view",
       "opacity",
+      "shape-fill",
       "stabilizer",
       "pressure",
       "symmetry",
       "shape",
-      "rotate-view",
+      "smart-shape",
       "ink",
       "erase",
     ]) {
       expect(drawOptionsSource).toContain(`"${preview}"`);
     }
+    expect(drawOptionsSource).toContain("`symmetry-${item.id}`");
+    expect(drawOptionsSource).toContain("`stabilizer-${stabilizerMode}`");
+    expect(drawOptionsSource).toContain("`stabilizer-${item.id}`");
+    expect(drawOptionsSource).toContain('"post-correction"');
+    expect(drawOptionsSource).toContain("`pressure-${item.id}`");
 
     expect(drawOptionsSource.match(/<StudioToolHintTarget/g)?.length ?? 0).toBeGreaterThanOrEqual(16);
     expect(drawOptionsSource).not.toContain('title="캔버스 좌우 반전"');

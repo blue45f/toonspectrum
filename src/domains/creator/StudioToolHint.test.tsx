@@ -52,6 +52,51 @@ describe("StudioToolHint", () => {
     expect(html).not.toContain("data-studio-tool-hint-preview=");
   });
 
+  it.each([
+    [1728, 1414],
+    [390, 76],
+  ])("positions an expanded coach inside a %ipx viewport", (viewportWidth, expectedLeft) => {
+    const originalWidth = globalThis.innerWidth;
+    const originalHeight = globalThis.innerHeight;
+    Object.defineProperty(globalThis, "innerWidth", {
+      configurable: true,
+      value: viewportWidth,
+    });
+    Object.defineProperty(globalThis, "innerHeight", {
+      configurable: true,
+      value: 844,
+    });
+    try {
+      const html = renderToStaticMarkup(
+        <StudioToolHintBubble
+          preferredSide="bottom"
+          hint={{
+            id: "right-edge-publish",
+            title: "게시하기",
+            description: "오른쪽 가장자리에서도 미리보기가 잘리지 않습니다.",
+            preview: "publish",
+          }}
+          anchor={{
+            left: viewportWidth - 40,
+            top: 10,
+            right: viewportWidth,
+            bottom: 50,
+            width: 40,
+            height: 40,
+          } as DOMRect}
+        />
+      );
+
+      expect(html).toContain('data-studio-tool-hint-expanded="true"');
+      expect(html).toContain(`style="left:${expectedLeft}px;`);
+    } finally {
+      if (originalWidth === undefined) Reflect.deleteProperty(globalThis, "innerWidth");
+      else Object.defineProperty(globalThis, "innerWidth", { configurable: true, value: originalWidth });
+      if (originalHeight === undefined) Reflect.deleteProperty(globalThis, "innerHeight");
+      else Object.defineProperty(globalThis, "innerHeight", { configurable: true, value: originalHeight });
+    }
+  });
+
   it("renders compact help without promising an expansion that cannot happen", () => {
     const html = renderToStaticMarkup(
       <StudioToolHintBubble
@@ -79,8 +124,8 @@ describe("StudioToolHint", () => {
     expect(bubbleSource).not.toMatch(
       /const studioToolHintPreviewModulePromise\s*=\s*import/u
     );
-    expect(bubbleSource).toContain("if (!richPreviewEnabled) return;");
-    expect(bubbleSource).toContain("richPreviewEnabled && expanded");
+    expect(bubbleSource).toContain("if (!richCoachAvailable) return;");
+    expect(bubbleSource).toContain("const coachExpanded = richCoachAvailable && expanded;");
     expect(bubbleSource).toContain(
       "reducedMotion={reducedMotion ? true : undefined}"
     );
@@ -104,6 +149,8 @@ describe("StudioToolHint", () => {
       expect(html).toContain('data-studio-tool-hint-condensed="true"');
       expect(html).toContain('data-studio-tool-hint-expanded="false"');
       expect(html).toContain("짧은 화면에서도 이 설명은 그대로 읽을 수 있습니다.");
+      expect(html).not.toContain("잠시 머물러 미리보기");
+      expect(html).not.toContain("동작 미리보기");
       expect(html).not.toContain("data-studio-tool-hint-preview=");
     } finally {
       if (originalHeight === undefined) {
@@ -115,6 +162,26 @@ describe("StudioToolHint", () => {
         });
       }
     }
+  });
+
+  it("disables bubble and preview-frame CSS motion for the product reduction setting", () => {
+    const html = renderToStaticMarkup(
+      <StudioToolHintBubble
+        reducedMotion
+        hint={{
+          id: "reduced-pen",
+          title: "펜",
+          description: "모션을 줄인 상태에서도 설명은 그대로 읽을 수 있습니다.",
+          preview: "ink",
+        }}
+        anchor={{ left: 10, top: 20, right: 50, bottom: 60, width: 40, height: 40 } as DOMRect}
+      />
+    );
+
+    expect(html).toContain('data-studio-tool-hint-reduced-motion="true"');
+    expect(html).toContain("transition-none");
+    expect(html).not.toContain("transition-[width]");
+    expect(html).toContain("animation:none");
   });
 
   it("keeps a completed touch long-press open and consumes its synthetic activation click", () => {

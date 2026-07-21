@@ -26,6 +26,7 @@ import {
 import { studioToolHintFromLabel } from "./studio-tool-hints";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
+import type { StudioToolHintPreviewKind } from "./studio-tool-hint-preview-kind";
 import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -432,6 +433,8 @@ export const StudioDockButton = forwardRef<
     swatch?: ReactNode;
     className?: string;
     hintDescription?: string;
+    hintPreview?: StudioToolHintPreviewKind;
+    hintPreviewVariant?: string;
     hintShortcut?: string;
     hintUnavailableReason?: string;
   } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children">
@@ -446,6 +449,8 @@ export const StudioDockButton = forwardRef<
     type = "button",
     swatch,
     hintDescription,
+    hintPreview,
+    hintPreviewVariant,
     hintShortcut,
     hintUnavailableReason,
     title,
@@ -493,7 +498,13 @@ export const StudioDockButton = forwardRef<
       }
       preferredSide="top"
       className="min-w-11 flex-1"
-      hint={studioToolHintFromLabel(label, hintDescription, hintShortcut)}
+      hint={studioToolHintFromLabel(
+        label,
+        hintDescription,
+        hintShortcut,
+        hintPreview,
+        hintPreviewVariant
+      )}
     >
       {button}
     </StudioToolHintTarget>
@@ -826,6 +837,10 @@ export interface StudioRailToolButtonProps
   label: string;
   /** Longer body for the rich hover tooltip (shown with StudioToolHintTarget). */
   description?: string;
+  /** Exact motion-coach visual when a dynamic label cannot be inferred safely. */
+  hintPreview?: StudioToolHintPreviewKind;
+  /** Stable state inside a shared preview family. */
+  hintPreviewVariant?: string;
   /** Group indicator (long-press / alternate tools exist). */
   grouped?: boolean;
   accented?: boolean;
@@ -839,6 +854,8 @@ export function StudioRailToolButton({
   icon: Icon,
   label,
   description,
+  hintPreview,
+  hintPreviewVariant,
   grouped = false,
   accented = false,
   unavailableReason,
@@ -900,7 +917,9 @@ export function StudioRailToolButton({
       hint={studioToolHintFromLabel(
         label,
         description,
-        label.match(/\(([^)]+)\)\s*$/u)?.[1]
+        label.match(/\(([^)]+)\)\s*$/u)?.[1],
+        hintPreview,
+        hintPreviewVariant
       )}
     >
       {button}
