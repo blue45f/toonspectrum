@@ -57,6 +57,7 @@ import {
   buildStudioVrmPersistentIkSignature,
   type StudioVrmPersistentIkSignatureInput,
 } from "./studio-vrm-persistent-ik-signature";
+import { createStudioVrmPhotoPoseApplyPlan } from "./studio-vrm-photo-pose-apply";
 import {
   parseVrmPhysicsSettings,
   DEFAULT_VRM_PHYSICS,
@@ -279,7 +280,10 @@ import {
   type StudioVrmJointHandleBone,
   type StudioVrmJointWorldPoint,
 } from "./StudioVrmJointHandles";
-import { StudioVrmPhotoPoseScanner } from "./StudioVrmPhotoPoseScanner";
+import {
+  StudioVrmPhotoPoseScanner,
+  type StudioVrmPhotoPoseApplyPayload,
+} from "./StudioVrmPhotoPoseScanner";
 import { StudioVrmPoseMaterialPanel } from "./StudioVrmPoseMaterialPanel";
 import { StudioVrmPropPanel } from "./StudioVrmPropPanel";
 import { StudioVrmRigAssistPanel } from "./StudioVrmRigAssistPanel";
@@ -5570,30 +5574,107 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     saveStudioVrmRecentCharacters(typeof localStorage === "undefined" ? null : localStorage, nextRecent);
   }
 
-  function handlePhotoPoseApply(bones: Readonly<Record<string, readonly [number, number, number]>>) {
-    if (!vrm || webcamActive || webcamLoading) return false;
-    const scannedBones: PoseBoneMap = { ...customBones };
-    for (const [boneName, rotation] of Object.entries(bones)) {
-      const key = boneName as VRMHumanBoneName;
-      if (lockedPoseBones.includes(key) || !vrm.humanoid?.getNormalizedBoneNode(key)) continue;
-      const nextRotation = rotation.map((radians, axisIndex) => {
-        if (!jointLimitsEnabled) return Number.isFinite(radians) ? radians : 0;
-        const degrees = THREE.MathUtils.radToDeg(Number.isFinite(radians) ? radians : 0);
-        return d(clampStudioVrmJointDegrees(key, axisIndex, degrees));
-      }) as [number, number, number];
-      scannedBones[key] = { rotation: nextRotation };
+  function handlePhotoPoseApply(payload: StudioVrmPhotoPoseApplyPayload) {
+    const currentVrm = vrmRef.current;
+    if (
+      !currentVrm
+      || poseMaterialRuntimeDisabled
+      || pendingPersistentIkCommandRef.current
+      || jointIkTransactionRef.current
+      || !persistentIkCaptureIsReady()
+    ) return false;
+
+    const before = captureFullState();
+    const plan = createStudioVrmPhotoPoseApplyPlan({
+      currentBones: customBones,
+      currentFingerEdits: fingerEdits,
+      scannedBones: payload.bones,
+      scannedFingerEdits: payload.fingerEdits,
+      lockedBones: lockedPoseBones,
+      isBoneAvailable: (bone) => Boolean(currentVrm.humanoid?.getNormalizedBoneNode(bone)),
+      clampRotation: jointLimitsEnabled
+        ? (bone, axisIndex, radians) => d(clampStudioVrmJointDegrees(
+            bone,
+            axisIndex,
+            THREE.MathUtils.radToDeg(radians),
+          ))
+        : undefined,
+    });
+    if (plan.appliedBodyBones.length === 0 && plan.appliedFingerBones.length === 0) {
+      setJointHandleStatus("사진에서 적용할 수 있는 잠금 해제 관절을 찾지 못했습니다.");
+      return false;
     }
-    setCustomBones(scannedBones);
-    setActivePoseId("photo-scan");
-    if (vrmRef.current) {
-      applyPoserVisualState(vrmRef.current, {
-        bones: scannedBones,
-        yOffset: customYOffset,
-        poseTranslations,
-        fingerEdits,
-        bodyScale,
-      });
+
+    const poseId = "photo-scan";
+    const after = serializeFullVrmState({
+      ...before,
+      poseId,
+      bones: plan.bones,
+      fingerOverrides: plan.fingerEdits,
+    });
+    const candidateSignature = buildStudioVrmPersistentIkSignature({
+      modelId: activeModelId,
+      bones: plan.bones,
+      fingerEdits: plan.fingerEdits,
+      yOffset: after.yOffset,
+      translations: after.poseTranslations,
+      bodyRotation: after.bodyRotation,
+      bodyScale: after.bodyScale ?? bodyScale,
+      constraints: after.ikConstraints,
+      lockedPoseBones,
+      jointProfile: rigJointProfile,
+      fullBodyIk: fullBodyIkEnabled,
+      footPlant: footPlantEnabled,
+      floorHeight: rigFloorHeight,
+    });
+    if (
+      after.ikConstraints.some((constraint) => constraint.enabled && constraint.locked)
+      && persistentIkResolvedSignatureRef.current !== candidateSignature
+    ) {
+      pendingPersistentIkCommandRef.current = {
+        before,
+        candidateAfter: after,
+        inputSignature: candidateSignature,
+        historyGeneration: fullStateHistoryRef.current.generation,
+      };
+      setPersistentIkReconciling(true);
+    } else {
+      const nextHistory = commitStudioVrmFullStateHistoryTransaction(
+        fullStateHistoryRef.current,
+        before,
+        after,
+        activeModelId,
+      );
+      fullStateHistoryRef.current = nextHistory;
+      setCanUndo(nextHistory.index > 0);
+      setCanRedo(nextHistory.index < nextHistory.entries.length - 1);
     }
+
+    setActivePoseId(poseId);
+    setCustomBones(plan.bones);
+    setFingerEdits(plan.fingerEdits);
+    const nextEffectiveFingers: FingerRotationMap = {
+      ...(createAutoGripFingerOverrides(
+        vrmPropItems,
+        propDefById,
+        effectivePropRigMetrics,
+      ) as FingerRotationMap),
+      ...plan.fingerEdits,
+    };
+    applyPoserVisualState(currentVrm, {
+      bones: plan.bones,
+      yOffset: customYOffset,
+      poseTranslations,
+      fingerEdits: nextEffectiveFingers,
+      bodyScale,
+    });
+    setJointHandleStatus(
+      `사진 포즈 관절 ${plan.appliedBodyBones.length}개${
+        payload.detectedHandSides.length > 0
+          ? ` · 손가락 ${plan.appliedFingerBones.length}개`
+          : ""
+      }를 적용했습니다.`,
+    );
     return true;
   }
 
@@ -7204,7 +7285,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                 </label>
 
                 <StudioVrmPhotoPoseScanner
-                  disabled={!vrm || webcamActive || webcamLoading || isCapturing || isSharingPose || isThumbnailCapturing || idleAnimation}
+                  disabled={poseMaterialRuntimeDisabled}
                   onApply={handlePhotoPoseApply}
                 />
 

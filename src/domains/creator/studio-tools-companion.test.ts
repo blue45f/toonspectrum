@@ -1,17 +1,23 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   buildStudioCompanionCommand,
+  buildStudioCompanionControl,
   buildStudioCompanionHello,
+  buildStudioCompanionNavigatorFrame,
   buildStudioCompanionPing,
   buildStudioCompanionPong,
   buildStudioCompanionPrimaryState,
+  buildStudioCompanionReviewState,
+  completeReservedStudioToolsCompanionWindow,
+  createStudioCompanionReviewProjection,
   createStudioCompanionChannel,
   createStudioCompanionSessionId,
   isStudioCompanionMessage,
   isStudioCompanionMessageFresh,
   isStudioCompanionSessionId,
   isStudioToolsCompanionWindowReusable,
+  openReadyStudioToolsCompanionForMenu,
   openStudioToolsCompanionWindow,
   parseStudioCompanionSessionId,
   parseStudioCompanionMessage,
@@ -19,14 +25,84 @@ import {
   studioCompanionChannelName,
   studioCompanionPrimaryUrl,
   studioCompanionUrl,
+  startStudioCompanionPrimaryRuntime,
   StudioCompanionCommandGuard,
   StudioCompanionPrimaryBinding,
+  type StudioCompanionMessage,
 } from "./studio-tools-companion";
 
 const primaryA = "primary-a-1234";
 const primaryB = "primary-b-5678";
 const companionA = "companion-a-1234";
 const companionB = "companion-b-5678";
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+function reviewProjection(overrides: {
+  revision?: number;
+  documentRevision?: number;
+  captureAllowed?: boolean;
+} = {}) {
+  return createStudioCompanionReviewProjection({
+    revision: overrides.revision ?? 1,
+    documentRevision: overrides.documentRevision ?? 1,
+    pageLabel: "1화",
+    selectionLabel: "선화",
+    canUndo: true,
+    canRedo: false,
+    captureAllowed: overrides.captureAllowed ?? true,
+    viewport: { x: 0, y: 0.1, width: 0.8, height: 0.4 },
+    layers: [{ id: "layer-1", label: "선화", type: "draw", selected: true }],
+    historyLength: 2,
+    historyIndex: 1,
+    comments: [{ id: "thread-1", author: "편집자", body: "눈썹 확인", unread: true }],
+    brush: {
+      id: "pen",
+      label: "펜",
+      size: 6,
+      opacity: 1,
+      color: "#112233",
+      choices: [{ id: "pencil", label: "연필" }],
+    },
+  });
+}
+
+class RuntimeBroadcastChannel {
+  static instances: RuntimeBroadcastChannel[] = [];
+
+  readonly postMessage = vi.fn();
+  readonly close = vi.fn();
+  onmessage: ((event: MessageEvent) => void) | null = null;
+
+  constructor(readonly name: string) {
+    RuntimeBroadcastChannel.instances.push(this);
+  }
+
+  emit(data: unknown): void {
+    this.onmessage?.({ data } as MessageEvent);
+  }
+}
+
+function demandNavigator(input: {
+  channel: RuntimeBroadcastChannel;
+  primaryInstanceId: string;
+  companionInstanceId: string;
+  generation?: number;
+  sequence?: number;
+  active?: boolean;
+}): void {
+  input.channel.emit(buildStudioCompanionControl({
+    control: { kind: "navigator-demand", active: input.active ?? true },
+    generation: input.generation ?? 1,
+    companionInstanceId: input.companionInstanceId,
+    targetPrimaryInstanceId: input.primaryInstanceId,
+    commandId: `navigator-demand-${input.sequence ?? 1}`,
+    sequence: input.sequence ?? 1,
+  }));
+}
 
 describe("studio-tools-companion protocol", () => {
   it("validates and builds hello / primary-state / command messages", () => {
@@ -398,6 +474,69 @@ describe("studio-tools-companion protocol", () => {
     expect(open).toHaveBeenCalledOnce();
   });
 
+  it("keeps ready-window recovery and reserved-window completion inside the lazy protocol", () => {
+    const wrongWindow = {
+      closed: false,
+      close: vi.fn(),
+      focus: vi.fn(),
+      location: { href: "http://localhost/studio" },
+    } as unknown as Window;
+    const recoveredWindow = {
+      closed: false,
+      focus: vi.fn(),
+      location: { href: "http://localhost/studio/tools-companion?session=primary-a-1234" },
+    } as unknown as Window;
+    const open = vi.fn(() => recoveredWindow);
+    vi.stubGlobal("window", { open });
+    const binding = new StudioCompanionPrimaryBinding();
+    const release = vi.spyOn(binding, "release");
+    const announce = vi.fn();
+    const windowRef = { current: wrongWindow as Window | null };
+
+    openReadyStudioToolsCompanionForMenu({
+      sessionId: primaryA,
+      windowRef,
+      binding,
+      announce,
+    });
+
+    expect(release).toHaveBeenCalledOnce();
+    expect(windowRef.current).toBe(recoveredWindow);
+    expect(announce).toHaveBeenLastCalledWith(expect.stringContaining("복구"));
+
+    const replace = vi.fn();
+    const reservation = {
+      closed: false,
+      close: vi.fn(),
+      focus: vi.fn(() => { throw new Error("focus denied"); }),
+      location: { href: "about:blank", replace },
+      name: "",
+    } as unknown as Window;
+    windowRef.current = reservation;
+    completeReservedStudioToolsCompanionWindow({
+      sessionId: primaryA,
+      reservation,
+      windowRef,
+      announce,
+    });
+
+    expect(reservation.name).toBe("toonspectrum-studio-tools-primary-a-1234");
+    expect(replace).toHaveBeenCalledWith(expect.stringContaining(
+      "/studio/tools-companion?session=primary-a-1234"
+    ));
+    expect(reservation.close).not.toHaveBeenCalled();
+    expect(announce).toHaveBeenLastCalledWith(expect.stringContaining("열었습니다"));
+
+    const staleReservation = { close: vi.fn() } as unknown as Window;
+    completeReservedStudioToolsCompanionWindow({
+      sessionId: primaryA,
+      reservation: staleReservation,
+      windowRef,
+      announce,
+    });
+    expect(staleReservation.close).toHaveBeenCalledOnce();
+  });
+
   it("recovers a live cached popup that was navigated away from its companion session", () => {
     const session = "primary-a-1234";
     const recovered = {
@@ -469,5 +608,482 @@ describe("studio-tools-companion protocol", () => {
     expect(openStudioToolsCompanionWindow(session, crossOrigin, open)).toBe(recovered);
     expect(crossOrigin.focus).not.toHaveBeenCalled();
     expect(open).toHaveBeenCalledOnce();
+  });
+
+  it("parses bounded review, navigator and control messages with exact nested shapes", () => {
+    const projection = reviewProjection();
+    const review = buildStudioCompanionReviewState({
+      primaryInstanceId: primaryA,
+      targetCompanionInstanceId: companionA,
+      generation: 1,
+      projection,
+      now: 1_000,
+    });
+    const frame = buildStudioCompanionNavigatorFrame({
+      primaryInstanceId: primaryA,
+      targetCompanionInstanceId: companionA,
+      frame: {
+        generation: 1,
+        revision: 1,
+        sequence: 1,
+        width: 1280,
+        height: 720,
+        blob: new Blob([new Uint8Array(32)], { type: "image/webp" }),
+      },
+      now: 1_001,
+    });
+    const control = buildStudioCompanionControl({
+      control: { kind: "brush", patch: { size: 12, opacity: 0.5 } },
+      generation: 1,
+      companionInstanceId: companionA,
+      targetPrimaryInstanceId: primaryA,
+      commandId: "control-command-1234",
+      sequence: 1,
+    }, 1_002);
+
+    expect(parseStudioCompanionMessage(review)).toEqual(review);
+    expect(parseStudioCompanionMessage(frame)).toEqual(frame);
+    expect(parseStudioCompanionMessage(control)).toEqual(control);
+    expect(parseStudioCompanionMessage({ ...review, extra: true })).toBeNull();
+    expect(parseStudioCompanionMessage({
+      ...review,
+      projection: { ...projection, brush: { ...projection.brush, extra: true } },
+    })).toBeNull();
+    expect(parseStudioCompanionMessage({
+      ...frame,
+      blob: new Blob([new Uint8Array(2 * 1024 * 1024 + 1)], { type: "image/webp" }),
+    })).toBeNull();
+    expect(parseStudioCompanionMessage({
+      ...control,
+      control: { kind: "brush", patch: { size: 12, extra: true } },
+    })).toBeNull();
+  });
+
+  it("shares one sequence fence across legacy and review controls without poisoning on rejection", () => {
+    const binding = new StudioCompanionPrimaryBinding();
+    expect(binding.acceptHello(buildStudioCompanionHello({
+      role: "companion",
+      companionInstanceId: companionA,
+      targetPrimaryInstanceId: primaryA,
+    }, 10_000), primaryA, 10_000)).toBe(true);
+
+    const firstControl = buildStudioCompanionControl({
+      control: { kind: "navigate", point: { x: 0.25, y: 0.75 } },
+      generation: 1,
+      companionInstanceId: companionA,
+      targetPrimaryInstanceId: primaryA,
+      commandId: "control-command-0001",
+      sequence: 1,
+    }, 10_001);
+    expect(binding.acceptControl(firstControl, primaryA, 1, 10_001)).toBe(true);
+
+    const legacy = buildStudioCompanionCommand({
+      command: "pen",
+      companionInstanceId: companionA,
+      targetPrimaryInstanceId: primaryA,
+      commandId: "legacy-command-0002",
+      sequence: 2,
+    }, 10_002);
+    expect(binding.acceptCommand(legacy, primaryA, 10_002)).toBe(true);
+    expect(binding.acceptControl(firstControl, primaryA, 1, 10_003)).toBe(false);
+
+    const wrongGeneration = buildStudioCompanionControl({
+      control: { kind: "history", action: "undo" },
+      generation: 2,
+      companionInstanceId: companionA,
+      targetPrimaryInstanceId: primaryA,
+      commandId: "control-command-0003",
+      sequence: 3,
+    }, 10_003);
+    expect(binding.acceptControl(wrongGeneration, primaryA, 1, 10_003)).toBe(false);
+    expect(binding.acceptControl({ ...wrongGeneration, generation: 1 }, primaryA, 1, 10_004))
+      .toBe(true);
+
+    const wrongTarget = buildStudioCompanionControl({
+      control: { kind: "select-layer", layerId: "layer-1" },
+      generation: 1,
+      companionInstanceId: companionA,
+      targetPrimaryInstanceId: primaryB,
+      commandId: "control-command-0004",
+      sequence: 4,
+    }, 10_005);
+    expect(binding.acceptControl(wrongTarget, primaryA, 1, 10_005)).toBe(false);
+    expect(binding.acceptControl({ ...wrongTarget, targetPrimaryInstanceId: primaryA }, primaryA, 1, 10_006))
+      .toBe(true);
+  });
+
+  it("publishes a bounded projection after handshake and captures only after an active stroke ends", async () => {
+    RuntimeBroadcastChannel.instances.length = 0;
+    vi.stubGlobal("BroadcastChannel", RuntimeBroadcastChannel);
+    let projection = reviewProjection({ captureAllowed: false, documentRevision: 7 });
+    const capture = vi.fn(async (request: {
+      generation: number;
+      revision: number;
+      sequence: number;
+    }) => ({
+      generation: request.generation,
+      revision: request.revision,
+      sequence: request.sequence,
+      width: 640,
+      height: 960,
+      blob: new Blob([new Uint8Array(32)], { type: "image/webp" }),
+    }));
+    const runtime = startStudioCompanionPrimaryRuntime({
+      search: `?session=${primaryA}`,
+      getSnapshot: () => ({
+        tool: "pen",
+        density: "full",
+        canvasOnly: false,
+        title: "1화",
+      }),
+      getReviewProjection: () => projection,
+      captureNavigatorFrame: capture,
+      onCommand: vi.fn(),
+      onControl: vi.fn(),
+    });
+    expect(runtime).not.toBeNull();
+    const channel = RuntimeBroadcastChannel.instances[0]!;
+    const initialHello = channel.postMessage.mock.calls[0]?.[0] as StudioCompanionMessage;
+    expect(initialHello.type).toBe("hello");
+    if (initialHello.type !== "hello" || initialHello.role !== "primary") {
+      throw new Error("primary hello missing");
+    }
+    channel.emit(buildStudioCompanionHello({
+      role: "companion",
+      companionInstanceId: companionA,
+      targetPrimaryInstanceId: initialHello.primaryInstanceId,
+    }));
+    demandNavigator({
+      channel,
+      primaryInstanceId: initialHello.primaryInstanceId,
+      companionInstanceId: companionA,
+    });
+
+    expect(channel.postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: "primary-review-state",
+      generation: 1,
+      projection,
+    }));
+    expect(capture).not.toHaveBeenCalled();
+
+    projection = reviewProjection({
+      revision: 2,
+      documentRevision: 7,
+      captureAllowed: true,
+    });
+    runtime?.publish();
+    await vi.waitFor(() => expect(capture).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(channel.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "navigator-frame",
+        generation: 1,
+        revision: 7,
+      })
+    ));
+    runtime?.dispose();
+  });
+
+  it("fails closed on navigator controls while the primary drawing surface is active", () => {
+    RuntimeBroadcastChannel.instances.length = 0;
+    vi.stubGlobal("BroadcastChannel", RuntimeBroadcastChannel);
+    let projection = reviewProjection({ captureAllowed: false, documentRevision: 8 });
+    const onControl = vi.fn();
+    const runtime = startStudioCompanionPrimaryRuntime({
+      search: `?session=${primaryA}`,
+      getSnapshot: () => ({
+        tool: "pen",
+        density: "full",
+        canvasOnly: false,
+        title: "1화",
+      }),
+      getReviewProjection: () => projection,
+      onCommand: vi.fn(),
+      onControl,
+    });
+    const channel = RuntimeBroadcastChannel.instances[0]!;
+    const initialHello = channel.postMessage.mock.calls[0]?.[0] as Extract<
+      StudioCompanionMessage,
+      { type: "hello"; role: "primary" }
+    >;
+    channel.emit(buildStudioCompanionHello({
+      role: "companion",
+      companionInstanceId: companionA,
+      targetPrimaryInstanceId: initialHello.primaryInstanceId,
+    }));
+    demandNavigator({
+      channel,
+      primaryInstanceId: initialHello.primaryInstanceId,
+      companionInstanceId: companionA,
+    });
+    channel.emit(buildStudioCompanionControl({
+      control: { kind: "navigate", point: { x: 0.25, y: 0.75 } },
+      generation: 1,
+      companionInstanceId: companionA,
+      targetPrimaryInstanceId: initialHello.primaryInstanceId,
+      commandId: "navigate-command-0001",
+      sequence: 2,
+    }));
+    expect(onControl).not.toHaveBeenCalled();
+
+    projection = reviewProjection({ captureAllowed: true, documentRevision: 8 });
+    channel.emit(buildStudioCompanionControl({
+      control: { kind: "navigate", point: { x: 0.5, y: 0.5 } },
+      generation: 1,
+      companionInstanceId: companionA,
+      targetPrimaryInstanceId: initialHello.primaryInstanceId,
+      commandId: "navigate-command-0002",
+      sequence: 3,
+    }));
+    expect(onControl).toHaveBeenCalledOnce();
+    expect(onControl).toHaveBeenCalledWith({ kind: "navigate", point: { x: 0.5, y: 0.5 } });
+
+    demandNavigator({
+      channel,
+      primaryInstanceId: initialHello.primaryInstanceId,
+      companionInstanceId: companionA,
+      active: false,
+      sequence: 4,
+    });
+    channel.emit(buildStudioCompanionControl({
+      control: { kind: "navigate", point: { x: 0.75, y: 0.25 } },
+      generation: 1,
+      companionInstanceId: companionA,
+      targetPrimaryInstanceId: initialHello.primaryInstanceId,
+      commandId: "navigate-command-0005",
+      sequence: 5,
+    }));
+    expect(onControl).toHaveBeenCalledOnce();
+    runtime?.dispose();
+  });
+
+  it("captures only on navigator demand and drops demand after leave or lease expiry", async () => {
+    vi.useFakeTimers({ now: 10_000 });
+    RuntimeBroadcastChannel.instances.length = 0;
+    vi.stubGlobal("BroadcastChannel", RuntimeBroadcastChannel);
+    let projection = reviewProjection({ documentRevision: 20, captureAllowed: true });
+    const pending: Array<{
+      request: { signal: AbortSignal };
+      resolve: (value: null) => void;
+    }> = [];
+    const capture = vi.fn((request: { signal: AbortSignal }) => new Promise<null>((resolve) => {
+      pending.push({ request, resolve });
+    }));
+    const runtime = startStudioCompanionPrimaryRuntime({
+      search: `?session=${primaryA}`,
+      getSnapshot: () => ({
+        tool: "select",
+        density: "full",
+        canvasOnly: false,
+        title: "1화",
+      }),
+      getReviewProjection: () => projection,
+      captureNavigatorFrame: capture,
+      onCommand: vi.fn(),
+    });
+    const channel = RuntimeBroadcastChannel.instances[0]!;
+    const initialHello = channel.postMessage.mock.calls[0]?.[0] as Extract<
+      StudioCompanionMessage,
+      { type: "hello"; role: "primary" }
+    >;
+    channel.emit(buildStudioCompanionHello({
+      role: "companion",
+      companionInstanceId: companionA,
+      targetPrimaryInstanceId: initialHello.primaryInstanceId,
+    }));
+    await Promise.resolve();
+    expect(capture).not.toHaveBeenCalled();
+
+    demandNavigator({
+      channel,
+      primaryInstanceId: initialHello.primaryInstanceId,
+      companionInstanceId: companionA,
+    });
+    await Promise.resolve();
+    expect(capture).toHaveBeenCalledOnce();
+    demandNavigator({
+      channel,
+      primaryInstanceId: initialHello.primaryInstanceId,
+      companionInstanceId: companionA,
+      active: false,
+      sequence: 2,
+    });
+    expect(pending[0]?.request.signal.aborted).toBe(true);
+    projection = reviewProjection({ revision: 2, documentRevision: 21, captureAllowed: true });
+    runtime?.publish();
+    await Promise.resolve();
+    expect(capture).toHaveBeenCalledOnce();
+
+    demandNavigator({
+      channel,
+      primaryInstanceId: initialHello.primaryInstanceId,
+      companionInstanceId: companionA,
+      sequence: 3,
+    });
+    await Promise.resolve();
+    expect(capture).toHaveBeenCalledTimes(2);
+    vi.advanceTimersByTime(12_001);
+    runtime?.publish();
+    expect(pending[1]?.request.signal.aborted).toBe(true);
+    expect(runtime?.binding.companionInstanceId()).toBeNull();
+
+    channel.emit(buildStudioCompanionHello({
+      role: "companion",
+      companionInstanceId: companionB,
+      targetPrimaryInstanceId: initialHello.primaryInstanceId,
+    }));
+    await Promise.resolve();
+    expect(runtime?.generation()).toBe(2);
+    expect(capture).toHaveBeenCalledTimes(2);
+    runtime?.dispose();
+    pending.forEach(({ resolve }) => resolve(null));
+  });
+
+  it.each(["null", "reject"] as const)(
+    "opens a capture circuit after three %s results and retries on the next document revision",
+    async (failureMode) => {
+      vi.useFakeTimers({ now: 10_000 });
+      RuntimeBroadcastChannel.instances.length = 0;
+      vi.stubGlobal("BroadcastChannel", RuntimeBroadcastChannel);
+      let projection = reviewProjection({ documentRevision: 9 });
+      const capture = vi.fn(async () => {
+        if (failureMode === "reject") throw new Error("encoder unavailable");
+        return null;
+      });
+      const runtime = startStudioCompanionPrimaryRuntime({
+        search: `?session=${primaryA}`,
+        getSnapshot: () => ({
+          tool: "select",
+          density: "full",
+          canvasOnly: false,
+          title: "1화",
+        }),
+        getReviewProjection: () => projection,
+        captureNavigatorFrame: capture,
+        onCommand: vi.fn(),
+      });
+      const channel = RuntimeBroadcastChannel.instances[0]!;
+      const initialHello = channel.postMessage.mock.calls[0]?.[0] as Extract<
+        StudioCompanionMessage,
+        { type: "hello"; role: "primary" }
+      >;
+      channel.emit(buildStudioCompanionHello({
+        role: "companion",
+        companionInstanceId: companionA,
+        targetPrimaryInstanceId: initialHello.primaryInstanceId,
+      }));
+      demandNavigator({
+        channel,
+        primaryInstanceId: initialHello.primaryInstanceId,
+        companionInstanceId: companionA,
+      });
+
+      await vi.runAllTimersAsync();
+      expect(capture).toHaveBeenCalledTimes(3);
+      await vi.advanceTimersByTimeAsync(9_000);
+      expect(capture).toHaveBeenCalledTimes(3);
+
+      projection = reviewProjection({ revision: 2, documentRevision: 10 });
+      runtime?.publish();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(capture).toHaveBeenCalledTimes(4);
+      runtime?.dispose();
+    }
+  );
+
+  it("aborts stale-generation and timed-out captures and never posts their late frames", async () => {
+    vi.useFakeTimers({ now: 10_000 });
+    RuntimeBroadcastChannel.instances.length = 0;
+    vi.stubGlobal("BroadcastChannel", RuntimeBroadcastChannel);
+    const pending: Array<{
+      request: { generation: number; revision: number; sequence: number; signal: AbortSignal };
+      resolve: (value: {
+        generation: number;
+        revision: number;
+        sequence: number;
+        width: number;
+        height: number;
+        blob: Blob;
+      } | null) => void;
+    }> = [];
+    const runtime = startStudioCompanionPrimaryRuntime({
+      search: `?session=${primaryA}`,
+      getSnapshot: () => ({
+        tool: "select",
+        density: "full",
+        canvasOnly: false,
+        title: "1화",
+      }),
+      getReviewProjection: () => reviewProjection({ documentRevision: 9 }),
+      captureNavigatorFrame: (request) => new Promise((resolve) => {
+        pending.push({ request, resolve });
+      }),
+      onCommand: vi.fn(),
+    });
+    const channel = RuntimeBroadcastChannel.instances[0]!;
+    const initialHello = channel.postMessage.mock.calls[0]?.[0] as Extract<
+      StudioCompanionMessage,
+      { type: "hello"; role: "primary" }
+    >;
+    channel.emit(buildStudioCompanionHello({
+      role: "companion",
+      companionInstanceId: companionA,
+      targetPrimaryInstanceId: initialHello.primaryInstanceId,
+    }));
+    demandNavigator({
+      channel,
+      primaryInstanceId: initialHello.primaryInstanceId,
+      companionInstanceId: companionA,
+    });
+    await Promise.resolve();
+    expect(pending).toHaveLength(1);
+
+    vi.advanceTimersByTime(12_001);
+    channel.emit(buildStudioCompanionHello({
+      role: "companion",
+      companionInstanceId: companionB,
+      targetPrimaryInstanceId: initialHello.primaryInstanceId,
+    }));
+    await Promise.resolve();
+    expect(pending[0]?.request.signal.aborted).toBe(true);
+    expect(pending).toHaveLength(1);
+    demandNavigator({
+      channel,
+      primaryInstanceId: initialHello.primaryInstanceId,
+      companionInstanceId: companionB,
+      generation: 2,
+    });
+    await Promise.resolve();
+    expect(pending).toHaveLength(2);
+    pending[0]?.resolve({
+      generation: 1,
+      revision: 9,
+      sequence: 1,
+      width: 320,
+      height: 480,
+      blob: new Blob([new Uint8Array(32)], { type: "image/webp" }),
+    });
+    await Promise.resolve();
+    expect(channel.postMessage.mock.calls.map(([message]) => message).some((message) => (
+      (message as StudioCompanionMessage).type === "navigator-frame"
+      && (message as Extract<StudioCompanionMessage, { type: "navigator-frame" }>).generation === 1
+    ))).toBe(false);
+
+    vi.advanceTimersByTime(5_000);
+    await Promise.resolve();
+    expect(pending[1]?.request.signal.aborted).toBe(true);
+    runtime?.dispose();
+    pending[1]?.resolve({
+      generation: 2,
+      revision: 9,
+      sequence: 2,
+      width: 320,
+      height: 480,
+      blob: new Blob([new Uint8Array(32)], { type: "image/webp" }),
+    });
+    await Promise.resolve();
+    expect(channel.postMessage.mock.calls.map(([message]) => message).some((message) => (
+      (message as StudioCompanionMessage).type === "navigator-frame"
+    ))).toBe(false);
   });
 });

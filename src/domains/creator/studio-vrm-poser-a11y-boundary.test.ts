@@ -52,8 +52,10 @@ describe("Studio VRM poser accessibility boundary", () => {
   });
 
   it("blocks photo analysis while another poser transaction owns the scene", () => {
-    expect(poserSource).toContain(
-      "disabled={!vrm || webcamActive || webcamLoading || isCapturing || isSharingPose || isThumbnailCapturing || idleAnimation}",
-    );
+    expect(poserSource).toContain("disabled={poseMaterialRuntimeDisabled}");
+    expect(poserSource).toContain("jointHandleInteracting ||");
+    expect(poserSource).toContain("isViewportHandIkDragging;");
+    expect(poserSource).toContain("pendingPersistentIkCommandRef.current");
+    expect(poserSource).toContain("!persistentIkCaptureIsReady()");
   });
 });

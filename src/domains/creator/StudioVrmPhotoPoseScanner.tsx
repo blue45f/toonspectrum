@@ -2,6 +2,12 @@ import { Check, FlipHorizontal2, ImageUp, Loader2, RotateCcw, X } from "lucide-r
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import {
+  type StudioVrmPhotoHandDetection,
+  type StudioVrmPhotoHandInferenceResult,
+  type StudioVrmPhotoHandSide,
+  type StudioVrmPhotoHandWarningCode,
+} from "./studio-vrm-photo-hand";
+import {
   StudioVrmPhotoPoseError,
   type StudioVrmPhotoPoseConfidenceSummary,
   type StudioVrmPhotoPoseLandmark,
@@ -17,7 +23,9 @@ import {
   type StudioVrmPhotoPoseProgressStage,
 } from "./studio-vrm-photo-pose-worker-client";
 import {
+  disposePhotoHandLandmarker,
   disposePhotoPoseLandmarker,
+  initPhotoHandLandmarker,
   initPhotoPoseLandmarker,
 } from "./studio-vrm-webcam-tracking";
 
@@ -25,10 +33,14 @@ import type { BoneEulerMap } from "./studio-vrm-pose-solver";
 
 export interface StudioVrmPhotoPoseScannerProps {
   readonly disabled?: boolean;
-  readonly onApply: (
-    bones: BoneEulerMap,
-    confidence: StudioVrmPhotoPoseConfidenceSummary,
-  ) => boolean;
+  readonly onApply: (payload: StudioVrmPhotoPoseApplyPayload) => boolean;
+}
+
+export interface StudioVrmPhotoPoseApplyPayload {
+  readonly bones: BoneEulerMap;
+  readonly confidence: StudioVrmPhotoPoseConfidenceSummary;
+  readonly fingerEdits: StudioVrmPhotoHandInferenceResult["fingerEdits"];
+  readonly detectedHandSides: readonly StudioVrmPhotoHandSide[];
 }
 
 interface PhotoPoseCandidate {
@@ -36,6 +48,7 @@ interface PhotoPoseCandidate {
   readonly bones: BoneEulerMap;
   readonly landmarks: readonly StudioVrmPhotoPoseLandmark[];
   readonly confidence: StudioVrmPhotoPoseConfidenceSummary;
+  readonly hands: StudioVrmPhotoHandInferenceResult;
 }
 
 const SKELETON_CONNECTIONS = [
@@ -53,6 +66,14 @@ const SKELETON_CONNECTIONS = [
   [26, 28],
 ] as const;
 
+const HAND_CONNECTIONS = [
+  [0, 1], [1, 2], [2, 3], [3, 4],
+  [0, 5], [5, 6], [6, 7], [7, 8],
+  [5, 9], [9, 10], [10, 11], [11, 12],
+  [9, 13], [13, 14], [14, 15], [15, 16],
+  [13, 17], [17, 18], [18, 19], [19, 20], [0, 17],
+] as const;
+
 const PROGRESS_LABELS: Readonly<Record<StudioVrmPhotoPoseProgressStage | "inference", string>> = {
   admission: "파일 확인",
   reading: "사진 읽기",
@@ -61,6 +82,14 @@ const PROGRESS_LABELS: Readonly<Record<StudioVrmPhotoPoseProgressStage | "infere
   transforming: "회전·리사이즈",
   ready: "전처리 완료",
   inference: "로컬 포즈 인식",
+};
+
+const HAND_WARNING_LABELS: Readonly<Record<StudioVrmPhotoHandWarningCode, string>> = {
+  "ambiguous-side": "같은 쪽 손이 겹쳐 보여 해당 손가락은 적용하지 않습니다.",
+  "inference-failed": "손가락 인식을 완료하지 못해 전신 포즈만 준비했습니다.",
+  "low-confidence": "손 인식 신뢰도가 낮아 해당 손가락은 적용하지 않습니다.",
+  "model-unavailable": "손 인식 모델을 준비하지 못해 전신 포즈만 준비했습니다.",
+  protocol: "손 인식 결과를 안전하게 확인하지 못해 전신 포즈만 준비했습니다.",
 };
 
 const LOW_CONFIDENCE_LABELS: Readonly<Record<string, string>> = {
@@ -72,6 +101,7 @@ const LOW_CONFIDENCE_LABELS: Readonly<Record<string, string>> = {
 };
 
 const STUDIO_VRM_PHOTO_POSE_SCAN_TIMEOUT_MS = 45_000;
+const STUDIO_VRM_PHOTO_HAND_INIT_BUDGET_MS = 8_000;
 
 function clampPercent(value: number): number {
   return Math.min(100, Math.max(0, value * 100));
@@ -83,7 +113,84 @@ function confidenceLabel(summary: StudioVrmPhotoPoseConfidenceSummary): string {
   return "낮음";
 }
 
-function SkeletonPreview({ landmarks }: { readonly landmarks: readonly StudioVrmPhotoPoseLandmark[] }) {
+function waitForOptionalPhotoHandDetector(
+  phase: PromiseLike<Awaited<ReturnType<typeof initPhotoHandLandmarker>>>,
+  signal: AbortSignal,
+): Promise<Awaited<ReturnType<typeof initPhotoHandLandmarker>> | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (detector: Awaited<ReturnType<typeof initPhotoHandLandmarker>> | null) => {
+      if (settled) return;
+      settled = true;
+      globalThis.clearTimeout(timeout);
+      signal.removeEventListener("abort", handleAbort);
+      resolve(detector);
+    };
+    const handleAbort = () => finish(null);
+    const timeout = globalThis.setTimeout(
+      () => finish(null),
+      STUDIO_VRM_PHOTO_HAND_INIT_BUDGET_MS,
+    );
+    signal.addEventListener("abort", handleAbort, { once: true });
+    if (signal.aborted) {
+      finish(null);
+      return;
+    }
+    void Promise.resolve(phase).then(
+      (detector) => finish(signal.aborted ? null : detector),
+      () => finish(null),
+    );
+  });
+}
+
+function handStatusLabel(hands: StudioVrmPhotoHandInferenceResult): string {
+  if (hands.status === "unavailable") return "손가락 인식 제외";
+  if (hands.detectedSides.length === 0) return "손 미검출 · 기존 손 유지";
+  const sides = hands.detectedSides.map((side) => side === "left" ? "왼손" : "오른손");
+  return `${sides.join(" · ")} 인식`;
+}
+
+function HandSkeleton({ detection }: { readonly detection: StudioVrmPhotoHandDetection }) {
+  const tone = detection.side === "left" ? "text-accent" : "text-warning";
+  return (
+    <g className={tone}>
+      {HAND_CONNECTIONS.map(([fromIndex, toIndex]) => {
+        const from = detection.normalizedLandmarks[fromIndex];
+        const to = detection.normalizedLandmarks[toIndex];
+        if (!from || !to) return null;
+        return (
+          <line
+            key={`${detection.side}-${fromIndex}-${toIndex}`}
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeWidth="1.15"
+            x1={clampPercent(from.x)}
+            x2={clampPercent(to.x)}
+            y1={clampPercent(from.y)}
+            y2={clampPercent(to.y)}
+          />
+        );
+      })}
+      {detection.normalizedLandmarks.map((landmark, index) => (
+        <circle
+          key={`${detection.side}-${index}`}
+          cx={clampPercent(landmark.x)}
+          cy={clampPercent(landmark.y)}
+          fill="currentColor"
+          r="1.15"
+        />
+      ))}
+    </g>
+  );
+}
+
+function SkeletonPreview({
+  landmarks,
+  hands,
+}: {
+  readonly landmarks: readonly StudioVrmPhotoPoseLandmark[];
+  readonly hands: StudioVrmPhotoHandInferenceResult;
+}) {
   return (
     <svg
       aria-label="인식한 사진 포즈 골격 미리보기"
@@ -123,6 +230,9 @@ function SkeletonPreview({ landmarks }: { readonly landmarks: readonly StudioVrm
           />
         );
       })}
+      {hands.detections.map((detection) => (
+        <HandSkeleton key={detection.side} detection={detection} />
+      ))}
     </svg>
   );
 }
@@ -140,6 +250,7 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
   const [progressStage, setProgressStage] = useState<StudioVrmPhotoPoseProgressStage | "inference">("admission");
   const [error, setError] = useState("");
   const [candidate, setCandidate] = useState<PhotoPoseCandidate | null>(null);
+  const [includeFingerEdits, setIncludeFingerEdits] = useState(true);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -151,6 +262,7 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
       jobRef.current = null;
       preprocessorRef.current?.dispose();
       preprocessorRef.current = null;
+      disposePhotoHandLandmarker();
       disposePhotoPoseLandmarker();
     };
   }, []);
@@ -162,6 +274,7 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
 
     setBusy(true);
     setCandidate(null);
+    setIncludeFingerEdits(true);
     setError("");
     setProgress(0);
     setProgressStage("admission");
@@ -210,10 +323,16 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
 
       setProgress(0.94);
       setProgressStage("inference");
+      const handPhase = waitForOptionalPhotoHandDetector(
+        initPhotoHandLandmarker(),
+        scanController.signal,
+      );
       const landmarker = await waitForStudioVrmPhotoPosePhase(
         initPhotoPoseLandmarker(),
         scanController.signal,
       );
+      const handDetector = await handPhase;
+      if (scanController.signal.aborted) throw new StudioVrmPhotoPoseError("aborted");
       if (
         !aliveRef.current ||
         scanAbortRef.current !== scanController ||
@@ -237,6 +356,8 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
         signal: scanController.signal,
         mirrorPose: false,
         minimumVisibility: 0.35,
+        handDetector,
+        minimumHandednessConfidence: 0.5,
       });
       const inference = scan.inference;
       if (
@@ -252,6 +373,7 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
         bones: inference.bones,
         landmarks: inference.normalizedLandmarks,
         confidence: inference.confidence,
+        hands: scan.hands,
       });
       setProgress(1);
     } catch (caughtError: unknown) {
@@ -296,13 +418,13 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
             <ImageUp size={13} className="text-accent" aria-hidden /> 사진 포즈 스캔
           </h4>
           <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
-            사진은 서버로 보내지 않고, Worker 전처리 후 브라우저 안에서 한 사람의 전신 포즈를 분석합니다.
+            사진은 서버로 보내지 않고, Worker 전처리 후 브라우저 안에서 한 사람의 전신 포즈와 보이는 손가락을 분석합니다.
           </p>
         </div>
         {busy ? (
           <button
             type="button"
-            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-line px-2 py-1 text-[0.66rem] font-bold text-fg-2 hover:bg-raised"
+            className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-line px-3 py-1 text-[0.66rem] font-bold text-fg-2 hover:bg-raised"
             onClick={cancelScan}
           >
             <X size={11} aria-hidden /> 취소
@@ -310,7 +432,7 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
         ) : (
           <button
             type="button"
-            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-accent/50 bg-accent-soft px-2 py-1 text-[0.66rem] font-bold text-accent hover:bg-accent-soft/80 disabled:opacity-45"
+            className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-accent/50 bg-accent-soft px-3 py-1 text-[0.66rem] font-bold text-accent hover:bg-accent-soft/80 disabled:opacity-45"
             disabled={disabled}
             onClick={() => inputRef.current?.click()}
           >
@@ -324,7 +446,7 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
           <span className="mb-1 flex items-center gap-1"><RotateCcw size={10} aria-hidden /> 회전</span>
           <select
             aria-label="사진 회전"
-            className="h-8 w-full rounded-md border border-line bg-panel px-2 text-[0.68rem] text-fg"
+            className="h-11 w-full rounded-md border border-line bg-panel px-2 text-[0.68rem] text-fg"
             disabled={busy || disabled}
             value={rotation}
             onChange={(event) => setRotation(Number(event.target.value) as StudioVrmPhotoPoseRotation)}
@@ -335,7 +457,7 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
             <option value={270}>왼쪽 90°</option>
           </select>
         </label>
-        <label className="flex min-h-8 cursor-pointer items-end gap-2 rounded-md border border-line bg-panel px-2 py-1.5 text-[0.66rem] font-semibold text-fg-2">
+        <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-line bg-panel px-2 py-1.5 text-[0.66rem] font-semibold text-fg-2">
           <input
             type="checkbox"
             checked={mirrorHorizontal}
@@ -363,7 +485,7 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
 
       {candidate ? (
         <div className="mt-3 grid gap-2">
-          <SkeletonPreview landmarks={candidate.landmarks} />
+          <SkeletonPreview landmarks={candidate.landmarks} hands={candidate.hands} />
           <div className="flex items-center justify-between gap-2 text-[0.66rem] text-fg-2">
             <span className="min-w-0 truncate" title={candidate.sourceName}>{candidate.sourceName}</span>
             <span className="shrink-0 font-bold">
@@ -375,21 +497,45 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
               확인 권장: {candidate.confidence.lowConfidenceGroups.map((group) => LOW_CONFIDENCE_LABELS[group] ?? group).join(", ")}
             </p>
           ) : null}
+          <p className="text-[0.64rem] font-semibold text-fg-2" aria-live="polite">
+            {handStatusLabel(candidate.hands)}
+          </p>
+          {candidate.hands.warnings.map((warning) => (
+            <p key={warning} className="text-[0.64rem] leading-relaxed text-warning">
+              {HAND_WARNING_LABELS[warning]}
+            </p>
+          ))}
+          {candidate.hands.detectedSides.length > 0 ? (
+            <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-line bg-panel px-3 text-[0.66rem] font-semibold text-fg-2">
+              <input
+                type="checkbox"
+                checked={includeFingerEdits}
+                onChange={(event) => setIncludeFingerEdits(event.target.checked)}
+                className="size-4 accent-accent"
+              />
+              인식한 손가락도 함께 적용
+            </label>
+          ) : null}
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              className="rounded-lg border border-line bg-card py-1.5 text-[0.68rem] font-bold text-fg-2 hover:bg-raised"
+              className="min-h-11 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.68rem] font-bold text-fg-2 hover:bg-raised"
               onClick={() => setCandidate(null)}
             >
               다시 선택
             </button>
             <button
               type="button"
-              className="inline-flex items-center justify-center gap-1 rounded-lg border border-accent/60 bg-accent py-1.5 text-[0.68rem] font-bold text-on-accent hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
+              className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-accent/60 bg-accent px-2 py-1.5 text-[0.68rem] font-bold text-on-accent hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
               disabled={disabled}
               onClick={() => {
                 if (disabled) return;
-                const applied = onApply(candidate.bones, candidate.confidence);
+                const applied = onApply({
+                  bones: candidate.bones,
+                  confidence: candidate.confidence,
+                  fingerEdits: includeFingerEdits ? candidate.hands.fingerEdits : {},
+                  detectedHandSides: includeFingerEdits ? candidate.hands.detectedSides : [],
+                });
                 if (applied) setCandidate(null);
               }}
             >

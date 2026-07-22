@@ -3,8 +3,9 @@
  *
  * studio-psd-export.ts(레이어별 PSD 내보내기)의 정확히 반대 방향이다 — ag-psd 의 readPsd 로 파싱한
  * 레이어 트리를 재귀적으로 평탄화해, 각 리프 레이어를 캔버스 좌표/불투명도/기본 블렌드 모드가
- * 보존된 하나의 "image" 요소로 변환한다. 조정 레이어·레이어 마스크 합성·레이어 이펙트·스마트
- * 오브젝트의 완전한 재현은 명시적으로 스코프 밖이다 — 전부 래스터 평탄화 임포트로 한정한다
+ * 보존된 하나의 "image" 요소로 변환한다. 래스터 레이어 마스크는 Studio의 편집 가능한 비파괴
+ * maskSrc로 변환하고, 조정 레이어·레이어 이펙트·스마트 오브젝트의 완전한 재현은 명시적으로
+ * 스코프 밖이다 — 해당 기능은 래스터 평탄화 또는 정직한 손실 고지로 한정한다
  * (docs/studio-psd-import-integration.md §0/§1.2/§4 참고).
  *
  * 좌표계 규약(studio-psd-export.ts 의 거울):
@@ -32,9 +33,15 @@
  * 테스트에서 실제 파일/canvas 없이 검증 가능하다.
  */
 
-import { readPsd, type BlendMode, type Layer, type Psd } from "ag-psd";
+import { readPsd, type BlendMode, type Layer, type Psd, type ReadOptions } from "ag-psd";
 
 import { downscaleDataUrl } from "./studio-image-utils";
+import {
+  rasterizePsdLayerMasks,
+  type PsdLayerMaskRasterInput,
+  type PsdLayerMaskRasterResult,
+  type PsdLayerMaskSource,
+} from "./studio-psd-mask-import";
 
 // ── 결과 타입 ────────────────────────────────────────────────────────────────
 
@@ -57,6 +64,10 @@ export interface PsdImportedElement {
   name?: string;
   /** 자신 또는 조상 그룹이 숨김이면 true. 아니면 필드 자체를 생략(El 관례). */
   hidden?: true;
+  /** Photoshop 래스터 마스크를 white-RGB/alpha PNG로 바꾼 편집 가능한 비파괴 마스크. */
+  maskSrc?: string;
+  /** Photoshop에서 마스크가 비활성 상태면 false. 미설정은 Studio 관례상 활성. */
+  maskEnabled?: false;
 }
 
 export interface PsdImportResult {
@@ -76,10 +87,14 @@ export interface PsdImportResult {
 export interface PsdImportDeps {
   /** 기본 ag-psd readPsd(skipCompositeImageData:true). 테스트에서 손으로 만든 Psd 픽스처를
    *  즉시 반환하도록 모킹. */
-  readPsdImpl?: (buffer: ArrayBuffer) => Psd;
+  readPsdImpl?: (buffer: ArrayBuffer, options?: ReadOptions) => Psd;
   /** 기본 studio-image-utils.downscaleDataUrl. 테스트에서 입력을 그대로 반환하도록 모킹
    *  (canvas/Image DOM 의존을 배치·스케일 계산 테스트에서 분리). */
   downscaleImpl?: (dataUrl: string, maxW: number) => Promise<string>;
+  /** 기본 Canvas2D 마스크 래스터화. 테스트에서는 DOM 없이 결과를 주입한다. */
+  rasterizeMaskImpl?: (
+    input: PsdLayerMaskRasterInput,
+  ) => PsdLayerMaskRasterResult | Promise<PsdLayerMaskRasterResult>;
 }
 
 // ── 평탄화 ──────────────────────────────────────────────────────────────────
@@ -242,6 +257,53 @@ export function psdImportResultMessage(result: PsdImportResult): string {
   return parts.join(" · ");
 }
 
+interface LayerMaskImportSelection {
+  sources: PsdLayerMaskSource[];
+  fallbackMask?: PsdLayerMaskSource;
+}
+
+function layerMaskSources(layer: Layer): LayerMaskImportSelection {
+  if (layer.realMask) {
+    return {
+      // PSD channel -3 is the authoritative final pixel+vector composite. It
+      // must not be multiplied by channel -2 a second time.
+      sources: [{
+        kind: "real",
+        mask: layer.realMask,
+        // ag-psd reads density/feather parameters from the primary descriptor.
+        parameterMask: layer.mask ?? layer.realMask,
+      }],
+      // Keep channel -2 only for explicit recovery when -3 pixels are corrupt.
+      fallbackMask: layer.mask ? { kind: "primary", mask: layer.mask } : undefined,
+    };
+  }
+  return {
+    sources: layer.mask ? [{ kind: "primary", mask: layer.mask }] : [],
+  };
+}
+
+function maskEditabilityWarnings(layer: Layer): string[] {
+  const warnings: string[] = [];
+  const rasterizedVectorMask = !!layer.mask?.fromVectorData || !!layer.realMask?.fromVectorData;
+  if (rasterizedVectorMask) {
+    warnings.push("벡터 마스크를 편집 가능한 단일 래스터 마스크로 근사했어요.");
+  }
+  if (layer.mask && layer.realMask) {
+    warnings.push("픽셀·벡터 이중 마스크를 편집 가능한 단일 래스터 마스크로 합성했어요.");
+  } else if (layer.mask && layer.vectorMask && !rasterizedVectorMask) {
+    warnings.push("벡터 마스크 경로는 별도로 편집할 수 없어 래스터 마스크에 포함되지 않았어요.");
+  }
+  return warnings;
+}
+
+function isUsableImageDataUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const separator = value.indexOf(",");
+  return separator > 0
+    && value.slice(0, separator).toLowerCase().startsWith("data:image/")
+    && separator < value.length - 1;
+}
+
 // ── id 생성 — studio-asset-library.ts 의 createAssetId 와 동일한 안전장치 패턴 ──
 
 function createImportedLayerId(): string {
@@ -252,6 +314,18 @@ function createImportedLayerId(): string {
 /** 각 임포트 이미지의 저장 해상도 상한 — downscaleImageFile/onPickImage 와 동일 관례. PSD 원본이
  *  아무리 고해상도여도 localStorage/히스토리에 그대로 쌓지 않는다. */
 const IMPORTED_LAYER_MAX_DIM = 1280;
+/** ag-psd otherwise permits up to 2GB of decoded bitmaps, which is not a safe
+ * browser/mobile boundary. The source ArrayBuffer and decoded layer pixels are
+ * independently bounded before editable proxies are admitted to the project. */
+export const PSD_IMPORT_MAX_FILE_BYTES = 128 * 1024 * 1024;
+export const PSD_IMPORT_MAX_DECODED_BYTES = 128 * 1024 * 1024;
+
+const PSD_READ_OPTIONS: ReadOptions = Object.freeze({
+  skipCompositeImageData: true,
+  skipThumbnail: true,
+  skipLinkedFilesData: true,
+  totalMemoryLimit: PSD_IMPORT_MAX_DECODED_BYTES,
+});
 
 // ── 메인 진입점 ──────────────────────────────────────────────────────────────
 
@@ -266,8 +340,16 @@ export async function importPsdFile(
   targetWidth: number,
   deps: PsdImportDeps = {}
 ): Promise<PsdImportResult> {
-  const readPsdImpl = deps.readPsdImpl ?? ((buffer: ArrayBuffer) => readPsd(buffer, { skipCompositeImageData: true }));
+  const readPsdImpl = deps.readPsdImpl ?? readPsd;
   const downscaleImpl = deps.downscaleImpl ?? downscaleDataUrl;
+  const rasterizeMaskImpl = deps.rasterizeMaskImpl ?? rasterizePsdLayerMasks;
+
+  if (
+    typeof file.size === "number"
+    && (!Number.isSafeInteger(file.size) || file.size < 0 || file.size > PSD_IMPORT_MAX_FILE_BYTES)
+  ) {
+    throw new Error(`PSD 파일은 최대 ${PSD_IMPORT_MAX_FILE_BYTES / 1024 / 1024}MB까지 가져올 수 있어요.`);
+  }
 
   let buffer: ArrayBuffer;
   try {
@@ -275,10 +357,13 @@ export async function importPsdFile(
   } catch (err) {
     throw new Error(`PSD 파일을 읽지 못했어요: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
   }
+  if (buffer.byteLength > PSD_IMPORT_MAX_FILE_BYTES) {
+    throw new Error(`PSD 파일은 최대 ${PSD_IMPORT_MAX_FILE_BYTES / 1024 / 1024}MB까지 가져올 수 있어요.`);
+  }
 
   let psd: Psd;
   try {
-    psd = readPsdImpl(buffer);
+    psd = readPsdImpl(buffer, PSD_READ_OPTIONS);
   } catch (err) {
     throw new Error(`PSD 파일을 해석하지 못했어요: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
   }
@@ -320,8 +405,30 @@ export async function importPsdFile(
       skipped.push(`${entry.name}: 래스터화 실패로 건너뜀`);
       continue;
     }
+    if (!isUsableImageDataUrl(rawDataUrl)) {
+      skipped.push(`${entry.name}: 래스터 PNG가 비어 있어 건너뜀`);
+      continue;
+    }
 
-    const src = await downscaleImpl(rawDataUrl, IMPORTED_LAYER_MAX_DIM);
+    let src = rawDataUrl;
+    let proxyFallbackWarning: string | undefined;
+    try {
+      const candidate = await downscaleImpl(rawDataUrl, IMPORTED_LAYER_MAX_DIM);
+      if (isUsableImageDataUrl(candidate)) {
+        src = candidate;
+      } else {
+        proxyFallbackWarning = "이미지 프록시 인코딩이 비어 원본 PNG를 유지했어요.";
+      }
+    } catch {
+      proxyFallbackWarning = "이미지 프록시 변환에 실패해 원본 PNG를 유지했어요.";
+    }
+    const sourcePixelWidth = canvas.width || entry.width;
+    const sourcePixelHeight = canvas.height || entry.height;
+    const sourceStayedOriginal = src === rawDataUrl;
+    if (sourceStayedOriginal && sourcePixelWidth > IMPORTED_LAYER_MAX_DIM && !proxyFallbackWarning) {
+      proxyFallbackWarning = "이미지 프록시 변환에 실패해 원본 PNG를 유지했어요.";
+    }
+    if (proxyFallbackWarning) skipped.push(`${entry.name}: ${proxyFallbackWarning}`);
     const placement = placementForLayer(
       { left: entry.left, top: entry.top, width: entry.width, height: entry.height },
       sourceWidth,
@@ -343,13 +450,44 @@ export async function importPsdFile(
     const blendMode = mapPsdBlendMode(entry.layer.blendMode);
     if (blendMode !== "source-over") el.blendMode = blendMode;
     if (entry.hidden) el.hidden = true;
+
+    const maskSelection = layerMaskSources(entry.layer);
+    for (const warning of maskEditabilityWarnings(entry.layer)) {
+      skipped.push(`${entry.name}: ${warning}`);
+    }
+    if (maskSelection.sources.length > 0) {
+      let maskResult: PsdLayerMaskRasterResult;
+      try {
+        maskResult = await rasterizeMaskImpl({
+          layerLeft: entry.left,
+          layerTop: entry.top,
+          layerPixelWidth: sourcePixelWidth,
+          layerPixelHeight: sourcePixelHeight,
+          masks: maskSelection.sources,
+          fallbackMask: maskSelection.fallbackMask,
+          // If the source proxy fell back to the original PNG, preserve the
+          // same natural pixel dimensions instead of attaching a 1280px mask
+          // that would drift when rendered against the full-resolution source.
+          maxWidth: sourceStayedOriginal ? sourcePixelWidth : IMPORTED_LAYER_MAX_DIM,
+        });
+      } catch {
+        maskResult = {
+          warnings: ["마스크 변환에 실패해 원본 레이어를 가리지 않고 가져왔어요."],
+        };
+      }
+      if (maskResult.maskSrc) {
+        el.maskSrc = maskResult.maskSrc;
+        if (maskResult.disabled) el.maskEnabled = false;
+      }
+      for (const warning of maskResult.warnings) skipped.push(`${entry.name}: ${warning}`);
+    } else if (entry.layer.vectorMask) {
+      // vector-only masks have no decoded pixel channel for the bounded Canvas bridge.
+      skipped.push(`${entry.name}: 벡터 전용 마스크는 래스터 픽셀이 없어 원본 레이어를 가리지 않고 가져왔어요.`);
+    }
     elements.push(el);
 
     // 반영은 하되(원본 그대로 래스터에 이미 포함) 재현되지 않는 부분을 정직하게 고지 — v1 명시적
     // 제외 목록(docs/studio-psd-import-integration.md §1.2)과 1:1 대응.
-    if (entry.layer.mask) {
-      skipped.push(`${entry.name}: 레이어 마스크는 반영되지 않고 원본 그대로 가져왔어요`);
-    }
     if (entry.layer.effects) {
       skipped.push(`${entry.name}: 레이어 스타일(그림자 등)은 반영되지 않아요`);
     }

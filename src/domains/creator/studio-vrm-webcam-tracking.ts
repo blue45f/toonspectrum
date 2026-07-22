@@ -378,6 +378,95 @@ export function disposePhotoPoseLandmarker(): void {
   }
 }
 
+let cachedPhotoHandLandmarker: HandLandmarker | null = null;
+let initPhotoHandPromise: Promise<HandLandmarker> | null = null;
+let photoHandLandmarkerGeneration = 0;
+
+export type PhotoHandLandmarkerFactory = () => Promise<HandLandmarker>;
+
+async function createPhotoHandLandmarker(): Promise<HandLandmarker> {
+  const { FilesetResolver, HandLandmarker: HLM } = await import("@mediapipe/tasks-vision");
+  const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_VISION_CDN);
+  const modelAssetPath =
+    "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+  const options = {
+    runningMode: "IMAGE",
+    numHands: 2,
+    minHandDetectionConfidence: 0.5,
+    minHandPresenceConfidence: 0.5,
+    minTrackingConfidence: 0.5,
+  } as const;
+  try {
+    return await HLM.createFromOptions(vision, {
+      baseOptions: { modelAssetPath, delegate: "GPU" },
+      ...options,
+    });
+  } catch (error) {
+    console.warn("Photo HandLandmarker GPU delegate failed, falling back to CPU:", error);
+    return HLM.createFromOptions(vision, {
+      baseOptions: { modelAssetPath, delegate: "CPU" },
+      ...options,
+    });
+  }
+}
+
+function photoHandLandmarkerDisposedError(): Error {
+  const error = new Error("Photo hand landmarker initialization was disposed.");
+  error.name = "AbortError";
+  return error;
+}
+
+/**
+ * Still photos own a dedicated IMAGE-mode task. Reusing the live VIDEO singleton would let a
+ * photo scan change task mode while the webcam frame loop is still reading it.
+ */
+export function initPhotoHandLandmarker(
+  factory: PhotoHandLandmarkerFactory = createPhotoHandLandmarker,
+): Promise<HandLandmarker> {
+  if (cachedPhotoHandLandmarker) return Promise.resolve(cachedPhotoHandLandmarker);
+  if (initPhotoHandPromise) return initPhotoHandPromise;
+
+  const generation = photoHandLandmarkerGeneration;
+  const pending: Promise<HandLandmarker> = Promise.resolve()
+    .then(factory)
+    .then(
+      (landmarker) => {
+        if (
+          generation !== photoHandLandmarkerGeneration
+          || initPhotoHandPromise !== pending
+        ) {
+          try {
+            landmarker.close();
+          } catch {
+            // A stale initialization cannot reclaim cache ownership even when close fails.
+          }
+          throw photoHandLandmarkerDisposedError();
+        }
+        cachedPhotoHandLandmarker = landmarker;
+        initPhotoHandPromise = null;
+        return landmarker;
+      },
+      (error: unknown) => {
+        if (initPhotoHandPromise === pending) initPhotoHandPromise = null;
+        throw error;
+      },
+    );
+  initPhotoHandPromise = pending;
+  return pending;
+}
+
+export function disposePhotoHandLandmarker(): void {
+  photoHandLandmarkerGeneration += 1;
+  const active = cachedPhotoHandLandmarker;
+  cachedPhotoHandLandmarker = null;
+  initPhotoHandPromise = null;
+  try {
+    active?.close();
+  } catch {
+    // Scanner unmount/disposal is best-effort and must remain idempotent.
+  }
+}
+
 let cachedHandLandmarker: HandLandmarker | null = null;
 let initHandPromise: Promise<HandLandmarker> | null = null;
 

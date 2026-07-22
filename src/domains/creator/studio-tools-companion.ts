@@ -6,6 +6,27 @@
  * Not a CRDT — no document merge.
  */
 
+import {
+  captureStudioCompanionNavigatorFrame,
+  createStudioCompanionReviewProjectionFromSource,
+  isStudioCompanionNavigatorFrame,
+  isStudioCompanionReviewControl,
+  isStudioCompanionReviewProjection,
+  planStudioCompanionNavigatorCapture,
+  type StudioCompanionNavigatorFrame,
+  type StudioCompanionReviewControl,
+  type StudioCompanionReviewProjection,
+  type StudioCompanionReviewProjectionSourceInput,
+} from "./studio-companion-review-projection";
+
+export {
+  captureStudioCompanionNavigatorFrame,
+  createStudioCompanionReviewProjection,
+  createStudioCompanionReviewProjectionFromSource,
+  encodeStudioCompanionNavigatorWebp,
+  planStudioCompanionExternalScreenPlacement,
+} from "./studio-companion-review-projection";
+
 export const STUDIO_TOOLS_COMPANION_CHANNEL = "toonspectrum.studio.tools-companion.v1";
 export const STUDIO_TOOLS_COMPANION_PATH = "/studio/tools-companion";
 export const STUDIO_TOOLS_COMPANION_WINDOW_NAME = "toonspectrum-studio-tools";
@@ -76,6 +97,39 @@ export type StudioCompanionMessage =
     }
   | {
       v: 1;
+      type: "primary-review-state";
+      primaryInstanceId: string;
+      targetCompanionInstanceId: string;
+      generation: number;
+      projection: StudioCompanionReviewProjection;
+      at: number;
+    }
+  | {
+      v: 1;
+      type: "navigator-frame";
+      primaryInstanceId: string;
+      targetCompanionInstanceId: string;
+      generation: number;
+      revision: number;
+      sequence: number;
+      width: number;
+      height: number;
+      blob: Blob;
+      at: number;
+    }
+  | {
+      v: 1;
+      type: "companion-control";
+      control: StudioCompanionReviewControl;
+      generation: number;
+      companionInstanceId: string;
+      targetPrimaryInstanceId: string;
+      commandId: string;
+      sequence: number;
+      at: number;
+    }
+  | {
+      v: 1;
       type: "ping";
       companionInstanceId: string;
       targetPrimaryInstanceId: string;
@@ -95,6 +149,15 @@ export type StudioCompanionCommandMessage = Extract<
   StudioCompanionMessage,
   { type: "companion-command" }
 >;
+
+export type StudioCompanionControlMessage = Extract<
+  StudioCompanionMessage,
+  { type: "companion-control" }
+>;
+
+export type StudioCompanionSequencedMessage =
+  | StudioCompanionCommandMessage
+  | StudioCompanionControlMessage;
 
 export const STUDIO_COMPANION_TOOL_LABELS: Record<StudioCompanionToolId, string> = {
   select: "선택",
@@ -133,6 +196,8 @@ const STUDIO_COMPANION_MAX_MESSAGE_AGE_MS = 30_000;
 const STUDIO_COMPANION_MAX_FUTURE_SKEW_MS = 5_000;
 const STUDIO_COMPANION_RECENT_COMMAND_LIMIT = 256;
 const STUDIO_COMPANION_PRIMARY_BINDING_LEASE_MS = 12_000;
+const STUDIO_COMPANION_CAPTURE_MAX_FAILURES_PER_REVISION = 3;
+const STUDIO_COMPANION_CAPTURE_RETRY_BASE_MS = 500;
 
 export function isStudioCompanionSessionId(value: unknown): value is string {
   return typeof value === "string" && STUDIO_COMPANION_SESSION_PATTERN.test(value);
@@ -325,6 +390,74 @@ export function isStudioCompanionMessage(value: unknown): value is StudioCompani
         && Number.isSafeInteger(msg.sequence)
         && msg.sequence > 0
       );
+    case "primary-review-state":
+      return (
+        hasExactStudioCompanionKeys(msg, [
+          "v",
+          "type",
+          "primaryInstanceId",
+          "targetCompanionInstanceId",
+          "generation",
+          "projection",
+          "at",
+        ])
+        && isStudioCompanionSessionId(msg.primaryInstanceId)
+        && isStudioCompanionSessionId(msg.targetCompanionInstanceId)
+        && typeof msg.generation === "number"
+        && Number.isSafeInteger(msg.generation)
+        && msg.generation > 0
+        && isStudioCompanionReviewProjection(msg.projection)
+      );
+    case "navigator-frame":
+      return (
+        hasExactStudioCompanionKeys(msg, [
+          "v",
+          "type",
+          "primaryInstanceId",
+          "targetCompanionInstanceId",
+          "generation",
+          "revision",
+          "sequence",
+          "width",
+          "height",
+          "blob",
+          "at",
+        ])
+        && isStudioCompanionSessionId(msg.primaryInstanceId)
+        && isStudioCompanionSessionId(msg.targetCompanionInstanceId)
+        && isStudioCompanionNavigatorFrame({
+          generation: msg.generation,
+          revision: msg.revision,
+          sequence: msg.sequence,
+          width: msg.width,
+          height: msg.height,
+          blob: msg.blob,
+        })
+      );
+    case "companion-control":
+      return (
+        hasExactStudioCompanionKeys(msg, [
+          "v",
+          "type",
+          "control",
+          "generation",
+          "companionInstanceId",
+          "targetPrimaryInstanceId",
+          "commandId",
+          "sequence",
+          "at",
+        ])
+        && isStudioCompanionReviewControl(msg.control)
+        && typeof msg.generation === "number"
+        && Number.isSafeInteger(msg.generation)
+        && msg.generation > 0
+        && isStudioCompanionSessionId(msg.companionInstanceId)
+        && isStudioCompanionSessionId(msg.targetPrimaryInstanceId)
+        && isStudioCompanionSessionId(msg.commandId)
+        && typeof msg.sequence === "number"
+        && Number.isSafeInteger(msg.sequence)
+        && msg.sequence > 0
+      );
     case "ping":
       return (
         hasExactStudioCompanionKeys(msg, [
@@ -448,6 +581,69 @@ export function buildStudioCompanionCommand(
   };
 }
 
+export function buildStudioCompanionControl(
+  input: {
+    control: StudioCompanionReviewControl;
+    generation: number;
+    companionInstanceId: string;
+    targetPrimaryInstanceId: string;
+    commandId: string;
+    sequence: number;
+  },
+  now = Date.now()
+): StudioCompanionControlMessage {
+  return {
+    v: 1,
+    type: "companion-control",
+    control: input.control,
+    generation: input.generation,
+    companionInstanceId: input.companionInstanceId,
+    targetPrimaryInstanceId: input.targetPrimaryInstanceId,
+    commandId: input.commandId,
+    sequence: input.sequence,
+    at: now,
+  };
+}
+
+export function buildStudioCompanionReviewState(input: {
+  primaryInstanceId: string;
+  targetCompanionInstanceId: string;
+  generation: number;
+  projection: StudioCompanionReviewProjection;
+  now?: number;
+}): Extract<StudioCompanionMessage, { type: "primary-review-state" }> {
+  return {
+    v: 1,
+    type: "primary-review-state",
+    primaryInstanceId: input.primaryInstanceId,
+    targetCompanionInstanceId: input.targetCompanionInstanceId,
+    generation: input.generation,
+    projection: input.projection,
+    at: input.now ?? Date.now(),
+  };
+}
+
+export function buildStudioCompanionNavigatorFrame(input: {
+  primaryInstanceId: string;
+  targetCompanionInstanceId: string;
+  frame: StudioCompanionNavigatorFrame;
+  now?: number;
+}): Extract<StudioCompanionMessage, { type: "navigator-frame" }> {
+  return {
+    v: 1,
+    type: "navigator-frame",
+    primaryInstanceId: input.primaryInstanceId,
+    targetCompanionInstanceId: input.targetCompanionInstanceId,
+    generation: input.frame.generation,
+    revision: input.frame.revision,
+    sequence: input.frame.sequence,
+    width: input.frame.width,
+    height: input.frame.height,
+    blob: input.frame.blob,
+    at: input.now ?? Date.now(),
+  };
+}
+
 export function buildStudioCompanionPing(input: {
   companionInstanceId: string;
   targetPrimaryInstanceId: string;
@@ -485,7 +681,7 @@ export class StudioCompanionCommandGuard {
     this.recentCommandOrder.length = 0;
   }
 
-  accept(message: StudioCompanionCommandMessage, expected: {
+  accept(message: StudioCompanionSequencedMessage, expected: {
     primaryInstanceId: string;
     companionInstanceId: string;
     now?: number;
@@ -567,8 +763,37 @@ export class StudioCompanionPrimaryBinding {
     return accepted;
   }
 
+  acceptControl(
+    message: StudioCompanionMessage,
+    primaryInstanceId: string,
+    generation: number,
+    now = Date.now()
+  ): message is StudioCompanionControlMessage {
+    if (
+      message.type !== "companion-control"
+      || !this.activeCompanionInstanceId
+      || message.generation !== generation
+    ) return false;
+    const accepted = this.commandGuard.accept(message, {
+      primaryInstanceId,
+      companionInstanceId: this.activeCompanionInstanceId,
+      now,
+    });
+    if (accepted) this.lastCompanionActivityAt = now;
+    return accepted;
+  }
+
   companionInstanceId(): string | null {
     return this.activeCompanionInstanceId;
+  }
+
+  expireIfStale(now = Date.now()): boolean {
+    if (
+      !this.activeCompanionInstanceId
+      || now - this.lastCompanionActivityAt < STUDIO_COMPANION_PRIMARY_BINDING_LEASE_MS
+    ) return false;
+    this.release();
+    return true;
   }
 
   release(): void {
@@ -679,6 +904,79 @@ export function openStudioToolsCompanionWindow(
   }
 }
 
+type StudioCompanionWindowRef = { current: Window | null };
+type StudioCompanionAnnounce = (message: string) => void;
+
+/** Keeps reuse/recovery policy in the lazy protocol chunk once the runtime is ready. */
+export function openReadyStudioToolsCompanionForMenu(input: {
+  sessionId: string;
+  windowRef: StudioCompanionWindowRef;
+  binding: StudioCompanionPrimaryBinding;
+  announce: StudioCompanionAnnounce;
+}): void {
+  const cachedWindow = input.windowRef.current;
+  const reusedExistingWindow = isStudioToolsCompanionWindowReusable(
+    input.sessionId,
+    cachedWindow
+  );
+  if (!reusedExistingWindow) {
+    input.binding.release();
+    input.windowRef.current = null;
+  }
+  const companionWindow = openStudioToolsCompanionWindow(
+    input.sessionId,
+    reusedExistingWindow ? cachedWindow : null
+  );
+  if (!companionWindow) {
+    input.announce("팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.");
+    return;
+  }
+  input.windowRef.current = companionWindow;
+  input.announce(
+    reusedExistingWindow
+      ? "도구 창을 앞으로 가져오도록 요청했어요 · 보이지 않으면 작업 표시줄에서 선택하세요"
+      : cachedWindow
+        ? "도구 창을 복구해 다시 연결합니다 · 다른 모니터로 옮겨 쓰세요"
+        : "도구 창을 열었습니다 · 다른 모니터로 옮겨 쓰세요"
+  );
+}
+
+/** Completes a synchronously reserved popup after the lazy protocol/runtime has loaded. */
+export function completeReservedStudioToolsCompanionWindow(input: {
+  sessionId: string;
+  reservation: Window;
+  windowRef: StudioCompanionWindowRef;
+  announce: StudioCompanionAnnounce;
+}): void {
+  if (input.windowRef.current !== input.reservation) {
+    try {
+      input.reservation.close();
+    } catch {
+      // The user may have closed the reservation before the runtime finished loading.
+    }
+    return;
+  }
+  try {
+    input.reservation.name = studioCompanionWindowName(input.sessionId);
+    input.reservation.location.replace(studioCompanionUrl(input.sessionId));
+  } catch {
+    input.windowRef.current = null;
+    try {
+      input.reservation.close();
+    } catch {
+      // Ignore a reservation already closed by the browser.
+    }
+    input.announce("도구 창을 열지 못했습니다. 다시 시도해 주세요.");
+    return;
+  }
+  try {
+    input.reservation.focus();
+  } catch {
+    // A valid popup remains usable when focus() is denied.
+  }
+  input.announce("도구 창을 열었습니다 · 다른 모니터로 옮겨 쓰세요");
+}
+
 export type StudioCompanionChannel = {
   postMessage: (data: unknown) => void;
   close: () => void;
@@ -718,8 +1016,60 @@ export type StudioCompanionPrimaryRuntime = {
   sessionId: string;
   binding: StudioCompanionPrimaryBinding;
   publish: () => void;
+  schedulePublish: () => void;
+  generation: () => number;
   dispose: () => void;
 };
+
+export type StudioCompanionNavigatorCaptureRequest = {
+  generation: number;
+  revision: number;
+  sequence: number;
+  signal: AbortSignal;
+};
+
+export type StudioCompanionPrimarySourceRuntimeInput = Omit<
+  Parameters<typeof startStudioCompanionPrimaryRuntime>[0],
+  "getReviewProjection" | "captureNavigatorFrame"
+> & {
+  getReviewProjectionInput?: () => StudioCompanionReviewProjectionSourceInput;
+  isNavigatorCaptureBlocked?: () => boolean;
+  captureNavigatorCanvas?: (maximumLongestEdge: number) => HTMLCanvasElement | null;
+};
+
+/**
+ * Adapts editor-owned source callbacks inside the optional companion chunk. The default Studio
+ * route therefore pays only for three narrow callbacks until a companion is actually requested.
+ */
+export function startStudioCompanionPrimaryRuntimeFromSources(
+  input: StudioCompanionPrimarySourceRuntimeInput
+): StudioCompanionPrimaryRuntime | null {
+  const {
+    getReviewProjectionInput,
+    isNavigatorCaptureBlocked,
+    captureNavigatorCanvas,
+    ...runtimeInput
+  } = input;
+  return startStudioCompanionPrimaryRuntime({
+    ...runtimeInput,
+    ...(getReviewProjectionInput
+      ? {
+          getReviewProjection: () => createStudioCompanionReviewProjectionFromSource(
+            getReviewProjectionInput()
+          ),
+        }
+      : {}),
+    ...(isNavigatorCaptureBlocked && captureNavigatorCanvas
+      ? {
+          captureNavigatorFrame: (request) => captureStudioCompanionNavigatorFrame({
+            request,
+            isCaptureBlocked: isNavigatorCaptureBlocked,
+            captureCanvas: captureNavigatorCanvas,
+          }),
+        }
+      : {}),
+  });
+}
 
 /**
  * Starts the primary-side protocol only after the optional companion chunk has loaded.
@@ -729,7 +1079,12 @@ export type StudioCompanionPrimaryRuntime = {
 export function startStudioCompanionPrimaryRuntime(input: {
   search: string;
   getSnapshot: () => StudioCompanionPrimarySnapshot;
+  getReviewProjection?: () => StudioCompanionReviewProjection;
+  captureNavigatorFrame?: (
+    request: StudioCompanionNavigatorCaptureRequest
+  ) => Promise<StudioCompanionNavigatorFrame | null>;
   onCommand: (command: StudioCompanionCommandName) => void;
+  onControl?: (control: StudioCompanionReviewControl) => void;
 }): StudioCompanionPrimaryRuntime | null {
   const sessionId = parseStudioCompanionSessionId(input.search) ?? createStudioCompanionSessionId();
   const primaryInstanceId = createStudioCompanionInstanceId();
@@ -740,8 +1095,196 @@ export function startStudioCompanionPrimaryRuntime(input: {
   if (!channel) return null;
 
   let disposed = false;
+  let bindingGeneration = 0;
+  let captureEpoch = 0;
+  let captureInFlight = false;
+  let captureSequence = 0;
+  let captureController: AbortController | null = null;
+  let captureTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
+  let publishTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
+  let lastCapturedGeneration = 0;
+  let lastCapturedRevision = -1;
+  let lastCaptureAt = -STUDIO_COMPANION_MAX_MESSAGE_AGE_MS;
+  let captureFailureGeneration = 0;
+  let captureFailureRevision = -1;
+  let captureFailureCount = 0;
+  let captureRetryNotBefore = 0;
+  let navigatorDemanded = false;
+
+  const clearCaptureTimer = () => {
+    if (captureTimer === null) return;
+    globalThis.clearTimeout(captureTimer);
+    captureTimer = null;
+  };
+
+  const resetCaptureGeneration = () => {
+    captureEpoch += 1;
+    captureInFlight = false;
+    captureController?.abort();
+    captureController = null;
+    clearCaptureTimer();
+    lastCapturedGeneration = 0;
+    lastCapturedRevision = -1;
+    lastCaptureAt = Date.now() - 500;
+    captureFailureGeneration = 0;
+    captureFailureRevision = -1;
+    captureFailureCount = 0;
+    captureRetryNotBefore = 0;
+  };
+
+  const scheduleNavigatorCapture = (delayMs: number) => {
+    if (captureTimer !== null) return;
+    const scheduledEpoch = captureEpoch;
+    captureTimer = globalThis.setTimeout(() => {
+      captureTimer = null;
+      if (disposed || captureEpoch !== scheduledEpoch) return;
+      const latest = input.getReviewProjection?.();
+      if (latest && isStudioCompanionReviewProjection(latest)) {
+        requestNavigatorCapture(latest);
+      }
+    }, Math.max(0, delayMs));
+  };
+
+  const requestNavigatorCapture = (projection: StudioCompanionReviewProjection) => {
+    const capture = input.captureNavigatorFrame;
+    if (binding.expireIfStale()) {
+      navigatorDemanded = false;
+      resetCaptureGeneration();
+      return;
+    }
+    const targetCompanionInstanceId = binding.companionInstanceId();
+    if (
+      disposed
+      || !navigatorDemanded
+      || !capture
+      || !targetCompanionInstanceId
+      || bindingGeneration <= 0
+    ) return;
+    const now = Date.now();
+    if (
+      captureFailureGeneration !== bindingGeneration
+      || captureFailureRevision !== projection.documentRevision
+    ) {
+      clearCaptureTimer();
+      captureFailureGeneration = bindingGeneration;
+      captureFailureRevision = projection.documentRevision;
+      captureFailureCount = 0;
+      captureRetryNotBefore = 0;
+    }
+    if (captureFailureCount >= STUDIO_COMPANION_CAPTURE_MAX_FAILURES_PER_REVISION) return;
+    if (captureRetryNotBefore > now) {
+      scheduleNavigatorCapture(captureRetryNotBefore - now);
+      return;
+    }
+    const plan = planStudioCompanionNavigatorCapture({
+      generation: bindingGeneration,
+      lastCapturedGeneration,
+      revision: projection.documentRevision,
+      lastCapturedRevision,
+      lastCaptureAt,
+      now,
+      activeStroke: !projection.captureAllowed,
+      inFlight: captureInFlight,
+    });
+    if (plan.kind === "defer") {
+      scheduleNavigatorCapture(plan.delayMs);
+      return;
+    }
+    if (plan.kind !== "capture") return;
+
+    clearCaptureTimer();
+    captureInFlight = true;
+    lastCaptureAt = now;
+    captureSequence += 1;
+    const scheduledEpoch = captureEpoch;
+    const scheduledGeneration = bindingGeneration;
+    const scheduledRevision = projection.documentRevision;
+    const scheduledSequence = captureSequence;
+    const scheduledTarget = targetCompanionInstanceId;
+    const controller = new AbortController();
+    captureController = controller;
+    let captureSucceeded = false;
+    let captureTimeout: ReturnType<typeof globalThis.setTimeout> | null = null;
+    const timeout = new Promise<null>((resolve) => {
+      captureTimeout = globalThis.setTimeout(() => {
+        controller.abort();
+        resolve(null);
+      }, 5_000);
+    });
+    const captured = Promise.resolve().then(() => capture({
+      generation: scheduledGeneration,
+      revision: scheduledRevision,
+      sequence: scheduledSequence,
+      signal: controller.signal,
+    }));
+    void Promise.race([captured, timeout]).then((frame) => {
+      if (
+        !frame
+        || disposed
+        || captureEpoch !== scheduledEpoch
+        || bindingGeneration !== scheduledGeneration
+        || binding.companionInstanceId() !== scheduledTarget
+        || frame.generation !== scheduledGeneration
+        || frame.revision !== scheduledRevision
+        || frame.sequence !== scheduledSequence
+        || !isStudioCompanionNavigatorFrame(frame)
+      ) return;
+      try {
+        channel.postMessage(buildStudioCompanionNavigatorFrame({
+          primaryInstanceId,
+          targetCompanionInstanceId: scheduledTarget,
+          frame,
+        }));
+        captureSucceeded = true;
+        lastCapturedGeneration = scheduledGeneration;
+        lastCapturedRevision = Math.max(lastCapturedRevision, scheduledRevision);
+      } catch {
+        // A detached window may close while an asynchronous WebP encode is finishing.
+      }
+    }).catch(() => {
+      // Capture is optional. The bounded textual review projection remains available.
+    }).finally(() => {
+      if (captureTimeout !== null) globalThis.clearTimeout(captureTimeout);
+      if (captureEpoch !== scheduledEpoch) return;
+      if (captureController === controller) captureController = null;
+      captureInFlight = false;
+      const latest = input.getReviewProjection?.();
+      const remainsCurrent = Boolean(
+        !disposed
+        && bindingGeneration === scheduledGeneration
+        && binding.companionInstanceId() === scheduledTarget
+        && latest
+        && isStudioCompanionReviewProjection(latest)
+        && latest.documentRevision === scheduledRevision
+      );
+      if (remainsCurrent && !captureSucceeded) {
+        captureFailureGeneration = scheduledGeneration;
+        captureFailureRevision = scheduledRevision;
+        captureFailureCount += 1;
+        captureRetryNotBefore = Date.now() + (
+          STUDIO_COMPANION_CAPTURE_RETRY_BASE_MS * (2 ** (captureFailureCount - 1))
+        );
+      } else if (remainsCurrent) {
+        captureFailureCount = 0;
+        captureRetryNotBefore = 0;
+      }
+      if (
+        latest
+        && isStudioCompanionReviewProjection(latest)
+        && latest.documentRevision > lastCapturedRevision
+      ) {
+        requestNavigatorCapture(latest);
+      }
+    });
+  };
+
   const publish = () => {
     if (disposed) return;
+    if (binding.expireIfStale()) {
+      navigatorDemanded = false;
+      resetCaptureGeneration();
+      return;
+    }
     const targetCompanionInstanceId = binding.companionInstanceId();
     if (!targetCompanionInstanceId) return;
     const snapshot = input.getSnapshot();
@@ -754,9 +1297,31 @@ export function startStudioCompanionPrimaryRuntime(input: {
         canvasOnly: snapshot.canvasOnly,
         title: snapshot.title || "스튜디오",
       }));
+      const projection = input.getReviewProjection?.();
+      if (
+        projection
+        && bindingGeneration > 0
+        && isStudioCompanionReviewProjection(projection)
+      ) {
+        channel.postMessage(buildStudioCompanionReviewState({
+          primaryInstanceId,
+          targetCompanionInstanceId,
+          generation: bindingGeneration,
+          projection,
+        }));
+        requestNavigatorCapture(projection);
+      }
     } catch {
       // The popup may have closed between the state projection and postMessage.
     }
+  };
+
+  const schedulePublish = () => {
+    if (disposed || !binding.companionInstanceId() || publishTimer !== null) return;
+    publishTimer = globalThis.setTimeout(() => {
+      publishTimer = null;
+      publish();
+    }, 100);
   };
 
   channel.onmessage = (event: MessageEvent) => {
@@ -765,6 +1330,11 @@ export function startStudioCompanionPrimaryRuntime(input: {
     if (message.type === "hello" && message.role === "companion") {
       const previousCompanionInstanceId = binding.companionInstanceId();
       if (!binding.acceptHello(message, primaryInstanceId)) return;
+      if (previousCompanionInstanceId !== message.companionInstanceId) {
+        bindingGeneration += 1;
+        navigatorDemanded = false;
+        resetCaptureGeneration();
+      }
       const shouldReply = previousCompanionInstanceId !== message.companionInstanceId
         || message.targetPrimaryInstanceId === null;
       if (!shouldReply) return;
@@ -794,8 +1364,36 @@ export function startStudioCompanionPrimaryRuntime(input: {
       }
       return;
     }
+    if (message.type === "companion-control") {
+      if (!binding.acceptControl(message, primaryInstanceId, bindingGeneration)) return;
+      if (message.control.kind === "navigator-demand") {
+        if (navigatorDemanded === message.control.active) return;
+        navigatorDemanded = message.control.active;
+        resetCaptureGeneration();
+        if (navigatorDemanded) {
+          const latest = input.getReviewProjection?.();
+          if (latest && isStudioCompanionReviewProjection(latest)) {
+            requestNavigatorCapture(latest);
+          }
+        }
+        return;
+      }
+      if (message.control.kind === "navigate") {
+        const latest = input.getReviewProjection?.();
+        if (
+          !navigatorDemanded
+          || !latest
+          || !isStudioCompanionReviewProjection(latest)
+          || !latest.captureAllowed
+        ) return;
+      }
+      input.onControl?.(message.control);
+      publish();
+      return;
+    }
     if (!binding.acceptCommand(message, primaryInstanceId)) return;
     input.onCommand(message.command);
+    publish();
   };
 
   try {
@@ -812,9 +1410,20 @@ export function startStudioCompanionPrimaryRuntime(input: {
     sessionId,
     binding,
     publish,
+    schedulePublish,
+    generation: () => bindingGeneration,
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      captureEpoch += 1;
+      clearCaptureTimer();
+      captureController?.abort();
+      captureController = null;
+      captureInFlight = false;
+      if (publishTimer !== null) {
+        globalThis.clearTimeout(publishTimer);
+        publishTimer = null;
+      }
       channel.onmessage = null;
       try {
         channel.close();

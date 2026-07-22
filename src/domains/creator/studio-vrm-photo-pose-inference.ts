@@ -1,4 +1,9 @@
 import {
+  createStudioVrmPhotoHandInferenceResult,
+  createStudioVrmPhotoHandUnavailableResult,
+  type StudioVrmPhotoHandInferenceResult,
+} from "./studio-vrm-photo-hand";
+import {
   StudioVrmPhotoPoseError,
   createStudioVrmPhotoPoseInferenceResult,
   type StudioVrmPhotoPoseInferenceResult,
@@ -11,21 +16,29 @@ export interface StudioVrmPhotoPoseImageDetector {
   detect(image: ImageBitmap): unknown;
 }
 
+/** A main-thread MediaPipe HandLandmarker configured with runningMode: "IMAGE". */
+export interface StudioVrmPhotoHandImageDetector {
+  detect(image: ImageBitmap): unknown;
+}
+
 export interface StudioVrmPhotoPoseInferenceOptions {
   readonly expectedGenerationId: number;
   readonly isGenerationCurrent?: (generationId: number) => boolean;
   readonly signal?: AbortSignal;
   readonly mirrorPose?: boolean;
   readonly minimumVisibility?: number;
+  readonly handDetector?: StudioVrmPhotoHandImageDetector | null;
+  readonly minimumHandednessConfidence?: number;
 }
 
 export interface StudioVrmPhotoPoseScanResult {
   readonly inference: StudioVrmPhotoPoseInferenceResult;
+  readonly hands: StudioVrmPhotoHandInferenceResult;
   readonly source: StudioVrmPhotoPosePreprocessedImage["source"];
   readonly output: StudioVrmPhotoPosePreprocessedImage["output"];
 }
 
-function closeStudioVrmPhotoPoseDetectorResult(result: unknown): void {
+function closeStudioVrmPhotoDetectorResult(result: unknown): void {
   if (typeof result !== "object" || result === null) return;
   const close = (result as { readonly close?: unknown }).close;
   if (typeof close !== "function") return;
@@ -34,6 +47,11 @@ function closeStudioVrmPhotoPoseDetectorResult(result: unknown): void {
   } catch {
     // MediaPipe cleanup is best-effort and must not replace the inference outcome.
   }
+}
+
+function isScanCancellation(error: unknown): boolean {
+  return error instanceof StudioVrmPhotoPoseError
+    && (error.code === "aborted" || error.code === "stale-generation");
 }
 
 /**
@@ -92,29 +110,55 @@ export function inferStudioVrmPhotoPoseFromImage(
 ): StudioVrmPhotoPoseScanResult {
   try {
     assertCurrentGeneration(preprocessed.generationId, options);
-    let rawResult: unknown = undefined;
+    let rawPoseResult: unknown = undefined;
+    let rawHandResult: unknown = undefined;
     try {
       try {
-        rawResult = detector.detect(preprocessed.bitmap);
+        rawPoseResult = detector.detect(preprocessed.bitmap);
       } catch (error) {
         throw new StudioVrmPhotoPoseError("inference-failed", { cause: error });
       }
       assertCurrentGeneration(preprocessed.generationId, options);
       const inference = createStudioVrmPhotoPoseInferenceResult(
         preprocessed.generationId,
-        rawResult,
+        rawPoseResult,
         {
           mirror: options.mirrorPose,
           minimumVisibility: options.minimumVisibility,
         },
       );
+      assertCurrentGeneration(preprocessed.generationId, options);
+
+      let hands: StudioVrmPhotoHandInferenceResult;
+      if (!options.handDetector) {
+        hands = createStudioVrmPhotoHandUnavailableResult("model-unavailable");
+      } else {
+        try {
+          rawHandResult = options.handDetector.detect(preprocessed.bitmap);
+          assertCurrentGeneration(preprocessed.generationId, options);
+          hands = createStudioVrmPhotoHandInferenceResult(rawHandResult, {
+            mirrorHorizontal: preprocessed.output.mirrorHorizontal,
+            minimumHandednessConfidence: options.minimumHandednessConfidence,
+          });
+        } catch (error) {
+          if (isScanCancellation(error)) throw error;
+          hands = createStudioVrmPhotoHandUnavailableResult(
+            error instanceof StudioVrmPhotoPoseError && error.code === "protocol"
+              ? "protocol"
+              : "inference-failed",
+          );
+        }
+      }
+      assertCurrentGeneration(preprocessed.generationId, options);
       return {
         inference,
+        hands,
         source: preprocessed.source,
         output: preprocessed.output,
       };
     } finally {
-      closeStudioVrmPhotoPoseDetectorResult(rawResult);
+      closeStudioVrmPhotoDetectorResult(rawHandResult);
+      closeStudioVrmPhotoDetectorResult(rawPoseResult);
     }
   } finally {
     // The worker transferred ownership to the main thread. The inference result contains copied

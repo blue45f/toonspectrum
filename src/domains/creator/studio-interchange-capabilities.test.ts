@@ -44,11 +44,22 @@ describe("Studio interchange capability registry", () => {
   });
 
   it("PSD는 부분 왕복, PDF/SVG/WebM은 출력 전용으로 정직하게 표시한다", () => {
-    expect(studioInterchangeCapability("psd")).toMatchObject({
+    const psd = studioInterchangeCapability("psd")!;
+    expect(psd).toMatchObject({
       import: "partial",
       export: "partial",
       roundTrip: "partial",
     });
+    expect(psd.lossModel.join(" ")).toContain("편집 가능한 알파 마스크");
+    expect(psd.lossModel.join(" ")).toContain("벡터·이중 마스크");
+    expect(psd.lossModel.join(" ")).toContain("페더");
+    expect(psd.notes.join(" ")).toContain("무손실 PNG");
+    expect(psd.sizeBudget).toMatchObject({
+      maxFileBytes: 128 * 1024 * 1024,
+      maxDecodedBytes: 128 * 1024 * 1024,
+      maxDimensionPx: 30_000,
+    });
+    expect(psd.notes.join(" ")).toContain("linked-file");
     for (const id of ["pdf", "svg", "webm"]) {
       expect(studioInterchangeCapability(id)).toMatchObject({ import: "unsupported", export: "available", roundTrip: "none" });
     }

@@ -243,15 +243,21 @@ export const STUDIO_INTERCHANGE_CAPABILITIES: readonly StudioInterchangeCapabili
     roundTrip: "partial",
     lossModel: [
       "텍스트·벡터·스마트 오브젝트·조정 레이어·일부 효과는 래스터화 또는 생략",
-      "그룹·마스크·블렌드 모드의 일부만 근사",
+      "래스터 레이어 마스크는 편집 가능한 알파 마스크로 가져오지만 벡터·이중 마스크와 페더는 래스터 근사",
+      "그룹과 일부 블렌드 모드는 Canvas 합성 범위로 근사",
     ],
     runtimeRequirement: ["ag-psd lazy chunk", "Canvas 2D"],
     sizeBudget: {
+      maxFileBytes: 128 * MiB,
+      maxDecodedBytes: 128 * MiB,
+      maxDimensionPx: 30_000,
       notes: "공통 손실 미리보기에서 영구 프로젝트 포함 자산을 모바일 64MiB, 데스크톱 128MiB로 제한",
     },
     status: "partial",
     notes: [
       "레이어 기반 교환은 가능하지만 Photoshop/CSP와 완전한 편집 왕복은 아닙니다.",
+      "레이어와 마스크는 같은 1,280px 폭 표시 프록시를 사용하며 마스크는 무손실 PNG로 보존합니다.",
+      "ag-psd 파싱은 원본 128MiB·누적 디코드 비트맵 128MiB에서 fail-closed하며 thumbnail·linked-file payload는 읽지 않습니다.",
       "ORA/CBZ와 같은 손실 미리보기에서 해상도·레이어·표시 프록시·편집성 변화를 적용 전에 확인합니다.",
     ],
   },

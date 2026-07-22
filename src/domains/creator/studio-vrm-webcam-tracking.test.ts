@@ -4,9 +4,11 @@ import {
   smoothRawChannels,
   convertChannelsToVrmData,
   createChannelSmoother,
+  disposePhotoHandLandmarker,
   disposePhotoPoseLandmarker,
   GAZE_PITCH_MAX_DEG,
   GAZE_YAW_MAX_DEG,
+  initPhotoHandLandmarker,
   initPhotoPoseLandmarker,
   NEUTRAL_CHANNELS,
   type TrackingChannels,
@@ -230,6 +232,44 @@ describe("photo-pose landmarker lifecycle", () => {
     expect(freshFactory).toHaveBeenCalledOnce();
 
     disposePhotoPoseLandmarker();
+    expect(closeFresh).toHaveBeenCalledOnce();
+  });
+});
+
+describe("photo-hand landmarker lifecycle", () => {
+  afterEach(() => {
+    disposePhotoHandLandmarker();
+  });
+
+  it("closes late initialization, retries after failure, caches once, and disposes idempotently", async () => {
+    type PhotoHandLandmarker = Awaited<ReturnType<typeof initPhotoHandLandmarker>>;
+    let resolveFactory!: (landmarker: PhotoHandLandmarker) => void;
+    const closeStale = vi.fn();
+    const factory = vi.fn(() => new Promise<PhotoHandLandmarker>((resolve) => {
+      resolveFactory = resolve;
+    }));
+    const pending = initPhotoHandLandmarker(factory);
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+
+    disposePhotoHandLandmarker();
+    resolveFactory({ close: closeStale } as unknown as PhotoHandLandmarker);
+
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(closeStale).toHaveBeenCalledOnce();
+
+    await expect(initPhotoHandLandmarker(async () => {
+      throw new Error("model unavailable");
+    })).rejects.toThrow("model unavailable");
+
+    const closeFresh = vi.fn();
+    const fresh = { close: closeFresh } as unknown as PhotoHandLandmarker;
+    const freshFactory = vi.fn(async () => fresh);
+    await expect(initPhotoHandLandmarker(freshFactory)).resolves.toBe(fresh);
+    await expect(initPhotoHandLandmarker()).resolves.toBe(fresh);
+    expect(freshFactory).toHaveBeenCalledOnce();
+
+    disposePhotoHandLandmarker();
+    disposePhotoHandLandmarker();
     expect(closeFresh).toHaveBeenCalledOnce();
   });
 });

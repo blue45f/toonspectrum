@@ -5,6 +5,8 @@ import {
   importPsdFile,
   mapPsdBlendMode,
   placementForLayer,
+  PSD_IMPORT_MAX_DECODED_BYTES,
+  PSD_IMPORT_MAX_FILE_BYTES,
   psdImportResultMessage,
   type PsdImportDeps,
   type PsdImportedElement,
@@ -14,8 +16,12 @@ import type { Layer, Psd } from "ag-psd";
 
 // ── 픽스처 헬퍼 — ag-psd Layer/Psd 는 필드가 전부 optional 이라 필요한 것만 채운다 ──────────
 
-function fakeCanvas(dataUrl = "data:image/png;base64,AAAA"): HTMLCanvasElement {
-  return { toDataURL: () => dataUrl } as unknown as HTMLCanvasElement;
+function fakeCanvas(
+  dataUrl = "data:image/png;base64,AAAA",
+  width = 100,
+  height = 100,
+): HTMLCanvasElement {
+  return { width, height, toDataURL: () => dataUrl } as unknown as HTMLCanvasElement;
 }
 
 /** 리프(비그룹) 레이어 — 기본으로 100x100 bounds + 캔버스를 채워 "정상 임포트 가능" 상태로 만든다. */
@@ -162,10 +168,15 @@ describe("psdImportResultMessage", () => {
 });
 
 describe("importPsdFile (readPsd/downscaleDataUrl 을 deps 로 주입 — DOM/실파일 불필요)", () => {
-  function depsFor(psd: Psd, downscaleImpl?: PsdImportDeps["downscaleImpl"]): PsdImportDeps {
+  function depsFor(
+    psd: Psd,
+    downscaleImpl?: PsdImportDeps["downscaleImpl"],
+    rasterizeMaskImpl?: PsdImportDeps["rasterizeMaskImpl"],
+  ): PsdImportDeps {
     return {
       readPsdImpl: () => psd,
       downscaleImpl: downscaleImpl ?? (async (dataUrl) => dataUrl),
+      rasterizeMaskImpl,
     };
   }
 
@@ -220,24 +231,133 @@ describe("importPsdFile (readPsd/downscaleDataUrl 을 deps 로 주입 — DOM/�
     expect(result.elements[0].hidden).toBeUndefined();
   });
 
-  it("마스크·이펙트·스마트오브젝트·텍스트 레이어는 이미지로 가져오되 각각 알림을 남긴다", async () => {
+  it("이펙트·스마트오브젝트·텍스트 레이어는 이미지로 가져오되 각각 알림을 남긴다", async () => {
     const psd = samplePsd([
-      leaf({ name: "마스크있음", mask: { top: 0, left: 0, bottom: 10, right: 10 } }),
       leaf({ name: "이펙트있음", effects: { dropShadow: [] } }),
       leaf({ name: "스마트오브젝트", placedLayer: { id: "1", type: "raster", transform: [] } }),
       leaf({ name: "텍스트", text: { text: "hi" } }),
     ]);
     const result = await importPsdFile(new File([], "t.psd"), 720, depsFor(psd));
-    expect(result.elements).toHaveLength(4);
-    expect(result.skipped).toHaveLength(4);
+    expect(result.elements).toHaveLength(3);
+    expect(result.skipped).toHaveLength(3);
     expect(result.skipped).toEqual(
       expect.arrayContaining([
-        "마스크있음: 레이어 마스크는 반영되지 않고 원본 그대로 가져왔어요",
         "이펙트있음: 레이어 스타일(그림자 등)은 반영되지 않아요",
         "스마트오브젝트: 스마트 오브젝트는 편집 가능한 원본이 아니라 미리보기 이미지로 가져왔어요",
         "텍스트: 텍스트 레이어는 편집 가능한 글자가 아니라 이미지로 가져왔어요",
       ])
     );
+  });
+
+  it("래스터 마스크를 편집 가능한 maskSrc로 연결하고 layer-local raster 입력을 전달한다", async () => {
+    const mask = { top: 230, left: 120, bottom: 270, right: 170 };
+    const psd = samplePsd([
+      leaf({ name: "마스크", left: 100, top: 200, right: 200, bottom: 300, mask }),
+    ]);
+    const captured: Parameters<NonNullable<PsdImportDeps["rasterizeMaskImpl"]>>[0][] = [];
+    const result = await importPsdFile(
+      new File([], "t.psd"),
+      720,
+      depsFor(psd, undefined, (input) => {
+        captured.push(input);
+        return { maskSrc: "data:image/png;base64,MASK", warnings: [] };
+      }),
+    );
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0]).toMatchObject({
+      layerLeft: 100,
+      layerTop: 200,
+      layerPixelWidth: 100,
+      layerPixelHeight: 100,
+      masks: [{ kind: "primary", mask }],
+    });
+    expect(result.elements[0]).toMatchObject({
+      src: "data:image/png;base64,AAAA",
+      maskSrc: "data:image/png;base64,MASK",
+    });
+    expect(result.elements[0].maskEnabled).toBeUndefined();
+    expect(result.skipped).toEqual([]);
+  });
+
+  it("Photoshop에서 꺼진 마스크는 픽셀을 보존하면서 maskEnabled=false로 가져온다", async () => {
+    const psd = samplePsd([leaf({ name: "꺼짐", mask: { disabled: true } })]);
+    const result = await importPsdFile(
+      new File([], "t.psd"),
+      720,
+      depsFor(psd, undefined, () => ({
+        maskSrc: "data:image/png;base64,OFF",
+        disabled: true,
+        warnings: [],
+      })),
+    );
+    expect(result.elements[0]).toMatchObject({
+      maskSrc: "data:image/png;base64,OFF",
+      maskEnabled: false,
+    });
+  });
+
+  it("손상·인코딩 실패 마스크는 레이어 자체를 숨기지 않고 경고만 남긴다", async () => {
+    const psd = samplePsd([leaf({ name: "손상", mask: {} })]);
+    const result = await importPsdFile(
+      new File([], "t.psd"),
+      720,
+      depsFor(psd, undefined, () => ({
+        warnings: ["마스크 픽셀 데이터가 없거나 손상되어 원본 레이어를 가리지 않고 가져왔어요."],
+      })),
+    );
+    expect(result.elements[0].src).toBeTruthy();
+    expect(result.elements[0].maskSrc).toBeUndefined();
+    expect(result.elements[0].maskEnabled).toBeUndefined();
+    expect(result.skipped).toEqual([
+      "손상: 마스크 픽셀 데이터가 없거나 손상되어 원본 레이어를 가리지 않고 가져왔어요.",
+    ]);
+  });
+
+  it("vector-only와 vector raster/dual mask의 편집성 손실을 명시한다", async () => {
+    const vectorMask = {} as NonNullable<Layer["vectorMask"]>;
+    const psd = samplePsd([
+      leaf({ name: "벡터전용", vectorMask }),
+      leaf({
+        name: "이중",
+        vectorMask,
+        mask: { fromVectorData: true },
+        realMask: {},
+      }),
+    ]);
+    const result = await importPsdFile(
+      new File([], "t.psd"),
+      720,
+      depsFor(psd, undefined, () => ({
+        maskSrc: "data:image/png;base64,DUAL",
+        warnings: [],
+      })),
+    );
+    expect(result.skipped.join(" ")).toContain("벡터 전용 마스크는 래스터 픽셀이 없어");
+    expect(result.skipped.join(" ")).toContain("벡터 마스크를 편집 가능한 단일 래스터 마스크로 근사");
+    expect(result.skipped.join(" ")).toContain("픽셀·벡터 이중 마스크");
+  });
+
+  it("realMask를 단일 authoritative source로 전달하고 primary는 parameter/fallback으로만 유지한다", async () => {
+    const primary = { userMaskDensity: 0.5 };
+    const real = { disabled: true };
+    const captured: Parameters<NonNullable<PsdImportDeps["rasterizeMaskImpl"]>>[0][] = [];
+    const psd = samplePsd([leaf({ name: "이중", mask: primary, realMask: real })]);
+
+    await importPsdFile(
+      new File([], "t.psd"),
+      720,
+      depsFor(psd, undefined, (input) => {
+        captured.push(input);
+        return { maskSrc: "data:image/png;base64,REAL", disabled: true, warnings: [] };
+      }),
+    );
+
+    expect(captured[0]).toMatchObject({
+      masks: [{ kind: "real", mask: real, parameterMask: primary }],
+      fallbackMask: { kind: "primary", mask: primary },
+    });
+    expect(captured[0].masks).toHaveLength(1);
   });
 
   it("레이어가 하나도 없으면 안내 메시지를 남긴다", async () => {
@@ -254,11 +374,95 @@ describe("importPsdFile (readPsd/downscaleDataUrl 을 deps 로 주입 — DOM/�
       720,
       depsFor(psd, async (dataUrl, maxW) => {
         captured.push({ dataUrl, maxW });
-        return "downscaled-src";
+        return "data:image/webp;base64,DOWNSCALED";
       })
     );
     expect(captured).toEqual([{ dataUrl: "data:image/png;base64,AAAA", maxW: 1280 }]);
-    expect(result.elements[0].src).toBe("downscaled-src");
+    expect(result.elements[0].src).toBe("data:image/webp;base64,DOWNSCALED");
+  });
+
+  it("고해상도 source 축소가 원본으로 fallback하면 mask도 원본 폭을 사용해 자연 크기를 맞춘다", async () => {
+    const raw = "data:image/png;base64,HIGH";
+    const canvas = fakeCanvas(raw, 2_560, 1_600);
+    const psd = samplePsd([
+      leaf({
+        name: "고해상도",
+        right: 2_560,
+        bottom: 1_600,
+        canvas,
+        mask: { left: 0, top: 0, right: 1, bottom: 1 },
+      }),
+    ]);
+    let captured: Parameters<NonNullable<PsdImportDeps["rasterizeMaskImpl"]>>[0] | undefined;
+
+    const result = await importPsdFile(
+      new File([], "t.psd"),
+      720,
+      depsFor(psd, async () => raw, (input) => {
+        captured = input;
+        return { warnings: [] };
+      }),
+    );
+
+    expect(captured).toMatchObject({
+      layerPixelWidth: 2_560,
+      layerPixelHeight: 1_600,
+      maxWidth: 2_560,
+    });
+    expect(result.elements[0].src).toBe(raw);
+    expect(result.skipped.join(" ")).toContain("원본 PNG를 유지");
+  });
+
+  it("고해상도 source가 새 1280px proxy로 변환되면 mask도 1280px 상한을 쓴다", async () => {
+    const canvas = fakeCanvas("data:image/png;base64,HIGH", 2_560, 1_600);
+    const psd = samplePsd([
+      leaf({
+        right: 2_560,
+        bottom: 1_600,
+        canvas,
+        mask: { left: 0, top: 0, right: 1, bottom: 1 },
+      }),
+    ]);
+    let captured: Parameters<NonNullable<PsdImportDeps["rasterizeMaskImpl"]>>[0] | undefined;
+
+    await importPsdFile(
+      new File([], "t.psd"),
+      720,
+      depsFor(psd, async () => "data:image/webp;base64,PROXY", (input) => {
+        captured = input;
+        return { warnings: [] };
+      }),
+    );
+
+    expect(captured?.maxWidth).toBe(1_280);
+  });
+
+  it("downscale throw/empty result는 원본 PNG로 안전하게 fallback하고 경고한다", async () => {
+    const psd = samplePsd([leaf({ name: "A" })]);
+    const thrown = await importPsdFile(
+      new File([], "t.psd"),
+      720,
+      depsFor(psd, async () => {
+        throw new Error("decoder failed");
+      }),
+    );
+    expect(thrown.elements[0].src).toBe("data:image/png;base64,AAAA");
+    expect(thrown.skipped.join(" ")).toContain("프록시 변환에 실패");
+
+    const empty = await importPsdFile(
+      new File([], "t.psd"),
+      720,
+      depsFor(psd, async () => "data:,"),
+    );
+    expect(empty.elements[0].src).toBe("data:image/png;base64,AAAA");
+    expect(empty.skipped.join(" ")).toContain("프록시 인코딩이 비어");
+  });
+
+  it("Canvas가 빈 PNG data URL을 반환하면 손상 레이어를 생성하지 않는다", async () => {
+    const psd = samplePsd([leaf({ name: "빈 레이어", canvas: fakeCanvas("data:,") })]);
+    const result = await importPsdFile(new File([], "t.psd"), 720, depsFor(psd));
+    expect(result.elements).toEqual([]);
+    expect(result.skipped).toEqual(["빈 레이어: 래스터 PNG가 비어 있어 건너뜀"]);
   });
 
   it("readPsd 파싱이 실패하면 한국어 메시지로 throw 한다", async () => {
@@ -270,6 +474,41 @@ describe("importPsdFile (readPsd/downscaleDataUrl 을 deps 로 주입 — DOM/�
     await expect(importPsdFile(new File([], "t.psd"), 720, badDeps)).rejects.toThrow(
       "PSD 파일을 해석하지 못했어요"
     );
+  });
+
+  it("ag-psd를 bounded bitmap decode와 불필요한 payload 생략 옵션으로 호출한다", async () => {
+    const calls: unknown[] = [];
+    await importPsdFile(new File([], "t.psd"), 720, {
+      readPsdImpl: (_buffer, options) => {
+        calls.push(options);
+        return samplePsd([]);
+      },
+    });
+    expect(calls).toEqual([{
+      skipCompositeImageData: true,
+      skipThumbnail: true,
+      skipLinkedFilesData: true,
+      totalMemoryLimit: PSD_IMPORT_MAX_DECODED_BYTES,
+    }]);
+  });
+
+  it("declared/actual source bytes가 PSD browser file budget을 넘으면 parsing 전에 거부한다", async () => {
+    let reads = 0;
+    const oversized = {
+      size: PSD_IMPORT_MAX_FILE_BYTES + 1,
+      arrayBuffer: async () => {
+        reads += 1;
+        return new ArrayBuffer(0);
+      },
+    } as unknown as File;
+    await expect(importPsdFile(oversized, 720)).rejects.toThrow("최대 128MB");
+    expect(reads).toBe(0);
+
+    const mismatched = {
+      size: 0,
+      arrayBuffer: async () => ({ byteLength: PSD_IMPORT_MAX_FILE_BYTES + 1 }) as ArrayBuffer,
+    } as unknown as File;
+    await expect(importPsdFile(mismatched, 720)).rejects.toThrow("최대 128MB");
   });
 
   it("file.arrayBuffer 자체가 실패해도 한국어 메시지로 throw 한다", async () => {

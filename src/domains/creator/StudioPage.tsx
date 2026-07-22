@@ -1249,6 +1249,7 @@ import type {
   StudioPageInsertState,
   StudioPageSelectedFrame,
 } from "./studio-comipo-shipped";
+import type { StudioCompanionReviewControl } from "./studio-companion-review-projection";
 import type { StudioCrdtDocument } from "./studio-crdt-document";
 import type { StudioRasterOverlaySourceElement } from "./studio-crdt-raster-ui-bridge";
 import type {
@@ -1318,7 +1319,6 @@ import type { StudioTeamCommentMutationPlan } from "./studio-team-comment-mutati
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type {
   StudioCompanionCommandName,
-  StudioCompanionPrimaryBinding,
   StudioCompanionPrimaryRuntime,
 } from "./studio-tools-companion";
 import type { StudioGpuBackend } from "./studio-webgpu-frame-contract";
@@ -2131,6 +2131,15 @@ type StudioToolsCompanionPrimaryRuntime = StudioCompanionPrimaryRuntime & {
   protocol: StudioToolsCompanionProtocol;
 };
 
+type StudioToolsCompanionReviewProjectionInput = Parameters<
+  StudioToolsCompanionProtocol["createStudioCompanionReviewProjectionFromSource"]
+>[0];
+
+type StudioToolsCompanionRuntimeInput = Omit<
+  Parameters<StudioToolsCompanionProtocol["startStudioCompanionPrimaryRuntimeFromSources"]>[0],
+  "getReviewProjectionInput"
+> & { getReviewProjectionInput?: () => StudioToolsCompanionReviewProjectionInput };
+
 let studioToolsCompanionProtocolPromise: Promise<StudioToolsCompanionProtocol> | null = null;
 
 function loadStudioToolsCompanionProtocol(): Promise<StudioToolsCompanionProtocol> {
@@ -2138,47 +2147,11 @@ function loadStudioToolsCompanionProtocol(): Promise<StudioToolsCompanionProtoco
 }
 
 async function startStudioToolsCompanionPrimaryRuntime(
-  input: Parameters<StudioToolsCompanionProtocol["startStudioCompanionPrimaryRuntime"]>[0]
+  input: StudioToolsCompanionRuntimeInput
 ): Promise<StudioToolsCompanionPrimaryRuntime | null> {
   const protocol = await loadStudioToolsCompanionProtocol();
-  const runtime = protocol.startStudioCompanionPrimaryRuntime(input);
+  const runtime = protocol.startStudioCompanionPrimaryRuntimeFromSources(input);
   return runtime ? { protocol, ...runtime } : null;
-}
-
-function openReadyStudioToolsCompanionForMenu(input: {
-  protocol: StudioToolsCompanionProtocol;
-  sessionId: string;
-  windowRef: { current: Window | null };
-  binding: StudioCompanionPrimaryBinding;
-  announce: (message: string) => void;
-}): void {
-  const {
-    isStudioToolsCompanionWindowReusable,
-    openStudioToolsCompanionWindow,
-  } = input.protocol;
-  const cachedWindow = input.windowRef.current;
-  const reusedExistingWindow = isStudioToolsCompanionWindowReusable(
-    input.sessionId,
-    cachedWindow
-  );
-  const existingWindow = reusedExistingWindow ? cachedWindow : null;
-  if (!reusedExistingWindow) {
-    input.binding.release();
-    input.windowRef.current = null;
-  }
-  const companionWindow = openStudioToolsCompanionWindow(input.sessionId, existingWindow);
-  if (!companionWindow) {
-    input.announce("팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.");
-    return;
-  }
-  input.windowRef.current = companionWindow;
-  input.announce(
-    reusedExistingWindow
-      ? "도구 창을 앞으로 가져오도록 요청했어요 · 보이지 않으면 작업 표시줄에서 선택하세요"
-      : cachedWindow
-        ? "도구 창을 복구해 다시 연결합니다 · 다른 모니터로 옮겨 쓰세요"
-      : "도구 창을 열었습니다 · 다른 모니터로 옮겨 쓰세요",
-  );
 }
 
 const STUDIO_TOOLS_COMPANION_RESERVATION_FEATURES =
@@ -2192,8 +2165,7 @@ function openStudioToolsCompanionForMenu(input: {
 }): void {
   const ready = input.runtimeRef.current;
   if (ready) {
-    openReadyStudioToolsCompanionForMenu({
-      protocol: ready.protocol,
+    ready.protocol.openReadyStudioToolsCompanionForMenu({
       sessionId: ready.sessionId,
       binding: ready.binding,
       windowRef: input.windowRef,
@@ -2226,33 +2198,36 @@ function openStudioToolsCompanionForMenu(input: {
   input.windowRef.current = reservation;
   input.announce("도구 창을 준비 중입니다 · 연결이 끝나면 자동으로 열립니다");
 
+  const abandonReservation = (message: string) => {
+    try {
+      reservation?.close();
+    } catch {
+      // Ignore a reservation already closed by the browser.
+    }
+    if (input.windowRef.current !== reservation) return;
+    input.windowRef.current = null;
+    input.announce(message);
+  };
+  const reservationTimeout = globalThis.setTimeout(() => {
+    abandonReservation("도구 창 준비 시간이 초과됐습니다. 다시 시도해 주세요.");
+  }, 8_000);
+  const unavailableMessage = "도구 창을 사용할 수 없습니다. 다시 시도해 주세요.";
+
   void input.ensureRuntime().then((runtime) => {
-    if (!runtime || input.windowRef.current !== reservation) {
-      try {
-        reservation?.close();
-      } catch {
-        // Ignore a reservation already closed by the user.
-      }
-      if (!runtime) {
-        input.windowRef.current = null;
-        input.announce("도구 창을 사용할 수 없습니다. 브라우저 채널 지원을 확인해 주세요.");
-      }
+    globalThis.clearTimeout(reservationTimeout);
+    if (!runtime) {
+      abandonReservation(unavailableMessage);
       return;
     }
-    try {
-      reservation.name = runtime.protocol.studioCompanionWindowName(runtime.sessionId);
-      reservation.location.replace(runtime.protocol.studioCompanionUrl(runtime.sessionId));
-      reservation.focus();
-      input.announce("도구 창을 열었습니다 · 다른 모니터로 옮겨 쓰세요");
-    } catch {
-      input.windowRef.current = null;
-      try {
-        reservation.close();
-      } catch {
-        // Ignore a reservation already closed by the browser.
-      }
-      input.announce("도구 창을 열지 못했습니다. 다시 시도해 주세요.");
-    }
+    runtime.protocol.completeReservedStudioToolsCompanionWindow({
+      sessionId: runtime.sessionId,
+      reservation,
+      windowRef: input.windowRef,
+      announce: input.announce,
+    });
+  }).catch(() => {
+    globalThis.clearTimeout(reservationTimeout);
+    abandonReservation(unavailableMessage);
   });
 }
 
@@ -9722,6 +9697,16 @@ function StudioCuttoonEditor() {
   const companionRuntimeGenerationRef = useRef(0);
   const companionWindowRef = useRef<Window | null>(null);
   const companionPendingTextTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
+  const companionProjectionRevisionRef = useRef(0);
+  const companionReviewProjectionInputRef = useRef<
+    (() => StudioToolsCompanionReviewProjectionInput) | null
+  >(null);
+  const companionControlHandlerRef = useRef<(control: StudioCompanionReviewControl) => void>(
+    () => undefined
+  );
+  const companionHistoryHandlerRef = useRef<(action: "undo" | "redo") => void>(
+    () => undefined
+  );
   const companionUiRef = useRef({
     tool,
     drawMode,
@@ -9734,6 +9719,116 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     companionUiRef.current = { tool, drawMode, menu, uiDensityMode, canvasOnlyMode, title };
   }, [tool, drawMode, menu, uiDensityMode, canvasOnlyMode, title]);
+
+  companionReviewProjectionInputRef.current = () => {
+    companionProjectionRevisionRef.current = companionProjectionRevisionRef.current
+      >= Number.MAX_SAFE_INTEGER
+      ? 0
+      : companionProjectionRevisionRef.current + 1;
+    const wrap = wrapRef.current;
+    const scrollWidth = Math.max(1, wrap?.scrollWidth ?? CANVAS_W * effScale);
+    const scrollHeight = Math.max(1, wrap?.scrollHeight ?? canvasH * effScale);
+    const selectedElement = selectedId ? elementById.get(selectedId) ?? null : null;
+    const companionReviewComments = studioCommentViewDocument.threads;
+    return {
+      revision: companionProjectionRevisionRef.current,
+      documentRevision: studioRevisionProjectGenerationRef.current,
+      pageLabel: pageDisplayName(activePage, activePageIndex),
+      selectionLabel: selectedElement ? elementLabel(selectedElement) : null,
+      canUndo: !masterEditMode && !collaborationDocumentLocked && pagesHi > 0,
+      canRedo:
+        !masterEditMode
+        && !collaborationDocumentLocked
+        && pagesHi < pagesHistory.length - 1,
+      captureAllowed:
+        drawingRef.current === null
+        && !drawingPointerTransportRef.current?.getSession(),
+      viewport: {
+        x: Math.max(0, Math.min(1, (wrap?.scrollLeft ?? 0) / scrollWidth)),
+        y: Math.max(0, Math.min(1, (wrap?.scrollTop ?? 0) / scrollHeight)),
+        width: Math.max(0.01, Math.min(1, (wrap?.clientWidth ?? scrollWidth) / scrollWidth)),
+        height: Math.max(0.01, Math.min(1, (wrap?.clientHeight ?? scrollHeight) / scrollHeight)),
+      },
+      selectedLayerId: selectedId,
+      layers: elements,
+      layerLabel: (layerId: string) => {
+        const element = elementById.get(layerId);
+        return element ? elementLabel(element) : "이름 없는 레이어";
+      },
+      historyLength: pagesHistory.length,
+      historyIndex: pagesHi,
+      comments: companionReviewComments,
+      unreadCommentIds: studioTeamUnreadCommentIds,
+      brush: {
+        id: brush,
+        label: activeCatalogBrush.name,
+        size: strokeWidth,
+        opacity: brushOpacity,
+        color,
+        choices: BRUSH_PRESETS,
+      },
+    };
+  };
+
+  companionControlHandlerRef.current = (control) => {
+    switch (control.kind) {
+      case "navigate": {
+        if (drawingRef.current || drawingPointerTransportRef.current?.getSession()) return;
+        const wrap = wrapRef.current;
+        if (!wrap) return;
+        const maximumLeft = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
+        const maximumTop = Math.max(0, wrap.scrollHeight - wrap.clientHeight);
+        const nextLeft = control.point.x * wrap.scrollWidth - wrap.clientWidth / 2;
+        const nextTop = control.point.y * wrap.scrollHeight - wrap.clientHeight / 2;
+        wrap.scrollLeft = Math.max(0, Math.min(maximumLeft, nextLeft));
+        wrap.scrollTop = Math.max(0, Math.min(maximumTop, nextTop));
+        return;
+      }
+      case "select-layer":
+        if (!activeElementsRef.current.some((element) => element.id === control.layerId)) return;
+        setSelectedId(control.layerId);
+        setTool("select");
+        return;
+      case "history":
+        companionHistoryHandlerRef.current(control.action);
+        return;
+      case "comment-focus":
+        if (!studioCommentViewDocumentRef.current.threads.some(
+          (thread) => thread.id === control.threadId
+        )) return;
+        openStudioCommentThreadInReview(control.threadId);
+        return;
+      case "brush": {
+        let applied = false;
+        if (control.patch.id !== undefined) {
+          const preset = BRUSH_PRESETS.find((candidate) => candidate.id === control.patch.id);
+          if (preset) {
+            applyBuiltInBrushPreset(preset);
+            applied = true;
+          }
+        }
+        if (control.patch.size !== undefined) {
+          setStrokeWidth(control.patch.size);
+          applied = true;
+        }
+        if (control.patch.opacity !== undefined) {
+          setBrushOpacity(control.patch.opacity);
+          applied = true;
+        }
+        if (control.patch.color !== undefined) {
+          setColor(control.patch.color.toLowerCase());
+          applied = true;
+        }
+        if (applied) {
+          setTool("draw");
+          setDrawMode("pen");
+        }
+        return;
+      }
+      default:
+        return;
+    }
+  };
 
   const companionCommandHandlerRef = useRef<(command: StudioCompanionCommandName) => void>(() => undefined);
   useEffect(() => {
@@ -9820,7 +9915,22 @@ function StudioCuttoonEditor() {
           title: s.title,
         };
       },
+      getReviewProjectionInput: () => {
+        const create = companionReviewProjectionInputRef.current;
+        if (!create) throw new Error("Studio companion projection is unavailable");
+        return create();
+      },
+      isNavigatorCaptureBlocked: () => Boolean(
+        drawingRef.current || drawingPointerTransportRef.current?.getSession()
+      ),
+      captureNavigatorCanvas: (maximumLongestEdge) => {
+        const stage = stageRef.current;
+        if (!stage) return null;
+        const longestEdge = Math.max(1, stage.width(), stage.height());
+        return stage.toCanvas({ pixelRatio: Math.min(1, maximumLongestEdge / longestEdge) });
+      },
       onCommand: (command) => companionCommandHandlerRef.current(command),
+      onControl: (control) => companionControlHandlerRef.current(control),
     }).then((runtime) => {
       if (generation !== companionRuntimeGenerationRef.current) {
         runtime?.dispose();
@@ -9865,7 +9975,7 @@ function StudioCuttoonEditor() {
       resolveStudioCompanionTool({ tool, drawMode, menu })
       !== resolveStudioCompanionTool(companionUiRef.current)
     ) return;
-    companionRuntimeRef.current?.publish();
+    companionRuntimeRef.current?.schedulePublish();
   }, [
     tool,
     drawMode,
@@ -9873,6 +9983,23 @@ function StudioCuttoonEditor() {
     uiDensityMode,
     canvasOnlyMode,
     title,
+    selectedId,
+    pagesHi,
+    pagesHistory,
+    currentPageId,
+    elements,
+    studioCommentViewDocument,
+    studioTeamUnreadCommentIds,
+    brush,
+    strokeWidth,
+    brushOpacity,
+    color,
+    activeCatalogBrush,
+    scrollPos,
+    effScale,
+    canvasH,
+    masterEditMode,
+    collaborationDocumentLocked,
   ]);
 
   // 툴바 드롭다운 바깥 클릭 시 닫기.
@@ -15273,6 +15400,16 @@ function StudioCuttoonEditor() {
     if (nextSnapshot && !publishStudioCrdtHistoryTransition(pages, nextSnapshot)) return;
     setPagesHi(nextIndex);
   };
+  companionHistoryHandlerRef.current = (action) => {
+    if (masterEditMode || collaborationDocumentLocked) return;
+    if (action === "undo") {
+      if (pagesHi <= 0) return;
+      undo();
+      return;
+    }
+    if (pagesHi >= pagesHistory.length - 1) return;
+    redo();
+  };
   function fitCanvasToWidth() {
     if (viewTransformSuppressed) return;
     const wrap = wrapRef.current;
@@ -19747,6 +19884,7 @@ function StudioCuttoonEditor() {
       }
     }
     drawingRef.current = null;
+    companionRuntimeRef.current?.schedulePublish();
     perspectiveRayRef.current = null;
     isometricAxisRayRef.current = null;
     advancedRulerSnapRef.current = null;
@@ -22576,6 +22714,7 @@ function StudioCuttoonEditor() {
       // No error or stale tool ref may strand DOM capture or a predicted RAF after the stroke ends.
       releaseDrawingPointerSession();
       drawingRef.current = null;
+      companionRuntimeRef.current?.schedulePublish();
       perspectiveRayRef.current = null;
       isometricAxisRayRef.current = null;
       advancedRulerSnapRef.current = null;

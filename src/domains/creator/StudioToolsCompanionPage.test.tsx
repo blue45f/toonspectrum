@@ -4,8 +4,11 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { MemoryRouter, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { createStudioCompanionReviewProjection } from "./studio-companion-review-projection";
 import {
+  buildStudioCompanionNavigatorFrame,
   buildStudioCompanionPing,
+  buildStudioCompanionReviewState,
   isStudioCompanionSessionId,
   studioCompanionChannelName,
   type StudioCompanionMessage,
@@ -37,6 +40,31 @@ const sessionId = "primary-a-1234";
 const sessionIdB = "primary-b-5678";
 const primaryInstanceA = "primary-instance-a-1234";
 const primaryInstanceB = "primary-instance-b-5678";
+const originalCreateObjectUrl = Object.getOwnPropertyDescriptor(URL, "createObjectURL");
+const originalRevokeObjectUrl = Object.getOwnPropertyDescriptor(URL, "revokeObjectURL");
+
+function installObjectUrlSpies() {
+  const createObjectURL = vi.fn((blob: Blob) => `blob:frame-${blob.size}-${createObjectURL.mock.calls.length}`);
+  const revokeObjectURL = vi.fn();
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    writable: true,
+    value: createObjectURL,
+  });
+  Object.defineProperty(URL, "revokeObjectURL", {
+    configurable: true,
+    writable: true,
+    value: revokeObjectURL,
+  });
+  return { createObjectURL, revokeObjectURL };
+}
+
+function restoreObjectUrlStatics() {
+  if (originalCreateObjectUrl) Object.defineProperty(URL, "createObjectURL", originalCreateObjectUrl);
+  else Reflect.deleteProperty(URL, "createObjectURL");
+  if (originalRevokeObjectUrl) Object.defineProperty(URL, "revokeObjectURL", originalRevokeObjectUrl);
+  else Reflect.deleteProperty(URL, "revokeObjectURL");
+}
 
 function renderCompanion(entry = `/studio/tools-companion?session=${sessionId}`) {
   return render(
@@ -52,6 +80,96 @@ function companionInstanceId(channel: FakeBroadcastChannel): string {
     .find((message) => message.type === "hello" && message.role === "companion");
   if (!hello || hello.role !== "companion") throw new Error("companion hello missing");
   return hello.companionInstanceId;
+}
+
+function projectedReview(input: {
+  revision?: number;
+  documentRevision?: number;
+  captureAllowed?: boolean;
+} = {}) {
+  return createStudioCompanionReviewProjection({
+    revision: input.revision ?? 1,
+    documentRevision: input.documentRevision ?? 5,
+    pageLabel: "1화",
+    selectionLabel: "선화",
+    canUndo: true,
+    canRedo: true,
+    captureAllowed: input.captureAllowed ?? true,
+    viewport: { x: 0.1, y: 0.2, width: 0.4, height: 0.3 },
+    layers: [{ id: "layer-1", label: "주인공 선화", type: "draw", selected: true }],
+    historyLength: 3,
+    historyIndex: 2,
+    comments: [{ id: "thread-1", author: "편집자", body: "표정 확인", unread: true }],
+    brush: {
+      id: "pen",
+      label: "펜",
+      size: 6,
+      opacity: 1,
+      color: "#112233",
+      choices: [{ id: "pencil", label: "연필" }],
+    },
+  });
+}
+
+function connectPrimary(input: {
+  channel: FakeBroadcastChannel;
+  companionInstance: string;
+  primaryInstance?: string;
+  generation?: number;
+  projection?: ReturnType<typeof projectedReview>;
+}) {
+  const primaryInstance = input.primaryInstance ?? primaryInstanceA;
+  const projection = input.projection ?? projectedReview();
+  act(() => {
+    input.channel.emit({
+      v: 1,
+      type: "hello",
+      role: "primary",
+      primaryInstanceId: primaryInstance,
+      targetCompanionInstanceId: input.companionInstance,
+      at: Date.now(),
+    });
+    input.channel.emit({
+      v: 1,
+      type: "primary-state",
+      primaryInstanceId: primaryInstance,
+      targetCompanionInstanceId: input.companionInstance,
+      tool: "pen",
+      density: "full",
+      canvasOnly: false,
+      title: "1화",
+      at: Date.now(),
+    });
+    input.channel.emit(buildStudioCompanionReviewState({
+      primaryInstanceId: primaryInstance,
+      targetCompanionInstanceId: input.companionInstance,
+      generation: input.generation ?? 1,
+      projection,
+    }));
+  });
+  return { primaryInstance, projection };
+}
+
+function navigatorFrame(input: {
+  primaryInstance?: string;
+  companionInstance: string;
+  generation?: number;
+  revision?: number;
+  sequence?: number;
+  marker?: string;
+}) {
+  return buildStudioCompanionNavigatorFrame({
+    primaryInstanceId: input.primaryInstance ?? primaryInstanceA,
+    targetCompanionInstanceId: input.companionInstance,
+    frame: {
+      generation: input.generation ?? 1,
+      revision: input.revision ?? 5,
+      sequence: input.sequence ?? 1,
+      width: 640,
+      height: 960,
+      blob: new Blob([input.marker ?? "frame"], { type: "image/webp" }),
+    },
+  });
 }
 
 function SessionSwitchHarness() {
@@ -78,7 +196,10 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  Reflect.deleteProperty(window, "getScreenDetails");
+  restoreObjectUrlStatics();
 });
 
 describe("StudioToolsCompanionPage", () => {
@@ -175,6 +296,64 @@ describe("StudioToolsCompanionPage", () => {
         sequence: 1,
       })
     );
+  });
+
+  it("removes the primary document title from the entire DOM in presentation-safe mode", () => {
+    const view = renderCompanion();
+    const channel = FakeBroadcastChannel.instances[0]!;
+    const companionInstance = companionInstanceId(channel);
+    connectPrimary({ channel, companionInstance });
+    const secretTitle = "미공개 계약작 7화";
+    act(() => {
+      channel.emit({
+        v: 1,
+        type: "primary-state",
+        primaryInstanceId: primaryInstanceA,
+        targetCompanionInstanceId: companionInstance,
+        tool: "pen",
+        density: "full",
+        canvasOnly: false,
+        title: secretTitle,
+        at: Date.now(),
+      });
+    });
+    expect(view.container.textContent).toContain(secretTitle);
+
+    fireEvent.click(screen.getByRole("tab", { name: "검수" }));
+    fireEvent.click(screen.getByRole("button", { name: "발표 안전" }));
+
+    expect(view.container.textContent).not.toContain(secretTitle);
+    expect(view.container.querySelector("header [role='status']")?.textContent)
+      .toContain("연결됨 · 발표 안전");
+    expect(screen.getByText("스튜디오")).toBeTruthy();
+  });
+
+  it("demands navigator frames only while the Navigator tab is active", () => {
+    renderCompanion();
+    const channel = FakeBroadcastChannel.instances[0]!;
+    const companionInstance = companionInstanceId(channel);
+    connectPrimary({ channel, companionInstance });
+    const demandMessages = () => channel.postMessage.mock.calls
+      .map(([message]) => message as StudioCompanionMessage)
+      .filter((message) => (
+        message.type === "companion-control"
+        && message.control.kind === "navigator-demand"
+      ));
+
+    expect(demandMessages()).toHaveLength(0);
+    fireEvent.click(screen.getByRole("tab", { name: "Navigator" }));
+    expect(demandMessages()).toHaveLength(1);
+    expect(demandMessages()[0]).toMatchObject({
+      control: { kind: "navigator-demand", active: true },
+      generation: 1,
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "도구" }));
+    expect(demandMessages()).toHaveLength(2);
+    expect(demandMessages()[1]).toMatchObject({
+      control: { kind: "navigator-demand", active: false },
+      generation: 1,
+    });
   });
 
   it("never treats another companion ping as primary activity", () => {
@@ -452,6 +631,11 @@ describe("StudioToolsCompanionPage", () => {
     expect(screen.getByRole("link", { name: "스튜디오 다시 연결" }).getAttribute("href")).toBe(
       `http://localhost:3000/studio?session=${sessionId}&remix=source-456`
     );
+    const toolsTab = screen.getByRole("tab", { name: "도구" });
+    fireEvent.keyDown(toolsTab, { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: "Navigator" }).getAttribute("aria-selected")).toBe("true");
+    expect(document.getElementById("companion-mode-panel-tools")?.hidden).toBe(true);
+    expect(document.getElementById("companion-mode-panel-navigator")?.hidden).toBe(false);
   });
 
   it("closes its channel when the detached window unmounts", () => {
@@ -462,5 +646,198 @@ describe("StudioToolsCompanionPage", () => {
     view.unmount();
     expect(channel?.close).toHaveBeenCalledOnce();
     expect(document.title).toBe("이전 제목");
+  });
+
+  it("fences navigator frames by target, generation, document revision and sequence", () => {
+    const { createObjectURL, revokeObjectURL } = installObjectUrlSpies();
+    renderCompanion();
+    const channel = FakeBroadcastChannel.instances[0]!;
+    const companionInstance = companionInstanceId(channel);
+    connectPrimary({ channel, companionInstance });
+
+    act(() => channel.emit(navigatorFrame({ companionInstance, marker: "first" })));
+    fireEvent.click(screen.getByRole("tab", { name: "Navigator" }));
+    expect(screen.getByAltText("현재 페이지 전체 캔버스").getAttribute("src")).toContain("blob:frame");
+    expect(createObjectURL).toHaveBeenCalledOnce();
+
+    act(() => {
+      channel.emit(navigatorFrame({ companionInstance: "other-companion-5678", sequence: 2 }));
+      channel.emit(navigatorFrame({ companionInstance, generation: 2, sequence: 2 }));
+      channel.emit(navigatorFrame({ companionInstance, sequence: 1 }));
+    });
+    expect(createObjectURL).toHaveBeenCalledOnce();
+
+    act(() => channel.emit(navigatorFrame({ companionInstance, sequence: 2, marker: "second" })));
+    expect(createObjectURL).toHaveBeenCalledTimes(2);
+    expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+
+    const nextProjection = projectedReview({ revision: 2, documentRevision: 6 });
+    act(() => channel.emit(buildStudioCompanionReviewState({
+      primaryInstanceId: primaryInstanceA,
+      targetCompanionInstanceId: companionInstance,
+      generation: 1,
+      projection: nextProjection,
+    })));
+    expect(screen.queryByAltText("현재 페이지 전체 캔버스")).toBeNull();
+    expect(revokeObjectURL).toHaveBeenCalledTimes(2);
+
+    act(() => channel.emit(navigatorFrame({ companionInstance, revision: 5, sequence: 3 })));
+    expect(createObjectURL).toHaveBeenCalledTimes(2);
+    act(() => channel.emit(navigatorFrame({ companionInstance, revision: 6, sequence: 4 })));
+    expect(createObjectURL).toHaveBeenCalledTimes(3);
+
+    act(() => channel.emit(buildStudioCompanionReviewState({
+      primaryInstanceId: primaryInstanceA,
+      targetCompanionInstanceId: companionInstance,
+      generation: 2,
+      projection: projectedReview({ revision: 1, documentRevision: 0 }),
+    })));
+    expect(screen.queryByAltText("현재 페이지 전체 캔버스")).toBeNull();
+    expect(revokeObjectURL).toHaveBeenCalledTimes(3);
+  });
+
+  it("shares command/control sequence and coalesces brush and navigator streams", () => {
+    vi.useFakeTimers();
+    installObjectUrlSpies();
+    renderCompanion();
+    const channel = FakeBroadcastChannel.instances[0]!;
+    const companionInstance = companionInstanceId(channel);
+    connectPrimary({ channel, companionInstance });
+
+    fireEvent.click(screen.getByRole("button", { name: "펜" }));
+    fireEvent.click(screen.getByRole("tab", { name: "검수" }));
+    const size = screen.getByRole("slider", { name: "원격 브러시 크기" });
+    fireEvent.change(size, { target: { value: "10" } });
+    fireEvent.change(size, { target: { value: "16" } });
+    fireEvent.change(size, { target: { value: "24" } });
+    const controls = () => channel.postMessage.mock.calls
+      .map(([message]) => message as StudioCompanionMessage)
+      .filter((message) => (
+        message.type === "companion-control"
+        && message.control.kind !== "navigator-demand"
+      ));
+    expect(controls()).toHaveLength(0);
+    act(() => vi.advanceTimersByTime(63));
+    expect(controls()).toHaveLength(0);
+    act(() => vi.advanceTimersByTime(1));
+    expect(controls()).toEqual([
+      expect.objectContaining({
+        type: "companion-control",
+        sequence: 2,
+        control: { kind: "brush", patch: { size: 24 } },
+      }),
+    ]);
+
+    act(() => channel.emit(navigatorFrame({ companionInstance })));
+    fireEvent.click(screen.getByRole("tab", { name: "Navigator" }));
+    const navigator = screen.getByRole("button", {
+      name: "전체 캔버스 미리보기에서 보이는 위치 이동",
+    });
+    Object.defineProperty(navigator, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({ left: 0, top: 0, width: 200, height: 400, right: 200, bottom: 400 }),
+    });
+    fireEvent.pointerDown(navigator, { pointerId: 7, clientX: 20, clientY: 40 });
+    fireEvent.pointerMove(navigator, { pointerId: 7, clientX: 100, clientY: 200 });
+    fireEvent.pointerMove(navigator, { pointerId: 7, clientX: 180, clientY: 360 });
+    act(() => vi.advanceTimersByTime(31));
+    expect(controls()).toHaveLength(1);
+    act(() => vi.advanceTimersByTime(1));
+    expect(controls()).toHaveLength(2);
+    expect(controls()[1]).toEqual(expect.objectContaining({
+      type: "companion-control",
+      sequence: 4,
+      control: { kind: "navigate", point: { x: 0.9, y: 0.9 } },
+    }));
+    fireEvent(navigator, new Event("lostpointercapture", { bubbles: true }));
+  });
+
+  it("revokes navigator URLs on expiry, session switch and unmount", () => {
+    vi.useFakeTimers();
+    const { revokeObjectURL } = installObjectUrlSpies();
+    const view = render(
+      <MemoryRouter initialEntries={[`/studio/tools-companion?session=${sessionId}`]}>
+        <SessionSwitchHarness />
+      </MemoryRouter>
+    );
+    const first = FakeBroadcastChannel.instances[0]!;
+    const firstCompanion = companionInstanceId(first);
+    connectPrimary({ channel: first, companionInstance: firstCompanion });
+    act(() => first.emit(navigatorFrame({ companionInstance: firstCompanion })));
+
+    act(() => vi.advanceTimersByTime(12_001));
+    expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+
+    connectPrimary({ channel: first, companionInstance: firstCompanion, generation: 2 });
+    act(() => first.emit(navigatorFrame({
+      companionInstance: firstCompanion,
+      generation: 2,
+      sequence: 2,
+    })));
+    fireEvent.click(screen.getByRole("button", { name: "세션 전환" }));
+    expect(revokeObjectURL).toHaveBeenCalledTimes(2);
+
+    const second = FakeBroadcastChannel.instances[1]!;
+    const secondCompanion = companionInstanceId(second);
+    connectPrimary({ channel: second, companionInstance: secondCompanion });
+    act(() => second.emit(navigatorFrame({ companionInstance: secondCompanion })));
+    view.unmount();
+    expect(revokeObjectURL).toHaveBeenCalledTimes(3);
+  });
+
+  it("requests Window Management only from the explicit placement button", async () => {
+    const getScreenDetails = vi.fn(async () => ({
+      currentScreen: { availLeft: 0, availTop: 0, availWidth: 1_920, availHeight: 1_080 },
+      screens: [
+        { availLeft: 0, availTop: 0, availWidth: 1_920, availHeight: 1_080, isPrimary: true },
+        { availLeft: 1_920, availTop: 0, availWidth: 1_280, availHeight: 900, label: "보조 화면" },
+      ],
+    }));
+    const moveTo = vi.spyOn(window, "moveTo").mockImplementation(() => undefined);
+    const resizeTo = vi.spyOn(window, "resizeTo").mockImplementation(() => undefined);
+    vi.spyOn(window, "focus").mockImplementation(() => undefined);
+    Object.defineProperty(window, "getScreenDetails", { configurable: true, value: getScreenDetails });
+    renderCompanion();
+    expect(getScreenDetails).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "다른 화면으로 창 배치" }));
+      await Promise.resolve();
+    });
+    expect(getScreenDetails).toHaveBeenCalledOnce();
+    expect(moveTo).toHaveBeenCalledWith(expect.any(Number), expect.any(Number));
+    expect(resizeTo).toHaveBeenCalledWith(520, 820);
+    expect(screen.getByText(/보조 화면에 창을 배치했습니다/u)).toBeTruthy();
+    Reflect.deleteProperty(window, "getScreenDetails");
+  });
+
+  it("drops a late screen permission result after an invalid-session page unmounts", async () => {
+    let resolveDetails: ((value: {
+      currentScreen: unknown;
+      screens: unknown[];
+    }) => void) | null = null;
+    const getScreenDetails = vi.fn(() => new Promise<{
+      currentScreen: unknown;
+      screens: unknown[];
+    }>((resolve) => {
+      resolveDetails = resolve;
+    }));
+    const moveTo = vi.spyOn(window, "moveTo").mockImplementation(() => undefined);
+    vi.spyOn(window, "resizeTo").mockImplementation(() => undefined);
+    Object.defineProperty(window, "getScreenDetails", { configurable: true, value: getScreenDetails });
+    const view = renderCompanion("/studio/tools-companion?session=invalid");
+    fireEvent.click(screen.getByRole("button", { name: "다른 화면으로 창 배치" }));
+    view.unmount();
+    await act(async () => {
+      resolveDetails?.({
+        currentScreen: { availLeft: 0, availTop: 0, availWidth: 1_000, availHeight: 800 },
+        screens: [
+          { availLeft: 0, availTop: 0, availWidth: 1_000, availHeight: 800 },
+          { availLeft: 1_000, availTop: 0, availWidth: 1_000, availHeight: 800 },
+        ],
+      });
+      await Promise.resolve();
+    });
+    expect(moveTo).not.toHaveBeenCalled();
   });
 });

@@ -17,6 +17,31 @@ function landmarks(): Array<{ x: number; y: number; z: number; visibility: numbe
   }));
 }
 
+function handLandmarks(): Array<{ x: number; y: number; z: number }> {
+  return Array.from({ length: 21 }, (_, index) => ({
+    x: index / 100,
+    y: index / 80,
+    z: -index / 120,
+  }));
+}
+
+function poseResult(close = vi.fn()) {
+  return {
+    landmarks: [landmarks()],
+    worldLandmarks: [landmarks()],
+    close,
+  };
+}
+
+function handResult(labels: readonly ("Left" | "Right")[], close = vi.fn()) {
+  return {
+    landmarks: labels.map(() => handLandmarks()),
+    worldLandmarks: labels.map(() => handLandmarks()),
+    handedness: labels.map((categoryName) => [{ categoryName, score: 0.9 }]),
+    close,
+  };
+}
+
 function preprocessed(generationId = 3): StudioVrmPhotoPosePreprocessedImage {
   return {
     generationId,
@@ -76,8 +101,88 @@ describe("studio VRM photo-pose main-thread inference boundary", () => {
     expect(detector.detect).toHaveBeenCalledWith(image.bitmap);
     expect(result.inference.generationId).toBe(3);
     expect(result.inference.normalizedLandmarks).not.toBe(rawLandmarks);
+    expect(result.hands.status).toBe("unavailable");
     expect(result.source).toBe(image.source);
     expect(close).toHaveBeenCalledOnce();
+    expect(image.bitmap.close).toHaveBeenCalledOnce();
+  });
+
+  it("recognizes zero, one, and two optional hands on the same transferred bitmap", () => {
+    for (const labels of [[], ["Left"], ["Left", "Right"]] as const) {
+      const image = preprocessed();
+      const closePose = vi.fn();
+      const closeHands = vi.fn();
+      const poseDetector = { detect: vi.fn(() => poseResult(closePose)) };
+      const handDetector = { detect: vi.fn(() => handResult(labels, closeHands)) };
+      const scan = inferStudioVrmPhotoPoseFromImage(image, poseDetector, {
+        expectedGenerationId: 3,
+        handDetector,
+      });
+
+      expect(poseDetector.detect).toHaveBeenCalledWith(image.bitmap);
+      expect(handDetector.detect).toHaveBeenCalledWith(image.bitmap);
+      expect(scan.hands.detectedSides).toHaveLength(labels.length);
+      expect(closePose).toHaveBeenCalledOnce();
+      expect(closeHands).toHaveBeenCalledOnce();
+      expect(image.bitmap.close).toHaveBeenCalledOnce();
+    }
+  });
+
+  it("keeps a valid body result when optional hand detection throws or returns malformed data", () => {
+    const thrown = preprocessed(11);
+    const thrownScan = inferStudioVrmPhotoPoseFromImage(
+      thrown,
+      { detect: () => poseResult() },
+      {
+        expectedGenerationId: 11,
+        handDetector: { detect: () => { throw new Error("hand wasm failure"); } },
+      },
+    );
+    expect(thrownScan.inference.bones.leftUpperArm).toBeDefined();
+    expect(thrownScan.hands).toMatchObject({
+      status: "unavailable",
+      warnings: ["inference-failed"],
+    });
+    expect(thrown.bitmap.close).toHaveBeenCalledOnce();
+
+    const malformed = preprocessed(12);
+    const closeMalformed = vi.fn();
+    const malformedScan = inferStudioVrmPhotoPoseFromImage(
+      malformed,
+      { detect: () => poseResult() },
+      {
+        expectedGenerationId: 12,
+        handDetector: {
+          detect: () => ({
+            landmarks: [handLandmarks().slice(0, 20)],
+            worldLandmarks: [handLandmarks()],
+            handedness: [[{ categoryName: "Left", score: 0.9 }]],
+            close: closeMalformed,
+          }),
+        },
+      },
+    );
+    expect(malformedScan.hands.warnings).toEqual(["protocol"]);
+    expect(closeMalformed).toHaveBeenCalledOnce();
+    expect(malformed.bitmap.close).toHaveBeenCalledOnce();
+  });
+
+  it("rejects a generation superseded during hand inference and closes both raw results once", () => {
+    const image = preprocessed(13);
+    const closePose = vi.fn();
+    const closeHands = vi.fn();
+    let checks = 0;
+    expect(() => inferStudioVrmPhotoPoseFromImage(
+      image,
+      { detect: () => poseResult(closePose) },
+      {
+        expectedGenerationId: 13,
+        isGenerationCurrent: () => ++checks < 4,
+        handDetector: { detect: () => handResult(["Left"], closeHands) },
+      },
+    )).toThrowError(expect.objectContaining({ code: "stale-generation" }));
+    expect(closePose).toHaveBeenCalledOnce();
+    expect(closeHands).toHaveBeenCalledOnce();
     expect(image.bitmap.close).toHaveBeenCalledOnce();
   });
 

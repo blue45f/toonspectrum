@@ -55,6 +55,27 @@ describe("studio document interchange preview adapters", () => {
     });
   });
 
+  it("counts editable PNG maskSrc together with its raster source in the durable PSD budget", () => {
+    const preview = createStudioPsdImportLossPreview("masked.psd", {
+      elements: [{
+        id: "layer",
+        type: "image",
+        src: `data:image/webp;base64,${"A".repeat(20)}`,
+        maskSrc: `data:image/png;base64,${"B".repeat(20)}`,
+      } as never],
+      sourceWidth: 1_080,
+      sourceHeight: 1_080,
+      scale: 1,
+      skipped: [],
+    } satisfies PsdImportResult, { canvasWidth: 1_080, maxEmbeddedBytes: 64 });
+
+    expect(preview.proxy?.format).toBe("WebP 레이어 + 무손실 PNG 마스크");
+    expect(summarizeStudioInterchangeLoss(preview)).toMatchObject({
+      status: "blocked",
+      canConfirm: false,
+    });
+  });
+
   it("blocks ORA confirmation when durable embedded image bytes exceed the device profile", () => {
     const preview = createStudioOpenRasterImportLossPreview("large.ora", {
       width: 2_000,

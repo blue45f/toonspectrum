@@ -19,6 +19,7 @@ describe("studio main-menu catalogue ownership boundary", () => {
 
   it("leaves only state projection and browser command composition in StudioPage", () => {
     const page = source("./StudioPage.tsx");
+    const companion = source("./studio-tools-companion.ts");
     const start = page.indexOf("const studioMainMenuGroups = useMemo(");
     const end = page.indexOf("// 모바일 하단 보조 막대 버튼", start);
     const composition = page.slice(start, end);
@@ -26,10 +27,14 @@ describe("studio main-menu catalogue ownership boundary", () => {
     expect(page).toContain('from "./studio-main-menu-groups"');
     expect(composition).toContain("buildStudioMainMenuGroups({");
     expect(composition).toContain("projectImportInputRef.current?.click()");
-    expect(page).toContain("openStudioToolsCompanionWindow(input.sessionId, existingWindow)");
-    expect(page).toContain("isStudioToolsCompanionWindowReusable(");
-    expect(page).toContain("input.binding.release()");
-    expect(page).toContain("도구 창을 복구해 다시 연결합니다");
+    expect(page).toContain('window.open("", "_blank", STUDIO_TOOLS_COMPANION_RESERVATION_FEATURES)');
+    expect(page).toContain("ready.protocol.openReadyStudioToolsCompanionForMenu({");
+    expect(page).toContain("runtime.protocol.completeReservedStudioToolsCompanionWindow({");
+    expect(page).toContain("}, 8_000)");
+    expect(companion).toContain("openStudioToolsCompanionWindow(");
+    expect(companion).toContain("isStudioToolsCompanionWindowReusable(");
+    expect(companion).toContain("input.binding.release()");
+    expect(companion).toContain("도구 창을 복구해 다시 연결합니다");
     expect(composition).toContain("openStudioToolsCompanionForMenu({");
     expect(composition).toContain("windowRef: companionWindowRef");
     expect(composition).not.toContain("items: [");

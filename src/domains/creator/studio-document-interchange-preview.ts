@@ -103,7 +103,10 @@ export function createStudioPsdImportLossPreview(
   const displayed = scaledDimensions(result.sourceWidth, result.sourceHeight, options.canvasWidth);
   const constraints = boundedMessages(result.skipped, "editability");
   const embeddedBytes = result.elements.reduce(
-    (total, element) => total + estimateDataUrlStorageBytes(element.src),
+    (total, element) =>
+      total
+      + estimateDataUrlStorageBytes(element.src)
+      + estimateDataUrlStorageBytes(element.maskSrc),
     0,
   );
   const budget = embeddedBudgetConstraint(embeddedBytes, options.maxEmbeddedBytes);
@@ -133,7 +136,9 @@ export function createStudioPsdImportLossPreview(
     },
     proxy: {
       enabled: result.scale < 1 || result.sourceWidth > 1_280 || result.sourceHeight > 1_280,
-      format: "WebP 레이어",
+      format: result.elements.some((element) => element.maskSrc)
+        ? "WebP 레이어 + 무손실 PNG 마스크"
+        : "WebP 레이어",
       width: displayed.width,
       height: displayed.height,
       originalRetained: false,
