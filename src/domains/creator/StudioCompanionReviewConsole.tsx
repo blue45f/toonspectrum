@@ -16,7 +16,7 @@ export interface StudioCompanionReviewConsoleProps {
   projection: StudioCompanionReviewProjection | null;
   connected: boolean;
   presentationSafe: boolean;
-  onPresentationSafeChange: (enabled: boolean) => void;
+  layout?: "embedded" | "dedicated";
   onSelectLayer: (layerId: string) => void;
   onHistory: (action: "undo" | "redo") => void;
   onCommentFocus: (threadId: string) => void;
@@ -30,7 +30,7 @@ export function StudioCompanionReviewConsole({
   projection,
   connected,
   presentationSafe,
-  onPresentationSafeChange,
+  layout = "embedded",
   onSelectLayer,
   onHistory,
   onCommentFocus,
@@ -41,7 +41,13 @@ export function StudioCompanionReviewConsole({
 
   if (!projection) {
     return (
-      <section aria-label="검수 Console" className="grid min-h-72 place-items-center rounded-xl border border-line bg-card px-6 text-center">
+      <section
+        aria-label="검수 Console"
+        className={cn(
+          "grid min-h-72 place-items-center rounded-xl border border-line bg-card px-6 text-center",
+          layout === "dedicated" && "min-h-80 flex-1"
+        )}
+      >
         <span>
           <History className="mx-auto size-6 text-fg-3" aria-hidden />
           <strong className="mt-3 block text-sm font-semibold text-fg-2">검수 정보를 기다리는 중</strong>
@@ -71,7 +77,13 @@ export function StudioCompanionReviewConsole({
   }
 
   return (
-    <section aria-labelledby="companion-review-title" className="space-y-3">
+    <section
+      aria-labelledby="companion-review-title"
+      className={cn(
+        "space-y-3",
+        layout === "dedicated" && "flex min-h-0 flex-1 flex-col space-y-0 gap-3"
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 id="companion-review-title" className="text-sm font-semibold text-fg">검수 Console</h2>
@@ -81,20 +93,6 @@ export function StudioCompanionReviewConsole({
               : `${projection.pageLabel} · ${projection.selectionLabel ?? "선택 없음"}`}
           </p>
         </div>
-        <button
-          type="button"
-          aria-pressed={presentationSafe}
-          onClick={() => onPresentationSafeChange(!presentationSafe)}
-          className={cn(
-            "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent/35",
-            presentationSafe
-              ? "border-good/45 bg-good/10 text-good"
-              : "border-line bg-card text-fg-2 hover:bg-raised"
-          )}
-        >
-          <Eye className="size-3.5" aria-hidden />
-          발표 안전
-        </button>
       </div>
 
       {presentationSafe ? (
@@ -198,7 +196,10 @@ export function StudioCompanionReviewConsole({
           id="companion-review-panel-layers"
           aria-labelledby="companion-review-tab-layers"
           hidden={section !== "layers"}
-          className="max-h-72 space-y-1 overflow-y-auto pr-0.5"
+          className={cn(
+            "space-y-1 overflow-y-auto pr-0.5",
+            layout === "dedicated" ? "min-h-40 flex-1" : "max-h-72"
+          )}
         >
           {projection.layers.map((layer, index) => (
             <button
@@ -239,7 +240,10 @@ export function StudioCompanionReviewConsole({
           id="companion-review-panel-history"
           aria-labelledby="companion-review-tab-history"
           hidden={section !== "history"}
-          className="space-y-2"
+          className={cn(
+            "space-y-2",
+            layout === "dedicated" && "flex min-h-40 flex-1 flex-col gap-2 space-y-0 overflow-hidden"
+          )}
         >
           {!presentationSafe ? (
             <div className="grid grid-cols-2 gap-2">
@@ -261,7 +265,10 @@ export function StudioCompanionReviewConsole({
               </button>
             </div>
           ) : null}
-          <ol className="max-h-64 space-y-1 overflow-y-auto">
+          <ol className={cn(
+            "space-y-1 overflow-y-auto",
+            layout === "dedicated" ? "max-h-none min-h-0 flex-1" : "max-h-64"
+          )}>
             {projection.history.map((entry, index) => (
               <li key={entry.index} className={cn(
                 "flex min-h-9 items-center gap-2 rounded-lg border px-2.5 text-xs",
@@ -287,7 +294,10 @@ export function StudioCompanionReviewConsole({
           id="companion-review-panel-comments"
           aria-labelledby="companion-review-tab-comments"
           hidden={section !== "comments"}
-          className="max-h-72 space-y-1.5 overflow-y-auto pr-0.5"
+          className={cn(
+            "space-y-1.5 overflow-y-auto pr-0.5",
+            layout === "dedicated" ? "min-h-40 flex-1" : "max-h-72"
+          )}
         >
           {projection.comments.map((comment) => (
             <button

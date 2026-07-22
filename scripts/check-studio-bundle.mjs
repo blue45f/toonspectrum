@@ -287,6 +287,7 @@ if (!fs.existsSync(manifestPath)) {
       ["optional flood fill panel", /src\/domains\/creator\/StudioFloodFillPanel\.tsx/],
       ["optional palette library", /src\/domains\/creator\/StudioPaletteLibraryPanel\.tsx/],
       ["optional panel split tool", /src\/domains\/creator\/StudioPanelSplitTool\.tsx/],
+      ["optional pixel-edit brush runtime", /src\/domains\/creator\/studio-pixel-edit-brush-runtime\.ts/],
       ["optional heal/clone overlay", /src\/domains\/creator\/StudioHealCloneOverlay\.tsx/],
       ["optional history brush overlay", /src\/domains\/creator\/StudioHistoryBrushOverlay\.tsx/],
       ["optional isometric overlay", /src\/domains\/creator\/StudioIsometricGridOverlay\.tsx/],

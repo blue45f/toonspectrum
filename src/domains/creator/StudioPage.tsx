@@ -530,7 +530,6 @@ import {
   HEAL_CLONE_RADIUS_DEFAULT,
   type HealCloneMode,
 } from "./studio-heal-clone";
-import { bakeHealCloneStrokeToCanvas } from "./studio-heal-clone-browser";
 import {
   bakeHistoryBrushStrokeToCanvas,
   planHistoryBrushDabs,
@@ -656,7 +655,6 @@ import {
   flipNormalizedPoint,
   MAGIC_WAND_TOLERANCE_DEFAULT,
 } from "./studio-magic-wand";
-import { magicWandScanFromImage } from "./studio-magic-wand-browser";
 import { buildStudioMainMenuGroups } from "./studio-main-menu-groups";
 import {
   MASTER_EDIT_GHOST_OPACITY,
@@ -1030,7 +1028,6 @@ import {
   type SmartGuideOverlay,
 } from "./studio-smart-guides";
 import { SMUDGE_RADIUS_DEFAULT, SMUDGE_STRENGTH_DEFAULT } from "./studio-smudge";
-import { smudgeStrokeImage } from "./studio-smudge-browser";
 import { useStudioStableHandlers } from "./studio-stable-handlers";
 import {
   snapshotStudioStagePointerBatchMapper,
@@ -2130,6 +2127,19 @@ type StudioToolsCompanionProtocol = typeof import("./studio-tools-companion");
 type StudioToolsCompanionPrimaryRuntime = StudioCompanionPrimaryRuntime & {
   protocol: StudioToolsCompanionProtocol;
 };
+
+type StudioPixelEditBrushRuntime = typeof import("./studio-pixel-edit-brush-runtime");
+
+let studioPixelEditBrushRuntimePromise: Promise<StudioPixelEditBrushRuntime> | null = null;
+
+function loadStudioPixelEditBrushRuntime(): Promise<StudioPixelEditBrushRuntime> {
+  return studioPixelEditBrushRuntimePromise ??= import("./studio-pixel-edit-brush-runtime").catch(
+    (error: unknown) => {
+      studioPixelEditBrushRuntimePromise = null;
+      throw error;
+    }
+  );
+}
 
 type StudioToolsCompanionReviewProjectionInput = Parameters<
   StudioToolsCompanionProtocol["createStudioCompanionReviewProjectionFromSource"]
@@ -18666,6 +18676,7 @@ function StudioCuttoonEditor() {
     const runId = ++pixelWandRunIdRef.current;
     setPixelBusy(true);
     try {
+      const { magicWandScanFromImage } = await loadStudioPixelEditBrushRuntime();
       const region = await magicWandScanFromImage(target.src, p.x, p.y, wandTolerance, {
         flipX: target.flipped,
         flipY: target.flippedY,
@@ -18958,6 +18969,7 @@ function StudioCuttoonEditor() {
     const mutationTicket = captureStudioMutationTicket();
     setSmudgeBusy(true);
     try {
+      const { smudgeStrokeImage } = await loadStudioPixelEditBrushRuntime();
       const radiusNorm = smudgeRadius / Math.max(1, target.width);
       const src = await smudgeStrokeImage(target.src, points, radiusNorm, smudgeStrength / 100, {
         flipX: target.flipped,
@@ -19102,6 +19114,7 @@ function StudioCuttoonEditor() {
     const mutationTicket = captureStudioMutationTicket();
     setHealCloneBusy(true);
     try {
+      const { bakeHealCloneStrokeToCanvas } = await loadStudioPixelEditBrushRuntime();
       const img = await loadStudioPixelEditImage(target.src);
       const w = img.naturalWidth || img.width;
       const h = img.naturalHeight || img.height;

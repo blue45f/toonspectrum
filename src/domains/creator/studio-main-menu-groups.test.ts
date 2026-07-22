@@ -441,6 +441,9 @@ describe("buildStudioMainMenuGroups", () => {
     expect(editor.setStudioUiDensity).toHaveBeenNthCalledWith(1, "focus");
     expect(ui.collapseSidePanels).toHaveBeenCalledOnce();
     expect(editor.setStudioUiDensity).toHaveBeenNthCalledWith(2, "full");
+    expect(menuItem(groups, "view", "tools-companion").label).toBe(
+      "멀티 디스플레이 작업공간…"
+    );
     expect(ui.openToolsCompanion).toHaveBeenCalledOnce();
     expect(editor.openFeatureTutorial).toHaveBeenCalledOnce();
     expect(ui.openAppSettings).toHaveBeenCalledWith();

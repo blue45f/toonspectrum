@@ -33,7 +33,8 @@ describe("studio main-menu catalogue ownership boundary", () => {
     expect(page).toContain("}, 8_000)");
     expect(companion).toContain("openStudioToolsCompanionWindow(");
     expect(companion).toContain("isStudioToolsCompanionWindowReusable(");
-    expect(companion).toContain("input.binding.release()");
+    expect(companion).toContain('const surface = input.surface ?? "workspace"');
+    expect(companion).toContain("input.binding.release(surface)");
     expect(companion).toContain("도구 창을 복구해 다시 연결합니다");
     expect(composition).toContain("openStudioToolsCompanionForMenu({");
     expect(composition).toContain("windowRef: companionWindowRef");

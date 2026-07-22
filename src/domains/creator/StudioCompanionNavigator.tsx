@@ -16,17 +16,62 @@ export interface StudioCompanionNavigatorProps {
   viewport: StudioCompanionNormalizedRect;
   connected: boolean;
   captureAllowed: boolean;
+  layout?: "embedded" | "dedicated";
   onNavigate: (point: StudioCompanionNormalizedPoint, final?: boolean) => void;
 }
 
+interface StudioCompanionNavigatorContainRect {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+}
+
+function resolveStudioCompanionNavigatorContainRect(input: {
+  containerHeight: number;
+  containerWidth: number;
+  imageHeight: number;
+  imageWidth: number;
+}): StudioCompanionNavigatorContainRect {
+  const containerWidth = Number.isFinite(input.containerWidth) && input.containerWidth > 0
+    ? input.containerWidth
+    : 0;
+  const containerHeight = Number.isFinite(input.containerHeight) && input.containerHeight > 0
+    ? input.containerHeight
+    : 0;
+  const imageWidth = Number.isFinite(input.imageWidth) && input.imageWidth > 0 ? input.imageWidth : 0;
+  const imageHeight = Number.isFinite(input.imageHeight) && input.imageHeight > 0 ? input.imageHeight : 0;
+  if (containerWidth <= 0 || containerHeight <= 0 || imageWidth <= 0 || imageHeight <= 0) {
+    return { x: 0, y: 0, width: containerWidth, height: containerHeight };
+  }
+  const scale = Math.min(containerWidth / imageWidth, containerHeight / imageHeight);
+  const width = imageWidth * scale;
+  const height = imageHeight * scale;
+  return {
+    x: (containerWidth - width) / 2,
+    y: (containerHeight - height) / 2,
+    width,
+    height,
+  };
+}
+
 function pointFromPointer(
-  event: PointerEvent<HTMLButtonElement>
+  event: PointerEvent<HTMLButtonElement>,
+  imageWidth: number,
+  imageHeight: number
 ): StudioCompanionNormalizedPoint {
   const bounds = event.currentTarget.getBoundingClientRect();
   if (bounds.width <= 0 || bounds.height <= 0) return { x: 0.5, y: 0.5 };
+  const contained = resolveStudioCompanionNavigatorContainRect({
+    containerWidth: bounds.width,
+    containerHeight: bounds.height,
+    imageWidth,
+    imageHeight,
+  });
+  if (contained.width <= 0 || contained.height <= 0) return { x: 0.5, y: 0.5 };
   return normalizeStudioCompanionPoint({
-    x: (event.clientX - bounds.left) / bounds.width,
-    y: (event.clientY - bounds.top) / bounds.height,
+    x: (event.clientX - bounds.left - contained.x) / contained.width,
+    y: (event.clientY - bounds.top - contained.y) / contained.height,
   });
 }
 
@@ -37,6 +82,7 @@ export function StudioCompanionNavigator({
   viewport,
   connected,
   captureAllowed,
+  layout = "embedded",
   onNavigate,
 }: StudioCompanionNavigatorProps) {
   const activePointerRef = useRef<number | null>(null);
@@ -54,17 +100,17 @@ export function StudioCompanionNavigator({
     } catch {
       // Older WebViews still deliver click navigation without pointer capture.
     }
-    onNavigate(pointFromPointer(event));
+    onNavigate(pointFromPointer(event, imageWidth, imageHeight));
   }
 
   function handlePointerMove(event: PointerEvent<HTMLButtonElement>) {
     if (!interactionReady || activePointerRef.current !== event.pointerId) return;
-    onNavigate(pointFromPointer(event));
+    onNavigate(pointFromPointer(event, imageWidth, imageHeight));
   }
 
   function releasePointer(event: PointerEvent<HTMLButtonElement>) {
     if (activePointerRef.current !== event.pointerId) return;
-    if (interactionReady) onNavigate(pointFromPointer(event), true);
+    if (interactionReady) onNavigate(pointFromPointer(event, imageWidth, imageHeight), true);
     activePointerRef.current = null;
     try {
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -97,12 +143,11 @@ export function StudioCompanionNavigator({
     onNavigate(normalizeStudioCompanionPoint(next));
   }
 
-  const aspectRatio = imageWidth > 0 && imageHeight > 0
-    ? `${imageWidth} / ${imageHeight}`
-    : "4 / 5";
-
   return (
-    <section aria-labelledby="companion-navigator-title" className="space-y-3">
+    <section
+      aria-labelledby="companion-navigator-title"
+      className={cn("space-y-3", layout === "dedicated" && "flex min-h-0 flex-1 flex-col")}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 id="companion-navigator-title" className="text-sm font-semibold text-fg">
@@ -123,6 +168,7 @@ export function StudioCompanionNavigator({
         disabled={!interactionReady}
         aria-label="전체 캔버스 미리보기에서 보이는 위치 이동"
         aria-describedby="companion-navigator-help"
+        aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={releasePointer}
@@ -132,13 +178,15 @@ export function StudioCompanionNavigator({
         }}
         onKeyDown={handleKeyDown}
         className={cn(
-          "relative grid min-h-48 w-full touch-none place-items-center overflow-hidden rounded-xl border border-line bg-[oklch(0.145_0.008_70)] text-left outline-none",
+          "relative grid w-full touch-none place-items-center overflow-hidden rounded-xl border border-line bg-[oklch(0.145_0.008_70)] text-left outline-none",
           "focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/35",
+          layout === "dedicated"
+            ? "h-[clamp(20rem,calc(100dvh-11rem),52rem)] min-h-80 flex-1"
+            : "h-[clamp(18rem,58dvh,42rem)] min-h-48",
           interactionReady
             ? "cursor-crosshair hover:border-line-strong"
             : "cursor-not-allowed opacity-70"
         )}
-        style={{ aspectRatio }}
       >
         {imageUrl ? (
           <>
@@ -146,19 +194,25 @@ export function StudioCompanionNavigator({
               src={imageUrl}
               alt="현재 페이지 전체 캔버스"
               draggable={false}
-              className="pointer-events-none absolute inset-0 size-full object-fill"
+              className="pointer-events-none absolute inset-0 size-full object-contain"
             />
-            <span
+            <svg
               aria-hidden
-              data-testid="studio-companion-viewport-box"
-              className="pointer-events-none absolute rounded-sm border-2 border-accent bg-accent/10 shadow-[0_0_0_1px_oklch(0.18_0.01_70/0.7)] motion-safe:transition-[left,top,width,height] motion-safe:duration-150 motion-reduce:transition-none"
-              style={{
-                left: `${viewport.x * 100}%`,
-                top: `${viewport.y * 100}%`,
-                width: `${viewport.width * 100}%`,
-                height: `${viewport.height * 100}%`,
-              }}
-            />
+              viewBox={`0 0 ${Math.max(1, imageWidth)} ${Math.max(1, imageHeight)}`}
+              preserveAspectRatio="xMidYMid meet"
+              className="pointer-events-none absolute inset-0 size-full overflow-visible text-accent"
+            >
+              <rect
+                data-testid="studio-companion-viewport-box"
+                x={viewport.x * imageWidth}
+                y={viewport.y * imageHeight}
+                width={viewport.width * imageWidth}
+                height={viewport.height * imageHeight}
+                rx={2}
+                vectorEffect="non-scaling-stroke"
+                className="fill-accent/10 stroke-current [stroke-width:2px] motion-safe:transition-all motion-safe:duration-150 motion-reduce:transition-none"
+              />
+            </svg>
           </>
         ) : (
           <span className="flex max-w-56 flex-col items-center px-5 text-center">

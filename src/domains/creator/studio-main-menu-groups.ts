@@ -779,7 +779,7 @@ export function buildStudioMainMenuGroups({
         },
         {
           id: "tools-companion",
-          label: "도구 창 분리 (멀티 디스플레이)",
+          label: "멀티 디스플레이 작업공간…",
           icon: PictureInPicture2,
           onSelect: () => {
             ui.openToolsCompanion();

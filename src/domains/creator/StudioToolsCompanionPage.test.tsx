@@ -191,6 +191,7 @@ beforeEach(() => {
   FakeBroadcastChannel.instances.length = 0;
   vi.stubGlobal("BroadcastChannel", FakeBroadcastChannel);
   window.history.replaceState(null, "", `/studio/tools-companion?session=${sessionId}`);
+  window.localStorage.clear();
 });
 
 afterEach(() => {
@@ -320,7 +321,7 @@ describe("StudioToolsCompanionPage", () => {
     expect(view.container.textContent).toContain(secretTitle);
 
     fireEvent.click(screen.getByRole("tab", { name: "검수" }));
-    fireEvent.click(screen.getByRole("button", { name: "발표 안전" }));
+    fireEvent.click(screen.getByRole("button", { name: "발표 안전 켜기" }));
 
     expect(view.container.textContent).not.toContain(secretTitle);
     expect(view.container.querySelector("header [role='status']")?.textContent)
@@ -622,6 +623,88 @@ describe("StudioToolsCompanionPage", () => {
     expect(companionInstanceId(second)).not.toBe(firstCompanion);
   });
 
+  it("closes matching same-origin dedicated windows when the workspace session changes", () => {
+    const popups: Array<{ close: ReturnType<typeof vi.fn>; focus: ReturnType<typeof vi.fn>; location: { href: string } }> = [];
+    vi.spyOn(window, "open").mockImplementation((url) => {
+      const popup = {
+        closed: false,
+        close: vi.fn(),
+        focus: vi.fn(),
+        location: { href: String(url) },
+      };
+      popups.push(popup);
+      return popup as unknown as Window;
+    });
+    render(
+      <MemoryRouter initialEntries={[`/studio/tools-companion?session=${sessionId}`]}>
+        <SessionSwitchHarness />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "Navigator 전용 창 열기 또는 앞으로 가져오기",
+    }));
+    fireEvent.click(screen.getByRole("button", {
+      name: "검수 전용 창 열기 또는 앞으로 가져오기",
+    }));
+    expect(popups).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "세션 전환" }));
+
+    expect(popups[0]?.close).toHaveBeenCalledOnce();
+    expect(popups[1]?.close).toHaveBeenCalledOnce();
+  });
+
+  it("never closes dedicated handles that the user navigated away before a session change", () => {
+    const popups: Array<{ close: ReturnType<typeof vi.fn>; focus: ReturnType<typeof vi.fn>; location: { href: string } }> = [];
+    vi.spyOn(window, "open").mockImplementation((url) => {
+      const popup = {
+        closed: false,
+        close: vi.fn(),
+        focus: vi.fn(),
+        location: { href: String(url) },
+      };
+      popups.push(popup);
+      return popup as unknown as Window;
+    });
+    render(
+      <MemoryRouter initialEntries={[`/studio/tools-companion?session=${sessionId}`]}>
+        <SessionSwitchHarness />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole("button", {
+      name: "Navigator 전용 창 열기 또는 앞으로 가져오기",
+    }));
+    fireEvent.click(screen.getByRole("button", {
+      name: "검수 전용 창 열기 또는 앞으로 가져오기",
+    }));
+    popups[0]!.location.href = "https://example.com/user-document";
+    popups[1]!.location.href = "http://localhost:3000/unrelated-page";
+
+    fireEvent.click(screen.getByRole("button", { name: "세션 전환" }));
+
+    expect(popups[0]?.close).not.toHaveBeenCalled();
+    expect(popups[1]?.close).not.toHaveBeenCalled();
+  });
+
+  it("does not close a matching dedicated window on an ordinary workspace unmount", () => {
+    const popup = {
+      closed: false,
+      close: vi.fn(),
+      focus: vi.fn(),
+      location: { href: `http://localhost:3000/studio/tools-companion?session=${sessionId}&view=navigator` },
+    };
+    vi.spyOn(window, "open").mockReturnValue(popup as unknown as Window);
+    const view = renderCompanion();
+    fireEvent.click(screen.getByRole("button", {
+      name: "Navigator 전용 창 열기 또는 앞으로 가져오기",
+    }));
+
+    view.unmount();
+
+    expect(popup.close).not.toHaveBeenCalled();
+  });
+
   it("keeps status live, touch actions at least 44px, and safe-area padding on small screens", () => {
     renderCompanion(`/studio/tools-companion?session=${sessionId}&remix=source-456`);
     const status = screen.getByRole("status");
@@ -638,6 +721,158 @@ describe("StudioToolsCompanionPage", () => {
     expect(document.getElementById("companion-mode-panel-navigator")?.hidden).toBe(false);
   });
 
+  it("rejects an invalid or duplicated surface without opening a channel", () => {
+    renderCompanion(`/studio/tools-companion?session=${sessionId}&view=navigator&view=review`);
+
+    expect(screen.getByRole("alert").textContent).toContain("유효한 컴패니언 보기 모드가 없습니다");
+    expect(FakeBroadcastChannel.instances).toHaveLength(0);
+  });
+
+  it("locks a dedicated Navigator surface, omits workspace tabs, and demands frames immediately", () => {
+    renderCompanion(`/studio/tools-companion?session=${sessionId}&view=navigator`);
+    const channel = FakeBroadcastChannel.instances[0]!;
+    const companionInstance = companionInstanceId(channel);
+
+    expect(screen.queryByRole("tablist", { name: "컴패니언 모드" })).toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "캔버스 내비게이터" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "펜" })).toBeNull();
+    expect(channel.postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: "hello",
+      role: "companion",
+      view: "navigator",
+    }));
+
+    connectPrimary({ channel, companionInstance });
+    const demands = channel.postMessage.mock.calls
+      .map(([message]) => message as StudioCompanionMessage)
+      .filter((message) => message.type === "companion-control" && message.control.kind === "navigator-demand");
+    expect(demands).toEqual([
+      expect.objectContaining({ control: { kind: "navigator-demand", active: true } }),
+    ]);
+    expect(screen.getByRole("button", { name: "전체 캔버스 미리보기에서 보이는 위치 이동" }).className)
+      .toContain("100dvh");
+  });
+
+  it("locks a dedicated review surface without requesting Navigator frames", () => {
+    renderCompanion(`/studio/tools-companion?session=${sessionId}&view=review`);
+    const channel = FakeBroadcastChannel.instances[0]!;
+    const companionInstance = companionInstanceId(channel);
+
+    connectPrimary({ channel, companionInstance });
+
+    expect(screen.queryByRole("tablist", { name: "컴패니언 모드" })).toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "검수 콘솔" })).toBeTruthy();
+    expect(document.getElementById("companion-mode-panel-review")?.className).toContain("flex-1");
+    expect(channel.postMessage.mock.calls
+      .map(([message]) => message as StudioCompanionMessage)
+      .some((message) => message.type === "companion-control" && message.control.kind === "navigator-demand"))
+      .toBe(false);
+  });
+
+  it("opens each dedicated surface synchronously from an explicit 44px workspace action", () => {
+    const popup = {
+      closed: false,
+      focus: vi.fn(),
+      location: { href: "about:blank" },
+    } as unknown as Window;
+    const open = vi.spyOn(window, "open").mockReturnValue(popup);
+    renderCompanion();
+
+    const navigatorLaunch = screen.getByRole("button", {
+      name: "Navigator 전용 창 열기 또는 앞으로 가져오기",
+    });
+    expect(navigatorLaunch.className).toContain("min-h-14");
+    fireEvent.click(navigatorLaunch);
+
+    expect(open).toHaveBeenCalledOnce();
+    expect(open.mock.calls[0]?.[0]).toContain(`view=navigator`);
+    expect(screen.getByText(/Navigator 창을 열거나 앞으로/u)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "검수 전용 창 열기 또는 앞으로 가져오기",
+    }));
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(open.mock.calls[1]?.[0]).toContain(`view=review`);
+  });
+
+  it("shows an actionable error when a dedicated popup is blocked", () => {
+    vi.spyOn(window, "open").mockReturnValue(null);
+    renderCompanion();
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "Navigator 전용 창 열기 또는 앞으로 가져오기",
+    }));
+
+    expect(screen.getByRole("alert").textContent).toContain("팝업이 차단됐습니다");
+  });
+
+  it("initializes and synchronizes presentation-safe state without exposing the document title", () => {
+    const key = `toonspectrum.studio.companion.presentation-safe.${sessionId}`;
+    window.localStorage.setItem(key, "1");
+    const view = renderCompanion();
+    const channel = FakeBroadcastChannel.instances[0]!;
+    const companionInstance = companionInstanceId(channel);
+    connectPrimary({ channel, companionInstance });
+    act(() => {
+      channel.emit({
+        v: 1,
+        type: "primary-state",
+        primaryInstanceId: primaryInstanceA,
+        targetCompanionInstanceId: companionInstance,
+        tool: "pen",
+        density: "full",
+        canvasOnly: false,
+        title: "공개 전 비밀 작품",
+        at: Date.now(),
+      });
+    });
+
+    expect(view.container.textContent).not.toContain("공개 전 비밀 작품");
+    expect(screen.getByRole("button", { name: "발표 안전 끄기" }).getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "발표 안전 끄기" }));
+    expect(window.localStorage.getItem(key)).toBe("0");
+    expect(view.container.textContent).toContain("공개 전 비밀 작품");
+
+    window.localStorage.setItem(key, "1");
+    act(() => {
+      window.dispatchEvent(new StorageEvent("storage", { key, newValue: "1" }));
+    });
+    expect(view.container.textContent).not.toContain("공개 전 비밀 작품");
+  });
+
+  it("keeps presentation-safe usable when hardened storage throws on read and write", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("blocked", "SecurityError");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("blocked", "SecurityError");
+    });
+    const view = renderCompanion();
+    const channel = FakeBroadcastChannel.instances[0]!;
+    const companionInstance = companionInstanceId(channel);
+    connectPrimary({ channel, companionInstance });
+    act(() => {
+      channel.emit({
+        v: 1,
+        type: "primary-state",
+        primaryInstanceId: primaryInstanceA,
+        targetCompanionInstanceId: companionInstance,
+        tool: "pen",
+        density: "full",
+        canvasOnly: false,
+        title: "저장소 차단 비밀 작품",
+        at: Date.now(),
+      });
+    });
+    expect(view.container.textContent).toContain("저장소 차단 비밀 작품");
+
+    fireEvent.click(screen.getByRole("button", { name: "발표 안전 켜기" }));
+
+    expect(screen.getByRole("button", { name: "발표 안전 끄기" }).getAttribute("aria-pressed")).toBe("true");
+    expect(view.container.textContent).not.toContain("저장소 차단 비밀 작품");
+  });
+
   it("closes its channel when the detached window unmounts", () => {
     document.title = "이전 제목";
     const view = renderCompanion();
@@ -646,6 +881,24 @@ describe("StudioToolsCompanionPage", () => {
     view.unmount();
     expect(channel?.close).toHaveBeenCalledOnce();
     expect(document.title).toBe("이전 제목");
+  });
+
+  it("releases dedicated Navigator demand before closing its channel on unmount", () => {
+    const view = renderCompanion(`/studio/tools-companion?session=${sessionId}&view=navigator`);
+    const channel = FakeBroadcastChannel.instances[0]!;
+    const companionInstance = companionInstanceId(channel);
+    connectPrimary({ channel, companionInstance });
+
+    view.unmount();
+
+    const demands = channel.postMessage.mock.calls
+      .map(([message]) => message as StudioCompanionMessage)
+      .filter((message) => message.type === "companion-control" && message.control.kind === "navigator-demand");
+    expect(demands).toEqual([
+      expect.objectContaining({ control: { kind: "navigator-demand", active: true } }),
+      expect.objectContaining({ control: { kind: "navigator-demand", active: false } }),
+    ]);
+    expect(channel.close).toHaveBeenCalledOnce();
   });
 
   it("fences navigator frames by target, generation, document revision and sequence", () => {
@@ -747,7 +1000,7 @@ describe("StudioToolsCompanionPage", () => {
     expect(controls()[1]).toEqual(expect.objectContaining({
       type: "companion-control",
       sequence: 4,
-      control: { kind: "navigate", point: { x: 0.9, y: 0.9 } },
+      control: { kind: "navigate", point: { x: 0.9, y: 1 } },
     }));
     fireEvent(navigator, new Event("lostpointercapture", { bubbles: true }));
   });
@@ -801,14 +1054,50 @@ describe("StudioToolsCompanionPage", () => {
     expect(getScreenDetails).not.toHaveBeenCalled();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "다른 화면으로 창 배치" }));
+      fireEvent.click(screen.getByRole("button", { name: "다른 화면으로 창 이동" }));
       await Promise.resolve();
     });
     expect(getScreenDetails).toHaveBeenCalledOnce();
     expect(moveTo).toHaveBeenCalledWith(expect.any(Number), expect.any(Number));
     expect(resizeTo).toHaveBeenCalledWith(520, 820);
-    expect(screen.getByText(/보조 화면에 창을 배치했습니다/u)).toBeTruthy();
+    expect(screen.getByText(/다른 화면으로 이동을 요청했습니다/u).getAttribute("role")).toBe("status");
     Reflect.deleteProperty(window, "getScreenDetails");
+  });
+
+  it("announces requesting placement politely and placement failures as alerts", async () => {
+    let resolveDetails: ((value: {
+      currentScreen: unknown;
+      screens: unknown[];
+    }) => void) | null = null;
+    const getScreenDetails = vi.fn(() => new Promise<{
+      currentScreen: unknown;
+      screens: unknown[];
+    }>((resolve) => {
+      resolveDetails = resolve;
+    }));
+    Object.defineProperty(window, "getScreenDetails", { configurable: true, value: getScreenDetails });
+    renderCompanion();
+
+    fireEvent.click(screen.getByRole("button", { name: "다른 화면으로 창 이동" }));
+    expect(screen.getByText("연결된 화면을 확인하고 있습니다…").getAttribute("role")).toBe("status");
+
+    await act(async () => {
+      resolveDetails?.({
+        currentScreen: { availLeft: 0, availTop: 0, availWidth: 1_000, availHeight: 800 },
+        screens: [{ availLeft: 0, availTop: 0, availWidth: 1_000, availHeight: 800 }],
+      });
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("alert").textContent).toContain("사용 가능한 다른 화면을 찾지 못했습니다");
+  });
+
+  it("announces unsupported automatic placement as an alert", () => {
+    Reflect.deleteProperty(window, "getScreenDetails");
+    renderCompanion();
+
+    fireEvent.click(screen.getByRole("button", { name: "다른 화면으로 창 이동" }));
+
+    expect(screen.getByRole("alert").textContent).toContain("자동 창 배치를 지원하지 않습니다");
   });
 
   it("drops a late screen permission result after an invalid-session page unmounts", async () => {
@@ -826,7 +1115,7 @@ describe("StudioToolsCompanionPage", () => {
     vi.spyOn(window, "resizeTo").mockImplementation(() => undefined);
     Object.defineProperty(window, "getScreenDetails", { configurable: true, value: getScreenDetails });
     const view = renderCompanion("/studio/tools-companion?session=invalid");
-    fireEvent.click(screen.getByRole("button", { name: "다른 화면으로 창 배치" }));
+    fireEvent.click(screen.getByRole("button", { name: "다른 화면으로 창 이동" }));
     view.unmount();
     await act(async () => {
       resolveDetails?.({

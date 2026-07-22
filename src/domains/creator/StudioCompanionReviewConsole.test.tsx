@@ -36,7 +36,6 @@ function renderConsole(overrides: Partial<React.ComponentProps<typeof StudioComp
     projection,
     connected: true,
     presentationSafe: false,
-    onPresentationSafeChange: vi.fn(),
     onSelectLayer: vi.fn(),
     onHistory: vi.fn(),
     onCommentFocus: vi.fn(),
@@ -67,7 +66,7 @@ describe("StudioCompanionReviewConsole", () => {
   });
 
   it("keeps all primary controls disabled and comment text hidden in presentation-safe mode", () => {
-    const { props } = renderConsole({ presentationSafe: true });
+    renderConsole({ presentationSafe: true });
     expect(screen.getByRole("status").textContent).toContain("발표 안전 모드");
     expect(screen.queryByRole("combobox", { name: "원격 브러시" })).toBeNull();
     expect(screen.queryByText("주인공 선화")).toBeNull();
@@ -76,13 +75,10 @@ describe("StudioCompanionReviewConsole", () => {
     fireEvent.click(screen.getByRole("tab", { name: /댓글/u }));
     expect(screen.queryByText("표정을 조금 더 선명하게")).toBeNull();
     expect(screen.getByText("검수 의견 열림")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "발표 안전" }));
-    expect(props.onPresentationSafeChange).toHaveBeenCalledWith(false);
   });
 
   it("uses at least 44px targets for tabs and controls", () => {
     renderConsole();
-    expect(screen.getByRole("button", { name: "발표 안전" }).className).toContain("min-h-11");
     for (const tab of screen.getAllByRole("tab")) {
       expect(tab.className).toContain("min-h-11");
     }
@@ -91,5 +87,14 @@ describe("StudioCompanionReviewConsole", () => {
     expect(screen.getByRole("tab", { name: /댓글/u }).getAttribute("aria-selected")).toBe("true");
     expect(document.getElementById("companion-review-panel-layers")?.hidden).toBe(true);
     expect(document.getElementById("companion-review-panel-comments")?.hidden).toBe(false);
+  });
+
+  it("fills the available height in a dedicated review window", () => {
+    renderConsole({ layout: "dedicated" });
+
+    const layersPanel = document.getElementById("companion-review-panel-layers");
+    expect(layersPanel?.className).toContain("flex-1");
+    expect(layersPanel?.className).not.toContain("max-h-72");
+    expect(screen.getByRole("tab", { name: /레이어/u }).className).toContain("min-h-11");
   });
 });
