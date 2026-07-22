@@ -3,7 +3,7 @@
  * Desktop headless check: Studio application menus + left rail + menu-driven popovers.
  *
  * Desktop IA (Magma-style):
- * - Visible: app menubar + MainMenu (파일/편집/삽입/보기/그리기/AI) + left tool rail
+ * - Visible: app menubar + MainMenu (파일/편집/삽입/보기/필터/그리기/AI) + left tool rail
  * - Toolbelt is parked off-screen on lg+ (still mounts popovers when opened via main menu)
  *
  * Run: pnpm exec tsx scripts/verify-studio-menus.mts
@@ -33,15 +33,15 @@ const MAIN_MENU: Record<string, string[]> = {
     "다시실행",
     "복사",
     "복제",
-    "삭제",
+    "선택 제거",
     "모두 선택",
     "선택 해제",
     "작업 내역",
-    "선택 도구",
-    "스포이드",
   ],
   삽입: [
     "템플릿 · 에셋",
+    "콜라주",
+    "요소 · 도형",
     "말풍선",
     "텍스트",
     "이미지…",
@@ -54,13 +54,20 @@ const MAIN_MENU: Record<string, string[]> = {
     "슈퍼심플 레이아웃",
     "전체 레이아웃",
     "패널 접어 넓게",
-    "너비에 맞춤",
+    "화면에 맞게 조정",
     "확대",
     "축소",
-    "실제 크기 (100%)",
+    "실제 픽셀 (100%)",
     "전체화면",
     "캔버스만",
     "단축키 도움말",
+  ],
+  필터: [
+    "가우시안 블러",
+    "모션 블러",
+    "색조 / 채도 / 밝기",
+    "명도 / 대비",
+    "색상 커브",
   ],
   그리기: ["펜", "지우개", "채우기", "스마트 도형", "배경 · 톤", "팔레트 · 브랜드"],
   AI: ["AI 어시스트", "스톡 이미지", "연동 설정"],
@@ -74,7 +81,7 @@ const RAIL_TOOLS = [
   // Fill: when no raster is selected the aria-label becomes the guard reason (still exposed).
   { anyOf: ["채우기 (G)", "래스터 이미지 레이어를 먼저 선택하세요."] },
   "스포이드 (I / Alt+클릭)",
-  "스마트 도형 — 낙서를 선·원·사각형으로 다듬기",
+  { anyOf: ["스마트 도형 켜기", "스마트 도형 끄기"] },
   "사각형 도형",
   "타원 도형",
   "텍스트 추가",
@@ -99,7 +106,7 @@ const MENU_DRIVEN_POPOVERS: {
   {
     group: "그리기",
     item: "배경 · 톤",
-    expectVisible: ["배경·톤", "스크린톤"],
+    expectVisible: ["배경 편집"],
   },
   {
     group: "그리기",
@@ -177,6 +184,15 @@ async function openMainMenuGroup(page: Page, label: string): Promise<void> {
   const btn = nav.getByRole("button", { name: label, exact: true });
   await btn.click({ timeout: 5000 });
   await page.locator(`[role="menu"][aria-label="${label}"]`).waitFor({ state: "visible", timeout: 5000 });
+}
+
+async function hasVisibleText(page: Page, text: string): Promise<boolean> {
+  const matches = page.getByText(text);
+  const count = await matches.count();
+  for (let index = 0; index < count; index += 1) {
+    if (await matches.nth(index).isVisible().catch(() => false)) return true;
+  }
+  return false;
 }
 
 async function assertChrome(page: Page): Promise<string[]> {
@@ -308,8 +324,7 @@ async function assertMenuDrivenPopovers(page: Page): Promise<string[]> {
 
       let matched = 0;
       for (const text of entry.expectVisible) {
-        const loc = page.getByText(text).first();
-        if (await loc.isVisible({ timeout: 2500 }).catch(() => false)) matched += 1;
+        if (await hasVisibleText(page, text)) matched += 1;
       }
       if (matched === 0) {
         failures.push(

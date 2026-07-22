@@ -209,18 +209,37 @@ async function main() {
     const menubarSvgs = await countVisibleSvgs(page, '[data-studio-app-menubar="true"] svg');
     const railSvgs = await countVisibleSvgs(page, '[data-studio-tool-rail="true"] svg');
     const drawOptSvgs = await countVisibleSvgs(page, '[data-studio-draw-options="true"] svg');
-    const mainMenuChevrons = await countVisibleSvgs(
-      page,
-      '[data-studio-main-menu="true"] button svg'
-    );
+    const mainMenu = page.locator('[data-studio-main-menu="true"]');
+    const mainMenuTriggerCount = await mainMenu
+      .locator("[data-studio-main-menu-trigger]")
+      .count();
+    const mainMenuChevronCount = await mainMenu
+      .locator('[data-studio-main-menu-chevron="true"]')
+      .count();
 
-    log(`menubar svgs=${menubarSvgs}, rail svgs=${railSvgs}, draw-options svgs=${drawOptSvgs}, main-menu chevrons=${mainMenuChevrons}`);
+    log(`menubar svgs=${menubarSvgs}, rail svgs=${railSvgs}, draw-options svgs=${drawOptSvgs}, main-menu triggers=${mainMenuTriggerCount}, chevrons=${mainMenuChevronCount}`);
 
     if (menubarSvgs < 3) failures.push(`앱 메뉴바 아이콘 부족: ${menubarSvgs} (expect ≥3 Download/chevron/etc)`);
     if (railSvgs < 8) failures.push(`좌측 레일 아이콘 부족: ${railSvgs} (expect ≥8 tool icons)`);
     if (drawOptSvgs < 3) failures.push(`그리기 옵션바 아이콘 부족: ${drawOptSvgs} (expect pen/eraser/etc)`);
-    if (mainMenuChevrons < 6) {
-      failures.push(`메인 메뉴 그룹 chevron 부족: ${mainMenuChevrons} (expect 6 groups)`);
+    if (mainMenuTriggerCount === 0 || mainMenuChevronCount !== mainMenuTriggerCount) {
+      failures.push(
+        `메인 메뉴 chevron 계약 불일치: triggers=${mainMenuTriggerCount}, chevrons=${mainMenuChevronCount}`
+      );
+    } else {
+      await page.setViewportSize({ width: 1600, height: 1100 });
+      await page.waitForTimeout(100);
+      const visibleMainMenuChevrons = await countVisibleSvgs(
+        page,
+        '[data-studio-main-menu-chevron="true"]'
+      );
+      if (visibleMainMenuChevrons !== mainMenuTriggerCount) {
+        failures.push(
+          `2xl 메인 메뉴 chevron 노출 불일치: visible=${visibleMainMenuChevrons}, triggers=${mainMenuTriggerCount}`
+        );
+      }
+      await page.setViewportSize({ width: 1440, height: 1100 });
+      await page.waitForTimeout(100);
     }
 
     // Rail tools must each have an SVG (icon-first IA)
@@ -252,11 +271,23 @@ async function main() {
       if ((await eraserBtn.locator("svg").count()) < 1) failures.push("지우개 모드 버튼에 아이콘 없음");
     }
 
+    // The tray is intentionally lazy-mounted inside advanced pen options.
+    const advancedToggle = page.locator(
+      '[data-studio-draw-options="true"] [data-studio-draw-advanced-toggle="true"]'
+    );
+    await advancedToggle.click({ timeout: 4000 });
+    await page
+      .locator('[data-studio-draw-advanced="true"]')
+      .waitFor({ state: "visible", timeout: 4000 });
+
     // Brush tray uses stroke previews (not lucide) — ensure listbox options visible
     const brushOpts = page.locator('[data-studio-brush-tray="true"] [role="option"]');
     const brushCount = await brushOpts.count();
     if (brushCount < 3) failures.push(`브러시 트레이 옵션 부족: ${brushCount}`);
-    else log(`brush tray options=${brushCount}`);
+    else {
+      await brushOpts.first().waitFor({ state: "visible", timeout: 4000 });
+      log(`brush tray options=${brushCount}`);
+    }
 
     // Open a main menu and ensure chevron + items layout (items are text; chevron on trigger)
     await page.locator('[data-studio-main-menu="true"]').getByRole("button", { name: "그리기", exact: true }).click();

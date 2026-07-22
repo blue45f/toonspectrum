@@ -9,7 +9,8 @@ name: related-info-update
 #    고품질 갱신은 로컬에서 `pnpm related:update`(크롤 + catalog:gen) 후 커밋하는 것이 primary 다.
 #    변경이 있을 때만 커밋하며, 없으면 조용히 종료한다.
 #
-# 선택 Secret (미설정 시 안전하게 skip): VERCEL_DEPLOY_HOOK_URL — 커밋 후 배포 트리거.
+# 성공한 main 푸시는 Vercel Git Integration이 자동 배포한다. 별도 hook/CLI를 호출하지
+# 않아 중복 빌드와 러너 비용을 막는다.
 
 on:
   schedule:
@@ -22,7 +23,6 @@ on:
 
 permissions:
   contents: write
-  actions: write
 
 concurrency:
   group: related-info-update
@@ -71,15 +71,4 @@ jobs:
             git commit -m "chore(related): 관련 정보 스냅샷 갱신 (${COUNT}개 작품)"
             git push
             echo "committed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Trigger production deploy
-        if: steps.commit.outputs.committed == 'true'
-        env:
-          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
-        run: |
-          if [ -n "${HOOK:-}" ]; then
-            curl -fsS -X POST "$HOOK" >/dev/null && echo "Vercel 배포 훅 트리거됨"
-          else
-            echo "::notice::VERCEL_DEPLOY_HOOK_URL 미설정 — Vercel Git 자동배포에 의존(설정돼 있으면 정상)"
           fi

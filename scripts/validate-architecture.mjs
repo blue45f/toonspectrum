@@ -1,6 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import {
+  validateNoDuplicateVercelTrigger,
+  validateVercelFallbackWorkflow,
+} from "./vercel-workflow-policy.mjs";
+
 const ROOT = process.cwd();
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 const exists = (rel) => fs.existsSync(path.join(ROOT, rel));
@@ -23,6 +28,13 @@ const requiredPaths = [
   "pnpm-workspace.yaml",
   "tsconfig.json",
   "commitlint.config.cjs",
+  ".github/workflows/catalog-update.yml",
+  ".github/workflows/deploy-vercel.yml",
+  ".github/workflows/related-info-update.yml",
+  "deploy/oci/.env.example",
+  "deploy/oci/crawl-update.sh",
+  "scripts/vercel-workflow-policy.mjs",
+  "scripts/vercel-workflow-policy.test.mjs",
   ".husky/pre-commit",
   ".husky/commit-msg",
 ];
@@ -46,6 +58,8 @@ const requiredScripts = [
   "test",
   "check:studio-bundle",
   "validate:architecture",
+  "verify:studio-menus",
+  "verify:studio-icons",
 ];
 for (const script of requiredScripts) {
   if (!scripts[script]) issues.push(`missing script: ${script}`);
@@ -74,6 +88,34 @@ if (!exists(apiPkgPath)) {
   const apiPkg = JSON.parse(read(apiPkgPath));
   if (!apiPkg.name) issues.push(`apps/api has no "name"`);
   if (!apiPkg.scripts || !apiPkg.scripts.build) issues.push(`apps/api has no "build" script`);
+}
+
+// Vercel Git Integration is the primary production path. Keep the Actions CLI
+// path manual-only, project-bound, and exactly pinned so configuring its three
+// secrets later cannot deploy a wrong project or silently adopt a new release.
+const vercelDeployWorkflowPath = ".github/workflows/deploy-vercel.yml";
+if (exists(vercelDeployWorkflowPath)) {
+  for (const issue of validateVercelFallbackWorkflow(read(vercelDeployWorkflowPath))) {
+    issues.push(`${vercelDeployWorkflowPath}: ${issue}`);
+  }
+}
+
+// Scheduled content commits are ordinary main pushes. Explicit CLI/hook
+// dispatches duplicate Vercel Git Integration builds and consume runner quota.
+for (const workflowPath of [
+  ".github/workflows/catalog-update.yml",
+  ".github/workflows/related-info-update.yml",
+]) {
+  if (!exists(workflowPath)) continue;
+  for (const issue of validateNoDuplicateVercelTrigger(read(workflowPath), { workflow: true })) {
+    issues.push(`${workflowPath}: ${issue}`);
+  }
+}
+for (const automationPath of ["deploy/oci/crawl-update.sh", "deploy/oci/.env.example"]) {
+  if (!exists(automationPath)) continue;
+  for (const issue of validateNoDuplicateVercelTrigger(read(automationPath))) {
+    issues.push(`${automationPath}: ${issue}`);
+  }
 }
 
 if (issues.length > 0) {

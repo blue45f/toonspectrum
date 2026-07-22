@@ -1,21 +1,8 @@
-name: Deploy to Vercel
+# Production pushes are deployed by Vercel Git Integration. This workflow is a
+# manual emergency fallback and fails unless all project credentials exist.
+name: Vercel CLI fallback deploy
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'components/**'
-      - 'lib/**'
-      - 'apps/api/**'
-      - 'api/**'
-      - 'public/**'
-      - 'index.html'
-      - 'vite.config.ts'
-      - 'vercel.json'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/deploy-vercel.yml'
   workflow_dispatch:
 
 permissions:
@@ -31,29 +18,31 @@ jobs:
     timeout-minutes: 20
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_CLI_VERSION: "56.4.1"
+      VERCEL_TELEMETRY_DISABLED: "1"
     steps:
+      - name: Require fallback deployment configuration
+        shell: bash
+        run: |
+          if [[ -z "${VERCEL_TOKEN:-}" || -z "${VERCEL_ORG_ID:-}" || -z "${VERCEL_PROJECT_ID:-}" ]]; then
+            echo "::error::VERCEL_TOKEN, VERCEL_ORG_ID, and VERCEL_PROJECT_ID are all required for the manual fallback deploy."
+            exit 1
+          fi
+
       - uses: actions/checkout@v6
 
-      - name: Skip deployment when Vercel token is not configured
-        if: env.VERCEL_TOKEN == ''
-        run: echo "VERCEL_TOKEN is not configured; skipping Vercel deployment."
-
       - uses: actions/setup-node@v6
-        if: env.VERCEL_TOKEN != ''
         with:
           node-version: 24
 
-      - name: Install dependencies
-        if: env.VERCEL_TOKEN != ''
+      - name: Install and verify pinned Vercel CLI
         run: |
-          npm install -g pnpm@11.4.0
-          pnpm install --frozen-lockfile
-
-      - name: Install Vercel CLI
-        if: env.VERCEL_TOKEN != ''
-        run: npm i -g vercel@latest
+          npm install --global --no-audit --no-fund "vercel@${VERCEL_CLI_VERSION}"
+          actual_version="$(vercel --version 2>&1 | awk '/Vercel CLI/{version=$NF} END {print version}')"
+          echo "Vercel CLI ${actual_version}"
+          test "$actual_version" = "$VERCEL_CLI_VERSION"
 
       - name: Deploy frontend to Vercel production
-        if: env.VERCEL_TOKEN != ''
-        run: |
-          vercel deploy --prod --yes --token "$VERCEL_TOKEN"
+        run: vercel deploy --prod --yes --token "$VERCEL_TOKEN"
