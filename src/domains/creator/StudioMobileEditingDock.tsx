@@ -28,6 +28,7 @@ import {
 import {
   Suspense,
   memo,
+  useId,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -90,6 +91,13 @@ const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 5;
 const MOBILE_DRAW_SETTINGS_ID = "studio-mobile-draw-settings";
 const MOBILE_WORKSPACE_TOOLS_ID = "studio-mobile-workspace-tools";
+const STUDIO_MOBILE_FILTER_KINDS = [
+  ["gaussian-blur", "가우시안 블러"],
+  ["motion-blur", "모션 블러"],
+  ["hue-saturation-brightness", "색조 / 채도 / 밝기"],
+  ["brightness-contrast", "명도 / 대비"],
+  ["color-curves", "색상 커브"],
+] as const satisfies readonly (readonly [StudioFilterKind, string])[];
 
 type StudioDrawSheetStyle = CSSProperties & {
   "--studio-draw-sheet-height": string;
@@ -114,6 +122,96 @@ function studioDrawSheetSizeStyle(
     height: "var(--studio-draw-sheet-height)",
     maxHeight: "var(--studio-draw-sheet-height)",
   };
+}
+
+interface StudioMobileFilterSelectProps {
+  filterMutationLocked: boolean;
+  filterPreparationBusy: boolean;
+  filterTargetLabel: "선택 이미지" | "현재 페이지 합성본";
+  filterUnavailableReason: string | null;
+  onSelect: (kind: StudioFilterKind) => void;
+  placement: "context" | "workspace";
+}
+
+/**
+ * Keeps the invisible native select affordance identical in both thumb-reachable mobile rows.
+ * The visible shell remains a 44px target while native selection provides familiar mobile UX.
+ */
+function StudioMobileFilterSelect({
+  filterMutationLocked,
+  filterPreparationBusy,
+  filterTargetLabel,
+  filterUnavailableReason,
+  onSelect,
+  placement,
+}: StudioMobileFilterSelectProps) {
+  const guidanceId = useId();
+  const unavailableReason = filterUnavailableReason ?? (
+    filterMutationLocked ? "편집 잠금을 해제한 뒤 필터를 적용하세요." : null
+  );
+  const disabled = unavailableReason !== null || filterPreparationBusy;
+  const guidance = filterPreparationBusy
+    ? `${filterTargetLabel}: 필터 미리보기를 준비하는 중입니다.`
+    : unavailableReason
+      ? `${filterTargetLabel}: ${unavailableReason}`
+      : `${filterTargetLabel}: 적용할 필터를 선택하세요.`;
+  const shellClassName = cn(
+    "relative flex min-h-11 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.62rem] font-semibold text-fg-2",
+    STUDIO_EASE,
+    "focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+    disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:bg-raised",
+  );
+
+  if (disabled) {
+    return (
+      <button
+        type="button"
+        data-studio-mobile-filter-select={placement}
+        data-studio-mobile-filter-target={filterTargetLabel}
+        aria-busy={filterPreparationBusy}
+        aria-disabled="true"
+        aria-label={`${filterTargetLabel} 필터를 사용할 수 없음`}
+        aria-describedby={guidanceId}
+        className={shellClassName}
+        title={guidance}
+      >
+        <WandSparkles size={16} aria-hidden />
+        <span>필터</span>
+        <span id={guidanceId} className="sr-only">{guidance}</span>
+      </button>
+    );
+  }
+
+  return (
+    <label
+      data-studio-mobile-filter-select={placement}
+      data-studio-mobile-filter-target={filterTargetLabel}
+      className={shellClassName}
+      title={guidance}
+    >
+      <WandSparkles size={16} aria-hidden />
+      <span>필터</span>
+      <span id={guidanceId} className="sr-only">{guidance}</span>
+      <select
+        aria-label={`${filterTargetLabel} 필터 선택`}
+        aria-describedby={guidanceId}
+        defaultValue=""
+        title={guidance}
+        className="absolute inset-0 size-full cursor-pointer opacity-0"
+        onChange={(event) => {
+          const kind = event.currentTarget.value as StudioFilterKind;
+          if (!kind) return;
+          onSelect(kind);
+          event.currentTarget.value = "";
+        }}
+      >
+        <option value="" disabled>필터 선택</option>
+        {STUDIO_MOBILE_FILTER_KINDS.map(([kind, label]) => (
+          <option key={kind} value={kind}>{label}</option>
+        ))}
+      </select>
+    </label>
+  );
 }
 
 export interface StudioBrushCatalogHandlers {
@@ -189,6 +287,9 @@ export interface StudioMobileEditingDockProps {
   drawShape: DrawShapeKind;
   drawSheetRef: import("react").RefObject<HTMLDivElement | null>;
   filterMutationLocked: boolean;
+  filterPreparationBusy: boolean;
+  filterTargetLabel: "선택 이미지" | "현재 페이지 합성본";
+  filterUnavailableReason: string | null;
   hi: number;
   history: PageState[][];
   isMobile: boolean;
@@ -273,6 +374,9 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   drawShape,
   drawSheetRef,
   filterMutationLocked,
+  filterPreparationBusy,
+  filterTargetLabel,
+  filterUnavailableReason,
   hi,
   history,
   isMobile,
@@ -380,6 +484,9 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   const redoUnavailableTitle = collaborationDocumentLocked
     ? "공동 작업 문서 잠금을 해제한 뒤 편집 기록을 이동할 수 있어요."
     : "다시 적용할 편집 기록이 없어요.";
+  const selectedSupportsContextFilter =
+    marqueeIds.length === 0 &&
+    selected !== null;
   const workspaceDockHasActiveTool =
     commentPinArmed ||
     quickActionsOpen ||
@@ -433,39 +540,18 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 setMobileSheet("props");
               }}
             />
+            {selectedSupportsContextFilter ? (
+              <StudioMobileFilterSelect
+                filterMutationLocked={filterMutationLocked}
+                filterPreparationBusy={filterPreparationBusy}
+                filterTargetLabel={filterTargetLabel}
+                filterUnavailableReason={filterUnavailableReason}
+                onSelect={openStudioFilter}
+                placement="context"
+              />
+            ) : null}
             {selected?.type === "image" && marqueeIds.length === 0 ? (
               <>
-                <label
-                  className={cn(
-                    "relative flex min-h-11 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.62rem] font-semibold text-fg-2",
-                    STUDIO_EASE,
-                    "focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent",
-                    filterMutationLocked ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:bg-raised",
-                  )}
-                  title={filterMutationLocked ? "이미지 또는 문서 잠금을 해제한 뒤 필터를 적용하세요." : "이미지 필터 선택"}
-                >
-                  <WandSparkles size={16} aria-hidden />
-                  필터
-                  <select
-                    aria-label="이미지 필터 선택"
-                    defaultValue=""
-                    disabled={filterMutationLocked}
-                    className="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
-                    onChange={(event) => {
-                      const kind = event.currentTarget.value as StudioFilterKind;
-                      if (!kind) return;
-                      openStudioFilter(kind);
-                      event.currentTarget.value = "";
-                    }}
-                  >
-                    <option value="" disabled>필터 선택</option>
-                    <option value="gaussian-blur">가우시안 블러</option>
-                    <option value="motion-blur">모션 블러</option>
-                    <option value="hue-saturation-brightness">색조 / 채도 / 밝기</option>
-                    <option value="brightness-contrast">명도 / 대비</option>
-                    <option value="color-curves">색상 커브</option>
-                  </select>
-                </label>
                 <StudioContextActionButton
                   icon={PaintBucket}
                   label="채우기"
@@ -1275,6 +1361,14 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   active={mobileSheet === "pages"}
                   aria-pressed={mobileSheet === "pages"}
                   onClick={() => setMobileSheet((s) => (s === "pages" ? null : "pages"))}
+                />
+                <StudioMobileFilterSelect
+                  filterMutationLocked={filterMutationLocked}
+                  filterPreparationBusy={filterPreparationBusy}
+                  filterTargetLabel={filterTargetLabel}
+                  filterUnavailableReason={filterUnavailableReason}
+                  onSelect={openStudioFilter}
+                  placement="workspace"
                 />
                 <StudioDockNavButton
                   icon={Plus}

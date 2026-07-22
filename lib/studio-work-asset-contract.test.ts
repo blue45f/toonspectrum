@@ -7,7 +7,9 @@ import {
   isStudioWorkAssetImageAdmissionOptedIn,
   STUDIO_WORK_ASSET_ADMISSION_OPT_IN_TOKEN,
   STUDIO_WORK_ASSET_IMAGE_ADMISSION_OPT_IN_TOKEN,
+  STUDIO_WORK_ASSET_MAX_CURVE_POINTS,
   STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
+  STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS,
   StudioWorkAssetManifestSchema,
   studioWorkAssetReferenceKey,
   studioWorkAssetSourceUri,
@@ -111,6 +113,111 @@ describe("studio work asset wire contract", () => {
             params: {},
           })),
         },
+      },
+    }, { assetId: "asset-1", elementType: "image" })).toThrow();
+  });
+
+  it("preserves the bounded page-composite cache hint on image references", () => {
+    const parsed = parseStudioWorkAssetDescriptor({
+      ...descriptor(),
+      element: { ...descriptor().element, filterPageComposite: true },
+    }, { assetId: "asset-1", elementType: "image" });
+
+    expect(STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS).toContain("filterPageComposite");
+    expect(parsed.element.filterPageComposite).toBe(true);
+  });
+
+  it.each([
+    { type: "gaussian" as const, strength: 100, radius: 40, angle: 0 },
+    { type: "motion" as const, strength: 100, radius: 40, angle: 360 },
+  ])("preserves bounded $type blur, tonal extrema, and normalized RGB curves", (blurFx) => {
+    const curve = [
+      { x: 0, y: 8 },
+      { x: 96, y: 72 },
+      { x: 255, y: 248 },
+    ];
+    const curveCh = {
+      r: [{ x: 0, y: 0 }, { x: 128, y: 144 }, { x: 255, y: 255 }],
+      g: [{ x: 0, y: 12 }, { x: 255, y: 244 }],
+      b: [{ x: 0, y: 0 }, { x: 255, y: 232 }],
+    };
+    const parsed = parseStudioWorkAssetDescriptor({
+      ...descriptor(),
+      element: {
+        ...descriptor().element,
+        blurFx,
+        curve,
+        curveCh,
+        brightness: 0.8,
+        contrast: -80,
+        hue: 180,
+        saturation: -1,
+      },
+    }, { assetId: "asset-1", elementType: "image" });
+
+    expect(STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS).toEqual([
+      "blurFx",
+      "curve",
+      "curveCh",
+      "smartFilters",
+    ]);
+    expect(STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS).toEqual(expect.arrayContaining([
+      "blurFx",
+      "curve",
+      "curveCh",
+    ]));
+    expect(parsed.element).toMatchObject({
+      blurFx,
+      curve,
+      curveCh,
+      brightness: 0.8,
+      contrast: -80,
+      hue: 180,
+      saturation: -1,
+    });
+
+    const oppositeExtrema = parseStudioWorkAssetDescriptor({
+      ...descriptor(),
+      element: {
+        ...descriptor().element,
+        brightness: -0.8,
+        contrast: 80,
+        hue: -180,
+        saturation: 1,
+      },
+    }, { assetId: "asset-1", elementType: "image" });
+    expect(oppositeExtrema.element).toMatchObject({
+      brightness: -0.8,
+      contrast: 80,
+      hue: -180,
+      saturation: 1,
+    });
+  });
+
+  it("rejects malformed, non-normalized, and over-point curve metadata", () => {
+    const parseCurve = (curve: unknown) => parseStudioWorkAssetDescriptor({
+      ...descriptor(),
+      element: { ...descriptor().element, curve },
+    }, { assetId: "asset-1", elementType: "image" });
+    const overPointCurve = Array.from(
+      { length: STUDIO_WORK_ASSET_MAX_CURVE_POINTS + 1 },
+      (_, index) => ({
+        x: Math.round(index * 255 / STUDIO_WORK_ASSET_MAX_CURVE_POINTS),
+        y: index,
+      })
+    );
+
+    expect(() => parseCurve(overPointCurve)).toThrow();
+    expect(() => parseCurve([{ x: 0, y: 0 }, { x: 0, y: 80 }, { x: 255, y: 255 }]))
+      .toThrow(/오름차순/u);
+    expect(() => parseCurve([{ x: 1, y: 0 }, { x: 255, y: 255 }]))
+      .toThrow(/첫 입력점/u);
+    expect(() => parseCurve([{ x: 0, y: 0 }, { x: 255, y: 255.5 }])).toThrow();
+    expect(() => parseStudioWorkAssetDescriptor({
+      ...descriptor(),
+      element: {
+        ...descriptor().element,
+        curveCh: { r: [{ x: 0, y: 0 }, { x: 255, y: 255 }], alpha: [] },
       },
     }, { assetId: "asset-1", elementType: "image" })).toThrow();
   });

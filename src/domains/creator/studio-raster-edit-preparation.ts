@@ -8,28 +8,31 @@
  * contract says it creates a merged copy.
  */
 
-import { STUDIO_ADVANCED_FILL_BROWSER_MAX_PIXELS } from "./studio-advanced-fill-raster-safety";
 import { isEffectivelyHidden, isEffectivelyLocked } from "./studio-layers";
 import {
   exportPageToSvg,
 } from "./studio-svg-export";
-import {
-  fingerprintStudioVectorReference,
-  renderStudioVectorReference,
-  STUDIO_VECTOR_REFERENCE_MAX_SOURCE_BYTES,
-  STUDIO_VECTOR_REFERENCE_MAX_SVG_BYTES,
-  StudioVectorReferenceError,
-  type StudioVectorReferenceBudgets,
-  type StudioVectorReferenceRenderOptions,
-  type StudioVectorReferenceResult,
-} from "./studio-vector-fill-reference";
 
 import type { El, ImageEl } from "./studio-element-model";
 import type { LayerGroup } from "./studio-layers";
 import type { SvgExportTheme } from "./studio-svg-export";
+import type {
+  StudioVectorReferenceInput,
+  StudioVectorReferenceBudgets,
+  StudioVectorReferenceRenderOptions,
+  StudioVectorReferenceResult,
+} from "./studio-vector-fill-reference";
 
 const EDITABLE_RASTER_COPY_NAMESPACE = "editable-raster-copy-v1";
+const PNG_BASE64_PREFIX = "data:image/png;base64,";
 const PNG_DATA_URL_PREFIX = "data:image/png;base64,iVBORw0KGgo";
+const EDITABLE_RASTER_COPY_MAX_SOURCE_BYTES = 16 * 1024 * 1024;
+const EDITABLE_RASTER_COPY_MAX_SVG_BYTES = 16 * 1024 * 1024;
+const EDITABLE_RASTER_COPY_MAX_PNG_BYTES = 32 * 1024 * 1024;
+// General merge callers keep the established browser hard cap. Page filters clamp to 4MP below.
+const EDITABLE_RASTER_COPY_MAX_PIXELS = 16 * 1024 * 1024;
+const PAGE_COMPOSITE_FILTER_MAX_PIXELS = 4 * 1024 * 1024;
+const PAGE_COMPOSITE_FILTER_MAX_PNG_BYTES = 4 * 1024 * 1024;
 const UTF8_ENCODER = new TextEncoder();
 
 export interface StudioEditableRasterCopyInput {
@@ -50,6 +53,37 @@ export interface StudioEditableRasterCopyInput {
   readonly insertionIndex?: number;
   readonly documentMutationBlockedReason?: string | null;
   readonly budgets?: StudioVectorReferenceBudgets;
+}
+
+export interface StudioEditablePageRasterSource {
+  readonly id: string;
+  readonly canvasH: number;
+  readonly elements: readonly El[];
+  readonly groups?: readonly LayerGroup[];
+  readonly hideMaster?: boolean;
+  readonly bg?: string;
+  readonly bgGrad?: readonly string[] | null;
+}
+
+export interface StudioEditablePageRasterContextInput {
+  readonly page: StudioEditablePageRasterSource;
+  readonly canvasWidth: number;
+  readonly masterElements: readonly El[];
+  readonly localHiddenElementIds: ReadonlySet<string>;
+  readonly theme?: SvgExportTheme;
+  readonly name: string;
+  readonly collaborationLockedReason?: string | null;
+  readonly sharedDocument: boolean;
+  readonly masterEditMode: boolean;
+  readonly reviewLocked: boolean;
+  readonly timelinePlaying: boolean;
+  readonly viewTransformSuppressed: boolean;
+  readonly budgets?: StudioVectorReferenceBudgets;
+}
+
+export interface StudioEditablePageRasterContext {
+  readonly input: StudioEditableRasterCopyInput;
+  readonly destinationElements: readonly El[];
 }
 
 export interface StudioRasterPreparationSourceSummary {
@@ -111,6 +145,19 @@ export type StudioEditableRasterCopyPlanResult =
       readonly reason: string;
     };
 
+export type StudioEditableRasterCopyApplyResult =
+  | { readonly ok: true; readonly elements: El[] }
+  | {
+      readonly ok: false;
+      readonly code: "stale-plan" | "invalid-composite";
+      readonly reason: string;
+    };
+
+export type StudioEditableRasterCopyRenderer = (
+  input: StudioVectorReferenceInput,
+  options?: StudioVectorReferenceRenderOptions,
+) => Promise<StudioVectorReferenceResult>;
+
 function normalizeCopyName(value: string | undefined): string {
   let safeValue = "";
   for (const character of value ?? "편집용 래스터 복사본") {
@@ -126,12 +173,16 @@ function normalizeInsertionIndex(value: number | undefined, maximum: number): nu
   return Math.max(0, Math.min(value!, maximum));
 }
 
-function validDimensions(width: number, height: number): boolean {
+function validDimensions(
+  width: number,
+  height: number,
+  maxPixelCount = EDITABLE_RASTER_COPY_MAX_PIXELS,
+): boolean {
   return Number.isSafeInteger(width)
     && Number.isSafeInteger(height)
     && width > 0
     && height > 0
-    && width * height <= STUDIO_ADVANCED_FILL_BROWSER_MAX_PIXELS;
+    && width * height <= maxPixelCount;
 }
 
 function boundedByteBudget(value: number | undefined, hardMaximum: number): number {
@@ -144,12 +195,101 @@ function utf8ByteLength(value: string): number {
   return UTF8_ENCODER.encode(value).byteLength;
 }
 
+function pngDataUrlByteLength(value: string): number | null {
+  if (!value.startsWith(PNG_DATA_URL_PREFIX)) return null;
+  const payload = value.slice(PNG_BASE64_PREFIX.length);
+  if (payload.length === 0 || payload.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/u.test(payload)) {
+    return null;
+  }
+  const padding = payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0;
+  return Math.floor(payload.length * 3 / 4) - padding;
+}
+
+/** Keep the lazy preparation seam independent from the Studio's eager vector runtime chunk. */
+function fingerprintEditableRasterCopy(value: string): string {
+  const bytes = UTF8_ENCODER.encode(value);
+  let first = 0x811c9dc5;
+  let second = 0x9e3779b9;
+  for (const byte of bytes) {
+    first = Math.imul(first ^ byte, 0x01000193) >>> 0;
+    second = Math.imul(second ^ byte, 0x85ebca6b) >>> 0;
+    second = (second ^ (second >>> 13)) >>> 0;
+  }
+  return `${EDITABLE_RASTER_COPY_NAMESPACE}:${first.toString(16).padStart(8, "0")}${second.toString(16).padStart(8, "0")}`;
+}
+
 function selectCopySources(input: StudioEditableRasterCopyInput): readonly El[] {
   const groups = [...(input.groups ?? [])];
   const requested = input.sourceIds ? new Set(input.sourceIds) : null;
   return input.elements.filter((element) =>
     !isEffectivelyHidden(element, groups) && (!requested || requested.has(element.id))
   );
+}
+
+/** Builds the page snapshot and all fail-closed reasons inside the user-triggered lazy seam. */
+export function createStudioEditablePageRasterContext(
+  context: StudioEditablePageRasterContextInput,
+): StudioEditablePageRasterContext {
+  const { page } = context;
+  const groups = [...(page.groups ?? [])];
+  const sourceElements = [
+    ...(page.hideMaster ? [] : context.masterElements),
+    ...page.elements,
+  ];
+  const hasVisibleAnimatedSource = sourceElements.some((element) =>
+    element.type === "image" &&
+    !isEffectivelyHidden(element, groups) &&
+    (element.isAnimatedGif || (element.frames?.length ?? 0) > 1)
+  );
+  const hasLocallyHiddenSource = sourceElements.some((element) =>
+    context.localHiddenElementIds.has(element.id)
+  );
+  const documentMutationBlockedReason = context.collaborationLockedReason
+    ?? (context.sharedDocument
+      ? "공동 작업 문서의 페이지 합성 필터는 모든 참여자에게 동일한 픽셀 결과를 전달할 수 있도록 준비 중이에요. 지금은 선택 이미지 필터를 사용해 주세요."
+      : hasLocallyHiddenSource
+        ? "‘나만 숨기기’ 레이어를 먼저 다시 표시해 주세요. 개인 표시 상태는 공유·저장되는 필터 합성본에 포함하지 않습니다."
+        : context.masterEditMode
+          ? "마스터 편집을 끝낸 뒤 현재 페이지 합성 필터를 사용할 수 있어요."
+          : context.reviewLocked
+            ? "검토 잠금을 해제한 뒤 현재 페이지에 필터를 적용해 주세요."
+            : context.timelinePlaying
+              ? "타임라인 재생을 멈춘 뒤 현재 프레임을 기준으로 필터를 적용해 주세요."
+              : hasVisibleAnimatedSource
+                ? "애니메이션 레이어는 현재 프레임의 정적 복사본을 만든 뒤 페이지 필터에 포함할 수 있어요."
+                : context.viewTransformSuppressed
+                  ? "저장·내보내기·타임랩스 캡처가 끝난 뒤 현재 페이지에 필터를 적용해 주세요."
+                  : null);
+  const budgets = {
+    ...context.budgets,
+    maxPixelCount: Math.min(
+      context.budgets?.maxPixelCount ?? PAGE_COMPOSITE_FILTER_MAX_PIXELS,
+      PAGE_COMPOSITE_FILTER_MAX_PIXELS,
+    ),
+    maxPngBytes: Math.min(
+      context.budgets?.maxPngBytes ?? PAGE_COMPOSITE_FILTER_MAX_PNG_BYTES,
+      PAGE_COMPOSITE_FILTER_MAX_PNG_BYTES,
+    ),
+  };
+
+  return {
+    input: {
+      pageId: page.id,
+      width: context.canvasWidth,
+      height: page.canvasH,
+      elements: sourceElements,
+      groups,
+      theme: context.theme,
+      includeBackground: true,
+      bg: page.bg,
+      bgGrad: page.bgGrad,
+      name: context.name,
+      insertionIndex: page.elements.length,
+      documentMutationBlockedReason,
+      budgets,
+    },
+    destinationElements: page.elements,
+  };
 }
 
 /**
@@ -231,11 +371,24 @@ export function planStudioEditableRasterCopy(
       reason: input.documentMutationBlockedReason,
     };
   }
-  if (!validDimensions(input.width, input.height)) {
+  const maxPixelCount = boundedByteBudget(
+    input.budgets?.maxPixelCount,
+    EDITABLE_RASTER_COPY_MAX_PIXELS,
+  );
+  if (!validDimensions(
+    input.width,
+    input.height,
+    maxPixelCount,
+  )) {
+    const requestedPixels = Number.isSafeInteger(input.width) && Number.isSafeInteger(input.height)
+      ? input.width * input.height
+      : null;
     return {
       ok: false,
       code: "invalid-dimensions",
-      reason: "페이지 크기가 브라우저의 안전한 래스터 처리 범위를 벗어났습니다. 페이지를 나누거나 해상도를 낮춰 주세요.",
+      reason: requestedPixels && requestedPixels > 0
+        ? `현재 페이지는 ${requestedPixels}픽셀로 필터 허용치 ${maxPixelCount}픽셀을 넘습니다. 페이지를 나누거나 해상도를 낮춰 주세요.`
+        : "페이지 크기가 올바르지 않습니다. 양수 정수 해상도로 조정해 주세요.",
     };
   }
 
@@ -260,7 +413,7 @@ export function planStudioEditableRasterCopy(
   }
   if (utf8ByteLength(serializedSource) > boundedByteBudget(
     input.budgets?.maxSourceBytes,
-    STUDIO_VECTOR_REFERENCE_MAX_SOURCE_BYTES,
+    EDITABLE_RASTER_COPY_MAX_SOURCE_BYTES,
   )) {
     return {
       ok: false,
@@ -288,7 +441,7 @@ export function planStudioEditableRasterCopy(
   }
   if (utf8ByteLength(exported.svg) > boundedByteBudget(
     input.budgets?.maxSvgBytes,
-    STUDIO_VECTOR_REFERENCE_MAX_SVG_BYTES,
+    EDITABLE_RASTER_COPY_MAX_SVG_BYTES,
   )) {
     return {
       ok: false,
@@ -312,10 +465,7 @@ export function planStudioEditableRasterCopy(
       bgGrad: input.bgGrad,
       name: normalizeCopyName(input.name),
       insertionIndex: normalizeInsertionIndex(input.insertionIndex, input.elements.length),
-      sourceFingerprint: fingerprintStudioVectorReference(
-        exported.svg,
-        EDITABLE_RASTER_COPY_NAMESPACE,
-      ),
+      sourceFingerprint: fingerprintEditableRasterCopy(exported.svg),
       sourceElementCount: exported.elementCount,
       budgets: input.budgets,
     },
@@ -324,9 +474,12 @@ export function planStudioEditableRasterCopy(
 
 export async function renderStudioEditableRasterCopy(
   plan: StudioEditableRasterCopyPlan,
+  renderVectorReference: StudioEditableRasterCopyRenderer,
   options: StudioVectorReferenceRenderOptions = {},
 ): Promise<StudioVectorReferenceResult> {
-  const result = await renderStudioVectorReference({
+  // The eager Studio owner injects its existing renderer. Keeping this lazy seam type-only avoids
+  // extracting that renderer into an additional shared HTTP request solely for this workflow.
+  const result = await renderVectorReference({
     width: plan.width,
     height: plan.height,
     elements: plan.sourceElements,
@@ -338,11 +491,22 @@ export async function renderStudioEditableRasterCopy(
     fingerprintNamespace: EDITABLE_RASTER_COPY_NAMESPACE,
     budgets: plan.budgets,
   }, options);
+  const pngByteLength = pngDataUrlByteLength(result.dataUrl);
   if (result.fingerprint !== plan.sourceFingerprint) {
-    throw new StudioVectorReferenceError(
-      "unsupported-vector-fidelity",
-      "편집용 복사본을 만드는 동안 원본 레이어가 바뀌었습니다. 최신 화면에서 다시 시도해 주세요.",
-    );
+    throw new Error("필터를 준비하는 동안 페이지 내용이 바뀌었습니다. 최신 화면에서 다시 시도해 주세요.");
+  }
+  if (result.width !== plan.width || result.height !== plan.height) {
+    throw new Error("필터 합성 결과의 해상도가 현재 페이지와 다릅니다. 페이지 크기를 확인한 뒤 다시 시도해 주세요.");
+  }
+  if (pngByteLength === null) {
+    throw new Error("필터 합성 결과가 올바른 PNG가 아닙니다. 레이어를 단순화한 뒤 다시 시도해 주세요.");
+  }
+  const maxPngBytes = boundedByteBudget(
+    plan.budgets?.maxPngBytes,
+    EDITABLE_RASTER_COPY_MAX_PNG_BYTES,
+  );
+  if (pngByteLength > maxPngBytes) {
+    throw new Error(`필터 합성 PNG가 ${pngByteLength}바이트로 허용치 ${maxPngBytes}바이트를 넘습니다. 페이지를 나누거나 해상도와 레이어 복잡도를 낮춰 주세요.`);
   }
   return result;
 }
@@ -360,10 +524,7 @@ export function materializeStudioEditableRasterCopy(input: {
     || input.rendered.height !== input.plan.height
     || !input.rendered.dataUrl.startsWith(PNG_DATA_URL_PREFIX)
   ) {
-    throw new StudioVectorReferenceError(
-      "invalid-png-output",
-      "편집용 래스터 복사본 결과가 현재 계획과 일치하지 않습니다.",
-    );
+    throw new Error("편집용 래스터 복사본 결과가 현재 계획과 일치하지 않습니다.");
   }
   return {
     id,
@@ -388,4 +549,74 @@ export function isStudioEditableRasterCopyPlanCurrent(
     && next.plan.pageId === plan.pageId
     && next.plan.sourceFingerprint === plan.sourceFingerprint
     && next.plan.insertionIndex === plan.insertionIndex;
+}
+
+/**
+ * Commit boundary for a non-destructive raster copy.
+ *
+ * Planning, rendering and materializing are deliberately mutation-free, so dismissing a preview
+ * requires no rollback. Applying revalidates the complete source fingerprint and document lock
+ * after the asynchronous raster boundary, then inserts exactly one composite without removing or
+ * patching any authored element.
+ */
+export function applyStudioEditableRasterCopy(input: {
+  readonly plan: StudioEditableRasterCopyPlan;
+  readonly current: StudioEditableRasterCopyInput;
+  readonly composite: ImageEl & El;
+  /**
+   * Optional authored destination when the raster source also contains read-only underlays such
+   * as a document master. The plan fingerprint still covers `current.elements`, while only this
+   * destination receives the new composite.
+   */
+  readonly destinationElements?: readonly El[];
+}): StudioEditableRasterCopyApplyResult {
+  if (!isStudioEditableRasterCopyPlanCurrent(input.plan, input.current)) {
+    return {
+      ok: false,
+      code: "stale-plan",
+      reason: "필터 미리보기 중 페이지 내용이나 잠금 상태가 바뀌었습니다. 최신 화면에서 다시 시도해 주세요.",
+    };
+  }
+
+  const { composite, plan } = input;
+  const destinationElements = input.destinationElements ?? input.current.elements;
+  const pngByteLength = pngDataUrlByteLength(composite.src);
+  const maxPngBytes = boundedByteBudget(
+    plan.budgets?.maxPngBytes,
+    EDITABLE_RASTER_COPY_MAX_PNG_BYTES,
+  );
+  if (pngByteLength === null) {
+    return {
+      ok: false,
+      code: "invalid-composite",
+      reason: "필터 합성 결과가 올바른 PNG가 아니어서 원본을 변경하지 않았습니다.",
+    };
+  }
+  if (pngByteLength > maxPngBytes) {
+    return {
+      ok: false,
+      code: "invalid-composite",
+      reason: `필터 합성 PNG가 허용치 ${maxPngBytes}바이트를 넘어 적용하지 않았습니다. 페이지를 나누거나 해상도를 낮춰 주세요.`,
+    };
+  }
+  if (
+    !composite.id.trim()
+    || destinationElements.some((element) => element.id === composite.id)
+    || composite.x !== 0
+    || composite.y !== 0
+    || composite.width !== plan.width
+    || composite.height !== plan.height
+    || composite.rotation !== 0
+    || plan.insertionIndex > destinationElements.length
+  ) {
+    return {
+      ok: false,
+      code: "invalid-composite",
+      reason: "필터 합성 레이어가 현재 페이지와 일치하지 않아 원본을 변경하지 않았습니다.",
+    };
+  }
+
+  const elements = [...destinationElements];
+  elements.splice(plan.insertionIndex, 0, composite);
+  return { ok: true, elements };
 }

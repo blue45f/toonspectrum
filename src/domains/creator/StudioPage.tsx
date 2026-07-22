@@ -1062,13 +1062,6 @@ import {
   type StudioTeamCommentRefreshSession,
 } from "./studio-team-comment-refresh-session";
 import {
-  buildStudioCompanionHello,
-  buildStudioCompanionPrimaryState,
-  createStudioCompanionChannel,
-  openStudioToolsCompanionWindow,
-  parseStudioCompanionMessage,
-} from "./studio-tools-companion";
-import {
   loadStudioUiDensityState,
   saveStudioUiDensityState,
   studioUiDensityAllows,
@@ -1081,6 +1074,7 @@ import {
   materializeStudioAdvancedFillVectorTarget,
   planStudioAdvancedFillVectorTarget,
   renderStudioAdvancedFillVectorReference,
+  renderStudioVectorReference,
   type StudioAdvancedFillVirtualTarget,
 } from "./studio-vector-fill-reference";
 import { STUDIO_VIEW_ACTION_HINTS } from "./studio-view-action-hints";
@@ -1304,6 +1298,9 @@ import type {
   StudioPublishProfile,
 } from "./studio-publish-preflight";
 import type {
+  StudioEditableRasterCopyPlan,
+} from "./studio-raster-edit-preparation";
+import type {
   StudioRasterEncoded,
   StudioRasterInterchangeFormat,
 } from "./studio-raster-interchange";
@@ -1319,6 +1316,11 @@ import type { StudioTeamCommentCapabilities } from "./studio-team-comment-client
 import type { StudioTeamCommentLiveEvent } from "./studio-team-comment-live-event";
 import type { StudioTeamCommentMutationPlan } from "./studio-team-comment-mutation-plan";
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
+import type {
+  StudioCompanionCommandName,
+  StudioCompanionPrimaryBinding,
+  StudioCompanionPrimaryRuntime,
+} from "./studio-tools-companion";
 import type { StudioGpuBackend } from "./studio-webgpu-frame-contract";
 import type {
   StudioGpuLiveStrokePlan,
@@ -2123,6 +2125,137 @@ export function StudioPage() {
   );
 }
 
+type StudioToolsCompanionProtocol = typeof import("./studio-tools-companion");
+
+type StudioToolsCompanionPrimaryRuntime = StudioCompanionPrimaryRuntime & {
+  protocol: StudioToolsCompanionProtocol;
+};
+
+let studioToolsCompanionProtocolPromise: Promise<StudioToolsCompanionProtocol> | null = null;
+
+function loadStudioToolsCompanionProtocol(): Promise<StudioToolsCompanionProtocol> {
+  return studioToolsCompanionProtocolPromise ??= import("./studio-tools-companion");
+}
+
+async function startStudioToolsCompanionPrimaryRuntime(
+  input: Parameters<StudioToolsCompanionProtocol["startStudioCompanionPrimaryRuntime"]>[0]
+): Promise<StudioToolsCompanionPrimaryRuntime | null> {
+  const protocol = await loadStudioToolsCompanionProtocol();
+  const runtime = protocol.startStudioCompanionPrimaryRuntime(input);
+  return runtime ? { protocol, ...runtime } : null;
+}
+
+function openReadyStudioToolsCompanionForMenu(input: {
+  protocol: StudioToolsCompanionProtocol;
+  sessionId: string;
+  windowRef: { current: Window | null };
+  binding: StudioCompanionPrimaryBinding;
+  announce: (message: string) => void;
+}): void {
+  const {
+    isStudioToolsCompanionWindowReusable,
+    openStudioToolsCompanionWindow,
+  } = input.protocol;
+  const cachedWindow = input.windowRef.current;
+  const reusedExistingWindow = isStudioToolsCompanionWindowReusable(
+    input.sessionId,
+    cachedWindow
+  );
+  const existingWindow = reusedExistingWindow ? cachedWindow : null;
+  if (!reusedExistingWindow) {
+    input.binding.release();
+    input.windowRef.current = null;
+  }
+  const companionWindow = openStudioToolsCompanionWindow(input.sessionId, existingWindow);
+  if (!companionWindow) {
+    input.announce("팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.");
+    return;
+  }
+  input.windowRef.current = companionWindow;
+  input.announce(
+    reusedExistingWindow
+      ? "도구 창을 앞으로 가져오도록 요청했어요 · 보이지 않으면 작업 표시줄에서 선택하세요"
+      : cachedWindow
+        ? "도구 창을 복구해 다시 연결합니다 · 다른 모니터로 옮겨 쓰세요"
+      : "도구 창을 열었습니다 · 다른 모니터로 옮겨 쓰세요",
+  );
+}
+
+const STUDIO_TOOLS_COMPANION_RESERVATION_FEATURES =
+  "popup=yes,width=420,height=780,menubar=no,toolbar=no,location=no,status=no";
+
+function openStudioToolsCompanionForMenu(input: {
+  ensureRuntime: () => Promise<StudioToolsCompanionPrimaryRuntime | null>;
+  runtimeRef: { current: StudioToolsCompanionPrimaryRuntime | null };
+  windowRef: { current: Window | null };
+  announce: (message: string) => void;
+}): void {
+  const ready = input.runtimeRef.current;
+  if (ready) {
+    openReadyStudioToolsCompanionForMenu({
+      protocol: ready.protocol,
+      sessionId: ready.sessionId,
+      binding: ready.binding,
+      windowRef: input.windowRef,
+      announce: input.announce,
+    });
+    return;
+  }
+
+  const existingReservation = input.windowRef.current;
+  if (existingReservation && !existingReservation.closed) {
+    try {
+      existingReservation.focus();
+    } catch {
+      // Browsers may deny focus while the reserved popup is still loading.
+    }
+    input.announce("도구 창을 준비 중입니다 · 잠시만 기다려 주세요");
+    return;
+  }
+
+  let reservation: Window | null = null;
+  try {
+    reservation = window.open("", "_blank", STUDIO_TOOLS_COMPANION_RESERVATION_FEATURES);
+  } catch {
+    reservation = null;
+  }
+  if (!reservation) {
+    input.announce("팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.");
+    return;
+  }
+  input.windowRef.current = reservation;
+  input.announce("도구 창을 준비 중입니다 · 연결이 끝나면 자동으로 열립니다");
+
+  void input.ensureRuntime().then((runtime) => {
+    if (!runtime || input.windowRef.current !== reservation) {
+      try {
+        reservation?.close();
+      } catch {
+        // Ignore a reservation already closed by the user.
+      }
+      if (!runtime) {
+        input.windowRef.current = null;
+        input.announce("도구 창을 사용할 수 없습니다. 브라우저 채널 지원을 확인해 주세요.");
+      }
+      return;
+    }
+    try {
+      reservation.name = runtime.protocol.studioCompanionWindowName(runtime.sessionId);
+      reservation.location.replace(runtime.protocol.studioCompanionUrl(runtime.sessionId));
+      reservation.focus();
+      input.announce("도구 창을 열었습니다 · 다른 모니터로 옮겨 쓰세요");
+    } catch {
+      input.windowRef.current = null;
+      try {
+        reservation.close();
+      } catch {
+        // Ignore a reservation already closed by the browser.
+      }
+      input.announce("도구 창을 열지 못했습니다. 다시 시도해 주세요.");
+    }
+  });
+}
+
 function StudioCuttoonEditor() {
   // React Compiler는 이 컴포넌트를 구조적으로 컴파일하지 못한다(본문 dynamic import 40+,
   // try/finally 다수). 명시적으로 옵트아웃하고, 무거운 JSX 영역은 컴파일되는 memo 자식
@@ -2554,6 +2687,8 @@ function StudioCuttoonEditor() {
     sharedDocumentScope.workId === workId
       ? sharedDocumentScope.value
       : null;
+  const sharedDocumentRef = useRef(sharedDocument);
+  sharedDocumentRef.current = sharedDocument;
   const studioLiveParticipant =
     workId &&
     studioAuthUserId &&
@@ -2901,6 +3036,8 @@ function StudioCuttoonEditor() {
   // 페이지 캔버스/썸네일에 깔 마스터 합성 목록(숨김 제외 · 잠금/노클립 강제 · 비상호작용).
   // useMemo: 캔버스 memo 자식 prop 안정성 — master 변경 시에만 재합성.
   const masterRenderEls = useMemo(() => composeMasterRenderElements(master), [master]);
+  const masterRenderElsRef = useRef(masterRenderEls);
+  masterRenderElsRef.current = masterRenderEls;
   const activePageIndex = Math.max(0, pages.findIndex((p) => p.id === currentPageId));
   // useMemo: 폴백 리터럴이 렌더마다 새 객체가 되지 않도록(memo 자식 prop 안정성).
   const activePage = useMemo(
@@ -4520,16 +4657,43 @@ function StudioCuttoonEditor() {
   }, [activePage.id, masterEditMode, pagesHi]);
   // 필터 클립보드 — "필터 복사"로 담아 다른 요소에 "붙여넣기"(웹툰 컷 간 룩 통일용).
   const [filterClipboard, setFilterClipboard] = useState<Partial<ImageFilterFields> | null>(null);
-  // Magma식 상단 필터 메뉴 — 다이얼로그의 draft는 히스토리/CRDT 밖에서 캔버스에만 투영하고,
-  // 저장할 때 patchEl 한 번으로 커밋한다. 취소는 preview만 비우므로 빈 undo 항목을 남기지 않는다.
+  // Magma식 상단 필터 메뉴 — 다이얼로그의 draft는 히스토리/CRDT 밖에서 캔버스에만 투영한다.
+  // 선택 이미지는 patchEl 한 번, 벡터 페이지는 원본 보존 합성 ImageEl 한 개로 커밋한다. 취소는
+  // preview만 비우므로 어느 경로도 빈 undo 항목이나 임시 레이어를 남기지 않는다.
   const studioFilterSessionIdRef = useRef(0);
-  const [studioFilterSession, setStudioFilterSession] = useState<{
-    id: number;
-    elementId: string;
-    kind: StudioFilterKind;
-    initialDraft?: StudioFilterDraft;
-  } | null>(null);
+  const [studioFilterSession, setStudioFilterSession] = useState<
+    | {
+        id: number;
+        target: "image";
+        elementId: string;
+        kind: StudioFilterKind;
+        initialDraft?: StudioFilterDraft;
+      }
+    | {
+        id: number;
+        target: "page-composite";
+        elementId: string;
+        kind: StudioFilterKind;
+        initialDraft?: StudioFilterDraft;
+        image: ImageEl & El;
+        plan: StudioEditableRasterCopyPlan;
+        mutationTicket: StudioEditorMutationTicket;
+        pageId: string;
+        historyIndex: number;
+      }
+    | null
+  >(null);
   const [studioFilterPreview, setStudioFilterPreview] = useState<StudioFilterPreview | null>(null);
+  const [studioFilterPreparationBusy, setStudioFilterPreparationBusy] = useState(false);
+  const [studioFilterApplying, setStudioFilterApplying] = useState(false);
+  const studioFilterPreparationRunIdRef = useRef(0);
+  const studioFilterPreparationAbortRef = useRef<AbortController | null>(null);
+  const studioFilterApplyBusyRef = useRef(false);
+  useEffect(() => () => {
+    studioFilterPreparationRunIdRef.current += 1;
+    studioFilterPreparationAbortRef.current?.abort();
+    studioFilterPreparationAbortRef.current = null;
+  }, []);
   const [lastStudioFilterDraft, setLastStudioFilterDraft] = useState<StudioFilterDraft | null>(null);
   const [editing, setEditing] = useState<{ id: string } | null>(null);
   const [pendingLetteringEdit, setPendingLetteringEdit] = useState<{
@@ -4651,6 +4815,8 @@ function StudioCuttoonEditor() {
   const [viewTool, setViewTool] = useState<"zoom" | "rotate" | null>(null);
   /** "나만 숨기기" — 이 클라이언트 화면에서만 숨긴다. 문서(CRDT)에는 반영되지 않아 다른 협업자에게는 그대로 보인다. */
   const [localHiddenElementIds, setLocalHiddenElementIds] = useState<ReadonlySet<string>>(() => new Set());
+  const localHiddenElementIdsRef = useRef(localHiddenElementIds);
+  localHiddenElementIdsRef.current = localHiddenElementIds;
   function toggleLocalHidden(id: string) {
     setLocalHiddenElementIds((prev) => {
       const next = new Set(prev);
@@ -5532,6 +5698,8 @@ function StudioCuttoonEditor() {
   const [pageSequenceOpen, setPageSequenceOpen] = useState(false);
   const [timelinePlayhead, setTimelinePlayhead] = useState(0);
   const [timelinePlaying, setTimelinePlaying] = useState(false);
+  const timelinePlayingRef = useRef(timelinePlaying);
+  timelinePlayingRef.current = timelinePlaying;
   const [timelineFocusedTrackId, setTimelineFocusedTrackId] = useState<string | null>(null);
   // 재생 중에만 의미 있는 ephemeral 미리보기 프레임 — 커밋되지 않는다(§3.10, 재생은 비파괴 미리보기).
   const [timelinePreviewFrame, setTimelinePreviewFrame] = useState(0);
@@ -9549,7 +9717,11 @@ function StudioCuttoonEditor() {
   }, []);
 
   // 멀티 디스플레이 도구 컴패니언 — 문서/undo 는 이 탭이 소유, 도구 의도만 BroadcastChannel.
-  const companionChannelRef = useRef<ReturnType<typeof createStudioCompanionChannel>>(null);
+  const companionRuntimeRef = useRef<StudioToolsCompanionPrimaryRuntime | null>(null);
+  const companionRuntimePromiseRef = useRef<Promise<StudioToolsCompanionPrimaryRuntime | null> | null>(null);
+  const companionRuntimeGenerationRef = useRef(0);
+  const companionWindowRef = useRef<Window | null>(null);
+  const companionPendingTextTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const companionUiRef = useRef({
     tool,
     drawMode,
@@ -9563,49 +9735,10 @@ function StudioCuttoonEditor() {
     companionUiRef.current = { tool, drawMode, menu, uiDensityMode, canvasOnlyMode, title };
   }, [tool, drawMode, menu, uiDensityMode, canvasOnlyMode, title]);
 
+  const companionCommandHandlerRef = useRef<(command: StudioCompanionCommandName) => void>(() => undefined);
   useEffect(() => {
-    const channel = createStudioCompanionChannel();
-    companionChannelRef.current = channel;
-    if (!channel) return;
-
-    const publish = () => {
-      const s = companionUiRef.current;
-      try {
-        channel.postMessage(
-          buildStudioCompanionPrimaryState({
-            tool: resolveStudioCompanionTool(s),
-            density: s.uiDensityMode,
-            canvasOnly: s.canvasOnlyMode,
-            title: s.title || "스튜디오",
-          })
-        );
-      } catch {
-        // channel may be closed
-      }
-    };
-
-    channel.onmessage = (ev: MessageEvent) => {
-      const msg = parseStudioCompanionMessage(ev.data);
-      if (!msg) return;
-      if (msg.type === "hello" && msg.role === "companion") {
-        try {
-          channel.postMessage(buildStudioCompanionHello("primary"));
-          publish();
-        } catch {
-          // ignore
-        }
-        return;
-      }
-      if (msg.type === "ping") {
-        try {
-          channel.postMessage({ v: 1, type: "pong", at: Date.now() });
-        } catch {
-          // ignore
-        }
-        return;
-      }
-      if (msg.type !== "companion-command") return;
-      switch (msg.command) {
+    companionCommandHandlerRef.current = (command) => {
+      switch (command) {
         case "select":
           setTool("select");
           break;
@@ -9628,7 +9761,11 @@ function StudioCuttoonEditor() {
           setMenu(null);
           setTool("select");
           // Defer text insert to avoid re-entering React from the channel handler.
-          globalThis.setTimeout(() => {
+          if (companionPendingTextTimerRef.current !== null) {
+            globalThis.clearTimeout(companionPendingTextTimerRef.current);
+          }
+          companionPendingTextTimerRef.current = globalThis.setTimeout(() => {
+            companionPendingTextTimerRef.current = null;
             window.dispatchEvent(new CustomEvent("studio-companion-add-text"));
           }, 0);
           break;
@@ -9662,41 +9799,81 @@ function StudioCuttoonEditor() {
           break;
       }
     };
-
-    try {
-      channel.postMessage(buildStudioCompanionHello("primary"));
-      publish();
-    } catch {
-      // ignore
-    }
-
     return () => {
-      try {
-        channel.close();
-      } catch {
-        // ignore
-      }
-      companionChannelRef.current = null;
+      companionCommandHandlerRef.current = () => undefined;
     };
   }, []);
 
+  const ensureStudioToolsCompanionRuntime = useCallback(() => {
+    const existing = companionRuntimePromiseRef.current;
+    if (existing) return existing;
+    const generation = companionRuntimeGenerationRef.current + 1;
+    companionRuntimeGenerationRef.current = generation;
+    const promise = startStudioToolsCompanionPrimaryRuntime({
+      search: typeof window !== "undefined" ? window.location.search : "",
+      getSnapshot: () => {
+        const s = companionUiRef.current;
+        return {
+          tool: resolveStudioCompanionTool(s),
+          density: s.uiDensityMode,
+          canvasOnly: s.canvasOnlyMode,
+          title: s.title,
+        };
+      },
+      onCommand: (command) => companionCommandHandlerRef.current(command),
+    }).then((runtime) => {
+      if (generation !== companionRuntimeGenerationRef.current) {
+        runtime?.dispose();
+        return null;
+      }
+      companionRuntimeRef.current = runtime;
+      return runtime;
+    }).catch(() => null);
+    companionRuntimePromiseRef.current = promise;
+    void promise.then((runtime) => {
+      if (!runtime && companionRuntimePromiseRef.current === promise) {
+        companionRuntimePromiseRef.current = null;
+      }
+    });
+    return promise;
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (new URLSearchParams(window.location.search).has("session")) {
+        void ensureStudioToolsCompanionRuntime();
+      }
+    } catch {
+      // A malformed query simply waits for an explicit tools-window request.
+    }
+    return () => {
+      companionRuntimeGenerationRef.current += 1;
+      const runtime = companionRuntimeRef.current;
+      companionRuntimeRef.current = null;
+      companionRuntimePromiseRef.current = null;
+      runtime?.dispose();
+      if (companionPendingTextTimerRef.current !== null) {
+        globalThis.clearTimeout(companionPendingTextTimerRef.current);
+        companionPendingTextTimerRef.current = null;
+      }
+    };
+  }, [ensureStudioToolsCompanionRuntime]);
+
   // 컴패니언에 현재 UI 상태 미러 (채널은 위 effect 가 소유).
   useEffect(() => {
-    const channel = companionChannelRef.current;
-    if (!channel) return;
-    try {
-      channel.postMessage(
-        buildStudioCompanionPrimaryState({
-          tool: resolveStudioCompanionTool({ tool, drawMode, menu }),
-          density: uiDensityMode,
-          canvasOnly: canvasOnlyMode,
-          title: title || "스튜디오",
-        })
-      );
-    } catch {
-      // ignore
-    }
-  }, [tool, drawMode, menu, uiDensityMode, canvasOnlyMode, title]);
+    if (
+      resolveStudioCompanionTool({ tool, drawMode, menu })
+      !== resolveStudioCompanionTool(companionUiRef.current)
+    ) return;
+    companionRuntimeRef.current?.publish();
+  }, [
+    tool,
+    drawMode,
+    menu,
+    uiDensityMode,
+    canvasOnlyMode,
+    title,
+  ]);
 
   // 툴바 드롭다운 바깥 클릭 시 닫기.
   // 팝오버는 body 포털(data-studio-tool-popover) — 트리거 래퍼(menuRef)와 포털 둘 다 내부로 본다.
@@ -9721,16 +9898,46 @@ function StudioCuttoonEditor() {
 
   const selected = selectedId ? (elementById.get(selectedId) ?? null) : null;
   const studioFilterDialogImage = studioFilterSession
-    ? (elementById.get(studioFilterSession.elementId) ?? null)
+    ? studioFilterSession.target === "page-composite"
+      ? studioFilterSession.pageId === activePage.id &&
+        studioFilterSession.historyIndex === pagesHi &&
+        !masterEditMode
+        ? studioFilterSession.image
+        : null
+      : (elementById.get(studioFilterSession.elementId) ?? null)
     : null;
-  const studioFilterDialogMutationLocked = !studioFilterDialogImage ||
-    studioFilterDialogImage.type !== "image" ||
-    activeSurfaceReviewLocked ||
-    studioWorkAssetDestructiveEditReason(studioFilterDialogImage) !== null ||
-    isEffectivelyLocked(studioFilterDialogImage, groups);
+  const studioFilterDialogImageEditReason =
+    studioFilterSession?.target === "image" && studioFilterDialogImage?.type === "image"
+      ? studioWorkAssetDestructiveEditReason(studioFilterDialogImage)
+      : null;
+  const studioFilterDialogMutationLockReason = !studioFilterDialogImage ||
+    studioFilterDialogImage.type !== "image"
+    ? "필터 대상이 현재 페이지에 없습니다. 대화상자를 닫고 다시 선택해 주세요."
+    : activeSurfaceReviewLocked
+      ? "검토 잠금을 해제한 뒤 필터를 적용하세요."
+      : timelinePlaying
+        ? "타임라인 재생을 멈춘 뒤 필터를 적용하세요."
+        : timelapseCapturing
+          ? "타임랩스 캡처가 끝난 뒤 필터를 적용하세요."
+          : saving
+            ? "저장이 끝난 뒤 필터를 적용하세요."
+            : studioFilterDialogImageEditReason
+              ? studioFilterDialogImageEditReason
+              : studioFilterSession?.target === "image" &&
+                  isEffectivelyLocked(studioFilterDialogImage, groups)
+                ? "이미지와 상위 그룹의 잠금을 해제한 뒤 필터를 적용하세요."
+                : null;
+  const studioFilterDialogMutationLocked = studioFilterDialogMutationLockReason !== null;
   useEffect(() => {
     if (!studioFilterSession) return;
     if (studioFilterDialogImage?.type === "image") return;
+    studioFilterSessionIdRef.current += 1;
+    studioFilterPreparationRunIdRef.current += 1;
+    studioFilterPreparationAbortRef.current?.abort();
+    studioFilterPreparationAbortRef.current = null;
+    studioFilterApplyBusyRef.current = false;
+    setStudioFilterPreparationBusy(false);
+    setStudioFilterApplying(false);
     setStudioFilterSession(null);
     setStudioFilterPreview(null);
   }, [studioFilterDialogImage, studioFilterSession]);
@@ -23501,30 +23708,152 @@ function StudioCuttoonEditor() {
     editMenuImageInputRef.current?.click();
   }
   function closeStudioFilterDialog() {
+    studioFilterSessionIdRef.current += 1;
+    studioFilterPreparationRunIdRef.current += 1;
+    studioFilterPreparationAbortRef.current?.abort();
+    studioFilterPreparationAbortRef.current = null;
+    studioFilterApplyBusyRef.current = false;
+    setStudioFilterPreparationBusy(false);
+    setStudioFilterApplying(false);
     setStudioFilterSession(null);
     setStudioFilterPreview(null);
   }
-  function openStudioFilter(kind: StudioFilterKind, initialDraft?: StudioFilterDraft) {
-    if (selected?.type !== "image") {
-      announceDrawingShortcut("필터를 적용할 이미지 레이어를 먼저 선택하세요");
-      return;
-    }
-    if (selectedContentMutationLocked) {
-      setError(
-        collaborationDocumentLocked
-          ? collaborationLockMessage()
-          : "이미지 또는 상위 그룹의 잠금을 해제한 뒤 필터를 적용해 주세요."
-      );
-      return;
-    }
-    setStudioFilterPreview(null);
-    studioFilterSessionIdRef.current += 1;
-    setStudioFilterSession({
-      id: studioFilterSessionIdRef.current,
-      elementId: selected.id,
-      kind,
-      ...(initialDraft?.kind === kind ? { initialDraft } : {}),
+
+  function currentStudioFilterPageRasterContext(
+    name: string,
+    rasterRuntime: typeof import("./studio-raster-edit-preparation"),
+  ) {
+    const currentHistory = pagesHistoryRef.current;
+    const currentHistoryIndex = Math.max(
+      0,
+      Math.min(pagesHiRef.current, Math.max(0, currentHistory.length - 1)),
+    );
+    const currentPages = currentHistory[currentHistoryIndex] ?? pages;
+    const targetPage = currentPages.find((page) => page.id === currentPageIdRef.current) ?? activePage;
+    return rasterRuntime.createStudioEditablePageRasterContext({
+      page: targetPage,
+      canvasWidth: CANVAS_W,
+      masterElements: masterRenderElsRef.current,
+      localHiddenElementIds: localHiddenElementIdsRef.current,
+      theme: webtoonTheme,
+      name,
+      collaborationLockedReason: collaborationAccessRef.current.locked
+        ? collaborationLockMessage()
+        : null,
+      sharedDocument: sharedDocumentRef.current !== null,
+      masterEditMode: masterEditModeRef.current,
+      reviewLocked: isPageReviewLocked(targetPage.review),
+      timelinePlaying: timelinePlayingRef.current,
+      viewTransformSuppressed: viewTransformSuppressedRef.current,
+      budgets: currentStudioVectorReferenceBudgets(),
     });
+  }
+
+  async function openStudioFilter(kind: StudioFilterKind, initialDraft?: StudioFilterDraft) {
+    if (studioFilterPreparationBusy) {
+      announceDrawingShortcut("현재 페이지 필터 미리보기를 준비하고 있어요");
+      return;
+    }
+    const selectedAnimated = selected?.type === "image" &&
+      (selected.isAnimatedGif || (selected.frames?.length ?? 0) > 1);
+    const directImageTarget = selected?.type === "image" &&
+      !selectedContentMutationLocked &&
+      !isEffectivelyHidden(selected, groups) &&
+      !selectedAnimated;
+    if (directImageTarget) {
+      if (timelinePlaying) {
+        setError("타임라인 재생을 멈춘 뒤 선택 이미지에 필터를 적용해 주세요.");
+        return;
+      }
+      setStudioFilterPreview(null);
+      studioFilterSessionIdRef.current += 1;
+      setStudioFilterSession({
+        id: studioFilterSessionIdRef.current,
+        target: "image",
+        elementId: selected.id,
+        kind,
+        ...(initialDraft?.kind === kind ? { initialDraft } : {}),
+      });
+      return;
+    }
+    disarmAllPixelTools();
+    setTool("select");
+    if (!prepareStudioDocumentReplacement("필터 미리보기를 준비", { flushPending: true })) return;
+
+    const mutationTicket = captureStudioMutationTicket();
+    const historyIndex = pagesHiRef.current;
+    const pageId = currentPageIdRef.current;
+    const layerName = "필터 · 현재 페이지 합성";
+    const runId = ++studioFilterPreparationRunIdRef.current;
+    studioFilterPreparationAbortRef.current?.abort();
+    const controller = new AbortController();
+    studioFilterPreparationAbortRef.current = controller;
+    setStudioFilterSession(null);
+    setStudioFilterPreview(null);
+    setStudioFilterPreparationBusy(true);
+    setError(null);
+    announceDrawingShortcut("선과 레이어를 필터 미리보기로 준비하고 있어요");
+
+    try {
+      const rasterRuntime = await import("./studio-raster-edit-preparation");
+      if (runId !== studioFilterPreparationRunIdRef.current || controller.signal.aborted) return;
+      const initialContext = currentStudioFilterPageRasterContext(layerName, rasterRuntime);
+      const planned = rasterRuntime.planStudioEditableRasterCopy(initialContext.input);
+      if (!planned.ok) throw new Error(planned.reason);
+      const rendered = await rasterRuntime.renderStudioEditableRasterCopy(
+        planned.plan,
+        renderStudioVectorReference,
+        {
+          signal: controller.signal,
+        },
+      );
+      if (
+        runId !== studioFilterPreparationRunIdRef.current ||
+        controller.signal.aborted ||
+        pagesHiRef.current !== historyIndex ||
+        currentPageIdRef.current !== pageId ||
+        !canApplyStudioMutation(mutationTicket)
+      ) return;
+      const latestContext = currentStudioFilterPageRasterContext(layerName, rasterRuntime);
+      if (!rasterRuntime.isStudioEditableRasterCopyPlanCurrent(planned.plan, latestContext.input)) {
+        throw new Error("필터 미리보기 준비 중 페이지가 바뀌었습니다. 최신 화면에서 다시 시도해 주세요.");
+      }
+      const image = {
+        ...rasterRuntime.materializeStudioEditableRasterCopy({
+          plan: planned.plan,
+          rendered,
+          newId: uid(),
+        }),
+        filterPageComposite: true,
+        noClip: true,
+      } satisfies ImageEl & El;
+      studioFilterSessionIdRef.current += 1;
+      setStudioFilterSession({
+        id: studioFilterSessionIdRef.current,
+        target: "page-composite",
+        elementId: image.id,
+        image,
+        plan: planned.plan,
+        mutationTicket,
+        pageId,
+        historyIndex,
+        kind,
+        ...(initialDraft?.kind === kind ? { initialDraft } : {}),
+      });
+      announceDrawingShortcut("원본을 보존한 페이지 필터 미리보기를 열었어요");
+    } catch (filterError) {
+      if (controller.signal.aborted || runId !== studioFilterPreparationRunIdRef.current) return;
+      setError(
+        filterError instanceof Error
+          ? filterError.message
+          : "현재 페이지의 필터 미리보기를 준비하지 못했습니다."
+      );
+    } finally {
+      if (runId === studioFilterPreparationRunIdRef.current) {
+        studioFilterPreparationAbortRef.current = null;
+        setStudioFilterPreparationBusy(false);
+      }
+    }
   }
   // 메뉴 항목 onSelect 클로저가 참조하는 에디터 핸들러의 안정 번들 — 그룹 배열 useMemo가
   // 렌더마다 무효화되지 않게 하고, 이벤트 시점엔 항상 최신 클로저를 호출한다.
@@ -23603,7 +23932,34 @@ function StudioCuttoonEditor() {
     selectedContentMutationLocked: selectedContentMutationLocked || timelapseCapturing,
     masterEditMode,
   });
-  const menuFilterDisabled = selected?.type !== "image" || selectedContentMutationLocked;
+  const menuSelectedAnimatedImage = selected?.type === "image" &&
+    (selected.isAnimatedGif || (selected.frames?.length ?? 0) > 1);
+  const studioDirectImageFilterTarget = selected?.type === "image" &&
+    !selectedContentMutationLocked &&
+    !menuSelectedAnimatedImage &&
+    !isEffectivelyHidden(selected, groups);
+  const studioFilterTargetLabel: "선택 이미지" | "현재 페이지 합성본" =
+    studioDirectImageFilterTarget ? "선택 이미지" : "현재 페이지 합성본";
+  const studioFilterUnavailableReason = timelinePlaying
+    ? "타임라인 재생을 멈춘 뒤 필터를 적용하세요."
+    : timelapseCapturing
+      ? "타임랩스 캡처가 끝난 뒤 필터를 적용하세요."
+      : saving
+        ? "저장이 끝난 뒤 필터를 적용하세요."
+        : activeSurfaceReviewLocked
+          ? "검토 잠금을 해제한 뒤 필터를 적용하세요."
+          : sharedDocument && !studioDirectImageFilterTarget
+            ? "공동 작업 문서의 페이지 합성 필터는 준비 중입니다. 지금은 이미지 레이어를 선택해 필터를 적용하세요."
+          : masterEditMode && selected?.type !== "image"
+            ? "마스터 편집에서는 필터를 적용할 이미지 레이어를 선택하세요."
+            : masterEditMode && selectedContentMutationLocked
+              ? "이미지와 상위 그룹의 잠금을 해제한 뒤 필터를 적용하세요."
+              : masterEditMode && menuSelectedAnimatedImage
+                ? "애니메이션 이미지는 정적 프레임으로 만든 뒤 필터를 적용하세요."
+                : masterEditMode && selected && isEffectivelyHidden(selected, groups)
+                  ? "숨긴 이미지 레이어를 다시 표시한 뒤 필터를 적용하세요."
+                  : null;
+  const menuFilterDisabled = studioFilterPreparationBusy || studioFilterUnavailableReason !== null;
   const menuSharedNonOwnerSave = Boolean(sharedDocument && sharedDocument.role !== "owner");
   const menuHasSavedView = savedStudioView?.pageId === activePage.id;
   const menuHasLocallyHiddenLayers = localHiddenElementIds.size > 0;
@@ -23633,6 +23989,7 @@ function StudioCuttoonEditor() {
             cropLayerDisabled: menuEditCropDisabled,
           },
           filterDisabled: menuFilterDisabled,
+          filterUnavailableReason: studioFilterUnavailableReason,
           viewTransformSuppressed,
           canvasFlipH,
           canvasRotation,
@@ -23727,18 +24084,12 @@ function StudioCuttoonEditor() {
             setLeftPanelOpen(false);
             setRightPanelOpen(false);
           },
-          openToolsCompanion: () => {
-            const companionWindow = openStudioToolsCompanionWindow();
-            if (!companionWindow) {
-              studioMainMenuActions.announceDrawingShortcut(
-                "팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.",
-              );
-              return;
-            }
-            studioMainMenuActions.announceDrawingShortcut(
-              "도구 창을 열었습니다 · 다른 모니터로 옮겨 쓰세요",
-            );
-          },
+          openToolsCompanion: () => openStudioToolsCompanionForMenu({
+            ensureRuntime: ensureStudioToolsCompanionRuntime,
+            runtimeRef: companionRuntimeRef,
+            windowRef: companionWindowRef,
+            announce: studioMainMenuActions.announceDrawingShortcut,
+          }),
           toggleLeftPanel: () => setLeftPanelOpen((current) => !current),
           toggleRightPanel: () => setRightPanelOpen((current) => !current),
           openShortcuts: () => setShortcutsOpen(true),
@@ -23758,6 +24109,7 @@ function StudioCuttoonEditor() {
       canvasRotation,
       collaborationDocumentLocked,
       colorBlindPreview,
+      ensureStudioToolsCompanionRuntime,
       isFullscreen,
       lastStudioFilterDraft,
       leftPanelOpen,
@@ -23774,6 +24126,7 @@ function StudioCuttoonEditor() {
       menuEditSelectAllDisabled,
       menuEditUndoDisabled,
       menuFilterDisabled,
+      studioFilterUnavailableReason,
       menuHasLocallyHiddenLayers,
       menuHasSavedView,
       menuSharedNonOwnerSave,
@@ -27218,6 +27571,14 @@ function StudioCuttoonEditor() {
           effScale={effScale}
           elementById={elementById}
           elements={elements}
+          studioFilterPageComposite={
+            studioFilterSession?.target === "page-composite" &&
+            studioFilterSession.pageId === activePage.id &&
+            studioFilterSession.historyIndex === pagesHi &&
+            !masterEditMode
+              ? studioFilterSession.image
+              : null
+          }
           studioFilterPreview={studioFilterPreview}
           followingStudioSessionId={followingStudioSessionId}
           frameAnimEl={frameAnimEl}
@@ -27812,7 +28173,10 @@ function StudioCuttoonEditor() {
           drawMode={drawMode}
           drawShape={drawShape}
           drawSheetRef={drawSheetRef}
-          filterMutationLocked={selectedContentMutationLocked}
+          filterMutationLocked={menuFilterDisabled}
+          filterPreparationBusy={studioFilterPreparationBusy}
+          filterTargetLabel={studioFilterTargetLabel}
+          filterUnavailableReason={studioFilterUnavailableReason}
           hi={hi}
           history={history}
           isMobile={isMobile}
@@ -28048,11 +28412,16 @@ function StudioCuttoonEditor() {
             activeKey={`filter:${studioFilterSession.id}`}
             kind={studioFilterSession.kind}
             image={studioFilterDialogImage}
+            targetKind={studioFilterSession.target}
             {...(studioFilterSession.initialDraft
               ? { initialDraft: studioFilterSession.initialDraft }
               : {})}
             rootRef={studioRootRef}
             mutationLocked={studioFilterDialogMutationLocked}
+            {...(studioFilterDialogMutationLockReason
+              ? { mutationLockReason: studioFilterDialogMutationLockReason }
+              : {})}
+            applying={studioFilterApplying}
             onPreview={(patch) => {
               setStudioFilterPreview(
                 patch
@@ -28060,11 +28429,82 @@ function StudioCuttoonEditor() {
                   : null,
               );
             }}
-            onApply={(patch, draft) => {
-              if (!patchEl(studioFilterSession.elementId, patch as Partial<El>)) return;
-              setStudioFilterPreview(null);
-              setLastStudioFilterDraft(draft);
-              setStudioFilterSession(null);
+            onApply={async (patch, draft) => {
+              if (studioFilterApplyBusyRef.current) return;
+              if (studioFilterSession.target === "image") {
+                if (!patchEl(studioFilterSession.elementId, patch as Partial<El>)) return;
+                setStudioFilterPreview(null);
+                setLastStudioFilterDraft(draft);
+                setStudioFilterApplying(false);
+                setStudioFilterSession(null);
+                return;
+              }
+              studioFilterApplyBusyRef.current = true;
+              setStudioFilterApplying(true);
+              const applySessionId = studioFilterSession.id;
+              try {
+                if (
+                  applySessionId !== studioFilterSessionIdRef.current ||
+                  studioFilterSession.pageId !== currentPageIdRef.current ||
+                  studioFilterSession.historyIndex !== pagesHiRef.current ||
+                  !canApplyStudioMutation(studioFilterSession.mutationTicket)
+                ) {
+                  closeStudioFilterDialog();
+                  return;
+                }
+                const rasterRuntime = await import("./studio-raster-edit-preparation");
+                if (applySessionId !== studioFilterSessionIdRef.current) return;
+                const currentContext = currentStudioFilterPageRasterContext(
+                  studioFilterSession.plan.name,
+                  rasterRuntime,
+                );
+                const composite = {
+                  ...studioFilterSession.image,
+                  ...patch,
+                  locked: false,
+                  noClip: true,
+                } as ImageEl & El;
+                const applied = rasterRuntime.applyStudioEditableRasterCopy({
+                  plan: studioFilterSession.plan,
+                  current: currentContext.input,
+                  composite,
+                  destinationElements: currentContext.destinationElements,
+                });
+                if (!applied.ok) {
+                  setError(applied.reason);
+                  closeStudioFilterDialog();
+                  return;
+                }
+                if (
+                  applySessionId !== studioFilterSessionIdRef.current ||
+                  studioFilterSession.pageId !== currentPageIdRef.current ||
+                  studioFilterSession.historyIndex !== pagesHiRef.current ||
+                  !canApplyStudioMutation(studioFilterSession.mutationTicket)
+                ) {
+                  closeStudioFilterDialog();
+                  return;
+                }
+                if (!commit(applied.elements, undefined, studioFilterSession.pageId)) return;
+                setMarqueeIds([]);
+                setSelectedId(composite.id);
+                setTool("select");
+                setStudioFilterPreview(null);
+                setLastStudioFilterDraft(draft);
+                setStudioFilterSession(null);
+                setError(null);
+                announceDrawingShortcut("원본을 보존한 페이지 필터 레이어를 추가했어요");
+              } catch (filterApplyError) {
+                setError(
+                  filterApplyError instanceof Error
+                    ? filterApplyError.message
+                    : "페이지 필터 레이어를 적용하지 못했습니다."
+                );
+              } finally {
+                if (applySessionId === studioFilterSessionIdRef.current) {
+                  studioFilterApplyBusyRef.current = false;
+                  setStudioFilterApplying(false);
+                }
+              }
             }}
             onClose={closeStudioFilterDialog}
           />
@@ -28298,6 +28738,7 @@ interface StudioCanvasViewportProps {
   effScale: number;
   elementById: Map<string, El>;
   elements: El[];
+  studioFilterPageComposite: (ImageEl & El) | null;
   studioFilterPreview: StudioFilterPreview | null;
   followingStudioSessionId: string | null;
   frameAnimEl: ImageEl | null;
@@ -28562,6 +29003,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   effScale,
   elementById,
   elements,
+  studioFilterPageComposite,
   studioFilterPreview,
   followingStudioSessionId,
   frameAnimEl,
@@ -29487,6 +29929,16 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                         : element,
                     )
                   : [...authoredCanvasRenderElements];
+                if (studioFilterPageComposite) {
+                  const previewComposite = studioFilterPreview?.elementId === studioFilterPageComposite.id
+                    ? ({ ...studioFilterPageComposite, ...studioFilterPreview.patch } as ImageEl & El)
+                    : studioFilterPageComposite;
+                  canvasRenderElements.push({
+                    ...previewComposite,
+                    locked: true,
+                    noClip: true,
+                  });
+                }
                 const virtualFillPreviewTarget =
                   !timelapseCapturing &&
                   advancedFillPreview?.virtualTarget &&

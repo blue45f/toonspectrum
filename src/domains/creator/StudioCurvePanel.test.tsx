@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { STUDIO_CURVE_MAX_CONTROL_POINTS } from "./studio-curves";
 import { StudioCurvePanel } from "./StudioCurvePanel";
 
 const curvePanelSource = readFileSync(
@@ -114,5 +115,19 @@ describe("StudioCurvePanel", () => {
     expect(second).toBeGreaterThan(first);
     expect(third).toBeGreaterThan(second);
     expect(last).toBeGreaterThan(third);
+  });
+
+  it("disables point insertion at the bounded shared-document limit and explains recovery", () => {
+    const points = Array.from({ length: STUDIO_CURVE_MAX_CONTROL_POINTS }, (_, index) => ({
+      x: Math.round(index * 255 / (STUDIO_CURVE_MAX_CONTROL_POINTS - 1)),
+      y: Math.round(index * 255 / (STUDIO_CURVE_MAX_CONTROL_POINTS - 1)),
+    }));
+    const html = renderToStaticMarkup(
+      <StudioCurvePanel points={points} onChange={vi.fn()} onReset={vi.fn()} />,
+    );
+
+    expect(html).toMatch(/disabled=""[^>]*title="채널마다 제어점은 최대 16개/);
+    expect(html).toContain("채널마다 최대 16개까지 사용할 수 있습니다.");
+    expect(curvePanelSource).toContain("if (curvePointLimitReached) return;");
   });
 });

@@ -8,6 +8,7 @@ import {
   planStudioDocumentMergeBake,
   renderStudioDocumentMergeBake,
 } from "./studio-layer-merge-document-bake";
+import { renderStudioVectorReference } from "./studio-vector-fill-reference";
 
 import type { El } from "./studio-element-model";
 
@@ -68,10 +69,14 @@ describe("mixed document layer merge bake", () => {
       width: request.width,
       height: request.height,
     }));
-    const rendered = await renderStudioDocumentMergeBake(planned.plan, {
-      workerFactory: null,
-      rasterize,
-    });
+    const rendered = await renderStudioDocumentMergeBake(
+      planned.plan,
+      renderStudioVectorReference,
+      {
+        workerFactory: null,
+        rasterize,
+      },
+    );
     expect(rasterize.mock.calls[0]?.[0].svg).toContain("효과음");
     const composite = materializeStudioDocumentMergeBake({
       plan: planned.plan,

@@ -2519,6 +2519,36 @@ describe("StudioCrdtService", () => {
       scene.set("prop:opacity", 0.5);
       scene.set("prop:flippedY", true);
       scene.set("prop:blur", 8);
+      if (elementType === "image") {
+        scene.set("prop:brightness", 0.8);
+        scene.set("prop:contrast", -80);
+        scene.set("prop:hue", 180);
+        scene.set("prop:saturation", -1);
+        scene.set("prop:blurFx", {
+          type: "motion",
+          strength: 100,
+          radius: 40,
+          angle: 315,
+        });
+        scene.set("prop:curve", [
+          { x: 0, y: 8 },
+          { x: 128, y: 144 },
+          { x: 255, y: 248 },
+        ]);
+        scene.set("prop:curveCh", {
+          r: [{ x: 0, y: 0 }, { x: 255, y: 240 }],
+          b: [{ x: 0, y: 12 }, { x: 255, y: 255 }],
+        });
+        scene.set("prop:smartFilters", {
+          version: 1,
+          entries: [{
+            id: "tone-1",
+            engine: "brightness-contrast",
+            enabled: true,
+            params: { brightness: 0.2 },
+          }],
+        });
+      }
       expect(hasValidStudioCrdtRootSchema(valid)).toBe(true);
       valid.destroy();
     }
@@ -2564,6 +2594,49 @@ describe("StudioCrdtService", () => {
     hiddenFilterScene.set("prop:blur", 4);
     expect(hasValidStudioCrdtRootSchema(hiddenInvalidFilter)).toBe(false);
     hiddenInvalidFilter.destroy();
+
+    const overPointCurve = createReferenceTopologyDocument();
+    overPointCurve.getMap<unknown>("scene-element:scene-1").set(
+      "prop:curve",
+      Array.from({ length: 17 }, (_, index) => ({
+        x: Math.round(index * 255 / 16),
+        y: index,
+      }))
+    );
+    expect(hasValidStudioCrdtRootSchema(overPointCurve)).toBe(false);
+    overPointCurve.destroy();
+
+    const hiddenInvalidCurve = createReferenceTopologyDocument();
+    const hiddenCurveScene = hiddenInvalidCurve.getMap<unknown>("scene-element:scene-1");
+    hiddenCurveScene.set("base:curve", [
+      { x: 0, y: 0 },
+      { x: 128, y: 100 },
+      { x: 128, y: 120 },
+      { x: 255, y: 255 },
+    ]);
+    hiddenCurveScene.set("prop:curve", [
+      { x: 0, y: 0 },
+      { x: 255, y: 255 },
+    ]);
+    expect(hasValidStudioCrdtRootSchema(hiddenInvalidCurve)).toBe(false);
+    hiddenInvalidCurve.destroy();
+
+    const hiddenInvalidBlurFx = createReferenceTopologyDocument();
+    const hiddenBlurFxScene = hiddenInvalidBlurFx.getMap<unknown>("scene-element:scene-1");
+    hiddenBlurFxScene.set("base:blurFx", {
+      type: "motion",
+      strength: 100,
+      radius: 41,
+      angle: 0,
+    });
+    hiddenBlurFxScene.set("prop:blurFx", {
+      type: "gaussian",
+      strength: 100,
+      radius: 10,
+      angle: 0,
+    });
+    expect(hasValidStudioCrdtRootSchema(hiddenInvalidBlurFx)).toBe(false);
+    hiddenInvalidBlurFx.destroy();
 
     const prototypeType = createReferenceTopologyDocument();
     prototypeType.getMap<unknown>("scene-element:scene-1").set("type", "toString");

@@ -6,7 +6,9 @@ import {
   STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
   STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
   STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES,
+  STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS,
   STUDIO_WORK_ASSET_TYPES,
+  parseStudioWorkAssetStructuredEditValue,
 } from "@/lib/studio-work-asset-contract";
 
 export const STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION = 1 as const;
@@ -363,6 +365,20 @@ export function validateStudioCrdtSceneElementPayload(
   if (payload.type === "reference") {
     for (const [key, range] of Object.entries(STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES)) {
       if (key in props) finiteRange(props[key], range.minimum, range.maximum, key);
+    }
+    for (const key of STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS) {
+      if (!(key in props)) continue;
+      if (props.elementType !== "image") {
+        throw new Error(`reference 요소의 ${key} 구조화 필터는 이미지에만 사용할 수 있습니다.`);
+      }
+      try {
+        props[key] = parseStudioWorkAssetStructuredEditValue(
+          key,
+          props[key]
+        ) as StudioCrdtJsonValue;
+      } catch {
+        throw new Error(`reference 요소의 ${key} 구조화 필터가 올바르지 않습니다.`);
+      }
     }
   }
   if ("text" in props && !boundedString(props.text)) {

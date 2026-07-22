@@ -16,6 +16,7 @@ import type Konva from "konva";
 const IMAGE_FILTER_BUILD_CACHE_LIMIT = 200;
 const IMAGE_FILTER_WORKER_DEBOUNCE_MS = 80;
 const IMAGE_FILTER_WORKER_RESULT_CACHE_LIMIT = 4;
+const PAGE_COMPOSITE_FILTER_RESULT_CACHE_LIMIT = 1;
 // One RGBA input plus transfer/result/intermediate buffers can coexist. Keep interactive filtering
 // at 16 MP / 64 MiB per surface. The Worker protocol independently enforces its broader 64 MP hard
 // boundary; keeping this stricter UI budget local avoids eagerly loading the optional Worker
@@ -66,6 +67,41 @@ interface WorkerResultCacheState {
   height: number;
   source: CanvasImageSource;
   width: number;
+}
+
+function releaseWorkerResultCanvas(canvas: HTMLCanvasElement): void {
+  canvas.width = 0;
+  canvas.height = 0;
+}
+
+function releaseWorkerResultCache(cache: WorkerResultCacheState | null): void {
+  if (!cache) return;
+  for (const canvas of cache.canvases.values()) {
+    releaseWorkerResultCanvas(canvas);
+  }
+  cache.canvases.clear();
+}
+
+function trimWorkerResultCache(
+  cache: WorkerResultCacheState | null,
+  limit: number,
+  retainedKey?: string,
+): void {
+  if (!cache) return;
+  while (cache.canvases.size > limit) {
+    let evictionKey: string | undefined;
+    for (const key of cache.canvases.keys()) {
+      if (key !== retainedKey) {
+        evictionKey = key;
+        break;
+      }
+    }
+    evictionKey ??= cache.canvases.keys().next().value;
+    if (!evictionKey) return;
+    const evictedCanvas = cache.canvases.get(evictionKey);
+    if (evictedCanvas) releaseWorkerResultCanvas(evictedCanvas);
+    cache.canvases.delete(evictionKey);
+  }
 }
 
 function loadStudioKonvaFilters(): Promise<StudioKonvaFiltersModule> {
@@ -259,6 +295,8 @@ export function StudioKonvaImageNode({
   useEffect(() => () => {
     filterWorkerSessionRef.current?.dispose();
     filterWorkerSessionRef.current = null;
+    releaseWorkerResultCache(workerResultCacheRef.current);
+    workerResultCacheRef.current = null;
   }, [filterWorkerClient]);
 
   // 보정값 → Konva 필터 배열 + 노드 속성. 캐시 의존성은 직렬화 키로 비교(좌표 드래그 시 재캐시 방지).
@@ -286,6 +324,9 @@ export function StudioKonvaImageNode({
     && hasFilters && !!filterModule && !!filterWorkerClient && cachePad === 0 && !el.isAnimatedGif;
   const workerRequestKey = JSON.stringify([el.src, filterCacheKey, workerWidth, workerHeight]);
   const workerPipelineActive = useWorkerFilterPath && workerFallbackKey !== workerRequestKey;
+  const workerResultCacheLimit = el.filterPageComposite === true
+    ? PAGE_COMPOSITE_FILTER_RESULT_CACHE_LIMIT
+    : IMAGE_FILTER_WORKER_RESULT_CACHE_LIMIT;
 
   const currentWorkerFilteredCanvas =
     workerFilteredCanvas?.src === el.src
@@ -304,6 +345,7 @@ export function StudioKonvaImageNode({
       setWorkerFilteredCanvas(undefined);
       setWorkerFallbackKey(undefined);
       workerSourcePixelsRef.current = null;
+      releaseWorkerResultCache(workerResultCacheRef.current);
       workerResultCacheRef.current = null;
       return;
     }
@@ -316,6 +358,10 @@ export function StudioKonvaImageNode({
     let controller: AbortController | null = null;
     let cancelled = false;
     setWorkerFallbackKey((current) => current === requestKey ? undefined : current);
+    // A regular image can retain several recent filter results. If the same source becomes a
+    // full-page composite, enforce its stricter one-canvas budget as soon as the mode changes,
+    // without waiting for another Worker result to arrive.
+    trimWorkerResultCache(workerResultCacheRef.current, workerResultCacheLimit, filterKey);
 
     const timer = setTimeout(() => {
       let resultCache = workerResultCacheRef.current;
@@ -325,6 +371,7 @@ export function StudioKonvaImageNode({
         || resultCache.width !== width
         || resultCache.height !== height
       ) {
+        releaseWorkerResultCache(resultCache);
         resultCache = { canvases: new Map(), height, source, width };
         workerResultCacheRef.current = resultCache;
       }
@@ -397,11 +444,8 @@ export function StudioKonvaImageNode({
               0,
               0,
             );
-            if (resultCache.canvases.size >= IMAGE_FILTER_WORKER_RESULT_CACHE_LIMIT) {
-              const oldest = resultCache.canvases.keys().next().value;
-              if (oldest) resultCache.canvases.delete(oldest);
-            }
             resultCache.canvases.set(filterKey, outCanvas);
+            trimWorkerResultCache(resultCache, workerResultCacheLimit, filterKey);
             setWorkerFallbackKey((current) => current === requestKey ? undefined : current);
             setWorkerFilteredCanvas({ canvas: outCanvas, filterKey, height, source, src, width });
           } catch (error) {
@@ -421,7 +465,17 @@ export function StudioKonvaImageNode({
       clearTimeout(timer);
       if (controller !== null) controller.abort();
     };
-  }, [useWorkerFilterPath, displayImg, filterCacheKey, filterWorkerClient, el.src, workerWidth, workerHeight, workerRequestKey]);
+  }, [
+    useWorkerFilterPath,
+    displayImg,
+    filterCacheKey,
+    filterWorkerClient,
+    el.src,
+    workerWidth,
+    workerHeight,
+    workerRequestKey,
+    workerResultCacheLimit,
+  ]);
 
   const showWorkerCanvas = workerPipelineActive && !!currentWorkerFilteredCanvas;
 

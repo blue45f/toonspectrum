@@ -61,8 +61,8 @@ export type StudioWorkAssetReference = z.infer<typeof StudioWorkAssetReferenceSc
 
 /**
  * Small, non-destructive fields that are safe to keep in an immutable upload descriptor and in
- * the realtime reference envelope. Pixel/source data stays in the private asset body. The sole
- * object-valued edit field (`smartFilters`) is accepted through an explicit bounded schema below.
+ * the realtime reference envelope. Pixel/source data stays in the private asset body.
+ * Object-valued filter edits are accepted only through explicit bounded schemas below.
  */
 export const STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS = [
   "hidden",
@@ -73,6 +73,7 @@ export const STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS = [
   "alphaLocked",
   "flipped",
   "flippedY",
+  "filterPageComposite",
   "grayscale",
   "sepia",
   "screentone",
@@ -95,17 +96,14 @@ export const STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES = {
   inkThreshold: { minimum: 0, maximum: 1 },
 } as const;
 
-export const STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS = [
-  "x",
-  "y",
-  "width",
-  "height",
-  "rotation",
-  "opacity",
+export const STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS = [
+  "blurFx",
+  "curve",
+  "curveCh",
   "smartFilters",
-  ...STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
-  ...Object.keys(STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES),
 ] as const;
+export type StudioWorkAssetStructuredEditKey =
+  (typeof STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS)[number];
 
 const StudioWorkAssetScalarFiltersSchema = z.object(Object.fromEntries(
   Object.entries(STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES).map(
@@ -187,6 +185,102 @@ export const StudioWorkAssetSmartFiltersSchema = z
   })
   .strict();
 
+export const StudioWorkAssetBlurFxSchema = z
+  .object({
+    type: z.enum(["gaussian", "motion", "spin", "zoom"]),
+    strength: z.number().finite().min(0).max(100),
+    radius: z.number().finite().min(1).max(40),
+    angle: z.number().finite().min(0).max(360),
+  })
+  .strict();
+
+/**
+ * A master or RGB-channel curve is intentionally capped at 16 points. Four full curves remain
+ * comfortably inside the immutable descriptor's 2 KiB budget while still covering detailed
+ * tonal edits. The strict wire form is already normalized by the authoring UI.
+ */
+export const STUDIO_WORK_ASSET_MAX_CURVE_POINTS = 16;
+
+export const StudioWorkAssetCurvePointSchema = z
+  .object({
+    x: z.number().finite().int().min(0).max(255),
+    y: z.number().finite().int().min(0).max(255),
+  })
+  .strict();
+
+export const StudioWorkAssetCurveSchema = z
+  .array(StudioWorkAssetCurvePointSchema)
+  .min(2)
+  .max(STUDIO_WORK_ASSET_MAX_CURVE_POINTS)
+  .superRefine((points, context) => {
+    if (points[0]?.x !== 0) {
+      context.addIssue({
+        code: "custom",
+        path: [0, "x"],
+        message: "커브의 첫 입력점은 0이어야 합니다.",
+      });
+    }
+    if (points.at(-1)?.x !== 255) {
+      context.addIssue({
+        code: "custom",
+        path: [points.length - 1, "x"],
+        message: "커브의 마지막 입력점은 255여야 합니다.",
+      });
+    }
+    for (let index = 1; index < points.length; index += 1) {
+      if (points[index]!.x <= points[index - 1]!.x) {
+        context.addIssue({
+          code: "custom",
+          path: [index, "x"],
+          message: "커브 입력점은 중복 없이 오름차순이어야 합니다.",
+        });
+      }
+    }
+  });
+
+export const StudioWorkAssetCurveChannelsSchema = z
+  .object({
+    r: StudioWorkAssetCurveSchema.optional(),
+    g: StudioWorkAssetCurveSchema.optional(),
+    b: StudioWorkAssetCurveSchema.optional(),
+  })
+  .strict();
+
+export type StudioWorkAssetStructuredEditValue =
+  | z.infer<typeof StudioWorkAssetBlurFxSchema>
+  | z.infer<typeof StudioWorkAssetCurveSchema>
+  | z.infer<typeof StudioWorkAssetCurveChannelsSchema>
+  | z.infer<typeof StudioWorkAssetSmartFiltersSchema>;
+
+/** Parses and clones one structured reference edit through its exact bounded wire schema. */
+export function parseStudioWorkAssetStructuredEditValue(
+  key: StudioWorkAssetStructuredEditKey,
+  value: unknown
+): StudioWorkAssetStructuredEditValue {
+  switch (key) {
+    case "blurFx":
+      return StudioWorkAssetBlurFxSchema.parse(value);
+    case "curve":
+      return StudioWorkAssetCurveSchema.parse(value);
+    case "curveCh":
+      return StudioWorkAssetCurveChannelsSchema.parse(value);
+    case "smartFilters":
+      return StudioWorkAssetSmartFiltersSchema.parse(value);
+  }
+}
+
+export const STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS = [
+  "x",
+  "y",
+  "width",
+  "height",
+  "rotation",
+  "opacity",
+  ...STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS,
+  ...STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
+  ...Object.keys(STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES),
+] as const;
+
 export const StudioWorkAssetElementSchema = z
   .object({
     id: ExactIdentifierSchema,
@@ -206,22 +300,29 @@ export const StudioWorkAssetElementSchema = z
     alphaLocked: z.boolean().optional(),
     flipped: z.boolean().optional(),
     flippedY: z.boolean().optional(),
+    filterPageComposite: z.boolean().optional(),
     grayscale: z.boolean().optional(),
     sepia: z.boolean().optional(),
     screentone: z.boolean().optional(),
     lineart: z.boolean().optional(),
     invert: z.boolean().optional(),
+    blurFx: StudioWorkAssetBlurFxSchema.optional(),
+    curve: StudioWorkAssetCurveSchema.optional(),
+    curveCh: StudioWorkAssetCurveChannelsSchema.optional(),
     smartFilters: StudioWorkAssetSmartFiltersSchema.optional(),
     ...StudioWorkAssetScalarFiltersSchema.shape,
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.type !== "image" && value.smartFilters !== undefined) {
-      context.addIssue({
-        code: "custom",
-        path: ["smartFilters"],
-        message: "스마트 필터는 이미지 에셋에만 사용할 수 있습니다.",
-      });
+    if (value.type !== "image") {
+      for (const key of STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS) {
+        if (value[key] === undefined) continue;
+        context.addIssue({
+          code: "custom",
+          path: [key],
+          message: "구조화된 필터는 이미지 에셋에만 사용할 수 있습니다.",
+        });
+      }
     }
   });
 

@@ -149,4 +149,72 @@ describe("StudioMainMenu tooltips", () => {
     expect(screen.getByRole("tooltip").textContent).toContain("명암 대비");
     expect(screen.getByRole("tooltip").textContent).toContain("보기 변환이 잠겨 있습니다.");
   });
+
+  it("keeps every disabled filter reason available to hover, focus, and assistive tech", () => {
+    vi.useFakeTimers();
+    const unavailableReason = "마스터 편집 중에는 페이지 필터를 적용할 수 없습니다.";
+    render(
+      <StudioToolHintPreferencesProvider
+        mode="compact"
+        touchHoldDelayMs={640}
+        reduceMotion
+      >
+        <StudioMainMenu
+          groups={[
+            {
+              id: "filter",
+              label: "필터",
+              items: [
+                ["gaussian-blur", "가우시안 블러"],
+                ["motion-blur", "모션 블러"],
+                ["hue-saturation-brightness", "색조 / 채도 / 밝기"],
+                ["brightness-contrast", "명도 / 대비"],
+                ["color-curves", "색상 커브"],
+              ].map(([id, label]) => ({
+                id: id!,
+                label: label!,
+                disabled: true,
+                unavailableReason,
+                onSelect: vi.fn(),
+              })),
+            },
+          ]}
+        />
+      </StudioToolHintPreferencesProvider>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "필터" }));
+    const filters = screen.getAllByRole("menuitem");
+    expect(filters).toHaveLength(5);
+
+    for (const filter of filters) {
+      expect(filter.getAttribute("aria-disabled")).toBe("true");
+      expect((filter as HTMLButtonElement).disabled).toBe(false);
+      const describedBy = filter.getAttribute("aria-describedby");
+      expect(describedBy).toBeTruthy();
+      expect(
+        describedBy
+          ?.split(/\s+/u)
+          .map((id) => document.getElementById(id)?.textContent ?? "")
+          .join(" ")
+      ).toContain(unavailableReason);
+
+      fireEvent.focus(filter);
+      expect(screen.getAllByRole("tooltip")).toHaveLength(1);
+      expect(screen.getByRole("tooltip").textContent).toContain(unavailableReason);
+    }
+
+    fireEvent.blur(filters.at(-1)!, { relatedTarget: null });
+    fireEvent.mouseLeave(filters.at(-1)!, { clientX: 999, clientY: 999 });
+    act(() => vi.advanceTimersByTime(280));
+    for (let reveal = 0; reveal < 3; reveal += 1) {
+      fireEvent.mouseEnter(filters[0]!);
+      act(() => vi.advanceTimersByTime(280));
+      expect(screen.getAllByRole("tooltip")).toHaveLength(1);
+      expect(screen.getByRole("tooltip").textContent).toContain(unavailableReason);
+      fireEvent.mouseLeave(filters[0]!, { clientX: 999, clientY: 999 });
+      act(() => vi.advanceTimersByTime(280));
+      expect(screen.queryByRole("tooltip")).toBeNull();
+    }
+  });
 });

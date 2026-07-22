@@ -55,9 +55,13 @@ const budgets = {
   // app-shell 이후 2,285,734/750,241 bytes, 138 requests를 관측했다. 파서·decode/apply·손실 UI는
   // 모두 사용자 선택 뒤 dynamic graph에 유지하고, 공유 page factory 주입으로 추가 요청도 제거했다.
   // raw에는 약 0.2%, route gzip에는 약 0.16%의 작은 drift 여유만 다시 고정한다.
-  studio: { raw: 2_790_000, gzip: 912_000 },
+  // 2026-07-23 선-only 페이지도 원본 보존 합성 필터로 처리하고, 4MP/4MiB fail-closed,
+  // 공유 descriptor/CRDT의 bounded blur·curve 왕복 검증을 추가했다. production 관측치는
+  // 2,795,227/913,046 bytes, app-shell 이후 2,293,501/752,758 bytes이며 요청 수는 138로 불변.
+  // 관측치에 0.1~0.2%의 작은 코드젠 drift만 허용하고 요청·incremental gzip 상한은 유지한다.
+  studio: { raw: 2_800_000, gzip: 915_000 },
   studioEntry: { raw: 1_284_000, gzip: 384_500 },
-  studioIncremental: { raw: 2_290_000, gzip: 755_000, chunks: 138 },
+  studioIncremental: { raw: 2_296_000, gzip: 755_000, chunks: 138 },
   // Rapier deterministic compat is intentionally isolated in a user-triggered module Worker.
   // 2026-07-18 production output: 2,302,139 raw / 855,399 gzip. Keep ~2% version-drift headroom
   // without charging this optional engine to Studio or the 3D editor's initial graph.
@@ -277,6 +281,7 @@ if (!fs.existsSync(manifestPath)) {
       ["optional Studio menubar commands", /src\/domains\/creator\/StudioMenubarContent\.tsx/],
       ["optional mobile editing dock", /src\/domains\/creator\/StudioMobileEditingDock\.tsx/],
       ["optional view tools HUD", /src\/domains\/creator\/StudioViewToolsHud\.tsx/],
+      ["optional tools companion protocol", /src\/domains\/creator\/studio-tools-companion\.ts/],
       ["optional workspace manager", /src\/domains\/creator\/StudioWorkspaceMenu\.tsx/],
       ["optional color palette", /src\/domains\/creator\/StudioColorPalettePanel\.tsx/],
       ["optional flood fill panel", /src\/domains\/creator\/StudioFloodFillPanel\.tsx/],

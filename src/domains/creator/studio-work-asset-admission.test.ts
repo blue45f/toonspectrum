@@ -9,6 +9,7 @@ import {
 
 import {
   STUDIO_WORK_ASSET_IMAGE_ADMISSION_OPT_IN_TOKEN,
+  STUDIO_WORK_ASSET_MAX_CURVE_POINTS,
   type StudioWorkAssetManifest,
 } from "@/lib/studio-work-asset-contract";
 
@@ -136,6 +137,70 @@ describe("studio work asset admission", () => {
     expect(descriptor.element).not.toHaveProperty("src");
     expect(descriptor.element).not.toHaveProperty("smartFilters");
     expect(JSON.stringify(descriptor)).not.toContain("base64");
+  });
+
+  it("keeps the page-composite marker in the detached immutable image descriptor", () => {
+    const source = {
+      ...image("filter-composite-1", "data:image/png;base64,private"),
+      filterPageComposite: true,
+    };
+    const descriptor = createStudioWorkAssetInitialImageDescriptor(source);
+
+    source.filterPageComposite = false;
+    expect(descriptor.element).toMatchObject({
+      id: "filter-composite-1",
+      type: "image",
+      filterPageComposite: true,
+    });
+    expect(descriptor.element).not.toHaveProperty("src");
+  });
+
+  it("detaches bounded blur, tonal extrema, and curve metadata for shared references", () => {
+    const source = {
+      ...image("filter-composite-1", "data:image/png;base64,private"),
+      blurFx: { type: "motion" as const, strength: 100, radius: 40, angle: 315 },
+      brightness: -0.8,
+      contrast: 80,
+      hue: -180,
+      saturation: 1,
+      curve: [{ x: 0, y: 10 }, { x: 128, y: 144 }, { x: 255, y: 245 }],
+      curveCh: {
+        r: [{ x: 0, y: 0 }, { x: 255, y: 240 }],
+        g: [{ x: 0, y: 12 }, { x: 255, y: 255 }],
+      },
+    };
+    const descriptor = createStudioWorkAssetInitialImageDescriptor(source);
+
+    source.blurFx.radius = 2;
+    source.curve[1]!.y = 20;
+    source.curveCh.r[1]!.y = 20;
+    expect(descriptor.element).toMatchObject({
+      blurFx: { type: "motion", strength: 100, radius: 40, angle: 315 },
+      brightness: -0.8,
+      contrast: 80,
+      hue: -180,
+      saturation: 1,
+      curve: [{ x: 0, y: 10 }, { x: 128, y: 144 }, { x: 255, y: 245 }],
+      curveCh: {
+        r: [{ x: 0, y: 0 }, { x: 255, y: 240 }],
+        g: [{ x: 0, y: 12 }, { x: 255, y: 255 }],
+      },
+    });
+  });
+
+  it("fails closed before admission when a curve exceeds the shared point budget", () => {
+    const curve = Array.from(
+      { length: STUDIO_WORK_ASSET_MAX_CURVE_POINTS + 1 },
+      (_, index) => ({
+        x: Math.round(index * 255 / STUDIO_WORK_ASSET_MAX_CURVE_POINTS),
+        y: index,
+      })
+    );
+
+    expect(() => createStudioWorkAssetInitialImageDescriptor({
+      ...image("filter-composite-1", "data:image/png;base64,private"),
+      curve,
+    })).toThrow();
   });
 
   it("includes only a normalized bounded smart-filter snapshot", () => {

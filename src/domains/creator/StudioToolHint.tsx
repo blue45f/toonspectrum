@@ -395,7 +395,10 @@ export function StudioToolHintTarget({
   function reveal(expandImmediately: boolean, intent: StudioToolHintRevealIntent) {
     if (!hint || preferences.mode === "off") return;
     const alreadyOpen = coordinator.getActiveHintId() === tipId;
-    if (!alreadyOpen && !exposure.canReveal(hint.id, intent)) {
+    // A usage condition is operational accessibility information, not passive
+    // coaching. Keep it available on every deliberate hover/focus even after
+    // ordinary feature coaches have reached their repetition cooldown.
+    if (!alreadyOpen && !unavailableReason && !exposure.canReveal(hint.id, intent)) {
       coordinator.clearPending(tipId);
       return;
     }
@@ -409,7 +412,7 @@ export function StudioToolHintTarget({
     if (!nextAnchor) return;
     setAnchor(nextAnchor);
     const previousHintId = coordinator.claim(tipId);
-    if (!alreadyOpen) exposure.markRevealed(hint.id, intent);
+    if (!alreadyOpen && !unavailableReason) exposure.markRevealed(hint.id, intent);
     if (previousHintId && previousHintId !== tipId) {
       hideRenderedTooltipImmediately(previousHintId);
     }
@@ -434,7 +437,7 @@ export function StudioToolHintTarget({
   function scheduleShow() {
     if (!hint || preferences.mode === "off") return;
     if (suppressedPointerHintAt) return;
-    if (!open && !exposure.canReveal(hint.id, "hover")) return;
+    if (!open && !unavailableReason && !exposure.canReveal(hint.id, "hover")) return;
     void loadStudioToolHintBubbleModule();
     if (hideTimer.current) {
       globalThis.clearTimeout(hideTimer.current);
@@ -490,7 +493,7 @@ export function StudioToolHintTarget({
     // pointerdown. Keep that synthetic focus transition from reopening the
     // coach under the user's cursor; leaving the target re-arms hover/focus.
     pointerDismissed.current = true;
-    if (hint && !disabled) exposure.markActivated(hint.id);
+    if (hint && !disabled && !unavailableReason) exposure.markActivated(hint.id);
     armPointerSuppression(event?.clientX ?? 0, event?.clientY ?? 0);
     touchHoldOpened.current = false;
     clearTimers();

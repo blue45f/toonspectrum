@@ -59,6 +59,8 @@ export interface ImageEl {
   width: number;
   height: number;
   rotation: number;
+  /** Full-page, non-destructive filter snapshot; keeps interactive filter caches memory-bounded. */
+  filterPageComposite?: boolean;
   opacity?: number; // 불투명도(흐린 배경 캐릭터·페이드 등). 미설정=1.
   flipped?: boolean; // 좌우 반전(캐릭터 미러링).
   flippedY?: boolean; // 상하 반전

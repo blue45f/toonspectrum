@@ -18,6 +18,7 @@ import {
   type StudioEditableRasterCopyInput,
   type StudioEditableRasterCopyPlan,
   type StudioEditableRasterCopyPlanResult,
+  type StudioEditableRasterCopyRenderer,
 } from "./studio-raster-edit-preparation";
 
 import type { El, ImageEl } from "./studio-element-model";
@@ -118,9 +119,10 @@ export function planStudioDocumentMergeBake(
 
 export async function renderStudioDocumentMergeBake(
   plan: StudioDocumentMergeBakePlan,
+  renderVectorReference: StudioEditableRasterCopyRenderer,
   options: StudioVectorReferenceRenderOptions = {},
 ): Promise<StudioVectorReferenceResult> {
-  return renderStudioEditableRasterCopy(plan.raster, options);
+  return renderStudioEditableRasterCopy(plan.raster, renderVectorReference, options);
 }
 
 export function materializeStudioDocumentMergeBake(input: {

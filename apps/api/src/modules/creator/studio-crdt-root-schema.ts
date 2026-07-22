@@ -5,8 +5,10 @@ import {
   STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
   STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
   STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES,
+  STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS,
   STUDIO_WORK_ASSET_TYPES,
   StudioWorkAssetElementSchema,
+  parseStudioWorkAssetStructuredEditValue,
   studioWorkAssetReferenceKey,
 } from "../../../../../lib/studio-work-asset-contract";
 
@@ -148,6 +150,9 @@ const STUDIO_CRDT_TEXT_ENCODER = new TextEncoder();
 const STUDIO_WORK_ASSET_TYPE_SET = new Set<string>(STUDIO_WORK_ASSET_TYPES);
 const STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEY_SET = new Set<string>(
   STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS
+);
+const STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEY_SET = new Set<string>(
+  STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS
 );
 
 type StudioCrdtDeletionTarget =
@@ -611,6 +616,17 @@ function isValidStudioWorkAssetReferenceCandidate(
   if (property === "rotation") return finiteNumberInRange(value, -360_000, 360_000);
   if (property === "opacity") return finiteNumberInRange(value, 0, 1);
   if (STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEY_SET.has(property)) return typeof value === "boolean";
+  if (STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEY_SET.has(property)) {
+    try {
+      parseStudioWorkAssetStructuredEditValue(
+        property as (typeof STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS)[number],
+        value
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
   const range = STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES[
     property as keyof typeof STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES
   ];

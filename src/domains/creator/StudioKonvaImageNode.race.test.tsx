@@ -280,6 +280,102 @@ describe("StudioKonvaImageNode async identity", () => {
     expect(canvasHarness.getImageDataCalls).toBe(1);
   });
 
+  it("keeps only one full-page composite result and releases evicted and unmounted canvases", async () => {
+    const view = render(node(imageEl({ brightness: 0.2, filterPageComposite: true })));
+    await load(imageHarness.assigned[0]!);
+    await flushWorkerDebounce();
+    await act(async () => resolveRun(workerHarness.runs[0]!));
+    const firstResult = konvaCapture.current?.image as HTMLCanvasElement;
+
+    expect(firstResult).toBeInstanceOf(HTMLCanvasElement);
+    expect(firstResult.width).toBe(20);
+    expect(firstResult.height).toBe(10);
+
+    view.rerender(node(imageEl({ brightness: 0.4, filterPageComposite: true })));
+    await flushWorkerDebounce();
+    await act(async () => resolveRun(workerHarness.runs[1]!));
+    const secondResult = konvaCapture.current?.image as HTMLCanvasElement;
+
+    expect(secondResult).toBeInstanceOf(HTMLCanvasElement);
+    expect(secondResult).not.toBe(firstResult);
+    expect(firstResult.width).toBe(0);
+    expect(firstResult.height).toBe(0);
+    expect(secondResult.width).toBe(20);
+    expect(secondResult.height).toBe(10);
+
+    view.rerender(node(imageEl({ brightness: 0.2, filterPageComposite: true })));
+    await flushWorkerDebounce();
+    expect(workerHarness.runs).toHaveLength(3);
+    await act(async () => resolveRun(workerHarness.runs[2]!));
+    const restoredFirstFilter = konvaCapture.current?.image as HTMLCanvasElement;
+
+    expect(restoredFirstFilter).not.toBe(firstResult);
+    expect(secondResult.width).toBe(0);
+    expect(secondResult.height).toBe(0);
+
+    view.unmount();
+    expect(restoredFirstFilter.width).toBe(0);
+    expect(restoredFirstFilter.height).toBe(0);
+  });
+
+  it("retains the existing multi-result cache for ordinary images", async () => {
+    const view = render(node(imageEl({ brightness: 0.2 })));
+    await load(imageHarness.assigned[0]!);
+    await flushWorkerDebounce();
+    await act(async () => resolveRun(workerHarness.runs[0]!));
+    const firstResult = konvaCapture.current?.image as HTMLCanvasElement;
+
+    view.rerender(node(imageEl({ brightness: 0.4 })));
+    await flushWorkerDebounce();
+    await act(async () => resolveRun(workerHarness.runs[1]!));
+    const secondResult = konvaCapture.current?.image as HTMLCanvasElement;
+
+    view.rerender(node(imageEl({ brightness: 0.2 })));
+    await flushWorkerDebounce();
+
+    expect(workerHarness.runs).toHaveLength(2);
+    expect(konvaCapture.current?.image).toBe(firstResult);
+    expect(firstResult.width).toBe(20);
+    expect(firstResult.height).toBe(10);
+    expect(secondResult.width).toBe(20);
+    expect(secondResult.height).toBe(10);
+
+    view.unmount();
+    expect(firstResult.width).toBe(0);
+    expect(firstResult.height).toBe(0);
+    expect(secondResult.width).toBe(0);
+    expect(secondResult.height).toBe(0);
+  });
+
+  it("immediately shrinks an existing ordinary-image cache when it becomes a page composite", async () => {
+    const view = render(node(imageEl({ brightness: 0.2 })));
+    await load(imageHarness.assigned[0]!);
+    await flushWorkerDebounce();
+    await act(async () => resolveRun(workerHarness.runs[0]!));
+    const firstResult = konvaCapture.current?.image as HTMLCanvasElement;
+
+    view.rerender(node(imageEl({ brightness: 0.4 })));
+    await flushWorkerDebounce();
+    await act(async () => resolveRun(workerHarness.runs[1]!));
+    const currentResult = konvaCapture.current?.image as HTMLCanvasElement;
+
+    expect(firstResult.width).toBe(20);
+    expect(firstResult.height).toBe(10);
+    expect(currentResult.width).toBe(20);
+    expect(currentResult.height).toBe(10);
+
+    view.rerender(node(imageEl({ brightness: 0.4, filterPageComposite: true })));
+
+    expect(firstResult.width).toBe(0);
+    expect(firstResult.height).toBe(0);
+    expect(currentResult.width).toBe(20);
+    expect(currentResult.height).toBe(10);
+
+    await flushWorkerDebounce();
+    expect(workerHarness.runs).toHaveLength(2);
+    expect(konvaCapture.current?.image).toBe(currentResult);
+  });
+
   it("rejects oversized interactive filter surfaces before canvas allocation", async () => {
     render(node(imageEl({ brightness: 0.2, width: 5_000, height: 5_000 })));
     await load(imageHarness.assigned[0]!);

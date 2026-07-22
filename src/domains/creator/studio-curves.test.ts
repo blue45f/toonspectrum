@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CURVE_PRESETS,
   DEFAULT_CURVE,
+  STUDIO_CURVE_MAX_CONTROL_POINTS,
   TONE_CHANNELS,
   addCurvePoint,
   applyCurve,
@@ -296,6 +297,17 @@ describe("addCurvePoint", () => {
   it("무효 좌표는 정규화본을 그대로 반환", () => {
     const out = addCurvePoint(DEFAULT_CURVE, Number.NaN, 100);
     expect(out).toEqual(normalizeCurve(DEFAULT_CURVE));
+  });
+
+  it("공유 가능한 채널 한도에서 새 점을 조용히 잘라내거나 다른 점으로 바꾸지 않는다", () => {
+    const full = Array.from({ length: STUDIO_CURVE_MAX_CONTROL_POINTS }, (_, index) => ({
+      x: Math.round(index * 255 / (STUDIO_CURVE_MAX_CONTROL_POINTS - 1)),
+      y: Math.round(index * 255 / (STUDIO_CURVE_MAX_CONTROL_POINTS - 1)),
+    }));
+    const normalized = normalizeCurve(full);
+
+    expect(normalized).toHaveLength(STUDIO_CURVE_MAX_CONTROL_POINTS);
+    expect(addCurvePoint(normalized, 110, 220)).toEqual(normalized);
   });
 });
 

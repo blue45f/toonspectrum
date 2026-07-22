@@ -226,9 +226,9 @@ export function createStudioWorkAssetInitialImageDescriptor(
     if (value !== undefined) descriptorElement[key] = value;
   }
   if (typeof element.name === "string") descriptorElement.name = element.name;
-  // Validate placement/scalar fields independently so they remain fail-closed. Smart filters are
-  // optional reference metadata: only the explicit schema's normalized clone may enter the
-  // descriptor, and an invalid/legacy or descriptor-budget-breaking program is safely omitted.
+  // Placement, scalar, boolean, blur and curve fields all pass the strict base schema and fail
+  // closed. Smart-filter stacks remain optional metadata: only an explicit bounded clone enters
+  // the descriptor; an invalid, legacy or descriptor-budget-breaking program is safely omitted.
   const baseDescriptor = parseStudioWorkAssetDescriptor({
     version: 1,
     element: descriptorElement,

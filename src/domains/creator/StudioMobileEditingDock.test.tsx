@@ -167,6 +167,9 @@ function createProps(
     drawShape: "rect",
     drawSheetRef: { current: null },
     filterMutationLocked: false,
+    filterPreparationBusy: false,
+    filterTargetLabel: "현재 페이지 합성본",
+    filterUnavailableReason: null,
     hi: 0,
     history: [[], []],
     isMobile: false,
@@ -631,6 +634,155 @@ describe("StudioMobileEditingDock", () => {
     expect(stableHandlers.removeSelected).toHaveBeenCalledOnce();
     expect(setSelectedId).toHaveBeenCalledWith(null);
     expect(setMarqueeIds).toHaveBeenCalledWith([]);
+  });
+
+  it("offers all five page-composite filters for a selected draw element", () => {
+    const stableHandlers = createHandlers();
+    render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          selected: { id: "draw-1", type: "draw" } as StudioMobileEditingDockProps["selected"],
+          stableHandlers,
+        })}
+      />,
+    );
+
+    const toolbar = screen.getByRole("toolbar", { name: "선택 항목 빠른 작업" });
+    const filter = within(toolbar).getByRole<HTMLSelectElement>("combobox", {
+      name: "현재 페이지 합성본 필터 선택",
+    });
+    expect(within(filter).getAllByRole("option")).toHaveLength(6);
+    expect(within(toolbar).queryByRole("button", { name: "채우기" })).toBeNull();
+    expect(filter.closest("label")?.className).toContain("min-h-11");
+    expect(filter.title).toContain("현재 페이지 합성본");
+  });
+
+  it("keeps the page-composite filter shortcut for non-drawing selections", () => {
+    render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          selected: { id: "frame-1", type: "frame" } as StudioMobileEditingDockProps["selected"],
+        })}
+      />,
+    );
+
+    const filter =
+      within(screen.getByRole("toolbar", { name: "선택 항목 빠른 작업" })).getByRole(
+        "combobox",
+        { name: "현재 페이지 합성본 필터 선택" },
+      ) as HTMLSelectElement;
+    expect(filter.disabled).toBe(false);
+  });
+
+  it("keeps page filters reachable from the expanded workspace without a selection", () => {
+    const stableHandlers = createHandlers();
+    render(
+      <StudioMobileEditingDock
+        {...createProps({ isMobile: true, selected: null, stableHandlers })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "작업 공간 도구 펼치기" }));
+    const workspace = screen.getByRole("toolbar", { name: "작업 공간" });
+    const filter = within(workspace).getByRole<HTMLSelectElement>("combobox", {
+      name: "현재 페이지 합성본 필터 선택",
+    });
+    expect(filter.disabled).toBe(false);
+    expect(filter.closest("label")?.className).toContain("min-h-11");
+    expect(filter.closest("label")?.className).toContain("min-w-14");
+
+    fireEvent.change(filter, { target: { value: "gaussian-blur" } });
+    expect(stableHandlers.openStudioFilter).toHaveBeenCalledWith("gaussian-blur");
+  });
+
+  it("distinguishes filter preparation from edit locks in mobile guidance", () => {
+    const view = render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          filterPreparationBusy: true,
+          filterTargetLabel: "현재 페이지 합성본",
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "작업 공간 도구 펼치기" }));
+    let unavailableFilter = within(
+      screen.getByRole("toolbar", { name: "작업 공간" }),
+    ).getByRole<HTMLButtonElement>("button", {
+      name: "현재 페이지 합성본 필터를 사용할 수 없음",
+    });
+    expect(unavailableFilter.getAttribute("aria-disabled")).toBe("true");
+    expect(unavailableFilter.getAttribute("aria-busy")).toBe("true");
+    expect(unavailableFilter.title).toBe("현재 페이지 합성본: 필터 미리보기를 준비하는 중입니다.");
+    expect(unavailableFilter.tabIndex).toBe(0);
+
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          filterMutationLocked: true,
+          filterTargetLabel: "선택 이미지",
+          selected: { id: "image-1", type: "image" } as StudioMobileEditingDockProps["selected"],
+        })}
+      />,
+    );
+    unavailableFilter = within(
+      screen.getByRole("toolbar", { name: "선택 항목 빠른 작업" }),
+    ).getByRole<HTMLButtonElement>("button", { name: "선택 이미지 필터를 사용할 수 없음" });
+    expect(unavailableFilter.getAttribute("aria-disabled")).toBe("true");
+    expect(unavailableFilter.getAttribute("aria-busy")).toBe("false");
+    expect(unavailableFilter.title).toBe("선택 이미지: 편집 잠금을 해제한 뒤 필터를 적용하세요.");
+    expect(unavailableFilter.getAttribute("aria-describedby")).not.toBeNull();
+
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          filterUnavailableReason: "저장이 끝난 뒤 필터를 적용하세요.",
+        })}
+      />,
+    );
+    unavailableFilter = within(
+      screen.getByRole("toolbar", { name: "작업 공간" }),
+    ).getByRole<HTMLButtonElement>("button", {
+      name: "현재 페이지 합성본 필터를 사용할 수 없음",
+    });
+    expect(unavailableFilter.title).toBe("현재 페이지 합성본: 저장이 끝난 뒤 필터를 적용하세요.");
+    expect(unavailableFilter.getAttribute("aria-describedby")).not.toBeNull();
+  });
+
+  it("routes every mobile filter kind through the stable handler", () => {
+    const stableHandlers = createHandlers();
+    render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          filterTargetLabel: "선택 이미지",
+          selected: { id: "image-1", type: "image" } as StudioMobileEditingDockProps["selected"],
+          stableHandlers,
+        })}
+      />,
+    );
+
+    const filter = within(
+      screen.getByRole("toolbar", { name: "선택 항목 빠른 작업" }),
+    ).getByRole<HTMLSelectElement>("combobox", { name: "선택 이미지 필터 선택" });
+    const kinds = [
+      "gaussian-blur",
+      "motion-blur",
+      "hue-saturation-brightness",
+      "brightness-contrast",
+      "color-curves",
+    ] as const;
+    kinds.forEach((kind) => fireEvent.change(filter, { target: { value: kind } }));
+
+    expect(stableHandlers.openStudioFilter).toHaveBeenCalledTimes(5);
+    kinds.forEach((kind, index) => {
+      expect(stableHandlers.openStudioFilter).toHaveBeenNthCalledWith(index + 1, kind);
+    });
   });
 
   it("keeps contextual fill clickable and exposes recovery guidance for an unsupported image", () => {

@@ -76,7 +76,7 @@ const MAIN_MENU_HINTS: Readonly<Record<string, StudioToolHintSpec>> = {
   filter: {
     id: "main-menu-filter",
     title: "필터",
-    description: "선택한 이미지에 블러, 색조·채도·밝기, 명도·대비와 색상 커브를 적용합니다.",
+    description: "선택 이미지 또는 현재 보이는 페이지에 블러, 색조·채도·밝기, 명도·대비와 색상 커브를 적용합니다.",
     preview: "filter",
     tip: "원본을 보존하려면 스마트 필터 스택에서 효과 순서와 강도를 조절하세요.",
   },
@@ -321,7 +321,18 @@ function MenuDropdown({
           >
             {group.items.map((item, itemIndex) => {
               const Icon = item.icon;
-              const hint = item.hint ?? (item.hintKey ? MAIN_MENU_ITEM_HINTS[item.hintKey] : undefined);
+              const hint = item.hint
+                ?? (item.hintKey ? MAIN_MENU_ITEM_HINTS[item.hintKey] : undefined)
+                ?? (item.unavailableReason
+                  ? {
+                      id: `main-menu-item-${group.id}-${item.id}`,
+                      title: item.label,
+                      description: "현재 상태에서 이 명령을 사용할 수 없는 이유를 확인하세요.",
+                    }
+                  : undefined);
+              const unavailableReasonId = item.unavailableReason
+                ? `${panelId}-item-${itemIndex}-unavailable-reason`
+                : undefined;
               return (
                 <div key={item.id}>
                   <StudioToolHintTarget
@@ -344,6 +355,7 @@ function MenuDropdown({
                       }
                       aria-checked={item.checked === undefined ? undefined : item.checked}
                       aria-disabled={item.disabled || undefined}
+                      aria-describedby={unavailableReasonId}
                       tabIndex={itemIndex !== activeItemIndex ? -1 : 0}
                       data-studio-main-menu-item-index={itemIndex}
                       onFocus={() => setActiveItemIndex(itemIndex)}
@@ -377,6 +389,15 @@ function MenuDropdown({
                       {item.shortcut ? <StudioKbdBadge>{item.shortcut}</StudioKbdBadge> : null}
                     </button>
                   </StudioToolHintTarget>
+                  {item.unavailableReason ? (
+                    <span
+                      id={unavailableReasonId}
+                      data-studio-main-menu-unavailable-reason="true"
+                      className="sr-only"
+                    >
+                      사용 조건: {item.unavailableReason}
+                    </span>
+                  ) : null}
                   {item.separatorAfter ? (
                     <div role="separator" className="mx-3 my-1.5 h-px bg-line/60" />
                   ) : null}

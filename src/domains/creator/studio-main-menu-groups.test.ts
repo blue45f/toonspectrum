@@ -38,6 +38,7 @@ const BASE_STATE: StudioMainMenuBuilderState = {
   psdImportBusy: false,
   edit: AVAILABLE_EDIT_ACTIONS,
   filterDisabled: false,
+  filterUnavailableReason: null,
   viewTransformSuppressed: false,
   canvasFlipH: false,
   canvasRotation: 0,
@@ -272,6 +273,7 @@ describe("buildStudioMainMenuGroups", () => {
         Object.keys(AVAILABLE_EDIT_ACTIONS).map((key) => [key, true]),
       ) as unknown as StudioMainMenuEditAvailability,
       filterDisabled: true,
+      filterUnavailableReason: "저장이 끝난 뒤 필터를 적용하세요.",
       viewTransformSuppressed: true,
       canvasFlipH: true,
       canvasRotation: 90,
@@ -366,8 +368,12 @@ describe("buildStudioMainMenuGroups", () => {
     expect(menuItem(groups, "filter", "last-filter")).toMatchObject({
       label: "마지막 필터 다시 열기",
       disabled: true,
+      unavailableReason: "저장이 끝난 뒤 필터를 적용하세요.",
     });
-    expect(menuItem(groups, "filter", "color-curves").disabled).toBe(true);
+    expect(menuItem(groups, "filter", "color-curves")).toMatchObject({
+      disabled: true,
+      unavailableReason: "저장이 끝난 뒤 필터를 적용하세요.",
+    });
   });
 
   it("routes file, edit, insert, and drawing commands to their injected owners", () => {

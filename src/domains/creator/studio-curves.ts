@@ -24,6 +24,12 @@ export const DEFAULT_CURVE: CurvePoint[] = [
   { x: 255, y: 255 },
 ];
 
+/**
+ * Shared authoring ceiling for one tone-curve channel. Sixteen points preserve precise artwork
+ * control while keeping a master + RGB channel snapshot inside the immutable 2 KiB asset contract.
+ */
+export const STUDIO_CURVE_MAX_CONTROL_POINTS = 16;
+
 const AXIS_MIN = 0;
 const AXIS_MAX = 255;
 
@@ -369,6 +375,9 @@ export function addCurvePoint(points: CurvePoint[], x: number, y: number): Curve
     next[replaceIndex] = { x: next[replaceIndex]!.x, y: cy };
     return normalizeCurve(next);
   }
+
+  // Never silently truncate or replace a different authored point at the persistence boundary.
+  if (base.length >= STUDIO_CURVE_MAX_CONTROL_POINTS) return base;
 
   const next = base.map((p) => ({ x: p.x, y: p.y }));
   next.push({ x: cx, y: cy });

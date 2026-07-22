@@ -18,6 +18,7 @@ import {
   normalizeCurve,
   normalizeCurveChannels,
   removeCurvePoint,
+  STUDIO_CURVE_MAX_CONTROL_POINTS,
   TONE_CHANNELS,
   type CurvePoint,
   type CurveRgbChannels,
@@ -81,6 +82,7 @@ function toPolyPoints(points: CurvePoint[]): string {
 /** 가장 넓은 구간의 선형 보간 중간점. 엔진의 동일-x 허용 오차를 피해 점을 추가할 수 없으면 null. */
 function suggestedCurvePoint(points: CurvePoint[]): CurvePoint | null {
   const normalized = normalizeCurve(points);
+  if (normalized.length >= STUDIO_CURVE_MAX_CONTROL_POINTS) return null;
   let best: { left: CurvePoint; right: CurvePoint; gap: number } | null = null;
   for (let index = 0; index < normalized.length - 1; index++) {
     const left = normalized[index]!;
@@ -226,6 +228,7 @@ export function StudioCurvePanel({
   const selectedIndex = Math.min(selectedPointIndex, curve.length - 1);
   const selectedPoint = curve[selectedIndex]!;
   const selectedPointIsEndpoint = selectedIndex === 0 || selectedIndex === curve.length - 1;
+  const curvePointLimitReached = curve.length >= STUDIO_CURVE_MAX_CONTROL_POINTS;
   const suggestedPoint = suggestedCurvePoint(curve);
 
   const movePoint = (index: number, x: number, y: number): void => {
@@ -354,6 +357,7 @@ export function StudioCurvePanel({
     }
     if (idx === -1) {
       // 빈 영역 — 클릭 위치에 점 추가.
+      if (curvePointLimitReached) return;
       const c = clientToCurve(e.clientX, e.clientY);
       if (c) {
         const next = addCurvePoint(curve, c.cx, c.cy);
@@ -567,6 +571,10 @@ export function StudioCurvePanel({
           <button
             type="button"
             disabled={!suggestedPoint}
+            aria-describedby={curvePointLimitReached ? instructionsId : undefined}
+            title={curvePointLimitReached
+              ? `채널마다 제어점은 최대 ${STUDIO_CURVE_MAX_CONTROL_POINTS}개까지 사용할 수 있습니다.`
+              : "가장 넓은 구간에 제어점을 추가합니다."}
             onClick={addSuggestedPoint}
             className={buttonClass({
               size: "sm",
@@ -600,7 +608,7 @@ export function StudioCurvePanel({
       </div>
 
       <p id={instructionsId} className="text-[0.6rem] leading-relaxed text-fg-4">
-        점을 선택한 뒤 화살표 키로 1, Shift+화살표로 10씩 이동합니다. 점 추가는 가장 넓은 구간의 중간에 배치됩니다.
+        점을 선택한 뒤 화살표 키로 1, Shift+화살표로 10씩 이동합니다. 점 추가는 가장 넓은 구간의 중간에 배치되며 채널마다 최대 {STUDIO_CURVE_MAX_CONTROL_POINTS}개까지 사용할 수 있습니다.
       </p>
     </div>
   );

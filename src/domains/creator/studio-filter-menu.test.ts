@@ -59,6 +59,24 @@ describe("studio filter menu", () => {
     ).toEqual({ brightness: undefined, contrast: undefined });
   });
 
+  it("clamps brightness and contrast to the renderer's exact shared-document range", () => {
+    expect(studioFilterDraftToPatch({
+      kind: "hue-saturation-brightness",
+      hue: 0,
+      saturation: 0,
+      brightness: 81,
+    })).toMatchObject({ brightness: 0.8 });
+    expect(studioFilterDraftToPatch({
+      kind: "brightness-contrast",
+      brightness: -81,
+      contrast: 81,
+    })).toMatchObject({ brightness: -0.8, contrast: 80 });
+    expect(createStudioFilterDraft("brightness-contrast", {
+      brightness: 1,
+      contrast: -100,
+    })).toMatchObject({ brightness: 80, contrast: -80 });
+  });
+
   it("removes identity curves and preserves adjusted RGB channel curves", () => {
     const identity = studioFilterDraftToPatch(
       createStudioFilterDraft("color-curves", {}),

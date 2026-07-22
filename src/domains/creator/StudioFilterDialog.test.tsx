@@ -11,7 +11,11 @@ const filterDialogSource = readFileSync(
   "utf8",
 );
 
-function renderMotionFilterDialog(mutationLocked = false): string {
+function renderMotionFilterDialog(
+  mutationLocked = false,
+  targetKind: "image" | "page-composite" = "image",
+  options: { applying?: boolean; mutationLockReason?: string } = {},
+): string {
   return renderToStaticMarkup(
     <StudioFilterDialog
       activeKey="filter:motion-blur"
@@ -19,7 +23,10 @@ function renderMotionFilterDialog(mutationLocked = false): string {
       image={{}}
       initialDraft={{ kind: "motion-blur", distance: 12, angle: -45 }}
       rootRef={createRef<HTMLElement>()}
+      targetKind={targetKind}
       mutationLocked={mutationLocked}
+      mutationLockReason={options.mutationLockReason}
+      applying={options.applying}
       onPreview={vi.fn()}
       onApply={vi.fn()}
       onClose={vi.fn()}
@@ -65,6 +72,37 @@ describe("StudioFilterDialog", () => {
     expect(html).not.toContain('aria-label="필터 창 닫기"');
   });
 
+  it("keeps image targeting as the default non-destructive workflow", () => {
+    const html = renderMotionFilterDialog();
+
+    expect(html).toContain("선택한 이미지 레이어에 비파괴 필터로 적용합니다.");
+    expect(html).not.toContain('id="studio-filter-composite-notice"');
+  });
+
+  it("explains page compositing, source preservation, and one-step undo accessibly", () => {
+    const html = renderMotionFilterDialog(false, "page-composite");
+
+    expect(html).toContain(
+      'aria-describedby="studio-filter-dialog-description studio-filter-composite-notice"',
+    );
+    expect(html).toContain(
+      "현재 보이는 페이지를 편집 가능한 합성 레이어로 만들고, 원본 레이어를 보존한 채 필터를 적용합니다.",
+    );
+    expect(html).toContain('id="studio-filter-composite-notice" role="note"');
+    expect(html).toContain("원본은 그대로 유지됩니다.");
+    expect(html).toContain(
+      "적용 후 실행 취소 한 번으로 새 합성 레이어만 제거할 수 있습니다.",
+    );
+  });
+
+  it("describes both page compositing and the lock state when mutation is blocked", () => {
+    const html = renderMotionFilterDialog(true, "page-composite");
+
+    expect(html).toContain(
+      'aria-describedby="studio-filter-dialog-description studio-filter-composite-notice studio-filter-lock-message"',
+    );
+  });
+
   it("uses at least 44px mobile and coarse-pointer targets for frequent actions", () => {
     const html = renderMotionFilterDialog();
 
@@ -90,5 +128,36 @@ describe("StudioFilterDialog", () => {
     );
     expect(html).toContain(">적용</button>");
     expect(html).not.toContain(">저장</button>");
+  });
+
+  it("uses the exact supplied mutation lock reason instead of the generic copy", () => {
+    const reason = "공동 편집 동기화 중에는 필터 레이어를 추가할 수 없습니다.";
+    const html = renderMotionFilterDialog(true, "image", {
+      mutationLockReason: reason,
+    });
+
+    expect(html).toContain(`role="status" aria-live="polite" aria-atomic="true"`);
+    expect(html).toContain(reason);
+    expect(html).not.toContain("선택한 이미지 또는 문서가 잠겨 있어 적용할 수 없습니다.");
+    expect(html).toContain('aria-describedby="studio-filter-lock-message"');
+  });
+
+  it("announces an in-flight apply, blocks reset and apply re-entry, and keeps dismissal available", () => {
+    const html = renderMotionFilterDialog(false, "page-composite", { applying: true });
+
+    expect(html.match(/aria-busy="true"/g)?.length ?? 0).toBe(2);
+    expect(html).toContain(">적용 중…</button>");
+    expect(html).not.toContain(">적용</button>");
+    expect(html.match(/disabled=""/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(html).toMatch(/<button type="button"[^>]*>취소<\/button>/);
+    expect(html).toMatch(/<button type="button"[^>]*aria-label="[^"]+ 닫기"[^>]*>/);
+    expect(filterDialogSource).toContain("if (applying) return;");
+    expect(filterDialogSource).toContain("if (mutationLocked || applying) return;");
+  });
+
+  it("keeps brightness and contrast controls inside the renderer's exact ±80 range", () => {
+    expect(filterDialogSource).toMatch(/label="밝기\/명도"[\s\S]*?min=\{-80\}[\s\S]*?max=\{80\}/u);
+    expect(filterDialogSource).toMatch(/label="명도"[\s\S]*?min=\{-80\}[\s\S]*?max=\{80\}/u);
+    expect(filterDialogSource).toMatch(/label="대비"[\s\S]*?min=\{-80\}[\s\S]*?max=\{80\}/u);
   });
 });

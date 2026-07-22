@@ -34,7 +34,10 @@ interface StudioFilterDialogProps {
   image: ImageFilterFields;
   initialDraft?: StudioFilterDraft;
   rootRef: RefObject<HTMLElement | null>;
+  targetKind?: "image" | "page-composite";
   mutationLocked?: boolean;
+  mutationLockReason?: string;
+  applying?: boolean;
   onPreview: (patch: FilterPatch | null) => void;
   onApply: (patch: FilterPatch, draft: StudioFilterDraft) => void;
   onClose: () => void;
@@ -143,7 +146,10 @@ export function StudioFilterDialog({
   image,
   initialDraft,
   rootRef,
+  targetKind = "image",
   mutationLocked = false,
+  mutationLockReason,
+  applying = false,
   onPreview,
   onApply,
   onClose,
@@ -172,9 +178,23 @@ export function StudioFilterDialog({
   useEffect(() => () => reportPreview(null), []);
 
   const title = STUDIO_FILTER_LABELS[kind];
-  const resetDraft = () => setDraft(defaultDraft(kind));
+  const resetDraft = () => {
+    if (applying) return;
+    setDraft(defaultDraft(kind));
+  };
+  const lockMessage =
+    mutationLockReason ??
+    "선택한 이미지 또는 문서가 잠겨 있어 적용할 수 없습니다. 잠금을 해제하면 현재 미리보기 값을 적용할 수 있습니다.";
   const descriptionId = "studio-filter-dialog-description";
+  const compositeNoticeId = "studio-filter-composite-notice";
   const lockMessageId = "studio-filter-lock-message";
+  const describedBy = [
+    descriptionId,
+    targetKind === "page-composite" ? compositeNoticeId : null,
+    mutationLocked ? lockMessageId : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center p-2 sm:p-4">
@@ -191,7 +211,8 @@ export function StudioFilterDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="studio-filter-dialog-title"
-        aria-describedby={mutationLocked ? `${descriptionId} ${lockMessageId}` : descriptionId}
+        aria-describedby={describedBy}
+        aria-busy={applying || undefined}
         data-studio-shortcut-boundary="true"
         tabIndex={-1}
         className="relative flex max-h-[min(86dvh,42rem)] w-[min(34rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-2xl border border-line-strong bg-panel text-fg shadow-2xl"
@@ -205,7 +226,9 @@ export function StudioFilterDialog({
               {title}
             </h2>
             <p id={descriptionId} className="mt-0.5 text-[0.7rem] leading-relaxed text-fg-3">
-              선택한 이미지 레이어에 비파괴 필터로 적용합니다.
+              {targetKind === "page-composite"
+                ? "현재 보이는 페이지를 편집 가능한 합성 레이어로 만들고, 원본 레이어를 보존한 채 필터를 적용합니다."
+                : "선택한 이미지 레이어에 비파괴 필터로 적용합니다."}
             </p>
           </div>
           <button
@@ -224,6 +247,17 @@ export function StudioFilterDialog({
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-width:thin]">
           <div className="space-y-4">
+            {targetKind === "page-composite" ? (
+              <p
+                id={compositeNoticeId}
+                role="note"
+                className="rounded-lg border border-accent/25 bg-accent-soft/55 px-3 py-2 text-[0.7rem] leading-relaxed text-fg-2"
+              >
+                <strong className="font-semibold text-fg">원본은 그대로 유지됩니다.</strong>{" "}
+                적용 후 실행 취소 한 번으로 새 합성 레이어만 제거할 수 있습니다.
+              </p>
+            ) : null}
+
             {draft.kind === "gaussian-blur" ? (
               <NumberControl
                 label="반지름"
@@ -279,8 +313,8 @@ export function StudioFilterDialog({
                 />
                 <NumberControl
                   label="밝기/명도"
-                  min={-100}
-                  max={100}
+                  min={-80}
+                  max={80}
                   value={draft.brightness}
                   suffix="%"
                   onChange={(brightness) => setDraft({ ...draft, brightness })}
@@ -292,8 +326,8 @@ export function StudioFilterDialog({
               <>
                 <NumberControl
                   label="명도"
-                  min={-100}
-                  max={100}
+                  min={-80}
+                  max={80}
                   value={draft.brightness}
                   suffix="%"
                   autofocus
@@ -301,8 +335,8 @@ export function StudioFilterDialog({
                 />
                 <NumberControl
                   label="대비"
-                  min={-100}
-                  max={100}
+                  min={-80}
+                  max={80}
                   value={draft.contrast}
                   suffix="%"
                   onChange={(contrast) => setDraft({ ...draft, contrast })}
@@ -316,7 +350,7 @@ export function StudioFilterDialog({
                 channels={draft.curveCh}
                 onChange={(curve: CurvePoint[]) => setDraft({ ...draft, curve })}
                 onChannelsChange={(curveCh: CurveRgbChannels) => setDraft({ ...draft, curveCh })}
-                onReset={() => setDraft(defaultDraft("color-curves"))}
+                onReset={resetDraft}
               />
             ) : null}
           </div>
@@ -324,6 +358,7 @@ export function StudioFilterDialog({
           <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-line/60 pt-3">
             <button
               type="button"
+              disabled={applying}
               onClick={resetDraft}
               className={buttonClass({
                 size: "sm",
@@ -355,7 +390,7 @@ export function StudioFilterDialog({
               aria-atomic="true"
               className="mb-2 rounded-xl border border-warn/35 bg-warn/10 px-3 py-2 text-[0.7rem] font-semibold leading-relaxed text-warn"
             >
-              선택한 이미지 또는 문서가 잠겨 있어 적용할 수 없습니다. 잠금을 해제하면 현재 미리보기 값을 적용할 수 있습니다.
+              {lockMessage}
             </p>
           ) : null}
           <div className="flex items-center justify-end gap-2">
@@ -371,15 +406,19 @@ export function StudioFilterDialog({
             </button>
             <button
               type="button"
-              disabled={mutationLocked}
+              disabled={mutationLocked || applying}
+              aria-busy={applying || undefined}
               aria-describedby={mutationLocked ? lockMessageId : undefined}
-              onClick={() => onApply(studioFilterDraftToPatch(draft), cloneStudioFilterDraft(draft))}
+              onClick={() => {
+                if (mutationLocked || applying) return;
+                onApply(studioFilterDraftToPatch(draft), cloneStudioFilterDraft(draft));
+              }}
               className={buttonClass({
                 variant: "solid",
                 className: "min-h-11 sm:min-h-10 pointer-coarse:min-h-11",
               })}
             >
-              적용
+              {applying ? "적용 중…" : "적용"}
             </button>
           </div>
         </footer>

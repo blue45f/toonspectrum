@@ -83,13 +83,13 @@ export function createStudioFilterDraft(
         kind,
         hue: clamp(image.hue ?? 0, -180, 180),
         saturation: clamp(Math.round((image.saturation ?? 0) * 100), -100, 100),
-        brightness: clamp(Math.round((image.brightness ?? 0) * 100), -100, 100),
+        brightness: clamp(Math.round((image.brightness ?? 0) * 100), -80, 80),
       };
     case "brightness-contrast":
       return {
         kind,
-        brightness: clamp(Math.round((image.brightness ?? 0) * 100), -100, 100),
-        contrast: clamp(Math.round(image.contrast ?? 0), -100, 100),
+        brightness: clamp(Math.round((image.brightness ?? 0) * 100), -80, 80),
+        contrast: clamp(Math.round(image.contrast ?? 0), -80, 80),
       };
     case "color-curves":
       return {
@@ -141,12 +141,12 @@ export function studioFilterDraftToPatch(
       return {
         hue: optionalNumber(clamp(Math.round(draft.hue), -180, 180)),
         saturation: optionalNumber(clamp(draft.saturation, -100, 100) / 100),
-        brightness: optionalNumber(clamp(draft.brightness, -100, 100) / 100),
+        brightness: optionalNumber(clamp(draft.brightness, -80, 80) / 100),
       };
     case "brightness-contrast":
       return {
-        brightness: optionalNumber(clamp(draft.brightness, -100, 100) / 100),
-        contrast: optionalNumber(clamp(Math.round(draft.contrast), -100, 100)),
+        brightness: optionalNumber(clamp(draft.brightness, -80, 80) / 100),
+        contrast: optionalNumber(clamp(Math.round(draft.contrast), -80, 80)),
       };
     case "color-curves": {
       const curve = normalizeCurve(draft.curve);

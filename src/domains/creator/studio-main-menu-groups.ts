@@ -102,6 +102,7 @@ export interface StudioMainMenuBuilderState {
   psdImportBusy: boolean;
   edit: StudioMainMenuEditAvailability;
   filterDisabled: boolean;
+  filterUnavailableReason: string | null;
   viewTransformSuppressed: boolean;
   canvasFlipH: boolean;
   canvasRotation: StudioViewRotation;
@@ -200,6 +201,9 @@ export function buildStudioMainMenuGroups({
   editor,
   ui,
 }: BuildStudioMainMenuGroupsInput): StudioMainMenuGroup[] {
+  const filterUnavailableReason = state.filterDisabled
+    ? state.filterUnavailableReason ?? "현재 편집 상태에서는 필터를 적용할 수 없습니다."
+    : undefined;
   return [
     {
       id: "file",
@@ -843,6 +847,11 @@ export function buildStudioMainMenuGroups({
           label: state.lastFilterDraft ? "마지막 필터 다시 열기" : "마지막 필터…",
           icon: HistoryIcon,
           disabled: !state.lastFilterDraft || state.filterDisabled,
+          unavailableReason: state.filterDisabled
+            ? filterUnavailableReason
+            : !state.lastFilterDraft
+              ? "아직 다시 열 수 있는 필터 설정이 없습니다."
+              : undefined,
           separatorAfter: true,
           onSelect: () => {
             if (state.lastFilterDraft) {
@@ -859,6 +868,7 @@ export function buildStudioMainMenuGroups({
           icon: Droplets,
           shortcut: "⌘⇧1",
           disabled: state.filterDisabled,
+          unavailableReason: filterUnavailableReason,
           onSelect: () => {
             editor.openStudioFilter("gaussian-blur");
           },
@@ -869,6 +879,7 @@ export function buildStudioMainMenuGroups({
           icon: Wind,
           shortcut: "⌘⇧2",
           disabled: state.filterDisabled,
+          unavailableReason: filterUnavailableReason,
           onSelect: () => {
             editor.openStudioFilter("motion-blur");
           },
@@ -879,6 +890,7 @@ export function buildStudioMainMenuGroups({
           icon: Palette,
           shortcut: "⌘⇧3",
           disabled: state.filterDisabled,
+          unavailableReason: filterUnavailableReason,
           onSelect: () => {
             editor.openStudioFilter("hue-saturation-brightness");
           },
@@ -889,6 +901,7 @@ export function buildStudioMainMenuGroups({
           icon: SlidersHorizontal,
           shortcut: "⌘⇧4",
           disabled: state.filterDisabled,
+          unavailableReason: filterUnavailableReason,
           onSelect: () => {
             editor.openStudioFilter("brightness-contrast");
           },
@@ -899,6 +912,7 @@ export function buildStudioMainMenuGroups({
           icon: GanttChartSquare,
           shortcut: "⌘⇧5",
           disabled: state.filterDisabled,
+          unavailableReason: filterUnavailableReason,
           onSelect: () => {
             editor.openStudioFilter("color-curves");
           },

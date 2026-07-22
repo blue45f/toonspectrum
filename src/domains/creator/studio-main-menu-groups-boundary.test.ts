@@ -26,7 +26,12 @@ describe("studio main-menu catalogue ownership boundary", () => {
     expect(page).toContain('from "./studio-main-menu-groups"');
     expect(composition).toContain("buildStudioMainMenuGroups({");
     expect(composition).toContain("projectImportInputRef.current?.click()");
-    expect(composition).toContain("openStudioToolsCompanionWindow()");
+    expect(page).toContain("openStudioToolsCompanionWindow(input.sessionId, existingWindow)");
+    expect(page).toContain("isStudioToolsCompanionWindowReusable(");
+    expect(page).toContain("input.binding.release()");
+    expect(page).toContain("도구 창을 복구해 다시 연결합니다");
+    expect(composition).toContain("openStudioToolsCompanionForMenu({");
+    expect(composition).toContain("windowRef: companionWindowRef");
     expect(composition).not.toContain("items: [");
     expect(composition).not.toContain("STUDIO_EDIT_MENU_COMMANDS");
     expect(composition.split("\n").length).toBeLessThanOrEqual(190);

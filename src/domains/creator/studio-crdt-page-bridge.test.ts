@@ -16,12 +16,15 @@ import {
   studioCrdtStrokeToDrawElement,
   studioDrawElementSampleSlice,
   studioDrawElementToCrdtStroke,
+  studioElementToCrdtSceneElement,
   studioPageToCrdtPage,
   studioSceneElementToCrdtElement,
+  type StudioCrdtCompatibleElement,
   type StudioCrdtCompatibleDrawElement,
   type StudioCrdtCompatibleSceneElement,
 } from "./studio-crdt-page-bridge";
 import { createDefaultStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
+import { createStudioWorkAssetInitialImageDescriptor } from "./studio-work-asset-admission";
 
 function record(
   id: string,
@@ -133,6 +136,109 @@ describe("phase-two brush CRDT bridge", () => {
 });
 
 describe("studio CRDT page bridge", () => {
+  it.each([
+    { type: "gaussian" as const, strength: 100, radius: 24, angle: 0 },
+    { type: "motion" as const, strength: 100, radius: 40, angle: 315 },
+  ])("round-trips admitted page-composite $type metadata from descriptor through hydration", (blurFx) => {
+    const canonicalSource = "work-asset://image/filter-composite-1";
+    const curve = [{ x: 0, y: 8 }, { x: 128, y: 148 }, { x: 255, y: 248 }];
+    const curveCh = {
+      r: [{ x: 0, y: 0 }, { x: 255, y: 240 }],
+      g: [{ x: 0, y: 12 }, { x: 255, y: 255 }],
+      b: [{ x: 0, y: 0 }, { x: 255, y: 232 }],
+    };
+    const descriptor = createStudioWorkAssetInitialImageDescriptor({
+      id: "filter-composite-1",
+      type: "image",
+      src: "data:image/png;base64,private",
+      x: 24,
+      y: 48,
+      width: 800,
+      height: 1_600,
+      rotation: 0,
+      filterPageComposite: true,
+      blurFx,
+      brightness: 0.8,
+      contrast: -80,
+      hue: 180,
+      saturation: -1,
+      curve,
+      curveCh,
+    });
+    const encoded = studioElementToCrdtSceneElement("page-a", {
+      ...descriptor.element,
+      src: canonicalSource,
+    } as StudioCrdtCompatibleElement & Record<string, unknown>);
+
+    expect(encoded.payload).toMatchObject({
+      version: 1,
+      type: "reference",
+      props: {
+        elementType: "image",
+        filterPageComposite: true,
+        blurFx,
+        brightness: 0.8,
+        contrast: -80,
+        hue: 180,
+        saturation: -1,
+        curve,
+        curveCh,
+      },
+    });
+    expect(encoded.payload.props).not.toHaveProperty("src");
+
+    const record = {
+      ...encoded,
+      orderIndex: 0,
+      deleted: false,
+    };
+    const referenceSource = {
+      id: "filter-composite-1",
+      type: "image",
+      src: canonicalSource,
+      decodedWidth: 800,
+    };
+    const restored = studioCrdtElementToSceneElement(record, referenceSource);
+    expect(restored).toMatchObject({
+      id: "filter-composite-1",
+      type: "image",
+      src: canonicalSource,
+      decodedWidth: 800,
+      filterPageComposite: true,
+      blurFx,
+      brightness: 0.8,
+      contrast: -80,
+      hue: 180,
+      saturation: -1,
+      curve,
+      curveCh,
+    });
+
+    const reconciled = reconcileStudioCrdtSceneGraphPages(
+      [{
+        id: "page-a",
+        bg: "#fff",
+        bgGrad: null,
+        canvasH: 1_600,
+        elements: [structuredClone(referenceSource)],
+      }],
+      [],
+      [record],
+      []
+    );
+    expect(reconciled.pages[0]?.elements[0]).toMatchObject({
+      src: canonicalSource,
+      filterPageComposite: true,
+      blurFx,
+      brightness: 0.8,
+      contrast: -80,
+      hue: 180,
+      saturation: -1,
+      curve,
+      curveCh,
+    });
+  });
+
   it("round-trips the complete drawing metadata and aligns legacy pointer arrays", () => {
     const element: StudioCrdtCompatibleDrawElement = {
       id: "stroke-a",
