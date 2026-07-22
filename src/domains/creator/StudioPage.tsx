@@ -50,6 +50,7 @@ import {
   studioAdvancedFillResultMessage,
   summarizeStudioAdvancedFillPreview,
 } from "./studio-advanced-fill-browser";
+import { resolveStudioAdvancedFillEntry } from "./studio-advanced-fill-entry";
 import {
   loadStudioAdvancedFillSettings,
   saveStudioAdvancedFillSettings,
@@ -344,6 +345,7 @@ import {
   createStudioCommunityAssetCredit,
   formatStudioCommunityAssetCredit,
 } from "./studio-community-asset-license";
+import { executeStudioCompanionToolCommand } from "./studio-companion-tool-command-executor";
 import { bakeContentAwareFillToCanvas } from "./studio-content-aware-fill";
 import {
   lintStudioContinuity,
@@ -858,6 +860,7 @@ import {
   appendStudioAuthoritativeInk,
   createStudioPredictedInkTailState,
   endStudioPredictedInkTail,
+  planStudioPredictedInkSuffixDraft,
   replaceStudioPredictedInkTail,
   type StudioPredictedInkTailState,
 } from "./studio-predicted-ink-tail";
@@ -948,6 +951,15 @@ import {
   resolveStudioRasterHandoffProjection,
 } from "./studio-raster-publication-projection";
 import { studioRasterVisibleDocumentRectFromViewport } from "./studio-raster-visible-rect";
+import {
+  createStudioRawPenInkPreviewState,
+  endStudioRawPenInkPreview,
+  isStudioRawPenInkPreviewEligible,
+  replaceStudioRawPenInkPreview,
+  syncStudioRawPenInkPreviewAuthority,
+  type StudioRawPenInkPreviewEligibility,
+  type StudioRawPenInkPreviewState,
+} from "./studio-raw-pen-ink-preview";
 import {
   areStudioReferenceBoardDocumentsEqual,
   createDefaultStudioReferenceBoardDocument,
@@ -1766,6 +1778,14 @@ const STUDIO_POINTER_PREDICTION_ENABLED = supportsStudioPointerPrediction(
   resolveStudioPointerPredictionPreference(import.meta.env.VITE_STUDIO_POINTER_PREDICTION),
   studioPointerPredictionEnvironment()
 );
+// `pointerrawupdate` itself is event-driven and not uniformly reflected as an `on*` property.
+// Mount the replaceable surface wherever Pointer Events + animation-frame presentation exist;
+// unsupported browsers simply never deliver a raw callback and stay on processed/coalesced ink.
+const STUDIO_RAW_PEN_INK_PREVIEW_ENABLED =
+  typeof globalThis.PointerEvent === "function"
+  && typeof globalThis.requestAnimationFrame === "function";
+const STUDIO_TRANSIENT_PEN_INK_SURFACE_ENABLED =
+  STUDIO_POINTER_PREDICTION_ENABLED || STUDIO_RAW_PEN_INK_PREVIEW_ENABLED;
 // 모바일 첫 사용 안내(하단 도구막대 + 두 손가락 이동/확대) 1회만 노출.
 const MOBILE_HINT_DISMISSED_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const WATERMARK_KEY = "toonspectrum-studio-watermark";
@@ -7984,6 +8004,8 @@ function StudioCuttoonEditor() {
     return mapped;
   };
   const predictedInkTailStateRef = useRef<StudioPredictedInkTailState | null>(null);
+  const rawPenInkPreviewStateRef = useRef<StudioRawPenInkPreviewState | null>(null);
+  const rawPenInkPreviewGenerationRef = useRef(0);
   const causalPostCorrectionStateRef = useRef<StudioCausalPostCorrectionState | null>(null);
   const liveInkOverlayClearGenRef = useRef(0);
   /** React 상태 예약이 아니라 실제 Konva draw 영수증 뒤에만 라이브 표면을 넘긴다. */
@@ -8225,8 +8247,45 @@ function StudioCuttoonEditor() {
       ? { ...el, points: [...transition.finalPoints] }
       : el;
   };
+  function currentRawPenInkPreviewEligibility(
+    pointerEvent: PointerEvent,
+    drawing: DrawEl,
+  ): StudioRawPenInkPreviewEligibility {
+    const settings = drawingInputSettingsRef.current;
+    return {
+      enabled: STUDIO_RAW_PEN_INK_PREVIEW_ENABLED,
+      pointerType: pointerEvent.pointerType,
+      tool,
+      strokeMode: drawing.mode ?? "pen",
+      strokeKind: drawing.kind ?? "freehand",
+      directCanvas2d:
+        liveDraftDirectRef.current
+        && isDirectLiveDraftEl(drawing)
+        && !isStudioPixelPencilRenderMode(drawing.brush),
+      opacity: drawing.opacity ?? 1,
+      fillActive: Boolean(drawing.fill),
+      symmetryType: drawing.symmetry?.type ?? "none",
+      gpuActive: gpuLiveInkPinnedRef.current,
+      stampActive: liveStampDraftDirectRef.current,
+      // Raw preview cannot safely reproduce a lagging/velocity-derived route without mutating its
+      // authoritative filter clocks, so those modes remain processed-only.
+      stabilizerActive:
+        drawingFixedRateFilterRef.current !== null
+        || (!drawingImmediateCausalInputRef.current && drawingStabilizerRef.current !== null)
+        || (settings?.stabilizer ?? 0) > 0
+        || settings?.useVelocityPressure === true,
+      postCorrectionActive: causalPostCorrectionStateRef.current !== null,
+      rulerActive: Boolean(
+        settings?.perspectiveActive
+        || settings?.isometricActive
+        || settings?.advancedRuler
+      ),
+      shiftActive: pointerEvent.shiftKey,
+    };
+  }
   const startCausalPostCorrection = (el: DrawEl) => {
     predictedInkTailStateRef.current = null;
+    rawPenInkPreviewStateRef.current = null;
     const transition = appendStudioCausalPostCorrection(
       createStudioCausalPostCorrectionState({
         strength: postCorrection,
@@ -8245,6 +8304,52 @@ function StudioCuttoonEditor() {
     });
     predictedInkTailStateRef.current = initial.state;
     liveInkPredictionRendererRef.current.apply(initial.predictionSurface, liveInkStyleFor(el));
+  };
+  const armRawPenInkPreview = (
+    pointerEvent: PointerEvent,
+    eligibility: StudioRawPenInkPreviewEligibility,
+  ) => {
+    const authoritativeTail = predictedInkTailStateRef.current;
+    if (!authoritativeTail || !isStudioRawPenInkPreviewEligible(eligibility)) {
+      rawPenInkPreviewStateRef.current = null;
+      return;
+    }
+    const previousGeneration = rawPenInkPreviewGenerationRef.current;
+    const generation = previousGeneration >= Number.MAX_SAFE_INTEGER
+      ? 1
+      : previousGeneration + 1;
+    rawPenInkPreviewGenerationRef.current = generation;
+    rawPenInkPreviewStateRef.current = createStudioRawPenInkPreviewState({
+      pointerId: pointerEvent.pointerId,
+      generation,
+      eligibility,
+      authoritativeTail,
+    });
+  };
+  const armTransientPenInkSurfaces = (input: {
+    pointerEvent: PointerEvent;
+    drawing: DrawEl;
+    causalPostCorrectionEligible: boolean;
+    nativePredictionEligible: boolean;
+  }) => {
+    const rawEligibility = currentRawPenInkPreviewEligibility(
+      input.pointerEvent,
+      input.drawing,
+    );
+    const rawEligible = isStudioRawPenInkPreviewEligible(rawEligibility);
+    if (input.causalPostCorrectionEligible) {
+      startCausalPostCorrection(input.drawing);
+      return;
+    }
+    if (input.nativePredictionEligible || rawEligible) {
+      startPredictedInkTail(input.drawing);
+      armRawPenInkPreview(input.pointerEvent, rawEligibility);
+      return;
+    }
+    causalPostCorrectionStateRef.current = null;
+    predictedInkTailStateRef.current = null;
+    rawPenInkPreviewStateRef.current = null;
+    liveInkPredictionRendererRef.current.clear();
   };
   const appendAuthoritativePredictedInkState = (el: DrawEl, startPointIndex: number) => {
     const state = predictedInkTailStateRef.current;
@@ -8281,6 +8386,21 @@ function StudioCuttoonEditor() {
   };
   const endPredictedInkTail = () => {
     causalPostCorrectionStateRef.current = null;
+    const active = drawingRef.current ?? liveDraftVisualRef.current;
+    const rawState = rawPenInkPreviewStateRef.current;
+    if (rawState) {
+      const rawTransition = endStudioRawPenInkPreview(rawState, {
+        pointerId: rawState.pointerId,
+        generation: rawState.generation,
+      });
+      rawPenInkPreviewStateRef.current = rawTransition.state;
+      if (active) {
+        liveInkPredictionRendererRef.current.apply(
+          rawTransition.predictionSurface,
+          liveInkStyleFor(active),
+        );
+      }
+    }
     const state = predictedInkTailStateRef.current;
     if (!state) {
       liveInkPredictionRendererRef.current.clear();
@@ -8289,7 +8409,6 @@ function StudioCuttoonEditor() {
     const transition = endStudioPredictedInkTail(state);
     predictedInkTailStateRef.current = transition.state;
     // Style is immaterial for clear/keep, but the active stroke keeps the exact canonical values.
-    const active = drawingRef.current ?? liveDraftVisualRef.current;
     if (active) {
       liveInkPredictionRendererRef.current.apply(
         transition.predictionSurface,
@@ -9845,21 +9964,17 @@ function StudioCuttoonEditor() {
     }
   };
 
+  const disarmAllPixelToolsRef = useRef<() => void>(() => undefined);
   const companionCommandHandlerRef = useRef<(command: StudioCompanionCommandName) => void>(() => undefined);
   useEffect(() => {
     companionCommandHandlerRef.current = (command) => {
+      const toolExecution = executeStudioCompanionToolCommand(command, {
+        disarmAllPixelTools: disarmAllPixelToolsRef.current,
+        setTool,
+        setDrawMode,
+      });
+      if (toolExecution.handled) return;
       switch (command) {
-        case "select":
-          setTool("select");
-          break;
-        case "pen":
-          setTool("draw");
-          setDrawMode("pen");
-          break;
-        case "eraser":
-          setTool("draw");
-          setDrawMode("eraser");
-          break;
         case "template":
           preloadStudioAssetMenuPanel();
           setMenu("template");
@@ -11384,13 +11499,27 @@ function StudioCuttoonEditor() {
   const advancedFillHasVisibleVectorLineArt = elements.some(
     (element) => element.type === "draw" && !isEffectivelyHidden(element, groups),
   );
+  const advancedFillEligibleRasterElements = elements.filter(
+    (element): element is ImageEl & El =>
+      element.type === "image" && advancedFillTargetUnsupportedReason(element) === null,
+  );
+  const selectedAdvancedFillRasterReason = selected?.type === "image"
+    ? advancedFillTargetUnsupportedReason(selected)
+    : null;
   const advancedFillUnsupportedReason = advancedFillVirtualTarget
     ? advancedFillDocumentUnsupportedReason
-    : selected?.type === "image"
-      ? advancedFillTargetUnsupportedReason(selected)
-      : advancedFillRasterLayers.length === 0 && advancedFillHasVisibleVectorLineArt
-        ? advancedFillDocumentUnsupportedReason
-        : advancedFillTargetUnsupportedReason(selected);
+    : advancedFillDocumentUnsupportedReason
+      ? advancedFillDocumentUnsupportedReason
+      : selected?.type === "image" && selectedAdvancedFillRasterReason === null
+        ? null
+        : advancedFillEligibleRasterElements.length === 1
+          ? null
+          : advancedFillEligibleRasterElements.length > 1
+            ? `채울 수 있는 래스터가 ${advancedFillEligibleRasterElements.length}개예요. 레이어에서 하나를 선택하세요.`
+            : advancedFillHasVisibleVectorLineArt
+              ? null
+              : selectedAdvancedFillRasterReason
+                ?? "채울 래스터 이미지나 표시 중인 벡터 선화가 없습니다.";
   const advancedFillRasterArmed =
     selected?.type === "image" && advancedFillTargetUnsupportedReason(selected) === null;
   const advancedFillVectorArmed =
@@ -13634,6 +13763,7 @@ function StudioCuttoonEditor() {
     setPuppetWarpPins([]); // ← 추가(핀도 함께 폐기 — 다른 도구로 전환 시 세션 종료)
     stopStudioCommentPlacementSession(); // ← 추가(자유 위치 댓글 핀 세션 해제)
   }
+  disarmAllPixelToolsRef.current = disarmAllPixelTools;
 
   /** 다각형 올가미 세션을 선택에 닫아 넣고 초안을 비운다. 점 <3 이면 폐기. */
   function finishPolyLassoSession() {
@@ -19337,71 +19467,67 @@ function StudioCuttoonEditor() {
       );
       return;
     }
-    let target = selected?.type === "image" && advancedFillTargetUnsupportedReason(selected) === null
-      ? selected
-      : null;
-    let automaticallySelected = false;
-    if (!target) {
-      const rasterLayers = elements.filter((element): element is ImageEl & El => element.type === "image");
-      const candidates = rasterLayers.filter(
-        (element) => advancedFillTargetUnsupportedReason(element) === null,
-      );
-      if (candidates.length === 1) {
-        target = candidates[0]!;
-        automaticallySelected = true;
-      } else {
-        const selectedReason = selected?.type === "image"
-          ? advancedFillTargetUnsupportedReason(selected)
-          : null;
-        const candidateReasons = [...new Set(
-          rasterLayers
-            .map((element) => advancedFillTargetUnsupportedReason(element))
-            .filter((reason): reason is string => reason !== null),
-        )];
-        let message: string;
-        if (advancedFillDocumentUnsupportedReason) {
-          message = advancedFillDocumentUnsupportedReason;
-        } else if (candidates.length > 1) {
-          message = `채울 수 있는 래스터가 ${candidates.length}개예요. 레이어에서 하나를 선택한 뒤 채우기를 다시 누르세요.`;
-        } else if (selectedReason) {
-          message = selectedReason;
-        } else if (rasterLayers.length === 0) {
-          if (!flushPendingStrokeCommitsRef.current()) {
-            message = "마지막 선화를 문서에 확정하지 못했어요. 잠금·동기화 상태를 확인한 뒤 다시 시도해 주세요.";
-          } else {
-            const vectorPlan = planStudioAdvancedFillVectorTarget(currentAdvancedFillVectorInput());
-            if (vectorPlan.ok) {
-              disarmAllPixelTools();
-              setTool("select");
-              setMarqueeIds([]);
-              setAdvancedFillVirtualTarget(vectorPlan.target);
-              advancedFillVirtualReferenceRef.current = null;
-              setAdvancedFillActive(true);
-              setAdvancedFillStatus(
-                `표시 중인 벡터 선화 ${vectorPlan.target.sourceElementCount}개를 참조합니다. 닫힌 영역을 탭하세요. 적용 전까지 문서는 바뀌지 않습니다.`,
-              );
-              setMobileSheet(null);
-              setError(null);
-              return;
-            }
-            message = vectorPlan.reason;
-          }
-        } else if (candidateReasons.length === 1) {
-          message = candidateReasons[0]!;
-        } else {
-          message = "채우기 가능한 표시·잠금 해제 래스터가 없어요. 레이어 잠금, 표시, 애니메이션과 참조 설정을 확인하세요.";
-        }
+    if (advancedFillDocumentUnsupportedReason) {
+      setAdvancedFillStatus(advancedFillDocumentUnsupportedReason);
+      setError(advancedFillDocumentUnsupportedReason);
+      return;
+    }
+    const rasterLayers = elements.filter(
+      (element): element is ImageEl & El => element.type === "image",
+    );
+    const resolveEntry = () => resolveStudioAdvancedFillEntry({
+      selectedRasterId: selected?.type === "image" ? selected.id : null,
+      rasterLayers,
+      getRasterUnsupportedReason: advancedFillTargetUnsupportedReason,
+      vectorInput: currentAdvancedFillVectorInput(),
+    });
+    let entry = resolveEntry();
+    if (entry.mode === "virtual-vector-fill" || entry.mode === "unavailable") {
+      if (!flushPendingStrokeCommitsRef.current()) {
+        const message = "마지막 선화를 문서에 확정하지 못했어요. 잠금·동기화 상태를 확인한 뒤 다시 시도해 주세요.";
         setAdvancedFillStatus(message);
         setError(message);
         return;
       }
+      // Pending direct ink may have become the newest vector reference during the flush.
+      entry = resolveEntry();
     }
-    if (!target) {
-      const message = "채우기 대상을 확인하지 못했어요. 레이어에서 래스터 이미지 하나를 선택한 뒤 다시 시도하세요.";
+    if (entry.mode === "virtual-vector-fill") {
+      disarmAllPixelTools();
+      setTool("select");
+      setMarqueeIds([]);
+      setAdvancedFillVirtualTarget(entry.target);
+      advancedFillVirtualReferenceRef.current = null;
+      setAdvancedFillActive(true);
+      setAdvancedFillStatus(
+        `표시 중인 벡터 선화 ${entry.target.sourceElementCount}개를 참조합니다. 닫힌 영역을 탭하세요. 적용 전까지 문서는 바뀌지 않습니다.`,
+      );
+      setMobileSheet(null);
+      setError(null);
+      return;
+    }
+    if (entry.mode === "ambiguous-raster") {
+      const message = `채울 수 있는 래스터가 ${entry.candidates.length}개예요. 레이어에서 하나를 선택한 뒤 채우기를 다시 누르세요.`;
       setAdvancedFillStatus(message);
       setError(message);
       return;
     }
+    if (entry.mode === "unavailable") {
+      const selectedReason = selected?.type === "image"
+        ? entry.ineligibleRasters.find(({ raster }) => raster.id === selected.id)?.reason ?? null
+        : null;
+      const candidateReasons = [...new Set(
+        entry.ineligibleRasters.map(({ reason }) => reason),
+      )];
+      const message = selectedReason
+        ?? (candidateReasons.length === 1 ? candidateReasons[0] : null)
+        ?? entry.vectorFailure.reason;
+      setAdvancedFillStatus(message);
+      setError(message);
+      return;
+    }
+    const target = entry.target;
+    const automaticallySelected = entry.mode === "auto-select-raster";
     disarmAllPixelTools();
     setAdvancedFillVirtualTarget(null);
     advancedFillVirtualReferenceRef.current = null;
@@ -20920,6 +21046,7 @@ function StudioCuttoonEditor() {
         const direct = pixelDirect || overlayDirect || gpuPin;
         liveDraftDirectRef.current = direct;
         liveStampDraftDirectRef.current = stampDirect;
+        gpuLiveInkPinnedRef.current = gpuPin;
         if (!stampDirect) liveStampOverlayRendererRef.current.resetActive();
         liveDraftVisualRef.current = direct || stampDirect ? next : null;
         liveDraftPendingRef.current = direct || stampDirect ? next : null;
@@ -20931,14 +21058,12 @@ function StudioCuttoonEditor() {
           && next.mode !== "eraser"
           && !next.fill
           && (next.symmetry?.type ?? "none") === "none";
-        if (causalPostCorrectionEligible) startCausalPostCorrection(next);
-        else if (predictionTailEligible) startPredictedInkTail(next);
-        else {
-          causalPostCorrectionStateRef.current = null;
-          predictedInkTailStateRef.current = null;
-          liveInkPredictionRendererRef.current.clear();
-        }
-        gpuLiveInkPinnedRef.current = gpuPin;
+        armTransientPenInkSurfaces({
+          pointerEvent: pointerSample,
+          drawing: next,
+          causalPostCorrectionEligible,
+          nativePredictionEligible: predictionTailEligible,
+        });
         gpuPinnedLivePointCountRef.current = 0;
         // 파인 가시성은 자식 컴포넌트만 갱신한다 — 대기(지연 커밋) GPU 잉크가 있으면 유지.
         webGpuCanvasHandleRef.current?.setPinnedVisible(
@@ -22052,6 +22177,27 @@ function StudioCuttoonEditor() {
 
       const authoritativeDrawing = publishAuthoritativeFreehandSuffix(crdtSampleStart);
       const authoritativePointCount = Math.floor((authoritativeDrawing?.points.length ?? 0) / 2);
+      const rawPreviewState = rawPenInkPreviewStateRef.current;
+      const canonicalPredictionTail = predictedInkTailStateRef.current;
+      if (
+        authoritativeDrawing
+        && rawPreviewState
+        && canonicalPredictionTail
+        && session.pointerId === rawPreviewState.pointerId
+      ) {
+        const rawSync = syncStudioRawPenInkPreviewAuthority(rawPreviewState, {
+          pointerId: rawPreviewState.pointerId,
+          generation: rawPreviewState.generation,
+          authoritativeTail: canonicalPredictionTail,
+        });
+        rawPenInkPreviewStateRef.current = rawSync.state;
+        // The canonical append has already cleared the old transient tail. Applying the same
+        // bounded command here keeps the wrapper lifecycle explicit before native predictions win.
+        liveInkPredictionRendererRef.current.apply(
+          rawSync.predictionSurface,
+          liveInkStyleFor(authoritativeDrawing),
+        );
+      }
       if (
         immediateBatchMutation
         && authoritativePointCount > crdtSampleStart
@@ -22075,22 +22221,49 @@ function StudioCuttoonEditor() {
         const authoritativeVelocity = drawingVelocityRef.current;
         try {
           drawingPredictionPreviewRef.current = true;
-          // Clone the authoritative prefix once, then mutate only this disposable prediction copy.
-          // Previously every predicted point cloned the growing full stroke, an O(n × estimates)
-          // cost that was most visible on long strokes and high-refresh stylus hardware.
+          const suffixDraftCandidate = liveDraftDirectRef.current && predictedInkTailStateRef.current
+            ? planStudioPredictedInkSuffixDraft({
+                points: authoritativeDrawing.points,
+                pressures: authoritativeDrawing.pressures,
+                tiltXs: authoritativeDrawing.tiltXs,
+                tiltYs: authoritativeDrawing.tiltYs,
+                twists: authoritativeDrawing.twists,
+                speeds: authoritativeDrawing.speeds,
+                tangentialPressures: authoritativeDrawing.tangentialPressures,
+                fallbackPressure: studioInkFallbackPressure(authoritativeDrawing.pressureModel),
+              })
+            : null;
+          const suffixDraft = suffixDraftCandidate?.authoritativeSampleCount === authoritativePointCount
+            ? suffixDraftCandidate
+            : null;
+          const predictionStartSampleIndex = suffixDraft?.draftPredictionStartSampleIndex
+            ?? authoritativePointCount;
+          // Direct replaceable-tail rendering needs only origin + current endpoint, so its work is
+          // independent of an already-long stroke. Causal correction and Konva fallbacks retain the
+          // complete private clone because those paths still render or compare the whole preview.
           drawingRef.current = {
             ...authoritativeDrawing,
-            points: [...authoritativeDrawing.points],
-            pressures: authoritativeDrawing.pressures
-              ? [...authoritativeDrawing.pressures]
-              : undefined,
-            tiltXs: authoritativeDrawing.tiltXs ? [...authoritativeDrawing.tiltXs] : undefined,
-            tiltYs: authoritativeDrawing.tiltYs ? [...authoritativeDrawing.tiltYs] : undefined,
-            twists: authoritativeDrawing.twists ? [...authoritativeDrawing.twists] : undefined,
-            speeds: authoritativeDrawing.speeds ? [...authoritativeDrawing.speeds] : undefined,
-            tangentialPressures: authoritativeDrawing.tangentialPressures
-              ? [...authoritativeDrawing.tangentialPressures]
-              : undefined,
+            points: suffixDraft?.points ?? [...authoritativeDrawing.points],
+            pressures: suffixDraft
+              ? suffixDraft.pressures
+              : authoritativeDrawing.pressures ? [...authoritativeDrawing.pressures] : undefined,
+            tiltXs: suffixDraft
+              ? suffixDraft.tiltXs
+              : authoritativeDrawing.tiltXs ? [...authoritativeDrawing.tiltXs] : undefined,
+            tiltYs: suffixDraft
+              ? suffixDraft.tiltYs
+              : authoritativeDrawing.tiltYs ? [...authoritativeDrawing.tiltYs] : undefined,
+            twists: suffixDraft
+              ? suffixDraft.twists
+              : authoritativeDrawing.twists ? [...authoritativeDrawing.twists] : undefined,
+            speeds: suffixDraft
+              ? suffixDraft.speeds
+              : authoritativeDrawing.speeds ? [...authoritativeDrawing.speeds] : undefined,
+            tangentialPressures: suffixDraft
+              ? suffixDraft.tangentialPressures
+              : authoritativeDrawing.tangentialPressures
+                ? [...authoritativeDrawing.tangentialPressures]
+                : undefined,
           };
           drawingPredictionBatchMutationRef.current = true;
           for (const sample of batch.predicted) {
@@ -22103,7 +22276,7 @@ function StudioCuttoonEditor() {
             if (liveDraftDirectRef.current && causalPostCorrectionStateRef.current) {
               previewCausalPostCorrectionTail(predictedPreview, authoritativePointCount);
             } else if (liveDraftDirectRef.current && predictedInkTailStateRef.current) {
-              replacePredictedInkTail(predictedPreview, authoritativePointCount);
+              replacePredictedInkTail(predictedPreview, predictionStartSampleIndex);
             } else {
               scheduleDraft(predictedPreview);
             }
@@ -22243,9 +22416,37 @@ function StudioCuttoonEditor() {
       if (!stage) return;
       const coordinateMapper = snapshotStudioStagePointerBatchMapper(stage);
       const contactPoint = coordinateMapper.pointFor(pointerEvent);
-      // Raw updates move only the outline cursor. Durable ink still consumes the following
-      // processed/coalesced pointermove, so duplicate samples and browser cadence differences can
-      // never fork history, CRDT operations, ruler locks, pressure, or QuickShape recognition.
+      const rawState = rawPenInkPreviewStateRef.current;
+      if (rawState && contactPoint) {
+        const settings = drawingInputSettingsRef.current;
+        const previewPressure = resolveBrushPressureSample({
+          pointerType: pointerEvent.pointerType,
+          rawPressure: pointerEvent.pressure,
+          distance: 0,
+          elapsedMs: 0,
+          velocityFallbackEnabled: false,
+          velocitySensitivity: settings?.velocitySensitivity ?? velocitySensitivity,
+          pressureCurve: settings?.pressureCurve ?? pressureCurve,
+          fallbackPressure: drawing.pressureModel ? 1 : 0.5,
+        });
+        const rawTransition = replaceStudioRawPenInkPreview(rawState, {
+          pointerId: pointerEvent.pointerId,
+          generation: rawState.generation,
+          eligibility: currentRawPenInkPreviewEligibility(pointerEvent, drawing),
+          point: {
+            x: contactPoint.x,
+            y: contactPoint.y,
+            pressure: studioLiveBrushPressure(drawing, previewPressure),
+          },
+        });
+        rawPenInkPreviewStateRef.current = rawTransition.state;
+        liveInkPredictionRendererRef.current.apply(
+          rawTransition.predictionSurface,
+          liveInkStyleFor(drawing),
+        );
+      }
+      // Raw ink is transient and replace-only. Durable geometry, history, CRDT, ruler locks,
+      // QuickShape recognition, and the pointer-session signature still wait for processed input.
       updateBrushCursor(stage, pointerEvent, contactPoint, true);
     },
     onDiscard: () => {
@@ -30902,7 +31103,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 flipX={canvasFlipH}
               />
             ) : null}
-            {STUDIO_POINTER_PREDICTION_ENABLED && webGpuViewportSurface ? (
+            {STUDIO_TRANSIENT_PEN_INK_SURFACE_ENABLED && webGpuViewportSurface ? (
               <StudioLiveInkPredictionHost
                 renderer={liveInkPredictionRenderer}
                 left={webGpuViewportSurface.surface.left}

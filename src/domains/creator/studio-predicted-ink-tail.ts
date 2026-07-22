@@ -14,6 +14,14 @@ import {
 
 export const STUDIO_PREDICTED_INK_DEFAULT_PRESSURE = STUDIO_CAUSAL_INK_DEFAULT_PRESSURE;
 
+/**
+ * A prediction simulation needs the stroke origin (ruler anchoring) and the latest authoritative
+ * sample (causal append anchoring), but never the complete already-painted route. Keeping this
+ * budget explicit prevents a long stroke from drifting back to one full-prefix clone per browser
+ * prediction delivery.
+ */
+export const STUDIO_PREDICTED_INK_DRAFT_MAX_CONTEXT_SAMPLES = 2;
+
 const EMPTY_SAMPLES: readonly StudioPredictedInkSample[] = Object.freeze([]);
 const KEEP_PREDICTION_SURFACE: StudioPredictedInkSurfaceUpdate = Object.freeze({ kind: "keep" });
 const CLEAR_PREDICTION_SURFACE: StudioPredictedInkSurfaceUpdate = Object.freeze({ kind: "clear" });
@@ -30,6 +38,45 @@ export interface StudioPredictedInkSampleInput {
   readonly points: readonly number[];
   /** Pressure at the corresponding coordinate-pair index. */
   readonly pressures?: readonly number[];
+}
+
+/**
+ * Per-sample channels needed by the existing freehand input pipeline while it simulates a
+ * disposable prediction suffix. This intentionally mirrors only mutable sample arrays, not a
+ * durable drawing/history/CRDT object.
+ */
+export interface StudioPredictedInkSuffixDraftInput {
+  readonly points: readonly number[];
+  readonly pressures?: readonly number[];
+  readonly tiltXs?: readonly number[];
+  readonly tiltYs?: readonly number[];
+  readonly twists?: readonly number[];
+  readonly speeds?: readonly number[];
+  readonly tangentialPressures?: readonly number[];
+  /** Raw pressure fallback used only when a present pressure channel has a sparse endpoint. */
+  readonly fallbackPressure: number;
+}
+
+/**
+ * A private, mutable seed for one browser-prediction pass.
+ *
+ * The caller may spread an authoritative drawing object and replace only its sample arrays with
+ * these arrays. Predicted samples then append after `draftPredictionStartSampleIndex`. The seed
+ * must stay transient: it is suitable for a separately replaceable prediction surface, never for
+ * history, persistence, CRDT publication, or a full-path fallback preview.
+ */
+export interface StudioPredictedInkSuffixDraftPlan {
+  /** Sample count in the untouched authoritative drawing; useful for invariant checks only. */
+  readonly authoritativeSampleCount: number;
+  /** First index that a predicted sample may occupy in this bounded private draft. */
+  readonly draftPredictionStartSampleIndex: number;
+  readonly points: number[];
+  readonly pressures?: number[];
+  readonly tiltXs?: number[];
+  readonly tiltYs?: number[];
+  readonly twists?: number[];
+  readonly speeds?: number[];
+  readonly tangentialPressures?: number[];
 }
 
 export interface StudioPredictedInkTailState {
@@ -87,6 +134,82 @@ function samePoint(
   right: StudioPredictedInkSample
 ): boolean {
   return left?.x === right.x && left.y === right.y;
+}
+
+function finiteChannelFallback(value: number, fallback: number): number {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+/** Selects at most the origin and authoritative endpoint without iterating a source channel. */
+function boundedDraftChannel(
+  values: readonly number[] | undefined,
+  sourceSampleCount: number,
+  sourceIndices: readonly number[],
+  fallback: number
+): number[] | undefined {
+  if (!values) return undefined;
+  const selected = new Array<number>(sourceIndices.length);
+  for (let index = 0; index < sourceIndices.length; index += 1) {
+    const sourceIndex = sourceIndices[index]!;
+    selected[index] = sourceIndex < sourceSampleCount
+      ? finiteChannelFallback(values[sourceIndex]!, fallback)
+      : fallback;
+  }
+  return selected;
+}
+
+/**
+ * Plans an O(1)-sized context for suffix-only native pointer prediction.
+ *
+ * Only four coordinate scalars and two scalars per present aligned channel are read for a
+ * multi-sample stroke, regardless of authoritative length. Invalid or incomplete endpoints fail
+ * closed because a prediction must never invent an anchor. The returned arrays are fresh and may
+ * be mutated privately by one prediction pass; every source array remains untouched.
+ */
+export function planStudioPredictedInkSuffixDraft(
+  input: StudioPredictedInkSuffixDraftInput
+): StudioPredictedInkSuffixDraftPlan | null {
+  const authoritativeSampleCount = Math.floor(input.points.length / 2);
+  if (authoritativeSampleCount <= 0) return null;
+
+  const endpointIndex = authoritativeSampleCount - 1;
+  const originX = input.points[0];
+  const originY = input.points[1];
+  const endpointX = input.points[endpointIndex * 2];
+  const endpointY = input.points[endpointIndex * 2 + 1];
+  if (![originX, originY, endpointX, endpointY].every(Number.isFinite)) return null;
+
+  const sourceIndices = endpointIndex === 0
+    ? [0]
+    : [0, endpointIndex];
+  const points = endpointIndex === 0
+    ? [originX!, originY!]
+    : [originX!, originY!, endpointX!, endpointY!];
+  const fallbackPressure = Number.isFinite(input.fallbackPressure)
+    ? input.fallbackPressure
+    : STUDIO_PREDICTED_INK_DEFAULT_PRESSURE;
+
+  return {
+    authoritativeSampleCount,
+    draftPredictionStartSampleIndex: sourceIndices.length,
+    points,
+    pressures: boundedDraftChannel(
+      input.pressures,
+      authoritativeSampleCount,
+      sourceIndices,
+      fallbackPressure
+    ),
+    tiltXs: boundedDraftChannel(input.tiltXs, authoritativeSampleCount, sourceIndices, 0),
+    tiltYs: boundedDraftChannel(input.tiltYs, authoritativeSampleCount, sourceIndices, 0),
+    twists: boundedDraftChannel(input.twists, authoritativeSampleCount, sourceIndices, 0),
+    speeds: boundedDraftChannel(input.speeds, authoritativeSampleCount, sourceIndices, 0),
+    tangentialPressures: boundedDraftChannel(
+      input.tangentialPressures,
+      authoritativeSampleCount,
+      sourceIndices,
+      0
+    ),
+  };
 }
 
 /**

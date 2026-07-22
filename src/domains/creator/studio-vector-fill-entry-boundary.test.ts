@@ -39,8 +39,11 @@ describe("Studio vector line-art advanced fill entry boundary", () => {
     expect(input).toContain("currentPageIdRef.current");
     expect(input).toContain("currentStudioVectorReferenceBudgets()");
     expect(toggle).toContain("flushPendingStrokeCommitsRef.current()");
-    expect(toggle).toContain("planStudioAdvancedFillVectorTarget(currentAdvancedFillVectorInput())");
-    expect(toggle).toContain("setAdvancedFillVirtualTarget(vectorPlan.target)");
+    expect(toggle).toContain("resolveStudioAdvancedFillEntry({");
+    expect(toggle).toContain("vectorInput: currentAdvancedFillVectorInput()");
+    expect(toggle).toContain('entry.mode === "virtual-vector-fill"');
+    expect(toggle).toContain("setAdvancedFillVirtualTarget(entry.target)");
+    expect(toggle).not.toContain("planStudioAdvancedFillVectorTarget(");
     expect(toggle).not.toContain("commit(");
     expect(toggle).not.toContain("patchEl(");
   });

@@ -120,6 +120,16 @@ describe("studio drawing pointer transport ownership boundary", () => {
     expect(predictionBlock).toContain(
       "const authoritativeFixedRateFilter = drawingFixedRateFilterRef.current"
     );
+    expect(predictionBlock).toContain(
+      "liveDraftDirectRef.current && predictedInkTailStateRef.current"
+    );
+    expect(predictionBlock).toContain("planStudioPredictedInkSuffixDraft({");
+    expect(predictionBlock).toContain(
+      "suffixDraftCandidate?.authoritativeSampleCount === authoritativePointCount"
+    );
+    expect(predictionBlock).toContain(
+      "replacePredictedInkTail(predictedPreview, predictionStartSampleIndex)"
+    );
     expect(predictionBlock).toContain("for (const sample of batch.predicted)");
     expect(predictionBlock).toContain(
       "drawingFixedRateFilterRef.current = authoritativeFixedRateFilter"

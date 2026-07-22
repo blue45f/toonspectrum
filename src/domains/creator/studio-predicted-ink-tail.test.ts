@@ -1,16 +1,169 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_PREDICTED_INK_DRAFT_MAX_CONTEXT_SAMPLES,
   STUDIO_PREDICTED_INK_DEFAULT_PRESSURE,
   appendStudioAuthoritativeInk,
   clearStudioPredictedInkTail,
   createStudioPredictedInkTailState,
   endStudioPredictedInkTail,
+  planStudioPredictedInkSuffixDraft,
   replaceStudioPredictedInkTail,
   type StudioPredictedInkSample,
 } from "./studio-predicted-ink-tail";
 
 describe("studio predicted ink tail", () => {
+  it("plans a bounded origin/endpoint seed instead of cloning a growing authoritative prefix", () => {
+    const sampleCount = 100_000;
+    const points = Array.from(
+      { length: sampleCount * 2 },
+      (_, index) => index / 2
+    );
+    const channel = Array.from({ length: sampleCount }, (_, index) => index / sampleCount);
+    const pointsBefore = points.slice();
+    const channelBefore = channel.slice();
+
+    const plan = planStudioPredictedInkSuffixDraft({
+      points,
+      pressures: channel,
+      tiltXs: channel,
+      tiltYs: channel,
+      twists: channel,
+      speeds: channel,
+      tangentialPressures: channel,
+      fallbackPressure: 0.5,
+    });
+
+    expect(plan).not.toBeNull();
+    expect(plan).toMatchObject({
+      authoritativeSampleCount: sampleCount,
+      draftPredictionStartSampleIndex: STUDIO_PREDICTED_INK_DRAFT_MAX_CONTEXT_SAMPLES,
+      points: [0, 0.5, sampleCount - 1, sampleCount - 0.5],
+      pressures: [0, (sampleCount - 1) / sampleCount],
+    });
+    expect(plan!.points).toHaveLength(STUDIO_PREDICTED_INK_DRAFT_MAX_CONTEXT_SAMPLES * 2);
+    expect([
+      plan!.pressures,
+      plan!.tiltXs,
+      plan!.tiltYs,
+      plan!.twists,
+      plan!.speeds,
+      plan!.tangentialPressures,
+    ].every(
+      (values) => values?.length === STUDIO_PREDICTED_INK_DRAFT_MAX_CONTEXT_SAMPLES
+    )).toBe(true);
+    expect(points).toEqual(pointsBefore);
+    expect(channel).toEqual(channelBefore);
+  });
+
+  it("reads and allocates constant-size context for a long stroke", () => {
+    const sampleCount = 1_000_000;
+    const pointsTarget = new Array<number>(sampleCount * 2);
+    pointsTarget[0] = 10;
+    pointsTarget[1] = 20;
+    pointsTarget[pointsTarget.length - 2] = 30;
+    pointsTarget[pointsTarget.length - 1] = 40;
+    const pressuresTarget = new Array<number>(sampleCount);
+    pressuresTarget[0] = 0.25;
+    pressuresTarget[pressuresTarget.length - 1] = 0.75;
+    let pointScalarReads = 0;
+    let pressureScalarReads = 0;
+    const observed = (
+      target: number[],
+      onScalarRead: () => void
+    ): readonly number[] => new Proxy(target, {
+      get(current, property, receiver) {
+        if (typeof property === "string" && /^\d+$/.test(property)) onScalarRead();
+        return Reflect.get(current, property, receiver);
+      },
+    });
+
+    const plan = planStudioPredictedInkSuffixDraft({
+      points: observed(pointsTarget, () => { pointScalarReads += 1; }),
+      pressures: observed(pressuresTarget, () => { pressureScalarReads += 1; }),
+      fallbackPressure: 0.5,
+    });
+
+    expect(plan).toEqual({
+      authoritativeSampleCount: sampleCount,
+      draftPredictionStartSampleIndex: 2,
+      points: [10, 20, 30, 40],
+      pressures: [0.25, 0.75],
+      tiltXs: undefined,
+      tiltYs: undefined,
+      twists: undefined,
+      speeds: undefined,
+      tangentialPressures: undefined,
+    });
+    // Any slice/spread/full scan would turn these counters into O(sampleCount).
+    expect(pointScalarReads).toBe(4);
+    expect(pressureScalarReads).toBe(2);
+  });
+
+  it("preserves a single anchor, aligns sparse channels, and fails closed without finite endpoints", () => {
+    expect(planStudioPredictedInkSuffixDraft({
+      points: [2, 3],
+      pressures: [Number.NaN],
+      tiltXs: [],
+      fallbackPressure: 0.4,
+    })).toEqual({
+      authoritativeSampleCount: 1,
+      draftPredictionStartSampleIndex: 1,
+      points: [2, 3],
+      pressures: [0.4],
+      tiltXs: [0],
+      tiltYs: undefined,
+      twists: undefined,
+      speeds: undefined,
+      tangentialPressures: undefined,
+    });
+    expect(planStudioPredictedInkSuffixDraft({
+      points: [],
+      fallbackPressure: 0.5,
+    })).toBeNull();
+    expect(planStudioPredictedInkSuffixDraft({
+      points: [0, 0, Number.POSITIVE_INFINITY, 2],
+      fallbackPressure: 0.5,
+    })).toBeNull();
+  });
+
+  it("feeds only its appended suffix into replace-only prediction state", () => {
+    const authoritative = appendStudioAuthoritativeInk(createStudioPredictedInkTailState(), {
+      points: [0, 0, 5, 0, 10, 0, 15, 0],
+      pressures: [0.2, 0.3, 0.4, 0.5],
+    }).state;
+    const plan = planStudioPredictedInkSuffixDraft({
+      points: [0, 0, 5, 0, 10, 0, 15, 0],
+      pressures: [0.2, 0.3, 0.4, 0.5],
+      fallbackPressure: 0.5,
+    })!;
+    plan.points.push(20, 2, 25, 4);
+    plan.pressures!.push(0.7, 0.9);
+    const authoritySnapshot = {
+      count: authoritative.authoritativeSampleCount,
+      endpoint: authoritative.authoritativeEndpoint,
+    };
+
+    const transition = replaceStudioPredictedInkTail(authoritative, {
+      points: plan.points.slice(plan.draftPredictionStartSampleIndex * 2),
+      pressures: plan.pressures!.slice(plan.draftPredictionStartSampleIndex),
+    });
+
+    expect(transition.authoritativeSpan).toEqual({ anchor: null, samples: [] });
+    expect(transition.predictionSurface).toEqual({
+      kind: "replace",
+      anchor: { x: 15, y: 0, pressure: 0.5 },
+      samples: [
+        { x: 20, y: 2, pressure: 0.7 },
+        { x: 25, y: 4, pressure: 0.9 },
+      ],
+    });
+    expect({
+      count: transition.state.authoritativeSampleCount,
+      endpoint: transition.state.authoritativeEndpoint,
+    }).toEqual(authoritySnapshot);
+  });
+
   it("exposes authoritative pixels only as append-only suffixes with a non-painted bridge anchor", () => {
     const first = appendStudioAuthoritativeInk(createStudioPredictedInkTailState(), {
       points: [0, 1, 10, 11],

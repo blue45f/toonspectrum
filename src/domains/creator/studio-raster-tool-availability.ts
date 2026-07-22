@@ -370,6 +370,12 @@ function resolveEntryGate(
         action: action("select-only-raster-layer", "대상 레이어 보기", "read-only"),
       };
     }
+    if (visibleRasterCount > 1) {
+      return blocked(
+        `채울 수 있는 이미지가 ${visibleRasterCount}개입니다. 대상 레이어를 하나 선택하세요.`,
+        action("select-raster-layer", "채울 레이어 선택", "read-only"),
+      );
+    }
     if ((context.visibleVectorDrawCount ?? 0) > 0) {
       return {
         enabled: true,
@@ -381,12 +387,6 @@ function resolveEntryGate(
           "non-destructive-copy",
         ),
       };
-    }
-    if (visibleRasterCount > 1) {
-      return blocked(
-        `채울 수 있는 이미지가 ${visibleRasterCount}개입니다. 대상 레이어를 하나 선택하세요.`,
-        action("select-raster-layer", "채울 레이어 선택", "read-only"),
-      );
     }
     return blocked(
       "채울 래스터 이미지나 표시 중인 벡터 선화가 없습니다.",

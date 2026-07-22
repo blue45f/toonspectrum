@@ -55,6 +55,17 @@ describe("Studio raster tool availability matrix", () => {
     });
   });
 
+  it("keeps multiple eligible fill rasters ambiguous even when vector line art is visible", () => {
+    expect(resolveStudioRasterToolAvailability("paint-bucket", {
+      visibleEditableRasterCount: 2,
+      visibleVectorDrawCount: 4,
+    }).entry).toMatchObject({
+      enabled: false,
+      mode: "blocked",
+      action: { id: "select-raster-layer" },
+    });
+  });
+
   it.each([
     "pixel-marquee",
     "pixel-lasso",

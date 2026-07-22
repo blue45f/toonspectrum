@@ -48,14 +48,20 @@ describe("Studio advanced fill entry boundary", () => {
     expect(targetPolicy).toContain('advancedFillSettings.referenceScope === "all-visible"');
   });
 
-  it("auto-selects one safe raster or arms a non-mutating vector-line-art target", () => {
+  it("delegates raster ambiguity and vector fallback to the canonical non-mutating entry decision", () => {
     const toggle = nestedFunction("toggleAdvancedFill");
     const editor = nestedFunction("StudioCuttoonEditor");
 
-    expect(toggle).toContain("advancedFillTargetUnsupportedReason(selected) === null");
-    expect(toggle).toContain("advancedFillTargetUnsupportedReason(element) === null");
-    expect(toggle).toContain("if (candidates.length === 1)");
-    expect(toggle).toContain("target = candidates[0]!");
+    expect(source).toContain(
+      'import { resolveStudioAdvancedFillEntry } from "./studio-advanced-fill-entry";',
+    );
+    expect(toggle).toContain("resolveStudioAdvancedFillEntry({");
+    expect(toggle).toContain("getRasterUnsupportedReason: advancedFillTargetUnsupportedReason");
+    expect(toggle).toContain("vectorInput: currentAdvancedFillVectorInput()");
+    expect(toggle).toContain('entry.mode === "auto-select-raster"');
+    expect(toggle).toContain('entry.mode === "ambiguous-raster"');
+    expect(toggle).toContain('entry.mode === "virtual-vector-fill"');
+    expect(toggle).toContain('entry.mode === "unavailable"');
     expect(toggle).toContain("setMarqueeIds([])");
     expect(toggle).toContain("setSelectedId(target.id)");
     expect(toggle).toContain("advancedFillAutoArmTargetRef.current = { targetId: target.id, status: readyStatus }");
@@ -64,15 +70,21 @@ describe("Studio advanced fill entry boundary", () => {
     expect(editor).toContain("setAdvancedFillStatus(pendingAutoArm.status)");
     expect(toggle).toContain('openInspectorRoute({ primary: "properties", image: "fill" })');
     expect(toggle).toContain("setAdvancedFillActive(true)");
-    expect(toggle).toContain("else if (candidates.length > 1)");
     expect(toggle).toContain("레이어에서 하나를 선택한 뒤 채우기를 다시 누르세요");
     expect(toggle).toContain("flushPendingStrokeCommitsRef.current()");
-    expect(toggle).toContain("planStudioAdvancedFillVectorTarget(currentAdvancedFillVectorInput())");
-    expect(toggle).toContain("setAdvancedFillVirtualTarget(vectorPlan.target)");
+    expect(toggle).toContain("setAdvancedFillVirtualTarget(entry.target)");
     expect(toggle).toContain("적용 전까지 문서는 바뀌지 않습니다");
+    expect(toggle).not.toContain("rasterLayers.length === 0");
+    expect(toggle).not.toContain("planStudioAdvancedFillVectorTarget(");
     expect(toggle).not.toContain("현재 페이지에 채울 래스터 이미지가 없어요");
     expect(toggle).not.toContain("setPages(");
     expect(toggle).not.toContain("commit(");
+    expect(editor).toContain("const advancedFillEligibleRasterElements = elements.filter(");
+    expect(editor).toContain("advancedFillEligibleRasterElements.length === 1");
+    expect(editor).toContain("advancedFillHasVisibleVectorLineArt");
+    expect(editor).not.toContain(
+      "advancedFillRasterLayers.length === 0 && advancedFillHasVisibleVectorLineArt",
+    );
   });
 
   it("routes the quick action through the same toggle and never pre-disables fill", () => {

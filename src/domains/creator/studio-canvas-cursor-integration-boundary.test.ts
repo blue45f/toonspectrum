@@ -64,8 +64,16 @@ describe("Studio canvas cursor integration boundary", () => {
     expect(authoritativeMove.match(/coordinateMapper\.pointFor\(pointerEvent\)/gu)).toHaveLength(1);
     expect(rawUpdate.match(/snapshotStudioStagePointerBatchMapper\(stage\)/gu)).toHaveLength(1);
     expect(rawUpdate.match(/coordinateMapper\.pointFor\(pointerEvent\)/gu)).toHaveLength(1);
+    expect(rawUpdate).toContain("replaceStudioRawPenInkPreview(rawState, {");
+    expect(rawUpdate).toContain("rawTransition.predictionSurface");
     expect(rawUpdate).toContain("updateBrushCursor(stage, pointerEvent, contactPoint, true);");
     expect(rawUpdate).not.toContain("consumeFreehandPointerBatch(");
+    expect(rawUpdate).not.toContain("drawingRef.current =");
+    expect(rawUpdate).not.toContain("appendDrawingCrdtSampleSuffix(");
+    expect(rawUpdate).not.toContain("scheduleDraft(");
+    expect(studioPageSource).toContain(
+      "STUDIO_TRANSIENT_PEN_INK_SURFACE_ENABLED && webGpuViewportSurface",
+    );
     expect(cursorRenderer).toContain("if (brushCursorDrawRafRef.current !== null) return;");
     expect(cursorRenderer).toContain("globalThis.requestAnimationFrame(() => {");
     expect(cursorRenderer.match(/brushCursorRef\.current\?\.getLayer\(\)\?\.drawScene\(\)/gu)).toHaveLength(2);
