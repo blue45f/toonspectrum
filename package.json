@@ -64,7 +64,6 @@
   "dependencies": {
     "@dimforge/rapier3d-deterministic-compat": "0.19.3",
     "@heejun/deskcloud": "^0.1.0",
-    "@heejun/platform-bridge": "^0.1.0",
     "@hookform/resolvers": "^5.4.0",
     "@libsql/client": "^0.17.3",
     "@mediapipe/tasks-vision": "^0.10.35",

@@ -77,7 +77,7 @@ describe("Studio ToolBelt rich hint coverage", () => {
     expect(uploadLabels).toHaveLength(1);
     expect(uploadLabels.filter((label) => nearestHintTarget(label) === null)).toEqual([]);
     expect(uploadLabels.filter((label) => jsxAttribute(label, "title"))).toEqual([]);
-    expect(source).toContain('<input type="file" accept="image/*" className="sr-only"');
+    expect(source).toContain('accept={STUDIO_CANVAS_IMAGE_ACCEPT}');
     expect(source).toContain("focus-within:outline-accent");
 
     for (const accessibleName of [
@@ -113,6 +113,23 @@ describe("Studio ToolBelt rich hint coverage", () => {
       expect(jsxAttribute(target!, "disabled"), button.getText(file)).toBeDefined();
       expect(jsxAttribute(target!, "unavailableReason"), button.getText(file)).toBeDefined();
     }
+  });
+
+  it("keeps mobile fill actionable while its shared hint explains recovery", () => {
+    const fillButton = nativeControls("button").find((button) =>
+      jsxAttribute(button, "onClick")?.getText(file).includes("toggleAdvancedFill")
+    );
+
+    expect(fillButton).toBeDefined();
+    expect(jsxAttribute(fillButton!, "disabled")).toBeUndefined();
+    expect(jsxAttribute(fillButton!, "className")?.getText(file)).not.toContain("disabled:");
+
+    const target = nearestHintTarget(fillButton!);
+    expect(target).not.toBeNull();
+    expect(jsxAttribute(target!, "disabled")).toBeUndefined();
+    expect(jsxAttribute(target!, "unavailableReason")?.getText(file)).toContain(
+      "안전한 단일 래스터 후보",
+    );
   });
 
   it("keeps stateful actions on purpose-built previews instead of generic fallbacks", () => {

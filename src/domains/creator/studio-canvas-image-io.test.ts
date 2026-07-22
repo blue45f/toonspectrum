@@ -3,13 +3,22 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  STUDIO_CANVAS_IMAGE_ACCEPT,
   assertStudioCanvasDecodedImageSize,
   createPixelEditCanvas,
   downscaleDataUrl,
+  isStudioOpenRasterFile,
   loadImageFileForCanvas,
   loadPixelEditImage,
   studioCanvasDecodedPixelLimit,
+  studioOpenRasterFormatForFile,
 } from "./studio-canvas-image-io";
+import { decodeStudioRasterInterchange, encodeStudioRasterInterchange } from "./studio-raster-interchange";
+import {
+  STUDIO_RASTER_INTERCHANGE_WORKER_VERSION,
+  type StudioRasterInterchangeWorkerRequest,
+  type StudioRasterInterchangeWorkerResponse,
+} from "./studio-raster-interchange-worker-protocol";
 import {
   STUDIO_UPLOAD_DESKTOP_MAX_DECODED_PIXELS,
   STUDIO_UPLOAD_MOBILE_MAX_DECODED_PIXELS,
@@ -122,6 +131,94 @@ describe("Studio canvas decoded image limits", () => {
 });
 
 describe("Studio canvas image file loading", () => {
+  it("advertises and recognizes the open raster extensions that browser image pickers omit", () => {
+    expect(STUDIO_CANVAS_IMAGE_ACCEPT).toContain(".qoi");
+    expect(STUDIO_CANVAS_IMAGE_ACCEPT).toContain(".tga");
+    expect(STUDIO_CANVAS_IMAGE_ACCEPT).toContain(".tiff");
+    expect(studioOpenRasterFormatForFile({ name: "INK.QOI", type: "" })).toBe("qoi");
+    expect(studioOpenRasterFormatForFile({ name: "paper", type: "image/x-targa" })).toBe("tga");
+    expect(isStudioOpenRasterFile({ name: "tone.pam", type: "application/octet-stream" })).toBe(true);
+    expect(studioOpenRasterFormatForFile({ name: "scan.tif", type: "application/octet-stream" })).toBe("tiff");
+    expect(isStudioOpenRasterFile({ name: "photo.png", type: "image/png" })).toBe(false);
+  });
+
+  it("decodes a QOI file and converts it to the canvas insertion source", async () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
+    const workerPosts = vi.fn();
+    const workerTerminates = vi.fn();
+    class RasterWorkerMock {
+      onmessage: ((event: MessageEvent<StudioRasterInterchangeWorkerResponse>) => void) | null = null;
+      onerror: ((event: { readonly message?: string }) => void) | null = null;
+
+      constructor() {
+        queueMicrotask(() => this.onmessage?.({ data: {
+          type: "studio-raster-interchange/ready",
+          version: STUDIO_RASTER_INTERCHANGE_WORKER_VERSION,
+        } } as MessageEvent<StudioRasterInterchangeWorkerResponse>));
+      }
+
+      postMessage(request: StudioRasterInterchangeWorkerRequest): void {
+        workerPosts(request);
+        if (request.type !== "studio-raster-interchange/decode") throw new Error("decode request expected");
+        const result = decodeStudioRasterInterchange(request.bytes, request.expectedFormat);
+        queueMicrotask(() => this.onmessage?.({ data: {
+          type: "studio-raster-interchange/decode-success",
+          version: STUDIO_RASTER_INTERCHANGE_WORKER_VERSION,
+          requestId: request.requestId,
+          result,
+        } } as MessageEvent<StudioRasterInterchangeWorkerResponse>));
+      }
+
+      terminate(): void {
+        workerTerminates();
+      }
+    }
+    vi.stubGlobal("Worker", RasterWorkerMock);
+    const encoded = encodeStudioRasterInterchange("qoi", {
+      width: 2,
+      height: 1,
+      data: Uint8Array.from([255, 0, 0, 255, 0, 128, 255, 192]),
+    });
+    const fileBytes = new Uint8Array(encoded.bytes.byteLength);
+    fileBytes.set(encoded.bytes);
+    const file = new File([fileBytes.buffer], "ink.qoi", { type: "image/qoi" });
+    const context = {
+      createImageData: vi.fn((width: number, height: number) => ({
+        data: new Uint8ClampedArray(width * height * 4),
+      })),
+      putImageData: vi.fn(),
+    } as unknown as CanvasRenderingContext2D;
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(() => context);
+    vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/webp;base64,cW9p");
+
+    await expect(loadImageFileForCanvas(file)).resolves.toEqual({
+      src: "data:image/webp;base64,cW9p",
+      width: 2,
+      height: 1,
+      isAnimatedGif: false,
+    });
+    expect(context.createImageData).toHaveBeenCalledWith(2, 1);
+    expect(context.putImageData).toHaveBeenCalledTimes(1);
+    expect(workerPosts).toHaveBeenCalledWith(expect.objectContaining({
+      type: "studio-raster-interchange/decode",
+      expectedFormat: "qoi",
+    }));
+    expect(workerTerminates).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed when the extension and the actual open-raster bytes disagree", async () => {
+    const encoded = encodeStudioRasterInterchange("qoi", {
+      width: 1,
+      height: 1,
+      data: Uint8Array.from([0, 0, 0, 255]),
+    });
+    const fileBytes = new Uint8Array(encoded.bytes.byteLength);
+    fileBytes.set(encoded.bytes);
+    const file = new File([fileBytes.buffer], "spoofed.bmp", { type: "image/bmp" });
+
+    await expect(loadImageFileForCanvas(file)).rejects.toThrow(/\.qoi.*\.bmp/);
+  });
+
   it("preserves animated GIF bytes and dimensions without a canvas re-encode", async () => {
     const instances = installControlledImage({ width: 320, height: 180 });
     const createElement = vi.spyOn(document, "createElement");

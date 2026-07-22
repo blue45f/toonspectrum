@@ -3,7 +3,7 @@ import { playSfx, resumeAudio, triggerParticleBurst } from "@toonspectrum/core/f
 import { cn } from "@/lib/utils";
 
 /**
- * ShimmerTitle — 웹·토스 공유 "화려한 타이틀". (NO fork)
+ * ShimmerTitle — 공용 강조 타이틀.
  *
  * fx.css 의 `.shimmer-title`(그라데이션 시머 + 글로우, bg-clip-text)을 입혀 텍스트가 끊김 없이
  * 흐르는 웜 스펙트럼으로 빛납니다. 탭하면 그 지점에 파티클 "팡"(triggerParticleBurst) +

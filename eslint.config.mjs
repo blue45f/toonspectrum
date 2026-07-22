@@ -17,7 +17,6 @@ export default defineConfig(
     // 커밋되진 않지만, eslint 기본 스캔은 gitignore 를 안 따라가므로 이 안에 있는 이 저장소의
     // 사본까지 전부 다시 스캔해버린다 — vitest.config.ts 의 동일 제외와 같은 이유).
     '**/.claude/worktrees/**',
-    'apps/toss/**',
     // 벤더링 단일 파일 위젯(상류 desk/SurveyDesk 레포에서 유지) — 호스트 앱 strict 린트 대상 외.
     // 소스를 이 레포에서 편집하지 않으므로(복붙 동기화), 게이트는 ignore 로 통과시킨다.
     '**/components/deskcloud/**',

@@ -34,6 +34,7 @@
  */
 import {
   normalizeStudioLiquifyMode,
+  type StudioLiquifyBrushDynamics,
   type StudioLiquifyMode,
 } from "./studio-liquify-contract";
 
@@ -42,10 +43,19 @@ import type { StudioImageDataLike } from "./studio-filters";
 export {
   LIQUIFY_RADIUS_DEFAULT,
   LIQUIFY_RADIUS_RANGE,
+  LIQUIFY_HARDNESS_DEFAULT,
+  LIQUIFY_HARDNESS_RANGE,
+  LIQUIFY_MIN_RADIUS_DEFAULT,
+  LIQUIFY_MIN_RADIUS_RANGE,
+  LIQUIFY_SPACING_DEFAULT,
+  LIQUIFY_SPACING_RANGE,
+  LIQUIFY_STABILIZER_DEFAULT,
+  LIQUIFY_STABILIZER_RANGE,
   LIQUIFY_STRENGTH_DEFAULT,
   LIQUIFY_STRENGTH_RANGE,
   STUDIO_LIQUIFY_MODES,
   normalizeStudioLiquifyMode,
+  type StudioLiquifyBrushDynamics,
   type StudioLiquifyMode,
 } from "./studio-liquify-contract";
 
@@ -54,14 +64,14 @@ export {
 // ---------------------------------------------------------------------------
 
 /** 픽셀 공간(원본 자연 해상도) 좌표 — SelPoint(정규화 0..1)와는 다른 개념(heal-clone/smudge와 동일 규약). */
-export type LiquifyPixelPoint = { x: number; y: number };
+export type LiquifyPixelPoint = { x: number; y: number; pressure?: number };
 
 /**
  * Push는 드래그 방향을 사용하고, 나머지 모드는 경로를 일정 간격의 dab으로 바꿔 각 dab 중심에서
  * 회전·수축·팽창 변위를 누적한다. 영속 상태나 외부 입력에서 알 수 없는 값이 들어오면 아래 빌더가
  * 안전하게 Push로 폴백한다.
  */
-export type LiquifyDisplacementOptions = {
+export type LiquifyDisplacementOptions = StudioLiquifyBrushDynamics & {
   mode?: StudioLiquifyMode;
   /** 긴 동기 계산 전·중단 지점에서 취소를 관찰한다. Worker 경로는 클라이언트가 Worker도 종료한다. */
   signal?: AbortSignal;
@@ -70,7 +80,8 @@ export type LiquifyDisplacementOptions = {
 // 리샘플 간격 = radiusPx * 이 비율(studio-smudge.ts의 SMUDGE_STEP_RATIO와 동일한 정신 — 촘촘할수록
 // 부드럽지만 세그먼트 수가 늘어 느려진다). 병적으로 길거나 루프 도는 스트로크 방어 상한도 동일.
 const LIQUIFY_STEP_RATIO = 0.35;
-const LIQUIFY_MAX_RESAMPLED_POINTS = 2000;
+export const LIQUIFY_MAX_INPUT_POINTS = 20_000;
+export const LIQUIFY_MAX_RESAMPLED_POINTS = 2_000;
 /** dx+dy Float32Array 합계 128MiB. 입력 크기와 무관하게 단일 스트로크 할당을 유한하게 묶는다. */
 export const LIQUIFY_MAX_FIELD_CELLS = 16_777_216;
 /** 병적 장거리/반복 경로가 Worker 한 작업에서 만드는 최대 dab×셀 방문 추정치. */
@@ -120,11 +131,72 @@ function clampFloat(v: number, min: number, max: number): number {
  * (단순 크래시가 아니라 조용한 이미지 오염이라 더 위험하다). 걸러낸 뒤에도 점이 2개 미만이면
  * 그대로 반환(빈 배열 포함) — 호출부(buildLiquifyDisplacementField)의 길이<2 가드가 이어받는다.
  */
+export function stabilizeLiquifyPath(
+  points: readonly LiquifyPixelPoint[],
+  amount: number
+): LiquifyPixelPoint[] {
+  const safeAmount = clampFloat(amount, 0, 1);
+  if (safeAmount <= 0 || points.length < 3) return points.map((point) => ({ ...point }));
+  const windowRadius = Math.max(1, Math.round(safeAmount * 4));
+  return points.map((point, index) => {
+    if (index === 0 || index === points.length - 1) return { ...point };
+    let sumX = 0;
+    let sumY = 0;
+    let sumPressure = 0;
+    let pressureWeight = 0;
+    let totalWeight = 0;
+    const start = Math.max(0, index - windowRadius);
+    const end = Math.min(points.length - 1, index + windowRadius);
+    for (let sampleIndex = start; sampleIndex <= end; sampleIndex += 1) {
+      const sample = points[sampleIndex]!;
+      if (!Number.isFinite(sample.x) || !Number.isFinite(sample.y)) continue;
+      const distance = Math.abs(sampleIndex - index);
+      const weight = windowRadius + 1 - distance;
+      sumX += sample.x * weight;
+      sumY += sample.y * weight;
+      totalWeight += weight;
+      if (Number.isFinite(sample.pressure)) {
+        sumPressure += clampFloat(sample.pressure!, 0, 1) * weight;
+        pressureWeight += weight;
+      }
+    }
+    if (totalWeight <= 0) return { ...point };
+    return {
+      x: sumX / totalWeight,
+      y: sumY / totalWeight,
+      ...(pressureWeight > 0 ? { pressure: sumPressure / pressureWeight } : {}),
+    };
+  });
+}
+
+function interpolatedLiquifyPoint(
+  previous: LiquifyPixelPoint,
+  current: LiquifyPixelPoint,
+  amount: number
+): LiquifyPixelPoint {
+  const point: LiquifyPixelPoint = {
+    x: previous.x + (current.x - previous.x) * amount,
+    y: previous.y + (current.y - previous.y) * amount,
+  };
+  if (previous.pressure !== undefined || current.pressure !== undefined) {
+    const start = clampFloat(previous.pressure ?? 1, 0, 1);
+    const end = clampFloat(current.pressure ?? 1, 0, 1);
+    point.pressure = start + (end - start) * amount;
+  }
+  return point;
+}
+
 export function resampleLiquifyPath(points: readonly LiquifyPixelPoint[], step: number): LiquifyPixelPoint[] {
+  const boundedPoints = points.length <= LIQUIFY_MAX_INPUT_POINTS
+    ? points
+    : Array.from({ length: LIQUIFY_MAX_INPUT_POINTS }, (_, index) => (
+        points[Math.round((index * (points.length - 1)) / (LIQUIFY_MAX_INPUT_POINTS - 1))]!
+      ));
   const finitePoints =
-    points.length < 2 || points.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
-      ? points
-      : points.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+    boundedPoints.length < 2
+    || boundedPoints.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
+      ? boundedPoints
+      : boundedPoints.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
   if (finitePoints.length < 2) return finitePoints.slice();
   const safeStep = Number.isFinite(step) && step > 0 ? step : 1;
 
@@ -140,7 +212,7 @@ export function resampleLiquifyPath(points: readonly LiquifyPixelPoint[], step: 
     let traveled = safeStep - carried;
     while (traveled <= segLen) {
       const t = traveled / segLen;
-      out.push({ x: prev.x + (curr.x - prev.x) * t, y: prev.y + (curr.y - prev.y) * t });
+      out.push(interpolatedLiquifyPoint(prev, curr, t));
       if (out.length >= LIQUIFY_MAX_RESAMPLED_POINTS) return out;
       traveled += safeStep;
     }
@@ -156,6 +228,98 @@ export function resampleLiquifyPath(points: readonly LiquifyPixelPoint[], step: 
   return out;
 }
 
+export interface LiquifyBrushDab {
+  readonly x: number;
+  readonly y: number;
+  readonly previousX: number;
+  readonly previousY: number;
+  readonly radius: number;
+  readonly strength: number;
+  readonly moveX: number;
+  readonly moveY: number;
+}
+
+export interface LiquifyBrushDabPlan {
+  readonly dabs: readonly LiquifyBrushDab[];
+  readonly estimatedCellVisits: number;
+  readonly complete: boolean;
+}
+
+/** Worker-safe, deterministic sampling contract shared by deformation and field refinement. */
+export function planLiquifyBrushDabs(
+  points: readonly LiquifyPixelPoint[],
+  radiusPx: number,
+  strength: number,
+  options: LiquifyDisplacementOptions = {}
+): LiquifyBrushDabPlan {
+  throwIfLiquifyAborted(options.signal);
+  const mode = normalizeStudioLiquifyMode(options.mode);
+  const radius = Number.isFinite(radiusPx) ? Math.max(0, radiusPx) : 0;
+  const baseStrength = clampFloat(strength, 0, 1);
+  const minimumPointCount = mode === "push" ? 2 : 1;
+  if (
+    points.length < minimumPointCount
+    || points.length > LIQUIFY_MAX_INPUT_POINTS
+    || radius <= 0
+    || baseStrength <= 0
+  ) {
+    return { dabs: [], estimatedCellVisits: 0, complete: points.length <= LIQUIFY_MAX_INPUT_POINTS };
+  }
+
+  const stabilizer = clampFloat(options.stabilizer ?? 0, 0, 1);
+  const spacingRatio = clampFloat(options.spacingRatio ?? LIQUIFY_STEP_RATIO, 0.1, 0.75);
+  const stabilized = stabilizeLiquifyPath(points, stabilizer);
+  const resampled = resampleLiquifyPath(stabilized, Math.max(1, radius * spacingRatio));
+  if (resampled.length < minimumPointCount) {
+    return { dabs: [], estimatedCellVisits: 0, complete: true };
+  }
+  const finalInput = stabilized.at(-1);
+  const finalSample = resampled.at(-1);
+  const complete = Boolean(
+    finalInput
+    && finalSample
+    && finalInput.x === finalSample.x
+    && finalInput.y === finalSample.y
+  );
+  if (!complete) return { dabs: [], estimatedCellVisits: 0, complete: false };
+
+  const minimumRadiusRatio = clampFloat(options.minimumRadiusRatio ?? 0, 0, 1);
+  const dabs: LiquifyBrushDab[] = [];
+  let estimatedCellVisits = 0;
+  const startIndex = mode === "push" ? 1 : 0;
+  for (let index = startIndex; index < resampled.length; index += 1) {
+    if ((index & 31) === 0) throwIfLiquifyAborted(options.signal);
+    const point = resampled[index]!;
+    const previous = mode === "push" ? resampled[index - 1]! : point;
+    const pressure = clampFloat(point.pressure ?? 1, 0, 1);
+    const radiusScale = options.pressureAffectsRadius
+      ? minimumRadiusRatio + (1 - minimumRadiusRatio) * pressure
+      : 1;
+    const dabRadius = radius * radiusScale;
+    const dabStrength = baseStrength * (options.pressureAffectsStrength ? pressure : 1);
+    if (dabRadius <= 0 || dabStrength <= 0) continue;
+    const diameterCells = Math.ceil(dabRadius) * 2 + 1;
+    estimatedCellVisits += diameterCells * diameterCells;
+    if (
+      !Number.isSafeInteger(estimatedCellVisits)
+      || estimatedCellVisits > LIQUIFY_MAX_DAB_CELL_VISITS
+    ) {
+      return { dabs: [], estimatedCellVisits, complete: false };
+    }
+    dabs.push({
+      x: point.x,
+      y: point.y,
+      previousX: previous.x,
+      previousY: previous.y,
+      radius: dabRadius,
+      strength: dabStrength,
+      moveX: mode === "push" ? (point.x - previous.x) * dabStrength : 0,
+      moveY: mode === "push" ? (point.y - previous.y) * dabStrength : 0,
+    });
+  }
+  return { dabs, estimatedCellVisits, complete };
+}
+
 /**
  * 브러시 중심에서 (dx,dy) 만큼 떨어진 지점의 변위 가중치(0..1) — 코사인(Hann window) falloff.
  * t=dist/radius 일 때 0.5*(1+cos(π·t)): 중심(t=0)에서 1, 가장자리(t=1)에서 0으로 매끈하게 줄어들고
@@ -164,13 +328,22 @@ export function resampleLiquifyPath(points: readonly LiquifyPixelPoint[], step: 
  * 완전히 0이 되지 않아 필드 바운딩박스 경계에서 미세한 불연속이 남을 수 있어 제외했다). radiusPx
  * 이상이면 0. 순수.
  */
-export function liquifyBrushWeight(dx: number, dy: number, radiusPx: number): number {
+export function liquifyBrushWeight(
+  dx: number,
+  dy: number,
+  radiusPx: number,
+  hardness?: number
+): number {
   const r = Number.isFinite(radiusPx) && radiusPx > 0 ? radiusPx : 0;
   if (r <= 0) return 0;
   const dist = Math.hypot(dx, dy);
   if (dist >= r) return 0;
   const t = dist / r;
-  return 0.5 * (1 + Math.cos(Math.PI * t));
+  if (hardness === undefined) return 0.5 * (1 + Math.cos(Math.PI * t));
+  const hardCore = clampFloat(hardness, 0, 1) * 0.8;
+  if (t <= hardCore) return 1;
+  const feather = (t - hardCore) / Math.max(1e-6, 1 - hardCore);
+  return 0.5 * (1 + Math.cos(Math.PI * feather));
 }
 
 // ---------------------------------------------------------------------------
@@ -222,30 +395,33 @@ export function buildLiquifyDisplacementField(
   const minimumPointCount = mode === "push" ? 2 : 1;
   if (points.length < minimumPointCount || R <= 0 || s <= 0 || w <= 0 || h <= 0) return null;
 
-  const step = Math.max(1, R * LIQUIFY_STEP_RATIO);
-  const resampled = resampleLiquifyPath(points, step).slice(0, LIQUIFY_MAX_RESAMPLED_POINTS);
-  if (resampled.length < minimumPointCount) return null;
+  const plan = planLiquifyBrushDabs(points, R, s, options);
+  if (!plan.complete || plan.dabs.length === 0) return null;
 
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
-  for (const p of resampled) {
-    if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
-    if (p.x < minX) minX = p.x;
-    if (p.y < minY) minY = p.y;
-    if (p.x > maxX) maxX = p.x;
-    if (p.y > maxY) maxY = p.y;
+  for (const dab of plan.dabs) {
+    if (dab.x - dab.radius < minX) minX = dab.x - dab.radius;
+    if (dab.y - dab.radius < minY) minY = dab.y - dab.radius;
+    if (dab.x + dab.radius > maxX) maxX = dab.x + dab.radius;
+    if (dab.y + dab.radius > maxY) maxY = dab.y + dab.radius;
+    if (mode === "push") {
+      if (dab.previousX - dab.radius < minX) minX = dab.previousX - dab.radius;
+      if (dab.previousY - dab.radius < minY) minY = dab.previousY - dab.radius;
+      if (dab.previousX + dab.radius > maxX) maxX = dab.previousX + dab.radius;
+      if (dab.previousY + dab.radius > maxY) maxY = dab.previousY + dab.radius;
+    }
   }
   if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
     return null; // 방어적 — 정상 입력에선 발생하지 않는다(모든 점이 비유한일 때만).
   }
 
-  const rCeil = Math.ceil(R);
-  const originX = clampInt(Math.floor(minX - rCeil), 0, w - 1);
-  const originY = clampInt(Math.floor(minY - rCeil), 0, h - 1);
-  const endX = clampInt(Math.ceil(maxX + rCeil), 0, w - 1);
-  const endY = clampInt(Math.ceil(maxY + rCeil), 0, h - 1);
+  const originX = clampInt(Math.floor(minX), 0, w - 1);
+  const originY = clampInt(Math.floor(minY), 0, h - 1);
+  const endX = clampInt(Math.ceil(maxX), 0, w - 1);
+  const endY = clampInt(Math.ceil(maxY), 0, h - 1);
   if (endX < originX || endY < originY) return null;
 
   const fieldW = endX - originX + 1;
@@ -261,10 +437,6 @@ export function buildLiquifyDisplacementField(
   }
 
   const fieldCells = fieldW * fieldH;
-  const dabCount = resampled.length - (mode === "push" ? 1 : 0);
-  const dabWidth = Math.min(fieldW, rCeil * 2 + 1);
-  const dabHeight = Math.min(fieldH, rCeil * 2 + 1);
-  if (dabCount > LIQUIFY_MAX_DAB_CELL_VISITS / (dabWidth * dabHeight)) return null;
   let dx: Float32Array;
   let dy: Float32Array;
   try {
@@ -289,19 +461,21 @@ export function buildLiquifyDisplacementField(
     dy[idx] = nextY;
   };
 
-  const firstDabIndex = mode === "push" ? 1 : 0;
-  for (let i = firstDabIndex; i < resampled.length; i += 1) {
+  const hardness = options.hardness === undefined
+    ? undefined
+    : clampFloat(options.hardness, 0, 1);
+  for (let i = 0; i < plan.dabs.length; i += 1) {
     if ((i & 15) === 0) throwIfLiquifyAborted(options.signal);
-    const curr = resampled[i]!;
-    const prev = mode === "push" ? resampled[i - 1]! : curr;
-    const segX = mode === "push" ? (curr.x - prev.x) * s : 0;
-    const segY = mode === "push" ? (curr.y - prev.y) * s : 0;
+    const curr = plan.dabs[i]!;
+    const segX = curr.moveX;
+    const segY = curr.moveY;
     if (mode === "push" && segX === 0 && segY === 0) continue;
 
-    const minLocalX = clampInt(Math.floor(curr.x - rCeil), originX, endX);
-    const maxLocalX = clampInt(Math.ceil(curr.x + rCeil), originX, endX);
-    const minLocalY = clampInt(Math.floor(curr.y - rCeil), originY, endY);
-    const maxLocalY = clampInt(Math.ceil(curr.y + rCeil), originY, endY);
+    const localRadius = Math.ceil(curr.radius);
+    const minLocalX = clampInt(Math.floor(curr.x - localRadius), originX, endX);
+    const maxLocalX = clampInt(Math.ceil(curr.x + localRadius), originX, endX);
+    const minLocalY = clampInt(Math.floor(curr.y - localRadius), originY, endY);
+    const maxLocalY = clampInt(Math.ceil(curr.y + localRadius), originY, endY);
 
     for (let y = minLocalY; y <= maxLocalY; y += 1) {
       if (((y - minLocalY) & 31) === 0) throwIfLiquifyAborted(options.signal);
@@ -309,7 +483,7 @@ export function buildLiquifyDisplacementField(
       for (let x = minLocalX; x <= maxLocalX; x += 1) {
         const offsetX = x - curr.x;
         const offsetY = y - curr.y;
-        const weight = liquifyBrushWeight(offsetX, offsetY, R);
+        const weight = liquifyBrushWeight(offsetX, offsetY, curr.radius, hardness);
         if (weight <= 0) continue;
         const idx = rowOffset + (x - originX);
         if (mode === "push") {
@@ -320,7 +494,7 @@ export function buildLiquifyDisplacementField(
         if (mode === "twirl-clockwise" || mode === "twirl-counterclockwise") {
           // 화면 좌표계는 +y가 아래라 양의 각도가 시계 방향이다.
           const direction = mode === "twirl-clockwise" ? 1 : -1;
-          const angle = direction * LIQUIFY_MAX_TWIRL_RADIANS * s * weight;
+          const angle = direction * LIQUIFY_MAX_TWIRL_RADIANS * curr.strength * weight;
           const cos = Math.cos(angle);
           const sin = Math.sin(angle);
           const rotatedX = offsetX * cos - offsetY * sin;
@@ -330,7 +504,7 @@ export function buildLiquifyDisplacementField(
         }
 
         const direction = mode === "bloat" ? 1 : -1;
-        const scaleDelta = direction * LIQUIFY_MAX_RADIAL_SCALE_DELTA * s * weight;
+        const scaleDelta = direction * LIQUIFY_MAX_RADIAL_SCALE_DELTA * curr.strength * weight;
         accumulate(idx, offsetX * scaleDelta, offsetY * scaleDelta);
       }
     }

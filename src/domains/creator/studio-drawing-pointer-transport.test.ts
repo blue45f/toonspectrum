@@ -112,6 +112,7 @@ function pointerSession(event: PointerEvent) {
 function portSpies(overrides: Partial<StudioDrawingPointerTransportPorts> = {}) {
   const finishes: Array<{ event: PointerEvent; request: StudioDrawingPointerFinishRequest }> = [];
   const onAuthoritativeMove = vi.fn();
+  const onRawPreviewMove = vi.fn();
   const onDiscard = vi.fn();
   const onFinish = vi.fn((event: PointerEvent, request: StudioDrawingPointerFinishRequest) => {
     finishes.push({ event, request });
@@ -121,11 +122,13 @@ function portSpies(overrides: Partial<StudioDrawingPointerTransportPorts> = {}) 
     ports: {
       getLastAuthoritativePointer: () => null,
       onAuthoritativeMove,
+      onRawPreviewMove,
       onDiscard,
       onFinish,
       ...overrides,
     } satisfies StudioDrawingPointerTransportPorts,
     onAuthoritativeMove,
+    onRawPreviewMove,
     onDiscard,
     onFinish,
   };
@@ -158,8 +161,9 @@ describe("studio drawing pointer transport", () => {
     expect(controller.getSession()?.pointerId).toBe(7);
     expect(controller.getCaptureTarget()).toBe(captureTarget);
     expect(captureTarget.setPointerCapture).toHaveBeenCalledWith(7);
-    expect(windowTarget.listenerCount()).toBe(5);
+    expect(windowTarget.listenerCount()).toBe(6);
     expect(windowTarget.listenerCapture("pointermove")).toBe(true);
+    expect(windowTarget.listenerCapture("pointerrawupdate")).toBe(true);
     expect(documentTarget.listenerCount("visibilitychange")).toBe(1);
     expect(captureTarget.listenerCount("lostpointercapture")).toBe(1);
 
@@ -228,6 +232,41 @@ describe("studio drawing pointer transport", () => {
     expect(secondMove).toHaveBeenCalledTimes(1);
     expect(controller.getSession()?.lastAuthoritativeSignature).toBe("latest");
     controller.release();
+  });
+
+  it("uses pen raw updates for cursor preview without advancing authoritative ink", () => {
+    const windowTarget = new TestEventTarget();
+    const controller = createStudioDrawingPointerTransportController({ windowTarget });
+    const down = pointerEvent("pointerdown", { pointerType: "pen" });
+    const spies = portSpies();
+    controller.updatePorts(spies.ports);
+    controller.start({ pointerEvent: down, session: pointerSession(down), stage: null });
+
+    const raw = pointerEvent("pointerrawupdate", { pointerType: "pen", timeStamp: 2 });
+    windowTarget.emit("pointerrawupdate", raw);
+
+    expect(spies.onRawPreviewMove).toHaveBeenCalledTimes(1);
+    expect(spies.onRawPreviewMove).toHaveBeenCalledWith(raw);
+    expect(spies.onAuthoritativeMove).not.toHaveBeenCalled();
+
+    const processed = pointerEvent("pointermove", { pointerType: "pen", timeStamp: 3 });
+    windowTarget.emit("pointermove", processed);
+    expect(spies.onAuthoritativeMove).toHaveBeenCalledTimes(1);
+    controller.release();
+  });
+
+  it("does not install the high-rate raw preview listener for mouse or touch", () => {
+    for (const pointerType of ["mouse", "touch"] as const) {
+      const windowTarget = new TestEventTarget();
+      const controller = createStudioDrawingPointerTransportController({ windowTarget });
+      const down = pointerEvent("pointerdown", { pointerType });
+      controller.updatePorts(portSpies().ports);
+      controller.start({ pointerEvent: down, session: pointerSession(down), stage: null });
+
+      expect(windowTarget.listenerCount("pointerrawupdate")).toBe(0);
+      expect(windowTarget.listenerCount()).toBe(5);
+      controller.release();
+    }
   });
 
   it("finishes released mouse contact without routing the hover coordinate as final ink", () => {

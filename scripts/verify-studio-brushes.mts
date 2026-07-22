@@ -6,9 +6,11 @@
  * - all 35 built-in presets selected, fast-drawn, visually changed, undone, and redone,
  * - all 35 presets survive a sparse 300 px move with visible ink in every route segment and the
  *   exact selected brush id in autosave,
- * - line/rect/ellipse/triangle/polygon Smart Shape gestures persist the right geometry without
- *   collapsing the hand-drawn bounds,
- * - mobile catalogue interactive targets are at least 44×44 CSS px,
+ * - line/rect/ellipse/triangle/polygon Smart Shape gestures persist as the selected brush's exact
+ *   snapped outline (rather than reverting to the original freehand gesture), without collapsing
+ *   the hand-drawn bounds,
+ * - every registered mobile-catalogue brush is exposed and its interactive target is at least
+ *   44×44 CSS px,
  * - an opaque deferred stroke survives immediate pagehide through emergency autosave + restore.
  *
  * Run after `pnpm build`:
@@ -32,6 +34,7 @@ import {
 } from "playwright";
 
 import { BRUSH_PRESETS, type BrushPreset } from "../src/domains/creator/studio-brush";
+import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "../src/domains/creator/studio-brush-catalog";
 
 const SCRATCH =
   process.env.TOONSPECTRUM_BRUSH_VERIFY_DIR
@@ -107,7 +110,10 @@ type SmartShapeExpectedKind = "line" | "rect" | "ellipse" | "triangle" | "polygo
 interface SmartShapeEvidence {
   expectedKind: SmartShapeExpectedKind;
   persistedKind: string | null;
+  persistedBrush: string | null;
   polygonSides: number | null;
+  persistenceMatched: boolean;
+  persistenceRepresentation: "brush-outline" | "geometry" | null;
   visualChanged: boolean;
   widthCoverage: number;
   heightCoverage: number;
@@ -543,7 +549,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       .locator('[role="dialog"][data-studio-brush-catalog="built-in"]')
       .count();
     await page.screenshot({ path: catalogScreenshot, animations: "disabled" });
-    await firstCatalog.getByRole("button", { name: "기본 프리셋 닫기", exact: true }).click();
+    await firstCatalog.getByRole("button", { name: "앱 브러시 닫기", exact: true }).click();
     await firstCatalog.waitFor({ state: "detached" });
 
     invariant(BRUSH_PRESETS.length === 35, `expected 35 presets, received ${BRUSH_PRESETS.length}`);
@@ -650,12 +656,14 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
   }
 }
 
-async function persistedDrawElements(page: Page): Promise<Array<{
+interface PersistedDrawElement {
   brush: string | null;
   kind: string | null;
   polygonSides: number | null;
   points: number[];
-}>> {
+}
+
+async function persistedDrawElements(page: Page): Promise<PersistedDrawElement[]> {
   return page.evaluate((prefix) => {
     interface PersistedStudioDocument {
       savedAt?: string;
@@ -698,6 +706,72 @@ async function persistedDrawElements(page: Page): Promise<Array<{
       }];
     });
   }, AUTOSAVE_PREFIX);
+}
+
+function pointsEqual(
+  points: readonly number[],
+  leftIndex: number,
+  rightIndex: number,
+  tolerance = 0.02,
+): boolean {
+  return Math.abs(points[leftIndex * 2]! - points[rightIndex * 2]!) <= tolerance
+    && Math.abs(points[leftIndex * 2 + 1]! - points[rightIndex * 2 + 1]!) <= tolerance;
+}
+
+function hasNonDegenerateBounds(points: readonly number[]): boolean {
+  const xs = points.filter((_, index) => index % 2 === 0);
+  const ys = points.filter((_, index) => index % 2 === 1);
+  return Math.max(...xs) - Math.min(...xs) > 1
+    && Math.max(...ys) - Math.min(...ys) > 1;
+}
+
+/**
+ * Selected-brush Smart Shape deliberately persists a freehand render path: that is how pressure,
+ * calligraphy and textured brush engines can replay the snapped outline in Canvas and SVG. Merely
+ * accepting `kind: "freehand"` would hide a recognition regression, though, so verify the exact
+ * outline topology emitted for each recognized primitive. The legacy geometry branch remains
+ * described for diagnostics but is not accepted by the current default-pen browser scenario.
+ */
+function persistedSmartShapeRepresentation(
+  saved: PersistedDrawElement | undefined,
+  fixture: Readonly<{
+    expectedKind: SmartShapeExpectedKind;
+    expectedPolygonSides?: number;
+  }>,
+): "brush-outline" | "geometry" | null {
+  if (!saved || saved.points.length < 4 || saved.points.length % 2 !== 0) return null;
+  if (saved.kind === fixture.expectedKind) {
+    if (
+      fixture.expectedPolygonSides !== undefined
+      && saved.polygonSides !== fixture.expectedPolygonSides
+    ) return null;
+    return "geometry";
+  }
+  if (saved.kind !== "freehand" || !saved.brush) return null;
+
+  const sampleCount = saved.points.length / 2;
+  const closed = sampleCount >= 2 && pointsEqual(saved.points, 0, sampleCount - 1);
+  if (fixture.expectedKind === "line") {
+    return sampleCount === 2 && !pointsEqual(saved.points, 0, 1)
+      ? "brush-outline"
+      : null;
+  }
+  if (!closed || !hasNonDegenerateBounds(saved.points)) return null;
+  if (fixture.expectedKind === "rect") {
+    return sampleCount === 5 ? "brush-outline" : null;
+  }
+  if (fixture.expectedKind === "triangle") {
+    return sampleCount === 4 ? "brush-outline" : null;
+  }
+  if (fixture.expectedKind === "polygon") {
+    return sampleCount === (fixture.expectedPolygonSides ?? 0) + 1
+      ? "brush-outline"
+      : null;
+  }
+  // Ellipse output is adaptively sampled but always has at least 32 unique outline points plus
+  // the explicit closing sample. A hand-drawn closed gesture contains the verifier's much smaller
+  // fixture route and therefore cannot accidentally satisfy this contract.
+  return sampleCount >= 33 ? "brush-outline" : null;
 }
 
 async function waitForPersistedDrawCount(page: Page, expectedCount: number): Promise<void> {
@@ -1073,7 +1147,10 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
       evidence.push({
         expectedKind: fixture.expectedKind,
         persistedKind: null,
+        persistedBrush: null,
         polygonSides: null,
+        persistenceMatched: false,
+        persistenceRepresentation: null,
         visualChanged,
         widthCoverage,
         heightCoverage,
@@ -1087,20 +1164,20 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
     for (const [index, fixture] of fixtures.entries()) {
       const saved = persisted[index];
       evidence[index]!.persistedKind = saved?.kind ?? null;
+      evidence[index]!.persistedBrush = saved?.brush ?? null;
       evidence[index]!.polygonSides = saved?.polygonSides ?? null;
-      if (saved?.kind !== fixture.expectedKind) {
+      const representation = persistedSmartShapeRepresentation(saved, fixture);
+      evidence[index]!.persistenceMatched = representation === "brush-outline";
+      evidence[index]!.persistenceRepresentation = representation;
+      if (representation !== "brush-outline") {
         log(`${fixture.expectedKind}: persisted mismatch ${JSON.stringify(saved)}`);
       }
       invariant(
-        saved?.kind === fixture.expectedKind,
-        `${fixture.expectedKind}: persisted Smart Shape kind is ${saved?.kind ?? "missing"}`,
+        representation === "brush-outline",
+        `${fixture.expectedKind}: persisted Smart Shape is not the selected-brush outline `
+          + `(kind=${saved?.kind ?? "missing"}, brush=${saved?.brush ?? "missing"}, `
+          + `samples=${(saved?.points.length ?? 0) / 2})`,
       );
-      if (fixture.expectedPolygonSides !== undefined) {
-        invariant(
-          saved.polygonSides === fixture.expectedPolygonSides,
-          `polygon: persisted ${saved.polygonSides ?? "missing"} sides instead of ${fixture.expectedPolygonSides}`,
-        );
-      }
     }
 
     await page.screenshot({ path: screenshot, animations: "disabled" });
@@ -1109,7 +1186,7 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
     invariant(errors.failedResponses.length === 0, "Smart Shape browser received unexpected 5xx responses");
     return {
       ok: evidence.length === fixtures.length && evidence.every((entry) =>
-        entry.visualChanged && entry.persistedKind === entry.expectedKind
+        entry.visualChanged && entry.persistenceMatched
       ),
       evidence,
       screenshot,
@@ -1146,7 +1223,11 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     invariant(await catalog.count() === 1, "mobile opened more than one built-in catalogue session");
     await catalog.getByRole("tab", { name: "전체", exact: true }).click();
     const selectionCount = await catalog.locator('button[aria-label$=" 선택"]').count();
-    invariant(selectionCount === 35, `mobile catalogue exposes ${selectionCount}/35 brush choices`);
+    const expectedCatalogCount = STUDIO_ALL_BRUSH_CATALOG_ITEMS.length;
+    invariant(
+      selectionCount === expectedCatalogCount,
+      `mobile catalogue exposes ${selectionCount}/${expectedCatalogCount} brush choices`,
+    );
 
     const targets = await catalog.locator("button, input").evaluateAll((elements) => elements
       .map((element) => {

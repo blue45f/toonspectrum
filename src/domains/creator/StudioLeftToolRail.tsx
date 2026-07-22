@@ -64,6 +64,8 @@ import { cn } from "@/lib/utils";
 
 const REVIEW_LOCK_REASON = "현재 작업면의 검토 잠금을 먼저 해제하세요.";
 const IMAGE_EDIT_LOCK_REASON = "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요.";
+const STUDIO_CANVAS_IMAGE_ACCEPT =
+  "image/*,.bmp,.dib,.tga,.icb,.vda,.vst,.ppm,.pam,.qoi,.tif,.tiff";
 const STUDIO_RAIL_MORE_GAP_PX = 4;
 const STUDIO_RAIL_MORE_MARGIN_PX = 8;
 const STUDIO_RAIL_MORE_MAX_HEIGHT_PX = 28 * 16;
@@ -557,10 +559,10 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             <StudioRailToolButton
               icon={PaintBucket}
               label="채우기 (G)"
-              description="선 안을 탭해 색을 채웁니다. 경계 인식과 참조 레이어 설정은 속성 패널에서 조정해요."
+              description={advancedFillUnsupportedReason
+                ? `선 안을 탭해 색을 채웁니다. ${advancedFillUnsupportedReason} 눌러서 안전한 단일 래스터 후보를 찾거나 필요한 조건을 확인하세요.`
+                : "선 안을 탭해 색을 채웁니다. 경계 인식과 참조 레이어 설정은 속성 패널에서 조정해요."}
               active={advancedFillActive}
-              disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
-              unavailableReason={advancedFillUnsupportedReason ?? undefined}
               onClick={toggleAdvancedFill}
             />
             ) : null}
@@ -844,7 +846,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 <span className="sr-only">이미지 추가</span>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept={STUDIO_CANVAS_IMAGE_ACCEPT}
                   className={cn(
                     "absolute inset-0 opacity-0",
                     activeSurfaceReviewLocked ? "cursor-not-allowed" : "cursor-pointer"

@@ -54,8 +54,11 @@ function rowProps(
     groupName: "주인공",
     effectivelyHidden: false,
     locallyHidden: false,
+    effectivelyLocked: false,
     statusLabel: "채우기 참조, 알파 락, 마스크 꺼짐, AI 작업, 아래 클리핑, 애니메이션",
     selected: false,
+    current: false,
+    selectionCount: 0,
     tabStop: false,
     renameInput: null,
     mobileMultiSelect: false,
@@ -95,8 +98,11 @@ describe("StudioLayerNavigatorItemRow", () => {
       rowProps({
         effectivelyHidden: true,
         locallyHidden: true,
+        effectivelyLocked: true,
         statusLabel,
         selected: true,
+        current: true,
+        selectionCount: 1,
         tabStop: true,
         mobileMultiSelect: true,
         readOnly: true,
@@ -109,16 +115,23 @@ describe("StudioLayerNavigatorItemRow", () => {
     );
 
     const treeItem = screen.getByRole("treeitem", {
-      name: /주인공 원화, 이미지, 그룹 주인공, 역할 채색, 색 라벨 파랑, 숨김, 잠김.+마스크 꺼짐.+나만 숨김/,
+      name: /주인공 원화, 현재 작업 레이어, 이미지, 그룹 주인공, 역할 채색, 색 라벨 파랑, 숨김, 잠김.+마스크 꺼짐.+나만 숨김/,
     });
     expect(treeItem.getAttribute("aria-selected")).toBe("true");
+    expect(treeItem.getAttribute("aria-current")).toBe("true");
     expect(treeItem.getAttribute("aria-level")).toBe("2");
     expect(treeItem.tabIndex).toBe(0);
     expect(treeItem.dataset.studioLayerSelected).toBe("true");
+    expect(treeItem.dataset.studioLayerSelectionState).toBe("current");
     expect(treeItem.dataset.studioLayerLocalHidden).toBe("true");
-    expect(treeItem.title).toContain("나만 숨김");
+    expect(treeItem.title).toBe("");
     expect(treeItem.className).toContain("content-visibility:auto");
+    expect(treeItem.className).toContain("border-accent/75");
+    expect(treeItem.className).toContain("focus-visible:outline-cool");
     expect(screen.getByLabelText("색 라벨 파랑").className).toContain("bg-cool");
+    expect(
+      treeItem.querySelector('[data-studio-layer-selection-marker="current"]')
+    ).not.toBeNull();
 
     const renameInput = screen.getByRole("textbox", {
       name: "레이어 이름 편집",
@@ -138,6 +151,32 @@ describe("StudioLayerNavigatorItemRow", () => {
     });
     expect(action.getAttribute("aria-expanded")).toBe("true");
     expect(action.getAttribute("aria-controls")).toBe("layer-actions");
+  });
+
+  it("shows a per-row check for multi-selection while keeping focus visually independent", () => {
+    renderRow(rowProps({
+      selected: true,
+      current: false,
+      selectionCount: 3,
+      effectivelyHidden: true,
+      effectivelyLocked: true,
+      statusLabel: "숨김, 잠김",
+      tabStop: true,
+    }));
+
+    const treeItem = screen.getByRole("treeitem", {
+      name: /주인공 원화, 다중 선택됨, 이미지.+숨김, 잠김/,
+    });
+    expect(treeItem.getAttribute("aria-selected")).toBe("true");
+    expect(treeItem.hasAttribute("aria-current")).toBe(false);
+    expect(treeItem.dataset.studioLayerSelectionState).toBe("selected");
+    expect(treeItem.className).toContain("border-accent/50");
+    expect(treeItem.className).toContain("focus-visible:outline-cool");
+    expect(
+      treeItem.querySelector('[data-studio-layer-selection-marker="selected"]')
+    ).not.toBeNull();
+    expect(treeItem.textContent).toContain("주인공 원화");
+    expect(treeItem.innerHTML).not.toContain("opacity-55");
   });
 
   it("dispatches visibility and action controls exactly once without selecting the row", () => {

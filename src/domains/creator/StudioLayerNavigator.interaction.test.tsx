@@ -1,0 +1,84 @@
+// @vitest-environment jsdom
+
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
+import { afterEach, describe, expect, it } from "vitest";
+
+import { StudioLayerNavigator } from "./StudioLayerNavigator";
+
+import type { StudioLayerNavigatorItem } from "./studio-layer-navigator";
+
+const ITEMS: StudioLayerNavigatorItem[] = [
+  { id: "back", type: "image", label: "배경 채색", zIndex: 0 },
+  { id: "middle", type: "draw", label: "인물 선화", zIndex: 1, locked: true },
+  { id: "front", type: "bubble", label: "주인공 대사", zIndex: 2, hidden: true },
+];
+
+function Harness({ initial = [] }: { initial?: readonly string[] }) {
+  const [selectedIds, setSelectedIds] = useState<readonly string[]>(initial);
+  return (
+    <StudioLayerNavigator
+      items={ITEMS}
+      groups={[]}
+      selectedIds={selectedIds}
+      pageKey="page-1"
+      localHiddenIds={new Set()}
+      onToggleLocalHidden={() => {}}
+      onSelectionChange={setSelectedIds}
+      onAction={() => {}}
+    />
+  );
+}
+
+function row(name: RegExp): HTMLElement {
+  return screen.getByRole("treeitem", { name });
+}
+
+afterEach(cleanup);
+
+describe("StudioLayerNavigator selection interaction", () => {
+  it("keeps click, modifier, range, and keyboard focus as distinct states", () => {
+    render(<Harness />);
+
+    fireEvent.click(row(/주인공 대사/));
+    expect(row(/주인공 대사/).getAttribute("aria-current")).toBe("true");
+    expect(row(/주인공 대사/).dataset.studioLayerSelectionState).toBe("current");
+    expect(screen.getByRole("status").textContent).toContain("선택 1");
+
+    fireEvent.click(row(/인물 선화/), { ctrlKey: true });
+    expect(row(/주인공 대사/).getAttribute("aria-selected")).toBe("true");
+    expect(row(/인물 선화/).getAttribute("aria-selected")).toBe("true");
+    expect(row(/주인공 대사/).hasAttribute("aria-current")).toBe(false);
+    expect(row(/인물 선화/).hasAttribute("aria-current")).toBe(false);
+    expect(screen.getByRole("status").textContent).toContain("선택 2");
+
+    fireEvent.click(row(/배경 채색/), { shiftKey: true });
+    expect(row(/주인공 대사/).getAttribute("aria-selected")).toBe("false");
+    expect(row(/인물 선화/).getAttribute("aria-selected")).toBe("true");
+    expect(row(/배경 채색/).getAttribute("aria-selected")).toBe("true");
+
+    const front = row(/주인공 대사/);
+    fireEvent.focus(front);
+    fireEvent.keyDown(front, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(row(/인물 선화/));
+    expect(row(/주인공 대사/).getAttribute("aria-selected")).toBe("false");
+    expect(row(/인물 선화/).className).toContain("focus-visible:outline-cool");
+  });
+
+  it("turns touch multi-select into visible per-row checks with 44px targets", () => {
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole("button", { name: /다중 선택/ }));
+    fireEvent.click(row(/주인공 대사/));
+    fireEvent.click(row(/배경 채색/));
+
+    const front = row(/주인공 대사/);
+    const back = row(/배경 채색/);
+    expect(front.getAttribute("aria-selected")).toBe("true");
+    expect(back.getAttribute("aria-selected")).toBe("true");
+    expect(front.querySelector('[data-studio-layer-selection-marker="selected"]')).not.toBeNull();
+    expect(back.querySelector('[data-studio-layer-selection-marker="selected"]')).not.toBeNull();
+    expect(front.className).toContain("pointer-coarse:min-h-11");
+    expect(screen.getByRole("toolbar", { name: "선택 레이어 일괄 작업" }).textContent).toContain("선택 2개");
+  });
+});

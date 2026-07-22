@@ -7,11 +7,10 @@ import { getLanguageOptions, useI18n, useT } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
 
 /**
- * FloatingControls — 웹(/)·토스(apps/toss) **공유** 플로팅 컨트롤 클러스터.
+ * FloatingControls — 웹 앱의 플로팅 설정 컨트롤 클러스터.
  *
  * 다크모드·언어·(선택) 효과음 토글. 전역 클릭 이펙트·BGM 컨트롤은 제품에서 제거됨.
  *  - 웹  : 다크모드 + 언어(기본). 사운드 토글은 기본 숨김.
- *  - 토스: 필요 시 showSound 만 켤 수 있음.
  *
  * @example 웹 App
  *   <FloatingControls placement="bottom-left" />
@@ -23,19 +22,17 @@ export interface FloatingControlsProps {
    * @deprecated BGM 컨트롤은 제거됨. prop 은 호환용으로 무시된다.
    */
   showBgm?: boolean;
-  /** 다크/주간 테마 토글 노출. 기본 true(토스는 false). */
+  /** 다크/주간 테마 토글 노출. 기본 true. */
   showTheme?: boolean;
-  /** 언어 셀렉트 노출. 기본 true(토스는 false). */
+  /** 언어 셀렉트 노출. 기본 true. */
   showLang?: boolean;
   /**
    * 고정 위치 프리셋.
    *  - "bottom-left" (기본): 좌하단(웹) — 모바일에선 우하단 단일 토글로 회피.
    *  - "bottom-right": 우하단.
-   *  - "above-nav"   : 우하단이되 하단 탭바 위로 띄움(토스 BottomNav 회피, safe-area 반영).
-   *  - "above-ad-nav": 우하단 고정 배너와 하단 탭바를 모두 피해 띄움.
    *  - "static"      : 위치 클래스 없음(부모가 배치 — 기존 웹 래퍼 호환).
    */
-  placement?: "bottom-left" | "bottom-right" | "above-nav" | "above-ad-nav" | "static";
+  placement?: "bottom-left" | "bottom-right" | "static";
   /** 인터랙션 없을 때 숨김까지(ms). 기본 4000. */
   hideAfterMs?: number;
   /** 근접 포인터로 깨우는 반경(px). 기본 120. 0이면 근접 감지 비활성. */
@@ -51,10 +48,6 @@ const PLACEMENT_CLASS: Record<NonNullable<FloatingControlsProps["placement"]>, s
   // 모바일: 우하단(하단 탭바 ~56px + safe-area 위로 띄움). 데스크톱: 좌하단.
   "bottom-left": "fixed z-40 bottom-4 left-4 max-md:bottom-[calc(4.75rem+env(safe-area-inset-bottom))] max-md:left-auto max-md:right-4",
   "bottom-right": "fixed right-4 bottom-4 z-40",
-  // 토스 BottomNav(~66px) 위로 safe-area 반영해 띄운다.
-  "above-nav": "fixed right-3.5 z-[60] bottom-[calc(82px+env(safe-area-inset-bottom))]",
-  // 토스 표준 고정 배너(96px) + BottomNav 위. 광고 클릭 영역과 컨트롤이 겹치면 안 된다.
-  "above-ad-nav": "fixed right-3.5 z-[60] bottom-[calc(178px+env(safe-area-inset-bottom))]",
   static: "",
 };
 
@@ -63,8 +56,6 @@ const PLACEMENT_CLASS: Record<NonNullable<FloatingControlsProps["placement"]>, s
 const COLLAPSIBLE: Record<NonNullable<FloatingControlsProps["placement"]>, boolean> = {
   "bottom-left": true,
   "bottom-right": true,
-  "above-nav": true,
-  "above-ad-nav": true,
   static: false,
 };
 
@@ -160,7 +151,7 @@ export function FloatingControls({
         </button>
       )}
 
-      {/* 다크/주간 테마 토글 — 토스에선 showTheme={false} */}
+      {/* 다크/주간 테마 토글 */}
       {showTheme && (
         <button
           type="button"
@@ -208,7 +199,7 @@ export function FloatingControls({
       onBlurCapture={scheduleHide}
     >
       {/* 펼친 행 — 무동작 시 흐려지며 물러나고(hover/focus/근접 시 복귀).
-          접힘형(웹)에선 데스크톱(md+)에서만 보이고, 비접힘형(토스/static)에선 항상 보인다. */}
+          접힘형은 데스크톱(md+)에서 보이고, static 배치는 항상 보인다. */}
       <div
         className={cx(
           "items-center gap-2 transition-[opacity,transform] duration-500 ease-out",

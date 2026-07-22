@@ -7,7 +7,7 @@ import { AuthModal } from "./auth-modal";
 import { resolveSignupAvatarImage } from "@/lib/avatar";
 import { useT } from "@/lib/i18n";
 import { cn, keepInlineText } from "@/lib/utils";
-import { useSession, signOut, isTossLoginAvailable, tossLoginFlow } from "@/src/compat/auth-session-store";
+import { useSession, signOut } from "@/src/compat/auth-session-store";
 import Link from "@/src/compat/router-link";
 import { adminFetch, type AdminMe } from "@/src/domains/admin/components/admin-client";
 
@@ -65,22 +65,10 @@ export function AuthMenu({
   }, [status, uid]);
 
   if (status !== "authenticated") {
-    const handleLoginClick = async () => {
-      if (isTossLoginAvailable()) {
-        const r = await tossLoginFlow();
-        if (!r.ok && r.error !== "toss-cancelled" && r.message) {
-          const { toast } = await import("@/lib/toast-store");
-          toast(r.message);
-        }
-      } else {
-        setModal(true);
-      }
-    };
-
     return (
       <>
         <button
-          onClick={handleLoginClick}
+          onClick={() => setModal(true)}
           aria-label={t("nav.login")}
           className="flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-line bg-card px-3 text-sm font-medium text-fg-2 [text-wrap:nowrap] [word-break:keep-all] transition-colors hover:border-line-strong hover:text-fg"
         >

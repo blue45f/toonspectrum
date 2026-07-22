@@ -50,10 +50,18 @@ export function studioColorPopoverTriggerHint(
 
 export const STUDIO_COLOR_EYEDROPPER_HINT: StudioToolHintSpec = {
   id: "color-popover:eyedropper",
-  title: "화면에서 색 가져오기",
-  description: "브라우저 화면에서 한 지점을 선택해 그 색을 현재 색으로 가져옵니다.",
+  title: "화면 전체에서 색 가져오기",
+  description: "브라우저 밖을 포함한 화면 한 지점을 선택해 그 색을 현재 색으로 가져옵니다.",
   preview: "sample",
   tip: "브라우저가 화면 색상 선택을 지원할 때만 표시됩니다.",
+};
+
+export const STUDIO_COLOR_CANVAS_EYEDROPPER_HINT: StudioToolHintSpec = {
+  id: "color-popover:canvas-eyedropper",
+  title: "캔버스에서 정밀 채집",
+  description: "툰 캔버스의 표시색·현재 레이어·최상위 레이어에서 정밀하게 색을 가져옵니다.",
+  preview: "sample",
+  tip: "브라우저 지원과 관계없이 사용할 수 있으며 I 또는 펜 사용 중 Alt로도 전환할 수 있어요.",
 };
 
 const STUDIO_PALETTE_HINT_VARIANT_BY_ID = {

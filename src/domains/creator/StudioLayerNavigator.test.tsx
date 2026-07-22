@@ -83,11 +83,15 @@ describe("StudioLayerNavigator", () => {
     expect(html).toContain('role="tree"');
     expect(html).toContain('aria-multiselectable="true"');
     expect(html).toContain('aria-selected="true"');
+    expect(html).toContain('aria-current="true"');
+    expect(html).toContain('data-studio-layer-selection-state="current"');
+    expect(html).toContain('data-studio-layer-selection-marker="current"');
     expect(html).toContain(
       'aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A"'
     );
     expect(html).toContain('data-studio-shortcut-boundary="true"');
     expect(html).toContain("레이어 3");
+    expect(html).toContain("결과 3 · 선택 1");
     expect(html).toContain("표시 3 · 숨김 0 · 잠금 2");
     expect(html).toContain("대사 / 주인공");
     expect(html).toContain("레터링");
@@ -97,6 +101,7 @@ describe("StudioLayerNavigator", () => {
     expect(html).toContain("max-lg:min-h-11");
     expect(html).toContain("max-lg:min-w-11");
     expect(html).toContain("pointer-coarse:min-h-11");
+    expect(html).toContain("focus-visible:outline-cool");
     expect(html).toContain('aria-pressed="false"');
 
     // 필터는 오버레이로 계속 마운트되어 세로 길이를 늘리지 않고 모든 전문 조건을 보존한다.
@@ -108,6 +113,25 @@ describe("StudioLayerNavigator", () => {
     expect(html).toContain("AI 작업");
     expect(html).toContain("작업 역할");
     expect(html).toContain("색 라벨");
+  });
+
+  it("distinguishes partial and complete group selection without conflating keyboard focus", () => {
+    const group = createLayerGroup("characters", "캐릭터");
+    const items = [
+      layer("line", "draw", 1, { groupId: group.id, label: "선화" }),
+      layer("color", "image", 0, { groupId: group.id, label: "채색" }),
+    ];
+    const partial = renderNavigator(items, [group], { selectedIds: ["line"] });
+    const complete = renderNavigator(items, [group], { selectedIds: ["line", "color"] });
+
+    expect(partial).toContain('data-studio-layer-group-selection="partial"');
+    expect(partial).toContain("캐릭터, 그룹, 2개 레이어, 1개 선택");
+    expect(partial).toContain("border-cool/45");
+    expect(partial).toContain('data-studio-layer-selection-marker="current"');
+    expect(complete).toContain('data-studio-layer-group-selection="all"');
+    expect(complete).toContain('aria-selected="true"');
+    expect(complete).toContain("border-accent/55");
+    expect(complete.match(/data-studio-layer-selection-marker="selected"/g)).toHaveLength(2);
   });
 
   it("keeps empty groups visible and supplies a useful empty-document state", () => {

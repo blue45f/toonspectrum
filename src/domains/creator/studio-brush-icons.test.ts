@@ -58,11 +58,13 @@ const ICONS_BY_PROCEDURAL_CATEGORY = {
     "cloud-fog",
     "circle-dot",
     "brush",
+    "blend",
+    "droplets",
     "paintbrush",
     "paint-roller",
     "spray-can",
   ]),
-  rake: new Set<StudioBrushIconId>(["rows", "align-justify", "fence", "feather"]),
+  rake: new Set<StudioBrushIconId>(["rows", "align-justify", "fence", "feather", "waves"]),
   foliage: new Set<StudioBrushIconId>(["trees", "wheat", "leaf", "feather", "flower"]),
   pattern: new Set<StudioBrushIconId>([
     "spline",
@@ -75,6 +77,9 @@ const ICONS_BY_PROCEDURAL_CATEGORY = {
     "fence",
   ]),
   stamp: new Set<StudioBrushIconId>(["stamp", "footprints", "heart"]),
+  pixel: new Set<StudioBrushIconId>(["square", "grid-2x2"]),
+  tone: new Set<StudioBrushIconId>(["grid-3x3", "rows", "circle-dot"]),
+  effect: new Set<StudioBrushIconId>(["sparkles"]),
 } satisfies Readonly<Record<StudioBrushPackCategory, ReadonlySet<StudioBrushIconId>>>;
 
 describe("studio-brush-icons", () => {
@@ -133,5 +138,9 @@ describe("studio-brush-icons", () => {
     expect(studioBrushIconId("hair-fiber")).toBe("feather");
     expect(studioBrushIconId("cloud-soft")).toBe("cloud");
     expect(studioBrushIconId("mist-soft")).toBe("cloud-fog");
+    expect(studioBrushIconId("pixel-square")).toBe("square");
+    expect(studioBrushIconId("cross-hatch")).toBe("grid-3x3");
+    expect(studioBrushIconId("bokeh-scatter")).toBe("sparkles");
+    expect(studioBrushIconId("pine-needle-cluster")).toBe("trees");
   });
 });

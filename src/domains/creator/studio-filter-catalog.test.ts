@@ -27,6 +27,13 @@ describe("studio filter catalog", () => {
     expect(searchStudioFilterCatalog("사용자 커널").map((entry) => entry.engine))
       .toEqual(["custom-convolution"]);
     expect(searchStudioFilterCatalog("구름 시드").map((entry) => entry.engine)).toEqual(["clouds"]);
+    expect(searchStudioFilterCatalog("방사형 회전").map((entry) => entry.engine)).toEqual(["spin-blur"]);
+    expect(searchStudioFilterCatalog("모자이크").map((entry) => entry.engine))
+      .toEqual(["pixelate", "crystal-mosaic"]);
+    expect(searchStudioFilterCatalog("sobel").map((entry) => entry.engine))
+      .toEqual(["line-extraction", "edge-detect"]);
+    expect(searchStudioFilterCatalog("cmyk 망점").map((entry) => entry.engine))
+      .toEqual(["color-halftone"]);
   });
 
   it("honors an allowed-engine boundary without changing catalog order", () => {

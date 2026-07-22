@@ -18,6 +18,7 @@ import {
   LockOpen,
   PaintBucket,
   Pencil,
+  Pipette,
   Shapes,
   Sparkles,
   Star,
@@ -96,6 +97,9 @@ export interface StudioDrawOptionsBarProps {
   onColorChange: (hex: string) => void;
   onSecondaryColorChange?: (hex: string) => void;
   onSwapColors?: () => void;
+  /** Canvas-native eyedropper. Kept beside the foreground/background well for one-hand access. */
+  eyedropperActive?: boolean;
+  onToggleEyedropper?: () => void;
   onToggleQuickShape: () => void;
   onToggleCanvasFlipH?: () => void;
   onOpenBrushStudio?: () => void;
@@ -213,6 +217,8 @@ export function StudioDrawOptionsBar({
   onColorChange,
   onSecondaryColorChange,
   onSwapColors,
+  eyedropperActive = false,
+  onToggleEyedropper,
   onToggleQuickShape,
   onToggleCanvasFlipH,
   onOpenBrushStudio,
@@ -654,14 +660,47 @@ export function StudioDrawOptionsBar({
           )}
         >
           {drawMode !== "eraser" ? (
-            <StudioDualColorWell
-              primary={color}
-              secondary={secondaryColor}
-              recent={recentSwatches}
-              onPrimaryChange={onColorChange}
-              onSecondaryChange={onSecondaryColorChange}
-              onSwap={onSwapColors}
-            />
+            <>
+              <StudioDualColorWell
+                primary={color}
+                secondary={secondaryColor}
+                recent={recentSwatches}
+                onPrimaryChange={onColorChange}
+                onSecondaryChange={onSecondaryColorChange}
+                onSwap={onSwapColors}
+              />
+              {onToggleEyedropper ? (
+                <StudioToolHintTarget
+                  preferredSide="top"
+                  hint={studioToolHintFromLabel(
+                    "스포이드",
+                    eyedropperActive
+                      ? "캔버스를 탭해 색을 가져옵니다. 다시 누르면 종료하고, 그리는 중 Alt를 누르면 일시적으로만 사용할 수 있어요."
+                      : "표시 결과나 레이어에서 색을 가져옵니다. I로 전환하고, 그리는 중에는 Alt를 누른 동안만 빠르게 사용할 수 있어요.",
+                    "I",
+                    "sample"
+                  )}
+                >
+                  <button
+                    type="button"
+                    aria-label={eyedropperActive ? "스포이드 사용 중" : "스포이드"}
+                    aria-keyshortcuts="I"
+                    aria-pressed={Boolean(eyedropperActive)}
+                    data-studio-eyedropper-trigger="true"
+                    onClick={onToggleEyedropper}
+                    className={cn(
+                      iconBtn,
+                      "size-8 pointer-coarse:size-11",
+                      eyedropperActive
+                        ? "border-accent/70 bg-accent-soft text-accent shadow-[0_0_0_1px_oklch(0.72_0.16_295/0.18)]"
+                        : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+                    )}
+                  >
+                    <Pipette size={14} aria-hidden />
+                  </button>
+                </StudioToolHintTarget>
+              ) : null}
+            </>
           ) : null}
 
           {/* Explicit overflow: unlike a hidden horizontal scroll, this control is always pinned. */}

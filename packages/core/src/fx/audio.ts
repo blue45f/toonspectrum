@@ -1,12 +1,12 @@
 /**
- * @toonspectrum/core/fx/audio — 웹(/)·토스(apps/toss) 양쪽이 공유하는 **isomorphic 오디오 엔진**.
+ * @toonspectrum/core/fx/audio — 브라우저용 isomorphic 오디오 엔진.
  *
  * 설계 원칙
  * - **하이브리드 오디오**: SFX와 폴백 BGM은 Web Audio로 합성하고, 앱이 등록한 라이선스 음원은
  *   호스티드 플레이리스트로 재생합니다.
  * - **단일 lazy AudioContext**: 최초 사용자 제스처 시점에 1개만 만들고 재사용해요(autoplay 정책 준수).
  * - **graceful no-op**: SSR·비브라우저·미지원·차단 환경에서 어떤 호출도 조용히 무시되고 절대 throw 하지 않습니다.
- *   (`window`/`AudioContext` 가드 + 전역 try/catch). 토스 웹뷰·브라우저 모두에서 안전.
+ *   (`window`/`AudioContext` 가드 + 전역 try/catch). 비브라우저 환경에서도 안전합니다.
  * - **React/Tailwind/Node 의존 0**: Web Audio + (선택) localStorage 만 씁니다.
  *
  * BGM 성격(2026-06 리튠)
@@ -174,8 +174,7 @@ export type SfxName =
   | "open"
   | "close"
   | "tab"
-  | "heart"
-  | "toss_coin";
+  | "heart";
 
 /**
  * 단일 오실레이터 톤을 soft attack/decay 엔벨로프로 마스터 버스에 재생해요(SFX 빌딩 블록).
@@ -520,26 +519,6 @@ const SFX_RECIPES: Record<SfxName, (ctx: AudioContext, master: GainNode, now: nu
       duration: 0.18,
       peak: 0.08,
       attackRatio: 0.1,
-    });
-  },
-  // toss_coin — 토스 인앱 스타일 청량한 동전/포인트 차링 소리.
-  toss_coin: (ctx, master, now) => {
-    playTone(ctx, master, {
-      type: "sine",
-      frequency: 987.77,
-      startAt: now,
-      duration: 0.15,
-      peak: 0.12,
-      attackRatio: 0.08,
-      glideToFrequency: 1975.53,
-    });
-    playTone(ctx, master, {
-      type: "triangle",
-      frequency: 2959.96,
-      startAt: now + 0.03,
-      duration: 0.25,
-      peak: 0.07,
-      attackRatio: 0.06,
     });
   },
 };
@@ -2000,4 +1979,3 @@ export const resumeAudioAfterAd = (): void => {
     }
   }
 };
-

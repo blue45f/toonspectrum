@@ -3,7 +3,6 @@ import { Suspense, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { findGame, PLAY_GAMES } from "./game-registry";
-import { PlayCheerCard } from "./PlayCheerCard";
 
 import { Container } from "@/components/section";
 import { SharePageButton } from "@/components/share-page-button";
@@ -62,7 +61,7 @@ export function PlayPage() {
           </h1>
           <p className="mt-1 text-sm text-fg-2">웹툰 캐릭터로 즐기는 미니게임 — 카드 배틀, 가위바위보, 퀴즈 등.</p>
         </div>
-        {/* 놀이터 공유 — 토스 공식 공유 링크(1200×600 OG) → OS 시트 → 클립보드 폴백 */}
+        {/* 놀이터 공유 — Web Share API → 클립보드 폴백 */}
         <SharePageButton path="/play" text="툰스펙트럼 놀이터 — 웹툰 캐릭터 미니게임" label="놀이터 공유" />
       </header>
 
@@ -95,9 +94,6 @@ export function PlayPage() {
           </li>
         ))}
       </ul>
-
-      {/* 보상형 광고 옵트인(응원 샤워) — 토스에서만 노출, 웹/미구성 환경은 자동 숨김. */}
-      <PlayCheerCard />
 
       <p className="mt-6 text-[0.68rem] leading-relaxed text-fg-3">
         놀이터 게임은 공개 카탈로그의 메타데이터(제목·작가·장르·지표)를 사용합니다. 표지 썸네일은 사이트

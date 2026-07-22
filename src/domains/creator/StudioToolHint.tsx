@@ -18,7 +18,6 @@ import {
   useSyncExternalStore,
   type CSSProperties,
   type AriaAttributes,
-  type AriaRole,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
@@ -30,6 +29,11 @@ import {
   createStudioToolHintCoordinator,
   type StudioToolHintCoordinator,
 } from "./studio-tool-hint-coordinator";
+import {
+  createStudioToolHintExposureManager,
+  type StudioToolHintExposureManager,
+  type StudioToolHintRevealIntent,
+} from "./studio-tool-hint-exposure";
 import {
   DEFAULT_STUDIO_TOOL_HINT_MODE,
   DEFAULT_STUDIO_TOOL_HINT_TOUCH_HOLD_MS,
@@ -61,15 +65,18 @@ type StudioToolHintPreferences = {
 
 type StudioToolHintContextValue = StudioToolHintPreferences & {
   coordinator: StudioToolHintCoordinator;
+  exposure: StudioToolHintExposureManager;
 };
 
 const defaultStudioToolHintCoordinator = createStudioToolHintCoordinator();
+const defaultStudioToolHintExposure = createStudioToolHintExposureManager();
 
 const StudioToolHintPreferencesContext = createContext<StudioToolHintContextValue>({
   mode: DEFAULT_STUDIO_TOOL_HINT_MODE,
   touchHoldDelayMs: DEFAULT_STUDIO_TOOL_HINT_TOUCH_HOLD_MS,
   reduceMotion: false,
   coordinator: defaultStudioToolHintCoordinator,
+  exposure: defaultStudioToolHintExposure,
 });
 
 export function StudioToolHintPreferencesProvider({
@@ -81,6 +88,9 @@ export function StudioToolHintPreferencesProvider({
   const coordinatorRef = useRef<StudioToolHintCoordinator | null>(null);
   coordinatorRef.current ??= createStudioToolHintCoordinator();
   const coordinator = coordinatorRef.current;
+  const exposureRef = useRef<StudioToolHintExposureManager | null>(null);
+  exposureRef.current ??= createStudioToolHintExposureManager();
+  const exposure = exposureRef.current;
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -137,7 +147,7 @@ export function StudioToolHintPreferencesProvider({
 
   return (
     <StudioToolHintPreferencesContext.Provider
-      value={{ mode, touchHoldDelayMs, reduceMotion, coordinator }}
+      value={{ mode, touchHoldDelayMs, reduceMotion, coordinator, exposure }}
     >
       {children}
     </StudioToolHintPreferencesContext.Provider>
@@ -201,6 +211,7 @@ type DescribedChildProps = Pick<
   | "aria-controls"
   | "aria-current"
   | "aria-describedby"
+  | "aria-disabled"
   | "aria-expanded"
   | "aria-haspopup"
   | "aria-hidden"
@@ -209,7 +220,6 @@ type DescribedChildProps = Pick<
   | "aria-pressed"
   | "aria-selected"
 > & {
-  role?: AriaRole;
   tabIndex?: number;
   title?: string;
 };
@@ -329,6 +339,7 @@ export function StudioToolHintTarget({
   const richCoachEnabled = preferences.mode === "rich";
   const tipId = useId();
   const coordinator = preferences.coordinator;
+  const exposure = preferences.exposure;
   const open = useSyncExternalStore(
     coordinator.subscribe,
     () => coordinator.getActiveHintId() === tipId,
@@ -381,8 +392,13 @@ export function StudioToolHintTarget({
     return el ? el.getBoundingClientRect() : null;
   }
 
-  function reveal(expandImmediately: boolean) {
+  function reveal(expandImmediately: boolean, intent: StudioToolHintRevealIntent) {
     if (!hint || preferences.mode === "off") return;
+    const alreadyOpen = coordinator.getActiveHintId() === tipId;
+    if (!alreadyOpen && !exposure.canReveal(hint.id, intent)) {
+      coordinator.clearPending(tipId);
+      return;
+    }
     coordinator.clearPending(tipId);
     void loadStudioToolHintBubbleModule();
     if (hideTimer.current) {
@@ -393,6 +409,7 @@ export function StudioToolHintTarget({
     if (!nextAnchor) return;
     setAnchor(nextAnchor);
     const previousHintId = coordinator.claim(tipId);
+    if (!alreadyOpen) exposure.markRevealed(hint.id, intent);
     if (previousHintId && previousHintId !== tipId) {
       hideRenderedTooltipImmediately(previousHintId);
     }
@@ -417,13 +434,14 @@ export function StudioToolHintTarget({
   function scheduleShow() {
     if (!hint || preferences.mode === "off") return;
     if (suppressedPointerHintAt) return;
+    if (!open && !exposure.canReveal(hint.id, "hover")) return;
     void loadStudioToolHintBubbleModule();
     if (hideTimer.current) {
       globalThis.clearTimeout(hideTimer.current);
       hideTimer.current = 0;
     }
     if (open) {
-      reveal(false);
+      reveal(false, "hover");
       return;
     }
     if (showTimer.current) globalThis.clearTimeout(showTimer.current);
@@ -436,7 +454,7 @@ export function StudioToolHintTarget({
       // the still-current intent is allowed to reveal itself.
       if (!coordinator.clearPending(tipId)) return;
       if (coordinator.getDismissEpoch() !== intentEpoch) return;
-      reveal(false);
+      reveal(false, "hover");
     }, SHOW_DELAY_MS) as unknown as number;
   }
 
@@ -472,6 +490,7 @@ export function StudioToolHintTarget({
     // pointerdown. Keep that synthetic focus transition from reopening the
     // coach under the user's cursor; leaving the target re-arms hover/focus.
     pointerDismissed.current = true;
+    if (hint && !disabled) exposure.markActivated(hint.id);
     armPointerSuppression(event?.clientX ?? 0, event?.clientY ?? 0);
     touchHoldOpened.current = false;
     clearTimers();
@@ -508,7 +527,7 @@ export function StudioToolHintTarget({
       touchHoldOpened.current = true;
       pointerDismissed.current = false;
       clearPointerSuppression();
-      reveal(richCoachEnabled);
+      reveal(richCoachEnabled, "touch");
     }, preferences.touchHoldDelayMs) as unknown as number;
   }
 
@@ -596,7 +615,7 @@ export function StudioToolHintTarget({
     pointerDismissed.current = false;
     clearPointerSuppression();
     describeFocusedControl(event.target);
-    reveal(richCoachEnabled);
+    reveal(richCoachEnabled, "focus");
   }
 
   function handleMouseLeave(event: ReactMouseEvent<HTMLSpanElement>) {
@@ -693,7 +712,6 @@ export function StudioToolHintTarget({
   }
 
   const canDescribeChild = isValidElement<DescribedChildProps>(children) && children.type !== Fragment;
-  const disabledChildProps = disabled && canDescribeChild ? children.props : null;
   const childAccessibleLabel = canDescribeChild
     ? children.props["aria-label"] ?? children.props.title
     : undefined;
@@ -704,7 +722,7 @@ export function StudioToolHintTarget({
       "aria-label": childAccessibleLabel,
       ...(disabled
         ? {
-            "aria-hidden": true,
+            "aria-disabled": true,
             tabIndex: -1,
           }
         : open
@@ -737,18 +755,9 @@ export function StudioToolHintTarget({
       onClickCapture={handleClickCapture}
       onFocus={handleFocus}
       onBlur={handleBlur}
-      role={disabled ? disabledChildProps?.role ?? "button" : undefined}
+      role={disabled ? "group" : undefined}
       aria-label={disabled ? childAccessibleLabel ?? hint.title : undefined}
-      aria-disabled={disabled ? true : undefined}
-      aria-checked={disabledChildProps?.["aria-checked"]}
-      aria-controls={disabledChildProps?.["aria-controls"]}
-      aria-current={disabledChildProps?.["aria-current"]}
       aria-describedby={needsWrapperDescription ? tipId : undefined}
-      aria-expanded={disabledChildProps?.["aria-expanded"]}
-      aria-haspopup={disabledChildProps?.["aria-haspopup"]}
-      aria-keyshortcuts={disabledChildProps?.["aria-keyshortcuts"]}
-      aria-pressed={disabledChildProps?.["aria-pressed"]}
-      aria-selected={disabledChildProps?.["aria-selected"]}
       tabIndex={disabled ? 0 : undefined}
     >
       {describedChildren}

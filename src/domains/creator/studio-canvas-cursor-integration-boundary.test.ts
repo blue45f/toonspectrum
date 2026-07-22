@@ -28,6 +28,10 @@ describe("Studio canvas cursor integration boundary", () => {
   it("wires saved brush cursor preferences to a renderer-specific contact cursor", () => {
     const authoritativeMove = studioPageSourceBetween(
       "onAuthoritativeMove: (pointerEvent) => {",
+      "onRawPreviewMove: (pointerEvent) => {",
+    );
+    const rawUpdate = studioPageSourceBetween(
+      "onRawPreviewMove: (pointerEvent) => {",
       "onDiscard: () => {",
     );
     const cursorRenderer = studioPageSourceBetween(
@@ -58,6 +62,10 @@ describe("Studio canvas cursor integration boundary", () => {
     expect(authoritativeMove).toContain("{ coordinateMapper }");
     expect(authoritativeMove.match(/snapshotStudioStagePointerBatchMapper\(stage\)/gu)).toHaveLength(1);
     expect(authoritativeMove.match(/coordinateMapper\.pointFor\(pointerEvent\)/gu)).toHaveLength(1);
+    expect(rawUpdate.match(/snapshotStudioStagePointerBatchMapper\(stage\)/gu)).toHaveLength(1);
+    expect(rawUpdate.match(/coordinateMapper\.pointFor\(pointerEvent\)/gu)).toHaveLength(1);
+    expect(rawUpdate).toContain("updateBrushCursor(stage, pointerEvent, contactPoint, true);");
+    expect(rawUpdate).not.toContain("consumeFreehandPointerBatch(");
     expect(cursorRenderer).toContain("if (brushCursorDrawRafRef.current !== null) return;");
     expect(cursorRenderer).toContain("globalThis.requestAnimationFrame(() => {");
     expect(cursorRenderer.match(/brushCursorRef\.current\?\.getLayer\(\)\?\.drawScene\(\)/gu)).toHaveLength(2);

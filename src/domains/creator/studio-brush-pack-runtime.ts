@@ -39,6 +39,11 @@ export const STUDIO_BRUSH_PACK_CUSTOM_TIP_MOTIFS = [
   "stripe",
   "footstep",
   "heart",
+  "cross-hatch",
+  "halftone",
+  "weave",
+  "fold",
+  "pine",
 ] as const;
 
 export type StudioBrushPackCustomTipMotif =
@@ -147,6 +152,26 @@ const COMPACT_PROFILE_ROWS: readonly CompactProfileRow[] = [
   ["stripe", 0.16, 0.06, 0.62, 0, FOLLOW_DIRECTION | WIDTH_GRAIN | ANGLE_GRAIN],
   ["footstep", 0.34, 0.04, 0.72, 0, FOLLOW_DIRECTION],
   ["heart", 0.3, 0.08, 0.82, 0, FOLLOW_DIRECTION | ANGLE_GRAIN],
+  ["hard", -0.06, 0, 0.34, 0, FOLLOW_DIRECTION | TAPER | PRESSURE_OPACITY | SPEED_SPACING],
+  ["sumi", 0.13, 0.05, 0.58, -7, FOLLOW_DIRECTION | TAPER | WIDTH_GRAIN | ANGLE_GRAIN | SPEED_SPACING],
+  ["chisel", 0.07, 0.04, 0.28, -18, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["sponge", 0.1, 0.08, 0.45, -12, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["round", 0.04, 0.01, 0.9, 0, FOLLOW_DIRECTION | TAPER | PRESSURE_OPACITY],
+  ["chisel", 0.1, 0.02, 0.32, -12, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN],
+  ["sponge", 0.03, 0.01, 0.82, 0, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN],
+  ["oval-stack", 0.08, 0.03, 0.6, -8, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["chisel", 0.02, 0, 0.34, -22, FOLLOW_DIRECTION | PRESSURE_OPACITY],
+  ["bristle", 0.05, 0.02, 0.58, -8, FOLLOW_DIRECTION | TAPER | PRESSURE_OPACITY | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["square", -0.05, 0, 1, 0, FOLLOW_DIRECTION],
+  ["checker", 0.16, 0, 1, 0, FOLLOW_DIRECTION],
+  ["cross-hatch", 0.18, 0.01, 0.92, 0, FOLLOW_DIRECTION | WIDTH_GRAIN],
+  ["rake", 0.14, 0.04, 0.52, 0, FOLLOW_DIRECTION | TAPER | SPEED_SPACING],
+  ["halftone", 0.14, 0, 1, 0, FOLLOW_DIRECTION | PRESSURE_OPACITY],
+  ["soft", 0.22, 0.58, 1, 0, PRESSURE_OPACITY | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["weave", 0.12, 0.03, 0.82, 0, FOLLOW_DIRECTION | WIDTH_GRAIN],
+  ["hair", 0.04, 0.015, 0.28, 0, FOLLOW_DIRECTION | TAPER | PRESSURE_OPACITY | ANGLE_GRAIN],
+  ["fold", 0.11, 0.04, 0.5, 0, FOLLOW_DIRECTION | WIDTH_GRAIN | ANGLE_GRAIN | SPEED_SPACING],
+  ["pine", 0.18, 0.32, 0.58, 0, FOLLOW_DIRECTION | WIDTH_GRAIN | ANGLE_GRAIN],
 ];
 
 if (COMPACT_PROFILE_ROWS.length !== STUDIO_BRUSH_PACK_CATALOG_IDS.length) {
@@ -187,6 +212,23 @@ function rotatedEllipseAlpha(
   const localX = (offsetX * cosine + offsetY * sine) / radiusX;
   const localY = (-offsetX * sine + offsetY * cosine) / radiusY;
   return smoothEdge(Math.hypot(localX, localY), 0.76, 1);
+}
+
+function distanceToSegment(
+  x: number,
+  y: number,
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number
+): number {
+  const segmentX = endX - startX;
+  const segmentY = endY - startY;
+  const lengthSquared = segmentX * segmentX + segmentY * segmentY;
+  const amount = lengthSquared > 0
+    ? clamp01(((x - startX) * segmentX + (y - startY) * segmentY) / lengthSquared)
+    : 0;
+  return Math.hypot(x - (startX + segmentX * amount), y - (startY + segmentY * amount));
 }
 
 function customTipAlpha(
@@ -286,6 +328,73 @@ function customTipAlpha(
       const middle = rotatedEllipseAlpha(x, y, 0.04, -0.08, 0.58, 0.29, 0.12);
       const front = rotatedEllipseAlpha(x, y, 0.38, 0.14, 0.4, 0.22, 0.28);
       return clamp01(Math.max(back * 0.62, middle * 0.82, front));
+    }
+    case "cross-hatch": {
+      const frequency = 3 + (variant % 3);
+      const firstPosition = ((x + y + 2) * frequency) / 4;
+      const secondPosition = ((x - y + 2) * frequency) / 4;
+      const firstDistance = Math.abs(firstPosition - Math.round(firstPosition));
+      const secondDistance = Math.abs(secondPosition - Math.round(secondPosition));
+      const lineWidth = 0.045 + (variant % 4) * 0.008;
+      const lines = Math.max(
+        smoothEdge(firstDistance, lineWidth * 0.35, lineWidth),
+        smoothEdge(secondDistance, lineWidth * 0.35, lineWidth)
+      );
+      return lines * smoothEdge(Math.max(absX, absY), 0.82, 0.98);
+    }
+    case "halftone": {
+      const cells = 4 + (variant % 3);
+      const gridX = ((x + 1) / 2) * cells;
+      const gridY = ((y + 1) / 2) * cells;
+      const localX = gridX - Math.floor(gridX) - 0.5;
+      const localY = gridY - Math.floor(gridY) - 0.5;
+      const dotRadius = 0.22 + (variant % 5) * 0.025;
+      const dot = smoothEdge(Math.hypot(localX, localY), dotRadius * 0.72, dotRadius);
+      return dot * smoothEdge(Math.max(absX, absY), 0.84, 0.98);
+    }
+    case "weave": {
+      const frequency = 5 + (variant % 3);
+      const gridX = ((x + 1) / 2) * frequency;
+      const gridY = ((y + 1) / 2) * frequency;
+      const column = Math.floor(gridX);
+      const row = Math.floor(gridY);
+      const localX = Math.abs(gridX - column - 0.5);
+      const localY = Math.abs(gridY - row - 0.5);
+      const vertical = smoothEdge(localX, 0.08, 0.22) * ((column + row) % 2 === 0 ? 1 : 0.48);
+      const horizontal = smoothEdge(localY, 0.08, 0.22) * ((column + row) % 2 === 0 ? 0.48 : 1);
+      return Math.max(vertical, horizontal) * smoothEdge(Math.max(absX, absY), 0.84, 0.98);
+    }
+    case "fold": {
+      const count = 3 + (variant % 4);
+      let alpha = 0;
+      for (let fold = 0; fold < count; fold++) {
+        const origin = -0.68 + fold * (1.36 / Math.max(1, count - 1));
+        const curve = Math.sin((y + 1) * (1.4 + fold * 0.18) + phase) * (0.08 + fold * 0.012);
+        const width = 0.035 + ((fold + variant) % 3) * 0.012;
+        alpha = Math.max(alpha, smoothEdge(Math.abs(x - origin - curve), width * 0.35, width));
+      }
+      return alpha * smoothEdge(Math.max(absX, absY), 0.84, 0.99);
+    }
+    case "pine": {
+      let alpha = smoothEdge(Math.abs(y), 0.018, 0.055) * smoothEdge(absX, 0.72, 0.9);
+      const count = 5 + (variant % 3);
+      for (let needle = 0; needle < count; needle++) {
+        const originX = -0.65 + needle * (1.3 / Math.max(1, count - 1));
+        const length = 0.42 + ((needle + variant) % 3) * 0.08;
+        const lean = 0.14 + (needle % 2) * 0.05;
+        for (const direction of [-1, 1] as const) {
+          const distance = distanceToSegment(
+            x,
+            y,
+            originX,
+            0,
+            originX + lean,
+            direction * length
+          );
+          alpha = Math.max(alpha, smoothEdge(distance, 0.012, 0.038));
+        }
+      }
+      return alpha * smoothEdge(Math.max(absX, absY), 0.86, 1);
     }
     case "footstep": {
       let alpha = 0;
@@ -393,7 +502,12 @@ function colorDynamicsFor(
       valueJitter: 0.055 + (index % 4) * 0.012,
     };
   }
-  if (descriptor.category === "pattern" || descriptor.category === "stamp") {
+  if (
+    descriptor.category === "pattern"
+    || descriptor.category === "stamp"
+    || descriptor.category === "tone"
+    || descriptor.category === "effect"
+  ) {
     return {
       hueJitter: 2 + (index % 3),
       saturationJitter: 0.02,
@@ -448,6 +562,28 @@ function tipLayersFor(
         offsetY: 0.5,
         angle: 4,
         roundness: 0.7,
+      },
+    ];
+  }
+  if (descriptor.category === "foliage" && motif === "pine") {
+    return [
+      {
+        tip: materializeStudioBrushPackTipSettings("pine", index + 79, 0.08),
+        scale: 0.72,
+        opacity: 0.64,
+        offsetX: 0.34,
+        offsetY: -0.28,
+        angle: 18,
+        roundness: 0.7,
+      },
+      {
+        tip: materializeStudioBrushPackTipSettings("hair", index + 37, 0.1),
+        scale: 0.34,
+        opacity: 0.4,
+        offsetX: -0.38,
+        offsetY: 0.3,
+        angle: -16,
+        roundness: 0.54,
       },
     ];
   }

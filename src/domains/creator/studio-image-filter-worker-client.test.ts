@@ -315,6 +315,30 @@ describe("runStudioImageFilterWorker", () => {
     });
   });
 
+  it("normalizes new smart-filter engines into one ordered Worker program", async () => {
+    const worker = new CapturingApplyingWorker();
+    const el: ImageFilterFields = {
+      smartFilters: {
+        version: 1,
+        entries: [
+          { id: "spin", engine: "spin-blur", enabled: true, params: { radius: 12, strength: 70 } },
+          { id: "mosaic", engine: "pixelate", enabled: true, params: { size: 6 } },
+          { id: "lines", engine: "line-extraction", enabled: false, params: {} },
+          { id: "halftone", engine: "color-halftone", enabled: true, params: { mode: "cmyk", dotSize: 4, strength: 80 } },
+        ],
+      },
+    };
+
+    const output = await runStudioImageFilterWorker(requestFixture(el), {
+      workerFactory: () => worker,
+    });
+
+    expect(output.execution).toBe("worker");
+    expect(worker.postedEl?.smartFilters).toBeUndefined();
+    expect(worker.postedEl?.smartFilterOperations?.map((entry) => entry.engine))
+      .toEqual(["spin-blur", "pixelate", "color-halftone"]);
+  });
+
   it("falls back to direct execution when postMessage throws synchronously", async () => {
     const request = requestFixture();
     const expected = expectedPixels(request.el);

@@ -44,9 +44,9 @@ describe("studio draw pointer-release planning ownership boundary", () => {
       "./studio-brush",
       "./studio-draw-completion",
       "./studio-pixel-pencil",
-      "./studio-quickshape",
-      "./studio-stroke-shapes",
+      "./studio-quickshape-release-promotion",
       "./studio-element-model",
+      "./studio-smart-shape-brush-effect",
     ]);
     expect(planner.source).not.toMatch(/from\s+["'](?:react|konva|react-konva)/u);
     expect(planner.source).not.toMatch(

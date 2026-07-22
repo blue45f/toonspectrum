@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // Static markup keeps the progressive-enhancement contract compact, while the DOM tests below
 // lock down the continuous keyboard-editing workflow and IME boundary.
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -101,7 +101,10 @@ function hasNestedButton(html: string): boolean {
   return false;
 }
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe("StudioDialogueBatchPanel read-aloud progressive enhancement", () => {
   it("keeps dialogue editing available with a clear unsupported-browser message", () => {
@@ -284,5 +287,164 @@ describe("StudioDialogueBatchPanel continuous dialogue editing", () => {
 
     expect(onSelectElement).toHaveBeenLastCalledWith("page-1", "bubble-3");
     expect(document.activeElement).toBe(editors[1]);
+  });
+});
+
+describe("StudioDialogueBatchPanel EX-style structure editing", () => {
+  const STRUCTURE_PAGES: StudioDialogueBatchPanelProps["pages"] = [
+    {
+      id: "page-1",
+      elements: [
+        { id: "bubble-1", type: "bubble", variant: "speech", text: "앞 대사", x: 20, y: 20 },
+        { id: "bubble-2", type: "bubble", variant: "speech", text: "뒤 대사", x: 20, y: 120 },
+      ],
+    },
+    {
+      id: "page-2",
+      elements: [{ id: "text-2", type: "text", text: "다음 페이지", x: 20, y: 20 }],
+    },
+  ];
+
+  function renderStructurePanel() {
+    const onSplitText = vi.fn();
+    const onMergeWithNext = vi.fn();
+    const onTransferElement = vi.fn();
+    render(
+      <StudioDialogueBatchPanel
+        pages={STRUCTURE_PAGES}
+        currentPageId="page-1"
+        selectedId="bubble-1"
+        onClose={vi.fn()}
+        onSelectElement={vi.fn()}
+        onPatchText={vi.fn()}
+        onApplyReplace={vi.fn()}
+        onSplitText={onSplitText}
+        onMergeWithNext={onMergeWithNext}
+        onTransferElement={onTransferElement}
+        readAloudAdapter={speechAdapter(false)}
+      />
+    );
+    return { onSplitText, onMergeWithNext, onTransferElement };
+  }
+
+  it("keeps one inline structure menu open and splits the latest draft at the caret", () => {
+    const { onSplitText } = renderStructurePanel();
+    const firstEditor = screen.getAllByRole<HTMLTextAreaElement>("textbox", {
+      name: "1페이지 말풍선·말하기 대사 수정",
+    })[0]!;
+    fireEvent.change(firstEditor, { target: { value: "앞과 뒤" } });
+    firstEditor.setSelectionRange(2, 2);
+    fireEvent.click(screen.getByRole("button", {
+      name: '1페이지 말풍선·말하기 "앞 대사" 구조 작업',
+    }));
+
+    const split = screen.getByRole("button", { name: "커서에서 나누기" });
+    fireEvent.pointerDown(split);
+    fireEvent.click(split);
+
+    expect(onSplitText).toHaveBeenCalledWith("page-1", "bubble-1", "앞과 뒤", 2);
+    expect(screen.queryByRole("group", { name: "1페이지 대사 구조 편집" })).toBeNull();
+  });
+
+  it("merges with the next reading-order dialogue and preserves the latest draft", () => {
+    const { onMergeWithNext } = renderStructurePanel();
+    const firstEditor = screen.getAllByRole<HTMLTextAreaElement>("textbox", {
+      name: "1페이지 말풍선·말하기 대사 수정",
+    })[0]!;
+    fireEvent.change(firstEditor, { target: { value: "합칠 최신본" } });
+    fireEvent.click(screen.getByRole("button", {
+      name: '1페이지 말풍선·말하기 "앞 대사" 구조 작업',
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "다음과 합치기" }));
+
+    expect(onMergeWithNext).toHaveBeenCalledWith("page-1", "bubble-1", "합칠 최신본");
+  });
+
+  it("moves or copies dialogue to an explicit target page from the same compact menu", () => {
+    const { onTransferElement } = renderStructurePanel();
+    fireEvent.click(screen.getByRole("button", {
+      name: '1페이지 말풍선·말하기 "앞 대사" 구조 작업',
+    }));
+    const target = screen.getByRole("combobox", { name: "1페이지 대사 이동 대상" });
+    fireEvent.change(target, { target: { value: "page-2" } });
+    fireEvent.click(screen.getByRole("button", { name: "복사" }));
+
+    expect(onTransferElement).toHaveBeenCalledWith(
+      "page-1",
+      "bubble-1",
+      "page-2",
+      "copy",
+      "앞 대사",
+    );
+  });
+});
+
+describe("StudioDialogueBatchPanel file interchange", () => {
+  function renderInterchange(onImportInterchange = vi.fn()) {
+    const rendered = render(
+      <StudioDialogueBatchPanel
+        pages={PAGES}
+        currentPageId="page-1"
+        selectedId={null}
+        onClose={vi.fn()}
+        onSelectElement={vi.fn()}
+        onPatchText={vi.fn()}
+        onApplyReplace={vi.fn()}
+        onImportInterchange={onImportInterchange}
+        readAloudAdapter={speechAdapter(false)}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /번역·대본 파일/u }));
+    return rendered;
+  }
+
+  it("keeps eight formats collapsed until requested and exports the current lettering", () => {
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn(() => "blob:test") });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    renderInterchange();
+
+    expect(screen.getByRole("combobox", { name: "대사 내보내기 형식" })).toHaveProperty("value", "csv");
+    expect(screen.getByText("8종")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "내보내기" }));
+
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/2개 대사를 \.csv 파일로 내보냈어요/u)).toBeTruthy();
+  });
+
+  it("parses a JSON translation and delegates one transactional apply with the chosen match mode", async () => {
+    const onImportInterchange = vi.fn().mockResolvedValue({
+      pages: PAGES,
+      matched: 1,
+      changed: 1,
+      locked: 0,
+      missing: 0,
+      droppedMetadata: 0,
+    });
+    const { container } = renderInterchange(onImportInterchange);
+    fireEvent.change(screen.getByRole("combobox", { name: "가져온 대사 연결 방식" }), {
+      target: { value: "id" },
+    });
+    const payload = JSON.stringify({
+      schema: "toonspectrum.dialogue-script",
+      version: 1,
+      cues: [{ id: "bubble-1", page: 1, text: "번역" }],
+    });
+    const file = new File([payload], "translation.json", { type: "application/json" });
+    Object.defineProperty(file, "arrayBuffer", {
+      configurable: true,
+      value: async () => new TextEncoder().encode(payload).buffer,
+    });
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(input).not.toBeNull();
+    fireEvent.change(input!, { target: { files: [file] } });
+
+    await waitFor(() => expect(onImportInterchange).toHaveBeenCalledTimes(1));
+    expect(onImportInterchange).toHaveBeenCalledWith(
+      expect.objectContaining({ cues: [expect.objectContaining({ id: "bubble-1", text: "번역" })] }),
+      "id"
+    );
+    expect(screen.getByText(/1개 대사를 한 번에 반영했어요/u)).toBeTruthy();
   });
 });

@@ -47,11 +47,6 @@ services:
         value: "true"
       - key: STUDIO_VOICE_TURN_TTL_SECONDS
         value: "900"
-      # 앱인토스 토스 로그인 서버 간 API용 mTLS PEM — 콘솔에서 발급한 인증서/키를 대시보드에 입력.
-      - key: TOSS_MTLS_CERT
-        sync: false
-      - key: TOSS_MTLS_KEY
-        sync: false
       # 수동 크롤 트리거 토큰 — Render가 자동 생성(GitHub cron 시크릿과 동일 값으로 맞출 것).
       - key: CATALOG_INGEST_TRIGGER_TOKEN
         generateValue: true

@@ -12,6 +12,7 @@
  * (StudioPerspectivePanel 이 소실점 드래그를 오버레이에 맡기는 것과 동일 역할 분담).
  */
 import { Check, RotateCcw, Trash2, Waypoints, X } from "lucide-react";
+import { useId } from "react";
 
 import { StudioToggleChip } from "./studio-panel-ui";
 import { MAX_PUPPET_PINS, type PuppetPin } from "./studio-puppet-warp";
@@ -51,6 +52,14 @@ export function StudioPuppetWarpPanel({
   onApply,
   onCancel,
 }: StudioPuppetWarpPanelProps): ReactElement {
+  const statusId = useId();
+  const statusText = busy
+    ? "퍼펫 워프를 원본 해상도로 적용하는 중입니다. 완료될 때까지 설정을 유지합니다."
+    : pins.length === 0
+      ? `이미지를 클릭해 핀을 놓으세요(최대 ${MAX_PUPPET_PINS}개). 핀을 드래그하면 주변 메쉬가 함께 움직입니다.`
+      : !canApply
+        ? "핀을 원본 위치에서 움직여 변형을 만든 뒤 적용하세요."
+        : "변형을 적용할 준비가 됐습니다. 적용 전까지 원본 픽셀은 바뀌지 않습니다.";
   return (
     <div className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5">
       <div className="flex items-center justify-between gap-2">
@@ -60,9 +69,12 @@ export function StudioPuppetWarpPanel({
         </p>
         <StudioToggleChip
           active={active}
+          disabled={busy}
           onClick={onToggle}
           title={
-            active
+            busy
+              ? "현재 변형을 적용한 뒤 퍼펫 워프를 종료할 수 있습니다."
+              : active
               ? "퍼펫 워프를 끕니다(놓은 핀은 버려집니다)."
               : "퍼펫 워프를 켜고 이미지 위에 핀을 놓아 모양을 변형합니다."
           }
@@ -74,9 +86,8 @@ export function StudioPuppetWarpPanel({
       {active ? (
         <>
           {pins.length === 0 ? (
-            <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
-              이미지의 빈 자리를 클릭해 핀을 놓으세요(최대 {MAX_PUPPET_PINS}개). 핀을 드래그하면 그
-              지점 주변이 메쉬를 따라 부드럽게 늘어납니다.
+            <p id={statusId} className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
+              {statusText}
             </p>
           ) : (
             <ul className="space-y-1.5">
@@ -109,19 +120,29 @@ export function StudioPuppetWarpPanel({
             </ul>
           )}
 
-          <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
-            {busy
-              ? "적용하는 중..."
-              : "핀을 더 놓거나 드래그해 자세를 조절한 뒤 적용하세요(팔다리를 굽히는 정도의 자연스러운 범위를 권장합니다 — 너무 크게 당기면 메쉬가 접혀 보일 수 있어요)."}
-          </p>
+          {pins.length > 0 ? (
+            <p id={statusId} className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
+              {statusText}
+              {!busy && canApply
+                ? " 팔다리를 굽히는 정도의 자연스러운 범위를 권장합니다."
+                : null}
+            </p>
+          ) : null}
 
           <div className="flex items-center gap-1.5 border-t border-line/40 pt-2">
             <button
               type="button"
               onClick={onApply}
               disabled={busy || !canApply}
+              aria-describedby={statusId}
               className={cn(buttonClass({ size: "sm", variant: "solid" }), "flex-1 gap-1")}
-              title="지금 핀 배치대로 이미지를 원본 해상도로 왜곡해 반영합니다(⌘Z 복구 가능)."
+              title={busy
+                ? "현재 변형을 적용하는 중입니다."
+                : !canApply
+                  ? pins.length === 0
+                    ? "이미지에 핀을 먼저 놓으세요."
+                    : "핀을 원본 위치에서 움직인 뒤 적용하세요."
+                  : "지금 핀 배치대로 이미지를 원본 해상도로 왜곡해 반영합니다(⌘Z 복구 가능)."}
             >
               <Check className="size-3.5" aria-hidden />
               {busy ? "적용 중..." : "적용"}
@@ -130,8 +151,13 @@ export function StudioPuppetWarpPanel({
               type="button"
               onClick={onResetPositions}
               disabled={busy || pins.length === 0}
+              aria-describedby={statusId}
               className={buttonClass({ size: "sm", variant: "quiet" })}
-              title="핀은 그대로 두고 전부 원본 위치로 되돌립니다."
+              title={busy
+                ? "현재 변형을 적용하는 중입니다."
+                : pins.length === 0
+                  ? "되돌릴 핀이 아직 없습니다."
+                  : "핀은 그대로 두고 전부 원본 위치로 되돌립니다."}
             >
               <RotateCcw className="size-3.5" aria-hidden />
               초기화

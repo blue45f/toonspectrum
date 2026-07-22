@@ -1,5 +1,5 @@
 /**
- * @toonspectrum/core/fx/hooks — fx 엔진을 React 에 잇는 얇은 훅 모음(웹·토스 공유).
+ * @toonspectrum/core/fx/hooks — fx 엔진을 React에 잇는 얇은 훅 모음.
  *
  * audio/particles 본체는 프레임워크 비종속이고, 이 파일만 React 를 **peer** 로 씁니다.
  * - useClickSfx()    : document 에 위임 클릭 리스너 1개를 달아 인터랙티브 요소 탭마다 'tick'.

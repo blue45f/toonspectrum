@@ -1,6 +1,7 @@
 import {
   ArrowDown,
   ArrowUp,
+  Check,
   ChevronDown,
   ChevronRight,
   Eye,
@@ -15,6 +16,7 @@ import {
   Lock,
   LockOpen,
   MoreHorizontal,
+  Minus,
   Palette,
   ScanLine,
   Search,
@@ -234,6 +236,7 @@ export function StudioLayerNavigator({
     includeEmptyGroups: true,
   });
   const selectedIdSet = new Set(selectedIds);
+  const selectionCount = selectedIdSet.size;
   const outsideSelectionCount = countStudioLayerSelectionOutsideResults(selectedIds, resultIds);
   const batchSelectedIds = [...new Set(
     filterActive ? selectedIds.filter((id) => resultIdSet.has(id)) : selectedIds
@@ -682,8 +685,11 @@ export function StudioLayerNavigator({
         groupName={entry.group?.name ?? null}
         effectivelyHidden={entry.effectivelyHidden}
         locallyHidden={localHiddenIds.has(item.id)}
+        effectivelyLocked={entry.effectivelyLocked}
         statusLabel={itemStatusLabel(entry)}
         selected={selectedIdSet.has(item.id)}
+        current={selectionCount === 1 && selectedIdSet.has(item.id)}
+        selectionCount={selectionCount}
         tabStop={tabStopKey === key}
         renameInput={editing && renameTarget ? renderRenameInput(renameTarget, key) : null}
         mobileMultiSelect={mobileMultiSelect}
@@ -712,7 +718,7 @@ export function StudioLayerNavigator({
             <div className="flex items-baseline gap-1.5">
               <h3 className="text-xs font-bold tracking-tight text-fg">레이어 {stats.total}</h3>
               <span id={resultStatusId} role="status" aria-live="polite" className="rounded-full bg-raised px-1.5 py-0.5 text-[0.62rem] font-semibold tabular-nums text-fg-3">
-                결과 {results.length}
+                결과 {results.length}{selectionCount > 0 ? ` · 선택 ${selectionCount}` : ""}
               </span>
             </div>
             <p className="truncate text-[0.68rem] text-fg-3 lg:text-[0.58rem]">
@@ -1016,7 +1022,7 @@ export function StudioLayerNavigator({
                 : `선택 ${selectedIds.length}개`
             }
           >
-            {batchSelectedIds.length}개
+            선택 {batchSelectedIds.length}개
             {outsideSelectionCount > 0 ? ` · 밖 ${outsideSelectionCount}` : ""}
           </span>
           <StudioToolHintTarget
@@ -1234,13 +1240,28 @@ export function StudioLayerNavigator({
               };
               const selectedChildCount = target.itemIds.filter((id) => selectedIdSet.has(id)).length;
               const allChildrenSelected = target.itemIds.length > 0 && selectedChildCount === target.itemIds.length;
+              const partiallySelected = selectedChildCount > 0 && !allChildrenSelected;
               const groupStatus = [
                 node.group.hidden ? "숨김" : null,
                 node.group.locked ? "잠김" : null,
                 selectedChildCount > 0 ? `${selectedChildCount}개 선택` : null,
               ].filter(Boolean).join(", ");
               return (
-                <li key={key} role="none" className="rounded-lg border border-line/65 bg-card/25">
+                <li
+                  key={key}
+                  role="none"
+                  className={cn(
+                    "rounded-lg border bg-card/25 transition-[border-color,background-color] duration-150 motion-reduce:transition-none",
+                    allChildrenSelected
+                      ? "border-accent/55 bg-accent-soft/20"
+                      : partiallySelected
+                        ? "border-cool/45 bg-cool/5"
+                        : "border-line/65"
+                  )}
+                  data-studio-layer-group-selection={
+                    allChildrenSelected ? "all" : partiallySelected ? "partial" : "none"
+                  }
+                >
                   <div
                     ref={(element) => {
                       if (element) rowRefs.current.set(key, element);
@@ -1265,22 +1286,54 @@ export function StudioLayerNavigator({
                     }}
                     className={cn(
                       "flex min-h-9 items-center gap-1 rounded-lg px-1 py-0.5 [contain-intrinsic-size:44px] [content-visibility:auto] max-lg:min-h-11 pointer-coarse:min-h-11",
-                      "hover:bg-raised/60",
+                      allChildrenSelected
+                        ? "bg-accent-soft/25 hover:bg-accent-soft/40"
+                        : partiallySelected
+                          ? "bg-cool/5 hover:bg-cool/10"
+                          : "hover:bg-raised/60",
                       focusRing
                     )}
                   >
                     <span className="grid size-7 shrink-0 place-items-center text-fg-3" aria-hidden>
                       {!node.empty && node.expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </span>
-                    <Folder size={14} className={cn("shrink-0 text-accent", node.group.hidden && "opacity-55")} aria-hidden />
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "grid size-5 shrink-0 place-items-center rounded-md border",
+                        allChildrenSelected
+                          ? "border-accent bg-accent text-on-accent"
+                          : partiallySelected
+                            ? "border-cool/70 bg-cool/10 text-cool"
+                            : "border-line/70 bg-card text-transparent"
+                      )}
+                    >
+                      {allChildrenSelected ? <Check size={12} strokeWidth={2.5} /> : partiallySelected ? <Minus size={12} strokeWidth={2.5} /> : null}
+                    </span>
+                    <Folder size={14} className="shrink-0 text-accent" aria-hidden />
                     {editing && renameTarget
                       ? renderRenameInput(renameTarget, key)
                       : (
-                          <span className={cn("min-w-0 flex-1 truncate text-[0.7rem] font-bold text-fg-2", node.group.hidden && "opacity-55")}>
+                          <span className={cn(
+                            "min-w-0 flex-1 truncate text-[0.7rem] font-bold",
+                            selectedChildCount > 0 ? "text-fg" : "text-fg-2",
+                            node.group.hidden && "line-through decoration-fg-3/80"
+                          )}>
                             {node.group.name}
                             <span className="ml-1 text-[0.68rem] font-normal text-fg-3 lg:text-[0.58rem]">{node.empty ? "비어 있음" : node.entries.length}</span>
                           </span>
                         )}
+                    {selectedChildCount > 0 ? (
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "shrink-0 rounded-full px-1.5 py-0.5 text-[0.58rem] font-bold tabular-nums",
+                          allChildrenSelected ? "bg-accent text-on-accent" : "bg-cool/15 text-cool"
+                        )}
+                      >
+                        {selectedChildCount}
+                      </span>
+                    ) : null}
                     <button
                       type="button"
                       tabIndex={-1}

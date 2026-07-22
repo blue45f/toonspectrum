@@ -83,8 +83,11 @@ export function StudioHistoryBrushPanel({
 
       <StudioToggleChip
         active={active}
+        disabled={busy}
         onClick={onToggleActive}
-        title="켜고 이미지를 드래그하면 지정한 작업 내역 시점의 픽셀로 그 부분만 되돌아갑니다."
+        title={busy
+          ? "현재 복원 스트로크를 반영한 뒤 모드를 바꿀 수 있습니다."
+          : "켜고 이미지를 드래그하면 지정한 작업 내역 시점의 픽셀로 그 부분만 되돌아갑니다."}
       >
         <span className="inline-flex items-center gap-1">
           <Paintbrush className="size-3" aria-hidden />
@@ -98,6 +101,7 @@ export function StudioHistoryBrushPanel({
         max={HISTORY_BRUSH_RADIUS_RANGE.max}
         step={HISTORY_BRUSH_RADIUS_RANGE.step}
         value={radiusPx}
+        disabled={busy}
         onChange={onRadiusChange}
         readout={`${radiusPx}px`}
       />
@@ -108,6 +112,7 @@ export function StudioHistoryBrushPanel({
         max={HISTORY_BRUSH_HARDNESS_RANGE.max}
         step={HISTORY_BRUSH_HARDNESS_RANGE.step}
         value={hardness}
+        disabled={busy}
         onChange={onHardnessChange}
         readout={`${Math.round(hardness * 100)}%`}
       />
@@ -118,6 +123,7 @@ export function StudioHistoryBrushPanel({
         max={HISTORY_BRUSH_OPACITY_RANGE.max}
         step={HISTORY_BRUSH_OPACITY_RANGE.step}
         value={opacity}
+        disabled={busy}
         onChange={onOpacityChange}
         readout={`${Math.round(opacity * 100)}%`}
       />
@@ -126,7 +132,8 @@ export function StudioHistoryBrushPanel({
         <button
           type="button"
           onClick={onClearSource}
-          title="지정한 히스토리 소스를 해제합니다."
+          disabled={busy}
+          title={busy ? "현재 복원 스트로크를 반영한 뒤 소스를 해제할 수 있습니다." : "지정한 히스토리 소스를 해제합니다."}
           className={cn(PANEL_CHIP_CLASS, "flex w-full items-center justify-center gap-1")}
         >
           <Undo2 className="size-3" aria-hidden />
@@ -137,7 +144,8 @@ export function StudioHistoryBrushPanel({
           <button
             type="button"
             onClick={onOpenHistoryPanel}
-            title="작업 내역 패널을 열어 되돌릴 시점을 고릅니다."
+            disabled={busy}
+            title={busy ? "현재 복원 스트로크를 반영한 뒤 작업 내역을 열 수 있습니다." : "작업 내역 패널을 열어 되돌릴 시점을 고릅니다."}
             className={cn(PANEL_CHIP_CLASS, "flex w-full items-center justify-center gap-1")}
           >
             <HistoryIcon className="size-3" aria-hidden />

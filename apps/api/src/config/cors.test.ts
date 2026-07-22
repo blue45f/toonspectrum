@@ -4,14 +4,16 @@ import { Controller, Module, Post, type INestApplication } from "@nestjs/common"
 import { NestFactory } from "@nestjs/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { allowedCorsOrigins, configureCors, TOSS_CORS_ORIGINS } from "./cors";
+import { allowedCorsOrigins, configureCors } from "./cors";
 
 import type { AddressInfo } from "node:net";
 
-@Controller("auth/toss")
+const CONFIGURED_ORIGIN = "https://app.toonspectrum.example";
+
+@Controller("cors-probe")
 class CorsProbeController {
-  @Post("exchange")
-  exchange() {
+  @Post()
+  create() {
     return { ok: true };
   }
 }
@@ -25,7 +27,10 @@ describe("API CORS", () => {
 
   beforeAll(async () => {
     app = await NestFactory.create(CorsProbeModule, { logger: false });
-    configureCors(app, { NODE_ENV: "production" });
+    configureCors(app, {
+      NODE_ENV: "production",
+      API_CORS_ALLOWED_ORIGINS: CONFIGURED_ORIGIN,
+    });
     app.setGlobalPrefix("api");
     await app.listen(0, "127.0.0.1");
     const address = app.getHttpServer().address() as AddressInfo;
@@ -36,18 +41,18 @@ describe("API CORS", () => {
     await app.close();
   });
 
-  it.each(TOSS_CORS_ORIGINS)("%s의 로그인 POST preflight를 허용한다", async (origin) => {
-    const response = await fetch(`${baseUrl}/api/auth/toss/exchange`, {
+  it("구성된 운영 Origin의 POST preflight를 허용한다", async () => {
+    const response = await fetch(`${baseUrl}/api/cors-probe`, {
       method: "OPTIONS",
       headers: {
-        Origin: origin,
+        Origin: CONFIGURED_ORIGIN,
         "Access-Control-Request-Method": "POST",
         "Access-Control-Request-Headers": "content-type,x-user-id,idempotency-key",
       },
     });
 
     expect(response.status).toBe(204);
-    expect(response.headers.get("access-control-allow-origin")).toBe(origin);
+    expect(response.headers.get("access-control-allow-origin")).toBe(CONFIGURED_ORIGIN);
     expect(response.headers.get("access-control-allow-methods")).toContain("POST");
     expect(response.headers.get("access-control-allow-headers")?.toLowerCase()).toContain("content-type");
     expect(response.headers.get("access-control-allow-headers")?.toLowerCase()).toContain("x-user-id");
@@ -55,15 +60,14 @@ describe("API CORS", () => {
   });
 
   it("허용된 Origin의 실제 POST 응답에도 CORS 헤더를 넣는다", async () => {
-    const origin = TOSS_CORS_ORIGINS[0];
-    const response = await fetch(`${baseUrl}/api/auth/toss/exchange`, {
+    const response = await fetch(`${baseUrl}/api/cors-probe`, {
       method: "POST",
-      headers: { Origin: origin, "Content-Type": "application/json" },
+      headers: { Origin: CONFIGURED_ORIGIN, "Content-Type": "application/json" },
       body: "{}",
     });
 
     expect(response.status).toBe(201);
-    expect(response.headers.get("access-control-allow-origin")).toBe(origin);
+    expect(response.headers.get("access-control-allow-origin")).toBe(CONFIGURED_ORIGIN);
     await expect(response.json()).resolves.toEqual({ ok: true });
   });
 

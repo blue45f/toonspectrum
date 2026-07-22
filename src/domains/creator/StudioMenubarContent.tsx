@@ -47,6 +47,10 @@ import type { StudioCharacterBible } from "./studio-character-bible";
 import type { StudioMenu } from "./studio-editor-tool-model";
 import type { ExportFormat } from "./studio-export";
 import type { PsdExportResult } from "./studio-psd-export";
+import type {
+  StudioRasterEncoded,
+  StudioRasterInterchangeFormat,
+} from "./studio-raster-interchange";
 import type { StudioSharedDocument } from "./studio-shared-document-client";
 import type { SvgExportResult } from "./studio-svg-export";
 import type { StudioToolHintSpec } from "./studio-tool-hints";
@@ -155,6 +159,9 @@ export interface StudioMenubarContentHandlers {
   changeMobileImmersiveMode: (enabled: boolean) => void;
   ensureWatermarkLoaded: () => WatermarkSettings;
   exportCurrentPageToPsd: () => Promise<PsdExportResult>;
+  exportCurrentPageToRasterInterchange: (
+    format: StudioRasterInterchangeFormat
+  ) => Promise<StudioRasterEncoded>;
   exportCurrentPageToSvg: () => Promise<SvgExportResult>;
   handleCapturePagesForPreset: (scope: "current" | "all") => Promise<HTMLCanvasElement[]>;
   handleCopyToClipboard: () => Promise<void>;
@@ -327,6 +334,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     toggleHistoryPanel,
     undo,
     exportCurrentPageToPsd,
+    exportCurrentPageToRasterInterchange,
     exportCurrentPageToSvg,
     handleCapturePagesForPreset,
   } = stableHandlers;
@@ -632,6 +640,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                       capturePagesForPreset={handleCapturePagesForPreset}
                       exportCurrentPageToSvg={exportCurrentPageToSvg}
                       exportCurrentPageToPsd={exportCurrentPageToPsd}
+                      exportCurrentPageToRasterInterchange={exportCurrentPageToRasterInterchange}
                       setExportScale={setExportScale}
                       setExportFormat={setExportFormat}
                       setExportTransparent={setExportTransparent}

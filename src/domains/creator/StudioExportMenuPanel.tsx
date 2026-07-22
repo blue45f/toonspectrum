@@ -1,4 +1,4 @@
-import { Copy, FileText, Layers, Scissors } from "lucide-react";
+import { Copy, FileImage, FileText, Layers, Scissors } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -11,6 +11,8 @@ import {
   EXPORT_FORMATS,
   EXPORT_SCALES,
   canCopyImageToClipboard,
+  canvasToBlob,
+  downloadBlob,
   exportFormatLabel,
   exportQuality,
   type ExportFormat,
@@ -36,6 +38,10 @@ import { WATERMARK_POSITIONS, type WatermarkSettings } from "./studio-watermark"
 import { StudioContactSheetPanel } from "./StudioContactSheetPanel";
 
 import type { PsdExportResult } from "./studio-psd-export";
+import type {
+  StudioRasterEncoded,
+  StudioRasterInterchangeFormat,
+} from "./studio-raster-interchange";
 import type { SvgExportResult } from "./studio-svg-export";
 import type { Dispatch, SetStateAction } from "react";
 
@@ -45,6 +51,30 @@ import { cx } from "@/lib/cx";
 interface ExportRunStatus {
   tone: "info" | "good" | "warn";
   text: string;
+}
+
+const OPEN_RASTER_FORMATS: readonly {
+  id: StudioRasterInterchangeFormat;
+  label: string;
+  detail: string;
+}[] = [
+  { id: "qoi", label: "QOI", detail: "빠른 무손실 RGBA" },
+  { id: "tga", label: "TGA", detail: "게임·3D RGBA" },
+  { id: "pam", label: "PAM", detail: "Netpbm RGBA" },
+  { id: "bmp", label: "BMP", detail: "범용 24-bit" },
+  { id: "ppm", label: "PPM", detail: "범용 RGB" },
+  { id: "tiff", label: "TIFF", detail: "무압축 RGBA 교환" },
+] as const;
+
+function safeExportBaseName(title: string): string {
+  return Array.from(title.trim())
+    .filter((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint >= 0x20 && !"\\/:*?\"<>|".includes(character);
+    })
+    .join("")
+    .trim()
+    .slice(0, 120) || "toonspectrum-comic";
 }
 
 export interface StudioExportMenuPanelProps {
@@ -86,6 +116,10 @@ export interface StudioExportMenuPanelProps {
    * 배율을 묶어 studio-psd-export.exportPagePsd 를 호출해 결과를 준다.
    */
   exportCurrentPageToPsd?: () => Promise<PsdExportResult>;
+  /** 브라우저 Canvas가 직접 인코딩하지 못하는 공개 래스터 포맷을 Worker/코덱 경계로 출력한다. */
+  exportCurrentPageToRasterInterchange?: (
+    format: StudioRasterInterchangeFormat
+  ) => Promise<StudioRasterEncoded>;
 }
 
 export function StudioExportMenuPanel({
@@ -109,6 +143,7 @@ export function StudioExportMenuPanel({
   capturePagesForPreset,
   exportCurrentPageToSvg,
   exportCurrentPageToPsd,
+  exportCurrentPageToRasterInterchange,
 }: StudioExportMenuPanelProps) {
   // 규격 슬라이스 실행 상태 — 캡처·저장이 비동기라 패널 안에서 진행/결과를 안내한다.
   const [presetBusy, setPresetBusy] = useState(false);
@@ -122,6 +157,11 @@ export function StudioExportMenuPanel({
   // PSD(레이어별) 내보내기 실행 상태 — 요소별 캡처가 여러 번 돌아 비동기라 진행/결과를 안내한다.
   const [psdBusy, setPsdBusy] = useState(false);
   const [psdStatus, setPsdStatus] = useState<ExportRunStatus | null>(null);
+  const [openRasterFormat, setOpenRasterFormat] = useState<StudioRasterInterchangeFormat>("qoi");
+  const [openRasterBusy, setOpenRasterBusy] = useState(false);
+  const [openRasterStatus, setOpenRasterStatus] = useState<ExportRunStatus | null>(null);
+  const [archiveBusy, setArchiveBusy] = useState<"cbz" | "ora" | null>(null);
+  const [archiveStatus, setArchiveStatus] = useState<ExportRunStatus | null>(null);
   // 콘택트시트(다중 페이지 축소판을 인쇄용 한 장에 타일링) 실행 상태 — 다른 내보내기와 독립.
   const [contactColumns, setContactColumns] = useState<number>(DEFAULT_CONTACT_SHEET_COLUMNS);
   const [contactRows, setContactRows] = useState<number>(DEFAULT_CONTACT_SHEET_ROWS);
@@ -138,6 +178,110 @@ export function StudioExportMenuPanel({
     };
   }, []);
   const selectedPreset = exportPresetId ? EXPORT_PRESETS.find((preset) => preset.id === exportPresetId) : null;
+
+  async function runOpenRasterExport() {
+    if (
+      !exportCurrentPageToRasterInterchange || openRasterBusy || psdBusy || svgBusy || pdfBusy ||
+      presetBusy || isExporting || contactBusy || archiveBusy !== null
+    ) return;
+    setOpenRasterBusy(true);
+    setOpenRasterStatus({ tone: "info", text: `${openRasterFormat.toUpperCase()} 픽셀을 인코딩하는 중...` });
+    try {
+      const result = await exportCurrentPageToRasterInterchange(openRasterFormat);
+      if (!mountedRef.current) return;
+      const owned = new Uint8Array(result.bytes.byteLength);
+      owned.set(result.bytes);
+      const safeTitle = safeExportBaseName(exportTitle);
+      downloadBlob(new Blob([owned.buffer], { type: result.mimeType }), `${safeTitle}${result.extension}`);
+      setOpenRasterStatus({
+        tone: result.lossy || result.warnings.length > 0 ? "warn" : "good",
+        text: [
+          `${openRasterFormat.toUpperCase()} 파일을 저장했어요.`,
+          ...result.warnings,
+        ].join(" "),
+      });
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setOpenRasterStatus({
+        tone: "warn",
+        text: error instanceof Error ? error.message : "공개 래스터 파일을 만들지 못했습니다.",
+      });
+    } finally {
+      if (mountedRef.current) setOpenRasterBusy(false);
+    }
+  }
+
+  async function runArchiveExport(kind: "cbz" | "ora") {
+    if (
+      archiveBusy !== null || openRasterBusy || psdBusy || svgBusy || pdfBusy || presetBusy ||
+      isExporting || contactBusy
+    ) return;
+    setArchiveBusy(kind);
+    setArchiveStatus({
+      tone: "info",
+      text: kind === "cbz" ? `${pageCount}페이지를 CBZ로 묶는 중…` : "현재 페이지를 OpenRaster로 묶는 중…",
+    });
+    try {
+      const canvases = await capturePagesForPreset(kind === "cbz" ? "all" : "current");
+      if (canvases.length === 0) throw new Error("내보낼 페이지를 캡처하지 못했습니다.");
+      const pngPages: Blob[] = [];
+      for (let index = 0; index < canvases.length; index += 1) {
+        if (mountedRef.current) {
+          setArchiveStatus({
+            tone: "info",
+            text: `${index + 1}/${canvases.length}페이지를 무손실 PNG로 변환하는 중…`,
+          });
+        }
+        pngPages.push(await canvasToBlob(canvases[index]!, "image/png"));
+      }
+      if (!mountedRef.current) return;
+      const safeTitle = safeExportBaseName(exportTitle);
+      if (kind === "cbz") {
+        const { buildStudioCbzBlob } = await import("./studio-cbz-interchange");
+        const result = await buildStudioCbzBlob({
+          pages: pngPages.map((image) => ({ image })),
+          metadata: {
+            title: exportTitle.trim() || safeTitle,
+            count: pngPages.length,
+            format: "Webtoon",
+          },
+        });
+        downloadBlob(result.blob, `${safeTitle}.cbz`);
+        setArchiveStatus({
+          tone: result.warnings.length > 0 ? "warn" : "good",
+          text: [`CBZ ${pngPages.length}페이지와 ComicInfo.xml을 저장했어요.`, ...result.warnings.map((item) => item.message)].join(" "),
+        });
+      } else {
+        const { buildStudioOpenRasterBlob } = await import("./studio-openraster-interchange");
+        const canvas = canvases[0]!;
+        const image = pngPages[0]!;
+        const result = await buildStudioOpenRasterBlob({
+          width: canvas.width,
+          height: canvas.height,
+          name: exportTitle.trim() || safeTitle,
+          layers: [{ name: "합성 페이지", png: image }],
+          mergedImage: image,
+          thumbnail: image,
+        });
+        downloadBlob(result.blob, `${safeTitle}.ora`);
+        setArchiveStatus({
+          tone: "warn",
+          text: [
+            "OpenRaster를 저장했어요. 현재 메뉴 경로는 화면과 같은 합성 1레이어이며, 요소별 레이어 교환은 PSD를 사용하세요.",
+            ...result.warnings.map((item) => item.message),
+          ].join(" "),
+        });
+      }
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setArchiveStatus({
+        tone: "warn",
+        text: error instanceof Error ? error.message : "문서 교환 파일을 만들지 못했습니다.",
+      });
+    } finally {
+      if (mountedRef.current) setArchiveBusy(null);
+    }
+  }
   const outW = Math.round(canvasWidth * exportScale);
   const outH = Math.round(canvasHeight * exportScale);
   const validation = selectedPreset
@@ -149,7 +293,7 @@ export function StudioExportMenuPanel({
 
   // 전체 페이지 캡처 → JPEG 인코드 → 미니멀 PDF 조립 → 한 파일 다운로드.
   async function runPdfExport() {
-    if (pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy) return;
+    if (pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy || archiveBusy !== null) return;
     setPdfBusy(true);
     setPdfStatus({ tone: "info", text: pageCount > 1 ? `${pageCount}페이지 캡처 중…` : "페이지 캡처 중…" });
     try {
@@ -174,7 +318,7 @@ export function StudioExportMenuPanel({
   // 페이지 축소판 여러 장을 한 인쇄용 시트에 격자로 배치 → PDF 한 파일. PDF 바이트 조립은
   // exportPagesToPdf와 동일한 buildPdfFromJpegPages를 재사용(studio-pdf-contact-sheet 내부).
   async function runContactSheetExport() {
-    if (contactBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting) return;
+    if (contactBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || archiveBusy !== null) return;
     const preset = CONTACT_SHEET_PAGE_PRESETS.find((p) => p.id === contactPagePresetId) ?? CONTACT_SHEET_PAGE_PRESETS[0];
     setContactBusy(true);
     setContactStatus({ tone: "info", text: pageCount > 1 ? `${pageCount}페이지 캡처 중…` : "페이지 캡처 중…" });
@@ -204,7 +348,10 @@ export function StudioExportMenuPanel({
   // 현재 페이지 → 벡터 SVG 한 파일. 요소 직렬화는 StudioPage(exportCurrentPageToSvg)가 하고,
   // 여기선 Blob 다운로드 + 스킵/근사 고지만 담당한다.
   async function runSvgExport() {
-    if (!exportCurrentPageToSvg || svgBusy || psdBusy || pdfBusy || presetBusy || isExporting || contactBusy) return;
+    if (
+      !exportCurrentPageToSvg || svgBusy || psdBusy || pdfBusy || presetBusy || isExporting ||
+      contactBusy || archiveBusy !== null
+    ) return;
     setSvgBusy(true);
     setSvgStatus({ tone: "info", text: "벡터 내보내기 엔진을 준비하는 중…" });
     try {
@@ -232,7 +379,10 @@ export function StudioExportMenuPanel({
   // 현재 페이지 → 요소별 레이어를 가진 PSD 한 파일. 캡처(stage.toCanvas 여러 번)는
   // StudioPage(exportCurrentPageToPsd)가 하고, 여기선 Blob 다운로드 + 스킵 고지만 담당한다.
   async function runPsdExport() {
-    if (!exportCurrentPageToPsd || psdBusy || svgBusy || pdfBusy || presetBusy || isExporting || contactBusy) return;
+    if (
+      !exportCurrentPageToPsd || psdBusy || svgBusy || pdfBusy || presetBusy || isExporting ||
+      contactBusy || archiveBusy !== null
+    ) return;
     setPsdBusy(true);
     setPsdStatus({ tone: "info", text: "레이어별로 캡처하는 중…" });
     try {
@@ -260,7 +410,7 @@ export function StudioExportMenuPanel({
 
   // 규격 선택 → 캡처 → 리샘플·분할 → 순차 다운로드까지 한 번에 실행.
   async function runPresetSliceExport(scope: PresetExportScope) {
-    if (!selectedPreset || presetBusy || pdfBusy || psdBusy || svgBusy || contactBusy) return;
+    if (!selectedPreset || presetBusy || pdfBusy || psdBusy || svgBusy || contactBusy || archiveBusy !== null) return;
     setPresetBusy(true);
     setPresetStatus({ tone: "info", text: scope === "all" ? `${pageCount}페이지 캡처 중…` : "페이지 캡처 중…" });
     try {
@@ -445,11 +595,110 @@ export function StudioExportMenuPanel({
         </button>
       )}
 
+      {exportCurrentPageToRasterInterchange && (
+        <section className="mt-2.5 rounded-xl border border-line bg-card/45 p-2" aria-label="공개 래스터 포맷">
+          <div className="flex items-center gap-2">
+            <FileImage size={14} className="shrink-0 text-accent" aria-hidden />
+            <label className="min-w-0 flex-1 text-[0.65rem] font-semibold text-fg-2">
+              공개 래스터 포맷
+              <select
+                value={openRasterFormat}
+                onChange={(event) => setOpenRasterFormat(event.target.value as StudioRasterInterchangeFormat)}
+                aria-label="공개 래스터 내보내기 형식"
+                disabled={openRasterBusy || isExporting}
+                className="mt-1 min-h-11 w-full rounded-lg border border-line bg-panel px-2 text-xs text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
+              >
+                {OPEN_RASTER_FORMATS.map((format) => (
+                  <option key={format.id} value={format.id}>
+                    {format.label} · {format.detail}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <button
+            type="button"
+            onClick={() => void runOpenRasterExport()}
+            disabled={
+              openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy ||
+              archiveBusy !== null
+            }
+            className="mt-1.5 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-accent/35 bg-accent/10 px-2 text-xs font-semibold text-accent transition-colors hover:bg-accent/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <FileImage size={13} aria-hidden />
+            {openRasterBusy ? "픽셀 인코딩 중" : `${openRasterFormat.toUpperCase()} 저장`}
+          </button>
+          <p className="mt-1 text-[0.6rem] leading-relaxed text-fg-4">
+            QOI·TGA·PAM·TIFF는 투명도를 보존합니다. BMP·PPM은 호환성을 위해 흰색 배경에 합성합니다.
+          </p>
+          <p
+            aria-live="polite"
+            className={cx(
+              openRasterStatus ? "mt-1.5 rounded-md border px-2 py-1 text-[10px] leading-snug" : "sr-only",
+              openRasterStatus?.tone === "info" && "border-line bg-panel text-fg-3",
+              openRasterStatus?.tone === "good" && "border-good/40 bg-good/10 text-good",
+              openRasterStatus?.tone === "warn" && "border-warn/40 bg-warn/10 text-warn"
+            )}
+          >
+            {openRasterStatus?.text}
+          </p>
+        </section>
+      )}
+
+      <section className="mt-2.5 rounded-xl border border-line bg-card/45 p-2" aria-label="문서 교환 포맷">
+        <div className="mb-1.5 flex items-center gap-1.5">
+          <Layers size={14} className="text-accent" aria-hidden />
+          <span className="text-[0.68rem] font-semibold text-fg-2">문서·만화 교환</span>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            onClick={() => void runArchiveExport("cbz")}
+            disabled={
+              archiveBusy !== null || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
+              isExporting || contactBusy
+            }
+            className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
+            title={`전체 ${pageCount}페이지를 ComicInfo.xml 메타데이터와 함께 CBZ로 저장`}
+          >
+            <FileImage size={13} aria-hidden />
+            {archiveBusy === "cbz" ? "CBZ 생성 중" : `CBZ · ${pageCount}P`}
+          </button>
+          <button
+            type="button"
+            onClick={() => void runArchiveExport("ora")}
+            disabled={
+              archiveBusy !== null || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
+              isExporting || contactBusy
+            }
+            className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
+            title="현재 페이지를 OpenRaster 합성 1레이어 파일로 저장"
+          >
+            <Layers size={13} aria-hidden />
+            {archiveBusy === "ora" ? "ORA 생성 중" : "ORA · 현재"}
+          </button>
+        </div>
+        <p className="mt-1 text-[0.6rem] leading-relaxed text-fg-4">
+          CBZ는 전체 페이지와 ComicInfo.xml을 보존합니다. ORA는 현재 화면을 합성 1레이어로 내보냅니다.
+        </p>
+        <p
+          aria-live="polite"
+          className={cx(
+            archiveStatus ? "mt-1.5 rounded-md border px-2 py-1 text-[10px] leading-snug" : "sr-only",
+            archiveStatus?.tone === "info" && "border-line bg-panel text-fg-3",
+            archiveStatus?.tone === "good" && "border-good/40 bg-good/10 text-good",
+            archiveStatus?.tone === "warn" && "border-warn/40 bg-warn/10 text-warn"
+          )}
+        >
+          {archiveStatus?.text}
+        </p>
+      </section>
+
       {/* 전체 페이지 → PDF 한 파일 — JPG(품질 92%)로 담는 규격 무관 백업·제출·공유용. */}
       <button
         type="button"
         onClick={() => void runPdfExport()}
-        disabled={pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy}
+        disabled={pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || contactBusy || archiveBusy !== null}
         className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
         title={`전체 ${pageCount}페이지를 JPG로 담은 PDF 한 파일로 저장`}
       >
@@ -474,7 +723,7 @@ export function StudioExportMenuPanel({
         showLabels={contactShowLabels}
         pageCount={pageCount}
         busy={contactBusy}
-        disabled={pdfBusy || presetBusy || psdBusy || svgBusy || isExporting}
+        disabled={pdfBusy || presetBusy || psdBusy || svgBusy || isExporting || archiveBusy !== null}
         status={contactStatus}
         setColumns={setContactColumns}
         setRows={setContactRows}
@@ -492,7 +741,9 @@ export function StudioExportMenuPanel({
             onPointerEnter={preloadStudioSvgExportModule}
             onPointerDown={preloadStudioSvgExportModule}
             onFocus={preloadStudioSvgExportModule}
-            disabled={svgBusy || psdBusy || pdfBusy || presetBusy || isExporting || contactBusy}
+            disabled={
+              svgBusy || psdBusy || pdfBusy || presetBusy || isExporting || contactBusy || archiveBusy !== null
+            }
             className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
             title="현재 페이지를 벡터 SVG 파일로 저장 (도형·텍스트·말풍선 벡터 보존)"
           >
@@ -521,7 +772,9 @@ export function StudioExportMenuPanel({
             onPointerEnter={preloadStudioPsdExportModule}
             onPointerDown={preloadStudioPsdExportModule}
             onFocus={preloadStudioPsdExportModule}
-            disabled={psdBusy || svgBusy || pdfBusy || presetBusy || isExporting || contactBusy}
+            disabled={
+              psdBusy || svgBusy || pdfBusy || presetBusy || isExporting || contactBusy || archiveBusy !== null
+            }
             className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
             title="현재 페이지를 요소별 레이어를 가진 PSD 파일로 저장 (포토샵에서 레이어별 편집 가능)"
           >
@@ -572,7 +825,9 @@ export function StudioExportMenuPanel({
             <button
               type="button"
               onClick={() => void runPresetSliceExport("current")}
-              disabled={presetBusy || pdfBusy || psdBusy || svgBusy || isExporting || contactBusy}
+              disabled={
+                presetBusy || pdfBusy || psdBusy || svgBusy || isExporting || contactBusy || archiveBusy !== null
+              }
               className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg border border-accent/30 bg-accent/10 px-2 text-[0.68rem] font-semibold text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
               title={`현재 페이지를 ${selectedPreset.label} 규격(폭 리샘플·세로 분할)으로 저장`}
             >
@@ -582,7 +837,9 @@ export function StudioExportMenuPanel({
               <button
                 type="button"
                 onClick={() => void runPresetSliceExport("all")}
-                disabled={presetBusy || pdfBusy || psdBusy || svgBusy || isExporting || contactBusy}
+                disabled={
+                  presetBusy || pdfBusy || psdBusy || svgBusy || isExporting || contactBusy || archiveBusy !== null
+                }
                 className="flex h-8 flex-1 items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
                 title={`${pageCount}페이지를 이어 붙여 ${selectedPreset.label} 규격으로 나눠 저장`}
               >

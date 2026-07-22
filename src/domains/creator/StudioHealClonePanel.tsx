@@ -85,7 +85,13 @@ export function StudioHealClonePanel({
         {HEAL_CLONE_MODES.map((m) => {
           const Icon = MODE_ICONS[m.id];
           return (
-            <StudioToggleChip key={m.id} active={mode === m.id} onClick={() => onPickMode(m.id)} title={m.tip}>
+            <StudioToggleChip
+              key={m.id}
+              active={mode === m.id}
+              disabled={busy}
+              onClick={() => onPickMode(m.id)}
+              title={busy ? "현재 스트로크를 반영한 뒤 모드를 바꿀 수 있습니다." : m.tip}
+            >
               <span className="inline-flex items-center gap-1">
                 <Icon className="size-3" aria-hidden />
                 {m.label}
@@ -101,6 +107,7 @@ export function StudioHealClonePanel({
         max={HEAL_CLONE_RADIUS_RANGE.max}
         step={HEAL_CLONE_RADIUS_RANGE.step}
         value={radiusPx}
+        disabled={busy}
         onChange={onRadiusChange}
         readout={`${radiusPx}px`}
       />
@@ -111,6 +118,7 @@ export function StudioHealClonePanel({
         max={HEAL_CLONE_HARDNESS_RANGE.max}
         step={HEAL_CLONE_HARDNESS_RANGE.step}
         value={hardness}
+        disabled={busy}
         onChange={onHardnessChange}
         readout={`${Math.round(hardness * 100)}%`}
       />
@@ -121,14 +129,18 @@ export function StudioHealClonePanel({
         max={HEAL_CLONE_OPACITY_RANGE.max}
         step={HEAL_CLONE_OPACITY_RANGE.step}
         value={opacity}
+        disabled={busy}
         onChange={onOpacityChange}
         readout={`${Math.round(opacity * 100)}%`}
       />
 
       <StudioToggleChip
         active={aligned}
+        disabled={busy}
         onClick={() => onAlignedChange(!aligned)}
-        title="켜면 소스 오프셋이 스트로크가 끝나도 유지됩니다(새 Alt+클릭 전까지). 끄면 매 스트로크마다 소스 앵커 지점부터 다시 복제합니다."
+        title={busy
+          ? "현재 스트로크를 반영한 뒤 정렬 방식을 바꿀 수 있습니다."
+          : "켜면 소스 오프셋이 스트로크가 끝나도 유지됩니다(새 Alt+클릭 전까지). 끄면 매 스트로크마다 소스 앵커 지점부터 다시 복제합니다."}
       >
         정렬(Aligned)
       </StudioToggleChip>
@@ -137,7 +149,8 @@ export function StudioHealClonePanel({
         <button
           type="button"
           onClick={onClearSource}
-          title="지정한 소스 앵커를 해제합니다."
+          disabled={busy}
+          title={busy ? "현재 스트로크를 반영한 뒤 소스를 해제할 수 있습니다." : "지정한 소스 앵커를 해제합니다."}
           className={cn(PANEL_CHIP_CLASS, "flex w-full items-center justify-center gap-1")}
         >
           <Crosshair className="size-3" aria-hidden />

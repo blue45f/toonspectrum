@@ -1,6 +1,5 @@
-// 커뮤니티 / 리뷰 — 웹·토스가 공유하는 읽기전용 리뷰 피드 응답 타입(브랜치 A).
-// GET /api/reviews 의 응답 계약을 한 곳에 모은다. 웹 ReviewsPage 와 토스가 동일 타입으로
-// 같은 GET(CORS 통과)을 fetch 한다. 작성형 데모 커뮤니티 엔진은 ./store 참고(브랜치 B).
+// 커뮤니티 / 리뷰 읽기전용 피드 응답 타입(브랜치 A).
+// GET /api/reviews 응답 계약을 한 곳에 모아 서버·클라이언트 드리프트를 방지합니다.
 
 import type { SeedReview, Title } from "../types";
 
@@ -24,7 +23,7 @@ export interface ReviewsStats {
   distinctTitles: number;
 }
 
-/** GET /api/reviews 응답 — 웹 ReviewsPage·토스 공유. */
+/** GET /api/reviews 응답. */
 export interface ReviewsResponse {
   sort: ReviewSort;
   feed: ReviewFeedItem[];

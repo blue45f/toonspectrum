@@ -28,7 +28,7 @@ import {
 } from "../../../../../lib/server/kmas";
 import { getTitleDetail as getTitleDetailFromLib } from "../../../../../lib/server/title";
 // 브라우저-세이프 카탈로그 read-model 7종은 @toonspectrum/core 패키지(packages/core/src/server)로 이전됨
-// (웹·토스와 공유). API 는 lib/* 와 동일한 deep-climb(rootDir=레포루트) 로 참조한다 — tsc 가 dist 로 함께
+// (웹 앱·API가 공유). API 는 lib/* 와 동일한 deep-climb(rootDir=레포루트) 로 참조한다 — tsc 가 dist 로 함께
 // 컴파일해 상대 require 로 런타임 해석되도록(bare 패키지 지정자는 plain-node 가 .ts exports 를 못 풀어 부적합).
 import {
   activeTags,

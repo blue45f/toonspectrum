@@ -1,4 +1,4 @@
-// 연재 캘린더 공용 순수 로직 — 웹(/)·토스(apps/toss)·API(apps/api) 가 동일 함수를 공유한다.
+// 연재 캘린더 공용 순수 로직 — 웹과 API가 동일 함수를 공유합니다.
 // React/DOM/Node/Drizzle/env 의존 없음. KST 요일 계산과 '요일별 그룹화'를 한 곳에 모은다.
 import { WEEK_DAYS } from "./taxonomy";
 
@@ -20,7 +20,7 @@ export function kstTodayIdx(): number {
 }
 
 // 연재 작품을 요일(월~일)별로 그룹화 — 각 요일 칸은 조회수 내림차순. 웹 서버 read-model(getCalendarData)·
-// NestJS 캘린더 라우트·토스 CalendarPage 가 같은 함수를 호출하도록 순수 함수로 뽑아낸다.
+// NestJS 캘린더 라우트와 웹 화면이 같은 함수를 호출하도록 순수 함수로 분리합니다.
 // 입력 titles 는 이미 연재 캘린더 대상(웹툰·연재중·updateDays 보유)으로 필터된 목록을 기대한다.
 export function groupByWeekday(titles: Title[]): Title[][] {
   return WEEK_DAYS.map((day) =>

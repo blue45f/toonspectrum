@@ -12,6 +12,7 @@ import {
 import { createPortal } from "react-dom";
 
 import {
+  STUDIO_COLOR_CANVAS_EYEDROPPER_HINT,
   STUDIO_COLOR_EYEDROPPER_HINT,
   studioColorPopoverTriggerHint,
   studioPaletteFamilyHint,
@@ -45,6 +46,8 @@ export type StudioColorPopoverProps = {
   onChange: (color: string) => void;
   recentColors: readonly string[];
   onUseColor?: (color: string) => void;
+  /** Always-available authored-canvas sampler. Independent of the optional browser EyeDropper API. */
+  onRequestCanvasEyedropper?: () => void;
   /** Accessible trigger name. Kept separate from native `title` tooltips. */
   label?: string;
   /** Selects copy and the action-specific rich preview for the trigger. */
@@ -58,6 +61,7 @@ export function StudioColorPopover({
   onChange,
   recentColors,
   onUseColor,
+  onRequestCanvasEyedropper,
   label = "색상 선택",
   purpose = "generic",
   className,
@@ -301,11 +305,27 @@ export function StudioColorPopover({
               }}
               className="h-7 min-w-0 flex-1 rounded border border-line bg-card px-2 text-xs tabular-nums text-fg-2 focus:outline-none focus:ring-1 focus:ring-accent pointer-coarse:h-11"
             />
-            {eyeDropperCtor && (
+            {onRequestCanvasEyedropper ? (
+              <StudioToolHintTarget hint={STUDIO_COLOR_CANVAS_EYEDROPPER_HINT} preferredSide="bottom">
+                <button
+                  type="button"
+                  aria-label="캔버스에서 정밀 색 가져오기"
+                  aria-keyshortcuts="I"
+                  onClick={() => {
+                    setOpen(false);
+                    onRequestCanvasEyedropper();
+                  }}
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded border border-line text-fg-2 hover:border-accent/50 hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent pointer-coarse:size-11"
+                >
+                  <Pipette className="size-3.5" aria-hidden />
+                </button>
+              </StudioToolHintTarget>
+            ) : null}
+            {eyeDropperCtor ? (
               <StudioToolHintTarget hint={STUDIO_COLOR_EYEDROPPER_HINT} preferredSide="bottom">
                 <button
                   type="button"
-                  aria-label="화면에서 색 가져오기"
+                  aria-label="화면 전체에서 색 가져오기"
                   onClick={() => {
                     const ed = new eyeDropperCtor();
                     ed.open()
@@ -317,7 +337,7 @@ export function StudioColorPopover({
                   <Pipette className="size-3.5" aria-hidden />
                 </button>
               </StudioToolHintTarget>
-            )}
+            ) : null}
           </div>
 
           {/* 최근 사용 색 */}

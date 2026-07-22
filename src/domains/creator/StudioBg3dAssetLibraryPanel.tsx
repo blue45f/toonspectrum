@@ -1,15 +1,17 @@
 import {
   AlertTriangle,
+  ChevronDown,
   Loader2,
   PackageOpen,
   Search,
+  ShieldCheck,
   Trash2,
   Upload,
   X,
 } from "lucide-react";
-import { useRef, useState, type ChangeEventHandler } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 
-import type { Bg3dModelLibraryEntry } from "./bg3d-model-library";
+import type { Bg3dModelImportItem, Bg3dModelLibraryEntry } from "./bg3d-model-library";
 
 const ASSET_BATCH_SIZE = 12;
 const MODEL_FILE_ACCEPT =
@@ -19,11 +21,24 @@ const CONTROL_BUTTON =
   "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-9";
 
 type AssetFilter = "all" | "usable" | "review";
+type ImportRights = NonNullable<Bg3dModelImportItem["rights"]>;
+type ImportRightsStatus = NonNullable<ImportRights["status"]>;
 
 const ASSET_FILTERS: ReadonlyArray<{ id: AssetFilter; label: string }> = [
   { id: "all", label: "전체" },
   { id: "usable", label: "사용 가능" },
   { id: "review", label: "확인 필요" },
+];
+
+const RIGHTS_PRESETS: ReadonlyArray<{
+  id: ImportRightsStatus;
+  label: string;
+  description: string;
+}> = [
+  { id: "owned", label: "직접 제작", description: "내가 만든 모델" },
+  { id: "licensed", label: "구매·허가", description: "ACON·웨어하우스 등" },
+  { id: "public-domain", label: "공개 이용", description: "퍼블릭 도메인" },
+  { id: "unknown", label: "확인 전", description: "상업 이용 보류" },
 ];
 
 type StudioBg3dAssetLibraryPanelProps = {
@@ -37,7 +52,7 @@ type StudioBg3dAssetLibraryPanelProps = {
   } | null;
   isRestoringScene: boolean;
   deviceProfileLabel: "모바일" | "데스크톱";
-  onFileChange: ChangeEventHandler<HTMLInputElement>;
+  onFileChange: (event: ChangeEvent<HTMLInputElement>, rights: ImportRights) => void;
   onCancelImport: () => void;
   onAdd: (id: string) => void;
   onDelete: (id: string) => void;
@@ -63,7 +78,25 @@ export function StudioBg3dAssetLibraryPanel({
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<AssetFilter>("all");
   const [visibleCount, setVisibleCount] = useState(ASSET_BATCH_SIZE);
+  const [rightsStatus, setRightsStatus] = useState<ImportRightsStatus>("unknown");
+  const [commercialUse, setCommercialUse] = useState(false);
+  const [attributionRequired, setAttributionRequired] = useState(false);
+  const [licenseName, setLicenseName] = useState("");
+  const [attribution, setAttribution] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const trimmedLicenseName = licenseName.trim();
+  const trimmedAttribution = attribution.trim();
+  const rightsAreComplete =
+    (rightsStatus !== "licensed" || trimmedLicenseName.length > 0) &&
+    (!attributionRequired || trimmedAttribution.length > 0);
+  const importRights: ImportRights = {
+    status: rightsStatus,
+    commercialUse: rightsStatus === "unknown" ? false : commercialUse,
+    attributionRequired,
+    ...(trimmedLicenseName ? { licenseName: trimmedLicenseName } : {}),
+    ...(trimmedAttribution ? { attribution: trimmedAttribution } : {}),
+  };
 
   const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
   const filteredEntries = entries.filter((entry) => {
@@ -96,11 +129,12 @@ export function StudioBg3dAssetLibraryPanel({
         className="sr-only"
         multiple
         type="file"
-        onChange={onFileChange}
+        onChange={(event) => onFileChange(event, importRights)}
       />
       <button
         type="button"
         className={cx(CONTROL_BUTTON, "w-full border-accent/50 bg-accent text-on-accent hover:bg-accent/90")}
+        disabled={!isUploading && !rightsAreComplete}
         onClick={() => {
           if (isUploading) onCancelImport();
           else fileInputRef.current?.click();
@@ -113,8 +147,105 @@ export function StudioBg3dAssetLibraryPanel({
             : "가져오기 취소"
           : "3D 모델 및 연결 파일 가져오기"}
       </button>
+      <details className="group mt-2 rounded-xl border border-line bg-card/60 open:bg-card">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-bold text-fg marker:content-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9">
+          <ShieldCheck size={14} className="shrink-0 text-accent" aria-hidden />
+          <span className="min-w-0 flex-1 truncate">이용 권리 기록</span>
+          <span className="shrink-0 text-[0.65rem] font-semibold text-fg-3">
+            {RIGHTS_PRESETS.find((preset) => preset.id === rightsStatus)?.label}
+          </span>
+          <ChevronDown
+            size={14}
+            className="shrink-0 text-fg-3 transition-transform duration-200 group-open:rotate-180"
+            aria-hidden
+          />
+        </summary>
+
+        <div className="border-t border-line px-3 pb-3 pt-2.5">
+          <p className="text-[0.68rem] leading-relaxed text-fg-3">
+            모델 파일은 외부로 전송하지 않습니다. 출처의 원본 라이선스를 확인하고, 작업에 함께 보관할 권리 정보를 선택하세요.
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="가져올 3D 모델 이용 권리">
+            {RIGHTS_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                role="radio"
+                aria-checked={rightsStatus === preset.id}
+                className={cx(
+                  "min-h-11 rounded-lg border px-2 py-1.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-10",
+                  rightsStatus === preset.id
+                    ? "border-accent/55 bg-accent-soft text-accent"
+                    : "border-line bg-panel text-fg-2 hover:bg-raised hover:text-fg",
+                )}
+                onClick={() => {
+                  setRightsStatus(preset.id);
+                  if (preset.id === "unknown") setCommercialUse(false);
+                }}
+              >
+                <span className="block text-[0.68rem] font-bold">{preset.label}</span>
+                <span className="mt-0.5 block text-[0.62rem] font-medium text-fg-3">{preset.description}</span>
+              </button>
+            ))}
+          </div>
+
+          {rightsStatus === "licensed" ? (
+            <label className="mt-2 block text-[0.68rem] font-bold text-fg-2">
+              라이선스·구매처 이름 <span className="text-accent">필수</span>
+              <input
+                type="text"
+                value={licenseName}
+                maxLength={160}
+                placeholder="예: ACON3D 구매 라이선스"
+                aria-invalid={!trimmedLicenseName || undefined}
+                className="mt-1 min-h-11 w-full rounded-lg border border-line bg-panel px-2.5 text-xs font-medium text-fg placeholder:text-fg-3 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
+                onChange={(event) => setLicenseName(event.target.value)}
+              />
+            </label>
+          ) : null}
+
+          <label className="mt-2 flex min-h-11 items-center gap-2 rounded-lg border border-line bg-panel px-2.5 text-[0.68rem] font-semibold text-fg-2 sm:min-h-9">
+            <input
+              type="checkbox"
+              checked={rightsStatus !== "unknown" && commercialUse}
+              disabled={rightsStatus === "unknown"}
+              className="size-4 accent-[var(--color-accent)]"
+              onChange={(event) => setCommercialUse(event.target.checked)}
+            />
+            상업 작품에 사용할 수 있음
+          </label>
+          <label className="mt-1.5 flex min-h-11 items-center gap-2 rounded-lg border border-line bg-panel px-2.5 text-[0.68rem] font-semibold text-fg-2 sm:min-h-9">
+            <input
+              type="checkbox"
+              checked={attributionRequired}
+              className="size-4 accent-[var(--color-accent)]"
+              onChange={(event) => setAttributionRequired(event.target.checked)}
+            />
+            작품에 출처 표기가 필요함
+          </label>
+          {attributionRequired ? (
+            <label className="mt-2 block text-[0.68rem] font-bold text-fg-2">
+              출처 표기 문구 <span className="text-accent">필수</span>
+              <input
+                type="text"
+                value={attribution}
+                maxLength={160}
+                placeholder="예: 모델 제작자 · 라이선스명"
+                aria-invalid={!trimmedAttribution || undefined}
+                className="mt-1 min-h-11 w-full rounded-lg border border-line bg-panel px-2.5 text-xs font-medium text-fg placeholder:text-fg-3 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
+                onChange={(event) => setAttribution(event.target.value)}
+              />
+            </label>
+          ) : null}
+          {!rightsAreComplete ? (
+            <p className="mt-2 text-[0.66rem] font-semibold leading-relaxed text-accent" role="alert">
+              필수 권리 정보를 입력하면 파일을 선택할 수 있습니다.
+            </p>
+          ) : null}
+        </div>
+      </details>
       <p className="mt-2 rounded-xl border border-line bg-card/60 px-3 py-2 text-xs leading-relaxed text-fg-3">
-        GLB·glTF·OBJ·FBX·DAE·STL·PLY·3DS를 지원합니다. glTF의 BIN/텍스처나 OBJ의 MTL/텍스처도 함께 선택하세요.
+        SketchUp에서 내보낸 DAE·OBJ를 포함해 GLB·glTF·FBX·STL·PLY·3DS를 지원합니다. glTF의 BIN/텍스처나 OBJ의 MTL/텍스처도 함께 선택하세요.
         외부 네트워크 참조 없이 자체 포함 GLB로 변환하고, Worker에서 SHA-256·파일 구조와 기기별
         삼각형/텍스처 예산을 검사한 뒤 로컬 라이브러리에 저장합니다. Meshopt 압축은 별도 WASM
         Worker에서 풀며 디코딩 후 메모리도 같은 기기 예산으로 제한합니다. KTX2/Basis 텍스처는

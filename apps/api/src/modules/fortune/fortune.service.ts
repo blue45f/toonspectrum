@@ -1,7 +1,7 @@
 // apps/api/src/modules/fortune/fortune.service.ts
 //
 // 운세 계산·명리·타로·별자리·콘티 파싱의 순수 엔진은 @toonspectrum/core/fortune 로
-// 이전됐다(웹 백엔드·토스 공유). 이 서비스는 NestJS @Injectable 래퍼로서,
+// 이전됐다(웹 앱·NestJS 백엔드 공유). 이 서비스는 NestJS @Injectable 래퍼로서,
 //  1) 카탈로그(TITLES, core/server)와
 //  2) Gemini LLM 가공기(process.env·fetch — 플랫폼 종속)
 // 를 코어 엔진에 주입하기만 한다.

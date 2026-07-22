@@ -5,6 +5,47 @@ import {
   STUDIO_UPLOAD_MAX_SOURCE_FILE_BYTES,
 } from "./studio-upload-image-safety";
 
+import type { StudioRasterInterchangeFormat, StudioRgbaBitmap } from "./studio-raster-interchange";
+
+export const STUDIO_CANVAS_IMAGE_ACCEPT =
+  "image/*,.bmp,.dib,.tga,.icb,.vda,.vst,.ppm,.pam,.qoi,.tif,.tiff" as const;
+export const STUDIO_CANVAS_OPEN_RASTER_MAX_BYTES = 64 * 1024 * 1024;
+
+const OPEN_RASTER_EXTENSION_FORMAT: Readonly<Record<string, StudioRasterInterchangeFormat>> = Object.freeze({
+  bmp: "bmp",
+  dib: "bmp",
+  tga: "tga",
+  icb: "tga",
+  vda: "tga",
+  vst: "tga",
+  ppm: "ppm",
+  pam: "pam",
+  qoi: "qoi",
+  tif: "tiff",
+  tiff: "tiff",
+});
+
+const OPEN_RASTER_MIME_FORMAT: Readonly<Record<string, StudioRasterInterchangeFormat>> = Object.freeze({
+  "image/bmp": "bmp",
+  "image/x-ms-bmp": "bmp",
+  "image/x-tga": "tga",
+  "image/x-targa": "tga",
+  "image/x-portable-pixmap": "ppm",
+  "image/x-portable-arbitrarymap": "pam",
+  "image/qoi": "qoi",
+  "image/tiff": "tiff",
+  "image/x-tiff": "tiff",
+});
+
+export function studioOpenRasterFormatForFile(file: Pick<File, "name" | "type">): StudioRasterInterchangeFormat | null {
+  const extension = file.name.toLocaleLowerCase("en-US").split(".").pop() ?? "";
+  return OPEN_RASTER_EXTENSION_FORMAT[extension] ?? OPEN_RASTER_MIME_FORMAT[file.type.toLocaleLowerCase("en-US")] ?? null;
+}
+
+export function isStudioOpenRasterFile(file: Pick<File, "name" | "type">): boolean {
+  return studioOpenRasterFormatForFile(file) !== null;
+}
+
 export function studioCanvasDecodedPixelLimit(): number {
   const navigatorWithMemory = globalThis.navigator as Navigator & { deviceMemory?: number };
   return selectStudioUploadDecodedPixelLimit({
@@ -64,6 +105,59 @@ export function downscaleImageFile(file: File, maxDim = 1280, quality = 0.85) {
   });
 }
 
+export function studioRasterBitmapToCanvasDataUrl(
+  bitmap: StudioRgbaBitmap,
+  maxDim = 1280,
+  quality = 0.85
+): { src: string; width: number; height: number } {
+  const maximumPixels = studioCanvasDecodedPixelLimit();
+  assertStudioCanvasDecodedImageSize(bitmap.width, bitmap.height, maximumPixels);
+  if (
+    !(bitmap.data instanceof Uint8Array) &&
+    !(bitmap.data instanceof Uint8ClampedArray)
+  ) throw new Error("래스터 픽셀 버퍼 형식이 올바르지 않습니다.");
+  if (bitmap.data.byteLength !== bitmap.width * bitmap.height * 4) {
+    throw new Error("래스터 픽셀 버퍼 길이가 이미지 크기와 일치하지 않습니다.");
+  }
+  const sourceCanvas = document.createElement("canvas");
+  sourceCanvas.width = bitmap.width;
+  sourceCanvas.height = bitmap.height;
+  const sourceContext = sourceCanvas.getContext("2d");
+  if (!sourceContext) throw new Error("래스터 픽셀을 캔버스로 변환할 수 없습니다.");
+  const imageData = sourceContext.createImageData(bitmap.width, bitmap.height);
+  imageData.data.set(bitmap.data);
+  sourceContext.putImageData(imageData, 0, 0);
+
+  const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const outputCanvas = scale === 1 ? sourceCanvas : document.createElement("canvas");
+  if (outputCanvas !== sourceCanvas) {
+    outputCanvas.width = width;
+    outputCanvas.height = height;
+    const outputContext = outputCanvas.getContext("2d");
+    if (!outputContext) throw new Error("래스터 이미지를 축소할 수 없습니다.");
+    outputContext.drawImage(sourceCanvas, 0, 0, width, height);
+  }
+  const src = outputCanvas.toDataURL("image/webp", quality);
+  if (!src.startsWith("data:image/")) throw new Error("래스터 이미지를 WebP로 변환하지 못했습니다.");
+  return { src, width, height };
+}
+
+async function loadOpenRasterFileForCanvas(
+  file: File,
+  format: StudioRasterInterchangeFormat
+): Promise<{ src: string; width: number; height: number; isAnimatedGif: false }> {
+  if (file.size > STUDIO_CANVAS_OPEN_RASTER_MAX_BYTES) {
+    throw new Error("BMP/TGA/PPM/PAM/QOI/TIFF 원본은 64MB 이하여야 합니다.");
+  }
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const { decodeStudioRasterInterchangeAsync } = await import("./studio-raster-interchange-worker-client");
+  const decoded = await decodeStudioRasterInterchangeAsync(bytes, format);
+  const converted = studioRasterBitmapToCanvasDataUrl(decoded.decoded.bitmap);
+  return { ...converted, isAnimatedGif: false };
+}
+
 // GIF 파일 전용 읽기 — downscaleImageFile과 달리 캔버스에 그려 재인코딩하지 않는다(애니메이션
 // GIF를 캔버스에 한 번 그리면 그 순간의 프레임 하나만 캡처되어 애니메이션이 사라진다).
 export function readGifFileAsDataUrl(file: File): Promise<string> {
@@ -86,6 +180,8 @@ export async function loadImageFileForCanvas(
   if (!Number.isSafeInteger(file.size) || file.size < 1) {
     throw new Error("이미지 파일이 비어 있거나 크기를 확인할 수 없습니다.");
   }
+  const openRasterFormat = studioOpenRasterFormatForFile(file);
+  if (openRasterFormat) return loadOpenRasterFileForCanvas(file, openRasterFormat);
   if (file.size > STUDIO_UPLOAD_MAX_SOURCE_FILE_BYTES) {
     throw new Error("이미지 원본이 12MB를 초과합니다. 먼저 크기를 줄여 주세요.");
   }

@@ -1,4 +1,4 @@
-// 작성형 데모 커뮤니티의 localStorage 엔진(브랜치 B) — 웹·토스 공유.
+// 작성형 데모 커뮤니티의 localStorage 엔진(브랜치 B).
 // 백엔드 없이 브라우저 로컬에만 저장하는 데모 레이어(웹의 server-backed 커뮤니티와 별개).
 // React/DOM-비종속(typeof window 가드)·순수 함수. 채널/게시판/카페/댓글 + isOwner(익명키).
 //

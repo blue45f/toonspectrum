@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * RevealOnScroll — 웹·토스 공유 스크롤-진입 래퍼(NO fork).
+ * RevealOnScroll — 공용 스크롤 진입 래퍼.
  *
  * 공유 `useReveal`(IntersectionObserver, once)로 요소가 처음 뷰포트에 들어올 때 fx.css 의
  * `reveal`/`reveal-soft` from-state 를 `is-revealed` 로 안착시킵니다. 가시성은 모션과 분리돼

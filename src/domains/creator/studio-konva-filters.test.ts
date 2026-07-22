@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  studioAdjustmentDefaultParams,
+  type StudioAdjustmentEngineId,
+} from "./studio-adjustment-stack";
 import { IMAGE_FILTER_PRESETS, type StudioImageDataLike } from "./studio-filters";
 import {
   hasActiveImageFilters as hasLightweightActiveImageFilters,
@@ -40,6 +44,20 @@ function solidImage(width: number, height: number, r: number, g: number, b: numb
     data[i + 3] = 255;
   }
   return { data, width, height };
+}
+
+function patternedImage(width = 19, height = 17): StudioImageDataLike {
+  const image = solidImage(width, height, 0, 0, 0);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = (y * width + x) * 4;
+      image.data[index] = (x * 31 + y * 17 + (x % 3) * 71) % 256;
+      image.data[index + 1] = (x * 11 + y * 47 + (y % 4) * 53) % 256;
+      image.data[index + 2] = (x * 61 + y * 7 + ((x + y) % 5) * 37) % 256;
+      image.data[index + 3] = 173;
+    }
+  }
+  return image;
 }
 
 const CUSTOM = [
@@ -419,6 +437,61 @@ describe("buildImageFilters", () => {
       random.mockRestore();
     }
   });
+
+  it("each added smart filter executes a distinct deterministic pixel program", () => {
+    const konva: KonvaLike = { Filters: {} };
+    registerStudioKonvaFilters(konva);
+    const engines = [
+      "spin-blur",
+      "zoom-blur",
+      "pixelate",
+      "posterize",
+      "ink-threshold",
+      "line-extraction",
+      "screentone",
+      "color-halftone",
+      "chromatic-aberration",
+      "grayscale",
+      "sepia",
+      "edge-detect",
+      "emboss",
+      "high-pass",
+      "median-despeckle",
+      "solarize",
+      "oil-paint",
+      "smart-sharpen",
+    ] as const satisfies readonly StudioAdjustmentEngineId[];
+    const source = patternedImage();
+    const sourceRgb = Array.from(source.data).filter((_, index) => index % 4 !== 3);
+    const signatures = new Map<StudioAdjustmentEngineId, string>();
+
+    for (const engine of engines) {
+      const image = {
+        ...source,
+        data: new Uint8ClampedArray(source.data),
+      };
+      const { filters, attrs } = buildImageFilters({
+        smartFilters: {
+          version: 1,
+          entries: [{
+            id: `effect-${engine}`,
+            engine,
+            enabled: true,
+            params: studioAdjustmentDefaultParams(engine),
+          }],
+        },
+      }, konva);
+      expect(filters.length, engine).toBeGreaterThan(0);
+      applyImageFilters(image, filters, attrs);
+      const rgb = Array.from(image.data).filter((_, index) => index % 4 !== 3);
+      expect(rgb, engine).not.toEqual(sourceRgb);
+      expect(Array.from(image.data).filter((_, index) => index % 4 === 3), engine)
+        .toEqual(Array.from({ length: source.width * source.height }, () => 173));
+      signatures.set(engine, rgb.join(","));
+    }
+
+    expect(new Set(signatures.values()).size).toBe(engines.length);
+  });
 });
 
 describe("IMAGE_FILTER_PRESETS pixel integration", () => {
@@ -496,6 +569,40 @@ describe("hasActiveImageFilters", () => {
     })).toBe(false);
     expect(hasLightweightActiveImageFilters({ hue: -90 })).toBe(true);
     expect(hasLightweightActiveImageFilters({ brightness: -0.25 })).toBe(true);
+  });
+
+  it("가벼운 초기 청크 판정이 새 스마트 필터 ID를 모두 보존한다", () => {
+    const engines = [
+      "spin-blur",
+      "zoom-blur",
+      "pixelate",
+      "posterize",
+      "ink-threshold",
+      "line-extraction",
+      "screentone",
+      "color-halftone",
+      "chromatic-aberration",
+      "grayscale",
+      "sepia",
+      "edge-detect",
+      "emboss",
+      "high-pass",
+      "median-despeckle",
+      "solarize",
+      "oil-paint",
+      "smart-sharpen",
+    ] as const satisfies readonly StudioAdjustmentEngineId[];
+    expect(hasLightweightActiveImageFilters({
+      smartFilters: {
+        version: 1,
+        entries: engines.map((engine) => ({
+          id: `lightweight-${engine}`,
+          engine,
+          enabled: true,
+          params: studioAdjustmentDefaultParams(engine),
+        })),
+      },
+    })).toBe(true);
   });
 });
 

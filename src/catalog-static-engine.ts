@@ -35,12 +35,7 @@ function ensureCatalog(origFetch: typeof fetch): Promise<void> {
         return r.json() as Promise<TitleCard[]>;
       })
       .then((titles) => {
-        // 채널 콘텐츠 정책 필터(토스 19+ 제외) — installStaticCatalog 가 전역으로 넘긴다.
-        // 시드 자체에서 제외하므로 검색·랭킹·탐색·추천·상세·랜덤 전 표면에 일관 적용된다(웹은 미설정=무필터).
-        const filter = (globalThis as { __toonspectrumCatalogFilter?: (t: { ageRating?: string | null }) => boolean })
-          .__toonspectrumCatalogFilter;
-        const seed = filter ? titles.filter((t) => filter(t)) : titles;
-        replaceCatalogData(seed, { source: "database-snapshot", sourceVersion: "static-catalog" });
+        replaceCatalogData(titles, { source: "database-snapshot", sourceVersion: "static-catalog" });
       })
       .catch((error) => {
         catalogPromise = null; // 다음 호출에서 재시도

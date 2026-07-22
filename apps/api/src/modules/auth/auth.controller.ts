@@ -37,12 +37,6 @@ import {
 } from "../../../../../lib/server/oauth";
 import { signSession } from "../../../../../lib/server/session";
 import {
-  handleTossLogin,
-  handleTossUnlink,
-  isTossLoginConfigured,
-  TossLoginExchangeError,
-} from "../../../../../lib/server/toss-login";
-import {
   ensureUserLifecycleSchema,
   getUserAuthBlock,
   normalizeSessionVersion,
@@ -164,107 +158,6 @@ export class AuthController {
       user,
       token: signSession(user.id, normalizeSessionVersion(user.sessionVersion)),
     };
-  }
-
-  // 토스 로그인 — 미니앱 appLogin 이 받은 인가코드를 mTLS 서버 교환해 세션을 발급한다(토스 네이티브 로그인).
-  // 토스 WebView 에서 깨지는 소셜 OAuth 리다이렉트 대신 쓰는 토스 전용 경로.
-  @Post("toss/exchange")
-  async tossExchange(
-    @Body() body: { authorizationCode?: unknown; referrer?: unknown },
-    @Req() req: Request,
-  ) {
-    const authorizationCode =
-      typeof body?.authorizationCode === "string" ? body.authorizationCode : "";
-    const referrer = body?.referrer === "SANDBOX" ? "SANDBOX" : "DEFAULT";
-    if (!authorizationCode)
-      throw new BadRequestException({ error: "인가 코드가 필요해요." });
-    if (!isTossLoginConfigured()) {
-      throw new HttpException(
-        { error: "토스 로그인이 아직 설정되지 않았어요." },
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
-    }
-    enforceRateLimit(`toss-login:${clientIp(req)}`, 30, 10 * 60_000);
-    let user;
-    try {
-      user = await handleTossLogin(authorizationCode, referrer);
-    } catch (error) {
-      if (error instanceof TossLoginExchangeError) {
-        if (error.code === "invalid-authorization") {
-          throw new HttpException(
-            {
-              error:
-                "토스 인증이 만료되었거나 이미 사용됐어요. 다시 로그인해 주세요.",
-            },
-            HttpStatus.UNAUTHORIZED,
-          );
-        }
-        if (error.code === "user-blocked") {
-          throw new HttpException(
-            { error: error.message },
-            HttpStatus.FORBIDDEN,
-          );
-        }
-        throw new HttpException(
-          {
-            error:
-              "토스 로그인 서버와 통신하지 못했어요. 잠시 후 다시 시도해 주세요.",
-          },
-          HttpStatus.BAD_GATEWAY,
-        );
-      }
-      // DB/세션 등 예상하지 못한 오류는 전역 예외 필터가 500으로 기록하고 내부 정보는 숨긴다.
-      throw error;
-    }
-    return {
-      ok: true,
-      user,
-      token: signSession(user.id, normalizeSessionVersion(user.sessionVersion)),
-    };
-  }
-
-  // 토스앱 설정의 연결 끊기/약관 철회/토스 탈퇴 콜백. 콘솔과 동일한 Basic Auth를 검증한다.
-  @Post("toss/unlink")
-  async tossUnlink(
-    @Body() body: { userKey?: unknown; referrer?: unknown },
-    @Headers("authorization") authorization: string | undefined,
-  ) {
-    const userKey =
-      typeof body?.userKey === "number" || typeof body?.userKey === "string"
-        ? String(body.userKey)
-        : "";
-    const allowedReferrers = new Set([
-      "UNLINK",
-      "WITHDRAWAL_TERMS",
-      "WITHDRAWAL_TOSS",
-    ]);
-    if (
-      !/^\d+$/.test(userKey) ||
-      !allowedReferrers.has(String(body?.referrer ?? ""))
-    ) {
-      throw new BadRequestException({
-        error: "올바른 연결 해제 요청이 아니에요.",
-      });
-    }
-    try {
-      return await handleTossUnlink(userKey, authorization);
-    } catch (error) {
-      if (error instanceof TossLoginExchangeError) {
-        if (error.code === "unlink-not-configured") {
-          throw new HttpException(
-            { error: error.message },
-            HttpStatus.SERVICE_UNAVAILABLE,
-          );
-        }
-        if (error.code === "unlink-unauthorized") {
-          throw new HttpException(
-            { error: error.message },
-            HttpStatus.UNAUTHORIZED,
-          );
-        }
-      }
-      throw error;
-    }
   }
 
   // 데모 폴백 로그인 — 실제 제공자 미설정 시에만 허용. 명확히 [데모] 사용자.

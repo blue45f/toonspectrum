@@ -15,8 +15,7 @@ import {
   type PoseBoneMap,
 } from "@/src/domains/creator/studio-vrm-poser-utils";
 
-// 토스(교차 출처 WebView)에서 root-relative /vrm 은 토스 오리진으로 해소돼 HTML(SPA index)이 와
-// 3D 로드가 깨진다. resolveAssetUrl 로 배포 오리진에 절대화한다(웹은 동일 출처라 무변경).
+// 정적 자산 경로 헬퍼를 거쳐 VRM URL 규약을 한 곳에서 유지합니다.
 const VRM_URL = "/vrm/sample.vrm";
 const d = (deg: number) => (deg * Math.PI) / 180;
 

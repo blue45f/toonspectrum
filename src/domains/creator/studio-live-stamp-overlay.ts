@@ -16,6 +16,10 @@ import {
   type StudioStampBrushStyle,
   type StudioStampWalkerState,
 } from "./studio-brush-stamp-engine";
+import {
+  acquireStudioLowLatencyCanvas2dContext,
+  resolveStudioLiveSurfaceDevicePixelRatio,
+} from "./studio-low-latency-canvas";
 
 import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
 
@@ -25,9 +29,13 @@ interface SettledLiveStampStroke {
   readonly pressures: readonly number[];
 }
 
-function liveStampDevicePixelRatio(): number {
+function liveStampDevicePixelRatio(surface: StudioLiveInkSurface): number {
   return typeof globalThis.devicePixelRatio === "number" && Number.isFinite(globalThis.devicePixelRatio)
-    ? Math.max(1, globalThis.devicePixelRatio)
+    ? resolveStudioLiveSurfaceDevicePixelRatio({
+        cssWidth: surface.width,
+        cssHeight: surface.height,
+        devicePixelRatio: globalThis.devicePixelRatio,
+      })
     : 1;
 }
 
@@ -63,7 +71,7 @@ export class StudioLiveStampOverlayRenderer {
 
   attach(canvas: HTMLCanvasElement | null): void {
     this.canvas = canvas;
-    this.context = canvas?.getContext("2d") ?? null;
+    this.context = canvas ? acquireStudioLowLatencyCanvas2dContext(canvas) : null;
     this.applySurface();
     if (this.active || this.settled.length > 0) this.replay();
   }
@@ -282,7 +290,7 @@ export class StudioLiveStampOverlayRenderer {
     const canvas = this.canvas;
     const surface = this.surface;
     if (!canvas || !surface) return;
-    this.dpr = liveStampDevicePixelRatio();
+    this.dpr = liveStampDevicePixelRatio(surface);
     const width = Math.max(1, Math.round(surface.width * this.dpr));
     const height = Math.max(1, Math.round(surface.height * this.dpr));
     if (canvas.width !== width) canvas.width = width;

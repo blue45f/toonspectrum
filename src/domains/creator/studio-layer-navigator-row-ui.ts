@@ -30,7 +30,7 @@ export const STUDIO_LAYER_NAVIGATOR_KIND_ICONS: Record<
 };
 
 export const STUDIO_LAYER_NAVIGATOR_FOCUS_RING =
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-cool";
 export const STUDIO_LAYER_NAVIGATOR_COARSE_TARGET =
   "max-lg:min-h-11 max-lg:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11";
 

@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 
+import { resolveStudioLiveSurfaceDevicePixelRatio } from "./studio-low-latency-canvas";
 import { resolveStudioWebGpuCanvasStrokes } from "./studio-webgpu-canvas-authority";
 import { isStudioWebGpuCanvasActive } from "./studio-webgpu-dab-planner";
 import { StudioWebGpuEngine } from "./studio-webgpu-engine";
@@ -158,9 +159,13 @@ function measuredCssSize(element: HTMLElement | null, logicalWidth: number, logi
   };
 }
 
-function devicePixelRatio(): number {
+function devicePixelRatio(cssWidth: number, cssHeight: number): number {
   return typeof globalThis.devicePixelRatio === "number" && Number.isFinite(globalThis.devicePixelRatio)
-    ? globalThis.devicePixelRatio
+    ? resolveStudioLiveSurfaceDevicePixelRatio({
+        cssWidth,
+        cssHeight,
+        devicePixelRatio: globalThis.devicePixelRatio,
+      })
     : 1;
 }
 
@@ -352,7 +357,10 @@ function StudioWebGpuCanvas({
         logicalHeight: latest.height,
         cssWidth: observedWidth && observedWidth > 0 ? observedWidth : measured.width,
         cssHeight: observedHeight && observedHeight > 0 ? observedHeight : measured.height,
-        dpr: devicePixelRatio(),
+        dpr: devicePixelRatio(
+          observedWidth && observedWidth > 0 ? observedWidth : measured.width,
+          observedHeight && observedHeight > 0 ? observedHeight : measured.height
+        ),
         scaleX: latest.scaleX,
         scaleY: latest.scaleY,
         offsetX: latest.offsetX,

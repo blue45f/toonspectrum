@@ -1,11 +1,13 @@
 import {
   Check,
+  CircleDot,
   Eye,
   EyeOff,
   Film,
   Ghost,
   Grid2X2,
   Layers3,
+  Lock,
   MoreHorizontal,
   ScanLine,
   Sparkles,
@@ -67,8 +69,11 @@ export interface StudioLayerNavigatorItemRowProps {
   groupName: string | null;
   effectivelyHidden: boolean;
   locallyHidden: boolean;
+  effectivelyLocked: boolean;
   statusLabel: string;
   selected: boolean;
+  current: boolean;
+  selectionCount: number;
   tabStop: boolean;
   renameInput: ReactNode | null;
   mobileMultiSelect: boolean;
@@ -93,8 +98,11 @@ export const StudioLayerNavigatorItemRow = memo(
     groupName,
     effectivelyHidden,
     locallyHidden,
+    effectivelyLocked,
     statusLabel,
     selected,
+    current,
+    selectionCount,
     tabStop,
     renameInput,
     mobileMultiSelect,
@@ -112,6 +120,7 @@ export const StudioLayerNavigatorItemRow = memo(
       .filter(Boolean)
       .join(", ");
     const accessibleMetadata = [
+      current ? "현재 작업 레이어" : selected ? "다중 선택됨" : null,
       STUDIO_LAYER_KIND_LABELS[kind],
       groupName ? `그룹 ${groupName}` : null,
       item.role ? `역할 ${STUDIO_LAYER_ROLE_LABELS[item.role]}` : null,
@@ -121,6 +130,8 @@ export const StudioLayerNavigatorItemRow = memo(
       .filter(Boolean)
       .join(", ");
     const visuallyHidden = effectivelyHidden || locallyHidden;
+    const multipleSelection = selectionCount > 1;
+    const selectionState = current ? "current" : selected ? "selected" : "none";
 
     return (
       <li role="none">
@@ -130,6 +141,7 @@ export const StudioLayerNavigatorItemRow = memo(
           role="treeitem"
           aria-level={level}
           aria-selected={selected}
+          aria-current={current ? "true" : undefined}
           aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A"
           aria-label={`${item.label}, ${accessibleMetadata}`}
           tabIndex={tabStop ? 0 : -1}
@@ -140,30 +152,35 @@ export const StudioLayerNavigatorItemRow = memo(
             stableHandlers.onRowDoubleClick(event, item.id, item.label)
           }
           className={cn(
-            "group/layer relative flex min-h-9 items-center gap-1 rounded-lg border px-1 py-0.5 text-left [contain-intrinsic-size:44px] [content-visibility:auto] max-lg:min-h-11 pointer-coarse:min-h-11",
-            selected
-              ? "border-accent/55 bg-accent-soft/45 shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.12)]"
+            "group/layer relative flex min-h-9 items-center gap-1 rounded-lg border px-1 py-0.5 text-left transition-[border-color,background-color,box-shadow] duration-150 [contain-intrinsic-size:44px] [content-visibility:auto] motion-reduce:transition-none max-lg:min-h-11 pointer-coarse:min-h-11",
+            current
+              ? "border-accent/75 bg-accent-soft/65 shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.18),0_1px_5px_oklch(0.1_0.01_60/0.18)]"
+              : selected
+                ? "border-accent/50 bg-accent-soft/35 shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.1)]"
               : "border-transparent hover:border-line/80 hover:bg-raised/60",
             STUDIO_LAYER_NAVIGATOR_FOCUS_RING
           )}
-          title={displayedStatusLabel || undefined}
           data-studio-layer-row="true"
           data-studio-layer-selected={selected ? "true" : "false"}
+          data-studio-layer-selection-state={selectionState}
           data-studio-layer-local-hidden={locallyHidden ? "true" : "false"}
         >
-          {mobileMultiSelect ? (
-            <span
-              aria-hidden
-              className={cn(
-                "grid size-5 shrink-0 place-items-center rounded border",
-                selected
-                  ? "border-accent bg-accent text-on-accent"
-                  : "border-line bg-card"
-              )}
-            >
-              {selected ? <Check size={13} /> : null}
-            </span>
-          ) : null}
+          <span
+            aria-hidden
+            data-studio-layer-selection-marker={selectionState}
+            className={cn(
+              "grid size-5 shrink-0 place-items-center rounded-md border transition-colors duration-150 motion-reduce:transition-none",
+              current
+                ? "border-accent bg-accent text-on-accent shadow-sm"
+                : selected
+                  ? "border-accent/80 bg-accent-soft text-accent"
+                  : mobileMultiSelect || multipleSelection
+                    ? "border-line-strong bg-card text-transparent"
+                    : "border-transparent bg-transparent text-transparent group-hover/layer:border-line"
+            )}
+          >
+            {current ? <CircleDot size={13} strokeWidth={2.25} /> : selected ? <Check size={13} strokeWidth={2.5} /> : null}
+          </span>
           {item.color ? (
             <span
               aria-label={`색 라벨 ${STUDIO_LAYER_COLOR_LABELS[item.color]}`}
@@ -176,7 +193,7 @@ export const StudioLayerNavigatorItemRow = memo(
           <span
             className={cn(
               "grid size-7 shrink-0 place-items-center rounded-lg border border-line/50 bg-[linear-gradient(160deg,oklch(0.24_0.01_66),oklch(0.19_0.009_68))] text-fg-3 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.05)]",
-              visuallyHidden && "opacity-55",
+              visuallyHidden && !selected && "text-fg-3",
               selected && "border-accent/35 text-accent"
             )}
             aria-hidden
@@ -185,8 +202,7 @@ export const StudioLayerNavigatorItemRow = memo(
           </span>
           <span
             className={cn(
-              "flex min-w-0 flex-1 items-center gap-1.5 px-0.5",
-              visuallyHidden && "opacity-55"
+              "flex min-w-0 flex-1 items-center gap-1.5 px-0.5"
             )}
           >
             {renameInput ?? (
@@ -194,12 +210,16 @@ export const StudioLayerNavigatorItemRow = memo(
                 <span
                   className={cn(
                     "block truncate text-[0.72rem] font-semibold",
-                    item.hidden && "line-through"
+                    selected ? "text-fg" : "text-fg-2",
+                    item.hidden && "line-through decoration-fg-3/80"
                   )}
                 >
                   {item.label}
                 </span>
-                <span className="flex min-w-0 items-center gap-1 text-[0.68rem] text-fg-3 lg:text-[0.58rem]">
+                <span className={cn(
+                  "flex min-w-0 items-center gap-1 text-[0.68rem] lg:text-[0.58rem]",
+                  selected ? "text-fg-2" : "text-fg-3"
+                )}>
                   <span className="truncate">
                     {groupName ?? STUDIO_LAYER_KIND_LABELS[kind]}
                   </span>
@@ -217,6 +237,7 @@ export const StudioLayerNavigatorItemRow = memo(
             aria-hidden
           >
             {locallyHidden ? <Ghost size={12} className="text-fg-3" /> : null}
+            {effectivelyLocked ? <Lock size={12} className={selected ? "text-accent" : "text-fg-3"} /> : null}
             {item.fillReference ? (
               <ScanLine size={12} className="text-cool" />
             ) : null}

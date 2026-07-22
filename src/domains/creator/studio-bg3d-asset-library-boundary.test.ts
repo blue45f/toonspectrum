@@ -55,10 +55,12 @@ describe("Studio BG3D asset-library ownership boundary", () => {
 
   it("keeps persistence, validation, resource disposal, scene, history, and selection in the parent", () => {
     const editorSource = moduleSource("./StudioBackground3D.tsx");
+    const editorImports = moduleImports("./StudioBackground3D.tsx");
     const panelSource = moduleSource("./StudioBg3dAssetLibraryPanel.tsx");
 
-    expect(editorSource).toContain('from "./StudioBg3dAssetLibraryPanel"');
-    expect(editorSource).toContain("<StudioBg3dAssetLibraryPanel");
+    expect(editorImports.valueImports).not.toContain("./StudioBg3dAssetLibraryPanel");
+    expect(editorImports.dynamicImports).toContain("./StudioBg3dAssetLibraryPanel");
+    expect(editorSource).toContain("<LazyStudioBg3dAssetLibraryPanel");
     for (const ownerToken of [
       "handleUploadModelFiles",
       "importVerifiedBg3dModelsAtomically",

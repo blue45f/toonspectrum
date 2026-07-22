@@ -2,7 +2,7 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 // kstDayOfWeek 는 연재 캘린더 그룹화(groupByWeekday)와 한 짝이라 @toonspectrum/core 의 calendar 모듈을
-// 단일 출처로 삼는다(웹·토스·API 공유). cn/keepInlineText 등 UI 의존(clsx/Tailwind) 유틸은 여기 남는다.
+// 단일 출처로 삼는다(웹 앱·API 공유). cn/keepInlineText 등 UI 의존(clsx/Tailwind) 유틸은 여기 남는다.
 export { kstDayOfWeek } from "../packages/core/src/calendar";
 
 export function cn(...inputs: ClassValue[]) {

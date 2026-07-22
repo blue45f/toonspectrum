@@ -96,10 +96,6 @@ export function FortuneShareModal({
     setError(null);
     try {
       const dataUrl = await renderPng();
-      const tossShareUrl =
-        typeof globalThis.__toonspectrumTossShareLink === "function"
-          ? await globalThis.__toonspectrumTossShareLink("/fortune")
-          : null;
       const nav = navigator as Navigator & {
         canShare?: (d: ShareData) => boolean;
       };
@@ -109,7 +105,7 @@ export function FortuneShareModal({
         const data: ShareData & { files?: File[] } = {
           title: "ToonSpectrum 캐릭터 운세",
           text: `${character.name}가 본 나의 ${TAB_LABEL[tab]} 🔮`,
-          url: tossShareUrl || shareUrl,
+          url: shareUrl,
         };
         if (nav.canShare && nav.canShare({ files: [file] }))
           data.files = [file];

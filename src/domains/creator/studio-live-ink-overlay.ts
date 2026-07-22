@@ -6,7 +6,9 @@
  * 백킹은 커밋 Konva surface와 같은 DPR을 써 handoff AA coverage를 일치시킨다.
  *
  * 픽셀 규약은 Konva Default(pen/marker)와 WebGPU가 공유하는 causal round-dab 계획을 쓴다.
- * 새 샘플은 과거 픽셀을 다시 쓰지 않고 직전 권위 점에서 현재 점까지 즉시 도달한다. 지우개
+ * 새 샘플은 과거 픽셀을 다시 쓰지 않고 직전 권위 점에서 현재 점까지 즉시 도달한다. 보통은
+ * 기기 DPR을 그대로 쓰고, 16M backing pixel을 넘는 초대형 화면에서만 라이브 표면을 낮춰
+ * 입력 프레임을 보호한다. 지우개
  * (destination-out)와 라쏘 필(내부 채움 미리보기)은
  * 이 오버레이 대상이 아니다 — 각각 메인 레이어/Konva 초안 경로가 담당한다.
  *
@@ -31,6 +33,10 @@ import {
   studioInkUsesResidualDabSpacing,
   type StudioInkPressureModel,
 } from "./studio-ink-pressure-model";
+import {
+  acquireStudioLowLatencyCanvas2dContext,
+  resolveStudioLiveSurfaceDevicePixelRatio,
+} from "./studio-low-latency-canvas";
 
 import type {
   StudioPredictedInkSample,
@@ -95,10 +101,13 @@ interface SettledLiveInkStroke {
   readonly ps: readonly number[];
 }
 
-/** Konva scene canvas와 동일한 DPR을 써 handoff 순간의 AA coverage/선명도 변화를 없앤다. */
-function liveInkDevicePixelRatio(): number {
+function liveInkDevicePixelRatio(surface: StudioLiveInkSurface): number {
   return typeof globalThis.devicePixelRatio === "number" && Number.isFinite(globalThis.devicePixelRatio)
-    ? Math.max(1, globalThis.devicePixelRatio)
+    ? resolveStudioLiveSurfaceDevicePixelRatio({
+        cssWidth: surface.width,
+        cssHeight: surface.height,
+        devicePixelRatio: globalThis.devicePixelRatio,
+      })
     : 1;
 }
 
@@ -129,7 +138,7 @@ export class StudioLiveInkOverlayRenderer {
   private settled: SettledLiveInkStroke[] = [];
   attach(canvas: HTMLCanvasElement | null): void {
     this.canvas = canvas;
-    this.context = canvas?.getContext("2d") ?? null;
+    this.context = canvas ? acquireStudioLowLatencyCanvas2dContext(canvas) : null;
     this.applySurface();
     if (this.active || this.settled.length > 0) this.replay();
   }
@@ -505,7 +514,7 @@ export class StudioLiveInkOverlayRenderer {
     const canvas = this.canvas;
     const surface = this.surface;
     if (!canvas || !surface) return;
-    this.dpr = liveInkDevicePixelRatio();
+    this.dpr = liveInkDevicePixelRatio(surface);
     const width = Math.max(1, Math.round(surface.width * this.dpr));
     const height = Math.max(1, Math.round(surface.height * this.dpr));
     if (canvas.width !== width) canvas.width = width;
@@ -553,7 +562,7 @@ export class StudioLiveInkPredictionRenderer {
 
   attach(canvas: HTMLCanvasElement | null): void {
     this.canvas = canvas;
-    this.context = canvas?.getContext("2d") ?? null;
+    this.context = canvas ? acquireStudioLowLatencyCanvas2dContext(canvas) : null;
     this.dirtyRect = null;
     this.applySurface();
     this.replay();
@@ -736,7 +745,7 @@ export class StudioLiveInkPredictionRenderer {
     const canvas = this.canvas;
     const surface = this.surface;
     if (!canvas || !surface) return;
-    this.dpr = liveInkDevicePixelRatio();
+    this.dpr = liveInkDevicePixelRatio(surface);
     const width = Math.max(1, Math.round(surface.width * this.dpr));
     const height = Math.max(1, Math.round(surface.height * this.dpr));
     if (canvas.width !== width) canvas.width = width;

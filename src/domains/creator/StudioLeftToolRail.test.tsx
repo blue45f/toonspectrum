@@ -246,6 +246,23 @@ describe("StudioLeftToolRail", () => {
     expect(typeof zoomAction === "function" ? zoomAction(null) : null).toBe("zoom");
   });
 
+  it("keeps fill discoverable and clickable while explaining how an unavailable selection recovers", () => {
+    const props = createProps({
+      advancedFillUnsupportedReason: "래스터 이미지 레이어를 먼저 선택하세요.",
+    });
+    render(<StudioLeftToolRail {...props} />);
+
+    const fill = screen.getByRole<HTMLButtonElement>("button", { name: "채우기 (G)" });
+    expect(fill.disabled).toBe(false);
+    expect(fill.getAttribute("data-hint-description")).toContain(
+      "래스터 이미지 레이어를 먼저 선택하세요.",
+    );
+    expect(fill.getAttribute("data-hint-description")).toContain("안전한 단일 래스터 후보");
+
+    fireEvent.click(fill);
+    expect(props.stableHandlers.toggleAdvancedFill).toHaveBeenCalledOnce();
+  });
+
   it("keeps remapped and unbound view shortcut labels synchronized with app settings", () => {
     const appSettings = defaultStudioAppSettings();
     appSettings.shortcuts = {

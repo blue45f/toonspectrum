@@ -22,7 +22,6 @@ import { useState, useEffect, useRef } from "react";
 import { CountUp, ConfettiBurst } from "./fortune-fx";
 import { useFortuneStore, computeStreak } from "./fortune-store";
 import { charThemeVars } from "./fortune-theme";
-import { FortuneBonusCard } from "./FortuneBonusCard";
 import { FortuneLoading } from "./FortuneLoading";
 import { FortuneShareModal } from "./FortuneShareModal";
 import { TarotCardFace } from "./TarotCardFace";
@@ -34,7 +33,7 @@ import type { FortunePanel } from "./fortune-types";
 import type { Title } from "@/lib/types";
 
 import { TitleCard } from "@/components/title-card";
-// 토스 WebView(교차 출처)에서 root-relative /images/.. 경로를 배포 오리진으로 절대화한다. 웹은 무변경.
+// 배포 환경에서도 root-relative 이미지 경로가 올바른 오리진을 가리키도록 정규화한다.
 import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 
@@ -201,7 +200,7 @@ export function FortunePage() {
   const clearHistory = useFortuneStore((s) => s.clearHistory);
   const removeFromHistory = useFortuneStore((s) => s.removeFromHistory);
 
-  // 캐릭터 목록은 @toonspectrum/core 의 정적 데이터(웹·API·토스 단일 출처)로 즉시 채운다 —
+  // 캐릭터 목록은 @toonspectrum/core 의 정적 데이터(웹·API 단일 출처)로 즉시 채운다 —
   // API(/api/fortune/characters, 로컬은 dev:api 필요)가 없거나 실패해도 피커가 동작한다.
   const [characters, setCharacters] = useState<Character[]>(() => getCharacters());
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
@@ -235,22 +234,6 @@ export function FortunePage() {
 
   // 결과 공유/저장 모달
   const [shareOpen, setShareOpen] = useState(false);
-
-  // 보상형 광고 중 낭독(Web Speech) 일시정지·재개 — 광고 훅(pauseAudioForAd)은 BGM/AudioContext
-  // 만 멈추므로, 낭독은 여기서 pause/resume 한다(광고 전에 재생 중이었을 때만 재개).
-  const playbackPausedForAdRef = useRef(false);
-  const handleAdStart = () => {
-    if (playback.status === "playing") {
-      playbackPausedForAdRef.current = true;
-      playback.pause();
-    }
-  };
-  const handleAdEnd = () => {
-    if (playbackPausedForAdRef.current) {
-      playbackPausedForAdRef.current = false;
-      playback.resume();
-    }
-  };
 
   // 에러·재시도 (운세 호출 실패 시)
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -1317,13 +1300,6 @@ export function FortunePage() {
                       />
                     </div>
                   )}
-
-                  {/* 스페셜 부적 카드 — 보상형 광고 옵트인(토스 전용, 웹/미구성 환경은 자동 숨김) */}
-                  <FortuneBonusCard
-                    character={selectedChar}
-                    onAdStart={handleAdStart}
-                    onAdEnd={handleAdEnd}
-                  />
 
                   {/* 행운의 웹툰/웹소설 추천 영역 */}
                   <div className="border-t border-line/80 pt-6">

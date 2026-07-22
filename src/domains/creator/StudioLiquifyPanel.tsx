@@ -3,11 +3,24 @@
  * Push·Twirl·Pinch·Bloat 왜곡 브러시의 모드, 반경, 강도를 한곳에서 조절한다. 패널은 상태만
  * 표현하며 실제 포인터 수집·비동기 굽기는 상위 Studio 캔버스가 담당한다.
  */
-import { Expand, Loader2, Move, RotateCcw, RotateCw, Shrink } from "lucide-react";
+import {
+  Expand,
+  Loader2,
+  Move,
+  RotateCcw,
+  RotateCw,
+  Shrink,
+  SlidersHorizontal,
+  Undo2,
+  Waves,
+} from "lucide-react";
 import { useId } from "react";
 
 import {
+  LIQUIFY_HARDNESS_RANGE,
+  LIQUIFY_MIN_RADIUS_RANGE,
   LIQUIFY_RADIUS_RANGE,
+  LIQUIFY_STABILIZER_RANGE,
   LIQUIFY_STRENGTH_RANGE,
   normalizeStudioLiquifyMode,
   type StudioLiquifyMode,
@@ -79,6 +92,20 @@ export type StudioLiquifyPanelProps = {
   onStrengthChange: (value: number) => void;
   /** 제공될 때만 모드 선택기를 노출한다. 호출부가 연결되지 않은 무동작 UI는 렌더하지 않는다. */
   onModeChange?: (mode: StudioLiquifyMode) => void;
+  /** 아래 고급 props는 연결된 항목만 점진적으로 노출한다. */
+  hardness?: number;
+  minimumRadius?: number;
+  stabilizer?: number;
+  pressureAffectsRadius?: boolean;
+  pressureAffectsStrength?: boolean;
+  onHardnessChange?: (value: number) => void;
+  onMinimumRadiusChange?: (value: number) => void;
+  onStabilizerChange?: (value: number) => void;
+  onTogglePressureRadius?: () => void;
+  onTogglePressureStrength?: () => void;
+  /** 누적 displacement 세션이 준비된 호출부에서만 제공한다. */
+  onReconstruct?: () => void;
+  onSmooth?: () => void;
 };
 
 export function StudioLiquifyPanel({
@@ -91,6 +118,18 @@ export function StudioLiquifyPanel({
   onRadiusChange,
   onStrengthChange,
   onModeChange,
+  hardness = 50,
+  minimumRadius = 20,
+  stabilizer = 0,
+  pressureAffectsRadius = false,
+  pressureAffectsStrength = false,
+  onHardnessChange,
+  onMinimumRadiusChange,
+  onStabilizerChange,
+  onTogglePressureRadius,
+  onTogglePressureStrength,
+  onReconstruct,
+  onSmooth,
 }: StudioLiquifyPanelProps): ReactElement {
   const titleId = useId();
   const safeMode = normalizeStudioLiquifyMode(mode);
@@ -98,6 +137,15 @@ export function StudioLiquifyPanel({
     LIQUIFY_MODE_PRESENTATIONS.find((presentation) => presentation.mode === safeMode) ??
     LIQUIFY_MODE_PRESENTATIONS[0]!;
   const CurrentIcon = current.icon;
+  const hasAdvancedControls = Boolean(
+    onHardnessChange
+    || onMinimumRadiusChange
+    || onStabilizerChange
+    || onTogglePressureRadius
+    || onTogglePressureStrength
+    || onReconstruct
+    || onSmooth
+  );
 
   return (
     <section
@@ -175,7 +223,7 @@ export function StudioLiquifyPanel({
       />
 
       <StudioSliderRow
-        label="강도"
+        label="늘림 강도"
         min={LIQUIFY_STRENGTH_RANGE.min}
         max={LIQUIFY_STRENGTH_RANGE.max}
         step={LIQUIFY_STRENGTH_RANGE.step}
@@ -184,6 +232,119 @@ export function StudioLiquifyPanel({
         disabled={busy}
         readout={`${strength}%`}
       />
+
+      {hasAdvancedControls ? (
+        <details className="group border-t border-line/70 pt-1.5">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-1.5 text-[0.72rem] font-medium text-fg-2 outline-none transition-colors hover:bg-raised/70 focus-visible:ring-2 focus-visible:ring-accent/70 motion-reduce:transition-none [&::-webkit-details-marker]:hidden">
+            <span className="inline-flex items-center gap-1.5">
+              <SlidersHorizontal className="size-3.5" aria-hidden />
+              세부 조절
+            </span>
+            <span className="text-[0.66rem] font-normal text-fg-3 group-open:hidden">경도 · 필압</span>
+            <span className="hidden text-[0.66rem] font-normal text-fg-3 group-open:inline">접기</span>
+          </summary>
+
+          <fieldset disabled={busy} className="mt-1.5 space-y-2.5 px-1 pb-0.5">
+            <legend className="sr-only">리퀴파이 세부 조절</legend>
+            {onHardnessChange ? (
+              <StudioSliderRow
+                label="경도"
+                min={LIQUIFY_HARDNESS_RANGE.min}
+                max={LIQUIFY_HARDNESS_RANGE.max}
+                step={LIQUIFY_HARDNESS_RANGE.step}
+                value={hardness}
+                onChange={onHardnessChange}
+                disabled={busy}
+                readout={`${hardness}%`}
+              />
+            ) : null}
+
+            {onStabilizerChange ? (
+              <StudioSliderRow
+                label="안정화"
+                min={LIQUIFY_STABILIZER_RANGE.min}
+                max={LIQUIFY_STABILIZER_RANGE.max}
+                step={LIQUIFY_STABILIZER_RANGE.step}
+                value={stabilizer}
+                onChange={onStabilizerChange}
+                disabled={busy}
+                readout={`${stabilizer}%`}
+              />
+            ) : null}
+
+            {onTogglePressureRadius || onTogglePressureStrength ? (
+              <div>
+                <p className="mb-1.5 text-[0.68rem] font-medium text-fg-3">펜 필압</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {onTogglePressureRadius ? (
+                    <StudioToggleChip
+                      active={pressureAffectsRadius}
+                      disabled={busy}
+                      onClick={onTogglePressureRadius}
+                      aria-label={`필압으로 크기 조절 ${pressureAffectsRadius ? "끄기" : "켜기"}`}
+                      title="펜을 세게 누를수록 브러시 반경이 커집니다."
+                    >
+                      크기
+                    </StudioToggleChip>
+                  ) : null}
+                  {onTogglePressureStrength ? (
+                    <StudioToggleChip
+                      active={pressureAffectsStrength}
+                      disabled={busy}
+                      onClick={onTogglePressureStrength}
+                      aria-label={`필압으로 강도 조절 ${pressureAffectsStrength ? "끄기" : "켜기"}`}
+                      title="펜을 세게 누를수록 왜곡 강도가 커집니다."
+                    >
+                      늘림 강도
+                    </StudioToggleChip>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
+            {onMinimumRadiusChange ? (
+              <StudioSliderRow
+                label="최소 크기"
+                min={LIQUIFY_MIN_RADIUS_RANGE.min}
+                max={LIQUIFY_MIN_RADIUS_RANGE.max}
+                step={LIQUIFY_MIN_RADIUS_RANGE.step}
+                value={minimumRadius}
+                onChange={onMinimumRadiusChange}
+                disabled={busy || !pressureAffectsRadius}
+                readout={`${minimumRadius}%`}
+              />
+            ) : null}
+
+            {onReconstruct || onSmooth ? (
+              <div>
+                <p className="mb-1.5 text-[0.68rem] font-medium text-fg-3">변위 다듬기</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {onReconstruct ? (
+                    <StudioPanelChip
+                      disabled={busy}
+                      onClick={onReconstruct}
+                      title="브러시가 닿은 누적 변위를 원래 형태 쪽으로 되돌립니다."
+                    >
+                      <Undo2 className="size-3" aria-hidden />
+                      원형 복원
+                    </StudioPanelChip>
+                  ) : null}
+                  {onSmooth ? (
+                    <StudioPanelChip
+                      disabled={busy}
+                      onClick={onSmooth}
+                      title="주변 변위 벡터를 평균내 울퉁불퉁한 왜곡을 부드럽게 합니다."
+                    >
+                      <Waves className="size-3" aria-hidden />
+                      변위 매끄럽게
+                    </StudioPanelChip>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </fieldset>
+        </details>
+      ) : null}
 
       <p className="text-[0.72rem] leading-relaxed text-fg-3 text-pretty" role="status">
         {busy

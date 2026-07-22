@@ -301,7 +301,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
     : null;
 
   return (
-    <>
+    <Group studioElementId={el.id} listening={false}>
       {symmetricVariations.map((points, index) => {
         if (kind === "rect") {
           const box = drawBounds(points);
@@ -1315,6 +1315,6 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           </Group>
         );
       })}
-    </>
+    </Group>
   );
 });

@@ -112,7 +112,7 @@ export function SiteFooter() {
       <div className="border-t border-line/60">
         <div className="mx-auto max-w-[1320px] px-4 py-8 sm:px-6 text-[11px] text-fg-3 space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 leading-relaxed">
-            {/* 사업자 표기 = @toonspectrum/core BUSINESS_INFO 단일 소스(토스 InfoPage와 공유) */}
+            {/* 사업자 표기 = @toonspectrum/core BUSINESS_INFO를 사용하는 웹 푸터의 단일 소스 */}
             <div>
               <p className="font-semibold text-fg-2">
                 {t("footer.business.company")}: {BUSINESS_INFO.name}

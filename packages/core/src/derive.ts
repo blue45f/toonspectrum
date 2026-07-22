@@ -1,4 +1,4 @@
-// 화면 공용 view-model derivation — 웹·토스가 같은 함수를 호출해 중복/드리프트를 막는다.
+// 화면 공용 view-model derivation — 동일 산식을 재사용해 중복과 드리프트를 막습니다.
 // (랭킹/검색/추천 같은 핵심 알고리즘은 각 모듈에; 여기는 칩·커버리지 등 가벼운 파생값.)
 
 import { PLATFORMS } from "./platforms";

@@ -1,6 +1,6 @@
-// 운세 웹툰 패널(컷) 타입은 @toonspectrum/core/fortune 엔진과 동일 형태(웹·토스·백엔드
-// 공유). 백엔드가 [N컷 - 묘사] + 이름: "대사" 콘티를 파싱해 내려주며, 같은 엔진을 토스가
-// 직접 호출해도 동일 구조를 얻는다. 여기서는 코어 타입을 그대로 재-export 한다.
+// 운세 웹툰 패널(컷) 타입은 @toonspectrum/core/fortune 엔진과 동일 형태로 웹 앱·백엔드가
+// 공유한다. 백엔드가 [N컷 - 묘사] + 이름: "대사" 콘티를 파싱해 내려주며, 여기서는
+// 웹 화면이 같은 구조를 소비하도록 코어 타입을 그대로 재-export 한다.
 
 import type { FortunePanel, FortunePanelLine } from "@toonspectrum/core";
 

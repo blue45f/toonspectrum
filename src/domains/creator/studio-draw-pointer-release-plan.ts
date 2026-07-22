@@ -11,13 +11,14 @@ import { smoothStrokePoints } from "./studio-brush";
 import { isStudioImmediateFreehandCommit } from "./studio-draw-completion";
 import { isStudioPixelPencilRenderMode } from "./studio-pixel-pencil";
 import {
-  promoteFreehandQuickShapeOnRelease,
-  trimQuickShapeDwellTail,
-  QUICKSHAPE_LOCK_HOLD_MS,
-} from "./studio-quickshape";
-import { DEFAULT_SHAPE_PARAMS } from "./studio-stroke-shapes";
+  planStudioQuickShapeRelease,
+  type StudioQuickShapeBrushEffectMode,
+  type StudioQuickShapeBrushEffectStatus,
+  type StudioQuickShapeReleaseTransition,
+} from "./studio-quickshape-release-promotion";
 
 import type { DrawEl } from "./studio-element-model";
+import type { StudioSmartShapeBrushEffectFallbackReason } from "./studio-smart-shape-brush-effect";
 
 export type StudioDrawReleaseShapeKind = Exclude<
   NonNullable<DrawEl["kind"]>,
@@ -32,6 +33,10 @@ export interface StudioDrawReleaseQuickShapeSnapshot {
   readonly elapsed: number;
   readonly locked: boolean;
   readonly converted: boolean;
+  /** Plain is the backward-compatible default; selected-brush routes supported effects to outline ink. */
+  readonly brushEffectMode?: StudioQuickShapeBrushEffectMode;
+  /** Original freehand snapshot needed when live QuickShape already removed its brush fields. */
+  readonly brushEffectSource?: DrawEl | null;
 }
 
 export interface StudioDrawPointerReleasePlanInput {
@@ -51,15 +56,14 @@ export interface StudioDrawPointerReleasePlanInput {
   }>;
 }
 
-export type StudioDrawReleaseQuickShapeTransition =
-  | "none"
-  | "promoted"
-  | "already-converted";
+export type StudioDrawReleaseQuickShapeTransition = StudioQuickShapeReleaseTransition;
 
 export interface StudioDrawPointerReleasePlan {
   readonly stroke: DrawEl;
   readonly quickShapeTransition: StudioDrawReleaseQuickShapeTransition;
   readonly quickShapeAnnouncementKind: StudioDrawReleaseShapeKind | null;
+  readonly quickShapeBrushEffectStatus: StudioQuickShapeBrushEffectStatus;
+  readonly quickShapeBrushEffectFallbackReason: StudioSmartShapeBrushEffectFallbackReason | null;
   readonly postCorrectionApplied: boolean;
   readonly commitMode: "immediate" | "deferred";
 }
@@ -71,68 +75,13 @@ export interface StudioDrawPointerReleasePlan {
 export function planStudioDrawPointerRelease(
   input: StudioDrawPointerReleasePlanInput
 ): StudioDrawPointerReleasePlan {
-  let stroke = input.stroke;
-  let quickShapeTransition: StudioDrawReleaseQuickShapeTransition = "none";
-  let quickShapeAnnouncementKind: StudioDrawReleaseShapeKind | null = null;
-
-  if (
-    input.quickShape.active
-    && stroke.mode !== "eraser"
-    && !isStudioPixelPencilRenderMode(stroke.brush)
-    && (stroke.kind ?? "freehand") === "freehand"
-  ) {
-    const heldRecognitionPoints = input.quickShape.elapsed > 0
-      ? trimQuickShapeDwellTail(
-          input.quickShape.sourcePoints,
-          input.quickShape.stableSourceLength
-        )
-      : input.quickShape.sourcePoints;
-    const promotionPoints = heldRecognitionPoints.length >= 8
-      ? heldRecognitionPoints
-      : stroke.points;
-    const promoted = promoteFreehandQuickShapeOnRelease(promotionPoints, {
-      anchor: input.quickShape.anchor,
-      lockAspect:
-        input.quickShape.locked
-        || input.quickShape.elapsed >= QUICKSHAPE_LOCK_HOLD_MS,
-    });
-    if (promoted) {
-      stroke = {
-        ...stroke,
-        kind: promoted.kind,
-        brush: undefined,
-        pressures: undefined,
-        tiltXs: undefined,
-        tiltYs: undefined,
-        twists: undefined,
-        brushTip: undefined,
-        stamp: undefined,
-        stampPipeline: undefined,
-        watercolorPipeline: undefined,
-        paintModel: undefined,
-        fill: undefined,
-        points: promoted.points,
-        shapeParams: promoted.polygonSides === undefined
-          ? undefined
-          : { ...DEFAULT_SHAPE_PARAMS, polygonSides: promoted.polygonSides },
-      };
-      quickShapeTransition = "promoted";
-      quickShapeAnnouncementKind = promoted.kind;
-    }
-  } else if (
-    input.quickShape.active
-    && stroke.mode !== "eraser"
-    && stroke.kind
-    && stroke.kind !== "freehand"
-    && input.quickShape.converted
-  ) {
-    quickShapeTransition = "already-converted";
-    quickShapeAnnouncementKind = stroke.kind;
-  }
+  const quickShape = planStudioQuickShapeRelease(input.stroke, input.quickShape);
+  let stroke = quickShape.stroke;
 
   let postCorrectionApplied = false;
   if (
     (stroke.kind ?? "freehand") === "freehand"
+    && quickShape.brushEffectStatus !== "applied"
     && !isStudioPixelPencilRenderMode(stroke.brush)
     && input.postCorrection.strength > 0
     && stroke.stampPipeline !== "causal-walker-v2"
@@ -158,13 +107,18 @@ export function planStudioDrawPointerRelease(
     && !isStudioImmediateFreehandCommit(stroke)
     // A translucent settled preview overlapping its committed node would briefly double-darken.
     && (stroke.opacity ?? 1) === 1
+    // The live direct surface still contains the pre-snap gesture/primitive, not the rebuilt
+    // brush outline. Commit it synchronously so an incorrect preview is never preserved.
+    && quickShape.brushEffectStatus !== "applied"
     // Direct drafts may defer only while their Canvas/WebGPU pixels can survive the handoff.
     && canKeepDeferredInkVisible;
 
   return {
     stroke,
-    quickShapeTransition,
-    quickShapeAnnouncementKind,
+    quickShapeTransition: quickShape.transition,
+    quickShapeAnnouncementKind: quickShape.announcementKind,
+    quickShapeBrushEffectStatus: quickShape.brushEffectStatus,
+    quickShapeBrushEffectFallbackReason: quickShape.brushEffectFallbackReason,
     postCorrectionApplied,
     commitMode: deferred ? "deferred" : "immediate",
   };

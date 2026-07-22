@@ -26,7 +26,7 @@ describe("design token discipline", () => {
   });
 
   it("renders the skip link with theme tokens so contrast holds in both themes", () => {
-    // 스킵 링크는 웹·토스 공유 셸(AppShell)에 산다(App.tsx 는 라우터+크롬만 조립).
+    // 스킵 링크는 웹 애플리케이션 셸(AppShell)에 산다(App.tsx 는 라우터+크롬만 조립).
     const shell = read("src/app/AppShell.tsx");
 
     expect(shell).not.toContain("bg-white");

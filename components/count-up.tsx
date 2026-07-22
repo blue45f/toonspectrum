@@ -18,7 +18,7 @@ export function CountUp({
   className?: string;
   /** 천 단위 구분 기호(ko-KR) 적용 — 대형 인덱스 넘버럴 가독성. */
   separator?: boolean;
-  /** 인라인 스타일 — 토스(인라인 스타일 위주) 재사용 시 색/굵기 주입용. */
+  /** 호출부에서 색과 굵기를 주입할 수 있는 인라인 스타일. */
   style?: React.CSSProperties;
 }) {
   const [n, setN] = useState(0);

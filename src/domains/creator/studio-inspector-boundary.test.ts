@@ -107,6 +107,10 @@ describe("Studio inspector module boundary", () => {
     expect(page.source).toContain("<LazyStudioInspectorAside");
     expect(page.source).toContain('mobileSheet === "props"');
     expect(page.source).toContain("<StudioInspectorAsideFallback");
+    expect(page.source).toContain('useState<StudioMobileSheetSnap>("medium")');
+    expect(page.source).toContain("mobileInspectorSnap={mobileInspectorSnap}");
+    expect(page.source).toContain("setMobileInspectorSnap={setMobileInspectorSnap}");
+    expect(inspector.source).not.toContain('useState<StudioMobileSheetSnap>("medium")');
   });
 
   it("keeps the inspector presentation-only and delegates optional loading to the registry", () => {

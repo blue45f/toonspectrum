@@ -1,5 +1,5 @@
 /*
- * @toonspectrum/core/fx/fx.css — 웹·토스 공유 fx 키프레임/유틸(프레임워크 비종속 CSS).
+ * @toonspectrum/core/fx/fx.css — 프레임워크 비종속 공용 fx 키프레임/유틸.
  *
  * 클래스 1개만 붙이면 동작하도록 keyframes + .pf-* 헬퍼를 함께 제공합니다.
  *   - pf-jelly-pop  : 탭 스프링(눌렀다 통 튀는 젤리감) — 1회성
@@ -19,7 +19,7 @@
  * prefers-reduced-motion 사용자는 모든 fx 애니메이션을 정지(접근성).
  *
  * easing 토큰(--ts-ease-*)은 앱 전역 var(--ease-out-expo 등)를 폴백 체인으로 흡수하되,
- * 토스처럼 그 변수가 없어도 동작하도록 cubic-bezier 리터럴로 끝맺습니다(self-contained).
+ * 전역 변수가 없어도 동작하도록 cubic-bezier 리터럴로 끝맺습니다(self-contained).
  */
 
 :root {
@@ -33,7 +33,7 @@
   /* 시머 타이틀 글로우 색(drop-shadow). 기본은 웜 액센트. */
   --ts-fx-shimmer-glow: oklch(0.72 0.185 42 / 0.5);
 
-  /* easing — 앱 전역 변수가 있으면 그걸 쓰고, 없으면 리터럴로 폴백(토스 self-contained). */
+  /* easing — 앱 전역 변수가 있으면 그걸 쓰고, 없으면 리터럴로 폴백합니다. */
   --ts-ease-out-expo: var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1));
   --ts-ease-out-quint: var(--ease-out-quint, cubic-bezier(0.22, 1, 0.36, 1));
   --ts-ease-out-quart: var(--ease-out-quart, cubic-bezier(0.25, 1, 0.5, 1));
@@ -356,16 +356,6 @@
   }
 }
 
-/* ── toss-spring — 토스 인앱 스타일 스프링 바운스 ───────────────────────────── */
-.toss-spring {
-  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.2s ease;
-  will-change: transform;
-}
-.toss-spring:active {
-  transform: scale(0.92);
-  filter: brightness(1.12);
-}
-
 /* ── pf-click-ripple — 클릭시 방사형 후광 리플 ──────────────────────────────── */
 @keyframes pf-click-ripple-anim {
   0% {
@@ -453,7 +443,6 @@
   .pf-sparkle,
   .pf-aurora,
   .pf-glow,
-  .toss-spring,
   .pf-click-ripple,
   .pf-popup-open,
   .pf-popup-close,

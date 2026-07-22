@@ -101,7 +101,7 @@ VITE_STUDIO_LIVE_ORIGIN=https://realtime.toonspectrum.example
 STUDIO_LIVE_CLUSTER_ADAPTER=postgres
 STUDIO_LIVE_POSTGRES_URL=postgresql://USER:PASSWORD@DIRECT_HOST/webdex?sslmode=verify-full&channel_binding=require
 STUDIO_LIVE_POSTGRES_POOL_MAX=2
-API_CORS_ALLOWED_ORIGINS=https://toonspectrum.example.com,https://toonspectrum.apps.tossmini.com
+API_CORS_ALLOWED_ORIGINS=https://toonspectrum.example.com
 
 # 검증된 원형 펜 래스터 CRDT 파일럿 — 프런트/서버를 같은 릴리스에서 함께 활성화
 VITE_STUDIO_RASTER_CRDT_AUTO_PUBLICATION=verified-renderer-handoff-v1
@@ -130,20 +130,3 @@ PubSub listener를 닫은 다음 pool을 닫습니다. 장기 실행 서버에�
 자동 타일 게시가 실행되지 않으며 기존 Yjs 벡터 원본이 계속 화면·내보내기의 권위가 됩니다. 활성화한
 배포에서는 먼저 실제 PostgreSQL migration과 래스터 에셋 업로드 권한을 확인하고, 두 브라우저에서
 동일 획의 `append → broadcast → replay → handoff`와 스크롤·내보내기 즉시 벡터 복구를 점검하세요.
-
-## 앱인토스 로그인·공유 운영 설정
-
-토스 로그인 API는 mTLS가 필수입니다. Vercel에는 인증서 파일 경로 대신 PEM 본문을 시크릿으로
-등록합니다(`\\n` 리터럴 개행도 지원).
-
-```sh
-TOSS_MTLS_CERT='-----BEGIN CERTIFICATE-----\n...'
-TOSS_MTLS_KEY='-----BEGIN PRIVATE KEY-----\n...'
-TOSS_UNLINK_USERNAME=callback-user
-TOSS_UNLINK_PASSWORD=long-random-password
-```
-
-앱인토스 콘솔의 연결 끊기 콜백은
-`POST https://toonspectrum.vercel.app/api/auth/toss/unlink`로 등록하고 위 Basic Auth 값을 사용합니다.
-미니앱 공유는 `getTossShareLink`에 `https://toonspectrum.vercel.app/og-toss.png`를 전달하며,
-이 파일은 앱인토스 전용 1200×600 PNG입니다. 일반 웹 OG는 1200×630 `og-web.png`를 사용합니다.

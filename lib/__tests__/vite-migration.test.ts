@@ -32,10 +32,10 @@ describe("vite migration", () => {
     expect(apiPath("search")).toBe("/api/search");
   });
 
-  it("uses the runtime API origin injected by a cross-origin mini-app shell", () => {
+  it("uses an explicitly injected runtime API origin", () => {
     setRuntimeApiBase("https://toonspectrum.vercel.app/");
 
-    expect(apiPath("/auth/toss/exchange")).toBe("https://toonspectrum.vercel.app/api/auth/toss/exchange");
+    expect(apiPath("/auth/providers")).toBe("https://toonspectrum.vercel.app/api/auth/providers");
 
     setRuntimeApiBase("");
   });
@@ -51,7 +51,7 @@ describe("vite migration", () => {
   });
 
   it("loads the command palette implementation lazily from a lightweight app host", () => {
-    // 커맨드 팔레트 호스트는 웹·토스 공유 셸(AppShell)에서 마운트한다(App.tsx 는 라우터+크롬만 조립).
+    // 커맨드 팔레트 호스트는 공용 셸(AppShell)에서 마운트한다(App.tsx 는 라우터+크롬만 조립).
     const app = readFileSync(join(process.cwd(), "src/app/App.tsx"), "utf8");
     const shell = readFileSync(join(process.cwd(), "src/app/AppShell.tsx"), "utf8");
     const host = readFileSync(join(process.cwd(), "components/command-palette-host.tsx"), "utf8");

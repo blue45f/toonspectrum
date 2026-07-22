@@ -138,6 +138,28 @@ export const STUDIO_PROCEDURAL_BRUSH_ICON_BY_ID = {
   "rough-stripe": "fence",
   "footstep-stamp": "footprints",
   "heart-stamp": "heart",
+
+  // Extended production media and assistants
+  "technical-needle-ink": "pen-line",
+  "broken-nib-ink": "pen-tool",
+  "side-graphite-shade": "pencil",
+  "compressed-charcoal-edge": "square-dashed",
+  "watercolor-detail-round": "droplets",
+  "watercolor-flat-wash": "blend",
+  "opaque-gouache": "paintbrush",
+  "oil-filbert": "paintbrush",
+  "alcohol-chisel-marker": "highlighter",
+  "taper-brush-marker": "feather",
+  "pixel-square": "square",
+  "pixel-dither": "grid-2x2",
+  "cross-hatch": "grid-3x3",
+  "speed-hatch": "rows",
+  "dense-halftone": "circle-dot",
+  "bokeh-scatter": "sparkles",
+  "canvas-weave": "grid-3x3",
+  "fine-hair-strands": "feather",
+  "cloth-fold-rake": "waves",
+  "pine-needle-cluster": "trees",
 } as const satisfies Readonly<
   Record<StudioBrushPackCatalogId, StudioBrushIconId>
 >;

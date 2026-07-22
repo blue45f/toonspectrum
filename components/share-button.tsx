@@ -4,12 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-declare global {
-  var __toonspectrumTossShareLink:
-    | undefined
-    | ((path: string) => Promise<string | null>);
-}
-
 // 작품 공유 버튼 — 모바일은 OS 공유 시트(navigator.share, 카카오/인스타 등), 데스크톱은 링크 복사 + X/페북.
 export function ShareButton({
   title,
@@ -42,19 +36,12 @@ export function ShareButton({
   }, [open]);
 
   async function onShare() {
-    const tossUrl =
-      typeof globalThis.__toonspectrumTossShareLink === "function"
-        ? await globalThis.__toonspectrumTossShareLink(
-            `/title/${encodeURIComponent(slug)}`,
-          )
-        : null;
-    const resolvedUrl = tossUrl || url;
     if (
       typeof navigator !== "undefined" &&
       typeof navigator.share === "function"
     ) {
       try {
-        await navigator.share({ title: shareText, url: resolvedUrl });
+        await navigator.share({ title: shareText, url });
         return;
       } catch {
         /* 사용자 취소 — 메뉴로 폴백 */

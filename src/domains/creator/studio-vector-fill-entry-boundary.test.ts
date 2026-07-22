@@ -1,0 +1,88 @@
+import { readFileSync } from "node:fs";
+
+import ts from "typescript";
+import { describe, expect, it } from "vitest";
+
+const pageUrl = new URL("./StudioPage.tsx", import.meta.url);
+const previewUrl = new URL("./studio-advanced-fill-preview.ts", import.meta.url);
+const source = readFileSync(pageUrl, "utf8");
+const previewSource = readFileSync(previewUrl, "utf8");
+const file = ts.createSourceFile(
+  pageUrl.pathname,
+  source,
+  ts.ScriptTarget.Latest,
+  true,
+  ts.ScriptKind.TSX,
+);
+
+function nestedFunction(name: string): string {
+  let match: ts.FunctionDeclaration | null = null;
+  function visit(node: ts.Node): void {
+    if (ts.isFunctionDeclaration(node) && node.name?.text === name) {
+      match = node;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(file);
+  if (!match) throw new Error(`Missing nested function ${name}`);
+  return (match as ts.FunctionDeclaration).getText(file);
+}
+
+describe("Studio vector line-art advanced fill entry boundary", () => {
+  it("plans from the latest page snapshot and never mutates while arming", () => {
+    const input = nestedFunction("currentAdvancedFillVectorInput");
+    const toggle = nestedFunction("toggleAdvancedFill");
+
+    expect(input).toContain("pagesHistoryRef.current");
+    expect(input).toContain("pagesHiRef.current");
+    expect(input).toContain("currentPageIdRef.current");
+    expect(input).toContain("currentStudioVectorReferenceBudgets()");
+    expect(toggle).toContain("flushPendingStrokeCommitsRef.current()");
+    expect(toggle).toContain("planStudioAdvancedFillVectorTarget(currentAdvancedFillVectorInput())");
+    expect(toggle).toContain("setAdvancedFillVirtualTarget(vectorPlan.target)");
+    expect(toggle).not.toContain("commit(");
+    expect(toggle).not.toContain("patchEl(");
+  });
+
+  it("rasterizes visible vectors through the abortable reference seam before filling", () => {
+    const run = nestedFunction("runAdvancedFillAt");
+
+    expect(run).toContain("advancedFillVirtualReferenceRef.current");
+    expect(run).toContain("renderStudioAdvancedFillVectorReference(vectorInput");
+    expect(run).toContain("signal: controller.signal");
+    expect(run).toContain("renderedReference.fingerprint !== vectorTarget.sourceFingerprint");
+    expect(run).toContain("referenceSrc = renderedReference.dataUrl");
+    expect(run).toContain("runStudioAdvancedFillInBrowser({");
+    expect(run).toContain("pagesHiRef.current !== historyIndex");
+    expect(run).toContain("canApplyStudioMutation(mutationTicket)");
+    expect(run).toContain("currentPlan.target.sourceFingerprint !== vectorTarget.sourceFingerprint");
+    expect(run).toContain("virtualTarget: vectorTarget");
+  });
+
+  it("keeps preview paint-only and applies exactly one image layer in one history commit", () => {
+    const apply = nestedFunction("applyAdvancedFillPreview");
+    const cancel = nestedFunction("cancelAdvancedFillPreview");
+    const renderStart = source.indexOf("const authoredCanvasRenderElements =");
+    const renderEnd = source.indexOf("const timelineComposite =", renderStart);
+    const paintProjection = source.slice(renderStart, renderEnd);
+    const renderEl = source.slice(
+      source.indexOf("const renderEl =", renderEnd),
+      source.indexOf("const panelClip =", renderEnd),
+    );
+
+    expect(previewSource).toContain("virtualTarget?: StudioAdvancedFillVirtualTarget");
+    expect(paintProjection).toContain("materializeStudioAdvancedFillVectorTarget(");
+    expect(paintProjection).toContain("canvasRenderElements.splice(insertionIndex, 0, virtualFillPreviewElement)");
+    expect(renderEl).toContain("isAdvancedFillVirtualPreview");
+    expect(renderEl).toContain("opts.asMask || isAdvancedFillVirtualPreview");
+
+    expect(apply).toContain("planStudioAdvancedFillVectorTarget(vectorInput)");
+    expect(apply).toContain("materializeStudioAdvancedFillVectorTarget(currentPlan.target, preview.resultSrc)");
+    expect(apply).toContain("nextElements.splice(currentPlan.target.insertionIndex, 0, materialized)");
+    expect(apply.match(/\bcommit\(/gu)).toHaveLength(1);
+    expect(apply).toContain("if (!commit(nextElements)) return");
+    expect(cancel).not.toContain("commit(");
+    expect(cancel).not.toContain("patchEl(");
+  });
+});

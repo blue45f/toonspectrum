@@ -10,6 +10,7 @@ import {
   removeStudioAdjustmentEntry,
   reorderStudioAdjustmentEntry,
   setStudioAdjustmentEntryEnabled,
+  studioAdjustmentDefaultParams,
   studioAdjustmentEngineHasLivePreview,
   studioAdjustmentOperationToFilterFields,
   studioAdjustmentStackHasLivePreview,
@@ -101,7 +102,7 @@ describe("studio adjustment stack", () => {
       .toEqual(["invert-a", "bright-a", "bright-b"]);
   });
 
-  it("maps gaussian and motion blur onto blurFx for live preview", () => {
+  it("maps gaussian, motion, spin and zoom blur onto distinct blurFx modes", () => {
     let stack = createEmptyStudioAdjustmentStack();
     stack = appendStudioAdjustmentEntry(stack, {
       engine: "gaussian-blur",
@@ -130,6 +131,62 @@ describe("studio adjustment stack", () => {
       radius: 20,
       angle: 45,
     });
+
+    stack = appendStudioAdjustmentEntry(createEmptyStudioAdjustmentStack(), {
+      engine: "spin-blur",
+      params: { radius: 16, strength: 75 },
+    });
+    fields = studioAdjustmentOperationToFilterFields(
+      studioAdjustmentStackToFilterFields(stack).smartFilterOperations![0]!,
+    );
+    expect(fields.blurFx).toEqual({ type: "spin", strength: 75, radius: 16, angle: 0 });
+
+    stack = appendStudioAdjustmentEntry(createEmptyStudioAdjustmentStack(), {
+      engine: "zoom-blur",
+      params: { radius: 24, strength: 65 },
+    });
+    fields = studioAdjustmentOperationToFilterFields(
+      studioAdjustmentStackToFilterFields(stack).smartFilterOperations![0]!,
+    );
+    expect(fields.blurFx).toEqual({ type: "zoom", strength: 65, radius: 24, angle: 0 });
+  });
+
+  it("projects every added commercial filter into a real bounded pixel field", () => {
+    const project = (
+      engine: Parameters<typeof studioAdjustmentDefaultParams>[0],
+      params = studioAdjustmentDefaultParams(engine),
+    ) => studioAdjustmentOperationToFilterFields({
+      id: `test-${engine}`,
+      engine,
+      enabled: true,
+      params,
+    });
+
+    expect(project("pixelate")).toMatchObject({ pixelate: 8 });
+    expect(project("posterize")).toMatchObject({ posterize: 5 });
+    expect(project("ink-threshold")).toMatchObject({ inkThreshold: 0.5 });
+    expect(project("line-extraction")).toMatchObject({ lineart: true });
+    expect(project("screentone")).toMatchObject({ screentone: true });
+    expect(project("chromatic-aberration")).toMatchObject({ chromatic: 4 });
+    expect(project("grayscale")).toMatchObject({ grayscale: true });
+    expect(project("sepia")).toMatchObject({ sepia: true });
+    expect(project("color-halftone").halftone).toEqual({
+      dotSize: 4,
+      angle: 15,
+      mode: "cmyk",
+      strength: 100,
+    });
+    expect(project("edge-detect").stylize?.type).toBe("findEdges");
+    expect(project("emboss").stylize?.type).toBe("emboss");
+    expect(project("solarize").stylize?.type).toBe("solarize");
+    expect(project("oil-paint").stylize?.type).toBe("oilPaint");
+    expect(project("smart-sharpen").detail?.type).toBe("smartSharpen");
+    expect(project("median-despeckle").detail?.type).toBe("median");
+    expect(project("high-pass").convolution).toEqual({
+      kernel: [-1, -1, -1, -1, 8, -1, -1, -1, -1],
+      divisor: 1,
+      bias: 128,
+    });
   });
 
   it("exposes every recognized engine as addable without catalog drift", () => {
@@ -141,6 +198,31 @@ describe("studio adjustment stack", () => {
       "offset",
       "custom-convolution",
       "clouds",
+      "spin-blur",
+      "zoom-blur",
+      "pixelate",
+      "posterize",
+      "ink-threshold",
+      "line-extraction",
+      "screentone",
+      "color-halftone",
+      "chromatic-aberration",
+      "grayscale",
+      "sepia",
+      "edge-detect",
+      "emboss",
+      "high-pass",
+      "median-despeckle",
+      "surface-blur",
+      "crystal-mosaic",
+      "pencil-sketch",
+      "crosshatch",
+      "ordered-dither",
+      "glowing-edges",
+      "cutout",
+      "retro-film",
+      "watercolor",
+      "diffuse-glow",
     ]));
   });
 

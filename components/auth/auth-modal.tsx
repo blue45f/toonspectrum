@@ -15,7 +15,7 @@ import {
   resolveSignupAvatarImage,
 } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
-import { isTossLoginAvailable, signIn, signInWithGoogleIdToken, tossLoginFlow } from "@/src/compat/auth-session-store";
+import { signIn, signInWithGoogleIdToken } from "@/src/compat/auth-session-store";
 import { apiPath } from "@/src/infrastructure/api";
 
 
@@ -158,10 +158,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [providers, setProviders] = useState<Record<string, ProviderInfo>>({});
   const [err, setErr] = useState("");
-  const [tossErr, setTossErr] = useState("");
   const [imageErr, setImageErr] = useState("");
-  const [tossBusy, setTossBusy] = useState(false);
-  const tossAvailable = isTossLoginAvailable();
   const panelRef = useRef<HTMLDivElement>(null);
   const emailRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -189,12 +186,11 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
   const emailField = register("email");
 
   useEffect(() => {
-    if (tossAvailable) return;
     fetch(apiPath("/auth/providers"))
       .then((r) => r.json())
       .then((p) => setProviders(p && typeof p === "object" ? p : {}))
       .catch(() => {});
-  }, [tossAvailable]);
+  }, []);
 
   // Escape 로 닫기 (키보드 접근성)
   useEffect(() => {
@@ -242,7 +238,6 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
 
   const submit = handleSubmit(async ({ email, password, name, avatar, image }) => {
     setErr("");
-    setTossErr("");
     try {
       if (mode === "signup") {
         const r = await fetch(apiPath("/auth/signup"), {
@@ -265,26 +260,6 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
       setErr("문제가 발생했어요. 다시 시도해 주세요.");
     }
   });
-
-  // 토스 네이티브 로그인 — appLogin 인가코드 → 서버 mTLS 교환 → 세션. 사용자가 창을 닫으면 조용히 무시.
-  const onTossLogin = async () => {
-    setErr("");
-    setTossErr("");
-    setTossBusy(true);
-    try {
-      const r = await tossLoginFlow();
-      if (r.ok) {
-        onClose();
-      } else if (r.error !== "toss-cancelled") {
-        setTossErr(r.message ?? "토스 로그인에 실패했어요. 다시 시도해 주세요.");
-      }
-    } catch {
-      // tossLoginFlow가 모든 정상 실패를 결과값으로 바꾸지만, 저장소 접근 등 예외에도 UI가 멈추지 않게 방어한다.
-      setTossErr("로그인 처리 중 문제가 발생했어요. 다시 시도해 주세요.");
-    } finally {
-      setTossBusy(false);
-    }
-  };
 
   const fieldError = errors.email?.message ?? errors.password?.message ?? null;
   const avatarImage = resolveSignupAvatarImage(imageValue);
@@ -343,48 +318,25 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
             {mode === "login" ? "다시 오셨네요. 로그인하세요." : "계정을 만들고 취향을 기록하세요."}
           </p>
 
-          {tossAvailable && (
-            <div className="mb-4">
+          <div className="mb-4 inline-flex rounded-lg border border-line bg-card p-0.5">
+            {(["login", "signup"] as const).map((m) => (
               <button
-                type="button"
-                onClick={onTossLogin}
-                disabled={tossBusy}
-                aria-busy={tossBusy}
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent text-[0.95rem] font-bold text-on-accent transition-colors hover:bg-accent-2 disabled:opacity-50"
+                key={m}
+                onClick={() => {
+                  setMode(m);
+                  setErr("");
+                }}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  mode === m ? "bg-raised text-fg" : "text-fg-3 hover:text-fg-2"
+                )}
               >
-                {tossBusy ? "토스 로그인 중…" : "토스로 로그인"}
+                {m === "login" ? "로그인" : "회원가입"}
               </button>
-              <p className="mt-2 text-center text-[0.7rem] text-fg-3">토스 계정으로 약관 동의 후 바로 시작해요</p>
-              {tossErr && (
-                <p role="alert" aria-live="polite" className="mt-2 text-center text-xs leading-relaxed text-bad">
-                  {tossErr}
-                </p>
-              )}
-            </div>
-          )}
+            ))}
+          </div>
 
-          {!tossAvailable && (
-            <>
-              <div className="mb-4 inline-flex rounded-lg border border-line bg-card p-0.5">
-                {(["login", "signup"] as const).map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => {
-                      setMode(m);
-                      setErr("");
-                      setTossErr("");
-                    }}
-                    className={cn(
-                      "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                      mode === m ? "bg-raised text-fg" : "text-fg-3 hover:text-fg-2"
-                    )}
-                  >
-                    {m === "login" ? "로그인" : "회원가입"}
-                  </button>
-                ))}
-              </div>
-
-              <form className="flex flex-col gap-2.5" onSubmit={submit}>
+          <form className="flex flex-col gap-2.5" onSubmit={submit}>
             {mode === "signup" && (
               <>
                 <input
@@ -524,11 +476,9 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
               {mode === "login" ? <LogIn size={16} /> : <UserPlus size={16} />}
               {isSubmitting ? "처리 중…" : mode === "login" ? "로그인" : "가입하고 시작"}
             </button>
-              </form>
-            </>
-          )}
+          </form>
 
-          {!tossAvailable && (providers.kakao || providers.google || providers.naver) && (
+          {(providers.kakao || providers.google || providers.naver) && (
             <>
               <div className="my-4 flex items-center gap-3 text-[0.7rem] text-fg-3">
                 <span className="h-px flex-1 bg-line" />또는<span className="h-px flex-1 bg-line" />
@@ -575,9 +525,8 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
             </>
           )}
           <p className="mt-4 text-[0.7rem] leading-relaxed text-fg-3">
-            {tossAvailable
-              ? "토스 계정으로 로그인하면 평점·리뷰·서재를 어느 기기에서나 이어갈 수 있어요."
-              : "계정을 만들면 평점·리뷰·서재가 DB에 저장되어 어느 기기에서나 이어집니다. 비로그인 시 이 브라우저에만 저장돼요."}
+            계정을 만들면 평점·리뷰·서재가 DB에 저장되어 어느 기기에서나 이어집니다. 비로그인 시 이
+            브라우저에만 저장돼요.
           </p>
         </div>
       </div>

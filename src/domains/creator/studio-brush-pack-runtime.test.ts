@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { planNormalizedStudioDynamicBrushDabs } from "./studio-brush-dynamics";
 import { STUDIO_BRUSH_PACK_CATALOG_IDS } from "./studio-brush-pack-id";
 import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";
 import {
@@ -41,10 +42,19 @@ function alphaSignature(values: Float32Array): string {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
+function withoutSeedFields(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutSeedFields);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).map(([key, entry]) => [
+    key,
+    key === "seed" ? 0 : withoutSeedFields(entry),
+  ]));
+}
+
 describe("procedural brush pack runtime", () => {
-  it("materializes all 67 descriptors into the shared selection contract", () => {
+  it("materializes all 87 descriptors into the shared selection contract", () => {
     const selections = materializeAllStudioBrushPackSelections();
-    expect(selections).toHaveLength(67);
+    expect(selections).toHaveLength(87);
     expect(selections.map((selection) => selection.catalogId)).toEqual(
       STUDIO_BRUSH_PACK_CATALOG_IDS
     );
@@ -94,18 +104,49 @@ describe("procedural brush pack runtime", () => {
     expect(signatures.size).toBe(STUDIO_BRUSH_PACK_CUSTOM_TIP_MOTIFS.length);
   });
 
-  it("gives all 67 catalogue brushes a distinct deterministic runtime signature", () => {
+  it("gives all 87 catalogue brushes a distinct deterministic runtime fingerprint", () => {
     const first = STUDIO_BRUSH_PACK_CATALOG_IDS.map(studioBrushPackRuntimeSignature);
     const second = STUDIO_BRUSH_PACK_CATALOG_IDS.map(studioBrushPackRuntimeSignature);
-    const physical = materializeAllStudioBrushPackSelections().map((selection) => JSON.stringify({
+    const physical = materializeAllStudioBrushPackSelections().map((selection) => JSON.stringify(withoutSeedFields({
       runtimeBrushId: selection.runtimeBrushId,
-      brushDynamics: { ...selection.brushDynamics, seed: 0 },
-    }));
+      brushDynamics: selection.brushDynamics,
+    })));
     expect(first).toEqual(second);
     expect(first.every((signature) => typeof signature === "string" && signature.length > 100)).toBe(true);
-    expect(new Set(first).size).toBe(67);
-    // A unique seed alone must not be the differentiator: every brush has distinct tip physics.
-    expect(new Set(physical).size).toBe(67);
+    expect(new Set(first).size).toBe(87);
+    // Neither the stroke seed nor nested grain seeds may be the sole differentiator.
+    expect(new Set(physical).size).toBe(87);
+  });
+
+  it("plans a finite, visible, deterministic engine stroke for every catalogue preset", () => {
+    for (const selection of materializeAllStudioBrushPackSelections()) {
+      const input = {
+        baseOpacity: selection.defaultOpacity,
+        baseWidth: selection.defaultWidth,
+        directions: [0, 18, -12, 24],
+        maxDabs: 512,
+        points: [4, 28, 24, 10, 48, 34, 76, 16],
+        pressures: [0.28, 0.64, 0.86, 0.48],
+        seed: 0x13ad_beef,
+        speeds: [0.2, 0.8, 1.4, 0.5],
+        tiltXs: [0, 24, 48, 12],
+        tiltYs: [0, -18, 36, 10],
+      };
+      const first = planNormalizedStudioDynamicBrushDabs(input, selection.brushDynamics);
+      const replay = planNormalizedStudioDynamicBrushDabs(input, selection.brushDynamics);
+      expect(first, `${selection.catalogId}: no planned dabs`).not.toHaveLength(0);
+      expect(replay, `${selection.catalogId}: non-deterministic dabs`).toEqual(first);
+      for (const dab of first) {
+        expect(Object.values(dab).every(Number.isFinite), `${selection.catalogId}: invalid dab`).toBe(true);
+        expect(dab.size, `${selection.catalogId}: invisible size`).toBeGreaterThan(0);
+        expect(dab.opacity * dab.flow, `${selection.catalogId}: invisible flow`).toBeGreaterThan(0);
+      }
+      const alphaMap = buildStudioBrushTipAlphaMap(selection.brushDynamics.tip);
+      expect(
+        alphaMap.alphas.some((alpha) => alpha > 0),
+        `${selection.catalogId}: empty tip alpha`
+      ).toBe(true);
+    }
   });
 
   it("materializes bounded phase-two colour, grain-space and multi-tip contracts", () => {

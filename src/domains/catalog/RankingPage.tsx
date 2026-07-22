@@ -57,7 +57,7 @@ export function RankingPage() {
             <ListFilter size={14} className="text-fg-3" />
             현재 축: <span className="font-medium text-fg">{axis}</span>
           </span>
-          {/* 랭킹 공유 — 토스 공식 공유 링크(1200×600 OG) → OS 시트 → 클립보드 폴백 */}
+          {/* 랭킹 공유 — OS 공유 시트 → 클립보드 폴백 */}
           <SharePageButton path="/ranking" text="툰스펙트럼 통합 랭킹" label="랭킹 공유" />
         </div>
       </header>

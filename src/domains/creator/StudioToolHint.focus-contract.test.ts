@@ -23,9 +23,9 @@ describe("StudioToolHint focus takeover contract", () => {
 
     expect(handleFocus).not.toContain("suppressedPointerHintAt !== null");
     expect(handleFocus).toContain("clearPointerSuppression();");
-    expect(handleFocus).toContain("reveal(richCoachEnabled);");
+    expect(handleFocus).toContain('reveal(richCoachEnabled, "focus");');
     expect(handleFocus.indexOf("clearPointerSuppression();")).toBeLessThan(
-      handleFocus.indexOf("reveal(richCoachEnabled);")
+      handleFocus.indexOf('reveal(richCoachEnabled, "focus");')
     );
   });
 
@@ -34,7 +34,7 @@ describe("StudioToolHint focus takeover contract", () => {
     const scheduleShow = functionBody("scheduleShow");
 
     expect(scheduleShow).toContain("if (open) {");
-    expect(scheduleShow).toContain("reveal(false);");
+    expect(scheduleShow).toContain('reveal(false, "hover");');
     expect(reveal).toContain("if (!richCoachEnabled) {");
     expect(reveal).toContain("if (expanded) return;");
     expect(reveal.indexOf("setExpanded(false);")).toBeLessThan(
@@ -62,15 +62,12 @@ describe("StudioToolHint focus takeover contract", () => {
     expect(disabledGuard.indexOf("return;")).toBeLessThan(
       disabledGuard.indexOf("dismissPointerActivation(event);")
     );
-    expect(source).toContain("aria-disabled={disabled ? true : undefined}");
     expect(source).toContain("tabIndex={disabled ? 0 : undefined}");
-    expect(source).toContain('role={disabled ? disabledChildProps?.role ?? "button" : undefined}');
+    expect(source).toContain('role={disabled ? "group" : undefined}');
     expect(source).toContain("aria-label={disabled ? childAccessibleLabel ?? hint.title : undefined}");
-    expect(source).toContain('aria-pressed={disabledChildProps?.["aria-pressed"]}');
-    expect(source).toContain('aria-expanded={disabledChildProps?.["aria-expanded"]}');
-    expect(source).toContain('aria-controls={disabledChildProps?.["aria-controls"]}');
     expect(source).toContain("focus-visible:outline-accent");
-    expect(source).toContain('"aria-hidden": true');
+    expect(source).toContain('"aria-disabled": true');
+    expect(source).not.toContain('"aria-hidden": true');
     expect(source).toContain("tabIndex: -1");
     expect(source).toContain("const needsWrapperDescription = open && (disabled || !canDescribeChild);");
   });

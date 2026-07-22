@@ -6,6 +6,8 @@ import {
   Eraser,
   FlipHorizontal2,
   LayoutTemplate,
+  Maximize2,
+  Minimize2,
   Pencil,
   Plus,
   Trash2,
@@ -38,6 +40,45 @@ import type { Resizable } from "@/components/use-resizable";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 
 import { cn } from "@/lib/utils";
+
+type StudioPagePreviewSize = "compact" | "comfortable" | "large";
+
+const PAGE_PREVIEW_SIZE_STORAGE_KEY = "toonspectrum:studio:page-preview-size:v1";
+const PAGE_PREVIEW_SIZE_VALUES: readonly StudioPagePreviewSize[] = [
+  "compact",
+  "comfortable",
+  "large",
+];
+const PAGE_PREVIEW_SIZE_CLASS: Record<StudioPagePreviewSize, string> = {
+  compact: "h-14",
+  comfortable: "h-24",
+  large: "h-36",
+};
+const PAGE_PREVIEW_SIZE_LABEL: Record<StudioPagePreviewSize, string> = {
+  compact: "작게",
+  comfortable: "보통",
+  large: "크게",
+};
+
+function readPagePreviewSize(): StudioPagePreviewSize {
+  if (typeof window === "undefined") return "comfortable";
+  try {
+    const stored = window.localStorage.getItem(PAGE_PREVIEW_SIZE_STORAGE_KEY);
+    return PAGE_PREVIEW_SIZE_VALUES.includes(stored as StudioPagePreviewSize)
+      ? (stored as StudioPagePreviewSize)
+      : "comfortable";
+  } catch {
+    return "comfortable";
+  }
+}
+
+function persistPagePreviewSize(value: StudioPagePreviewSize): void {
+  try {
+    window.localStorage.setItem(PAGE_PREVIEW_SIZE_STORAGE_KEY, value);
+  } catch {
+    // 사생활 보호 모드나 저장소 차단 환경에서도 현재 세션의 조절은 그대로 유지한다.
+  }
+}
 
 export interface StudioPageListPaneHandlers {
   addPage: () => void;
@@ -124,6 +165,9 @@ export const StudioPageListPane = memo(function StudioPageListPane({
     movePageUp,
   } = stableHandlers;
   const [mobileSnap, setMobileSnap] = useState<StudioMobileSheetSnap>("medium");
+  const [pagePreviewSize, setPagePreviewSize] = useState<StudioPagePreviewSize>(
+    readPagePreviewSize
+  );
   const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
     ? Math.max(0, Math.round(mobileKeyboardInset))
     : 0;
@@ -212,7 +256,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
             <div
               role="toolbar"
               aria-label="페이지 일괄 작업"
-              className="flex gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-wrap lg:overflow-x-visible"
+              className="flex items-center gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-wrap lg:overflow-x-visible"
             >
               <button
                 type="button"
@@ -247,6 +291,31 @@ export const StudioPageListPane = memo(function StudioPageListPane({
               >
                 마스터{master.elements.length > 0 ? ` ${master.elements.length}` : ""}
               </button>
+              <div
+                role="group"
+                aria-label="페이지 미리보기 크기"
+                className="ml-auto flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-line bg-card px-1.5 lg:min-h-6"
+                title={`페이지 미리보기 ${PAGE_PREVIEW_SIZE_LABEL[pagePreviewSize]}`}
+              >
+                <Minimize2 size={12} className="shrink-0 text-fg-3" aria-hidden />
+                <input
+                  type="range"
+                  min={0}
+                  max={PAGE_PREVIEW_SIZE_VALUES.length - 1}
+                  step={1}
+                  value={PAGE_PREVIEW_SIZE_VALUES.indexOf(pagePreviewSize)}
+                  onChange={(event) => {
+                    const next = PAGE_PREVIEW_SIZE_VALUES[Number(event.currentTarget.value)];
+                    if (!next) return;
+                    setPagePreviewSize(next);
+                    persistPagePreviewSize(next);
+                  }}
+                  aria-label="페이지 미리보기 크기 조절"
+                  aria-valuetext={PAGE_PREVIEW_SIZE_LABEL[pagePreviewSize]}
+                  className="h-11 w-20 cursor-pointer accent-accent lg:h-6 lg:w-16"
+                />
+                <Maximize2 size={12} className="shrink-0 text-fg-3" aria-hidden />
+              </div>
             </div>
           </div>
           <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain pr-0.5">
@@ -376,7 +445,10 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                       />
                     )}
                   >
-                    <StudioPageThumbnail page={composeWorkAssetPreviewPage(p)} />
+                    <StudioPageThumbnail
+                      page={composeWorkAssetPreviewPage(p)}
+                      className={PAGE_PREVIEW_SIZE_CLASS[pagePreviewSize]}
+                    />
                   </Suspense>
                   {metaEditPageId === p.id ? (
                     // 인라인 편집 입력은 늘린 선택 버튼(z-10) 위로 올려 포커스·타이핑을 받게 한다.

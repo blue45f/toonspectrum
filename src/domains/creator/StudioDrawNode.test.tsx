@@ -275,6 +275,15 @@ describe("StudioDrawNode orchestration", () => {
     );
   });
 
+  it("tags the retained vector layer for layer-scoped sampling and export", () => {
+    render(<StudioDrawNode el={drawEl({ id: "ink-layer" })} />);
+
+    expect(captured("Group")[0]?.props).toMatchObject({
+      listening: false,
+      studioElementId: "ink-layer",
+    });
+  });
+
   it("renders source-first and mirrored rectangle bounds", () => {
     render(
       <StudioDrawNode

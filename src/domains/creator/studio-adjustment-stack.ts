@@ -16,7 +16,14 @@ import type {
 import type { ChannelMixer } from "./studio-channel-mixer";
 import type { ColorBalance } from "./studio-color-balance";
 import type { CurvePoint } from "./studio-curves";
+import type { Detail } from "./studio-detail";
+import type { Glow } from "./studio-glow";
 import type { GradientMap } from "./studio-gradient-map";
+import type { Grain } from "./studio-grain";
+import type { Halftone } from "./studio-halftone";
+import type { InkWash } from "./studio-ink-wash";
+import type { Sketch } from "./studio-sketch";
+import type { Stylize } from "./studio-stylize";
 
 export const STUDIO_ADJUSTMENT_STACK_VERSION = 1 as const;
 export const STUDIO_ADJUSTMENT_STACK_MAX_ENTRIES = 24;
@@ -33,15 +40,44 @@ export const STUDIO_ADJUSTMENT_ENGINE_IDS = [
   /** Blur gallery engines (map onto blurFx). */
   "gaussian-blur",
   "motion-blur",
+  "spin-blur",
+  "zoom-blur",
   "sharpen",
+  "smart-sharpen",
+  "median-despeckle",
+  "high-pass",
   "noise",
   "invert",
+  "grayscale",
+  "sepia",
+  "pixelate",
+  "posterize",
+  "ink-threshold",
+  "line-extraction",
+  "screentone",
+  "color-halftone",
+  "chromatic-aberration",
+  "edge-detect",
+  "emboss",
+  "solarize",
+  "oil-paint",
   "exposure",
   "unsharp-mask",
   "morphology",
   "offset",
   "custom-convolution",
   "clouds",
+  /** Bounded Filter Gallery composites built from the shared Worker pixel engines. */
+  "surface-blur",
+  "crystal-mosaic",
+  "pencil-sketch",
+  "crosshatch",
+  "ordered-dither",
+  "glowing-edges",
+  "cutout",
+  "retro-film",
+  "watercolor",
+  "diffuse-glow",
 ] as const;
 
 export type StudioAdjustmentEngineId = (typeof STUDIO_ADJUSTMENT_ENGINE_IDS)[number];
@@ -73,6 +109,10 @@ export function studioAdjustmentDefaultParams(
       return { radius: 8, strength: 70 };
     case "motion-blur":
       return { radius: 18, strength: 85, angle: 0 };
+    case "spin-blur":
+      return { radius: 18, strength: 85 };
+    case "zoom-blur":
+      return { radius: 20, strength: 85 };
     case "brightness-contrast":
       return { brightness: 0.12, contrast: 10 };
     case "hue-saturation":
@@ -81,10 +121,39 @@ export function studioAdjustmentDefaultParams(
       return { black: 0, white: 255, gamma: 1, outBlack: 0, outWhite: 255 };
     case "sharpen":
       return { amount: 0.3 };
+    case "smart-sharpen":
+      return { amount: 65, radius: 2 };
+    case "median-despeckle":
+      return { amount: 100, radius: 1 };
+    case "high-pass":
+      return {};
     case "noise":
       return { amount: 15, seed: 1_337 };
     case "invert":
       return {};
+    case "grayscale":
+    case "sepia":
+    case "line-extraction":
+    case "screentone":
+      return {};
+    case "pixelate":
+      return { size: 8 };
+    case "posterize":
+      return { levels: 5 };
+    case "ink-threshold":
+      return { level: 0.5 };
+    case "color-halftone":
+      return { dotSize: 4, angle: 15, mode: "cmyk", strength: 100 };
+    case "chromatic-aberration":
+      return { offset: 4 };
+    case "edge-detect":
+      return { strength: 100, detail: 1 };
+    case "emboss":
+      return { strength: 100, detail: 1 };
+    case "solarize":
+      return { strength: 100, detail: 3 };
+    case "oil-paint":
+      return { strength: 100, detail: 3 };
     case "exposure":
       return { exposure: 0.5, gamma: 1, offset: 0 };
     case "unsharp-mask":
@@ -103,6 +172,26 @@ export function studioAdjustmentDefaultParams(
       };
     case "clouds":
       return { amount: 0.35, scale: 96, seed: 1_337, mode: "overlay" };
+    case "surface-blur":
+      return { strength: 78, radius: 3 };
+    case "crystal-mosaic":
+      return { size: 3, strength: 72 };
+    case "pencil-sketch":
+      return { strength: 88, detail: 4 };
+    case "crosshatch":
+      return { strength: 82, detail: 5 };
+    case "ordered-dither":
+      return { strength: 100, detail: 4 };
+    case "glowing-edges":
+      return { strength: 86, detail: 2, glow: 72, radius: 5, threshold: 18 };
+    case "cutout":
+      return { strength: 100, levels: 4, smoothing: 82, radius: 2, contrast: 18 };
+    case "retro-film":
+      return { strength: 100, grain: 24, grainSize: 2, fade: 14, chromatic: 2, seed: 1_337 };
+    case "watercolor":
+      return { strength: 78, spread: 4, bleed: 62, granulation: 52, paper: 46, seed: 112 };
+    case "diffuse-glow":
+      return { strength: 55, radius: 10, threshold: 58, grain: 8, seed: 1_337 };
   }
 }
 
@@ -303,12 +392,48 @@ export function studioAdjustmentEngineLabel(engine: StudioAdjustmentEngineId): s
       return "가우시안 블러";
     case "motion-blur":
       return "모션 블러";
+    case "spin-blur":
+      return "회전 블러";
+    case "zoom-blur":
+      return "줌 블러";
     case "sharpen":
       return "샤픈";
+    case "smart-sharpen":
+      return "스마트 샤픈";
+    case "median-despeckle":
+      return "미디언 잡티 제거";
+    case "high-pass":
+      return "하이패스";
     case "noise":
       return "노이즈";
     case "invert":
       return "반전";
+    case "grayscale":
+      return "그레이스케일";
+    case "sepia":
+      return "세피아";
+    case "pixelate":
+      return "모자이크 / 픽셀화";
+    case "posterize":
+      return "포스터화";
+    case "ink-threshold":
+      return "먹선 임계값";
+    case "line-extraction":
+      return "선화 추출";
+    case "screentone":
+      return "흑백 스크린톤";
+    case "color-halftone":
+      return "컬러 하프톤";
+    case "chromatic-aberration":
+      return "색수차";
+    case "edge-detect":
+      return "외곽선 검출";
+    case "emboss":
+      return "엠보스";
+    case "solarize":
+      return "솔라리제이션";
+    case "oil-paint":
+      return "유화";
     case "exposure":
       return "노출 / 감마 / 오프셋";
     case "unsharp-mask":
@@ -321,6 +446,26 @@ export function studioAdjustmentEngineLabel(engine: StudioAdjustmentEngineId): s
       return "사용자 컨볼루션";
     case "clouds":
       return "구름 텍스처";
+    case "surface-blur":
+      return "표면 보존 블러";
+    case "crystal-mosaic":
+      return "크리스털 모자이크";
+    case "pencil-sketch":
+      return "연필 스케치";
+    case "crosshatch":
+      return "교차 해칭";
+    case "ordered-dither":
+      return "순서 디더";
+    case "glowing-edges":
+      return "빛나는 외곽선";
+    case "cutout":
+      return "종이 컷아웃";
+    case "retro-film":
+      return "레트로 필름";
+    case "watercolor":
+      return "수채화";
+    case "diffuse-glow":
+      return "확산 글로우";
     default:
       return engine;
   }
@@ -341,6 +486,14 @@ export type StudioAdjustmentEntryFilterFields = {
   noise?: number;
   noiseSeed?: number;
   invert?: boolean;
+  grayscale?: boolean;
+  sepia?: boolean;
+  screentone?: boolean;
+  lineart?: boolean;
+  chromatic?: number;
+  posterize?: number;
+  pixelate?: number;
+  inkThreshold?: number;
   /** Gaussian/motion blur gallery — applied via studio-blur Konva filter. */
   blurFx?: {
     type: "gaussian" | "motion" | "spin" | "zoom";
@@ -358,6 +511,13 @@ export type StudioAdjustmentEntryFilterFields = {
   pixelOffset?: StudioPixelOffset;
   convolution?: StudioConvolution;
   clouds?: StudioClouds;
+  halftone?: Halftone;
+  glow?: Glow;
+  grain?: Grain;
+  inkWash?: InkWash;
+  sketch?: Sketch;
+  stylize?: Stylize;
+  detail?: Detail;
 };
 
 /** Projection spread onto an image element without flattening away order or duplicate engines. */
@@ -499,6 +659,28 @@ export function studioAdjustmentOperationToFilterFields(
         };
         break;
       }
+      case "spin-blur": {
+        const radius = finiteNumber(p.radius, 18);
+        const strength = finiteNumber(p.strength, 85);
+        out.blurFx = {
+          type: "spin",
+          strength: Math.min(100, Math.max(0, strength)),
+          radius: Math.min(40, Math.max(1, radius)),
+          angle: 0,
+        };
+        break;
+      }
+      case "zoom-blur": {
+        const radius = finiteNumber(p.radius, 20);
+        const strength = finiteNumber(p.strength, 85);
+        out.blurFx = {
+          type: "zoom",
+          strength: Math.min(100, Math.max(0, strength)),
+          radius: Math.min(40, Math.max(1, radius)),
+          angle: 0,
+        };
+        break;
+      }
       case "brightness-contrast":
         out.brightness = finiteNumber(p.brightness, 0);
         out.contrast = finiteNumber(p.contrast, 0);
@@ -517,12 +699,93 @@ export function studioAdjustmentOperationToFilterFields(
       case "sharpen":
         out.sharpen = finiteNumber(p.amount ?? p.sharpen, 0);
         break;
+      case "smart-sharpen":
+        out.detail = {
+          type: "smartSharpen",
+          amount: finiteNumber(p.amount, 65),
+          radius: finiteNumber(p.radius, 2),
+        };
+        break;
+      case "median-despeckle":
+        out.detail = {
+          type: "median",
+          amount: finiteNumber(p.amount, 100),
+          radius: finiteNumber(p.radius, 1),
+        };
+        break;
+      case "high-pass":
+        out.convolution = {
+          kernel: [-1, -1, -1, -1, 8, -1, -1, -1, -1],
+          divisor: 1,
+          bias: 128,
+        };
+        break;
       case "noise":
         out.noise = finiteNumber(p.amount ?? p.noise, 0);
         out.noiseSeed = finiteNumber(p.seed, stableOperationSeed(entry.id));
         break;
       case "invert":
         out.invert = p.invert === false ? false : true;
+        break;
+      case "grayscale":
+        out.grayscale = true;
+        break;
+      case "sepia":
+        out.sepia = true;
+        break;
+      case "pixelate":
+        out.pixelate = Math.min(40, Math.max(1, Math.round(finiteNumber(p.size, 8))));
+        break;
+      case "posterize":
+        out.posterize = Math.min(8, Math.max(2, Math.round(finiteNumber(p.levels, 5))));
+        break;
+      case "ink-threshold":
+        out.inkThreshold = Math.min(1, Math.max(0, finiteNumber(p.level, 0.5)));
+        break;
+      case "line-extraction":
+        out.lineart = true;
+        break;
+      case "screentone":
+        out.screentone = true;
+        break;
+      case "color-halftone":
+        out.halftone = {
+          dotSize: finiteNumber(p.dotSize, 4),
+          angle: finiteNumber(p.angle, 15),
+          mode: p.mode === "mono" ? "mono" : "cmyk",
+          strength: finiteNumber(p.strength, 100),
+        };
+        break;
+      case "chromatic-aberration":
+        out.chromatic = Math.min(12, Math.max(1, Math.round(finiteNumber(p.offset, 4))));
+        break;
+      case "edge-detect":
+        out.stylize = {
+          type: "findEdges",
+          strength: finiteNumber(p.strength, 100),
+          detail: finiteNumber(p.detail, 1),
+        };
+        break;
+      case "emboss":
+        out.stylize = {
+          type: "emboss",
+          strength: finiteNumber(p.strength, 100),
+          detail: finiteNumber(p.detail, 1),
+        };
+        break;
+      case "solarize":
+        out.stylize = {
+          type: "solarize",
+          strength: finiteNumber(p.strength, 100),
+          detail: finiteNumber(p.detail, 3),
+        };
+        break;
+      case "oil-paint":
+        out.stylize = {
+          type: "oilPaint",
+          strength: finiteNumber(p.strength, 100),
+          detail: finiteNumber(p.detail, 3),
+        };
         break;
       case "curves": {
         const curve = curvePreset(stringParam(p.preset, ["soft-contrast", "matte", "fade"]));
@@ -586,6 +849,104 @@ export function studioAdjustmentOperationToFilterFields(
           mode: p.mode === "multiply" || p.mode === "screen" ? p.mode : "overlay",
         };
         break;
+      case "surface-blur":
+        // A bounded median pass removes small variations while retaining hard transitions.
+        out.detail = {
+          type: "median",
+          amount: finiteNumber(p.strength, 78),
+          radius: finiteNumber(p.radius, 3),
+        };
+        break;
+      case "crystal-mosaic":
+        // The bounded local representative-colour pass creates faceted islands without averaging
+        // alpha support (the native block pixelizer intentionally averages alpha for mosaics).
+        out.stylize = {
+          type: "oilPaint",
+          strength: finiteNumber(p.strength, 72),
+          detail: finiteNumber(p.size, 3),
+        };
+        break;
+      case "pencil-sketch":
+        out.sketch = {
+          type: "photocopy",
+          strength: finiteNumber(p.strength, 88),
+          detail: finiteNumber(p.detail, 4),
+        };
+        break;
+      case "crosshatch":
+        out.sketch = {
+          type: "crosshatch",
+          strength: finiteNumber(p.strength, 82),
+          detail: finiteNumber(p.detail, 5),
+        };
+        break;
+      case "ordered-dither":
+        out.sketch = {
+          type: "mezzotint",
+          strength: finiteNumber(p.strength, 100),
+          detail: finiteNumber(p.detail, 4),
+        };
+        break;
+      case "glowing-edges": {
+        const strength = finiteNumber(p.strength, 86);
+        out.stylize = { type: "findEdges", strength, detail: finiteNumber(p.detail, 2) };
+        out.glow = {
+          strength: strength > 0 ? finiteNumber(p.glow, 72) : 0,
+          size: finiteNumber(p.radius, 5),
+          threshold: finiteNumber(p.threshold, 18),
+          color: "auto",
+        };
+        break;
+      }
+      case "cutout":
+        if (finiteNumber(p.strength, 100) <= 0) break;
+        out.detail = {
+          type: "median",
+          amount: finiteNumber(p.smoothing, 82),
+          radius: finiteNumber(p.radius, 2),
+        };
+        out.posterize = Math.min(8, Math.max(2, Math.round(finiteNumber(p.levels, 4))));
+        out.contrast = Math.min(80, Math.max(-80, finiteNumber(p.contrast, 18)));
+        break;
+      case "retro-film":
+        if (finiteNumber(p.strength, 100) <= 0) break;
+        out.sepia = true;
+        out.brightness = Math.min(0.8, Math.max(-0.8, finiteNumber(p.fade, 14) / 100));
+        out.chromatic = Math.min(12, Math.max(1, Math.round(finiteNumber(p.chromatic, 2))));
+        out.grain = {
+          type: "film",
+          amount: finiteNumber(p.grain, 24),
+          size: finiteNumber(p.grainSize, 2),
+          seed: finiteNumber(p.seed, stableOperationSeed(entry.id)) % 10_000,
+        };
+        break;
+      case "watercolor":
+        out.inkWash = {
+          strength: finiteNumber(p.strength, 78),
+          spread: finiteNumber(p.spread, 4),
+          edgeBleed: finiteNumber(p.bleed, 62),
+          granulation: finiteNumber(p.granulation, 52),
+          paper: finiteNumber(p.paper, 46),
+          inkColor: "#264c70",
+          seed: finiteNumber(p.seed, stableOperationSeed(entry.id)) % 10_000,
+        };
+        break;
+      case "diffuse-glow": {
+        const strength = finiteNumber(p.strength, 55);
+        out.glow = {
+          strength,
+          size: finiteNumber(p.radius, 10),
+          threshold: finiteNumber(p.threshold, 58),
+          color: "auto",
+        };
+        out.grain = {
+          type: "film",
+          amount: strength > 0 ? finiteNumber(p.grain, 8) : 0,
+          size: 1,
+          seed: finiteNumber(p.seed, stableOperationSeed(entry.id)) % 10_000,
+        };
+        break;
+      }
       default:
         break;
   }

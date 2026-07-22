@@ -134,7 +134,7 @@ KMAS_PRV_KEY=... pnpm kmas:update-catalog  # 기존 catalog.json.gz 썸네일 UR
   - `/api/catalog/ingest/status`에서 current snapshot, 최근 실행 이력, 다음 실행 예정 시각 확인
   - `WEBDEX_SOURCE_IDS=all` 또는 쉼표 구분 source id로 실제 실행 소스를 제한
 - **랭킹 갱신성**: 웹 기본 경로는 `/api/ranking` 서버 응답이며, 정적 모드(`VITE_CATALOG_SOURCE=static`)에서는 `scripts/build-static-catalog.ts`와 `src/catalog-static.ts`가 사전 계산한 파일을 사용합니다. 두 경로 모두 기본 랭킹은 같은 스냅샷 산식으로 동작하고, 규장각 병합은 작품 메타와 썸네일 URL 보강에만 적용됩니다. `lib/server/live.ts`의 실시간 어댑터와 `WEBTOON_LIVE_*` 환경변수는 보존되어 있지만, 별도 운영 경로로 다시 연결하기 전까지 기본 랭킹에는 외부 실시간 랭킹 호출을 반영하지 않습니다.
-- **카탈로그 호출 경로**: 웹 기본값은 `/api/*` 서버 경로입니다. 규장각 병합·런타임 정책을 타지 않는 완전 정적 카탈로그가 필요하면 `VITE_CATALOG_SOURCE=static`을 명시합니다(토스처럼 `dataBase`를 주입하는 교차 출처 셸은 정적 라우팅 유지).
+- **카탈로그 호출 경로**: 웹 기본값은 `/api/*` 서버 경로입니다. 규장각 병합·런타임 정책을 타지 않는 완전 정적 카탈로그가 필요하면 `VITE_CATALOG_SOURCE=static`을 명시합니다.
 
 법적 리스크 완화를 위해 기본 수집 모드는 `off`입니다. 운영 전 플랫폼별 robots.txt, 이용약관, API 약관, 제휴 가능성, 저장 필드 범위를 검토해야 합니다. 랭킹 산식·스냅샷 모드·보존된 live 어댑터의 경계는 [`docs/ranking-architecture.md`](docs/ranking-architecture.md)에서 확인하세요. 수집 → 스냅샷 → 정적 카탈로그/API → 화면 노출까지의 전 과정 도식과 단계별 설명은 [`docs/data-pipeline.md`](docs/data-pipeline.md)를 참고하세요.
 

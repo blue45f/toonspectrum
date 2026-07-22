@@ -1,0 +1,347 @@
+import { describe, expect, it, vi } from "vitest";
+
+import { exportPageToSvg } from "./studio-svg-export";
+import {
+  fingerprintStudioVectorReference,
+  materializeStudioAdvancedFillVectorTarget,
+  planStudioAdvancedFillVectorTarget,
+  renderStudioAdvancedFillVectorReference,
+  renderStudioVectorReference,
+  StudioVectorReferenceError,
+  type StudioAdvancedFillVectorTargetInput,
+  type StudioVectorReferenceRasterizer,
+} from "./studio-vector-fill-reference";
+
+import type { El } from "./studio-element-model";
+
+const PNG_DATA_URL = "data:image/png;base64,iVBORw0KGgo=";
+
+function draw(id: string, over: Partial<Extract<El, { type: "draw" }>> = {}): Extract<El, { type: "draw" }> {
+  return {
+    id,
+    type: "draw",
+    kind: "freehand",
+    points: [10, 10, 20, 20, 30, 15],
+    stroke: "#111111",
+    strokeWidth: 8,
+    brush: "gpen",
+    pressures: [0.25, 0.7, 0.45],
+    ...over,
+  };
+}
+
+function input(
+  elements: readonly El[],
+  over: Partial<StudioAdvancedFillVectorTargetInput> = {},
+): StudioAdvancedFillVectorTargetInput {
+  return {
+    pageId: "page-1",
+    width: 720,
+    height: 1_000,
+    elements,
+    ...over,
+  };
+}
+
+function rasterizer(spy?: (svg: string) => void): StudioVectorReferenceRasterizer {
+  return async (request) => {
+    spy?.(request.svg);
+    return {
+      dataUrl: PNG_DATA_URL,
+      width: request.width,
+      height: request.height,
+    };
+  };
+}
+
+describe("planStudioAdvancedFillVectorTarget", () => {
+  it("selects visible DrawEl only and inserts the materialized color below the first line-art z-index", () => {
+    const elements: El[] = [
+      {
+        id: "caption",
+        type: "text",
+        text: "UI가 아닌 문서 텍스트",
+        x: 0,
+        y: 0,
+        width: 100,
+        fontSize: 20,
+        fill: "#000000",
+        rotation: 0,
+      },
+      draw("hidden", { hidden: true }),
+      draw("group-hidden", { groupId: "hidden-group" }),
+      draw("visible"),
+      {
+        id: "guide-like-effect",
+        type: "focusLines",
+        x: 0,
+        y: 0,
+        width: 720,
+        height: 1_000,
+        lineCount: 20,
+        innerRadius: 20,
+        outerRadius: 300,
+        stroke: "#000000",
+        strokeWidth: 2,
+        noise: 0,
+        rotation: 0,
+      },
+    ];
+
+    const plan = planStudioAdvancedFillVectorTarget(input(elements, {
+      groups: [{ id: "hidden-group", name: "숨김", hidden: true }],
+    }));
+
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.target.sourceElementCount).toBe(1);
+    expect(plan.target.insertionIndex).toBe(3);
+    expect(plan.target.frame).toEqual({ x: 0, y: 0, width: 720, height: 1_000, rotation: 0 });
+    expect(plan.target.blankSrc).toContain("data:image/svg+xml");
+    expect(decodeURIComponent(plan.target.blankSrc)).not.toContain("<rect");
+
+    const materialized = materializeStudioAdvancedFillVectorTarget(plan.target, PNG_DATA_URL);
+    expect(materialized).toMatchObject({
+      id: plan.target.id,
+      type: "image",
+      name: "벡터 채색",
+      src: PNG_DATA_URL,
+      x: 0,
+      y: 0,
+      width: 720,
+      height: 1_000,
+      rotation: 0,
+    });
+  });
+
+  it("returns a stable no-content reason and elements.length insertion fallback", () => {
+    const elements: El[] = [{
+      id: "caption",
+      type: "text",
+      text: "대사",
+      x: 0,
+      y: 0,
+      width: 100,
+      fontSize: 20,
+      fill: "#000000",
+      rotation: 0,
+    }];
+    const plan = planStudioAdvancedFillVectorTarget(input(elements));
+    expect(plan).toEqual({
+      ok: false,
+      code: "no-visible-vector-draw",
+      reason: "페이지에 표시 중인 벡터 선화가 없습니다. 펜이나 도형으로 선화를 추가한 뒤 다시 시도해 주세요.",
+      insertionIndex: 1,
+    });
+  });
+
+  it("is deterministic for the same visible source and ignores hidden/non-draw document changes", () => {
+    const source = draw("line");
+    const first = planStudioAdvancedFillVectorTarget(input([source]));
+    const second = planStudioAdvancedFillVectorTarget(input([
+      source,
+      draw("hidden-change", { hidden: true, stroke: "#ff0000" }),
+      {
+        id: "comment-surrogate",
+        type: "text",
+        text: "선화 참조 아님",
+        x: 20,
+        y: 20,
+        width: 200,
+        fontSize: 16,
+        fill: "#ff00ff",
+        rotation: 0,
+      },
+    ]));
+    expect(first.ok && second.ok).toBe(true);
+    if (!first.ok || !second.ok) return;
+    expect(second.target.sourceFingerprint).toBe(first.target.sourceFingerprint);
+    expect(second.target.id).toBe(first.target.id);
+  });
+
+  it("changes the source fingerprint when visible brush geometry changes", () => {
+    const first = planStudioAdvancedFillVectorTarget(input([draw("line")]));
+    const second = planStudioAdvancedFillVectorTarget(input([draw("line", { strokeWidth: 9 })]));
+    expect(first.ok && second.ok).toBe(true);
+    if (!first.ok || !second.ok) return;
+    expect(second.target.sourceFingerprint).not.toBe(first.target.sourceFingerprint);
+  });
+
+  it("fails closed when the shared SVG path cannot reproduce an eraser exactly", () => {
+    const plan = planStudioAdvancedFillVectorTarget(input([
+      draw("ink"),
+      draw("erase", { mode: "eraser" }),
+    ]));
+    expect(plan).toMatchObject({ ok: false, code: "unsupported-vector-fidelity", insertionIndex: 0 });
+  });
+
+  it("reports dimension and byte-budget failures before raster allocation", () => {
+    expect(planStudioAdvancedFillVectorTarget(input([draw("line")], { width: 0 }))).toMatchObject({
+      ok: false,
+      code: "invalid-dimensions",
+    });
+    expect(planStudioAdvancedFillVectorTarget(input([draw("line")], {
+      budgets: { maxSourceBytes: 8 },
+    }))).toMatchObject({ ok: false, code: "source-budget-exceeded" });
+    expect(planStudioAdvancedFillVectorTarget(input([draw("line")], {
+      budgets: { maxSvgBytes: 8 },
+    }))).toMatchObject({ ok: false, code: "svg-budget-exceeded" });
+  });
+});
+
+describe("renderStudioAdvancedFillVectorReference", () => {
+  it("passes the exact transparent shared-SVG brush serialization to the PNG rasterizer", async () => {
+    const line = draw("pressure-line", {
+      brush: "gpen",
+      pressureModel: "linear-residual-path-v3",
+      symmetry: { type: "vertical", centerX: 360, centerY: 500 },
+    });
+    const nonDraw: El = {
+      id: "caption",
+      type: "text",
+      text: "참조 제외",
+      x: 0,
+      y: 0,
+      width: 100,
+      fontSize: 20,
+      fill: "#000000",
+      rotation: 0,
+    };
+    let capturedSvg = "";
+    const result = await renderStudioAdvancedFillVectorReference(input([nonDraw, line]), {
+      workerFactory: null,
+      rasterize: rasterizer((svg) => {
+        capturedSvg = svg;
+      }),
+    });
+    const expected = exportPageToSvg({
+      width: 720,
+      height: 1_000,
+      elements: [line],
+      transparentBg: true,
+    }).svg;
+
+    expect(capturedSvg).toBe(expected);
+    expect(capturedSvg).not.toContain("참조 제외");
+    expect(capturedSvg).not.toContain('<rect width="720" height="1000"');
+    expect(result).toMatchObject({
+      dataUrl: PNG_DATA_URL,
+      elementCount: 1,
+      width: 720,
+      height: 1_000,
+      execution: "direct",
+    });
+    const plan = planStudioAdvancedFillVectorTarget(input([nonDraw, line]));
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(result.fingerprint).toBe(plan.target.sourceFingerprint);
+  });
+
+  it("aborts before serialization and rechecks ownership after an injected rasterizer", async () => {
+    const before = new AbortController();
+    before.abort();
+    const neverCalled = vi.fn(rasterizer());
+    await expect(renderStudioAdvancedFillVectorReference(input([draw("line")]), {
+      signal: before.signal,
+      workerFactory: null,
+      rasterize: neverCalled,
+    })).rejects.toMatchObject({ name: "AbortError", code: "aborted" });
+    expect(neverCalled).not.toHaveBeenCalled();
+
+    const during = new AbortController();
+    await expect(renderStudioAdvancedFillVectorReference(input([draw("line")]), {
+      signal: during.signal,
+      workerFactory: null,
+      rasterize: async (request) => {
+        during.abort();
+        return { dataUrl: PNG_DATA_URL, width: request.width, height: request.height };
+      },
+    })).rejects.toMatchObject({ name: "AbortError", code: "aborted" });
+  });
+
+  it("rejects non-PNG, wrong-size and over-budget raster outputs", async () => {
+    await expect(renderStudioAdvancedFillVectorReference(input([draw("line")]), {
+      workerFactory: null,
+      rasterize: async (request) => ({
+        dataUrl: "data:image/svg+xml;base64,PHN2Zy8+",
+        width: request.width,
+        height: request.height,
+      }),
+    })).rejects.toMatchObject({ code: "invalid-png-output" });
+
+    await expect(renderStudioAdvancedFillVectorReference(input([draw("line")]), {
+      workerFactory: null,
+      rasterize: async () => ({ dataUrl: PNG_DATA_URL, width: 1, height: 1 }),
+    })).rejects.toMatchObject({ code: "invalid-png-output" });
+
+    await expect(renderStudioAdvancedFillVectorReference(input([draw("line")], {
+      budgets: { maxPngBytes: 1 },
+    }), {
+      workerFactory: null,
+      rasterize: rasterizer(),
+    })).rejects.toMatchObject({ code: "png-budget-exceeded" });
+  });
+});
+
+describe("renderStudioVectorReference generic seam", () => {
+  it("lets later attachment-less filters select a different explicit vector subset", async () => {
+    const text: Extract<El, { type: "text" }> = {
+      id: "title",
+      type: "text",
+      text: "필터 참조",
+      x: 12,
+      y: 18,
+      width: 180,
+      fontSize: 24,
+      fill: "#111111",
+      rotation: 0,
+    };
+    let captured = "";
+    const result = await renderStudioVectorReference({
+      width: 320,
+      height: 240,
+      elements: [text],
+      fingerprintNamespace: "filter-vector-v1",
+    }, {
+      workerFactory: null,
+      rasterize: rasterizer((svg) => {
+        captured = svg;
+      }),
+    });
+    expect(captured).toContain("필터 참조");
+    expect(result.elementCount).toBe(1);
+    expect(result.fingerprint).toBe(fingerprintStudioVectorReference(captured, "filter-vector-v1"));
+  });
+
+  it("can include the authored page background for an opaque merged filter copy", async () => {
+    const line = draw("line");
+    let captured = "";
+    await renderStudioVectorReference({
+      width: 320,
+      height: 240,
+      elements: [line],
+      transparentBg: false,
+      bg: "#f3e9d2",
+      fingerprintNamespace: "filter-merged-copy-v1",
+    }, {
+      workerFactory: null,
+      rasterize: rasterizer((svg) => {
+        captured = svg;
+      }),
+    });
+    expect(captured).toContain("#f3e9d2");
+    expect(captured).toContain('<rect width="320" height="240"');
+  });
+});
+
+describe("materializeStudioAdvancedFillVectorTarget", () => {
+  it("rejects a non-PNG fill result instead of persisting an untrusted virtual source", () => {
+    const plan = planStudioAdvancedFillVectorTarget(input([draw("line")]));
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(() => materializeStudioAdvancedFillVectorTarget(
+      plan.target,
+      "data:image/svg+xml;base64,PHN2Zy8+",
+    )).toThrow(StudioVectorReferenceError);
+  });
+});

@@ -75,8 +75,6 @@ test-accounts.local.*
 
 # CDP/playwright scratch screenshots (repo root)
 /console-*.jpeg
-/toss-home-*.jpeg
-/toss-preview-*.jpeg
 /web-home-*.jpeg
 /web-mobile-*.jpeg
 /.playwright-mcp/

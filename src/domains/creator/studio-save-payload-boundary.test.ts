@@ -45,7 +45,7 @@ describe("studio save payload ownership boundary", () => {
     expect(save).toContain("new AbortController()");
     expect(save).toContain("await authoritativeSaveBarrier(10_000)");
     expect(save).toContain("await captureReadyStageForPage(page)");
-    expect(save).toContain("await downscaleDataUrl(pageImages[0] || \"\", 480)");
+    expect(save).toContain("await downscaleStudioCanvasDataUrl(pageImages[0] || \"\", 480)");
     expect(save).toContain("await updateStudioSharedDocument(");
     expect(save).toContain("await updateWork(");
     expect(save).toContain("await createWork(");
@@ -58,7 +58,7 @@ describe("studio save payload ownership boundary", () => {
       "sharedDocumentSaveAbortRef.current?.abort()",
       "await authoritativeSaveBarrier(10_000)",
       "await captureReadyStageForPage(page)",
-      "await downscaleDataUrl(pageImages[0] || \"\", 480)",
+      "await downscaleStudioCanvasDataUrl(pageImages[0] || \"\", 480)",
       "buildStudioSavePayload({",
     ]);
 

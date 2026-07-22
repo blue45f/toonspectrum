@@ -44,13 +44,13 @@ describe("studio-draw-ux", () => {
     expect(searched.some((i) => i.id === "glitter")).toBe(true);
   });
 
-  it("filters the injected 102-brush catalog without losing Pro favorites, recents, or search", () => {
+  it("filters the injected 122-brush catalog without losing Pro favorites, recents, or search", () => {
     const pro = filterStudioBrushLibraryItems({
       category: "pro",
       catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
     });
-    expect(pro).toHaveLength(67);
-    expect(new Set(pro.map((item) => item.id))).toHaveProperty("size", 67);
+    expect(pro).toHaveLength(87);
+    expect(new Set(pro.map((item) => item.id))).toHaveProperty("size", 87);
 
     const favorites = filterStudioBrushLibraryItems({
       category: "favorites",

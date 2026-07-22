@@ -12,8 +12,8 @@ import {
 import type { PageState } from "./studio-page-state";
 
 vi.mock("./studio-page-lazy-ui", () => ({
-  StudioPageThumbnail: ({ page }: { page: PageState }) => (
-    <div data-testid={`page-thumbnail-${page.id}`}>{page.id}</div>
+  StudioPageThumbnail: ({ page, className }: { page: PageState; className?: string }) => (
+    <div data-testid={`page-thumbnail-${page.id}`} data-class-name={className}>{page.id}</div>
   ),
 }));
 
@@ -115,6 +115,7 @@ function createProps(
 
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
   vi.restoreAllMocks();
 });
 
@@ -230,6 +231,35 @@ describe("StudioPageListPane", () => {
     expect(props.stableHandlers.commitPageMeta).toHaveBeenCalledWith("page-1", {
       note: "카메라를 천천히 당긴다",
     });
+  });
+
+  it("adjusts and persists page preview density for long EX-style projects", () => {
+    const props = createProps();
+    const view = render(<StudioPageListPane {...props} />);
+    const size = screen.getByRole<HTMLInputElement>("slider", {
+      name: "페이지 미리보기 크기 조절",
+    });
+
+    expect(size.value).toBe("1");
+    expect(size.getAttribute("aria-valuetext")).toBe("보통");
+    expect(screen.getByTestId("page-thumbnail-page-1").getAttribute("data-class-name")).toBe(
+      "h-24",
+    );
+
+    fireEvent.change(size, { target: { value: "0" } });
+    expect(size.getAttribute("aria-valuetext")).toBe("작게");
+    expect(screen.getByTestId("page-thumbnail-page-1").getAttribute("data-class-name")).toBe(
+      "h-14",
+    );
+    expect(window.localStorage.getItem("toonspectrum:studio:page-preview-size:v1")).toBe(
+      "compact",
+    );
+
+    view.unmount();
+    render(<StudioPageListPane {...props} />);
+    expect(
+      screen.getByRole<HTMLInputElement>("slider", { name: "페이지 미리보기 크기 조절" }).value,
+    ).toBe("0");
   });
 
   it("keeps the mobile sheet inert while closed and restores modal semantics when opened", () => {

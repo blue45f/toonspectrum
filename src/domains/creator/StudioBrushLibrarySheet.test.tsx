@@ -61,21 +61,21 @@ describe("StudioBrushLibrarySheet", () => {
 
     expect(html).toContain('data-studio-brush-catalog="built-in"');
     expect(html).toContain("앱 브러시");
-    expect(html).toContain("코어 35 + 프로시저럴 67 · 내 브러시와 별개");
+    expect(html).toContain("코어 35 + 프로시저럴 87 · 내 브러시와 별개");
     expect(html).toContain('aria-label="앱 브러시 닫기"');
     expect(html).not.toContain(">브러시 라이브러리<");
   });
 
-  it("publishes one unique 102-brush catalog while keeping the 67-profile runtime lazy", () => {
+  it("publishes one unique 122-brush catalog while keeping the 87-profile runtime lazy", () => {
     const coreItems = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "core");
     const proItems = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "pro");
 
-    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(102);
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(122);
     expect(coreItems).toHaveLength(35);
-    expect(proItems).toHaveLength(67);
+    expect(proItems).toHaveLength(87);
     expect(new Set(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id))).toHaveProperty(
       "size",
-      102
+      122
     );
     expect(sheetSource).toContain('import("./studio-brush-pack-runtime")');
     expect(sheetSource).not.toMatch(/from\s+["']\.\/studio-brush-pack-runtime["']/);
@@ -120,7 +120,7 @@ describe("StudioBrushLibrarySheet", () => {
     expect(html).toContain("8개의 브러시가 표시됩니다.");
   });
 
-  it("opens the Pro 67 tab, labels every extended profile, and lazily materializes a durable selection", async () => {
+  it("opens the Pro 87 tab, labels every extended profile, and lazily materializes a durable selection", async () => {
     const onSelect = vi.fn();
     const onClose = vi.fn();
     const { container } = render(
@@ -132,11 +132,11 @@ describe("StudioBrushLibrarySheet", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "프로 67" }));
+    fireEvent.click(screen.getByRole("tab", { name: "프로 87" }));
 
-    expect(screen.getByRole("status").textContent).toBe("67개의 브러시가 표시됩니다.");
-    expect(container.querySelectorAll('[data-studio-brush-source="pro"]')).toHaveLength(67);
-    expect(screen.getAllByText("PRO")).toHaveLength(67);
+    expect(screen.getByRole("status").textContent).toBe("87개의 브러시가 표시됩니다.");
+    expect(container.querySelectorAll('[data-studio-brush-source="pro"]')).toHaveLength(87);
+    expect(screen.getAllByText("PRO")).toHaveLength(87);
 
     fireEvent.click(screen.getByRole("button", { name: "하트 도장 선택" }));
 

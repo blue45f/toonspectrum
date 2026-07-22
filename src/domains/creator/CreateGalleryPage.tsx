@@ -38,8 +38,7 @@ const TABS: { value: GalleryTab; label: string }[] = [
   { value: "following", label: "팔로잉" },
 ];
 
-// root-relative 자산: 웹(동일 출처)은 그대로, 토스 WebView(교차 출처)는 resolveAssetUrl 이
-// 사용 시점에 배포 오리진으로 절대화한다(404 → 정상 로드). 상수는 raw 경로로 두고 렌더에서 감싼다.
+// root-relative 자산은 정적 경로 헬퍼를 거쳐 렌더링합니다.
 const CREATOR_BOARD_HERO = "/assets/create/creator-board-hero.png";
 const CREATOR_BOARD_EMPTY = "/assets/create/creator-board-empty.png";
 

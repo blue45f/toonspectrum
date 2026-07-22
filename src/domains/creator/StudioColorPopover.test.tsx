@@ -55,7 +55,7 @@ describe("StudioColorPopover", () => {
     fireEvent.click(recentOther);
     expect(onChange).toHaveBeenCalledWith("#654321");
 
-    const eyedropper = screen.getByRole("button", { name: "화면에서 색 가져오기" });
+    const eyedropper = screen.getByRole("button", { name: "화면 전체에서 색 가져오기" });
     expect(eyedropper.closest('[data-studio-tool-hint-target="true"]')).not.toBeNull();
     expect(eyedropper.hasAttribute("title")).toBe(false);
 
@@ -76,6 +76,27 @@ describe("StudioColorPopover", () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "헥스 색상 코드" }));
     });
+  });
+
+  it("keeps the authored-canvas eyedropper available without browser EyeDropper support", async () => {
+    Reflect.deleteProperty(window, "EyeDropper");
+    const onRequestCanvasEyedropper = vi.fn();
+    render(
+      <StudioColorPopover
+        value="#123456"
+        onChange={vi.fn()}
+        recentColors={[]}
+        onRequestCanvasEyedropper={onRequestCanvasEyedropper}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "색상 선택" }));
+    const canvasPicker = await screen.findByRole("button", { name: "캔버스에서 정밀 색 가져오기" });
+    expect(canvasPicker.getAttribute("aria-keyshortcuts")).toBe("I");
+    expect(screen.queryByRole("button", { name: "화면 전체에서 색 가져오기" })).toBeNull();
+    fireEvent.click(canvasPicker);
+    expect(onRequestCanvasEyedropper).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("dialog", { name: "색상 선택 선택" })).toBeNull();
   });
 
   it("closes with Escape and restores focus to the color trigger", async () => {

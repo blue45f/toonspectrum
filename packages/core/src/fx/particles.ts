@@ -1,5 +1,5 @@
 /**
- * @toonspectrum/core/fx/particles — 웹·토스 공유 **DOM 파티클 "팡"** 연출(isomorphic).
+ * @toonspectrum/core/fx/particles — 공용 DOM 파티클 연출(isomorphic).
  *
  * canvas/렌더 루프 없이, 한 점에서 작은 DOM 노드 한 무더기를 방사상으로 날려 보내고
  * Web Animations API 로 애니메이션한 뒤 **스스로 정리**합니다(메모리 누수 0).
@@ -28,7 +28,7 @@ const BRAND_COLORS: readonly string[] = [
   "oklch(0.95 0.02 85)", // near-white
 ];
 
-/** 웹툰 브랜드 기본 이모지(작품/반응/토스 결). */
+/** 웹툰 브랜드 기본 이모지(작품/반응). */
 const BRAND_CHARS: readonly string[] = ["✨", "💖", "⭐", "🎉", "💫", "🔖", "🪙", "💎", "⚡", "🌸", "✦", "★"];
 
 /** triggerParticleBurst 옵션. */

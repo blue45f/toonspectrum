@@ -82,9 +82,8 @@ describe("Studio canvas image I/O module boundary", () => {
       expect(imageIo.exportedDeclarations.has(name)).toBe(true);
       expect(page.topLevelDeclarations.has(name)).toBe(false);
     }
-    expect(page.imports.filter((specifier) => specifier === "./studio-canvas-image-io")).toEqual([
-      "./studio-canvas-image-io",
-    ]);
+    expect(page.imports).not.toContain("./studio-canvas-image-io");
+    expect(page.source.match(/import\("\.\/studio-canvas-image-io"\)/gu)).toHaveLength(1);
   });
 
   it("keeps the extracted module independent from React, Konva, and StudioPage", () => {
@@ -93,7 +92,10 @@ describe("Studio canvas image I/O module boundary", () => {
     expect(imageIo.imports).toEqual([
       "./studio-gif-element",
       "./studio-upload-image-safety",
+      "./studio-raster-interchange",
     ]);
+    expect(imageIo.source.match(/import\("\.\/studio-raster-interchange-worker-client"\)/gu)).toHaveLength(1);
+    expect(imageIo.source).not.toContain("const { decodeStudioRasterInterchange }");
     expect(imageIo.imports).not.toContain("./StudioPage");
     expect(imageIo.imports.some((specifier) => specifier === "react" || specifier.includes("konva"))).toBe(false);
   });
@@ -101,10 +103,10 @@ describe("Studio canvas image I/O module boundary", () => {
   it("preserves every StudioPage consumer call after extraction", () => {
     const page = moduleShape("./StudioPage.tsx");
 
-    expect(callCount(page.sourceFile, "loadImageFileForCanvas")).toBe(4);
-    expect(callCount(page.sourceFile, "downscaleDataUrl")).toBe(1);
-    expect(callCount(page.sourceFile, "loadPixelEditImage")).toBe(14);
-    expect(page.source.match(/\bcreatePixelEditCanvas\b/gu)).toHaveLength(16);
+    expect(callCount(page.sourceFile, "loadStudioCanvasImageFile")).toBe(4);
+    expect(callCount(page.sourceFile, "downscaleStudioCanvasDataUrl")).toBe(1);
+    expect(callCount(page.sourceFile, "loadStudioPixelEditImage")).toBe(14);
+    expect(page.source.match(/\bcreateStudioPixelEditCanvas\b/gu)).toHaveLength(16);
     expect(page.source).not.toContain('from "./studio-gif-element"');
     expect(page.source).not.toContain('from "./studio-upload-image-safety"');
   });

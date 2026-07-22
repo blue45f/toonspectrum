@@ -39,6 +39,8 @@ describe("StudioDrawOptionsBar", () => {
         onColorChange={vi.fn()}
         onSecondaryColorChange={vi.fn()}
         onSwapColors={vi.fn()}
+        eyedropperActive
+        onToggleEyedropper={vi.fn()}
         onToggleQuickShape={vi.fn()}
       />
     );
@@ -55,6 +57,8 @@ describe("StudioDrawOptionsBar", () => {
     // CSP/Photopea dual well on the commercial options strip
     expect(html).toContain('data-studio-dual-color-well="true"');
     expect(html).toContain('data-studio-color-swap="true"');
+    expect(html).toContain('data-studio-eyedropper-trigger="true"');
+    expect(html).toContain('aria-label="스포이드 사용 중"');
     expect(html).toContain('data-studio-size-preview="true"');
     expect(html).toContain('data-studio-opacity-glyph="true"');
     // Active brush pill + continuous controls + progressive disclosure
@@ -426,11 +430,15 @@ describe("StudioDrawOptionsBar", () => {
       />
     );
 
-    expect(html).toContain('data-studio-tool-hint-unavailable="true"');
-    expect(html).toContain('role="button"');
-    expect(html).toContain('aria-label="도형 채우기"');
-    expect(html).toContain('aria-disabled="true"');
-    expect(html).toContain('tabindex="0"');
+    const unavailableCoach = html.slice(
+      html.indexOf('data-studio-tool-hint-unavailable="true"'),
+      html.indexOf('data-studio-tool-hint-unavailable="true"') + 900,
+    );
+    expect(unavailableCoach).toContain('role="group"');
+    expect(unavailableCoach).not.toContain('role="button"');
+    expect(unavailableCoach).toContain('aria-label="도형 채우기"');
+    expect(unavailableCoach).toContain('aria-disabled="true"');
+    expect(unavailableCoach).toContain('tabindex="0"');
   });
 
   it("keeps the fixed dock inside the canvas column when desktop panels are open", () => {

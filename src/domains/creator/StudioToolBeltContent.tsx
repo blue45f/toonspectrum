@@ -126,6 +126,9 @@ import type {
 
 import { cn } from "@/lib/utils";
 
+const STUDIO_CANVAS_IMAGE_ACCEPT =
+  "image/*,.bmp,.dib,.tga,.icb,.vda,.vst,.ppm,.pam,.qoi,.tif,.tiff";
+
 const toolBtn = (active: boolean) => studioToolButtonClass(active, { dense: true });
 
 // Group popovers stay viewport-fixed because the desktop ToolBelt is an inert zero-size host.
@@ -989,14 +992,14 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
         </StudioToolBeltHintTarget>
         <StudioToolBeltHintTarget
           hint={TOOL_BELT_HINTS.fill}
-          disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
-          unavailableReason={advancedFillUnsupportedReason ?? undefined}
+          unavailableReason={advancedFillUnsupportedReason
+            ? `${advancedFillUnsupportedReason} 채우기를 누르면 안전한 단일 래스터 후보를 찾거나 필요한 조건을 안내합니다.`
+            : undefined}
         >
           <button
             type="button"
             onClick={toggleAdvancedFill}
-            disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
-            className={cn(toolBtn(advancedFillActive), "disabled:cursor-not-allowed disabled:opacity-40")}
+            className={toolBtn(advancedFillActive)}
             aria-pressed={advancedFillActive}
           >
             <PaintBucket size={15} aria-hidden /> 채우기
@@ -1232,7 +1235,12 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             )}
           >
             <ImagePlus size={15} aria-hidden /> 이미지
-            <input type="file" accept="image/*" className="sr-only" onChange={onPickImage} />
+            <input
+              type="file"
+              accept={STUDIO_CANVAS_IMAGE_ACCEPT}
+              className="sr-only"
+              onChange={onPickImage}
+            />
           </label>
         </StudioToolBeltHintTarget>
         <span className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-2 text-xs text-fg-2 pointer-coarse:h-11">

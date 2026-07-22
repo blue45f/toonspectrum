@@ -8,7 +8,7 @@ const SESSION_KEY = "toonspectrum-intro-shown";
 export interface IntroSplashProps {
   /**
    * 세션당 1회만 노출(sessionStorage). 기본 true(현행 웹 동작).
-   * false 면 마운트마다 노출한다 — 토스 앱 재오픈마다 인트로를 다시 보여줄 때 사용.
+   * false 면 마운트마다 노출한다.
    */
   once?: boolean;
 }

@@ -246,6 +246,71 @@ describe("planStudioDrawPointerRelease", () => {
     expect(result.commitMode).toBe("deferred");
   });
 
+  it("routes an explicitly requested supported brush through a real perfect-outline freehand path", () => {
+    const linePoints = [0, 0, 10, 0.2, 20, -0.1, 30, 0.1, 40, 0, 50, 0];
+    const completed = stroke({
+      points: linePoints,
+      brush: "neon",
+      pressures: [0.2, 0.4, 0.6, 0.8, 0.9, 1],
+      pressureModel: "linear-full-v1",
+      sampleSpacing: 0,
+    });
+    const result = plan({
+      stroke: completed,
+      quickShape: {
+        active: true,
+        sourcePoints: linePoints,
+        stableSourceLength: linePoints.length,
+        brushEffectMode: "selected-brush",
+      },
+      postCorrection: { strength: 10 },
+    });
+
+    expect(result.quickShapeTransition).toBe("promoted");
+    expect(result.quickShapeAnnouncementKind).toBe("line");
+    expect(result.quickShapeBrushEffectStatus).toBe("applied");
+    expect(result.quickShapeBrushEffectFallbackReason).toBeNull();
+    expect(result.stroke.kind).toBe("freehand");
+    expect(result.stroke.brush).toBe("neon");
+    expect(result.stroke.points).toHaveLength(4);
+    expect(result.stroke.pressures).toHaveLength(2);
+    // The generated perfect outline is already authoritative; release smoothing must not deform it.
+    expect(result.postCorrectionApplied).toBe(false);
+    // The live surface still owns the pre-snap gesture, so the rebuilt visual commits synchronously.
+    expect(result.commitMode).toBe("immediate");
+  });
+
+  it.each([
+    {
+      label: "causal stamp",
+      source: stroke({ brush: "ink-brush", stampPipeline: "causal-walker-v2" }),
+      reason: "causal-stamp",
+    },
+    {
+      label: "causal watercolor",
+      source: stroke({ brush: "watercolor", watercolorPipeline: "causal-walker-v2" }),
+      reason: "causal-watercolor",
+    },
+  ] as const)("falls back to the stable geometric node for $label QuickShape", ({ source, reason }) => {
+    const result = plan({
+      stroke: source,
+      quickShape: {
+        active: true,
+        sourcePoints: source.points,
+        stableSourceLength: source.points.length,
+        brushEffectMode: "selected-brush",
+      },
+    });
+
+    expect(result.quickShapeTransition).toBe("promoted");
+    expect(result.quickShapeBrushEffectStatus).toBe("fallback");
+    expect(result.quickShapeBrushEffectFallbackReason).toBe(reason);
+    expect(result.stroke.kind).not.toBe("freehand");
+    expect(result.stroke.brush).toBeUndefined();
+    expect(result.stroke.stampPipeline).toBeUndefined();
+    expect(result.stroke.watercolorPipeline).toBeUndefined();
+  });
+
   it("trims dwell jitter before release promotion", () => {
     const stableLine = [0, 0, 10, 0, 20, 0, 30, 0, 40, 0, 50, 0];
     const sourceWithDwellJitter = [
@@ -282,6 +347,64 @@ describe("planStudioDrawPointerRelease", () => {
     expect(result.quickShapeTransition).toBe("already-converted");
     expect(result.quickShapeAnnouncementKind).toBe("rect");
     expect(result.postCorrectionApplied).toBe(false);
+  });
+
+  it("rebuilds an already converted live QuickShape from its captured brush-effect source", () => {
+    const original = stroke({
+      brush: "gpen",
+      pressures: [0.2, 0.4, 0.6, 0.8, 1],
+      pressureModel: "linear-full-v1",
+      sampleSpacing: 0,
+    });
+    const converted = stroke({
+      kind: "ellipse",
+      points: [10, 20, 210, 120],
+      brush: undefined,
+      pressures: undefined,
+    });
+    const result = plan({
+      stroke: converted,
+      quickShape: {
+        active: true,
+        converted: true,
+        brushEffectMode: "selected-brush",
+        brushEffectSource: original,
+      },
+    });
+
+    expect(result.quickShapeTransition).toBe("already-converted");
+    expect(result.quickShapeAnnouncementKind).toBe("ellipse");
+    expect(result.quickShapeBrushEffectStatus).toBe("applied");
+    expect(result.stroke.kind).toBe("freehand");
+    expect(result.stroke.brush).toBe("gpen");
+    expect(result.stroke.points.slice(-2)).toEqual(result.stroke.points.slice(0, 2));
+    expect(result.stroke.pressures).toHaveLength(result.stroke.points.length / 2);
+  });
+
+  it("fails closed when live conversion did not capture the original brush source", () => {
+    const converted = stroke({
+      kind: "rect",
+      points: [10, 20, 90, 70],
+      brush: undefined,
+      pressures: undefined,
+      brushCatalogId: "stale-brush",
+      stampPipeline: "causal-walker-v2",
+    });
+    const result = plan({
+      stroke: converted,
+      quickShape: {
+        active: true,
+        converted: true,
+        brushEffectMode: "selected-brush",
+      },
+    });
+
+    expect(result.quickShapeTransition).toBe("already-converted");
+    expect(result.quickShapeBrushEffectStatus).toBe("fallback");
+    expect(result.quickShapeBrushEffectFallbackReason).toBe("missing-source");
+    expect(result.stroke.kind).toBe("rect");
+    expect(result.stroke.brushCatalogId).toBeUndefined();
+    expect(result.stroke.stampPipeline).toBeUndefined();
   });
 
   it("never promotes or announces an eraser QuickShape gesture", () => {

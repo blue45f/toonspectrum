@@ -2,7 +2,7 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
- * LoadingState — 웹(/)·토스(apps/toss) **공유** 동적 로딩 표시.
+ * LoadingState — 공용 동적 로딩 표시.
  *
  * 정적 "불러오는 중…" / "로딩" 텍스트를 대체하는 동적 표현:
  *  - variant="skeleton" (기본): shimmer 스켈레톤 골격(DESIGN.md "스켈레톤 로딩, 스피너 금지" 준수).
@@ -12,9 +12,6 @@ import { cn } from "@/lib/utils";
  *
  * 접근성: role="status" + aria-busy + sr-only 라벨(label). 시각 요소는 aria-hidden.
  * prefers-reduced-motion 은 skeleton/펄스 애니메이션이 전역 가드로 자동 정지된다.
- *
- * 단일 출처(NO fork): Tailwind 유틸만 사용 → 웹(Tailwind)·토스(web-theme.css 로 동일 토큰 공유)에서
- * 같은 컴포넌트를 재사용한다. `@/components/LoadingState` 로 양쪽 import.
  *
  * @example 라우트/섹션 폴백
  *   import { LoadingState } from "@/components/LoadingState";

@@ -10,7 +10,7 @@
 scripts/crawl-related-info.mjs   # 작품별 실링크 수집
   → data/related-info.json       # { [titleId]: RelatedInfoItem[] } (git 소스, 커밋됨)
   → pnpm catalog:gen             # build-static-catalog 가 detail 샤드(TitleDetailExtra.r)에 주입
-  → public/data/detail/*.json    # 정적 서빙(오프라인/토스 동작, API 불필요)
+  → public/data/detail/*.json    # 웹 정적 서빙(런타임 API 호출 불필요)
   → components/title-external.tsx # 카테고리 탭 + 카드(클릭 시 원본으로 이동)
 ```
 

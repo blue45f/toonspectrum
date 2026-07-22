@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -45,6 +46,26 @@ function renderHintPair() {
   );
 }
 
+function RemountingBrushHint() {
+  const [selected, setSelected] = useState(false);
+  return (
+    <StudioToolHintPreferencesProvider
+      mode="compact"
+      touchHoldDelayMs={480}
+      reduceMotion
+    >
+      <StudioToolHintTarget
+        key={selected ? "selected" : "idle"}
+        hint={{ id: "brush/ink", title: "잉크 펜", description: "잉크 선을 그립니다." }}
+      >
+        <button type="button" onClick={() => setSelected(true)}>
+          {selected ? "선택된 잉크 펜" : "잉크 펜 선택"}
+        </button>
+      </StudioToolHintTarget>
+    </StudioToolHintPreferencesProvider>
+  );
+}
+
 afterEach(() => {
   cleanup();
   vi.clearAllTimers();
@@ -52,6 +73,39 @@ afterEach(() => {
 });
 
 describe("StudioToolHint touch intent", () => {
+  it("exposes one disabled button and opens its unavailable help from a non-interactive focus proxy", async () => {
+    render(
+      <StudioToolHintPreferencesProvider
+        mode="compact"
+        touchHoldDelayMs={480}
+        reduceMotion
+      >
+        <StudioToolHintTarget
+          disabled
+          unavailableReason="먼저 편집할 레이어를 선택하세요."
+          hint={{ id: "locked-fill", title: "채우기", description: "닫힌 영역을 채웁니다." }}
+        >
+          <button type="button" disabled>채우기</button>
+        </StudioToolHintTarget>
+      </StudioToolHintPreferencesProvider>
+    );
+
+    const disabledButton = screen.getByRole("button", { name: "채우기" });
+    const helpTarget = screen.getByRole("group", { name: "채우기" });
+
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    expect((disabledButton as HTMLButtonElement).disabled).toBe(true);
+    expect(disabledButton.getAttribute("aria-disabled")).toBe("true");
+    expect(helpTarget.getAttribute("tabindex")).toBe("0");
+
+    fireEvent.focus(helpTarget);
+
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip.textContent).toContain("닫힌 영역을 채웁니다.");
+    expect(tooltip.textContent).toContain("먼저 편집할 레이어를 선택하세요.");
+    expect(helpTarget.getAttribute("aria-describedby")).toBe(tooltip.id);
+  });
+
   it("cancels a pending long-press when a touch becomes a drag", () => {
     vi.useFakeTimers();
     renderHint("크기", 480);
@@ -121,5 +175,79 @@ describe("StudioToolHint touch intent", () => {
     act(() => vi.advanceTimersByTime(280));
 
     expect(screen.getByRole("tooltip").textContent).toContain("다음 도구 동작을 설명합니다.");
+  });
+
+  it("does not automatically repeat the same tooltip after it was shown", () => {
+    vi.useFakeTimers();
+    renderHint("잉크 펜");
+    const target = screen.getByRole("button", { name: "잉크 펜" });
+
+    fireEvent.mouseEnter(target);
+    act(() => vi.advanceTimersByTime(280));
+    expect(screen.getByRole("tooltip")).toBeTruthy();
+
+    fireEvent.mouseLeave(target, { clientX: 500, clientY: 500 });
+    act(() => vi.advanceTimersByTime(300));
+    expect(screen.queryByRole("tooltip")).toBeNull();
+
+    fireEvent.mouseEnter(target);
+    act(() => vi.advanceTimersByTime(320));
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("keeps another tool discoverable while the previous tool is cooling down", () => {
+    vi.useFakeTimers();
+    renderHintPair();
+    const pen = screen.getByRole("button", { name: "펜" });
+    const eraser = screen.getByRole("button", { name: "지우개" });
+
+    fireEvent.mouseEnter(pen);
+    act(() => vi.advanceTimersByTime(280));
+    fireEvent.mouseLeave(pen, { clientX: 500, clientY: 500 });
+    act(() => vi.advanceTimersByTime(300));
+
+    fireEvent.mouseEnter(eraser);
+    act(() => vi.advanceTimersByTime(280));
+    expect(screen.getByRole("tooltip").textContent).toContain("선을 지웁니다.");
+  });
+
+  it("lets keyboard focus explicitly reopen help during a hover cooldown", () => {
+    vi.useFakeTimers();
+    renderHint("연필");
+    const target = screen.getByRole("button", { name: "연필" });
+
+    fireEvent.mouseEnter(target);
+    act(() => vi.advanceTimersByTime(280));
+    fireEvent.mouseLeave(target, { clientX: 500, clientY: 500 });
+    act(() => vi.advanceTimersByTime(300));
+
+    fireEvent.focus(target);
+    expect(screen.getByRole("tooltip").textContent).toContain("연필 동작을 설명합니다.");
+  });
+
+  it("does not reopen a selected brush coach when its control remounts under the pointer", () => {
+    vi.useFakeTimers();
+    render(<RemountingBrushHint />);
+    const initialTarget = screen.getByRole("button", { name: "잉크 펜 선택" });
+
+    fireEvent.pointerDown(initialTarget, {
+      pointerId: 9,
+      pointerType: "mouse",
+      clientX: 24,
+      clientY: 24,
+    });
+    fireEvent.click(initialTarget, { clientX: 24, clientY: 24 });
+    const selectedTarget = screen.getByRole("button", { name: "선택된 잉크 펜" });
+
+    fireEvent.pointerMove(window, {
+      pointerId: 9,
+      pointerType: "mouse",
+      clientX: 48,
+      clientY: 24,
+    });
+    fireEvent.mouseEnter(selectedTarget);
+    act(() => vi.advanceTimersByTime(320));
+
+    expect(screen.queryByRole("tooltip")).toBeNull();
   });
 });

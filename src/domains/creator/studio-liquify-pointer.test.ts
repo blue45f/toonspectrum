@@ -165,4 +165,39 @@ describe("studio liquify pointer ownership", () => {
       { cancelled: false, releasePoint: { x: 0.8, y: 0.8 } }
     )).toEqual({ kind: "ignored", session });
   });
+
+  it("preserves normalized pen pressure per sample while mouse pressure remains nominal", () => {
+    const pen = beginStudioLiquifyPointerSession({
+      elId: "image-1",
+      frame,
+      point: { x: 0.1, y: 0.1 },
+      pointer: { pointerId: 31, pointerType: "pen", pressure: 0.2 },
+    })!;
+    const moved = appendStudioLiquifyPointerPoint(
+      pen,
+      { pointerId: 31, pointerType: "pen", pressure: 0.8 },
+      { x: 0.5, y: 0.5 }
+    );
+    expect(endStudioLiquifyPointerSession(
+      moved,
+      { pointerId: 31, pointerType: "pen", pressure: 2 },
+      { cancelled: false, releasePoint: { x: 0.9, y: 0.9 } }
+    )).toMatchObject({
+      kind: "apply",
+      points: [
+        { x: 0.1, y: 0.1, pressure: 0.2 },
+        { x: 0.5, y: 0.5, pressure: 0.8 },
+        { x: 0.9, y: 0.9, pressure: 1 },
+      ],
+    });
+
+    const mouse = beginStudioLiquifyPointerSession({
+      elId: "image-1",
+      frame,
+      point: { x: 0.2, y: 0.2 },
+      pointer: { pointerId: 32, pointerType: "mouse", pressure: 0.5 },
+      mode: "bloat",
+    })!;
+    expect(mouse.points).toEqual([{ x: 0.2, y: 0.2 }]);
+  });
 });

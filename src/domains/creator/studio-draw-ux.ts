@@ -4,7 +4,10 @@
  */
 
 import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
-import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
+import {
+  isStudioBrushPackCatalogId,
+  STUDIO_BRUSH_PACK_CATALOG_IDS,
+} from "./studio-brush-pack-id";
 import {
   listStudioBrushTrayItems,
   type StudioBrushTrayCategory,
@@ -97,7 +100,11 @@ export const STUDIO_BRUSH_LIBRARY_TABS: readonly {
   { id: "favorites", label: "즐겨찾기", title: "즐겨찾기 브러시" },
   { id: "recent", label: "최근", title: "최근 사용한 브러시" },
   { id: "beginner", label: "기본", title: "초보 키트" },
-  { id: "pro", label: "프로 67", title: "프로시저럴 확장 브러시 67종" },
+  {
+    id: "pro",
+    label: `프로 ${STUDIO_BRUSH_PACK_CATALOG_IDS.length}`,
+    title: `프로시저럴 확장 브러시 ${STUDIO_BRUSH_PACK_CATALOG_IDS.length}종`,
+  },
   { id: "line", label: "선", title: "펜·연필·G펜" },
   { id: "marker", label: "마커", title: "마커·형광·네온" },
   { id: "paint", label: "페인트", title: "붓·수채·유화" },

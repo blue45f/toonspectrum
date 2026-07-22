@@ -36,6 +36,7 @@ export interface StudioOptionsBarsDrawModel {
   }>;
   drawMode: StudioDrawModeUi;
   drawShape: DrawShapeKind;
+  eyedropperActive?: boolean;
   favoriteBrushIds: readonly string[];
   opacityLocked: boolean;
   postCorrection: number;
@@ -90,6 +91,7 @@ export interface StudioOptionsBarsHandlers {
   toggleBrushCatalog: (trigger: HTMLButtonElement) => void;
   toggleCanvasFlip: () => void;
   toggleFavoriteBrush: (brushId: string) => void;
+  toggleEyedropper?: () => void;
   toggleOpacityLock: () => void;
   toggleQuickShape: () => void;
   toggleSelectedLock: () => void;
@@ -147,6 +149,8 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
             secondaryColor={draw.secondaryColor}
             onSecondaryColorChange={stableHandlers.setSecondaryColor}
             onSwapColors={stableHandlers.swapColors}
+            eyedropperActive={draw.eyedropperActive}
+            onToggleEyedropper={stableHandlers.toggleEyedropper}
             canvasFlipH={draw.canvasFlipH}
             onToggleCanvasFlipH={stableHandlers.toggleCanvasFlip}
             onOpenBrushStudio={stableHandlers.openBrushStudio}

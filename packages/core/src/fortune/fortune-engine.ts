@@ -1,11 +1,10 @@
-// 운세 엔진 — 웹 백엔드(NestJS)·토스가 공유하는 UI/플랫폼-비종속 순수 코어.
+// 운세 엔진 — 웹과 NestJS 백엔드가 공유하는 UI/플랫폼 비종속 순수 코어.
 // 명리(사주/궁합/일진/세운)·타로·별자리·오늘의 운세·독서 처방의 결정적 계산과 웹툰
 // 콘티(panels) 파싱을 모두 담는다. 외부 의존: 없음(React/DOM/Node/Drizzle/env 0).
 //
 // LLM 가공(Gemini, process.env·fetch)은 플랫폼 종속이라 여기에 두지 않고, generateText
 // 콜백으로 주입한다(없거나 throw 하면 결정적 폴백 콘티를 쓴다). 추천 작품(curateTitles)도
-// 카탈로그(TITLES)를 인자로 받아 산출하므로, 웹은 core/server 의 TITLES 를, 토스는 자기
-// 카탈로그를 넘기면 동일 엔진이 그대로 동작한다.
+// 카탈로그(TITLES)를 인자로 받아 산출하므로 데이터 공급원과 무관하게 동일 엔진이 동작합니다.
 
 import {
   analyzeCompatibility,
@@ -62,7 +61,7 @@ export interface FortunePanel {
   lines: FortunePanelLine[];
 }
 
-/** curateTitles 가 읽는 카탈로그 항목의 최소 구조(웹·토스 Title 모두 할당 가능). */
+/** curateTitles가 읽는 카탈로그 항목의 최소 구조. */
 export interface CurateTitleLike {
   ageRating: string;
   genres: string[];

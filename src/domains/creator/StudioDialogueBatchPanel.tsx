@@ -3,13 +3,22 @@
 // 순수 계산은 studio-dialogue-batch, 상태 커밋(히스토리)은 StudioPage(메인 루프)가 담당한다.
 // 자체완결 플로팅 패널: 캔버스 컨테이너(relative) 안에서 우측에 떠 있고 Esc 로 닫힌다.
 import {
+  ArrowRight,
+  ChevronDown,
+  Combine,
+  Copy,
+  Download,
+  FileText,
   MessageCircle,
+  MoreHorizontal,
   Pause,
   Play,
   Replace,
   Search,
+  Scissors,
   Square,
   Type as TypeIcon,
+  Upload,
   Volume2,
   X,
 } from "lucide-react";
@@ -28,6 +37,15 @@ import {
   type DialogueReplaceScope,
 } from "./studio-dialogue-batch";
 import {
+  parseStudioDialogueInterchange,
+  serializeStudioDialogueInterchange,
+  studioDialogueItemsToInterchange,
+  type StudioDialogueImportApplyResult,
+  type StudioDialogueImportMatchMode,
+  type StudioDialogueInterchangeDocument,
+  type StudioDialogueInterchangeFormat,
+} from "./studio-dialogue-interchange";
+import {
   buildDialogueReadAloudQueue,
   choosePreferredDialogueVoice,
   createBrowserDialogueSpeechAdapter,
@@ -38,6 +56,7 @@ import {
   type DialogueReadAloudPlaybackState,
   type DialogueSpeechAdapter,
 } from "./studio-dialogue-read-aloud";
+import { downloadBlob } from "./studio-export";
 
 import { cx } from "@/lib/cx";
 
@@ -55,6 +74,23 @@ export type StudioDialogueBatchPanelProps = {
   onPatchText: (pageId: string, elId: string, text: string) => void;
   /** 찾아바꾸기 일괄 적용 — 메인 루프가 applyReplacePlanToPages 로 단일 커밋한다. */
   onApplyReplace: (plan: DialogueReplacePlan) => void;
+  /** 현재 커서 위치에서 한 대사를 두 블록으로 나눈다. */
+  onSplitText?: (pageId: string, elId: string, text: string, offset: number) => void;
+  /** 현재 대사와 같은 페이지의 다음 대사를 한 블록으로 합친다. */
+  onMergeWithNext?: (pageId: string, elId: string, text: string) => void;
+  /** 최신 임시본을 보존해 다른 페이지로 이동하거나 복사한다. */
+  onTransferElement?: (
+    pageId: string,
+    elId: string,
+    targetPageId: string,
+    mode: "move" | "copy",
+    text: string
+  ) => void;
+  /** 번역/대본 파일의 cue를 기존 말풍선에 한 번의 문서 커밋으로 반영한다. */
+  onImportInterchange?: (
+    document: StudioDialogueInterchangeDocument,
+    mode: StudioDialogueImportMatchMode
+  ) => Promise<StudioDialogueImportApplyResult> | StudioDialogueImportApplyResult;
   /** Web Speech API 테스트·점진 향상 경계. 운영에서는 브라우저 어댑터를 자동 생성한다. */
   readAloudAdapter?: DialogueSpeechAdapter;
   /** 모바일 소프트 키보드가 가린 높이. 스튜디오 도크와 함께 패널도 같은 만큼 올린다. */
@@ -70,6 +106,28 @@ const inputClass =
   "min-h-11 w-full rounded-lg border border-line bg-card px-2 py-1.5 text-[0.7rem] text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";
 
 const READ_ALOUD_RATES = [0.6, 0.8, 1, 1.2, 1.4, 1.6] as const;
+
+const INTERCHANGE_FORMATS: readonly {
+  id: StudioDialogueInterchangeFormat;
+  label: string;
+}[] = [
+  { id: "csv", label: "CSV 번역표" },
+  { id: "tsv", label: "TSV 번역표" },
+  { id: "json", label: "JSON 무손실" },
+  { id: "fountain", label: "Fountain 대본" },
+  { id: "srt", label: "SRT 자막" },
+  { id: "vtt", label: "WebVTT 자막" },
+  { id: "markdown", label: "Markdown" },
+  { id: "txt", label: "TXT" },
+] as const;
+
+function dialogueFormatFromFileName(fileName: string): StudioDialogueInterchangeFormat | null {
+  const extension = fileName.toLocaleLowerCase("en-US").split(".").pop();
+  if (extension === "md") return "markdown";
+  return INTERCHANGE_FORMATS.some((format) => format.id === extension)
+    ? extension as StudioDialogueInterchangeFormat
+    : null;
+}
 
 function playbackStatusText(
   playback: DialogueReadAloudPlaybackState,
@@ -105,6 +163,10 @@ export function StudioDialogueBatchPanel({
   onSelectElement,
   onPatchText,
   onApplyReplace,
+  onSplitText,
+  onMergeWithNext,
+  onTransferElement,
+  onImportInterchange,
   readAloudAdapter,
   mobileKeyboardInset = 0,
 }: StudioDialogueBatchPanelProps) {
@@ -117,6 +179,17 @@ export function StudioDialogueBatchPanel({
   const [listQuery, setListQuery] = useState("");
   // 인라인 수정 임시본 — 포커스 아웃/⌘Enter 에만 확정해 히스토리를 키 입력마다 만들지 않는다.
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  // 구조 작업은 한 행만 펼쳐 목록 밀도를 유지한다.
+  const [structureMenuId, setStructureMenuId] = useState<string | null>(null);
+  const [transferTargetByItem, setTransferTargetByItem] = useState<Record<string, string>>({});
+  const [interchangeOpen, setInterchangeOpen] = useState(false);
+  const [interchangeFormat, setInterchangeFormat] = useState<StudioDialogueInterchangeFormat>("csv");
+  const [interchangeMatchMode, setInterchangeMatchMode] = useState<StudioDialogueImportMatchMode>("auto");
+  const [interchangeStatus, setInterchangeStatus] = useState<{
+    tone: "good" | "warn" | "bad";
+    text: string;
+  } | null>(null);
+  const [interchangeBusy, setInterchangeBusy] = useState(false);
 
   const [speechAdapter] = useState<DialogueSpeechAdapter>(
     () => readAloudAdapter ?? createBrowserDialogueSpeechAdapter()
@@ -241,6 +314,14 @@ export function StudioDialogueBatchPanel({
     if (last && last.pageId === item.pageId) last.items.push(item);
     else grouped.push({ pageId: item.pageId, pageIndex: item.pageIndex, items: [item] });
   }
+  const nextDialogueById = new Map<string, DialogueBatchItem>();
+  for (const page of pages) {
+    const pageItems = collectDialogueItems([page]);
+    pageItems.forEach((item, index) => {
+      const next = pageItems[index + 1];
+      if (next) nextDialogueById.set(item.id, next);
+    });
+  }
 
   const plan = planDialogueReplace(pages, find, replaceWith, {
     caseSensitive,
@@ -322,6 +403,107 @@ export function StudioDialogueBatchPanel({
     else readAloudController.pause();
   };
 
+  const clearDraft = (id: string) => {
+    setDrafts((previous) => {
+      const { [id]: _omit, ...rest } = previous;
+      return rest;
+    });
+  };
+
+  const splitAtCaret = (item: DialogueBatchItem) => {
+    const editor = textareaRefs.current.get(item.id);
+    const text = drafts[item.id] ?? item.text;
+    const offset = editor?.selectionStart ?? -1;
+    if (!onSplitText || offset <= 0 || offset >= text.length) return;
+    clearDraft(item.id);
+    setStructureMenuId(null);
+    onSplitText(item.pageId, item.id, text, offset);
+  };
+
+  const mergeWithNext = (item: DialogueBatchItem) => {
+    if (!onMergeWithNext) return;
+    const next = nextDialogueById.get(item.id);
+    if (!next || next.locked) return;
+    const text = drafts[item.id] ?? item.text;
+    clearDraft(item.id);
+    setStructureMenuId(null);
+    onMergeWithNext(item.pageId, item.id, text);
+  };
+
+  const transferElement = (item: DialogueBatchItem, mode: "move" | "copy") => {
+    if (!onTransferElement) return;
+    const fallbackTarget = pages.find((page) => page.id !== item.pageId)?.id;
+    const targetPageId = transferTargetByItem[item.id] ?? fallbackTarget;
+    if (!targetPageId) return;
+    const text = drafts[item.id] ?? item.text;
+    clearDraft(item.id);
+    setStructureMenuId(null);
+    onTransferElement(item.pageId, item.id, targetPageId, mode, text);
+  };
+
+  const exportInterchange = () => {
+    const draftItems = items.map((item) => ({ ...item, text: drafts[item.id] ?? item.text }));
+    try {
+      const file = serializeStudioDialogueInterchange(
+        interchangeFormat,
+        studioDialogueItemsToInterchange(draftItems, { language: "ko-KR" })
+      );
+      downloadBlob(
+        new Blob([file.text], { type: file.mimeType }),
+        `toonspectrum-dialogue${file.extension}`
+      );
+      setInterchangeStatus({
+        tone: file.lossy ? "warn" : "good",
+        text: [
+          `${draftItems.length}개 대사를 ${file.extension} 파일로 내보냈어요.`,
+          ...file.warnings,
+        ].join(" "),
+      });
+    } catch (error) {
+      setInterchangeStatus({
+        tone: "bad",
+        text: error instanceof Error ? error.message : "대사 파일을 만들지 못했습니다.",
+      });
+    }
+  };
+
+  const importInterchange = async (file: File) => {
+    const format = dialogueFormatFromFileName(file.name);
+    if (!format) {
+      setInterchangeStatus({ tone: "bad", text: "지원하는 대사 파일 확장자가 아닙니다." });
+      return;
+    }
+    if (!onImportInterchange) {
+      setInterchangeStatus({ tone: "bad", text: "현재 문서에서는 대사 가져오기를 사용할 수 없습니다." });
+      return;
+    }
+    setInterchangeBusy(true);
+    setInterchangeStatus(null);
+    try {
+      const parsed = parseStudioDialogueInterchange(format, await file.arrayBuffer());
+      const applied = await onImportInterchange(parsed.document, interchangeMatchMode);
+      setDrafts({});
+      const details = [
+        `${applied.changed}개 대사를 한 번에 반영했어요.`,
+        applied.locked > 0 ? `잠긴 대사 ${applied.locked}개 제외.` : "",
+        applied.missing > 0 ? `연결하지 못한 대사 ${applied.missing}개.` : "",
+        applied.droppedMetadata > 0 ? `화자·시간 메타데이터 ${applied.droppedMetadata}개는 캔버스에 쓰지 않았어요.` : "",
+        ...parsed.warnings,
+      ].filter(Boolean);
+      setInterchangeStatus({
+        tone: applied.missing > 0 || applied.locked > 0 || parsed.lossy ? "warn" : "good",
+        text: details.join(" "),
+      });
+    } catch (error) {
+      setInterchangeStatus({
+        tone: "bad",
+        text: error instanceof Error ? error.message : "대사 파일을 가져오지 못했습니다.",
+      });
+    } finally {
+      setInterchangeBusy(false);
+    }
+  };
+
   const canPause = playback.status === "playing" || playback.status === "paused";
   const isActive = playback.status === "playing" || playback.status === "paused";
   const statusText = selectedVoice
@@ -361,6 +543,99 @@ export function StudioDialogueBatchPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      <section className="border-b border-line/60 px-3 py-2.5" aria-label="대사 파일 입출력">
+        <button
+          type="button"
+          onClick={() => setInterchangeOpen((open) => !open)}
+          aria-expanded={interchangeOpen}
+          className="flex min-h-11 w-full items-center gap-2 rounded-lg px-1 text-left text-[0.7rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          <FileText size={14} aria-hidden />
+          번역·대본 파일
+          <span className="ml-auto text-[0.6rem] font-medium text-fg-4">8종</span>
+          <ChevronDown
+            size={14}
+            aria-hidden
+            className={cx("transition-transform", interchangeOpen && "rotate-180")}
+          />
+        </button>
+        {interchangeOpen && (
+          <div className="mt-1.5 space-y-2 rounded-xl border border-line bg-card/55 p-2">
+            <div className="grid grid-cols-2 gap-1.5">
+              <label className="text-[0.6rem] font-medium text-fg-3">
+                내보내기 형식
+                <select
+                  value={interchangeFormat}
+                  onChange={(event) => setInterchangeFormat(event.target.value as StudioDialogueInterchangeFormat)}
+                  aria-label="대사 내보내기 형식"
+                  className="mt-1 min-h-11 w-full rounded-lg border border-line bg-panel px-2 text-[0.66rem] text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                >
+                  {INTERCHANGE_FORMATS.map((format) => (
+                    <option key={format.id} value={format.id}>{format.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-[0.6rem] font-medium text-fg-3">
+                가져오기 연결
+                <select
+                  value={interchangeMatchMode}
+                  onChange={(event) => setInterchangeMatchMode(event.target.value as StudioDialogueImportMatchMode)}
+                  aria-label="가져온 대사 연결 방식"
+                  className="mt-1 min-h-11 w-full rounded-lg border border-line bg-panel px-2 text-[0.66rem] text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                >
+                  <option value="auto">ID→페이지→순서</option>
+                  <option value="id">ID만</option>
+                  <option value="page-order">페이지·컷 순서</option>
+                  <option value="document-order">문서 읽기 순서</option>
+                </select>
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={exportInterchange}
+                disabled={items.length === 0 || interchangeBusy}
+                className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-panel text-[0.66rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Download size={13} aria-hidden /> 내보내기
+              </button>
+              <label className={cx(
+                "flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent text-[0.66rem] font-semibold text-on-accent transition-opacity hover:opacity-90 focus-within:outline focus-within:outline-2 focus-within:outline-accent",
+                interchangeBusy && "cursor-wait opacity-50"
+              )}>
+                <Upload size={13} aria-hidden /> {interchangeBusy ? "읽는 중" : "가져오기"}
+                <input
+                  type="file"
+                  accept=".csv,.tsv,.json,.fountain,.srt,.vtt,.md,.txt,text/plain,text/csv,text/vtt,application/json"
+                  className="sr-only"
+                  disabled={interchangeBusy}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (file) void importInterchange(file);
+                  }}
+                />
+              </label>
+            </div>
+            <p className="text-[0.6rem] leading-relaxed text-fg-4">
+              ID가 있는 JSON/CSV는 가장 정확합니다. SRT·VTT는 시간은 읽지만 캔버스 좌표가 없어 순서로 연결합니다.
+            </p>
+            {interchangeStatus && (
+              <p
+                role={interchangeStatus.tone === "bad" ? "alert" : "status"}
+                className={cx(
+                  "rounded-lg border px-2 py-1.5 text-[0.62rem] leading-relaxed",
+                  interchangeStatus.tone === "good" && "border-good/35 bg-good/10 text-good",
+                  interchangeStatus.tone === "warn" && "border-warn/35 bg-warn/10 text-fg-2",
+                  interchangeStatus.tone === "bad" && "border-bad/35 bg-bad/10 text-bad"
+                )}
+              >
+                {interchangeStatus.text}
+              </p>
+            )}
+          </div>
+        )}
+      </section>
       {/* 찾아바꾸기 — 적용 전 매치 미리보기를 보여주고, 적용은 실행취소 1회로 복구된다. */}
       <div className="space-y-1.5 border-b border-line/60 px-3 py-2.5">
         <div className="grid grid-cols-2 gap-1.5">
@@ -673,6 +948,22 @@ export function StudioDialogueBatchPanel({
                             <Volume2 size={16} aria-hidden />
                           </button>
                         )}
+                        {(onSplitText || onMergeWithNext || onTransferElement) && !item.locked ? (
+                          <button
+                            type="button"
+                            onClick={() => setStructureMenuId((current) => current === item.id ? null : item.id)}
+                            aria-label={`${item.pageIndex + 1}페이지 ${dialogueItemTypeLabel(item)} "${dialogueExcerpt(item.text, 16)}" 구조 작업`}
+                            aria-expanded={structureMenuId === item.id}
+                            className={cx(
+                              "grid size-11 shrink-0 place-items-center rounded-lg border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+                              structureMenuId === item.id
+                                ? "border-accent bg-accent-soft text-accent"
+                                : "border-line bg-card text-fg-2 hover:bg-raised"
+                            )}
+                          >
+                            <MoreHorizontal size={16} aria-hidden />
+                          </button>
+                        ) : null}
                       </div>
                       <textarea
                         ref={(node) => {
@@ -722,6 +1013,76 @@ export function StudioDialogueBatchPanel({
                           "resize-y py-1 leading-snug disabled:cursor-not-allowed disabled:opacity-50"
                         )}
                       />
+                      {structureMenuId === item.id ? (
+                        <div
+                          role="group"
+                          aria-label={`${item.pageIndex + 1}페이지 대사 구조 편집`}
+                          className="mt-1.5 rounded-lg border border-line bg-panel p-1.5"
+                        >
+                          <div className="grid grid-cols-2 gap-1">
+                            {onSplitText ? (
+                              <button
+                                type="button"
+                                onPointerDown={(event) => event.preventDefault()}
+                                onClick={() => splitAtCaret(item)}
+                                className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-2 text-[0.64rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                                title="대사 입력 커서가 있는 위치에서 둘로 나눕니다"
+                              >
+                                <Scissors size={13} aria-hidden /> 커서에서 나누기
+                              </button>
+                            ) : null}
+                            {onMergeWithNext ? (
+                              <button
+                                type="button"
+                                onClick={() => mergeWithNext(item)}
+                                disabled={!nextDialogueById.get(item.id) || nextDialogueById.get(item.id)?.locked}
+                                className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-2 text-[0.64rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+                                title="같은 페이지의 다음 대사를 현재 대사 뒤에 합칩니다"
+                              >
+                                <Combine size={13} aria-hidden /> 다음과 합치기
+                              </button>
+                            ) : null}
+                          </div>
+                          {onTransferElement && pages.length > 1 ? (
+                            <div className="mt-1.5 grid grid-cols-2 gap-1 border-t border-line/60 pt-1.5">
+                              <label className="col-span-2 text-[0.58rem] font-medium text-fg-3">
+                                대상 페이지
+                                <select
+                                  value={
+                                    transferTargetByItem[item.id] ??
+                                    pages.find((page) => page.id !== item.pageId)?.id ??
+                                    ""
+                                  }
+                                  onChange={(event) => setTransferTargetByItem((current) => ({
+                                    ...current,
+                                    [item.id]: event.target.value,
+                                  }))}
+                                  aria-label={`${item.pageIndex + 1}페이지 대사 이동 대상`}
+                                  className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-2 text-[0.66rem] text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                                >
+                                  {pages.map((page, pageIndex) => page.id === item.pageId ? null : (
+                                    <option key={page.id} value={page.id}>{pageIndex + 1}페이지</option>
+                                  ))}
+                                </select>
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => transferElement(item, "move")}
+                                className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent px-2 text-[0.64rem] font-semibold text-on-accent hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                              >
+                                <ArrowRight size={13} aria-hidden /> 이동
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => transferElement(item, "copy")}
+                                className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-[0.64rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                              >
+                                <Copy size={13} aria-hidden /> 복사
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -733,7 +1094,7 @@ export function StudioDialogueBatchPanel({
       </div>
 
       <p className="border-t border-line/60 px-3 py-1.5 text-[0.58rem] leading-snug text-fg-4">
-        ⌘/Ctrl+Enter 저장 후 다음 · Shift와 함께 누르면 이전 · 잠긴 대사는 자동으로 건너뛰어요.
+        ⌘/Ctrl+Enter 저장 후 다음 · Shift와 함께 누르면 이전 · ⋯에서 나누기·합치기·페이지 이동을 할 수 있어요.
       </p>
     </section>
   );

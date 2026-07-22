@@ -212,15 +212,18 @@ describe("StudioToolHint", () => {
 
     expect(targetHtml).toContain('data-studio-tool-hint-target="true"');
     expect(targetHtml).toContain('data-studio-tool-hint-unavailable="true"');
+    expect(targetHtml).toContain('role="group"');
     expect(targetHtml).toContain('aria-disabled="true"');
     expect(targetHtml).toContain('tabindex="0"');
     expect(targetHtml).toContain('disabled=""');
+    expect(targetHtml).not.toContain('role="button"');
+    expect(targetHtml).not.toContain('aria-hidden="true"');
     expect(bubbleHtml).toContain('data-studio-tool-hint-unavailable="true"');
     expect(bubbleHtml).toContain("사용 조건");
     expect(bubbleHtml).toContain("먼저 편집할 레이어를 선택하세요.");
   });
 
-  it("promotes state and popup relationships when a native disabled control needs a focusable coach", () => {
+  it("keeps native disabled state on the control without nesting an interactive wrapper role", () => {
     const html = renderToStaticMarkup(
       <StudioToolHintTarget
         disabled
@@ -242,7 +245,8 @@ describe("StudioToolHint", () => {
       </StudioToolHintTarget>
     );
 
-    expect(html).toContain('role="button"');
+    expect(html).toContain('role="group"');
+    expect(html).not.toContain('role="button"');
     expect(html).toContain('aria-label="올가미 설정"');
     expect(html).toContain('aria-disabled="true"');
     expect(html).toContain('aria-pressed="true"');
@@ -251,7 +255,8 @@ describe("StudioToolHint", () => {
     expect(html).toContain('aria-controls="lasso-settings"');
     expect(html).toContain('aria-keyshortcuts="L"');
     expect(html).toContain('tabindex="0"');
-    expect(html).toContain('aria-hidden="true"');
+    expect(html).toContain('disabled=""');
+    expect(html).not.toContain('aria-hidden="true"');
   });
 
   it("does not add wrapper keyboard semantics to active controls or no-hint fallbacks", () => {
@@ -278,7 +283,7 @@ describe("StudioToolHint", () => {
   it("opens from keyboard and assistive focus without depending on :focus-visible support", () => {
     expect(source).toContain("Pointer focus is already filtered by pointerdown suppression");
     expect(source).not.toContain('matches(":focus-visible")');
-    expect(source).toContain("reveal(richCoachEnabled);");
+    expect(source).toContain('reveal(richCoachEnabled, "focus");');
   });
 
   it("keeps rich help exclusive and removes a competing native title tooltip", () => {

@@ -146,6 +146,13 @@ describe("StudioBg3dAssetLibraryPanel", () => {
     expect(input.accept).toContain(".glb");
     expect(input.accept).toContain(".fbx");
     expect(input.accept).toContain(".mtl");
+    fireEvent.click(screen.getByText("이용 권리 기록"));
+    fireEvent.click(screen.getByRole("radio", { name: /구매·허가/ }));
+    expect(screen.getByRole("button", { name: "3D 모델 및 연결 파일 가져오기" }).hasAttribute("disabled")).toBe(true);
+    fireEvent.change(screen.getByLabelText(/라이선스·구매처 이름/), {
+      target: { value: "ACON3D 구매 라이선스" },
+    });
+    fireEvent.click(screen.getByLabelText("상업 작품에 사용할 수 있음"));
     fireEvent.click(screen.getByRole("button", { name: "3D 모델 및 연결 파일 가져오기" }));
     expect(inputClick).toHaveBeenCalledOnce();
 
@@ -153,6 +160,15 @@ describe("StudioBg3dAssetLibraryPanel", () => {
       target: { files: [new File(["glb"], "background.glb", { type: "model/gltf-binary" })] },
     });
     expect(onFileChange).toHaveBeenCalledOnce();
+    expect(onFileChange).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        status: "licensed",
+        commercialUse: true,
+        attributionRequired: false,
+        licenseName: "ACON3D 구매 라이선스",
+      }),
+    );
 
     view.rerender(
       <StudioBg3dAssetLibraryPanel
@@ -164,6 +180,23 @@ describe("StudioBg3dAssetLibraryPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "가져오기 취소 · 1/3" }));
     expect(onCancelImport).toHaveBeenCalledOnce();
     expect(inputClick).toHaveBeenCalledOnce();
+  });
+
+  it("requires attribution text before allowing a rights-bound import", () => {
+    renderPanel();
+
+    fireEvent.click(screen.getByText("이용 권리 기록"));
+    fireEvent.click(screen.getByRole("radio", { name: /직접 제작/ }));
+    fireEvent.click(screen.getByLabelText("작품에 출처 표기가 필요함"));
+
+    const upload = screen.getByRole("button", { name: "3D 모델 및 연결 파일 가져오기" });
+    expect(upload.hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("alert").textContent).toContain("필수 권리 정보");
+
+    fireEvent.change(screen.getByLabelText(/출처 표기 문구/), {
+      target: { value: "배경 모델 · 작가 이름" },
+    });
+    expect(upload.hasAttribute("disabled")).toBe(false);
   });
 
   it("renders contained thumbnails, format, rights, and status metadata", () => {

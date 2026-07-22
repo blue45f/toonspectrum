@@ -33,14 +33,15 @@ interface MockDockButtonProps {
   readonly hintDescription?: string;
   readonly hintPreview?: string;
   readonly hintPreviewVariant?: string;
+  readonly hintUnavailableReason?: string;
   readonly label: string;
   readonly onClick?: () => void;
   readonly title?: string;
 }
 
 vi.mock("./studio-chrome-ui", () => ({
-  StudioContextActionButton: ({ label, disabled, onClick }: MockDockButtonProps) => (
-    <button type="button" disabled={disabled} onClick={onClick}>{label}</button>
+  StudioContextActionButton: ({ label, disabled, onClick, title }: MockDockButtonProps) => (
+    <button type="button" disabled={disabled} onClick={onClick} title={title}>{label}</button>
   ),
   StudioDockButton: ({
     "aria-controls": ariaControls,
@@ -51,7 +52,9 @@ vi.mock("./studio-chrome-ui", () => ({
     hintDescription,
     hintPreview,
     hintPreviewVariant,
+    hintUnavailableReason,
     onClick,
+    title,
   }: MockDockButtonProps) => (
     <button
       type="button"
@@ -61,8 +64,10 @@ vi.mock("./studio-chrome-ui", () => ({
       data-hint-description={hintDescription}
       data-hint-preview={hintPreview}
       data-hint-preview-variant={hintPreviewVariant}
+      data-hint-unavailable-reason={hintUnavailableReason}
       disabled={disabled}
       onClick={onClick}
+      title={hintDescription ? undefined : title}
     >
       {label}
     </button>
@@ -252,15 +257,36 @@ describe("StudioMobileEditingDock", () => {
     expect(dock.getAttribute("data-studio-mobile-editing-dock")).toBe("true");
     expect(dock.className).toContain("env(safe-area-inset-bottom)");
     expect(dock.style.bottom).toBe("18px");
+    expect(dock.getAttribute("data-studio-mobile-dock-expanded")).toBe("false");
     expect(within(dock).getByRole("toolbar", { name: "드로잉 도구" })).toBeTruthy();
+    const workspaceToggle = within(dock).getByRole<HTMLButtonElement>("button", {
+      name: "작업 공간 도구 펼치기",
+    });
+    expect(workspaceToggle.getAttribute("aria-controls")).toBe("studio-mobile-workspace-tools");
+    expect(workspaceToggle.getAttribute("aria-expanded")).toBe("false");
+    expect(workspaceToggle.className).toContain("min-h-11");
+    expect(workspaceToggle.className).toContain("min-w-11");
+    expect(dock.querySelector("#studio-mobile-workspace-tools")?.hasAttribute("hidden")).toBe(true);
+    fireEvent.click(workspaceToggle);
+    expect(dock.getAttribute("data-studio-mobile-dock-expanded")).toBe("true");
     expect(within(dock).getByRole("toolbar", { name: "작업 공간" })).toBeTruthy();
+    expect(
+      within(dock).getByRole("button", { name: "작업 공간 도구 접기" }).getAttribute("aria-expanded"),
+    ).toBe("true");
+    fireEvent.click(within(dock).getByRole("button", { name: "선택" }));
+    expect(dock.getAttribute("data-studio-mobile-dock-expanded")).toBe("false");
     expect(within(dock).getByRole<HTMLButtonElement>("button", { name: "실행취소" }).disabled).toBe(true);
     expect(within(dock).getByRole<HTMLButtonElement>("button", { name: "다시실행" }).disabled).toBe(false);
+    expect(within(dock).getByRole("button", { name: "실행취소" }).getAttribute("data-hint-description")).toContain("한 단계 되돌립니다");
+    expect(within(dock).getByRole("button", { name: "다시실행" }).getAttribute("data-hint-description")).toContain("다시 적용");
+    expect(dock.querySelector("button button")).toBeNull();
 
     view.rerender(<StudioMobileEditingDock {...createProps({ isMobile: true, hi: 1 })} />);
     dock = screen.getByRole("navigation", { name: "스튜디오 모바일 도구막대" });
     expect(within(dock).getByRole<HTMLButtonElement>("button", { name: "실행취소" }).disabled).toBe(false);
     expect(within(dock).getByRole<HTMLButtonElement>("button", { name: "다시실행" }).disabled).toBe(true);
+    expect(within(dock).getByRole("button", { name: "실행취소" }).getAttribute("data-hint-description")).toContain("한 단계 되돌립니다");
+    expect(within(dock).getByRole("button", { name: "다시실행" }).getAttribute("data-hint-description")).toContain("다시 적용");
 
     view.rerender(
       <StudioMobileEditingDock
@@ -270,9 +296,11 @@ describe("StudioMobileEditingDock", () => {
     dock = screen.getByRole("navigation", { name: "스튜디오 모바일 도구막대" });
     expect(within(dock).getByRole<HTMLButtonElement>("button", { name: "실행취소" }).disabled).toBe(true);
     expect(within(dock).getByRole<HTMLButtonElement>("button", { name: "다시실행" }).disabled).toBe(true);
+    expect(within(dock).getByRole("button", { name: "실행취소" }).getAttribute("data-hint-unavailable-reason")).toContain("문서 잠금");
+    expect(within(dock).getByRole("button", { name: "다시실행" }).getAttribute("data-hint-unavailable-reason")).toContain("문서 잠금");
   });
 
-  it("keeps a 44px canvas-comment action first and visible in the 390px scroll row", () => {
+  it("keeps the comment first and pins the quick menu beside it for a left-hand layout", () => {
     const stableHandlers = createHandlers();
     const setMobileSheet = vi.fn();
     const view = render(
@@ -287,13 +315,19 @@ describe("StudioMobileEditingDock", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "작업 공간 도구 펼치기" }));
     const workspace = screen.getByRole("toolbar", { name: "작업 공간" });
     const comment = within(workspace).getByRole<HTMLButtonElement>("button", {
       name: "캔버스 위치 댓글",
     });
-    expect(workspace.className).toContain("overflow-x-auto");
-    expect(workspace.getAttribute("data-studio-mobile-dock-scroll")).toBe("secondary");
+    const scrollLane = workspace.querySelector('[data-studio-mobile-dock-scroll="secondary"]');
+    const quickSlot = workspace.querySelector('[data-studio-mobile-quick-actions-slot="left"]');
+    expect(workspace.getAttribute("data-studio-mobile-control-side")).toBe("left");
+    expect(scrollLane?.className).toContain("overflow-x-auto");
     expect(workspace.firstElementChild).toBe(comment);
+    expect(workspace.children.item(1)).toBe(quickSlot);
+    expect(within(quickSlot as HTMLElement).getByRole("button", { name: "빠른 작업" })).not.toBeNull();
+    expect(quickSlot?.className).toContain("size-11");
     expect(comment.className).toContain("min-h-11");
     expect(comment.className).toContain("min-w-11");
     expect(comment.getAttribute("data-studio-mobile-comment-trigger")).toBe("true");
@@ -324,6 +358,30 @@ describe("StudioMobileEditingDock", () => {
 
     fireEvent.click(cancel);
     expect(stableHandlers.toggleStudioCommentPinPlacement).toHaveBeenCalledTimes(2);
+  });
+
+  it("pins the quick menu to the opposite edge for a right-hand layout without moving the first comment action", () => {
+    render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          workspaceState: { mobileControlSide: "right" } as StudioWorkspaceState,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "작업 공간 도구 펼치기" }));
+    const workspace = screen.getByRole("toolbar", { name: "작업 공간" });
+    const comment = within(workspace).getByRole("button", { name: "캔버스 위치 댓글" });
+    const quickSlot = workspace.querySelector('[data-studio-mobile-quick-actions-slot="right"]');
+    const scrollLane = workspace.querySelector('[data-studio-mobile-dock-scroll="secondary"]');
+
+    expect(workspace.getAttribute("data-studio-mobile-control-side")).toBe("right");
+    expect(workspace.firstElementChild).toBe(comment);
+    expect(workspace.lastElementChild).toBe(quickSlot);
+    expect(scrollLane?.nextElementSibling).toBe(quickSlot);
+    expect(within(quickSlot as HTMLElement).getByRole("button", { name: "빠른 작업" })).not.toBeNull();
+    expect(quickSlot?.className).toContain("size-11");
   });
 
   it("preserves the draw and brush-manager dialog contracts through stable handlers", () => {
@@ -432,6 +490,7 @@ describe("StudioMobileEditingDock", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "작업 공간 도구 펼치기" }));
     fireEvent.click(screen.getByRole("button", { name: "색각·명암 검수" }));
     expect(setMobileSheet).toHaveBeenCalledOnce();
 
@@ -572,5 +631,76 @@ describe("StudioMobileEditingDock", () => {
     expect(stableHandlers.removeSelected).toHaveBeenCalledOnce();
     expect(setSelectedId).toHaveBeenCalledWith(null);
     expect(setMarqueeIds).toHaveBeenCalledWith([]);
+  });
+
+  it("keeps contextual fill clickable and exposes recovery guidance for an unsupported image", () => {
+    const stableHandlers = createHandlers();
+    render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          selected: { id: "image-1", type: "image" } as StudioMobileEditingDockProps["selected"],
+          advancedFillUnsupportedReason: "잠긴 레이어는 채울 수 없어요.",
+          stableHandlers,
+        })}
+      />,
+    );
+
+    const fill = within(
+      screen.getByRole("toolbar", { name: "선택 항목 빠른 작업" }),
+    ).getByRole<HTMLButtonElement>("button", { name: "채우기" });
+    expect(fill.disabled).toBe(false);
+    expect(fill.title).toContain("잠긴 레이어는 채울 수 없어요.");
+    expect(fill.title).toContain("조건을 확인");
+
+    fireEvent.click(fill);
+    expect(stableHandlers.toggleAdvancedFill).toHaveBeenCalledOnce();
+  });
+
+  it("keeps fill in the primary mobile drawing toolbar without requiring a selection", () => {
+    const stableHandlers = createHandlers();
+    const setMenu = vi.fn();
+    const setMobileSheet = vi.fn();
+    render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          selected: null,
+          advancedFillUnsupportedReason: "래스터 이미지 레이어를 먼저 선택하세요.",
+          setMenu,
+          setMobileSheet,
+          stableHandlers,
+        })}
+      />,
+    );
+
+    const fill = within(
+      screen.getByRole("toolbar", { name: "드로잉 도구" }),
+    ).getByRole<HTMLButtonElement>("button", { name: "채우기" });
+    expect(fill.disabled).toBe(false);
+    expect(fill.getAttribute("data-hint-description")).toContain(
+      "래스터 이미지 레이어를 먼저 선택하세요.",
+    );
+    expect(fill.getAttribute("data-hint-description")).toContain("안전한 단일 래스터 후보");
+
+    fireEvent.click(fill);
+    expect(setMenu).toHaveBeenCalledWith(null);
+    expect(setMobileSheet).toHaveBeenCalledWith(null);
+    expect(stableHandlers.toggleAdvancedFill).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the first-use coach close action at the 44px mobile target minimum", () => {
+    const stableHandlers = createHandlers();
+    render(
+      <StudioMobileEditingDock
+        {...createProps({ isMobile: true, showMobileHint: true, stableHandlers })}
+      />,
+    );
+
+    const close = screen.getByRole<HTMLButtonElement>("button", { name: "안내 닫기" });
+    expect(close.className).toContain("size-11");
+
+    fireEvent.click(close);
+    expect(stableHandlers.dismissMobileHint).toHaveBeenCalledOnce();
   });
 });

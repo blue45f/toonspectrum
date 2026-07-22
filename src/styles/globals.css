@@ -98,8 +98,7 @@ html[data-studio-canvas-only="true"] body {
 }
 
 /* ── 고대비 선호(prefers-contrast: more) — OS 접근성 설정 존중. ──────────────
-   경계선을 또렷하게 올리고 muted 텍스트를 AAA(≥7:1) 수준으로 상향한다.
-   토스 셸(web-theme.css)이 이 파일을 그대로 import 하므로 라이트 고정 화면에도 적용된다. */
+   경계선을 또렷하게 올리고 muted 텍스트를 AAA(≥7:1) 수준으로 상향한다. */
 @media (prefers-contrast: more) {
   :root {
     --color-line: oklch(0.46 0.012 64);
@@ -1112,7 +1111,53 @@ body[data-studio-app="true"] .route-stage::before,
 /* One shared safe-area contract for every mobile surface that sits above the editing dock. */
 @media (max-width: 63.999rem) {
   [data-studio-editor="true"] {
-    --studio-canvas-bottom-inset: calc(7rem + env(safe-area-inset-bottom));
+    --studio-mobile-dock-compact-height: calc(3.5rem + env(safe-area-inset-bottom));
+    --studio-mobile-dock-expanded-height: calc(7rem + env(safe-area-inset-bottom));
+    --studio-canvas-bottom-inset: var(--studio-mobile-dock-expanded-height);
+  }
+
+  /* 평소에는 한 행만 예약하고, 댓글·페이지·레이어·줌 행을 펼쳤을 때만 기존 높이를 쓴다.
+     :has() 미지원 브라우저는 안전한 기존 7rem 예약값으로 자연스럽게 폴백한다. */
+  [data-studio-editor="true"]:has(
+      [data-studio-mobile-editing-dock="true"][data-studio-mobile-dock-expanded="false"]
+    ) {
+    --studio-canvas-bottom-inset: var(--studio-mobile-dock-compact-height);
+  }
+
+  [data-studio-editor="true"]
+    :has(> [data-studio-mobile-editing-dock="true"][data-studio-mobile-dock-expanded="false"]) {
+    padding-bottom: var(--studio-mobile-dock-compact-height) !important;
+  }
+
+  [data-studio-mobile-dock-scroll="primary"] {
+    scroll-padding-inline-end: 3rem;
+  }
+
+  /* 몰입 헤더는 44px 접근성 타깃을 보존하되 레이아웃 높이를 점유하지 않는 작은 플로팅
+     컨트롤로 만든다. 상태 메시지가 실제로 있을 때만 그 아래 공간을 다시 확보한다. */
+  [data-studio-editor="true"][data-studio-mobile-immersive="true"]
+    [data-studio-app-menubar="true"] {
+    position: absolute;
+    top: env(safe-area-inset-top);
+    left: env(safe-area-inset-left);
+    width: min(14rem, calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 0.5rem));
+    border-right: 1px solid var(--color-line);
+    border-bottom: 1px solid var(--color-line);
+    border-bottom-right-radius: 0.875rem;
+    background: color-mix(in oklab, var(--color-panel) 96%, transparent);
+    box-shadow: 0 12px 28px oklch(0.06 0.01 70 / 0.36);
+    backdrop-filter: blur(14px);
+  }
+
+  [data-studio-editor="true"][data-studio-mobile-immersive="true"]
+    [data-studio-app-menubar-scroll="true"] {
+    gap: 0.25rem;
+    padding-inline: 0.375rem;
+  }
+
+  [data-studio-editor="true"][data-studio-mobile-immersive="true"]
+    [data-studio-global-status-rail]:not(:empty) {
+    padding-top: 2.75rem;
   }
 
   [data-studio-mobile-immersive="true"] [data-studio-status-bar="true"] {

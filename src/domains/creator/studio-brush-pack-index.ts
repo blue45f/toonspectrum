@@ -20,7 +20,10 @@ export type StudioBrushPackCategory =
   | "rake"
   | "foliage"
   | "pattern"
-  | "stamp";
+  | "stamp"
+  | "pixel"
+  | "tone"
+  | "effect";
 
 /** Display-only catalogue data. The full dynamics snapshot stays in the lazy runtime module. */
 export interface StudioBrushPackDescriptor {
@@ -123,6 +126,26 @@ const DESCRIPTOR_ROWS: readonly DescriptorRow[] = [
   ["거친 줄무늬", "거친 줄", "끊기고 흔들리는 평행 줄을 겹치는 질감 붓", "pattern", 34, 0.7, "dry-media", "texture", "texture", 0.82],
   ["발자국 도장", "발자국", "좌우 발자국이 번갈아 이어지는 장식 스탬프", "stamp", 24, 0.92, "ink-particle", "fx", "dots", 0.68],
   ["하트 도장", "하트", "손그림 느낌의 하트 자국을 이어 찍는 스탬프", "stamp", 26, 0.94, "ink-particle", "fx", "glitter", 0.72],
+  ["초정밀 제도 잉크", "제도 잉크", "극세 제도선과 웹툰 세부 선화를 또렷하게 잇는 단단한 잉킹 촉", "ink", 2, 1, "ink-particle", "line", "solid", 0.2],
+  ["마른 깨짐 잉크", "깨짐 잉크", "마른 붓과 닳은 펜촉처럼 공극이 생기는 거친 드라이 잉크", "ink", 11, 0.9, "dry-media", "line", "texture", 0.48],
+  ["측면 흑연 음영", "측면 흑연", "연필 측면을 눕힌 듯 넓은 흑연 입자와 종이결을 쌓는 음영 촉", "sketch", 13, 0.58, "dry-media", "texture", "texture", 0.58],
+  ["압축 목탄 모서리", "압축 목탄", "압축 목탄의 단단한 모서리와 부서지는 가루를 함께 남기는 촉", "chalk", 15, 0.76, "dry-media", "texture", "dashed", 0.62],
+  ["수채 세필", "수채 세필", "가느다란 수채 세부 묘사와 투명한 농담을 겹쳐 만드는 원형 붓", "paint", 7, 0.62, "ink-particle", "paint", "soft", 0.36],
+  ["수채 평면 워시", "평면 워시", "넓은 수채 워시와 가장자리 물고임을 만드는 부드러운 평붓", "paint", 42, 0.36, "airbrush", "paint", "soft", 0.9],
+  ["불투명 구아슈", "구아슈", "매트한 불투명 구아슈 물감을 빈틈 없이 겹쳐 칠하는 채색 붓", "paint", 27, 0.92, "ink-particle", "paint", "oil", 0.76],
+  ["필버트 유화", "필버트", "둥근 타원 모서리와 굵은 강모 결로 유화 면과 세부를 함께 칠하는 붓", "paint", 31, 0.9, "dry-media", "paint", "oil", 0.82],
+  ["알코올 사선 마커", "사선 마커", "사선 평촉으로 넓은 알코올 마커 면과 가는 모서리를 전환하는 촉", "marker", 25, 0.52, "ink-particle", "marker", "calligraphy", 0.72],
+  ["테이퍼 브러시 마커", "브러시 마커", "필압에 따라 시작과 끝이 가늘어지는 섬유형 브러시 마커", "marker", 14, 0.72, "dry-media", "marker", "wavy", 0.56],
+  ["픽셀 정사각 촉", "픽셀 사각", "각진 정사각 도장을 촘촘히 이어 또렷한 픽셀 계단선을 만드는 촉", "pixel", 8, 1, "ink-particle", "line", "solid", 0.38],
+  ["픽셀 디더 패턴", "픽셀 디더", "체커형 픽셀 점을 규칙적으로 쌓아 제한 색 디더링 명암을 만드는 촉", "pixel", 16, 0.9, "ink-particle", "texture", "tone", 0.54],
+  ["교차 해칭", "교차 해칭", "서로 교차하는 가는 선 묶음으로 만화 음영과 재질을 빠르게 쌓는 촉", "tone", 18, 0.78, "dry-media", "texture", "dashed", 0.64],
+  ["속도 해칭", "속도 해칭", "진행 방향으로 길게 뻗는 평행 해칭을 이용해 속도감과 그림자를 더하는 촉", "tone", 24, 0.82, "ink-particle", "fx", "wavy", 0.72],
+  ["고밀도 망점", "고밀도 망점", "촘촘한 원형 망점을 반복해 웹툰 스크린톤 농담을 만드는 패턴 촉", "tone", 22, 0.86, "ink-particle", "texture", "tone", 0.68],
+  ["보케 빛망울", "보케", "크기와 농도가 다른 부드러운 빛망울을 흩뿌려 배경 보케 효과를 만드는 촉", "effect", 48, 0.38, "airbrush", "fx", "glitter", 0.92],
+  ["캔버스 직조", "직조", "가로세로 실이 교차하는 캔버스 천 결을 넓게 쌓는 표면 질감 촉", "texture", 32, 0.66, "dry-media", "texture", "texture", 0.8],
+  ["극세 모발 다발", "극세 모발", "굵기와 흐름이 다른 여러 머리카락을 한 획으로 자연스럽게 잇는 보조 붓", "rake", 12, 0.86, "ink-particle", "line", "dashed", 0.5],
+  ["천주름 갈퀴", "천주름", "완만하게 휘는 평행 섬유선으로 옷주름과 천의 흐름을 잡는 보조 붓", "rake", 28, 0.68, "dry-media", "texture", "wavy", 0.76],
+  ["솔잎 군집", "솔잎", "중심에서 뻗는 가는 솔잎 묶음을 흩어 식생과 침엽수 가지를 채우는 촉", "foliage", 30, 0.8, "ink-particle", "texture", "dots", 0.78],
 ];
 
 if (DESCRIPTOR_ROWS.length !== STUDIO_BRUSH_PACK_CATALOG_IDS.length) {

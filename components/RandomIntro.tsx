@@ -40,13 +40,13 @@ function IntroSplashLoading() {
 export interface RandomIntroProps {
   /**
    * 세션당 1회만 노출(sessionStorage). 기본 true(웹 동작).
-   * false 면 마운트마다 노출 — 토스 앱 재오픈마다 인트로를 다시 보여줄 때 사용.
+   * false 면 마운트마다 노출.
    */
   once?: boolean;
 }
 
 /**
- * RandomIntro — 웹(/)·토스(apps/toss) **공유** 인트로 셔플러(NO fork).
+ * RandomIntro — 웹 인트로 셔플러.
  *
  * 마운트 시 한 번 동전 던지기(Math.random() < 0.5)로 두 인트로 중 하나를 고른다:
  *  - 절반: 구(舊) 웹 인트로 <IntroSplash/> — Three.js 스펙트럼 웨이브("더 멋진").

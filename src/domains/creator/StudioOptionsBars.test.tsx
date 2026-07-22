@@ -48,6 +48,7 @@ const DRAW_MODEL: StudioOptionsBarsDrawModel = {
   dockInsets: { left: 244, right: 308 },
   drawMode: "shape",
   drawShape: "ellipse",
+  eyedropperActive: true,
   favoriteBrushIds: ["gpen", "marker"],
   opacityLocked: true,
   postCorrection: 7,
@@ -103,6 +104,7 @@ function createHandlers(): StudioOptionsBarsHandlers {
     toggleBrushCatalog: vi.fn(),
     toggleCanvasFlip: vi.fn(),
     toggleFavoriteBrush: vi.fn(),
+    toggleEyedropper: vi.fn(),
     toggleOpacityLock: vi.fn(),
     toggleQuickShape: vi.fn(),
     toggleSelectedLock: vi.fn(),
@@ -188,6 +190,7 @@ describe("StudioOptionsBars", () => {
     expect(drawProps.color).toBe("#112233");
     expect(drawProps.dockInsets).toEqual({ left: 244, right: 308 });
     expect(drawProps.drawMode).toBe("shape");
+    expect(drawProps.eyedropperActive).toBe(true);
     expect(drawProps.shapeKind).toBe("ellipse");
     expect(drawProps.shapeFill).toBe(true);
     expect(drawProps.pressureCurveId).toBe("firm");
@@ -227,6 +230,7 @@ describe("StudioOptionsBars", () => {
     drawProps.onCycleStabilizer?.();
     drawProps.onToggleSizeLock?.();
     drawProps.onToggleOpacityLock?.();
+    drawProps.onToggleEyedropper?.();
 
     expect(stableHandlers.toggleBrushCatalog).toHaveBeenCalledWith(trigger);
     expect(stableHandlers.selectBrushId).toHaveBeenCalledWith("marker");
@@ -244,6 +248,7 @@ describe("StudioOptionsBars", () => {
     expect(stableHandlers.cycleStabilizer).toHaveBeenCalledOnce();
     expect(stableHandlers.toggleSizeLock).toHaveBeenCalledOnce();
     expect(stableHandlers.toggleOpacityLock).toHaveBeenCalledOnce();
+    expect(stableHandlers.toggleEyedropper).toHaveBeenCalledOnce();
   });
 
   it("passes selection state and delegates selection actions without leaking an element", () => {

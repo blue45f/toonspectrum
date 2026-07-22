@@ -3,14 +3,10 @@ import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
-// 전역 토스 공유 링크 브릿지 타입(__toonspectrumTossShareLink)은 share-button.tsx 의
-// declare global 이 프로젝트 전역에 앰비언트로 제공한다(런타임 import 불필요).
-
 /**
  * 화면(경로) 공유 버튼 — 작품 상세 외 공유 가치가 높은 화면(랭킹·놀이터 등)용 경량 공유.
  *
- * 우선순위: 토스 공식 공유 링크(`getTossShareLink` — 토스 셸이 전역으로 주입, 1200×600 OG 포함)
- * → OS 공유 시트(navigator.share) → 클립보드 복사(✓ 피드백). 웹·토스 공유(NO fork).
+ * 우선순위: OS 공유 시트(navigator.share) → 클립보드 복사(✓ 피드백).
  */
 export function SharePageButton({
   path,
@@ -37,13 +33,8 @@ export function SharePageButton({
   );
 
   async function onShare() {
-    const webUrl =
+    const url =
       typeof window !== "undefined" ? `${globalThis.location.origin}${path}` : path;
-    const tossUrl =
-      typeof globalThis.__toonspectrumTossShareLink === "function"
-        ? await globalThis.__toonspectrumTossShareLink(path)
-        : null;
-    const url = tossUrl || webUrl;
 
     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
       try {

@@ -1,203 +1,517 @@
-// 팔레트 라이브러리 패널 — "스타일" 툴바 그룹 팝오버 안에 서브탭 콘텐츠로 얹히는 컴포넌트.
-// 이름 붙은 색상 팔레트를 저장·이름변경·삭제하고, GIMP .gpl 파일로 가져오기/내보내기 한다.
-// StudioColorPalettePanel(이미지 추출)과 달리 이 패널은 사용자가 직접 만들거나 가져온
-// 팔레트를 "보관"하는 라이브러리 매니저다.
-// 팝오버 위치·z-index·max-height는 호출부(StudioPage.tsx의 스타일 그룹 wrapper)가 담당한다 —
-// 이 컴포넌트는 자체 fixed/absolute wrapper를 갖지 않는다(2026-07-05 툴바 그룹화로 이관).
-import { Download, Pencil, Plus, Upload, X } from "lucide-react";
-import { useState, type ChangeEvent, type KeyboardEvent } from "react";
+// Palette library manager. The compact panel is mounted inside Studio's lazy style popover;
+// binary/text interchange codecs remain in a second intent-loaded chunk.
+import { AlertTriangle, CheckCircle2, Download, Pencil, Plus, Upload, X } from "lucide-react";
+import { useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 
 import { downloadBlob } from "./studio-export";
 import {
   createPalette,
   deletePalette,
-  importPaletteFromGpl,
   listPalettes,
-  MAX_COLORS_PER_PALETTE,
   paletteFileName,
   renamePalette,
   savePalette,
-  writeGplPalette,
   type StudioNamedPalette,
 } from "./studio-palette-library";
 
 import { cx } from "@/lib/cx";
 
-const MAX_IMPORT_FILE_BYTES = 2 * 1024 * 1024; // 2MB — 병적으로 큰 파일의 메인스레드 파싱 지연 방지용 저비용 가드.
+type StudioPaletteInterchangeModule = typeof import("./studio-palette-interchange");
+type StudioPaletteInterchangeFormat = Parameters<
+  StudioPaletteInterchangeModule["exportStudioPalette"]
+>[0];
+
+let paletteInterchangeModulePromise: Promise<StudioPaletteInterchangeModule> | null = null;
+
+function loadStudioPaletteInterchangeModule(): Promise<StudioPaletteInterchangeModule> {
+  paletteInterchangeModulePromise ??= import("./studio-palette-interchange").catch((error: unknown) => {
+    paletteInterchangeModulePromise = null;
+    throw error;
+  });
+  return paletteInterchangeModulePromise;
+}
+
+function preloadStudioPaletteInterchangeModule(): void {
+  void loadStudioPaletteInterchangeModule().catch(() => {
+    // A failed deployment chunk is retried by the real click/change action.
+  });
+}
+
 const SWATCH_PREVIEW_COUNT = 8;
+const PALETTE_IMPORT_ACCEPT =
+  ".gpl,.ase,.aco,.act,.pal,.css,.json,text/plain,text/css,application/json,application/octet-stream";
+const PALETTE_FORMAT_HELP = "GPL, ASE, ACO, ACT, JASC-PAL, CSS 또는 JSON";
+
+const FORMAT_OPTIONS: readonly {
+  id: StudioPaletteInterchangeFormat;
+  label: string;
+  shortLabel: string;
+  extension: string;
+  mimeType: string;
+  description: string;
+}[] = [
+  {
+    id: "gpl",
+    label: "GIMP Palette (.gpl)",
+    shortLabel: "GPL",
+    extension: ".gpl",
+    mimeType: "text/plain;charset=utf-8",
+    description: "GIMP·Krita 계열과 교환하기 좋은 텍스트 팔레트",
+  },
+  {
+    id: "ase",
+    label: "Adobe Swatch Exchange (.ase)",
+    shortLabel: "ASE",
+    extension: ".ase",
+    mimeType: "application/octet-stream",
+    description: "Adobe 앱 간 교환용 RGB 스와치",
+  },
+  {
+    id: "aco",
+    label: "Adobe Color Swatch (.aco)",
+    shortLabel: "ACO",
+    extension: ".aco",
+    mimeType: "application/octet-stream",
+    description: "Photoshop 호환 v1+v2 색상 스와치",
+  },
+  {
+    id: "act",
+    label: "Adobe Color Table (.act)",
+    shortLabel: "ACT",
+    extension: ".act",
+    mimeType: "application/octet-stream",
+    description: "인덱스 이미지용 256색 Adobe RGB 테이블",
+  },
+  {
+    id: "pal",
+    label: "JASC-PAL (.pal)",
+    shortLabel: "PAL",
+    extension: ".pal",
+    mimeType: "text/plain;charset=utf-8",
+    description: "Paint Shop Pro 계열 256색 텍스트 팔레트",
+  },
+  {
+    id: "css",
+    label: "CSS 변수 (.css)",
+    shortLabel: "CSS",
+    extension: ".css",
+    mimeType: "text/css;charset=utf-8",
+    description: "디자인 토큰용 --color-name 변수",
+  },
+  {
+    id: "json",
+    label: "ToonSpectrum JSON (.palette.json)",
+    shortLabel: "JSON",
+    extension: ".palette.json",
+    mimeType: "application/json;charset=utf-8",
+    description: "버전이 명시된 ToonSpectrum 팔레트 교환 형식",
+  },
+] as const;
+
+const GENERIC_IMPORTED_NAMES = new Set([
+  "Adobe ACO 팔레트",
+  "Adobe ACT 팔레트",
+  "Adobe ASE 팔레트",
+  "CSS 변수 팔레트",
+  "GIMP GPL 팔레트",
+  "JSON 팔레트",
+  "JASC-PAL 팔레트",
+  "가져온 팔레트",
+]);
+
+interface OperationMessage {
+  readonly tone: "error" | "success" | "warning";
+  readonly title: string;
+  readonly details: readonly string[];
+}
+
+interface BusyOperation {
+  readonly kind: "export" | "import";
+  readonly paletteId?: string;
+}
 
 export interface StudioPaletteLibraryPanelProps {
-  /** 스와치를 클릭하면 호출 — 전역 브러시/도형 색(StudioPage의 `color`)을 갱신하도록 호출부가 결정한다. */
+  /** Updates Studio's current brush/shape color. */
   onPickColor: (hex: string) => void;
-  /** "최근 사용 색으로 새 팔레트" 시드로 쓸 후보(StudioPage의 recentColors). 비어 있으면 해당 버튼 비활성. */
+  /** Candidate colors used by “최근 색으로 만들기”. */
   seedColors?: string[];
 }
 
+function formatOption(format: StudioPaletteInterchangeFormat) {
+  return FORMAT_OPTIONS.find((option) => option.id === format) ?? FORMAT_OPTIONS[0];
+}
+
+function extensionFormat(fileName: string): StudioPaletteInterchangeFormat | null {
+  const normalized = fileName.trim().toLocaleLowerCase("en-US");
+  if (normalized.endsWith(".gpl")) return "gpl";
+  if (normalized.endsWith(".ase")) return "ase";
+  if (normalized.endsWith(".aco")) return "aco";
+  if (normalized.endsWith(".act")) return "act";
+  if (normalized.endsWith(".pal")) return "pal";
+  if (normalized.endsWith(".css")) return "css";
+  if (normalized.endsWith(".json")) return "json";
+  return null;
+}
+
+function hasAdobeAcoHeader(bytes: Uint8Array): boolean {
+  if (bytes.byteLength < 4 || bytes[0] !== 0 || (bytes[1] !== 1 && bytes[1] !== 2)) return false;
+  const count = (bytes[2]! << 8) | bytes[3]!;
+  // An empty section is not a useful ACO signature and collides with valid 768-byte ACT tables
+  // whose first two RGB components happen to be 0 and 1. Full structural validation remains in
+  // the codec; this sniff only routes a file to that validator.
+  return count >= 1 && count <= 4_096 && bytes.byteLength >= 4 + count * 10;
+}
+
+function hasJascPalHeader(bytes: Uint8Array): boolean {
+  const offset = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? 3 : 0;
+  const magic = [0x4a, 0x41, 0x53, 0x43, 0x2d, 0x50, 0x41, 0x4c];
+  return magic.every((byte, index) => bytes[offset + index] === byte)
+    && (bytes[offset + magic.length] === 0x0a || bytes[offset + magic.length] === 0x0d);
+}
+
+function detectPaletteFormat(fileName: string, bytes: Uint8Array): StudioPaletteInterchangeFormat {
+  if (
+    bytes.byteLength >= 4
+    && bytes[0] === 0x41
+    && bytes[1] === 0x53
+    && bytes[2] === 0x45
+    && bytes[3] === 0x46
+  ) {
+    return "ase";
+  }
+  if (hasJascPalHeader(bytes)) return "pal";
+  const fromExtension = extensionFormat(fileName);
+  // ACT has no magic bytes. Prefer its explicit extension plus exact legal byte length before the
+  // weaker ACO prefix sniff so a legitimate color table cannot be misrouted as an empty ACO file.
+  if (fromExtension === "act" && (bytes.byteLength === 768 || bytes.byteLength === 772)) return "act";
+  if (hasAdobeAcoHeader(bytes)) return "aco";
+  if (fromExtension) return fromExtension;
+  if (bytes.byteLength === 768 || bytes.byteLength === 772) return "act";
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^\uFEFF/u, "").trimStart();
+  } catch {
+    throw new Error(`지원하는 팔레트 형식을 판별하지 못했어요. ${PALETTE_FORMAT_HELP} 파일을 선택해 주세요.`);
+  }
+  if (text.startsWith("GIMP Palette")) return "gpl";
+  if (text.startsWith("{")) return "json";
+  if (/--[\p{L}\p{N}_-]+\s*:/u.test(text)) return "css";
+  throw new Error(`지원하는 팔레트 형식을 판별하지 못했어요. ${PALETTE_FORMAT_HELP} 파일을 선택해 주세요.`);
+}
+
+function safePaletteBaseName(name: string): string {
+  return paletteFileName({ name }).replace(/\.gpl$/iu, "");
+}
+
+function importedPaletteName(sourceName: string, fileName: string): string {
+  if (sourceName.trim() && !GENERIC_IMPORTED_NAMES.has(sourceName.trim())) return sourceName.trim();
+  const withoutKnownExtension = fileName
+    .replace(/\.palette\.json$/iu, "")
+    .replace(/\.(?:aco|act|ase|css|gpl|json|pal)$/iu, "")
+    .trim();
+  return withoutKnownExtension || sourceName || "가져온 팔레트";
+}
+
+function exportFileName(palette: StudioNamedPalette, format: StudioPaletteInterchangeFormat): string {
+  if (format === "gpl") return paletteFileName(palette);
+  return `${safePaletteBaseName(palette.name)}${formatOption(format).extension}`;
+}
+
+function ownedArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+}
+
+function uniqueDetails(details: readonly string[]): string[] {
+  return [...new Set(details.map((detail) => detail.trim()).filter(Boolean))];
+}
+
 export function StudioPaletteLibraryPanel({ onPickColor, seedColors }: StudioPaletteLibraryPanelProps) {
-  // lazy 초기화 — StudioPage가 사용자 의도 시 이 패널 청크를 불러오고, 마운트 시점에는
-  // 별도 네트워크나 effect 없이 브라우저 저장소의 팔레트 목록을 동기 복원한다.
   const [palettes, setPalettes] = useState<StudioNamedPalette[]>(() => listPalettes(globalThis.localStorage));
-  const [error, setError] = useState<string | null>(null);
-  const [doneMsg, setDoneMsg] = useState<string | null>(null); // StudioMotionExportPanel.tsx의 doneMsg 관례
+  const [message, setMessage] = useState<OperationMessage | null>(null);
+  const [busyOperation, setBusyOperation] = useState<BusyOperation | null>(null);
+  const busyRef = useRef(false);
+  const [exportFormat, setExportFormat] = useState<StudioPaletteInterchangeFormat>("gpl");
   const [creatorOpen, setCreatorOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newColorsText, setNewColorsText] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renamingName, setRenamingName] = useState("");
+  const selectedFormat = formatOption(exportFormat);
+  const busy = busyOperation !== null;
 
   function handleDelete(id: string) {
+    if (busyRef.current) return;
     setPalettes(deletePalette(globalThis.localStorage, id));
+    setMessage(null);
   }
 
-  function startRename(p: StudioNamedPalette) {
-    setRenamingId(p.id);
-    setRenamingName(p.name);
+  function startRename(palette: StudioNamedPalette) {
+    if (busyRef.current) return;
+    setRenamingId(palette.id);
+    setRenamingName(palette.name);
   }
 
   function commitRename() {
-    if (!renamingId) return;
+    if (!renamingId || busyRef.current) return;
     setPalettes(renamePalette(globalThis.localStorage, renamingId, renamingName));
     setRenamingId(null);
   }
 
-  function handleRenameKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") commitRename();
-    else if (e.key === "Escape") setRenamingId(null);
+  function handleRenameKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") commitRename();
+    else if (event.key === "Escape") setRenamingId(null);
   }
 
   function handleCreateFromRecent() {
-    if (!seedColors || seedColors.length === 0) return;
+    if (busyRef.current || !seedColors || seedColors.length === 0) return;
     try {
       const palette = createPalette("최근 사용 색", seedColors);
       setPalettes(savePalette(globalThis.localStorage, palette));
-      setError(null);
-      setDoneMsg(`"${palette.name}" 팔레트를 만들었어요 (${palette.colors.length}색).`);
-    } catch (e) {
-      setDoneMsg(null);
-      setError(e instanceof Error ? e.message : "팔레트를 만들지 못했어요.");
+      setMessage({ tone: "success", title: `“${palette.name}” 팔레트를 만들었어요.`, details: [`${palette.colors.length}색`] });
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        title: error instanceof Error ? error.message : "팔레트를 만들지 못했어요.",
+        details: [],
+      });
     }
   }
 
   function handleCreateFromPaste() {
-    const colors = newColorsText
-      .split(/[\s,]+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
+    if (busyRef.current) return;
+    const colors = newColorsText.split(/[\s,]+/u).map((value) => value.trim()).filter(Boolean);
     try {
       const palette = createPalette(newName, colors);
       setPalettes(savePalette(globalThis.localStorage, palette));
-      setError(null);
-      setDoneMsg(`"${palette.name}" 팔레트를 만들었어요 (${palette.colors.length}색).`);
+      setMessage({ tone: "success", title: `“${palette.name}” 팔레트를 만들었어요.`, details: [`${palette.colors.length}색`] });
       setNewName("");
       setNewColorsText("");
       setCreatorOpen(false);
-    } catch (e) {
-      setDoneMsg(null);
-      setError(e instanceof Error ? e.message : "팔레트를 만들지 못했어요.");
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        title: error instanceof Error ? error.message : "팔레트를 만들지 못했어요.",
+        details: [],
+      });
     }
   }
 
-  function handleImportFile(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // 같은 파일 재선택 시에도 onChange가 다시 발생하도록 즉시 리셋(중요: StudioPage.tsx의
-    // handleImportProject와 동일한 관례 — file input의 근본적 함정).
-    if (!file) return;
-    setError(null);
-    setDoneMsg(null);
-    if (file.size > MAX_IMPORT_FILE_BYTES) {
-      setError("파일이 너무 커요. 2MB 이하 .gpl 파일만 가져올 수 있어요.");
-      return;
+  async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || busyRef.current) return;
+    busyRef.current = true;
+    setBusyOperation({ kind: "import" });
+    setMessage(null);
+    try {
+      const interchange = await loadStudioPaletteInterchangeModule();
+      if (file.size > interchange.STUDIO_PALETTE_INTERCHANGE_LIMITS.maxBytes) {
+        throw new Error("팔레트 파일이 4MB 안전 처리 한도를 초과했습니다.");
+      }
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const format = detectPaletteFormat(file.name, bytes);
+      const imported = interchange.importStudioPalette(format, bytes);
+      const now = Date.now();
+      const palette: StudioNamedPalette = {
+        id: crypto.randomUUID(),
+        name: importedPaletteName(imported.palette.name, file.name),
+        createdAt: now,
+        updatedAt: now,
+        colors: imported.palette.colors.map((color) => color.hex),
+      };
+      setPalettes(savePalette(globalThis.localStorage, palette));
+      const namedColorCount = imported.palette.colors.filter((color) => Boolean(color.name)).length;
+      const details = uniqueDetails([
+        ...imported.warnings.map((item) => item.message),
+        ...(imported.skippedColors > 0 ? [`해석하지 못한 색 ${imported.skippedColors}개를 건너뛰었습니다.`] : []),
+        ...(imported.truncated ? [`앞쪽 ${interchange.STUDIO_PALETTE_INTERCHANGE_LIMITS.maxColors}색만 저장했습니다.`] : []),
+        ...(namedColorCount > 0 ? [`색 이름 ${namedColorCount}개는 현재 라이브러리에서 색값만 저장됩니다.`] : []),
+      ]);
+      setMessage({
+        tone: details.length > 0 ? "warning" : "success",
+        title: `${formatOption(format).shortLabel}에서 “${palette.name}” ${palette.colors.length}색을 가져왔어요.`,
+        details,
+      });
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        title: error instanceof Error ? error.message : "팔레트 파일을 가져오지 못했어요.",
+        details: [],
+      });
+    } finally {
+      busyRef.current = false;
+      setBusyOperation(null);
     }
-    const reader = new FileReader(); // StudioPage.tsx의 handleImportProject와 동일한 FileReader 관례(Blob.text() 아님).
-    reader.onload = (event) => {
-      const text = event.target?.result;
-      if (typeof text !== "string") {
-        setError("팔레트 파일을 읽지 못했어요.");
-        return;
-      }
-      try {
-        const fallbackName = file.name.replace(/\.gpl$/i, "");
-        const { palette, skippedLines, truncated } = importPaletteFromGpl(text, fallbackName);
-        setPalettes(savePalette(globalThis.localStorage, palette));
-        const parts = [`"${palette.name}" 팔레트에 ${palette.colors.length}개 색을 가져왔어요.`];
-        if (skippedLines > 0) parts.push(`인식하지 못한 줄 ${skippedLines}개는 건너뛰었어요.`);
-        if (truncated) parts.push(`색이 너무 많아 앞쪽 ${MAX_COLORS_PER_PALETTE}개만 저장했어요.`);
-        setDoneMsg(parts.join(" "));
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "팔레트 파일을 가져오지 못했어요.");
-      }
-    };
-    reader.onerror = () => setError("팔레트 파일을 읽지 못했어요.");
-    reader.readAsText(file);
   }
 
-  function handleExport(p: StudioNamedPalette) {
-    downloadBlob(new Blob([writeGplPalette(p)], { type: "text/plain;charset=utf-8" }), paletteFileName(p));
+  async function handleExport(palette: StudioNamedPalette) {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusyOperation({ kind: "export", paletteId: palette.id });
+    setMessage(null);
+    try {
+      const interchange = await loadStudioPaletteInterchangeModule();
+      const result = interchange.exportStudioPalette(exportFormat, {
+        name: palette.name,
+        colors: palette.colors.map((hex) => ({ hex })),
+      });
+      const option = formatOption(exportFormat);
+      const part = typeof result.data === "string" ? result.data : ownedArrayBuffer(result.data);
+      const fileName = exportFileName(palette, exportFormat);
+      downloadBlob(new Blob([part], { type: option.mimeType }), fileName);
+      const details = uniqueDetails([
+        ...result.warnings.map((item) => item.message),
+        ...(result.skippedColors > 0 ? [`해석하지 못한 색 ${result.skippedColors}개를 제외했습니다.`] : []),
+        ...(result.truncated ? [
+          `앞쪽 ${exportFormat === "act" || exportFormat === "pal"
+            ? interchange.STUDIO_INDEXED_PALETTE_MAX_COLORS
+            : interchange.STUDIO_PALETTE_INTERCHANGE_LIMITS.maxColors}색만 내보냈습니다.`,
+        ] : []),
+      ]);
+      setMessage({
+        tone: details.length > 0 ? "warning" : "success",
+        title: `${option.shortLabel} 파일 “${fileName}” 다운로드를 시작했어요.`,
+        details,
+      });
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        title: error instanceof Error ? error.message : "팔레트를 내보내지 못했어요.",
+        details: [],
+      });
+    } finally {
+      busyRef.current = false;
+      setBusyOperation(null);
+    }
   }
 
   return (
-    <>
-      <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">내 팔레트 — 저장·가져오기(.gpl)·내보내기</p>
+    <section aria-label="내 팔레트 라이브러리" aria-busy={busy}>
+      <div className="mb-2">
+        <p className="text-xs font-semibold text-fg">내 팔레트</p>
+        <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">GPL·Adobe·JASC·CSS·JSON을 한 곳에서 교환합니다.</p>
+      </div>
 
-      {error && (
-        <p className="mb-1.5 text-[0.66rem] text-bad" role="alert">
-          {error}
-        </p>
+      {message && (
+        <div
+          className={cx(
+            "mb-2 rounded-lg border px-2.5 py-2 text-[0.66rem] leading-relaxed",
+            message.tone === "error" && "border-bad/40 bg-bad/10 text-bad",
+            message.tone === "warning" && "border-warn/40 bg-warn/10 text-fg",
+            message.tone === "success" && "border-good/35 bg-good/10 text-fg"
+          )}
+          role={message.tone === "error" ? "alert" : "status"}
+          aria-live={message.tone === "error" ? "assertive" : "polite"}
+        >
+          <div className="flex items-start gap-1.5 font-semibold">
+            {message.tone === "success" ? (
+              <CheckCircle2 className="mt-0.5 shrink-0 text-good" size={13} aria-hidden />
+            ) : message.tone === "warning" ? (
+              <AlertTriangle className="mt-0.5 shrink-0 text-warn" size={13} aria-hidden />
+            ) : null}
+            <span>{message.title}</span>
+          </div>
+          {message.details.length > 0 && (
+            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-fg-2">
+              {message.details.map((detail) => <li key={detail}>{detail}</li>)}
+            </ul>
+          )}
+        </div>
       )}
-      {doneMsg && !error && (
-        <p className="mb-1.5 text-[0.66rem] text-good" role="status">
-          {doneMsg}
+
+      {busy && (
+        <p className="sr-only" role="status" aria-live="polite">
+          {busyOperation.kind === "import" ? "팔레트 파일을 확인하고 있어요." : "팔레트 파일을 만들고 있어요."}
         </p>
       )}
 
       <div className="mb-2 grid grid-cols-2 gap-1.5">
-        <label className="flex cursor-pointer items-center justify-center gap-1 rounded-lg border border-line bg-card py-1.5 text-[0.66rem] font-semibold text-fg-2 transition-colors hover:bg-raised">
-          <Upload size={11} /> 가져오기(.gpl)
-          <input type="file" accept=".gpl,text/plain" className="hidden" onChange={handleImportFile} />
+        <label
+          className={cx(
+            "flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors duration-150 hover:bg-raised focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent",
+            busy && "pointer-events-none cursor-wait opacity-55"
+          )}
+          onPointerEnter={preloadStudioPaletteInterchangeModule}
+        >
+          <Upload size={14} aria-hidden /> {busyOperation?.kind === "import" ? "확인 중…" : "파일 가져오기"}
+          <input
+            type="file"
+            accept={PALETTE_IMPORT_ACCEPT}
+            aria-label="팔레트 파일 가져오기"
+            className="sr-only"
+            disabled={busy}
+            onFocus={preloadStudioPaletteInterchangeModule}
+            onChange={(event) => void handleImportFile(event)}
+          />
         </label>
         <button
           type="button"
           onClick={handleCreateFromRecent}
-          disabled={!seedColors || seedColors.length === 0}
+          disabled={busy || !seedColors || seedColors.length === 0}
           title={seedColors && seedColors.length > 0 ? "최근 사용한 색으로 새 팔레트 만들기" : "최근 사용한 색이 없어요"}
-          className="flex items-center justify-center gap-1 rounded-lg border border-line bg-card py-1.5 text-[0.66rem] font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors duration-150 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Plus size={11} /> 최근 색으로 만들기
+          <Plus size={14} aria-hidden /> 최근 색으로 만들기
         </button>
       </div>
 
+      <label className="mb-2 block" onPointerEnter={preloadStudioPaletteInterchangeModule}>
+        <span className="mb-1 block text-[0.66rem] font-semibold text-fg-2">내보내기 형식</span>
+        <select
+          value={exportFormat}
+          disabled={busy}
+          aria-label="내보내기 형식"
+          aria-describedby="palette-export-format-description"
+          onFocus={preloadStudioPaletteInterchangeModule}
+          onChange={(event) => setExportFormat(event.target.value as StudioPaletteInterchangeFormat)}
+          className="min-h-11 w-full rounded-lg border border-line bg-panel px-2.5 text-xs text-fg outline-none transition-colors duration-150 hover:border-line-strong focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-55"
+        >
+          {FORMAT_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+        </select>
+        <span id="palette-export-format-description" className="mt-1 block text-[0.62rem] leading-relaxed text-fg-3">
+          {selectedFormat.description}
+        </span>
+      </label>
+
       <button
         type="button"
-        onClick={() => setCreatorOpen((v) => !v)}
+        onClick={() => setCreatorOpen((open) => !open)}
         aria-expanded={creatorOpen}
+        disabled={busy}
         className={cx(
-          "mb-2 w-full rounded-lg py-1.5 text-[0.66rem] font-semibold transition-colors hover:bg-raised",
+          "mb-2 min-h-11 w-full rounded-lg px-2 text-[0.68rem] font-semibold transition-colors duration-150 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-55",
           creatorOpen ? "bg-raised text-fg-2" : "text-fg-3 hover:text-fg-2"
         )}
       >
         직접 입력
       </button>
       {creatorOpen && (
-        <div className="mb-2 flex flex-col gap-1.5 rounded-lg border border-line bg-card p-2">
+        <div className="mb-2 flex flex-col gap-1.5 border-y border-line bg-card/50 py-2">
           <input
             type="text"
             value={newName}
-            onChange={(e) => setNewName(e.target.value)}
+            disabled={busy}
+            onChange={(event) => setNewName(event.target.value)}
             placeholder="팔레트 이름"
-            className="h-7 rounded border border-line bg-panel px-2 text-xs text-fg outline-none focus:border-accent"
+            aria-label="새 팔레트 이름"
+            className="min-h-11 rounded-lg border border-line bg-panel px-2.5 text-xs text-fg outline-none placeholder:text-fg-2 focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           />
           <textarea
             value={newColorsText}
-            onChange={(e) => setNewColorsText(e.target.value)}
-            placeholder="#ff0000 #00ff00 #0000ff 처럼 스페이스나 쉼표로 구분해 입력하세요"
-            rows={2}
-            className="resize-none rounded border border-line bg-panel px-2 py-1 text-xs leading-relaxed text-fg outline-none focus:border-accent"
+            disabled={busy}
+            onChange={(event) => setNewColorsText(event.target.value)}
+            placeholder="#ff0000 #00ff00 #0000ff — 공백이나 쉼표로 구분"
+            aria-label="새 팔레트 색상 코드"
+            rows={3}
+            className="min-h-[4.5rem] resize-none rounded-lg border border-line bg-panel px-2.5 py-2 text-xs leading-relaxed text-fg outline-none placeholder:text-fg-2 focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           />
           <button
             type="button"
             onClick={handleCreateFromPaste}
-            disabled={!newColorsText.trim()}
-            className="rounded-lg bg-accent py-1.5 text-[0.66rem] font-semibold text-on-accent transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={busy || !newColorsText.trim()}
+            className="min-h-11 rounded-lg bg-accent px-3 text-[0.68rem] font-semibold text-on-accent transition-colors duration-150 hover:bg-accent-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
           >
             팔레트 만들기
           </button>
@@ -205,80 +519,87 @@ export function StudioPaletteLibraryPanel({ onPickColor, seedColors }: StudioPal
       )}
 
       {palettes.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-line px-2 py-4 text-center text-[0.66rem] leading-relaxed text-fg-3">
-          저장된 팔레트가 없어요. .gpl 파일을 가져오거나 최근 사용 색으로 새로 만들어보세요.
+        <p className="rounded-lg border border-dashed border-line px-3 py-5 text-center text-[0.68rem] leading-relaxed text-fg-3">
+          아직 저장된 팔레트가 없어요.<br />GPL·Adobe·JASC·CSS·JSON 파일을 가져오거나 최근 색으로 시작하세요.
         </p>
       ) : (
-        <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
-          {palettes.map((p) => (
-            <div key={p.id} className="rounded-lg border border-line bg-card px-2 py-1.5">
-              <div className="flex items-center gap-1">
-                {renamingId === p.id ? (
+        <div className="max-h-80 space-y-1.5 overflow-y-auto pr-1" aria-label={`저장된 팔레트 ${palettes.length}개`}>
+          {palettes.map((palette) => (
+            <article key={palette.id} className="rounded-lg border border-line bg-card px-2 py-1.5">
+              <div className="flex items-center gap-0.5">
+                {renamingId === palette.id ? (
                   <input
                     type="text"
                     value={renamingName}
-                    onChange={(e) => setRenamingName(e.target.value)}
+                    disabled={busy}
+                    aria-label={`${palette.name} 새 이름`}
+                    onChange={(event) => setRenamingName(event.target.value)}
                     onBlur={commitRename}
                     onKeyDown={handleRenameKeyDown}
-                    // eslint-disable-next-line jsx-a11y/no-autofocus -- inline rename field opens only on user action; focusing it immediately is correct edit-on-demand UX
+                    // eslint-disable-next-line jsx-a11y/no-autofocus -- edit-on-demand action should focus its field.
                     autoFocus
-                    className="min-w-0 flex-1 rounded border border-accent bg-panel px-1 py-0.5 text-xs text-fg outline-none"
+                    className="min-h-11 min-w-0 flex-1 rounded-lg border border-accent bg-panel px-2 text-xs text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                   />
                 ) : (
-                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-fg" title={p.name}>
-                    {p.name}
-                    <span className="ml-1 text-[0.6rem] text-fg-3">{p.colors.length}색</span>
+                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-fg" title={palette.name}>
+                    {palette.name}
+                    <span className="ml-1 text-[0.62rem] text-fg-3">{palette.colors.length}색</span>
                   </span>
                 )}
                 <button
                   type="button"
-                  onClick={() => startRename(p)}
-                  aria-label={`${p.name} 이름 변경`}
+                  onClick={() => startRename(palette)}
+                  disabled={busy}
+                  aria-label={`${palette.name} 이름 변경`}
                   title="이름 변경"
-                  className="shrink-0 text-fg-3 transition-colors hover:text-accent"
+                  className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45"
                 >
-                  <Pencil size={11} />
+                  <Pencil size={14} aria-hidden />
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleExport(p)}
-                  aria-label={`${p.name} 내보내기`}
-                  title="GIMP 팔레트(.gpl)로 내보내기"
-                  className="shrink-0 text-fg-3 transition-colors hover:text-accent"
+                  onClick={() => void handleExport(palette)}
+                  disabled={busy}
+                  aria-label={`${palette.name} ${selectedFormat.shortLabel}로 내보내기`}
+                  title={`${selectedFormat.label}로 내보내기`}
+                  className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-45"
                 >
-                  <Download size={11} />
+                  <Download size={14} aria-hidden />
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDelete(p.id)}
-                  aria-label={`${p.name} 팔레트 삭제`}
+                  onClick={() => handleDelete(palette.id)}
+                  disabled={busy}
+                  aria-label={`${palette.name} 팔레트 삭제`}
                   title="삭제"
-                  className="shrink-0 text-fg-3 transition-colors hover:text-bad"
+                  className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-bad disabled:cursor-wait disabled:opacity-45"
                 >
-                  <X size={11} />
+                  <X size={14} aria-hidden />
                 </button>
               </div>
-              <div className="mt-1.5 flex flex-wrap gap-1">
-                {p.colors.slice(0, SWATCH_PREVIEW_COUNT).map((hex, idx) => (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {palette.colors.slice(0, SWATCH_PREVIEW_COUNT).map((hex, index) => (
                   <button
-                    key={`${hex}-${idx}`}
+                    key={`${hex}-${index}`}
                     type="button"
                     onClick={() => onPickColor(hex)}
+                    disabled={busy}
+                    aria-label={`${palette.name} 색상 ${hex} 선택`}
                     title={hex}
-                    className="h-5 w-5 rounded border border-line"
+                    className="size-11 rounded-lg border border-line-strong shadow-[0_0_0_1px_oklch(0.15_0.008_70/0.35)_inset] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-55"
                     style={{ background: hex }}
                   />
                 ))}
-                {p.colors.length > SWATCH_PREVIEW_COUNT && (
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded border border-line px-0.5 text-[0.55rem] font-medium text-fg-3">
-                    +{p.colors.length - SWATCH_PREVIEW_COUNT}
+                {palette.colors.length > SWATCH_PREVIEW_COUNT && (
+                  <span className="flex size-11 items-center justify-center rounded-lg border border-line px-1 text-[0.62rem] font-semibold text-fg-3">
+                    +{palette.colors.length - SWATCH_PREVIEW_COUNT}
                   </span>
                 )}
               </div>
-            </div>
+            </article>
           ))}
         </div>
       )}
-    </>
+    </section>
   );
 }

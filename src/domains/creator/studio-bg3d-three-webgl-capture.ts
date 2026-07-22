@@ -6,6 +6,7 @@ import {
   STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
   STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1,
 } from "./studio-bg3d-capture-adapter";
+import { hideStudioBg3dCaptureExcludedObjects } from "./studio-bg3d-capture-exclusion";
 import { captureStudioBg3dThreeDepth } from "./studio-bg3d-lt-three-depth";
 import { normalizeStudioBg3dRgbaReadback } from "./studio-bg3d-readback-normalize";
 import { createStudioBg3dStraightAlphaOutputPass } from "./studio-bg3d-straight-alpha-output-pass";
@@ -16,31 +17,17 @@ import type {
   StudioBg3dCaptureRequest,
 } from "./studio-bg3d-capture-adapter";
 
+export { registerStudioBg3dCaptureExcludedObject } from "./studio-bg3d-capture-exclusion";
+export {
+  acquireStudioBg3dCaptureAdapterAfterViewTransition,
+  captureStudioBg3dRaster,
+  getStudioBg3dCaptureSourceSize,
+} from "./studio-bg3d-capture-adapter";
+
 export interface CreateStudioBg3dThreeWebglCaptureAdapterInput {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene: THREE.Scene;
   readonly camera: THREE.Camera;
-}
-
-// Identity-only registry: GLTF extras are copied into Object3D.userData, so a public string flag
-// would let uploaded assets accidentally or deliberately remove themselves from Studio exports.
-const captureExcludedObjects = new WeakSet<THREE.Object3D>();
-
-/** Registers a renderer-owned viewport helper that never belongs in a color/depth export. */
-export function registerStudioBg3dCaptureExcludedObject(object: THREE.Object3D | null): void {
-  if (object) captureExcludedObjects.add(object);
-}
-
-function hideCaptureExcludedObjects(scene: THREE.Scene): () => void {
-  const previousVisibility: Array<{ object: THREE.Object3D; visible: boolean }> = [];
-  scene.traverse((object) => {
-    if (!captureExcludedObjects.has(object)) return;
-    previousVisibility.push({ object, visible: object.visible });
-    object.visible = false;
-  });
-  return () => {
-    for (const { object, visible } of previousVisibility) object.visible = visible;
-  };
 }
 
 /**
@@ -167,7 +154,7 @@ export function createStudioBg3dThreeWebglCaptureAdapter(
   }
 
   async function capture(request: StudioBg3dCaptureRequest): Promise<StudioBg3dCapturedRaster> {
-    const restoreCaptureExcludedObjects = hideCaptureExcludedObjects(scene);
+    const restoreCaptureExcludedObjects = hideStudioBg3dCaptureExcludedObjects(scene);
     let colorReadback: Promise<Uint8ClampedArray>;
     let depthReadback: Promise<Float32Array> | undefined;
     try {

@@ -70,6 +70,7 @@ describe("studio drawing pointer transport ownership boundary", () => {
       "resolveStudioDrawingPointerCaptureTarget",
       "handledNativeEndEvents",
       'add(windowTarget, "pointermove"',
+      'add(windowTarget, "pointerrawupdate"',
       'add(windowTarget, "pointerup"',
       'add(windowTarget, "pointercancel"',
       'add(captureTarget as StudioDrawingPointerEventTarget, "lostpointercapture"',

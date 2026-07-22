@@ -62,6 +62,14 @@ const NUMERIC_CONTROLS: Partial<Record<StudioAdjustmentEngineId, readonly Numeri
     { key: "strength", label: "세기", min: 0, max: 100, step: 1, fallback: 85, suffix: "%" },
     { key: "angle", label: "각도", min: 0, max: 360, step: 1, fallback: 0, suffix: "°" },
   ],
+  "spin-blur": [
+    { key: "radius", label: "회전 범위", min: 1, max: 40, step: 1, fallback: 18, suffix: "°" },
+    { key: "strength", label: "세기", min: 0, max: 100, step: 1, fallback: 85, suffix: "%" },
+  ],
+  "zoom-blur": [
+    { key: "radius", label: "줌 범위", min: 1, max: 40, step: 1, fallback: 20, suffix: "%" },
+    { key: "strength", label: "세기", min: 0, max: 100, step: 1, fallback: 85, suffix: "%" },
+  ],
   "brightness-contrast": [
     { key: "brightness", label: "밝기", min: -0.8, max: 0.8, step: 0.05, fallback: 0 },
     { key: "contrast", label: "대비", min: -80, max: 80, step: 1, fallback: 0 },
@@ -80,8 +88,49 @@ const NUMERIC_CONTROLS: Partial<Record<StudioAdjustmentEngineId, readonly Numeri
   sharpen: [
     { key: "amount", label: "선명도", min: 0, max: 1, step: 0.05, fallback: 0.3 },
   ],
+  "smart-sharpen": [
+    { key: "amount", label: "세기", min: 0, max: 100, step: 1, fallback: 65, suffix: "%" },
+    { key: "radius", label: "반경", min: 1, max: 10, step: 1, fallback: 2, suffix: "px" },
+  ],
+  "median-despeckle": [
+    { key: "amount", label: "세기", min: 0, max: 100, step: 1, fallback: 100, suffix: "%" },
+    { key: "radius", label: "반경", min: 1, max: 5, step: 1, fallback: 1, suffix: "px" },
+  ],
   noise: [
     { key: "amount", label: "양", min: 0, max: 100, step: 1, fallback: 15, suffix: "%" },
+  ],
+  pixelate: [
+    { key: "size", label: "블록 크기", min: 1, max: 40, step: 1, fallback: 8, suffix: "px" },
+  ],
+  posterize: [
+    { key: "levels", label: "계조 수", min: 2, max: 8, step: 1, fallback: 5 },
+  ],
+  "ink-threshold": [
+    { key: "level", label: "임계값", min: 0.01, max: 1, step: 0.01, fallback: 0.5 },
+  ],
+  "color-halftone": [
+    { key: "dotSize", label: "망점 크기", min: 2, max: 16, step: 1, fallback: 4, suffix: "px" },
+    { key: "angle", label: "기준 각도", min: 0, max: 90, step: 1, fallback: 15, suffix: "°" },
+    { key: "strength", label: "세기", min: 0, max: 100, step: 1, fallback: 100, suffix: "%" },
+  ],
+  "chromatic-aberration": [
+    { key: "offset", label: "채널 간격", min: 1, max: 12, step: 1, fallback: 4, suffix: "px" },
+  ],
+  "edge-detect": [
+    { key: "strength", label: "세기", min: 0, max: 100, step: 1, fallback: 100, suffix: "%" },
+    { key: "detail", label: "선 두께", min: 1, max: 10, step: 1, fallback: 1 },
+  ],
+  emboss: [
+    { key: "strength", label: "세기", min: 0, max: 100, step: 1, fallback: 100, suffix: "%" },
+    { key: "detail", label: "양각 깊이", min: 1, max: 10, step: 1, fallback: 1 },
+  ],
+  solarize: [
+    { key: "strength", label: "세기", min: 0, max: 100, step: 1, fallback: 100, suffix: "%" },
+    { key: "detail", label: "반전 범위", min: 1, max: 10, step: 1, fallback: 3 },
+  ],
+  "oil-paint": [
+    { key: "strength", label: "세기", min: 0, max: 100, step: 1, fallback: 100, suffix: "%" },
+    { key: "detail", label: "붓 반경", min: 1, max: 5, step: 1, fallback: 3, suffix: "px" },
   ],
   exposure: [
     { key: "exposure", label: "노출", min: -5, max: 5, step: 0.1, fallback: 0, suffix: "EV" },
@@ -107,6 +156,60 @@ const NUMERIC_CONTROLS: Partial<Record<StudioAdjustmentEngineId, readonly Numeri
   clouds: [
     { key: "amount", label: "합성량", min: 0, max: 1, step: 0.01, fallback: 0.35 },
     { key: "scale", label: "크기", min: 8, max: 512, step: 1, fallback: 96, suffix: "px" },
+  ],
+  "surface-blur": [
+    { key: "strength", label: "평활 강도", min: 0, max: 100, step: 1, fallback: 78, suffix: "%" },
+    { key: "radius", label: "보존 반경", min: 1, max: 5, step: 1, fallback: 3, suffix: "px" },
+  ],
+  "crystal-mosaic": [
+    { key: "size", label: "결정 크기", min: 1, max: 5, step: 1, fallback: 3, suffix: "px" },
+    { key: "strength", label: "색면 강도", min: 0, max: 100, step: 1, fallback: 72, suffix: "%" },
+  ],
+  "pencil-sketch": [
+    { key: "strength", label: "연필 농도", min: 0, max: 100, step: 1, fallback: 88, suffix: "%" },
+    { key: "detail", label: "선 디테일", min: 1, max: 10, step: 1, fallback: 4 },
+  ],
+  crosshatch: [
+    { key: "strength", label: "잉크 농도", min: 0, max: 100, step: 1, fallback: 82, suffix: "%" },
+    { key: "detail", label: "해칭 간격", min: 1, max: 10, step: 1, fallback: 5 },
+  ],
+  "ordered-dither": [
+    { key: "strength", label: "디더 강도", min: 0, max: 100, step: 1, fallback: 100, suffix: "%" },
+    { key: "detail", label: "패턴 크기", min: 1, max: 10, step: 1, fallback: 4 },
+  ],
+  "glowing-edges": [
+    { key: "strength", label: "경계 강도", min: 0, max: 100, step: 1, fallback: 86, suffix: "%" },
+    { key: "detail", label: "선 굵기", min: 1, max: 10, step: 1, fallback: 2 },
+    { key: "glow", label: "빛 강도", min: 0, max: 100, step: 1, fallback: 72, suffix: "%" },
+    { key: "radius", label: "빛 반경", min: 1, max: 20, step: 1, fallback: 5, suffix: "px" },
+    { key: "threshold", label: "빛 임계", min: 0, max: 100, step: 1, fallback: 18, suffix: "%" },
+  ],
+  cutout: [
+    { key: "strength", label: "효과 강도", min: 0, max: 100, step: 1, fallback: 100, suffix: "%" },
+    { key: "levels", label: "색면 수", min: 2, max: 8, step: 1, fallback: 4 },
+    { key: "smoothing", label: "면 평활", min: 0, max: 100, step: 1, fallback: 82, suffix: "%" },
+    { key: "radius", label: "평활 반경", min: 1, max: 5, step: 1, fallback: 2, suffix: "px" },
+    { key: "contrast", label: "경계 대비", min: -80, max: 80, step: 1, fallback: 18 },
+  ],
+  "retro-film": [
+    { key: "strength", label: "효과 강도", min: 0, max: 100, step: 1, fallback: 100, suffix: "%" },
+    { key: "grain", label: "필름 입자", min: 0, max: 100, step: 1, fallback: 24, suffix: "%" },
+    { key: "grainSize", label: "입자 크기", min: 1, max: 8, step: 1, fallback: 2, suffix: "px" },
+    { key: "fade", label: "페이드", min: -80, max: 80, step: 1, fallback: 14, suffix: "%" },
+    { key: "chromatic", label: "색수차", min: 1, max: 12, step: 1, fallback: 2, suffix: "px" },
+  ],
+  watercolor: [
+    { key: "strength", label: "안료 농도", min: 0, max: 100, step: 1, fallback: 78, suffix: "%" },
+    { key: "spread", label: "확산 반경", min: 1, max: 12, step: 1, fallback: 4, suffix: "px" },
+    { key: "bleed", label: "가장자리 번짐", min: 0, max: 100, step: 1, fallback: 62, suffix: "%" },
+    { key: "granulation", label: "안료 과립", min: 0, max: 100, step: 1, fallback: 52, suffix: "%" },
+    { key: "paper", label: "종이 질감", min: 0, max: 100, step: 1, fallback: 46, suffix: "%" },
+  ],
+  "diffuse-glow": [
+    { key: "strength", label: "빛 강도", min: 0, max: 100, step: 1, fallback: 55, suffix: "%" },
+    { key: "radius", label: "확산 반경", min: 1, max: 40, step: 1, fallback: 10, suffix: "px" },
+    { key: "threshold", label: "밝기 임계", min: 0, max: 100, step: 1, fallback: 58, suffix: "%" },
+    { key: "grain", label: "입자", min: 0, max: 40, step: 1, fallback: 8, suffix: "%" },
   ],
 };
 
@@ -143,10 +246,27 @@ const CONVOLUTION_PRESETS: readonly {
   bias: number;
 }[] = [
   { id: "sharpen", label: "샤픈", kernel: [0, -1, 0, -1, 5, -1, 0, -1, 0], divisor: 1, bias: 0 },
-  { id: "edge", label: "외곽선", kernel: [-1, -1, -1, -1, 8, -1, -1, -1, -1], divisor: 1, bias: 128 },
+  { id: "edge", label: "외곽선", kernel: [0, 1, 0, 1, -4, 1, 0, 1, 0], divisor: 1, bias: 128 },
+  { id: "high-pass", label: "하이패스", kernel: [-1, -1, -1, -1, 8, -1, -1, -1, -1], divisor: 1, bias: 128 },
   { id: "emboss", label: "엠보스", kernel: [-2, -1, 0, -1, 1, 1, 0, 1, 2], divisor: 1, bias: 128 },
   { id: "box-blur", label: "박스 블러", kernel: [1, 1, 1, 1, 1, 1, 1, 1, 1], divisor: 9, bias: 0 },
 ];
+
+const STATIC_EFFECT_DESCRIPTIONS: Partial<Record<StudioAdjustmentEngineId, string>> = {
+  invert: "RGB 채널을 즉시 반전합니다.",
+  grayscale: "휘도 기반 흑백 변환을 적용합니다.",
+  sepia: "고전 사진의 갈색 계열 색감을 적용합니다.",
+  "line-extraction": "Sobel 경계를 순흑·순백 선화로 변환합니다.",
+  screentone: "휘도를 고정 크기의 흑백 망점으로 변환합니다.",
+  "high-pass": "제한된 3 × 3 커널로 고주파 윤곽만 분리합니다.",
+};
+
+const SEEDED_EFFECT_ENGINES = new Set<StudioAdjustmentEngineId>([
+  "noise",
+  "retro-film",
+  "watercolor",
+  "diffuse-glow",
+]);
 
 function numericParam(params: SmartFilterParams, key: string, fallback: number): number {
   const value = params[key];
@@ -325,13 +445,26 @@ function StudioSmartFilterControls({
           onChange={onChange}
         />
       ) : null}
-      {entry.engine === "noise" ? (
+      {entry.engine === "color-halftone" ? (
+        <SelectParameterControl
+          label="색상 모드"
+          paramKey="mode"
+          value={entry.params.mode === "mono" ? "mono" : "cmyk"}
+          options={[
+            { value: "cmyk", label: "CMYK 컬러 망점" },
+            { value: "mono", label: "단색 흑백 망점" },
+          ]}
+          params={entry.params}
+          onChange={onChange}
+        />
+      ) : null}
+      {SEEDED_EFFECT_ENGINES.has(entry.engine) ? (
         <label className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-2 text-[0.62rem] font-semibold text-fg-2">
           <span>시드</span>
           <input
             type="number"
             min={0}
-            max={2_147_483_647}
+            max={entry.engine === "noise" ? 2_147_483_647 : 9_999}
             step={1}
             value={numericParam(entry.params, "seed", 1_337)}
             onChange={(event) => onChange({ ...entry.params, seed: Number(event.target.value) })}
@@ -378,8 +511,10 @@ function StudioSmartFilterControls({
           onChange={onChange}
         />
       ))}
-      {entry.engine === "invert" ? (
-        <p className="text-[0.62rem] leading-relaxed text-fg-3">추가하는 즉시 RGB 색상을 반전합니다.</p>
+      {STATIC_EFFECT_DESCRIPTIONS[entry.engine] ? (
+        <p className="text-[0.62rem] leading-relaxed text-fg-3">
+          {STATIC_EFFECT_DESCRIPTIONS[entry.engine]}
+        </p>
       ) : null}
     </div>
   );

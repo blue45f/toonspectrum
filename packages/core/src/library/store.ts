@@ -1,8 +1,8 @@
-// 내 서재 / 라이브러리 — 웹·토스가 공유하는 UI-비종속 스토어/파생 로직.
+// 내 서재 / 라이브러리 — UI 비종속 스토어와 파생 로직.
 // (A) createBookmarkStore<T>: React 없는 제네릭 즐겨찾기 엔진(useSyncExternalStore용 안정 스냅샷).
-//     토스는 이걸로 찜·구독을 굴리고, 웹은 zustand persist를 유지하되 (B)를 공유한다.
+//     소비 화면은 이 엔진을 직접 쓰거나 기존 zustand persist와 파생 규칙을 공유합니다.
 // (B) deriveSavedTitleIds: '내 찜·서재' 집합(읽음≠하차 + 구독 + 컬렉션 합집합)을 순수 함수로 산출.
-//     웹 useSavedTitleIds·토스 양쪽이 동일 규칙을 쓴다.
+//     useSavedTitleIds와 서버 동기화가 동일 규칙을 사용합니다.
 
 import type { ReadState } from "../types";
 
@@ -35,13 +35,13 @@ export interface RemoteBookmarkAdapter<T> {
 }
 
 /**
- * 즐겨찾기 스토어 제네릭 팩토리 — 웹·토스가 같은 메커니즘을 공유한다(중복 제거).
+ * 즐겨찾기 스토어 제네릭 팩토리 — 여러 화면이 같은 메커니즘을 공유합니다.
  * 의존성 0(React 없음). 각 앱은 자기 Bookmark 타입·storageKey·식별키 함수를 주입하고,
  * 얇은 React 훅(useSyncExternalStore)으로 감싸 쓴다. getSnapshot 은 쓰기 전까지 동일
  * 참조를 돌려줘 useSyncExternalStore 무한 루프를 막는다(쓰기/크로스탭 변경 시에만 무효화).
  *
  * @param storageKey  localStorage 키(앱별 고유)
- * @param getKey      항목 → 식별키(웹은 b.id, 토스는 `${b.type}:${b.id}` 등)
+ * @param getKey      항목 → 식별키
  * @param isValid     로드 시 항목 유효성 가드(손상 데이터 필터)
  * @param remote      선택 — 원격(DB) 어댑터. 주면 로컬 캐시 + 서버 동기화(오프라인-퍼스트).
  */
@@ -143,7 +143,7 @@ export function createBookmarkStore<T>(
 
 /* ── (B) '내 찜·서재' 집합 파생 ─────────────────────────────────────────── */
 
-/** deriveSavedTitleIds 가 읽는 컬렉션의 최소 구조(웹 Collection·토스 모두 할당 가능). */
+/** deriveSavedTitleIds가 읽는 컬렉션의 최소 구조. */
 export interface CollectionLike {
   titleIds: string[];
 }

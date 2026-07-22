@@ -54,6 +54,8 @@ export interface StudioDrawingPointerFinishRequest {
 export interface StudioDrawingPointerTransportPorts {
   readonly getLastAuthoritativePointer: () => PointerEvent | null;
   readonly onAuthoritativeMove: (pointerEvent: PointerEvent) => void;
+  /** Pen-only, preview-only low-latency signal. It must never mutate durable stroke geometry. */
+  readonly onRawPreviewMove: (pointerEvent: PointerEvent) => void;
   readonly onDiscard: () => void;
   readonly onFinish: (
     pointerEvent: PointerEvent,
@@ -80,6 +82,7 @@ export interface StartStudioDrawingPointerTransportResult {
 const EMPTY_PORTS: StudioDrawingPointerTransportPorts = {
   getLastAuthoritativePointer: () => null,
   onAuthoritativeMove: () => undefined,
+  onRawPreviewMove: () => undefined,
   onDiscard: () => undefined,
   onFinish: () => undefined,
 };
@@ -185,7 +188,7 @@ export class StudioDrawingPointerTransportController {
     this.captureTarget = captureTarget;
     const captured = tryCaptureStudioStrokePointer(captureTarget, input.session.pointerId);
     try {
-      this.safetyCleanup = this.installSafetyListeners(input.session.pointerId, captureTarget);
+      this.safetyCleanup = this.installSafetyListeners(input.session, captureTarget);
       return { captured, started: true };
     } catch {
       // No partially armed session may survive an unusual host/WebView listener failure.
@@ -213,9 +216,10 @@ export class StudioDrawingPointerTransportController {
   }
 
   private installSafetyListeners(
-    pointerId: number,
+    startedSession: StudioStrokePointerSession,
     captureTarget: StudioDrawingPointerCaptureTarget | null
   ): () => void {
+    const pointerId = startedSession.pointerId;
     const windowTarget = Object.hasOwn(this.environment, "windowTarget")
       ? this.environment.windowTarget ?? null
       : defaultWindowTarget();
@@ -254,6 +258,18 @@ export class StudioDrawingPointerTransportController {
       const claim = claimStudioStrokeMoveTransport(session, pointerEvent, "pointermove");
       this.session = claim.session;
       if (claim.accepted) this.ports.onAuthoritativeMove(pointerEvent);
+    };
+    const onGlobalRawPreviewMove: EventListener = (event) => {
+      const pointerEvent = event as PointerEvent;
+      const session = this.session;
+      if (!session || session.pointerId !== pointerId) return;
+      const claim = claimStudioStrokeMoveTransport(session, pointerEvent, "pointerrawupdate");
+      this.session = claim.session;
+      // Pointer Events guarantees rawupdate before its corresponding processed move. Keep this
+      // channel visual-only: the later pointermove/coalesced batch remains the sole ink authority.
+      if (isStudioStrokePointerEvent(session, pointerEvent)) {
+        this.ports.onRawPreviewMove(pointerEvent);
+      }
     };
     const onGlobalEnd: EventListener = (event) => {
       const pointerEvent = event as PointerEvent;
@@ -321,6 +337,11 @@ export class StudioDrawingPointerTransportController {
       if (windowTarget) {
         // Capture phase makes processed pointermove/coalesced samples authoritative before Konva.
         add(windowTarget, "pointermove", onGlobalMove, true);
+        // The high-rate listener exists only for an active pen contact and is removed on release.
+        // Mouse/touch keep the ordinary processed path, avoiding unnecessary main-thread traffic.
+        if (startedSession.pointerType === "pen") {
+          add(windowTarget, "pointerrawupdate", onGlobalRawPreviewMove, true);
+        }
         add(windowTarget, "pointerup", onGlobalEnd, true);
         add(windowTarget, "pointercancel", onGlobalEnd, true);
         add(windowTarget, "blur", onGlobalAbort);

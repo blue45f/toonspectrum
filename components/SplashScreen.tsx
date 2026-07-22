@@ -5,27 +5,27 @@ import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 
 /**
- * SplashScreen — 웹(/)·토스(apps/toss) **공유** 동적 인트로/스플래시.
+ * SplashScreen — 웹 앱의 동적 인트로/스플래시.
  *
- * 단일 출처(NO fork): 웹의 IntroSplash 디자인(TOONSPECTRUM 워드마크 + 스펙트럼 링 + 책 로고)을
- * Tailwind + 공유 fx(@toonspectrum/core/fx)로 재구성해 웹과 토스가 같은 컴포넌트를 쓴다.
+ * IntroSplash 디자인(TOONSPECTRUM 워드마크 + 스펙트럼 링 + 책 로고)을
+ * Tailwind + 공유 fx(@toonspectrum/core/fx)로 재구성합니다.
  *
  * 모바일 폭 안전:
  *  - 루트는 `fixed inset-0` + `max-w-full overflow-hidden` 으로 가로 오버플로 0.
- *  - 타이포/간격은 clamp 기반 fluid 사이징 → 좁은 토스 웹뷰에서도 안 잘린다.
+ *  - 타이포/간격은 clamp 기반 fluid 사이징 → 좁은 모바일 화면에서도 잘리지 않는다.
  *  - safe-area(노치/홈 인디케이터) 패딩 반영.
  *
  * 동적 연출(공유 fx 키프레임 재사용 — fx.css 필요):
  *  - `pf-aurora`  : 배경 오로라 그라데이션 흐름.
  *  - `pf-glow`    : 로고 발광 펄스(그림자 호흡).
  *  - `pf-sparkle` : 스펙트럼 도트 반짝임.
- *  - logoFloat    : 로고 떠오름(아래 인라인 keyframes, 토스/웹 공통).
+ *  - logoFloat    : 로고 떠오름(아래 인라인 keyframes).
  *  - 마운트 시 중앙에서 `triggerParticleBurst` 1회 → 반짝임 "팡".
  *  - 부드러운 fade-out(blur 동반).
  *
  * 접근성: 장식 오버레이라 `aria-hidden`. prefers-reduced-motion 은 fx.css/유틸이 자동 정지.
  *
- * @example 웹/토스 App 에서
+ * @example App 에서
  *   import { SplashScreen } from "@/components/SplashScreen";
  *   import "@toonspectrum/core/fx/fx.css"; // (이미 전역 import 되어 있으면 생략)
  *   <SplashScreen />
@@ -187,7 +187,7 @@ export function SplashScreen({
         </span>
       </div>
 
-      {/* 컴포넌트 로컬 keyframes — 토스/웹 공통(별도 CSS import 불필요).
+      {/* 컴포넌트 로컬 keyframes — 별도 CSS import 불필요.
           fx.css 의 공유 키프레임(pf-*)과 충돌하지 않게 ts-splash-* 네임스페이스 사용. */}
       <style>{`
         @keyframes ts-splash-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }

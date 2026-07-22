@@ -9,7 +9,7 @@ import { CommandPaletteHost } from "@/components/command-palette-host";
 import { RandomIntro } from "@/components/RandomIntro";
 import { pingVisit } from "@/lib/visits-api";
 
-// 공유 fx 키프레임/유틸(.pf-* + --ts-fx-* 토큰). 전역 1회 import(웹·토스 공유).
+// 공용 fx 키프레임/유틸(.pf-* + --ts-fx-* 토큰). 전역에서 한 번만 import 합니다.
 import "@toonspectrum/core/fx/fx.css";
 
 const AgeGateHost = lazy(() =>
@@ -27,7 +27,7 @@ const ToastHost = lazy(() =>
 );
 
 // 라우트 전환 시 스크롤을 최상단으로 되돌리고, 본문 랜드마크로 포커스를 옮긴다(a11y).
-// 첫 진입(직접 연 위치)은 포커스를 가로채지 않는다. 웹·토스 공유.
+// 첫 진입(직접 연 위치)은 포커스를 가로채지 않습니다.
 function ScrollToTop() {
   const { pathname } = useLocation();
   const isFirstRender = useRef(true);
@@ -88,37 +88,25 @@ function DeferredGlobalOverlays() {
 }
 
 export interface AppShellProps {
-  /**
-   * 본문 위 상단 크롬(웹=SiteHeader, 토스=null — 토스는 자체 TDS BottomNav/SearchFab 를 chromeOverlay 로 띄운다).
-   */
+  /** 본문 위 상단 크롬. */
   header?: ReactNode;
-  /** 본문 아래 푸터(웹=SiteFooter). 토스는 BottomNav 가 대신하므로 생략한다. */
+  /** 본문 아래 푸터. */
   footer?: ReactNode;
-  /**
-   * 자동 숨김 플로팅 컨트롤 클러스터. 채널마다 노출 컨트롤이 달라(웹=테마·언어,
-   * 토스=사운드 등) 호출부가 구성한 엘리먼트를 그대로 받는다.
-   */
+  /** 자동 숨김 플로팅 컨트롤 클러스터. */
   floatingControls?: ReactNode;
-  /**
-   * 콘텐츠 트리 밖(셸 최상위)에 얹는 채널 전용 오버레이.
-   * 웹=BackToTop·DeskCloud 마운트, 토스=BottomNav·검색 FAB.
-   */
+  /** 콘텐츠 트리 밖(셸 최상위)에 얹는 오버레이. */
   chromeOverlay?: ReactNode;
-  /** 인트로/스플래시 노출. 기본=RandomIntro(구 IntroSplash/현행 SplashScreen 랜덤, 세션 1회). 토스는 once={false} 엘리먼트를 직접 넘긴다. */
+  /** 인트로/스플래시 노출. 기본=RandomIntro(세션 1회). */
   splash?: ReactNode;
-  /** 'sr-only' 스킵 링크 노출(웹 키보드 a11y). 토스 WebView 는 BottomNav 가 본문 포커스를 담당해 생략. */
+  /** `sr-only` 본문 바로가기 링크 노출. */
   showSkipLink?: boolean;
-  /** <main> 에 적용할 클래스(웹=풀 높이·반응형 패딩, 토스=하단 탭 여백 등). */
+  /** `<main>`에 적용할 클래스. */
   mainClassName?: string;
 }
 
 /**
- * AppShell — 웹(/)·토스(apps/toss) **공유** 앱 본문 셸.
- *
- * 라우터 컨텍스트 안쪽(웹=BrowserRouter, 토스=HashRouter)에서 마운트되며, 양 채널이 동일한
- * 콘텐츠 트리(AuthSessionProvider → AppRouter(웹 도메인 페이지 전체) + 커맨드 팔레트 + 전역
- * 오버레이 + 스토어 동기화 + 스크롤/포커스 복원)를 공유한다. 채널 차이(상단/하단 크롬, 플로팅
- * 컨트롤, 스플래시, 스킵 링크)는 prop 으로만 주입한다 — 페이지/데이터 포크 0.
+ * AppShell — 라우터 안에서 인증, 페이지, 커맨드 팔레트, 전역 오버레이,
+ * 스토어 동기화, 스크롤·포커스 복원을 조립하는 웹 앱 본문 셸입니다.
  */
 export function AppShell({
   header,

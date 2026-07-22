@@ -115,6 +115,46 @@ describe("studio work asset wire contract", () => {
     }, { assetId: "asset-1", elementType: "image" })).toThrow();
   });
 
+  it("accepts expanded local filter engines at the immutable asset boundary", () => {
+    const engines = [
+      "spin-blur",
+      "zoom-blur",
+      "pixelate",
+      "posterize",
+      "ink-threshold",
+      "line-extraction",
+      "screentone",
+      "color-halftone",
+      "chromatic-aberration",
+      "grayscale",
+      "sepia",
+      "edge-detect",
+      "emboss",
+      "high-pass",
+      "median-despeckle",
+      "solarize",
+      "oil-paint",
+      "smart-sharpen",
+    ] as const;
+    const parsed = parseStudioWorkAssetDescriptor({
+      ...descriptor(),
+      element: {
+        ...descriptor().element,
+        smartFilters: {
+          version: 1,
+          entries: engines.map((engine) => ({
+            id: `filter-${engine}`,
+            engine,
+            enabled: true,
+            params: {},
+          })),
+        },
+      },
+    }, { assetId: "asset-1", elementType: "image" });
+
+    expect(parsed.element.smartFilters?.entries.map((entry) => entry.engine)).toEqual(engines);
+  });
+
   it("rejects MIME/type mismatches and over-limit manifests", () => {
     const common = {
       version: 1,

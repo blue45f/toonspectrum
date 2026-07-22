@@ -1090,7 +1090,7 @@ export function useIsBookmarked(titleId: string): boolean {
 
 // '내 찜·서재' = 사용자가 저장/구독/컬렉션에 담은 모든 작품 id 집합(하차 제외).
 // 페이지 필터의 "내 찜만 보기"에 사용. 합집합 규칙은 @toonspectrum/core 의 순수
-// deriveSavedTitleIds 로 추출돼 웹·토스가 공유한다(세 레코드 참조는 안정적이라 React Compiler가 메모이즈).
+// deriveSavedTitleIds 로 추출돼 여러 웹 화면이 공유한다(세 레코드 참조는 안정적이라 React Compiler가 메모이즈).
 export function useSavedTitleIds(): Set<string> {
   const reads = useApp((s) => s.reads);
   const subscriptions = useApp((s) => s.subscriptions);

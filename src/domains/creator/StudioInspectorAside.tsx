@@ -355,6 +355,7 @@ interface StudioInspectorAsideProps {
   marqueeIds: string[];
   masterEditMode: boolean;
   mobileKeyboardInset: number;
+  mobileInspectorSnap: StudioMobileSheetSnap;
   mobileSheet: StudioMobileSheet;
   nodeEditHandles: NodeEditHandle[];
   nodeEditTool: NodeEditTool | null;
@@ -434,6 +435,7 @@ interface StudioInspectorAsideProps {
   setLiquifyStrength: import("react").Dispatch<import("react").SetStateAction<number>>;
   setMagicResizeStrategy: import("react").Dispatch<import("react").SetStateAction<MagicResizeStrategy>>;
   setMenu: import("react").Dispatch<import("react").SetStateAction<StudioMenu | null>>;
+  setMobileInspectorSnap: import("react").Dispatch<import("react").SetStateAction<StudioMobileSheetSnap>>;
   setMobileSheet: import("react").Dispatch<import("react").SetStateAction<StudioMobileSheet>>;
   setNodeEditTool: import("react").Dispatch<import("react").SetStateAction<NodeEditTool | null>>;
   setNodeSmoothStrength: import("react").Dispatch<import("react").SetStateAction<number>>;
@@ -605,6 +607,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   marqueeIds,
   masterEditMode,
   mobileKeyboardInset,
+  mobileInspectorSnap,
   mobileSheet,
   nodeEditHandles,
   nodeEditTool,
@@ -685,6 +688,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   setLiquifyStrength,
   setMagicResizeStrategy,
   setMenu,
+  setMobileInspectorSnap,
   setMobileSheet,
   setNodeEditTool,
   setNodeSmoothStrength,
@@ -852,8 +856,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   const [activatedImageInspectorTabs, setActivatedImageInspectorTabs] = useState<
     ReadonlySet<StudioImageInspectorSection>
   >(() => new Set());
-  const [mobileInspectorSnap, setMobileInspectorSnap] =
-    useState<StudioMobileSheetSnap>("medium");
   const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
     ? Math.max(0, Math.round(mobileKeyboardInset))
     : 0;

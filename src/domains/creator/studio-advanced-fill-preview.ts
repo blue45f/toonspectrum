@@ -1,4 +1,5 @@
 import type { AdvancedFillDiagnostics } from "./studio-advanced-fill";
+import type { StudioAdvancedFillVirtualTarget } from "./studio-vector-fill-reference";
 
 export type StudioAdvancedFillPreview = {
   targetId: string;
@@ -9,4 +10,6 @@ export type StudioAdvancedFillPreview = {
   message: string;
   paintedPixelCount: number;
   regionCount: number;
+  /** Preview-only full-page raster synthesized from visible DrawEl line art. */
+  virtualTarget?: StudioAdvancedFillVirtualTarget;
 };

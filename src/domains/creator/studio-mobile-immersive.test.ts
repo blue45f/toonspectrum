@@ -77,10 +77,42 @@ describe("Studio mobile immersive preference", () => {
     );
     expect(studioMobileEditingDockSource).toContain('data-studio-mobile-dock-scroll="primary"');
     expect(studioMobileEditingDockSource).toContain('data-studio-mobile-dock-scroll="secondary"');
+    expect(studioMobileEditingDockSource).toContain(
+      'data-studio-mobile-dock-expanded={workspaceDockExpanded ? "true" : "false"}',
+    );
+    expect(studioMobileEditingDockSource).toContain("hidden={!workspaceDockExpanded}");
+    expect(studioMobileEditingDockSource).toContain('data-studio-mobile-workspace-toggle="true"');
+    expect(studioMobileEditingDockSource).toContain(
+      'data-studio-mobile-control-side={mobileControlSide}',
+    );
+    expect(studioMobileEditingDockSource).toContain(
+      'data-studio-mobile-quick-actions-slot="left"',
+    );
+    expect(studioMobileEditingDockSource).toContain(
+      'data-studio-mobile-quick-actions-slot="right"',
+    );
+    expect(studioMobileEditingDockSource).toContain(
+      'workspaceState.mobileControlSide === "left" ? "left" : "right"',
+    );
+    expect(studioMobileEditingDockSource).toContain("min-h-11 min-w-11");
     expect(studioMobileEditingDockSource.match(/touch-pan-x/g)).toHaveLength(2);
     expect(studioMobileEditingDockSource).toContain("gap-0.5 overflow-x-auto");
     expect(studioMobileEditingDockSource).toContain("gap-0 overflow-x-auto");
     expect(studioGlobalsSource).toContain("[data-studio-mobile-dock-scroll] :focus-visible");
     expect(studioGlobalsSource).toContain("outline-offset: -2px");
+  });
+
+  it("reserves one dock row by default and floats the 44px immersive header over the canvas", () => {
+    expect(studioGlobalsSource).toContain("--studio-mobile-dock-compact-height: calc(3.5rem");
+    expect(studioGlobalsSource).toContain("--studio-mobile-dock-expanded-height: calc(7rem");
+    expect(studioGlobalsSource).toContain('data-studio-mobile-dock-expanded="false"');
+    expect(studioGlobalsSource).toContain("padding-bottom: var(--studio-mobile-dock-compact-height) !important");
+    expect(studioGlobalsSource).toContain(
+      '[data-studio-editor="true"][data-studio-mobile-immersive="true"]',
+    );
+    expect(studioGlobalsSource).toContain('[data-studio-app-menubar="true"]');
+    expect(studioGlobalsSource).toContain("position: absolute");
+    expect(studioGlobalsSource).toContain("width: min(14rem");
+    expect(studioGlobalsSource).toContain("padding-top: 2.75rem");
   });
 });

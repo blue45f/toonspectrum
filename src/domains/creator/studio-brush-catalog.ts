@@ -1,7 +1,7 @@
 /**
  * Lightweight built-in brush catalogue metadata.
  *
- * The 67-brush physics table remains behind StudioBrushLibrarySheet's dynamic import. This module
+ * The 87-brush physics table remains behind StudioBrushLibrarySheet's dynamic import. This module
  * only carries labels and preview hints, so opening Studio does not eagerly parse custom alpha tips.
  */
 import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";

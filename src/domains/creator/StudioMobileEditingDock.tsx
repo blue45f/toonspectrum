@@ -1,6 +1,8 @@
 import {
   ArrowDownToLine,
   ArrowUpToLine,
+  ChevronDown,
+  ChevronUp,
   Copy,
   Eraser,
   Files,
@@ -87,6 +89,7 @@ import { cn } from "@/lib/utils";
 const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 5;
 const MOBILE_DRAW_SETTINGS_ID = "studio-mobile-draw-settings";
+const MOBILE_WORKSPACE_TOOLS_ID = "studio-mobile-workspace-tools";
 
 type StudioDrawSheetStyle = CSSProperties & {
   "--studio-draw-sheet-height": string;
@@ -359,6 +362,8 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   const [drawSheetSnap, setDrawSheetSnap] = useState<StudioMobileSheetSnap>("medium");
   const [brushManagerSheetSnap, setBrushManagerSheetSnap] =
     useState<StudioMobileSheetSnap>("medium");
+  const [workspaceDockExpanded, setWorkspaceDockExpanded] = useState<boolean>(false);
+  const mobileControlSide = workspaceState.mobileControlSide === "left" ? "left" : "right";
   const colorVisionOpen = mobileSheet === "color-vision";
   const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
     ? Math.max(0, Math.round(mobileKeyboardInset))
@@ -367,6 +372,20 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   const penModeActive = tool === "draw" && drawMode === "pen";
   const pixelModeActive = tool === "draw" && drawMode === "pixel";
   const shapeModeActive = tool === "draw" && drawMode === "shape";
+  const undoDisabled = hi === 0 || collaborationDocumentLocked;
+  const redoDisabled = hi >= history.length - 1 || collaborationDocumentLocked;
+  const undoUnavailableTitle = collaborationDocumentLocked
+    ? "공동 작업 문서 잠금을 해제한 뒤 편집 기록을 이동할 수 있어요."
+    : "아직 되돌릴 편집 기록이 없어요.";
+  const redoUnavailableTitle = collaborationDocumentLocked
+    ? "공동 작업 문서 잠금을 해제한 뒤 편집 기록을 이동할 수 있어요."
+    : "다시 적용할 편집 기록이 없어요.";
+  const workspaceDockHasActiveTool =
+    commentPinArmed ||
+    quickActionsOpen ||
+    mobileSheet === "pages" ||
+    mobileSheet === "props" ||
+    mobileSheet === "color-vision";
   const penHintPreviewProps = penModeActive
     ? {
         hintPreview: "draw-settings" as const,
@@ -392,7 +411,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             aria-label="선택 항목 빠른 작업"
             className="fixed inset-x-2 z-[53] mx-auto flex max-w-[34rem] items-center gap-1 overflow-x-auto rounded-2xl border border-line bg-panel/95 p-1.5 shadow-2xl backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden"
             style={{
-              bottom: `calc(var(--studio-canvas-bottom-inset, 7rem) + 0.35rem + ${mobileKeyboardInset}px)`,
+              bottom: `calc(var(--studio-canvas-bottom-inset, 7rem) + 0.35rem + ${safeMobileKeyboardInset}px)`,
             }}
           >
             <div className="w-[4.75rem] shrink-0 px-2">
@@ -451,7 +470,9 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   icon={PaintBucket}
                   label="채우기"
                   active={advancedFillActive}
-                  disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
+                  title={advancedFillUnsupportedReason
+                    ? `${advancedFillUnsupportedReason} 눌러서 사용할 수 있는 래스터를 찾거나 조건을 확인하세요.`
+                    : "고급 채우기"}
                   onClick={toggleAdvancedFill}
                 />
               </>
@@ -482,7 +503,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             data-studio-canvas-transient="coach"
             className="fixed inset-x-3 z-[53] mx-auto flex max-w-[32rem] items-start gap-2.5 rounded-2xl border border-accent/30 bg-panel/95 p-3 shadow-2xl backdrop-blur motion-safe:animate-hud-in lg:hidden"
             style={{
-              bottom: `calc(var(--studio-canvas-bottom-inset, 7rem) + 0.5rem + ${mobileKeyboardInset}px)`,
+              bottom: `calc(var(--studio-canvas-bottom-inset, 7rem) + 0.5rem + ${safeMobileKeyboardInset}px)`,
             }}
           >
             <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
@@ -499,7 +520,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             <button
               type="button"
               onClick={dismissMobileHint}
-              className="grid size-7 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised"
+              className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised"
               aria-label="안내 닫기"
             >
               <X size={15} aria-hidden />
@@ -941,7 +962,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             data-studio-shortcut-boundary="true"
             className="fixed inset-x-2 z-[60] mx-auto max-w-[32rem] rounded-2xl border border-line bg-panel/98 p-3 shadow-2xl backdrop-blur lg:hidden"
             style={{
-              bottom: `calc(var(--studio-canvas-bottom-inset, 7rem) + 0.5rem + ${mobileKeyboardInset}px)`,
+              bottom: `calc(var(--studio-canvas-bottom-inset, 7rem) + 0.5rem + ${safeMobileKeyboardInset}px)`,
             }}
           >
             <div className="mb-2 flex items-center justify-between gap-3">
@@ -968,21 +989,23 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
         ) : null}
 
         {/* 모바일 하단 드로잉 도크 — 한 손으로 그리기 위한 핵심 도구를 thumb 사정권에.
-            1행: 그리기 도구(선택·펜·지우개·도형·실행취소·다시·브러시). 2행: 보조 내비(페이지·추가·속성·줌). */}
+            1행: 그리기 도구(선택·펜·지우개·채우기·도형·실행취소·다시·브러시). 2행: 보조 내비(페이지·추가·속성·줌). */}
         {isMobile && (
           <nav
             aria-label="스튜디오 모바일 도구막대"
             data-studio-mobile-editing-dock="true"
+            data-studio-mobile-dock-expanded={workspaceDockExpanded ? "true" : "false"}
             className="fixed inset-x-0 bottom-0 z-[55] flex flex-col gap-1 border-t border-line bg-panel/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pl-[max(0.375rem,env(safe-area-inset-left))] pr-[max(0.375rem,env(safe-area-inset-right))] pt-1.5 backdrop-blur lg:hidden"
-            style={{ bottom: mobileKeyboardInset }}
+            style={{ bottom: safeMobileKeyboardInset }}
           >
-            {/* 1행: 핵심 드로잉 도구 — 선택 | 펜/지우개/도형 | 히스토리 | 브러시 (CSP/Procreate 도크 IA) */}
-            <div
-              className="flex min-w-0 touch-pan-x items-stretch gap-0.5 overflow-x-auto overscroll-x-contain [scrollbar-width:none] min-[360px]:gap-1 [&::-webkit-scrollbar]:hidden"
-              role="toolbar"
-              aria-label="드로잉 도구"
-              data-studio-mobile-dock-scroll="primary"
-            >
+            {/* 1행: 핵심 드로잉 도구 — 선택 | 펜/지우개/채우기/도형 | 히스토리 | 브러시 (CSP/Procreate 도크 IA) */}
+            <div className="relative min-w-0">
+              <div
+                className="mr-12 flex min-w-0 touch-pan-x items-stretch gap-0.5 overflow-x-auto overscroll-x-contain pr-1 [scrollbar-width:none] min-[360px]:gap-1 [&::-webkit-scrollbar]:hidden"
+                role="toolbar"
+                aria-label="드로잉 도구"
+                data-studio-mobile-dock-scroll="primary"
+              >
               <StudioDockButton
                 icon={MousePointer2}
                 label="선택"
@@ -990,6 +1013,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 hintShortcut="V"
                 active={tool === "select"}
                 onClick={() => {
+                  setWorkspaceDockExpanded(false);
                   setTool("select");
                   setMenu(null);
                   setMobileSheet(null);
@@ -1011,6 +1035,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 disabled={activeSurfaceReviewLocked}
                 title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요" : "펜 (B)"}
                 onClick={() => {
+                  setWorkspaceDockExpanded(false);
                   if (penModeActive) {
                     setMobileSheet((s) => (s === "draw" ? null : "draw"));
                     return;
@@ -1038,6 +1063,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 disabled={activeSurfaceReviewLocked}
                 title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 픽셀 펜을 사용할 수 있어요" : "픽셀 펜 (P)"}
                 onClick={() => {
+                  setWorkspaceDockExpanded(false);
                   if (pixelModeActive) {
                     setMobileSheet((sheet) => (sheet === "draw" ? null : "draw"));
                     return;
@@ -1061,12 +1087,32 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 disabled={activeSurfaceReviewLocked}
                 title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요" : "지우개 (E)"}
                 onClick={() => {
+                  setWorkspaceDockExpanded(false);
                   setTool("draw");
                   setDrawMode("eraser");
                   setMenu(null);
                   setMobileSheet(null);
                 }}
                 aria-pressed={tool === "draw" && drawMode === "eraser"}
+              />
+              <StudioDockButton
+                icon={PaintBucket}
+                label="채우기"
+                hintDescription={advancedFillUnsupportedReason
+                  ? `${advancedFillUnsupportedReason} 눌러서 안전한 단일 래스터 후보를 찾거나 필요한 조건을 확인하세요.`
+                  : "래스터의 닫힌 영역을 탭해 색을 채웁니다. 경계와 참조 범위는 채우기 속성에서 조절합니다."}
+                hintShortcut="G"
+                active={advancedFillActive}
+                title={advancedFillUnsupportedReason
+                  ? `${advancedFillUnsupportedReason} 눌러서 사용할 수 있는 래스터를 찾거나 조건을 확인하세요.`
+                  : "채우기 (G)"}
+                onClick={() => {
+                  setWorkspaceDockExpanded(false);
+                  setMenu(null);
+                  setMobileSheet(null);
+                  toggleAdvancedFill();
+                }}
+                aria-pressed={advancedFillActive}
               />
               <StudioDockButton
                 icon={Square}
@@ -1081,6 +1127,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 disabled={activeSurfaceReviewLocked}
                 title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 도형을 사용할 수 있어요" : "도형"}
                 onClick={() => {
+                  setWorkspaceDockExpanded(false);
                   if (shapeModeActive) {
                     setMobileSheet((s) => (s === "draw" ? null : "draw"));
                     return;
@@ -1099,30 +1146,26 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 icon={Undo2}
                 label="되돌리기"
                 hintDescription="마지막 편집을 한 단계 되돌립니다. 공동 작업 변경 이력과 함께 안전하게 이동합니다."
-                disabled={hi === 0 || collaborationDocumentLocked}
-                hintUnavailableReason={
-                  collaborationDocumentLocked
-                    ? "공동 작업 문서 잠금을 해제한 뒤 편집 기록을 이동할 수 있어요."
-                    : hi === 0
-                      ? "아직 되돌릴 편집 기록이 없어요."
-                      : undefined
-                }
-                onClick={undo}
+                hintUnavailableReason={undoDisabled ? undoUnavailableTitle : undefined}
+                disabled={undoDisabled}
+                title={undoDisabled ? undoUnavailableTitle : "실행취소"}
+                onClick={() => {
+                  setWorkspaceDockExpanded(false);
+                  undo();
+                }}
                 aria-label="실행취소"
               />
               <StudioDockButton
                 icon={Redo2}
                 label="다시"
                 hintDescription="되돌린 편집을 한 단계 다시 적용합니다."
-                disabled={hi >= history.length - 1 || collaborationDocumentLocked}
-                hintUnavailableReason={
-                  collaborationDocumentLocked
-                    ? "공동 작업 문서 잠금을 해제한 뒤 편집 기록을 이동할 수 있어요."
-                    : hi >= history.length - 1
-                      ? "다시 적용할 편집 기록이 없어요."
-                      : undefined
-                }
-                onClick={redo}
+                hintUnavailableReason={redoDisabled ? redoUnavailableTitle : undefined}
+                disabled={redoDisabled}
+                title={redoDisabled ? redoUnavailableTitle : "다시실행"}
+                onClick={() => {
+                  setWorkspaceDockExpanded(false);
+                  redo();
+                }}
                 aria-label="다시실행"
               />
               <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
@@ -1142,6 +1185,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 onPointerEnter={() => void loadStudioBrushStudio()}
                 onFocus={() => void loadStudioBrushStudio()}
                 onClick={() => {
+                  setWorkspaceDockExpanded(false);
                   void loadStudioBrushStudio();
                   if (tool !== "draw") {
                     setTool("draw");
@@ -1158,14 +1202,45 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   />
                 )}
               />
+              </div>
+              <button
+                type="button"
+                aria-controls={MOBILE_WORKSPACE_TOOLS_ID}
+                aria-expanded={workspaceDockExpanded}
+                aria-label={workspaceDockExpanded ? "작업 공간 도구 접기" : "작업 공간 도구 펼치기"}
+                title={workspaceDockExpanded ? "작업 공간 도구 접기" : "댓글·페이지·레이어·줌 도구 펼치기"}
+                data-studio-mobile-workspace-toggle="true"
+                onClick={() => setWorkspaceDockExpanded((expanded) => !expanded)}
+                className={cn(
+                  "absolute inset-y-0 right-0 z-10 flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-xl border-l border-line/70 bg-panel/98 px-1 text-[0.6rem] font-bold leading-none text-fg-2 shadow-[-10px_0_16px_-10px_oklch(0.06_0.01_70/0.85)]",
+                  STUDIO_EASE,
+                  "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
+                  (workspaceDockExpanded || workspaceDockHasActiveTool) && "text-accent",
+                )}
+              >
+                {workspaceDockExpanded ? (
+                  <ChevronDown size={17} strokeWidth={2} aria-hidden />
+                ) : (
+                  <ChevronUp size={17} strokeWidth={2} aria-hidden />
+                )}
+                <span>{workspaceDockExpanded ? "접기" : "작업"}</span>
+                {!workspaceDockExpanded && workspaceDockHasActiveTool ? (
+                  <span
+                    aria-hidden
+                    className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-accent"
+                  />
+                ) : null}
+              </button>
             </div>
 
             {/* 2행: 보조 내비 — 페이지·추가·6방향 퀵 메뉴·속성(레이어)·줌 */}
             <div
-              className="flex min-w-0 touch-pan-x items-stretch gap-0 overflow-x-auto overscroll-x-contain border-t border-line/60 pt-1 [scrollbar-width:none] min-[360px]:gap-0.5 [&::-webkit-scrollbar]:hidden"
+              id={MOBILE_WORKSPACE_TOOLS_ID}
+              hidden={!workspaceDockExpanded}
+              className="flex min-w-0 items-stretch overflow-hidden border-t border-line/60 pt-1"
               role="toolbar"
               aria-label="작업 공간"
-              data-studio-mobile-dock-scroll="secondary"
+              data-studio-mobile-control-side={mobileControlSide}
             >
               <StudioDockNavButton
                 icon={commentPinArmed ? X : MessageCircle}
@@ -1181,82 +1256,97 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   toggleStudioCommentPinPlacement();
                 }}
               />
-              {workspaceState.mobileControlSide === "left"
-                ? mobileQuickActionsButton
-                : null}
-              <StudioDockNavButton
-                icon={Files}
-                label="페이지"
-                aria-label="페이지"
-                active={mobileSheet === "pages"}
-                aria-pressed={mobileSheet === "pages"}
-                onClick={() => setMobileSheet((s) => (s === "pages" ? null : "pages"))}
-              />
-              <StudioDockNavButton
-                icon={Plus}
-                label="추가"
-                onClick={() => {
-                  setMobileSheet(null);
-                  setQuickStartOpen(true);
-                }}
-              />
-              <StudioDockNavButton
-                icon={Layers}
-                label="작업"
-                aria-label="작업"
-                active={mobileSheet === "props"}
-                aria-pressed={mobileSheet === "props"}
-                onClick={() => {
-                  if (mobileSheet === "props") {
+              {mobileControlSide === "left" ? (
+                <div
+                  className="flex size-11 min-h-11 min-w-11 shrink-0 [&>button]:min-h-11 [&>button]:min-w-11"
+                  data-studio-mobile-quick-actions-slot="left"
+                >
+                  {mobileQuickActionsButton}
+                </div>
+              ) : null}
+              <div
+                className="flex min-w-0 flex-1 touch-pan-x items-stretch gap-0 overflow-x-auto overscroll-x-contain [scrollbar-width:none] min-[360px]:gap-0.5 [&::-webkit-scrollbar]:hidden"
+                data-studio-mobile-dock-scroll="secondary"
+              >
+                <StudioDockNavButton
+                  icon={Files}
+                  label="페이지"
+                  aria-label="페이지"
+                  active={mobileSheet === "pages"}
+                  aria-pressed={mobileSheet === "pages"}
+                  onClick={() => setMobileSheet((s) => (s === "pages" ? null : "pages"))}
+                />
+                <StudioDockNavButton
+                  icon={Plus}
+                  label="추가"
+                  onClick={() => {
                     setMobileSheet(null);
-                    return;
-                  }
-                  openInspectorRoute({ primary: selected ? "properties" : "layers" });
-                  setMobileSheet("props");
-                }}
-              />
-              <StudioDockNavButton
-                icon={Palette}
-                label="색각"
-                aria-label="색각·명암 검수"
-                active={colorVisionOpen || colorBlindPreview !== "none"}
-                aria-pressed={colorVisionOpen}
-                data-studio-color-vision-trigger="true"
-                onClick={() => setMobileSheet((sheet) =>
-                  sheet === "color-vision" ? null : "color-vision"
-                )}
-              />
-              <div className="flex w-[8.25rem] flex-none items-center justify-center">
-                <button
-                  type="button"
-                  onClick={() => setZoom((z) => clampZoom(z - 0.25))}
-                  disabled={zoom <= ZOOM_MIN}
-                  className="grid size-11 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
-                  aria-label="축소"
-                >
-                  <Minus size={16} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  onClick={fitCanvasToWidth}
-                  className="min-h-11 min-w-11 flex-1 rounded-lg px-1 py-2 text-center text-[0.7rem] font-semibold tabular-nums text-fg transition-colors hover:bg-raised"
-                  aria-label="화면 폭에 맞춤"
-                >
-                  {Math.round(zoom * 100)}%
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setZoom((z) => clampZoom(z + 0.25))}
-                  disabled={zoom >= ZOOM_MAX}
-                  className="grid size-11 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
-                  aria-label="확대"
-                >
-                  <Plus size={16} aria-hidden />
-                </button>
+                    setQuickStartOpen(true);
+                  }}
+                />
+                <StudioDockNavButton
+                  icon={Layers}
+                  label="작업"
+                  aria-label="작업"
+                  active={mobileSheet === "props"}
+                  aria-pressed={mobileSheet === "props"}
+                  onClick={() => {
+                    if (mobileSheet === "props") {
+                      setMobileSheet(null);
+                      return;
+                    }
+                    openInspectorRoute({ primary: selected ? "properties" : "layers" });
+                    setMobileSheet("props");
+                  }}
+                />
+                <StudioDockNavButton
+                  icon={Palette}
+                  label="색각"
+                  aria-label="색각·명암 검수"
+                  active={colorVisionOpen || colorBlindPreview !== "none"}
+                  aria-pressed={colorVisionOpen}
+                  data-studio-color-vision-trigger="true"
+                  onClick={() => setMobileSheet((sheet) =>
+                    sheet === "color-vision" ? null : "color-vision"
+                  )}
+                />
+                <div className="flex w-[8.25rem] flex-none items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setZoom((z) => clampZoom(z - 0.25))}
+                    disabled={zoom <= ZOOM_MIN}
+                    className="grid size-11 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
+                    aria-label="축소"
+                  >
+                    <Minus size={16} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={fitCanvasToWidth}
+                    className="min-h-11 min-w-11 flex-1 rounded-lg px-1 py-2 text-center text-[0.7rem] font-semibold tabular-nums text-fg transition-colors hover:bg-raised"
+                    aria-label="화면 폭에 맞춤"
+                  >
+                    {Math.round(zoom * 100)}%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setZoom((z) => clampZoom(z + 0.25))}
+                    disabled={zoom >= ZOOM_MAX}
+                    className="grid size-11 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
+                    aria-label="확대"
+                  >
+                    <Plus size={16} aria-hidden />
+                  </button>
+                </div>
               </div>
-              {workspaceState.mobileControlSide === "right"
-                ? mobileQuickActionsButton
-                : null}
+              {mobileControlSide === "right" ? (
+                <div
+                  className="flex size-11 min-h-11 min-w-11 shrink-0 [&>button]:min-h-11 [&>button]:min-w-11"
+                  data-studio-mobile-quick-actions-slot="right"
+                >
+                  {mobileQuickActionsButton}
+                </div>
+              ) : null}
             </div>
           </nav>
         )}

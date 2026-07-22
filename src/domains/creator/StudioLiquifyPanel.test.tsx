@@ -52,4 +52,39 @@ describe("StudioLiquifyPanel", () => {
     render(<StudioLiquifyPanel {...props({ mode: "corrupt" as StudioLiquifyPanelProps["mode"] })} />);
     expect(screen.getByRole("heading", { name: "리퀴파이 · 밀기" })).toBeTruthy();
   });
+
+  it("연결된 고급 설정만 점진적으로 노출하고 필압 최소 크기의 의존 상태를 설명한다", () => {
+    const onHardnessChange = vi.fn();
+    const onMinimumRadiusChange = vi.fn();
+    const onTogglePressureRadius = vi.fn();
+    render(<StudioLiquifyPanel {...props({
+      hardness: 65,
+      minimumRadius: 25,
+      pressureAffectsRadius: false,
+      onHardnessChange,
+      onMinimumRadiusChange,
+      onTogglePressureRadius,
+    })} />);
+
+    expect(screen.getByText("세부 조절")).toBeTruthy();
+    fireEvent.click(screen.getByText("세부 조절"));
+    const hardness = screen.getByRole("slider", { name: /경도/ });
+    const minimumRadius = screen.getByRole("slider", { name: /최소 크기/ }) as HTMLInputElement;
+    expect((hardness as HTMLInputElement).value).toBe("65");
+    expect(minimumRadius.disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "필압으로 크기 조절 켜기" }));
+    expect(onTogglePressureRadius).toHaveBeenCalledOnce();
+  });
+
+  it("누적 변위 세션이 연결된 경우에만 복원과 스무딩 작업을 제공한다", () => {
+    const onReconstruct = vi.fn();
+    const onSmooth = vi.fn();
+    render(<StudioLiquifyPanel {...props({ onReconstruct, onSmooth })} />);
+    fireEvent.click(screen.getByText("세부 조절"));
+
+    fireEvent.click(screen.getByRole("button", { name: /원형 복원/ }));
+    fireEvent.click(screen.getByRole("button", { name: /변위 매끄럽게/ }));
+    expect(onReconstruct).toHaveBeenCalledOnce();
+    expect(onSmooth).toHaveBeenCalledOnce();
+  });
 });

@@ -37,6 +37,17 @@ function isExpectedStaticPreviewApiError(message: string): boolean {
   return OPTIONAL_STATIC_PREVIEW_API_PATHS.some((path) => message.includes(path));
 }
 
+async function revealOverflowTarget(target: Locator): Promise<void> {
+  // Playwright's actionability gate can classify a focusable wrapper that starts partially
+  // clipped by a horizontal overflow row as invisible before it gets a chance to scroll. Native
+  // nearest-edge scrolling matches the actual touch/keyboard reveal path and lets the following
+  // hit-test assertions decide whether the control became genuinely usable.
+  await target.evaluate((element) => element.scrollIntoView({
+    block: "nearest",
+    inline: "nearest",
+  }));
+}
+
 interface RunResult {
   ok: boolean;
   stageInfo: {
@@ -540,7 +551,7 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
   // The unified picker intentionally keeps only starter/favorite/recent presets in the quick row.
   // Exercise the shipped catalog path for an expressive brush instead of depending on tray order.
   await sheet.getByRole("button", { name: "기본 프리셋 전체 보기", exact: true }).click();
-  const builtInBrushCatalog = page.getByRole("dialog", { name: "기본 프리셋" });
+  const builtInBrushCatalog = page.getByRole("dialog", { name: "앱 브러시", exact: true });
   await builtInBrushCatalog.waitFor({ state: "visible", timeout: 3000 });
   await builtInBrushCatalog.getByRole("tab", { name: "페인트", exact: true }).click();
   await builtInBrushCatalog.getByRole("button", { name: "소프트 에어브러시 선택", exact: true }).click();
@@ -1049,10 +1060,17 @@ async function runMobileDockLayout(
   );
   const primary = dock.locator('[data-studio-mobile-dock-scroll="primary"]');
   const secondary = dock.locator('[data-studio-mobile-dock-scroll="secondary"]');
+  const secondaryToolbar = dock.getByRole("toolbar", { name: "작업 공간", exact: true });
+  const workspaceToolsToggle = dock.getByRole("button", {
+    name: "작업 공간 도구 펼치기",
+    exact: true,
+  });
+  await workspaceToolsToggle.click();
+  await secondary.waitFor({ state: "visible", timeout: 3000 });
   const primaryTargets = primary.locator(
     ':scope > button, :scope > [data-studio-tool-hint-target="true"]',
   );
-  const secondaryTargets = secondary.locator(":scope > button, :scope > div > button");
+  const secondaryTargets = secondaryToolbar.locator("button");
   const primaryWidths = await primaryTargets.evaluateAll((targets) =>
     targets.map((target) => target.getBoundingClientRect().width)
   );
@@ -1061,9 +1079,30 @@ async function runMobileDockLayout(
   );
   const primaryTargetCount = primaryWidths.length;
   const secondaryTargetCount = secondaryWidths.length;
+  const pinnedPlacementReady = await secondaryToolbar.evaluate((toolbar) => {
+    const comment = toolbar.querySelector<HTMLElement>('[data-studio-mobile-comment-trigger="true"]');
+    const quickSlot = toolbar.querySelector<HTMLElement>('[data-studio-mobile-quick-actions-slot]');
+    const side = toolbar.getAttribute("data-studio-mobile-control-side");
+    if (!comment || !quickSlot || (side !== "left" && side !== "right")) return false;
+
+    const toolbarRect = toolbar.getBoundingClientRect();
+    const commentRect = comment.getBoundingClientRect();
+    const quickRect = quickSlot.getBoundingClientRect();
+    const bothInside = [commentRect, quickRect].every((rect) =>
+      rect.width >= 44 &&
+      rect.height >= 44 &&
+      rect.left >= toolbarRect.left - 0.5 &&
+      rect.right <= toolbarRect.right + 0.5
+    );
+    if (!bothInside || comment !== toolbar.firstElementChild) return false;
+    return side === "left"
+      ? quickRect.left >= commentRect.right - 0.5
+      : Math.abs(quickRect.right - toolbarRect.right) <= 1;
+  });
   const targetsReady =
-    primaryTargetCount === 7 &&
-    secondaryTargetCount === 7 &&
+    primaryTargetCount >= 9 &&
+    secondaryTargetCount >= 9 &&
+    pinnedPlacementReady &&
     [...primaryWidths, ...secondaryWidths].every((targetWidth) => targetWidth >= 44);
   const scrollGeometry = await primary.evaluate((toolbar) => ({
     clientWidth: toolbar.clientWidth,
@@ -1082,7 +1121,7 @@ async function runMobileDockLayout(
     const target = primary.locator(
       `[data-studio-tool-hint-target="true"]:has(> button[aria-label="${label}"])`,
     );
-    await target.scrollIntoViewIfNeeded();
+    await revealOverflowTarget(target);
     await target.focus();
     const visible = await target.evaluate((element) => {
       const targetRect = element.getBoundingClientRect();
@@ -1117,7 +1156,7 @@ async function runMobileDockLayout(
     initialFocus: pagesDialog.getByRole("button", { name: "페이지 시트 닫기", exact: true }),
     launcher: pagesLauncher,
     open: async () => {
-      await pagesLauncher.scrollIntoViewIfNeeded();
+      await revealOverflowTarget(pagesLauncher);
       await pagesLauncher.click();
     },
     page,
@@ -1130,14 +1169,14 @@ async function runMobileDockLayout(
     initialFocus: propsDialog.getByRole("button", { name: "속성 시트 닫기", exact: true }),
     launcher: propsLauncher,
     open: async () => {
-      await propsLauncher.scrollIntoViewIfNeeded();
+      await revealOverflowTarget(propsLauncher);
       await propsLauncher.click();
     },
     page,
     shot: join(SCRATCH, `studio-launch-mobile-sheet-props-${width}.png`),
   }));
 
-  await brushDockLauncher.scrollIntoViewIfNeeded();
+  await revealOverflowTarget(brushDockLauncher);
   await brushDockLauncher.click();
   const drawDialog = page.locator('[data-studio-sheet-id="draw"]');
   await page.waitForFunction(() =>
@@ -1166,7 +1205,7 @@ async function runMobileDockLayout(
     initialFocus: brushesDialog.getByRole("button", { name: "브러시 관리 닫기", exact: true }),
     launcher: managerLauncher,
     open: async () => {
-      await managerLauncher.scrollIntoViewIfNeeded();
+      await revealOverflowTarget(managerLauncher);
       const managerHandle = await managerLauncher.elementHandle();
       if (!managerHandle) throw new Error("brush manager launcher did not mount");
       // `visible` alone includes opacity-only and clipped states. Require the shipped control to
@@ -1203,7 +1242,7 @@ async function runMobileDockLayout(
     sheets.every((sheet) => sheet.ok) &&
     consoleErrors.length === 0;
   log(
-    `mobile-dock-${width}: targets=${primaryTargetCount}+${secondaryTargetCount} ` +
+    `mobile-dock-${width}: targets=${primaryTargetCount}+${secondaryTargetCount} pinned=${pinnedPlacementReady} ` +
     `widths=${[...primaryWidths, ...secondaryWidths].join(",")} ` +
     `primaryScrollable=${primaryScrollable} documentOverflow=${!noDocumentOverflow} ` +
     `historyFocusReady=${historyFocusReady} drawInteractive=${drawSheetCanvasInteractive} ` +
