@@ -73,7 +73,10 @@ function baseProps(overrides: Partial<ControlledPopoverProps> = {}): ControlledP
   };
 }
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe("StudioCommentThreadPopover", () => {
   it("presents author, time, unread and resolution state beside the selected canvas pin", () => {
@@ -216,7 +219,7 @@ describe("StudioCommentThreadPopover", () => {
     const onCanvasPointerDown = vi.fn();
     canvasControl.addEventListener("pointerdown", onCanvasPointerDown);
     document.body.append(canvasControl);
-    render(
+    const view = render(
       <ControlledPopover
         {...baseProps({ onClose, onOpenReview })}
       />
@@ -236,10 +239,64 @@ describe("StudioCommentThreadPopover", () => {
     })).toBeTruthy();
     expect(document.activeElement).toBe(canvasControl);
 
+    view.rerender(
+      <ControlledPopover
+        {...baseProps({ onClose, onOpenReview, syncing: true })}
+      />
+    );
+    view.rerender(
+      <ControlledPopover
+        {...baseProps({ onClose, onOpenReview, syncing: false })}
+      />
+    );
+    await act(async () => {
+      await new Promise<void>((resolve) => globalThis.requestAnimationFrame(() => resolve()));
+    });
+    expect(document.activeElement).toBe(canvasControl);
+
+    textarea.focus();
+    view.rerender(
+      <ControlledPopover
+        {...baseProps({ onClose, onOpenReview, syncing: true })}
+      />
+    );
+    view.rerender(
+      <ControlledPopover
+        {...baseProps({ onClose, onOpenReview, syncing: false })}
+      />
+    );
+    await act(async () => {
+      await new Promise<void>((resolve) => globalThis.requestAnimationFrame(() => resolve()));
+    });
+    expect(document.activeElement).toBe(textarea);
+
     fireEvent.click(screen.getByRole("button", { name: "전체 댓글 검토함에서 열기" }));
     expect(onOpenReview).toHaveBeenCalledWith("thread-1");
     expect(textarea.value).toBe("사라지면 안 되는 초안");
     canvasControl.remove();
+  });
+
+  it("uses the opening control only for the first autofocus handoff", async () => {
+    const openingControl = document.createElement("button");
+    document.body.append(openingControl);
+    openingControl.focus();
+
+    try {
+      const view = render(<ControlledPopover {...baseProps()} />);
+      const textarea = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "빠른 답글" });
+      await waitFor(() => expect(document.activeElement).toBe(textarea));
+
+      openingControl.focus();
+      view.rerender(<ControlledPopover {...baseProps({ syncing: true })} />);
+      view.rerender(<ControlledPopover {...baseProps({ syncing: false })} />);
+      await act(async () => {
+        await new Promise<void>((resolve) => globalThis.requestAnimationFrame(() => resolve()));
+      });
+
+      expect(document.activeElement).toBe(openingControl);
+    } finally {
+      openingControl.remove();
+    }
   });
 
   it("closes on an empty outside click or Escape, ignores secondary pointers, and opens review by id", () => {

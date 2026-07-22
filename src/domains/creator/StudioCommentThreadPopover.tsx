@@ -308,6 +308,8 @@ export function StudioCommentThreadPopover({
   const fallbackScreenPointRef = useRef(screenPoint);
   fallbackScreenPointRef.current = screenPoint;
   const shouldRestoreFocusRef = useRef(true);
+  const suppressDeferredFocusRef = useRef(false);
+  const deferredFocusAttemptedRef = useRef(false);
   const pendingMutationRef = useRef<PopoverMutation>(null);
   const mutationRevisionRef = useRef(0);
   const [pendingMutation, setPendingMutation] = useState<PopoverMutation>(null);
@@ -454,6 +456,16 @@ export function StudioCommentThreadPopover({
 
   useEffect(() => {
     const frame = globalThis.requestAnimationFrame(() => {
+      const activeElement = globalThis.document?.activeElement;
+      const dialog = dialogRef.current;
+      const openingTargetStillFocused = !deferredFocusAttemptedRef.current
+        && activeElement === returnFocusRef.current;
+      const focusMovedOutside = activeElement instanceof HTMLElement
+        && activeElement !== globalThis.document?.body
+        && !openingTargetStillFocused
+        && !dialog?.contains(activeElement);
+      deferredFocusAttemptedRef.current = true;
+      if (suppressDeferredFocusRef.current || focusMovedOutside) return;
       if (replyAllowed && !syncing) textareaRef.current?.focus();
       else if (!syncing && !submitting) closeButtonRef.current?.focus();
       else dialogRef.current?.focus();
@@ -476,6 +488,8 @@ export function StudioCommentThreadPopover({
   }, []);
 
   useEffect(() => {
+    suppressDeferredFocusRef.current = false;
+    deferredFocusAttemptedRef.current = false;
     setError(null);
     setNotice(null);
     mutationRevisionRef.current += 1;
@@ -501,12 +515,14 @@ export function StudioCommentThreadPopover({
         !dialog
         || !(target instanceof Node)
         || dialog.contains(target)
-        || pendingMutationRef.current
-        || syncing
-        || submitting
         || event.button !== 0
         || event.isPrimary === false
       ) return;
+      // The popover is intentionally non-modal. Once the user returns to the
+      // canvas, a deferred autofocus or a later syncing transition must not
+      // reclaim keyboard focus from that newer interaction.
+      suppressDeferredFocusRef.current = true;
+      if (pendingMutationRef.current || syncing || submitting) return;
       if (replyBody.trim()) {
         setNotice("작성 중인 답글은 유지했어요. 캔버스 작업을 계속하거나 답글을 등록할 수 있어요.");
         return;
@@ -631,6 +647,9 @@ export function StudioCommentThreadPopover({
         data-studio-shortcut-boundary="true"
         data-placement={position.placement}
         data-presentation={bottomSheet ? "bottom-sheet" : "anchored-popover"}
+        onFocusCapture={() => {
+          suppressDeferredFocusRef.current = false;
+        }}
         className={`fixed z-[94] flex overflow-hidden border border-line-strong bg-panel/98 text-fg backdrop-blur-xl motion-safe:animate-in motion-safe:fade-in motion-reduce:transition-none ${
           bottomSheet
             ? "rounded-t-2xl border-b-0 shadow-[0_-18px_58px_oklch(0.06_0.02_70/0.5)] motion-safe:slide-in-from-bottom-3"
