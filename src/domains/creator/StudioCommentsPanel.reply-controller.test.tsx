@@ -20,6 +20,12 @@ const DOCUMENT = addStudioCommentThread(createEmptyStudioCommentsDocument(), {
   author: { id: "user-2", displayName: "민호" },
   body: "말풍선 위치를 확인해 주세요.",
 }, new Date("2025-01-01T01:00:00.000Z"));
+const TWO_THREAD_DOCUMENT = addStudioCommentThread(DOCUMENT, {
+  id: "thread-2",
+  anchor: { type: "page", pageId: "page-2" },
+  author: { id: "user-3", displayName: "서윤" },
+  body: "두 번째 컷의 배경 톤도 확인해 주세요.",
+}, new Date("2025-01-01T02:00:00.000Z"));
 
 function panelProps(
   overrides: Partial<StudioCommentsPanelProps> = {}
@@ -38,6 +44,179 @@ function panelProps(
 afterEach(() => cleanup());
 
 describe("StudioCommentsPanel shared reply controller", () => {
+  it("opens a compact reply editor from the comment body and cancels it with Escape", async () => {
+    const onChange = vi.fn(async () => true);
+    render(<StudioCommentsPanel {...panelProps({ onChange })} />);
+
+    const quickReply = await screen.findByRole("button", {
+      name: "민호의 댓글에 빠르게 답글",
+    });
+    expect(quickReply.className).toContain("min-h-11");
+    expect(quickReply.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(quickReply);
+    const textarea = await screen.findByRole<HTMLTextAreaElement>("textbox", {
+      name: "민호에게 답글",
+    });
+    expect(quickReply.getAttribute("aria-expanded")).toBe("true");
+    expect(quickReply.getAttribute("aria-controls")).toBe(textarea.closest("form")?.id);
+    expect(textarea.getAttribute("aria-keyshortcuts")).toBe(
+      "Meta+Enter Control+Enter Escape"
+    );
+    const touchHint = screen.getByText("클릭해 답글 쓰기");
+    expect(touchHint.className).toContain("sm:opacity-0");
+    expect(touchHint.className).not.toContain(" opacity-0");
+
+    fireEvent.change(textarea, { target: { value: "취소할 답글" } });
+    fireEvent.keyDown(textarea, { key: "Escape" });
+    expect(screen.queryByRole("textbox", { name: "민호에게 답글" })).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("submits a quick reply with Cmd/Ctrl+Enter without opening another modal", async () => {
+    const submittedDocuments: StudioCommentsPanelProps["document"][] = [];
+    const onChange = vi.fn(async (nextDocument: StudioCommentsPanelProps["document"]) => {
+      submittedDocuments.push(nextDocument);
+      return true;
+    });
+    render(<StudioCommentsPanel {...panelProps({ onChange })} />);
+
+    fireEvent.click(await screen.findByRole("button", {
+      name: "민호의 댓글에 빠르게 답글",
+    }));
+    const textarea = screen.getByRole<HTMLTextAreaElement>("textbox", {
+      name: "민호에게 답글",
+    });
+    fireEvent.change(textarea, { target: { value: "바로 등록할 답글" } });
+    fireEvent.keyDown(textarea, { key: "Enter", metaKey: true });
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
+    expect(
+      screen.queryByRole("dialog", { name: /답글/u })
+    ).toBeNull();
+    expect(submittedDocuments[0]?.threads[0]?.replies[0]?.body).toBe(
+      "바로 등록할 답글"
+    );
+  });
+
+  it("protects an existing shared draft when another thread is clicked", async () => {
+    const sharedReply = {
+      threadId: "thread-1",
+      body: "보존해야 하는 답글",
+      mutationId: "reply-protected-switch",
+      submitting: false,
+      onThreadChange: vi.fn(),
+      onBodyChange: vi.fn(),
+      onDiscard: vi.fn(),
+      onSubmit: vi.fn(async () => true),
+    };
+    render(
+      <StudioCommentsPanel
+        {...panelProps({
+          activeAnchor: null,
+          document: TWO_THREAD_DOCUMENT,
+          sharedReply,
+        })}
+      />
+    );
+
+    fireEvent.click(await screen.findByRole("button", {
+      name: "서윤의 댓글에 빠르게 답글",
+    }));
+
+    expect(sharedReply.onThreadChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toContain("작성 중인 답글");
+    expect(screen.getByRole<HTMLTextAreaElement>("textbox", {
+      name: "민호에게 답글",
+    }).value).toBe("보존해야 하는 답글");
+  });
+
+  it("keeps resolved and read-only comment bodies non-interactive", async () => {
+    const resolvedDocument = resolveStudioCommentThread(DOCUMENT, "thread-1", ACTOR);
+    const view = render(
+      <StudioCommentsPanel {...panelProps({ document: resolvedDocument })} />
+    );
+
+    expect(screen.queryByRole("button", {
+      name: "민호의 댓글에 빠르게 답글",
+    })).toBeNull();
+    expect(screen.getByText("말풍선 위치를 확인해 주세요.").tagName).toBe("P");
+
+    view.rerender(
+      <StudioCommentsPanel
+        {...panelProps({ readOnlyThreadIds: new Set(["thread-1"]) })}
+      />
+    );
+    expect(screen.queryByRole("button", {
+      name: "민호의 댓글에 빠르게 답글",
+    })).toBeNull();
+    expect(await screen.findByText("로컬 보관본 · 읽기 전용")).toBeTruthy();
+  });
+
+  it("labels the current-selection composer body and explains a disabled action", async () => {
+    const view = render(<StudioCommentsPanel {...panelProps()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "현재 선택에 댓글" }));
+    const body = await screen.findByRole<HTMLTextAreaElement>("textbox", {
+      name: "댓글 내용",
+    });
+    await waitFor(() => expect(document.activeElement).toBe(body));
+    expect(screen.getByText("댓글 위치").tagName).toBe("SPAN");
+
+    view.rerender(
+      <StudioCommentsPanel
+        {...panelProps({
+          capabilities: { create: false },
+          mutationDisabledReason: "열람자는 댓글을 작성할 수 없어요.",
+        })}
+      />
+    );
+    fireEvent.keyDown(body, { key: "Escape" });
+    const disabledAction = await screen.findByRole("button", { name: "현재 선택에 댓글" });
+    expect((disabledAction as HTMLButtonElement).disabled).toBe(true);
+    const reasonId = disabledAction.getAttribute("aria-describedby");
+    expect(reasonId).toBeTruthy();
+    expect(reasonId ? document.getElementById(reasonId)?.textContent : null).toBe(
+      "열람자는 댓글을 작성할 수 없어요."
+    );
+
+    view.rerender(
+      <StudioCommentsPanel {...panelProps({ activeAnchor: null })} />
+    );
+    const selectionRequiredAction = await screen.findByRole("button", {
+      name: "현재 선택에 댓글",
+    });
+    expect((selectionRequiredAction as HTMLButtonElement).disabled).toBe(true);
+    const selectionReasonId = selectionRequiredAction.getAttribute("aria-describedby");
+    expect(selectionReasonId ? document.getElementById(selectionReasonId)?.textContent : null).toBe(
+      "먼저 캔버스에서 페이지, 컷 또는 요소를 선택하세요."
+    );
+  });
+
+  it("deduplicates identical anchor choices while keeping the first label", async () => {
+    render(
+      <StudioCommentsPanel
+        {...panelProps({
+          anchorOptions: [
+            { anchor: ANCHOR, label: "첫 번째 페이지" },
+            { anchor: ANCHOR, label: "중복 페이지" },
+          ],
+          onSelectAnchor: vi.fn(),
+        })}
+      />
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "현재 선택에 댓글" }));
+    fireEvent.click(screen.getByRole("button", { name: "위치 변경" }));
+    const picker = screen.getByRole<HTMLSelectElement>("combobox", {
+      name: "댓글 연결 위치",
+    });
+    expect(Array.from(picker.options).map((option) => option.textContent)).toEqual([
+      "위치를 선택하세요",
+      "첫 번째 페이지",
+    ]);
+  });
+
   it("renders a parent-owned draft, delegates changes with its stable ID, and fences same-tick submit", async () => {
     let settle!: (accepted: boolean) => void;
     const onSubmit = vi.fn(() => new Promise<boolean>((resolve) => {
@@ -106,7 +285,9 @@ describe("StudioCommentsPanel shared reply controller", () => {
     const props = panelProps();
     const view = render(<StudioCommentsPanel {...props} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "답글" }));
+    fireEvent.click(await screen.findByRole("button", {
+      name: "민호의 댓글에 빠르게 답글",
+    }));
     const textarea = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "민호에게 답글" });
     fireEvent.change(textarea, { target: { value: "레일 내부 초안" } });
     view.rerender(<StudioCommentsPanel {...props} open={false} />);
@@ -141,7 +322,9 @@ describe("StudioCommentsPanel shared reply controller", () => {
     const replyEditor = await screen.findByRole<HTMLTextAreaElement>("textbox", {
       name: "민호에게 답글",
     });
-    fireEvent.click(screen.getByRole("button", { name: "답글" }));
+    fireEvent.click(screen.getByRole("button", {
+      name: "민호의 댓글에 빠르게 답글",
+    }));
     expect(replyEditor.isConnected).toBe(true);
     expect(onDiscard).not.toHaveBeenCalled();
 
@@ -166,7 +349,7 @@ describe("StudioCommentsPanel shared reply controller", () => {
     expect((await screen.findByRole<HTMLTextAreaElement>("textbox", {
       name: "민호에게 답글",
     })).value).toBe("사라지면 안 되는 공유 초안");
-    expect(screen.queryByRole("textbox", { name: "댓글 위치" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "댓글 내용" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
     expect(onDiscard).toHaveBeenCalledWith("thread-1");
@@ -179,7 +362,9 @@ describe("StudioCommentsPanel shared reply controller", () => {
     }));
     render(<StudioCommentsPanel {...panelProps({ onChange })} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "답글" }));
+    fireEvent.click(await screen.findByRole("button", {
+      name: "민호의 댓글에 빠르게 답글",
+    }));
     const textarea = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "민호에게 답글" });
     fireEvent.change(textarea, { target: { value: "한 번만 제출할 초안" } });
     const form = textarea.closest("form");

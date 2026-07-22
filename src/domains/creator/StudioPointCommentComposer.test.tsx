@@ -150,12 +150,35 @@ describe("StudioPointCommentComposer", () => {
 
     const textarea = screen.getByRole("textbox", { name: "위치 댓글 내용" });
     await waitFor(() => expect(globalThis.document.activeElement).toBe(textarea));
+    expect(textarea.getAttribute("aria-keyshortcuts")).toBe(
+      "Meta+Enter Control+Enter Escape"
+    );
     fireEvent.change(textarea, { target: { value: "  말풍선을 조금 위로 옮겨 주세요.  " } });
     fireEvent.keyDown(textarea, { key: "Enter", ctrlKey: true });
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith("말풍선을 조금 위로 옮겨 주세요.");
     });
+  });
+
+  it("supports Command+Enter and ignores submit or cancel shortcuts during IME composition", async () => {
+    const onSubmit = vi.fn(async () => true);
+    const onCancel = vi.fn();
+    renderComposer({ onCancel, onSubmit });
+
+    const textarea = screen.getByRole("textbox", { name: "위치 댓글 내용" });
+    fireEvent.change(textarea, { target: { value: "한글 조합 뒤 등록" } });
+    fireEvent.keyDown(textarea, {
+      isComposing: true,
+      key: "Enter",
+      metaKey: true,
+    });
+    fireEvent.keyDown(textarea, { isComposing: true, key: "Escape" });
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(onCancel).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(textarea, { key: "Enter", metaKey: true });
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith("한글 조합 뒤 등록"));
   });
 
   it("cancels with Escape but does not trap ordinary Tab navigation", () => {

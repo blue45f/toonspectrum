@@ -142,6 +142,7 @@ const SORTS: readonly { value: CommentSort; label: string }[] = [
 ];
 
 const EMPTY_THREAD_IDS: ReadonlySet<string> = new Set<string>();
+const EMPTY_ANCHOR_OPTIONS: readonly StudioCommentAnchorOption[] = [];
 
 const DEFAULT_CAPABILITIES: StudioCommentsPanelCapabilities = Object.freeze({
   create: true,
@@ -210,6 +211,20 @@ function getAnchorLabel(
     ?? fallbackAnchorLabel(anchor);
 }
 
+function uniqueStudioCommentAnchorOptions(
+  options: readonly StudioCommentAnchorOption[]
+): StudioCommentAnchorOption[] {
+  const seenAnchorKeys = new Set<string>();
+  const uniqueOptions: StudioCommentAnchorOption[] = [];
+  for (const option of options) {
+    const anchorKey = canonicalStudioCommentAnchorKey(option.anchor);
+    if (seenAnchorKeys.has(anchorKey)) continue;
+    seenAnchorKeys.add(anchorKey);
+    uniqueOptions.push(option);
+  }
+  return uniqueOptions;
+}
+
 export function StudioCommentsPanel({
   open,
   onClose,
@@ -217,7 +232,7 @@ export function StudioCommentsPanel({
   onChange,
   activeAnchor,
   currentActor,
-  anchorOptions = [],
+  anchorOptions = EMPTY_ANCHOR_OPTIONS,
   isAnchorValid = () => true,
   onSelectAnchor,
   onArmPinPlacement,
@@ -239,6 +254,7 @@ export function StudioCommentsPanel({
 }: StudioCommentsPanelProps) {
   const titleId = useId();
   const descriptionId = useId();
+  const newThreadDisabledReasonId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const replyEditorRef = useRef<HTMLTextAreaElement>(null);
@@ -320,12 +336,7 @@ export function StudioCommentsPanel({
   const focusReviewRail = () => {
     dialogRef.current?.focus({ preventScroll: true });
   };
-  const currentAnchorOptions = anchorOptions.filter((option, index) =>
-    anchorOptions.findIndex((candidate) =>
-      canonicalStudioCommentAnchorKey(candidate.anchor)
-        === canonicalStudioCommentAnchorKey(option.anchor)
-    ) === index
-  );
+  const currentAnchorOptions = uniqueStudioCommentAnchorOptions(anchorOptions);
   const frozenComposerAnchorOption = composerAnchor !== null
     && composerAnchorValid
     && !currentAnchorOptions.some((option) =>
@@ -532,6 +543,17 @@ export function StudioCommentsPanel({
     && !saving
     && mutableThreads.length < STUDIO_COMMENTS_MAX_THREADS
     && mutableTotalMessages < STUDIO_COMMENTS_MAX_TOTAL_MESSAGES;
+  const newThreadDisabledReason = canAddThread
+    ? null
+    : mutationDisabledReason
+      ?? (!capabilities.create
+        ? "현재 권한으로는 새 댓글을 남길 수 없어요."
+        : saving
+          ? "댓글을 동기화하는 중이에요."
+          : "댓글 문서의 저장 한도에 도달했어요.");
+  const currentSelectionCommentDisabledReason = !activeAnchor
+    ? "먼저 캔버스에서 페이지, 컷 또는 요소를 선택하세요."
+    : newThreadDisabledReason;
 
   const applyChange = async (
     operation: () => StudioCommentsDocument,
@@ -767,6 +789,41 @@ export function StudioCommentsPanel({
     }
   };
 
+  const beginQuickReply = (threadId: string): void => {
+    if (replySubmitInFlightRef.current || sharedReply?.submitting || saving) return;
+
+    if (
+      ownedReplyThreadId
+      && ownedReplyThreadId !== threadId
+      && ownedReplyBody.trim()
+    ) {
+      setError("작성 중인 답글을 등록하거나 취소한 뒤 다른 댓글에 답글을 남겨 주세요.");
+      if (sharedReply?.threadId) setDismissedSharedReplyThreadId(null);
+      globalThis.requestAnimationFrame(() => replyEditorRef.current?.focus());
+      return;
+    }
+
+    if (sharedReply) {
+      setDismissedSharedReplyThreadId(null);
+      if (sharedReply.threadId !== threadId) sharedReply.onThreadChange(threadId);
+    } else {
+      if (replyingThreadId !== threadId) {
+        setReplyBody("");
+        pendingReplyIdRef.current = null;
+      }
+      setReplyingThreadId(threadId);
+    }
+    setAssigningThreadId(null);
+    setEditingMessage(null);
+    setEditBody("");
+    setPendingDelete(null);
+    setError(null);
+
+    if (activeReplyThreadId === threadId) {
+      globalThis.requestAnimationFrame(() => replyEditorRef.current?.focus());
+    }
+  };
+
   let emptyTitle = "이 조건에 맞는 댓글이 없어요";
   let emptyDescription = "필터를 바꾸거나 새 댓글을 등록하면 여기에 표시됩니다.";
   if (normalizedQuery) {
@@ -898,9 +955,9 @@ export function StudioCommentsPanel({
                   <MapPin size={14} aria-hidden />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <label htmlFor={`${titleId}-body`} className="block text-[0.68rem] font-semibold text-fg-3">
+                  <span className="block text-[0.68rem] font-semibold text-fg-3">
                     댓글 위치
-                  </label>
+                  </span>
                   <p className="mt-0.5 truncate text-xs font-semibold text-fg" title={composerAnchorLabel}>
                     {composerAnchorLabel}
                   </p>
@@ -967,6 +1024,7 @@ export function StudioCommentsPanel({
                     </select>
                   </div>
                 ) : null}
+              <label htmlFor={`${titleId}-body`} className="sr-only">댓글 내용</label>
               <textarea
                 ref={composerRef}
                 id={`${titleId}-body`}
@@ -996,9 +1054,7 @@ export function StudioCommentsPanel({
               />
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[0.7rem] text-fg-3">
-                  {canAddThread
-                    ? "⌘/Ctrl + Enter로 등록"
-                    : mutationDisabledReason ?? (saving ? "댓글을 동기화하는 중이에요." : "댓글 문서의 저장 한도에 도달했어요.")}
+                  {canAddThread ? "⌘/Ctrl + Enter로 등록" : newThreadDisabledReason}
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-[0.7rem] tabular-nums text-fg-3">
@@ -1034,12 +1090,17 @@ export function StudioCommentsPanel({
                   title="캔버스를 한 번 클릭한 뒤 그 자리에서 바로 댓글을 작성합니다"
                 >
                   <MapPin size={13} aria-hidden />
-                  캔버스에 바로 댓글
+                  위치 찍고 댓글
                 </button>
               ) : null}
               <button
                 type="button"
                 disabled={!activeAnchor || !canAddThread}
+                aria-describedby={currentSelectionCommentDisabledReason
+                  ? newThreadDisabledReasonId
+                  : undefined}
+                title={currentSelectionCommentDisabledReason
+                  ?? "현재 선택한 페이지, 컷 또는 요소에 댓글을 남깁니다"}
                 onClick={() => {
                   if (!closeReplyEditor({ protectDraft: true })) return;
                   setComposerAnchor(activeAnchor);
@@ -1053,8 +1114,16 @@ export function StudioCommentsPanel({
                 className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
               >
                 <Plus size={13} aria-hidden />
-                새 댓글
+                현재 선택에 댓글
               </button>
+              {currentSelectionCommentDisabledReason ? (
+                <p
+                  id={newThreadDisabledReasonId}
+                  className="basis-full text-[0.68rem] leading-relaxed text-fg-3"
+                >
+                  {currentSelectionCommentDisabledReason}
+                </p>
+              ) : null}
             </div>
           )}
 
@@ -1272,7 +1341,7 @@ export function StudioCommentsPanel({
                                 void markThreadRead(thread.id);
                               }}
                               aria-label={`${locationLabel} 위치로 이동`}
-                              className="mt-1 inline-flex max-w-full items-center gap-1 rounded-md text-[0.68rem] font-semibold text-cool hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                              className="mt-1 inline-flex min-h-11 max-w-full items-center gap-1 rounded-md py-1 text-[0.68rem] font-semibold text-cool hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-7"
                             >
                               <MapPin size={11} className="shrink-0" aria-hidden />
                               <span className="truncate">{locationLabel}</span>
@@ -1380,6 +1449,28 @@ export function StudioCommentsPanel({
                             </div>
                           </div>
                         </form>
+                      ) : canReply ? (
+                        <button
+                          type="button"
+                          aria-expanded={isReplying}
+                          aria-controls={`${titleId}-reply-${thread.id}`}
+                          aria-label={`${thread.author.displayName}의 댓글에 빠르게 답글`}
+                          data-studio-comment-quick-reply="true"
+                          onClick={() => {
+                            beginQuickReply(thread.id);
+                            void markThreadRead(thread.id);
+                          }}
+                          className="group mt-2 block min-h-11 w-full rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-raised/65 focus-visible:bg-raised/65 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                          title="클릭해 바로 답글을 작성합니다"
+                        >
+                          <span className="block whitespace-pre-wrap break-words text-sm leading-6 text-fg">
+                            {thread.body}
+                          </span>
+                          <span className="mt-1 flex items-center gap-1 text-[0.68rem] font-semibold text-fg-3 transition-colors group-hover:text-accent group-focus-visible:text-accent sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-visible:opacity-100">
+                            <Reply size={11} aria-hidden />
+                            클릭해 답글 쓰기
+                          </span>
+                        </button>
                       ) : (
                         <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-fg">
                           {thread.body}
@@ -1524,41 +1615,6 @@ export function StudioCommentsPanel({
                             {readMutation === thread.id ? "읽음 처리 중" : "읽음으로 표시"}
                           </button>
                         ) : null}
-                        {!isReadOnlyArchive && capabilities.reply ? <button
-                          type="button"
-                          aria-expanded={isReplying}
-                          disabled={!canReply}
-                          title={thread.resolved ? "다시 열면 답글을 남길 수 있어요." : undefined}
-                          onClick={() => {
-                            if (sharedReply) {
-                              if (isReplying && sharedReply.body.trim()) {
-                                setError("작성 중인 답글을 등록하거나 취소하면 답글 편집기를 접을 수 있어요.");
-                                globalThis.requestAnimationFrame(() => replyEditorRef.current?.focus());
-                                return;
-                              } else if (isReplying) {
-                                setDismissedSharedReplyThreadId(thread.id);
-                              } else {
-                                setDismissedSharedReplyThreadId(null);
-                                if (sharedReply.threadId !== thread.id) {
-                                  sharedReply.onThreadChange(thread.id);
-                                }
-                              }
-                            } else {
-                              setReplyingThreadId(isReplying ? null : thread.id);
-                              setReplyBody("");
-                              pendingReplyIdRef.current = null;
-                            }
-                            setAssigningThreadId(null);
-                            setEditingMessage(null);
-                            setEditBody("");
-                            setPendingDelete(null);
-                            setError(null);
-                          }}
-                          className={QUIET_BUTTON_CLASS}
-                        >
-                          <Reply size={13} aria-hidden />
-                          답글{thread.replies.length > 0 ? ` ${thread.replies.length}` : ""}
-                        </button> : null}
                         {!isReadOnlyArchive && capabilities.assign ? <button
                           type="button"
                           aria-expanded={isAssigning}
@@ -1612,17 +1668,28 @@ export function StudioCommentsPanel({
                       </div>
 
                       {isReplying && (
-                        <form onSubmit={(event) => submitReply(event, thread.id)} className="mt-3 bg-raised/25 p-3">
-                          <label htmlFor={`${titleId}-reply-${thread.id}`} className="block text-[0.7rem] font-semibold text-fg-2">
+                        <form
+                          id={`${titleId}-reply-${thread.id}`}
+                          aria-labelledby={`${titleId}-reply-label-${thread.id}`}
+                          data-studio-comment-inline-reply="true"
+                          onSubmit={(event) => submitReply(event, thread.id)}
+                          className="mt-3 rounded-lg border border-accent/35 bg-accent-soft/10 p-3 transition-colors focus-within:border-accent/65 focus-within:bg-accent-soft/15"
+                        >
+                          <label
+                            id={`${titleId}-reply-label-${thread.id}`}
+                            htmlFor={`${titleId}-reply-editor-${thread.id}`}
+                            className="block text-[0.7rem] font-semibold text-fg-2"
+                          >
                             {thread.author.displayName}에게 답글
                           </label>
                           <textarea
                             ref={replyEditorRef}
-                            id={`${titleId}-reply-${thread.id}`}
+                            id={`${titleId}-reply-editor-${thread.id}`}
                             value={activeReplyBody}
                             maxLength={STUDIO_COMMENTS_MAX_BODY_LENGTH}
                             rows={2}
                             disabled={!canReply}
+                            aria-keyshortcuts="Meta+Enter Control+Enter Escape"
                             onChange={(event) => {
                               const body = event.target.value.slice(0, STUDIO_COMMENTS_MAX_BODY_LENGTH);
                               if (sharedReply) sharedReply.onBodyChange(thread.id, body);
@@ -1643,7 +1710,10 @@ export function StudioCommentsPanel({
                           />
                           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                             <span className="text-[0.65rem] text-fg-3">
-                              {activeReplyBody.length.toLocaleString("ko-KR")}/{STUDIO_COMMENTS_MAX_BODY_LENGTH.toLocaleString("ko-KR")}
+                              <span className="hidden sm:inline">⌘/Ctrl + Enter 등록 · Esc 취소 · </span>
+                              <span className="tabular-nums">
+                                {activeReplyBody.length.toLocaleString("ko-KR")}/{STUDIO_COMMENTS_MAX_BODY_LENGTH.toLocaleString("ko-KR")}
+                              </span>
                             </span>
                             <div className="flex items-center gap-2">
                               <button

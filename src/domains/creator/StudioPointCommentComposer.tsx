@@ -332,6 +332,7 @@ export function StudioPointCommentComposer({
             readOnly={saving}
             aria-readonly={saving}
             aria-label="위치 댓글 내용"
+            aria-keyshortcuts="Meta+Enter Control+Enter Escape"
             aria-describedby={`${hintId} ${countId}${error ? ` ${errorId}` : notice ? ` ${noticeId}` : ""}`}
             placeholder="이 위치에서 확인할 점이나 수정 의견을 남겨 주세요."
             onChange={(event) => {

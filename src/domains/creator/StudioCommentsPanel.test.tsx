@@ -228,6 +228,9 @@ describe("StudioCommentsPanel review rail contract", () => {
     );
     expect(source).toContain("!preserveReplyDraft");
     expect(source).toContain("flex min-w-0 items-start gap-2");
+    expect(source).toContain("uniqueStudioCommentAnchorOptions(anchorOptions)");
+    expect(source).toContain("const seenAnchorKeys = new Set<string>()");
+    expect(source).not.toContain("anchorOptions.findIndex");
   });
 
   it("switches pin placement into a compact Figma-style composer without review filters", () => {
@@ -305,8 +308,19 @@ describe("StudioCommentsPanel review rail contract", () => {
   it("keeps pre-server document comments visible without exposing team mutation actions", () => {
     expect(source).toContain("readOnlyThreadIds.has(thread.id)");
     expect(source).toContain("로컬 보관본 · 읽기 전용");
-    expect(source).toContain("!isReadOnlyArchive && capabilities.reply");
+    expect(source).toContain("const canReply =");
+    expect(source).toContain("&& capabilities.reply");
     expect(source).toContain("!isReadOnlyArchive && capabilities.resolve");
+  });
+
+  it("keeps quick replies inline, touch-sized, and free from a duplicate reply action", () => {
+    expect(source).toContain('data-studio-comment-quick-reply="true"');
+    expect(source).toContain('data-studio-comment-inline-reply="true"');
+    expect(source).toContain('aria-keyshortcuts="Meta+Enter Control+Enter Escape"');
+    expect(source).toContain("min-h-11 w-full");
+    expect(source).toContain("sm:opacity-0 sm:group-hover:opacity-100");
+    expect(source).not.toContain("답글{thread.replies.length");
+    expect(source).not.toContain("shadow-[inset_3px");
   });
 
   it("renders comment sync failures in a dedicated rail status instead of collaboration notices", () => {
