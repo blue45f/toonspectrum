@@ -11,6 +11,20 @@ import {
 } from "./studio-bg3d-geometry-worker-protocol";
 import { STUDIO_BG3D_GLB_MAX_BYTES } from "./studio-bg3d-glb-validation";
 import { STUDIO_BG3D_MESHOPT_EXTENSION } from "./studio-bg3d-meshopt";
+import { hydrateStudioBg3dObjWorkerResult } from "./studio-bg3d-obj-three-hydrator";
+import {
+  StudioBg3dObjWorkerClientError,
+  parseStudioBg3dObjInWorker,
+} from "./studio-bg3d-obj-worker-client";
+import {
+  STUDIO_BG3D_OBJ_WORKER_BUDGETS,
+  STUDIO_BG3D_OBJ_WORKER_PROTOCOL_VERSION,
+  isStudioBg3dObjWorkerResponseForRequest,
+  type StudioBg3dObjWorkerCanonicalResult,
+  type StudioBg3dObjWorkerFailureCode,
+  type StudioBg3dObjWorkerMtlEntry,
+  type StudioBg3dObjWorkerParseRequest,
+} from "./studio-bg3d-obj-worker-protocol";
 
 import type { Bg3dModelUploadSource } from "./bg3d-model-library";
 import type * as THREE from "three";
@@ -49,6 +63,7 @@ export const STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_REFERENCE_DIRECTIVES = 256;
 export const STUDIO_BG3D_IMPORT_MAX_OBJ_MATERIAL_LIBRARIES = 64;
 export const STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_TOTAL_BYTES = 16 * 1024 * 1024;
 export const STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_DIRECTIVES = 65_536;
+export const STUDIO_BG3D_IMPORT_OBJ_MAIN_FALLBACK_MAX_BYTES = 512 * 1024;
 const STUDIO_BG3D_IMPORT_MAX_GLTF_TABLE_ENTRIES = 65_536;
 const STUDIO_BG3D_IMPORT_MAX_RESOURCE_RECORDS = 256;
 const STUDIO_BG3D_IMPORT_MAX_MATERIAL_RECORDS = STUDIO_BG3D_IMPORT_MAX_EXPORT_MATERIALS;
@@ -170,7 +185,7 @@ const ERROR_MESSAGES: Readonly<Record<StudioBg3dModelImportErrorCode, string>> =
   "unsafe-resource-uri": "3D 모델이 로컬 선택 범위 밖의 네트워크 또는 파일 리소스를 참조합니다.",
   "unsupported-extension": "아직 변환할 수 없는 압축 또는 텍스처 확장이 포함되어 있습니다. 표준 glTF/GLB로 다시 내보내 주세요.",
   "vertex-budget-exceeded": "3D 모델의 정점 수가 가져오기 안전 기준을 초과했습니다. 메시를 경량화해 주세요.",
-  "worker-required": "큰 STL·PLY 모델은 안전한 백그라운드 변환 Worker가 필요합니다. 최신 브라우저에서 다시 시도하거나 모델을 줄여 주세요.",
+  "worker-required": "큰 OBJ·STL·PLY 모델은 안전한 백그라운드 변환 Worker가 필요합니다. 최신 브라우저에서 다시 시도하거나 모델을 줄여 주세요.",
   "geometry-memory-too-large": "3D 모델의 디코딩된 기하 데이터가 256MiB 안전 기준을 초과했습니다. 메시를 경량화해 주세요.",
 });
 
@@ -184,6 +199,7 @@ export class StudioBg3dModelImportError extends Error {
 const PRIMARY_FORMAT_SET = new Set<string>(STUDIO_BG3D_IMPORT_PRIMARY_FORMATS);
 const COMPANION_FORMAT_SET = new Set<string>(STUDIO_BG3D_IMPORT_COMPANION_FORMATS);
 const SCHEME_PATTERN = /^[a-z][a-z0-9+.-]*:/iu;
+const ENCODED_SEPARATOR_PATTERN = /%(?:2f|5c)/iu;
 const SAFE_DATA_URI_PREFIX_PATTERN = /^data:(application\/(?:octet-stream|gltf-buffer)|image\/(?:png|jpeg|webp));base64,/iu;
 const UNSUPPORTED_REQUIRED_GLTF_EXTENSIONS = new Set([
   "KHR_draco_mesh_compression",
@@ -382,6 +398,18 @@ function directoryOf(path: string): string {
   return separator >= 0 ? path.slice(0, separator + 1) : "";
 }
 
+function compareUtf8(left: string, right: string): number {
+  const encoder = new TextEncoder();
+  const leftBytes = encoder.encode(left);
+  const rightBytes = encoder.encode(right);
+  const length = Math.min(leftBytes.length, rightBytes.length);
+  for (let index = 0; index < length; index += 1) {
+    const difference = (leftBytes[index] ?? 0) - (rightBytes[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return leftBytes.length - rightBytes.length;
+}
+
 class LocalResourceResolver {
   readonly #resources: ReadonlyMap<string, StudioBg3dImportFile>;
   readonly #primaryDirectory: string;
@@ -390,10 +418,12 @@ class LocalResourceResolver {
   readonly #objectUrlByPath = new Map<string, string>();
   readonly #ownedObjectUrls = new Set<string>();
   readonly #approvedInlineUris = new Set<string>();
+  readonly #packageRootDepth: number;
 
   constructor(resources: ReadonlyMap<string, StudioBg3dImportFile>, primaryPath: string) {
     this.#resources = resources;
     this.#primaryDirectory = directoryOf(primaryPath);
+    this.#packageRootDepth = primaryPath.includes("/") ? 1 : 0;
     for (const path of resources.keys()) {
       this.#pathByFoldedPath.set(path.toLocaleLowerCase("en-US"), path);
       const baseName = path.slice(path.lastIndexOf("/") + 1).toLocaleLowerCase("en-US");
@@ -407,6 +437,26 @@ class LocalResourceResolver {
 
   fileForUri(uri: string): StudioBg3dImportFile {
     return this.resourceForUri(uri).file;
+  }
+
+  fileForCanonicalPath(path: string): StudioBg3dImportFile {
+    const file = this.#resources.get(path);
+    if (!file) throw importError("missing-resource");
+    return file;
+  }
+
+  canonicalResourcePaths(): readonly string[] {
+    return [...this.#resources.keys()].sort(compareUtf8);
+  }
+
+  resourceForPackageUri(referrerPath: string, uri: string): {
+    readonly path: string;
+    readonly file: StudioBg3dImportFile;
+  } {
+    const path = this.#resolvePackagePath(referrerPath, uri);
+    const file = this.#resources.get(path);
+    if (!file) throw importError("missing-resource");
+    return { path, file };
   }
 
   resourceForUri(uri: string): {
@@ -431,6 +481,15 @@ class LocalResourceResolver {
     if (uri.startsWith("blob:") && this.#ownedObjectUrls.has(uri)) return uri;
     if (SCHEME_PATTERN.test(uri) || uri.startsWith("//")) throw importError("unsafe-resource-uri");
     const path = this.#resolvePath(uri);
+    return this.#urlForCanonicalPath(path);
+  };
+
+  urlForCanonicalPath(path: string): string {
+    if (!this.#resources.has(path)) throw importError("missing-resource");
+    return this.#urlForCanonicalPath(path);
+  }
+
+  #urlForCanonicalPath(path: string): string {
     const existing = this.#objectUrlByPath.get(path);
     if (existing) return existing;
     if (typeof URL?.createObjectURL !== "function") throw importError("environment-unsupported");
@@ -440,7 +499,7 @@ class LocalResourceResolver {
     this.#objectUrlByPath.set(path, objectUrl);
     this.#ownedObjectUrls.add(objectUrl);
     return objectUrl;
-  };
+  }
 
   dispose(): void {
     for (const objectUrl of this.#ownedObjectUrls) {
@@ -469,6 +528,66 @@ class LocalResourceResolver {
     const uniquePath = this.#uniquePathByFoldedBaseName.get(baseName);
     if (uniquePath) return uniquePath;
     throw importError("missing-resource");
+  }
+
+  #resolvePackagePath(referrerPath: string, uri: string): string {
+    const raw = uri.trim();
+    if (
+      !raw
+      || raw.length > 1_024
+      || raw.startsWith("/")
+      || raw.startsWith("//")
+      || raw.includes("\\")
+      || raw.includes("?")
+      || raw.includes("#")
+      || containsControlCharacter(raw)
+      || SCHEME_PATTERN.test(raw)
+      || ENCODED_SEPARATOR_PATTERN.test(raw)
+    ) throw importError("unsafe-resource-uri");
+
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(raw).normalize("NFC");
+    } catch {
+      throw importError("unsafe-resource-uri");
+    }
+    if (
+      !decoded
+      || decoded.startsWith("/")
+      || decoded.startsWith("//")
+      || decoded.includes("\\")
+      || decoded.includes("?")
+      || decoded.includes("#")
+      || containsControlCharacter(decoded)
+      || SCHEME_PATTERN.test(decoded)
+    ) throw importError("unsafe-resource-uri");
+
+    const segments = referrerPath.split("/").slice(0, -1);
+    for (const segment of decoded.split("/")) {
+      if (!segment || segment === ".") continue;
+      if (segment === "..") {
+        if (segments.length <= this.#packageRootDepth) throw importError("unsafe-resource-uri");
+        segments.pop();
+      } else {
+        segments.push(segment);
+      }
+    }
+    const relative = this.#canonicalPathForCandidate(segments.join("/"));
+    if (relative) return relative;
+
+    if (!decoded.includes("..")) {
+      const direct = this.#canonicalPathForCandidate(
+        decoded.split("/").filter((segment) => segment && segment !== ".").join("/"),
+      );
+      if (direct) return direct;
+    }
+    throw importError("missing-resource");
+  }
+
+  #canonicalPathForCandidate(candidate: string): string | null {
+    if (!candidate) return null;
+    if (this.#resources.has(candidate)) return candidate;
+    return this.#pathByFoldedPath.get(candidate.toLocaleLowerCase("en-US")) ?? null;
   }
 }
 
@@ -548,6 +667,10 @@ async function readUtf8(
 ): Promise<string> {
   if (file.size > STUDIO_BG3D_IMPORT_MAX_TEXT_BYTES) throw importError("file-too-large");
   const bytes = await readBytes(file, signal);
+  return decodeUtf8(bytes, signal);
+}
+
+function decodeUtf8(bytes: ArrayBuffer, signal?: AbortSignal): string {
   throwIfAborted(signal);
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
@@ -1041,7 +1164,18 @@ function preflightObjText(text: string, signal?: AbortSignal): readonly string[]
         }
       } else if (directive === "f" || directive === "l" || directive === "p") {
         const references = countObjArguments(line, directiveEnd);
-        expandedVertices = safeAddCount(expandedVertices, references, "vertex-budget-exceeded");
+        // OBJLoader triangulates an n-gon as a fan and emits three non-indexed vertices for every
+        // resulting triangle. Counting only the source references substantially underestimates the
+        // allocation (for a large n-gon it is almost 3x) and lets the parser cross the vertex
+        // budget before the post-parse gate can run.
+        const expandedReferences = directive === "f"
+          ? safeMultiplyCount(Math.max(0, references - 2), 3, "vertex-budget-exceeded")
+          : references;
+        expandedVertices = safeAddCount(
+          expandedVertices,
+          expandedReferences,
+          "vertex-budget-exceeded",
+        );
         if (expandedVertices > STUDIO_BG3D_IMPORT_MAX_VERTICES) {
           throw importError("vertex-budget-exceeded");
         }
@@ -1159,22 +1293,28 @@ async function parseObjImport(
   resolver: LocalResourceResolver,
   signal?: AbortSignal,
 ): Promise<ParsedImport> {
-  const text = await readUtf8(item.primary, signal);
+  const bytes = await readBytes(item.primary, signal);
+  const text = decodeUtf8(bytes, signal);
   const materialLibraryReferences = preflightObjText(text, signal);
-  const tracked = await createTrackedLoadingManager(resolver);
-  throwIfAborted(signal);
-  const { OBJLoader } = await import("three/examples/jsm/loaders/OBJLoader.js");
-  throwIfAborted(signal);
-  const loader = new OBJLoader(tracked.manager);
-  if (materialLibraryReferences.length > 0) {
-    const materialResources: Array<{
-      readonly path: string;
-      readonly file: StudioBg3dImportFile;
-    }> = [];
-    const seenMaterialPaths = new Set<string>();
-    let totalMaterialBytes = 0;
-    for (const uri of materialLibraryReferences) {
-      const resource = resolver.resourceForUri(uri);
+  const materialResources: Array<{
+    readonly path: string;
+    readonly file: StudioBg3dImportFile;
+  }> = [];
+  const seenMaterialPaths = new Set<string>();
+  let totalMaterialBytes = 0;
+  for (const reference of materialLibraryReferences) {
+    let resources: readonly { readonly path: string; readonly file: StudioBg3dImportFile }[];
+    try {
+      resources = [resolver.resourceForPackageUri(item.primaryPath, reference)];
+    } catch (error) {
+      if (!(error instanceof StudioBg3dModelImportError) || error.code !== "missing-resource") {
+        throw error;
+      }
+      const tokens = reference.split(/[\t ]+/u).filter(Boolean);
+      if (tokens.length < 2) throw error;
+      resources = tokens.map((token) => resolver.resourceForPackageUri(item.primaryPath, token));
+    }
+    for (const resource of resources) {
       if (extensionOf(resource.path) !== "mtl") throw importError("missing-resource");
       if (seenMaterialPaths.has(resource.path)) continue;
       seenMaterialPaths.add(resource.path);
@@ -1191,31 +1331,123 @@ async function parseObjImport(
       }
       materialResources.push(resource);
     }
-    const { MTLLoader } = await import("three/examples/jsm/loaders/MTLLoader.js");
-    throwIfAborted(signal);
-    const materialTexts: string[] = [];
-    const materialBudget: ObjMtlPreflightBudget = { directives: 0, materials: 0, textureSlots: 0 };
-    for (const resource of materialResources) {
-      const materialText = await readUtf8(resource.file, signal);
-      preflightObjMtlText(materialText, materialBudget, signal);
-      materialTexts.push(materialText);
-    }
-    throwIfAborted(signal);
-    const materials = new MTLLoader(tracked.manager).parse(materialTexts.join("\n"), "");
-    materials.preload();
-    loader.setMaterials(materials);
   }
+
+  const materialBudget: ObjMtlPreflightBudget = { directives: 0, materials: 0, textureSlots: 0 };
+  const materialLibraries: StudioBg3dObjWorkerMtlEntry[] = [];
+  for (const resource of materialResources.sort((left, right) => compareUtf8(left.path, right.path))) {
+    const materialBytes = await readBytes(resource.file, signal);
+    preflightObjMtlText(decodeUtf8(materialBytes, signal), materialBudget, signal);
+    materialLibraries.push({
+      path: resource.path,
+      sourceByteLength: materialBytes.byteLength,
+      bytes: materialBytes,
+    });
+  }
+
+  const resourcePaths = resolver.canonicalResourcePaths();
+  const fallbackInputBytes = safeAddCount(
+    bytes.byteLength,
+    totalMaterialBytes,
+    "material-budget-exceeded",
+  );
+  const fallbackRequest: StudioBg3dObjWorkerParseRequest | null =
+    fallbackInputBytes <= STUDIO_BG3D_IMPORT_OBJ_MAIN_FALLBACK_MAX_BYTES
+      ? {
+          version: STUDIO_BG3D_OBJ_WORKER_PROTOCOL_VERSION,
+          kind: "parse",
+          requestId: 1,
+          generationId: 1,
+          primaryPath: item.primaryPath,
+          sourceByteLength: bytes.byteLength,
+          bytes: bytes.slice(0),
+          materialLibraries: materialLibraries.map((entry) => ({
+            path: entry.path,
+            sourceByteLength: entry.sourceByteLength,
+            bytes: entry.bytes.slice(0),
+          })),
+          resourcePaths,
+          budgets: STUDIO_BG3D_OBJ_WORKER_BUDGETS,
+        }
+      : null;
+
+  let result: StudioBg3dObjWorkerCanonicalResult;
   let root: THREE.Object3D | null = null;
   try {
-    root = loader.parse(text);
+    try {
+      result = await parseStudioBg3dObjInWorker({
+        primaryPath: item.primaryPath,
+        bytes,
+        materialLibraries,
+        resourcePaths,
+      }, { signal });
+    } catch (error) {
+      if (!(error instanceof StudioBg3dObjWorkerClientError)) throw error;
+      if (fallbackRequest && error.code === "worker-unavailable") {
+        const {
+          StudioBg3dObjWorkerRuntimeError,
+          parseStudioBg3dObjWorkerRequest,
+        } = await import(
+          "./studio-bg3d-obj-worker-runtime"
+        );
+        let fallbackResult: StudioBg3dObjWorkerCanonicalResult;
+        try {
+          fallbackResult = await parseStudioBg3dObjWorkerRequest(fallbackRequest);
+        } catch (fallbackError) {
+          if (fallbackError instanceof StudioBg3dObjWorkerRuntimeError) {
+            throw mapObjWorkerFailure(fallbackError.code);
+          }
+          throw fallbackError;
+        }
+        const response = {
+          version: STUDIO_BG3D_OBJ_WORKER_PROTOCOL_VERSION,
+          kind: "result" as const,
+          requestId: fallbackRequest.requestId,
+          generationId: fallbackRequest.generationId,
+          result: fallbackResult,
+        };
+        if (!isStudioBg3dObjWorkerResponseForRequest(response, fallbackRequest)) {
+          throw importError("parse-failed");
+        }
+        result = response.result;
+      } else {
+        throw mapObjWorkerFailure(error.code);
+      }
+    }
     throwIfAborted(signal);
+    for (const path of result.usedResourcePaths) resolver.fileForCanonicalPath(path);
+    const tracked = await createTrackedLoadingManager(resolver);
+    root = await hydrateStudioBg3dObjWorkerResult(result, {
+      loadingManager: tracked.manager,
+      signal,
+      textureUrlForPath: (path) => resolver.urlForCanonicalPath(path),
+    });
     await tracked.waitForIdle(signal);
     throwIfAborted(signal);
     return { root, animations: [] };
   } catch (error) {
     if (root) disposeStudioBg3dThreeResources(root);
+    if (signal?.aborted) throw importError("aborted");
     throw error;
   }
+}
+
+function mapObjWorkerFailure(
+  code: StudioBg3dObjWorkerFailureCode | StudioBg3dObjWorkerClientError["code"],
+): StudioBg3dModelImportError {
+  if (code === "aborted") return importError("aborted");
+  if (
+    code === "geometry-memory-too-large"
+    || code === "material-budget-exceeded"
+    || code === "mesh-budget-exceeded"
+    || code === "missing-resource"
+    || code === "node-budget-exceeded"
+    || code === "triangle-budget-exceeded"
+    || code === "unsafe-resource-uri"
+    || code === "vertex-budget-exceeded"
+  ) return importError(code);
+  if (code === "parse-failed" || code === "protocol") return importError("parse-failed");
+  return importError("worker-required");
 }
 
 async function parseFbxImport(

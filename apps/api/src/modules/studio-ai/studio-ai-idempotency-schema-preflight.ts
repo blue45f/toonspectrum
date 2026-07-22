@@ -206,12 +206,15 @@ export async function preflightStudioAiIdempotencySchema(
           AND NOT index_record.indnullsnotdistinct
           AND index_record.indexprs IS NULL AND index_record.indpred IS NULL
           AND index_record.indnkeyatts = 1 AND index_record.indnatts = 1
-          AND index_record.indkey::smallint[] = ARRAY[(
+          -- int2vector casts retain a zero lower bound [0:0], whereas ARRAY[...] starts at
+          -- one. Whole-array equality therefore rejects an otherwise exact single-column index.
+          -- Cardinality is fixed above, so compare the sole catalog vector slots directly.
+          AND index_record.indkey[0] = (
             SELECT attribute.attnum FROM pg_catalog.pg_attribute AS attribute
             WHERE attribute.attrelid = to_regclass('public.studio_ai_request_receipt')
               AND attribute.attname = 'expiresAt' AND NOT attribute.attisdropped
-          )]::smallint[]
-          AND index_record.indoption::smallint[] = ARRAY[0]::smallint[]
+          )
+          AND index_record.indoption[0] = 0
       ) AS "expiryIndexReady",
       (
         SELECT pg_catalog.pg_get_expr(default_record.adbin, default_record.adrelid)

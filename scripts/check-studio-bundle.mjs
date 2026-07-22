@@ -72,6 +72,10 @@ const budgets = {
   bg3dPsdWorker: { raw: 1_250_000, gzip: 360_000 },
   // OffscreenCanvas/createImageBitmap contact-sheet compositor, isolated from the editor graph.
   bg3dContactSheetWorker: { raw: 80_000, gzip: 25_000 },
+  // OBJ/MTL parsing, triangulation, and clone-safe scene canonicalization stay in an isolated
+  // module Worker. 2026-07-22 production output: 325,024 raw / 77,443 gzip; retain modest
+  // dependency-drift headroom without allowing this parser to join the BG3D editor graph.
+  bg3dObjWorker: { raw: 340_000, gzip: 82_000 },
   // Measured after the same build: 443,257 raw / 143,956 gzip.
   app: { raw: 510_000, gzip: 170_000 },
 };
@@ -459,6 +463,18 @@ if (!fs.existsSync(manifestPath)) {
         raw: bytes.byteLength,
         gzip: gzipSync(bytes).byteLength,
       }, budgets.bg3dContactSheetWorker);
+    }
+
+    const objWorkerFiles = fs.readdirSync(path.join(outputDirectory, "assets"))
+      .filter((file) => /^studio-bg3d-obj\.worker-[A-Za-z0-9_-]+\.js$/u.test(file));
+    if (objWorkerFiles.length !== 1) {
+      fail(`expected one isolated BG3D OBJ Worker asset, found ${objWorkerFiles.length}`);
+    } else {
+      const bytes = fs.readFileSync(path.join(outputDirectory, "assets", objWorkerFiles[0]));
+      checkBudget("BG3D OBJ Worker", {
+        raw: bytes.byteLength,
+        gzip: gzipSync(bytes).byteLength,
+      }, budgets.bg3dObjWorker);
     }
 
     const psdWorkerFiles = fs.readdirSync(path.join(outputDirectory, "assets"))

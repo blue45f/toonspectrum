@@ -20,6 +20,7 @@ import {
   STUDIO_BG3D_IMPORT_MAX_OBJ_MATERIAL_LIBRARIES,
   STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_REFERENCE_DIRECTIVES,
   STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_TOTAL_BYTES,
+  STUDIO_BG3D_IMPORT_OBJ_MAIN_FALLBACK_MAX_BYTES,
   STUDIO_BG3D_IMPORT_MAX_OUTPUT_TOTAL_BYTES,
   STUDIO_BG3D_IMPORT_MAX_VERTICES,
   StudioBg3dModelImportError,
@@ -28,6 +29,7 @@ import {
   planStudioBg3dModelImports,
   type StudioBg3dImportFile,
 } from "./studio-bg3d-model-import";
+import { disposeSharedStudioBg3dObjWorkerClient } from "./studio-bg3d-obj-worker-client";
 
 import type { Bg3dModelUploadSource } from "./bg3d-model-library";
 import type { Mesh, MeshStandardMaterial } from "three";
@@ -636,6 +638,7 @@ async function expectReloadedTexturedTriangle(
 
 afterEach(() => {
   disposeSharedStudioBg3dGeometryWorkerClient();
+  disposeSharedStudioBg3dObjWorkerClient();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -643,16 +646,22 @@ afterEach(() => {
 describe("planStudioBg3dModelImports", () => {
   it("keeps format loaders and the GLB exporter behind analyzable dynamic imports", () => {
     const source = readFileSync(new URL("./studio-bg3d-model-import.ts", import.meta.url), "utf8");
+    const objRuntimeSource = readFileSync(
+      new URL("./studio-bg3d-obj-worker-runtime.ts", import.meta.url),
+      "utf8",
+    );
 
     expect(source).not.toMatch(/^import .*three\/examples\/jsm\/(?:loaders|exporters)\//gmu);
     for (const runtime of [
       "loaders/GLTFLoader.js",
-      "loaders/OBJLoader.js",
-      "loaders/MTLLoader.js",
       "exporters/GLTFExporter.js",
     ]) {
       expect(source).toContain(`import("three/examples/jsm/${runtime}")`);
     }
+    expect(source).not.toContain("loaders/OBJLoader.js");
+    expect(source).not.toContain("loaders/MTLLoader.js");
+    expect(objRuntimeSource).toContain('import("three/examples/jsm/loaders/OBJLoader.js")');
+    expect(objRuntimeSource).not.toContain("loaders/MTLLoader.js");
   });
 
   it("plans all standard primary formats while retaining bounded companion resources", () => {
@@ -1005,7 +1014,7 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
     });
   });
 
-  it("preflights MTL material and texture-slot directives before MTLLoader.parse", async () => {
+  it("preflights MTL material and texture-slot directives before Worker parsing", async () => {
     const objFor = (library: string) => sourceFile(`${library}.obj`, [
       `mtllib ${library}.mtl`,
       "v 0 0 0",
@@ -1346,6 +1355,33 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
     );
   });
 
+  it("resolves an OBJ material library inside the selected package without basename guessing", async () => {
+    vi.stubGlobal("FileReader", TestFileReader);
+    const obj = sourceFile("triangle.obj", [
+      "mtllib ../materials/triangle.mtl",
+      "o triangle",
+      "v 0 0 0",
+      "v 1 0 0",
+      "v 0 1 0",
+      "usemtl webtoon-blue",
+      "f 1 2 3",
+    ].join("\n"), "package/models/triangle.obj");
+    const mtl = sourceFile(
+      "triangle.mtl",
+      "newmtl webtoon-blue\nKd 0 0 1",
+      "package/materials/triangle.mtl",
+    );
+
+    const [converted] = await convertStudioBg3dModelFilesToGlb([obj, mtl]);
+    const buffer = await converted.arrayBuffer();
+    const jsonChunkLength = new DataView(buffer).getUint32(12, true);
+    const json = JSON.parse(
+      new TextDecoder().decode(new Uint8Array(buffer, 20, jsonChunkLength)).trim(),
+    ) as { materials?: Array<{ name?: string }> };
+
+    expect(json.materials).toContainEqual(expect.objectContaining({ name: "webtoon-blue" }));
+  });
+
   it("embeds and reloads a real OBJ, MTL, and PNG companion set as a textured GLB", async () => {
     const harness = installThreeImageFixtureHarness();
     const png = generatedPngFixture();
@@ -1638,6 +1674,21 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
 
     await expect(convertStudioBg3dModelFilesToGlb([small])).resolves.toHaveLength(1);
     await expect(convertStudioBg3dModelFilesToGlb([large])).rejects.toMatchObject({
+      code: "worker-required",
+    });
+  });
+
+  it("requires the dedicated Worker for an OBJ source above the main-thread compatibility limit", async () => {
+    vi.stubGlobal("Worker", undefined);
+    const obj = sourceFile("large.obj", [
+      `#${"x".repeat(STUDIO_BG3D_IMPORT_OBJ_MAIN_FALLBACK_MAX_BYTES)}`,
+      "v 0 0 0",
+      "v 1 0 0",
+      "v 0 1 0",
+      "f 1 2 3",
+    ].join("\n"));
+
+    await expect(convertStudioBg3dModelFilesToGlb([obj])).rejects.toMatchObject({
       code: "worker-required",
     });
   });
