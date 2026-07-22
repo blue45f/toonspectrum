@@ -180,6 +180,16 @@ describe("studio-tools-companion protocol", () => {
     });
     expect(parseStudioCompanionMessage(cmd)).toEqual(cmd);
 
+    for (const command of ["enter-canvas-only", "exit-canvas-only"] as const) {
+      expect(parseStudioCompanionMessage(buildStudioCompanionCommand({
+        command,
+        companionInstanceId: companionA,
+        targetPrimaryInstanceId: primaryA,
+        commandId: `command-${command}`,
+        sequence: command === "enter-canvas-only" ? 2 : 3,
+      }, 301))).toEqual(expect.objectContaining({ command }));
+    }
+
     const ping = buildStudioCompanionPing({
       companionInstanceId: companionA,
       targetPrimaryInstanceId: primaryA,
@@ -532,8 +542,12 @@ describe("studio-tools-companion protocol", () => {
     const call = open.mock.calls[0] as [string, string, string];
     expect(call[0]).toContain("/studio/tools-companion?session=primary-a-1234");
     expect(call[1]).toBe("toonspectrum-studio-tools-primary-a-1234");
+    expect(call[2]).toBe(
+      "popup=yes,width=520,height=820,menubar=no,toolbar=no,location=no,status=no"
+    );
     expect(focus).toHaveBeenCalledOnce();
     expect(win).not.toBeNull();
+    expect(popup.opener).toBeNull();
 
     expect(openStudioToolsCompanionWindow(session, popup, open)).toBe(popup);
     expect(isStudioToolsCompanionWindowReusable(session, popup)).toBe(true);
@@ -577,7 +591,7 @@ describe("studio-tools-companion protocol", () => {
     expect(openNavigator).toHaveBeenCalledWith(
       expect.stringContaining("view=navigator"),
       "toonspectrum-studio-tools-primary-a-1234-navigator",
-      expect.any(String)
+      "popup=yes,width=390,height=860,menubar=no,toolbar=no,location=no,status=no"
     );
     expect(isStudioToolsCompanionWindowReusable(primaryA, navigatorPopup, "navigator")).toBe(true);
     expect(isStudioToolsCompanionWindowReusable(primaryA, navigatorPopup, "review")).toBe(false);
@@ -586,7 +600,7 @@ describe("studio-tools-companion protocol", () => {
     expect(openReview).toHaveBeenCalledWith(
       expect.stringContaining("view=review"),
       "toonspectrum-studio-tools-primary-a-1234-review",
-      expect.any(String)
+      "popup=yes,width=420,height=860,menubar=no,toolbar=no,location=no,status=no"
     );
     expect(studioCompanionUrl(primaryA, "https://example.com")).not.toContain("view=");
   });
@@ -646,6 +660,7 @@ describe("studio-tools-companion protocol", () => {
     });
 
     expect(reservation.name).toBe("toonspectrum-studio-tools-primary-a-1234");
+    expect(reservation.opener).toBeNull();
     expect(replace).toHaveBeenCalledWith(expect.stringContaining(
       "/studio/tools-companion?session=primary-a-1234"
     ));
@@ -896,19 +911,33 @@ describe("studio-tools-companion protocol", () => {
       sequence: 1,
     }, 10_003), primaryA, 10_003)).toBe(true);
     expect(binding.acceptCommand(buildStudioCompanionCommand({
+      command: "enter-canvas-only",
+      companionInstanceId: companionA,
+      targetPrimaryInstanceId: primaryA,
+      commandId: "workspace-canvas-only-0002",
+      sequence: 2,
+    }, 10_004), primaryA, 10_004)).toBe(true);
+    expect(binding.acceptCommand(buildStudioCompanionCommand({
       command: "pen",
       companionInstanceId: reviewA,
       targetPrimaryInstanceId: primaryA,
       commandId: "review-command-0002",
       sequence: 2,
-    }, 10_004), primaryA, 10_004)).toBe(false);
+    }, 10_005), primaryA, 10_005)).toBe(false);
+    expect(binding.acceptCommand(buildStudioCompanionCommand({
+      command: "exit-canvas-only",
+      companionInstanceId: reviewA,
+      targetPrimaryInstanceId: primaryA,
+      commandId: "review-canvas-only-0002",
+      sequence: 2,
+    }, 10_006), primaryA, 10_006)).toBe(false);
     expect(binding.acceptCommand(buildStudioCompanionCommand({
       command: "focus-primary",
       companionInstanceId: reviewA,
       targetPrimaryInstanceId: primaryA,
       commandId: "review-focus-0002",
       sequence: 2,
-    }, 10_005), primaryA, 10_005)).toBe(true);
+    }, 10_007), primaryA, 10_007)).toBe(true);
   });
 
   it("expires stale surfaces independently and keeps generation monotonic per surface", () => {

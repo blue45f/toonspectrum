@@ -31,7 +31,17 @@ export const STUDIO_TOOLS_COMPANION_CHANNEL = "toonspectrum.studio.tools-compani
 export const STUDIO_TOOLS_COMPANION_PATH = "/studio/tools-companion";
 export const STUDIO_TOOLS_COMPANION_WINDOW_NAME = "toonspectrum-studio-tools";
 export const STUDIO_TOOLS_COMPANION_WINDOW_FEATURES =
-  "popup=yes,width=420,height=780,menubar=no,toolbar=no,location=no,status=no";
+  "popup=yes,width=520,height=820,menubar=no,toolbar=no,location=no,status=no";
+
+const STUDIO_COMPANION_WINDOW_FEATURES_BY_SURFACE: Readonly<Record<StudioCompanionSurface, string>> = {
+  workspace: STUDIO_TOOLS_COMPANION_WINDOW_FEATURES,
+  navigator: "popup=yes,width=390,height=860,menubar=no,toolbar=no,location=no,status=no",
+  review: "popup=yes,width=420,height=860,menubar=no,toolbar=no,location=no,status=no",
+};
+
+export function studioCompanionDefaultWindowFeatures(surface: StudioCompanionSurface): string {
+  return STUDIO_COMPANION_WINDOW_FEATURES_BY_SURFACE[surface];
+}
 
 const STUDIO_COMPANION_SESSION_QUERY = "session";
 const STUDIO_COMPANION_VIEW_QUERY = "view";
@@ -60,7 +70,9 @@ export type StudioCompanionDensity = "simple" | "full" | "focus";
 export type StudioCompanionCommandName =
   | StudioCompanionToolId
   | "focus-primary"
-  | "toggle-canvas-only";
+  | "toggle-canvas-only"
+  | "enter-canvas-only"
+  | "exit-canvas-only";
 
 export type StudioCompanionMessage =
   | {
@@ -199,6 +211,8 @@ const STUDIO_COMPANION_COMMANDS = new Set<string>([
   ...STUDIO_COMPANION_TOOL_ORDER,
   "focus-primary",
   "toggle-canvas-only",
+  "enter-canvas-only",
+  "exit-canvas-only",
 ]);
 const STUDIO_COMPANION_MAX_MESSAGE_AGE_MS = 30_000;
 const STUDIO_COMPANION_MAX_FUTURE_SKEW_MS = 5_000;
@@ -1080,6 +1094,14 @@ export function isStudioToolsCompanionWindowReusable(
   }
 }
 
+function severStudioCompanionOpener(candidate: Window): void {
+  try {
+    candidate.opener = null;
+  } catch {
+    // A recovered or already navigated popup can deny cross-origin property writes.
+  }
+}
+
 /**
  * Open (or focus) the tools companion popup. Returns the window handle when available.
  * Reuses a live matching handle without navigating it again. A live handle that was
@@ -1096,6 +1118,7 @@ export function openStudioCompanionSurfaceWindow(
   if (!isStudioCompanionSessionId(sessionId)) return null;
   const expectedUrl = studioCompanionUrl(sessionId, undefined, undefined, surface);
   if (isStudioToolsCompanionWindowReusable(sessionId, existingWindow, surface)) {
+    severStudioCompanionOpener(existingWindow);
     try {
       existingWindow.focus?.();
     } catch {
@@ -1107,9 +1130,10 @@ export function openStudioCompanionSurfaceWindow(
     const win = openWindow(
       expectedUrl,
       studioCompanionWindowName(sessionId, surface),
-      STUDIO_TOOLS_COMPANION_WINDOW_FEATURES
+      studioCompanionDefaultWindowFeatures(surface)
     );
     if (!win) return null;
+    severStudioCompanionOpener(win);
     try {
       win.focus?.();
     } catch {
@@ -1193,6 +1217,7 @@ export function completeReservedStudioToolsCompanionWindow(input: {
   }
   try {
     const surface = input.surface ?? "workspace";
+    severStudioCompanionOpener(input.reservation);
     input.reservation.name = studioCompanionWindowName(input.sessionId, surface);
     input.reservation.location.replace(studioCompanionUrl(
       input.sessionId,

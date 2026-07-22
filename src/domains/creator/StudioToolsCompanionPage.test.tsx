@@ -297,6 +297,29 @@ describe("StudioToolsCompanionPage", () => {
         sequence: 1,
       })
     );
+
+    const drawPreset = screen.getByRole("button", { name: /작화 집중/u });
+    expect(drawPreset.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: /전체 탐색/u }));
+    expect(channel?.postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: "companion-command",
+      command: "enter-canvas-only",
+      companionInstanceId: companionInstance,
+      targetPrimaryInstanceId: primaryInstanceA,
+    }));
+    expect(screen.getByRole("tab", { name: "Navigator" }).getAttribute("aria-selected"))
+      .toBe("true");
+
+    fireEvent.click(screen.getByRole("tab", { name: "도구" }));
+    fireEvent.click(screen.getByRole("button", { name: /기본 배치.*검수/u }));
+    expect(channel?.postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: "companion-command",
+      command: "exit-canvas-only",
+      companionInstanceId: companionInstance,
+      targetPrimaryInstanceId: primaryInstanceA,
+    }));
+    expect(screen.getByRole("tab", { name: "검수" }).getAttribute("aria-selected"))
+      .toBe("true");
   });
 
   it("removes the primary document title from the entire DOM in presentation-safe mode", () => {
@@ -707,10 +730,16 @@ describe("StudioToolsCompanionPage", () => {
 
   it("keeps status live, touch actions at least 44px, and safe-area padding on small screens", () => {
     renderCompanion(`/studio/tools-companion?session=${sessionId}&remix=source-456`);
-    const status = screen.getByRole("status");
+    const status = document.querySelector<HTMLElement>("header [role='status']");
+    if (!status) throw new Error("companion connection status is missing");
     expect(status.getAttribute("aria-live")).toBe("polite");
     expect(screen.getByRole("button", { name: "기본 탭 앞으로" }).className).toContain("min-h-11");
-    expect(screen.getByTestId("studio-tools-companion-root").className).toContain("safe-area-inset");
+    const companionRoot = screen.getByTestId("studio-tools-companion-root");
+    expect(companionRoot.className).toContain("safe-area-inset");
+    expect(companionRoot.className).toContain("h-dvh");
+    expect(companionRoot.className).toContain("overflow-y-auto");
+    expect(screen.getByRole("button", { name: "현재 위치 저장" }).hasAttribute("disabled"))
+      .toBe(true);
     expect(screen.getByRole("link", { name: "스튜디오 다시 연결" }).getAttribute("href")).toBe(
       `http://localhost:3000/studio?session=${sessionId}&remix=source-456`
     );

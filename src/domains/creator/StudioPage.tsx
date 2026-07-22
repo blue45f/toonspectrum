@@ -2165,7 +2165,7 @@ async function startStudioToolsCompanionPrimaryRuntime(
 }
 
 const STUDIO_TOOLS_COMPANION_RESERVATION_FEATURES =
-  "popup=yes,width=420,height=780,menubar=no,toolbar=no,location=no,status=no";
+  "popup=yes,width=520,height=820,menubar=no,toolbar=no,location=no,status=no";
 
 function openStudioToolsCompanionForMenu(input: {
   ensureRuntime: () => Promise<StudioToolsCompanionPrimaryRuntime | null>;
@@ -2204,6 +2204,11 @@ function openStudioToolsCompanionForMenu(input: {
   if (!reservation) {
     input.announce("팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.");
     return;
+  }
+  try {
+    reservation.opener = null;
+  } catch {
+    // The lazy companion protocol retries this before navigation; keep the popup usable here.
   }
   input.windowRef.current = reservation;
   input.announce("도구 창을 준비 중입니다 · 연결이 끝나면 자동으로 열립니다");
@@ -9899,6 +9904,12 @@ function StudioCuttoonEditor() {
         case "toggle-canvas-only":
           if (companionUiRef.current.canvasOnlyMode) setCanvasOnlyMode(false);
           else setCanvasOnlyMode(true);
+          break;
+        case "enter-canvas-only":
+          setCanvasOnlyMode(true);
+          break;
+        case "exit-canvas-only":
+          setCanvasOnlyMode(false);
           break;
         default:
           break;

@@ -44,6 +44,7 @@ import {
   STUDIO_COMPANION_TOOL_LABELS,
   STUDIO_COMPANION_TOOL_ORDER,
   studioCompanionPrimaryUrl,
+  type StudioCompanionCommandName,
   type StudioCompanionDensity,
   type StudioCompanionMessage,
   type StudioCompanionSurface,
@@ -51,7 +52,16 @@ import {
 } from "./studio-tools-companion";
 import { StudioCompanionNavigator } from "./StudioCompanionNavigator";
 import { StudioCompanionReviewConsole } from "./StudioCompanionReviewConsole";
+import {
+  StudioCompanionWindowLayoutControls,
+  type StudioCompanionWindowLayoutPersistenceStatus,
+} from "./StudioCompanionWindowLayoutControls";
 import { StudioCompanionWindowManager } from "./StudioCompanionWindowManager";
+import {
+  StudioCompanionWorkspacePresets,
+  type StudioCompanionWorkspacePresetId,
+} from "./StudioCompanionWorkspacePresets";
+import { useStudioCompanionWindowLayout } from "./use-studio-companion-window-layout";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
@@ -67,7 +77,7 @@ type CompanionMode = "tools" | "navigator" | "review";
 type DedicatedCompanionSurface = Extract<StudioCompanionSurface, "navigator" | "review">;
 
 type ScreenPlacementStatus = {
-  kind: "requesting" | "unsupported" | "denied" | "timeout" | "no-secondary" | "failed" | "requested";
+  kind: "requesting" | "unsupported" | "denied" | "timeout" | "no-secondary" | "failed" | "requested" | "restored" | "stale";
   text: string;
 };
 
@@ -150,6 +160,7 @@ export function StudioToolsCompanionPage() {
   const [primaryTitle, setPrimaryTitle] = useState("스튜디오");
   const [activeTool, setActiveTool] = useState<StudioCompanionToolId>("select");
   const [density, setDensity] = useState<StudioCompanionDensity>("full");
+  const [primaryCanvasOnly, setPrimaryCanvasOnly] = useState(false);
   const [mode, setMode] = useState<CompanionMode>("tools");
   const [projection, setProjection] = useState<StudioCompanionReviewProjection | null>(null);
   const [navigatorImage, setNavigatorImage] = useState<{
@@ -164,6 +175,24 @@ export function StudioToolsCompanionPage() {
   }));
   const [screenPlacementStatus, setScreenPlacementStatus] = useState<ScreenPlacementStatus | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
+  const interactionReady = connected && targetPrimaryInstanceId !== null;
+  const companionWindowLayout = useStudioCompanionWindowLayout({
+    surface: effectiveSurface,
+    enabled: sessionId !== null,
+    interactionReady,
+    onRestored: () => {
+      setScreenPlacementStatus({
+        kind: "restored",
+        text: "이 역할에 저장된 창 위치와 크기를 복원했습니다.",
+      });
+    },
+    onTopologyStale: () => {
+      setScreenPlacementStatus({
+        kind: "stale",
+        text: "모니터 구성이 바뀌어 자동 복원을 멈췄습니다. 창을 원하는 곳으로 옮긴 뒤 ‘현재 위치 저장’을 눌러 주세요.",
+      });
+    },
+  });
 
   const presentationSafe = presentationSafeState.sessionId === sessionId
     ? presentationSafeState.enabled
@@ -405,6 +434,7 @@ export function StudioToolsCompanionPage() {
       setPrimaryTitle("스튜디오");
       setActiveTool("select");
       setDensity("full");
+      setPrimaryCanvasOnly(false);
       targetPrimaryInstanceIdRef.current = null;
       pendingPingNonceRef.current = null;
       primaryConfirmed = false;
@@ -446,6 +476,7 @@ export function StudioToolsCompanionPage() {
         markPrimaryActivity();
         setActiveTool(msg.tool);
         setDensity(msg.density);
+        setPrimaryCanvasOnly(msg.canvasOnly);
         setPrimaryTitle(msg.title || "스튜디오");
         return;
       }
@@ -565,7 +596,7 @@ export function StudioToolsCompanionPage() {
     };
   }, [clearPendingBrushControl, clearPendingNavigatorControl, clearReviewState, sessionId, surface]);
 
-  function sendCommand(command: StudioCompanionToolId | "focus-primary" | "toggle-canvas-only") {
+  function sendCommand(command: StudioCompanionCommandName) {
     const companionInstanceId = companionInstanceIdRef.current;
     const targetPrimary = targetPrimaryInstanceIdRef.current;
     if (!connected || !companionInstanceId || !targetPrimary) return;
@@ -577,7 +608,13 @@ export function StudioToolsCompanionPage() {
       commandId: createStudioCompanionCommandId(),
       sequence: commandSequenceRef.current,
     }));
-    if (sent && command !== "focus-primary" && command !== "toggle-canvas-only") {
+    if (
+      sent
+      && command !== "focus-primary"
+      && command !== "toggle-canvas-only"
+      && command !== "enter-canvas-only"
+      && command !== "exit-canvas-only"
+    ) {
       setActiveTool(command);
     }
   }
@@ -615,6 +652,7 @@ export function StudioToolsCompanionPage() {
       }
       window.moveTo(placement.left, placement.top);
       window.resizeTo(placement.width, placement.height);
+      companionWindowLayout.notifyManualPlacement();
       try {
         window.focus();
       } catch {
@@ -660,7 +698,30 @@ export function StudioToolsCompanionPage() {
     return true;
   }
 
-  const interactionReady = connected && targetPrimaryInstanceId !== null;
+  const activeWorkspacePreset: StudioCompanionWorkspacePresetId | null = !interactionReady
+    ? null
+    : mode === "tools" && primaryCanvasOnly
+      ? "draw"
+      : mode === "navigator" && primaryCanvasOnly
+        ? "navigate"
+        : mode === "review" && !primaryCanvasOnly
+          ? "review"
+          : null;
+  function applyWorkspacePreset(preset: StudioCompanionWorkspacePresetId): void {
+    if (!interactionReady || effectiveSurface !== "workspace") return;
+    if (preset === "draw") {
+      setMode("tools");
+      sendCommand("enter-canvas-only");
+      return;
+    }
+    if (preset === "navigate") {
+      setMode("navigator");
+      sendCommand("enter-canvas-only");
+      return;
+    }
+    setMode("review");
+    sendCommand("exit-canvas-only");
+  }
   const visiblePrimaryTitle = presentationSafe ? "스튜디오" : primaryTitle;
   const navigatorSurfaceActive = effectiveSurface === "navigator"
     || (effectiveSurface === "workspace" && mode === "navigator");
@@ -687,6 +748,41 @@ export function StudioToolsCompanionPage() {
       : "검수 콘솔";
   const dedicatedLayout = effectiveSurface !== "workspace";
   const screenPlacementBusy = screenPlacementStatus?.kind === "requesting";
+  const windowLayoutPersistenceStatus: StudioCompanionWindowLayoutPersistenceStatus =
+    companionWindowLayout.status === "unsupported"
+      ? "unsupported"
+      : companionWindowLayout.sessionOnly
+        ? "session-only"
+        : "persistent";
+  const windowLayoutAutomationNote =
+    companionWindowLayout.status === "permission-required"
+      ? "자동 복원을 허용하려면 상단의 ‘다른 화면으로 창 이동’을 한 번 눌러 창 관리 권한을 허용해 주세요."
+      : companionWindowLayout.status === "permission-denied"
+        ? "창 관리 권한이 꺼져 있어 자동 복원할 수 없습니다. 브라우저 사이트 설정에서 권한을 켜거나 직접 옮겨 주세요."
+        : companionWindowLayout.status === "stale-topology"
+          ? "저장 당시와 모니터 구성이 달라 임의의 화면으로 옮기지 않았습니다. 원하는 곳으로 옮긴 뒤 ‘현재 위치 저장’을 눌러 주세요."
+          : companionWindowLayout.status === "restore-failed"
+            ? "브라우저가 창 이동을 적용하지 않아 기존 저장 배치를 유지했습니다. 창을 직접 옮기면 실제 위치를 다시 기억합니다."
+          : null;
+  const windowLayoutSettings = (
+    <>
+      <StudioCompanionWindowLayoutControls
+        surface={effectiveSurface}
+        enabled={companionWindowLayout.rememberEnabled}
+        disabled={!interactionReady}
+        hasSavedLayout={companionWindowLayout.hasSaved}
+        persistenceStatus={windowLayoutPersistenceStatus}
+        onEnabledChange={companionWindowLayout.setRememberEnabled}
+        onCapture={companionWindowLayout.notifyManualPlacement}
+        onClear={companionWindowLayout.resetSavedLayout}
+      />
+      {windowLayoutAutomationNote ? (
+        <p className="rounded-lg border border-warn/30 bg-warn/10 px-2.5 py-2 text-[0.66rem] leading-relaxed text-warn">
+          {windowLayoutAutomationNote}
+        </p>
+      ) : null}
+    </>
+  );
 
   function handleModeTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     let nextIndex: number | null = null;
@@ -708,7 +804,7 @@ export function StudioToolsCompanionPage() {
     <div
       data-testid="studio-tools-companion-root"
       data-companion-surface={effectiveSurface}
-      className="flex min-h-dvh flex-col overflow-x-hidden bg-canvas text-fg [--studio-safe-bottom:env(safe-area-inset-bottom)] [--studio-safe-left:env(safe-area-inset-left)] [--studio-safe-right:env(safe-area-inset-right)] [--studio-safe-top:env(safe-area-inset-top)]"
+      className="flex h-dvh min-h-0 flex-col overflow-x-hidden overflow-y-auto bg-canvas text-fg [--studio-safe-bottom:env(safe-area-inset-bottom)] [--studio-safe-left:env(safe-area-inset-left)] [--studio-safe-right:env(safe-area-inset-right)] [--studio-safe-top:env(safe-area-inset-top)]"
     >
       <header className="sticky top-0 z-20 border-b border-line bg-panel/95 pb-2 backdrop-blur-xl [padding-left:max(0.75rem,var(--studio-safe-left))] [padding-right:max(0.75rem,var(--studio-safe-right))] [padding-top:max(0.65rem,var(--studio-safe-top))]">
         <div className="flex items-start gap-2.5">
@@ -804,15 +900,19 @@ export function StudioToolsCompanionPage() {
         ) : null}
         {screenPlacementStatus ? (
           <p
-            role={screenPlacementStatus.kind === "requesting" || screenPlacementStatus.kind === "requested"
+            role={screenPlacementStatus.kind === "requesting"
+              || screenPlacementStatus.kind === "requested"
+              || screenPlacementStatus.kind === "restored"
               ? "status"
               : "alert"}
-            aria-live={screenPlacementStatus.kind === "requesting" || screenPlacementStatus.kind === "requested"
+            aria-live={screenPlacementStatus.kind === "requesting"
+              || screenPlacementStatus.kind === "requested"
+              || screenPlacementStatus.kind === "restored"
               ? "polite"
               : undefined}
             className={cn(
               "rounded-xl border px-3 py-2 text-xs",
-              screenPlacementStatus.kind === "requested"
+              screenPlacementStatus.kind === "requested" || screenPlacementStatus.kind === "restored"
                 ? "border-good/35 bg-good/10 text-good"
                 : screenPlacementStatus.kind === "requesting"
                   ? "border-line bg-card text-fg-2"
@@ -835,6 +935,17 @@ export function StudioToolsCompanionPage() {
           >
             <WandSparkles className="size-3.5" aria-hidden /> 스튜디오 다시 연결
           </a>
+        ) : null}
+
+        {dedicatedLayout ? (
+          <details className="group shrink-0 rounded-xl border border-line/70 bg-card/55 p-1.5">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-2.5 text-xs font-semibold text-fg-2 outline-none hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/35 [&::-webkit-details-marker]:hidden">
+              창 배치 설정
+              <span className="text-[0.64rem] font-medium text-fg-3 group-open:hidden">펼치기</span>
+              <span className="hidden text-[0.64rem] font-medium text-fg-3 group-open:inline">접기</span>
+            </summary>
+            <div className="space-y-1.5 pt-1.5">{windowLayoutSettings}</div>
+          </details>
         ) : null}
 
         {effectiveSurface === "workspace" ? (
@@ -906,6 +1017,12 @@ export function StudioToolsCompanionPage() {
                 ) : null}
               </div>
             </section>
+            <StudioCompanionWorkspacePresets
+              disabled={!interactionReady}
+              activePreset={activeWorkspacePreset}
+              onApplyPreset={applyWorkspacePreset}
+            />
+            {windowLayoutSettings}
             <StudioCompanionWindowManager
               disabled={!sessionId || surface !== "workspace"}
               onOpenSurface={openDedicatedSurface}
