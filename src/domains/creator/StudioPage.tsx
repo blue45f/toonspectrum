@@ -248,7 +248,9 @@ import {
   removeBubbleShapePoint,
 } from "./studio-bubble-custom-shape";
 import {
+  isStudioBrushCursorMode,
   isStudioCanvasInteractionBlocked,
+  shouldShowStudioBrushCursor,
   studioCanvasCursorClassName,
   studioCanvasViewportCursorClassName,
 } from "./studio-canvas-cursor";
@@ -1135,6 +1137,7 @@ import {
   projectStudioWriterRoomToCanvasPlan,
   type StudioWriterRoomCanvasProjectionResult,
 } from "./studio-writer-room-canvas-projection";
+import { StudioBrushCursor } from "./StudioBrushCursor";
 import { StudioCanvasContextMenu } from "./StudioCanvasContextMenu";
 import {
   StudioCanvasGuideOverlayLayers,
@@ -7372,7 +7375,7 @@ function StudioCuttoonEditor() {
   const quickShapeConvertedRef = useRef<boolean>(false); // 이 스트로크가 QuickShape 로 변환됐는지
   const quickShapeLockedRef = useRef<boolean>(false); // 2단계(정비율 고정)를 이미 적용했는지
   // 브러시 커서 프리뷰(Konva 노드 직접 갱신 — hover 리렌더 방지).
-  const brushCursorRef = useRef<Konva.Circle>(null);
+  const brushCursorRef = useRef<Konva.Group>(null);
   // 비다이렉트 초안(팬시 브러시·도형 드래그)은 격리 스토어로 흐른다(StudioDraftPreviewLayers).
   // 포인터 프레임이 이 30k 라인 컴포넌트를 다시 렌더하지 않는다 — 모든 브러시가 펜과 같은
   // 필기감을 갖는 구조적 토대. 스마트 도형 변환 라벨만 저빈도 상태로 승격한다(변환 시 1회).
@@ -19711,6 +19714,7 @@ function StudioCuttoonEditor() {
         endLiveResourceEdit();
         return;
       }
+      updateBrushCursor(e.target.getStage(), pointerSample);
       // One pointer contact owns one immutable input contract. Toolbar shortcuts can re-render
       // while a pen is still down; those new preferences apply to the next stroke, never halfway
       // through the current filter/pressure/post-correction pipeline.
@@ -19823,9 +19827,8 @@ function StudioCuttoonEditor() {
         );
       }
       drawingRef.current = next;
-      // A translucent cursor disc/shadow over fresh ink makes stable pixels look as if they are
-      // still darkening. Hide the hover-only size preview for the entire pointer contact.
-      hideBrushCursor();
+      // The active cursor is outline-only, so it can track the contact without darkening stable
+      // pixels or becoming part of the live-ink/commit receipt.
       perspectiveRayRef.current = null; // 새 스트로크마다 원근 락을 다시 잡는다(첫 move에서 재계산).
       isometricAxisRayRef.current = null; // 새 스트로크마다 아이소메트릭 축 락도 다시 잡는다.
       advancedRulerSnapRef.current = null;
@@ -20442,21 +20445,8 @@ function StudioCuttoonEditor() {
         };
         updateHistoryBrushCursorNode(canvasPointToNormalized(pos.x, pos.y, frame), frame);
       }
-    } else if (tool === "draw") {
-      const cursorPos = e.target.getStage()?.getRelativePointerPosition();
-      const cursorNode = brushCursorRef.current;
-      if (cursorPos && cursorNode) {
-        if (drawingRef.current) {
-          if (cursorNode.visible()) {
-            cursorNode.visible(false);
-            cursorNode.getLayer()?.batchDraw();
-          }
-        } else {
-          cursorNode.position(cursorPos);
-          if (!cursorNode.visible()) cursorNode.visible(true);
-          cursorNode.getLayer()?.batchDraw();
-        }
-      }
+    } else if (tool === "draw" && isStudioBrushCursorMode(drawMode)) {
+      updateBrushCursor(e.target.getStage(), e.evt as PointerEvent);
     }
     if (tool !== "draw" || !drawingRef.current) return;
     const pointerEvent = e.evt as PointerEvent;
@@ -21620,6 +21610,7 @@ function StudioCuttoonEditor() {
   }
   function onStagePointerCancel(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     const pointerEvent = e.evt as PointerEvent;
+    hideBrushCursor();
     if (liquifyHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     if (pixelSelectionHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     if (requireStudioDrawingPointerTransport(drawingPointerTransportRef).consumeHandledNativeEnd(pointerEvent)) return;
@@ -21699,6 +21690,7 @@ function StudioCuttoonEditor() {
       // cannot intercept pointerup and leak capture; finishDrawingPointer always cleans up in finally
       // (including QuickShape timer stop after promote snapshot).
       finishDrawingPointer(e.target.getStage(), pointerEvent);
+      updateBrushCursor(e.target.getStage(), pointerEvent);
       return;
     }
     if (liquifyDragRef.current) {
@@ -21896,6 +21888,36 @@ function StudioCuttoonEditor() {
       cursorNode.visible(false);
       cursorNode.getLayer()?.batchDraw();
     }
+  }
+  function updateBrushCursor(stage: Konva.Stage | null, pointerEvent: PointerEvent) {
+    const cursorNode = brushCursorRef.current;
+    if (!cursorNode) return;
+    if (
+      tool !== "draw"
+      || !isStudioBrushCursorMode(drawMode)
+      || isSpacePressed
+      || isPanning
+      || appSettingsRef.current.general.brushCursorStyle === "none"
+      || !shouldShowStudioBrushCursor(pointerEvent.pointerType)
+    ) {
+      hideBrushCursor();
+      return;
+    }
+    stage?.setPointersPositions(pointerEvent);
+    const cursorPos = stage?.getRelativePointerPosition();
+    if (
+      !cursorPos
+      || cursorPos.x < 0
+      || cursorPos.x > CANVAS_W
+      || cursorPos.y < 0
+      || cursorPos.y > canvasH
+    ) {
+      hideBrushCursor();
+      return;
+    }
+    cursorNode.position(cursorPos);
+    if (!cursorNode.visible()) cursorNode.visible(true);
+    cursorNode.getLayer()?.batchDraw();
   }
   function hideSmudgeCursor() {
     const cursorNode = smudgeCursorRef.current;
@@ -25994,7 +26016,6 @@ function StudioCuttoonEditor() {
           collaborationDocumentUnavailable={collaborationDocumentUnavailable}
           collaborationLockMessage={collaborationLockMessage}
           closeViewToolWithFocus={closeViewToolWithFocus}
-          color={color}
           colorBlindPreview={colorBlindPreview}
           commentPinArmed={commentPinArmed}
           commentQuickReplyActive={
@@ -26159,6 +26180,8 @@ function StudioCuttoonEditor() {
           stabilizerMode={stabilizerMode}
           stageRef={stageRef}
           strokeWidth={strokeWidth}
+          tipAngle={tipAngle}
+          tipRoundness={tipRoundness}
           studioCanvasCommentPins={studioCanvasCommentPins}
           studioCommentPinReanchorableThreadIds={studioCommentPinReanchorableThreadIds}
           studioCommentPinReanchorDisabledReason={studioCommentPinReanchorDisabledReason}
@@ -27056,7 +27079,7 @@ interface StudioCanvasViewportProps {
   bg: string;
   bgGrad: string[] | null;
   brush: string;
-  brushCursorRef: import("react").RefObject<import("konva/lib/shapes/Circle").Circle | null>;
+  brushCursorRef: import("react").RefObject<import("konva/lib/Group").Group | null>;
   brushOpacity: number;
   bubbleShapeArmed: boolean;
   bubbleShapeDraft: { elId: string; points: number[]; } | null;
@@ -27071,7 +27094,6 @@ interface StudioCanvasViewportProps {
   commentQuickReplyActive: boolean;
   collaborationLockMessage: () => string;
   closeViewToolWithFocus: (options?: { preferCanvas?: boolean }) => void;
-  color: string;
   colorBlindPreview: CvdMode;
   commentPinArmed: boolean;
   cropArmed: boolean;
@@ -27233,6 +27255,8 @@ interface StudioCanvasViewportProps {
   stabilizerMode: "standard" | "adaptive" | "precision";
   stageRef: import("react").RefObject<import("konva/lib/Stage").Stage | null>;
   strokeWidth: number;
+  tipAngle: number;
+  tipRoundness: number;
   studioCanvasCommentPins: import("./studio-live-canvas-overlay-model").StudioCanvasCommentPin[];
   studioCommentPinReanchorableThreadIds: ReadonlySet<string>;
   studioCommentPinReanchorDisabledReason?: string;
@@ -27333,7 +27357,6 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   collaborationDocumentUnavailable,
   collaborationLockMessage,
   closeViewToolWithFocus,
-  color,
   colorBlindPreview,
   commentPinArmed,
   commentQuickReplyActive,
@@ -27495,6 +27518,8 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   stabilizerMode,
   stageRef,
   strokeWidth,
+  tipAngle,
+  tipRoundness,
   studioCanvasCommentPins,
   studioCommentPinReanchorableThreadIds,
   studioCommentPinReanchorDisabledReason,
@@ -27681,6 +27706,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   } as const;
   const viewportCursorClassName = studioCanvasViewportCursorClassName(canvasCursorInput);
   const canvasCursorClassName = studioCanvasCursorClassName(canvasCursorInput);
+  const brushCursorStyle = appSettings.general.brushCursorStyle;
   const zoomOutAtLimit = stepStudioViewZoom(zoom, -1) === zoom;
   const zoomInAtLimit = stepStudioViewZoom(zoom, 1) === zoom;
   const viewBusyReason = viewTransformSuppressed
@@ -28109,6 +28135,16 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
           <div
             ref={zoomHostRef}
             data-studio-canvas-cursor={canvasCursorClassName.replace("cursor-", "")}
+            data-studio-brush-cursor-style={
+              tool === "draw" && isStudioBrushCursorMode(drawMode)
+                ? brushCursorStyle
+                : undefined
+            }
+            data-studio-brush-cursor-brush={
+              tool === "draw" && isStudioBrushCursorMode(drawMode)
+                ? drawMode === "eraser" ? "eraser" : brush
+                : undefined
+            }
             data-studio-comment-placement-active={commentPinArmed ? "true" : undefined}
             className={cn(
               "relative rounded-sm shadow-[0_0_0_1px_oklch(0.3_0.012_64/0.55),0_18px_50px_oklch(0.08_0.01_70/0.45)]",
@@ -28702,37 +28738,29 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
             <StudioDraftPreviewLayers
               store={draftPreviewStore}
             />
-            {/* 브러시 커서 프리뷰: 드로잉 모드에서 포인터를 따라다니는 브러시 크기 원 */}
-            {!isExporting && tool === "draw" && drawMode !== "pixel" && (
-              <Layer listening={false}>
-                {/* CSP/Procreate-style size disc: soft fill + crisp ring */}
-                <KCircle
-                  ref={brushCursorRef}
-                  visible={false}
-                  radius={Math.max(
-                    1.5,
-                    (drawMode === "shape"
-                      ? 6
-                      : drawMode === "pen"
-                        ? studioBrushAliasEffectiveDiameter(brush, strokeWidth)
-                        : strokeWidth) / 2
-                  )}
-                  fill={drawMode === "eraser" ? "#a1a1aa" : color}
-                  fillEnabled={drawMode !== "shape"}
-                  fillOpacity={drawMode === "eraser" ? 0.12 : 0.14}
-                  opacity={1}
-                  stroke={drawMode === "eraser" ? "#71717a" : color}
-                  strokeWidth={1.35 / effScale}
-                  dash={drawMode === "eraser" ? [4 / effScale, 3 / effScale] : undefined}
-                  strokeEnabled
-                  perfectDrawEnabled={false}
-                  shadowEnabled={drawMode === "pen"}
-                  shadowColor={color}
-                  shadowBlur={drawMode === "pen" ? 3 / effScale : 0}
-                  shadowOpacity={drawMode === "pen" ? 0.2 : 0}
+            {/* 브러시 렌더 종류와 실제 범위를 반영하는 고대비 포인터. */}
+            {!isExporting
+              && !canvasInteractionBlocked
+              && !isSpacePressed
+              && !isPanning
+              && tool === "draw"
+              && isStudioBrushCursorMode(drawMode)
+              && brushCursorStyle !== "none" ? (
+                <StudioBrushCursor
+                  cursorRef={brushCursorRef}
+                  brushId={drawMode === "eraser" ? "eraser" : brush}
+                  diameter={
+                    drawMode === "pen"
+                      ? studioBrushAliasEffectiveDiameter(brush, strokeWidth)
+                      : strokeWidth
+                  }
+                  effectiveScale={effScale}
+                  mode={drawMode}
+                  style={brushCursorStyle}
+                  tipAngleDeg={tipAngle}
+                  tipRoundness={tipRoundness}
                 />
-              </Layer>
-            )}
+              ) : null}
             {!isExporting && (smudgeArmed || liquifyArmed) && (
               <Layer listening={false}>
                 <KCircle

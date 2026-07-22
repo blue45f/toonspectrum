@@ -307,13 +307,16 @@ export function StudioAppSettingsPanel({
                     }
                   />
                 </Row>
-                <Row label="브러시 커서" hint="캔버스 위 커서 표시 방식">
+                <Row
+                  label="브러시 커서"
+                  hint="윤곽은 실제 브러시 크기를, 점은 중심만 표시합니다. 시스템은 십자 포인터만 사용합니다"
+                >
                   <SelectChipGroup
                     value={settings.general.brushCursorStyle}
                     options={[
                       { id: "outline", label: "윤곽" },
                       { id: "dot", label: "점" },
-                      { id: "none", label: "숨김" },
+                      { id: "none", label: "시스템" },
                     ]}
                     onChange={(brushCursorStyle) =>
                       patch({ general: { ...settings.general, brushCursorStyle } })

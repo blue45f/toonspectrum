@@ -17,6 +17,19 @@ describe("Studio canvas cursor integration boundary", () => {
     expect(studioPageSource).toContain("data-studio-canvas-cursor={canvasCursorClassName");
   });
 
+  it("wires saved brush cursor preferences to a renderer-specific contact cursor", () => {
+    expect(studioPageSource).toContain(
+      "const brushCursorStyle = appSettings.general.brushCursorStyle"
+    );
+    expect(studioPageSource).toContain("brushCursorStyle !== \"none\"");
+    expect(studioPageSource).toContain("<StudioBrushCursor");
+    expect(studioPageSource).toContain("brushId={drawMode === \"eraser\" ? \"eraser\" : brush}");
+    expect(studioPageSource).toContain(
+      "updateBrushCursor(e.target.getStage(), e.evt as PointerEvent)"
+    );
+    expect(studioPageSource).not.toContain("Hide the hover-only size preview");
+  });
+
   it("shows the comment cursor only while the resolved paper cursor is a usable crosshair", () => {
     expect(globalsSource).toContain('@media (pointer: fine)');
     expect(globalsSource).toContain(

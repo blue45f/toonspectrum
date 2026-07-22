@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isStudioBrushCursorMode,
   isStudioCanvasInteractionBlocked,
+  planStudioBrushCursorVisual,
+  shouldShowStudioBrushCursor,
   studioCanvasCursorClassName,
   studioCanvasViewportCursorClassName,
   type StudioCanvasCursorInput,
@@ -106,13 +109,118 @@ describe("studioCanvasCursorClassName", () => {
     expect(studioCanvasCursorClassName({ ...base, tool: "draw", drawMode: "pixel" })).toBe("cursor-crosshair");
   });
 
-  it("lets precision brush rings replace the obscuring system pointer", () => {
-    expect(studioCanvasCursorClassName({ ...base, tool: "draw", drawMode: "pen" })).toBe("cursor-none");
+  it("keeps a native crosshair fallback beneath pen and eraser footprint rings", () => {
+    expect(studioCanvasCursorClassName({ ...base, tool: "draw", drawMode: "pen" })).toBe("cursor-crosshair");
+    expect(studioCanvasCursorClassName({ ...base, tool: "draw", drawMode: "eraser" })).toBe("cursor-crosshair");
     expect(studioCanvasCursorClassName({ ...base, precisionBrushArmed: true })).toBe("cursor-none");
   });
 
   it("keeps blocked and active-pan states higher priority than tool hints", () => {
     expect(studioCanvasCursorClassName({ ...base, interactionBlocked: true, commentPinArmed: true })).toBe("cursor-not-allowed");
     expect(studioCanvasCursorClassName({ ...base, isPanning: true, precisionBrushArmed: true })).toBe("cursor-grabbing");
+  });
+});
+
+describe("Studio brush cursor", () => {
+  it("uses custom footprint rings only for pen and eraser modes", () => {
+    expect(isStudioBrushCursorMode("pen")).toBe(true);
+    expect(isStudioBrushCursorMode("eraser")).toBe(true);
+    expect(isStudioBrushCursorMode("shape")).toBe(false);
+    expect(isStudioBrushCursorMode("pixel")).toBe(false);
+    expect(isStudioBrushCursorMode("lasso-fill")).toBe(false);
+  });
+
+  it("keeps mouse and pen cursors visible while avoiding a fake hover cursor for touch", () => {
+    expect(shouldShowStudioBrushCursor("mouse")).toBe(true);
+    expect(shouldShowStudioBrushCursor("pen")).toBe(true);
+    expect(shouldShowStudioBrushCursor(undefined)).toBe(true);
+    expect(shouldShowStudioBrushCursor("touch")).toBe(false);
+  });
+
+  it("preserves the exact document footprint while keeping outlines screen-stable", () => {
+    const atHalf = planStudioBrushCursorVisual({
+      diameter: 20,
+      effectiveScale: 0.5,
+      mode: "eraser",
+    });
+    const atDouble = planStudioBrushCursorVisual({
+      diameter: 20,
+      effectiveScale: 2,
+      mode: "eraser",
+    });
+
+    expect(atHalf.radius).toBe(10);
+    expect(atDouble.radius).toBe(10);
+    expect(atHalf.outerStrokeWidth * 0.5).toBeCloseTo(3.25);
+    expect(atDouble.outerStrokeWidth * 2).toBeCloseTo(3.25);
+    expect(atHalf.innerStrokeWidth * 0.5).toBeCloseTo(1.25);
+    expect(atDouble.innerStrokeWidth * 2).toBeCloseTo(1.25);
+    expect(atHalf.dash?.map((value) => value * 0.5)).toEqual([4, 3]);
+    expect(atDouble.dash?.map((value) => value * 2)).toEqual([4, 3]);
+  });
+
+  it("adds a center sight for tiny outlines and honors the saved dot style", () => {
+    const tiny = planStudioBrushCursorVisual({ diameter: 2, effectiveScale: 1, mode: "pen" });
+    const large = planStudioBrushCursorVisual({ diameter: 20, effectiveScale: 1, mode: "pen" });
+    const dot = planStudioBrushCursorVisual({
+      diameter: 20,
+      effectiveScale: 2,
+      mode: "eraser",
+      style: "dot",
+    });
+
+    expect(tiny.radius).toBe(1);
+    expect(tiny.centerRadius).toBe(1.5);
+    expect(tiny.centerStrokeWidth).toBe(0.75);
+    expect(tiny.dash).toBeUndefined();
+    expect(tiny.showOutline).toBe(true);
+    expect(large.centerRadius).toBeNull();
+    expect(dot.showOutline).toBe(false);
+    expect(dot.centerRadius).toBe(1);
+    expect(dot.centerStrokeWidth * 2).toBe(0.75);
+  });
+
+  it("matches cursor geometry and texture to the active brush renderer", () => {
+    const calligraphy = planStudioBrushCursorVisual({
+      brushId: "calligraphy",
+      diameter: 20,
+      effectiveScale: 1,
+      mode: "pen",
+      tipAngleDeg: 36,
+      tipRoundness: 0.25,
+    });
+    const highlighter = planStudioBrushCursorVisual({
+      brushId: "highlighter",
+      diameter: 24,
+      effectiveScale: 1,
+      mode: "pen",
+    });
+    const softGlow = planStudioBrushCursorVisual({
+      brushId: "soft-glow",
+      diameter: 20,
+      effectiveScale: 1,
+      mode: "pen",
+    });
+    const starDust = planStudioBrushCursorVisual({
+      brushId: "star-dust",
+      diameter: 20,
+      effectiveScale: 1,
+      mode: "pen",
+    });
+
+    expect(calligraphy).toMatchObject({
+      shape: "ellipse",
+      texture: "solid",
+      radiusX: 10,
+      radiusY: 2.5,
+      rotationDeg: 36,
+    });
+    expect(highlighter.shape).toBe("square");
+    expect(softGlow.texture).toBe("soft");
+    expect(softGlow.radius).toBe(42);
+    expect(softGlow.innerBoundaryScale).toBe(0.2);
+    expect(starDust.texture).toBe("scatter");
+    expect(starDust.radius).toBe(23);
+    expect(starDust.dash).toEqual([2, 2]);
   });
 });
