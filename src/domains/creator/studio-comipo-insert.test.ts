@@ -65,7 +65,11 @@ function assemblyToElements(layoutId: string): TestElement[] {
 /** StudioPage.studioInsertState() 와 동일한 입력 조립. */
 function studioPageState(
   elements: TestElement[],
-  opts?: { canvasH?: number; selectedId?: string | null }
+  opts?: {
+    canvasH?: number;
+    selectedId?: string | null;
+    viewCenter?: { x: number; y: number } | null;
+  }
 ): StudioPageInsertState {
   const selectedEl =
     opts?.selectedId != null
@@ -75,6 +79,7 @@ function studioPageState(
     elements,
     canvasH: opts?.canvasH ?? STUDIO_CANVAS_H,
     canvasW: CANVAS_W,
+    viewCenter: opts?.viewCenter,
     selected:
       selectedEl &&
       selectedEl.x != null &&
@@ -132,6 +137,51 @@ describe("runStudioPageAddSceneTemplate / runStudioPageAddDialogueBubbles", () =
 
     const result = runStudioPageAddSceneTemplate(state, "confession", nextId);
     expect(result.ok).toBe(true);
+  });
+
+  it("addSceneTemplate: current visible center wins over the long document center", () => {
+    const state = studioPageState([], {
+      canvasH: 6000,
+      viewCenter: { x: 360, y: 4200 },
+    });
+
+    expect(studioSpawnCenter(state)).toEqual([360, 4200]);
+    const result = runStudioPageAddSceneTemplate(state, "confession", nextId);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const frame = result.elements.find((element) => element.type === "frame");
+    expect(frame?.y).toBe(3970);
+  });
+
+  it("addSceneTemplate: clamps a new scene inside the bottom of a long document", () => {
+    const state = studioPageState([], {
+      canvasH: 6_000,
+      viewCenter: { x: 360, y: 5_980 },
+    });
+
+    const result = runStudioPageAddSceneTemplate(state, "confession", nextId);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const frame = result.elements.find((element) => element.type === "frame");
+    expect(frame?.y).toBe(5_516);
+    expect((frame?.y ?? 0) + (frame?.height ?? 0)).toBeLessThanOrEqual(5_976);
+  });
+
+  it("addSceneTemplate: creates near the current empty work area instead of jumping to the first frame", () => {
+    const elements: TestElement[] = [
+      { id: "top-frame", type: "frame", x: 24, y: 24, width: 672, height: 480 },
+    ];
+    const state = studioPageState(elements, {
+      canvasH: 6_000,
+      viewCenter: { x: 360, y: 4_200 },
+    });
+
+    const result = runStudioPageAddSceneTemplate(state, "confession", nextId);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const frames = result.elements.filter((element) => element.type === "frame");
+    expect(frames).toHaveLength(2);
+    expect(frames.some((frame) => frame.y === 3_970)).toBe(true);
   });
 
   it("addDialogueBubbles: scene then dialogue quickstart stays composable", () => {

@@ -165,6 +165,13 @@ export interface StudioViewClientRect {
   bottom: number;
 }
 
+export interface StudioVisibleDocumentPlacement {
+  /** Center of the document area that is genuinely visible inside the scroll viewport. */
+  center: StudioViewPoint;
+  /** Axis-aligned visible bounds in document coordinates. */
+  bounds: StudioViewRect;
+}
+
 export interface StudioViewZoomGestureAnchor {
   /** Client-space point used for the final scroll anchor. */
   clientX: number;
@@ -464,6 +471,59 @@ export function projectStudioViewRectToDocumentRect(
     projectStudioViewPointToDocument({ ...input, x: input.x, y: bottom }),
     projectStudioViewPointToDocument({ ...input, x: right, y: bottom }),
   ]);
+}
+
+/**
+ * Resolve the visible document intersection from measured DOM rectangles.
+ *
+ * Using the intersection (instead of the browser viewport center) avoids placing
+ * new content on a clamped document edge when the zoomed canvas is smaller than
+ * its scroll viewport. The same inverse transform keeps click insertion aligned
+ * after view-only rotation and horizontal flip.
+ */
+export function resolveStudioVisibleDocumentPlacement(input: StudioViewTransformInput & {
+  hostRect: StudioViewClientRect;
+  viewportRect: StudioViewClientRect;
+}): StudioVisibleDocumentPlacement | null {
+  const hostWidth = input.hostRect.right - input.hostRect.left;
+  const hostHeight = input.hostRect.bottom - input.hostRect.top;
+  if (
+    !Number.isFinite(hostWidth) || hostWidth <= 0 ||
+    !Number.isFinite(hostHeight) || hostHeight <= 0 ||
+    !Number.isFinite(input.documentWidth) || input.documentWidth <= 0 ||
+    !Number.isFinite(input.documentHeight) || input.documentHeight <= 0
+  ) return null;
+
+  const left = Math.max(input.hostRect.left, input.viewportRect.left);
+  const top = Math.max(input.hostRect.top, input.viewportRect.top);
+  const right = Math.min(input.hostRect.right, input.viewportRect.right);
+  const bottom = Math.min(input.hostRect.bottom, input.viewportRect.bottom);
+  if (right <= left || bottom <= top) return null;
+
+  const rotation = normalizeStudioViewRotation(input.canvasRotation ?? 0);
+  const quarterTurn = rotation === 90 || rotation === 270;
+  const viewWidth = quarterTurn ? input.documentHeight : input.documentWidth;
+  const viewHeight = quarterTurn ? input.documentWidth : input.documentHeight;
+  const viewRect = {
+    x: ((left - input.hostRect.left) / hostWidth) * viewWidth,
+    y: ((top - input.hostRect.top) / hostHeight) * viewHeight,
+    width: ((right - left) / hostWidth) * viewWidth,
+    height: ((bottom - top) / hostHeight) * viewHeight,
+  };
+  const transform = {
+    documentWidth: input.documentWidth,
+    documentHeight: input.documentHeight,
+    canvasFlipH: input.canvasFlipH,
+    canvasRotation: rotation,
+  };
+  return {
+    bounds: projectStudioViewRectToDocumentRect({ ...transform, ...viewRect }),
+    center: projectStudioViewPointToDocument({
+      ...transform,
+      x: viewRect.x + viewRect.width / 2,
+      y: viewRect.y + viewRect.height / 2,
+    }),
+  };
 }
 
 /** Center a document-local point in the current visual view while respecting scroll bounds. */

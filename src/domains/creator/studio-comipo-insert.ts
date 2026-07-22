@@ -33,6 +33,8 @@ export type ComipoInsertAction =
       /** 지정 없으면 snapshot.frames 또는 가상 컷. */
       targetFrame?: PanelLayoutFrame;
       originY?: number;
+      /** 현재 작업 영역에 가까운 기존 컷이 없을 때 originY에 새 컷을 만든다. */
+      createFrameAtOrigin?: boolean;
     }
   | {
       kind: "dialogue";
@@ -50,20 +52,39 @@ function findSceneTemplate(id: string) {
   return SCENE_TEMPLATES.find((t) => t.id === id) ?? null;
 }
 
+/** Height of the first frame created by a scene template, or the safe virtual-frame fallback. */
+export function sceneTemplateInsertHeight(templateId: string): number {
+  const scene = findSceneTemplate(templateId);
+  const frame = scene?.build(0, 0).find((seed) => seed.type === "frame");
+  return frame?.height && Number.isFinite(frame.height)
+    ? Math.max(1, frame.height)
+    : OFF_FRAME_HEIGHT;
+}
+
 function frameToRect(frame: PanelLayoutFrame): Rect {
   return { x: frame.x, y: frame.y, w: frame.width, h: frame.height };
 }
 
-/** 뷰포트 중심이 들어가는 패널 프레임(없으면 첫 프레임). */
+function distanceFromPointToFrame(frame: PanelLayoutFrame, x: number, y: number): number {
+  const dx = Math.max(frame.x - x, 0, x - (frame.x + frame.width));
+  const dy = Math.max(frame.y - y, 0, y - (frame.y + frame.height));
+  return Math.hypot(dx, dy);
+}
+
+/** 뷰포트 중심이 들어가거나 가까이 있는 패널. 먼 화면의 첫 컷으로 점프하지 않는다. */
 export function pickTargetPanelFrame(
   frames: readonly PanelLayoutFrame[],
   viewCenterX: number,
-  viewCenterY: number
+  viewCenterY: number,
+  maxDistance = 160
 ): PanelLayoutFrame | null {
   if (frames.length === 0) return null;
   const hit = frames.find((f) => rectContainsPoint(frameToRect(f), viewCenterX, viewCenterY));
   if (hit) return hit;
-  return [...frames].sort((a, b) => a.y - b.y || a.x - b.x)[0] ?? null;
+  const nearest = [...frames]
+    .map((frame) => ({ frame, distance: distanceFromPointToFrame(frame, viewCenterX, viewCenterY) }))
+    .sort((a, b) => a.distance - b.distance || a.frame.y - b.frame.y || a.frame.x - b.frame.x)[0];
+  return nearest && nearest.distance <= Math.max(0, maxDistance) ? nearest.frame : null;
 }
 
 function virtualInsertFrame(originY: number, canvasWidth = CANVAS_W): PanelLayoutFrame {
@@ -141,7 +162,8 @@ function mutateScene(
   createId: () => string,
   canvasWidth: number,
   targetFrame?: PanelLayoutFrame,
-  originY = 80
+  originY = 80,
+  createFrameAtOrigin = false
 ): MutateComipoResult {
   const scene = findSceneTemplate(templateId);
   if (!scene) return { ok: false };
@@ -151,7 +173,7 @@ function mutateScene(
   let checkVirtual: PanelLayoutFrame | null = null;
 
   let frame = targetFrame ?? null;
-  if (!frame && frames.length > 0) {
+  if (!frame && frames.length > 0 && !createFrameAtOrigin) {
     frame = [...frames].sort((a, b) => a.y - b.y || a.x - b.x)[0]!;
   }
 
@@ -167,9 +189,7 @@ function mutateScene(
         }
       : virtualInsertFrame(originY, canvasWidth);
     checkVirtual = frame;
-    if (frameSeed && frames.length === 0) {
-      frames = [frame];
-    }
+    if (frameSeed || createFrameAtOrigin) frames = [...frames, frame];
   }
 
   const existing = collectStudioDecorRefs(frame, decor);
@@ -178,7 +198,7 @@ function mutateScene(
   if (!placed) return { ok: false };
 
   decor = applyIncrementalDecor(decor, decorPatchFromResult(placed), createId);
-  if (snapshot.frames.length === 0 && checkVirtual) {
+  if (snapshot.frames.length === 0 && checkVirtual && !frames.includes(checkVirtual)) {
     frames = [checkVirtual];
   }
   if (!assertSnapshotComposable(frames, decor)) return { ok: false };
@@ -243,7 +263,8 @@ export function mutateComipoSnapshot(
       createId,
       canvasWidth,
       action.targetFrame,
-      action.originY
+      action.originY,
+      action.createFrameAtOrigin
     );
   }
   return mutateDialogue(snapshot, action.script, createId, canvasWidth, action.startY);

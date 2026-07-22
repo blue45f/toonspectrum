@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  clampCanvasPlacementCenter,
   computeAlignDeltas,
   computeDistributeDeltas,
   isMeaningfulMarquee,
@@ -27,6 +28,30 @@ describe("studio-selection", () => {
     const frame = { x: 100, y: 200, w: 400, h: 300 };
     expect(viewportSpawnCenter(720, 2000, frame)).toEqual([300, 350]);
     expect(viewportSpawnCenter(720, 2000, null)).toEqual([360, 1000]);
+  });
+
+  it("keeps a center-anchored insertion footprint inside every canvas edge", () => {
+    expect(clampCanvasPlacementCenter(
+      720,
+      2_000,
+      { x: 4, y: 1_996 },
+      { width: 280, height: 180, margin: 8 }
+    )).toEqual([148, 1_902]);
+    expect(clampCanvasPlacementCenter(
+      720,
+      2_000,
+      { x: 716, y: 4 },
+      { width: 220, height: 100, margin: 8 }
+    )).toEqual([602, 58]);
+  });
+
+  it("centers an oversized footprint instead of returning an impossible off-canvas edge", () => {
+    expect(clampCanvasPlacementCenter(
+      720,
+      2_000,
+      { x: 0, y: 0 },
+      { width: 900, height: 2_400, margin: 8 }
+    )).toEqual([360, 1_000]);
   });
 
   it("detects rectangle intersection for marquee pick", () => {

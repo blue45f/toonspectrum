@@ -30,14 +30,55 @@ export function rectContainsPoint(rect: Rect, x: number, y: number): boolean {
   return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
 }
 
-/** StudioPage.spawnCenter — 선택 패널 중심, 없으면 캔버스 중심. */
+export type CanvasPlacementFootprint = {
+  width: number;
+  height: number;
+  margin?: number;
+};
+
+function clampPlacementAxis(center: number, extent: number, canvasExtent: number, margin: number) {
+  const safeCanvasExtent = Math.max(1, Number.isFinite(canvasExtent) ? canvasExtent : 1);
+  const safeExtent = Math.max(0, Number.isFinite(extent) ? extent : 0);
+  const safeMargin = Math.max(
+    0,
+    Math.min(Number.isFinite(margin) ? margin : 0, safeCanvasExtent / 2)
+  );
+  const safeCenter = Number.isFinite(center) ? center : safeCanvasExtent / 2;
+  if (safeExtent >= safeCanvasExtent - safeMargin * 2) return safeCanvasExtent / 2;
+  return Math.min(
+    Math.max(safeCenter, safeMargin + safeExtent / 2),
+    safeCanvasExtent - safeMargin - safeExtent / 2
+  );
+}
+
+/** Keep a center-anchored insertion's full footprint inside the document whenever it can fit. */
+export function clampCanvasPlacementCenter(
+  canvasW: number,
+  canvasH: number,
+  center: { x: number; y: number },
+  footprint: CanvasPlacementFootprint
+): [number, number] {
+  return [
+    clampPlacementAxis(center.x, footprint.width, canvasW, footprint.margin ?? 0),
+    clampPlacementAxis(center.y, footprint.height, canvasH, footprint.margin ?? 0),
+  ];
+}
+
+/** StudioPage.spawnCenter — 선택 패널, 현재 보이는 작업 영역, 문서 중심 순서. */
 export function viewportSpawnCenter(
   canvasW: number,
   canvasH: number,
-  selectedFrame?: Rect | null
+  selectedFrame?: Rect | null,
+  viewCenter?: { x: number; y: number } | null
 ): [number, number] {
   if (selectedFrame) {
     return [selectedFrame.x + selectedFrame.w / 2, selectedFrame.y + selectedFrame.h / 2];
+  }
+  if (viewCenter && Number.isFinite(viewCenter.x) && Number.isFinite(viewCenter.y)) {
+    return [
+      Math.min(Math.max(viewCenter.x, 0), canvasW),
+      Math.min(Math.max(viewCenter.y, 0), canvasH),
+    ];
   }
   return [canvasW / 2, canvasH / 2];
 }

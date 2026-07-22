@@ -17,6 +17,7 @@ import {
   projectStudioDocumentRectToViewRect,
   projectStudioViewPointToDocument,
   projectStudioViewRectToDocumentRect,
+  resolveStudioVisibleDocumentPlacement,
   resolveStudioViewShortcut,
   rotateStudioViewLeft,
   rotateStudioViewRight,
@@ -471,6 +472,60 @@ describe("studio view rotation", () => {
       x: 100,
       y: 200,
     })).toEqual({ scrollLeft: 320, scrollTop: 140 });
+  });
+});
+
+describe("visible document placement", () => {
+  it("uses the scrolled canvas intersection instead of the full long-document center", () => {
+    expect(resolveStudioVisibleDocumentPlacement({
+      documentWidth: 720,
+      documentHeight: 4_000,
+      canvasFlipH: false,
+      canvasRotation: 0,
+      hostRect: { left: 100, top: 100, right: 820, bottom: 4_100 },
+      viewportRect: { left: 100, top: 1_500, right: 820, bottom: 2_300 },
+    })).toEqual({
+      center: { x: 360, y: 1_800 },
+      bounds: { x: 0, y: 1_400, width: 720, height: 800 },
+    });
+  });
+
+  it("uses the document center when a zoomed-out canvas is fully visible", () => {
+    expect(resolveStudioVisibleDocumentPlacement({
+      documentWidth: 720,
+      documentHeight: 4_000,
+      canvasFlipH: false,
+      canvasRotation: 0,
+      hostRect: { left: 320, top: 200, right: 680, bottom: 2_200 },
+      viewportRect: { left: 0, top: 0, right: 1_000, bottom: 3_000 },
+    })).toEqual({
+      center: { x: 360, y: 2_000 },
+      bounds: { x: 0, y: 0, width: 720, height: 4_000 },
+    });
+  });
+
+  it("maps the visible intersection back through a quarter-turn rotation", () => {
+    expect(resolveStudioVisibleDocumentPlacement({
+      documentWidth: 720,
+      documentHeight: 4_000,
+      canvasFlipH: false,
+      canvasRotation: 90,
+      hostRect: { left: 0, top: 0, right: 4_000, bottom: 720 },
+      viewportRect: { left: 1_000, top: 0, right: 1_800, bottom: 720 },
+    })).toEqual({
+      center: { x: 360, y: 2_600 },
+      bounds: { x: 0, y: 2_200, width: 720, height: 800 },
+    });
+  });
+
+  it("returns null when the canvas is outside the viewport", () => {
+    expect(resolveStudioVisibleDocumentPlacement({
+      documentWidth: 720,
+      documentHeight: 4_000,
+      canvasFlipH: false,
+      hostRect: { left: 0, top: 0, right: 720, bottom: 4_000 },
+      viewportRect: { left: 900, top: 0, right: 1_200, bottom: 500 },
+    })).toBeNull();
   });
 });
 

@@ -91,12 +91,18 @@ function renderPanel(overrides: Partial<StudioAssetMenuPanelProps> = {}) {
 }
 
 describe("StudioAssetMenuPanel mobile asset controls", () => {
-  it("renders 44px upload/generate controls and an accessible canvas-add action", () => {
+  it("renders 44px controls, placement guidance, and an accessible context-aware add action", () => {
     const html = renderPanel();
 
     expect(html).toContain('aria-label="이미지 에셋 업로드"');
-    expect(html).toContain('aria-label="AI 에셋 생성"');
-    expect(html).toContain('aria-label="로컬 에셋 캔버스에 추가"');
+    expect(html).toContain('aria-label="AI 에셋 생성 도구 열기"');
+    expect(html).toContain('aria-controls="studio-ai-asset-creator"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('id="studio-ai-asset-creator" hidden=""');
+    expect(html).toContain('aria-label="로컬 에셋 선택한 컷 또는 현재 보이는 위치에 추가"');
+    expect(html).toContain('data-studio-asset-placement-help="true"');
+    expect(html).toContain("클릭·탭");
+    expect(html).toContain("끌어 놓기");
     expect(html.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(7);
     expect(html).toContain("lucide-plus");
   });
@@ -123,7 +129,7 @@ describe("StudioAssetMenuPanel mobile asset controls", () => {
   it("gives owned shared assets an always-visible management entry and accessible add action", () => {
     const html = renderPanel({ assetTab: "community" });
 
-    expect(html).toContain('aria-label="공유 에셋 캔버스에 추가"');
+    expect(html).toContain('aria-label="공유 에셋 선택한 컷 또는 현재 보이는 위치에 추가"');
     expect(html).toContain('aria-controls="shared-asset-actions-shared-1"');
     expect(html).toContain('aria-label="공유 에셋 공유 관리 작업 열기"');
     expect(html).not.toContain("group-hover:opacity-100");
@@ -218,7 +224,7 @@ describe("StudioAssetMenuPanel favorites", () => {
     const html = renderPanel();
     const favoriteButton = html.indexOf('aria-label="로컬 에셋 즐겨찾기에 추가"');
     const favoriteButtonEnd = html.indexOf("</button>", favoriteButton);
-    const useButton = html.indexOf('aria-label="로컬 에셋 캔버스에 추가"');
+    const useButton = html.indexOf('aria-label="로컬 에셋 선택한 컷 또는 현재 보이는 위치에 추가"');
 
     expect(html).toContain('aria-label="즐겨찾기만"');
     expect(html).toContain('aria-label="로컬 에셋 즐겨찾기에 추가" aria-pressed="false"');

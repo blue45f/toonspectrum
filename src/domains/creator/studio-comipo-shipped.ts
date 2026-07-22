@@ -7,6 +7,7 @@ import { CANVAS_W } from "./studio-assets";
 import {
   mutateComipoSnapshot,
   pickTargetPanelFrame,
+  sceneTemplateInsertHeight,
   type ComipoInsertAction,
   type MutateComipoResult,
   type StudioCanvasSnapshot,
@@ -46,6 +47,8 @@ export type StudioPageInsertState = {
   canvasH: number;
   canvasW?: number;
   selected: StudioPageSelectedFrame | null;
+  /** 현재 화면에 실제로 보이는 캔버스 중심. DOM이 없는 테스트/SSR에서는 생략한다. */
+  viewCenter?: { x: number; y: number } | null;
 };
 
 export function studioSpawnCenter(state: StudioPageInsertState): [number, number] {
@@ -53,7 +56,7 @@ export function studioSpawnCenter(state: StudioPageInsertState): [number, number
   const selectedRect: Rect | null = state.selected
     ? { x: state.selected.x, y: state.selected.y, w: state.selected.width, h: state.selected.height }
     : null;
-  return viewportSpawnCenter(w, state.canvasH, selectedRect);
+  return viewportSpawnCenter(w, state.canvasH, selectedRect, state.viewCenter);
 }
 
 /** StudioPage.studioCanvasSnapshot 과 동일 계약. */
@@ -95,10 +98,14 @@ export function buildSceneInsertActionFromPageState(
   if (target && snapshot.frames.length > 0) {
     return { kind: "scene", templateId, targetFrame: target };
   }
+  const sceneHeight = sceneTemplateInsertHeight(templateId);
+  const margin = 24;
+  const maxOriginY = Math.max(margin, state.canvasH - sceneHeight - margin);
   return {
     kind: "scene",
     templateId,
-    originY: Math.max(20, Math.round(cy - 240)),
+    originY: Math.min(maxOriginY, Math.max(margin, Math.round(cy - sceneHeight / 2))),
+    createFrameAtOrigin: true,
   };
 }
 

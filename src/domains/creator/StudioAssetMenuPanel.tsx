@@ -3,6 +3,7 @@
 import {
   BadgeCheck,
   Check,
+  ChevronDown,
   Flag,
   Globe,
   ImagePlus,
@@ -153,6 +154,7 @@ function sortSharedAssets(
 }
 
 function dragLocalAssetData(event: DragEvent<HTMLElement>, asset: Pick<StudioAsset, "dataUrl" | "width" | "height">) {
+  event.dataTransfer.effectAllowed = "copy";
   event.dataTransfer.setData(
     "application/json-asset",
     serializeStudioLocalAssetDragPayload({ src: asset.dataUrl, width: asset.width, height: asset.height })
@@ -160,6 +162,7 @@ function dragLocalAssetData(event: DragEvent<HTMLElement>, asset: Pick<StudioAss
 }
 
 function dragSharedAssetData(event: DragEvent<HTMLElement>, asset: Pick<SharedAssetCatalogItem, "id">) {
+  event.dataTransfer.effectAllowed = "copy";
   event.dataTransfer.setData(
     "application/json-asset",
     serializeStudioCommunityAssetDragPayload(asset.id)
@@ -254,6 +257,7 @@ export function StudioAssetMenuPanel({
   onDeleteSharedAsset,
   onReportSharedAsset,
 }: StudioAssetMenuPanelProps) {
+  const [aiCreatorOpen, setAiCreatorOpen] = useState(false);
   const localFavoriteId = (asset: StudioAsset) => createStudioAssetFavoriteId("local", asset.id);
   const sharedFavoriteId = (asset: SharedAssetCatalogItem) => createStudioAssetFavoriteId("community", asset.id);
   const sortedAssets = favoriteFirst(
@@ -315,12 +319,56 @@ export function StudioAssetMenuPanel({
         )}
       </div>
 
+      <div
+        data-studio-asset-placement-help="true"
+        className="mb-2 grid grid-cols-2 gap-1 rounded-xl border border-accent/20 bg-accent-soft/45 p-1.5 text-[0.58rem] leading-snug text-fg-2"
+      >
+        <div className="flex min-h-9 items-center gap-1.5 rounded-lg bg-panel/60 px-2">
+          <Plus size={12} className="shrink-0 text-accent" aria-hidden />
+          <span><strong className="font-bold text-fg">클릭·탭</strong><br />선택 컷 또는 현재 화면</span>
+        </div>
+        <div className="flex min-h-9 items-center gap-1.5 rounded-lg bg-panel/60 px-2">
+          <ImagePlus size={12} className="shrink-0 text-accent" aria-hidden />
+          <span><strong className="font-bold text-fg">끌어 놓기</strong><br />포인터 위치에 정확히</span>
+        </div>
+      </div>
+
       {assetTab === "mine" && (
-        <div className="mb-2 rounded-lg border border-line bg-card/70 p-2">
-          <div className="mb-1.5 flex items-center gap-1 text-[0.65rem] font-semibold text-fg-2">
-            <Sparkles size={12} className="text-accent" />
-            AI 에셋 생성
-          </div>
+        <div className="mb-2 rounded-xl border border-line bg-card/70 p-1.5">
+          <button
+            type="button"
+            onClick={() => setAiCreatorOpen((current) => !current)}
+            aria-expanded={aiCreatorOpen}
+            aria-controls="studio-ai-asset-creator"
+            aria-label={`AI 에셋 생성 도구 ${aiCreatorOpen ? "닫기" : "열기"}`}
+            className={cx(
+              TOUCH_CONTROL_CLASS,
+              "flex w-full items-center gap-2 rounded-lg px-2 text-left transition-colors hover:bg-raised",
+              CONTROL_FOCUS_CLASS
+            )}
+          >
+            {assetGenerating ? (
+              <Loader2 size={14} className="shrink-0 animate-spin text-accent" aria-hidden />
+            ) : (
+              <Sparkles size={14} className="shrink-0 text-accent" aria-hidden />
+            )}
+            <span className="min-w-0 flex-1">
+              <strong className="block text-[0.65rem] font-bold text-fg-2">
+                {assetGenerating ? "AI 에셋 생성 중" : "AI 에셋 생성"}
+              </strong>
+              <span className="block truncate text-[0.55rem] text-fg-3">설명으로 나만의 소재 만들기</span>
+            </span>
+            <ChevronDown
+              size={14}
+              className={cx("shrink-0 text-fg-3 transition-transform", aiCreatorOpen && "rotate-180")}
+              aria-hidden
+            />
+          </button>
+          <div
+            id="studio-ai-asset-creator"
+            hidden={!aiCreatorOpen}
+            className="border-t border-line/70 px-0.5 pt-2"
+          >
           {/* 생성형 AI 고지(정책 필수) — 결과물이 생성형 AI 산출물임을 항상 명시한다. */}
           <p className="mb-1.5 rounded-md border border-line bg-panel/60 px-2 py-1 text-[0.58rem] leading-relaxed text-fg-3">
             생성형 AI(OpenAI)로 이미지를 만들어요. 결과물에는 <span className="font-semibold text-accent">AI</span> 배지가 표시되며,
@@ -395,6 +443,7 @@ export function StudioAssetMenuPanel({
               <option value="high">고품질</option>
               <option value="auto">자동</option>
             </select>
+          </div>
           </div>
         </div>
       )}
@@ -637,8 +686,8 @@ function LocalAssetGrid({
                 backgroundSize: "10px 10px",
                 backgroundPosition: "0 0, 0 5px, 5px -5px, -5px 0",
               }}
-              title={asset.kind === "ai" ? `${asset.name} · AI 생성 이미지` : asset.name}
-              aria-label={`${asset.name} 캔버스에 추가`}
+              title={`${asset.name} · 선택한 컷 또는 현재 보이는 위치에 추가`}
+              aria-label={`${asset.name} 선택한 컷 또는 현재 보이는 위치에 추가`}
             >
               <img
                 src={asset.dataUrl}
@@ -1072,8 +1121,8 @@ function SharedAssetGrid({
                 backgroundSize: "10px 10px",
                 backgroundPosition: "0 0, 0 5px, 5px -5px, -5px 0",
               }}
-              title={`${asset.name} · ${asset.author.name}`}
-              aria-label={`${asset.name} 캔버스에 추가`}
+              title={`${asset.name} · ${asset.author.name} · 선택한 컷 또는 현재 보이는 위치에 추가`}
+              aria-label={`${asset.name} 선택한 컷 또는 현재 보이는 위치에 추가`}
             >
               <img
                 src={asset.previewDataUrl}

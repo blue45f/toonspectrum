@@ -7,6 +7,7 @@ import {
   BookOpen,
   FlipHorizontal2,
   Grid3X3,
+  ImagePlus,
   Lock,
   MessageCircle,
   UsersRound,
@@ -145,6 +146,10 @@ import {
   type StudioAssetFavoriteId,
   type StudioAssetFavoriteState,
 } from "./studio-asset-favorites";
+import {
+  studioTransferCanInsert,
+  studioTransferHasFiles,
+} from "./studio-asset-transfer";
 import {
   CANVAS_W,
   EFFECT_EMOJIS,
@@ -520,7 +525,11 @@ import {
   HISTORY_BRUSH_RADIUS_DEFAULT,
 } from "./studio-history-brush";
 import { uid } from "./studio-id";
-import { createCanvasImageElement } from "./studio-image-placement";
+import {
+  cascadeCanvasPlacementAnchor,
+  createCanvasImageElement,
+  type CanvasImagePlacement,
+} from "./studio-image-placement";
 import {
   studioInkFallbackPressure,
 } from "./studio-ink-pressure-model";
@@ -939,6 +948,7 @@ import {
 } from "./studio-save-payload";
 import { layoutScenarioPanels, type ScenarioPanelAspect, type ScenarioPreviewItem } from "./studio-scenario-layout";
 import {
+  clampCanvasPlacementCenter,
   computeAlignDeltas,
   computeDistributeDeltas,
   normalizeMarqueeRect,
@@ -1054,6 +1064,7 @@ import {
   planStudioViewZoomGestureFrame,
   projectStudioDocumentPointToView,
   projectStudioViewPointToDocument,
+  resolveStudioVisibleDocumentPlacement,
   resolveStudioViewShortcut,
   rotateStudioViewLeft,
   rotateStudioViewRight,
@@ -5812,6 +5823,11 @@ function StudioCuttoonEditor() {
 
   // 표시용 스케일(컨테이너 폭에 맞춤).
   const wrapRef = useRef<HTMLDivElement>(null);
+  const assetInsertSequenceRef = useRef<{
+    key: string;
+    count: number;
+    lastAt: number;
+  } | null>(null);
   const lastNonViewHudFocusRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     function rememberViewToolOpener(event: FocusEvent) {
@@ -6933,8 +6949,145 @@ function StudioCuttoonEditor() {
     updateScrollPos();
   };
 
+  function projectStudioClientPointToDocument(clientX: number, clientY: number) {
+    const host = zoomHostRef.current;
+    if (!host) return null;
+    const rect = host.getBoundingClientRect();
+    if (!(rect.width > 0) || !(rect.height > 0)) return null;
+    const quarterTurn = canvasRotation === 90 || canvasRotation === 270;
+    const viewWidth = quarterTurn ? canvasH : CANVAS_W;
+    const viewHeight = quarterTurn ? CANVAS_W : canvasH;
+    return projectStudioViewPointToDocument({
+      documentWidth: CANVAS_W,
+      documentHeight: canvasH,
+      canvasFlipH,
+      canvasRotation,
+      x: ((clientX - rect.left) / rect.width) * viewWidth,
+      y: ((clientY - rect.top) / rect.height) * viewHeight,
+    });
+  }
+
+  function currentVisibleCanvasPlacement() {
+    const host = zoomHostRef.current;
+    const wrap = wrapRef.current;
+    if (!host || !wrap) return null;
+    const hostRect = host.getBoundingClientRect();
+    const wrapRect = wrap.getBoundingClientRect();
+    return resolveStudioVisibleDocumentPlacement({
+      documentWidth: CANVAS_W,
+      documentHeight: canvasH,
+      canvasFlipH,
+      canvasRotation,
+      hostRect: {
+        left: hostRect.left,
+        top: hostRect.top,
+        right: hostRect.right,
+        bottom: hostRect.bottom,
+      },
+      viewportRect: {
+        left: wrapRect.left,
+        top: wrapRect.top,
+        right: wrapRect.right,
+        bottom: wrapRect.bottom,
+      },
+    });
+  }
+
+  function currentCanvasInsertionTarget(): {
+    key: string;
+    center: { x: number; y: number };
+    placement: CanvasImagePlacement;
+  } {
+    if (selected?.type === "frame") {
+      const inset = Math.max(10, Math.min(28, Math.min(selected.width, selected.height) * 0.04));
+      return {
+        key: `${activePage.id}:${masterEditMode ? "master" : "page"}:frame:${selected.id}`,
+        center: {
+          x: selected.x + selected.width / 2,
+          y: selected.y + selected.height / 2,
+        },
+        placement: {
+          anchor: {
+            x: selected.x + selected.width / 2,
+            y: selected.y + selected.height / 2,
+          },
+          bounds: {
+            x: selected.x,
+            y: selected.y,
+            width: selected.width,
+            height: selected.height,
+          },
+          inset,
+        },
+      };
+    }
+
+    const visible = currentVisibleCanvasPlacement();
+    const center = visible?.center ?? { x: CANVAS_W / 2, y: canvasH / 2 };
+    const bounds = visible?.bounds ?? { x: 0, y: 0, width: CANVAS_W, height: canvasH };
+    const inset = Math.max(16, Math.min(40, Math.min(bounds.width, bounds.height) * 0.05));
+    return {
+      key: `${activePage.id}:${masterEditMode ? "master" : "page"}:view:${Math.round(center.x / 80)}:${Math.round(center.y / 80)}`,
+      center,
+      placement: {
+        anchor: center,
+        bounds,
+        inset,
+      },
+    };
+  }
+
+  function nextAssetInsertionPlacement(): CanvasImagePlacement {
+    const target = currentCanvasInsertionTarget();
+    const now = Date.now();
+    const previous = assetInsertSequenceRef.current;
+    const count = previous && previous.key === target.key && now - previous.lastAt < 5_000
+      ? previous.count + 1
+      : 0;
+    assetInsertSequenceRef.current = { key: target.key, count, lastAt: now };
+    const bounds = target.placement.bounds;
+    const step = bounds
+      ? Math.max(10, Math.min(18, Math.min(bounds.width, bounds.height) / 18))
+      : 18;
+    return {
+      ...target.placement,
+      anchor: cascadeCanvasPlacementAnchor(target.center, count, step),
+    };
+  }
+
+  function clearStudioDropIndicator(target: EventTarget | null) {
+    if (!(target instanceof HTMLElement)) return;
+    delete target.dataset.studioAssetDropActive;
+    target.style.removeProperty("--studio-asset-drop-x");
+    target.style.removeProperty("--studio-asset-drop-y");
+  }
+
   const onWrapDragOver = (e: React.DragEvent) => {
+    const canInsert = studioTransferCanInsert(e.dataTransfer);
+    if (!canInsert && !studioTransferHasFiles(e.dataTransfer)) return;
     e.preventDefault();
+    e.dataTransfer.dropEffect = canInsert ? "copy" : "none";
+    const target = e.currentTarget as HTMLElement;
+    if (!canInsert) {
+      clearStudioDropIndicator(target);
+      return;
+    }
+    const rect = target.getBoundingClientRect();
+    target.dataset.studioAssetDropActive = "true";
+    target.style.setProperty(
+      "--studio-asset-drop-x",
+      `${e.clientX - rect.left + target.scrollLeft}px`
+    );
+    target.style.setProperty(
+      "--studio-asset-drop-y",
+      `${e.clientY - rect.top + target.scrollTop}px`
+    );
+  };
+
+  const onWrapDragLeave = (e: React.DragEvent) => {
+    const nextTarget = e.relatedTarget;
+    if (nextTarget instanceof Node && e.currentTarget.contains(nextTarget)) return;
+    clearStudioDropIndicator(e.currentTarget);
   };
 
   async function loadCommunityAssetContent(asset: SharedAssetCatalogItem) {
@@ -6961,6 +7114,9 @@ function StudioCuttoonEditor() {
   }
 
   const onWrapDrop = async (e: React.DragEvent) => {
+    clearStudioDropIndicator(e.currentTarget);
+    const hasFiles = studioTransferHasFiles(e.dataTransfer);
+    if (!studioTransferCanInsert(e.dataTransfer) && !hasFiles) return;
     e.preventDefault();
     const mutationTicket = captureStudioMutationTicket();
     const wrap = wrapRef.current;
@@ -6973,8 +7129,14 @@ function StudioCuttoonEditor() {
       : undefined;
     const assetData = e.dataTransfer.getData("application/json-asset");
     const insertData = e.dataTransfer.getData("application/json-insert");
+    if (hasFiles && !imageFile && !assetData && !insertData) {
+      setError("캔버스에는 PNG, JPEG, WebP, GIF 같은 이미지 파일만 놓을 수 있어요.");
+      return;
+    }
 
     const dropStagePoint = () => {
+      const projected = projectStudioClientPointToDocument(cx, cy);
+      if (projected) return projected;
       const rect = wrap.getBoundingClientRect();
       return projectStudioViewPointToDocument({
         documentWidth: CANVAS_W,
@@ -7013,19 +7175,22 @@ function StudioCuttoonEditor() {
       fixedPoint?: { x: number; y: number }
     ) => {
       const { x, y } = fixedPoint ?? dropStagePoint();
-      const fit = Math.min(1, (CANVAS_W - 80) / width);
-      const targetW = Math.round(width * fit);
-      const targetH = Math.round(height * fit);
+      const placed = createCanvasImageElement({
+        id: uid(),
+        src,
+        canvasWidth: CANVAS_W,
+        canvasHeight: canvasH,
+        sourceWidth: width,
+        sourceHeight: height,
+        placement: {
+          anchor: { x, y },
+          bounds: { x: 0, y: 0, width: CANVAS_W, height: canvasH },
+          inset: 40,
+        },
+      });
       setError(null);
       return addEl({
-        id: uid(),
-        type: "image",
-        src,
-        x: x - targetW / 2,
-        y: y - targetH / 2,
-        width: targetW,
-        height: targetH,
-        rotation: 0,
+        ...placed,
         ...(isAnimatedGif ? { isAnimatedGif: true } : {}),
         ...elementPatch,
       });
@@ -7035,6 +7200,7 @@ function StudioCuttoonEditor() {
     if (imageFile) {
       const targetPageId = activePage.id;
       const targetMasterEditMode = masterEditMode;
+      const externalDropPoint = dropStagePoint();
       try {
         const { src, width, height, isAnimatedGif } = await loadImageFileForCanvas(imageFile);
         if (!isStudioPasteScopeCurrent({
@@ -7045,7 +7211,7 @@ function StudioCuttoonEditor() {
           targetMasterEditMode,
           currentMasterEditMode: masterEditModeRef.current,
         })) return;
-        placeAt(src, width, height, isAnimatedGif);
+        placeAt(src, width, height, isAnimatedGif, undefined, externalDropPoint);
       } catch (err) {
         setError(err instanceof Error ? err.message : "이미지를 추가하지 못했어요.");
       }
@@ -11765,6 +11931,7 @@ function StudioCuttoonEditor() {
   async function executeGenerateAsset(prompt: string) {
     if (collaborationAccessRef.current.locked) return;
     const mutationTicket = captureStudioMutationTicket();
+    const insertionPlacement = nextAssetInsertionPlacement();
     const requestProvenance = captureStudioAiGeneratedAssetProvenance(
       { provider: "openai", model: "gpt-image-2", transport: "server" },
       "generated"
@@ -11817,7 +11984,15 @@ function StudioCuttoonEditor() {
       const generatedProvenance = finalizeStudioAiGeneratedAssetProvenance(requestProvenance, {
         model: generated.model,
       });
-      if (!addRenderedImage(saved.dataUrl, saved.width, saved.height, generatedProvenance)) {
+      if (!addRenderedImage(
+        saved.dataUrl,
+        saved.width,
+        saved.height,
+        generatedProvenance,
+        false,
+        undefined,
+        insertionPlacement
+      )) {
         setError("생성한 에셋은 라이브러리에 저장했지만 현재 캔버스에는 추가하지 못했어요. 편집 잠금과 동기화 상태를 확인한 뒤 다시 시도해 주세요.");
         return;
       }
@@ -12100,6 +12275,8 @@ function StudioCuttoonEditor() {
     const mutationTicket = captureStudioMutationTicket();
     const targetPageId = activePage.id;
     const targetMasterEditMode = masterEditMode;
+    // 네트워크 대기 중 스크롤·줌·선택이 바뀌어도 사용자가 클릭한 순간의 작업 위치를 보존한다.
+    const insertionPlacement = nextAssetInsertionPlacement();
     try {
       const content = await loadCommunityAssetContent(asset);
       if (!isStudioPasteScopeCurrent({
@@ -12113,7 +12290,7 @@ function StudioCuttoonEditor() {
       if (!addRenderedImage(content.dataUrl, content.width, content.height, undefined, false, {
         name: asset.name,
         communityAssetCredit,
-      })) return;
+      }, insertionPlacement)) return;
       recordCommunityAssetUse(asset.id);
       setMenu(null);
     } catch (err) {
@@ -13742,17 +13919,19 @@ function StudioCuttoonEditor() {
     height: number,
     aiProvenance?: StudioPublishAiProvenance,
     isAnimatedGif = false,
-    elementPatch?: Partial<ImageEl> & { name?: string }
+    elementPatch?: Partial<ImageEl> & { name?: string },
+    insertionPlacement?: CanvasImagePlacement
   ): boolean {
     setError(null);
     const element = createCanvasImageElement({
-        id: uid(),
-        src,
-        canvasWidth: CANVAS_W,
-        canvasHeight: canvasH,
-        sourceWidth: width,
-        sourceHeight: height,
-      });
+      id: uid(),
+      src,
+      canvasWidth: CANVAS_W,
+      canvasHeight: canvasH,
+      sourceWidth: width,
+      sourceHeight: height,
+      placement: insertionPlacement ?? nextAssetInsertionPlacement(),
+    });
     return addEl({
       ...element,
       ...(aiProvenance ? { aiProvenance } : {}),
@@ -13867,6 +14046,15 @@ function StudioCuttoonEditor() {
   async function addBuiltinRasterAsset(asset: StudioRasterAsset) {
     if (builtinRasterBusyId) return;
     const mutationTicket = captureStudioMutationTicket();
+    const targetFrame = selected?.type === "frame"
+      ? {
+          x: selected.x,
+          y: selected.y,
+          width: selected.width,
+          height: selected.height,
+        }
+      : null;
+    const insertionPlacement = targetFrame ? undefined : nextAssetInsertionPlacement();
     setBuiltinRasterBusyId(asset.id);
     setError(null);
     try {
@@ -13892,21 +14080,22 @@ function StudioCuttoonEditor() {
         sourceWidth: asset.width,
         sourceHeight: asset.height,
         horizontalInset: 80,
+        placement: insertionPlacement,
       });
-      if (selected?.type === "frame") {
-        const inset = Math.max(10, Math.min(selected.width, selected.height) * 0.04);
-        const maxWidth = Math.max(1, selected.width - inset * 2);
-        const maxHeight = Math.max(1, selected.height - inset * 2);
+      if (targetFrame) {
+        const inset = Math.max(10, Math.min(targetFrame.width, targetFrame.height) * 0.04);
+        const maxWidth = Math.max(1, targetFrame.width - inset * 2);
+        const maxHeight = Math.max(1, targetFrame.height - inset * 2);
         const scale = Math.min(maxWidth / asset.width, maxHeight / asset.height, 1);
         const width = Math.round(asset.width * scale);
         const height = Math.round(asset.height * scale);
         element = {
           ...element,
-          x: Math.round(selected.x + (selected.width - width) / 2),
+          x: Math.round(targetFrame.x + (targetFrame.width - width) / 2),
           y:
             asset.defaultPlacement === "frame-bottom-center"
-              ? Math.round(selected.y + selected.height - height - inset)
-              : Math.round(selected.y + (selected.height - height) / 2),
+              ? Math.round(targetFrame.y + targetFrame.height - height - inset)
+              : Math.round(targetFrame.y + (targetFrame.height - height) / 2),
           width,
           height,
         };
@@ -13947,6 +14136,7 @@ function StudioCuttoonEditor() {
       canvasHeight: canvasH,
       sourceWidth: width,
       sourceHeight: height,
+      placement: nextAssetInsertionPlacement(),
     });
     addEl({ ...base, stockImageCredit: photo.credit });
   }
@@ -15824,6 +16014,7 @@ function StudioCuttoonEditor() {
         const mutationTicket = captureStudioMutationTicket();
         const targetPageId = activePage.id;
         const targetMasterEditMode = masterEditMode;
+        const insertionPlacement = nextAssetInsertionPlacement();
         void (async () => {
           try {
             const { src, width, height, isAnimatedGif } = await loadImageFileForCanvas(file);
@@ -15835,7 +16026,15 @@ function StudioCuttoonEditor() {
               targetMasterEditMode,
               currentMasterEditMode: masterEditModeRef.current,
             })) return;
-            addRenderedImage(src, width, height, undefined, isAnimatedGif);
+            addRenderedImage(
+              src,
+              width,
+              height,
+              undefined,
+              isAnimatedGif,
+              undefined,
+              insertionPlacement
+            );
           } catch (err) {
             setError(err instanceof Error ? err.message : "이미지 붙여넣기 실패");
           }
@@ -15866,10 +16065,14 @@ function StudioCuttoonEditor() {
       canvasH,
       canvasW: CANVAS_W,
       selected: selectedFrame,
+      viewCenter: currentCanvasInsertionTarget().center,
     };
   }
-  // 새 요소를 놓을 중심: 패널이 선택돼 있으면 그 칸 중앙, 아니면 캔버스 중앙.
-  function spawnCenter(): [number, number] {
+  // 새 요소를 놓을 중심: 선택 컷 → 현재 보이는 캔버스 → 문서 중앙 순서.
+  function spawnCenter(
+    footprint?: { width: number; height: number; margin?: number },
+    at?: { x: number; y: number }
+  ): [number, number] {
     const state = studioInsertState();
     const selectedRect = state.selected
       ? {
@@ -15879,10 +16082,25 @@ function StudioCuttoonEditor() {
           h: state.selected.height,
         }
       : null;
-    return viewportSpawnCenter(state.canvasW ?? CANVAS_W, state.canvasH, selectedRect);
+    const [x, y] = at
+      ? [at.x, at.y]
+      : viewportSpawnCenter(
+      state.canvasW ?? CANVAS_W,
+      state.canvasH,
+      selectedRect,
+      state.viewCenter
+    );
+    return footprint
+      ? clampCanvasPlacementCenter(
+          state.canvasW ?? CANVAS_W,
+          state.canvasH,
+          { x, y },
+          footprint
+        )
+      : [x, y];
   }
   function addText(at?: { x: number; y: number }, editImmediately = false) {
-    const [cx, cy] = at ? [at.x, at.y] : spawnCenter();
+    const [cx, cy] = spawnCenter({ width: 220, height: 48, margin: 8 }, at);
     const element: El = {
       id: uid(),
       type: "text",
@@ -15951,7 +16169,7 @@ function StudioCuttoonEditor() {
       height = 180;
     }
 
-    const [cx, cy] = at ? [at.x, at.y] : spawnCenter();
+    const [cx, cy] = spawnCenter({ width, height, margin: 8 }, at);
     const element: El = {
       id: uid(),
       type: "bubble",
@@ -15972,7 +16190,7 @@ function StudioCuttoonEditor() {
   }
   function addSticker(emoji: string, at?: { x: number; y: number }) {
     setMenu(null);
-    const [cx, cy] = at ? [at.x, at.y] : spawnCenter();
+    const [cx, cy] = spawnCenter({ width: 80, height: 80, margin: 8 }, at);
     addEl({ id: uid(), type: "sticker", text: emoji, x: cx - 40, y: cy - 40, fontSize: 96, rotation: 0 });
   }
   // 효과음 프리셋 삽입 — studio-sfx-presets의 무드별 스타일(색·외곽선·그라디언트·기울기)을
@@ -15980,7 +16198,7 @@ function StudioCuttoonEditor() {
   async function addSfxPreset(preset: SfxPreset) {
     setMenu(null);
     const mutationTicket = captureStudioMutationTicket();
-    const [cx, cy] = spawnCenter();
+    const [cx, cy] = spawnCenter({ width: 220, height: 100, margin: 8 });
     const { createSfxTextConfig } = await import("./studio-sfx-presets");
     if (!canApplyStudioMutation(mutationTicket)) return;
     addEl({ id: uid(), type: "text", ...createSfxTextConfig(preset, cx - 110, cy - 50) });
@@ -16712,7 +16930,7 @@ function StudioCuttoonEditor() {
   // (선택된 패널이 있으면 그 중앙, 없으면 캔버스 중앙), 다만 제안 텍스트는 여러 줄 불릿이라 addText
   // 기본값(fontSize 40, width 220)보다 작은 글자 크기·넓은 폭을 쓴다.
   function insertAiCompositionNote(text: string) {
-    const [cx, cy] = spawnCenter();
+    const [cx, cy] = spawnCenter({ width: 260, height: 140, margin: 8 });
     addEl({ id: uid(), type: "text", text, x: cx - 130, y: cy - 70, width: 260, fontSize: 16, fill: color, rotation: 0 });
   }
 
@@ -16942,6 +17160,7 @@ function StudioCuttoonEditor() {
         sourceWidth: w,
         sourceHeight: h,
         horizontalInset: 100,
+        placement: nextAssetInsertionPlacement(),
       })
     );
   }
@@ -16958,7 +17177,18 @@ function StudioCuttoonEditor() {
     } else {
       const w = TONE_DEFAULT_SIZE.width;
       const h = TONE_DEFAULT_SIZE.height;
-      addEl({ id: uid(), type: "image", src, x: Math.round((CANVAS_W - w) / 2), y: Math.max(24, Math.round(canvasH / 2 - h / 2)), width: w, height: h, rotation: 0, opacity: 0.9 });
+      addEl({
+        ...createCanvasImageElement({
+          id: uid(),
+          src,
+          canvasWidth: CANVAS_W,
+          canvasHeight: canvasH,
+          sourceWidth: w,
+          sourceHeight: h,
+          placement: nextAssetInsertionPlacement(),
+        }),
+        opacity: 0.9,
+      });
     }
   }
   // 이메레스(툰스푼 스타일) — 스케치 밑그림을 반투명+잠금 레이어로 깔고 바로 펜 모드로 전환.
@@ -16995,6 +17225,7 @@ function StudioCuttoonEditor() {
           sourceWidth: t.width,
           sourceHeight: t.height,
           horizontalInset: 80,
+          placement: nextAssetInsertionPlacement(),
         }),
         opacity,
         locked: true,
@@ -17040,6 +17271,7 @@ function StudioCuttoonEditor() {
           sourceWidth: item.width,
           sourceHeight: item.height,
           horizontalInset: 80,
+          placement: nextAssetInsertionPlacement(),
         }),
         opacity,
         locked: true,
@@ -17300,17 +17532,25 @@ function StudioCuttoonEditor() {
   }
   // 클립을 캔버스에 삽입 — 새 id·새 그룹으로 화면 중앙 부근에 배치.
   function insertClip(clip: StudioClip) {
-    const [cx, cy] = spawnCenter();
+    const clipElements = clip.els as El[];
+    if (clipElements.length === 0) return;
+    const clipBounds = unionBounds(clipElements.map((element) => elBounds(element)));
+    const [cx, cy] = spawnCenter({
+      width: clipBounds.w,
+      height: clipBounds.h,
+      margin: 8,
+    });
+    const dx = cx - (clipBounds.x + clipBounds.w / 2);
+    const dy = cy - (clipBounds.y + clipBounds.h / 2);
     const groupMap = new Map<string, string>();
-    const newEls = (clip.els as El[]).map((e) => {
+    const newEls = clipElements.map((e) => {
       let groupId = e.groupId;
       if (groupId) {
         if (!groupMap.has(groupId)) groupMap.set(groupId, uid());
         groupId = groupMap.get(groupId);
       }
-      return { ...shiftEl(e, cx - 120, cy - 120), id: uid(), groupId, hidden: false, locked: false };
+      return { ...shiftEl(e, dx, dy), id: uid(), groupId, hidden: false, locked: false };
     });
-    if (newEls.length === 0) return;
     const insertedElements = remapStudioBg3dLtCopiedBundles(newEls, masterEditMode);
     const clipGroups = masterEditMode
       ? []
@@ -17540,6 +17780,7 @@ function StudioCuttoonEditor() {
         sourceWidth: item.width,
         sourceHeight: item.height,
         horizontalInset: 100,
+        placement: nextAssetInsertionPlacement(),
       })
     );
   }
@@ -17652,6 +17893,7 @@ function StudioCuttoonEditor() {
     const mutationTicket = captureStudioMutationTicket();
     const targetPageId = activePage.id;
     const targetMasterEditMode = masterEditMode;
+    const insertionPlacement = nextAssetInsertionPlacement();
     try {
       const { src, width, height, isAnimatedGif } = await loadImageFileForCanvas(file);
       if (!isStudioPasteScopeCurrent({
@@ -17662,17 +17904,17 @@ function StudioCuttoonEditor() {
         targetMasterEditMode,
         currentMasterEditMode: masterEditModeRef.current,
       })) return;
-      const fit = Math.min(1, (CANVAS_W - 80) / width);
       setError(null);
       addEl({
-        id: uid(),
-        type: "image",
-        src,
-        x: (CANVAS_W - width * fit) / 2,
-        y: 80,
-        width: Math.round(width * fit),
-        height: Math.round(height * fit),
-        rotation: 0,
+        ...createCanvasImageElement({
+          id: uid(),
+          src,
+          canvasWidth: CANVAS_W,
+          canvasHeight: canvasH,
+          sourceWidth: width,
+          sourceHeight: height,
+          placement: insertionPlacement,
+        }),
         ...(isAnimatedGif ? { isAnimatedGif: true } : {}), // studio-skew.ts와 동일한 관례: 항등값(false)은 저장하지 않는다.
       });
     } catch (err) {
@@ -24971,6 +25213,7 @@ function StudioCuttoonEditor() {
     onStageMove,
     onStagePointerCancel,
     onStageUp,
+    onWrapDragLeave,
     onWrapDragOver,
     onWrapDrop,
     onWrapMouseDown,
@@ -26751,6 +26994,7 @@ interface StudioCanvasViewportHandlers {
   onStageMove: (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => void;
   onStagePointerCancel: (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => void;
   onStageUp: (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => void;
+  onWrapDragLeave: (e: React.DragEvent) => void;
   onWrapDragOver: (e: React.DragEvent) => void;
   onWrapDrop: (e: React.DragEvent) => Promise<void>;
   onWrapMouseDown: (e: React.MouseEvent) => void;
@@ -27353,6 +27597,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     onStageMove,
     onStagePointerCancel,
     onStageUp,
+    onWrapDragLeave,
     onWrapDragOver,
     onWrapDrop,
     onWrapMouseDown,
@@ -27696,11 +27941,13 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
             onMouseMove={onWrapMouseMove}
             onMouseUp={onWrapMouseUp}
             onMouseLeave={onWrapMouseUp}
+            onDragLeave={onWrapDragLeave}
             onDragOver={onWrapDragOver}
             onDrop={onWrapDrop}
             className={cn(
               // Canvas fills remaining viewport under thin menubar+toolbelt (~6.5rem).
               "relative min-h-0 flex-1 overflow-auto rounded-none border-0 outline-none",
+              "group/asset-drop transition-shadow data-[studio-asset-drop-active=true]:shadow-[inset_0_0_0_2px_oklch(0.72_0.18_45/0.9)]",
               "bg-[oklch(0.145_0.008_70)]",
               "[background-image:linear-gradient(oklch(0.162_0.008_70)_1px,transparent_1px),linear-gradient(90deg,oklch(0.162_0.008_70)_1px,transparent_1px)]",
               "[background-size:24px_24px]",
@@ -27713,6 +27960,27 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               (isSpacePressed || tool === "hand") && "select-none"
             )}
           >
+          <div
+            data-studio-asset-drop-indicator
+            aria-hidden
+            className="pointer-events-none absolute z-[46] size-12 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-accent bg-accent/15 opacity-0 shadow-[0_0_0_8px_oklch(0.72_0.18_45/0.12)] transition-opacity group-data-[studio-asset-drop-active=true]/asset-drop:opacity-100"
+            style={{
+              left: "var(--studio-asset-drop-x, -9999px)",
+              top: "var(--studio-asset-drop-y, -9999px)",
+            }}
+          >
+            <span className="absolute inset-1 rounded-full border border-dashed border-accent/80" />
+          </div>
+          <div
+            aria-hidden
+            className="pointer-events-none sticky top-3 z-[47] flex h-0 justify-center px-3 opacity-0 transition-opacity group-data-[studio-asset-drop-active=true]/asset-drop:opacity-100"
+          >
+            <div className="inline-flex min-h-9 items-center gap-2 rounded-full border border-accent/60 bg-panel/95 px-3 text-[0.68rem] font-bold text-fg shadow-xl backdrop-blur-md">
+              <ImagePlus size={14} className="text-accent" aria-hidden />
+              놓는 위치에 정확히 배치
+              <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.58rem] text-accent">복사</span>
+            </div>
+          </div>
           <div className="pointer-events-none sticky top-2 z-40 flex h-0 items-start justify-end pr-2">
             <Suspense fallback={null}>
               <StudioLivePresenceDockConnected
