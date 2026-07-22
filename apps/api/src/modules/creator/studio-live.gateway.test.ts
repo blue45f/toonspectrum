@@ -97,10 +97,17 @@ type FakeNamespaceMiddleware = (
 
 class MemoryStudioLiveLockRepository implements StudioLiveLockRepository {
   private readonly locks = new Map<string, StudioLiveLockRecord>();
+  private readonly revisions = new Map<string, bigint>();
   private readonly workMutationTails = new Map<string, Promise<void>>();
 
   private key(workId: string, resourceId: string): string {
     return JSON.stringify([workId, resourceId]);
+  }
+
+  private nextRevision(workId: string): bigint {
+    const revision = (this.revisions.get(workId) ?? 0n) + 1n;
+    this.revisions.set(workId, revision);
+    return revision;
   }
 
   async withWorkMutation<T>(workId: string, operation: () => Promise<T>): Promise<T> {
@@ -124,7 +131,15 @@ class MemoryStudioLiveLockRepository implements StudioLiveLockRepository {
 
   async acquire(input: AcquireStudioLiveLockInput) {
     return this.withWorkMutation(input.workId, async () => {
-      await this.purgeExpired();
+      const now = Date.now();
+      let removedExpired = false;
+      for (const [key, lock] of this.locks) {
+        if (lock.workId === input.workId && lock.expiresAt.getTime() <= now) {
+          this.locks.delete(key);
+          removedExpired = true;
+        }
+      }
+      if (removedExpired) this.nextRevision(input.workId);
       const key = this.key(input.workId, input.resourceId);
       const active = [...this.locks.values()]
         .filter((lock) => lock.workId === input.workId)
@@ -159,6 +174,7 @@ class MemoryStudioLiveLockRepository implements StudioLiveLockRepository {
         acquisitionId: input.acquisitionId,
         ownerConnectionId: input.ownerConnectionId,
         ownerName: input.ownerName,
+        revision: this.nextRevision(input.workId),
         expiresAt: new Date(Date.now() + input.leaseMs),
       };
       this.locks.set(key, lock);
@@ -181,7 +197,7 @@ class MemoryStudioLiveLockRepository implements StudioLiveLockRepository {
         current.leaseId !== input.leaseId
       ) return null;
       this.locks.delete(key);
-      return current;
+      return { ...current, revision: this.nextRevision(input.workId) };
     });
   }
 
@@ -192,42 +208,61 @@ class MemoryStudioLiveLockRepository implements StudioLiveLockRepository {
     acquisitionId: string;
     ownerConnectionId: string;
   }) {
-    const key = this.key(input.workId, input.resourceId);
-    const current = this.locks.get(key);
-    if (
-      !current ||
-      current.ownerConnectionId !== input.ownerConnectionId ||
-      current.leaseId !== input.leaseId ||
-      current.acquisitionId !== input.acquisitionId
-    ) return null;
-    this.locks.delete(key);
-    return current;
+    return this.withWorkMutation(input.workId, async () => {
+      const key = this.key(input.workId, input.resourceId);
+      const current = this.locks.get(key);
+      if (
+        !current ||
+        current.ownerConnectionId !== input.ownerConnectionId ||
+        current.leaseId !== input.leaseId ||
+        current.acquisitionId !== input.acquisitionId
+      ) return null;
+      this.locks.delete(key);
+      return { ...current, revision: this.nextRevision(input.workId) };
+    });
   }
 
   async releaseConnection(workId: string, ownerConnectionId: string) {
-    const released: StudioLiveLockRecord[] = [];
-    for (const [key, lock] of this.locks) {
-      if (lock.workId !== workId || lock.ownerConnectionId !== ownerConnectionId) continue;
-      this.locks.delete(key);
-      released.push(lock);
-    }
-    return released;
+    return this.withWorkMutation(workId, async () => {
+      const released: StudioLiveLockRecord[] = [];
+      for (const [key, lock] of this.locks) {
+        if (lock.workId !== workId || lock.ownerConnectionId !== ownerConnectionId) continue;
+        this.locks.delete(key);
+        released.push(lock);
+      }
+      if (released.length === 0) return [];
+      const revision = this.nextRevision(workId);
+      return released.map((lock) => ({ ...lock, revision }));
+    });
+  }
+
+  async snapshot(workId: string) {
+    return this.withWorkMutation(workId, async () => ({
+      revision: this.revisions.get(workId) ?? 0n,
+      locks: [...this.locks.values()]
+        .filter((lock) => lock.workId === workId && lock.expiresAt.getTime() > Date.now())
+        .sort((left, right) => left.resourceId.localeCompare(right.resourceId)),
+    }));
   }
 
   async list(workId: string) {
-    await this.purgeExpired();
-    return [...this.locks.values()]
-      .filter((lock) => lock.workId === workId)
-      .sort((left, right) => left.resourceId.localeCompare(right.resourceId));
+    return (await this.snapshot(workId)).locks;
   }
 
   async purgeExpired() {
     const now = Date.now();
-    const expired: StudioLiveLockRecord[] = [];
+    const expiredByWork = new Map<string, StudioLiveLockRecord[]>();
     for (const [key, lock] of this.locks) {
       if (lock.expiresAt.getTime() > now) continue;
       this.locks.delete(key);
-      expired.push(lock);
+      const workLocks = expiredByWork.get(lock.workId) ?? [];
+      workLocks.push(lock);
+      expiredByWork.set(lock.workId, workLocks);
+    }
+    const expired: StudioLiveLockRecord[] = [];
+    for (const [workId, locks] of expiredByWork) {
+      const revision = this.nextRevision(workId);
+      expired.push(...locks.map((lock) => ({ ...lock, revision })));
     }
     return expired;
   }
@@ -1067,6 +1102,8 @@ describe("StudioLiveGateway", () => {
     expect(response.ok).toBe(true);
     if (!response.ok) throw new Error("join failed");
     expect(response.data.lockProtocolVersion).toBe(2);
+    expect(response.data.lockRevisionVersion).toBe(1);
+    expect(response.data.lockSnapshotRevision).toBe("0");
     expect(response.data.self).toMatchObject({
       connectionId: "owner",
       clientInstanceId: "client-owner",
@@ -2141,6 +2178,7 @@ describe("StudioLiveGateway", () => {
         resourceId: "element:panel-1",
         leaseId: renewed.ok ? renewed.data.lock.leaseId : "missing",
         released: true,
+        revision: "3",
       },
     });
     expect(harness.emissions).toContainEqual({
@@ -2150,6 +2188,7 @@ describe("StudioLiveGateway", () => {
         action: "released",
         requestId: "00000000-0000-4000-8000-000000000012",
         releaseRequestId: "00000000-0000-4000-8000-000000000015",
+        revision: "3",
       }),
     });
   });
@@ -2415,6 +2454,69 @@ describe("StudioLiveGateway", () => {
       code: "lock_stale",
       requestId: "00000000-0000-4000-8000-000000000020",
     });
+  });
+
+  it("keeps a legacy release behind an earlier delayed renewal so the lease cannot resurrect", async () => {
+    const repository = new MemoryStudioLiveLockRepository();
+    const harness = createHarness(undefined, undefined, undefined, repository);
+    const socket = harness.socket("legacy-release-order");
+    await connectAndJoin(harness, socket);
+
+    const acquired = await harness.gateway.requestLock(
+      socket as never,
+      { workId: "work-1", resourceId: "page:legacy-release-order", leaseMs: 15_000 },
+      undefined
+    );
+    expect(acquired.ok).toBe(true);
+    if (!acquired.ok) throw new Error("initial legacy lock failed");
+
+    let resumeRenewalCheck:
+      | ((snapshot: ReturnType<typeof teamSnapshot>) => void)
+      | undefined;
+    const delayedRenewalCheck = new Promise<ReturnType<typeof teamSnapshot>>((resolve) => {
+      resumeRenewalCheck = resolve;
+    });
+    const teamReadsBeforeRenewal = harness.service.getWorkTeam.mock.calls.length;
+    harness.service.getWorkTeam.mockImplementationOnce(() => delayedRenewalCheck);
+
+    const renewal = harness.gateway.requestLock(
+      socket as never,
+      { workId: "work-1", resourceId: "page:legacy-release-order", leaseMs: 20_000 },
+      undefined
+    );
+    await vi.waitFor(() => {
+      expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsBeforeRenewal + 1);
+    });
+
+    let releaseSettled = false;
+    const release = harness.gateway.releaseLock(
+      socket as never,
+      {
+        workId: "work-1",
+        resourceId: "page:legacy-release-order",
+        leaseId: acquired.data.lock.leaseId,
+      },
+      undefined
+    );
+    void release.finally(() => {
+      releaseSettled = true;
+    });
+    await Promise.resolve();
+    expect(releaseSettled).toBe(false);
+
+    resumeRenewalCheck?.(teamSnapshot(socket.id, "work-1"));
+    await expect(renewal).resolves.toMatchObject({
+      ok: true,
+      data: { lock: { leaseId: acquired.data.lock.leaseId } },
+    });
+    await expect(release).resolves.toMatchObject({
+      ok: true,
+      data: {
+        leaseId: acquired.data.lock.leaseId,
+        released: true,
+      },
+    });
+    await expect(repository.list("work-1")).resolves.toEqual([]);
   });
 
   it("serializes one shared lock owner across API gateway instances", async () => {
@@ -2997,7 +3099,7 @@ describe("StudioLiveGateway", () => {
     }
   });
 
-  it("cannot roll back a newly created lease after a newer participant generation adopts it", async () => {
+  it("serializes a newer participant generation behind its in-flight lock lifecycle", async () => {
     const repository = new MemoryStudioLiveLockRepository();
     const harness = createHarness(undefined, undefined, undefined, repository);
     const socket = harness.socket("editor");
@@ -3042,7 +3144,8 @@ describe("StudioLiveGateway", () => {
       )
     ).resolves.toMatchObject({ ok: true });
 
-    const adopted = await harness.gateway.requestLock(
+    let adoptedSettled = false;
+    const adoptedRequest = harness.gateway.requestLock(
       socket as never,
       {
         workId: "work-1",
@@ -3053,16 +3156,25 @@ describe("StudioLiveGateway", () => {
       },
       undefined
     );
-    expect(adopted).toMatchObject({ ok: true });
-    if (!adopted.ok) throw new Error("new participant did not adopt the lease");
+    void adoptedRequest.finally(() => {
+      adoptedSettled = true;
+    });
+    await Promise.resolve();
+    expect(adoptedSettled).toBe(false);
 
     resumeFirstAcquire?.();
-    await expect(staleAcquire).resolves.toMatchObject({
-      ok: false,
-      code: "lock_stale",
-      decision: "revoked",
-      requestId: "00000000-0000-4000-8000-000000000043",
+    const first = await staleAcquire;
+    expect(first).toMatchObject({
+      ok: true,
+      data: {
+        requestId: "00000000-0000-4000-8000-000000000043",
+      },
     });
+    if (!first.ok) throw new Error("serialized first lifecycle did not complete");
+    const adopted = await adoptedRequest;
+    expect(adopted).toMatchObject({ ok: true });
+    if (!adopted.ok) throw new Error("new participant did not adopt the lease");
+    expect(adopted.data.lock.leaseId).toBe(first.data.lock.leaseId);
     await expect(repository.list("work-1")).resolves.toEqual([
       expect.objectContaining({
         resourceId: "page:adopt-race",
@@ -3129,6 +3241,99 @@ describe("StudioLiveGateway", () => {
       undefined
     );
     expect(currentCursor).toEqual({ ok: true, data: { accepted: true } });
+  });
+
+  it("waits for an older work cleanup before a returning participant acquires a new lock", async () => {
+    const repository = new MemoryStudioLiveLockRepository();
+    const releaseConnection = repository.releaseConnection.bind(repository);
+    let releaseOldCleanup: (() => void) | undefined;
+    const oldCleanupGate = new Promise<void>((resolve) => {
+      releaseOldCleanup = resolve;
+    });
+    const releaseConnectionSpy = vi
+      .spyOn(repository, "releaseConnection")
+      .mockImplementation(async (workId, ownerConnectionId) => {
+        if (workId === "work-a") await oldCleanupGate;
+        return releaseConnection(workId, ownerConnectionId);
+      });
+    const acquireSpy = vi.spyOn(repository, "acquire");
+    const harness = createHarness(undefined, undefined, undefined, repository);
+    const socket = harness.socket("returning-editor");
+    await connectAndJoin(harness, socket, "work-a");
+
+    const initial = await harness.gateway.requestLock(
+      socket as never,
+      {
+        workId: "work-a",
+        resourceId: "page:old-generation",
+        protocolVersion: 2,
+        requestId: "00000000-0000-4000-8000-000000000069",
+        leaseMs: 15_000,
+      },
+      undefined
+    );
+    expect(initial.ok).toBe(true);
+
+    await expect(
+      harness.gateway.join(
+        socket as never,
+        { workId: "work-b", clientInstanceId: "client-returning-editor-b" },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true });
+    await vi.waitFor(() => {
+      expect(releaseConnectionSpy).toHaveBeenCalledWith("work-a", socket.id);
+    });
+    await expect(
+      harness.gateway.join(
+        socket as never,
+        { workId: "work-a", clientInstanceId: "client-returning-editor-a" },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true });
+
+    const gatewayInternals = harness.gateway as unknown as {
+      awaitSocketLockCleanup(workId: string, connectionId: string): Promise<void>;
+    };
+    const cleanupWaitSpy = vi.spyOn(gatewayInternals, "awaitSocketLockCleanup");
+    let requestSettled = false;
+    const returningAcquire = harness.gateway.requestLock(
+      socket as never,
+      {
+        workId: "work-a",
+        resourceId: "page:new-generation",
+        protocolVersion: 2,
+        requestId: "00000000-0000-4000-8000-000000000070",
+        leaseMs: 15_000,
+      },
+      undefined
+    );
+    void returningAcquire.then(() => {
+      requestSettled = true;
+    });
+    await vi.waitFor(() => {
+      expect(cleanupWaitSpy).toHaveBeenCalledWith("work-a", socket.id);
+    });
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect(requestSettled).toBe(false);
+    expect(acquireSpy).toHaveBeenCalledTimes(1);
+
+    releaseOldCleanup?.();
+    await expect(returningAcquire).resolves.toMatchObject({
+      ok: true,
+      data: {
+        decision: "acquired",
+        requestId: "00000000-0000-4000-8000-000000000070",
+        lock: { resourceId: "page:new-generation" },
+      },
+    });
+    expect(acquireSpy).toHaveBeenCalledTimes(2);
+    await expect(repository.list("work-a")).resolves.toEqual([
+      expect.objectContaining({
+        resourceId: "page:new-generation",
+        ownerConnectionId: socket.id,
+      }),
+    ]);
   });
 
   it("discards a stale concurrent ACL result after a newer role downgrade", async () => {

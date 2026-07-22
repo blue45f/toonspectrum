@@ -21,6 +21,25 @@ const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
   dataType: () => "bytea",
 });
 
+// SQL cutovers that cannot be represented safely by `drizzle-kit push` record a durable marker
+// here. Unlike a column comment, this survives normal schema introspection and data dump/restore,
+// so retrying a migration cannot repeat a destructive one-time transition.
+export const toonspectrumSchemaMigrations = pgTable(
+  "toonspectrum_schema_migration",
+  {
+    id: text("id").primaryKey(),
+    appliedAt: timestamp("appliedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    check(
+      "toonspectrum_schema_migration_id_check",
+      sql`length(${t.id}) between 1 and 160`
+    ),
+  ]
+);
+
 // Socket.IO PostgreSQL cluster adapter의 8 KiB 초과·binary packet 임시 본문. 실제 room/presence
 // 권위 상태가 아니라 LISTEN/NOTIFY 전달 보조 저장소이며 adapter cleanup 주기 이후 제거된다.
 // 이름과 컬럼은 lifecycle-safe PostgreSQL transport의 고정 SQL 계약과 정확히 일치해야 한다.
@@ -586,6 +605,30 @@ export const creatorWorkCrdtUpdateReceipts = pgTable(
   ]
 );
 
+// 작품별 실시간 잠금 revision high-water. 동일 작품의 advisory-lock 임계 구역 안에서만
+// 증가시키며, JOIN snapshot과 mutation fanout이 같은 단조 순서를 공유하게 한다.
+export const creatorWorkLiveLockClocks = pgTable(
+  "creator_work_live_lock_clock",
+  {
+    workId: text("workId").primaryKey(),
+    revision: bigint("revision", { mode: "bigint" }).notNull().default(sql`0`),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      name: "creator_work_live_lock_clock_work_fkey",
+      columns: [t.workId],
+      foreignColumns: [creatorWorks.id],
+    }).onDelete("cascade"),
+    check(
+      "creator_work_live_lock_clock_revision_check",
+      sql`${t.revision} >= 0`
+    ),
+  ]
+);
+
 // 실시간 편집의 짧은 임대 잠금. WebSocket gateway 프로세스 메모리가 아니라 PostgreSQL을
 // 권위 저장소로 사용하므로 여러 API 인스턴스가 같은 리소스를 동시에 승인할 수 없다. 연결이
 // 비정상 종료되더라도 expiresAt 이후 다른 편집자가 재획득하며, 정상 종료는 owner/lease 조건부
@@ -602,6 +645,10 @@ export const creatorWorkLiveLocks = pgTable(
     acquisitionId: text("acquisitionId").notNull(),
     ownerConnectionId: text("ownerConnectionId").notNull(),
     ownerName: text("ownerName").notNull(),
+    // Every writer must participate in the per-work clock. A permissive default would let an old
+    // API process mutate rows without advancing the high-water mark, so incompatible writers fail
+    // closed instead of silently violating the ordering contract.
+    revision: bigint("revision", { mode: "bigint" }).notNull(),
     expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }).notNull(),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
@@ -632,6 +679,10 @@ export const creatorWorkLiveLocks = pgTable(
     check(
       "creator_work_live_lock_connection_id_check",
       sql`length(${t.ownerConnectionId}) between 1 and 128`
+    ),
+    check(
+      "creator_work_live_lock_revision_check",
+      sql`${t.revision} > 0`
     ),
     check(
       "creator_work_live_lock_owner_name_check",

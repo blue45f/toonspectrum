@@ -150,7 +150,7 @@ pnpm build && pnpm start   # 프로덕션 프리뷰
 
 ### DB 준비 (PostgreSQL / Neon)
 
-DB는 **PostgreSQL**입니다 — 로컬은 docker, 원격·배포는 **Neon**(서버리스 Postgres). `lib/db`가 `DATABASE_URL`을 읽고, 미설정 시 로컬 docker(`postgres://webdex:webdex@127.0.0.1:55432/webdex`)로 폴백합니다. 둘 중 하나를 고른 뒤 스키마를 push하고 카탈로그를 적재하세요.
+DB는 **PostgreSQL**입니다 — 로컬은 docker, 원격·배포는 **Neon**(서버리스 Postgres). `DATABASE_URL`은 필수이며, Studio 다중 인스턴스와 수동 SQL migration에는 transaction pooler가 아닌 `STUDIO_LIVE_POSTGRES_URL` direct endpoint도 필요합니다. 스키마를 push한 뒤 realtime SQL migration을 적용하고 카탈로그를 적재하세요.
 
 **A. 로컬 docker Postgres**
 
@@ -158,7 +158,11 @@ DB는 **PostgreSQL**입니다 — 로컬은 docker, 원격·배포는 **Neon**(�
 docker run -d --name wd-pg \
   -e POSTGRES_USER=webdex -e POSTGRES_PASSWORD=webdex -e POSTGRES_DB=webdex \
   -p 55432:5432 postgres:16-alpine
-pnpm exec drizzle-kit push        # 스키마 생성(20테이블). DATABASE_URL 미설정 시 위 docker 기본값 사용
+export DATABASE_URL='postgres://webdex:webdex@127.0.0.1:55432/webdex'
+export STUDIO_LIVE_POSTGRES_URL="$DATABASE_URL"
+pnpm exec drizzle-kit push --force
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0009_socket_io_postgres_adapter.sql
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0017_creator_work_live_lock_revision.sql
 pnpm ingest                       # 전 소스 크롤 후 catalog.json.gz 갱신(DB 무관) → API가 폴링으로 자동 반영
 pnpm dev:all
 ```
@@ -166,12 +170,19 @@ pnpm dev:all
 **B. 원격 Neon** — `.env.local`에 연결 문자열만 넣으면 크롤·ingest·API가 모두 원격을 사용합니다.
 
 ```bash
-# .env.local (gitignore됨)
+# .env.local (gitignore됨): 앱 일반 쿼리는 pooler, realtime migration/adapter는 direct endpoint
 echo 'DATABASE_URL="postgresql://<user>:<pw>@<host>-pooler.<region>.aws.neon.tech/<db>?sslmode=require"' >> .env.local
-pnpm exec drizzle-kit push        # Neon에 스키마 생성(동적 데이터 전용 — 카탈로그는 DB에 없음)
+echo 'STUDIO_LIVE_POSTGRES_URL="postgresql://<user>:<pw>@<direct-host>.<region>.aws.neon.tech/<db>?sslmode=verify-full"' >> .env.local
+set -a; source .env.local; set +a
+pnpm exec drizzle-kit push --force
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0009_socket_io_postgres_adapter.sql
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0017_creator_work_live_lock_revision.sql
 pnpm ingest                       # catalog.json.gz 갱신(Neon 전송 0)
 pnpm dev:all                      # apps/api가 부팅 시 .env.local을 먼저 로드 → 자동으로 Neon 연결
 ```
+
+기존 운영 DB는 API writer를 먼저 drain해야 합니다. live-lock revision cutover, 검증, retry,
+emergency rollback 절차는 [`docs/STUDIO-LIVE-LOCK-REVISION-MIGRATION.md`](docs/STUDIO-LIVE-LOCK-REVISION-MIGRATION.md)를 따릅니다.
 
 > 데이터 갱신: 정적 운영에서는 `pnpm catalog:gen`으로 `public/data/*.json`을 재생성하고 재배포합니다. API는 gz 파일 mtime/size 폴링(`CATALOG_REFRESH_POLL_SECONDS`, 기본 60s — DB 왕복 없음)으로 새 카탈로그를 **무중단 핫 리로드**하거나, `POST /api/catalog/refresh`로 즉시 반영합니다. 전체 흐름은 [`docs/data-pipeline.md`](docs/data-pipeline.md) 참고.
 

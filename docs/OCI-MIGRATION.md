@@ -46,10 +46,20 @@ cp .env.example .env && nano .env     # DOMAIN, POSTGRES_PASSWORD, AUTH_SECRET, 
 ## 5. 스택 기동 + 스키마
 ```bash
 cd /opt/webdex/deploy/oci
-docker compose up -d --build               # db + api + caddy(자동 HTTPS 발급)
-docker compose exec -w /repo api pnpm exec drizzle-kit push --force   # 최초 1회 스키마
+docker compose up -d db
+docker compose build api
+docker compose run --rm api pnpm exec drizzle-kit push --force
+docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+  < ../../lib/db/migrations/0009_socket_io_postgres_adapter.sql
+docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+  < ../../lib/db/migrations/0017_creator_work_live_lock_revision.sql
+docker compose up -d api caddy              # migration 완료 후에만 Studio API를 공개
 curl -s https://api.example.com/api/config # 200 확인
 ```
+
+기존 스택 업그레이드는 `api`를 먼저 중지하고 `0017`을 적용한 뒤 새 이미지로 다시 시작해야
+합니다. 세부 사후조건과 retry/rollback 절차는
+[`STUDIO-LIVE-LOCK-REVISION-MIGRATION.md`](./STUDIO-LIVE-LOCK-REVISION-MIGRATION.md)를 따릅니다.
 
 ## 6. DB 데이터 이전 (Neon → OCI) — 선택
 스키마는 §5의 drizzle push로 생성됨. 기존 데이터(리뷰·커뮤니티 등) 이관이 필요하면:

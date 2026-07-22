@@ -1,8 +1,14 @@
+import { readFileSync } from "node:fs";
+
 import { getTableConfig, PgDialect } from "drizzle-orm/pg-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "../../../../../lib/db";
-import { creatorWorkLiveLocks } from "../../../../../lib/db/schema";
+import {
+  creatorWorkLiveLockClocks,
+  creatorWorkLiveLocks,
+  toonspectrumSchemaMigrations,
+} from "../../../../../lib/db/schema";
 import {
   parseStudioLiveLockResourceScope,
   studioLiveLockResourcesConflict,
@@ -36,6 +42,7 @@ interface FakeLockRow {
   acquisitionId: string;
   ownerConnectionId: string;
   ownerName: string;
+  revision: bigint;
   expiresAt: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -48,6 +55,7 @@ interface RenderedLockCondition {
 
 interface LockPersistenceHarnessState {
   row: FakeLockRow | null;
+  readonly revisions: Map<string, bigint>;
   readonly updateSets: Array<Record<string, unknown>>;
   readonly updateConditions: RenderedLockCondition[];
   readonly releaseConditions: RenderedLockCondition[];
@@ -109,6 +117,7 @@ class FakeLockInsertQuery {
       acquisitionId: String(value.acquisitionId),
       ownerConnectionId: String(value.ownerConnectionId),
       ownerName: String(value.ownerName),
+      revision: typeof value.revision === "bigint" ? value.revision : 1n,
       expiresAt: new Date("2026-07-20T00:01:00.000Z"),
       createdAt: now,
       updatedAt: now,
@@ -119,6 +128,27 @@ class FakeLockInsertQuery {
 
   returning(): Promise<FakeLockRow[]> {
     return Promise.resolve(this.stored ? [{ ...this.stored }] : []);
+  }
+}
+
+class FakeLockClockInsertQuery {
+  private workId = "";
+
+  constructor(private readonly state: LockPersistenceHarnessState) {}
+
+  values(value: Record<string, unknown>): this {
+    this.workId = String(value.workId);
+    return this;
+  }
+
+  onConflictDoUpdate(..._arguments: unknown[]): this {
+    return this;
+  }
+
+  returning(..._arguments: unknown[]): Promise<Array<{ revision: bigint }>> {
+    const revision = (this.state.revisions.get(this.workId) ?? 0n) + 1n;
+    this.state.revisions.set(this.workId, revision);
+    return Promise.resolve([{ revision }]);
   }
 }
 
@@ -152,6 +182,7 @@ class FakeLockUpdateQuery {
         ? { acquisitionId: this.patch.acquisitionId }
         : {}),
       ...(typeof this.patch.ownerName === "string" ? { ownerName: this.patch.ownerName } : {}),
+      ...(typeof this.patch.revision === "bigint" ? { revision: this.patch.revision } : {}),
       expiresAt: new Date("2026-07-20T00:01:00.000Z"),
       updatedAt: new Date("2026-07-20T00:00:01.000Z"),
     };
@@ -172,7 +203,9 @@ class FakeLockDeleteQuery implements PromiseLike<unknown[]> {
 
   returning(): Promise<FakeLockRow[]> {
     if (!this.condition) return Promise.resolve([]);
-    this.state.releaseConditions.push(this.condition);
+    if (this.condition.params.length === 4 || this.condition.params.length === 5) {
+      this.state.releaseConditions.push(this.condition);
+    }
     const current = this.state.row;
     if (!current || !matchesCurrentFence(current, this.condition)) return Promise.resolve([]);
     this.state.row = null;
@@ -192,6 +225,7 @@ class FakeLockDeleteQuery implements PromiseLike<unknown[]> {
 function createLockPersistenceHarness() {
   const state: LockPersistenceHarnessState = {
     row: null,
+    revisions: new Map(),
     updateSets: [],
     updateConditions: [],
     releaseConditions: [],
@@ -200,7 +234,11 @@ function createLockPersistenceHarness() {
     execute: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn(() => new FakeLockDeleteQuery(state)),
     select: vi.fn(() => new FakeLockSelectQuery(state)),
-    insert: vi.fn(() => new FakeLockInsertQuery(state)),
+    insert: vi.fn((table: unknown) =>
+      table === creatorWorkLiveLockClocks
+        ? new FakeLockClockInsertQuery(state)
+        : new FakeLockInsertQuery(state)
+    ),
     update: vi.fn(() => new FakeLockUpdateQuery(state)),
   };
   return { state, transaction };
@@ -210,6 +248,35 @@ describe("studio live distributed lock persistence contract", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
+
+  it("ships a ledger-fenced, fail-closed revision cutover migration", () => {
+    const migration = readFileSync(
+      new URL(
+        "../../../../../lib/db/migrations/0017_creator_work_live_lock_revision.sql",
+        import.meta.url
+      ),
+      "utf8"
+    );
+
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS "toonspectrum_schema_migration"');
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS "creator_work_live_lock_clock"');
+    expect(migration).toContain('ADD COLUMN IF NOT EXISTS "revision" bigint');
+    expect(migration).toContain("IN ACCESS EXCLUSIVE MODE");
+    expect(migration).toContain("GREATEST(");
+    expect(migration).toContain('ALTER COLUMN "revision" DROP DEFAULT');
+    expect(migration).toContain('ALTER COLUMN "revision" SET NOT NULL');
+    expect(migration).toContain(
+      "WHERE \"id\" = '0017_creator_work_live_lock_revision'"
+    );
+    expect(migration).toContain(
+      'INSERT INTO "toonspectrum_schema_migration" ("id", "appliedAt")'
+    );
+    expect(migration).toContain("ToonSpectrum live-lock revision v1 cutover complete");
+    expect(migration).toMatch(
+      /DELETE FROM "creator_work_live_lock"\s+WHERE \(SELECT "required"/u
+    );
+  });
+
   it("keeps request correlation while fencing repeated request ids with a private nonce", () => {
     const requestId = "00000000-0000-4000-8000-000000000001";
     const first = createStudioLiveLockAcquisitionId(
@@ -272,9 +339,23 @@ describe("studio live distributed lock persistence contract", () => {
       "creator_work_live_lock_lease_id_check",
       "creator_work_live_lock_owner_name_check",
       "creator_work_live_lock_resource_id_check",
+      "creator_work_live_lock_revision_check",
     ]);
     expect(table.columns.find((column) => column.name === "acquisitionId")?.notNull).toBe(true);
+    expect(table.columns.find((column) => column.name === "revision")?.notNull).toBe(true);
     expect(STUDIO_LIVE_LOCK_LIMIT_PER_WORK).toBe(200);
+  });
+
+  it("defines a durable schema-cutover ledger instead of using comments as state", () => {
+    const table = getTableConfig(toonspectrumSchemaMigrations);
+
+    expect(table.name).toBe("toonspectrum_schema_migration");
+    expect(table.columns.find((column) => column.name === "id")?.primary).toBe(true);
+    expect(names(table.checks)).toEqual([
+      "toonspectrum_schema_migration_id_check",
+    ]);
+    expect(table.columns.find((column) => column.name === "id")?.notNull).toBe(true);
+    expect(table.columns.find((column) => column.name === "appliedAt")?.notNull).toBe(true);
   });
 
   it("uses an isolated, stable per-work PostgreSQL advisory-lock namespace", () => {

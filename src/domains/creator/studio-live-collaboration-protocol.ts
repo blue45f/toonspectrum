@@ -11,6 +11,7 @@ import { STUDIO_TEAM_ROLES, type StudioTeamRole } from "./studio-team-client";
 export const STUDIO_LIVE_PROTOCOL_VERSION = 1 as const;
 /** Socket lock-control capability negotiated independently from the local envelope version. */
 export const STUDIO_LIVE_LOCK_PROTOCOL_VERSION = 2 as const;
+export const STUDIO_LIVE_LOCK_REVISION_VERSION = 1 as const;
 export const STUDIO_LIVE_MESSAGE_MAX_BYTES = 64 * 1024;
 export const STUDIO_LIVE_MESSAGE_MAX_AGE_MS = 30_000;
 export const STUDIO_LIVE_MESSAGE_FUTURE_SKEW_MS = 5_000;

@@ -1,6 +1,7 @@
 import { and, asc, eq, gt, lte, sql } from "drizzle-orm";
 
 import {
+  creatorWorkLiveLockClocks,
   creatorWorkLiveLocks,
   db,
 } from "../../../../../lib/db";
@@ -10,6 +11,8 @@ export const STUDIO_LIVE_LOCK_REPOSITORY = Symbol("STUDIO_LIVE_LOCK_REPOSITORY")
 export const STUDIO_LIVE_LOCK_LIMIT_PER_WORK = 200;
 export const STUDIO_LIVE_LOCK_ADVISORY_NAMESPACE =
   "toonspectrum:creator-work-live-lock:v1:";
+const STUDIO_LIVE_LOCK_EXPIRY_WORK_BATCH_LIMIT = 128;
+const STUDIO_LIVE_LOCK_EXPIRY_CONCURRENCY = 4;
 const STUDIO_LIVE_LOCK_ACQUISITION_SEPARATOR = ".";
 
 type DrizzleStudioLiveLockTransaction = Parameters<
@@ -24,7 +27,14 @@ export interface StudioLiveLockRecord {
   acquisitionId: string;
   ownerConnectionId: string;
   ownerName: string;
+  /** Per-work monotonic mutation order. Release records carry the deletion event revision. */
+  revision: bigint;
   expiresAt: Date;
+}
+
+export interface StudioLiveLockSnapshot {
+  revision: bigint;
+  locks: StudioLiveLockRecord[];
 }
 
 export interface AcquireStudioLiveLockInput {
@@ -65,6 +75,7 @@ export interface StudioLiveLockRepository {
     input: ReleaseStudioLiveLockInput & { acquisitionId: string }
   ): Promise<StudioLiveLockRecord | null>;
   releaseConnection(workId: string, ownerConnectionId: string): Promise<StudioLiveLockRecord[]>;
+  snapshot(workId: string): Promise<StudioLiveLockSnapshot>;
   list(workId: string): Promise<StudioLiveLockRecord[]>;
   purgeExpired(): Promise<StudioLiveLockRecord[]>;
 }
@@ -92,6 +103,25 @@ export async function withStudioLiveLockWorkMutation<T>(
   return operation();
 }
 
+async function nextStudioLiveLockRevision(
+  transaction: DrizzleStudioLiveLockTransaction,
+  workId: string
+): Promise<bigint> {
+  const [clock] = await transaction
+    .insert(creatorWorkLiveLockClocks)
+    .values({ workId, revision: 1n, updatedAt: sql`statement_timestamp()` })
+    .onConflictDoUpdate({
+      target: creatorWorkLiveLockClocks.workId,
+      set: {
+        revision: sql`${creatorWorkLiveLockClocks.revision} + 1`,
+        updatedAt: sql`statement_timestamp()`,
+      },
+    })
+    .returning({ revision: creatorWorkLiveLockClocks.revision });
+  if (!clock) throw new Error("studio live lock revision clock did not advance");
+  return clock.revision;
+}
+
 function toRecord(
   row: typeof creatorWorkLiveLocks.$inferSelect
 ): StudioLiveLockRecord {
@@ -102,6 +132,7 @@ function toRecord(
     acquisitionId: row.acquisitionId,
     ownerConnectionId: row.ownerConnectionId,
     ownerName: row.ownerName,
+    revision: row.revision,
     expiresAt: row.expiresAt,
   };
 }
@@ -116,22 +147,31 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
   constructor(private readonly database: typeof db = db) {}
 
   async withWorkMutation<T>(workId: string, operation: () => Promise<T>): Promise<T> {
-    return this.database.transaction((transaction) =>
-      withStudioLiveLockWorkMutation(transaction, workId, operation)
+    return this.database.transaction(
+      (transaction) => withStudioLiveLockWorkMutation(transaction, workId, operation),
+      { isolationLevel: "read committed" }
     );
   }
 
   async acquire(input: AcquireStudioLiveLockInput): Promise<AcquireStudioLiveLockResult> {
-    return this.database.transaction((transaction) =>
-      withStudioLiveLockWorkMutation(transaction, input.workId, async () => {
-        await transaction
+    return this.database.transaction(
+      (transaction) => withStudioLiveLockWorkMutation(transaction, input.workId, async () => {
+        const expired = await transaction
           .delete(creatorWorkLiveLocks)
           .where(
             and(
               eq(creatorWorkLiveLocks.workId, input.workId),
-              lte(creatorWorkLiveLocks.expiresAt, sql`now()`)
+              lte(creatorWorkLiveLocks.expiresAt, sql`statement_timestamp()`)
             )
-          );
+          )
+          .returning({ resourceId: creatorWorkLiveLocks.resourceId });
+        // Expiry is a real state transition even when this acquire later returns stale/conflict.
+        // It intentionally owns a revision separate from the following acquire so a later JOIN
+        // snapshot has a floor newer than every removed fence. No fanout is needed here because
+        // those leases are already invalid by their database-authored wall-clock deadline.
+        if (expired.length > 0) {
+          await nextStudioLiveLockRevision(transaction, input.workId);
+        }
 
         // The per-work advisory lock makes this read/check/write one atomic admission decision
         // across API instances. Read the bounded active set so page/element ancestors participate
@@ -184,16 +224,18 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
         const leaseId = existing && !input.rotateLease
           ? existing.leaseId
           : input.requestedLeaseId;
-        const expiresAt = sql`now() + (${input.leaseMs} * interval '1 millisecond')`;
+        const revision = await nextStudioLiveLockRevision(transaction, input.workId);
+        const expiresAt = sql`statement_timestamp() + (${input.leaseMs} * interval '1 millisecond')`;
         const [stored] = existing
           ? await transaction
               .update(creatorWorkLiveLocks)
               .set({
                 leaseId,
                 ownerName: input.ownerName,
+                revision,
                 acquisitionId: input.acquisitionId,
                 expiresAt,
-                updatedAt: sql`now()`,
+                updatedAt: sql`statement_timestamp()`,
               })
               .where(
                 and(
@@ -213,25 +255,26 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
                 acquisitionId: input.acquisitionId,
                 ownerConnectionId: input.ownerConnectionId,
                 ownerName: input.ownerName,
+                revision,
                 expiresAt,
               })
               .returning();
-        // The periodic expiry sweep does not take the per-work advisory lock. PostgreSQL normally
-        // rechecks a waited DELETE against the renewed row, but if an expired row disappears after
-        // our read and before this fenced UPDATE, surface the lost CAS as stale rather than an
-        // internal server failure. Inserts still cannot disappear inside this transaction.
+        // Every repository mutation, including the expiry sweep, takes the per-work advisory lock.
+        // Keep the fenced predicate as defense in depth; an out-of-band writer that removes the
+        // row after our read is surfaced as stale instead of reviving an older lifecycle.
         if (!stored) {
           if (existing) return { status: "stale" };
           throw new Error("studio live lock mutation lost its serialized owner");
         }
         return { status: "acquired", lock: toRecord(stored), created: !existing };
-      })
+      }),
+      { isolationLevel: "read committed" }
     );
   }
 
   async release(input: ReleaseStudioLiveLockInput): Promise<StudioLiveLockRecord | null> {
-    return this.database.transaction((transaction) =>
-      withStudioLiveLockWorkMutation(transaction, input.workId, async () => {
+    return this.database.transaction(
+      (transaction) => withStudioLiveLockWorkMutation(transaction, input.workId, async () => {
         const [released] = await transaction
           .delete(creatorWorkLiveLocks)
           .where(
@@ -243,16 +286,19 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
             )
           )
           .returning();
-        return released ? toRecord(released) : null;
-      })
+        if (!released) return null;
+        const revision = await nextStudioLiveLockRevision(transaction, input.workId);
+        return { ...toRecord(released), revision };
+      }),
+      { isolationLevel: "read committed" }
     );
   }
 
   async rollbackAcquire(
     input: ReleaseStudioLiveLockInput & { acquisitionId: string }
   ): Promise<StudioLiveLockRecord | null> {
-    return this.database.transaction((transaction) =>
-      withStudioLiveLockWorkMutation(transaction, input.workId, async () => {
+    return this.database.transaction(
+      (transaction) => withStudioLiveLockWorkMutation(transaction, input.workId, async () => {
         const [released] = await transaction
           .delete(creatorWorkLiveLocks)
           .where(
@@ -265,8 +311,11 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
             )
           )
           .returning();
-        return released ? toRecord(released) : null;
-      })
+        if (!released) return null;
+        const revision = await nextStudioLiveLockRevision(transaction, input.workId);
+        return { ...toRecord(released), revision };
+      }),
+      { isolationLevel: "read committed" }
     );
   }
 
@@ -274,8 +323,8 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
     workId: string,
     ownerConnectionId: string
   ): Promise<StudioLiveLockRecord[]> {
-    return this.database.transaction((transaction) =>
-      withStudioLiveLockWorkMutation(transaction, workId, async () => {
+    return this.database.transaction(
+      (transaction) => withStudioLiveLockWorkMutation(transaction, workId, async () => {
         const released = await transaction
           .delete(creatorWorkLiveLocks)
           .where(
@@ -285,31 +334,78 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
             )
           )
           .returning();
-        return released.map(toRecord);
-      })
+        if (released.length === 0) return [];
+        const revision = await nextStudioLiveLockRevision(transaction, workId);
+        return released.map((row) => ({ ...toRecord(row), revision }));
+      }),
+      { isolationLevel: "read committed" }
+    );
+  }
+
+  async snapshot(workId: string): Promise<StudioLiveLockSnapshot> {
+    return this.database.transaction(
+      (transaction) => withStudioLiveLockWorkMutation(transaction, workId, async () => {
+        // Read the clock first. A creator_work parent deletion does not participate in this
+        // advisory namespace; if its cascade commits between these statements, the result is an
+        // older valid floor plus an empty lock set rather than rows paired with a vanished clock.
+        const [clock] = await transaction
+          .select({ revision: creatorWorkLiveLockClocks.revision })
+          .from(creatorWorkLiveLockClocks)
+          .where(eq(creatorWorkLiveLockClocks.workId, workId))
+          .limit(1);
+        const rows = await transaction
+          .select()
+          .from(creatorWorkLiveLocks)
+          .where(
+            and(
+              eq(creatorWorkLiveLocks.workId, workId),
+              gt(creatorWorkLiveLocks.expiresAt, sql`statement_timestamp()`)
+            )
+          )
+          .orderBy(asc(creatorWorkLiveLocks.resourceId));
+        return { revision: clock?.revision ?? 0n, locks: rows.map(toRecord) };
+      }),
+      { isolationLevel: "read committed" }
     );
   }
 
   async list(workId: string): Promise<StudioLiveLockRecord[]> {
-    const rows = await this.database
-      .select()
-      .from(creatorWorkLiveLocks)
-      .where(
-        and(
-          eq(creatorWorkLiveLocks.workId, workId),
-          gt(creatorWorkLiveLocks.expiresAt, sql`now()`)
-        )
-      )
-      .orderBy(asc(creatorWorkLiveLocks.resourceId));
-    return rows.map(toRecord);
+    return (await this.snapshot(workId)).locks;
   }
 
   async purgeExpired(): Promise<StudioLiveLockRecord[]> {
-    const rows = await this.database
-      .delete(creatorWorkLiveLocks)
-      .where(lte(creatorWorkLiveLocks.expiresAt, sql`now()`))
-      .returning();
-    return rows.map(toRecord);
+    const works = await this.database
+      .selectDistinct({ workId: creatorWorkLiveLocks.workId })
+      .from(creatorWorkLiveLocks)
+      .where(lte(creatorWorkLiveLocks.expiresAt, sql`statement_timestamp()`))
+      .orderBy(asc(creatorWorkLiveLocks.workId))
+      .limit(STUDIO_LIVE_LOCK_EXPIRY_WORK_BATCH_LIMIT);
+    const purged: StudioLiveLockRecord[] = [];
+    for (let index = 0; index < works.length; index += STUDIO_LIVE_LOCK_EXPIRY_CONCURRENCY) {
+      const batch = await Promise.all(
+        works.slice(index, index + STUDIO_LIVE_LOCK_EXPIRY_CONCURRENCY).map(({ workId }) =>
+          this.database.transaction(
+            (transaction) => withStudioLiveLockWorkMutation(transaction, workId, async () => {
+              const rows = await transaction
+                .delete(creatorWorkLiveLocks)
+                .where(
+                  and(
+                    eq(creatorWorkLiveLocks.workId, workId),
+                    lte(creatorWorkLiveLocks.expiresAt, sql`statement_timestamp()`)
+                  )
+                )
+                .returning();
+              if (rows.length === 0) return [];
+              const revision = await nextStudioLiveLockRevision(transaction, workId);
+              return rows.map((row) => ({ ...toRecord(row), revision }));
+            }),
+            { isolationLevel: "read committed" }
+          )
+        )
+      );
+      for (const rows of batch) purged.push(...rows);
+    }
+    return purged;
   }
 }
 

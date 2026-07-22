@@ -28,7 +28,10 @@ describe("studio live socket wire ownership boundary", () => {
   it("keeps wire validation pure and independent from Socket.IO and browser runtime APIs", () => {
     const wire = moduleImports("./studio-live-socket-wire.ts");
 
-    expect(wire.specifiers).toEqual(["./studio-live-collaboration-protocol"]);
+    expect(wire.specifiers).toEqual([
+      "./studio-live-collaboration-protocol",
+      "@/lib/studio-live-lock-resource",
+    ]);
     expect(wire.source).not.toMatch(/socket\.io-client|studio-live-socket-endpoint|runtime-api-base/);
     expect(wire.source).not.toMatch(
       /\b(?:globalThis|window|document|navigator|localStorage|sessionStorage|WebSocket|EventSource)\b/

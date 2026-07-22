@@ -88,7 +88,22 @@ rewrites rather than claims that every legacy scene type already runs on the new
   target node before delivery.
 - Short resource edit leases are stored in `creator_work_live_lock`, use the PostgreSQL clock, and
   are serialized per work. Disconnect, role downgrade, explicit release, and expiry all remove the
-  authoritative lease; owner and lease ID must both match.
+  authoritative lease; owner and lease ID must both match. Lock protocol v2 rotates the public
+  fence on every successful renewal and requires the prior fence as a compare-and-swap token, so a
+  delayed release or renewal cannot remove or resurrect a newer lease.
+- Lock revision protocol v1 assigns every committed per-work mutation a PostgreSQL `bigint`
+  revision and returns a JOIN snapshot high-water mark. Browsers parse only canonical decimal
+  revisions, retain a global snapshot floor plus per-resource watermarks/tombstones, accept
+  out-of-order revisions for different resources, and reject stale same-resource broadcasts,
+  acquire/release acknowledgements, regressing reconnect snapshots, or capability downgrade.
+- Migration `0017_creator_work_live_lock_revision.sql` is a coordinated cutover: drain old Studio
+  writers, apply the migration, then start revision-aware API instances. Its first application
+  evicts only the short-lived lease rows under an `ACCESS EXCLUSIVE` lock, removes the revision
+  default so old inserts fail closed, and records a durable schema-migration ledger row so a retry
+  repairs clocks and constraints without evicting new revision-aware leases again. CreatorModule
+  boot checks the table shape and ledger before accepting Studio traffic. The executable cutover,
+  verification, retry, and emergency rollback sequence is documented in
+  [`STUDIO-LIVE-LOCK-REVISION-MIGRATION.md`](./STUDIO-LIVE-LOCK-REVISION-MIGRATION.md).
 
 ### Intentional limits / next slices
 
@@ -112,6 +127,11 @@ rewrites rather than claims that every legacy scene type already runs on the new
   instance from retaining an unbounded queue, but they do not enforce one cluster-wide total; a
   horizontally scaled deployment that needs a global adaptive budget still requires distributed
   admission accounting such as a Redis-backed counter or queue.
+- Socket.IO lock fanout is ordered and revision-fenced but not a durable transactional outbox. A
+  process failure after the PostgreSQL commit can therefore delay another browser's cosmetic lock
+  update until its bounded lease expires, a conflict ACK supplies the authoritative newer lock, or
+  the next JOIN snapshot repairs state. Editing authority remains in PostgreSQL; a future durable
+  broker/outbox is the slice required for immediate, lossless post-commit fanout.
 
 ## G10b: retained WebGPU drawing compositor
 

@@ -52,6 +52,7 @@ import { StudioLiveSocketAuthService } from "./studio-live-socket-auth.service";
 import {
   STUDIO_CRDT_PROTOCOL_VERSION,
   STUDIO_LIVE_LOCK_PROTOCOL_VERSION,
+  STUDIO_LIVE_LOCK_REVISION_VERSION,
   StudioLiveActiveScreenShareSchema,
   StudioLiveChatSchema,
   StudioLiveCrdtSyncSchema,
@@ -296,6 +297,7 @@ function publicLock(lock: StudioLiveLockRecord): StudioLiveLock {
     ownerConnectionId: lock.ownerConnectionId,
     ownerName: lock.ownerName,
     expiresAt: lock.expiresAt.toISOString(),
+    revision: lock.revision.toString(),
   };
 }
 
@@ -376,6 +378,8 @@ export class StudioLiveGateway
   private readonly logger = new Logger(StudioLiveGateway.name);
   private readonly participantsBySocket = new Map<string, StudioLiveParticipantInternal>();
   private readonly socketIdsByWork = new Map<string, Set<string>>();
+  private readonly lockCleanupByConnectionWork = new Map<string, Promise<void>>();
+  private readonly lockOperationTailByResource = new Map<string, Promise<void>>();
   private readonly rateLimits = new Map<string, Map<string, RateLimitBucket>>();
   private readonly crdtQuotaLimiter = new StudioLiveCrdtQuotaLimiter();
   private readonly participantAuthorizationRechecks = new Map<
@@ -454,6 +458,8 @@ export class StudioLiveGateway
     this.accessRecheckTimer = null;
     this.participantsBySocket.clear();
     this.socketIdsByWork.clear();
+    this.lockCleanupByConnectionWork.clear();
+    this.lockOperationTailByResource.clear();
     this.rateLimits.clear();
     this.crdtQuotaLimiter.clear();
     this.joinTransitions.clearAll();
@@ -679,7 +685,7 @@ export class StudioLiveGateway
         return rejectInvalidSession(joinedNewRoom ? nextRoom : undefined);
       }
       if (existing?.workId === input.workId && existing.capabilities.edit && !participant.capabilities.edit) {
-        this.releaseSocketLocks(existing, "revoked");
+        void this.releaseSocketLocks(existing, "revoked");
       }
       this.participantAuthorizationRechecks.delete(client.id);
       this.deleteCandidateRelayAuthorizationsForSocket(client.id);
@@ -695,9 +701,9 @@ export class StudioLiveGateway
       this.server
         .to(studioLiveRoom(input.workId))
         .emit("studio:presence:update", safeParticipant);
-      const [participants, locks, voiceMembers, screenShares] = await Promise.all([
+      const [participants, lockSnapshot, voiceMembers, screenShares] = await Promise.all([
         this.listParticipants(input.workId),
-        this.listLocks(input.workId),
+        this.lockSnapshot(input.workId),
         this.liveFeatures.voiceEnabled
           ? this.listVoiceMembers(input.workId)
           : Promise.resolve([]),
@@ -716,9 +722,11 @@ export class StudioLiveGateway
         ok: true,
         data: {
           lockProtocolVersion: STUDIO_LIVE_LOCK_PROTOCOL_VERSION,
+          lockRevisionVersion: STUDIO_LIVE_LOCK_REVISION_VERSION,
+          lockSnapshotRevision: lockSnapshot.revision,
           self: safeParticipant,
           participants,
-          locks,
+          locks: lockSnapshot.locks,
           voiceMembers,
           screenShares,
         },
@@ -992,6 +1000,11 @@ export class StudioLiveGateway
         )
       );
     }
+    return this.withSocketLockOperation(
+      client.id,
+      parsed.data.workId,
+      parsed.data.resourceId,
+      async () => {
     const authorized = await this.runWithAuthorizedParticipant(
       client,
       parsed.data.workId,
@@ -1005,6 +1018,18 @@ export class StudioLiveGateway
         lockRequestFailure(
           requestId,
           "denied",
+          "forbidden",
+          "이 원고를 편집할 권한이 없습니다."
+        )
+      );
+    }
+    await this.awaitSocketLockCleanup(parsed.data.workId, client.id);
+    if (!this.isParticipantAuthorizationCurrent(client, authorized.value, true)) {
+      return reply(
+        ack,
+        lockRequestFailure(
+          requestId,
+          "revoked",
           "forbidden",
           "이 원고를 편집할 권한이 없습니다."
         )
@@ -1160,9 +1185,12 @@ export class StudioLiveGateway
       action: "acquired",
       requestId,
       lock,
+      revision: lock.revision,
     };
     this.server.to(studioLiveRoom(parsed.data.workId)).emit("studio:lock:update", update);
     return reply(ack, { ok: true, data: { decision: "acquired", requestId, lock } });
+      }
+    );
   }
 
   @SubscribeMessage("studio:lock:release")
@@ -1199,6 +1227,11 @@ export class StudioLiveGateway
         lockReleaseFailure(requestId, "rate_limited", "편집 잠금 해제 요청이 너무 많습니다.")
       );
     }
+    return this.withSocketLockOperation(
+      client.id,
+      parsed.data.workId,
+      parsed.data.resourceId,
+      async () => {
     const authorized = await this.runWithAuthorizedParticipant(
       client,
       parsed.data.workId,
@@ -1241,6 +1274,7 @@ export class StudioLiveGateway
         releaseRequestId: requestId,
         resourceId: released.resourceId,
         leaseId: released.leaseId,
+        revision: released.revision.toString(),
       };
       this.server.to(studioLiveRoom(parsed.data.workId)).emit("studio:lock:update", update);
     }
@@ -1251,8 +1285,11 @@ export class StudioLiveGateway
         resourceId: parsed.data.resourceId,
         leaseId: parsed.data.leaseId,
         released: released !== null,
+        ...(released ? { revision: released.revision.toString() } : {}),
       },
     });
+      }
+    );
   }
 
   @SubscribeMessage("studio:screen:set")
@@ -3034,7 +3071,7 @@ export class StudioLiveGateway
       participant.authorizedAt = Date.now();
       participant.updatedAt = new Date().toISOString();
       const safeParticipant = this.publishParticipantToSocketData(socket, participant);
-      if (!participant.capabilities.edit) this.releaseSocketLocks(participant, "revoked");
+      if (!participant.capabilities.edit) void this.releaseSocketLocks(participant, "revoked");
       if (participant.role === "viewer") this.removeVoiceMembership(socketId, "revoked");
       if (
         previousRole !== participant.role ||
@@ -3134,7 +3171,10 @@ export class StudioLiveGateway
     const roomSockets = this.socketIdsByWork.get(participant.workId);
     roomSockets?.delete(socketId);
     if (roomSockets?.size === 0) this.socketIdsByWork.delete(participant.workId);
-    this.releaseSocketLocks(participant, reason === "revoked" ? "revoked" : "released");
+    void this.releaseSocketLocks(
+      participant,
+      reason === "revoked" ? "revoked" : "released"
+    );
     if (voiceMember) {
       this.emitVoiceLeave(
         voiceMember,
@@ -3184,8 +3224,23 @@ export class StudioLiveGateway
     } catch {
       // The bounded database lease remains the final fail-safe when rollback is unavailable.
     }
-    if (!rolledBack && !rotatingProtocol) return;
-    const source = rolledBack ?? lock;
+    let source = rolledBack;
+    if (!source) {
+      if (!rotatingProtocol) return;
+      try {
+        const snapshot = await this.studioLiveLockRepository.snapshot(lock.workId);
+        const current = snapshot.locks.find(
+          (candidate) => candidate.resourceId === lock.resourceId
+        );
+        // Another exact mutation already removed this rotation while the authorization recheck
+        // was in flight. Only an empty authoritative snapshot with a strictly newer clock may
+        // stand in for that deletion; reusing the acquire revision could erase a real newer lock.
+        if (current || snapshot.revision <= lock.revision) return;
+        source = { ...lock, revision: snapshot.revision };
+      } catch {
+        return;
+      }
+    }
     const requestId = studioLiveLockRequestIdFromAcquisitionId(source.acquisitionId);
     const fences = new Set([
       ...(rolledBack || rotatingProtocol ? [source.leaseId] : []),
@@ -3199,6 +3254,7 @@ export class StudioLiveGateway
         requestId,
         resourceId: source.resourceId,
         leaseId,
+        revision: source.revision.toString(),
       };
       this.server.to(studioLiveRoom(source.workId)).emit("studio:lock:update", update);
     }
@@ -3207,21 +3263,29 @@ export class StudioLiveGateway
   private releaseSocketLocks(
     participant: StudioLiveParticipantInternal,
     action: "released" | "revoked" = "released"
-  ): void {
-    void this.studioLiveLockRepository
-      .releaseConnection(participant.workId, participant.connectionId)
-      .then((released) => {
+  ): Promise<void> {
+    const cleanupKey = this.socketLockCleanupKey(
+      participant.workId,
+      participant.connectionId
+    );
+    const previousCleanup = this.lockCleanupByConnectionWork.get(cleanupKey);
+    const runCleanup = async (): Promise<void> => {
+      try {
+        const released = await this.studioLiveLockRepository.releaseConnection(
+          participant.workId,
+          participant.connectionId
+        );
         for (const lock of released) {
           const update: StudioLiveLockUpdate = {
             action,
             requestId: studioLiveLockRequestIdFromAcquisitionId(lock.acquisitionId),
             resourceId: lock.resourceId,
             leaseId: lock.leaseId,
+            revision: lock.revision.toString(),
           };
           this.server.to(studioLiveRoom(lock.workId)).emit("studio:lock:update", update);
         }
-      })
-      .catch((error: unknown) => {
+      } catch (error: unknown) {
         this.logger.error(
           {
             workId: participant.workId,
@@ -3230,7 +3294,73 @@ export class StudioLiveGateway
           },
           "studio distributed locks could not be released for connection"
         );
-      });
+      }
+    };
+    const cleanup = previousCleanup
+      ? previousCleanup.then(runCleanup)
+      : runCleanup();
+    this.lockCleanupByConnectionWork.set(cleanupKey, cleanup);
+    void cleanup.then(() => {
+      if (this.lockCleanupByConnectionWork.get(cleanupKey) === cleanup) {
+        this.lockCleanupByConnectionWork.delete(cleanupKey);
+      }
+    });
+    return cleanup;
+  }
+
+  private socketLockCleanupKey(workId: string, connectionId: string): string {
+    return JSON.stringify([workId, connectionId]);
+  }
+
+  private socketLockOperationKey(
+    connectionId: string,
+    workId: string,
+    resourceId: string
+  ): string {
+    return JSON.stringify([connectionId, workId, resourceId]);
+  }
+
+  /**
+   * Socket.IO preserves packet order, but Nest message handlers do not await the previous async
+   * handler before starting the next one. Serialize one socket's lifecycle for one exact resource
+   * from the first authorization await through the repository mutation. This keeps legacy stable
+   * renewals safe during the v2 rolling window: a later release cannot overtake an earlier delayed
+   * heartbeat and leave the heartbeat to recreate the lease afterwards. Different resources and
+   * different collaborators still run independently.
+   */
+  private async withSocketLockOperation<T>(
+    connectionId: string,
+    workId: string,
+    resourceId: string,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    const key = this.socketLockOperationKey(connectionId, workId, resourceId);
+    const previous = this.lockOperationTailByResource.get(key) ?? Promise.resolve();
+    let releaseTurn!: () => void;
+    const turn = new Promise<void>((resolve) => {
+      releaseTurn = resolve;
+    });
+    const tail = previous.then(() => turn);
+    this.lockOperationTailByResource.set(key, tail);
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      releaseTurn();
+      if (this.lockOperationTailByResource.get(key) === tail) {
+        this.lockOperationTailByResource.delete(key);
+      }
+    }
+  }
+
+  private async awaitSocketLockCleanup(workId: string, connectionId: string): Promise<void> {
+    const cleanupKey = this.socketLockCleanupKey(workId, connectionId);
+    while (true) {
+      const pending = this.lockCleanupByConnectionWork.get(cleanupKey);
+      if (!pending) return;
+      await pending;
+      if (this.lockCleanupByConnectionWork.get(cleanupKey) === pending) return;
+    }
   }
 
   private async purgeExpiredLocks(): Promise<void> {
@@ -3242,6 +3372,7 @@ export class StudioLiveGateway
           requestId: studioLiveLockRequestIdFromAcquisitionId(lock.acquisitionId),
           resourceId: lock.resourceId,
           leaseId: lock.leaseId,
+          revision: lock.revision.toString(),
         };
         this.server.to(studioLiveRoom(lock.workId)).emit("studio:lock:update", update);
       }
@@ -3576,9 +3707,14 @@ export class StudioLiveGateway
     }
   }
 
-  private async listLocks(workId: string): Promise<StudioLiveLock[]> {
-    const locks = await this.studioLiveLockRepository.list(workId);
-    return locks.map(publicLock);
+  private async lockSnapshot(
+    workId: string
+  ): Promise<{ revision: string; locks: StudioLiveLock[] }> {
+    const snapshot = await this.studioLiveLockRepository.snapshot(workId);
+    return {
+      revision: snapshot.revision.toString(),
+      locks: snapshot.locks.map(publicLock),
+    };
   }
 
 }

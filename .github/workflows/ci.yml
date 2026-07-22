@@ -79,8 +79,13 @@ jobs:
           END;
           $$;
           SQL
-      # 배포 migration 자체도 idempotent하게 적용되는지 검증한 뒤 realtime integration을 실행한다.
-      - run: psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0009_socket_io_postgres_adapter.sql
+      # 배포 migration 자체도 실제 PostgreSQL에서 실행한 뒤 realtime integration을 수행한다.
+      # 0017은 최종 Drizzle 스키마에서도 안전하게 원장만 기록하며, integration suite가 별도
+      # schema에 legacy 상태를 구성해 최초 cutover와 재적용 보존을 함께 증명한다.
+      - name: Apply realtime SQL migrations
+        run: |
+          psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0009_socket_io_postgres_adapter.sql
+          psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0017_creator_work_live_lock_revision.sql
       - run: pnpm run test
       - run: pnpm run build
       - run: pnpm run check:studio-bundle

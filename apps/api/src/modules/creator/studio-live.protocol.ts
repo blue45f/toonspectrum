@@ -62,6 +62,7 @@ const ScreenShareLabelSchema = boundedIdentifier(80);
 const VoiceCallIdSchema = boundedIdentifier(160);
 export const StudioLiveLockRequestIdSchema = z.uuid();
 export const STUDIO_LIVE_LOCK_PROTOCOL_VERSION = 2 as const;
+export const STUDIO_LIVE_LOCK_REVISION_VERSION = 1 as const;
 
 // v4 is the first room protocol that accepts drawing-assist v2 with authored advanced rulers.
 // Rejecting v1-v3 prevents stale tabs from sharing a Yjs room whose page schema they cannot
@@ -549,6 +550,7 @@ export interface StudioLiveLock {
   ownerConnectionId: string;
   ownerName: string;
   expiresAt: string;
+  revision: string;
 }
 
 export interface StudioLiveVoiceMember {
@@ -601,6 +603,8 @@ export interface StudioLiveLockReleaseDecision {
   resourceId: string;
   leaseId: string;
   released: boolean;
+  /** Present when an exact release committed and advanced the per-work lock clock. */
+  revision?: string;
 }
 
 export type StudioLiveLockReleaseFailure = StudioLiveFailure & {
@@ -616,6 +620,7 @@ export type StudioLiveLockUpdate =
       action: "acquired";
       requestId: string;
       lock: StudioLiveLock;
+      revision: string;
     }
   | {
       action: "released";
@@ -624,16 +629,20 @@ export type StudioLiveLockUpdate =
       releaseRequestId?: string;
       resourceId: string;
       leaseId: string;
+      revision: string;
     }
   | {
       action: "expired" | "revoked";
       requestId: string;
       resourceId: string;
       leaseId: string;
+      revision: string;
     };
 
 export interface StudioLiveJoinResult {
   lockProtocolVersion: typeof STUDIO_LIVE_LOCK_PROTOCOL_VERSION;
+  lockRevisionVersion: typeof STUDIO_LIVE_LOCK_REVISION_VERSION;
+  lockSnapshotRevision: string;
   self: StudioLiveParticipant;
   participants: StudioLiveParticipant[];
   locks: StudioLiveLock[];

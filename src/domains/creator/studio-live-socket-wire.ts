@@ -1,11 +1,20 @@
 import {
+  STUDIO_LIVE_LOCK_REVISION_VERSION,
   STUDIO_LIVE_SDP_MAX_LENGTH,
   studioLiveDisplayName,
   studioLiveStringFitsByteContract,
   type StudioLiveParticipant,
 } from "./studio-live-collaboration-protocol";
 
+import { studioLiveLockResourcesConflict } from "@/lib/studio-live-lock-resource";
+
 export type ServerRole = StudioLiveParticipant["role"];
+export type StudioLiveLockRevision = bigint;
+
+const POSTGRES_BIGINT_MAX = BigInt("9223372036854775807");
+const ZERO_LOCK_REVISION = BigInt(0);
+const POSTGRES_BIGINT_MAX_DECIMAL_DIGITS = 19;
+const CANONICAL_UNSIGNED_DECIMAL_PATTERN = /^(?:0|[1-9][0-9]*)$/u;
 
 export interface ServerParticipant {
   connectionId: string;
@@ -25,6 +34,8 @@ export interface ServerLock {
   ownerConnectionId: string;
   ownerName: string;
   expiresAt: string;
+  /** Null only when a legacy gateway omitted the additive lock-revision contract. */
+  revision: StudioLiveLockRevision | null;
 }
 
 export interface ServerVoiceMember {
@@ -42,6 +53,10 @@ export interface ServerActiveScreenShare {
 export interface ServerJoinSnapshot {
   /** Missing on v1 gateways; new clients retain their legacy wire behavior in that case. */
   lockProtocolVersion: number;
+  /** Zero is the local legacy sentinel; revision-aware gateways advertise the exact v1 contract. */
+  lockRevisionVersion: 0 | typeof STUDIO_LIVE_LOCK_REVISION_VERSION;
+  /** Null only for a legacy snapshot that did not advertise lock revision support. */
+  lockSnapshotRevision: StudioLiveLockRevision | null;
   self: ServerParticipant;
   participants: ServerParticipant[];
   locks: ServerLock[];
@@ -108,6 +123,29 @@ export function isRole(value: unknown): value is ServerRole {
   );
 }
 
+/** Parses the canonical decimal wire representation of a non-negative PostgreSQL bigint. */
+export function parseLockRevision(
+  value: unknown,
+  options: { allowZero?: boolean } = {}
+): StudioLiveLockRevision | null {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > POSTGRES_BIGINT_MAX_DECIMAL_DIGITS ||
+    !CANONICAL_UNSIGNED_DECIMAL_PATTERN.test(value)
+  ) {
+    return null;
+  }
+  const revision = BigInt(value);
+  if (
+    revision > POSTGRES_BIGINT_MAX ||
+    (!options.allowZero && revision === ZERO_LOCK_REVISION)
+  ) {
+    return null;
+  }
+  return revision;
+}
+
 export function parseParticipant(value: unknown): ServerParticipant | null {
   if (
     !isRecord(value) ||
@@ -137,7 +175,10 @@ export function parseParticipant(value: unknown): ServerParticipant | null {
   };
 }
 
-export function parseLock(value: unknown): ServerLock | null {
+export function parseLock(
+  value: unknown,
+  options: { requireRevision?: boolean } = {}
+): ServerLock | null {
   if (
     !isRecord(value) ||
     !safeString(value.resourceId, 200) ||
@@ -149,12 +190,17 @@ export function parseLock(value: unknown): ServerLock | null {
   ) {
     return null;
   }
+  const revision = value.revision === undefined ? null : parseLockRevision(value.revision);
+  if ((value.revision !== undefined && revision === null) || (options.requireRevision && revision === null)) {
+    return null;
+  }
   return {
     resourceId: value.resourceId,
     leaseId: value.leaseId,
     ownerConnectionId: value.ownerConnectionId,
     ownerName: value.ownerName,
     expiresAt: value.expiresAt,
+    revision,
   };
 }
 
@@ -210,12 +256,24 @@ export function parseJoinAck(value: unknown): ServerJoinSnapshot | ServerFailure
   const lockProtocolVersion = value.data.lockProtocolVersion === undefined
     ? 1
     : value.data.lockProtocolVersion;
+  const hasLockRevisionVersion = value.data.lockRevisionVersion !== undefined;
+  const hasLockSnapshotRevision = value.data.lockSnapshotRevision !== undefined;
+  const revisionAware = hasLockRevisionVersion || hasLockSnapshotRevision;
+  const lockRevisionVersion = revisionAware
+    ? value.data.lockRevisionVersion
+    : 0;
+  const lockSnapshotRevision = revisionAware
+    ? parseLockRevision(value.data.lockSnapshotRevision, { allowZero: true })
+    : null;
   if (
     !self ||
     typeof lockProtocolVersion !== "number" ||
     !Number.isInteger(lockProtocolVersion) ||
     lockProtocolVersion < 1 ||
     lockProtocolVersion > 100 ||
+    (revisionAware &&
+      (lockRevisionVersion !== STUDIO_LIVE_LOCK_REVISION_VERSION ||
+        lockSnapshotRevision === null)) ||
     !Array.isArray(value.data.participants) ||
     !Array.isArray(value.data.locks) ||
     (value.data.voiceMembers !== undefined && !Array.isArray(value.data.voiceMembers)) ||
@@ -224,7 +282,9 @@ export function parseJoinAck(value: unknown): ServerJoinSnapshot | ServerFailure
     return null;
   }
   const participants = value.data.participants.map(parseParticipant);
-  const locks = value.data.locks.map(parseLock);
+  const locks = value.data.locks.map((lock) =>
+    parseLock(lock, { requireRevision: revisionAware })
+  );
   const voiceMembers = Array.isArray(value.data.voiceMembers)
     ? value.data.voiceMembers.map(parseVoiceMember)
     : [];
@@ -239,11 +299,48 @@ export function parseJoinAck(value: unknown): ServerJoinSnapshot | ServerFailure
   ) {
     return null;
   }
+  const parsedParticipants = participants as ServerParticipant[];
+  const participantConnectionIds = new Set(
+    parsedParticipants.map((participant) => participant.connectionId)
+  );
+  const parsedLocks = locks as ServerLock[];
+  const lockResourceIds = new Set<string>();
+  for (let leftIndex = 0; leftIndex < parsedLocks.length; leftIndex += 1) {
+    const left = parsedLocks[leftIndex];
+    if (!left) return null;
+    if (
+      !participantConnectionIds.has(left.ownerConnectionId) ||
+      lockResourceIds.has(left.resourceId)
+    ) {
+      return null;
+    }
+    lockResourceIds.add(left.resourceId);
+    for (let rightIndex = leftIndex + 1; rightIndex < parsedLocks.length; rightIndex += 1) {
+      const right = parsedLocks[rightIndex];
+      if (
+        right &&
+        left.ownerConnectionId !== right.ownerConnectionId &&
+        studioLiveLockResourcesConflict(left.resourceId, right.resourceId)
+      ) {
+        return null;
+      }
+    }
+  }
+  if (
+    revisionAware &&
+    parsedLocks.some(
+      (lock) => lock.revision === null || lock.revision > lockSnapshotRevision!
+    )
+  ) {
+    return null;
+  }
   return {
     lockProtocolVersion,
+    lockRevisionVersion: revisionAware ? STUDIO_LIVE_LOCK_REVISION_VERSION : 0,
+    lockSnapshotRevision,
     self,
-    participants: participants as ServerParticipant[],
-    locks: locks as ServerLock[],
+    participants: parsedParticipants,
+    locks: parsedLocks,
     voiceMembers: voiceMembers as ServerVoiceMember[],
     screenShares: screenShares as ServerActiveScreenShare[],
   };

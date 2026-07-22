@@ -9,6 +9,7 @@ import {
   parseFailure,
   parseJoinAck,
   parseLock,
+  parseLockRevision,
   parseParticipant,
   parseVoiceMember,
   publicParticipant,
@@ -120,6 +121,30 @@ describe("studio live socket wire primitives", () => {
     expect(isRole("Owner")).toBe(false);
     expect(isRole(null)).toBe(false);
   });
+
+  it("parses canonical PostgreSQL bigint lock revisions without number precision loss", () => {
+    expect(parseLockRevision("0", { allowZero: true })).toBe(BigInt(0));
+    expect(parseLockRevision("1")).toBe(BigInt(1));
+    expect(parseLockRevision("9007199254740993")).toBe(BigInt("9007199254740993"));
+    expect(parseLockRevision("9223372036854775807")).toBe(BigInt("9223372036854775807"));
+  });
+
+  it.each([
+    ["mutation zero", "0", undefined],
+    ["empty", "", { allowZero: true }],
+    ["leading zero", "01", { allowZero: true }],
+    ["positive sign", "+1", { allowZero: true }],
+    ["negative", "-1", { allowZero: true }],
+    ["fraction", "1.0", { allowZero: true }],
+    ["exponent", "1e3", { allowZero: true }],
+    ["whitespace", " 1", { allowZero: true }],
+    ["non-ASCII digit", "１", { allowZero: true }],
+    ["PostgreSQL bigint overflow", "9223372036854775808", { allowZero: true }],
+    ["non-string number", 1, { allowZero: true }],
+    ["null", null, { allowZero: true }],
+  ])("rejects %s lock revisions", (_case, value, options) => {
+    expect(parseLockRevision(value, options)).toBeNull();
+  });
 });
 
 describe("studio live socket wire entity parsers", () => {
@@ -168,6 +193,7 @@ describe("studio live socket wire entity parsers", () => {
       ownerConnectionId: "connection-1",
       ownerName: "작가",
       expiresAt: EXPIRES_AT,
+      revision: null,
     });
     expect(Object.keys(parsed ?? {})).toEqual([
       "resourceId",
@@ -175,7 +201,18 @@ describe("studio live socket wire entity parsers", () => {
       "ownerConnectionId",
       "ownerName",
       "expiresAt",
+      "revision",
     ]);
+    expect(parseLock(lock({ revision: "42" }))).toEqual({
+      ...parsed,
+      revision: BigInt(42),
+    });
+    expect(parseLock(lock(), { requireRevision: true })).toBeNull();
+    expect(parseLock(lock({ revision: "42" }), { requireRevision: true })?.revision).toBe(
+      BigInt(42)
+    );
+    expect(parseLock(lock({ revision: "0" }))).toBeNull();
+    expect(parseLock(lock({ revision: "01" }))).toBeNull();
     expect(parseLock(lock({ expiresAt: "never" }))).toBeNull();
     expect(parseLock(lock({ resourceId: "" }))).toBeNull();
     expect(parseLock(lock({ leaseId: "x".repeat(81) }))).toBeNull();
@@ -239,7 +276,7 @@ describe("studio live socket join acknowledgement", () => {
       data: {
         self: participant({ connectionId: "self" }),
         participants: [participant({ connectionId: "self" }), participant({ connectionId: "remote" })],
-        locks: [lock()],
+        locks: [lock({ ownerConnectionId: "remote", ownerName: "원격 편집자" })],
         voiceMembers: [voiceMember()],
         screenShares: [screenShare()],
         serverOnly: "ignored",
@@ -251,6 +288,8 @@ describe("studio live socket join acknowledgement", () => {
     expect(parsed).not.toHaveProperty("ok");
     expect(Object.keys(parsed ?? {})).toEqual([
       "lockProtocolVersion",
+      "lockRevisionVersion",
+      "lockSnapshotRevision",
       "self",
       "participants",
       "locks",
@@ -259,6 +298,8 @@ describe("studio live socket join acknowledgement", () => {
     ]);
     if (!parsed || "ok" in parsed) throw new Error("expected a join snapshot");
     expect(parsed.lockProtocolVersion).toBe(1);
+    expect(parsed.lockRevisionVersion).toBe(0);
+    expect(parsed.lockSnapshotRevision).toBeNull();
     expect(parsed.participants).toHaveLength(2);
     expect(parsed.locks).toHaveLength(1);
     expect(parsed.voiceMembers).toHaveLength(1);
@@ -307,6 +348,186 @@ describe("studio live socket join acknowledgement", () => {
         })
       ).toBeNull();
     }
+  });
+
+  it("negotiates the exact lock revision v1 snapshot and preserves every bigint revision", () => {
+    const parsed = parseJoinAck({
+      ok: true,
+      data: {
+        lockProtocolVersion: 2,
+        lockRevisionVersion: 1,
+        lockSnapshotRevision: "9007199254740993",
+        self: participant(),
+        participants: [participant()],
+        locks: [
+          lock({ resourceId: "page:1", revision: "9007199254740992" }),
+          lock({ resourceId: "page:2", leaseId: "lease-2", revision: "9007199254740993" }),
+        ],
+      },
+    });
+
+    expect(parsed && !("ok" in parsed) ? parsed : null).toMatchObject({
+      lockProtocolVersion: 2,
+      lockRevisionVersion: 1,
+      lockSnapshotRevision: BigInt("9007199254740993"),
+      locks: [
+        { resourceId: "page:1", revision: BigInt("9007199254740992") },
+        { resourceId: "page:2", revision: BigInt("9007199254740993") },
+      ],
+    });
+  });
+
+  it("accepts revision zero only for an empty revision-aware snapshot", () => {
+    const empty = parseJoinAck({
+      ok: true,
+      data: {
+        lockRevisionVersion: 1,
+        lockSnapshotRevision: "0",
+        self: participant(),
+        participants: [participant()],
+        locks: [],
+      },
+    });
+    expect(empty && !("ok" in empty) ? empty.lockSnapshotRevision : null).toBe(BigInt(0));
+
+    expect(parseJoinAck({
+      ok: true,
+      data: {
+        lockRevisionVersion: 1,
+        lockSnapshotRevision: "0",
+        self: participant(),
+        participants: [participant()],
+        locks: [lock({ revision: "1" })],
+      },
+    })).toBeNull();
+  });
+
+  it.each([
+    ["version without snapshot", { lockRevisionVersion: 1 }],
+    ["snapshot without version", { lockSnapshotRevision: "1" }],
+    ["legacy sentinel on wire", { lockRevisionVersion: 0, lockSnapshotRevision: "1" }],
+    ["unknown version", { lockRevisionVersion: 2, lockSnapshotRevision: "1" }],
+    ["string version", { lockRevisionVersion: "1", lockSnapshotRevision: "1" }],
+    ["numeric snapshot", { lockRevisionVersion: 1, lockSnapshotRevision: 1 }],
+    ["non-canonical snapshot", { lockRevisionVersion: 1, lockSnapshotRevision: "01" }],
+    ["overflow snapshot", { lockRevisionVersion: 1, lockSnapshotRevision: "9223372036854775808" }],
+  ])("rejects an incomplete or unsupported lock revision capability: %s", (_case, fields) => {
+    expect(parseJoinAck({
+      ok: true,
+      data: {
+        ...fields,
+        self: participant(),
+        participants: [participant()],
+        locks: [],
+      },
+    })).toBeNull();
+  });
+
+  it.each([
+    ["missing lock revision", lock()],
+    ["zero lock revision", lock({ revision: "0" })],
+    ["malformed lock revision", lock({ revision: "01" })],
+    ["lock newer than snapshot", lock({ revision: "8" })],
+    ["one malformed lock in an otherwise valid snapshot", [lock({ revision: "7" }), lock({ resourceId: "page:2" })]],
+  ])("rejects a revision v1 snapshot with %s", (_case, locks) => {
+    expect(parseJoinAck({
+      ok: true,
+      data: {
+        lockRevisionVersion: 1,
+        lockSnapshotRevision: "7",
+        self: participant(),
+        participants: [participant()],
+        locks: Array.isArray(locks) ? locks : [locks],
+      },
+    })).toBeNull();
+  });
+
+  it("rejects a snapshot with conflicting page and element locks owned by different connections", () => {
+    const secondParticipant = participant({
+      connectionId: "connection-2",
+      clientInstanceId: "client-2",
+      name: "어시스턴트",
+    });
+    const baseData = {
+      lockRevisionVersion: 1,
+      lockSnapshotRevision: "7",
+      self: participant(),
+      participants: [participant(), secondParticipant],
+    };
+    const page = lock({ resourceId: "page:hierarchy", revision: "6" });
+    const element = lock({
+      resourceId: "element:hierarchy:panel-1",
+      leaseId: "lease-2",
+      revision: "7",
+    });
+
+    expect(parseJoinAck({
+      ok: true,
+      data: {
+        ...baseData,
+        locks: [
+          page,
+          { ...element, ownerConnectionId: "connection-2", ownerName: "어시스턴트" },
+        ],
+      },
+    })).toBeNull();
+    expect(parseJoinAck({
+      ok: true,
+      data: { ...baseData, locks: [page, element] },
+    })).not.toBeNull();
+  });
+
+  it("rejects locks owned by an absent participant and duplicate exact resources", () => {
+    const baseData = {
+      lockRevisionVersion: 1,
+      lockSnapshotRevision: "8",
+      self: participant(),
+      participants: [participant()],
+    };
+
+    expect(parseJoinAck({
+      ok: true,
+      data: {
+        ...baseData,
+        locks: [lock({ ownerConnectionId: "connection-missing", revision: "7" })],
+      },
+    })).toBeNull();
+    expect(parseJoinAck({
+      ok: true,
+      data: {
+        ...baseData,
+        locks: [
+          lock({ revision: "7" }),
+          lock({ leaseId: "lease-duplicate", revision: "8" }),
+        ],
+      },
+    })).toBeNull();
+  });
+
+  it("keeps a legacy snapshot compatible while preserving an optional valid lock revision", () => {
+    const withoutRevision = parseJoinAck({
+      ok: true,
+      data: { self: participant(), participants: [participant()], locks: [lock()] },
+    });
+    const withRevision = parseJoinAck({
+      ok: true,
+      data: {
+        self: participant(),
+        participants: [participant()],
+        locks: [lock({ revision: "7" })],
+      },
+    });
+
+    expect(withoutRevision && !("ok" in withoutRevision) ? withoutRevision : null).toMatchObject({
+      lockRevisionVersion: 0,
+      lockSnapshotRevision: null,
+      locks: [{ revision: null }],
+    });
+    expect(withRevision && !("ok" in withRevision) ? withRevision : null).toMatchObject({
+      lockRevisionVersion: 0,
+      lockSnapshotRevision: null,
+      locks: [{ revision: BigInt(7) }],
+    });
   });
 
   it.each([

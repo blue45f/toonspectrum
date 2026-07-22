@@ -17,6 +17,7 @@ import { StudioLiveCleanupNotificationDispatcher } from "./studio-live-cleanup-n
 import { studioLiveFeaturePolicyProvider } from "./studio-live-feature-policy";
 import { StudioLiveInterServerRelayTransport } from "./studio-live-inter-server-relay-transport";
 import { StudioLiveJoinTransitionSequencer } from "./studio-live-join-transition-sequencer";
+import { studioLiveLockSchemaPreflightProvider } from "./studio-live-lock-schema-preflight";
 import { studioLiveLockRepositoryProvider } from "./studio-live-lock.repository";
 import { StudioLiveRoomTransitionCoordinator } from "./studio-live-room-transition-coordinator";
 import { StudioLiveSocketAuthService } from "./studio-live-socket-auth.service";
@@ -63,6 +64,7 @@ import { StudioWorkAssetService } from "./studio-work-asset.service";
     studioCrdtRasterCheckpointRepositoryProvider,
     studioCrdtRepositoryProvider,
     studioLiveFeaturePolicyProvider,
+    studioLiveLockSchemaPreflightProvider,
     studioLiveLockRepositoryProvider,
     studioRasterAssetRepositoryProvider,
     studioRemoteReferenceDnsResolverProvider,
