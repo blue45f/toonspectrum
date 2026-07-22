@@ -162,6 +162,22 @@ export type StudioCompanionMessage =
       targetCompanionInstanceId: string;
       nonce: string;
       at: number;
+    }
+  | {
+      v: 1;
+      type: "companion-goodbye";
+      companionInstanceId: string;
+      targetPrimaryInstanceId: string;
+      surface: StudioCompanionSurface;
+      at: number;
+    }
+  | {
+      v: 1;
+      type: "primary-goodbye";
+      primaryInstanceId: string;
+      targetCompanionInstanceId: string;
+      surface: StudioCompanionSurface;
+      at: number;
     };
 
 export type StudioCompanionCommandMessage = Extract<
@@ -172,6 +188,11 @@ export type StudioCompanionCommandMessage = Extract<
 export type StudioCompanionControlMessage = Extract<
   StudioCompanionMessage,
   { type: "companion-control" }
+>;
+
+export type StudioCompanionGoodbyeMessage = Extract<
+  StudioCompanionMessage,
+  { type: "companion-goodbye" }
 >;
 
 export type StudioCompanionSequencedMessage =
@@ -542,6 +563,36 @@ export function isStudioCompanionMessage(value: unknown): value is StudioCompani
         && isStudioCompanionSessionId(msg.targetCompanionInstanceId)
         && isStudioCompanionSessionId(msg.nonce)
       );
+    case "companion-goodbye":
+      return (
+        hasExactStudioCompanionKeys(msg, [
+          "v",
+          "type",
+          "companionInstanceId",
+          "targetPrimaryInstanceId",
+          "surface",
+          "at",
+        ])
+        && isStudioCompanionSessionId(msg.companionInstanceId)
+        && isStudioCompanionSessionId(msg.targetPrimaryInstanceId)
+        && typeof msg.surface === "string"
+        && STUDIO_COMPANION_SURFACE_IDS.has(msg.surface)
+      );
+    case "primary-goodbye":
+      return (
+        hasExactStudioCompanionKeys(msg, [
+          "v",
+          "type",
+          "primaryInstanceId",
+          "targetCompanionInstanceId",
+          "surface",
+          "at",
+        ])
+        && isStudioCompanionSessionId(msg.primaryInstanceId)
+        && isStudioCompanionSessionId(msg.targetCompanionInstanceId)
+        && typeof msg.surface === "string"
+        && STUDIO_COMPANION_SURFACE_IDS.has(msg.surface)
+      );
     default:
       return false;
   }
@@ -760,6 +811,22 @@ export function buildStudioCompanionPong(input: {
   return { v: 1, type: "pong", ...input, at: now };
 }
 
+export function buildStudioCompanionGoodbye(input: {
+  companionInstanceId: string;
+  targetPrimaryInstanceId: string;
+  surface: StudioCompanionSurface;
+}, now = Date.now()): StudioCompanionGoodbyeMessage {
+  return { v: 1, type: "companion-goodbye", ...input, at: now };
+}
+
+export function buildStudioCompanionPrimaryGoodbye(input: {
+  primaryInstanceId: string;
+  targetCompanionInstanceId: string;
+  surface: StudioCompanionSurface;
+}, now = Date.now()): Extract<StudioCompanionMessage, { type: "primary-goodbye" }> {
+  return { v: 1, type: "primary-goodbye", ...input, at: now };
+}
+
 export class StudioCompanionCommandGuard {
   private companionInstanceId: string | null = null;
   private lastSequence = 0;
@@ -909,6 +976,21 @@ export class StudioCompanionPrimaryBinding {
     );
     if (accepted && slot) slot.lastActivityAt = now;
     return accepted;
+  }
+
+  acceptGoodbye(
+    message: StudioCompanionMessage,
+    primaryInstanceId: string,
+    now = Date.now()
+  ): message is StudioCompanionGoodbyeMessage {
+    if (message.type !== "companion-goodbye") return false;
+    if (!isStudioCompanionMessageFresh(message, now)) return false;
+    if (message.targetPrimaryInstanceId !== primaryInstanceId) return false;
+    const slot = this.slotsBySurface.get(message.surface);
+    if (!slot || slot.companionInstanceId !== message.companionInstanceId) return false;
+    if (this.surfaceByInstanceId.get(message.companionInstanceId) !== message.surface) return false;
+    this.release(message.surface);
+    return true;
   }
 
   acceptCommand(
@@ -1361,6 +1443,7 @@ export function startStudioCompanionPrimaryRuntime(input: {
   if (!channel) return null;
 
   let disposed = false;
+  let primaryGoodbyeSent = false;
   let captureEpoch = 0;
   let captureInFlight = false;
   let captureSequence = 0;
@@ -1635,7 +1718,7 @@ export function startStudioCompanionPrimaryRuntime(input: {
   };
 
   const publish = () => {
-    if (disposed) return;
+    if (disposed || primaryGoodbyeSent) return;
     expireBindingsAndReconcile();
     scheduleLeaseSweep();
     const peers = binding.activeBindings();
@@ -1678,16 +1761,67 @@ export function startStudioCompanionPrimaryRuntime(input: {
   };
 
   const schedulePublish = () => {
-    if (disposed || binding.activeBindings().length === 0 || publishTimer !== null) return;
+    if (
+      disposed
+      || primaryGoodbyeSent
+      || binding.activeBindings().length === 0
+      || publishTimer !== null
+    ) return;
     publishTimer = globalThis.setTimeout(() => {
       publishTimer = null;
       publish();
     }, 100);
   };
 
+  const sendPrimaryGoodbye = () => {
+    if (primaryGoodbyeSent) return;
+    primaryGoodbyeSent = true;
+    resetCaptureGeneration();
+    clearLeaseTimer();
+    if (publishTimer !== null) {
+      globalThis.clearTimeout(publishTimer);
+      publishTimer = null;
+    }
+    for (const peer of binding.activeBindings()) {
+      try {
+        channel.postMessage(buildStudioCompanionPrimaryGoodbye({
+          primaryInstanceId,
+          targetCompanionInstanceId: peer.companionInstanceId,
+          surface: peer.surface,
+        }));
+      } catch {
+        // Continue notifying the other independently bound role windows.
+      }
+    }
+  };
+  const primaryPageTarget = typeof window === "undefined" ? null : window;
+  const onPrimaryPageHide = (event: PageTransitionEvent) => {
+    if (event.persisted) return;
+    sendPrimaryGoodbye();
+  };
+  primaryPageTarget?.addEventListener("pagehide", onPrimaryPageHide);
+
   channel.onmessage = (event: MessageEvent) => {
+    if (primaryGoodbyeSent) return;
     const message = parseStudioCompanionMessage(event.data);
     if (!message) return;
+    if (message.type === "companion-goodbye") {
+      const departing = binding.bindingForSurface(message.surface);
+      if (!binding.acceptGoodbye(message, primaryInstanceId)) return;
+      if (departing) {
+        navigatorDemandByInstanceId.delete(departing.companionInstanceId);
+        pendingDemandRefreshInstanceIds.delete(departing.companionInstanceId);
+      }
+      const ownerChanged = reconcileCaptureOwner();
+      scheduleLeaseSweep();
+      if (ownerChanged && captureOwner) {
+        const latest = input.getReviewProjection?.();
+        if (latest && isStudioCompanionReviewProjection(latest)) {
+          requestNavigatorCapture(latest);
+        }
+      }
+      return;
+    }
     if (message.type === "hello" && message.role === "companion") {
       const surface = studioCompanionSurfaceForHello(message);
       const previous = binding.bindingForSurface(surface);
@@ -1796,6 +1930,8 @@ export function startStudioCompanionPrimaryRuntime(input: {
     generation: (surface = "workspace") => binding.generation(surface),
     dispose: () => {
       if (disposed) return;
+      primaryPageTarget?.removeEventListener("pagehide", onPrimaryPageHide);
+      sendPrimaryGoodbye();
       disposed = true;
       captureEpoch += 1;
       clearCaptureTimer();

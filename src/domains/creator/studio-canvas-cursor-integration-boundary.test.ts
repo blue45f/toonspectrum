@@ -39,7 +39,7 @@ describe("Studio canvas cursor integration boundary", () => {
       "// 포인터가 캔버스를 벗어나면 브러시 커서 프리뷰를 숨긴다.",
     );
     const snapshot = authoritativeMove.indexOf(
-      "const coordinateMapper = snapshotStudioStagePointerBatchMapper(stage);",
+      "const coordinateMapper = stagePointerFrameMapperCacheRef.current!.mapperFor(stage);",
     );
     const contactPoint = authoritativeMove.indexOf(
       "const contactPoint = coordinateMapper.pointFor(pointerEvent);",
@@ -60,10 +60,13 @@ describe("Studio canvas cursor integration boundary", () => {
     expect(consume).toBeGreaterThan(contactPoint);
     expect(cursor).toBeGreaterThan(consume);
     expect(authoritativeMove).toContain("{ coordinateMapper }");
-    expect(authoritativeMove.match(/snapshotStudioStagePointerBatchMapper\(stage\)/gu)).toHaveLength(1);
+    expect(authoritativeMove.match(/stagePointerFrameMapperCacheRef\.current!\.mapperFor\(stage\)/gu)).toHaveLength(1);
     expect(authoritativeMove.match(/coordinateMapper\.pointFor\(pointerEvent\)/gu)).toHaveLength(1);
-    expect(rawUpdate.match(/snapshotStudioStagePointerBatchMapper\(stage\)/gu)).toHaveLength(1);
+    expect(rawUpdate.match(/stagePointerFrameMapperCacheRef\.current!\.mapperFor\(stage\)/gu)).toHaveLength(1);
     expect(rawUpdate.match(/coordinateMapper\.pointFor\(pointerEvent\)/gu)).toHaveLength(1);
+    expect(studioPageSource).toContain("createStudioStagePointerFrameMapperCache({");
+    expect(studioPageSource).toContain("stagePointerFrameMapperCacheRef.current?.invalidate();");
+    expect(studioPageSource).toContain("stagePointerFrameMapperCacheRef.current?.dispose();");
     expect(rawUpdate).toContain("replaceStudioRawPenInkPreview(rawState, {");
     expect(rawUpdate).toContain("rawTransition.predictionSurface");
     expect(rawUpdate).toContain("updateBrushCursor(stage, pointerEvent, contactPoint, true);");

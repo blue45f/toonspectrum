@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { snapshotStudioStagePointerBatchMapper } from "./studio-stage-pointer-coordinate";
+import {
+  createStudioStagePointerFrameMapperCache,
+  snapshotStudioStagePointerBatchMapper,
+} from "./studio-stage-pointer-coordinate";
 
 function fakeStage(options: {
   rect?: Partial<DOMRect>;
@@ -62,5 +65,99 @@ describe("snapshotStudioStagePointerBatchMapper", () => {
 
     expect(mapper.pointFor({ clientX: Number.POSITIVE_INFINITY, clientY: 10 })).toBeNull();
     expect(mapper.pointFor({ clientX: 10, clientY: 10 })).toBeNull();
+  });
+});
+
+function fakeFrameScheduler() {
+  let nextHandle = 1;
+  const callbacks = new Map<number, FrameRequestCallback>();
+  const requestFrame = vi.fn((callback: FrameRequestCallback) => {
+    const handle = nextHandle++;
+    callbacks.set(handle, callback);
+    return handle;
+  });
+  const cancelFrame = vi.fn((handle: number) => {
+    callbacks.delete(handle);
+  });
+  const flush = () => {
+    const pending = [...callbacks.entries()];
+    callbacks.clear();
+    for (const [, callback] of pending) callback(16.67);
+  };
+  return { callbacks, cancelFrame, flush, requestFrame };
+}
+
+describe("createStudioStagePointerFrameMapperCache", () => {
+  it("shares one layout and inverse snapshot across raw and processed deliveries in a frame", () => {
+    const scheduler = fakeFrameScheduler();
+    const fixture = fakeStage();
+    const cache = createStudioStagePointerFrameMapperCache(scheduler);
+
+    const rawMapper = cache.mapperFor(fixture.stage as never);
+    const processedMapper = cache.mapperFor(fixture.stage as never);
+
+    expect(processedMapper).toBe(rawMapper);
+    expect(fixture.getBoundingClientRect).toHaveBeenCalledTimes(1);
+    expect(fixture.copy).toHaveBeenCalledTimes(1);
+    expect(fixture.invert).toHaveBeenCalledTimes(1);
+    expect(scheduler.requestFrame).toHaveBeenCalledTimes(1);
+  });
+
+  it("takes a fresh snapshot after the next paint frame", () => {
+    const scheduler = fakeFrameScheduler();
+    const fixture = fakeStage();
+    const cache = createStudioStagePointerFrameMapperCache(scheduler);
+
+    const first = cache.mapperFor(fixture.stage as never);
+    scheduler.flush();
+    const second = cache.mapperFor(fixture.stage as never);
+
+    expect(second).not.toBe(first);
+    expect(fixture.getBoundingClientRect).toHaveBeenCalledTimes(2);
+    expect(fixture.copy).toHaveBeenCalledTimes(2);
+    expect(fixture.invert).toHaveBeenCalledTimes(2);
+    expect(scheduler.requestFrame).toHaveBeenCalledTimes(2);
+  });
+
+  it("resnapshots immediately when the Stage identity changes", () => {
+    const scheduler = fakeFrameScheduler();
+    const first = fakeStage();
+    const second = fakeStage({ rect: { left: 20 } });
+    const cache = createStudioStagePointerFrameMapperCache(scheduler);
+
+    cache.mapperFor(first.stage as never);
+    cache.mapperFor(second.stage as never);
+
+    expect(first.getBoundingClientRect).toHaveBeenCalledTimes(1);
+    expect(second.getBoundingClientRect).toHaveBeenCalledTimes(1);
+    expect(scheduler.requestFrame).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidates pointer-session snapshots and cancels their pending frame", () => {
+    const scheduler = fakeFrameScheduler();
+    const fixture = fakeStage();
+    const cache = createStudioStagePointerFrameMapperCache(scheduler);
+
+    cache.mapperFor(fixture.stage as never);
+    cache.invalidate();
+    cache.mapperFor(fixture.stage as never);
+
+    expect(scheduler.cancelFrame).toHaveBeenCalledTimes(1);
+    expect(fixture.getBoundingClientRect).toHaveBeenCalledTimes(2);
+    expect(scheduler.requestFrame).toHaveBeenCalledTimes(2);
+  });
+
+  it("disposes idempotently and rejects late pointer deliveries", () => {
+    const scheduler = fakeFrameScheduler();
+    const fixture = fakeStage();
+    const cache = createStudioStagePointerFrameMapperCache(scheduler);
+
+    cache.mapperFor(fixture.stage as never);
+    cache.dispose();
+    cache.dispose();
+
+    expect(scheduler.cancelFrame).toHaveBeenCalledTimes(1);
+    expect(scheduler.callbacks.size).toBe(0);
+    expect(() => cache.mapperFor(fixture.stage as never)).toThrow(/disposed/i);
   });
 });

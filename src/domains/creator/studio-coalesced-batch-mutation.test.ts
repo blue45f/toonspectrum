@@ -7,8 +7,7 @@ const base = {
   gpuPinned: false,
   fixedRateFilterActive: false,
   immediateCausalInput: false,
-  directInkSurfaceActive: false,
-  directStampSurfaceActive: false,
+  mutableDirectSurfaceActive: false,
 };
 
 describe("studio coalesced batch mutation", () => {
@@ -32,8 +31,16 @@ describe("studio coalesced batch mutation", () => {
     expect(shouldOwnStudioCoalescedBatchDraft({
       ...base,
       immediateCausalInput: true,
-      directInkSurfaceActive: true,
+      mutableDirectSurfaceActive: true,
     })).toBe(false);
+  });
+
+  it("owns one batch for a direct-model eraser without a mutable presentation surface", () => {
+    expect(shouldOwnStudioCoalescedBatchDraft({
+      ...base,
+      immediateCausalInput: true,
+      mutableDirectSurfaceActive: false,
+    })).toBe(true);
   });
 
   it("does not allocate an owned batch when no authoritative sample arrived", () => {

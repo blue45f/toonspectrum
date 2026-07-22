@@ -216,7 +216,15 @@ describe("studio drawing pointer transport", () => {
     const firstMove = vi.fn();
     const secondMove = vi.fn((_event: PointerEvent) => {
       const session = controller.getSession();
-      if (session) controller.replaceSession({ ...session, lastAuthoritativeSignature: "latest" });
+      if (session) {
+        controller.replaceSession({
+          ...session,
+          lastAuthoritativeSample: {
+            ...session.lastAuthoritativeSample,
+            clientX: 999,
+          },
+        });
+      }
     });
     controller.updatePorts(portSpies({ onAuthoritativeMove: firstMove }).ports);
     controller.start({ pointerEvent: down, session: pointerSession(down), stage: null });
@@ -230,7 +238,7 @@ describe("studio drawing pointer transport", () => {
     windowTarget.emit("pointermove", pointerEvent("pointermove", { timeStamp: 3 }));
     expect(firstMove).toHaveBeenCalledTimes(1);
     expect(secondMove).toHaveBeenCalledTimes(1);
-    expect(controller.getSession()?.lastAuthoritativeSignature).toBe("latest");
+    expect(controller.getSession()?.lastAuthoritativeSample.clientX).toBe(999);
     controller.release();
   });
 

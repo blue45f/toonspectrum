@@ -10,6 +10,20 @@ export interface StudioStagePointerBatchMapper {
   pointFor(sample: StudioClientPointerCoordinate): { x: number; y: number } | null;
 }
 
+export interface StudioStagePointerFrameScheduler {
+  requestFrame(callback: FrameRequestCallback): number;
+  cancelFrame(handle: number): void;
+}
+
+export interface StudioStagePointerFrameMapperCache {
+  /** Reuses one coordinate snapshot for raw and processed deliveries in the same paint frame. */
+  mapperFor(stage: StudioStageCoordinateSource): StudioStagePointerBatchMapper;
+  /** Invalidates immediately when the pointer session or view ownership changes. */
+  invalidate(): void;
+  /** Permanently releases the scheduled frame callback. */
+  dispose(): void;
+}
+
 type StudioStageCoordinateSource = Pick<Konva.Stage, "getAbsoluteTransform" | "getContent">;
 
 function positiveFiniteScale(renderedSize: number, layoutSize: number): number {
@@ -43,6 +57,54 @@ export function snapshotStudioStagePointerBatchMapper(
         y: (sample.clientY - top) / scaleY,
       });
       return Number.isFinite(mapped.x) && Number.isFinite(mapped.y) ? mapped : null;
+    },
+  };
+}
+
+/**
+ * Shares the expensive DOM/layout and inverse-transform snapshot across raw and processed pen
+ * events delivered before the next animation frame. The cache never spans a paint boundary, so
+ * resize and layout changes are observed on the following frame without a polling clock.
+ */
+export function createStudioStagePointerFrameMapperCache(
+  scheduler: StudioStagePointerFrameScheduler
+): StudioStagePointerFrameMapperCache {
+  let cachedStage: StudioStageCoordinateSource | null = null;
+  let cachedMapper: StudioStagePointerBatchMapper | null = null;
+  let frameHandle: number | null = null;
+  let disposed = false;
+
+  const clearSnapshot = (): void => {
+    cachedStage = null;
+    cachedMapper = null;
+  };
+
+  const invalidate = (): void => {
+    if (frameHandle !== null) scheduler.cancelFrame(frameHandle);
+    frameHandle = null;
+    clearSnapshot();
+  };
+
+  return {
+    mapperFor(stage) {
+      if (disposed) throw new Error("Studio stage pointer mapper cache is disposed");
+      if (cachedStage !== stage || cachedMapper === null) {
+        cachedStage = stage;
+        cachedMapper = snapshotStudioStagePointerBatchMapper(stage);
+      }
+      if (frameHandle === null) {
+        frameHandle = scheduler.requestFrame(() => {
+          frameHandle = null;
+          clearSnapshot();
+        });
+      }
+      return cachedMapper;
+    },
+    invalidate,
+    dispose() {
+      if (disposed) return;
+      invalidate();
+      disposed = true;
     },
   };
 }

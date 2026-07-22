@@ -36,8 +36,25 @@ export interface StudioStrokePointerSession {
    * samples without the extra jitter/duplicate topology of a parallel raw-update subscription.
    */
   readonly moveTransport: "pointermove";
-  /** Exact signature of the last stored hardware sample, used only for adjacent deduplication. */
-  readonly lastAuthoritativeSignature: string;
+  /** Exact normalized identity of the last stored sample, used only for adjacent deduplication. */
+  readonly lastAuthoritativeSample: StudioPointerSampleIdentity;
+}
+
+export interface StudioPointerSampleIdentity {
+  readonly pointerId: number;
+  readonly pointerType: string;
+  readonly timeStamp: number;
+  readonly clientX: number;
+  readonly clientY: number;
+  readonly pressure: number;
+  readonly tangentialPressure: number;
+  readonly tiltX: number;
+  readonly tiltY: number;
+  readonly altitudeAngle: number;
+  readonly azimuthAngle: number;
+  readonly twist: number;
+  readonly width: number;
+  readonly height: number;
 }
 
 export interface StudioStrokePointerBatch<T extends StudioPointerEventLike> {
@@ -79,25 +96,50 @@ function pointerTypeOf(event: StudioPointerEventLike): StudioStrokePointerSessio
   return value === "pen" || value === "touch" || value === "mouse" ? value : "unknown";
 }
 
-function pointerSampleSignature(event: StudioPointerEventLike, pointerId: number): string {
+function pointerSampleIdentity(
+  event: StudioPointerEventLike,
+  pointerId: number
+): StudioPointerSampleIdentity {
   // Do not deduplicate by timestamp alone. Safari and some tablet drivers legitimately emit a
   // run of distinct coordinates with timestamp=0 (or the same reduced-precision timestamp).
-  return JSON.stringify([
+  return {
     pointerId,
-    typeof event.pointerType === "string" ? event.pointerType.toLowerCase() : "",
-    finiteNumber(event.timeStamp, 0),
-    finiteNumber(event.clientX, 0),
-    finiteNumber(event.clientY, 0),
-    finiteNumber(event.pressure, 0),
-    finiteNumber(event.tangentialPressure, 0),
-    finiteNumber(event.tiltX, 0),
-    finiteNumber(event.tiltY, 0),
-    finiteNumber(event.altitudeAngle, 0),
-    finiteNumber(event.azimuthAngle, 0),
-    finiteNumber(event.twist, 0),
-    finiteNumber(event.width, 0),
-    finiteNumber(event.height, 0),
-  ]);
+    pointerType: typeof event.pointerType === "string" ? event.pointerType.toLowerCase() : "",
+    timeStamp: finiteNumber(event.timeStamp, 0),
+    clientX: finiteNumber(event.clientX, 0),
+    clientY: finiteNumber(event.clientY, 0),
+    pressure: finiteNumber(event.pressure, 0),
+    tangentialPressure: finiteNumber(event.tangentialPressure, 0),
+    tiltX: finiteNumber(event.tiltX, 0),
+    tiltY: finiteNumber(event.tiltY, 0),
+    altitudeAngle: finiteNumber(event.altitudeAngle, 0),
+    azimuthAngle: finiteNumber(event.azimuthAngle, 0),
+    twist: finiteNumber(event.twist, 0),
+    width: finiteNumber(event.width, 0),
+    height: finiteNumber(event.height, 0),
+  };
+}
+
+function samePointerSampleIdentity(
+  left: StudioPointerSampleIdentity,
+  right: StudioPointerSampleIdentity
+): boolean {
+  return left === right || (
+    left.pointerId === right.pointerId
+    && left.pointerType === right.pointerType
+    && left.timeStamp === right.timeStamp
+    && left.clientX === right.clientX
+    && left.clientY === right.clientY
+    && left.pressure === right.pressure
+    && left.tangentialPressure === right.tangentialPressure
+    && left.tiltX === right.tiltX
+    && left.tiltY === right.tiltY
+    && left.altitudeAngle === right.altitudeAngle
+    && left.azimuthAngle === right.azimuthAngle
+    && left.twist === right.twist
+    && left.width === right.width
+    && left.height === right.height
+  );
 }
 
 /**
@@ -127,13 +169,13 @@ function isUsableStudioRelatedPointerEvent(value: unknown): value is StudioPoint
  * event. Match and read every optional stylus channel inside one exception boundary so one broken
  * getter cannot abort the authoritative parent fallback.
  */
-function safeRelatedPointerSampleSignature(
+function safeRelatedPointerSampleIdentity(
   session: StudioStrokePointerSession,
   event: StudioPointerEventLike
-): string | null {
+): StudioPointerSampleIdentity | null {
   try {
     if (!isStudioStrokePointerEvent(session, event)) return null;
-    return pointerSampleSignature(event, session.pointerId);
+    return pointerSampleIdentity(event, session.pointerId);
   } catch {
     return null;
   }
@@ -191,7 +233,7 @@ export function beginStudioStrokePointerSession(
     pointerId,
     pointerType: pointerTypeOf(event),
     moveTransport: "pointermove",
-    lastAuthoritativeSignature: pointerSampleSignature(event, pointerId),
+    lastAuthoritativeSample: pointerSampleIdentity(event, pointerId),
   };
 }
 
@@ -315,7 +357,7 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
   }
 
   const authoritative: T[] = [];
-  let previousSignature = session.lastAuthoritativeSignature;
+  let previousSample = session.lastAuthoritativeSample;
   const coalesced = options.authoritativeSource === "parent-only"
     ? []
     : safeRelatedEvents(event, "getCoalescedEvents");
@@ -323,40 +365,40 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
   // hardware sample. Consume one representation only; empty/throwing APIs fall back to parent.
   const candidates = coalesced.length > 0 ? coalesced : [event];
   for (const candidate of candidates) {
-    const signature = candidate === event
-      ? pointerSampleSignature(candidate, session.pointerId)
-      : safeRelatedPointerSampleSignature(session, candidate);
-    if (signature === null) continue;
-    if (signature === previousSignature) continue;
+    const identity = candidate === event
+      ? pointerSampleIdentity(candidate, session.pointerId)
+      : safeRelatedPointerSampleIdentity(session, candidate);
+    if (identity === null) continue;
+    if (samePointerSampleIdentity(identity, previousSample)) continue;
     authoritative.push(candidate);
-    previousSignature = signature;
+    previousSample = identity;
   }
 
   // A malformed implementation can return a non-empty list containing only foreign or otherwise
   // unusable entries. In that case the matching dispatched event is still the standards-complete
   // fallback. Preserve the usual adjacent dedupe rule so a repeated parent does not invent ink.
   if (coalesced.length > 0 && authoritative.length === 0) {
-    const parentSignature = pointerSampleSignature(event, session.pointerId);
-    if (parentSignature !== previousSignature) {
+    const parentIdentity = pointerSampleIdentity(event, session.pointerId);
+    if (!samePointerSampleIdentity(parentIdentity, previousSample)) {
       authoritative.push(event);
-      previousSignature = parentSignature;
+      previousSample = parentIdentity;
     }
   }
 
   const nextSession: StudioStrokePointerSession = {
     ...session,
-    lastAuthoritativeSignature: previousSignature,
+    lastAuthoritativeSample: previousSample,
   };
 
   const predicted: T[] = [];
   if (options.includePredicted) {
-    let previousPredictedSignature = previousSignature;
+    let previousPredictedSample = previousSample;
     for (const candidate of safeRelatedEvents(event, "getPredictedEvents")) {
-      const signature = safeRelatedPointerSampleSignature(session, candidate);
-      if (signature === null) continue;
-      if (signature === previousPredictedSignature) continue;
+      const identity = safeRelatedPointerSampleIdentity(session, candidate);
+      if (identity === null) continue;
+      if (samePointerSampleIdentity(identity, previousPredictedSample)) continue;
       predicted.push(candidate);
-      previousPredictedSignature = signature;
+      previousPredictedSample = identity;
     }
   }
 

@@ -25,6 +25,25 @@ describe("Studio freehand hot-path boundary", () => {
     expect(consume.match(/stage\.setPointersPositions\(pointerEvent\)/gu)).toHaveLength(1);
   });
 
+  it("owns a coalesced batch from the active mutable surface instead of the model flag", () => {
+    const consume = functionBody(
+      "function consumeFreehandPointerBatch(",
+      "function publishAuthoritativeFreehandSuffix("
+    );
+    const policyStart = consume.indexOf("const mutableDirectSurfaceActive =");
+    const policyEnd = consume.indexOf("if (immediateBatchMutation", policyStart);
+    const policyBlock = consume.slice(policyStart, policyEnd);
+
+    expect(policyStart).toBeGreaterThan(-1);
+    expect(policyBlock).toContain("liveInkOverlayRendererRef.current.isActive");
+    expect(policyBlock).toContain("isStudioPixelPencilRenderMode(activeDrawing.brush)");
+    expect(policyBlock).toContain("liveStampOverlayRendererRef.current.isActive");
+    expect(policyBlock).toContain("mutableDirectSurfaceActive,");
+    expect(policyBlock).not.toContain(
+      "directInkSurfaceActive: liveDraftDirectRef.current"
+    );
+  });
+
   it("processes authoritative ink before coalescing the contact cursor with the same mapper", () => {
     const transport = functionBody(
       "onAuthoritativeMove: (pointerEvent) => {",
@@ -39,6 +58,8 @@ describe("Studio freehand hot-path boundary", () => {
     expect(cursorIndex).toBeGreaterThan(consumeIndex);
     expect(transport).toContain("{ coordinateMapper }");
     expect(transport).toContain("contactPoint, true");
+    expect(transport).toContain("canCollectStudioPointerPredictionsForActiveTail(");
+    expect(transport).toContain("predictedInkTailStateRef.current !== null");
   });
 
   it("coalesces active cursor draws to one latest-position frame while hover stays immediate", () => {

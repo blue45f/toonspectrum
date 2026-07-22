@@ -62,3 +62,17 @@ export function canUseStudioPointerPredictionForSession(
 ): boolean {
   return capabilityEnabled && session?.pointerType === "pen";
 }
+
+/**
+ * Native predictions are worth collecting only after the stroke owns a replaceable presentation
+ * tail. Without that surface the fallback preview clones the full authoritative prefix, adding
+ * latency without presenting a prediction that can be safely corrected.
+ */
+export function canCollectStudioPointerPredictionsForActiveTail(
+  capabilityEnabled: boolean,
+  session: StudioPointerPredictionSessionLike | null | undefined,
+  replaceableTailArmed: boolean
+): boolean {
+  return replaceableTailArmed
+    && canUseStudioPointerPredictionForSession(capabilityEnabled, session);
+}

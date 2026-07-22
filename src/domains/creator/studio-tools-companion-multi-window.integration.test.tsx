@@ -210,8 +210,22 @@ describe("Studio tools companion multi-window integration", () => {
     expect(onControl).toHaveBeenLastCalledWith({ kind: "history", action: "undo" });
 
     navigatorView.unmount();
+    expect(primaryRuntime?.binding.companionInstanceId("navigator")).toBeNull();
+    expect(messages()).toContainEqual(expect.objectContaining({
+      type: "companion-goodbye",
+      companionInstanceId: navigatorId,
+      surface: "navigator",
+    }));
     expect(workspace.getByText(/연결됨/u)).toBeTruthy();
     expect(review.getByText(/연결됨/u)).toBeTruthy();
+
+    const replacementNavigatorView = renderCompanion("navigator");
+    const replacementNavigator = within(replacementNavigatorView.container);
+    await waitFor(() => {
+      expect(replacementNavigator.getByText(/연결됨/u)).toBeTruthy();
+      expect(primaryRuntime?.binding.companionInstanceId("navigator")).not.toBe(navigatorId);
+      expect(primaryRuntime?.generation("navigator")).toBe(2);
+    });
     fireEvent.click(workspace.getByRole("button", { name: "지우개" }));
     expect(onCommand).toHaveBeenLastCalledWith("eraser");
     fireEvent.click(review.getByRole("button", { name: "실행 취소" }));

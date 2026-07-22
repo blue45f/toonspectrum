@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canCollectStudioPointerPredictionsForActiveTail,
   canUseStudioPointerPredictionForSession,
   resolveStudioPointerPredictionPreference,
   supportsStudioPointerPrediction,
@@ -44,5 +45,29 @@ describe("Studio pointer prediction capability", () => {
     expect(canUseStudioPointerPredictionForSession(true, { pointerType: "touch" })).toBe(false);
     expect(canUseStudioPointerPredictionForSession(false, { pointerType: "pen" })).toBe(false);
     expect(canUseStudioPointerPredictionForSession(true, null)).toBe(false);
+  });
+
+  it("collects native predictions only while a replaceable pen tail is armed", () => {
+    expect(canCollectStudioPointerPredictionsForActiveTail(
+      true,
+      { pointerType: "pen" },
+      true
+    )).toBe(true);
+    expect(canCollectStudioPointerPredictionsForActiveTail(
+      true,
+      { pointerType: "pen" },
+      false
+    )).toBe(false);
+    expect(canCollectStudioPointerPredictionsForActiveTail(
+      true,
+      { pointerType: "mouse" },
+      true
+    )).toBe(false);
+    expect(canCollectStudioPointerPredictionsForActiveTail(
+      false,
+      { pointerType: "pen" },
+      true
+    )).toBe(false);
+    expect(canCollectStudioPointerPredictionsForActiveTail(true, null, true)).toBe(false);
   });
 });

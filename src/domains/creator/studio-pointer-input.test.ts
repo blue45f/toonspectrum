@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -16,6 +18,8 @@ import {
   tryReleaseStudioStrokePointer,
   type StudioPointerEventLike,
 } from "./studio-pointer-input";
+
+const pointerInputSource = readFileSync(new URL("./studio-pointer-input.ts", import.meta.url), "utf8");
 
 function sample(
   x: number,
@@ -295,6 +299,33 @@ describe("studio pointer input", () => {
       twistChange,
       contactChange,
     ]);
+  });
+
+  it("deduplicates normalized scalar identities without JSON allocation in the hardware hot path", () => {
+    const down = sample(0, {
+      pointerType: "PEN",
+      timeStamp: -0,
+      pressure: Number.NaN,
+      tangentialPressure: Number.POSITIVE_INFINITY,
+    });
+    const session = beginStudioStrokePointerSession(down)!;
+    const equivalent = sample(0, {
+      pointerType: "pen",
+      timeStamp: 0,
+      pressure: 0,
+      tangentialPressure: 0,
+    });
+
+    expect(collectStudioStrokePointerBatch(session, equivalent).authoritative).toEqual([]);
+    expect(session.lastAuthoritativeSample).toMatchObject({
+      pointerId: 7,
+      pointerType: "pen",
+      timeStamp: -0,
+      pressure: 0,
+      tangentialPressure: 0,
+    });
+    expect(pointerInputSource).not.toContain("JSON.stringify");
+    expect(pointerInputSource).toContain("samePointerSampleIdentity(identity, previousSample)");
   });
 
   it("keeps durable ink on processed pointermove and ignores raw updates without poisoning it", () => {

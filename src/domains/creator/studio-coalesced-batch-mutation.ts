@@ -3,8 +3,7 @@ export interface StudioCoalescedBatchMutationInput {
   readonly gpuPinned: boolean;
   readonly fixedRateFilterActive: boolean;
   readonly immediateCausalInput: boolean;
-  readonly directInkSurfaceActive: boolean;
-  readonly directStampSurfaceActive: boolean;
+  readonly mutableDirectSurfaceActive: boolean;
 }
 
 /**
@@ -20,6 +19,5 @@ export function shouldOwnStudioCoalescedBatchDraft(
   }
   if (input.gpuPinned) return !input.fixedRateFilterActive;
   return input.immediateCausalInput
-    && !input.directInkSurfaceActive
-    && !input.directStampSurfaceActive;
+    && !input.mutableDirectSurfaceActive;
 }

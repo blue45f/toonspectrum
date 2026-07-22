@@ -8,6 +8,7 @@ import { createStudioCompanionReviewProjection } from "./studio-companion-review
 import {
   buildStudioCompanionNavigatorFrame,
   buildStudioCompanionPing,
+  buildStudioCompanionPrimaryGoodbye,
   buildStudioCompanionReviewState,
   isStudioCompanionSessionId,
   studioCompanionChannelName,
@@ -493,6 +494,38 @@ describe("StudioToolsCompanionPage", () => {
     }));
   });
 
+  it("disconnects immediately only for an exact fresh primary goodbye", () => {
+    const { revokeObjectURL } = installObjectUrlSpies();
+    renderCompanion(`/studio/tools-companion?session=${sessionId}&view=navigator`);
+    const channel = FakeBroadcastChannel.instances[0]!;
+    const companionInstance = companionInstanceId(channel);
+    connectPrimary({ channel, companionInstance });
+    act(() => channel.emit(navigatorFrame({ companionInstance })));
+    expect(screen.getByText(/연결됨/u)).toBeTruthy();
+    expect(screen.getByAltText("현재 페이지 전체 캔버스")).toBeTruthy();
+
+    const goodbye = buildStudioCompanionPrimaryGoodbye({
+      primaryInstanceId: primaryInstanceA,
+      targetCompanionInstanceId: companionInstance,
+      surface: "navigator",
+    });
+    act(() => {
+      channel.emit({ ...goodbye, at: Date.now() - 30_001 });
+      channel.emit({ ...goodbye, primaryInstanceId: primaryInstanceB });
+      channel.emit({ ...goodbye, targetCompanionInstanceId: "other-companion-5678" });
+      channel.emit({ ...goodbye, surface: "review" });
+    });
+    expect(screen.getByText(/연결됨/u)).toBeTruthy();
+    expect(screen.getByAltText("현재 페이지 전체 캔버스")).toBeTruthy();
+
+    act(() => channel.emit(goodbye));
+
+    expect(screen.getByText(/연결 대기/u)).toBeTruthy();
+    expect(screen.queryByAltText("현재 페이지 전체 캔버스")).toBeNull();
+    expect(revokeObjectURL).toHaveBeenCalledOnce();
+    expect(screen.getByRole("link", { name: "스튜디오 다시 연결" })).toBeTruthy();
+  });
+
   it("does not refresh primary liveness for a pong with the wrong nonce", () => {
     vi.useFakeTimers();
     renderCompanion();
@@ -912,12 +945,13 @@ describe("StudioToolsCompanionPage", () => {
     expect(document.title).toBe("이전 제목");
   });
 
-  it("releases dedicated Navigator demand before closing its channel on unmount", () => {
+  it("sends one goodbye after releasing Navigator demand across pagehide and unmount", () => {
     const view = renderCompanion(`/studio/tools-companion?session=${sessionId}&view=navigator`);
     const channel = FakeBroadcastChannel.instances[0]!;
     const companionInstance = companionInstanceId(channel);
     connectPrimary({ channel, companionInstance });
 
+    act(() => window.dispatchEvent(new Event("pagehide")));
     view.unmount();
 
     const demands = channel.postMessage.mock.calls
@@ -926,6 +960,23 @@ describe("StudioToolsCompanionPage", () => {
     expect(demands).toEqual([
       expect.objectContaining({ control: { kind: "navigator-demand", active: true } }),
       expect.objectContaining({ control: { kind: "navigator-demand", active: false } }),
+    ]);
+    const goodbyes = channel.postMessage.mock.calls
+      .map(([message]) => message as StudioCompanionMessage)
+      .filter((message) => message.type === "companion-goodbye");
+    expect(goodbyes).toEqual([
+      expect.objectContaining({
+        companionInstanceId: companionInstance,
+        targetPrimaryInstanceId: primaryInstanceA,
+        surface: "navigator",
+      }),
+    ]);
+    const lifecycleMessages = channel.postMessage.mock.calls
+      .map(([message]) => message as StudioCompanionMessage)
+      .filter((message) => message.type === "companion-control" || message.type === "companion-goodbye");
+    expect(lifecycleMessages.slice(-2).map((message) => message.type)).toEqual([
+      "companion-control",
+      "companion-goodbye",
     ]);
     expect(channel.close).toHaveBeenCalledOnce();
   });

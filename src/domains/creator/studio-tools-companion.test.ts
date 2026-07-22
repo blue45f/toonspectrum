@@ -3,10 +3,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildStudioCompanionCommand,
   buildStudioCompanionControl,
+  buildStudioCompanionGoodbye,
   buildStudioCompanionHello,
   buildStudioCompanionNavigatorFrame,
   buildStudioCompanionPing,
   buildStudioCompanionPong,
+  buildStudioCompanionPrimaryGoodbye,
   buildStudioCompanionPrimaryState,
   buildStudioCompanionReviewState,
   completeReservedStudioToolsCompanionWindow,
@@ -202,6 +204,21 @@ describe("studio-tools-companion protocol", () => {
     }, 401);
     expect(isStudioCompanionMessage(ping)).toBe(true);
     expect(isStudioCompanionMessage(pong)).toBe(true);
+
+    const companionGoodbye = buildStudioCompanionGoodbye({
+      companionInstanceId: navigatorA,
+      targetPrimaryInstanceId: primaryA,
+      surface: "navigator",
+    }, 500);
+    const primaryGoodbye = buildStudioCompanionPrimaryGoodbye({
+      primaryInstanceId: primaryA,
+      targetCompanionInstanceId: navigatorA,
+      surface: "navigator",
+    }, 501);
+    expect(parseStudioCompanionMessage(companionGoodbye)).toEqual(companionGoodbye);
+    expect(parseStudioCompanionMessage(primaryGoodbye)).toEqual(primaryGoodbye);
+    expect(parseStudioCompanionMessage({ ...companionGoodbye, surface: "unknown" })).toBeNull();
+    expect(parseStudioCompanionMessage({ ...primaryGoodbye, extra: true })).toBeNull();
   });
 
   it("rejects garbage payloads", () => {
@@ -940,6 +957,58 @@ describe("studio-tools-companion protocol", () => {
     }, 10_007), primaryA, 10_007)).toBe(true);
   });
 
+  it("releases only the exactly targeted role slot on a fresh companion goodbye", () => {
+    const binding = new StudioCompanionPrimaryBinding();
+    for (const [surface, companionInstanceId] of [
+      ["workspace", companionA],
+      ["navigator", navigatorA],
+      ["review", reviewA],
+    ] as const) {
+      expect(binding.acceptHello(buildStudioCompanionHello({
+        role: "companion",
+        companionInstanceId,
+        targetPrimaryInstanceId: primaryA,
+        surface,
+      }, 10_000), primaryA, 10_000)).toBe(true);
+    }
+
+    const goodbye = buildStudioCompanionGoodbye({
+      companionInstanceId: navigatorA,
+      targetPrimaryInstanceId: primaryA,
+      surface: "navigator",
+    }, 10_001);
+    expect(binding.acceptGoodbye(goodbye, primaryA, 40_002)).toBe(false);
+    expect(binding.acceptGoodbye({
+      ...goodbye,
+      targetPrimaryInstanceId: primaryB,
+      at: 10_002,
+    }, primaryA, 10_002)).toBe(false);
+    expect(binding.acceptGoodbye({
+      ...goodbye,
+      companionInstanceId: navigatorB,
+      at: 10_003,
+    }, primaryA, 10_003)).toBe(false);
+    expect(binding.acceptGoodbye({
+      ...goodbye,
+      surface: "review",
+      at: 10_004,
+    }, primaryA, 10_004)).toBe(false);
+    expect(binding.activeBindings()).toHaveLength(3);
+
+    expect(binding.acceptGoodbye({ ...goodbye, at: 10_005 }, primaryA, 10_005)).toBe(true);
+    expect(binding.acceptGoodbye({ ...goodbye, at: 10_006 }, primaryA, 10_006)).toBe(false);
+    expect(binding.companionInstanceId("workspace")).toBe(companionA);
+    expect(binding.companionInstanceId("navigator")).toBeNull();
+    expect(binding.companionInstanceId("review")).toBe(reviewA);
+    expect(binding.acceptHello(buildStudioCompanionHello({
+      role: "companion",
+      companionInstanceId: navigatorB,
+      targetPrimaryInstanceId: primaryA,
+      surface: "navigator",
+    }, 10_007), primaryA, 10_007)).toBe(true);
+    expect(binding.generation("navigator")).toBe(2);
+  });
+
   it("expires stale surfaces independently and keeps generation monotonic per surface", () => {
     const binding = new StudioCompanionPrimaryBinding();
     expect(binding.acceptHello(buildStudioCompanionHello({
@@ -1326,6 +1395,89 @@ describe("studio-tools-companion protocol", () => {
     expect(capture).toHaveBeenCalledTimes(2);
     runtime?.dispose();
     pending.forEach(({ resolve }) => resolve(null));
+  });
+
+  it("clears Navigator capture and retry state immediately on companion goodbye", async () => {
+    vi.useFakeTimers({ now: 10_000 });
+    RuntimeBroadcastChannel.instances.length = 0;
+    vi.stubGlobal("BroadcastChannel", RuntimeBroadcastChannel);
+    const projection = reviewProjection({ documentRevision: 25, captureAllowed: true });
+    const pending: Array<{
+      request: { signal: AbortSignal };
+      resolve: (value: null) => void;
+    }> = [];
+    const capture = vi.fn((request: { signal: AbortSignal }) => new Promise<null>((resolve) => {
+      pending.push({ request, resolve });
+    }));
+    const runtime = startStudioCompanionPrimaryRuntime({
+      search: `?session=${primaryA}`,
+      getSnapshot: () => ({
+        tool: "select",
+        density: "full",
+        canvasOnly: false,
+        title: "1화",
+      }),
+      getReviewProjection: () => projection,
+      captureNavigatorFrame: capture,
+      onCommand: vi.fn(),
+    });
+    const channel = RuntimeBroadcastChannel.instances[0]!;
+    const primaryHello = channel.postMessage.mock.calls[0]?.[0] as Extract<
+      StudioCompanionMessage,
+      { type: "hello"; role: "primary" }
+    >;
+    for (const [surface, companionInstanceId] of [
+      ["workspace", companionA],
+      ["navigator", navigatorA],
+      ["review", reviewA],
+    ] as const) {
+      channel.emit(buildStudioCompanionHello({
+        role: "companion",
+        companionInstanceId,
+        targetPrimaryInstanceId: primaryHello.primaryInstanceId,
+        surface,
+      }, Date.now()));
+    }
+    demandNavigator({
+      channel,
+      primaryInstanceId: primaryHello.primaryInstanceId,
+      companionInstanceId: navigatorA,
+    });
+    await Promise.resolve();
+    expect(capture).toHaveBeenCalledOnce();
+    expect(pending[0]?.request.signal.aborted).toBe(false);
+
+    channel.emit(buildStudioCompanionGoodbye({
+      companionInstanceId: navigatorA,
+      targetPrimaryInstanceId: primaryHello.primaryInstanceId,
+      surface: "navigator",
+    }, Date.now()));
+    expect(pending[0]?.request.signal.aborted).toBe(true);
+    expect(runtime?.binding.companionInstanceId("navigator")).toBeNull();
+    expect(runtime?.binding.companionInstanceId("workspace")).toBe(companionA);
+    expect(runtime?.binding.companionInstanceId("review")).toBe(reviewA);
+
+    pending[0]?.resolve(null);
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(capture).toHaveBeenCalledOnce();
+    channel.emit(buildStudioCompanionHello({
+      role: "companion",
+      companionInstanceId: navigatorB,
+      targetPrimaryInstanceId: primaryHello.primaryInstanceId,
+      surface: "navigator",
+    }, Date.now()));
+    expect(runtime?.generation("navigator")).toBe(2);
+    demandNavigator({
+      channel,
+      primaryInstanceId: primaryHello.primaryInstanceId,
+      companionInstanceId: navigatorB,
+      generation: 2,
+    });
+    await Promise.resolve();
+    expect(capture).toHaveBeenCalledTimes(2);
+    runtime?.dispose();
+    pending[1]?.resolve(null);
   });
 
   it("prioritizes the dedicated Navigator without letting Review disturb capture ownership", async () => {
@@ -1731,6 +1883,74 @@ describe("studio-tools-companion protocol", () => {
     expect(runtime?.generation()).toBe(1);
     expect(runtime?.generation("review")).toBe(1);
     runtime?.dispose();
+  });
+
+  it("notifies every bound role exactly once across primary pagehide and disposal", () => {
+    RuntimeBroadcastChannel.instances.length = 0;
+    vi.stubGlobal("BroadcastChannel", RuntimeBroadcastChannel);
+    let pagehideHandler: ((event: PageTransitionEvent) => void) | null = null;
+    const addEventListener = vi.fn((type: string, listener: EventListenerOrEventListenerObject) => {
+      if (type === "pagehide" && typeof listener === "function") {
+        pagehideHandler = listener as (event: PageTransitionEvent) => void;
+      }
+    });
+    const removeEventListener = vi.fn();
+    vi.stubGlobal("window", { addEventListener, removeEventListener });
+    const runtime = startStudioCompanionPrimaryRuntime({
+      search: `?session=${primaryA}`,
+      getSnapshot: () => ({
+        tool: "select",
+        density: "full",
+        canvasOnly: false,
+        title: "1화",
+      }),
+      getReviewProjection: () => reviewProjection({ documentRevision: 41 }),
+      onCommand: vi.fn(),
+    });
+    const channel = RuntimeBroadcastChannel.instances[0]!;
+    const primaryHello = channel.postMessage.mock.calls[0]?.[0] as Extract<
+      StudioCompanionMessage,
+      { type: "hello"; role: "primary" }
+    >;
+    for (const [surface, companionInstanceId] of [
+      ["workspace", companionA],
+      ["navigator", navigatorA],
+      ["review", reviewA],
+    ] as const) {
+      channel.emit(buildStudioCompanionHello({
+        role: "companion",
+        companionInstanceId,
+        targetPrimaryInstanceId: primaryHello.primaryInstanceId,
+        surface,
+      }));
+    }
+    channel.postMessage.mockClear();
+
+    const pagehide = pagehideHandler as ((event: PageTransitionEvent) => void) | null;
+    pagehide?.({ persisted: false } as PageTransitionEvent);
+    pagehide?.({ persisted: false } as PageTransitionEvent);
+    runtime?.dispose();
+    runtime?.dispose();
+
+    expect(channel.postMessage.mock.calls.map(([message]) => message)).toEqual([
+      expect.objectContaining({
+        type: "primary-goodbye",
+        targetCompanionInstanceId: companionA,
+        surface: "workspace",
+      }),
+      expect.objectContaining({
+        type: "primary-goodbye",
+        targetCompanionInstanceId: navigatorA,
+        surface: "navigator",
+      }),
+      expect.objectContaining({
+        type: "primary-goodbye",
+        targetCompanionInstanceId: reviewA,
+        surface: "review",
+      }),
+    ]);
+    expect(channel.close).toHaveBeenCalledOnce();
+    expect(removeEventListener).toHaveBeenCalledWith("pagehide", pagehide);
   });
 
   it.each(["null", "reject"] as const)(

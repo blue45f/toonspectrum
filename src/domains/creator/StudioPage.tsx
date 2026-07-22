@@ -263,6 +263,7 @@ import {
   studioCanvasCursorClassName,
   studioCanvasViewportCursorClassName,
 } from "./studio-canvas-cursor";
+import { resolveStudioCanvasGestureDisposition } from "./studio-canvas-gesture-arbitration";
 import { clampStudioCanvasHeight } from "./studio-canvas-size";
 import {
   collectStudioCaptureAssetSources,
@@ -850,6 +851,7 @@ import {
   shouldCancelStudioFingerStrokeForAdditionalContact,
 } from "./studio-pointer-input";
 import {
+  canCollectStudioPointerPredictionsForActiveTail,
   canUseStudioPointerPredictionForSession,
   resolveStudioPointerPredictionPreference,
   studioPointerPredictionEnvironment,
@@ -1042,6 +1044,7 @@ import {
 import { SMUDGE_RADIUS_DEFAULT, SMUDGE_STRENGTH_DEFAULT } from "./studio-smudge";
 import { useStudioStableHandlers } from "./studio-stable-handlers";
 import {
+  createStudioStagePointerFrameMapperCache,
   snapshotStudioStagePointerBatchMapper,
   type StudioStagePointerBatchMapper,
 } from "./studio-stage-pointer-coordinate";
@@ -6461,6 +6464,26 @@ function StudioCuttoonEditor() {
     const snappedLocalY = Math.round(localPos.y / gridSize) * gridSize;
     return stage.getAbsoluteTransform().point({ x: snappedLocalX, y: snappedLocalY });
   };
+  const canvasEditingGestureIsOwned = () => Boolean(
+    drawingRef.current
+    || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()
+    || isPanningRef.current
+    || KonvaRuntime.isDragging()
+    || KonvaRuntime.isTransforming()
+    || groupDragRef.current
+    || marqueeStartRef.current
+    || advancedFillTapGestureRef.current
+    || liquifyDragRef.current
+    || smudgeDragRef.current
+    || pixelDragRef.current
+    || cropDragRef.current
+    || panelSplitDragRef.current
+    || nodeEditDragRef.current
+    || bubbleShapeDragRef.current
+    || healCloneDragRef.current
+    || historyBrushDragRef.current
+    || layerMaskDragRef.current
+  );
   const canvasPointerGestureIsOwned = () => Boolean(
     drawingRef.current
     || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()
@@ -6487,15 +6510,19 @@ function StudioCuttoonEditor() {
     const node = wrapRef.current;
     if (!node) return;
     const onWheel = (e: WheelEvent) => {
-      if (viewTransformSuppressedRef.current) return;
-      if (isStudioViewToolsHudEventTarget(e.target)) return;
+      const gestureDisposition = resolveStudioCanvasGestureDisposition({
+        gestureOwned: canvasPointerGestureIsOwned(),
+        viewTransformSuppressed: viewTransformSuppressedRef.current,
+        viewToolsHudTarget: isStudioViewToolsHudEventTarget(e.target),
+      });
       // A contact-owned edit must see an immutable view transform from pointerdown to pointerup.
       // Trackpad/wheel noise during pen contact otherwise changes both the visual anchor and the
-      // document coordinate scale midway through one stroke. Consume it without scrolling.
-      if (canvasPointerGestureIsOwned()) {
+      // document coordinate scale midway through one stroke. Consume it even over nested HUD UI.
+      if (gestureDisposition === "consume-owned") {
         e.preventDefault();
         return;
       }
+      if (gestureDisposition !== "handle-canvas") return;
       const prefs = appSettingsRef.current.mouse;
       const modZoom = e.ctrlKey || e.metaKey;
       const wheelMode = modZoom ? "zoom" : prefs.wheel;
@@ -6599,6 +6626,15 @@ function StudioCuttoonEditor() {
     };
     const onTouchStart = arm;
     const onTouchMove = (e: TouchEvent) => {
+      // A finger-pan may have started before a pen or edit tool acquired the canvas. The editing
+      // contact wins immediately; otherwise the old finger session can still scroll the viewport
+      // underneath a new stroke before the shared ownership resolver is reached.
+      if (oneFingerPan && canvasEditingGestureIsOwned()) {
+        clearOneFingerPan();
+        pinchStartDist = 0;
+        e.preventDefault();
+        return;
+      }
       if (oneFingerPan) {
         const touch = Array.from(e.touches).find(
           (candidate) => candidate.identifier === oneFingerPan?.identifier
@@ -6616,18 +6652,23 @@ function StudioCuttoonEditor() {
         }
         clearOneFingerPan();
       }
-      if (viewTransformSuppressedRef.current) {
-        pinchStartDist = 0;
-        return;
-      }
-      if (isStudioViewToolsHudEventTarget(e.target)) return;
-      if (appSettingsRef.current.touch.twoFinger !== "pan-zoom") {
-        pinchStartDist = 0;
-        return;
-      }
-      if (canvasPointerGestureIsOwned()) {
+      const gestureDisposition = resolveStudioCanvasGestureDisposition({
+        gestureOwned: canvasPointerGestureIsOwned(),
+        viewTransformSuppressed: viewTransformSuppressedRef.current,
+        viewToolsHudTarget: isStudioViewToolsHudEventTarget(e.target),
+      });
+      if (gestureDisposition === "consume-owned") {
         pinchStartDist = 0;
         e.preventDefault();
+        return;
+      }
+      if (gestureDisposition === "pass-suppressed") {
+        pinchStartDist = 0;
+        return;
+      }
+      if (gestureDisposition === "pass-view-tools-hud") return;
+      if (appSettingsRef.current.touch.twoFinger !== "pan-zoom") {
+        pinchStartDist = 0;
         return;
       }
       if (e.touches.length !== 2) {
@@ -7673,6 +7714,13 @@ function StudioCuttoonEditor() {
   if (drawingPointerTransportRef.current === null) {
     drawingPointerTransportRef.current = createStudioDrawingPointerTransportController();
   }
+  const stagePointerFrameMapperCacheRef = useRef<
+    ReturnType<typeof createStudioStagePointerFrameMapperCache> | null
+  >(null);
+  stagePointerFrameMapperCacheRef.current ??= createStudioStagePointerFrameMapperCache({
+    requestFrame: (callback) => globalThis.requestAnimationFrame(callback),
+    cancelFrame: (handle) => globalThis.cancelAnimationFrame(handle),
+  });
   /** beginStroke가 예약된 로컬 세션만 접미 샘플을 전송한다(포인터마다 전체 CRDT 획 조회 금지). */
   const drawingCrdtStrokeActiveRef = useRef(false);
   const drawingCrdtPublishErrorRef = useRef<(cause: unknown) => void>(() => undefined);
@@ -8923,6 +8971,7 @@ function StudioCuttoonEditor() {
         },
         cleanupDrawing: () => drawingUnmountCleanupRef.current(),
         disposePointerTransport: () => {
+          stagePointerFrameMapperCacheRef.current?.dispose();
           requireStudioDrawingPointerTransport(drawingPointerTransportRef).dispose();
         },
         clearPendingCommit: () => {
@@ -20010,6 +20059,7 @@ function StudioCuttoonEditor() {
 
   function releaseDrawingPointerSession() {
     stopFixedRateStrokePump();
+    stagePointerFrameMapperCacheRef.current?.invalidate();
     requireStudioDrawingPointerTransport(drawingPointerTransportRef).release();
     drawingCrdtStrokeActiveRef.current = false;
     drawingPredictionPreviewRef.current = false;
@@ -22133,13 +22183,26 @@ function StudioCuttoonEditor() {
     const coordinateMapper = options.coordinateMapper
       ?? snapshotStudioStagePointerBatchMapper(stage);
     const crdtSampleStart = Math.floor((drawingRef.current?.points.length ?? 0) / 2);
+    const activeDrawing = drawingRef.current;
+    const mutableDirectSurfaceActive = (
+      (
+        liveDraftDirectRef.current
+        && (
+          liveInkOverlayRendererRef.current.isActive
+          || (activeDrawing !== null && isStudioPixelPencilRenderMode(activeDrawing.brush))
+        )
+      )
+      || (
+        liveStampDraftDirectRef.current
+        && liveStampOverlayRendererRef.current.isActive
+      )
+    );
     const immediateBatchMutation = shouldOwnStudioCoalescedBatchDraft({
       authoritativeSampleCount: batch.authoritative.length,
       gpuPinned: gpuLiveInkPinnedRef.current,
       fixedRateFilterActive: drawingFixedRateFilterRef.current !== null,
       immediateCausalInput: drawingImmediateCausalInputRef.current,
-      directInkSurfaceActive: liveDraftDirectRef.current,
-      directStampSurfaceActive: liveStampDraftDirectRef.current,
+      mutableDirectSurfaceActive,
     });
     if (immediateBatchMutation && drawingRef.current) {
       const current = drawingRef.current;
@@ -22382,14 +22445,15 @@ function StudioCuttoonEditor() {
       ) return;
       const stage = stageRef.current;
       if (!stage) return;
-      const coordinateMapper = snapshotStudioStagePointerBatchMapper(stage);
+      const coordinateMapper = stagePointerFrameMapperCacheRef.current!.mapperFor(stage);
       const contactPoint = coordinateMapper.pointFor(pointerEvent);
       consumeFreehandPointerBatch(
         stage,
         pointerEvent,
-        canUseStudioPointerPredictionForSession(
+        canCollectStudioPointerPredictionsForActiveTail(
           STUDIO_POINTER_PREDICTION_ENABLED,
-          session
+          session,
+          predictedInkTailStateRef.current !== null
         ),
         { coordinateMapper }
       );
@@ -22414,7 +22478,7 @@ function StudioCuttoonEditor() {
       ) return;
       const stage = stageRef.current;
       if (!stage) return;
-      const coordinateMapper = snapshotStudioStagePointerBatchMapper(stage);
+      const coordinateMapper = stagePointerFrameMapperCacheRef.current!.mapperFor(stage);
       const contactPoint = coordinateMapper.pointFor(pointerEvent);
       const rawState = rawPenInkPreviewStateRef.current;
       if (rawState && contactPoint) {

@@ -30,6 +30,7 @@ import {
 import {
   buildStudioCompanionCommand,
   buildStudioCompanionControl,
+  buildStudioCompanionGoodbye,
   buildStudioCompanionHello,
   buildStudioCompanionPing,
   createStudioCompanionChannel,
@@ -400,11 +401,13 @@ export function StudioToolsCompanionPage() {
 
     let lastPrimaryActivityAt = 0;
     let primaryConfirmed = false;
-    const releaseNavigatorDemand = () => {
+    let companionGoodbyeSent = false;
+    let leaving = false;
+    const releaseNavigatorDemand = (notifyPrimary = true) => {
       if (!navigatorDemandActiveRef.current) return;
       const targetPrimary = targetPrimaryInstanceIdRef.current;
       const generation = generationRef.current;
-      if (targetPrimary && generation > 0) {
+      if (notifyPrimary && targetPrimary && generation > 0) {
         commandSequenceRef.current += 1;
         try {
           channel.postMessage(buildStudioCompanionControl({
@@ -421,14 +424,37 @@ export function StudioToolsCompanionPage() {
       }
       navigatorDemandActiveRef.current = false;
     };
+    const leaveCompanion = () => {
+      if (companionGoodbyeSent) return;
+      companionGoodbyeSent = true;
+      leaving = true;
+      releaseNavigatorDemand();
+      const targetPrimary = targetPrimaryInstanceIdRef.current;
+      if (!targetPrimary) return;
+      try {
+        channel.postMessage(buildStudioCompanionGoodbye({
+          companionInstanceId,
+          targetPrimaryInstanceId: targetPrimary,
+          surface,
+        }));
+      } catch {
+        // The channel may already be unavailable while the detached window is closing.
+      }
+    };
+    const onCompanionPageHide = (event: PageTransitionEvent) => {
+      if (event.persisted) return;
+      leaveCompanion();
+    };
+    window.addEventListener("pagehide", onCompanionPageHide);
     const markPrimaryActivity = () => {
       lastPrimaryActivityAt = Date.now();
       primaryConfirmed = true;
       setConnected(true);
       setLastError(null);
     };
-    const expirePrimary = () => {
-      releaseNavigatorDemand();
+    const expirePrimary = (notifyPrimary = true) => {
+      releaseNavigatorDemand(notifyPrimary);
+      lastPrimaryActivityAt = 0;
       setConnected(false);
       setTargetPrimaryInstanceId(null);
       setPrimaryTitle("스튜디오");
@@ -442,8 +468,16 @@ export function StudioToolsCompanionPage() {
     };
 
     channel.onmessage = (event: MessageEvent) => {
+      if (leaving) return;
       const msg = parseStudioCompanionMessage(event.data);
       if (!msg || !isStudioCompanionMessageFresh(msg)) return;
+      if (msg.type === "primary-goodbye") {
+        if (msg.primaryInstanceId !== targetPrimaryInstanceIdRef.current) return;
+        if (msg.targetCompanionInstanceId !== companionInstanceId) return;
+        if (msg.surface !== surface) return;
+        expirePrimary(false);
+        return;
+      }
       if (msg.type === "hello" && msg.role === "primary") {
         if (
           msg.targetCompanionInstanceId !== null
@@ -546,6 +580,7 @@ export function StudioToolsCompanionPage() {
       // The status remains disconnected and heartbeat retries discovery.
     }
     const ping = globalThis.setInterval(() => {
+      if (leaving) return;
       if (
         lastPrimaryActivityAt > 0
         && Date.now() - lastPrimaryActivityAt >= PRIMARY_STALE_AFTER_MS
@@ -579,8 +614,9 @@ export function StudioToolsCompanionPage() {
 
     return () => {
       screenPlacementEpochRef.current += 1;
+      window.removeEventListener("pagehide", onCompanionPageHide);
       globalThis.clearInterval(ping);
-      releaseNavigatorDemand();
+      leaveCompanion();
       channel.onmessage = null;
       try {
         channel.close();
