@@ -51,9 +51,13 @@ const budgets = {
   // 추가한 production build는 app-shell 이후 약 2.27MB/740KB, 137 requests와 app entry 약
   // 500KB raw다. 실제 3D/decoder/원본 이미지 payload는 계속 사용자 동작 뒤 dynamic graph에
   // 남아 있으므로, 새 동기 복구·보안 계약의 관측치에 약 2%/1-request 여유만 다시 고정한다.
-  studio: { raw: 2_790_000, gzip: 910_000 },
+  // 2026-07-22 안전한 ORA/CBZ 가져오기와 공통 손실 확인 배선 후 2,787,460/910,538 bytes,
+  // app-shell 이후 2,285,734/750,241 bytes, 138 requests를 관측했다. 파서·decode/apply·손실 UI는
+  // 모두 사용자 선택 뒤 dynamic graph에 유지하고, 공유 page factory 주입으로 추가 요청도 제거했다.
+  // raw에는 약 0.2%, route gzip에는 약 0.16%의 작은 drift 여유만 다시 고정한다.
+  studio: { raw: 2_790_000, gzip: 912_000 },
   studioEntry: { raw: 1_284_000, gzip: 384_500 },
-  studioIncremental: { raw: 2_278_000, gzip: 755_000, chunks: 138 },
+  studioIncremental: { raw: 2_290_000, gzip: 755_000, chunks: 138 },
   // Rapier deterministic compat is intentionally isolated in a user-triggered module Worker.
   // 2026-07-18 production output: 2,302,139 raw / 855,399 gzip. Keep ~2% version-drift headroom
   // without charging this optional engine to Studio or the 3D editor's initial graph.

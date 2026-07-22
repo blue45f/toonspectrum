@@ -45,6 +45,7 @@ const WATERMARK = {
 function createHandlers(): StudioMenubarContentHandlers {
   return {
     applyStudioWorkspaceLayout: vi.fn(),
+    cancelInterchangeImport: vi.fn(),
     changeMobileImmersiveMode: vi.fn(),
     ensureWatermarkLoaded: vi.fn(() => WATERMARK),
     exportCurrentPageToPsd: vi.fn(async () => ({}) as never),
@@ -58,6 +59,7 @@ function createHandlers(): StudioMenubarContentHandlers {
     handleExportProjectArchive: vi.fn(async () => undefined),
     handleImportProject: vi.fn(),
     handleImportProjectArchive: vi.fn(async () => undefined),
+    handleImportInterchangeArchive: vi.fn(async () => undefined),
     handleImportPsd: vi.fn(async () => undefined),
     handleSave: vi.fn(async () => undefined),
     openAutoActions: vi.fn(async () => undefined),
@@ -105,6 +107,9 @@ function createProps(
     projectArchiveImportInputRef: { current: null },
     projectArchiveStatus: null,
     projectImportInputRef: { current: null },
+    interchangeImportBusy: false,
+    interchangeImportInputRef: { current: null },
+    interchangeImportStatus: null,
     psdImportBusy: false,
     psdImportInputRef: { current: null },
     psdImportStatus: null,
@@ -218,6 +223,50 @@ describe("StudioMenubarContent", () => {
 
     vi.runAllTimers();
     expect(setProjectActionsOpen).toHaveBeenCalledWith(false);
+  });
+
+  it("routes ORA/CBZ file selection and turns the busy control into an explicit cancel action", () => {
+    const stableHandlers = createHandlers();
+    const view = render(
+      <StudioMenubarContent
+        {...createProps({
+          projectActionsOpen: true,
+          stableHandlers,
+        })}
+      />
+    );
+
+    const input = screen.getByLabelText("OpenRaster 또는 CBZ 가져오기");
+    const archive = new File(["archive"], "episode.cbz", {
+      type: "application/vnd.comicbook+zip",
+    });
+    fireEvent.change(input, { target: { files: [archive] } });
+    expect(stableHandlers.handleImportInterchangeArchive).toHaveBeenCalledOnce();
+
+    view.rerender(
+      <StudioMenubarContent
+        {...createProps({
+          interchangeImportBusy: true,
+          projectActionsOpen: true,
+          stableHandlers,
+        })}
+      />
+    );
+    expect(screen.getByRole("button", { name: "PSD 가져오기" })).toHaveProperty("disabled", true);
+    fireEvent.click(screen.getByRole("button", { name: "문서 검사 취소" }));
+    expect(stableHandlers.cancelInterchangeImport).toHaveBeenCalledOnce();
+
+    view.rerender(
+      <StudioMenubarContent
+        {...createProps({
+          psdImportBusy: true,
+          projectActionsOpen: true,
+          stableHandlers,
+        })}
+      />
+    );
+    expect(screen.getByRole("button", { name: "ORA / CBZ 가져오기" }))
+      .toHaveProperty("disabled", true);
   });
 
   it("delegates mobile immersive and save actions without taking controller state", () => {

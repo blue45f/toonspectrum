@@ -13,6 +13,8 @@ import {
   parseStudioProjectFile,
   resetStudioAiProvenanceForRemix,
   serializeStudioProjectFile,
+  STUDIO_PROJECT_MAX_CANVAS_HEIGHT,
+  STUDIO_PROJECT_MAX_PAGES,
 } from "./studio-project-file";
 import { createStudioReferenceBoardDocument } from "./studio-reference-board";
 import {
@@ -155,6 +157,17 @@ describe("studio project file", () => {
       pagesList: [page],
       master: { elements: Array.from({ length: 10_001 }, (_, index) => ({ id: `m-${index}` })) },
     })).toThrow(/마스터 요소 수/);
+    expect(() => parseStudioProjectFile({
+      version: 2,
+      pagesList: Array.from({ length: STUDIO_PROJECT_MAX_PAGES + 1 }, (_, index) => ({
+        ...page,
+        id: `p-${index}`,
+      })),
+    })).toThrow(/프로젝트/);
+    expect(() => parseStudioProjectFile({
+      version: 2,
+      pagesList: [{ ...page, canvasH: STUDIO_PROJECT_MAX_CANVAS_HEIGHT + 1 }],
+    })).toThrow(/프로젝트/);
   });
 
   it("페이지와 마스터의 canonical 3D 배경 장면을 별도 메타데이터로 왕복한다", () => {

@@ -4,6 +4,7 @@ import {
   Clapperboard,
   ClipboardCheck,
   Download,
+  Files,
   Folder,
   GanttChartSquare,
   History as HistoryIcon,
@@ -156,6 +157,7 @@ const MENUBAR_HINTS = {
 
 export interface StudioMenubarContentHandlers {
   applyStudioWorkspaceLayout: (layout: StudioWorkspaceLayout) => void;
+  cancelInterchangeImport: () => void;
   changeMobileImmersiveMode: (enabled: boolean) => void;
   ensureWatermarkLoaded: () => WatermarkSettings;
   exportCurrentPageToPsd: () => Promise<PsdExportResult>;
@@ -171,6 +173,7 @@ export interface StudioMenubarContentHandlers {
   handleExportProjectArchive: () => Promise<void>;
   handleImportProject: (e: ChangeEvent<HTMLInputElement>) => void;
   handleImportProjectArchive: (e: ChangeEvent<HTMLInputElement>) => Promise<void>;
+  handleImportInterchangeArchive: (e: ChangeEvent<HTMLInputElement>) => Promise<void>;
   handleImportPsd: (e: ChangeEvent<HTMLInputElement>) => Promise<void>;
   handleSave: (status: "published" | "draft") => Promise<void>;
   openAutoActions: () => Promise<void>;
@@ -214,6 +217,9 @@ export interface StudioMenubarContentProps {
   projectArchiveImportInputRef: RefObject<HTMLInputElement | null>;
   projectArchiveStatus: { tone: "good" | "warn" | "bad"; text: string; } | null;
   projectImportInputRef: RefObject<HTMLInputElement | null>;
+  interchangeImportBusy: boolean;
+  interchangeImportInputRef: RefObject<HTMLInputElement | null>;
+  interchangeImportStatus: { tone: "good" | "warn" | "bad"; text: string; } | null;
   psdImportBusy: boolean;
   psdImportInputRef: RefObject<HTMLInputElement | null>;
   psdImportStatus: { tone: "good" | "warn"; text: string; } | null;
@@ -280,6 +286,9 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   projectArchiveImportInputRef,
   projectArchiveStatus,
   projectImportInputRef,
+  interchangeImportBusy,
+  interchangeImportInputRef,
+  interchangeImportStatus,
   psdImportBusy,
   psdImportInputRef,
   psdImportStatus,
@@ -315,6 +324,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
 }: StudioMenubarContentProps) {
   const {
     applyStudioWorkspaceLayout,
+    cancelInterchangeImport,
     changeMobileImmersiveMode,
     ensureWatermarkLoaded,
     handleCopyToClipboard,
@@ -324,6 +334,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     handleExportProjectArchive,
     handleImportProject,
     handleImportProjectArchive,
+    handleImportInterchangeArchive,
     handleImportPsd,
     handleSave,
     openAutoActions,
@@ -890,10 +901,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             type="button"
             data-project-keep-open
             onClick={() => psdImportInputRef.current?.click()}
-            disabled={psdImportBusy || collaborationDocumentLocked}
+            disabled={psdImportBusy || interchangeImportBusy || collaborationDocumentLocked}
             className={cn(
-              buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" }),
-              psdImportBusy && "cursor-wait opacity-60",
+              buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5" }),
+              (psdImportBusy || interchangeImportBusy) && "cursor-wait opacity-60",
               collaborationDocumentLocked && "cursor-not-allowed opacity-50"
             )}
             title={collaborationDocumentLocked ? collaborationLockMessage() : "포토샵(.psd) 파일의 레이어를 이미지 요소로 가져와요(래스터 평탄화, 편집 가능한 텍스트/조정 레이어는 재현되지 않음)"}
@@ -906,7 +917,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             type="file"
             accept=".psd,image/vnd.adobe.photoshop"
             className="hidden"
-            disabled={psdImportBusy || collaborationDocumentLocked}
+            disabled={psdImportBusy || interchangeImportBusy || collaborationDocumentLocked}
             onChange={(event) => void handleImportPsd(event)}
           />
           {psdImportStatus && (
@@ -920,6 +931,66 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               {psdImportStatus.text}
             </span>
           )}
+          <button
+            type="button"
+            data-project-keep-open
+            onClick={() => {
+              if (interchangeImportBusy) {
+                cancelInterchangeImport();
+                return;
+              }
+              interchangeImportInputRef.current?.click();
+            }}
+            disabled={psdImportBusy || collaborationDocumentLocked}
+            className={cn(
+              buttonClass({
+                size: "sm",
+                variant: "quiet",
+                className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5",
+              }),
+              interchangeImportBusy && "border-warn/30 bg-warn/10 text-warn",
+              psdImportBusy && "cursor-wait opacity-60",
+              collaborationDocumentLocked && "cursor-not-allowed opacity-50",
+            )}
+            title={
+              collaborationDocumentLocked
+                ? collaborationLockMessage()
+                : interchangeImportBusy
+                  ? "현재 OpenRaster/CBZ 안전 검사를 취소합니다."
+                  : psdImportBusy
+                    ? "PSD 문서 검사가 끝난 뒤 사용할 수 있습니다."
+                  : "OpenRaster 레이어 또는 CBZ 페이지를 안전 검사하고 손실 미리보기 후 가져옵니다."
+            }
+          >
+            {interchangeImportBusy
+              ? <X size={14} aria-hidden />
+              : <Files size={14} aria-hidden />}
+            {interchangeImportBusy ? "문서 검사 취소" : "ORA / CBZ 가져오기"}
+          </button>
+          <input
+            ref={interchangeImportInputRef}
+            type="file"
+            accept=".ora,.cbz,image/openraster,application/vnd.comicbook+zip"
+            className="hidden"
+            disabled={interchangeImportBusy || psdImportBusy || collaborationDocumentLocked}
+            aria-label="OpenRaster 또는 CBZ 가져오기"
+            onChange={(event) => void handleImportInterchangeArchive(event)}
+          />
+          {interchangeImportStatus ? (
+            <span
+              role="status"
+              className={cn(
+                "max-w-80 shrink-0 rounded-lg border px-2 py-1 text-[0.68rem] leading-relaxed",
+                interchangeImportStatus.tone === "good"
+                  ? "border-good/40 bg-good/10 text-good"
+                  : interchangeImportStatus.tone === "warn"
+                    ? "border-warn/40 bg-warn/10 text-warn"
+                    : "border-bad/40 bg-bad/10 text-bad",
+              )}
+            >
+              {interchangeImportStatus.text}
+            </span>
+          ) : null}
           {sharedDocument?.role === "owner" || loadedWork ? (
             <button
               type="button"

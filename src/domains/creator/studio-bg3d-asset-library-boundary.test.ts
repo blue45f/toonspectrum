@@ -47,7 +47,7 @@ describe("Studio BG3D asset-library ownership boundary", () => {
 
     expect(imports.valueImports).toEqual(["lucide-react", "react"]);
     expect(imports.typeImports).toEqual(["./bg3d-model-library"]);
-    expect(imports.dynamicImports).toEqual([]);
+    expect(imports.dynamicImports).toEqual(["./studio-bg3d-canonical-glb-download"]);
     expect([...imports.valueImports, ...imports.typeImports]).not.toContain("./StudioBackground3D");
     expect(imports.valueImports).not.toContain("three");
     expect(imports.valueImports.some((source) => source.startsWith("@react-three/"))).toBe(false);

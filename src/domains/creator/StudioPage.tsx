@@ -793,6 +793,7 @@ import {
   applyBackgroundToAllPages,
   applyGradeToAllPages,
   clearPage,
+  createBlankPage,
   duplicateMirroredPage,
   duplicatePageState,
   executeDeletePageTransition,
@@ -878,6 +879,8 @@ import {
   parseStudioProjectFile,
   resetStudioAiProvenanceForRemix,
   serializeStudioProjectFile,
+  STUDIO_PROJECT_MAX_CANVAS_HEIGHT,
+  STUDIO_PROJECT_MAX_PAGES,
   type StudioProjectFile,
 } from "./studio-project-file";
 import {
@@ -1260,6 +1263,10 @@ import type {
   StudioDialogueInterchangeDocument,
 } from "./studio-dialogue-interchange";
 import type {
+  PendingStudioInterchangeImport,
+  StudioInterchangeImportChoice,
+} from "./studio-document-interchange-commit";
+import type {
   DrawMode,
   DrawShapeKind,
   StudioMenu,
@@ -1362,6 +1369,12 @@ import { useSession } from "@/src/compat/auth-session-store";
 const LazyStudioMenubarContent = lazy(() =>
   import("./StudioMenubarContent").then(({ StudioMenubarContent }) => ({
     default: StudioMenubarContent,
+  }))
+);
+
+const LazyStudioInterchangeLossPreviewDialog = lazy(() =>
+  import("./StudioInterchangeLossPreviewDialog").then(({ StudioInterchangeLossPreviewDialog }) => ({
+    default: StudioInterchangeLossPreviewDialog,
   }))
 );
 
@@ -1614,6 +1627,20 @@ interface PendingBrushDelete {
   deleted: DeletedBrushRecord;
   expiresAt: number;
 }
+
+const STUDIO_INTERCHANGE_IMPORT_PLACEMENT_CHOICES = Object.freeze([
+  Object.freeze({
+    id: "new-page",
+    label: "새 페이지로 추가",
+    description: "현재 원고를 건드리지 않고 다음 페이지에 원본 크기와 레이어 순서를 적용합니다.",
+    recommended: true,
+  }),
+  Object.freeze({
+    id: "current-page",
+    label: "현재 페이지 위에 배치",
+    description: "현재 레이어를 유지한 채 가져온 레이어를 맨 위에 추가하고 필요한 경우 페이지 높이를 늘립니다.",
+  }),
+]);
 
 // 캔버스와 도구 패널 사이의 드래그 스플리터(데스크톱). 너비를 끌어서 조절, 더블클릭=기본값, ←/→=미세조절.
 
@@ -5815,6 +5842,21 @@ function StudioCuttoonEditor() {
   // psdStatus/svgStatus/pdfStatus와 동일한 { tone, text } 관례).
   const [psdImportBusy, setPsdImportBusy] = useState(false);
   const [psdImportStatus, setPsdImportStatus] = useState<{ tone: "good" | "warn"; text: string } | null>(null);
+  const [interchangeImportBusy, setInterchangeImportBusy] = useState(false);
+  const [interchangeImportStatus, setInterchangeImportStatus] = useState<{
+    tone: "good" | "warn" | "bad";
+    text: string;
+  } | null>(null);
+  const [pendingInterchangeImport, setPendingInterchangeImport] =
+    useState<PendingStudioInterchangeImport | null>(null);
+  const [interchangeImportChoice, setInterchangeImportChoice] =
+    useState<StudioInterchangeImportChoice>("new-page");
+  const interchangeImportAbortRef = useRef<AbortController | null>(null);
+  const documentImportEpochRef = useRef(0);
+  const documentImportOperationRef = useRef<{
+    readonly epoch: number;
+    readonly kind: "archive-apply" | "archive-inspect" | "psd-inspect";
+  } | null>(null);
   const [projectArchiveBusy, setProjectArchiveBusy] = useState(false);
   const [projectArchiveStatus, setProjectArchiveStatus] = useState<{
     tone: "good" | "warn" | "bad";
@@ -9451,7 +9493,15 @@ function StudioCuttoonEditor() {
   const editMenuImageInputRef = useRef<HTMLInputElement>(null);
   const projectImportInputRef = useRef<HTMLInputElement>(null);
   const projectArchiveImportInputRef = useRef<HTMLInputElement>(null);
+  const interchangeImportInputRef = useRef<HTMLInputElement>(null);
   const psdImportInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => () => {
+    documentImportEpochRef.current += 1;
+    documentImportOperationRef.current = null;
+    interchangeImportAbortRef.current?.abort();
+    interchangeImportAbortRef.current = null;
+  }, []);
 
   // 내보내기 옵션 팝오버 바깥 클릭시 닫기
   useEffect(() => {
@@ -12679,6 +12729,19 @@ function StudioCuttoonEditor() {
     targetPageId?: string
   ): boolean {
     if (!editorMountedRef.current) return false;
+    if (
+      extraPatch?.canvasH !== undefined &&
+      (
+        !Number.isFinite(extraPatch.canvasH) ||
+        extraPatch.canvasH <= 0 ||
+        extraPatch.canvasH > STUDIO_PROJECT_MAX_CANVAS_HEIGHT
+      )
+    ) {
+      setError(
+        `페이지 높이는 1–${STUDIO_PROJECT_MAX_CANVAS_HEIGHT.toLocaleString("ko-KR")}px 범위여야 저장할 수 있어요.`,
+      );
+      return false;
+    }
     if (documentSaveInFlightRef.current) {
       setError("저장 중에는 원고를 변경할 수 없어요. 저장이 끝난 뒤 다시 시도해 주세요.");
       return false;
@@ -13034,6 +13097,21 @@ function StudioCuttoonEditor() {
     } = {}
   ): boolean {
     if (!editorMountedRef.current) return false;
+    if (nextPages.length === 0 || nextPages.length > STUDIO_PROJECT_MAX_PAGES) {
+      setError(`프로젝트는 1–${STUDIO_PROJECT_MAX_PAGES}페이지 범위에서 편집할 수 있어요.`);
+      return false;
+    }
+    const invalidCanvasPage = nextPages.find((page) => (
+      !Number.isFinite(page.canvasH) ||
+      page.canvasH <= 0 ||
+      page.canvasH > STUDIO_PROJECT_MAX_CANVAS_HEIGHT
+    ));
+    if (invalidCanvasPage) {
+      setError(
+        `페이지 높이는 1–${STUDIO_PROJECT_MAX_CANVAS_HEIGHT.toLocaleString("ko-KR")}px 범위여야 저장할 수 있어요.`,
+      );
+      return false;
+    }
     if (documentSaveInFlightRef.current) {
       setError("저장 중에는 원고를 변경할 수 없어요. 저장이 끝난 뒤 다시 시도해 주세요.");
       return false;
@@ -23538,7 +23616,8 @@ function StudioCuttoonEditor() {
           collaborationDocumentLocked,
           hasWorkId: Boolean(workId),
           projectArchiveBusy,
-          psdImportBusy,
+          interchangeImportBusy: interchangeImportBusy || psdImportBusy,
+          psdImportBusy: psdImportBusy || interchangeImportBusy,
           edit: {
             undoDisabled: menuEditUndoDisabled,
             redoDisabled: menuEditRedoDisabled,
@@ -23611,6 +23690,7 @@ function StudioCuttoonEditor() {
             setExportMenuOpen(true);
           },
           requestProjectImport: () => projectImportInputRef.current?.click(),
+          requestInterchangeImport: () => interchangeImportInputRef.current?.click(),
           requestPsdImport: () => psdImportInputRef.current?.click(),
           openProjectTools: () => {
             setExportMenuOpen(false);
@@ -23700,6 +23780,7 @@ function StudioCuttoonEditor() {
       pageSequenceOpen,
       perspectiveRulerActive,
       projectArchiveBusy,
+      interchangeImportBusy,
       psdImportBusy,
       referencePanelOpen,
       rightPanelOpen,
@@ -25250,51 +25331,290 @@ function StudioCuttoonEditor() {
     }
   }
 
-  // PSD 레이어 가져오기 — ag-psd로 파싱해 레이어별 이미지 요소로 캔버스에 배치한다.
-  // "새 페이지로" vs "현재 페이지 맨 위에 얹기" 두 방식을 확인창 하나로 고른다 — handleDownloadAll의
-  // "확인=A/취소=B" confirm() 분기 관례를 그대로 따른다(전용 모달 컴포넌트를 새로 만들지 않는다).
+  function cancelInterchangeImport() {
+    documentImportEpochRef.current += 1;
+    const activeOperation = documentImportOperationRef.current;
+    if (activeOperation?.kind === "archive-inspect" || activeOperation?.kind === "archive-apply") {
+      documentImportOperationRef.current = null;
+    }
+    interchangeImportAbortRef.current?.abort();
+    interchangeImportAbortRef.current = null;
+    setInterchangeImportBusy(false);
+    setInterchangeImportStatus({ tone: "warn", text: "문서 안전 검사를 취소했어요." });
+  }
+
+  async function handleImportInterchangeArchive(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (
+      !file ||
+      interchangeImportBusy ||
+      psdImportBusy ||
+      documentImportOperationRef.current !== null
+    ) return;
+    const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+    if (extension !== ".ora" && extension !== ".cbz") {
+      setInterchangeImportStatus({
+        tone: "bad",
+        text: "이 경로에서는 OpenRaster(.ora) 또는 Comic Book ZIP(.cbz)만 가져올 수 있어요.",
+      });
+      return;
+    }
+
+    if (extension === ".cbz" && pages.length >= STUDIO_PROJECT_MAX_PAGES) {
+      setInterchangeImportStatus({
+        tone: "bad",
+        text: `프로젝트 저장 한도 ${STUDIO_PROJECT_MAX_PAGES}페이지에 도달했어요. 기존 페이지를 정리한 뒤 CBZ를 가져와 주세요.`,
+      });
+      return;
+    }
+
+    interchangeImportAbortRef.current?.abort();
+    const importEpoch = documentImportEpochRef.current + 1;
+    documentImportEpochRef.current = importEpoch;
+    documentImportOperationRef.current = { epoch: importEpoch, kind: "archive-inspect" };
+    const controller = new AbortController();
+    interchangeImportAbortRef.current = controller;
+    setInterchangeImportBusy(true);
+    setInterchangeImportStatus({
+      tone: "warn",
+      text: extension === ".ora"
+        ? "OpenRaster 구조·PNG·메모리 예산을 검사하는 중…"
+        : "CBZ 페이지 순서·이미지 header·메모리 예산을 검사하는 중…",
+    });
+    try {
+      const [
+        { studioDocumentImportDeviceProfile },
+        { inspectStudioDocumentInterchangeArchive },
+      ] = await Promise.all([
+        import("./studio-document-import-device-profile"),
+        import("./studio-document-interchange-commit"),
+      ]);
+      const deviceProfile = studioDocumentImportDeviceProfile(isMobile, pages.length);
+      const inspected = await inspectStudioDocumentInterchangeArchive(file, {
+        extension,
+        signal: controller.signal,
+        canvasWidth: CANVAS_W,
+        maxEmbeddedBytes: deviceProfile.maxEmbeddedBytes,
+        currentPageCount: pages.length,
+        canAddPage: pages.length < STUDIO_PROJECT_MAX_PAGES,
+        openRasterLimits: deviceProfile.openRasterLimits,
+        cbzLimits: deviceProfile.cbzLimits,
+      });
+      if (
+        controller.signal.aborted ||
+        interchangeImportAbortRef.current !== controller ||
+        documentImportEpochRef.current !== importEpoch
+      ) return;
+      setPendingInterchangeImport(inspected.pending);
+      setInterchangeImportChoice(inspected.choice);
+      setInterchangeImportStatus(inspected.status);
+      setProjectActionsOpen(false);
+    } catch (cause) {
+      if (controller.signal.aborted || documentImportEpochRef.current !== importEpoch) return;
+      const message = cause instanceof Error ? cause.message : "문서 파일을 안전하게 검사하지 못했어요.";
+      setInterchangeImportStatus({ tone: "bad", text: message });
+      setError(message);
+    } finally {
+      if (
+        interchangeImportAbortRef.current === controller &&
+        documentImportOperationRef.current?.kind === "archive-inspect" &&
+        documentImportOperationRef.current.epoch === importEpoch
+      ) {
+        documentImportOperationRef.current = null;
+        interchangeImportAbortRef.current = null;
+        setInterchangeImportBusy(false);
+      }
+    }
+  }
+
+  // PSD 레이어 가져오기 — ag-psd로 파싱한 뒤 공통 손실 미리보기에서 해상도·편집성·프로젝트
+  // 포함 예산과 새 페이지/현재 페이지 배치를 명시적으로 확인하고 적용한다.
   async function handleImportPsd(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file) return;
+    if (
+      !file ||
+      psdImportBusy ||
+      interchangeImportBusy ||
+      documentImportOperationRef.current !== null
+    ) return;
+    interchangeImportAbortRef.current?.abort();
+    interchangeImportAbortRef.current = null;
+    const importEpoch = documentImportEpochRef.current + 1;
+    documentImportEpochRef.current = importEpoch;
+    documentImportOperationRef.current = { epoch: importEpoch, kind: "psd-inspect" };
     const mutationTicket = captureStudioMutationTicket();
     setPsdImportBusy(true);
     setPsdImportStatus(null);
     try {
-      const { importPsdFile, psdImportResultMessage } = await loadStudioPsdImportModule();
+      const [
+        { importPsdFile, psdImportResultMessage },
+        { createStudioPsdImportLossPreview },
+        { studioDocumentImportDeviceProfile },
+      ] = await Promise.all([
+        loadStudioPsdImportModule(),
+        import("./studio-document-interchange-preview"),
+        import("./studio-document-import-device-profile"),
+      ]);
+      const deviceProfile = studioDocumentImportDeviceProfile(isMobile, pages.length);
       const result = await importPsdFile(file, CANVAS_W);
+      if (documentImportEpochRef.current !== importEpoch) return;
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (result.elements.length === 0) {
         setPsdImportStatus({ tone: "warn", text: psdImportResultMessage(result) });
         return;
       }
-      const asNewPage = globalThis.confirm(
-        `PSD에서 레이어 ${result.elements.length}개를 찾았어요.\n` +
-          `확인: 새 페이지로 추가 / 취소: 현재 페이지 맨 위에 얹기`
+      const preview = createStudioPsdImportLossPreview(file.name, result, {
+        canvasWidth: CANVAS_W,
+        maxEmbeddedBytes: deviceProfile.maxEmbeddedBytes,
+        currentPageCount: pages.length,
+      });
+      setPendingInterchangeImport({ kind: "psd", fileName: file.name, result, preview });
+      setInterchangeImportChoice(
+        pages.length >= STUDIO_PROJECT_MAX_PAGES ? "current-page" : "new-page",
       );
-      if (asNewPage) {
-        const targetH = Math.max(1, Math.round(result.sourceHeight * result.scale));
-        const idx = findPageIndexInPages(activePage.id) + 1;
-        const withPage = insertBlankPageAt(pages, idx, uid, targetH);
-        const finalPages = withPage.map((p, i) =>
-          i === idx ? { ...p, elements: result.elements as El[] } : p
-        );
-        commitPages(finalPages);
-        setCurrentPageId(withPage[idx].id);
-      } else {
-        commit([...elements, ...(result.elements as El[])]);
-      }
+      setProjectActionsOpen(false);
       setPsdImportStatus({
-        tone: result.skipped.length > 0 ? "warn" : "good",
-        text: psdImportResultMessage(result),
+        tone: "warn",
+        text: `${psdImportResultMessage(result)} · 적용 전 편집성 손실과 배치 방식을 확인해 주세요.`,
       });
     } catch (err) {
+      if (documentImportEpochRef.current !== importEpoch) return;
       setPsdImportStatus({
         tone: "warn",
         text: err instanceof Error ? err.message : "PSD 파일을 읽지 못했어요.",
       });
     } finally {
-      setPsdImportBusy(false);
+      if (
+        documentImportOperationRef.current?.kind === "psd-inspect" &&
+        documentImportOperationRef.current.epoch === importEpoch
+      ) {
+        documentImportOperationRef.current = null;
+        setPsdImportBusy(false);
+      }
+    }
+  }
+
+  function dismissPendingInterchangeImport() {
+    if (interchangeImportBusy) {
+      cancelInterchangeImport();
+      return;
+    }
+    setPendingInterchangeImport(null);
+  }
+
+  async function applyPendingInterchangeImport(selectedChoiceId?: string | null) {
+    const pending = pendingInterchangeImport;
+    if (
+      !pending ||
+      interchangeImportBusy ||
+      collaborationDocumentLocked ||
+      documentImportOperationRef.current !== null
+    ) return;
+    const applyChoice: StudioInterchangeImportChoice = selectedChoiceId === "current-page"
+      ? "current-page"
+      : selectedChoiceId === "new-page"
+        ? "new-page"
+        : interchangeImportChoice;
+    const anchorPageId = activePage.id;
+    if (
+      pending.kind !== "cbz" &&
+      applyChoice === "new-page" &&
+      pages.length >= STUDIO_PROJECT_MAX_PAGES
+    ) {
+      setInterchangeImportStatus({
+        tone: "bad",
+        text: `프로젝트 저장 한도 ${STUDIO_PROJECT_MAX_PAGES}페이지에 도달했어요. 현재 페이지 위에 배치하거나 기존 페이지를 정리해 주세요.`,
+      });
+      return;
+    }
+    if (
+      pending.kind === "cbz" &&
+      pages.length > STUDIO_PROJECT_MAX_PAGES - pending.result.pages.length
+    ) {
+      setInterchangeImportStatus({
+        tone: "bad",
+        text: `CBZ를 추가하면 프로젝트 저장 한도 ${STUDIO_PROJECT_MAX_PAGES}페이지를 넘습니다. 파일을 나누거나 기존 페이지를 정리해 주세요.`,
+      });
+      return;
+    }
+    if (applyChoice === "current-page" && activePageMutationLocked) {
+      setInterchangeImportStatus({
+        tone: "bad",
+        text: "현재 페이지가 검토 잠금 상태라 레이어를 추가할 수 없어요. 새 페이지로 가져와 주세요.",
+      });
+      return;
+    }
+
+    interchangeImportAbortRef.current?.abort();
+    const applyEpoch = documentImportEpochRef.current + 1;
+    documentImportEpochRef.current = applyEpoch;
+    documentImportOperationRef.current = { epoch: applyEpoch, kind: "archive-apply" };
+    const controller = new AbortController();
+    interchangeImportAbortRef.current = controller;
+    const mutationTicket = captureStudioMutationTicket();
+    setInterchangeImportBusy(true);
+    setInterchangeImportStatus({ tone: "warn", text: "검증된 이미지와 레이어를 문서에 적용하는 중…" });
+    const commitImportedPages = (nextPages: PageState[]): boolean => {
+      if (commitPages(nextPages)) return true;
+      setInterchangeImportStatus({
+        tone: "bad",
+        text: "적용 직전에 문서 상태가 바뀌어 가져오기를 멈췄어요. 손실 확인 창에서 다시 시도해 주세요.",
+      });
+      return false;
+    };
+    const canCommitImport = (): boolean => {
+      if (canApplyStudioMutation(mutationTicket)) return true;
+      setInterchangeImportStatus({
+        tone: "bad",
+        text: "검사하는 동안 다른 편집이 반영되어 가져오기를 멈췄어요. 최신 문서에서 다시 시도해 주세요.",
+      });
+      return false;
+    };
+    try {
+      const [
+        { prepareStudioDocumentInterchangeCommit },
+        { studioDocumentImportDeviceProfile },
+      ] = await Promise.all([
+        import("./studio-document-interchange-commit"),
+        import("./studio-document-import-device-profile"),
+      ]);
+      const deviceProfile = studioDocumentImportDeviceProfile(isMobile, pages.length);
+      const draft = await prepareStudioDocumentInterchangeCommit(pending, {
+        pages,
+        anchorPageId,
+        choice: applyChoice,
+        canvasWidth: CANVAS_W,
+        createId: uid,
+        createBlankPage: (createId, canvasHeight) => (
+          createBlankPage(createId, canvasHeight) as PageState
+        ),
+        maxEmbeddedBytes: deviceProfile.maxEmbeddedBytes,
+        signal: controller.signal,
+      });
+      if (!canCommitImport()) return;
+      if (!commitImportedPages(draft.pages)) return;
+      if (draft.selectedPageId) setCurrentPageId(draft.selectedPageId);
+      setInterchangeImportStatus(draft.status);
+      if (draft.psdStatus) setPsdImportStatus(draft.psdStatus);
+      setPendingInterchangeImport(null);
+      setError(null);
+    } catch (cause) {
+      if (controller.signal.aborted) return;
+      const message = cause instanceof Error ? cause.message : "문서 가져오기를 적용하지 못했어요.";
+      setInterchangeImportStatus({ tone: "bad", text: message });
+      setError(message);
+    } finally {
+      if (
+        interchangeImportAbortRef.current === controller &&
+        documentImportOperationRef.current?.kind === "archive-apply" &&
+        documentImportOperationRef.current.epoch === applyEpoch
+      ) {
+        documentImportOperationRef.current = null;
+        interchangeImportAbortRef.current = null;
+        setInterchangeImportBusy(false);
+      }
     }
   }
 
@@ -25588,6 +25908,7 @@ function StudioCuttoonEditor() {
 
   const studioMenubarContentHandlers = useStudioStableHandlers<StudioMenubarContentHandlers>({
     applyStudioWorkspaceLayout,
+    cancelInterchangeImport,
     changeMobileImmersiveMode,
     ensureWatermarkLoaded,
     handleCopyToClipboard,
@@ -25597,6 +25918,7 @@ function StudioCuttoonEditor() {
     handleExportProjectArchive,
     handleImportProject,
     handleImportProjectArchive,
+    handleImportInterchangeArchive,
     handleImportPsd,
     handleSave,
     openAutoActions,
@@ -26145,6 +26467,46 @@ function StudioCuttoonEditor() {
       aria-label="편집 메뉴에서 이미지 파일 붙여넣기"
       onChange={onPickImage}
     />
+    {pendingInterchangeImport ? (
+      <Suspense fallback={null}>
+        <LazyStudioInterchangeLossPreviewDialog
+          open
+          preview={pendingInterchangeImport.preview}
+          busy={interchangeImportBusy}
+          confirmLabel={
+            pendingInterchangeImport.kind === "cbz"
+              ? `${pendingInterchangeImport.result.pages.length}페이지 추가`
+              : "선택한 위치로 가져오기"
+          }
+          choices={
+            pendingInterchangeImport.kind === "cbz"
+              ? undefined
+              : STUDIO_INTERCHANGE_IMPORT_PLACEMENT_CHOICES.map((choice) =>
+                  choice.id === "new-page" && pages.length >= STUDIO_PROJECT_MAX_PAGES
+                    ? {
+                        ...choice,
+                        disabled: true,
+                        description: `프로젝트 저장 한도 ${STUDIO_PROJECT_MAX_PAGES}페이지에 도달해 현재 페이지 배치만 사용할 수 있습니다.`,
+                      }
+                    : choice
+                )
+          }
+          selectedChoiceId={
+            pendingInterchangeImport.kind === "cbz" ? undefined : interchangeImportChoice
+          }
+          onSelectedChoiceChange={(choiceId) => {
+            if (
+              choiceId === "current-page" ||
+              (choiceId === "new-page" && pages.length < STUDIO_PROJECT_MAX_PAGES)
+            ) {
+              setInterchangeImportChoice(choiceId);
+            }
+          }}
+          onConfirm={(choiceId) => void applyPendingInterchangeImport(choiceId)}
+          onCancel={dismissPendingInterchangeImport}
+        />
+      </Suspense>
+    ) : null}
     {pendingBrushDelete ? (
       <div
         ref={brushUndoToastRef}
@@ -26241,6 +26603,9 @@ function StudioCuttoonEditor() {
           projectArchiveImportInputRef={projectArchiveImportInputRef}
           projectArchiveStatus={projectArchiveStatus}
           projectImportInputRef={projectImportInputRef}
+          interchangeImportBusy={interchangeImportBusy}
+          interchangeImportInputRef={interchangeImportInputRef}
+          interchangeImportStatus={interchangeImportStatus}
           psdImportBusy={psdImportBusy}
           psdImportInputRef={psdImportInputRef}
           psdImportStatus={psdImportStatus}

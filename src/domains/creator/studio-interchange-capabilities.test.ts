@@ -54,6 +54,43 @@ describe("Studio interchange capability registry", () => {
     }
   });
 
+  it("ORA와 CBZ import는 실제 UI 계약과 fail-closed ZIP 경계를 공개한다", () => {
+    const ora = studioInterchangeCapability("ora")!;
+    expect(ora).toMatchObject({
+      import: "available",
+      export: "available",
+      roundTrip: "partial",
+      status: "partial",
+    });
+    expect(ora.lossModel.join(" ")).toContain("단일 그룹");
+    expect(ora.notes.join(" ")).toContain("좌표");
+    expect(ora.notes.join(" ")).toContain("opacity/visibility");
+    expect(ora.runtimeRequirement.join(" ")).toContain("PNG IHDR");
+
+    const cbz = studioInterchangeCapability("cbz")!;
+    expect(cbz).toMatchObject({
+      import: "available",
+      export: "available",
+      roundTrip: "none",
+      status: "partial",
+    });
+    expect(cbz.notes.join(" ")).toContain("PNG/JPEG/WebP/GIF");
+    expect(cbz.notes.join(" ")).toContain("natural order");
+    expect(cbz.notes.join(" ")).toContain("ComicInfo.xml");
+    expect(cbz.sizeBudget.maxItems).toBe(200);
+
+    for (const capability of [ora, cbz]) {
+      const contract = [...capability.runtimeRequirement, ...capability.notes].join(" ");
+      expect(contract).toContain("STORE/DEFLATE");
+      expect(contract).toContain("ZIP64");
+      expect(contract).toContain("암호화");
+      expect(contract).toContain("data descriptor");
+      expect(contract).toContain("legacy non-UTF-8");
+      expect(contract).toContain("공통 손실 미리보기");
+      expect(capability.sizeBudget.notes).toContain("모바일 64MiB/데스크톱 128MiB");
+    }
+  });
+
   it("공개 래스터 codec과 1,280px 표시 프록시 손실을 실제 UI 상태로 기록한다", () => {
     for (const id of ["bmp", "tga", "netpbm", "qoi", "tiff"]) {
       const capability = studioInterchangeCapability(id);
@@ -131,7 +168,15 @@ describe("Studio interchange capability registry", () => {
       maxDecodedBytes: 128 * 1024 * 1024,
       maxDimensionPx: 32_768,
       maxFiles: 516,
+      maxItems: 500,
     });
     expect(studioInterchangeCapability("ora")?.sizeBudget.notes).toContain("16,777,216픽셀");
+    expect(studioInterchangeCapability("cbz")?.sizeBudget).toMatchObject({
+      maxFileBytes: 520_000_000,
+      maxDecodedBytes: 512 * 1024 * 1024,
+      maxDimensionPx: 131_072,
+      maxFiles: 1_163,
+      maxItems: 200,
+    });
   });
 });

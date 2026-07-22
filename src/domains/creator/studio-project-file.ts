@@ -21,6 +21,10 @@ import {
 
 const STUDIO_PROJECT_MAX_ELEMENTS_PER_PAGE_OR_MASTER = 10_000;
 
+/** Canonical limits shared by Studio mutation paths and the persisted project schema. */
+export const STUDIO_PROJECT_MAX_PAGES = 200;
+export const STUDIO_PROJECT_MAX_CANVAS_HEIGHT = 100_000;
+
 const OptionalAiProvenanceSchema = z
   .unknown()
   .optional()
@@ -34,7 +38,7 @@ const ProjectPageSchema = z
     elements: z.array(z.unknown()).max(10_000),
     bg: z.string(),
     bgGrad: z.array(z.string()).nullable(),
-    canvasH: z.number().finite().positive().max(100_000),
+    canvasH: z.number().finite().positive().max(STUDIO_PROJECT_MAX_CANVAS_HEIGHT),
   })
   .passthrough();
 
@@ -62,14 +66,14 @@ const CommonProjectSchema = z.object({
 const ProjectV2Schema = CommonProjectSchema.extend({
   version: z.literal(2),
   savedAt: z.string().optional(),
-  pagesList: z.array(ProjectPageSchema).min(1).max(200),
+  pagesList: z.array(ProjectPageSchema).min(1).max(STUDIO_PROJECT_MAX_PAGES),
 }).passthrough();
 
 const LegacyProjectSchema = z
   .object({
     version: z.union([z.literal("1.0"), z.literal(1)]).optional(),
     title: z.string().max(200).default(""),
-    pages: z.array(ProjectPageSchema).min(1).max(200),
+    pages: z.array(ProjectPageSchema).min(1).max(STUDIO_PROJECT_MAX_PAGES),
     master: z.unknown().optional(),
     writerRoom: z.unknown().optional(),
     aiProvenance: OptionalAiProvenanceSchema,

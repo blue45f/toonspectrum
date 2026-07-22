@@ -98,6 +98,7 @@ export interface StudioMainMenuBuilderState {
   collaborationDocumentLocked: boolean;
   hasWorkId: boolean;
   projectArchiveBusy: boolean;
+  interchangeImportBusy: boolean;
   psdImportBusy: boolean;
   edit: StudioMainMenuEditAvailability;
   filterDisabled: boolean;
@@ -160,6 +161,7 @@ export interface StudioMainMenuEditorActions {
 export interface StudioMainMenuUiActions {
   openExportDownload: () => unknown;
   requestProjectImport: () => unknown;
+  requestInterchangeImport: () => unknown;
   requestPsdImport: () => unknown;
   openProjectTools: () => unknown;
   toggleHistoryPanel: () => unknown;
@@ -274,9 +276,18 @@ export function buildStudioMainMenuGroups({
           label: "PSD 가져오기…",
           icon: FileUp,
           disabled: state.psdImportBusy || state.collaborationDocumentLocked,
-          separatorAfter: true,
           onSelect: () => {
             ui.requestPsdImport();
+          },
+        },
+        {
+          id: "import-ora-cbz",
+          label: "ORA / CBZ 가져오기…",
+          icon: Package,
+          disabled: state.interchangeImportBusy || state.collaborationDocumentLocked,
+          separatorAfter: true,
+          onSelect: () => {
+            ui.requestInterchangeImport();
           },
         },
         {

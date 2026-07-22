@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   ChevronDown,
+  Download,
   Loader2,
   PackageOpen,
   Search,
@@ -9,7 +10,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import type { Bg3dModelImportItem, Bg3dModelLibraryEntry } from "./bg3d-model-library";
 
@@ -23,6 +24,11 @@ const CONTROL_BUTTON =
 type AssetFilter = "all" | "usable" | "review";
 type ImportRights = NonNullable<Bg3dModelImportItem["rights"]>;
 type ImportRightsStatus = NonNullable<ImportRights["status"]>;
+type DownloadFeedback = {
+  readonly modelId: string;
+  readonly tone: "error" | "notice" | "success";
+  readonly message: string;
+};
 
 const ASSET_FILTERS: ReadonlyArray<{ id: AssetFilter; label: string }> = [
   { id: "all", label: "전체" },
@@ -83,7 +89,77 @@ export function StudioBg3dAssetLibraryPanel({
   const [attributionRequired, setAttributionRequired] = useState(false);
   const [licenseName, setLicenseName] = useState("");
   const [attribution, setAttribution] = useState("");
+  const [exportingModelId, setExportingModelId] = useState<string | null>(null);
+  const [downloadFeedback, setDownloadFeedback] = useState<DownloadFeedback | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const downloadOperationRef = useRef<{
+    readonly controller: AbortController;
+    readonly modelId: string;
+    readonly revision: number;
+  } | null>(null);
+  const downloadRevisionRef = useRef(0);
+
+  useEffect(() => () => {
+    downloadRevisionRef.current += 1;
+    downloadOperationRef.current?.controller.abort("asset-panel-unmounted");
+    downloadOperationRef.current = null;
+  }, []);
+
+  const downloadCanonicalGlb = async (entry: Bg3dModelLibraryEntry): Promise<void> => {
+    const activeOperation = downloadOperationRef.current;
+    if (activeOperation) {
+      if (activeOperation.modelId === entry.id) activeOperation.controller.abort("user-cancelled");
+      return;
+    }
+    if (
+      entry.source !== "indexed-db" ||
+      entry.status !== "verified" ||
+      !entry.canUse ||
+      !entry.contentHash ||
+      entry.byteSize === null
+    ) return;
+
+    const controller = new AbortController();
+    const revision = downloadRevisionRef.current + 1;
+    downloadRevisionRef.current = revision;
+    downloadOperationRef.current = { controller, modelId: entry.id, revision };
+    setExportingModelId(entry.id);
+    setDownloadFeedback(null);
+    let runtime: typeof import("./studio-bg3d-canonical-glb-download") | null = null;
+    try {
+      runtime = await import("./studio-bg3d-canonical-glb-download");
+      const result = await runtime.downloadCanonicalStudioBg3dGlb({
+        storageId: entry.id,
+        expectedContentHash: entry.contentHash,
+        expectedByteSize: entry.byteSize,
+        expectedName: entry.name,
+      }, { signal: controller.signal });
+      if (downloadOperationRef.current?.revision !== revision) return;
+      setDownloadFeedback({
+        modelId: entry.id,
+        tone: "success",
+        message: `${result.fileName} 저장을 시작했습니다.`,
+      });
+    } catch (cause) {
+      if (downloadOperationRef.current?.revision !== revision) return;
+      const isKnownError = runtime && cause instanceof runtime.StudioBg3dCanonicalGlbDownloadError;
+      const cancelled = isKnownError && cause.code === "aborted";
+      setDownloadFeedback({
+        modelId: entry.id,
+        tone: cancelled ? "notice" : "error",
+        message: cancelled
+          ? "정규화 GLB 저장을 취소했습니다."
+          : isKnownError
+            ? cause.message
+            : "정규화 GLB를 저장하지 못했습니다. 라이브러리를 새로고침한 뒤 다시 시도해 주세요.",
+      });
+    } finally {
+      if (downloadOperationRef.current?.revision === revision) {
+        downloadOperationRef.current = null;
+        setExportingModelId(null);
+      }
+    }
+  };
 
   const trimmedLicenseName = licenseName.trim();
   const trimmedAttribution = attribution.trim();
@@ -111,7 +187,10 @@ export function StudioBg3dAssetLibraryPanel({
   const hiddenEntryCount = Math.max(0, filteredEntries.length - visibleEntries.length);
 
   return (
-    <section aria-labelledby="bg3d-asset-library-title" aria-busy={libraryStatus === "loading" || isUploading}>
+    <section
+      aria-labelledby="bg3d-asset-library-title"
+      aria-busy={libraryStatus === "loading" || isUploading || exportingModelId !== null}
+    >
       <div className="mb-2 flex items-center justify-between gap-3">
         <h3 id="bg3d-asset-library-title" className="flex items-center gap-1.5 text-sm font-bold text-fg">
           <PackageOpen size={15} className="text-accent" aria-hidden />
@@ -250,7 +329,33 @@ export function StudioBg3dAssetLibraryPanel({
         삼각형/텍스처 예산을 검사한 뒤 로컬 라이브러리에 저장합니다. Meshopt 압축은 별도 WASM
         Worker에서 풀며 디코딩 후 메모리도 같은 기기 예산으로 제한합니다. KTX2/Basis 텍스처는
         전체 mip 선행 검사 뒤 현재 3D 렌더러에 맞는 형식으로 변환합니다.
+        카드의 GLB 저장은 원본 FBX·OBJ를 확장자만 바꾸는 기능이 아니라, 로컬에서 검증·정규화한
+        자체 포함 GLB를 저장 직전에 다시 검사해 내려받는 기능입니다.
       </p>
+
+      {downloadFeedback ? (
+        <p
+          className={cx(
+            "mt-2 flex items-start gap-2 rounded-xl border px-3 py-2 text-xs leading-relaxed",
+            downloadFeedback.tone === "error"
+              ? "border-bad/35 bg-bad/10 text-bad"
+              : downloadFeedback.tone === "success"
+                ? "border-good/35 bg-good/10 text-good"
+                : "border-line bg-card text-fg-2",
+          )}
+          role={downloadFeedback.tone === "error" ? "alert" : "status"}
+          aria-live={downloadFeedback.tone === "error" ? "assertive" : "polite"}
+        >
+          {downloadFeedback.tone === "error" ? (
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden />
+          ) : (
+            <Download size={14} className="mt-0.5 shrink-0" aria-hidden />
+          )}
+          <span className="min-w-0 break-words [overflow-wrap:anywhere]">
+            {downloadFeedback.message}
+          </span>
+        </p>
+      ) : null}
 
       {libraryStatus === "error" ? (
         <p className="mt-2 rounded-xl border border-line bg-card/70 px-3 py-2 text-xs leading-relaxed text-fg-3" role="alert">
@@ -318,14 +423,23 @@ export function StudioBg3dAssetLibraryPanel({
 
         {visibleEntries.map((entry) => {
           const isDeleting = deletingModelId === entry.id;
+          const isExporting = exportingModelId === entry.id;
+          const canDownloadCanonicalGlb = entry.source === "indexed-db"
+            && entry.status === "verified"
+            && entry.canUse
+            && entry.contentHash !== null
+            && entry.byteSize !== null;
           return (
-            <div key={entry.id} className="relative overflow-hidden rounded-xl border border-line bg-card transition-colors hover:bg-raised">
+            <div
+              key={entry.id}
+              className="relative overflow-hidden rounded-xl border border-line bg-card transition-colors hover:bg-raised"
+            >
               <button
                 type="button"
                 aria-label={`${entry.name} 장면에 추가`}
                 aria-describedby={`bg3d-model-status-${entry.id}`}
                 className="grid min-h-[7.75rem] w-full grid-rows-[3rem_auto] gap-2 px-2.5 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-55"
-                disabled={!entry.canUse || isDeleting || isUploading || isRestoringScene}
+                disabled={!entry.canUse || isDeleting || isExporting || isUploading || isRestoringScene}
                 onClick={() => onAdd(entry.id)}
               >
                 <span className="grid h-12 place-items-center overflow-hidden rounded-lg border border-line/80 bg-panel">
@@ -359,18 +473,49 @@ export function StudioBg3dAssetLibraryPanel({
               </button>
 
               {entry.source === "indexed-db" ? (
-                <button
-                  type="button"
-                  aria-label={`${entry.name} 삭제`}
-                  className="absolute right-1.5 top-1.5 grid size-11 place-items-center rounded-lg border border-line bg-panel/90 text-fg-3 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-45 sm:size-7"
-                  disabled={isDeleting}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onDelete(entry.id);
-                  }}
-                >
-                  {isDeleting ? <Loader2 className="animate-spin" size={13} aria-hidden /> : <Trash2 size={13} aria-hidden />}
-                </button>
+                <div className="grid grid-cols-2 gap-1.5 border-t border-line/80 bg-panel/45 p-1.5">
+                  <button
+                    type="button"
+                    aria-label={isExporting
+                      ? `${entry.name} 정규화 GLB 저장 취소`
+                      : `${entry.name} 정규화 GLB 저장`}
+                    aria-describedby={`bg3d-model-status-${entry.id}`}
+                    className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-1.5 text-[0.64rem] font-bold text-fg-2 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-8"
+                    disabled={
+                      !canDownloadCanonicalGlb ||
+                      isDeleting ||
+                      (exportingModelId !== null && !isExporting)
+                    }
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void downloadCanonicalGlb(entry);
+                    }}
+                  >
+                    {isExporting ? (
+                      <Loader2 className="shrink-0 animate-spin motion-reduce:animate-none" size={13} aria-hidden />
+                    ) : (
+                      <Download className="shrink-0" size={13} aria-hidden />
+                    )}
+                    <span className="truncate">{isExporting ? "취소" : "GLB 저장"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`${entry.name} 삭제`}
+                    className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-1.5 text-[0.64rem] font-bold text-fg-3 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-8"
+                    disabled={isDeleting || isExporting}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDelete(entry.id);
+                    }}
+                  >
+                    {isDeleting ? (
+                      <Loader2 className="shrink-0 animate-spin motion-reduce:animate-none" size={13} aria-hidden />
+                    ) : (
+                      <Trash2 className="shrink-0" size={13} aria-hidden />
+                    )}
+                    <span className="truncate">{isDeleting ? "삭제 중" : "삭제"}</span>
+                  </button>
+                </div>
               ) : null}
             </div>
           );

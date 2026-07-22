@@ -34,6 +34,7 @@ const BASE_STATE: StudioMainMenuBuilderState = {
   collaborationDocumentLocked: false,
   hasWorkId: false,
   projectArchiveBusy: false,
+  interchangeImportBusy: false,
   psdImportBusy: false,
   edit: AVAILABLE_EDIT_ACTIONS,
   filterDisabled: false,
@@ -96,6 +97,7 @@ function createUiActions(): StudioMainMenuUiActions {
   return {
     openExportDownload: vi.fn(),
     requestProjectImport: vi.fn(),
+    requestInterchangeImport: vi.fn(),
     requestPsdImport: vi.fn(),
     openProjectTools: vi.fn(),
     toggleHistoryPanel: vi.fn(),
@@ -173,6 +175,7 @@ describe("buildStudioMainMenuGroups", () => {
         "export-archive",
         "import-json",
         "import-psd",
+        "import-ora-cbz",
         "project",
       ],
       [
@@ -263,6 +266,7 @@ describe("buildStudioMainMenuGroups", () => {
       collaborationDocumentLocked: true,
       hasWorkId: true,
       projectArchiveBusy: true,
+      interchangeImportBusy: true,
       psdImportBusy: true,
       edit: Object.fromEntries(
         Object.keys(AVAILABLE_EDIT_ACTIONS).map((key) => [key, true]),
@@ -293,6 +297,7 @@ describe("buildStudioMainMenuGroups", () => {
     });
     expect(menuItem(groups, "file", "export-archive").disabled).toBe(true);
     expect(menuItem(groups, "file", "import-psd").disabled).toBe(true);
+    expect(menuItem(groups, "file", "import-ora-cbz").disabled).toBe(true);
     expect(menuItem(groups, "insert", "page").disabled).toBe(true);
 
     for (const itemId of [
@@ -372,6 +377,8 @@ describe("buildStudioMainMenuGroups", () => {
     menuItem(groups, "file", "save-draft").onSelect();
     menuItem(groups, "file", "publish").onSelect();
     menuItem(groups, "file", "import-json").onSelect();
+    menuItem(groups, "file", "import-psd").onSelect();
+    menuItem(groups, "file", "import-ora-cbz").onSelect();
     menuItem(groups, "edit", "paste").onSelect();
     menuItem(groups, "edit", "paste-in-place").onSelect();
     menuItem(groups, "edit", "bring-forward").onSelect();
@@ -389,6 +396,8 @@ describe("buildStudioMainMenuGroups", () => {
     expect(editor.save).toHaveBeenNthCalledWith(1, "draft");
     expect(editor.save).toHaveBeenNthCalledWith(2, "published");
     expect(ui.requestProjectImport).toHaveBeenCalledOnce();
+    expect(ui.requestPsdImport).toHaveBeenCalledOnce();
+    expect(ui.requestInterchangeImport).toHaveBeenCalledOnce();
     expect(editor.pasteElements).toHaveBeenNthCalledWith(1, "cascade");
     expect(editor.pasteElements).toHaveBeenNthCalledWith(2, "in-place");
     expect(editor.reorder).toHaveBeenCalledWith("forward");

@@ -1,3 +1,4 @@
+import { STUDIO_PROJECT_MAX_PAGES } from "./studio-project-file";
 import { STUDIO_TEAM_ROLES, type StudioTeamRole } from "./studio-team-client";
 
 import { api, isHttpError, toApiError } from "@/src/infrastructure/api";
@@ -9,7 +10,6 @@ const MAX_TITLE_LENGTH = 120;
 const MAX_DESCRIPTION_LENGTH = 2_000;
 const MAX_TAG_LENGTH = 24;
 const MAX_TAGS = 8;
-const MAX_PAGES = 200;
 const POSTGRES_BIGINT_MAX = BigInt("9223372036854775807");
 
 const SHARED_DOCUMENT_MUTABLE_FIELDS = [
@@ -298,7 +298,7 @@ function normalizeDocumentContent(value: unknown): StudioSharedDocumentContent {
   const challengeId = nullableId(value.challengeId);
   const remixFromId = nullableId(value.remixFromId);
   const tags = stringArray(value.tags, MAX_TAGS, MAX_TAG_LENGTH);
-  const pages = stringArray(value.pages, MAX_PAGES);
+  const pages = stringArray(value.pages, STUDIO_PROJECT_MAX_PAGES);
   const doc = documentRecord(value.doc);
   const episodeNo =
     value.episodeNo === null
@@ -474,7 +474,7 @@ export function normalizeStudioSharedDocumentPatch(
     result.cover = value.cover;
   }
   if (hasOwn(value, "pages")) {
-    const pages = stringArray(value.pages, MAX_PAGES);
+    const pages = stringArray(value.pages, STUDIO_PROJECT_MAX_PAGES);
     if (!pages) inputError("공동 문서 페이지가 올바르지 않습니다.");
     result.pages = pages;
   }

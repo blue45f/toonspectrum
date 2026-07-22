@@ -1,12 +1,27 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioBg3dAssetLibraryPanel } from "./StudioBg3dAssetLibraryPanel";
 
 import type { Bg3dModelLibraryEntry } from "./bg3d-model-library";
 import type { ComponentProps } from "react";
+
+const downloadCanonicalStudioBg3dGlb = vi.hoisted(() => vi.fn());
+
+vi.mock("./studio-bg3d-canonical-glb-download", () => {
+  class MockDownloadError extends Error {
+    constructor(readonly code: string) {
+      super(code === "aborted" ? "정규화 GLB 저장을 취소했습니다." : "정규화 GLB 저장 실패");
+      this.name = "StudioBg3dCanonicalGlbDownloadError";
+    }
+  }
+  return {
+    downloadCanonicalStudioBg3dGlb,
+    StudioBg3dCanonicalGlbDownloadError: MockDownloadError,
+  };
+});
 
 type PanelProps = ComponentProps<typeof StudioBg3dAssetLibraryPanel>;
 
@@ -57,6 +72,7 @@ function renderPanel(overrides: Partial<PanelProps> = {}) {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  downloadCanonicalStudioBg3dGlb.mockReset();
 });
 
 describe("StudioBg3dAssetLibraryPanel", () => {
@@ -245,6 +261,92 @@ describe("StudioBg3dAssetLibraryPanel", () => {
     expect(onOuterClick).toHaveBeenCalledOnce();
   });
 
+  it("exports only a verified canonical GLB entry and keeps card mutations locked until it settles", async () => {
+    const contentHash = `sha256:${"a".repeat(64)}` as const;
+    let settle!: (value: { fileName: string; contentHash: string; byteSize: number }) => void;
+    downloadCanonicalStudioBg3dGlb.mockImplementation(() => new Promise((resolve) => {
+      settle = resolve;
+    }));
+    const entry = createEntry("canonical", "검증 거리 배경", {
+      contentHash,
+      byteSize: 4_096,
+    });
+    const { container } = renderPanel({ entries: [entry] });
+
+    const save = screen.getByRole("button", { name: "검증 거리 배경 정규화 GLB 저장" });
+    expect(save).toHaveProperty("disabled", false);
+    fireEvent.click(save);
+
+    await waitFor(() => expect(downloadCanonicalStudioBg3dGlb).toHaveBeenCalledWith({
+      storageId: "canonical",
+      expectedContentHash: contentHash,
+      expectedByteSize: 4_096,
+      expectedName: "검증 거리 배경",
+    }, { signal: expect.any(AbortSignal) }));
+    expect(container.querySelector("section")?.getAttribute("aria-busy")).toBe("true");
+    expect(screen.getByRole("button", { name: "검증 거리 배경 장면에 추가" }))
+      .toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "검증 거리 배경 삭제" }))
+      .toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "검증 거리 배경 정규화 GLB 저장 취소" }))
+      .toHaveProperty("disabled", false);
+
+    await act(async () => settle({
+      fileName: "검증 거리 배경.glb",
+      contentHash,
+      byteSize: 4_096,
+    }));
+
+    await waitFor(() => expect(screen.getByRole("status").textContent)
+      .toContain("검증 거리 배경.glb 저장을 시작했습니다."));
+    expect(container.querySelector("section")?.getAttribute("aria-busy")).toBe("false");
+    expect(screen.getByRole("button", { name: "검증 거리 배경 정규화 GLB 저장" }))
+      .toHaveProperty("disabled", false);
+  });
+
+  it("shows but disables canonical download for legacy or identity-incomplete local records", () => {
+    renderPanel({
+      entries: [
+        createEntry("legacy", "기존 OBJ", {
+          format: "obj",
+          status: "legacy-reimport-required",
+          canUse: false,
+          contentHash: null,
+        }),
+        createEntry("missing-hash", "해시 누락 GLB", { contentHash: null }),
+      ],
+    });
+
+    expect(screen.getByRole("button", { name: "기존 OBJ 정규화 GLB 저장" }))
+      .toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "해시 누락 GLB 정규화 GLB 저장" }))
+      .toHaveProperty("disabled", true);
+    fireEvent.click(screen.getByRole("button", { name: "기존 OBJ 정규화 GLB 저장" }));
+    expect(downloadCanonicalStudioBg3dGlb).not.toHaveBeenCalled();
+    expect(screen.getByText(/원본 FBX·OBJ를 확장자만 바꾸는 기능이 아니라/u)).toBeTruthy();
+  });
+
+  it("surfaces a sanitized canonical-download failure without deleting or adding the model", async () => {
+    downloadCanonicalStudioBg3dGlb.mockRejectedValue(new Error("raw internal detail"));
+    const onAdd = vi.fn();
+    const onDelete = vi.fn();
+    renderPanel({
+      entries: [createEntry("failed", "실패 모델", {
+        contentHash: `sha256:${"b".repeat(64)}`,
+      })],
+      onAdd,
+      onDelete,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "실패 모델 정규화 GLB 저장" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("정규화 GLB를 저장하지 못했습니다");
+    expect(alert.textContent).not.toContain("raw internal detail");
+    expect(onAdd).not.toHaveBeenCalled();
+    expect(onDelete).not.toHaveBeenCalled();
+  });
+
   it("disables unsafe or busy scene actions and preserves mobile touch targets", () => {
     const deleting = createEntry("deleting", "삭제 중 모델");
     const unsafe = createEntry("unsafe", "사용 불가 모델", {
@@ -267,8 +369,8 @@ describe("StudioBg3dAssetLibraryPanel", () => {
     expect(unsafeAdd.disabled).toBe(true);
     expect(deleteButton.disabled).toBe(true);
     expect(deleteButton.querySelector(".animate-spin")).toBeTruthy();
-    expect(deleteButton.className).toContain("size-11");
-    expect(deleteButton.className).toContain("sm:size-7");
+    expect(deleteButton.className).toContain("min-h-11");
+    expect(deleteButton.className).toContain("sm:min-h-8");
     expect(search.className).toContain("min-h-11");
     expect(search.className).toContain("focus-visible:outline");
     expect(filter.className).toContain("min-h-11");

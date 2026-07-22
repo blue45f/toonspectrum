@@ -6,6 +6,9 @@ import {
 } from "./studio-package-archive";
 import {
   readStudioZipArchive,
+  StudioZipReaderError,
+  type StudioZipArchive,
+  type StudioZipEntry,
   type StudioZipInflateRawAdapter,
   type StudioZipReaderLimits,
 } from "./studio-zip-reader";
@@ -17,23 +20,47 @@ export const STUDIO_CBZ_EXTENSION = ".cbz" as const;
 
 export const STUDIO_CBZ_LIMITS = Object.freeze({
   maxArchiveBytes: 520_000_000,
+  maxArchiveEntries: 1_163,
   maxPages: 1_099,
   maxPageBytes: 192_000_000,
   maxTotalPageBytes: 510_000_000,
+  maxPageDimension: 131_072,
+  maxPagePixels: 67_108_864,
+  maxTotalDecodedPixels: 134_217_728,
+  maxTotalDecodedBytes: 536_870_912,
+  maxCompressionRatio: 100,
   maxComicInfoBytes: 1_000_000,
   maxMetadataCharacters: 100_000,
+  maxComicInfoElements: 4_096,
+  maxComicInfoDepth: 64,
+  maxComicInfoAttributesPerElement: 32,
+  maxComicInfoTextCharacters: 200_000,
 });
 
 export interface StudioCbzLimits {
   maxArchiveBytes: number;
+  maxArchiveEntries: number;
   maxPages: number;
   maxPageBytes: number;
   maxTotalPageBytes: number;
+  maxPageDimension: number;
+  maxPagePixels: number;
+  maxTotalDecodedPixels: number;
+  maxTotalDecodedBytes: number;
+  maxCompressionRatio: number;
   maxComicInfoBytes: number;
   maxMetadataCharacters: number;
+  maxComicInfoElements: number;
+  maxComicInfoDepth: number;
+  maxComicInfoAttributesPerElement: number;
+  maxComicInfoTextCharacters: number;
 }
 
-export type StudioCbzPageMimeType = "image/png" | "image/jpeg" | "image/webp";
+export type StudioCbzPageMimeType =
+  | "image/png"
+  | "image/jpeg"
+  | "image/webp"
+  | "image/gif";
 
 export interface StudioCbzPageInput {
   image: StudioPackageArchiveSource;
@@ -110,12 +137,32 @@ export interface StudioCbzImportedPage {
   path: string;
   mimeType: StudioCbzPageMimeType;
   byteSize: number;
+  /** Header-authenticated dimensions used by page layout before browser decoding. */
+  width: number;
+  height: number;
+  pixelCount: number;
+  frameCount: number;
+  decodedPixelCount: number;
+  /** Conservative RGBA8 working-set estimate, not the encoded Blob size. */
+  decodedByteSize: number;
   image: Blob;
+}
+
+export interface StudioCbzImportSummary {
+  pageCount: number;
+  totalEncodedBytes: number;
+  totalDecodedPixels: number;
+  totalDecodedBytes: number;
+  maxWidth: number;
+  maxHeight: number;
+  hasComicInfo: boolean;
+  ignoredEntryCount: number;
 }
 
 export interface StudioCbzImportResult {
   pages: readonly StudioCbzImportedPage[];
   metadata: Readonly<StudioComicInfoMetadata>;
+  summary: Readonly<StudioCbzImportSummary>;
   warnings: readonly StudioCbzWarning[];
 }
 
@@ -142,7 +189,13 @@ export class StudioCbzError extends Error {
 
 interface DetectedPage {
   mimeType: StudioCbzPageMimeType;
-  extension: "png" | "jpg" | "webp";
+  extension: "png" | "jpg" | "webp" | "gif";
+  width: number;
+  height: number;
+  pixelCount: number;
+  frameCount: number;
+  decodedPixelCount: number;
+  decodedByteSize: number;
 }
 
 interface PreparedCbz {
@@ -151,6 +204,7 @@ interface PreparedCbz {
 }
 
 const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+const MAX_IMAGE_CONTAINER_RECORDS = 131_072;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
@@ -165,13 +219,14 @@ function throwIfAborted(signal?: AbortSignal): void {
 function resolveIntegerLimit(
   value: number | undefined,
   maximum: number,
-  key: keyof StudioCbzLimits
+  key: keyof StudioCbzLimits,
+  minimum = 0
 ): number {
   if (value === undefined) return maximum;
-  if (!Number.isSafeInteger(value) || value < 0 || value > maximum) {
+  if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
     throw cbzError(
       "LIMIT_INVALID",
-      `${key} 한도는 0 이상 ${maximum.toLocaleString("en-US")} 이하의 정수여야 합니다.`
+      `${key} 한도는 ${minimum.toLocaleString("en-US")} 이상 ${maximum.toLocaleString("en-US")} 이하의 정수여야 합니다.`
     );
   }
   return value;
@@ -184,6 +239,11 @@ function resolveLimits(value?: Partial<StudioCbzLimits>): StudioCbzLimits {
       STUDIO_CBZ_LIMITS.maxArchiveBytes,
       "maxArchiveBytes"
     ),
+    maxArchiveEntries: resolveIntegerLimit(
+      value?.maxArchiveEntries,
+      STUDIO_CBZ_LIMITS.maxArchiveEntries,
+      "maxArchiveEntries"
+    ),
     maxPages: resolveIntegerLimit(value?.maxPages, STUDIO_CBZ_LIMITS.maxPages, "maxPages"),
     maxPageBytes: resolveIntegerLimit(
       value?.maxPageBytes,
@@ -195,6 +255,32 @@ function resolveLimits(value?: Partial<StudioCbzLimits>): StudioCbzLimits {
       STUDIO_CBZ_LIMITS.maxTotalPageBytes,
       "maxTotalPageBytes"
     ),
+    maxPageDimension: resolveIntegerLimit(
+      value?.maxPageDimension,
+      STUDIO_CBZ_LIMITS.maxPageDimension,
+      "maxPageDimension"
+    ),
+    maxPagePixels: resolveIntegerLimit(
+      value?.maxPagePixels,
+      STUDIO_CBZ_LIMITS.maxPagePixels,
+      "maxPagePixels"
+    ),
+    maxTotalDecodedPixels: resolveIntegerLimit(
+      value?.maxTotalDecodedPixels,
+      STUDIO_CBZ_LIMITS.maxTotalDecodedPixels,
+      "maxTotalDecodedPixels"
+    ),
+    maxTotalDecodedBytes: resolveIntegerLimit(
+      value?.maxTotalDecodedBytes,
+      STUDIO_CBZ_LIMITS.maxTotalDecodedBytes,
+      "maxTotalDecodedBytes"
+    ),
+    maxCompressionRatio: resolveIntegerLimit(
+      value?.maxCompressionRatio,
+      STUDIO_CBZ_LIMITS.maxCompressionRatio,
+      "maxCompressionRatio",
+      1
+    ),
     maxComicInfoBytes: resolveIntegerLimit(
       value?.maxComicInfoBytes,
       STUDIO_CBZ_LIMITS.maxComicInfoBytes,
@@ -204,6 +290,26 @@ function resolveLimits(value?: Partial<StudioCbzLimits>): StudioCbzLimits {
       value?.maxMetadataCharacters,
       STUDIO_CBZ_LIMITS.maxMetadataCharacters,
       "maxMetadataCharacters"
+    ),
+    maxComicInfoElements: resolveIntegerLimit(
+      value?.maxComicInfoElements,
+      STUDIO_CBZ_LIMITS.maxComicInfoElements,
+      "maxComicInfoElements"
+    ),
+    maxComicInfoDepth: resolveIntegerLimit(
+      value?.maxComicInfoDepth,
+      STUDIO_CBZ_LIMITS.maxComicInfoDepth,
+      "maxComicInfoDepth"
+    ),
+    maxComicInfoAttributesPerElement: resolveIntegerLimit(
+      value?.maxComicInfoAttributesPerElement,
+      STUDIO_CBZ_LIMITS.maxComicInfoAttributesPerElement,
+      "maxComicInfoAttributesPerElement"
+    ),
+    maxComicInfoTextCharacters: resolveIntegerLimit(
+      value?.maxComicInfoTextCharacters,
+      STUDIO_CBZ_LIMITS.maxComicInfoTextCharacters,
+      "maxComicInfoTextCharacters"
     ),
   };
 }
@@ -249,35 +355,414 @@ function startsWith(bytes: Uint8Array, signature: Uint8Array): boolean {
   return true;
 }
 
-function detectPage(bytes: Uint8Array): DetectedPage | undefined {
-  if (startsWith(bytes, PNG_SIGNATURE)) return { mimeType: "image/png", extension: "png" };
+function detectedPage(
+  mimeType: StudioCbzPageMimeType,
+  extension: DetectedPage["extension"],
+  width: number,
+  height: number,
+  frameCount = 1
+): DetectedPage | undefined {
   if (
-    bytes.byteLength >= 4 &&
-    bytes[0] === 0xff &&
-    bytes[1] === 0xd8 &&
-    bytes[2] === 0xff &&
-    bytes[bytes.byteLength - 2] === 0xff &&
-    bytes[bytes.byteLength - 1] === 0xd9
+    !Number.isSafeInteger(width) ||
+    !Number.isSafeInteger(height) ||
+    !Number.isSafeInteger(frameCount) ||
+    width <= 0 ||
+    height <= 0 ||
+    frameCount <= 0
   ) {
-    return { mimeType: "image/jpeg", extension: "jpg" };
+    return undefined;
   }
+  const pixelCount = width * height;
+  const decodedPixelCount = pixelCount * frameCount;
+  const decodedByteSize = decodedPixelCount * 4;
   if (
-    bytes.byteLength >= 12 &&
-    bytes[0] === 0x52 &&
-    bytes[1] === 0x49 &&
-    bytes[2] === 0x46 &&
-    bytes[3] === 0x46 &&
-    bytes[8] === 0x57 &&
-    bytes[9] === 0x45 &&
-    bytes[10] === 0x42 &&
-    bytes[11] === 0x50
+    !Number.isSafeInteger(pixelCount) ||
+    !Number.isSafeInteger(decodedPixelCount) ||
+    !Number.isSafeInteger(decodedByteSize)
   ) {
-    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    if (view.getUint32(4, true) + 8 === bytes.byteLength) {
-      return { mimeType: "image/webp", extension: "webp" };
+    return undefined;
+  }
+  return {
+    mimeType,
+    extension,
+    width,
+    height,
+    pixelCount,
+    frameCount,
+    decodedPixelCount,
+    decodedByteSize,
+  };
+}
+
+function ascii4(bytes: Uint8Array, offset: number): string {
+  return String.fromCharCode(
+    bytes[offset] ?? 0,
+    bytes[offset + 1] ?? 0,
+    bytes[offset + 2] ?? 0,
+    bytes[offset + 3] ?? 0
+  );
+}
+
+function uint24LittleEndian(bytes: Uint8Array, offset: number): number {
+  return (bytes[offset] ?? 0) | ((bytes[offset + 1] ?? 0) << 8) | ((bytes[offset + 2] ?? 0) << 16);
+}
+
+function detectPng(bytes: Uint8Array): DetectedPage | undefined {
+  if (!startsWith(bytes, PNG_SIGNATURE) || bytes.byteLength < 45) return undefined;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let offset = PNG_SIGNATURE.byteLength;
+  let dimensions: DetectedPage | undefined;
+  let sawImageData = false;
+  let sawEnd = false;
+  let declaredAnimationFrames: number | undefined;
+  let frameControlCount = 0;
+  let records = 0;
+  while (offset < bytes.byteLength) {
+    records += 1;
+    if (records > MAX_IMAGE_CONTAINER_RECORDS) return undefined;
+    if (offset + 12 > bytes.byteLength) return undefined;
+    const length = view.getUint32(offset, false);
+    const type = ascii4(bytes, offset + 4);
+    if (!/^[A-Za-z]{4}$/u.test(type)) return undefined;
+    const dataOffset = offset + 8;
+    const end = dataOffset + length + 4;
+    if (!Number.isSafeInteger(end) || end > bytes.byteLength) return undefined;
+    if (!dimensions) {
+      if (type !== "IHDR" || length !== 13) return undefined;
+      const width = view.getUint32(dataOffset, false);
+      const height = view.getUint32(dataOffset + 4, false);
+      const bitDepth = bytes[dataOffset + 8];
+      const colorType = bytes[dataOffset + 9];
+      const validBitDepth =
+        (colorType === 0 && [1, 2, 4, 8, 16].includes(bitDepth ?? -1)) ||
+        (colorType === 2 && (bitDepth === 8 || bitDepth === 16)) ||
+        (colorType === 3 && [1, 2, 4, 8].includes(bitDepth ?? -1)) ||
+        ((colorType === 4 || colorType === 6) && (bitDepth === 8 || bitDepth === 16));
+      if (
+        !validBitDepth ||
+        bytes[dataOffset + 10] !== 0 ||
+        bytes[dataOffset + 11] !== 0 ||
+        ![0, 1].includes(bytes[dataOffset + 12] ?? -1)
+      ) {
+        return undefined;
+      }
+      dimensions = detectedPage("image/png", "png", width, height);
+      if (!dimensions) return undefined;
+    } else if (type === "IHDR") {
+      return undefined;
     }
+    if (type === "acTL") {
+      if (declaredAnimationFrames !== undefined || sawImageData || length !== 8) return undefined;
+      declaredAnimationFrames = view.getUint32(dataOffset, false);
+      if (
+        declaredAnimationFrames <= 0 ||
+        declaredAnimationFrames > MAX_IMAGE_CONTAINER_RECORDS
+      ) {
+        return undefined;
+      }
+    } else if (type === "fcTL") {
+      if (declaredAnimationFrames === undefined || length !== 26) return undefined;
+      frameControlCount += 1;
+    } else if (type === "fdAT") {
+      if (declaredAnimationFrames === undefined || length <= 4) return undefined;
+    }
+    if (type === "IDAT") sawImageData ||= length > 0;
+    if (type === "IEND") {
+      if (length !== 0 || end !== bytes.byteLength) return undefined;
+      sawEnd = true;
+      break;
+    }
+    if (/^[A-Z]/u.test(type) && !["IHDR", "PLTE", "IDAT", "IEND"].includes(type)) {
+      return undefined;
+    }
+    offset = end;
+  }
+  if (!dimensions || !sawImageData || !sawEnd) return undefined;
+  if (
+    declaredAnimationFrames !== undefined &&
+    frameControlCount !== declaredAnimationFrames
+  ) {
+    return undefined;
+  }
+  return detectedPage(
+    dimensions.mimeType,
+    dimensions.extension,
+    dimensions.width,
+    dimensions.height,
+    declaredAnimationFrames ?? 1
+  );
+}
+
+const JPEG_START_OF_FRAME_MARKERS = new Set([
+  0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf,
+]);
+
+function detectJpeg(bytes: Uint8Array): DetectedPage | undefined {
+  if (
+    bytes.byteLength < 16 ||
+    bytes[0] !== 0xff ||
+    bytes[1] !== 0xd8 ||
+    bytes[bytes.byteLength - 2] !== 0xff ||
+    bytes[bytes.byteLength - 1] !== 0xd9
+  ) {
+    return undefined;
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let offset = 2;
+  let dimensions: DetectedPage | undefined;
+  let sawScan = false;
+  let records = 0;
+  while (offset < bytes.byteLength - 2) {
+    records += 1;
+    if (records > MAX_IMAGE_CONTAINER_RECORDS) return undefined;
+    if (bytes[offset] !== 0xff) return undefined;
+    while (offset < bytes.byteLength - 2 && bytes[offset] === 0xff) offset += 1;
+    const marker = bytes[offset];
+    if (marker === undefined || marker === 0x00 || marker === 0xd9) return undefined;
+    offset += 1;
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (offset + 2 > bytes.byteLength - 2) return undefined;
+    const segmentLength = view.getUint16(offset, false);
+    if (segmentLength < 2 || offset + segmentLength > bytes.byteLength - 2) return undefined;
+    if (JPEG_START_OF_FRAME_MARKERS.has(marker)) {
+      if (dimensions || segmentLength < 11) return undefined;
+      const components = bytes[offset + 7] ?? 0;
+      if (components === 0 || segmentLength !== 8 + components * 3) return undefined;
+      dimensions = detectedPage(
+        "image/jpeg",
+        "jpg",
+        view.getUint16(offset + 5, false),
+        view.getUint16(offset + 3, false)
+      );
+      if (!dimensions) return undefined;
+    }
+    if (marker === 0xda) {
+      const components = bytes[offset + 2] ?? 0;
+      if (components === 0 || segmentLength !== 6 + components * 2 || !dimensions) {
+        return undefined;
+      }
+      sawScan = true;
+      break;
+    }
+    offset += segmentLength;
+  }
+  return dimensions && sawScan ? dimensions : undefined;
+}
+
+function detectWebp(bytes: Uint8Array): DetectedPage | undefined {
+  if (
+    bytes.byteLength < 26 ||
+    ascii4(bytes, 0) !== "RIFF" ||
+    ascii4(bytes, 8) !== "WEBP"
+  ) {
+    return undefined;
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (view.getUint32(4, true) + 8 !== bytes.byteLength) return undefined;
+  let offset = 12;
+  let canvas: DetectedPage | undefined;
+  let payloadDimensions: DetectedPage | undefined;
+  let sawPayload = false;
+  let animationDeclared = false;
+  let sawAnimationHeader = false;
+  let animationFrameCount = 0;
+  let records = 0;
+  while (offset < bytes.byteLength) {
+    records += 1;
+    if (records > MAX_IMAGE_CONTAINER_RECORDS) return undefined;
+    if (offset + 8 > bytes.byteLength) return undefined;
+    const type = ascii4(bytes, offset);
+    const length = view.getUint32(offset + 4, true);
+    const dataOffset = offset + 8;
+    const dataEnd = dataOffset + length;
+    const paddedEnd = dataEnd + (length & 1);
+    if (!Number.isSafeInteger(paddedEnd) || paddedEnd > bytes.byteLength) return undefined;
+    if (type === "VP8X") {
+      if (canvas || length !== 10 || (bytes[dataOffset] ?? 0) & 0xc1) return undefined;
+      if (bytes[dataOffset + 1] !== 0 || bytes[dataOffset + 2] !== 0 || bytes[dataOffset + 3] !== 0) {
+        return undefined;
+      }
+      animationDeclared = (((bytes[dataOffset] ?? 0) & 0x02) !== 0);
+      canvas = detectedPage(
+        "image/webp",
+        "webp",
+        uint24LittleEndian(bytes, dataOffset + 4) + 1,
+        uint24LittleEndian(bytes, dataOffset + 7) + 1
+      );
+      if (!canvas) return undefined;
+    } else if (type === "VP8 ") {
+      if (
+        payloadDimensions ||
+        length < 10 ||
+        bytes[dataOffset + 3] !== 0x9d ||
+        bytes[dataOffset + 4] !== 0x01 ||
+        bytes[dataOffset + 5] !== 0x2a
+      ) {
+        return undefined;
+      }
+      payloadDimensions = detectedPage(
+        "image/webp",
+        "webp",
+        view.getUint16(dataOffset + 6, true) & 0x3fff,
+        view.getUint16(dataOffset + 8, true) & 0x3fff
+      );
+      if (!payloadDimensions) return undefined;
+      sawPayload = true;
+    } else if (type === "VP8L") {
+      if (payloadDimensions || length < 5 || bytes[dataOffset] !== 0x2f) return undefined;
+      const byte1 = bytes[dataOffset + 1] ?? 0;
+      const byte2 = bytes[dataOffset + 2] ?? 0;
+      const byte3 = bytes[dataOffset + 3] ?? 0;
+      const byte4 = bytes[dataOffset + 4] ?? 0;
+      if ((byte4 & 0xe0) !== 0) return undefined;
+      payloadDimensions = detectedPage(
+        "image/webp",
+        "webp",
+        1 + byte1 + ((byte2 & 0x3f) << 8),
+        1 + (byte2 >> 6) + (byte3 << 2) + ((byte4 & 0x0f) << 10)
+      );
+      if (!payloadDimensions) return undefined;
+      sawPayload = true;
+    } else if (type === "ANIM") {
+      if (length !== 6) return undefined;
+      sawAnimationHeader = true;
+    } else if (type === "ANMF") {
+      if (!canvas || length < 16) return undefined;
+      const frameX = uint24LittleEndian(bytes, dataOffset) * 2;
+      const frameY = uint24LittleEndian(bytes, dataOffset + 3) * 2;
+      const frameWidth = uint24LittleEndian(bytes, dataOffset + 6) + 1;
+      const frameHeight = uint24LittleEndian(bytes, dataOffset + 9) + 1;
+      if (frameX + frameWidth > canvas.width || frameY + frameHeight > canvas.height) {
+        return undefined;
+      }
+      animationFrameCount += 1;
+      sawPayload = true;
+    }
+    offset = paddedEnd;
+  }
+  if (offset !== bytes.byteLength || !sawPayload) return undefined;
+  if (animationDeclared && (!sawAnimationHeader || animationFrameCount === 0 || payloadDimensions)) {
+    return undefined;
+  }
+  if (!animationDeclared && (sawAnimationHeader || animationFrameCount > 0 || !payloadDimensions)) {
+    return undefined;
+  }
+  if (canvas && payloadDimensions && (
+    canvas.width !== payloadDimensions.width || canvas.height !== payloadDimensions.height
+  )) {
+    return undefined;
+  }
+  const dimensions = canvas ?? payloadDimensions;
+  if (!dimensions) return undefined;
+  return detectedPage(
+    dimensions.mimeType,
+    dimensions.extension,
+    dimensions.width,
+    dimensions.height,
+    animationFrameCount || 1
+  );
+}
+
+function skipGifSubBlocks(bytes: Uint8Array, initialOffset: number): { end: number; bytes: number } | undefined {
+  let offset = initialOffset;
+  let payloadBytes = 0;
+  let records = 0;
+  for (;;) {
+    records += 1;
+    if (records > MAX_IMAGE_CONTAINER_RECORDS) return undefined;
+    const length = bytes[offset];
+    if (length === undefined) return undefined;
+    offset += 1;
+    if (length === 0) return { end: offset, bytes: payloadBytes };
+    if (offset + length > bytes.byteLength) return undefined;
+    payloadBytes += length;
+    offset += length;
+  }
+}
+
+function detectGif(bytes: Uint8Array): DetectedPage | undefined {
+  if (bytes.byteLength < 28) return undefined;
+  const header = String.fromCharCode(...bytes.subarray(0, 6));
+  if (header !== "GIF87a" && header !== "GIF89a") return undefined;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const dimensions = detectedPage(
+    "image/gif",
+    "gif",
+    view.getUint16(6, true),
+    view.getUint16(8, true)
+  );
+  if (!dimensions) return undefined;
+  const packed = bytes[10] ?? 0;
+  let offset = 13;
+  if ((packed & 0x80) !== 0) offset += 3 * (1 << ((packed & 0x07) + 1));
+  if (offset > bytes.byteLength) return undefined;
+  let frameCount = 0;
+  let records = 0;
+  while (offset < bytes.byteLength) {
+    records += 1;
+    if (records > MAX_IMAGE_CONTAINER_RECORDS) return undefined;
+    const marker = bytes[offset];
+    if (marker === 0x3b) {
+      return frameCount > 0 && offset + 1 === bytes.byteLength
+        ? detectedPage(
+            dimensions.mimeType,
+            dimensions.extension,
+            dimensions.width,
+            dimensions.height,
+            frameCount
+          )
+        : undefined;
+    }
+    if (marker === 0x21) {
+      if (offset + 2 > bytes.byteLength) return undefined;
+      const blocks = skipGifSubBlocks(bytes, offset + 2);
+      if (!blocks) return undefined;
+      offset = blocks.end;
+      continue;
+    }
+    if (marker !== 0x2c || offset + 10 > bytes.byteLength) return undefined;
+    const left = view.getUint16(offset + 1, true);
+    const top = view.getUint16(offset + 3, true);
+    const width = view.getUint16(offset + 5, true);
+    const height = view.getUint16(offset + 7, true);
+    if (
+      width === 0 ||
+      height === 0 ||
+      left + width > dimensions.width ||
+      top + height > dimensions.height
+    ) {
+      return undefined;
+    }
+    const imagePacked = bytes[offset + 9] ?? 0;
+    offset += 10;
+    if ((imagePacked & 0x80) !== 0) offset += 3 * (1 << ((imagePacked & 0x07) + 1));
+    const minimumCodeSize = bytes[offset];
+    if (minimumCodeSize === undefined || minimumCodeSize < 2 || minimumCodeSize > 8) {
+      return undefined;
+    }
+    const blocks = skipGifSubBlocks(bytes, offset + 1);
+    if (!blocks || blocks.bytes === 0) return undefined;
+    offset = blocks.end;
+    frameCount += 1;
   }
   return undefined;
+}
+
+function detectPage(bytes: Uint8Array): DetectedPage | undefined {
+  return detectPng(bytes) ?? detectJpeg(bytes) ?? detectWebp(bytes) ?? detectGif(bytes);
+}
+
+function assertDetectedPageBudget(
+  page: DetectedPage,
+  limits: StudioCbzLimits,
+  path: string
+): void {
+  if (page.width > limits.maxPageDimension || page.height > limits.maxPageDimension) {
+    throw cbzError("SIZE_LIMIT", "CBZ 페이지 한 변의 길이가 안전 한도를 넘었습니다.", path);
+  }
+  if (page.pixelCount > limits.maxPagePixels) {
+    throw cbzError("SIZE_LIMIT", "CBZ 페이지의 디코드 픽셀 수가 안전 한도를 넘었습니다.", path);
+  }
 }
 
 function hasUnsafeXmlControl(value: string): boolean {
@@ -448,6 +933,9 @@ async function prepareCbz(
   if (sources.length === 0 || sources.length > limits.maxPages) {
     throw cbzError("PAGE_COUNT_LIMIT", "CBZ 페이지 수가 안전 범위를 벗어났습니다.");
   }
+  if (sources.length + 1 > limits.maxArchiveEntries) {
+    throw cbzError("PAGE_COUNT_LIMIT", "CBZ 페이지와 metadata 항목 수가 archive 한도를 넘었습니다.");
+  }
   const metadataCharacters = JSON.stringify(metadata).length;
   if (metadataCharacters > limits.maxMetadataCharacters) {
     throw cbzError("COMICINFO_INVALID", "ComicInfo metadata가 안전 한도를 넘었습니다.");
@@ -456,6 +944,8 @@ async function prepareCbz(
   const digits = Math.max(4, String(sources.length).length);
   const pageEntries: StudioPackageArchiveEntry[] = [];
   let totalPageBytes = 0;
+  let totalDecodedPixels = 0;
+  let totalDecodedBytes = 0;
   for (let index = 0; index < sources.length; index += 1) {
     throwIfAborted(options.signal);
     const source = sources[index];
@@ -467,11 +957,26 @@ async function prepareCbz(
     const bytes = await sourceBytes(source, `page ${index + 1}`, options.signal);
     const detected = detectPage(bytes);
     if (!detected) {
-      throw cbzError("IMAGE_INVALID", "CBZ 페이지는 PNG, JPEG, WebP 중 하나여야 합니다.", `page ${index + 1}`);
+      throw cbzError(
+        "IMAGE_INVALID",
+        "CBZ 페이지는 구조와 크기 정보가 올바른 PNG, JPEG, WebP, GIF 중 하나여야 합니다.",
+        `page ${index + 1}`
+      );
     }
+    assertDetectedPageBudget(detected, limits, `page ${index + 1}`);
     totalPageBytes += bytes.byteLength;
     if (totalPageBytes > limits.maxTotalPageBytes) {
       throw cbzError("SIZE_LIMIT", "CBZ 전체 페이지 크기가 안전 한도를 넘었습니다.");
+    }
+    totalDecodedPixels += detected.decodedPixelCount;
+    totalDecodedBytes += detected.decodedByteSize;
+    if (
+      !Number.isSafeInteger(totalDecodedPixels) ||
+      totalDecodedPixels > limits.maxTotalDecodedPixels ||
+      !Number.isSafeInteger(totalDecodedBytes) ||
+      totalDecodedBytes > limits.maxTotalDecodedBytes
+    ) {
+      throw cbzError("SIZE_LIMIT", "CBZ 전체 페이지의 디코드 메모리 예산을 넘었습니다.");
     }
     pageEntries.push({
       path: `pages/${String(index + 1).padStart(digits, "0")}.${detected.extension}`,
@@ -490,7 +995,7 @@ async function prepareCbz(
 
 function writerLimits(limits: StudioCbzLimits) {
   return {
-    maxFiles: limits.maxPages + 1,
+    maxFiles: Math.min(limits.maxPages + 1, limits.maxArchiveEntries),
     maxEntryBytes: Math.max(limits.maxPageBytes, limits.maxComicInfoBytes),
     maxTotalBytes: Math.min(
       512_000_000,
@@ -591,14 +1096,222 @@ function isValidXmlCodePoint(value: number): boolean {
   );
 }
 
-function extractSimpleTag(xml: string, tag: string): string | undefined {
-  const expression = new RegExp(`<${tag}\\s*>([\\s\\S]*?)<\\/${tag}\\s*>`, "giu");
-  const matches = [...xml.matchAll(expression)];
-  if (matches.length > 1) {
-    throw cbzError("COMICINFO_INVALID", `ComicInfo.xml에 ${tag} tag가 중복되었습니다.`);
+const COMIC_INFO_IMPORTED_FIELDS = new Set([
+  ...COMIC_INFO_STRING_FIELDS.map(([, tag]) => tag),
+  ...COMIC_INFO_INTEGER_FIELDS.map(([, tag]) => tag),
+  "Genre",
+  "Tags",
+  "BlackAndWhite",
+  "PageCount",
+]);
+
+interface ComicInfoXmlElement {
+  name: string;
+  attributeCount: number;
+  textParts: string[];
+  hasChild: boolean;
+}
+
+function findXmlTagEnd(xml: string, start: number): number {
+  let quote: '"' | "'" | undefined;
+  for (let index = start + 1; index < xml.length; index += 1) {
+    const character = xml[index];
+    if (quote) {
+      if (character === quote) quote = undefined;
+      continue;
+    }
+    if (character === '"' || character === "'") quote = character;
+    else if (character === ">") return index;
+    else if (character === "<") break;
   }
-  const value = matches[0]?.[1];
-  return value === undefined ? undefined : decodeXmlText(value);
+  throw cbzError("COMICINFO_INVALID", "ComicInfo.xml element가 닫히지 않았습니다.");
+}
+
+function parseXmlAttributes(source: string, maximum: number): number {
+  let offset = 0;
+  let count = 0;
+  const names = new Set<string>();
+  while (offset < source.length) {
+    while (/\s/u.test(source[offset] ?? "")) offset += 1;
+    if (offset >= source.length) break;
+    const match = /^[A-Za-z_][\w:.-]*/u.exec(source.slice(offset));
+    const name = match?.[0];
+    if (!name) throw cbzError("COMICINFO_INVALID", "ComicInfo.xml attribute 이름이 올바르지 않습니다.");
+    offset += name.length;
+    while (/\s/u.test(source[offset] ?? "")) offset += 1;
+    if (source[offset] !== "=") {
+      throw cbzError("COMICINFO_INVALID", "ComicInfo.xml attribute에 등호가 없습니다.");
+    }
+    offset += 1;
+    while (/\s/u.test(source[offset] ?? "")) offset += 1;
+    const quote = source[offset];
+    if (quote !== '"' && quote !== "'") {
+      throw cbzError("COMICINFO_INVALID", "ComicInfo.xml attribute 값은 따옴표로 감싸야 합니다.");
+    }
+    const end = source.indexOf(quote, offset + 1);
+    if (end < 0) throw cbzError("COMICINFO_INVALID", "ComicInfo.xml attribute 값이 닫히지 않았습니다.");
+    const rawValue = source.slice(offset + 1, end);
+    if (rawValue.includes("<")) {
+      throw cbzError("COMICINFO_INVALID", "ComicInfo.xml attribute 값에 안전하지 않은 문자가 있습니다.");
+    }
+    decodeXmlText(rawValue);
+    if (names.has(name)) {
+      throw cbzError("COMICINFO_INVALID", `ComicInfo.xml에 ${name} attribute가 중복되었습니다.`);
+    }
+    names.add(name);
+    count += 1;
+    if (count > maximum) {
+      throw cbzError("COMICINFO_INVALID", "ComicInfo.xml element의 attribute가 너무 많습니다.");
+    }
+    offset = end + 1;
+    if (offset < source.length && !/\s/u.test(source[offset] ?? "")) {
+      throw cbzError("COMICINFO_INVALID", "ComicInfo.xml attribute 사이에 공백이 없습니다.");
+    }
+  }
+  return count;
+}
+
+function finalizeComicInfoElement(
+  element: ComicInfoXmlElement,
+  parent: ComicInfoXmlElement | undefined,
+  fields: Map<string, string>
+): void {
+  const text = decodeXmlText(element.textParts.join(""));
+  if (element.hasChild && text.length > 0) {
+    throw cbzError("COMICINFO_INVALID", `ComicInfo.xml ${element.name} element에 혼합 content가 있습니다.`);
+  }
+  if (parent?.name !== "ComicInfo" || !COMIC_INFO_IMPORTED_FIELDS.has(element.name)) return;
+  if (element.attributeCount > 0 || element.hasChild) {
+    throw cbzError("COMICINFO_INVALID", `ComicInfo.xml ${element.name} 값의 구조가 올바르지 않습니다.`);
+  }
+  if (fields.has(element.name)) {
+    throw cbzError("COMICINFO_INVALID", `ComicInfo.xml에 ${element.name} tag가 중복되었습니다.`);
+  }
+  fields.set(element.name, text);
+}
+
+function parseComicInfoFields(
+  xml: string,
+  limits: StudioCbzLimits,
+): ReadonlyMap<string, string> {
+  let normalizedXml = xml.trim();
+  if (normalizedXml.startsWith("<?xml")) {
+    const declarationEnd = normalizedXml.indexOf("?>");
+    if (declarationEnd < 0) {
+      throw cbzError("COMICINFO_INVALID", "ComicInfo.xml 선언이 닫히지 않았습니다.");
+    }
+    const declaration = normalizedXml.slice(0, declarationEnd + 2);
+    if (!/^<\?xml\s+version\s*=\s*(?:"1\.0"|'1\.0')(?:\s+encoding\s*=\s*(?:"UTF-8"|'UTF-8'))?(?:\s+standalone\s*=\s*(?:"(?:yes|no)"|'(?:yes|no)'))?\s*\?>$/iu.test(declaration)) {
+      throw cbzError("COMICINFO_INVALID", "ComicInfo.xml 선언이 지원하는 안전한 형식이 아닙니다.");
+    }
+    normalizedXml = normalizedXml.slice(declarationEnd + 2).trim();
+  }
+
+  const fields = new Map<string, string>();
+  const stack: ComicInfoXmlElement[] = [];
+  let rootSeen = false;
+  let rootClosed = false;
+  let offset = 0;
+  let elementCount = 0;
+  let textCharacterCount = 0;
+  while (offset < normalizedXml.length) {
+    if (normalizedXml[offset] !== "<") {
+      const next = normalizedXml.indexOf("<", offset);
+      const end = next < 0 ? normalizedXml.length : next;
+      const text = normalizedXml.slice(offset, end);
+      const current = stack.at(-1);
+      if (!current) {
+        if (text.trim().length > 0) {
+          throw cbzError("COMICINFO_INVALID", "ComicInfo.xml root 밖에 text가 있습니다.");
+        }
+      } else {
+        textCharacterCount += text.length;
+        if (textCharacterCount > limits.maxComicInfoTextCharacters) {
+          throw cbzError("COMICINFO_INVALID", "ComicInfo.xml text가 안전한 복잡도 한도를 넘습니다.");
+        }
+        current.textParts.push(text);
+      }
+      offset = end;
+      continue;
+    }
+    if (normalizedXml.startsWith("<!--", offset)) {
+      const commentEnd = normalizedXml.indexOf("-->", offset + 4);
+      if (commentEnd < 0) {
+        throw cbzError("COMICINFO_INVALID", "ComicInfo.xml 주석이 닫히지 않았습니다.");
+      }
+      if (normalizedXml.slice(offset + 4, commentEnd).includes("--")) {
+        throw cbzError("COMICINFO_INVALID", "ComicInfo.xml 주석 내용이 올바르지 않습니다.");
+      }
+      offset = commentEnd + 3;
+      continue;
+    }
+    if (normalizedXml.startsWith("<!", offset) || normalizedXml.startsWith("<?", offset)) {
+      throw cbzError("COMICINFO_INVALID", "ComicInfo.xml DTD, CDATA, 처리 지시문은 허용되지 않습니다.");
+    }
+    const tagEnd = findXmlTagEnd(normalizedXml, offset);
+    let body = normalizedXml.slice(offset + 1, tagEnd).trim();
+    if (body.startsWith("/")) {
+      const closing = body.slice(1).trim();
+      if (!/^[A-Za-z_][\w:.-]*$/u.test(closing)) {
+        throw cbzError("COMICINFO_INVALID", "ComicInfo.xml 닫는 tag가 올바르지 않습니다.");
+      }
+      const element = stack.pop();
+      if (!element || element.name !== closing) {
+        throw cbzError("COMICINFO_INVALID", "ComicInfo.xml tag 중첩이 올바르지 않습니다.");
+      }
+      const parent = stack.at(-1);
+      finalizeComicInfoElement(element, parent, fields);
+      if (!parent) rootClosed = true;
+      offset = tagEnd + 1;
+      continue;
+    }
+
+    const selfClosing = /\/\s*$/u.test(body);
+    if (selfClosing) body = body.replace(/\/\s*$/u, "").trimEnd();
+    const nameMatch = /^[A-Za-z_][\w:.-]*/u.exec(body);
+    const name = nameMatch?.[0];
+    if (!name) throw cbzError("COMICINFO_INVALID", "ComicInfo.xml 여는 tag가 올바르지 않습니다.");
+    const attributesSource = body.slice(name.length);
+    if (attributesSource.length > 0 && !/^\s/u.test(attributesSource)) {
+      throw cbzError("COMICINFO_INVALID", "ComicInfo.xml tag와 attribute 사이에 공백이 없습니다.");
+    }
+    const element: ComicInfoXmlElement = {
+      name,
+      attributeCount: parseXmlAttributes(
+        attributesSource,
+        limits.maxComicInfoAttributesPerElement,
+      ),
+      textParts: [],
+      hasChild: false,
+    };
+    const parent = stack.at(-1);
+    if (!parent) {
+      if (rootSeen || rootClosed || name !== "ComicInfo") {
+        throw cbzError("COMICINFO_INVALID", "ComicInfo.xml root가 올바르지 않습니다.");
+      }
+      rootSeen = true;
+    } else {
+      parent.hasChild = true;
+    }
+    elementCount += 1;
+    if (elementCount > limits.maxComicInfoElements) {
+      throw cbzError("COMICINFO_INVALID", "ComicInfo.xml element 수가 안전한 한도를 넘습니다.");
+    }
+    if (stack.length + 1 > limits.maxComicInfoDepth) {
+      throw cbzError("COMICINFO_INVALID", "ComicInfo.xml 중첩 깊이가 안전한 한도를 넘습니다.");
+    }
+    if (selfClosing) {
+      finalizeComicInfoElement(element, parent, fields);
+      if (!parent) rootClosed = true;
+    } else {
+      stack.push(element);
+    }
+    offset = tagEnd + 1;
+  }
+  if (!rootSeen || !rootClosed || stack.length > 0) {
+    throw cbzError("COMICINFO_INVALID", "ComicInfo.xml root 또는 tag가 완전히 닫히지 않았습니다.");
+  }
+  return fields;
 }
 
 function parseComicInfoInteger(
@@ -636,66 +1349,41 @@ function parseComicInfo(
   } catch {
     throw cbzError("COMICINFO_INVALID", "ComicInfo.xml이 올바른 UTF-8이 아닙니다.");
   }
-  if (/<!\s*(?:DOCTYPE|ENTITY)/iu.test(xml)) {
-    throw cbzError("COMICINFO_INVALID", "ComicInfo.xml DTD/entity 선언은 허용되지 않습니다.");
+  if (hasUnsafeXmlControl(xml)) {
+    throw cbzError("COMICINFO_INVALID", "ComicInfo.xml에 안전하지 않은 제어 문자가 있습니다.");
   }
-  let normalizedXml = xml.trim();
-  if (normalizedXml.startsWith("<?xml")) {
-    const declarationEnd = normalizedXml.indexOf("?>");
-    if (declarationEnd < 0) {
-      throw cbzError("COMICINFO_INVALID", "ComicInfo.xml 선언이 닫히지 않았습니다.");
-    }
-    normalizedXml = normalizedXml.slice(declarationEnd + 2).trim();
-  }
-  if (normalizedXml.includes("<?")) {
-    throw cbzError("COMICINFO_INVALID", "ComicInfo.xml 처리 지시문은 허용되지 않습니다.");
-  }
-  for (;;) {
-    const commentStart = normalizedXml.indexOf("<!--");
-    if (commentStart < 0) break;
-    const commentEnd = normalizedXml.indexOf("-->", commentStart + 4);
-    if (commentEnd < 0) {
-      throw cbzError("COMICINFO_INVALID", "ComicInfo.xml 주석이 닫히지 않았습니다.");
-    }
-    normalizedXml = `${normalizedXml.slice(0, commentStart)}${normalizedXml.slice(commentEnd + 3)}`;
-  }
-  normalizedXml = normalizedXml.trim();
-  if (/^<ComicInfo(?:\s[^>]*)?\s*\/>$/iu.test(normalizedXml)) {
-    normalizedXml = "<ComicInfo></ComicInfo>";
-  }
-  if (!/^<ComicInfo(?:\s[^>]*)?>[\s\S]*<\/ComicInfo\s*>$/iu.test(normalizedXml)) {
-    throw cbzError("COMICINFO_INVALID", "ComicInfo.xml root가 올바르지 않습니다.");
-  }
+  const fields = parseComicInfoFields(xml, limits);
+  const field = (tag: string) => fields.get(tag);
 
   const metadata: StudioComicInfoMetadata = {
-    title: extractSimpleTag(normalizedXml, "Title"),
-    series: extractSimpleTag(normalizedXml, "Series"),
-    number: extractSimpleTag(normalizedXml, "Number"),
-    count: parseComicInfoInteger(extractSimpleTag(normalizedXml, "Count"), "Count", 0, 1_000_000),
-    volume: parseComicInfoInteger(extractSimpleTag(normalizedXml, "Volume"), "Volume", 0, 1_000_000),
-    summary: extractSimpleTag(normalizedXml, "Summary"),
-    notes: extractSimpleTag(normalizedXml, "Notes"),
-    year: parseComicInfoInteger(extractSimpleTag(normalizedXml, "Year"), "Year", 0, 9_999),
-    month: parseComicInfoInteger(extractSimpleTag(normalizedXml, "Month"), "Month", 1, 12),
-    day: parseComicInfoInteger(extractSimpleTag(normalizedXml, "Day"), "Day", 1, 31),
-    writer: extractSimpleTag(normalizedXml, "Writer"),
-    penciller: extractSimpleTag(normalizedXml, "Penciller"),
-    inker: extractSimpleTag(normalizedXml, "Inker"),
-    colorist: extractSimpleTag(normalizedXml, "Colorist"),
-    letterer: extractSimpleTag(normalizedXml, "Letterer"),
-    coverArtist: extractSimpleTag(normalizedXml, "CoverArtist"),
-    editor: extractSimpleTag(normalizedXml, "Editor"),
-    publisher: extractSimpleTag(normalizedXml, "Publisher"),
-    imprint: extractSimpleTag(normalizedXml, "Imprint"),
-    genre: splitMetadataList(extractSimpleTag(normalizedXml, "Genre")),
-    tags: splitMetadataList(extractSimpleTag(normalizedXml, "Tags")),
-    web: extractSimpleTag(normalizedXml, "Web"),
-    languageISO: extractSimpleTag(normalizedXml, "LanguageISO"),
-    format: extractSimpleTag(normalizedXml, "Format"),
-    ageRating: extractSimpleTag(normalizedXml, "AgeRating"),
-    manga: extractSimpleTag(normalizedXml, "Manga"),
+    title: field("Title"),
+    series: field("Series"),
+    number: field("Number"),
+    count: parseComicInfoInteger(field("Count"), "Count", 0, 1_000_000),
+    volume: parseComicInfoInteger(field("Volume"), "Volume", 0, 1_000_000),
+    summary: field("Summary"),
+    notes: field("Notes"),
+    year: parseComicInfoInteger(field("Year"), "Year", 0, 9_999),
+    month: parseComicInfoInteger(field("Month"), "Month", 1, 12),
+    day: parseComicInfoInteger(field("Day"), "Day", 1, 31),
+    writer: field("Writer"),
+    penciller: field("Penciller"),
+    inker: field("Inker"),
+    colorist: field("Colorist"),
+    letterer: field("Letterer"),
+    coverArtist: field("CoverArtist"),
+    editor: field("Editor"),
+    publisher: field("Publisher"),
+    imprint: field("Imprint"),
+    genre: splitMetadataList(field("Genre")),
+    tags: splitMetadataList(field("Tags")),
+    web: field("Web"),
+    languageISO: field("LanguageISO"),
+    format: field("Format"),
+    ageRating: field("AgeRating"),
+    manga: field("Manga"),
   };
-  const blackAndWhite = extractSimpleTag(normalizedXml, "BlackAndWhite");
+  const blackAndWhite = field("BlackAndWhite");
   if (blackAndWhite !== undefined) {
     if (blackAndWhite !== "Yes" && blackAndWhite !== "No") {
       throw cbzError("COMICINFO_INVALID", "BlackAndWhite 값은 Yes 또는 No여야 합니다.");
@@ -708,7 +1396,7 @@ function parseComicInfo(
   return {
     metadata,
     declaredPageCount: parseComicInfoInteger(
-      extractSimpleTag(normalizedXml, "PageCount"),
+      field("PageCount"),
       "PageCount",
       0,
       limits.maxPages
@@ -728,6 +1416,33 @@ function bytesToBlob(bytes: Uint8Array, type: string): Blob {
   return new Blob([copy.buffer], { type });
 }
 
+function isCbzMetadataJunkPath(path: string): boolean {
+  const segments = path.toLowerCase().split("/");
+  const leaf = segments.at(-1) ?? "";
+  return segments[0] === "__macosx" || leaf.startsWith("._") || leaf === ".ds_store" || leaf === "thumbs.db";
+}
+
+function rethrowZipFailure(cause: unknown, signal?: AbortSignal, fallbackPath?: string): never {
+  if (signal?.aborted || (cause instanceof StudioZipReaderError && cause.code === "ABORTED")) {
+    throw cbzError("ABORTED", "CBZ 작업이 취소되었습니다.", cause instanceof StudioZipReaderError ? cause.path : fallbackPath);
+  }
+  const detail = cause instanceof Error ? `: ${cause.message}` : "";
+  const path = cause instanceof StudioZipReaderError ? cause.path : fallbackPath;
+  throw cbzError("ARCHIVE_INVALID", `CBZ ZIP 항목이 올바르지 않습니다${detail}`, path);
+}
+
+async function readCbzEntry(
+  archive: StudioZipArchive,
+  entry: StudioZipEntry,
+  signal?: AbortSignal
+): Promise<Uint8Array> {
+  try {
+    return await archive.readEntry(entry, { signal });
+  } catch (cause) {
+    rethrowZipFailure(cause, signal, entry.path);
+  }
+}
+
 export async function importStudioCbz(
   source: Blob | Uint8Array | ArrayBuffer,
   options: StudioCbzImportOptions = {}
@@ -736,15 +1451,16 @@ export async function importStudioCbz(
   throwIfAborted(options.signal);
   const zipLimits: Partial<StudioZipReaderLimits> = {
     maxArchiveBytes: limits.maxArchiveBytes,
-    maxEntries: limits.maxPages + 64,
+    maxEntries: Math.min(limits.maxArchiveEntries, limits.maxPages + 64),
     maxEntryCompressedBytes: Math.max(limits.maxPageBytes, limits.maxComicInfoBytes),
     maxEntryUncompressedBytes: Math.max(limits.maxPageBytes, limits.maxComicInfoBytes),
     maxTotalUncompressedBytes: Math.min(
       512_000_000,
       limits.maxTotalPageBytes + limits.maxComicInfoBytes
     ),
+    maxCompressionRatio: limits.maxCompressionRatio,
   };
-  let archive;
+  let archive: StudioZipArchive;
   try {
     archive = await readStudioZipArchive(source, {
       limits: zipLimits,
@@ -752,8 +1468,7 @@ export async function importStudioCbz(
       signal: options.signal,
     });
   } catch (cause) {
-    const detail = cause instanceof Error ? `: ${cause.message}` : "";
-    throw cbzError("ARCHIVE_INVALID", `CBZ ZIP이 올바르지 않습니다${detail}`);
+    rethrowZipFailure(cause, options.signal);
   }
 
   const warnings: StudioCbzWarning[] = [];
@@ -764,7 +1479,7 @@ export async function importStudioCbz(
   let declaredPageCount: number | undefined;
   if (comicInfoEntry) {
     const parsed = parseComicInfo(
-      await archive.readEntry(comicInfoEntry, { signal: options.signal }),
+      await readCbzEntry(archive, comicInfoEntry, options.signal),
       limits
     );
     metadata = parsed.metadata;
@@ -780,7 +1495,15 @@ export async function importStudioCbz(
     .filter((entry) => {
       if (entry.directory || entry === comicInfoEntry) return false;
       const lower = entry.path.toLowerCase();
-      if (/\.(?:png|jpe?g|webp)$/u.test(lower)) return true;
+      if (isCbzMetadataJunkPath(lower)) {
+        warnings.push({
+          code: "IGNORED_ENTRY",
+          path: entry.path,
+          message: `CBZ의 운영체제 metadata 항목 '${entry.path}'을 건너뛰었습니다.`,
+        });
+        return false;
+      }
+      if (/\.(?:png|jpe?g|webp|gif)$/u.test(lower)) return true;
       warnings.push({
         code: "IGNORED_ENTRY",
         path: entry.path,
@@ -795,6 +1518,10 @@ export async function importStudioCbz(
 
   const pages: StudioCbzImportedPage[] = [];
   let totalPageBytes = 0;
+  let totalDecodedPixels = 0;
+  let totalDecodedBytes = 0;
+  let maxWidth = 0;
+  let maxHeight = 0;
   for (let index = 0; index < imageEntries.length; index += 1) {
     throwIfAborted(options.signal);
     const entry = imageEntries[index];
@@ -802,24 +1529,43 @@ export async function importStudioCbz(
     if (entry.uncompressedBytes > limits.maxPageBytes) {
       throw cbzError("SIZE_LIMIT", "CBZ 페이지가 안전 한도를 넘었습니다.", entry.path);
     }
-    const bytes = await archive.readEntry(entry, { signal: options.signal });
+    const bytes = await readCbzEntry(archive, entry, options.signal);
     const detected = detectPage(bytes);
     if (!detected || !imageExtensionMatches(entry.path, detected)) {
       throw cbzError(
         "IMAGE_INVALID",
-        "CBZ 페이지의 확장자와 PNG/JPEG/WebP signature가 일치하지 않습니다.",
+        "CBZ 페이지의 확장자와 PNG/JPEG/WebP/GIF 구조 및 크기 정보가 일치하지 않습니다.",
         entry.path
       );
     }
+    assertDetectedPageBudget(detected, limits, entry.path);
     totalPageBytes += bytes.byteLength;
     if (totalPageBytes > limits.maxTotalPageBytes) {
       throw cbzError("SIZE_LIMIT", "CBZ 전체 페이지 크기가 안전 한도를 넘었습니다.");
     }
+    totalDecodedPixels += detected.decodedPixelCount;
+    totalDecodedBytes += detected.decodedByteSize;
+    if (
+      !Number.isSafeInteger(totalDecodedPixels) ||
+      totalDecodedPixels > limits.maxTotalDecodedPixels ||
+      !Number.isSafeInteger(totalDecodedBytes) ||
+      totalDecodedBytes > limits.maxTotalDecodedBytes
+    ) {
+      throw cbzError("SIZE_LIMIT", "CBZ 전체 페이지의 디코드 메모리 예산을 넘었습니다.");
+    }
+    maxWidth = Math.max(maxWidth, detected.width);
+    maxHeight = Math.max(maxHeight, detected.height);
     pages.push(Object.freeze({
       index,
       path: entry.path,
       mimeType: detected.mimeType,
       byteSize: bytes.byteLength,
+      width: detected.width,
+      height: detected.height,
+      pixelCount: detected.pixelCount,
+      frameCount: detected.frameCount,
+      decodedPixelCount: detected.decodedPixelCount,
+      decodedByteSize: detected.decodedByteSize,
       image: bytesToBlob(bytes, detected.mimeType),
     }));
   }
@@ -837,6 +1583,16 @@ export async function importStudioCbz(
       ...(metadata.genre ? { genre: Object.freeze([...metadata.genre]) } : {}),
       ...(metadata.tags ? { tags: Object.freeze([...metadata.tags]) } : {}),
     }),
-    warnings: Object.freeze(warnings),
+    summary: Object.freeze({
+      pageCount: pages.length,
+      totalEncodedBytes: totalPageBytes,
+      totalDecodedPixels,
+      totalDecodedBytes,
+      maxWidth,
+      maxHeight,
+      hasComicInfo: comicInfoEntry !== undefined,
+      ignoredEntryCount: warnings.filter((warning) => warning.code === "IGNORED_ENTRY").length,
+    }),
+    warnings: Object.freeze(warnings.map((warning) => Object.freeze({ ...warning }))),
   });
 }

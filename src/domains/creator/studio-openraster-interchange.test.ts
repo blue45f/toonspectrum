@@ -4,6 +4,7 @@ import {
   buildStudioOpenRasterBlob,
   buildStudioOpenRasterBytes,
   importStudioOpenRaster,
+  STUDIO_OPENRASTER_BLEND_MODES,
   STUDIO_OPENRASTER_LIMITS,
   STUDIO_OPENRASTER_MIME,
   StudioOpenRasterError,
@@ -54,6 +55,7 @@ async function customOra(stackXml: string, overrides?: {
   layer?: Uint8Array;
   merged?: Uint8Array;
   thumbnail?: Uint8Array;
+  extraEntries?: ReadonlyArray<{ path: string; data: Uint8Array }>;
 }): Promise<Uint8Array> {
   return buildStudioPackageArchiveBytes([
     {
@@ -68,7 +70,24 @@ async function customOra(stackXml: string, overrides?: {
       ? []
       : [{ path: "Thumbnails/thumbnail.png", data: overrides?.thumbnail ?? png(2) }]),
     { path: "data/layer.png", data: overrides?.layer ?? png(3) },
+    ...(overrides?.extraEntries ?? []),
   ]);
+}
+
+function replaceAsciiEverywhere(source: Uint8Array, from: string, to: string): Uint8Array {
+  const fromBytes = encoder.encode(from);
+  const toBytes = encoder.encode(to);
+  expect(toBytes.byteLength).toBe(fromBytes.byteLength);
+  const output = source.slice();
+  let replacements = 0;
+  for (let offset = 0; offset <= output.byteLength - fromBytes.byteLength; offset += 1) {
+    if (!fromBytes.every((value, index) => output[offset + index] === value)) continue;
+    output.set(toBytes, offset);
+    offset += fromBytes.byteLength - 1;
+    replacements += 1;
+  }
+  expect(replacements).toBeGreaterThanOrEqual(2);
+  return output;
 }
 
 describe("OpenRaster interchange", () => {
@@ -77,7 +96,7 @@ describe("OpenRaster interchange", () => {
       width: 800,
       height: 1_200,
       name: "Episode & <One>",
-      mergedImage: png(10),
+      mergedImage: png(10, 800, 1_200),
       thumbnail: png(11),
       layers: [
         {
@@ -152,9 +171,50 @@ describe("OpenRaster interchange", () => {
       },
     ]);
     expect(imported.layers[0]?.png.type).toBe("image/png");
+    expect(imported.layers[0]).toMatchObject({
+      width: 1,
+      height: 1,
+      byteLength: 33,
+      decodedRgbaBytes: 4,
+      groupIds: [],
+      groupPath: [],
+      depth: 0,
+      effectiveOpacity: 0.75,
+      effectiveVisible: false,
+    });
     expect([...new Uint8Array(await imported.layers[0]!.png.arrayBuffer())]).toEqual([...png(12)]);
     expect(imported.mergedImage.type).toBe("image/png");
     expect(imported.thumbnail.type).toBe("image/png");
+    expect(imported.groups).toEqual([]);
+    expect(imported.mergedImageInfo).toMatchObject({
+      path: "mergedimage.png",
+      width: 800,
+      height: 1_200,
+      byteLength: 33,
+      decodedRgbaBytes: 3_840_000,
+      bitDepth: 8,
+      colorType: 6,
+      interlaced: false,
+    });
+    expect(imported.thumbnailInfo).toMatchObject({ width: 1, height: 1 });
+    expect(imported.summary).toMatchObject({
+      layerCount: 2,
+      groupCount: 0,
+      hiddenLayerCount: 1,
+      hiddenGroupCount: 0,
+      unsupportedFeatureCount: 0,
+    });
+    expect([
+      imported,
+      imported.layers,
+      imported.layers[0],
+      imported.layers[0]?.groupIds,
+      imported.groups,
+      imported.mergedImageInfo,
+      imported.thumbnailInfo,
+      imported.summary,
+      imported.warnings,
+    ].every((value) => Object.isFrozen(value))).toBe(true);
   });
 
   it("builds an image/openraster Blob through the shared ZIP writer", async () => {
@@ -162,7 +222,7 @@ describe("OpenRaster interchange", () => {
       width: 10,
       height: 20,
       layers: [{ name: "Layer", png: png(1) }],
-      mergedImage: png(2),
+      mergedImage: png(2, 10, 20),
       thumbnail: png(3),
     });
 
@@ -176,7 +236,7 @@ describe("OpenRaster interchange", () => {
       width: 10,
       height: 10,
       layers: [{ name: "Layer", png: png(1), blendMode: "linear-burn" }],
-      mergedImage: png(2),
+      mergedImage: png(2, 10, 10),
       thumbnail: png(3),
     });
 
@@ -187,19 +247,99 @@ describe("OpenRaster interchange", () => {
     expect(imported.layers[0]?.blendMode).toBe("normal");
   });
 
-  it("flattens groups and reports masks, unknown blend modes, and XML elements", async () => {
+  it("round-trips every baseline OpenRaster composite operation", async () => {
+    const result = await buildStudioOpenRasterBytes({
+      width: 10,
+      height: 10,
+      layers: STUDIO_OPENRASTER_BLEND_MODES.map((blendMode, index) => ({
+        name: blendMode,
+        png: png(index + 1),
+        blendMode,
+      })),
+      mergedImage: png(80, 10, 10),
+      thumbnail: png(81),
+    });
+
+    expect(result.warnings).toEqual([]);
+    const imported = await importStudioOpenRaster(result.bytes);
+    expect(imported.layers.map((layer) => layer.blendMode)).toEqual([
+      ...STUDIO_OPENRASTER_BLEND_MODES,
+    ]);
+    expect(imported.layers.map((layer) => layer.sourceCompositeOp)).toEqual([
+      "svg:src-over",
+      "svg:multiply",
+      "svg:screen",
+      "svg:overlay",
+      "svg:darken",
+      "svg:lighten",
+      "svg:color-dodge",
+      "svg:color-burn",
+      "svg:hard-light",
+      "svg:soft-light",
+      "svg:difference",
+      "svg:exclusion",
+      "svg:color",
+      "svg:luminosity",
+      "svg:hue",
+      "svg:saturation",
+      "svg:plus",
+      "svg:dst-in",
+      "svg:dst-out",
+      "svg:src-atop",
+      "svg:dst-atop",
+    ]);
+  });
+
+  it("preserves nested groups, cumulative state, resolution, and unsupported-feature warnings", async () => {
     const archive = await customOra(`<?xml version="1.0"?>
-<image w="10" h="20" name="Grouped">
+<image version="0.0.6" w="10" h="20" name="Grouped" xres="300" yres="600">
   <stack>
-    <stack name="Characters" opacity="0.8">
-      <layer name="Hero" src="data/layer.png" x="2" y="3" opacity="0.5" visibility="visible" composite-op="krita:linear-burn"/>
-      <mask src="data/mask.png"/>
-      <metadata value="ignored"/>
+    <stack name="Characters" opacity="0.8" composite-op="svg:multiply" isolation="isolate">
+      <stack name="Hidden FX" opacity="0.5" visibility="hidden" composite-op="svg:screen" isolation="auto">
+        <layer name="Hero" src="data/layer.png" x="2" y="3" opacity="0.5" visibility="visible" composite-op="krita:linear-burn">
+          <mask src="data/mask.png"/>
+        </layer>
+        <metadata value="ignored">extension payload</metadata>
+      </stack>
     </stack>
   </stack>
 </image>`);
 
     const imported = await importStudioOpenRaster(archive);
+    expect(imported).toMatchObject({
+      version: "0.0.6",
+      resolution: { xPpi: 300, yPpi: 600 },
+    });
+    expect(imported.groups).toEqual([
+      {
+        id: "group-0000",
+        name: "Characters",
+        depth: 1,
+        siblingIndex: 0,
+        opacity: 0.8,
+        visible: true,
+        blendMode: "multiply",
+        sourceCompositeOp: "svg:multiply",
+        isolation: "isolate",
+        effectiveOpacity: 0.8,
+        effectiveVisible: true,
+      },
+      {
+        id: "group-0001",
+        parentId: "group-0000",
+        name: "Hidden FX",
+        depth: 2,
+        siblingIndex: 0,
+        opacity: 0.5,
+        visible: false,
+        blendMode: "screen",
+        sourceCompositeOp: "svg:screen",
+        isolation: "auto",
+        effectiveOpacity: 0.4,
+        effectiveVisible: false,
+      },
+    ]);
+    expect(imported.groups.every((group) => Object.isFrozen(group))).toBe(true);
     expect(imported.layers[0]).toMatchObject({
       name: "Hero",
       x: 2,
@@ -207,13 +347,27 @@ describe("OpenRaster interchange", () => {
       opacity: 0.5,
       blendMode: "normal",
       sourceCompositeOp: "krita:linear-burn",
+      parentGroupId: "group-0001",
+      groupIds: ["group-0000", "group-0001"],
+      groupPath: ["Characters", "Hidden FX"],
+      depth: 2,
+      siblingIndex: 0,
+      effectiveOpacity: 0.2,
+      effectiveVisible: false,
     });
     expect(imported.warnings.map((warning) => warning.code)).toEqual([
-      "GROUPS_FLATTENED",
       "UNSUPPORTED_BLEND_MODE",
       "MASKS_IGNORED",
       "UNSUPPORTED_XML_ELEMENT",
+      "PREVIEW_DIMENSION_MISMATCH",
     ]);
+    expect(imported.summary).toMatchObject({
+      layerCount: 1,
+      groupCount: 2,
+      hiddenLayerCount: 1,
+      hiddenGroupCount: 1,
+      unsupportedFeatureCount: 3,
+    });
   });
 
   it("requires first-and-stored mimetype plus all canonical preview entries", async () => {
@@ -266,6 +420,152 @@ describe("OpenRaster interchange", () => {
       ),
       "REQUIRED_ENTRY_MISSING"
     );
+  });
+
+  it("rejects unsafe, reserved, normalized, and duplicate layer references before extraction", async () => {
+    const wrap = (layers: string) => `<image w="1" h="1"><stack>${layers}</stack></image>`;
+    const unsafe = await expectOraError(
+      importStudioOpenRaster(await customOra(wrap('<layer src="../escape0.png"/>'))),
+      "STACK_XML_INVALID",
+      "../escape0.png",
+    );
+    expect(unsafe.message).toContain("안전하지 않은 경로");
+
+    await expectOraError(
+      importStudioOpenRaster(await customOra(wrap('<layer src="mergedimage.png"/>'))),
+      "STACK_XML_INVALID",
+      "mergedimage.png",
+    );
+    await expectOraError(
+      importStudioOpenRaster(await customOra(wrap('<layer src="data/cafe\u0301.png"/>'))),
+      "STACK_XML_INVALID",
+      "data/cafe\u0301.png",
+    );
+    const duplicate = await expectOraError(
+      importStudioOpenRaster(await customOra(wrap(
+        '<layer src="data/layer.png"/><layer src="DATA/LAYER.PNG"/>',
+      ))),
+      "STACK_XML_INVALID",
+      "DATA/LAYER.PNG",
+    );
+    expect(duplicate.message).toContain("중복 참조");
+  });
+
+  it("does not interpret supported-looking descendants inside unknown XML extensions", async () => {
+    const archive = await customOra(`<image w="1" h="1"><stack>
+      <extension vendor="example">text payload<layer src="data/layer.png"/></extension>
+      <layer name="Real" src="data/layer.png" selected="true"/>
+    </stack></image>`);
+
+    const imported = await importStudioOpenRaster(archive);
+    expect(imported.layers.map((layer) => layer.name)).toEqual(["Real"]);
+    expect(imported.warnings.map((warning) => warning.code)).toEqual([
+      "UNSUPPORTED_XML_ELEMENT",
+      "UNSUPPORTED_XML_ATTRIBUTE",
+    ]);
+    expect(imported.warnings.every((warning) => warning.message.includes("보존") || warning.message.includes("저장"))).toBe(true);
+  });
+
+  it("rejects ambiguous ZIP paths and preserves the offending archive path", async () => {
+    const valid = await customOra(
+      '<image w="1" h="1"><stack><layer src="data/layer.png"/></stack></image>',
+      { extraEntries: [{ path: "data/other.png", data: png(9) }] },
+    );
+    const duplicatePaths = replaceAsciiEverywhere(valid, "data/other.png", "data/layer.png");
+    const error = await expectOraError(
+      importStudioOpenRaster(duplicatePaths),
+      "ARCHIVE_INVALID",
+      "data/layer.png",
+    );
+    expect(error.message).toContain("경로");
+  });
+
+  it("normalizes deferred ZIP CRC failures into a path-aware ORA error", async () => {
+    const valid = await customOra(
+      '<image w="1" h="1"><stack><layer src="data/layer.png"/></stack></image>',
+    );
+    const parsed = await readStudioZipArchive(valid);
+    const layerEntry = parsed.getEntry("data/layer.png")!;
+    const corrupted = valid.slice();
+    const corruptOffset = layerEntry.dataOffset + layerEntry.uncompressedBytes - 1;
+    corrupted[corruptOffset] = (corrupted[corruptOffset] ?? 0) ^ 0xff;
+
+    const error = await expectOraError(
+      importStudioOpenRaster(corrupted),
+      "ARCHIVE_INVALID",
+      "data/layer.png",
+    );
+    expect(error.message).toContain("CRC-32");
+  });
+
+  it("fails closed on invalid XML placement, declarations, comments, and resolution metadata", async () => {
+    const invalidXmlDocuments = [
+      '<image w="1" h="1"><stack><layer src="data/layer.png"><layer src="data/other.png"/></layer></stack></image>',
+      '<image w="1" h="1"><stack><layer src="data/layer.png"/></stack><stack/></image>',
+      '<image w="1" h="1" xres="300"><stack><layer src="data/layer.png"/></stack></image>',
+      '<image version="future" w="1" h="1"><stack><layer src="data/layer.png"/></stack></image>',
+      '<image w="1" h="1"><stack><layer src="data/layer.png"/></stack></image><?target value?>',
+      '<!-- invalid -- comment --><image w="1" h="1"><stack><layer src="data/layer.png"/></stack></image>',
+    ];
+    for (const xml of invalidXmlDocuments) {
+      await expectOraError(importStudioOpenRaster(await customOra(xml)), "STACK_XML_INVALID");
+    }
+  });
+
+  it("enforces XML element, attribute, depth, group, and stack-byte budgets", async () => {
+    const flat = '<image w="1" h="1"><stack><layer src="data/layer.png"/></stack></image>';
+    await expectOraError(
+      importStudioOpenRaster(await customOra(flat), { limits: { maxXmlElements: 2 } }),
+      "STACK_XML_INVALID",
+      "stack.xml",
+    );
+    await expectOraError(
+      importStudioOpenRaster(await customOra(flat), { limits: { maxXmlAttributesPerElement: 1 } }),
+      "STACK_XML_INVALID",
+    );
+    await expectOraError(
+      importStudioOpenRaster(await customOra(flat), { limits: { maxXmlDepth: 2 } }),
+      "STACK_XML_INVALID",
+      "stack.xml",
+    );
+    const grouped = '<image w="1" h="1"><stack><stack><layer src="data/layer.png"/></stack></stack></image>';
+    await expectOraError(
+      importStudioOpenRaster(await customOra(grouped), { limits: { maxGroups: 0 } }),
+      "STACK_XML_INVALID",
+      "stack.xml",
+    );
+    await expectOraError(
+      importStudioOpenRaster(await customOra(flat), { limits: { maxStackXmlBytes: 20 } }),
+      "SIZE_LIMIT",
+      "stack.xml",
+    );
+  });
+
+  it("returns preview metadata and warns on noncanonical preview dimensions or profiles", async () => {
+    const thumbnail = png(2, 300, 100);
+    thumbnail[28] = 1;
+    const archive = await customOra(
+      '<image version="0.0.6" w="10" h="20"><stack><layer src="data/layer.png"/></stack></image>',
+      { merged: png(1, 9, 20), thumbnail },
+    );
+
+    const imported = await importStudioOpenRaster(archive);
+    expect(imported.mergedImageInfo).toMatchObject({
+      width: 9,
+      height: 20,
+      bitDepth: 8,
+      colorType: 6,
+      interlaced: false,
+    });
+    expect(imported.thumbnailInfo).toMatchObject({
+      width: 300,
+      height: 100,
+      interlaced: true,
+    });
+    expect(imported.warnings.map((warning) => warning.code)).toEqual([
+      "PREVIEW_DIMENSION_MISMATCH",
+      "PREVIEW_PROFILE_MISMATCH",
+    ]);
   });
 
   it("validates a complete PNG IHDR instead of accepting signature-only image entries", async () => {
