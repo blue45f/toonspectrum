@@ -25,6 +25,8 @@ const IDENTITY: StudioBrushSymmetryTransform = { a: 1, b: 0, c: 0, d: 1, e: 0, f
  * radial directions (64 affine copies for kaleidoscope).
  */
 export const STUDIO_BRUSH_MAX_RADIAL_SYMMETRY_DIRECTIONS = 32;
+export const STUDIO_BRUSH_MAX_SYMMETRY_VARIATIONS =
+  STUDIO_BRUSH_MAX_RADIAL_SYMMETRY_DIRECTIONS * 2;
 
 function finite(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;

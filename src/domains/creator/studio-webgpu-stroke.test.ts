@@ -1,19 +1,23 @@
 import { describe, expect, it } from "vitest";
 
 import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
-import { planStudioGpuDabUpdate } from "./studio-webgpu-dab-planner";
+import { isValidStudioGpuStroke, planStudioGpuDabUpdate } from "./studio-webgpu-dab-planner";
 import {
   planStudioGpuLiveStroke,
   STUDIO_GPU_MAX_LIVE_SYMMETRY_DIRECTIONS,
 } from "./studio-webgpu-live-stroke-plan";
 import {
+  STUDIO_GPU_STROKE_FEED_REVISION,
   buildStudioGpuLiveStroke,
   orderStudioGpuStrokes,
   sameStudioGpuStroke,
   sameStudioGpuStrokes,
+  snapshotStudioGpuStroke,
   snapshotStudioGpuStrokes,
   type StudioGpuStroke,
 } from "./studio-webgpu-stroke";
+import { createStudioGpuStrokeFeedBaseline } from "./studio-webgpu-stroke-feed";
+import { signatureStudioGpuStroke } from "./studio-webgpu-tile-plan";
 
 function stroke(overrides: Partial<StudioGpuStroke> = {}): StudioGpuStroke {
   return {
@@ -82,6 +86,23 @@ describe("studio WebGPU stroke authority helpers", () => {
       points: [0, 0, 4, 6],
       pressures: [0.75, 0.5],
     });
+
+    expect(buildStudioGpuLiveStroke({
+      id: "float32-overflow",
+      points: [1e100, 0],
+      pressures: [0.5],
+      color: "#000000",
+      size: 4,
+    })).toBeNull();
+    expect(isValidStudioGpuStroke(stroke({ points: [1e100, 0] }))).toBe(false);
+    expect(planStudioGpuLiveStroke({
+      id: "overflow-symmetry",
+      points: [1, 0],
+      pressures: [0.5],
+      color: "#000000",
+      size: 4,
+      symmetry: { type: "vertical", centerX: 1e100, centerY: 0 },
+    })).toBeNull();
   });
 
   it("extends a one-point tap through the append-only GPU update path", () => {
@@ -162,6 +183,61 @@ describe("studio WebGPU stroke authority helpers", () => {
     ["order", stroke({ orderKey: "front" })],
   ] as const)("rejects a changed %s without relying on fingerprints", (_label, changed) => {
     expect(sameStudioGpuStroke(stroke(), changed)).toBe(false);
+  });
+
+  it.each([
+    ["id", { id: "other" }],
+    ["color", { color: "#ffffff" }],
+    ["size", { size: 7 }],
+    ["pressure model", { pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 }],
+    ["opacity", { opacity: 0.5 }],
+    ["composite", { composite: "erase" as const }],
+    ["order", { orderKey: "other-order" }],
+  ] as const)("does not let a preserved feed token hide a changed %s", (_label, patch) => {
+    const baseline = createStudioGpuStrokeFeedBaseline([stroke()], "authority-style")!;
+    const fed = baseline[0]!;
+    expect(sameStudioGpuStroke(fed, { ...fed, ...patch })).toBe(false);
+  });
+
+  it("does not trust feed metadata copied onto an unregistered wrapper", () => {
+    const fed = createStudioGpuStrokeFeedBaseline([stroke()], "authority-provenance")![0]!;
+    const copied = Object.freeze({
+      ...fed,
+      points: Object.freeze([99, 99, 100, 100]),
+      pressures: Object.freeze([1, 1]),
+      [STUDIO_GPU_STROKE_FEED_REVISION]: fed[STUDIO_GPU_STROKE_FEED_REVISION],
+    });
+
+    expect(isValidStudioGpuStroke(fed)).toBe(true);
+    expect(isValidStudioGpuStroke(copied)).toBe(false);
+    expect(signatureStudioGpuStroke(fed)).toMatch(/^feed:/u);
+    expect(signatureStudioGpuStroke(copied)).not.toMatch(/^feed:/u);
+  });
+
+  it("deep-snapshots mutable arrays even when a caller forges trusted feed metadata", () => {
+    const points = [0, 0, 12, 8];
+    const pressures = [0.25, 0.75];
+    const fake = stroke({
+      points,
+      pressures,
+      [STUDIO_GPU_STROKE_FEED_REVISION]: {
+        trustedImmutable: true,
+      } as StudioGpuStroke[typeof STUDIO_GPU_STROKE_FEED_REVISION],
+    });
+
+    const snapshot = snapshotStudioGpuStroke(fake);
+    points[0] = 99;
+    pressures[0] = 1;
+
+    expect(snapshot).not.toBe(fake);
+    expect(snapshot.points[0]).toBe(0);
+    expect(snapshot.pressures?.[0]).toBe(0.25);
+  });
+
+  it("keeps genuine registered feed wrappers zero-copy at the snapshot boundary", () => {
+    const fed = createStudioGpuStrokeFeedBaseline([stroke()], "authority-zero-copy")![0]!;
+
+    expect(snapshotStudioGpuStroke(fed)).toBe(fed);
   });
 
   it("deep-snapshots mutable pointer arrays at the receipt boundary", () => {

@@ -9,6 +9,10 @@ import {
   studioGpuPressureRadius,
   type StudioGpuStroke,
 } from "./studio-webgpu-stroke";
+import {
+  isTrustedStudioGpuStrokeFeedRevision,
+  isTrustedStudioGpuStrokeFeedStroke,
+} from "./studio-webgpu-stroke-feed";
 
 export const STUDIO_GPU_TILE_SIZE = 512;
 export const STUDIO_GPU_TILE_BLEED = 2;
@@ -180,7 +184,10 @@ function strokeStyleSignature(stroke: StudioGpuStroke): string {
 
 function operationForStudioGpuStroke(stroke: StudioGpuStroke): StudioGpuTileOperation {
   const feed = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
-  if (feed) {
+  if (
+    isTrustedStudioGpuStrokeFeedStroke(stroke)
+    && isTrustedStudioGpuStrokeFeedRevision(feed)
+  ) {
     return {
       id: stroke.id,
       fingerprint: `feed:${feed.token}`,
@@ -211,7 +218,10 @@ function operationForStudioGpuStroke(stroke: StudioGpuStroke): StudioGpuTileOper
 /** Exact immutable operation identity. Full strokes use unambiguous length-prefixed fields. */
 export function signatureStudioGpuStroke(stroke: StudioGpuStroke): string {
   const feed = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
-  if (feed) return `feed:${feed.token}`;
+  if (
+    isTrustedStudioGpuStrokeFeedStroke(stroke)
+    && isTrustedStudioGpuStrokeFeedRevision(feed)
+  ) return `feed:${feed.token}`;
   const tokens: string[] = [];
   const write = (value: string | number | undefined) => tokens.push(semanticToken(value));
   write(stroke.id);
@@ -233,7 +243,10 @@ export function signatureStudioGpuStroke(stroke: StudioGpuStroke): string {
 /** Stable, locale-independent precheck; callers must retain the exact signature beside it. */
 export function fingerprintStudioGpuStroke(stroke: StudioGpuStroke): string {
   const feed = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
-  if (feed) return `feed:${feed.token}`;
+  if (
+    isTrustedStudioGpuStrokeFeedStroke(stroke)
+    && isTrustedStudioGpuStrokeFeedRevision(feed)
+  ) return `feed:${feed.token}`;
   let hash = fnv1a(stroke.id);
   const write = (value: string | number | undefined) => {
     const token = typeof value === "number" ? stableNumber(value) : value ?? "<undefined>";
@@ -260,7 +273,10 @@ export function boundsForStudioGpuStroke(
   bleed = STUDIO_GPU_TILE_BLEED
 ): StudioGpuRect | null {
   const feed = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
-  if (feed) {
+  if (
+    isTrustedStudioGpuStrokeFeedStroke(stroke)
+    && isTrustedStudioGpuStrokeFeedRevision(feed)
+  ) {
     const edgeBleed = Math.max(0, finiteOr(bleed, STUDIO_GPU_TILE_BLEED));
     return {
       x: feed.minimumX - edgeBleed,

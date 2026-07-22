@@ -10,6 +10,27 @@ import type { StudioResidualInkState } from "./studio-causal-ink";
 export type StudioGpuComposite = "normal" | "erase";
 
 /**
+ * Immutable root geometry retained by an append-only feed for device-loss/rebuild recovery.
+ * The point arrays are canonical GPU samples and may alias the already-frozen baseline arrays;
+ * suffix revisions must never replace or mutate this checkpoint.
+ */
+export interface StudioGpuStrokeFeedRecoveryCheckpoint {
+  readonly lineage: string;
+  readonly pointCount: number;
+  readonly points: readonly number[];
+  readonly pressures: readonly number[];
+  readonly id: string;
+  readonly color: string;
+  readonly size: number;
+  readonly pressureModel?: StudioInkPressureModel;
+  readonly opacity?: number;
+  readonly composite?: StudioGpuComposite;
+  readonly orderKey?: string;
+  readonly styleSignature: string;
+  readonly trustedImmutable: true;
+}
+
+/**
  * Opaque lineage carried only by the imperative live-stroke feed. A revision proves that the
  * current samples were produced by appending the recorded suffix to its parent revision; normal
  * document strokes never receive this metadata and continue through exact full-array comparison.
@@ -36,12 +57,19 @@ export interface StudioGpuStrokeFeedRevision {
   readonly maximumX: number;
   readonly maximumY: number;
   readonly styleSignature: string;
+  /** Present only on revision zero. Descendants reach it through their immutable parent chain. */
+  readonly recoveryCheckpoint: StudioGpuStrokeFeedRecoveryCheckpoint | null;
   readonly trustedImmutable: true;
 }
 
 export const STUDIO_GPU_STROKE_FEED_REVISION: unique symbol = Symbol(
   "StudioGpuStrokeFeedRevision"
 );
+
+// `trustedImmutable` is descriptive metadata, not an authority token: callers can copy or forge
+// the public symbol. Only wrappers registered by the feed implementation may bypass the ordinary
+// deep snapshot boundary. Keeping the registry in this module avoids a stroke -> feed import cycle.
+const trustedStudioGpuStrokeFeedStrokes = new WeakSet<object>();
 
 export interface StudioGpuStroke {
   readonly id: string;
@@ -55,6 +83,27 @@ export interface StudioGpuStroke {
   readonly orderKey?: string;
   /** Internal append-only proof. It does not alter paint semantics or serialized document data. */
   readonly [STUDIO_GPU_STROKE_FEED_REVISION]?: StudioGpuStrokeFeedRevision;
+}
+
+export function isTrustedStudioGpuStrokeFeedStroke(value: unknown): boolean {
+  return typeof value === "object"
+    && value !== null
+    && trustedStudioGpuStrokeFeedStrokes.has(value);
+}
+
+/** @internal Feed wrappers must be frozen before they receive in-process snapshot authority. */
+export function registerTrustedStudioGpuStrokeFeedStroke(stroke: StudioGpuStroke): void {
+  if (
+    !Object.isFrozen(stroke)
+    || !Array.isArray(stroke.points)
+    || !Object.isFrozen(stroke.points)
+    || (stroke.pressures !== undefined && (
+      !Array.isArray(stroke.pressures) || !Object.isFrozen(stroke.pressures)
+    ))
+  ) {
+    throw new TypeError("A trusted GPU stroke feed wrapper and its sample arrays must be frozen");
+  }
+  trustedStudioGpuStrokeFeedStrokes.add(stroke);
 }
 
 /**
@@ -74,6 +123,13 @@ export interface StudioGpuLiveStrokeInput {
 
 export const STUDIO_GPU_MAX_BRUSH_SIZE = STUDIO_INK_MAX_BRUSH_SIZE;
 
+/** Values uploaded to GPU float buffers must remain finite after Float32 conversion. */
+export function isStudioGpuFiniteScalar(value: unknown): value is number {
+  return typeof value === "number"
+    && Number.isFinite(value)
+    && Number.isFinite(Math.fround(value));
+}
+
 export function sameStudioGpuNumberArray(
   left: readonly number[] | undefined,
   right: readonly number[] | undefined
@@ -88,6 +144,17 @@ export function sameStudioGpuNumberArray(
  * A hash is intentionally insufficient here: a collision must never hide the source pixels.
  */
 export function sameStudioGpuStroke(left: StudioGpuStroke, right: StudioGpuStroke): boolean {
+  if (
+    left.id !== right.id
+    || left.color !== right.color
+    || !Object.is(left.size, right.size)
+    || left.pressureModel !== right.pressureModel
+    || !Object.is(left.opacity, right.opacity)
+    || left.composite !== right.composite
+    || left.orderKey !== right.orderKey
+  ) {
+    return false;
+  }
   const leftRevision = left[STUDIO_GPU_STROKE_FEED_REVISION];
   const rightRevision = right[STUDIO_GPU_STROKE_FEED_REVISION];
   if (
@@ -99,14 +166,7 @@ export function sameStudioGpuStroke(left: StudioGpuStroke, right: StudioGpuStrok
   ) {
     return true;
   }
-  return left.id === right.id
-    && left.color === right.color
-    && Object.is(left.size, right.size)
-    && left.pressureModel === right.pressureModel
-    && Object.is(left.opacity, right.opacity)
-    && left.composite === right.composite
-    && left.orderKey === right.orderKey
-    && sameStudioGpuNumberArray(left.points, right.points)
+  return sameStudioGpuNumberArray(left.points, right.points)
     && sameStudioGpuNumberArray(left.pressures, right.pressures);
 }
 
@@ -121,7 +181,7 @@ export function sameStudioGpuStrokes(
 }
 
 export function snapshotStudioGpuStroke(stroke: StudioGpuStroke): StudioGpuStroke {
-  if (stroke[STUDIO_GPU_STROKE_FEED_REVISION]?.trustedImmutable) return stroke;
+  if (isTrustedStudioGpuStrokeFeedStroke(stroke)) return stroke;
   return {
     ...stroke,
     points: [...stroke.points],
@@ -149,7 +209,7 @@ export function buildStudioGpuLiveStroke(
   for (let index = 0; index + 1 < input.points.length; index += 2) {
     const x = input.points[index];
     const y = input.points[index + 1];
-    if (!Number.isFinite(x) || !Number.isFinite(y)) break;
+    if (!isStudioGpuFiniteScalar(x) || !isStudioGpuFiniteScalar(y)) break;
     points.push(x!, y!);
   }
 
@@ -165,8 +225,8 @@ export function buildStudioGpuLiveStroke(
 
   return {
     id: input.id,
-    points,
-    pressures,
+    points: Object.freeze(points),
+    pressures: Object.freeze(pressures),
     color: input.color,
     size: input.size,
     ...(input.pressureModel === undefined ? {} : { pressureModel: input.pressureModel }),

@@ -7,6 +7,7 @@ import {
 import { isStudioGpuColorSupported } from "./studio-webgpu-color";
 import {
   buildStudioGpuLiveStroke,
+  isStudioGpuFiniteScalar,
   STUDIO_GPU_MAX_BRUSH_SIZE,
   type StudioGpuComposite,
   type StudioGpuLiveStrokeInput,
@@ -48,11 +49,11 @@ export type StudioGpuLiveStrokePlanner = (
 function validStyle(input: StudioGpuLiveStrokeInput): boolean {
   return !!input.id
     && isStudioGpuColorSupported(input.color)
-    && Number.isFinite(input.size)
+    && isStudioGpuFiniteScalar(input.size)
     && input.size > 0
     && input.size <= STUDIO_GPU_MAX_BRUSH_SIZE
     && (input.opacity === undefined
-      || (Number.isFinite(input.opacity) && input.opacity >= 0 && input.opacity <= 1))
+      || (isStudioGpuFiniteScalar(input.opacity) && input.opacity >= 0 && input.opacity <= 1))
     && (input.composite === undefined || input.composite === "normal" || input.composite === "erase");
 }
 
@@ -60,8 +61,8 @@ function normalizeSymmetry(input?: StudioBrushSymmetrySpec): StudioBrushSymmetry
   if (!input || input.type === "none") return { type: "none", centerX: 0, centerY: 0 };
   if (
     !["vertical", "horizontal", "radial", "kaleidoscope"].includes(input.type)
-    || !Number.isFinite(input.centerX)
-    || !Number.isFinite(input.centerY)
+    || !isStudioGpuFiniteScalar(input.centerX)
+    || !isStudioGpuFiniteScalar(input.centerY)
   ) return null;
   if (input.type === "vertical" || input.type === "horizontal") return input;
   const radialCount = Math.round(input.radialCount ?? 4);
@@ -74,7 +75,7 @@ function normalizeSymmetry(input?: StudioBrushSymmetrySpec): StudioBrushSymmetry
 function transformPoints(
   points: readonly number[],
   transform: StudioBrushSymmetryTransform
-): readonly number[] {
+): readonly number[] | null {
   if (
     transform.a === 1 && transform.b === 0 && transform.c === 0
     && transform.d === 1 && transform.e === 0 && transform.f === 0
@@ -83,10 +84,15 @@ function transformPoints(
   for (let index = 0; index < points.length; index += 2) {
     const x = points[index]!;
     const y = points[index + 1]!;
-    transformed[index] = transform.a * x + transform.c * y + transform.e;
-    transformed[index + 1] = transform.b * x + transform.d * y + transform.f;
+    const transformedX = transform.a * x + transform.c * y + transform.e;
+    const transformedY = transform.b * x + transform.d * y + transform.f;
+    if (!isStudioGpuFiniteScalar(transformedX) || !isStudioGpuFiniteScalar(transformedY)) {
+      return null;
+    }
+    transformed[index] = transformedX;
+    transformed[index + 1] = transformedY;
   }
-  return transformed;
+  return Object.freeze(transformed);
 }
 
 /** Builds the exact ordered live operation group after the WebGPU capability boundary is warm. */
@@ -98,10 +104,10 @@ export const planStudioGpuLiveStroke: StudioGpuLiveStrokePlanner = (input) => {
   if (
     renderedPoints.length < 2
     || renderedPoints.length % 2 !== 0
-    || !renderedPoints.every(Number.isFinite)
+    || !renderedPoints.every(isStudioGpuFiniteScalar)
     || (input.correctedPressures !== undefined
       && (input.correctedPressures.length !== renderedPoints.length / 2
-        || !input.correctedPressures.every(Number.isFinite)))
+        || !input.correctedPressures.every(isStudioGpuFiniteScalar)))
     || (input.correctedPoints !== undefined && input.correctedPressures === undefined
       && input.pressures !== undefined && input.pressures.length !== renderedPoints.length / 2)
   ) return null;
@@ -116,13 +122,19 @@ export const planStudioGpuLiveStroke: StudioGpuLiveStrokePlanner = (input) => {
     composite: input.composite ?? "normal",
   });
   if (!base) return null;
-  const strokes = studioBrushSymmetryTransforms(symmetry).map((transform, index): StudioGpuStroke => ({
-    ...base,
-    id: index === 0 ? base.id : `${base.id}:gpu-symmetry:${index}`,
-    points: transformPoints(base.points, transform),
-    pressures: base.pressures,
-    orderKey: input.orderKey,
-  }));
+  const strokes: StudioGpuStroke[] = [];
+  const transforms = studioBrushSymmetryTransforms(symmetry);
+  for (let index = 0; index < transforms.length; index += 1) {
+    const transformedPoints = transformPoints(base.points, transforms[index]!);
+    if (!transformedPoints) return null;
+    strokes.push({
+      ...base,
+      id: index === 0 ? base.id : `${base.id}:gpu-symmetry:${index}`,
+      points: transformedPoints,
+      pressures: base.pressures,
+      orderKey: input.orderKey,
+    });
+  }
   return Object.freeze({
     strokes: Object.freeze(strokes),
     preparation: Object.freeze({

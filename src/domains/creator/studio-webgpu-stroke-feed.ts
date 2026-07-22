@@ -1,3 +1,4 @@
+import { STUDIO_BRUSH_MAX_SYMMETRY_VARIATIONS } from "./studio-brush-symmetry";
 import {
   advanceStudioResidualInk,
   startStudioResidualInk,
@@ -10,13 +11,83 @@ import {
 } from "./studio-ink-pressure-model";
 import {
   STUDIO_GPU_STROKE_FEED_REVISION,
+  isTrustedStudioGpuStrokeFeedStroke,
+  registerTrustedStudioGpuStrokeFeedStroke,
   sameStudioGpuStroke,
   studioGpuPressureRadius,
   type StudioGpuStroke,
   type StudioGpuStrokeFeedRevision,
+  type StudioGpuStrokeFeedRecoveryCheckpoint,
 } from "./studio-webgpu-stroke";
 
 let studioGpuStrokeFeedTokenSequence = 0;
+const trustedStudioGpuStrokeFeedCheckpoints = new WeakSet<object>();
+const trustedStudioGpuStrokeFeedRevisions = new WeakSet<object>();
+const materializedStudioGpuStrokeFeedCache = new WeakMap<object, StudioGpuStroke>();
+const trustedStudioGpuStrokeFeedSourceReceipts = new WeakMap<object, Readonly<{
+  source: StudioGpuStroke;
+  points: readonly number[];
+  pressures: readonly number[] | undefined;
+  styleSignature: string;
+}>>();
+
+/** Caps one skipped pointer delivery before any suffix copy or residual-dab planning begins. */
+export const STUDIO_GPU_STROKE_FEED_MAX_ADVANCE_POINTS = 100_000;
+/** Caps aggregate work for one atomic symmetry fan. */
+export const STUDIO_GPU_STROKE_FEED_MAX_BATCH_POINTS = 1_000_000;
+/** Caps the one-time root snapshot retained for recovery. */
+export const STUDIO_GPU_STROKE_FEED_MAX_BASELINE_POINTS = 1_000_000;
+
+export function isTrustedStudioGpuStrokeFeedRevision(
+  value: unknown
+): value is StudioGpuStrokeFeedRevision {
+  return typeof value === "object"
+    && value !== null
+    && trustedStudioGpuStrokeFeedRevisions.has(value);
+}
+
+export { isTrustedStudioGpuStrokeFeedStroke } from "./studio-webgpu-stroke";
+
+function createTrustedStudioGpuStrokeFeedStroke(
+  source: StudioGpuStroke,
+  revision: StudioGpuStrokeFeedRevision,
+  sourceReference: StudioGpuStroke
+): StudioGpuStroke | null {
+  try {
+    // Pinning is an ownership handoff: source code must switch to copy-on-write after this point.
+    // Freezing in place is constant-space and turns that contract into an enforceable invariant.
+    Object.freeze(source.points);
+    if (source.pressures) Object.freeze(source.pressures);
+    const candidate: StudioGpuStroke = {
+      id: source.id,
+      points: source.points,
+      ...(source.pressures === undefined ? {} : { pressures: source.pressures }),
+      color: source.color,
+      size: source.size,
+      ...(source.pressureModel === undefined ? {} : { pressureModel: source.pressureModel }),
+      ...(source.opacity === undefined ? {} : { opacity: source.opacity }),
+      ...(source.composite === undefined ? {} : { composite: source.composite }),
+      ...(source.orderKey === undefined ? {} : { orderKey: source.orderKey }),
+    };
+    Object.defineProperty(candidate, STUDIO_GPU_STROKE_FEED_REVISION, {
+      value: revision,
+      enumerable: false,
+      configurable: false,
+      writable: false,
+    });
+    const frozen = Object.freeze(candidate);
+    registerTrustedStudioGpuStrokeFeedStroke(frozen);
+    trustedStudioGpuStrokeFeedSourceReceipts.set(frozen, Object.freeze({
+      source: sourceReference,
+      points: sourceReference.points,
+      pressures: sourceReference.pressures,
+      styleSignature: studioGpuStrokeFeedStyleSignature(sourceReference),
+    }));
+    return frozen;
+  } catch {
+    return null;
+  }
+}
 
 function nextFeedToken(lineage: string): string {
   studioGpuStrokeFeedTokenSequence += 1;
@@ -66,6 +137,24 @@ export interface StudioGpuStrokeFeedAdvance {
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
+}
+
+function finiteGpuScalar(value: unknown): value is number {
+  return typeof value === "number"
+    && Number.isFinite(value)
+    && Number.isFinite(Math.fround(value));
+}
+
+function freezeResidualInkState(state: StudioResidualInkState): StudioResidualInkState {
+  return Object.freeze({
+    previousX: state.previousX,
+    previousY: state.previousY,
+    previousPressure: state.previousPressure,
+    lastDabX: state.lastDabX,
+    lastDabY: state.lastDabY,
+    distanceRemainder: state.distanceRemainder,
+    ...(state.spacingPhase === undefined ? {} : { spacingPhase: state.spacingPhase }),
+  });
 }
 
 function pressureAt(stroke: StudioGpuStroke, index: number): number {
@@ -138,7 +227,8 @@ function includeResidualDabBounds(
 
 function baseFeedRevision(
   stroke: StudioGpuStroke,
-  lineage: string
+  lineage: string,
+  recoveryCheckpoint: StudioGpuStrokeFeedRecoveryCheckpoint
 ): StudioGpuStrokeFeedRevision | null {
   const pointCount = stroke.points.length / 2;
   if (!Number.isSafeInteger(pointCount) || pointCount < 1) return null;
@@ -151,7 +241,7 @@ function baseFeedRevision(
   for (let index = 0; index < pointCount; index += 1) {
     const x = stroke.points[index * 2];
     const y = stroke.points[index * 2 + 1];
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    if (!finiteGpuScalar(x) || !finiteGpuScalar(y)) return null;
     const [left, top, right, bottom] = boundsForPoint(
       stroke.size,
       x!,
@@ -173,7 +263,7 @@ function baseFeedRevision(
           STUDIO_CAUSAL_INK_MAX_DABS
         );
         if (!started.complete) return null;
-        residualInkState = started.state;
+        residualInkState = freezeResidualInkState(started.state);
         residualDabCount = started.dabs.length;
         const bounds = { minimumX, minimumY, maximumX, maximumY };
         includeResidualDabBounds(started.dabs, bounds);
@@ -188,7 +278,7 @@ function baseFeedRevision(
           STUDIO_CAUSAL_INK_MAX_DABS - residualDabCount
         );
         if (!advanced.complete) return null;
-        residualInkState = advanced.state;
+        residualInkState = freezeResidualInkState(advanced.state);
         residualDabCount += advanced.dabs.length;
         const bounds = { minimumX, minimumY, maximumX, maximumY };
         includeResidualDabBounds(advanced.dabs, bounds);
@@ -197,7 +287,7 @@ function baseFeedRevision(
     }
   }
   const lastIndex = pointCount - 1;
-  return Object.freeze({
+  const revision: StudioGpuStrokeFeedRevision = Object.freeze({
     lineage,
     revision: 0,
     token: nextFeedToken(lineage),
@@ -217,8 +307,49 @@ function baseFeedRevision(
     maximumX,
     maximumY,
     styleSignature: studioGpuStrokeFeedStyleSignature(stroke),
+    recoveryCheckpoint,
     trustedImmutable: true,
   });
+  trustedStudioGpuStrokeFeedRevisions.add(revision);
+  return revision;
+}
+
+function createStudioGpuStrokeFeedRecoveryCheckpoint(
+  stroke: StudioGpuStroke,
+  lineage: string
+): StudioGpuStrokeFeedRecoveryCheckpoint | null {
+  const pointCount = stroke.points.length / 2;
+  if (!Number.isSafeInteger(pointCount) || pointCount < 1 || !Object.isFrozen(stroke.points)) {
+    return null;
+  }
+  const resolvedPressures = Array.from(
+    { length: pointCount },
+    (_, index) => pressureAt(stroke, index)
+  );
+  const canReusePressures = stroke.pressures !== undefined
+    && Object.isFrozen(stroke.pressures)
+    && stroke.pressures.length === pointCount
+    && stroke.pressures.every((value, index) => Object.is(value, resolvedPressures[index]));
+  const pressures = canReusePressures
+    ? stroke.pressures!
+    : Object.freeze(resolvedPressures);
+  const checkpoint: StudioGpuStrokeFeedRecoveryCheckpoint = Object.freeze({
+    lineage,
+    pointCount,
+    points: stroke.points,
+    pressures,
+    id: stroke.id,
+    color: stroke.color,
+    size: stroke.size,
+    ...(stroke.pressureModel === undefined ? {} : { pressureModel: stroke.pressureModel }),
+    opacity: stroke.opacity,
+    composite: stroke.composite,
+    orderKey: stroke.orderKey,
+    styleSignature: studioGpuStrokeFeedStyleSignature(stroke),
+    trustedImmutable: true,
+  });
+  trustedStudioGpuStrokeFeedCheckpoints.add(checkpoint);
+  return checkpoint;
 }
 
 /**
@@ -229,22 +360,61 @@ export function createStudioGpuStrokeFeedBaseline(
   strokes: readonly StudioGpuStroke[],
   lineage: string
 ): readonly StudioGpuStroke[] | null {
+  try {
   const snapshots: StudioGpuStroke[] = [];
+  const prepared: Array<{
+    source: StudioGpuStroke;
+    snapshot: StudioGpuStroke;
+    revision: StudioGpuStrokeFeedRevision;
+  }> = [];
   for (let index = 0; index < strokes.length; index += 1) {
     const source = strokes[index]!;
-    const points = [...source.points];
-    const pressures = source.pressures ? [...source.pressures] : undefined;
-    const snapshot: StudioGpuStroke = { ...source, points, pressures };
-    const revision = baseFeedRevision(snapshot, `${lineage}:${index}:${source.id}`);
+    const sourcePointCount = source.points.length / 2;
+    if (
+      !Array.isArray(source.points)
+      || !Number.isSafeInteger(sourcePointCount)
+      || sourcePointCount < 1
+      || sourcePointCount > STUDIO_GPU_STROKE_FEED_MAX_BASELINE_POINTS
+      || (source.pressures !== undefined && (
+        !Array.isArray(source.pressures)
+        || source.pressures.length > sourcePointCount
+      ))
+    ) return null;
+    const points = Object.freeze([...source.points]);
+    const pressures = source.pressures ? Object.freeze([...source.pressures]) : undefined;
+    const snapshot: StudioGpuStroke = {
+      id: source.id,
+      points,
+      ...(pressures === undefined ? {} : { pressures }),
+      color: source.color,
+      size: source.size,
+      ...(source.pressureModel === undefined ? {} : { pressureModel: source.pressureModel }),
+      ...(source.opacity === undefined ? {} : { opacity: source.opacity }),
+      ...(source.composite === undefined ? {} : { composite: source.composite }),
+      ...(source.orderKey === undefined ? {} : { orderKey: source.orderKey }),
+    };
+    const strokeLineage = `${lineage}:${index}:${source.id}`;
+    const recoveryCheckpoint = createStudioGpuStrokeFeedRecoveryCheckpoint(snapshot, strokeLineage);
+    if (!recoveryCheckpoint) return null;
+    const revision = baseFeedRevision(snapshot, strokeLineage, recoveryCheckpoint);
     if (!revision) return null;
-    snapshots.push(Object.freeze({
-      ...snapshot,
-      points: Object.freeze(points),
-      pressures: pressures ? Object.freeze(pressures) : undefined,
-      [STUDIO_GPU_STROKE_FEED_REVISION]: revision,
-    }));
+    prepared.push({ source, snapshot, revision });
+  }
+  // Complete validation for the whole group before the ownership handoff so a rejected baseline
+  // never freezes an earlier valid source merely because a later variation was malformed.
+  for (const { source } of prepared) {
+    Object.freeze(source.points);
+    if (source.pressures) Object.freeze(source.pressures);
+  }
+  for (const { source, snapshot, revision } of prepared) {
+    const baselineStroke = createTrustedStudioGpuStrokeFeedStroke(snapshot, revision, source);
+    if (!baselineStroke) return null;
+    snapshots.push(baselineStroke);
   }
   return Object.freeze(snapshots);
+  } catch {
+    return null;
+  }
 }
 
 /** Appends newly-started operations while preserving every existing operation revision. */
@@ -267,7 +437,8 @@ export function appendStudioGpuStrokeFeedOperations(
     // prefix check here. Pointer-frame suffix appends remain history-free, while a direct public
     // operation patch can never silently retain edited/deleted authoritative history.
     if (
-      !previous?.[STUDIO_GPU_STROKE_FEED_REVISION]
+      !isTrustedStudioGpuStrokeFeedStroke(previous)
+      || !isTrustedStudioGpuStrokeFeedRevision(previous[STUDIO_GPU_STROKE_FEED_REVISION])
       || !fallback
       || !sameStudioGpuStroke(previous, fallback)
     ) {
@@ -289,14 +460,16 @@ function validSuffixPatch(
 ): boolean {
   const revision = previous[STUDIO_GPU_STROKE_FEED_REVISION];
   if (
-    !revision
+    !isTrustedStudioGpuStrokeFeedStroke(previous)
+    || !isTrustedStudioGpuStrokeFeedRevision(revision)
     || !sameStudioGpuStrokeFeedStyle(previous, patch.nextStroke)
     || patch.previousPointCount !== revision.pointCount
     || patch.suffixPoints.length < 2
+    || patch.suffixPoints.length > STUDIO_GPU_STROKE_FEED_MAX_ADVANCE_POINTS * 2
     || patch.suffixPoints.length % 2 !== 0
     || patch.suffixPressures.length !== patch.suffixPoints.length / 2
-    || !patch.suffixPoints.every(Number.isFinite)
-    || !patch.suffixPressures.every(Number.isFinite)
+    || !patch.suffixPoints.every(finiteGpuScalar)
+    || !patch.suffixPressures.every(finiteGpuScalar)
   ) {
     return false;
   }
@@ -306,7 +479,7 @@ function validSuffixPatch(
     !Number.isSafeInteger(nextPointCount)
     || nextPointCount !== revision.pointCount + suffixPointCount
     || (patch.nextStroke.pressures !== undefined
-      && patch.nextStroke.pressures.length < nextPointCount)
+      && patch.nextStroke.pressures.length !== nextPointCount)
   ) {
     return false;
   }
@@ -327,12 +500,18 @@ function validSuffixPatch(
   return true;
 }
 
-/** Applies a proven suffix without copying or comparing retained point history. */
-function advanceStudioGpuStrokeFeedAtIndex(
+interface PreparedStudioGpuStrokeFeedAdvance {
+  readonly strokeIndex: number;
+  readonly nextStroke: StudioGpuStroke;
+  readonly revision: StudioGpuStrokeFeedRevision;
+}
+
+/** Prepares a proven suffix without mutating caller-owned source arrays. */
+function prepareStudioGpuStrokeFeedAtIndex(
   previousStrokes: readonly StudioGpuStroke[],
   patch: StudioGpuStrokeSuffixPatch,
   requireTerminal: boolean
-): StudioGpuStrokeFeedAdvance {
+): PreparedStudioGpuStrokeFeedAdvance | null {
   if (
     !Number.isSafeInteger(patch.strokeIndex)
     || patch.strokeIndex < 0
@@ -341,12 +520,12 @@ function advanceStudioGpuStrokeFeedAtIndex(
     || patch.fallbackStrokes.length !== previousStrokes.length
     || patch.fallbackStrokes[patch.strokeIndex] !== patch.nextStroke
   ) {
-    return { status: "rejected", strokes: previousStrokes };
+    return null;
   }
   const previous = previousStrokes[patch.strokeIndex]!;
   const parent = previous[STUDIO_GPU_STROKE_FEED_REVISION];
   if (!parent || !validSuffixPatch(previous, patch)) {
-    return { status: "rejected", strokes: previousStrokes };
+    return null;
   }
 
   const suffixPoints = Object.freeze([...patch.suffixPoints]);
@@ -373,7 +552,7 @@ function advanceStudioGpuStrokeFeedAtIndex(
     maximumY = Math.max(maximumY, bottom);
     if (studioInkUsesResidualDabSpacing(previous.pressureModel) && previous.pressureModel) {
       if (!residualInkState || residualDabCount === undefined) {
-        return { status: "rejected", strokes: previousStrokes };
+        return null;
       }
       const advanced = advanceStudioResidualInk(
         residualInkState,
@@ -387,8 +566,8 @@ function advanceStudioGpuStrokeFeedAtIndex(
         previous.pressureModel,
         STUDIO_CAUSAL_INK_MAX_DABS - residualDabCount
       );
-      if (!advanced.complete) return { status: "rejected", strokes: previousStrokes };
-      residualInkState = advanced.state;
+      if (!advanced.complete) return null;
+      residualInkState = freezeResidualInkState(advanced.state);
       residualDabCount += advanced.dabs.length;
       const bounds = { minimumX, minimumY, maximumX, maximumY };
       includeResidualDabBounds(advanced.dabs, bounds);
@@ -417,15 +596,25 @@ function advanceStudioGpuStrokeFeedAtIndex(
     maximumX,
     maximumY,
     styleSignature: parent.styleSignature,
+    recoveryCheckpoint: null,
     trustedImmutable: true,
   });
-  const nextStroke = Object.freeze({
-    ...patch.nextStroke,
-    [STUDIO_GPU_STROKE_FEED_REVISION]: revision,
+  trustedStudioGpuStrokeFeedRevisions.add(revision);
+  return Object.freeze({
+    strokeIndex: patch.strokeIndex,
+    nextStroke: patch.nextStroke,
+    revision,
   });
-  const strokes = previousStrokes.slice();
-  strokes[patch.strokeIndex] = nextStroke;
-  return { status: "appended", strokes: Object.freeze(strokes) };
+}
+
+function publishPreparedStudioGpuStrokeFeedAdvance(
+  prepared: PreparedStudioGpuStrokeFeedAdvance
+): StudioGpuStroke | null {
+  return createTrustedStudioGpuStrokeFeedStroke(
+    prepared.nextStroke,
+    prepared.revision,
+    prepared.nextStroke
+  );
 }
 
 /** Applies one proven suffix to the terminal live operation. */
@@ -433,7 +622,13 @@ export function advanceStudioGpuStrokeFeed(
   previousStrokes: readonly StudioGpuStroke[],
   patch: StudioGpuStrokeSuffixPatch
 ): StudioGpuStrokeFeedAdvance {
-  return advanceStudioGpuStrokeFeedAtIndex(previousStrokes, patch, true);
+  const prepared = prepareStudioGpuStrokeFeedAtIndex(previousStrokes, patch, true);
+  if (!prepared) return { status: "rejected", strokes: previousStrokes };
+  const nextStroke = publishPreparedStudioGpuStrokeFeedAdvance(prepared);
+  if (!nextStroke) return { status: "rejected", strokes: previousStrokes };
+  const strokes = previousStrokes.slice();
+  strokes[prepared.strokeIndex] = nextStroke;
+  return { status: "appended", strokes: Object.freeze(strokes) };
 }
 
 /**
@@ -449,14 +644,35 @@ export function advanceStudioGpuStrokeFeedBatch(
   const firstStrokeIndex = previousStrokes.length - patches.length;
   if (
     patches.length < 1
-    || patches.length > 32
+    || patches.length > STUDIO_BRUSH_MAX_SYMMETRY_VARIATIONS
     || firstStrokeIndex < 0
     || fallbackStrokes.length !== previousStrokes.length
+    || patches.reduce((total, patch) => total + patch.suffixPressures.length, 0)
+      > STUDIO_GPU_STROKE_FEED_MAX_BATCH_POINTS
   ) {
     return { status: "rejected", strokes: previousStrokes };
   }
+  const firstPatch = patches[0]!;
+  const sharedPreviousPointCount = firstPatch.previousPointCount;
+  const sharedSuffixCoordinateCount = firstPatch.suffixPoints.length;
+  const sharedSuffixPressures = firstPatch.suffixPressures;
   for (let index = 0; index < firstStrokeIndex; index += 1) {
-    if (!sameStudioGpuStroke(previousStrokes[index]!, fallbackStrokes[index]!)) {
+    // Pointer-frame symmetry updates prove the settled prefix with the source object captured when
+    // the engine cloned its baseline. Semantic array comparison here would reread every settled
+    // stroke on every hardware sample, while direct wrapper equality alone would reject the
+    // engine's intentional baseline clone.
+    const previous = previousStrokes[index]!;
+    const fallback = fallbackStrokes[index]!;
+    const receipt = trustedStudioGpuStrokeFeedSourceReceipts.get(previous);
+    if (
+      previous !== fallback
+      && (
+        receipt?.source !== fallback
+        || receipt.points !== fallback.points
+        || receipt.pressures !== fallback.pressures
+        || receipt.styleSignature !== studioGpuStrokeFeedStyleSignature(fallback)
+      )
+    ) {
       return { status: "rejected", strokes: previousStrokes };
     }
   }
@@ -466,20 +682,211 @@ export function advanceStudioGpuStrokeFeedBatch(
       patch.strokeIndex !== firstStrokeIndex + index
       || patch.fallbackStrokes !== fallbackStrokes
       || patch.nextStroke !== fallbackStrokes[patch.strokeIndex]
+      || patch.previousPointCount !== sharedPreviousPointCount
+      || patch.suffixPoints.length !== sharedSuffixCoordinateCount
+      || patch.suffixPressures.length !== sharedSuffixPressures.length
+      || patch.suffixPressures.some((pressure, pressureIndex) => (
+        !Object.is(pressure, sharedSuffixPressures[pressureIndex])
+      ))
+      || !validSuffixPatch(previousStrokes[patch.strokeIndex]!, patch)
     ) {
       return { status: "rejected", strokes: previousStrokes };
     }
   }
 
-  let advancedStrokes = previousStrokes;
+  const preparedAdvances: PreparedStudioGpuStrokeFeedAdvance[] = [];
   for (const patch of patches) {
-    const advanced = advanceStudioGpuStrokeFeedAtIndex(advancedStrokes, patch, false);
-    if (advanced.status === "rejected") {
-      return { status: "rejected", strokes: previousStrokes };
-    }
-    advancedStrokes = advanced.strokes;
+    const prepared = prepareStudioGpuStrokeFeedAtIndex(previousStrokes, patch, false);
+    if (!prepared) return { status: "rejected", strokes: previousStrokes };
+    preparedAdvances.push(prepared);
   }
-  return { status: "appended", strokes: advancedStrokes };
+  const published = preparedAdvances.map(publishPreparedStudioGpuStrokeFeedAdvance);
+  if (published.some((stroke) => stroke === null)) {
+    return { status: "rejected", strokes: previousStrokes };
+  }
+  const advancedStrokes = previousStrokes.slice();
+  for (let index = 0; index < preparedAdvances.length; index += 1) {
+    advancedStrokes[preparedAdvances[index]!.strokeIndex] = published[index]!;
+  }
+  return { status: "appended", strokes: Object.freeze(advancedStrokes) };
+}
+
+interface ValidStudioGpuStrokeFeedRecoveryLineage {
+  readonly checkpoint: StudioGpuStrokeFeedRecoveryCheckpoint;
+  /** Child revisions in newest-to-oldest order. The checkpoint owns revision zero. */
+  readonly suffixRevisions: readonly StudioGpuStrokeFeedRevision[];
+  readonly latest: StudioGpuStrokeFeedRevision;
+}
+
+function validStudioGpuStrokeFeedRecoveryLineage(
+  stroke: StudioGpuStroke
+): ValidStudioGpuStrokeFeedRecoveryLineage | null {
+  try {
+    const latest = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
+    if (
+      !isTrustedStudioGpuStrokeFeedStroke(stroke)
+      || !isTrustedStudioGpuStrokeFeedRevision(latest)
+      || !Object.isFrozen(latest)
+    ) return null;
+
+    const suffixRevisions: StudioGpuStrokeFeedRevision[] = [];
+    const visitedRevisions = new Set<StudioGpuStrokeFeedRevision>();
+    const visitedTokens = new Set<string>();
+    let cursor: StudioGpuStrokeFeedRevision | null = latest;
+    while (cursor) {
+      if (
+        visitedRevisions.has(cursor)
+        || !isTrustedStudioGpuStrokeFeedRevision(cursor)
+        || typeof cursor.token !== "string"
+        || cursor.token.length === 0
+        || visitedTokens.has(cursor.token)
+        || cursor.trustedImmutable !== true
+        || !Object.isFrozen(cursor)
+        || !Number.isSafeInteger(cursor.revision)
+        || cursor.revision < 0
+        || !Number.isSafeInteger(cursor.pointCount)
+        || cursor.pointCount < 1
+        || cursor.lineage !== latest.lineage
+        || cursor.styleSignature !== latest.styleSignature
+      ) {
+        return null;
+      }
+      visitedRevisions.add(cursor);
+      visitedTokens.add(cursor.token);
+
+      const parent: StudioGpuStrokeFeedRevision | null = cursor.parent;
+      if (parent === null) {
+        const checkpoint = cursor.recoveryCheckpoint;
+        if (
+          cursor.revision !== 0
+          || cursor.parentPointCount !== cursor.pointCount
+          || cursor.suffixPoints.length !== 0
+          || cursor.suffixPressures.length !== 0
+          || !Object.isFrozen(cursor.suffixPoints)
+          || !Object.isFrozen(cursor.suffixPressures)
+          || !checkpoint
+          || !trustedStudioGpuStrokeFeedCheckpoints.has(checkpoint)
+          || checkpoint.trustedImmutable !== true
+          || !Object.isFrozen(checkpoint)
+          || checkpoint.lineage !== cursor.lineage
+          || checkpoint.pointCount !== cursor.pointCount
+          || checkpoint.styleSignature !== cursor.styleSignature
+          || checkpoint.styleSignature !== studioGpuStrokeFeedStyleSignature(checkpoint)
+          || !sameStudioGpuStrokeFeedStyle(checkpoint, stroke)
+          || !Object.isFrozen(checkpoint.points)
+          || checkpoint.points.length !== checkpoint.pointCount * 2
+          || !checkpoint.points.every(finiteGpuScalar)
+          || !Object.isFrozen(checkpoint.pressures)
+          || checkpoint.pressures.length !== checkpoint.pointCount
+          || !checkpoint.pressures.every((pressure) => (
+            Number.isFinite(pressure) && pressure >= 0 && pressure <= 1
+          ))
+          || !Object.is(cursor.lastX, checkpoint.points.at(-2))
+          || !Object.is(cursor.lastY, checkpoint.points.at(-1))
+          || !Object.is(cursor.lastPressure, checkpoint.pressures.at(-1))
+        ) {
+          return null;
+        }
+        return { checkpoint, suffixRevisions, latest };
+      }
+
+      const suffixPointCount = cursor.suffixPoints.length / 2;
+      if (
+        cursor.recoveryCheckpoint !== null
+        || !Object.isFrozen(cursor.suffixPoints)
+        || !Object.isFrozen(cursor.suffixPressures)
+        || cursor.suffixPoints.length < 2
+        || !Number.isSafeInteger(suffixPointCount)
+        || cursor.suffixPressures.length !== suffixPointCount
+        || !cursor.suffixPoints.every(finiteGpuScalar)
+        || !cursor.suffixPressures.every((pressure) => (
+          Number.isFinite(pressure) && pressure >= 0 && pressure <= 1
+        ))
+        || cursor.revision !== parent.revision + 1
+        || cursor.parentPointCount !== parent.pointCount
+        || cursor.pointCount !== parent.pointCount + suffixPointCount
+        || cursor.lineage !== parent.lineage
+        || cursor.styleSignature !== parent.styleSignature
+        || !Object.is(cursor.lastX, cursor.suffixPoints.at(-2))
+        || !Object.is(cursor.lastY, cursor.suffixPoints.at(-1))
+        || !Object.is(cursor.lastPressure, cursor.suffixPressures.at(-1))
+      ) {
+        return null;
+      }
+      suffixRevisions.push(cursor);
+      cursor = parent;
+    }
+  } catch {
+    // A forged Proxy/getter must fail closed instead of escaping the recovery boundary.
+  }
+  return null;
+}
+
+/**
+ * Rebuilds one exact, immutable full stroke from its frozen root checkpoint and suffix lineage.
+ * The current stroke's full point/pressure arrays are deliberately never inspected: they may be
+ * unavailable after a device loss or may only exist in the caller's transient live-stroke model.
+ */
+export function materializeStudioGpuStrokeFeedStroke(
+  stroke: StudioGpuStroke
+): StudioGpuStroke | null {
+  try {
+    const cached = materializedStudioGpuStrokeFeedCache.get(stroke);
+    if (cached) return cached;
+    const lineage = validStudioGpuStrokeFeedRecoveryLineage(stroke);
+    if (!lineage) return null;
+    const { checkpoint, suffixRevisions, latest } = lineage;
+
+    let points: readonly number[] = checkpoint.points;
+    let pressures: readonly number[] = checkpoint.pressures;
+    if (suffixRevisions.length > 0) {
+      const fullPoints = new Array<number>(latest.pointCount * 2);
+      const fullPressures = new Array<number>(latest.pointCount);
+      let pointOffset = 0;
+      let pressureOffset = 0;
+      for (const value of checkpoint.points) fullPoints[pointOffset++] = value;
+      for (const value of checkpoint.pressures) fullPressures[pressureOffset++] = value;
+      for (let index = suffixRevisions.length - 1; index >= 0; index -= 1) {
+        const revision = suffixRevisions[index]!;
+        for (const value of revision.suffixPoints) fullPoints[pointOffset++] = value;
+        for (const value of revision.suffixPressures) fullPressures[pressureOffset++] = value;
+      }
+      if (pointOffset !== fullPoints.length || pressureOffset !== fullPressures.length) return null;
+      points = Object.freeze(fullPoints);
+      pressures = Object.freeze(fullPressures);
+    }
+
+    const materialized = Object.freeze({
+      id: checkpoint.id,
+      points,
+      pressures,
+      color: checkpoint.color,
+      size: checkpoint.size,
+      ...(checkpoint.pressureModel === undefined
+        ? {}
+        : { pressureModel: checkpoint.pressureModel }),
+      opacity: checkpoint.opacity,
+      composite: checkpoint.composite,
+      orderKey: checkpoint.orderKey,
+    });
+    materializedStudioGpuStrokeFeedCache.set(stroke, materialized);
+    return materialized;
+  } catch {
+    return null;
+  }
+}
+
+/** Atomically materializes a complete variation/symmetry feed, or rejects the whole set. */
+export function materializeStudioGpuStrokeFeedStrokes(
+  strokes: readonly StudioGpuStroke[]
+): readonly StudioGpuStroke[] | null {
+  const materialized: StudioGpuStroke[] = [];
+  for (const stroke of strokes) {
+    const recovered = materializeStudioGpuStrokeFeedStroke(stroke);
+    if (!recovered) return null;
+    materialized.push(recovered);
+  }
+  return Object.freeze(materialized);
 }
 
 /**
@@ -492,7 +899,8 @@ export function studioGpuStrokeFeedSuffixFromPointCount(
 ): StudioGpuStroke | null {
   const latest = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
   if (
-    !latest
+    !isTrustedStudioGpuStrokeFeedStroke(stroke)
+    || !isTrustedStudioGpuStrokeFeedRevision(latest)
     || !Number.isSafeInteger(previousPointCount)
     || previousPointCount < 1
     || previousPointCount >= latest.pointCount
@@ -501,11 +909,27 @@ export function studioGpuStrokeFeedSuffixFromPointCount(
   }
   const revisions: StudioGpuStrokeFeedRevision[] = [];
   let cursor: StudioGpuStrokeFeedRevision | null = latest;
+  let remainingSteps = latest.revision + 1;
   while (cursor && cursor.pointCount > previousPointCount) {
+    if (
+      remainingSteps <= 0
+      || !isTrustedStudioGpuStrokeFeedRevision(cursor)
+      || (cursor.parent !== null && (
+        !isTrustedStudioGpuStrokeFeedRevision(cursor.parent)
+        || cursor.parent.revision !== cursor.revision - 1
+        || cursor.parent.pointCount >= cursor.pointCount
+      ))
+    ) return null;
+    remainingSteps -= 1;
     revisions.push(cursor);
     cursor = cursor.parent;
   }
-  if (!cursor || cursor.pointCount !== previousPointCount || cursor.lineage !== latest.lineage) {
+  if (
+    !cursor
+    || !isTrustedStudioGpuStrokeFeedRevision(cursor)
+    || cursor.pointCount !== previousPointCount
+    || cursor.lineage !== latest.lineage
+  ) {
     return null;
   }
   const points: number[] = [cursor.lastX, cursor.lastY];
@@ -533,10 +957,33 @@ export function studioGpuStrokeFeedRevisionAtPointCount(
   pointCount: number
 ): StudioGpuStrokeFeedRevision | null {
   const latest = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
-  if (!latest || !Number.isSafeInteger(pointCount) || pointCount < 1) return null;
+  if (
+    !isTrustedStudioGpuStrokeFeedStroke(stroke)
+    || !isTrustedStudioGpuStrokeFeedRevision(latest)
+    || !Number.isSafeInteger(pointCount)
+    || pointCount < 1
+  ) return null;
   let cursor: StudioGpuStrokeFeedRevision | null = latest;
-  while (cursor && cursor.pointCount > pointCount) cursor = cursor.parent;
-  return cursor?.pointCount === pointCount && cursor.lineage === latest.lineage ? cursor : null;
+  let remainingSteps = latest.revision + 1;
+  while (cursor && cursor.pointCount > pointCount) {
+    if (
+      remainingSteps <= 0
+      || !isTrustedStudioGpuStrokeFeedRevision(cursor)
+      || (cursor.parent !== null && (
+        !isTrustedStudioGpuStrokeFeedRevision(cursor.parent)
+        || cursor.parent.revision !== cursor.revision - 1
+        || cursor.parent.pointCount >= cursor.pointCount
+      ))
+    ) return null;
+    remainingSteps -= 1;
+    cursor = cursor.parent;
+  }
+  return cursor
+    && isTrustedStudioGpuStrokeFeedRevision(cursor)
+    && cursor.pointCount === pointCount
+    && cursor.lineage === latest.lineage
+    ? cursor
+    : null;
 }
 
 function exactPrefixReferences(

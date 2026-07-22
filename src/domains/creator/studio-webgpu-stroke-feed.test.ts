@@ -10,8 +10,12 @@ import {
   advanceStudioGpuStrokeFeed,
   advanceStudioGpuStrokeFeedBatch,
   createStudioGpuStrokeFeedBaseline,
+  materializeStudioGpuStrokeFeedStroke,
+  materializeStudioGpuStrokeFeedStrokes,
   planStudioGpuPinnedStrokeFeedUpdate,
+  studioGpuStrokeFeedRevisionAtPointCount,
   studioGpuStrokeFeedSuffixFromPointCount,
+  STUDIO_GPU_STROKE_FEED_MAX_ADVANCE_POINTS,
   type StudioGpuStrokeSuffixPatch,
 } from "./studio-webgpu-stroke-feed";
 
@@ -83,6 +87,25 @@ describe("Studio WebGPU append-only stroke feed", () => {
       points: [2, 3, 9, 7],
       pressures: [0.5, 0.8],
     });
+  });
+
+  it("pins advanced source arrays before granting zero-copy snapshot authority", () => {
+    const sourcePoints = [2, 3, 8, 4];
+    const sourcePressures = [0.5, 0.65];
+    const next = [stroke({ points: sourcePoints, pressures: sourcePressures })];
+    const baseline = createStudioGpuStrokeFeedBaseline([stroke()], "immutable-child")!;
+    const advanced = advanceStudioGpuStrokeFeed(
+      baseline,
+      patch(next, 1, [8, 4], [0.65])
+    );
+
+    expect(advanced.status).toBe("appended");
+    expect(Object.isFrozen(sourcePoints)).toBe(true);
+    expect(Object.isFrozen(sourcePressures)).toBe(true);
+    expect(() => {
+      sourcePoints[0] = 99;
+    }).toThrow(TypeError);
+    expect(advanced.strokes[0]?.points[0]).toBe(2);
   });
 
   it("coalesces skipped pointer frames from revision chunks without reading retained arrays", () => {
@@ -192,6 +215,228 @@ describe("Studio WebGPU append-only stroke feed", () => {
     expect(baseline.map((candidate) => (
       candidate[STUDIO_GPU_STROKE_FEED_REVISION]?.pointCount
     ))).toEqual([1, 1]);
+  });
+
+  it("rejects symmetry variations with different sample counts even when each child is valid", () => {
+    const baseline = createStudioGpuStrokeFeedBaseline([
+      stroke({ id: "live" }),
+      stroke({ id: "live:gpu-symmetry:1", points: [98, 3] }),
+    ], "atomic-symmetry-count")!;
+    const fallback = [
+      stroke({ id: "live", points: [2, 3, 9, 7], pressures: [0.5, 0.8] }),
+      stroke({
+        id: "live:gpu-symmetry:1",
+        points: [98, 3, 91, 7, 88, 9],
+        pressures: [0.5, 0.8, 0.9],
+      }),
+    ];
+    const result = advanceStudioGpuStrokeFeedBatch(baseline, {
+      fallbackStrokes: fallback,
+      patches: [
+        {
+          strokeIndex: 0,
+          previousPointCount: 1,
+          suffixPoints: [9, 7],
+          suffixPressures: [0.8],
+          nextStroke: fallback[0]!,
+          fallbackStrokes: fallback,
+        },
+        {
+          strokeIndex: 1,
+          previousPointCount: 1,
+          suffixPoints: [91, 7, 88, 9],
+          suffixPressures: [0.8, 0.9],
+          nextStroke: fallback[1]!,
+          fallbackStrokes: fallback,
+        },
+      ],
+    });
+
+    expect(result).toEqual({ status: "rejected", strokes: baseline });
+  });
+
+  it("proves a settled prefix by its captured source reference without reading its point history", () => {
+    let denyHistoricalReads = false;
+    const settledPoints = new Proxy([0, 0, 10, 10], {
+      get(target, property, receiver) {
+        if (
+          denyHistoricalReads
+          && typeof property === "string"
+          && /^(?:0|[1-9]\d*)$/u.test(property)
+        ) throw new Error(`historical sample ${property} was read`);
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const settledSource = stroke({ id: "settled", points: settledPoints });
+    const initial = [
+      settledSource,
+      stroke({ id: "live" }),
+      stroke({ id: "live:gpu-symmetry:1", points: [98, 3] }),
+    ];
+    const baseline = createStudioGpuStrokeFeedBaseline(initial, "symmetry-prefix-receipt")!;
+    denyHistoricalReads = true;
+    const fallback = [
+      settledSource,
+      stroke({ id: "live", points: [2, 3, 9, 7], pressures: [0.5, 0.8] }),
+      stroke({
+        id: "live:gpu-symmetry:1",
+        points: [98, 3, 91, 7],
+        pressures: [0.5, 0.8],
+      }),
+    ];
+
+    expect(() => advanceStudioGpuStrokeFeedBatch(baseline, {
+      fallbackStrokes: fallback,
+      patches: fallback.slice(1).map((nextStroke, variationIndex) => ({
+        strokeIndex: variationIndex + 1,
+        previousPointCount: 1,
+        suffixPoints: nextStroke.points.slice(2),
+        suffixPressures: [0.8],
+        nextStroke,
+        fallbackStrokes: fallback,
+      })),
+    })).not.toThrow();
+    expect(advanceStudioGpuStrokeFeedBatch(baseline, {
+      fallbackStrokes: fallback,
+      patches: fallback.slice(1).map((nextStroke, variationIndex) => ({
+        strokeIndex: variationIndex + 1,
+        previousPointCount: 1,
+        suffixPoints: nextStroke.points.slice(2),
+        suffixPressures: [0.8],
+        nextStroke,
+        fallbackStrokes: fallback,
+      })),
+    }).status).toBe("appended");
+  });
+
+  it("rejects a settled-prefix source whose captured arrays or style were replaced", () => {
+    const settledSource = stroke({ id: "settled", points: [0, 0, 10, 10] });
+    const initial = [
+      settledSource,
+      stroke({ id: "live" }),
+      stroke({ id: "live:gpu-symmetry:1", points: [98, 3] }),
+    ];
+    const baseline = createStudioGpuStrokeFeedBaseline(initial, "symmetry-prefix-mutation")!;
+    Object.defineProperty(settledSource, "points", {
+      value: [0, 0, 10, 10],
+      configurable: true,
+      enumerable: true,
+    });
+    Object.defineProperty(settledSource, "color", {
+      value: "#ffffff",
+      configurable: true,
+      enumerable: true,
+    });
+    const fallback = [
+      settledSource,
+      stroke({ id: "live", points: [2, 3, 9, 7], pressures: [0.5, 0.8] }),
+      stroke({
+        id: "live:gpu-symmetry:1",
+        points: [98, 3, 91, 7],
+        pressures: [0.5, 0.8],
+      }),
+    ];
+    const result = advanceStudioGpuStrokeFeedBatch(baseline, {
+      fallbackStrokes: fallback,
+      patches: fallback.slice(1).map((nextStroke, variationIndex) => ({
+        strokeIndex: variationIndex + 1,
+        previousPointCount: 1,
+        suffixPoints: nextStroke.points.slice(2),
+        suffixPressures: [0.8],
+        nextStroke,
+        fallbackStrokes: fallback,
+      })),
+    });
+
+    expect(result).toEqual({ status: "rejected", strokes: baseline });
+  });
+
+  it("prepares every residual child before freezing any caller array", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+    const baseline = createStudioGpuStrokeFeedBaseline([
+      stroke({ id: "left", points: [0, 0], pressureModel }),
+      stroke({ id: "right", points: [0, 0], pressureModel }),
+    ], "residual-batch-prepare")!;
+    const leftPoints = [0, 0, 1, 0];
+    const rightPoints = [0, 0, 1_000_010, 0];
+    const leftPressures = [0.5, 0.5];
+    const rightPressures = [0.5, 0.5];
+    const fallback = [
+      stroke({ id: "left", points: leftPoints, pressures: leftPressures, pressureModel }),
+      stroke({ id: "right", points: rightPoints, pressures: rightPressures, pressureModel }),
+    ];
+    const result = advanceStudioGpuStrokeFeedBatch(baseline, {
+      fallbackStrokes: fallback,
+      patches: fallback.map((nextStroke, strokeIndex) => ({
+        strokeIndex,
+        previousPointCount: 1,
+        suffixPoints: nextStroke.points.slice(2),
+        suffixPressures: [0.5],
+        nextStroke,
+        fallbackStrokes: fallback,
+      })),
+    });
+
+    expect(result).toEqual({ status: "rejected", strokes: baseline });
+    expect(Object.isFrozen(leftPoints)).toBe(false);
+    expect(Object.isFrozen(leftPressures)).toBe(false);
+    expect(Object.isFrozen(rightPoints)).toBe(false);
+    expect(Object.isFrozen(rightPressures)).toBe(false);
+  });
+
+  it("bounds direct suffix work and rejects overlong pressure ownership", () => {
+    const baseline = createStudioGpuStrokeFeedBaseline([stroke()], "bounded-direct-feed")!;
+    const oversizedSuffix: number[] = [];
+    oversizedSuffix.length = (STUDIO_GPU_STROKE_FEED_MAX_ADVANCE_POINTS + 1) * 2;
+    const oversizedPoints = [2, 3];
+    oversizedPoints.length += oversizedSuffix.length;
+    const oversizedNext = [stroke({
+      points: oversizedPoints,
+      pressures: new Array(STUDIO_GPU_STROKE_FEED_MAX_ADVANCE_POINTS + 2).fill(0.5),
+    })];
+    expect(advanceStudioGpuStrokeFeed(
+      baseline,
+      patch(oversizedNext, 1, oversizedSuffix, oversizedNext[0]!.pressures!.slice(1))
+    ).status).toBe("rejected");
+
+    const overlong = [stroke({ points: [2, 3, 9, 7], pressures: [0.5, 0.8, 1] })];
+    expect(advanceStudioGpuStrokeFeed(
+      baseline,
+      patch(overlong, 1, [9, 7], [0.8])
+    ).status).toBe("rejected");
+    expect(createStudioGpuStrokeFeedBaseline([
+      stroke({ points: [2, 3], pressures: [0.5, 0.6] }),
+    ], "overlong-root")).toBeNull();
+  });
+
+  it("accepts the bounded 64-copy kaleidoscope terminal group atomically", () => {
+    const initial = Array.from({ length: 64 }, (_, index) => stroke({
+      id: index === 0 ? "live" : `live:gpu-symmetry:${index}`,
+      points: [index, 0],
+    }));
+    const baseline = createStudioGpuStrokeFeedBaseline(initial, "kaleidoscope-64")!;
+    const fallback = initial.map((candidate, index) => stroke({
+      ...candidate,
+      points: [index, 0, index + 1, 1],
+      pressures: [0.5, 0.8],
+    }));
+    const result = advanceStudioGpuStrokeFeedBatch(baseline, {
+      fallbackStrokes: fallback,
+      patches: fallback.map((nextStroke, strokeIndex) => ({
+        strokeIndex,
+        previousPointCount: 1,
+        suffixPoints: nextStroke.points.slice(2),
+        suffixPressures: [0.8],
+        nextStroke,
+        fallbackStrokes: fallback,
+      })),
+    });
+
+    expect(result.status).toBe("appended");
+    expect(result.strokes).toHaveLength(64);
+    expect(result.strokes.every((candidate) => (
+      candidate[STUDIO_GPU_STROKE_FEED_REVISION]?.pointCount === 2
+    ))).toBe(true);
   });
 
   it("treats a final sealed endpoint as one ordinary append and rejects a stale count", () => {
@@ -330,6 +575,7 @@ describe("Studio WebGPU append-only stroke feed", () => {
         lastDabX: 3.2,
       },
     });
+    expect(Object.isFrozen(revision?.residualInkState)).toBe(true);
     expect(revision?.residualInkState?.distanceRemainder).toBeCloseTo(0.8, 12);
   });
 
@@ -407,5 +653,224 @@ describe("Studio WebGPU append-only stroke feed", () => {
     expect(revision?.maximumX).toBeCloseTo(13, 12);
     expect(revision?.minimumY).toBe(-8);
     expect(revision?.maximumY).toBe(8);
+  });
+
+  it("materializes tap, multi-revision suffix, and final-seal geometry from one root checkpoint", () => {
+    const baseline = createStudioGpuStrokeFeedBaseline([stroke()], "recovery-feed")!;
+    const rootRevision = baseline[0]![STUDIO_GPU_STROKE_FEED_REVISION]!;
+    expect(rootRevision.recoveryCheckpoint).toMatchObject({
+      lineage: rootRevision.lineage,
+      pointCount: 1,
+      points: [2, 3],
+      pressures: [0.5],
+      trustedImmutable: true,
+    });
+    expect(rootRevision.recoveryCheckpoint?.points).toBe(baseline[0]!.points);
+    expect(rootRevision.recoveryCheckpoint?.pressures).toBe(baseline[0]!.pressures);
+
+    const tap = materializeStudioGpuStrokeFeedStroke(baseline[0]!);
+    expect(tap).toMatchObject({ points: [2, 3], pressures: [0.5] });
+    expect(tap?.points).toBe(rootRevision.recoveryCheckpoint?.points);
+    expect(tap?.pressures).toBe(rootRevision.recoveryCheckpoint?.pressures);
+
+    const moved = [stroke({ points: [2, 3, 8, 4], pressures: [0.5, 0.65] })];
+    const first = advanceStudioGpuStrokeFeed(baseline, patch(moved, 1, [8, 4], [0.65]));
+    expect(first.status).toBe("appended");
+    const sealedSource = [stroke({
+      points: [2, 3, 8, 4, 13, 9],
+      pressures: [0.5, 0.65, 0.9],
+    })];
+    const sealed = advanceStudioGpuStrokeFeed(
+      first.strokes,
+      patch(sealedSource, 2, [13, 9], [0.9])
+    );
+    expect(sealed.status).toBe("appended");
+
+    const recovered = materializeStudioGpuStrokeFeedStroke(sealed.strokes[0]!);
+    expect(recovered).toMatchObject({
+      id: "live",
+      points: [2, 3, 8, 4, 13, 9],
+      pressures: [0.5, 0.65, 0.9],
+      color: "#7c5cff",
+      size: 6,
+    });
+    expect(Object.isFrozen(recovered)).toBe(true);
+    expect(Object.isFrozen(recovered?.points)).toBe(true);
+    expect(Object.isFrozen(recovered?.pressures)).toBe(true);
+    expect(materializeStudioGpuStrokeFeedStroke(sealed.strokes[0]!)).toBe(recovered);
+  });
+
+  it("normalizes unsafe root pressure arrays without duplicating already-canonical ones", () => {
+    const baseline = createStudioGpuStrokeFeedBaseline([
+      stroke({ points: [0, 0, 1, 1], pressures: [2] }),
+    ], "normalized-recovery")!;
+    const checkpoint = baseline[0]![STUDIO_GPU_STROKE_FEED_REVISION]!.recoveryCheckpoint!;
+
+    expect(checkpoint.points).toBe(baseline[0]!.points);
+    expect(checkpoint.pressures).not.toBe(baseline[0]!.pressures);
+    expect(checkpoint.pressures).toEqual([1, 0.5]);
+    expect(materializeStudioGpuStrokeFeedStroke(baseline[0]!)).toMatchObject({
+      points: [0, 0, 1, 1],
+      pressures: [1, 0.5],
+    });
+  });
+
+  it("materializes multiple symmetry variations atomically", () => {
+    const baseline = createStudioGpuStrokeFeedBaseline([
+      stroke({ id: "live", points: [2, 3] }),
+      stroke({ id: "live:gpu-symmetry:1", points: [98, 3] }),
+    ], "recovery-symmetry")!;
+    const fallback = [
+      stroke({ id: "live", points: [2, 3, 9, 7], pressures: [0.5, 0.8] }),
+      stroke({
+        id: "live:gpu-symmetry:1",
+        points: [98, 3, 91, 7],
+        pressures: [0.5, 0.8],
+      }),
+    ];
+    const advanced = advanceStudioGpuStrokeFeedBatch(baseline, {
+      fallbackStrokes: fallback,
+      patches: fallback.map((nextStroke, strokeIndex) => ({
+        strokeIndex,
+        previousPointCount: 1,
+        suffixPoints: nextStroke.points.slice(2),
+        suffixPressures: [0.8],
+        nextStroke,
+        fallbackStrokes: fallback,
+      })),
+    });
+    expect(advanced.status).toBe("appended");
+
+    const recovered = materializeStudioGpuStrokeFeedStrokes(advanced.strokes);
+    expect(recovered?.map(({ id, points, pressures }) => ({ id, points, pressures }))).toEqual([
+      { id: "live", points: [2, 3, 9, 7], pressures: [0.5, 0.8] },
+      {
+        id: "live:gpu-symmetry:1",
+        points: [98, 3, 91, 7],
+        pressures: [0.5, 0.8],
+      },
+    ]);
+    expect(Object.isFrozen(recovered)).toBe(true);
+  });
+
+  it("preserves residual pressure samples while recovering across phase-bearing revisions", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3;
+    const baseline = createStudioGpuStrokeFeedBaseline([stroke({
+      points: [0, 0, 9, 0],
+      pressures: [1, 1],
+      size: 50,
+      pressureModel,
+    })], "recovery-residual-v3")!;
+    const pressureOnly = [stroke({
+      points: [0, 0, 9, 0, 9, 0],
+      pressures: [1, 1, 0],
+      size: 50,
+      pressureModel,
+    })];
+    const stationary = advanceStudioGpuStrokeFeed(
+      baseline,
+      patch(pressureOnly, 2, [9, 0], [0])
+    );
+    expect(stationary.status).toBe("appended");
+    expect(stationary.strokes[0]?.[STUDIO_GPU_STROKE_FEED_REVISION]).toMatchObject({
+      residualInkState: { previousPressure: 0, spacingPhase: 0.9 },
+    });
+
+    expect(materializeStudioGpuStrokeFeedStroke(stationary.strokes[0]!)).toMatchObject({
+      points: [0, 0, 9, 0, 9, 0],
+      pressures: [1, 1, 0],
+      pressureModel,
+    });
+  });
+
+  it("fails closed for malformed lineage, point counts, and current style", () => {
+    const baseline = createStudioGpuStrokeFeedBaseline([stroke()], "recovery-reject")!;
+    const next = [stroke({ points: [2, 3, 8, 4], pressures: [0.5, 0.65] })];
+    const advanced = advanceStudioGpuStrokeFeed(baseline, patch(next, 1, [8, 4], [0.65]));
+    const candidate = advanced.strokes[0]!;
+    const revision = candidate[STUDIO_GPU_STROKE_FEED_REVISION]!;
+    const withRevision = (overrides: Partial<typeof revision>): StudioGpuStroke => Object.freeze({
+      ...candidate,
+      [STUDIO_GPU_STROKE_FEED_REVISION]: Object.freeze({ ...revision, ...overrides }),
+    });
+
+    expect(materializeStudioGpuStrokeFeedStroke(withRevision({ lineage: "forged" }))).toBeNull();
+    expect(materializeStudioGpuStrokeFeedStroke(withRevision({ pointCount: 99 }))).toBeNull();
+    expect(materializeStudioGpuStrokeFeedStroke({ ...candidate, color: "#ff0000" })).toBeNull();
+    expect(materializeStudioGpuStrokeFeedStrokes([
+      candidate,
+      withRevision({ parentPointCount: 999 }),
+    ])).toBeNull();
+  });
+
+  it("rejects copied or fabricated revision provenance across every traversal", () => {
+    const baseline = createStudioGpuStrokeFeedBaseline([stroke()], "recovery-provenance")!;
+    const next = [stroke({ points: [2, 3, 8, 4], pressures: [0.5, 0.65] })];
+    const advanced = advanceStudioGpuStrokeFeed(baseline, patch(next, 1, [8, 4], [0.65]));
+    const genuine = advanced.strokes[0]!;
+    const copied = Object.freeze({
+      ...genuine,
+      [STUDIO_GPU_STROKE_FEED_REVISION]: genuine[STUDIO_GPU_STROKE_FEED_REVISION],
+    });
+    expect(materializeStudioGpuStrokeFeedStroke(copied)).toBeNull();
+    expect(studioGpuStrokeFeedSuffixFromPointCount(copied, 1)).toBeNull();
+    expect(studioGpuStrokeFeedRevisionAtPointCount(copied, 1)).toBeNull();
+
+    const fakeRevision: Record<PropertyKey, unknown> = {
+      lineage: "fake",
+      revision: 1,
+      token: "fake-token",
+      pointCount: 2,
+      parentPointCount: 1,
+      suffixPoints: Object.freeze([1, 1]),
+      suffixPressures: Object.freeze([0.5]),
+      lastX: 1,
+      lastY: 1,
+      lastPressure: 0.5,
+      minimumX: 0,
+      minimumY: 0,
+      maximumX: 1,
+      maximumY: 1,
+      styleSignature: "fake-style",
+      recoveryCheckpoint: null,
+      trustedImmutable: true,
+    };
+    fakeRevision.parent = fakeRevision;
+    Object.freeze(fakeRevision);
+    const fabricated = Object.freeze({
+      ...stroke({ points: [0, 0, 1, 1] }),
+      [STUDIO_GPU_STROKE_FEED_REVISION]: fakeRevision,
+    }) as unknown as StudioGpuStroke;
+    expect(materializeStudioGpuStrokeFeedStroke(fabricated)).toBeNull();
+    expect(studioGpuStrokeFeedSuffixFromPointCount(fabricated, 1)).toBeNull();
+    expect(studioGpuStrokeFeedRevisionAtPointCount(fabricated, 1)).toBeNull();
+  });
+
+  it("recovers exclusively from checkpoint and suffixes when the current prefix is inaccessible", () => {
+    const baseline = createStudioGpuStrokeFeedBaseline([stroke()], "recovery-no-current-prefix")!;
+    const firstSource = [stroke({
+      points: inaccessiblePrefix([2, 3, 8, 4], 2),
+      pressures: inaccessiblePrefix([0.5, 0.65], 1),
+    })];
+    const first = advanceStudioGpuStrokeFeed(
+      baseline,
+      patch(firstSource, 1, [8, 4], [0.65])
+    );
+    expect(first.status).toBe("appended");
+    const finalSource = [stroke({
+      points: inaccessiblePrefix([2, 3, 8, 4, 13, 9], 4),
+      pressures: inaccessiblePrefix([0.5, 0.65, 0.9], 2),
+    })];
+    const sealed = advanceStudioGpuStrokeFeed(
+      first.strokes,
+      patch(finalSource, 2, [13, 9], [0.9])
+    );
+    expect(sealed.status).toBe("appended");
+
+    expect(() => materializeStudioGpuStrokeFeedStroke(sealed.strokes[0]!)).not.toThrow();
+    expect(materializeStudioGpuStrokeFeedStroke(sealed.strokes[0]!)).toMatchObject({
+      points: [2, 3, 8, 4, 13, 9],
+      pressures: [0.5, 0.65, 0.9],
+    });
   });
 });

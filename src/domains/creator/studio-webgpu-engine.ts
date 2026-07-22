@@ -29,6 +29,8 @@ import {
   advanceStudioGpuStrokeFeedBatch,
   appendStudioGpuStrokeFeedOperations,
   createStudioGpuStrokeFeedBaseline,
+  isTrustedStudioGpuStrokeFeedRevision,
+  isTrustedStudioGpuStrokeFeedStroke,
   type StudioGpuStrokeOperationsAppendPatch,
   type StudioGpuStrokeSuffixBatchPatch,
   type StudioGpuStrokeSuffixPatch,
@@ -313,7 +315,10 @@ export function fingerprintStudioGpuFrame(
   hash = updateFingerprint(hash, ordered.length);
   for (const stroke of ordered) {
     const feed = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
-    if (feed) {
+    if (
+      isTrustedStudioGpuStrokeFeedStroke(stroke)
+      && isTrustedStudioGpuStrokeFeedRevision(feed)
+    ) {
       hash = updateFingerprint(hash, `feed:${feed.token}`);
       continue;
     }

@@ -11,6 +11,7 @@ import {
 import { parseStudioGpuColor } from "./studio-webgpu-color";
 import {
   STUDIO_GPU_STROKE_FEED_REVISION,
+  isStudioGpuFiniteScalar,
   orderStudioGpuStrokes,
   studioGpuPressureRadius,
   STUDIO_GPU_MAX_BRUSH_SIZE,
@@ -18,6 +19,9 @@ import {
   type StudioGpuStroke,
 } from "./studio-webgpu-stroke";
 import {
+  isTrustedStudioGpuStrokeFeedRevision,
+  isTrustedStudioGpuStrokeFeedStroke,
+  materializeStudioGpuStrokeFeedStroke,
   sameStudioGpuStrokeFeedStyle,
   studioGpuStrokeFeedRevisionAtPointCount,
   studioGpuStrokeFeedSuffixFromPointCount,
@@ -62,39 +66,41 @@ function validClipRect(rect: StudioGpuRect): boolean {
 export function isValidStudioGpuStroke(stroke: StudioGpuStroke): boolean {
   const feed = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
   if (feed) {
-    return feed.trustedImmutable
+    return isTrustedStudioGpuStrokeFeedStroke(stroke)
+      && isTrustedStudioGpuStrokeFeedRevision(feed)
+      && feed.trustedImmutable
       && feed.pointCount >= 1
       && stroke.points.length === feed.pointCount * 2
       && feed.styleSignature.length > 0
-      && Number.isFinite(feed.minimumX)
-      && Number.isFinite(feed.minimumY)
-      && Number.isFinite(feed.maximumX)
-      && Number.isFinite(feed.maximumY)
+      && isStudioGpuFiniteScalar(feed.minimumX)
+      && isStudioGpuFiniteScalar(feed.minimumY)
+      && isStudioGpuFiniteScalar(feed.maximumX)
+      && isStudioGpuFiniteScalar(feed.maximumY)
       && typeof stroke.color === "string"
       && parseStudioGpuColor(stroke.color) !== null
-      && Number.isFinite(stroke.size)
+      && isStudioGpuFiniteScalar(stroke.size)
       && stroke.size > 0
       && stroke.size <= STUDIO_GPU_MAX_BRUSH_SIZE
       && (stroke.pressureModel === undefined || isStudioInkPressureModel(stroke.pressureModel))
       && (stroke.opacity === undefined || (
-        Number.isFinite(stroke.opacity) && stroke.opacity >= 0 && stroke.opacity <= 1
+        isStudioGpuFiniteScalar(stroke.opacity) && stroke.opacity >= 0 && stroke.opacity <= 1
       ));
   }
   return Array.isArray(stroke.points)
     && stroke.points.length >= 2
     && stroke.points.length % 2 === 0
-    && stroke.points.every(Number.isFinite)
+    && stroke.points.every(isStudioGpuFiniteScalar)
     && (stroke.pressures === undefined || (
-      Array.isArray(stroke.pressures) && stroke.pressures.every(Number.isFinite)
+      Array.isArray(stroke.pressures) && stroke.pressures.every(isStudioGpuFiniteScalar)
     ))
     && typeof stroke.color === "string"
     && parseStudioGpuColor(stroke.color) !== null
-    && Number.isFinite(stroke.size)
+    && isStudioGpuFiniteScalar(stroke.size)
     && stroke.size > 0
     && stroke.size <= STUDIO_GPU_MAX_BRUSH_SIZE
     && (stroke.pressureModel === undefined || isStudioInkPressureModel(stroke.pressureModel))
     && (stroke.opacity === undefined || (
-      Number.isFinite(stroke.opacity) && stroke.opacity >= 0 && stroke.opacity <= 1
+      isStudioGpuFiniteScalar(stroke.opacity) && stroke.opacity >= 0 && stroke.opacity <= 1
     ));
 }
 
@@ -185,7 +191,16 @@ function planStudioGpuDabsInternal(
     return { dabs, batches, complete: false };
   }
 
-  for (const stroke of orderStudioGpuStrokes(strokes)) {
+  for (const sourceStroke of orderStudioGpuStrokes(strokes)) {
+    const sourceFeed = sourceStroke[STUDIO_GPU_STROKE_FEED_REVISION];
+    const stroke = isTrustedStudioGpuStrokeFeedStroke(sourceStroke)
+      && isTrustedStudioGpuStrokeFeedRevision(sourceFeed)
+      ? materializeStudioGpuStrokeFeedStroke(sourceStroke)
+      : sourceStroke;
+    if (!stroke) {
+      complete = false;
+      break;
+    }
     // The unclipped Canvas2D/full-frame planner retains its historical truncation behavior. A
     // clipped tile planner must continue validating off-tile operations after reaching the exact
     // emitted-dab limit, because those operations consume no frame budget.
@@ -563,7 +578,12 @@ function sameStrokeStyle(previous: StudioGpuStroke, next: StudioGpuStroke): bool
 function isStrictPointPrefix(previous: StudioGpuStroke, next: StudioGpuStroke): boolean {
   const previousFeed = previous[STUDIO_GPU_STROKE_FEED_REVISION];
   const nextFeed = next[STUDIO_GPU_STROKE_FEED_REVISION];
-  if (previousFeed && nextFeed) {
+  if (
+    isTrustedStudioGpuStrokeFeedStroke(previous)
+    && isTrustedStudioGpuStrokeFeedStroke(next)
+    && isTrustedStudioGpuStrokeFeedRevision(previousFeed)
+    && isTrustedStudioGpuStrokeFeedRevision(nextFeed)
+  ) {
     return previousFeed.lineage === nextFeed.lineage
       && previousFeed.pointCount < nextFeed.pointCount;
   }
@@ -583,7 +603,12 @@ function isStrictPointPrefix(previous: StudioGpuStroke, next: StudioGpuStroke): 
 function isExactStrokeMatch(previous: StudioGpuStroke, next: StudioGpuStroke): boolean {
   const previousFeed = previous[STUDIO_GPU_STROKE_FEED_REVISION];
   const nextFeed = next[STUDIO_GPU_STROKE_FEED_REVISION];
-  if (previousFeed && nextFeed) {
+  if (
+    isTrustedStudioGpuStrokeFeedStroke(previous)
+    && isTrustedStudioGpuStrokeFeedStroke(next)
+    && isTrustedStudioGpuStrokeFeedRevision(previousFeed)
+    && isTrustedStudioGpuStrokeFeedRevision(nextFeed)
+  ) {
     return previousFeed.token === nextFeed.token
       && previous.points === next.points
       && previous.pressures === next.pressures;

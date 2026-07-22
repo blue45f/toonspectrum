@@ -5,8 +5,10 @@ import {
 import { resolveStudioLiveSurfaceDevicePixelRatio } from "./studio-low-latency-canvas";
 import { parseStudioGpuColor, type StudioGpuRgba } from "./studio-webgpu-color";
 import { isValidStudioGpuStroke } from "./studio-webgpu-dab-planner";
-
-import type { StudioGpuStroke } from "./studio-webgpu-stroke";
+import {
+  isStudioGpuFiniteScalar,
+  type StudioGpuStroke,
+} from "./studio-webgpu-stroke";
 
 /** Hard ceiling for a transient WebGL drawing buffer; document/export pixels are unaffected. */
 export const STUDIO_WEBGL_LIVE_INK_MAX_BACKING_PIXELS = 16_777_216;
@@ -212,6 +214,15 @@ export function planStudioWebGlLiveInkGeometry(
   surface: ResolvedStudioWebGlLiveInkSurface,
   maximumVertices: number
 ): StudioWebGlLiveInkGeometryPlan {
+  if (
+    Array.isArray(stroke.points)
+    && stroke.points.length >= 2
+    && stroke.points.length % 2 === 0
+    && stroke.points.every(Number.isFinite)
+    && !stroke.points.every(isStudioGpuFiniteScalar)
+  ) {
+    return { ok: false, reason: "numeric-overflow" };
+  }
   if (!isValidStudioGpuStroke(stroke)) {
     return { ok: false, reason: "invalid-stroke" };
   }

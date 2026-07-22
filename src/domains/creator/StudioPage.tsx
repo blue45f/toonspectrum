@@ -7704,6 +7704,7 @@ function StudioCuttoonEditor() {
    * 매 호출 참조 동일성을 다시 확인하므로 노출이 정확히 언제·얼마나 자주 일어나든 항상 옳게 감지한다.
    */
   const gpuLiveInkExposedPointsRef = useRef<number[] | null>(null);
+  const gpuLiveInkExposedPressuresRef = useRef<number[] | null>(null);
   const drawingLastAuthoritativePointerRef = useRef<PointerEvent | null>(null);
   const drawingVelocityRef = useRef<StudioPointerVelocityState | null>(null);
   // The imperative transport owns the single pointer session, DOM capture and safety listeners.
@@ -8031,12 +8032,20 @@ function StudioCuttoonEditor() {
       && sourcePointCount >= cache.pointCount
       && sourceLength >= cache.sourceLength
     ) {
+      const mapped = sourcePointCount > cache.pointCount
+        && cache.mapped === gpuLiveInkExposedPressuresRef.current
+        ? [...cache.mapped]
+        : cache.mapped;
       for (let index = cache.pointCount; index < sourcePointCount; index += 1) {
-        cache.mapped.push(studioLiveBrushPressure(el, el.pressures?.[index]));
+        mapped.push(studioLiveBrushPressure(el, el.pressures?.[index]));
       }
-      cache.sourceLength = sourceLength;
-      cache.pointCount = sourcePointCount;
-      return cache.mapped;
+      const nextCache = mapped === cache.mapped
+        ? cache
+        : { ...cache, mapped };
+      nextCache.sourceLength = sourceLength;
+      nextCache.pointCount = sourcePointCount;
+      liveBrushPressureCacheRef.current = nextCache;
+      return mapped;
     }
     const mapped = studioLiveBrushPressureSamples(el, sourcePointCount);
     liveBrushPressureCacheRef.current = {
@@ -8620,6 +8629,7 @@ function StudioCuttoonEditor() {
           // reference in fallbackStrokes/nextStroke for a possible device-loss resync, so it must
           // never be mutated again from here on.
           gpuLiveInkExposedPointsRef.current = next.points;
+          gpuLiveInkExposedPressuresRef.current = strokeView.pressures as number[];
           handle.appendPinnedStrokeSuffix({
             strokeIndex: pendingGpuStrokesRef.current.length,
             previousPointCount,
