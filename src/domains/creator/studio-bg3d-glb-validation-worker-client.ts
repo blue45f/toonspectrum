@@ -11,6 +11,20 @@ import {
 
 export const STUDIO_BG3D_GLB_WORKER_TIMEOUT_MS = 90_000;
 
+/**
+ * Synchronous validation above this ceiling is deliberately unavailable. Eight MiB keeps the
+ * compatibility path useful for small files without allowing a missing Worker to move a large
+ * digest/container/texture preflight onto the render thread.
+ */
+export const STUDIO_BG3D_GLB_MAIN_THREAD_FALLBACK_MAX_BYTES = 8 * 1024 * 1024;
+
+/** Whether this byte payload must have a functioning validation Worker. */
+export function studioBg3dGlbRequiresValidationWorker(
+  input: ArrayBuffer | Uint8Array,
+): boolean {
+  return input.byteLength > STUDIO_BG3D_GLB_MAIN_THREAD_FALLBACK_MAX_BYTES;
+}
+
 export type StudioBg3dGlbValidationExecution = "worker" | "main-thread";
 
 export interface StudioBg3dGlbWorkerValidationOutcome {
@@ -366,6 +380,23 @@ function abortedValidationError(): StudioBg3dValidationWorkerError {
   return new StudioBg3dValidationWorkerError("aborted");
 }
 
+function unavailableValidationWorkerError(): StudioBg3dValidationWorkerError {
+  // Keep the established public worker error contract while making the large-job branch explicit.
+  return new StudioBg3dValidationWorkerError("worker-failed");
+}
+
+function validateStudioBg3dGlbWithBoundedMainThreadFallback(
+  input: ArrayBuffer | Uint8Array,
+  options: StudioBg3dGlbValidationOptions,
+  signal?: AbortSignal,
+): Promise<StudioBg3dGlbWorkerValidationOutcome> {
+  if (signal?.aborted) return Promise.reject(abortedValidationError());
+  if (studioBg3dGlbRequiresValidationWorker(input)) {
+    return Promise.reject(unavailableValidationWorkerError());
+  }
+  return validateStudioBg3dGlbOnMainThread(input, options, signal);
+}
+
 async function validateStudioBg3dGlbOnMainThread(
   input: ArrayBuffer | Uint8Array,
   options: StudioBg3dGlbValidationOptions,
@@ -415,7 +446,7 @@ export async function validateStudioBg3dGlbOffMainThread(
     throw new StudioBg3dValidationWorkerError("basis-worker-attestation-required");
   }
   if (!canUseBrowserWorker(options)) {
-    return validateStudioBg3dGlbOnMainThread(input, options, signal);
+    return validateStudioBg3dGlbWithBoundedMainThreadFallback(input, options, signal);
   }
   try {
     sharedPool ??= new StudioBg3dValidationWorkerPool({
@@ -423,21 +454,30 @@ export async function validateStudioBg3dGlbOffMainThread(
       maximumWorkers: maximumBrowserValidationWorkers(),
     });
   } catch {
-    return validateStudioBg3dGlbOnMainThread(input, options, signal);
+    return validateStudioBg3dGlbWithBoundedMainThreadFallback(input, options, signal);
   }
   const pool = sharedPool;
   try {
     return await pool.validate(input, options, signal);
   } catch (error) {
+    const workerStarted = error instanceof StudioBg3dValidationWorkerError;
     if (
-      error instanceof StudioBg3dValidationWorkerError
+      workerStarted
       && error.code !== "aborted"
       && sharedPool === pool
     ) {
       pool.dispose();
       sharedPool = null;
     }
-    throw error;
+    if (workerStarted) throw error;
+
+    // Browser Worker construction can throw before the client establishes its typed lifecycle.
+    // Small inputs retain the compatibility path; large inputs fail closed with the existing code.
+    if (sharedPool === pool) {
+      pool.dispose();
+      sharedPool = null;
+    }
+    return validateStudioBg3dGlbWithBoundedMainThreadFallback(input, options, signal);
   }
 }
 

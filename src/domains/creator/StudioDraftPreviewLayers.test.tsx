@@ -80,7 +80,7 @@ describe("StudioDraftPreviewLayers", () => {
     ]);
   });
 
-  it("isolates a live dynamics brush from the settled layer without active-draft correction", () => {
+  it("isolates a live dynamics brush and applies the active-draft render budget", () => {
     const store = new StudioDraftPreviewStore();
     store.settle(draw("settled"));
     store.setActive(draw("dynamic", { brush: "ink-particle" }));
@@ -92,7 +92,7 @@ describe("StudioDraftPreviewLayers", () => {
       id: "settled",
     });
     expect(within(layers[1]!).getByTestId("draw-node").dataset).toMatchObject({
-      activeDraft: "false",
+      activeDraft: "true",
       id: "dynamic",
     });
   });

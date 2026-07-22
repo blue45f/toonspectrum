@@ -15,6 +15,10 @@ import {
 } from "./studio-bg3d-glb-validation-worker-client";
 import { STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS } from "./studio-bg3d-meshopt";
 import {
+  inspectStudioBg3dModelThumbnailDataUrl,
+  normalizeStudioBg3dModelThumbnailDataUrl,
+} from "./studio-bg3d-model-thumbnail-data";
+import {
   STUDIO_BG3D_GLB_MIME,
   type StudioBg3dAttachmentRights,
   type StudioBg3dAttachmentSource,
@@ -150,7 +154,16 @@ interface Bg3dModelThumbnailRecord {
   readonly id: string;
   readonly thumbnail: string;
   readonly updatedAt: number;
+  /** Monotonic operation fence. Legacy V2 rows without it are treated as revision zero. */
+  readonly captureRevision?: number;
 }
+
+export interface Bg3dModelThumbnailSaveOptions {
+  readonly captureRevision?: number;
+  readonly now?: number;
+}
+
+let lastThumbnailCaptureRevision = 0;
 
 export interface Bg3dModelUploadSource {
   readonly name: string;
@@ -323,13 +336,47 @@ function isSafeTimestamp(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
-function isSafeStorageId(value: unknown): value is string {
+function isSafeThumbnailCaptureRevision(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+export function isSafeBg3dModelStorageId(value: unknown): value is string {
   return Boolean(
     typeof value === "string" &&
       STORAGE_ID_PATTERN.test(value) &&
       !FORBIDDEN_SCENE_IDS.has(value.toLowerCase()) &&
       !SENSITIVE_REFERENCE_PATTERN.test(value),
   );
+}
+
+/**
+ * Creates a wall-clock-prefixed fence while remaining monotonic within this realm. Equal fences
+ * from two tabs are allowed: IndexedDB serializes their read/write transactions, so the later
+ * transaction remains authoritative instead of being discarded arbitrarily.
+ */
+export function createBg3dModelThumbnailCaptureRevision(now = Date.now()): number {
+  if (!isSafeTimestamp(now) || now > Math.floor(Number.MAX_SAFE_INTEGER / 1_024)) {
+    throw createLibraryError("invalid-file");
+  }
+  const clockRevision = now * 1_024;
+  lastThumbnailCaptureRevision = Math.max(lastThumbnailCaptureRevision + 1, clockRevision);
+  return lastThumbnailCaptureRevision;
+}
+
+function readSafeThumbnailRecord(
+  value: unknown,
+  expectedId?: string,
+): (Bg3dModelThumbnailRecord & { readonly thumbnail: string }) | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Partial<Bg3dModelThumbnailRecord>;
+  if (
+    !isSafeBg3dModelStorageId(record.id)
+    || (expectedId !== undefined && record.id !== expectedId)
+    || !isSafeTimestamp(record.updatedAt)
+    || (record.captureRevision !== undefined && !isSafeThumbnailCaptureRevision(record.captureRevision))
+  ) return null;
+  const thumbnail = normalizeStudioBg3dModelThumbnailDataUrl(record.thumbnail);
+  return thumbnail ? { ...record, id: record.id, thumbnail, updatedAt: record.updatedAt } : null;
 }
 
 function hasSafeMetrics(value: unknown): value is StudioBg3dGlbMetrics {
@@ -367,7 +414,7 @@ export function isVerifiedBg3dModelRecord(value: unknown): value is Bg3dVerified
   const record = value as Partial<Bg3dVerifiedStoredRecord>;
   return Boolean(
     record.storageVersion === BG3D_MODEL_STORAGE_VERSION &&
-      isSafeStorageId(record.id) &&
+      isSafeBg3dModelStorageId(record.id) &&
       typeof record.name === "string" &&
       record.format === "glb" &&
       record.blob instanceof Blob &&
@@ -540,6 +587,66 @@ function validateUploadMetadata(file: Bg3dModelUploadSource): void {
   if (file.size > STUDIO_BG3D_GLB_MAX_BYTES) throw createLibraryError("file-too-large");
 }
 
+interface Bg3dDeclaredByteAdmission {
+  readonly profile: StudioBg3dGlbProfile;
+  readonly budgets: StudioBg3dGlbBudgetProfiles;
+  readonly cumulativeUsedBytes: number;
+  readonly maximumCumulativeBytes: number;
+}
+
+/**
+ * Applies the byte-only subset of the GLB validation policy to trusted Blob/File metadata before
+ * materializing or hashing its bytes. A within-batch item without an expected hash cannot yet be
+ * distinguished from a previously counted duplicate, so only that cumulative check remains at the
+ * post-digest validator boundary; the per-model profile ceiling is always decidable here.
+ */
+function assertDeclaredBg3dModelByteAdmission(
+  item: Bg3dModelImportItem,
+  options: Bg3dModelVerificationOptions,
+  alreadyCountedHashes: ReadonlySet<string>,
+): Bg3dDeclaredByteAdmission {
+  const profile = options.profile ?? "desktop";
+  const budgets = options.budgets ?? DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES;
+  const maxModelBytes = budgets?.[profile]?.complexity?.maxModelBytes;
+  const cumulativeUsedBytes = options.cumulativeUsedBytes ?? 0;
+  const maximumCumulativeBytes = options.maximumCumulativeBytes ?? STUDIO_BG3D_GLB_MAX_BYTES;
+  if (
+    typeof maxModelBytes !== "number"
+    || !Number.isSafeInteger(maxModelBytes)
+    || maxModelBytes <= 0
+    || !Number.isSafeInteger(cumulativeUsedBytes)
+    || cumulativeUsedBytes < 0
+    || !Number.isSafeInteger(maximumCumulativeBytes)
+    || maximumCumulativeBytes <= 0
+    || cumulativeUsedBytes > maximumCumulativeBytes
+  ) {
+    throw createLibraryError("validation-failed", "invalid-options");
+  }
+  if (item.file.size > maxModelBytes) {
+    throw createLibraryError("validation-failed", "model-byte-budget-exceeded");
+  }
+
+  const expectedHash = item.expectedSha256 === undefined
+    ? null
+    : canonicalizeBg3dModelHash(item.expectedSha256);
+  const cumulativeCanBeDecidedBeforeDigest = alreadyCountedHashes.size === 0 || expectedHash !== null;
+  if (cumulativeCanBeDecidedBeforeDigest) {
+    const validationUsedBytes = expectedHash && alreadyCountedHashes.has(expectedHash)
+      ? Math.max(0, cumulativeUsedBytes - item.file.size)
+      : cumulativeUsedBytes;
+    if (item.file.size > maximumCumulativeBytes - validationUsedBytes) {
+      throw createLibraryError("validation-failed", "cumulative-byte-budget-exceeded");
+    }
+  }
+
+  return {
+    profile,
+    budgets,
+    cumulativeUsedBytes,
+    maximumCumulativeBytes,
+  };
+}
+
 function resolveNow(now: number | undefined): number {
   const value = now ?? Date.now();
   if (!isSafeTimestamp(value)) throw createLibraryError("invalid-file");
@@ -571,6 +678,11 @@ async function prepareVerifiedBg3dModelRecordInternal(
   const item = normalizeImportItem(input);
   throwIfBg3dOperationAborted(options.signal);
   validateUploadMetadata(item.file);
+  const declaredByteAdmission = assertDeclaredBg3dModelByteAdmission(
+    item,
+    options,
+    alreadyCountedHashes,
+  );
 
   let rawBuffer: ArrayBuffer;
   try {
@@ -598,9 +710,12 @@ async function prepareVerifiedBg3dModelRecordInternal(
     if (!expectedHash || expectedHash !== computedHash) throw createLibraryError("hash-mismatch");
   }
 
-  const profile = options.profile ?? "desktop";
-  const cumulativeUsedBytes = options.cumulativeUsedBytes ?? 0;
-  const maximumCumulativeBytes = options.maximumCumulativeBytes ?? STUDIO_BG3D_GLB_MAX_BYTES;
+  const {
+    profile,
+    budgets,
+    cumulativeUsedBytes,
+    maximumCumulativeBytes,
+  } = declaredByteAdmission;
   const validationUsedBytes = alreadyCountedHashes.has(computedHash)
     ? Math.max(0, cumulativeUsedBytes - inputSnapshot.byteLength)
     : cumulativeUsedBytes;
@@ -612,7 +727,7 @@ async function prepareVerifiedBg3dModelRecordInternal(
     },
     cumulative: { usedBytes: validationUsedBytes, maximumBytes: maximumCumulativeBytes },
     profile,
-    budgets: options.budgets ?? DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
+    budgets,
     digest: options.digest,
     supportedRequiredExtensions: options.supportedRequiredExtensions
       ?? STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS,
@@ -627,7 +742,7 @@ async function prepareVerifiedBg3dModelRecordInternal(
   } catch {
     throw createLibraryError("invalid-file");
   }
-  if (!isSafeStorageId(storageId)) throw createLibraryError("invalid-file");
+  if (!isSafeBg3dModelStorageId(storageId)) throw createLibraryError("invalid-file");
   const record: Bg3dVerifiedStoredRecord = {
     id: storageId,
     storageVersion: BG3D_MODEL_STORAGE_VERSION,
@@ -667,7 +782,7 @@ export function createUploadedBg3dModelRecord(
 ): Bg3dLegacyStoredRecord {
   if (detectBg3dModelFormat(file.name) !== "glb") throw createLibraryError("unsupported-format");
   if (file.size > STUDIO_BG3D_GLB_MAX_BYTES) throw createLibraryError("file-too-large");
-  if (!isSafeStorageId(id) || !isSafeTimestamp(now)) throw createLibraryError("invalid-file");
+  if (!isSafeBg3dModelStorageId(id) || !isSafeTimestamp(now)) throw createLibraryError("invalid-file");
   return {
     id,
     name: normalizeModelName(file.name),
@@ -711,7 +826,8 @@ export function withDefaultBg3dModelEntry(
 ): Bg3dModelLibraryEntry[] {
   const sampleEntries = SAMPLE_BG3D_MODEL_ENTRIES.map((entry) => ({
     ...entry,
-    thumbnail: thumbnails[entry.id] ?? entry.thumbnail,
+    thumbnail: normalizeStudioBg3dModelThumbnailDataUrl(thumbnails[entry.id])
+      ?? normalizeStudioBg3dModelThumbnailDataUrl(entry.thumbnail),
   }));
   const uploadedEntries = storedModels
     .filter(isBaseStoredRecord)
@@ -722,7 +838,8 @@ export function withDefaultBg3dModelEntry(
       name: record.name,
       format: record.format,
       source: "indexed-db",
-      thumbnail: thumbnails[record.id] ?? record.thumbnail ?? null,
+      thumbnail: normalizeStudioBg3dModelThumbnailDataUrl(thumbnails[record.id])
+        ?? normalizeStudioBg3dModelThumbnailDataUrl(record.thumbnail),
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
       ...libraryStatus(record),
@@ -972,7 +1089,8 @@ async function promoteLegacyGlb(record: Bg3dLegacyStoredRecord): Promise<Bg3dVer
     if (duplicate) return duplicate;
 
     return withDatabase(async (database) => {
-      const stores = record.thumbnail ? [MODEL_STORE, THUMBNAIL_STORE] : [MODEL_STORE];
+      const safeThumbnail = normalizeStudioBg3dModelThumbnailDataUrl(record.thumbnail);
+      const stores = safeThumbnail ? [MODEL_STORE, THUMBNAIL_STORE] : [MODEL_STORE];
       const transaction = database.transaction(stores, "readwrite");
       const done = transactionDone(transaction);
       const storedRecord = Object.freeze({
@@ -980,10 +1098,10 @@ async function promoteLegacyGlb(record: Bg3dLegacyStoredRecord): Promise<Bg3dVer
         createdAt: record.createdAt,
       } satisfies Bg3dVerifiedStoredRecord);
       transaction.objectStore(MODEL_STORE).put(storedRecord);
-      if (record.thumbnail) {
+      if (safeThumbnail) {
         transaction.objectStore(THUMBNAIL_STORE).put({
           id: record.id,
-          thumbnail: record.thumbnail,
+          thumbnail: safeThumbnail,
           updatedAt: record.updatedAt,
         } satisfies Bg3dModelThumbnailRecord);
       }
@@ -1012,20 +1130,20 @@ export async function admitStoredBg3dModelForRendering(
   storageId: string,
   options: Bg3dModelAdmissionOptions = {},
 ): Promise<StudioBg3dGlbValidationSuccess> {
-  if (!isSafeStorageId(storageId)) throw createLibraryError("admission-failed");
+  if (!isSafeBg3dModelStorageId(storageId)) throw createLibraryError("admission-failed");
   const record = await getStoredBg3dModel(storageId);
   if (!record) throw createLibraryError("admission-failed");
   return revalidateStoredBg3dModelForRendering(record, options);
 }
 
 export async function getCachedBg3dModelThumbnail(id: string): Promise<string | null> {
+  if (!isSafeBg3dModelStorageId(id)) return null;
   return withDatabase(async (database) => {
     const transaction = database.transaction(THUMBNAIL_STORE, "readonly");
     const done = transactionDone(transaction);
     const value = await requestResult<unknown>(transaction.objectStore(THUMBNAIL_STORE).get(id));
     await done;
-    const record = value as Partial<Bg3dModelThumbnailRecord> | undefined;
-    return typeof record?.thumbnail === "string" ? record.thumbnail : null;
+    return readSafeThumbnailRecord(value, id)?.thumbnail ?? null;
   });
 }
 
@@ -1037,8 +1155,8 @@ export async function listBg3dModelLibraryEntries(): Promise<Bg3dModelLibraryEnt
     const values = await requestResult<unknown[]>(transaction.objectStore(THUMBNAIL_STORE).getAll());
     await done;
     const pairs = values.flatMap((value): readonly (readonly [string, string])[] => {
-      const item = value as Partial<Bg3dModelThumbnailRecord> | null;
-      return item && typeof item.id === "string" && typeof item.thumbnail === "string"
+      const item = readSafeThumbnailRecord(value);
+      return item
         ? [[item.id, item.thumbnail] as const]
         : [];
     });
@@ -1047,20 +1165,64 @@ export async function listBg3dModelLibraryEntries(): Promise<Bg3dModelLibraryEnt
   return withDefaultBg3dModelEntry(records, thumbnails);
 }
 
-export async function saveBg3dModelThumbnail(id: string, thumbnail: string): Promise<void> {
-  if (typeof thumbnail !== "string" || !/^data:image\/(?:png|jpeg|webp);base64,/iu.test(thumbnail)) {
+/**
+ * Commits a validated thumbnail only if no newer capture fence already owns the model. The model
+ * lookup, fence comparison, and thumbnail put share one IndexedDB transaction, preventing a late
+ * capture or concurrent delete from resurrecting stale UI data.
+ */
+export async function saveBg3dModelThumbnailIfCurrent(
+  id: string,
+  thumbnail: string,
+  options: Bg3dModelThumbnailSaveOptions = {},
+): Promise<boolean> {
+  const inspected = inspectStudioBg3dModelThumbnailDataUrl(thumbnail);
+  if (!isSafeBg3dModelStorageId(id) || !inspected) {
     throw createLibraryError("invalid-file");
   }
+  const captureRevision = options.captureRevision
+    ?? createBg3dModelThumbnailCaptureRevision(options.now);
+  if (!isSafeThumbnailCaptureRevision(captureRevision)) throw createLibraryError("invalid-file");
+  const updatedAt = resolveNow(options.now);
   return withDatabase(async (database) => {
-    const transaction = database.transaction(THUMBNAIL_STORE, "readwrite");
+    const transaction = database.transaction([MODEL_STORE, THUMBNAIL_STORE], "readwrite");
     const done = transactionDone(transaction);
-    transaction.objectStore(THUMBNAIL_STORE).put({
-      id,
-      thumbnail,
-      updatedAt: Date.now(),
-    } satisfies Bg3dModelThumbnailRecord);
+    const modelStore = transaction.objectStore(MODEL_STORE);
+    const thumbnailStore = transaction.objectStore(THUMBNAIL_STORE);
+    let outcome: "missing" | "saved" | "stale" = "missing";
+    const modelLookup = modelStore.get(id);
+    modelLookup.onsuccess = () => {
+      if (!isVerifiedBg3dModelRecord(modelLookup.result)) return;
+      const thumbnailLookup = thumbnailStore.get(id);
+      thumbnailLookup.onsuccess = () => {
+        const existing = readSafeThumbnailRecord(thumbnailLookup.result, id);
+        const existingRevision = existing?.captureRevision ?? 0;
+        if (existingRevision > captureRevision) {
+          outcome = "stale";
+          return;
+        }
+        outcome = "saved";
+        thumbnailStore.put({
+          id,
+          thumbnail: inspected.dataUrl,
+          updatedAt,
+          captureRevision,
+        } satisfies Bg3dModelThumbnailRecord);
+      };
+      thumbnailLookup.onerror = () => transaction.abort();
+    };
+    modelLookup.onerror = () => transaction.abort();
     await done;
+    if (outcome === "missing") throw createLibraryError("invalid-file");
+    return outcome === "saved";
   });
+}
+
+export async function saveBg3dModelThumbnail(
+  id: string,
+  thumbnail: string,
+  options: Bg3dModelThumbnailSaveOptions = {},
+): Promise<void> {
+  await saveBg3dModelThumbnailIfCurrent(id, thumbnail, options);
 }
 
 export async function deleteStoredBg3dModel(id: string): Promise<void> {

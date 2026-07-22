@@ -5,7 +5,9 @@ import * as THREE from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  constrainStudioVrmJointWorldPoint,
   createStudioVrmJointDragPlane,
+  projectStudioVrmJointPointerByMode,
   projectStudioVrmJointPointerToPlane,
   resolveStudioVrmJointDragOutcome,
   resolveStudioVrmJointNodeBindings,
@@ -65,6 +67,7 @@ beforeEach(() => {
   camera.updateMatrixWorld();
   fiberMock.state = {
     camera,
+    scene: new THREE.Scene(),
     gl: {
       domElement: {
         getBoundingClientRect: () => ({ left: 0, top: 0, width: 400, height: 400 }),
@@ -175,6 +178,67 @@ describe("StudioVrmJointHandles helpers", () => {
     )).toBeNull();
   });
 
+  it("supports screen-plane axis locks and pointer-driven depth movement", () => {
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+    camera.position.set(0, 0, 5);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
+    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+    const start = new THREE.Vector3(1, 2, 0);
+    const rect = { left: 0, top: 0, width: 400, height: 400 };
+
+    const lockedScreen = projectStudioVrmJointPointerByMode(
+      200,
+      200,
+      200,
+      rect,
+      camera,
+      plane,
+      start,
+      "screen",
+      "x",
+    );
+    expect(lockedScreen?.x).toBeCloseTo(0);
+    expect(lockedScreen?.y).toBeCloseTo(2);
+    expect(lockedScreen?.z).toBeCloseTo(0);
+
+    const depth = projectStudioVrmJointPointerByMode(
+      200,
+      100,
+      200,
+      rect,
+      camera,
+      plane,
+      start,
+      "depth",
+      "free",
+    );
+    expect(depth?.x).toBeCloseTo(1);
+    expect(depth?.y).toBeCloseTo(2);
+    expect(depth?.z).toBeLessThan(0);
+
+    const yDepth = projectStudioVrmJointPointerByMode(
+      200,
+      100,
+      200,
+      rect,
+      camera,
+      plane,
+      start,
+      "depth",
+      "y",
+    );
+    expect(yDepth?.x).toBeCloseTo(1);
+    expect(yDepth?.y).toBeGreaterThan(2);
+    expect(yDepth?.z).toBeCloseTo(0);
+
+    expect(constrainStudioVrmJointWorldPoint(
+      start,
+      new THREE.Vector3(3, 4, 5),
+      "z",
+    )?.toArray()).toEqual([1, 2, 5]);
+  });
+
   it("commits only a previewed pointerup and rolls pointer cancellation back to its start", () => {
     const snapshot = {
       bone: "leftHand" as const,
@@ -214,8 +278,31 @@ describe("StudioVrmJointHandles interaction boundary", () => {
     expect(hips.getAttribute("aria-pressed")).toBe("false");
     expect(leftHand.getAttribute("aria-pressed")).toBe("true");
     expect(leftHand.getAttribute("aria-keyshortcuts")).toContain("ArrowLeft");
-    expect(leftHand.style.width).toBe("24px");
+    expect(leftHand.style.width).toBe("44px");
+    expect(
+      (leftHand.querySelector('[data-handle-visual="target"]') as HTMLElement).style.width,
+    ).toBe("24px");
     expect(screen.queryByRole("button", { name: "오른손 관절 IK 목표 이동" })).toBeNull();
+  });
+
+  it("renders an accessible 44px pole handle for each supplied active constraint", () => {
+    const vrm = makeVrm({ leftHand: new THREE.Object3D() });
+    render(
+      <StudioVrmJointHandles
+        vrm={vrm}
+        selectedBone="leftHand"
+        selectedPole="leftHand"
+        poleSceneTargets={{ leftHand: [0.4, 1.2, 0.3] }}
+      />,
+    );
+
+    const target = screen.getByRole("button", { name: "왼손 관절 IK 목표 이동" });
+    const pole = screen.getByRole("button", { name: "왼손 IK 폴 방향 이동" });
+    expect(target.getAttribute("aria-pressed")).toBe("false");
+    expect(pole.getAttribute("aria-pressed")).toBe("true");
+    expect(pole.getAttribute("data-ik-control")).toBe("pole");
+    expect(pole.style.width).toBe("44px");
+    expect(pole.style.height).toBe("44px");
   });
 
   it("stops pointer bubbling, locks orbit interaction, and does not commit a selection-only press", () => {
@@ -337,5 +424,55 @@ describe("StudioVrmJointHandles interaction boundary", () => {
     expect(onEffectorRollback).toHaveBeenCalledOnce();
     expect(onEffectorRollback).toHaveBeenCalledWith("rightHand", [0.25, 1.1, -0.2]);
     expect(onInteractionActiveChange.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it("previews and commits a pole drag through the shared pointer transaction", () => {
+    const onPolePreview = vi.fn();
+    const onPoleCommit = vi.fn();
+    const onPoleRollback = vi.fn();
+    const vrm = makeVrm({ leftFoot: new THREE.Object3D() });
+    render(
+      <StudioVrmJointHandles
+        vrm={vrm}
+        poleSceneTargets={{ leftFoot: [0.2, 0.6, 0.4] }}
+        onPolePreview={onPolePreview}
+        onPoleCommit={onPoleCommit}
+        onPoleRollback={onPoleRollback}
+      />,
+    );
+    const pole = screen.getByRole("button", { name: "왼발 IK 폴 방향 이동" });
+
+    fireEvent.pointerDown(pole, { pointerId: 12, button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(pole, { pointerId: 12, clientX: 145, clientY: 120 });
+    fireEvent.pointerUp(pole, { pointerId: 12, button: 0, clientX: 145, clientY: 120 });
+
+    expect(onPolePreview).toHaveBeenCalledOnce();
+    expect(onPoleCommit).toHaveBeenCalledOnce();
+    expect(onPolePreview.mock.calls[0]).toEqual(onPoleCommit.mock.calls[0]);
+    expect(onPoleCommit.mock.calls[0]?.[0]).toBe("leftFoot");
+    expect(onPoleRollback).not.toHaveBeenCalled();
+  });
+
+  it("restores the pole baseline when pointer cancellation interrupts a drag", () => {
+    const onPoleCommit = vi.fn();
+    const onPoleRollback = vi.fn();
+    const vrm = makeVrm({ rightFoot: new THREE.Object3D() });
+    render(
+      <StudioVrmJointHandles
+        vrm={vrm}
+        poleSceneTargets={{ rightFoot: [-0.2, 0.6, 0.4] }}
+        onPoleCommit={onPoleCommit}
+        onPoleRollback={onPoleRollback}
+      />,
+    );
+    const pole = screen.getByRole("button", { name: "오른발 IK 폴 방향 이동" });
+
+    fireEvent.pointerDown(pole, { pointerId: 13, button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(pole, { pointerId: 13, clientX: 140, clientY: 130 });
+    fireEvent.pointerCancel(pole, { pointerId: 13, clientX: 140, clientY: 130 });
+
+    expect(onPoleCommit).not.toHaveBeenCalled();
+    expect(onPoleRollback).toHaveBeenCalledOnce();
+    expect(onPoleRollback).toHaveBeenCalledWith("rightFoot", [-0.2, 0.6, 0.4]);
   });
 });

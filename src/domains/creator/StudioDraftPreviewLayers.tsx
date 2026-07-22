@@ -41,7 +41,7 @@ export const StudioDraftPreviewLayers = memo(function StudioDraftPreviewLayers({
           수천 개의 dab 을 재실행하지 않는다. */}
       {isolatedDynamic ? (
         <Layer listening={false}>
-          <StudioDrawNode el={isolatedDynamic} />
+          <StudioDrawNode el={isolatedDynamic} activeDraft />
         </Layer>
       ) : null}
     </>

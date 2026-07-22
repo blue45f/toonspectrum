@@ -1,74 +1,552 @@
-import { type BgCustomModelInstance } from "./studio-background-3d-model";
-import { type BgPrimitive } from "./studio-background-3d-primitives";
+/**
+ * Durable user-template boundary for Studio BG3D.
+ *
+ * A template stores only canonical scene JSON. In particular, private IndexedDB model keys are
+ * never part of this format: model nodes refer to logical attachment ids and attachments carry the
+ * verified SHA-256 identity used to resolve the local model library at apply time.
+ */
 
-const DB_NAME = "toonspectrum-studio-bg3d-template-library";
-const DB_VERSION = 1;
+import {
+  STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES,
+  parseStudioBg3dSceneDocument,
+  serializeStudioBg3dSceneDocument,
+  type StudioBg3dSceneDocument,
+  type StudioBg3dSceneNode,
+} from "./studio-bg3d-scene-document";
+
+export const BG3D_TEMPLATE_LIBRARY_DATABASE_NAME =
+  "toonspectrum-studio-bg3d-template-library";
+export const BG3D_TEMPLATE_LIBRARY_DATABASE_VERSION = 2;
+export const BG3D_TEMPLATE_LIBRARY_MAX_ENTRIES = 128;
+export const BG3D_TEMPLATE_LIBRARY_MAX_NAME_LENGTH = 80;
+
 const STORE_NAME = "templates";
+const TEMPLATE_RECORD_KIND = "toonspectrum-studio-bg3d-template";
+const TEMPLATE_RECORD_VERSION = 1;
+const TEMPLATE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._~-]{0,79}$/u;
+const FORBIDDEN_ID_SET = new Set(["constructor", "prototype", "__proto__"]);
+const UTF8_ENCODER = new TextEncoder();
+const MAX_CREATED_AT = 8_640_000_000_000_000;
+const MAX_NODE_ID_ATTEMPTS = 64;
+const MAX_STORED_ROW_SCAN = BG3D_TEMPLATE_LIBRARY_MAX_ENTRIES * 4;
 
-export interface Bg3dUserTemplate {
-  primitives?: BgPrimitive[];
-  customModels?: BgCustomModelInstance[];
-}
+const DRAFT_KEYS = ["id", "name", "createdAt", "document"] as const;
+const RECORD_KEYS = ["kind", "version", "id", "name", "createdAt", "sceneJson"] as const;
 
-export interface Bg3dTemplateLibraryEntry {
+export interface Bg3dTemplateLibraryDraft {
   readonly id: string;
   readonly name: string;
   readonly createdAt: number;
-  readonly template: Bg3dUserTemplate;
-  readonly commercialUse?: boolean;
+  readonly document: StudioBg3dSceneDocument;
+}
+
+export interface Bg3dTemplateLibraryEntry extends Bg3dTemplateLibraryDraft {
+  /** Derived from every canonical attachment; it is never trusted from IndexedDB. */
+  readonly commercialUse: boolean;
+}
+
+export interface Bg3dInstantiatedTemplate {
+  /** Canonical document containing fresh nodes and no template-local storyboard state. */
+  readonly document: StudioBg3dSceneDocument;
+  readonly nodeIdByTemplateNodeId: ReadonlyMap<string, string>;
+}
+
+export type Bg3dTemplateLibraryErrorCode =
+  | "invalid-entry"
+  | "invalid-id"
+  | "max-entries"
+  | "storage-unavailable"
+  | "storage-blocked"
+  | "transaction-failed";
+
+export class Bg3dTemplateLibraryError extends Error {
+  readonly code: Bg3dTemplateLibraryErrorCode;
+
+  constructor(code: Bg3dTemplateLibraryErrorCode, message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "Bg3dTemplateLibraryError";
+    this.code = code;
+  }
+}
+
+interface StoredBg3dTemplateRecord {
+  readonly kind: typeof TEMPLATE_RECORD_KIND;
+  readonly version: typeof TEMPLATE_RECORD_VERSION;
+  readonly id: string;
+  readonly name: string;
+  readonly createdAt: number;
+  readonly sceneJson: string;
 }
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
+function libraryError(
+  code: Bg3dTemplateLibraryErrorCode,
+  message: string,
+  cause?: unknown,
+): Bg3dTemplateLibraryError {
+  return new Bg3dTemplateLibraryError(
+    code,
+    message,
+    cause === undefined ? undefined : { cause },
+  );
+}
+
+function exactDataProperties<const Keys extends readonly string[]>(
+  raw: unknown,
+  keys: Keys,
+): { readonly [Key in Keys[number]]: unknown } | null {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
+  try {
+    const prototype = Object.getPrototypeOf(raw);
+    if (prototype !== Object.prototype && prototype !== null) return null;
+    const ownKeys = Reflect.ownKeys(raw);
+    if (
+      ownKeys.length !== keys.length ||
+      ownKeys.some((key) => typeof key !== "string" || !keys.includes(key))
+    ) {
+      return null;
+    }
+    const descriptors = Object.getOwnPropertyDescriptors(raw);
+    const values = Object.create(null) as Record<string, unknown>;
+    for (const key of keys) {
+      const descriptor = descriptors[key];
+      if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) return null;
+      values[key] = descriptor.value;
+    }
+    return values as { readonly [Key in Keys[number]]: unknown };
+  } catch {
+    return null;
+  }
+}
+
+function isSafeId(value: unknown): value is string {
+  return typeof value === "string" &&
+    TEMPLATE_ID_PATTERN.test(value) &&
+    !FORBIDDEN_ID_SET.has(value.toLowerCase());
+}
+
+function isSafeName(value: unknown): value is string {
+  return typeof value === "string" &&
+    value.length >= 1 &&
+    value.length <= BG3D_TEMPLATE_LIBRARY_MAX_NAME_LENGTH &&
+    value.trim() === value &&
+    ![...value].some((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint <= 0x1f || codePoint === 0x7f;
+    }) &&
+    UTF8_ENCODER.encode(value).byteLength <= BG3D_TEMPLATE_LIBRARY_MAX_NAME_LENGTH * 4;
+}
+
+function isSafeCreatedAt(value: unknown): value is number {
+  return typeof value === "number" &&
+    Number.isSafeInteger(value) &&
+    value >= 0 &&
+    value <= MAX_CREATED_AT;
+}
+
+function canonicalDocument(raw: unknown): {
+  readonly document: StudioBg3dSceneDocument;
+  readonly sceneJson: string;
+} | null {
+  const sceneJson = serializeStudioBg3dSceneDocument(raw);
+  if (!sceneJson || UTF8_ENCODER.encode(sceneJson).byteLength > STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES) {
+    return null;
+  }
+  const document = parseStudioBg3dSceneDocument(sceneJson);
+  if (!document || serializeStudioBg3dSceneDocument(document) !== sceneJson) return null;
+  return { document, sceneJson };
+}
+
+function recordFromDraft(raw: unknown): StoredBg3dTemplateRecord | null {
+  const draft = exactDataProperties(raw, DRAFT_KEYS);
+  if (!draft || !isSafeId(draft.id) || !isSafeName(draft.name) ||
+    !isSafeCreatedAt(draft.createdAt)) {
+    return null;
+  }
+  const canonical = canonicalDocument(draft.document);
+  if (!canonical) return null;
+  return {
+    kind: TEMPLATE_RECORD_KIND,
+    version: TEMPLATE_RECORD_VERSION,
+    id: draft.id,
+    name: draft.name,
+    createdAt: draft.createdAt,
+    sceneJson: canonical.sceneJson,
+  };
+}
+
+function entryFromStoredRecord(raw: unknown): Bg3dTemplateLibraryEntry | null {
+  const record = exactDataProperties(raw, RECORD_KEYS);
+  if (
+    !record ||
+    record.kind !== TEMPLATE_RECORD_KIND ||
+    record.version !== TEMPLATE_RECORD_VERSION ||
+    !isSafeId(record.id) ||
+    !isSafeName(record.name) ||
+    !isSafeCreatedAt(record.createdAt) ||
+    typeof record.sceneJson !== "string" ||
+    record.sceneJson.length > STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES
+  ) {
+    return null;
+  }
+  const document = parseStudioBg3dSceneDocument(record.sceneJson);
+  if (!document || serializeStudioBg3dSceneDocument(document) !== record.sceneJson) return null;
+  return Object.freeze({
+    id: record.id,
+    name: record.name,
+    createdAt: record.createdAt,
+    document,
+    commercialUse: document.attachments.every(
+      (attachment) => attachment.rights.commercialUse,
+    ),
+  });
+}
+
+function entriesFromStoredRecords(rawRecords: readonly unknown[]): Bg3dTemplateLibraryEntry[] {
+  const entries: Bg3dTemplateLibraryEntry[] = [];
+  for (const raw of rawRecords.slice(0, MAX_STORED_ROW_SCAN)) {
+    const entry = entryFromStoredRecord(raw);
+    if (entry) entries.push(entry);
+    if (entries.length >= BG3D_TEMPLATE_LIBRARY_MAX_ENTRIES) break;
+  }
+  entries.sort((left, right) => {
+    if (left.createdAt !== right.createdAt) return right.createdAt - left.createdAt;
+    return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+  });
+  return entries;
+}
+
 function getDb(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+  if (typeof indexedDB === "undefined") {
+    return Promise.reject(libraryError(
+      "storage-unavailable",
+      "IndexedDB is unavailable for the BG3D template library.",
+    ));
+  }
+
+  const opening = new Promise<IDBDatabase>((resolve, reject) => {
+    let settled = false;
+    const fail = (error: Bg3dTemplateLibraryError) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+    let request: IDBOpenDBRequest;
+    try {
+      request = indexedDB.open(
+        BG3D_TEMPLATE_LIBRARY_DATABASE_NAME,
+        BG3D_TEMPLATE_LIBRARY_DATABASE_VERSION,
+      );
+    } catch (error) {
+      fail(libraryError("storage-unavailable", "Unable to open the BG3D template library.", error));
+      return;
+    }
     request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: "id" });
+      const database = request.result;
+      if (!database.objectStoreNames.contains(STORE_NAME)) {
+        database.createObjectStore(STORE_NAME, { keyPath: "id" });
       }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-  return dbPromise;
-}
-
-export async function saveBg3dTemplate(entry: Bg3dTemplateLibraryEntry): Promise<void> {
-  const db = await getDb();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, "readwrite");
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.put(entry);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
-}
-
-export async function listBg3dTemplates(): Promise<Bg3dTemplateLibraryEntry[]> {
-  const db = await getDb();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, "readonly");
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.getAll();
-    request.onsuccess = () => {
-      const results = request.result as Bg3dTemplateLibraryEntry[];
-      results.sort((a, b) => b.createdAt - a.createdAt);
-      resolve(results);
+    request.onblocked = () => {
+      fail(libraryError("storage-blocked", "The BG3D template library upgrade is blocked."));
     };
-    request.onerror = () => reject(request.error);
+    request.onerror = () => {
+      fail(libraryError(
+        "storage-unavailable",
+        "Unable to open the BG3D template library.",
+        request.error,
+      ));
+    };
+    request.onsuccess = () => {
+      if (settled) {
+        request.result.close();
+        return;
+      }
+      settled = true;
+      const database = request.result;
+      database.onversionchange = () => {
+        database.close();
+        if (dbPromise === opening) dbPromise = null;
+      };
+      resolve(database);
+    };
+  });
+  dbPromise = opening;
+  void opening.catch(() => {
+    if (dbPromise === opening) dbPromise = null;
+  });
+  return opening;
+}
+
+function transactionFailure(transaction: IDBTransaction, fallback: string): Bg3dTemplateLibraryError {
+  return libraryError("transaction-failed", fallback, transaction.error);
+}
+
+/** Reads only validated current-format rows and waits for the readonly transaction to complete. */
+export async function listBg3dTemplates(): Promise<Bg3dTemplateLibraryEntry[]> {
+  const database = await getDb();
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let records: readonly unknown[] | null = null;
+    const fail = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+    try {
+      const transaction = database.transaction(STORE_NAME, "readonly");
+      transaction.oncomplete = () => {
+        if (settled) return;
+        if (!records) {
+          fail(transactionFailure(transaction, "The BG3D template read did not complete."));
+          return;
+        }
+        settled = true;
+        resolve(entriesFromStoredRecords(records));
+      };
+      transaction.onerror = () => fail(transactionFailure(
+        transaction,
+        "Unable to read the BG3D template library.",
+      ));
+      transaction.onabort = () => fail(transactionFailure(
+        transaction,
+        "The BG3D template read was aborted.",
+      ));
+      const request = transaction.objectStore(STORE_NAME).getAll(
+        undefined,
+        MAX_STORED_ROW_SCAN,
+      );
+      request.onsuccess = () => {
+        records = request.result as readonly unknown[];
+      };
+      request.onerror = () => fail(libraryError(
+        "transaction-failed",
+        "Unable to read BG3D template rows.",
+        request.error,
+      ));
+    } catch (error) {
+      fail(libraryError("transaction-failed", "Unable to start the BG3D template read.", error));
+    }
   });
 }
 
-export async function deleteBg3dTemplate(id: string): Promise<void> {
-  const db = await getDb();
+/**
+ * Atomically stores one canonical row and returns the list from that same readwrite transaction.
+ * The promise never resolves on `put.onsuccess`; transaction completion is the durability point.
+ */
+export async function saveBg3dTemplate(
+  draft: Bg3dTemplateLibraryDraft,
+): Promise<Bg3dTemplateLibraryEntry[]> {
+  const record = recordFromDraft(draft);
+  if (!record) {
+    throw libraryError("invalid-entry", "The BG3D template is not canonical or bounded.");
+  }
+  const database = await getDb();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, "readwrite");
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.delete(id);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
+    let settled = false;
+    let records: readonly unknown[] | null = null;
+    let existingDone = false;
+    let countDone = false;
+    let existing: unknown;
+    let count = 0;
+    let mutationQueued = false;
+    const fail = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+    try {
+      const transaction = database.transaction(STORE_NAME, "readwrite");
+      const store = transaction.objectStore(STORE_NAME);
+      transaction.oncomplete = () => {
+        if (settled) return;
+        if (!records) {
+          fail(transactionFailure(transaction, "The BG3D template save did not complete."));
+          return;
+        }
+        settled = true;
+        resolve(entriesFromStoredRecords(records));
+      };
+      transaction.onerror = () => fail(transactionFailure(
+        transaction,
+        "Unable to save the BG3D template.",
+      ));
+      transaction.onabort = () => fail(transactionFailure(
+        transaction,
+        "The BG3D template save was aborted.",
+      ));
+
+      const queueMutation = () => {
+        if (!existingDone || !countDone || mutationQueued || settled) return;
+        mutationQueued = true;
+        if (existing === undefined && count >= BG3D_TEMPLATE_LIBRARY_MAX_ENTRIES) {
+          fail(libraryError("max-entries", "The BG3D template library is full."));
+          try {
+            transaction.abort();
+          } catch {
+            // The explicit domain error above remains authoritative.
+          }
+          return;
+        }
+        try {
+          store.put(record);
+          const listRequest = store.getAll(undefined, MAX_STORED_ROW_SCAN);
+          listRequest.onsuccess = () => {
+            records = listRequest.result as readonly unknown[];
+          };
+          listRequest.onerror = () => fail(libraryError(
+            "transaction-failed",
+            "Unable to read the saved BG3D template list.",
+            listRequest.error,
+          ));
+        } catch (error) {
+          fail(libraryError(
+            "transaction-failed",
+            "Unable to queue the BG3D template save.",
+            error,
+          ));
+          try {
+            transaction.abort();
+          } catch {
+            // The synchronous queue failure above remains authoritative.
+          }
+        }
+      };
+
+      const existingRequest = store.get(record.id);
+      existingRequest.onsuccess = () => {
+        existing = existingRequest.result;
+        existingDone = true;
+        queueMutation();
+      };
+      existingRequest.onerror = () => fail(libraryError(
+        "transaction-failed",
+        "Unable to inspect the BG3D template identity.",
+        existingRequest.error,
+      ));
+      const countRequest = store.count();
+      countRequest.onsuccess = () => {
+        count = countRequest.result;
+        countDone = true;
+        queueMutation();
+      };
+      countRequest.onerror = () => fail(libraryError(
+        "transaction-failed",
+        "Unable to count BG3D templates.",
+        countRequest.error,
+      ));
+    } catch (error) {
+      fail(libraryError("transaction-failed", "Unable to start the BG3D template save.", error));
+    }
+  });
+}
+
+/** Deletes one id and returns the post-delete list only after the transaction commits. */
+export async function deleteBg3dTemplate(id: string): Promise<Bg3dTemplateLibraryEntry[]> {
+  if (!isSafeId(id)) throw libraryError("invalid-id", "Invalid BG3D template id.");
+  const database = await getDb();
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let records: readonly unknown[] | null = null;
+    const fail = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+    try {
+      const transaction = database.transaction(STORE_NAME, "readwrite");
+      const store = transaction.objectStore(STORE_NAME);
+      transaction.oncomplete = () => {
+        if (settled) return;
+        if (!records) {
+          fail(transactionFailure(transaction, "The BG3D template delete did not complete."));
+          return;
+        }
+        settled = true;
+        resolve(entriesFromStoredRecords(records));
+      };
+      transaction.onerror = () => fail(transactionFailure(
+        transaction,
+        "Unable to delete the BG3D template.",
+      ));
+      transaction.onabort = () => fail(transactionFailure(
+        transaction,
+        "The BG3D template delete was aborted.",
+      ));
+      store.delete(id);
+      const listRequest = store.getAll(undefined, MAX_STORED_ROW_SCAN);
+      listRequest.onsuccess = () => {
+        records = listRequest.result as readonly unknown[];
+      };
+      listRequest.onerror = () => fail(libraryError(
+        "transaction-failed",
+        "Unable to read the remaining BG3D templates.",
+        listRequest.error,
+      ));
+    } catch (error) {
+      fail(libraryError("transaction-failed", "Unable to start the BG3D template delete.", error));
+    }
+  });
+}
+
+/**
+ * Reissues every template node id before insertion and remaps hierarchy parents exactly. Template
+ * shots are intentionally omitted: applying a reusable object group must not replace or append the
+ * destination scene's storyboard state.
+ */
+export function instantiateBg3dTemplateDocument(
+  rawDocument: StudioBg3dSceneDocument,
+  occupiedNodeIds: ReadonlySet<string>,
+  createNodeId: () => string,
+): Bg3dInstantiatedTemplate | null {
+  const canonical = canonicalDocument(rawDocument);
+  if (!canonical || typeof createNodeId !== "function") return null;
+  const blockedIds = new Set(canonical.document.nodes.map((node) => node.id));
+  const nodeIdByTemplateNodeId = new Map<string, string>();
+  try {
+    for (const node of canonical.document.nodes) {
+      let nextId: string | null = null;
+      for (let attempt = 0; attempt < MAX_NODE_ID_ATTEMPTS; attempt += 1) {
+        const candidate = createNodeId();
+        if (
+          isSafeId(candidate) &&
+          !blockedIds.has(candidate) &&
+          !occupiedNodeIds.has(candidate)
+        ) {
+          nextId = candidate;
+          break;
+        }
+      }
+      if (!nextId) return null;
+      blockedIds.add(nextId);
+      nodeIdByTemplateNodeId.set(node.id, nextId);
+    }
+  } catch {
+    return null;
+  }
+
+  const nodes: StudioBg3dSceneNode[] = [];
+  for (const node of canonical.document.nodes) {
+    const id = nodeIdByTemplateNodeId.get(node.id);
+    if (!id) return null;
+    const parentId = node.parentId === null || node.parentId === undefined
+      ? null
+      : nodeIdByTemplateNodeId.get(node.parentId);
+    if (parentId === undefined) return null;
+    nodes.push({ ...node, id, parentId });
+  }
+
+  const {
+    shots: _templateShots,
+    activeShotId: _templateActiveShotId,
+    ...documentWithoutShots
+  } = canonical.document;
+  const instantiated = canonicalDocument({ ...documentWithoutShots, nodes });
+  if (!instantiated) return null;
+  return Object.freeze({
+    document: instantiated.document,
+    nodeIdByTemplateNodeId: new Map(nodeIdByTemplateNodeId),
   });
 }

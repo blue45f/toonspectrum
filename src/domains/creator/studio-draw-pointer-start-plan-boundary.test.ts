@@ -108,9 +108,9 @@ describe("studio draw pointer-start planning ownership boundary", () => {
       "scheduleLiveDrawPressure(pressure)",
       "requireStudioDrawingPointerTransport(drawingPointerTransportRef).start({",
       "drawingImmediateCausalInputRef.current = causalInputPlan.quantizeImmediately",
-      "crdtDocument.beginStroke(studioDrawElementToCrdtStroke(activePage.id, next))",
       "drawingRef.current = next",
       "flushDirectLiveDraftNow(next)",
+      "drawingCrdtPublisherRef.current.begin(next.id",
       "startFixedRateStrokePump(pointerSample, pointerDownFrameTimeStamp)",
     ]);
   });

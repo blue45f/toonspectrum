@@ -68,12 +68,13 @@ describe("studio pro draw prefs", () => {
     expect(prefs.favoriteBrushIds).toContain("footstep-stamp");
   });
 
-  it("cycles SAI/CSP-style stabilizer steps", () => {
-    expect(cycleStudioStabilizerStrength(0)).toBe(3);
-    expect(cycleStudioStabilizerStrength(3)).toBe(6);
-    expect(cycleStudioStabilizerStrength(6)).toBe(10);
+  it("cycles only through the low-latency stabilizer steps", () => {
+    expect(cycleStudioStabilizerStrength(0)).toBe(1);
+    expect(cycleStudioStabilizerStrength(1)).toBe(2);
+    expect(cycleStudioStabilizerStrength(2)).toBe(3);
+    expect(cycleStudioStabilizerStrength(3)).toBe(0);
+    expect(cycleStudioStabilizerStrength(6)).toBe(0);
     expect(cycleStudioStabilizerStrength(10)).toBe(0);
-    expect(cycleStudioStabilizerStrength(4)).toBe(6);
   });
 
   it("round-trips through storage", () => {

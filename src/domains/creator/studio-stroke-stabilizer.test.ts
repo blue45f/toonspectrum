@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createStudioPointerVelocityState,
   createStudioStrokeStabilizerState,
+  describeStudioStabilizerLatency,
   flushStudioStrokeStabilizerEndpoint,
   normalizeStudioStabilizerMode,
   sampleStudioPointerVelocity,
@@ -10,6 +11,50 @@ import {
 } from "./studio-stroke-stabilizer";
 
 describe("studio stroke stabilizer", () => {
+  it("describes zero-strength input as immediate in every mode", () => {
+    for (const mode of ["standard", "adaptive", "precision"] as const) {
+      expect(describeStudioStabilizerLatency(mode, 0)).toEqual({
+        kind: "instant",
+        label: "즉시",
+        description: "입력 보정을 우회해 펜 위치를 바로 반영합니다.",
+        estimatedMs: 0,
+      });
+    }
+  });
+
+  it("matches the fixed-rate standard filter's conservative 90% response", () => {
+    expect(describeStudioStabilizerLatency("standard", 1)).toMatchObject({
+      kind: "estimated",
+      label: "약 30ms",
+      estimatedMs: 30,
+    });
+    expect(describeStudioStabilizerLatency("standard", 2)).toMatchObject({
+      label: "약 40ms",
+      estimatedMs: 40,
+    });
+    expect(describeStudioStabilizerLatency("standard", 3)).toMatchObject({
+      label: "약 55ms",
+      estimatedMs: 55,
+    });
+    expect(describeStudioStabilizerLatency("standard", 10)).toMatchObject({
+      label: "약 535ms",
+      estimatedMs: 535,
+    });
+  });
+
+  it("uses honest categorical latency copy for adaptive and precision modes", () => {
+    expect(describeStudioStabilizerLatency("adaptive", 6)).toMatchObject({
+      kind: "variable",
+      label: "가변 반응",
+      estimatedMs: null,
+    });
+    expect(describeStudioStabilizerLatency("precision", 6)).toMatchObject({
+      kind: "guided",
+      label: "의도적 후행",
+      estimatedMs: null,
+    });
+  });
+
   it("normalizes modes without accepting arbitrary persisted values", () => {
     expect(normalizeStudioStabilizerMode("standard")).toBe("standard");
     expect(normalizeStudioStabilizerMode("adaptive")).toBe("adaptive");

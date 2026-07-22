@@ -143,9 +143,9 @@ export function toggleFavoriteBrushId(
   };
 }
 
-/** SAI/CSP-like stabilizer step cycle: 0 → 3 → 6 → 10 → 0 */
+/** Low-latency stabilizer step cycle: 0 → 1 → 2 → 3 → 0. */
 export function cycleStudioStabilizerStrength(current: number): number {
-  const steps = [0, 3, 6, 10] as const;
+  const steps = [0, 1, 2, 3] as const;
   const safe = Number.isFinite(current) ? Math.max(0, Math.min(10, Math.round(current))) : 0;
   const idx = steps.findIndex((step) => step >= safe);
   if (idx === -1) return steps[0];

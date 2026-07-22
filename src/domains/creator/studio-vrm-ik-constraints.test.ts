@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
 import {
+  canCommitStudioVrmIkResult,
+  enabledStudioVrmIkPolesSceneLocal,
   enabledStudioVrmIkTargetsWorld,
   mirrorStudioVrmIkConstraints,
   parseStudioVrmIkConstraints,
@@ -10,7 +12,9 @@ import {
   upsertStudioVrmIkConstraint,
 } from "./studio-vrm-ik-constraints";
 
+import type { StudioVrmFullBodyIkResult } from "./studio-vrm-full-body-ik";
 import type { StudioVrmIkConstraint } from "./studio-vrm-scene-document";
+import type { StudioVrmUserIkResult } from "./studio-vrm-user-ik";
 
 const leftHand: StudioVrmIkConstraint = {
   effector: "leftHand",
@@ -60,6 +64,18 @@ describe("studio-vrm-ik-constraints", () => {
     movedRoundTrip?.forEach((coordinate, index) => expect(coordinate).toBeCloseTo(local[index]!, 10));
   });
 
+  it("requires convergence only for full-body IK commit candidates", () => {
+    expect(canCommitStudioVrmIkResult({} as StudioVrmUserIkResult)).toBe(true);
+    expect(canCommitStudioVrmIkResult({
+      constraints: [],
+      converged: true,
+    } as unknown as StudioVrmFullBodyIkResult)).toBe(true);
+    expect(canCommitStudioVrmIkResult({
+      constraints: [],
+      converged: false,
+    } as unknown as StudioVrmFullBodyIkResult)).toBe(false);
+  });
+
   it("mirrors only the requested limb scope and exchanges target/pole ownership", () => {
     const rightFoot: StudioVrmIkConstraint = {
       effector: "rightFoot",
@@ -103,5 +119,9 @@ describe("studio-vrm-ik-constraints", () => {
     expect(enabledStudioVrmIkTargetsWorld(scene, updated)).toEqual({
       leftHand: [-0.25, 1.4, 0.1],
     });
+    expect(enabledStudioVrmIkPolesSceneLocal([disabled])).toEqual({});
+    const poles = enabledStudioVrmIkPolesSceneLocal(updated);
+    expect(poles).toEqual({ leftHand: leftHand.pole });
+    expect(poles.leftHand).not.toBe(leftHand.pole);
   });
 });

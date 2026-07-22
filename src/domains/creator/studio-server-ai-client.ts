@@ -62,7 +62,7 @@ export type StudioServerAiCompletion = {
 
 export type StudioServerAiResult<T> =
   | { ok: true; data: T }
-  | { ok: false; code: "network_error" | "http_error" | "parse_error"; error: string };
+  | { ok: false; code: "invalid_input" | "network_error" | "http_error" | "parse_error"; error: string };
 
 export async function getStudioServerAiStatus(signal?: AbortSignal): Promise<StudioServerAiStatus> {
   return api.get<StudioServerAiStatus>("/studio-ai/status", { signal });
@@ -71,6 +71,17 @@ export async function getStudioServerAiStatus(signal?: AbortSignal): Promise<Stu
 const MAX_MODEL_CODE_UNITS = 200;
 const MAX_REQUEST_ID_CODE_UNITS = 240;
 const MAX_TOKEN_COUNT = 2_147_483_647;
+const STUDIO_SERVER_AI_OPERATION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$/u;
+
+/**
+ * Canonical retry key shared with the Studio AI controller contract. The opaque ASCII identity is
+ * exact: whitespace, Unicode normalization, and truncation must never turn an invalid caller value
+ * into a different durable receipt key.
+ */
+export function canonicalStudioServerAiOperationId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return STUDIO_SERVER_AI_OPERATION_ID_PATTERN.test(value) ? value : null;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -172,11 +183,25 @@ export async function completeStudioServerText(
     promptVersion: 1;
     system: string;
     user: string;
+    /** Stable tracked operation ID; sent only as the server's bounded idempotency header. */
+    operationId?: string;
   },
   signal?: AbortSignal
 ): Promise<StudioServerAiResult<StudioServerAiCompletion>> {
+  const idempotencyKey = canonicalStudioServerAiOperationId(input.operationId);
+  if (!idempotencyKey) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: "서버 AI 요청 식별자가 올바르지 않아요.",
+    };
+  }
+  const { operationId: _operationId, ...request } = input;
   try {
-    const raw = await api.post<unknown>("/studio-ai/chat", input, { signal });
+    const raw = await api.post<unknown>("/studio-ai/chat", request, {
+      signal,
+      headers: { "Idempotency-Key": idempotencyKey },
+    });
     const data = parseStudioServerAiCompletion(raw);
     if (!data) return { ok: false, code: "parse_error", error: "서버 AI 응답 형식을 확인하지 못했어요." };
     return { ok: true, data };

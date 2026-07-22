@@ -20,6 +20,7 @@ import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 const POSITION_EPSILON = 1e-8;
 const DEFAULT_DRAG_THRESHOLD_PX = 3;
 const DEFAULT_KEYBOARD_STEP = 0.025;
+const MINIMUM_TOUCH_TARGET_PX = 44;
 
 export type StudioVrmJointHandleBone =
   | "hips"
@@ -42,6 +43,9 @@ export type StudioVrmIkEffectorBone =
   | "rightFoot";
 
 export type StudioVrmJointWorldPoint = readonly [number, number, number];
+export type StudioVrmIkHandleControl = "target" | "pole";
+export type StudioVrmIkDragMode = "screen" | "depth";
+export type StudioVrmIkAxisLock = "free" | "x" | "y" | "z";
 
 type StudioVrmJointSide = "center" | "left" | "right";
 
@@ -101,13 +105,18 @@ export type StudioVrmJointDragOutcome =
 export interface StudioVrmJointHandlesProps {
   vrm: Pick<VRM, "humanoid"> | null;
   selectedBone?: StudioVrmJointHandleBone | null;
+  selectedPole?: StudioVrmIkEffectorBone | null;
   effectorSceneTargets?: Partial<Record<StudioVrmIkEffectorBone, StudioVrmJointWorldPoint>>;
+  poleSceneTargets?: Partial<Record<StudioVrmIkEffectorBone, StudioVrmJointWorldPoint>>;
   dragPlane?: THREE.Plane | null;
+  dragMode?: StudioVrmIkDragMode;
+  axisLock?: StudioVrmIkAxisLock;
   screenSize?: number;
   keyboardStep?: number;
   disabled?: boolean;
   visible?: boolean;
   onSelectBone?: (bone: StudioVrmJointHandleBone) => void;
+  onSelectPole?: (bone: StudioVrmIkEffectorBone) => void;
   onHoverBoneChange?: (bone: StudioVrmJointHandleBone | null) => void;
   onEffectorPreview?: (
     bone: StudioVrmIkEffectorBone,
@@ -118,6 +127,18 @@ export interface StudioVrmJointHandlesProps {
     worldPosition: StudioVrmJointWorldPoint
   ) => void;
   onEffectorRollback?: (
+    bone: StudioVrmIkEffectorBone,
+    originalWorldPosition: StudioVrmJointWorldPoint
+  ) => void;
+  onPolePreview?: (
+    bone: StudioVrmIkEffectorBone,
+    worldPosition: StudioVrmJointWorldPoint
+  ) => void;
+  onPoleCommit?: (
+    bone: StudioVrmIkEffectorBone,
+    worldPosition: StudioVrmJointWorldPoint
+  ) => void;
+  onPoleRollback?: (
     bone: StudioVrmIkEffectorBone,
     originalWorldPosition: StudioVrmJointWorldPoint
   ) => void;
@@ -257,6 +278,88 @@ export function projectStudioVrmJointPointerToPlane(
   return isFiniteVector(intersection) ? intersection : null;
 }
 
+function worldUnitsPerVerticalPixel(
+  camera: THREE.Camera,
+  startWorld: THREE.Vector3,
+  viewportHeight: number
+): number | null {
+  if (!Number.isFinite(viewportHeight) || viewportHeight <= 0) return null;
+  if (camera instanceof THREE.PerspectiveCamera) {
+    const distance = camera.getWorldPosition(new THREE.Vector3()).distanceTo(startWorld);
+    const verticalFov = THREE.MathUtils.degToRad(camera.getEffectiveFOV());
+    const units = (2 * Math.tan(verticalFov / 2) * distance) / viewportHeight;
+    return Number.isFinite(units) && units > 0 ? units : null;
+  }
+  if (camera instanceof THREE.OrthographicCamera) {
+    const units = Math.abs(camera.top - camera.bottom) / Math.max(camera.zoom, POSITION_EPSILON) / viewportHeight;
+    return Number.isFinite(units) && units > 0 ? units : null;
+  }
+  return null;
+}
+
+/** Keeps a pointer candidate on one explicit scene axis without mutating either input vector. */
+export function constrainStudioVrmJointWorldPoint(
+  startWorld: THREE.Vector3,
+  candidateWorld: THREE.Vector3,
+  axisLock: StudioVrmIkAxisLock,
+  target = new THREE.Vector3()
+): THREE.Vector3 | null {
+  if (!isFiniteVector(startWorld) || !isFiniteVector(candidateWorld)) return null;
+  target.copy(candidateWorld);
+  if (axisLock === "x") target.set(candidateWorld.x, startWorld.y, startWorld.z);
+  else if (axisLock === "y") target.set(startWorld.x, candidateWorld.y, startWorld.z);
+  else if (axisLock === "z") target.set(startWorld.x, startWorld.y, candidateWorld.z);
+  return isFiniteVector(target) ? target : null;
+}
+
+/**
+ * Resolves screen-plane or pointer-driven depth movement, then applies an optional world-axis lock.
+ * In depth mode an upward drag moves away from the camera; a locked axis uses that axis directly.
+ */
+export function projectStudioVrmJointPointerByMode(
+  clientX: number,
+  clientY: number,
+  startClientY: number,
+  canvasRect: CanvasRectLike,
+  camera: THREE.Camera,
+  plane: THREE.Plane,
+  startWorld: THREE.Vector3,
+  dragMode: StudioVrmIkDragMode,
+  axisLock: StudioVrmIkAxisLock,
+  target = new THREE.Vector3()
+): THREE.Vector3 | null {
+  if (!Number.isFinite(startClientY) || !isFiniteVector(startWorld)) return null;
+  if (dragMode === "screen") {
+    const projected = projectStudioVrmJointPointerToPlane(
+      clientX,
+      clientY,
+      canvasRect,
+      camera,
+      plane,
+      target
+    );
+    return projected
+      ? constrainStudioVrmJointWorldPoint(startWorld, projected, axisLock, target)
+      : null;
+  }
+  if (!Number.isFinite(clientY)) return null;
+  const unitsPerPixel = worldUnitsPerVerticalPixel(camera, startWorld, canvasRect.height);
+  if (!unitsPerPixel) return null;
+  const direction = axisLock === "free"
+    ? camera.getWorldDirection(new THREE.Vector3()).normalize()
+    : new THREE.Vector3(
+        axisLock === "x" ? 1 : 0,
+        axisLock === "y" ? 1 : 0,
+        axisLock === "z" ? 1 : 0
+      );
+  if (!isFiniteVector(direction) || direction.lengthSq() <= POSITION_EPSILON) return null;
+  target.copy(startWorld).addScaledVector(
+    direction,
+    (startClientY - clientY) * unitsPerPixel
+  );
+  return isFiniteVector(target) ? target : null;
+}
+
 /** 취소 계열은 항상 시작점 롤백, 정상 종료는 실제 preview가 있었을 때만 확정한다. */
 export function resolveStudioVrmJointDragOutcome(
   snapshot: StudioVrmJointDragSnapshot,
@@ -285,31 +388,37 @@ function handleColor(side: StudioVrmJointSide): string {
 
 function Handle({
   binding,
+  control,
   selected,
   controlledSceneTarget,
   dragPlane,
+  dragMode,
+  axisLock,
   screenSize,
   keyboardStep,
   disabled,
-  onSelectBone,
+  onSelect,
   onHoverBoneChange,
-  onEffectorPreview,
-  onEffectorCommit,
-  onEffectorRollback,
+  onPreview,
+  onCommit,
+  onRollback,
   onInteractionActiveChange,
 }: {
   binding: StudioVrmJointNodeBinding;
+  control: StudioVrmIkHandleControl;
   selected: boolean;
   controlledSceneTarget?: StudioVrmJointWorldPoint;
   dragPlane?: THREE.Plane | null;
+  dragMode: StudioVrmIkDragMode;
+  axisLock: StudioVrmIkAxisLock;
   screenSize: number;
   keyboardStep: number;
   disabled: boolean;
-  onSelectBone?: StudioVrmJointHandlesProps["onSelectBone"];
+  onSelect?: () => void;
   onHoverBoneChange?: StudioVrmJointHandlesProps["onHoverBoneChange"];
-  onEffectorPreview?: StudioVrmJointHandlesProps["onEffectorPreview"];
-  onEffectorCommit?: StudioVrmJointHandlesProps["onEffectorCommit"];
-  onEffectorRollback?: StudioVrmJointHandlesProps["onEffectorRollback"];
+  onPreview?: StudioVrmJointHandlesProps["onEffectorPreview"];
+  onCommit?: StudioVrmJointHandlesProps["onEffectorCommit"];
+  onRollback?: StudioVrmJointHandlesProps["onEffectorRollback"];
   onInteractionActiveChange?: StudioVrmJointHandlesProps["onInteractionActiveChange"];
 }) {
   const groupRef = useRef<THREE.Group>(null);
@@ -330,7 +439,7 @@ function Handle({
   };
 
   const rollbackOnUnmount = useEffectEvent((session: DragSession) => {
-    onEffectorRollback?.(session.bone, worldPoint(session.startWorld));
+    onRollback?.(session.bone, worldPoint(session.startWorld));
     onInteractionActiveChange?.(false);
   });
 
@@ -353,6 +462,10 @@ function Handle({
       group.visible = true;
       return;
     }
+    if (control === "pole") {
+      group.visible = false;
+      return;
+    }
 
     binding.node.updateWorldMatrix(true, false);
     const world = binding.node.getWorldPosition(scratchWorldRef.current);
@@ -363,6 +476,7 @@ function Handle({
   const readCurrentWorldPosition = (): THREE.Vector3 | null => {
     const controlledWorld = readControlledWorldPosition();
     if (controlledWorld) return controlledWorld;
+    if (control === "pole") return null;
     binding.node.updateWorldMatrix(true, false);
     const world = binding.node.getWorldPosition(new THREE.Vector3());
     return isFiniteVector(world) ? world : null;
@@ -381,7 +495,7 @@ function Handle({
     session.didPreview = true;
     session.latestWorld.copy(pendingWorld);
     groupRef.current?.position?.copy(pendingWorld);
-    onEffectorPreview?.(session.bone, worldPoint(pendingWorld));
+    onPreview?.(session.bone, worldPoint(pendingWorld));
   };
 
   const schedulePendingPreview = (session: DragSession) => {
@@ -415,9 +529,9 @@ function Handle({
     }, cancelled);
     if (outcome.kind === "rollback") {
       groupRef.current?.position?.copy(session.startWorld);
-      onEffectorRollback?.(outcome.bone, outcome.worldPosition);
+      onRollback?.(outcome.bone, outcome.worldPosition);
     } else if (outcome.kind === "commit") {
-      onEffectorCommit?.(outcome.bone, outcome.worldPosition);
+      onCommit?.(outcome.bone, outcome.worldPosition);
     }
 
     if (captureTarget?.hasPointerCapture?.(pointerId)) {
@@ -447,49 +561,76 @@ function Handle({
     stopKeyboardEvent(event);
     const current = readCurrentWorldPosition();
     if (!current) return;
-    const next = current.add(delta);
-    groupRef.current?.position?.copy(next);
-    const nextPoint = worldPoint(next);
-    onSelectBone?.(binding.bone);
-    onEffectorPreview?.(effectorBone, nextPoint);
-    onEffectorCommit?.(effectorBone, nextPoint);
+    const next = current.clone().add(delta);
+    const constrained = constrainStudioVrmJointWorldPoint(current, next, axisLock, next);
+    if (!constrained) return;
+    groupRef.current?.position?.copy(constrained);
+    const nextPoint = worldPoint(constrained);
+    onSelect?.();
+    onPreview?.(effectorBone, nextPoint);
+    onCommit?.(effectorBone, nextPoint);
   };
 
-  const size = THREE.MathUtils.clamp(screenSize, 14, 36);
-  const color = handleColor(binding.side);
+  const isPole = control === "pole";
+  const size = THREE.MathUtils.clamp(
+    isPole ? screenSize * 0.82 : screenSize,
+    isPole ? 16 : 14,
+    36
+  );
+  const color = isPole ? "#f59e0b" : handleColor(binding.side);
   const active = selected || hovered || dragging;
   const buttonStyle: CSSProperties = {
+    width: MINIMUM_TOUCH_TARGET_PX,
+    height: MINIMUM_TOUCH_TARGET_PX,
+    border: 0,
+    background: "transparent",
+    cursor: disabled ? "not-allowed" : dragging ? "grabbing" : binding.effector ? "grab" : "pointer",
+    display: "grid",
+    placeItems: "center",
+    opacity: disabled ? 0.45 : 0.94,
+    pointerEvents: "auto",
+    padding: 0,
+    touchAction: "none",
+  };
+  const visualStyle: CSSProperties = {
     width: size,
     height: size,
-    borderRadius: binding.effector ? Math.max(5, size * 0.28) : "999px",
+    borderRadius: isPole || !binding.effector ? "999px" : Math.max(5, size * 0.28),
     border: `${selected ? 3 : 2}px solid ${selected ? "#ffffff" : "rgba(255,255,255,0.9)"}`,
     background: color,
     boxShadow: selected
       ? `0 0 0 2px rgba(15,23,42,0.92), 0 0 14px ${color}`
       : "0 1px 5px rgba(15,23,42,0.75)",
-    cursor: disabled ? "not-allowed" : dragging ? "grabbing" : binding.effector ? "grab" : "pointer",
-    opacity: disabled ? 0.45 : 0.94,
-    pointerEvents: "auto",
     position: "relative",
-    padding: 0,
-    transform: `${active ? "scale(1.18)" : "scale(1)"} ${binding.effector ? "rotate(45deg)" : ""}`,
+    display: "grid",
+    placeItems: "center",
+    color: "#3c2b20",
+    fontSize: Math.max(9, size * 0.48),
+    fontWeight: 900,
+    lineHeight: 1,
+    transform: `${active ? "scale(1.18)" : "scale(1)"} ${binding.effector && !isPole ? "rotate(45deg)" : ""}`,
     transition: dragging ? "none" : "transform 100ms ease, box-shadow 100ms ease",
-    touchAction: "none",
   };
+  const axisLabel = axisLock === "free" ? "자유 축" : `${axisLock.toUpperCase()}축 제한`;
+  const modeLabel = dragMode === "screen" ? "화면 평면" : "깊이";
+  const controlLabel = isPole
+    ? `${binding.label} IK 폴 방향 이동`
+    : `${binding.label} 관절${binding.effector ? " IK 목표 이동" : " 선택"}`;
 
   return (
     <group ref={groupRef}>
       <Html center transform={false} zIndexRange={[80, 10]} pointerEvents="none">
         <button
           type="button"
-          aria-label={`${binding.label} 관절${binding.effector ? " IK 목표 이동" : " 선택"}`}
+          aria-label={controlLabel}
           aria-pressed={selected}
           aria-keyshortcuts={binding.effector ? "ArrowLeft ArrowRight ArrowUp ArrowDown PageUp PageDown" : undefined}
           data-bone={binding.bone}
           data-effector={binding.effector || undefined}
+          data-ik-control={binding.effector ? control : undefined}
           disabled={disabled}
           title={binding.effector
-            ? `${binding.label}: 드래그 또는 방향키로 IK 목표 이동`
+            ? `${binding.label} ${isPole ? "폴" : "목표"}: ${modeLabel} 이동 · ${axisLabel}`
             : `${binding.label} 관절 선택`}
           style={buttonStyle}
           onFocus={() => {
@@ -511,7 +652,7 @@ function Handle({
           onPointerDown={(event) => {
             if (disabled || event.button !== 0) return;
             stopPointerEvent(event);
-            onSelectBone?.(binding.bone);
+            onSelect?.();
             if (!effectorBone) return;
 
             const startWorld = readCurrentWorldPosition();
@@ -545,12 +686,16 @@ function Handle({
             );
             if (!session.didPreview && movement < DEFAULT_DRAG_THRESHOLD_PX) return;
 
-            const projected = projectStudioVrmJointPointerToPlane(
+            const projected = projectStudioVrmJointPointerByMode(
               event.clientX,
               event.clientY,
+              session.startClientY,
               canvas.getBoundingClientRect(),
               camera,
-              session.plane
+              session.plane,
+              session.startWorld,
+              dragMode,
+              axisLock
             );
             if (!projected) return;
             if (session.pendingWorld) session.pendingWorld.copy(projected);
@@ -577,7 +722,7 @@ function Handle({
           onKeyDown={(event) => {
             if ((event.key === "Enter" || event.key === " ") && !disabled) {
               stopKeyboardEvent(event);
-              onSelectBone?.(binding.bone);
+              onSelect?.();
               return;
             }
             if (event.key === "Escape" && dragRef.current) {
@@ -588,18 +733,18 @@ function Handle({
             handleKeyboardNudge(event);
           }}
         >
-          {binding.effector ? (
-            <span
-              aria-hidden
-              style={{
-                display: "block",
-                position: "absolute",
-                inset: "28%",
-                borderRadius: "999px",
-                background: "rgba(15,23,42,0.82)",
-              }}
-            />
-          ) : null}
+          <span aria-hidden data-handle-visual={control} style={visualStyle}>
+            {isPole ? "P" : binding.effector ? (
+              <span
+                style={{
+                  position: "absolute",
+                  inset: "28%",
+                  borderRadius: "999px",
+                  background: "rgba(15,23,42,0.82)",
+                }}
+              />
+            ) : null}
+          </span>
         </button>
       </Html>
     </group>
@@ -613,17 +758,25 @@ function Handle({
 export function StudioVrmJointHandles({
   vrm,
   selectedBone = null,
+  selectedPole = null,
   effectorSceneTargets,
+  poleSceneTargets,
   dragPlane,
+  dragMode = "screen",
+  axisLock = "free",
   screenSize = 22,
   keyboardStep = DEFAULT_KEYBOARD_STEP,
   disabled = false,
   visible = true,
   onSelectBone,
+  onSelectPole,
   onHoverBoneChange,
   onEffectorPreview,
   onEffectorCommit,
   onEffectorRollback,
+  onPolePreview,
+  onPoleCommit,
+  onPoleRollback,
   onInteractionActiveChange,
 }: StudioVrmJointHandlesProps) {
   if (!visible) return null;
@@ -641,22 +794,52 @@ export function StudioVrmJointHandles({
         <Handle
           key={binding.bone}
           binding={binding}
-          selected={selectedBone === binding.bone}
+          control="target"
+          selected={selectedBone === binding.bone && selectedPole !== binding.bone}
           controlledSceneTarget={isStudioVrmIkEffectorBone(binding.bone)
             ? effectorSceneTargets?.[binding.bone]
             : undefined}
           dragPlane={dragPlane}
+          dragMode={dragMode}
+          axisLock={axisLock}
           screenSize={safeScreenSize}
           keyboardStep={safeKeyboardStep}
           disabled={disabled}
-          onSelectBone={onSelectBone}
+          onSelect={() => onSelectBone?.(binding.bone)}
           onHoverBoneChange={onHoverBoneChange}
-          onEffectorPreview={onEffectorPreview}
-          onEffectorCommit={onEffectorCommit}
-          onEffectorRollback={onEffectorRollback}
+          onPreview={onEffectorPreview}
+          onCommit={onEffectorCommit}
+          onRollback={onEffectorRollback}
           onInteractionActiveChange={onInteractionActiveChange}
         />
       ))}
+      {bindings.flatMap((binding) => {
+        if (!isStudioVrmIkEffectorBone(binding.bone)) return [];
+        const effector = binding.bone;
+        const pole = poleSceneTargets?.[effector];
+        if (!isFiniteWorldPoint(pole)) return [];
+        return [(
+          <Handle
+            key={`${binding.bone}-pole`}
+            binding={binding}
+            control="pole"
+            selected={selectedPole === effector}
+            controlledSceneTarget={pole}
+            dragPlane={dragPlane}
+            dragMode={dragMode}
+            axisLock={axisLock}
+            screenSize={safeScreenSize}
+            keyboardStep={safeKeyboardStep}
+            disabled={disabled}
+            onSelect={() => onSelectPole?.(effector)}
+            onHoverBoneChange={onHoverBoneChange}
+            onPreview={onPolePreview}
+            onCommit={onPoleCommit}
+            onRollback={onPoleRollback}
+            onInteractionActiveChange={onInteractionActiveChange}
+          />
+        )];
+      })}
     </group>
   );
 }

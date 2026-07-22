@@ -4,13 +4,26 @@ import { deflateSync } from "node:zlib";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  STUDIO_BG3D_GEOMETRY_WORKER_SMALL_FALLBACK_MAX_BYTES,
+  disposeSharedStudioBg3dGeometryWorkerClient,
+} from "./studio-bg3d-geometry-worker-client";
+import {
+  STUDIO_BG3D_IMPORT_MAX_ANIMATION_DURATION_SECONDS,
+  STUDIO_BG3D_IMPORT_MAX_ANIMATION_KEYFRAMES,
+  STUDIO_BG3D_IMPORT_MAX_ANIMATION_TRACKS,
+  STUDIO_BG3D_IMPORT_MAX_EXPORT_MATERIALS,
+  STUDIO_BG3D_IMPORT_MAX_EXPORT_MATERIAL_SLOTS,
   STUDIO_BG3D_IMPORT_MAX_FILE_BYTES,
   STUDIO_BG3D_IMPORT_MAX_FILES,
   STUDIO_BG3D_IMPORT_MAX_INLINE_RESOURCE_BYTES,
   STUDIO_BG3D_IMPORT_MAX_NODES,
+  STUDIO_BG3D_IMPORT_MAX_OBJ_MATERIAL_LIBRARIES,
+  STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_REFERENCE_DIRECTIVES,
+  STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_TOTAL_BYTES,
   STUDIO_BG3D_IMPORT_MAX_OUTPUT_TOTAL_BYTES,
   STUDIO_BG3D_IMPORT_MAX_VERTICES,
   StudioBg3dModelImportError,
+  assertStudioBg3dPreExportBudgets,
   convertStudioBg3dModelFilesToGlb,
   planStudioBg3dModelImports,
   type StudioBg3dImportFile,
@@ -622,6 +635,7 @@ async function expectReloadedTexturedTriangle(
 }
 
 afterEach(() => {
+  disposeSharedStudioBg3dGeometryWorkerClient();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -730,6 +744,123 @@ describe("planStudioBg3dModelImports", () => {
 });
 
 describe("convertStudioBg3dModelFilesToGlb", () => {
+  it("bounds material and animation work before the GLB exporter is entered", async () => {
+    const {
+      AnimationClip,
+      BufferGeometry,
+      Float32BufferAttribute,
+      Group,
+      Mesh,
+      MeshBasicMaterial,
+      NumberKeyframeTrack,
+    } = await import("three");
+    const root = new Group();
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new Float32BufferAttribute([
+      0, 0, 0,
+      1, 0, 0,
+      0, 1, 0,
+    ], 3));
+    const material = new MeshBasicMaterial();
+    root.add(new Mesh(geometry, material));
+    const animation = new AnimationClip("blink", 1, [
+      new NumberKeyframeTrack(".position[x]", [0, 1], [0, 1]),
+    ]);
+
+    try {
+      expect(() => assertStudioBg3dPreExportBudgets({
+        root,
+        animations: [animation],
+      })).not.toThrow();
+    } finally {
+      geometry.dispose();
+      material.dispose();
+    }
+
+    const source = readFileSync(new URL("./studio-bg3d-model-import.ts", import.meta.url), "utf8");
+    const conversion = source.slice(
+      source.indexOf("async function convertPlanItem("),
+      source.indexOf("export async function convertStudioBg3dModelFilesToGlb("),
+    );
+    expect(conversion.indexOf("assertStudioBg3dPreExportBudgets(parsed, signal)")).toBeLessThan(
+      conversion.indexOf("exportParsedImportToGlb(parsed, item.primaryPath, signal)"),
+    );
+  });
+
+  it("rejects excessive OBJ/MTL material sets before conversion", async () => {
+    const {
+      BufferGeometry,
+      Float32BufferAttribute,
+      Group,
+      Mesh,
+      MeshBasicMaterial,
+    } = await import("three");
+    const root = new Group();
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new Float32BufferAttribute([0, 0, 0], 3));
+    const materials = Array.from(
+      { length: STUDIO_BG3D_IMPORT_MAX_EXPORT_MATERIALS + 1 },
+      () => new MeshBasicMaterial(),
+    );
+    root.add(new Mesh(geometry, materials));
+
+    try {
+      expect(() => assertStudioBg3dPreExportBudgets({ root, animations: [] }))
+        .toThrowError(expect.objectContaining({ code: "material-budget-exceeded" }));
+    } finally {
+      geometry.dispose();
+      for (const material of materials) material.dispose();
+    }
+  });
+
+  it("rejects excessive or malformed animation data before conversion", async () => {
+    const { Group } = await import("three");
+    const root = new Group();
+    const track = (times: Float32Array, values: Float32Array) => ({
+      name: ".position[x]",
+      times,
+      values,
+    });
+    const clip = (overrides: Record<string, unknown> = {}) => ({
+      name: "motion",
+      duration: 1,
+      tracks: [track(new Float32Array([0, 1]), new Float32Array([0, 1]))],
+      ...overrides,
+    });
+
+    expect(() => assertStudioBg3dPreExportBudgets({
+      root,
+      animations: [clip({
+        tracks: Array.from(
+          { length: STUDIO_BG3D_IMPORT_MAX_ANIMATION_TRACKS + 1 },
+          () => track(new Float32Array(), new Float32Array()),
+        ),
+      }) as never],
+    })).toThrowError(expect.objectContaining({ code: "animation-budget-exceeded" }));
+
+    const tooManyTimes = new Float32Array(STUDIO_BG3D_IMPORT_MAX_ANIMATION_KEYFRAMES + 1);
+    expect(() => assertStudioBg3dPreExportBudgets({
+      root,
+      animations: [clip({
+        tracks: [track(tooManyTimes, tooManyTimes)],
+      }) as never],
+    })).toThrowError(expect.objectContaining({ code: "animation-budget-exceeded" }));
+
+    expect(() => assertStudioBg3dPreExportBudgets({
+      root,
+      animations: [clip({
+        duration: STUDIO_BG3D_IMPORT_MAX_ANIMATION_DURATION_SECONDS + 1,
+      }) as never],
+    })).toThrowError(expect.objectContaining({ code: "animation-budget-exceeded" }));
+
+    expect(() => assertStudioBg3dPreExportBudgets({
+      root,
+      animations: [clip({
+        tracks: [track(new Float32Array([1, 0]), new Float32Array([0, 1]))],
+      }) as never],
+    })).toThrowError(expect.objectContaining({ code: "animation-budget-exceeded" }));
+  });
+
   it("passes GLB through to the existing validation boundary and reports deterministic progress", async () => {
     const file = sourceFile("prop.glb", new Uint8Array([1, 2, 3, 4]));
     const progress = vi.fn();
@@ -788,6 +919,123 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
     await expect(convertStudioBg3dModelFilesToGlb([obj, mtl])).rejects.toMatchObject({
       code: "unsafe-resource-uri",
     });
+  });
+
+  it("rejects repeated OBJ mtllib directives before reading the repeated companion", async () => {
+    const readMaterial = vi.fn(async () => new TextEncoder().encode("newmtl safe").buffer);
+    const repeated = Array.from(
+      { length: STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_REFERENCE_DIRECTIVES + 1 },
+      () => "mtllib repeated.mtl",
+    );
+    const obj = sourceFile("repeated.obj", [
+      ...repeated,
+      "v 0 0 0",
+      "v 1 0 0",
+      "v 0 1 0",
+      "f 1 2 3",
+    ].join("\n"));
+    const mtl = virtualFile("repeated.mtl", 11, readMaterial);
+
+    await expect(convertStudioBg3dModelFilesToGlb([obj, mtl])).rejects.toMatchObject({
+      code: "material-budget-exceeded",
+    });
+    expect(readMaterial).not.toHaveBeenCalled();
+  });
+
+  it("rejects cumulative MTL bytes before materializing any companion", async () => {
+    const readFirst = vi.fn(async () => new ArrayBuffer(0));
+    const readSecond = vi.fn(async () => new ArrayBuffer(0));
+    const firstBytes = Math.floor(STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_TOTAL_BYTES / 2) + 1;
+    const secondBytes = STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_TOTAL_BYTES - firstBytes + 1;
+    const obj = sourceFile("bounded.obj", [
+      "mtllib first.mtl",
+      "mtllib second.mtl",
+      "v 0 0 0",
+      "v 1 0 0",
+      "v 0 1 0",
+      "f 1 2 3",
+    ].join("\n"));
+
+    await expect(convertStudioBg3dModelFilesToGlb([
+      obj,
+      virtualFile("first.mtl", firstBytes, readFirst),
+      virtualFile("second.mtl", secondBytes, readSecond),
+    ])).rejects.toMatchObject({ code: "material-budget-exceeded" });
+    expect(readFirst).not.toHaveBeenCalled();
+    expect(readSecond).not.toHaveBeenCalled();
+  });
+
+  it("canonicalizes case-folded MTL references and reads one material library once", async () => {
+    vi.stubGlobal("FileReader", TestFileReader);
+    const obj = sourceFile("dedupe.obj", [
+      "mtllib material.mtl",
+      "mtllib MATERIAL.MTL",
+      "v 0 0 0",
+      "v 1 0 0",
+      "v 0 1 0",
+      "usemtl safe",
+      "f 1 2 3",
+    ].join("\n"));
+    const mtl = sourceFile("material.mtl", [
+      "newmtl safe",
+      "Kd 0.5 0.5 0.5",
+    ].join("\n"));
+    const readMaterial = vi.spyOn(mtl, "arrayBuffer");
+
+    const [converted] = await convertStudioBg3dModelFilesToGlb([obj, mtl]);
+    expect(converted?.name).toBe("dedupe.glb");
+    expect(readMaterial).toHaveBeenCalledTimes(1);
+  });
+
+  it("caps unique MTL libraries before parser allocation", async () => {
+    const references = Array.from(
+      { length: STUDIO_BG3D_IMPORT_MAX_OBJ_MATERIAL_LIBRARIES + 1 },
+      (_, index) => `mtllib material-${index}.mtl`,
+    );
+    const obj = sourceFile("many-materials.obj", [
+      ...references,
+      "v 0 0 0",
+      "v 1 0 0",
+      "v 0 1 0",
+      "f 1 2 3",
+    ].join("\n"));
+
+    await expect(convertStudioBg3dModelFilesToGlb([obj])).rejects.toMatchObject({
+      code: "material-budget-exceeded",
+    });
+  });
+
+  it("preflights MTL material and texture-slot directives before MTLLoader.parse", async () => {
+    const objFor = (library: string) => sourceFile(`${library}.obj`, [
+      `mtllib ${library}.mtl`,
+      "v 0 0 0",
+      "v 1 0 0",
+      "v 0 1 0",
+      "f 1 2 3",
+    ].join("\n"));
+    const excessiveMaterials = sourceFile(
+      "materials.mtl",
+      Array.from(
+        { length: STUDIO_BG3D_IMPORT_MAX_EXPORT_MATERIALS + 1 },
+        (_, index) => `newmtl material-${index}`,
+      ).join("\n"),
+    );
+    await expect(convertStudioBg3dModelFilesToGlb([
+      objFor("materials"),
+      excessiveMaterials,
+    ])).rejects.toMatchObject({ code: "material-budget-exceeded" });
+
+    const excessiveTextures = sourceFile("textures.mtl", [
+      "newmtl material",
+      ...Array.from(
+        { length: STUDIO_BG3D_IMPORT_MAX_EXPORT_MATERIAL_SLOTS + 1 },
+        () => "map_Kd missing.png",
+      ),
+    ].join("\n"));
+    await expect(convertStudioBg3dModelFilesToGlb([
+      objFor("textures"),
+      excessiveTextures,
+    ])).rejects.toMatchObject({ code: "material-budget-exceeded" });
   });
 
   it("rejects optional, undeclared, and malformed Meshopt buffer views before Three parses them", async () => {
@@ -1367,6 +1615,31 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
 
     expect(converted.name).toBe("triangle.glb");
     expect(new DataView(buffer).getUint32(0, true)).toBe(0x46546c67);
+  });
+
+  it("uses only the explicit small-file compatibility parser when a module Worker is unavailable", async () => {
+    vi.stubGlobal("FileReader", TestFileReader);
+    vi.stubGlobal("Worker", undefined);
+    const small = sourceFile("small.stl", [
+      "solid triangle",
+      "facet normal 0 0 1",
+      "outer loop",
+      "vertex 0 0 0",
+      "vertex 1 0 0",
+      "vertex 0 1 0",
+      "endloop",
+      "endfacet",
+      "endsolid triangle",
+    ].join("\n"));
+    const large = sourceFile(
+      "large.stl",
+      new Uint8Array(STUDIO_BG3D_GEOMETRY_WORKER_SMALL_FALLBACK_MAX_BYTES + 1),
+    );
+
+    await expect(convertStudioBg3dModelFilesToGlb([small])).resolves.toHaveLength(1);
+    await expect(convertStudioBg3dModelFilesToGlb([large])).rejects.toMatchObject({
+      code: "worker-required",
+    });
   });
 
   it("parses a generated ASCII FBX mesh and reloads its canonical GLB with Three", async () => {

@@ -34,6 +34,7 @@ export class StudioAiController {
   @HttpCode(HttpStatus.OK)
   async chat(
     @Headers("x-user-id") userId: string | undefined,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
     @Body() body: StudioAiChatDto,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response
@@ -55,7 +56,12 @@ export class StudioAiController {
     if (request.aborted || response.destroyed) abortForClientDisconnect();
 
     try {
-      return await this.studioAiService.complete(userId, body, clientController.signal);
+      return await this.studioAiService.complete(
+        userId,
+        body,
+        idempotencyKey,
+        clientController.signal
+      );
     } finally {
       request.off("aborted", abortForClientDisconnect);
       response.off("close", abortForResponseClose);

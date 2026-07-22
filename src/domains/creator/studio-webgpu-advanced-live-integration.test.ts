@@ -14,6 +14,10 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(page).not.toContain('import { planStudioGpuLiveStroke } from "./studio-webgpu-stroke"');
     expect(page).toContain("preparedStroke: gpuStartPlan?.preparation");
     expect(page).toContain("direct: overlayDirect && gpuStartPlan !== null");
+    expect(page).toContain(
+      'const gpuStartPlan = STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu"'
+    );
+    expect(page).toContain('webGpuBackendRef.current === "webgpu"');
     expect(page).toContain("const direct = pixelDirect || overlayDirect || gpuPin");
     expect(page).toContain("if (overlayDirect && !gpuPin");
     expect(page).toContain('destination: "transparent-overlay"');

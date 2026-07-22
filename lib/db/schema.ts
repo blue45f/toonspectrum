@@ -15,6 +15,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
@@ -1453,11 +1454,20 @@ export const creatorAssets = pgTable(
     createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
   },
   (t) => [
-    index("creator_asset_created_idx").on(t.createdAt), // 런타임 ensure 미러(이름 유지)
-    index("idx_creator_asset_user").on(t.userId), // 내 에셋 목록
-    index("idx_creator_asset_catalog").on(t.moderationStatus, t.hidden, t.createdAt),
-    index("idx_creator_asset_downloads").on(t.downloads, t.createdAt),
-    unique("creator_asset_owner_hash_unique").on(t.userId, t.contentHash),
+    index("creator_asset_created_idx").on(t.createdAt.asc().nullsLast()),
+    index("idx_creator_asset_user").on(t.userId.asc().nullsLast()), // 내 에셋 목록
+    index("idx_creator_asset_catalog").on(
+      t.moderationStatus.asc().nullsLast(),
+      t.hidden.asc().nullsLast(),
+      t.createdAt.desc().nullsFirst()
+    ),
+    index("idx_creator_asset_downloads").on(
+      t.downloads.desc().nullsFirst(),
+      t.createdAt.desc().nullsFirst()
+    ),
+    uniqueIndex("creator_asset_owner_hash_unique")
+      .on(t.userId.asc().nullsLast(), t.contentHash.asc().nullsLast())
+      .where(sql`${t.contentHash} is not null`),
     check(
       "creator_asset_license_check",
       sql`${t.license} in ('toonspectrum-standard', 'cc0-1.0', 'cc-by-4.0', 'cc-by-nc-4.0')`
@@ -1489,6 +1499,11 @@ export const creatorAssets = pgTable(
         and ${t.previewContentHash} is null
       ) or (
         ${t.previewDataUrl} is not null
+        and ${t.previewWidth} is not null
+        and ${t.previewHeight} is not null
+        and ${t.previewMimeType} is not null
+        and ${t.previewByteSize} is not null
+        and ${t.previewContentHash} is not null
         and ${t.previewWidth} between 1 and 320
         and ${t.previewHeight} between 1 and 320
         and ${t.previewMimeType} in ('image/png', 'image/jpeg', 'image/webp')
@@ -1531,8 +1546,14 @@ export const creatorAssetReports = pgTable(
   },
   (t) => [
     unique("creator_asset_report_asset_reporter_unique").on(t.assetId, t.reporterId),
-    index("idx_creator_asset_report_queue").on(t.status, t.createdAt),
-    index("idx_creator_asset_report_reporter").on(t.reporterId, t.createdAt),
+    index("idx_creator_asset_report_queue").on(
+      t.status.asc().nullsLast(),
+      t.createdAt.asc().nullsLast()
+    ),
+    index("idx_creator_asset_report_reporter").on(
+      t.reporterId.asc().nullsLast(),
+      t.createdAt.desc().nullsFirst()
+    ),
     check(
       "creator_asset_report_reason_check",
       sql`${t.reason} in ('copyright', 'unsafe', 'spam', 'misleading', 'other')`
@@ -1544,6 +1565,87 @@ export const creatorAssetReports = pgTable(
 // ── 창작 스튜디오 서버 AI: 분산 일일 쿼터 + 최소 사용 이력 ──────────────
 // 원장에는 프롬프트/응답/API 키/제공자 오류 본문을 저장하지 않는다. 일일 집계 행은 외부 호출 전에
 // 토큰을 보수적으로 예약해 여러 API 인스턴스의 동시 요청도 짧은 Postgres 트랜잭션으로 제한한다.
+export const studioAiRequestGates = pgTable(
+  "studio_ai_request_gate",
+  {
+    userId: text("userId")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    requestTimes: timestamp("requestTimes", { mode: "date", withTimezone: true })
+      .array()
+      .notNull()
+      .default(sql`'{}'::timestamptz[]`),
+    // Bearer token 원문은 API 프로세스에만 있고 DB에는 SHA-256 digest만 저장한다.
+    leaseTokenHash: bytea("leaseTokenHash"),
+    leaseFence: bigint("leaseFence", { mode: "bigint" }).notNull().default(sql`0`),
+    leaseExpiresAt: timestamp("leaseExpiresAt", { mode: "date", withTimezone: true }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check(
+      "studio_ai_request_gate_request_times_check",
+      sql`cardinality(${t.requestTimes}) between 0 and 10000`
+    ),
+    check("studio_ai_request_gate_lease_fence_check", sql`${t.leaseFence} >= 0`),
+    check(
+      "studio_ai_request_gate_lease_state_check",
+      sql`(
+          ${t.leaseTokenHash} is null
+          and ${t.leaseExpiresAt} is null
+        ) or (
+          ${t.leaseTokenHash} is not null
+          and octet_length(${t.leaseTokenHash}) = 32
+          and ${t.leaseExpiresAt} is not null
+        )`
+    ),
+  ]
+);
+
+// 유료 공급자 호출의 재전송 방지 receipt. 원문 Idempotency-Key, 프롬프트, 응답 본문은 저장하지
+// 않고 사용자 결합 키 해시와 canonical request hash만 보관한다.
+export const studioAiRequestReceipts = pgTable(
+  "studio_ai_request_receipt",
+  {
+    userKeyHash: bytea("userKeyHash").primaryKey(),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    requestHash: bytea("requestHash").notNull(),
+    leaseFence: bigint("leaseFence", { mode: "bigint" }).notNull(),
+    status: text("status").notNull(),
+    attemptCount: integer("attemptCount").notNull().default(0),
+    expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("studio_ai_request_receipt_user_request_unique").on(t.userId, t.requestHash),
+    index("idx_studio_ai_request_receipt_expires").on(t.expiresAt),
+    check(
+      "studio_ai_request_receipt_user_key_hash_check",
+      sql`octet_length(${t.userKeyHash}) = 32`
+    ),
+    check(
+      "studio_ai_request_receipt_request_hash_check",
+      sql`octet_length(${t.requestHash}) = 32`
+    ),
+    check("studio_ai_request_receipt_lease_fence_check", sql`${t.leaseFence} >= 0`),
+    check(
+      "studio_ai_request_receipt_status_check",
+      sql`${t.status} in ('admitted', 'sent', 'succeeded', 'ambiguous')`
+    ),
+    check(
+      "studio_ai_request_receipt_attempt_count_check",
+      sql`${t.attemptCount} between 0 and 2`
+    ),
+    check(
+      "studio_ai_request_receipt_expiry_check",
+      sql`${t.expiresAt} > ${t.createdAt}`
+    ),
+  ]
+);
+
 export const studioAiGlobalDailyQuotas = pgTable(
   "studio_ai_global_daily_quota",
   {

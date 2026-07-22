@@ -15,6 +15,7 @@ import {
   saveStudioAiSettings,
   STUDIO_AI_DEFAULT_SETTINGS,
   STUDIO_AI_SETTINGS_KEY,
+  studioTextAiTransportForOperation,
   suggestColorPalette,
   suggestDialogueLines,
   suggestSceneComposition,
@@ -520,10 +521,21 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
       );
       globalThis.fetch = mockFetch as unknown as typeof fetch;
 
-      const result = await suggestSceneComposition(CONFIGURED, "주인공이 교실에 들어온다");
+      const byokTransport = { mode: "byok" as const };
+      const operationTransport = studioTextAiTransportForOperation(
+        byokTransport,
+        "composition-00000000-0000-4000-8000-000000000021"
+      );
+      const result = await suggestSceneComposition(
+        CONFIGURED,
+        "주인공이 교실에 들어온다",
+        operationTransport
+      );
 
       const [url, init] = mockFetch.mock.calls[0] as unknown as [string, RequestInit];
       expect(url).toBe("https://api.example.com/v1/chat/completions");
+      expect(operationTransport).toBe(byokTransport);
+      expect(new Headers(init.headers).has("Idempotency-Key")).toBe(false);
       const body = JSON.parse(init.body as string);
       expect(body.model).toBe(CONFIGURED.textModel);
       expect(body.messages[1]).toEqual({ role: "user", content: "주인공이 교실에 들어온다" });

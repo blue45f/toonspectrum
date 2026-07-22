@@ -29,6 +29,7 @@ describe("Studio 3D viewport Motion Coach integration", () => {
       "bg3d:transform:snap",
       "bg3d:object:ground",
       "bg3d:object:origin-ground",
+      "bg3d:object:surface-snap",
       "bg3d:camera:focus-selection",
       "bg3d:camera:zoom-in",
       "bg3d:camera:zoom-out",
@@ -53,7 +54,7 @@ describe("Studio 3D viewport Motion Coach integration", () => {
   it("replaces native background toolbar titles and explains unavailable actions", () => {
     const toolbar = sliceBetween(
       backgroundSource,
-      '<div className="absolute left-2 top-2 z-10 grid grid-cols-3 gap-1.5 sm:left-2.5 sm:top-2.5 sm:flex sm:flex-col">',
+      'className="absolute left-2 top-2 z-10 grid grid-cols-3 gap-1.5 sm:left-2.5 sm:top-2.5 sm:flex sm:flex-col"',
       "{!physicsInteractionLocked && !viewportHinted ?"
     );
 
@@ -62,8 +63,8 @@ describe("Studio 3D viewport Motion Coach integration", () => {
     expect(toolbar).toContain('unavailableReason={!canUndo ? "되돌릴 3D 장면 변경이 없습니다."');
     expect(toolbar).toContain('unavailableReason={!canRedo ? "다시 적용할 3D 장면 변경이 없습니다."');
     expect(toolbar).toContain("disabled={Boolean(groundSelectionDisabledReason)}");
-    expect(toolbar).toContain('disabled={!selectedEntity}');
-    expect(toolbar).toContain('"도형 또는 3D 모델을 먼저 선택하세요."');
+    expect(toolbar).toContain("disabled={Boolean(focusSelectionDisabledReason)}");
+    expect(backgroundSource).toContain('"화면에 맞출 객체를 하나만 선택해 주세요."');
     expect(backgroundSource).toContain('"선택한 객체의 잠금을 해제하세요."');
   });
 

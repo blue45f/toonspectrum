@@ -9,14 +9,17 @@ import {
   Bg3dModelLibraryError,
   admitStoredBg3dModelForRendering,
   canonicalizeBg3dModelHash,
+  createBg3dModelThumbnailCaptureRevision,
   createStudioBg3dModelAttachment,
   createUploadedBg3dModelRecord,
   detectBg3dModelFormat,
   getDeletableModelIds,
+  getCachedBg3dModelThumbnail,
   getStoredBg3dModel,
   getStoredBg3dModelByHash,
   importVerifiedBg3dModelsAtomically,
   isVerifiedBg3dModelRecord,
+  listBg3dModelLibraryEntries,
   listStoredBg3dModels,
   normalizeBg3dModelRights,
   prepareVerifiedBg3dModelRecord,
@@ -24,12 +27,18 @@ import {
   SAMPLE_BG3D_MODEL_ENTRIES,
   SAMPLE_BG3D_MODELS,
   saveUploadedBg3dModel,
+  saveBg3dModelThumbnail,
+  saveBg3dModelThumbnailIfCurrent,
   withDefaultBg3dModelEntry,
   type Bg3dLegacyStoredRecord,
   type Bg3dModelStoredRecord,
   type Bg3dVerifiedStoredRecord,
 } from "./bg3d-model-library";
-import { STUDIO_BG3D_GLB_MAX_BYTES, STUDIO_BG3D_GLB_MIME_TYPE } from "./studio-bg3d-glb-validation";
+import {
+  DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
+  STUDIO_BG3D_GLB_MAX_BYTES,
+  STUDIO_BG3D_GLB_MIME_TYPE,
+} from "./studio-bg3d-glb-validation";
 import {
   createDefaultStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
@@ -68,6 +77,41 @@ async function sha256(bytes: Uint8Array): Promise<`sha256:${string}`> {
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes)));
   const hex = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
   return `sha256:${hex}`;
+}
+
+function thumbnailPng(width = 320, height = 180): Uint8Array {
+  const bytes = new Uint8Array(58);
+  const view = new DataView(bytes.buffer);
+  bytes.set([137, 80, 78, 71, 13, 10, 26, 10], 0);
+  view.setUint32(8, 13, false);
+  bytes.set([0x49, 0x48, 0x44, 0x52], 12);
+  view.setUint32(16, width, false);
+  view.setUint32(20, height, false);
+  bytes.set([8, 6, 0, 0, 0], 24);
+  view.setUint32(33, 1, false);
+  bytes.set([0x49, 0x44, 0x41, 0x54], 37);
+  bytes[41] = 0;
+  bytes.set([0x49, 0x45, 0x4e, 0x44], 50);
+  const crc32 = (start: number, end: number) => {
+    let crc = 0xffff_ffff;
+    for (let offset = start; offset < end; offset += 1) {
+      crc ^= bytes[offset] ?? 0;
+      for (let bit = 0; bit < 8; bit += 1) {
+        crc = (crc >>> 1) ^ ((crc & 1) === 1 ? 0xedb8_8320 : 0);
+      }
+    }
+    return (crc ^ 0xffff_ffff) >>> 0;
+  };
+  view.setUint32(29, crc32(12, 29), false);
+  view.setUint32(42, crc32(37, 42), false);
+  view.setUint32(54, crc32(50, 54), false);
+  return bytes;
+}
+
+function thumbnailDataUrl(width = 320, height = 180): string {
+  let binary = "";
+  for (const byte of thumbnailPng(width, height)) binary += String.fromCharCode(byte);
+  return `data:image/png;base64,${btoa(binary)}`;
 }
 
 type StoreName = "models" | "thumbnails";
@@ -480,6 +524,60 @@ describe("verified GLB preparation", () => {
     expect(arrayBuffer).not.toHaveBeenCalled();
   });
 
+  it("enforces the selected profile byte budget before materializing or hashing the file", async () => {
+    const source = validGlb();
+    const arrayBuffer = vi.fn(async () => Uint8Array.from(source).buffer);
+    const digest = vi.fn(async () => new Uint8Array(32));
+    const budgets = {
+      ...DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
+      mobile: {
+        ...DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES.mobile,
+        complexity: {
+          ...DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES.mobile.complexity,
+          maxModelBytes: source.byteLength - 1,
+        },
+      },
+    };
+
+    await expect(prepareVerifiedBg3dModelRecord({
+      name: "profile-budget.glb",
+      type: STUDIO_BG3D_GLB_MIME_TYPE,
+      size: source.byteLength,
+      arrayBuffer,
+    }, {
+      profile: "mobile",
+      budgets,
+      digest,
+    })).rejects.toMatchObject({
+      code: "validation-failed",
+      validationCode: "model-byte-budget-exceeded",
+    });
+    expect(arrayBuffer).not.toHaveBeenCalled();
+    expect(digest).not.toHaveBeenCalled();
+  });
+
+  it("enforces the cumulative byte budget before materializing or hashing the file", async () => {
+    const source = validGlb();
+    const arrayBuffer = vi.fn(async () => Uint8Array.from(source).buffer);
+    const digest = vi.fn(async () => new Uint8Array(32));
+
+    await expect(prepareVerifiedBg3dModelRecord({
+      name: "cumulative-budget.glb",
+      type: STUDIO_BG3D_GLB_MIME_TYPE,
+      size: source.byteLength,
+      arrayBuffer,
+    }, {
+      cumulativeUsedBytes: 1,
+      maximumCumulativeBytes: source.byteLength,
+      digest,
+    })).rejects.toMatchObject({
+      code: "validation-failed",
+      validationCode: "cumulative-byte-budget-exceeded",
+    });
+    expect(arrayBuffer).not.toHaveBeenCalled();
+    expect(digest).not.toHaveBeenCalled();
+  });
+
   it("rejects explicit storage IDs with invalid length, characters, reserved names, or credential patterns", async () => {
     const credentialLikeId = [["s", "k"].join(""), "abcdefgh"].join("-");
     const invalidIds = ["../storage", "x".repeat(81), "Constructor", credentialLikeId];
@@ -652,6 +750,76 @@ describe("V2 IndexedDB behavior", () => {
     });
     expect(isVerifiedBg3dModelRecord(state.records.get("legacy-glb"))).toBe(true);
     expect(state.deletedKeys).toEqual([]);
+  });
+
+  it("stores only bounded thumbnails for a verified model and rejects an older capture fence", async () => {
+    const record = await prepareVerifiedBg3dModelRecord(glbFile(), {
+      idFactory: () => "thumbnail-storage",
+      now: 1,
+    });
+    const state = installFakeIndexedDb([record]);
+    const first = thumbnailDataUrl(320, 180);
+    const newer = thumbnailDataUrl(160, 90);
+
+    expect(await saveBg3dModelThumbnailIfCurrent(record.id, first, {
+      captureRevision: 10,
+      now: 20,
+    })).toBe(true);
+    expect(await saveBg3dModelThumbnailIfCurrent(record.id, newer, {
+      captureRevision: 9,
+      now: 21,
+    })).toBe(false);
+    expect(await getCachedBg3dModelThumbnail(record.id)).toBe(first);
+    expect((await listBg3dModelLibraryEntries())[0]?.thumbnail).toBe(first);
+    expect(state.thumbnails.get(record.id)).toMatchObject({
+      id: record.id,
+      thumbnail: first,
+      updatedAt: 20,
+      captureRevision: 10,
+    });
+  });
+
+  it("fails closed before thumbnail writes for unsafe ids, malformed images, and missing models", async () => {
+    const record = await prepareVerifiedBg3dModelRecord(glbFile(), {
+      idFactory: () => "safe-thumbnail-storage",
+      now: 1,
+    });
+    const state = installFakeIndexedDb([record]);
+    const valid = thumbnailDataUrl();
+
+    await expect(saveBg3dModelThumbnail("../unsafe", valid)).rejects.toMatchObject({ code: "invalid-file" });
+    await expect(saveBg3dModelThumbnail(record.id, "data:image/png;base64,AAAA"))
+      .rejects.toMatchObject({ code: "invalid-file" });
+    await expect(saveBg3dModelThumbnail("missing-model", valid))
+      .rejects.toMatchObject({ code: "invalid-file" });
+    expect(state.thumbnails.size).toBe(0);
+  });
+
+  it("filters corrupt or oversized persisted thumbnails before list/get presentation", async () => {
+    const record = await prepareVerifiedBg3dModelRecord(glbFile(), {
+      idFactory: () => "corrupt-thumbnail-storage",
+      now: 1,
+    });
+    const state = installFakeIndexedDb([record]);
+    state.thumbnails.set(record.id, {
+      id: record.id,
+      thumbnail: thumbnailDataUrl(513, 1),
+      updatedAt: 2,
+      captureRevision: 3,
+    });
+
+    expect(await getCachedBg3dModelThumbnail(record.id)).toBeNull();
+    expect((await listBg3dModelLibraryEntries())[0]?.thumbnail).toBeNull();
+    expect(withDefaultBg3dModelEntry([record], { [record.id]: "data:image/png;base64,AAAA" })[0]?.thumbnail)
+      .toBeNull();
+    expect(await getCachedBg3dModelThumbnail("../unsafe")).toBeNull();
+  });
+
+  it("allocates monotonic safe capture revisions even when the clock stalls", () => {
+    const first = createBg3dModelThumbnailCaptureRevision(100);
+    const second = createBg3dModelThumbnailCaptureRevision(100);
+    expect(second).toBe(first + 1);
+    expect(Number.isSafeInteger(second)).toBe(true);
   });
 
   it("deduplicates same-byte imports by canonical hash and supports exact hash lookup", async () => {

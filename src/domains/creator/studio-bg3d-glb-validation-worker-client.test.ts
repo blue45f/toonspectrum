@@ -5,9 +5,11 @@ import {
   type StudioBg3dGlbValidationOptions,
 } from "./studio-bg3d-glb-validation";
 import {
+  STUDIO_BG3D_GLB_MAIN_THREAD_FALLBACK_MAX_BYTES,
   StudioBg3dValidationWorkerClient,
   StudioBg3dValidationWorkerPool,
   disposeSharedStudioBg3dValidationWorker,
+  studioBg3dGlbRequiresValidationWorker,
   validateStudioBg3dGlbOffMainThread,
   type StudioBg3dValidationWorkerLike,
 } from "./studio-bg3d-glb-validation-worker-client";
@@ -28,6 +30,14 @@ const OPTIONS: StudioBg3dGlbValidationOptions = {
   profile: "desktop",
   budgets: DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
 };
+
+function optionsForByteLength(byteLength: number): StudioBg3dGlbValidationOptions {
+  return {
+    ...OPTIONS,
+    declared: { ...OPTIONS.declared, byteSize: byteLength },
+    cumulative: { usedBytes: 0, maximumBytes: byteLength },
+  };
+}
 
 class FakeWorker implements StudioBg3dValidationWorkerLike {
   readonly messages: { message: StudioBg3dGlbWorkerRequest; transfer?: Transferable[] }[] = [];
@@ -313,6 +323,44 @@ describe("StudioBg3dValidationWorkerClient", () => {
 
     await expect(pending).rejects.toMatchObject({ code: "aborted" });
     releaseDigest?.(new Uint8Array(32));
+  });
+
+  it("allows only bounded payloads to use the main-thread compatibility path", async () => {
+    const ceiling = STUDIO_BG3D_GLB_MAIN_THREAD_FALLBACK_MAX_BYTES;
+    expect(studioBg3dGlbRequiresValidationWorker(new ArrayBuffer(ceiling))).toBe(false);
+    expect(studioBg3dGlbRequiresValidationWorker(new ArrayBuffer(ceiling + 1))).toBe(true);
+
+    vi.stubGlobal("Worker", undefined);
+    await expect(validateStudioBg3dGlbOffMainThread(
+      new Uint8Array([1, 2, 3, 4]),
+      OPTIONS,
+    )).resolves.toMatchObject({ execution: "main-thread" });
+
+    const large = new Uint8Array(ceiling + 1);
+    await expect(validateStudioBg3dGlbOffMainThread(
+      large,
+      optionsForByteLength(large.byteLength),
+    )).rejects.toMatchObject({ code: "worker-failed" });
+  });
+
+  it("falls back after Worker construction failure only for bounded payloads", async () => {
+    class ThrowingWorker {
+      constructor() {
+        throw new Error("Worker construction blocked");
+      }
+    }
+    vi.stubGlobal("Worker", ThrowingWorker);
+
+    await expect(validateStudioBg3dGlbOffMainThread(
+      new Uint8Array([1, 2, 3, 4]),
+      OPTIONS,
+    )).resolves.toMatchObject({ execution: "main-thread" });
+
+    const large = new Uint8Array(STUDIO_BG3D_GLB_MAIN_THREAD_FALLBACK_MAX_BYTES + 1);
+    await expect(validateStudioBg3dGlbOffMainThread(
+      large,
+      optionsForByteLength(large.byteLength),
+    )).rejects.toMatchObject({ code: "worker-failed" });
   });
 
   it("rejects a main-realm Basis capability until the validation worker can self-attest", async () => {

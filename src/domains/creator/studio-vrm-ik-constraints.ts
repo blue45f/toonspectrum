@@ -8,7 +8,9 @@ import {
   type StudioVrmVec3,
 } from "./studio-vrm-scene-document";
 
+import type { StudioVrmFullBodyIkResult } from "./studio-vrm-full-body-ik";
 import type { StudioVrmPoseMirrorScope } from "./studio-vrm-pose-editing";
+import type { StudioVrmUserIkResult } from "./studio-vrm-user-ik";
 
 const MAX_SCENE_COORDINATE = 10_000;
 const CONSTRAINT_KEYS = new Set(["effector", "enabled", "locked", "target", "pole"]);
@@ -83,6 +85,13 @@ export function cloneStudioVrmIkConstraints(
     target: [...constraint.target],
     pole: constraint.pole ? [...constraint.pole] : null,
   }));
+}
+
+/** Single-chain IK has no convergence flag; only a full-body solve must explicitly converge. */
+export function canCommitStudioVrmIkResult(
+  result: StudioVrmUserIkResult | StudioVrmFullBodyIkResult,
+): boolean {
+  return !("constraints" in result) || result.converged;
 }
 
 export function upsertStudioVrmIkConstraint(
@@ -200,6 +209,19 @@ export function enabledStudioVrmIkTargetsSceneLocal(
   const result: Partial<Record<StudioVrmIkEffector, StudioVrmVec3>> = {};
   for (const constraint of constraints) {
     if (constraint.enabled) result[constraint.effector] = [...constraint.target];
+  }
+  return result;
+}
+
+/** Enabled pole controls are copied so the transient handle layer never mutates persisted DTOs. */
+export function enabledStudioVrmIkPolesSceneLocal(
+  constraints: readonly StudioVrmIkConstraint[],
+): Partial<Record<StudioVrmIkEffector, StudioVrmVec3>> {
+  const result: Partial<Record<StudioVrmIkEffector, StudioVrmVec3>> = {};
+  for (const constraint of constraints) {
+    if (constraint.enabled && constraint.pole) {
+      result[constraint.effector] = [...constraint.pole];
+    }
   }
   return result;
 }

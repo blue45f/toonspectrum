@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   applyStudioBg3dInsertResult,
   applyStudioVrmInsertResult,
+  mapStudioBg3dPerspectiveGuidesToAnchor,
   type ApplyStudioVrmInsertResultInput,
 } from "./studio-3d-insert-controller";
 
@@ -54,6 +55,52 @@ function vrmInput(
 }
 
 describe("studio 3D insert controller", () => {
+  describe("BG3D perspective guide mapping", () => {
+    const guides = [
+      { axis: "world-x" as const, x: -0.5, y: 0.25 },
+      { axis: "world-z" as const, x: 1.5, y: 0.75 },
+    ];
+
+    it("maps normalized vanishing points into an axis-aligned LT anchor", () => {
+      expect(mapStudioBg3dPerspectiveGuidesToAnchor(guides, {
+        x: 100,
+        y: 200,
+        width: 400,
+        height: 300,
+      })).toEqual([
+        { axis: "world-x", x: -100, y: 275 },
+        { axis: "world-z", x: 700, y: 425 },
+      ]);
+    });
+
+    it.each([
+      { rotation: 1 },
+      { flipped: true },
+      { flippedY: true },
+      { skewX: 0.1 },
+      { skewY: -0.1 },
+    ])("fails transformed anchors closed: %#", (transform) => {
+      expect(mapStudioBg3dPerspectiveGuidesToAnchor(guides, {
+        x: 0,
+        y: 0,
+        width: 400,
+        height: 300,
+        ...transform,
+      })).toEqual([]);
+    });
+
+    it("rejects malformed, duplicate-axis, and non-finite guide payloads as one unit", () => {
+      const anchor = { x: 0, y: 0, width: 400, height: 300 };
+      expect(mapStudioBg3dPerspectiveGuidesToAnchor([
+        guides[0]!,
+        { ...guides[0]!, x: 0.25 },
+      ], anchor)).toEqual([]);
+      expect(mapStudioBg3dPerspectiveGuidesToAnchor([
+        { axis: "world-y", x: Number.NaN, y: 0 },
+      ], anchor)).toEqual([]);
+    });
+  });
+
   describe("VRM insertion", () => {
     it("rejects a missing ticket before admission or document effects", () => {
       const admitMutation = vi.fn(() => true);

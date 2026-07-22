@@ -37,6 +37,79 @@ export type StudioBg3dInsertHandler = (
   result: StudioBackground3DInsertResult
 ) => boolean;
 
+export interface StudioBg3dPerspectiveGuideAnchor {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly rotation?: number;
+  readonly flipped?: boolean;
+  readonly flippedY?: boolean;
+  readonly skewX?: number;
+  readonly skewY?: number;
+}
+
+export interface StudioBg3dCanvasPerspectiveGuide {
+  readonly axis: StudioBackground3DInsertResult["perspectiveGuides"][number]["axis"];
+  readonly x: number;
+  readonly y: number;
+}
+
+const MAX_NORMALIZED_GUIDE_DISTANCE = 100_000;
+
+/**
+ * Maps renderer-normalized vanishing points only when the LT anchor has an axis-aligned transform.
+ * A rotated/flipped/skewed bundle needs a full element-transform projection; guessing with its
+ * bounding box would silently author a wrong ruler, so that case deliberately fails closed.
+ */
+export function mapStudioBg3dPerspectiveGuidesToAnchor(
+  guides: StudioBackground3DInsertResult["perspectiveGuides"],
+  anchor: StudioBg3dPerspectiveGuideAnchor
+): readonly StudioBg3dCanvasPerspectiveGuide[] {
+  if (
+    !Number.isFinite(anchor.x)
+    || !Number.isFinite(anchor.y)
+    || !Number.isFinite(anchor.width)
+    || anchor.width <= 0
+    || !Number.isFinite(anchor.height)
+    || anchor.height <= 0
+    || !Number.isFinite(anchor.rotation ?? 0)
+    || Math.abs(anchor.rotation ?? 0) >= 1e-6
+    || anchor.flipped === true
+    || anchor.flippedY === true
+    || !Number.isFinite(anchor.skewX ?? 0)
+    || !Number.isFinite(anchor.skewY ?? 0)
+    || Math.abs(anchor.skewX ?? 0) >= 1e-6
+    || Math.abs(anchor.skewY ?? 0) >= 1e-6
+    || !Array.isArray(guides)
+    || guides.length > 3
+  ) {
+    return [];
+  }
+
+  const axes = new Set<string>();
+  const mapped: StudioBg3dCanvasPerspectiveGuide[] = [];
+  for (const guide of guides) {
+    if (
+      !guide
+      || (guide.axis !== "world-x" && guide.axis !== "world-y" && guide.axis !== "world-z")
+      || axes.has(guide.axis)
+      || !Number.isFinite(guide.x)
+      || !Number.isFinite(guide.y)
+      || Math.abs(guide.x) > MAX_NORMALIZED_GUIDE_DISTANCE
+      || Math.abs(guide.y) > MAX_NORMALIZED_GUIDE_DISTANCE
+    ) {
+      return [];
+    }
+    const x = anchor.x + guide.x * anchor.width;
+    const y = anchor.y + guide.y * anchor.height;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return [];
+    axes.add(guide.axis);
+    mapped.push({ axis: guide.axis, x, y });
+  }
+  return mapped;
+}
+
 export interface ApplyStudioVrmInsertResultInput {
   readonly result: StudioVrmPoserInsertResult;
   readonly mutationTicket: StudioEditorMutationTicket | null;

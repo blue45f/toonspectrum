@@ -12,6 +12,7 @@ import { useState } from "react";
 
 import {
   suggestSceneComposition,
+  studioTextAiTransportForOperation,
   type StudioAiResult,
   type StudioAiSettings,
   type StudioTextAiProvenance,
@@ -62,7 +63,10 @@ export function StudioAiCompositionPanel({
     setError(null);
     setCopied(false);
     const operationId = onOperationStart?.(prompt);
-    const result = await suggestSceneComposition(settings, prompt, transport);
+    const operationTransport = operationId && transport
+      ? studioTextAiTransportForOperation(transport, operationId)
+      : transport;
+    const result = await suggestSceneComposition(settings, prompt, operationTransport);
     if (operationId) {
       onOperationSettled?.({
         operationId,

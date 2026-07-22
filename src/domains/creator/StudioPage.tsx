@@ -36,7 +36,14 @@ import { studioCreationLinkParams } from "./creator-studio-links";
 import {
   applyStudioBg3dInsertResult,
   applyStudioVrmInsertResult,
+  mapStudioBg3dPerspectiveGuidesToAnchor,
 } from "./studio-3d-insert-controller";
+import {
+  planStudioActiveStrokeUnmountRecovery,
+  runStudioDrawingUnmountLifecycle,
+  studioActiveStrokeRecoveryFingerprint,
+  type StudioActiveStrokePointerType,
+} from "./studio-active-stroke-lifecycle";
 import { studioAdjustmentStackToFilterFields } from "./studio-adjustment-stack";
 import {
   runStudioAdvancedFillInBrowser,
@@ -77,6 +84,7 @@ import {
   isStudioTextAiConfigured,
   loadStudioAiSessionSettings,
   saveStudioAiSettings,
+  studioTextAiTransportForOperation,
   suggestColorPalette,
   suggestDialogueLines,
   translateDialogueBatch,
@@ -351,6 +359,7 @@ import {
   studioDrawElementSampleSlice,
   studioDrawElementToCrdtStroke,
 } from "./studio-crdt-draw-bridge";
+import { StudioCrdtLiveStrokePublisher } from "./studio-crdt-live-stroke-publisher";
 import { STUDIO_CRDT_ORIGIN_LOCAL } from "./studio-crdt-protocol";
 import { creatorWorkSnapshotToStudioProject } from "./studio-creator-work-project";
 import {
@@ -1015,6 +1024,10 @@ import {
 import { SMUDGE_RADIUS_DEFAULT, SMUDGE_STRENGTH_DEFAULT } from "./studio-smudge";
 import { smudgeStrokeImage } from "./studio-smudge-browser";
 import { useStudioStableHandlers } from "./studio-stable-handlers";
+import {
+  snapshotStudioStagePointerBatchMapper,
+  type StudioStagePointerBatchMapper,
+} from "./studio-stage-pointer-coordinate";
 import { resolveShiftFreehandTransition } from "./studio-stroke-constrain";
 import {
   DEFAULT_SHAPE_PARAMS,
@@ -4362,9 +4375,13 @@ function StudioCuttoonEditor() {
     timer: ReturnType<typeof setTimeout> | null;
     retryCount: number;
   } | null>(null);
+  // Page pending batches cannot represent a document-master edit. Keep an interrupted master
+  // pen/mouse mark in its own lifecycle slot so emergency recovery never moves it onto a page.
+  const lifecycleMasterStrokeRecoveryRef = useRef<DrawEl | null>(null);
   const persistPendingStrokeEmergencyAutosaveRef = useRef<(
     reason: StudioPendingStrokeDurabilityReason
   ) => void>(() => undefined);
+  const recoverActiveStrokeOnUnmountRef = useRef<() => void>(() => undefined);
   // Monotonic generation of the latest browser/server durable snapshot. Pending strokes live
   // outside React history, so lifecycle persistence also checks the pending batch independently.
   const studioLifecycleDurableGenerationRef = useRef(0);
@@ -6495,11 +6512,21 @@ function StudioCuttoonEditor() {
   const { buildCurrentStudioProjectFileSnapshot } = useStudioStableHandlers<{
     buildCurrentStudioProjectFileSnapshot: (
       durablePages: PageState[],
-      savedAt: string
+      savedAt: string,
+      recoveredMasterStroke?: DrawEl | null
     ) => StudioProjectSnapshot;
   }>({
-    buildCurrentStudioProjectFileSnapshot: (durablePages, savedAt) =>
-      buildStudioProjectFileSnapshot({
+    buildCurrentStudioProjectFileSnapshot: (
+      durablePages,
+      savedAt,
+      recoveredMasterStroke = lifecycleMasterStrokeRecoveryRef.current
+    ) => {
+      const durableMaster = recoveredMasterStroke && !master.elements.some(
+        (element) => element.id === recoveredMasterStroke.id
+      )
+        ? withMasterElements(master, [...master.elements, recoveredMasterStroke])
+        : master;
+      return buildStudioProjectFileSnapshot({
         savedAt,
         title,
         description,
@@ -6508,7 +6535,7 @@ function StudioCuttoonEditor() {
         linkedSeriesId,
         linkedChallengeId,
         pagesList: durablePages,
-        master,
+        master: durableMaster,
         characterBible,
         writerRoom,
         aiProvenance,
@@ -6527,7 +6554,8 @@ function StudioCuttoonEditor() {
           packageSettings: effectivePublishPackageSettings,
           packageCredits: publishPackageCredits,
         },
-      }),
+      });
+    },
   });
 
   // 오토세이브 임시저장 리스너 (디바운스 1.5초)
@@ -7347,10 +7375,34 @@ function StudioCuttoonEditor() {
   if (drawingPointerTransportRef.current === null) {
     drawingPointerTransportRef.current = createStudioDrawingPointerTransportController();
   }
-  /** beginStroke가 성공한 세션만 접미 샘플을 전송한다(포인터마다 전체 CRDT 획 조회 금지). */
+  /** beginStroke가 예약된 로컬 세션만 접미 샘플을 전송한다(포인터마다 전체 CRDT 획 조회 금지). */
   const drawingCrdtStrokeActiveRef = useRef(false);
+  const drawingCrdtPublishErrorRef = useRef<(cause: unknown) => void>(() => undefined);
+  drawingCrdtPublishErrorRef.current = (cause) => {
+    drawingCrdtStrokeActiveRef.current = false;
+    setError(
+      cause instanceof Error
+        ? `실시간 획 전송: ${cause.message}`
+        : "실시간 획을 팀 문서에 추가하지 못했습니다."
+    );
+  };
+  const drawingCrdtPublisherRef = useRef<StudioCrdtLiveStrokePublisher<DrawEl>>(null as never);
+  drawingCrdtPublisherRef.current ??= new StudioCrdtLiveStrokePublisher<DrawEl>({
+    scheduler: {
+      requestFrame: (callback) => globalThis.requestAnimationFrame(callback),
+      cancelFrame: (handle) => globalThis.cancelAnimationFrame(handle),
+      // StudioPage only mounts in a browser, where setTimeout returns a numeric handle. The root
+      // TypeScript program also includes Node globals, so keep that ambient overload out of this
+      // browser-only scheduler boundary.
+      setTimer: (callback) => globalThis.setTimeout(callback, 0) as unknown as number,
+      clearTimer: (handle) => globalThis.clearTimeout(handle),
+    },
+    onError: (cause) => drawingCrdtPublishErrorRef.current(cause),
+  });
   /** Predicted samples may simulate the drawing pipeline, but must never schedule durable ink. */
   const drawingPredictionPreviewRef = useRef(false);
+  /** One prediction pass owns a private clone, so its samples can append without O(n²) copies. */
+  const drawingPredictionBatchMutationRef = useRef(false);
   const drawingUnmountCleanupRef = useRef<() => void>(() => undefined);
   const perspectiveRayRef = useRef<PerspectiveRay | null>(null);
   const isometricAxisRayRef = useRef<IsometricAxisRay | null>(null);
@@ -7376,6 +7428,9 @@ function StudioCuttoonEditor() {
   const quickShapeLockedRef = useRef<boolean>(false); // 2단계(정비율 고정)를 이미 적용했는지
   // 브러시 커서 프리뷰(Konva 노드 직접 갱신 — hover 리렌더 방지).
   const brushCursorRef = useRef<Konva.Group>(null);
+  // Active ink owns a high-frequency native stream. Coalesce its cursor surface to one latest
+  // position per browser frame; non-drawing hover still draws synchronously for immediate feedback.
+  const brushCursorDrawRafRef = useRef<number | null>(null);
   // 비다이렉트 초안(팬시 브러시·도형 드래그)은 격리 스토어로 흐른다(StudioDraftPreviewLayers).
   // 포인터 프레임이 이 30k 라인 컴포넌트를 다시 렌더하지 않는다 — 모든 브러시가 펜과 같은
   // 필기감을 갖는 구조적 토대. 스마트 도형 변환 라벨만 저빈도 상태로 승격한다(변환 시 1회).
@@ -7926,9 +7981,16 @@ function StudioCuttoonEditor() {
   const replacePredictedInkTail = (el: DrawEl, authoritativePointCount: number) => {
     const state = predictedInkTailStateRef.current;
     if (!state) return;
+    const predictedPointCount = Math.floor(el.points.length / 2);
+    const predictedPressures: number[] = [];
+    for (let index = authoritativePointCount; index < predictedPointCount; index += 1) {
+      predictedPressures.push(studioLiveBrushPressure(el, el.pressures?.[index]));
+    }
     const transition = replaceStudioPredictedInkTail(state, {
       points: el.points.slice(authoritativePointCount * 2),
-      pressures: liveBrushPressureSamplesFor(el).slice(authoritativePointCount),
+      // Predictions are disposable. Mapping only their suffix prevents a future-pressure preview
+      // from extending the authoritative prefix cache and stalling the next real sample.
+      pressures: predictedPressures,
     });
     predictedInkTailStateRef.current = transition.state;
     liveInkPredictionRendererRef.current.apply(
@@ -8405,14 +8467,27 @@ function StudioCuttoonEditor() {
     () => () => {
       if (draftRafRef.current !== null) globalThis.cancelAnimationFrame(draftRafRef.current);
       if (marqueeRafRef.current !== null) globalThis.cancelAnimationFrame(marqueeRafRef.current);
-      drawingUnmountCleanupRef.current();
-      requireStudioDrawingPointerTransport(drawingPointerTransportRef).dispose();
-      const pendingBatch = pendingStrokeCommitsRef.current;
-      // React route transitions do not dispatch pagehide. Persist every dirty stable generation as
-      // well as an uncommitted batch; the ref-backed writer cheaply no-ops when both are durable.
-      persistPendingStrokeEmergencyAutosaveRef.current("route-change");
-      if (pendingBatch?.timer) globalThis.clearTimeout(pendingBatch.timer);
-      pendingStrokeCommitsRef.current = null;
+      runStudioDrawingUnmountLifecycle({
+        // React route transitions do not dispatch pagehide. Promote a viable contact before the
+        // recovery write and before the collaboration cleanup deletes its streaming CRDT draft.
+        promoteActiveStroke: () => recoverActiveStrokeOnUnmountRef.current(),
+        persistRecovery: () => {
+          persistPendingStrokeEmergencyAutosaveRef.current("route-change");
+        },
+        cleanupDrawing: () => drawingUnmountCleanupRef.current(),
+        disposePointerTransport: () => {
+          requireStudioDrawingPointerTransport(drawingPointerTransportRef).dispose();
+        },
+        clearPendingCommit: () => {
+          const pendingBatch = pendingStrokeCommitsRef.current;
+          if (pendingBatch?.timer) globalThis.clearTimeout(pendingBatch.timer);
+          pendingStrokeCommitsRef.current = null;
+          if (brushCursorDrawRafRef.current !== null) {
+            globalThis.cancelAnimationFrame(brushCursorDrawRafRef.current);
+            brushCursorDrawRafRef.current = null;
+          }
+        },
+      });
     },
     []
   );
@@ -11645,7 +11720,7 @@ function StudioCuttoonEditor() {
         characterContext,
         direction: writerRoomAiDirection,
         signal: controller.signal,
-      }, textAiTransport);
+      }, studioTextAiTransportForOperation(textAiTransport, operationId));
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (!result.ok) {
         if (controller.signal.aborted) {
@@ -14023,27 +14098,42 @@ function StudioCuttoonEditor() {
       setError(plan.message);
       return false;
     }
-    if (!commit(plan.nextElements, { groups: plan.nextGroups })) return false;
+    const anchor = plan.nextElements.find((element) => element.id === plan.anchorElementId);
+    const mappedGuides = anchor?.type === "image"
+      ? mapStudioBg3dPerspectiveGuidesToAnchor(result.perspectiveGuides, anchor)
+      : [];
+    const drawingAssistState = mappedGuides.length > 0
+      ? currentStudioDrawingAssistDocument()
+      : null;
+    const nextDrawingAssist = drawingAssistState?.page.id === activePage.id
+      ? normalizeStudioDrawingAssistDocument({
+          ...drawingAssistState.document,
+          perspective: {
+            ...drawingAssistState.document.perspective,
+            active: true,
+            points: mappedGuides.map((point) => ({ id: uid(), x: point.x, y: point.y })),
+          },
+          isometric: { ...drawingAssistState.document.isometric, active: false },
+          advanced: {
+            ...drawingAssistState.document.advanced,
+            activeSnapRulerId: null,
+          },
+        }, {
+          canvasWidth: CANVAS_W,
+          canvasHeight: drawingAssistState.page.canvasH,
+        })
+      : undefined;
+    // LT layers, their editable group, and the camera-derived perspective ruler are one document
+    // transition. Undo can never leave only half of a 3D insertion behind.
+    if (!commit(plan.nextElements, {
+      groups: plan.nextGroups,
+      ...(nextDrawingAssist ? { drawingAssist: nextDrawingAssist } : {}),
+    })) return false;
+    if (nextDrawingAssist) {
+      setDrawingAssistPreview(null);
+    }
     setSelectedId(plan.anchorElementId);
     setTool("select");
-
-    const anchor = plan.nextElements.find((element) => element.id === plan.anchorElementId);
-    if (
-      anchor?.type === "image" &&
-      Math.abs(anchor.rotation ?? 0) < 1e-6 &&
-      result.perspectiveGuides.length > 0
-    ) {
-      const perspectivePoints = result.perspectiveGuides.map((point) => ({
-        id: uid(),
-        x: anchor.x + point.x * anchor.width,
-        y: anchor.y + point.y * anchor.height,
-      }));
-      commitStudioDrawingAssistDocument((current) => ({
-        ...current,
-        perspective: { ...current.perspective, active: true, points: perspectivePoints },
-        isometric: { ...current.isometric, active: false },
-      }));
-    }
     return true;
   }
   async function addBuiltinRasterAsset(asset: StudioRasterAsset) {
@@ -16512,7 +16602,7 @@ function StudioCuttoonEditor() {
         sceneCountHint: scenarioSceneCountHint,
         characterContext,
         signal: controller.signal,
-      }, textAiTransport);
+      }, studioTextAiTransportForOperation(textAiTransport, operationId));
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (!scenesResult.ok) {
         settleTrackedTextAiOperation(operationId, scenesResult, undefined, controller.signal.aborted);
@@ -16968,7 +17058,12 @@ function StudioCuttoonEditor() {
       target: { pageId: activePage.id },
       references: [],
     });
-    const result = await suggestDialogueLines(aiSettings, situation, { existingContext }, textAiTransport);
+    const result = await suggestDialogueLines(
+      aiSettings,
+      situation,
+      { existingContext },
+      studioTextAiTransportForOperation(textAiTransport, operationId)
+    );
     if (!canApplyStudioMutation(mutationTicket)) {
       if (editorMountedRef.current) setAiDialogueSuggestBusy(false);
       return;
@@ -17024,7 +17119,11 @@ function StudioCuttoonEditor() {
       target: { pageId: activePage.id },
       references: [],
     });
-    const result = await suggestColorPalette(aiSettings, mood, textAiTransport);
+    const result = await suggestColorPalette(
+      aiSettings,
+      mood,
+      studioTextAiTransportForOperation(textAiTransport, operationId)
+    );
     if (!canApplyStudioMutation(mutationTicket)) {
       if (editorMountedRef.current) setAiPaletteSuggestBusy(false);
       return;
@@ -17447,7 +17546,7 @@ function StudioCuttoonEditor() {
         translationItems,
         localeLabel(translateTargetLocale),
         translateGlossary,
-        textAiTransport
+        studioTextAiTransportForOperation(textAiTransport, operationId)
       );
       if (!canApplyStudioMutation(mutationTicket)) {
         if (editorMountedRef.current) {
@@ -18941,6 +19040,7 @@ function StudioCuttoonEditor() {
   }
   function discardDrawingPointerSession() {
     const discardedId = drawingRef.current?.id;
+    drawingCrdtPublisherRef.current.cancel(discardedId);
     if (discardedId) {
       try {
         studioCrdtDocumentRef.current?.deleteStroke(discardedId);
@@ -18961,11 +19061,72 @@ function StudioCuttoonEditor() {
     releaseDrawingPointerSession();
     endLiveResourceEdit();
   }
+  function readActiveStrokeLifecycleRecovery() {
+    const activeStroke = drawingRef.current;
+    const activePageId = currentPageIdRef.current;
+    const pointerSession = requireStudioDrawingPointerTransport(
+      drawingPointerTransportRef
+    ).getSession();
+    const lastPointerType = drawingLastAuthoritativePointerRef.current?.pointerType;
+    const pointerTypeCandidate = pointerSession?.pointerType ?? lastPointerType;
+    const pointerType: StudioActiveStrokePointerType =
+      pointerTypeCandidate === "pen"
+      || pointerTypeCandidate === "mouse"
+      || pointerTypeCandidate === "touch"
+        ? pointerTypeCandidate
+        : "unknown";
+    const recoveringMaster = masterEditModeRef.current;
+    const currentHistory = pagesHistoryRef.current;
+    const currentIndex = Math.max(
+      0,
+      Math.min(pagesHiRef.current, Math.max(0, currentHistory.length - 1))
+    );
+    const currentPages = currentHistory[currentIndex] ?? pages;
+    const stablePage = currentPages.find((page) => page.id === activePageId);
+    const existing = pendingStrokeCommitsRef.current;
+    const recovery = planStudioActiveStrokeUnmountRecovery({
+      activeStroke,
+      activePageId,
+      pointerType,
+      stableElementIds: new Set(
+        (recoveringMaster ? master.elements : stablePage?.elements ?? []).map(
+          (element) => element.id
+        )
+      ),
+      pending: !recoveringMaster && existing
+        ? { pageId: existing.pageId, strokes: existing.strokes }
+        : null,
+    });
+    return { existing, recoveringMaster, recovery };
+  }
+  recoverActiveStrokeOnUnmountRef.current = () => {
+    const { existing, recoveringMaster, recovery } = readActiveStrokeLifecycleRecovery();
+    if (recovery.action !== "recover") return;
+
+    if (recoveringMaster) {
+      // Master edits live outside page history and scene CRDT. Preserve that exact scope in the
+      // lifecycle snapshot instead of borrowing the active page's pending-stroke projection.
+      lifecycleMasterStrokeRecoveryRef.current = recovery.pending.strokes.at(-1) ?? null;
+      return;
+    }
+
+    // This is a local lifecycle-recovery projection, not a second scene/CRDT commit. The cleanup
+    // below still cancels/deletes the unfinished streaming record; restoring the autosave later
+    // performs one normal absent -> present transition with the original stable stroke id.
+    if (existing?.timer) globalThis.clearTimeout(existing.timer);
+    pendingStrokeCommitsRef.current = {
+      pageId: recovery.pending.pageId,
+      strokes: recovery.pending.strokes,
+      timer: null,
+      retryCount: existing?.retryCount ?? 0,
+    };
+  };
   // The mount-only effect above must not capture an old render's room/document. Keep its cleanup
   // entry current so a route/work-key remount deletes an in-progress CRDT draft before releasing
   // pointer capture and the collaboration lease. This path intentionally avoids React state work.
   drawingUnmountCleanupRef.current = () => {
     const discardedId = drawingRef.current?.id;
+    drawingCrdtPublisherRef.current.cancel(discardedId);
     if (discardedId) {
       try {
         studioCrdtDocumentRef.current?.deleteStroke(discardedId);
@@ -19812,20 +19973,6 @@ function StudioCuttoonEditor() {
         drawMode === "shape" || drawMode === "pixel"
           ? null
           : createStudioPointerVelocityState(pointerSample);
-      drawingCrdtStrokeActiveRef.current = false;
-      try {
-        const crdtDocument = studioCrdtDocumentRef.current;
-        if (crdtDocument) {
-          crdtDocument.beginStroke(studioDrawElementToCrdtStroke(activePage.id, next));
-          drawingCrdtStrokeActiveRef.current = true;
-        }
-      } catch (cause) {
-        setError(
-          cause instanceof Error
-            ? `실시간 획 시작: ${cause.message}`
-            : "실시간 획을 시작하지 못했지만 로컬 드로잉은 계속할 수 있습니다."
-        );
-      }
       drawingRef.current = next;
       // The active cursor is outline-only, so it can track the contact without darkening stable
       // pixels or becoming part of the live-ink/commit receipt.
@@ -19882,7 +20029,11 @@ function StudioCuttoonEditor() {
         // 도착하지 않으면(조용히 실패하는 GPU 환경) 같은 스트로크 안에서 Konva 로 인계된다.
         // (미드스트로크 스크린샷 검증 완료 — drawImage 기반 픽셀 판정은 WebGPU 캔버스에서
         // 위음성을 내므로 합성 스크린샷/영수증으로만 판정한다.)
-        const gpuStartPlan = !pixelDirect && isDirectLiveDraftEl(next)
+        const gpuStartPlan = STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu"
+          && webGpuBackendRef.current === "webgpu"
+          && gpuLiveStrokePlannerRef.current !== null
+          && !pixelDirect
+          && isDirectLiveDraftEl(next)
           ? buildGpuLiveStrokePlan(next)
           : null;
         const liveInkBackendDecision = decideStudioLiveInkBackend({
@@ -19974,6 +20125,27 @@ function StudioCuttoonEditor() {
           // 비다이렉트 시작도 격리 스토어로 — 이후 프레임은 scheduleDraft 가 스토어만 갱신한다.
           draftPreviewStoreRef.current.setActive(next);
           setLiveDraftShapeKind(next.kind && next.kind !== "freehand" ? next.kind : null);
+        }
+      }
+      drawingCrdtPublisherRef.current.cancel();
+      drawingCrdtStrokeActiveRef.current = false;
+      const crdtDocument = studioCrdtDocumentRef.current;
+      if (crdtDocument) {
+        try {
+          const crdtStroke = studioDrawElementToCrdtStroke(activePage.id, next);
+          drawingCrdtStrokeActiveRef.current = true;
+          drawingCrdtPublisherRef.current.begin(next.id, () => {
+            if (
+              !drawingCrdtStrokeActiveRef.current
+              || studioCrdtDocumentRef.current !== crdtDocument
+            ) {
+              throw new Error("실시간 협업 문서가 획 시작 전에 변경되었습니다.");
+            }
+            crdtDocument.beginStroke(crdtStroke);
+          });
+        } catch (cause) {
+          drawingCrdtPublisherRef.current.cancel(next.id);
+          drawingCrdtPublishErrorRef.current(cause);
         }
       }
       startFixedRateStrokePump(pointerSample, pointerDownFrameTimeStamp);
@@ -20446,7 +20618,20 @@ function StudioCuttoonEditor() {
         updateHistoryBrushCursorNode(canvasPointToNormalized(pos.x, pos.y, frame), frame);
       }
     } else if (tool === "draw" && isStudioBrushCursorMode(drawMode)) {
-      updateBrushCursor(e.target.getStage(), e.evt as PointerEvent);
+      const brushPointerEvent = e.evt as PointerEvent;
+      const brushPointerSession = requireStudioDrawingPointerTransport(
+        drawingPointerTransportRef
+      ).getSession();
+      const nativeFreehandMoveOwnsCursor = Boolean(
+        drawingRef.current
+        && (drawingRef.current.kind ?? "freehand") === "freehand"
+        && isStudioStrokePointerEvent(brushPointerSession, brushPointerEvent)
+      );
+      // The window capture listener has already painted the raw contact cursor for active
+      // freehand ink. Avoid redrawing the same cursor again when Konva bubbles that event.
+      if (!nativeFreehandMoveOwnsCursor) {
+        updateBrushCursor(e.target.getStage(), brushPointerEvent);
+      }
     }
     if (tool !== "draw" || !drawingRef.current) return;
     const pointerEvent = e.evt as PointerEvent;
@@ -20500,7 +20685,10 @@ function StudioCuttoonEditor() {
       || (liveStampDraftDirectRef.current && liveStampOverlayRendererRef.current.isActive)
     )
       && !gpuLiveInkPinnedRef.current
-      && !drawingPredictionPreviewRef.current;
+      && (
+        !drawingPredictionPreviewRef.current
+        || drawingPredictionBatchMutationRef.current
+      );
     // current.points가 지난 호출에서 우리가 만들어 넘긴 바로 그 배열이면(같은 스트로크가 계속
     // 이어지는 중이면) 다시 복제하지 않고 그대로 이어붙인다 — 매 호출 전체 복제는 긴 스트로크에서
     // O(n²)이 된다. 바깥 DrawEl(next)은 그래도 매 호출 새 객체라 scheduleDraft의 참조 비교 변경
@@ -20592,7 +20780,7 @@ function StudioCuttoonEditor() {
     if (!drawingPredictionPreviewRef.current) scheduleDraft(next);
   }
   // 자유선 스트로크에 점 하나를 추가한다(압력 계산 + 원근 스냅 + 손떨림 보정 + 최소간격 필터) —
-  // onStageMove 에서 getCoalescedEvents 로 얻은 이벤트마다 이 함수를 반복 호출해 여러 점을
+  // native capture pointermove 배치의 coalesced event마다 이 함수를 반복 호출해 여러 점을
   // 한 번에 누적한다(단일 pointermove 당 한 번 호출해도 기존과 동일하게 동작).
   function appendFreehandStrokePoint(
     pos: { x: number; y: number },
@@ -20839,7 +21027,10 @@ function StudioCuttoonEditor() {
       )
     )
       && !gpuLiveInkPinnedRef.current
-      && !drawingPredictionPreviewRef.current;
+      && (
+        !drawingPredictionPreviewRef.current
+        || drawingPredictionBatchMutationRef.current
+      );
     if (canAppendDirectly) {
       current.points.push(targetX, targetY);
       if (!current.pressures) {
@@ -20862,7 +21053,13 @@ function StudioCuttoonEditor() {
         );
       }
       drawingRef.current = current;
-      if (!drawingImmediateBatchMutationRef.current) scheduleDraft(current);
+      // A predicted batch owns this private mutable clone only for the replaceable prediction
+      // surface below. Publishing it through scheduleDraft would leave liveDraftPendingRef/rAF
+      // pointing at future samples and append those estimates to the authoritative live overlay.
+      if (
+        !drawingImmediateBatchMutationRef.current
+        && !drawingPredictionPreviewRef.current
+      ) scheduleDraft(current);
       return;
     }
     const next: DrawEl = {
@@ -20885,19 +21082,20 @@ function StudioCuttoonEditor() {
   function appendDrawingCrdtSampleSuffix(drawing: DrawEl, startSample: number): void {
     const crdtDocument = studioCrdtDocumentRef.current;
     if (!crdtDocument || !drawingCrdtStrokeActiveRef.current) return;
-    const samples = studioDrawElementSampleSlice(drawing, startSample);
-    if (!samples) return;
-    try {
-      crdtDocument.appendStrokeSamples(drawing.id, samples);
-    } catch (cause) {
-      // 한 번 실패한 세션은 이후 포인터 배치마다 동일한 append/오류를 반복하지 않는다.
-      drawingCrdtStrokeActiveRef.current = false;
-      setError(
-        cause instanceof Error
-          ? `실시간 획 전송: ${cause.message}`
-          : "실시간 획 샘플을 팀 문서에 추가하지 못했습니다."
-      );
-    }
+    drawingCrdtPublisherRef.current.append(drawing.id, {
+      snapshot: drawing,
+      startSample,
+      publish: (latestDrawing, earliestSample) => {
+        if (
+          !drawingCrdtStrokeActiveRef.current
+          || studioCrdtDocumentRef.current !== crdtDocument
+        ) {
+          throw new Error("실시간 협업 문서가 획 전송 전에 변경되었습니다.");
+        }
+        const samples = studioDrawElementSampleSlice(latestDrawing, earliestSample);
+        if (samples) crdtDocument.appendStrokeSamples(latestDrawing.id, samples);
+      },
+    });
   }
   function consumeFreehandPointerBatch(
     stage: Konva.Stage,
@@ -20906,6 +21104,7 @@ function StudioCuttoonEditor() {
     options: {
       dispatchedPressureOverride?: number;
       authoritativeSource?: "coalesced-or-parent" | "parent-only";
+      coordinateMapper?: StudioStagePointerBatchMapper;
     } = {}
   ): boolean {
     const session = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
@@ -20932,6 +21131,10 @@ function StudioCuttoonEditor() {
     if (sampleClockTransition) {
       drawingFixedRateSampleClockRef.current = sampleClockTransition.state;
     }
+    // One browser delivery shares one layout/Stage transform. Mapping the full coalesced and
+    // predicted batch from one snapshot avoids a DOM read plus transform inversion per sample.
+    const coordinateMapper = options.coordinateMapper
+      ?? snapshotStudioStagePointerBatchMapper(stage);
     const crdtSampleStart = Math.floor((drawingRef.current?.points.length ?? 0) / 2);
     const immediateBatchMutation = drawingImmediateCausalInputRef.current
       && !gpuLiveInkPinnedRef.current
@@ -20958,11 +21161,8 @@ function StudioCuttoonEditor() {
       drawingImmediateBatchMutationRef.current = true;
     }
     try {
-      // Konva derives canvas coordinates from client coordinates. Temporarily feeding each restored
-      // hardware event through the public pointer API avoids duplicating its transform math.
       for (const [sampleIndex, sample] of batch.authoritative.entries()) {
-        stage.setPointersPositions(sample);
-        const point = stage.getRelativePointerPosition();
+        const point = coordinateMapper.pointFor(sample);
         if (point) {
           drawingLastAuthoritativePointerRef.current = sample;
           appendFreehandStrokePoint(
@@ -21000,9 +21200,26 @@ function StudioCuttoonEditor() {
         const authoritativeVelocity = drawingVelocityRef.current;
         try {
           drawingPredictionPreviewRef.current = true;
+          // Clone the authoritative prefix once, then mutate only this disposable prediction copy.
+          // Previously every predicted point cloned the growing full stroke, an O(n × estimates)
+          // cost that was most visible on long strokes and high-refresh stylus hardware.
+          drawingRef.current = {
+            ...authoritativeDrawing,
+            points: [...authoritativeDrawing.points],
+            pressures: authoritativeDrawing.pressures
+              ? [...authoritativeDrawing.pressures]
+              : undefined,
+            tiltXs: authoritativeDrawing.tiltXs ? [...authoritativeDrawing.tiltXs] : undefined,
+            tiltYs: authoritativeDrawing.tiltYs ? [...authoritativeDrawing.tiltYs] : undefined,
+            twists: authoritativeDrawing.twists ? [...authoritativeDrawing.twists] : undefined,
+            speeds: authoritativeDrawing.speeds ? [...authoritativeDrawing.speeds] : undefined,
+            tangentialPressures: authoritativeDrawing.tangentialPressures
+              ? [...authoritativeDrawing.tangentialPressures]
+              : undefined,
+          };
+          drawingPredictionBatchMutationRef.current = true;
           for (const sample of batch.predicted) {
-            stage.setPointersPositions(sample);
-            const point = stage.getRelativePointerPosition();
+            const point = coordinateMapper.pointFor(sample);
             if (point) appendFreehandStrokePoint(point, sample);
           }
           const predictedPreview = drawingRef.current;
@@ -21017,6 +21234,7 @@ function StudioCuttoonEditor() {
             }
           }
         } finally {
+          drawingPredictionBatchMutationRef.current = false;
           drawingPredictionPreviewRef.current = false;
           drawingRef.current = authoritativeDrawing;
           perspectiveRayRef.current = authoritativePerspectiveRay;
@@ -21032,6 +21250,7 @@ function StudioCuttoonEditor() {
       }
     } finally {
       drawingImmediateBatchMutationRef.current = false;
+      drawingPredictionBatchMutationRef.current = false;
       // Other Stage consumers (cursor, hit testing, collaboration) must observe the real latest
       // pointer rather than a coalesced or future estimate after this handler returns.
       stage.setPointersPositions(pointerEvent);
@@ -21042,7 +21261,6 @@ function StudioCuttoonEditor() {
   function publishAuthoritativeFreehandSuffix(startSample: number): DrawEl | null {
     const authoritativeDrawing = drawingRef.current;
     if (!authoritativeDrawing) return null;
-    appendDrawingCrdtSampleSuffix(authoritativeDrawing, startSample);
     if (liveDraftDirectRef.current || liveStampDraftDirectRef.current) {
       if (causalPostCorrectionStateRef.current) {
         appendCausalPostCorrectionState(authoritativeDrawing, startSample);
@@ -21055,6 +21273,9 @@ function StudioCuttoonEditor() {
       // Publish Canvas/WebGPU suffixes now instead of adding another display frame of latency.
       flushDirectLiveDraftNow(authoritativeDrawing);
     }
+    // Local ink is the interaction-critical path. Yjs encoding/broadcast is coalesced behind a
+    // paint opportunity; pointer release flushes the same queue before final CRDT reconciliation.
+    appendDrawingCrdtSampleSuffix(authoritativeDrawing, startSample);
     return authoritativeDrawing;
   }
 
@@ -21113,14 +21334,20 @@ function StudioCuttoonEditor() {
       ) return;
       const stage = stageRef.current;
       if (!stage) return;
+      const coordinateMapper = snapshotStudioStagePointerBatchMapper(stage);
+      const contactPoint = coordinateMapper.pointFor(pointerEvent);
       consumeFreehandPointerBatch(
         stage,
         pointerEvent,
         canUseStudioPointerPredictionForSession(
           STUDIO_POINTER_PREDICTION_ENABLED,
           session
-        )
+        ),
+        { coordinateMapper }
       );
+      // Authoritative ink wins the native pointer task. The cursor keeps only the latest position
+      // and paints once on the next frame, so a high-Hz pen cannot make a cosmetic layer delay ink.
+      updateBrushCursor(stage, pointerEvent, contactPoint, true);
       if (drawMode === "pen") {
         const point = stage.getRelativePointerPosition();
         if (point) noteQuickShapePointerMoved(point);
@@ -21403,6 +21630,12 @@ function StudioCuttoonEditor() {
         // release/coalesced sample과 stabilizer endpoint를 live surface에 동기적으로 반영한다.
         // clearDraftPreview가 예약 rAF를 취소하기 전에 이 호출이 반드시 완료되어야 한다.
         flushDirectLiveDraftNow(authoritativeLiveStroke);
+        drawingCrdtPublisherRef.current.flush(authoritativeLiveStroke.id);
+      }
+      // Shapes do not append freehand suffixes, but their deferred begin must still precede the
+      // final scene publication (or deletion of an intentionally incomplete gesture).
+      if (drawingRef.current) {
+        drawingCrdtPublisherRef.current.flush(drawingRef.current.id);
       }
       if (drawingRef.current && isCompleteStudioDrawOp(drawingRef.current)) {
         const overlayRenderer = liveInkOverlayRendererRef.current;
@@ -21881,15 +22114,35 @@ function StudioCuttoonEditor() {
       return;
     }
   }
+  function drawBrushCursorLayer(deferToFrame: boolean) {
+    if (!deferToFrame) {
+      if (brushCursorDrawRafRef.current !== null) {
+        globalThis.cancelAnimationFrame(brushCursorDrawRafRef.current);
+        brushCursorDrawRafRef.current = null;
+      }
+      brushCursorRef.current?.getLayer()?.drawScene();
+      return;
+    }
+    if (brushCursorDrawRafRef.current !== null) return;
+    brushCursorDrawRafRef.current = globalThis.requestAnimationFrame(() => {
+      brushCursorDrawRafRef.current = null;
+      brushCursorRef.current?.getLayer()?.drawScene();
+    });
+  }
   // 포인터가 캔버스를 벗어나면 브러시 커서 프리뷰를 숨긴다.
-  function hideBrushCursor() {
+  function hideBrushCursor(deferToFrame = false) {
     const cursorNode = brushCursorRef.current;
     if (cursorNode && cursorNode.visible()) {
       cursorNode.visible(false);
-      cursorNode.getLayer()?.batchDraw();
+      drawBrushCursorLayer(deferToFrame);
     }
   }
-  function updateBrushCursor(stage: Konva.Stage | null, pointerEvent: PointerEvent) {
+  function updateBrushCursor(
+    stage: Konva.Stage | null,
+    pointerEvent: PointerEvent,
+    mappedPoint?: { x: number; y: number } | null,
+    deferToFrame = false
+  ) {
     const cursorNode = brushCursorRef.current;
     if (!cursorNode) return;
     if (
@@ -21900,11 +22153,13 @@ function StudioCuttoonEditor() {
       || appSettingsRef.current.general.brushCursorStyle === "none"
       || !shouldShowStudioBrushCursor(pointerEvent.pointerType)
     ) {
-      hideBrushCursor();
+      hideBrushCursor(deferToFrame);
       return;
     }
-    stage?.setPointersPositions(pointerEvent);
-    const cursorPos = stage?.getRelativePointerPosition();
+    if (mappedPoint === undefined) stage?.setPointersPositions(pointerEvent);
+    const cursorPos = mappedPoint === undefined
+      ? stage?.getRelativePointerPosition()
+      : mappedPoint;
     if (
       !cursorPos
       || cursorPos.x < 0
@@ -21912,12 +22167,12 @@ function StudioCuttoonEditor() {
       || cursorPos.y < 0
       || cursorPos.y > canvasH
     ) {
-      hideBrushCursor();
+      hideBrushCursor(deferToFrame);
       return;
     }
     cursorNode.position(cursorPos);
     if (!cursorNode.visible()) cursorNode.visible(true);
-    cursorNode.getLayer()?.batchDraw();
+    drawBrushCursorLayer(deferToFrame);
   }
   function hideSmudgeCursor() {
     const cursorNode = smudgeCursorRef.current;
@@ -23623,10 +23878,18 @@ function StudioCuttoonEditor() {
     );
   }
 
-  function currentStudioProjectSnapshot(): StudioProjectSnapshot {
+  function currentStudioProjectSnapshot(options: {
+    readonly pendingStrokeCommits?: {
+      readonly pageId: string;
+      readonly strokes: readonly DrawEl[];
+    } | null;
+    readonly recoveredMasterStroke?: DrawEl | null;
+  } = {}): StudioProjectSnapshot {
     // Immediate pointerup commits advance these refs before React renders, closing the same-task
     // route/pagehide gap where this render's `pages` could still be one stroke behind.
-    const pendingBatch = pendingStrokeCommitsRef.current;
+    const pendingBatch = options.pendingStrokeCommits === undefined
+      ? pendingStrokeCommitsRef.current
+      : options.pendingStrokeCommits;
     const durablePages = resolveStudioDurableProjectPages({
       pagesHistory: pagesHistoryRef.current,
       historyIndex: pagesHiRef.current,
@@ -23637,7 +23900,8 @@ function StudioCuttoonEditor() {
     }).pagesList as PageState[];
     return buildCurrentStudioProjectFileSnapshot(
       durablePages,
-      new Date().toISOString()
+      new Date().toISOString(),
+      options.recoveredMasterStroke
     );
   }
 
@@ -23646,9 +23910,34 @@ function StudioCuttoonEditor() {
   // synchronous, private recovery write only; normal editing still uses the debounced autosave.
   persistPendingStrokeEmergencyAutosaveRef.current = (reason) => {
     const pendingBatch = pendingStrokeCommitsRef.current;
-    const pendingFingerprint = pendingBatch?.strokes.length
-      ? `${pendingBatch.pageId}:${pendingBatch.strokes.map((stroke) => stroke.id).join(",")}`
+    const activeRecovery = readActiveStrokeLifecycleRecovery();
+    const recoveredActiveStroke = activeRecovery.recovery.action === "recover"
+      ? activeRecovery.recovery.pending.strokes.at(-1) ?? null
+      : null;
+    const effectivePendingBatch = recoveredActiveStroke && !activeRecovery.recoveringMaster
+      ? activeRecovery.recovery.action === "recover"
+        ? activeRecovery.recovery.pending
+        : pendingBatch
+      : pendingBatch;
+    const effectiveMasterStroke = activeRecovery.recoveringMaster && recoveredActiveStroke
+      ? recoveredActiveStroke
+      : lifecycleMasterStrokeRecoveryRef.current;
+    const pagePendingFingerprint = effectivePendingBatch?.strokes.length
+      ? `${effectivePendingBatch.pageId}:${effectivePendingBatch.strokes.map((stroke) => stroke.id).join(",")}`
       : "";
+    const activePendingFingerprint = recoveredActiveStroke
+      ? studioActiveStrokeRecoveryFingerprint(recoveredActiveStroke)
+      : "";
+    const masterPendingFingerprint = effectiveMasterStroke
+      ? `master:${effectiveMasterStroke.id}`
+      : "";
+    const pendingFingerprint = [
+      pagePendingFingerprint,
+      masterPendingFingerprint,
+      activePendingFingerprint,
+    ]
+      .filter(Boolean)
+      .join("|");
     const hasDirtyPendingState =
       pendingFingerprint !== studioLifecycleDurablePendingFingerprintRef.current;
     const hasDirtyStableState =
@@ -23661,7 +23950,10 @@ function StudioCuttoonEditor() {
     if (workId && !sharedDocument) return;
     try {
       const savedAt = new Date().toISOString();
-      const snapshot = currentStudioProjectSnapshot();
+      const snapshot = currentStudioProjectSnapshot({
+        pendingStrokeCommits: effectivePendingBatch,
+        recoveredMasterStroke: effectiveMasterStroke,
+      });
       const stablePages = resolveStudioDurableProjectPages({
         pagesHistory: pagesHistoryRef.current,
         historyIndex: pagesHiRef.current,
@@ -23680,8 +23972,8 @@ function StudioCuttoonEditor() {
       };
       const emergency = createStudioLifecycleEmergencyAutosave({
         payload: basePayload,
-        pending: pendingBatch
-          ? { pageId: pendingBatch.pageId, strokes: pendingBatch.strokes }
+        pending: effectivePendingBatch
+          ? { pageId: effectivePendingBatch.pageId, strokes: effectivePendingBatch.strokes }
           : null,
         reason,
         savedAt,

@@ -150,7 +150,7 @@ pnpm build && pnpm start   # 프로덕션 프리뷰
 
 ### DB 준비 (PostgreSQL / Neon)
 
-DB는 **PostgreSQL**입니다 — 로컬은 docker, 원격·배포는 **Neon**(서버리스 Postgres). `DATABASE_URL`은 필수이며, Studio 다중 인스턴스와 수동 SQL migration에는 transaction pooler가 아닌 `STUDIO_LIVE_POSTGRES_URL` direct endpoint도 필요합니다. 스키마를 push한 뒤 realtime SQL migration을 적용하고 카탈로그를 적재하세요.
+DB는 **PostgreSQL**입니다 — 로컬은 docker, 원격·배포는 **Neon**(서버리스 Postgres). `DATABASE_URL`은 필수이며, Studio 다중 인스턴스와 수동 SQL migration에는 transaction pooler가 아닌 `STUDIO_LIVE_POSTGRES_URL` direct endpoint도 필요합니다. 스키마를 push한 뒤 forward SQL migration을 적용하고 카탈로그를 적재하세요. Creator Asset API는 `0013`의 권리 보정·제약이, Studio AI API는 `0018`의 분산 rate-limit·lease 및 `0019`의 유료 호출 멱등성 receipt 경계가 누락되면 요청 중 DDL을 실행하지 않고 부팅 단계에서 즉시 실패합니다.
 
 **A. 로컬 docker Postgres**
 
@@ -161,8 +161,11 @@ docker run -d --name wd-pg \
 export DATABASE_URL='postgres://webdex:webdex@127.0.0.1:55432/webdex'
 export STUDIO_LIVE_POSTGRES_URL="$DATABASE_URL"
 pnpm exec drizzle-kit push --force
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0013_creator_asset_marketplace.sql
 psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0009_socket_io_postgres_adapter.sql
 psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0017_creator_work_live_lock_revision.sql
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0018_studio_ai_request_gate.sql
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0019_studio_ai_request_receipt.sql
 pnpm ingest                       # 전 소스 크롤 후 catalog.json.gz 갱신(DB 무관) → API가 폴링으로 자동 반영
 pnpm dev:all
 ```
@@ -175,8 +178,11 @@ echo 'DATABASE_URL="postgresql://<user>:<pw>@<host>-pooler.<region>.aws.neon.tec
 echo 'STUDIO_LIVE_POSTGRES_URL="postgresql://<user>:<pw>@<direct-host>.<region>.aws.neon.tech/<db>?sslmode=verify-full"' >> .env.local
 set -a; source .env.local; set +a
 pnpm exec drizzle-kit push --force
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0013_creator_asset_marketplace.sql
 psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0009_socket_io_postgres_adapter.sql
 psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0017_creator_work_live_lock_revision.sql
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0018_studio_ai_request_gate.sql
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0019_studio_ai_request_receipt.sql
 pnpm ingest                       # catalog.json.gz 갱신(Neon 전송 0)
 pnpm dev:all                      # apps/api가 부팅 시 .env.local을 먼저 로드 → 자동으로 Neon 연결
 ```

@@ -1604,181 +1604,6 @@ export async function generateImageAsset(
   };
 }
 
-// creator_asset 테이블 자가생성(멱등) — 서버리스/무료DB 환경에서 drizzle push 없이도 첫 호출 시 보장.
-// 운영 DB 접속문자열이 비공개(Vercel Sensitive)라 외부에서 push 불가 → 런타임 DATABASE_URL로 생성.
-// 주의: drizzle의 db.execute는 prepared(extended) 경로 — 일부 풀러(pgbouncer)에서 DDL 실패.
-// 그래서 raw 풀(simple query protocol)로 실행한다. 실패해도 throw 대신 false 반환 → 호출부가 우아하게 처리.
-const CREATE_ASSET_TABLE_SQL = `
-  CREATE TABLE IF NOT EXISTS "creator_asset" (
-    "id" text PRIMARY KEY NOT NULL,
-    "userId" text NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-    "name" text NOT NULL,
-    "description" text NOT NULL DEFAULT '',
-    "tags" jsonb NOT NULL DEFAULT '[]'::jsonb,
-    "dataUrl" text NOT NULL,
-    "width" integer NOT NULL,
-    "height" integer NOT NULL,
-    "kind" text NOT NULL DEFAULT 'image',
-    "mimeType" text,
-    "byteSize" integer,
-    "contentHash" text,
-    "previewDataUrl" text,
-    "previewWidth" integer,
-    "previewHeight" integer,
-    "previewMimeType" text,
-    "previewByteSize" integer,
-    "previewContentHash" text,
-    "license" text NOT NULL DEFAULT 'toonspectrum-standard',
-    "attributionText" text NOT NULL DEFAULT '',
-    "containsAi" boolean NOT NULL DEFAULT false,
-    "rightsConfirmedAt" timestamptz,
-    "moderationStatus" text NOT NULL DEFAULT 'under_review',
-    "moderationNote" text NOT NULL DEFAULT '',
-    "reportCount" integer NOT NULL DEFAULT 0,
-    "reviewedBy" text REFERENCES "user"("id") ON DELETE SET NULL,
-    "reviewedAt" timestamptz,
-    "hidden" boolean NOT NULL DEFAULT false,
-    "downloads" integer NOT NULL DEFAULT 0,
-    "createdAt" timestamp
-  );
-  ALTER TABLE "creator_asset"
-    ADD COLUMN IF NOT EXISTS "description" text NOT NULL DEFAULT '',
-    ADD COLUMN IF NOT EXISTS "tags" jsonb NOT NULL DEFAULT '[]'::jsonb,
-    ADD COLUMN IF NOT EXISTS "mimeType" text,
-    ADD COLUMN IF NOT EXISTS "byteSize" integer,
-    ADD COLUMN IF NOT EXISTS "contentHash" text,
-    ADD COLUMN IF NOT EXISTS "previewDataUrl" text,
-    ADD COLUMN IF NOT EXISTS "previewWidth" integer,
-    ADD COLUMN IF NOT EXISTS "previewHeight" integer,
-    ADD COLUMN IF NOT EXISTS "previewMimeType" text,
-    ADD COLUMN IF NOT EXISTS "previewByteSize" integer,
-    ADD COLUMN IF NOT EXISTS "previewContentHash" text,
-    ADD COLUMN IF NOT EXISTS "license" text NOT NULL DEFAULT 'toonspectrum-standard',
-    ADD COLUMN IF NOT EXISTS "attributionText" text NOT NULL DEFAULT '',
-    ADD COLUMN IF NOT EXISTS "containsAi" boolean NOT NULL DEFAULT false,
-    ADD COLUMN IF NOT EXISTS "rightsConfirmedAt" timestamptz,
-    ADD COLUMN IF NOT EXISTS "moderationStatus" text NOT NULL DEFAULT 'under_review',
-    ADD COLUMN IF NOT EXISTS "moderationNote" text NOT NULL DEFAULT '',
-    ADD COLUMN IF NOT EXISTS "reportCount" integer NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS "reviewedBy" text REFERENCES "user"("id") ON DELETE SET NULL,
-    ADD COLUMN IF NOT EXISTS "reviewedAt" timestamptz;
-  UPDATE "creator_asset"
-    SET "moderationStatus" = 'under_review'
-    WHERE "rightsConfirmedAt" IS NULL
-      AND "moderationStatus" = 'published';
-  ALTER TABLE "creator_asset"
-    ALTER COLUMN "moderationStatus" SET DEFAULT 'under_review';
-  CREATE INDEX IF NOT EXISTS "creator_asset_created_idx" ON "creator_asset" ("createdAt");
-  CREATE INDEX IF NOT EXISTS "idx_creator_asset_catalog"
-    ON "creator_asset" ("moderationStatus", "hidden", "createdAt" DESC);
-  CREATE INDEX IF NOT EXISTS "idx_creator_asset_downloads"
-    ON "creator_asset" ("downloads" DESC, "createdAt" DESC);
-  CREATE UNIQUE INDEX IF NOT EXISTS "creator_asset_owner_hash_unique"
-    ON "creator_asset" ("userId", "contentHash") WHERE "contentHash" IS NOT NULL;
-  DO $$
-  BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'creator_asset_license_check') THEN
-      ALTER TABLE "creator_asset" ADD CONSTRAINT "creator_asset_license_check"
-        CHECK ("license" IN ('toonspectrum-standard', 'cc0-1.0', 'cc-by-4.0', 'cc-by-nc-4.0'));
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'creator_asset_moderation_status_check') THEN
-      ALTER TABLE "creator_asset" ADD CONSTRAINT "creator_asset_moderation_status_check"
-        CHECK ("moderationStatus" IN ('published', 'under_review', 'rejected'));
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'creator_asset_mime_type_check') THEN
-      ALTER TABLE "creator_asset" ADD CONSTRAINT "creator_asset_mime_type_check"
-        CHECK ("mimeType" IS NULL OR "mimeType" IN ('image/png', 'image/jpeg', 'image/webp'));
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'creator_asset_byte_size_check') THEN
-      ALTER TABLE "creator_asset" ADD CONSTRAINT "creator_asset_byte_size_check"
-        CHECK ("byteSize" IS NULL OR "byteSize" BETWEEN 1 AND 2250000);
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'creator_asset_content_hash_check') THEN
-      ALTER TABLE "creator_asset" ADD CONSTRAINT "creator_asset_content_hash_check"
-        CHECK ("contentHash" IS NULL OR "contentHash" ~ '^[0-9a-f]{64}$');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'creator_asset_dimensions_check') THEN
-      ALTER TABLE "creator_asset" ADD CONSTRAINT "creator_asset_dimensions_check"
-        CHECK ("width" BETWEEN 1 AND 4096 AND "height" BETWEEN 1 AND 4096 AND "width"::bigint * "height"::bigint <= 16777216);
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'creator_asset_preview_check') THEN
-      ALTER TABLE "creator_asset" ADD CONSTRAINT "creator_asset_preview_check"
-        CHECK ((
-          "previewDataUrl" IS NULL
-          AND "previewWidth" IS NULL
-          AND "previewHeight" IS NULL
-          AND "previewMimeType" IS NULL
-          AND "previewByteSize" IS NULL
-          AND "previewContentHash" IS NULL
-        ) OR (
-          "previewDataUrl" IS NOT NULL
-          AND "previewWidth" BETWEEN 1 AND 320
-          AND "previewHeight" BETWEEN 1 AND 320
-          AND "previewMimeType" IN ('image/png', 'image/jpeg', 'image/webp')
-          AND "previewByteSize" BETWEEN 1 AND 131072
-          AND "previewContentHash" ~ '^[0-9a-f]{64}$'
-        ));
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'creator_asset_tags_check') THEN
-      ALTER TABLE "creator_asset" ADD CONSTRAINT "creator_asset_tags_check"
-        CHECK (jsonb_typeof("tags") = 'array');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'creator_asset_report_count_check') THEN
-      ALTER TABLE "creator_asset" ADD CONSTRAINT "creator_asset_report_count_check"
-        CHECK ("reportCount" >= 0);
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'creator_asset_published_rights_check') THEN
-      ALTER TABLE "creator_asset" ADD CONSTRAINT "creator_asset_published_rights_check"
-        CHECK ("moderationStatus" <> 'published' OR "rightsConfirmedAt" IS NOT NULL);
-    END IF;
-  END $$;
-  CREATE TABLE IF NOT EXISTS "creator_asset_report" (
-    "id" text PRIMARY KEY NOT NULL,
-    "assetId" text NOT NULL REFERENCES "creator_asset"("id") ON DELETE CASCADE,
-    "reporterId" text NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-    "reason" text NOT NULL,
-    "details" text NOT NULL DEFAULT '',
-    "status" text NOT NULL DEFAULT 'open',
-    "resolutionNote" text NOT NULL DEFAULT '',
-    "reviewedBy" text REFERENCES "user"("id") ON DELETE SET NULL,
-    "reviewedAt" timestamptz,
-    "createdAt" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "creator_asset_report_asset_reporter_unique" UNIQUE ("assetId", "reporterId"),
-    CONSTRAINT "creator_asset_report_reason_check"
-      CHECK ("reason" IN ('copyright', 'unsafe', 'spam', 'misleading', 'other')),
-    CONSTRAINT "creator_asset_report_status_check"
-      CHECK ("status" IN ('open', 'resolved', 'dismissed'))
-  );
-  DO $$
-  BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'creator_asset_report_reason_check') THEN
-      ALTER TABLE "creator_asset_report" ADD CONSTRAINT "creator_asset_report_reason_check"
-        CHECK ("reason" IN ('copyright', 'unsafe', 'spam', 'misleading', 'other'));
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'creator_asset_report_status_check') THEN
-      ALTER TABLE "creator_asset_report" ADD CONSTRAINT "creator_asset_report_status_check"
-        CHECK ("status" IN ('open', 'resolved', 'dismissed'));
-    END IF;
-  END $$;
-  CREATE INDEX IF NOT EXISTS "idx_creator_asset_report_queue"
-    ON "creator_asset_report" ("status", "createdAt");
-  CREATE INDEX IF NOT EXISTS "idx_creator_asset_report_reporter"
-    ON "creator_asset_report" ("reporterId", "createdAt" DESC);
-`;
-let assetTableReady = false;
-async function ensureAssetTable(): Promise<boolean> {
-  if (assetTableReady) return true;
-  try {
-    await dbPool.query(CREATE_ASSET_TABLE_SQL); // simple protocol; 다중 statement 허용
-    assetTableReady = true;
-    return true;
-  } catch (error) {
-    const e = error as { code?: string; message?: string };
-    console.error(`[creator_asset] ensure table failed (code=${e?.code ?? "?"}): ${e?.message ?? error}`);
-    return false;
-  }
-}
-
 interface SharedAssetListOptions {
   limit?: number;
   offset?: number;
@@ -1834,7 +1659,6 @@ async function selectSharedAssets(
   opts: SharedAssetListOptions,
   requestedLimit: number
 ): Promise<CreatorSharedAsset[]> {
-  if (!(await ensureAssetTable())) return [];
   const limit = Math.max(1, Math.min(121, requestedLimit));
   const offset = Math.max(0, opts.offset ?? 0);
   const { wheres, order } = sharedAssetQueryParts(opts);
@@ -1900,7 +1724,6 @@ async function selectSharedAssetCatalogItems(
   opts: SharedAssetListOptions,
   requestedLimit: number
 ): Promise<CreatorSharedAssetCatalogItem[]> {
-  if (!(await ensureAssetTable())) return [];
   const limit = Math.max(1, Math.min(CREATOR_ASSET_CATALOG_MAX_PAGE_SIZE + 1, requestedLimit));
   const offset = Math.max(0, opts.offset ?? 0);
   const { wheres, order } = sharedAssetQueryParts(opts);
@@ -2028,7 +1851,6 @@ export async function publishAsset(
     rightsConfirmed?: unknown;
   }
 ): Promise<CreatorSharedAsset> {
-  if (!(await ensureAssetTable())) throw new Error("에셋 공유 기능을 준비 중입니다. 잠시 후 다시 시도해주세요.");
   if (input.rightsConfirmed !== true) {
     throw new Error("직접 제작했거나 공유 권한을 가진 에셋인지 확인해 주세요.");
   }
@@ -2120,7 +1942,6 @@ export async function publishAsset(
 }
 
 export async function deleteSharedAsset(userId: string, id: string, isAdmin: boolean): Promise<{ deleted: boolean }> {
-  if (!(await ensureAssetTable())) return { deleted: false };
   return db.transaction(async (tx) => {
     const [existing] = await tx
       .select({
@@ -2161,7 +1982,6 @@ export async function reportSharedAsset(
   assetId: string,
   input: { reason?: unknown; details?: unknown }
 ): Promise<{ reported: true; reportCount: number }> {
-  if (!(await ensureAssetTable())) throw new Error("에셋 신고 기능을 준비 중입니다. 잠시 후 다시 시도해주세요.");
   if (!isCreatorAssetReportReason(input.reason)) throw new Error("신고 사유를 선택해 주세요.");
   const [asset] = await db
     .select({
@@ -2213,7 +2033,6 @@ export async function listAssetModerationQueue(opts: {
   offset?: number;
   status?: "open" | "resolved" | "dismissed";
 } = {}): Promise<CreatorAssetModerationQueueItem[]> {
-  if (!(await ensureAssetTable())) return [];
   const limit = Math.max(
     1,
     Math.min(
@@ -2323,7 +2142,6 @@ export async function moderateSharedAsset(
   assetId: string,
   input: { status?: unknown; note?: unknown }
 ): Promise<{ updated: true; status: CreatorAssetModerationStatus }> {
-  if (!(await ensureAssetTable())) throw new Error("에셋 검수 기능을 준비 중입니다. 잠시 후 다시 시도해주세요.");
   const status = creatorAssetModerationStatusOf(input.status);
   if (status !== input.status) throw new Error("검수 상태가 올바르지 않습니다.");
   const note = normalizeMultiline(input.note, MAX_ASSET_MODERATION_NOTE);
@@ -2368,7 +2186,6 @@ export async function getSharedAssetContent(
   viewerId?: string,
   reviewerAccess = false
 ): Promise<CreatorSharedAssetContent> {
-  if (!(await ensureAssetTable())) throw new Error("공유 에셋 원본을 불러올 수 없습니다.");
   const [asset] = await db
     .select({
       id: creatorAssets.id,
@@ -2424,7 +2241,6 @@ export async function getSharedAssetContent(
 }
 
 export async function bumpAssetDownloads(id: string): Promise<void> {
-  if (!(await ensureAssetTable())) return;
   await db
     .update(creatorAssets)
     .set({ downloads: sql`${creatorAssets.downloads} + 1` })

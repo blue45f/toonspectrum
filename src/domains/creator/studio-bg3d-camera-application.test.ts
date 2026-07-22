@@ -2,24 +2,42 @@ import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  applyStudioBg3dProjectionAwareZoom,
   applyStudioBg3dViewportAfterTransition,
   applyStudioBg3dViewToThreeCamera,
+  isStudioBg3dViewportControlTarget,
+  readStudioBg3dObjectWorldBounds,
+  readStudioBg3dWorldSurfaceHit,
   type BgViewportApi,
 } from "./studio-bg3d-camera-application";
 import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "./studio-bg3d-scene-document";
 
 describe("Studio BG3D complete camera application", () => {
+  it("distinguishes floating viewport controls from genuine scene misses", () => {
+    const controlTarget = {
+      closest: (selector: string) => selector === '[data-bg3d-viewport-control="true"]'
+        ? { dataset: { bg3dViewportControl: "true" } }
+        : null,
+    } as unknown as EventTarget;
+    const sceneTarget = { closest: () => null } as unknown as EventTarget;
+
+    expect(isStudioBg3dViewportControlTarget(controlTarget)).toBe(true);
+    expect(isStudioBg3dViewportControlTarget(sceneTarget)).toBe(false);
+    expect(isStudioBg3dViewportControlTarget(null)).toBe(false);
+  });
+
   it("waits for a replacement viewport identity and paints on both sides of view application", async () => {
     const events: string[] = [];
     const view = DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera;
     const makeApi = (name: string): BgViewportApi => ({
-      zoomBy: () => undefined,
-      applyPreset: () => undefined,
+      zoomBy: () => true,
+      applyPreset: () => true,
       applyView: () => {
         events.push(`apply:${name}`);
         return true;
       },
       readView: () => view,
+      readFramingState: () => ({ view, viewportAspect: 1 }),
       focusOn: () => undefined,
     });
     const previous = makeApi("stale");
@@ -105,5 +123,91 @@ describe("Studio BG3D complete camera application", () => {
 
     expect(applyStudioBg3dViewToThreeCamera(camera, null, view)).toBe(true);
     expect(camera.view?.enabled).toBe(false);
+  });
+
+  it("uses camera.zoom for orthographic buttons and preserves the current target", () => {
+    const camera = new THREE.OrthographicCamera(-8, 8, 4.5, -4.5, 0.1, 200);
+    camera.position.set(7, 5, 9);
+    camera.zoom = 2;
+    const target = new THREE.Vector3(1, 2, 3);
+    const update = vi.fn();
+
+    expect(applyStudioBg3dProjectionAwareZoom(
+      camera,
+      { target, update },
+      0.82,
+      [0, 0, 0],
+    )).toBe(true);
+    expect(camera.zoom).toBeCloseTo(2 / 0.82);
+    expect(camera.position.toArray()).toEqual([7, 5, 9]);
+    expect(target.toArray()).toEqual([1, 2, 3]);
+    expect(update).toHaveBeenCalledOnce();
+  });
+
+  it("keeps perspective zoom on the view ray instead of changing projection zoom", () => {
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+    camera.position.set(0, 0, 10);
+    camera.zoom = 1.5;
+    const target = new THREE.Vector3(0, 0, 2);
+
+    expect(applyStudioBg3dProjectionAwareZoom(camera, { target }, 0.5, [0, 0, 0])).toBe(true);
+    expect(camera.position.toArray()).toEqual([0, 0, 6]);
+    expect(camera.zoom).toBe(1.5);
+  });
+
+  it("reads precise registered world bounds and rejects empty objects", () => {
+    const parent = new THREE.Group();
+    parent.position.set(4, 3, -2);
+    parent.rotation.y = Math.PI / 2;
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(2, 4, 6));
+    mesh.position.set(1, 0, 0);
+    parent.add(mesh);
+
+    const bounds = readStudioBg3dObjectWorldBounds(parent);
+    expect(bounds).not.toBeNull();
+    expect(bounds?.min[0]).toBeCloseTo(1);
+    expect(bounds?.max[0]).toBeCloseTo(7);
+    expect(bounds?.min[1]).toBeCloseTo(1);
+    expect(bounds?.max[1]).toBeCloseTo(5);
+    expect(readStudioBg3dObjectWorldBounds(new THREE.Group())).toBeNull();
+    mesh.geometry.dispose();
+  });
+
+  it("converts regular and instanced local normals through the complete world transform", () => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+    mesh.rotation.z = Math.PI / 2;
+    mesh.updateMatrixWorld(true);
+    const regular = readStudioBg3dWorldSurfaceHit({
+      object: mesh,
+      point: new THREE.Vector3(1, 2, 3),
+      normal: new THREE.Vector3(1, 0, 0),
+    });
+    expect(regular?.normal[0]).toBeCloseTo(0);
+    expect(regular?.normal[1]).toBeCloseTo(1);
+
+    const instanced = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshBasicMaterial(),
+      1,
+    );
+    instanced.setMatrixAt(0, new THREE.Matrix4().makeRotationZ(-Math.PI / 2));
+    instanced.updateMatrixWorld(true);
+    const hit = readStudioBg3dWorldSurfaceHit({
+      object: instanced,
+      instanceId: 0,
+      point: new THREE.Vector3(0, 0, 0),
+      normal: new THREE.Vector3(1, 0, 0),
+    });
+    expect(hit?.normal[0]).toBeCloseTo(0);
+    expect(hit?.normal[1]).toBeCloseTo(-1);
+    expect(readStudioBg3dWorldSurfaceHit({
+      object: instanced,
+      instanceId: 2,
+      point: new THREE.Vector3(),
+      normal: new THREE.Vector3(1, 0, 0),
+    })).toBeNull();
+    mesh.geometry.dispose();
+    instanced.geometry.dispose();
+    (instanced.material as THREE.Material).dispose();
   });
 });

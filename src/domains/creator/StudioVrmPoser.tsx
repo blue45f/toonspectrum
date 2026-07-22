@@ -42,7 +42,9 @@ import {
 } from "./studio-vrm-full-body-ik";
 import { avatarSideForHand, solveHandToFingerBones } from "./studio-vrm-hand-solver";
 import {
+  canCommitStudioVrmIkResult,
   cloneStudioVrmIkConstraints,
+  enabledStudioVrmIkPolesSceneLocal,
   enabledStudioVrmIkTargetsSceneLocal,
   mirrorStudioVrmIkConstraints,
   removeStudioVrmIkConstraint,
@@ -270,7 +272,10 @@ import { StudioVrmCharacterLibraryPanel } from "./StudioVrmCharacterLibraryPanel
 import {
   STUDIO_VRM_JOINT_HANDLE_DEFINITIONS,
   StudioVrmJointHandles,
+  type StudioVrmIkAxisLock,
+  type StudioVrmIkDragMode,
   type StudioVrmIkEffectorBone,
+  type StudioVrmIkHandleControl,
   type StudioVrmJointHandleBone,
   type StudioVrmJointWorldPoint,
 } from "./StudioVrmJointHandles";
@@ -896,6 +901,7 @@ type StudioVrmIkTransaction = {
   vrm: VRM;
   coordinateScene: THREE.Scene;
   effector: StudioVrmIkEffectorBone;
+  control: StudioVrmIkHandleControl;
   revision: number;
   /** React-side pose/config snapshot that owns this pointer transaction. */
   authoritativeSignature: string;
@@ -904,9 +910,33 @@ type StudioVrmIkTransaction = {
     yOffset: number;
     translations: StudioVrmPoseTranslations;
   };
+  targetWorld: THREE.Vector3;
   poleWorld?: THREE.Vector3;
   latest: StudioVrmUserIkResult | StudioVrmFullBodyIkResult | null;
 };
+
+const STUDIO_VRM_IK_NOT_CONVERGED_STATUS =
+  "전신 IK가 안정적으로 수렴하지 않아 미리보기를 취소하고 시작 자세로 되돌렸습니다. 목표를 몸 가까이 옮기거나 고정점을 줄인 뒤 다시 시도해 주세요.";
+
+const STUDIO_VRM_IK_DRAG_MODES: readonly {
+  id: StudioVrmIkDragMode;
+  label: string;
+  description: string;
+}[] = Object.freeze([
+  { id: "screen", label: "화면", description: "화면과 나란한 평면에서 이동" },
+  { id: "depth", label: "깊이", description: "위로 끌면 멀리, 아래로 끌면 가까이 이동" },
+]);
+
+const STUDIO_VRM_IK_AXIS_LOCKS: readonly {
+  id: StudioVrmIkAxisLock;
+  label: string;
+  description: string;
+}[] = Object.freeze([
+  { id: "free", label: "자유", description: "축 제한 없이 이동" },
+  { id: "x", label: "X", description: "장면 X축으로만 이동" },
+  { id: "y", label: "Y", description: "장면 Y축으로만 이동" },
+  { id: "z", label: "Z", description: "장면 Z축으로만 이동" },
+]);
 
 type PendingStudioVrmPersistentIkCommand = {
   before: FullVrmState;
@@ -2383,6 +2413,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const [mannequinMode, setMannequinMode] = useState(false);
   const [jointHandlesVisible, setJointHandlesVisible] = useState(true);
   const [selectedJointHandle, setSelectedJointHandle] = useState<StudioVrmJointHandleBone | null>(null);
+  const [selectedIkPole, setSelectedIkPole] = useState<StudioVrmIkEffectorBone | null>(null);
+  const [ikHandleDragMode, setIkHandleDragMode] = useState<StudioVrmIkDragMode>("screen");
+  const [ikHandleAxisLock, setIkHandleAxisLock] = useState<StudioVrmIkAxisLock>("free");
   const [jointHandleInteracting, setJointHandleInteracting] = useState(false);
   const [jointHandleSessionGeneration, setJointHandleSessionGeneration] = useState(0);
   const [jointHandleStatus, setJointHandleStatus] = useState("");
@@ -2797,6 +2830,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   }, [currentPersistentIkSignature, ikConstraints]);
 
   function handleJointHandleSelect(bone: StudioVrmJointHandleBone) {
+    setSelectedIkPole(null);
     setSelectedJointHandle(bone);
     const category = categoryForStudioVrmJointHandle(bone);
     if (category) setActiveCategory(category);
@@ -2808,6 +2842,16 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
         behavior: "smooth",
       });
     });
+  }
+
+  function handleJointHandlePoleSelect(effector: StudioVrmIkEffectorBone) {
+    setSelectedJointHandle(effector);
+    setSelectedIkPole(effector);
+    setActiveCategory(categoryForStudioVrmJointHandle(effector) ?? "torso");
+    handlePanelTabChange("pose");
+    setJointHandleStatus(
+      `${BONE_LABELS[effector] ?? effector} IK 폴 선택 · 팔꿈치·무릎이 향할 방향을 조절합니다.`,
+    );
   }
 
   function cancelJointIkTransaction(options: {
@@ -2844,6 +2888,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   function previewJointHandleIk(
     effector: StudioVrmIkEffectorBone,
     worldPosition: StudioVrmJointWorldPoint,
+    options: {
+      control?: StudioVrmIkHandleControl;
+      poleWorld?: StudioVrmJointWorldPoint;
+    } = {},
   ): StudioVrmUserIkResult | StudioVrmFullBodyIkResult | null {
     const currentVrm = vrmRef.current;
     const coordinateScene = captureRef.current.scene;
@@ -2851,6 +2899,34 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       setJointHandleStatus("실시간 추적·대기 애니메이션·캡처 중에는 관절 핸들을 편집할 수 없습니다.");
       return null;
     }
+    const control = options.control ?? "target";
+    const targetLocal = studioVrmWorldPointToSceneLocal(coordinateScene, worldPosition);
+    const canonicalTarget = targetLocal
+      ? studioVrmSceneLocalPointToWorld(coordinateScene, targetLocal)
+      : null;
+    const poleLocal = options.poleWorld
+      ? studioVrmWorldPointToSceneLocal(coordinateScene, options.poleWorld)
+      : null;
+    const canonicalPole = poleLocal
+      ? studioVrmSceneLocalPointToWorld(coordinateScene, poleLocal)
+      : null;
+    if (!canonicalTarget || (options.poleWorld && !canonicalPole)) {
+      const activeTransaction = jointIkTransactionRef.current;
+      if (activeTransaction?.vrm === currentVrm) {
+        applyStudioVrmRotationPose(currentVrm, activeTransaction.baseline, bodyScale);
+        activeTransaction.latest = null;
+      }
+      setJointHandleStatus("IK 목표 또는 폴 좌표가 장면 안전 범위를 벗어나 시작 자세로 되돌렸습니다.");
+      return null;
+    }
+    const targetWorld = new THREE.Vector3(
+      canonicalTarget[0],
+      canonicalTarget[1],
+      canonicalTarget[2],
+    );
+    const poleWorldOverride = canonicalPole
+      ? new THREE.Vector3(canonicalPole[0], canonicalPole[1], canonicalPole[2])
+      : undefined;
     const chain = STUDIO_VRM_USER_IK_CHAINS[effector];
     if ([chain.upper, chain.lower, chain.end].some((boneName) => lockedPoseBones.includes(boneName))) {
       setJointHandleStatus("잠긴 관절이 포함된 손·발 체인은 IK로 움직일 수 없습니다. 먼저 해당 관절의 잠금을 해제해 주세요.");
@@ -2871,7 +2947,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     if (
       !transaction
       || transaction.vrm !== currentVrm
+      || transaction.coordinateScene !== coordinateScene
       || transaction.effector !== effector
+      || transaction.control !== control
       || transaction.revision !== jointIkRevisionRef.current
     ) {
       if (transaction) {
@@ -2886,13 +2964,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
         vrm: currentVrm,
         coordinateScene,
         effector,
+        control,
         revision: jointIkRevisionRef.current,
         authoritativeSignature: currentPersistentIkSignature(),
         baseline: {
           ...baseline,
           translations: cloneStudioVrmPoseTranslations(poseTranslations),
         },
-        poleWorld: (() => {
+        targetWorld: targetWorld.clone(),
+        poleWorld: poleWorldOverride ?? (() => {
           const persistedPole = ikConstraints.find((constraint) => (
             constraint.effector === effector && constraint.enabled
           ))?.pole;
@@ -2909,9 +2989,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     } else {
       // 매 move를 직전 preview가 아닌 같은 시작 자세에서 다시 풀어 누적 오차와 관절 뒤집힘을 막는다.
       applyStudioVrmRotationPose(currentVrm, transaction.baseline, bodyScale);
+      transaction.targetWorld.copy(targetWorld);
+      if (poleWorldOverride) transaction.poleWorld = poleWorldOverride;
     }
 
-    const targetWorld = new THREE.Vector3(worldPosition[0], worldPosition[1], worldPosition[2]);
     const lockedTargets: Array<{
       effector: StudioVrmIkEffectorBone;
       targetWorld: THREE.Vector3;
@@ -2975,6 +3056,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       setJointHandleStatus("선택한 손·발의 IK 체인을 계산하지 못했습니다. 모델의 휴머노이드 본 구성을 확인해 주세요.");
       return null;
     }
+    if (!canCommitStudioVrmIkResult(result)) {
+      applyStudioVrmRotationPose(currentVrm, transaction.baseline, bodyScale);
+      transaction.latest = null;
+      setJointHandleStatus(STUDIO_VRM_IK_NOT_CONVERGED_STATUS);
+      return null;
+    }
 
     transaction.latest = result;
     applyStudioVrmRotationPose(currentVrm, {
@@ -3000,14 +3087,32 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   function handleJointHandleIkCommit(
     effector: StudioVrmIkEffectorBone,
     worldPosition: StudioVrmJointWorldPoint,
+    control: StudioVrmIkHandleControl = "target",
   ) {
     let transaction = jointIkTransactionRef.current;
-    if (!transaction || transaction.effector !== effector || !transaction.latest) {
-      previewJointHandleIk(effector, worldPosition);
+    if (
+      !transaction
+      || transaction.effector !== effector
+      || transaction.control !== control
+      || !transaction.latest
+    ) {
+      if (control === "pole") {
+        previewJointHandlePole(effector, worldPosition);
+      } else {
+        previewJointHandleIk(effector, worldPosition);
+      }
       transaction = jointIkTransactionRef.current;
     }
     const result = transaction?.latest;
     const currentVrm = vrmRef.current;
+    if (result && !canCommitStudioVrmIkResult(result)) {
+      cancelJointIkTransaction({
+        restoreBaseline: true,
+        remountHandles: false,
+        status: STUDIO_VRM_IK_NOT_CONVERGED_STATUS,
+      });
+      return;
+    }
     if (
       !result
       || !currentVrm
@@ -3026,7 +3131,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       : transaction.baseline.translations;
     const persistedTargetWorld = "constraints" in result
       ? result.constraints.find((constraint) => constraint.effector === effector)?.targetWorld
-      : worldPosition;
+      : ([
+          transaction.targetWorld.x,
+          transaction.targetWorld.y,
+          transaction.targetWorld.z,
+        ] as const);
     const targetLocal = persistedTargetWorld
       ? studioVrmWorldPointToSceneLocal(transaction.coordinateScene, persistedTargetWorld)
       : null;
@@ -3082,14 +3191,43 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setPoseTranslations(cloneStudioVrmPoseTranslations(nextTranslations));
     setIkConstraints(nextConstraints);
     setSelectedJointHandle(effector);
+    setSelectedIkPole(control === "pole" ? effector : null);
     setJointHandleInteracting(false);
     applyStudioVrmRotationPose(currentVrm, {
       ...result,
       translations: nextTranslations,
     }, bodyScale);
     setJointHandleStatus(
-      `${BONE_LABELS[effector] ?? effector} IK 적용 완료${"constraints" in result ? ` · ${result.constraints.length}개 체인 동시 반영` : ""}${result.clamped ? " · 도달/이동 범위에서 제한됨" : result.limited ? " · 관절 범위에서 제한됨" : ""}`,
+      `${BONE_LABELS[effector] ?? effector} IK ${control === "pole" ? "폴 방향" : "목표"} 적용 완료${"constraints" in result ? ` · ${result.constraints.length}개 체인 동시 반영` : ""}${result.clamped ? " · 도달/이동 범위에서 제한됨" : result.limited ? " · 관절 범위에서 제한됨" : ""}`,
     );
+  }
+
+  function previewJointHandlePole(
+    effector: StudioVrmIkEffectorBone,
+    poleWorld: StudioVrmJointWorldPoint,
+  ): StudioVrmUserIkResult | StudioVrmFullBodyIkResult | null {
+    const coordinateScene = captureRef.current.scene;
+    const constraint = ikConstraints.find((candidate) => (
+      candidate.effector === effector && candidate.enabled
+    ));
+    const targetWorld = coordinateScene && constraint
+      ? studioVrmSceneLocalPointToWorld(coordinateScene, constraint.target)
+      : null;
+    if (!targetWorld) {
+      setJointHandleStatus("활성 IK 목표를 찾지 못해 폴 방향을 이동할 수 없습니다.");
+      return null;
+    }
+    return previewJointHandleIk(effector, targetWorld, {
+      control: "pole",
+      poleWorld,
+    });
+  }
+
+  function handleJointHandlePoleCommit(
+    effector: StudioVrmIkEffectorBone,
+    poleWorld: StudioVrmJointWorldPoint,
+  ) {
+    handleJointHandleIkCommit(effector, poleWorld, "pole");
   }
 
   function handleJointHandleIkRollback(effector: StudioVrmIkEffectorBone) {
@@ -3424,6 +3562,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       });
       if (!result || persistentIkReconcileRevisionRef.current !== revision) {
         rollbackPendingCommand("현재 포즈에서 저장된 손·발 고정점을 함께 유지하지 못했습니다.");
+        return;
+      }
+      if (!canCommitStudioVrmIkResult(result)) {
+        rollbackPendingCommand(STUDIO_VRM_IK_NOT_CONVERGED_STATUS);
         return;
       }
       const nextBones = stripFingerBones(result.bones);
@@ -4951,6 +5093,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setJointHandleInteracting(false);
     setJointHandleStatus("");
     setSelectedJointHandle(null);
+    setSelectedIkPole(null);
+    setIkHandleDragMode("screen");
+    setIkHandleAxisLock("free");
     setRigJointProfile("neutral");
     setFullBodyIkEnabled(false);
     setFootPlantEnabled(false);
@@ -6367,12 +6512,20 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                         && !persistentIkReconciling
                       }
                       effectorSceneTargets={enabledStudioVrmIkTargetsSceneLocal(ikConstraints)}
+                      poleSceneTargets={enabledStudioVrmIkPolesSceneLocal(ikConstraints)}
                       selectedBone={selectedJointHandle}
+                      selectedPole={selectedIkPole}
+                      dragMode={ikHandleDragMode}
+                      axisLock={ikHandleAxisLock}
                       disabled={webcamActive || idleAnimation || isCapturing || persistentIkReconciling}
                       onSelectBone={handleJointHandleSelect}
+                      onSelectPole={handleJointHandlePoleSelect}
                       onEffectorPreview={previewJointHandleIk}
                       onEffectorCommit={handleJointHandleIkCommit}
                       onEffectorRollback={handleJointHandleIkRollback}
+                      onPolePreview={previewJointHandlePole}
+                      onPoleCommit={handleJointHandlePoleCommit}
+                      onPoleRollback={handleJointHandleIkRollback}
                       onInteractionActiveChange={setJointHandleInteracting}
                     />
                   ) : null}
@@ -6866,7 +7019,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                     <div className="min-w-0">
                       <p className="text-[0.7rem] font-bold text-fg">뷰포트 관절 핸들 · 손발 IK</p>
                       <p className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3">
-                        점을 누르면 해당 관절로 이동하고, 손·발 마름모를 끌면 팔·다리가 자연스럽게 따라옵니다.
+                        손·발 마름모는 목표를, 주황색 P는 팔꿈치·무릎 방향을 조절합니다.
                       </p>
                     </div>
                     <button
@@ -6878,7 +7031,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                         setJointHandleStatus("");
                       }}
                       className={cx(
-                        "shrink-0 rounded-lg border px-2.5 py-1.5 text-[0.68rem] font-bold transition-colors disabled:opacity-45",
+                        "min-h-11 min-w-11 shrink-0 rounded-lg border px-2.5 py-1.5 text-[0.68rem] font-bold transition-colors disabled:opacity-45",
                         jointHandlesVisible
                           ? "border-accent/60 bg-accent-soft text-accent"
                           : "border-line bg-card text-fg-2 hover:bg-raised",
@@ -6886,6 +7039,74 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                     >
                       {jointHandlesVisible ? "핸들 켜짐" : "핸들 꺼짐"}
                     </button>
+                  </div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <p className="mb-1 text-[0.62rem] font-bold text-fg-3">이동 방식</p>
+                      <div
+                        className="flex max-w-full gap-1 overflow-x-auto"
+                        role="group"
+                        aria-label="IK 핸들 이동 방식"
+                      >
+                        {STUDIO_VRM_IK_DRAG_MODES.map((mode) => (
+                          <button
+                            key={mode.id}
+                            type="button"
+                            aria-pressed={ikHandleDragMode === mode.id}
+                            disabled={!vrm || jointHandleInteracting}
+                            title={mode.description}
+                            onClick={() => {
+                              cancelJointIkTransaction();
+                              setIkHandleDragMode(mode.id);
+                              setJointHandleStatus(
+                                mode.id === "depth"
+                                  ? "깊이 이동 · 위로 끌면 멀리, 아래로 끌면 가까이 이동합니다."
+                                  : "화면 이동 · 현재 화면과 나란한 평면에서 움직입니다.",
+                              );
+                            }}
+                            className={cx(
+                              "min-h-11 min-w-11 flex-1 rounded-lg border px-2 text-[0.66rem] font-bold transition-colors disabled:opacity-45",
+                              ikHandleDragMode === mode.id
+                                ? "border-accent/60 bg-accent-soft text-accent"
+                                : "border-line bg-card text-fg-2 hover:bg-raised",
+                            )}
+                          >
+                            {mode.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-[0.62rem] font-bold text-fg-3">축 제한</p>
+                      <div
+                        className="flex max-w-full gap-1 overflow-x-auto"
+                        role="group"
+                        aria-label="IK 핸들 축 제한"
+                      >
+                        {STUDIO_VRM_IK_AXIS_LOCKS.map((axis) => (
+                          <button
+                            key={axis.id}
+                            type="button"
+                            aria-pressed={ikHandleAxisLock === axis.id}
+                            disabled={!vrm || jointHandleInteracting}
+                            title={axis.description}
+                            onClick={() => {
+                              cancelJointIkTransaction();
+                              setIkHandleAxisLock(axis.id);
+                              setJointHandleStatus(`IK 핸들 ${axis.description} 모드입니다.`);
+                            }}
+                            className={cx(
+                              "min-h-11 min-w-11 flex-1 rounded-lg border px-2 text-[0.66rem] font-bold transition-colors disabled:opacity-45",
+                              ikHandleAxisLock === axis.id
+                                ? "border-accent/60 bg-accent-soft text-accent"
+                                : "border-line bg-card text-fg-2 hover:bg-raised",
+                            )}
+                          >
+                            {axis.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                   {webcamActive || idleAnimation ? (
                     <p className="mt-1.5 text-[0.65rem] text-warn" role="status">
@@ -6964,6 +7185,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                     );
                   }}
                   onConstraintRemove={(effector) => {
+                    if (selectedIkPole === effector) setSelectedIkPole(null);
                     commitIkConstraintSettings(
                       removeStudioVrmIkConstraint(ikConstraints, effector),
                       "손·발 고정점을 삭제했습니다.",

@@ -1,4 +1,14 @@
 import { disposeStudioBg3dThreeResources } from "./studio-background-3d-model";
+import {
+  STUDIO_BG3D_GEOMETRY_WORKER_SMALL_FALLBACK_MAX_BYTES,
+  StudioBg3dGeometryWorkerClientError,
+  parseStudioBg3dGeometryInWorker,
+} from "./studio-bg3d-geometry-worker-client";
+import {
+  hasValidStudioBg3dCanonicalGeometryNumbers,
+  isStudioBg3dCanonicalGeometryPayload,
+  type StudioBg3dCanonicalGeometryPayload,
+} from "./studio-bg3d-geometry-worker-protocol";
 import { STUDIO_BG3D_GLB_MAX_BYTES } from "./studio-bg3d-glb-validation";
 import { STUDIO_BG3D_MESHOPT_EXTENSION } from "./studio-bg3d-meshopt";
 
@@ -28,9 +38,20 @@ export const STUDIO_BG3D_IMPORT_MAX_VERTICES = 4_000_000;
 export const STUDIO_BG3D_IMPORT_MAX_TRIANGLES = 2_000_000;
 export const STUDIO_BG3D_IMPORT_MAX_ACCESSOR_ELEMENTS = 40_000_000;
 export const STUDIO_BG3D_IMPORT_MAX_DECODED_GEOMETRY_BYTES = 256 * 1024 * 1024;
+export const STUDIO_BG3D_IMPORT_MAX_EXPORT_MATERIALS = 1_024;
+export const STUDIO_BG3D_IMPORT_MAX_EXPORT_MATERIAL_SLOTS = 4_096;
+export const STUDIO_BG3D_IMPORT_MAX_ANIMATION_CLIPS = 128;
+export const STUDIO_BG3D_IMPORT_MAX_ANIMATION_TRACKS = 4_096;
+export const STUDIO_BG3D_IMPORT_MAX_ANIMATION_KEYFRAMES = 2_000_000;
+export const STUDIO_BG3D_IMPORT_MAX_ANIMATION_BYTES = 128 * 1024 * 1024;
+export const STUDIO_BG3D_IMPORT_MAX_ANIMATION_DURATION_SECONDS = 6 * 60 * 60;
+export const STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_REFERENCE_DIRECTIVES = 256;
+export const STUDIO_BG3D_IMPORT_MAX_OBJ_MATERIAL_LIBRARIES = 64;
+export const STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_TOTAL_BYTES = 16 * 1024 * 1024;
+export const STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_DIRECTIVES = 65_536;
 const STUDIO_BG3D_IMPORT_MAX_GLTF_TABLE_ENTRIES = 65_536;
 const STUDIO_BG3D_IMPORT_MAX_RESOURCE_RECORDS = 256;
-const STUDIO_BG3D_IMPORT_MAX_MATERIAL_RECORDS = 1_024;
+const STUDIO_BG3D_IMPORT_MAX_MATERIAL_RECORDS = STUDIO_BG3D_IMPORT_MAX_EXPORT_MATERIALS;
 /** Mirrors the downstream model library's default cumulative admission budget. */
 export const STUDIO_BG3D_IMPORT_MAX_OUTPUT_TOTAL_BYTES = STUDIO_BG3D_GLB_MAX_BYTES;
 
@@ -90,6 +111,7 @@ export interface StudioBg3dModelImportOptions {
 
 export type StudioBg3dModelImportErrorCode =
   | "aborted"
+  | "animation-budget-exceeded"
   | "duplicate-resource"
   | "empty-file"
   | "environment-unsupported"
@@ -103,6 +125,7 @@ export type StudioBg3dModelImportErrorCode =
   | "invalid-text"
   | "missing-resource"
   | "mesh-budget-exceeded"
+  | "material-budget-exceeded"
   | "no-model"
   | "node-budget-exceeded"
   | "output-too-large"
@@ -115,10 +138,12 @@ export type StudioBg3dModelImportErrorCode =
   | "unsafe-resource-uri"
   | "unsupported-extension"
   | "vertex-budget-exceeded"
+  | "worker-required"
   | "geometry-memory-too-large";
 
 const ERROR_MESSAGES: Readonly<Record<StudioBg3dModelImportErrorCode, string>> = Object.freeze({
   aborted: "3D 모델 가져오기를 취소했습니다.",
+  "animation-budget-exceeded": "3D 애니메이션의 클립·트랙·키프레임 또는 재생 시간이 변환 안전 기준을 초과했습니다. 애니메이션을 줄이거나 키를 단순화해 주세요.",
   "duplicate-resource": "같은 경로 또는 이름의 3D 리소스가 중복되어 있습니다. 파일 구성을 정리해 주세요.",
   "empty-file": "비어 있는 3D 모델 또는 리소스 파일은 가져올 수 없습니다.",
   "environment-unsupported": "이 브라우저에서는 3D 모델 변환 기능을 사용할 수 없습니다. 최신 브라우저에서 다시 시도해 주세요.",
@@ -132,6 +157,7 @@ const ERROR_MESSAGES: Readonly<Record<StudioBg3dModelImportErrorCode, string>> =
   "invalid-text": "3D 모델의 텍스트 데이터를 UTF-8로 읽지 못했습니다.",
   "missing-resource": "3D 모델이 참조하는 BIN·MTL·텍스처 파일이 선택 항목에 없습니다.",
   "mesh-budget-exceeded": "3D 모델의 메시 또는 프리미티브 수가 가져오기 안전 기준을 초과했습니다. 메시를 병합해 주세요.",
+  "material-budget-exceeded": "3D 모델의 재질 또는 재질 슬롯 수가 변환 안전 기준을 초과했습니다. OBJ/MTL 재질을 병합해 주세요.",
   "no-model": "GLB, glTF, OBJ, FBX, DAE, STL, PLY 또는 3DS 모델 파일을 하나 이상 선택해 주세요.",
   "node-budget-exceeded": "3D 모델의 노드 수가 가져오기 안전 기준을 초과했습니다. 계층을 단순화해 주세요.",
   "output-too-large": "변환된 GLB가 100MiB 제한을 초과했습니다. 텍스처나 메시를 최적화해 주세요.",
@@ -144,6 +170,7 @@ const ERROR_MESSAGES: Readonly<Record<StudioBg3dModelImportErrorCode, string>> =
   "unsafe-resource-uri": "3D 모델이 로컬 선택 범위 밖의 네트워크 또는 파일 리소스를 참조합니다.",
   "unsupported-extension": "아직 변환할 수 없는 압축 또는 텍스처 확장이 포함되어 있습니다. 표준 glTF/GLB로 다시 내보내 주세요.",
   "vertex-budget-exceeded": "3D 모델의 정점 수가 가져오기 안전 기준을 초과했습니다. 메시를 경량화해 주세요.",
+  "worker-required": "큰 STL·PLY 모델은 안전한 백그라운드 변환 Worker가 필요합니다. 최신 브라우저에서 다시 시도하거나 모델을 줄여 주세요.",
   "geometry-memory-too-large": "3D 모델의 디코딩된 기하 데이터가 256MiB 안전 기준을 초과했습니다. 메시를 경량화해 주세요.",
 });
 
@@ -379,10 +406,17 @@ class LocalResourceResolver {
   }
 
   fileForUri(uri: string): StudioBg3dImportFile {
+    return this.resourceForUri(uri).file;
+  }
+
+  resourceForUri(uri: string): {
+    readonly path: string;
+    readonly file: StudioBg3dImportFile;
+  } {
     const path = this.#resolvePath(uri);
     const file = this.#resources.get(path);
     if (!file) throw importError("missing-resource");
-    return file;
+    return { path, file };
   }
 
   approveInlineUri(uri: string): void {
@@ -898,10 +932,12 @@ function preflightJsonGltf(
   }
 }
 
-interface ParsedImport {
+export interface StudioBg3dParsedExportCandidate {
   readonly root: THREE.Object3D;
   readonly animations: readonly THREE.AnimationClip[];
 }
+
+type ParsedImport = StudioBg3dParsedExportCandidate;
 
 async function parseGltfImport(
   item: StudioBg3dImportPlanItem,
@@ -944,20 +980,6 @@ async function parseGltfImport(
   }
 }
 
-function objMaterialLibraries(text: string): readonly string[] {
-  const result: string[] = [];
-  for (const line of text.split(/\r?\n/gu)) {
-    const match = /^\s*mtllib\s+(.+?)\s*$/iu.exec(line);
-    if (!match) continue;
-    const reference = match[1].trim();
-    if (!reference || SCHEME_PATTERN.test(reference) || reference.startsWith("//")) {
-      throw importError("unsafe-resource-uri");
-    }
-    result.push(reference);
-  }
-  return result;
-}
-
 function countObjArguments(value: string, start: number): number {
   let count = 0;
   let insideToken = false;
@@ -979,15 +1001,18 @@ function countObjArguments(value: string, start: number): number {
  * OBJLoader expands face references into non-indexed arrays. Bound both source declarations and
  * expanded references before the parser is allowed to allocate them.
  */
-function preflightObjText(text: string, signal?: AbortSignal): void {
+function preflightObjText(text: string, signal?: AbortSignal): readonly string[] {
   let sourceVertices = 0;
   let sourceAttributeRecords = 0;
   let expandedVertices = 0;
   let triangles = 0;
   let objectNodes = 0;
   let materialSections = 0;
+  let materialLibraryDirectives = 0;
   let offset = 0;
   let lineNumber = 0;
+  const materialLibraries: string[] = [];
+  const seenMaterialLibraryReferences = new Set<string>();
 
   while (offset <= text.length) {
     if ((lineNumber & 0x3ff) === 0) throwIfAborted(signal);
@@ -1037,6 +1062,90 @@ function preflightObjText(text: string, signal?: AbortSignal): void {
         if (materialSections > STUDIO_BG3D_IMPORT_MAX_MESH_PRIMITIVES) {
           throw importError("mesh-budget-exceeded");
         }
+      } else if (directive === "mtllib") {
+        materialLibraryDirectives = safeAddCount(
+          materialLibraryDirectives,
+          1,
+          "material-budget-exceeded",
+        );
+        if (materialLibraryDirectives > STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_REFERENCE_DIRECTIVES) {
+          throw importError("material-budget-exceeded");
+        }
+        const reference = line.slice(directiveEnd).trim();
+        if (
+          !reference
+          || reference.length > 1_024
+          || SCHEME_PATTERN.test(reference)
+          || reference.startsWith("//")
+          || containsControlCharacter(reference)
+        ) throw importError("unsafe-resource-uri");
+        if (!seenMaterialLibraryReferences.has(reference)) {
+          seenMaterialLibraryReferences.add(reference);
+          materialLibraries.push(reference);
+          if (materialLibraries.length > STUDIO_BG3D_IMPORT_MAX_OBJ_MATERIAL_LIBRARIES) {
+            throw importError("material-budget-exceeded");
+          }
+        }
+      }
+    }
+    if (newline < 0) break;
+    offset = newline + 1;
+    lineNumber += 1;
+  }
+  return Object.freeze(materialLibraries);
+}
+
+interface ObjMtlPreflightBudget {
+  directives: number;
+  materials: number;
+  textureSlots: number;
+}
+
+function preflightObjMtlText(
+  text: string,
+  budget: ObjMtlPreflightBudget,
+  signal?: AbortSignal,
+): void {
+  let offset = 0;
+  let lineNumber = 0;
+  while (offset <= text.length) {
+    if ((lineNumber & 0x3ff) === 0) throwIfAborted(signal);
+    const newline = text.indexOf("\n", offset);
+    const end = newline < 0 ? text.length : newline;
+    if (end - offset > 1024 * 1024) throw importError("parse-failed");
+    const line = text.slice(offset, end);
+    let directiveStart = 0;
+    while (directiveStart < line.length && /\s/u.test(line[directiveStart] ?? "")) directiveStart += 1;
+    if (directiveStart < line.length && line.charCodeAt(directiveStart) !== 0x23) {
+      let directiveEnd = directiveStart;
+      while (directiveEnd < line.length && !/\s/u.test(line[directiveEnd] ?? "")) directiveEnd += 1;
+      const directive = line.slice(directiveStart, directiveEnd).toLowerCase();
+      budget.directives = safeAddCount(budget.directives, 1, "material-budget-exceeded");
+      if (budget.directives > STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_DIRECTIVES) {
+        throw importError("material-budget-exceeded");
+      }
+      if (directive === "newmtl") {
+        budget.materials = safeAddCount(budget.materials, 1, "material-budget-exceeded");
+        if (budget.materials > STUDIO_BG3D_IMPORT_MAX_EXPORT_MATERIALS) {
+          throw importError("material-budget-exceeded");
+        }
+      }
+      if (
+        directive.startsWith("map_")
+        || directive === "bump"
+        || directive === "decal"
+        || directive === "disp"
+        || directive === "norm"
+        || directive === "refl"
+      ) {
+        budget.textureSlots = safeAddCount(budget.textureSlots, 1, "material-budget-exceeded");
+        if (budget.textureSlots > STUDIO_BG3D_IMPORT_MAX_EXPORT_MATERIAL_SLOTS) {
+          throw importError("material-budget-exceeded");
+        }
+        const reference = line.slice(directiveEnd).trim();
+        if (SCHEME_PATTERN.test(reference) || reference.startsWith("//")) {
+          throw importError("unsafe-resource-uri");
+        }
       }
     }
     if (newline < 0) break;
@@ -1051,19 +1160,46 @@ async function parseObjImport(
   signal?: AbortSignal,
 ): Promise<ParsedImport> {
   const text = await readUtf8(item.primary, signal);
-  preflightObjText(text, signal);
+  const materialLibraryReferences = preflightObjText(text, signal);
   const tracked = await createTrackedLoadingManager(resolver);
   throwIfAborted(signal);
   const { OBJLoader } = await import("three/examples/jsm/loaders/OBJLoader.js");
   throwIfAborted(signal);
   const loader = new OBJLoader(tracked.manager);
-  const materialLibraries = objMaterialLibraries(text);
-  if (materialLibraries.length > 0) {
+  if (materialLibraryReferences.length > 0) {
+    const materialResources: Array<{
+      readonly path: string;
+      readonly file: StudioBg3dImportFile;
+    }> = [];
+    const seenMaterialPaths = new Set<string>();
+    let totalMaterialBytes = 0;
+    for (const uri of materialLibraryReferences) {
+      const resource = resolver.resourceForUri(uri);
+      if (extensionOf(resource.path) !== "mtl") throw importError("missing-resource");
+      if (seenMaterialPaths.has(resource.path)) continue;
+      seenMaterialPaths.add(resource.path);
+      if (seenMaterialPaths.size > STUDIO_BG3D_IMPORT_MAX_OBJ_MATERIAL_LIBRARIES) {
+        throw importError("material-budget-exceeded");
+      }
+      totalMaterialBytes = safeAddCount(
+        totalMaterialBytes,
+        resource.file.size,
+        "material-budget-exceeded",
+      );
+      if (totalMaterialBytes > STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_TOTAL_BYTES) {
+        throw importError("material-budget-exceeded");
+      }
+      materialResources.push(resource);
+    }
     const { MTLLoader } = await import("three/examples/jsm/loaders/MTLLoader.js");
     throwIfAborted(signal);
-    const materialTexts = await Promise.all(
-      materialLibraries.map((uri) => readUtf8(resolver.fileForUri(uri), signal)),
-    );
+    const materialTexts: string[] = [];
+    const materialBudget: ObjMtlPreflightBudget = { directives: 0, materials: 0, textureSlots: 0 };
+    for (const resource of materialResources) {
+      const materialText = await readUtf8(resource.file, signal);
+      preflightObjMtlText(materialText, materialBudget, signal);
+      materialTexts.push(materialText);
+    }
     throwIfAborted(signal);
     const materials = new MTLLoader(tracked.manager).parse(materialTexts.join("\n"), "");
     materials.preload();
@@ -1131,11 +1267,11 @@ async function parseDaeImport(
   }
 }
 
-async function parseStlImport(
+async function parseStlOnMainThread(
   item: StudioBg3dImportPlanItem,
+  bytes: ArrayBuffer,
   signal?: AbortSignal,
 ): Promise<ParsedImport> {
-  const bytes = await readBytes(item.primary, signal);
   const [{ Mesh, MeshStandardMaterial }, { STLLoader }] = await Promise.all([
     import("three"),
     import("three/examples/jsm/loaders/STLLoader.js"),
@@ -1157,11 +1293,11 @@ async function parseStlImport(
   return { root, animations: [] };
 }
 
-async function parsePlyImport(
+async function parsePlyOnMainThread(
   item: StudioBg3dImportPlanItem,
+  bytes: ArrayBuffer,
   signal?: AbortSignal,
 ): Promise<ParsedImport> {
-  const bytes = await readBytes(item.primary, signal);
   const [{ Mesh, MeshStandardMaterial, Points, PointsMaterial }, { PLYLoader }] = await Promise.all([
     import("three"),
     import("three/examples/jsm/loaders/PLYLoader.js"),
@@ -1196,6 +1332,116 @@ async function parsePlyImport(
   }));
   root.name = modelBaseName(item.primaryPath);
   return { root, animations: [] };
+}
+
+function mapGeometryWorkerFailure(error: StudioBg3dGeometryWorkerClientError): StudioBg3dModelImportError {
+  if (error.code === "aborted") return importError("aborted");
+  if (
+    error.code === "geometry-memory-too-large"
+    || error.code === "triangle-budget-exceeded"
+    || error.code === "vertex-budget-exceeded"
+  ) return importError(error.code);
+  if (error.code === "parse-failed" || error.code === "protocol") return importError("parse-failed");
+  return importError("worker-required");
+}
+
+async function parsedImportFromCanonicalGeometry(
+  item: StudioBg3dImportPlanItem,
+  payload: StudioBg3dCanonicalGeometryPayload,
+  signal?: AbortSignal,
+): Promise<ParsedImport> {
+  if (
+    !isStudioBg3dCanonicalGeometryPayload(payload, item.format === "stl" ? "stl" : "ply")
+    || !hasValidStudioBg3dCanonicalGeometryNumbers(payload)
+  ) throw importError("parse-failed");
+  throwIfAborted(signal);
+  const {
+    BufferAttribute,
+    BufferGeometry,
+    Mesh,
+    MeshStandardMaterial,
+    Points,
+    PointsMaterial,
+  } = await import("three");
+  throwIfAborted(signal);
+  const geometry = new BufferGeometry();
+  try {
+    for (const attribute of payload.attributes) {
+      geometry.setAttribute(
+        attribute.name,
+        new BufferAttribute(new Float32Array(attribute.buffer), attribute.itemSize, false),
+      );
+    }
+    if (payload.index) {
+      geometry.setIndex(new BufferAttribute(new Uint32Array(payload.index.buffer), 1, false));
+    }
+    const hasVertexColors = payload.attributes.some((attribute) => attribute.name === "color");
+    if (payload.kind === "mesh") {
+      const root = new Mesh(geometry, new MeshStandardMaterial({
+        color: 0xb8b8c2,
+        vertexColors: hasVertexColors,
+      }));
+      root.name = modelBaseName(item.primaryPath);
+      return { root, animations: [] };
+    }
+    const root = new Points(geometry, new PointsMaterial({
+      color: 0xb8b8c2,
+      size: 0.01,
+      sizeAttenuation: true,
+      vertexColors: hasVertexColors,
+    }));
+    root.name = modelBaseName(item.primaryPath);
+    return { root, animations: [] };
+  } catch (error) {
+    geometry.dispose();
+    throw error;
+  }
+}
+
+async function parseWorkerGeometryImport(
+  item: StudioBg3dImportPlanItem & { readonly format: "ply" | "stl" },
+  signal?: AbortSignal,
+): Promise<ParsedImport> {
+  const bytes = await readBytes(item.primary, signal);
+  const fallbackBytes = bytes.byteLength <= STUDIO_BG3D_GEOMETRY_WORKER_SMALL_FALLBACK_MAX_BYTES
+    ? bytes.slice(0)
+    : null;
+  try {
+    const payload = await parseStudioBg3dGeometryInWorker(item.format, bytes, { signal });
+    throwIfAborted(signal);
+    return parsedImportFromCanonicalGeometry(item, payload, signal);
+  } catch (error) {
+    if (!(error instanceof StudioBg3dGeometryWorkerClientError)) throw error;
+    if (
+      fallbackBytes
+      && (error.code === "worker-unavailable" || error.code === "worker-failed")
+    ) {
+      return item.format === "stl"
+        ? parseStlOnMainThread(item, fallbackBytes, signal)
+        : parsePlyOnMainThread(item, fallbackBytes, signal);
+    }
+    throw mapGeometryWorkerFailure(error);
+  }
+}
+
+async function parseStlImport(
+  item: StudioBg3dImportPlanItem,
+  signal?: AbortSignal,
+): Promise<ParsedImport> {
+  return parseWorkerGeometryImport(
+    item as StudioBg3dImportPlanItem & { readonly format: "stl" },
+    signal,
+  );
+}
+
+async function parsePlyImport(
+  item: StudioBg3dImportPlanItem,
+  signal?: AbortSignal,
+): Promise<ParsedImport> {
+  return parseWorkerGeometryImport(
+    item as StudioBg3dImportPlanItem & { readonly format: "ply" },
+    signal,
+  );
 }
 
 async function parse3dsImport(
@@ -1331,6 +1577,163 @@ function assertParsedImportBudgets(root: THREE.Object3D, signal?: AbortSignal): 
       for (const attribute of attributes) countAttributeBuffer(attribute);
     }
   }
+}
+
+function assertParsedMaterialBudgets(root: THREE.Object3D, signal?: AbortSignal): void {
+  const stack: THREE.Object3D[] = [root];
+  const visited = new Set<THREE.Object3D>();
+  const materials = new Set<THREE.Material>();
+  let materialSlots = 0;
+
+  while (stack.length > 0) {
+    if ((visited.size & 0xff) === 0) throwIfAborted(signal);
+    const object = stack.pop();
+    if (!object || visited.has(object)) throw importError("parse-failed");
+    visited.add(object);
+    for (const child of object.children) stack.push(child);
+
+    const material = (object as THREE.Object3D & {
+      readonly material?: THREE.Material | readonly THREE.Material[];
+    }).material;
+    if (!material) continue;
+    const slots = Array.isArray(material) ? material : [material];
+    materialSlots = safeAddCount(
+      materialSlots,
+      slots.length,
+      "material-budget-exceeded",
+    );
+    if (materialSlots > STUDIO_BG3D_IMPORT_MAX_EXPORT_MATERIAL_SLOTS) {
+      throw importError("material-budget-exceeded");
+    }
+    for (const candidate of slots) {
+      if (!candidate || typeof candidate !== "object") throw importError("parse-failed");
+      materials.add(candidate);
+      if (materials.size > STUDIO_BG3D_IMPORT_MAX_EXPORT_MATERIALS) {
+        throw importError("material-budget-exceeded");
+      }
+    }
+  }
+}
+
+type StudioAnimationNumberArray = ArrayLike<number> & ArrayBufferView;
+
+function animationNumberArray(value: unknown): ArrayLike<number> | null {
+  if (Array.isArray(value)) return value;
+  if (!ArrayBuffer.isView(value) || value instanceof DataView) return null;
+  const length = (value as { readonly length?: unknown }).length;
+  return Number.isSafeInteger(length) && (length as number) >= 0
+    ? value as StudioAnimationNumberArray
+    : null;
+}
+
+function countAnimationArrayBytes(
+  values: ArrayLike<number>,
+  countedBuffers: Set<ArrayBufferLike>,
+): number {
+  if (ArrayBuffer.isView(values)) {
+    if (countedBuffers.has(values.buffer)) return 0;
+    countedBuffers.add(values.buffer);
+    return values.buffer.byteLength;
+  }
+  return safeMultiplyCount(values.length, 8, "animation-budget-exceeded");
+}
+
+function assertAnimationNumberArray(
+  values: ArrayLike<number>,
+  signal: AbortSignal | undefined,
+  options: { nondecreasing?: boolean } = {},
+): void {
+  let previous = Number.NEGATIVE_INFINITY;
+  for (let index = 0; index < values.length; index += 1) {
+    if ((index & 0x3fff) === 0) throwIfAborted(signal);
+    const value = values[index];
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw importError("animation-budget-exceeded");
+    }
+    if (options.nondecreasing && value < previous) {
+      throw importError("animation-budget-exceeded");
+    }
+    previous = value;
+  }
+}
+
+function assertParsedAnimationBudgets(
+  animations: readonly THREE.AnimationClip[],
+  signal?: AbortSignal,
+): void {
+  if (
+    !Array.isArray(animations)
+    || animations.length > STUDIO_BG3D_IMPORT_MAX_ANIMATION_CLIPS
+  ) {
+    throw importError("animation-budget-exceeded");
+  }
+  const countedBuffers = new Set<ArrayBufferLike>();
+  let tracks = 0;
+  let keyframes = 0;
+  let decodedBytes = 0;
+
+  for (const clip of animations) {
+    throwIfAborted(signal);
+    if (
+      !clip
+      || typeof clip !== "object"
+      || typeof clip.name !== "string"
+      || clip.name.length > 256
+      || !Number.isFinite(clip.duration)
+      || clip.duration < 0
+      || clip.duration > STUDIO_BG3D_IMPORT_MAX_ANIMATION_DURATION_SECONDS
+      || !Array.isArray(clip.tracks)
+    ) {
+      throw importError("animation-budget-exceeded");
+    }
+    tracks = safeAddCount(tracks, clip.tracks.length, "animation-budget-exceeded");
+    if (tracks > STUDIO_BG3D_IMPORT_MAX_ANIMATION_TRACKS) {
+      throw importError("animation-budget-exceeded");
+    }
+
+    for (const track of clip.tracks) {
+      if (!track || typeof track.name !== "string" || track.name.length > 512) {
+        throw importError("animation-budget-exceeded");
+      }
+      const times = animationNumberArray(track.times);
+      const values = animationNumberArray(track.values);
+      if (!times || !values || (times.length === 0 ? values.length !== 0 : values.length % times.length !== 0)) {
+        throw importError("animation-budget-exceeded");
+      }
+      keyframes = safeAddCount(keyframes, times.length, "animation-budget-exceeded");
+      if (keyframes > STUDIO_BG3D_IMPORT_MAX_ANIMATION_KEYFRAMES) {
+        throw importError("animation-budget-exceeded");
+      }
+      decodedBytes = safeAddCount(
+        decodedBytes,
+        countAnimationArrayBytes(times, countedBuffers),
+        "animation-budget-exceeded",
+      );
+      decodedBytes = safeAddCount(
+        decodedBytes,
+        countAnimationArrayBytes(values, countedBuffers),
+        "animation-budget-exceeded",
+      );
+      if (decodedBytes > STUDIO_BG3D_IMPORT_MAX_ANIMATION_BYTES) {
+        throw importError("animation-budget-exceeded");
+      }
+      assertAnimationNumberArray(times, signal, { nondecreasing: true });
+      assertAnimationNumberArray(values, signal);
+    }
+  }
+}
+
+/**
+ * Bounds every CPU-heavy structure that GLTFExporter will walk. This runs after format parsing but
+ * before legacy material conversion, matrix updates, texture encoding, or GLB allocation.
+ */
+export function assertStudioBg3dPreExportBudgets(
+  parsed: StudioBg3dParsedExportCandidate,
+  signal?: AbortSignal,
+): void {
+  assertParsedImportBudgets(parsed.root, signal);
+  assertParsedMaterialBudgets(parsed.root, signal);
+  assertParsedAnimationBudgets(parsed.animations, signal);
 }
 
 function isLegacyPhongMaterial(material: THREE.Material): material is THREE.MeshPhongMaterial {
@@ -1472,7 +1875,7 @@ async function convertPlanItem(
   try {
     parsed = await parsePlanItem(item, resolver, signal, companionDecodedImageBytes);
     throwIfAborted(signal);
-    assertParsedImportBudgets(parsed.root, signal);
+    assertStudioBg3dPreExportBudgets(parsed, signal);
     throwIfAborted(signal);
     onBeforeExport?.();
     throwIfAborted(signal);

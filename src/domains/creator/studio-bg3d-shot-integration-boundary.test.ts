@@ -31,6 +31,22 @@ function expectInOrder(haystack: string, needles: readonly string[]): void {
 }
 
 describe("Studio BG3D shot UI integration boundary", () => {
+  it("loads the asset writer only after the user starts a guarded library save", () => {
+    const handler = functionSlice("handleSaveToLibrary", "handleInsert");
+
+    expect(source).not.toContain('import { saveAsset } from "./studio-asset-library";');
+    expectInOrder(handler, [
+      "captureInFlightRef.current = true",
+      "setIsCapturing(true)",
+      'const { saveAsset } = await import("./studio-asset-library")',
+      "const captureAdapter = await acquireStudioBg3dCaptureAdapterAfterViewTransition({",
+      "const captured = await captureStudioBg3dRaster(captureAdapter",
+      "await saveAsset({",
+      "} finally {",
+      "captureInFlightRef.current = false",
+    ]);
+  });
+
   it("captures the current canonical runtime view as one undoable command", () => {
     const handler = functionSlice("captureCurrentShot", "applySavedShot");
 
@@ -292,7 +308,10 @@ describe("Studio BG3D shot UI integration boundary", () => {
       transition.indexOf("api.applyView(input.view)"),
     );
     expect(source).toContain("onReady={handleViewportReady}");
-    expect(source).toContain("if (api && pendingView && api.applyView(pendingView))");
+    expect(source).toContain("if (api && pendingView)");
+    expect(source).toContain(
+      "applyOrDeferStudioBg3dHistoryCamera(api, pendingInitialCameraRef, pendingView)",
+    );
     expect(cameraApplicationSource).not.toContain("camera.copy(projection, false)");
   });
 });

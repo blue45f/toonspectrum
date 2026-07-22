@@ -186,7 +186,24 @@ export function isStudioAiConfigured(settings: StudioAiSettings): boolean {
 /** 텍스트 생성만 서버 보유 Z.ai/DeepSeek를 사용할 수 있다. 이미지 생성/편집은 계속 BYOK 설정을 요구한다. */
 export type StudioTextAiTransport =
   | { mode: "byok"; signal?: AbortSignal }
-  | { mode: "server"; provider?: StudioServerAiProviderPreference; signal?: AbortSignal };
+  | {
+      mode: "server";
+      provider?: StudioServerAiProviderPreference;
+      signal?: AbortSignal;
+      /** Stable Studio provenance operation ID reused as the paid server request retry key. */
+      operationId?: string;
+    };
+
+/**
+ * Binds an already-tracked Studio operation to a server transport. BYOK requests deliberately keep
+ * their original transport unchanged and never receive the app server's idempotency header.
+ */
+export function studioTextAiTransportForOperation(
+  transport: StudioTextAiTransport,
+  operationId: string
+): StudioTextAiTransport {
+  return transport.mode === "server" ? { ...transport, operationId } : transport;
+}
 
 export interface StudioAiTokenUsage {
   promptTokens?: number;
@@ -363,6 +380,7 @@ async function postTextCompletion(
         promptVersion: 1,
         system: request.system,
         user: request.user,
+        operationId: transport.operationId,
         ...(transport.provider ? { provider: transport.provider } : {}),
       },
       transport.signal

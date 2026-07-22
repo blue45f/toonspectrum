@@ -210,22 +210,21 @@ describe("Studio 3D insert controller boundary", () => {
     expect(backgroundInsert).toContain("if (!patchEl(targetElementId, {");
     expect(backgroundInsert).toContain("if (!addEl({");
     expect(backgroundInsert).toContain(
-      "if (!commit(plan.nextElements, { groups: plan.nextGroups })) return false;"
+      "if (!commit(plan.nextElements, {"
     );
     expect(backgroundInsert.indexOf("setSelectedId(plan.anchorElementId);")).toBeGreaterThan(
       backgroundInsert.indexOf(
-        "if (!commit(plan.nextElements, { groups: plan.nextGroups })) return false;"
+        "if (!commit(plan.nextElements, {"
       )
     );
-    expect(backgroundInsert.indexOf("commitStudioDrawingAssistDocument(")).toBeGreaterThan(
-      backgroundInsert.indexOf("setTool(\"select\");")
-    );
+    expect(backgroundInsert).toContain("drawingAssist: nextDrawingAssist");
+    expect(backgroundInsert).toContain("mapStudioBg3dPerspectiveGuidesToAnchor(");
     expect(backgroundInsert).toContain(
       "const anchor = plan.nextElements.find((element) => element.id === plan.anchorElementId);"
     );
-    expect(backgroundInsert).not.toContain("if (!commitStudioDrawingAssistDocument(");
-    expect(backgroundInsert).not.toMatch(
-      /const\s+\w+\s*=\s*commitStudioDrawingAssistDocument\(/u
+    expect(backgroundInsert).not.toContain("commitStudioDrawingAssistDocument(");
+    expect(backgroundInsert.indexOf("setTool(\"select\");")).toBeGreaterThan(
+      backgroundInsert.indexOf("if (!commit(plan.nextElements, {")
     );
     expect(backgroundInsert.lastIndexOf("return true;")).toBeGreaterThan(
       backgroundInsert.indexOf("commitStudioDrawingAssistDocument(")

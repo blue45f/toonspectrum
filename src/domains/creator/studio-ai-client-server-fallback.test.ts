@@ -5,6 +5,8 @@ import {
   STUDIO_AI_DEFAULT_SETTINGS,
 } from "./studio-ai-client";
 
+const SCENARIO_OPERATION_ID = "scenario-00000000-0000-4000-8000-000000000011";
+
 const { completeStudioServerTextMock } = vi.hoisted(() => ({
   completeStudioServerTextMock: vi.fn(),
 }));
@@ -50,7 +52,7 @@ describe("studio-ai-client server failover provenance", () => {
       STUDIO_AI_DEFAULT_SETTINGS,
       "비 오는 옥상에서 재회한다.",
       {},
-      { mode: "server", provider: "zai" }
+      { mode: "server", provider: "zai", operationId: SCENARIO_OPERATION_ID }
     );
 
     expect(result).toMatchObject({
@@ -73,7 +75,11 @@ describe("studio-ai-client server failover provenance", () => {
       },
     });
     expect(completeStudioServerTextMock).toHaveBeenCalledWith(
-      expect.objectContaining({ task: "scenario", provider: "zai" }),
+      expect.objectContaining({
+        task: "scenario",
+        provider: "zai",
+        operationId: SCENARIO_OPERATION_ID,
+      }),
       undefined
     );
     expect(JSON.stringify(result)).not.toContain("must-not-propagate");
@@ -104,7 +110,10 @@ describe("studio-ai-client server failover provenance", () => {
       STUDIO_AI_DEFAULT_SETTINGS,
       "옥상 장면",
       {},
-      { mode: "server" }
+      {
+        mode: "server",
+        operationId: "scenario-00000000-0000-4000-8000-000000000012",
+      }
     );
 
     expect(result.ok).toBe(true);
@@ -113,5 +122,32 @@ describe("studio-ai-client server failover provenance", () => {
     expect(result.data.textProvenance.model).toBe("deepseek-v4-flash");
     expect(result.data.textProvenance.failover).toBeUndefined();
     expect(JSON.stringify(result)).not.toContain("private-provider-payload");
+  });
+
+  it("reuses the exact tracked operation ID when an existing operation is deliberately retried", async () => {
+    completeStudioServerTextMock.mockResolvedValue({
+      ok: true,
+      data: {
+        content: JSON.stringify({
+          characterDescription: "주인공",
+          scenes: [{ imagePrompt: "옥상", dialogue: "" }],
+        }),
+        provider: "zai",
+        model: "glm-5.1",
+      },
+    });
+    const transport = {
+      mode: "server" as const,
+      provider: "zai" as const,
+      operationId: SCENARIO_OPERATION_ID,
+    };
+
+    await generateScenarioScenes(STUDIO_AI_DEFAULT_SETTINGS, "옥상 장면", {}, transport);
+    await generateScenarioScenes(STUDIO_AI_DEFAULT_SETTINGS, "옥상 장면", {}, transport);
+
+    expect(completeStudioServerTextMock).toHaveBeenCalledTimes(2);
+    for (const [request] of completeStudioServerTextMock.mock.calls) {
+      expect(request).toMatchObject({ operationId: SCENARIO_OPERATION_ID });
+    }
   });
 });

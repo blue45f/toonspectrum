@@ -6,8 +6,11 @@
 #   docker compose up -d db
 #   docker compose build api
 #   docker compose run --rm api pnpm exec drizzle-kit push --force
+#   docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < ../../lib/db/migrations/0013_creator_asset_marketplace.sql
 #   docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < ../../lib/db/migrations/0009_socket_io_postgres_adapter.sql
 #   docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < ../../lib/db/migrations/0017_creator_work_live_lock_revision.sql
+#   docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < ../../lib/db/migrations/0018_studio_ai_request_gate.sql
+#   docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < ../../lib/db/migrations/0019_studio_ai_request_receipt.sql
 #   docker compose up -d api caddy
 
 name: webdex

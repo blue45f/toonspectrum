@@ -1,5 +1,6 @@
 import * as THREE from "three";
 
+import { resolveStudioBg3dOrthographicZoom } from "./studio-bg3d-camera-framing";
 import { waitForStudioBg3dCapturePhase } from "./studio-bg3d-capture-adapter";
 
 import type { StudioBg3dCameraSettings } from "./studio-bg3d-scene-document";
@@ -7,12 +8,160 @@ import type { StudioBg3dCameraSettings } from "./studio-bg3d-scene-document";
 type OrbitLike = { target?: THREE.Vector3; update?: () => void } | null;
 
 export interface BgViewportApi {
-  zoomBy(factor: number): void;
-  applyPreset(presetId: string): void;
+  /** Applies a projection-aware zoom command and reports whether a complete view was published. */
+  zoomBy(factor: number): boolean;
+  applyPreset(presetId: string): boolean;
   /** Returns false when React has not mounted the requested projection camera yet. */
   applyView(view: StudioBg3dCameraSettings): boolean;
   readView(): StudioBg3dCameraSettings;
+  readFramingState(): StudioBg3dViewportFramingState | null;
   focusOn(position: [number, number, number]): void;
+}
+
+export interface StudioBg3dViewportFramingState {
+  readonly view: StudioBg3dCameraSettings;
+  readonly viewportAspect: number;
+  readonly orthographicFrustumAtZoomOne?: {
+    readonly width: number;
+    readonly height: number;
+  };
+}
+
+export interface StudioBg3dWorldBounds {
+  readonly min: readonly [number, number, number];
+  readonly max: readonly [number, number, number];
+}
+
+export interface StudioBg3dSurfaceIntersectionLike {
+  readonly object: THREE.Object3D;
+  readonly point: THREE.Vector3;
+  readonly normal?: THREE.Vector3;
+  readonly face?: { readonly normal: THREE.Vector3 } | null;
+  readonly instanceId?: number;
+}
+
+export interface StudioBg3dWorldSurfaceHit {
+  readonly point: readonly [number, number, number];
+  readonly normal: readonly [number, number, number];
+}
+
+const STUDIO_BG3D_CAMERA_APPLICATION_MAX_COORDINATE = 10_000;
+const STUDIO_BG3D_CAMERA_APPLICATION_MIN_NORMAL_LENGTH = 1e-6;
+const STUDIO_BG3D_VIEWPORT_CONTROL_SELECTOR = '[data-bg3d-viewport-control="true"]';
+
+/**
+ * R3F listens for misses on the viewport event source, which also contains our floating controls.
+ * A toolbar click is not a scene miss and must never clear the active selection before a camera or
+ * surface command runs. Keep this structural so the helper stays testable without a DOM runtime.
+ */
+export function isStudioBg3dViewportControlTarget(target: EventTarget | null): boolean {
+  const candidate = target as { closest?: (selector: string) => unknown } | null;
+  return typeof candidate?.closest === "function" &&
+    candidate.closest(STUDIO_BG3D_VIEWPORT_CONTROL_SELECTOR) !== null;
+}
+
+function finiteWorldVector(vector: THREE.Vector3): boolean {
+  return vector.toArray().every((component) => (
+    Number.isFinite(component) &&
+    Math.abs(component) <= STUDIO_BG3D_CAMERA_APPLICATION_MAX_COORDINATE
+  ));
+}
+
+/** Reads the precise rendered world AABB. Empty, detached, and non-finite geometry fails closed. */
+export function readStudioBg3dObjectWorldBounds(
+  object: THREE.Object3D | null | undefined,
+): StudioBg3dWorldBounds | null {
+  if (!object?.isObject3D) return null;
+  object.updateWorldMatrix(true, true);
+  const bounds = new THREE.Box3().setFromObject(object, true);
+  if (bounds.isEmpty() || !finiteWorldVector(bounds.min) || !finiteWorldVector(bounds.max)) {
+    return null;
+  }
+  return Object.freeze({
+    min: Object.freeze(bounds.min.toArray() as [number, number, number]),
+    max: Object.freeze(bounds.max.toArray() as [number, number, number]),
+  });
+}
+
+/**
+ * Converts a Three raycast's geometry-local normal into a normalized world normal. InstancedMesh
+ * intersections need their instance transform in addition to object.matrixWorld.
+ */
+export function readStudioBg3dWorldSurfaceHit(
+  intersection: StudioBg3dSurfaceIntersectionLike,
+): StudioBg3dWorldSurfaceHit | null {
+  const object = intersection?.object;
+  const point = intersection?.point;
+  const sourceNormal = intersection?.normal ?? intersection?.face?.normal;
+  if (!object?.isObject3D || !point?.isVector3 || !sourceNormal?.isVector3) return null;
+  if (!finiteWorldVector(point) || !sourceNormal.toArray().every(Number.isFinite)) return null;
+
+  object.updateWorldMatrix(true, false);
+  const worldMatrix = object.matrixWorld.clone();
+  const instanced = object as THREE.InstancedMesh;
+  if (instanced.isInstancedMesh) {
+    if (
+      !Number.isSafeInteger(intersection.instanceId) ||
+      intersection.instanceId! < 0 ||
+      intersection.instanceId! >= instanced.count
+    ) return null;
+    const instanceMatrix = new THREE.Matrix4();
+    instanced.getMatrixAt(intersection.instanceId!, instanceMatrix);
+    worldMatrix.multiply(instanceMatrix);
+  }
+  if (!worldMatrix.elements.every(Number.isFinite)) return null;
+  const determinant = worldMatrix.determinant();
+  if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-12) return null;
+
+  const normal = sourceNormal.clone().applyNormalMatrix(
+    new THREE.Matrix3().getNormalMatrix(worldMatrix),
+  );
+  const normalLength = normal.length();
+  if (!Number.isFinite(normalLength) || normalLength < STUDIO_BG3D_CAMERA_APPLICATION_MIN_NORMAL_LENGTH) {
+    return null;
+  }
+  normal.multiplyScalar(1 / normalLength);
+  if (!normal.toArray().every(Number.isFinite)) return null;
+  return Object.freeze({
+    point: Object.freeze(point.toArray() as [number, number, number]),
+    normal: Object.freeze(normal.toArray() as [number, number, number]),
+  });
+}
+
+/** Applies the existing distance-factor convention to the active Three projection. */
+export function applyStudioBg3dProjectionAwareZoom(
+  camera: THREE.PerspectiveCamera | THREE.OrthographicCamera,
+  controls: OrbitLike,
+  distanceFactor: number,
+  fallbackTarget: readonly [number, number, number],
+): boolean {
+  if (!Number.isFinite(distanceFactor) || distanceFactor < 0.05 || distanceFactor > 20) {
+    return false;
+  }
+  if (camera instanceof THREE.OrthographicCamera) {
+    const zoom = resolveStudioBg3dOrthographicZoom({
+      currentZoom: camera.zoom,
+      distanceFactor,
+    });
+    if (zoom === null) return false;
+    camera.zoom = zoom;
+    camera.updateProjectionMatrix();
+    camera.updateMatrixWorld();
+    controls?.update?.();
+    return true;
+  }
+
+  const target = controls?.target ?? new THREE.Vector3(...fallbackTarget);
+  if (!finiteWorldVector(target)) return false;
+  const offset = camera.position.clone().sub(target);
+  const distance = offset.length();
+  if (!Number.isFinite(distance) || distance < 1e-6) return false;
+  const nextDistance = THREE.MathUtils.clamp(distance * distanceFactor, 2, 60);
+  offset.setLength(nextDistance);
+  camera.position.copy(target).add(offset);
+  camera.updateMatrixWorld();
+  controls?.update?.();
+  return finiteWorldVector(camera.position);
 }
 
 /** Applies every persisted composition field without replacing Three's live camera identity. */

@@ -8,6 +8,10 @@
  */
 
 import { STABILIZER_MAX } from "./studio-brush";
+import {
+  FIXED_RATE_STROKE_FILTER_TICK_MS,
+  resolveFixedRateStrokeFilterParameters,
+} from "./studio-fixed-rate-stroke-filter";
 
 export const STUDIO_STABILIZER_MODES = [
   {
@@ -23,11 +27,27 @@ export const STUDIO_STABILIZER_MODES = [
   {
     id: "precision",
     label: "정밀 추적",
-    description: "펜 끝을 가상의 끈으로 당겨 긴 선화와 곡선을 정교하게 만듭니다.",
+    description: "펜 끝을 가상의 끈으로 의도적으로 뒤따라 긴 선화와 곡선을 정교하게 만듭니다.",
   },
 ] as const;
 
 export type StudioStabilizerMode = (typeof STUDIO_STABILIZER_MODES)[number]["id"];
+
+export type StudioStabilizerLatencyKind =
+  | "instant"
+  | "estimated"
+  | "variable"
+  | "guided";
+
+export interface StudioStabilizerLatencyDescription {
+  kind: StudioStabilizerLatencyKind;
+  /** Compact status text intended for controls and badges. */
+  label: string;
+  /** Accessible explanation of what the status means for the current mode. */
+  description: string;
+  /** Standard-mode 90% step-response estimate. Categorical modes intentionally return null. */
+  estimatedMs: number | null;
+}
 
 export interface StudioStabilizerPointSample {
   x: number;
@@ -129,6 +149,78 @@ export function normalizeStudioStabilizerMode(
   fallback: StudioStabilizerMode = "adaptive"
 ): StudioStabilizerMode {
   return isStudioStabilizerMode(value) ? value : fallback;
+}
+
+const STANDARD_LATENCY_RESPONSE_TARGET = 0.9;
+const STANDARD_LATENCY_ESTIMATE_LIMIT_MS = 5_000;
+
+/**
+ * Estimates the fixed-rate cascade's 90% unit-step response on its actual 5ms logical clock.
+ * Reading the production filter parameters keeps the UI estimate aligned when the cascade is
+ * tuned, without running or mutating a live stroke filter.
+ */
+function estimateStandardStabilizerLatencyMs(strength: number): number {
+  const parameters = resolveFixedRateStrokeFilterParameters(strength);
+  const stages = Array<number>(parameters.stageCount).fill(0);
+  const maximumTicks = Math.ceil(
+    STANDARD_LATENCY_ESTIMATE_LIMIT_MS / FIXED_RATE_STROKE_FILTER_TICK_MS
+  );
+
+  for (let tick = 1; tick <= maximumTicks; tick += 1) {
+    let input = 1;
+    for (let stageIndex = 0; stageIndex < stages.length; stageIndex += 1) {
+      const output = stages[stageIndex]! + (input - stages[stageIndex]!) * parameters.alpha;
+      stages[stageIndex] = output;
+      input = output;
+    }
+    if (input >= STANDARD_LATENCY_RESPONSE_TARGET) {
+      return tick * FIXED_RATE_STROKE_FILTER_TICK_MS;
+    }
+  }
+
+  return STANDARD_LATENCY_ESTIMATE_LIMIT_MS;
+}
+
+/** Pure, renderer-neutral input-latency copy for the line-correction UI. */
+export function describeStudioStabilizerLatency(
+  mode: StudioStabilizerMode,
+  requestedStrength: number
+): StudioStabilizerLatencyDescription {
+  const strength = clampStrength(requestedStrength);
+  if (strength <= 0) {
+    return {
+      kind: "instant",
+      label: "즉시",
+      description: "입력 보정을 우회해 펜 위치를 바로 반영합니다.",
+      estimatedMs: 0,
+    };
+  }
+
+  const normalizedMode = normalizeStudioStabilizerMode(mode);
+  if (normalizedMode === "adaptive") {
+    return {
+      kind: "variable",
+      label: "가변 반응",
+      description: "느린 선은 더 안정시키고 빠른 플릭은 보정을 줄여 반응 시간이 달라집니다.",
+      estimatedMs: null,
+    };
+  }
+  if (normalizedMode === "precision") {
+    return {
+      kind: "guided",
+      label: "의도적 후행",
+      description: "가이드 끈을 따라 선이 펜 끝보다 뒤에서 움직입니다.",
+      estimatedMs: null,
+    };
+  }
+
+  const estimatedMs = estimateStandardStabilizerLatencyMs(strength);
+  return {
+    kind: "estimated",
+    label: `약 ${estimatedMs}ms`,
+    description: "고정 주기 지원 브러시에서 큰 이동의 90%를 따라가는 예상 시간입니다.",
+    estimatedMs,
+  };
 }
 
 export function createStudioStrokeStabilizerState(

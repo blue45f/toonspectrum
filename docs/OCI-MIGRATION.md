@@ -50,15 +50,21 @@ docker compose up -d db
 docker compose build api
 docker compose run --rm api pnpm exec drizzle-kit push --force
 docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+  < ../../lib/db/migrations/0013_creator_asset_marketplace.sql
+docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
   < ../../lib/db/migrations/0009_socket_io_postgres_adapter.sql
 docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
   < ../../lib/db/migrations/0017_creator_work_live_lock_revision.sql
+docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+  < ../../lib/db/migrations/0018_studio_ai_request_gate.sql
+docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+  < ../../lib/db/migrations/0019_studio_ai_request_receipt.sql
 docker compose up -d api caddy              # migration 완료 후에만 Studio API를 공개
 curl -s https://api.example.com/api/config # 200 확인
 ```
 
-기존 스택 업그레이드는 `api`를 먼저 중지하고 `0017`을 적용한 뒤 새 이미지로 다시 시작해야
-합니다. 세부 사후조건과 retry/rollback 절차는
+기존 스택 업그레이드는 `api`를 먼저 중지하고 `0013`, `0017`, `0018`, `0019`를 순서대로 적용한 뒤 새
+이미지로 다시 시작해야 합니다. 세부 사후조건과 retry/rollback 절차는
 [`STUDIO-LIVE-LOCK-REVISION-MIGRATION.md`](./STUDIO-LIVE-LOCK-REVISION-MIGRATION.md)를 따릅니다.
 
 ## 6. DB 데이터 이전 (Neon → OCI) — 선택

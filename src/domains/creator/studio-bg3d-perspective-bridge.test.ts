@@ -91,7 +91,7 @@ describe("studio-bg3d-perspective-bridge", () => {
     expect(backgroundSource).toContain("const perspectiveGuides = deriveStudioBg3dVanishingPoints(");
     expect(backgroundSource).toContain("x: point.x / rendered.width");
     expect(backgroundSource).toContain("perspectiveGuides,");
-    expect(studioPageSource).toContain("result.perspectiveGuides.map((point)");
+    expect(studioPageSource).toContain("mapStudioBg3dPerspectiveGuidesToAnchor(");
     expect(studioPageSource).not.toContain('from "./studio-bg3d-perspective-bridge"');
   });
 });

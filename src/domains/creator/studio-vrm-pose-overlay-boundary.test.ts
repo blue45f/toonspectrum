@@ -66,11 +66,49 @@ describe("Studio VRM visual pose bone boundary", () => {
     expect(previewSource).toContain('(["leftFoot", "rightFoot"] as const).flatMap');
     expect(previewSource).toContain("양발 고정에 참여하는 다리에 잠긴 관절이 있습니다");
     expect(previewSource).toContain("applyStudioVrmRotationPose(currentVrm");
+    const convergenceGuard = previewSource.indexOf("if (!canCommitStudioVrmIkResult(result))");
+    const latestPreview = previewSource.indexOf("transaction.latest = result");
+    expect(convergenceGuard).toBeGreaterThan(-1);
+    expect(latestPreview).toBeGreaterThan(convergenceGuard);
+    expect(previewSource.slice(convergenceGuard, latestPreview)).toContain(
+      "applyStudioVrmRotationPose(currentVrm, transaction.baseline, bodyScale)",
+    );
+    expect(previewSource.slice(convergenceGuard, latestPreview)).toContain("transaction.latest = null");
     expect(previewSource).not.toContain("setPoseTranslations(");
     expect(previewSource).not.toContain("setCustomBones(");
+    expect(commitSource).toContain("if (result && !canCommitStudioVrmIkResult(result))");
+    expect(commitSource).toContain("restoreBaseline: true");
+    expect(commitSource).toContain("status: STUDIO_VRM_IK_NOT_CONVERGED_STATUS");
     expect(commitSource).toContain("setCustomBones(nextBones)");
     expect(commitSource).toContain("setPoseTranslations(cloneStudioVrmPoseTranslations(nextTranslations))");
     expect(commitSource).toContain("constraints.length");
+    expect(commitSource).toContain("transaction.control !== control");
+    expect(commitSource).toContain("transaction.targetWorld.x");
+    expect(commitSource).toContain("commitStudioVrmFullStateHistoryTransaction(");
+    expect(commitSource.match(/commitStudioVrmFullStateHistoryTransaction\(/g)).toHaveLength(1);
+    expect(commitSource).toContain('control: "pole"');
+    expect(source).toContain("enabledStudioVrmIkPolesSceneLocal(ikConstraints)");
+    expect(source).toContain("onPolePreview={previewJointHandlePole}");
+    expect(source).toContain("onPoleCommit={handleJointHandlePoleCommit}");
+    expect(source).toContain('aria-label="IK 핸들 이동 방식"');
+    expect(source).toContain('aria-label="IK 핸들 축 제한"');
+    expect(source).toContain("min-h-11 min-w-11");
+  });
+
+  it("rolls persistent locked-pin reconciliation back when the full-body solver does not converge", () => {
+    const solver = source.indexOf("const result = solveStudioVrmFullBodyIk(vrm, {");
+    const publish = source.indexOf("const nextBones = stripFingerBones(result.bones);", solver);
+    expect(solver).toBeGreaterThan(-1);
+    expect(publish).toBeGreaterThan(solver);
+    const admission = source.slice(solver, publish);
+    const convergence = admission.indexOf("if (!canCommitStudioVrmIkResult(result))");
+
+    expect(convergence).toBeGreaterThan(-1);
+    expect(admission.slice(convergence)).toContain(
+      "rollbackPendingCommand(STUDIO_VRM_IK_NOT_CONVERGED_STATUS)"
+    );
+    expect(admission).not.toContain("persistentIkResolvedSignatureRef.current =");
+    expect(admission).not.toContain("commitPendingCommand(");
   });
 
   it("keeps the poser open when the editor rejects an obsolete insertion ticket", () => {

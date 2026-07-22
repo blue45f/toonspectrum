@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 
 import {
+  BadRequestException,
   BadGatewayException,
   GatewayTimeoutException,
   HttpException,
@@ -10,8 +11,17 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 
-import { rateLimit } from "../../../../../lib/rate-limit";
-
+import {
+  STUDIO_AI_ADMISSION_GATE,
+  STUDIO_AI_LEASE_GRACE_MS,
+  STUDIO_AI_RATE_LIMIT_REQUESTS,
+  STUDIO_AI_RATE_LIMIT_WINDOW_MS,
+} from "./studio-ai-admission";
+import {
+  parseStudioAiIdempotencyKey,
+  studioAiCanonicalRequestHash,
+  studioAiUserIdempotencyKeyHash,
+} from "./studio-ai-idempotency";
 import {
   classifyStudioAiProviderFailure,
   resolveStudioAiProviderCandidates,
@@ -28,6 +38,13 @@ import {
   STUDIO_AI_USAGE_STORE,
 } from "./studio-ai-usage";
 
+import type {
+  StudioAiAdmissionGate,
+  StudioAiAdmissionLease,
+  StudioAiAdmissionReceipt,
+  StudioAiIdempotencyConflictReason,
+  StudioAiReceiptMutationInput,
+} from "./studio-ai-admission";
 import type { StudioAiProviderConfig, StudioAiProviderId } from "./studio-ai-provider";
 import type {
   StudioAiTokenUsage,
@@ -36,8 +53,6 @@ import type {
 } from "./studio-ai-usage";
 import type { StudioAiChatDto } from "./studio-ai.dto";
 
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_REQUESTS = 20;
 const CLIENT_CLOSED_REQUEST_STATUS = 499;
 const MAX_RECORDED_TOKEN_COUNT = 2_147_483_647;
 
@@ -105,6 +120,7 @@ function providerFailure(
   status: StudioAiUsageStatus;
   exception: HttpException;
   billingFailoverEligible: boolean;
+  definitivelyRejectedBeforeInference: boolean;
 } {
   const classification = classifyStudioAiProviderFailure(provider, responseStatus, payload);
   if (classification.kind === STUDIO_AI_BILLING_FAILOVER_REASON) {
@@ -115,6 +131,7 @@ function providerFailure(
         HttpStatus.TOO_MANY_REQUESTS
       ),
       billingFailoverEligible: true,
+      definitivelyRejectedBeforeInference: true,
     };
   }
   if (classification.kind === "rate_limited") {
@@ -125,6 +142,7 @@ function providerFailure(
         HttpStatus.TOO_MANY_REQUESTS
       ),
       billingFailoverEligible: false,
+      definitivelyRejectedBeforeInference: true,
     };
   }
   if (classification.kind === "authentication" || responseStatus === 402) {
@@ -134,6 +152,7 @@ function providerFailure(
         "서버 AI 인증 또는 결제 설정을 확인하고 있어요. 내 API 키 연동을 이용해 주세요."
       ),
       billingFailoverEligible: false,
+      definitivelyRejectedBeforeInference: true,
     };
   }
   if (classification.kind === "provider_unavailable") {
@@ -143,6 +162,7 @@ function providerFailure(
         "AI 제공자가 일시적으로 응답하지 않아요. 잠시 후 다시 시도해 주세요."
       ),
       billingFailoverEligible: false,
+      definitivelyRejectedBeforeInference: false,
     };
   }
   return {
@@ -151,6 +171,7 @@ function providerFailure(
       "AI 제공자가 요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요."
     ),
     billingFailoverEligible: false,
+    definitivelyRejectedBeforeInference: responseStatus < 500,
   };
 }
 
@@ -187,11 +208,66 @@ function dailyQuotaExceededException(): HttpException {
   );
 }
 
+function admissionUnavailableException(): ServiceUnavailableException {
+  return new ServiceUnavailableException(
+    "서버 AI 요청 보호 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요."
+  );
+}
+
+function admissionRateLimitException(): HttpException {
+  return new HttpException(
+    "AI 요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",
+    HttpStatus.TOO_MANY_REQUESTS
+  );
+}
+
+function admissionBusyException(): HttpException {
+  return new HttpException(
+    "이미 처리 중인 서버 AI 요청이 있어요. 완료된 뒤 다시 시도해 주세요.",
+    HttpStatus.TOO_MANY_REQUESTS
+  );
+}
+
+function invalidIdempotencyKeyException(): BadRequestException {
+  return new BadRequestException(
+    "AI 작업 식별자가 없거나 올바르지 않아요. 페이지를 새로고침한 뒤 다시 시도해 주세요."
+  );
+}
+
+function idempotencyConflictException(reason: StudioAiIdempotencyConflictReason): HttpException {
+  if (reason === "request_admitted" || reason === "request_sent") {
+    return new HttpException(
+      "같은 AI 작업이 이미 처리 중이에요. 완료 상태를 확인한 뒤 다시 시도해 주세요.",
+      425
+    );
+  }
+  if (reason === "key_reused_with_different_request") {
+    return new HttpException(
+      "같은 AI 작업 식별자를 다른 요청에 재사용할 수 없어요.",
+      HttpStatus.CONFLICT
+    );
+  }
+  if (reason === "request_ambiguous") {
+    return new HttpException(
+      "이 AI 작업은 공급자 처리 여부를 확인 중이라 재전송하지 않았어요. 새 과금 방지를 위해 잠시 후 작업 기록을 확인해 주세요.",
+      HttpStatus.CONFLICT
+    );
+  }
+  return new HttpException(
+    "이 AI 작업은 이미 공급자에서 완료되어 재전송하지 않았어요.",
+    HttpStatus.CONFLICT
+  );
+}
+
+type StudioAiReceiptOutcome = "not_sent" | "safe_rejection" | "ambiguous" | "succeeded";
+
 @Injectable()
 export class StudioAiService {
   constructor(
     @Inject(STUDIO_AI_USAGE_STORE)
-    private readonly usageStore: StudioAiUsageStore
+    private readonly usageStore: StudioAiUsageStore,
+    @Inject(STUDIO_AI_ADMISSION_GATE)
+    private readonly admissionGate: StudioAiAdmissionGate
   ) {}
 
   status() {
@@ -225,7 +301,22 @@ export class StudioAiService {
     };
   }
 
-  async complete(userId: string, input: StudioAiChatDto, clientSignal?: AbortSignal) {
+  async complete(
+    userId: string,
+    input: StudioAiChatDto,
+    idempotencyKeyInput: string | undefined,
+    clientSignal?: AbortSignal
+  ) {
+    let idempotencyKey: string;
+    try {
+      idempotencyKey = parseStudioAiIdempotencyKey(idempotencyKeyInput);
+    } catch {
+      throw invalidIdempotencyKeyException();
+    }
+    const identity = {
+      userKeyHash: studioAiUserIdempotencyKeyHash(userId, idempotencyKey),
+      requestHash: studioAiCanonicalRequestHash(input),
+    };
     const providerPreference = input.provider ?? "auto";
     const providers = resolveStudioAiProviderCandidates(providerPreference);
     if (providers.length === 0) {
@@ -235,10 +326,81 @@ export class StudioAiService {
           : "선택한 서버 AI 제공자가 설정되지 않았어요. 자동 선택이나 내 API 키 연동을 이용해 주세요."
       );
     }
-    if (!rateLimit(`studio-ai:${userId}`, RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW_MS)) {
-      throw new HttpException("AI 요청이 너무 많아요. 잠시 후 다시 시도해 주세요.", HttpStatus.TOO_MANY_REQUESTS);
+    const providerTimeoutMs = resolveStudioAiTimeoutMs(providers[0]?.id);
+    const leaseMs = providerTimeoutMs + STUDIO_AI_LEASE_GRACE_MS;
+    let admission: Awaited<ReturnType<StudioAiAdmissionGate["acquire"]>>;
+    try {
+      admission = await this.admissionGate.acquire({
+        userId,
+        identity,
+        requestLimit: STUDIO_AI_RATE_LIMIT_REQUESTS,
+        windowMs: STUDIO_AI_RATE_LIMIT_WINDOW_MS,
+        leaseMs,
+      });
+    } catch {
+      throw admissionUnavailableException();
+    }
+    if (admission.status === "rate_limited") throw admissionRateLimitException();
+    if (admission.status === "busy") throw admissionBusyException();
+    if (admission.status === "idempotency_conflict") {
+      throw idempotencyConflictException(admission.reason);
     }
 
+    let result: StudioAiCompletionResult | undefined;
+    let failure: unknown;
+    let failed = false;
+    try {
+      result = await this.completeAdmitted(
+        userId,
+        input,
+        providers,
+        admission.lease,
+        admission.receipt,
+        providerTimeoutMs,
+        leaseMs,
+        clientSignal
+      );
+    } catch (error) {
+      failed = true;
+      failure = error;
+    } finally {
+      try {
+        await this.admissionGate.release({
+          userId,
+          token: admission.lease.token,
+          fence: admission.lease.fence,
+        });
+      } catch {
+        // Do not hide an already-paid result or original provider failure: a retry could duplicate
+        // billing. The exact hash/fence cannot clear a newer lease, and this lease expires in DB.
+      }
+    }
+    if (failed) throw failure;
+    if (!result) throw new BadGatewayException("AI 응답을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.");
+    return result;
+  }
+
+  private async completeAdmitted(
+    userId: string,
+    input: StudioAiChatDto,
+    providers: readonly StudioAiProviderConfig[],
+    admissionLease: StudioAiAdmissionLease,
+    admissionReceipt: StudioAiAdmissionReceipt,
+    providerTimeoutMs: number,
+    leaseMs: number,
+    clientSignal?: AbortSignal
+  ) {
+    const receiptMutation: StudioAiReceiptMutationInput = {
+      userId,
+      ...admissionReceipt,
+    };
+    const abandonBeforeSend = async () => {
+      try {
+        await this.admissionGate.abandonBeforeSend(receiptMutation);
+      } catch {
+        // The short admitted expiry remains a conservative replay block if cleanup storage fails.
+      }
+    };
     const spec = TASK_SPECS[input.task];
     const anonymousUserId = providerUserId(userId);
     const startedAt = new Date();
@@ -256,9 +418,55 @@ export class StudioAiService {
         limits: resolveStudioAiQuotaLimits(),
       });
     } catch {
+      await abandonBeforeSend();
       throw usageLedgerUnavailableException();
     }
-    if (!reservation.allowed) throw dailyQuotaExceededException();
+    if (!reservation.allowed) {
+      await abandonBeforeSend();
+      throw dailyQuotaExceededException();
+    }
+
+    // Quota reservation may wait on the service-wide daily row. Reset the fenced lease only after
+    // that wait, immediately before the upstream timeout begins, so admission time cannot consume
+    // the paid-call concurrency budget. The exact identity permits an expired-but-unreplaced lease
+    // to recover, while a newer fence fails closed without sending the prompt.
+    let renewedLease: StudioAiAdmissionLease | null = null;
+    try {
+      renewedLease = await this.admissionGate.renew({
+        userId,
+        token: admissionLease.token,
+        fence: admissionLease.fence,
+        leaseMs,
+      });
+    } catch {
+      // Normalize storage failures below after releasing the already-reserved token budget.
+    }
+    if (!renewedLease) {
+      const finishedAt = new Date(Math.max(Date.now(), startedAt.getTime()));
+      let ledgerFailed = false;
+      try {
+        await this.usageStore.finalize({
+          userId,
+          usageDay: reservation.usageDay,
+          reservedTokens,
+          task: input.task,
+          provider: providers[0].id,
+          model: providers[0].model,
+          attemptCount: 1,
+          status: "network_error",
+          // No provider request was sent. Make the zero charge explicit so conservative fallback
+          // accounting does not consume the full token reservation during fenced admission loss.
+          usage: { totalTokens: 0 },
+          startedAt,
+          finishedAt,
+        });
+      } catch {
+        ledgerFailed = true;
+      }
+      await abandonBeforeSend();
+      if (ledgerFailed) throw usageLedgerUnavailableException();
+      throw admissionUnavailableException();
+    }
 
     const upstreamController = new AbortController();
     let abortSource: RequestAbortSource | undefined;
@@ -270,6 +478,7 @@ export class StudioAiService {
     let ledgerProvider: StudioAiProviderConfig = providers[0];
     let attemptCount = 0;
     let failoverSource: StudioAiProviderConfig | undefined;
+    let receiptOutcome: StudioAiReceiptOutcome = "not_sent";
 
     const abortFromClient = () => {
       if (upstreamController.signal.aborted) return;
@@ -297,7 +506,7 @@ export class StudioAiService {
 
     clientSignal?.addEventListener("abort", abortFromClient, { once: true });
     if (clientSignal?.aborted) abortFromClient();
-    const timer = setTimeout(abortFromTimeout, resolveStudioAiTimeoutMs(providers[0]?.id));
+    const timer = setTimeout(abortFromTimeout, providerTimeoutMs);
 
     try {
       throwIfCancelled();
@@ -309,6 +518,16 @@ export class StudioAiService {
         attemptCount = index + 1;
         usage = {};
         const hasFallback = index < providers.length - 1;
+
+        let sent = false;
+        try {
+          sent = await this.admissionGate.markSent(receiptMutation);
+        } catch {
+          // Storage authority is required before every provider attempt.
+        }
+        if (!sent) throw admissionUnavailableException();
+        // From this exact point onward, any non-definitive outcome may already have been billed.
+        receiptOutcome = "ambiguous";
 
         let response: Response;
         try {
@@ -354,6 +573,9 @@ export class StudioAiService {
           const providerError = providerFailure(provider.id, response.status, errorPayload);
           outcomeStatus = providerError.status;
           lastProviderFailure = providerError.exception;
+          if (providerError.definitivelyRejectedBeforeInference) {
+            receiptOutcome = "safe_rejection";
+          }
           if (hasFallback && providerError.billingFailoverEligible) {
             failoverSource = provider;
             continue;
@@ -405,6 +627,7 @@ export class StudioAiService {
         }
 
         outcomeStatus = "success";
+        receiptOutcome = "succeeded";
         const responseModel =
           typeof payload.model === "string" && payload.model.trim()
             ? payload.model.trim().slice(0, 200)
@@ -443,6 +666,25 @@ export class StudioAiService {
       clientSignal?.removeEventListener("abort", abortFromClient);
     }
 
+    try {
+      if (receiptOutcome === "succeeded") {
+        await this.admissionGate.markSucceeded(receiptMutation);
+      } else if (receiptOutcome === "ambiguous") {
+        await this.admissionGate.markAmbiguous(receiptMutation);
+      } else if (receiptOutcome === "safe_rejection") {
+        await this.admissionGate.abandonSafeRejection(receiptMutation);
+      } else {
+        await this.admissionGate.abandonBeforeSend(receiptMutation);
+      }
+    } catch {
+      // A pre-call `sent` write is already durable. Never replace a paid success/provider error
+      // with a storage error that would encourage a second request; sent remains replay-blocking.
+      console.error("[studio-ai] receipt finalization failed", {
+        outcome: receiptOutcome,
+        attemptCount: Math.max(0, attemptCount),
+      });
+    }
+
     const finishedAt = new Date(Math.max(Date.now(), startedAt.getTime()));
     try {
       await this.usageStore.finalize({
@@ -459,7 +701,19 @@ export class StudioAiService {
         finishedAt,
       });
     } catch {
-      throw usageLedgerUnavailableException();
+      if (!failed && result && outcomeStatus === "success") {
+        // The reservation already holds the conservative maximum token charge. Hiding a paid
+        // success behind 503 would invite a retry and a second provider charge, while returning it
+        // cannot open quota. Keep the over-reservation for later reconciliation and emit only
+        // bounded operational metadata (never prompts, keys, provider bodies, or user ids).
+        console.error("[studio-ai] usage finalization failed after paid success", {
+          provider: ledgerProvider.id,
+          model: ledgerProvider.model,
+          attemptCount: Math.max(1, attemptCount),
+        });
+      } else {
+        throw usageLedgerUnavailableException();
+      }
     }
 
     if (failed) throw failure;

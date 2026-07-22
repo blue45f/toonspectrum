@@ -22,18 +22,27 @@ default, so such an old insert fails closed, but the deployment must still be tr
 
 ## Fresh database
 
-Provision the schema and run both realtime SQL migrations before starting the API:
+Provision the schema, apply the Creator Asset, realtime, and Studio AI forward migrations before
+starting the API:
 
 ```bash
 pnpm exec drizzle-kit push --force
 psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
+  -f lib/db/migrations/0013_creator_asset_marketplace.sql
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
   -f lib/db/migrations/0009_socket_io_postgres_adapter.sql
 psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
   -f lib/db/migrations/0017_creator_work_live_lock_revision.sql
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
+  -f lib/db/migrations/0018_studio_ai_request_gate.sql
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
+  -f lib/db/migrations/0019_studio_ai_request_receipt.sql
 ```
 
-On a fresh Drizzle schema there are no legacy leases to evict. The second command establishes the
-durable `0017_creator_work_live_lock_revision` ledger row used by API boot and future retries.
+On a fresh Drizzle schema there are no legacy leases to evict. The `0017` command establishes the
+durable `0017_creator_work_live_lock_revision` ledger row used by API boot and future retries. The
+`0018` and `0019` commands establish the distributed Studio AI admission and durable idempotency
+boundaries required by API boot.
 
 ## Existing database upgrade
 
@@ -41,7 +50,13 @@ With all Studio API writers stopped:
 
 ```bash
 psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
+  -f lib/db/migrations/0013_creator_asset_marketplace.sql
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
   -f lib/db/migrations/0017_creator_work_live_lock_revision.sql
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
+  -f lib/db/migrations/0018_studio_ai_request_gate.sql
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
+  -f lib/db/migrations/0019_studio_ai_request_receipt.sql
 ```
 
 Do not run `drizzle-kit push --force` as a substitute. It can create the final column shape but

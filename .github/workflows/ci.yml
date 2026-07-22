@@ -79,13 +79,17 @@ jobs:
           END;
           $$;
           SQL
-      # 배포 migration 자체도 실제 PostgreSQL에서 실행한 뒤 realtime integration을 수행한다.
-      # 0017은 최종 Drizzle 스키마에서도 안전하게 원장만 기록하며, integration suite가 별도
-      # schema에 legacy 상태를 구성해 최초 cutover와 재적용 보존을 함께 증명한다.
-      - name: Apply realtime SQL migrations
+      # 배포 migration 자체도 실제 PostgreSQL에서 실행한 뒤 integration을 수행한다.
+      # 0013은 Creator Asset 권리 보정과 제약을, 0017은 live-lock cutover 원장을,
+      # 0018은 Studio AI 분산 rate-limit/lease 경계를, 0019는 유료 호출의 durable
+      # idempotency receipt 경계를 실제 PostgreSQL에서 검증한다.
+      - name: Apply forward SQL migrations
         run: |
+          psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0013_creator_asset_marketplace.sql
           psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0009_socket_io_postgres_adapter.sql
           psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0017_creator_work_live_lock_revision.sql
+          psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0018_studio_ai_request_gate.sql
+          psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0019_studio_ai_request_receipt.sql
       - run: pnpm run test
       - run: pnpm run build
       - run: pnpm run check:studio-bundle

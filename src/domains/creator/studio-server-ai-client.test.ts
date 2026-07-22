@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  canonicalStudioServerAiOperationId,
   completeStudioServerText,
   getStudioServerAiStatus,
   parseStudioServerAiCompletion,
   parseStudioServerAiFailoverMetadata,
 } from "./studio-server-ai-client";
+
+const OPERATION_ID = "composition-00000000-0000-4000-8000-000000000001";
 
 const { apiGet, apiPost, toApiError } = vi.hoisted(() => ({
   apiGet: vi.fn(),
@@ -55,6 +58,7 @@ describe("studio-server-ai-client", () => {
       system: "구도를 제안하세요.",
       user: "옥상 장면",
       provider: "zai",
+      operationId: OPERATION_ID,
     });
     expect(result).toEqual({
       ok: true,
@@ -69,8 +73,43 @@ describe("studio-server-ai-client", () => {
         user: "옥상 장면",
         provider: "zai",
       },
-      { signal: undefined }
+      {
+        signal: undefined,
+        headers: { "Idempotency-Key": OPERATION_ID },
+      }
     );
+  });
+
+  it("서버 계약에 맞는 operation ID만 canonical retry key로 허용한다", () => {
+    expect(canonicalStudioServerAiOperationId(OPERATION_ID)).toBe(OPERATION_ID);
+    expect(canonicalStudioServerAiOperationId(`  ${OPERATION_ID}  `)).toBeNull();
+    expect(canonicalStudioServerAiOperationId("a".repeat(16))).toBe("a".repeat(16));
+    expect(canonicalStudioServerAiOperationId("a".repeat(128))).toBe("a".repeat(128));
+    expect(canonicalStudioServerAiOperationId("a".repeat(15))).toBeNull();
+    expect(canonicalStudioServerAiOperationId("a".repeat(129))).toBeNull();
+    expect(canonicalStudioServerAiOperationId("작업-0000000000000000")).toBeNull();
+    expect(canonicalStudioServerAiOperationId("operation id with spaces")).toBeNull();
+  });
+
+  it.each([
+    undefined,
+    "too-short",
+    "a".repeat(129),
+    "작업-0000000000000000",
+    "operation id with spaces",
+  ])("잘못된 operation ID(%s)는 HTTP 전에 fail-closed 한다", async (operationId) => {
+    await expect(completeStudioServerText({
+      task: "composition",
+      promptVersion: 1,
+      system: "구도를 제안하세요.",
+      user: "옥상 장면",
+      operationId,
+    })).resolves.toEqual({
+      ok: false,
+      code: "invalid_input",
+      error: "서버 AI 요청 식별자가 올바르지 않아요.",
+    });
+    expect(apiPost).not.toHaveBeenCalled();
   });
 
   it("잔액 소진으로 대체 공급자가 응답한 이력을 안전한 구조로 보존한다", async () => {
@@ -97,6 +136,7 @@ describe("studio-server-ai-client", () => {
       promptVersion: 1,
       system: "JSON 장면을 만드세요.",
       user: "비 오는 옥상",
+      operationId: "scenario-00000000-0000-4000-8000-000000000002",
     });
 
     expect(result).toEqual({
@@ -181,6 +221,7 @@ describe("studio-server-ai-client", () => {
       promptVersion: 1,
       system: "구도를 제안하세요.",
       user: "옥상 장면",
+      operationId: "composition-00000000-0000-4000-8000-000000000003",
     });
 
     expect(result).toEqual({
@@ -199,6 +240,7 @@ describe("studio-server-ai-client", () => {
         promptVersion: 1,
         system: "JSON 팔레트를 만드세요.",
         user: "새벽 바다",
+        operationId: "palette-00000000-0000-4000-8000-000000000004",
       })
     ).resolves.toMatchObject({ ok: false, code: "http_error", error: "로그인이 필요해요." });
   });
