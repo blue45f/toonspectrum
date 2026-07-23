@@ -7,6 +7,7 @@ import {
   StudioPageReviewPanel,
   StudioQuickActionsMenu,
   StudioScenarioAutoLayoutPanel,
+  StudioMannequinPoserPanel,
   StudioScrollPreviewPanel,
   StudioStoryboardGridPanel,
   StudioTimelapsePanel,
@@ -31,6 +32,7 @@ type StudioThreeDPreviewPanelStackHandlers = Pick<
   | "handleTimelapseRecordingStart"
   | "insertBg3dResult"
   | "insertVrmResult"
+  | "insertMannequinResult"
   | "patchPageReview"
   | "setCurrentPageId"
 >;
@@ -53,6 +55,7 @@ export type StudioThreeDPreviewPanelStackProps = Pick<
   | "pages"
   | "pagesHi"
   | "pagesHistory"
+  | "mannequinPoserOpen"
   | "poserInitialDataUrl"
   | "poserInitialElementId"
   | "poserVrmOpen"
@@ -64,6 +67,7 @@ export type StudioThreeDPreviewPanelStackProps = Pick<
   | "setBg3dInitialElementId"
   | "setBg3dInitialScene"
   | "setBg3dOpen"
+  | "setMannequinPoserOpen"
   | "setPageReviewOpen"
   | "setPoserInitialDataUrl"
   | "setPoserInitialElementId"
@@ -125,6 +129,17 @@ function PoserLoadingOverlay() {
       <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
         <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
         <span>포저를 여는 중</span>
+      </div>
+    </div>
+  );
+}
+
+function MannequinLoadingOverlay() {
+  return (
+    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
+      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
+        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
+        <span>3D 데생 인형을 여는 중</span>
       </div>
     </div>
   );
@@ -202,6 +217,7 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
   pages,
   pagesHi,
   pagesHistory,
+  mannequinPoserOpen,
   poserInitialDataUrl,
   poserInitialElementId,
   poserVrmOpen,
@@ -213,6 +229,7 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
   setBg3dInitialElementId,
   setBg3dInitialScene,
   setBg3dOpen,
+  setMannequinPoserOpen,
   setPageReviewOpen,
   setPoserInitialDataUrl,
   setPoserInitialElementId,
@@ -237,6 +254,7 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
     handleTimelapseRecordingStart,
     insertBg3dResult,
     insertVrmResult,
+    insertMannequinResult,
     patchPageReview,
     setCurrentPageId,
   } = stableHandlers;
@@ -275,6 +293,16 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
               setPoserInitialElementId(undefined);
             }}
             onInsert={insertVrmResult}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={<MannequinLoadingOverlay />}>
+        {mannequinPoserOpen ? (
+          <StudioMannequinPoserPanel
+            open
+            onClose={() => setMannequinPoserOpen(false)}
+            onInsert={insertMannequinResult}
           />
         ) : null}
       </Suspense>

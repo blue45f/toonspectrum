@@ -20,6 +20,7 @@ import type { ColorToAlpha } from "./studio-color-to-alpha";
 import type { CurvePoint, CurveRgbChannels } from "./studio-curves";
 import type { Detail } from "./studio-detail";
 import type { Distort } from "./studio-distort";
+import type { StudioGlitchFx, StudioVignetteFx } from "./studio-filter-pack";
 import type { Glow } from "./studio-glow";
 import type { GradientMap } from "./studio-gradient-map";
 import type { Grain } from "./studio-grain";
@@ -30,6 +31,7 @@ import type { Light } from "./studio-light";
 import type { Outline } from "./studio-outline";
 import type { PhotoFilter } from "./studio-photo-filter";
 import type { SelectiveHsl } from "./studio-selective-hsl";
+import type { ShadowHighlight } from "./studio-shadow-highlight";
 import type { Sketch } from "./studio-sketch";
 import type { Stylize } from "./studio-stylize";
 import type { Vibrance } from "./studio-vibrance";
@@ -75,6 +77,8 @@ export type ImageFilterFields = {
   colorToAlpha?: ColorToAlpha;
   autoAdjust?: AutoAdjust;
   clarity?: Clarity;
+  /** 섀도우/하이라이트 — 휘도 LUT 기반 명암 복구(studio-shadow-highlight). */
+  shadowHighlight?: ShadowHighlight;
   outline?: Outline;
   glow?: Glow;
   halftone?: Halftone;
@@ -84,6 +88,10 @@ export type ImageFilterFields = {
   blurFx?: BlurFx;
   distort?: Distort;
   stylize?: Stylize;
+  /** 글리치 — 시드 기반 row-slice 오프셋 + RGB 분리(studio-filter-pack, type-only 의존). */
+  glitchFx?: StudioGlitchFx;
+  /** 비네트 — smoothstep 가장자리 어둡히기(studio-filter-pack, type-only 의존). */
+  vignetteFx?: StudioVignetteFx;
   light?: Light;
   sketch?: Sketch;
   detail?: Detail;
@@ -158,6 +166,16 @@ function hasActiveAmountCandidate(value: unknown): boolean {
   return !!source && candidateFinite(source.amount) && source.amount > 0;
 }
 
+function hasActiveIntensityCandidate(value: unknown): boolean {
+  const source = candidateRecord(value);
+  return !!source && candidateFinite(source.intensity) && source.intensity > 0;
+}
+
+function hasActiveDarknessCandidate(value: unknown): boolean {
+  const source = candidateRecord(value);
+  return !!source && candidateFinite(source.darkness) && source.darkness > 0;
+}
+
 function hasActiveRadiusCandidate(value: unknown): boolean {
   const source = candidateRecord(value);
   return !!source && candidateFinite(source.radius) && source.radius > 0;
@@ -186,6 +204,7 @@ const LIGHTWEIGHT_ADJUSTMENT_ENGINES = new Set<StudioAdjustmentEngineId>([
   "curves",
   "levels",
   "brightness-contrast",
+  "shadow-highlight",
   "hue-saturation",
   "color-balance",
   "channel-mixer",
@@ -303,6 +322,7 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasObjectFilter(el.photoFilter) ||
     hasObjectFilter(el.autoAdjust) ||
     hasObjectFilter(el.clarity) ||
+    hasObjectFilter(el.shadowHighlight) ||
     hasObjectFilter(el.outline) ||
     hasObjectFilter(el.glow) ||
     hasObjectFilter(el.halftone) ||
@@ -320,6 +340,8 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActivePixelOffsetCandidate(el.pixelOffset) ||
     hasActiveConvolutionCandidate(el.convolution) ||
     hasActiveAmountCandidate(el.clouds) ||
+    hasActiveIntensityCandidate(el.glitchFx) ||
+    hasActiveDarknessCandidate(el.vignetteFx) ||
     hasActiveSmartFilterProgram(el) ||
     hasObjectFilter(el.colorToAlpha) ||
     isActiveNumber(el.saturation) ||
@@ -381,6 +403,7 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.photoFilter ?? null,
     el.autoAdjust ?? null,
     el.clarity ?? null,
+    el.shadowHighlight ?? null,
     el.outline ?? null,
     el.glow ?? null,
     el.halftone ?? null,
@@ -401,6 +424,8 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.pixelOffset ?? null,
     el.convolution ?? null,
     el.clouds ?? null,
+    el.glitchFx ?? null,
+    el.vignetteFx ?? null,
     smartFilterProgram,
   ]);
 }

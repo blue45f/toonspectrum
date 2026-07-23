@@ -243,10 +243,24 @@ export function resolveStudioGpuTileTasks<Resource>(
   return { tasks: resolved, dabCount };
 }
 
+/**
+ * Packs every resolved dab into instance floats.
+ *
+ * `scratch` is an optional grow-only staging array owned by the caller. When it is large enough,
+ * the pack writes into it and returns a length-exact subarray view; the view stays valid only
+ * until the next pack into the same scratch, so callers must upload/consume it synchronously
+ * (GPUQueue.writeBuffer copies at call time). A missing or too-small scratch allocates a fresh
+ * exact-size array, which the caller may retain as its next scratch. Every returned float is
+ * written by this call — stale scratch content can never leak into the view.
+ */
 export function packStudioGpuTileDabs(
-  tasks: StudioGpuResolvedTileTasks<unknown>
+  tasks: StudioGpuResolvedTileTasks<unknown>,
+  scratch?: Float32Array
 ): Float32Array {
-  const packed = new Float32Array(tasks.dabCount * STUDIO_GPU_DAB_INSTANCE_FLOATS);
+  const requiredFloats = tasks.dabCount * STUDIO_GPU_DAB_INSTANCE_FLOATS;
+  const packed = scratch !== undefined && scratch.length >= requiredFloats
+    ? scratch.subarray(0, requiredFloats)
+    : new Float32Array(requiredFloats);
   for (const resolved of tasks.tasks) {
     const { descriptor } = resolved.task;
     for (let index = 0; index < resolved.plan.dabs.length; index += 1) {

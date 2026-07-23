@@ -120,6 +120,7 @@ function projectImageFilterFields(el: ImageFilterFields): ImageFilterFields {
     colorToAlpha: el.colorToAlpha,
     autoAdjust: el.autoAdjust,
     clarity: el.clarity,
+    shadowHighlight: el.shadowHighlight,
     outline: el.outline,
     glow: el.glow,
     halftone: el.halftone,
@@ -137,6 +138,8 @@ function projectImageFilterFields(el: ImageFilterFields): ImageFilterFields {
     pixelOffset: el.pixelOffset,
     convolution: el.convolution,
     clouds: el.clouds,
+    glitchFx: el.glitchFx,
+    vignetteFx: el.vignetteFx,
     // The persisted stack can carry disabled/corrupt entries. Send only one normalized ordered
     // program across the clone boundary so the Worker cannot apply it twice.
     smartFilters: undefined,

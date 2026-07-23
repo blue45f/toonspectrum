@@ -368,6 +368,7 @@ export const LOOK_FILTER_KEYS: (keyof ImageFilterFields)[] = [
   "photoFilter",
   "autoAdjust",
   "clarity",
+  "shadowHighlight",
   "outline",
   "glow",
   "halftone",

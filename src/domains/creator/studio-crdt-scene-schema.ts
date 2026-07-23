@@ -1,6 +1,5 @@
+import { copyStudioAdvancedRulerAsJson, type StudioAdvancedRulerDocument } from "./studio-advanced-ruler-document";
 import { parseStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
-
-import type { StudioAdvancedRulerDocument } from "./studio-advanced-ruler-document";
 
 import {
   STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
@@ -244,41 +243,10 @@ function cloneJsonObject(value: StudioCrdtJsonObject): StudioCrdtJsonObject {
 function copyStudioAdvancedRulerDocument(
   document: StudioAdvancedRulerDocument
 ): StudioCrdtJsonObject {
-  const rulers: StudioCrdtJsonObject[] = document.rulers.map((ruler) => {
-    const common: StudioCrdtJsonObject = {
-      id: ruler.id,
-      type: ruler.type,
-      name: ruler.name,
-      enabled: ruler.enabled,
-      visible: ruler.visible,
-      scope: {
-        kind: ruler.scope.kind,
-        groupId: ruler.scope.groupId,
-      },
-    };
-    if (ruler.type === "curve") {
-      return {
-        ...common,
-        snapMode: ruler.snapMode,
-        fixedOffset: ruler.fixedOffset,
-        p0: { x: ruler.p0.x, y: ruler.p0.y },
-        p1: { x: ruler.p1.x, y: ruler.p1.y },
-        p2: { x: ruler.p2.x, y: ruler.p2.y },
-        p3: { x: ruler.p3.x, y: ruler.p3.y },
-      };
-    }
-    return {
-      ...common,
-      guideFamily: ruler.guideFamily,
-      centerX: ruler.centerX,
-      centerY: ruler.centerY,
-      radius: ruler.radius,
-      rotationDeg: ruler.rotationDeg,
-      fovDeg: ruler.fovDeg,
-      strength: ruler.strength,
-      outsidePolicy: ruler.outsidePolicy,
-    };
-  });
+  // 종별 필드 복사는 문서 모듈이 담당한다 — 새 자(ruler) 종류가 늘어도 이 스키마는 무수정.
+  const rulers: StudioCrdtJsonObject[] = document.rulers.map(
+    (ruler) => copyStudioAdvancedRulerAsJson(ruler) as StudioCrdtJsonObject
+  );
   return {
     version: document.version,
     rulers,

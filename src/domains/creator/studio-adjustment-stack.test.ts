@@ -187,6 +187,22 @@ describe("studio adjustment stack", () => {
       divisor: 1,
       bias: 128,
     });
+    expect(project("shadow-highlight").shadowHighlight).toEqual({
+      shadows: 35,
+      shadowsWidth: 50,
+      highlights: 20,
+      highlightsWidth: 50,
+      midtoneContrast: 0,
+    });
+    expect(
+      project("shadow-highlight", { shadows: 60, highlights: 40, midtoneContrast: -15 }).shadowHighlight
+    ).toEqual({
+      shadows: 60,
+      shadowsWidth: 50,
+      highlights: 40,
+      highlightsWidth: 50,
+      midtoneContrast: -15,
+    });
   });
 
   it("exposes every recognized engine as addable without catalog drift", () => {

@@ -253,6 +253,63 @@ describe("studio 3D insert controller", () => {
       });
     });
 
+    it("appends a HiDPI capture at its logical display size so density becomes sharpness", () => {
+      const appendImage = vi.fn(() => true);
+
+      expect(applyStudioVrmInsertResult(vrmInput({
+        result: { ...vrmResult, width: 800, height: 400, displayWidth: 200, displayHeight: 100 },
+        appendImage,
+      }))).toBe(true);
+      expect(appendImage).toHaveBeenCalledWith({
+        src: vrmResult.pngDataUrl,
+        width: 200,
+        height: 100,
+        elementPatch: {
+          vrmScene,
+          name: "3D 데생 인형",
+        },
+      });
+    });
+
+    it.each([
+      // Partial pairs, hostile values, and display sizes exceeding the raster all fall back to
+      // the raster size — the insert never upscales past natural pixels.
+      { displayWidth: 200 },
+      { displayHeight: 100 },
+      { displayWidth: 0, displayHeight: 100 },
+      { displayWidth: Number.NaN, displayHeight: 100 },
+      { displayWidth: 200, displayHeight: Number.POSITIVE_INFINITY },
+      { displayWidth: 201, displayHeight: 100 },
+      { displayWidth: 200, displayHeight: 101 },
+    ])("falls back to the raster size for unusable display dimensions %j", (displayPatch) => {
+      const appendImage = vi.fn(() => true);
+
+      expect(applyStudioVrmInsertResult(vrmInput({
+        result: { ...vrmResult, ...displayPatch },
+        appendImage,
+      }))).toBe(true);
+      expect(appendImage).toHaveBeenCalledWith(expect.objectContaining({
+        width: vrmResult.width,
+        height: vrmResult.height,
+      }));
+    });
+
+    it("keeps replacement patches ratio-based regardless of display dimensions", () => {
+      const patchTarget = vi.fn(() => true);
+
+      expect(applyStudioVrmInsertResult(vrmInput({
+        result: { ...vrmResult, width: 800, height: 400, displayWidth: 200, displayHeight: 100 },
+        targetElementId: "image-1",
+        resolveTarget: vi.fn(() => ({ type: "image", width: 333 })),
+        patchTarget,
+      }))).toBe(true);
+      expect(patchTarget).toHaveBeenCalledWith("image-1", {
+        src: vrmResult.pngDataUrl,
+        height: 167,
+        vrmScene,
+      });
+    });
+
     it("propagates a new-image append rejection", () => {
       expect(applyStudioVrmInsertResult(vrmInput({
         appendImage: vi.fn(() => false),

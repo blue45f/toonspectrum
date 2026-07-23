@@ -1,4 +1,12 @@
 import {
+  canonicalizeStudioConcentricRuler,
+  canonicalizeStudioParallelRuler,
+  canonicalizeStudioRadialRuler,
+  mirrorStudioConcentricRulerHorizontally,
+  mirrorStudioParallelRulerHorizontally,
+  mirrorStudioRadialRulerHorizontally,
+} from "./studio-advanced-ruler-guide-snap";
+import {
   canonicalizeStudioCurveRuler,
   mirrorStudioCurveRulerHorizontally,
   type StudioCurvePoint,
@@ -34,6 +42,16 @@ const CURVE_KEYS = [
 const FISHEYE_KEYS = [
   "id", "type", "name", "enabled", "visible", "scope", "guideFamily", "centerX",
   "centerY", "radius", "rotationDeg", "fovDeg", "strength", "outsidePolicy",
+] as const;
+const PARALLEL_KEYS = [
+  "id", "type", "name", "enabled", "visible", "scope", "angleDeg", "originX",
+  "originY", "guideSpacing",
+] as const;
+const CONCENTRIC_KEYS = [
+  "id", "type", "name", "enabled", "visible", "scope", "centerX", "centerY", "guideSpacing",
+] as const;
+const RADIAL_KEYS = [
+  "id", "type", "name", "enabled", "visible", "scope", "centerX", "centerY",
 ] as const;
 
 export interface StudioAdvancedRulerScope {
@@ -75,7 +93,45 @@ export interface StudioAuthoredFisheyeRuler extends StudioAdvancedRulerBase {
   outsidePolicy: StudioFisheyeOutsidePolicy;
 }
 
-export type StudioAdvancedRuler = StudioAuthoredCurveRuler | StudioAuthoredFisheyeRuler;
+export interface StudioAuthoredParallelRuler extends StudioAdvancedRulerBase {
+  type: "parallel";
+  /** Line direction in degrees, canonical range [0, 180). */
+  angleDeg: number;
+  /** Display anchor for overlay guides and handles; snapping ignores it. */
+  originX: number;
+  originY: number;
+  /** Display-only guide density: spacing between neighboring guide lines. */
+  guideSpacing: number;
+}
+
+export interface StudioAuthoredConcentricRuler extends StudioAdvancedRulerBase {
+  type: "concentric";
+  centerX: number;
+  centerY: number;
+  /** Display-only guide density: spacing between neighboring guide circles. */
+  guideSpacing: number;
+}
+
+export interface StudioAuthoredRadialRuler extends StudioAdvancedRulerBase {
+  type: "radial";
+  centerX: number;
+  centerY: number;
+}
+
+export type StudioAdvancedRuler =
+  | StudioAuthoredCurveRuler
+  | StudioAuthoredFisheyeRuler
+  | StudioAuthoredParallelRuler
+  | StudioAuthoredConcentricRuler
+  | StudioAuthoredRadialRuler;
+
+export const STUDIO_ADVANCED_RULER_NAME_PREFIXES: Record<StudioAdvancedRuler["type"], string> = {
+  curve: "곡선",
+  fisheye: "어안",
+  parallel: "평행선",
+  concentric: "동심원",
+  radial: "방사선",
+};
 
 export interface StudioAdvancedRulerDocument {
   version: typeof STUDIO_ADVANCED_RULER_DOCUMENT_VERSION;
@@ -268,11 +324,110 @@ function canonicalFisheye(value: unknown, strict: boolean): StudioAuthoredFishey
   };
 }
 
+function canonicalParallel(value: unknown, strict: boolean): StudioAuthoredParallelRuler | null {
+  const source = strict
+    ? strictDataRecord(value, PARALLEL_KEYS)
+    : ownDataRecord(value);
+  if (!source || source.type !== "parallel" || !validId(source.id)) return null;
+  const scope = strict ? strictScope(source.scope) : canonicalScope(source.scope);
+  if (!scope) return null;
+  const ruler = canonicalizeStudioParallelRuler(source);
+  if (
+    strict && (
+      !validText(source.name, MAX_NAME_LENGTH) ||
+      typeof source.enabled !== "boolean" ||
+      typeof source.visible !== "boolean" ||
+      source.angleDeg !== ruler.angleDeg ||
+      source.originX !== ruler.originX ||
+      source.originY !== ruler.originY ||
+      source.guideSpacing !== ruler.guideSpacing
+    )
+  ) return null;
+  return {
+    id: ruler.id,
+    type: "parallel",
+    name: normalizedName(source.name, "평행선자"),
+    enabled: source.enabled !== false,
+    visible: source.visible !== false,
+    scope,
+    angleDeg: ruler.angleDeg,
+    originX: ruler.originX,
+    originY: ruler.originY,
+    guideSpacing: ruler.guideSpacing,
+  };
+}
+
+function canonicalConcentric(
+  value: unknown,
+  strict: boolean
+): StudioAuthoredConcentricRuler | null {
+  const source = strict
+    ? strictDataRecord(value, CONCENTRIC_KEYS)
+    : ownDataRecord(value);
+  if (!source || source.type !== "concentric" || !validId(source.id)) return null;
+  const scope = strict ? strictScope(source.scope) : canonicalScope(source.scope);
+  if (!scope) return null;
+  const ruler = canonicalizeStudioConcentricRuler(source);
+  if (
+    strict && (
+      !validText(source.name, MAX_NAME_LENGTH) ||
+      typeof source.enabled !== "boolean" ||
+      typeof source.visible !== "boolean" ||
+      source.centerX !== ruler.centerX ||
+      source.centerY !== ruler.centerY ||
+      source.guideSpacing !== ruler.guideSpacing
+    )
+  ) return null;
+  return {
+    id: ruler.id,
+    type: "concentric",
+    name: normalizedName(source.name, "동심원자"),
+    enabled: source.enabled !== false,
+    visible: source.visible !== false,
+    scope,
+    centerX: ruler.centerX,
+    centerY: ruler.centerY,
+    guideSpacing: ruler.guideSpacing,
+  };
+}
+
+function canonicalRadial(value: unknown, strict: boolean): StudioAuthoredRadialRuler | null {
+  const source = strict
+    ? strictDataRecord(value, RADIAL_KEYS)
+    : ownDataRecord(value);
+  if (!source || source.type !== "radial" || !validId(source.id)) return null;
+  const scope = strict ? strictScope(source.scope) : canonicalScope(source.scope);
+  if (!scope) return null;
+  const ruler = canonicalizeStudioRadialRuler(source);
+  if (
+    strict && (
+      !validText(source.name, MAX_NAME_LENGTH) ||
+      typeof source.enabled !== "boolean" ||
+      typeof source.visible !== "boolean" ||
+      source.centerX !== ruler.centerX ||
+      source.centerY !== ruler.centerY
+    )
+  ) return null;
+  return {
+    id: ruler.id,
+    type: "radial",
+    name: normalizedName(source.name, "방사선자"),
+    enabled: source.enabled !== false,
+    visible: source.visible !== false,
+    scope,
+    centerX: ruler.centerX,
+    centerY: ruler.centerY,
+  };
+}
+
 function canonicalRuler(value: unknown, strict: boolean): StudioAdvancedRuler | null {
   const source = ownDataRecord(value);
   if (!source) return null;
   if (source.type === "curve") return canonicalCurve(value, strict);
   if (source.type === "fisheye") return canonicalFisheye(value, strict);
+  if (source.type === "parallel") return canonicalParallel(value, strict);
+  if (source.type === "concentric") return canonicalConcentric(value, strict);
+  if (source.type === "radial") return canonicalRadial(value, strict);
   return null;
 }
 
@@ -305,6 +460,157 @@ export function createDefaultStudioAdvancedRulerDocument(): StudioAdvancedRulerD
     rulers: [],
     activeSnapRulerId: null,
     selectedRulerId: null,
+  };
+}
+
+export interface StudioAdvancedRulerFactoryOptions {
+  id: string;
+  name: string;
+  canvasWidth: number;
+  canvasHeight: number;
+}
+
+/**
+ * Canonical page-editor defaults for a newly added ruler of any kind. Keeping the per-kind
+ * literals here lets the page shell add future kinds without knowing their fields.
+ */
+export function createStudioAdvancedRulerOfType(
+  type: StudioAdvancedRuler["type"],
+  options: StudioAdvancedRulerFactoryOptions
+): StudioAdvancedRuler {
+  const width = Number.isFinite(options.canvasWidth) ? options.canvasWidth : 0;
+  const height = Number.isFinite(options.canvasHeight) ? options.canvasHeight : 0;
+  const base = {
+    id: options.id,
+    name: options.name,
+    enabled: true,
+    visible: true,
+    scope: { kind: "page", groupId: null } as StudioAdvancedRulerScope,
+  };
+  switch (type) {
+    case "curve":
+      return {
+        ...base,
+        type: "curve",
+        snapMode: "through-start",
+        fixedOffset: 0,
+        p0: { x: width * 0.2, y: height * 0.55 },
+        p1: { x: width * 0.38, y: height * 0.35 },
+        p2: { x: width * 0.62, y: height * 0.75 },
+        p3: { x: width * 0.8, y: height * 0.55 },
+      };
+    case "fisheye":
+      return {
+        ...base,
+        type: "fisheye",
+        guideFamily: "auto",
+        centerX: width / 2,
+        centerY: height / 2,
+        radius: Math.max(80, Math.min(width, height) * 0.38),
+        rotationDeg: 0,
+        fovDeg: 180,
+        strength: 1,
+        outsidePolicy: "clamp",
+      };
+    case "parallel":
+      return {
+        ...base,
+        type: "parallel",
+        angleDeg: 0,
+        originX: width / 2,
+        originY: height / 2,
+        guideSpacing: 96,
+      };
+    case "concentric":
+      return {
+        ...base,
+        type: "concentric",
+        centerX: width / 2,
+        centerY: height / 2,
+        guideSpacing: 96,
+      };
+    case "radial":
+      return {
+        ...base,
+        type: "radial",
+        centerX: width / 2,
+        centerY: height / 2,
+      };
+  }
+}
+
+type StudioAdvancedRulerJsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: StudioAdvancedRulerJsonValue };
+
+export type StudioAdvancedRulerJsonObject = { [key: string]: StudioAdvancedRulerJsonValue };
+
+/**
+ * Deep JSON-safe copy of one authored ruler for CRDT/export payload builders, so those builders
+ * stay kind-agnostic when new ruler kinds are added.
+ */
+export function copyStudioAdvancedRulerAsJson(
+  ruler: StudioAdvancedRuler
+): StudioAdvancedRulerJsonObject {
+  const common: StudioAdvancedRulerJsonObject = {
+    id: ruler.id,
+    type: ruler.type,
+    name: ruler.name,
+    enabled: ruler.enabled,
+    visible: ruler.visible,
+    scope: {
+      kind: ruler.scope.kind,
+      groupId: ruler.scope.groupId,
+    },
+  };
+  if (ruler.type === "curve") {
+    return {
+      ...common,
+      snapMode: ruler.snapMode,
+      fixedOffset: ruler.fixedOffset,
+      p0: { x: ruler.p0.x, y: ruler.p0.y },
+      p1: { x: ruler.p1.x, y: ruler.p1.y },
+      p2: { x: ruler.p2.x, y: ruler.p2.y },
+      p3: { x: ruler.p3.x, y: ruler.p3.y },
+    };
+  }
+  if (ruler.type === "fisheye") {
+    return {
+      ...common,
+      guideFamily: ruler.guideFamily,
+      centerX: ruler.centerX,
+      centerY: ruler.centerY,
+      radius: ruler.radius,
+      rotationDeg: ruler.rotationDeg,
+      fovDeg: ruler.fovDeg,
+      strength: ruler.strength,
+      outsidePolicy: ruler.outsidePolicy,
+    };
+  }
+  if (ruler.type === "parallel") {
+    return {
+      ...common,
+      angleDeg: ruler.angleDeg,
+      originX: ruler.originX,
+      originY: ruler.originY,
+      guideSpacing: ruler.guideSpacing,
+    };
+  }
+  if (ruler.type === "concentric") {
+    return {
+      ...common,
+      centerX: ruler.centerX,
+      centerY: ruler.centerY,
+      guideSpacing: ruler.guideSpacing,
+    };
+  }
+  return {
+    ...common,
+    centerX: ruler.centerX,
+    centerY: ruler.centerY,
   };
 }
 
@@ -407,6 +713,18 @@ export function mirrorStudioAdvancedRulerDocument(
         p3: { ...ruler.p3 },
       };
     }
+    if (ruler.type === "parallel") {
+      const mirrored = mirrorStudioParallelRulerHorizontally(ruler, canvasWidth);
+      return { ...ruler, ...mirrored, scope: { ...ruler.scope } };
+    }
+    if (ruler.type === "concentric") {
+      const mirrored = mirrorStudioConcentricRulerHorizontally(ruler, canvasWidth);
+      return { ...ruler, ...mirrored, scope: { ...ruler.scope } };
+    }
+    if (ruler.type === "radial") {
+      const mirrored = mirrorStudioRadialRulerHorizontally(ruler, canvasWidth);
+      return { ...ruler, ...mirrored, scope: { ...ruler.scope } };
+    }
     const mirrored = mirrorStudioFisheyeRulerHorizontally(ruler, canvasWidth);
     return { ...ruler, ...mirrored, scope: { ...ruler.scope } };
   });
@@ -456,6 +774,21 @@ export function areStudioAdvancedRulerDocumentsEqual(
         ruler.fovDeg === other.fovDeg &&
         ruler.strength === other.strength &&
         ruler.outsidePolicy === other.outsidePolicy;
+    }
+    if (ruler.type === "parallel" && other.type === "parallel") {
+      return ruler.angleDeg === other.angleDeg &&
+        ruler.originX === other.originX &&
+        ruler.originY === other.originY &&
+        ruler.guideSpacing === other.guideSpacing;
+    }
+    if (ruler.type === "concentric" && other.type === "concentric") {
+      return ruler.centerX === other.centerX &&
+        ruler.centerY === other.centerY &&
+        ruler.guideSpacing === other.guideSpacing;
+    }
+    if (ruler.type === "radial" && other.type === "radial") {
+      return ruler.centerX === other.centerX &&
+        ruler.centerY === other.centerY;
     }
     return false;
   });

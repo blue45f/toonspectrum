@@ -7,10 +7,14 @@ import {
   isStudioBg3dShotPngFallbackEligibleError,
 } from "./studio-bg3d-shot-png-worker-client";
 import { STUDIO_BG3D_SHOT_PNG_WORKER_MAX_OUTPUT_BYTES } from "./studio-bg3d-shot-png-worker-protocol";
+import { createStudioBg3dStraightAlphaOutputPass } from "./studio-bg3d-straight-alpha-output-pass";
 
 import type { StudioBg3dLtRasterLayer } from "./studio-bg3d-lt-render";
 
-const STUDIO_VRM_CAPTURE_MAIN_THREAD_FALLBACK_MAX_PIXELS = 1_048_576;
+// The compatibility encoder only runs when Worker/OffscreenCanvas creation is unavailable. A
+// one-off insert capture at devicePixelRatio × supersample density must still encode there, so
+// this bound matches the capture pixel budget instead of artificially failing hi-res inserts.
+const STUDIO_VRM_CAPTURE_MAIN_THREAD_FALLBACK_MAX_PIXELS = STUDIO_BG3D_LT_RENDER_MAX_PIXELS;
 
 export interface StudioVrmRasterCaptureDimensions {
   readonly width: number;
@@ -117,10 +121,18 @@ export function flipStudioVrmCaptureRows(
 }
 
 /**
- * Render into an explicit RGBA8 target and synchronously read only the raw pixels. PNG compression
- * happens later in a Worker. Using a render target makes capture independent of the browser's
+ * Render into explicit targets and synchronously read only the raw pixels. PNG compression
+ * happens later in a Worker. Using render targets makes capture independent of the browser's
  * default-framebuffer preservation policy, so the interactive Canvas need not opt into
  * `preserveDrawingBuffer`.
+ *
+ * Two passes are required for color parity with the live viewport: WebGLRenderer deliberately
+ * skips material tone mapping and the output color-space transfer when a normal render target is
+ * active, so a single-target readback would return linear, un-tone-mapped (and premultiplied)
+ * bytes that look dark and washed out next to the preview. The MSAA scene target holds Three's
+ * linear pass; the straight-alpha OutputPass then unpremultiplies and recreates the renderer's
+ * active tone mapping + output color space into an RGBA8 target suitable for readback — the same
+ * contract as the bg3d capture adapter.
  */
 export function captureStudioVrmRgba(
   renderer: THREE.WebGLRenderer,
@@ -134,22 +146,41 @@ export function captureStudioVrmRgba(
   const previousActiveMipmapLevel = renderer.getActiveMipmapLevel();
   const previousClearColor = renderer.getClearColor(new THREE.Color()).clone();
   const previousClearAlpha = renderer.getClearAlpha();
-  const target = new THREE.WebGLRenderTarget(width, height, {
+  const sceneTarget = new THREE.WebGLRenderTarget(width, height, {
     depthBuffer: true,
     format: THREE.RGBAFormat,
+    generateMipmaps: false,
+    magFilter: THREE.LinearFilter,
+    minFilter: THREE.LinearFilter,
     samples: Math.min(4, Math.max(0, Math.floor(renderer.capabilities.maxSamples))),
     stencilBuffer: false,
     type: THREE.UnsignedByteType,
   });
-  target.texture.colorSpace = renderer.outputColorSpace;
+  // Intermediate working-color buffer: the straight-alpha output pass owns the one explicit
+  // tone-map/sRGB transfer, so this texture must not declare an output color space of its own.
+  sceneTarget.texture.colorSpace = THREE.NoColorSpace;
+  const outputTarget = new THREE.WebGLRenderTarget(width, height, {
+    depthBuffer: false,
+    format: THREE.RGBAFormat,
+    generateMipmaps: false,
+    magFilter: THREE.NearestFilter,
+    minFilter: THREE.NearestFilter,
+    stencilBuffer: false,
+    type: THREE.UnsignedByteType,
+  });
+  outputTarget.texture.colorSpace = THREE.NoColorSpace;
+  const outputPass = createStudioBg3dStraightAlphaOutputPass();
   const bottomUp = new Uint8Array(width * height * 4);
 
   try {
-    renderer.setRenderTarget(target);
+    renderer.setRenderTarget(sceneTarget);
     renderer.setClearColor(0x000000, 0);
     renderer.clear(true, true, true);
     renderer.render(scene, camera);
-    renderer.readRenderTargetPixels(target, 0, 0, width, height, bottomUp);
+    // Sampling the MSAA scene texture resolves it; the pass writes display-ready straight-alpha
+    // RGBA8 into the non-MSAA output target, which is then read back synchronously.
+    outputPass.render(renderer, outputTarget, sceneTarget, 0, false);
+    renderer.readRenderTargetPixels(outputTarget, 0, 0, width, height, bottomUp);
   } finally {
     renderer.setRenderTarget(
       previousRenderTarget,
@@ -157,7 +188,11 @@ export function captureStudioVrmRgba(
       previousActiveMipmapLevel,
     );
     renderer.setClearColor(previousClearColor, previousClearAlpha);
-    target.dispose();
+    // OutputPass owns a module-shared fullscreen geometry, so dispose only its per-capture
+    // material. Its public dispose() would also dispose that shared geometry.
+    outputPass.material.dispose();
+    sceneTarget.dispose();
+    outputTarget.dispose();
   }
 
   return flipStudioVrmCaptureRows(bottomUp, dimensions);

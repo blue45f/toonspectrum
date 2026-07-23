@@ -21,6 +21,7 @@ import {
   PictureInPicture2,
   Plus,
   Redo2,
+  PersonStanding,
   Smartphone,
   SquareSplitHorizontal,
   Type as TypeIcon,
@@ -232,6 +233,12 @@ const TOOL_BELT_HINTS = {
     "베이스 캐릭터를 고른 뒤 포즈, 표정, 의상과 색상을 조정해 투명 배경 이미지로 추가합니다.",
     undefined,
     "character-3d"
+  ),
+  mannequin3d: studioToolHintFromLabel(
+    "3D 데생 인형",
+    "모델 파일 없이 체형을 조절하고 포즈를 잡아 드로잉 참고 이미지로 캡처합니다.",
+    undefined,
+    "mannequin-3d"
   ),
   reference: studioToolHintFromLabel(
     "참고 이미지",
@@ -605,6 +612,7 @@ export interface StudioToolBeltContentProps {
   openStudioCommentCount: number;
   pageEditLocked: boolean;
   pageReviewOpen: boolean;
+  mannequinPoserOpen: boolean;
   panelLayoutPresets: PanelLayoutPreset[];
   panelLayoutsError: string | null;
   panelLayoutsLoading: boolean;
@@ -665,6 +673,7 @@ export interface StudioToolBeltContentProps {
   setLeftPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setMagicResizeStrategy: import("react").Dispatch<import("react").SetStateAction<MagicResizeStrategy>>;
   setMenu: import("react").Dispatch<import("react").SetStateAction<StudioMenu | null>>;
+  setMannequinPoserOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPageReviewOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPoserVrmOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setRasterFavoriteOnly: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -745,6 +754,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     menuRef,
     openStudioCommentCount,
     pageEditLocked,
+    mannequinPoserOpen,
     pageReviewOpen,
     poserVrmOpen,
     presentationPanelsHidden,
@@ -758,6 +768,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     setDrawMode,
     setHistoryPanelOpen,
     setLeftPanelOpen,
+    setMannequinPoserOpen,
     setMenu,
     setPageReviewOpen,
     setPoserVrmOpen,
@@ -1034,6 +1045,15 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             className={cn(toolBtn(poserVrmOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
           >
             <UsersRound size={15} aria-hidden /> 3D 캐릭터
+          </button>
+        </StudioToolBeltHintTarget>
+        <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.mannequin3d}>
+          <button
+            type="button"
+            onClick={() => setMannequinPoserOpen(true)}
+            className={cn(toolBtn(mannequinPoserOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
+          >
+            <PersonStanding size={15} aria-hidden /> 3D 데생 인형
           </button>
         </StudioToolBeltHintTarget>
         <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.reference}>

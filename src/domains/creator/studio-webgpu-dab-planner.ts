@@ -635,7 +635,12 @@ function concatenateStudioGpuDabPlans(
   const batches: StudioGpuBatch[] = [];
   for (const plan of plans) {
     const instanceOffset = dabs.length;
-    dabs.push(...plan.dabs);
+    // A residual catch-up suffix can carry tens of thousands of dabs. `push(...plan.dabs)` spreads
+    // each dab as one call argument and exceeds engine argument limits (~65k on JSC, ~124k on V8),
+    // so the concatenation copies by index instead of by spread.
+    for (let dabIndex = 0; dabIndex < plan.dabs.length; dabIndex += 1) {
+      dabs.push(plan.dabs[dabIndex]!);
+    }
     for (const batch of plan.batches) {
       const firstInstance = instanceOffset + batch.firstInstance;
       const previous = batches.at(-1);

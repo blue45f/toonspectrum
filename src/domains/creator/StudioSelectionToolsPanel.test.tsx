@@ -233,3 +233,82 @@ describe("StudioSelectionToolsPanel", () => {
     expect(html.match(new RegExp(`data-unavailable-reason="${busyReason}"`, "gu"))?.length).toBe(36);
   });
 });
+
+describe("StudioSelectionToolsPanel — 색상 범위(Color Range)", () => {
+  const colorRangeProps = {
+    colorRangeSamples: [
+      { r: 220, g: 40, b: 40 },
+      { r: 40, g: 60, b: 220 },
+    ],
+    colorRangeFuzziness: 72,
+    onColorRangeFuzzinessChange: vi.fn(),
+    onColorRangeFuzzinessCommit: vi.fn(),
+    onColorRangeTogglePick: vi.fn(),
+    onColorRangeTogglePreview: vi.fn(),
+    onColorRangeRemoveSample: vi.fn(),
+    onColorRangeClearSamples: vi.fn(),
+    onColorRangeApply: vi.fn(),
+  } as const;
+
+  it("stays hidden (fully backward compatible) when the color-range callbacks are absent", () => {
+    const html = renderPanel();
+    expect(html).not.toContain("data-studio-color-range");
+    expect(html).not.toContain("색상 범위");
+    expect(html.match(/<button\b/gu)?.length).toBe(36); // 기존 버튼 수 불변
+  });
+
+  it("renders sample chips, armed pick toggle, fuzziness slider, preview toggle, and apply", () => {
+    const html = renderPanel(colorRangeProps);
+
+    expect(html).toContain('data-studio-color-range="true"');
+    expect(html).toContain("#DC2828"); // 220,40,40 헥사 칩 라벨
+    expect(html).toContain("#283CDC"); // 40,60,220
+    expect(html).toContain('aria-label="색상 샘플 1 (#DC2828) 제거"');
+    expect(html).toContain('aria-label="색상 샘플 모두 지우기"');
+    expect(html).toContain('aria-label="캔버스에서 색 추출"');
+    expect(html).toContain('aria-label="색상 범위 미리보기"');
+    expect(html).toContain('aria-label="색상 범위로 선택"');
+    expect(html).toContain("허용량");
+    expect(html).toContain(">72<"); // readout
+    expect(html).toContain("색상 범위로 선택 (합치기)"); // 결합 모드 라벨 반영
+
+    // 새 버튼도 전부 리치 힌트 타깃과 1:1 — 기존 36개 + 색상 범위 6개(지우기+칩2+추출+미리보기+적용).
+    const buttonCount = html.match(/<button\b/gu)?.length ?? 0;
+    const hintTargetCount = html.match(/data-hint-id=/gu)?.length ?? 0;
+    expect(buttonCount).toBe(42);
+    expect(hintTargetCount).toBe(buttonCount);
+  });
+
+  it("mirrors the armed pick state from props (page-owned, fully controlled)", () => {
+    const armed = renderPanel({ ...colorRangeProps, colorRangePickArmed: true });
+    expect(armed).toMatch(/aria-pressed="true"[^>]*aria-label="캔버스에서 색 추출"/u);
+    expect(armed).toContain("이미지 위를 클릭하면 그 지점의 색이 샘플로 추가됩니다.");
+
+    const disarmed = renderPanel(colorRangeProps);
+    expect(disarmed).toMatch(/aria-pressed="false"[^>]*aria-label="캔버스에서 색 추출"/u);
+  });
+
+  it("reflects the current combine mode on the apply button", () => {
+    const html = renderPanel({ ...colorRangeProps, combineMode: "subtract" });
+    expect(html).toContain("색상 범위로 선택 (빼기)");
+    expect(html).toMatch(
+      /data-hint-id="pixel-selection-color-range-apply"[^>]*data-preview-kind="selection-subtract"/u
+    );
+  });
+
+  it("explains why apply/preview are unavailable without samples", () => {
+    const html = renderPanel({ ...colorRangeProps, colorRangeSamples: [] });
+    expect(html).toContain("아직 추출한 색이 없습니다.");
+    expect(html).toContain('data-unavailable-reason="먼저 캔버스에서 색을 추출하세요."');
+    expect(html).toContain('data-unavailable-reason="지울 색 샘플이 없습니다."');
+    expect(html).toMatch(/aria-label="색상 범위로 선택"[^>]*|disabled[^>]*aria-label="색상 범위로 선택"/u);
+  });
+
+  it("disables the whole section with the shared busy reason while pixel work runs", () => {
+    const html = renderPanel({ ...colorRangeProps, busy: true });
+    const busyReason = "다른 픽셀 작업을 적용하는 동안 기다려 주세요.";
+    // 기존 36개 + 색상 범위 힌트 타깃 6개 전부 busy 사유로 잠긴다.
+    expect(html.match(/data-hint-disabled="true"/gu)?.length).toBe(42);
+    expect(html.match(new RegExp(`data-unavailable-reason="${busyReason}"`, "gu"))?.length).toBe(42);
+  });
+});

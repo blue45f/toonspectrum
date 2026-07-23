@@ -6,6 +6,10 @@ import {
   type StudioBrushDynamicsMappingSettings,
   type StudioBrushDynamicsSettings,
 } from "./studio-brush-dynamics";
+import {
+  applyStudioBrushPackExpansionTuning,
+  studioBrushPackExpansionTuningById,
+} from "./studio-brush-pack-expansion";
 import { STUDIO_BRUSH_PACK_CATALOG_IDS, type StudioBrushPackCatalogId } from "./studio-brush-pack-id";
 import {
   STUDIO_BRUSH_PACK_DESCRIPTORS,
@@ -172,6 +176,40 @@ const COMPACT_PROFILE_ROWS: readonly CompactProfileRow[] = [
   ["hair", 0.04, 0.015, 0.28, 0, FOLLOW_DIRECTION | TAPER | PRESSURE_OPACITY | ANGLE_GRAIN],
   ["fold", 0.11, 0.04, 0.5, 0, FOLLOW_DIRECTION | WIDTH_GRAIN | ANGLE_GRAIN | SPEED_SPACING],
   ["pine", 0.18, 0.32, 0.58, 0, FOLLOW_DIRECTION | WIDTH_GRAIN | ANGLE_GRAIN],
+  // ── 2026-07 확장 웨이브(33) — 세부 물성은 studio-brush-pack-expansion.ts 튜닝이 덮어쓴다.
+  ["grain", 0.02, 0.04, 0.86, 0, FOLLOW_DIRECTION | TAPER | PRESSURE_OPACITY | WIDTH_GRAIN],
+  ["hard", -0.06, 0.00, 0.97, 0, FOLLOW_DIRECTION | TAPER],
+  ["grain", 0.04, 0.05, 0.8, 0, FOLLOW_DIRECTION | TAPER | PRESSURE_OPACITY | WIDTH_GRAIN],
+  ["sponge", 0.06, 0.08, 0.66, 0, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["grain", 0.08, 0.03, 0.8, 0, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN],
+  ["hard", -0.05, 0.00, 0.9, 0, FOLLOW_DIRECTION | TAPER | SPEED_SPACING],
+  ["hard", -0.07, 0.00, 0.95, 0, FOLLOW_DIRECTION | TAPER],
+  ["round", -0.04, 0.00, 0.93, 0, FOLLOW_DIRECTION | TAPER],
+  ["sumi", -0.02, 0.02, 0.55, -6, FOLLOW_DIRECTION | TAPER | PRESSURE_OPACITY | SPEED_SPACING],
+  ["chisel", 0.00, 0.00, 0.24, -32, TAPER],
+  ["hard", -0.03, 0.00, 1.00, 0, 0],
+  ["soft", 0.08, 0.04, 1.00, 0, PRESSURE_OPACITY | WIDTH_GRAIN],
+  ["sponge", 0.14, 0.08, 0.94, 0, PRESSURE_OPACITY | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["bristle", -0.07, 0.01, 0.62, -6, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["bristle", 0.08, 0.05, 0.58, 0, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN | SPEED_SPACING],
+  ["sponge", 0.09, 0.05, 0.85, 0, PRESSURE_OPACITY | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["grain", 0.03, 0.03, 0.78, 0, FOLLOW_DIRECTION | TAPER | PRESSURE_OPACITY | WIDTH_GRAIN],
+  ["soft", 0.2, 0.02, 1.00, 0, PRESSURE_OPACITY],
+  ["sponge", 0.6, 0.16, 0.9, 0, PRESSURE_OPACITY | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["soft", 0.08, 0.00, 0.86, 0, PRESSURE_OPACITY],
+  ["chisel", 0.00, 0.00, 0.3, -35, 0],
+  ["hard", 0.28, 0.9, 1.00, 0, PRESSURE_OPACITY | WIDTH_GRAIN | SPEED_SPACING],
+  ["star", 0.55, 0.5, 1.00, 0, ANGLE_GRAIN | WIDTH_GRAIN],
+  ["leaf", 0.45, 0.6, 0.6, 0, ANGLE_GRAIN | WIDTH_GRAIN],
+  ["sponge", 0.22, 0.1, 1.00, 0, PRESSURE_OPACITY | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["fold", 0.85, 0.00, 0.55, 90, FOLLOW_DIRECTION],
+  ["halftone", 0.3, 0.00, 1.00, 0, FOLLOW_DIRECTION | PRESSURE_OPACITY],
+  ["hair", 0.35, 0.5, 0.3, -70, SPEED_SPACING | WIDTH_GRAIN],
+  ["star", 0.9, 0.35, 1.00, 0, PRESSURE_OPACITY | WIDTH_GRAIN],
+  ["flake", 0.55, 0.65, 0.95, 0, ANGLE_GRAIN | WIDTH_GRAIN],
+  ["hard", 0.45, 0.8, 0.9, 0, WIDTH_GRAIN],
+  ["hair", 0.06, 0.1, 0.5, 0, FOLLOW_DIRECTION | TAPER | ANGLE_GRAIN],
+  ["fold", 0.08, 0.02, 0.6, 0, FOLLOW_DIRECTION | WIDTH_GRAIN | SPEED_SPACING],
 ];
 
 if (COMPACT_PROFILE_ROWS.length !== STUDIO_BRUSH_PACK_CATALOG_IDS.length) {
@@ -635,6 +673,7 @@ export function materializeStudioBrushPackDynamics(
   const profile = COMPACT_PROFILE_ROWS[index]!;
   const motif = profile[0];
   const flags = profile[5];
+  const tuning = studioBrushPackExpansionTuningById(descriptor.catalogId);
   const base = studioBrushDynamicsPresetSettings(descriptor.runtimeBrushId);
   const widthMapping = pressureWidthMapping(descriptor, index);
   const opacityMappings: StudioBrushDynamicsMappingSettings[] = (flags & PRESSURE_OPACITY) !== 0
@@ -664,7 +703,11 @@ export function materializeStudioBrushPackDynamics(
     seed,
     fallbackPressure: 0.48 + (index % 5) * 0.025,
     maxSpeed: 1.2 + (index % 7) * 0.14,
-    tip: materializeStudioBrushPackTipSettings(motif, index, profileSoftness(descriptor, index)),
+    tip: materializeStudioBrushPackTipSettings(
+      motif,
+      index,
+      tuning?.tipSoftness ?? profileSoftness(descriptor, index)
+    ),
     colorDynamics: colorDynamicsFor(descriptor, index),
     grain: grainFor(descriptor, index),
     tipLayers: tipLayersFor(descriptor, motif, index),
@@ -729,6 +772,17 @@ export function materializeStudioBrushPackDynamics(
         : null,
     },
   };
+  if (tuning) {
+    // Expansion presets replace the index-derived formula with hand-tuned physics. Catalogue
+    // width and the neutral dynamics opacity stay invariant so the toolbar remains the artist's
+    // outer control (same contract as the formula path above).
+    const tuned = applyStudioBrushPackExpansionTuning(settings, tuning);
+    return normalizeStudioBrushDynamicsSettings({
+      ...tuned,
+      width: { ...tuned.width, base: descriptor.defaultWidth },
+      opacity: { ...tuned.opacity, base: 1 },
+    });
+  }
   return normalizeStudioBrushDynamicsSettings(settings);
 }
 

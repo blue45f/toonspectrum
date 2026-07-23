@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal as createDomPortal } from "react-dom";
 import * as THREE from "three";
 
+import { planStudio3dInsertCaptureSize } from "./studio-3d-insert-capture-plan";
 import {
   isStudioHumanoidBoneName,
   type StudioHumanoidBoneName,
@@ -6385,7 +6386,17 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
             settleVrmPhysics(currentVrm);
           }
           currentVrm.update(0);
-          const { width, height } = roundExportSize(gl.domElement);
+          // Display size = the legacy logical export size (stable placement on the document);
+          // the raster renders denser so the insert stays crisp at 100% zoom on HiDPI and
+          // survives a moderate scale-up. Budget failures fall back to display-density capture.
+          const { width: displayWidth, height: displayHeight } = roundExportSize(gl.domElement);
+          const capturePlan = planStudio3dInsertCaptureSize({
+            displayWidth,
+            displayHeight,
+            devicePixelRatio: globalThis.devicePixelRatio || 1,
+          });
+          const width = capturePlan?.width ?? displayWidth;
+          const height = capturePlan?.height ?? displayHeight;
           const bakedPose = bakeStudioVrmRuntimePose(currentVrm);
           if (!bakedPose) {
             throw new Error("삽입할 VRM 자세를 회전 기반 데이터로 변환하지 못했습니다.");
@@ -6396,7 +6407,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
             yOffset: bakedPose.yOffset,
           }, modelName);
           const hashPayload = encodeURIComponent(JSON.stringify(poseMetadata));
-          const sceneDocument = createCurrentSceneDocument(width, height);
+          // Scene documents keep recording the logical viewport size — re-edit camera framing
+          // depends only on the aspect, and this keeps parity with pre-HiDPI documents.
+          const sceneDocument = createCurrentSceneDocument(displayWidth, displayHeight);
           if (!sceneDocument) {
             throw new Error("재편집 가능한 3D 데생 인형 장면을 만들지 못했습니다.");
           }
@@ -6428,6 +6441,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
             pngDataUrl: fullDataUrl,
             width,
             height,
+            displayWidth,
+            displayHeight,
             scene: sceneDocument,
           });
           if (

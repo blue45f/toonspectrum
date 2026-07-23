@@ -2,15 +2,22 @@ import { describe, expect, it } from "vitest";
 
 import {
   STUDIO_ADVANCED_RULER_MAX_SERIALIZED_BYTES,
+  STUDIO_ADVANCED_RULER_NAME_PREFIXES,
+  copyStudioAdvancedRulerAsJson,
   createDefaultStudioAdvancedRulerDocument,
+  createStudioAdvancedRulerOfType,
   mirrorStudioAdvancedRulerDocument,
   normalizeStudioAdvancedRulerDocument,
   parseStudioAdvancedRulerDocument,
   resolveActiveStudioAdvancedRuler,
   studioAdvancedRulerAppliesToGroup,
+  type StudioAdvancedRuler,
   type StudioAdvancedRulerDocument,
+  type StudioAuthoredConcentricRuler,
   type StudioAuthoredCurveRuler,
   type StudioAuthoredFisheyeRuler,
+  type StudioAuthoredParallelRuler,
+  type StudioAuthoredRadialRuler,
 } from "./studio-advanced-ruler-document";
 
 const curve: StudioAuthoredCurveRuler = {
@@ -45,10 +52,46 @@ const fisheye: StudioAuthoredFisheyeRuler = {
   outsidePolicy: "clamp",
 };
 
+const parallel: StudioAuthoredParallelRuler = {
+  id: "parallel-a",
+  type: "parallel",
+  name: "빗줄기",
+  enabled: true,
+  visible: true,
+  scope: { kind: "page", groupId: null },
+  angleDeg: 60,
+  originX: 240,
+  originY: 480,
+  guideSpacing: 96,
+};
+
+const concentric: StudioAuthoredConcentricRuler = {
+  id: "concentric-a",
+  type: "concentric",
+  name: "파문",
+  enabled: true,
+  visible: true,
+  scope: { kind: "page", groupId: null },
+  centerX: 320,
+  centerY: 320,
+  guideSpacing: 120,
+};
+
+const radial: StudioAuthoredRadialRuler = {
+  id: "radial-a",
+  type: "radial",
+  name: "집중선",
+  enabled: true,
+  visible: true,
+  scope: { kind: "group", groupId: "effects" },
+  centerX: 400,
+  centerY: 200,
+};
+
 function document(): StudioAdvancedRulerDocument {
   return {
     version: 1,
-    rulers: [curve, fisheye],
+    rulers: [curve, fisheye, parallel, concentric, radial],
     activeSnapRulerId: "fisheye-a",
     selectedRulerId: "curve-a",
   };
@@ -149,5 +192,94 @@ describe("studio advanced ruler document", () => {
     expect(curve.p0.x).toBe(10);
     mirrored.rulers[0]!.scope.kind = "group";
     expect(source.rulers[0]!.scope.kind).toBe("page");
+  });
+
+  it("mirrors parallel angle and circle/ray centers", () => {
+    const mirrored = mirrorStudioAdvancedRulerDocument(document(), 800);
+    expect(mirrored.rulers[2]).toEqual({ ...parallel, angleDeg: 120, originX: 560 });
+    expect(mirrored.rulers[3]).toEqual({ ...concentric, centerX: 480 });
+    expect(mirrored.rulers[4]).toEqual({ ...radial, centerX: 400 });
+    expect(parallel.angleDeg).toBe(60);
+  });
+
+  it("normalizes malformed new-kind rulers and rejects invalid ones", () => {
+    const normalized = normalizeStudioAdvancedRulerDocument({
+      rulers: [
+        { ...parallel, name: "", angleDeg: 240, guideSpacing: Number.NaN },
+        { ...concentric, centerY: Number.POSITIVE_INFINITY, guideSpacing: 100_000 },
+        { ...radial, id: "" },
+        { ...radial, type: "spiral" },
+      ],
+      activeSnapRulerId: parallel.id,
+      selectedRulerId: null,
+    });
+    expect(normalized.rulers).toEqual([
+      { ...parallel, name: "평행선자", angleDeg: 60, guideSpacing: 96 },
+      { ...concentric, centerY: 0, guideSpacing: 512 },
+    ]);
+    expect(normalized.activeSnapRulerId).toBe(parallel.id);
+  });
+
+  it("strictly rejects unknown keys and drifted values on new kinds", () => {
+    expect(parseStudioAdvancedRulerDocument({
+      ...document(),
+      rulers: [{ ...parallel, future: true }],
+      activeSnapRulerId: null,
+      selectedRulerId: null,
+    })).toBeNull();
+    expect(parseStudioAdvancedRulerDocument({
+      ...document(),
+      rulers: [{ ...parallel, angleDeg: 240 }],
+      activeSnapRulerId: null,
+      selectedRulerId: null,
+    })).toBeNull();
+    expect(parseStudioAdvancedRulerDocument({
+      ...document(),
+      rulers: [{ ...concentric, guideSpacing: 8 }],
+      activeSnapRulerId: null,
+      selectedRulerId: null,
+    })).toBeNull();
+    expect(parseStudioAdvancedRulerDocument({
+      ...document(),
+      rulers: [{ ...radial, centerX: "10" }],
+      activeSnapRulerId: null,
+      selectedRulerId: null,
+    })).toBeNull();
+  });
+
+  it("creates canonical defaults for every ruler kind", () => {
+    const types = Object.keys(STUDIO_ADVANCED_RULER_NAME_PREFIXES) as StudioAdvancedRuler["type"][];
+    for (const type of types) {
+      const ruler = createStudioAdvancedRulerOfType(type, {
+        id: `${type}-new`,
+        name: `${STUDIO_ADVANCED_RULER_NAME_PREFIXES[type]} 1`,
+        canvasWidth: 800,
+        canvasHeight: 1_200,
+      });
+      expect(ruler.type).toBe(type);
+      const normalized = normalizeStudioAdvancedRulerDocument({
+        rulers: [ruler],
+        activeSnapRulerId: ruler.id,
+        selectedRulerId: ruler.id,
+      });
+      expect(normalized.rulers).toEqual([ruler]);
+      expect(parseStudioAdvancedRulerDocument(normalized)).toEqual(normalized);
+    }
+    const added = createStudioAdvancedRulerOfType("parallel", {
+      id: "p",
+      name: "평행선 1",
+      canvasWidth: 800,
+      canvasHeight: 1_200,
+    });
+    expect(added).toMatchObject({ originX: 400, originY: 600, angleDeg: 0, guideSpacing: 96 });
+  });
+
+  it("copies every ruler kind into a JSON-safe payload", () => {
+    for (const ruler of document().rulers) {
+      const copy = copyStudioAdvancedRulerAsJson(ruler);
+      expect(copy).toEqual(JSON.parse(JSON.stringify(ruler)));
+      expect(copy).not.toBe(ruler);
+      expect(copy.scope).not.toBe(ruler.scope);
+    }
   });
 });

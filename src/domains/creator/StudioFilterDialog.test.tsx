@@ -160,4 +160,66 @@ describe("StudioFilterDialog", () => {
     expect(filterDialogSource).toMatch(/label="명도"[\s\S]*?min=\{-80\}[\s\S]*?max=\{80\}/u);
     expect(filterDialogSource).toMatch(/label="대비"[\s\S]*?min=\{-80\}[\s\S]*?max=\{80\}/u);
   });
+
+  it("renders schema-driven sliders for filter-pack kinds (vignette)", () => {
+    const html = renderToStaticMarkup(
+      <StudioFilterDialog
+        activeKey="filter:vignette"
+        kind="vignette"
+        image={{}}
+        rootRef={createRef<HTMLElement>()}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain(">비네트</h2>");
+    for (const label of ["어둡기", "크기", "둥글기", "페더"]) {
+      expect(html).toContain(`>${label}</label>`);
+      expect(html).toContain(`aria-label="${label} 숫자"`);
+    }
+    // 첫 파라미터가 초기 포커스 대상이다.
+    expect(html).toContain('data-autofocus="true"');
+  });
+
+  it("renders native color pickers for the duotone filter-pack kind", () => {
+    const html = renderToStaticMarkup(
+      <StudioFilterDialog
+        activeKey="filter:duotone"
+        kind="duotone"
+        image={{ duotoneShadow: "#102030", duotoneHighlight: "#f0e0d0" }}
+        rootRef={createRef<HTMLElement>()}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain(">세피아 / 듀오톤</h2>");
+    expect(html.match(/type="color"/g)?.length ?? 0).toBe(2);
+    // 현재 이미지의 듀오톤 색을 되읽어 초기값으로 쓴다(다시 열기 패리티).
+    expect(html).toContain('value="#102030"');
+    expect(html).toContain('value="#f0e0d0"');
+    expect(html).toContain("어두운 영역 색");
+    expect(html).toContain("밝은 영역 색");
+  });
+
+  it("reopens a filter-pack kind from a stored last-filter draft", () => {
+    const html = renderToStaticMarkup(
+      <StudioFilterDialog
+        activeKey="filter:mosaic"
+        kind="mosaic"
+        image={{}}
+        initialDraft={{ kind: "mosaic", values: { cell: 24 } }}
+        rootRef={createRef<HTMLElement>()}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain(">모자이크 / 픽셀화</h2>");
+    expect(html).toContain('value="24"');
+  });
 });

@@ -932,12 +932,30 @@ export function studioGpuStrokeFeedSuffixFromPointCount(
   ) {
     return null;
   }
-  const points: number[] = [cursor.lastX, cursor.lastY];
-  const pressures: number[] = [cursor.lastPressure];
-  for (const revision of revisions.reverse()) {
-    points.push(...revision.suffixPoints);
-    pressures.push(...revision.suffixPressures);
+  // One accepted catch-up delivery may legally carry STUDIO_GPU_STROKE_FEED_MAX_ADVANCE_POINTS
+  // samples (200k coordinates). Spreading such a suffix into `push(...)` exceeds engine argument
+  // limits (~65k on JSC, ~124k on V8), so the bridge is preallocated and filled by index.
+  const suffixSampleCount = latest.pointCount - cursor.pointCount;
+  const points = new Array<number>((suffixSampleCount + 1) * 2);
+  const pressures = new Array<number>(suffixSampleCount + 1);
+  points[0] = cursor.lastX;
+  points[1] = cursor.lastY;
+  pressures[0] = cursor.lastPressure;
+  let pointOffset = 2;
+  let pressureOffset = 1;
+  for (let revisionIndex = revisions.length - 1; revisionIndex >= 0; revisionIndex -= 1) {
+    const revision = revisions[revisionIndex]!;
+    const { suffixPoints, suffixPressures } = revision;
+    for (let index = 0; index < suffixPoints.length; index += 1) {
+      points[pointOffset++] = suffixPoints[index]!;
+    }
+    for (let index = 0; index < suffixPressures.length; index += 1) {
+      pressures[pressureOffset++] = suffixPressures[index]!;
+    }
   }
+  // The trusted revision chain guarantees suffix lengths sum to the point-count delta; a forged or
+  // corrupted lineage that breaks that invariant must fail closed instead of emitting sparse holes.
+  if (pointOffset !== points.length || pressureOffset !== pressures.length) return null;
   return {
     id: stroke.id,
     points,

@@ -7,16 +7,35 @@ import {
   type CurvePoint,
   type CurveRgbChannels,
 } from "./studio-curves";
+import {
+  STUDIO_FILTER_PACK_KINDS,
+  STUDIO_FILTER_PACK_LABELS,
+  createStudioFilterPackValues,
+  isStudioFilterPackKind,
+  studioFilterPackValuesToPatch,
+  type StudioFilterPackKind,
+  type StudioFilterPackPatch,
+  type StudioFilterPackValues,
+} from "./studio-filter-pack";
 
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
-/** Magma-style top-menu filters. The authored image stays untouched until the dialog is applied. */
-export type StudioFilterKind =
+/** 초기 5개 필터 — 각자 전용 드래프트 모양을 가진 하드코드 종류. */
+export type StudioFilterCoreKind =
   | "gaussian-blur"
   | "motion-blur"
   | "hue-saturation-brightness"
   | "brightness-contrast"
   | "color-curves";
+
+/** Magma-style top-menu filters. The authored image stays untouched until the dialog is applied. */
+export type StudioFilterKind = StudioFilterCoreKind | StudioFilterPackKind;
+
+/** 필터 팩 종류의 공용 드래프트 — 파라미터 스키마 기반 값 가방 하나로 표현한다. */
+export type StudioFilterPackDraft = {
+  kind: StudioFilterPackKind;
+  values: StudioFilterPackValues;
+};
 
 export type StudioFilterDraft =
   | { kind: "gaussian-blur"; radius: number }
@@ -28,11 +47,21 @@ export type StudioFilterDraft =
       brightness: number;
     }
   | { kind: "brightness-contrast"; brightness: number; contrast: number }
-  | { kind: "color-curves"; curve: CurvePoint[]; curveCh: CurveRgbChannels };
+  | { kind: "color-curves"; curve: CurvePoint[]; curveCh: CurveRgbChannels }
+  | StudioFilterPackDraft;
+
+/** 다이얼로그가 내보내는 패치 — 기존 필드 + 필터 팩 확장 필드(글리치/비네트). */
+export type StudioFilterPatch = StudioFilterPackPatch;
 
 export interface StudioFilterPreview {
   elementId: string;
-  patch: Partial<ImageFilterFields>;
+  patch: StudioFilterPatch;
+}
+
+export function isStudioFilterPackDraft(
+  draft: StudioFilterDraft,
+): draft is StudioFilterPackDraft {
+  return isStudioFilterPackKind(draft.kind);
 }
 
 export const STUDIO_FILTER_LABELS: Record<StudioFilterKind, string> = {
@@ -41,7 +70,18 @@ export const STUDIO_FILTER_LABELS: Record<StudioFilterKind, string> = {
   "hue-saturation-brightness": "색조 / 채도 / 밝기",
   "brightness-contrast": "명도 / 대비",
   "color-curves": "색상 커브",
+  ...STUDIO_FILTER_PACK_LABELS,
 };
+
+/** 상단 "필터" 메뉴 등록 순서 — 코어 5개 뒤에 필터 팩 전체. */
+export const STUDIO_FILTER_MENU_KINDS: readonly StudioFilterKind[] = [
+  "gaussian-blur",
+  "motion-blur",
+  "hue-saturation-brightness",
+  "brightness-contrast",
+  "color-curves",
+  ...STUDIO_FILTER_PACK_KINDS,
+];
 
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
@@ -65,6 +105,9 @@ export function createStudioFilterDraft(
   kind: StudioFilterKind,
   image: ImageFilterFields,
 ): StudioFilterDraft {
+  if (isStudioFilterPackKind(kind)) {
+    return { kind, values: createStudioFilterPackValues(kind, image) };
+  }
   const blur = normalizeBlurFx(image.blurFx);
   switch (kind) {
     case "gaussian-blur":
@@ -101,6 +144,7 @@ export function createStudioFilterDraft(
 }
 
 export function cloneStudioFilterDraft(draft: StudioFilterDraft): StudioFilterDraft {
+  if (isStudioFilterPackDraft(draft)) return { ...draft, values: { ...draft.values } };
   if (draft.kind !== "color-curves") return { ...draft };
   return {
     ...draft,
@@ -115,9 +159,10 @@ export function cloneStudioFilterDraft(draft: StudioFilterDraft): StudioFilterDr
 }
 
 /** Converts dialog values into the existing non-destructive image-filter document fields. */
-export function studioFilterDraftToPatch(
-  draft: StudioFilterDraft,
-): Partial<ImageFilterFields> {
+export function studioFilterDraftToPatch(draft: StudioFilterDraft): StudioFilterPatch {
+  if (isStudioFilterPackDraft(draft)) {
+    return studioFilterPackValuesToPatch(draft.kind, draft.values);
+  }
   switch (draft.kind) {
     case "gaussian-blur":
       return {

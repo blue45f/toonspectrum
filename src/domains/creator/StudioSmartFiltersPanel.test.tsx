@@ -10,7 +10,8 @@ describe("StudioSmartFiltersPanel", () => {
     );
     expect(html).toContain('type="search"');
     expect(html).toContain("필터 이름·효과 검색");
-    expect(html).toContain("사용 가능한 필터 47개");
+    expect(html).toContain("사용 가능한 필터 48개");
+    expect(html).toContain("섀도우/하이라이트");
     expect(html).toContain("노출 / 감마 / 오프셋");
     expect(html).toContain("언샤프 마스크");
     expect(html).toContain("팽창 / 침식");

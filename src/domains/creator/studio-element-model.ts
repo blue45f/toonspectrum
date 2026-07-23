@@ -40,6 +40,7 @@ import type { PhotoFilter } from "./studio-photo-filter";
 import type { StudioPublishAiProvenance } from "./studio-publish-preflight";
 import type { StudioRasterAsset } from "./studio-raster-assets";
 import type { SelectiveHsl } from "./studio-selective-hsl";
+import type { ShadowHighlight } from "./studio-shadow-highlight";
 import type { Sketch } from "./studio-sketch";
 import type { StudioStockImageCredit } from "./studio-stock-image-client";
 import type { ScenarioBeatType } from "./studio-story-beats";
@@ -108,6 +109,7 @@ export interface ImageEl {
   colorToAlpha?: ColorToAlpha; // 색상 투명화 — 키 색상을 알파로 punching(studio-color-to-alpha)
   autoAdjust?: AutoAdjust;
   clarity?: Clarity;
+  shadowHighlight?: ShadowHighlight;
   outline?: Outline;
   glow?: Glow;
   halftone?: Halftone;

@@ -23,6 +23,7 @@ import {
   Settings2,
   Shapes,
   Square,
+  Sun,
   Triangle,
   Type as TypeIcon,
   Wind,
@@ -138,6 +139,7 @@ export interface StudioLeftToolRailHandlers {
   disarmAllPixelTools: () => void;
   onPickImage: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   toggleAdvancedFill: () => void;
+  toggleDodgeBurnTool: () => void;
   toggleLiquifyTool: () => void;
   togglePixelMarquee: (kind: "rect" | "circle") => void;
   toggleSmudgeTool: () => void;
@@ -185,6 +187,7 @@ interface StudioLeftToolRailProps {
   setStrokeWidth: import("react").Dispatch<import("react").SetStateAction<number>>;
   setTool: import("react").Dispatch<import("react").SetStateAction<Tool>>;
   setViewTool: import("react").Dispatch<import("react").SetStateAction<"zoom" | "rotate" | null>>;
+  dodgeBurnActive: boolean;
   smudgeActive: boolean;
   tool: Tool;
   uiDensityMode: "simple" | "full" | "focus";
@@ -234,6 +237,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   setStrokeWidth,
   setTool,
   setViewTool,
+  dodgeBurnActive,
   smudgeActive,
   tool,
   uiDensityMode,
@@ -294,6 +298,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     onPickImage,
     toggleAdvancedFill,
     toggleStudioCommentPinPlacement,
+    toggleDodgeBurnTool,
     toggleLiquifyTool,
     togglePixelMarquee,
     toggleSmudgeTool,
@@ -536,6 +541,23 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                     : undefined
               }
               onClick={toggleSmudgeTool}
+            />
+            ) : null}
+            {isRailToolVisible("dodge-burn") ? (
+            <StudioRailToolButton
+              icon={Sun}
+              label="닷지/번 (O)"
+              description="어둡거나 밝은 영역을 브러시로 밝히거나 태우고, 스펀지로 채도를 조절합니다."
+              active={dodgeBurnActive}
+              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              unavailableReason={
+                selected?.type !== "image"
+                  ? "보정할 이미지 레이어를 먼저 고르세요."
+                  : selectedContentMutationLocked
+                    ? IMAGE_EDIT_LOCK_REASON
+                    : undefined
+              }
+              onClick={toggleDodgeBurnTool}
             />
             ) : null}
             {isRailToolVisible("liquify") ? (
@@ -941,6 +963,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                         "pixel-pencil",
                         "eraser",
                         "blend",
+                        "dodge-burn",
                         "liquify",
                         "fill",
                         "lasso-fill",

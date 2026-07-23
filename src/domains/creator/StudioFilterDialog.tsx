@@ -12,12 +12,19 @@ import {
   STUDIO_FILTER_LABELS,
   cloneStudioFilterDraft,
   createStudioFilterDraft,
+  isStudioFilterPackDraft,
   studioFilterDraftToPatch,
   type StudioFilterDraft,
   type StudioFilterKind,
+  type StudioFilterPackDraft,
 } from "./studio-filter-menu";
+import {
+  STUDIO_FILTER_PACK_DEFS,
+  type StudioFilterPackValues,
+} from "./studio-filter-pack";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioCurvePanel } from "./StudioCurvePanel";
+import { useStudioHistogramSource } from "./useStudioHistogramSource";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import type { CurvePoint, CurveRgbChannels } from "./studio-curves";
@@ -32,6 +39,8 @@ interface StudioFilterDialogProps {
   activeKey: string;
   kind: StudioFilterKind;
   image: ImageFilterFields;
+  /** 선택 이미지의 src — 있으면 색상 커브 위에 히스토그램을 그린다(페이지 합성 대상이면 생략). */
+  imageSrc?: string | null;
   initialDraft?: StudioFilterDraft;
   rootRef: RefObject<HTMLElement | null>;
   targetKind?: "image" | "page-composite";
@@ -136,6 +145,86 @@ function NumberControl({
   );
 }
 
+interface ColorControlProps {
+  label: string;
+  value: string;
+  autofocus?: boolean;
+  onChange: (value: string) => void;
+}
+
+// 듀오톤 등 색상 파라미터용 — 네이티브 색상 피커 + 현재 헥스 값 표시.
+function ColorControl({ label, value, autofocus, onChange }: ColorControlProps): ReactElement {
+  const id = `studio-filter-${label.replace(/\s+/g, "-")}`;
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-x-3 gap-y-2">
+      <label htmlFor={id} className="text-xs font-semibold text-fg-2">
+        {label}
+      </label>
+      <label className="flex min-h-11 items-center gap-2 rounded-xl border border-line bg-card px-2 focus-within:border-accent sm:min-h-10 pointer-coarse:min-h-11">
+        <input
+          id={id}
+          type="color"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="size-6 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
+          data-autofocus={autofocus ? "true" : undefined}
+          aria-label={label}
+        />
+        <span className="min-w-0 flex-1 text-right text-xs font-semibold tabular-nums text-fg">
+          {value}
+        </span>
+      </label>
+    </div>
+  );
+}
+
+interface FilterPackControlsProps {
+  draft: StudioFilterPackDraft;
+  onChange: (values: StudioFilterPackValues) => void;
+}
+
+// 필터 팩 종류 — studio-filter-pack의 파라미터 스키마로 컨트롤을 데이터 기반 렌더링.
+function FilterPackControls({ draft, onChange }: FilterPackControlsProps): ReactElement {
+  const def = STUDIO_FILTER_PACK_DEFS[draft.kind];
+  const setValue = (key: string, value: number | string) => {
+    onChange({ ...draft.values, [key]: value });
+  };
+  return (
+    <>
+      {def.params.map((param, index) => {
+        if (param.control === "color") {
+          const raw = draft.values[param.key];
+          const fallback = def.defaults[param.key];
+          return (
+            <ColorControl
+              key={param.key}
+              label={param.label}
+              value={typeof raw === "string" ? raw : String(fallback)}
+              autofocus={index === 0}
+              onChange={(value) => setValue(param.key, value)}
+            />
+          );
+        }
+        const raw = draft.values[param.key];
+        const fallback = def.defaults[param.key];
+        return (
+          <NumberControl
+            key={param.key}
+            label={param.label}
+            min={param.min}
+            max={param.max}
+            step={param.step ?? 1}
+            {...(param.suffix ? { suffix: param.suffix } : {})}
+            value={typeof raw === "number" ? raw : Number(fallback)}
+            autofocus={index === 0}
+            onChange={(value) => setValue(param.key, value)}
+          />
+        );
+      })}
+    </>
+  );
+}
+
 function defaultDraft(kind: StudioFilterKind): StudioFilterDraft {
   return createStudioFilterDraft(kind, {});
 }
@@ -144,6 +233,7 @@ export function StudioFilterDialog({
   activeKey,
   kind,
   image,
+  imageSrc,
   initialDraft,
   rootRef,
   targetKind = "image",
@@ -155,6 +245,8 @@ export function StudioFilterDialog({
   onClose,
 }: StudioFilterDialogProps): ReactElement {
   const dialogRef = useRef<HTMLElement>(null);
+  // 히스토그램 원본 — src 키 LRU 캐시(디코드는 다이얼로그 세션당 최대 1회).
+  const histogramSource = useStudioHistogramSource(imageSrc);
   const [draft, setDraft] = useState<StudioFilterDraft>(() =>
     initialDraft && initialDraft.kind === kind
       ? cloneStudioFilterDraft(initialDraft)
@@ -258,6 +350,13 @@ export function StudioFilterDialog({
               </p>
             ) : null}
 
+            {isStudioFilterPackDraft(draft) ? (
+              <FilterPackControls
+                draft={draft}
+                onChange={(values) => setDraft({ ...draft, values })}
+              />
+            ) : null}
+
             {draft.kind === "gaussian-blur" ? (
               <NumberControl
                 label="반지름"
@@ -346,6 +445,7 @@ export function StudioFilterDialog({
 
             {draft.kind === "color-curves" ? (
               <StudioCurvePanel
+                histogramSource={histogramSource}
                 points={draft.curve}
                 channels={draft.curveCh}
                 onChange={(curve: CurvePoint[]) => setDraft({ ...draft, curve })}

@@ -16,11 +16,13 @@ import {
 const ICONS_BY_PROCEDURAL_CATEGORY = {
   ink: new Set<StudioBrushIconId>([
     "circle",
+    "pen",
     "pen-line",
     "pen-tool",
     "circle-dot",
     "circle-ellipsis",
     "brush",
+    "a-large-small",
   ]),
   sketch: new Set<StudioBrushIconId>(["pencil", "pen-line", "feather", "circle-dashed"]),
   chalk: new Set<StudioBrushIconId>(["circle-dashed", "grip", "square-dashed", "blend"]),
@@ -52,6 +54,7 @@ const ICONS_BY_PROCEDURAL_CATEGORY = {
     "gem",
     "cloud",
     "circle-dot",
+    "waves",
   ]),
   paint: new Set<StudioBrushIconId>([
     "cloud",
@@ -63,6 +66,7 @@ const ICONS_BY_PROCEDURAL_CATEGORY = {
     "paintbrush",
     "paint-roller",
     "spray-can",
+    "wind",
   ]),
   rake: new Set<StudioBrushIconId>(["rows", "align-justify", "fence", "feather", "waves"]),
   foliage: new Set<StudioBrushIconId>(["trees", "wheat", "leaf", "feather", "flower"]),
@@ -76,10 +80,17 @@ const ICONS_BY_PROCEDURAL_CATEGORY = {
     "rows",
     "fence",
   ]),
-  stamp: new Set<StudioBrushIconId>(["stamp", "footprints", "heart"]),
+  stamp: new Set<StudioBrushIconId>(["stamp", "footprints", "heart", "spline"]),
   pixel: new Set<StudioBrushIconId>(["square", "grid-2x2"]),
   tone: new Set<StudioBrushIconId>(["grid-3x3", "rows", "circle-dot"]),
-  effect: new Set<StudioBrushIconId>(["sparkles"]),
+  effect: new Set<StudioBrushIconId>([
+    "sparkles",
+    "spray-can",
+    "star",
+    "cloud",
+    "cloud-fog",
+    "asterisk",
+  ]),
 } satisfies Readonly<Record<StudioBrushPackCategory, ReadonlySet<StudioBrushIconId>>>;
 
 describe("studio-brush-icons", () => {

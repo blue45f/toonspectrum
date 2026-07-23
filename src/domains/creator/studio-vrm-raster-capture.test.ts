@@ -37,11 +37,14 @@ function dependencies(
 class FakeRenderer {
   readonly capabilities = { maxSamples: 8 };
   readonly outputColorSpace = THREE.SRGBColorSpace;
+  readonly toneMapping = THREE.ACESFilmicToneMapping;
+  readonly toneMappingExposure = 1;
   readonly calls: string[] = [];
   clearColor = new THREE.Color("#234567");
   clearAlpha = 0.75;
   failRead = false;
-  captureTarget: THREE.WebGLRenderTarget | null = null;
+  captureTargets: THREE.WebGLRenderTarget[] = [];
+  readTarget: THREE.WebGLRenderTarget | null = null;
   previousActiveCubeFace = 3;
   previousActiveMipmapLevel = 2;
 
@@ -76,8 +79,8 @@ class FakeRenderer {
     activeMipmapLevel = 0,
   ): void {
     if (target) {
-      this.captureTarget = target;
-      this.calls.push("set-capture-target");
+      this.captureTargets.push(target);
+      this.calls.push(`set-capture-target:${this.captureTargets.length}`);
     } else {
       this.calls.push(`restore-target:${activeCubeFace}:${activeMipmapLevel}`);
     }
@@ -103,7 +106,7 @@ class FakeRenderer {
   }
 
   readRenderTargetPixels(
-    _target: THREE.WebGLRenderTarget,
+    target: THREE.WebGLRenderTarget,
     _x: number,
     _y: number,
     width: number,
@@ -111,6 +114,7 @@ class FakeRenderer {
     output: Uint8Array,
   ): void {
     this.calls.push("read");
+    this.readTarget = target;
     if (this.failRead) throw new Error("readback failed");
     expect({ width, height }).toEqual({ width: 1, height: 2 });
     output.set([
@@ -142,7 +146,7 @@ describe("Studio VRM raster capture", () => {
     expect(() => flipStudioVrmCaptureRows(source, { width: 2, height: 2 })).toThrow(TypeError);
   });
 
-  it("renders into an explicit transparent target, reads pixels, and restores renderer state", () => {
+  it("renders the scene into an MSAA linear target, tone-maps through the straight-alpha output pass, and restores renderer state", () => {
     const renderer = new FakeRenderer();
 
     const output = captureStudioVrmRgba(
@@ -159,15 +163,24 @@ describe("Studio VRM raster capture", () => {
       "get-active-mipmap-level",
       "get-clear-color",
       "get-clear-alpha",
-      "set-capture-target",
+      "set-capture-target:1",
       "set-transparent-clear",
       "clear",
+      "render",
+      "set-capture-target:2",
       "render",
       "read",
       "restore-target:3:2",
       "restore-clear-color",
     ]);
-    expect(renderer.captureTarget?.samples).toBe(4);
+    const [sceneTarget, outputTarget] = renderer.captureTargets;
+    // Scene pass: antialiased linear working buffer; no output color space of its own.
+    expect(sceneTarget?.samples).toBe(4);
+    expect(sceneTarget?.texture.colorSpace).toBe(THREE.NoColorSpace);
+    // Output pass target: display-ready bytes, read back synchronously.
+    expect(outputTarget?.samples).toBe(0);
+    expect(outputTarget?.texture.colorSpace).toBe(THREE.NoColorSpace);
+    expect(renderer.readTarget).toBe(outputTarget);
     expect(renderer.clearColor.getHexString()).toBe("234567");
     expect(renderer.clearAlpha).toBe(0.75);
   });

@@ -237,10 +237,11 @@ describe("Studio lazy panel stack boundary", () => {
     expect(accessGate).toContain("return false;");
   });
 
-  it("keeps all six modal loading overlays colocated with their Suspense boundaries", () => {
+  it("keeps all seven modal loading overlays colocated with their Suspense boundaries", () => {
     const stack = moduleEdges("./StudioThreeDPreviewPanelStack.tsx").source;
     const contracts = [
       ["PoserLoadingOverlay", "포저를 여는 중"],
+      ["MannequinLoadingOverlay", "3D 데생 인형을 여는 중"],
       ["Bg3DLoadingOverlay", "3D 배경 도구를 여는 중"],
       ["TimelapseLoadingOverlay", "타임랩스 도구를 여는 중"],
       ["StoryboardGridLoadingOverlay", "스토리보드 그리드를 여는 중"],
@@ -253,8 +254,8 @@ describe("Studio lazy panel stack boundary", () => {
       expect(stack).toContain(label);
       expect(stack).toContain(`<Suspense fallback={<${name} />}>`);
     }
-    expect(stack.match(/aria-live="polite"/g)).toHaveLength(6);
-    expect(stack.match(/<Loader2\b/g)).toHaveLength(6);
+    expect(stack.match(/aria-live="polite"/g)).toHaveLength(7);
+    expect(stack.match(/<Loader2\b/g)).toHaveLength(7);
   });
 
   it("guards optional surfaces with their existing open or mounted flags", () => {

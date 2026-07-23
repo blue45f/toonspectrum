@@ -6,6 +6,7 @@ import { View } from "@react-three/drei/web/View.js";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import {
   AlertTriangle,
+  Aperture,
   Boxes,
   Camera,
   ChevronDown,
@@ -18,6 +19,7 @@ import {
   EyeOff,
   Globe,
   Hexagon,
+  Home,
   ImagePlus,
   Layers,
   LayoutTemplate,
@@ -36,9 +38,11 @@ import {
   RectangleHorizontal,
   RotateCcw,
   RotateCw,
+  Ruler,
   Save,
   ScanLine,
   Scaling,
+  Scissors,
   Trash2,
   Triangle,
   Torus as TorusIcon,
@@ -178,6 +182,15 @@ import {
   collectStudioBg3dEffectivelyVisibleEntityIds,
   resolveStudioBg3dHierarchy,
 } from "./studio-bg3d-hierarchy";
+import {
+  STUDIO_BG3D_LENS_MAX_FOCAL_MM,
+  STUDIO_BG3D_LENS_MIN_FOCAL_MM,
+  STUDIO_BG3D_LENS_PRESETS,
+  computeStudioBg3dTwoPointPerspective,
+  isStudioBg3dTwoPointPerspectiveActive,
+  studioBg3dFocalLengthToFovDegrees,
+  studioBg3dFovDegreesToFocalLength,
+} from "./studio-bg3d-lens";
 import { projectStudioBg3dLodDiameterCssPx } from "./studio-bg3d-lod-selection";
 import { resolveStudioBg3dLtCaptureSize } from "./studio-bg3d-lt-capture-size";
 import {
@@ -299,6 +312,13 @@ import {
   type StudioBg3dRigSelectionState,
 } from "./studio-bg3d-rig-selection";
 import {
+  clampStudioBg3dRoomSpec,
+  getStudioBg3dRoomPreset,
+  instantiateStudioBg3dRoomBuild,
+  type StudioBg3dRoomSpec,
+} from "./studio-bg3d-room-builder";
+import { buildStudioBg3dScaleGuideParts } from "./studio-bg3d-scale-guide";
+import {
   DEFAULT_STUDIO_BG3D_ANIMATION_PLAYBACK,
   DEFAULT_STUDIO_BG3D_CONSTRAINT_LAYER,
   DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE,
@@ -345,6 +365,14 @@ import {
   hydrateStudioBg3dDocumentToRuntime,
 } from "./studio-bg3d-scene-runtime";
 import {
+  DEFAULT_STUDIO_BG3D_SECTION_PLANE_STATE,
+  STUDIO_BG3D_SECTION_AXES,
+  STUDIO_BG3D_SECTION_AXIS_LABELS,
+  STUDIO_BG3D_SECTION_OFFSET_LIMIT,
+  computeStudioBg3dSectionPlane,
+  type StudioBg3dSectionPlaneState,
+} from "./studio-bg3d-section-plane";
+import {
   createStudioBg3dSemanticRenderPassPlan,
   type StudioBg3dSemanticMaterialClassificationResult,
   type StudioBg3dSemanticMaterialConfidence,
@@ -360,6 +388,13 @@ import {
   freezeStudioBg3dShotAnimationsForBatch,
   projectStudioBg3dShotVisibilityToRuntime,
 } from "./studio-bg3d-shot-runtime";
+import {
+  DEFAULT_STUDIO_BG3D_SUN_RIG_CONFIG,
+  STUDIO_BG3D_SUN_TIME_PRESETS,
+  applyStudioBg3dSunRig,
+  resolveStudioBg3dSunLightState,
+  type StudioBg3dSunRigConfig,
+} from "./studio-bg3d-sun-rig";
 import {
   collectStudioBg3dSurfaceSelectionSubtreeIds,
   collectStudioBg3dSurfaceTargetPathIds,
@@ -391,6 +426,7 @@ import {
   StudioBg3dPhysicsTransport,
 } from "./StudioBg3dPhysicsControls";
 import { StudioBg3dPlacementPointerController } from "./StudioBg3dPlacementPointerController";
+import { StudioBg3dRoomBuilderPanel } from "./StudioBg3dRoomBuilderPanel";
 import { StudioBg3dSceneFog } from "./StudioBg3dSceneFog";
 import { StudioBg3dScenePanorama } from "./StudioBg3dScenePanorama";
 import { StudioBg3dSceneTemplatePanel } from "./StudioBg3dSceneTemplatePanel";
@@ -1548,6 +1584,78 @@ function BgGroundHelper({ visible }: { visible: boolean }) {
   );
 }
 
+/** 태양 릭 시간 슬라이더 표기(24h "HH:MM"). 0.25h 스텝 외 임의 소수도 안전하게 반올림한다. */
+function formatBg3dSunTime(hours: number): string {
+  const safe = Number.isFinite(hours) ? ((hours % 24) + 24) % 24 : 12;
+  let wholeHours = Math.floor(safe);
+  let minutes = Math.round((safe - wholeHours) * 60);
+  if (minutes === 60) {
+    wholeHours = (wholeHours + 1) % 24;
+    minutes = 0;
+  }
+  return `${String(wholeHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+/* 단면(Section) 컷 — 전역 renderer.clippingPlanes 하나로 SketchUp 단면 평면을 재현한다.
+   평면 수학은 studio-bg3d-section-plane.ts의 순수 함수가 담당하고, 여기서는 상태의 원시 필드만
+   의존성으로 삼아(객체 identity 아님) 실제 값이 바뀔 때만 렌더러에 반영한다. 언마운트/비활성 시
+   클리핑 배열을 비워 원상 복구한다 — 평면은 GPU 자원이 아니라 별도 dispose가 필요 없다. */
+function applyBg3dSectionClippingPlanes(
+  gl: THREE.WebGLRenderer,
+  state: StudioBg3dSectionPlaneState,
+): void {
+  const equation = computeStudioBg3dSectionPlane(state);
+  gl.clippingPlanes = equation
+    ? [
+        new THREE.Plane(
+          new THREE.Vector3(equation.normal[0], equation.normal[1], equation.normal[2]),
+          equation.constant,
+        ),
+      ]
+    : [];
+}
+
+function clearBg3dSectionClippingPlanes(gl: THREE.WebGLRenderer): void {
+  gl.clippingPlanes = [];
+}
+
+function BgSectionPlaneController({ state }: { state: StudioBg3dSectionPlaneState }) {
+  const gl = useThree((s) => s.gl);
+  const { enabled, axis, offset, flip } = state;
+  useEffect(() => {
+    applyBg3dSectionClippingPlanes(gl, { enabled, axis, offset, flip });
+    return () => clearBg3dSectionClippingPlanes(gl);
+  }, [gl, enabled, axis, offset, flip]);
+  return null;
+}
+
+/* 160cm 인체 스케일 가이드 — SketchUp의 기준 인물처럼 벽·가구 크기를 즉시 가늠하게 하는
+   뷰포트 보조물. BgGroundHelper와 같은 캡처 제외 계약이라 씬 데이터·PNG/LT 결과물에는 절대
+   포함되지 않고, raycast를 비워 선택·표면 스냅을 가로채지 않는다. */
+const BG_SCALE_GUIDE_PARTS = buildStudioBg3dScaleGuideParts();
+
+function BgScaleGuide({ visible }: { visible: boolean }) {
+  return (
+    <group ref={registerStudioBg3dCaptureExcludedObject} visible={visible} position={[0, 0, 0]}>
+      {BG_SCALE_GUIDE_PARTS.map((part) => (
+        <mesh
+          key={part.name}
+          raycast={() => null}
+          position={[part.position[0], part.position[1], part.position[2]]}
+          scale={[part.scale[0], part.scale[1], part.scale[2]]}
+        >
+          {part.shape === "sphere" ? (
+            <sphereGeometry args={[0.5, 16, 12]} />
+          ) : (
+            <boxGeometry args={[1, 1, 1]} />
+          )}
+          <meshBasicMaterial color="#3b82f6" transparent opacity={0.45} depthWrite={false} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 function BgPlacementPreview({
   asset,
   preview,
@@ -2181,6 +2289,19 @@ export function StudioBackground3D({
   // BgSceneTemplateCategory와 BgCompositeCategory는 서로 다른 타입이라 공유할 수 없다("공간 종류" vs
   // "물체 종류"라는 다른 축, studio-background-3d-scene-templates.ts 상단 주석 참고).
   const [sceneTemplateCategory, setSceneTemplateCategory] = useState<BgSceneTemplateCategory | null>(null);
+  // 방 만들기(파라메트릭 블로킹) 스펙 — clampStudioBg3dRoomSpec을 통해서만 갱신되는 항상-유효 상태.
+  const [roomBuilderSpec, setRoomBuilderSpec] = useState<StudioBg3dRoomSpec>(
+    () => getStudioBg3dRoomPreset("studio-flat")!.spec,
+  );
+  // 태양·시간대 릭 컨트롤 상태 — 문서에는 applyStudioBg3dSunRig의 결과(lighting 등)만 저장된다.
+  const [sunRigConfig, setSunRigConfig] = useState<StudioBg3dSunRigConfig>(
+    DEFAULT_STUDIO_BG3D_SUN_RIG_CONFIG,
+  );
+  // 단면 컷·스케일 가이드 — 뷰포트 보조물이라 장면 문서에 저장하지 않는다(그리드와 같은 계약).
+  const [sectionPlane, setSectionPlane] = useState<StudioBg3dSectionPlaneState>(
+    DEFAULT_STUDIO_BG3D_SECTION_PLANE_STATE,
+  );
+  const [scaleGuideVisible, setScaleGuideVisible] = useState(false);
   // CSP-style move/rotate step snap + 레이어 목록 검색.
   const [snapSettings, setSnapSettings] = useState<StudioBg3dSnapSettings>(() => ({
     ...DEFAULT_STUDIO_BG3D_SNAP_SETTINGS,
@@ -3216,6 +3337,24 @@ export function StudioBackground3D({
     if (parts.length === 0) return;
     setPrimitives((prev) => [...prev, ...parts]);
     setSelectedIds(new Set([parts[0].id]));
+  };
+
+  // 방 만들기 스펙 → BgPrimitive[] 전개 추가 — addSceneTemplate과 동일한 "추가 = 선택" UX와
+  // 디바운스 히스토리 계약(Ctrl+Z 한 번에 방 전체가 되돌아간다).
+  const addRoomBuild = () => {
+    const parts = instantiateStudioBg3dRoomBuild(roomBuilderSpec, primitives.length);
+    if (parts.length === 0) return;
+    setPrimitives((prev) => [...prev, ...parts]);
+    setSelectedIds(new Set([parts[0].id]));
+  };
+
+  const applyRoomBuilderPreset = (presetId: string) => {
+    const preset = getStudioBg3dRoomPreset(presetId);
+    if (preset) setRoomBuilderSpec(preset.spec);
+  };
+
+  const handleRoomBuilderSpecChange = (next: StudioBg3dRoomSpec) => {
+    setRoomBuilderSpec(clampStudioBg3dRoomSpec(next));
   };
 
   const commitSceneEntityRemoval = (
@@ -4808,6 +4947,60 @@ export function StudioBackground3D({
     setError(null);
   }
 
+  // 태양·시간대 릭 — 슬라이더 연속 조작이라 즉시 히스토리 대신 디바운스 스냅샷(안개 슬라이더와
+  // 동일 계약)에 맡긴다. 함수형 업데이트로 연속 이벤트 간 문서 클로버를 방지한다.
+  function applySunRigConfig(patch: Partial<StudioBg3dSunRigConfig>) {
+    if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) return;
+    const nextConfig: StudioBg3dSunRigConfig = { ...sunRigConfig, ...patch };
+    setSunRigConfig(nextConfig);
+    setSceneBaseDocument((currentDocument) =>
+      applyStudioBg3dSunRig(currentDocument, nextConfig) ?? currentDocument);
+    setError(null);
+  }
+
+  /**
+   * 렌즈/투영 계열 카메라 편집의 단일 경로. 현재 라이브 시점을 먼저 읽어 문서 카메라와 동기화한
+   * 뒤 패치를 얹는다 — 그래야 fov만 바꿔도 저장돼 있던 옛 position으로 시점이 튀지 않는다.
+   * 투영 전환은 R3F 기본 카메라를 재마운트하므로 applyOrDeferStudioBg3dHistoryCamera가
+   * undo/redo와 동일한 지연 적용 계약으로 처리한다.
+   */
+  function updateCameraLens(
+    patch: (view: StudioBg3dCameraSettings) => Partial<StudioBg3dCameraSettings>,
+  ) {
+    if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) return;
+    const liveView = viewportApiRef.current?.readView() ?? sceneBaseDocument.camera;
+    const nextCamera: StudioBg3dCameraSettings = { ...liveView, ...patch(liveView) };
+    const nextDocument = canonicalSceneDocument({ ...sceneBaseDocument, camera: nextCamera });
+    if (!nextDocument) {
+      setError("카메라 렌즈 설정을 장면 원본에 안전하게 적용하지 못했습니다.");
+      return;
+    }
+    setSceneBaseDocument(nextDocument);
+    applyOrDeferStudioBg3dHistoryCamera(
+      viewportApiRef.current,
+      pendingInitialCameraRef,
+      nextDocument.camera,
+    );
+    setError(null);
+  }
+
+  function applyTwoPointPerspective() {
+    const liveView = viewportApiRef.current?.readView() ?? sceneBaseDocument.camera;
+    const corrected = computeStudioBg3dTwoPointPerspective(liveView);
+    if (!corrected) {
+      setError("정수직 시점에서는 2점 투시 보정을 정의할 수 없습니다. 카메라를 조금 기울여 주세요.");
+      return;
+    }
+    updateCameraLens((view) => ({
+      target: corrected.target,
+      lensShift: [view.lensShift?.[0] ?? 0, corrected.lensShiftY],
+    }));
+  }
+
+  function resetTwoPointPerspective() {
+    updateCameraLens((view) => ({ lensShift: [view.lensShift?.[0] ?? 0, 0] }));
+  }
+
   function readCurrentCanonicalSceneForShot(): StudioBg3dSceneDocument | null {
     if (
       captureInFlightRef.current ||
@@ -6109,10 +6302,17 @@ export function StudioBackground3D({
       const captureAdapterIsStale = () => captureRef.current.adapter !== captureAdapter;
 
       const sourceSize = await getStudioBg3dCaptureSourceSize(captureAdapter);
+      // HiDPI 화면에서 프리뷰(디바이스 픽셀 밀도 렌더)와 삽입 결과의 선명도가 일치하도록
+      // exportHeight에 dpr(1..3 클램프)만 곱한다 — 슈퍼샘플은 LT 주선/톤이 px 단위라 룩이
+      // 변해 의도적으로 제외. 픽셀 예산·4096 edge 캡은 resolveStudioBg3dLtCaptureSize가 지킨다.
+      const captureDensity = Math.min(3, Math.max(1, globalThis.devicePixelRatio || 1));
       const captureSize = resolveStudioBg3dLtCaptureSize({
         sourceWidth: sourceSize.width,
         sourceHeight: sourceSize.height,
-        requestedHeight: adapted.document.output.exportHeight,
+        requestedHeight: Math.min(
+          4096,
+          Math.round(adapted.document.output.exportHeight * captureDensity)
+        ),
         maxPixels: Math.min(deviceQuality.maxRenderPixels, STUDIO_BG3D_LT_RENDER_MAX_PIXELS),
       });
       if (!captureSize) {
@@ -7231,6 +7431,11 @@ export function StudioBackground3D({
     batchRendering: isBatchRenderingShots,
   });
   const isMainOrtho = sceneBaseDocument.camera.projection === "orthographic";
+  const currentFocalLengthMm = Math.round(
+    studioBg3dFovDegreesToFocalLength(sceneBaseDocument.camera.fovDegrees),
+  );
+  const twoPointPerspectiveActive = isStudioBg3dTwoPointPerspectiveActive(sceneBaseDocument.camera);
+  const sunLightState = resolveStudioBg3dSunLightState(sunRigConfig.timeOfDayHours);
   const selectedSky = getSkyPreset(skyPresetId);
   const panoramaRotation = normalizePanoramaRotationDegrees(
     sceneBaseDocument.background.panoramaRotation,
@@ -7402,6 +7607,8 @@ export function StudioBackground3D({
         shadow-mapSize-width={deviceQuality.shadowMapSize || 1024}
       />
       <BgGroundHelper visible={!lineArtPreview && !isCapturing} />
+      <BgSectionPlaneController state={sectionPlane} />
+      <BgScaleGuide visible={scaleGuideVisible && !isCapturing} />
       {placementSession.phase === "preview" && placementPreviewAsset ? (
         <BgPlacementPreview asset={placementPreviewAsset} preview={placementSession} />
       ) : null}
@@ -9440,6 +9647,25 @@ export function StudioBackground3D({
                   onCategoryChange={setSceneTemplateCategory}
                   onAddTemplate={addSceneTemplate}
                 />
+
+                <div className="mt-5 border-t border-line pt-4">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
+                      <Home size={15} className="text-accent" aria-hidden />
+                      방 만들기
+                    </h3>
+                    <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.62rem] font-semibold text-fg-3">
+                      파라메트릭
+                    </span>
+                  </div>
+                  <StudioBg3dRoomBuilderPanel
+                    spec={roomBuilderSpec}
+                    disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
+                    onSpecChange={handleRoomBuilderSpecChange}
+                    onApplyPreset={applyRoomBuilderPreset}
+                    onInsert={addRoomBuild}
+                  />
+                </div>
               </section>
 
               <section hidden={hideOnTab("layers")}>
@@ -10074,6 +10300,99 @@ export function StudioBackground3D({
                 </div>
 
                 <div className="mt-5 border-t border-line pt-4">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
+                      <Aperture size={15} className="text-accent" aria-hidden />
+                      렌즈 · 투영
+                    </h3>
+                    <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.62rem] font-semibold text-fg-3">
+                      35mm 환산
+                    </span>
+                  </div>
+                  <div
+                    className={cx(
+                      "rounded-xl border border-line bg-card/70 px-3 py-2",
+                      isMainOrtho && "opacity-45",
+                    )}
+                  >
+                    <LtRangeControl
+                      id="bg3d-lens-focal"
+                      label="초점거리"
+                      min={STUDIO_BG3D_LENS_MIN_FOCAL_MM}
+                      max={STUDIO_BG3D_LENS_MAX_FOCAL_MM}
+                      step={1}
+                      value={currentFocalLengthMm}
+                      valueText={`${currentFocalLengthMm}mm · ${Math.round(sceneBaseDocument.camera.fovDegrees)}°`}
+                      disabled={isCapturing || isBatchRenderingShots || isRestoringScene || physicsInteractionLocked || isMainOrtho}
+                      onChange={(focalLengthMm) => updateCameraLens(() => ({
+                        fovDegrees: studioBg3dFocalLengthToFovDegrees(focalLengthMm),
+                      }))}
+                    />
+                    <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="렌즈 프리셋">
+                      {STUDIO_BG3D_LENS_PRESETS.map((preset) => (
+                        <button
+                          key={preset.focalLengthMm}
+                          type="button"
+                          aria-pressed={currentFocalLengthMm === preset.focalLengthMm}
+                          disabled={isCapturing || isBatchRenderingShots || isRestoringScene || physicsInteractionLocked || isMainOrtho}
+                          className={cx(
+                            "rounded-full border border-line bg-card px-2.5 py-1 text-[0.64rem] font-semibold text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45",
+                            currentFocalLengthMm === preset.focalLengthMm &&
+                              "border-accent/60 bg-accent-soft text-accent",
+                          )}
+                          onClick={() => updateCameraLens(() => ({
+                            fovDegrees: studioBg3dFocalLengthToFovDegrees(preset.focalLengthMm),
+                          }))}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <LtToggleRow
+                    label="직교 투영(설계도·아이소메트릭)"
+                    checked={isMainOrtho}
+                    disabled={isCapturing || isBatchRenderingShots || isRestoringScene || physicsInteractionLocked}
+                    onChange={(orthographic) => updateCameraLens(() => ({
+                      projection: orthographic ? "orthographic" : "perspective",
+                    }))}
+                  />
+
+                  <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                    <button
+                      type="button"
+                      aria-pressed={twoPointPerspectiveActive}
+                      disabled={isCapturing || isBatchRenderingShots || isRestoringScene || physicsInteractionLocked || isMainOrtho}
+                      className={cx(
+                        CONTROL_BUTTON,
+                        "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
+                        twoPointPerspectiveActive && "border-accent/60 bg-accent-soft text-accent",
+                      )}
+                      onClick={applyTwoPointPerspective}
+                    >
+                      2점 투시 보정
+                    </button>
+                    <button
+                      type="button"
+                      disabled={
+                        isCapturing || isBatchRenderingShots || isRestoringScene ||
+                        physicsInteractionLocked || isMainOrtho || !twoPointPerspectiveActive
+                      }
+                      className={cx(CONTROL_BUTTON, "border-line bg-panel px-3 text-fg-2 hover:bg-raised hover:text-fg")}
+                      onClick={resetTwoPointPerspective}
+                    >
+                      <RotateCcw size={14} aria-hidden />
+                      해제
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-[0.64rem] leading-relaxed text-fg-3">
+                    올려다보거나 내려다보는 구도에서 수직선을 화면과 평행하게 세웁니다(건축 컷).
+                    시선은 수평이 되고 원래 구도는 렌즈 시프트로 보존됩니다.
+                  </p>
+                </div>
+
+                <div className="mt-5 border-t border-line pt-4">
                   <label className="flex items-start gap-2.5">
                     <input
                       type="checkbox"
@@ -10150,6 +10469,75 @@ export function StudioBackground3D({
                   <p className="mt-2 text-[0.66rem] leading-relaxed text-fg-3" aria-live="polite">
                     {appliedMoodRig?.description ??
                       "현재 하늘·안개·조명·노출 값은 개별 조정된 사용자 설정입니다."}
+                  </p>
+                </div>
+
+                <div className="mt-5 border-t border-line pt-4">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
+                      <SunMoon size={15} className="text-accent" aria-hidden />
+                      태양 · 시간대 릭
+                    </h3>
+                    <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.62rem] font-semibold text-fg-3">
+                      {sunLightState.mode === "sun" ? "태양광" : "달빛"}
+                    </span>
+                  </div>
+                  <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
+                    시각과 방위각에서 태양 방향·색온도·하늘을 절차 계산해 조명에 기록합니다.
+                    무드 리그와 달리 슬라이더로 연속 조정할 수 있어요.
+                  </p>
+                  <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="시간대 프리셋">
+                    {STUDIO_BG3D_SUN_TIME_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        aria-pressed={Math.abs(sunRigConfig.timeOfDayHours - preset.timeOfDayHours) < 0.01}
+                        disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
+                        className={cx(
+                          "rounded-full border border-line bg-card px-2.5 py-1 text-[0.64rem] font-semibold text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45",
+                          Math.abs(sunRigConfig.timeOfDayHours - preset.timeOfDayHours) < 0.01 &&
+                            "border-accent/60 bg-accent-soft text-accent",
+                        )}
+                        onClick={() => applySunRigConfig({ timeOfDayHours: preset.timeOfDayHours })}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="rounded-xl border border-line bg-card/70 px-3 py-2">
+                    <LtRangeControl
+                      id="bg3d-sun-time"
+                      label="시각"
+                      min={0}
+                      max={24}
+                      step={0.25}
+                      value={sunRigConfig.timeOfDayHours}
+                      valueText={formatBg3dSunTime(sunRigConfig.timeOfDayHours)}
+                      disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
+                      onChange={(timeOfDayHours) => applySunRigConfig({ timeOfDayHours })}
+                    />
+                    <LtRangeControl
+                      id="bg3d-sun-azimuth"
+                      label="방위각"
+                      min={-180}
+                      max={180}
+                      step={5}
+                      value={sunRigConfig.azimuthDeg}
+                      valueText={`${sunRigConfig.azimuthDeg}°`}
+                      disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
+                      onChange={(azimuthDeg) => applySunRigConfig({ azimuthDeg })}
+                    />
+                    <LtToggleRow
+                      label="태양 그림자(기기 성능에 따라 자동 제한)"
+                      checked={sunRigConfig.shadowsEnabled}
+                      disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
+                      onChange={(shadowsEnabled) => applySunRigConfig({ shadowsEnabled })}
+                    />
+                  </div>
+                  <p className="mt-1.5 text-[0.64rem] leading-relaxed text-fg-3" aria-live="polite">
+                    {sunLightState.mode === "sun"
+                      ? `태양 고도 ${Math.round(sunLightState.sunElevationDeg)}° · 색온도 ${Math.round(sunLightState.colorTemperatureK)}K`
+                      : "지평선 아래 — 달빛과 야간 하늘로 전환되었습니다."}
                   </p>
                 </div>
 
@@ -10364,6 +10752,96 @@ export function StudioBackground3D({
                       안개는 뷰포트와 컬러·톤 캡처에 함께 반영되며 선화 레이어의 투명 배경은 유지됩니다.
                     </p>
                   </div>
+                </div>
+
+                <div className="mt-5 border-t border-line pt-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
+                        <Scissors size={15} className="text-accent" aria-hidden />
+                        단면 컷
+                      </h3>
+                      <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
+                        벽이나 천장을 잘라내 바깥에서 실내를 들여다보는 컷을 만듭니다. 잘린 상태
+                        그대로 캡처됩니다.
+                      </p>
+                    </div>
+                    <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-fg-2 sm:min-h-9">
+                      <input
+                        type="checkbox"
+                        aria-label="단면 컷 사용"
+                        checked={sectionPlane.enabled}
+                        onChange={(event) => setSectionPlane((current) => ({
+                          ...current,
+                          enabled: event.target.checked,
+                        }))}
+                        className="size-4 accent-accent"
+                      />
+                      {sectionPlane.enabled ? "켜짐" : "꺼짐"}
+                    </label>
+                  </div>
+                  <div
+                    className={cx(
+                      "mt-3 space-y-2 transition-opacity duration-150 motion-reduce:transition-none",
+                      !sectionPlane.enabled && "pointer-events-none opacity-45",
+                    )}
+                    aria-disabled={!sectionPlane.enabled}
+                  >
+                    <div className="flex gap-1.5" role="group" aria-label="단면 축">
+                      {STUDIO_BG3D_SECTION_AXES.map((axis) => (
+                        <button
+                          key={axis}
+                          type="button"
+                          aria-pressed={sectionPlane.axis === axis}
+                          disabled={!sectionPlane.enabled}
+                          className={cx(
+                            CONTROL_BUTTON,
+                            "flex-1 border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
+                            sectionPlane.axis === axis && "border-accent/60 bg-accent-soft text-accent",
+                          )}
+                          onClick={() => setSectionPlane((current) => ({ ...current, axis }))}
+                        >
+                          {STUDIO_BG3D_SECTION_AXIS_LABELS[axis]}
+                        </button>
+                      ))}
+                    </div>
+                    <LtRangeControl
+                      id="bg3d-section-offset"
+                      label="절단 위치"
+                      min={-STUDIO_BG3D_SECTION_OFFSET_LIMIT}
+                      max={STUDIO_BG3D_SECTION_OFFSET_LIMIT}
+                      step={0.1}
+                      value={sectionPlane.offset}
+                      valueText={`${round(sectionPlane.offset, 1)}m`}
+                      disabled={!sectionPlane.enabled}
+                      onChange={(offset) => setSectionPlane((current) => ({ ...current, offset }))}
+                    />
+                    <LtToggleRow
+                      label="반대쪽 잘라내기"
+                      checked={sectionPlane.flip}
+                      disabled={!sectionPlane.enabled}
+                      onChange={(flip) => setSectionPlane((current) => ({ ...current, flip }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-5 border-t border-line pt-4">
+                  <label className="flex items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      checked={scaleGuideVisible}
+                      onChange={(event) => setScaleGuideVisible(event.target.checked)}
+                      className="mt-0.5 size-4 accent-accent"
+                    />
+                    <Ruler size={13} className="mt-0.5 shrink-0 text-accent" aria-hidden />
+                    <span className="block text-xs font-bold text-fg">
+                      160cm 인체 스케일 가이드
+                      <span className="mt-0.5 block text-[0.68rem] font-normal leading-relaxed text-fg-3">
+                        기준 인물 실루엣을 원점에 세워 벽 높이·가구 크기를 즉시 가늠합니다.
+                        바닥 그리드 한 칸은 1m이며, 가이드는 캡처 결과물에 포함되지 않습니다.
+                      </span>
+                    </span>
+                  </label>
                 </div>
                 </div>
               </section>

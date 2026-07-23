@@ -42,6 +42,8 @@ import {
   type StudioBrushSnapshot,
   type StudioSavedBrush,
 } from "./studio-brush-library";
+import { STUDIO_BRUSH_PACK_EXPANSION_WAVE_IDS } from "./studio-brush-pack-expansion";
+import { materializeAllStudioBrushPackSelections } from "./studio-brush-pack-runtime";
 
 // 인메모리 가짜 저장소 (studio-palette-library.test.ts와 동일 패턴)
 function fakeStorage(initial: Record<string, string> = {}) {
@@ -1099,5 +1101,98 @@ describe("brushFileName", () => {
   it("정제 후 이름이 비면 brush.json으로 대체한다", () => {
     expect(brushFileName({ name: "///" })).toBe("brush.json");
     expect(brushFileName({ name: "   " })).toBe("brush.json");
+  });
+});
+
+// ── 내장 프로시저럴 카탈로그(120종) × 저장 라이브러리 계약 ──────────────────
+// 카탈로그 프리셋을 "내 브러시"로 저장하면 StudioPage는 brushId=런타임 엔진 id,
+// sourcePreset* = 카탈로그 정체성, brushDynamics = 완전한 정규화 스냅샷으로 기록한다.
+// 이 블록은 120개 전부가 라이브러리 정규화를 보정 없이 통과하고, 내보내기/가져오기
+// 왕복이 무손실이며, 각 파라미터가 엔진 안전 범위 안에 있음을 프리셋 단위로 고정한다.
+describe("내장 카탈로그 120종 저장 라이브러리 왕복", () => {
+  const selections = materializeAllStudioBrushPackSelections();
+
+  function catalogSnapshot(selection: (typeof selections)[number]): StudioBrushSnapshot {
+    return {
+      sourcePresetId: selection.catalogId,
+      sourcePresetName: selection.catalogName,
+      brushId: selection.runtimeBrushId,
+      strokeWidth: selection.defaultWidth,
+      brushOpacity: selection.defaultOpacity,
+      color: "#7c5cfc",
+      stabilizer: 0,
+      stabilizerMode: "standard",
+      postCorrection: 0,
+      preserveCorners: true,
+      pressureCurve: 1,
+      useVelocityPressure: false,
+      velocitySensitivity: 0.65,
+      tiltEnabled: true,
+      tipAngle: -30,
+      tipRoundness: 0.24,
+      brushDynamics: selection.brushDynamics,
+      stampTuning: null,
+    };
+  }
+
+  it("120개 전 프리셋이 sanitizeBrushSnapshot을 무보정 통과한다", () => {
+    expect(selections).toHaveLength(120);
+    expect(new Set(selections.map((selection) => selection.catalogId)).size).toBe(120);
+    for (const selection of selections) {
+      const { snapshot, adjustedFields } = sanitizeBrushSnapshot(catalogSnapshot(selection));
+      expect(adjustedFields, `${selection.catalogId}: sanitized fields`).toEqual([]);
+      expect(snapshot, selection.catalogId).toEqual(catalogSnapshot(selection));
+    }
+  });
+
+  it("확장 웨이브 33종을 포함해 전 프리셋 파라미터가 스냅샷 안전 범위 안이다", () => {
+    expect(
+      STUDIO_BRUSH_PACK_EXPANSION_WAVE_IDS.every((id) =>
+        selections.some((selection) => selection.catalogId === id)
+      )
+    ).toBe(true);
+    for (const selection of selections) {
+      const id = selection.catalogId;
+      const dynamics = selection.brushDynamics;
+      expect(selection.defaultWidth, id).toBeGreaterThanOrEqual(BRUSH_STROKE_WIDTH_RANGE[0]);
+      expect(selection.defaultWidth, id).toBeLessThanOrEqual(BRUSH_STROKE_WIDTH_RANGE[1]);
+      expect(selection.defaultOpacity, id).toBeGreaterThanOrEqual(BRUSH_OPACITY_RANGE[0]);
+      expect(selection.defaultOpacity, id).toBeLessThanOrEqual(BRUSH_OPACITY_RANGE[1]);
+      // 정규화 멱등성 — 이미 정규화된 스냅샷을 다시 정규화해도 구조가 같아야 한다.
+      expect(normalizeStudioBrushDynamicsSettings(dynamics), id).toEqual(dynamics);
+      expect(dynamics.spacingRatio, id).not.toBeNull();
+      expect(dynamics.spacingRatio!, id).toBeGreaterThanOrEqual(0.01);
+      expect(dynamics.spacingRatio!, id).toBeLessThanOrEqual(16);
+      if (dynamics.scatterRatio !== null) {
+        expect(dynamics.scatterRatio, id).toBeGreaterThanOrEqual(0);
+        expect(dynamics.scatterRatio, id).toBeLessThanOrEqual(16);
+      }
+      expect(dynamics.taper.startLength, id).toBeLessThanOrEqual(0.5);
+      expect(dynamics.taper.endLength, id).toBeLessThanOrEqual(0.5);
+      expect(dynamics.flow.base, id).toBeGreaterThan(0);
+      expect(dynamics.flow.base, id).toBeLessThanOrEqual(1);
+      expect(dynamics.opacity.base, id).toBe(1);
+      expect(dynamics.width.base, id).toBe(selection.defaultWidth);
+      expect(dynamics.roundness.base, id).toBeGreaterThanOrEqual(0.08);
+      expect(dynamics.roundness.base, id).toBeLessThanOrEqual(1);
+      expect(Math.abs(dynamics.angle.base), id).toBeLessThanOrEqual(180);
+      expect(dynamics.grain.amount, id).toBeGreaterThanOrEqual(0);
+      expect(dynamics.grain.amount, id).toBeLessThanOrEqual(1);
+      expect(dynamics.grain.scale, id).toBeGreaterThanOrEqual(0.25);
+      expect(dynamics.grain.scale, id).toBeLessThanOrEqual(512);
+      expect(dynamics.colorDynamics.hueJitter, id).toBeGreaterThanOrEqual(0);
+      expect(dynamics.colorDynamics.hueJitter, id).toBeLessThanOrEqual(180);
+      expect(dynamics.tipLayers.length, id).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("전 프리셋이 JSON 내보내기/가져오기 왕복에서 무손실이다", () => {
+    for (const selection of selections) {
+      const source = createBrush(selection.catalogName, catalogSnapshot(selection));
+      const { brush: imported, adjustedFields } = importBrushFromJson(writeBrushJson(source));
+      expect(adjustedFields, selection.catalogId).toEqual([]);
+      expect(imported.name, selection.catalogId).toBe(selection.catalogName);
+      expect(brushMatchesSnapshot(imported, catalogSnapshot(selection)), selection.catalogId).toBe(true);
+    }
   });
 });

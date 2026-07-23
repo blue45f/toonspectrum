@@ -22,6 +22,7 @@ import type { GradientMap } from "./studio-gradient-map";
 import type { Grain } from "./studio-grain";
 import type { Halftone } from "./studio-halftone";
 import type { InkWash } from "./studio-ink-wash";
+import type { ShadowHighlight } from "./studio-shadow-highlight";
 import type { Sketch } from "./studio-sketch";
 import type { Stylize } from "./studio-stylize";
 
@@ -32,6 +33,7 @@ export const STUDIO_ADJUSTMENT_ENGINE_IDS = [
   "curves",
   "levels",
   "brightness-contrast",
+  "shadow-highlight",
   "hue-saturation",
   "color-balance",
   "channel-mixer",
@@ -115,6 +117,8 @@ export function studioAdjustmentDefaultParams(
       return { radius: 20, strength: 85 };
     case "brightness-contrast":
       return { brightness: 0.12, contrast: 10 };
+    case "shadow-highlight":
+      return { shadows: 35, shadowsWidth: 50, highlights: 20, highlightsWidth: 50, midtoneContrast: 0 };
     case "hue-saturation":
       return { hue: 0, saturation: 0.2 };
     case "levels":
@@ -378,6 +382,8 @@ export function studioAdjustmentEngineLabel(engine: StudioAdjustmentEngineId): s
       return "레벨";
     case "brightness-contrast":
       return "밝기/대비";
+    case "shadow-highlight":
+      return "섀도우/하이라이트";
     case "hue-saturation":
       return "색조/채도";
     case "color-balance":
@@ -505,6 +511,7 @@ export type StudioAdjustmentEntryFilterFields = {
   colorBalance?: ColorBalance;
   channelMixer?: ChannelMixer;
   gradientMap?: GradientMap;
+  shadowHighlight?: ShadowHighlight;
   exposureAdjustment?: StudioExposureAdjustment;
   unsharpMask?: StudioUnsharpMask;
   morphology?: StudioMorphology;
@@ -684,6 +691,15 @@ export function studioAdjustmentOperationToFilterFields(
       case "brightness-contrast":
         out.brightness = finiteNumber(p.brightness, 0);
         out.contrast = finiteNumber(p.contrast, 0);
+        break;
+      case "shadow-highlight":
+        out.shadowHighlight = {
+          shadows: finiteNumber(p.shadows, 0),
+          shadowsWidth: finiteNumber(p.shadowsWidth, 50),
+          highlights: finiteNumber(p.highlights, 0),
+          highlightsWidth: finiteNumber(p.highlightsWidth, 50),
+          midtoneContrast: finiteNumber(p.midtoneContrast, 0),
+        };
         break;
       case "hue-saturation":
         out.hue = finiteNumber(p.hue, 0);

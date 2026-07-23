@@ -110,6 +110,10 @@ const StudioLayerMaskOverlay = lazyRetry(
   () => import("./StudioLayerMaskOverlay").then((mod) => ({ default: mod.StudioLayerMaskOverlay })),
   "StudioLayerMaskOverlay"
 );
+const StudioQuickMaskOverlay = lazyRetry(
+  () => import("./StudioQuickMaskOverlay").then((mod) => ({ default: mod.StudioQuickMaskOverlay })),
+  "StudioQuickMaskOverlay"
+);
 const studioPanelSplitToolLoader = createStudioIntentLazyLoader(
   () => import("./StudioPanelSplitTool")
 );
@@ -306,6 +310,10 @@ const StudioVrmPoser = lazyRetry(
   () => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })),
   "StudioVrmPoser"
 );
+const StudioMannequinPoserPanel = lazyRetry(
+  () => import("./StudioMannequinPoserPanel").then((mod) => ({ default: mod.StudioMannequinPoserPanel })),
+  "StudioMannequinPoserPanel"
+);
 const StudioBackground3D = lazyRetry(
   () => loadStudioBackground3DModule().then((mod) => ({ default: mod.StudioBackground3D })),
   "StudioBackground3D"
@@ -333,6 +341,10 @@ const StudioBubbleTailControls = lazyRetry(
 const StudioSmudgePanel = lazyRetry(
   () => import("./StudioSmudgePanel").then((mod) => ({ default: mod.StudioSmudgePanel })),
   "StudioSmudgePanel"
+);
+const StudioDodgeBurnPanel = lazyRetry(
+  () => import("./StudioDodgeBurnPanel").then((mod) => ({ default: mod.StudioDodgeBurnPanel })),
+  "StudioDodgeBurnPanel"
 );
 const StudioLiquifyPanel = lazyRetry(
   () => import("./StudioLiquifyPanel").then((mod) => ({ default: mod.StudioLiquifyPanel })),
@@ -389,6 +401,10 @@ const StudioCropOverlay = lazyRetry(
 const StudioNodeEditOverlay = lazyRetry(
   () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioNodeEditOverlay })),
   "StudioNodeEditOverlay"
+);
+const StudioDrawSelectionOverlay = lazyRetry(
+  () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioDrawSelectionOverlay })),
+  "StudioDrawSelectionOverlay"
 );
 const StudioBubbleShapeOverlay = lazyRetry(
   () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioBubbleShapeOverlay })),
@@ -736,6 +752,7 @@ export {
   StudioIsometricGridOverlay,
   StudioLayerMaskPanel,
   StudioLayerMaskOverlay,
+  StudioQuickMaskOverlay,
   StudioLayerNavigator,
   StudioLiquifyPanel,
   StudioLiveInkOverlayHost,
@@ -745,6 +762,7 @@ export {
   StudioLiveStampOverlayHost,
   StudioMainMenu,
   StudioMasterPagePanel,
+  StudioDrawSelectionOverlay,
   StudioNodeEditOverlay,
   StudioOnionSkinImage,
   StudioPageGradePanel,
@@ -780,6 +798,7 @@ export {
   StudioShapePickerGrid,
   StudioShortcutsHelp,
   StudioSmudgePanel,
+  StudioDodgeBurnPanel,
   QuickStartPanel,
   StudioStickerGrid,
   StudioStockImagePanel,
@@ -795,6 +814,7 @@ export {
   StudioUnifiedBrushPicker,
   StudioUploadPublish,
   StudioVrmPoser,
+  StudioMannequinPoserPanel,
   StudioWebGpuCanvas,
   StudioWriterRoomPanel,
   WorkFxPanel,

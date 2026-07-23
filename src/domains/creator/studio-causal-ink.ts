@@ -490,7 +490,12 @@ function planStudioResidualInkDabs(input: StudioCausalInkDabInput): StudioCausal
       input.pressureModel,
       maximumDabs - dabs.length
     );
-    dabs.push(...advanced.dabs);
+    // One long fast segment at the 0.5px spacing floor can emit tens of thousands of dabs inside
+    // the 100k budget. Spread-push would pass each dab as a call argument and exceed engine
+    // argument limits (~65k on JSC), so append by index.
+    for (let dabIndex = 0; dabIndex < advanced.dabs.length; dabIndex += 1) {
+      dabs.push(advanced.dabs[dabIndex]!);
+    }
     state = advanced.state;
     complete = advanced.complete;
   }

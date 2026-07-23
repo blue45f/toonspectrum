@@ -5,6 +5,8 @@
  * onChange/onChannelsChange/onReset으로만 쓴다. onChannelsChange가 없으면 채널 UI를 숨긴다(하위호환).
  * 로컬 상태는 드래그/선택 중인 점과 편집 채널, 좌표 입력 draft뿐이며 실제 곡선은 부모가 소유한다.
  * 좌표 변환은 svgRef의 getBoundingClientRect로 CSS 스케일을 보정한다(브라우저 전용, 테스트 대상 아님).
+ * histogramSource(선택 이미지 디코드 픽셀)가 주어지면 커브 위에 히스토그램을 그린다 —
+ * 없으면 기존과 완전히 동일하게 렌더된다(하위호환).
  */
 import { Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -25,6 +27,9 @@ import {
   type ToneChannel,
 } from "./studio-curves";
 import { StudioToggleChip } from "./studio-panel-ui";
+import { StudioHistogramSection } from "./StudioHistogramGraph";
+
+import type { StudioImageDataLike } from "./studio-filters";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
@@ -176,6 +181,7 @@ function CurveCoordinateInput({
 export function StudioCurvePanel({
   points,
   channels,
+  histogramSource,
   onChange,
   onChannelsChange,
   onReset,
@@ -183,6 +189,11 @@ export function StudioCurvePanel({
   points: CurvePoint[];
   /** r/g/b 개별 채널 곡선(마스터는 points). 미지정이면 전 채널 항등으로 본다. */
   channels?: CurveRgbChannels;
+  /**
+   * 선택 이미지의 디코드 픽셀 — 지정된 경우에만 커브 위에 히스토그램을 그린다
+   * (마스터=휘도, r/g/b=해당 채널 분포). 미지정/null이면 기존 렌더와 동일.
+   */
+  histogramSource?: StudioImageDataLike | null;
   onChange: (points: CurvePoint[]) => void;
   /** 채널 곡선 변경 콜백 — 지정된 경우에만 채널 세그먼트 UI를 노출한다. */
   onChannelsChange?: (channels: CurveRgbChannels) => void;
@@ -443,6 +454,9 @@ export function StudioCurvePanel({
           })}
         </div>
       )}
+
+      {/* 히스토그램 — 선택 이미지 픽셀이 주어졌을 때만. 편집 채널을 따라간다(마스터=휘도). */}
+      <StudioHistogramSection source={histogramSource} channel={activeChannel} />
 
       {/* 인터랙티브 커브 — 격자/대각 기준선 + (채널 편집 시) 마스터 참조선 + 폴리라인 + 드래그 핸들. */}
       <svg

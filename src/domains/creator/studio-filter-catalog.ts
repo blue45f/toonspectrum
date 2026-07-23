@@ -73,6 +73,13 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     keywords: ["brightness", "contrast", "명도", "밝기", "대비"],
   },
   {
+    engine: "shadow-highlight",
+    title: "섀도우/하이라이트",
+    description: "어두운 영역을 밝히고 날아간 밝은 영역을 되살리며 미드톤 대비를 함께 다듬습니다.",
+    group: "tone",
+    keywords: ["shadow", "highlight", "섀도우", "하이라이트", "역광", "명암 복구", "톤 범위"],
+  },
+  {
     engine: "exposure",
     title: "노출 / 감마 / 오프셋",
     description: "스톱 단위 노출, 중간톤 감마와 선형 오프셋을 함께 조정합니다.",

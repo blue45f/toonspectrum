@@ -3752,6 +3752,38 @@ function CharacterBuilderPreview({ animate }: { animate: boolean }): ReactElemen
   );
 }
 
+function MannequinPoserPreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <>
+      <rect x="34" y="13" width="105" height="79" rx="8" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeWidth="2" />
+      {/* 목각 데생 인형 — 구체 관절(어깨/팔꿈치/골반/무릎)을 점으로 드러낸 스틱 피겨. */}
+      <g transform="translate(86 16)" fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="0" cy="12" r="9" fill={COLOR.raised} stroke={COLOR.fg2} strokeWidth="2.5" />
+        <path d="M0 21v22M0 43l-10 22M0 43l10 22M-10 65l-2 12M10 65l2 12" stroke={COLOR.fg2} strokeWidth="3.5" />
+        <path d="M0 26l-13 8M-13 34l-7 12" stroke={COLOR.fg2} strokeWidth="3.5" />
+        <g transform={animate ? undefined : "rotate(-24 0 26)"}>
+          <path d="M0 26l14 6M14 32l11-9" stroke={COLOR.accent} strokeWidth="3.5" />
+          <circle cx="25" cy="23" r="3" fill={COLOR.accent} />
+          {animate ? <animateTransform attributeName="transform" type="rotate" dur="2.6s" values="0 0 26;-30 0 26;-30 0 26;0 0 26" keyTimes="0;.4;.7;1" repeatCount="indefinite" /> : null}
+        </g>
+        {[[0, 21], [0, 43], [-13, 34], [-10, 65], [10, 65]].map(([jx, jy]) => (
+          <circle key={`${jx}:${jy}`} cx={jx} cy={jy} r="2.6" fill={COLOR.canvas} stroke={COLOR.fg} strokeWidth="1.4" />
+        ))}
+      </g>
+      {/* 체형 슬라이더 열 — 프리셋 목록(3D 캐릭터)과 구별되는 파라메트릭 조절 UI. */}
+      <g transform="translate(148 22)">
+        {[0, 1, 2].map((index) => (
+          <g key={index} transform={`translate(0 ${index * 21})`}>
+            <path d="M0 6h40" stroke={COLOR.lineStrong} strokeLinecap="round" strokeWidth="3" />
+            <circle cx={[26, 12, 33][index]} cy="6" r="5" fill={index === 0 ? COLOR.accent : COLOR.raised} stroke={index === 0 ? COLOR.accent : COLOR.fg3} strokeWidth="1.5" />
+          </g>
+        ))}
+        <path d="M4 66h32" stroke={COLOR.fg3} strokeLinecap="round" strokeWidth="2" />
+      </g>
+    </>
+  );
+}
+
 function BackgroundLibraryPreview({ animate }: { animate: boolean }): ReactElement {
   return (
     <>
@@ -4807,6 +4839,8 @@ function renderPreview(
       return <PanelLayoutPreview animate={animate} variant={variant} />;
     case "character-3d":
       return <CharacterBuilderPreview animate={animate} />;
+    case "mannequin-3d":
+      return <MannequinPoserPreview animate={animate} />;
     case "background-library":
       return <BackgroundLibraryPreview animate={animate} />;
     case "style-library":

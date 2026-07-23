@@ -59,16 +59,24 @@ const budgets = {
   // 공유 descriptor/CRDT의 bounded blur·curve 왕복 검증을 추가했다. production 관측치는
   // 2,795,227/913,046 bytes, app-shell 이후 2,293,501/752,758 bytes이며 요청 수는 138로 불변.
   // 관측치에 0.1~0.2%의 작은 코드젠 drift만 허용하고 요청·incremental gzip 상한은 유지한다.
-  studio: { raw: 2_800_000, gzip: 915_000 },
+  // 2026-07-23 경쟁사 갭 1차 웨이브(닷지/번·색상범위·퀵마스크·섀도우하이라이트·히스토그램·
+  // 필터팩 15종·특수자 3종·GIF/APNG·브러시 120종·데생인형·bg3d 방만들기/태양릭/렌즈·선화 선택
+  // 표시·3D 캡처 화질)를 반영한 관측치는 route 2,849,800/932,100, app-shell 이후
+  // 2,347,500/771,500 bytes, 146 requests. 신규 패널·엔코더·3D 모듈은 전부 lazy 청크(+8 requests)
+  // 이고 eager 증가분은 InspectorAside 확장(퀵마스크/색상범위/닷지번 배선)+메뉴/단축키 데이터
+  // 뿐이다. 관측치+약 2% 여유·request +2로 다시 잠근다.
+  studio: { raw: 2_905_000, gzip: 951_000 },
   studioEntry: { raw: 1_284_000, gzip: 384_500 },
-  studioIncremental: { raw: 2_296_000, gzip: 755_000, chunks: 138 },
+  studioIncremental: { raw: 2_395_000, gzip: 787_000, chunks: 148 },
   // Rapier deterministic compat is intentionally isolated in a user-triggered module Worker.
   // 2026-07-18 production output: 2,302,139 raw / 855,399 gzip. Keep ~2% version-drift headroom
   // without charging this optional engine to Studio or the 3D editor's initial graph.
   bg3dPhysicsWorker: { raw: 2_350_000, gzip: 875_000 },
   // 2026-07-19 selected-shot/multi-pass/recovery UI baseline. This is the complete static closure
   // activated only after the user opens StudioBackground3D; PSD/physics/engine labs stay isolated.
-  bg3dEditor: { raw: 2_380_000, gzip: 690_000, chunks: 40 },
+  // 2026-07-23 방 만들기·태양 릭·렌즈·단면·스케일 가이드(전부 lazy bg3d 청크) 반영:
+  // 2,399,700/698,200 bytes, 42 requests 관측 — 관측치+약 2%/1-request 여유로 상향.
+  bg3dEditor: { raw: 2_448_000, gzip: 712_000, chunks: 43 },
   // Durable recovery, integrity verification, PNG/contact-sheet/PSD clients, and ZIP packaging load
   // only after explicit batch export. 2026-07-20 OffscreenCanvas pass-PNG Worker client/protocol:
   // measured incremental closure 164,352 raw / 43,602 gzip; retain ~2% raw headroom.

@@ -626,13 +626,27 @@ export const STUDIO_INTERCHANGE_CAPABILITIES: readonly StudioInterchangeCapabili
     mime: ["image/gif", "image/apng", "video/mp4"],
     category: "animation",
     import: "unsupported",
-    export: "unsupported",
+    export: "partial",
     roundTrip: "none",
-    lossModel: ["구현 전"],
-    runtimeRequirement: ["추가 encoder 또는 WebCodecs/muxer 검증 필요"],
-    sizeBudget: {},
-    status: "planned",
-    notes: ["현재 WebM 출력을 GIF/APNG/MP4 지원으로 오표시하지 않습니다."],
+    lossModel: [
+      "GIF는 median-cut ≤256색 양자화와 1비트 투명으로 평탄화됨(선택적 ordered/Floyd–Steinberg 디더링, 지연 시간은 centisecond 정밀도)",
+      "APNG는 프레임별 무손실 PNG지만 레이어·벡터·프레임 편집성은 평탄화됨",
+      "MP4 내보내기는 구현 전",
+    ],
+    runtimeRequirement: [
+      "Canvas 2D",
+      "순수 TS GIF89a encoder(median-cut·LZW·NETSCAPE2.0 무한 루프)",
+      "브라우저 PNG encoder + chunk 단위 APNG assembler(acTL/fcTL/fdAT sequence·CRC32)",
+    ],
+    sizeBudget: {
+      maxItems: 60,
+      notes: "프레임 애니메이션 패널 기준 요소당 최대 60프레임",
+    },
+    status: "partial",
+    notes: [
+      "프레임 애니메이션 패널에서 GIF와 APNG를 무한 반복으로 내보냅니다(프레임별 지연 시간 유지, 투명 배경 지원).",
+      "GIF/APNG 가져오기와 MP4 내보내기는 지원하지 않으며, WebM 출력을 MP4 지원으로 오표시하지 않습니다.",
+    ],
   },
 ]);
 

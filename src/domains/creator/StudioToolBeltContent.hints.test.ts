@@ -59,7 +59,7 @@ describe("Studio ToolBelt rich hint coverage", () => {
   it("routes every native ToolBelt button through the shared single-open hint target", () => {
     const buttons = nativeControls("button");
 
-    expect(buttons).toHaveLength(36);
+    expect(buttons).toHaveLength(37);
     expect(buttons.filter((button) => nearestHintTarget(button) === null)).toEqual([]);
     expect(source).toContain(
       '<StudioToolHintTarget preferredSide="bottom" {...props} />'
@@ -139,6 +139,7 @@ describe("Studio ToolBelt rich hint coverage", () => {
       ["panelDiagonalize", "panel-layout", "diagonalize"],
       ["panelStraighten", "panel-layout", "straighten"],
       ["character3d", "character-3d", null],
+      ["mannequin3d", "mannequin-3d", null],
       ["background", "background-library", null],
       ["style", "style-library", null],
       ["storyboard", "storyboard-grid", null],

@@ -1,8 +1,9 @@
 /**
- * Optional WebM export runtime for frame animation cells.
+ * Optional WebM/GIF/APNG export runtime for frame animation cells.
  *
  * The always-on Studio route only needs frame editing and preview timing. MediaRecorder, motion
- * export helpers, and their BGM graph stay behind the already-lazy Frame Animation panel.
+ * export helpers, their BGM graph, and the pure GIF/APNG encoders (via
+ * studio-frame-anim-media-export) stay behind the already-lazy Frame Animation panel.
  */
 import {
   frameDurationsMs,
@@ -30,6 +31,23 @@ export type {
   MotionExportProgress,
   MotionExportResult,
 };
+
+// GIF/APNG 경로 — 패널은 이 모듈만 임포트하므로 인코더도 같은 lazy 청크에 남는다.
+export {
+  FRAME_ANIM_MEDIA_MIME,
+  GIF_DITHER_PRESETS,
+  frameAnimMediaFileName,
+  isFrameAnimMediaExportSupported,
+  startFrameAnimMediaExport,
+} from "./studio-frame-anim-media-export";
+export type {
+  FrameAnimMediaExportHandle,
+  FrameAnimMediaExportRequest,
+  FrameAnimMediaExportResult,
+  FrameAnimMediaFormat,
+  FrameAnimMediaProgress,
+  GifDitherMode,
+} from "./studio-frame-anim-media-export";
 
 export const FRAME_ANIM_EXPORT_SCALE_PRESETS = [
   { id: "1x", label: "표준 화질 (1x)", pixelRatio: 1 },

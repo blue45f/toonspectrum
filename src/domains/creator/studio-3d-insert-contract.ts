@@ -40,7 +40,17 @@ export interface StudioBackground3DInsertResult {
 
 export type StudioVrmPoserInsertResult = {
   pngDataUrl: string;
+  /** Capture raster size in pixels — the PNG's natural dimensions. */
   width: number;
   height: number;
+  /**
+   * Logical size the insert should occupy on the document at 100% zoom, in canvas units.
+   * Captures render at devicePixelRatio × supersample density, so displaying at the raster size
+   * would make the layer physically oversized; omitting these falls back to the raster size for
+   * older callers. Must not exceed the raster size — the insert never upscales past natural
+   * pixels.
+   */
+  displayWidth?: number;
+  displayHeight?: number;
   scene: StudioVrmSceneDocument;
 };

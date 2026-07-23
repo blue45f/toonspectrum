@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- 순수 측정 헬퍼(drawSelectionIndicatorBox)도 선택 표시 회귀 테스트의 공개 계약이다. */
 /**
  * Optional Konva overlays for pixel selection and crop editing.
  *
@@ -15,6 +16,10 @@ import {
   type CropRect,
 } from "./studio-crop";
 import {
+  getSymmetricPoints,
+  studioLiveBrushEffectiveDiameter,
+} from "./studio-draw-rendering";
+import {
   pressureAt,
   type NodeEditHandle,
   type NodeEditTool,
@@ -30,6 +35,7 @@ import {
   type SelPoint,
 } from "./studio-selection-tools";
 
+import type { DrawEl } from "./studio-element-model";
 import type { OnionSkinLayer } from "./studio-frame-animation";
 
 function selectionModePreviewColors(
@@ -345,6 +351,98 @@ export function StudioBubbleShapeOverlay({
           strokeWidth={1.25 / scale}
         />
       ))}
+    </Group>
+  );
+}
+
+/** Matches the Transformer border / locked-selection accent so "selected" reads as one language. */
+const DRAW_SELECTION_ACCENT = "oklch(0.72 0.185 42 / 0.9)";
+const DRAW_SELECTION_DEFAULT_SCREEN_PADDING_PX = 2;
+
+export interface DrawSelectionIndicatorBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Document-space bounding box for a draw(선화) element's *visible ink*.
+ *
+ * Draw elements have no x/y/width/height — geometry lives in `points` — so the Konva Transformer
+ * never attaches to them (they register no node ref and are intentionally outside the
+ * drag/transform system). This is the shared measurement for their dedicated selection indicator:
+ * it scans every point (not just the first two like `drawBounds`), unions all symmetry copies,
+ * and pads by the brush's effective ink radius plus a small zoom-compensated screen margin.
+ */
+export function drawSelectionIndicatorBox(
+  el: DrawEl,
+  options: { scale: number; screenPaddingPx?: number }
+): DrawSelectionIndicatorBox | null {
+  if (el.points.length < 2) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const variation of getSymmetricPoints(el.points, el.symmetry)) {
+    for (let i = 0; i + 1 < variation.length; i += 2) {
+      const x = variation[i]!;
+      const y = variation[i + 1]!;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) return null;
+  const scale = Math.max(options.scale, 0.0001);
+  const pad =
+    studioLiveBrushEffectiveDiameter(el) / 2 +
+    (options.screenPaddingPx ?? DRAW_SELECTION_DEFAULT_SCREEN_PADDING_PX) / scale;
+  return {
+    x: minX - pad,
+    y: minY - pad,
+    width: maxX - minX + pad * 2,
+    height: maxY - minY + pad * 2,
+  };
+}
+
+export interface StudioDrawSelectionOverlayProps {
+  /** Selected draw elements (single selection or the draw members of a marquee multi-select). */
+  els: readonly DrawEl[];
+  scale: number;
+}
+
+/**
+ * Dashed "selected" boxes for draw(선화) elements.
+ *
+ * The Transformer resolves nodes through the element ref map, which draw elements never join,
+ * so without this overlay a selected stroke shows no on-canvas selection chrome at all. Styling
+ * mirrors the locked-element dashed rect in StudioPage (same accent, stroke and dash rhythm),
+ * and everything is zoom-compensated so the indicator keeps a constant screen weight.
+ */
+export function StudioDrawSelectionOverlay({ els, scale }: StudioDrawSelectionOverlayProps) {
+  return (
+    <Group listening={false}>
+      {els.map((el) => {
+        const box = drawSelectionIndicatorBox(el, { scale });
+        if (!box) return null;
+        return (
+          <Rect
+            key={el.id}
+            x={box.x}
+            y={box.y}
+            width={box.width}
+            height={box.height}
+            stroke={DRAW_SELECTION_ACCENT}
+            strokeWidth={1.5 / scale}
+            dash={[7 / scale, 4 / scale]}
+            listening={false}
+            perfectDrawEnabled={false}
+          />
+        );
+      })}
     </Group>
   );
 }

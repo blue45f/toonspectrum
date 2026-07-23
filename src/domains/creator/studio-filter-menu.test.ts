@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_FILTER_LABELS,
+  STUDIO_FILTER_MENU_KINDS,
   cloneStudioFilterDraft,
   createStudioFilterDraft,
   projectStudioFilterPreview,
   studioFilterDraftToPatch,
   type StudioFilterDraft,
 } from "./studio-filter-menu";
+import {
+  STUDIO_FILTER_PACK_KINDS,
+  isStudioFilterPackKind,
+} from "./studio-filter-pack";
 
 describe("studio filter menu", () => {
   it("creates Magma-compatible blur defaults and clamps authored patches", () => {
@@ -110,6 +116,28 @@ describe("studio filter menu", () => {
     const cloned = cloneStudioFilterDraft(source) as typeof source;
     cloned.curve[0]!.y = 42;
     expect(source.curve[0]!.y).toBe(0);
+  });
+
+  it("registers every filter-pack kind alongside the five core filters", () => {
+    expect(STUDIO_FILTER_MENU_KINDS).toHaveLength(5 + STUDIO_FILTER_PACK_KINDS.length);
+    for (const kind of STUDIO_FILTER_PACK_KINDS) {
+      expect(STUDIO_FILTER_MENU_KINDS).toContain(kind);
+      expect(STUDIO_FILTER_LABELS[kind]!.length).toBeGreaterThan(0);
+    }
+    expect(new Set(STUDIO_FILTER_MENU_KINDS).size).toBe(STUDIO_FILTER_MENU_KINDS.length);
+  });
+
+  it("routes filter-pack kinds through the shared draft lifecycle", () => {
+    for (const kind of STUDIO_FILTER_PACK_KINDS) {
+      expect(isStudioFilterPackKind(kind)).toBe(true);
+      const draft = createStudioFilterDraft(kind, {});
+      expect(draft.kind).toBe(kind);
+      const cloned = cloneStudioFilterDraft(draft);
+      expect(cloned).toEqual(draft);
+      expect(cloned).not.toBe(draft);
+      const patch = studioFilterDraftToPatch(draft);
+      expect(Object.keys(patch).length).toBeGreaterThan(0);
+    }
   });
 
   it("projects a preview onto one image without mutating authored elements", () => {

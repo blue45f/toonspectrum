@@ -45,6 +45,14 @@ import { colorToAlphaKonvaFilter, normalizeColorToAlpha, isIdentityColorToAlpha 
 import { curveKonvaFilter, normalizeCurve, normalizeCurveChannels, isIdentityCurve, isIdentityCurveChannels, curveToFlat } from "./studio-curves";
 import { detailKonvaFilter, normalizeDetail, isIdentityDetail } from "./studio-detail";
 import { distortKonvaFilter, normalizeDistort, isIdentityDistort } from "./studio-distort";
+import {
+  glitchFxKonvaFilter,
+  isIdentityGlitchFx,
+  isIdentityVignetteFx,
+  normalizeGlitchFx,
+  normalizeVignetteFx,
+  vignetteFxKonvaFilter,
+} from "./studio-filter-pack";
 import { STUDIO_PIXEL_FILTERS, type StudioImageDataLike } from "./studio-filters";
 import { glowKonvaFilter, normalizeGlow, isIdentityGlow } from "./studio-glow";
 import { gradientMapKonvaFilter, normalizeGradientMap, gradientMapToFlat } from "./studio-gradient-map";
@@ -63,6 +71,7 @@ import { lightKonvaFilter, normalizeLight, isIdentityLight } from "./studio-ligh
 import { outlineKonvaFilter, normalizeOutline, isIdentityOutline, outlineCachePad } from "./studio-outline";
 import { photoFilterKonvaFilter, normalizePhotoFilter, isIdentityPhotoFilter } from "./studio-photo-filter";
 import { selectiveHslKonvaFilter, normalizeSelectiveHsl, isIdentitySelectiveHsl, selectiveHslToFlat } from "./studio-selective-hsl";
+import { shadowHighlightKonvaFilter, normalizeShadowHighlight, isIdentityShadowHighlight } from "./studio-shadow-highlight";
 import { sketchKonvaFilter, normalizeSketch, isIdentitySketch } from "./studio-sketch";
 import { stylizeKonvaFilter, normalizeStylize, isIdentityStylize } from "./studio-stylize";
 import { vibranceKonvaFilter, normalizeVibrance, isIdentityVibrance } from "./studio-vibrance";
@@ -94,6 +103,14 @@ function hasActiveDistort(el: ImageFilterFields): boolean {
 // 스타일라이즈가 항등(세기0)이 아니면 활성.
 function hasActiveStylize(el: ImageFilterFields): boolean {
   return !!el.stylize && !isIdentityStylize(normalizeStylize(el.stylize));
+}
+// 글리치가 항등(강도0)이 아니면 활성.
+function hasActiveGlitchFx(el: ImageFilterFields): boolean {
+  return !!el.glitchFx && !isIdentityGlitchFx(normalizeGlitchFx(el.glitchFx));
+}
+// 비네트가 항등(어둡기0)이 아니면 활성.
+function hasActiveVignetteFx(el: ImageFilterFields): boolean {
+  return !!el.vignetteFx && !isIdentityVignetteFx(normalizeVignetteFx(el.vignetteFx));
 }
 // 조명 효과가 항등(세기0)이 아니면 활성.
 function hasActiveLight(el: ImageFilterFields): boolean {
@@ -154,6 +171,10 @@ function hasActiveAutoAdjust(el: ImageFilterFields): boolean {
 // 선명도/디테일이 항등이 아니면 활성.
 function hasActiveClarity(el: ImageFilterFields): boolean {
   return !!el.clarity && !isIdentityClarity(normalizeClarity(el.clarity));
+}
+// 섀도우/하이라이트가 항등(양·대비 0)이 아니면 활성.
+function hasActiveShadowHighlight(el: ImageFilterFields): boolean {
+  return !!el.shadowHighlight && !isIdentityShadowHighlight(normalizeShadowHighlight(el.shadowHighlight));
 }
 
 // 그라디언트 맵은 설정되면 항상 활성(기본 흑→백도 흑백 변환이므로).
@@ -466,6 +487,9 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.AutoAdjust = autoAdjustKonvaFilter;
   // 선명도/디테일 — this.attrs.clarity/dehaze 적용(studio-clarity).
   F.Clarity = clarityKonvaFilter;
+  // 섀도우/하이라이트 — this.attrs.shShadows/shShadowsWidth/shHighlights/shHighlightsWidth/
+  // shMidtoneContrast 적용(studio-shadow-highlight).
+  F.ShadowHighlight = shadowHighlightKonvaFilter;
   // 스티커 테두리 — this.attrs.outlineColor/outlineWidth/outlineOpacity 적용(studio-outline). 캐시 offset 패딩 필요.
   F.Outline = outlineKonvaFilter;
   // 글로우/블룸 — this.attrs.glowStrength/glowSize/glowThreshold/glowColor 적용(studio-glow).
@@ -495,6 +519,9 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.PixelOffset = pixelOffsetKonvaFilter;
   F.Convolution = convolutionKonvaFilter;
   F.Clouds = cloudsKonvaFilter;
+  // 필터 팩 — this.attrs.glitch*/vignette* 적용(studio-filter-pack).
+  F.GlitchFx = glitchFxKonvaFilter;
+  F.VignetteFx = vignetteFxKonvaFilter;
 }
 
 /** 활성 보정이 하나라도 있으면 true (캐시 on/off 판단용). */
@@ -515,6 +542,7 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActivePhotoFilter(el) ||
     hasActiveAutoAdjust(el) ||
     hasActiveClarity(el) ||
+    hasActiveShadowHighlight(el) ||
     hasActiveOutline(el) ||
     hasActiveGlow(el) ||
     hasActiveHalftone(el) ||
@@ -532,6 +560,8 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActivePixelOffset(el) ||
     hasActiveConvolution(el) ||
     hasActiveClouds(el) ||
+    hasActiveGlitchFx(el) ||
+    hasActiveVignetteFx(el) ||
     hasActiveSmartFilterProgram(el) ||
     hasActiveColorToAlpha(el) ||
     isActiveNumber(el.saturation) ||
@@ -579,6 +609,15 @@ export function buildImageFilters(
     attrs.dsType = ds.type;
     attrs.dsAmount = ds.amount;
     attrs.dsScale = ds.scale;
+  }
+  // 글리치 — 픽셀 이동 계열이라 기하 왜곡 직후에 태운다(색 보정 전에 조각이 흩어져야 자연).
+  if (hasActiveGlitchFx(el)) {
+    filters.push(F.GlitchFx!);
+    const gf = normalizeGlitchFx(el.glitchFx);
+    attrs.glitchIntensity = gf.intensity;
+    attrs.glitchSlices = gf.slices;
+    attrs.glitchSplit = gf.split;
+    attrs.glitchSeed = gf.seed;
   }
   if (hasActiveBlurFx(el)) {
     filters.push(F.BlurFx!);
@@ -710,6 +749,15 @@ export function buildImageFilters(
     const cl = normalizeClarity(el.clarity);
     attrs.clarity = cl.clarity;
     attrs.dehaze = cl.dehaze;
+  }
+  if (hasActiveShadowHighlight(el)) {
+    filters.push(F.ShadowHighlight!);
+    const sh = normalizeShadowHighlight(el.shadowHighlight);
+    attrs.shShadows = sh.shadows;
+    attrs.shShadowsWidth = sh.shadowsWidth;
+    attrs.shHighlights = sh.highlights;
+    attrs.shHighlightsWidth = sh.highlightsWidth;
+    attrs.shMidtoneContrast = sh.midtoneContrast;
   }
   if (hasActivePhotoFilter(el)) {
     filters.push(F.PhotoFilter!);
@@ -850,6 +898,15 @@ export function buildImageFilters(
     attrs.ltX = lt.x;
     attrs.ltY = lt.y;
     attrs.ltHue = lt.hue;
+  }
+  // 비네트 — 조명까지 끝난 결과의 가장자리를 어둡히는 마무리 연출(테두리 직전).
+  if (hasActiveVignetteFx(el)) {
+    filters.push(F.VignetteFx!);
+    const vf = normalizeVignetteFx(el.vignetteFx);
+    attrs.vignetteDarkness = vf.darkness;
+    attrs.vignetteSize = vf.size;
+    attrs.vignetteRoundness = vf.roundness;
+    attrs.vignetteFeather = vf.feather;
   }
   let cachePad = 0;
   if (hasActiveOutline(el)) {

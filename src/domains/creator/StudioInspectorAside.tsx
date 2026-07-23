@@ -48,6 +48,7 @@ import {
 } from "./studio-brush-library";
 import { hasCustomBubbleShape } from "./studio-bubble-custom-shape";
 import { normalizeExtraTails } from "./studio-bubble-path";
+import { type ColorRangeSample } from "./studio-color-range";
 import {
   applyCropAspect,
   cropAspectRatio,
@@ -56,6 +57,11 @@ import {
   type CropAspectId,
   type CropRect,
 } from "./studio-crop";
+import {
+  type DodgeBurnMode,
+  type DodgeBurnRange,
+  type DodgeBurnSpongeMode,
+} from "./studio-dodge-burn";
 import { DRAW_COLOR_SWATCHES } from "./studio-draw-color-swatches";
 import { STUDIO_DRAW_SHAPE_PICKER_KINDS } from "./studio-draw-hud";
 import { STUDIO_BRUSH_OPACITY_RANGE, STUDIO_BRUSH_SIZE_RANGE } from "./studio-draw-ux";
@@ -120,6 +126,7 @@ import {
   StudioSelectionToolsPanel,
   StudioShapePickerGrid,
   StudioSmudgePanel,
+  StudioDodgeBurnPanel,
   StudioStrokeShapePanel,
   StudioTextEffectPanel,
   StudioTextPathPanel,
@@ -133,6 +140,7 @@ import {
   resetPuppetPinPositions,
   type PuppetPin,
 } from "./studio-puppet-warp";
+import { type QuickMaskBrushMode } from "./studio-quick-mask";
 import { QUICKSHAPE_KIND_LABELS } from "./studio-quickshape-labels";
 import {
   emptyPixelSelection,
@@ -170,6 +178,7 @@ import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
+import { StudioQuickMaskPanel } from "./StudioQuickMaskPanel";
 import { StudioSkewPanel } from "./StudioSkewPanel";
 
 import type {
@@ -260,6 +269,7 @@ export interface StudioInspectorAsideHandlers {
   toggleBubbleAnchorPick: () => void;
   toggleLiquifyTool: () => void;
   toggleSmudgeTool: () => void;
+  toggleDodgeBurnTool: () => void;
   toggleEffectFavorite: (effectId: StudioEffectId) => void;
   toggleIsometricGridActive: () => void;
   toggleLayerMaskEnabled: () => void;
@@ -298,6 +308,17 @@ interface StudioInspectorAsideProps {
   canvasRotation: StudioViewRotation;
   collaborationDocumentLocked: boolean;
   color: string;
+  colorRangeFuzziness: number;
+  colorRangePickActive: boolean;
+  colorRangePreviewEnabled: boolean;
+  colorRangeSamples: readonly ColorRangeSample[];
+  quickMaskActive: boolean;
+  quickMaskBrushMode: QuickMaskBrushMode;
+  quickMaskHardness: number;
+  quickMaskOpacity: number;
+  quickMaskRadius: number;
+  quickMaskTintColor: string;
+  quickMaskTintOpacity: number;
   cropAspect: CropAspectId;
   cropBusy: boolean;
   cropRect: CropRect | null;
@@ -451,6 +472,21 @@ interface StudioInspectorAsideProps {
   resetPixelSelectionState: (selection: PixelSelection | null) => void;
   undoPixelSelectionState: () => void;
   redoPixelSelectionState: () => void;
+  runColorRangeApply: (opts?: { fuzziness?: number; coalesceKey?: string }) => Promise<void>;
+  enterQuickMask: () => void;
+  commitQuickMask: () => void;
+  exitQuickMask: () => void;
+  invertQuickMask: () => void;
+  onQuickMaskTintColorChange: (color: string) => void;
+  onQuickMaskTintOpacityChange: (value: number) => void;
+  setQuickMaskBrushMode: import("react").Dispatch<import("react").SetStateAction<QuickMaskBrushMode>>;
+  setQuickMaskRadius: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setQuickMaskHardness: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setQuickMaskOpacity: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setColorRangeFuzziness: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setColorRangePickActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setColorRangePreviewEnabled: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setColorRangeSamples: import("react").Dispatch<import("react").SetStateAction<ColorRangeSample[]>>;
   setPixelTool: import("react").Dispatch<import("react").SetStateAction<SelectionToolKind | "wand" | null>>;
   setPoserInitialDataUrl: import("react").Dispatch<import("react").SetStateAction<string | undefined>>;
   setPoserInitialElementId: import("react").Dispatch<import("react").SetStateAction<string | undefined>>;
@@ -469,6 +505,12 @@ interface StudioInspectorAsideProps {
   setShowWebtoonGuides: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setSmudgeRadius: import("react").Dispatch<import("react").SetStateAction<number>>;
   setSmudgeStrength: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setDodgeBurnExposure: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setDodgeBurnHardness: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setDodgeBurnMode: import("react").Dispatch<import("react").SetStateAction<DodgeBurnMode>>;
+  setDodgeBurnRadius: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setDodgeBurnRange: import("react").Dispatch<import("react").SetStateAction<DodgeBurnRange>>;
+  setDodgeBurnSponge: import("react").Dispatch<import("react").SetStateAction<DodgeBurnSpongeMode>>;
   setSnapEnabled: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setStabilizer: import("react").Dispatch<import("react").SetStateAction<number>>;
   setStabilizerMode: import("react").Dispatch<import("react").SetStateAction<"standard" | "adaptive" | "precision">>;
@@ -493,6 +535,14 @@ interface StudioInspectorAsideProps {
   smudgeBusy: boolean;
   smudgeRadius: number;
   smudgeStrength: number;
+  dodgeBurnActive: boolean;
+  dodgeBurnBusy: boolean;
+  dodgeBurnExposure: number;
+  dodgeBurnHardness: number;
+  dodgeBurnMode: DodgeBurnMode;
+  dodgeBurnRadius: number;
+  dodgeBurnRange: DodgeBurnRange;
+  dodgeBurnSponge: DodgeBurnSpongeMode;
   snapEnabled: boolean;
   stabilizer: number;
   stabilizerMode: "standard" | "adaptive" | "precision";
@@ -551,6 +601,17 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   canvasRotation,
   collaborationDocumentLocked,
   color,
+  colorRangeFuzziness,
+  colorRangePickActive,
+  colorRangePreviewEnabled,
+  colorRangeSamples,
+  quickMaskActive,
+  quickMaskBrushMode,
+  quickMaskHardness,
+  quickMaskOpacity,
+  quickMaskRadius,
+  quickMaskTintColor,
+  quickMaskTintOpacity,
   cropAspect,
   cropBusy,
   cropRect,
@@ -701,6 +762,21 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   setPixelCombine,
   setPixelForceCircle,
   commitPixelSelectionState, resetPixelSelectionState, undoPixelSelectionState, redoPixelSelectionState,
+  runColorRangeApply,
+  enterQuickMask,
+  commitQuickMask,
+  exitQuickMask,
+  invertQuickMask,
+  onQuickMaskTintColorChange,
+  onQuickMaskTintOpacityChange,
+  setQuickMaskBrushMode,
+  setQuickMaskRadius,
+  setQuickMaskHardness,
+  setQuickMaskOpacity,
+  setColorRangeFuzziness,
+  setColorRangePickActive,
+  setColorRangePreviewEnabled,
+  setColorRangeSamples,
   setPixelTool,
   setPoserInitialDataUrl,
   setPoserInitialElementId,
@@ -719,6 +795,12 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   setShowWebtoonGuides,
   setSmudgeRadius,
   setSmudgeStrength,
+  setDodgeBurnExposure,
+  setDodgeBurnHardness,
+  setDodgeBurnMode,
+  setDodgeBurnRadius,
+  setDodgeBurnRange,
+  setDodgeBurnSponge,
   setSnapEnabled,
   setStabilizer,
   setStabilizerMode,
@@ -743,6 +825,14 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   smudgeBusy,
   smudgeRadius,
   smudgeStrength,
+  dodgeBurnActive,
+  dodgeBurnBusy,
+  dodgeBurnExposure,
+  dodgeBurnHardness,
+  dodgeBurnMode,
+  dodgeBurnRadius,
+  dodgeBurnRange,
+  dodgeBurnSponge,
   snapEnabled,
   stabilizer,
   stabilizerMode,
@@ -847,6 +937,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     toggleBubbleAnchorPick,
     toggleLiquifyTool,
     toggleSmudgeTool,
+    toggleDodgeBurnTool,
     toggleEffectFavorite,
     toggleIsometricGridActive,
     toggleLayerMaskEnabled,
@@ -2131,6 +2222,28 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     onContentTransform={(t) => void applyPixelSelectionContentTransform(t)}
                     onApplyAdjust={(plan) => void applyPixelSelectionAdjust(plan)}
                     onContentAwareFill={() => void applyContentAwareFill()}
+                    colorRangeSamples={colorRangeSamples}
+                    colorRangeFuzziness={colorRangeFuzziness}
+                    colorRangePickArmed={colorRangePickActive}
+                    colorRangePreviewEnabled={colorRangePreviewEnabled}
+                    onColorRangeTogglePick={() => {
+                      const next = !colorRangePickActive;
+                      if (next) disarmAllPixelTools();
+                      setColorRangePickActive(next);
+                    }}
+                    onColorRangeFuzzinessChange={setColorRangeFuzziness}
+                    onColorRangeFuzzinessCommit={(v) => {
+                      setColorRangeFuzziness(v);
+                      if (colorRangePreviewEnabled) void runColorRangeApply({ fuzziness: v, coalesceKey: "color-range-preview" });
+                    }}
+                    onColorRangeTogglePreview={() => {
+                      const next = !colorRangePreviewEnabled;
+                      setColorRangePreviewEnabled(next);
+                      if (next) void runColorRangeApply({ coalesceKey: "color-range-preview" });
+                    }}
+                    onColorRangeRemoveSample={(i) => setColorRangeSamples((prev) => prev.filter((_, idx) => idx !== i))}
+                    onColorRangeClearSamples={() => setColorRangeSamples([])}
+                    onColorRangeApply={() => void runColorRangeApply()}
                   />
                   <StudioMagicWandPanel
                     active={pixelTool === "wand"}
@@ -2143,6 +2256,25 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     }}
                     onToleranceChange={setWandTolerance}
                   />
+                  <StudioQuickMaskPanel
+                    active={quickMaskActive}
+                    brushMode={quickMaskBrushMode}
+                    radiusPx={quickMaskRadius}
+                    hardness={quickMaskHardness}
+                    opacity={quickMaskOpacity}
+                    tintColor={quickMaskTintColor}
+                    tintOpacity={quickMaskTintOpacity}
+                    onEnter={enterQuickMask}
+                    onCommit={commitQuickMask}
+                    onCancel={exitQuickMask}
+                    onBrushModeChange={setQuickMaskBrushMode}
+                    onRadiusChange={setQuickMaskRadius}
+                    onHardnessChange={setQuickMaskHardness}
+                    onOpacityChange={setQuickMaskOpacity}
+                    onInvert={invertQuickMask}
+                    onTintColorChange={onQuickMaskTintColorChange}
+                    onTintOpacityChange={onQuickMaskTintOpacityChange}
+                  />
                   <StudioSmudgePanel
                     active={smudgeActive}
                     radius={smudgeRadius}
@@ -2151,6 +2283,23 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     onToggleActive={toggleSmudgeTool}
                     onRadiusChange={setSmudgeRadius}
                     onStrengthChange={setSmudgeStrength}
+                  />
+                  <StudioDodgeBurnPanel
+                    active={dodgeBurnActive}
+                    mode={dodgeBurnMode}
+                    range={dodgeBurnRange}
+                    sponge={dodgeBurnSponge}
+                    radiusPx={dodgeBurnRadius}
+                    hardness={dodgeBurnHardness}
+                    exposure={dodgeBurnExposure}
+                    busy={dodgeBurnBusy}
+                    onToggleActive={toggleDodgeBurnTool}
+                    onModeChange={setDodgeBurnMode}
+                    onRangeChange={setDodgeBurnRange}
+                    onSpongeChange={setDodgeBurnSponge}
+                    onRadiusChange={setDodgeBurnRadius}
+                    onHardnessChange={setDodgeBurnHardness}
+                    onExposureChange={setDodgeBurnExposure}
                   />
                   <StudioLiquifyPanel
                     active={liquifyActive}

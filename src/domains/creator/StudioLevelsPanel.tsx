@@ -4,6 +4,8 @@
  * 입력/감마/출력 슬라이더. studio-levels 엔진의 LevelsParams(마스터)와 LevelsRgbChannels(r/g/b)를
  * props로 읽고 onPatch/onChannelsChange/onApplyPreset/onReset으로만 쓴다.
  * onChannelsChange가 없으면 채널 UI를 숨긴다(하위호환). 로컬 상태는 편집 채널(channel) 하나뿐.
+ * histogramSource(선택 이미지 디코드 픽셀)가 주어지면 슬라이더 위에 히스토그램을 그린다 —
+ * 없으면 기존과 완전히 동일하게 렌더된다(하위호환).
  */
 import { RotateCcw } from "lucide-react";
 import { useState } from "react";
@@ -20,6 +22,9 @@ import {
   type LevelsRgbChannels,
 } from "./studio-levels";
 import { StudioPanelChip, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
+import { StudioHistogramSection } from "./StudioHistogramGraph";
+
+import type { StudioImageDataLike } from "./studio-filters";
 
 import { buttonClass } from "@/components/ui/button-utils";
 
@@ -36,6 +41,7 @@ const LEVELS_SLIDERS: { key: keyof LevelsParams; label: string; gamma?: boolean 
 export function StudioLevelsPanel({
   value,
   channels,
+  histogramSource,
   onPatch,
   onChannelsChange,
   onApplyPreset,
@@ -44,6 +50,11 @@ export function StudioLevelsPanel({
   value: LevelsParams;
   /** r/g/b 개별 채널 레벨(마스터는 value). 미지정이면 전 채널 항등으로 본다. */
   channels?: LevelsRgbChannels;
+  /**
+   * 선택 이미지의 디코드 픽셀 — 지정된 경우에만 슬라이더 위에 히스토그램을 그린다
+   * (마스터=휘도, r/g/b=해당 채널 분포). 미지정/null이면 기존 렌더와 동일.
+   */
+  histogramSource?: StudioImageDataLike | null;
   onPatch: (patch: Partial<LevelsParams>) => void;
   /** 채널 레벨 변경 콜백 — 지정된 경우에만 채널 세그먼트 UI를 노출한다. */
   onChannelsChange?: (channels: LevelsRgbChannels) => void;
@@ -128,6 +139,9 @@ export function StudioLevelsPanel({
           ))}
         </div>
       )}
+
+      {/* 히스토그램 — 선택 이미지 픽셀이 주어졌을 때만. 편집 채널을 따라간다(마스터=휘도). */}
+      <StudioHistogramSection source={histogramSource} channel={activeChannel} />
 
       {/* 입력 검정/흰점 · 중간톤 감마 · 출력 하한/상한 슬라이더 — 범위는 LEVELS_RANGES에서. */}
       <div className="space-y-2">

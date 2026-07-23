@@ -10,6 +10,7 @@ import {
   ArrowUp,
   Circle,
   Eraser,
+  Eye,
   FlipHorizontal2,
   FlipVertical2,
   Lasso,
@@ -18,15 +19,22 @@ import {
   Move,
   Paintbrush,
   Pentagon,
+  Pipette,
   RotateCcw,
   RotateCw,
   Redo2,
   Square,
   Undo2,
   WandSparkles,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 
+import {
+  COLOR_RANGE_FUZZINESS_DEFAULT,
+  COLOR_RANGE_FUZZINESS_RANGE,
+  type ColorRangeSample,
+} from "./studio-color-range";
 import { StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
 import {
   SELECTION_BRIGHTNESS_RANGE,
@@ -256,6 +264,36 @@ const SELECTION_ACTION_HINTS = {
   },
 } satisfies Record<string, StudioToolHintSpec>;
 
+/** 색상 범위(Select > Color Range) 섹션 전용 힌트 — 도구별 힌트와 분리해 섹션 게이팅과 함께 관리. */
+const COLOR_RANGE_HINTS = {
+  pick: {
+    id: "pixel-selection-color-range-pick",
+    title: "캔버스에서 색 추출",
+    description:
+      "켜고 이미지 위 지점을 클릭하면 그 색이 샘플로 추가됩니다. 여러 지점을 이어서 클릭해 색 범위를 넓힐 수 있어요.",
+    preview: "sample",
+    tip: "스포이드처럼 클릭 한 번마다 샘플이 쌓입니다. 다른 도구를 켜면 추출이 해제돼요.",
+  },
+  preview: {
+    id: "pixel-selection-color-range-preview",
+    title: "색상 범위 미리보기",
+    description:
+      "허용량을 조절할 때마다 점선 선택 경계로 결과를 미리 보여줍니다. 끄면 적용 버튼을 눌렀을 때만 계산합니다.",
+    preview: "selection-boundary",
+  },
+  clearSamples: {
+    id: "pixel-selection-color-range-clear-samples",
+    title: "색상 샘플 모두 지우기",
+    description: "추출한 색 샘플을 전부 비웁니다. 선택 영역과 이미지 픽셀은 바뀌지 않습니다.",
+  },
+} satisfies Record<string, StudioToolHintSpec>;
+
+/** 샘플 칩 라벨 — #RRGGBB 대문자 헥사. */
+function colorRangeSampleHex(sample: ColorRangeSample): string {
+  const channel = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
+  return `#${channel(sample.r)}${channel(sample.g)}${channel(sample.b)}`.toUpperCase();
+}
+
 export type StudioSelectionToolsPanelProps = {
   selection: PixelSelection | null;
   activeTool: SelectionToolKind | null;
@@ -293,6 +331,27 @@ export type StudioSelectionToolsPanelProps = {
   onContentTransform: (transform: SelectionContentTransform) => void;
   onApplyAdjust: (plan: SelectionAdjustPlan) => void;
   onContentAwareFill: () => void;
+  // ── 색상 범위(Select > Color Range) — 전부 optional. onColorRangeApply 가 없으면 섹션 자체가
+  //    렌더되지 않아 기존 렌더 사이트는 코드/마크업 변경 없이 그대로 컴파일·동작한다. ──
+  /** 추출한 샘플 색 목록 — 페이지가 소유(캔버스 클릭 샘플링 결과). */
+  colorRangeSamples?: readonly ColorRangeSample[];
+  /** fuzziness(허용량) — COLOR_RANGE_FUZZINESS_RANGE 범위. 미지정 시 기본값 표시. */
+  colorRangeFuzziness?: number;
+  /** "캔버스에서 색 추출" 무장 상태 — 페이지가 소유(eyedropper/bubbleAnchorPick 과 동일 규약). */
+  colorRangePickArmed?: boolean;
+  /** 미리보기 토글 — 켜면 허용량 조절 시 페이지가 스캔을 돌려 점선 경계로 보여준다. */
+  colorRangePreviewEnabled?: boolean;
+  /** 허용량 슬라이더 실시간 변경(transient preview) — StudioSliderRow 의 onChange 로 전달. */
+  onColorRangeFuzzinessChange?: (value: number) => void;
+  /** 허용량 슬라이더 확정(제스처 종료 1회) — StudioSliderRow 의 onCommit 으로 전달. */
+  onColorRangeFuzzinessCommit?: (value: number) => void;
+  onColorRangeTogglePick?: () => void;
+  onColorRangeTogglePreview?: () => void;
+  /** 샘플 칩 클릭 = 해당 샘플 제거. */
+  onColorRangeRemoveSample?: (index: number) => void;
+  onColorRangeClearSamples?: () => void;
+  /** 색상 범위 → 선택 적용 — 현재 결합 모드(combineMode)를 그대로 따른다. 섹션 게이트 프롭. */
+  onColorRangeApply?: () => void;
 };
 
 /** 마퀴 이동 한 칸(정규화) — 이미지 폭 대비 약 2%. */
@@ -326,6 +385,17 @@ export function StudioSelectionToolsPanel({
   onContentTransform,
   onApplyAdjust,
   onContentAwareFill,
+  colorRangeSamples = [],
+  colorRangeFuzziness = COLOR_RANGE_FUZZINESS_DEFAULT,
+  colorRangePickArmed = false,
+  colorRangePreviewEnabled = false,
+  onColorRangeFuzzinessChange,
+  onColorRangeFuzzinessCommit,
+  onColorRangeTogglePick,
+  onColorRangeTogglePreview,
+  onColorRangeRemoveSample,
+  onColorRangeClearSamples,
+  onColorRangeApply,
 }: StudioSelectionToolsPanelProps): ReactElement {
   const [brightness, setBrightness] = useState(0);
   const [hue, setHue] = useState(0);
@@ -362,6 +432,12 @@ export function StudioSelectionToolsPanel({
     ?? (brightness === 0 ? "밝기 값을 0이 아닌 값으로 조절하세요." : undefined);
   const hueUnavailableReason = selectionUnavailableReason
     ?? (hue === 0 ? "색조 값을 0°가 아닌 값으로 조절하세요." : undefined);
+  const colorRangeSectionVisible = onColorRangeApply !== undefined;
+  const colorRangeNoSamplesReason =
+    colorRangeSamples.length === 0 ? "먼저 캔버스에서 색을 추출하세요." : undefined;
+  const colorRangeApplyUnavailableReason = busyUnavailableReason ?? colorRangeNoSamplesReason;
+  const combineLabel =
+    SELECTION_COMBINE_MODES.find((mode) => mode.id === combineMode)?.label ?? combineMode;
 
   const applyThenReset = (plan: SelectionAdjustPlan, reset: () => void) => {
     onApplyAdjust(plan);
@@ -588,6 +664,168 @@ export function StudioSelectionToolsPanel({
           </button>
         </StudioToolHintTarget>
       </div>
+
+      {/* 색상 범위 — 이미지 전체에서 샘플 색과 비슷한 픽셀을 비연속으로 선택(Select > Color Range).
+          onColorRangeApply 미지정 시 섹션 전체가 렌더되지 않는다(기존 렌더 사이트 하위호환). */}
+      {colorRangeSectionVisible ? (
+        <div className="space-y-1.5 border-t border-line/40 pt-2" data-studio-color-range="true">
+          <div className="flex items-center justify-between gap-2">
+            <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
+              <Pipette className="size-3" aria-hidden />
+              색상 범위
+            </p>
+            <StudioToolHintTarget
+              hint={COLOR_RANGE_HINTS.clearSamples}
+              disabled={Boolean(busyUnavailableReason ?? colorRangeNoSamplesReason)}
+              unavailableReason={
+                busyUnavailableReason
+                ?? (colorRangeSamples.length === 0 ? "지울 색 샘플이 없습니다." : undefined)
+              }
+              preferredSide="left"
+            >
+              <button
+                type="button"
+                onClick={() => onColorRangeClearSamples?.()}
+                disabled={busy || colorRangeSamples.length === 0}
+                className={buttonClass({ size: "sm", variant: "quiet" })}
+                aria-label="색상 샘플 모두 지우기"
+              >
+                <Eraser className="size-3.5" aria-hidden />
+                지우기
+              </button>
+            </StudioToolHintTarget>
+          </div>
+
+          {colorRangeSamples.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="추출한 색상 샘플">
+              {colorRangeSamples.map((sample, index) => {
+                const hex = colorRangeSampleHex(sample);
+                return (
+                  <StudioToolHintTarget
+                    key={`${index}-${hex}`}
+                    hint={{
+                      id: `pixel-selection-color-range-sample-${index}`,
+                      title: `색상 샘플 ${hex}`,
+                      description: "클릭하면 이 샘플만 범위에서 제거합니다. 다른 샘플과 선택 영역은 유지됩니다.",
+                    }}
+                    disabled={busy}
+                    unavailableReason={busyUnavailableReason}
+                    preferredSide="left"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onColorRangeRemoveSample?.(index)}
+                      disabled={busy}
+                      className={cn(buttonClass({ size: "sm", variant: "quiet" }), "gap-1")}
+                      aria-label={`색상 샘플 ${index + 1} (${hex}) 제거`}
+                    >
+                      <span
+                        className="size-3 rounded-full border border-line/60"
+                        style={{ backgroundColor: `rgb(${sample.r}, ${sample.g}, ${sample.b})` }}
+                        aria-hidden
+                      />
+                      <span className="font-mono text-[0.64rem]">{hex}</span>
+                      <X className="size-3" aria-hidden />
+                    </button>
+                  </StudioToolHintTarget>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-[0.68rem] leading-relaxed text-fg-3">
+              아직 추출한 색이 없습니다. 아래 버튼을 켜고 이미지에서 색을 클릭하세요.
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            <StudioToolHintTarget
+              hint={COLOR_RANGE_HINTS.pick}
+              disabled={busy}
+              unavailableReason={busyUnavailableReason}
+              preferredSide="left"
+            >
+              <span className="inline-flex">
+                <StudioToggleChip
+                  active={colorRangePickArmed}
+                  disabled={busy}
+                  onClick={() => onColorRangeTogglePick?.()}
+                  aria-label="캔버스에서 색 추출"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    <Pipette className="size-3" aria-hidden />
+                    캔버스에서 색 추출
+                  </span>
+                </StudioToggleChip>
+              </span>
+            </StudioToolHintTarget>
+            <StudioToolHintTarget
+              hint={COLOR_RANGE_HINTS.preview}
+              disabled={Boolean(busyUnavailableReason ?? colorRangeNoSamplesReason)}
+              unavailableReason={busyUnavailableReason ?? colorRangeNoSamplesReason}
+              preferredSide="left"
+            >
+              <span className="inline-flex">
+                <StudioToggleChip
+                  active={colorRangePreviewEnabled}
+                  disabled={busy || colorRangeSamples.length === 0}
+                  onClick={() => onColorRangeTogglePreview?.()}
+                  aria-label="색상 범위 미리보기"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    <Eye className="size-3" aria-hidden />
+                    미리보기
+                  </span>
+                </StudioToggleChip>
+              </span>
+            </StudioToolHintTarget>
+          </div>
+
+          <StudioSliderRow
+            label="허용량"
+            min={COLOR_RANGE_FUZZINESS_RANGE.min}
+            max={COLOR_RANGE_FUZZINESS_RANGE.max}
+            step={COLOR_RANGE_FUZZINESS_RANGE.step}
+            value={colorRangeFuzziness}
+            onChange={onColorRangeFuzzinessChange ?? (() => undefined)}
+            onCommit={onColorRangeFuzzinessCommit}
+            readout={String(colorRangeFuzziness)}
+          />
+
+          <StudioToolHintTarget
+            hint={{
+              id: "pixel-selection-color-range-apply",
+              title: "색상 범위로 선택",
+              description:
+                "이미지 전체에서 샘플 색과 비슷한 픽셀을 연결 여부와 무관하게 모두 찾아, 현재 결합 모드로 선택 영역에 적용합니다.",
+              preview: COMBINE_PREVIEWS[combineMode],
+              tip: "허용량이 클수록 더 넓은 색이 잡힙니다. 결합(합치기/빼기/교집합)은 위 결합 모드를 그대로 따라요.",
+            }}
+            disabled={Boolean(colorRangeApplyUnavailableReason)}
+            unavailableReason={colorRangeApplyUnavailableReason}
+            preferredSide="left"
+            className="w-full"
+          >
+            <button
+              type="button"
+              onClick={() => onColorRangeApply?.()}
+              disabled={busy || colorRangeSamples.length === 0}
+              className={cn(buttonClass({ size: "sm", variant: "outline" }), "w-full gap-1")}
+              aria-label="색상 범위로 선택"
+            >
+              <WandSparkles className="size-3.5" aria-hidden />
+              {busy ? "적용 중..." : `색상 범위로 선택 (${combineLabel})`}
+            </button>
+          </StudioToolHintTarget>
+
+          <p className="text-[0.68rem] leading-relaxed text-fg-3" role="status">
+            {colorRangePickArmed
+              ? "이미지 위를 클릭하면 그 지점의 색이 샘플로 추가됩니다."
+              : colorRangeSamples.length > 0
+                ? `샘플 ${colorRangeSamples.length}개 · 허용량 ${colorRangeFuzziness} · 마술봉과 달리 떨어져 있는 같은 색도 한 번에 선택됩니다.`
+                : "색을 추출한 뒤 적용하면 이미지 전체에서 비슷한 색이 모두 선택됩니다."}
+          </p>
+        </div>
+      ) : null}
 
       {/* 확장 / 축소 */}
       <div className="flex flex-wrap items-center gap-1.5 border-t border-line/40 pt-2">

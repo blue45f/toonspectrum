@@ -140,6 +140,27 @@ function isPositiveFiniteDimension(value: number | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
+/**
+ * Captures render at devicePixelRatio × supersample density; the element should occupy the
+ * logical display size so the extra pixels become sharpness instead of physical size. Both
+ * display dimensions must be valid and no larger than the raster — a hostile or partial pair
+ * falls back to the raster size, which is never an upscale.
+ */
+function resolveVrmInsertDisplaySize(
+  result: StudioVrmPoserInsertResult
+): { readonly width: number; readonly height: number } {
+  const { displayWidth, displayHeight } = result;
+  if (
+    isPositiveFiniteDimension(displayWidth)
+    && isPositiveFiniteDimension(displayHeight)
+    && displayWidth <= result.width
+    && displayHeight <= result.height
+  ) {
+    return { width: displayWidth, height: displayHeight };
+  }
+  return { width: result.width, height: result.height };
+}
+
 export function applyStudioVrmInsertResult({
   result,
   mutationTicket,
@@ -173,10 +194,11 @@ export function applyStudioVrmInsertResult({
     });
   }
 
+  const displaySize = resolveVrmInsertDisplaySize(result);
   return appendImage({
     src: result.pngDataUrl,
-    width: result.width,
-    height: result.height,
+    width: displaySize.width,
+    height: displaySize.height,
     elementPatch: {
       vrmScene: result.scene,
       name: "3D 데생 인형",

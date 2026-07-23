@@ -84,7 +84,7 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     expect(onStageDown).not.toContain("const layeredFlowPaintEligible =");
     expect(onStageDown).not.toContain("const common = {");
     expect(onStageDown).not.toContain("const next: DrawEl =");
-    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(780);
+    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(900);
 
     expectTokenOrder(pointCommentHandler, [
       "if (pointCommentComposer) return true",

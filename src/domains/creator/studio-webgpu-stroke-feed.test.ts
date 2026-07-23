@@ -384,6 +384,48 @@ describe("Studio WebGPU append-only stroke feed", () => {
     expect(Object.isFrozen(rightPressures)).toBe(false);
   });
 
+  it("reconstructs a maximum-size catch-up suffix without engine argument-count limits", () => {
+    // One accepted delivery may legally carry STUDIO_GPU_STROKE_FEED_MAX_ADVANCE_POINTS samples
+    // (200k coordinates). The bridge reconstruction must fill by index: spreading that suffix
+    // into `push(...)` throws RangeError on V8 (~124k call arguments) and JSC (~65k).
+    const baseline = createStudioGpuStrokeFeedBaseline([stroke()], "max-advance-suffix")!;
+    const suffixSampleCount = STUDIO_GPU_STROKE_FEED_MAX_ADVANCE_POINTS;
+    const suffixPoints = new Array<number>(suffixSampleCount * 2);
+    const suffixPressures = new Array<number>(suffixSampleCount);
+    for (let index = 0; index < suffixSampleCount; index += 1) {
+      suffixPoints[index * 2] = 2 + (index % 1_000) * 0.25;
+      suffixPoints[index * 2 + 1] = 3 + Math.floor(index / 1_000) * 0.25;
+      suffixPressures[index] = 0.25 + (index % 3) * 0.25;
+    }
+    const moved = [stroke({
+      points: [2, 3].concat(suffixPoints),
+      pressures: [0.5].concat(suffixPressures),
+    })];
+    const advanced = advanceStudioGpuStrokeFeed(
+      baseline,
+      patch(moved, 1, suffixPoints, suffixPressures)
+    );
+    expect(advanced.status).toBe("appended");
+
+    const bridge = studioGpuStrokeFeedSuffixFromPointCount(advanced.strokes[0]!, 1);
+    expect(bridge).not.toBeNull();
+    expect(bridge!.points).toHaveLength((suffixSampleCount + 1) * 2);
+    expect(bridge!.pressures).toHaveLength(suffixSampleCount + 1);
+    // Bridge endpoint first, then the appended suffix in exact delivery order.
+    expect(bridge!.points.slice(0, 4)).toEqual([2, 3, suffixPoints[0], suffixPoints[1]]);
+    expect(bridge!.pressures!.slice(0, 2)).toEqual([0.5, suffixPressures[0]]);
+    const middle = Math.floor(suffixSampleCount / 2);
+    expect(bridge!.points[(middle + 1) * 2]).toBe(suffixPoints[middle * 2]);
+    expect(bridge!.points[(middle + 1) * 2 + 1]).toBe(suffixPoints[middle * 2 + 1]);
+    expect(bridge!.pressures![middle + 1]).toBe(suffixPressures[middle]);
+    expect(bridge!.points.at(-2)).toBe(suffixPoints.at(-2));
+    expect(bridge!.points.at(-1)).toBe(suffixPoints.at(-1));
+    expect(bridge!.pressures!.at(-1)).toBe(suffixPressures.at(-1));
+    // No sparse holes: the preallocated arrays are completely filled.
+    expect(bridge!.points.every((value) => typeof value === "number")).toBe(true);
+    expect(bridge!.pressures!.every((value) => typeof value === "number")).toBe(true);
+  });
+
   it("bounds direct suffix work and rejects overlong pressure ownership", () => {
     const baseline = createStudioGpuStrokeFeedBaseline([stroke()], "bounded-direct-feed")!;
     const oversizedSuffix: number[] = [];

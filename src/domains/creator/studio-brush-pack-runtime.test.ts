@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { planNormalizedStudioDynamicBrushDabs } from "./studio-brush-dynamics";
+import {
+  STUDIO_BRUSH_PACK_EXPANSION_WAVE_IDS,
+  studioBrushPackExpansionTuningById,
+} from "./studio-brush-pack-expansion";
 import { STUDIO_BRUSH_PACK_CATALOG_IDS } from "./studio-brush-pack-id";
 import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";
 import {
@@ -52,9 +56,9 @@ function withoutSeedFields(value: unknown): unknown {
 }
 
 describe("procedural brush pack runtime", () => {
-  it("materializes all 87 descriptors into the shared selection contract", () => {
+  it("materializes all 120 descriptors into the shared selection contract", () => {
     const selections = materializeAllStudioBrushPackSelections();
-    expect(selections).toHaveLength(87);
+    expect(selections).toHaveLength(120);
     expect(selections.map((selection) => selection.catalogId)).toEqual(
       STUDIO_BRUSH_PACK_CATALOG_IDS
     );
@@ -104,7 +108,7 @@ describe("procedural brush pack runtime", () => {
     expect(signatures.size).toBe(STUDIO_BRUSH_PACK_CUSTOM_TIP_MOTIFS.length);
   });
 
-  it("gives all 87 catalogue brushes a distinct deterministic runtime fingerprint", () => {
+  it("gives all 120 catalogue brushes a distinct deterministic runtime fingerprint", () => {
     const first = STUDIO_BRUSH_PACK_CATALOG_IDS.map(studioBrushPackRuntimeSignature);
     const second = STUDIO_BRUSH_PACK_CATALOG_IDS.map(studioBrushPackRuntimeSignature);
     const physical = materializeAllStudioBrushPackSelections().map((selection) => JSON.stringify(withoutSeedFields({
@@ -113,9 +117,9 @@ describe("procedural brush pack runtime", () => {
     })));
     expect(first).toEqual(second);
     expect(first.every((signature) => typeof signature === "string" && signature.length > 100)).toBe(true);
-    expect(new Set(first).size).toBe(87);
+    expect(new Set(first).size).toBe(120);
     // Neither the stroke seed nor nested grain seeds may be the sole differentiator.
-    expect(new Set(physical).size).toBe(87);
+    expect(new Set(physical).size).toBe(120);
   });
 
   it("plans a finite, visible, deterministic engine stroke for every catalogue preset", () => {
@@ -181,5 +185,69 @@ describe("procedural brush pack runtime", () => {
     expect(materializeStudioBrushPackDynamics("pen")).toBeNull();
     expect(materializeStudioBrushPackSelection("not-a-brush")).toBeNull();
     expect(studioBrushPackRuntimeSignature(null)).toBeNull();
+  });
+
+  it("hand-tunes the 2026-07 expansion wave without touching pre-expansion physics", () => {
+    // Tuning strictly targets appended ids; every original catalogue id must resolve to null so
+    // saved strokes recorded before the expansion replay byte-identically.
+    const waveIds = new Set<string>(STUDIO_BRUSH_PACK_EXPANSION_WAVE_IDS);
+    for (const id of STUDIO_BRUSH_PACK_CATALOG_IDS) {
+      expect(
+        studioBrushPackExpansionTuningById(id) !== null,
+        `${id}: tuning table membership drift`
+      ).toBe(waveIds.has(id));
+    }
+
+    const dynamicsById = (id: (typeof STUDIO_BRUSH_PACK_CATALOG_IDS)[number]) =>
+      materializeStudioBrushPackDynamics(id)!;
+
+    // Technical liner ignores pressure entirely; the G-pen swells dramatically instead.
+    const milli = dynamicsById("milli-pen-uniform");
+    expect(milli.width.mappings).toHaveLength(0);
+    expect(milli.taper.enabled).toBe(false);
+    const gPen = dynamicsById("g-pen-flex");
+    expect(gPen.width.mappings[0]).toMatchObject({ source: "pressure", from: 0.12, to: 1.9 });
+    expect(gPen.taper.enabled).toBe(true);
+    expect(gPen.taper.minSizeRatio).toBeLessThanOrEqual(0.05);
+
+    // The calligraphy nib rotates with the stylus azimuth, never with the stroke direction.
+    const calligraphy = dynamicsById("calligraphy-tilt-nib");
+    expect(calligraphy.angle.mappings.map((mapping) => mapping.source)).toEqual([
+      "tilt-azimuth",
+      "twist",
+    ]);
+    const tiltPencil = dynamicsById("pencil-tilt-shading");
+    expect(tiltPencil.width.mappings.some((mapping) => mapping.source === "tilt-magnitude")).toBe(true);
+
+    // Grain pin-mode contrast: pastel tooth stays canvas-pinned, crayon wax drags with the stroke.
+    expect(dynamicsById("pastel-paper-soft").grain).toMatchObject({
+      space: "canvas-fixed",
+      amount: 0.55,
+    });
+    expect(dynamicsById("crayon-wax-bold").grain.space).toBe("stroke-fixed");
+    expect(dynamicsById("oil-impasto-heavy").spacingRatio).toBeLessThan(0.06);
+
+    // Colour dynamics land on the colored pencil and the autumn leaf scatter.
+    expect(dynamicsById("pencil-colored-soft").colorDynamics.hueJitter).toBeGreaterThan(0);
+    expect(dynamicsById("leaf-fall-flurry").colorDynamics.hueJitter).toBeGreaterThanOrEqual(10);
+
+    // Stamps and scatters: rope dabs sit one tip-width apart, splatter bursts under pressure,
+    // rain keeps a fixed diagonal with velocity-driven spacing.
+    expect(dynamicsById("rope-twist-stamp").spacingRatio).toBeGreaterThanOrEqual(0.9);
+    expect(dynamicsById("sponge-stipple-dab").spacingRatio).toBeGreaterThanOrEqual(0.7);
+    expect(
+      dynamicsById("ink-splatter-burst").scatter.mappings.some(
+        (mapping) => mapping.source === "pressure"
+      )
+    ).toBe(true);
+    const rain = dynamicsById("rain-streak-diagonal");
+    expect(rain.angle.base).toBeLessThan(-60);
+    expect(rain.angle.mappings.some((mapping) => mapping.source === "direction")).toBe(false);
+    expect(rain.width.mappings.some((mapping) => mapping.source === "speed")).toBe(true);
+    expect(dynamicsById("snow-flurry-flake").angle.jitter).toMatchObject({ amount: 180 });
+
+    // Multi-tip composition still applies to the expansion's foliage and rake members.
+    expect(dynamicsById("leaf-fall-flurry").tipLayers.length).toBeGreaterThan(0);
+    expect(dynamicsById("fur-soft-clumps").tipLayers.length).toBeGreaterThan(0);
   });
 });

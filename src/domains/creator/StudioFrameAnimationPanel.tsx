@@ -29,13 +29,18 @@ import {
 import {
   FRAME_ANIM_EXPORT_SCALE_PRESETS,
   FRAME_ANIM_LOOP_COUNT_PRESETS,
+  GIF_DITHER_PRESETS,
+  frameAnimMediaFileName,
   frameAnimationExportFileName,
+  isFrameAnimMediaExportSupported,
   isMotionExportCancelled,
   isMotionExportSupported,
   loadMotionCutImages,
   planFrameAnimationExport,
   startFrameAnimationExport,
-  type FrameAnimationExportHandle,
+  startFrameAnimMediaExport,
+  type FrameAnimMediaProgress,
+  type GifDitherMode,
   type MotionExportProgress,
 } from "./studio-frame-animation-export";
 import { PANEL_LABEL_ROW, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
@@ -78,6 +83,14 @@ function formatSeconds(sec: number): string {
   const rounded = Math.round(sec * 10) / 10;
   return `${rounded}초`;
 }
+
+type StudioFrameAnimExportFormat = "apng" | "gif" | "webm";
+
+const FRAME_ANIM_FORMAT_OPTIONS = [
+  { id: "webm", label: "WebM 영상 (작은 용량)" },
+  { id: "gif", label: "GIF 애니메이션 (어디서나 재생·256색)" },
+  { id: "apng", label: "APNG (무손실·부드러운 투명)" },
+] as const satisfies readonly { id: StudioFrameAnimExportFormat; label: string }[];
 
 export function StudioFrameAnimationPanel({
   element,
@@ -167,16 +180,20 @@ export function StudioFrameAnimationPanel({
     if (fallback) onActiveFrameChange(fallback.id);
   }
 
-  // ── 내보내기(WebM) — StudioMotionExportPanel과 동일한 아코디언 패턴 미러 ──
+  // ── 내보내기(WebM · GIF · APNG) — StudioMotionExportPanel과 동일한 아코디언 패턴 미러 ──
   const [exportOpen, setExportOpen] = useState(false);
+  const [format, setFormat] = useState<StudioFrameAnimExportFormat>("webm");
   const [scaleId, setScaleId] = useState<string>(FRAME_ANIM_EXPORT_SCALE_PRESETS[1].id);
   const [loopId, setLoopId] = useState<string>(FRAME_ANIM_LOOP_COUNT_PRESETS[0].id);
   const [background, setBackground] = useState("#ffffff");
+  const [transparentBg, setTransparentBg] = useState(false);
+  const [ditherId, setDitherId] = useState<GifDitherMode>("none");
   const [preparing, setPreparing] = useState(false);
   const [progress, setProgress] = useState<MotionExportProgress | null>(null);
+  const [mediaProgress, setMediaProgress] = useState<FrameAnimMediaProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [doneMsg, setDoneMsg] = useState<string | null>(null);
-  const handleRef = useRef<FrameAnimationExportHandle | null>(null);
+  const handleRef = useRef<{ cancel(): void } | null>(null);
 
   useEffect(() => {
     return () => {
@@ -185,7 +202,9 @@ export function StudioFrameAnimationPanel({
     };
   }, []);
 
-  const supported = isMotionExportSupported();
+  const webmSupported = isMotionExportSupported();
+  const mediaSupported = isFrameAnimMediaExportSupported();
+  const supported = format === "webm" ? webmSupported : mediaSupported;
   const scale = FRAME_ANIM_EXPORT_SCALE_PRESETS.find((s) => s.id === scaleId) ?? FRAME_ANIM_EXPORT_SCALE_PRESETS[1];
   const loopPreset = FRAME_ANIM_LOOP_COUNT_PRESETS.find((l) => l.id === loopId) ?? FRAME_ANIM_LOOP_COUNT_PRESETS[0];
   const plan = planFrameAnimationExport(element.width, element.height, frames, fps, {
@@ -193,7 +212,7 @@ export function StudioFrameAnimationPanel({
     loopCount: loopPreset.loopCount,
     background,
   });
-  const exporting = preparing || progress != null;
+  const exporting = preparing || progress != null || mediaProgress != null;
 
   async function exportAnimation() {
     if (exporting || !supported || frames.length < 2) return;
@@ -202,34 +221,63 @@ export function StudioFrameAnimationPanel({
     setPreparing(true);
     try {
       const images = await loadMotionCutImages(frames.map((f) => f.src));
-      const handle = startFrameAnimationExport({
-        plan,
-        images,
-        background,
-        onProgress: (p) => setProgress(p),
-      });
-      handleRef.current = handle;
-      setPreparing(false);
-      const result = await handle.done;
-      downloadBlob(result.blob, frameAnimationExportFileName(title));
-      setDoneMsg("애니메이션 영상을 저장했어요.");
+      if (format === "webm") {
+        const handle = startFrameAnimationExport({
+          plan,
+          images,
+          background,
+          onProgress: (p) => setProgress(p),
+        });
+        handleRef.current = handle;
+        setPreparing(false);
+        const result = await handle.done;
+        downloadBlob(result.blob, frameAnimationExportFileName(title));
+        setDoneMsg("애니메이션 영상을 저장했어요.");
+      } else {
+        const mediaFormat = format;
+        const handle = startFrameAnimMediaExport({
+          format: mediaFormat,
+          width: plan.width,
+          height: plan.height,
+          frameDurations: plan.frameDurations,
+          images,
+          background: transparentBg ? null : background,
+          dither: ditherId,
+          onProgress: (p) => setMediaProgress(p),
+        });
+        handleRef.current = handle;
+        setPreparing(false);
+        const result = await handle.done;
+        downloadBlob(result.blob, frameAnimMediaFileName(title, mediaFormat));
+        setDoneMsg(mediaFormat === "gif" ? "GIF 애니메이션을 저장했어요." : "APNG 애니메이션을 저장했어요.");
+      }
     } catch (err) {
       if (!isMotionExportCancelled(err)) {
-        setError(err instanceof Error ? err.message : "영상을 내보내지 못했어요.");
+        setError(err instanceof Error ? err.message : "애니메이션을 내보내지 못했어요.");
       }
     } finally {
       handleRef.current = null;
       setPreparing(false);
       setProgress(null);
+      setMediaProgress(null);
     }
   }
 
-  const progressPct = Math.round((progress?.ratio ?? 0) * 100);
+  const progressPct = Math.round((mediaProgress?.ratio ?? progress?.ratio ?? 0) * 100);
+  const mediaStatusLabel =
+    mediaProgress == null
+      ? null
+      : mediaProgress.phase === "render"
+        ? "프레임 그리는 중…"
+        : mediaProgress.phase === "quantize"
+          ? "색상 팔레트 계산 중…"
+          : mediaProgress.phase === "assemble"
+            ? "APNG 조립 중…"
+            : "GIF 인코딩 중…";
   const statusLabel = preparing
     ? "프레임 이미지 준비 중…"
-    : progress?.phase === "finalize"
-      ? "영상 파일 생성 중…"
-      : "녹화 중…";
+    : mediaStatusLabel ??
+      (progress?.phase === "finalize" ? "영상 파일 생성 중…" : "녹화 중…");
 
   return (
     <section
@@ -602,7 +650,7 @@ export function StudioFrameAnimationPanel({
               )}
             </div>
 
-            {/* 내보내기(WebM) */}
+            {/* 내보내기(WebM · GIF · APNG) */}
             <div className="rounded-xl border border-line bg-card/50">
               <button
                 type="button"
@@ -611,7 +659,7 @@ export function StudioFrameAnimationPanel({
                 className="flex w-full items-center gap-1.5 px-2.5 py-2 text-xs font-medium text-fg-2 transition-colors hover:text-fg"
               >
                 <Download size={13} className="text-accent" />
-                애니메이션 영상 내보내기 (WebM)
+                애니메이션 내보내기 (WebM · GIF · APNG)
               </button>
               {exportOpen &&
                 (frames.length < 2 ? (
@@ -620,7 +668,27 @@ export function StudioFrameAnimationPanel({
                   </p>
                 ) : (
                   <div className="flex flex-col gap-2.5 border-t border-line px-2.5 py-2.5">
-                    <p className="text-[0.7rem] text-fg-3">약 {formatSeconds(plan.durationSec)} 분량으로 내보내요.</p>
+                    <label className="flex flex-col gap-1 text-xs text-fg-2">
+                      포맷
+                      <select
+                        value={format}
+                        onChange={(e) => setFormat(e.target.value as StudioFrameAnimExportFormat)}
+                        disabled={exporting}
+                        className="h-8 rounded-lg border border-line bg-canvas px-2 text-xs text-fg outline-none focus:border-accent/50 disabled:opacity-50"
+                      >
+                        {FRAME_ANIM_FORMAT_OPTIONS.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <p className="text-[0.7rem] text-fg-3">
+                      {format === "webm"
+                        ? `약 ${formatSeconds(plan.durationSec)} 분량으로 내보내요.`
+                        : `한 루프 ${formatSeconds(plan.loopDurationMs / 1000)} — 무한 반복으로 저장돼요.`}
+                    </p>
 
                     <label className="flex flex-col gap-1 text-xs text-fg-2">
                       화질
@@ -638,32 +706,67 @@ export function StudioFrameAnimationPanel({
                       </select>
                     </label>
 
-                    <label className="flex flex-col gap-1 text-xs text-fg-2">
-                      반복 횟수
-                      <select
-                        value={loopId}
-                        onChange={(e) => setLoopId(e.target.value)}
-                        disabled={exporting}
-                        className="h-8 rounded-lg border border-line bg-canvas px-2 text-xs text-fg outline-none focus:border-accent/50 disabled:opacity-50"
-                      >
-                        {FRAME_ANIM_LOOP_COUNT_PRESETS.map((l) => (
-                          <option key={l.id} value={l.id}>
-                            {l.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    {format === "webm" && (
+                      <label className="flex flex-col gap-1 text-xs text-fg-2">
+                        반복 횟수
+                        <select
+                          value={loopId}
+                          onChange={(e) => setLoopId(e.target.value)}
+                          disabled={exporting}
+                          className="h-8 rounded-lg border border-line bg-canvas px-2 text-xs text-fg outline-none focus:border-accent/50 disabled:opacity-50"
+                        >
+                          {FRAME_ANIM_LOOP_COUNT_PRESETS.map((l) => (
+                            <option key={l.id} value={l.id}>
+                              {l.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
 
-                    <label className="flex items-center justify-between gap-2 text-xs text-fg-2">
-                      배경색 (WebM은 투명 배경을 지원하지 않아요)
-                      <input
-                        type="color"
-                        value={background}
-                        onChange={(e) => setBackground(e.target.value)}
-                        disabled={exporting}
-                        className="h-7 w-10 cursor-pointer rounded border border-line bg-canvas disabled:opacity-50"
-                      />
-                    </label>
+                    {format === "gif" && (
+                      <label className="flex flex-col gap-1 text-xs text-fg-2">
+                        디더링 (256색 축소 방식)
+                        <select
+                          value={ditherId}
+                          onChange={(e) => setDitherId(e.target.value as GifDitherMode)}
+                          disabled={exporting}
+                          className="h-8 rounded-lg border border-line bg-canvas px-2 text-xs text-fg outline-none focus:border-accent/50 disabled:opacity-50"
+                        >
+                          {GIF_DITHER_PRESETS.map((preset) => (
+                            <option key={preset.id} value={preset.id}>
+                              {preset.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+
+                    {format !== "webm" && (
+                      <label className="flex cursor-pointer items-center gap-1.5 text-xs text-fg-2">
+                        <input
+                          type="checkbox"
+                          checked={transparentBg}
+                          onChange={(e) => setTransparentBg(e.target.checked)}
+                          disabled={exporting}
+                          className="size-3.5 cursor-pointer accent-[var(--color-accent)]"
+                        />
+                        투명 배경으로 내보내기
+                      </label>
+                    )}
+
+                    {(format === "webm" || !transparentBg) && (
+                      <label className="flex items-center justify-between gap-2 text-xs text-fg-2">
+                        {format === "webm" ? "배경색 (WebM은 투명 배경을 지원하지 않아요)" : "배경색"}
+                        <input
+                          type="color"
+                          value={background}
+                          onChange={(e) => setBackground(e.target.value)}
+                          disabled={exporting}
+                          className="h-7 w-10 cursor-pointer rounded border border-line bg-canvas disabled:opacity-50"
+                        />
+                      </label>
+                    )}
 
                     {exporting && (
                       <div className="rounded-lg border border-line bg-panel/40 px-2 py-1.5">
@@ -673,7 +776,7 @@ export function StudioFrameAnimationPanel({
                         </div>
                         <div
                           role="progressbar"
-                          aria-label="영상 내보내기 진행률"
+                          aria-label="애니메이션 내보내기 진행률"
                           aria-valuemin={0}
                           aria-valuemax={100}
                           aria-valuenow={progressPct}
@@ -687,9 +790,15 @@ export function StudioFrameAnimationPanel({
                       </div>
                     )}
 
-                    {!supported && (
+                    {format === "webm" && !webmSupported && (
                       <p className="text-xs text-bad">
-                        이 브라우저는 영상 녹화(MediaRecorder/WebM)를 지원하지 않아요. 크롬·엣지·파이어폭스에서
+                        이 브라우저는 영상 녹화(MediaRecorder/WebM)를 지원하지 않아요. GIF나 APNG 포맷을
+                        선택하면 계속 내보낼 수 있어요.
+                      </p>
+                    )}
+                    {format !== "webm" && !mediaSupported && (
+                      <p className="text-xs text-bad">
+                        이 브라우저는 캔버스 이미지 내보내기를 지원하지 않아요. 크롬·엣지·파이어폭스에서
                         시도해주세요.
                       </p>
                     )}
@@ -715,7 +824,7 @@ export function StudioFrameAnimationPanel({
                         className={buttonClass({ size: "sm", variant: "solid", className: "gap-1.5" })}
                       >
                         <Download size={14} />
-                        영상 내보내기
+                        {format === "webm" ? "영상 내보내기" : format === "gif" ? "GIF 내보내기" : "APNG 내보내기"}
                       </button>
                     </div>
                   </div>

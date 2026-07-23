@@ -161,12 +161,32 @@ describe("Studio interchange capability registry", () => {
     expect(studioInterchangeCapabilitiesForExtension("unknown")).toEqual([]);
   });
 
-  it("direct support filter excludes bridge-only and planned unsupported rows", () => {
+  it("direct support filter excludes bridge-only rows and includes the GIF/APNG export row", () => {
     const ids = studioDirectlySupportedInterchangeCapabilities().map((capability) => capability.id);
     expect(ids).toContain("toonproject-archive");
     expect(ids).toContain("ase");
     expect(ids).not.toContain("clip");
-    expect(ids).not.toContain("gif-apng-mp4-export");
+    expect(ids).toContain("gif-apng-mp4-export");
+  });
+
+  it("GIF/APNG는 내보내기 전용으로, 가져오기와 MP4는 미지원으로 정직하게 표시한다", () => {
+    const capability = studioInterchangeCapability("gif-apng-mp4-export")!;
+    expect(capability).toMatchObject({
+      import: "unsupported",
+      export: "partial",
+      roundTrip: "none",
+      status: "partial",
+    });
+    expect(capability.lossModel.join(" ")).toContain("256색");
+    expect(capability.lossModel.join(" ")).toContain("1비트 투명");
+    expect(capability.lossModel.join(" ")).toContain("MP4 내보내기는 구현 전");
+    expect(capability.runtimeRequirement.join(" ")).toContain("GIF89a");
+    expect(capability.runtimeRequirement.join(" ")).toContain("NETSCAPE2.0");
+    expect(capability.runtimeRequirement.join(" ")).toContain("acTL/fcTL/fdAT");
+    expect(capability.runtimeRequirement.join(" ")).toContain("CRC32");
+    expect(capability.notes.join(" ")).toContain("무한 반복");
+    expect(capability.notes.join(" ")).toContain("MP4 지원으로 오표시하지 않습니다");
+    expect(capability.sizeBudget.maxItems).toBe(60);
   });
 
   it("known hard limits match the audited runtime boundaries", () => {

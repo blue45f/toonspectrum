@@ -1,9 +1,12 @@
 import {
   Circle,
+  CircleDot,
+  Equal,
   Eye,
   EyeOff,
   Plus,
   Spline,
+  Sun,
   Target,
   Trash2,
 } from "lucide-react";
@@ -13,6 +16,10 @@ import {
   type StudioAdvancedRuler,
   type StudioAdvancedRulerDocument,
 } from "./studio-advanced-ruler-document";
+import {
+  STUDIO_GUIDE_RULER_MAX_SPACING,
+  STUDIO_GUIDE_RULER_MIN_SPACING,
+} from "./studio-advanced-ruler-guide-snap";
 import {
   STUDIO_FISHEYE_MAX_FOV_DEG,
   STUDIO_FISHEYE_MAX_STRENGTH,
@@ -26,7 +33,28 @@ import {
   StudioSliderRow,
 } from "./studio-panel-ui";
 
+import type { LucideIcon } from "lucide-react";
 import type { ReactElement } from "react";
+
+const RULER_KIND_LABELS: Record<StudioAdvancedRuler["type"], string> = {
+  curve: "곡선자",
+  fisheye: "어안자",
+  parallel: "평행선자",
+  concentric: "동심원자",
+  radial: "방사선자",
+};
+
+const ADD_RULER_BUTTONS: readonly {
+  type: StudioAdvancedRuler["type"];
+  title: string;
+  Icon: LucideIcon;
+}[] = [
+  { type: "curve", title: "3차 Bézier 곡선자 추가", Icon: Spline },
+  { type: "fisheye", title: "구면 어안자 추가", Icon: Circle },
+  { type: "parallel", title: "평행선 자 추가", Icon: Equal },
+  { type: "concentric", title: "동심원 자 추가", Icon: CircleDot },
+  { type: "radial", title: "방사선 자 추가", Icon: Sun },
+];
 
 export interface StudioAdvancedRulerPanelProps {
   document: StudioAdvancedRulerDocument;
@@ -106,7 +134,7 @@ export function StudioAdvancedRulerPanel({
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-xs font-semibold text-fg-3">고급 자</p>
-          <p className="text-[0.58rem] text-fg-3">곡선·어안 가이드는 여러 개 표시하고 하나만 스냅합니다.</p>
+          <p className="text-[0.58rem] text-fg-3">곡선·어안·평행선·동심원·방사선 가이드는 여러 개 표시하고 하나만 스냅합니다.</p>
         </div>
         <span className="text-[0.6rem] tabular-nums text-fg-3">
           {document.rulers.length}/{STUDIO_ADVANCED_RULER_MAX_COUNT}
@@ -114,26 +142,19 @@ export function StudioAdvancedRulerPanel({
       </div>
 
       <div className="grid grid-cols-2 gap-1.5">
-        <button
-          type="button"
-          disabled={disabled || atLimit}
-          title={disabled ? disabledTitle : "3차 Bézier 곡선자 추가"}
-          className="flex min-h-9 items-center justify-center gap-1 rounded-md border border-line bg-card text-[0.66rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-45 pointer-coarse:min-h-11"
-          onClick={() => onAdd("curve")}
-        >
-          <Spline size={12} aria-hidden />
-          <Plus size={10} aria-hidden /> 곡선자
-        </button>
-        <button
-          type="button"
-          disabled={disabled || atLimit}
-          title={disabled ? disabledTitle : "구면 어안자 추가"}
-          className="flex min-h-9 items-center justify-center gap-1 rounded-md border border-line bg-card text-[0.66rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-45 pointer-coarse:min-h-11"
-          onClick={() => onAdd("fisheye")}
-        >
-          <Circle size={12} aria-hidden />
-          <Plus size={10} aria-hidden /> 어안자
-        </button>
+        {ADD_RULER_BUTTONS.map(({ type, title, Icon }) => (
+          <button
+            key={type}
+            type="button"
+            disabled={disabled || atLimit}
+            title={disabled ? disabledTitle : title}
+            className="flex min-h-9 items-center justify-center gap-1 rounded-md border border-line bg-card text-[0.66rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-45 pointer-coarse:min-h-11"
+            onClick={() => onAdd(type)}
+          >
+            <Icon size={12} aria-hidden />
+            <Plus size={10} aria-hidden /> {RULER_KIND_LABELS[type]}
+          </button>
+        ))}
       </div>
 
       {document.rulers.length === 0 ? (
@@ -157,7 +178,7 @@ export function StudioAdvancedRulerPanel({
                   className="min-w-0 flex-1 truncate text-left text-[0.66rem] font-semibold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                   onClick={() => onSelect(ruler.id)}
                 >
-                  {ruler.type === "curve" ? "곡선자" : "어안자"} · {ruler.name}
+                  {RULER_KIND_LABELS[ruler.type]} · {ruler.name}
                 </button>
                 <button
                   type="button"
@@ -273,7 +294,9 @@ export function StudioAdvancedRulerPanel({
                 />
               ))}
             </>
-          ) : (
+          ) : null}
+
+          {selected.type === "fisheye" ? (
             <>
               <CoordinatePair
                 label="렌즈 중심"
@@ -357,7 +380,85 @@ export function StudioAdvancedRulerPanel({
                 </select>
               </label>
             </>
-          )}
+          ) : null}
+
+          {selected.type === "parallel" ? (
+            <>
+              <StudioSliderRow
+                label="각도"
+                min={0}
+                max={179}
+                step={1}
+                value={selected.angleDeg}
+                disabled={disabled}
+                onChange={NOOP_PREVIEW}
+                onCommit={(angleDeg) => onPatch(selected.id, { angleDeg })}
+                formatReadout={(value) => `${Math.round(value)}°`}
+              />
+              <StudioSliderRow
+                label="가이드 간격"
+                min={STUDIO_GUIDE_RULER_MIN_SPACING}
+                max={STUDIO_GUIDE_RULER_MAX_SPACING}
+                step={1}
+                value={selected.guideSpacing}
+                disabled={disabled}
+                onChange={NOOP_PREVIEW}
+                onCommit={(guideSpacing) => onPatch(selected.id, { guideSpacing })}
+                formatReadout={(value) => `${Math.round(value)}px`}
+              />
+              <CoordinatePair
+                label="기준점"
+                x={selected.originX}
+                y={selected.originY}
+                disabled={disabled}
+                onCommit={(originX, originY) => onPatch(selected.id, { originX, originY })}
+              />
+              <p className="text-[0.58rem] leading-relaxed text-fg-3">
+                획은 시작점을 지나는 같은 각도의 평행선에 스냅됩니다. 가이드 간격은 표시 전용입니다.
+              </p>
+            </>
+          ) : null}
+
+          {selected.type === "concentric" ? (
+            <>
+              <CoordinatePair
+                label="중심점"
+                x={selected.centerX}
+                y={selected.centerY}
+                disabled={disabled}
+                onCommit={(centerX, centerY) => onPatch(selected.id, { centerX, centerY })}
+              />
+              <StudioSliderRow
+                label="가이드 간격"
+                min={STUDIO_GUIDE_RULER_MIN_SPACING}
+                max={STUDIO_GUIDE_RULER_MAX_SPACING}
+                step={1}
+                value={selected.guideSpacing}
+                disabled={disabled}
+                onChange={NOOP_PREVIEW}
+                onCommit={(guideSpacing) => onPatch(selected.id, { guideSpacing })}
+                formatReadout={(value) => `${Math.round(value)}px`}
+              />
+              <p className="text-[0.58rem] leading-relaxed text-fg-3">
+                획은 시작점을 지나는 중심 기준 원에 스냅됩니다. 가이드 간격은 표시 전용입니다.
+              </p>
+            </>
+          ) : null}
+
+          {selected.type === "radial" ? (
+            <>
+              <CoordinatePair
+                label="중심점"
+                x={selected.centerX}
+                y={selected.centerY}
+                disabled={disabled}
+                onCommit={(centerX, centerY) => onPatch(selected.id, { centerX, centerY })}
+              />
+              <p className="text-[0.58rem] leading-relaxed text-fg-3">
+                획은 중심에서 시작점을 지나는 방사선에 스냅되고 중심 반대쪽으로는 넘어가지 않습니다.
+              </p>
+            </>
+          ) : null}
         </div>
       ) : null}
     </div>

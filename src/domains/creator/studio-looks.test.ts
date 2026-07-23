@@ -18,6 +18,7 @@ import {
   type StudioLookCategory,
 } from "./studio-looks";
 import { normalizePhotoFilter } from "./studio-photo-filter";
+import { normalizeShadowHighlight } from "./studio-shadow-highlight";
 import { normalizeSketch } from "./studio-sketch";
 import { normalizeStylize } from "./studio-stylize";
 import { normalizeVibrance } from "./studio-vibrance";
@@ -43,6 +44,7 @@ const OBJECT_NORMALIZERS: Partial<Record<keyof ImageFilterFields, (v: unknown) =
   light: (v) => normalizeLight(v as never),
   sketch: (v) => normalizeSketch(v as never),
   clarity: (v) => normalizeClarity(v as never),
+  shadowHighlight: (v) => normalizeShadowHighlight(v as never),
 };
 
 // ---------------------------------------------------------------------------
@@ -184,6 +186,7 @@ describe("LOOK_FILTER_KEYS", () => {
       "photoFilter",
       "autoAdjust",
       "clarity",
+      "shadowHighlight",
       "outline",
       "glow",
       "halftone",

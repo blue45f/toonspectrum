@@ -504,6 +504,12 @@ export class StudioWebGpuEngine {
   private presentationBindGroups = new WeakMap<GPUTexture, GPUBindGroup>();
   private instanceBuffer: GPUBuffer | null = null;
   private instanceCapacity = 0;
+  /**
+   * Grow-only CPU staging array reused across frames by `packStudioGpuTileDabs`. One render is in
+   * flight at a time and `GPUQueue.writeBuffer` copies synchronously, so reuse cannot alias a
+   * previous frame's upload. Released on suspend/dispose with the other retained frame resources.
+   */
+  private instanceStagingScratch: Float32Array | null = null;
   private presentationBuffer: GPUBuffer | null = null;
   private presentationCapacity = 0;
   private instanceBufferAllocations = 0;
@@ -588,6 +594,7 @@ export class StudioWebGpuEngine {
       this.instanceBuffer?.destroy();
       this.instanceBuffer = null;
       this.instanceCapacity = 0;
+      this.instanceStagingScratch = null;
       this.presentationBuffer?.destroy();
       this.presentationBuffer = null;
       this.presentationCapacity = 0;
@@ -820,6 +827,7 @@ export class StudioWebGpuEngine {
     // `invalidateFrameReceipt` retires the authority snapshot into this pool when there are no
     // readers. Destroy it immediately so an inactive live canvas retains no full-surface copy.
     this.destroyReadbackSnapshotPool();
+    this.instanceStagingScratch = null;
     if (hadPresentation && this.backend === "canvas2d") {
       clearStudioCanvas2dDabSurface(
         this.fallbackContext,
@@ -887,6 +895,7 @@ export class StudioWebGpuEngine {
     this.instanceBuffer?.destroy();
     this.instanceBuffer = null;
     this.instanceCapacity = 0;
+    this.instanceStagingScratch = null;
     this.presentationBuffer?.destroy();
     this.presentationBuffer = null;
     this.presentationCapacity = 0;
@@ -1466,6 +1475,7 @@ export class StudioWebGpuEngine {
     this.instanceBuffer?.destroy();
     this.instanceBuffer = null;
     this.instanceCapacity = 0;
+    this.instanceStagingScratch = null;
     this.presentationBuffer?.destroy();
     this.presentationBuffer = null;
     this.presentationCapacity = 0;
@@ -1836,7 +1846,15 @@ export class StudioWebGpuEngine {
         planStudioGpuStrokeExtensionInRect
       );
       if (!resolved) throw new Error("Studio WebGPU tile operation resolution failed");
-      const packed = packStudioGpuTileDabs(resolved);
+      const packed = packStudioGpuTileDabs(
+        resolved,
+        this.instanceStagingScratch ?? undefined
+      );
+      // Retain a freshly grown staging array so later pointer frames pack without reallocating.
+      if (this.instanceStagingScratch === null
+        || packed.buffer !== this.instanceStagingScratch.buffer) {
+        this.instanceStagingScratch = new Float32Array(packed.buffer);
+      }
       const instanceBuffer = this.ensureInstanceBuffer(resolved.dabCount);
       if (instanceBuffer && packed.byteLength > 0) {
         device.queue.writeBuffer(

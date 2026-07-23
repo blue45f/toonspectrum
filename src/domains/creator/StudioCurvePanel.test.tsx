@@ -6,6 +6,8 @@ import { describe, expect, it, vi } from "vitest";
 import { STUDIO_CURVE_MAX_CONTROL_POINTS } from "./studio-curves";
 import { StudioCurvePanel } from "./StudioCurvePanel";
 
+import type { StudioImageDataLike } from "./studio-filters";
+
 const curvePanelSource = readFileSync(
   new URL("./StudioCurvePanel.tsx", import.meta.url),
   "utf8",
@@ -115,6 +117,40 @@ describe("StudioCurvePanel", () => {
     expect(second).toBeGreaterThan(first);
     expect(third).toBeGreaterThan(second);
     expect(last).toBeGreaterThan(third);
+  });
+
+  it("renders unchanged without a histogram source and mounts the luma histogram above the curve when provided", () => {
+    expect(renderCurvePanel()).not.toContain("data-studio-histogram");
+
+    const histogramSource: StudioImageDataLike = {
+      data: new Uint8ClampedArray([
+        0, 0, 0, 255,
+        255, 255, 255, 255,
+        128, 128, 128, 255,
+        9, 9, 9, 0,
+      ]),
+      width: 2,
+      height: 2,
+    };
+    const html = renderToStaticMarkup(
+      <StudioCurvePanel
+        points={[
+          { x: 0, y: 0 },
+          { x: 255, y: 255 },
+        ]}
+        histogramSource={histogramSource}
+        onChange={vi.fn()}
+        onReset={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain('data-studio-histogram-section="true"');
+    expect(html).toContain('data-studio-histogram-bars="true"');
+    expect(html).toContain("휘도 히스토그램");
+    const histogramIndex = html.indexOf("data-studio-histogram-section");
+    const curveEditorIndex = html.indexOf("톤 커브 편집기");
+    expect(histogramIndex).toBeGreaterThan(0);
+    expect(curveEditorIndex).toBeGreaterThan(histogramIndex);
   });
 
   it("disables point insertion at the bounded shared-document limit and explains recovery", () => {

@@ -12,6 +12,7 @@ import {
 } from "./studio-levels";
 import { extractFilterFields, looksResetPatch, type StudioLook } from "./studio-looks";
 import { applyPhotoWebtoonPreset, resetPhotoWebtoonPreset } from "./studio-photo-webtoon-preset";
+import { useStudioHistogramSource } from "./useStudioHistogramSource";
 
 import type { El, ImageEl } from "./studio-element-model";
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
@@ -267,6 +268,30 @@ const StudioClaritySection = lazy(async () => {
     );
   }
   return { default: StudioClaritySection };
+});
+
+const StudioShadowHighlightSection = lazy(async () => {
+  const [panelMod, shadowHighlight] = await Promise.all([
+    import("./StudioShadowHighlightPanel"),
+    import("./studio-shadow-highlight"),
+  ]);
+  const Panel = panelMod.StudioShadowHighlightPanel;
+  function StudioShadowHighlightSection({ selected, onPatch }: DeferredAdjustmentSectionProps) {
+    const value = shadowHighlight.normalizeShadowHighlight(selected.shadowHighlight);
+    return (
+      <Panel
+        value={value}
+        onPatch={(patch) =>
+          onPatch({
+            shadowHighlight: shadowHighlight.normalizeShadowHighlight({ ...value, ...patch }),
+          } as Partial<El>)
+        }
+        onApplyPreset={(v) => onPatch({ shadowHighlight: v } as Partial<El>)}
+        onReset={() => onPatch({ shadowHighlight: undefined } as Partial<El>)}
+      />
+    );
+  }
+  return { default: StudioShadowHighlightSection };
 });
 
 const StudioGlowSection = lazy(async () => {
@@ -604,6 +629,9 @@ export function StudioImageAdjustmentsPanel({
   // 채널(r/g/b) 곡선·레벨 필드(curveCh/levelsCh) — ImageEl 타입 선언에는 아직 없어
   // ImageFilterFields로 읽는다(런타임은 같은 요소 객체라 patchEl 스프레드로 그대로 왕복된다).
   const filterFields: ImageFilterFields = selected;
+  // 히스토그램 원본 픽셀 — src 키 LRU 캐시라 선택/src 변경 시에만 디코드되고
+  // 레벨·톤커브 두 패널이 같은 디코드 1회를 공유한다.
+  const histogramSource = useStudioHistogramSource(selected.src);
   return (
     <>
       <AdjustmentSection title="룩 프리셋" defaultOpen>
@@ -646,6 +674,7 @@ export function StudioImageAdjustmentsPanel({
 
       <AdjustmentSection title="레벨" defaultOpen>
         <StudioLevelsPanel
+          histogramSource={histogramSource}
           value={normalizeLevels({
             blackPoint: selected.levelsBlack,
             whitePoint: selected.levelsWhite,
@@ -705,6 +734,7 @@ export function StudioImageAdjustmentsPanel({
         defaultOpen={hasAdjustmentValue(selected.curve) || hasAdjustmentValue(filterFields.curveCh)}
       >
         <StudioCurvePanel
+          histogramSource={histogramSource}
           points={normalizeCurve(selected.curve)}
           channels={filterFields.curveCh}
           onChange={(pts: CurvePoint[]) => onPatch({ curve: pts } as Partial<El>)}
@@ -756,6 +786,10 @@ export function StudioImageAdjustmentsPanel({
 
       <AdjustmentSection title="명료도" forceOpen={hasAdjustmentValue(selected.clarity)}>
         <StudioClaritySection selected={selected} onPatch={onPatch} />
+      </AdjustmentSection>
+
+      <AdjustmentSection title="섀도우/하이라이트" forceOpen={hasAdjustmentValue(selected.shadowHighlight)}>
+        <StudioShadowHighlightSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
       <AdjustmentSection title="글로우" forceOpen={hasAdjustmentValue(selected.glow)}>

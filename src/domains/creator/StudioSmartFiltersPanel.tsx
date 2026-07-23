@@ -74,6 +74,13 @@ const NUMERIC_CONTROLS: Partial<Record<StudioAdjustmentEngineId, readonly Numeri
     { key: "brightness", label: "밝기", min: -0.8, max: 0.8, step: 0.05, fallback: 0 },
     { key: "contrast", label: "대비", min: -80, max: 80, step: 1, fallback: 0 },
   ],
+  "shadow-highlight": [
+    { key: "shadows", label: "섀도우", min: 0, max: 100, step: 1, fallback: 35, suffix: "%" },
+    { key: "shadowsWidth", label: "섀도우 톤 범위", min: 0, max: 100, step: 1, fallback: 50, suffix: "%" },
+    { key: "highlights", label: "하이라이트", min: 0, max: 100, step: 1, fallback: 20, suffix: "%" },
+    { key: "highlightsWidth", label: "하이라이트 톤 범위", min: 0, max: 100, step: 1, fallback: 50, suffix: "%" },
+    { key: "midtoneContrast", label: "미드톤 대비", min: -50, max: 50, step: 1, fallback: 0 },
+  ],
   "hue-saturation": [
     { key: "hue", label: "색조", min: -180, max: 180, step: 5, fallback: 0, suffix: "°" },
     { key: "saturation", label: "채도", min: -1, max: 1, step: 0.05, fallback: 0 },

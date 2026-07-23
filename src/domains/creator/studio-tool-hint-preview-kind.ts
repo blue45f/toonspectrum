@@ -188,6 +188,7 @@ export const STUDIO_TOOL_HINT_PREVIEW_VARIANTS = {
   assets: [],
   "panel-layout": ["add", "split-diagonal", "diagonalize", "straighten"],
   "character-3d": [],
+  "mannequin-3d": [],
   "background-library": [],
   "style-library": [],
   "storyboard-grid": [],

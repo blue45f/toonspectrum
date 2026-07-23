@@ -558,4 +558,42 @@ describe("studio causal ink", () => {
     expect(plan.dabs).toHaveLength(2);
     expect(plan.complete).toBe(false);
   });
+
+  it("plans one long V2 flick at the spacing floor without engine argument-count limits", () => {
+    // size 5 at average pressure 0.5 hits the exact 0.5px spacing floor, so a single 40,000px
+    // segment legally emits 80,000 chord dabs inside the 100k budget. The per-segment append
+    // must copy by index: spreading that many dabs as call arguments throws RangeError on JSC
+    // (~65k arguments) and V8 (~124k).
+    const plan = planStudioCausalInkDabs({
+      samples: [
+        { x: 0, y: 0, pressure: 0.5, sourceIndex: 0 },
+        { x: 40_000, y: 0, pressure: 0.5, sourceIndex: 1 },
+      ],
+      size: 5,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+    });
+
+    expect(plan.complete).toBe(true);
+    expect(plan.dabs).toHaveLength(80_001);
+    // Determinism spot checks: initial dab plus an exact 0.5px chord walk toward the endpoint.
+    expect(plan.dabs[0]).toMatchObject({ x: 0, y: 0, pressure: 0.5 });
+    expect(plan.dabs[1]).toMatchObject({ x: 0.5, y: 0, pressure: 0.5 });
+    expect(plan.dabs[40_000]).toMatchObject({ x: 20_000, y: 0, pressure: 0.5 });
+    expect(plan.dabs.at(-1)).toMatchObject({ x: 40_000, y: 0, pressure: 0.5 });
+    // The indexed append preserves the exact streaming walker output.
+    const started = startStudioResidualInk(
+      { x: 0, y: 0, pressure: 0.5, sourceIndex: 0 },
+      5,
+      STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2
+    );
+    const advanced = advanceStudioResidualInk(
+      started.state,
+      { x: 40_000, y: 0, pressure: 0.5, sourceIndex: 1 },
+      5,
+      STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+      100_000 - started.dabs.length
+    );
+    expect(advanced.complete).toBe(true);
+    expect(plan.dabs).toEqual([...started.dabs, ...advanced.dabs]);
+  });
 });

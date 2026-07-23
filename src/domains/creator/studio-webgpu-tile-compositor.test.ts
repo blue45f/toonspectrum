@@ -176,6 +176,46 @@ describe("studio WebGPU tile compositor planning", () => {
     expect(packed[8]).toBe(0);
   });
 
+  it("packs identically into a caller-owned scratch and keeps consecutive packs independent", () => {
+    const current = stroke();
+    const resolved = resolveStudioGpuTileTasks(
+      [task(current)],
+      [current],
+      planStudioGpuDabsInRect,
+      100_000
+    )!;
+    const fresh = packStudioGpuTileDabs(resolved);
+    const other = stroke({ id: "other", points: [520, 1_300, 470, 1_260], pressures: [1, 0.5] });
+    const otherResolved = resolveStudioGpuTileTasks(
+      [task(other)],
+      [other],
+      planStudioGpuDabsInRect,
+      100_000
+    )!;
+    const otherFresh = packStudioGpuTileDabs(otherResolved);
+
+    // A large-enough scratch is reused: same values, exact-length view, tail bytes untouched.
+    const scratch = new Float32Array(Math.max(fresh.length, otherFresh.length) + 32).fill(123);
+    const packed = packStudioGpuTileDabs(resolved, scratch);
+    expect(packed.buffer).toBe(scratch.buffer);
+    expect(packed).toHaveLength(fresh.length);
+    expect(Array.from(packed)).toEqual(Array.from(fresh));
+    expect(scratch[Math.max(fresh.length, otherFresh.length)]).toBe(123);
+
+    // A second, different stroke packed into the same scratch is byte-for-byte the fresh pack:
+    // no value from the previous stroke survives inside the returned view.
+    const otherPacked = packStudioGpuTileDabs(otherResolved, scratch);
+    expect(otherPacked.buffer).toBe(scratch.buffer);
+    expect(Array.from(otherPacked)).toEqual(Array.from(otherFresh));
+
+    // A too-small scratch is never partially written; the pack allocates a fresh exact array.
+    const tooSmall = new Float32Array(4).fill(77);
+    const grown = packStudioGpuTileDabs(resolved, tooSmall);
+    expect(grown.buffer).not.toBe(tooSmall.buffer);
+    expect(Array.from(grown)).toEqual(Array.from(fresh));
+    expect(Array.from(tooSmall)).toEqual([77, 77, 77, 77]);
+  });
+
   it("clips a globally oversized crossing stroke to visible dabs with exact spacing", () => {
     const crossing = stroke({
       id: "crossing",

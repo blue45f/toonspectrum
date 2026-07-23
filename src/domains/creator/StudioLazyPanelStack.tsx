@@ -164,6 +164,9 @@ export interface StudioLazyPanelStackHandlers {
   importAutoActionJson: (json: string, fileName: string) => Promise<void>;
   insertBg3dResult: StudioBg3dInsertHandler;
   insertVrmResult: StudioVrmInsertHandler;
+  insertMannequinResult: (
+    result: { pngDataUrl: string; width: number; height: number }
+  ) => boolean | void | Promise<boolean | void>;
   onApplyScenarioPreview: () => void;
   onCancelScenario: () => void;
   onChangeScenarioScene: (index: number, patch: { beatType?: ScenarioBeatType; summary?: string; imagePrompt?: string; dialogue?: string; continuity?: ScenarioPreviewItem["continuity"]; }) => void;
@@ -260,6 +263,7 @@ export interface StudioLazyPanelStackProps {
   pages: PageState[];
   pagesHi: number;
   pagesHistory: PageState[][];
+  mannequinPoserOpen: boolean;
   poserInitialDataUrl: string | undefined;
   poserInitialElementId: string | undefined;
   poserVrmOpen: boolean;
@@ -320,6 +324,7 @@ export interface StudioLazyPanelStackProps {
   setContinuityOpen: Dispatch<SetStateAction<boolean>>;
   setFxPanelOpen: Dispatch<SetStateAction<boolean>>;
   setLoadedWork: Dispatch<SetStateAction<WorkDetail | null>>;
+  setMannequinPoserOpen: Dispatch<SetStateAction<boolean>>;
   setPageReviewOpen: Dispatch<SetStateAction<boolean>>;
   setPoserInitialDataUrl: Dispatch<SetStateAction<string | undefined>>;
   setPoserInitialElementId: Dispatch<SetStateAction<string | undefined>>;
@@ -425,6 +430,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   pages,
   pagesHi,
   pagesHistory,
+  mannequinPoserOpen,
   poserInitialDataUrl,
   poserInitialElementId,
   poserVrmOpen,
@@ -485,6 +491,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   setContinuityOpen,
   setFxPanelOpen,
   setLoadedWork,
+  setMannequinPoserOpen,
   setPageReviewOpen,
   setPoserInitialDataUrl,
   setPoserInitialElementId,
@@ -589,6 +596,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
         pages={pages}
         pagesHi={pagesHi}
         pagesHistory={pagesHistory}
+        mannequinPoserOpen={mannequinPoserOpen}
         poserInitialDataUrl={poserInitialDataUrl}
         poserInitialElementId={poserInitialElementId}
         poserVrmOpen={poserVrmOpen}
@@ -600,6 +608,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
         setBg3dInitialElementId={setBg3dInitialElementId}
         setBg3dInitialScene={setBg3dInitialScene}
         setBg3dOpen={setBg3dOpen}
+        setMannequinPoserOpen={setMannequinPoserOpen}
         setPageReviewOpen={setPageReviewOpen}
         setPoserInitialDataUrl={setPoserInitialDataUrl}
         setPoserInitialElementId={setPoserInitialElementId}
