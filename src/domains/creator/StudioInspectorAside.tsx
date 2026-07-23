@@ -128,6 +128,7 @@ import {
   StudioShapePickerGrid,
   StudioSmudgePanel,
   StudioDodgeBurnPanel,
+  StudioWetMixPanel,
   StudioExtendedBlendPanel,
   StudioPathBooleanPanel,
   StudioStrokeShapePanel,
@@ -278,6 +279,7 @@ export interface StudioInspectorAsideHandlers {
   toggleLiquifyTool: () => void;
   toggleSmudgeTool: () => void;
   toggleDodgeBurnTool: () => void;
+  toggleWetMixTool: () => void;
   toggleEffectFavorite: (effectId: StudioEffectId) => void;
   toggleIsometricGridActive: () => void;
   toggleLayerMaskEnabled: () => void;
@@ -523,6 +525,11 @@ interface StudioInspectorAsideProps {
   setDodgeBurnRadius: import("react").Dispatch<import("react").SetStateAction<number>>;
   setDodgeBurnRange: import("react").Dispatch<import("react").SetStateAction<DodgeBurnRange>>;
   setDodgeBurnSponge: import("react").Dispatch<import("react").SetStateAction<DodgeBurnSpongeMode>>;
+  setWetMixHardness: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setWetMixPickup: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setWetMixRadius: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setWetMixStrength: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setWetMixWetness: import("react").Dispatch<import("react").SetStateAction<number>>;
   setSnapEnabled: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setStabilizer: import("react").Dispatch<import("react").SetStateAction<number>>;
   setStabilizerMode: import("react").Dispatch<import("react").SetStateAction<"standard" | "adaptive" | "precision">>;
@@ -561,6 +568,13 @@ interface StudioInspectorAsideProps {
   dodgeBurnRadius: number;
   dodgeBurnRange: DodgeBurnRange;
   dodgeBurnSponge: DodgeBurnSpongeMode;
+  wetMixActive: boolean;
+  wetMixBusy: boolean;
+  wetMixHardness: number;
+  wetMixPickup: number;
+  wetMixRadius: number;
+  wetMixStrength: number;
+  wetMixWetness: number;
   snapEnabled: boolean;
   stabilizer: number;
   stabilizerMode: "standard" | "adaptive" | "precision";
@@ -823,6 +837,11 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   setDodgeBurnRadius,
   setDodgeBurnRange,
   setDodgeBurnSponge,
+  setWetMixHardness,
+  setWetMixPickup,
+  setWetMixRadius,
+  setWetMixStrength,
+  setWetMixWetness,
   setSnapEnabled,
   setStabilizer,
   setStabilizerMode,
@@ -861,6 +880,13 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   dodgeBurnRadius,
   dodgeBurnRange,
   dodgeBurnSponge,
+  wetMixActive,
+  wetMixBusy,
+  wetMixHardness,
+  wetMixPickup,
+  wetMixRadius,
+  wetMixStrength,
+  wetMixWetness,
   snapEnabled,
   stabilizer,
   stabilizerMode,
@@ -966,6 +992,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     toggleLiquifyTool,
     toggleSmudgeTool,
     toggleDodgeBurnTool,
+    toggleWetMixTool,
     toggleEffectFavorite,
     toggleIsometricGridActive,
     toggleLayerMaskEnabled,
@@ -2352,6 +2379,22 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     onRadiusChange={setDodgeBurnRadius}
                     onHardnessChange={setDodgeBurnHardness}
                     onExposureChange={setDodgeBurnExposure}
+                  />
+                  <StudioWetMixPanel
+                    active={wetMixActive}
+                    radius={wetMixRadius}
+                    strength={wetMixStrength}
+                    wetness={wetMixWetness}
+                    pickup={wetMixPickup}
+                    hardness={wetMixHardness}
+                    paintColor={color}
+                    busy={wetMixBusy}
+                    onToggleActive={toggleWetMixTool}
+                    onRadiusChange={setWetMixRadius}
+                    onStrengthChange={setWetMixStrength}
+                    onWetnessChange={setWetMixWetness}
+                    onPickupChange={setWetMixPickup}
+                    onHardnessChange={setWetMixHardness}
                   />
                   <StudioLiquifyPanel
                     active={liquifyActive}

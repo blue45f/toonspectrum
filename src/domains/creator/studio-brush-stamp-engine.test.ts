@@ -104,6 +104,28 @@ describe("studio stamp brush engine", () => {
     }
   });
 
+  // 의도적 변경(2026-07-23 스트로크 렌더 품질 감사): 시작 도트 위에 t=0 중복 dab을 얹지 않는다.
+  it("does not double-stamp the stroke head: exactly one dab sits on the start point", () => {
+    for (const kind of ["airbrush", "pencil", "ink", "watercolor"] as const) {
+      const planned = planStudioStampBrushDabs(style(kind), [5, 5, 65, 5], [0.6, 0.6]);
+      const headDabs = planned.filter((dab) => dab.x === 5 && dab.y === 5);
+      expect(headDabs).toHaveLength(1);
+      expect(headDabs[0]!.index).toBe(0);
+      // 첫 워커 dab은 시작 도트에서 최소 한 간격만큼 떨어져 있고, 이후 간격과 동일한 리듬이다.
+      const first = planned[1]!;
+      const second = planned[2]!;
+      expect(first.x - 5).toBeGreaterThan(0);
+      expect(second.x - first.x).toBeCloseTo(first.x - 5, 10);
+    }
+  });
+
+  it("keeps the t=0 dab for a dot-less walker (stampIndex 0) exactly as before", () => {
+    const rec = recordingContext();
+    const state = beginStampWalker(0, 0, 0.8);
+    walkStampSegment(rec.context, style("ink"), state, 40, 0, 0.8);
+    expect(rec.dabs[0]).toMatchObject({ x: 0, y: 0 });
+  });
+
   it("pure dab planner preserves tap, short-stroke and long-stroke ordering deterministically", () => {
     const ink = style("ink", { size: 16, minSizeRatio: 0.2 });
     const tap = planStudioStampBrushDabs(ink, [7, 9], [0.25]);

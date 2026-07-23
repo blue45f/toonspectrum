@@ -283,6 +283,16 @@ function walkStampSegmentPlan(
   let travelled = state.residual;
   const spacingOf = (p: number): number =>
     Math.max(0.5, pressureRadius(style, p) * 2 * STAMP_SPACING_RATIO[style.kind]);
+  // 의도적 변경(2026-07-23 스트로크 렌더 품질 감사): 시작 도트(index 0)를 이미 소비한 fresh
+  // walker(stampIndex > 0, residual 0)는 t=0에서 시작점 위에 dab을 한 번 더 찍지 않는다.
+  // 기존에는 도트와 같은 좌표에 중복 dab이 얹혀 반투명 브러시(airbrush/watercolor/저불투명
+  // ink)의 획 머리가 본문보다 진해졌다. GPU 잉크 플래너(legacy·V2·V3)는 모두 "시작 도트 후
+  // 한 간격 뒤 첫 dab" 규약이며, 이 코어는 라이브 오버레이·커밋 재생·SVG 내보내기가 공유하므로
+  // 세 경로의 증분/재생 픽셀 동일성 계약은 그대로 유지된다. 도트 없이 워커만 시작한 호출
+  // (stampIndex === 0)은 기존처럼 t=0 dab을 찍는다.
+  if (travelled === 0 && state.stampIndex > 0) {
+    travelled = spacingOf(state.lastPressure);
+  }
   while (travelled <= distance && state.stampIndex < maximumDabs) {
     const t = distance === 0 ? 0 : travelled / distance;
     const px = state.lastX + dx * t;

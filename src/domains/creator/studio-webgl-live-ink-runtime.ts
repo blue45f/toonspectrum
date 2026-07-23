@@ -29,7 +29,10 @@ uniform vec4 u_color;
 out vec4 out_color;
 
 void main() {
-  out_color = u_color;
+  // premultipliedAlpha:true 캔버스 계약에 맞춰 셰이더가 직접 premultiply 출력한다.
+  // straight 출력+SRC_ALPHA 블렌드 조합은 프레임버퍼 알파가 a²이 되어 반투명 라이브 잉크가
+  // 커밋 픽셀보다 밝고 투명하게 보이던 버그(브러시 품질 감사 #7b)의 원인이었다.
+  out_color = vec4(u_color.rgb * u_color.a, u_color.a);
 }
 `;
 
@@ -270,7 +273,8 @@ export class StudioWebGlLiveInkRenderer {
       gl.bindBuffer(gl.ARRAY_BUFFER, resources.vertexBuffer);
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, geometry.vertices);
       gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      // premultiplied 출력이므로 ONE/ONE_MINUS_SRC_ALPHA — 셰이더 premultiply와 한 쌍의 계약.
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl.uniform4f(
         resources.colorLocation,
         geometry.color[0],

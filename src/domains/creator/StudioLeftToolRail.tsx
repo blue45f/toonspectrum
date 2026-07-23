@@ -1,6 +1,7 @@
 import {
   Circle,
   Crop,
+  Droplets,
   Eraser,
   Film,
   Hand,
@@ -140,6 +141,7 @@ export interface StudioLeftToolRailHandlers {
   onPickImage: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   toggleAdvancedFill: () => void;
   toggleDodgeBurnTool: () => void;
+  toggleWetMixTool: () => void;
   toggleLiquifyTool: () => void;
   togglePixelMarquee: (kind: "rect" | "circle") => void;
   toggleSmudgeTool: () => void;
@@ -188,6 +190,7 @@ interface StudioLeftToolRailProps {
   setTool: import("react").Dispatch<import("react").SetStateAction<Tool>>;
   setViewTool: import("react").Dispatch<import("react").SetStateAction<"zoom" | "rotate" | null>>;
   dodgeBurnActive: boolean;
+  wetMixActive: boolean;
   smudgeActive: boolean;
   tool: Tool;
   uiDensityMode: "simple" | "full" | "focus";
@@ -238,6 +241,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   setTool,
   setViewTool,
   dodgeBurnActive,
+  wetMixActive,
   smudgeActive,
   tool,
   uiDensityMode,
@@ -299,6 +303,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     toggleAdvancedFill,
     toggleStudioCommentPinPlacement,
     toggleDodgeBurnTool,
+    toggleWetMixTool,
     toggleLiquifyTool,
     togglePixelMarquee,
     toggleSmudgeTool,
@@ -541,6 +546,23 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                     : undefined
               }
               onClick={toggleSmudgeTool}
+            />
+            ) : null}
+            {isRailToolVisible("wet-mix") ? (
+            <StudioRailToolButton
+              icon={Droplets}
+              label="혼색 브러시 (Shift+N)"
+              description="바닥색을 묻혀 섞어가며 안료를 얹는 CSP식 색혼합 브러시입니다."
+              active={wetMixActive}
+              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              unavailableReason={
+                selected?.type !== "image"
+                  ? "칠할 이미지 레이어를 먼저 고르세요."
+                  : selectedContentMutationLocked
+                    ? IMAGE_EDIT_LOCK_REASON
+                    : undefined
+              }
+              onClick={toggleWetMixTool}
             />
             ) : null}
             {isRailToolVisible("dodge-burn") ? (
@@ -963,6 +985,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                         "pixel-pencil",
                         "eraser",
                         "blend",
+                        "wet-mix",
                         "dodge-burn",
                         "liquify",
                         "fill",

@@ -514,6 +514,7 @@ import {
   composeStudioFillReferenceImage,
   type StudioFillReferenceLayer,
 } from "./studio-fill-reference";
+import { hexToRgb } from "./studio-filters";
 import {
   createFixedRateStrokeFilter,
   quantizeFixedRateStrokeSample,
@@ -1182,6 +1183,13 @@ import {
 } from "./studio-webgpu-pending-authority";
 import { StudioGpuPinReceiptWatchdog } from "./studio-webgpu-pin-receipt-watchdog";
 import { planStudioWebGpuViewportSurface } from "./studio-webgpu-viewport";
+import {
+  WET_MIX_HARDNESS_DEFAULT,
+  WET_MIX_PICKUP_DEFAULT,
+  WET_MIX_RADIUS_DEFAULT,
+  WET_MIX_STRENGTH_DEFAULT,
+  WET_MIX_WETNESS_DEFAULT,
+} from "./studio-wet-mix";
 import {
   StudioWorkAssetAdmissionCoordinator,
   replaceStudioWorkAssetSourceAcrossHistory,
@@ -6592,6 +6600,7 @@ function StudioCuttoonEditor() {
     || liquifyDragRef.current
     || smudgeDragRef.current
     || dodgeBurnDragRef.current
+    || wetMixDragRef.current
     || pixelDragRef.current
     || cropDragRef.current
     || panelSplitDragRef.current
@@ -6615,6 +6624,7 @@ function StudioCuttoonEditor() {
     || liquifyDragRef.current
     || smudgeDragRef.current
     || dodgeBurnDragRef.current
+    || wetMixDragRef.current
     || pixelDragRef.current
     || cropDragRef.current
     || panelSplitDragRef.current
@@ -9490,6 +9500,15 @@ function StudioCuttoonEditor() {
   const [dodgeBurnExposure, setDodgeBurnExposure] = useState(DODGE_BURN_EXPOSURE_DEFAULT); // %
   const [dodgeBurnBusy, setDodgeBurnBusy] = useState(false);
   const dodgeBurnDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
+  // 혼색 브러시(CSP 색혼합) — 바닥색을 묻혀가며 안료를 얹는 armed 픽셀 툴(설정값은 disarm 후 유지).
+  const [wetMixActive, setWetMixActive] = useState(false);
+  const [wetMixRadius, setWetMixRadius] = useState(WET_MIX_RADIUS_DEFAULT);
+  const [wetMixStrength, setWetMixStrength] = useState(WET_MIX_STRENGTH_DEFAULT); // %
+  const [wetMixWetness, setWetMixWetness] = useState(WET_MIX_WETNESS_DEFAULT); // %
+  const [wetMixPickup, setWetMixPickup] = useState(WET_MIX_PICKUP_DEFAULT); // %
+  const [wetMixHardness, setWetMixHardness] = useState(WET_MIX_HARDNESS_DEFAULT); // 0..1
+  const [wetMixBusy, setWetMixBusy] = useState(false);
+  const wetMixDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
   // 진행 중 드래그 — ref 가 원본(포인터 이벤트마다 갱신), 미리보기 상태는 RAF 로 합쳐 반영(마퀴와
   // 동일 패턴). frame 은 드래그 시작 시점 스냅샷 — 제스처 중 좌표 변환이 흔들리지 않는다.
   const pixelDragRef = useRef<{
@@ -12252,6 +12271,8 @@ function StudioCuttoonEditor() {
     smudgeActive && !smudgeBusy && selected?.type === "image" && !selectedContentMutationLocked;
   const dodgeBurnArmed =
     dodgeBurnActive && !dodgeBurnBusy && selected?.type === "image" && !selectedContentMutationLocked;
+  const wetMixArmed =
+    wetMixActive && !wetMixBusy && selected?.type === "image" && !selectedContentMutationLocked;
   const liquifyArmed =
     liquifyActive && !liquifyBusy && selected?.type === "image" && !selectedContentMutationLocked;
   useEffect(() => {
@@ -14545,6 +14566,7 @@ function StudioCuttoonEditor() {
     setNodeEditTool(null);
     setSmudgeActive(false);
     setDodgeBurnActive(false); // ← 추가(닷지/번 무장 해제 — 설정값은 유지)
+    setWetMixActive(false); // ← 추가(혼색 브러시 무장 해제 — 설정값은 유지)
     setLiquifyActive(false);
     setHealCloneTool(null);
     setEyedropperActive(false);
@@ -17002,6 +17024,11 @@ function StudioCuttoonEditor() {
         toggleSmudgeTool();
         return;
       }
+      if (matchStudioShortcut(sc["tool-wet-mix"], e)) {
+        e.preventDefault();
+        toggleWetMixTool();
+        return;
+      }
       if (matchStudioShortcut(sc["tool-dodge-burn"], e)) {
         e.preventDefault();
         toggleDodgeBurnTool();
@@ -17456,6 +17483,9 @@ function StudioCuttoonEditor() {
         } else if (dodgeBurnActive) {
           setDodgeBurnActive(false);
           dodgeBurnDragRef.current = null;
+        } else if (wetMixActive) {
+          setWetMixActive(false);
+          wetMixDragRef.current = null;
         } else if (liquifyActive) {
           setLiquifyActive(false);
           cancelLiquifyPointerSession();
@@ -20250,6 +20280,57 @@ function StudioCuttoonEditor() {
     refreshQuickMaskTint();
   }
 
+  // 혼색 브러시 스트로크 적용 — 닷지/번과 동일한 오프스크린 캔버스 골격(스트로크 1회 = undo 1스텝).
+  async function applyWetMixStroke(elId: string, points: SelPoint[]) {
+    if (wetMixBusy) return;
+    const target = elementById.get(elId);
+    if (
+      !target ||
+      target.type !== "image" ||
+      activeSurfaceReviewLocked ||
+      isEffectivelyLocked(target, groups)
+    ) return;
+    const mutationTicket = captureStudioMutationTicket();
+    setWetMixBusy(true);
+    try {
+      const { wetMixStroke } = await import("./studio-wet-mix");
+      const img = await loadStudioPixelEditImage(target.src);
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      const made = createStudioPixelEditCanvas(w, h);
+      if (!made) throw new Error("캔버스를 만들 수 없습니다.");
+      made.ctx.drawImage(img, 0, 0, w, h);
+      const imageData = made.ctx.getImageData(0, 0, w, h);
+      const flipX = target.flipped ?? false;
+      const flipY = target.flippedY ?? false;
+      const pixelPoints = points.map((p) => {
+        const unflipped = flipNormalizedPoint(p, flipX, flipY);
+        return { x: unflipped.x * w, y: unflipped.y * h };
+      });
+      const radiusPx = Math.max(1, (wetMixRadius / Math.max(1, target.width)) * w);
+      wetMixStroke(imageData.data, w, h, pixelPoints, {
+        radiusPx,
+        hardness: wetMixHardness,
+        strength: wetMixStrength / 100,
+        wetness: wetMixWetness / 100,
+        pickup: wetMixPickup / 100,
+        paintColor: hexToRgb(color),
+      });
+      made.ctx.putImageData(imageData, 0, 0);
+      const src = made.canvas.toDataURL("image/png");
+      if (!canApplyStudioMutation(mutationTicket)) return;
+      if (src !== target.src && !isLatestLayerContentMutationLocked(target.id)) {
+        patchEl(target.id, { src } as Partial<El>);
+      }
+      setError(null);
+    } catch (err) {
+      console.error("Failed to apply wet mix stroke:", err);
+      setError(err instanceof Error ? err.message : "혼색 브러시를 적용하지 못했습니다.");
+    } finally {
+      setWetMixBusy(false);
+    }
+  }
+
   // ── 레이어 마스크 브러시 스트로크 굽기 — 스트로크 종료마다 자동 실행(붓처럼 즉시 반영).
   // heal-clone과 동일하게 target은 elementById에서 다시 읽는다(await 사이 selected가 바뀌어도
   // 정확한 요소에 적용된다). 기존 el.src는 절대 patchEl하지 않는다 — maskSrc만 바뀐다(비파괴).
@@ -21540,6 +21621,7 @@ function StudioCuttoonEditor() {
       !nodeEditTool &&
       !smudgeActive &&
       !dodgeBurnActive &&
+      !wetMixActive &&
       !healCloneTool &&
       !advancedFillActive &&
       !eyedropperActive &&
@@ -21752,6 +21834,25 @@ function StudioCuttoonEditor() {
         rotation: selected.rotation,
       };
       dodgeBurnDragRef.current = { elId: selected.id, frame, points: [canvasPointToNormalized(pos.x, pos.y, frame)] };
+      return;
+    }
+    // 혼색 브러시 무장 중: 스테이지 드래그를 혼색 스트로크 좌표 누적으로 가로챈다.
+    if (
+      wetMixArmed &&
+      selected?.type === "image" &&
+      !isSpacePressed &&
+      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
+    ) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (!pos) return;
+      const frame: SelectionFrame = {
+        x: selected.x,
+        y: selected.y,
+        width: selected.width,
+        height: selected.height,
+        rotation: selected.rotation,
+      };
+      wetMixDragRef.current = { elId: selected.id, frame, points: [canvasPointToNormalized(pos.x, pos.y, frame)] };
       return;
     }
     // 리퀴파이 — 이미지를 드래그하면 픽셀을 밀어 왜곡한다.
@@ -22668,6 +22769,17 @@ function StudioCuttoonEditor() {
       }
       return;
     }
+    // 혼색 브러시 드래그 중이면 좌표를 누적한다(동일한 최소 간격 필터).
+    if (wetMixDragRef.current) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos) {
+        const session = wetMixDragRef.current;
+        const next = canvasPointToNormalized(pos.x, pos.y, session.frame);
+        const last = session.points[session.points.length - 1];
+        if (!last || Math.hypot(next.x - last.x, next.y - last.y) >= 0.002) session.points.push(next);
+      }
+      return;
+    }
     if (liquifyDragRef.current) {
       const pointerEvent = e.evt as PointerEvent;
       if (!isStudioLiquifyPointerOwner(liquifyDragRef.current, pointerEvent)) return;
@@ -22759,7 +22871,7 @@ function StudioCuttoonEditor() {
     // 동시에 성립 가능), 셋 다 조건이 참일 수 있는 경우를 else if 로 묶어 한 프레임에 커서 하나만
     // (그리고 batchDraw 한 번만) 갱신되게 한다 — onStageDown 의 armed 우선순위(smudge/healClone이
     // draw 브러시보다 우선)와 동일 순서.
-    if (smudgeArmed || liquifyArmed || dodgeBurnArmed) {
+    if (smudgeArmed || liquifyArmed || dodgeBurnArmed || wetMixArmed) {
       const cursorPos = e.target.getStage()?.getRelativePointerPosition();
       const cursorNode = smudgeCursorRef.current;
       if (cursorPos && cursorNode) {
@@ -24407,6 +24519,13 @@ function StudioCuttoonEditor() {
       if (session.points.length >= 1) void applyDodgeBurnStroke(session.elId, session.points);
       return;
     }
+    // 혼색 브러시 드래그 종료 — 누적된 좌표로 혼색 스트로크를 적용한다(탭 1점도 도장 1개).
+    if (wetMixDragRef.current) {
+      const session = wetMixDragRef.current;
+      wetMixDragRef.current = null;
+      if (session.points.length >= 1) void applyWetMixStroke(session.elId, session.points);
+      return;
+    }
     // 퀵 마스크 드래그 종료 — 스트로크당 1회만 마스크에 굽고 틴트 캔버스를 교체(핫패스 계약).
     if (quickMaskDragRef.current) {
       const session = quickMaskDragRef.current;
@@ -25307,6 +25426,16 @@ function StudioCuttoonEditor() {
       setTool("select");
       setDodgeBurnActive(true);
       announceDrawingShortcut("닷지/번 · 이미지 위를 드래그하세요");
+    }
+  }
+  function toggleWetMixTool() {
+    if (selected?.type !== "image" || selectedContentMutationLocked || wetMixBusy) return;
+    const next = !wetMixActive;
+    disarmAllPixelTools();
+    if (next) {
+      setTool("select");
+      setWetMixActive(true);
+      announceDrawingShortcut("혼색 브러시 · 바닥색을 섞어가며 칠해 보세요");
     }
   }
   function openPixelSelectionTransform() {
@@ -27642,14 +27771,14 @@ function StudioCuttoonEditor() {
       tool !== "select" || canvasRotation !== 0 || eyedropperActive || timelinePlaying ||
       marqueeActive || userGuides.length > 0 ||
       advancedFillArmed || pixelToolArmed || cropArmed || panelSplitArmed ||
-      nodeEditArmed || bubbleShapeArmed || smudgeArmed || dodgeBurnArmed || liquifyArmed || healCloneArmed ||
+      nodeEditArmed || bubbleShapeArmed || smudgeArmed || dodgeBurnArmed || wetMixArmed || liquifyArmed || healCloneArmed ||
       layerMaskPaintArmed || quickMaskArmed || historyBrushArmed || puppetWarpArmed,
     postProcessingActive: pageGradeActive || colorBlindPreview !== "none",
   } as const), [
     isExporting, saving, timelapseCapturing, masterEditMode, selectedId, marqueeIds.length,
     editing, tool, canvasRotation, eyedropperActive, timelinePlaying, marqueeActive, userGuides.length,
     advancedFillArmed, pixelToolArmed, cropArmed, panelSplitArmed, nodeEditArmed,
-    bubbleShapeArmed, smudgeArmed, dodgeBurnArmed, liquifyArmed, healCloneArmed, layerMaskPaintArmed, quickMaskArmed, historyBrushArmed,
+    bubbleShapeArmed, smudgeArmed, dodgeBurnArmed, wetMixArmed, liquifyArmed, healCloneArmed, layerMaskPaintArmed, quickMaskArmed, historyBrushArmed,
     puppetWarpArmed, pageGradeActive, colorBlindPreview,
   ]);
   const {
@@ -27769,6 +27898,7 @@ function StudioCuttoonEditor() {
     toggleLiquifyTool,
     toggleSmudgeTool,
     toggleDodgeBurnTool,
+    toggleWetMixTool,
     toggleBubbleAnchorPick,
     toggleEffectFavorite,
     toggleIsometricGridActive,
@@ -27791,6 +27921,7 @@ function StudioCuttoonEditor() {
     onPickImage,
     toggleAdvancedFill,
     toggleDodgeBurnTool,
+    toggleWetMixTool,
     toggleLiquifyTool,
     togglePixelMarquee,
     toggleSmudgeTool,
@@ -29126,6 +29257,7 @@ function StudioCuttoonEditor() {
           setTool={setTool}
           setViewTool={setViewTool}
           dodgeBurnActive={dodgeBurnActive}
+          wetMixActive={wetMixActive}
           smudgeActive={smudgeActive}
           tool={tool}
           uiDensityMode={uiDensityMode}
@@ -29350,6 +29482,8 @@ function StudioCuttoonEditor() {
           smudgeArmed={smudgeArmed}
           dodgeBurnArmed={dodgeBurnArmed}
           dodgeBurnRadius={dodgeBurnRadius}
+          wetMixArmed={wetMixArmed}
+          wetMixRadius={wetMixRadius}
           liquifyArmed={liquifyArmed}
           liquifyRadius={liquifyRadius}
           smudgeCursorRef={smudgeCursorRef}
@@ -29768,6 +29902,11 @@ function StudioCuttoonEditor() {
           setDodgeBurnRadius={setDodgeBurnRadius}
           setDodgeBurnRange={setDodgeBurnRange}
           setDodgeBurnSponge={setDodgeBurnSponge}
+          setWetMixHardness={setWetMixHardness}
+          setWetMixPickup={setWetMixPickup}
+          setWetMixRadius={setWetMixRadius}
+          setWetMixStrength={setWetMixStrength}
+          setWetMixWetness={setWetMixWetness}
           setSnapEnabled={setSnapEnabled}
           setStabilizer={setStabilizer}
           setStabilizerMode={setStabilizerMode}
@@ -29818,6 +29957,13 @@ function StudioCuttoonEditor() {
           dodgeBurnRadius={dodgeBurnRadius}
           dodgeBurnRange={dodgeBurnRange}
           dodgeBurnSponge={dodgeBurnSponge}
+          wetMixActive={wetMixActive}
+          wetMixBusy={wetMixBusy}
+          wetMixHardness={wetMixHardness}
+          wetMixPickup={wetMixPickup}
+          wetMixRadius={wetMixRadius}
+          wetMixStrength={wetMixStrength}
+          wetMixWetness={wetMixWetness}
           snapEnabled={snapEnabled}
           stabilizer={stabilizer}
           stabilizerMode={stabilizerMode}
@@ -30587,6 +30733,8 @@ interface StudioCanvasViewportProps {
   smudgeArmed: boolean;
   dodgeBurnArmed: boolean;
   dodgeBurnRadius: number;
+  wetMixArmed: boolean;
+  wetMixRadius: number;
   liquifyArmed: boolean;
   liquifyRadius: number;
   smudgeCursorRef: import("react").RefObject<import("konva/lib/shapes/Circle").Circle | null>;
@@ -30859,6 +31007,8 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   smudgeArmed,
   dodgeBurnArmed,
   dodgeBurnRadius,
+  wetMixArmed,
+  wetMixRadius,
   liquifyArmed,
   liquifyRadius,
   smudgeCursorRef,
@@ -31093,6 +31243,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     precisionBrushArmed:
       smudgeArmed
       || dodgeBurnArmed
+      || wetMixArmed
       || liquifyArmed
       || healCloneArmed
       || historyBrushArmed
@@ -31722,6 +31873,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   !nodeEditArmed &&
                   !smudgeArmed &&
                   !dodgeBurnArmed &&
+                  !wetMixArmed &&
                   !liquifyArmed &&
                   !healCloneArmed &&
                   !layerMaskPaintArmed &&
@@ -31744,6 +31896,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       !nodeEditArmed &&
                       !smudgeArmed &&
                       !dodgeBurnArmed &&
+                      !wetMixArmed &&
                       !liquifyArmed &&
                       !healCloneArmed &&
                       !layerMaskPaintArmed &&
@@ -32216,13 +32369,13 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   tipRoundness={tipRoundness}
                 />
               ) : null}
-            {!isExporting && (smudgeArmed || liquifyArmed || dodgeBurnArmed) && (
+            {!isExporting && (smudgeArmed || liquifyArmed || dodgeBurnArmed || wetMixArmed) && (
               <Layer listening={false}>
                 <KCircle
                   ref={smudgeCursorRef}
                   visible={false}
-                  radius={Math.max(1.5, dodgeBurnArmed ? dodgeBurnRadius : liquifyArmed ? liquifyRadius : smudgeRadius)}
-                  stroke={dodgeBurnArmed ? "#eab308" : liquifyArmed ? "#fb923c" : "#7c5cff"}
+                  radius={Math.max(1.5, wetMixArmed ? wetMixRadius : dodgeBurnArmed ? dodgeBurnRadius : liquifyArmed ? liquifyRadius : smudgeRadius)}
+                  stroke={wetMixArmed ? "#2dd4bf" : dodgeBurnArmed ? "#eab308" : liquifyArmed ? "#fb923c" : "#7c5cff"}
                   strokeWidth={1.25 / effScale}
                   dash={[3 / effScale, 3 / effScale]}
                   opacity={0.9}
