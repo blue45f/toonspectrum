@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  COMBO_LAYER_STYLE_PRESETS,
   hasActiveLayerStyle,
   LAYER_STYLE_PRESETS,
   LAYER_STYLE_RANGES,
   layerStyleResetPatch,
   type LayerStylePatch,
 } from "./studio-layer-styles";
+import { isIdentityOutline, normalizeOutline } from "./studio-outline";
 
 // LayerStylePatch의 전체 키 집합(layerStyleResetPatch가 빠짐없이 채워야 하는 6개 키).
 const ALL_PATCH_KEYS = [
@@ -105,6 +107,62 @@ describe("LAYER_STYLE_PRESETS", () => {
     for (const preset of LAYER_STYLE_PRESETS.slice(1)) {
       expect(hasActiveLayerStyle(preset.patch)).toBe(true);
     }
+  });
+});
+
+describe("COMBO_LAYER_STYLE_PRESETS (테두리+그림자 콤보)", () => {
+  const RESET_KEYS = new Set(Object.keys(layerStyleResetPatch()));
+  const NUMERIC_RANGES = LAYER_STYLE_RANGES as Record<string, { min: number; max: number; step: number }>;
+
+  it("스티커/이중 테두리/네온 3종을 고유 id로 담고 있다", () => {
+    const ids = COMBO_LAYER_STYLE_PRESETS.map((p) => p.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toEqual(["sticker-outline-shadow", "double-outline", "neon-glow-outline"]);
+  });
+
+  it("label/tip은 비어있지 않다", () => {
+    for (const preset of COMBO_LAYER_STYLE_PRESETS) {
+      expect(preset.label.trim().length).toBeGreaterThan(0);
+      expect(preset.tip.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it("layer 패치는 알려진 키만 쓰고 범위/형식 안이다", () => {
+    for (const preset of COMBO_LAYER_STYLE_PRESETS) {
+      for (const [key, value] of Object.entries(preset.layer) as [keyof LayerStylePatch, unknown][]) {
+        expect(RESET_KEYS.has(key)).toBe(true);
+        if (value === undefined) continue;
+        if (COLOR_KEYS.has(key)) {
+          expect(typeof value).toBe("string");
+          expect(HEX_RE.test(value as string)).toBe(true);
+        } else {
+          const range = NUMERIC_RANGES[key];
+          expect(range).toBeDefined();
+          expect(typeof value).toBe("number");
+          expect(value as number).toBeGreaterThanOrEqual(range!.min);
+          expect(value as number).toBeLessThanOrEqual(range!.max);
+        }
+      }
+    }
+  });
+
+  it("outline은 전부 normalizeOutline을 통과한 비항등 값이다(실제로 테두리가 그려짐)", () => {
+    for (const preset of COMBO_LAYER_STYLE_PRESETS) {
+      expect(preset.outline).toEqual(normalizeOutline(preset.outline));
+      expect(isIdentityOutline(preset.outline)).toBe(false);
+    }
+  });
+
+  it("스티커/네온 콤보는 그림자도 실제로 보인다, 이중 테두리는 그림자 없이 테두리만", () => {
+    const byId = new Map(COMBO_LAYER_STYLE_PRESETS.map((p) => [p.id, p]));
+    expect(hasActiveLayerStyle(byId.get("sticker-outline-shadow")!.layer)).toBe(true);
+    expect(hasActiveLayerStyle(byId.get("neon-glow-outline")!.layer)).toBe(true);
+    // 이중 테두리는 layer가 비어 reset만 적용(그림자 제거) — 테두리는 2차 링 포함.
+    expect(hasActiveLayerStyle(byId.get("double-outline")!.layer)).toBe(false);
+    expect(byId.get("double-outline")!.outline.secondWidth).toBeGreaterThan(0);
+    // 스티커 콤보는 흰 테두리, 네온 콤보는 시안 테두리.
+    expect(byId.get("sticker-outline-shadow")!.outline.color).toBe("#ffffff");
+    expect(byId.get("neon-glow-outline")!.outline.color).toBe("#00e5ff");
   });
 });
 

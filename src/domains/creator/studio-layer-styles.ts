@@ -3,8 +3,12 @@
  * 포토샵 레이어 스타일(드롭 섀도/외곽 글로우/둥근 모서리) 원클릭 프리셋.
  * Konva.Image가 그림자/모서리를 네이티브로 그리므로 여기엔 픽셀 필터가 없다 —
  * 프리셋·슬라이더 범위·활성 판정만 담는 순수 데이터/헬퍼 모듈이다.
+ * 추가로 스티커 테두리(studio-outline)와 그림자를 한 번에 세팅하는 콤보 프리셋을 담는다
+ * (웹툰 스티커의 흰 테두리+그림자, 이중 테두리, 네온 글로우+테두리).
  * Konva/DOM 의존 없음 — StudioPage 인스펙터와 단위 테스트가 공유한다.
  */
+
+import { normalizeOutline, type Outline } from "./studio-outline";
 
 // ---------------------------------------------------------------------------
 // 레이어 스타일 패치 — Konva.Image가 네이티브로 지원하는 그림자/모서리 속성에 대응.
@@ -129,5 +133,45 @@ export const LAYER_STYLE_PRESETS: LayerStylePreset[] = [
     label: "종이 들뜸",
     tip: "살짝 둥근 모서리와 짧은 그림자로 종이가 들뜬 느낌을 냅니다.",
     patch: { cornerRadius: 6, shadowColor: "#000000", shadowBlur: 4, shadowOffsetX: 2, shadowOffsetY: 4, shadowOpacity: 0.4 },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// 콤보 프리셋 — 레이어 스타일(그림자)과 스티커 테두리(outline)를 한 클릭에 함께 세팅.
+// layer는 reset 위에 덮어써 절대값으로 적용하고, outline은 el.outline을 통째로 교체한다.
+// 모든 layer 수치는 LAYER_STYLE_RANGES 안, outline은 normalizeOutline을 통과한 값.
+// ---------------------------------------------------------------------------
+
+export type ComboLayerStylePreset = {
+  id: string;
+  label: string;
+  tip: string;
+  /** layerStyleResetPatch() 위에 덮어쓸 그림자/모서리 패치(빈 객체면 그림자 제거만). */
+  layer: LayerStylePatch;
+  /** el.outline에 절대값으로 세팅할 테두리. */
+  outline: Outline;
+};
+
+export const COMBO_LAYER_STYLE_PRESETS: ComboLayerStylePreset[] = [
+  {
+    id: "sticker-outline-shadow",
+    label: "스티커(흰 테두리+그림자)",
+    tip: "도톰한 흰 테두리와 부드러운 그림자로 다이컷 스티커처럼 떼어 붙입니다.",
+    layer: { shadowColor: "#000000", shadowBlur: 10, shadowOffsetX: 0, shadowOffsetY: 6, shadowOpacity: 0.4 },
+    outline: normalizeOutline({ color: "#ffffff", width: 10, opacity: 100 }),
+  },
+  {
+    id: "double-outline",
+    label: "이중 테두리",
+    tip: "안쪽 흰 테두리에 바깥 검정 라인을 두른 웹툰 스티커 이중 테두리입니다(그림자 없음).",
+    layer: {},
+    outline: normalizeOutline({ color: "#ffffff", width: 6, opacity: 100, secondColor: "#111111", secondWidth: 3 }),
+  },
+  {
+    id: "neon-glow-outline",
+    label: "네온(글로우+테두리)",
+    tip: "시안 테두리와 하늘색 글로우를 겹쳐 빛나는 네온 사인을 만듭니다.",
+    layer: { shadowColor: "#38bdf8", shadowBlur: 22, shadowOffsetX: 0, shadowOffsetY: 0, shadowOpacity: 0.95 },
+    outline: normalizeOutline({ color: "#00e5ff", width: 4, opacity: 100 }),
   },
 ];

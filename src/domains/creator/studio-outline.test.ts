@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { type StudioImageDataLike } from "./studio-filters";
 import {
   DEFAULT_OUTLINE,
+  DEFAULT_OUTLINE_SECOND_COLOR,
+  OUTLINE_FEATHER_PX,
   OUTLINE_OPACITY_RANGE,
   OUTLINE_PRESETS,
   OUTLINE_WIDTH_RANGE,
@@ -11,6 +13,7 @@ import {
   normalizeOutline,
   outlineCachePad,
   outlineKonvaFilter,
+  outlineTotalWidth,
   type Outline,
 } from "./studio-outline";
 
@@ -50,6 +53,10 @@ describe("DEFAULT_OUTLINE / isIdentityOutline", () => {
     expect(isIdentityOutline(DEFAULT_OUTLINE)).toBe(true);
   });
 
+  it("기본값은 레거시 3키 형태 그대로다(secondColor/secondWidth 키 없음 — 저장본 바이트 동일성)", () => {
+    expect(Object.keys(DEFAULT_OUTLINE).sort()).toEqual(["color", "opacity", "width"]);
+  });
+
   it("두께>0이고 불투명도>0이면 항등이 아니다", () => {
     expect(isIdentityOutline({ color: "#ffffff", width: 8, opacity: 100 })).toBe(false);
   });
@@ -58,14 +65,41 @@ describe("DEFAULT_OUTLINE / isIdentityOutline", () => {
     expect(isIdentityOutline({ color: "#ffffff", width: 0, opacity: 100 })).toBe(true);
     expect(isIdentityOutline({ color: "#ffffff", width: 10, opacity: 0 })).toBe(true);
   });
+
+  // 이중 외곽선 — width 0이어도 2차 링이 있으면 그려지므로 항등이 아니다.
+  it("width0이어도 secondWidth>0이면 항등이 아니다(2차 링 단독 활성)", () => {
+    expect(isIdentityOutline({ color: "#ffffff", width: 0, opacity: 100, secondColor: "#000000", secondWidth: 3 })).toBe(
+      false
+    );
+    expect(isIdentityOutline({ color: "#ffffff", width: 0, opacity: 100, secondColor: "#000000", secondWidth: 0 })).toBe(
+      true
+    );
+    // 불투명도 0이면 링이 몇 개든 항등.
+    expect(isIdentityOutline({ color: "#ffffff", width: 4, opacity: 0, secondColor: "#000000", secondWidth: 3 })).toBe(
+      true
+    );
+  });
+});
+
+describe("outlineTotalWidth", () => {
+  it("1차+2차 링 합계(누락/음수 2차는 0)", () => {
+    expect(outlineTotalWidth({ color: "#ffffff", width: 6, opacity: 100 })).toBe(6);
+    expect(outlineTotalWidth({ color: "#ffffff", width: 6, opacity: 100, secondColor: "#000000", secondWidth: 3 })).toBe(9);
+    expect(outlineTotalWidth({ color: "#ffffff", width: 0, opacity: 100, secondColor: "#000000", secondWidth: 5 })).toBe(5);
+  });
 });
 
 describe("OUTLINE_WIDTH_RANGE / OUTLINE_OPACITY_RANGE", () => {
-  it("두께 범위는 0..30, step 1", () => {
-    expect(OUTLINE_WIDTH_RANGE).toEqual({ min: 0, max: 30, step: 1 });
+  // 의도적 변경(2026-07): 두께 상한 30→60 — 스티커급 두꺼운 테두리용. 거리 변환이 O(n)이라
+  // 두께가 커져도 비용은 선형(성능 회귀 없음). 1차/2차 링이 같은 범위를 공유한다.
+  it("두께 범위는 0..60, step 1", () => {
+    expect(OUTLINE_WIDTH_RANGE).toEqual({ min: 0, max: 60, step: 1 });
   });
   it("불투명도 범위는 0..100, step 1", () => {
     expect(OUTLINE_OPACITY_RANGE).toEqual({ min: 0, max: 100, step: 1 });
+  });
+  it("AA 페더는 1px(캐시 패딩에 포함)", () => {
+    expect(OUTLINE_FEATHER_PX).toBe(1);
   });
 });
 
@@ -81,8 +115,48 @@ describe("normalizeOutline", () => {
   });
 
   it("범위 밖 width/opacity는 각 범위로 클램프", () => {
-    expect(normalizeOutline({ width: 999, opacity: 999 })).toEqual({ color: "#ffffff", width: 30, opacity: 100 });
+    // 의도적 변경(2026-07): 두께 상한 30→60 확장에 맞춰 클램프 상한도 60.
+    expect(normalizeOutline({ width: 999, opacity: 999 })).toEqual({ color: "#ffffff", width: 60, opacity: 100 });
     expect(normalizeOutline({ width: -50, opacity: -50 })).toEqual({ color: "#ffffff", width: 0, opacity: 0 });
+  });
+
+  // --- 저장본 바이트 동일성 회귀 잠금 — 레거시(3키) 설정은 정규화를 지나도 형태가 그대로다. ---
+  it("2차 링 데이터가 없는 레거시 입력은 3키 형태 그대로 반환(새 키 주입 금지)", () => {
+    const legacy = { color: "#123456", width: 8, opacity: 50 };
+    const out = normalizeOutline(legacy);
+    expect(out).toEqual(legacy);
+    expect(Object.keys(out).sort()).toEqual(["color", "opacity", "width"]);
+    // JSON 직렬화까지 동일 — 문서 저장본/CRDT 패치가 변하지 않는다.
+    expect(JSON.stringify(out)).toBe(JSON.stringify({ color: "#123456", width: 8, opacity: 50 }));
+  });
+
+  it("secondWidth가 있으면 secondColor/secondWidth 두 키를 모두 채워 반환", () => {
+    expect(normalizeOutline({ width: 4, secondWidth: 3 })).toEqual({
+      color: "#ffffff",
+      width: 4,
+      opacity: 100,
+      secondColor: DEFAULT_OUTLINE_SECOND_COLOR,
+      secondWidth: 3,
+    });
+  });
+
+  it("secondColor만 있어도 두 키를 채운다(secondWidth 0 — 색 선택을 잃지 않음)", () => {
+    expect(normalizeOutline({ secondColor: "#ff0000" })).toEqual({
+      color: "#ffffff",
+      width: 0,
+      opacity: 100,
+      secondColor: "#ff0000",
+      secondWidth: 0,
+    });
+  });
+
+  it("무효 secondColor는 기본 검정, 범위 밖 secondWidth는 클램프", () => {
+    expect(normalizeOutline({ secondColor: "red", secondWidth: 3 }).secondColor).toBe(DEFAULT_OUTLINE_SECOND_COLOR);
+    expect(normalizeOutline({ secondWidth: 999 }).secondWidth).toBe(60);
+    expect(normalizeOutline({ secondWidth: -5 }).secondWidth).toBe(0);
+    // NaN secondWidth + 무효 secondColor → 2차 링 데이터 없음으로 보고 레거시 형태.
+    const out = normalizeOutline({ width: 2, secondWidth: Number.NaN, secondColor: 7 as unknown as string });
+    expect(Object.keys(out).sort()).toEqual(["color", "opacity", "width"]);
   });
 
   it("#rrggbb가 아닌 color는 기본 흰색으로 되돌린다", () => {
@@ -160,17 +234,21 @@ describe("applyOutline — 실루엣 바깥 테두리(알파 팽창)", () => {
     }
   });
 
-  it("width=1에서 대각 코너(거리^2=2)는 반경 밖이라 칠하지 않는다", () => {
+  // 의도적 변경(2026-07): 하드 임계 → AA 페더. 코너(dist=√2)는 이제 "반경 밖 미채색"이 아니라
+  // 링 바깥 1px 페더 밴드에서 거리 램프 알파(coverage=total+1-dist)를 받는다 — 계단 현상 제거.
+  it("width=1에서 대각 코너(dist=√2)는 AA 페더로 부분 알파를 받는다", () => {
     const img = makeBlockImage([200, 0, 0]);
     applyOutline(img, normalizeOutline({ color: "#00ff00", width: 1, opacity: 100 }));
-    // 네 코너는 가장 가까운 불투명 픽셀까지 거리^2=2 > 1^2 → 투명 유지.
+    // coverage = (1+1) - √2 ≈ 0.5858 → alpha = round(255*0.5858) = 149. 색은 테두리 초록.
+    const expectedAlpha = Math.round(255 * (2 - Math.SQRT2));
+    expect(expectedAlpha).toBe(149);
     for (const [x, y] of [
       [0, 0],
       [3, 0],
       [0, 3],
       [3, 3],
     ]) {
-      expect(pixelAt(img, at(x!, y!))).toEqual([0, 0, 0, 0]);
+      expect(pixelAt(img, at(x!, y!))).toEqual([0, 255, 0, expectedAlpha]);
     }
   });
 
@@ -228,6 +306,119 @@ describe("applyOutline — 실루엣 바깥 테두리(알파 팽창)", () => {
   });
 });
 
+describe("applyOutline — AA 페더(레거시 추가 전용 회귀 잠금)", () => {
+  // 회귀 잠금: AA 페더는 "추가"만 한다 — 레거시 하드 임계 알고리즘(distSq<=width²)이 칠하던
+  // 모든 픽셀은 바이트 단위로 동일하고(전부 ringAlpha·테두리 색), 실루엣도 그대로다.
+  // 새로 칠해지는 픽셀은 링 바깥 1px 페더 밴드뿐이며 알파가 항상 ringAlpha 미만이다.
+  it("레거시가 칠하던 픽셀(dist<=width)·실루엣은 바이트 동일, 페더만 새로 얹힌다", () => {
+    const img = makeBlockImage([200, 0, 0]);
+    applyOutline(img, normalizeOutline({ color: "#00ff00", width: 1, opacity: 100 }));
+
+    // 실루엣(불투명 2x2): 레거시와 동일하게 완전 보존.
+    for (const [x, y] of [[1, 1], [2, 1], [1, 2], [2, 2]] as const) {
+      expect(pixelAt(img, at(x, y))).toEqual([200, 0, 0, 255]);
+    }
+    // 레거시 링(dist=1인 변 8픽셀): 레거시와 동일한 풀 알파 테두리.
+    for (const [x, y] of [[0, 1], [0, 2], [3, 1], [3, 2], [1, 0], [2, 0], [1, 3], [2, 3]] as const) {
+      expect(pixelAt(img, at(x, y))).toEqual([0, 255, 0, 255]);
+    }
+    // 페더(코너 4픽셀): 새로 얹힌 픽셀은 전부 알파 < ringAlpha(255).
+    for (const [x, y] of [[0, 0], [3, 0], [0, 3], [3, 3]] as const) {
+      const px = pixelAt(img, at(x, y));
+      expect(px[3]).toBeGreaterThan(0);
+      expect(px[3]).toBeLessThan(255);
+    }
+  });
+
+  it("페더 알파는 opacity에 비례한다(ringAlpha * coverage)", () => {
+    const img = makeBlockImage([200, 0, 0]);
+    applyOutline(img, normalizeOutline({ color: "#00ff00", width: 1, opacity: 40 }));
+    // ringAlpha = round(255*40/100) = 102; 코너 coverage = 2-√2 → round(102*0.5858) = 60.
+    expect(pixelAt(img, at(0, 0))[3]).toBe(Math.round(102 * (2 - Math.SQRT2)));
+    expect(pixelAt(img, at(0, 0))[3]).toBe(60);
+  });
+
+  it("페더는 기존 픽셀 알파가 더 강하면 덮지 않는다(반투명 원본 보존)", () => {
+    // 코너(0,0)에 페더 알파(60)보다 강한 반투명(120<128 → 여전히 테두리 후보) 픽셀을 둔다.
+    const img = makeBlockImage([200, 0, 0]);
+    img.data.set([10, 20, 30, 120], at(0, 0) * 4);
+    applyOutline(img, normalizeOutline({ color: "#00ff00", width: 1, opacity: 40 }));
+    // 페더 밴드(코너)는 60 <= 120이라 보존, 솔리드 링(변)은 레거시대로 무조건 덮어쓴다.
+    expect(pixelAt(img, at(0, 0))).toEqual([10, 20, 30, 120]);
+    expect(pixelAt(img, at(0, 1))).toEqual([0, 255, 0, 102]);
+  });
+
+  it("페더 경계(dist=total+1)에서는 coverage 0이라 칠하지 않는다", () => {
+    // 9x1: 불투명 x=4, width=1·second=2 → total=3. x0/x8은 dist=4=total+1 → 미채색.
+    const pixels = Array.from({ length: 9 }, (_, x) => (x === 4 ? [0, 0, 0, 255] : [0, 0, 0, 0]));
+    const img = makeImage(9, 1, pixels);
+    applyOutline(
+      img,
+      normalizeOutline({ color: "#ffffff", width: 1, opacity: 100, secondColor: "#000000", secondWidth: 2 })
+    );
+    expect(pixelAt(img, 0)).toEqual([0, 0, 0, 0]);
+    expect(pixelAt(img, 8)).toEqual([0, 0, 0, 0]);
+  });
+});
+
+describe("applyOutline — 이중 외곽선(2차 링)", () => {
+  it("1차 링 안쪽은 color, 그 바깥 2차 링은 secondColor로 칠한다", () => {
+    // 7x1: 불투명 x=3. dist: x2/x4=1, x1/x5=2, x0/x6=3. width=1, secondWidth=2 → total=3.
+    const pixels = Array.from({ length: 7 }, (_, x) => (x === 3 ? [9, 9, 9, 255] : [0, 0, 0, 0]));
+    const img = makeImage(7, 1, pixels);
+    applyOutline(
+      img,
+      normalizeOutline({ color: "#ffffff", width: 1, opacity: 100, secondColor: "#000000", secondWidth: 2 })
+    );
+    // 실루엣 보존.
+    expect(pixelAt(img, 3)).toEqual([9, 9, 9, 255]);
+    // 1차 링(dist=1): 흰색 풀 알파.
+    expect(pixelAt(img, 2)).toEqual([255, 255, 255, 255]);
+    expect(pixelAt(img, 4)).toEqual([255, 255, 255, 255]);
+    // 2차 링(dist=2,3): 경계 1px 블렌드 구간(t=min(1,dist-width))을 지나 순수 검정.
+    for (const i of [1, 5, 0, 6]) {
+      expect(pixelAt(img, i)).toEqual([0, 0, 0, 255]);
+    }
+  });
+
+  it("링 경계 1px는 color→secondColor 거리 블렌드로 잇는다(코너 dist=√2)", () => {
+    // 4x4 블록: 코너 dist=√2 ∈ (1,2] → t=√2-1≈0.414 → 검정→흰 블렌드 회색.
+    const img = makeBlockImage([200, 0, 0]);
+    applyOutline(
+      img,
+      normalizeOutline({ color: "#000000", width: 1, opacity: 100, secondColor: "#ffffff", secondWidth: 1 })
+    );
+    const t = Math.SQRT2 - 1;
+    const mixed = Math.round(255 * t);
+    expect(mixed).toBe(106);
+    expect(pixelAt(img, at(0, 0))).toEqual([mixed, mixed, mixed, 255]);
+    // 1차 링(변, dist=1)은 순수 검정.
+    expect(pixelAt(img, at(0, 1))).toEqual([0, 0, 0, 255]);
+  });
+
+  it("width=0이어도 secondWidth>0이면 실루엣에 붙여 2차 링을 그린다", () => {
+    const img = makeBlockImage([200, 0, 0]);
+    applyOutline(
+      img,
+      normalizeOutline({ color: "#ffffff", width: 0, opacity: 100, secondColor: "#112233", secondWidth: 1 })
+    );
+    // 변 픽셀(dist=1)은 2차 링 색(t=min(1,1-0)=1 → 순수 secondColor).
+    expect(pixelAt(img, at(0, 1))).toEqual([0x11, 0x22, 0x33, 255]);
+  });
+
+  it("2차 링의 알파도 공통 opacity를 따른다", () => {
+    const pixels = Array.from({ length: 7 }, (_, x) => (x === 3 ? [0, 0, 0, 255] : [0, 0, 0, 0]));
+    const img = makeImage(7, 1, pixels);
+    applyOutline(
+      img,
+      normalizeOutline({ color: "#ffffff", width: 1, opacity: 40, secondColor: "#000000", secondWidth: 2 })
+    );
+    // round(255*40/100)=102 — 1차/2차 링 모두 동일.
+    expect(pixelAt(img, 2)[3]).toBe(102);
+    expect(pixelAt(img, 1)[3]).toBe(102);
+  });
+});
+
 describe("OUTLINE_PRESETS", () => {
   it("첫 항목은 none/없음 항등(width0)", () => {
     const first = OUTLINE_PRESETS[0]!;
@@ -253,8 +444,11 @@ describe("OUTLINE_PRESETS", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("value도 (색·width·opacity 조합으로) 모두 고유하다", () => {
-    const keys = OUTLINE_PRESETS.map((p) => `${p.value.color}|${p.value.width}|${p.value.opacity}`);
+  it("value도 (색·width·opacity·2차 링 조합으로) 모두 고유하다", () => {
+    // 이중 외곽선 프리셋이 생기면서 고유 키에 secondColor/secondWidth도 포함한다.
+    const keys = OUTLINE_PRESETS.map(
+      (p) => `${p.value.color}|${p.value.width}|${p.value.opacity}|${p.value.secondColor ?? ""}|${p.value.secondWidth ?? 0}`
+    );
     expect(new Set(keys).size).toBe(keys.length);
   });
 
@@ -272,10 +466,13 @@ describe("OUTLINE_PRESETS", () => {
       expect(p.value.width).toBeLessThanOrEqual(OUTLINE_WIDTH_RANGE.max);
       expect(p.value.opacity).toBeGreaterThanOrEqual(OUTLINE_OPACITY_RANGE.min);
       expect(p.value.opacity).toBeLessThanOrEqual(OUTLINE_OPACITY_RANGE.max);
+      // 2차 링을 쓰는 프리셋도 같은 두께 범위 안이어야 한다.
+      expect(p.value.secondWidth ?? 0).toBeGreaterThanOrEqual(OUTLINE_WIDTH_RANGE.min);
+      expect(p.value.secondWidth ?? 0).toBeLessThanOrEqual(OUTLINE_WIDTH_RANGE.max);
     }
   });
 
-  it("명세된 대표 프리셋(흰/검정/두꺼운 흰/스티커/네온/핑크)을 담고 있다", () => {
+  it("명세된 대표 프리셋(흰/검정/두꺼운 흰/스티커/이중/네온/핑크)을 담고 있다", () => {
     const byId = new Map(OUTLINE_PRESETS.map((p) => [p.id, p.value]));
     expect(byId.get("white")).toEqual({ color: "#ffffff", width: 8, opacity: 100 });
     expect(byId.get("black")).toEqual({ color: "#000000", width: 6, opacity: 100 });
@@ -283,23 +480,43 @@ describe("OUTLINE_PRESETS", () => {
     expect(byId.get("sticker")).toEqual({ color: "#ffffff", width: 10, opacity: 100 });
     expect(byId.get("neon")?.width).toBe(6);
     expect(byId.get("pink")?.width).toBe(6);
+    // 신규: 웹툰 스티커의 흰+검 이중 테두리 프리셋.
+    expect(byId.get("double")).toEqual({
+      color: "#ffffff",
+      width: 6,
+      opacity: 100,
+      secondColor: "#111111",
+      secondWidth: 3,
+    });
   });
 });
 
 describe("outlineCachePad", () => {
-  it("활성(테두리 그려질 때)이면 ceil(width)", () => {
-    expect(outlineCachePad(normalizeOutline({ width: 8 }))).toBe(8);
-    expect(outlineCachePad(normalizeOutline({ width: 14 }))).toBe(14);
+  // 의도적 변경(2026-07): 패딩 = ceil(총 링 두께) + AA 페더 1px. 페더가 링 바깥 1px까지
+  // 자라므로 기존 ceil(width)만으로는 페더가 잘린다.
+  it("활성(테두리 그려질 때)이면 ceil(총 두께)+페더 1px", () => {
+    expect(outlineCachePad(normalizeOutline({ width: 8 }))).toBe(8 + OUTLINE_FEATHER_PX);
+    expect(outlineCachePad(normalizeOutline({ width: 14 }))).toBe(14 + OUTLINE_FEATHER_PX);
+  });
+
+  it("이중 외곽선은 1차+2차 총 두께를 덮는다", () => {
+    expect(outlineCachePad(normalizeOutline({ width: 6, secondColor: "#111111", secondWidth: 3 }))).toBe(
+      9 + OUTLINE_FEATHER_PX
+    );
+    expect(outlineCachePad(normalizeOutline({ width: 0, secondColor: "#111111", secondWidth: 5 }))).toBe(
+      5 + OUTLINE_FEATHER_PX
+    );
   });
 
   it("소수 width는 올림(테두리가 잘리지 않게 여유 확보)", () => {
-    expect(outlineCachePad({ color: "#ffffff", width: 2.3, opacity: 100 })).toBe(3);
-    expect(outlineCachePad({ color: "#ffffff", width: 0.1, opacity: 100 })).toBe(1);
+    expect(outlineCachePad({ color: "#ffffff", width: 2.3, opacity: 100 })).toBe(3 + OUTLINE_FEATHER_PX);
+    expect(outlineCachePad({ color: "#ffffff", width: 0.1, opacity: 100 })).toBe(1 + OUTLINE_FEATHER_PX);
   });
 
-  it("항등(width0/opacity0)이면 0", () => {
+  it("항등(두께0/불투명0)이면 0", () => {
     expect(outlineCachePad(DEFAULT_OUTLINE)).toBe(0);
     expect(outlineCachePad({ color: "#ffffff", width: 10, opacity: 0 })).toBe(0);
+    expect(outlineCachePad({ color: "#ffffff", width: 0, opacity: 100, secondColor: "#000000", secondWidth: 0 })).toBe(0);
   });
 });
 
@@ -344,6 +561,47 @@ describe("outlineKonvaFilter", () => {
     expect(() => outlineKonvaFilter.call({ attrs }, img)).not.toThrow();
     // width가 무효→0으로 정규화되어 항등 no-op.
     expect(Array.from(img.data)).toEqual(before);
+  });
+
+  it("이중 외곽선 attrs(outlineSecondColor/Width)도 읽어 applyOutline과 동일하게 그린다", () => {
+    const img = makeBlockImage([200, 0, 0]);
+    outlineKonvaFilter.call(
+      {
+        attrs: {
+          outlineColor: "#ffffff",
+          outlineWidth: 1,
+          outlineOpacity: 100,
+          outlineSecondColor: "#000000",
+          outlineSecondWidth: 2,
+        },
+      },
+      img
+    );
+    const ref = makeBlockImage([200, 0, 0]);
+    applyOutline(
+      ref,
+      normalizeOutline({ color: "#ffffff", width: 1, opacity: 100, secondColor: "#000000", secondWidth: 2 })
+    );
+    expect(Array.from(img.data)).toEqual(Array.from(ref.data));
+  });
+
+  it("무효 타입의 이중 외곽선 attrs는 단일 링과 동일하게 동작", () => {
+    const img = makeBlockImage([200, 0, 0]);
+    outlineKonvaFilter.call(
+      {
+        attrs: {
+          outlineColor: "#00ff00",
+          outlineWidth: 1,
+          outlineOpacity: 100,
+          outlineSecondColor: 42,
+          outlineSecondWidth: "wide",
+        },
+      },
+      img
+    );
+    const ref = makeBlockImage([200, 0, 0]);
+    applyOutline(ref, normalizeOutline({ color: "#00ff00", width: 1, opacity: 100 }));
+    expect(Array.from(img.data)).toEqual(Array.from(ref.data));
   });
 });
 

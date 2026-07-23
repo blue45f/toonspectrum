@@ -1,17 +1,26 @@
 /**
  * Studio Sticker Outline Engine
  * 스티커 테두리 — 불투명 실루엣 바깥으로 컬러 스트로크를 그린다(알파 팽창/dilation).
- * 알파가 불투명(>=128)인 원본 픽셀은 그대로 두고, 투명/반투명 픽셀이 반경 width 안에
+ * 알파가 불투명(>=128)인 원본 픽셀은 그대로 두고, 투명/반투명 픽셀이 반경 안에
  * 불투명 픽셀을 두면 그 픽셀을 outline color로 채우고 alpha=255*opacity/100으로 만든다.
  * 실루엣 "바깥" 테두리만 칠하므로 스티커·이모티콘 컷아웃 느낌을 낸다.
  *
- * 효율: 각 픽셀에서 가장 가까운 불투명 픽셀까지의 거리를 분리형(가로→세로) 거리 변환
- * (Felzenszwalb & Huttenlocher, O(n))으로 한 번에 구한 뒤, dist<=width인 투명 픽셀만 칠한다.
- * 박스 스캔이 아니라서 width가 커도 비용이 선형이고, 둥근(유클리드) 테두리가 나온다.
+ * 링 구성(안쪽→바깥):
+ *   1) 1차 링 dist∈(0..width] — color. 레거시와 바이트 동일(하드 덮어쓰기, alpha=ringAlpha).
+ *   2) 2차 링 dist∈(width..width+secondWidth] — secondColor(이중 외곽선, 웹툰 스티커의
+ *      흰+검 테두리). 링 경계 1px는 color→secondColor 거리 블렌드로 부드럽게 잇는다.
+ *   3) AA 페더 dist∈(total..total+1) — 가장 바깥 링 색을 거리 램프 알파로 얹어 계단 현상을
+ *      없앤다. 페더는 "추가"만 한다: 레거시 알고리즘이 칠하던 픽셀(dist<=width)의 바이트는
+ *      전혀 바뀌지 않고, 기존 알파가 더 강한 픽셀은 덮지 않는다.
  *
- * 필터는 StudioPage가 offset=width로 캐싱한 "패딩된" 캔버스 위에서 돈다(테두리가 바깥으로
- * 자랄 여유 공간). Konva/DOM 의존 없음 — StudioPage 캔버스 로직과 단위 테스트가 공유한다.
- * 전부 순수·결정적(랜덤 없음).
+ * 효율: 각 픽셀에서 가장 가까운 불투명 픽셀까지의 거리를 분리형(가로→세로) 거리 변환
+ * (Felzenszwalb & Huttenlocher, O(n))으로 한 번에 구한 뒤, 반경 안 투명 픽셀만 칠한다.
+ * 박스 스캔이 아니라서 width가 커도 비용이 선형이고, 둥근(유클리드) 테두리가 나온다.
+ * sqrt는 링 경계 블렌드/페더 후보에서만 계산한다.
+ *
+ * 필터는 StudioPage가 offset=outlineCachePad로 캐싱한 "패딩된" 캔버스 위에서 돈다(테두리가
+ * 바깥으로 자랄 여유 공간 — 총 링 두께 + 페더 1px). Konva/DOM 의존 없음 — StudioPage 캔버스
+ * 로직과 단위 테스트가 공유한다. 전부 순수·결정적(랜덤 없음).
  */
 
 import { hexToRgb } from "./studio-filters";
@@ -22,17 +31,41 @@ import type { StudioImageDataLike } from "./studio-filters";
 // 파라미터 타입·기본값·범위
 // ---------------------------------------------------------------------------
 
-/** 스티커 테두리. color #rrggbb, width 0..30(px 두께), opacity 0..100(테두리 알파 %). */
-export type Outline = { color: string; width: number; opacity: number };
+/**
+ * 스티커 테두리. color #rrggbb, width 0..60(px 두께), opacity 0..100(테두리 알파 %).
+ * secondColor/secondWidth는 선택적 "이중 외곽선"(1차 링 바깥의 2차 링) — 없으면(레거시 저장본)
+ * 단일 링과 완전히 동일하게 동작한다(항등 기본값).
+ */
+export type Outline = {
+  color: string;
+  width: number;
+  opacity: number;
+  /** 2차(바깥) 링 색 #rrggbb — secondWidth와 함께일 때만 의미 있다. */
+  secondColor?: string;
+  /** 2차(바깥) 링 두께 0..60px — 0이면 이중 외곽선 없음(항등). */
+  secondWidth?: number;
+};
 
-/** 항등(테두리 없음) — 흰색·두께 0·불투명 100. width 0이라 아무것도 그리지 않는다. */
+/**
+ * 항등(테두리 없음) — 흰색·두께 0·불투명 100. width 0이라 아무것도 그리지 않는다.
+ * 2차 링 키는 의도적으로 없다(레거시 3키 형태 유지 — 저장본 바이트 동일성).
+ */
 export const DEFAULT_OUTLINE: Outline = { color: "#ffffff", width: 0, opacity: 100 };
 
-/** 두께 슬라이더 한 칸 범위 — 0..30px, 1 단위. */
-export const OUTLINE_WIDTH_RANGE = { min: 0, max: 30, step: 1 } as const;
+/** 2차 링 색 폴백 — 웹툰 이중 테두리의 대표값(검정). 무효 secondColor 정규화에 쓴다. */
+export const DEFAULT_OUTLINE_SECOND_COLOR = "#000000";
+
+/**
+ * 두께 슬라이더 한 칸 범위 — 0..60px, 1 단위. 1차/2차 링이 공유한다.
+ * (기존 0..30에서 확장 — 거리 변환이 O(n)이라 두꺼운 스티커 테두리도 선형 비용.)
+ */
+export const OUTLINE_WIDTH_RANGE = { min: 0, max: 60, step: 1 } as const;
 
 /** 불투명도 슬라이더 한 칸 범위 — 0..100%, 1 단위. */
 export const OUTLINE_OPACITY_RANGE = { min: 0, max: 100, step: 1 } as const;
+
+/** AA 페더 폭(px) — 총 링 바깥으로 이만큼 거리 램프 알파를 얹는다. 캐시 패딩에 포함된다. */
+export const OUTLINE_FEATHER_PX = 1;
 
 // 알파 임계 — 이 값 이상이면 "불투명"(원본 실루엣), 미만이면 테두리 후보(투명/반투명).
 const ALPHA_OPAQUE = 128;
@@ -56,20 +89,41 @@ function clampTo(raw: unknown, min: number, max: number, fallback: number): numb
 /**
  * 과거 저장본/외부 입력 안전장치 — 누락/무효 키는 기본값, 범위 밖 숫자는 클램프.
  * color는 #rrggbb 형식이 아니면 기본 흰색으로 되돌린다(셰이더에 잘못된 색 차단).
+ *
+ * 저장본 바이트 동일성 계약: 입력이 2차 링 데이터를 전혀 담지 않으면(레거시 저장본)
+ * 출력도 레거시 3키({color,width,opacity}) 형태 그대로다 — secondColor/secondWidth 키를
+ * 주입하지 않는다. 2차 링 데이터가 하나라도 있으면 두 키를 모두 채워 반환한다.
  */
 export function normalizeOutline(o?: Partial<Outline> | null): Outline {
   const src = o && typeof o === "object" ? o : {};
   const color = typeof src.color === "string" && HEX6_RE.test(src.color) ? src.color : DEFAULT_OUTLINE.color;
-  return {
+  const base: Outline = {
     color,
     width: clampTo(src.width, OUTLINE_WIDTH_RANGE.min, OUTLINE_WIDTH_RANGE.max, DEFAULT_OUTLINE.width),
     opacity: clampTo(src.opacity, OUTLINE_OPACITY_RANGE.min, OUTLINE_OPACITY_RANGE.max, DEFAULT_OUTLINE.opacity),
   };
+  // 2차 링 데이터를 실제로 담고 있는 입력만 새 키를 갖는다(레거시 형태 보존).
+  const hasSecondColor = typeof src.secondColor === "string" && HEX6_RE.test(src.secondColor);
+  const hasSecondWidth = typeof src.secondWidth === "number" && Number.isFinite(src.secondWidth);
+  if (!hasSecondColor && !hasSecondWidth) return base;
+  return {
+    ...base,
+    secondColor: hasSecondColor ? (src.secondColor as string) : DEFAULT_OUTLINE_SECOND_COLOR,
+    secondWidth: clampTo(src.secondWidth, OUTLINE_WIDTH_RANGE.min, OUTLINE_WIDTH_RANGE.max, 0),
+  };
 }
 
-/** 두께 0 이하 또는 불투명도 0 이하 — 즉 픽셀을 건드리지 않는 항등 설정인지. */
+/** 1차+2차 링을 합친 총 두께(px) — 캐시 패딩·반경 계산의 기준. 음수/누락은 0으로 본다. */
+export function outlineTotalWidth(o: Outline): number {
+  return Math.max(0, o.width) + Math.max(0, o.secondWidth ?? 0);
+}
+
+/**
+ * 픽셀을 전혀 건드리지 않는 항등 설정인지 — 불투명도 0 이하이거나,
+ * 1차·2차 링 두께가 모두 0 이하일 때(width 0이어도 secondWidth>0이면 2차 링이 그려진다).
+ */
 export function isIdentityOutline(o: Outline): boolean {
-  return o.width <= 0 || o.opacity <= 0;
+  return outlineTotalWidth(o) <= 0 || o.opacity <= 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -144,12 +198,15 @@ function squaredDistanceToOpaque(seed: Float64Array, width: number, height: numb
 // ---------------------------------------------------------------------------
 
 /**
- * 스티커 테두리 제자리 적용 — 항등(width<=0 또는 opacity<=0)이면 no-op.
+ * 스티커 테두리 제자리 적용 — 항등(총 두께<=0 또는 opacity<=0)이면 no-op.
  *
  * 1) 원본 알파로 시드 맵을 만든다(불투명 픽셀=0, 그 외=FAR).
  * 2) 제곱 유클리드 거리 변환으로 각 픽셀의 "가장 가까운 불투명 픽셀까지 거리^2"를 구한다.
- * 3) 투명/반투명 픽셀(alpha<128) 중 dist<=width인 픽셀을 outline color로 칠하고
- *    alpha=round(255*opacity/100)로 만든다(실루엣 바깥 테두리).
+ * 3) 투명/반투명 픽셀(alpha<128)을 거리 밴드별로 칠한다:
+ *    - dist<=width               → 1차 링 color, alpha=ringAlpha(레거시와 바이트 동일).
+ *    - width<dist<=width+second  → 2차 링 secondColor. 경계 1px는 color→secondColor 블렌드.
+ *    - total<dist<total+1(페더)  → 가장 바깥 링 색, alpha=ringAlpha*(total+1-dist) 램프.
+ *      페더는 기존 픽셀 알파보다 강할 때만 얹는다(반투명 원본 디테일을 지우지 않음).
  *
  * 불투명 픽셀(원본 실루엣)의 r/g/b·alpha는 절대 건드리지 않는다(알파·색 보존).
  * width가 커도 거리 변환이 선형이라 비용이 합리적이다.
@@ -159,10 +216,22 @@ export function applyOutline(img: StudioImageDataLike, o: Outline): void {
   const { data, width, height } = img;
   if (!(width > 0) || !(height > 0)) return;
 
-  const { r, g, b } = hexToRgb(o.color);
+  const w1 = Math.max(0, o.width);
+  const w2 = Math.max(0, o.secondWidth ?? 0);
+  const total = w1 + w2;
+
+  const c1 = hexToRgb(o.color);
+  // 2차 링이 없으면 c2=c1이라 밴드 구분이 자연히 사라진다(레거시 경로).
+  const c2 = w2 > 0 ? hexToRgb(o.secondColor ?? DEFAULT_OUTLINE_SECOND_COLOR) : c1;
+  // 페더는 항상 가장 바깥 링의 색으로 얹는다.
+  const outer = w2 > 0 ? c2 : c1;
   const ringAlpha = Math.round((255 * o.opacity) / 100);
-  // 두께 비교는 제곱 거리로(루트 회피). width는 px 두께 그대로 반경.
-  const maxDistSq = o.width * o.width;
+
+  // 두께 비교는 제곱 거리로(루트 회피). sqrt는 블렌드/페더 후보에서만 계산.
+  const w1Sq = w1 * w1;
+  const totalSq = total * total;
+  const featherEdge = total + OUTLINE_FEATHER_PX;
+  const featherEdgeSq = featherEdge * featherEdge;
 
   // 1) 시드: 불투명 픽셀이면 비용 0, 아니면 FAR.
   const count = width * height;
@@ -182,21 +251,45 @@ export function applyOutline(img: StudioImageDataLike, o: Outline): void {
   // 2) 거리 변환.
   const distSq = squaredDistanceToOpaque(seed, width, height);
 
-  // 3) 투명 픽셀 중 반경 안인 것만 테두리 색으로 채운다(불투명 원본은 건너뜀).
+  // 3) 거리 밴드별 채색(불투명 원본은 건너뜀).
   for (let p = 0; p < count; p++) {
     const a = p * 4;
     if (data[a + 3]! >= ALPHA_OPAQUE) continue; // 원본 실루엣 보존
-    if (distSq[p]! > maxDistSq) continue; // 반경 밖
-    data[a] = r;
-    data[a + 1] = g;
-    data[a + 2] = b;
-    data[a + 3] = ringAlpha;
+    const dsq = distSq[p]!;
+    if (dsq > featherEdgeSq) continue; // 페더 밖
+
+    if (dsq <= totalSq) {
+      // --- 솔리드 링 밴드: 하드 덮어쓰기(레거시 동일). ---
+      let cr = c1.r;
+      let cg = c1.g;
+      let cb = c1.b;
+      if (w2 > 0 && dsq > w1Sq) {
+        // 2차 링 — 링 경계 1px는 거리 t로 color→secondColor 블렌드(경계 계단 방지).
+        const t = Math.min(1, Math.sqrt(dsq) - w1);
+        cr = Math.round(c1.r + (c2.r - c1.r) * t);
+        cg = Math.round(c1.g + (c2.g - c1.g) * t);
+        cb = Math.round(c1.b + (c2.b - c1.b) * t);
+      }
+      data[a] = cr;
+      data[a + 1] = cg;
+      data[a + 2] = cb;
+      data[a + 3] = ringAlpha;
+    } else {
+      // --- AA 페더 밴드: 커버리지 램프 알파. 기존보다 강한 픽셀은 보존(추가 전용). ---
+      const coverage = featherEdge - Math.sqrt(dsq);
+      const alpha = Math.round(ringAlpha * coverage);
+      if (alpha <= data[a + 3]!) continue;
+      data[a] = outer.r;
+      data[a + 1] = outer.g;
+      data[a + 2] = outer.b;
+      data[a + 3] = alpha;
+    }
   }
 }
 
 // ---------------------------------------------------------------------------
 // 스티커 테두리 프리셋 — 첫 항목은 항등(없음), 나머지는 자주 쓰는 테두리.
-// 모든 value는 normalizeOutline을 통과(색 #rrggbb, width 0..30, opacity 0..100).
+// 모든 value는 normalizeOutline을 통과(색 #rrggbb, width 0..60, opacity 0..100).
 // ---------------------------------------------------------------------------
 
 export type OutlinePreset = { id: string; label: string; tip: string; value: Outline };
@@ -233,6 +326,12 @@ export const OUTLINE_PRESETS: OutlinePreset[] = [
     value: normalizeOutline({ color: "#ffffff", width: 10, opacity: 100 }),
   },
   {
+    id: "double",
+    label: "이중 테두리",
+    tip: "안쪽 흰 테두리에 바깥 검정 라인을 둘러 웹툰 스티커처럼 만듭니다.",
+    value: normalizeOutline({ color: "#ffffff", width: 6, opacity: 100, secondColor: "#111111", secondWidth: 3 }),
+  },
+  {
     id: "neon",
     label: "네온",
     tip: "밝은 시안 테두리로 빛나는 네온 윤곽을 만듭니다.",
@@ -252,8 +351,9 @@ export const OUTLINE_PRESETS: OutlinePreset[] = [
 // ---------------------------------------------------------------------------
 
 /**
- * Konva 필터 함수 — node(`this`).attrs에서 outlineColor·outlineWidth·outlineOpacity를 읽어
- * normalizeOutline로 안전 변환 후 applyOutline. 항등(width0/opacity0)이거나 attrs가 비면 no-op.
+ * Konva 필터 함수 — node(`this`).attrs에서 outlineColor·outlineWidth·outlineOpacity와
+ * (이중 외곽선용) outlineSecondColor·outlineSecondWidth를 읽어 normalizeOutline로 안전 변환 후
+ * applyOutline. 항등(총 두께0/opacity0)이거나 attrs가 비면 no-op.
  */
 export function outlineKonvaFilter(this: { attrs?: Record<string, unknown> }, imageData: StudioImageDataLike): void {
   const attrs = this.attrs;
@@ -262,6 +362,8 @@ export function outlineKonvaFilter(this: { attrs?: Record<string, unknown> }, im
     color: typeof attrs.outlineColor === "string" ? attrs.outlineColor : undefined,
     width: typeof attrs.outlineWidth === "number" ? attrs.outlineWidth : undefined,
     opacity: typeof attrs.outlineOpacity === "number" ? attrs.outlineOpacity : undefined,
+    secondColor: typeof attrs.outlineSecondColor === "string" ? attrs.outlineSecondColor : undefined,
+    secondWidth: typeof attrs.outlineSecondWidth === "number" ? attrs.outlineSecondWidth : undefined,
   });
   if (isIdentityOutline(o)) return;
   applyOutline(imageData, o);
@@ -269,11 +371,11 @@ export function outlineKonvaFilter(this: { attrs?: Record<string, unknown> }, im
 
 // ---------------------------------------------------------------------------
 // 캐시 패딩 — StudioPage가 node.cache({offset})에 쓰는 오프셋(px).
-// 테두리가 바깥으로 width만큼 자라므로 그만큼 캔버스를 키워야 잘리지 않는다.
+// 테두리가 바깥으로 "총 링 두께 + AA 페더"만큼 자라므로 그만큼 캔버스를 키워야 잘리지 않는다.
 // ---------------------------------------------------------------------------
 
-/** 캐시 오프셋(px) = 활성(테두리가 그려질 때)이면 ceil(width), 항등/무효면 0. */
+/** 캐시 오프셋(px) = 활성이면 ceil(총 링 두께)+페더 1px, 항등/무효면 0. */
 export function outlineCachePad(o: Outline): number {
   if (isIdentityOutline(o)) return 0;
-  return Math.ceil(o.width);
+  return Math.ceil(outlineTotalWidth(o)) + OUTLINE_FEATHER_PX;
 }

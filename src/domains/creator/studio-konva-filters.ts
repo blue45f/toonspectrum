@@ -915,6 +915,9 @@ export function buildImageFilters(
     attrs.outlineColor = ol.color;
     attrs.outlineWidth = ol.width;
     attrs.outlineOpacity = ol.opacity;
+    // 이중 외곽선 — attrs 레코드가 undefined를 허용하지 않으므로 값이 있을 때만 싣는다.
+    if (ol.secondColor !== undefined) attrs.outlineSecondColor = ol.secondColor;
+    if (ol.secondWidth !== undefined) attrs.outlineSecondWidth = ol.secondWidth;
     cachePad = outlineCachePad(ol); // 테두리가 실루엣 밖으로 자라도록 캐시 offset 패딩.
   }
 

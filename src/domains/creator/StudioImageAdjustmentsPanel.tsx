@@ -726,6 +726,8 @@ export function StudioImageAdjustmentsPanel({
         <StudioLayerStylePanel
           values={selected as LayerStylePatch}
           onPatch={(patch) => onPatch(patch as Partial<El>)}
+          outline={selected.outline}
+          onOutlineChange={(next) => onPatch({ outline: next } as Partial<El>)}
         />
       </AdjustmentSection>
 
