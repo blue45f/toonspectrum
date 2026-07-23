@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
@@ -5,10 +7,13 @@ import {
   createStudioRasterHandoffAuthorityKey,
   createStudioRasterHandoffBaseKey,
   isStudioRasterHandoffCandidateAuthorized,
+  isStudioRasterHandoffViewNavigationTool,
   readStudioAuthoritativeStageFrame,
   studioRasterAuthorizedOperationIds,
   type StudioRasterHandoffCandidate,
 } from "./studio-raster-handoff-authority";
+
+import type { Tool } from "./studio-editor-tool-model";
 
 const viewport = {
   surface: { left: 10, top: 20, width: 300, height: 400 },
@@ -167,6 +172,64 @@ describe("studio raster handoff authority", () => {
       authorizedRasterLogSha256: ready.rasterLogSha256,
       blocked: false,
     }).size).toBe(0);
+  });
+
+  it("admits only chrome-free view navigation tools and fails closed for unknown tools", () => {
+    expect(isStudioRasterHandoffViewNavigationTool("select")).toBe(true);
+    expect(isStudioRasterHandoffViewNavigationTool("hand")).toBe(true);
+    expect(isStudioRasterHandoffViewNavigationTool("draw")).toBe(false);
+    // A future tool union member must opt in explicitly instead of inheriting the open slice.
+    expect(isStudioRasterHandoffViewNavigationTool("warp" as Tool)).toBe(false);
+  });
+
+  it("keeps one base identity across view navigation tools but re-keys on a special draft", () => {
+    const openGates = { specialDraftActive: false } as const;
+    // select and hand both derive the same open gate bits, so their base identity is shared and
+    // an authorized candidate survives switching between the two view navigation tools.
+    expect(baseKey({ gates: openGates })).toBe(baseKey({ gates: { ...openGates } }));
+    expect(baseKey({ gates: openGates })).toBe(baseKey());
+    expect(baseKey({ gates: { specialDraftActive: true } })).not.toBe(baseKey({ gates: openGates }));
+  });
+
+  it("pins the StudioPage gate matrix wiring for the M2 view-tool slice", () => {
+    const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+    const memoStart = source.indexOf("const studioRasterHandoffGates = useMemo");
+    expect(memoStart).toBeGreaterThan(-1);
+    const memo = source.slice(memoStart, source.indexOf("]);", memoStart));
+
+    // Correctness vetoes: capture/scene identity and post-processing stay closed.
+    expect(memo).toContain("exportActive: isExporting || saving || timelapseCapturing");
+    expect(memo).toContain("masterEditActive: masterEditMode");
+    expect(memo).toContain(
+      "editActive: selectedId !== null || marqueeIds.length > 0 || editing !== null"
+    );
+    expect(memo).toContain(
+      "postProcessingActive: pageGradeActive || colorBlindPreview !== \"none\""
+    );
+
+    // M2 slice: only the tested view-navigation predicate may widen the tool axis.
+    expect(memo).toContain("!isStudioRasterHandoffViewNavigationTool(tool)");
+    expect(memo).not.toMatch(/tool\s*!==\s*"select"/u);
+
+    // Every state that still shows a Konva interaction plane keeps its veto bit.
+    expect(memo).toMatch(/canvasRotation\s*!==\s*0/u);
+    expect(memo).toMatch(/marqueeActive\s*\|\|\s*userGuides\.length\s*>\s*0/u);
+    for (const flag of [
+      "eyedropperActive", "timelinePlaying",
+      "advancedFillArmed", "pixelToolArmed", "cropArmed", "panelSplitArmed", "nodeEditArmed",
+      "bubbleShapeArmed", "smudgeArmed", "dodgeBurnArmed", "wetMixArmed", "liquifyArmed",
+      "healCloneArmed", "layerMaskPaintArmed", "quickMaskArmed", "historyBrushArmed",
+      "puppetWarpArmed",
+    ]) {
+      expect(memo, `specialDraftActive must keep vetoing on ${flag}`).toContain(flag);
+    }
+
+    // Keystone for the hand-tool opening: native scrolling (wheel, space pan and the hand tool
+    // alike) must keep revoking the raster authority synchronously before the viewport plan
+    // catches up, so a stale frame can never leave a blank newly exposed edge.
+    expect(source).toMatch(
+      /const onScroll = \(\) => \{\s*revokeStudioRasterHandoffRef\.current\(\);/u
+    );
   });
 
   it("revokes the raster surface and redraws Konva before a Stage-only readback", () => {

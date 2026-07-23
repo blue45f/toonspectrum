@@ -2,10 +2,29 @@ import type {
   StudioRasterOverlaySourceElement,
   StudioRasterOverlaySourceOperation,
 } from "./studio-crdt-raster-ui-bridge";
+import type { Tool } from "./studio-editor-tool-model";
 import type { StudioWebGpuCommittedPlanGates } from "./studio-webgpu-committed-plan";
 import type { StudioWebGpuViewportSurfacePlan } from "./studio-webgpu-viewport";
 
 import { canonicalStudioRasterJson } from "@/lib/studio-crdt-raster-ops";
+
+/**
+ * M2 gate slice: editor tools whose armed state may keep the raster handoff presented.
+ *
+ * "select" is the original idle slice. "hand" also qualifies because the pan tool draws no Konva
+ * chrome — its grab cursor is a CSS cursor on the canvas host, never a Stage plane — and it
+ * mutates no scene pixels. An active pan gesture is already fail-closed independently of this
+ * predicate: native wrap scrolling revokes the raster authority synchronously before the React
+ * viewport plan catches up (the same mechanism that keeps select-mode wheel/space panning safe),
+ * and a marquee or selection started while the hand tool is armed re-asserts its own gate bit.
+ *
+ * "draw" and every future tool stay vetoed (fail closed) until the Konva interaction planes —
+ * brush cursors, rulers, node handles — move to a shared top overlay contract that stacks above
+ * the raster surface.
+ */
+export function isStudioRasterHandoffViewNavigationTool(tool: Tool): boolean {
+  return tool === "select" || tool === "hand";
+}
 
 export interface StudioRasterHandoffCandidate {
   /** Exact presentation generation. A stale frame can never reuse this identity. */

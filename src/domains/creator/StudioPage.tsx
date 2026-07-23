@@ -985,6 +985,7 @@ import {
 } from "./studio-raster-assets";
 import {
   createStudioRasterHandoffBaseKey,
+  isStudioRasterHandoffViewNavigationTool,
   readStudioAuthoritativeStageFrame,
   studioRasterAuthorizedOperationIds,
   type StudioRasterHandoffCandidate,
@@ -27792,15 +27793,17 @@ function StudioCuttoonEditor() {
           : "none" as const,
       })),
     }), [elements, groups, masterEditMode]);
-  // The first product slice is deliberately idle/select-only. Konva interaction planes such as
-  // brush cursors, rulers and node handles currently live inside the Stage; an HTML raster surface
-  // above the Stage must not cover them until those planes move to a shared top overlay contract.
+  // The first product slice was idle/select-only; the M2 slice also admits the hand (pan) tool,
+  // whose only chrome is a CSS cursor on the canvas host and whose live pan is fail-closed by the
+  // synchronous scroll revocation above. Konva interaction planes such as brush cursors, rulers
+  // and node handles still live inside the Stage; every state that shows one keeps its veto until
+  // those planes move to a shared top overlay contract above the raster surface.
   const studioRasterHandoffGates = useMemo(() => ({
     exportActive: isExporting || saving || timelapseCapturing,
     masterEditActive: masterEditMode,
     editActive: selectedId !== null || marqueeIds.length > 0 || editing !== null,
     specialDraftActive:
-      tool !== "select" || canvasRotation !== 0 || eyedropperActive || timelinePlaying ||
+      !isStudioRasterHandoffViewNavigationTool(tool) || canvasRotation !== 0 || eyedropperActive || timelinePlaying ||
       marqueeActive || userGuides.length > 0 ||
       advancedFillArmed || pixelToolArmed || cropArmed || panelSplitArmed ||
       nodeEditArmed || bubbleShapeArmed || smudgeArmed || dodgeBurnArmed || wetMixArmed || liquifyArmed || healCloneArmed ||
