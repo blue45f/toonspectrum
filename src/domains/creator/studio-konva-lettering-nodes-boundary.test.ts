@@ -278,6 +278,8 @@ describe("Studio Konva lettering node boundary", () => {
     expect(bubbleNode.valueImports).toEqual([
       "react-konva/lib/ReactKonvaCore",
       "./studio-bubble-custom-shape",
+      // 의도적 변경(2026-07-24): 말풍선 손그림 외곽선(rough/wobbly) 스타일 엔진 도입.
+      "./studio-bubble-outline-style",
       "./studio-bubble-path",
       "./studio-bubble-text-fit",
       "./studio-bubble-text-runtime",
