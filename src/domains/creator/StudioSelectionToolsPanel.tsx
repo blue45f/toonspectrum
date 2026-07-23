@@ -307,6 +307,10 @@ export type StudioSelectionToolsPanelProps = {
   onBrushRadiusChange?: (px: number) => void;
   onFeatherChange: (px: number) => void;
   onToggleInvert: () => void;
+  /** 자석 올가미 모드 — 켜면 올가미 궤적·꼭짓점이 가까운 휘도 가장자리로 스냅한다. */
+  magneticLasso?: boolean;
+  /** 자석 올가미 토글. 없으면 토글 칩이 렌더되지 않는다(하위호환). */
+  onToggleMagnetic?: () => void;
   canUndoSelection: boolean;
   canRedoSelection: boolean;
   onUndoSelection: () => void;
@@ -369,6 +373,8 @@ export function StudioSelectionToolsPanel({
   onBrushRadiusChange,
   onFeatherChange,
   onToggleInvert,
+  magneticLasso = false,
+  onToggleMagnetic,
   canUndoSelection,
   canRedoSelection,
   onUndoSelection,
@@ -537,6 +543,23 @@ export function StudioSelectionToolsPanel({
           onChange={onBrushRadiusChange}
           readout={`${brushRadius}px`}
         />
+      ) : null}
+
+      {(activeTool === "lasso" || activeTool === "poly-lasso") && onToggleMagnetic ? (
+        <div className="flex items-center justify-between gap-2 text-xs text-fg-2">
+          <span>
+            자석 올가미
+            <span className="ml-1 text-fg-3">경계에 달라붙기</span>
+          </span>
+          <StudioToggleChip
+            active={magneticLasso}
+            disabled={busy}
+            onClick={onToggleMagnetic}
+            aria-label="자석 올가미"
+          >
+            {magneticLasso ? "켜짐" : "꺼짐"}
+          </StudioToggleChip>
+        </div>
       ) : null}
 
       <div className="flex items-center justify-between gap-2 text-xs text-fg-2">

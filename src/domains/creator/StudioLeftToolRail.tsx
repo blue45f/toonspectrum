@@ -410,11 +410,11 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="사각 선택 (M)"
               description="이미지 픽셀을 사각형으로 선택합니다. Shift=정사각, Alt=중심 확장."
               active={pixelTool === "rect" && !pixelForceCircle}
-              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              disabled={activeSurfaceReviewLocked || (selected?.type === "image" && selectedContentMutationLocked)}
               unavailableReason={
-                selected?.type !== "image"
-                  ? "픽셀을 선택할 이미지 레이어를 먼저 고르세요."
-                  : selectedContentMutationLocked
+                activeSurfaceReviewLocked
+                  ? REVIEW_LOCK_REASON
+                  : selected?.type === "image" && selectedContentMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
@@ -427,11 +427,11 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="원형 선택"
               description="이미지 픽셀을 정원으로 선택합니다. Alt=중심 확장."
               active={pixelTool === "ellipse" && pixelForceCircle}
-              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              disabled={activeSurfaceReviewLocked || (selected?.type === "image" && selectedContentMutationLocked)}
               unavailableReason={
-                selected?.type !== "image"
-                  ? "픽셀을 선택할 이미지 레이어를 먼저 고르세요."
-                  : selectedContentMutationLocked
+                activeSurfaceReviewLocked
+                  ? REVIEW_LOCK_REASON
+                  : selected?.type === "image" && selectedContentMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
@@ -658,16 +658,16 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               }
               {...lassoToolHintProps}
               active={(pixelTool === "lasso" || pixelTool === "poly-lasso") && !pixelForceCircle}
-              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              disabled={activeSurfaceReviewLocked || (selected?.type === "image" && selectedContentMutationLocked)}
               unavailableReason={
-                selected?.type !== "image"
-                  ? "픽셀을 고를 이미지 레이어를 먼저 선택하세요."
-                  : selectedContentMutationLocked
+                activeSurfaceReviewLocked
+                  ? REVIEW_LOCK_REASON
+                  : selected?.type === "image" && selectedContentMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
               onClick={() => {
-                if (selected?.type !== "image" || selectedContentMutationLocked) return;
+                if (activeSurfaceReviewLocked || (selected?.type === "image" && selectedContentMutationLocked)) return;
                 setTool("select");
                 setMenu(null);
                 setPixelForceCircle(false);

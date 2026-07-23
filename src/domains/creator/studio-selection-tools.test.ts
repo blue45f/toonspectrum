@@ -19,6 +19,7 @@ import {
   addSelectionSubpath,
   appendBrushPoint,
   appendLassoPoint,
+  appendMagneticLassoPoint,
   appendPolyLassoVertex,
   applySelectionAdjustToCanvas,
   beginPolyLassoSession,
@@ -39,6 +40,8 @@ import {
   isSelectionAdjustNoop,
   isSelectionContentTransformNoop,
   isSelectionUsable,
+  luminanceFieldFromRgba,
+  luminanceFieldGradientAt,
   marchingAntsDashOffset,
   marchingAntsPasses,
   normalizedPointToCanvas,
@@ -52,6 +55,8 @@ import {
   rasterizeSelectionMask,
   rectSelectionPolygon,
   removeLastSubpath,
+  resolvePixelSelectionAutoTarget,
+  resolveSelectionCombineOverride,
   rotateSelection,
   scaleSelection,
   selectAllPixels,
@@ -59,6 +64,7 @@ import {
   selectionCentroidNorm,
   setSelectionFeather,
   simplifyLassoPolygon,
+  snapLassoPointToEdge,
   subpathOutlinePoints,
   toggleSelectionInvert,
   transformSelectionMarquee,
@@ -1186,5 +1192,141 @@ describe("DOM 구조 타입 호환(컴파일 검증)", () => {
     expect(ctxCompat).toBeNull();
     expect(canvasCompat).toBeNull();
     expect(imageCompat).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 자석 올가미 — 휘도장·엣지 스냅·궤적 누적 (arm-anytime 웨이브 2026-07-24)
+// ---------------------------------------------------------------------------
+
+describe("자석 올가미 휘도장", () => {
+  // 좌: 검정(0), 우: 흰색(255)인 2×1 세로 경계 4×2 RGBA.
+  function verticalEdgeRgba(w: number, h: number, edgeX: number): Uint8ClampedArray {
+    const data = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        const o = (y * w + x) * 4;
+        const v = x >= edgeX ? 255 : 0;
+        data[o] = v;
+        data[o + 1] = v;
+        data[o + 2] = v;
+        data[o + 3] = 255;
+      }
+    }
+    return data;
+  }
+
+  it("luminanceFieldFromRgba — Rec.601 휘도, 크기 불일치는 null", () => {
+    const field = luminanceFieldFromRgba(verticalEdgeRgba(4, 2, 2), 4, 2);
+    expect(field).not.toBeNull();
+    expect(field!.width).toBe(4);
+    expect(field!.data[0]).toBe(0); // 좌측 검정
+    expect(field!.data[3]).toBe(255); // 우측 흰색
+    // 알파 0은 흰 배경 합성(255)으로 근사 — 가짜 경계 방지.
+    const transparent = new Uint8ClampedArray([10, 10, 10, 0]);
+    expect(luminanceFieldFromRgba(transparent, 1, 1)!.data[0]).toBe(255);
+    expect(luminanceFieldFromRgba(new Uint8ClampedArray(3), 4, 2)).toBeNull();
+  });
+
+  it("luminanceFieldGradientAt — 경계에서 최대, 평탄부는 0", () => {
+    const field = luminanceFieldFromRgba(verticalEdgeRgba(4, 2, 2), 4, 2)!;
+    // 경계(x=1↔2)에서 |Δx| 큼, 좌측 평탄부(x=0)는 0.
+    expect(luminanceFieldGradientAt(field, 1, 0)).toBeGreaterThan(
+      luminanceFieldGradientAt(field, 0, 0),
+    );
+  });
+
+  it("snapLassoPointToEdge — 근처 점을 가장 강한 가장자리 셀로 끌어당긴다", () => {
+    const field = luminanceFieldFromRgba(verticalEdgeRgba(8, 1, 4), 8, 1)!;
+    // 경계는 셀 3↔4 사이. 셀 2 중심(정규화 2.5/8)에서 시작하면 가장자리(셀 3 또는 4)로 스냅.
+    const snapped = snapLassoPointToEdge({ x: 2.5 / 8, y: 0.5 }, field, { searchRadiusPx: 3 });
+    const snappedCell = Math.round(snapped.x * 8 - 0.5);
+    expect(snappedCell === 3 || snappedCell === 4).toBe(true);
+  });
+
+  it("snapLassoPointToEdge — 평탄한 장(가장자리 없음)에서는 원점 유지", () => {
+    const flat = luminanceFieldFromRgba(new Uint8ClampedArray(8 * 4).fill(128), 8, 1)!;
+    const p = { x: 0.4, y: 0.5 };
+    expect(snapLassoPointToEdge(p, flat)).toEqual(p);
+  });
+
+  it("appendMagneticLassoPoint — field 없으면 일반 올가미와 동일, 결정적", () => {
+    const field = luminanceFieldFromRgba(verticalEdgeRgba(8, 1, 4), 8, 1)!;
+    const start: SelPoint[] = [{ x: 0.1, y: 0.5 }];
+    // field=null → 스냅 없이 그대로 누적(일반 올가미).
+    const plain = appendMagneticLassoPoint(start, { x: 0.3, y: 0.5 }, null);
+    expect(plain).toEqual(appendLassoPoint(start, { x: 0.3, y: 0.5 }));
+    // field 있으면 스냅된 점이 누적되고, 같은 입력은 같은 결과(결정성).
+    const a = appendMagneticLassoPoint(start, { x: 2.5 / 8, y: 0.5 }, field, { searchRadiusPx: 3 });
+    const b = appendMagneticLassoPoint(start, { x: 2.5 / 8, y: 0.5 }, field, { searchRadiusPx: 3 });
+    expect(a).toEqual(b);
+    expect(a.length).toBe(2);
+  });
+
+  it("updateSelectionDrag — magneticField 옵션이 lasso 궤적을 엣지로 스냅한다", () => {
+    const field = luminanceFieldFromRgba(verticalEdgeRgba(8, 1, 4), 8, 1)!;
+    const drag = beginSelectionDrag("lasso", "add", { x: 0.1, y: 0.5 });
+    const nextPlain = updateSelectionDrag(drag, { x: 2.5 / 8, y: 0.5 }, {});
+    const nextMagnetic = updateSelectionDrag(drag, { x: 2.5 / 8, y: 0.5 }, { magneticField: field });
+    // 자석 옵션이 있으면 마지막 점이 가장자리로 이동해 일반 궤적과 달라진다.
+    expect(nextMagnetic.points.at(-1)).not.toEqual(nextPlain.points.at(-1));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// arm-anytime — 자동 대상 획득 + 제스처 시작 결합 모드 (2026-07-24)
+// ---------------------------------------------------------------------------
+
+describe("resolvePixelSelectionAutoTarget", () => {
+  const box = (id: string, x: number, y: number, extra?: { hidden?: boolean; locked?: boolean }) => ({
+    id,
+    frame: { x, y, width: 100, height: 100, rotation: 0 },
+    ...extra,
+  });
+
+  it("포인터 아래 최상단(배열 뒤쪽) 편집 가능 이미지를 고른다", () => {
+    const res = resolvePixelSelectionAutoTarget([box("bottom", 0, 0), box("top", 0, 0)], { x: 50, y: 50 });
+    expect(res).toEqual({ kind: "target", id: "top" });
+  });
+
+  it("숨김 후보는 히트하지 않고 아래의 보이는 이미지를 고른다", () => {
+    const res = resolvePixelSelectionAutoTarget(
+      [box("visible", 0, 0), box("hidden-top", 0, 0, { hidden: true })],
+      { x: 50, y: 50 },
+    );
+    expect(res).toEqual({ kind: "target", id: "visible" });
+  });
+
+  it("잠긴 후보는 통과시켜 아래의 편집 가능 이미지를 고른다", () => {
+    const res = resolvePixelSelectionAutoTarget(
+      [box("editable", 0, 0), box("locked-top", 0, 0, { locked: true })],
+      { x: 50, y: 50 },
+    );
+    expect(res).toEqual({ kind: "target", id: "editable" });
+  });
+
+  it("편집 가능 히트가 전혀 없고 잠긴 이미지만 있으면 locked + 최상단 잠긴 id", () => {
+    const res = resolvePixelSelectionAutoTarget([box("locked", 0, 0, { locked: true })], { x: 50, y: 50 });
+    expect(res).toEqual({ kind: "locked", id: "locked" });
+  });
+
+  it("포인터 아래에 이미지가 없으면 none", () => {
+    expect(resolvePixelSelectionAutoTarget([box("far", 500, 500)], { x: 50, y: 50 })).toEqual({ kind: "none" });
+    expect(resolvePixelSelectionAutoTarget([], { x: 50, y: 50 })).toEqual({ kind: "none" });
+    expect(resolvePixelSelectionAutoTarget([box("a", 0, 0)], { x: Number.NaN, y: 50 })).toEqual({ kind: "none" });
+  });
+});
+
+describe("resolveSelectionCombineOverride", () => {
+  it("기존 선택이 없으면 base 유지(Shift/Alt 는 형태 제약 의미)", () => {
+    expect(resolveSelectionCombineOverride("add", { shift: true }, false)).toBe("add");
+    expect(resolveSelectionCombineOverride("add", { alt: true }, false)).toBe("add");
+  });
+
+  it("기존 선택이 있으면 Shift=add, Alt=subtract, 둘 다=intersect", () => {
+    expect(resolveSelectionCombineOverride("subtract", { shift: true }, true)).toBe("add");
+    expect(resolveSelectionCombineOverride("add", { alt: true }, true)).toBe("subtract");
+    expect(resolveSelectionCombineOverride("add", { shift: true, alt: true }, true)).toBe("intersect");
+    expect(resolveSelectionCombineOverride("subtract", {}, true)).toBe("subtract");
   });
 });

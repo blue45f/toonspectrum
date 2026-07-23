@@ -1050,19 +1050,25 @@ import {
   planSelectionAdjust,
   polyLassoCloseToStart,
   rasterizeSelectionMask,
+  resolvePixelSelectionAutoTarget,
+  resolveSelectionCombineOverride,
   selectAllPixels,
   selectionBoundsNorm,
   SELECTION_BRUSH_RADIUS_DEFAULT,
+  snapLassoPointToEdge,
   toggleSelectionInvert,
   transformSelectionMarquee,
   updateSelectionDrag,
   type PixelSelection,
+  type PixelSelectionAutoTargetCandidate,
+  type PixelSelectionAutoTargetResolution,
   type PolyLassoSession,
   type SelectionAdjustPlan,
   type SelectionCombineMode,
   type SelectionContentTransform,
   type SelectionDragState,
   type SelectionFrame,
+  type SelectionLuminanceField,
   type SelectionToolKind,
   type SelPoint,
 } from "./studio-selection-tools";
@@ -9532,7 +9538,17 @@ function StudioCuttoonEditor() {
     frame: SelectionFrame;
     drag: SelectionDragState;
     pointerId: number;
+    /** 자석 올가미 휘도장 스냅샷(드래그 시작 시점) — null 이면 일반 올가미와 동일하게 동작. */
+    magneticField: SelectionLuminanceField | null;
   } | null>(null);
+  // arm-anytime(2026-07-24) — 대상 이미지 없이 무장된 픽셀 선택 도구의 첫 제스처가 방금 자동
+  // 획득한 이미지 id. 요소 전환 effect 가 이 값을 보고, 같은 포인터 제스처로 연 드래그/다각형
+  // 초안/완드 스캔을 취소하지 않는다(advanced fill 의 auto-arm ref 재무장과 동일한 패턴).
+  const pixelSelectionAutoTargetRef = useRef<string | null>(null);
+  // 자석 올가미(2026-07-24) — 옵션 토글 + 대상 이미지의 다운스케일 휘도장(비동기 로드, ref 소유).
+  const [pixelMagneticLasso, setPixelMagneticLasso] = useState(false);
+  const pixelMagneticFieldRef = useRef<{ elId: string; src: string; field: SelectionLuminanceField } | null>(null);
+  const pixelMagneticFieldRunIdRef = useRef(0);
   const pixelSelectionCaptureTargetRef = useRef<Element | null>(null);
   const pixelSelectionHandledNativeEndEventsRef = useRef(new WeakSet<Event>());
   const pixelSelectionPointerGlobalEndRef = useRef<
@@ -9685,10 +9701,18 @@ function StudioCuttoonEditor() {
     };
   }, [releasePixelSelectionPointerCapture]);
   // 선택 요소가 바뀌면 픽셀 선택·진행 중 드래그·busy 를 해제한다(선택 영역은 이미지 1개 귀속).
+  // 예외(arm-anytime 2026-07-24): 첫 제스처가 방금 자동 획득한 대상으로의 전환이면, 같은
+  // 포인터 제스처로 연 드래그/다각형 초안/완드 스캔을 살려 둔다 — 히스토리/선택 상태는
+  // 어차피 비어 있던 것을 새 소유자 id 로 다시 바인딩할 뿐이다.
   useEffect(() => {
+    const autoTargetId = pixelSelectionAutoTargetRef.current;
+    pixelSelectionAutoTargetRef.current = null;
+    const keepAutoTargetGesture = autoTargetId !== null && autoTargetId === selectedImageElementId;
     cancelLiquifyPointerSession();
-    cancelPixelSelectionPointerSession();
-    clearPolyLassoDraft();
+    if (!keepAutoTargetGesture) {
+      cancelPixelSelectionPointerSession();
+      clearPolyLassoDraft();
+    }
     pixelSelectionDocumentHistoryOwnsLatestEditRef.current = false;
     const history = createPixelSelectionHistory(
       selectedImageElementId,
@@ -9699,8 +9723,10 @@ function StudioCuttoonEditor() {
     pixelSelRef.current = null;
     setPixelSelectionHistory(history);
     setPixelSel(null);
-    setPixelBusy(false);
-    pixelWandRunIdRef.current += 1; // 요소가 바뀌면 진행 중인 매직완드 스캔 결과를 무효화한다.
+    if (!keepAutoTargetGesture) {
+      setPixelBusy(false);
+      pixelWandRunIdRef.current += 1; // 요소가 바뀌면 진행 중인 매직완드 스캔 결과를 무효화한다.
+    }
     colorRangeRunIdRef.current += 1; // 색상 범위 스캔도 함께 무효화 — 샘플은 다른 이미지 기준이라 비운다.
     setColorRangeSamples([]);
   }, [cancelLiquifyPointerSession, cancelPixelSelectionPointerSession, selectedImageElementId]);
@@ -12158,12 +12184,84 @@ function StudioCuttoonEditor() {
   // 무장 중엔 캔버스 드래그를 픽셀 선택으로 가로채므로 요소 드래그/클릭 선택 전환을 함께 잠근다.
   const pixelToolArmed =
     pixelTool !== null && !pixelBusy && selected?.type === "image" && !selectedContentMutationLocked;
+  // arm-anytime(2026-07-24) — 대상 이미지 없이 무장된 픽셀 선택 도구. 첫 캔버스 제스처가
+  // 포인터 아래 최상단의 편집 가능 이미지를 자동 획득한다(Photoshop/CSP 관례). 검토 잠금은
+  // 표면 전체 잠금이라 여기서도 무장 불가. 비이미지 요소(잠김 포함)가 선택돼 있어도 무장된다.
+  const pixelToolAutoTargetArmed =
+    pixelTool !== null && !pixelBusy && selected?.type !== "image" && !activeSurfaceReviewLocked;
+  // 캔버스 자식(커서/요소 드래그·클릭 선택 잠금)에는 두 무장 상태를 합쳐 넘긴다 — 자동 획득
+  // 대기 중에도 crosshair 커서와 "제스처는 도구가 가져간다" 규약이 유지된다.
+  const pixelToolGestureArmed = pixelToolArmed || pixelToolAutoTargetArmed;
+  // arm-anytime(2026-07-24) — 포인터 아래 최상단의 편집 가능 이미지를 결정한다(순수 리졸버 위임).
+  // 이미지 후보만 위→아래 z순서로 모아 넘긴다(숨김/잠금 판정은 그룹 상속까지 포함). 검토잠금
+  // 표면에서는 후보를 비워 항상 none — 작업에셋 파괴잠금은 획득 후 커밋 단계에서 재차 가드된다.
+  const acquirePixelSelectionAutoTarget = (
+    pos: { x: number; y: number },
+  ): PixelSelectionAutoTargetResolution => {
+    if (activeSurfaceReviewLocked) return { kind: "none" };
+    const candidates: PixelSelectionAutoTargetCandidate[] = [];
+    for (const el of elements) {
+      if (el.type !== "image") continue;
+      candidates.push({
+        id: el.id,
+        frame: { x: el.x, y: el.y, width: el.width, height: el.height, rotation: el.rotation },
+        hidden: isEffectivelyHidden(el, groups),
+        locked: isEffectivelyLocked(el, groups),
+      });
+    }
+    return resolvePixelSelectionAutoTarget(candidates, pos);
+  };
   // 마칭앤츠 오버레이용 프레임/선택 — 이미지 요소가 아닐 땐 null(오버레이 미마운트).
   const pixelOverlayFrame: SelectionFrame | null =
     selected?.type === "image"
       ? { x: selected.x, y: selected.y, width: selected.width, height: selected.height, rotation: selected.rotation }
       : null;
   const pixelOverlaySel = pixelSel && (pixelSel.subpaths.length > 0 || pixelSel.invert) ? pixelSel : null;
+  // 자석 올가미(2026-07-24) — 올가미가 무장되고 옵션이 켜진 동안 대상 이미지의 휘도장을
+  // 비동기 로드해 ref 에 캐시한다. 로드 전/실패 시엔 스냅 없는 일반 올가미로 조용히 폴백.
+  const magneticLassoFieldKey =
+    pixelMagneticLasso && pixelTool === "lasso" && selected?.type === "image" && selectedImageElementId
+      ? `${selectedImageElementId} ${selected.src} ${selected.flipped ? 1 : 0}${selected.flippedY ? 1 : 0}`
+      : null;
+  const magneticLassoFieldSrc = magneticLassoFieldKey && selected?.type === "image" ? selected.src : null;
+  const magneticLassoFieldFlipX = selected?.type === "image" ? !!selected.flipped : false;
+  const magneticLassoFieldFlipY = selected?.type === "image" ? !!selected.flippedY : false;
+  useEffect(() => {
+    if (!magneticLassoFieldKey || !magneticLassoFieldSrc || !selectedImageElementId) {
+      pixelMagneticFieldRef.current = null; // 대상이 사라지면 비운다(다시 켜면 다시 로드).
+      return;
+    }
+    const cached = pixelMagneticFieldRef.current;
+    if (cached && cached.src === magneticLassoFieldKey) return;
+    const runId = ++pixelMagneticFieldRunIdRef.current;
+    const elId = selectedImageElementId;
+    void (async () => {
+      try {
+        const { sampleImageLuminanceField } = await loadStudioPixelEditBrushRuntime();
+        const field = await sampleImageLuminanceField(magneticLassoFieldSrc, {
+          flipX: magneticLassoFieldFlipX,
+          flipY: magneticLassoFieldFlipY,
+        });
+        if (runId !== pixelMagneticFieldRunIdRef.current) return;
+        pixelMagneticFieldRef.current = { elId, src: magneticLassoFieldKey, field };
+      } catch {
+        // 휘도장 로드 실패는 제스처를 막지 않는다 — 스냅 없는 일반 올가미로 동작한다.
+        if (runId === pixelMagneticFieldRunIdRef.current) pixelMagneticFieldRef.current = null;
+      }
+    })();
+  }, [
+    magneticLassoFieldKey,
+    magneticLassoFieldSrc,
+    magneticLassoFieldFlipX,
+    magneticLassoFieldFlipY,
+    selectedImageElementId,
+  ]);
+  /** 현재 드래그에 쓸 자석 휘도장 — 옵션 on + 캐시가 지금 대상과 일치할 때만. */
+  const currentMagneticLassoField = (): SelectionLuminanceField | null => {
+    if (!magneticLassoFieldKey) return null;
+    const cached = pixelMagneticFieldRef.current;
+    return cached && cached.src === magneticLassoFieldKey ? cached.field : null;
+  };
   // 크롭 모드 무장(이미지 요소 선택 + 크롭 rect 존재) — 무장 중엔 스테이지 드래그를 크롭 rect
   // 조작으로 가로채고, 요소 드래그/클릭 선택 전환을 함께 잠근다(픽셀 선택 도구와 동일 정책).
   const cropArmed =
@@ -22055,28 +22153,59 @@ function StudioCuttoonEditor() {
     // 드로잉보다 우선). 트랜스포머 앵커는 예외(선택이 정규화 좌표라 리사이즈/회전을 따라간다),
     // Space/Hand 팬도 예외. 시작점은 이미지 밖이어도 된다(rect/ellipse 는 0..1 로 클램프).
     if (
-      pixelToolArmed &&
-      selected?.type === "image" &&
+      pixelToolGestureArmed &&
       !isSpacePressed &&
       tool !== "hand" &&
       !(e.target.getParent() instanceof KonvaRuntime.Transformer)
     ) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (!pos) return;
+      // 대상 이미지 해석 — 이미 편집 가능한 이미지가 선택돼 있으면 그대로, 아니면(arm-anytime)
+      // 포인터 아래 최상단 이미지를 자동 획득해 선택하고 이번 제스처를 그 위에서 시작한다.
+      // 자동 획득 id 를 ref 에 남겨 선택 변경 이펙트가 진행 중 제스처를 살려 두게 한다.
+      let pixelTarget: ImageEl | null =
+        pixelToolArmed && selected?.type === "image" ? selected : null;
+      if (!pixelTarget) {
+        const resolution = acquirePixelSelectionAutoTarget(pos);
+        if (resolution.kind === "locked") {
+          setError("이 위치의 이미지 레이어는 편집이 잠겨 있어요. 잠금을 먼저 해제하세요.");
+          return;
+        }
+        const acquired =
+          resolution.kind === "target" ? elementById.get(resolution.id) ?? null : null;
+        if (!acquired || acquired.type !== "image") {
+          setError("픽셀을 고를 이미지가 이 위치에 없어요. 이미지 레이어 위에서 다시 시작하세요.");
+          return;
+        }
+        pixelTarget = acquired;
+        pixelSelectionAutoTargetRef.current = acquired.id;
+        setMarqueeIds([]);
+        setSelectedId(acquired.id);
+      }
       const frame: SelectionFrame = {
-        x: selected.x,
-        y: selected.y,
-        width: selected.width,
-        height: selected.height,
-        rotation: selected.rotation,
+        x: pixelTarget.x,
+        y: pixelTarget.y,
+        width: pixelTarget.width,
+        height: pixelTarget.height,
+        rotation: pixelTarget.rotation,
       };
       if (pixelTool === "wand") {
         void runMagicWandSelect(pos, frame);
         return;
       }
+      // 제스처 시작 결합 모드 — 기존 선택이 있을 때만 Shift=합치기/Alt=빼기/둘 다=교집합으로
+      // 덮어쓴다(Photoshop/CSP 관례). 선택이 없으면 base(add) + Shift/Alt 는 정원/중심 제약 의미.
+      const effectiveCombine = resolveSelectionCombineOverride(
+        pixelCombine,
+        { shift: e.evt.shiftKey, alt: e.evt.altKey },
+        isSelectionUsable(pixelSelRef.current)
+      );
       // 다각형 올가미 — 클릭마다 꼭짓점. 시작점 근처 재클릭·더블클릭으로 닫기(드래그 세션 아님).
       if (pixelTool === "poly-lasso") {
-        const p = canvasPointToNormalized(pos.x, pos.y, frame);
+        const raw = canvasPointToNormalized(pos.x, pos.y, frame);
+        // 자석이 켜지고 휘도장이 로드됐으면 클릭 꼭짓점도 가까운 가장자리로 끌어당긴다.
+        const magneticField = currentMagneticLassoField();
+        const p = magneticField ? snapLassoPointToEdge(raw, magneticField) : raw;
         const existing = polyLassoSessionRef.current;
         const detail = "detail" in e.evt ? e.evt.detail : 1;
         if (existing && (detail >= 2 || polyLassoCloseToStart(existing, p))) {
@@ -22084,7 +22213,7 @@ function StudioCuttoonEditor() {
           return;
         }
         if (!existing) {
-          const next = beginPolyLassoSession(pixelCombine, p);
+          const next = beginPolyLassoSession(effectiveCombine, p);
           polyLassoSessionRef.current = next;
           setPolyLassoSession(next);
           setPolyLassoHover(null);
@@ -22097,10 +22226,10 @@ function StudioCuttoonEditor() {
         return;
       }
       // 브러시는 캔버스 px 반경을 요소 폭 기준 정규화 반경으로 넘긴다(다른 도구는 무시됨).
-      const brushRadiusNorm = pixelBrushRadius / Math.max(1, selected.width);
+      const brushRadiusNorm = pixelBrushRadius / Math.max(1, pixelTarget.width);
       const drag = beginSelectionDrag(
         pixelTool,
-        pixelCombine,
+        effectiveCombine,
         canvasPointToNormalized(pos.x, pos.y, frame),
         brushRadiusNorm,
         { forceCircle: pixelForceCircle || (pixelTool === "ellipse" && e.evt.shiftKey) }
@@ -22108,7 +22237,13 @@ function StudioCuttoonEditor() {
       const pointerId = Number.isFinite(stagePointerEvent.pointerId)
         ? stagePointerEvent.pointerId
         : 1;
-      pixelDragRef.current = { elId: selected.id, frame, drag, pointerId };
+      pixelDragRef.current = {
+        elId: pixelTarget.id,
+        frame,
+        drag,
+        pointerId,
+        magneticField: currentMagneticLassoField(),
+      };
       const captureTarget = stagePointerEvent.target instanceof Element
         ? stagePointerEvent.target
         : e.target.getStage()?.container() ?? null;
@@ -22749,6 +22884,7 @@ function StudioCuttoonEditor() {
             shift: e.evt.shiftKey,
             alt: e.evt.altKey,
             aspect,
+            magneticField: session.magneticField,
           }
         );
         if (next !== session.drag) {
@@ -25412,7 +25548,9 @@ function StudioCuttoonEditor() {
     announceDrawingShortcut("레이어 자르기");
   }
   function togglePixelMarquee(kind: "rect" | "circle") {
-    if (selected?.type !== "image" || selectedContentMutationLocked) return;
+    // arm-anytime(2026-07-24) — 편집 가능한 이미지가 선택돼 있지 않아도 무장한다. 첫 캔버스
+    // 제스처가 포인터 아래 이미지를 자동 획득한다. 검토 잠금이나 잠긴 이미지 선택 시에만 막는다.
+    if (activeSurfaceReviewLocked || (selected?.type === "image" && selectedContentMutationLocked)) return;
     const isActive = kind === "circle"
       ? pixelTool === "ellipse" && pixelForceCircle
       : pixelTool === "rect" && !pixelForceCircle;
@@ -29823,6 +29961,8 @@ function StudioCuttoonEditor() {
           pixelBrushRadius={pixelBrushRadius}
           pixelBusy={pixelBusy}
           pixelCombine={pixelCombine}
+          pixelMagneticLasso={pixelMagneticLasso}
+          onTogglePixelMagneticLasso={() => setPixelMagneticLasso((v) => !v)}
           pixelSel={pixelSel}
           pixelSelectionCanRedo={canRedoPixelSelectionHistory(
             pixelSelectionHistory,

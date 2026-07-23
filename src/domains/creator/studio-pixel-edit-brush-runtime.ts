@@ -6,5 +6,5 @@
  * startup code no longer consume the initial Studio route budget.
  */
 export { bakeHealCloneStrokeToCanvas } from "./studio-heal-clone-browser";
-export { magicWandScanFromImage } from "./studio-magic-wand-browser";
+export { magicWandScanFromImage, sampleImageLuminanceField } from "./studio-magic-wand-browser";
 export { smudgeStrokeImage } from "./studio-smudge-browser";

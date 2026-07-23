@@ -402,6 +402,8 @@ interface StudioInspectorAsideProps {
   pixelBrushRadius: number;
   pixelBusy: boolean;
   pixelCombine: SelectionCombineMode;
+  pixelMagneticLasso: boolean;
+  onTogglePixelMagneticLasso: () => void;
   pixelSel: PixelSelection | null;
   pixelSelectionCanRedo: boolean; pixelSelectionCanUndo: boolean;
   pixelTool: SelectionToolKind | "wand" | null;
@@ -716,6 +718,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   pixelBrushRadius,
   pixelBusy,
   pixelCombine,
+  pixelMagneticLasso,
+  onTogglePixelMagneticLasso,
   pixelSel,
   pixelSelectionCanRedo,
   pixelSelectionCanUndo,
@@ -2267,6 +2271,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     onCombineModeChange={setPixelCombine}
                     onFeatherChange={(px) => commitPixelSelectionState((selection) => selection ? setSelectionFeather(selection, px) : selection, "feather", "feather")}
                     onToggleInvert={() => commitPixelSelectionState((selection) => toggleSelectionInvert(selection ?? emptyPixelSelection()), "invert")}
+                    magneticLasso={pixelMagneticLasso}
+                    onToggleMagnetic={onTogglePixelMagneticLasso}
                     canUndoSelection={pixelSelectionCanUndo}
                     canRedoSelection={pixelSelectionCanRedo}
                     onUndoSelection={undoPixelSelectionState}

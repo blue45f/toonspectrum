@@ -941,7 +941,31 @@ export type SelectionDragModifiers = {
   alt?: boolean;
   /** 요소 height/width — 화면상 정원 보정. */
   aspect?: number;
+  /**
+   * 자석 올가미 휘도장 — lasso/poly-lasso 궤적 누적 시 각 점을 가까운 휘도 가장자리로
+   * 스냅한다(자석 올가미). null/미설정이면 일반 올가미와 동일(스냅 없음).
+   */
+  magneticField?: SelectionLuminanceField | null;
 };
+
+/**
+ * 제스처 "시작" 수정자 → 결합 모드 오버라이드(Photoshop/CSP 관례 — 2026-07-24).
+ * 기존 선택이 있을 때만 Shift=합치기, Alt=빼기, Shift+Alt=교집합으로 덮어쓴다 —
+ * 선택이 없으면 Shift/Alt 는 오늘처럼 정사각(Shift)/중심 확장(Alt) 제약 의미를 유지한다
+ * (Photoshop 도 선택이 없으면 Shift 를 비율 제약으로 해석한다). 드래그 "중" 수정자는
+ * 계속 updateSelectionDrag 의 정원/중심 제약에만 쓰인다 — 두 의미가 공존한다.
+ */
+export function resolveSelectionCombineOverride(
+  base: SelectionCombineMode,
+  mods: { shift?: boolean; alt?: boolean },
+  hasExistingSelection: boolean
+): SelectionCombineMode {
+  if (!hasExistingSelection) return base;
+  if (mods.shift && mods.alt) return "intersect";
+  if (mods.shift) return "add";
+  if (mods.alt) return "subtract";
+  return base;
+}
 
 /**
  * 드래그 시작 — rect/ellipse 는 퇴화 폴리곤(면적 0), lasso/brush 는 시작점 1개로 초기화한다.
@@ -971,7 +995,11 @@ export function updateSelectionDrag(
 ): SelectionDragState {
   if (drag.tool === "lasso" || drag.tool === "poly-lasso" || drag.tool === "brush") {
     const points =
-      drag.tool === "brush" ? appendBrushPoint(drag.points, p, drag.brushRadius) : appendLassoPoint(drag.points, p);
+      drag.tool === "brush"
+        ? appendBrushPoint(drag.points, p, drag.brushRadius)
+        : mods?.magneticField
+          ? appendMagneticLassoPoint(drag.points, p, mods.magneticField)
+          : appendLassoPoint(drag.points, p);
     return points === drag.points ? drag : { ...drag, points };
   }
   const corners = constrainSelectionDragCorners(drag.start, p, {
@@ -1025,6 +1053,184 @@ export function canvasPointToNormalized(px: number, py: number, frame: Selection
   const lx = dx * cos + dy * sin;
   const ly = -dx * sin + dy * cos;
   return { x: clampNum(lx / w, -1e6, 1e6), y: clampNum(ly / h, -1e6, 1e6) };
+}
+
+// ---------------------------------------------------------------------------
+// (5b) arm-anytime 자동 대상 획득 — 포인터 아래 최상단 이미지 결정(순수, 2026-07-24)
+// ---------------------------------------------------------------------------
+
+/**
+ * 자동 대상 후보 — z순서 아래→위(캔버스 렌더 순서 그대로) 배열로 넘긴다.
+ * hidden/locked 평가(그룹 상속 포함)는 호출자(StudioPage)가 미리 끝내서 넣는다.
+ */
+export type PixelSelectionAutoTargetCandidate = {
+  id: string;
+  frame: SelectionFrame;
+  hidden?: boolean;
+  locked?: boolean;
+};
+
+/**
+ * 자동 대상 결정 결과.
+ *  - target: 히트한 최상단의 편집 가능 이미지.
+ *  - locked: 편집 가능 히트가 없고 잠긴 이미지만 히트 — 최상단 잠긴 id(잠금 안내 문구용).
+ *  - none  : 포인터 아래에 보이는 이미지가 없음(죽은 클릭 안내용).
+ */
+export type PixelSelectionAutoTargetResolution =
+  | { kind: "target"; id: string }
+  | { kind: "locked"; id: string }
+  | { kind: "none" };
+
+/**
+ * 픽셀 선택 도구를 이미지 선택 없이 무장(arm-anytime)했을 때, 첫 제스처의 포인터 아래에서
+ * 대상 이미지를 자동 획득한다(Photoshop/CSP 관례). 규칙:
+ *  - 숨김 후보는 히트 자체가 안 된다(보이지 않으면 고를 수 없다).
+ *  - 잠긴 후보는 아래로 통과시킨다(겹친 아래쪽의 편집 가능 이미지를 살린다). 편집 가능 히트가
+ *    하나도 없으면 최상단 잠긴 히트를 돌려줘 안내 문구를 띄울 수 있게 한다.
+ *  - 회전 요소는 canvasPointToNormalized 의 역회전으로 정확히 히트테스트한다.
+ * 결정적: 같은 입력은 항상 같은 결과(순회 순서 고정, 랜덤/Date 없음).
+ */
+export function resolvePixelSelectionAutoTarget(
+  candidates: readonly PixelSelectionAutoTargetCandidate[],
+  point: { x: number; y: number }
+): PixelSelectionAutoTargetResolution {
+  if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return { kind: "none" };
+  let topLockedHitId: string | null = null;
+  for (let i = candidates.length - 1; i >= 0; i -= 1) {
+    const candidate = candidates[i]!;
+    if (candidate.hidden) continue;
+    const { frame } = candidate;
+    if (
+      !Number.isFinite(frame.width) || !Number.isFinite(frame.height) ||
+      frame.width === 0 || frame.height === 0
+    ) {
+      continue;
+    }
+    const p = canvasPointToNormalized(point.x, point.y, frame);
+    if (p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1) continue;
+    if (candidate.locked) {
+      topLockedHitId ??= candidate.id;
+      continue;
+    }
+    return { kind: "target", id: candidate.id };
+  }
+  return topLockedHitId !== null ? { kind: "locked", id: topLockedHitId } : { kind: "none" };
+}
+
+// ---------------------------------------------------------------------------
+// (5c) 자석 올가미 — 휘도장 기반 가장자리 스냅(순수, 픽셀 샘플러 주입 · 2026-07-24)
+// ---------------------------------------------------------------------------
+
+/** 자석 올가미 휘도장 해상도 상한(긴 변 px) — 스냅 검색용이라 마스크 추적보다 낮아도 충분하다. */
+export const MAGNETIC_LASSO_FIELD_MAX_DIM = 320;
+/** 스냅 검색 반경(휘도장 px) — 이 안에서 가장 강한 가장자리로 끌어당긴다. */
+export const MAGNETIC_LASSO_SEARCH_RADIUS_PX = 10;
+/** 가장자리로 인정할 최소 그래디언트 크기(0..255 휘도 차 스케일) — 미만이면 스냅하지 않는다. */
+export const MAGNETIC_LASSO_MIN_GRADIENT = 24;
+
+/**
+ * 다운스케일 휘도장 — data[y*width+x] = 0..255 휘도. 브라우저 쪽(sampleImageLuminanceField)이
+ * 표시 좌표계(요소 flip 반영)로 만들어 주입하므로, 이 코어의 정규화 좌표와 축이 항상 일치한다.
+ */
+export type SelectionLuminanceField = {
+  width: number;
+  height: number;
+  data: ArrayLike<number>;
+};
+
+/** RGBA 평탄 배열 → 휘도장(Rec.601 luma). 길이가 width*height*4 와 안 맞으면 null. */
+export function luminanceFieldFromRgba(
+  rgba: ArrayLike<number>,
+  width: number,
+  height: number
+): SelectionLuminanceField | null {
+  const w = Math.round(width);
+  const h = Math.round(height);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return null;
+  if (rgba.length < w * h * 4) return null;
+  const data = new Uint8ClampedArray(w * h);
+  for (let i = 0; i < w * h; i += 1) {
+    const o = i * 4;
+    // Rec.601 — 마술봉/플러드필과 같은 지각 가중치 계열. 알파는 흰 배경 합성으로 근사한다
+    // (투명 픽셀이 0(검정)으로 읽혀 실제 콘텐츠 경계보다 강한 가짜 가장자리를 만들지 않도록).
+    const a = (rgba[o + 3] ?? 255) / 255;
+    const lum =
+      0.299 * (rgba[o] ?? 0) + 0.587 * (rgba[o + 1] ?? 0) + 0.114 * (rgba[o + 2] ?? 0);
+    data[i] = Math.round(lum * a + 255 * (1 - a));
+  }
+  return { width: w, height: h, data };
+}
+
+/** 휘도장 안전 읽기 — 경계는 복제 패딩(클램프). */
+function luminanceAt(field: SelectionLuminanceField, x: number, y: number): number {
+  const cx = x < 0 ? 0 : x >= field.width ? field.width - 1 : x;
+  const cy = y < 0 ? 0 : y >= field.height ? field.height - 1 : y;
+  return Number(field.data[cy * field.width + cx] ?? 0);
+}
+
+/** 휘도장 (x,y)의 그래디언트 크기 — 중앙차분 |∂x|+|∂y| (결정적, 경계 복제 패딩). */
+export function luminanceFieldGradientAt(field: SelectionLuminanceField, x: number, y: number): number {
+  const dx = luminanceAt(field, x + 1, y) - luminanceAt(field, x - 1, y);
+  const dy = luminanceAt(field, x, y + 1) - luminanceAt(field, x, y - 1);
+  return Math.abs(dx) + Math.abs(dy);
+}
+
+/**
+ * 자석 올가미 스냅 — 점 주변 검색창(searchRadiusPx)에서 가장 강한 휘도 가장자리 셀로 점을
+ * 끌어당긴다. 최강 그래디언트가 minGradient 미만이면 원래 점을 그대로 반환한다(스냅 없음).
+ * 타이브레이크(결정적): 그래디언트 큰 쪽 → 원점에 가까운 쪽 → 행 우선(작은 y, 작은 x).
+ * 좌표 규약: 셀 i 의 중심 = (i + 0.5) / size — 반환 점도 셀 중심 정규화 좌표다.
+ */
+export function snapLassoPointToEdge(
+  p: SelPoint,
+  field: SelectionLuminanceField,
+  opts?: { searchRadiusPx?: number; minGradient?: number }
+): SelPoint {
+  const w = field.width;
+  const h = field.height;
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return p;
+  if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return p;
+  const radius = Math.max(0, Math.round(opts?.searchRadiusPx ?? MAGNETIC_LASSO_SEARCH_RADIUS_PX));
+  const minGradient = opts?.minGradient ?? MAGNETIC_LASSO_MIN_GRADIENT;
+  const fx = p.x * w - 0.5;
+  const fy = p.y * h - 0.5;
+  const cx = Math.min(w - 1, Math.max(0, Math.round(fx)));
+  const cy = Math.min(h - 1, Math.max(0, Math.round(fy)));
+  let bestX = -1;
+  let bestY = -1;
+  let bestScore = -Infinity;
+  let bestDistSq = Infinity;
+  for (let y = Math.max(0, cy - radius); y <= Math.min(h - 1, cy + radius); y += 1) {
+    for (let x = Math.max(0, cx - radius); x <= Math.min(w - 1, cx + radius); x += 1) {
+      const score = luminanceFieldGradientAt(field, x, y);
+      if (score < minGradient) continue;
+      const dx = x - fx;
+      const dy = y - fy;
+      const distSq = dx * dx + dy * dy;
+      if (score > bestScore || (score === bestScore && distSq < bestDistSq)) {
+        bestScore = score;
+        bestDistSq = distSq;
+        bestX = x;
+        bestY = y;
+      }
+    }
+  }
+  if (bestX < 0) return p;
+  return { x: (bestX + 0.5) / w, y: (bestY + 0.5) / h };
+}
+
+/**
+ * 자석 올가미 점 추가 — field 가 있으면 스냅 후 appendLassoPoint 와 동일한 불변 규약으로
+ * 궤적에 잇는다(안 늘면 같은 배열). field 가 null 이면(휘도장 로딩 전) 일반 올가미와 동일.
+ */
+export function appendMagneticLassoPoint(
+  points: readonly SelPoint[],
+  p: SelPoint,
+  field: SelectionLuminanceField | null,
+  opts?: { searchRadiusPx?: number; minGradient?: number; minDist?: number }
+): SelPoint[] {
+  const snapped = field ? snapLassoPointToEdge(p, field, opts) : p;
+  return appendLassoPoint(points, snapped, opts?.minDist ?? LASSO_MIN_POINT_DIST);
 }
 
 /** 정규화 좌표 → 캔버스 좌표 — canvasPointToNormalized 의 역변환. */
