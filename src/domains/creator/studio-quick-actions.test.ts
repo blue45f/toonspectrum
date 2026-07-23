@@ -60,6 +60,9 @@ describe("studio quick actions preferences", () => {
       "fit-width",
       "add-bubble",
       "advanced-fill",
+      "quick-mask",
+      "wet-mix",
+      "dodge-burn",
     ]);
   });
 

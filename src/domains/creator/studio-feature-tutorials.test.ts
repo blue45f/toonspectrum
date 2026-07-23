@@ -41,6 +41,55 @@ describe("studio-feature-tutorials catalog", () => {
     expect(STUDIO_FEATURE_TUTORIAL_BY_ID.has("bubble")).toBe(true);
     expect(STUDIO_FEATURE_TUTORIAL_BY_ID.has("pen")).toBe(true);
   });
+
+  it("신규 도구 웨이브(보정·선택 등) 튜토리얼이 포함된다", () => {
+    const newIds = [
+      "wet-mix",
+      "dual-brush",
+      "sketch-shape",
+      "special-rulers",
+      "dodge-burn",
+      "quick-mask",
+      "color-range",
+      "path-boolean",
+      "mannequin",
+      "room-builder",
+      "gif-export",
+    ];
+    for (const id of newIds) {
+      expect(STUDIO_FEATURE_TUTORIAL_BY_ID.has(id), `missing tutorial: ${id}`).toBe(true);
+    }
+    expect(STUDIO_FEATURE_TUTORIALS.length).toBe(22);
+  });
+
+  it("배지는 1~2자, tryAction 은 StudioPage 가 배선한 키만 쓴다", () => {
+    // StudioPage.handleTutorialTry 의 switch 분기와 일치해야 하는 키 집합.
+    // 새 키를 추가하려면 StudioPage 분기를 먼저 배선한 뒤 이 목록을 갱신한다.
+    const wiredTryActions = new Set([
+      "pen",
+      "smart-shape",
+      "bubble",
+      "brush",
+      "template",
+      "layers",
+      "character",
+      "bg3d",
+      "ai-assist",
+      "dialogue",
+      "export",
+      "wet-mix",
+      "dodge-burn",
+      "quick-mask",
+      "mannequin",
+      "frame-anim",
+    ]);
+    for (const t of STUDIO_FEATURE_TUTORIALS) {
+      expect(t.badge.length, `badge too long: ${t.id}`).toBeLessThanOrEqual(2);
+      if (t.tryAction !== undefined) {
+        expect(wiredTryActions.has(t.tryAction), `unwired tryAction on ${t.id}: ${t.tryAction}`).toBe(true);
+      }
+    }
+  });
 });
 
 describe("tutorial progress", () => {

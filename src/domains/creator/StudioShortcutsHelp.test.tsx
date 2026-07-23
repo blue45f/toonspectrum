@@ -32,6 +32,13 @@ describe("StudioShortcutsHelp", () => {
     expect(html).toContain("대화상자·검토 또는 협업 잠금");
   });
 
+  it("픽셀 보정·선택 신규 단축키(N·⇧N·O·Q)를 안내한다", () => {
+    const html = renderToStaticMarkup(<StudioShortcutsHelp open onClose={() => undefined} />);
+    expect(html).toContain("혼합(스머지) · 혼색 브러시");
+    expect(html).toContain("닷지/번/스펀지");
+    expect(html).toContain("퀵 마스크 켬 · 선택 영역으로 완료");
+  });
+
   it("접근 가능한 제목을 가진 고정 모달과 모바일 44px 닫기 타깃을 유지한다", () => {
     const html = renderToStaticMarkup(<StudioShortcutsHelp open onClose={() => undefined} />);
 

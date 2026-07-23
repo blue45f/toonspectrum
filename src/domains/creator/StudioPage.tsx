@@ -4906,6 +4906,21 @@ function StudioCuttoonEditor() {
       case "export":
         setExportMenuOpen(true);
         break;
+      case "wet-mix":
+        toggleWetMixTool();
+        break;
+      case "dodge-burn":
+        toggleDodgeBurnTool();
+        break;
+      case "quick-mask":
+        if (!quickMaskActive) enterQuickMask();
+        break;
+      case "mannequin":
+        setMannequinPoserOpen(true);
+        break;
+      case "frame-anim":
+        openFrameAnimationForSelected();
+        break;
       default:
         break;
     }
@@ -16531,7 +16546,12 @@ function StudioCuttoonEditor() {
     setColorWheelOpen(false);
     // 화면 보기/패널 열기 외의 작업은 이전 armed 캔버스 제스처가 다음 탭을 가로채지 않게 종료한다.
     // 특히 복제·삭제·말풍선 추가도 도구 상태를 바꾸지 않아 예전 armed 상태가 남기 쉬웠다.
-    if (action !== "fit-width" && action !== "properties" && action !== "advanced-fill") {
+    // quick-mask/wet-mix/dodge-burn 토글은 자체적으로 disarm을 호출하므로 여기서 이중 해제하지 않는다
+    // (여기서 먼저 disarm하면 "켜짐 상태"를 읽어 토글이 항상 켜기만 하게 된다).
+    if (
+      action !== "fit-width" && action !== "properties" && action !== "advanced-fill" &&
+      action !== "quick-mask" && action !== "wet-mix" && action !== "dodge-burn"
+    ) {
       disarmAllPixelTools();
     }
 
@@ -16560,6 +16580,11 @@ function StudioCuttoonEditor() {
     else if (action === "fit-width") fitCanvasToWidth();
     else if (action === "add-bubble") addBubble("speech");
     else if (action === "advanced-fill") toggleAdvancedFill();
+    else if (action === "quick-mask") {
+      if (quickMaskActive) commitQuickMask();
+      else enterQuickMask();
+    } else if (action === "wet-mix") toggleWetMixTool();
+    else if (action === "dodge-burn") toggleDodgeBurnTool();
   }
   const mobileHistoryGestureRef = useRef<{ undo: () => void; toggleUi: () => void }>({
     undo,
@@ -25907,6 +25932,12 @@ function StudioCuttoonEditor() {
       disabled.add("bring-front");
       disabled.add("add-bubble");
     }
+    // 픽셀 보정 3종은 이미지 레이어 선택+편집 가능 상태에서만 의미가 있다.
+    if (selected?.type !== "image" || selectedContentMutationLocked) {
+      disabled.add("quick-mask");
+      disabled.add("wet-mix");
+      disabled.add("dodge-burn");
+    }
     return disabled;
   }, [
     hi,
@@ -25916,6 +25947,7 @@ function StudioCuttoonEditor() {
     selected,
     marqueeIds,
     activePageMutationLocked,
+    selectedContentMutationLocked,
   ]);
   // 모바일 한 손 모드에서 퀵 메뉴 트리거 자체를 DOM 순서로 좌/우 끝에 옮긴다.
   // flex-row-reverse를 쓰지 않아 보이는 순서와 키보드/스위치 제어 순서가 항상 일치한다.

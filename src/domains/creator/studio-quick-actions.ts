@@ -30,6 +30,9 @@ export const QUICK_ACTION_IDS = [
   "fit-width",
   "add-bubble",
   "advanced-fill",
+  "quick-mask",
+  "wet-mix",
+  "dodge-burn",
 ] as const;
 
 export type StudioQuickActionId = (typeof QUICK_ACTION_IDS)[number];

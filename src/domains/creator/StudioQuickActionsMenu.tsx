@@ -7,8 +7,11 @@ import {
   MousePointer2,
   Move,
   PenTool,
+  Contrast,
+  Droplets,
   PaintBucket,
   Pipette,
+  Scan,
   Redo2,
   Settings2,
   SlidersHorizontal,
@@ -69,6 +72,9 @@ const ACTION_PRESENTATION: Record<
   "fit-width": { label: "폭 맞춤", Icon: Maximize2 },
   "add-bubble": { label: "말풍선 추가", Icon: MessageCirclePlus },
   "advanced-fill": { label: "고급 채우기", Icon: PaintBucket },
+  "quick-mask": { label: "퀵 마스크", Icon: Scan },
+  "wet-mix": { label: "혼색 브러시", Icon: Droplets },
+  "dodge-burn": { label: "닷지/번", Icon: Contrast },
 };
 
 export interface StudioQuickActionsMenuProps {

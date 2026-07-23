@@ -21,6 +21,8 @@ const GROUPS: ShortcutGroup[] = [
     rows: [
       { keys: "B", label: "펜으로 전환" },
       { keys: "E", label: "펜·지우개 전환" },
+      { keys: "N · ⇧N", label: "혼합(스머지) · 혼색 브러시" },
+      { keys: "O", label: "닷지/번/스펀지" },
       { keys: "[ · ]", label: "브러시 크기 ±1px" },
       { keys: "⇧ [ · ⇧ ]", label: "브러시 크기 ±5px" },
       { keys: "⌥ [ · ⌥ ]", label: "불투명도 ±5%" },
@@ -42,6 +44,7 @@ const GROUPS: ShortcutGroup[] = [
       { keys: "⌘A", label: "모두 선택" },
       { keys: "⌘D", label: "선택 해제" },
       { keys: "⌘⇧I", label: "픽셀 선택 반전" },
+      { keys: "Q", label: "퀵 마스크 켬 · 선택 영역으로 완료" },
       { keys: "⌘J", label: "요소 복제" },
       { keys: "G", label: "고급 채우기 켜기·끄기" },
       { keys: "Delete · ⌫", label: "픽셀 선택 삭제 · 없으면 요소 삭제" },
