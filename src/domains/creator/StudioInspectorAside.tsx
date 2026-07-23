@@ -79,6 +79,7 @@ import {
   type StickerEl,
   type TextEl,
 } from "./studio-element-model";
+import { type StudioExtendedBlendModeId } from "./studio-extended-blend";
 import { legacyTextGradientToSpec } from "./studio-gradient-engine";
 import { type HealCloneMode } from "./studio-heal-clone";
 import { uid } from "./studio-id";
@@ -127,6 +128,7 @@ import {
   StudioShapePickerGrid,
   StudioSmudgePanel,
   StudioDodgeBurnPanel,
+  StudioExtendedBlendPanel,
   StudioStrokeShapePanel,
   StudioTextEffectPanel,
   StudioTextPathPanel,
@@ -473,6 +475,9 @@ interface StudioInspectorAsideProps {
   undoPixelSelectionState: () => void;
   redoPixelSelectionState: () => void;
   runColorRangeApply: (opts?: { fuzziness?: number; coalesceKey?: string }) => Promise<void>;
+  applyExtendedBlendMergeDown: () => Promise<void>;
+  setExtendedBlendMode: import("react").Dispatch<import("react").SetStateAction<StudioExtendedBlendModeId>>;
+  setExtendedBlendOpacity: import("react").Dispatch<import("react").SetStateAction<number>>;
   enterQuickMask: () => void;
   commitQuickMask: () => void;
   exitQuickMask: () => void;
@@ -535,6 +540,10 @@ interface StudioInspectorAsideProps {
   smudgeBusy: boolean;
   smudgeRadius: number;
   smudgeStrength: number;
+  extendedBlendBusy: boolean;
+  extendedBlendMode: StudioExtendedBlendModeId;
+  extendedBlendOpacity: number;
+  extendedBlendUnavailableReason: string | null;
   dodgeBurnActive: boolean;
   dodgeBurnBusy: boolean;
   dodgeBurnExposure: number;
@@ -763,6 +772,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   setPixelForceCircle,
   commitPixelSelectionState, resetPixelSelectionState, undoPixelSelectionState, redoPixelSelectionState,
   runColorRangeApply,
+  applyExtendedBlendMergeDown,
+  setExtendedBlendMode,
+  setExtendedBlendOpacity,
   enterQuickMask,
   commitQuickMask,
   exitQuickMask,
@@ -825,6 +837,10 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   smudgeBusy,
   smudgeRadius,
   smudgeStrength,
+  extendedBlendBusy,
+  extendedBlendMode,
+  extendedBlendOpacity,
+  extendedBlendUnavailableReason,
   dodgeBurnActive,
   dodgeBurnBusy,
   dodgeBurnExposure,
@@ -1939,6 +1955,20 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     <option value="luminosity">광도 (Luminosity)</option>
                   </select>
                 </label>
+              )}
+
+              {selected.type === "image" && (
+                <Suspense fallback={null}>
+                  <StudioExtendedBlendPanel
+                    mode={extendedBlendMode}
+                    opacity={extendedBlendOpacity}
+                    busy={extendedBlendBusy}
+                    unavailableReason={extendedBlendUnavailableReason}
+                    onModeChange={setExtendedBlendMode}
+                    onOpacityChange={setExtendedBlendOpacity}
+                    onApply={() => void applyExtendedBlendMergeDown()}
+                  />
+                </Suspense>
               )}
 
               {/* 직접 좌표 및 크기 조정 (코미포 스타일) */}

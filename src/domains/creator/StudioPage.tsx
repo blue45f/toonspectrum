@@ -1336,6 +1336,7 @@ import type {
   ImageEl,
 } from "./studio-element-model";
 import type { StudioEmeresLibraryItem } from "./studio-emeres-library";
+import type { StudioExtendedBlendModeId } from "./studio-extended-blend";
 import type { StudioTutorialTryAction } from "./studio-feature-tutorials";
 import type {
   StudioFilterDraft,
@@ -2457,6 +2458,10 @@ function StudioCuttoonEditor() {
   );
   const [macroSession, setMacroSession] = useState<StudioMacroSession>(() => createStudioMacroSession());
   const [layerMergeBusy, setLayerMergeBusy] = useState(false);
+  // 확장 블렌드(포토샵 전용 10모드) — 라이브 합성 불가(Konva 백드롭 미지원)라 "아래와 병합" bake 전용.
+  // 엔진은 lazy 청크에 남기려고 기본값을 리터럴로 초기화한다(type-only import).
+  const [extendedBlendMode, setExtendedBlendMode] = useState<StudioExtendedBlendModeId>("linear-dodge");
+  const [extendedBlendOpacity, setExtendedBlendOpacity] = useState(1);
   function persistAppSettings(next: StudioAppSettings): boolean {
     const settingsSaved = saveStudioAppSettings(studioAppSettingsStorage(), next);
     const densitySaved = saveStudioUiDensityState(
@@ -15252,6 +15257,112 @@ function StudioCuttoonEditor() {
         elements: groupItems(elements, [...plan.removeIds], group.id) as El[],
       });
       setError(null);
+    } finally {
+      setLayerMergeBusy(false);
+      endLiveResourceEdit();
+    }
+  }
+
+  // 확장 블렌드 병합 — commitLayerMergePlan과 동일한 게이트/잠금/단일 undo 계약을 따르되,
+  // 소스 2장을 각자 공유 좌표계 캔버스에 래스터한 뒤 studio-extended-blend 엔진으로 합성한다.
+  async function applyExtendedBlendMergeDown() {
+    if (selected?.type !== "image") return;
+    const result = planStudioLayerMergeDown({ items: elements, groups, selectedId: selected.id });
+    if (!result.ok) {
+      setError(result.reason);
+      return;
+    }
+    if (masterEditMode) {
+      setError("마스터 편집 중에는 레이어 병합을 사용할 수 없어요.");
+      return;
+    }
+    if (pageEditLocked && !masterEditMode) {
+      setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 레이어를 편집해 주세요.");
+      return;
+    }
+    if (layerMergeBusy) return;
+    if (!(await beginLiveResourceEditAsync(result.plan.removeIds))) return;
+    setLayerMergeBusy(true);
+    try {
+      const plan = result.plan;
+      const { studioMergeBoundsFromSources } = await import("./studio-layer-merge-bake");
+      const { blendExtended, extendedBlendModeLabel } = await import("./studio-extended-blend");
+      const sources = plan.removeIds
+        .map((id) => elements.find((element) => element.id === id))
+        .filter((element): element is El => Boolean(element))
+        .map((element) => {
+          const bounds = elBounds(element);
+          return {
+            id: element.id,
+            type: element.type,
+            src: element.type === "image" ? element.src : undefined,
+            x: bounds.x,
+            y: bounds.y,
+            width: Math.max(1, bounds.w),
+            height: Math.max(1, bounds.h),
+            opacity: element.opacity,
+            rotation: "rotation" in element ? Number(element.rotation ?? 0) : 0,
+            flipped: element.type === "image" ? element.flipped : undefined,
+            flippedY: element.type === "image" ? element.flippedY : undefined,
+          };
+        });
+      const ordered = [...plan.sources]
+        .sort((a, b) => a.zIndex - b.zIndex)
+        .map((entry) => sources.find((source) => source.id === entry.id))
+        .filter((source): source is (typeof sources)[number] => Boolean(source));
+      if (ordered.length !== 2 || ordered.some((source) => source.type !== "image" || !source.src)) {
+        setError("이미지 레이어끼리만 확장 블렌드로 합칠 수 있습니다.");
+        return;
+      }
+      const bounds = studioMergeBoundsFromSources(ordered, plan.bounds);
+      const width = Math.max(1, Math.ceil(bounds.width));
+      const height = Math.max(1, Math.ceil(bounds.height));
+      // 소스별로 "각자" 캔버스에 병합 bake와 동일 레시피(회전/반전/불투명도)로 그려 픽셀을 뽑는다.
+      const layers: ImageData[] = [];
+      for (const source of ordered) {
+        const image = await loadStudioPixelEditImage(source.src!);
+        const made = createStudioPixelEditCanvas(width, height);
+        if (!made) throw new Error("캔버스를 만들 수 없습니다.");
+        const ctx = made.ctx;
+        ctx.clearRect(0, 0, width, height);
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, Math.max(0, source.opacity ?? 1));
+        const cx = source.x - bounds.x + source.width / 2;
+        const cy = source.y - bounds.y + source.height / 2;
+        ctx.translate(cx, cy);
+        ctx.rotate(((source.rotation ?? 0) * Math.PI) / 180);
+        ctx.scale(source.flipped ? -1 : 1, source.flippedY ? -1 : 1);
+        ctx.drawImage(image, -source.width / 2, -source.height / 2, source.width, source.height);
+        ctx.restore();
+        layers.push(ctx.getImageData(0, 0, width, height));
+      }
+      const blended = blendExtended(layers[0]!, layers[1]!, extendedBlendMode, extendedBlendOpacity);
+      const made = createStudioPixelEditCanvas(width, height);
+      if (!made) throw new Error("캔버스를 만들 수 없습니다.");
+      const outImage = made.ctx.createImageData(width, height);
+      outImage.data.set(blended.data);
+      made.ctx.putImageData(outImage, 0, 0);
+      const src = made.canvas.toDataURL("image/png");
+      // name은 ImageEl 리터럴이 아닌 병합 계약(StudioMergeBakeComposite)과 동일하게 spread로 싣는다.
+      const composite: ImageEl = {
+        ...{ name: `확장 블렌드 ${extendedBlendModeLabel(extendedBlendMode)}` },
+        id: uid(),
+        type: "image",
+        src,
+        x: bounds.x,
+        y: bounds.y,
+        width,
+        height,
+        rotation: 0,
+        opacity: 1,
+      };
+      commit(applyStudioLayerMergePlan(elements, plan, composite) as El[]);
+      setSelectedId(composite.id);
+      setMarqueeIds([]);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to apply extended blend merge:", err);
+      setError("확장 블렌드를 적용하지 못했습니다(이미지 픽셀 읽기/인코딩 실패).");
     } finally {
       setLayerMergeBusy(false);
       endLiveResourceEdit();
@@ -29617,6 +29728,19 @@ function StudioCuttoonEditor() {
           smudgeBusy={smudgeBusy}
           smudgeRadius={smudgeRadius}
           smudgeStrength={smudgeStrength}
+          extendedBlendBusy={layerMergeBusy}
+          extendedBlendMode={extendedBlendMode}
+          extendedBlendOpacity={extendedBlendOpacity}
+          extendedBlendUnavailableReason={(() => {
+            if (selected?.type !== "image") return "이미지 요소를 선택하세요.";
+            const index = elements.findIndex((element) => element.id === selected.id);
+            const below = index > 0 ? elements[index - 1] : undefined;
+            if (below?.type !== "image") return "바로 아래에 이미지 레이어가 있어야 합니다.";
+            return null;
+          })()}
+          applyExtendedBlendMergeDown={applyExtendedBlendMergeDown}
+          setExtendedBlendMode={setExtendedBlendMode}
+          setExtendedBlendOpacity={setExtendedBlendOpacity}
           dodgeBurnActive={dodgeBurnActive}
           dodgeBurnBusy={dodgeBurnBusy}
           dodgeBurnExposure={dodgeBurnExposure}

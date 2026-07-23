@@ -346,6 +346,10 @@ const StudioDodgeBurnPanel = lazyRetry(
   () => import("./StudioDodgeBurnPanel").then((mod) => ({ default: mod.StudioDodgeBurnPanel })),
   "StudioDodgeBurnPanel"
 );
+const StudioExtendedBlendPanel = lazyRetry(
+  () => import("./StudioExtendedBlendPanel").then((mod) => ({ default: mod.StudioExtendedBlendPanel })),
+  "StudioExtendedBlendPanel"
+);
 const StudioLiquifyPanel = lazyRetry(
   () => import("./StudioLiquifyPanel").then((mod) => ({ default: mod.StudioLiquifyPanel })),
   "StudioLiquifyPanel"
@@ -799,6 +803,7 @@ export {
   StudioShortcutsHelp,
   StudioSmudgePanel,
   StudioDodgeBurnPanel,
+  StudioExtendedBlendPanel,
   QuickStartPanel,
   StudioStickerGrid,
   StudioStockImagePanel,

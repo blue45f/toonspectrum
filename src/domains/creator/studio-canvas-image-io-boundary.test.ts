@@ -105,8 +105,8 @@ describe("Studio canvas image I/O module boundary", () => {
 
     expect(callCount(page.sourceFile, "loadStudioCanvasImageFile")).toBe(4);
     expect(callCount(page.sourceFile, "downscaleStudioCanvasDataUrl")).toBe(1);
-    expect(callCount(page.sourceFile, "loadStudioPixelEditImage")).toBe(15);
-    expect(page.source.match(/\bcreateStudioPixelEditCanvas\b/gu)).toHaveLength(17);
+    expect(callCount(page.sourceFile, "loadStudioPixelEditImage")).toBe(16);
+    expect(page.source.match(/\bcreateStudioPixelEditCanvas\b/gu)).toHaveLength(19);
     expect(page.source).not.toContain('from "./studio-gif-element"');
     expect(page.source).not.toContain('from "./studio-upload-image-safety"');
   });
