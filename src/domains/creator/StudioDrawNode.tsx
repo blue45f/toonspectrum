@@ -58,6 +58,8 @@ import {
 } from "./studio-brush-symmetry";
 import {
   composeNormalizedStudioBrushTipLayerDab,
+  composeStudioBrushDualTipAlphaMap,
+  studioBrushDualTipUsesSolidEllipse,
   type StudioBrushComposableDab,
 } from "./studio-brush-tip-composition";
 import {
@@ -362,13 +364,21 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           ...dynamicBrushPlan.dynamics.tipLayers.map((layer) => layer.tip),
         ];
         const grainActive = dynamicBrushPlan.dynamics.grain.amount > 0;
-        const tipUsesEllipse = tipDefinitions.map((tip) => (
-          !grainActive && studioBrushTipUsesSolidEllipse(tip)
+        // 듀얼 브러시는 1차 팁(index 0)에만 합성한다 — 비활성 시 두 함수 모두 기존과 동일 반환.
+        const dualBrush = dynamicBrushPlan.dynamics.dualBrush;
+        const tipUsesEllipse = tipDefinitions.map((tip, tipIndex) => (
+          !grainActive && (tipIndex === 0
+            ? studioBrushDualTipUsesSolidEllipse(tip, dualBrush)
+            : studioBrushTipUsesSolidEllipse(tip))
         ));
         return {
           tipUsesEllipse,
           tipAlphaMaps: tipDefinitions.map((tip, tipIndex) => (
-            tipUsesEllipse[tipIndex] ? null : buildStudioBrushTipAlphaMap(tip)
+            tipUsesEllipse[tipIndex]
+              ? null
+              : tipIndex === 0
+                ? composeStudioBrushDualTipAlphaMap(tip, dualBrush)
+                : buildStudioBrushTipAlphaMap(tip)
           )),
         };
       })()

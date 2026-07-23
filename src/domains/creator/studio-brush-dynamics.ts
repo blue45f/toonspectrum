@@ -23,8 +23,12 @@ import {
   type StudioBrushGrainSettings,
 } from "./studio-brush-material-dynamics";
 import {
+  normalizeStudioBrushDualBrushSettings,
   normalizeStudioBrushTipLayers,
+  studioBrushDualBrushSettingsAreIdentity,
+  type NormalizedStudioBrushDualBrushSettings,
   type NormalizedStudioBrushTipLayerSettings,
+  type StudioBrushDualBrushSettings,
   type StudioBrushTipLayerSettings,
 } from "./studio-brush-tip-composition";
 import {
@@ -155,6 +159,8 @@ export interface StudioBrushDynamicsSettings {
   grain?: StudioBrushGrainSettings | null;
   /** Up to two extra transformed tips; the legacy `tip` remains the primary. */
   tipLayers?: readonly StudioBrushTipLayerSettings[] | null;
+  /** Secondary tip texture that modulates the primary tip at composition time (dual brush). */
+  dualBrush?: StudioBrushDualBrushSettings | null;
   width?: StudioBrushDynamicsPropertySettings;
   size?: StudioBrushDynamicsPropertySettings;
   opacity?: StudioBrushDynamicsPropertySettings;
@@ -235,6 +241,12 @@ export interface NormalizedStudioBrushDynamicsSettings {
   colorDynamics: NormalizedStudioBrushColorDynamicsSettings;
   grain: NormalizedStudioBrushGrainSettings;
   tipLayers: readonly NormalizedStudioBrushTipLayerSettings[];
+  /**
+   * Omitted while it equals the no-op identity (disabled + untouched secondary tip), keeping the
+   * canonical serialization of pre-dual-brush snapshots byte-stable. Consumers treat a missing
+   * value as identity via `normalizeStudioBrushDualBrushSettings`/`composeStudioBrushDualTipAlphaMap`.
+   */
+  dualBrush?: NormalizedStudioBrushDualBrushSettings;
   width: NormalizedStudioBrushDynamicsProperty;
   opacity: NormalizedStudioBrushDynamicsProperty;
   flow: NormalizedStudioBrushDynamicsProperty;
@@ -593,6 +605,12 @@ function cloneTipLayers(
   return layers.map((layer) => ({ ...layer, tip: cloneTip(layer.tip) }));
 }
 
+function cloneDualBrush(
+  dualBrush: NormalizedStudioBrushDualBrushSettings
+): NormalizedStudioBrushDualBrushSettings {
+  return { ...dualBrush, tip: cloneTip(dualBrush.tip) };
+}
+
 function cloneNormalizedSettings(
   settings: NormalizedStudioBrushDynamicsSettings
 ): NormalizedStudioBrushDynamicsSettings {
@@ -608,6 +626,7 @@ function cloneNormalizedSettings(
     colorDynamics: { ...settings.colorDynamics },
     grain: { ...settings.grain },
     tipLayers: cloneTipLayers(settings.tipLayers),
+    ...(settings.dualBrush ? { dualBrush: cloneDualBrush(settings.dualBrush) } : {}),
     width: cloneProperty(settings.width),
     opacity: cloneProperty(settings.opacity),
     flow: cloneProperty(settings.flow),
@@ -795,6 +814,7 @@ export function normalizeStudioBrushDynamicsSettings(value?: unknown): Normalize
   const spacing = normalizeProperty(source.spacing, INTERNAL_DEFAULT_SETTINGS.spacing, "spacing");
   const scatter = normalizeProperty(source.scatter, INTERNAL_DEFAULT_SETTINGS.scatter, "scatter");
   const tip = normalizeStudioBrushTipSettings(source.tip);
+  const dualBrush = normalizeStudioBrushDualBrushSettings(source.dualBrush, tip);
   return {
     version: STUDIO_BRUSH_DYNAMICS_SETTINGS_VERSION,
     seed: uint32(source.seed, INTERNAL_DEFAULT_SETTINGS.seed),
@@ -807,6 +827,7 @@ export function normalizeStudioBrushDynamicsSettings(value?: unknown): Normalize
     colorDynamics: normalizeStudioBrushColorDynamicsSettings(source.colorDynamics),
     grain: normalizeStudioBrushGrainSettings(source.grain),
     tipLayers: normalizeStudioBrushTipLayers(source.tipLayers, tip),
+    ...(studioBrushDualBrushSettingsAreIdentity(dualBrush) ? {} : { dualBrush }),
     width,
     opacity: normalizeProperty(source.opacity, INTERNAL_DEFAULT_SETTINGS.opacity, "opacity"),
     flow: normalizeProperty(source.flow, INTERNAL_DEFAULT_SETTINGS.flow, "flow"),
@@ -1074,6 +1095,7 @@ function mergeStudioBrushDynamicsVariant(
     tip: { ...base.tip, ...overrides.tip },
     colorDynamics: { ...base.colorDynamics, ...overrides.colorDynamics },
     grain: { ...base.grain, ...overrides.grain },
+    dualBrush: { ...base.dualBrush, ...overrides.dualBrush },
     width: mergeProperty(base.width, overrides.width ?? overrides.size),
     opacity: mergeProperty(base.opacity, overrides.opacity),
     flow: mergeProperty(base.flow, overrides.flow),
@@ -1463,6 +1485,7 @@ function settingsForPlan(
     colorDynamics: { ...settings.colorDynamics },
     grain: { ...settings.grain },
     tipLayers: cloneTipLayers(settings.tipLayers),
+    ...(settings.dualBrush ? { dualBrush: cloneDualBrush(settings.dualBrush) } : {}),
     width: { ...settings.width, base: width },
     opacity: { ...settings.opacity, base: opacity },
     spacing: { ...settings.spacing, base: spacing },

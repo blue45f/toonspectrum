@@ -902,6 +902,73 @@ describe("studio dynamic brush arc-length dab planner", () => {
     expect(plan.dabs[0]!.opacity).toBe(0.9);
   });
 
+  it("normalizes missing dual brush to identity defaults without disturbing legacy snapshots", () => {
+    const legacy = {
+      seed: 11,
+      tip: { shape: "grain" as const, softness: 0.4 },
+      width: { base: 9 },
+    };
+    const normalized = normalizeStudioBrushDynamicsSettings(legacy);
+    // Identity dual settings are omitted so legacy canonical serializations stay byte-stable.
+    expect(normalized.dualBrush).toBeUndefined();
+    const canonical = serializeStudioBrushDynamicsSettingsCanonical(legacy);
+    expect(canonical).not.toContain("dualBrush");
+    // Regression: null/absent/garbage/explicit-identity dualBrush values all normalize to the
+    // identical canonical serialization a pre-dual-brush snapshot produced.
+    expect(serializeStudioBrushDynamicsSettingsCanonical({ ...legacy, dualBrush: null })).toBe(canonical);
+    expect(serializeStudioBrushDynamicsSettingsCanonical({
+      ...legacy,
+      dualBrush: { enabled: "yes", blendMode: 3, sizeRatio: "x" },
+    })).toBe(canonical);
+    expect(serializeStudioBrushDynamicsSettingsCanonical({
+      ...legacy,
+      dualBrush: { enabled: false, blendMode: "multiply", sizeRatio: 1 },
+    })).toBe(canonical);
+    expect(studioBrushDynamicsSettingsEqual(legacy, { ...legacy, dualBrush: null })).toBe(true);
+    // Idempotent: normalized output re-normalizes byte-identically.
+    expect(serializeStudioBrushDynamicsSettingsCanonical(normalized)).toBe(JSON.stringify(normalized));
+  });
+
+  it("round-trips enabled dual brush fields through normalization, JSON and the planner", () => {
+    const normalized = normalizeStudioBrushDynamicsSettings({
+      dualBrush: {
+        enabled: true,
+        tip: { shape: "halftone", softness: 2 },
+        blendMode: "screen",
+        sizeRatio: 9,
+      },
+    });
+    expect(normalized.dualBrush).toEqual({
+      enabled: true,
+      tip: { shape: "halftone", softness: 1, alphaMapBase64: null, alphaMapSize: 24 },
+      blendMode: "screen",
+      sizeRatio: 2,
+    });
+    expect(normalizeStudioBrushDynamicsSettings(JSON.parse(JSON.stringify(normalized))))
+      .toEqual(normalized);
+    const plan = planStudioDynamicBrush({
+      points: [0, 0, 40, 0],
+      pressures: [0.5, 0.5],
+      baseWidth: 8,
+      baseOpacity: 1,
+      settings: normalized,
+    });
+    // The planner hands renderers a detached copy of the dual-brush contract.
+    expect(plan.settings.dualBrush).toEqual(normalized.dualBrush);
+    expect(plan.settings.dualBrush).not.toBe(normalized.dualBrush);
+    // Non-identity but still-disabled settings persist so the artist's setup survives toggling.
+    const configuredButDisabled = normalizeStudioBrushDynamicsSettings({
+      dualBrush: { enabled: false, tip: { shape: "star" }, blendMode: "screen", sizeRatio: 0.5 },
+    });
+    expect(configuredButDisabled.dualBrush).toMatchObject({
+      enabled: false,
+      blendMode: "screen",
+      sizeRatio: 0.5,
+      tip: { shape: "star" },
+    });
+    expect(DEFAULT_STUDIO_BRUSH_DYNAMICS_SETTINGS.dualBrush).toBeUndefined();
+  });
+
   it("normalizes taper + tip and keeps them in the canonical serialization", () => {
     const normalized = normalizeStudioBrushDynamicsSettings({
       taper: { enabled: true, startLength: 0.9, minSizeRatio: -1, curve: 99 },

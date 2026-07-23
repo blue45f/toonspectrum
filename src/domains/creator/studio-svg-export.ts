@@ -83,7 +83,11 @@ import {
   studioBrushSymmetryTransforms,
   transformStudioBrushSymmetryPoint,
 } from "./studio-brush-symmetry";
-import { planNormalizedStudioBrushTipComposition } from "./studio-brush-tip-composition";
+import {
+  composeStudioBrushDualTipAlphaMap,
+  planNormalizedStudioBrushTipComposition,
+  studioBrushDualTipUsesSolidEllipse,
+} from "./studio-brush-tip-composition";
 import {
   buildStudioBrushTipAlphaMap,
   planStudioBrushTipStampWorldSamples,
@@ -1096,11 +1100,19 @@ function serializeFreehand(
       normalizedDynamics.tip,
       ...normalizedDynamics.tipLayers.map((layer) => layer.tip),
     ];
-    const tipUsesEllipse = tipDefinitions.map((tip) => (
-      !grainActive && studioBrushTipUsesSolidEllipse(tip)
+    // 듀얼 브러시는 1차 팁(index 0)에만 합성 — 비활성 시 기존 함수와 동일 반환(바이트 불변).
+    const dualBrush = normalizedDynamics.dualBrush;
+    const tipUsesEllipse = tipDefinitions.map((tip, tipIndex) => (
+      !grainActive && (tipIndex === 0
+        ? studioBrushDualTipUsesSolidEllipse(tip, dualBrush)
+        : studioBrushTipUsesSolidEllipse(tip))
     ));
     const tipAlphaMaps = tipDefinitions.map((tip, tipIndex) => (
-      tipUsesEllipse[tipIndex] ? null : buildStudioBrushTipAlphaMap(tip)
+      tipUsesEllipse[tipIndex]
+        ? null
+        : tipIndex === 0
+          ? composeStudioBrushDualTipAlphaMap(tip, dualBrush)
+          : buildStudioBrushTipAlphaMap(tip)
     ));
     const strokeOriginX = dabs[0]?.sourceX ?? dabs[0]?.x ?? 0;
     const strokeOriginY = dabs[0]?.sourceY ?? dabs[0]?.y ?? 0;

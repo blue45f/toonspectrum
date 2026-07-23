@@ -28,6 +28,7 @@ import { createPortal } from "react-dom";
 import { BRUSH_PRESETS } from "./studio-brush";
 import {
   STUDIO_BRUSH_DYNAMICS_PRESETS,
+  normalizeStudioBrushDynamicsSettings,
   planStudioDynamicBrush,
   resolveStudioBrushDynamicsPresetId,
   studioBrushDynamicsPresetSettings,
@@ -52,7 +53,16 @@ import {
   studioBrushGrainIsActive,
 } from "./studio-brush-material-dynamics";
 import { studioBrushStudioDefaultPresetId } from "./studio-brush-studio-contract";
-import { planNormalizedStudioBrushTipComposition } from "./studio-brush-tip-composition";
+import {
+  STUDIO_BRUSH_DUAL_BRUSH_BLEND_MODES,
+  STUDIO_BRUSH_DUAL_BRUSH_SIZE_RATIO_LIMITS,
+  composeStudioBrushDualTipAlphaMap,
+  normalizeStudioBrushDualBrushSettings,
+  planNormalizedStudioBrushTipComposition,
+  studioBrushDualTipUsesSolidEllipse,
+  type StudioBrushDualBrushBlendMode,
+  type StudioBrushDualBrushSettings,
+} from "./studio-brush-tip-composition";
 import {
   importStudioBrushTipPng,
   studioBrushTipImportErrorMessage,
@@ -222,11 +232,19 @@ export function StudioBrushDynamicsPreview({
           const normalized = plan.settings;
           const grainActive = studioBrushGrainIsActive(normalized.grain);
           const tips = [normalized.tip, ...normalized.tipLayers.map((layer) => layer.tip)];
-          const ellipseTips = tips.map((tip) => (
-            !grainActive && studioBrushTipUsesSolidEllipse(tip)
+          // The primary tip is dual-brush aware: an active secondary texture forces the
+          // alpha-map stamp path and swaps in the composed (once-per-settings) map.
+          const ellipseTips = tips.map((tip, tipIndex) => (
+            !grainActive && (tipIndex === 0
+              ? studioBrushDualTipUsesSolidEllipse(tip, normalized.dualBrush)
+              : studioBrushTipUsesSolidEllipse(tip))
           ));
           const alphaMaps = tips.map((tip, tipIndex) => (
-            ellipseTips[tipIndex] ? null : buildStudioBrushTipAlphaMap(tip)
+            ellipseTips[tipIndex]
+              ? null
+              : tipIndex === 0
+                ? composeStudioBrushDualTipAlphaMap(tip, normalized.dualBrush)
+                : buildStudioBrushTipAlphaMap(tip)
           ));
           const strokeOriginX = plan.dabs[0]?.sourceX ?? plan.dabs[0]?.x ?? 0;
           const strokeOriginY = plan.dabs[0]?.sourceY ?? plan.dabs[0]?.y ?? 0;
@@ -292,7 +310,7 @@ export function StudioBrushDynamicsPreview({
         })()}
       </svg>
       <p className="mt-1.5 text-[0.62rem] leading-relaxed text-fg-3">
-        필압·테이퍼·색상·고정 그레인·멀티 팁이 실제 엔진 도장 경로에 반영됩니다.
+        필압·테이퍼·색상·고정 그레인·멀티 팁·듀얼 브러시가 실제 엔진 도장 경로에 반영됩니다.
         {plan.capped ? " 미리보기 도장 수는 256개로 제한했습니다." : ""}
       </p>
     </div>
@@ -555,6 +573,131 @@ export function StudioBrushTipImportControls({
         )}
         {importing ? "펜촉 변환 중…" : customActive ? "다른 PNG로 교체" : "PNG 펜촉 가져오기"}
       </button>
+    </div>
+  );
+}
+
+const DUAL_BRUSH_BLEND_MODE_LABELS: Record<StudioBrushDualBrushBlendMode, string> = {
+  multiply: "곱하기",
+  screen: "스크린",
+};
+
+const DUAL_BRUSH_BLEND_MODE_HINTS: Record<StudioBrushDualBrushBlendMode, string> = {
+  multiply: "2차 팁의 어두운 부분이 1차 팁을 깎아 질감을 만듭니다",
+  screen: "2차 팁의 밝은 부분이 1차 팁 커버리지를 밝게 넓힙니다",
+};
+
+export interface StudioBrushDualBrushControlsProps {
+  settings: NormalizedStudioBrushDynamicsSettings;
+  onSettingsChange: (settings: NormalizedStudioBrushDynamicsSettings) => void;
+}
+
+/**
+ * 듀얼 브러시 — 2차 팁 텍스처가 1차 팁 알파를 합성(도장 텍스처 구성) 시점에 변조합니다.
+ * 간격·산포·지터는 1차 브러시 설정을 그대로 따르므로 도장(dab) 단가는 변하지 않습니다.
+ */
+export function StudioBrushDualBrushControls({
+  settings,
+  onSettingsChange,
+}: StudioBrushDualBrushControlsProps) {
+  // Identity dual settings are omitted from normalized snapshots; editing starts from identity.
+  const dualBrush = settings.dualBrush ?? normalizeStudioBrushDualBrushSettings();
+  const update = (patch: Partial<StudioBrushDualBrushSettings>) => {
+    onSettingsChange(normalizeStudioBrushDynamicsSettings({
+      ...settings,
+      dualBrush: { ...dualBrush, ...patch },
+    }));
+  };
+  return (
+    <div className="space-y-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[0.68rem] font-semibold text-fg-2">듀얼 브러시</span>
+        <span className="text-[0.62rem] text-fg-3">간격·산포는 1차 브러시를 따릅니다</span>
+      </div>
+      <ToggleRow
+        label="듀얼 브러시 사용"
+        description="2차 팁 텍스처가 1차 팁을 도장 텍스처 합성 시점에 변조합니다"
+        checked={dualBrush.enabled}
+        onChange={(enabled) => update({ enabled })}
+      />
+      {dualBrush.enabled ? (
+        <>
+          <div>
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <span className="text-[0.68rem] font-semibold text-fg-2">2차 팁</span>
+              <span className="text-[0.62rem] text-fg-3">선택하면 2차 사용자 PNG가 해제됩니다</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
+              {STUDIO_BRUSH_TIP_SHAPE_IDS.map((shapeId) => {
+                const active = dualBrush.tip.shape === shapeId && !dualBrush.tip.alphaMapBase64;
+                return (
+                  <button
+                    key={shapeId}
+                    type="button"
+                    aria-pressed={active}
+                    aria-label={`2차 팁 ${TIP_SHAPE_LABELS[shapeId]}`}
+                    onClick={() => update({
+                      tip: { ...dualBrush.tip, shape: shapeId, alphaMapBase64: null },
+                    })}
+                    className={cn(
+                      "flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl border px-2 py-2 text-[0.68rem] font-semibold transition-colors duration-150",
+                      STUDIO_FOCUS_RING,
+                      active
+                        ? "border-accent bg-accent-soft/55 text-fg ring-1 ring-accent/20"
+                        : "border-line bg-card/55 text-fg-2 hover:border-accent/45 hover:bg-raised"
+                    )}
+                  >
+                    <TipShapeGlyph shape={shapeId} active={active} />
+                    {TIP_SHAPE_LABELS[shapeId]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div role="radiogroup" aria-label="듀얼 브러시 합성 모드" className="grid grid-cols-2 gap-1.5">
+            {STUDIO_BRUSH_DUAL_BRUSH_BLEND_MODES.map((blendMode) => {
+              const active = dualBrush.blendMode === blendMode;
+              return (
+                <button
+                  key={blendMode}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => update({ blendMode })}
+                  className={cn(
+                    "min-h-[44px] rounded-xl border px-3 py-2 text-left transition-colors duration-150",
+                    STUDIO_FOCUS_RING,
+                    active
+                      ? "border-accent bg-accent-soft/55 text-fg ring-1 ring-accent/20"
+                      : "border-line bg-card/55 text-fg-2 hover:border-accent/45 hover:bg-raised"
+                  )}
+                >
+                  <span className="block text-xs font-semibold">
+                    {DUAL_BRUSH_BLEND_MODE_LABELS[blendMode]}
+                  </span>
+                  <span className="mt-0.5 block text-[0.62rem] leading-relaxed text-fg-3">
+                    {DUAL_BRUSH_BLEND_MODE_HINTS[blendMode]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <RangeRow
+            label="2차 팁 크기 비율"
+            value={dualBrush.sizeRatio}
+            min={STUDIO_BRUSH_DUAL_BRUSH_SIZE_RATIO_LIMITS.min}
+            max={STUDIO_BRUSH_DUAL_BRUSH_SIZE_RATIO_LIMITS.max}
+            step={0.05}
+            display={`${Math.round(dualBrush.sizeRatio * 100)}%`}
+            hint="1차 팁 지름 대비 2차 팁 지름"
+            onChange={(sizeRatio) => update({ sizeRatio })}
+          />
+          <StudioBrushTipImportControls
+            tip={dualBrush.tip}
+            onTipChange={(patch) => update({ tip: { ...dualBrush.tip, ...patch } })}
+          />
+        </>
+      ) : null}
     </div>
   );
 }
@@ -978,6 +1121,7 @@ export function StudioBrushStudio({
               )
             : removeStudioBrushDynamicsMapping(settings, "roundness", "tilt-magnitude"))}
         />
+        <StudioBrushDualBrushControls settings={settings} onSettingsChange={onSettingsChange} />
       </div>
     ) : brushId === "calligraphy" ? (
       <div className="space-y-2.5">

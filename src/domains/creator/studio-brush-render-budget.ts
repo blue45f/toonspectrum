@@ -8,9 +8,11 @@
  */
 
 import {
-  buildStudioBrushTipAlphaMap,
+  composeStudioBrushDualTipAlphaMap,
+  studioBrushDualTipUsesSolidEllipse,
+} from "./studio-brush-tip-composition";
+import {
   countStudioBrushTipStampSamples,
-  studioBrushTipUsesSolidEllipse,
   type NormalizedStudioBrushTipSettings,
 } from "./studio-brush-tip-stamp";
 
@@ -65,10 +67,12 @@ function finiteInteger(value: number, fallback: number, min: number, max: number
 function studioBrushTipMarkCount(
   tip: NormalizedStudioBrushTipSettings,
   grainActive: boolean,
-  grid: StudioDynamicBrushRenderStampGrid
+  grid: StudioDynamicBrushRenderStampGrid,
+  dualBrush?: unknown
 ): number {
-  if (!grainActive && studioBrushTipUsesSolidEllipse(tip)) return 1;
-  const alphaMap = buildStudioBrushTipAlphaMap(tip);
+  // 듀얼 브러시(1차 팁 전용)가 활성이면 합성 맵 기준으로 샘플 수를 센다 — 비활성 시 기존과 동일.
+  if (!grainActive && studioBrushDualTipUsesSolidEllipse(tip, dualBrush)) return 1;
+  const alphaMap = composeStudioBrushDualTipAlphaMap(tip, dualBrush);
   return countStudioBrushTipStampSamples(tip, { alphaMap, grid });
 }
 
@@ -78,7 +82,7 @@ export function countStudioDynamicBrushMarksPerDab(
   grid: StudioDynamicBrushRenderStampGrid
 ): number {
   const grainActive = settings.grain.amount > 0;
-  let marks = studioBrushTipMarkCount(settings.tip, grainActive, grid);
+  let marks = studioBrushTipMarkCount(settings.tip, grainActive, grid, settings.dualBrush);
   for (const layer of settings.tipLayers) {
     if (layer.opacity <= 0) continue;
     marks += studioBrushTipMarkCount(layer.tip, grainActive, grid);

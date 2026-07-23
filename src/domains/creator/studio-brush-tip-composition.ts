@@ -7,13 +7,46 @@
  */
 
 import {
+  buildStudioBrushTipAlphaMap,
   normalizeStudioBrushTipSettings,
+  sampleStudioBrushTipAlphaMap,
+  studioBrushTipUsesSolidEllipse,
   type NormalizedStudioBrushTipSettings,
+  type StudioBrushTipAlphaMap,
   type StudioBrushTipSettings,
 } from "./studio-brush-tip-stamp";
 
 export const STUDIO_BRUSH_TIP_LAYER_MAX_COUNT = 2;
 export const STUDIO_BRUSH_TIP_COMBINED_ALPHA_MAP_BASE64_MAX_CHARS = 8 * 1024;
+
+export const STUDIO_BRUSH_DUAL_BRUSH_BLEND_MODES = ["multiply", "screen"] as const;
+export type StudioBrushDualBrushBlendMode =
+  (typeof STUDIO_BRUSH_DUAL_BRUSH_BLEND_MODES)[number];
+export const STUDIO_BRUSH_DUAL_BRUSH_SIZE_RATIO_LIMITS = { min: 0.25, max: 2 } as const;
+/** Bounds retained composed dual-tip textures (each entry is one Float32Array tip map). */
+const STUDIO_BRUSH_DUAL_TIP_ALPHA_MAP_CACHE_LIMIT = 32;
+
+/**
+ * Photoshop/CSP-style dual brush: a secondary tip texture modulates the PRIMARY tip alpha at
+ * composition time. Spacing, scatter and jitter intentionally follow the primary brush — the
+ * secondary tip changes texture only, never dab placement, so enabling it costs nothing per dab.
+ */
+export interface StudioBrushDualBrushSettings {
+  enabled?: boolean;
+  /** Secondary tip from the same shape catalog / PNG import payloads as the primary `tip`. */
+  tip?: StudioBrushTipSettings | null;
+  /** multiply erodes the primary by the secondary; screen lightens/unions coverage. */
+  blendMode?: StudioBrushDualBrushBlendMode;
+  /** Secondary tip diameter relative to the primary tip (0.25..2). */
+  sizeRatio?: number;
+}
+
+export interface NormalizedStudioBrushDualBrushSettings {
+  enabled: boolean;
+  tip: NormalizedStudioBrushTipSettings;
+  blendMode: StudioBrushDualBrushBlendMode;
+  sizeRatio: number;
+}
 
 export const STUDIO_BRUSH_TIP_LAYER_LIMITS = {
   scale: { min: 0.1, max: 4 },
@@ -173,6 +206,176 @@ export function normalizeStudioBrushTipLayers(
     });
   }
   return layers;
+}
+
+/**
+ * Normalizes dual-brush settings. Missing/unknown input yields identity defaults (disabled,
+ * multiply, ratio 1), so pre-dual-brush snapshots keep byte-stable rendering. A custom secondary
+ * alpha payload shares the same aggregate inline budget contract as tip layers: when the primary
+ * plus secondary encoded bytes exceed it, only the secondary payload is dropped while its
+ * declared procedural shape/softness survive.
+ */
+export function normalizeStudioBrushDualBrushSettings(
+  value?: unknown,
+  primaryTipValue?: unknown
+): NormalizedStudioBrushDualBrushSettings {
+  const source = asRecord(value);
+  let tip = normalizeStudioBrushTipSettings(source?.tip);
+  if (tip.alphaMapBase64) {
+    const primaryTip = normalizeStudioBrushTipSettings(primaryTipValue);
+    const remainingAlphaCharacters = Math.max(
+      0,
+      STUDIO_BRUSH_TIP_COMBINED_ALPHA_MAP_BASE64_MAX_CHARS
+        - alphaMapCharacterCount(primaryTip)
+    );
+    if (alphaMapCharacterCount(tip) > remainingAlphaCharacters) {
+      tip = { ...tip, alphaMapBase64: null };
+    }
+  }
+  return {
+    enabled: source?.enabled === true,
+    tip,
+    blendMode: source?.blendMode === "screen" ? "screen" : "multiply",
+    sizeRatio: clamp(
+      finiteNumber(source?.sizeRatio, 1),
+      STUDIO_BRUSH_DUAL_BRUSH_SIZE_RATIO_LIMITS.min,
+      STUDIO_BRUSH_DUAL_BRUSH_SIZE_RATIO_LIMITS.max
+    ),
+  };
+}
+
+/**
+ * True when normalized dual settings are the exact no-op identity (disabled with an untouched
+ * default secondary tip). The dynamics normalizer omits identity dual settings entirely, so
+ * pre-dual-brush snapshots keep a byte-stable canonical serialization and never read as repaired.
+ */
+export function studioBrushDualBrushSettingsAreIdentity(
+  value: NormalizedStudioBrushDualBrushSettings
+): boolean {
+  if (value.enabled || value.blendMode !== "multiply" || value.sizeRatio !== 1) return false;
+  const defaultTip = normalizeStudioBrushTipSettings();
+  return value.tip.shape === defaultTip.shape
+    && value.tip.softness === defaultTip.softness
+    && value.tip.alphaMapBase64 === defaultTip.alphaMapBase64
+    && value.tip.alphaMapSize === defaultTip.alphaMapSize;
+}
+
+/** True only when an enabled dual brush actually changes the primary tip texture. */
+export function studioBrushDualBrushIsActive(value?: unknown): boolean {
+  // Mirrors the normalization contract (`enabled === true`) without paying for tip base64
+  // canonicalization on the disabled fast path.
+  return asRecord(value)?.enabled === true;
+}
+
+/**
+ * Dual-aware variant of `studioBrushTipUsesSolidEllipse` for the primary-tip fast path: an
+ * active dual brush always needs the composed alpha-map stamp path.
+ */
+export function studioBrushDualTipUsesSolidEllipse(
+  primaryTipValue?: unknown,
+  dualValue?: unknown
+): boolean {
+  return !studioBrushDualBrushIsActive(dualValue)
+    && studioBrushTipUsesSolidEllipse(primaryTipValue);
+}
+
+const dualTipAlphaMapCache = new Map<string, StudioBrushTipAlphaMap>();
+
+/** Raw-input tip key part, mirroring the alpha-map cache key contract in the tip stamp module. */
+function rawTipCacheKeyPart(value: unknown): string {
+  const source = asRecord(value);
+  if (!source) return "default";
+  const alphaMapBase64 = typeof source.alphaMapBase64 === "string"
+    ? source.alphaMapBase64.length <= STUDIO_BRUSH_TIP_COMBINED_ALPHA_MAP_BASE64_MAX_CHARS
+      ? source.alphaMapBase64
+      : `oversized:${source.alphaMapBase64.length}`
+    : source.alphaMapBase64 === null ? "null" : "";
+  return [
+    typeof source.shape === "string" ? source.shape : "",
+    typeof source.softness === "number" ? source.softness : "",
+    typeof source.alphaMapSize === "number" ? source.alphaMapSize : "",
+    alphaMapBase64,
+  ].join("\u0000");
+}
+
+/**
+ * Composes the dual-brush secondary tip into the primary tip alpha map.
+ *
+ * Runs once per unique brush-settings value (LRU-cached on the raw inputs, mirroring
+ * `buildStudioBrushTipAlphaMap`), never per dab — renderers keep sampling one prebuilt map.
+ * Disabled or absent dual settings return the primary's own cached map unchanged, guaranteeing
+ * byte-identical output to a non-dual composition.
+ */
+export function composeStudioBrushDualTipAlphaMap(
+  primaryTipValue?: unknown,
+  dualValue?: unknown
+): StudioBrushTipAlphaMap {
+  if (!studioBrushDualBrushIsActive(dualValue)) {
+    return buildStudioBrushTipAlphaMap(primaryTipValue);
+  }
+  const dualSource = asRecord(dualValue);
+  const cacheKey = [
+    rawTipCacheKeyPart(primaryTipValue),
+    rawTipCacheKeyPart(dualSource?.tip),
+    String(dualSource?.blendMode),
+    String(dualSource?.sizeRatio),
+  ].join("\u0000");
+  const cached = dualTipAlphaMapCache.get(cacheKey);
+  if (cached) {
+    // Map insertion order is the LRU queue; composed maps are immutable renderer inputs.
+    dualTipAlphaMapCache.delete(cacheKey);
+    dualTipAlphaMapCache.set(cacheKey, cached);
+    return cached;
+  }
+
+  const dual = normalizeStudioBrushDualBrushSettings(dualValue, primaryTipValue);
+  const primaryMap = buildStudioBrushTipAlphaMap(primaryTipValue);
+  const secondaryMap = buildStudioBrushTipAlphaMap(dual.tip);
+  const size = primaryMap.size;
+  const centre = (size - 1) / 2;
+  const secondaryMax = secondaryMap.size - 1;
+  const alphas = new Float32Array(size * size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const index = y * size + x;
+      const primaryAlpha = primaryMap.alphas[index] ?? 0;
+      const nx = centre === 0 ? 0 : (x - centre) / centre;
+      const ny = centre === 0 ? 0 : (y - centre) / centre;
+      // sizeRatio scales the secondary tip footprint: sampling coordinates shrink by the ratio,
+      // and anything outside the secondary's own [-1, 1] square reads as fully transparent.
+      const sx = nx / dual.sizeRatio;
+      const sy = ny / dual.sizeRatio;
+      let secondaryAlpha = 0;
+      if (sx >= -1 && sx <= 1 && sy >= -1 && sy <= 1) {
+        secondaryAlpha = sampleStudioBrushTipAlphaMap(
+          secondaryMap,
+          (sx * 0.5 + 0.5) * secondaryMax,
+          (sy * 0.5 + 0.5) * secondaryMax
+        );
+      }
+      alphas[index] = clamp(
+        dual.blendMode === "screen"
+          ? primaryAlpha + secondaryAlpha - primaryAlpha * secondaryAlpha
+          : primaryAlpha * secondaryAlpha,
+        0,
+        1
+      );
+    }
+  }
+
+  const composed: StudioBrushTipAlphaMap = {
+    size,
+    alphas,
+    shape: primaryMap.shape,
+    softness: primaryMap.softness,
+    custom: true,
+  };
+  if (dualTipAlphaMapCache.size >= STUDIO_BRUSH_DUAL_TIP_ALPHA_MAP_CACHE_LIMIT) {
+    const oldestKey = dualTipAlphaMapCache.keys().next().value;
+    if (oldestKey !== undefined) dualTipAlphaMapCache.delete(oldestKey);
+  }
+  dualTipAlphaMapCache.set(cacheKey, composed);
+  return composed;
 }
 
 /** Expands one base dab into its primary and bounded transformed secondary tips. */

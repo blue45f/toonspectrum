@@ -1,10 +1,14 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { studioBrushDynamicsPresetSettings } from "./studio-brush-dynamics";
+import {
+  normalizeStudioBrushDynamicsSettings,
+  studioBrushDynamicsPresetSettings,
+} from "./studio-brush-dynamics";
 import { studioBrushStudioDefaultPresetId } from "./studio-brush-studio-contract";
 import { studioBrushTipAlphaMapToBase64 } from "./studio-brush-tip-stamp";
 import {
+  StudioBrushDualBrushControls,
   StudioBrushDynamicsPreview,
   StudioBrushStudio,
   StudioBrushTipImportControls,
@@ -136,6 +140,64 @@ describe("StudioBrushStudio", () => {
     expect(radiusX).toBe(0.25);
     expect(radiusY).toBeCloseTo(radiusX * settings.roundness.base, 12);
     expect(radiusY).toBeLessThan(0.25);
+  });
+
+  it("renders dual brush controls with secondary tip, blend mode, size ratio and PNG import", () => {
+    const settings = normalizeStudioBrushDynamicsSettings({
+      ...studioBrushDynamicsPresetSettings("ink-particle"),
+      dualBrush: {
+        enabled: true,
+        tip: { shape: "halftone" },
+        blendMode: "screen",
+        sizeRatio: 1.5,
+      },
+    });
+    const html = renderToStaticMarkup(
+      <StudioBrushDualBrushControls settings={settings} onSettingsChange={vi.fn()} />
+    );
+    expect(html).toContain("듀얼 브러시 사용");
+    expect(html).toContain("간격·산포는 1차 브러시를 따릅니다");
+    expect(html).toContain('aria-label="듀얼 브러시 합성 모드"');
+    expect(html).toContain("곱하기");
+    expect(html).toContain("스크린");
+    expect(html).toContain("2차 팁 크기 비율");
+    expect(html).toContain("150%");
+    expect(html).toContain('aria-label="2차 팁 망점"');
+    // The secondary tip reuses the shared PNG tip import system.
+    expect(html).toContain("PNG 펜촉 가져오기");
+  });
+
+  it("collapses dual brush to a single accessible toggle while disabled", () => {
+    const html = renderToStaticMarkup(
+      <StudioBrushDualBrushControls
+        settings={studioBrushDynamicsPresetSettings("ink-particle")}
+        onSettingsChange={vi.fn()}
+      />
+    );
+    expect(html).toContain("듀얼 브러시 사용");
+    expect(html).toContain('aria-checked="false"');
+    expect(html).not.toContain("2차 팁 크기 비율");
+    expect(html).not.toContain('aria-label="듀얼 브러시 합성 모드"');
+  });
+
+  it("moves the preview primary tip off the solid-ellipse path only while dual brush is active", () => {
+    const roundTip = {
+      tip: { shape: "round" as const, softness: 0.35, alphaMapBase64: null, alphaMapSize: 24 },
+    };
+    const base = { ...studioBrushDynamicsPresetSettings("dry-media"), ...roundTip };
+    const disabledHtml = renderToStaticMarkup(
+      <StudioBrushDynamicsPreview settings={base} strokeWidth={9} color="#3a2218" />
+    );
+    expect(disabledHtml).toContain("<ellipse");
+    const enabled = normalizeStudioBrushDynamicsSettings({
+      ...base,
+      dualBrush: { enabled: true, tip: { shape: "halftone" }, blendMode: "multiply", sizeRatio: 1 },
+    });
+    const enabledHtml = renderToStaticMarkup(
+      <StudioBrushDynamicsPreview settings={enabled} strokeWidth={9} color="#3a2218" />
+    );
+    expect(enabledHtml).toContain("<circle");
+    expect(enabledHtml).not.toContain("<ellipse");
   });
 
   it("offers an actual PNG chooser with clear limits and a 44px touch target", () => {
