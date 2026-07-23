@@ -128,6 +128,12 @@ export interface ImageEl {
   skewY?: number;
   /** Photopea-style reorderable smart filter stack (non-destructive). */
   smartFilters?: StudioAdjustmentStack;
+  // 필터 마스크(Krita/Photoshop 필터 마스크) — 비파괴 필터 체인을 요소의 일부에만 적용하는
+  // 요소-로컬 그레이스케일 마스크(el.src 자연 해상도 기준, maskSrc와 동일 좌표 규약).
+  // 흰색/불투명=필터 결과, 검정/투명=원본, 회색=선형 블렌드. 미설정=기존 전체 적용과 동일.
+  // 가시성을 자르는 maskSrc(레이어 마스크)와는 독립 축 — studio-filter-mask.ts 참고.
+  filterMaskSrc?: string;
+  filterMaskEnabled?: boolean;
   // 프레임별 셀 애니메이션 — 있으면 이 이미지는 "애니메이션 셀"이다.
   // src는 항상 frames 중 현재 표시 프레임의 src와 동일하게 유지한다.
   frames?: StudioAnimFrame[];
@@ -238,6 +244,9 @@ export interface BubbleEl {
   autoShrinkText?: boolean; // true면 텍스트가 넘칠 때 높이 대신 폰트 크기를 자동 축소(studio-bubble-text-fit).
   autoShrinkMinFontSize?: number; // 자동 축소 하한(px). 미설정 시 BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT.
   starAmplitude?: number; // shout/angry variant(Star)의 안쪽 반경 비율(0..1). 미설정 시 각 variant의 기존 비율(36/68, 28/64).
+  starPoints?: number; // shout/angry variant의 스파이크 개수(6..40). 미설정 시 기존 개수(20, 22) — studio-bubble-path 정규화.
+  /** 외곽선 손그림 스타일(studio-bubble-outline-style) — 미설정은 기존과 동일한 매끈한 벡터 외곽선. */
+  outlineStyle?: "rough" | "wobbly";
   shadowColor?: string;
   shadowBlur?: number;
   shadowOffsetX?: number;

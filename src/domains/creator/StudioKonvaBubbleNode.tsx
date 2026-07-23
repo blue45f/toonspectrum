@@ -14,14 +14,22 @@ import {
   normalizeCustomShapePoints,
 } from "./studio-bubble-custom-shape";
 import {
+  normalizeBubbleOutlineStyle,
+  styledBubblePathData,
+  styledBubblePolygonPathData,
+} from "./studio-bubble-outline-style";
+import {
+  BURST_STAR_VARIANT_PARAMS,
   bubblePathData,
   bubblePathDataMulti,
   burstStarPathData,
   doubleBubblePathData,
   heartBubblePathData,
+  normalizeBurstStarPoints,
   normalizeExtraTails,
   scaredBubblePathData,
   thoughtBubbleBodyPath,
+  thoughtTailDots,
 } from "./studio-bubble-path";
 import {
   BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
@@ -146,12 +154,18 @@ export function StudioKonvaBubbleNode({
   // 정규화한다(짝수 길이·유한수 아니면 undefined로 폴백 — 커스텀 모양 미적용 취급).
   const liveCustomShapePoints = customShapeDraftPoints ?? normalizeCustomShapePoints(el.customShapePoints);
   const showCustomShape = hasCustomBubbleShape(liveCustomShapePoints);
-  const speechPathData = bubbleExtraTails.length > 0
-    ? bubblePathDataMulti(el.width, el.height, bRadius, [
-        ...(bubbleTailSpec ? [bubbleTailSpec] : []),
-        ...bubbleExtraTails,
-      ])
-    : bubblePathData(el.width, el.height, bRadius, bubbleTailSpec);
+  // 손그림 외곽선(studio-bubble-outline-style) — 미설정이면 styled()는 입력 d를 그대로 돌려줘
+  // 기본 렌더 경로가 바이트 단위로 불변이다(하위호환).
+  const outlineStyle = normalizeBubbleOutlineStyle(el.outlineStyle);
+  const styled = (d: string) => styledBubblePathData(d, outlineStyle, el.id, bStrokeW);
+  const speechPathData = styled(
+    bubbleExtraTails.length > 0
+      ? bubblePathDataMulti(el.width, el.height, bRadius, [
+          ...(bubbleTailSpec ? [bubbleTailSpec] : []),
+          ...bubbleExtraTails,
+        ])
+      : bubblePathData(el.width, el.height, bRadius, bubbleTailSpec)
+  );
   // 타이포: 한글 가독성을 위한 테마별 줄간격 + 약한 자간(세로쓰기는 넉넉히).
   const bubbleLineHeight =
     el.lineHeight ?? (el.vertical ? 1.4 : theme === "soft" ? 1.35 : theme === "vivid" ? 1.2 : 1.25);
@@ -178,54 +192,30 @@ export function StudioKonvaBubbleNode({
   const bHPad = bubbleHorizontalPadding(bFs);
   const { top: bVPadTop, bottom: bVPadBot } = bubbleVerticalPadding(bFs);
 
-  const thoughtBigX = tailDir === "right" ? el.width * 0.74 : el.width * 0.26;
-  const thoughtSmallX = tailDir === "right" ? el.width * 0.84 : el.width * 0.16;
-
-  // 생각 말풍선 꼬리: 큰→중간→작은 3단 구름방울(코미포식). 외곽선은 본체보다 살짝 얇게.
+  // 생각 말풍선 꼬리: 큰→중간→작은 3단 구름방울(코미포식) — 캔버스·SVG export 가 공유하는
+  // thoughtTailDots 단일 소스. tailXRatio/tailHeight 가 있으면 손잡이를 따라 움직인다.
   const thoughtSW = bStrokeW * 0.8;
-  const tBubble = (x: number, y: number, rx: number, ry: number, key: string) => (
-    <Ellipse key={key} x={x} y={y} radiusX={rx} radiusY={ry} fill={el.fill} stroke={bStroke} strokeWidth={thoughtSW} />
-  );
-  let thoughtEllipses = null;
-  if (showTail) {
-    if (tailDirection === "bottom") {
-      thoughtEllipses = (
-        <>
-          {tBubble(thoughtBigX, el.height + 14, 14, 11, "a")}
-          {tBubble(thoughtBigX, el.height + 32, 10, 8, "b")}
-          {tBubble(thoughtSmallX, el.height + 54, 6, 5, "c")}
-        </>
-      );
-    } else if (tailDirection === "top") {
-      thoughtEllipses = (
-        <>
-          {tBubble(thoughtBigX, -14, 14, 11, "a")}
-          {tBubble(thoughtBigX, -32, 10, 8, "b")}
-          {tBubble(thoughtSmallX, -54, 6, 5, "c")}
-        </>
-      );
-    } else if (tailDirection === "left") {
-      const bigY = tailDir === "right" ? el.height * 0.74 : el.height * 0.26;
-      const smallY = tailDir === "right" ? el.height * 0.84 : el.height * 0.16;
-      thoughtEllipses = (
-        <>
-          {tBubble(-14, bigY, 11, 14, "a")}
-          {tBubble(-32, bigY, 8, 10, "b")}
-          {tBubble(-54, smallY, 5, 6, "c")}
-        </>
-      );
-    } else if (tailDirection === "right") {
-      const bigY = tailDir === "right" ? el.height * 0.74 : el.height * 0.26;
-      const smallY = tailDir === "right" ? el.height * 0.84 : el.height * 0.16;
-      thoughtEllipses = (
-        <>
-          {tBubble(el.width + 14, bigY, 11, 14, "a")}
-          {tBubble(el.width + 32, bigY, 8, 10, "b")}
-          {tBubble(el.width + 54, smallY, 5, 6, "c")}
-        </>
-      );
-    }
-  }
+  const thoughtEllipses = showTail
+    ? thoughtTailDots({
+        width: el.width,
+        height: el.height,
+        direction: tailDirection,
+        mirror: tailDir === "right" ? "right" : "left",
+        ratio: el.tailXRatio,
+        length: el.tailHeight,
+      }).map((dot, index) => (
+        <Ellipse
+          key={`thought-dot-${index}`}
+          x={dot.x}
+          y={dot.y}
+          radiusX={dot.rx}
+          radiusY={dot.ry}
+          fill={el.fill}
+          stroke={bStroke}
+          strokeWidth={thoughtSW}
+        />
+      ))
+    : null;
 
   let lx = el.width * tXRatio;
   let ly = el.height + bTailLen;
@@ -367,18 +357,29 @@ export function StudioKonvaBubbleNode({
       {...bubbleInteractionProps}
     >
       {showCustomShape ? (
-        <Line
-          points={liveCustomShapePoints}
-          closed
-          fill={el.fill}
-          stroke={bStroke}
-          strokeWidth={bStrokeW}
-          lineJoin="round"
-          lineCap="round"
-        />
+        outlineStyle ? (
+          <Path
+            data={styledBubblePolygonPathData(liveCustomShapePoints, outlineStyle, el.id, bStrokeW)}
+            fill={el.fill}
+            stroke={bStroke}
+            strokeWidth={bStrokeW}
+            lineJoin="round"
+            lineCap="round"
+          />
+        ) : (
+          <Line
+            points={liveCustomShapePoints}
+            closed
+            fill={el.fill}
+            stroke={bStroke}
+            strokeWidth={bStrokeW}
+            lineJoin="round"
+            lineCap="round"
+          />
+        )
       ) : el.variant === "double" ? (
         <Path
-          data={doubleBubblePathData(el.width, el.height, bubbleTailSpec)}
+          data={styled(doubleBubblePathData(el.width, el.height, bubbleTailSpec))}
           fill={el.fill}
           {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
           stroke={bStroke}
@@ -389,13 +390,13 @@ export function StudioKonvaBubbleNode({
         />
       ) : el.variant === "shout" ? (
         <Path
-          data={burstStarPathData(
+          data={styled(burstStarPathData(
             el.width,
             el.height,
-            20,
+            normalizeBurstStarPoints(el.starPoints, BURST_STAR_VARIANT_PARAMS.shout.points),
             68 * Math.min(0.95, Math.max(0.1, el.starAmplitude ?? 36 / 68)),
             68,
-          )}
+          ))}
           fill={el.fill}
           {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
           stroke={bStroke}
@@ -407,7 +408,7 @@ export function StudioKonvaBubbleNode({
       ) : el.variant === "thought" ? (
         <>
           <Path
-            data={thoughtBubbleBodyPath(el.width, el.height)}
+            data={styled(thoughtBubbleBodyPath(el.width, el.height))}
             fill={el.fill}
             {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
             stroke={bStroke}
@@ -431,7 +432,7 @@ export function StudioKonvaBubbleNode({
         />
       ) : el.variant === "scared" ? (
         <Path
-          data={scaredBubblePathData(el.width, el.height, bubbleTailSpec)}
+          data={styled(scaredBubblePathData(el.width, el.height, bubbleTailSpec))}
           fill={el.fill === "transparent" ? "transparent" : (el.fill === "#ffffff" ? "#f5f3ff" : el.fill)}
           {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
           stroke="#7c3aed"
@@ -470,13 +471,13 @@ export function StudioKonvaBubbleNode({
         </>
       ) : el.variant === "angry" ? (
         <Path
-          data={burstStarPathData(
+          data={styled(burstStarPathData(
             el.width,
             el.height,
-            22,
+            normalizeBurstStarPoints(el.starPoints, BURST_STAR_VARIANT_PARAMS.angry.points),
             64 * Math.min(0.95, Math.max(0.1, el.starAmplitude ?? 28 / 64)),
             64,
-          )}
+          ))}
           fill={el.fill}
           {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
           stroke={theme === "soft" ? "#dc2626" : theme === "vivid" ? "#7f1d1d" : "#991b1b"}
@@ -486,7 +487,7 @@ export function StudioKonvaBubbleNode({
         />
       ) : el.variant === "phone" ? (
         <Path
-          data={bubblePathData(
+          data={styled(bubblePathData(
             el.width,
             el.height,
             theme === "soft" ? 10 : theme === "vivid" ? 6 : 8,
@@ -498,7 +499,7 @@ export function StudioKonvaBubbleNode({
                   base: Math.min(bubbleTailSpec.base, Math.max(6, bMinDim * 0.12)),
                 }
               : null,
-          )}
+          ))}
           fill={el.fill}
           {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
           stroke={bStroke}

@@ -419,6 +419,20 @@ function normalizeMultiPolygon(raw: StudioPathPolygon[]): StudioPathPolygon[] {
 }
 
 /**
+ * 폴리곤 여러 개를 한 번에 union 한 MultiPolygon(정규형) — 말풍선 병합(studio-bubble-merge)용.
+ * polygon-clipping 은 variadic geom 을 지원하므로 한 호출로 전체 합집합을 구한다
+ * (연쇄 pairwise 는 "떨어진 두 조각을 세 번째가 잇는" 케이스 처리가 번거롭다).
+ */
+export async function unionStudioPolygons(
+  polygons: readonly StudioPathPolygon[]
+): Promise<StudioPathPolygon[]> {
+  if (polygons.length === 0) return [];
+  const lib = await loadPolygonClipping();
+  const [first, ...rest] = polygons;
+  return normalizeMultiPolygon(lib.union(first!, ...rest));
+}
+
+/**
  * 폴리곤 2개를 불리언 결합한 MultiPolygon(정규형). subtract 는 a(아래) − b(위).
  * 라이브러리 예외는 호출부(combineStudioShapes)가 사유 문자열로 감싼다.
  */

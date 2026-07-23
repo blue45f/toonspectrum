@@ -120,8 +120,10 @@ export const STUDIO_CRDT_SCENE_ELEMENT_KEYS_BY_TYPE: Record<
     "tail", "tailDirection", "extraTails", "font", "fontSize", "lineHeight", "vertical",
     "align", "fontStyle", "tailXRatio", "tailHeight", "tailBase", "tailBend",
     "tailAnchorId", "tailAnchorPoint", "stroke", "strokeWidth", "strokeStyle", "gradient",
-    "autoShrinkText", "autoShrinkMinFontSize", "starAmplitude", "shadowColor", "shadowBlur",
-    "shadowOffsetX", "shadowOffsetY", "shadowOpacity", "customShapePoints",
+    "autoShrinkText", "autoShrinkMinFontSize", "starAmplitude", "starPoints", "shadowColor",
+    "shadowBlur", "shadowOffsetX", "shadowOffsetY", "shadowOpacity", "customShapePoints",
+    // 의도적 변경(2026-07-24): 말풍선 burst 스파이크 수(starPoints)·손그림 외곽선(outlineStyle) 동기화.
+    "outlineStyle",
   ]),
   sticker: new Set([
     ...COMMON_SCENE_ELEMENT_KEYS,
@@ -312,8 +314,8 @@ export function validateStudioCrdtSceneElementPayload(
   for (const key of [
     "letterSpacing", "lineHeight", "shadowBlur", "shadowOffsetX", "shadowOffsetY",
     "shadowOpacity", "skewX", "skewY", "tailXRatio", "tailHeight", "tailBase", "tailBend",
-    "autoShrinkMinFontSize", "starAmplitude", "lineCount", "innerRadius", "outerRadius", "noise",
-    "centerXRatio", "centerYRatio",
+    "autoShrinkMinFontSize", "starAmplitude", "starPoints", "lineCount", "innerRadius",
+    "outerRadius", "noise", "centerXRatio", "centerYRatio",
   ] as const) {
     if (key in props) finiteRange(props[key], -MAX_COORDINATE, MAX_COORDINATE, key);
   }

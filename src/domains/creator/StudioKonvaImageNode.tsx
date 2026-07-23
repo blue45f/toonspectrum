@@ -2,6 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { Image as KImage } from "react-konva/lib/ReactKonvaCore";
 
 import {
+  applyFilterMaskToPixels,
+  computeFilterMaskCoverage,
+  shouldApplyFilterMask,
+  wrapKonvaFiltersWithFilterMask,
+  type FilterMaskCoverage,
+  type FilterMaskKonvaFilterFn,
+} from "./studio-filter-mask";
+import {
   hasActiveImageFilters,
   imageFilterCacheKey,
   type ImageFilterFields,
@@ -184,6 +192,11 @@ interface WorkerResultCacheState {
   height: number;
   source: CanvasImageSource;
   width: number;
+}
+
+interface FilterMaskDecodedState {
+  coverage: FilterMaskCoverage;
+  src: string;
 }
 
 function releaseWorkerResultCanvas(canvas: HTMLCanvasElement): void {
@@ -378,6 +391,61 @@ export function StudioKonvaImageNode({
 
   const hasFilters = hasActiveImageFilters(el);
   const filterCacheKey = imageFilterCacheKey(el);
+
+  // ── 필터 마스크(비파괴 필터 부분 적용) — 디코드된 커버리지 맵. 새 마스크(스트로크)가
+  // 디코드되는 동안에도 직전 커버리지로 계속 블렌드해 "전체 필터 ↔ 부분 필터" 깜빡임을 없앤다
+  // (마스크 페인팅은 스트로크마다 filterMaskSrc data URL이 통째로 갱신된다). 마스크가 제거되면
+  // 즉시 null로 돌아가 기존 전체 적용과 동일해진다. 디코드/커버리지 실패는 fail-open(마스크
+  // 없이 기존 필터 룩 유지 — 마스크는 보정 범위 축이라 가시성 손실이 없다).
+  const filterMaskWantedSrc = hasFilters && shouldApplyFilterMask(el)
+    ? el.filterMaskSrc
+    : undefined;
+  const [decodedFilterMask, setDecodedFilterMask] = useState<FilterMaskDecodedState | null>(null);
+  useEffect(() => {
+    if (!filterMaskWantedSrc) {
+      setDecodedFilterMask(null);
+      return;
+    }
+    const src = filterMaskWantedSrc;
+    const im = new globalThis.Image();
+    let active = true;
+    im.onload = () => {
+      if (!active) return;
+      try {
+        const w = im.naturalWidth || im.width;
+        const h = im.naturalHeight || im.height;
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(im, 0, 0);
+        const pixels = ctx.getImageData(0, 0, w, h);
+        const coverage = computeFilterMaskCoverage(pixels.data, w, h);
+        if (coverage && active) setDecodedFilterMask({ coverage, src });
+      } catch (error) {
+        console.error("[studio] filter mask decode failed, applying filters unmasked:", error);
+      }
+    };
+    im.onerror = () => {
+      // 현재 마스크의 재디코드까지 실패했다면 이전 커버리지를 남기지 않는다(전체 적용 폴백).
+      if (active) setDecodedFilterMask((current) => current?.src === src ? null : current);
+    };
+    // 캐시된 data URL은 대입과 같은 tick에 완료될 수 있으므로 handler를 먼저 연결한다.
+    im.src = src;
+    return () => {
+      active = false;
+      im.onload = null;
+      im.onerror = null;
+    };
+  }, [filterMaskWantedSrc]);
+  const activeFilterMask = filterMaskWantedSrc ? decodedFilterMask : null;
+  // 마스크가 섞인 필터 결과는 별도 정체성으로 캐시한다 — imageFilterCacheKey(다른 소유자의
+  // 파일)는 건드리지 않고, 이 노드가 소유한 모든 결과 캐시 키에 마스크 data URL을 함께 섞는다
+  // (el.src를 키에 그대로 쓰는 기존 관례와 동일 — 내용이 곧 정체성).
+  const maskedFilterKey = activeFilterMask
+    ? JSON.stringify([filterCacheKey, activeFilterMask.src])
+    : filterCacheKey;
   useEffect(() => {
     if (!hasFilters || filterModule) return;
     let active = true;
@@ -476,7 +544,15 @@ export function StudioKonvaImageNode({
   const useWorkerFilterPath =
     workerDimensionsSafe
     && hasFilters && !!filterModule && !!filterWorkerClient && cachePad === 0 && !el.isAnimatedGif;
-  const workerRequestKey = JSON.stringify([el.src, filterCacheKey, workerWidth, workerHeight]);
+  const workerRequestKey = JSON.stringify([
+    el.src,
+    filterCacheKey,
+    workerWidth,
+    workerHeight,
+    // 필터 마스크 정체성 — 마스크가 바뀌면(스트로크/반전/삭제) 결과 픽셀이 달라지므로 같은
+    // 요청으로 취급하면 안 된다(fail-closed 폴백 키와 결과 상태 매칭이 함께 이 키를 쓴다).
+    activeFilterMask?.src ?? null,
+  ]);
   const workerPipelineActive = useWorkerFilterPath && workerFallbackKey !== workerRequestKey;
   const workerResultCacheLimit = el.filterPageComposite === true
     ? PAGE_COMPOSITE_FILTER_RESULT_CACHE_LIMIT
@@ -485,7 +561,7 @@ export function StudioKonvaImageNode({
   const currentWorkerFilteredCanvas =
     workerFilteredCanvas?.src === el.src
     && workerFilteredCanvas.source === displayImg
-    && workerFilteredCanvas.filterKey === filterCacheKey
+    && workerFilteredCanvas.filterKey === maskedFilterKey
     && workerFilteredCanvas.width === workerWidth
     && workerFilteredCanvas.height === workerHeight
       ? workerFilteredCanvas.canvas
@@ -505,10 +581,16 @@ export function StudioKonvaImageNode({
     }
     const src = el.src;
     const source = displayImg;
-    const filterKey = filterCacheKey;
+    const filterKey = maskedFilterKey;
     const width = workerWidth;
     const height = workerHeight;
     const requestKey = workerRequestKey;
+    // 필터 마스크 — Worker/GPU 공통 커밋에서 원본(sourcePixels)과 블렌드한다. 표시 스냅샷은
+    // 반전이 이미 구워져 있으므로 마스크 샘플 쪽을 같은 방향으로 뒤집는다.
+    const maskCoverage = activeFilterMask?.coverage ?? null;
+    const maskTransform = maskCoverage
+      ? { flipX: !!elRef.current.flipped, flipY: !!elRef.current.flippedY }
+      : undefined;
     let controller: AbortController | null = null;
     let cancelled = false;
     setWorkerFallbackKey((current) => current === requestKey ? undefined : current);
@@ -565,6 +647,19 @@ export function StudioKonvaImageNode({
       const commitFilteredPixels = (filtered: { data: Uint8ClampedArray; width: number; height: number }) => {
         if (cancelled) return;
         if (filtered.width !== width || filtered.height !== height) return;
+        // 필터 마스크 블렌드 — Worker/GPU 어느 결과든 여기 한 곳에서 out = filtered·m +
+        // original·(1−m)로 섞는다. filtered.data는 이 요청 전용 버퍼(전송/GPU 산출)라 제자리
+        // 변형이 안전하고, sourcePixels.data는 읽기 전용으로만 쓴다(스냅샷 캐시 보존).
+        if (maskCoverage) {
+          applyFilterMaskToPixels({
+            target: filtered.data,
+            original: sourcePixels.data,
+            width,
+            height,
+            coverage: maskCoverage,
+            transform: maskTransform,
+          });
+        }
         try {
           const outCanvas = document.createElement("canvas");
           outCanvas.width = filtered.width;
@@ -647,7 +742,8 @@ export function StudioKonvaImageNode({
   }, [
     useWorkerFilterPath,
     displayImg,
-    filterCacheKey,
+    maskedFilterKey,
+    activeFilterMask,
     filterWorkerClient,
     gpuFilterModule,
     el.src,
@@ -683,7 +779,7 @@ export function StudioKonvaImageNode({
       }
       node.getLayer()?.batchDraw();
     }
-  }, [displayImg, el.width, el.height, filterCacheKey, hasFilters, filterModule, cachePad, el.isAnimatedGif, workerPipelineActive, workerDimensionsSafe, filterDensity]);
+  }, [displayImg, el.width, el.height, maskedFilterKey, hasFilters, filterModule, cachePad, el.isAnimatedGif, workerPipelineActive, workerDimensionsSafe, filterDensity]);
 
   // 애니메이션 GIF 주기적 리렌더 — 브라우저가 img(HTMLImageElement)를 내부적으로 계속
   // 디코딩·재생하지만(studio-gif-element.ts 헤더 참고), Konva는 그리기 시점의 스냅샷만 캔버스에
@@ -724,8 +820,23 @@ export function StudioKonvaImageNode({
   // Worker가 이미 최종 픽셀을 계산해 뒀으면 그 캔버스를 그대로 그린다(filters/filterAttrs는
   // 비워 Konva가 다시 필터링하지 않게 한다) — 아니면 기존과 동일하게 원본 + Konva 필터.
   const imageSource: CanvasImageSource = showWorkerCanvas ? currentWorkerFilteredCanvas! : displayImg;
+  // Konva 폴백(cachePad>0 테두리 경로·Worker 준비/실행 실패 fail-closed)도 같은 마스크 결과를
+  // 내야 한다 — 내장 필터 체인을 [원본 스냅샷, ...체인, 마스크 블렌드]로 감싼다. 캐시 캔버스는
+  // 표시 반전이 구워져 있고 cachePad 만큼 패딩이 있으므로 샘플 변환으로 콘텐츠 창을 되돌린다.
+  const konvaFallbackFilters = activeFilterMask && filters.length > 0
+    ? wrapKonvaFiltersWithFilterMask(
+        filters as unknown as readonly FilterMaskKonvaFilterFn[],
+        activeFilterMask.coverage,
+        {
+          flipX: !!el.flipped,
+          flipY: !!el.flippedY,
+          padRatioX: cachePad > 0 ? cachePad / (Math.max(1, el.width) + cachePad * 2) : 0,
+          padRatioY: cachePad > 0 ? cachePad / (Math.max(1, el.height) + cachePad * 2) : 0,
+        }
+      ) as unknown as NonNullable<Konva.NodeConfig["filters"]>
+    : filters;
   const activeFilters: Konva.NodeConfig["filters"] =
-    workerPipelineActive || !workerDimensionsSafe ? undefined : filters;
+    workerPipelineActive || !workerDimensionsSafe ? undefined : konvaFallbackFilters;
   const activeFilterAttrs = workerPipelineActive || !workerDimensionsSafe ? {} : filterAttrs;
 
   return (

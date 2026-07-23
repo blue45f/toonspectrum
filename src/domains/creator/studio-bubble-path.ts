@@ -546,6 +546,110 @@ export function heartBubblePathData(w: number, h: number): string {
   ].join(" ");
 }
 
+/* ── 생각풍선 점점이 꼬리 ────────────────────────────────────────────────────
+ * 기존에는 캔버스(StudioKonvaBubbleNode)와 SVG export가 각각 고정 오프셋(14/32/54px,
+ * 0.26/0.74 지점)을 인라인으로 중복 계산해, 꼬리 손잡이를 끌어도 방울이 따라오지 않는
+ * "죽은 손잡이" UX였다. 이 함수 하나로 두 소비처의 기하를 통일하고, tailXRatio/tailHeight가
+ * 명시된 경우에만 반응형으로 위치·크기를 조절한다.
+ *
+ * 하위호환: ratio·length가 모두 undefined(구 문서 기본 상태)이면 기존 고정 배치와 좌표·크기가
+ * 정확히 일치한다(렌더 결과 바이트 동일). 새 문서는 손잡이를 끄는 순간 두 값이 커밋되어
+ * 방울이 즉시 따라온다.
+ */
+
+export interface ThoughtTailDot {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+}
+
+export interface ThoughtTailDotsInput {
+  width: number;
+  height: number;
+  direction: BubbleTailDirection;
+  /** 화자 방향 미러(BubbleEl.tail). "none"은 호출 전에 걸러진다(꼬리 없음). */
+  mirror: "left" | "right";
+  /** 변 위 위치(0~1). undefined → 레거시 고정 배치(0.26/0.74). */
+  ratio?: number;
+  /** 꼬리 길이(px, BubbleEl.tailHeight). undefined → 레거시 고정 도달거리(54px). */
+  length?: number;
+}
+
+/** 레거시 고정 배치의 방울 단계(바깥 축 오프셋·반경) — 도달거리 54px 기준. */
+const THOUGHT_DOT_STEPS = [
+  { offset: 14, rMajor: 14, rMinor: 11 },
+  { offset: 32, rMajor: 10, rMinor: 8 },
+  { offset: 54, rMajor: 6, rMinor: 5 },
+] as const;
+const THOUGHT_LEGACY_REACH = 54;
+
+/**
+ * 생각풍선 3단 구름방울 좌표 — 캔버스(Konva Ellipse)와 SVG(<ellipse>)가 공유하는 단일 소스.
+ * 가로 변(bottom/top)은 rx=rMajor/ry=rMinor, 세로 변(left/right)은 축이 뒤집힌다.
+ */
+export function thoughtTailDots(input: ThoughtTailDotsInput): ThoughtTailDot[] {
+  const { width: w, height: h, direction, mirror } = input;
+  const horizontal = direction === "bottom" || direction === "top";
+  const responsive = input.ratio !== undefined || input.length !== undefined;
+
+  // 변 위 주 방울 위치(0~1) — 레거시는 0.26/0.74 고정, 반응형은 tailXRatio를 speech 규약대로
+  // (가로 변에서만 화자 미러 반전) 해석한다.
+  let big: number;
+  if (responsive) {
+    const raw = clamp(input.ratio ?? 0.35, 0.1, 0.9);
+    big = horizontal && mirror === "right" ? 1 - raw : raw;
+  } else {
+    big = mirror === "right" ? 0.74 : 0.26;
+  }
+  // 마지막(가장 작은) 방울은 화자 반대쪽 바깥으로 0.10 만큼 흘러나간다 — 레거시 0.16/0.84 재현.
+  const drift = mirror === "right" ? 0.1 : -0.1;
+  const small = clamp(big + drift, 0.05, 0.95);
+
+  // 도달거리 — 레거시 54px 고정, 반응형은 tailHeight(기본 30)의 1.8배(30→54로 연속).
+  const reach = responsive
+    ? clamp((input.length ?? 30) * 1.8, 24, 150)
+    : THOUGHT_LEGACY_REACH;
+  const sizeScale = clamp(reach / THOUGHT_LEGACY_REACH, 0.55, 1.5);
+
+  const span = horizontal ? w : h;
+  const dots: ThoughtTailDot[] = [];
+  THOUGHT_DOT_STEPS.forEach((step, index) => {
+    const along = span * (index === THOUGHT_DOT_STEPS.length - 1 ? small : big);
+    const out = (reach * step.offset) / THOUGHT_LEGACY_REACH;
+    const rMajor = step.rMajor * sizeScale;
+    const rMinor = step.rMinor * sizeScale;
+    if (direction === "bottom") {
+      dots.push({ x: along, y: h + out, rx: rMajor, ry: rMinor });
+    } else if (direction === "top") {
+      dots.push({ x: along, y: -out, rx: rMajor, ry: rMinor });
+    } else if (direction === "left") {
+      dots.push({ x: -out, y: along, rx: rMinor, ry: rMajor });
+    } else {
+      dots.push({ x: w + out, y: along, rx: rMinor, ry: rMajor });
+    }
+  });
+  return dots;
+}
+
+/* ── 외침/격앙(burst) 변형 파라미터 ─────────────────────────────────────────
+ * 캔버스·SVG export·병합 실루엣이 같은 스파이크 수/반경을 쓰도록 단일 소스로 둔다.
+ */
+
+export const BURST_STAR_VARIANT_PARAMS = {
+  shout: { points: 20, outer: 68, innerRatio: 36 / 68 },
+  angry: { points: 22, outer: 64, innerRatio: 28 / 64 },
+} as const;
+
+/** 스파이크 수 허용 범위 — 인스펙터 슬라이더와 검증이 공유한다. */
+export const BURST_STAR_POINTS_RANGE = { min: 6, max: 40 } as const;
+
+/** 저장 문서의 starPoints를 안전한 정수로 정규화한다(미설정/이상값 → fallback). */
+export function normalizeBurstStarPoints(raw: unknown, fallback: number): number {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return fallback;
+  return clamp(Math.round(raw), BURST_STAR_POINTS_RANGE.min, BURST_STAR_POINTS_RANGE.max);
+}
+
 /**
  * 외침/격앙 별 폴리곤 path — Konva Star와 같은 파라미터(numPoints·inner/outer).
  * SVG export / thumbs / 캔버스가 동일 좌표를 쓰도록 순수 함수로 둔다.

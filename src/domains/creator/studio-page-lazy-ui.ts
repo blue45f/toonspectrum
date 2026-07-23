@@ -374,6 +374,10 @@ const StudioLayerMaskPanel = lazyRetry(
   () => import("./StudioLayerMaskPanel").then((mod) => ({ default: mod.StudioLayerMaskPanel })),
   "StudioLayerMaskPanel"
 );
+const StudioFilterMaskPanel = lazyRetry(
+  () => import("./StudioFilterMaskPanel").then((mod) => ({ default: mod.StudioFilterMaskPanel })),
+  "StudioFilterMaskPanel"
+);
 const StudioPuppetWarpPanel = lazyRetry(
   () => import("./StudioPuppetWarpPanel").then((mod) => ({ default: mod.StudioPuppetWarpPanel })),
   "StudioPuppetWarpPanel"
@@ -750,6 +754,7 @@ export {
   StudioExportMenuPanel,
   StudioFeatureTutorialHub,
   StudioFilterDialog,
+  StudioFilterMaskPanel,
   StudioFrameAnimationPanel,
   StudioFloodFillPanel,
   StudioGradientEnginePanel,

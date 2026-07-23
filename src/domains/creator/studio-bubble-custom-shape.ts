@@ -115,8 +115,8 @@ export function computeBubbleShapeGeometry(input: BubbleShapeGeometryInput): Bub
 // SVG path(d) 초소형 워커 — bubblePathData/bubblePathDataMulti 가 실제로 내는 명령 집합만 지원
 // ---------------------------------------------------------------------------
 
-/** bubblePathData/Multi 가 쓰는 명령의 인자 개수. L 은 현재 미사용이지만 방어적으로 지원. */
-const PATH_CMD_ARG_COUNT: Record<string, number> = { M: 2, L: 2, H: 1, V: 1, A: 7, Q: 4, Z: 0 };
+/** bubblePathData/Multi 가 쓰는 명령의 인자 개수. L 은 scared, C 는 heart 실루엣이 사용한다. */
+const PATH_CMD_ARG_COUNT: Record<string, number> = { M: 2, L: 2, H: 1, V: 1, A: 7, Q: 4, C: 6, Z: 0 };
 
 type PathToken = { cmd: string; args: number[] };
 
@@ -202,6 +202,30 @@ function sampleArc(
   }
 }
 
+/** 3차 베지어를 samples 개 점으로 샘플링해 emit(끝점 포함, 시작점 제외) — heart 실루엣용. */
+function sampleCubic(
+  x0: number,
+  y0: number,
+  c1x: number,
+  c1y: number,
+  c2x: number,
+  c2y: number,
+  x1: number,
+  y1: number,
+  samples: number,
+  emit: (x: number, y: number) => void
+): void {
+  const n = Math.max(1, Math.round(samples));
+  for (let i = 1; i <= n; i++) {
+    const t = i / n;
+    const mt = 1 - t;
+    emit(
+      mt * mt * mt * x0 + 3 * mt * mt * t * c1x + 3 * mt * t * t * c2x + t * t * t * x1,
+      mt * mt * mt * y0 + 3 * mt * mt * t * c1y + 3 * mt * t * t * c2y + t * t * t * y1
+    );
+  }
+}
+
 /** 2차 베지어(De Casteljau) 를 samples 개 점으로 샘플링해 emit(끝점 포함, 시작점 제외). */
 function sampleQuadratic(
   x0: number,
@@ -258,6 +282,11 @@ function walkPathDataToPolygon(d: string, samplesPerCurve: number): number[] {
       sampleQuadratic(cx, cy, qx, qy, ex, ey, samplesPerCurve, emit);
       cx = ex;
       cy = ey;
+    } else if (cmd === "C") {
+      const [c1x, c1y, c2x, c2y, ex, ey] = args as [number, number, number, number, number, number];
+      sampleCubic(cx, cy, c1x, c1y, c2x, c2y, ex, ey, samplesPerCurve, emit);
+      cx = ex;
+      cy = ey;
     }
     // "Z" — 닫기. 마지막 명령의 끝점이 이미 시작점과 (거의) 같으므로 별도 emit 불필요.
   }
@@ -286,6 +315,18 @@ export const BUBBLE_CUSTOM_SHAPE_DEFAULT_SAMPLES_PER_CURVE = 6;
 export const BUBBLE_CUSTOM_SHAPE_MIN_POINTS = 3;
 /** 영역 좌표에서 동일한 점으로 판정하는 거리. 샘플링 중 부동소수 오차는 흡수하되 실제 절점은 보존한다. */
 export const BUBBLE_CUSTOM_SHAPE_POINT_EPSILON = 1e-6;
+
+/**
+ * bubblePathData 계열이 내놓는 SVG path(d) 를 폐곡선 폴리곤으로 샘플링한다 — 커스텀 모양 전환·
+ * 말풍선 병합(studio-bubble-merge)·손그림 외곽선(studio-bubble-outline-style)이 공유하는 워커.
+ * M/L/H/V/A/Q/C 만 지원한다(모든 variant 실루엣 생성기가 이 집합 안에서만 명령을 낸다).
+ */
+export function sampleBubblePathDataToPolygon(
+  d: string,
+  samplesPerCurve: number = BUBBLE_CUSTOM_SHAPE_DEFAULT_SAMPLES_PER_CURVE
+): number[] {
+  return walkPathDataToPolygon(d, Math.max(2, Math.round(samplesPerCurve)));
+}
 
 /**
  * 현재 말풍선 지오메트리(테마 반지름 + 꼬리 사양)를 폴리곤 점 배열로 샘플링한다 — "커스텀
