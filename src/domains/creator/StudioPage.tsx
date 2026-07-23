@@ -27955,7 +27955,8 @@ function StudioCuttoonEditor() {
         !mannequinMutationTicketRef.current ||
         !canApplyStudioMutation(mannequinMutationTicketRef.current)
       ) return false;
-      return addRenderedImage(result.pngDataUrl, result.width, result.height, undefined, false, {
+      // 캡처 래스터는 dpr 슈퍼샘플 크기 — 배치는 논리(display) 크기로, 없으면 래스터 크기 폴백.
+      return addRenderedImage(result.pngDataUrl, result.displayWidth ?? result.width, result.displayHeight ?? result.height, undefined, false, {
         name: "3D 데생 인형(마네킹)",
       });
     },

@@ -43,8 +43,43 @@ export type StudioMannequinProjection = "perspective" | "orthographic";
 
 export interface StudioMannequinCaptureResult {
   readonly pngDataUrl: string;
+  /** 캡처 래스터 크기(px) — PNG 원본 치수. */
   readonly width: number;
   readonly height: number;
+  /**
+   * 100% 줌에서 문서에 놓일 논리 크기(캡처 시점의 뷰포트 논리 뷰 크기). 캡처는
+   * pixelRatio × 배율로 슈퍼샘플링되므로 래스터 크기로 삽입하면 물리적으로 커진다 —
+   * 소비자는 displayWidth ?? width 로 논리 크기 삽입을 선택한다(VRM 3D 삽입 계약과 동일).
+   * 래스터가 논리 크기보다 작게 축소된 경우(픽셀 예산 등)에는 업스케일 삽입을 막기 위해
+   * 생략된다.
+   */
+  readonly displayWidth?: number;
+  readonly displayHeight?: number;
+}
+
+/**
+ * 캡처 래스터와 논리 뷰 크기로 삽입 결과를 만든다 — display 쌍은 둘 다 유한 양수이면서
+ * 래스터 이하일 때만 포함한다(업스케일 금지 — studio-3d-insert-controller 의
+ * resolveVrmInsertDisplaySize 와 같은 규칙). 순수 함수라 WebGL 없이 단위 테스트된다.
+ */
+export function resolveStudioMannequinCaptureResult(input: {
+  readonly pngDataUrl: string;
+  readonly width: number;
+  readonly height: number;
+  readonly displayWidth: number;
+  readonly displayHeight: number;
+}): StudioMannequinCaptureResult {
+  const { pngDataUrl, width, height, displayWidth, displayHeight } = input;
+  const displayValid =
+    Number.isFinite(displayWidth)
+    && displayWidth > 0
+    && Number.isFinite(displayHeight)
+    && displayHeight > 0
+    && displayWidth <= width
+    && displayHeight <= height;
+  return displayValid
+    ? { pngDataUrl, width, height, displayWidth, displayHeight }
+    : { pngDataUrl, width, height };
 }
 
 export interface StudioMannequinSceneOptions {
@@ -515,6 +550,9 @@ export function createStudioMannequinScene(
   ): Promise<StudioMannequinCaptureResult> {
     if (disposed) throw new Error("이미 정리된 3D 데생 인형 씬입니다.");
     const { width, height } = clampCaptureDimensions(scale);
+    // 논리 뷰 크기는 인코딩 await 중 리사이즈로 바뀔 수 있으니 래스터 계산 시점에 스냅샷한다.
+    const displayWidth = viewWidth;
+    const displayHeight = viewHeight;
 
     // 헬퍼(그리드·IK 핸들)와 선택 틴트는 참고용 이미지에 굽지 않는다.
     const previousSelection = selectedJointId;
@@ -538,7 +576,13 @@ export function createStudioMannequinScene(
       { width, height },
       { signal: captureOptions.signal, timeoutMs: CAPTURE_PNG_TIMEOUT_MS },
     );
-    return { pngDataUrl, width, height };
+    return resolveStudioMannequinCaptureResult({
+      pngDataUrl,
+      width,
+      height,
+      displayWidth,
+      displayHeight,
+    });
   }
 
   // ── 핸들 구성 ────────────────────────────────────────────────────────────

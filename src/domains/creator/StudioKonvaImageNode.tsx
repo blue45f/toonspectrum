@@ -4,6 +4,7 @@ import { Image as KImage } from "react-konva/lib/ReactKonvaCore";
 import {
   hasActiveImageFilters,
   imageFilterCacheKey,
+  type ImageFilterFields,
 } from "./studio-konva-filter-fields";
 import { studioKonvaRuntime as KonvaRuntime } from "./studio-konva-runtime";
 import { resizableNodeProps } from "./studio-node-props";
@@ -22,6 +23,121 @@ const PAGE_COMPOSITE_FILTER_RESULT_CACHE_LIMIT = 1;
 // boundary; keeping this stricter UI budget local avoids eagerly loading the optional Worker
 // protocol solely to read a constant before the user applies an image filter.
 const IMAGE_FILTER_INTERACTIVE_MAX_PIXELS = 16 * 1024 * 1024;
+// HiDPI 필터 슈퍼샘플 상한 — 3D 인서트 캡처와 같은 이유로 2를 넘기지 않는다(픽셀 4× 메모리 캡).
+const IMAGE_FILTER_SUPERSAMPLE_MAX = 2;
+
+/**
+ * 밀도 불변이 증명된 buildImageFilters attrs 화이트리스트(명시적 per-attr 목록).
+ *
+ * 여기 있는 attr 는 전부 픽셀 단위 기하가 전혀 없는 per-pixel 포인트(색/톤) 연산이거나
+ * 정규화 좌표(치수 상대) 연산(비네트)이다 — 슈퍼샘플 버퍼에서 실행해도 수학적으로 같은 룩이
+ * 나오고 픽셀만 촘촘해진다. 목록에 없는 attr 가 하나라도 있으면 기본 거부(1× 밀도)로 남는다:
+ * px 단위 파라미터(블러 반경·망점 도트 px·테두리 굵기·그레인 크기·픽셀레이트 셀·왜곡 스케일,
+ * 커널 풋프린트 등)는 Konva 캐시/Worker 버퍼가 커지면 콘텐츠 대비 효과가 줄어들기 때문이다.
+ * 새 필터가 추가되어도 여기 등재 전까지는 자동으로 기존 1× 동작을 유지한다(default-deny).
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- 밀도 화이트리스트는 이 노드의 캐시 소유권과 한 경계이며 계약 테스트가 직접 대조한다
+export const STUDIO_DENSITY_INVARIANT_FILTER_ATTRS: ReadonlySet<string> = new Set([
+  // 밝기/대비 — per-pixel 포인트 연산.
+  "brightness",
+  "contrast",
+  // HSL — per-pixel 색 변환(luminance 는 항상 0 으로 부착된다).
+  "saturation",
+  "hue",
+  "luminance",
+  // 색온도 — per-pixel 채널 시프트.
+  "temperature",
+  // 레벨(마스터 + r/g/b 채널) — 256칸 LUT 포인트 연산.
+  "levelsBlack",
+  "levelsWhite",
+  "levelsGamma",
+  "levelsOutBlack",
+  "levelsOutWhite",
+  "levelsR",
+  "levelsG",
+  "levelsB",
+  // 톤 커브(마스터 + r/g/b 채널) — LUT 포인트 연산.
+  "curvePoints",
+  "curvePointsR",
+  "curvePointsG",
+  "curvePointsB",
+  // 컬러 밸런스 — per-pixel 톤 영역 가중 시프트.
+  "cbShadows",
+  "cbMidtones",
+  "cbHighlights",
+  // 채널 믹서 — per-pixel 3×3 색 행렬.
+  "channelMixer",
+  // 선택 색상(HSL 밴드) — per-pixel 색상 분류·보정.
+  "selectiveHsl",
+  // 생동감 — per-pixel 채도 곡선.
+  "vibrance",
+  "vibranceSat",
+  // 그라디언트 맵 — 휘도 LUT 포인트 연산.
+  "gradientMap",
+  // 포토 필터 — per-pixel 색 오버레이.
+  "pfColor",
+  "pfDensity",
+  "pfPreserve",
+  // 색상 투명화 — per-pixel 키 컬러 거리 → 알파.
+  "ctaColor",
+  "ctaStrength",
+  // 듀오톤 — 휘도 → 2색 매핑 포인트 연산.
+  "duotoneShadow",
+  "duotoneHighlight",
+  // 잉크 스레숄드 — per-pixel 휘도 임계.
+  "inkThreshold",
+  // 포스터라이즈 — per-pixel 양자화.
+  "posterize",
+  // 노출 — per-pixel EV/감마/오프셋.
+  "exposureEv",
+  "exposureGamma",
+  "exposureOffset",
+  // 섀도우/하이라이트 — 휘도 LUT 포인트 연산(width 파라미터는 톤 범위이지 px 가 아니다).
+  "shShadows",
+  "shShadowsWidth",
+  "shHighlights",
+  "shHighlightsWidth",
+  "shMidtoneContrast",
+  // 비네트 — half-dimension 정규화 좌표 기하(절대 px 없음).
+  "vignetteDarkness",
+  "vignetteSize",
+  "vignetteRoundness",
+  "vignetteFeather",
+]);
+
+/**
+ * 이미지 필터 슈퍼샘플 밀도를 결정한다 — 활성 보정 프로그램 전체가 밀도 불변으로 증명된
+ * 경우에만 min(2, devicePixelRatio), 그 외에는 1(기존 룩 그대로).
+ *
+ * 판정 재료는 buildImageFilters 가 실제로 부착한 attrs(default-deny 화이트리스트)와,
+ * attrs 없이 filters 배열에만 나타나는 px 단위 플래그 필터(screentone/lineart — 6px 타일·
+ * 3×3 소벨 커널), 그리고 attrs 가 래퍼 클로저에 숨는 스마트 필터 스택(내용 검사가 불가하므로
+ * 보수적으로 제외)이다. Grayscale/Sepia/Invert 도 attrs 가 없지만 포인트 연산이라 안전하다.
+ * Konva 캐시(pixelRatio)와 Worker 스냅샷이 같은 값을 써야 두 경로의 룩이 일치한다.
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- 순수 밀도 판정은 이 노드의 캐시 구성과 분리할 수 없는 공개 계약이다
+export function studioImageFilterSupersampleDensity(input: {
+  readonly attrs: Record<string, unknown>;
+  readonly el: Pick<
+    ImageFilterFields,
+    "screentone" | "lineart" | "smartFilters" | "smartFilterOperations"
+  >;
+  readonly devicePixelRatio: number;
+}): number {
+  const dpr = input.devicePixelRatio;
+  if (typeof dpr !== "number" || !Number.isFinite(dpr) || dpr <= 1) return 1;
+  if (input.el.screentone || input.el.lineart) return 1;
+  if (
+    input.el.smartFilters != null
+    || (Array.isArray(input.el.smartFilterOperations) && input.el.smartFilterOperations.length > 0)
+  ) {
+    return 1;
+  }
+  for (const key of Object.keys(input.attrs)) {
+    if (!STUDIO_DENSITY_INVARIANT_FILTER_ATTRS.has(key)) return 1;
+  }
+  return Math.min(IMAGE_FILTER_SUPERSAMPLE_MAX, dpr);
+}
 type StudioKonvaFiltersModule = typeof import("./studio-konva-filters");
 type StudioImageFilterWorkerClientModule = typeof import("./studio-image-filter-worker-client");
 type StudioImageFilterWorkerSession = ReturnType<
@@ -303,8 +419,27 @@ export function StudioKonvaImageNode({
   const built = hasFilters && filterModule
     ? cachedBuildImageFilters(el, filterCacheKey, filterModule)
     : EMPTY_IMAGE_FILTER_BUILD;
-  const workerWidth = Math.max(1, Math.round(el.width));
-  const workerHeight = Math.max(1, Math.round(el.height));
+  // HiDPI 필터 밀도 — 활성 보정이 전부 밀도 불변(포인트/정규화 연산)일 때만 min(2, dpr)로
+  // 슈퍼샘플링한다("같은 룩, 더 선명한 픽셀"). px 단위 필터가 하나라도 있으면 1× 유지.
+  const requestedFilterDensity = hasFilters && filterModule
+    ? studioImageFilterSupersampleDensity({
+        attrs: built.attrs,
+        el,
+        devicePixelRatio: globalThis.devicePixelRatio || 1,
+      })
+    : 1;
+  const workerBaseWidth = Math.max(1, Math.round(el.width));
+  const workerBaseHeight = Math.max(1, Math.round(el.height));
+  const densifiedWidth = Math.max(1, Math.round(el.width * requestedFilterDensity));
+  const densifiedHeight = Math.max(1, Math.round(el.height * requestedFilterDensity));
+  // 슈퍼샘플 결과가 인터랙티브 픽셀 예산을 넘으면 기존 1× 밀도로 되돌린다(예산이 우선).
+  const filterDensity = requestedFilterDensity > 1
+    && Number.isSafeInteger(densifiedWidth * densifiedHeight)
+    && densifiedWidth * densifiedHeight <= IMAGE_FILTER_INTERACTIVE_MAX_PIXELS
+      ? requestedFilterDensity
+      : 1;
+  const workerWidth = filterDensity > 1 ? densifiedWidth : workerBaseWidth;
+  const workerHeight = filterDensity > 1 ? densifiedHeight : workerBaseHeight;
   const workerPixelCount = workerWidth * workerHeight;
   const workerDimensionsSafe = Number.isSafeInteger(workerWidth)
     && Number.isSafeInteger(workerHeight)
@@ -496,11 +631,14 @@ export function StudioKonvaImageNode({
         // 테두리가 있으면 offset만큼 캐시 캔버스를 키워 실루엣 바깥에 테두리를 그릴 자리를 만든다.
         // isAnimatedGif는 캐시를 만들지 않는다 — Konva 캐시는 "그 순간의 정적 스냅샷"이라
         // 애니메이션 GIF에 캐시를 씌우면 그 프레임에 멈춘다(필터는 조용히 미적용, 알려진 한계).
-        node.cache(cachePad > 0 ? { offset: cachePad } : undefined);
+        // cachePad === 0 이면 pixelRatio 를 명시해 Worker 스냅샷 밀도와 정확히 일치시킨다 —
+        // Konva 10 은 미지정 시 기기 dpr 를 암묵 사용해 px 단위 필터가 Worker 경로와 다르게
+        // 보였다(HiDPI에서 효과가 절반으로 줄어듦). 테두리(cachePad>0) 경로는 기존 동작 유지.
+        node.cache(cachePad > 0 ? { offset: cachePad } : { pixelRatio: filterDensity });
       }
       node.getLayer()?.batchDraw();
     }
-  }, [displayImg, el.width, el.height, filterCacheKey, hasFilters, filterModule, cachePad, el.isAnimatedGif, workerPipelineActive, workerDimensionsSafe]);
+  }, [displayImg, el.width, el.height, filterCacheKey, hasFilters, filterModule, cachePad, el.isAnimatedGif, workerPipelineActive, workerDimensionsSafe, filterDensity]);
 
   // 애니메이션 GIF 주기적 리렌더 — 브라우저가 img(HTMLImageElement)를 내부적으로 계속
   // 디코딩·재생하지만(studio-gif-element.ts 헤더 참고), Konva는 그리기 시점의 스냅샷만 캔버스에

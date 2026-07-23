@@ -26,6 +26,9 @@ const sceneHandle: StudioMannequinSceneHandle = {
     pngDataUrl: "data:image/png;base64,AAAA",
     width: 640,
     height: 480,
+    // 래스터는 dpr×배율 슈퍼샘플 — 논리 뷰 크기가 함께 전달돼야 캔버스에 논리 크기로 삽입된다.
+    displayWidth: 320,
+    displayHeight: 240,
   })),
   dispose: vi.fn(),
 };
@@ -102,7 +105,7 @@ describe("StudioMannequinPoserPanel", () => {
     });
   });
 
-  it("캡처 버튼은 씬 캡처 → onInsert → onClose 순으로 흐른다", async () => {
+  it("캡처 버튼은 씬 캡처 → onInsert → onClose 순으로 흐르고 논리 크기를 함께 전달한다", async () => {
     const onClose = vi.fn();
     const onInsert = vi.fn(() => true);
     renderPanel({ onClose, onInsert });
@@ -113,8 +116,29 @@ describe("StudioMannequinPoserPanel", () => {
         pngDataUrl: "data:image/png;base64,AAAA",
         width: 640,
         height: 480,
+        displayWidth: 320,
+        displayHeight: 240,
       });
       expect(onClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("display 쌍이 없는 캡처 결과(예산 축소 등)는 그대로 래스터 크기만 전달한다", async () => {
+    vi.mocked(sceneHandle.captureDataUrl).mockResolvedValueOnce({
+      pngDataUrl: "data:image/png;base64,BBBB",
+      width: 500,
+      height: 400,
+    });
+    const onInsert = vi.fn(() => true);
+    renderPanel({ onInsert });
+    fireEvent.click(screen.getByRole("button", { name: /카메라/ }));
+    fireEvent.click(screen.getByRole("button", { name: /캔버스로 캡처/ }));
+    await waitFor(() => {
+      expect(onInsert).toHaveBeenCalledWith({
+        pngDataUrl: "data:image/png;base64,BBBB",
+        width: 500,
+        height: 400,
+      });
     });
   });
 

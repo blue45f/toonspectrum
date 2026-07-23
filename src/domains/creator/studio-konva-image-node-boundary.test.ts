@@ -241,8 +241,26 @@ describe("Studio Konva image node boundary", () => {
     expect(source).toContain("if (el.frames && el.frames.length > 1) return;");
     expect(source).toContain("if (!liveStrokeRef?.current && now - lastDrawAt >= FRAME_INTERVAL_MS)");
     expect(source).toContain("cx.scale(scaleX, scaleY);");
-    expect(source).toContain("node.cache(cachePad > 0 ? { offset: cachePad } : undefined);");
+    expect(source).toContain(
+      "node.cache(cachePad > 0 ? { offset: cachePad } : { pixelRatio: filterDensity });"
+    );
     expect(source).toContain("computePanelAutoFitPatch(");
     expect(source).toContain("onInteractionEnd?.();");
+  });
+
+  it("keeps the HiDPI supersample density gated by the explicit invariant-attr allowlist", () => {
+    const imageNode = moduleShape("./StudioKonvaImageNode.tsx");
+
+    // 밀도 결정은 default-deny 화이트리스트 + 순수 함수로만 이뤄지고, 둘 다 export 되어
+    // 단위 테스트(studio-konva-image-node-density.test.ts)가 실제 buildImageFilters 출력과
+    // 대조한다. Worker 스냅샷과 Konva 캐시가 같은 filterDensity 를 공유해야 룩이 일치한다.
+    expect(imageNode.exportedDeclarations.has("STUDIO_DENSITY_INVARIANT_FILTER_ATTRS")).toBe(true);
+    expect(imageNode.exportedDeclarations.has("studioImageFilterSupersampleDensity")).toBe(true);
+    expect(imageNode.source).toContain("const IMAGE_FILTER_SUPERSAMPLE_MAX = 2;");
+    expect(imageNode.source).toContain("devicePixelRatio: globalThis.devicePixelRatio || 1,");
+    // 슈퍼샘플 크기도 기존 인터랙티브 픽셀 예산을 그대로 지킨다(넘으면 1×로 폴백).
+    expect(imageNode.source).toContain(
+      "&& densifiedWidth * densifiedHeight <= IMAGE_FILTER_INTERACTIVE_MAX_PIXELS"
+    );
   });
 });

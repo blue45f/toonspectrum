@@ -165,7 +165,7 @@ export interface StudioLazyPanelStackHandlers {
   insertBg3dResult: StudioBg3dInsertHandler;
   insertVrmResult: StudioVrmInsertHandler;
   insertMannequinResult: (
-    result: { pngDataUrl: string; width: number; height: number }
+    result: { pngDataUrl: string; width: number; height: number; displayWidth?: number; displayHeight?: number }
   ) => boolean | void | Promise<boolean | void>;
   onApplyScenarioPreview: () => void;
   onCancelScenario: () => void;

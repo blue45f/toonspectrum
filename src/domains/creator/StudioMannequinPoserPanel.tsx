@@ -51,7 +51,6 @@ import {
 } from "./studio-mannequin-poses";
 import {
   createStudioMannequinScene,
-  type StudioMannequinCaptureResult,
   type StudioMannequinProjection,
   type StudioMannequinSceneHandle,
 } from "./studio-mannequin-scene";
@@ -70,12 +69,26 @@ import { cn } from "@/lib/utils";
 
 export type { StudioMannequinCaptureResult } from "./studio-mannequin-scene";
 
+/**
+ * onInsert 로 전달되는 캡처 페이로드. width/height 는 캡처 래스터(px), displayWidth/
+ * displayHeight 는 100% 줌에서 문서에 놓일 논리 크기다(래스터가 논리 크기보다 작으면 생략 —
+ * 업스케일 금지). 소비자는 `result.displayWidth ?? result.width` 로 논리 크기 삽입을 택한다
+ * (StudioVrmPoserInsertResult 와 동일한 계약).
+ */
+export interface StudioMannequinInsertPayload {
+  pngDataUrl: string;
+  width: number;
+  height: number;
+  displayWidth?: number;
+  displayHeight?: number;
+}
+
 export interface StudioMannequinPoserPanelProps {
   open: boolean;
   onClose: () => void;
   /** false 를 반환하면 문서가 바뀐 것으로 보고 삽입을 중단한다(3D 삽입 컨트롤러 계약). */
   onInsert: (
-    result: StudioMannequinCaptureResult,
+    result: StudioMannequinInsertPayload,
   ) => boolean | void | Promise<boolean | void>;
 }
 
