@@ -6,12 +6,14 @@
  *  - the real CPU oracle StudioKonvaImageNode ultimately executes (buildImageFilters +
  *    applyImageFilters on a registerStudioKonvaFilters registry), and
  *  - the WebGPU compute chain (applyGpuFilterChain) in a real Chromium WebGPU context,
- * then the raw byte buffers are diffed per channel. The Node orchestrator gates
- * maxChannelDelta <= 2 for single-kernel cases (f32 vs f64 rounding-boundary tolerance) and
- * maxAlphaDelta === 0 everywhere (all five kernels must preserve alpha exactly). Multi-kernel
- * chains get a wider documented bound: a +-1 f32 tie seed from a formula kernel (e.g. contrast
- * adjust 1.44 lands every 25th byte exactly on a .5 boundary, where f64 and f32 noise can pick
- * different sides) is amplified by downstream levels/curves LUT slopes.
+ * then the raw byte buffers are diffed per channel. The Node orchestrator gates:
+ *  - lutOnly plans (brightness/contrast, levels, curves, and their fused combinations are all
+ *    exact CPU-built byte LUTs routed through the integer-lookup lut3 kernel): delta === 0
+ *  - single formula kernels (HSL, color balance): maxChannelDelta <= 2 (f32 vs f64
+ *    rounding-boundary tolerance)
+ *  - mixed chains: a +-1 f32 tie seed from a formula kernel can be amplified by downstream
+ *    LUT slopes — gate is observed+1
+ * and maxAlphaDelta === 0 everywhere (all kernels must preserve alpha exactly).
  *
  * Settles window.__studioGpuFiltersParityResult to a success payload, an "unsupported" marker
  * (headless WebGPU unavailable), or a structured error.
@@ -33,8 +35,10 @@ const HEIGHT = 128;
 interface FilterParityCaseResult {
   readonly id: string;
   readonly stepCount: number;
-  /** GPU compute dispatch count — the Node gate widens tolerance for multi-kernel chains. */
+  /** GPU compute dispatch count (after adjacent-LUT fusion) — drives the Node gate tier. */
   readonly kernelCount: number;
+  /** true when every plan step is an exact CPU-built LUT — the Node gate requires delta 0. */
+  readonly lutOnly: boolean;
   readonly maxChannelDelta: number;
   readonly maxAlphaDelta: number;
   readonly changedPixels: number;
@@ -129,6 +133,26 @@ const PARITY_CASES: readonly FilterParityCase[] = [
         midtones: [0, 15, 0],
         highlights: [-25, 0, 30],
       },
+    },
+  },
+  {
+    // brightness/contrast + levels + curves are all byte->byte LUT stages with no formula
+    // kernel between them — the plan must fuse them into a single lut3 dispatch that stays
+    // bit-identical to the CPU chain (lutOnly gate: delta 0).
+    id: "lut-fused-chain",
+    el: {
+      brightness: -0.2,
+      contrast: 45,
+      levelsBlack: 20,
+      levelsWhite: 235,
+      levelsGamma: 1.3,
+      levelsCh: { r: { gamma: 0.8 } },
+      curve: [
+        { x: 0, y: 0 },
+        { x: 64, y: 48 },
+        { x: 255, y: 255 },
+      ],
+      curveCh: { g: [{ x: 0, y: 10 }, { x: 255, y: 245 }] },
     },
   },
   {
@@ -233,6 +257,7 @@ async function run(): Promise<FilterParityResult> {
       id: parityCase.id,
       stepCount: filters.length,
       kernelCount: plan.length,
+      lutOnly: plan.every((step) => !!step.lut),
       ...diffBuffers(cpuImage.data, gpuImage.data),
     });
   }

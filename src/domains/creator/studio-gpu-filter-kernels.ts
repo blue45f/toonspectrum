@@ -8,14 +8,17 @@
  *    동일한 0..255 "바이트 공간" 수식을 그대로 계산한다(텍스처 unorm 변환의 반올림 규칙에
  *    의존하지 않는다). 스테이지 경계의 양자화는 `clamp(round(v), 0, 255)` — WGSL `round` 는
  *    round-half-to-even 이라 Uint8ClampedArray 대입의 반올림 규칙과 일치한다.
- *  - 레벨/커브는 CPU 엔진(studio-levels / studio-curves)의 LUT 빌더를 **그대로 호출**해
- *    256칸 채널 LUT 를 굽고 그 바이트를 GPU 로 올린다 — LUT 매핑은 순수 정수 조회라
- *    CPU 결과와 비트 단위로 동일하다.
- *  - 밝기/대비·HSL·컬러밸런스 계수는 패커가 CPU 와 동일한 f64 수식으로 미리 계산해 uniform 에
+ *  - 밝기/대비·레벨/커브는 전부 바이트→바이트 사상이라 CPU 쪽에서 정확한 256칸 LUT 를 굽고
+ *    그 바이트를 GPU 로 올린다(lut3 커널) — LUT 매핑은 순수 정수 조회라 CPU 결과와 비트
+ *    단위로 동일하다. 레벨/커브는 CPU 엔진(studio-levels / studio-curves)의 LUT 빌더를
+ *    **그대로 호출**하고, 밝기/대비는 nativeBrighten→nativeContrast 를 스테이지 사이
+ *    Uint8ClampedArray 양자화까지 포함해 f64 로 재현한 LUT 를 굽는다.
+ *  - HSL·컬러밸런스 계수는 패커가 CPU 와 동일한 f64 수식으로 미리 계산해 uniform 에
  *    싣는다. 픽셀별 잔여 연산만 f32 라 최대 채널 오차는 반올림 경계에서 ±1 수준이다.
  *
  * CPU 원본(수식 출처, 그대로 복제):
- *  - 밝기/대비: studio-konva-native-filters.ts nativeBrighten / nativeContrast (Konva verbatim)
+ *  - 밝기/대비: studio-konva-native-filters.ts nativeBrighten / nativeContrast (Konva verbatim,
+ *    두 스테이지 사이 Uint8ClampedArray 재양자화 포함 — LUT 로 정확 재현)
  *  - HSL: studio-konva-native-filters.ts nativeHSL (Konva verbatim)
  *  - 레벨: studio-levels.ts buildChannelLevelsLuts
  *  - 커브: studio-curves.ts buildCurveChannelLuts
@@ -57,20 +60,11 @@ export const STUDIO_GPU_FILTER_BINDINGS = {
 /** 모든 uniform 의 첫 4바이트는 pixelCount(u32 LE) — 패커는 0 자리표시자를 쓴다. */
 export const STUDIO_GPU_FILTER_PIXEL_COUNT_OFFSET = 0;
 
-/** 밝기/대비 uniform 바이트 오프셋(구조 테스트·apply 가 공유). */
-export const STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS = {
-  applyBrightness: 4,
-  applyContrast: 8,
-  brightnessOffset: 16,
-  contrastAdjust: 20,
-} as const;
-export const STUDIO_GPU_BRIGHTNESS_CONTRAST_UNIFORM_BYTES = 32;
-
 /** HSL uniform — 행렬 3행(vec4: 계수 3개 + luminance 오프셋). */
 export const STUDIO_GPU_HSL_OFFSETS = { rowR: 16, rowG: 32, rowB: 48 } as const;
 export const STUDIO_GPU_HSL_UNIFORM_BYTES = 64;
 
-/** 레벨/커브(lut3) 공용 uniform — pixelCount 뿐(16바이트 패딩). */
+/** 밝기대비/레벨/커브(lut3) 공용 uniform — pixelCount 뿐(16바이트 패딩). */
 export const STUDIO_GPU_LUT3_UNIFORM_BYTES = 16;
 /** lut3 스토리지 버퍼 엔트리 수 — r 0..255, g 256..511, b 512..767. */
 export const STUDIO_GPU_LUT3_ENTRY_COUNT = 768;
@@ -106,61 +100,6 @@ fn studio_repack(r : u32, g : u32, b : u32, a : u32) -> u32 {
 
 // gid → 선형 픽셀 인덱스. dispatch 는 (256, ceil(pixelCount/16384)) 2D 그리드.
 const WGSL_INDEX_EXPR = "gid.y * 16384u + gid.x";
-
-/**
- * ① 밝기/대비 — nativeBrighten(값 + brightness*255) 뒤 nativeContrast 를 한 디스패치로.
- * CPU 는 필터 사이마다 Uint8ClampedArray 에 다시 쓰므로(양자화), 두 스테이지가 모두 켜진
- * 경우 중간에 반드시 `clamp(round(...))` 로 같은 양자화를 복제한다.
- */
-const WGSL_BRIGHTNESS_CONTRAST = /* wgsl */ `
-struct Params {
-  pixel_count : u32,
-  apply_brightness : u32,
-  apply_contrast : u32,
-  _pad0 : u32,
-  brightness_offset : f32,
-  contrast_adjust : f32,
-  _pad1 : f32,
-  _pad2 : f32,
-}
-
-@group(0) @binding(0) var<storage, read> src : array<u32>;
-@group(0) @binding(1) var<storage, read_write> dst : array<u32>;
-@group(0) @binding(2) var<uniform> params : Params;
-${WGSL_BYTE_HELPERS}
-fn studio_contrast_channel(value : f32, adjust : f32) -> f32 {
-  // konva/lib/filters/Contrast.js verbatim: (v/255 - 0.5) * adjust + 0.5, *255, 명시적 클램프.
-  return clamp(((value / 255.0 - 0.5) * adjust + 0.5) * 255.0, 0.0, 255.0);
-}
-
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
-  let i = ${WGSL_INDEX_EXPR};
-  if (i >= params.pixel_count) { return; }
-  let texel = src[i];
-  var r = studio_unpack_r(texel);
-  var g = studio_unpack_g(texel);
-  var b = studio_unpack_b(texel);
-  let a = studio_unpack_a(texel);
-  if (params.apply_brightness != 0u) {
-    // nativeBrighten 의 Uint8ClampedArray 쓰기(반올림+클램프)를 스테이지 경계에서 복제.
-    r = clamp(round(r + params.brightness_offset), 0.0, 255.0);
-    g = clamp(round(g + params.brightness_offset), 0.0, 255.0);
-    b = clamp(round(b + params.brightness_offset), 0.0, 255.0);
-  }
-  if (params.apply_contrast != 0u) {
-    r = studio_contrast_channel(r, params.contrast_adjust);
-    g = studio_contrast_channel(g, params.contrast_adjust);
-    b = studio_contrast_channel(b, params.contrast_adjust);
-  }
-  dst[i] = studio_repack(
-    studio_quantize_byte(r),
-    studio_quantize_byte(g),
-    studio_quantize_byte(b),
-    a,
-  );
-}
-`;
 
 /**
  * ② HSL — nativeHSL 의 3×3 색 행렬 + luminance 오프셋. 행렬 계수는 패커가 CPU 와 동일한
@@ -203,8 +142,9 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
 `;
 
 /**
- * ③④ 레벨/커브 공용 lut3 — 채널별 256칸 LUT 순수 정수 조회(data[i] = lut[data[i]]).
+ * ①③④ 밝기대비/레벨/커브 공용 lut3 — 채널별 256칸 LUT 순수 정수 조회(data[i] = lut[data[i]]).
  * LUT 바이트는 CPU 빌더가 만든 것을 그대로 올리므로 결과는 CPU 와 비트 단위로 동일하다.
+ * 인접한 lut3 스텝들은 plan 단계에서 LUT 합성으로 한 디스패치에 융합된다("lut-fused").
  */
 const WGSL_LUT3 = /* wgsl */ `
 struct Params {
@@ -294,7 +234,9 @@ export type StudioGpuFilterKernelId =
   | "hsl"
   | "levels"
   | "curves"
-  | "color-balance";
+  | "color-balance"
+  /** 인접 LUT 스텝들을 plan 이 하나로 합성한 결과 — 스펙은 lut3 와 동일하다. */
+  | "lut-fused";
 
 export interface StudioGpuFilterKernelSpec {
   readonly id: StudioGpuFilterKernelId;
@@ -310,11 +252,11 @@ export interface StudioGpuFilterKernelSpec {
 export const STUDIO_GPU_FILTER_KERNELS: Record<StudioGpuFilterKernelId, StudioGpuFilterKernelSpec> = {
   "brightness-contrast": {
     id: "brightness-contrast",
-    shaderId: "studio-gpu-filter/brightness-contrast",
-    wgsl: WGSL_BRIGHTNESS_CONTRAST,
+    shaderId: "studio-gpu-filter/lut3",
+    wgsl: WGSL_LUT3,
     entryPoint: "main",
-    usesLut: false,
-    uniformByteLength: STUDIO_GPU_BRIGHTNESS_CONTRAST_UNIFORM_BYTES,
+    usesLut: true,
+    uniformByteLength: STUDIO_GPU_LUT3_UNIFORM_BYTES,
   },
   hsl: {
     id: "hsl",
@@ -348,6 +290,14 @@ export const STUDIO_GPU_FILTER_KERNELS: Record<StudioGpuFilterKernelId, StudioGp
     usesLut: false,
     uniformByteLength: STUDIO_GPU_COLOR_BALANCE_UNIFORM_BYTES,
   },
+  "lut-fused": {
+    id: "lut-fused",
+    shaderId: "studio-gpu-filter/lut3",
+    wgsl: WGSL_LUT3,
+    entryPoint: "main",
+    usesLut: true,
+    uniformByteLength: STUDIO_GPU_LUT3_UNIFORM_BYTES,
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -366,55 +316,6 @@ function clampFinite(value: number, min: number, max: number): number {
 /** uniform 의 pixelCount(u32 LE, offset 0)를 실제 픽셀 수로 패치한다(apply 가 이미지별 호출). */
 export function patchStudioGpuFilterPixelCount(uniform: ArrayBuffer, pixelCount: number): void {
   new DataView(uniform).setUint32(STUDIO_GPU_FILTER_PIXEL_COUNT_OFFSET, pixelCount >>> 0, true);
-}
-
-// f32 half-ulp at v+offset ≤ 511 은 2^-16 ≈ 1.5e-5 — 그보다 넉넉히 큰 경계 여유.
-const BRIGHTNESS_TIE_MARGIN = 2 ** -12;
-
-/**
- * 밝기 오프셋의 .5 타이 경계 가드 — brightness*255 가 f64 에서 x.4999…/x.5000…1 처럼 .5 에
- * 극도로 근접하면(예: 0.1*255 = 25.499999999999996) f32 반올림이 정확히 x.5 로 올라가
- * 모든 정수 픽셀값이 round-half-even 타이에 걸리며 CPU 와 ±1 로 전면 발산한다. 소수부가
- * .5 에서 MARGIN 미만이면 CPU(f64) 반올림 방향이 보존되도록 .5 반대편으로 밀어 준다
- * (f64 소수부가 정확히 .5 인 값은 f32 로도 정확해 CPU 와 같은 half-even 동작 — 그대로 둔다).
- * 오차 상한 2^-12 ≈ 0.00024/255 로 시각적 영향은 없다. 정수 v 에 대해 CPU 와 비트 동일함을
- * 커널 테스트의 전수 스윕이 증명한다.
- */
-function guardBrightnessOffsetTie(exact: number): number {
-  const floorValue = Math.floor(exact);
-  let frac = exact - floorValue;
-  if (frac !== 0.5) {
-    if (frac < 0.5 && frac > 0.5 - BRIGHTNESS_TIE_MARGIN) frac = 0.5 - BRIGHTNESS_TIE_MARGIN;
-    else if (frac > 0.5 && frac < 0.5 + BRIGHTNESS_TIE_MARGIN) frac = 0.5 + BRIGHTNESS_TIE_MARGIN;
-  }
-  return floorValue + frac;
-}
-
-/**
- * ① 밝기/대비 — buildImageFilters 의 attrs 계산 verbatim:
- *   brightness → clampFinite(-0.8..0.8) 후 nativeBrighten 의 *255,
- *   contrast → clampFinite(-80..80) 후 nativeContrast 의 ((c+100)/100)^2.
- * 비활성 스테이지는 apply 플래그 0 (CPU 에서 해당 필터가 아예 체인에 없는 것과 동일).
- */
-export function packStudioGpuBrightnessContrastParams(input: {
-  brightness?: number;
-  contrast?: number;
-}): ArrayBuffer {
-  const applyBrightness = isActiveNumber(input.brightness);
-  const applyContrast = isActiveNumber(input.contrast);
-  const brightnessOffset = applyBrightness
-    ? guardBrightnessOffsetTie(clampFinite(input.brightness!, -0.8, 0.8) * 255)
-    : 0;
-  const contrastAdjust = applyContrast
-    ? Math.pow((clampFinite(input.contrast!, -80, 80) + 100) / 100, 2)
-    : 1;
-  const uniform = new ArrayBuffer(STUDIO_GPU_BRIGHTNESS_CONTRAST_UNIFORM_BYTES);
-  const view = new DataView(uniform);
-  view.setUint32(STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS.applyBrightness, applyBrightness ? 1 : 0, true);
-  view.setUint32(STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS.applyContrast, applyContrast ? 1 : 0, true);
-  view.setFloat32(STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS.brightnessOffset, brightnessOffset, true);
-  view.setFloat32(STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS.contrastAdjust, contrastAdjust, true);
-  return uniform;
 }
 
 /**
@@ -482,6 +383,55 @@ function lutsToUint32(luts: {
     packed[512 + i] = luts.b[i]!;
   }
   return packed;
+}
+
+/**
+ * ① 밝기/대비 LUT — 두 필터 모두 바이트→바이트 사상이므로 CPU 체인을 f64 로 정확 재현한
+ * 256칸 LUT 를 굽는다(세 채널 동일). CPU 원본(applyImageFilters)은 필터마다
+ * Uint8ClampedArray 에 다시 쓰므로 스테이지 사이에 ToUint8Clamp(클램프+round-half-even)
+ * 양자화가 있다 — LUT 도 같은 순서로 복제한다:
+ *   lut[i] = u8clamp( contrast_f64( u8clamp( i + brightness*255 ) ) )
+ * 파라미터는 buildImageFilters 의 attrs 계산 verbatim: brightness clampFinite(-0.8..0.8)*255,
+ * contrast clampFinite(-80..80) → ((c+100)/100)^2. 비활성 스테이지는 CPU 체인에서 해당
+ * 필터가 아예 빠진 것과 동일하게 건너뛴다. lut3 정수 조회라 결과는 CPU 와 비트 동일하다.
+ */
+export function packStudioGpuBrightnessContrastLut(input: {
+  brightness?: number;
+  contrast?: number;
+}): Uint32Array {
+  const applyBrightness = isActiveNumber(input.brightness);
+  const applyContrast = isActiveNumber(input.contrast);
+  const brightnessOffset = applyBrightness ? clampFinite(input.brightness!, -0.8, 0.8) * 255 : 0;
+  const contrastAdjust = applyContrast
+    ? Math.pow((clampFinite(input.contrast!, -80, 80) + 100) / 100, 2)
+    : 1;
+  const lut = new Uint8ClampedArray(256);
+  for (let i = 0; i < 256; i += 1) {
+    // nativeBrighten: data[i] += brightness*255 — Uint8ClampedArray 대입이 스테이지 경계 양자화.
+    lut[i] = applyBrightness ? i + brightnessOffset : i;
+    if (applyContrast) {
+      // nativeContrast verbatim: (v/255 - 0.5)*adjust + 0.5, *255, 명시적 클램프 후 대입 양자화.
+      const value = ((lut[i]! / 255 - 0.5) * contrastAdjust + 0.5) * 255;
+      lut[i] = value < 0 ? 0 : value > 255 ? 255 : value;
+    }
+  }
+  return lutsToUint32({ r: lut, g: lut, b: lut });
+}
+
+/**
+ * 인접 lut3 스텝 융합용 LUT 합성 — first 를 먼저, second 를 나중에 태운 순차 디스패치와
+ * 동일한 사상: out[c][i] = second[c][ first[c][i] ]. LUT 엔트리는 이미 양자화된 바이트라
+ * 정수 조회 합성은 스테이지 경계 양자화를 그대로 보존한다(순차 실행과 비트 동일).
+ */
+export function composeStudioGpuLut3(first: Uint32Array, second: Uint32Array): Uint32Array {
+  const composed = new Uint32Array(STUDIO_GPU_LUT3_ENTRY_COUNT);
+  for (let channel = 0; channel < 3; channel += 1) {
+    const base = channel * 256;
+    for (let i = 0; i < 256; i += 1) {
+      composed[base + i] = second[base + (first[base + i]! & 0xff)]! & 0xff;
+    }
+  }
+  return composed;
 }
 
 /**

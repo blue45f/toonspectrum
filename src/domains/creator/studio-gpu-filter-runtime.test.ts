@@ -107,19 +107,20 @@ describe("studio-gpu-filter-runtime: 기능 감지·획득", () => {
 });
 
 describe("studio-gpu-filter-runtime: 파이프라인 캐시", () => {
-  it("shaderId 로 캐시한다 — 레벨/커브는 lut3 파이프라인 하나를 공유", async () => {
+  it("shaderId 로 캐시한다 — 밝기대비/레벨/커브/융합은 lut3 파이프라인 하나를 공유", async () => {
     const harness = createFakeDevice();
     const runtime = await acquireStudioGpuFilterRuntime({ gpu: fakeGpuFor(harness.device) });
     expect(runtime).not.toBeNull();
 
     const levelsPipeline = runtime!.getComputePipeline(STUDIO_GPU_FILTER_KERNELS.levels);
-    const curvesPipeline = runtime!.getComputePipeline(STUDIO_GPU_FILTER_KERNELS.curves);
-    expect(curvesPipeline).toBe(levelsPipeline);
+    expect(runtime!.getComputePipeline(STUDIO_GPU_FILTER_KERNELS.curves)).toBe(levelsPipeline);
+    expect(runtime!.getComputePipeline(STUDIO_GPU_FILTER_KERNELS["brightness-contrast"])).toBe(levelsPipeline);
+    expect(runtime!.getComputePipeline(STUDIO_GPU_FILTER_KERNELS["lut-fused"])).toBe(levelsPipeline);
     expect(harness.createShaderModule).toHaveBeenCalledTimes(1);
     expect(harness.createComputePipeline).toHaveBeenCalledTimes(1);
 
-    runtime!.getComputePipeline(STUDIO_GPU_FILTER_KERNELS["brightness-contrast"]);
-    runtime!.getComputePipeline(STUDIO_GPU_FILTER_KERNELS["brightness-contrast"]);
+    runtime!.getComputePipeline(STUDIO_GPU_FILTER_KERNELS.hsl);
+    runtime!.getComputePipeline(STUDIO_GPU_FILTER_KERNELS.hsl);
     expect(harness.createComputePipeline).toHaveBeenCalledTimes(2);
     runtime!.dispose();
   });

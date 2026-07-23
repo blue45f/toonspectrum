@@ -10,7 +10,9 @@
  *    하므로 검증 오류는 error scope 로 감지해 null 로 강등한다(fail-closed).
  *  - 체인 순서는 buildImageFilters(studio-konva-filters.ts)가 같은 필드를 적용하는 순서와
  *    동일하다: Brighten→Contrast → HSL → Levels → Curve → ColorBalance
- *    (계약 테스트가 buildImageFilters 실물과 대조한다).
+ *    (계약 테스트가 buildImageFilters 실물과 대조한다). 인접한 LUT 스텝(밝기대비/레벨/커브)
+ *    은 LUT 합성으로 한 lut3 디스패치에 융합된다 — 합성은 순차 실행과 비트 동일하므로
+ *    체인 순서 의미가 보존된다.
  *  - 지원 5필드 외의 보정이 하나라도 활성이면 전체를 CPU 로 넘긴다(부분 GPU 실행 금지 —
  *    중간 순서에 끼어드는 미지원 필터와 결과가 달라질 수 있기 때문).
  *
@@ -25,7 +27,8 @@ import {
   STUDIO_GPU_FILTER_DISPATCH_ROW_THREADS,
   STUDIO_GPU_FILTER_KERNELS,
   STUDIO_GPU_FILTER_WORKGROUP_SIZE,
-  packStudioGpuBrightnessContrastParams,
+  composeStudioGpuLut3,
+  packStudioGpuBrightnessContrastLut,
   packStudioGpuColorBalanceParams,
   packStudioGpuCurvesLut,
   packStudioGpuHslParams,
@@ -64,6 +67,11 @@ export interface StudioGpuFilterPlanStep {
   /** offset 0 은 pixelCount 자리표시자 — apply 가 이미지별로 패치한다. */
   readonly uniform: ArrayBuffer;
   readonly lut?: Uint32Array;
+  /**
+   * "lut-fused" 스텝에만 존재 — 이 스텝으로 합성된 원본 LUT 커널들의 체인 순서.
+   * 순차 실행과의 동치는 LUT 합성(composeStudioGpuLut3)이 보장한다.
+   */
+  readonly fusedKernelIds?: readonly StudioGpuFilterKernelId[];
 }
 
 export type StudioGpuFilterPlan = readonly StudioGpuFilterPlanStep[];
@@ -111,8 +119,36 @@ function hasUnsupportedActiveFilters(el: ImageFilterFields): boolean {
 }
 
 /**
+ * 인접한 lut3 스텝들을 한 디스패치로 융합한다 — 바이트→바이트 LUT 사상의 합성은 순차
+ * 실행과 비트 동일하다(각 LUT 출력이 이미 스테이지 경계 양자화를 거친 바이트이므로 추가
+ * 반올림이 없다). 사이에 수식 커널(HSL/컬러밸런스)이 끼면 체인 순서 보존을 위해 융합하지
+ * 않는다.
+ */
+function fuseAdjacentLutSteps(steps: readonly StudioGpuFilterPlanStep[]): StudioGpuFilterPlanStep[] {
+  const fused: StudioGpuFilterPlanStep[] = [];
+  for (const step of steps) {
+    const previous = fused[fused.length - 1];
+    if (previous?.lut && step.lut) {
+      fused[fused.length - 1] = {
+        kernelId: "lut-fused",
+        uniform: packStudioGpuLut3Uniform(),
+        lut: composeStudioGpuLut3(previous.lut, step.lut),
+        fusedKernelIds: [
+          ...(previous.fusedKernelIds ?? [previous.kernelId]),
+          ...(step.fusedKernelIds ?? [step.kernelId]),
+        ],
+      };
+      continue;
+    }
+    fused.push(step);
+  }
+  return fused;
+}
+
+/**
  * 보정 필드 → GPU 커널 체인 계획. buildImageFilters 가 같은 필드를 태우는 순서와 동일한
- * 순서의 스텝 배열을 돌려준다. 다음의 경우 null(호출부는 CPU 경로):
+ * 순서로 스텝을 만들고, 인접한 LUT 스텝(밝기대비/레벨/커브)은 한 lut3 디스패치로 융합해
+ * 돌려준다(fusedKernelIds 가 원본 순서를 보존). 다음의 경우 null(호출부는 CPU 경로):
  *  - 지원 5필드 중 활성이 하나도 없음
  *  - 지원 외 보정이 하나라도 활성
  */
@@ -123,7 +159,8 @@ export function planStudioGpuFilterChain(el: ImageFilterFields): StudioGpuFilter
   if (isActiveNumber(el.brightness) || isActiveNumber(el.contrast)) {
     steps.push({
       kernelId: "brightness-contrast",
-      uniform: packStudioGpuBrightnessContrastParams({
+      uniform: packStudioGpuLut3Uniform(),
+      lut: packStudioGpuBrightnessContrastLut({
         brightness: el.brightness,
         contrast: el.contrast,
       }),
@@ -164,7 +201,7 @@ export function planStudioGpuFilterChain(el: ImageFilterFields): StudioGpuFilter
       uniform: packStudioGpuColorBalanceParams(el.colorBalance),
     });
   }
-  return steps.length > 0 ? steps : null;
+  return steps.length > 0 ? fuseAdjacentLutSteps(steps) : null;
 }
 
 /** 통합 게이트용 — 이 보정 프로그램을 GPU 체인이 통째로 담당할 수 있는지. */

@@ -3,8 +3,6 @@ import { describe, expect, it } from "vitest";
 import { applyColorBalance } from "./studio-color-balance";
 import { buildCurveChannelLuts, normalizeCurve } from "./studio-curves";
 import {
-  STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS,
-  STUDIO_GPU_BRIGHTNESS_CONTRAST_UNIFORM_BYTES,
   STUDIO_GPU_COLOR_BALANCE_OFFSETS,
   STUDIO_GPU_COLOR_BALANCE_UNIFORM_BYTES,
   STUDIO_GPU_FILTER_BINDINGS,
@@ -16,7 +14,8 @@ import {
   STUDIO_GPU_HSL_UNIFORM_BYTES,
   STUDIO_GPU_LUT3_ENTRY_COUNT,
   STUDIO_GPU_LUT3_UNIFORM_BYTES,
-  packStudioGpuBrightnessContrastParams,
+  composeStudioGpuLut3,
+  packStudioGpuBrightnessContrastLut,
   packStudioGpuColorBalanceParams,
   packStudioGpuCurvesLut,
   packStudioGpuHslParams,
@@ -47,6 +46,18 @@ function patternedImageData(width = 16, height = 12) {
     }
   }
   return { data, width, height };
+}
+
+/** 전 바이트 램프(256×1) — r/g/b 모두 i, 알파 255. LUT 대조 스윕용. */
+function byteRampImageData() {
+  const data = new Uint8ClampedArray(256 * 4);
+  for (let i = 0; i < 256; i += 1) {
+    data[i * 4] = i;
+    data[i * 4 + 1] = i;
+    data[i * 4 + 2] = i;
+    data[i * 4 + 3] = 255;
+  }
+  return { data, width: 256, height: 1 };
 }
 
 function cpuFiltered(el: ImageFilterFields, img = patternedImageData()) {
@@ -117,18 +128,21 @@ describe("studio-gpu-filter-kernels: WGSL 구조", () => {
         expect(kernel.wgsl).not.toContain(`@binding(${STUDIO_GPU_FILTER_BINDINGS.lut})`);
       }
     }
+    expect(STUDIO_GPU_FILTER_KERNELS["brightness-contrast"].usesLut).toBe(true);
     expect(STUDIO_GPU_FILTER_KERNELS.levels.usesLut).toBe(true);
     expect(STUDIO_GPU_FILTER_KERNELS.curves.usesLut).toBe(true);
-    expect(STUDIO_GPU_FILTER_KERNELS["brightness-contrast"].usesLut).toBe(false);
+    expect(STUDIO_GPU_FILTER_KERNELS["lut-fused"].usesLut).toBe(true);
     expect(STUDIO_GPU_FILTER_KERNELS.hsl.usesLut).toBe(false);
     expect(STUDIO_GPU_FILTER_KERNELS["color-balance"].usesLut).toBe(false);
   });
 
-  it("레벨/커브는 lut3 셰이더(파이프라인 캐시 키)를 공유하고 나머지는 고유하다", () => {
-    expect(STUDIO_GPU_FILTER_KERNELS.levels.shaderId).toBe(STUDIO_GPU_FILTER_KERNELS.curves.shaderId);
-    expect(STUDIO_GPU_FILTER_KERNELS.levels.wgsl).toBe(STUDIO_GPU_FILTER_KERNELS.curves.wgsl);
+  it("밝기대비/레벨/커브/융합은 lut3 셰이더(파이프라인 캐시 키)를 공유하고 나머지는 고유하다", () => {
+    for (const id of ["brightness-contrast", "curves", "lut-fused"] as const) {
+      expect(STUDIO_GPU_FILTER_KERNELS[id].shaderId).toBe(STUDIO_GPU_FILTER_KERNELS.levels.shaderId);
+      expect(STUDIO_GPU_FILTER_KERNELS[id].wgsl).toBe(STUDIO_GPU_FILTER_KERNELS.levels.wgsl);
+    }
     const shaderIds = new Set(KERNEL_IDS.map((id) => STUDIO_GPU_FILTER_KERNELS[id].shaderId));
-    expect(shaderIds.size).toBe(4);
+    expect(shaderIds.size).toBe(3); // lut3 · hsl · color-balance
   });
 
   it("컬러 밸런스 WGSL 이 CPU 와 동일한 GAIN·휘도 계수를 담는다", () => {
@@ -140,10 +154,11 @@ describe("studio-gpu-filter-kernels: WGSL 구조", () => {
   it("디스패치 상수·uniform 크기가 서로 정합한다", () => {
     expect(STUDIO_GPU_FILTER_DISPATCH_ROW_THREADS % STUDIO_GPU_FILTER_WORKGROUP_SIZE).toBe(0);
     expect(STUDIO_GPU_FILTER_KERNELS["brightness-contrast"].uniformByteLength)
-      .toBe(STUDIO_GPU_BRIGHTNESS_CONTRAST_UNIFORM_BYTES);
+      .toBe(STUDIO_GPU_LUT3_UNIFORM_BYTES);
     expect(STUDIO_GPU_FILTER_KERNELS.hsl.uniformByteLength).toBe(STUDIO_GPU_HSL_UNIFORM_BYTES);
     expect(STUDIO_GPU_FILTER_KERNELS.levels.uniformByteLength).toBe(STUDIO_GPU_LUT3_UNIFORM_BYTES);
     expect(STUDIO_GPU_FILTER_KERNELS.curves.uniformByteLength).toBe(STUDIO_GPU_LUT3_UNIFORM_BYTES);
+    expect(STUDIO_GPU_FILTER_KERNELS["lut-fused"].uniformByteLength).toBe(STUDIO_GPU_LUT3_UNIFORM_BYTES);
     expect(STUDIO_GPU_FILTER_KERNELS["color-balance"].uniformByteLength)
       .toBe(STUDIO_GPU_COLOR_BALANCE_UNIFORM_BYTES);
   });
@@ -152,7 +167,6 @@ describe("studio-gpu-filter-kernels: WGSL 구조", () => {
 describe("studio-gpu-filter-kernels: 파라미터 패커", () => {
   it("pixelCount 자리표시자는 0 이고 patch 가 LE u32 로 덮어쓴다", () => {
     const uniforms = [
-      packStudioGpuBrightnessContrastParams({ brightness: 0.3 }),
       packStudioGpuHslParams({ saturation: 0.5 }),
       packStudioGpuLut3Uniform(),
       packStudioGpuColorBalanceParams({ shadows: [10, 0, 0] }),
@@ -165,45 +179,68 @@ describe("studio-gpu-filter-kernels: 파라미터 패커", () => {
     }
   });
 
-  it("밝기/대비 — buildImageFilters 의 클램프와 Konva 수식(f64→f32)을 그대로 담는다", () => {
-    const view = new DataView(packStudioGpuBrightnessContrastParams({ brightness: 0.3, contrast: 40 }));
-    expect(view.getUint32(STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS.applyBrightness, true)).toBe(1);
-    expect(view.getUint32(STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS.applyContrast, true)).toBe(1);
-    // 타이 가드가 미세 조정할 수 있으므로 오프셋은 근사(±2^-12)로, 수식 파라미터는 정확히 검증.
-    expect(view.getFloat32(STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS.brightnessOffset, true))
-      .toBeCloseTo(0.3 * 255, 3);
-    expect(view.getFloat32(STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS.contrastAdjust, true))
-      .toBe(Math.fround(Math.pow((40 + 100) / 100, 2)));
-
+  it("밝기/대비 LUT — 클램프·비활성 판정이 buildImageFilters 와 동일하다", () => {
     // 범위 밖 값은 buildImageFilters 와 동일하게 -0.8..0.8 / -80..80 으로 클램프.
-    const clamped = new DataView(packStudioGpuBrightnessContrastParams({ brightness: 5, contrast: -200 }));
-    expect(clamped.getFloat32(STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS.brightnessOffset, true))
-      .toBeCloseTo(0.8 * 255, 3);
-    expect(clamped.getFloat32(STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS.contrastAdjust, true))
-      .toBe(Math.fround(Math.pow((-80 + 100) / 100, 2)));
-
-    // 비활성(0/NaN/누락) 스테이지는 CPU 체인에서 해당 필터가 빠진 것과 동일하게 플래그 0.
-    const contrastOnly = new DataView(packStudioGpuBrightnessContrastParams({ brightness: Number.NaN, contrast: 30 }));
-    expect(contrastOnly.getUint32(STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS.applyBrightness, true)).toBe(0);
-    expect(contrastOnly.getFloat32(STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS.brightnessOffset, true)).toBe(0);
-    expect(contrastOnly.getUint32(STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS.applyContrast, true)).toBe(1);
+    expect(packStudioGpuBrightnessContrastLut({ brightness: 5, contrast: -200 }))
+      .toEqual(packStudioGpuBrightnessContrastLut({ brightness: 0.8, contrast: -80 }));
+    // 비활성(0/NaN/누락) 스테이지는 CPU 체인에서 해당 필터가 빠진 것과 동일하다.
+    expect(packStudioGpuBrightnessContrastLut({ brightness: Number.NaN, contrast: 30 }))
+      .toEqual(packStudioGpuBrightnessContrastLut({ contrast: 30 }));
+    // 둘 다 비활성이면 항등 LUT(plan 은 이 경우 스텝 자체를 만들지 않는다).
+    const identity = packStudioGpuBrightnessContrastLut({});
+    expect(identity.length).toBe(STUDIO_GPU_LUT3_ENTRY_COUNT);
+    for (let i = 0; i < 256; i += 1) {
+      expect(identity[i]).toBe(i);
+      expect(identity[256 + i]).toBe(i);
+      expect(identity[512 + i]).toBe(i);
+    }
   });
 
-  it("밝기 오프셋 타이 가드 — 전 브라이트니스 스윕에서 f32 덧셈이 CPU 와 비트 동일", () => {
-    // 0.1*255=25.4999… 같은 값이 f32 에서 정확히 x.5 로 올라가면 모든 픽셀이 half-even
-    // 타이에 걸려 CPU 와 전면 ±1 발산한다 — 가드된 오프셋은 -0.8..0.8 전 구간(0.01 간격)
-    // × 전 바이트에서 CPU Uint8ClampedArray 결과와 정확히 일치해야 한다.
+  it("밝기/대비 LUT — 파라미터 전 스윕에서 CPU 체인과 비트 단위로 동일하다", () => {
+    // 전 바이트 램프를 실제 CPU 오라클(buildImageFilters+applyImageFilters, Konva verbatim
+    // nativeBrighten→nativeContrast — 스테이지 사이 Uint8ClampedArray 재양자화 포함)에 태워
+    // LUT 와 대조한다. 0.1*255=25.4999… 류의 타이 경계까지 f64 재현이라 오차는 0 이어야 한다.
+    const sweep = (el: ImageFilterFields) => {
+      const cpu = cpuFiltered(el, byteRampImageData());
+      const lut = packStudioGpuBrightnessContrastLut({ brightness: el.brightness, contrast: el.contrast });
+      for (let i = 0; i < 256; i += 1) {
+        const label = `brightness=${el.brightness} contrast=${el.contrast} v=${i}`;
+        expect(lut[i], label).toBe(cpu.data[i * 4]);
+        expect(lut[256 + i], label).toBe(cpu.data[i * 4 + 1]);
+        expect(lut[512 + i], label).toBe(cpu.data[i * 4 + 2]);
+      }
+    };
+    // 밝기 단독: -0.8..0.8 전 구간(0.01 간격).
     for (let step = -80; step <= 80; step += 1) {
       if (step === 0) continue;
-      const brightness = step / 100;
-      const exact = brightness * 255;
-      const view = new DataView(packStudioGpuBrightnessContrastParams({ brightness }));
-      const packed = view.getFloat32(STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS.brightnessOffset, true);
-      const cpu = new Uint8ClampedArray(1);
-      for (let value = 0; value < 256; value += 1) {
-        cpu[0] = value + exact; // CPU nativeBrighten + Uint8ClampedArray 대입 semantics.
-        const gpuSum = Math.fround(value + packed); // WGSL f32 add.
-        expect(quantizeByte(gpuSum), `brightness=${brightness} v=${value}`).toBe(cpu[0]);
+      sweep({ brightness: step / 100 });
+    }
+    // 대비 단독: -80..80 전 정수.
+    for (let contrast = -80; contrast <= 80; contrast += 1) {
+      if (contrast === 0) continue;
+      sweep({ contrast });
+    }
+    // 결합 그리드: 스테이지 사이 재양자화가 정확해야 하는 경로.
+    for (let bStep = -80; bStep <= 80; bStep += 16) {
+      for (let contrast = -80; contrast <= 80; contrast += 10) {
+        if (bStep === 0 || contrast === 0) continue;
+        sweep({ brightness: bStep / 100, contrast });
+      }
+    }
+  });
+
+  it("composeStudioGpuLut3 — 합성 LUT 는 두 LUT 순차 조회와 채널별로 동일하다", () => {
+    const first = packStudioGpuBrightnessContrastLut({ brightness: -0.2, contrast: 45 });
+    const second = packStudioGpuLevelsLut({
+      master: { blackPoint: 20, whitePoint: 235, gamma: 1.3 },
+      channels: { r: { gamma: 0.8 } },
+    });
+    const composed = composeStudioGpuLut3(first, second);
+    expect(composed.length).toBe(STUDIO_GPU_LUT3_ENTRY_COUNT);
+    for (let channel = 0; channel < 3; channel += 1) {
+      const base = channel * 256;
+      for (let i = 0; i < 256; i += 1) {
+        expect(composed[base + i]).toBe(second[base + first[base + i]!]);
       }
     }
   });
@@ -285,24 +322,19 @@ describe("studio-gpu-filter-kernels: 파라미터 패커", () => {
 });
 
 describe("studio-gpu-filter-kernels: WGSL 수식 에뮬레이션 vs CPU 필터", () => {
-  it("밝기→대비 — 스테이지 사이 양자화를 포함해 CPU 체인과 ±1 이내", () => {
+  it("밝기→대비 LUT 조회(data[i]=lut[data[i]])는 CPU 체인과 비트 단위로 동일하다", () => {
     const el: ImageFilterFields = { brightness: -0.2, contrast: 45 };
     const img = patternedImageData();
     const cpu = cpuFiltered(el, img);
 
-    const view = new DataView(packStudioGpuBrightnessContrastParams(el));
-    const offset = view.getFloat32(STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS.brightnessOffset, true);
-    const adjust = view.getFloat32(STUDIO_GPU_BRIGHTNESS_CONTRAST_OFFSETS.contrastAdjust, true);
+    const lut = packStudioGpuBrightnessContrastLut({ brightness: el.brightness, contrast: el.contrast });
     const emulated = new Uint8ClampedArray(img.data);
     for (let i = 0; i < emulated.length; i += 4) {
-      for (let channel = 0; channel < 3; channel += 1) {
-        let value: number = emulated[i + channel]!;
-        value = quantizeByte(value + offset); // WGSL 스테이지 경계 양자화.
-        value = Math.min(255, Math.max(0, ((value / 255 - 0.5) * adjust + 0.5) * 255));
-        emulated[i + channel] = quantizeByte(value);
-      }
+      emulated[i] = lut[emulated[i]!]!;
+      emulated[i + 1] = lut[256 + emulated[i + 1]!]!;
+      emulated[i + 2] = lut[512 + emulated[i + 2]!]!;
     }
-    expect(maxChannelDelta(cpu.data, emulated)).toBeLessThanOrEqual(1);
+    expect(maxChannelDelta(cpu.data, emulated)).toBe(0);
     // 알파는 절대 변하지 않는다.
     for (let i = 3; i < emulated.length; i += 4) {
       expect(emulated[i]).toBe(img.data[i]);

@@ -2,17 +2,22 @@
  * CPU/GPU parity check for the M1 GPU image-filter foundation (studio-gpu-filter-*):
  * renders a deterministic test image through the real CPU filter chain (buildImageFilters +
  * applyImageFilters) and the WebGPU compute chain (applyGpuFilterChain) for each of the five
- * supported kernels (brightness/contrast, HSL, levels incl. channels, curves incl. channels,
- * color balance) plus a full five-kernel chain, inside a real headless Chromium WebGPU context.
+ * supported adjustments (brightness/contrast, HSL, levels incl. channels, curves incl.
+ * channels, color balance) plus an all-LUT fused chain (single lut3 dispatch) and a full
+ * five-adjustment chain, inside a real headless Chromium WebGPU context.
  *
  * Gates:
  *  - every case must run on GPU (null fallback on a WebGPU browser fails the run)
- *  - single-kernel cases: maxChannelDelta <= 2 (f32-vs-f64 rounding boundary tolerance)
- *  - multi-kernel chains: maxChannelDelta <= 6 — a +-1 f32 tie seed from a formula kernel
- *    (contrast/HSL outputs can land exactly on a .5 rounding boundary, where f64 and f32
- *    noise legitimately pick different sides) is amplified by the slopes of downstream
- *    levels/curves LUT stages; observed worst case is 4 on ~1.5% of pixels
- *  - maxAlphaDelta === 0 per case (all five kernels preserve alpha exactly)
+ *  - lutOnly plans (brightness/contrast + levels + curves, alone or fused): maxChannelDelta
+ *    === 0 — these stages are exact CPU-built byte LUTs routed through the integer-lookup
+ *    lut3 kernel, so any nonzero delta is a real regression
+ *  - single formula kernels (HSL, color balance): maxChannelDelta <= 2 (f32-vs-f64 rounding
+ *    boundary tolerance; observed worst case is 1 on a single color-balance pixel)
+ *  - mixed chains (formula kernel + LUT stages): maxChannelDelta <= 1 — the old contrast f32
+ *    tie seed is gone now that brightness/contrast is an exact LUT; the only remaining noise
+ *    source is an HSL/color-balance rounding boundary; observed worst case is 0 (gate is
+ *    observed+1)
+ *  - maxAlphaDelta === 0 per case (all kernels preserve alpha exactly)
  *
  * Exit codes: 0 = parity ok, 1 = parity/gate failure, 2 = environment lacks headless WebGPU
  * (documented limitation — rely on the vitest structure tests in that case).
@@ -28,13 +33,16 @@ import { createServer as createViteServer } from "vite";
 
 const HARNESS_PATH = "/__studio_gpu_filters_parity__";
 const RESULT_TIMEOUT_MS = 45_000;
+/** LUT-only plans are exact CPU byte maps — parity must be bit-identical. */
+const MAX_CHANNEL_DELTA_LUT_EXACT = 0;
 const MAX_CHANNEL_DELTA_SINGLE_KERNEL = 2;
-const MAX_CHANNEL_DELTA_CHAIN = 6;
+const MAX_CHANNEL_DELTA_CHAIN = 1;
 
 interface FilterParityCaseResult {
   readonly id: string;
   readonly stepCount: number;
   readonly kernelCount: number;
+  readonly lutOnly: boolean;
   readonly maxChannelDelta: number;
   readonly maxAlphaDelta: number;
   readonly changedPixels: number;
@@ -140,7 +148,11 @@ async function main(): Promise<void> {
 
     const failures: string[] = [];
     for (const parityCase of result.cases) {
-      const gate = parityCase.kernelCount > 1 ? MAX_CHANNEL_DELTA_CHAIN : MAX_CHANNEL_DELTA_SINGLE_KERNEL;
+      const gate = parityCase.lutOnly
+        ? MAX_CHANNEL_DELTA_LUT_EXACT
+        : parityCase.kernelCount > 1
+          ? MAX_CHANNEL_DELTA_CHAIN
+          : MAX_CHANNEL_DELTA_SINGLE_KERNEL;
       if (parityCase.maxChannelDelta > gate) {
         failures.push(
           `${parityCase.id}: maxChannelDelta ${parityCase.maxChannelDelta} > ${gate}`
@@ -155,6 +167,7 @@ async function main(): Promise<void> {
       {
         width: result.width,
         height: result.height,
+        maxChannelDeltaGateLutExact: MAX_CHANNEL_DELTA_LUT_EXACT,
         maxChannelDeltaGateSingleKernel: MAX_CHANNEL_DELTA_SINGLE_KERNEL,
         maxChannelDeltaGateChain: MAX_CHANNEL_DELTA_CHAIN,
         cases: result.cases,

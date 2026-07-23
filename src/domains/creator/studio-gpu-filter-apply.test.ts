@@ -5,6 +5,12 @@ import {
   isStudioGpuFilterChainEligible,
   planStudioGpuFilterChain,
 } from "./studio-gpu-filter-apply";
+import {
+  STUDIO_GPU_FILTER_KERNELS,
+  packStudioGpuBrightnessContrastLut,
+  packStudioGpuCurvesLut,
+  packStudioGpuLevelsLut,
+} from "./studio-gpu-filter-kernels";
 import { disposeStudioGpuFilterRuntime } from "./studio-gpu-filter-runtime";
 import { buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "./studio-konva-filters";
 
@@ -34,6 +40,29 @@ function cpuKernelOrder(el: ImageFilterFields): StudioGpuFilterKernelId[] {
     if (ids[ids.length - 1] !== id) ids.push(id);
   }
   return ids;
+}
+
+/**
+ * plan 의 LUT 융합을 커널 id 수준에서 재현 — 인접한 LUT 커널 런(run)을 하나로 접는다.
+ * 반환: [기대 스텝 id 순서, 스텝별 원본 run(융합 스텝만 길이>1)].
+ */
+function fusedKernelOrder(
+  ids: readonly StudioGpuFilterKernelId[],
+): [StudioGpuFilterKernelId[], StudioGpuFilterKernelId[][]] {
+  const stepIds: StudioGpuFilterKernelId[] = [];
+  const runs: StudioGpuFilterKernelId[][] = [];
+  for (const id of ids) {
+    const usesLut = STUDIO_GPU_FILTER_KERNELS[id].usesLut;
+    const lastRun = runs[runs.length - 1];
+    if (usesLut && lastRun && STUDIO_GPU_FILTER_KERNELS[stepIds[stepIds.length - 1]!].usesLut) {
+      lastRun.push(id);
+      stepIds[stepIds.length - 1] = "lut-fused";
+      continue;
+    }
+    stepIds.push(id);
+    runs.push([id]);
+  }
+  return [stepIds, runs];
 }
 
 /** CPU 체인이 지원 필터만으로 구성됐는지(비지원 필터가 끼면 GPU plan 은 null 이어야 한다). */
@@ -80,23 +109,89 @@ describe("studio-gpu-filter-apply: 체인 계획", () => {
     ],
   ];
 
-  it("스텝 순서가 buildImageFilters 의 지원-필드 적용 순서와 정확히 일치한다", () => {
+  it("스텝 순서가 buildImageFilters 의 지원-필드 적용 순서(인접 LUT 융합 포함)와 정확히 일치한다", () => {
     for (const [label, el] of FIVE_FIELD_CASES) {
       // 전제: 이 케이스들의 CPU 체인은 지원 필터만으로 구성된다.
       expect(cpuChainFullySupported(el), label).toBe(true);
       const plan = planStudioGpuFilterChain(el);
       expect(plan, label).not.toBeNull();
-      expect(plan!.map((step) => step.kernelId), label).toEqual(cpuKernelOrder(el));
-      // LUT 커널 스텝은 항상 768칸 LUT 를 동반한다.
-      for (const step of plan!) {
-        if (step.kernelId === "levels" || step.kernelId === "curves") {
+      const [expectedIds, expectedRuns] = fusedKernelOrder(cpuKernelOrder(el));
+      expect(plan!.map((step) => step.kernelId), label).toEqual(expectedIds);
+      for (const [index, step] of plan!.entries()) {
+        // LUT 커널 스텝은 항상 768칸 LUT 를 동반한다.
+        if (STUDIO_GPU_FILTER_KERNELS[step.kernelId].usesLut) {
           expect(step.lut, label).toBeInstanceOf(Uint32Array);
           expect(step.lut!.length, label).toBe(768);
         } else {
           expect(step.lut, label).toBeUndefined();
         }
+        // 융합 스텝만 원본 커널 순서를 보존하는 fusedKernelIds 를 가진다.
+        if (step.kernelId === "lut-fused") {
+          expect(step.fusedKernelIds, label).toEqual(expectedRuns[index]);
+          expect(expectedRuns[index]!.length, label).toBeGreaterThan(1);
+        } else {
+          expect(step.fusedKernelIds, label).toBeUndefined();
+        }
       }
     }
+  });
+
+  it("인접 LUT 스텝 융합 — 합성 LUT 가 순차 LUT 조회와 비트 단위로 동일하다", () => {
+    // 밝기대비→레벨→커브 전부 LUT: 단일 lut-fused 스텝으로 융합돼야 한다.
+    const el: ImageFilterFields = {
+      brightness: -0.2,
+      contrast: 45,
+      levelsBlack: 20,
+      levelsWhite: 235,
+      levelsGamma: 1.3,
+      levelsCh: { r: { gamma: 0.8 } },
+      curve: [{ x: 0, y: 0 }, { x: 64, y: 48 }, { x: 255, y: 255 }],
+      curveCh: { g: [{ x: 0, y: 10 }, { x: 255, y: 245 }] },
+    };
+    const plan = planStudioGpuFilterChain(el);
+    expect(plan).not.toBeNull();
+    expect(plan!.length).toBe(1);
+    expect(plan![0]!.kernelId).toBe("lut-fused");
+    expect(plan![0]!.fusedKernelIds).toEqual(["brightness-contrast", "levels", "curves"]);
+
+    // 순차 실행 오라클: 개별 스테이지 LUT 를 순서대로 정수 조회.
+    const bc = packStudioGpuBrightnessContrastLut({ brightness: el.brightness, contrast: el.contrast });
+    const levels = packStudioGpuLevelsLut({
+      master: { blackPoint: 20, whitePoint: 235, gamma: 1.3 },
+      channels: el.levelsCh,
+    });
+    const curves = packStudioGpuCurvesLut({ master: el.curve, channels: el.curveCh });
+    const fusedLut = plan![0]!.lut!;
+    for (let channel = 0; channel < 3; channel += 1) {
+      const base = channel * 256;
+      for (let i = 0; i < 256; i += 1) {
+        const sequential = curves[base + levels[base + bc[base + i]!]!]!;
+        expect(fusedLut[base + i], `channel=${channel} v=${i}`).toBe(sequential);
+      }
+    }
+  });
+
+  it("수식 커널(HSL/컬러밸런스)이 사이에 끼면 그 경계 너머로는 융합하지 않는다", () => {
+    // 밝기대비 | HSL | 레벨+커브 — 체인 순서 의미 보존을 위해 HSL 양쪽은 분리 유지.
+    const acrossHsl = planStudioGpuFilterChain({
+      brightness: 0.2,
+      hue: 90,
+      levelsBlack: 20,
+      curve: [{ x: 0, y: 0 }, { x: 128, y: 150 }, { x: 255, y: 255 }],
+    });
+    expect(acrossHsl).not.toBeNull();
+    expect(acrossHsl!.map((step) => step.kernelId)).toEqual(["brightness-contrast", "hsl", "lut-fused"]);
+    expect(acrossHsl![2]!.fusedKernelIds).toEqual(["levels", "curves"]);
+
+    // 컬러밸런스는 체인 끝(수식) — LUT 융합 스텝 뒤에 그대로 남는다.
+    const withColorBalance = planStudioGpuFilterChain({
+      brightness: 0.2,
+      levelsBlack: 20,
+      colorBalance: { shadows: [10, 0, 0], midtones: [0, 0, 0], highlights: [0, 0, 0] },
+    });
+    expect(withColorBalance).not.toBeNull();
+    expect(withColorBalance!.map((step) => step.kernelId)).toEqual(["lut-fused", "color-balance"]);
+    expect(withColorBalance![0]!.fusedKernelIds).toEqual(["brightness-contrast", "levels"]);
   });
 
   it("활성 보정이 없으면 null — 항등 값(0/항등 곡선/항등 레벨)도 비활성으로 본다", () => {
