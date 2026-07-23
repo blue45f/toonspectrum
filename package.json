@@ -89,6 +89,7 @@
     "ky": "^2.0.2",
     "lucide-react": "^1.17.0",
     "motion": "^12.40.0",
+    "perfect-freehand": "^1.2.3",
     "pg": "^8.21.0",
     "polygon-clipping": "^0.15.7",
     "react": "^19.2.6",

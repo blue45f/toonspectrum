@@ -25,6 +25,7 @@ export type StudioBrushRenderFamily =
   | "pen"
   | "gpen"
   | "calligraphy"
+  | "perfect"
   | "marker"
   | "highlighter"
   | "neon"
@@ -55,6 +56,9 @@ export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRend
   "pencil-grain": "stamp",
   "wash-brush": "stamp",
   calligraphy: "calligraphy",
+  // perfect-freehand(tldraw) 아웃라인 폴리곤 렌더 — studio-perfect-freehand.ts 어댑터가 그린다.
+  "perfect-ink": "perfect",
+  "perfect-marker": "perfect",
   marker: "marker",
   "felt-tip": "marker",
   "marker-bold": "marker",
@@ -100,6 +104,8 @@ export const BRUSH_PRESETS: BrushPreset[] = [
   { id: "liner", name: "잉크 라이너", defaultWidth: 5, defaultOpacity: 1.0 },
   { id: "ink-brush", name: "잉크 붓(속도)", defaultWidth: 8, defaultOpacity: 1.0 },
   { id: "calligraphy", name: "캘리그래피(펜 기울기)", defaultWidth: 12, defaultOpacity: 1.0 },
+  { id: "perfect-ink", name: "캘리 잉크펜(퍼펙트)", defaultWidth: 9, defaultOpacity: 1.0 },
+  { id: "perfect-marker", name: "마커 펜(퍼펙트)", defaultWidth: 14, defaultOpacity: 1.0 },
   // —— Markers (Canva Draw / Express / Picsart) ——
   { id: "marker", name: "마커(굵고 반투명)", defaultWidth: 16, defaultOpacity: 0.6 },
   { id: "felt-tip", name: "펠트펜", defaultWidth: 10, defaultOpacity: 0.85 },

@@ -73,7 +73,9 @@ const budgets = {
   studioEntry: { raw: 1_284_000, gzip: 384_500 },
   // 2026-07-23 저녁: roughjs 스케치 도형·polygon-clipping 패스 불리언 도입 — 두 라이브러리 본체는
   // 다이내믹 청크(예산 밖)이나 어댑터 공유 청크 +1로 정적 요청 149 관측. +1 여유로 재고정.
-  studioIncremental: { raw: 2_425_000, gzip: 795_000, chunks: 150 },
+  // 2026-07-23 밤: perfect-freehand 벡터 펜(퍼펙트 잉크/마커) 어댑터 도입 — 라이브러리 본체는
+  // 다이내믹 청크(예산 밖)이나 어댑터 공유 청크 +1로 정적 요청 150 관측. +1 여유로 재고정.
+  studioIncremental: { raw: 2_425_000, gzip: 795_000, chunks: 151 },
   // Rapier deterministic compat is intentionally isolated in a user-triggered module Worker.
   // 2026-07-18 production output: 2,302,139 raw / 855,399 gzip. Keep ~2% version-drift headroom
   // without charging this optional engine to Studio or the 3D editor's initial graph.

@@ -7,7 +7,7 @@
  * cannot silently become a duplicate of an existing one.
  *
  * Keep this table explicit rather than generating it from the family map: reviewers should be able
- * to audit all 35 promises in one place and tests can compare the declaration with the real engine
+ * to audit all 37 promises in one place and tests can compare the declaration with the real engine
  * resolvers used by Canvas and SVG.
  */
 
@@ -20,6 +20,7 @@ export type StudioBrushRuntimeEngine =
   | "pressure-segments"
   | "stamp-dabs"
   | "calligraphy-segments"
+  | "perfect-outline"
   | "highlighter-path"
   | "neon-halo"
   | "glow-halo"
@@ -69,6 +70,7 @@ export type StudioBrushRuntimeDynamics =
   | "segment-pressure"
   | "stamp-pressure-flow"
   | "tilt-pressure"
+  | "outline-pressure"
   | "fixed-path"
   | "seeded-particles"
   | "ribbon-pressure"
@@ -112,6 +114,8 @@ export const STUDIO_BRUSH_RUNTIME_CONTRACT = [
   { id: "liner", family: "gpen", engine: "pressure-segments", engineVariant: "round", canonicalId: "gpen", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "segment-pressure", distinctness: "profile-variant" },
   { id: "ink-brush", family: "stamp", engine: "stamp-dabs", engineVariant: "ink", canonicalId: "ink-brush", preview: "solid", tip: "stamp-ink", texture: "none", dynamics: "stamp-pressure-flow", distinctness: "unique" },
   { id: "calligraphy", family: "calligraphy", engine: "calligraphy-segments", engineVariant: "tilt-chisel", canonicalId: "calligraphy", preview: "calligraphy", tip: "chisel", texture: "none", dynamics: "tilt-pressure", distinctness: "unique" },
+  { id: "perfect-ink", family: "perfect", engine: "perfect-outline", engineVariant: "ink-taper", canonicalId: "perfect-ink", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "outline-pressure", distinctness: "unique" },
+  { id: "perfect-marker", family: "perfect", engine: "perfect-outline", engineVariant: "marker-flat", canonicalId: "perfect-marker", preview: "solid", tip: "round", texture: "none", dynamics: "outline-pressure", distinctness: "unique" },
   { id: "marker", family: "marker", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "profile-variant" },
   { id: "felt-tip", family: "marker", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "profile-variant" },
   { id: "marker-bold", family: "marker", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "profile-variant" },
@@ -177,6 +181,12 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
   },
   "calligraphy-segments": {
     "tilt-chisel": { families: ["calligraphy"], previews: ["calligraphy"], tip: "chisel", texture: "none", dynamics: "tilt-pressure" },
+  },
+  // perfect-freehand 아웃라인 폴리곤(studio-perfect-freehand.ts). 두 variant는 실제 getStroke
+  // 옵션(thinning/taper 프로필)이 다른 별개 실행 시그니처다.
+  "perfect-outline": {
+    "ink-taper": { families: ["perfect"], previews: ["calligraphy"], tip: "pressure-round", texture: "none", dynamics: "outline-pressure" },
+    "marker-flat": { families: ["perfect"], previews: ["solid"], tip: "round", texture: "none", dynamics: "outline-pressure" },
   },
   "highlighter-path": {
     "multiply-square": { families: ["highlighter"], previews: ["solid"], tip: "square", texture: "none", dynamics: "fixed-path" },
@@ -489,8 +499,10 @@ export function resolveStudioBrushSinglePointRoute({
   switch (contract.engine) {
     case "causal-ink":
       return causalInkEnabled ? "causal-ink" : "generic-dot";
+    // perfect-outline 도 최소 한 세그먼트가 필요하다(테이퍼가 탭을 지워버리는 것 방지).
     case "pressure-segments":
     case "calligraphy-segments":
+    case "perfect-outline":
     case "highlighter-path":
     case "angled-ribbon":
     case "pencil-path":

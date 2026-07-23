@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
 import {
@@ -14,9 +14,15 @@ import {
   resolveStudioBrushRuntime,
   type StudioBrushRuntimeContract,
 } from "./studio-brush-runtime-contract";
+import { loadStudioPerfectFreehandStroker } from "./studio-perfect-freehand";
 import { exportPageToSvg } from "./studio-svg-export";
 
 describe("Studio brush executable runtime validation", () => {
+  // perfect-outline 엔진의 다이내믹 청크를 선로드해 동기 SVG 감사가 실제 아웃라인을 검증한다.
+  beforeAll(async () => {
+    await loadStudioPerfectFreehandStroker();
+  });
+
   it("fail-fast audit proves every built-in preset has a supported engine tuple", () => {
     expect(STUDIO_BRUSH_RUNTIME_CATALOG_AUDIT).toEqual({
       ok: true,

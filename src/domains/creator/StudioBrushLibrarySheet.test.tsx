@@ -61,21 +61,21 @@ describe("StudioBrushLibrarySheet", () => {
 
     expect(html).toContain('data-studio-brush-catalog="built-in"');
     expect(html).toContain("앱 브러시");
-    expect(html).toContain("코어 35 + 프로시저럴 120 · 내 브러시와 별개");
+    expect(html).toContain("코어 37 + 프로시저럴 120 · 내 브러시와 별개");
     expect(html).toContain('aria-label="앱 브러시 닫기"');
     expect(html).not.toContain(">브러시 라이브러리<");
   });
 
-  it("publishes one unique 155-brush catalog while keeping the 120-profile runtime lazy", () => {
+  it("publishes one unique 157-brush catalog while keeping the 120-profile runtime lazy", () => {
     const coreItems = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "core");
     const proItems = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "pro");
 
-    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(155);
-    expect(coreItems).toHaveLength(35);
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(157);
+    expect(coreItems).toHaveLength(37);
     expect(proItems).toHaveLength(120);
     expect(new Set(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id))).toHaveProperty(
       "size",
-      155
+      157
     );
     expect(sheetSource).toContain('import("./studio-brush-pack-runtime")');
     expect(sheetSource).not.toMatch(/from\s+["']\.\/studio-brush-pack-runtime["']/);

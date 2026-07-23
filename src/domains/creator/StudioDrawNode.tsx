@@ -92,6 +92,12 @@ import {
   patternDataUrl,
 } from "./studio-pattern-fill";
 import {
+  buildStudioPerfectFreehandPathData,
+  loadStudioPerfectFreehandStroker,
+  peekStudioPerfectFreehandStroker,
+  resolveStudioPerfectFreehandProfile,
+} from "./studio-perfect-freehand";
+import {
   fillStudioPixelPencilCells,
   isStudioPixelPencilRenderMode,
   planStudioPixelPencilCells,
@@ -122,6 +128,7 @@ import type { CalligraphyStylusInput } from "./studio-brush";
 import type { NormalizedStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
 import type { DrawEl } from "./studio-element-model";
 import type { StudioPatternSpec } from "./studio-pattern-fill";
+import type { StudioPerfectFreehandStroker } from "./studio-perfect-freehand";
 import type { StudioRoughGeneratorHandle } from "./studio-rough-shape";
 
 const STUDIO_PENCIL_DEFAULT_JITTER_RADIUS = 0.75;
@@ -203,6 +210,31 @@ function useStudioRoughGenerator(wanted: boolean): StudioRoughGeneratorHandle | 
   return wanted ? generator : null;
 }
 
+// 퍼펙트-프리핸드(tldraw 필기감) 스트로커 훅 — 퍼펙트 브러시 획이 처음 보일 때만 동적
+// import로 로드한다(Studio eager 청크에 perfect-freehand 미포함). 로드 전에는 null을 반환해
+// 깨끗한 Line 폴백으로 그리고, 로드가 끝나면 상태 변경으로 다시 그린다.
+function useStudioPerfectFreehandStroker(wanted: boolean): StudioPerfectFreehandStroker | null {
+  const [stroker, setStroker] = useState<StudioPerfectFreehandStroker | null>(
+    () => peekStudioPerfectFreehandStroker()
+  );
+  useEffect(() => {
+    if (!wanted || stroker) return;
+    let active = true;
+    loadStudioPerfectFreehandStroker()
+      .then((loaded) => {
+        // 스트로커는 함수 값이라 updater 로 오인되지 않게 반드시 클로저로 감싼다.
+        if (active) setStroker(() => loaded);
+      })
+      .catch(() => {
+        // 로드 실패 시 깨끗한 Line 폴백 렌더를 유지한다 — 다음 마운트가 재시도.
+      });
+    return () => {
+      active = false;
+    };
+  }, [wanted, stroker]);
+  return wanted ? stroker : null;
+}
+
 // 패턴 채우기 타일 이미지 훅 — 패턴 스펙의 SVG 타일(data URL)을 HTMLImage로 비동기 로드한다.
 // UrlImage의 effect 로드 방식을 훅으로 컴포넌트화한 것. 타일 src는 patternId/색에만
 // 의존하므로(배율은 fillPatternScale로 적용) 배율 조절로는 재로드되지 않는다.
@@ -256,6 +288,12 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   // 손그림(스케치) 스타일 — 켜진 도형은 rough.js 패스로 그린다(요소 id 시드로 결정적).
   const sketchStyle = kind !== "freehand" ? studioSketchStyleOfElement(el) : null;
   const roughGenerator = useStudioRoughGenerator(sketchStyle?.enabled === true);
+  // 퍼펙트-프리핸드 브러시 — 커밋/리테인드 초안 렌더 전용(다이렉트 핫패스 라이브 잉크는
+  // pen/marker 패밀리만 대상이라 이 패밀리는 건드리지 않는다). 프로필이 있으면 스트로커 로드.
+  const perfectProfile = kind === "freehand" && el.mode !== "eraser"
+    ? resolveStudioPerfectFreehandProfile(el.brush)
+    : null;
+  const perfectStroker = useStudioPerfectFreehandStroker(perfectProfile !== null);
 
   const stampBrushKind = kind === "freehand" && el.mode !== "eraser"
     ? resolveStudioStampBrushKind(el.brush)
@@ -641,6 +679,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               || brushFamily === "pen"
               || brushFamily === "gpen"
               || brushFamily === "calligraphy"
+              || brushFamily === "perfect"
               || brushFamily === "marker";
             const width = pressureAware
               ? aliasStrokeWidth * (0.3 + pressure * 1.4)
@@ -774,6 +813,57 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 }}
                 globalCompositeOperation={composite}
                 listening={false}
+              />
+            );
+          }
+
+          if (perfectProfile && el.mode !== "eraser") {
+            // 퍼펙트-프리핸드(tldraw 필기감): 필압·테이퍼가 새겨진 아웃라인 폴리곤을 선 색으로
+            // 채운다(stroked Line 대체). getStroke는 순수 함수라 협업 복제본·재렌더에서 결정적.
+            // 라이브 계약(§핫패스): 다이렉트 라이브 초안 파이프라인(임페러티브 sceneFunc/WebGPU)
+            // 은 pen/marker 전용이며 여기서 건드리지 않는다 — "perfect" 패밀리 초안은 리테인드
+            // 경로로 이 브랜치를 그대로 지나고, pointer-up 커밋 스왑 계약도 동일하게 유지된다.
+            if (perfectStroker) {
+              const perfectPathData = buildStudioPerfectFreehandPathData(perfectStroker, {
+                points,
+                pressures: el.pressures,
+                strokeWidth: aliasStrokeWidth,
+                profile: perfectProfile,
+              });
+              if (perfectPathData) {
+                return (
+                  <Path
+                    key={index}
+                    data={perfectPathData}
+                    fill={stroke}
+                    opacity={opacity}
+                    globalCompositeOperation={composite}
+                    listening={false}
+                    perfectDrawEnabled={false}
+                  />
+                );
+              }
+            }
+            // 스트로커 로드 전/지오메트리 부족 — 깨끗한 Line 폴백(로드 완료 시 훅 상태로 재렌더).
+            const perfectFallback = resolveStudioFreehandRenderPath(points, {
+              sampleSpacing: el.sampleSpacing,
+              legacyMinDistance: renderSampleDistance,
+              legacyTension: 0.4,
+            });
+            return (
+              <Line
+                key={index}
+                points={perfectFallback.points}
+                stroke={stroke}
+                strokeWidth={aliasStrokeWidth}
+                opacity={opacity}
+                lineCap="round"
+                lineJoin="round"
+                tension={perfectFallback.tension}
+                globalCompositeOperation={composite}
+                listening={false}
+                perfectDrawEnabled={false}
+                shadowForStrokeEnabled={false}
               />
             );
           }

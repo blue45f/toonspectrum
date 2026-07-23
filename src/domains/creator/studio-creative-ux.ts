@@ -32,6 +32,8 @@ export const STUDIO_EXPRESSIVE_BRUSH_IDS = [
   "gpen",
   "liner",
   "calligraphy",
+  "perfect-ink",
+  "perfect-marker",
   "marker-bold",
   "neon",
   "glow",
@@ -118,6 +120,8 @@ const MEDIA_GROUP: Record<string, StudioBrushMediaGroup> = {
   pencil: "line",
   "soft-pencil": "line",
   "ink-brush": "line",
+  "perfect-ink": "line",
+  "perfect-marker": "marker",
   "pencil-grain": "line",
   "airbrush-fine": "paint",
   "wash-brush": "paint",
@@ -182,6 +186,8 @@ const SHORT_NAMES: Record<string, string> = {
   "airbrush-fine": "정밀에어",
   "pencil-grain": "그레인",
   "wash-brush": "물맛",
+  "perfect-ink": "퍼펙잉크",
+  "perfect-marker": "퍼펙마커",
 };
 
 const HINTS: Record<string, string> = {
@@ -220,6 +226,8 @@ const HINTS: Record<string, string> = {
   "airbrush-fine": "입자 없는 매끈한 에어브러시 — 부드러운 셰이딩",
   "pencil-grain": "종이결 그레인 연필 — 러프·해칭",
   "wash-brush": "플로우가 쌓이는 물붓 — 웻엣지 수채",
+  "perfect-ink": "필압 테이퍼 잉크 — tldraw급 필기감",
+  "perfect-marker": "매끈한 아웃라인 마커 — 균일 굵기 필기감",
 };
 
 function previewWeightFor(preset: BrushPreset): number {

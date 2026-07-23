@@ -133,6 +133,12 @@ import { hasActiveImageFilters, type ImageFilterFields } from "./studio-konva-fi
 import { isEffectivelyHidden, type LayerGroup } from "./studio-layers";
 import { getPatternDef, normalizePatternSpec, type StudioPatternSpec } from "./studio-pattern-fill";
 import {
+  buildStudioPerfectFreehandPathData,
+  loadStudioPerfectFreehandStroker,
+  peekStudioPerfectFreehandStroker,
+  resolveStudioPerfectFreehandProfile,
+} from "./studio-perfect-freehand";
+import {
   isStudioPixelPencilRenderMode,
   planStudioPixelPencilCells,
 } from "./studio-pixel-pencil";
@@ -1040,6 +1046,7 @@ function serializeFreehand(
     const pressureAware = brushFamily === "pen"
       || brushFamily === "gpen"
       || brushFamily === "calligraphy"
+      || brushFamily === "perfect"
       || brushFamily === "marker";
     const width = pressureAware
       ? aliasStrokeWidth * (0.3 + pressure * 1.4)
@@ -1151,6 +1158,35 @@ function serializeFreehand(
       }
     }
     return `<g>${marks.join("")}</g>`;
+  }
+
+  if (brushFamily === "perfect") {
+    // 퍼펙트-프리핸드(tldraw) — 캔버스와 같은 어댑터가 만든 아웃라인 폴리곤을 선 색으로 채운다.
+    // getStroke는 순수 함수라 같은 입력이면 바이트가 동일하다(내보내기 결정성 규약 유지).
+    const perfectProfile = resolveStudioPerfectFreehandProfile(brush);
+    const perfectStroker = peekStudioPerfectFreehandStroker();
+    if (perfectProfile && perfectStroker) {
+      const pathD = buildStudioPerfectFreehandPathData(perfectStroker, {
+        points,
+        pressures: el.pressures,
+        strokeWidth: aliasStrokeWidth,
+        profile: perfectProfile,
+      });
+      if (pathD) {
+        return `<path d="${pathD}" fill="${escapeXml(stroke)}" data-brush-engine="perfect-outline" data-brush-variant="${escapeXml(brush)}"${opacityAttr}/>`;
+      }
+    }
+    // 모듈 미로드(드문 경우: 해당 브러시 획을 화면에 그린 적 없이 곧바로 내보내기) — 다음
+    // 내보내기를 위해 백그라운드 로드를 걸고, 이번에는 깨끗한 라인 폴백으로 근사한다.
+    if (perfectProfile && !perfectStroker) {
+      void loadStudioPerfectFreehandStroker().catch(() => {});
+    }
+    const renderPath = resolveStudioFreehandRenderPath(points, {
+      sampleSpacing: el.sampleSpacing,
+      legacyMinDistance: renderSampleDistance,
+      legacyTension: 0.4,
+    });
+    return `<path d="${tensionPathD(renderPath.points, renderPath.tension)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(aliasStrokeWidth)}" stroke-linecap="round" stroke-linejoin="round"${opacityAttr}/>`;
   }
 
   if (brushFamily === "watercolor") {

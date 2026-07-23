@@ -25,7 +25,7 @@ describe("studio creative ux", () => {
 
   it("keeps the Pro pack out of the eager core tray so its full dynamics stay lazy", () => {
     expect(listStudioBrushTrayItems("pro")).toEqual([]);
-    expect(listStudioBrushTrayItems("all")).toHaveLength(35);
+    expect(listStudioBrushTrayItems("all")).toHaveLength(37);
   });
 
   it("filters Picsart-style media groups", () => {
@@ -94,8 +94,8 @@ describe("studio creative ux", () => {
     expect(listStudioQuickBrushTrayItems({ limit: 0 })).toEqual([]);
   });
 
-  it("resolves Pro favorites and recent brushes from the expanded 155-item catalogue", () => {
-    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(155);
+  it("resolves Pro favorites and recent brushes from the expanded 157-item catalogue", () => {
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(157);
 
     const quick = listStudioQuickBrushTrayItems({
       catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,

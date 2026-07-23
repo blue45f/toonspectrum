@@ -209,6 +209,8 @@ export const STUDIO_BRUSH_ICON_BY_ID: Readonly<Record<string, StudioBrushIconId>
   liner: "pen-line",
   "ink-brush": "paintbrush",
   calligraphy: "a-large-small",
+  "perfect-ink": "pen-line",
+  "perfect-marker": "highlighter",
   pencil: "pencil",
   "soft-pencil": "pencil",
   "pencil-grain": "pencil",

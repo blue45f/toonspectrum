@@ -3,8 +3,8 @@
  *
  * The harness intentionally drives the shipped UI rather than importing renderer internals:
  * - exactly one desktop built-in catalogue session and no inspector quick-shelf duplicate,
- * - all 35 built-in presets selected, fast-drawn, visually changed, undone, and redone,
- * - all 35 presets survive a sparse 300 px move with visible ink in every route segment and the
+ * - all 37 built-in presets selected, fast-drawn, visually changed, undone, and redone,
+ * - all 37 presets survive a sparse 300 px move with visible ink in every route segment and the
  *   exact selected brush id in autosave,
  * - line/rect/ellipse/triangle/polygon Smart Shape gestures persist as the selected brush's exact
  *   snapped outline (rather than reverting to the original freehand gesture), without collapsing
@@ -523,7 +523,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const page = await context.newPage();
   const errors = collectBrowserErrors(page, "desktop-brushes");
-  const screenshot = join(SCRATCH, "studio-brush-desktop-35.png");
+  const screenshot = join(SCRATCH, "studio-brush-desktop-37.png");
   const catalogScreenshot = join(SCRATCH, "studio-brush-desktop-catalog.png");
 
   try {
@@ -552,7 +552,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
     await firstCatalog.getByRole("button", { name: "앱 브러시 닫기", exact: true }).click();
     await firstCatalog.waitFor({ state: "detached" });
 
-    invariant(BRUSH_PRESETS.length === 35, `expected 35 presets, received ${BRUSH_PRESETS.length}`);
+    invariant(BRUSH_PRESETS.length === 37, `expected 37 presets, received ${BRUSH_PRESETS.length}`);
     const stage = page.locator(".konvajs-content").first();
     await stage.waitFor({ state: "visible" });
     const stageBox = await stage.boundingBox();
@@ -626,14 +626,14 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         undoRestoredPixels,
         redoRestoredStroke,
       });
-      log(`desktop ${index + 1}/35 ${preset.id}: select/draw/undo/redo OK`);
+      log(`desktop ${index + 1}/37 ${preset.id}: select/draw/undo/redo OK`);
     }
 
     await page.screenshot({ path: screenshot, animations: "disabled" });
     reportBrowserErrors(errors);
     invariant(errors.messages.length === 0, "desktop browser emitted console/page errors");
     invariant(errors.failedResponses.length === 0, "desktop browser received unexpected 5xx responses");
-    const ok = evidence.length === 35 && evidence.every((entry) =>
+    const ok = evidence.length === 37 && evidence.every((entry) =>
       entry.selected
       && entry.visualChanged
       && entry.undoEnabled
@@ -798,7 +798,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const page = await context.newPage();
   const errors = collectBrowserErrors(page, "long-brushes");
-  const screenshot = join(SCRATCH, "studio-brush-desktop-long-35.png");
+  const screenshot = join(SCRATCH, "studio-brush-desktop-long-37.png");
 
   try {
     await prepareStudioPage(page, studioUrl);
@@ -811,11 +811,11 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
     const safeLeft = Math.max(stageBox.x + 70, viewport.width * 0.34);
     const safeRight = Math.min(stageBox.x + stageBox.width - 70, viewport.width * 0.69);
     const safeTop = Math.max(stageBox.y + 70, viewport.height * 0.18);
-    // The Konva surface continues behind the bottom zoom/density dock. Keep even the 35th lane in
+    // The Konva surface continues behind the bottom zoom/density dock. Keep even the 37th lane in
     // the exposed paper so elementFromPoint proves the browser gesture reaches canvas.
     const safeBottom = Math.min(stageBox.y + stageBox.height - 70, viewport.height * 0.52);
     invariant(safeRight - safeLeft >= 300, "visible canvas is too narrow for a 300 px stroke");
-    invariant(safeBottom - safeTop >= 300, "visible canvas is too short for the 35-brush lanes");
+    invariant(safeBottom - safeTop >= 300, "visible canvas is too short for the 37-brush lanes");
 
     const evidence: LongBrushStrokeEvidence[] = [];
     for (const [index, preset] of BRUSH_PRESETS.entries()) {
@@ -868,12 +868,12 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         totalSegments: 6,
         persistedBrushId: null,
       });
-      log(`long ${index + 1}/35 ${preset.id}: 6/6 visible segments OK`);
+      log(`long ${index + 1}/37 ${preset.id}: 6/6 visible segments OK`);
     }
 
     await waitForPersistedDrawCount(page, BRUSH_PRESETS.length);
     const persisted = (await persistedDrawElements(page)).slice(-BRUSH_PRESETS.length);
-    invariant(persisted.length === BRUSH_PRESETS.length, `autosave contains ${persisted.length}/35 long strokes`);
+    invariant(persisted.length === BRUSH_PRESETS.length, `autosave contains ${persisted.length}/37 long strokes`);
     for (const [index, preset] of BRUSH_PRESETS.entries()) {
       const saved = persisted[index];
       evidence[index]!.persistedBrushId = saved?.brush ?? null;
@@ -1488,9 +1488,9 @@ async function main(): Promise<void> {
     await waitForServer(origin);
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
     const desktop = drawingOnly || shapesOnly ? null : await runDesktopBrushMatrix(browser, studioUrl);
-    if (desktop) invariant(desktop.ok, "desktop 35-brush matrix failed");
+    if (desktop) invariant(desktop.ok, "desktop 37-brush matrix failed");
     const longBrushes = shapesOnly ? null : await runLongBrushMatrix(browser, studioUrl);
-    if (longBrushes) invariant(longBrushes.ok, "long 35-brush matrix failed");
+    if (longBrushes) invariant(longBrushes.ok, "long 37-brush matrix failed");
     const smartShapes = await runSmartShapeMatrix(browser, studioUrl);
     invariant(smartShapes.ok, "Smart Shape matrix failed");
     const mobile = drawingOnly || shapesOnly ? null : await runMobileTouchAudit(browser, studioUrl);

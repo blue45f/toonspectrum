@@ -44,7 +44,7 @@ describe("studio-draw-ux", () => {
     expect(searched.some((i) => i.id === "glitter")).toBe(true);
   });
 
-  it("filters the injected 155-brush catalog without losing Pro favorites, recents, or search", () => {
+  it("filters the injected 157-brush catalog without losing Pro favorites, recents, or search", () => {
     const pro = filterStudioBrushLibraryItems({
       category: "pro",
       catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,

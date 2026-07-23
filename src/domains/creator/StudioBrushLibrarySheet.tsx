@@ -588,7 +588,7 @@ export function StudioBrushLibrarySheet({
             앱 브러시
           </p>
           <p id={`${titleId}-description`} className="text-[0.62rem] text-fg-3">
-            코어 35 + 프로시저럴 120 · 내 브러시와 별개 · {items.length}개 표시
+            코어 37 + 프로시저럴 120 · 내 브러시와 별개 · {items.length}개 표시
           </p>
         </div>
         <button

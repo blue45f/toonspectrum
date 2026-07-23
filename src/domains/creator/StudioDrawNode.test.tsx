@@ -112,6 +112,7 @@ vi.mock("react-konva/lib/ReactKonvaCore", async () => {
     Ellipse: capture("Ellipse"),
     Group: capture("Group", true),
     Line: capture("Line"),
+    Path: capture("Path"),
     Rect: capture("Rect"),
     Shape: capture("Shape"),
     Star: capture("Star"),
@@ -714,4 +715,74 @@ describe("StudioDrawNode orchestration", () => {
       );
     },
   );
+});
+
+describe("StudioDrawNode perfect-freehand outline brush", () => {
+  const perfectEl = (overrides: Partial<DrawEl> = {}): DrawEl =>
+    drawEl({
+      brush: "perfect-ink",
+      mode: "pen",
+      points: [0, 0, 20, 4, 40, 0, 60, 6, 80, 2],
+      pressures: [0.3, 0.6, 0.9, 0.5, 0.4],
+      sampleSpacing: 1,
+      ...overrides,
+    });
+
+  it("falls back to a clean Line before the stroker chunk loads, then swaps to a filled Path", async () => {
+    // 로더 상태는 모듈 전역이라 이 파일에서는 아직 로드 전이다 — 폴백 계약을 먼저 검증한다.
+    const { peekStudioPerfectFreehandStroker, loadStudioPerfectFreehandStroker } =
+      await import("./studio-perfect-freehand");
+    expect(peekStudioPerfectFreehandStroker()).toBeNull();
+
+    render(<StudioDrawNode el={perfectEl()} />);
+    expect(captured("Path")).toHaveLength(0);
+    const fallbackLines = captured("Line");
+    expect(fallbackLines).toHaveLength(1);
+    expect(fallbackLines[0]!.props.stroke).toBe("#123456");
+    expect(fallbackLines[0]!.props.tension).toBe(0);
+    expect(fallbackLines[0]!.props.points).toEqual([0, 0, 20, 4, 40, 0, 60, 6, 80, 2]);
+
+    // 훅이 걸어둔 동적 import가 끝나면 상태 변경으로 채워진 아웃라인 Path로 교체된다.
+    await act(async () => {
+      await loadStudioPerfectFreehandStroker();
+    });
+    const paths = captured("Path");
+    expect(paths).toHaveLength(1);
+    expect(paths[0]!.props.fill).toBe("#123456");
+    expect(paths[0]!.props.listening).toBe(false);
+    const data = paths[0]!.props.data as string;
+    expect(data).toMatch(/^M-?\d/);
+    expect(data).toContain("Q");
+    expect(data.endsWith("Z")).toBe(true);
+  });
+
+  it("renders both perfect profiles as distinct deterministic outlines once loaded", () => {
+    render(<StudioDrawNode el={perfectEl()} />);
+    const inkData = captured("Path")[0]!.props.data as string;
+    konvaCapture.nodes.length = 0;
+
+    render(<StudioDrawNode el={perfectEl()} />);
+    expect(captured("Path")[0]!.props.data).toBe(inkData);
+    konvaCapture.nodes.length = 0;
+
+    render(<StudioDrawNode el={perfectEl({ brush: "perfect-marker" })} />);
+    const markerData = captured("Path")[0]!.props.data as string;
+    expect(markerData).toMatch(/^M-?\d/);
+    expect(markerData).not.toBe(inkData);
+  });
+
+  it("keeps eraser strokes and taps out of the outline branch", () => {
+    render(<StudioDrawNode el={perfectEl({ mode: "eraser" })} />);
+    expect(captured("Path")).toHaveLength(0);
+    konvaCapture.nodes.length = 0;
+
+    // 한 점 탭은 generic-dot 계약(퍼펙트 테이퍼가 탭을 지우지 않도록)으로 원 도트를 그린다.
+    render(
+      <StudioDrawNode
+        el={perfectEl({ points: [5, 5], pressures: [0.6], sampleSpacing: undefined })}
+      />,
+    );
+    expect(captured("Path")).toHaveLength(0);
+    expect(captured("Circle")).toHaveLength(1);
+  });
 });
