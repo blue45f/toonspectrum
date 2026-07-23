@@ -112,7 +112,8 @@ describe("Studio mobile immersive preference", () => {
     );
     expect(studioGlobalsSource).toContain('[data-studio-app-menubar="true"]');
     expect(studioGlobalsSource).toContain("position: absolute");
-    expect(studioGlobalsSource).toContain("width: min(14rem");
+    // 의도적 변경(2026-07-24): 고정 14rem 캡이 게시하기 버튼을 클립해 콘텐츠 기반 폭으로 교체.
+    expect(studioGlobalsSource).toContain("width: fit-content");
     expect(studioGlobalsSource).toContain("padding-top: 2.75rem");
   });
 });

@@ -127,6 +127,8 @@ describe("studio Konva runtime ownership boundary", () => {
     expect(imageNode.dynamicImports).toEqual([
       "./studio-konva-filters",
       "./studio-image-filter-worker-client",
+      // M1 GPU 필터 경로 — Worker 앞에서 시도하는 지연 청크(폴백은 기존 Worker/Konva).
+      "./studio-gpu-filter-apply",
     ]);
     expect(imageNode.valueImports).toContain("./studio-konva-runtime");
   });
