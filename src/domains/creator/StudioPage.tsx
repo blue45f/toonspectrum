@@ -27798,6 +27798,15 @@ function StudioCuttoonEditor() {
   // synchronous scroll revocation above. Konva interaction planes such as brush cursors, rulers
   // and node handles still live inside the Stage; every state that shows one keeps its veto until
   // those planes move to a shared top overlay contract above the raster surface.
+  //
+  // M2b post-processing slice: the page grade CSS filter chain and the colour-vision preview are
+  // applied on the shared [data-studio-post-processing-scope] wrapper that contains both the Konva
+  // Stage and the DOM raster surface — colocation pinned by the source contract in
+  // studio-raster-handoff-authority.test.ts — so handed-off pixels receive exactly the filters the
+  // vector presentation receives and neither input needs a veto anymore. The vignette is the one
+  // non-filter grade component: it renders as an overlay sibling OUTSIDE that wrapper, and the
+  // z-indexed raster surface only stays beneath it while the wrapper forms a stacking context
+  // (i.e. while some CSS filter is active). A vignette therefore still fails closed here.
   const studioRasterHandoffGates = useMemo(() => ({
     exportActive: isExporting || saving || timelapseCapturing,
     masterEditActive: masterEditMode,
@@ -27808,13 +27817,13 @@ function StudioCuttoonEditor() {
       advancedFillArmed || pixelToolArmed || cropArmed || panelSplitArmed ||
       nodeEditArmed || bubbleShapeArmed || smudgeArmed || dodgeBurnArmed || wetMixArmed || liquifyArmed || healCloneArmed ||
       layerMaskPaintArmed || quickMaskArmed || historyBrushArmed || puppetWarpArmed,
-    postProcessingActive: pageGradeActive || colorBlindPreview !== "none",
+    postProcessingActive: pageGrade.vignette > 0,
   } as const), [
     isExporting, saving, timelapseCapturing, masterEditMode, selectedId, marqueeIds.length,
     editing, tool, canvasRotation, eyedropperActive, timelinePlaying, marqueeActive, userGuides.length,
     advancedFillArmed, pixelToolArmed, cropArmed, panelSplitArmed, nodeEditArmed,
     bubbleShapeArmed, smudgeArmed, dodgeBurnArmed, wetMixArmed, liquifyArmed, healCloneArmed, layerMaskPaintArmed, quickMaskArmed, historyBrushArmed,
-    puppetWarpArmed, pageGradeActive, colorBlindPreview,
+    puppetWarpArmed, pageGrade.vignette,
   ]);
   const {
     visibleDocumentRect: studioRasterVisibleDocumentRect,
@@ -31713,6 +31722,12 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
           ) : null}
           {/* 페이지 색보정 미리보기: Stage에 CSS filter, 그 위에 비네트 오버레이(내보내기 때 픽셀로 합성) */}
           {/* 색맹 시뮬레이션은 이미 색보정된 결과 위에 적용되도록 pageGradeCss 뒤에 이어 붙인다(filter 리스트는 좌→우로 순차 적용). */}
+          {/* Raster handoff colocation contract — the data-studio-post-processing-scope div below
+              applies the page grade + colour-vision CSS filters to the Konva Stage AND the DOM
+              raster surface alike, so handed-off pixels match the vector presentation exactly.
+              This is what lets the postProcessing handoff gate stay open for those inputs; the
+              invariant (surface + Stage share this filter ancestor, vignette stays outside) is
+              pinned by studio-raster-handoff-authority.test.ts. */}
           <div
             ref={zoomHostRef}
             data-studio-canvas-cursor={canvasCursorClassName.replace("cursor-", "")}
@@ -31736,6 +31751,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
             style={{ width: stageViewLayout.width, height: stageViewLayout.height }}
           >
           <div
+            data-studio-post-processing-scope=""
             className="relative"
             style={{ filter: [pageGradeCss, colorBlindFilterStyle(colorBlindPreview).filter].filter(Boolean).join(" ") || undefined }}
           >
@@ -32732,6 +32748,11 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
             </Suspense>
           ) : null}
           </div>
+          {/* 비네트는 CSS filter가 아니라 별도 오버레이 — 필터 래퍼(post-processing scope) 밖의
+              후행 형제라, z-[9] 래스터 표면이 래퍼의 스태킹 컨텍스트(필터가 있을 때만 생김)를
+              벗어나면 비네트 위로 올라와 픽셀이 어긋날 수 있다. 그래서 pageGrade.vignette 는
+              래스터 핸드오프 postProcessing 게이트에서 유일하게 veto 를 유지한다(fail closed).
+              이 오버레이를 래퍼 안으로 옮기면 계약 테스트가 게이트 재검토를 강제한다. */}
           {pageGrade.vignette > 0 && (
             <div
               className="pointer-events-none absolute inset-0"

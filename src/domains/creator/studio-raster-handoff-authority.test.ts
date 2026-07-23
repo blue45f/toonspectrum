@@ -26,6 +26,65 @@ const viewport = {
   },
 } as const;
 
+function countOccurrences(source: string, needle: string): number {
+  let count = 0;
+  for (
+    let index = source.indexOf(needle);
+    index !== -1;
+    index = source.indexOf(needle, index + needle.length)
+  ) {
+    count += 1;
+  }
+  return count;
+}
+
+/**
+ * Finds the `>` that terminates the JSX opening tag starting at `tagStart`, skipping `>` inside
+ * attribute expressions (`{...}` — arrow functions, comparisons) and string/template literals.
+ */
+function findJsxTagEnd(source: string, tagStart: number): { end: number; selfClosing: boolean } {
+  let braceDepth = 0;
+  let quote: '"' | "'" | "`" | null = null;
+  for (let index = tagStart; index < source.length; index += 1) {
+    const char = source[index]!;
+    if (quote !== null) {
+      if (char === quote && source[index - 1] !== "\\") quote = null;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === "`") quote = char;
+    else if (char === "{") braceDepth += 1;
+    else if (char === "}") braceDepth -= 1;
+    else if (char === ">" && braceDepth === 0) {
+      return { end: index, selfClosing: source[index - 1] === "/" };
+    }
+  }
+  throw new Error("unterminated JSX opening tag");
+}
+
+/**
+ * Returns the full JSX source of the `<div>` element starting at `wrapperStart` (through its
+ * matching `</div>`), tracking nested and self-closing div tags. Formatting-robust: no line
+ * numbers, only tag structure.
+ */
+function jsxDivSubtree(source: string, wrapperStart: number): string {
+  let depth = 0;
+  let cursor = wrapperStart;
+  for (;;) {
+    const open = source.indexOf("<div", cursor);
+    const close = source.indexOf("</div>", cursor);
+    if (close === -1) throw new Error("unbalanced <div> subtree");
+    if (open !== -1 && open < close) {
+      const tag = findJsxTagEnd(source, open);
+      if (!tag.selfClosing) depth += 1;
+      cursor = tag.end + 1;
+    } else {
+      depth -= 1;
+      cursor = close + "</div>".length;
+      if (depth === 0) return source.slice(wrapperStart, cursor);
+    }
+  }
+}
+
 function baseKey(overrides: Partial<Parameters<typeof createStudioRasterHandoffBaseKey>[0]> = {}) {
   return createStudioRasterHandoffBaseKey({
     pageId: "page-a",
@@ -197,15 +256,19 @@ describe("studio raster handoff authority", () => {
     expect(memoStart).toBeGreaterThan(-1);
     const memo = source.slice(memoStart, source.indexOf("]);", memoStart));
 
-    // Correctness vetoes: capture/scene identity and post-processing stay closed.
+    // Correctness vetoes: capture and scene identity stay closed.
     expect(memo).toContain("exportActive: isExporting || saving || timelapseCapturing");
     expect(memo).toContain("masterEditActive: masterEditMode");
     expect(memo).toContain(
       "editActive: selectedId !== null || marqueeIds.length > 0 || editing !== null"
     );
-    expect(memo).toContain(
-      "postProcessingActive: pageGradeActive || colorBlindPreview !== \"none\""
-    );
+    // M2b: the CSS-filter post-processing inputs (page grade filter chain, colour-vision preview)
+    // are colocation-proven by the wrapper contract test below and no longer veto. The vignette
+    // is not a CSS filter — it is an overlay outside the filter wrapper — so it is the one
+    // remaining post-processing veto.
+    expect(memo).toContain("postProcessingActive: pageGrade.vignette > 0");
+    expect(memo).not.toContain("pageGradeActive");
+    expect(memo).not.toContain("colorBlindPreview");
 
     // M2 slice: only the tested view-navigation predicate may widen the tool axis.
     expect(memo).toContain("!isStudioRasterHandoffViewNavigationTool(tool)");
@@ -230,6 +293,46 @@ describe("studio raster handoff authority", () => {
     expect(source).toMatch(
       /const onScroll = \(\) => \{\s*revokeStudioRasterHandoffRef\.current\(\);/u
     );
+  });
+
+  it("pins the raster surface inside the page grade + colour vision filter wrapper (M2b)", () => {
+    const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+
+    // Stable anchor: the single post-processing filter wrapper carries an inert data attribute.
+    // Moving the attribute, the filter style or either presentation breaks this contract, which
+    // is the proof the open postProcessing gate rests on.
+    const anchor = 'data-studio-post-processing-scope=""';
+    expect(countOccurrences(source, anchor)).toBe(1);
+    const wrapperStart = source.lastIndexOf("<div", source.indexOf(anchor));
+    expect(wrapperStart).toBeGreaterThan(-1);
+
+    // The anchored wrapper itself must be the element applying BOTH post-processing filters.
+    const tag = findJsxTagEnd(source, wrapperStart);
+    expect(tag.selfClosing).toBe(false);
+    const openTag = source.slice(wrapperStart, tag.end + 1);
+    expect(openTag).toMatch(/style=\{\{\s*filter:/u);
+    expect(openTag).toContain("pageGradeCss");
+    expect(openTag).toContain("colorBlindFilterStyle(colorBlindPreview)");
+
+    // Both presentations render inside that same wrapper, so a handed-off raster frame receives
+    // exactly the filter chain the authoritative Konva Stage receives.
+    const wrapper = jsxDivSubtree(source, wrapperStart);
+    expect(wrapper).toMatch(/<Stage[\s>]/u);
+    expect(wrapper).toMatch(/<StudioRasterCrdtSurface[\s>]/u);
+
+    // Single render sites: neither the Stage nor the raster surface may also render on some other
+    // path (fullscreen, portal, split view) outside the filter wrapper.
+    expect((source.match(/<Stage[\s>]/gu) ?? []).length).toBe(1);
+    expect((source.match(/<StudioRasterCrdtSurface[\s>]/gu) ?? []).length).toBe(1);
+    // And this is the single colour-vision filter application, so no second chain can diverge.
+    expect(countOccurrences(source, "colorBlindFilterStyle(")).toBe(1);
+
+    // The vignette is NOT a CSS filter: it stays an overlay OUTSIDE the wrapper, painting above
+    // the wrapper only while the wrapper's filter forms a stacking context. That unprovable paint
+    // order is exactly why pageGrade.vignette keeps the postProcessing veto. If the overlay moves
+    // inside the wrapper (or a second one appears), the gate derivation must be revisited.
+    expect(wrapper).not.toContain("vignetteCss");
+    expect(source.indexOf("vignetteCss(", wrapperStart + wrapper.length)).toBeGreaterThan(-1);
   });
 
   it("revokes the raster surface and redraws Konva before a Stage-only readback", () => {
