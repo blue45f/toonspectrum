@@ -350,6 +350,10 @@ const StudioExtendedBlendPanel = lazyRetry(
   () => import("./StudioExtendedBlendPanel").then((mod) => ({ default: mod.StudioExtendedBlendPanel })),
   "StudioExtendedBlendPanel"
 );
+const StudioPathBooleanPanel = lazyRetry(
+  () => import("./StudioPathBooleanPanel").then((mod) => ({ default: mod.StudioPathBooleanPanel })),
+  "StudioPathBooleanPanel"
+);
 const StudioLiquifyPanel = lazyRetry(
   () => import("./StudioLiquifyPanel").then((mod) => ({ default: mod.StudioLiquifyPanel })),
   "StudioLiquifyPanel"
@@ -804,6 +808,7 @@ export {
   StudioSmudgePanel,
   StudioDodgeBurnPanel,
   StudioExtendedBlendPanel,
+  StudioPathBooleanPanel,
   QuickStartPanel,
   StudioStickerGrid,
   StudioStockImagePanel,

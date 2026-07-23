@@ -833,6 +833,14 @@ import {
   type PanelSplitPreview,
 } from "./studio-panel-split";
 import {
+  combineStudioShapes,
+  drawElToStudioPathBooleanSpec,
+  studioPathBooleanOpLabel,
+  studioPathBooleanPieceToDrawElSeed,
+  studioPathBooleanUnavailableReason,
+  type StudioPathBooleanOp,
+} from "./studio-path-boolean";
+import {
   appendStudioPagesHistorySnapshot,
   createStudioLifecycleEmergencyAutosave,
   projectStudioPendingStrokes,
@@ -2462,6 +2470,8 @@ function StudioCuttoonEditor() {
   // 엔진은 lazy 청크에 남기려고 기본값을 리터럴로 초기화한다(type-only import).
   const [extendedBlendMode, setExtendedBlendMode] = useState<StudioExtendedBlendModeId>("linear-dodge");
   const [extendedBlendOpacity, setExtendedBlendOpacity] = useState(1);
+  // 벡터 패스 불리언(도형 결합) — 마퀴 2도형 선택 시 합치기/빼기/교차/제외.
+  const [pathBooleanBusy, setPathBooleanBusy] = useState(false);
   function persistAppSettings(next: StudioAppSettings): boolean {
     const settingsSaved = saveStudioAppSettings(studioAppSettingsStorage(), next);
     const densitySaved = saveStudioUiDensityState(
@@ -15366,6 +15376,59 @@ function StudioCuttoonEditor() {
     } finally {
       setLayerMergeBusy(false);
       endLiveResourceEdit();
+    }
+  }
+
+  // 벡터 패스 불리언 결합 — 마퀴로 고른 도형 2개를 합치기/빼기/교차/제외로 치환한다.
+  // 순수 벡터 커밋(단일 undo)이라 라이브 리소스 잠금은 불필요(alignSelected와 동일 계층).
+  async function applyPathBooleanCombine(op: StudioPathBooleanOp) {
+    const selectionEls = marqueeIds
+      .map((id) => elements.find((el) => el.id === id))
+      .filter((el): el is El => Boolean(el));
+    const gate = studioPathBooleanUnavailableReason(selectionEls);
+    if (gate) {
+      setError(gate);
+      return;
+    }
+    if (selectionEls.some((el) => isEffectivelyLocked(el, groups))) {
+      setError("잠긴 도형은 결합할 수 없어요.");
+      return;
+    }
+    if (pageEditLocked && !masterEditMode) {
+      setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 편집해 주세요.");
+      return;
+    }
+    if (pathBooleanBusy) return;
+    setPathBooleanBusy(true);
+    try {
+      const indexed = selectionEls
+        .map((el) => ({ el: el as DrawEl & El, index: elements.findIndex((e) => e.id === el.id) }))
+        .sort((x, y) => x.index - y.index);
+      const base = indexed[0]!.el; // 아래(BACK 쪽)
+      const top = indexed[1]!.el; // 위
+      const baseSpec = drawElToStudioPathBooleanSpec(base)!;
+      const topSpec = drawElToStudioPathBooleanSpec(top)!;
+      const result = await combineStudioShapes(baseSpec, topSpec, op); // polygon-clipping은 여기서 lazy 로드
+      if (!result.ok) {
+        setError(result.reason);
+        return;
+      }
+      const pieceEls = result.output.pieces.map((piece) => ({
+        ...studioPathBooleanPieceToDrawElSeed(piece, base),
+        id: uid(),
+        name: `도형 결합 ${studioPathBooleanOpLabel(op)}`,
+      }) as El);
+      const kept = elements.filter((el) => el.id !== base.id && el.id !== top.id);
+      const insertAt = elements.slice(0, indexed[0]!.index).filter((el) => el.id !== top.id).length;
+      commit([...kept.slice(0, insertAt), ...pieceEls, ...kept.slice(insertAt)]);
+      setSelectedId(pieceEls.length === 1 ? pieceEls[0]!.id : null);
+      setMarqueeIds(pieceEls.length > 1 ? pieceEls.map((el) => el.id) : []);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to apply path boolean combine:", err);
+      setError("도형 결합에 실패했습니다.");
+    } finally {
+      setPathBooleanBusy(false);
     }
   }
 
@@ -29741,6 +29804,11 @@ function StudioCuttoonEditor() {
           applyExtendedBlendMergeDown={applyExtendedBlendMergeDown}
           setExtendedBlendMode={setExtendedBlendMode}
           setExtendedBlendOpacity={setExtendedBlendOpacity}
+          pathBooleanBusy={pathBooleanBusy}
+          pathBooleanUnavailableReason={studioPathBooleanUnavailableReason(
+            marqueeIds.map((id) => elementById.get(id)).filter((el): el is El => Boolean(el))
+          )}
+          applyPathBooleanCombine={(op) => void applyPathBooleanCombine(op)}
           dodgeBurnActive={dodgeBurnActive}
           dodgeBurnBusy={dodgeBurnBusy}
           dodgeBurnExposure={dodgeBurnExposure}

@@ -39,6 +39,7 @@ import type { StudioPatternSpec } from "./studio-pattern-fill";
 import type { PhotoFilter } from "./studio-photo-filter";
 import type { StudioPublishAiProvenance } from "./studio-publish-preflight";
 import type { StudioRasterAsset } from "./studio-raster-assets";
+import type { StudioSketchStyle } from "./studio-rough-shape";
 import type { SelectiveHsl } from "./studio-selective-hsl";
 import type { ShadowHighlight } from "./studio-shadow-highlight";
 import type { Sketch } from "./studio-sketch";
@@ -366,6 +367,8 @@ export interface DrawEl extends StudioBrushCatalogIdentityMetadata {
   pressureModel?: StudioInkPressureModel;
   /** 새 획을 만들 때의 논리 좌표 샘플 간격. 미설정 legacy 획은 과거 3px 렌더 규칙을 유지한다. */
   sampleSpacing?: number;
+  /** 손그림(rough.js) 스케치 스타일 — 미설정이면 기존 클린 프리미티브 렌더. */
+  sketch?: StudioSketchStyle;
   /** 포인트별 PointerEvent 스타일러스 메타데이터. 캘리그래피·입자 브러시에서 저장한다. */
   tiltXs?: number[];
   tiltYs?: number[];

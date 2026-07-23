@@ -53,6 +53,7 @@ export interface StudioCrdtCompatibleDrawElement {
   watercolorPipeline?: "causal-walker-v2";
   strokeStyle?: unknown;
   shapeParams?: unknown;
+  sketch?: unknown;
   symmetry?: unknown;
   blendMode?: string;
   name?: string;
@@ -217,6 +218,7 @@ export function studioDrawElementToCrdtStroke(
   payload.brushTip = jsonObject(element.brushTip);
   payload.strokeStyle = jsonObject(element.strokeStyle);
   payload.shapeParams = jsonObject(element.shapeParams);
+  payload.sketch = jsonObject(element.sketch);
   payload.symmetry = jsonObject(element.symmetry);
   payload.extensions = extensions;
   return {

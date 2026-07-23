@@ -183,6 +183,7 @@ const JSON_PAYLOAD_KEYS = [
   "brushTip",
   "strokeStyle",
   "shapeParams",
+  "sketch",
   "symmetry",
   "extensions",
 ] as const;
@@ -197,7 +198,7 @@ const OPTIONAL_STRING_PAYLOAD_KEYS = [
 const STROKE_PAYLOAD_KEYS = [
   "version", "type", "kind", "mode", "stroke", "strokeWidth", "opacity", "sampleSpacing",
   ...OPTIONAL_STRING_PAYLOAD_KEYS,
-  "gradient", "pattern", "brushDynamics", "brushTip", "strokeStyle", "shapeParams",
+  "gradient", "pattern", "brushDynamics", "brushTip", "strokeStyle", "shapeParams", "sketch",
   "symmetry", "extensions", ...SAMPLE_ARRAY_KEYS,
 ] as const;
 
@@ -237,6 +238,7 @@ export interface StudioCrdtDrawStrokePayload extends StudioCrdtStrokeSamples {
   brushTip?: StudioCrdtJsonObject;
   strokeStyle?: StudioCrdtJsonObject;
   shapeParams?: StudioCrdtJsonObject;
+  sketch?: StudioCrdtJsonObject;
   symmetry?: StudioCrdtJsonObject;
   blendMode?: string;
   /** Future DrawEl/common-layer fields remain lossless without loosening the wire envelope. */

@@ -1,13 +1,21 @@
 /**
  * Studio Stroke & Shape Panel
  * 선/도형 공용 스트로크 스타일(점선 프리셋 6종·선 끝·시작/끝 화살촉) +
- * 도형 파라미터(별 꼭짓점 수/내부 반경, 다각형 변 수, 사각형 모서리 반경) 인스펙터.
- * studio-stroke-shapes 엔진의 StrokeStyle/ShapeParams를 props로 읽고
- * onPatchStrokeStyle/onPatchShapeParams로만 쓴다. 상태 없는 순수 프레젠테이션.
+ * 도형 파라미터(별 꼭짓점 수/내부 반경, 다각형 변 수, 사각형 모서리 반경) +
+ * 손그림 스케치 스타일(rough.js — 거칠기/휘어짐/채우기 질감) 인스펙터.
+ * studio-stroke-shapes 엔진의 StrokeStyle/ShapeParams와 studio-rough-shape의
+ * StudioSketchStyle을 props로 읽고 onPatch* 콜백으로만 쓴다. 상태 없는 순수 프레젠테이션.
  */
 import { RotateCcw } from "lucide-react";
 
 import { PANEL_LABEL_ROW, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
+import {
+  DEFAULT_STUDIO_SKETCH_STYLE,
+  isDefaultStudioSketchStyle,
+  STUDIO_SKETCH_FILL_STYLES,
+  STUDIO_SKETCH_RANGES,
+  type StudioSketchStyle,
+} from "./studio-rough-shape";
 import {
   DEFAULT_SHAPE_PARAMS,
   DEFAULT_STROKE_STYLE,
@@ -79,22 +87,32 @@ export function StudioStrokeShapePanel({
   kind,
   strokeStyle,
   shapeParams,
+  sketch,
   onPatchStrokeStyle,
   onPatchShapeParams,
+  onPatchSketch,
 }: {
   kind: StrokeShapeKind;
   strokeStyle: StrokeStyle;
   shapeParams: ShapeParams;
+  sketch: StudioSketchStyle;
   onPatchStrokeStyle: (patch: Partial<StrokeStyle>) => void;
   onPatchShapeParams: (patch: Partial<ShapeParams>) => void;
+  onPatchSketch: (patch: Partial<StudioSketchStyle>) => void;
 }): React.ReactElement {
   // 전부 기본값이면 리셋 비활성.
-  const isIdentity = isDefaultStrokeStyle(strokeStyle) && isDefaultShapeParams(shapeParams);
+  const isIdentity =
+    isDefaultStrokeStyle(strokeStyle) &&
+    isDefaultShapeParams(shapeParams) &&
+    isDefaultStudioSketchStyle(sketch);
   // 화살촉은 선("line")에서만 그려진다(도형 외곽선에는 의미 없음, arrow는 자체 머리 보유).
   const showArrowHeads = kind === "line";
   // 도형 파라미터가 있는 종류에서만 하단 섹션 노출.
   const showShapeSection = kind === "star" || kind === "polygon" || kind === "rect";
+  // 채우기 질감은 채우기 색이 가능한 도형에서만 의미가 있다(선·화살표 제외).
+  const showSketchFillStyles = kind !== "line" && kind !== "arrow";
   const innerRatioPercent = Math.round(shapeParams.starInnerRatio * 100);
+  const sketchRoughness = Math.round(sketch.roughness * 10) / 10;
 
   return (
     <div className="space-y-2.5">
@@ -106,10 +124,11 @@ export function StudioStrokeShapePanel({
           onClick={() => {
             onPatchStrokeStyle(DEFAULT_STROKE_STYLE);
             onPatchShapeParams(DEFAULT_SHAPE_PARAMS);
+            onPatchSketch(DEFAULT_STUDIO_SKETCH_STYLE);
           }}
           disabled={isIdentity}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title="선 스타일과 도형 파라미터를 기본값으로 되돌립니다."
+          title="선 스타일·도형 파라미터·손그림 스케치를 기본값으로 되돌립니다."
         >
           <RotateCcw className="size-3.5" />
           기본값
@@ -238,6 +257,62 @@ export function StudioStrokeShapePanel({
           )}
         </div>
       )}
+
+      {/* 손그림 스케치 — rough.js 렌더 토글 + 거칠기/휘어짐 + 채우기 질감. */}
+      <div className="space-y-2 border-t border-line/40 pt-2.5">
+        <div className={PANEL_LABEL_ROW}>
+          <span className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
+            손그림 스케치
+          </span>
+          <StudioToggleChip
+            active={sketch.enabled}
+            title="도형을 손으로 그린 듯한 흔들리는 선(rough.js)으로 그립니다."
+            onClick={() => onPatchSketch({ enabled: !sketch.enabled })}
+          >
+            {sketch.enabled ? "켬" : "끔"}
+          </StudioToggleChip>
+        </div>
+
+        {sketch.enabled && (
+          <>
+            <StudioSliderRow
+              label="거칠기"
+              min={STUDIO_SKETCH_RANGES.roughness.min}
+              max={STUDIO_SKETCH_RANGES.roughness.max}
+              step={STUDIO_SKETCH_RANGES.roughness.step}
+              value={sketchRoughness}
+              onChange={(n) => onPatchSketch({ roughness: n })}
+              readout={`${sketchRoughness}`}
+            />
+            <StudioSliderRow
+              label="휘어짐"
+              min={STUDIO_SKETCH_RANGES.bowing.min}
+              max={STUDIO_SKETCH_RANGES.bowing.max}
+              step={STUDIO_SKETCH_RANGES.bowing.step}
+              value={sketch.bowing}
+              onChange={(n) => onPatchSketch({ bowing: n })}
+              readout={`${sketch.bowing}`}
+            />
+            {showSketchFillStyles && (
+              <div className={PANEL_LABEL_ROW}>
+                채우기 질감
+                <span className="flex flex-wrap justify-end gap-1.5">
+                  {STUDIO_SKETCH_FILL_STYLES.map((item) => (
+                    <StudioToggleChip
+                      key={item.id}
+                      active={sketch.fillStyle === item.id}
+                      title={item.tip}
+                      onClick={() => onPatchSketch({ fillStyle: item.id })}
+                    >
+                      {item.label}
+                    </StudioToggleChip>
+                  ))}
+                </span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

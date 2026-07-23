@@ -5,6 +5,7 @@ import {
   Ellipse,
   Group,
   Line,
+  Path,
   Rect,
   Shape,
   Star,
@@ -95,6 +96,13 @@ import {
   isStudioPixelPencilRenderMode,
   planStudioPixelPencilCells,
 } from "./studio-pixel-pencil";
+import {
+  buildStudioRoughShapeRenderPlan,
+  loadStudioRoughGenerator,
+  peekStudioRoughGenerator,
+  studioRoughSeedFromElementId,
+  studioSketchStyleOfElement,
+} from "./studio-rough-shape";
 import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
 import {
   effectiveCornerRadius,
@@ -114,6 +122,7 @@ import type { CalligraphyStylusInput } from "./studio-brush";
 import type { NormalizedStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
 import type { DrawEl } from "./studio-element-model";
 import type { StudioPatternSpec } from "./studio-pattern-fill";
+import type { StudioRoughGeneratorHandle } from "./studio-rough-shape";
 
 const STUDIO_PENCIL_DEFAULT_JITTER_RADIUS = 0.75;
 const dynamicBrushSettingsBySnapshot = new WeakMap<object, NormalizedStudioBrushDynamicsSettings>();
@@ -170,6 +179,30 @@ function processStudioPencilAliasPassPoints(
   });
 }
 
+// 손그림(스케치) 도형용 rough.js generator 훅 — 스케치가 켜진 도형이 처음 보일 때만
+// 동적 import로 로드한다(Studio eager 청크에 rough.js 미포함). 로드 전에는 null을 반환해
+// 깨끗한 Konva 프리미티브 폴백으로 그리고, 로드가 끝나면 상태 변경으로 다시 그린다.
+function useStudioRoughGenerator(wanted: boolean): StudioRoughGeneratorHandle | null {
+  const [generator, setGenerator] = useState<StudioRoughGeneratorHandle | null>(
+    () => peekStudioRoughGenerator()
+  );
+  useEffect(() => {
+    if (!wanted || generator) return;
+    let active = true;
+    loadStudioRoughGenerator()
+      .then((loaded) => {
+        if (active) setGenerator(loaded);
+      })
+      .catch(() => {
+        // 로드 실패 시 깨끗한 프리미티브 렌더를 유지한다 — 다음 마운트가 재시도.
+      });
+    return () => {
+      active = false;
+    };
+  }, [wanted, generator]);
+  return wanted ? generator : null;
+}
+
 // 패턴 채우기 타일 이미지 훅 — 패턴 스펙의 SVG 타일(data URL)을 HTMLImage로 비동기 로드한다.
 // UrlImage의 effect 로드 방식을 훅으로 컴포넌트화한 것. 타일 src는 patternId/색에만
 // 의존하므로(배율은 fillPatternScale로 적용) 배율 조절로는 재로드되지 않는다.
@@ -220,6 +253,9 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   const strokeStyle = normalizeStrokeStyle(el.strokeStyle);
   const shapeParams = normalizeShapeParams(el.shapeParams);
   const shapeDash = strokeDashArray(strokeStyle.dash, strokeWidth);
+  // 손그림(스케치) 스타일 — 켜진 도형은 rough.js 패스로 그린다(요소 id 시드로 결정적).
+  const sketchStyle = kind !== "freehand" ? studioSketchStyleOfElement(el) : null;
+  const roughGenerator = useStudioRoughGenerator(sketchStyle?.enabled === true);
 
   const stampBrushKind = kind === "freehand" && el.mode !== "eraser"
     ? resolveStudioStampBrushKind(el.brush)
@@ -303,6 +339,89 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   return (
     <Group studioElementId={el.id} listening={false}>
       {symmetricVariations.map((points, index) => {
+        // 손그림(스케치) 모드 — 모든 도형 종류를 rough.js 패스로 그린다. generator 로드 전이나
+        // 지오메트리 부족으로 계획이 비면 아래 깨끗한 프리미티브 분기로 그대로 폴백한다.
+        if (kind !== "freehand" && sketchStyle?.enabled && roughGenerator) {
+          const sketchPlan = buildStudioRoughShapeRenderPlan(roughGenerator, {
+            kind,
+            points,
+            strokeWidth,
+            hasFill: Boolean(el.fill),
+            shapeParams,
+            style: sketchStyle,
+            // 대칭 복제본은 index 오프셋으로 서로 다른(그러나 결정적인) 흔들림을 갖는다.
+            seed: studioRoughSeedFromElementId(el.id) + index,
+          });
+          if (sketchPlan.length > 0) {
+            const lineHeads =
+              kind === "line" ? lineArrowHeadGeoms(points, strokeStyle, strokeWidth) : [];
+            return (
+              <Group key={index} opacity={opacity} listening={false}>
+                {sketchPlan.map((path, pathIndex) =>
+                  path.role === "outline" ? (
+                    <Path
+                      key={pathIndex}
+                      data={path.data}
+                      stroke={stroke}
+                      strokeWidth={path.strokeWidth}
+                      dash={shapeDash}
+                      lineCap={strokeStyle.lineCap}
+                      lineJoin="round"
+                      globalCompositeOperation={composite}
+                      listening={false}
+                      perfectDrawEnabled={false}
+                    />
+                  ) : path.role === "fill-hatch" ? (
+                    <Path
+                      key={pathIndex}
+                      data={path.data}
+                      stroke={el.fill}
+                      strokeWidth={path.strokeWidth}
+                      lineCap="round"
+                      lineJoin="round"
+                      globalCompositeOperation={composite}
+                      listening={false}
+                      perfectDrawEnabled={false}
+                    />
+                  ) : (
+                    <Path
+                      key={pathIndex}
+                      data={path.data}
+                      fill={path.role === "outline-fill" ? stroke : el.fill}
+                      globalCompositeOperation={composite}
+                      listening={false}
+                      perfectDrawEnabled={false}
+                    />
+                  )
+                )}
+                {lineHeads.map((head, headIndex) =>
+                  head.kind === "dot" ? (
+                    <KCircle
+                      key={`head-${headIndex}`}
+                      x={head.cx}
+                      y={head.cy}
+                      radius={head.r}
+                      fill={stroke}
+                      globalCompositeOperation={composite}
+                      listening={false}
+                    />
+                  ) : (
+                    <Line
+                      key={`head-${headIndex}`}
+                      points={head.points}
+                      closed
+                      fill={stroke}
+                      lineJoin="round"
+                      globalCompositeOperation={composite}
+                      listening={false}
+                    />
+                  )
+                )}
+              </Group>
+            );
+          }
+        }
+
         if (kind === "rect") {
           const box = drawBounds(points);
           return (

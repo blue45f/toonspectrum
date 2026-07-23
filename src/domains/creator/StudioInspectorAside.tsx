@@ -129,11 +129,13 @@ import {
   StudioSmudgePanel,
   StudioDodgeBurnPanel,
   StudioExtendedBlendPanel,
+  StudioPathBooleanPanel,
   StudioStrokeShapePanel,
   StudioTextEffectPanel,
   StudioTextPathPanel,
 } from "./studio-page-lazy-ui";
 import { type PageState } from "./studio-page-state";
+import { type StudioPathBooleanOp } from "./studio-path-boolean";
 import { type VanishingPoint } from "./studio-perspective-guide";
 import { type PixelSelectionHistoryOperation } from "./studio-pixel-selection-history";
 import {
@@ -144,6 +146,10 @@ import {
 } from "./studio-puppet-warp";
 import { type QuickMaskBrushMode } from "./studio-quick-mask";
 import { QUICKSHAPE_KIND_LABELS } from "./studio-quickshape-labels";
+import {
+  DEFAULT_STUDIO_SKETCH_STYLE,
+  studioSketchStyleOfElement,
+} from "./studio-rough-shape";
 import {
   emptyPixelSelection,
   expandContractSelection,
@@ -478,6 +484,7 @@ interface StudioInspectorAsideProps {
   applyExtendedBlendMergeDown: () => Promise<void>;
   setExtendedBlendMode: import("react").Dispatch<import("react").SetStateAction<StudioExtendedBlendModeId>>;
   setExtendedBlendOpacity: import("react").Dispatch<import("react").SetStateAction<number>>;
+  applyPathBooleanCombine: (op: StudioPathBooleanOp) => void;
   enterQuickMask: () => void;
   commitQuickMask: () => void;
   exitQuickMask: () => void;
@@ -544,6 +551,8 @@ interface StudioInspectorAsideProps {
   extendedBlendMode: StudioExtendedBlendModeId;
   extendedBlendOpacity: number;
   extendedBlendUnavailableReason: string | null;
+  pathBooleanBusy: boolean;
+  pathBooleanUnavailableReason: string | null;
   dodgeBurnActive: boolean;
   dodgeBurnBusy: boolean;
   dodgeBurnExposure: number;
@@ -775,6 +784,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   applyExtendedBlendMergeDown,
   setExtendedBlendMode,
   setExtendedBlendOpacity,
+  applyPathBooleanCombine,
   enterQuickMask,
   commitQuickMask,
   exitQuickMask,
@@ -841,6 +851,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   extendedBlendMode,
   extendedBlendOpacity,
   extendedBlendUnavailableReason,
+  pathBooleanBusy,
+  pathBooleanUnavailableReason,
   dodgeBurnActive,
   dodgeBurnBusy,
   dodgeBurnExposure,
@@ -1286,6 +1298,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           kind={selected.kind}
                           strokeStyle={normalizeStrokeStyle(selected.strokeStyle)}
                           shapeParams={normalizeShapeParams(selected.shapeParams)}
+                          sketch={studioSketchStyleOfElement(selected) ?? DEFAULT_STUDIO_SKETCH_STYLE}
                           onPatchStrokeStyle={(patch) =>
                             patchEl(selected.id, {
                               strokeStyle: { ...normalizeStrokeStyle(selected.strokeStyle), ...patch },
@@ -1294,6 +1307,15 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           onPatchShapeParams={(patch) =>
                             patchEl(selected.id, {
                               shapeParams: { ...normalizeShapeParams(selected.shapeParams), ...patch },
+                            } as Partial<El>)
+                          }
+                          onPatchSketch={(patch) =>
+                            patchEl(selected.id, {
+                              // DrawEl.sketch 필드는 element-model 한 줄 추가 전까지 구조적으로 기록한다.
+                              sketch: {
+                                ...(studioSketchStyleOfElement(selected) ?? DEFAULT_STUDIO_SKETCH_STYLE),
+                                ...patch,
+                              },
                             } as Partial<El>)
                           }
                         />
@@ -2574,6 +2596,23 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   <Trash2 size={14} /> 삭제
                 </button>
                 </div>
+              </Suspense>
+            </div>
+          )}
+
+          {marqueeIds.length === 2 && (
+            <div
+              role="tabpanel"
+              aria-label="도형 결합"
+              hidden={inspectorLayout.primary !== "properties"}
+              className="rounded-xl border border-line bg-panel/40 p-3"
+            >
+              <Suspense fallback={null}>
+                <StudioPathBooleanPanel
+                  busy={pathBooleanBusy}
+                  unavailableReason={pathBooleanUnavailableReason}
+                  onApply={(op) => applyPathBooleanCombine(op)}
+                />
               </Suspense>
             </div>
           )}
