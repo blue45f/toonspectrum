@@ -4,7 +4,16 @@ import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-
 import {
   planStudioGpuDabs,
   planStudioGpuDabsInRect,
+  planStudioGpuStrokeExtensionInRect,
 } from "./studio-webgpu-dab-planner";
+import {
+  STUDIO_GPU_STROKE_FEED_REVISION,
+  type StudioGpuStroke,
+} from "./studio-webgpu-stroke";
+import {
+  advanceStudioGpuStrokeFeedCompact,
+  createStudioGpuStrokeFeedCompactBaseline,
+} from "./studio-webgpu-stroke-feed";
 import {
   packStudioGpuTileDabs,
   planStudioGpuTilePresentation,
@@ -14,12 +23,13 @@ import {
   studioGpuLogicalViewBox,
 } from "./studio-webgpu-tile-compositor";
 import {
+  diffStudioGpuTileStates,
   fingerprintStudioGpuStroke,
+  planStudioGpuTileStates,
   signatureStudioGpuStroke,
   type StudioGpuTile,
 } from "./studio-webgpu-tile-plan";
 
-import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 import type {
   StudioGpuTileCompositeFrame,
   StudioGpuTileRenderTask,
@@ -155,6 +165,99 @@ describe("studio WebGPU tile compositor planning", () => {
     expect(nominalRadiusRatio).toBeLessThan(1);
     const nominalRadius = nominalRadiusRatio * quadRadius;
     expect(quadRadius - nominalRadius).toBeCloseTo(1);
+  });
+
+  it("resolves compact feed extensions by revision count instead of root-array length", () => {
+    const initial = stroke({ points: [500, 1_200], pressures: [0.5] });
+    const baseline = createStudioGpuStrokeFeedCompactBaseline([initial], "compact-tile")!;
+    const advanced = advanceStudioGpuStrokeFeedCompact(baseline, {
+      strokeIndex: 0,
+      previousPointCount: 1,
+      previousRevisionToken: baseline[0]![STUDIO_GPU_STROKE_FEED_REVISION]!.token,
+      suffixPoints: [540, 1_200],
+      suffixPressures: [1],
+    });
+    expect(advanced.status).toBe("appended");
+    expect(advanced.strokes[0]!.points).toHaveLength(2);
+
+    const options = { logicalWidth: 1_024, logicalHeight: 4_096 };
+    const previousStates = planStudioGpuTileStates(baseline, options);
+    const nextStates = planStudioGpuTileStates(advanced.strokes, options);
+    const update = diffStudioGpuTileStates(previousStates, nextStates)
+      .find(({ tile: candidate, mode }) => candidate.id === tile().id && mode === "append");
+    expect(update?.strokeExtension).toBeDefined();
+    const current = advanced.strokes[0]!;
+    const resolved = resolveStudioGpuTileTasks(
+      [task(current, {
+        mode: "append",
+        operations: update!.operations,
+        strokeExtension: update!.strokeExtension,
+        previousOperationCount: update!.previousOperationCount,
+        nextOperationCount: update!.nextOperationCount,
+      })],
+      [current],
+      planStudioGpuDabsInRect,
+      100_000,
+      planStudioGpuStrokeExtensionInRect
+    );
+
+    expect(resolved).not.toBeNull();
+    expect(resolved!.tasks[0]!.plan).toEqual(planStudioGpuStrokeExtensionInRect(
+      current,
+      1,
+      {
+        x: descriptor().renderX,
+        y: descriptor().renderY,
+        width: descriptor().renderWidth,
+        height: descriptor().renderHeight,
+      },
+      100_000
+    ));
+  });
+
+  it("keeps a newer live operation terminal when its random UUID sorts before pending ink", () => {
+    const pending = stroke({
+      id: "z-pending-uuid",
+      orderKey: "\uffffstudio-live:0000000000000001",
+    });
+    const active = stroke({
+      id: "a-active-uuid",
+      orderKey: "\uffffstudio-live:0000000000000002",
+      points: [500, 1_220],
+      pressures: [0.5],
+    });
+    const baseline = createStudioGpuStrokeFeedCompactBaseline(
+      [pending, active],
+      "reverse-uuid-live-order",
+    )!;
+    const activeRevision = baseline[1]![STUDIO_GPU_STROKE_FEED_REVISION]!;
+    const advanced = advanceStudioGpuStrokeFeedCompact(baseline, {
+      strokeIndex: 1,
+      previousPointCount: 1,
+      previousRevisionToken: activeRevision.token,
+      suffixPoints: [540, 1_220],
+      suffixPressures: [0.8],
+    });
+
+    expect(advanced.status).toBe("appended");
+    const options = { logicalWidth: 1_024, logicalHeight: 4_096 };
+    const previousStates = planStudioGpuTileStates(baseline, options);
+    const nextStates = planStudioGpuTileStates(advanced.strokes, options);
+    const updates = diffStudioGpuTileStates(previousStates, nextStates);
+    const activeTileUpdates = updates.filter(({ operations }) =>
+      operations.some(({ id }) => id === active.id)
+    );
+
+    expect(activeTileUpdates.length).toBeGreaterThan(0);
+    expect(activeTileUpdates.every(({ mode }) => mode === "append")).toBe(true);
+    const overlappingNextStates = nextStates.filter(({ operations }) =>
+      operations.some(({ id }) => id === pending.id)
+      && operations.some(({ id }) => id === active.id)
+    );
+    expect(overlappingNextStates.length).toBeGreaterThan(0);
+    expect(overlappingNextStates.every(({ operations }) =>
+      operations.map(({ id }) => id).join(",") === `${pending.id},${active.id}`
+    )).toBe(true);
   });
 
   it("packs a zero-radius dab as zero quad geometry instead of a phantom AA-guard dot", () => {

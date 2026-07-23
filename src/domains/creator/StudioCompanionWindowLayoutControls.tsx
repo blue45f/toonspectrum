@@ -1,9 +1,11 @@
 import { CheckCircle2, MonitorCog, Save, Trash2, TriangleAlert } from "lucide-react";
 import { useId } from "react";
 
+import type { StudioCompanionWindowLayoutSurface } from "./studio-companion-window-layout";
+
 import { cn } from "@/lib/utils";
 
-export type StudioCompanionWindowSurface = "workspace" | "navigator" | "review";
+export type StudioCompanionWindowSurface = StudioCompanionWindowLayoutSurface;
 export type StudioCompanionWindowLayoutPersistenceStatus =
   | "persistent"
   | "session-only"
@@ -25,6 +27,7 @@ const SURFACE_LABELS: Readonly<Record<StudioCompanionWindowSurface, string>> = {
   workspace: "작업공간",
   navigator: "Navigator",
   review: "검수",
+  reference: "레퍼런스",
 };
 
 function describePersistence(

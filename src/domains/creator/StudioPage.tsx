@@ -210,7 +210,10 @@ import {
   strokeSampleDistanceForScale,
   type BrushPreset,
 } from "./studio-brush";
-import { studioBrushAliasEffectiveDiameter } from "./studio-brush-alias-profile";
+import {
+  isStudioBrushAliasId,
+  studioBrushAliasEffectiveDiameter,
+} from "./studio-brush-alias-profile";
 import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
 import {
   normalizeStudioBrushDynamicsSettings,
@@ -252,6 +255,7 @@ import {
   resolveStudioStampBrushStyle,
   STUDIO_STAMP_BRUSH_DEFAULTS,
 } from "./studio-brush-stamp-engine";
+import { studioBrushSymmetryTransforms } from "./studio-brush-symmetry";
 import { resolveAnchorTargetPoint, computeBubbleAnchorTail, type AnchorTargetBounds } from "./studio-bubble-anchor";
 import {
   bubbleShapeCanvasPointToLocal,
@@ -354,6 +358,10 @@ import {
   type StudioCommittedInkSurfaceHandoff,
   type StudioCommittedInkVisibleDrawReceipt,
 } from "./studio-committed-ink-handoff-coordinator";
+import {
+  planStudioCommittedInkRetainedRetry,
+  type StudioCommittedInkRetainedRetryState,
+} from "./studio-committed-ink-release-retry";
 import {
   createStudioCommunityAssetCredit,
   formatStudioCommunityAssetCredit,
@@ -1070,9 +1078,10 @@ import {
 import { SMUDGE_RADIUS_DEFAULT, SMUDGE_STRENGTH_DEFAULT } from "./studio-smudge";
 import { useStudioStableHandlers } from "./studio-stable-handlers";
 import {
-  createStudioStagePointerFrameMapperCache,
+  acquireStudioStagePointerFrameMapperCache,
   snapshotStudioStagePointerBatchMapper,
   type StudioStagePointerBatchMapper,
+  type StudioStagePointerFrameMapperCache,
 } from "./studio-stage-pointer-coordinate";
 import { resolveShiftFreehandTransition } from "./studio-stroke-constrain";
 import { StudioStrokePostprocessWorkerClient } from "./studio-stroke-postprocess-worker-client";
@@ -1149,6 +1158,21 @@ import {
   snapshotStudioWebGpuAuthority,
   type StudioWebGpuAuthorityFrame,
 } from "./studio-webgpu-authority";
+import { restoreStudioGpuPendingBaselineOnHandle } from "./studio-webgpu-handle-recovery";
+import {
+  advanceStudioGpuLiveSourceJournal,
+  createStudioGpuLiveSourceJournal,
+  sameStudioGpuLiveSourceJournalIdentity,
+  type StudioGpuLiveSourceJournalAdvance,
+  type StudioGpuLiveSourceJournalIdentity,
+  type StudioGpuLiveSourceJournalState,
+} from "./studio-webgpu-live-source-journal";
+import {
+  promoteStudioGpuPendingAuthority,
+  releaseStudioGpuPendingAuthorityPrefix,
+  type StudioGpuPendingDrawAuthority,
+} from "./studio-webgpu-pending-authority";
+import { StudioGpuPinReceiptWatchdog } from "./studio-webgpu-pin-receipt-watchdog";
 import { planStudioWebGpuViewportSurface } from "./studio-webgpu-viewport";
 import {
   StudioWorkAssetAdmissionCoordinator,
@@ -1359,7 +1383,10 @@ import type {
   StudioCompanionCommandName,
   StudioCompanionPrimaryRuntime,
 } from "./studio-tools-companion";
-import type { StudioGpuBackend } from "./studio-webgpu-frame-contract";
+import type {
+  StudioGpuBackend,
+  StudioGpuFrameReceipt,
+} from "./studio-webgpu-frame-contract";
 import type {
   StudioGpuLiveStrokePlan,
   StudioGpuLiveStrokePlanner,
@@ -1793,10 +1820,9 @@ function studioElementIdOf(node: Konva.Node | null): string | null {
 }
 
 const QUICK_START_DISMISSED_KEY = "toonspectrum-studio-quick-start-dismissed";
-// Pointer contact defaults to the exact suffix-only Canvas2D overlay. The current WebGPU recovery
-// contract retains a full immutable fallback stroke, so a growing live stroke can otherwise repeat
-// full-prefix planning/copies. WebGPU remains active for 3D, FX and settled composition; an explicit
-// rollout flag can still opt the live path in after the GPU-owned chunk feed is deployed.
+// Pointer contact defaults to the exact suffix-only Canvas2D overlay. The opt-in WebGPU path now
+// owns a root + compact suffix journal, but remains rollout-gated while device/driver coverage is
+// gathered; WebGPU continues to serve 3D, FX and settled composition independently of this flag.
 const STUDIO_VISIBLE_LIVE_INK_PREFERENCE =
   resolveStudioLiveInkBackendPreference(import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND) === "webgpu"
     ? "webgpu"
@@ -2030,6 +2056,11 @@ function studioTimelineClockMs(): number {
 const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 5;
 const EMPTY_STUDIO_GPU_STROKES: readonly StudioGpuStroke[] = Object.freeze([]);
+const STUDIO_GPU_LIVE_SOURCE_JOURNAL_STYLE_KEY = "round-ink-source-journal-v1";
+// Live operations must sort after the already-settled prefix even when their random UUID happens
+// to compare before it. A fixed-width sequence preserves append-only tile composition.
+const STUDIO_GPU_LIVE_OPERATION_ORDER_PREFIX = "\uffffstudio-live:";
+const STUDIO_GPU_PIN_REQUEST_TIMEOUT_MS = 300;
 
 function clampZoom(z: number) {
   const safe = Number.isFinite(z) ? z : 1;
@@ -2172,6 +2203,12 @@ export function StudioPage() {
 }
 
 type StudioToolsCompanionProtocol = typeof import("./studio-tools-companion");
+type StudioCompanionReferenceCaptureRuntimeModule = typeof import(
+  "@/components/studio/runtime/studio-companion-reference-capture-runtime"
+);
+type StudioCompanionReferenceCaptureRuntime = ReturnType<
+  StudioCompanionReferenceCaptureRuntimeModule["createStudioCompanionReferenceCaptureRuntime"]
+>;
 
 type StudioToolsCompanionPrimaryRuntime = StudioCompanionPrimaryRuntime & {
   protocol: StudioToolsCompanionProtocol;
@@ -2200,9 +2237,22 @@ type StudioToolsCompanionRuntimeInput = Omit<
 > & { getReviewProjectionInput?: () => StudioToolsCompanionReviewProjectionInput };
 
 let studioToolsCompanionProtocolPromise: Promise<StudioToolsCompanionProtocol> | null = null;
+let studioCompanionReferenceCaptureRuntimePromise:
+  Promise<StudioCompanionReferenceCaptureRuntimeModule> | null = null;
 
 function loadStudioToolsCompanionProtocol(): Promise<StudioToolsCompanionProtocol> {
   return studioToolsCompanionProtocolPromise ??= import("./studio-tools-companion");
+}
+
+function loadStudioCompanionReferenceCaptureRuntime(): Promise<
+  StudioCompanionReferenceCaptureRuntimeModule
+> {
+  return studioCompanionReferenceCaptureRuntimePromise ??= import(
+    "@/components/studio/runtime/studio-companion-reference-capture-runtime"
+  ).catch((error: unknown) => {
+    studioCompanionReferenceCaptureRuntimePromise = null;
+    throw error;
+  });
 }
 
 async function startStudioToolsCompanionPrimaryRuntime(
@@ -3058,13 +3108,32 @@ function StudioCuttoonEditor() {
   const [referenceBoard, setReferenceBoardState] = useState<StudioReferenceBoardDocument>(() =>
     createDefaultStudioReferenceBoardDocument()
   );
-  const referenceBoardRef = useRef(referenceBoard);
-  referenceBoardRef.current = referenceBoard;
+  const referenceBoardCommittedSnapshotRef = useRef<Readonly<{
+    document: StudioReferenceBoardDocument;
+    revision: number;
+  }>>(Object.freeze({ document: referenceBoard, revision: 1 }));
+  // Tracks the latest accepted React write, including multiple writes batched into one task.
+  // The committed snapshot remains the only document exposed outside React.
+  const referenceBoardLatestRequestedRef = useRef(referenceBoard);
+  useLayoutEffect(() => {
+    referenceBoardLatestRequestedRef.current = referenceBoard;
+    const previous = referenceBoardCommittedSnapshotRef.current;
+    if (previous.document === referenceBoard) return;
+    referenceBoardCommittedSnapshotRef.current = Object.freeze({
+      document: referenceBoard,
+      revision: previous.revision >= Number.MAX_SAFE_INTEGER ? 1 : previous.revision + 1,
+    });
+  }, [referenceBoard]);
   const setReferenceBoard = (next: StudioReferenceBoardDocument): boolean => {
     const normalized = normalizeStudioReferenceBoardDocument(next);
-    if (areStudioReferenceBoardDocumentsEqual(referenceBoardRef.current, normalized)) return true;
+    if (
+      areStudioReferenceBoardDocumentsEqual(
+        referenceBoardLatestRequestedRef.current,
+        normalized
+      )
+    ) return true;
     if (!markStudioDocumentChanged()) return false;
-    referenceBoardRef.current = normalized;
+    referenceBoardLatestRequestedRef.current = normalized;
     setReferenceBoardState(normalized);
     return true;
   };
@@ -7728,19 +7797,6 @@ function StudioCuttoonEditor() {
    * 바깥 DrawEl 객체(next)는 여전히 매 호출 새 참조라 scheduleDraft의 변경 감지는 그대로 동작한다.
    */
   const drawingFixedRateOwnedPointsRef = useRef<number[] | null>(null);
-  /**
-   * drawingFixedRateOwnedPointsRef가 가리키는 배열이 실제로 handle.appendPinnedStrokeSuffix로
-   * 비동기 WebGPU 큐에 노출된(fallbackStrokes/nextStroke로 참조 보관되는) 그 순간의 참조만 담는다
-   * — flushDirectLiveDraft 안에서 buildGpuLiveStrokeView가 뷰를 만든다고 해서 항상 노출되는 건
-   * 아니다(증분 없는 호출은 조기 반환, 최초 baseline 호출은 별도로 리샘플한 배열을 보낸다 —
-   * 둘 다 next.points 자체는 건드리지 않는다). gpuLiveInkPinnedRef가 켜져 있다는 사실 자체가
-   * 아니라 이 배열이 "정말 노출됐는가"만으로 계속 이어붙여도 되는지 판단한다(task #27:
-   * gpuLiveInkPinnedRef 하나로만 판단하면 핀이 켜진 매 호출마다 무조건 새로 복제해야 했다).
-   * 노출 빈도 자체(호출 경로별로 rAF 게이팅 유무가 다르다)는 이 판단과 무관하다 — ownsCurrentArrays는
-   * 매 호출 참조 동일성을 다시 확인하므로 노출이 정확히 언제·얼마나 자주 일어나든 항상 옳게 감지한다.
-   */
-  const gpuLiveInkExposedPointsRef = useRef<number[] | null>(null);
-  const gpuLiveInkExposedPressuresRef = useRef<number[] | null>(null);
   const drawingLastAuthoritativePointerRef = useRef<PointerEvent | null>(null);
   const drawingVelocityRef = useRef<StudioPointerVelocityState | null>(null);
   // The imperative transport owns the single pointer session, DOM capture and safety listeners.
@@ -7751,13 +7807,7 @@ function StudioCuttoonEditor() {
   if (drawingPointerTransportRef.current === null) {
     drawingPointerTransportRef.current = createStudioDrawingPointerTransportController();
   }
-  const stagePointerFrameMapperCacheRef = useRef<
-    ReturnType<typeof createStudioStagePointerFrameMapperCache> | null
-  >(null);
-  stagePointerFrameMapperCacheRef.current ??= createStudioStagePointerFrameMapperCache({
-    requestFrame: (callback) => globalThis.requestAnimationFrame(callback),
-    cancelFrame: (handle) => globalThis.cancelAnimationFrame(handle),
-  });
+  const stagePointerFrameMapperCacheRef = useRef<StudioStagePointerFrameMapperCache | null>(null);
   /** beginStroke가 예약된 로컬 세션만 접미 샘플을 전송한다(포인터마다 전체 CRDT 획 조회 금지). */
   const drawingCrdtStrokeActiveRef = useRef(false);
   const drawingCrdtPublishErrorRef = useRef<(cause: unknown) => void>(() => undefined);
@@ -7823,10 +7873,58 @@ function StudioCuttoonEditor() {
   // 라이브 잉크 파인닝: 스트로크 시작 시점의 백엔드로 렌더러를 한 번 결정한다(중도 교대 금지).
   const webGpuBackendRef = useRef<StudioGpuBackend | null>(null);
   const gpuLiveStrokePlannerRef = useRef<StudioGpuLiveStrokePlanner | null>(null);
+  const gpuLiveSourceJournalRef = useRef<StudioGpuLiveSourceJournalState | null>(null);
+  const gpuLiveSourceJournalEpochRef = useRef(0);
+  const gpuLiveSourceJournalFirstStrokeIndexRef = useRef(0);
+  const gpuLiveOperationOrderSequenceRef = useRef(0);
+  const gpuLiveOperationOrderKeyRef = useRef<string | null>(null);
   const webGpuCanvasHandleRef = useRef<StudioWebGpuCanvasHandle | null>(null);
+  const gpuHandleBaselineRecoveryPendingRef = useRef(false);
+  function gpuAuthoritySurfaceIsPending(): boolean {
+    return gpuLiveInkPinnedRef.current
+      || pendingGpuDrawAuthoritiesRef.current.length > 0
+      || pendingGpuStrokesRef.current.length > 0;
+  }
+  function failOverGpuAuthorityAfterSurfaceLoss(): boolean {
+    if (!gpuAuthoritySurfaceIsPending()) {
+      webGpuBackendRef.current = "canvas2d";
+      gpuHandleBaselineRecoveryPendingRef.current = false;
+      return true;
+    }
+    let promoted = false;
+    try {
+      promoted = relinquishGpuLiveInkToKonva(true);
+    } catch {
+      // A lost imperative adapter may throw while the promotion fallback tries to hide or replace
+      // its old pixels. The original queues are still ref-owned, so retain their remount baseline.
+      webGpuBackendRef.current = "canvas2d";
+    }
+    gpuHandleBaselineRecoveryPendingRef.current = !promoted
+      && pendingGpuStrokesRef.current.length > 0;
+    return promoted;
+  }
   // 캔버스 memo 자식은 prop 경유 ref 변이가 금지(React Compiler)라 GPU 캔버스 콜백을 승격.
   function setWebGpuCanvasHandle(handle: StudioWebGpuCanvasHandle | null) {
     webGpuCanvasHandleRef.current = handle;
+    if (!handle) {
+      // Ref teardown may happen after pointerup, when the active pin is already false but its
+      // settled-only GPU prefix still owns the visible handoff. Promote the whole authority graph;
+      // if corrupted accounting rejects promotion, preserve its exact operation baseline for the
+      // next handle rather than silently dropping those pixels.
+      failOverGpuAuthorityAfterSurfaceLoss();
+      gpuLiveAcceptedRequestIdRef.current = null;
+      gpuFinalReceiptFallbackStrokeRef.current = null;
+      gpuFinalReceiptRequestIdRef.current = null;
+      cancelGpuPinnedRequestWatchdog();
+      gpuPinReceiptWatchdogRef.current = null;
+      return;
+    }
+    const recovery = restoreStudioGpuPendingBaselineOnHandle({
+      handle,
+      pendingStrokes: pendingGpuStrokesRef.current,
+      recoveryPending: gpuHandleBaselineRecoveryPendingRef.current,
+    });
+    gpuHandleBaselineRecoveryPendingRef.current = recovery.pending;
   }
   function onWebGpuBackendChange(backend: StudioGpuBackend) {
     webGpuBackendRef.current = backend;
@@ -7840,24 +7938,17 @@ function StudioCuttoonEditor() {
       });
   }
   function onWebGpuDeviceLost() {
-    // fail-once: 남은 스트로크는 Konva 초안이 즉시 이어받고 이 스트로크 동안
-    // GPU 로 되돌아가지 않는다.
-    webGpuBackendRef.current = "canvas2d";
-    if (gpuLiveInkPinnedRef.current) {
-      gpuLiveInkPinnedRef.current = false;
-      gpuPinnedLivePointCountRef.current = 0;
-      webGpuCanvasHandleRef.current?.setPinnedVisible(
-        pendingGpuStrokesRef.current.length > 0
-      );
-      liveDraftLayerRef.current?.batchDraw();
-    }
+    // Active and pointerup-settled authority share one whole-group failover path. A rejected
+    // corrupted promotion keeps an exact baseline for a subsequently remounted canvas handle.
+    failOverGpuAuthorityAfterSurfaceLoss();
   }
-  function onWebGpuFrameReady() {
+  function onWebGpuFrameReady(receipt: StudioGpuFrameReceipt) {
+    const exactPinnedReceipt = gpuPinReceiptWatchdog().receipt(receipt.requestId);
     // 파인된 라이브 잉크는 영수증으로 가시성을 정하지 않는다 — 프레임당 권한
     // 스냅샷 setState 로 30k 라인 컴포넌트를 다시 그리는 낭비를 만들지 않는다.
     // 다만 "GPU 가 실제로 프레임을 완성했다"는 사실은 자가검증 게이트가 소비한다.
     if (gpuLiveInkPinnedRef.current) {
-      gpuPinnedFrameSeenRef.current = true;
+      if (!exactPinnedReceipt) return;
       return;
     }
     if (!webGpuViewportSurface) return;
@@ -7870,6 +7961,12 @@ function StudioCuttoonEditor() {
       viewport: webGpuViewportSurface,
     }));
   }
+  function onWebGpuFrameInvalid() {
+    setWebGpuAuthority(null);
+    // The Canvas boundary intentionally has no request id on invalidation. Do not let an older
+    // invalidation re-arm a timer after the current receipt; every admitted journal request arms
+    // its own exact-request watchdog below, while Canvas filters ready receipts by request id.
+  }
   // 파인 가시성은 StudioWebGpuCanvas 임페러티브 핸들(setPinnedVisible)로만 흐른다 — 스트로크
   // 시작/종료가 30k 라인 부모를 다시 렌더하지 않는다. 펜 리프트 핸드오프(마지막 GPU 프레임을
   // 커밋 페인트까지 유지)도 아래 더블 rAF + 핸들 호출로 처리한다.
@@ -7877,10 +7974,31 @@ function StudioCuttoonEditor() {
   const gpuLiveInkPinnedRef = useRef(false);
   // 런타임 자가검증: 파인 직후 첫 GPU 프레임 영수증이 기한 안에 오지 않으면(조용히 실패하는
   // 드라이버/기기) 남은 스트로크를 Konva 초안에 자동 인계한다 — 동선은 어떤 환경에서도 보인다.
-  const gpuPinnedFrameSeenRef = useRef(false);
-  const gpuPinProbeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Point revision already published to the explicit WebGPU suffix feed for the active stroke. */
-  const gpuPinnedLivePointCountRef = useRef(0);
+  const gpuLiveAcceptedRequestIdRef = useRef<string | null>(null);
+  const gpuFinalReceiptFallbackStrokeRef = useRef<DrawEl | null>(null);
+  const gpuFinalReceiptRequestIdRef = useRef<string | null>(null);
+  const gpuFinalFallbackOrderIdsRef = useRef<readonly string[] | null>(null);
+  const gpuPinReceiptWatchdogRef = useRef<StudioGpuPinReceiptWatchdog | null>(null);
+  function gpuPinReceiptWatchdog(): StudioGpuPinReceiptWatchdog {
+    gpuPinReceiptWatchdogRef.current ??= new StudioGpuPinReceiptWatchdog({
+      timeoutMs: STUDIO_GPU_PIN_REQUEST_TIMEOUT_MS,
+      onTimeout: () => {
+        if (gpuLiveInkPinnedRef.current) relinquishGpuLiveInkToKonva(true);
+      },
+    });
+    return gpuPinReceiptWatchdogRef.current;
+  }
+  function cancelGpuPinnedRequestWatchdog(): void {
+    gpuPinReceiptWatchdogRef.current?.cancel();
+  }
+  function armGpuPinnedRequestWatchdog(requestId: string): void {
+    if (!gpuLiveInkPinnedRef.current) return;
+    gpuPinReceiptWatchdog().request(requestId);
+  }
+  function beginGpuPinnedReceiptEpoch(requestId: string): void {
+    if (!gpuLiveInkPinnedRef.current) return;
+    gpuPinReceiptWatchdog().begin(requestId);
+  }
   // 다이렉트 라이브 초안: 프리핸드 펜 계열은 스트로크 수명주기 전체(시작·프레임·종료)에서
   // React 를 거치지 않는다 — 초안 노드는 상시 마운트된 임페러티브 sceneFunc 이고, 시작은 ref
   // 무장, 커밋은 아래 지연 파이프라인이 유휴 시 한 번만 동기화한다. 30k 라인 컴포넌트 본문
@@ -8064,19 +8182,12 @@ function StudioCuttoonEditor() {
       && sourcePointCount >= cache.pointCount
       && sourceLength >= cache.sourceLength
     ) {
-      const mapped = sourcePointCount > cache.pointCount
-        && cache.mapped === gpuLiveInkExposedPressuresRef.current
-        ? [...cache.mapped]
-        : cache.mapped;
+      const mapped = cache.mapped;
       for (let index = cache.pointCount; index < sourcePointCount; index += 1) {
         mapped.push(studioLiveBrushPressure(el, el.pressures?.[index]));
       }
-      const nextCache = mapped === cache.mapped
-        ? cache
-        : { ...cache, mapped };
-      nextCache.sourceLength = sourceLength;
-      nextCache.pointCount = sourcePointCount;
-      liveBrushPressureCacheRef.current = nextCache;
+      cache.sourceLength = sourceLength;
+      cache.pointCount = sourcePointCount;
       return mapped;
     }
     const mapped = studioLiveBrushPressureSamples(el, sourcePointCount);
@@ -8102,6 +8213,8 @@ function StudioCuttoonEditor() {
   /** Draw 실패 재시도는 StudioPage 전체 렌더가 아니라 bounded rAF coordinator로만 진행한다. */
   const committedInkSurfaceHandoffRafRef = useRef(0);
   const processCommittedInkSurfaceHandoffsRef = useRef<() => void>(() => undefined);
+  const committedInkRetainedRetryRef = useRef<StudioCommittedInkRetainedRetryState | null>(null);
+  const committedInkRetainedWarnedKeyRef = useRef<string | null>(null);
   // 재시도 예산 소진(반복 draw 실패)은 화면은 계속 정상 표시(fail-visible)되지만 표면 계정 정리가
   // 무기한 멎는다 — 다음 문서 편집이 revision을 올릴 때까지 진단 흔적이 전혀 없었다. 이 헤드에
   // 대해 한 번만 경고하고(무한 재렌더 스팸 방지), revision이 바뀌면(=예산 리셋) 다시 경고 가능.
@@ -8114,6 +8227,10 @@ function StudioCuttoonEditor() {
   const discardPendingStrokeCommitsRef = useRef<() => void>(() => {});
   // GPU 파인 획의 지연 표면 유지: 커밋 동기화 전까지 엔진에 함께 공급되는 확정 획들.
   const pendingGpuStrokesRef = useRef<StudioGpuStroke[]>([]);
+  // Symmetry can fan one DrawEl out to several GPU operations. Retain that exact grouping so a
+  // delayed/missing final receipt can promote the whole FIFO to Konva without partial mirrors,
+  // hidden earlier strokes, or a later baseline that double-composites already-promoted ink.
+  const pendingGpuDrawAuthoritiesRef = useRef<StudioGpuPendingDrawAuthority[]>([]);
   const [studioRasterHandoffCandidate, setStudioRasterHandoffCandidate] =
     useState<StudioRasterHandoffCandidate | null>(null);
   const [studioRasterServerAuthority, setStudioRasterServerAuthority] =
@@ -8550,37 +8667,244 @@ function StudioCuttoonEditor() {
       pressureModel: el.pressureModel,
       opacity: el.opacity ?? 1,
       composite: el.mode === "eraser" ? "erase" : "normal",
-      orderKey: el.id,
+      orderKey: gpuLiveOperationOrderKeyRef.current ?? el.id,
       symmetry: el.symmetry,
       // The current live canvas is a transparent overlay over Konva. It must never claim that a
       // destination-out eraser can punch through the retained document layer.
       destination: "transparent-overlay",
     });
   };
-  const buildGpuLiveStrokeView = (el: DrawEl): StudioGpuStroke | null => {
-    const pointCount = Math.floor(el.points.length / 2);
-    if (pointCount < 1 || el.points.length !== pointCount * 2) return null;
-    if (!el.pressures || el.pressures.length < pointCount) return null;
-    // Building a view here does NOT by itself expose el.points to the async GPU queue — the
-    // caller may still discard it (no-growth early-return) or replace it with a differently
-    // resampled array (the baseline branch's buildGpuLiveStrokePlan(next), no "View" suffix). Only
-    // mark gpuLiveInkExposedPointsRef at the specific call site that actually retains this
-    // reference asynchronously (the appendPinnedStrokeSuffix branch below).
+  function nextGpuLiveOperationOrderKey(): string {
+    // Saturate instead of wrapping: equal terminal keys preserve stable insertion order, whereas
+    // wrapping to 1 could move an astronomically late active stroke before its settled prefix.
+    const nextSequence = Math.min(
+      Number.MAX_SAFE_INTEGER,
+      gpuLiveOperationOrderSequenceRef.current + 1,
+    );
+    gpuLiveOperationOrderSequenceRef.current = nextSequence;
+    return `${STUDIO_GPU_LIVE_OPERATION_ORDER_PREFIX}${String(nextSequence).padStart(16, "0")}`;
+  }
+  function nextGpuLiveSourceJournalEpoch(): number {
+    const nextEpoch = gpuLiveSourceJournalEpochRef.current >= Number.MAX_SAFE_INTEGER
+      ? 1
+      : gpuLiveSourceJournalEpochRef.current + 1;
+    gpuLiveSourceJournalEpochRef.current = nextEpoch;
+    return nextEpoch;
+  }
+  function gpuLiveSourceJournalIdentityFor(
+    el: DrawEl,
+    epoch: number,
+    variations: StudioGpuLiveSourceJournalIdentity["variations"]
+  ): StudioGpuLiveSourceJournalIdentity {
     return {
-      id: el.id,
-      // The drawing model replaces these arrays rather than mutating them. The explicit suffix
-      // feed validates only the new range and retains this object solely as a recovery fallback.
-      points: el.points,
-      pressures: liveBrushPressureSamplesFor(el, pointCount),
+      epoch,
+      strokeId: el.id,
+      styleKey: STUDIO_GPU_LIVE_SOURCE_JOURNAL_STYLE_KEY,
+      ...(el.pressureModel === undefined ? {} : { pressureModel: el.pressureModel }),
+      brushAlias: isStudioBrushAliasId(el.brush) ? el.brush : null,
+      mode: el.mode === "eraser" ? "eraser" : "pen",
+      selectedDiameter: Math.max(1, el.strokeWidth),
       color: el.stroke,
-      size: studioLiveBrushEffectiveDiameter(el),
-      pressureModel: el.pressureModel,
       opacity: el.opacity ?? 1,
       composite: el.mode === "eraser" ? "erase" : "normal",
-      orderKey: el.id,
+      orderKey: gpuLiveOperationOrderKeyRef.current ?? el.id,
+      sampleSpacing: el.sampleSpacing ?? 0,
+      variations,
     };
-  };
+  }
+  function initialGpuLiveSourceJournalMatchesPlan(
+    advanced: StudioGpuLiveSourceJournalAdvance,
+    plan: StudioGpuLiveStrokePlan
+  ): boolean {
+    if (
+      advanced.status !== "advanced"
+      || advanced.state.renderedPointCount !== plan.renderedPointCount
+      || advanced.suffixes.length !== plan.strokes.length
+    ) return false;
+    return advanced.suffixes.every((suffix, variationIndex) => {
+      const stroke = plan.strokes[variationIndex];
+      if (
+        !stroke
+        || suffix.id !== stroke.id
+        || suffix.previousRenderedPointCount !== 0
+        || suffix.nextRenderedPointCount !== plan.renderedPointCount
+        || suffix.points.length !== stroke.points.length
+        || suffix.pressures.length !== stroke.pressures?.length
+      ) return false;
+      for (let index = 0; index < suffix.points.length; index += 1) {
+        if (!Object.is(suffix.points[index], stroke.points[index])) return false;
+      }
+      for (let index = 0; index < suffix.pressures.length; index += 1) {
+        if (!Object.is(suffix.pressures[index], stroke.pressures?.[index])) return false;
+      }
+      return true;
+    });
+  }
+  function activeGpuLiveSourceJournalMatchesPlan(
+    el: DrawEl,
+    plan: StudioGpuLiveStrokePlan,
+    journal: StudioGpuLiveSourceJournalState
+  ): boolean {
+    const transforms = studioBrushSymmetryTransforms(el.symmetry);
+    if (transforms.length !== plan.strokes.length) return false;
+    const identity = gpuLiveSourceJournalIdentityFor(
+      el,
+      journal.identity.epoch,
+      transforms.map((transform, index) => ({
+        id: plan.strokes[index]!.id,
+        transform,
+      }))
+    );
+    return sameStudioGpuLiveSourceJournalIdentity(journal.identity, identity);
+  }
+  function beginGpuLiveSourceJournal(
+    el: DrawEl,
+    plan: StudioGpuLiveStrokePlan
+  ): boolean {
+    const handle = webGpuCanvasHandleRef.current;
+    const transforms = studioBrushSymmetryTransforms(el.symmetry);
+    if (transforms.length !== plan.strokes.length) return false;
+    const identity = gpuLiveSourceJournalIdentityFor(
+      el,
+      nextGpuLiveSourceJournalEpoch(),
+      transforms.map((transform, index) => ({
+        id: plan.strokes[index]!.id,
+        transform,
+      }))
+    );
+    const emptyJournal = createStudioGpuLiveSourceJournal(identity);
+    if (!handle || !emptyJournal) return false;
+    const initial = advanceStudioGpuLiveSourceJournal(emptyJournal, {
+      identity: emptyJournal.identity,
+      points: el.points,
+      pressures: el.pressures,
+    });
+    if (!initialGpuLiveSourceJournalMatchesPlan(initial, plan)) return false;
+
+    gpuLiveSourceJournalRef.current = initial.state;
+    gpuLiveSourceJournalFirstStrokeIndexRef.current = pendingGpuStrokesRef.current.length;
+    const initialVariationStrokes = [...pendingGpuStrokesRef.current, ...plan.strokes];
+    const outcome = handle.replacePinnedJournalBaseline(initialVariationStrokes);
+    if (outcome.status === "rejected") {
+      // The engine deliberately retains its previous pixels on journal rejection. Restore the
+      // settled prefix immediately so a stale retained receipt cannot authorize this new stroke.
+      relinquishGpuLiveInkToKonva(true);
+      return false;
+    }
+    gpuLiveAcceptedRequestIdRef.current = outcome.requestId;
+    return true;
+  }
+  function promotePendingGpuAuthoritiesToKonva(
+    explicitUncommittedOrderIds?: readonly string[],
+  ): boolean {
+    const promotion = promoteStudioGpuPendingAuthority({
+      authorities: pendingGpuDrawAuthoritiesRef.current,
+      gpuStrokeCount: pendingGpuStrokesRef.current.length,
+      handoffs: committedInkSurfaceHandoffsRef.current,
+      settledDrafts: draftPreviewStoreRef.current.getSnapshot().settled,
+      uncommittedOrderIds: explicitUncommittedOrderIds
+        ?? pendingStrokeCommitsRef.current?.strokes.map((stroke) => stroke.id)
+        ?? [],
+    });
+    if (promotion.status === "rejected") return false;
+
+    gpuHandleBaselineRecoveryPendingRef.current = false;
+    pendingGpuDrawAuthoritiesRef.current = [];
+    pendingGpuStrokesRef.current = [];
+    committedInkSurfaceHandoffsRef.current = [...promotion.handoffs];
+    draftPreviewStoreRef.current.replaceSettled(promotion.settledDrafts);
+    const handle = webGpuCanvasHandleRef.current;
+    handle?.syncPinnedStrokes(EMPTY_STUDIO_GPU_STROKES);
+    handle?.setPinnedVisible(false);
+    return true;
+  }
+  function relinquishGpuLiveInkToKonva(disableWebGpuForSession = false): boolean {
+    if (disableWebGpuForSession) webGpuBackendRef.current = "canvas2d";
+    gpuLiveInkPinnedRef.current = false;
+    gpuLiveSourceJournalRef.current = null;
+    gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
+    gpuLiveOperationOrderKeyRef.current = null;
+    gpuLiveAcceptedRequestIdRef.current = null;
+    gpuFinalReceiptFallbackStrokeRef.current = null;
+    gpuFinalReceiptRequestIdRef.current = null;
+    cancelGpuPinnedRequestWatchdog();
+    const promotedPending = promotePendingGpuAuthoritiesToKonva();
+    if (!promotedPending) {
+      const pendingGpu = pendingGpuStrokesRef.current;
+      const handle = webGpuCanvasHandleRef.current;
+      handle?.replacePinnedStrokes(pendingGpu);
+      handle?.setPinnedVisible(pendingGpu.length > 0);
+    }
+    const retainedCurrent = liveDraftVisualRef.current ?? drawingRef.current;
+    if (promotedPending && retainedCurrent?.mode !== "eraser") {
+      // GPU is a DOM overlay above the main Konva Stage. Once its older prefix moves into the
+      // settled Konva FIFO, the current exact vector must join that same top preview layer so
+      // chronological source-over ordering remains intact for the rest of this pointer session.
+      liveDraftDirectRef.current = false;
+      draftPreviewStoreRef.current.setActive(retainedCurrent);
+    }
+    // Konva has retained the exact authoritative DrawEl throughout the GPU epoch. Once the pin is
+    // relinquished, redraw it immediately rather than waiting for another pointer sample.
+    liveDraftLayerRef.current?.batchDraw();
+    mainLayerRef.current?.batchDraw();
+    return promotedPending;
+  }
+  function appendGpuLiveSourceJournalSuffix(
+    el: DrawEl,
+    sealEndpoint = false
+  ): "advanced" | "retained" | "rejected" {
+    const journal = gpuLiveSourceJournalRef.current;
+    const handle = webGpuCanvasHandleRef.current;
+    if (!journal || !handle) {
+      relinquishGpuLiveInkToKonva(true);
+      return "rejected";
+    }
+    const advanced = advanceStudioGpuLiveSourceJournal(journal, {
+      // Rebuild only the O(1) paint identity from the current DrawEl. A mid-contact style or epoch
+      // mutation therefore rejects before the journal reads even one source-array suffix slot.
+      identity: gpuLiveSourceJournalIdentityFor(
+        el,
+        journal.identity.epoch,
+        journal.identity.variations
+      ),
+      points: el.points,
+      pressures: el.pressures,
+      sealEndpoint,
+    });
+    if (advanced.status === "rejected") {
+      relinquishGpuLiveInkToKonva(true);
+      return "rejected";
+    }
+    if (advanced.status === "retained") {
+      gpuLiveSourceJournalRef.current = advanced.state;
+      return "retained";
+    }
+
+    const firstStrokeIndex = gpuLiveSourceJournalFirstStrokeIndexRef.current;
+    const outcome = handle.appendPinnedJournalSuffixBatch({
+      patches: advanced.suffixes.map((suffix, variationIndex) => ({
+        strokeIndex: firstStrokeIndex + variationIndex,
+        previousPointCount: suffix.previousRenderedPointCount,
+        suffixPoints: suffix.points,
+        suffixPressures: suffix.pressures,
+      })),
+    });
+    if (outcome.status === "rejected") {
+      relinquishGpuLiveInkToKonva(true);
+      return "rejected";
+    }
+    gpuLiveSourceJournalRef.current = advanced.state;
+    gpuLiveAcceptedRequestIdRef.current = outcome.requestId;
+    armGpuPinnedRequestWatchdog(outcome.requestId);
+    return "advanced";
+  }
   const settleGpuLiveStroke = (source: DrawEl, finished: DrawEl): boolean => {
+    if (appendGpuLiveSourceJournalSuffix(source, true) === "rejected") {
+      // A release-time journal failure must not erase the only exact final drawing before a deferred
+      // React commit. Keep a Konva settled copy as the fail-visible authority.
+      draftPreviewStoreRef.current.settle(finished);
+      return false;
+    }
     const correctedEl = source.points === finished.points
       && source.pressures === finished.pressures
       ? null
@@ -8589,12 +8913,28 @@ function StudioCuttoonEditor() {
       sealEndpoint: true,
       correctedEl,
     });
-    if (!settled) return false;
+    if (!settled) {
+      relinquishGpuLiveInkToKonva(true);
+      draftPreviewStoreRef.current.settle(finished);
+      return false;
+    }
     pendingGpuStrokesRef.current = [
       ...pendingGpuStrokesRef.current,
       ...settled.strokes,
     ];
-    webGpuCanvasHandleRef.current?.syncPinnedStrokes(pendingGpuStrokesRef.current);
+    pendingGpuDrawAuthoritiesRef.current = [
+      ...pendingGpuDrawAuthoritiesRef.current,
+      { element: finished, gpuStrokeCount: settled.strokes.length },
+    ];
+    gpuLiveSourceJournalRef.current = null;
+    gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
+    // Keep the exact vector available until clearDraftPreview observes the final request receipt.
+    // A corrected result cannot reuse the pre-correction journal receipt: the legacy void replace
+    // API has no admission/result identity, so it deliberately takes the Konva fail-visible path.
+    gpuFinalReceiptFallbackStrokeRef.current = finished;
+    gpuFinalReceiptRequestIdRef.current = correctedEl
+      ? null
+      : gpuLiveAcceptedRequestIdRef.current;
     return true;
   };
   const flushDirectLiveDraft = () => {
@@ -8623,67 +8963,8 @@ function StudioCuttoonEditor() {
     // 명시적 문서 처리이며 라이브 중 이미 칠한 픽셀을 소급 수정하지 않는다.
     liveDraftVisualRef.current = next;
     if (gpuLiveInkPinnedRef.current) {
-      const handle = webGpuCanvasHandleRef.current;
-      const strokePlan = buildGpuLiveStrokePlan(next);
-      if (handle && strokePlan && strokePlan.variationCount > 1) {
-        const pointCount = strokePlan.renderedPointCount;
-        const previousPointCount = gpuPinnedLivePointCountRef.current;
-        const fallbackStrokes = [...pendingGpuStrokesRef.current, ...strokePlan.strokes];
-        if (previousPointCount > 0 && pointCount > previousPointCount) {
-          const firstStrokeIndex = pendingGpuStrokesRef.current.length;
-          handle.appendPinnedStrokeSuffixBatch({
-            fallbackStrokes,
-            patches: strokePlan.strokes.map((stroke, variationIndex) => ({
-              strokeIndex: firstStrokeIndex + variationIndex,
-              previousPointCount,
-              suffixPoints: stroke.points.slice(previousPointCount * 2),
-              suffixPressures: stroke.pressures!.slice(previousPointCount, pointCount),
-              nextStroke: stroke,
-              fallbackStrokes,
-            })),
-          });
-          gpuPinnedLivePointCountRef.current = pointCount;
-          return;
-        }
-        if (previousPointCount === pointCount && pointCount > 0) return;
-        handle.syncPinnedStrokes(fallbackStrokes);
-        gpuPinnedLivePointCountRef.current = pointCount;
-        return;
-      }
-      const strokeView = buildGpuLiveStrokeView(next);
-      if (handle && strokeView) {
-        const pointCount = strokeView.points.length / 2;
-        const previousPointCount = gpuPinnedLivePointCountRef.current;
-        const fallbackStrokes = [...pendingGpuStrokesRef.current, strokeView];
-        if (previousPointCount > 0 && pointCount > previousPointCount) {
-          // This is the exact moment next.points (=== strokeView.points, just read back through
-          // a readonly-typed field) becomes exposed to the async WebGPU queue — it's retained by
-          // reference in fallbackStrokes/nextStroke for a possible device-loss resync, so it must
-          // never be mutated again from here on.
-          gpuLiveInkExposedPointsRef.current = next.points;
-          gpuLiveInkExposedPressuresRef.current = strokeView.pressures as number[];
-          handle.appendPinnedStrokeSuffix({
-            strokeIndex: pendingGpuStrokesRef.current.length,
-            previousPointCount,
-            suffixPoints: strokeView.points.slice(previousPointCount * 2),
-            suffixPressures: strokeView.pressures!.slice(previousPointCount, pointCount),
-            nextStroke: strokeView,
-            fallbackStrokes,
-          });
-          gpuPinnedLivePointCountRef.current = pointCount;
-          return;
-        }
-        if (previousPointCount === pointCount && pointCount > 0) return;
-
-        // First tap (or a defensive non-prefix replacement) establishes one validated baseline.
-        // Subsequent pointer frames use only the explicit suffix above.
-        const baselineStroke = strokePlan?.strokes[0] ?? null;
-        if (baselineStroke) {
-          handle.syncPinnedStrokes([...pendingGpuStrokesRef.current, baselineStroke]);
-          gpuPinnedLivePointCountRef.current = baselineStroke.points.length / 2;
-          return;
-        }
-      }
+      const journalOutcome = appendGpuLiveSourceJournalSuffix(next);
+      if (journalOutcome !== "rejected") return;
     }
     (next.mode === "eraser" ? mainLayerRef.current : liveDraftLayerRef.current)?.batchDraw();
   };
@@ -8708,7 +8989,12 @@ function StudioCuttoonEditor() {
     if (!liveDraftDirectRef.current && !liveStampDraftDirectRef.current) return;
     liveDraftDirectRef.current = false;
     liveStampDraftDirectRef.current = false;
-    gpuPinnedLivePointCountRef.current = 0;
+    gpuLiveSourceJournalRef.current = null;
+    gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
+    gpuLiveOperationOrderKeyRef.current = null;
+    gpuLiveAcceptedRequestIdRef.current = null;
+    gpuFinalReceiptFallbackStrokeRef.current = null;
+    gpuFinalReceiptRequestIdRef.current = null;
     endPredictedInkTail();
     // 대기 중 커밋 배치를 먼저 동기화한다 — 아래의 즉시 클리어가 그 잉크까지 지우기 때문.
     flushPendingStrokeCommitsRef.current();
@@ -8718,10 +9004,7 @@ function StudioCuttoonEditor() {
       globalThis.cancelAnimationFrame(liveDraftRafRef.current);
       liveDraftRafRef.current = null;
     }
-    if (gpuPinProbeTimerRef.current) {
-      clearTimeout(gpuPinProbeTimerRef.current);
-      gpuPinProbeTimerRef.current = null;
-    }
+    cancelGpuPinnedRequestWatchdog();
     liveInkOverlayClearGenRef.current += 1;
     liveInkOverlayRendererRef.current.resetActive();
     liveStampOverlayRendererRef.current.resetActive();
@@ -8776,6 +9059,20 @@ function StudioCuttoonEditor() {
   const clearDraftPreview = (options?: { preserveInkForDeferredCommit?: boolean }) => {
     // 지연 커밋 경로: 잉크는 라이브 표면에 남긴다 — 커밋 동기화(flush)가 페인트 뒤에 정리한다.
     const preserveInk = options?.preserveInkForDeferredCommit === true;
+    const finalGpuFallbackStroke = gpuFinalReceiptFallbackStrokeRef.current;
+    const finalGpuRequestId = gpuFinalReceiptRequestIdRef.current;
+    const finalGpuReceiptReady = finalGpuRequestId !== null
+      && gpuPinReceiptWatchdogRef.current?.hasExactReceipt(finalGpuRequestId) === true;
+    const requiresFinalGpuFallback = preserveInk
+      && finalGpuFallbackStroke !== null
+      && !finalGpuReceiptReady;
+    const promotedFinalGpuFallback = requiresFinalGpuFallback
+      && promotePendingGpuAuthoritiesToKonva(gpuFinalFallbackOrderIdsRef.current ?? undefined);
+    if (requiresFinalGpuFallback && !promotedFinalGpuFallback) {
+      // The exact vector remains visible until the committed main-layer draw receipt. Hiding the
+      // unreceipted GPU pin below prevents a stale pre-correction/prefix frame from covering it.
+      draftPreviewStoreRef.current.settle(finalGpuFallbackStroke);
+    }
     const wasStampDirect = liveStampDraftDirectRef.current;
     const wasDirect = liveDraftDirectRef.current || wasStampDirect;
     const wasEraser = liveDraftVisualRef.current?.mode === "eraser";
@@ -8793,11 +9090,14 @@ function StudioCuttoonEditor() {
     }
     liveDraftDirectRef.current = false;
     liveStampDraftDirectRef.current = false;
-    gpuPinnedLivePointCountRef.current = 0;
-    if (gpuPinProbeTimerRef.current) {
-      clearTimeout(gpuPinProbeTimerRef.current);
-      gpuPinProbeTimerRef.current = null;
-    }
+    gpuLiveSourceJournalRef.current = null;
+    gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
+    gpuLiveOperationOrderKeyRef.current = null;
+    gpuLiveAcceptedRequestIdRef.current = null;
+    gpuFinalReceiptFallbackStrokeRef.current = null;
+    gpuFinalReceiptRequestIdRef.current = null;
+    gpuFinalFallbackOrderIdsRef.current = null;
+    cancelGpuPinnedRequestWatchdog();
     {
       const overlay = liveInkOverlayRendererRef.current;
       if (overlay.isActive) {
@@ -8820,6 +9120,10 @@ function StudioCuttoonEditor() {
         const pendingGpu = pendingGpuStrokesRef.current;
         webGpuCanvasHandleRef.current?.syncPinnedStrokes(pendingGpu);
         webGpuCanvasHandleRef.current?.setPinnedVisible(pendingGpu.length > 0);
+      } else if (requiresFinalGpuFallback && !promotedFinalGpuFallback) {
+        // No exact final receipt means GPU is not an authority surface. Konva's settled copy above
+        // stays visible and the ordinary committed-draw handoff releases it atomically.
+        webGpuCanvasHandleRef.current?.setPinnedVisible(false);
       }
       // preserveInk: 파인 표면은 main-layer draw 영수증이 정리한다.
     }
@@ -9000,8 +9304,15 @@ function StudioCuttoonEditor() {
       node.getLayer()?.batchDraw();
     }
   };
-  useEffect(
-    () => () => {
+  useLayoutEffect(() => {
+    const mapperCacheLease = acquireStudioStagePointerFrameMapperCache(
+      stagePointerFrameMapperCacheRef,
+      {
+        requestFrame: (callback) => globalThis.requestAnimationFrame(callback),
+        cancelFrame: (handle) => globalThis.cancelAnimationFrame(handle),
+      }
+    );
+    return () => {
       if (draftRafRef.current !== null) globalThis.cancelAnimationFrame(draftRafRef.current);
       if (marqueeRafRef.current !== null) globalThis.cancelAnimationFrame(marqueeRafRef.current);
       runStudioDrawingUnmountLifecycle({
@@ -9013,7 +9324,7 @@ function StudioCuttoonEditor() {
         },
         cleanupDrawing: () => drawingUnmountCleanupRef.current(),
         disposePointerTransport: () => {
-          stagePointerFrameMapperCacheRef.current?.dispose();
+          mapperCacheLease.release();
           requireStudioDrawingPointerTransport(drawingPointerTransportRef).dispose();
         },
         clearPendingCommit: () => {
@@ -9026,9 +9337,8 @@ function StudioCuttoonEditor() {
           }
         },
       });
-    },
-    []
-  );
+    };
+  }, []);
   useEffect(() => {
     const handlePageHide = () => {
       persistPendingStrokeEmergencyAutosaveRef.current("pagehide");
@@ -9988,6 +10298,12 @@ function StudioCuttoonEditor() {
   const companionRuntimeGenerationRef = useRef(0);
   const companionWindowRef = useRef<Window | null>(null);
   const companionPendingTextTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
+  const companionReferenceCaptureRuntimeRef =
+    useRef<StudioCompanionReferenceCaptureRuntime | null>(null);
+  const companionReferenceCaptureRuntimePromiseRef =
+    useRef<Promise<StudioCompanionReferenceCaptureRuntime | null> | null>(null);
+  const companionReferenceCaptureGenerationRef = useRef(0);
+  const companionReferenceDemandActiveRef = useRef(false);
   const companionProjectionRevisionRef = useRef(0);
   const companionReviewProjectionInputRef = useRef<
     (() => StudioToolsCompanionReviewProjectionInput) | null
@@ -10192,6 +10508,44 @@ function StudioCuttoonEditor() {
     };
   }, []);
 
+  const ensureStudioCompanionReferenceCaptureRuntime = useCallback(() => {
+    const existingRuntime = companionReferenceCaptureRuntimeRef.current;
+    if (existingRuntime) return Promise.resolve(existingRuntime);
+    const existingPromise = companionReferenceCaptureRuntimePromiseRef.current;
+    if (existingPromise) return existingPromise;
+    const generation = companionReferenceCaptureGenerationRef.current;
+    const promise = loadStudioCompanionReferenceCaptureRuntime().then((module) => {
+      if (generation !== companionReferenceCaptureGenerationRef.current) return null;
+      const runtime = module.createStudioCompanionReferenceCaptureRuntime({
+        getSnapshot: () => {
+          const snapshot = referenceBoardCommittedSnapshotRef.current;
+          return {
+            document: snapshot.document,
+            revision: snapshot.revision,
+            itemCount: snapshot.document.items.length,
+          };
+        },
+        isCaptureBlocked: () => Boolean(
+          drawingRef.current || drawingPointerTransportRef.current?.getSession()
+        ),
+        onProjectionChanged: () => companionRuntimeRef.current?.schedulePublish(),
+      });
+      if (generation !== companionReferenceCaptureGenerationRef.current) {
+        runtime.release();
+        return null;
+      }
+      companionReferenceCaptureRuntimeRef.current = runtime;
+      return runtime;
+    }).catch(() => null);
+    companionReferenceCaptureRuntimePromiseRef.current = promise;
+    void promise.then((runtime) => {
+      if (!runtime && companionReferenceCaptureRuntimePromiseRef.current === promise) {
+        companionReferenceCaptureRuntimePromiseRef.current = null;
+      }
+    });
+    return promise;
+  }, []);
+
   const ensureStudioToolsCompanionRuntime = useCallback(() => {
     const existing = companionRuntimePromiseRef.current;
     if (existing) return existing;
@@ -10222,6 +10576,63 @@ function StudioCuttoonEditor() {
         const longestEdge = Math.max(1, stage.width(), stage.height());
         return stage.toCanvas({ pixelRatio: Math.min(1, maximumLongestEdge / longestEdge) });
       },
+      getReferenceProjection: (surfaceGeneration) => {
+        const ready = companionReferenceCaptureRuntimeRef.current?.getProjection(surfaceGeneration);
+        if (ready) return ready;
+        const snapshot = referenceBoardCommittedSnapshotRef.current;
+        return {
+          generation: surfaceGeneration,
+          revision: 1,
+          referenceRevision: snapshot.revision,
+          itemCount: snapshot.document.items.length,
+          resolvedItemCount: 0,
+          canPickColor: false,
+        };
+      },
+      captureReferenceFrame: async (request) => {
+        if (!companionReferenceDemandActiveRef.current) return null;
+        const runtime = await ensureStudioCompanionReferenceCaptureRuntime();
+        if (!runtime || request.signal.aborted || !companionReferenceDemandActiveRef.current) {
+          return null;
+        }
+        await runtime.setDemand(true);
+        if (request.signal.aborted || !companionReferenceDemandActiveRef.current) return null;
+        return runtime.captureFrame(request);
+      },
+      sampleReferenceColor: async ({ current, point, sequence, signal }) => {
+        if (
+          signal.aborted
+          || drawingRef.current
+          || drawingPointerTransportRef.current?.getSession()
+        ) return null;
+        const runtime = companionReferenceCaptureRuntimeRef.current;
+        if (!runtime || !companionReferenceDemandActiveRef.current) return null;
+        const sampled = await runtime.sampleColor({ current, point, sequence, signal });
+        if (
+          !sampled
+          || signal.aborted
+          || drawingRef.current
+          || drawingPointerTransportRef.current?.getSession()
+        ) return null;
+        const nextColor = sampled.toLowerCase();
+        setColor(nextColor);
+        rememberColor(nextColor);
+        return nextColor;
+      },
+      onReferenceDemandChange: (active) => {
+        companionReferenceDemandActiveRef.current = active;
+        if (!active) {
+          void companionReferenceCaptureRuntimeRef.current?.setDemand(false);
+          return;
+        }
+        void ensureStudioCompanionReferenceCaptureRuntime().then(async (runtime) => {
+          if (!runtime || !companionReferenceDemandActiveRef.current) return;
+          const ready = await runtime.setDemand(true);
+          if (ready && companionReferenceDemandActiveRef.current) {
+            companionRuntimeRef.current?.schedulePublish();
+          }
+        });
+      },
       onCommand: (command) => companionCommandHandlerRef.current(command),
       onControl: (control) => companionControlHandlerRef.current(control),
     }).then((runtime) => {
@@ -10239,7 +10650,7 @@ function StudioCuttoonEditor() {
       }
     });
     return promise;
-  }, []);
+  }, [ensureStudioCompanionReferenceCaptureRuntime]);
 
   useEffect(() => {
     try {
@@ -10251,10 +10662,16 @@ function StudioCuttoonEditor() {
     }
     return () => {
       companionRuntimeGenerationRef.current += 1;
+      companionReferenceCaptureGenerationRef.current += 1;
+      companionReferenceDemandActiveRef.current = false;
       const runtime = companionRuntimeRef.current;
       companionRuntimeRef.current = null;
       companionRuntimePromiseRef.current = null;
       runtime?.dispose();
+      const referenceRuntime = companionReferenceCaptureRuntimeRef.current;
+      companionReferenceCaptureRuntimeRef.current = null;
+      companionReferenceCaptureRuntimePromiseRef.current = null;
+      referenceRuntime?.release();
       if (companionPendingTextTimerRef.current !== null) {
         globalThis.clearTimeout(companionPendingTextTimerRef.current);
         companionPendingTextTimerRef.current = null;
@@ -10293,6 +10710,7 @@ function StudioCuttoonEditor() {
     canvasH,
     masterEditMode,
     collaborationDocumentLocked,
+    referenceBoard,
   ]);
 
   // 툴바 드롭다운 바깥 클릭 시 닫기.
@@ -12051,11 +12469,11 @@ function StudioCuttoonEditor() {
             : normalizeStudioReleaseSchedule(doc?.releaseSchedule)
         );
         setPublicationAnalyticsState(normalizedPublicationAnalytics);
-        setReferenceBoardState(
-          remixId
-            ? createDefaultStudioReferenceBoardDocument()
-            : normalizeStudioReferenceBoardDocument(hydratedProject.referenceBoard)
-        );
+        const hydratedReferenceBoard = remixId
+          ? createDefaultStudioReferenceBoardDocument()
+          : normalizeStudioReferenceBoardDocument(hydratedProject.referenceBoard);
+        referenceBoardLatestRequestedRef.current = hydratedReferenceBoard;
+        setReferenceBoardState(hydratedReferenceBoard);
         if (doc?.webtoonTheme) setWebtoonThemeState(doc.webtoonTheme);
         if (doc?.panelGutter) setPanelGutterState(doc.panelGutter);
         const publishPack = normalizeStudioPublishPackSettings(doc?.publishPack);
@@ -13564,6 +13982,8 @@ function StudioCuttoonEditor() {
       liveInkOverlayRendererRef.current.clear();
       draftPreviewStoreRef.current.clearSettled();
       pendingGpuStrokesRef.current = [];
+      pendingGpuDrawAuthoritiesRef.current = [];
+      gpuHandleBaselineRecoveryPendingRef.current = false;
       if (!gpuLiveInkPinnedRef.current) {
         webGpuCanvasHandleRef.current?.syncPinnedStrokes(EMPTY_STUDIO_GPU_STROKES);
         webGpuCanvasHandleRef.current?.setPinnedVisible(false);
@@ -13633,26 +14053,144 @@ function StudioCuttoonEditor() {
     };
   }
 
-  function releaseCommittedInkSurfaceCounts(released: StudioCommittedInkSurfaceCounts): void {
-    if (released.overlay === 0 && released.draft === 0 && released.gpu === 0) return;
-    liveInkOverlayRendererRef.current.releaseSettledPrefix(released.overlay);
-    draftPreviewStoreRef.current.releaseSettledPrefix(released.draft);
+  function releaseCommittedInkSurfaceCounts(
+    released: StudioCommittedInkSurfaceCounts,
+    completeGpuElementIds: ReadonlySet<string>,
+  ):
+    | { readonly status: "released" }
+    | { readonly status: "promoted" }
+    | { readonly status: "retained"; readonly reason: string } {
+    const hasCompleteGpuAuthority = pendingGpuDrawAuthoritiesRef.current.some((authority) => (
+      completeGpuElementIds.has(authority.element.id)
+    ));
+    if (
+      released.overlay === 0 && released.draft === 0 && released.gpu === 0
+      && !hasCompleteGpuAuthority
+    ) {
+      return { status: "released" };
+    }
 
-    if (released.gpu > 0) {
-      pendingGpuStrokesRef.current = pendingGpuStrokesRef.current.slice(released.gpu);
-      if (gpuLingerRafRef.current) globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
-      gpuLingerRafRef.current = 0;
+    const overlayRenderer = liveInkOverlayRendererRef.current;
+    const draftPreviewStore = draftPreviewStoreRef.current;
+    if (
+      released.overlay > overlayRenderer.settledStrokeCount
+      || released.draft > draftPreviewStore.settledCount
+    ) {
+      // A ready handoff cannot consume a partial FIFO. Keep the original handoff queue and every
+      // visible authority untouched until the surface graph changes or a bounded retry succeeds.
+      return { status: "retained", reason: "surface-count-preflight" };
+    }
+
+    const shouldPlanGpuRelease = released.gpu > 0 || hasCompleteGpuAuthority;
+    const releasedAuthorities = shouldPlanGpuRelease
+      ? releaseStudioGpuPendingAuthorityPrefix({
+          authorities: pendingGpuDrawAuthoritiesRef.current,
+          requestedGpuStrokeCount: released.gpu,
+          availableGpuStrokeCount: pendingGpuStrokesRef.current.length,
+          completeElementIds: completeGpuElementIds,
+        })
+      : null;
+    if (releasedAuthorities?.status === "rejected") {
+      // Preserve both queues until a safe whole-DrawEl transition exists. The original handoffs
+      // are still installed when this function runs, so a successful promotion migrates their GPU
+      // reservations to the exact Konva FIFO and a later coordinator pass releases that draft.
+      // If even promotion rejects an already-corrupt count map, retain the current GPU pixels and
+      // handoffs untouched: duplicate authority is safer than losing an uncommitted suffix.
+      const promoted = relinquishGpuLiveInkToKonva(true);
+      return promoted
+        ? { status: "promoted" }
+        : { status: "retained", reason: "gpu-authority-release-rejected" };
+    }
+
+    let nextPendingGpuStrokes = pendingGpuStrokesRef.current;
+    let acceptedRebaselineRequestId: string | null = null;
+    if (releasedAuthorities?.status === "released") {
+      nextPendingGpuStrokes = pendingGpuStrokesRef.current.slice(
+        releasedAuthorities.releasedGpuStrokeCount,
+      );
       const handle = webGpuCanvasHandleRef.current;
       const activeGpuPlan = gpuLiveInkPinnedRef.current && drawingRef.current
         ? buildGpuLiveStrokePlan(drawingRef.current)
         : null;
       const nextGpuStrokes = activeGpuPlan
-        ? [...pendingGpuStrokesRef.current, ...activeGpuPlan.strokes]
-        : pendingGpuStrokesRef.current;
-      handle?.syncPinnedStrokes(nextGpuStrokes);
-      handle?.setPinnedVisible(nextGpuStrokes.length > 0);
-      gpuPinnedLivePointCountRef.current = activeGpuPlan?.renderedPointCount ?? 0;
+        ? [...nextPendingGpuStrokes, ...activeGpuPlan.strokes]
+        : nextPendingGpuStrokes;
+      const activeJournal = gpuLiveSourceJournalRef.current;
+      const activeDrawing = gpuLiveInkPinnedRef.current ? drawingRef.current : null;
+      if (
+        activeGpuPlan
+        && activeJournal
+        && activeDrawing
+        && activeGpuPlan.renderedPointCount === activeJournal.renderedPointCount
+        && activeGpuLiveSourceJournalMatchesPlan(activeDrawing, activeGpuPlan, activeJournal)
+      ) {
+        // A settled-prefix release changes operation indices, so pay one bounded rebaseline while
+        // preserving the source journal cursor. The next pointer frame remains suffix-only.
+        const outcome = handle?.replacePinnedJournalBaseline(nextGpuStrokes);
+        if (!outcome || outcome.status === "rejected") {
+          const promoted = relinquishGpuLiveInkToKonva(true);
+          return promoted
+            ? { status: "promoted" }
+            : { status: "retained", reason: "journal-rebaseline-rejected" };
+        }
+        acceptedRebaselineRequestId = outcome.requestId;
+      } else if (gpuLiveInkPinnedRef.current && activeJournal) {
+        // A non-prefix active projection cannot continue under the old operation indices. Konva
+        // still has the exact DrawEl, so fail visible instead of feeding a stale journal cursor.
+        const promoted = relinquishGpuLiveInkToKonva(true);
+        return promoted
+          ? { status: "promoted" }
+          : { status: "retained", reason: "journal-identity-mismatch" };
+      } else {
+        handle?.syncPinnedStrokes(nextGpuStrokes);
+      }
     }
+
+    // Mutate every visible FIFO only after the GPU rebaseline has accepted its replacement.
+    // A rejected rebaseline can therefore promote or retain the complete pre-release authority
+    // graph instead of leaving an already-sliced queue behind.
+    if (
+      released.overlay > overlayRenderer.settledStrokeCount
+      || released.draft > draftPreviewStore.settledCount
+    ) {
+      // Imperative GPU adapters are allowed to synchronously publish receipts while accepting a
+      // baseline. Revalidate both Canvas FIFOs after that call and before mutating either one.
+      // Promotion restores the original GPU authority graph; otherwise every original ref and
+      // handoff remains installed for the bounded retained recovery path.
+      const promoted = shouldPlanGpuRelease ? relinquishGpuLiveInkToKonva(true) : false;
+      return promoted
+        ? { status: "promoted" }
+        : { status: "retained", reason: "surface-count-before-release" };
+    }
+    const releasedOverlayCount = overlayRenderer.releaseSettledPrefix(released.overlay);
+    const releasedDraftCount = draftPreviewStore.releaseSettledPrefix(released.draft);
+    if (
+      releasedOverlayCount !== released.overlay
+      || releasedDraftCount !== released.draft
+    ) {
+      return { status: "retained", reason: "surface-release-mismatch" };
+    }
+
+    if (releasedAuthorities?.status === "released") {
+      pendingGpuDrawAuthoritiesRef.current = [...releasedAuthorities.remaining];
+      pendingGpuStrokesRef.current = nextPendingGpuStrokes;
+      if (gpuLingerRafRef.current) globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
+      gpuLingerRafRef.current = 0;
+      if (acceptedRebaselineRequestId !== null) {
+        gpuLiveSourceJournalFirstStrokeIndexRef.current = nextPendingGpuStrokes.length;
+        gpuLiveAcceptedRequestIdRef.current = acceptedRebaselineRequestId;
+        armGpuPinnedRequestWatchdog(acceptedRebaselineRequestId);
+      }
+      const handle = webGpuCanvasHandleRef.current;
+      const activeGpuPlan = gpuLiveInkPinnedRef.current && drawingRef.current
+        ? buildGpuLiveStrokePlan(drawingRef.current)
+        : null;
+      const nextGpuStrokes = activeGpuPlan
+        ? [...nextPendingGpuStrokes, ...activeGpuPlan.strokes]
+        : nextPendingGpuStrokes;
+      handle?.setPinnedVisible(nextGpuStrokes.length > 0);
+    }
+    return { status: "released" };
   }
 
   function scheduleCommittedInkSurfaceHandoffRetry(): void {
@@ -13663,12 +14201,72 @@ function StudioCuttoonEditor() {
     });
   }
 
+  function committedInkRetainedInvariantKey(
+    released: StudioCommittedInkSurfaceCounts,
+    completeGpuElementIds: ReadonlySet<string>,
+    reason: string
+  ): string {
+    const journal = gpuLiveSourceJournalRef.current;
+    return JSON.stringify([
+      "studio-committed-ink-retained-v1",
+      reason,
+      studioRevisionProjectGenerationRef.current,
+      committedInkSurfaceHandoffsRef.current[0] ?? null,
+      released,
+      [...completeGpuElementIds].sort(),
+      liveInkOverlayRendererRef.current.settledStrokeCount,
+      draftPreviewStoreRef.current.settledCount,
+      pendingGpuStrokesRef.current.map((stroke) => stroke.id),
+      pendingGpuDrawAuthoritiesRef.current.map((authority) => [
+        authority.element.id,
+        authority.gpuStrokeCount,
+      ]),
+      journal
+        ? [journal.revision, journal.renderedPointCount, journal.identity]
+        : null,
+    ]);
+  }
+
+  function scheduleCommittedInkRetainedRetry(
+    released: StudioCommittedInkSurfaceCounts,
+    completeGpuElementIds: ReadonlySet<string>,
+    reason: string
+  ): void {
+    if (committedInkSurfaceHandoffRafRef.current || !editorMountedRef.current) return;
+    const revision = studioRevisionProjectGenerationRef.current;
+    const invariantKey = committedInkRetainedInvariantKey(
+      released,
+      completeGpuElementIds,
+      reason
+    );
+    const plan = planStudioCommittedInkRetainedRetry(
+      committedInkRetainedRetryRef.current,
+      { invariantKey, revision }
+    );
+    committedInkRetainedRetryRef.current = plan.state;
+    if (plan.status === "schedule") {
+      scheduleCommittedInkSurfaceHandoffRetry();
+      return;
+    }
+    const warnedKey = JSON.stringify([invariantKey, revision]);
+    if (committedInkRetainedWarnedKeyRef.current === warnedKey) return;
+    committedInkRetainedWarnedKeyRef.current = warnedKey;
+    console.warn(
+      "[studio] committed-ink GPU release stayed retained after bounded recovery — original handoffs and visible authority remain installed until the invariant or scene revision changes.",
+      { reason, revision, attempts: plan.state.attempts }
+    );
+  }
+
   processCommittedInkSurfaceHandoffsRef.current = () => {
     let queue: readonly StudioCommittedInkSurfaceHandoff[] =
       committedInkSurfaceHandoffsRef.current;
-    if (queue.length === 0 || !editorMountedRef.current) return;
+    if (queue.length === 0 || !editorMountedRef.current) {
+      committedInkRetainedRetryRef.current = null;
+      return;
+    }
 
     let released: StudioCommittedInkSurfaceCounts = { overlay: 0, draft: 0, gpu: 0 };
+    const completeGpuElementIds = new Set<string>();
     let retryVisibleDraw = false;
     while (queue.length > 0) {
       const handoff = queue[0]!;
@@ -13718,10 +14316,30 @@ function StudioCuttoonEditor() {
         draft: released.draft + transition.accounting.released.draft,
         gpu: released.gpu + transition.accounting.released.gpu,
       };
+      for (const strokeId of transition.head.strokeIds) completeGpuElementIds.add(strokeId);
     }
 
-    committedInkSurfaceHandoffsRef.current = [...queue];
-    releaseCommittedInkSurfaceCounts(released);
+    const releaseOutcome = releaseCommittedInkSurfaceCounts(released, completeGpuElementIds);
+    if (releaseOutcome.status === "released") {
+      committedInkRetainedRetryRef.current = null;
+      // Whole-group normalization belongs to the completed handoff whose semantic DrawEl evidence
+      // authorized it. A later handoff still reserves its own independent GPU operation prefix.
+      committedInkSurfaceHandoffsRef.current = [...queue];
+    } else if (releaseOutcome.status === "promoted") {
+      committedInkRetainedRetryRef.current = null;
+      // Promotion rewrote the still-installed original handoffs from GPU to draft authority.
+      // Re-run synchronously so the already-proven main-layer draw retires that exact Konva prefix
+      // before the browser can paint one frame with both committed and promoted copies.
+      processCommittedInkSurfaceHandoffsRef.current();
+      return;
+    } else {
+      scheduleCommittedInkRetainedRetry(
+        released,
+        completeGpuElementIds,
+        releaseOutcome.reason
+      );
+      return;
+    }
     if (retryVisibleDraw) scheduleCommittedInkSurfaceHandoffRetry();
   };
 
@@ -20462,10 +21080,7 @@ function StudioCuttoonEditor() {
       globalThis.cancelAnimationFrame(liveDraftRafRef.current);
       liveDraftRafRef.current = null;
     }
-    if (gpuPinProbeTimerRef.current) {
-      globalThis.clearTimeout(gpuPinProbeTimerRef.current);
-      gpuPinProbeTimerRef.current = null;
-    }
+    cancelGpuPinnedRequestWatchdog();
     if (gpuLingerRafRef.current) {
       globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
       gpuLingerRafRef.current = 0;
@@ -20473,7 +21088,12 @@ function StudioCuttoonEditor() {
     liveDraftDirectRef.current = false;
     liveStampDraftDirectRef.current = false;
     gpuLiveInkPinnedRef.current = false;
-    gpuPinnedLivePointCountRef.current = 0;
+    gpuLiveSourceJournalRef.current = null;
+    gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
+    gpuLiveOperationOrderKeyRef.current = null;
+    gpuLiveAcceptedRequestIdRef.current = null;
+    gpuFinalReceiptFallbackStrokeRef.current = null;
+    gpuFinalReceiptRequestIdRef.current = null;
     liveInkOverlayRendererRef.current.resetActive();
     liveStampOverlayRendererRef.current.resetActive();
     endPredictedInkTail();
@@ -21410,13 +22030,15 @@ function StudioCuttoonEditor() {
         // 도착하지 않으면(조용히 실패하는 GPU 환경) 같은 스트로크 안에서 Konva 로 인계된다.
         // (미드스트로크 스크린샷 검증 완료 — drawImage 기반 픽셀 판정은 WebGPU 캔버스에서
         // 위음성을 내므로 합성 스크린샷/영수증으로만 판정한다.)
-        const gpuStartPlan = STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu"
+        const gpuStartEligible = STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu"
           && webGpuBackendRef.current === "webgpu"
           && gpuLiveStrokePlannerRef.current !== null
           && !pixelDirect
-          && isDirectLiveDraftEl(next)
-          ? buildGpuLiveStrokePlan(next)
+          && isDirectLiveDraftEl(next);
+        gpuLiveOperationOrderKeyRef.current = gpuStartEligible
+          ? nextGpuLiveOperationOrderKey()
           : null;
+        const gpuStartPlan = gpuStartEligible ? buildGpuLiveStrokePlan(next) : null;
         const liveInkBackendDecision = decideStudioLiveInkBackend({
           preference: STUDIO_VISIBLE_LIVE_INK_PREFERENCE,
           resolvedBackend: webGpuBackendRef.current,
@@ -21430,7 +22052,15 @@ function StudioCuttoonEditor() {
           symmetryType: next.symmetry?.type ?? "none",
           preparedStroke: gpuStartPlan?.preparation,
         });
-        const gpuPin = liveInkBackendDecision.backend === "webgpu";
+        let gpuPin = liveInkBackendDecision.backend === "webgpu";
+        gpuLiveSourceJournalRef.current = null;
+        gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
+        if (gpuPin && (!gpuStartPlan || !beginGpuLiveSourceJournal(next, gpuStartPlan))) {
+          // The exact Konva draft remains authoritative when the compact journal cannot establish
+          // its one-time root. Do not let a nominal WebGPU decision hide that visible fallback.
+          gpuPin = false;
+          gpuLiveOperationOrderKeyRef.current = null;
+        }
         const direct = pixelDirect || overlayDirect || gpuPin;
         liveDraftDirectRef.current = direct;
         liveStampDraftDirectRef.current = stampDirect;
@@ -21452,7 +22082,6 @@ function StudioCuttoonEditor() {
           causalPostCorrectionEligible,
           nativePredictionEligible: predictionTailEligible,
         });
-        gpuPinnedLivePointCountRef.current = 0;
         // 파인 가시성은 자식 컴포넌트만 갱신한다 — 대기(지연 커밋) GPU 잉크가 있으면 유지.
         webGpuCanvasHandleRef.current?.setPinnedVisible(
           gpuPin || pendingGpuStrokesRef.current.length > 0
@@ -21477,22 +22106,11 @@ function StudioCuttoonEditor() {
           // 다른 렌더러를 쓰는 새 획도 이전 커밋의 draw 영수증 대기 잉크를 지우면 안 된다.
           liveInkOverlayRendererRef.current.resetActive();
         }
-        gpuPinnedFrameSeenRef.current = false;
-        if (gpuPinProbeTimerRef.current) clearTimeout(gpuPinProbeTimerRef.current);
-        gpuPinProbeTimerRef.current = gpuPin
-          ? setTimeout(() => {
-              gpuPinProbeTimerRef.current = null;
-              if (!gpuLiveInkPinnedRef.current || gpuPinnedFrameSeenRef.current) return;
-              // fail-once: 이 스트로크의 남은 구간과 이후 스트로크는 Konva 가 전담한다.
-              gpuLiveInkPinnedRef.current = false;
-              gpuPinnedLivePointCountRef.current = 0;
-              webGpuBackendRef.current = "canvas2d";
-              webGpuCanvasHandleRef.current?.setPinnedVisible(
-                pendingGpuStrokesRef.current.length > 0
-              );
-              liveDraftLayerRef.current?.batchDraw();
-            }, 300)
-          : null;
+        if (gpuPin && gpuLiveAcceptedRequestIdRef.current) {
+          beginGpuPinnedReceiptEpoch(gpuLiveAcceptedRequestIdRef.current);
+        } else {
+          cancelGpuPinnedRequestWatchdog();
+        }
         if (gpuLingerRafRef.current) {
           globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
           gpuLingerRafRef.current = 0;
@@ -22079,20 +22697,12 @@ function StudioCuttoonEditor() {
         !drawingPredictionPreviewRef.current
         || drawingPredictionBatchMutationRef.current
       );
-    // current.points가 지난 호출에서 우리가 만들어 넘긴 바로 그 배열이면(같은 스트로크가 계속
-    // 이어지는 중이면) 다시 복제하지 않고 그대로 이어붙인다 — 매 호출 전체 복제는 긴 스트로크에서
-    // O(n²)이 된다. 바깥 DrawEl(next)은 그래도 매 호출 새 객체라 scheduleDraft의 참조 비교 변경
-    // 감지는 그대로 유효하다.
-    // gpuLiveInkPinnedRef가 켜져 있는 동안 flushDirectLiveDraft가 이 points 배열을 그대로(clone
-    // 없이) trustedImmutable=true 로 잡아 handle.appendPinnedStrokeSuffix로 비동기 WebGPU 큐에
-    // 넘기는 "그 순간"부터는 절대 이어붙이면 안 된다 — 다만 핀이 켜져 있다는 사실 자체가 아니라
-    // gpuLiveInkExposedPointsRef로 실제 노출 여부를 추적한다(task #27: 핀 플래그 하나로만 판단하면
-    // 핀이 켜진 매 호출마다 무조건 새로 복제해야 했다). 노출이 정확히 몇 번, 어떤 호출 경로로
-    // 일어나는지는 이 판단과 무관하다 — 매 호출 참조 동일성을 다시 확인하므로 노출 전까지는 계속
-    // 안전하게 이어붙일 수 있고, 실제로 노출된 바로 그 배열과 일치할 때만 새로 복제한다.
+    // current.points가 지난 호출에서 우리가 만든 배열이면 같은 스트로크 동안 그대로 이어붙인다.
+    // WebGPU journal은 매 프레임 동결된 새 접미사만 보관하고 이 원본 배열을 노출하지 않으므로,
+    // GPU 파인 중에도 전체 prefix 복제 없이 O(새 샘플 수)로 진행할 수 있다. 바깥 DrawEl(next)은
+    // 매 호출 새 객체라 scheduleDraft의 참조 기반 변경 감지는 그대로 유지된다.
     const ownsCurrentArrays = !mutateDirectly
-      && current.points === drawingFixedRateOwnedPointsRef.current
-      && current.points !== gpuLiveInkExposedPointsRef.current;
+      && current.points === drawingFixedRateOwnedPointsRef.current;
     const reuseOrClone = <T,>(shouldTrack: boolean, arr: T[] | undefined): T[] | undefined => {
       if (!shouldTrack || !arr) return arr;
       return ownsCurrentArrays ? arr : [...arr];
@@ -22404,21 +23014,24 @@ function StudioCuttoonEditor() {
       aligned.push(value);
       return aligned;
     };
-    // Canvas2D authoritative overlay는 ref 전용 draft를 소비한다. 이 경로에서는 배열 참조를
-    // React 상태/히스토리에 게시하지 않으므로 접미 샘플을 제자리 추가해 긴 획의 매 포인트
-    // 전체 points/pressure 복사(O(N²))를 없앤다. GPU/예측/비다이렉트 경로는 immutable 유지.
+    // Canvas2D authoritative overlay와 compact GPU journal은 ref 전용 draft를 소비한다. GPU도
+    // 동결한 접미사만 큐에 넘기므로 원본 배열 참조는 외부에 게시되지 않는다. 두 경로 모두 새
+    // 샘플을 제자리 추가해 긴 획의 매 포인트 전체 points/pressure 복사(O(N²))를 없앤다.
     const canAppendDirectly = (
       (
         (
           (liveDraftDirectRef.current && liveInkOverlayRendererRef.current.isActive)
           || (liveDraftDirectRef.current && isStudioPixelPencilRenderMode(current.brush))
           || (liveStampDraftDirectRef.current && liveStampOverlayRendererRef.current.isActive)
+          || (
+            liveDraftDirectRef.current
+            && gpuLiveInkPinnedRef.current
+            && gpuLiveSourceJournalRef.current !== null
+          )
         )
-        && !gpuLiveInkPinnedRef.current
       )
       // These batches already cloned one private draft before their loop. Reusing that owned
-      // array turns N coalesced hardware samples into one prefix copy, including the opt-in WebGPU
-      // path whose previous array may be retained by an asynchronous recovery command.
+      // array turns N coalesced hardware samples into one prefix copy for non-journal paths.
       || drawingImmediateBatchMutationRef.current
       || drawingPredictionBatchMutationRef.current
     )
@@ -22545,13 +23158,16 @@ function StudioCuttoonEditor() {
         && liveStampOverlayRendererRef.current.isActive
       )
     );
-    const immediateBatchMutation = shouldOwnStudioCoalescedBatchDraft({
-      authoritativeSampleCount: batch.authoritative.length,
-      gpuPinned: gpuLiveInkPinnedRef.current,
-      fixedRateFilterActive: drawingFixedRateFilterRef.current !== null,
-      immediateCausalInput: drawingImmediateCausalInputRef.current,
-      mutableDirectSurfaceActive,
-    });
+    const compactGpuSourceJournalActive = gpuLiveInkPinnedRef.current
+      && gpuLiveSourceJournalRef.current !== null;
+    const immediateBatchMutation = !compactGpuSourceJournalActive
+      && shouldOwnStudioCoalescedBatchDraft({
+        authoritativeSampleCount: batch.authoritative.length,
+        gpuPinned: gpuLiveInkPinnedRef.current,
+        fixedRateFilterActive: drawingFixedRateFilterRef.current !== null,
+        immediateCausalInput: drawingImmediateCausalInputRef.current,
+        mutableDirectSurfaceActive,
+      });
     if (immediateBatchMutation && drawingRef.current) {
       const current = drawingRef.current;
       // Clone once per browser delivery, then append every coalesced sample into that private
@@ -22793,7 +23409,9 @@ function StudioCuttoonEditor() {
       ) return;
       const stage = stageRef.current;
       if (!stage) return;
-      const coordinateMapper = stagePointerFrameMapperCacheRef.current!.mapperFor(stage);
+      const pointerMapperCache = stagePointerFrameMapperCacheRef.current;
+      if (!pointerMapperCache) return;
+      const coordinateMapper = pointerMapperCache.mapperFor(stage);
       const contactPoint = coordinateMapper.pointFor(pointerEvent);
       consumeFreehandPointerBatch(
         stage,
@@ -22826,7 +23444,9 @@ function StudioCuttoonEditor() {
       ) return;
       const stage = stageRef.current;
       if (!stage) return;
-      const coordinateMapper = stagePointerFrameMapperCacheRef.current!.mapperFor(stage);
+      const pointerMapperCache = stagePointerFrameMapperCacheRef.current;
+      if (!pointerMapperCache) return;
+      const coordinateMapper = pointerMapperCache.mapperFor(stage);
       const contactPoint = coordinateMapper.pointFor(pointerEvent);
       const rawState = rawPenInkPreviewStateRef.current;
       if (rawState && contactPoint) {
@@ -23356,6 +23976,7 @@ function StudioCuttoonEditor() {
       isometricAxisRayRef.current = null;
       advancedRulerSnapRef.current = null;
       scheduleLiveDrawPressure(null);
+      gpuFinalFallbackOrderIdsRef.current = immediateSurfaceHandoff?.strokeIds ?? null;
       clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup });
       if (immediateSurfaceHandoff) {
         queueCommittedStrokeSurfaceHandoff(
@@ -27504,6 +28125,7 @@ function StudioCuttoonEditor() {
   const studioCanvasViewportHandlers = useStudioStableHandlers<StudioCanvasViewportHandlers>({
   addPage,
   fitCanvasToWidth,
+  onWebGpuFrameInvalid,
   onWebGpuFrameReady,
   onWebGpuDeviceLost,
   onWebGpuBackendChange,
@@ -28543,7 +29165,6 @@ function StudioCuttoonEditor() {
           setTranslateTargetLocale={setTranslateTargetLocale}
           setTutorialHubOpen={setTutorialHubOpen}
           setUserGuides={setUserGuides}
-          setWebGpuAuthority={setWebGpuAuthority}
           setZoom={setZoom}
           shapeFill={shapeFill}
           shortcutsOpen={shortcutsOpen}
@@ -29477,7 +30098,8 @@ function StudioCuttoonEditor() {
 interface StudioCanvasViewportHandlers {
   addPage: () => void;
   fitCanvasToWidth: () => void;
-  onWebGpuFrameReady: () => void;
+  onWebGpuFrameInvalid: () => void;
+  onWebGpuFrameReady: (receipt: StudioGpuFrameReceipt) => void;
   onWebGpuDeviceLost: () => void;
   onWebGpuBackendChange: (backend: StudioGpuBackend) => void;
   setWebGpuCanvasHandle: (handle: StudioWebGpuCanvasHandle | null) => void;
@@ -29762,7 +30384,6 @@ interface StudioCanvasViewportProps {
   setTranslateTargetLocale: import("react").Dispatch<import("react").SetStateAction<string>>;
   setTutorialHubOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setUserGuides: import("react").Dispatch<import("react").SetStateAction<{ id: string; type: "v" | "h"; pos: number; }[]>>;
-  setWebGpuAuthority: import("react").Dispatch<import("react").SetStateAction<StudioWebGpuAuthorityFrame | null>>;
   setZoom: import("react").Dispatch<import("react").SetStateAction<number>>;
   shapeFill: boolean;
   shortcutsOpen: boolean;
@@ -30035,7 +30656,6 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   setTranslateTargetLocale,
   setTutorialHubOpen,
   setUserGuides,
-  setWebGpuAuthority,
   setZoom,
   shapeFill,
   shortcutsOpen,
@@ -30198,6 +30818,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     setWebGpuCanvasHandle,
     onWebGpuBackendChange,
     onWebGpuDeviceLost,
+    onWebGpuFrameInvalid,
     onWebGpuFrameReady,
   } = stableHandlers;
   function splitDialogueText(pageId: string, elementId: string, text: string, offset: number) {
@@ -31724,7 +32345,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 eagerInitialize
                 onBackendChange={onWebGpuBackendChange}
                 onDeviceLost={onWebGpuDeviceLost}
-                onFrameInvalid={() => setWebGpuAuthority(null)}
+                onFrameInvalid={onWebGpuFrameInvalid}
                 onFrameReady={onWebGpuFrameReady}
               />
             </Suspense>

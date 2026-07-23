@@ -52,7 +52,7 @@ function memoryStorage(): StudioCompanionWindowLayoutStorage & { values: Map<str
 }
 
 function captured(
-  surface: "workspace" | "navigator" | "review" = "navigator",
+  surface: "workspace" | "navigator" | "review" | "reference" = "navigator",
   screens: readonly unknown[] = [primary, leftExternal],
   currentScreen: unknown = leftExternal
 ) {
@@ -78,15 +78,17 @@ describe("studio companion window layout persistence", () => {
       "workspace",
       "navigator",
       "review",
+      "reference",
     ]);
     const keys = STUDIO_COMPANION_WINDOW_LAYOUT_SURFACES.map(
       studioCompanionWindowLayoutStorageKey
     );
-    expect(new Set(keys).size).toBe(3);
+    expect(new Set(keys).size).toBe(4);
     expect(keys).toEqual([
       "toonspectrum.studio.companion-window-layout.v1.workspace",
       "toonspectrum.studio.companion-window-layout.v1.navigator",
       "toonspectrum.studio.companion-window-layout.v1.review",
+      "toonspectrum.studio.companion-window-layout.v1.reference",
     ]);
     expect(() => studioCompanionWindowLayoutStorageKey("future" as "workspace"))
       .toThrow(TypeError);
@@ -256,13 +258,16 @@ describe("studio companion window layout persistence", () => {
     const storage = memoryStorage();
     const navigatorKey = studioCompanionWindowLayoutStorageKey("navigator");
     const reviewKey = studioCompanionWindowLayoutStorageKey("review");
+    const referenceKey = studioCompanionWindowLayoutStorageKey("reference");
     storage.values.set(navigatorKey, JSON.stringify(captured("navigator")));
     storage.values.set(reviewKey, JSON.stringify(captured("review")));
+    storage.values.set(referenceKey, JSON.stringify(captured("reference")));
 
     expect(clearStudioCompanionWindowLayout(storage, "navigator"))
       .toEqual({ status: "cleared", failure: null });
     expect(storage.values.has(navigatorKey)).toBe(false);
     expect(storage.values.has(reviewKey)).toBe(true);
+    expect(storage.values.has(referenceKey)).toBe(true);
     expect(clearStudioCompanionWindowLayout({
       getItem: () => "still-there",
       setItem: () => undefined,
@@ -301,6 +306,31 @@ describe("studio companion window layout capture and matching", () => {
     expect(placement!.top).toBeGreaterThanOrEqual(leftExternal.availTop);
     expect(placement!.top + placement!.height)
       .toBeLessThanOrEqual(leftExternal.availTop + leftExternal.availHeight);
+  });
+
+  it("applies the reference window's 320x360 minimum while keeping its layout role-local", () => {
+    const layout = captureStudioCompanionWindowLayout({
+      surface: "reference",
+      now: NOW,
+      screens: [primary],
+      currentScreen: primary,
+      windowMetrics: {
+        screenX: 120,
+        screenY: 80,
+        outerWidth: 100,
+        outerHeight: 100,
+      },
+    });
+
+    expect(layout).toMatchObject({
+      surface: "reference",
+      outerSize: { width: 320, height: 360 },
+    });
+    expect(parseStudioCompanionWindowLayout(
+      JSON.stringify(layout),
+      "review",
+      { now: NOW }
+    )).toBeNull();
   });
 
   it("matches a uniquely identifiable screen after screen-array reordering", () => {

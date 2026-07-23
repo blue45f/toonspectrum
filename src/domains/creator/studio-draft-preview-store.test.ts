@@ -82,4 +82,23 @@ describe("StudioDraftPreviewStore", () => {
     store.setActive(draw("after-unsubscribe"));
     expect(listener).toHaveBeenCalledTimes(4);
   });
+
+  it("replaces a settled authority queue atomically without dropping the active draft", () => {
+    const store = new StudioDraftPreviewStore();
+    const active = draw("active");
+    const first = draw("first");
+    const second = draw("second");
+    const listener = vi.fn();
+    store.subscribe(listener);
+    store.setActive(active);
+
+    store.replaceSettled([first, second]);
+    expect(store.getSnapshot()).toEqual({ active, settled: [first, second] });
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    const snapshot = store.getSnapshot();
+    store.replaceSettled(snapshot.settled);
+    expect(store.getSnapshot()).toBe(snapshot);
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
 });

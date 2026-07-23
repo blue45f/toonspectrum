@@ -33,6 +33,7 @@ describe("StudioCompanionWindowLayoutControls", () => {
       { surface: "workspace", heading: "작업공간 창 배치" },
       { surface: "navigator", heading: "Navigator 창 배치" },
       { surface: "review", heading: "검수 창 배치" },
+      { surface: "reference", heading: "레퍼런스 창 배치" },
     ];
 
     for (const roleCase of cases) {

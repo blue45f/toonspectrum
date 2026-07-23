@@ -107,6 +107,12 @@ export type StudioCompanionReferenceObjectUrlApi = {
   revokeObjectURL: (url: string) => void;
 };
 
+export type StudioCompanionReferenceWebpHeader = Readonly<{
+  format: "vp8" | "vp8l" | "vp8x";
+  width: number;
+  height: number;
+}>;
+
 type ExactOwnData = Readonly<Record<string, unknown>>;
 
 function exactOwnData(value: unknown, expectedKeys: readonly string[]): ExactOwnData | null {
@@ -187,6 +193,109 @@ function intrinsicBlobMetadata(value: unknown): { size: number; type: string } |
     return typeof size === "number" && typeof type === "string" ? { size, type } : null;
   } catch {
     return null;
+  }
+}
+
+function ascii(bytes: Uint8Array, offset: number, value: string): boolean {
+  if (offset < 0 || offset + value.length > bytes.byteLength) return false;
+  for (let index = 0; index < value.length; index += 1) {
+    if (bytes[offset + index] !== value.charCodeAt(index)) return false;
+  }
+  return true;
+}
+
+function uint24LittleEndian(bytes: Uint8Array, offset: number): number {
+  return bytes[offset]! | (bytes[offset + 1]! << 8) | (bytes[offset + 2]! << 16);
+}
+
+/** Parses only the bounded WebP container/header needed before browser image decoding. */
+export function parseStudioCompanionReferenceWebpHeader(
+  bytes: Uint8Array,
+  totalBytes: number
+): StudioCompanionReferenceWebpHeader | null {
+  try {
+    if (
+      !(bytes instanceof Uint8Array)
+      || bytes.byteLength < 25
+      || !safePositiveInteger(totalBytes)
+      || totalBytes > STUDIO_COMPANION_REFERENCE_MAX_BYTES
+      || !ascii(bytes, 0, "RIFF")
+      || !ascii(bytes, 8, "WEBP")
+    ) return null;
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const riffPayloadBytes = view.getUint32(4, true);
+    const chunkPayloadBytes = view.getUint32(16, true);
+    if (
+      riffPayloadBytes + 8 !== totalBytes
+      || chunkPayloadBytes + 20 > totalBytes
+    ) return null;
+
+    let format: StudioCompanionReferenceWebpHeader["format"];
+    let width: number;
+    let height: number;
+    if (ascii(bytes, 12, "VP8X")) {
+      if (chunkPayloadBytes !== 10 || bytes.byteLength < 30) return null;
+      format = "vp8x";
+      width = uint24LittleEndian(bytes, 24) + 1;
+      height = uint24LittleEndian(bytes, 27) + 1;
+    } else if (ascii(bytes, 12, "VP8L")) {
+      if (chunkPayloadBytes < 5 || bytes.byteLength < 25 || bytes[20] !== 0x2f) return null;
+      const packed = view.getUint32(21, true);
+      format = "vp8l";
+      width = (packed & 0x3fff) + 1;
+      height = ((packed >>> 14) & 0x3fff) + 1;
+    } else if (ascii(bytes, 12, "VP8 ")) {
+      if (
+        chunkPayloadBytes < 10
+        || bytes.byteLength < 30
+        || bytes[23] !== 0x9d
+        || bytes[24] !== 0x01
+        || bytes[25] !== 0x2a
+      ) return null;
+      format = "vp8";
+      width = view.getUint16(26, true) & 0x3fff;
+      height = view.getUint16(28, true) & 0x3fff;
+    } else {
+      return null;
+    }
+    if (
+      !safePositiveInteger(width)
+      || !safePositiveInteger(height)
+      || Math.max(width, height) > STUDIO_COMPANION_REFERENCE_MAX_EDGE
+      || width * height > STUDIO_COMPANION_REFERENCE_MAX_PIXELS
+    ) return null;
+    return Object.freeze({ format, width, height });
+  } catch {
+    return null;
+  }
+}
+
+/** Reads at most 30 bytes and rejects spoofed dimensions before a Blob reaches the image decoder. */
+export async function verifyStudioCompanionReferenceWebpBlob(
+  value: unknown,
+  expectedWidth: number,
+  expectedHeight: number
+): Promise<boolean> {
+  const metadata = intrinsicBlobMetadata(value);
+  if (
+    metadata === null
+    || metadata.type !== "image/webp"
+    || metadata.size < 25
+    || metadata.size > STUDIO_COMPANION_REFERENCE_MAX_BYTES
+    || !safePositiveInteger(expectedWidth)
+    || !safePositiveInteger(expectedHeight)
+  ) return false;
+  try {
+    const blobPrototype = Blob.prototype;
+    const head = Reflect.apply(blobPrototype.slice, value, [0, Math.min(30, metadata.size)]) as Blob;
+    const buffer = await Reflect.apply(blobPrototype.arrayBuffer, head, []) as ArrayBuffer;
+    const parsed = parseStudioCompanionReferenceWebpHeader(
+      new Uint8Array(buffer),
+      metadata.size
+    );
+    return parsed?.width === expectedWidth && parsed.height === expectedHeight;
+  } catch {
+    return false;
   }
 }
 
@@ -502,6 +611,18 @@ export class StudioCompanionReferenceObjectUrlOwner {
 
   ownedCount(): number {
     return Number(this.currentValue !== null) + Number(this.pendingValue !== null);
+  }
+
+  /** Wire-safe staging path: validates the RIFF/WebP header before allocating an object URL. */
+  async stageVerified(frame: unknown): Promise<StudioCompanionReferenceObjectUrlHandle | null> {
+    const parsedFrame = parseStudioCompanionReferencePreviewFrame(frame);
+    if (!parsedFrame) return null;
+    if (!(await verifyStudioCompanionReferenceWebpBlob(
+      parsedFrame.blob,
+      parsedFrame.width,
+      parsedFrame.height
+    ))) return null;
+    return this.stage(parsedFrame);
   }
 
   stage(frame: unknown): StudioCompanionReferenceObjectUrlHandle | null {

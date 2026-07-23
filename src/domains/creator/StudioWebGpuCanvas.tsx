@@ -3,7 +3,11 @@ import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, us
 import { resolveStudioLiveSurfaceDevicePixelRatio } from "./studio-low-latency-canvas";
 import { resolveStudioWebGpuCanvasStrokes } from "./studio-webgpu-canvas-authority";
 import { isStudioWebGpuCanvasActive } from "./studio-webgpu-dab-planner";
-import { StudioWebGpuEngine } from "./studio-webgpu-engine";
+import {
+  StudioWebGpuEngine,
+  type StudioGpuStrokeJournalSuffixBatchPatch,
+  type StudioGpuStrokeJournalSuffixPatch,
+} from "./studio-webgpu-engine";
 import {
   sameStudioGpuStrokes,
   snapshotStudioGpuStrokes,
@@ -91,10 +95,22 @@ export interface StudioWebGpuCanvasHandle {
   readonly appendPinnedStrokeSuffix: (patch: StudioGpuStrokeSuffixPatch) => void;
   /** Appends a terminal symmetry group's suffixes atomically and submits exactly one frame. */
   readonly appendPinnedStrokeSuffixBatch: (patch: StudioGpuStrokeSuffixBatchPatch) => void;
+  /** Suffix-only journal path; the engine binds its private revision receipt at execution time. */
+  readonly appendPinnedJournalSuffix: (
+    patch: StudioGpuStrokeJournalSuffixPatch
+  ) => StudioWebGpuJournalFeedOutcome;
+  /** Atomically advances a journal symmetry group without constructing full fallback strokes. */
+  readonly appendPinnedJournalSuffixBatch: (
+    patch: StudioGpuStrokeJournalSuffixBatchPatch
+  ) => StudioWebGpuJournalFeedOutcome;
   /** Appends newly-started operations while retaining earlier normal/erase pixels in place. */
   readonly appendPinnedStrokeOperations: (patch: StudioGpuStrokeOperationsAppendPatch) => void;
   /** Replaces the pinned baseline and deliberately pays one full validation/snapshot cost. */
   readonly replacePinnedStrokes: (strokes: readonly StudioGpuStroke[]) => void;
+  /** Starts a root-only journal feed; subsequent journal calls retain no caller full history. */
+  readonly replacePinnedJournalBaseline: (
+    strokes: readonly StudioGpuStroke[]
+  ) => StudioWebGpuJournalFeedOutcome;
   /** Clears pinned pixels while keeping the initialized backend warm. */
   readonly resetPinnedStrokes: () => void;
   /**
@@ -103,6 +119,12 @@ export interface StudioWebGpuCanvasHandle {
    * host page's render cost.
    */
   readonly setPinnedVisible: (visible: boolean) => void;
+}
+
+/** Synchronous admission plus the exact receipt identity for a no-fallback journal command. */
+export interface StudioWebGpuJournalFeedOutcome {
+  readonly status: "accepted" | "rejected";
+  readonly requestId: string;
 }
 
 interface LatestCanvasProps {
@@ -123,11 +145,24 @@ interface LatestCanvasProps {
 type StudioGpuEngineFeedCommand =
   | { readonly mode: "full" }
   | { readonly mode: "replace" }
+  | { readonly mode: "journal-replace" }
   | { readonly mode: "append-operations"; readonly patch: StudioGpuStrokeOperationsAppendPatch }
   | { readonly mode: "append"; readonly patch: StudioGpuStrokeSuffixPatch }
   | { readonly mode: "append-batch"; readonly patch: StudioGpuStrokeSuffixBatchPatch }
+  | { readonly mode: "journal-append"; readonly patch: StudioGpuStrokeJournalSuffixPatch }
+  | { readonly mode: "journal-append-batch"; readonly patch: StudioGpuStrokeJournalSuffixBatchPatch }
   | { readonly mode: "retain" }
   | { readonly mode: "reset" };
+
+function resumedPinnedFeedCommand(
+  pinnedStrokes: readonly StudioGpuStroke[] | null,
+  journalActive: boolean,
+  currentStrokes: readonly StudioGpuStroke[]
+): StudioGpuEngineFeedCommand {
+  if (pinnedStrokes === null) return { mode: "full" };
+  if (journalActive) return { mode: "retain" };
+  return currentStrokes.length > 0 ? { mode: "replace" } : { mode: "reset" };
+}
 
 function sameCanvasRequest(left: LatestCanvasProps, right: LatestCanvasProps): boolean {
   return Object.is(left.width, right.width)
@@ -202,9 +237,10 @@ function StudioWebGpuCanvas({
   const requestSequenceRef = useRef(0);
   const desiredRequestIdRef = useRef("frame:0");
   const lastIssuedRequestRef = useRef<LatestCanvasProps | null>(null);
-  const issueLatestRequestRef = useRef<(() => void) | null>(null);
+  const issueLatestRequestRef = useRef<(() => StudioWebGpuJournalFeedOutcome) | null>(null);
   const pendingEngineCommandRef = useRef<StudioGpuEngineFeedCommand>({ mode: "full" });
   const pinnedStrokesRef = useRef<readonly StudioGpuStroke[] | null>(null);
+  const pinnedJournalActiveRef = useRef(false);
   const declarativeRequestRef = useRef<LatestCanvasProps>({
     width,
     height,
@@ -260,6 +296,18 @@ function StudioWebGpuCanvas({
     issueLatestRequestRef.current?.();
   };
 
+  const queuePinnedJournalRequest = (
+    command: StudioGpuEngineFeedCommand
+  ): StudioWebGpuJournalFeedOutcome => {
+    pendingEngineCommandRef.current = command;
+    requestSequenceRef.current += 1;
+    desiredRequestIdRef.current = `frame:${requestSequenceRef.current}`;
+    return issueLatestRequestRef.current?.() ?? {
+      status: "rejected",
+      requestId: desiredRequestIdRef.current,
+    };
+  };
+
   useImperativeHandle(ref, () => ({
     captureFrame: (request) => engineRef.current?.captureFrame(request) ?? Promise.resolve({
       status: "rejected",
@@ -268,6 +316,7 @@ function StudioWebGpuCanvas({
     getPerformanceMetrics: () =>
       engineRef.current?.getPerformanceMetrics() ?? EMPTY_PERFORMANCE_METRICS,
     syncPinnedStrokes: (nextStrokes) => {
+      pinnedJournalActiveRef.current = false;
       const update = planStudioGpuPinnedStrokeFeedUpdate(
         pinnedStrokesRef.current,
         nextStrokes
@@ -285,26 +334,59 @@ function StudioWebGpuCanvas({
       }
     },
     appendPinnedStrokeSuffix: (patch) => {
+      pinnedJournalActiveRef.current = false;
       queuePinnedRequest(patch.fallbackStrokes, { mode: "append", patch });
     },
     appendPinnedStrokeSuffixBatch: (patch) => {
+      pinnedJournalActiveRef.current = false;
       queuePinnedRequest(patch.fallbackStrokes, { mode: "append-batch", patch });
     },
+    appendPinnedJournalSuffix: (patch) => {
+      pinnedJournalActiveRef.current = true;
+      const outcome = queuePinnedJournalRequest({ mode: "journal-append", patch });
+      if (outcome.status === "rejected") pinnedJournalActiveRef.current = false;
+      return outcome;
+    },
+    appendPinnedJournalSuffixBatch: (patch) => {
+      pinnedJournalActiveRef.current = true;
+      const outcome = queuePinnedJournalRequest({ mode: "journal-append-batch", patch });
+      if (outcome.status === "rejected") pinnedJournalActiveRef.current = false;
+      return outcome;
+    },
     appendPinnedStrokeOperations: (patch) => {
+      pinnedJournalActiveRef.current = false;
       queuePinnedRequest(patch.fallbackStrokes, { mode: "append-operations", patch });
     },
     replacePinnedStrokes: (nextStrokes) => {
+      pinnedJournalActiveRef.current = false;
       queuePinnedRequest(nextStrokes, nextStrokes.length > 0
         ? { mode: "replace" }
         : { mode: "reset" });
     },
-    resetPinnedStrokes: () => queuePinnedRequest(EMPTY_STROKES, { mode: "reset" }),
+    replacePinnedJournalBaseline: (nextStrokes) => {
+      pinnedJournalActiveRef.current = nextStrokes.length > 0;
+      pinnedStrokesRef.current = nextStrokes;
+      latestEffectiveRequestRef.current = {
+        ...declarativeRequestRef.current,
+        strokes: nextStrokes,
+      };
+      const outcome = queuePinnedJournalRequest(nextStrokes.length > 0
+        ? { mode: "journal-replace" }
+        : { mode: "reset" });
+      if (outcome.status === "rejected") pinnedJournalActiveRef.current = false;
+      return outcome;
+    },
+    resetPinnedStrokes: () => {
+      pinnedJournalActiveRef.current = false;
+      queuePinnedRequest(EMPTY_STROKES, { mode: "reset" });
+    },
     setPinnedVisible: (visible) => {
       if (!visible && pinnedStrokesRef.current !== null) {
         // Pin release is an authority transition, not just a CSS visibility change. Restore the
         // newest declarative request immediately even when React can bail out of an unchanged
         // `false` state update (for example, a GPU failover before visibility state commits).
         pinnedStrokesRef.current = null;
+        pinnedJournalActiveRef.current = false;
         const latest = declarativeRequestRef.current;
         latestEffectiveRequestRef.current = latest;
         lastIssuedRequestRef.current = snapshotCanvasRequest(latest);
@@ -375,14 +457,16 @@ function StudioWebGpuCanvas({
       void engine.initialize().then(() => {
         if (!mounted || engineRef.current !== engine) return;
         const current = latestEffectiveRequestRef.current;
-        pendingEngineCommandRef.current = pinnedStrokesRef.current !== null
-          ? (current.strokes.length > 0 ? { mode: "replace" } : { mode: "reset" })
-          : { mode: "full" };
+        pendingEngineCommandRef.current = resumedPinnedFeedCommand(
+          pinnedStrokesRef.current,
+          pinnedJournalActiveRef.current,
+          current.strokes
+        );
         issueLatestRequestRef.current?.();
       });
     };
 
-    const issueLatestRequest = () => {
+    const issueLatestRequest = (): StudioWebGpuJournalFeedOutcome => {
       const latest = latestEffectiveRequestRef.current;
       const requestId = desiredRequestIdRef.current;
       const command = pendingEngineCommandRef.current;
@@ -393,23 +477,34 @@ function StudioWebGpuCanvas({
         || (requiresFullValidation && !isStudioWebGpuCanvasActive(latest.strokes))
       ) {
         engine.resetStrokeFeed(requestId);
-        return;
+        return { status: "accepted", requestId };
       }
       syncViewport();
+      let journalOutcome: StudioWebGpuJournalFeedOutcome["status"] = "accepted";
       if (command.mode === "append") {
         engine.appendStrokeFeedSuffix(command.patch, requestId);
       } else if (command.mode === "append-batch") {
         engine.appendStrokeFeedSuffixBatch(command.patch, requestId);
+      } else if (command.mode === "journal-append") {
+        journalOutcome = engine.appendStrokeFeedJournalSuffix(command.patch, requestId)
+          === "appended" ? "accepted" : "rejected";
+      } else if (command.mode === "journal-append-batch") {
+        journalOutcome = engine.appendStrokeFeedJournalSuffixBatch(command.patch, requestId)
+          === "appended" ? "accepted" : "rejected";
       } else if (command.mode === "append-operations") {
         engine.appendStrokeFeedOperations(command.patch, requestId);
       } else if (command.mode === "retain") {
         engine.retainStrokeFeed(requestId);
+      } else if (command.mode === "journal-replace") {
+        journalOutcome = engine.replaceStrokeFeedJournalBaseline(latest.strokes, requestId)
+          === "replaced" ? "accepted" : "rejected";
       } else if (command.mode === "replace") {
         engine.replaceStrokeFeed(latest.strokes, requestId);
       } else {
         engine.render(latest.strokes, requestId);
       }
       requestInitialization();
+      return { status: journalOutcome, requestId };
     };
     issueLatestRequestRef.current = issueLatestRequest;
     issueLatestRequest();
@@ -421,9 +516,11 @@ function StudioWebGpuCanvas({
       void engine.initialize().then(() => {
         if (!mounted || engineRef.current !== engine) return;
         const current = latestEffectiveRequestRef.current;
-        pendingEngineCommandRef.current = pinnedStrokesRef.current !== null
-          ? (current.strokes.length > 0 ? { mode: "replace" } : { mode: "reset" })
-          : { mode: "full" };
+        pendingEngineCommandRef.current = resumedPinnedFeedCommand(
+          pinnedStrokesRef.current,
+          pinnedJournalActiveRef.current,
+          current.strokes
+        );
         issueLatestRequest();
       });
     }

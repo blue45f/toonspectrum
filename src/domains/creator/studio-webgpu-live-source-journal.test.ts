@@ -637,6 +637,36 @@ describe("studio WebGPU live source journal", () => {
     })).toMatchObject({ status: "rejected", reason: "variation-budget" });
   });
 
+  it("applies the symmetry allocation budget cumulatively across small advances", () => {
+    const variations = Array.from(
+      { length: STUDIO_GPU_LIVE_SOURCE_JOURNAL_MAX_VARIATIONS },
+      (_, index) => ({ id: `cumulative:${index}`, transform: IDENTITY_TRANSFORM })
+    );
+    const sourceIdentity = identity({ sampleSpacing: 0, variations });
+    const perAdvancePointCount = Math.ceil(
+      STUDIO_GPU_LIVE_SOURCE_JOURNAL_MAX_VARIATION_POINTS / variations.length / 2
+    );
+    const firstPoints = Array.from({ length: perAdvancePointCount * 2 }, (_, index) => (
+      index % 2 === 0 ? index / 2 : 0
+    ));
+    const first = advanceStudioGpuLiveSourceJournal(stateFor(sourceIdentity), {
+      identity: sourceIdentity,
+      points: firstPoints,
+    });
+    expect(first.status).toBe("advanced");
+
+    const secondPoints = Array.from({ length: perAdvancePointCount * 4 }, (_, index) => (
+      index % 2 === 0 ? index / 2 : 0
+    ));
+    const rejected = advanceStudioGpuLiveSourceJournal(first.state, {
+      identity: sourceIdentity,
+      points: secondPoints,
+    });
+
+    expect(rejected).toMatchObject({ status: "rejected", reason: "variation-budget" });
+    expect(rejected.state).toBe(first.state);
+  });
+
   it("rejects malformed initial paint and variation identities", () => {
     expect(createStudioGpuLiveSourceJournal(identity({
       mode: "pen",

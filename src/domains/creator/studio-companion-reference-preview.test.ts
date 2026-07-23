@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  STUDIO_COMPANION_REFERENCE_MAX_ENCODER_FLIGHTS,
   STUDIO_COMPANION_REFERENCE_MAX_RGBA_BYTES,
   STUDIO_COMPANION_REFERENCE_WEBP_QUALITIES,
   STUDIO_COMPANION_REFERENCE_WEBP_RESIZE_SCALE,
+  createStudioCompanionReferencePreview,
   createStudioCompanionReferencePreviewFrame,
   encodeStudioCompanionReferencePreviewWebp,
   fitStudioCompanionReferencePreviewDimensions,
@@ -160,8 +162,32 @@ function rendered(
   return { canvas, width, height, resolvedItemCount: 1 };
 }
 
-function webp(size: number): Blob {
-  return new Blob([new Uint8Array(size)], { type: "image/webp" });
+function webp(size: number, width = 400, height = 200): Blob {
+  const bytes = new Uint8Array(size);
+  if (size >= 30) {
+    const view = new DataView(bytes.buffer);
+    const writeAscii = (offset: number, value: string) => {
+      for (let index = 0; index < value.length; index += 1) {
+        bytes[offset + index] = value.charCodeAt(index);
+      }
+    };
+    writeAscii(0, "RIFF");
+    view.setUint32(4, size - 8, true);
+    writeAscii(8, "WEBP");
+    writeAscii(12, "VP8X");
+    view.setUint32(16, 10, true);
+    const widthMinusOne = width - 1;
+    const heightMinusOne = height - 1;
+    bytes.set([
+      widthMinusOne & 0xff,
+      (widthMinusOne >>> 8) & 0xff,
+      (widthMinusOne >>> 16) & 0xff,
+      heightMinusOne & 0xff,
+      (heightMinusOne >>> 8) & 0xff,
+      (heightMinusOne >>> 16) & 0xff,
+    ], 24);
+  }
+  return new Blob([bytes], { type: "image/webp" });
 }
 
 afterEach(() => {
@@ -339,12 +365,12 @@ describe("bounded reference preview WebP encoding", () => {
       quality: number;
     }) => {
       calls.push({ width: canvas.width, quality: options.quality });
-      return webp(calls.length === 1 ? 9 : 8);
+      return webp(calls.length === 1 ? 41 : 40);
     });
 
     const result = await encodeStudioCompanionReferencePreviewWebp(
       rendered(),
-      { maximumBytes: 8 },
+      { maximumBytes: 40 },
       { encodeCanvas }
     );
 
@@ -353,7 +379,7 @@ describe("bounded reference preview WebP encoding", () => {
       { width: 400, quality: STUDIO_COMPANION_REFERENCE_WEBP_QUALITIES[1] },
     ]);
     expect(result).toMatchObject({ width: 400, height: 200, resolvedItemCount: 1 });
-    expect(result?.blob.size).toBe(8);
+    expect(result?.blob.size).toBe(40);
   });
 
   it("falls back to smaller dimensions only after every original-size quality is oversized", async () => {
@@ -362,7 +388,7 @@ describe("bounded reference preview WebP encoding", () => {
     const initial = rendered();
     const result = await encodeStudioCompanionReferencePreviewWebp(
       initial,
-      { maximumBytes: 8 },
+      { maximumBytes: 40 },
       {
         createCanvas: (width, height) => {
           const canvas = new FakeCanvas(width, height);
@@ -371,7 +397,11 @@ describe("bounded reference preview WebP encoding", () => {
         },
         encodeCanvas: (canvas, options) => {
           calls.push({ width: canvas.width, height: canvas.height, quality: options.quality });
-          return webp(canvas.width === 400 ? 9 : 8);
+          return webp(
+            canvas.width === 400 ? 41 : 40,
+            canvas.width,
+            canvas.height
+          );
         },
       }
     );
@@ -385,7 +415,7 @@ describe("bounded reference preview WebP encoding", () => {
       quality: STUDIO_COMPANION_REFERENCE_WEBP_QUALITIES.at(-1),
     });
     expect(result).toMatchObject({ width: 312, height: 156 });
-    expect(result?.blob.size).toBe(8);
+    expect(result?.blob.size).toBe(40);
     expect(resizedCanvases[0]?.context?.draws[0]?.image).toBe(initial.canvas);
   });
 
@@ -416,12 +446,15 @@ describe("bounded reference preview WebP encoding", () => {
 
   it("returns null when an injected deadline expires around a hanging encoder", async () => {
     let scheduled: (() => void) | null = null;
+    let settleEncode: ((blob: Blob | null) => void) | null = null;
     const cancel = vi.fn();
     const pending = encodeStudioCompanionReferencePreviewWebp(
       rendered(),
       { timeoutMs: 50 },
       {
-        encodeCanvas: () => new Promise<Blob | null>(() => undefined),
+        encodeCanvas: () => new Promise<Blob | null>((resolve) => {
+          settleEncode = resolve;
+        }),
         clock: {
           now: () => 100,
           schedule: (callback) => {
@@ -437,6 +470,580 @@ describe("bounded reference preview WebP encoding", () => {
     (scheduled as unknown as () => void)();
     await expect(pending).resolves.toBeNull();
     expect(cancel).toHaveBeenCalledWith("deadline");
+    expect(settleEncode).not.toBeNull();
+    (settleEncode as unknown as (blob: Blob | null) => void)(webp(64));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  it("rejects an already-aborted capture before allocating its staging canvas", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const createCanvas = vi.fn((width: number, height: number) => new FakeCanvas(width, height));
+    const encodeCanvas = vi.fn(() => webp(64, 320, 180));
+
+    await expect(createStudioCompanionReferencePreview({
+      boardWidth: 320,
+      boardHeight: 180,
+      items: [item(source("already-aborted", 4, 2))],
+    }, { signal: controller.signal }, { createCanvas, encodeCanvas })).resolves.toBeNull();
+
+    expect(createCanvas).not.toHaveBeenCalled();
+    expect(encodeCanvas).not.toHaveBeenCalled();
+  });
+
+  it("rejects a deadline exhausted before compositing without allocating a canvas", async () => {
+    const createCanvas = vi.fn((width: number, height: number) => new FakeCanvas(width, height));
+    const encodeCanvas = vi.fn(() => webp(64, 320, 180));
+    const now = vi.fn()
+      .mockReturnValueOnce(100)
+      .mockReturnValue(150);
+
+    await expect(createStudioCompanionReferencePreview({
+      boardWidth: 320,
+      boardHeight: 180,
+      items: [item(source("expired-before-render", 4, 2))],
+    }, { timeoutMs: 50 }, {
+      createCanvas,
+      encodeCanvas,
+      clock: { now, schedule: vi.fn(), cancel: vi.fn() },
+    })).resolves.toBeNull();
+
+    expect(createCanvas).not.toHaveBeenCalled();
+    expect(encodeCanvas).not.toHaveBeenCalled();
+  });
+
+  it("quarantines a hanging custom encoder per stable scope and resumes after late settle", async () => {
+    let settleFirst: ((blob: Blob | null) => void) | null = null;
+    const encodeCanvas = vi.fn(() => {
+      if (encodeCanvas.mock.calls.length === 1) {
+        return new Promise<Blob | null>((resolve) => {
+          settleFirst = resolve;
+        });
+      }
+      return Promise.resolve(webp(64, 320, 180));
+    });
+    const createCanvas = vi.fn((width: number, height: number) => new FakeCanvas(width, height));
+    const scheduled: Array<() => void> = [];
+    const dependencies = {
+      createCanvas,
+      encodeCanvas,
+      encoderScope: {},
+      clock: {
+        now: () => 100,
+        schedule: (callback: () => void) => {
+          scheduled.push(callback);
+          return `custom-deadline-${scheduled.length}`;
+        },
+        cancel: vi.fn(),
+      },
+    };
+    const input = {
+      boardWidth: 320,
+      boardHeight: 180,
+      items: [item(source("custom-scope", 4, 2))],
+    };
+
+    const first = createStudioCompanionReferencePreview(
+      input,
+      { timeoutMs: 50 },
+      dependencies
+    );
+    await Promise.resolve();
+    scheduled[0]?.();
+    await expect(first).resolves.toBeNull();
+
+    await expect(createStudioCompanionReferencePreview(
+      input,
+      { timeoutMs: 50 },
+      dependencies
+    )).resolves.toBeNull();
+    expect(createCanvas).toHaveBeenCalledOnce();
+    expect(encodeCanvas).toHaveBeenCalledOnce();
+
+    expect(settleFirst).not.toBeNull();
+    (settleFirst as unknown as (blob: Blob | null) => void)(webp(64, 320, 180));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await expect(createStudioCompanionReferencePreview(
+      input,
+      { timeoutMs: 50 },
+      dependencies
+    )).resolves.toMatchObject({ width: 320, height: 180 });
+    expect(createCanvas).toHaveBeenCalledTimes(2);
+    expect(encodeCanvas).toHaveBeenCalledTimes(2);
+  });
+
+  it("bounds quarantined native encoders while allowing an independent second scope", async () => {
+    const settleNative: Array<(blob: Blob | null) => void> = [];
+    const createCanvas = vi.fn((width: number, height: number) => {
+      const canvas = new FakeCanvas(width, height);
+      canvas.convertToBlob = () => new Promise<Blob | null>((resolve) => {
+        settleNative.push(resolve);
+      }) as Promise<Blob>;
+      return canvas;
+    });
+    const scheduled: Array<() => void> = [];
+    const dependencies = {
+      createCanvas,
+      clock: {
+        now: () => 100,
+        schedule: (callback: () => void) => {
+          scheduled.push(callback);
+          return `bounded-deadline-${scheduled.length}`;
+        },
+        cancel: vi.fn(),
+      },
+    };
+    const makeInput = (marker: string) => ({
+      boardWidth: 320,
+      boardHeight: 180,
+      items: [item(source(marker, 4, 2))],
+    });
+
+    const first = createStudioCompanionReferencePreview(
+      makeInput("native-scope-a"),
+      { timeoutMs: 50 },
+      dependencies
+    );
+    const second = createStudioCompanionReferencePreview(
+      makeInput("native-scope-b"),
+      { timeoutMs: 50 },
+      dependencies
+    );
+    await Promise.resolve();
+
+    expect(STUDIO_COMPANION_REFERENCE_MAX_ENCODER_FLIGHTS).toBe(2);
+    expect(createCanvas).toHaveBeenCalledTimes(2);
+    expect(settleNative).toHaveLength(2);
+    await expect(createStudioCompanionReferencePreview(
+      makeInput("native-scope-c"),
+      { timeoutMs: 50 },
+      dependencies
+    )).resolves.toBeNull();
+    expect(createCanvas).toHaveBeenCalledTimes(2);
+
+    scheduled[0]?.();
+    scheduled[1]?.();
+    await expect(first).resolves.toBeNull();
+    await expect(second).resolves.toBeNull();
+    settleNative[0]?.(webp(64, 320, 180));
+    settleNative[1]?.(webp(64, 320, 180));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  it("cleans up a hostile signal that invokes its abort listener synchronously", async () => {
+    const removeEventListener = vi.fn();
+    const signal = {
+      aborted: false,
+      addEventListener: vi.fn((_type: string, listener: EventListener) => {
+        listener(new Event("abort"));
+      }),
+      removeEventListener,
+    } as unknown as AbortSignal;
+    const createCanvas = vi.fn((width: number, height: number) => new FakeCanvas(width, height));
+    const encodeCanvas = vi.fn(() => webp(64, 320, 180));
+
+    await expect(createStudioCompanionReferencePreview({
+      boardWidth: 320,
+      boardHeight: 180,
+      items: [item(source("hostile-signal", 4, 2))],
+    }, { signal }, { createCanvas, encodeCanvas })).resolves.toBeNull();
+
+    expect(createCanvas).toHaveBeenCalledOnce();
+    expect(encodeCanvas).not.toHaveBeenCalled();
+    expect(removeEventListener).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed when abort arrives while the WebP header is being verified", async () => {
+    const originalArrayBuffer = Blob.prototype.arrayBuffer;
+    let releaseVerification: (() => void) | null = null;
+    const arrayBufferSpy = vi.spyOn(Blob.prototype, "arrayBuffer").mockImplementation(function (
+      this: Blob
+    ) {
+      return new Promise<ArrayBuffer>((resolve, reject) => {
+        releaseVerification = () => {
+          Reflect.apply(originalArrayBuffer, this, []).then(resolve, reject);
+        };
+      });
+    });
+    const controller = new AbortController();
+    try {
+      const pending = encodeStudioCompanionReferencePreviewWebp(
+        rendered(),
+        { signal: controller.signal },
+        { encodeCanvas: () => webp(64) }
+      );
+      for (let index = 0; index < 8 && releaseVerification === null; index += 1) {
+        await Promise.resolve();
+      }
+      expect(releaseVerification).not.toBeNull();
+      controller.abort();
+      (releaseVerification as unknown as () => void)();
+      await expect(pending).resolves.toBeNull();
+    } finally {
+      arrayBufferSpy.mockRestore();
+    }
+  });
+
+  it("fails closed when the absolute deadline expires during WebP verification", async () => {
+    const originalArrayBuffer = Blob.prototype.arrayBuffer;
+    let releaseVerification: (() => void) | null = null;
+    let now = 100;
+    const arrayBufferSpy = vi.spyOn(Blob.prototype, "arrayBuffer").mockImplementation(function (
+      this: Blob
+    ) {
+      return new Promise<ArrayBuffer>((resolve, reject) => {
+        releaseVerification = () => {
+          Reflect.apply(originalArrayBuffer, this, []).then(resolve, reject);
+        };
+      });
+    });
+    try {
+      const pending = encodeStudioCompanionReferencePreviewWebp(
+        rendered(),
+        { timeoutMs: 50 },
+        {
+          encodeCanvas: () => webp(64),
+          clock: {
+            now: () => now,
+            schedule: vi.fn(() => "verification-deadline"),
+            cancel: vi.fn(),
+          },
+        }
+      );
+      for (let index = 0; index < 8 && releaseVerification === null; index += 1) {
+        await Promise.resolve();
+      }
+      expect(releaseVerification).not.toBeNull();
+      now = 150;
+      (releaseVerification as unknown as () => void)();
+      await expect(pending).resolves.toBeNull();
+    } finally {
+      arrayBufferSpy.mockRestore();
+    }
+  });
+
+  it("returns promptly when abort stops a never-settling WebP verification", async () => {
+    const arrayBufferSpy = vi.spyOn(Blob.prototype, "arrayBuffer").mockImplementation(() => (
+      new Promise<ArrayBuffer>(() => undefined)
+    ));
+    const controller = new AbortController();
+    const schedule = vi.fn(() => "abort-verification-deadline");
+    const cancel = vi.fn();
+    const removeListener = vi.spyOn(controller.signal, "removeEventListener");
+    try {
+      const pending = encodeStudioCompanionReferencePreviewWebp(
+        rendered(),
+        { signal: controller.signal, timeoutMs: 50 },
+        {
+          encodeCanvas: () => webp(64),
+          clock: { now: () => 100, schedule, cancel },
+        }
+      );
+      for (let index = 0; index < 8 && arrayBufferSpy.mock.calls.length === 0; index += 1) {
+        await Promise.resolve();
+      }
+      expect(arrayBufferSpy).toHaveBeenCalledOnce();
+      expect(schedule).toHaveBeenCalledTimes(2);
+
+      controller.abort();
+      await expect(pending).resolves.toBeNull();
+      expect(cancel).toHaveBeenCalledTimes(2);
+      expect(removeListener).toHaveBeenCalledTimes(2);
+    } finally {
+      arrayBufferSpy.mockRestore();
+    }
+  });
+
+  it("returns promptly when the deadline stops a never-settling WebP verification", async () => {
+    const arrayBufferSpy = vi.spyOn(Blob.prototype, "arrayBuffer").mockImplementation(() => (
+      new Promise<ArrayBuffer>(() => undefined)
+    ));
+    const scheduled: Array<() => void> = [];
+    const cancel = vi.fn();
+    try {
+      const pending = encodeStudioCompanionReferencePreviewWebp(
+        rendered(),
+        { timeoutMs: 50 },
+        {
+          encodeCanvas: () => webp(64),
+          clock: {
+            now: () => 100,
+            schedule: (callback) => {
+              scheduled.push(callback);
+              return `verification-deadline-${scheduled.length}`;
+            },
+            cancel,
+          },
+        }
+      );
+      for (let index = 0; index < 8 && arrayBufferSpy.mock.calls.length === 0; index += 1) {
+        await Promise.resolve();
+      }
+      expect(arrayBufferSpy).toHaveBeenCalledOnce();
+      expect(scheduled).toHaveLength(2);
+
+      scheduled[1]?.();
+      await expect(pending).resolves.toBeNull();
+      expect(cancel).toHaveBeenCalledTimes(2);
+    } finally {
+      arrayBufferSpy.mockRestore();
+    }
+  });
+
+  it("blocks native timeout retries before staging-canvas allocation and resumes after late settle", async () => {
+    let resolveFirst: ((blob: Blob) => void) | null = null;
+    const nativeEncode = vi.fn(() => {
+      if (nativeEncode.mock.calls.length === 1) {
+        return new Promise<Blob>((resolve) => {
+          resolveFirst = resolve;
+        });
+      }
+      return Promise.resolve(webp(64, 320, 180));
+    });
+    const createCanvas = vi.fn((width: number, height: number) => {
+      const canvas = new FakeCanvas(width, height);
+      canvas.convertToBlob = nativeEncode;
+      return canvas;
+    });
+    const scheduled: Array<() => void> = [];
+    const cancel = vi.fn();
+    const clock = {
+      now: () => 100,
+      schedule: (callback: () => void) => {
+        scheduled.push(callback);
+        return `deadline-${scheduled.length}`;
+      },
+      cancel,
+    };
+    const input = {
+      boardWidth: 320,
+      boardHeight: 180,
+      items: [item(source("reference", 4, 2))],
+    };
+
+    const first = createStudioCompanionReferencePreview(
+      input,
+      { timeoutMs: 50 },
+      { createCanvas, clock }
+    );
+    await Promise.resolve();
+    expect(createCanvas).toHaveBeenCalledOnce();
+    expect(nativeEncode).toHaveBeenCalledOnce();
+    expect(scheduled).toHaveLength(1);
+
+    scheduled[0]?.();
+    await expect(first).resolves.toBeNull();
+    await expect(createStudioCompanionReferencePreview(
+      input,
+      { timeoutMs: 50 },
+      { createCanvas, clock }
+    )).resolves.toBeNull();
+    expect(createCanvas).toHaveBeenCalledOnce();
+    expect(nativeEncode).toHaveBeenCalledOnce();
+    expect(scheduled).toHaveLength(1);
+    expect(cancel).toHaveBeenCalledOnce();
+
+    const customEncode = vi.fn(() => webp(64, 320, 180));
+    const customCreateCanvas = vi.fn((width: number, height: number) => (
+      new FakeCanvas(width, height)
+    ));
+    await expect(createStudioCompanionReferencePreview(
+      input,
+      { timeoutMs: 50 },
+      { createCanvas: customCreateCanvas, encodeCanvas: customEncode }
+    )).resolves.toMatchObject({ width: 320, height: 180 });
+    expect(customCreateCanvas).toHaveBeenCalledOnce();
+    expect(customEncode).toHaveBeenCalledOnce();
+    expect(createCanvas).toHaveBeenCalledOnce();
+    expect(nativeEncode).toHaveBeenCalledOnce();
+
+    expect(resolveFirst).not.toBeNull();
+    (resolveFirst as unknown as (blob: Blob) => void)(webp(64, 320, 180));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await expect(createStudioCompanionReferencePreview(
+      input,
+      { timeoutMs: 50 },
+      { createCanvas, clock }
+    )).resolves.toMatchObject({ width: 320, height: 180 });
+    expect(createCanvas).toHaveBeenCalledTimes(2);
+    expect(nativeEncode).toHaveBeenCalledTimes(2);
+    expect(scheduled).toHaveLength(3);
+    expect(cancel).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps an aborted native encode single-flight and releases its listener before late settle", async () => {
+    let resolveFirst: ((blob: Blob) => void) | null = null;
+    const nativeEncode = vi.fn(() => {
+      if (nativeEncode.mock.calls.length === 1) {
+        return new Promise<Blob>((resolve) => {
+          resolveFirst = resolve;
+        });
+      }
+      return Promise.resolve(webp(64, 320, 180));
+    });
+    const createCanvas = vi.fn((width: number, height: number) => {
+      const canvas = new FakeCanvas(width, height);
+      canvas.convertToBlob = nativeEncode;
+      return canvas;
+    });
+    const schedule = vi.fn(() => "abort-deadline");
+    const cancel = vi.fn();
+    const controller = new AbortController();
+    const addListener = vi.spyOn(controller.signal, "addEventListener");
+    const removeListener = vi.spyOn(controller.signal, "removeEventListener");
+    const input = {
+      boardWidth: 320,
+      boardHeight: 180,
+      items: [item(source("reference", 4, 2))],
+    };
+    const dependencies = {
+      createCanvas,
+      clock: { now: () => 100, schedule, cancel },
+    };
+
+    const first = createStudioCompanionReferencePreview(
+      input,
+      { signal: controller.signal, timeoutMs: 50 },
+      dependencies
+    );
+    await Promise.resolve();
+    controller.abort();
+    await expect(first).resolves.toBeNull();
+    expect(addListener).toHaveBeenCalledOnce();
+    expect(removeListener).toHaveBeenCalledOnce();
+    expect(cancel).toHaveBeenCalledOnce();
+
+    await expect(createStudioCompanionReferencePreview(
+      input,
+      { timeoutMs: 50 },
+      dependencies
+    )).resolves.toBeNull();
+    expect(createCanvas).toHaveBeenCalledOnce();
+    expect(nativeEncode).toHaveBeenCalledOnce();
+    expect(schedule).toHaveBeenCalledOnce();
+
+    expect(resolveFirst).not.toBeNull();
+    (resolveFirst as unknown as (blob: Blob) => void)(webp(64, 320, 180));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await expect(createStudioCompanionReferencePreview(
+      input,
+      { timeoutMs: 50 },
+      dependencies
+    )).resolves.toMatchObject({ width: 320, height: 180 });
+    expect(createCanvas).toHaveBeenCalledTimes(2);
+    expect(nativeEncode).toHaveBeenCalledTimes(2);
+    expect(schedule).toHaveBeenCalledTimes(3);
+    expect(cancel).toHaveBeenCalledTimes(3);
+    expect(removeListener).toHaveBeenCalledOnce();
+  });
+
+  it("applies the same stuck-encoder circuit to the native toBlob callback path", async () => {
+    let settleFirst: ((blob: Blob | null) => void) | null = null;
+    let nativeCalls = 0;
+    const createCanvas = vi.fn((width: number, height: number) => {
+      const canvas = new FakeCanvas(width, height);
+      canvas.toBlob = (callback) => {
+        nativeCalls += 1;
+        if (nativeCalls === 1) settleFirst = callback;
+        else callback(webp(64, 320, 180));
+      };
+      return canvas;
+    });
+    const scheduled: Array<() => void> = [];
+    const cancel = vi.fn();
+    const dependencies = {
+      createCanvas,
+      clock: {
+        now: () => 100,
+        schedule: (callback: () => void) => {
+          scheduled.push(callback);
+          return `to-blob-deadline-${scheduled.length}`;
+        },
+        cancel,
+      },
+    };
+    const input = {
+      boardWidth: 320,
+      boardHeight: 180,
+      items: [item(source("reference", 4, 2))],
+    };
+
+    const first = createStudioCompanionReferencePreview(
+      input,
+      { timeoutMs: 50 },
+      dependencies
+    );
+    await Promise.resolve();
+    scheduled[0]?.();
+    await expect(first).resolves.toBeNull();
+    await expect(createStudioCompanionReferencePreview(
+      input,
+      { timeoutMs: 50 },
+      dependencies
+    )).resolves.toBeNull();
+    expect(createCanvas).toHaveBeenCalledOnce();
+    expect(nativeCalls).toBe(1);
+
+    expect(settleFirst).not.toBeNull();
+    (settleFirst as unknown as (blob: Blob | null) => void)(webp(64, 320, 180));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await expect(createStudioCompanionReferencePreview(
+      input,
+      { timeoutMs: 50 },
+      dependencies
+    )).resolves.toMatchObject({ width: 320, height: 180 });
+    expect(createCanvas).toHaveBeenCalledTimes(2);
+    expect(nativeCalls).toBe(2);
+    expect(cancel).toHaveBeenCalledTimes(3);
+  });
+
+  it("reopens the native encoder circuit after rejection without affecting injected encoders", async () => {
+    const nativeEncode = vi.fn()
+      .mockRejectedValueOnce(new Error("native encoder rejected"))
+      .mockResolvedValueOnce(webp(64, 320, 180));
+    const createCanvas = vi.fn((width: number, height: number) => {
+      const canvas = new FakeCanvas(width, height);
+      canvas.convertToBlob = nativeEncode;
+      return canvas;
+    });
+    const input = {
+      boardWidth: 320,
+      boardHeight: 180,
+      items: [item(source("reference", 4, 2))],
+    };
+
+    await expect(createStudioCompanionReferencePreview(
+      input,
+      {},
+      { createCanvas }
+    )).resolves.toBeNull();
+    await expect(createStudioCompanionReferencePreview(
+      input,
+      {},
+      { createCanvas }
+    )).resolves.toMatchObject({ width: 320, height: 180 });
+    expect(nativeEncode).toHaveBeenCalledTimes(2);
+
+    const customEncode = vi.fn(() => webp(64, 320, 180));
+    await expect(createStudioCompanionReferencePreview(
+      input,
+      {},
+      {
+        createCanvas: (width, height) => new FakeCanvas(width, height),
+        encodeCanvas: customEncode,
+      }
+    )).resolves.toMatchObject({ width: 320, height: 180 });
+    expect(customEncode).toHaveBeenCalledOnce();
   });
 
   it("uses canvas WebP methods and produces an exact validated transport frame", async () => {
@@ -444,7 +1051,7 @@ describe("bounded reference preview WebP encoding", () => {
     const canvas = new FakeCanvas(320, 180, context);
     const convertToBlob = vi.fn(async (options?: { type?: string; quality?: number }) => {
       expect(options?.type).toBe("image/webp");
-      return webp(64);
+      return webp(64, 320, 180);
     });
     canvas.convertToBlob = convertToBlob;
 
@@ -493,7 +1100,7 @@ describe("bounded reference preview WebP encoding", () => {
     input.referenceRevision = 99;
     input.sequence = 99;
     expect(resolveEncode).not.toBeNull();
-    (resolveEncode as unknown as (blob: Blob) => void)(webp(64));
+    (resolveEncode as unknown as (blob: Blob) => void)(webp(64, 320, 180));
 
     await expect(pending).resolves.toMatchObject({
       generation: 2,
@@ -505,6 +1112,22 @@ describe("bounded reference preview WebP encoding", () => {
 });
 
 describe("authoritative reference preview color sampling", () => {
+  it("samples the epoch-owned RGBA buffer without cloning the full raster", () => {
+    const pixels = solidPixels(64, 64, 12, 34, 56);
+    const setSpy = vi.spyOn(Uint8ClampedArray.prototype, "set");
+    try {
+      expect(sampleStudioCompanionReferenceColor(
+        [item(source("zero-copy", 64, 64, { pixels }))],
+        { x: 0.5, y: 0.5 },
+        100,
+        100
+      )).toBe("#0c2238");
+      expect(setSpy).not.toHaveBeenCalled();
+    } finally {
+      setSpy.mockRestore();
+    }
+  });
+
   it("walks front-to-back, falls through transparent pixels and ignores display grayscale", () => {
     const behind = source("behind", 2, 2, { pixels: solidPixels(2, 2, 0, 0, 255) });
     const transparentFrontPixels = solidPixels(2, 2, 255, 0, 0);

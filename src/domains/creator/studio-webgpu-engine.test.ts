@@ -586,6 +586,121 @@ describe("StudioWebGpuEngine", () => {
     }, "symmetry:stale")).toBe("rebuilt");
   });
 
+  it("runs suffix-only journal frames from internal revision receipts and rolls stale input back", () => {
+    const gpuSurface = fakeGpuCanvas(null);
+    const fallback = fakeCanvas2d();
+    const onFrameReady = vi.fn();
+    const engine = new StudioWebGpuEngine({
+      canvas: gpuSurface,
+      fallbackCanvas: fallback.canvas,
+      gpu: null,
+      onFrameReady,
+    });
+    const rootPoints = [2, 3];
+    const rootPressures = [0.5];
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    expect(engine.replaceStrokeFeedJournalBaseline([
+      stroke({ points: rootPoints, pressures: rootPressures }),
+    ], "journal:root")).toBe("replaced");
+    const clearsAfterRoot = fallback.clearRect.mock.calls.length;
+    const suffixPoints = [9, 7, 10, 8];
+    const suffixPressures = [0.8, 0.7];
+
+    expect(engine.appendStrokeFeedJournalSuffix({
+      strokeIndex: 0,
+      previousPointCount: 1,
+      suffixPoints,
+      suffixPressures,
+    }, "journal:move")).toBe("appended");
+    expect(fallback.arcs.some(({ x, y }) => x === 9 && y === 7)).toBe(true);
+    expect(fallback.arcs.some(({ x, y }) => x === 10 && y === 8)).toBe(true);
+    expect(fallback.clearRect).toHaveBeenCalledTimes(clearsAfterRoot);
+    expect(Object.isFrozen(rootPoints)).toBe(false);
+    expect(Object.isFrozen(rootPressures)).toBe(false);
+    expect(Object.isFrozen(suffixPoints)).toBe(false);
+    expect(Object.isFrozen(suffixPressures)).toBe(false);
+
+    const compactStrokes = (engine as unknown as {
+      lastStrokes: readonly StudioGpuStroke[];
+    }).lastStrokes;
+    expect(compactStrokes[0]!.points).toEqual([2, 3]);
+    const arcsAfterMove = fallback.arcs.length;
+    expect(engine.appendStrokeFeedJournalSuffix({
+      strokeIndex: 0,
+      previousPointCount: 1,
+      suffixPoints: [99, 99],
+      suffixPressures: [1],
+    }, "journal:stale")).toBe("rejected");
+    expect(fallback.arcs).toHaveLength(arcsAfterMove);
+    expect(fallback.clearRect).toHaveBeenCalledTimes(clearsAfterRoot);
+    expect(onFrameReady).toHaveBeenLastCalledWith(expect.objectContaining({
+      requestId: "journal:stale",
+    }));
+    expect(engine.replaceStrokeFeedJournalBaseline([
+      stroke({ points: [0, 0, Number.NaN, 1] }),
+    ], "journal:invalid-root")).toBe("rejected");
+    expect(fallback.arcs).toHaveLength(arcsAfterMove);
+    expect(fallback.clearRect).toHaveBeenCalledTimes(clearsAfterRoot);
+    expect(onFrameReady).toHaveBeenLastCalledWith(expect.objectContaining({
+      requestId: "journal:invalid-root",
+    }));
+  });
+
+  it("rejects a torn journal symmetry batch without publishing any variation", () => {
+    const gpuSurface = fakeGpuCanvas(null);
+    const fallback = fakeCanvas2d();
+    const engine = new StudioWebGpuEngine({
+      canvas: gpuSurface,
+      fallbackCanvas: fallback.canvas,
+      gpu: null,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    expect(engine.replaceStrokeFeedJournalBaseline([
+      stroke({ id: "left", points: [2, 3], pressures: [0.5] }),
+      stroke({ id: "right", points: [98, 3], pressures: [0.5] }),
+    ], "journal-batch:root")).toBe("replaced");
+    const arcsBefore = fallback.arcs.length;
+    const clearsBefore = fallback.clearRect.mock.calls.length;
+
+    expect(engine.appendStrokeFeedJournalSuffixBatch({
+      patches: [
+        {
+          strokeIndex: 0,
+          previousPointCount: 1,
+          suffixPoints: [9, 7],
+          suffixPressures: [0.8],
+        },
+        {
+          strokeIndex: 1,
+          previousPointCount: 0,
+          suffixPoints: [91, 7],
+          suffixPressures: [0.8],
+        },
+      ],
+    }, "journal-batch:torn")).toBe("rejected");
+    expect(fallback.arcs).toHaveLength(arcsBefore);
+    expect(fallback.clearRect).toHaveBeenCalledTimes(clearsBefore);
+
+    expect(engine.appendStrokeFeedJournalSuffixBatch({
+      patches: [
+        {
+          strokeIndex: 0,
+          previousPointCount: 1,
+          suffixPoints: [9, 7],
+          suffixPressures: [0.8],
+        },
+        {
+          strokeIndex: 1,
+          previousPointCount: 1,
+          suffixPoints: [91, 7],
+          suffixPressures: [0.8],
+        },
+      ],
+    }, "journal-batch:valid")).toBe("appended");
+    expect(fallback.arcs.some(({ x, y }) => x === 9 && y === 7)).toBe(true);
+    expect(fallback.arcs.some(({ x, y }) => x === 91 && y === 7)).toBe(true);
+  });
+
   it("appends residual V2 feed dabs from cached phase without rereading retained coordinates", () => {
     const gpuSurface = fakeGpuCanvas(null);
     const fallback = fakeCanvas2d();
@@ -790,10 +905,10 @@ describe("StudioWebGpuEngine", () => {
       onDeviceLost,
     });
     engine.resize({ logicalWidth: 100, logicalHeight: 80, cssWidth: 100, cssHeight: 80, dpr: 2 });
-    engine.render([
+    expect(engine.replaceStrokeFeedJournalBaseline([
       stroke(),
       stroke({ id: "erase", composite: "erase", orderKey: "z" }),
-    ]);
+    ], "device-loss:root")).toBe("replaced");
 
     await expect(engine.initialize()).resolves.toBe("webgpu");
     const pipelineCalls = vi.mocked(fake.device.createRenderPipeline).mock.calls;
@@ -827,12 +942,20 @@ describe("StudioWebGpuEngine", () => {
     expect(fake.draw.mock.calls.some(([, instanceCount]) => Number(instanceCount) > 0)).toBe(true);
     expect(gpuSurface.style.visibility).toBe("visible");
 
+    expect(engine.appendStrokeFeedJournalSuffix({
+      strokeIndex: 1,
+      previousPointCount: 2,
+      suffixPoints: [50, 12],
+      suffixPressures: [0.9],
+    }, "device-loss:suffix")).toBe("appended");
+
     const lossInfo = { reason: "unknown", message: "test loss" } as GPUDeviceLostInfo;
     lost.resolve(lossInfo);
     await vi.waitFor(() => expect(onDeviceLost).toHaveBeenCalledWith(lossInfo));
     expect(engine.getBackend()).toBe("canvas2d");
     expect(onBackendChange).toHaveBeenLastCalledWith("canvas2d");
     expect(fallback.arcs.length).toBeGreaterThan(0);
+    expect(fallback.arcs.some(({ x, y }) => x === 50 && y === 12)).toBe(true);
     expect(context.unconfigure).toHaveBeenCalled();
 
     engine.dispose();

@@ -1,8 +1,12 @@
-import { Check, ListChecks, Map, Paintbrush } from "lucide-react";
+import { Check, Images, ListChecks, Map, Paintbrush } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-export type StudioCompanionWorkspacePresetId = "draw" | "navigate" | "review";
+export type StudioCompanionWorkspacePresetId =
+  | "draw"
+  | "navigate"
+  | "review"
+  | "reference";
 
 export interface StudioCompanionWorkspacePresetsProps {
   disabled: boolean;
@@ -42,6 +46,14 @@ const PRESETS: ReadonlyArray<{
     secondaryRole: "검수",
     icon: ListChecks,
   },
+  {
+    id: "reference",
+    label: "레퍼런스 집중",
+    description: "캔버스는 넓게 유지하고 참고 이미지와 색상 피커를 별도 창에 고정",
+    primaryRole: "캔버스만",
+    secondaryRole: "레퍼런스",
+    icon: Images,
+  },
 ];
 
 export function StudioCompanionWorkspacePresets({
@@ -53,14 +65,18 @@ export function StudioCompanionWorkspacePresets({
     <section aria-labelledby="companion-workspace-presets-title" className="space-y-2">
       <div>
         <h2 id="companion-workspace-presets-title" className="text-xs font-semibold text-fg-2">
-          2화면 빠른 배치
+          멀티 화면 빠른 배치
         </h2>
         <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-          작업 단계에 맞춰 기본 화면과 보조 화면의 역할을 한 번에 고릅니다.
+          작업 단계에 맞춰 기본 화면과 전용 창의 역할을 한 번에 고릅니다.
         </p>
       </div>
 
-      <div role="group" aria-label="2화면 빠른 배치 프리셋" className="grid grid-cols-1 gap-1.5">
+      <div
+        role="group"
+        aria-label="멀티 화면 빠른 배치 프리셋"
+        className="grid grid-cols-1 gap-1.5 min-[480px]:grid-cols-2"
+      >
         {PRESETS.map(({ description, icon: Icon, id, label, primaryRole, secondaryRole }) => {
           const active = activePreset === id;
 

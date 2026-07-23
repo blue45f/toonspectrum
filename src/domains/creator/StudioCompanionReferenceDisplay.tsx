@@ -12,6 +12,7 @@ import {
   useEffect,
   useEffectEvent,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
@@ -30,6 +31,11 @@ import { cn } from "@/lib/utils";
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 8;
 const ZOOM_STEP = 1.25;
+const WHEEL_ZOOM_SENSITIVITY = 0.0025;
+const MODIFIED_WHEEL_ZOOM_SENSITIVITY = 0.01;
+const MIN_WHEEL_ZOOM_FACTOR = 0.8;
+const MAX_WHEEL_ZOOM_FACTOR = 1.25;
+const WHEEL_FEEDBACK_IDLE_MS = 150;
 
 export type StudioCompanionReferenceConnectionStatus =
   | "connected"
@@ -65,6 +71,24 @@ export interface StudioCompanionReferenceDisplayProps {
 }
 
 type Pan = { x: number; y: number };
+type ReferenceViewMode = "fit" | "actual" | "custom";
+type PendingWheelZoom = {
+  zoom: number;
+  pan: Pan;
+  percent: number;
+};
+type TouchPoint = {
+  x: number;
+  y: number;
+};
+type PinchSession = {
+  pointerIds: readonly [number, number];
+  startDistance: number;
+  startCentroid: TouchPoint;
+  startZoom: number;
+  startPan: Pan;
+  moved: boolean;
+};
 type PanSession = {
   pointerId: number;
   x: number;
@@ -158,6 +182,66 @@ function pointWithinImage(input: {
   const y = input.clientY - input.bounds.top - image.y;
   if (x < 0 || y < 0 || x >= image.width || y >= image.height) return null;
   return { x: x / image.width, y: y / image.height };
+}
+
+function anchorPreservingPan(input: {
+  anchorX: number;
+  anchorY: number;
+  containerWidth: number;
+  containerHeight: number;
+  currentZoom: number;
+  nextZoom: number;
+  currentPan: Pan;
+}): Pan {
+  if (input.currentZoom <= 0 || input.nextZoom <= 0) return input.currentPan;
+  const ratio = input.nextZoom / input.currentZoom;
+  const offsetX = input.anchorX - input.containerWidth / 2;
+  const offsetY = input.anchorY - input.containerHeight / 2;
+  return {
+    x: offsetX - (offsetX - input.currentPan.x) * ratio,
+    y: offsetY - (offsetY - input.currentPan.y) * ratio,
+  };
+}
+
+function touchDistance(first: TouchPoint, second: TouchPoint): number {
+  return Math.hypot(second.x - first.x, second.y - first.y);
+}
+
+function touchCentroid(first: TouchPoint, second: TouchPoint): TouchPoint {
+  return {
+    x: (first.x + second.x) / 2,
+    y: (first.y + second.y) / 2,
+  };
+}
+
+function pinchPreservingPan(input: {
+  startCentroid: TouchPoint;
+  currentCentroid: TouchPoint;
+  containerWidth: number;
+  containerHeight: number;
+  startZoom: number;
+  nextZoom: number;
+  startPan: Pan;
+}): Pan {
+  if (input.startZoom <= 0 || input.nextZoom <= 0) return input.startPan;
+  const ratio = input.nextZoom / input.startZoom;
+  const startOffsetX = input.startCentroid.x - input.containerWidth / 2;
+  const startOffsetY = input.startCentroid.y - input.containerHeight / 2;
+  const currentOffsetX = input.currentCentroid.x - input.containerWidth / 2;
+  const currentOffsetY = input.currentCentroid.y - input.containerHeight / 2;
+  return {
+    x: currentOffsetX - (startOffsetX - input.startPan.x) * ratio,
+    y: currentOffsetY - (startOffsetY - input.startPan.y) * ratio,
+  };
+}
+
+function normalizedWheelDelta(event: WheelEvent, viewportHeight: number): number {
+  const modeScale = event.deltaMode === 1
+    ? 16
+    : event.deltaMode === 2
+      ? Math.max(1, viewportHeight)
+      : 1;
+  return Math.max(-240, Math.min(240, event.deltaY * modeScale));
 }
 
 function matchesProjection(
@@ -256,8 +340,13 @@ export function StudioCompanionReferenceDisplay({
   const statusId = `${id}-status`;
   const viewportRef = useRef<HTMLButtonElement>(null);
   const panSessionRef = useRef<PanSession | null>(null);
+  const activeTouchPointersRef = useRef(new Map<number, TouchPoint>());
+  const pinchSessionRef = useRef<PinchSession | null>(null);
+  const touchGestureWasPinchRef = useRef(false);
   const suppressClickRef = useRef(false);
   const spaceHeldRef = useRef(false);
+  const lastPointerTypeRef = useRef("");
+  const viewModeRef = useRef<ReferenceViewMode>("fit");
   const pickCursorRef = useRef({
     generation: projection?.generation ?? 0,
     referenceRevision: projection?.referenceRevision ?? 0,
@@ -265,6 +354,12 @@ export function StudioCompanionReferenceDisplay({
   });
   const pendingPanDeltaRef = useRef<Pan>({ x: 0, y: 0 });
   const panAnimationFrameRef = useRef(0);
+  const pendingWheelZoomRef = useRef<PendingWheelZoom | null>(null);
+  const wheelAnimationFrameRef = useRef(0);
+  const wheelFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingWheelFeedbackPercentRef = useRef<number | null>(null);
+  const pendingPinchZoomRef = useRef<PendingWheelZoom | null>(null);
+  const pinchAnimationFrameRef = useRef(0);
   const [zoom, setZoom] = useState(1);
   const [zoomLabel, setZoomLabel] = useState("맞춤");
   const [pan, setPan] = useState<Pan>({ x: 0, y: 0 });
@@ -272,6 +367,14 @@ export function StudioCompanionReferenceDisplay({
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [feedback, setFeedback] = useState("레퍼런스 전용 화면이 열렸습니다.");
   const sendDemandControl = useEffectEvent(onControl);
+  const zoomRef = useRef(zoom);
+  const panRef = useRef(pan);
+  useLayoutEffect(() => {
+    // Native wheel/pointer callbacks may outlive a render attempt. Mirror only committed view
+    // state so an abandoned concurrent render cannot change the imperative transform.
+    zoomRef.current = zoom;
+    panRef.current = pan;
+  }, [pan, zoom]);
 
   const displayState = resolveDisplayState(connectionStatus, projection, preview);
   const copy = stateCopy(displayState);
@@ -283,6 +386,14 @@ export function StudioCompanionReferenceDisplay({
     && currentFrameRenderable
     ? preview
     : null;
+  const connectedPreview = connectionStatus === "connected" ? visiblePreview : null;
+  const connectedPreviewRef = useRef(connectedPreview);
+  useLayoutEffect(() => {
+    // Keep native gesture handlers on the last committed transport frame. A render that suspends
+    // or is superseded cannot grant access to a Blob URL that the visible tree never accepted.
+    connectedPreviewRef.current = connectedPreview;
+  }, [connectedPreview]);
+  const touchGesturesReady = connectedPreview !== null;
   const pickerReady = connectionStatus === "connected"
     && currentFrameRenderable
     && projection?.canPickColor === true;
@@ -298,6 +409,44 @@ export function StudioCompanionReferenceDisplay({
   )
     ? latestColorResult
     : null;
+  const handleNativeWheel = useEffectEvent((event: WheelEvent) => {
+    scheduleWheelZoom(event);
+  });
+
+  function clearTouchGesture(input: { flush: boolean; releaseCapture: boolean }) {
+    const activePointerIds = [...activeTouchPointersRef.current.keys()];
+    const viewport = viewportRef.current;
+    if (input.releaseCapture && viewport) {
+      for (const pointerId of activePointerIds) {
+        try {
+          if (!viewport.hasPointerCapture || viewport.hasPointerCapture(pointerId)) {
+            viewport.releasePointerCapture(pointerId);
+          }
+        } catch {
+          // Capture can already be released by pointercancel/lostpointercapture.
+        }
+      }
+    }
+    activeTouchPointersRef.current.clear();
+    pinchSessionRef.current = null;
+    touchGestureWasPinchRef.current = false;
+    if (panSessionRef.current && activePointerIds.includes(panSessionRef.current.pointerId)) {
+      panSessionRef.current = null;
+      cancelPendingPan(input.flush);
+    }
+    cancelPendingPinchZoom(input.flush);
+    suppressClickRef.current = false;
+  }
+
+  const clearTouchGestureFromEffect = useEffectEvent(
+    (input: { flush: boolean; releaseCapture: boolean }) => clearTouchGesture(input)
+  );
+  const cancelPendingWheelFeedbackFromEffect = useEffectEvent(
+    () => cancelPendingWheelFeedback(false)
+  );
+  const cancelPendingWheelZoomFromEffect = useEffectEvent(
+    () => cancelPendingWheelZoom(false)
+  );
 
   useEffect(() => {
     let demanded = false;
@@ -327,6 +476,23 @@ export function StudioCompanionReferenceDisplay({
   }, [connectionEpoch, connectionStatus, projection?.generation]);
 
   useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const onWheel = (event: WheelEvent) => handleNativeWheel(event);
+    const preventNativeGesture = (event: Event) => {
+      if (connectedPreviewRef.current) event.preventDefault();
+    };
+    viewport.addEventListener("wheel", onWheel, { passive: false });
+    viewport.addEventListener("gesturestart", preventNativeGesture, { passive: false });
+    viewport.addEventListener("gesturechange", preventNativeGesture, { passive: false });
+    return () => {
+      viewport.removeEventListener("wheel", onWheel);
+      viewport.removeEventListener("gesturestart", preventNativeGesture);
+      viewport.removeEventListener("gesturechange", preventNativeGesture);
+    };
+  }, []);
+
+  useEffect(() => {
     pickCursorRef.current = {
       generation: projection?.generation ?? 0,
       referenceRevision: projection?.referenceRevision ?? 0,
@@ -336,6 +502,13 @@ export function StudioCompanionReferenceDisplay({
   }, [projection?.generation, projection?.referenceRevision]);
 
   useEffect(() => {
+    clearTouchGestureFromEffect({ flush: false, releaseCapture: true });
+    if (wheelAnimationFrameRef.current && globalThis.cancelAnimationFrame) {
+      globalThis.cancelAnimationFrame(wheelAnimationFrameRef.current);
+    }
+    wheelAnimationFrameRef.current = 0;
+    pendingWheelZoomRef.current = null;
+    cancelPendingWheelFeedbackFromEffect();
     if (panAnimationFrameRef.current && globalThis.cancelAnimationFrame) {
       globalThis.cancelAnimationFrame(panAnimationFrameRef.current);
     }
@@ -344,12 +517,28 @@ export function StudioCompanionReferenceDisplay({
     panSessionRef.current = null;
     suppressClickRef.current = false;
     spaceHeldRef.current = false;
+    lastPointerTypeRef.current = "";
+    viewModeRef.current = "fit";
     setSpaceHeld(false);
+    zoomRef.current = 1;
+    panRef.current = { x: 0, y: 0 };
     setZoom(1);
     setZoomLabel("맞춤");
     setPan({ x: 0, y: 0 });
     setFeedback("새 레퍼런스 화면을 맞춤 보기로 열었습니다.");
   }, [projection?.generation]);
+
+  useEffect(() => {
+    clearTouchGestureFromEffect({ flush: false, releaseCapture: true });
+    if (!connectedPreviewRef.current) cancelPendingWheelZoomFromEffect();
+  }, [
+    connectionStatus,
+    visiblePreview?.generation,
+    visiblePreview?.referenceRevision,
+    visiblePreview?.revision,
+    visiblePreview?.sequence,
+    visiblePreview?.url,
+  ]);
 
   useEffect(() => () => {
     if (panAnimationFrameRef.current && globalThis.cancelAnimationFrame) {
@@ -357,6 +546,13 @@ export function StudioCompanionReferenceDisplay({
     }
     panAnimationFrameRef.current = 0;
     pendingPanDeltaRef.current = { x: 0, y: 0 };
+    if (wheelAnimationFrameRef.current && globalThis.cancelAnimationFrame) {
+      globalThis.cancelAnimationFrame(wheelAnimationFrameRef.current);
+    }
+    wheelAnimationFrameRef.current = 0;
+    pendingWheelZoomRef.current = null;
+    cancelPendingWheelFeedbackFromEffect();
+    clearTouchGestureFromEffect({ flush: false, releaseCapture: true });
   }, []);
 
   useEffect(() => {
@@ -369,7 +565,9 @@ export function StudioCompanionReferenceDisplay({
     const delta = pendingPanDeltaRef.current;
     pendingPanDeltaRef.current = { x: 0, y: 0 };
     if (delta.x === 0 && delta.y === 0) return;
-    setPan((current) => ({ x: current.x + delta.x, y: current.y + delta.y }));
+    const next = { x: panRef.current.x + delta.x, y: panRef.current.y + delta.y };
+    panRef.current = next;
+    setPan(next);
   }
 
   function cancelPendingPan(flush: boolean) {
@@ -394,8 +592,152 @@ export function StudioCompanionReferenceDisplay({
     panAnimationFrameRef.current = globalThis.requestAnimationFrame(flushPendingPan);
   }
 
+  function flushPendingWheelZoom() {
+    wheelAnimationFrameRef.current = 0;
+    const pending = pendingWheelZoomRef.current;
+    pendingWheelZoomRef.current = null;
+    if (!pending) return;
+    zoomRef.current = pending.zoom;
+    panRef.current = pending.pan;
+    viewModeRef.current = "custom";
+    setZoom(pending.zoom);
+    setPan(pending.pan);
+    setZoomLabel(`${pending.percent}%`);
+    scheduleWheelFeedback(pending.percent);
+  }
+
+  function flushPendingWheelFeedback() {
+    if (wheelFeedbackTimerRef.current) clearTimeout(wheelFeedbackTimerRef.current);
+    wheelFeedbackTimerRef.current = null;
+    const percent = pendingWheelFeedbackPercentRef.current;
+    pendingWheelFeedbackPercentRef.current = null;
+    if (percent === null) return;
+    setFeedback(`확대율 ${percent}% · 포인터 위치를 유지했습니다.`);
+  }
+
+  function cancelPendingWheelFeedback(announce: boolean) {
+    if (wheelFeedbackTimerRef.current) clearTimeout(wheelFeedbackTimerRef.current);
+    wheelFeedbackTimerRef.current = null;
+    if (announce) flushPendingWheelFeedback();
+    else pendingWheelFeedbackPercentRef.current = null;
+  }
+
+  function scheduleWheelFeedback(percent: number) {
+    pendingWheelFeedbackPercentRef.current = percent;
+    if (wheelFeedbackTimerRef.current) clearTimeout(wheelFeedbackTimerRef.current);
+    wheelFeedbackTimerRef.current = globalThis.setTimeout(
+      flushPendingWheelFeedback,
+      WHEEL_FEEDBACK_IDLE_MS
+    );
+  }
+
+  function cancelPendingWheelZoom(flush: boolean) {
+    if (wheelAnimationFrameRef.current && globalThis.cancelAnimationFrame) {
+      globalThis.cancelAnimationFrame(wheelAnimationFrameRef.current);
+    }
+    wheelAnimationFrameRef.current = 0;
+    if (flush) {
+      flushPendingWheelZoom();
+      flushPendingWheelFeedback();
+    } else {
+      pendingWheelZoomRef.current = null;
+      cancelPendingWheelFeedback(false);
+    }
+  }
+
+  function flushPendingPinchZoom() {
+    pinchAnimationFrameRef.current = 0;
+    const pending = pendingPinchZoomRef.current;
+    pendingPinchZoomRef.current = null;
+    if (!pending) return;
+    zoomRef.current = pending.zoom;
+    panRef.current = pending.pan;
+    viewModeRef.current = "custom";
+    setZoom(pending.zoom);
+    setPan(pending.pan);
+    setZoomLabel(`${pending.percent}%`);
+  }
+
+  function cancelPendingPinchZoom(flush: boolean) {
+    if (pinchAnimationFrameRef.current && globalThis.cancelAnimationFrame) {
+      globalThis.cancelAnimationFrame(pinchAnimationFrameRef.current);
+    }
+    pinchAnimationFrameRef.current = 0;
+    if (flush) flushPendingPinchZoom();
+    else pendingPinchZoomRef.current = null;
+  }
+
+  function schedulePinchZoom(next: PendingWheelZoom) {
+    pendingPinchZoomRef.current = next;
+    if (pinchAnimationFrameRef.current) return;
+    if (typeof globalThis.requestAnimationFrame !== "function") {
+      flushPendingPinchZoom();
+      return;
+    }
+    pinchAnimationFrameRef.current = globalThis.requestAnimationFrame(flushPendingPinchZoom);
+  }
+
+  function scheduleWheelZoom(event: WheelEvent) {
+    const currentPreview = connectedPreviewRef.current;
+    const viewport = viewportRef.current;
+    if (!currentPreview || !viewport) return;
+    event.preventDefault();
+    if (event.deltaY === 0 || !Number.isFinite(event.deltaY)) return;
+    clearTouchGesture({ flush: true, releaseCapture: true });
+    cancelPendingPan(true);
+    const bounds = viewport.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return;
+    const base = pendingWheelZoomRef.current ?? {
+      zoom: zoomRef.current,
+      pan: panRef.current,
+      percent: 0,
+    };
+    const delta = normalizedWheelDelta(event, bounds.height);
+    const sensitivity = event.ctrlKey || event.metaKey
+      ? MODIFIED_WHEEL_ZOOM_SENSITIVITY
+      : WHEEL_ZOOM_SENSITIVITY;
+    const factor = Math.max(
+      MIN_WHEEL_ZOOM_FACTOR,
+      Math.min(MAX_WHEEL_ZOOM_FACTOR, Math.exp(-delta * sensitivity))
+    );
+    const nextZoom = clampZoom(base.zoom * factor);
+    const anchorX = Math.max(0, Math.min(bounds.width, event.clientX - bounds.left));
+    const anchorY = Math.max(0, Math.min(bounds.height, event.clientY - bounds.top));
+    const nextPan = anchorPreservingPan({
+      anchorX,
+      anchorY,
+      containerWidth: bounds.width,
+      containerHeight: bounds.height,
+      currentZoom: base.zoom,
+      nextZoom,
+      currentPan: base.pan,
+    });
+    const scale = fitScale(
+      bounds.width,
+      bounds.height,
+      currentPreview.width,
+      currentPreview.height
+    );
+    pendingWheelZoomRef.current = {
+      zoom: nextZoom,
+      pan: nextPan,
+      percent: Math.round(scale * nextZoom * 100),
+    };
+    if (wheelAnimationFrameRef.current) return;
+    if (typeof globalThis.requestAnimationFrame !== "function") {
+      flushPendingWheelZoom();
+      return;
+    }
+    wheelAnimationFrameRef.current = globalThis.requestAnimationFrame(flushPendingWheelZoom);
+  }
+
   function resetFit() {
+    clearTouchGesture({ flush: false, releaseCapture: true });
     cancelPendingPan(false);
+    cancelPendingWheelZoom(false);
+    zoomRef.current = 1;
+    panRef.current = { x: 0, y: 0 };
+    viewModeRef.current = "fit";
     setZoom(1);
     setZoomLabel("맞춤");
     setPan({ x: 0, y: 0 });
@@ -412,9 +754,14 @@ export function StudioCompanionReferenceDisplay({
       visiblePreview.height
     );
     if (scale <= 0) return;
+    clearTouchGesture({ flush: false, releaseCapture: true });
     cancelPendingPan(false);
+    cancelPendingWheelZoom(false);
     const next = clampZoom(1 / scale);
     const percent = Math.round(scale * next * 100);
+    zoomRef.current = next;
+    panRef.current = { x: 0, y: 0 };
+    viewModeRef.current = "actual";
     setZoom(next);
     setZoomLabel(`${percent}%`);
     setPan({ x: 0, y: 0 });
@@ -425,12 +772,18 @@ export function StudioCompanionReferenceDisplay({
 
   function adjustZoom(direction: 1 | -1) {
     if (!visiblePreview) return;
-    const next = clampZoom(zoom * (direction > 0 ? ZOOM_STEP : 1 / ZOOM_STEP));
+    clearTouchGesture({ flush: true, releaseCapture: true });
+    cancelPendingWheelZoom(true);
+    const next = clampZoom(
+      zoomRef.current * (direction > 0 ? ZOOM_STEP : 1 / ZOOM_STEP)
+    );
     const bounds = viewportRef.current?.getBoundingClientRect();
     const scale = bounds
       ? fitScale(bounds.width, bounds.height, visiblePreview.width, visiblePreview.height)
       : 0;
     const percent = Math.round((scale > 0 ? scale * next : next) * 100);
+    zoomRef.current = next;
+    viewModeRef.current = "custom";
     setZoom(next);
     setZoomLabel(`${percent}%`);
     setFeedback(`확대율 ${percent}%`);
@@ -470,15 +823,22 @@ export function StudioCompanionReferenceDisplay({
       suppressClickRef.current = false;
       return;
     }
-    if (!pickerActive || !pickerReady || !visiblePreview || event.button !== 0) return;
+    if (
+      !pickerActive
+      || !pickerReady
+      || !visiblePreview
+      || event.button !== 0
+      || event.detail > 1
+    ) return;
+    cancelPendingWheelZoom(true);
     const point = pointWithinImage({
       clientX: event.clientX,
       clientY: event.clientY,
       bounds: event.currentTarget.getBoundingClientRect(),
       imageWidth: visiblePreview.width,
       imageHeight: visiblePreview.height,
-      zoom,
-      pan,
+      zoom: zoomRef.current,
+      pan: panRef.current,
     });
     if (!point) {
       setFeedback("합성된 이미지 안쪽에서 색을 선택해 주세요.");
@@ -487,13 +847,160 @@ export function StudioCompanionReferenceDisplay({
     emitPick(point);
   }
 
+  function handleDoubleClick(event: MouseEvent<HTMLButtonElement>) {
+    if (
+      event.button !== 0
+      || pickerActive
+      || lastPointerTypeRef.current === "touch"
+      || !visiblePreview
+    ) return;
+    event.preventDefault();
+    cancelPendingPan(true);
+    cancelPendingWheelZoom(true);
+    if (viewModeRef.current === "actual") resetFit();
+    else setActualSize();
+  }
+
+  function capturePointer(target: HTMLButtonElement, pointerId: number) {
+    try {
+      target.setPointerCapture(pointerId);
+    } catch {
+      // Pointer capture is an enhancement; local gestures still work while pointers remain here.
+    }
+  }
+
+  function releasePointer(target: HTMLButtonElement, pointerId: number) {
+    try {
+      if (!target.hasPointerCapture || target.hasPointerCapture(pointerId)) {
+        target.releasePointerCapture(pointerId);
+      }
+    } catch {
+      // Browsers may release capture before pointerup/lostpointercapture.
+    }
+  }
+
+  function beginPinch(target: HTMLButtonElement): boolean {
+    const pointers = [...activeTouchPointersRef.current.entries()];
+    if (pointers.length !== 2 || !connectedPreviewRef.current) return false;
+    const [[firstId, first], [secondId, second]] = pointers;
+    const startDistance = touchDistance(first, second);
+    const bounds = target.getBoundingClientRect();
+    if (
+      !Number.isFinite(startDistance)
+      || startDistance <= 0
+      || bounds.width <= 0
+      || bounds.height <= 0
+    ) return false;
+    cancelPendingPan(true);
+    cancelPendingWheelZoom(true);
+    cancelPendingPinchZoom(false);
+    panSessionRef.current = null;
+    pinchSessionRef.current = {
+      pointerIds: [firstId, secondId],
+      startDistance,
+      startCentroid: touchCentroid(first, second),
+      startZoom: zoomRef.current,
+      startPan: { ...panRef.current },
+      moved: false,
+    };
+    touchGestureWasPinchRef.current = true;
+    suppressClickRef.current = true;
+    setFeedback("두 손가락으로 확대하고 이동할 수 있습니다.");
+    return true;
+  }
+
+  function updatePinch(target: HTMLButtonElement) {
+    const session = pinchSessionRef.current;
+    const currentPreview = connectedPreviewRef.current;
+    if (!session || !currentPreview) return;
+    const first = activeTouchPointersRef.current.get(session.pointerIds[0]);
+    const second = activeTouchPointersRef.current.get(session.pointerIds[1]);
+    if (!first || !second) return;
+    const distance = touchDistance(first, second);
+    const bounds = target.getBoundingClientRect();
+    if (
+      !Number.isFinite(distance)
+      || distance <= 0
+      || bounds.width <= 0
+      || bounds.height <= 0
+    ) return;
+    const currentCentroid = touchCentroid(first, second);
+    const nextZoom = clampZoom(session.startZoom * (distance / session.startDistance));
+    const nextPan = pinchPreservingPan({
+      startCentroid: {
+        x: session.startCentroid.x - bounds.left,
+        y: session.startCentroid.y - bounds.top,
+      },
+      currentCentroid: {
+        x: currentCentroid.x - bounds.left,
+        y: currentCentroid.y - bounds.top,
+      },
+      containerWidth: bounds.width,
+      containerHeight: bounds.height,
+      startZoom: session.startZoom,
+      nextZoom,
+      startPan: session.startPan,
+    });
+    const scale = fitScale(
+      bounds.width,
+      bounds.height,
+      currentPreview.width,
+      currentPreview.height
+    );
+    session.moved = session.moved
+      || Math.abs(distance - session.startDistance) > 0.5
+      || Math.abs(currentCentroid.x - session.startCentroid.x) > 0.5
+      || Math.abs(currentCentroid.y - session.startCentroid.y) > 0.5;
+    schedulePinchZoom({
+      zoom: nextZoom,
+      pan: nextPan,
+      percent: Math.round(scale * nextZoom * 100),
+    });
+  }
+
   function handlePointerDown(event: PointerEvent<HTMLButtonElement>) {
+    lastPointerTypeRef.current = event.pointerType;
+    if (event.pointerType === "touch") {
+      const pointers = activeTouchPointersRef.current;
+      if (!visiblePreview || connectionStatus !== "connected") return;
+      if (!pickerActive || pointers.size > 0) event.preventDefault();
+      if (!pointers.has(event.pointerId) && pointers.size >= 2) {
+        suppressClickRef.current = true;
+        setFeedback("핀치 확대는 두 손가락까지만 사용할 수 있습니다.");
+        return;
+      }
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      capturePointer(event.currentTarget, event.pointerId);
+      if (pointers.size === 2) {
+        touchGestureWasPinchRef.current = true;
+        suppressClickRef.current = true;
+        cancelPendingPan(true);
+        panSessionRef.current = null;
+        if (!beginPinch(event.currentTarget)) {
+          setFeedback("두 손가락 간격을 벌리면 핀치 확대가 시작됩니다.");
+        }
+        return;
+      }
+      touchGestureWasPinchRef.current = false;
+      if (pickerActive) return;
+      cancelPendingWheelZoom(true);
+      suppressClickRef.current = true;
+      panSessionRef.current = {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        moved: false,
+        suppressPrimaryClick: true,
+      };
+      return;
+    }
+
     if (panSessionRef.current) return;
     const shouldPan = event.button === 1
-      || (event.button === 0 && spaceHeldRef.current)
-      || (event.button === 0 && event.pointerType === "touch" && !pickerActive);
+      || (event.button === 0 && spaceHeldRef.current);
     if (!shouldPan || !visiblePreview) return;
     event.preventDefault();
+    cancelPendingWheelZoom(true);
     suppressClickRef.current = event.button === 0;
     panSessionRef.current = {
       pointerId: event.pointerId,
@@ -502,14 +1009,24 @@ export function StudioCompanionReferenceDisplay({
       moved: false,
       suppressPrimaryClick: event.button === 0,
     };
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {
-      // Pointer capture is an enhancement; local panning still works while the pointer remains here.
-    }
+    capturePointer(event.currentTarget, event.pointerId);
   }
 
   function handlePointerMove(event: PointerEvent<HTMLButtonElement>) {
+    const pointers = activeTouchPointersRef.current;
+    if (pointers.has(event.pointerId)) {
+      const shouldPrevent = pointers.size > 1
+        || pinchSessionRef.current !== null
+        || panSessionRef.current?.pointerId === event.pointerId;
+      if (shouldPrevent) event.preventDefault();
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointers.size === 2) {
+        if (!pinchSessionRef.current && !beginPinch(event.currentTarget)) return;
+        updatePinch(event.currentTarget);
+        return;
+      }
+    }
+
     const session = panSessionRef.current;
     if (!session || session.pointerId !== event.pointerId) return;
     const deltaX = event.clientX - session.x;
@@ -521,7 +1038,58 @@ export function StudioCompanionReferenceDisplay({
     schedulePan(deltaX, deltaY);
   }
 
+  function finishTouchPointer(
+    event: PointerEvent<HTMLButtonElement>,
+    reason: "up" | "cancel" | "lost"
+  ): boolean {
+    const pointers = activeTouchPointersRef.current;
+    if (!pointers.has(event.pointerId)) return false;
+    const pinch = pinchSessionRef.current;
+    const wasPinch = touchGestureWasPinchRef.current
+      || Boolean(pinch?.pointerIds.includes(event.pointerId));
+    const panSession = panSessionRef.current;
+    if (wasPinch || panSession?.pointerId === event.pointerId) event.preventDefault();
+    pointers.delete(event.pointerId);
+    if (pinch) {
+      cancelPendingPinchZoom(reason === "up");
+      pinchSessionRef.current = null;
+    }
+    if (panSession?.pointerId === event.pointerId) {
+      panSessionRef.current = null;
+      cancelPendingPan(reason === "up");
+      if (reason === "up" && panSession.moved && !wasPinch) {
+        setFeedback("레퍼런스 위치를 옮겼습니다.");
+      }
+    }
+    if (reason !== "lost") releasePointer(event.currentTarget, event.pointerId);
+
+    const remaining = [...pointers.entries()];
+    if (remaining.length === 1 && wasPinch && connectedPreviewRef.current) {
+      const [pointerId, point] = remaining[0]!;
+      panSessionRef.current = {
+        pointerId,
+        x: point.x,
+        y: point.y,
+        moved: false,
+        suppressPrimaryClick: true,
+      };
+      suppressClickRef.current = true;
+    } else if (remaining.length === 0) {
+      if (wasPinch && reason === "up") {
+        setFeedback("핀치 확대를 마쳤습니다. 한 손가락 이동으로 자연스럽게 이어집니다.");
+      }
+      touchGestureWasPinchRef.current = false;
+      if (suppressClickRef.current) {
+        globalThis.setTimeout(() => {
+          if (activeTouchPointersRef.current.size === 0) suppressClickRef.current = false;
+        }, 0);
+      }
+    }
+    return true;
+  }
+
   function releasePan(event: PointerEvent<HTMLButtonElement>) {
+    if (finishTouchPointer(event, "up")) return;
     const session = panSessionRef.current;
     if (!session || session.pointerId !== event.pointerId) return;
     panSessionRef.current = null;
@@ -532,14 +1100,19 @@ export function StudioCompanionReferenceDisplay({
         suppressClickRef.current = false;
       }, 0);
     }
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {
-      // Browsers may release capture before pointerup/lostpointercapture.
-    }
+    releasePointer(event.currentTarget, event.pointerId);
   }
 
   function cancelPan(event: PointerEvent<HTMLButtonElement>) {
+    if (finishTouchPointer(event, "cancel")) return;
+    if (panSessionRef.current?.pointerId !== event.pointerId) return;
+    panSessionRef.current = null;
+    cancelPendingPan(false);
+    suppressClickRef.current = false;
+  }
+
+  function handleLostPointerCapture(event: PointerEvent<HTMLButtonElement>) {
+    if (finishTouchPointer(event, "lost")) return;
     if (panSessionRef.current?.pointerId !== event.pointerId) return;
     panSessionRef.current = null;
     cancelPendingPan(false);
@@ -570,8 +1143,10 @@ export function StudioCompanionReferenceDisplay({
       togglePicker();
     } else if (event.key === "Escape") {
       event.preventDefault();
+      clearTouchGesture({ flush: false, releaseCapture: true });
       panSessionRef.current = null;
       cancelPendingPan(false);
+      cancelPendingWheelZoom(false);
       suppressClickRef.current = false;
       setPickerActive(false);
       setFeedback("스포이드와 이동 조작을 취소했습니다.");
@@ -606,7 +1181,12 @@ export function StudioCompanionReferenceDisplay({
             레퍼런스 전용 화면
           </h2>
           <p id={helpId} className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-            한 손가락 드래그 또는 Space+드래그로 이동 · 0 맞춤 · I 스포이드
+            <span className="[@media(pointer:coarse)]:hidden">
+              휠 확대 · 더블 클릭 맞춤/100% · Space+드래그 이동 · I 스포이드
+            </span>
+            <span className="hidden [@media(pointer:coarse)]:inline">
+              두 손가락 확대 · 한 손가락 이동 · I 스포이드
+            </span>
           </p>
         </div>
         <span
@@ -706,31 +1286,28 @@ export function StudioCompanionReferenceDisplay({
         aria-describedby={`${helpId} ${statusId}`}
         aria-keyshortcuts="0 + - I Escape Enter Space"
         onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={releasePan}
         onPointerCancel={cancelPan}
-        onLostPointerCapture={() => {
-          if (panSessionRef.current) {
-            panSessionRef.current = null;
-            cancelPendingPan(false);
-            suppressClickRef.current = false;
-          }
-        }}
+        onLostPointerCapture={handleLostPointerCapture}
         onKeyDown={handleKeyDown}
         onKeyUp={handleKeyUp}
         onBlur={() => {
           spaceHeldRef.current = false;
           setSpaceHeld(false);
+          clearTouchGesture({ flush: true, releaseCapture: true });
           panSessionRef.current = null;
           cancelPendingPan(false);
+          cancelPendingWheelZoom(true);
           suppressClickRef.current = false;
         }}
         onContextMenu={(event) => {
           if (spaceHeld || pickerActive) event.preventDefault();
         }}
         className={cn(
-          "relative grid min-h-64 flex-1 touch-none place-items-center overflow-hidden rounded-xl border bg-[oklch(0.145_0.008_70)] outline-none",
+          "relative grid min-h-64 flex-1 place-items-center overflow-hidden rounded-xl border bg-[oklch(0.145_0.008_70)] outline-none",
           "focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/35",
           "motion-reduce:scroll-auto",
           spaceHeld
@@ -739,6 +1316,7 @@ export function StudioCompanionReferenceDisplay({
               ? "cursor-crosshair border-accent/45"
               : "cursor-default border-line"
         )}
+        style={{ touchAction: touchGesturesReady ? "none" : "pan-y" }}
       >
         {visiblePreview ? (
           <img

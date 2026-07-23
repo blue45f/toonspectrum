@@ -1,3 +1,4 @@
+import { studioGpuStrokeFeedPointCount } from "./studio-webgpu-stroke-feed";
 import {
   fingerprintStudioGpuStroke,
   planStudioGpuTileStates,
@@ -220,7 +221,7 @@ export function resolveStudioGpuTileTasks<Resource>(
         return null;
       }
       const exact = exactStrokeForOperation(next, strokesById);
-      if (!exact || next.pointCount !== exact.points.length / 2) return null;
+      if (!exact || next.pointCount !== studioGpuStrokeFeedPointCount(exact)) return null;
       plan = planStrokeExtension(
         exact,
         previous.pointCount,

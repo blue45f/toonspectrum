@@ -39,7 +39,10 @@ describe("Studio canvas cursor integration boundary", () => {
       "// 포인터가 캔버스를 벗어나면 브러시 커서 프리뷰를 숨긴다.",
     );
     const snapshot = authoritativeMove.indexOf(
-      "const coordinateMapper = stagePointerFrameMapperCacheRef.current!.mapperFor(stage);",
+      "const pointerMapperCache = stagePointerFrameMapperCacheRef.current;",
+    );
+    const mapper = authoritativeMove.indexOf(
+      "const coordinateMapper = pointerMapperCache.mapperFor(stage);",
     );
     const contactPoint = authoritativeMove.indexOf(
       "const contactPoint = coordinateMapper.pointFor(pointerEvent);",
@@ -56,17 +59,19 @@ describe("Studio canvas cursor integration boundary", () => {
     expect(studioPageSource).toContain("<StudioBrushCursor");
     expect(studioPageSource).toContain("brushId={drawMode === \"eraser\" ? \"eraser\" : brush}");
     expect(snapshot).toBeGreaterThanOrEqual(0);
-    expect(contactPoint).toBeGreaterThan(snapshot);
+    expect(mapper).toBeGreaterThan(snapshot);
+    expect(contactPoint).toBeGreaterThan(mapper);
     expect(consume).toBeGreaterThan(contactPoint);
     expect(cursor).toBeGreaterThan(consume);
     expect(authoritativeMove).toContain("{ coordinateMapper }");
-    expect(authoritativeMove.match(/stagePointerFrameMapperCacheRef\.current!\.mapperFor\(stage\)/gu)).toHaveLength(1);
+    expect(authoritativeMove.match(/pointerMapperCache\.mapperFor\(stage\)/gu)).toHaveLength(1);
     expect(authoritativeMove.match(/coordinateMapper\.pointFor\(pointerEvent\)/gu)).toHaveLength(1);
-    expect(rawUpdate.match(/stagePointerFrameMapperCacheRef\.current!\.mapperFor\(stage\)/gu)).toHaveLength(1);
+    expect(rawUpdate.match(/pointerMapperCache\.mapperFor\(stage\)/gu)).toHaveLength(1);
     expect(rawUpdate.match(/coordinateMapper\.pointFor\(pointerEvent\)/gu)).toHaveLength(1);
-    expect(studioPageSource).toContain("createStudioStagePointerFrameMapperCache({");
+    expect(studioPageSource).toContain("acquireStudioStagePointerFrameMapperCache(");
+    expect(studioPageSource).toContain("mapperCacheLease.release();");
     expect(studioPageSource).toContain("stagePointerFrameMapperCacheRef.current?.invalidate();");
-    expect(studioPageSource).toContain("stagePointerFrameMapperCacheRef.current?.dispose();");
+    expect(studioPageSource).not.toContain("stagePointerFrameMapperCacheRef.current?.dispose();");
     expect(rawUpdate).toContain("replaceStudioRawPenInkPreview(rawState, {");
     expect(rawUpdate).toContain("rawTransition.predictionSurface");
     expect(rawUpdate).toContain("updateBrushCursor(stage, pointerEvent, contactPoint, true);");

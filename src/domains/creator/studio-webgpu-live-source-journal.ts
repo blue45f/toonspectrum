@@ -27,7 +27,7 @@ export const STUDIO_GPU_LIVE_SOURCE_JOURNAL_MAX_VARIATIONS =
 export const STUDIO_GPU_LIVE_SOURCE_JOURNAL_MAX_SOURCE_POINTS = 1_000_000;
 /** A browser delivery may skip frames, but one call may not monopolize the main thread. */
 export const STUDIO_GPU_LIVE_SOURCE_JOURNAL_MAX_ADVANCE_SOURCE_POINTS = 100_000;
-/** Caps transformed point slots across all symmetry copies to a bounded transient allocation. */
+/** Caps the whole epoch's transformed point slots across all symmetry copies. */
 export const STUDIO_GPU_LIVE_SOURCE_JOURNAL_MAX_VARIATION_POINTS = 1_000_000;
 
 const MAX_IDENTITY_TEXT_LENGTH = 1_024;
@@ -549,9 +549,12 @@ function advanceStudioGpuLiveSourceJournalUnchecked(
     lastRenderedSample = lastSourceSample;
   }
 
+  const variationCount = state.identity.variations.length;
+  const nextRenderedPointCount = state.renderedPointCount + accepted.length;
   if (
-    accepted.length * state.identity.variations.length
-    > STUDIO_GPU_LIVE_SOURCE_JOURNAL_MAX_VARIATION_POINTS
+    !Number.isSafeInteger(nextRenderedPointCount)
+    || nextRenderedPointCount
+      > Math.floor(STUDIO_GPU_LIVE_SOURCE_JOURNAL_MAX_VARIATION_POINTS / variationCount)
   ) {
     return rejected(state, "variation-budget");
   }
@@ -570,7 +573,7 @@ function advanceStudioGpuLiveSourceJournalUnchecked(
         revision: state.revision + 1,
         sourcePointCount,
         pressurePointCount,
-        renderedPointCount: state.renderedPointCount + accepted.length,
+        renderedPointCount: nextRenderedPointCount,
         lastSourceSample,
         lastRenderedSample,
         sealed: nextSealed,

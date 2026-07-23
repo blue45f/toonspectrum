@@ -2,8 +2,15 @@
 // (멤버 간 공유 서버 동기화는 추후 백엔드 작업; 현재는 기기-로컬 개인 라이브러리.)
 
 const DB_NAME = "toonspectrum-studio-asset-library";
-const DB_VERSION = 1;
+export const STUDIO_ASSET_LIBRARY_DB_VERSION = 2;
 const STORE = "assets";
+const CONTENT_HASH_INDEX = "contentHash";
+export const STUDIO_ASSET_DATA_URL_MAX_CHARS = 32 * 1024 * 1024;
+export const STUDIO_ASSET_DATA_URL_MAX_DECODED_BYTES = 64 * 1024 * 1024;
+export const STUDIO_ASSET_CONTENT_IDENTITY_MAX_CANDIDATES_PER_HASH = 8;
+export const STUDIO_ASSET_CONTENT_IDENTITY_MAX_RETURN_CANDIDATES = 64;
+export const STUDIO_ASSET_CONTENT_IDENTITY_MAX_RETURN_DATA_URL_CHARS = 64 * 1024 * 1024;
+export const STUDIO_ASSET_CONTENT_IDENTITY_MAX_RETURN_DATA_URL_BYTES = 64 * 1024 * 1024;
 
 const SHA256_HEX_LENGTH = 64;
 const SHA256_CONTENT_HASH_PATTERN = /^sha256:([0-9a-f]{64})$/i;
@@ -32,6 +39,17 @@ export interface StudioAsset {
 export type StudioAssetWithContentHash = StudioAsset & {
   contentHash: StudioAssetContentHash;
 };
+
+export interface StudioAssetContentIdentityLookup {
+  contentHash: unknown;
+  assetId?: unknown;
+  signal?: AbortSignal;
+}
+
+export type StudioAssetContentIdentityCandidateMap = ReadonlyMap<
+  StudioAssetContentHash,
+  readonly StudioAsset[]
+>;
 
 function createAssetId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
@@ -78,13 +96,26 @@ export function canonicalizeStudioAssetContentHash(value: unknown): StudioAssetC
 }
 
 function decodePercentEncodedPayload(payload: string): Uint8Array<ArrayBuffer> {
-  const chunks: number[] = [];
   const encoder = new TextEncoder();
+  const maximumCapacity = Math.min(
+    STUDIO_ASSET_DATA_URL_MAX_DECODED_BYTES + 1,
+    payload.length * 3
+  );
+  const bytes = new Uint8Array(maximumCapacity);
+  let byteOffset = 0;
   let textStart = 0;
 
   const appendText = (end: number) => {
     if (end <= textStart) return;
-    for (const byte of encoder.encode(payload.slice(textStart, end))) chunks.push(byte);
+    const text = payload.slice(textStart, end);
+    const encoded = encoder.encodeInto(text, bytes.subarray(byteOffset));
+    if (encoded.read !== text.length) {
+      throw new TypeError("에셋 데이터 URL의 디코딩 크기가 제한을 초과했습니다.");
+    }
+    byteOffset += encoded.written;
+    if (byteOffset > STUDIO_ASSET_DATA_URL_MAX_DECODED_BYTES) {
+      throw new TypeError("에셋 데이터 URL의 디코딩 크기가 제한을 초과했습니다.");
+    }
   };
 
   for (let index = 0; index < payload.length; index += 1) {
@@ -94,13 +125,17 @@ function decodePercentEncodedPayload(payload: string): Uint8Array<ArrayBuffer> {
     if (!/^[0-9a-f]{2}$/i.test(encodedByte)) {
       throw new TypeError("에셋 데이터 URL의 퍼센트 인코딩이 올바르지 않습니다.");
     }
-    chunks.push(Number.parseInt(encodedByte, 16));
+    if (byteOffset >= STUDIO_ASSET_DATA_URL_MAX_DECODED_BYTES) {
+      throw new TypeError("에셋 데이터 URL의 디코딩 크기가 제한을 초과했습니다.");
+    }
+    bytes[byteOffset] = Number.parseInt(encodedByte, 16);
+    byteOffset += 1;
     index += 2;
     textStart = index + 1;
   }
 
   appendText(payload.length);
-  return Uint8Array.from(chunks);
+  return bytes.subarray(0, byteOffset);
 }
 
 function decodeBase64Payload(payload: string): Uint8Array<ArrayBuffer> {
@@ -119,6 +154,9 @@ function decodeBase64Payload(payload: string): Uint8Array<ArrayBuffer> {
   }
 
   const bytes = new Uint8Array(decoded.length);
+  if (bytes.byteLength > STUDIO_ASSET_DATA_URL_MAX_DECODED_BYTES) {
+    throw new TypeError("에셋 데이터 URL의 디코딩 크기가 제한을 초과했습니다.");
+  }
   for (let index = 0; index < decoded.length; index += 1) {
     bytes[index] = decoded.charCodeAt(index);
   }
@@ -128,6 +166,9 @@ function decodeBase64Payload(payload: string): Uint8Array<ArrayBuffer> {
 function decodeStudioAssetDataUrl(dataUrl: string): Uint8Array<ArrayBuffer> {
   if (typeof dataUrl !== "string" || !/^data:/i.test(dataUrl)) {
     throw new TypeError("에셋 콘텐츠는 데이터 URL이어야 합니다.");
+  }
+  if (dataUrl.length > STUDIO_ASSET_DATA_URL_MAX_CHARS) {
+    throw new TypeError("에셋 데이터 URL의 크기가 제한을 초과했습니다.");
   }
   const separatorIndex = dataUrl.indexOf(",");
   if (separatorIndex < 5) {
@@ -190,6 +231,63 @@ function safeCreatedAt(value: number): number {
   return Number.isFinite(value) ? value : 0;
 }
 
+function boundedUtf8ByteLength(value: string, maximumBytes: number): number | null {
+  if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 0 || value.length > maximumBytes) {
+    return null;
+  }
+  // Begin with the one-byte ASCII cost per UTF-16 code unit and add only the Unicode delta. This is
+  // allocation-free even for a maximum-sized data URL and exactly models TextEncoder replacement
+  // semantics for lone surrogates.
+  let byteLength = value.length;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x7f) continue;
+    if (code <= 0x7ff) byteLength += 1;
+    else if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        byteLength += 2;
+        index += 1;
+      } else {
+        byteLength += 2;
+      }
+    } else {
+      byteLength += 2;
+    }
+    if (byteLength > maximumBytes) return null;
+  }
+  return byteLength;
+}
+
+interface StudioAssetCandidateReturnBudget {
+  remainingCandidates: number;
+  remainingDataUrlChars: number;
+  remainingDataUrlBytes: number;
+}
+
+function admitStudioAssetCandidate(
+  candidate: StudioAsset,
+  budget: StudioAssetCandidateReturnBudget
+): boolean {
+  if (
+    candidate.id.length < 1
+    || candidate.id.length > 512
+    || candidate.dataUrl.length < 1
+    || candidate.dataUrl.length > STUDIO_ASSET_DATA_URL_MAX_CHARS
+    || candidate.dataUrl.length > budget.remainingDataUrlChars
+    || budget.remainingCandidates <= 0
+  ) return false;
+  const dataUrlBytes = boundedUtf8ByteLength(
+    candidate.dataUrl,
+    budget.remainingDataUrlBytes
+  );
+  if (dataUrlBytes === null) return false;
+  budget.remainingCandidates -= 1;
+  budget.remainingDataUrlChars -= candidate.dataUrl.length;
+  budget.remainingDataUrlBytes -= dataUrlBytes;
+  return true;
+}
+
 interface StudioAssetHashBackfill {
   id: string;
   dataUrl: string;
@@ -250,15 +348,44 @@ function transactionDone(transaction: IDBTransaction) {
 function openDatabase() {
   if (!hasIndexedDb()) return Promise.reject(dbError());
   return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const request = indexedDB.open(DB_NAME, STUDIO_ASSET_LIBRARY_DB_VERSION);
+    let settled = false;
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
     request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        db.createObjectStore(STORE, { keyPath: "id" });
+      try {
+        const db = request.result;
+        const store = db.objectStoreNames.contains(STORE)
+          ? request.transaction?.objectStore(STORE) ?? null
+          : db.createObjectStore(STORE, { keyPath: "id" });
+        if (!store) throw dbError();
+        if (!store.indexNames.contains(CONTENT_HASH_INDEX)) {
+          store.createIndex(CONTENT_HASH_INDEX, "contentHash", { unique: false });
+        }
+      } catch (error) {
+        try {
+          request.transaction?.abort();
+        } catch {
+          // An already-aborted versionchange transaction needs no further action.
+        }
+        fail(error instanceof Error ? error : dbError());
       }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? dbError());
+    request.onblocked = () => fail(new Error("에셋 라이브러리 업그레이드가 다른 탭에 의해 차단되었습니다."));
+    request.onsuccess = () => {
+      const db = request.result;
+      if (settled) {
+        db.close();
+        return;
+      }
+      settled = true;
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
+    request.onerror = () => fail(request.error ?? dbError());
   });
 }
 
@@ -328,6 +455,129 @@ export async function listAssets(): Promise<StudioAsset[]> {
       .map(({ asset }) => asset)
       .sort((a, b) => safeCreatedAt(b.createdAt) - safeCreatedAt(a.createdAt));
   });
+}
+
+/**
+ * Reference/companion처럼 이미 콘텐츠 식별자를 아는 경로를 위한 bounded batch 조회다.
+ *
+ * 전체 object store를 복제하지 않는다. device-local id 후보는 한 트랜잭션에서 정확 조회하고,
+ * 아직 해석되지 않은 최대 32개 SHA-256은 v2 `contentHash` 비고유 인덱스에서 직접 조회한다.
+ * 해시 후보는 id fallback보다 먼저 반환하되 호출자가 실제 바이트 SHA-256을 다시 검증한다.
+ * 해시가 없는 v1 레거시 행은 정확한 id 힌트가 있을 때만 안전하게 반환한다.
+ */
+export async function findStudioAssetCandidatesByContentIdentities(
+  lookups: readonly StudioAssetContentIdentityLookup[],
+  signal?: AbortSignal
+): Promise<StudioAssetContentIdentityCandidateMap> {
+  if (signal?.aborted) return new Map();
+  const assetIdsByHash = new Map<StudioAssetContentHash, string[]>();
+  for (const lookup of lookups.slice(0, 32)) {
+    const contentHash = canonicalizeStudioAssetContentHash(lookup.contentHash);
+    if (!contentHash || lookup.signal?.aborted) continue;
+    const assetId = typeof lookup.assetId === "string"
+      && lookup.assetId.length > 0
+      && lookup.assetId.length <= 512
+      ? lookup.assetId
+      : null;
+    const ids = assetIdsByHash.get(contentHash) ?? [];
+    if (assetId && !ids.includes(assetId)) ids.push(assetId);
+    assetIdsByHash.set(contentHash, ids);
+  }
+  if (assetIdsByHash.size === 0) return new Map();
+
+  return withDatabase(async (db) => {
+    const exactIds = [...new Set([...assetIdsByHash.values()].flat())];
+    const exactAssets = new Map<string, StudioAsset>();
+    if (exactIds.length > 0) {
+      const tx = db.transaction(STORE, "readonly");
+      const done = transactionDone(tx);
+      const store = tx.objectStore(STORE);
+      const [rows] = await Promise.all([
+        Promise.all(exactIds.map((id) => requestResult<unknown>(store.get(id)))),
+        done,
+      ]);
+      rows.forEach((row, index) => {
+        if (isStudioAssetRecord(row)) exactAssets.set(exactIds[index], row);
+      });
+    }
+    if (signal?.aborted) return new Map();
+
+    const idFallbacksByHash = new Map<StudioAssetContentHash, readonly StudioAsset[]>();
+    for (const [contentHash, ids] of assetIdsByHash) {
+      const idCandidates = ids.flatMap((id) => {
+        const candidate = exactAssets.get(id);
+        return candidate ? [candidate] : [];
+      });
+      if (idCandidates.length === 0) continue;
+      idFallbacksByHash.set(contentHash, idCandidates);
+    }
+
+    const indexedCandidatesByHash = new Map<StudioAssetContentHash, readonly StudioAsset[]>();
+    await (async () => {
+      try {
+        const tx = db.transaction(STORE, "readonly");
+        const done = transactionDone(tx);
+        const index = tx.objectStore(STORE).index(CONTENT_HASH_INDEX);
+        const hashes = [...assetIdsByHash.keys()];
+        const [rows] = await Promise.all([
+          Promise.all(hashes.map((hash) => requestResult<unknown[]>(index.getAll(
+            hash,
+            STUDIO_ASSET_CONTENT_IDENTITY_MAX_CANDIDATES_PER_HASH
+          )))),
+          done,
+        ]);
+        rows.forEach((hashRows, rowIndex) => {
+          const hash = hashes[rowIndex];
+          if (!hash) return;
+          indexedCandidatesByHash.set(hash, hashRows.filter((row): row is StudioAsset => (
+            isStudioAssetRecord(row)
+            && canonicalizeStudioAssetContentHash(row.contentHash) === hash
+          )));
+        });
+      } catch {
+        // A missing/corrupt index fails closed to exact-id rows; never copy the full object store.
+      }
+    })();
+    if (signal?.aborted) return new Map();
+
+    const candidates = new Map<StudioAssetContentHash, readonly StudioAsset[]>();
+    const budget: StudioAssetCandidateReturnBudget = {
+      remainingCandidates: STUDIO_ASSET_CONTENT_IDENTITY_MAX_RETURN_CANDIDATES,
+      remainingDataUrlChars: STUDIO_ASSET_CONTENT_IDENTITY_MAX_RETURN_DATA_URL_CHARS,
+      remainingDataUrlBytes: STUDIO_ASSET_CONTENT_IDENTITY_MAX_RETURN_DATA_URL_BYTES,
+    };
+    for (const contentHash of assetIdsByHash.keys()) {
+      const seenIds = new Set<string>();
+      const boundedCandidates: StudioAsset[] = [];
+      const appendCandidate = (candidate: StudioAsset) => {
+        if (
+          boundedCandidates.length >= STUDIO_ASSET_CONTENT_IDENTITY_MAX_CANDIDATES_PER_HASH
+          || seenIds.has(candidate.id)
+        ) return;
+        seenIds.add(candidate.id);
+        if (admitStudioAssetCandidate(candidate, budget)) boundedCandidates.push(candidate);
+      };
+      for (const candidate of indexedCandidatesByHash.get(contentHash) ?? []) {
+        appendCandidate(candidate);
+      }
+      const idCandidates = idFallbacksByHash.get(contentHash) ?? [];
+      for (const candidate of idCandidates) appendCandidate(candidate);
+      candidates.set(contentHash, boundedCandidates);
+    }
+    return candidates;
+  });
+}
+
+export async function findStudioAssetCandidatesByContentIdentity(
+  lookup: StudioAssetContentIdentityLookup
+): Promise<StudioAsset[]> {
+  const contentHash = canonicalizeStudioAssetContentHash(lookup.contentHash);
+  if (!contentHash || lookup.signal?.aborted) return [];
+  const candidates = await findStudioAssetCandidatesByContentIdentities(
+    [lookup],
+    lookup.signal
+  );
+  return [...(candidates.get(contentHash) ?? [])];
 }
 
 export async function deleteAsset(id: string): Promise<void> {

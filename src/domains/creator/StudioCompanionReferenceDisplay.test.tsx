@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -13,7 +13,10 @@ import type {
   StudioCompanionReferenceProjection,
 } from "./studio-companion-reference-projection";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 function projection(
   overrides: Partial<StudioCompanionReferenceProjection> = {}
@@ -341,6 +344,513 @@ describe("StudioCompanionReferenceDisplay", () => {
     expect(screen.getByRole("status").textContent).toContain("위치를 옮겼습니다");
   });
 
+  it("pinch-zooms around the moving centroid and transitions to one-finger pan", () => {
+    vi.stubGlobal("requestAnimationFrame", undefined);
+    const { container } = renderDisplay();
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    setViewportBounds(viewport);
+    const setPointerCapture = vi.fn();
+    const releasePointerCapture = vi.fn();
+    Object.assign(viewport, {
+      setPointerCapture,
+      releasePointerCapture,
+      hasPointerCapture: () => true,
+    });
+
+    fireEvent.pointerDown(viewport, {
+      button: 0,
+      pointerId: 41,
+      pointerType: "touch",
+      clientX: 50,
+      clientY: 100,
+    });
+    fireEvent.pointerDown(viewport, {
+      button: 0,
+      pointerId: 42,
+      pointerType: "touch",
+      clientX: 150,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(viewport, {
+      pointerId: 41,
+      pointerType: "touch",
+      clientX: 75,
+      clientY: 100,
+    });
+    const moveAccepted = fireEvent.pointerMove(viewport, {
+      pointerId: 42,
+      pointerType: "touch",
+      clientX: 225,
+      clientY: 100,
+    });
+
+    expect(moveAccepted).toBe(false);
+    expect(container.querySelector("img")?.style.transform)
+      .toBe("translate3d(75px, 25px, 0) scale(1.5)");
+    expect(screen.getByRole("status").textContent).not.toContain("두 손가락 중심을 유지했습니다");
+
+    fireEvent.pointerUp(viewport, {
+      button: 0,
+      pointerId: 42,
+      pointerType: "touch",
+      clientX: 225,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(viewport, {
+      pointerId: 41,
+      pointerType: "touch",
+      clientX: 95,
+      clientY: 110,
+    });
+    fireEvent.pointerUp(viewport, {
+      button: 0,
+      pointerId: 41,
+      pointerType: "touch",
+      clientX: 95,
+      clientY: 110,
+    });
+
+    expect(container.querySelector("img")?.style.transform)
+      .toBe("translate3d(95px, 35px, 0) scale(1.5)");
+    expect(screen.getByRole("status").textContent).toContain("핀치 확대를 마쳤습니다");
+    expect(setPointerCapture).toHaveBeenCalledTimes(2);
+    expect(releasePointerCapture).toHaveBeenCalledWith(42);
+    expect(releasePointerCapture).toHaveBeenCalledWith(41);
+  });
+
+  it("blocks picker sampling during pinch and safely ignores a third or zero-distance pointer", () => {
+    vi.stubGlobal("requestAnimationFrame", undefined);
+    const { container, onControl } = renderDisplay();
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    setViewportBounds(viewport);
+    fireEvent.click(screen.getByRole("button", { name: "스포이드" }));
+
+    for (const pointerId of [51, 52] as const) {
+      fireEvent.pointerDown(viewport, {
+        button: 0,
+        pointerId,
+        pointerType: "touch",
+        clientX: 100,
+        clientY: 100,
+      });
+    }
+    fireEvent.pointerDown(viewport, {
+      button: 0,
+      pointerId: 53,
+      pointerType: "touch",
+      clientX: 250,
+      clientY: 250,
+    });
+    expect(container.querySelector("img")?.style.transform).not.toContain("NaN");
+
+    fireEvent.pointerMove(viewport, {
+      pointerId: 52,
+      pointerType: "touch",
+      clientX: 200,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(viewport, {
+      pointerId: 52,
+      pointerType: "touch",
+      clientX: 250,
+      clientY: 100,
+    });
+    expect(container.querySelector("img")?.style.transform).toContain("scale(1.5)");
+
+    fireEvent.pointerUp(viewport, {
+      pointerId: 52,
+      pointerType: "touch",
+      clientX: 250,
+      clientY: 100,
+    });
+    fireEvent.pointerUp(viewport, {
+      pointerId: 51,
+      pointerType: "touch",
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.click(viewport, { button: 0, clientX: 150, clientY: 150 });
+
+    expect(onControl).toHaveBeenCalledTimes(1);
+    expect(onControl).toHaveBeenCalledWith({
+      kind: "reference-preview-demand",
+      active: true,
+    });
+    expect(screen.getByRole("button", { name: "스포이드" }).getAttribute("aria-pressed"))
+      .toBe("true");
+
+    fireEvent.pointerDown(viewport, {
+      button: 0,
+      pointerId: 54,
+      pointerType: "touch",
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerDown(viewport, {
+      button: 0,
+      pointerId: 55,
+      pointerType: "touch",
+      clientX: 101,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(viewport, {
+      pointerId: 55,
+      pointerType: "touch",
+      clientX: 1_000,
+      clientY: 100,
+    });
+    expect(container.querySelector("img")?.style.transform).toContain("scale(8)");
+    fireEvent.pointerMove(viewport, {
+      pointerId: 55,
+      pointerType: "touch",
+      clientX: 100.1,
+      clientY: 100,
+    });
+    expect(container.querySelector("img")?.style.transform).toContain("scale(0.25)");
+  });
+
+  it("cleans up pinch capture on cancel, lost capture, preview replacement and disconnect", () => {
+    let frame: FrameRequestCallback | null = null;
+    vi.stubGlobal("requestAnimationFrame", vi.fn((callback: FrameRequestCallback) => {
+      frame = callback;
+      return 91;
+    }));
+    const cancelAnimationFrame = vi.fn();
+    vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
+    const view = renderDisplay();
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    setViewportBounds(viewport);
+    const releasePointerCapture = vi.fn();
+    Object.assign(viewport, {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture,
+      hasPointerCapture: () => true,
+    });
+
+    fireEvent.pointerDown(viewport, {
+      button: 0,
+      pointerId: 61,
+      pointerType: "touch",
+      clientX: 75,
+      clientY: 100,
+    });
+    fireEvent.pointerDown(viewport, {
+      button: 0,
+      pointerId: 62,
+      pointerType: "touch",
+      clientX: 175,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(viewport, {
+      pointerId: 62,
+      pointerType: "touch",
+      clientX: 225,
+      clientY: 100,
+    });
+    expect(frame).not.toBeNull();
+
+    view.rerender(
+      <StudioCompanionReferenceDisplay
+        projection={projection({ revision: 10, referenceRevision: 6 })}
+        preview={preview({
+          url: "blob:replacement-reference",
+          revision: 10,
+          referenceRevision: 6,
+          sequence: 4,
+        })}
+        connectionStatus="connected"
+        onControl={vi.fn()}
+      />
+    );
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(91);
+    expect(releasePointerCapture).toHaveBeenCalledWith(61);
+    expect(releasePointerCapture).toHaveBeenCalledWith(62);
+    expect(view.container.querySelector("img")?.style.transform)
+      .toBe("translate3d(0px, 0px, 0) scale(1)");
+
+    const replacementViewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    setViewportBounds(replacementViewport);
+    fireEvent.pointerDown(replacementViewport, {
+      button: 0,
+      pointerId: 63,
+      pointerType: "touch",
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerCancel(replacementViewport, {
+      pointerId: 63,
+      pointerType: "touch",
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.lostPointerCapture(replacementViewport, {
+      pointerId: 63,
+      pointerType: "touch",
+    });
+    fireEvent.pointerDown(replacementViewport, {
+      button: 0,
+      pointerId: 65,
+      pointerType: "touch",
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.lostPointerCapture(replacementViewport, {
+      pointerId: 65,
+      pointerType: "touch",
+    });
+    fireEvent.pointerMove(replacementViewport, {
+      pointerId: 65,
+      pointerType: "touch",
+      clientX: 200,
+      clientY: 200,
+    });
+
+    view.rerender(
+      <StudioCompanionReferenceDisplay
+        projection={projection({ revision: 10, referenceRevision: 6 })}
+        preview={preview({
+          url: "blob:replacement-reference",
+          revision: 10,
+          referenceRevision: 6,
+          sequence: 4,
+        })}
+        connectionStatus="disconnected"
+        onControl={vi.fn()}
+      />
+    );
+    fireEvent.pointerDown(replacementViewport, {
+      button: 0,
+      pointerId: 64,
+      pointerType: "touch",
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(replacementViewport, {
+      pointerId: 64,
+      pointerType: "touch",
+      clientX: 150,
+      clientY: 150,
+    });
+    expect(view.container.querySelector("img")?.style.transform)
+      .toBe("translate3d(0px, 0px, 0) scale(1)");
+  });
+
+  it("keeps the image point below the pointer anchored while wheel-zooming", () => {
+    vi.stubGlobal("requestAnimationFrame", undefined);
+    const onControl = vi.fn();
+    const { container } = renderDisplay({ onControl });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    setViewportBounds(viewport);
+    const wheel = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 200,
+      clientY: 100,
+      deltaY: -100,
+      deltaMode: 0,
+    });
+
+    fireEvent(viewport, wheel);
+
+    expect(wheel.defaultPrevented).toBe(true);
+    expect(container.querySelector("img")?.style.transform)
+      .toBe("translate3d(-12.5px, 12.5px, 0) scale(1.25)");
+    expect(screen.getByRole("status").textContent)
+      .not.toContain("포인터 위치를 유지했습니다");
+
+    fireEvent.click(screen.getByRole("button", { name: "스포이드" }));
+    fireEvent.click(viewport, { button: 0, clientX: 200, clientY: 100 });
+    const pick = onControl.mock.calls.at(-1)?.[0];
+    expect(pick?.kind).toBe("reference-pick-color");
+    if (pick?.kind !== "reference-pick-color") throw new Error("pick missing");
+    expect(pick.point.x).toBeCloseTo(5 / 6, 6);
+    expect(pick.point.y).toBeCloseTo(1 / 3, 6);
+  });
+
+  it("allows page scrolling while the reference surface is empty or disconnected", () => {
+    const view = renderDisplay({ connectionStatus: "disconnected" });
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    setViewportBounds(viewport);
+
+    expect((viewport as HTMLButtonElement).style.touchAction).toBe("pan-y");
+
+    const touchDown = new Event("pointerdown", { bubbles: true, cancelable: true });
+    Object.defineProperties(touchDown, {
+      pointerType: { value: "touch" },
+      pointerId: { value: 71 },
+      button: { value: 0 },
+      clientX: { value: 100 },
+      clientY: { value: 100 },
+    });
+    fireEvent(viewport, touchDown);
+    expect(touchDown.defaultPrevented).toBe(false);
+
+    const wheel = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 100,
+      clientY: 100,
+      deltaY: 40,
+    });
+    fireEvent(viewport, wheel);
+    expect(wheel.defaultPrevented).toBe(false);
+
+    const nativeGesture = new Event("gesturestart", { bubbles: true, cancelable: true });
+    fireEvent(viewport, nativeGesture);
+    expect(nativeGesture.defaultPrevented).toBe(false);
+
+    view.rerender(
+      <StudioCompanionReferenceDisplay
+        projection={projection({ itemCount: 0, resolvedItemCount: 0, canPickColor: false })}
+        preview={null}
+        connectionStatus="connected"
+        onControl={vi.fn()}
+      />
+    );
+    expect((screen.getByRole("button", {
+      name: "합성된 레퍼런스 보드",
+    }) as HTMLButtonElement).style.touchAction).toBe("pan-y");
+  });
+
+  it("coalesces dense trackpad wheel input into one animation-frame commit", () => {
+    let frame: FrameRequestCallback | null = null;
+    const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+      frame = callback;
+      return 7;
+    });
+    vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    const { container } = renderDisplay();
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    setViewportBounds(viewport);
+
+    fireEvent.wheel(viewport, { clientX: 200, clientY: 100, deltaY: -20 });
+    fireEvent.wheel(viewport, { clientX: 200, clientY: 100, deltaY: -20 });
+    fireEvent.wheel(viewport, { clientX: 200, clientY: 100, deltaY: -20 });
+    expect(requestAnimationFrame).toHaveBeenCalledOnce();
+    expect(container.querySelector("img")?.style.transform)
+      .toBe("translate3d(0px, 0px, 0) scale(1)");
+
+    act(() => frame?.(16));
+    expect(container.querySelector("img")?.style.transform).not.toContain("scale(1)");
+  });
+
+  it("handles Ctrl/Cmd wheel locally and keeps zoom inside the 25%–800% limits", () => {
+    vi.stubGlobal("requestAnimationFrame", undefined);
+    const { container } = renderDisplay();
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    setViewportBounds(viewport);
+    const ctrlWheel = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 150,
+      clientY: 150,
+      deltaY: -100,
+      ctrlKey: true,
+    });
+    fireEvent(viewport, ctrlWheel);
+    expect(ctrlWheel.defaultPrevented).toBe(true);
+    expect(container.querySelector("img")?.style.transform).toContain("scale(1.25)");
+
+    const metaWheel = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 150,
+      clientY: 150,
+      deltaY: 100,
+      metaKey: true,
+    });
+    fireEvent(viewport, metaWheel);
+    expect(metaWheel.defaultPrevented).toBe(true);
+    expect(container.querySelector("img")?.style.transform).toContain("scale(1)");
+
+    for (let index = 0; index < 40; index += 1) {
+      fireEvent.wheel(viewport, { clientX: 150, clientY: 150, deltaY: -100 });
+    }
+    expect(container.querySelector("img")?.style.transform).toContain("scale(8)");
+    expect((screen.getByRole("button", { name: "확대" }) as HTMLButtonElement).disabled).toBe(true);
+
+    for (let index = 0; index < 80; index += 1) {
+      fireEvent.wheel(viewport, { clientX: 150, clientY: 150, deltaY: 100 });
+    }
+    expect(container.querySelector("img")?.style.transform).toContain("scale(0.25)");
+    expect((screen.getByRole("button", { name: "축소" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("announces continuous wheel zoom only once after the interaction becomes idle", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("requestAnimationFrame", undefined);
+    renderDisplay();
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    setViewportBounds(viewport);
+
+    fireEvent.wheel(viewport, { clientX: 150, clientY: 150, deltaY: -40 });
+    fireEvent.wheel(viewport, { clientX: 150, clientY: 150, deltaY: -40 });
+    expect(screen.getByRole("status").textContent).not.toContain("포인터 위치를 유지했습니다");
+
+    act(() => vi.advanceTimersByTime(149));
+    expect(screen.getByRole("status").textContent).not.toContain("포인터 위치를 유지했습니다");
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.getByRole("status").textContent).toContain("포인터 위치를 유지했습니다");
+  });
+
+  it("toggles fit and original 100% on double click without stealing picker or touch gestures", () => {
+    vi.stubGlobal("requestAnimationFrame", undefined);
+    const { container, onControl } = renderDisplay();
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    setViewportBounds(viewport, 400, 400);
+
+    fireEvent.doubleClick(viewport, { button: 0, clientX: 200, clientY: 200 });
+    expect(screen.getByRole("button", { name: "원본 100% 크기" }).textContent).toBe("100%");
+    expect(container.querySelector("img")?.style.transform).toContain("scale(0.5)");
+    fireEvent.doubleClick(viewport, { button: 0, clientX: 200, clientY: 200 });
+    expect(screen.getByRole("button", { name: "원본 100% 크기" }).textContent).toBe("맞춤");
+    expect(container.querySelector("img")?.style.transform).toContain("scale(1)");
+
+    fireEvent.click(screen.getByRole("button", { name: "스포이드" }));
+    fireEvent.click(viewport, { button: 0, detail: 1, clientX: 200, clientY: 200 });
+    fireEvent.click(viewport, { button: 0, detail: 2, clientX: 200, clientY: 200 });
+    fireEvent.doubleClick(viewport, { button: 0, clientX: 200, clientY: 200 });
+    expect(screen.getByRole("button", { name: "원본 100% 크기" }).textContent).toBe("맞춤");
+    expect(onControl).toHaveBeenCalledTimes(2);
+    expect(onControl).toHaveBeenLastCalledWith(expect.objectContaining({
+      kind: "reference-pick-color",
+      sequence: 1,
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: "스포이드" }));
+    fireEvent.pointerDown(viewport, {
+      button: 0,
+      pointerId: 31,
+      pointerType: "touch",
+      clientX: 200,
+      clientY: 200,
+    });
+    fireEvent.pointerUp(viewport, {
+      button: 0,
+      pointerId: 31,
+      pointerType: "touch",
+      clientX: 200,
+      clientY: 200,
+    });
+    fireEvent.doubleClick(viewport, { button: 0, clientX: 200, clientY: 200 });
+    expect(screen.getByRole("button", { name: "원본 100% 크기" }).textContent).toBe("맞춤");
+  });
+
+  it("continues to reject letterbox and outside picks after an anchored zoom", () => {
+    vi.stubGlobal("requestAnimationFrame", undefined);
+    const { onControl } = renderDisplay();
+    fireEvent.click(screen.getByRole("button", { name: "스포이드" }));
+    const viewport = screen.getByRole("button", { name: "합성된 레퍼런스 보드" });
+    setViewportBounds(viewport);
+    fireEvent.wheel(viewport, { clientX: 200, clientY: 100, deltaY: -100 });
+    fireEvent.click(viewport, { button: 0, clientX: 10, clientY: 150 });
+    fireEvent.click(viewport, { button: 0, clientX: 330, clientY: 150 });
+
+    expect(onControl).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("status").textContent).toContain("이미지 안쪽");
+  });
+
   it("hides stale, non-blob, empty, and generation-mismatched previews", () => {
     const view = renderDisplay({ preview: preview({ generation: 1 }) });
     expect(view.container.querySelector("img")).toBeNull();
@@ -430,6 +940,11 @@ describe("StudioCompanionReferenceDisplay", () => {
     expect(toolbar).toBeTruthy();
     expect(screen.getByRole("button", { name: "합성된 레퍼런스 보드" }).getAttribute("aria-keyshortcuts"))
       .toBe("0 + - I Escape Enter Space");
+    expect(screen.getByText(/두 손가락 확대 · 한 손가락 이동/u).className)
+      .toContain("pointer:coarse");
+    expect((screen.getByRole("button", {
+      name: "합성된 레퍼런스 보드",
+    }) as HTMLButtonElement).style.touchAction).toBe("none");
     for (const button of within(toolbar).getAllByRole("button")) {
       expect(button.className).toContain("min-h-11");
       expect(button.className).toContain("min-w-11");
