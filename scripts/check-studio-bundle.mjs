@@ -75,7 +75,9 @@ const budgets = {
   // 다이내믹 청크(예산 밖)이나 어댑터 공유 청크 +1로 정적 요청 149 관측. +1 여유로 재고정.
   // 2026-07-23 밤: perfect-freehand 벡터 펜(퍼펙트 잉크/마커) 어댑터 도입 — 라이브러리 본체는
   // 다이내믹 청크(예산 밖)이나 어댑터 공유 청크 +1로 정적 요청 150 관측. +1 여유로 재고정.
-  studioIncremental: { raw: 2_425_000, gzip: 795_000, chunks: 151 },
+  // 2026-07-24: 비파괴 필터 마스크(studio-filter-mask, KonvaImageNode 정적 임포트) + 말풍선
+  // 손그림 외곽선(studio-bubble-outline-style, KonvaBubbleNode 정적 임포트)로 정적 요청 152 관측.
+  studioIncremental: { raw: 2_425_000, gzip: 795_000, chunks: 152 },
   // Rapier deterministic compat is intentionally isolated in a user-triggered module Worker.
   // 2026-07-18 production output: 2,302,139 raw / 855,399 gzip. Keep ~2% version-drift headroom
   // without charging this optional engine to Studio or the 3D editor's initial graph.
