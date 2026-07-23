@@ -204,7 +204,29 @@ function decodeBmp(bytes: Uint8Array, maximumPixels?: number): StudioRasterDecod
   const bits = view.getUint16(28, true);
   const compression = view.getUint32(30, true);
   if (width <= 0 || signedHeight === 0) fail("INVALID_DIMENSIONS", "BMP 크기가 올바르지 않습니다.");
-  if (planes !== 1 || compression !== 0 || (bits !== 24 && bits !== 32)) {
+  if (planes !== 1 || (bits !== 24 && bits !== 32)) {
+    fail("UNSUPPORTED_VARIANT", "압축되지 않은 24/32-bit RGB BMP만 지원합니다.");
+  }
+  // BI_BITFIELDS(3)는 Windows/GIMP가 32-bit BMP를 저장하는 사실상 표준 경로다. 마스크가 정확히
+  // 표준 BGRA(V4/V5의 알파 포함 또는 40-byte header의 3-마스크 불투명) 배치일 때만 무압축 32-bit
+  // 와 동일하게 디코드하고, 그 외 커스텀 비트필드는 정직하게 거부한다.
+  let bitfieldsAlphaMask = 0xff00_0000;
+  if (compression === 3) {
+    const maskEnd = dibSize >= 56 ? 70 : 66;
+    if (bits !== 32 || bytes.length < maskEnd || pixelOffset < maskEnd) {
+      fail("UNSUPPORTED_VARIANT", "표준 BGRA 마스크의 32-bit BI_BITFIELDS BMP만 지원합니다.");
+    }
+    const redMask = view.getUint32(54, true);
+    const greenMask = view.getUint32(58, true);
+    const blueMask = view.getUint32(62, true);
+    bitfieldsAlphaMask = dibSize >= 56 ? view.getUint32(66, true) : 0;
+    if (
+      redMask !== 0x00ff_0000 || greenMask !== 0x0000_ff00 || blueMask !== 0x0000_00ff ||
+      (bitfieldsAlphaMask !== 0 && bitfieldsAlphaMask !== 0xff00_0000)
+    ) {
+      fail("UNSUPPORTED_VARIANT", "표준 BGRA 마스크의 32-bit BI_BITFIELDS BMP만 지원합니다.");
+    }
+  } else if (compression !== 0) {
     fail("UNSUPPORTED_VARIANT", "압축되지 않은 24/32-bit RGB BMP만 지원합니다.");
   }
   const height = Math.abs(signedHeight);
@@ -213,8 +235,9 @@ function decodeBmp(bytes: Uint8Array, maximumPixels?: number): StudioRasterDecod
   if (pixelOffset + rowBytes * height > bytes.length) fail("INVALID_FORMAT", "BMP 픽셀 데이터가 잘렸습니다.");
   const output = new Uint8ClampedArray(pixelBytes);
   const warnings: string[] = [];
+  const alphaChannelPresent = bits === 32 && (compression !== 3 || bitfieldsAlphaMask !== 0);
   let nonZeroAlpha = false;
-  if (bits === 32) {
+  if (alphaChannelPresent) {
     for (let offset = pixelOffset + 3; offset < pixelOffset + rowBytes * height; offset += 4) {
       nonZeroAlpha ||= bytes[offset] !== 0;
     }
@@ -229,7 +252,7 @@ function decodeBmp(bytes: Uint8Array, maximumPixels?: number): StudioRasterDecod
       output[target] = bytes[source + 2]!;
       output[target + 1] = bytes[source + 1]!;
       output[target + 2] = bytes[source]!;
-      output[target + 3] = bits === 32 && nonZeroAlpha ? bytes[source + 3]! : 255;
+      output[target + 3] = alphaChannelPresent && nonZeroAlpha ? bytes[source + 3]! : 255;
     }
   }
   return { bitmap: { width, height, data: output }, format: "bmp", warnings };
