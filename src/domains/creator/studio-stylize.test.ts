@@ -378,6 +378,21 @@ describe("applyStylize — oilPaint(유화)", () => {
     applyStylize(img, { type: "oilPaint", strength: 100, detail: 4 });
     expect(alphaPreserved(img, before)).toBe(true);
   });
+
+  // [의도적 변경] 최빈 빈 하드 argmax → 빈도^6 소프트 가중 — 압도적 다수 빈은 그대로 지배하고
+  // (소수 빈 가중 (1/8)^6 ≈ 0), 최빈 빈이 픽셀 간 뒤바뀌는 경계의 색 계단(밴딩)만 사라진다.
+  it("압도적 다수 빈이 지배한다 — 소수 스페클 픽셀은 다수 색으로 뭉개진다", () => {
+    // 5x5 다수색 [200,60,60] 위 중앙 한 픽셀만 어두운 [10,10,10](다른 휘도 빈).
+    const img = makeSolid(5, 5, [200, 60, 60, 255]);
+    const center = 2 * 5 + 2;
+    img.data.set([10, 10, 10, 255], center * 4);
+    applyStylize(img, { type: "oilPaint", strength: 100, detail: 1 });
+    // 중앙 3x3 창: 다수 8 vs 소수 1 → (1/8)^6 가중은 무시 수준 → 다수 색으로 수렴.
+    const px = pixelAt(img, center);
+    expect(Math.abs(px[0]! - 200)).toBeLessThanOrEqual(1);
+    expect(Math.abs(px[1]! - 60)).toBeLessThanOrEqual(1);
+    expect(Math.abs(px[2]! - 60)).toBeLessThanOrEqual(1);
+  });
 });
 
 describe("applyStylize — 작은 이미지 안전성", () => {

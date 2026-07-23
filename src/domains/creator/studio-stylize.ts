@@ -4,12 +4,12 @@
  *   emboss:    3x3 방향성 엠보스 커널을 휘도에 걸어 128 회색 기준 양각(릴리프)을 낸다.
  *   findEdges: 소벨(Sobel) 기울기 크기를 구해 밝은 바탕에 어두운 외곽선을 그린다(라인아트 추출).
  *   solarize:  임계값보다 큰 채널만 부분 반전해 포토샵 솔라리제이션 톤 반전을 만든다.
- *   oilPaint:  (detail) 반경 이웃에서 휘도를 N개 빈으로 묶어 최빈 빈의 평균색으로 칠한다(유화·쿠와하라).
+ *   oilPaint:  (detail) 반경 이웃에서 휘도를 N개 빈으로 묶고 빈도^6 소프트 가중 평균색으로 칠한다(유화·쿠와하라).
  * 이웃 읽기는 전부 원본 스냅샷(src)에서 하고, 샘플 좌표는 [0,w-1]/[0,h-1]로 클램프하며
  *   비유한 좌표는 0으로 고정한다(NaN이 Uint8ClampedArray를 0으로 뭉개는 버그 방지).
  * 결과는 t=strength/100로 원본과 블렌드한다. 빛을 더하는 항은 alpha/255로 스케일해
  *   완전 투명(alpha 0) 픽셀은 건드리지 않는다. 알파(+3)는 절대 쓰지 않는다(보존).
- * Math.random·Date 없음 — 같은 입력은 항상 같은 출력(결정적). 동률은 낮은 빈 인덱스로 안정 타이브레이크.
+ * Math.random·Date 없음 — 같은 입력은 항상 같은 출력(결정적). 유화 동률 빈은 자연 평균으로 안정.
  * Konva/DOM 의존 없음 — StudioPage 캔버스 로직과 단위 테스트가 공유한다.
  */
 
@@ -121,7 +121,7 @@ function blendGrayInto(data: Uint8ClampedArray, src: Uint8ClampedArray, i: numbe
  *   emboss:    방향성 엠보스 커널(휘도)을 128 기준 양각으로 → r/g/b 동일 회색 릴리프.
  *   findEdges: 소벨 기울기 크기 → out = 255 - clamp(mag), 밝은 바탕에 어두운 외곽선.
  *   solarize:  채널값 > 임계값이면 255-값으로 반전(부분 톤 반전).
- *   oilPaint:  detail 반경 이웃 휘도를 N빈 히스토그램으로 묶어 최빈 빈 평균색으로 칠함.
+ *   oilPaint:  detail 반경 이웃 휘도를 N빈 히스토그램으로 묶어 빈도^6 소프트 가중 평균색으로 칠함.
  *
  * 결과는 t=strength/100로 원본과 채널별 블렌드(final = orig*(1-t) + styl*t).
  * emboss는 회색 양각을 더하는 성격이라 (alpha/255)로 기여를 스케일해 투명 영역 헤일로를 막는다.
@@ -240,12 +240,17 @@ function applySolarize(data: Uint8ClampedArray, width: number, height: number, d
 const OIL_BINS = 8;
 // 유화 반경 상한 — detail이 커도 이웃 윈도가 과하게 커지지 않게(속도) 캡.
 const OIL_MAX_RADIUS = 5;
+// 유화 빈 소프트 가중 지수 — (count/maxCount)^N 가중 평균. N이 클수록 최빈 빈 위주(하드)이고,
+// 유한 N은 최빈 빈이 픽셀 간에 뒤바뀔 때 색이 계단으로 튀는 밴딩 윤곽을 부드럽게 잇는다.
+const OIL_HARDNESS = 6;
 
 /**
  * 유화 — 각 픽셀의 (detail) 반경 이웃에서 휘도를 OIL_BINS개 빈으로 묶어 히스토그램을 만들고,
- * 가장 빈도 높은 빈(동률이면 낮은 인덱스)을 골라 그 빈에 속한 이웃들의 평균 r/g/b로 칠한다.
+ * 빈별 평균색을 (count/maxCount)^OIL_HARDNESS 가중으로 섞어 칠한다(표준 GPU oil-paint 방식).
+ * 최빈 빈이 지배하되 근소한 2위 빈도 조금 섞여, 이웃 픽셀 간 최빈 빈이 뒤바뀌는 경계에서
+ * 색이 계단으로 튀던 밴딩 윤곽이 사라진다(하드 argmax의 상위호환 — 동률도 자연 평균).
  * 쿠와하라/유화 느낌의 평탄화. 반경은 min(detail, OIL_MAX_RADIUS)로 캡(캐시당 1회 실행).
- * 결과는 t로 원본과 블렌드하고 알파(+3)는 보존. 같은 입력=같은 출력(결정적 타이브레이크).
+ * 결과는 t로 원본과 블렌드하고 알파(+3)는 보존. 같은 입력=같은 출력(결정적).
  */
 function applyOilPaint(data: Uint8ClampedArray, width: number, height: number, detail: number, t: number): void {
   const src = new Uint8ClampedArray(data); // 원본 스냅샷(이웃 읽기용)
@@ -282,22 +287,31 @@ function applyOilPaint(data: Uint8ClampedArray, width: number, height: number, d
           sumB[bin]! += b;
         }
       }
-      // 최빈 빈(동률이면 가장 낮은 인덱스 — 결정적 타이브레이크).
-      let best = 0;
-      let bestCount = count[0]!;
-      for (let k = 1; k < OIL_BINS; k++) {
-        if (count[k]! > bestCount) {
-          bestCount = count[k]!;
-          best = k;
-        }
+      // 최빈 빈 개수(가중 정규화 기준).
+      let maxCount = 0;
+      for (let k = 0; k < OIL_BINS; k++) {
+        if (count[k]! > maxCount) maxCount = count[k]!;
       }
-      const c = bestCount > 0 ? bestCount : 1; // 0 나눗셈 방지(이론상 항상 >0)
-      const or = sumR[best]! / c;
-      const og = sumG[best]! / c;
-      const ob = sumB[best]! / c;
+      // (count/maxCount)^OIL_HARDNESS 소프트 가중으로 빈 평균색을 섞는다.
+      let wSum = 0;
+      let or = 0;
+      let og = 0;
+      let ob = 0;
+      for (let k = 0; k < OIL_BINS; k++) {
+        const ck = count[k]!;
+        if (ck <= 0) continue;
+        const ratio = ck / maxCount;
+        const w = ratio ** OIL_HARDNESS;
+        wSum += w;
+        const inv = w / ck;
+        or += sumR[k]! * inv;
+        og += sumG[k]! * inv;
+        ob += sumB[k]! * inv;
+      }
+      const invW = wSum > 0 ? 1 / wSum : 0; // 0 나눗셈 방지(이론상 항상 >0)
       const i = (y * width + x) * 4;
       // 투명 픽셀은 평탄화를 적용하지 않는다(알파 비율로 블렌드 강도 조절).
-      blendRgbInto(data, src, i, or, og, ob, t);
+      blendRgbInto(data, src, i, or * invW, og * invW, ob * invW, t);
     }
   }
 }

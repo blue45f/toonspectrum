@@ -14,7 +14,7 @@
  * Konva/DOM 의존 없음 — StudioPage 캔버스 로직과 단위 테스트가 공유한다.
  */
 
-import { clampCoord, lumaAt, sobelMagnitude } from "./studio-pixel-utils";
+import { clampCoord, lumaAt } from "./studio-pixel-utils";
 
 import type { StudioImageDataLike } from "./studio-filters";
 
@@ -104,7 +104,7 @@ function blendInk(data: Uint8ClampedArray, src: Uint8ClampedArray, i: number, in
 /**
  * 스케치 제자리 적용 — 항등(strength<=0)이면 no-op. 종류별로 분기한다.
  *
- *   photocopy:  소벨 기울기 크기로 잉크 농도를 정해 평탄=흰 바탕, 윤곽=검은 잉크의 2계조 톤.
+ *   photocopy:  평활 휘도 소벨 기울기 크기로 잉크 농도를 정해 평탄=흰 바탕, 윤곽=검은 잉크의 2계조 톤.
  *   crosshatch: 휘도가 어두울수록 대각 해치선을 촘촘히, 아주 어두우면 교차 방향까지 깐다.
  *   stamp:      박스 블러한 휘도를 임계값으로 잘라 순수 흑/백 도장.
  *   mezzotint:  고정 4x4 베이어 행렬로 휘도를 순서 디더링해 흑/백 점 입자.
@@ -138,32 +138,92 @@ export function applySketch(img: StudioImageDataLike, s: Sketch): void {
   }
 }
 
+// 포토카피 소벨 입력용 — 3x3 박스 평활 휘도 평면. 원본 휘도의 한 픽셀짜리 스페클(점 노이즈)이
+// 그대로 잉크 점으로 튀는 것을 막고, 실제 경계의 선은 유지한다(평면 1회 계산이라 더 빠르기도 하다).
+function smoothedLumaPlane(src: Uint8ClampedArray, width: number, height: number): Float32Array {
+  const n = width * height;
+  const luma = new Float32Array(n);
+  for (let p = 0; p < n; p++) {
+    const i = p * 4;
+    luma[p] = 0.299 * src[i]! + 0.587 * src[i + 1]! + 0.114 * src[i + 2]!;
+  }
+  const out = new Float32Array(n);
+  for (let y = 0; y < height; y++) {
+    const ym = clampCoord(y - 1, height) * width;
+    const y0 = y * width;
+    const yp = clampCoord(y + 1, height) * width;
+    for (let x = 0; x < width; x++) {
+      const xm = clampCoord(x - 1, width);
+      const xp = clampCoord(x + 1, width);
+      out[y0 + x] =
+        (luma[ym + xm]! +
+          luma[ym + x]! +
+          luma[ym + xp]! +
+          luma[y0 + xm]! +
+          luma[y0 + x]! +
+          luma[y0 + xp]! +
+          luma[yp + xm]! +
+          luma[yp + x]! +
+          luma[yp + xp]!) /
+        9;
+    }
+  }
+  return out;
+}
+
+// 평활 휘도 평면에서의 소벨 기울기 크기(거리 1 3x3).
+function sobelOnPlane(
+  plane: Float32Array,
+  width: number,
+  xm: number,
+  x: number,
+  xp: number,
+  ymRow: number,
+  yRow: number,
+  ypRow: number
+): number {
+  const tl = plane[ymRow + xm]!;
+  const tc = plane[ymRow + x]!;
+  const tr = plane[ymRow + xp]!;
+  const ml = plane[yRow + xm]!;
+  const mr = plane[yRow + xp]!;
+  const bl = plane[ypRow + xm]!;
+  const bc = plane[ypRow + x]!;
+  const br = plane[ypRow + xp]!;
+  const gx = -tl - 2 * ml - bl + tr + 2 * mr + br;
+  const gy = -tl - 2 * tc - tr + bl + 2 * bc + br;
+  return Math.sqrt(gx * gx + gy * gy);
+}
+
 /**
- * 포토카피 — 거리 1 소벨 기울기 크기로 잉크 농도를 정한다.
+ * 포토카피 — 3x3 평활 휘도 평면 위 거리 1 소벨 기울기 크기로 잉크 농도를 정한다.
+ * 평활 덕에 한 픽셀 스페클 노이즈는 잉크 점으로 튀지 않고 실제 윤곽선만 살아난다.
  * 기울기가 임계(thr) 이상이면 검은 잉크(0), 그 아래면 부드럽게 흰 바탕(255)으로 가는 2계조 톤.
  * detail이 클수록 thr이 낮아져(선 두께↑) 더 약한 경계도 잉크로 살아난다.
  * 평탄 영역은 기울기 0 → 흰 바탕. 잉크는 alpha-scaled 블렌드라 투명 영역은 보존.
  */
 function applyPhotocopy(data: Uint8ClampedArray, width: number, height: number, detail: number, t: number): void {
-  const src = new Uint8ClampedArray(data); // 원본 스냅샷(이웃 읽기용)
+  const src = new Uint8ClampedArray(data); // 원본 스냅샷(알파·블렌드 기준)
+  const plane = smoothedLumaPlane(src, width, height); // 평활 휘도(스페클 억제)
   // detail 1..10 → 잉크 임계 약 200..40(낮을수록 가는 선도 잉크로). 선폭/문턱.
   const thr = 220 - detail * 18;
   // thr 위 soft 구간 폭(2계조지만 경계 한 칸은 회색으로 부드럽게).
   const soft = 40;
   for (let y = 0; y < height; y++) {
-    const ym = clampCoord(y - 1, height);
-    const yp = clampCoord(y + 1, height);
+    const ymRow = clampCoord(y - 1, height) * width;
+    const yRow = y * width;
+    const ypRow = clampCoord(y + 1, height) * width;
     for (let x = 0; x < width; x++) {
       const xm = clampCoord(x - 1, width);
       const xp = clampCoord(x + 1, width);
-      // 소벨 기울기 크기(거리 1 3x3 이웃).
-      const mag = sobelMagnitude(src, width, xm, x, xp, ym, y, yp);
+      // 평활 평면 소벨 기울기 크기(거리 1 3x3 이웃).
+      const mag = sobelOnPlane(plane, width, xm, x, xp, ymRow, yRow, ypRow);
       // 잉크값: mag가 thr 이상이면 0(검정), thr-soft 이하면 255(흰 바탕), 사이는 선형.
       let ink: number;
       if (mag >= thr) ink = 0;
       else if (mag <= thr - soft) ink = 255;
       else ink = 255 * (1 - (mag - (thr - soft)) / soft);
-      const i = (y * width + x) * 4;
+      const i = (yRow + x) * 4;
       blendInk(data, src, i, ink, t);
     }
   }

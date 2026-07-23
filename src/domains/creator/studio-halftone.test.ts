@@ -193,7 +193,9 @@ describe("applyHalftone — cmyk 망점화", () => {
 });
 
 describe("applyHalftone — mono 망점화", () => {
-  it("그라디언트에 단일 흑색 망점 — 픽셀이 거의 검정/흰색의 이봉(bimodal)", () => {
+  // [의도적 변경] 망점 가장자리 안티에일리어싱 도입 — 점 경계 1px 램프가 중간톤을 만든다.
+  // 이전에는 완전 이봉(mid === 0)이었지만, 이제 이봉 "지배"(점/바탕이 다수) + AA 중간톤 존재를 검증한다.
+  it("그라디언트에 단일 흑색 망점 — 검정/흰색이 지배하고 점 경계엔 AA 중간톤이 있다", () => {
     const W = 32;
     const H = 8;
     // 가로 그라디언트(0..255).
@@ -207,7 +209,7 @@ describe("applyHalftone — mono 망점화", () => {
     const out = makeImage(W, H, px);
     applyHalftone(out, { dotSize: 4, angle: 45, mode: "mono", strength: 100 });
 
-    // strength100 mono는 점=0·바탕=255만 나온다 → 모든 픽셀이 0 또는 255.
+    // strength100 mono는 점 내부=0·바탕=255가 지배하고, 점 경계에만 AA 중간톤이 남는다.
     let near0 = 0;
     let near255 = 0;
     let mid = 0;
@@ -217,9 +219,39 @@ describe("applyHalftone — mono 망점화", () => {
       else if (v >= 254) near255++;
       else mid++;
     }
-    expect(mid).toBe(0); // 중간톤 없음(이봉)
     expect(near0).toBeGreaterThan(0); // 어두운 쪽엔 검정 점
     expect(near255).toBeGreaterThan(0); // 밝은 쪽엔 흰 바탕
+    expect(mid).toBeGreaterThan(0); // 점 경계 AA 중간톤 존재(계단 방지)
+    expect(mid).toBeLessThan(near0 + near255); // 이봉 지배(중간톤은 소수)
+  });
+
+  it("품질 지표 — 점 경계 대부분이 AA 램프를 지나 0↔255 하드 점프는 극소수다", () => {
+    // 큰 점(dotSize 8) 균일 중간톤 — 이전(이진 마스크)에는 모든 경계 스텝이 0↔255 점프였다.
+    // AA 도입 후 경계는 중간 커버리지 픽셀을 지나며, 정확히 방사 방향과 정렬된 극소수 스텝만 남는다.
+    const W = 32;
+    const H = 32;
+    const out = makeSolid(W, H, [128, 128, 128, 255]);
+    applyHalftone(out, { dotSize: 8, angle: 0, mode: "mono", strength: 100 });
+    let aaPixels = 0;
+    for (let i = 0; i < W * H; i++) {
+      const v = out.data[i * 4]!;
+      if (v > 10 && v < 245) aaPixels++;
+    }
+    let hardSteps = 0;
+    let significantSteps = 0;
+    for (let y = 0; y < H; y++) {
+      for (let x = 1; x < W; x++) {
+        const a = out.data[(y * W + x - 1) * 4]!;
+        const b = out.data[(y * W + x) * 4]!;
+        const d = Math.abs(a - b);
+        if (d >= 50) significantSteps++;
+        if (d >= 250) hardSteps++;
+      }
+    }
+    expect(significantSteps).toBeGreaterThan(0); // 점 패턴은 존재
+    expect(aaPixels).toBeGreaterThan(0); // 경계 AA 중간톤 존재
+    // 하드 점프는 경계 스텝의 극소수(이진 마스크였다면 전부 하드 점프).
+    expect(hardSteps).toBeLessThan(significantSteps / 10);
   });
 
   it("어두운 영역일수록 검정 점 비율이 높다(톤 방향성)", () => {

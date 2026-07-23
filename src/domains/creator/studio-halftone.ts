@@ -90,7 +90,10 @@ export function isIdentityHalftone(h: Halftone): boolean {
  *  - 화면을 angle만큼 회전한 좌표계에서 dotSize 정사각 셀 격자를 깐다.
  *  - 각 셀의 평균 커버리지 c(0..1)를 구하고, 셀 중심에 반지름 r=sqrt(c)*rMax 점을 찍는다.
  *    (점 면적 ∝ c → 톤 보존. 셀 대각선 절반까지 커지므로 진한 톤은 점이 맞붙어 메워진다.)
- *  - 결과 ink[px]는 그 픽셀이 점 안이면 1, 밖이면 0(0..1). 결정적.
+ *  - 점 가장자리는 1px 선형 램프로 안티에일리어싱 — ink = clamp(r - dist + 0.5, 0, 1).
+ *    램프가 실제 원 경계(dist=r)를 중심으로 대칭이라 점 면적(톤)은 1차 근사로 보존되고,
+ *    계단(에일리어싱)과 각도 회전 시 모아레가 크게 줄어든다. 이웃 점이 겹치면 max 커버리지.
+ *  - 결과 ink[px]는 연속 커버리지 0..1(경계는 중간값). 결정적.
  *
  * cov: 길이 width*height의 채널 커버리지(0..1). 반환: 같은 길이의 ink 마스크(0..1).
  */
@@ -151,7 +154,7 @@ function screenChannel(
     }
   }
 
-  // 2패스: 각 픽셀이 자기 셀(및 이웃 셀) 중심 점 안에 드는지 판정.
+  // 2패스: 각 픽셀이 자기 셀(및 이웃 셀) 중심 점에서 받는 AA 커버리지의 최댓값을 구한다.
   // 점은 셀 중심(회전계 격자 중심)에 있고, 이웃 1칸까지 닿을 수 있어 3x3 셀을 본다.
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -159,8 +162,8 @@ function screenChannel(
       const v = -x * sin + y * cos;
       const baseIu = Math.floor(u / cell);
       const baseIv = Math.floor(v / cell);
-      let inside = 0;
-      for (let dv = -1; dv <= 1 && inside === 0; dv++) {
+      let coverage = 0;
+      for (let dv = -1; dv <= 1 && coverage < 1; dv++) {
         for (let du = -1; du <= 1; du++) {
           const iu = baseIu + du - minIu;
           const iv = baseIv + dv - minIv;
@@ -176,13 +179,17 @@ function screenChannel(
           const cv = (baseIv + dv + 0.5) * cell;
           const ddu = u - cu;
           const ddv = v - cv;
-          if (ddu * ddu + ddv * ddv <= r * r) {
-            inside = 1;
+          // 1px 선형 AA 램프 — 원 경계(dist=r) 기준 대칭이라 점 면적(톤)을 보존한다.
+          const dist = Math.sqrt(ddu * ddu + ddv * ddv);
+          const cov = r - dist + 0.5;
+          if (cov >= 1) {
+            coverage = 1;
             break;
           }
+          if (cov > coverage) coverage = cov;
         }
       }
-      ink[y * width + x] = inside;
+      ink[y * width + x] = coverage;
     }
   }
 
@@ -222,7 +229,7 @@ export function applyHalftone(img: StudioImageDataLike, h: Halftone): void {
     const ink = screenChannel(cov, width, height, h.dotSize, MONO_BASE_ANGLE + h.angle);
     for (let i = 0; i < n; i++) {
       const j = i * 4;
-      const v = ink[i]! > 0 ? 0 : 255; // 점=검정, 바탕=흰
+      const v = 255 * (1 - ink[i]!); // 점=검정, 바탕=흰, 가장자리는 AA 중간톤
       data[j] = data[j]! + (v - data[j]!) * blend;
       data[j + 1] = data[j + 1]! + (v - data[j + 1]!) * blend;
       data[j + 2] = data[j + 2]! + (v - data[j + 2]!) * blend;
@@ -261,10 +268,10 @@ export function applyHalftone(img: StudioImageDataLike, h: Halftone): void {
   const inkY = screenChannel(cY, width, height, h.dotSize, CHANNEL_BASE_ANGLES.y + h.angle);
   const inkK = screenChannel(cK, width, height, h.dotSize, CHANNEL_BASE_ANGLES.k + h.angle);
 
-  // 흰 바탕에서 점이 찍힌 잉크를 승법으로 빼서 재구성.
+  // 흰 바탕에서 점이 찍힌 잉크를 승법으로 빼서 재구성(AA 커버리지 그대로 승법 — 부드러운 점 경계).
   for (let i = 0; i < n; i++) {
     const j = i * 4;
-    const kk = inkK[i]! > 0 ? 0 : 1; // K 점이면 검정(곱 0)
+    const kk = 1 - inkK[i]!; // K 잉크 커버리지만큼 어둡게(경계는 부분 잉크)
     let rr = (1 - inkC[i]!) * kk;
     let gg = (1 - inkM[i]!) * kk;
     let bb = (1 - inkY[i]!) * kk;

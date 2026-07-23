@@ -2,8 +2,11 @@
  * Studio Glow / Bloom Engine
  * 포토샵 "글로우(Glow)/블룸(Bloom)" 효과 — 밝은 영역만 뽑아 블러로 번지게 한 뒤
  * 원본에 스크린 합성해 빛이 새어 나오는 듯한 광채를 입힌다.
- *   1) 휘도 >= threshold%인 픽셀만 남긴 밝은 레이어(나머지 0)를 만든다(color로 칠하기 선택).
- *   2) 밝은 레이어를 size 반경 분리형 박스블러로 부드럽게 번지게 한다.
+ *   1) 휘도 >= threshold%인 픽셀을 소프트 니(knee)로 추출 — 임계 바로 아래 휘도도 부분
+ *      가중(smoothstep)으로 살려 하드 컷 밴딩(경계 링) 없이 자연스럽게 빛이 이어진다.
+ *      (color로 칠하기 선택.)
+ *   2) 밝은 레이어를 합계 반경 = size인 연속 3패스 박스블러로 번지게 한다 — 단일 박스의
+ *      사각 별 모양 아티팩트 없이 가우시안형 부드러운 감쇠, 도달 거리는 size 그대로.
  *   3) 원본에 스크린 합성: out = 255 - (255-orig)*(255-blur*strength/100)/255.
  * 밝은 픽셀은 더 밝아지고 주변으로 빛이 번지지만 어두운 영역은 거의 그대로 남는다(알파 보존).
  * Konva/DOM 의존 없음 — StudioPage 캔버스 로직과 단위 테스트가 공유한다.
@@ -101,12 +104,34 @@ export function isIdentityGlow(g: Glow): boolean {
 // 적용 — 밝은 레이어 추출 → 블러 → 스크린 합성(제자리 변형)
 // ---------------------------------------------------------------------------
 
+// 소프트 니 폭(휘도 단위) — 임계 아래 이 폭 구간에서 smoothstep으로 가중이 0→1로 올라간다.
+// 임계 이상 픽셀은 기존과 동일하게 가중 1(사용자 threshold 의미 보존), 바로 아래만 부드럽게 이어진다.
+const GLOW_KNEE = 32;
+
+// smoothstep(0..1) — 니 램프의 부드러운 보간.
+function smoothstep01(t: number): number {
+  const c = t <= 0 ? 0 : t >= 1 ? 1 : t;
+  return c * c * (3 - 2 * c);
+}
+
+// 합계 반경 = size가 되도록 연속 3패스 박스 반경으로 쪼갠다(0 반경 패스는 스킵).
+// 도달 거리(빛이 미치는 최대 px)는 단일 박스와 동일하게 유지하면서 프로파일만 가우시안형이 된다.
+function bloomPassRadii(size: number): [number, number, number] {
+  const r1 = Math.round(size / 3);
+  const r2 = Math.round((size - r1) / 2);
+  const r3 = size - r1 - r2;
+  return [r1, r2, r3];
+}
+
 /**
  * 글로우 제자리 적용 — 항등(strength 0)이면 no-op.
  *
- * 1) 밝은 레이어 추출: 휘도 L = 0.299r+0.587g+0.114b 가 threshold%(*255) 이상인 픽셀만
- *    남기고 나머지는 0. color!=="auto"면 그 색으로 칠하고(원래 밝기 L에 비례) 아니면 원색.
- * 2) size 반경 박스블러로 밝은 레이어를 번지게 한다(boxBlurRgb).
+ * 1) 밝은 레이어 추출: 휘도 L = 0.299r+0.587g+0.114b 기준, cut = threshold%(*255).
+ *    w = smoothstep((L - (cut-GLOW_KNEE)) / GLOW_KNEE) — L ≥ cut이면 1(기존과 동일),
+ *    cut 바로 아래 니 구간은 부분 가중, 그 아래는 0. 하드 컷 밴딩(경계 링)을 없앤다.
+ *    color!=="auto"면 그 색으로 칠하고(원래 밝기 L·w에 비례) 아니면 원색·w 가중.
+ * 2) 합계 반경 = size인 연속 3패스 박스블러(boxBlurRgb ×3)로 밝은 레이어를 번지게 한다
+ *    — 단일 박스의 사각/계단 프로파일 대신 가우시안형 감쇠, 도달 거리는 size 그대로.
  * 3) 원본에 스크린 합성(채널별, k=strength/100):
  *    out = 255 - (255-orig)*(255 - blur*k)/255.
  *    밝은 곳은 더 밝아지고 주변으로 빛이 번지며, blur 0(어두운 영역)은 orig 그대로.
@@ -119,42 +144,51 @@ export function applyGlow(img: StudioImageDataLike, g: Glow): void {
   if (!(width > 0) || !(height > 0)) return;
 
   const cut = (g.threshold / 100) * 255; // 추출 휘도 컷오프(0..255)
+  const kneeLo = cut - GLOW_KNEE; // 니 램프 시작 휘도
   const tinted = g.color !== "auto"; // 글로우를 단색으로 칠할지
   const tint = tinted ? hexChannels(g.color) : { r: 0, g: 0, b: 0 };
 
-  // --- 1) 밝은 레이어: threshold 이상만 남긴다(나머지 0) ---
+  // --- 1) 밝은 레이어: threshold 이상 = 1, 니 구간은 부분 가중, 그 아래 0 ---
   const bright = new Float32Array(data.length);
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i]!;
     const gg = data[i + 1]!;
     const b = data[i + 2]!;
     const lum = LUMA_R * r + LUMA_G * gg + LUMA_B * b;
-    if (lum < cut) continue; // 어두운 픽셀은 0(이미 초기값)
+    if (lum <= kneeLo) continue; // 니 아래 어두운 픽셀은 0(이미 초기값)
+    const w = smoothstep01((lum - kneeLo) / GLOW_KNEE); // cut 이상이면 1
     if (tinted) {
-      // 단색 글로우 — 추출 휘도 비율(L/255)로 칠해 밝을수록 진하게.
-      const w = lum / 255;
-      bright[i] = tint.r * w;
-      bright[i + 1] = tint.g * w;
-      bright[i + 2] = tint.b * w;
+      // 단색 글로우 — 추출 휘도 비율(L/255)·니 가중으로 칠해 밝을수록 진하게.
+      const s = (lum / 255) * w;
+      bright[i] = tint.r * s;
+      bright[i + 1] = tint.g * s;
+      bright[i + 2] = tint.b * s;
     } else {
-      // 원색 글로우 — 밝은 픽셀의 색을 그대로 번지게.
-      bright[i] = r;
-      bright[i + 1] = gg;
-      bright[i + 2] = b;
+      // 원색 글로우 — 밝은 픽셀의 색을 니 가중으로 번지게.
+      bright[i] = r * w;
+      bright[i + 1] = gg * w;
+      bright[i + 2] = b * w;
     }
   }
 
-  // --- 2) 밝은 레이어를 size 반경으로 번지게 ---
+  // --- 2) 밝은 레이어를 합계 반경 size의 3패스로 번지게(가우시안형 프로파일) ---
+  // bright ↔ blurred 두 버퍼를 핑퐁하며 0이 아닌 반경 패스만 실행. 마지막 결과가 bloom.
   const blurred = new Float32Array(data.length);
-  boxBlurRgb(bright, blurred, width, height, g.size);
+  let bloom: Float32Array = bright;
+  for (const r of bloomPassRadii(g.size)) {
+    if (r <= 0) continue;
+    const target = bloom === bright ? blurred : bright;
+    boxBlurRgb(bloom, target, width, height, r);
+    bloom = target;
+  }
 
   // --- 3) 원본에 스크린 합성 ---
   const k = g.strength / 100;
   for (let i = 0; i < data.length; i += 4) {
     // out = 255 - (255-orig)*(255 - blur*k)/255
-    data[i] = 255 - ((255 - data[i]!) * (255 - blurred[i]! * k)) / 255;
-    data[i + 1] = 255 - ((255 - data[i + 1]!) * (255 - blurred[i + 1]! * k)) / 255;
-    data[i + 2] = 255 - ((255 - data[i + 2]!) * (255 - blurred[i + 2]! * k)) / 255;
+    data[i] = 255 - ((255 - data[i]!) * (255 - bloom[i]! * k)) / 255;
+    data[i + 1] = 255 - ((255 - data[i + 1]!) * (255 - bloom[i + 1]! * k)) / 255;
+    data[i + 2] = 255 - ((255 - data[i + 2]!) * (255 - bloom[i + 2]! * k)) / 255;
   }
 }
 

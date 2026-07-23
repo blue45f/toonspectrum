@@ -226,6 +226,38 @@ describe("applyGrain — film(결정적 노이즈)", () => {
     expect(pixelAt(img, 2)[3]).toBe(170);
     expect(pixelAt(img, 3)[3]).toBe(250);
   });
+
+  // [의도적 변경] 필름 노이즈 분포를 균등 → 종형(해시 3합 Irwin-Hall)으로 개선 —
+  // 실제 필름처럼 잔입자가 많고 극단 입자는 드물다. 표준편차는 기존과 동일하게 정규화됐다.
+  it("품질 지표 — 노이즈 분포가 종형(1σ 이내 비율 ≈ 2/3 > 0.6, 균등 분포면 0.577)", () => {
+    const W = 64;
+    const H = 64;
+    const img = makeSolid(W, H, 128);
+    applyGrain(img, { type: "film", amount: 30, size: 1, seed: 7 });
+    // amount 30 → span 76.5, 정규화 표준편차 ≈ 0.289*span ≈ 22 (중간톤 128의 톤 가중 ≈ 1).
+    const sigma = 0.289 * (30 * 2.55);
+    let within = 0;
+    const n = W * H;
+    for (let i = 0; i < n; i++) {
+      if (Math.abs(img.data[i * 4]! - 128) <= sigma) within++;
+    }
+    expect(within / n).toBeGreaterThan(0.6);
+  });
+
+  it("품질 지표 — 순흑/순백에서는 중간톤보다 입자가 약하다(필름 톤 반응)", () => {
+    const mid = makeSolid(32, 32, 128);
+    const dark = makeSolid(32, 32, 4);
+    applyGrain(mid, { type: "film", amount: 40, size: 1, seed: 7 });
+    applyGrain(dark, { type: "film", amount: 40, size: 1, seed: 7 });
+    // 같은 seed의 같은 노이즈 필드 — 평균 절대 편차가 중간톤 쪽이 크다.
+    const meanAbsDelta = (img: StudioImageDataLike, base: number) => {
+      let s = 0;
+      const n = img.width * img.height;
+      for (let i = 0; i < n; i++) s += Math.abs(img.data[i * 4]! - base);
+      return s / n;
+    };
+    expect(meanAbsDelta(mid, 128)).toBeGreaterThan(meanAbsDelta(dark, 4));
+  });
 });
 
 describe("applyGrain — scanline(번갈아 어둡게)", () => {

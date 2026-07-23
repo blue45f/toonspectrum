@@ -222,6 +222,16 @@ function horizontalBoxBlur(
   }
 }
 
+// Soft threshold gate for unsharp masking. |delta| <= threshold contributes nothing and
+// |delta| >= 2*threshold sharpens fully; the smoothstep ramp between them removes the
+// hard on/off boundary that used to read as halo rings around near-threshold edges.
+function unsharpGate(deltaAbs: number, threshold: number): number {
+  if (threshold <= 0) return 1;
+  const t = (deltaAbs - threshold) / threshold;
+  const c = t <= 0 ? 0 : t >= 1 ? 1 : t;
+  return c * c * (3 - 2 * c);
+}
+
 export function applyStudioUnsharpMask(image: StudioImageDataLike, value: StudioUnsharpMask): void {
   const normalized = normalizeStudioUnsharpMask(value);
   if (normalized.amount === 0 || image.width === 0 || image.height === 0) return;
@@ -240,8 +250,9 @@ export function applyStudioUnsharpMask(image: StudioImageDataLike, value: Studio
         }
         const blurred = sum / diameter;
         const delta = data[index + channel]! - blurred;
-        if (Math.abs(delta) >= normalized.threshold) {
-          data[index + channel] = data[index + channel]! + delta * normalized.amount;
+        const gate = unsharpGate(Math.abs(delta), normalized.threshold);
+        if (gate > 0) {
+          data[index + channel] = data[index + channel]! + delta * normalized.amount * gate;
         }
       }
     }

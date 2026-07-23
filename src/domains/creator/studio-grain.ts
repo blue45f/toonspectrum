@@ -113,7 +113,7 @@ export function hash2(x: number, y: number, seed: number): number {
 /**
  * 그레인/텍스처 제자리 적용 — 항등(amount 0)이면 no-op. 종류별로 분기한다.
  *
- *   film:       각 픽셀에 noise=(hash2-0.5)*amount*2.55 휘도 노이즈를 r/g/b에 가산.
+ *   film:       각 픽셀에 종형(해시 3합 Irwin-Hall) 휘도 노이즈를 톤 반응 가중과 함께 r/g/b에 가산.
  *               size로 노이즈 블록 크기를 키워(좌표를 size로 양자화) 굵은 입자를 낸다.
  *   paper:      size*8 크기의 큰 블록마다 결정적 얼룩값을 뽑아 약한 대비(±)로 곱한다.
  *               저주파라 넓게 번지는 종이결처럼 보인다.
@@ -143,9 +143,19 @@ export function applyGrain(img: StudioImageDataLike, g: Grain): void {
   }
 }
 
+// 필름 그레인 분포 정규화 — Irwin-Hall(합성 3회) 종형 노이즈의 표준편차를
+// 기존 균등 분포와 동일(0.289·span)하게 맞추는 계수: std(IH3 중심) = 0.5 → 0.577배.
+const FILM_BELL_SCALE = 0.577;
+// 필름 그레인 톤 반응 바닥 — 섀도/하이라이트에서도 이 비율만큼은 입자가 남는다.
+const FILM_TONE_FLOOR = 0.35;
+
 /**
  * 필름 그레인 — 픽셀(또는 size 블록)별 결정적 노이즈를 휘도에 가산.
- * amount=100, hash2 양끝에서 최대 ±127.5(=amount*2.55/2) 정도 흔들린다.
+ * 분포: 독립 해시 3개 합(Irwin-Hall) — 균등 분포 대신 종형(가우시안 근사) 입자라
+ *   실제 필름처럼 잔입자가 많고 튀는 입자는 드물다(표준편차는 기존 균등과 동일하게 정규화).
+ * 톤 반응: 실제 필름 입자는 중간톤에서 가장 굵게 보인다 — 픽셀 휘도의 midWeight
+ *   (0.35 + 0.65·(1-|2L/255-1|))를 곱해 순흑/순백에서 입자가 과하게 끼지 않는다.
+ * 같은 (블록,seed)는 항상 같은 노이즈(결정적).
  */
 function applyFilm(data: Uint8ClampedArray, width: number, height: number, g: Grain): void {
   const span = g.amount * 2.55; // 0..255 진폭(amount 비례)
@@ -154,12 +164,17 @@ function applyFilm(data: Uint8ClampedArray, width: number, height: number, g: Gr
     const by = Math.floor(y / block); // 블록 좌표로 양자화
     for (let x = 0; x < width; x++) {
       const bx = Math.floor(x / block);
-      // -0.5..0.5 중심 노이즈 → 휘도 가산량.
-      const noise = (hash2(bx, by, g.seed) - 0.5) * span;
+      // 종형(가우시안 근사) 중심 노이즈 — 해시 3개 합 - 1.5 ∈ [-1.5, 1.5], 종 모양 밀도.
+      const bell = hash2(bx, by, g.seed) + hash2(bx, by, g.seed + 101) + hash2(bx, by, g.seed + 211) - 1.5;
+      const noise = bell * span * FILM_BELL_SCALE;
       const i = (y * width + x) * 4;
-      data[i] = data[i]! + noise;
-      data[i + 1] = data[i + 1]! + noise;
-      data[i + 2] = data[i + 2]! + noise;
+      // 필름 톤 반응 — 중간톤에서 최대, 순흑/순백으로 갈수록 바닥(FILM_TONE_FLOOR)까지 감쇠.
+      const lum = 0.299 * data[i]! + 0.587 * data[i + 1]! + 0.114 * data[i + 2]!;
+      const tone = FILM_TONE_FLOOR + (1 - FILM_TONE_FLOOR) * (1 - Math.abs((2 * lum) / 255 - 1));
+      const n = noise * tone;
+      data[i] = data[i]! + n;
+      data[i + 1] = data[i + 1]! + n;
+      data[i + 2] = data[i + 2]! + n;
     }
   }
 }

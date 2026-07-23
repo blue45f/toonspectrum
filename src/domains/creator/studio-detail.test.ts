@@ -368,6 +368,20 @@ describe("applyDetail — smartSharpen(엣지 인식 샤픈)", () => {
     expect(dataEqual(img, before)).toBe(true);
   });
 
+  // [의도적 변경] 하드 임계 게이트 → 소프트 램프(smoothstep, thr..2·thr) — 임계 부근 고주파는
+  // 부분 증폭만 받아 임계 경계에서 증폭이 0↔1로 튀며 생기던 헤일로/팝핑이 사라진다.
+  it("임계~2배 임계 사이 고주파는 부분 증폭된다(소프트 게이트 램프)", () => {
+    // 균일 128 위 한 픽셀만 +9(=137) — radius1 박스 블러에서 hi = 137-129 = 8 (thr 6 < 8 < 12).
+    const img = makeSolid(5, 5, [128, 128, 128, 255]);
+    const center = 2 * 5 + 2;
+    img.data.set([137, 137, 137, 255], center * 4);
+    applyDetail(img, { type: "smartSharpen", amount: 100, radius: 1 });
+    const r = img.data[center * 4]!;
+    // 부분 증폭 — 원본(137)보다 커지되, 완전 증폭(137 + 8*1.5 = 149)에는 못 미친다.
+    expect(r).toBeGreaterThan(137);
+    expect(r).toBeLessThan(146);
+  });
+
   it("강한 샤픈에도 채널은 유한 0..255", () => {
     const img = makePattern(16, 16, 255);
     applyDetail(img, { type: "smartSharpen", amount: 100, radius: 5 });

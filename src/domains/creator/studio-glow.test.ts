@@ -147,8 +147,11 @@ describe("applyGlow — 밝은 영역은 번지고 어두운 곳은 그대로", 
 });
 
 describe("applyGlow — threshold 게이팅", () => {
-  it("threshold를 높이면 추출되는 밝은 픽셀이 줄어 이웃 글로우가 약해진다", () => {
-    // 가운데(4) 휘도 150: threshold 40(cut 102) 통과, threshold 70(cut 178) 탈락.
+  // [의도적 변경] 소프트 니(knee) 도입 — 임계 바로 아래 휘도도 부분 가중으로 추출된다.
+  // 이전에는 임계 미만이 전부 0(하드 컷)이라 high 이웃이 정확히 0이었지만, 이제 니 구간에
+  // 걸친 휘도는 아주 약한 글로우를 남긴다(하드 컷 밴딩 제거). 순서 관계와 "훨씬 약함"을 검증한다.
+  it("threshold를 높이면 추출 가중이 급감해 이웃 글로우가 크게 약해진다(소프트 니)", () => {
+    // 가운데(4) 휘도 150: threshold 40(cut 102)은 완전 통과, threshold 70(cut 178.5)은 니 하단에 살짝 걸침.
     const values = makeBrightCenterRow(9, 4, 150);
     const low = makeGrayRow(values);
     const high = makeGrayRow(values);
@@ -157,8 +160,41 @@ describe("applyGlow — threshold 게이팅", () => {
 
     // 임계가 낮을수록 이웃이 받는 빛이 더 크다.
     expect(pixelAt(low, 3)[0]!).toBeGreaterThan(pixelAt(high, 3)[0]!);
-    // 임계 70에서는 중심이 탈락해 글로우 0 → 이웃 불변(검정 유지).
-    expect(pixelAt(high, 3)[0]!).toBe(0);
+    // 임계 70에서 중심(150)은 니 하단에 겨우 걸쳐 글로우가 거의 없다(잔광 ≤ 2).
+    expect(pixelAt(high, 3)[0]!).toBeLessThanOrEqual(2);
+  });
+
+  it("니 하단(cut-32)보다 어두운 픽셀은 여전히 전혀 추출되지 않는다", () => {
+    // 중심 휘도 120, threshold 70 → cut 178.5, 니 시작 146.5 > 120 → 가중 0 → 데이터 불변.
+    const values = makeBrightCenterRow(9, 4, 120);
+    const img = makeGrayRow(values);
+    const before = Array.from(img.data);
+    applyGlow(img, { strength: 80, size: 3, threshold: 70, color: "auto" });
+    expect(Array.from(img.data)).toEqual(before);
+  });
+});
+
+describe("applyGlow — 블룸 프로파일 품질(3패스 감쇠)", () => {
+  it("임펄스 응답이 중심에서 바깥으로 단조 감소하고 계단 없이 부드럽게 감쇠한다", () => {
+    // 가운데 한 픽셀만 밝은 긴 행 — 단일 박스 블러라면 플래토(같은 값 평탄 구간) 후 급락하지만,
+    // 연속 3패스 블러는 중심에서 매 픽셀 strictly 감소하는 종형 프로파일을 만든다.
+    const W = 21;
+    const center = 10;
+    const values = makeBrightCenterRow(W, center, 255);
+    const img = makeGrayRow(values);
+    applyGlow(img, { strength: 100, size: 6, threshold: 30, color: "auto" });
+
+    // 중심 → +1 → +2 → +3 순으로 strictly 감소(플래토·계단 없음).
+    const v = (x: number) => pixelAt(img, x)[0]!;
+    expect(v(center)).toBeGreaterThan(v(center + 1));
+    expect(v(center + 1)).toBeGreaterThan(v(center + 2));
+    expect(v(center + 2)).toBeGreaterThan(v(center + 3));
+    // 좌우 대칭.
+    expect(v(center - 1)).toBe(v(center + 1));
+    expect(v(center - 2)).toBe(v(center + 2));
+    // 도달 거리는 size를 넘지 않는다(합계 반경 = size 계약).
+    expect(v(center + 7)).toBe(0);
+    expect(v(center - 7)).toBe(0);
   });
 });
 

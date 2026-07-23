@@ -227,6 +227,72 @@ describe("applyBlurFx — gaussian(전체 부드럽게)", () => {
   });
 });
 
+describe("applyBlurFx — gaussian 품질 지표(임펄스 응답)", () => {
+  it("임펄스 응답이 좌우 대칭이고 중심에서 바깥으로 단조 감소한다(가우시안 프로파일)", () => {
+    // 긴 행 가운데 한 픽셀만 흰색 — boxesForGauss 3패스는 종형(단조 감소) 프로파일을 만든다.
+    const W = 33;
+    const center = 16;
+    const px: number[][] = [];
+    for (let x = 0; x < W; x++) px.push([x === center ? 255 : 0, 0, 0, 255]);
+    const img = makeImage(W, 1, px);
+    applyBlurFx(img, { type: "gaussian", strength: 100, radius: 4, angle: 0 });
+
+    const v = (x: number) => img.data[x * 4]!;
+    // 좌우 대칭.
+    for (let d = 1; d <= 8; d++) {
+      expect(v(center - d)).toBe(v(center + d));
+    }
+    // 중심이 최대, 바깥으로 단조 감소(플래토 허용 안 함 — 초반 몇 칸은 strictly).
+    expect(v(center)).toBeGreaterThan(v(center + 1));
+    expect(v(center + 1)).toBeGreaterThan(v(center + 2));
+    for (let d = 2; d <= 8; d++) {
+      expect(v(center + d)).toBeLessThanOrEqual(v(center + d - 1));
+    }
+  });
+
+  it("[의도적 변경] 알파 프리멀티플라이 — 투명 배경의 숨은 검정 RGB가 불투명 영역으로 새지 않는다", () => {
+    // 투명 검정(0,0,0,0) 바탕 위 불투명 흰색 3x3 블록 — 예전 비프리멀티 블러는 블록 가장자리
+    // RGB가 투명 검정과 섞여 회색 프린지가 생겼다. 이제 가중치(α)가 0이라 흰색이 유지된다.
+    const W = 9;
+    const H = 9;
+    const px: number[][] = [];
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const inBlock = x >= 3 && x <= 5 && y >= 3 && y <= 5;
+        px.push(inBlock ? [255, 255, 255, 255] : [0, 0, 0, 0]);
+      }
+    }
+    const img = makeImage(W, H, px);
+    applyBlurFx(img, { type: "gaussian", strength: 100, radius: 3, angle: 0 });
+
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4;
+        const inBlock = x >= 3 && x <= 5 && y >= 3 && y <= 5;
+        // 알파는 절대 기록하지 않는다.
+        expect(img.data[i + 3]).toBe(inBlock ? 255 : 0);
+        if (inBlock) {
+          // 보이는(불투명) 픽셀의 RGB는 흰색 그대로 — 검은 프린지 없음.
+          expect(img.data[i]).toBeGreaterThanOrEqual(254);
+          expect(img.data[i + 1]).toBeGreaterThanOrEqual(254);
+          expect(img.data[i + 2]).toBeGreaterThanOrEqual(254);
+        }
+      }
+    }
+  });
+
+  it("모션 블러도 프리멀티 샘플 — 투명 배경 위 불투명 픽셀의 RGB가 어두워지지 않는다", () => {
+    const W = 9;
+    const px: number[][] = [];
+    for (let x = 0; x < W; x++) px.push(x === 4 ? [255, 255, 255, 255] : [0, 0, 0, 0]);
+    const img = makeImage(W, 1, px);
+    applyBlurFx(img, { type: "motion", strength: 100, radius: 6, angle: 0 });
+    // 불투명 중심 픽셀 — 샘플 경로의 투명 검정은 가중 0이라 흰색 유지.
+    expect(img.data[4 * 4]).toBeGreaterThanOrEqual(254);
+    expect(img.data[4 * 4 + 3]).toBe(255);
+  });
+});
+
 describe("applyBlurFx — motion(방향 잔상)", () => {
   it("가로(angle0) 모션은 세로 줄무늬를 흐리지만 가로 균일 영역은 거의 유지", () => {
     // 세로 줄무늬(열마다 검정/흰) → 가로 모션이 좌우로 섞어 대비를 낮춘다.

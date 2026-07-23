@@ -280,10 +280,19 @@ const SMART_SHARPEN_THRESHOLD = 6;
 // 스마트 샤픈 최대 증폭 계수 — amount 100에서 (src-blur)에 곱하는 k의 상한.
 const SMART_SHARPEN_MAX_K = 1.5;
 
+// 소프트 엣지 게이트 — |hi| ≤ thr → 0, ≥ 2·thr → 1, 사이는 smoothstep.
+// 임계 경계에서 증폭이 0↔1로 튀며 생기던 헤일로/팝핑 아티팩트를 부드러운 램프로 없앤다.
+function smartSharpenGate(hiAbs: number): number {
+  const t = (hiAbs - SMART_SHARPEN_THRESHOLD) / SMART_SHARPEN_THRESHOLD;
+  const c = t <= 0 ? 0 : t >= 1 ? 1 : t;
+  return c * c * (3 - 2 * c);
+}
+
 /**
  * 스마트 샤픈 — 언샤프 마스크(src + (src-blur)*k)로 엣지 대비를 키우되, 엣지 인식으로 노이즈는 보존한다.
- * 고주파 크기 hi=|src-blur|가 SMART_SHARPEN_THRESHOLD를 넘는 채널에서만 가산해, 평탄한 미세 노이즈는
- * 증폭하지 않는다(threshold 이하면 원본 유지). k는 (amount/100)*SMART_SHARPEN_MAX_K로 세기에 비례.
+ * 고주파 크기 hi=|src-blur|에 소프트 게이트(smoothstep, thr..2·thr)를 곱해 가산 — 임계 이하 평탄
+ * 노이즈는 증폭하지 않고, 임계 부근에서 증폭이 갑자기 켜지며 생기는 헤일로 경계도 없다.
+ * k는 (amount/100)*SMART_SHARPEN_MAX_K로 세기에 비례.
  * 결과는 0..255로 클램프(Uint8ClampedArray)되고 알파(+3)는 보존. 같은 입력=같은 출력(결정적).
  * 엣지에선 샤픈값이 원본과 달라지므로 (alpha/255)로 기여를 스케일해 완전 투명(alpha 0) 픽셀은
  * 원본 RGB 그대로 둔다(헤일로 방지). 균일/평탄 영역은 sr≈src라 본래 변화가 없다.
@@ -295,13 +304,13 @@ function applySmartSharpen(data: Uint8ClampedArray, width: number, height: numbe
   const n = width * height;
   for (let p = 0; p < n; p++) {
     const i = p * 4;
-    // 채널별 고주파(src-blur). 임계 초과 채널만 언샤프 가산.
+    // 채널별 고주파(src-blur). 소프트 게이트 가중 언샤프 가산.
     const hiR = src[i]! - blur[i]!;
     const hiG = src[i + 1]! - blur[i + 1]!;
     const hiB = src[i + 2]! - blur[i + 2]!;
-    const sr = Math.abs(hiR) > SMART_SHARPEN_THRESHOLD ? src[i]! + hiR * k : src[i]!;
-    const sg = Math.abs(hiG) > SMART_SHARPEN_THRESHOLD ? src[i + 1]! + hiG * k : src[i + 1]!;
-    const sb = Math.abs(hiB) > SMART_SHARPEN_THRESHOLD ? src[i + 2]! + hiB * k : src[i + 2]!;
+    const sr = src[i]! + hiR * k * smartSharpenGate(Math.abs(hiR));
+    const sg = src[i + 1]! + hiG * k * smartSharpenGate(Math.abs(hiG));
+    const sb = src[i + 2]! + hiB * k * smartSharpenGate(Math.abs(hiB));
     // 투명 픽셀은 샤픈값으로 새지 않도록 알파 비율로 블렌드 강도를 줄인다(헤일로 방지).
     const a = (src[i + 3]! / 255) * t;
     data[i] = src[i]! + (sr - src[i]!) * a;
