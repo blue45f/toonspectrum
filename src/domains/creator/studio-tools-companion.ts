@@ -7,6 +7,20 @@
  */
 
 import {
+  STUDIO_COMPANION_REFERENCE_FAILURE_BACKOFF_MS,
+  isStudioCompanionReferenceControl,
+  isStudioCompanionReferencePreviewFrame,
+  isStudioCompanionReferenceProjection,
+  planStudioCompanionReferenceCapture,
+  type StudioCompanionReferenceCaptureCursor,
+  type StudioCompanionReferenceCaptureFailure,
+  type StudioCompanionReferenceCaptureRecord,
+  type StudioCompanionReferenceControl,
+  type StudioCompanionReferencePoint,
+  type StudioCompanionReferencePreviewFrame,
+  type StudioCompanionReferenceProjection,
+} from "./studio-companion-reference-projection";
+import {
   captureStudioCompanionNavigatorFrame,
   createStudioCompanionReviewProjectionFromSource,
   isStudioCompanionNavigatorFrame,
@@ -26,6 +40,16 @@ export {
   encodeStudioCompanionNavigatorWebp,
   planStudioCompanionExternalScreenPlacement,
 } from "./studio-companion-review-projection";
+export {
+  isStudioCompanionReferenceControl,
+  isStudioCompanionReferencePreviewFrame,
+  isStudioCompanionReferenceProjection,
+} from "./studio-companion-reference-projection";
+export type {
+  StudioCompanionReferenceControl,
+  StudioCompanionReferencePreviewFrame,
+  StudioCompanionReferenceProjection,
+} from "./studio-companion-reference-projection";
 
 export const STUDIO_TOOLS_COMPANION_CHANNEL = "toonspectrum.studio.tools-companion.v1";
 export const STUDIO_TOOLS_COMPANION_PATH = "/studio/tools-companion";
@@ -37,6 +61,7 @@ const STUDIO_COMPANION_WINDOW_FEATURES_BY_SURFACE: Readonly<Record<StudioCompani
   workspace: STUDIO_TOOLS_COMPANION_WINDOW_FEATURES,
   navigator: "popup=yes,width=390,height=860,menubar=no,toolbar=no,location=no,status=no",
   review: "popup=yes,width=420,height=860,menubar=no,toolbar=no,location=no,status=no",
+  reference: "popup=yes,width=420,height=860,menubar=no,toolbar=no,location=no,status=no",
 };
 
 export function studioCompanionDefaultWindowFeatures(surface: StudioCompanionSurface): string {
@@ -49,7 +74,7 @@ const STUDIO_COMPANION_SESSION_PATTERN = /^[A-Za-z0-9_-]{12,96}$/u;
 const STUDIO_COMPANION_SCOPE_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 
 export type StudioCompanionRole = "primary" | "companion";
-export const STUDIO_COMPANION_SURFACES = ["workspace", "navigator", "review"] as const;
+export const STUDIO_COMPANION_SURFACES = ["workspace", "navigator", "review", "reference"] as const;
 export type StudioCompanionSurface = (typeof STUDIO_COMPANION_SURFACES)[number];
 /** @deprecated Use StudioCompanionSurface. */
 export type StudioCompanionView = StudioCompanionSurface;
@@ -73,6 +98,25 @@ export type StudioCompanionCommandName =
   | "toggle-canvas-only"
   | "enter-canvas-only"
   | "exit-canvas-only";
+
+export type StudioCompanionControl =
+  | StudioCompanionReviewControl
+  | StudioCompanionReferenceControl;
+
+export type StudioCompanionReferenceColorResult = {
+  generation: number;
+  revision: number;
+  referenceRevision: number;
+  sequence: number;
+  color: string;
+};
+
+export type StudioCompanionPresentationSafeState = Readonly<{
+  enabled: boolean;
+  clock: number;
+  writerInstanceId: string;
+  mutationId: string;
+}>;
 
 export type StudioCompanionMessage =
   | {
@@ -138,8 +182,53 @@ export type StudioCompanionMessage =
     }
   | {
       v: 1;
+      type: "primary-reference-state";
+      primaryInstanceId: string;
+      targetCompanionInstanceId: string;
+      generation: number;
+      projection: StudioCompanionReferenceProjection;
+      at: number;
+    }
+  | {
+      v: 1;
+      type: "reference-preview-frame";
+      primaryInstanceId: string;
+      targetCompanionInstanceId: string;
+      generation: number;
+      revision: number;
+      referenceRevision: number;
+      sequence: number;
+      width: number;
+      height: number;
+      blob: Blob;
+      at: number;
+    }
+  | {
+      v: 1;
+      type: "reference-color-result";
+      primaryInstanceId: string;
+      targetCompanionInstanceId: string;
+      generation: number;
+      revision: number;
+      referenceRevision: number;
+      sequence: number;
+      color: string;
+      at: number;
+    }
+  | {
+      v: 1;
+      type: "companion-presentation-safe";
+      /** The companion forwarding this state; never a primary routing target. */
+      companionInstanceId: string;
+      /** Null broadcasts a mutation, while a peer hello replay is precisely targeted. */
+      targetCompanionInstanceId: string | null;
+      state: StudioCompanionPresentationSafeState;
+      at: number;
+    }
+  | {
+      v: 1;
       type: "companion-control";
-      control: StudioCompanionReviewControl;
+      control: StudioCompanionControl;
       generation: number;
       companionInstanceId: string;
       targetPrimaryInstanceId: string;
@@ -188,6 +277,26 @@ export type StudioCompanionCommandMessage = Extract<
 export type StudioCompanionControlMessage = Extract<
   StudioCompanionMessage,
   { type: "companion-control" }
+>;
+
+export type StudioCompanionReferenceStateMessage = Extract<
+  StudioCompanionMessage,
+  { type: "primary-reference-state" }
+>;
+
+export type StudioCompanionReferencePreviewFrameMessage = Extract<
+  StudioCompanionMessage,
+  { type: "reference-preview-frame" }
+>;
+
+export type StudioCompanionReferenceColorResultMessage = Extract<
+  StudioCompanionMessage,
+  { type: "reference-color-result" }
+>;
+
+export type StudioCompanionPresentationSafeMessage = Extract<
+  StudioCompanionMessage,
+  { type: "companion-presentation-safe" }
 >;
 
 export type StudioCompanionGoodbyeMessage = Extract<
@@ -241,6 +350,8 @@ const STUDIO_COMPANION_RECENT_COMMAND_LIMIT = 256;
 const STUDIO_COMPANION_PRIMARY_BINDING_LEASE_MS = 12_000;
 const STUDIO_COMPANION_CAPTURE_MAX_FAILURES_PER_REVISION = 3;
 const STUDIO_COMPANION_CAPTURE_RETRY_BASE_MS = 500;
+const STUDIO_COMPANION_REFERENCE_MAX_CAPTURE_FAILURES =
+  STUDIO_COMPANION_REFERENCE_FAILURE_BACKOFF_MS.length + 1;
 
 export function isStudioCompanionSessionId(value: unknown): value is string {
   return typeof value === "string" && STUDIO_COMPANION_SESSION_PATTERN.test(value);
@@ -368,6 +479,76 @@ function hasExactStudioCompanionKeys(
   } catch {
     return false;
   }
+}
+
+function studioCompanionExactOwnData(
+  value: unknown,
+  expected: readonly string[]
+): Readonly<Record<string, unknown>> | null {
+  if (!isPlainStudioCompanionRecord(value) || !hasExactStudioCompanionKeys(value, expected)) {
+    return null;
+  }
+  try {
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const snapshot: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+    for (const key of expected) {
+      const descriptor = descriptors[key];
+      if (!descriptor || !descriptor.enumerable || !("value" in descriptor)) return null;
+      snapshot[key] = descriptor.value;
+    }
+    return snapshot;
+  } catch {
+    return null;
+  }
+}
+
+export function isStudioCompanionReferenceColorResult(
+  value: unknown
+): value is StudioCompanionReferenceColorResult {
+  const result = studioCompanionExactOwnData(value, [
+    "generation",
+    "revision",
+    "referenceRevision",
+    "sequence",
+    "color",
+  ]);
+  return result !== null
+    && typeof result.generation === "number"
+    && Number.isSafeInteger(result.generation)
+    && result.generation > 0
+    && typeof result.revision === "number"
+    && Number.isSafeInteger(result.revision)
+    && result.revision > 0
+    && typeof result.referenceRevision === "number"
+    && Number.isSafeInteger(result.referenceRevision)
+    && result.referenceRevision > 0
+    && typeof result.sequence === "number"
+    && Number.isSafeInteger(result.sequence)
+    && result.sequence > 0
+    && typeof result.color === "string"
+    && /^#[\da-f]{6}(?:[\da-f]{2})?$/iu.test(result.color);
+}
+
+export function isStudioCompanionPresentationSafeState(
+  value: unknown
+): value is StudioCompanionPresentationSafeState {
+  const state = studioCompanionExactOwnData(value, [
+    "enabled",
+    "clock",
+    "writerInstanceId",
+    "mutationId",
+  ]);
+  return state !== null
+    && typeof state.enabled === "boolean"
+    && typeof state.clock === "number"
+    && Number.isSafeInteger(state.clock)
+    && state.clock > 0
+    && isStudioCompanionSessionId(state.writerInstanceId)
+    && isStudioCompanionSessionId(state.mutationId);
+}
+
+export function isStudioCompanionControl(value: unknown): value is StudioCompanionControl {
+  return isStudioCompanionReviewControl(value) || isStudioCompanionReferenceControl(value);
 }
 
 export function isStudioCompanionMessage(value: unknown): value is StudioCompanionMessage {
@@ -511,6 +692,94 @@ export function isStudioCompanionMessage(value: unknown): value is StudioCompani
           blob: msg.blob,
         })
       );
+    case "primary-reference-state":
+      return (
+        hasExactStudioCompanionKeys(msg, [
+          "v",
+          "type",
+          "primaryInstanceId",
+          "targetCompanionInstanceId",
+          "generation",
+          "projection",
+          "at",
+        ])
+        && isStudioCompanionSessionId(msg.primaryInstanceId)
+        && isStudioCompanionSessionId(msg.targetCompanionInstanceId)
+        && typeof msg.generation === "number"
+        && Number.isSafeInteger(msg.generation)
+        && msg.generation > 0
+        && isStudioCompanionReferenceProjection(msg.projection)
+        && msg.projection.generation === msg.generation
+      );
+    case "reference-preview-frame":
+      return (
+        hasExactStudioCompanionKeys(msg, [
+          "v",
+          "type",
+          "primaryInstanceId",
+          "targetCompanionInstanceId",
+          "generation",
+          "revision",
+          "referenceRevision",
+          "sequence",
+          "width",
+          "height",
+          "blob",
+          "at",
+        ])
+        && isStudioCompanionSessionId(msg.primaryInstanceId)
+        && isStudioCompanionSessionId(msg.targetCompanionInstanceId)
+        && isStudioCompanionReferencePreviewFrame({
+          generation: msg.generation,
+          revision: msg.revision,
+          referenceRevision: msg.referenceRevision,
+          sequence: msg.sequence,
+          width: msg.width,
+          height: msg.height,
+          blob: msg.blob,
+        })
+      );
+    case "reference-color-result":
+      return (
+        hasExactStudioCompanionKeys(msg, [
+          "v",
+          "type",
+          "primaryInstanceId",
+          "targetCompanionInstanceId",
+          "generation",
+          "revision",
+          "referenceRevision",
+          "sequence",
+          "color",
+          "at",
+        ])
+        && isStudioCompanionSessionId(msg.primaryInstanceId)
+        && isStudioCompanionSessionId(msg.targetCompanionInstanceId)
+        && isStudioCompanionReferenceColorResult({
+          generation: msg.generation,
+          revision: msg.revision,
+          referenceRevision: msg.referenceRevision,
+          sequence: msg.sequence,
+          color: msg.color,
+        })
+      );
+    case "companion-presentation-safe":
+      return (
+        hasExactStudioCompanionKeys(msg, [
+          "v",
+          "type",
+          "companionInstanceId",
+          "targetCompanionInstanceId",
+          "state",
+          "at",
+        ])
+        && isStudioCompanionSessionId(msg.companionInstanceId)
+        && (
+          msg.targetCompanionInstanceId === null
+          || isStudioCompanionSessionId(msg.targetCompanionInstanceId)
+        )
+        && isStudioCompanionPresentationSafeState(msg.state)
+      );
     case "companion-control":
       return (
         hasExactStudioCompanionKeys(msg, [
@@ -524,7 +793,7 @@ export function isStudioCompanionMessage(value: unknown): value is StudioCompani
           "sequence",
           "at",
         ])
-        && isStudioCompanionReviewControl(msg.control)
+        && isStudioCompanionControl(msg.control)
         && typeof msg.generation === "number"
         && Number.isSafeInteger(msg.generation)
         && msg.generation > 0
@@ -701,7 +970,7 @@ export function buildStudioCompanionCommand(
 
 export function buildStudioCompanionControl(
   input: {
-    control: StudioCompanionReviewControl;
+    control: StudioCompanionControl;
     generation: number;
     companionInstanceId: string;
     targetPrimaryInstanceId: string;
@@ -795,6 +1064,82 @@ export function buildStudioCompanionNavigatorFrame(input: {
   };
 }
 
+export function buildStudioCompanionReferenceState(input: {
+  primaryInstanceId: string;
+  targetCompanionInstanceId: string;
+  generation: number;
+  projection: StudioCompanionReferenceProjection;
+  now?: number;
+}): StudioCompanionReferenceStateMessage {
+  return {
+    v: 1,
+    type: "primary-reference-state",
+    primaryInstanceId: input.primaryInstanceId,
+    targetCompanionInstanceId: input.targetCompanionInstanceId,
+    generation: input.generation,
+    projection: input.projection,
+    at: input.now ?? Date.now(),
+  };
+}
+
+export function buildStudioCompanionReferencePreviewFrame(input: {
+  primaryInstanceId: string;
+  targetCompanionInstanceId: string;
+  frame: StudioCompanionReferencePreviewFrame;
+  now?: number;
+}): StudioCompanionReferencePreviewFrameMessage {
+  return {
+    v: 1,
+    type: "reference-preview-frame",
+    primaryInstanceId: input.primaryInstanceId,
+    targetCompanionInstanceId: input.targetCompanionInstanceId,
+    generation: input.frame.generation,
+    revision: input.frame.revision,
+    referenceRevision: input.frame.referenceRevision,
+    sequence: input.frame.sequence,
+    width: input.frame.width,
+    height: input.frame.height,
+    blob: input.frame.blob,
+    at: input.now ?? Date.now(),
+  };
+}
+
+export function buildStudioCompanionReferenceColorResult(input: {
+  primaryInstanceId: string;
+  targetCompanionInstanceId: string;
+  result: StudioCompanionReferenceColorResult;
+  now?: number;
+}): StudioCompanionReferenceColorResultMessage {
+  return {
+    v: 1,
+    type: "reference-color-result",
+    primaryInstanceId: input.primaryInstanceId,
+    targetCompanionInstanceId: input.targetCompanionInstanceId,
+    generation: input.result.generation,
+    revision: input.result.revision,
+    referenceRevision: input.result.referenceRevision,
+    sequence: input.result.sequence,
+    color: input.result.color,
+    at: input.now ?? Date.now(),
+  };
+}
+
+export function buildStudioCompanionPresentationSafe(input: {
+  companionInstanceId: string;
+  targetCompanionInstanceId: string | null;
+  state: StudioCompanionPresentationSafeState;
+  now?: number;
+}): StudioCompanionPresentationSafeMessage {
+  return {
+    v: 1,
+    type: "companion-presentation-safe",
+    companionInstanceId: input.companionInstanceId,
+    targetCompanionInstanceId: input.targetCompanionInstanceId,
+    state: Object.freeze({ ...input.state }),
+    at: input.now ?? Date.now(),
+  };
+}
+
 export function buildStudioCompanionPing(input: {
   companionInstanceId: string;
   targetPrimaryInstanceId: string;
@@ -825,6 +1170,112 @@ export function buildStudioCompanionPrimaryGoodbye(input: {
   surface: StudioCompanionSurface;
 }, now = Date.now()): Extract<StudioCompanionMessage, { type: "primary-goodbye" }> {
   return { v: 1, type: "primary-goodbye", ...input, at: now };
+}
+
+function compareStudioCompanionPresentationSafeState(
+  left: StudioCompanionPresentationSafeState,
+  right: StudioCompanionPresentationSafeState
+): number {
+  if (left.clock !== right.clock) return left.clock < right.clock ? -1 : 1;
+  if (left.writerInstanceId !== right.writerInstanceId) {
+    return left.writerInstanceId < right.writerInstanceId ? -1 : 1;
+  }
+  if (left.mutationId === right.mutationId) return 0;
+  return left.mutationId < right.mutationId ? -1 : 1;
+}
+
+/**
+ * Companion-only LWW register for presentation-safe state. Primary windows deliberately do not
+ * participate. Lamport clock + writer/mutation ids form a deterministic total order, so peer
+ * hello snapshots and concurrent updates converge without replaying an already-applied state.
+ */
+export class StudioCompanionPresentationSafeGuard {
+  private companionInstanceId: string | null = null;
+  private logicalClock = 0;
+  private value: StudioCompanionPresentationSafeState | null = null;
+
+  bind(companionInstanceId: string): boolean {
+    if (!isStudioCompanionSessionId(companionInstanceId)) return false;
+    if (this.companionInstanceId === companionInstanceId) return true;
+    this.companionInstanceId = companionInstanceId;
+    this.logicalClock = 0;
+    this.value = null;
+    return true;
+  }
+
+  reset(): void {
+    this.companionInstanceId = null;
+    this.logicalClock = 0;
+    this.value = null;
+  }
+
+  write(enabled: boolean, mutationId: string): StudioCompanionPresentationSafeState | null {
+    const writerInstanceId = this.companionInstanceId;
+    if (
+      !writerInstanceId
+      || typeof enabled !== "boolean"
+      || !isStudioCompanionSessionId(mutationId)
+    ) return null;
+    this.logicalClock = Math.max(this.logicalClock, this.value?.clock ?? 0) + 1;
+    this.value = Object.freeze({
+      enabled,
+      clock: this.logicalClock,
+      writerInstanceId,
+      mutationId,
+    });
+    return this.value;
+  }
+
+  /**
+   * Restores or merges an exact durable register value without pretending that the local
+   * companion authored it. This is also used by the storage event bridge. Keeping the original
+   * writer and mutation ids preserves the same total order across window reloads.
+   */
+  merge(state: unknown): boolean {
+    if (!this.companionInstanceId || !isStudioCompanionPresentationSafeState(state)) return false;
+    const candidate = Object.freeze({ ...state });
+    this.logicalClock = Math.max(this.logicalClock, candidate.clock);
+    if (this.value && compareStudioCompanionPresentationSafeState(candidate, this.value) <= 0) {
+      return false;
+    }
+    this.value = candidate;
+    return true;
+  }
+
+  accept(
+    message: StudioCompanionMessage,
+    expected: { companionInstanceId: string; now?: number }
+  ): boolean {
+    if (
+      message.type !== "companion-presentation-safe"
+      || !isStudioCompanionMessage(message)
+      || this.companionInstanceId !== expected.companionInstanceId
+      || message.companionInstanceId === expected.companionInstanceId
+      || (
+        message.targetCompanionInstanceId !== null
+        && message.targetCompanionInstanceId !== expected.companionInstanceId
+      )
+      || !isStudioCompanionMessageFresh(message, expected.now ?? Date.now())
+    ) return false;
+
+    return this.merge(message.state);
+  }
+
+  current(): StudioCompanionPresentationSafeState | null {
+    return this.value;
+  }
+
+  snapshot(): Readonly<{
+    companionInstanceId: string | null;
+    logicalClock: number;
+    state: StudioCompanionPresentationSafeState | null;
+  }> {
+    return Object.freeze({
+      companionInstanceId: this.companionInstanceId,
+      logicalClock: this.logicalClock,
+      state: this.value,
+    });
+  }
 }
 
 export class StudioCompanionCommandGuard {
@@ -883,6 +1334,143 @@ export class StudioCompanionCommandGuard {
   }
 }
 
+/**
+ * Companion-side fence for the view-only Reference stream. The projection is the revision
+ * authority; preview and color messages are accepted only for that exact cursor and once per
+ * monotonically increasing sequence. A new binding generation resets both sequence fences.
+ */
+export class StudioCompanionReferenceMessageGuard {
+  private primaryInstanceId: string | null = null;
+  private companionInstanceId: string | null = null;
+  private generation = 0;
+  private revision = 0;
+  private referenceRevision = 0;
+  private frameSequence = 0;
+  private colorSequence = 0;
+
+  bind(primaryInstanceId: string, companionInstanceId: string): boolean {
+    if (
+      !isStudioCompanionSessionId(primaryInstanceId)
+      || !isStudioCompanionSessionId(companionInstanceId)
+    ) return false;
+    if (
+      this.primaryInstanceId === primaryInstanceId
+      && this.companionInstanceId === companionInstanceId
+    ) return true;
+    this.primaryInstanceId = primaryInstanceId;
+    this.companionInstanceId = companionInstanceId;
+    this.resetCursor();
+    return true;
+  }
+
+  reset(): void {
+    this.primaryInstanceId = null;
+    this.companionInstanceId = null;
+    this.resetCursor();
+  }
+
+  acceptState(
+    message: StudioCompanionMessage,
+    now = Date.now()
+  ): message is StudioCompanionReferenceStateMessage {
+    if (
+      message.type !== "primary-reference-state"
+      || !this.matchesRoute(message)
+      || !isStudioCompanionMessageFresh(message, now)
+    ) return false;
+
+    const { generation, revision, referenceRevision } = message.projection;
+    if (generation < this.generation) return false;
+    if (generation === this.generation) {
+      if (revision < this.revision || referenceRevision < this.referenceRevision) return false;
+      if (revision === this.revision && referenceRevision === this.referenceRevision) return false;
+    }
+
+    if (generation > this.generation) {
+      this.frameSequence = 0;
+      this.colorSequence = 0;
+    } else if (revision > this.revision || referenceRevision > this.referenceRevision) {
+      this.frameSequence = 0;
+      this.colorSequence = 0;
+    }
+    this.generation = generation;
+    this.revision = revision;
+    this.referenceRevision = referenceRevision;
+    return true;
+  }
+
+  acceptPreviewFrame(
+    message: StudioCompanionMessage,
+    now = Date.now()
+  ): message is StudioCompanionReferencePreviewFrameMessage {
+    if (
+      message.type !== "reference-preview-frame"
+      || !this.matchesRoute(message)
+      || !isStudioCompanionMessageFresh(message, now)
+      || !this.matchesCurrentCursor(message)
+      || message.sequence <= this.frameSequence
+    ) return false;
+    this.frameSequence = message.sequence;
+    return true;
+  }
+
+  acceptColorResult(
+    message: StudioCompanionMessage,
+    now = Date.now()
+  ): message is StudioCompanionReferenceColorResultMessage {
+    if (
+      message.type !== "reference-color-result"
+      || !this.matchesRoute(message)
+      || !isStudioCompanionMessageFresh(message, now)
+      || !this.matchesCurrentCursor(message)
+      || message.sequence <= this.colorSequence
+    ) return false;
+    this.colorSequence = message.sequence;
+    return true;
+  }
+
+  snapshot(): Readonly<{
+    generation: number;
+    revision: number;
+    referenceRevision: number;
+    frameSequence: number;
+    colorSequence: number;
+  }> {
+    return {
+      generation: this.generation,
+      revision: this.revision,
+      referenceRevision: this.referenceRevision,
+      frameSequence: this.frameSequence,
+      colorSequence: this.colorSequence,
+    };
+  }
+
+  private matchesRoute(message: StudioCompanionMessage): boolean {
+    if (
+      message.type !== "primary-reference-state"
+      && message.type !== "reference-preview-frame"
+      && message.type !== "reference-color-result"
+    ) return false;
+    return message.primaryInstanceId === this.primaryInstanceId
+      && message.targetCompanionInstanceId === this.companionInstanceId;
+  }
+
+  private matchesCurrentCursor(message: StudioCompanionReferencePreviewFrameMessage | StudioCompanionReferenceColorResultMessage): boolean {
+    return this.generation > 0
+      && message.generation === this.generation
+      && message.revision === this.revision
+      && message.referenceRevision === this.referenceRevision;
+  }
+
+  private resetCursor(): void {
+    this.generation = 0;
+    this.revision = 0;
+    this.referenceRevision = 0;
+    this.frameSequence = 0;
+    this.colorSequence = 0;
+  }
+}
+
 export type StudioCompanionBindingSnapshot = {
   surface: StudioCompanionSurface;
   companionInstanceId: string;
@@ -892,6 +1480,8 @@ export type StudioCompanionBindingSnapshot = {
 
 type StudioCompanionBindingSlot = StudioCompanionBindingSnapshot & {
   commandGuard: StudioCompanionCommandGuard;
+  referencePickRevision: number;
+  referencePickSequence: number;
 };
 
 function studioCompanionSurfaceForHello(
@@ -909,16 +1499,38 @@ function isStudioCompanionCommandAllowed(
 
 function isStudioCompanionControlAllowed(
   surface: StudioCompanionSurface,
-  control: StudioCompanionReviewControl
+  control: StudioCompanionControl
 ): boolean {
   if (surface === "workspace") return true;
   if (surface === "navigator") {
     return control.kind === "navigator-demand" || control.kind === "navigate";
   }
+  if (surface === "reference") return isStudioCompanionReferenceControl(control);
   return control.kind === "select-layer"
     || control.kind === "history"
     || control.kind === "comment-focus"
     || control.kind === "brush";
+}
+
+function canAcceptStudioCompanionReferencePick(
+  slot: StudioCompanionBindingSlot,
+  control: StudioCompanionControl
+): boolean {
+  if (control.kind !== "reference-pick-color") return true;
+  return control.referenceRevision > slot.referencePickRevision
+    || (
+      control.referenceRevision === slot.referencePickRevision
+      && control.sequence > slot.referencePickSequence
+    );
+}
+
+function commitStudioCompanionReferencePick(
+  slot: StudioCompanionBindingSlot,
+  control: StudioCompanionControl
+): void {
+  if (control.kind !== "reference-pick-color") return;
+  slot.referencePickRevision = control.referenceRevision;
+  slot.referencePickSequence = control.sequence;
 }
 
 export class StudioCompanionPrimaryBinding {
@@ -962,6 +1574,8 @@ export class StudioCompanionPrimaryBinding {
       generation,
       lastActivityAt: now,
       commandGuard,
+      referencePickRevision: 0,
+      referencePickSequence: 0,
     });
     this.surfaceByInstanceId.set(message.companionInstanceId, surface);
     return true;
@@ -1021,13 +1635,17 @@ export class StudioCompanionPrimaryBinding {
       !slot
       || message.generation !== slot.generation
       || !isStudioCompanionControlAllowed(slot.surface, message.control)
+      || !canAcceptStudioCompanionReferencePick(slot, message.control)
     ) return false;
     const accepted = slot.commandGuard.accept(message, {
       primaryInstanceId,
       companionInstanceId: slot.companionInstanceId,
       now,
     });
-    if (accepted) slot.lastActivityAt = now;
+    if (accepted) {
+      commitStudioCompanionReferencePick(slot, message.control);
+      slot.lastActivityAt = now;
+    }
     return accepted;
   }
 
@@ -1376,6 +1994,24 @@ export type StudioCompanionNavigatorCaptureRequest = {
   signal: AbortSignal;
 };
 
+export type StudioCompanionReferenceCaptureRequest = StudioCompanionReferenceCaptureCursor & {
+  sequence: number;
+  signal: AbortSignal;
+};
+
+export type StudioCompanionReferenceRequester = Readonly<{
+  companionInstanceId: string;
+  generation: number;
+}>;
+
+export type StudioCompanionReferenceColorSampleRequest = Readonly<{
+  requester: StudioCompanionReferenceRequester;
+  current: StudioCompanionReferenceCaptureCursor;
+  point: StudioCompanionReferencePoint;
+  sequence: number;
+  signal: AbortSignal;
+}>;
+
 export type StudioCompanionPrimarySourceRuntimeInput = Omit<
   Parameters<typeof startStudioCompanionPrimaryRuntime>[0],
   "getReviewProjection" | "captureNavigatorFrame"
@@ -1385,9 +2021,27 @@ export type StudioCompanionPrimarySourceRuntimeInput = Omit<
   captureNavigatorCanvas?: (maximumLongestEdge: number) => HTMLCanvasElement | null;
 };
 
+type StudioCompanionReferenceCaptureState = {
+  companionInstanceId: string;
+  generation: number;
+  epoch: number;
+  inFlight: boolean;
+  controller: AbortController | null;
+  timer: ReturnType<typeof globalThis.setTimeout> | null;
+  current: StudioCompanionReferenceCaptureCursor | null;
+  lastCaptured: StudioCompanionReferenceCaptureRecord | null;
+  failure: StudioCompanionReferenceCaptureFailure | null;
+};
+
+type StudioCompanionReferenceColorState = {
+  epoch: number;
+  controller: AbortController;
+  current: StudioCompanionReferenceCaptureCursor;
+};
+
 /**
  * Adapts editor-owned source callbacks inside the optional companion chunk. The default Studio
- * route therefore pays only for three narrow callbacks until a companion is actually requested.
+ * route therefore pays only for narrow callbacks until a companion is actually requested.
  */
 export function startStudioCompanionPrimaryRuntimeFromSources(
   input: StudioCompanionPrimarySourceRuntimeInput
@@ -1428,11 +2082,22 @@ export function startStudioCompanionPrimaryRuntime(input: {
   search: string;
   getSnapshot: () => StudioCompanionPrimarySnapshot;
   getReviewProjection?: () => StudioCompanionReviewProjection;
+  getReferenceProjection?: (
+    generation: number
+  ) => StudioCompanionReferenceProjection | null;
   captureNavigatorFrame?: (
     request: StudioCompanionNavigatorCaptureRequest
   ) => Promise<StudioCompanionNavigatorFrame | null>;
+  captureReferenceFrame?: (
+    request: StudioCompanionReferenceCaptureRequest
+  ) => Promise<StudioCompanionReferencePreviewFrame | null>;
+  sampleReferenceColor?: (
+    request: StudioCompanionReferenceColorSampleRequest
+  ) => Promise<string | null>;
   onCommand: (command: StudioCompanionCommandName) => void;
   onControl?: (control: StudioCompanionReviewControl) => void;
+  onReferenceControl?: (control: StudioCompanionReferenceControl) => void;
+  onReferenceDemandChange?: (active: boolean) => void;
 }): StudioCompanionPrimaryRuntime | null {
   const sessionId = parseStudioCompanionSessionId(input.search) ?? createStudioCompanionSessionId();
   const primaryInstanceId = createStudioCompanionInstanceId();
@@ -1441,6 +2106,7 @@ export function startStudioCompanionPrimaryRuntime(input: {
   const binding = new StudioCompanionPrimaryBinding();
   const channel = createStudioCompanionChannel(sessionId);
   if (!channel) return null;
+  const referenceChannel: StudioCompanionChannel = channel;
 
   let disposed = false;
   let primaryGoodbyeSent = false;
@@ -1461,6 +2127,12 @@ export function startStudioCompanionPrimaryRuntime(input: {
   let captureOwner: StudioCompanionBindingSnapshot | null = null;
   const navigatorDemandByInstanceId = new Map<string, boolean>();
   const pendingDemandRefreshInstanceIds = new Set<string>();
+  const referenceDemandInstanceIds = new Set<string>();
+  const referenceCaptureStates = new Map<string, StudioCompanionReferenceCaptureState>();
+  const referenceFrameSequenceByInstanceId = new Map<string, number>();
+  const referenceColorStates = new Map<string, StudioCompanionReferenceColorState>();
+  let referenceAsyncEpoch = 0;
+  let referenceDemandAggregateActive = false;
 
   const clearCaptureTimer = () => {
     if (captureTimer === null) return;
@@ -1482,6 +2154,401 @@ export function startStudioCompanionPrimaryRuntime(input: {
     captureFailureCount = 0;
     captureRetryNotBefore = 0;
   };
+
+  const referenceCursorFromProjection = (
+    projection: StudioCompanionReferenceProjection
+  ): StudioCompanionReferenceCaptureCursor => Object.freeze({
+    generation: projection.generation,
+    revision: projection.revision,
+    referenceRevision: projection.referenceRevision,
+  });
+
+  const sameReferenceCursor = (
+    left: StudioCompanionReferenceCaptureCursor | null,
+    right: StudioCompanionReferenceCaptureCursor
+  ): boolean => Boolean(
+    left
+    && left.generation === right.generation
+    && left.revision === right.revision
+    && left.referenceRevision === right.referenceRevision
+  );
+
+  const referenceRecordIsAhead = (
+    record: StudioCompanionReferenceCaptureRecord,
+    current: StudioCompanionReferenceCaptureCursor
+  ): boolean => record.generation > current.generation
+    || (
+      record.generation === current.generation
+      && (
+        record.revision > current.revision
+        || record.referenceRevision > current.referenceRevision
+      )
+    );
+
+  const referencePeerForInstance = (
+    companionInstanceId: string
+  ): StudioCompanionBindingSnapshot | null => {
+    const surface = binding.surfaceForInstance(companionInstanceId);
+    if (surface !== "workspace" && surface !== "reference") return null;
+    const peer = binding.bindingForSurface(surface);
+    return peer?.companionInstanceId === companionInstanceId ? peer : null;
+  };
+
+  const readReferenceProjection = (
+    peer: StudioCompanionBindingSnapshot
+  ): StudioCompanionReferenceProjection | null => {
+    if (!input.getReferenceProjection) return null;
+    try {
+      const candidate = input.getReferenceProjection(peer.generation);
+      return candidate
+        && isStudioCompanionReferenceProjection(candidate)
+        && candidate.generation === peer.generation
+        ? candidate
+        : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const referenceCaptureIsBlocked = (): boolean => {
+    if (!input.getReviewProjection) return false;
+    try {
+      const projection = input.getReviewProjection();
+      return !isStudioCompanionReviewProjection(projection) || !projection.captureAllowed;
+    } catch {
+      return true;
+    }
+  };
+
+  const releaseReferenceCaptureState = (companionInstanceId: string): void => {
+    const state = referenceCaptureStates.get(companionInstanceId);
+    if (!state) return;
+    referenceCaptureStates.delete(companionInstanceId);
+    state.epoch = ++referenceAsyncEpoch;
+    if (state.timer !== null) globalThis.clearTimeout(state.timer);
+    state.timer = null;
+    state.controller?.abort();
+    state.controller = null;
+    state.inFlight = false;
+  };
+
+  const releaseReferenceColorState = (companionInstanceId: string): void => {
+    const state = referenceColorStates.get(companionInstanceId);
+    if (!state) return;
+    referenceColorStates.delete(companionInstanceId);
+    state.controller.abort();
+  };
+
+  const releaseReferenceTransport = (
+    companionInstanceId: string,
+    releaseSequence: boolean
+  ): void => {
+    referenceDemandInstanceIds.delete(companionInstanceId);
+    const nextDemandActive = referenceDemandInstanceIds.size > 0;
+    if (nextDemandActive !== referenceDemandAggregateActive) {
+      referenceDemandAggregateActive = nextDemandActive;
+      try {
+        input.onReferenceDemandChange?.(nextDemandActive);
+      } catch {
+        // Resource-release observers cannot compromise transport cleanup.
+      }
+    }
+    releaseReferenceCaptureState(companionInstanceId);
+    releaseReferenceColorState(companionInstanceId);
+    if (releaseSequence) referenceFrameSequenceByInstanceId.delete(companionInstanceId);
+  };
+
+  const releaseAllReferenceTransports = (): void => {
+    const companionInstanceIds = new Set([
+      ...referenceDemandInstanceIds,
+      ...referenceCaptureStates.keys(),
+      ...referenceColorStates.keys(),
+      ...referenceFrameSequenceByInstanceId.keys(),
+    ]);
+    for (const companionInstanceId of companionInstanceIds) {
+      releaseReferenceTransport(companionInstanceId, true);
+    }
+  };
+
+  const ensureReferenceCaptureState = (
+    peer: StudioCompanionBindingSnapshot
+  ): StudioCompanionReferenceCaptureState => {
+    const existing = referenceCaptureStates.get(peer.companionInstanceId);
+    if (existing?.generation === peer.generation) return existing;
+    releaseReferenceCaptureState(peer.companionInstanceId);
+    const state: StudioCompanionReferenceCaptureState = {
+      companionInstanceId: peer.companionInstanceId,
+      generation: peer.generation,
+      epoch: ++referenceAsyncEpoch,
+      inFlight: false,
+      controller: null,
+      timer: null,
+      current: null,
+      lastCaptured: null,
+      failure: null,
+    };
+    referenceCaptureStates.set(peer.companionInstanceId, state);
+    return state;
+  };
+
+  const synchronizeReferenceCaptureCursor = (
+    state: StudioCompanionReferenceCaptureState,
+    current: StudioCompanionReferenceCaptureCursor
+  ): void => {
+    if (sameReferenceCursor(state.current, current)) return;
+    state.epoch = ++referenceAsyncEpoch;
+    releaseReferenceColorState(state.companionInstanceId);
+    if (state.timer !== null) globalThis.clearTimeout(state.timer);
+    state.timer = null;
+    state.controller?.abort();
+    state.controller = null;
+    state.inFlight = false;
+    state.current = current;
+    state.failure = null;
+    if (state.lastCaptured && referenceRecordIsAhead(state.lastCaptured, current)) {
+      state.lastCaptured = null;
+    }
+  };
+
+  function scheduleReferenceCapture(
+    state: StudioCompanionReferenceCaptureState,
+    delayMs: number
+  ): void {
+    if (state.timer !== null || disposed) return;
+    const scheduledEpoch = state.epoch;
+    state.timer = globalThis.setTimeout(() => {
+      state.timer = null;
+      if (
+        disposed
+        || state.epoch !== scheduledEpoch
+        || referenceCaptureStates.get(state.companionInstanceId) !== state
+        || !referenceDemandInstanceIds.has(state.companionInstanceId)
+      ) return;
+      const peer = referencePeerForInstance(state.companionInstanceId);
+      if (!peer || peer.generation !== state.generation) {
+        releaseReferenceTransport(state.companionInstanceId, true);
+        return;
+      }
+      requestReferenceCapture(peer);
+    }, Math.max(0, delayMs));
+  }
+
+  function requestReferenceCapture(
+    peer: StudioCompanionBindingSnapshot,
+    suppliedProjection?: StudioCompanionReferenceProjection
+  ): void {
+    if (
+      disposed
+      || !input.captureReferenceFrame
+      || !referenceDemandInstanceIds.has(peer.companionInstanceId)
+      || (peer.surface !== "workspace" && peer.surface !== "reference")
+    ) return;
+    const projection = suppliedProjection ?? readReferenceProjection(peer);
+    if (!projection || projection.generation !== peer.generation) {
+      releaseReferenceCaptureState(peer.companionInstanceId);
+      return;
+    }
+    if (projection.itemCount === 0 || projection.resolvedItemCount === 0) {
+      // Bootstrap, invalidated, empty and fully unresolved boards intentionally have no frame.
+      // The coordinator publishes again when a source-backed revision becomes ready.
+      releaseReferenceCaptureState(peer.companionInstanceId);
+      return;
+    }
+    const current = referenceCursorFromProjection(projection);
+    const state = ensureReferenceCaptureState(peer);
+    synchronizeReferenceCaptureCursor(state, current);
+    const failure = state.failure;
+    if (
+      failure
+      && sameReferenceCursor(failure, current)
+      && failure.count >= STUDIO_COMPANION_REFERENCE_MAX_CAPTURE_FAILURES
+    ) return;
+
+    const now = Date.now();
+    const plan = planStudioCompanionReferenceCapture({
+      demand: true,
+      current,
+      lastCaptured: state.lastCaptured,
+      failure: state.failure,
+      now,
+      activeStroke: referenceCaptureIsBlocked(),
+      inFlight: state.inFlight,
+    });
+    if (plan.kind === "defer") {
+      scheduleReferenceCapture(state, plan.delayMs);
+      return;
+    }
+    if (plan.kind !== "capture") return;
+
+    if (state.timer !== null) globalThis.clearTimeout(state.timer);
+    state.timer = null;
+    state.inFlight = true;
+    const sequence = (referenceFrameSequenceByInstanceId.get(peer.companionInstanceId) ?? 0) + 1;
+    referenceFrameSequenceByInstanceId.set(peer.companionInstanceId, sequence);
+    const scheduledEpoch = state.epoch;
+    const controller = new AbortController();
+    state.controller = controller;
+    const request: StudioCompanionReferenceCaptureRequest = Object.freeze({
+      ...current,
+      sequence,
+      signal: controller.signal,
+    });
+    let captureSucceeded = false;
+    let captureTimeout: ReturnType<typeof globalThis.setTimeout> | null = null;
+    const timeout = new Promise<null>((resolve) => {
+      captureTimeout = globalThis.setTimeout(() => {
+        controller.abort();
+        resolve(null);
+      }, 5_000);
+    });
+    const captured = Promise.resolve().then(() => input.captureReferenceFrame?.(request) ?? null);
+    void Promise.race([captured, timeout]).then((frame) => {
+      if (
+        !frame
+        || disposed
+        || controller.signal.aborted
+        || state.epoch !== scheduledEpoch
+        || referenceCaptureStates.get(peer.companionInstanceId) !== state
+        || !referenceDemandInstanceIds.has(peer.companionInstanceId)
+        || !isStudioCompanionReferencePreviewFrame(frame)
+        || frame.generation !== current.generation
+        || frame.revision !== current.revision
+        || frame.referenceRevision !== current.referenceRevision
+        || frame.sequence !== sequence
+      ) return;
+      const activePeer = referencePeerForInstance(peer.companionInstanceId);
+      if (!activePeer || activePeer.generation !== peer.generation) return;
+      const latest = readReferenceProjection(activePeer);
+      if (!latest || !sameReferenceCursor(referenceCursorFromProjection(latest), current)) return;
+      try {
+        referenceChannel.postMessage(buildStudioCompanionReferencePreviewFrame({
+          primaryInstanceId,
+          targetCompanionInstanceId: peer.companionInstanceId,
+          frame,
+        }));
+        captureSucceeded = true;
+        state.lastCaptured = Object.freeze({ ...current, at: Date.now() });
+        state.failure = null;
+      } catch {
+        // A detached peer may disappear between the final route check and transfer.
+      }
+    }).catch(() => {
+      // Reference capture is optional and failure is handled by bounded retry below.
+    }).finally(() => {
+      if (captureTimeout !== null) globalThis.clearTimeout(captureTimeout);
+      if (
+        state.epoch !== scheduledEpoch
+        || referenceCaptureStates.get(peer.companionInstanceId) !== state
+      ) return;
+      if (state.controller === controller) state.controller = null;
+      state.inFlight = false;
+      if (disposed || !referenceDemandInstanceIds.has(peer.companionInstanceId)) return;
+      const activePeer = referencePeerForInstance(peer.companionInstanceId);
+      if (!activePeer || activePeer.generation !== peer.generation) {
+        releaseReferenceTransport(peer.companionInstanceId, true);
+        return;
+      }
+      const latest = readReferenceProjection(activePeer);
+      if (!latest) return;
+      const latestCursor = referenceCursorFromProjection(latest);
+      if (!sameReferenceCursor(latestCursor, current)) {
+        synchronizeReferenceCaptureCursor(state, latestCursor);
+        requestReferenceCapture(activePeer, latest);
+        return;
+      }
+      if (captureSucceeded) return;
+      const previousFailure = state.failure;
+      const count = previousFailure && sameReferenceCursor(previousFailure, current)
+        ? previousFailure.count + 1
+        : 1;
+      state.failure = Object.freeze({ ...current, count, at: Date.now() });
+      if (count < STUDIO_COMPANION_REFERENCE_MAX_CAPTURE_FAILURES) {
+        requestReferenceCapture(activePeer, latest);
+      }
+    });
+  }
+
+  function requestReferenceColor(
+    peer: StudioCompanionBindingSnapshot,
+    control: Extract<StudioCompanionReferenceControl, { kind: "reference-pick-color" }>
+  ): void {
+    if (
+      disposed
+      || !input.sampleReferenceColor
+      || !referenceDemandInstanceIds.has(peer.companionInstanceId)
+    ) return;
+    const projection = readReferenceProjection(peer);
+    if (
+      !projection
+      || !projection.canPickColor
+      || projection.referenceRevision !== control.referenceRevision
+    ) return;
+    releaseReferenceColorState(peer.companionInstanceId);
+    const controller = new AbortController();
+    const current = referenceCursorFromProjection(projection);
+    const state: StudioCompanionReferenceColorState = {
+      epoch: ++referenceAsyncEpoch,
+      controller,
+      current,
+    };
+    referenceColorStates.set(peer.companionInstanceId, state);
+    const request: StudioCompanionReferenceColorSampleRequest = Object.freeze({
+      requester: Object.freeze({
+        companionInstanceId: peer.companionInstanceId,
+        generation: peer.generation,
+      }),
+      current,
+      point: Object.freeze({ x: control.point.x, y: control.point.y }),
+      sequence: control.sequence,
+      signal: controller.signal,
+    });
+    let sampleTimeout: ReturnType<typeof globalThis.setTimeout> | null = null;
+    const timeout = new Promise<null>((resolve) => {
+      sampleTimeout = globalThis.setTimeout(() => {
+        controller.abort();
+        resolve(null);
+      }, 5_000);
+    });
+    const sampled = Promise.resolve().then(() => input.sampleReferenceColor?.(request) ?? null);
+    void Promise.race([sampled, timeout]).then((color) => {
+      const result: StudioCompanionReferenceColorResult = {
+        ...current,
+        sequence: control.sequence,
+        color: color ?? "",
+      };
+      if (
+        disposed
+        || controller.signal.aborted
+        || referenceColorStates.get(peer.companionInstanceId) !== state
+        || !referenceDemandInstanceIds.has(peer.companionInstanceId)
+        || !isStudioCompanionReferenceColorResult(result)
+      ) return;
+      const activePeer = referencePeerForInstance(peer.companionInstanceId);
+      if (!activePeer || activePeer.generation !== peer.generation) return;
+      const latest = readReferenceProjection(activePeer);
+      if (
+        !latest
+        || !latest.canPickColor
+        || !sameReferenceCursor(referenceCursorFromProjection(latest), current)
+      ) return;
+      try {
+        referenceChannel.postMessage(buildStudioCompanionReferenceColorResult({
+          primaryInstanceId,
+          targetCompanionInstanceId: peer.companionInstanceId,
+          result,
+        }));
+      } catch {
+        // A detached peer may close while the asynchronous sample resolves.
+      }
+    }).catch(() => {
+      // Color sampling is best-effort and never mutates the Reference document.
+    }).finally(() => {
+      if (sampleTimeout !== null) globalThis.clearTimeout(sampleTimeout);
+      if (referenceColorStates.get(peer.companionInstanceId) === state) {
+        referenceColorStates.delete(peer.companionInstanceId);
+      }
+    });
+  }
 
   const sameCaptureOwner = (
     left: StudioCompanionBindingSnapshot | null,
@@ -1505,7 +2572,7 @@ export function startStudioCompanionPrimaryRuntime(input: {
 
   const demandedFrameRecipients = (): readonly StudioCompanionBindingSnapshot[] => (
     binding.activeBindings().filter((peer) => (
-      peer.surface !== "review"
+      (peer.surface === "workspace" || peer.surface === "navigator")
       && navigatorDemandByInstanceId.get(peer.companionInstanceId) === true
     ))
   );
@@ -1541,6 +2608,7 @@ export function startStudioCompanionPrimaryRuntime(input: {
     for (const peer of expired) {
       navigatorDemandByInstanceId.delete(peer.companionInstanceId);
       pendingDemandRefreshInstanceIds.delete(peer.companionInstanceId);
+      releaseReferenceTransport(peer.companionInstanceId, true);
     }
     return reconcileCaptureOwner();
   };
@@ -1740,11 +2808,34 @@ export function startStudioCompanionPrimaryRuntime(input: {
           tool: snapshot.tool,
           density: snapshot.density,
           canvasOnly: snapshot.canvasOnly,
-          title: peer.surface === "navigator"
+          title: peer.surface === "navigator" || peer.surface === "reference"
             ? STUDIO_COMPANION_NAVIGATOR_GENERIC_TITLE
             : snapshot.title || "스튜디오",
         }));
-        if (!projection) continue;
+        if (peer.surface === "workspace" || peer.surface === "reference") {
+          const referenceProjection = readReferenceProjection(peer);
+          if (referenceProjection) {
+            const colorState = referenceColorStates.get(peer.companionInstanceId);
+            if (
+              colorState
+              && !sameReferenceCursor(
+                colorState.current,
+                referenceCursorFromProjection(referenceProjection)
+              )
+            ) releaseReferenceColorState(peer.companionInstanceId);
+            channel.postMessage(buildStudioCompanionReferenceState({
+              primaryInstanceId,
+              targetCompanionInstanceId: peer.companionInstanceId,
+              generation: peer.generation,
+              projection: referenceProjection,
+            }));
+            requestReferenceCapture(peer, referenceProjection);
+          } else {
+            releaseReferenceCaptureState(peer.companionInstanceId);
+            releaseReferenceColorState(peer.companionInstanceId);
+          }
+        }
+        if (!projection || peer.surface === "reference") continue;
         channel.postMessage(buildStudioCompanionReviewState({
           primaryInstanceId,
           targetCompanionInstanceId: peer.companionInstanceId,
@@ -1777,6 +2868,7 @@ export function startStudioCompanionPrimaryRuntime(input: {
     if (primaryGoodbyeSent) return;
     primaryGoodbyeSent = true;
     resetCaptureGeneration();
+    releaseAllReferenceTransports();
     clearLeaseTimer();
     if (publishTimer !== null) {
       globalThis.clearTimeout(publishTimer);
@@ -1811,6 +2903,7 @@ export function startStudioCompanionPrimaryRuntime(input: {
       if (departing) {
         navigatorDemandByInstanceId.delete(departing.companionInstanceId);
         pendingDemandRefreshInstanceIds.delete(departing.companionInstanceId);
+        releaseReferenceTransport(departing.companionInstanceId, true);
       }
       const ownerChanged = reconcileCaptureOwner();
       scheduleLeaseSweep();
@@ -1832,6 +2925,7 @@ export function startStudioCompanionPrimaryRuntime(input: {
         if (previous) {
           navigatorDemandByInstanceId.delete(previous.companionInstanceId);
           pendingDemandRefreshInstanceIds.delete(previous.companionInstanceId);
+          releaseReferenceTransport(previous.companionInstanceId, true);
         }
         reconcileCaptureOwner();
       }
@@ -1902,8 +2996,37 @@ export function startStudioCompanionPrimaryRuntime(input: {
           || !latest.captureAllowed
         ) return;
       }
+      if (isStudioCompanionReferenceControl(message.control)) {
+        input.onReferenceControl?.(message.control);
+        const peer = referencePeerForInstance(message.companionInstanceId);
+        if (!peer || peer.generation !== message.generation) return;
+        if (message.control.kind === "reference-preview-demand") {
+          if (message.control.active) {
+            referenceDemandInstanceIds.add(message.companionInstanceId);
+            if (!referenceDemandAggregateActive) {
+              referenceDemandAggregateActive = true;
+              try {
+                input.onReferenceDemandChange?.(true);
+              } catch {
+                // Demand observers are optional; the protocol remains authoritative.
+              }
+            }
+            publish();
+          } else {
+            releaseReferenceTransport(message.companionInstanceId, false);
+          }
+          return;
+        }
+        requestReferenceColor(peer, message.control);
+        return;
+      }
       input.onControl?.(message.control);
       publish();
+      return;
+    }
+    if (message.type === "companion-presentation-safe") {
+      // Presentation safety is an ephemeral companion-to-companion LWW register. The primary
+      // never binds, forwards, or interprets it as a document/tool command.
       return;
     }
     if (!binding.acceptCommand(message, primaryInstanceId)) return;

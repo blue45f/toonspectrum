@@ -422,7 +422,7 @@ describe("useStudioCompanionWindowLayout", () => {
   });
 
   it("keeps restore lifetime independent per companion surface", async () => {
-    for (const surface of ["navigator", "review"] as const) {
+    for (const surface of ["navigator", "review", "reference"] as const) {
       const layout = persistedLayout(surface);
       expect(saveStudioCompanionWindowLayout(window.localStorage, surface, layout, { now: NOW }).status)
         .toBe("persisted");
@@ -442,10 +442,15 @@ describe("useStudioCompanionWindowLayout", () => {
     expect(browser.moveTo).toHaveBeenCalledTimes(2);
     expect(browser.resizeTo).toHaveBeenCalledTimes(2);
 
+    view.rerender({ surface: "reference", enabled: true, interactionReady: true });
+    await flushEffects();
+    expect(browser.moveTo).toHaveBeenCalledTimes(3);
+    expect(browser.resizeTo).toHaveBeenCalledTimes(3);
+
     view.rerender({ surface: "navigator", enabled: true, interactionReady: true });
     await flushEffects();
-    expect(browser.moveTo).toHaveBeenCalledTimes(2);
-    expect(browser.resizeTo).toHaveBeenCalledTimes(2);
+    expect(browser.moveTo).toHaveBeenCalledTimes(3);
+    expect(browser.resizeTo).toHaveBeenCalledTimes(3);
   });
 
   it("debounces resize by 250ms and polls geometry only while visible", async () => {

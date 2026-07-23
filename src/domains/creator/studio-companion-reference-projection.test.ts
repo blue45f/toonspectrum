@@ -12,8 +12,10 @@ import {
   isStudioCompanionReferenceControl,
   isStudioCompanionReferencePreviewFrame,
   isStudioCompanionReferenceProjection,
+  parseStudioCompanionReferenceWebpHeader,
   planStudioCompanionReferenceCapture,
   studioCompanionReferenceFailureBackoffMs,
+  verifyStudioCompanionReferenceWebpBlob,
   type StudioCompanionReferencePreviewFrame,
 } from "./studio-companion-reference-projection";
 
@@ -40,6 +42,50 @@ function frame(overrides: Partial<StudioCompanionReferencePreviewFrame> = {}) {
     blob: new Blob([new Uint8Array(32)], { type: "image/webp" }),
     ...overrides,
   };
+}
+
+function webpHeaderBlob(
+  width: number,
+  height: number,
+  format: "vp8" | "vp8l" | "vp8x" = "vp8x"
+): Blob {
+  const byteLength = format === "vp8l" ? 26 : 30;
+  const bytes = new Uint8Array(byteLength);
+  const view = new DataView(bytes.buffer);
+  const writeAscii = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index += 1) {
+      bytes[offset + index] = value.charCodeAt(index);
+    }
+  };
+  writeAscii(0, "RIFF");
+  view.setUint32(4, byteLength - 8, true);
+  writeAscii(8, "WEBP");
+  if (format === "vp8x") {
+    writeAscii(12, "VP8X");
+    view.setUint32(16, 10, true);
+    const widthMinusOne = width - 1;
+    const heightMinusOne = height - 1;
+    bytes.set([
+      widthMinusOne & 0xff,
+      (widthMinusOne >>> 8) & 0xff,
+      (widthMinusOne >>> 16) & 0xff,
+      heightMinusOne & 0xff,
+      (heightMinusOne >>> 8) & 0xff,
+      (heightMinusOne >>> 16) & 0xff,
+    ], 24);
+  } else if (format === "vp8l") {
+    writeAscii(12, "VP8L");
+    view.setUint32(16, 5, true);
+    bytes[20] = 0x2f;
+    view.setUint32(21, (width - 1) | ((height - 1) << 14), true);
+  } else {
+    writeAscii(12, "VP8 ");
+    view.setUint32(16, 10, true);
+    bytes.set([0x9d, 0x01, 0x2a], 23);
+    view.setUint16(26, width, true);
+    view.setUint16(28, height, true);
+  }
+  return new Blob([bytes], { type: "image/webp" });
 }
 
 function planner(overrides: Record<string, unknown> = {}) {
@@ -213,6 +259,37 @@ describe("Studio companion reference projection", () => {
       lastAcceptedSequence: Number.MAX_SAFE_INTEGER + 1,
     })).toBe(false);
   });
+
+  it.each(["vp8", "vp8l", "vp8x"] as const)(
+    "preflights %s WebP headers and exact intrinsic dimensions",
+    async (format) => {
+      const blob = webpHeaderBlob(320, 180, format);
+      const bytes = new Uint8Array(await blob.slice(0, 30).arrayBuffer());
+      expect(parseStudioCompanionReferenceWebpHeader(bytes, blob.size)).toEqual({
+        format,
+        width: 320,
+        height: 180,
+      });
+      await expect(verifyStudioCompanionReferenceWebpBlob(blob, 320, 180)).resolves.toBe(true);
+      await expect(verifyStudioCompanionReferenceWebpBlob(blob, 321, 180)).resolves.toBe(false);
+    }
+  );
+
+  it("rejects corrupt, truncated, oversized, and forged WebP headers", async () => {
+    const corrupt = new Blob([new Uint8Array(30)], { type: "image/webp" });
+    const mismatchedRiff = new Uint8Array(await webpHeaderBlob(320, 180).arrayBuffer());
+    new DataView(mismatchedRiff.buffer).setUint32(4, 1, true);
+    const tooWide = webpHeaderBlob(STUDIO_COMPANION_REFERENCE_MAX_EDGE + 1, 1);
+
+    await expect(verifyStudioCompanionReferenceWebpBlob(corrupt, 320, 180)).resolves.toBe(false);
+    await expect(verifyStudioCompanionReferenceWebpBlob(
+      new Blob([mismatchedRiff], { type: "image/webp" }),
+      320,
+      180
+    )).resolves.toBe(false);
+    await expect(verifyStudioCompanionReferenceWebpBlob(tooWide, 1_281, 1)).resolves.toBe(false);
+    expect(parseStudioCompanionReferenceWebpHeader(new Uint8Array(24), 24)).toBeNull();
+  });
 });
 
 describe("Studio companion reference capture planning", () => {
@@ -285,6 +362,34 @@ describe("Studio companion reference capture planning", () => {
 });
 
 describe("Studio companion reference object URL ownership", () => {
+  it("allocates a wire Blob URL only after WebP header and dimensions are verified", async () => {
+    const createObjectURL = vi.fn(() => "blob:verified");
+    const revokeObjectURL = vi.fn();
+    const owner = new StudioCompanionReferenceObjectUrlOwner({ createObjectURL, revokeObjectURL });
+    const verifiedFrame = frame({
+      width: 320,
+      height: 180,
+      blob: webpHeaderBlob(320, 180),
+    });
+
+    await expect(owner.stageVerified(verifiedFrame)).resolves.toMatchObject({
+      url: "blob:verified",
+      width: 320,
+      height: 180,
+    });
+    expect(createObjectURL).toHaveBeenCalledOnce();
+
+    const corruptOwner = new StudioCompanionReferenceObjectUrlOwner({
+      createObjectURL,
+      revokeObjectURL,
+    });
+    await expect(corruptOwner.stageVerified(frame({
+      width: 320,
+      height: 180,
+      blob: new Blob([new Uint8Array(30)], { type: "image/webp" }),
+    }))).resolves.toBeNull();
+    expect(createObjectURL).toHaveBeenCalledOnce();
+  });
   it("stages, commits, replaces, rejects, and clears with at most two owned URLs", () => {
     const createObjectURL = vi.fn()
       .mockReturnValueOnce("blob:first")

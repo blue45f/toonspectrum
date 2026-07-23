@@ -59,9 +59,14 @@ const budgets = {
   // 공유 descriptor/CRDT의 bounded blur·curve 왕복 검증을 추가했다. production 관측치는
   // 2,795,227/913,046 bytes, app-shell 이후 2,293,501/752,758 bytes이며 요청 수는 138로 불변.
   // 관측치에 0.1~0.2%의 작은 코드젠 drift만 허용하고 요청·incremental gzip 상한은 유지한다.
-  studio: { raw: 2_800_000, gzip: 915_000 },
+  // 2026-07-23 compact WebGPU live-journal/whole-group failover와 다중 화면 reference capture의
+  // commit-safe 제어면을 추가했다. Worker·raster encoder·reference renderer는 계속 사용자 수요 뒤
+  // dynamic graph에 남고 정적 요청 수도 137개로 불변이다. production 관측치는
+  // 2,819,602/919,407 bytes, app-shell 이후 2,317,637/759,027 bytes다. 기능을 예산 밖으로
+  // 밀어내지 않으면서도 이후 eager 회귀를 잡도록 각 관측치에 0.2~0.4% 미만 여유만 둔다.
+  studio: { raw: 2_825_000, gzip: 922_000 },
   studioEntry: { raw: 1_284_000, gzip: 384_500 },
-  studioIncremental: { raw: 2_296_000, gzip: 755_000, chunks: 138 },
+  studioIncremental: { raw: 2_322_000, gzip: 762_000, chunks: 138 },
   // Rapier deterministic compat is intentionally isolated in a user-triggered module Worker.
   // 2026-07-18 production output: 2,302,139 raw / 855,399 gzip. Keep ~2% version-drift headroom
   // without charging this optional engine to Studio or the 3D editor's initial graph.

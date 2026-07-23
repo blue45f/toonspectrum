@@ -8,8 +8,12 @@ import {
   buildStudioCompanionNavigatorFrame,
   buildStudioCompanionPing,
   buildStudioCompanionPong,
+  buildStudioCompanionPresentationSafe,
   buildStudioCompanionPrimaryGoodbye,
   buildStudioCompanionPrimaryState,
+  buildStudioCompanionReferenceColorResult,
+  buildStudioCompanionReferencePreviewFrame,
+  buildStudioCompanionReferenceState,
   buildStudioCompanionReviewState,
   completeReservedStudioToolsCompanionWindow,
   createStudioCompanionReviewProjection,
@@ -17,6 +21,7 @@ import {
   createStudioCompanionSessionId,
   isStudioCompanionMessage,
   isStudioCompanionMessageFresh,
+  isStudioCompanionReferenceColorResult,
   isStudioCompanionSessionId,
   isStudioToolsCompanionWindowReusable,
   openReadyStudioToolsCompanionForMenu,
@@ -32,6 +37,8 @@ import {
   startStudioCompanionPrimaryRuntime,
   StudioCompanionCommandGuard,
   StudioCompanionPrimaryBinding,
+  StudioCompanionPresentationSafeGuard,
+  StudioCompanionReferenceMessageGuard,
   type StudioCompanionMessage,
 } from "./studio-tools-companion";
 
@@ -42,6 +49,8 @@ const companionB = "companion-b-5678";
 const navigatorA = "navigator-a-1234";
 const navigatorB = "navigator-b-5678";
 const reviewA = "review-peer-a-1234";
+const referenceA = "reference-peer-a-1234";
+const referenceB = "reference-peer-b-5678";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -77,6 +86,25 @@ function reviewProjection(overrides: {
   });
 }
 
+function referenceProjection(overrides: {
+  generation?: number;
+  revision?: number;
+  referenceRevision?: number;
+  itemCount?: number;
+  resolvedItemCount?: number;
+} = {}) {
+  const itemCount = overrides.itemCount ?? 3;
+  const resolvedItemCount = overrides.resolvedItemCount ?? 2;
+  return {
+    generation: overrides.generation ?? 1,
+    revision: overrides.revision ?? 1,
+    referenceRevision: overrides.referenceRevision ?? 1,
+    itemCount,
+    resolvedItemCount,
+    canPickColor: resolvedItemCount > 0,
+  } as const;
+}
+
 class RuntimeBroadcastChannel {
   static instances: RuntimeBroadcastChannel[] = [];
 
@@ -107,6 +135,24 @@ function demandNavigator(input: {
     companionInstanceId: input.companionInstanceId,
     targetPrimaryInstanceId: input.primaryInstanceId,
     commandId: `navigator-demand-${input.sequence ?? 1}`,
+    sequence: input.sequence ?? 1,
+  }));
+}
+
+function demandReference(input: {
+  channel: RuntimeBroadcastChannel;
+  primaryInstanceId: string;
+  companionInstanceId: string;
+  generation?: number;
+  sequence?: number;
+  active?: boolean;
+}): void {
+  input.channel.emit(buildStudioCompanionControl({
+    control: { kind: "reference-preview-demand", active: input.active ?? true },
+    generation: input.generation ?? 1,
+    companionInstanceId: input.companionInstanceId,
+    targetPrimaryInstanceId: input.primaryInstanceId,
+    commandId: `reference-demand-${input.sequence ?? 1}`,
     sequence: input.sequence ?? 1,
   }));
 }
@@ -307,6 +353,108 @@ describe("studio-tools-companion protocol", () => {
     expect(parseStudioCompanionMessage({ ...validCompanionHello, extra: true })).toBeNull();
   });
 
+  it("validates, routes and replay-fences companion presentation-safe state exactly", () => {
+    const guard = new StudioCompanionPresentationSafeGuard();
+    expect(guard.bind(companionA)).toBe(true);
+    const message = buildStudioCompanionPresentationSafe({
+      companionInstanceId: companionB,
+      targetCompanionInstanceId: companionA,
+      state: {
+        enabled: true,
+        clock: 1,
+        writerInstanceId: companionB,
+        mutationId: "presentation-b-0001",
+      },
+      now: 10_000,
+    });
+
+    expect(parseStudioCompanionMessage(message)).toEqual(message);
+    expect(parseStudioCompanionMessage({ ...message, extra: true })).toBeNull();
+    expect(parseStudioCompanionMessage({
+      ...message,
+      state: { ...message.state, extra: true },
+    })).toBeNull();
+    expect(parseStudioCompanionMessage({
+      ...message,
+      state: { ...message.state, clock: 0 },
+    })).toBeNull();
+    expect(guard.accept(message, { companionInstanceId: companionA, now: 10_000 })).toBe(true);
+    expect(guard.accept(message, { companionInstanceId: companionA, now: 10_001 })).toBe(false);
+    expect(guard.accept({
+      ...message,
+      targetCompanionInstanceId: referenceA,
+      state: { ...message.state, clock: 2, mutationId: "presentation-b-0002" },
+    }, { companionInstanceId: companionA, now: 10_001 })).toBe(false);
+    expect(guard.current()).toEqual(message.state);
+  });
+
+  it("converges concurrent presentation-safe mutations with a deterministic LWW order", () => {
+    const guardA = new StudioCompanionPresentationSafeGuard();
+    const guardB = new StudioCompanionPresentationSafeGuard();
+    const guardC = new StudioCompanionPresentationSafeGuard();
+    guardA.bind(companionA);
+    guardB.bind(companionB);
+    guardC.bind(referenceA);
+    const stateA = guardA.write(true, "presentation-a-0001")!;
+    const stateB = guardB.write(false, "presentation-b-0001")!;
+    const messageA = buildStudioCompanionPresentationSafe({
+      companionInstanceId: companionA,
+      targetCompanionInstanceId: null,
+      state: stateA,
+      now: 10_000,
+    });
+    const messageB = buildStudioCompanionPresentationSafe({
+      companionInstanceId: companionB,
+      targetCompanionInstanceId: null,
+      state: stateB,
+      now: 10_000,
+    });
+
+    expect(guardA.accept(messageB, { companionInstanceId: companionA, now: 10_000 })).toBe(true);
+    expect(guardB.accept(messageA, { companionInstanceId: companionB, now: 10_000 })).toBe(false);
+    expect(guardC.accept(messageA, { companionInstanceId: referenceA, now: 10_000 })).toBe(true);
+    expect(guardC.accept(messageB, { companionInstanceId: referenceA, now: 10_000 })).toBe(true);
+    expect([guardA.current(), guardB.current(), guardC.current()])
+      .toEqual([stateB, stateB, stateB]);
+
+    const stateA2 = guardA.write(true, "presentation-a-0002")!;
+    const messageA2 = buildStudioCompanionPresentationSafe({
+      companionInstanceId: companionA,
+      targetCompanionInstanceId: null,
+      state: stateA2,
+      now: 10_001,
+    });
+    expect(stateA2.clock).toBe(2);
+    expect(guardB.accept(messageA2, { companionInstanceId: companionB, now: 10_001 })).toBe(true);
+    expect(guardC.accept(messageA2, { companionInstanceId: referenceA, now: 10_001 })).toBe(true);
+    expect([guardA.current(), guardB.current(), guardC.current()])
+      .toEqual([stateA2, stateA2, stateA2]);
+  });
+
+  it("restores an exact durable presentation-safe register and advances from its clock", () => {
+    const guard = new StudioCompanionPresentationSafeGuard();
+    guard.bind(companionA);
+    const durable = {
+      enabled: true,
+      clock: 41,
+      writerInstanceId: companionB,
+      mutationId: "presentation-b-0041",
+    } as const;
+
+    expect(guard.merge(durable)).toBe(true);
+    expect(guard.merge(durable)).toBe(false);
+    expect(guard.merge({ ...durable, extra: true })).toBe(false);
+    expect(guard.current()).toEqual(durable);
+
+    const next = guard.write(false, "presentation-a-0042");
+    expect(next).toEqual({
+      enabled: false,
+      clock: 42,
+      writerInstanceId: companionA,
+      mutationId: "presentation-a-0042",
+    });
+  });
+
   it("rejects stale/future messages and command replay across one bound companion", () => {
     const guard = new StudioCompanionCommandGuard();
     guard.bindCompanion(companionA);
@@ -492,6 +640,7 @@ describe("studio-tools-companion protocol", () => {
     expect(parseStudioCompanionSurface("?session=primary-a-1234")).toBe("workspace");
     expect(parseStudioCompanionSurface("?session=primary-a-1234&view=navigator")).toBe("navigator");
     expect(parseStudioCompanionSurface("?view=review")).toBe("review");
+    expect(parseStudioCompanionSurface("?view=reference")).toBe("reference");
     expect(parseStudioCompanionSurface("?view=unknown")).toBeNull();
     expect(parseStudioCompanionSurface("?view=navigator&view=review")).toBeNull();
   });
@@ -584,7 +733,7 @@ describe("studio-tools-companion protocol", () => {
     expect(open).toHaveBeenCalledOnce();
   });
 
-  it("isolates workspace, Navigator and Review popup URLs, names and reuse", () => {
+  it("isolates workspace, Navigator, Review and Reference popup URLs, names and reuse", () => {
     const makePopup = (href: string) => ({
       closed: false,
       focus: vi.fn(),
@@ -596,8 +745,12 @@ describe("studio-tools-companion protocol", () => {
     const reviewPopup = makePopup(
       "http://localhost/studio/tools-companion?session=primary-a-1234&view=review"
     );
+    const referencePopup = makePopup(
+      "http://localhost/studio/tools-companion?session=primary-a-1234&view=reference"
+    );
     const openNavigator = vi.fn(() => navigatorPopup);
     const openReview = vi.fn(() => reviewPopup);
+    const openReference = vi.fn(() => referencePopup);
 
     expect(openStudioCompanionSurfaceWindow(
       primaryA,
@@ -619,6 +772,19 @@ describe("studio-tools-companion protocol", () => {
       "toonspectrum-studio-tools-primary-a-1234-review",
       "popup=yes,width=420,height=860,menubar=no,toolbar=no,location=no,status=no"
     );
+    expect(openStudioCompanionSurfaceWindow(
+      primaryA,
+      "reference",
+      null,
+      openReference
+    )).toBe(referencePopup);
+    expect(openReference).toHaveBeenCalledWith(
+      expect.stringContaining("view=reference"),
+      "toonspectrum-studio-tools-primary-a-1234-reference",
+      "popup=yes,width=420,height=860,menubar=no,toolbar=no,location=no,status=no"
+    );
+    expect(isStudioToolsCompanionWindowReusable(primaryA, referencePopup, "reference")).toBe(true);
+    expect(isStudioToolsCompanionWindowReusable(primaryA, referencePopup, "review")).toBe(false);
     expect(studioCompanionUrl(primaryA, "https://example.com")).not.toContain("view=");
   });
 
@@ -816,6 +982,175 @@ describe("studio-tools-companion protocol", () => {
     })).toBeNull();
   });
 
+  it("parses exact Reference projection, preview and color-result envelopes", () => {
+    const projection = referenceProjection({
+      generation: 2,
+      revision: 7,
+      referenceRevision: 11,
+    });
+    const state = buildStudioCompanionReferenceState({
+      primaryInstanceId: primaryA,
+      targetCompanionInstanceId: referenceA,
+      generation: 2,
+      projection,
+      now: 1_000,
+    });
+    const frame = buildStudioCompanionReferencePreviewFrame({
+      primaryInstanceId: primaryA,
+      targetCompanionInstanceId: referenceA,
+      frame: {
+        generation: 2,
+        revision: 7,
+        referenceRevision: 11,
+        sequence: 3,
+        width: 640,
+        height: 480,
+        blob: new Blob([new Uint8Array(64)], { type: "image/webp" }),
+      },
+      now: 1_001,
+    });
+    const color = buildStudioCompanionReferenceColorResult({
+      primaryInstanceId: primaryA,
+      targetCompanionInstanceId: referenceA,
+      result: {
+        generation: 2,
+        revision: 7,
+        referenceRevision: 11,
+        sequence: 4,
+        color: "#12aBcD",
+      },
+      now: 1_002,
+    });
+
+    expect(parseStudioCompanionMessage(state)).toEqual(state);
+    expect(parseStudioCompanionMessage(frame)).toEqual(frame);
+    expect(parseStudioCompanionMessage(color)).toEqual(color);
+    expect(isStudioCompanionReferenceColorResult({
+      generation: 2,
+      revision: 7,
+      referenceRevision: 11,
+      sequence: 4,
+      color: "#12abcd",
+    })).toBe(true);
+
+    expect(parseStudioCompanionMessage({ ...state, generation: 3 })).toBeNull();
+    expect(parseStudioCompanionMessage({
+      ...state,
+      projection: { ...projection, itemCount: 33 },
+    })).toBeNull();
+    expect(parseStudioCompanionMessage({ ...frame, sequence: 0 })).toBeNull();
+    expect(parseStudioCompanionMessage({
+      ...frame,
+      blob: new Blob([new Uint8Array(8)], { type: "image/png" }),
+    })).toBeNull();
+    expect(parseStudioCompanionMessage({ ...color, color: "rgb(1, 2, 3)" })).toBeNull();
+    expect(parseStudioCompanionMessage({ ...color, extra: true })).toBeNull();
+
+    const colorGetter = vi.fn(() => "#123456");
+    const hostile = {
+      generation: 2,
+      revision: 7,
+      referenceRevision: 11,
+      sequence: 4,
+    } as Record<string, unknown>;
+    Object.defineProperty(hostile, "color", { enumerable: true, get: colorGetter });
+    expect(isStudioCompanionReferenceColorResult(hostile)).toBe(false);
+    expect(colorGetter).not.toHaveBeenCalled();
+  });
+
+  it("fences Reference primary routing by target, generation, revision and per-stream sequence", () => {
+    const guard = new StudioCompanionReferenceMessageGuard();
+    expect(guard.bind(primaryA, referenceA)).toBe(true);
+    const state = buildStudioCompanionReferenceState({
+      primaryInstanceId: primaryA,
+      targetCompanionInstanceId: referenceA,
+      generation: 1,
+      projection: referenceProjection({ generation: 1, revision: 4, referenceRevision: 9 }),
+      now: 10_000,
+    });
+    const frame = buildStudioCompanionReferencePreviewFrame({
+      primaryInstanceId: primaryA,
+      targetCompanionInstanceId: referenceA,
+      frame: {
+        generation: 1,
+        revision: 4,
+        referenceRevision: 9,
+        sequence: 1,
+        width: 320,
+        height: 240,
+        blob: new Blob([new Uint8Array(32)], { type: "image/webp" }),
+      },
+      now: 10_001,
+    });
+    const color = buildStudioCompanionReferenceColorResult({
+      primaryInstanceId: primaryA,
+      targetCompanionInstanceId: referenceA,
+      result: {
+        generation: 1,
+        revision: 4,
+        referenceRevision: 9,
+        sequence: 1,
+        color: "#123456",
+      },
+      now: 10_002,
+    });
+
+    expect(guard.acceptPreviewFrame(frame, 10_001)).toBe(false);
+    expect(guard.acceptState({ ...state, targetCompanionInstanceId: referenceB }, 10_000))
+      .toBe(false);
+    expect(guard.acceptState(state, 10_000)).toBe(true);
+    expect(guard.acceptState(state, 10_000)).toBe(false);
+    expect(guard.acceptPreviewFrame(frame, 10_001)).toBe(true);
+    expect(guard.acceptPreviewFrame(frame, 10_001)).toBe(false);
+    expect(guard.acceptColorResult(color, 10_002)).toBe(true);
+    expect(guard.acceptColorResult(color, 10_002)).toBe(false);
+
+    const nextState = buildStudioCompanionReferenceState({
+      primaryInstanceId: primaryA,
+      targetCompanionInstanceId: referenceA,
+      generation: 1,
+      projection: referenceProjection({ generation: 1, revision: 5, referenceRevision: 10 }),
+      now: 10_003,
+    });
+    expect(guard.acceptState(nextState, 10_003)).toBe(true);
+    expect(guard.acceptPreviewFrame({
+      ...frame,
+      revision: 4,
+      referenceRevision: 9,
+      sequence: 2,
+      at: 10_004,
+    }, 10_004)).toBe(false);
+    expect(guard.acceptPreviewFrame({
+      ...frame,
+      revision: 5,
+      referenceRevision: 10,
+      sequence: 1,
+      at: 10_004,
+    }, 10_004)).toBe(true);
+
+    const nextGeneration = buildStudioCompanionReferenceState({
+      primaryInstanceId: primaryA,
+      targetCompanionInstanceId: referenceA,
+      generation: 2,
+      projection: referenceProjection({ generation: 2, revision: 1, referenceRevision: 1 }),
+      now: 10_005,
+    });
+    expect(guard.acceptState(nextGeneration, 10_005)).toBe(true);
+    expect(guard.acceptColorResult({
+      ...color,
+      generation: 1,
+      sequence: 2,
+      at: 10_006,
+    }, 10_006)).toBe(false);
+    expect(guard.snapshot()).toEqual({
+      generation: 2,
+      revision: 1,
+      referenceRevision: 1,
+      frameSequence: 0,
+      colorSequence: 0,
+    });
+  });
+
   it("shares one sequence fence across legacy and review controls without poisoning on rejection", () => {
     const binding = new StudioCompanionPrimaryBinding();
     expect(binding.acceptHello(buildStudioCompanionHello({
@@ -875,6 +1210,7 @@ describe("studio-tools-companion protocol", () => {
       ["workspace", companionA],
       ["navigator", navigatorA],
       ["review", reviewA],
+      ["reference", referenceA],
     ] as const) {
       expect(binding.acceptHello(buildStudioCompanionHello({
         role: "companion",
@@ -920,6 +1256,59 @@ describe("studio-tools-companion protocol", () => {
       sequence: 1,
     }, 10_002), primaryA, 10_002)).toBe(true);
 
+    const referenceBrush = buildStudioCompanionControl({
+      control: { kind: "brush", patch: { size: 8 } },
+      generation: 1,
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: primaryA,
+      commandId: "reference-invalid-0001",
+      sequence: 1,
+    }, 10_001);
+    expect(binding.acceptControl(referenceBrush, primaryA, 10_001)).toBe(false);
+    const firstReferencePick = buildStudioCompanionControl({
+      control: {
+        kind: "reference-pick-color",
+        point: { x: 0.25, y: 0.75 },
+        referenceRevision: 3,
+        sequence: 1,
+      },
+      generation: 1,
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: primaryA,
+      commandId: "reference-valid-0001",
+      sequence: 1,
+    }, 10_002);
+    expect(binding.acceptControl(firstReferencePick, primaryA, 10_002)).toBe(true);
+    expect(binding.acceptControl(buildStudioCompanionControl({
+      control: {
+        kind: "reference-pick-color",
+        point: { x: 0.25, y: 0.75 },
+        referenceRevision: 3,
+        sequence: 1,
+      },
+      generation: 1,
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: primaryA,
+      commandId: "reference-replayed-pick-0002",
+      sequence: 2,
+    }, 10_003), primaryA, 10_003)).toBe(false);
+    expect(binding.acceptControl(buildStudioCompanionControl({
+      control: { kind: "reference-preview-demand", active: true },
+      generation: 2,
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: primaryA,
+      commandId: "reference-wrong-generation-0002",
+      sequence: 2,
+    }, 10_003), primaryA, 10_003)).toBe(false);
+    expect(binding.acceptControl(buildStudioCompanionControl({
+      control: { kind: "reference-preview-demand", active: true },
+      generation: 1,
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: primaryA,
+      commandId: "reference-demand-0002",
+      sequence: 2,
+    }, 10_004), primaryA, 10_004)).toBe(true);
+
     expect(binding.acceptCommand(buildStudioCompanionCommand({
       command: "pen",
       companionInstanceId: companionA,
@@ -955,6 +1344,20 @@ describe("studio-tools-companion protocol", () => {
       commandId: "review-focus-0002",
       sequence: 2,
     }, 10_007), primaryA, 10_007)).toBe(true);
+    expect(binding.acceptCommand(buildStudioCompanionCommand({
+      command: "pen",
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: primaryA,
+      commandId: "reference-command-0003",
+      sequence: 3,
+    }, 10_008), primaryA, 10_008)).toBe(false);
+    expect(binding.acceptCommand(buildStudioCompanionCommand({
+      command: "focus-primary",
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: primaryA,
+      commandId: "reference-focus-0003",
+      sequence: 3,
+    }, 10_009), primaryA, 10_009)).toBe(true);
   });
 
   it("releases only the exactly targeted role slot on a fresh companion goodbye", () => {
@@ -963,6 +1366,7 @@ describe("studio-tools-companion protocol", () => {
       ["workspace", companionA],
       ["navigator", navigatorA],
       ["review", reviewA],
+      ["reference", referenceA],
     ] as const) {
       expect(binding.acceptHello(buildStudioCompanionHello({
         role: "companion",
@@ -993,13 +1397,14 @@ describe("studio-tools-companion protocol", () => {
       surface: "review",
       at: 10_004,
     }, primaryA, 10_004)).toBe(false);
-    expect(binding.activeBindings()).toHaveLength(3);
+    expect(binding.activeBindings()).toHaveLength(4);
 
     expect(binding.acceptGoodbye({ ...goodbye, at: 10_005 }, primaryA, 10_005)).toBe(true);
     expect(binding.acceptGoodbye({ ...goodbye, at: 10_006 }, primaryA, 10_006)).toBe(false);
     expect(binding.companionInstanceId("workspace")).toBe(companionA);
     expect(binding.companionInstanceId("navigator")).toBeNull();
     expect(binding.companionInstanceId("review")).toBe(reviewA);
+    expect(binding.companionInstanceId("reference")).toBe(referenceA);
     expect(binding.acceptHello(buildStudioCompanionHello({
       role: "companion",
       companionInstanceId: navigatorB,
@@ -1167,6 +1572,7 @@ describe("studio-tools-companion protocol", () => {
       ["workspace", companionA],
       ["navigator", navigatorA],
       ["review", reviewA],
+      ["reference", referenceA],
     ] as const) {
       channel.emit(buildStudioCompanionHello({
         role: "companion",
@@ -1183,7 +1589,7 @@ describe("studio-tools-companion protocol", () => {
     expect(getReviewProjection).toHaveBeenCalledOnce();
     expect(messages.filter((message) => message.type === "primary-state").map((message) => (
       message.type === "primary-state" ? message.targetCompanionInstanceId : ""
-    ))).toEqual([companionA, navigatorA, reviewA]);
+    ))).toEqual([companionA, navigatorA, reviewA, referenceA]);
     expect(messages.filter((message) => message.type === "primary-review-state").map((message) => (
       message.type === "primary-review-state"
         ? [message.targetCompanionInstanceId, message.generation]
@@ -1193,8 +1599,15 @@ describe("studio-tools-companion protocol", () => {
       [navigatorA, 1],
       [reviewA, 1],
     ]);
+    expect(messages.some((message) => (
+      message.type === "primary-review-state"
+      && message.targetCompanionInstanceId === referenceA
+    ))).toBe(false);
     const navigatorState = messages.find((message) => (
       message.type === "primary-state" && message.targetCompanionInstanceId === navigatorA
+    ));
+    const referenceState = messages.find((message) => (
+      message.type === "primary-state" && message.targetCompanionInstanceId === referenceA
     ));
     const navigatorReview = messages.find((message) => (
       message.type === "primary-review-state" && message.targetCompanionInstanceId === navigatorA
@@ -1206,6 +1619,7 @@ describe("studio-tools-companion protocol", () => {
       message.type === "primary-review-state" && message.targetCompanionInstanceId === reviewA
     ));
     expect(navigatorState).toEqual(expect.objectContaining({ title: "스튜디오" }));
+    expect(referenceState).toEqual(expect.objectContaining({ title: "스튜디오" }));
     expect(workspaceReview).toEqual(expect.objectContaining({ projection: fullProjection }));
     expect(reviewReview).toEqual(expect.objectContaining({ projection: fullProjection }));
     if (!navigatorReview || navigatorReview.type !== "primary-review-state") {
@@ -1239,6 +1653,789 @@ describe("studio-tools-companion protocol", () => {
     expect(serializedNavigator).not.toContain("선화");
     expect(serializedNavigator).not.toContain("편집자");
     expect(serializedNavigator).not.toContain("눈썹 확인");
+    runtime?.dispose();
+  });
+
+  it("keeps companion presentation-safe traffic out of primary command and control routing", () => {
+    RuntimeBroadcastChannel.instances.length = 0;
+    vi.stubGlobal("BroadcastChannel", RuntimeBroadcastChannel);
+    const onCommand = vi.fn();
+    const onControl = vi.fn();
+    const onReferenceControl = vi.fn();
+    const runtime = startStudioCompanionPrimaryRuntime({
+      search: `?session=${primaryA}`,
+      getSnapshot: () => ({
+        tool: "pen",
+        density: "full",
+        canvasOnly: false,
+        title: "1화",
+      }),
+      onCommand,
+      onControl,
+      onReferenceControl,
+    });
+    const channel = RuntimeBroadcastChannel.instances[0]!;
+    const before = runtime?.binding.activeBindings();
+
+    channel.emit(buildStudioCompanionPresentationSafe({
+      companionInstanceId: companionB,
+      targetCompanionInstanceId: null,
+      state: {
+        enabled: true,
+        clock: 1,
+        writerInstanceId: companionB,
+        mutationId: "presentation-b-0001",
+      },
+    }));
+
+    expect(onCommand).not.toHaveBeenCalled();
+    expect(onControl).not.toHaveBeenCalled();
+    expect(onReferenceControl).not.toHaveBeenCalled();
+    expect(runtime?.binding.activeBindings()).toEqual(before);
+    runtime?.dispose();
+  });
+
+  it("routes only Reference demand and pick controls to the dedicated callback", () => {
+    RuntimeBroadcastChannel.instances.length = 0;
+    vi.stubGlobal("BroadcastChannel", RuntimeBroadcastChannel);
+    const onControl = vi.fn();
+    const onReferenceControl = vi.fn();
+    const runtime = startStudioCompanionPrimaryRuntime({
+      search: `?session=${primaryA}`,
+      getSnapshot: () => ({
+        tool: "pen",
+        density: "full",
+        canvasOnly: false,
+        title: "1화",
+      }),
+      onCommand: vi.fn(),
+      onControl,
+      onReferenceControl,
+    });
+    const channel = RuntimeBroadcastChannel.instances[0]!;
+    const initialHello = channel.postMessage.mock.calls[0]?.[0] as Extract<
+      StudioCompanionMessage,
+      { type: "hello"; role: "primary" }
+    >;
+    channel.emit(buildStudioCompanionHello({
+      role: "companion",
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: initialHello.primaryInstanceId,
+      surface: "reference",
+    }, Date.now()));
+
+    channel.emit(buildStudioCompanionControl({
+      control: { kind: "reference-preview-demand", active: true },
+      generation: 1,
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: initialHello.primaryInstanceId,
+      commandId: "reference-demand-0001",
+      sequence: 1,
+    }));
+    channel.emit(buildStudioCompanionControl({
+      control: {
+        kind: "reference-pick-color",
+        point: { x: 0.5, y: 0.25 },
+        referenceRevision: 3,
+        sequence: 1,
+      },
+      generation: 1,
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: initialHello.primaryInstanceId,
+      commandId: "reference-pick-0002",
+      sequence: 2,
+    }));
+    channel.emit(buildStudioCompanionControl({
+      control: {
+        kind: "reference-pick-color",
+        point: { x: 0.75, y: 0.75 },
+        referenceRevision: 3,
+        sequence: 1,
+      },
+      generation: 1,
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: initialHello.primaryInstanceId,
+      commandId: "reference-pick-replay-0003",
+      sequence: 3,
+    }));
+    channel.emit(buildStudioCompanionControl({
+      control: { kind: "history", action: "undo" },
+      generation: 1,
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: initialHello.primaryInstanceId,
+      commandId: "reference-history-invalid-0003",
+      sequence: 3,
+    }));
+
+    expect(onReferenceControl).toHaveBeenCalledTimes(2);
+    expect(onReferenceControl).toHaveBeenNthCalledWith(1, {
+      kind: "reference-preview-demand",
+      active: true,
+    });
+    expect(onReferenceControl).toHaveBeenNthCalledWith(2, {
+      kind: "reference-pick-color",
+      point: { x: 0.5, y: 0.25 },
+      referenceRevision: 3,
+      sequence: 1,
+    });
+    expect(onControl).not.toHaveBeenCalled();
+    runtime?.dispose();
+  });
+
+  it("waits for a source-backed Reference projection before starting a demanded capture", async () => {
+    RuntimeBroadcastChannel.instances.length = 0;
+    vi.stubGlobal("BroadcastChannel", RuntimeBroadcastChannel);
+    let projection = referenceProjection({ itemCount: 0, resolvedItemCount: 0 });
+    const captureReferenceFrame = vi.fn(() => new Promise<never>(() => undefined));
+    const runtime = startStudioCompanionPrimaryRuntime({
+      search: `?session=${primaryA}`,
+      getSnapshot: () => ({
+        tool: "pen",
+        density: "full",
+        canvasOnly: false,
+        title: "1화",
+      }),
+      getReviewProjection: () => reviewProjection({ captureAllowed: true }),
+      getReferenceProjection: () => projection,
+      captureReferenceFrame,
+      onCommand: vi.fn(),
+    });
+    const channel = RuntimeBroadcastChannel.instances[0]!;
+    const primaryHello = channel.postMessage.mock.calls[0]?.[0] as Extract<
+      StudioCompanionMessage,
+      { type: "hello"; role: "primary" }
+    >;
+    channel.emit(buildStudioCompanionHello({
+      role: "companion",
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: primaryHello.primaryInstanceId,
+      surface: "reference",
+    }));
+    demandReference({
+      channel,
+      primaryInstanceId: primaryHello.primaryInstanceId,
+      companionInstanceId: referenceA,
+    });
+    await Promise.resolve();
+    expect(captureReferenceFrame).not.toHaveBeenCalled();
+
+    projection = referenceProjection({
+      revision: 2,
+      referenceRevision: 2,
+      itemCount: 2,
+      resolvedItemCount: 0,
+    });
+    runtime?.publish();
+    await Promise.resolve();
+    expect(captureReferenceFrame).not.toHaveBeenCalled();
+
+    projection = referenceProjection({
+      revision: 3,
+      referenceRevision: 3,
+      itemCount: 2,
+      resolvedItemCount: 1,
+    });
+    runtime?.publish();
+    await Promise.resolve();
+    expect(captureReferenceFrame).toHaveBeenCalledTimes(1);
+    expect(captureReferenceFrame).toHaveBeenCalledWith(expect.objectContaining({
+      generation: 1,
+      revision: 3,
+      referenceRevision: 3,
+      sequence: 1,
+    }));
+    runtime?.dispose();
+  });
+
+  it("publishes Reference state only to eligible peers and captures only for each demander", async () => {
+    vi.useFakeTimers({ now: 10_000 });
+    RuntimeBroadcastChannel.instances.length = 0;
+    vi.stubGlobal("BroadcastChannel", RuntimeBroadcastChannel);
+    type CapturedReferenceFrame = {
+      generation: number;
+      revision: number;
+      referenceRevision: number;
+      sequence: number;
+      width: number;
+      height: number;
+      blob: Blob;
+    };
+    const pending: Array<{
+      request: {
+        generation: number;
+        revision: number;
+        referenceRevision: number;
+        sequence: number;
+        signal: AbortSignal;
+      };
+      resolve: (frame: CapturedReferenceFrame | null) => void;
+    }> = [];
+    const getReferenceProjection = vi.fn((generation: number) => referenceProjection({
+      generation,
+      revision: 4,
+      referenceRevision: 8,
+    }));
+    const captureReferenceFrame = vi.fn((request: (typeof pending)[number]["request"]) => (
+      new Promise<CapturedReferenceFrame | null>((resolve) => pending.push({ request, resolve }))
+    ));
+    const runtime = startStudioCompanionPrimaryRuntime({
+      search: `?session=${primaryA}`,
+      getSnapshot: () => ({
+        tool: "pen",
+        density: "full",
+        canvasOnly: false,
+        title: "1화",
+      }),
+      getReviewProjection: () => reviewProjection({ captureAllowed: true }),
+      getReferenceProjection,
+      captureReferenceFrame,
+      onCommand: vi.fn(),
+    });
+    const channel = RuntimeBroadcastChannel.instances[0]!;
+    const primaryHello = channel.postMessage.mock.calls[0]?.[0] as Extract<
+      StudioCompanionMessage,
+      { type: "hello"; role: "primary" }
+    >;
+    for (const [surface, companionInstanceId] of [
+      ["workspace", companionA],
+      ["navigator", navigatorA],
+      ["review", reviewA],
+      ["reference", referenceA],
+    ] as const) {
+      channel.emit(buildStudioCompanionHello({
+        role: "companion",
+        companionInstanceId,
+        targetPrimaryInstanceId: primaryHello.primaryInstanceId,
+        surface,
+      }, Date.now()));
+    }
+
+    const initialReferenceTargets = channel.postMessage.mock.calls
+      .map(([message]) => message as StudioCompanionMessage)
+      .filter((message): message is Extract<
+        StudioCompanionMessage,
+        { type: "primary-reference-state" }
+      > => message.type === "primary-reference-state")
+      .map((message) => message.targetCompanionInstanceId);
+    expect(new Set(initialReferenceTargets)).toEqual(new Set([companionA, referenceA]));
+    expect(initialReferenceTargets).not.toContain(navigatorA);
+    expect(initialReferenceTargets).not.toContain(reviewA);
+    expect(captureReferenceFrame).not.toHaveBeenCalled();
+
+    demandReference({
+      channel,
+      primaryInstanceId: primaryHello.primaryInstanceId,
+      companionInstanceId: referenceA,
+    });
+    await Promise.resolve();
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.request).toEqual(expect.objectContaining({
+      generation: 1,
+      revision: 4,
+      referenceRevision: 8,
+      sequence: 1,
+    }));
+    expect(Object.isFrozen(pending[0]?.request)).toBe(true);
+    pending[0]?.resolve({
+      generation: 1,
+      revision: 4,
+      referenceRevision: 8,
+      sequence: 1,
+      width: 320,
+      height: 240,
+      blob: new Blob([new Uint8Array(16)], { type: "image/webp" }),
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    const firstFrames = channel.postMessage.mock.calls
+      .map(([message]) => message as StudioCompanionMessage)
+      .filter((message): message is Extract<
+        StudioCompanionMessage,
+        { type: "reference-preview-frame" }
+      > => message.type === "reference-preview-frame");
+    expect(firstFrames.map((message) => message.targetCompanionInstanceId)).toEqual([referenceA]);
+
+    demandReference({
+      channel,
+      primaryInstanceId: primaryHello.primaryInstanceId,
+      companionInstanceId: companionA,
+    });
+    await Promise.resolve();
+    expect(pending).toHaveLength(2);
+    expect(pending[1]?.request.sequence).toBe(1);
+    pending[1]?.resolve({
+      generation: 1,
+      revision: 4,
+      referenceRevision: 8,
+      sequence: 1,
+      width: 320,
+      height: 240,
+      blob: new Blob([new Uint8Array(16)], { type: "image/webp" }),
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    const allFrames = channel.postMessage.mock.calls
+      .map(([message]) => message as StudioCompanionMessage)
+      .filter((message): message is Extract<
+        StudioCompanionMessage,
+        { type: "reference-preview-frame" }
+      > => message.type === "reference-preview-frame");
+    expect(allFrames.map((message) => message.targetCompanionInstanceId)).toEqual([
+      referenceA,
+      companionA,
+    ]);
+    runtime?.dispose();
+  });
+
+  it("drops stale Reference capture and color results after the authoritative cursor changes", async () => {
+    vi.useFakeTimers({ now: 20_000 });
+    RuntimeBroadcastChannel.instances.length = 0;
+    vi.stubGlobal("BroadcastChannel", RuntimeBroadcastChannel);
+    let revision = 2;
+    let referenceRevision = 8;
+    const captures: Array<{
+      request: {
+        generation: number;
+        revision: number;
+        referenceRevision: number;
+        sequence: number;
+        signal: AbortSignal;
+      };
+      resolve: (value: {
+        generation: number;
+        revision: number;
+        referenceRevision: number;
+        sequence: number;
+        width: number;
+        height: number;
+        blob: Blob;
+      } | null) => void;
+    }> = [];
+    const colors: Array<{
+      request: {
+        requester: { companionInstanceId: string; generation: number };
+        current: { generation: number; revision: number; referenceRevision: number };
+        point: { x: number; y: number };
+        sequence: number;
+        signal: AbortSignal;
+      };
+      resolve: (value: string | null) => void;
+    }> = [];
+    const runtime = startStudioCompanionPrimaryRuntime({
+      search: `?session=${primaryA}`,
+      getSnapshot: () => ({
+        tool: "pen",
+        density: "full",
+        canvasOnly: false,
+        title: "1화",
+      }),
+      getReviewProjection: () => reviewProjection({ captureAllowed: true }),
+      getReferenceProjection: (generation) => referenceProjection({
+        generation,
+        revision,
+        referenceRevision,
+      }),
+      captureReferenceFrame: (request) => new Promise((resolve) => {
+        captures.push({ request, resolve });
+      }),
+      sampleReferenceColor: (request) => new Promise((resolve) => {
+        colors.push({ request, resolve });
+      }),
+      onCommand: vi.fn(),
+    });
+    const channel = RuntimeBroadcastChannel.instances[0]!;
+    const primaryHello = channel.postMessage.mock.calls[0]?.[0] as Extract<
+      StudioCompanionMessage,
+      { type: "hello"; role: "primary" }
+    >;
+    channel.emit(buildStudioCompanionHello({
+      role: "companion",
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: primaryHello.primaryInstanceId,
+      surface: "reference",
+    }, Date.now()));
+    demandReference({
+      channel,
+      primaryInstanceId: primaryHello.primaryInstanceId,
+      companionInstanceId: referenceA,
+    });
+    await Promise.resolve();
+    expect(captures).toHaveLength(1);
+
+    revision = 3;
+    referenceRevision = 9;
+    runtime?.publish();
+    await Promise.resolve();
+    expect(captures[0]?.request.signal.aborted).toBe(true);
+    expect(captures).toHaveLength(2);
+    captures[0]?.resolve({
+      generation: 1,
+      revision: 2,
+      referenceRevision: 8,
+      sequence: 1,
+      width: 320,
+      height: 240,
+      blob: new Blob([new Uint8Array(8)], { type: "image/webp" }),
+    });
+    captures[1]?.resolve({
+      generation: 1,
+      revision: 3,
+      referenceRevision: 9,
+      sequence: 2,
+      width: 320,
+      height: 240,
+      blob: new Blob([new Uint8Array(8)], { type: "image/webp" }),
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    const frames = channel.postMessage.mock.calls
+      .map(([message]) => message as StudioCompanionMessage)
+      .filter((message): message is Extract<
+        StudioCompanionMessage,
+        { type: "reference-preview-frame" }
+      > => message.type === "reference-preview-frame");
+    expect(frames).toHaveLength(1);
+    expect(frames[0]).toEqual(expect.objectContaining({
+      targetCompanionInstanceId: referenceA,
+      revision: 3,
+      referenceRevision: 9,
+      sequence: 2,
+    }));
+
+    channel.emit(buildStudioCompanionControl({
+      control: {
+        kind: "reference-pick-color",
+        point: { x: 0.25, y: 0.5 },
+        referenceRevision: 9,
+        sequence: 1,
+      },
+      generation: 1,
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: primaryHello.primaryInstanceId,
+      commandId: "reference-color-0002",
+      sequence: 2,
+    }));
+    await Promise.resolve();
+    expect(colors).toHaveLength(1);
+    expect(colors[0]?.request.current).toEqual({
+      generation: 1,
+      revision: 3,
+      referenceRevision: 9,
+    });
+    expect(colors[0]?.request.requester).toEqual({
+      companionInstanceId: referenceA,
+      generation: 1,
+    });
+    expect(colors[0]?.request.point).toEqual({ x: 0.25, y: 0.5 });
+    expect(Object.isFrozen(colors[0]?.request)).toBe(true);
+    expect(Object.isFrozen(colors[0]?.request.current)).toBe(true);
+    expect(Object.isFrozen(colors[0]?.request.point)).toBe(true);
+
+    revision = 4;
+    referenceRevision = 10;
+    runtime?.publish();
+    expect(colors[0]?.request.signal.aborted).toBe(true);
+    colors[0]?.resolve("#112233");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(channel.postMessage.mock.calls.some(([message]) => (
+      (message as StudioCompanionMessage).type === "reference-color-result"
+    ))).toBe(false);
+
+    channel.emit(buildStudioCompanionControl({
+      control: {
+        kind: "reference-pick-color",
+        point: { x: 0.75, y: 0.25 },
+        referenceRevision: 10,
+        sequence: 1,
+      },
+      generation: 1,
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: primaryHello.primaryInstanceId,
+      commandId: "reference-color-0003",
+      sequence: 3,
+    }));
+    await Promise.resolve();
+    expect(colors).toHaveLength(2);
+    colors[1]?.resolve("#aabbcc");
+    await vi.advanceTimersByTimeAsync(0);
+    const colorResults = channel.postMessage.mock.calls
+      .map(([message]) => message as StudioCompanionMessage)
+      .filter((message): message is Extract<
+        StudioCompanionMessage,
+        { type: "reference-color-result" }
+      > => message.type === "reference-color-result");
+    expect(colorResults).toEqual([
+      expect.objectContaining({
+        targetCompanionInstanceId: referenceA,
+        generation: 1,
+        revision: 4,
+        referenceRevision: 10,
+        sequence: 1,
+        color: "#aabbcc",
+      }),
+    ]);
+    runtime?.dispose();
+  });
+
+  it("blocks Reference capture during a stroke and bounds retries with 500/1000ms backoff", async () => {
+    vi.useFakeTimers({ now: 30_000 });
+    RuntimeBroadcastChannel.instances.length = 0;
+    vi.stubGlobal("BroadcastChannel", RuntimeBroadcastChannel);
+    let captureAllowed = false;
+    const demandChanges: boolean[] = [];
+    const captureReferenceFrame = vi.fn(async () => null);
+    const runtime = startStudioCompanionPrimaryRuntime({
+      search: `?session=${primaryA}`,
+      getSnapshot: () => ({
+        tool: "pen",
+        density: "full",
+        canvasOnly: false,
+        title: "1화",
+      }),
+      getReviewProjection: () => reviewProjection({ captureAllowed }),
+      getReferenceProjection: (generation) => referenceProjection({
+        generation,
+        revision: 5,
+        referenceRevision: 12,
+      }),
+      captureReferenceFrame,
+      onReferenceDemandChange: (active) => demandChanges.push(active),
+      onCommand: vi.fn(),
+    });
+    const channel = RuntimeBroadcastChannel.instances[0]!;
+    const primaryHello = channel.postMessage.mock.calls[0]?.[0] as Extract<
+      StudioCompanionMessage,
+      { type: "hello"; role: "primary" }
+    >;
+    channel.emit(buildStudioCompanionHello({
+      role: "companion",
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: primaryHello.primaryInstanceId,
+      surface: "reference",
+    }, Date.now()));
+    demandReference({
+      channel,
+      primaryInstanceId: primaryHello.primaryInstanceId,
+      companionInstanceId: referenceA,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(demandChanges).toEqual([true]);
+    expect(captureReferenceFrame).not.toHaveBeenCalled();
+
+    captureAllowed = true;
+    runtime?.publish();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(captureReferenceFrame).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(499);
+    expect(captureReferenceFrame).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(captureReferenceFrame).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(captureReferenceFrame).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(captureReferenceFrame).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(captureReferenceFrame).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(captureReferenceFrame).toHaveBeenCalledTimes(4);
+    await vi.advanceTimersByTimeAsync(2_500);
+    expect(captureReferenceFrame).toHaveBeenCalledTimes(4);
+
+    runtime?.dispose();
+    expect(demandChanges).toEqual([true, false]);
+  });
+
+  it("keeps at least 500ms between successful Reference captures after a revision change", async () => {
+    vi.useFakeTimers({ now: 40_000 });
+    RuntimeBroadcastChannel.instances.length = 0;
+    vi.stubGlobal("BroadcastChannel", RuntimeBroadcastChannel);
+    let revision = 1;
+    let referenceRevision = 1;
+    const captureReferenceFrame = vi.fn(async (request: {
+      generation: number;
+      revision: number;
+      referenceRevision: number;
+      sequence: number;
+    }) => ({
+      generation: request.generation,
+      revision: request.revision,
+      referenceRevision: request.referenceRevision,
+      sequence: request.sequence,
+      width: 320,
+      height: 240,
+      blob: new Blob([new Uint8Array(8)], { type: "image/webp" }),
+    }));
+    const runtime = startStudioCompanionPrimaryRuntime({
+      search: `?session=${primaryA}`,
+      getSnapshot: () => ({
+        tool: "pen",
+        density: "full",
+        canvasOnly: false,
+        title: "1화",
+      }),
+      getReviewProjection: () => reviewProjection({ captureAllowed: true }),
+      getReferenceProjection: (generation) => referenceProjection({
+        generation,
+        revision,
+        referenceRevision,
+      }),
+      captureReferenceFrame,
+      onCommand: vi.fn(),
+    });
+    const channel = RuntimeBroadcastChannel.instances[0]!;
+    const primaryHello = channel.postMessage.mock.calls[0]?.[0] as Extract<
+      StudioCompanionMessage,
+      { type: "hello"; role: "primary" }
+    >;
+    channel.emit(buildStudioCompanionHello({
+      role: "companion",
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: primaryHello.primaryInstanceId,
+      surface: "reference",
+    }, Date.now()));
+    demandReference({
+      channel,
+      primaryInstanceId: primaryHello.primaryInstanceId,
+      companionInstanceId: referenceA,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(captureReferenceFrame).toHaveBeenCalledTimes(1);
+
+    revision = 2;
+    referenceRevision = 2;
+    runtime?.publish();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(captureReferenceFrame).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(499);
+    expect(captureReferenceFrame).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(captureReferenceFrame).toHaveBeenCalledTimes(2);
+    runtime?.dispose();
+  });
+
+  it("releases per-peer Reference work on demand false and goodbye without dropping other demanders", async () => {
+    vi.useFakeTimers({ now: 50_000 });
+    RuntimeBroadcastChannel.instances.length = 0;
+    vi.stubGlobal("BroadcastChannel", RuntimeBroadcastChannel);
+    const demandChanges: boolean[] = [];
+    const pending: Array<{
+      request: {
+        generation: number;
+        revision: number;
+        referenceRevision: number;
+        sequence: number;
+        signal: AbortSignal;
+      };
+      resolve: (value: null) => void;
+    }> = [];
+    const runtime = startStudioCompanionPrimaryRuntime({
+      search: `?session=${primaryA}`,
+      getSnapshot: () => ({
+        tool: "pen",
+        density: "full",
+        canvasOnly: false,
+        title: "1화",
+      }),
+      getReviewProjection: () => reviewProjection({ captureAllowed: true }),
+      getReferenceProjection: (generation) => referenceProjection({ generation }),
+      captureReferenceFrame: (request) => new Promise((resolve) => {
+        pending.push({ request, resolve });
+      }),
+      onReferenceDemandChange: (active) => demandChanges.push(active),
+      onCommand: vi.fn(),
+    });
+    const channel = RuntimeBroadcastChannel.instances[0]!;
+    const primaryHello = channel.postMessage.mock.calls[0]?.[0] as Extract<
+      StudioCompanionMessage,
+      { type: "hello"; role: "primary" }
+    >;
+    for (const [surface, companionInstanceId] of [
+      ["workspace", companionA],
+      ["reference", referenceA],
+    ] as const) {
+      channel.emit(buildStudioCompanionHello({
+        role: "companion",
+        companionInstanceId,
+        targetPrimaryInstanceId: primaryHello.primaryInstanceId,
+        surface,
+      }, Date.now()));
+      demandReference({
+        channel,
+        primaryInstanceId: primaryHello.primaryInstanceId,
+        companionInstanceId,
+      });
+    }
+    await Promise.resolve();
+    expect(pending).toHaveLength(2);
+    expect(demandChanges).toEqual([true]);
+
+    demandReference({
+      channel,
+      primaryInstanceId: primaryHello.primaryInstanceId,
+      companionInstanceId: referenceA,
+      sequence: 2,
+      active: false,
+    });
+    expect(pending.find(({ request }) => request.signal.aborted)?.request.signal.aborted).toBe(true);
+    expect(demandChanges).toEqual([true]);
+
+    channel.emit(buildStudioCompanionGoodbye({
+      companionInstanceId: companionA,
+      targetPrimaryInstanceId: primaryHello.primaryInstanceId,
+      surface: "workspace",
+    }, Date.now()));
+    expect(pending.every(({ request }) => request.signal.aborted)).toBe(true);
+    expect(demandChanges).toEqual([true, false]);
+    for (const item of pending) item.resolve(null);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(channel.postMessage.mock.calls.some(([message]) => (
+      (message as StudioCompanionMessage).type === "reference-preview-frame"
+    ))).toBe(false);
+    runtime?.dispose();
+    expect(demandChanges).toEqual([true, false]);
+  });
+
+  it("expires Reference demand leases and aborts the bounded in-flight retry", async () => {
+    vi.useFakeTimers({ now: 70_000 });
+    RuntimeBroadcastChannel.instances.length = 0;
+    vi.stubGlobal("BroadcastChannel", RuntimeBroadcastChannel);
+    const demandChanges: boolean[] = [];
+    const signals: AbortSignal[] = [];
+    const runtime = startStudioCompanionPrimaryRuntime({
+      search: `?session=${primaryA}`,
+      getSnapshot: () => ({
+        tool: "pen",
+        density: "full",
+        canvasOnly: false,
+        title: "1화",
+      }),
+      getReviewProjection: () => reviewProjection({ captureAllowed: true }),
+      getReferenceProjection: (generation) => referenceProjection({ generation }),
+      captureReferenceFrame: (request) => new Promise<never>(() => {
+        signals.push(request.signal);
+      }),
+      onReferenceDemandChange: (active) => demandChanges.push(active),
+      onCommand: vi.fn(),
+    });
+    const channel = RuntimeBroadcastChannel.instances[0]!;
+    const primaryHello = channel.postMessage.mock.calls[0]?.[0] as Extract<
+      StudioCompanionMessage,
+      { type: "hello"; role: "primary" }
+    >;
+    channel.emit(buildStudioCompanionHello({
+      role: "companion",
+      companionInstanceId: referenceA,
+      targetPrimaryInstanceId: primaryHello.primaryInstanceId,
+      surface: "reference",
+    }, Date.now()));
+    demandReference({
+      channel,
+      primaryInstanceId: primaryHello.primaryInstanceId,
+      companionInstanceId: referenceA,
+    });
+    await vi.advanceTimersByTimeAsync(12_001);
+
+    expect(signals).toHaveLength(3);
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+    expect(runtime?.binding.companionInstanceId("reference")).toBeNull();
+    expect(demandChanges).toEqual([true, false]);
     runtime?.dispose();
   });
 

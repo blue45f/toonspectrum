@@ -13,6 +13,7 @@ import {
   STUDIO_COMPANION_REFERENCE_MAX_ITEMS,
   STUDIO_COMPANION_REFERENCE_MAX_PIXELS,
   isStudioCompanionReferencePreviewFrame,
+  verifyStudioCompanionReferenceWebpBlob,
   type StudioCompanionReferencePoint,
   type StudioCompanionReferencePreviewFrame,
 } from "./studio-companion-reference-projection";
@@ -33,6 +34,7 @@ export const STUDIO_COMPANION_REFERENCE_WEBP_RESIZE_SCALE = 0.78;
 export const STUDIO_COMPANION_REFERENCE_WEBP_MAX_RESIZE_PASSES = 3;
 export const STUDIO_COMPANION_REFERENCE_WEBP_DEFAULT_TIMEOUT_MS = 1_500;
 export const STUDIO_COMPANION_REFERENCE_MAX_RGBA_BYTES = 32 * 1024 * 1024;
+export const STUDIO_COMPANION_REFERENCE_MAX_ENCODER_FLIGHTS = 2;
 
 export interface StudioCompanionReferencePreviewSource {
   /** A decoded CanvasImageSource-like object. Strings and source URLs are rejected at runtime. */
@@ -108,6 +110,12 @@ export interface StudioCompanionReferencePreviewDependencies {
   createCanvas?: StudioCompanionReferencePreviewCanvasFactory;
   encodeCanvas?: StudioCompanionReferencePreviewEncoder;
   clock?: StudioCompanionReferencePreviewClock;
+  /**
+   * Stable ownership key for encoder single-flight isolation. Callers that inject an encoder should
+   * reuse one key for the lifetime of their capture runtime. The composite helper derives a stable
+   * key from its reference-item snapshot when this is omitted.
+   */
+  encoderScope?: object;
 }
 
 export interface StudioCompanionReferencePreviewInput {
@@ -160,6 +168,16 @@ type EncodeAttempt =
   | { kind: "done"; blob: Blob | null }
   | { kind: "failed" }
   | { kind: "stopped" };
+
+type EncodeDeadline = Readonly<{
+  clock: StudioCompanionReferencePreviewClock;
+  deadline: number;
+}>;
+
+type EncoderLane = Readonly<{
+  encoder: StudioCompanionReferencePreviewEncoder;
+  scope: object;
+}>;
 
 type WebpBlobState =
   | { kind: "accepted"; blob: Blob }
@@ -291,14 +309,28 @@ function inspectUint8ClampedArray(
     const typedArrayPrototype = Object.getPrototypeOf(Uint8ClampedArray.prototype) as object;
     const lengthGetter = Object.getOwnPropertyDescriptor(typedArrayPrototype, "length")?.get;
     const bufferGetter = Object.getOwnPropertyDescriptor(typedArrayPrototype, "buffer")?.get;
-    if (!lengthGetter || !bufferGetter) return null;
+    const byteOffsetGetter = Object.getOwnPropertyDescriptor(
+      typedArrayPrototype,
+      "byteOffset"
+    )?.get;
+    if (!lengthGetter || !bufferGetter || !byteOffsetGetter) return null;
     const length = Reflect.apply(lengthGetter, value, []) as unknown;
     const buffer = Reflect.apply(bufferGetter, value, []) as unknown;
+    const byteOffset = Reflect.apply(byteOffsetGetter, value, []) as unknown;
     if (
       length !== expectedLength
+      || typeof byteOffset !== "number"
+      || !Number.isSafeInteger(byteOffset)
+      || byteOffset < 0
       || (typeof SharedArrayBuffer === "function" && buffer instanceof SharedArrayBuffer)
     ) return null;
-    if (!copy) return {};
+    // The caller may retain the already primary-owned buffer for a synchronous, no-await read.
+    // SharedArrayBuffer is rejected above, so another thread cannot mutate it while sampling.
+    if (!copy) {
+      return {
+        snapshot: new Uint8ClampedArray(buffer as ArrayBuffer, byteOffset, expectedLength),
+      };
+    }
     const snapshot = new Uint8ClampedArray(expectedLength);
     Reflect.apply(Uint8ClampedArray.prototype.set, snapshot, [value, 0]);
     return { snapshot };
@@ -566,6 +598,58 @@ function defaultClock(): StudioCompanionReferencePreviewClock {
   };
 }
 
+// Browser/custom encoders may remain pending after their caller times out. Each stable runtime
+// scope therefore admits one operation per encoder lane, while the module retains at most two
+// underlying operations in total. One quarantined native canvas cannot starve another reference
+// runtime, and repeated retries cannot accumulate an unbounded number of hung canvases.
+const encoderFlightsByScope = new WeakMap<
+  object,
+  WeakMap<StudioCompanionReferencePreviewEncoder, Promise<Blob | null>>
+>();
+const activeEncoderFlights = new Set<Promise<Blob | null>>();
+
+function encoderLaneFlights(
+  scope: object
+): WeakMap<StudioCompanionReferencePreviewEncoder, Promise<Blob | null>> {
+  const current = encoderFlightsByScope.get(scope);
+  if (current) return current;
+  const created = new WeakMap<StudioCompanionReferencePreviewEncoder, Promise<Blob | null>>();
+  encoderFlightsByScope.set(scope, created);
+  return created;
+}
+
+function encoderFlightCanStart(
+  scope: object,
+  encoder: StudioCompanionReferencePreviewEncoder
+): boolean {
+  return !encoderLaneFlights(scope).has(encoder)
+    && activeEncoderFlights.size < STUDIO_COMPANION_REFERENCE_MAX_ENCODER_FLIGHTS;
+}
+
+function startEncoderFlight(
+  scope: object,
+  encoder: StudioCompanionReferencePreviewEncoder,
+  canvas: StudioCompanionReferencePreviewCanvas,
+  options: { type: "image/webp"; quality: number }
+): Promise<Blob | null> | null {
+  const laneFlights = encoderLaneFlights(scope);
+  if (
+    laneFlights.has(encoder)
+    || activeEncoderFlights.size >= STUDIO_COMPANION_REFERENCE_MAX_ENCODER_FLIGHTS
+  ) return null;
+
+  const encoded = encoder(canvas, options);
+  const tracked = Promise.resolve(encoded)
+    .then((blob) => blob, () => null)
+    .finally(() => {
+      if (laneFlights.get(encoder) === tracked) laneFlights.delete(encoder);
+      activeEncoderFlights.delete(tracked);
+    });
+  laneFlights.set(encoder, tracked);
+  activeEncoderFlights.add(tracked);
+  return tracked;
+}
+
 function defaultEncodeCanvas(
   canvas: StudioCompanionReferencePreviewCanvas,
   options: { type: "image/webp"; quality: number }
@@ -606,10 +690,59 @@ function clockNow(clock: StudioCompanionReferencePreviewClock): number | null {
   }
 }
 
+function prepareEncodeDeadline(
+  options: StudioCompanionReferencePreviewEncodeOptions,
+  dependencies: StudioCompanionReferencePreviewDependencies
+): EncodeDeadline | null {
+  try {
+    const clock = dependencies.clock ?? defaultClock();
+    const startedAt = clockNow(clock);
+    if (startedAt === null) return null;
+    const deadline = startedAt + boundedTimeout(options.timeoutMs);
+    return Number.isFinite(deadline) ? { clock, deadline } : null;
+  } catch {
+    return null;
+  }
+}
+
+function remainingEncodeTime(
+  timing: EncodeDeadline,
+  signal: AbortSignal | undefined
+): number | null {
+  try {
+    if (signal?.aborted) return null;
+  } catch {
+    return null;
+  }
+  const now = clockNow(timing.clock);
+  if (now === null || now >= timing.deadline) return null;
+  return Math.max(1, Math.ceil(timing.deadline - now));
+}
+
+function weakKey(value: unknown): value is object {
+  return value !== null && (typeof value === "object" || typeof value === "function");
+}
+
+function resolveEncoderLane(
+  dependencies: StudioCompanionReferencePreviewDependencies,
+  fallbackScope: object
+): EncoderLane | null {
+  try {
+    const encoder = dependencies.encodeCanvas ?? defaultEncodeCanvas;
+    if (typeof encoder !== "function") return null;
+    const explicitScope = dependencies.encoderScope;
+    const scope = explicitScope === undefined ? fallbackScope : explicitScope;
+    return weakKey(scope) ? { encoder, scope } : null;
+  } catch {
+    return null;
+  }
+}
+
 function runEncodeAttempt(
   canvas: StudioCompanionReferencePreviewCanvas,
   quality: number,
   encode: StudioCompanionReferencePreviewEncoder,
+  encoderScope: object,
   clock: StudioCompanionReferencePreviewClock,
   delayMs: number,
   signal: AbortSignal | undefined
@@ -617,26 +750,99 @@ function runEncodeAttempt(
   return new Promise((resolve) => {
     let settled = false;
     let timer: unknown;
-    const finish = (result: EncodeAttempt) => {
-      if (settled) return;
-      settled = true;
+    let ownsTimer = false;
+    let ownsAbortListener = false;
+    const releaseTimer = () => {
+      if (!ownsTimer) return;
+      ownsTimer = false;
       try {
         clock.cancel(timer);
       } catch {
         // Timer ownership is already released from this attempt.
       }
-      signal?.removeEventListener("abort", onAbort);
+    };
+    const releaseAbortListener = () => {
+      if (!ownsAbortListener) return;
+      ownsAbortListener = false;
+      try {
+        signal?.removeEventListener("abort", onAbort);
+      } catch {
+        // A hostile signal cannot keep this attempt alive after settlement.
+      }
+    };
+    const finish = (result: EncodeAttempt) => {
+      if (settled) return;
+      settled = true;
+      releaseTimer();
+      releaseAbortListener();
       resolve(result);
     };
     const onAbort = () => finish({ kind: "stopped" });
-    if (signal?.aborted) {
+    let alreadyAborted: boolean;
+    try {
+      alreadyAborted = signal?.aborted ?? false;
+    } catch {
+      finish({ kind: "failed" });
+      return;
+    }
+    if (alreadyAborted) {
       finish({ kind: "stopped" });
       return;
     }
-    signal?.addEventListener("abort", onAbort, { once: true });
+    if (signal) {
+      try {
+        signal.addEventListener("abort", onAbort, { once: true });
+        ownsAbortListener = true;
+      } catch {
+        try {
+          signal.removeEventListener("abort", onAbort);
+        } catch {
+          // A hostile signal may throw after registering; make a best-effort removal.
+        }
+        finish({ kind: "failed" });
+        return;
+      }
+      // Close both the read/register race and hostile synchronous listener callbacks. `finish`
+      // may have run while addEventListener was still on the stack, before ownership was recorded.
+      if (settled) {
+        releaseAbortListener();
+        return;
+      }
+      try {
+        if (signal.aborted) {
+          finish({ kind: "stopped" });
+          return;
+        }
+      } catch {
+        finish({ kind: "failed" });
+        return;
+      }
+    }
     try {
-      timer = clock.schedule(() => finish({ kind: "stopped" }), delayMs);
-      Promise.resolve(encode(canvas, { type: "image/webp", quality })).then(
+      const scheduledTimer = clock.schedule(() => finish({ kind: "stopped" }), delayMs);
+      timer = scheduledTimer;
+      ownsTimer = true;
+      // A custom clock may invoke the deadline synchronously before returning its handle.
+      if (settled) {
+        releaseTimer();
+        return;
+      }
+    } catch {
+      finish({ kind: "failed" });
+      return;
+    }
+    try {
+      const flight = startEncoderFlight(
+        encoderScope,
+        encode,
+        canvas,
+        { type: "image/webp", quality }
+      );
+      if (!flight) {
+        finish({ kind: "failed" });
+        return;
+      }
+      flight.then(
         (blob) => finish({ kind: "done", blob }),
         () => finish({ kind: "failed" })
       );
@@ -644,6 +850,125 @@ function runEncodeAttempt(
       finish({ kind: "failed" });
     }
   });
+}
+
+function runWebpVerificationAttempt(
+  blob: Blob,
+  expectedWidth: number,
+  expectedHeight: number,
+  clock: StudioCompanionReferencePreviewClock,
+  delayMs: number,
+  signal: AbortSignal | undefined
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false;
+    let timer: unknown;
+    let ownsTimer = false;
+    let ownsAbortListener = false;
+    const releaseTimer = () => {
+      if (!ownsTimer) return;
+      ownsTimer = false;
+      try {
+        clock.cancel(timer);
+      } catch {
+        // Timer ownership is already released from this verification attempt.
+      }
+    };
+    const releaseAbortListener = () => {
+      if (!ownsAbortListener) return;
+      ownsAbortListener = false;
+      try {
+        signal?.removeEventListener("abort", onAbort);
+      } catch {
+        // A hostile signal cannot retain a settled verification attempt.
+      }
+    };
+    const finish = (verified: boolean) => {
+      if (settled) return;
+      settled = true;
+      releaseTimer();
+      releaseAbortListener();
+      resolve(verified);
+    };
+    const onAbort = () => finish(false);
+    let alreadyAborted: boolean;
+    try {
+      alreadyAborted = signal?.aborted ?? false;
+    } catch {
+      finish(false);
+      return;
+    }
+    if (alreadyAborted) {
+      finish(false);
+      return;
+    }
+    if (signal) {
+      try {
+        signal.addEventListener("abort", onAbort, { once: true });
+        ownsAbortListener = true;
+      } catch {
+        try {
+          signal.removeEventListener("abort", onAbort);
+        } catch {
+          // A hostile signal may throw after registering; make a best-effort removal.
+        }
+        finish(false);
+        return;
+      }
+      if (settled) {
+        releaseAbortListener();
+        return;
+      }
+      try {
+        if (signal.aborted) {
+          finish(false);
+          return;
+        }
+      } catch {
+        finish(false);
+        return;
+      }
+    }
+    try {
+      const scheduledTimer = clock.schedule(() => finish(false), delayMs);
+      timer = scheduledTimer;
+      ownsTimer = true;
+      if (settled) {
+        releaseTimer();
+        return;
+      }
+    } catch {
+      finish(false);
+      return;
+    }
+    try {
+      verifyStudioCompanionReferenceWebpBlob(blob, expectedWidth, expectedHeight).then(
+        (verified) => finish(verified),
+        () => finish(false)
+      );
+    } catch {
+      finish(false);
+    }
+  });
+}
+
+function validRenderedPreview(
+  rendered: StudioCompanionReferenceRenderedPreview
+): boolean {
+  try {
+    return safePositiveInteger(rendered.width)
+      && safePositiveInteger(rendered.height)
+      && Math.max(rendered.width, rendered.height) <= STUDIO_COMPANION_REFERENCE_MAX_EDGE
+      && rendered.width * rendered.height <= STUDIO_COMPANION_REFERENCE_MAX_PIXELS
+      && safePositiveInteger(rendered.resolvedItemCount)
+      && rendered.resolvedItemCount <= STUDIO_COMPANION_REFERENCE_MAX_ITEMS
+      && Boolean(rendered.canvas)
+      && typeof rendered.canvas === "object"
+      && rendered.canvas.width === rendered.width
+      && rendered.canvas.height === rendered.height;
+  } catch {
+    return false;
+  }
 }
 
 function inspectWebpBlob(value: unknown, maximumBytes: number): WebpBlobState {
@@ -697,27 +1022,31 @@ export async function encodeStudioCompanionReferencePreviewWebp(
   options: StudioCompanionReferencePreviewEncodeOptions = {},
   dependencies: StudioCompanionReferencePreviewDependencies = {}
 ): Promise<StudioCompanionReferenceEncodedPreview | null> {
-  if (
-    !safePositiveInteger(rendered.width)
-    || !safePositiveInteger(rendered.height)
-    || Math.max(rendered.width, rendered.height) > STUDIO_COMPANION_REFERENCE_MAX_EDGE
-    || rendered.width * rendered.height > STUDIO_COMPANION_REFERENCE_MAX_PIXELS
-    || !safePositiveInteger(rendered.resolvedItemCount)
-    || rendered.resolvedItemCount > STUDIO_COMPANION_REFERENCE_MAX_ITEMS
-    || !rendered.canvas
-    || typeof rendered.canvas !== "object"
-    || rendered.canvas.width !== rendered.width
-    || rendered.canvas.height !== rendered.height
-  ) return null;
+  if (!validRenderedPreview(rendered)) return null;
+  const timing = prepareEncodeDeadline(options, dependencies);
+  const lane = resolveEncoderLane(dependencies, rendered.canvas);
+  if (!timing || !lane || remainingEncodeTime(timing, options.signal) === null) return null;
+  return encodeRenderedPreviewWebp(rendered, options, dependencies, timing, lane);
+}
 
-  const clock = dependencies.clock ?? defaultClock();
-  const startedAt = clockNow(clock);
-  if (startedAt === null) return null;
-  const deadline = startedAt + boundedTimeout(options.timeoutMs);
-  if (!Number.isFinite(deadline)) return null;
-  const maximumBytes = boundedMaximumBytes(options.maximumBytes);
-  const encode = dependencies.encodeCanvas ?? defaultEncodeCanvas;
-  const factory = dependencies.createCanvas ?? defaultCanvasFactory;
+async function encodeRenderedPreviewWebp(
+  rendered: StudioCompanionReferenceRenderedPreview,
+  options: StudioCompanionReferencePreviewEncodeOptions,
+  dependencies: StudioCompanionReferencePreviewDependencies,
+  timing: EncodeDeadline,
+  lane: EncoderLane
+): Promise<StudioCompanionReferenceEncodedPreview | null> {
+  let maximumBytes: number;
+  let factory: StudioCompanionReferencePreviewCanvasFactory;
+  try {
+    maximumBytes = boundedMaximumBytes(options.maximumBytes);
+    factory = dependencies.createCanvas ?? defaultCanvasFactory;
+  } catch {
+    return null;
+  }
+  if (typeof factory !== "function" || !encoderFlightCanStart(lane.scope, lane.encoder)) {
+    return null;
+  }
   let candidate = rendered;
 
   for (let resizePass = 0; resizePass <= STUDIO_COMPANION_REFERENCE_WEBP_MAX_RESIZE_PASSES; resizePass += 1) {
@@ -725,20 +1054,32 @@ export async function encodeStudioCompanionReferencePreviewWebp(
       ? STUDIO_COMPANION_REFERENCE_WEBP_QUALITIES
       : [STUDIO_COMPANION_REFERENCE_WEBP_QUALITIES.at(-1) ?? 0.54];
     for (const quality of qualities) {
-      const now = clockNow(clock);
-      if (now === null || now >= deadline || options.signal?.aborted) return null;
+      const remaining = remainingEncodeTime(timing, options.signal);
+      if (remaining === null || !encoderFlightCanStart(lane.scope, lane.encoder)) return null;
       const attempt = await runEncodeAttempt(
         candidate.canvas,
         quality,
-        encode,
-        clock,
-        Math.max(1, Math.ceil(deadline - now)),
+        lane.encoder,
+        lane.scope,
+        timing.clock,
+        remaining,
         options.signal
       );
       if (attempt.kind !== "done") return null;
       const inspected = inspectWebpBlob(attempt.blob, maximumBytes);
       if (inspected.kind === "invalid") return null;
       if (inspected.kind === "accepted") {
+        const verificationRemaining = remainingEncodeTime(timing, options.signal);
+        if (verificationRemaining === null) return null;
+        const verified = await runWebpVerificationAttempt(
+          inspected.blob,
+          candidate.width,
+          candidate.height,
+          timing.clock,
+          verificationRemaining,
+          options.signal
+        );
+        if (!verified || remainingEncodeTime(timing, options.signal) === null) return null;
         return {
           blob: inspected.blob,
           width: candidate.width,
@@ -749,6 +1090,10 @@ export async function encodeStudioCompanionReferencePreviewWebp(
     }
 
     if (resizePass === STUDIO_COMPANION_REFERENCE_WEBP_MAX_RESIZE_PASSES) break;
+    if (
+      remainingEncodeTime(timing, options.signal) === null
+      || !encoderFlightCanStart(lane.scope, lane.encoder)
+    ) return null;
     const nextWidth = Math.max(
       1,
       Math.floor(candidate.width * STUDIO_COMPANION_REFERENCE_WEBP_RESIZE_SCALE)
@@ -771,10 +1116,28 @@ export async function createStudioCompanionReferencePreview(
   options: StudioCompanionReferencePreviewEncodeOptions = {},
   dependencies: StudioCompanionReferencePreviewDependencies = {}
 ): Promise<StudioCompanionReferenceEncodedPreview | null> {
-  const rendered = renderStudioCompanionReferencePreview(input, dependencies);
-  return rendered
-    ? encodeStudioCompanionReferencePreviewWebp(rendered, options, dependencies)
-    : null;
+  const timing = prepareEncodeDeadline(options, dependencies);
+  if (!timing || remainingEncodeTime(timing, options.signal) === null) return null;
+  const exact = plainOwnData(input, ["boardWidth", "boardHeight", "items"]);
+  if (!exact || !Array.isArray(exact.items)) return null;
+  const lane = resolveEncoderLane(dependencies, exact.items);
+  if (
+    !lane
+    || !encoderFlightCanStart(lane.scope, lane.encoder)
+    || remainingEncodeTime(timing, options.signal) === null
+  ) return null;
+  const previewInput: StudioCompanionReferencePreviewInput = Object.freeze({
+    boardWidth: exact.boardWidth as number,
+    boardHeight: exact.boardHeight as number,
+    items: exact.items as readonly StudioCompanionReferencePreviewItem[],
+  });
+  const rendered = renderStudioCompanionReferencePreview(previewInput, dependencies);
+  if (
+    !rendered
+    || remainingEncodeTime(timing, options.signal) === null
+    || !encoderFlightCanStart(lane.scope, lane.encoder)
+  ) return null;
+  return encodeRenderedPreviewWebp(rendered, options, dependencies, timing, lane);
 }
 
 /** Produces the exact transport frame only after the contract validator accepts the encoded Blob. */
@@ -847,7 +1210,10 @@ export function sampleStudioCompanionReferenceColor(
     || !finitePositive(boardWidth)
     || !finitePositive(boardHeight)
   ) return null;
-  const items = parseResolvedItems(itemsInput, { copyPixels: true });
+  // This function is synchronous and receives the coordinator's epoch-fenced primary snapshot.
+  // Re-validating brands and byte budgets is still required, but cloning up to 32 MiB for one
+  // sampled pixel would introduce avoidable input latency and GC pressure.
+  const items = parseResolvedItems(itemsInput, { copyPixels: false });
   if (!items) return null;
   const boardPoint = { x: exactPoint.x * boardWidth, y: exactPoint.y * boardHeight };
 

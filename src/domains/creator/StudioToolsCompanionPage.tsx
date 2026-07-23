@@ -5,6 +5,7 @@
 import {
   Eye,
   EyeOff,
+  Images,
   Layers,
   ListChecks,
   LoaderCircle,
@@ -15,16 +16,30 @@ import {
   Sparkles,
   WandSparkles,
 } from "lucide-react";
-import { useCallback, useEffect, useEffectEvent, useRef, useState, type KeyboardEvent } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { useLocation } from "react-router-dom";
 
+import {
+  StudioCompanionReferenceObjectUrlOwner,
+  type StudioCompanionReferencePreviewFrame,
+  type StudioCompanionReferenceProjection,
+} from "./studio-companion-reference-projection";
 import {
   mergeStudioCompanionBrushPatches,
   planStudioCompanionExternalScreenPlacement,
   StudioCompanionNavigatorObjectUrlOwner,
   type StudioCompanionBrushPatch,
   type StudioCompanionNormalizedPoint,
-  type StudioCompanionReviewControl,
   type StudioCompanionReviewProjection,
 } from "./studio-companion-review-projection";
 import {
@@ -33,21 +48,28 @@ import {
   buildStudioCompanionGoodbye,
   buildStudioCompanionHello,
   buildStudioCompanionPing,
+  buildStudioCompanionPresentationSafe,
   createStudioCompanionChannel,
   createStudioCompanionCommandId,
   createStudioCompanionInstanceId,
   isStudioCompanionMessageFresh,
+  isStudioCompanionPresentationSafeState,
   isStudioToolsCompanionWindowReusable,
   openStudioCompanionSurfaceWindow,
   parseStudioCompanionMessage,
   parseStudioCompanionSessionId,
   parseStudioCompanionSurface,
+  StudioCompanionPresentationSafeGuard,
+  StudioCompanionReferenceMessageGuard,
   STUDIO_COMPANION_TOOL_LABELS,
   STUDIO_COMPANION_TOOL_ORDER,
   studioCompanionPrimaryUrl,
   type StudioCompanionCommandName,
+  type StudioCompanionControl,
   type StudioCompanionDensity,
   type StudioCompanionMessage,
+  type StudioCompanionPresentationSafeState,
+  type StudioCompanionReferenceColorResult,
   type StudioCompanionSurface,
   type StudioCompanionToolId,
 } from "./studio-tools-companion";
@@ -73,9 +95,20 @@ const BRUSH_CONTROL_COALESCE_MS = 64;
 const NAVIGATOR_CONTROL_COALESCE_MS = 32;
 const SCREEN_DETAILS_TIMEOUT_MS = 2_500;
 const PRESENTATION_SAFE_STORAGE_PREFIX = "toonspectrum.studio.companion.presentation-safe";
+const PRESENTATION_SAFE_STORAGE_MAX_CHARS = 1_024;
+const REFERENCE_IMAGE_DECODE_TIMEOUT_MS = 5_000;
 
-type CompanionMode = "tools" | "navigator" | "review";
-type DedicatedCompanionSurface = Extract<StudioCompanionSurface, "navigator" | "review">;
+type CompanionMode = "tools" | "navigator" | "review" | "reference";
+type DedicatedCompanionSurface = Extract<
+  StudioCompanionSurface,
+  "navigator" | "review" | "reference"
+>;
+
+const LazyStudioCompanionReferenceDisplay = lazy(() =>
+  import("./StudioCompanionReferenceDisplay").then((module) => ({
+    default: module.StudioCompanionReferenceDisplay,
+  }))
+);
 
 type ScreenPlacementStatus = {
   kind: "requesting" | "unsupported" | "denied" | "timeout" | "no-secondary" | "failed" | "requested" | "restored" | "stale";
@@ -90,22 +123,77 @@ function presentationSafeStorageKey(sessionId: string): string {
   return `${PRESENTATION_SAFE_STORAGE_PREFIX}.${sessionId}`;
 }
 
-function readPresentationSafe(sessionId: string | null): boolean {
-  if (!sessionId || typeof window === "undefined") return false;
+type StoredPresentationSafe = Readonly<{
+  kind: "state" | "legacy" | "missing" | "invalid" | "unavailable";
+  enabled: boolean;
+  state: StudioCompanionPresentationSafeState | null;
+}>;
+
+function parseStoredPresentationSafe(raw: string | null): StoredPresentationSafe {
+  if (raw === null) return { kind: "missing", enabled: false, state: null };
+  if (raw === "1" || raw === "0") {
+    return { kind: "legacy", enabled: raw === "1", state: null };
+  }
+  if (raw.length === 0 || raw.length > PRESENTATION_SAFE_STORAGE_MAX_CHARS) {
+    return { kind: "invalid", enabled: false, state: null };
+  }
   try {
-    return window.localStorage.getItem(presentationSafeStorageKey(sessionId)) === "1";
+    const state = JSON.parse(raw) as unknown;
+    return isStudioCompanionPresentationSafeState(state)
+      ? { kind: "state", enabled: state.enabled, state: Object.freeze({ ...state }) }
+      : { kind: "invalid", enabled: false, state: null };
   } catch {
+    return { kind: "invalid", enabled: false, state: null };
+  }
+}
+
+function readPresentationSafe(sessionId: string | null): StoredPresentationSafe {
+  if (!sessionId || typeof window === "undefined") {
+    return { kind: "unavailable", enabled: false, state: null };
+  }
+  try {
+    return parseStoredPresentationSafe(
+      window.localStorage.getItem(presentationSafeStorageKey(sessionId))
+    );
+  } catch {
+    return { kind: "unavailable", enabled: false, state: null };
+  }
+}
+
+function writePresentationSafe(
+  sessionId: string | null,
+  state: StudioCompanionPresentationSafeState
+): boolean {
+  if (
+    !sessionId
+    || typeof window === "undefined"
+    || !isStudioCompanionPresentationSafeState(state)
+  ) return false;
+  try {
+    const serialized = JSON.stringify(state);
+    if (serialized.length === 0 || serialized.length > PRESENTATION_SAFE_STORAGE_MAX_CHARS) {
+      return false;
+    }
+    window.localStorage.setItem(presentationSafeStorageKey(sessionId), serialized);
+    return true;
+  } catch {
+    // Private browsing and hardened WebViews may deny localStorage; peer LWW remains usable.
     return false;
   }
 }
 
-function writePresentationSafe(sessionId: string | null, enabled: boolean): void {
-  if (!sessionId || typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(presentationSafeStorageKey(sessionId), enabled ? "1" : "0");
-  } catch {
-    // Private browsing and hardened WebViews may deny localStorage; local state remains usable.
-  }
+function samePresentationSafeState(
+  left: StudioCompanionPresentationSafeState | null,
+  right: StudioCompanionPresentationSafeState | null
+): boolean {
+  return Boolean(
+    left
+    && right
+    && left.enabled === right.enabled
+    && left.clock === right.clock
+    && left.writerInstanceId === right.writerInstanceId
+    && left.mutationId === right.mutationId
+  );
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
@@ -124,12 +212,46 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   });
 }
 
+function decodeStudioCompanionReferenceImage(
+  url: string
+): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    if (!url.startsWith("blob:")) {
+      resolve(null);
+      return;
+    }
+    const image = new Image();
+    let settled = false;
+    const timer = globalThis.setTimeout(() => finish(null), REFERENCE_IMAGE_DECODE_TIMEOUT_MS);
+    const finish = (value: { width: number; height: number } | null) => {
+      if (settled) return;
+      settled = true;
+      globalThis.clearTimeout(timer);
+      image.onload = null;
+      image.onerror = null;
+      resolve(value);
+    };
+    image.onload = () => {
+      const width = image.naturalWidth || image.width;
+      const height = image.naturalHeight || image.height;
+      finish(
+        Number.isSafeInteger(width) && width > 0 && Number.isSafeInteger(height) && height > 0
+          ? { width, height }
+          : null
+      );
+    };
+    image.onerror = () => finish(null);
+    image.src = url;
+  });
+}
+
 export function StudioToolsCompanionPage() {
   const location = useLocation();
   const sessionId = parseStudioCompanionSessionId(location.search);
   const surface = parseStudioCompanionSurface(location.search);
   const effectiveSurface: StudioCompanionSurface = surface ?? "workspace";
   const channelRef = useRef<ReturnType<typeof createStudioCompanionChannel>>(null);
+  const companionIdentityRef = useRef<{ scope: string; instanceId: string } | null>(null);
   const companionInstanceIdRef = useRef<string | null>(null);
   const targetPrimaryInstanceIdRef = useRef<string | null>(null);
   const pendingPingNonceRef = useRef<string | null>(null);
@@ -141,6 +263,16 @@ export function StudioToolsCompanionPage() {
   const navigatorRevisionRef = useRef(-1);
   const navigatorUrlOwnerRef = useRef<StudioCompanionNavigatorObjectUrlOwner | null>(null);
   navigatorUrlOwnerRef.current ??= new StudioCompanionNavigatorObjectUrlOwner();
+  const referenceGuardRef = useRef<StudioCompanionReferenceMessageGuard | null>(null);
+  referenceGuardRef.current ??= new StudioCompanionReferenceMessageGuard();
+  const presentationSafeGuardRef = useRef<StudioCompanionPresentationSafeGuard | null>(null);
+  const releaseNavigatorDemandRef = useRef<() => void>(() => undefined);
+  const releaseReferenceDemandRef = useRef<() => void>(() => undefined);
+  const referenceUrlOwnerRef = useRef<StudioCompanionReferenceObjectUrlOwner | null>(null);
+  referenceUrlOwnerRef.current ??= new StudioCompanionReferenceObjectUrlOwner();
+  const referenceFrameEpochRef = useRef(0);
+  const referenceDemandActiveRef = useRef(false);
+  const presentationSafeRef = useRef(false);
   const pendingBrushPatchRef = useRef<StudioCompanionBrushPatch | null>(null);
   const pendingBrushTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const pendingNavigatorPointRef = useRef<StudioCompanionNormalizedPoint | null>(null);
@@ -151,6 +283,7 @@ export function StudioToolsCompanionPage() {
   const dedicatedWindowRefs = useRef<Record<DedicatedCompanionSurface, Window | null>>({
     navigator: null,
     review: null,
+    reference: null,
   });
   const dedicatedWindowOwnerSessionRef = useRef<string | null>(
     surface === "workspace" ? sessionId : null
@@ -170,9 +303,23 @@ export function StudioToolsCompanionPage() {
     height: number;
     revision: number;
   } | null>(null);
+  const [referenceProjection, setReferenceProjection] =
+    useState<StudioCompanionReferenceProjection | null>(null);
+  const [referencePreview, setReferencePreview] = useState<{
+    url: string;
+    generation: number;
+    revision: number;
+    referenceRevision: number;
+    sequence: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [referenceColorResult, setReferenceColorResult] =
+    useState<StudioCompanionReferenceColorResult | null>(null);
+  const [referenceConnectionEpoch, setReferenceConnectionEpoch] = useState(0);
   const [presentationSafeState, setPresentationSafeState] = useState(() => ({
     sessionId,
-    enabled: readPresentationSafe(sessionId),
+    enabled: readPresentationSafe(sessionId).enabled,
   }));
   const [screenPlacementStatus, setScreenPlacementStatus] = useState<ScreenPlacementStatus | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
@@ -197,7 +344,12 @@ export function StudioToolsCompanionPage() {
 
   const presentationSafe = presentationSafeState.sessionId === sessionId
     ? presentationSafeState.enabled
-    : readPresentationSafe(sessionId);
+    : readPresentationSafe(sessionId).enabled;
+  useLayoutEffect(() => {
+    // BroadcastChannel callbacks are external observers. Expose only the value that React
+    // committed; a speculative/abandoned render must never momentarily reopen preview capture.
+    presentationSafeRef.current = presentationSafe;
+  }, [presentationSafe]);
 
   function post(msg: StudioCompanionMessage): boolean {
     try {
@@ -234,19 +386,42 @@ export function StudioToolsCompanionPage() {
     navigatorSequenceRef.current = 0;
     navigatorRevisionRef.current = -1;
     navigatorUrlOwnerRef.current?.clear();
+    referenceFrameEpochRef.current += 1;
+    referenceDemandActiveRef.current = false;
+    referenceGuardRef.current?.reset();
+    referenceUrlOwnerRef.current?.clear();
     clearPendingBrushControl();
     clearPendingNavigatorControl();
     setProjection(null);
     setNavigatorImage(null);
+    setReferenceProjection(null);
+    setReferencePreview(null);
+    setReferenceColorResult(null);
   }, [clearPendingBrushControl, clearPendingNavigatorControl]);
 
-  function sendControl(control: StudioCompanionReviewControl): boolean {
+  const applyPresentationSafe = useCallback((enabled: boolean) => {
+    presentationSafeRef.current = enabled;
+    setPresentationSafeState({ sessionId, enabled });
+    if (!enabled) return;
+    // Revoke every visual preview and cancel primary-side capture before React swaps in the safe
+    // placeholders. The epoch also rejects a Reference decode already awaiting Image.onload.
+    navigatorUrlOwnerRef.current?.clear();
+    setNavigatorImage(null);
+    referenceFrameEpochRef.current += 1;
+    referenceUrlOwnerRef.current?.clear();
+    setReferencePreview(null);
+    setReferenceColorResult(null);
+    releaseNavigatorDemandRef.current();
+    releaseReferenceDemandRef.current();
+  }, [sessionId]);
+
+  function sendControl(control: StudioCompanionControl): boolean {
     const companionInstanceId = companionInstanceIdRef.current;
     const targetPrimary = targetPrimaryInstanceIdRef.current;
     const generation = generationRef.current;
     if (!connected || !companionInstanceId || !targetPrimary || generation <= 0) return false;
     commandSequenceRef.current += 1;
-    return post(buildStudioCompanionControl({
+    const sent = post(buildStudioCompanionControl({
       control,
       generation,
       companionInstanceId,
@@ -254,6 +429,16 @@ export function StudioToolsCompanionPage() {
       commandId: createStudioCompanionCommandId(),
       sequence: commandSequenceRef.current,
     }));
+    if (control.kind === "reference-preview-demand" && (sent || !control.active)) {
+      referenceDemandActiveRef.current = control.active;
+      if (!control.active) {
+        referenceFrameEpochRef.current += 1;
+        referenceUrlOwnerRef.current?.clear();
+        setReferencePreview(null);
+        setReferenceColorResult(null);
+      }
+    }
+    return sent;
   }
 
   function flushBrushControl() {
@@ -302,8 +487,38 @@ export function StudioToolsCompanionPage() {
   }
 
   function changePresentationSafe(enabled: boolean) {
-    setPresentationSafeState({ sessionId, enabled });
-    writePresentationSafe(sessionId, enabled);
+    applyPresentationSafe(enabled);
+    const companionInstanceId = companionInstanceIdRef.current;
+    const guard = presentationSafeGuardRef.current;
+    if (!companionInstanceId || !guard) return;
+    const state = guard.write(enabled, createStudioCompanionCommandId());
+    if (!state) return;
+    writePresentationSafe(sessionId, state);
+    post(buildStudioCompanionPresentationSafe({
+      companionInstanceId,
+      targetCompanionInstanceId: null,
+      state,
+    }));
+    if (enabled || interactionReady) return;
+
+    const targetPrimaryInstanceId = targetPrimaryInstanceIdRef.current;
+    if (!targetPrimaryInstanceId) {
+      post(buildStudioCompanionHello({
+        role: "companion",
+        surface: effectiveSurface,
+        companionInstanceId,
+        targetPrimaryInstanceId: null,
+      }));
+      return;
+    }
+
+    const nonce = createStudioCompanionCommandId();
+    pendingPingNonceRef.current = nonce;
+    post(buildStudioCompanionPing({
+      companionInstanceId,
+      targetPrimaryInstanceId,
+      nonce,
+    }));
   }
 
   useEffect(() => {
@@ -320,28 +535,83 @@ export function StudioToolsCompanionPage() {
       ? "도구 창"
       : effectiveSurface === "navigator"
         ? "캔버스 내비게이터"
-        : "검수 콘솔"} · ToonSpectrum Studio`;
+        : effectiveSurface === "review"
+          ? "검수 콘솔"
+          : "레퍼런스 화면"} · ToonSpectrum Studio`;
   }, [effectiveSurface]);
 
   useEffect(() => {
-    const enabled = readPresentationSafe(sessionId);
-    setPresentationSafeState({ sessionId, enabled });
+    if (!presentationSafe) return;
+    navigatorUrlOwnerRef.current?.clear();
+    setNavigatorImage(null);
+    referenceFrameEpochRef.current += 1;
+    referenceUrlOwnerRef.current?.clear();
+    setReferencePreview(null);
+    setReferenceColorResult(null);
+    releaseNavigatorDemandRef.current();
+    releaseReferenceDemandRef.current();
+  }, [presentationSafe]);
+
+  useEffect(() => {
+    const stored = readPresentationSafe(sessionId);
+    applyPresentationSafe(stored.enabled);
     if (!sessionId) return;
     const key = presentationSafeStorageKey(sessionId);
     const onStorage = (event: StorageEvent) => {
       if (event.key !== key) return;
-      setPresentationSafeState({ sessionId, enabled: event.newValue === "1" });
+      const incoming = parseStoredPresentationSafe(event.newValue);
+      if (incoming.kind === "missing" || incoming.kind === "invalid") return;
+      const companionInstanceId = companionInstanceIdRef.current;
+      const guard = presentationSafeGuardRef.current;
+      const channel = channelRef.current;
+      if (!companionInstanceId || !guard || !channel) {
+        applyPresentationSafe(incoming.enabled);
+        return;
+      }
+
+      let state: StudioCompanionPresentationSafeState | null = null;
+      let shouldBroadcast = false;
+      if (incoming.kind === "state" && incoming.state) {
+        const merged = guard.merge(incoming.state);
+        const current = guard.current();
+        if (merged || samePresentationSafeState(current, incoming.state)) {
+          state = current;
+        } else if (current) {
+          // The storage event lost the LWW race. Repair durable storage and peers with the newer
+          // register instead of letting an older browser task resurrect a stale preference.
+          state = current;
+          shouldBroadcast = true;
+        }
+      } else if (incoming.kind === "legacy") {
+        state = guard.write(incoming.enabled, createStudioCompanionCommandId());
+        shouldBroadcast = state !== null;
+      }
+      if (!state) return;
+      applyPresentationSafe(state.enabled);
+      if (incoming.kind !== "state" || !samePresentationSafeState(state, incoming.state)) {
+        writePresentationSafe(sessionId, state);
+      }
+      if (!shouldBroadcast) return;
+      try {
+        channel.postMessage(buildStudioCompanionPresentationSafe({
+          companionInstanceId,
+          targetCompanionInstanceId: null,
+          state,
+        }));
+      } catch {
+        // Storage already applied the safety state; the next peer hello repairs convergence.
+      }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [sessionId]);
+  }, [applyPresentationSafe, sessionId]);
 
   useEffect(() => {
     if (surface !== "workspace") return;
     const previousSessionId = dedicatedWindowOwnerSessionRef.current;
     if (previousSessionId === sessionId) return;
     if (previousSessionId) {
-      for (const dedicatedSurface of ["navigator", "review"] as const) {
+      for (const dedicatedSurface of ["navigator", "review", "reference"] as const) {
         const companionWindow = dedicatedWindowRefs.current[dedicatedSurface];
         if (!isStudioToolsCompanionWindowReusable(
           previousSessionId,
@@ -390,13 +660,45 @@ export function StudioToolsCompanionPage() {
       return;
     }
 
-    const companionInstanceId = createStudioCompanionInstanceId();
+    const companionScope = `${sessionId}:${surface}`;
+    let companionIdentity = companionIdentityRef.current;
+    if (!companionIdentity || companionIdentity.scope !== companionScope) {
+      companionIdentity = {
+        scope: companionScope,
+        instanceId: createStudioCompanionInstanceId(),
+      };
+      companionIdentityRef.current = companionIdentity;
+    }
+    const companionInstanceId = companionIdentity.instanceId;
     companionInstanceIdRef.current = companionInstanceId;
     const channel = createStudioCompanionChannel(sessionId);
     channelRef.current = channel;
     if (!channel) {
       setLastError("이 브라우저는 BroadcastChannel을 지원하지 않습니다.");
       return;
+    }
+
+    const presentationSafeGuard = new StudioCompanionPresentationSafeGuard();
+    presentationSafeGuard.bind(companionInstanceId);
+    const storedPresentationSafe = readPresentationSafe(sessionId);
+    if (storedPresentationSafe.kind === "state" && storedPresentationSafe.state) {
+      presentationSafeGuard.merge(storedPresentationSafe.state);
+    } else if (
+      storedPresentationSafe.kind === "legacy"
+      || (storedPresentationSafe.kind === "unavailable" && presentationSafeRef.current)
+    ) {
+      const seededState = presentationSafeGuard.write(
+        storedPresentationSafe.kind === "unavailable"
+          ? presentationSafeRef.current
+          : storedPresentationSafe.enabled,
+        createStudioCompanionCommandId()
+      );
+      if (seededState) writePresentationSafe(sessionId, seededState);
+    }
+    presentationSafeGuardRef.current = presentationSafeGuard;
+    const initialPresentationSafeState = presentationSafeGuard.current();
+    if (initialPresentationSafeState) {
+      applyPresentationSafe(initialPresentationSafeState.enabled);
     }
 
     let lastPrimaryActivityAt = 0;
@@ -424,11 +726,37 @@ export function StudioToolsCompanionPage() {
       }
       navigatorDemandActiveRef.current = false;
     };
+    const releaseReferenceDemand = (notifyPrimary = true) => {
+      if (!referenceDemandActiveRef.current) return;
+      const targetPrimary = targetPrimaryInstanceIdRef.current;
+      const generation = generationRef.current;
+      if (notifyPrimary && targetPrimary && generation > 0) {
+        commandSequenceRef.current += 1;
+        try {
+          channel.postMessage(buildStudioCompanionControl({
+            control: { kind: "reference-preview-demand", active: false },
+            generation,
+            companionInstanceId,
+            targetPrimaryInstanceId: targetPrimary,
+            commandId: createStudioCompanionCommandId(),
+            sequence: commandSequenceRef.current,
+          }));
+        } catch {
+          // Closing the detached window may race the final demand release.
+        }
+      }
+      referenceDemandActiveRef.current = false;
+    };
+    const releasePresentationSafeNavigatorDemand = () => releaseNavigatorDemand(true);
+    const releasePresentationSafeReferenceDemand = () => releaseReferenceDemand(true);
+    releaseNavigatorDemandRef.current = releasePresentationSafeNavigatorDemand;
+    releaseReferenceDemandRef.current = releasePresentationSafeReferenceDemand;
     const leaveCompanion = () => {
       if (companionGoodbyeSent) return;
       companionGoodbyeSent = true;
       leaving = true;
       releaseNavigatorDemand();
+      releaseReferenceDemand();
       const targetPrimary = targetPrimaryInstanceIdRef.current;
       if (!targetPrimary) return;
       try {
@@ -454,6 +782,7 @@ export function StudioToolsCompanionPage() {
     };
     const expirePrimary = (notifyPrimary = true) => {
       releaseNavigatorDemand(notifyPrimary);
+      releaseReferenceDemand(notifyPrimary);
       lastPrimaryActivityAt = 0;
       setConnected(false);
       setTargetPrimaryInstanceId(null);
@@ -464,13 +793,100 @@ export function StudioToolsCompanionPage() {
       targetPrimaryInstanceIdRef.current = null;
       pendingPingNonceRef.current = null;
       primaryConfirmed = false;
+      setReferenceConnectionEpoch((value) => value + 1);
       clearReviewState();
+    };
+
+    const stageReferenceFrame = async (frame: StudioCompanionReferencePreviewFrame) => {
+      const acceptedEpoch = referenceFrameEpochRef.current;
+      const owner = referenceUrlOwnerRef.current;
+      if (!owner || presentationSafeRef.current) return;
+      const handle = await owner.stageVerified(frame);
+      if (!handle) return;
+      if (
+        presentationSafeRef.current
+        || referenceFrameEpochRef.current !== acceptedEpoch
+        || owner.pending() !== handle
+      ) {
+        owner.reject(handle);
+        return;
+      }
+      const decoded = await decodeStudioCompanionReferenceImage(handle.url);
+      if (
+        !decoded
+        || presentationSafeRef.current
+        || referenceFrameEpochRef.current !== acceptedEpoch
+        || owner.pending() !== handle
+      ) {
+        owner.reject(handle);
+        return;
+      }
+      const url = owner.commit(handle, decoded.width, decoded.height);
+      if (!url) return;
+      setReferencePreview({ ...handle, url });
     };
 
     channel.onmessage = (event: MessageEvent) => {
       if (leaving) return;
       const msg = parseStudioCompanionMessage(event.data);
       if (!msg || !isStudioCompanionMessageFresh(msg)) return;
+      if (msg.type === "hello" && msg.role === "companion") {
+        if (msg.companionInstanceId === companionInstanceId) return;
+        const state = presentationSafeGuard.current();
+        if (!state) return;
+        try {
+          channel.postMessage(buildStudioCompanionPresentationSafe({
+            companionInstanceId,
+            targetCompanionInstanceId: msg.companionInstanceId,
+            state,
+          }));
+        } catch {
+          // A peer hello is retried; the latest register remains available for the next replay.
+        }
+        return;
+      }
+      if (msg.type === "companion-presentation-safe") {
+        if (!presentationSafeGuard.accept(msg, { companionInstanceId })) return;
+        let state = presentationSafeGuard.current();
+        const durable = msg.targetCompanionInstanceId === null
+          ? null
+          : readPresentationSafe(sessionId);
+        if (
+          state
+          && durable?.kind === "state"
+          && durable.state
+          && durable.state.enabled !== state.enabled
+        ) {
+          // A targeted message is a peer-hello snapshot, not a fresh user mutation. If a
+          // suspended peer replays an older preference with an artificially higher clock, first
+          // observe that clock and then publish a newer corrective value from durable storage.
+          state = presentationSafeGuard.write(
+            durable.state.enabled,
+            createStudioCompanionCommandId()
+          );
+          if (state) {
+            applyPresentationSafe(state.enabled);
+            writePresentationSafe(sessionId, state);
+            try {
+              channel.postMessage(buildStudioCompanionPresentationSafe({
+                companionInstanceId,
+                targetCompanionInstanceId: null,
+                state,
+              }));
+            } catch {
+              // Durable state remains authoritative and the next peer hello retries convergence.
+            }
+          }
+          return;
+        }
+        if (state) {
+          applyPresentationSafe(state.enabled);
+          // Persist the exact total-order register. A reopened companion can now reject a stale
+          // snapshot instead of reconstructing the value with a reset Lamport clock.
+          writePresentationSafe(sessionId, state);
+        }
+        return;
+      }
       if (msg.type === "primary-goodbye") {
         if (msg.primaryInstanceId !== targetPrimaryInstanceIdRef.current) return;
         if (msg.targetCompanionInstanceId !== companionInstanceId) return;
@@ -486,11 +902,13 @@ export function StudioToolsCompanionPage() {
         const currentPrimary = targetPrimaryInstanceIdRef.current;
         if (currentPrimary && currentPrimary !== msg.primaryInstanceId) return;
         const isNewCandidate = currentPrimary === null;
+        if (!referenceGuardRef.current?.bind(msg.primaryInstanceId, companionInstanceId)) return;
         targetPrimaryInstanceIdRef.current = msg.primaryInstanceId;
         setTargetPrimaryInstanceId(msg.primaryInstanceId);
         lastPrimaryActivityAt = Date.now();
         if (!primaryConfirmed) setConnected(false);
         if (isNewCandidate) {
+          setReferenceConnectionEpoch((value) => value + 1);
           try {
             channel.postMessage(buildStudioCompanionHello({
               role: "companion",
@@ -512,6 +930,47 @@ export function StudioToolsCompanionPage() {
         setDensity(msg.density);
         setPrimaryCanvasOnly(msg.canvasOnly);
         setPrimaryTitle(msg.title || "스튜디오");
+        return;
+      }
+      if (msg.type === "primary-reference-state") {
+        const guard = referenceGuardRef.current;
+        if (!guard?.acceptState(msg)) return;
+        generationRef.current = msg.generation;
+        referenceFrameEpochRef.current += 1;
+        referenceUrlOwnerRef.current?.clearStale(msg.projection);
+        const current = referenceUrlOwnerRef.current?.current() ?? null;
+        setReferencePreview(current ? { ...current } : null);
+        setReferenceColorResult(null);
+        setReferenceProjection(msg.projection);
+        markPrimaryActivity();
+        return;
+      }
+      if (msg.type === "reference-preview-frame") {
+        const guard = referenceGuardRef.current;
+        if (!guard?.acceptPreviewFrame(msg) || presentationSafeRef.current) return;
+        markPrimaryActivity();
+        void stageReferenceFrame({
+          generation: msg.generation,
+          revision: msg.revision,
+          referenceRevision: msg.referenceRevision,
+          sequence: msg.sequence,
+          width: msg.width,
+          height: msg.height,
+          blob: msg.blob,
+        });
+        return;
+      }
+      if (msg.type === "reference-color-result") {
+        const guard = referenceGuardRef.current;
+        if (!guard?.acceptColorResult(msg) || presentationSafeRef.current) return;
+        setReferenceColorResult({
+          generation: msg.generation,
+          revision: msg.revision,
+          referenceRevision: msg.referenceRevision,
+          sequence: msg.sequence,
+          color: msg.color,
+        });
+        markPrimaryActivity();
         return;
       }
       if (msg.type === "primary-review-state") {
@@ -552,6 +1011,7 @@ export function StudioToolsCompanionPage() {
         if (msg.generation !== generationRef.current || msg.generation <= 0) return;
         if (msg.sequence <= navigatorSequenceRef.current) return;
         if (msg.revision !== projectionDocumentRevisionRef.current) return;
+        if (presentationSafeRef.current) return;
         navigatorSequenceRef.current = msg.sequence;
         const url = navigatorUrlOwnerRef.current?.replace(msg.blob);
         if (!url) return;
@@ -624,13 +1084,32 @@ export function StudioToolsCompanionPage() {
         // Ignore a channel already closed by the browser.
       }
       if (channelRef.current === channel) channelRef.current = null;
-      companionInstanceIdRef.current = null;
+      if (companionInstanceIdRef.current === companionInstanceId) {
+        companionInstanceIdRef.current = null;
+      }
+      if (presentationSafeGuardRef.current === presentationSafeGuard) {
+        presentationSafeGuard.reset();
+        presentationSafeGuardRef.current = null;
+      }
+      if (releaseNavigatorDemandRef.current === releasePresentationSafeNavigatorDemand) {
+        releaseNavigatorDemandRef.current = () => undefined;
+      }
+      if (releaseReferenceDemandRef.current === releasePresentationSafeReferenceDemand) {
+        releaseReferenceDemandRef.current = () => undefined;
+      }
       targetPrimaryInstanceIdRef.current = null;
       pendingPingNonceRef.current = null;
       commandSequenceRef.current = 0;
       clearReviewState();
     };
-  }, [clearPendingBrushControl, clearPendingNavigatorControl, clearReviewState, sessionId, surface]);
+  }, [
+    applyPresentationSafe,
+    clearPendingBrushControl,
+    clearPendingNavigatorControl,
+    clearReviewState,
+    sessionId,
+    surface,
+  ]);
 
   function sendCommand(command: StudioCompanionCommandName) {
     const companionInstanceId = companionInstanceIdRef.current;
@@ -676,7 +1155,11 @@ export function StudioToolsCompanionPage() {
       const placement = planStudioCompanionExternalScreenPlacement({
         screens: details.screens,
         currentScreen: details.currentScreen,
-        preferredWidth: effectiveSurface === "navigator" ? 390 : effectiveSurface === "review" ? 420 : 520,
+        preferredWidth: effectiveSurface === "workspace"
+          ? 520
+          : effectiveSurface === "navigator"
+            ? 390
+            : 420,
         preferredHeight: effectiveSurface === "workspace" ? 820 : 860,
       });
       if (!placement) {
@@ -742,6 +1225,8 @@ export function StudioToolsCompanionPage() {
         ? "navigate"
         : mode === "review" && !primaryCanvasOnly
           ? "review"
+          : mode === "reference" && primaryCanvasOnly
+            ? "reference"
           : null;
   function applyWorkspacePreset(preset: StudioCompanionWorkspacePresetId): void {
     if (!interactionReady || effectiveSurface !== "workspace") return;
@@ -752,6 +1237,11 @@ export function StudioToolsCompanionPage() {
     }
     if (preset === "navigate") {
       setMode("navigator");
+      sendCommand("enter-canvas-only");
+      return;
+    }
+    if (preset === "reference") {
+      setMode("reference");
       sendCommand("enter-canvas-only");
       return;
     }
@@ -769,19 +1259,27 @@ export function StudioToolsCompanionPage() {
   });
   useEffect(() => {
     syncNavigatorDemand(
-      interactionReady && projection !== null && navigatorSurfaceActive
+      interactionReady && projection !== null && navigatorSurfaceActive && !presentationSafe
     );
-  }, [interactionReady, navigatorSurfaceActive, projection]);
+  }, [interactionReady, navigatorSurfaceActive, presentationSafe, projection]);
   const tabs: ReadonlyArray<{ id: CompanionMode; label: string; icon: typeof Palette }> = [
     { id: "tools", label: "도구", icon: Palette },
     { id: "navigator", label: "Navigator", icon: Map },
     { id: "review", label: "검수", icon: ListChecks },
+    { id: "reference", label: "레퍼런스", icon: Images },
   ];
   const shellTitle = effectiveSurface === "workspace"
     ? visiblePrimaryTitle
     : effectiveSurface === "navigator"
       ? "캔버스 내비게이터"
-      : "검수 콘솔";
+      : effectiveSurface === "review"
+        ? "검수 콘솔"
+        : "레퍼런스 화면";
+  const referenceConnectionStatus = connected
+    ? "connected"
+    : targetPrimaryInstanceId
+      ? "reconnecting"
+      : "disconnected";
   const dedicatedLayout = effectiveSurface !== "workspace";
   const screenPlacementBusy = screenPlacementStatus?.kind === "requesting";
   const windowLayoutPersistenceStatus: StudioCompanionWindowLayoutPersistenceStatus =
@@ -899,7 +1397,7 @@ export function StudioToolsCompanionPage() {
         {effectiveSurface === "workspace" ? (
           <div
             role="tablist"
-            className="mt-2 grid grid-cols-3 gap-1 rounded-xl border border-line bg-card p-1"
+            className="mt-2 grid grid-cols-4 gap-1 rounded-xl border border-line bg-card p-1"
             aria-label="컴패니언 모드"
           >
             {tabs.map(({ id, label, icon: Icon }, index) => (
@@ -908,17 +1406,19 @@ export function StudioToolsCompanionPage() {
                 type="button"
                 role="tab"
                 id={`companion-mode-tab-${id}`}
+                aria-label={label}
                 aria-selected={mode === id}
                 aria-controls={`companion-mode-panel-${id}`}
                 tabIndex={mode === id ? 0 : -1}
                 onClick={() => setMode(id)}
                 onKeyDown={(event) => handleModeTabKeyDown(event, index)}
                 className={cn(
-                  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold outline-none transition-colors motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-accent/35",
+                  "inline-flex min-h-11 min-w-0 items-center justify-center gap-1 overflow-hidden rounded-lg px-1 text-xs font-semibold outline-none transition-colors motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-accent/35 min-[390px]:gap-1.5 min-[390px]:px-2",
                   mode === id ? "bg-raised text-fg shadow-sm" : "text-fg-3 hover:text-fg-2"
                 )}
               >
-                <Icon className="size-3.5" aria-hidden /> {label}
+                <Icon className="size-3.5 shrink-0" aria-hidden />
+                <span className="hidden min-w-0 truncate min-[390px]:inline">{label}</span>
               </button>
             ))}
           </div>
@@ -1075,16 +1575,28 @@ export function StudioToolsCompanionPage() {
             hidden={effectiveSurface === "workspace" && mode !== "navigator"}
             className={cn(dedicatedLayout && "flex min-h-0 flex-1 flex-col")}
           >
-            <StudioCompanionNavigator
-              imageUrl={navigatorImage?.url ?? null}
-              imageWidth={navigatorImage?.width ?? 0}
-              imageHeight={navigatorImage?.height ?? 0}
-              viewport={projection?.viewport ?? { x: 0, y: 0, width: 1, height: 1 }}
-              connected={interactionReady}
-              captureAllowed={projection?.captureAllowed ?? false}
-              layout={dedicatedLayout ? "dedicated" : "embedded"}
-              onNavigate={queueNavigatorControl}
-            />
+            {presentationSafe ? (
+              <section className="grid min-h-64 flex-1 place-items-center rounded-xl border border-line bg-card px-5 text-center">
+                <div className="max-w-64">
+                  <EyeOff className="mx-auto size-6 text-fg-3" aria-hidden />
+                  <h2 className="mt-3 text-sm font-semibold text-fg">Navigator 발표 안전 모드</h2>
+                  <p className="mt-1 text-xs leading-relaxed text-fg-3">
+                    캔버스 미리보기 전송을 멈추고 브라우저 메모리의 이미지 URL을 해제했습니다.
+                  </p>
+                </div>
+              </section>
+            ) : (
+              <StudioCompanionNavigator
+                imageUrl={navigatorImage?.url ?? null}
+                imageWidth={navigatorImage?.width ?? 0}
+                imageHeight={navigatorImage?.height ?? 0}
+                viewport={projection?.viewport ?? { x: 0, y: 0, width: 1, height: 1 }}
+                connected={interactionReady}
+                captureAllowed={projection?.captureAllowed ?? false}
+                layout={dedicatedLayout ? "dedicated" : "embedded"}
+                onNavigate={queueNavigatorControl}
+              />
+            )}
           </div>
         ) : null}
 
@@ -1110,8 +1622,53 @@ export function StudioToolsCompanionPage() {
           </div>
         ) : null}
 
+        {effectiveSurface === "reference"
+        || (effectiveSurface === "workspace" && mode === "reference") ? (
+          <div
+            role={effectiveSurface === "workspace" ? "tabpanel" : undefined}
+            id="companion-mode-panel-reference"
+            aria-labelledby={effectiveSurface === "workspace" ? "companion-mode-tab-reference" : undefined}
+            aria-label={effectiveSurface === "reference" ? "레퍼런스 화면" : undefined}
+            className={dedicatedLayout
+              ? "flex min-h-[29rem] flex-1 flex-col"
+              : "min-h-0"}
+          >
+            {presentationSafe ? (
+              <section className="grid min-h-64 flex-1 place-items-center rounded-xl border border-line bg-card px-5 text-center">
+                <div className="max-w-64">
+                  <EyeOff className="mx-auto size-6 text-fg-3" aria-hidden />
+                  <h2 className="mt-3 text-sm font-semibold text-fg">발표 안전 모드</h2>
+                  <p className="mt-1 text-xs leading-relaxed text-fg-3">
+                    레퍼런스 이미지와 최근 선택 색상을 숨기고 브라우저 메모리의 미리보기 URL도 해제했습니다.
+                  </p>
+                </div>
+              </section>
+            ) : (
+              <Suspense
+                fallback={(
+                  <div
+                    role="status"
+                    className="grid min-h-64 flex-1 place-items-center rounded-xl border border-line bg-card text-xs text-fg-3"
+                  >
+                    레퍼런스 도구를 불러오는 중…
+                  </div>
+                )}
+              >
+                <LazyStudioCompanionReferenceDisplay
+                  projection={referenceProjection}
+                  preview={referencePreview}
+                  connectionStatus={referenceConnectionStatus}
+                  latestColorResult={referenceColorResult}
+                  connectionEpoch={referenceConnectionEpoch}
+                  onControl={sendControl}
+                />
+              </Suspense>
+            )}
+          </div>
+        ) : null}
+
         <p className={cn("text-xs leading-relaxed text-fg-3", dedicatedLayout && "shrink-0")}>
-          편집 문서는 기본 탭만 소유합니다. 이 창은 같은 브라우저의 BroadcastChannel로 압축 미리보기와 검수 의도만 전달하므로 별도 서버 비용이 없습니다.
+          편집 문서는 기본 탭만 소유합니다. 이 창은 같은 브라우저의 BroadcastChannel로 압축 미리보기와 검수·레퍼런스 의도만 전달하므로 별도 서버 비용이 없습니다.
         </p>
       </main>
     </div>

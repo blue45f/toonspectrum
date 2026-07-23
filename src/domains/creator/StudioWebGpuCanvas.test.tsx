@@ -143,4 +143,44 @@ describe("StudioWebGpuCanvas", () => {
       "engine.appendStrokeFeedSuffixBatch(command.patch, requestId)",
     );
   });
+
+  it("exposes suffix-only journal commands without retaining a full fallback frame", () => {
+    expect(webGpuCanvasSource).toContain(
+      ") => StudioWebGpuJournalFeedOutcome",
+    );
+    expect(webGpuCanvasSource).toContain(
+      "export interface StudioWebGpuJournalFeedOutcome",
+    );
+    expect(webGpuCanvasSource).toContain(
+      "patch: StudioGpuStrokeJournalSuffixBatchPatch",
+    );
+    expect(webGpuCanvasSource).toContain(
+      'queuePinnedJournalRequest({ mode: "journal-append", patch })',
+    );
+    expect(webGpuCanvasSource).toContain(
+      'queuePinnedJournalRequest({ mode: "journal-append-batch", patch })',
+    );
+    expect(webGpuCanvasSource).toContain(
+      "engine.replaceStrokeFeedJournalBaseline(latest.strokes, requestId)",
+    );
+    expect(webGpuCanvasSource).toContain(
+      "engine.appendStrokeFeedJournalSuffixBatch(command.patch, requestId)",
+    );
+    expect(webGpuCanvasSource).toContain(
+      '=== "appended" ? "accepted" : "rejected"',
+    );
+    expect(webGpuCanvasSource).toContain(
+      '=== "replaced" ? "accepted" : "rejected"',
+    );
+    expect(webGpuCanvasSource).toContain(
+      'status: "rejected"',
+    );
+    expect(webGpuCanvasSource).toContain("return { status: journalOutcome, requestId }");
+    expect(webGpuCanvasSource).toContain(
+      "if (receipt.requestId !== desiredRequestIdRef.current) return",
+    );
+    expect(webGpuCanvasSource).toContain("pinnedJournalActiveRef.current");
+    expect(webGpuCanvasSource).toContain("function resumedPinnedFeedCommand(");
+    expect(webGpuCanvasSource).toContain('if (journalActive) return { mode: "retain" }');
+  });
 });

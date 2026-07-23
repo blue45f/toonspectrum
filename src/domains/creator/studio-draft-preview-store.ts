@@ -55,6 +55,16 @@ export class StudioDraftPreviewStore implements StudioDraftPreviewSource {
     this.emit();
   }
 
+  /** Atomically replaces the settled FIFO while preserving any active non-GPU draft. */
+  replaceSettled(elements: readonly DrawEl[]): void {
+    if (
+      this.snapshot.settled.length === elements.length
+      && this.snapshot.settled.every((element, index) => element === elements[index])
+    ) return;
+    this.snapshot = { active: this.snapshot.active, settled: [...elements] };
+    this.emit();
+  }
+
   clearSettled(): void {
     this.releaseSettledPrefix(this.snapshot.settled.length);
   }

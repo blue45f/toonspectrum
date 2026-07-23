@@ -2,6 +2,7 @@ import {
   clearStudioCanvas2dDabSurface,
   renderStudioCanvas2dDabSurface,
 } from "./studio-canvas2d-dab-surface";
+import { resolveStudioInkPressure } from "./studio-ink-pressure-model";
 import {
   isValidStudioGpuStroke,
   planStudioGpuDabs,
@@ -21,16 +22,22 @@ import {
 import {
   STUDIO_GPU_STROKE_FEED_REVISION,
   orderStudioGpuStrokes,
+  sameStudioGpuStroke,
   snapshotStudioGpuStrokes,
   type StudioGpuStroke,
 } from "./studio-webgpu-stroke";
 import {
-  advanceStudioGpuStrokeFeed,
-  advanceStudioGpuStrokeFeedBatch,
+  advanceStudioGpuStrokeFeedBatchCompact,
+  advanceStudioGpuStrokeFeedCompact,
   appendStudioGpuStrokeFeedOperations,
-  createStudioGpuStrokeFeedBaseline,
+  createStudioGpuStrokeFeedCompactBaseline,
   isTrustedStudioGpuStrokeFeedRevision,
   isTrustedStudioGpuStrokeFeedStroke,
+  materializeStudioGpuStrokeFeedStroke,
+  sameStudioGpuStrokeFeedStyle,
+  studioGpuStrokeFeedPointCount,
+  type StudioGpuStrokeCompactSuffixBatchPatch,
+  type StudioGpuStrokeCompactSuffixPatch,
   type StudioGpuStrokeOperationsAppendPatch,
   type StudioGpuStrokeSuffixBatchPatch,
   type StudioGpuStrokeSuffixPatch,
@@ -126,6 +133,18 @@ export interface StudioWebGpuEngineOptions {
   readonly onFrameInvalid?: () => void;
   /** Fired only after the latest request is fully covered and submitted by the active backend. */
   readonly onFrameReady?: (receipt: StudioGpuFrameReceipt) => void;
+}
+
+/** Suffix-only journal contract; the engine supplies the private revision token itself. */
+export interface StudioGpuStrokeJournalSuffixPatch {
+  readonly strokeIndex: number;
+  readonly previousPointCount: number;
+  readonly suffixPoints: readonly number[];
+  readonly suffixPressures: readonly number[];
+}
+
+export interface StudioGpuStrokeJournalSuffixBatchPatch {
+  readonly patches: readonly StudioGpuStrokeJournalSuffixPatch[];
 }
 
 interface NormalizedStudioGpuViewport {
@@ -464,6 +483,85 @@ function readbackSnapshotByteLength(width: number, height: number): number | nul
     : null;
 }
 
+function compactJournalSuffixPatch(
+  strokes: readonly StudioGpuStroke[],
+  patch: StudioGpuStrokeJournalSuffixPatch
+): StudioGpuStrokeCompactSuffixPatch | null {
+  const stroke = Number.isSafeInteger(patch.strokeIndex)
+    ? strokes[patch.strokeIndex]
+    : undefined;
+  const revision = stroke?.[STUDIO_GPU_STROKE_FEED_REVISION];
+  if (
+    !stroke
+    || !isTrustedStudioGpuStrokeFeedStroke(stroke)
+    || !isTrustedStudioGpuStrokeFeedRevision(revision)
+    || patch.previousPointCount !== revision.pointCount
+  ) return null;
+  return {
+    strokeIndex: patch.strokeIndex,
+    previousPointCount: revision.pointCount,
+    previousRevisionToken: revision.token,
+    suffixPoints: patch.suffixPoints,
+    suffixPressures: patch.suffixPressures,
+  };
+}
+
+function legacySuffixPatchMatchesCurrent(
+  strokes: readonly StudioGpuStroke[],
+  patch: StudioGpuStrokeSuffixPatch,
+  fallbackStrokes: readonly StudioGpuStroke[]
+): boolean {
+  const current = strokes[patch.strokeIndex];
+  if (
+    !current
+    || fallbackStrokes.length !== strokes.length
+    || fallbackStrokes[patch.strokeIndex] !== patch.nextStroke
+    || !sameStudioGpuStrokeFeedStyle(current, patch.nextStroke)
+    || patch.previousPointCount !== studioGpuStrokeFeedPointCount(current)
+    || patch.suffixPoints.length < 2
+    || patch.suffixPoints.length % 2 !== 0
+    || patch.suffixPressures.length !== patch.suffixPoints.length / 2
+  ) return false;
+  const nextPointCount = patch.nextStroke.points.length / 2;
+  if (
+    !Number.isSafeInteger(nextPointCount)
+    || nextPointCount !== patch.previousPointCount + patch.suffixPressures.length
+    || (patch.nextStroke.pressures !== undefined
+      && patch.nextStroke.pressures.length !== nextPointCount)
+  ) return false;
+  const coordinateOffset = patch.previousPointCount * 2;
+  for (let index = 0; index < patch.suffixPoints.length; index += 1) {
+    if (!Object.is(patch.suffixPoints[index], patch.nextStroke.points[coordinateOffset + index])) {
+      return false;
+    }
+  }
+  for (let index = 0; index < patch.suffixPressures.length; index += 1) {
+    const resolved = resolveStudioInkPressure(
+      patch.nextStroke.pressures?.[patch.previousPointCount + index],
+      patch.nextStroke.pressureModel
+    );
+    const supplied = Math.min(1, Math.max(0, patch.suffixPressures[index]!));
+    if (!Object.is(resolved, supplied)) return false;
+  }
+  return true;
+}
+
+function legacySettledPrefixMatchesCurrent(
+  strokes: readonly StudioGpuStroke[],
+  fallbackStrokes: readonly StudioGpuStroke[],
+  settledCount: number
+): boolean {
+  if (fallbackStrokes.length !== strokes.length) return false;
+  for (let index = 0; index < settledCount; index += 1) {
+    const current = strokes[index]!;
+    const exact = isTrustedStudioGpuStrokeFeedStroke(current)
+      ? materializeStudioGpuStrokeFeedStroke(current)
+      : current;
+    if (!exact || !sameStudioGpuStroke(exact, fallbackStrokes[index]!)) return false;
+  }
+  return true;
+}
+
 interface StudioGpuFrameSnapshot {
   readonly texture: GPUTexture;
   readonly device: GPUDevice;
@@ -675,7 +773,7 @@ export class StudioWebGpuEngine {
       this.render(strokes, requestId);
       return;
     }
-    const baseline = createStudioGpuStrokeFeedBaseline(
+    const baseline = createStudioGpuStrokeFeedCompactBaseline(
       strokes,
       `engine:${this.strokeFeedEngineId}:feed:${this.strokeFeedSequence}`
     );
@@ -684,6 +782,34 @@ export class StudioWebGpuEngine {
       return;
     }
     this.renderPreparedStrokes(baseline, requestId);
+  }
+
+  /** Starts a compact journal epoch and rolls back intact if validation or snapshotting fails. */
+  public replaceStrokeFeedJournalBaseline(
+    strokes: readonly StudioGpuStroke[],
+    requestId = this.lastRequestId
+  ): "replaced" | "rejected" {
+    if (this.disposed) return "rejected";
+    try {
+      if (strokes.length < 1 || !strokes.every(isValidStudioGpuStroke)) {
+        this.retainStrokeFeed(requestId);
+        return "rejected";
+      }
+      this.strokeFeedSequence += 1;
+      const baseline = createStudioGpuStrokeFeedCompactBaseline(
+        strokes,
+        `engine:${this.strokeFeedEngineId}:feed:${this.strokeFeedSequence}`
+      );
+      if (!baseline) {
+        this.retainStrokeFeed(requestId);
+        return "rejected";
+      }
+      this.renderPreparedStrokes(baseline, requestId);
+      return "replaced";
+    } catch {
+      this.retainStrokeFeed(requestId);
+      return "rejected";
+    }
   }
 
   /**
@@ -695,13 +821,37 @@ export class StudioWebGpuEngine {
     requestId = this.lastRequestId
   ): "appended" | "rebuilt" {
     if (this.disposed) return "rebuilt";
-    const advanced = advanceStudioGpuStrokeFeed(this.lastStrokes, patch);
-    if (advanced.status === "rejected") {
-      this.replaceStrokeFeed(patch.fallbackStrokes, requestId);
+    let fallbackStrokes: readonly StudioGpuStroke[];
+    try {
+      fallbackStrokes = patch.fallbackStrokes;
+    } catch {
+      this.retainStrokeFeed(requestId);
       return "rebuilt";
     }
-    this.renderPreparedStrokes(advanced.strokes, requestId);
-    return "appended";
+    try {
+      if (!legacySuffixPatchMatchesCurrent(this.lastStrokes, patch, fallbackStrokes)) {
+        this.replaceStrokeFeed(fallbackStrokes, requestId);
+        return "rebuilt";
+      }
+      const compact = compactJournalSuffixPatch(this.lastStrokes, {
+        strokeIndex: patch.strokeIndex,
+        previousPointCount: patch.previousPointCount,
+        suffixPoints: patch.suffixPoints,
+        suffixPressures: patch.suffixPressures,
+      });
+      const advanced = compact
+        ? advanceStudioGpuStrokeFeedCompact(this.lastStrokes, compact)
+        : null;
+      if (!advanced || advanced.status === "rejected") {
+        this.replaceStrokeFeed(fallbackStrokes, requestId);
+        return "rebuilt";
+      }
+      this.renderPreparedStrokes(advanced.strokes, requestId);
+      return "appended";
+    } catch {
+      this.replaceStrokeFeed(fallbackStrokes, requestId);
+      return "rebuilt";
+    }
   }
 
   /**
@@ -713,13 +863,115 @@ export class StudioWebGpuEngine {
     requestId = this.lastRequestId
   ): "appended" | "rebuilt" {
     if (this.disposed) return "rebuilt";
-    const advanced = advanceStudioGpuStrokeFeedBatch(this.lastStrokes, patch);
-    if (advanced.status === "rejected") {
-      this.replaceStrokeFeed(patch.fallbackStrokes, requestId);
+    let fallbackStrokes: readonly StudioGpuStroke[];
+    try {
+      fallbackStrokes = patch.fallbackStrokes;
+    } catch {
+      this.retainStrokeFeed(requestId);
       return "rebuilt";
     }
-    this.renderPreparedStrokes(advanced.strokes, requestId);
-    return "appended";
+    try {
+      if (
+        patch.patches.length < 1
+        || !legacySettledPrefixMatchesCurrent(
+          this.lastStrokes,
+          fallbackStrokes,
+          this.lastStrokes.length - patch.patches.length
+        )
+        || patch.patches.some((candidate) => (
+          !legacySuffixPatchMatchesCurrent(this.lastStrokes, candidate, fallbackStrokes)
+          || candidate.fallbackStrokes !== fallbackStrokes
+        ))
+      ) {
+        this.replaceStrokeFeed(fallbackStrokes, requestId);
+        return "rebuilt";
+      }
+      const compactPatches = patch.patches.map((candidate) => compactJournalSuffixPatch(
+        this.lastStrokes,
+        {
+          strokeIndex: candidate.strokeIndex,
+          previousPointCount: candidate.previousPointCount,
+          suffixPoints: candidate.suffixPoints,
+          suffixPressures: candidate.suffixPressures,
+        }
+      ));
+      if (compactPatches.some((candidate) => candidate === null)) {
+        this.replaceStrokeFeed(fallbackStrokes, requestId);
+        return "rebuilt";
+      }
+      const advanced = advanceStudioGpuStrokeFeedBatchCompact(this.lastStrokes, {
+        patches: compactPatches as StudioGpuStrokeCompactSuffixPatch[],
+      });
+      if (advanced.status === "rejected") {
+        this.replaceStrokeFeed(fallbackStrokes, requestId);
+        return "rebuilt";
+      }
+      this.renderPreparedStrokes(advanced.strokes, requestId);
+      return "appended";
+    } catch {
+      this.replaceStrokeFeed(fallbackStrokes, requestId);
+      return "rebuilt";
+    }
+  }
+
+  /**
+   * Appends a journal suffix using the engine's current trusted revision receipt. Rejection keeps
+   * the previous pixels authoritative and issues a fresh receipt for the caller's request id.
+   */
+  public appendStrokeFeedJournalSuffix(
+    patch: StudioGpuStrokeJournalSuffixPatch,
+    requestId = this.lastRequestId
+  ): "appended" | "rejected" {
+    if (this.disposed) return "rejected";
+    try {
+      const compact = compactJournalSuffixPatch(this.lastStrokes, patch);
+      if (!compact) {
+        this.retainStrokeFeed(requestId);
+        return "rejected";
+      }
+      const advanced = advanceStudioGpuStrokeFeedCompact(this.lastStrokes, compact);
+      if (advanced.status === "rejected") {
+        this.retainStrokeFeed(requestId);
+        return "rejected";
+      }
+      this.renderPreparedStrokes(advanced.strokes, requestId);
+      return "appended";
+    } catch {
+      this.retainStrokeFeed(requestId);
+      return "rejected";
+    }
+  }
+
+  /** Atomically appends one terminal journal symmetry group without a full fallback snapshot. */
+  public appendStrokeFeedJournalSuffixBatch(
+    patch: StudioGpuStrokeJournalSuffixBatchPatch,
+    requestId = this.lastRequestId
+  ): "appended" | "rejected" {
+    if (this.disposed) return "rejected";
+    try {
+      const compactPatches: StudioGpuStrokeCompactSuffixPatch[] = [];
+      for (const candidate of patch.patches) {
+        const compact = compactJournalSuffixPatch(this.lastStrokes, candidate);
+        if (!compact) {
+          this.retainStrokeFeed(requestId);
+          return "rejected";
+        }
+        compactPatches.push(compact);
+      }
+      const compactBatch: StudioGpuStrokeCompactSuffixBatchPatch = {
+        patches: compactPatches,
+      };
+      const advanced = advanceStudioGpuStrokeFeedBatchCompact(this.lastStrokes, compactBatch);
+      if (advanced.status === "rejected") {
+        this.retainStrokeFeed(requestId);
+        return "rejected";
+      }
+      this.renderPreparedStrokes(advanced.strokes, requestId);
+      return "appended";
+    } catch {
+      this.retainStrokeFeed(requestId);
+      return "rejected";
+    }
   }
 
   /** Adds newly-started normal/erase operations without replaying retained operation history. */

@@ -23,6 +23,7 @@ import {
   isTrustedStudioGpuStrokeFeedStroke,
   materializeStudioGpuStrokeFeedStroke,
   sameStudioGpuStrokeFeedStyle,
+  studioGpuStrokeFeedPointCount,
   studioGpuStrokeFeedRevisionAtPointCount,
   studioGpuStrokeFeedSuffixFromPointCount,
 } from "./studio-webgpu-stroke-feed";
@@ -70,7 +71,6 @@ export function isValidStudioGpuStroke(stroke: StudioGpuStroke): boolean {
       && isTrustedStudioGpuStrokeFeedRevision(feed)
       && feed.trustedImmutable
       && feed.pointCount >= 1
-      && stroke.points.length === feed.pointCount * 2
       && feed.styleSignature.length > 0
       && isStudioGpuFiniteScalar(feed.minimumX)
       && isStudioGpuFiniteScalar(feed.minimumY)
@@ -397,7 +397,7 @@ function planStudioGpuResidualStrokeExtensionInternal(
   clipRect: StudioGpuRect | null,
   maximumDabs: number
 ): PlannedStudioGpuDabs {
-  const pointCount = stroke.points.length / 2;
+  const pointCount = studioGpuStrokeFeedPointCount(stroke);
   if (
     !studioInkUsesResidualDabSpacing(stroke.pressureModel)
     || !stroke.pressureModel
@@ -419,9 +419,18 @@ function planStudioGpuResidualStrokeExtensionInternal(
   if (alpha <= 0) return { dabs: [], batches: [], complete: true };
 
   const cached = studioGpuStrokeFeedRevisionAtPointCount(stroke, previousPointCount);
+  const trustedFeed = isTrustedStudioGpuStrokeFeedStroke(stroke)
+    && isTrustedStudioGpuStrokeFeedRevision(stroke[STUDIO_GPU_STROKE_FEED_REVISION]);
+  const feedSuffix = trustedFeed
+    ? studioGpuStrokeFeedSuffixFromPointCount(stroke, previousPointCount)
+    : null;
+  if (trustedFeed && !feedSuffix) {
+    return { dabs: [], batches: [], complete: false };
+  }
   let state = cached?.residualInkState;
   let totalDabCount = cached?.residualDabCount;
   if (!state || totalDabCount === undefined) {
+    if (trustedFeed) return { dabs: [], batches: [], complete: false };
     const started = startStudioResidualInk(
       {
         x: stroke.points[0]!,
@@ -465,12 +474,14 @@ function planStudioGpuResidualStrokeExtensionInternal(
 
   const dabs: StudioGpuDab[] = [];
   for (let sourceIndex = previousPointCount; sourceIndex < pointCount; sourceIndex += 1) {
+    const localSourceIndex = trustedFeed ? sourceIndex - previousPointCount + 1 : sourceIndex;
+    const source = feedSuffix ?? stroke;
     const advanced = advanceStudioResidualInk(
       state,
       {
-        x: stroke.points[sourceIndex * 2]!,
-        y: stroke.points[sourceIndex * 2 + 1]!,
-        pressure: pointPressure(stroke, sourceIndex),
+        x: source.points[localSourceIndex * 2]!,
+        y: source.points[localSourceIndex * 2 + 1]!,
+        pressure: pointPressure(source, localSourceIndex),
         sourceIndex,
       },
       stroke.size,
@@ -530,7 +541,7 @@ export function planStudioGpuStrokeExtensionInRect(
   clipRect: StudioGpuRect,
   maximumDabs = STUDIO_GPU_MAX_DABS
 ): PlannedStudioGpuDabs {
-  const pointCount = stroke.points.length / 2;
+  const pointCount = studioGpuStrokeFeedPointCount(stroke);
   if (
     !Number.isSafeInteger(previousPointCount)
     || previousPointCount < 1
@@ -593,7 +604,7 @@ function isStrictPointPrefix(previous: StudioGpuStroke, next: StudioGpuStroke): 
     if (!Number.isFinite(previous.points[index])) return false;
     if (!Object.is(previous.points[index], next.points[index])) return false;
   }
-  const previousPointCount = previous.points.length / 2;
+  const previousPointCount = studioGpuStrokeFeedPointCount(previous);
   for (let index = 0; index < previousPointCount; index += 1) {
     if (!Object.is(pointPressure(previous, index), pointPressure(next, index))) return false;
   }
@@ -621,7 +632,7 @@ function isExactStrokeMatch(previous: StudioGpuStroke, next: StudioGpuStroke): b
     if (!Number.isFinite(previous.points[index])) return false;
     if (!Object.is(previous.points[index], next.points[index])) return false;
   }
-  const pointCount = previous.points.length / 2;
+  const pointCount = studioGpuStrokeFeedPointCount(previous);
   for (let index = 0; index < pointCount; index += 1) {
     if (!Object.is(pointPressure(previous, index), pointPressure(next, index))) return false;
   }
@@ -714,7 +725,7 @@ export function planStudioGpuDabUpdate(
     if (studioInkUsesResidualDabSpacing(nextTerminal.pressureModel)) {
       const residualSuffix = planStudioGpuResidualStrokeExtensionInternal(
         nextTerminal,
-        previousTerminal.points.length / 2,
+        studioGpuStrokeFeedPointCount(previousTerminal),
         null,
         STUDIO_GPU_MAX_DABS
       );
@@ -729,13 +740,13 @@ export function planStudioGpuDabUpdate(
         ]),
       };
     }
-    const previousPointCount = previousTerminal.points.length / 2;
+    const previousPointCount = studioGpuStrokeFeedPointCount(previousTerminal);
     const feedSuffix = studioGpuStrokeFeedSuffixFromPointCount(
       nextTerminal,
       previousPointCount
     );
     const suffixStart = previousPointCount - 1;
-    const suffixPointCount = nextTerminal.points.length / 2 - suffixStart;
+    const suffixPointCount = studioGpuStrokeFeedPointCount(nextTerminal) - suffixStart;
     const suffix: StudioGpuStroke = feedSuffix ?? {
       ...nextTerminal,
       points: nextTerminal.points.slice(suffixStart * 2),

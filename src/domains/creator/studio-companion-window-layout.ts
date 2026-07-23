@@ -19,6 +19,7 @@ export const STUDIO_COMPANION_WINDOW_LAYOUT_SURFACES = [
   "workspace",
   "navigator",
   "review",
+  "reference",
 ] as const;
 
 export type StudioCompanionWindowLayoutSurface =
@@ -210,6 +211,7 @@ const SURFACE_MINIMUM_OUTER_SIZE: Readonly<
   workspace: Object.freeze({ width: 360, height: 480 }),
   navigator: Object.freeze({ width: 320, height: 360 }),
   review: Object.freeze({ width: 360, height: 480 }),
+  reference: Object.freeze({ width: 320, height: 360 }),
 });
 
 function isRecord(value: unknown): value is Record<string, unknown> {

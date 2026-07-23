@@ -39,8 +39,8 @@ describe("studio WebGPU frame contract boundary", () => {
     expect(canvas).not.toMatch(
       /import \{[\s\S]{0,320}type StudioGpuBackend[\s\S]{0,320}\} from "\.\/studio-webgpu-engine"/u
     );
-    expect(page).toContain(
-      'import type { StudioGpuBackend } from "./studio-webgpu-frame-contract"'
+    expect(page).toMatch(
+      /import type \{[\s\S]{0,320}\bStudioGpuBackend\b[\s\S]{0,320}\} from "\.\/studio-webgpu-frame-contract"/u
     );
     expect(page).not.toContain(
       'import type { StudioGpuBackend } from "./studio-webgpu-engine"'

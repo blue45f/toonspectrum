@@ -93,10 +93,15 @@ describe("Studio freehand hot-path boundary", () => {
     expect(mutableAppend.match(/scheduleDraft\(current\)/gu)).toHaveLength(1);
     expect(source).toContain("drawingPredictionBatchMutationRef.current = true");
     expect(source).toContain("pressures: predictedPressures");
-    expect(source).toContain(
-      'const gpuStartPlan = STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu"'
+    const gpuStart = functionBody(
+      "const gpuStartEligible =",
+      "const liveInkBackendDecision ="
     );
-    expect(source).toContain('webGpuBackendRef.current === "webgpu"');
+    expect(gpuStart).toContain('STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu"');
+    expect(gpuStart).toContain('webGpuBackendRef.current === "webgpu"');
+    expect(gpuStart).toContain(
+      "const gpuStartPlan = gpuStartEligible ? buildGpuLiveStrokePlan(next) : null"
+    );
   });
 
   it("presents local ink and schedules CRDT encoding behind a paint opportunity", () => {

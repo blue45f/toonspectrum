@@ -24,6 +24,17 @@ export interface StudioStagePointerFrameMapperCache {
   dispose(): void;
 }
 
+export interface StudioStagePointerFrameMapperCacheRef {
+  current: StudioStagePointerFrameMapperCache | null;
+}
+
+export interface StudioStagePointerFrameMapperCacheLease {
+  /** The exact cache owned by this effect setup. Retained late calls fail after release. */
+  readonly cache: StudioStagePointerFrameMapperCache;
+  /** Clears only this lease from the shared ref and permanently disposes its cache. */
+  release(): void;
+}
+
 type StudioStageCoordinateSource = Pick<Konva.Stage, "getAbsoluteTransform" | "getContent">;
 
 function positiveFiniteScale(renderedSize: number, layoutSize: number): number {
@@ -107,4 +118,29 @@ export function createStudioStagePointerFrameMapperCache(
       disposed = true;
     },
   };
+}
+
+/**
+ * Acquires one cache for a React effect setup. StrictMode and Fast Refresh may immediately run the
+ * matching cleanup and setup again, so cleanup must release the exact captured instance instead of
+ * leaving a disposed cache in the ref. A late holder of the released instance still observes the
+ * cache's fail-closed `disposed` contract.
+ */
+export function acquireStudioStagePointerFrameMapperCache(
+  target: StudioStagePointerFrameMapperCacheRef,
+  scheduler: StudioStagePointerFrameScheduler
+): StudioStagePointerFrameMapperCacheLease {
+  const cache = createStudioStagePointerFrameMapperCache(scheduler);
+  target.current = cache;
+  let released = false;
+
+  return Object.freeze({
+    cache,
+    release() {
+      if (released) return;
+      released = true;
+      if (target.current === cache) target.current = null;
+      cache.dispose();
+    },
+  });
 }

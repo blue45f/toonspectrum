@@ -4,10 +4,17 @@ import {
   canonicalizeStudioAssetContentHash,
   createAssetRecord,
   ensureStudioAssetContentHash,
+  findStudioAssetCandidatesByContentIdentities,
+  findStudioAssetCandidatesByContentIdentity,
   hashStudioAssetDataUrl,
   listAssets,
   normalizeAssetName,
+  STUDIO_ASSET_CONTENT_IDENTITY_MAX_CANDIDATES_PER_HASH,
+  STUDIO_ASSET_CONTENT_IDENTITY_MAX_RETURN_DATA_URL_BYTES,
+  STUDIO_ASSET_CONTENT_IDENTITY_MAX_RETURN_DATA_URL_CHARS,
   saveAsset,
+  STUDIO_ASSET_DATA_URL_MAX_CHARS,
+  STUDIO_ASSET_LIBRARY_DB_VERSION,
   type StudioAsset,
 } from "./studio-asset-library";
 
@@ -15,8 +22,22 @@ interface FakeAssetDbState {
   records: Map<string, unknown>;
   requestedVersions: number[];
   transactionModes: IDBTransactionMode[];
+  getAllCount: number;
+  getAllKeysCount: number;
+  getCount: number;
+  indexGetCount: number;
+  indexCreateCount: number;
   writeCount: number;
   failWrites: boolean;
+  failIndexCreation: boolean;
+  failIndexReads: boolean;
+  onIndexRead: (() => void) | null;
+  blocked: boolean;
+  currentVersion: number;
+  hasStore: boolean;
+  hasContentHashIndex: boolean;
+  closeCount: number;
+  triggerVersionChange: () => void;
 }
 
 class FakeRequest<T> {
@@ -44,6 +65,7 @@ class FakeAssetTransaction {
   private pending = 0;
   private completed = false;
   private completionGeneration = 0;
+  private aborted = false;
 
   constructor(
     private readonly state: FakeAssetDbState,
@@ -52,6 +74,15 @@ class FakeAssetTransaction {
 
   objectStore(): IDBObjectStore {
     return new FakeAssetStore(this.state, this) as unknown as IDBObjectStore;
+  }
+
+  abort(): void {
+    this.aborted = true;
+    this.abortWithError(new DOMException("upgrade aborted", "AbortError"));
+  }
+
+  get wasAborted(): boolean {
+    return this.aborted;
   }
 
   schedule<T>(operation: () => T, write = false): IDBRequest<T> {
@@ -100,12 +131,45 @@ class FakeAssetStore {
     private readonly transaction: FakeAssetTransaction
   ) {}
 
+  readonly indexNames = {
+    contains: (name: string) => name === "contentHash" && this.state.hasContentHashIndex,
+  } as unknown as DOMStringList;
+
+  createIndex(name: string): IDBIndex {
+    if (name !== "contentHash" || this.state.failIndexCreation) {
+      throw new DOMException("index creation failed", "ConstraintError");
+    }
+    this.state.hasContentHashIndex = true;
+    this.state.indexCreateCount += 1;
+    return new FakeAssetIndex(this.state, this.transaction) as unknown as IDBIndex;
+  }
+
+  index(name: string): IDBIndex {
+    if (name !== "contentHash" || !this.state.hasContentHashIndex) {
+      throw new DOMException("index missing", "NotFoundError");
+    }
+    return new FakeAssetIndex(this.state, this.transaction) as unknown as IDBIndex;
+  }
+
   getAll(): IDBRequest<unknown[]> {
-    return this.transaction.schedule(() => Array.from(this.state.records.values()));
+    return this.transaction.schedule(() => {
+      this.state.getAllCount += 1;
+      return Array.from(this.state.records.values());
+    });
   }
 
   get(id: string): IDBRequest<unknown> {
-    return this.transaction.schedule(() => this.state.records.get(id));
+    return this.transaction.schedule(() => {
+      this.state.getCount += 1;
+      return this.state.records.get(id);
+    });
+  }
+
+  getAllKeys(_query?: IDBValidKey | IDBKeyRange | null, count?: number): IDBRequest<IDBValidKey[]> {
+    return this.transaction.schedule<IDBValidKey[]>(() => {
+      this.state.getAllKeysCount += 1;
+      return Array.from(this.state.records.keys()).slice(0, count) as IDBValidKey[];
+    });
   }
 
   put(value: StudioAsset): IDBRequest<IDBValidKey> {
@@ -125,14 +189,49 @@ class FakeAssetStore {
   }
 }
 
+class FakeAssetIndex {
+  constructor(
+    private readonly state: FakeAssetDbState,
+    private readonly transaction: FakeAssetTransaction
+  ) {}
+
+  get(contentHash: string): IDBRequest<unknown> {
+    return this.transaction.schedule(() => {
+      this.state.indexGetCount += 1;
+      return Array.from(this.state.records.values()).find((candidate) => (
+        candidate
+        && typeof candidate === "object"
+        && (candidate as { contentHash?: unknown }).contentHash === contentHash
+      ));
+    });
+  }
+
+  getAll(contentHash: string, count?: number): IDBRequest<unknown[]> {
+    return this.transaction.schedule(() => {
+      this.state.indexGetCount += 1;
+      this.state.onIndexRead?.();
+      if (this.state.failIndexReads) {
+        throw new DOMException("index read failed", "UnknownError");
+      }
+      return Array.from(this.state.records.values()).filter((candidate) => (
+        candidate
+        && typeof candidate === "object"
+        && (candidate as { contentHash?: unknown }).contentHash === contentHash
+      )).slice(0, count);
+    });
+  }
+}
+
 class FakeAssetDatabase {
   readonly objectStoreNames = {
-    contains: (name: string) => name === "assets",
+    contains: (name: string) => name === "assets" && this.state.hasStore,
   } as unknown as DOMStringList;
+  onversionchange: ((this: IDBDatabase, event: IDBVersionChangeEvent) => unknown) | null = null;
 
   constructor(private readonly state: FakeAssetDbState) {}
 
   createObjectStore(): IDBObjectStore {
+    this.state.hasStore = true;
     return new FakeAssetStore(
       this.state,
       new FakeAssetTransaction(this.state, "versionchange")
@@ -145,31 +244,83 @@ class FakeAssetDatabase {
   }
 
   close() {
-    // This in-memory database intentionally persists between open calls.
+    this.state.closeCount += 1;
   }
 }
 
 function installFakeIndexedDb(
   seed: readonly StudioAsset[] = [],
-  options: { failWrites?: boolean } = {}
+  options: {
+    failWrites?: boolean;
+    failIndexCreation?: boolean;
+    failIndexReads?: boolean;
+    onIndexRead?: () => void;
+    blocked?: boolean;
+    currentVersion?: number;
+    hasStore?: boolean;
+    hasContentHashIndex?: boolean;
+  } = {}
 ): FakeAssetDbState {
   const state: FakeAssetDbState = {
     records: new Map(seed.map((asset) => [asset.id, { ...asset }])),
     requestedVersions: [],
     transactionModes: [],
+    getAllCount: 0,
+    getAllKeysCount: 0,
+    getCount: 0,
+    indexGetCount: 0,
+    indexCreateCount: 0,
     writeCount: 0,
     failWrites: options.failWrites ?? false,
+    failIndexCreation: options.failIndexCreation ?? false,
+    failIndexReads: options.failIndexReads ?? false,
+    onIndexRead: options.onIndexRead ?? null,
+    blocked: options.blocked ?? false,
+    currentVersion: options.currentVersion ?? STUDIO_ASSET_LIBRARY_DB_VERSION,
+    hasStore: options.hasStore ?? true,
+    hasContentHashIndex: options.hasContentHashIndex ?? true,
+    closeCount: 0,
+    triggerVersionChange: () => undefined,
   };
   const database = new FakeAssetDatabase(state);
+  state.triggerVersionChange = () => database.onversionchange?.call(
+    database as unknown as IDBDatabase,
+    new Event("versionchange") as IDBVersionChangeEvent
+  );
   const factory = {
     open: (_name: string, version: number) => {
       state.requestedVersions.push(version);
       const request = new FakeRequest<IDBDatabase>() as FakeRequest<IDBDatabase> & {
         onupgradeneeded: ((this: IDBOpenDBRequest, event: IDBVersionChangeEvent) => unknown) | null;
+        onblocked: ((this: IDBOpenDBRequest, event: IDBVersionChangeEvent) => unknown) | null;
+        transaction: IDBTransaction | null;
       };
       request.onupgradeneeded = null;
+      request.onblocked = null;
+      request.transaction = null;
       queueMicrotask(() => {
         request.result = database as unknown as IDBDatabase;
+        if (state.blocked) {
+          request.onblocked?.call(
+            request as unknown as IDBOpenDBRequest,
+            new Event("blocked") as IDBVersionChangeEvent
+          );
+          return;
+        }
+        if (version > state.currentVersion) {
+          const upgrade = new FakeAssetTransaction(state, "versionchange");
+          request.transaction = upgrade as unknown as IDBTransaction;
+          request.onupgradeneeded?.call(
+            request as unknown as IDBOpenDBRequest,
+            new Event("upgradeneeded") as IDBVersionChangeEvent
+          );
+          if (upgrade.wasAborted) {
+            request.fail("upgrade aborted");
+            return;
+          }
+          state.currentVersion = version;
+          request.transaction = null;
+        }
         request.succeed(database as unknown as IDBDatabase);
       });
       return request as unknown as IDBOpenDBRequest;
@@ -308,6 +459,17 @@ describe("studio asset durable content identity", () => {
     await expect(hashStudioAssetDataUrl("data:text/plain,bad%2")).rejects.toThrow("퍼센트");
   });
 
+  it("rejects oversized raw, percent, and base64 data URLs before decoding", async () => {
+    const oversizedPayload = "A".repeat(STUDIO_ASSET_DATA_URL_MAX_CHARS);
+
+    await expect(hashStudioAssetDataUrl(`data:text/plain,${oversizedPayload}`))
+      .rejects.toThrow("크기가 제한");
+    await expect(hashStudioAssetDataUrl(`data:text/plain,%41${oversizedPayload}`))
+      .rejects.toThrow("크기가 제한");
+    await expect(hashStudioAssetDataUrl(`data:application/octet-stream;base64,${oversizedPayload}`))
+      .rejects.toThrow("크기가 제한");
+  });
+
   it("reuses and canonicalizes an existing hash without mutating the source record", async () => {
     const source = createAssetRecord(
       {
@@ -327,7 +489,93 @@ describe("studio asset durable content identity", () => {
     expect(ensured).toBe(source);
   });
 
-  it("requires a computed content hash for every new save while keeping DB v1", async () => {
+  it("migrates DB v1 to v2 in place, preserves rows, and queries the new hash index", async () => {
+    const portable = createAssetRecord({
+      name: "portable.png",
+      dataUrl: "data:text/plain,hello",
+      width: 20,
+      height: 20,
+      contentHash: helloHash,
+    }, "portable-v1", 7);
+    const state = installFakeIndexedDb([portable], {
+      currentVersion: 1,
+      hasContentHashIndex: false,
+    });
+
+    await expect(findStudioAssetCandidatesByContentIdentity({
+      contentHash: helloHash,
+    })).resolves.toEqual([portable]);
+
+    expect(state.requestedVersions).toEqual([STUDIO_ASSET_LIBRARY_DB_VERSION]);
+    expect(state.currentVersion).toBe(STUDIO_ASSET_LIBRARY_DB_VERSION);
+    expect(state.hasContentHashIndex).toBe(true);
+    expect(state.indexCreateCount).toBe(1);
+    expect(state.records.get(portable.id)).toEqual(portable);
+    expect(state.writeCount).toBe(0);
+    expect(state.indexGetCount).toBe(1);
+    expect(state.getAllCount).toBe(0);
+  });
+
+  it("fails closed and preserves DB v1 data when hash-index migration fails", async () => {
+    const portable = createAssetRecord({
+      name: "portable.png",
+      dataUrl: "data:text/plain,hello",
+      width: 20,
+      height: 20,
+      contentHash: helloHash,
+    }, "portable-v1", 7);
+    const state = installFakeIndexedDb([portable], {
+      currentVersion: 1,
+      hasContentHashIndex: false,
+      failIndexCreation: true,
+    });
+
+    await expect(findStudioAssetCandidatesByContentIdentity({
+      contentHash: helloHash,
+    })).rejects.toThrow("index creation failed");
+
+    expect(state.currentVersion).toBe(1);
+    expect(state.hasContentHashIndex).toBe(false);
+    expect(state.records.get(portable.id)).toEqual(portable);
+    expect(state.transactionModes).toEqual([]);
+    expect(state.getAllCount).toBe(0);
+    expect(state.indexGetCount).toBe(0);
+  });
+
+  it("fails closed without reading rows when a DB upgrade is blocked by another tab", async () => {
+    const state = installFakeIndexedDb([], {
+      blocked: true,
+      currentVersion: 1,
+      hasContentHashIndex: false,
+    });
+
+    await expect(findStudioAssetCandidatesByContentIdentity({
+      contentHash: helloHash,
+    })).rejects.toThrow("차단");
+
+    expect(state.currentVersion).toBe(1);
+    expect(state.transactionModes).toEqual([]);
+    expect(state.getAllCount).toBe(0);
+    expect(state.getCount).toBe(0);
+    expect(state.indexGetCount).toBe(0);
+  });
+
+  it("closes an opened connection when another tab requests a version change", async () => {
+    const state = installFakeIndexedDb();
+    await saveAsset({
+      name: "hello.png",
+      dataUrl: "data:text/plain,hello",
+      width: 1,
+      height: 1,
+    });
+    expect(state.closeCount).toBe(1);
+
+    state.triggerVersionChange();
+
+    expect(state.closeCount).toBe(2);
+  });
+
+  it("requires a computed content hash for every new save in DB v2", async () => {
     const state = installFakeIndexedDb();
     const saved = await saveAsset({
       name: "hello.png",
@@ -338,7 +586,7 @@ describe("studio asset durable content identity", () => {
 
     expect(saved.contentHash).toBe(helloHash);
     expect(state.records.get(saved.id)).toMatchObject({ contentHash: helloHash });
-    expect(state.requestedVersions).toEqual([1]);
+    expect(state.requestedVersions).toEqual([STUDIO_ASSET_LIBRARY_DB_VERSION]);
     expect(state.transactionModes).toEqual(["readwrite"]);
   });
 
@@ -410,5 +658,359 @@ describe("studio asset durable content identity", () => {
 
     await expect(listAssets()).resolves.toMatchObject([{ id: "legacy", contentHash: helloHash }]);
     expect(state.records.get("legacy")).not.toHaveProperty("contentHash");
+  });
+
+  it("resolves one bounded hash row and one exact id row without cloning the library", async () => {
+    const hashMatch = createAssetRecord(
+      {
+        name: "hash.png",
+        dataUrl: "data:image/png;base64,aGFzaA==",
+        width: 10,
+        height: 10,
+        contentHash: helloHash,
+      },
+      "hash-match",
+      2
+    );
+    const idFallback = createAssetRecord(
+      {
+        name: "legacy.png",
+        dataUrl: "data:image/png;base64,bGVnYWN5",
+        width: 10,
+        height: 10,
+      },
+      "legacy-id",
+      1
+    );
+    const unrelated = Array.from({ length: 100 }, (_, index) => createAssetRecord(
+      {
+        name: `unrelated-${index}.png`,
+        dataUrl: `data:image/png;base64,dW5yZWxhdGVkL${index}`,
+        width: 10,
+        height: 10,
+        contentHash: `sha256:${String(index).padStart(64, "0")}`,
+      },
+      `unrelated-${index}`,
+      index + 10
+    ));
+    const state = installFakeIndexedDb([hashMatch, idFallback, ...unrelated]);
+
+    const candidates = await findStudioAssetCandidatesByContentIdentity({
+      contentHash: helloHash,
+      assetId: idFallback.id,
+    });
+
+    expect(candidates.map(({ id }) => id)).toEqual([hashMatch.id, idFallback.id]);
+    expect(state.getAllCount).toBe(0);
+    expect(state.getAllKeysCount).toBe(0);
+    expect(state.getCount).toBe(1);
+    expect(state.indexGetCount).toBe(1);
+    expect(state.transactionModes).toEqual(["readonly", "readonly"]);
+  });
+
+  it("returns later exact-key duplicates after a stale first row so byte verification can recover", async () => {
+    const stale = createAssetRecord({
+      name: "stale.png",
+      dataUrl: "data:text/plain,stale",
+      width: 1,
+      height: 1,
+      contentHash: helloHash,
+    }, "a-stale", 1);
+    const valid = createAssetRecord({
+      name: "valid.png",
+      dataUrl: "data:text/plain,hello",
+      width: 1,
+      height: 1,
+      contentHash: helloHash,
+    }, "b-valid", 2);
+    const state = installFakeIndexedDb([stale, valid]);
+
+    const candidates = await findStudioAssetCandidatesByContentIdentity({
+      contentHash: helloHash,
+    });
+    const verifiedIds: string[] = [];
+    for (const candidate of candidates) {
+      if (await hashStudioAssetDataUrl(candidate.dataUrl) === helloHash) {
+        verifiedIds.push(candidate.id);
+      }
+    }
+
+    expect(candidates.map(({ id }) => id)).toEqual([stale.id, valid.id]);
+    expect(verifiedIds).toEqual([valid.id]);
+    expect(state.getAllCount).toBe(0);
+    expect(state.getAllKeysCount).toBe(0);
+    expect(state.indexGetCount).toBe(1);
+  });
+
+  it("keeps DB v1 legacy rows available through the exact id fallback and deduplicates matches", async () => {
+    const legacy = createAssetRecord(
+      {
+        name: "legacy.png",
+        dataUrl: "data:image/png;base64,bGVnYWN5",
+        width: 10,
+        height: 10,
+      },
+      "legacy-id",
+      1
+    );
+    const indexed = { ...legacy, contentHash: helloHash } satisfies StudioAsset;
+
+    const legacyState = installFakeIndexedDb([legacy]);
+    await expect(findStudioAssetCandidatesByContentIdentity({
+      contentHash: helloHash,
+      assetId: legacy.id,
+    })).resolves.toEqual([legacy]);
+    expect(legacyState.getAllCount).toBe(0);
+    expect(legacyState.getAllKeysCount).toBe(0);
+    expect(legacyState.getCount).toBe(1);
+    expect(legacyState.indexGetCount).toBe(1);
+
+    const indexedState = installFakeIndexedDb([indexed]);
+    await expect(findStudioAssetCandidatesByContentIdentity({
+      contentHash: helloHash,
+      assetId: indexed.id,
+    })).resolves.toEqual([indexed]);
+    expect(indexedState.getCount).toBe(1);
+    expect(indexedState.getAllCount).toBe(0);
+    expect(indexedState.getAllKeysCount).toBe(0);
+    expect(indexedState.indexGetCount).toBe(1);
+  });
+
+  it("does not scan legacy unhashed rows without an exact id", async () => {
+    const missingHash = `sha256:${"f".repeat(64)}`;
+    const unrelated = Array.from({ length: 600 }, (_, index) => createAssetRecord(
+      {
+        name: `unrelated-${index}.png`,
+        dataUrl: "data:image/png;base64,dW5yZWxhdGVk",
+        width: 10,
+        height: 10,
+      },
+      `unrelated-${index}`,
+      index
+    ));
+    const state = installFakeIndexedDb(unrelated);
+
+    await expect(findStudioAssetCandidatesByContentIdentity({
+      contentHash: missingHash,
+    })).resolves.toEqual([]);
+
+    expect(state.getAllCount).toBe(0);
+    expect(state.getAllKeysCount).toBe(0);
+    expect(state.getCount).toBe(0);
+    expect(state.indexGetCount).toBe(1);
+  });
+
+  it("recovers indexed hashes after the 513th row without scanning the object store", async () => {
+    const hashB = `sha256:${"b".repeat(64)}` as const;
+    const unrelated = Array.from({ length: 513 }, (_, index) => createAssetRecord(
+      {
+        name: `unrelated-${index}.png`,
+        dataUrl: "data:image/png;base64,dW5yZWxhdGVk",
+        width: 10,
+        height: 10,
+        contentHash: `sha256:${String(index).padStart(64, "0")}`,
+      },
+      `unrelated-${index}`,
+      index
+    ));
+    const targetA = createAssetRecord({
+      name: "target-a.png",
+      dataUrl: "data:image/png;base64,YQ==",
+      width: 1,
+      height: 1,
+      contentHash: helloHash,
+    }, "target-a", 514);
+    const middle = Array.from({ length: 17 }, (_, index) => createAssetRecord(
+      {
+        name: `middle-${index}.png`,
+        dataUrl: "data:image/png;base64,bWlkZGxl",
+        width: 1,
+        height: 1,
+      },
+      `middle-${index}`,
+      515 + index
+    ));
+    const targetB = createAssetRecord({
+      name: "target-b.png",
+      dataUrl: "data:image/png;base64,Yg==",
+      width: 1,
+      height: 1,
+      contentHash: hashB,
+    }, "target-b", 532);
+    const state = installFakeIndexedDb([...unrelated, targetA, ...middle, targetB]);
+
+    const candidates = await findStudioAssetCandidatesByContentIdentities([
+      { contentHash: helloHash },
+      { contentHash: hashB },
+    ]);
+
+    expect(candidates.get(helloHash)?.map(({ id }) => id)).toEqual([targetA.id]);
+    expect(candidates.get(hashB)?.map(({ id }) => id)).toEqual([targetB.id]);
+    expect(state.getAllCount).toBe(0);
+    expect(state.getAllKeysCount).toBe(0);
+    expect(state.getCount).toBe(0);
+    expect(state.indexGetCount).toBe(2);
+    expect(state.transactionModes).toEqual(["readonly"]);
+  });
+
+  it("bounds duplicate exact-key candidates and deduplicates an exact-id row", async () => {
+    const duplicates = Array.from(
+      { length: STUDIO_ASSET_CONTENT_IDENTITY_MAX_CANDIDATES_PER_HASH + 3 },
+      (_, index) => createAssetRecord({
+        name: `duplicate-${index}.png`,
+        dataUrl: `data:image/png;base64,ZHVwbGljYXRlL${index}`,
+        width: 1,
+        height: 1,
+        contentHash: helloHash,
+      }, `duplicate-${index}`, index)
+    );
+    const state = installFakeIndexedDb(duplicates);
+
+    const candidates = await findStudioAssetCandidatesByContentIdentity({
+      contentHash: helloHash,
+      assetId: duplicates[0]?.id,
+    });
+
+    expect(candidates).toHaveLength(STUDIO_ASSET_CONTENT_IDENTITY_MAX_CANDIDATES_PER_HASH);
+    expect(candidates.map(({ id }) => id)).toEqual(
+      duplicates
+        .slice(0, STUDIO_ASSET_CONTENT_IDENTITY_MAX_CANDIDATES_PER_HASH)
+        .map(({ id }) => id)
+    );
+    expect(new Set(candidates.map(({ id }) => id)).size).toBe(candidates.length);
+    expect(state.getAllCount).toBe(0);
+    expect(state.getAllKeysCount).toBe(0);
+    expect(state.indexGetCount).toBe(1);
+  });
+
+  it("caps aggregate returned data URL characters and UTF-8 bytes without a store scan", async () => {
+    const prefix = "data:image/png;base64,";
+    const largeDataUrl = prefix + "A".repeat(STUDIO_ASSET_DATA_URL_MAX_CHARS - prefix.length);
+    const duplicates = Array.from({ length: 3 }, (_, index) => createAssetRecord({
+      name: `large-${index}.png`,
+      dataUrl: largeDataUrl,
+      width: 1,
+      height: 1,
+      contentHash: helloHash,
+    }, `large-${index}`, index));
+    const state = installFakeIndexedDb(duplicates);
+
+    const candidates = await findStudioAssetCandidatesByContentIdentity({
+      contentHash: helloHash,
+    });
+
+    expect(STUDIO_ASSET_CONTENT_IDENTITY_MAX_RETURN_DATA_URL_CHARS).toBe(
+      STUDIO_ASSET_DATA_URL_MAX_CHARS * 2
+    );
+    expect(STUDIO_ASSET_CONTENT_IDENTITY_MAX_RETURN_DATA_URL_BYTES).toBe(
+      STUDIO_ASSET_CONTENT_IDENTITY_MAX_RETURN_DATA_URL_CHARS
+    );
+    expect(candidates.map(({ id }) => id)).toEqual(["large-0", "large-1"]);
+    expect(candidates.reduce((total, candidate) => total + candidate.dataUrl.length, 0)).toBe(
+      STUDIO_ASSET_CONTENT_IDENTITY_MAX_RETURN_DATA_URL_CHARS
+    );
+    expect(state.getAllCount).toBe(0);
+    expect(state.getAllKeysCount).toBe(0);
+    expect(state.indexGetCount).toBe(1);
+  });
+
+  it("keeps every distinct exact-id fallback for one hash so callers can verify legacy bytes", async () => {
+    const stale = createAssetRecord({
+      name: "stale.png",
+      dataUrl: "data:image/png;base64,c3RhbGU=",
+      width: 1,
+      height: 1,
+    }, "stale-id", 1);
+    const valid = createAssetRecord({
+      name: "valid.png",
+      dataUrl: "data:image/png;base64,dmFsaWQ=",
+      width: 1,
+      height: 1,
+    }, "valid-id", 2);
+    const state = installFakeIndexedDb([stale, valid]);
+
+    const candidates = await findStudioAssetCandidatesByContentIdentities([
+      { contentHash: helloHash, assetId: stale.id },
+      { contentHash: helloHash, assetId: valid.id },
+    ]);
+
+    expect(candidates.get(helloHash)?.map(({ id }) => id)).toEqual([stale.id, valid.id]);
+    expect(state.getCount).toBe(2);
+    expect(state.getAllKeysCount).toBe(0);
+    expect(state.indexGetCount).toBe(1);
+  });
+
+  it("fails closed before opening IndexedDB for a malformed content identity", async () => {
+    const state = installFakeIndexedDb();
+
+    await expect(findStudioAssetCandidatesByContentIdentity({
+      contentHash: "sha256:not-a-hash",
+      assetId: "legacy-id",
+    })).resolves.toEqual([]);
+
+    expect(state.requestedVersions).toEqual([]);
+    expect(state.getAllCount).toBe(0);
+    expect(state.getAllKeysCount).toBe(0);
+    expect(state.getCount).toBe(0);
+  });
+
+  it("does not start a targeted lookup after its caller aborts", async () => {
+    const state = installFakeIndexedDb();
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(findStudioAssetCandidatesByContentIdentity({
+      contentHash: helloHash,
+      assetId: "legacy-id",
+      signal: controller.signal,
+    })).resolves.toEqual([]);
+
+    expect(state.requestedVersions).toEqual([]);
+    expect(state.getAllCount).toBe(0);
+    expect(state.getAllKeysCount).toBe(0);
+    expect(state.getCount).toBe(0);
+  });
+
+  it("drops every candidate when the caller aborts during the exact-key index read", async () => {
+    const controller = new AbortController();
+    const indexed = createAssetRecord({
+      name: "indexed.png",
+      dataUrl: "data:text/plain,hello",
+      width: 1,
+      height: 1,
+      contentHash: helloHash,
+    }, "indexed", 1);
+    const state = installFakeIndexedDb([indexed], {
+      onIndexRead: () => controller.abort(),
+    });
+
+    await expect(findStudioAssetCandidatesByContentIdentity({
+      contentHash: helloHash,
+      signal: controller.signal,
+    })).resolves.toEqual([]);
+
+    expect(state.getAllCount).toBe(0);
+    expect(state.getAllKeysCount).toBe(0);
+    expect(state.indexGetCount).toBe(1);
+  });
+
+  it("fails closed to the exact-id fallback when the content-hash index read fails", async () => {
+    const legacy = createAssetRecord({
+      name: "legacy.png",
+      dataUrl: "data:text/plain,hello",
+      width: 1,
+      height: 1,
+    }, "legacy", 1);
+    const state = installFakeIndexedDb([legacy], { failIndexReads: true });
+
+    await expect(findStudioAssetCandidatesByContentIdentity({
+      contentHash: helloHash,
+      assetId: legacy.id,
+    })).resolves.toEqual([legacy]);
+
+    expect(state.getAllCount).toBe(0);
+    expect(state.getAllKeysCount).toBe(0);
+    expect(state.getCount).toBe(1);
+    expect(state.indexGetCount).toBe(1);
   });
 });

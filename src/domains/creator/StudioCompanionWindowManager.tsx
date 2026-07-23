@@ -1,11 +1,14 @@
-import { ExternalLink, ListChecks, Map, MonitorCog } from "lucide-react";
+import { ExternalLink, Images, ListChecks, Map, MonitorCog } from "lucide-react";
 import { useState } from "react";
 
 import type { StudioCompanionSurface } from "./studio-tools-companion";
 
 import { cn } from "@/lib/utils";
 
-type DedicatedCompanionSurface = Extract<StudioCompanionSurface, "navigator" | "review">;
+export type DedicatedCompanionSurface = Extract<
+  StudioCompanionSurface,
+  "navigator" | "review" | "reference"
+>;
 
 export interface StudioCompanionWindowManagerProps {
   disabled: boolean;
@@ -30,7 +33,19 @@ const SURFACES: ReadonlyArray<{
     description: "레이어, 작업 기록과 댓글을 별도 화면에서 확인합니다.",
     icon: ListChecks,
   },
+  {
+    surface: "reference",
+    label: "레퍼런스 전용 창",
+    description: "참고 이미지와 색상 피커를 캔버스와 분리해 크게 확인합니다.",
+    icon: Images,
+  },
 ];
+
+const SURFACE_NOTICE_LABELS: Readonly<Record<DedicatedCompanionSurface, string>> = {
+  navigator: "Navigator",
+  review: "검수",
+  reference: "레퍼런스",
+};
 
 export function StudioCompanionWindowManager({
   disabled,
@@ -53,12 +68,16 @@ export function StudioCompanionWindowManager({
             멀티 디스플레이
           </h2>
           <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-            브라우저 팝업 정책에 맞춰 필요한 창을 하나씩 열어 주세요.
+            작업공간과 세 전용 창을 독립 배치해 최대 4화면으로 확장할 수 있습니다.
+            브라우저 정책에 맞춰 필요한 창을 하나씩 열어 주세요.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-1.5">
+      <div
+        data-companion-window-list
+        className="grid grid-cols-1 gap-1.5 min-[480px]:grid-cols-2"
+      >
         {SURFACES.map(({ description, icon: Icon, label, surface }) => (
           <button
             key={surface}
@@ -98,7 +117,7 @@ export function StudioCompanionWindowManager({
         >
           {notice.blocked
             ? "팝업이 차단됐습니다. 주소창의 팝업 권한을 허용한 뒤 다시 눌러 주세요."
-            : `${notice.surface === "navigator" ? "Navigator" : "검수"} 창을 열거나 앞으로 가져오도록 요청했습니다.`}
+            : `${SURFACE_NOTICE_LABELS[notice.surface]} 창을 열거나 앞으로 가져오도록 요청했습니다.`}
         </p>
       ) : null}
     </section>
