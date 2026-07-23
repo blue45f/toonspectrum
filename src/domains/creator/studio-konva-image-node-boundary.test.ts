@@ -215,6 +215,8 @@ describe("Studio Konva image node boundary", () => {
     expect(imageNode.dynamicImports).toEqual([
       "./studio-konva-filters",
       "./studio-image-filter-worker-client",
+      // M1 GPU 필터 경로 — Worker 디스패치 앞에서 시도하는 지연 청크(폴백은 기존 Worker).
+      "./studio-gpu-filter-apply",
     ]);
     expect(
       page.dynamicImports.filter((specifier) =>

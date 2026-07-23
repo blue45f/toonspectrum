@@ -140,6 +140,7 @@ export function studioImageFilterSupersampleDensity(input: {
 }
 type StudioKonvaFiltersModule = typeof import("./studio-konva-filters");
 type StudioImageFilterWorkerClientModule = typeof import("./studio-image-filter-worker-client");
+type StudioGpuFilterApplyModule = typeof import("./studio-gpu-filter-apply");
 type StudioImageFilterWorkerSession = ReturnType<
   StudioImageFilterWorkerClientModule["createStudioImageFilterWorkerSession"]
 >;
@@ -278,6 +279,7 @@ export function StudioKonvaImageNode({
   const [displayImage, setDisplayImage] = useState<DisplayImageState>();
   const [filterModule, setFilterModule] = useState<StudioKonvaFiltersModule | null>(null);
   const [filterWorkerClient, setFilterWorkerClient] = useState<StudioImageFilterWorkerClientModule | null>(null);
+  const [gpuFilterModule, setGpuFilterModule] = useState<StudioGpuFilterApplyModule | null>(null);
   const [workerFilteredCanvas, setWorkerFilteredCanvas] = useState<WorkerFilteredCanvasState>();
   const [workerFallbackKey, setWorkerFallbackKey] = useState<string>();
   const imageRef = useRef<Konva.Image | null>(null);
@@ -407,6 +409,23 @@ export function StudioKonvaImageNode({
       active = false;
     };
   }, [filterWorkerClient, hasFilters]);
+
+  // M1 GPU(WGSL) 필터 경로 — 지원 5필드 전용, 실패/미지원 시 null이라 기존 Worker 경로로 폴백.
+  // konva 미의존 별도 청크라 첫 청크 예산 무영향(worker client 로드와 동일한 이유).
+  useEffect(() => {
+    if (!hasFilters || gpuFilterModule) return;
+    let active = true;
+    import("./studio-gpu-filter-apply")
+      .then((mod) => {
+        if (active) setGpuFilterModule(mod);
+      })
+      .catch((error) => {
+        console.error("Failed to load studio GPU filter module:", error);
+      });
+    return () => {
+      active = false;
+    };
+  }, [gpuFilterModule, hasFilters]);
 
   useEffect(() => () => {
     filterWorkerSessionRef.current?.dispose();
@@ -542,57 +561,82 @@ export function StudioKonvaImageNode({
         }
       }
 
-      controller = new AbortController();
-      if (!filterWorkerSessionRef.current) {
-        const createSession = filterWorkerClient.createStudioImageFilterWorkerSession;
-        if (typeof createSession === "function") {
-          filterWorkerSessionRef.current = createSession();
-        }
-      }
-      const request = {
-        imageData: {
-          data: new Uint8ClampedArray(sourcePixels.data),
-          width,
-          height,
-        },
-        el: elRef.current,
-      };
-      const pending = filterWorkerSessionRef.current
-        ? filterWorkerSessionRef.current.run(request, { signal: controller.signal })
-        : filterWorkerClient.runStudioImageFilterWorker(request, { signal: controller.signal });
-      pending
-        .then((result) => {
-          if (cancelled) return;
-          if (result.imageData.width !== width || result.imageData.height !== height) return;
-          try {
-            const outCanvas = document.createElement("canvas");
-            outCanvas.width = result.imageData.width;
-            outCanvas.height = result.imageData.height;
-            const outCtx = outCanvas.getContext("2d");
-            if (!outCtx) return;
-            outCtx.putImageData(
-              new ImageData(
-                new Uint8ClampedArray(result.imageData.data),
-                result.imageData.width,
-                result.imageData.height,
-              ),
-              0,
-              0,
-            );
-            resultCache.canvases.set(filterKey, outCanvas);
-            trimWorkerResultCache(resultCache, workerResultCacheLimit, filterKey);
-            setWorkerFallbackKey((current) => current === requestKey ? undefined : current);
-            setWorkerFilteredCanvas({ canvas: outCanvas, filterKey, height, source, src, width });
-          } catch (error) {
-            console.error("[studio] image filter canvas commit failed, using Konva fallback:", error);
-            setWorkerFallbackKey(requestKey);
-          }
-        })
-        .catch((error) => {
-          if ((error as { name?: string })?.name === "AbortError") return;
-          console.error("[studio] image filter worker failed, using Konva fallback:", error);
+      // 결과 커밋 경로 — Worker/GPU 어느 쪽 결과든 같은 캐시·상태 갱신을 탄다(verbatim 추출).
+      const commitFilteredPixels = (filtered: { data: Uint8ClampedArray; width: number; height: number }) => {
+        if (cancelled) return;
+        if (filtered.width !== width || filtered.height !== height) return;
+        try {
+          const outCanvas = document.createElement("canvas");
+          outCanvas.width = filtered.width;
+          outCanvas.height = filtered.height;
+          const outCtx = outCanvas.getContext("2d");
+          if (!outCtx) return;
+          outCtx.putImageData(
+            new ImageData(
+              new Uint8ClampedArray(filtered.data),
+              filtered.width,
+              filtered.height,
+            ),
+            0,
+            0,
+          );
+          resultCache.canvases.set(filterKey, outCanvas);
+          trimWorkerResultCache(resultCache, workerResultCacheLimit, filterKey);
+          setWorkerFallbackKey((current) => current === requestKey ? undefined : current);
+          setWorkerFilteredCanvas({ canvas: outCanvas, filterKey, height, source, src, width });
+        } catch (error) {
+          console.error("[studio] image filter canvas commit failed, using Konva fallback:", error);
           setWorkerFallbackKey(requestKey);
-        });
+        }
+      };
+      const dispatchWorkerRequest = (): void => {
+        controller = new AbortController();
+        if (!filterWorkerSessionRef.current) {
+          const createSession = filterWorkerClient.createStudioImageFilterWorkerSession;
+          if (typeof createSession === "function") {
+            filterWorkerSessionRef.current = createSession();
+          }
+        }
+        const request = {
+          imageData: {
+            data: new Uint8ClampedArray(sourcePixels.data),
+            width,
+            height,
+          },
+          el: elRef.current,
+        };
+        const pending = filterWorkerSessionRef.current
+          ? filterWorkerSessionRef.current.run(request, { signal: controller.signal })
+          : filterWorkerClient.runStudioImageFilterWorker(request, { signal: controller.signal });
+        pending
+          .then((result) => {
+            commitFilteredPixels(result.imageData);
+          })
+          .catch((error) => {
+            if ((error as { name?: string })?.name === "AbortError") return;
+            console.error("[studio] image filter worker failed, using Konva fallback:", error);
+            setWorkerFallbackKey(requestKey);
+          });
+      };
+      // M1 GPU 경로 — 지원 5필드 체인만 GPU에서 시도, null(미지원/디바이스 손실/검증 오류)이면
+      // 기존 Worker 경로로 그대로 폴백한다. 결과는 동일한 commit/캐시 경로를 공유한다.
+      if (gpuFilterModule?.isStudioGpuFilterChainEligible(elRef.current)) {
+        const gpuInput = { data: new Uint8ClampedArray(sourcePixels.data), width, height };
+        void gpuFilterModule.applyGpuFilterChain(gpuInput, elRef.current)
+          .then((gpuResult) => {
+            if (cancelled) return;
+            if (!gpuResult) {
+              dispatchWorkerRequest();
+              return;
+            }
+            commitFilteredPixels(gpuResult);
+          })
+          .catch(() => {
+            if (!cancelled) dispatchWorkerRequest();
+          });
+        return;
+      }
+      dispatchWorkerRequest();
     }, IMAGE_FILTER_WORKER_DEBOUNCE_MS);
 
     return () => {
@@ -605,6 +649,7 @@ export function StudioKonvaImageNode({
     displayImg,
     filterCacheKey,
     filterWorkerClient,
+    gpuFilterModule,
     el.src,
     workerWidth,
     workerHeight,
