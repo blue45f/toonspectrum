@@ -2,6 +2,7 @@
  * Studio Grain / Texture Engine
  * 포토샵 "필름 그레인(Grain)/텍스처(Texture)" 오버레이 —
  *   film:       픽셀별 결정적 노이즈를 휘도에 가산해 거친 필름 입자를 입힌다.
+ *               chroma>0이면 채널별 독립 시드 노이즈를 비율 혼합해 컬러 입자를 낸다.
  *   paper:      큰 블록의 저주파 얼룩(약한 대비)을 곱해 종이결을 흉내 낸다.
  *   scanline:   가로 주사선을 번갈아 어둡게 눌러 CRT/모니터 라인을 낸다.
  *   halftoneDot: 격자 점 패턴을 약하게 곱해 인쇄 도트 질감을 더한다.
@@ -24,6 +25,12 @@ export type Grain = {
   amount: number; // 0..100 세기(0이면 항등)
   size: number; // 1..8 거칠기/주기(클수록 굵은 입자·넓은 주기)
   seed: number; // 0..9999 결정적 노이즈 시드(같은 시드=같은 노이즈)
+  /**
+   * 0..100 크로마(색) 노이즈 비율 — film 전용. 0/누락이면 기존 휘도 단일 노이즈와
+   * 바이트 동일(항등 보존). >0이면 채널별 독립 시드(seed + ch·37)의 종형 노이즈를
+   * 휘도 노이즈와 비율 혼합해 컬러 필름 입자를 낸다(여전히 결정적).
+   */
+  chroma?: number;
 };
 
 /** 항등(효과 없음) — amount 0이라 픽셀을 건드리지 않는다. */
@@ -33,6 +40,8 @@ export const DEFAULT_GRAIN: Grain = { type: "film", amount: 0, size: 1, seed: 1 
 export const GRAIN_AMOUNT_RANGE = { min: 0, max: 100, step: 1 } as const;
 /** 거칠기/주기 슬라이더 한 칸 범위 — 1..8, 1 단위. */
 export const GRAIN_SIZE_RANGE = { min: 1, max: 8, step: 1 } as const;
+/** 크로마(색 노이즈) 슬라이더 한 칸 범위 — 0..100, 1 단위(film 전용, 0=기존 휘도 노이즈). */
+export const GRAIN_CHROMA_RANGE = { min: 0, max: 100, step: 1 } as const;
 
 // seed 허용 범위(슬라이더 노출은 안 하지만 normalize·검증에 사용).
 const GRAIN_SEED_MIN = 0;
@@ -68,14 +77,18 @@ function normalizeType(raw: unknown): GrainType {
  * 과거 저장본/외부 입력 안전장치 — 누락 키는 기본값, 숫자 아님은 기본값,
  * 범위 밖은 각 범위로 클램프. type은 유효 GrainType(아니면 기본 "film"),
  * seed는 0..9999 정수로 내림(소수 시드도 안정적으로 양자화).
+ * chroma는 0..100 클램프하되 0(항등)이면 키 자체를 생략한다 — 과거 저장본과
+ * 캐시 키(JSON 직렬화)가 바이트 동일하게 유지된다(의도적 변경 2026-07-24).
  */
 export function normalizeGrain(g?: Partial<Grain> | null): Grain {
   const src = g && typeof g === "object" ? g : {};
+  const chroma = clampTo(src.chroma, GRAIN_CHROMA_RANGE.min, GRAIN_CHROMA_RANGE.max, 0);
   return {
     type: normalizeType(src.type),
     amount: clampTo(src.amount, GRAIN_AMOUNT_RANGE.min, GRAIN_AMOUNT_RANGE.max, DEFAULT_GRAIN.amount),
     size: clampTo(src.size, GRAIN_SIZE_RANGE.min, GRAIN_SIZE_RANGE.max, DEFAULT_GRAIN.size),
     seed: Math.floor(clampTo(src.seed, GRAIN_SEED_MIN, GRAIN_SEED_MAX, DEFAULT_GRAIN.seed)),
+    ...(chroma > 0 ? { chroma } : {}),
   };
 }
 
@@ -148,6 +161,10 @@ export function applyGrain(img: StudioImageDataLike, g: Grain): void {
 const FILM_BELL_SCALE = 0.577;
 // 필름 그레인 톤 반응 바닥 — 섀도/하이라이트에서도 이 비율만큼은 입자가 남는다.
 const FILM_TONE_FLOOR = 0.35;
+// 크로마 채널 시드 간격 — 채널 ch(r=1, g=2, b=3)마다 seed + ch·37의 독립 노이즈 필드.
+// 휘도 필드(seed, +101, +211)와 세 채널 필드(+37/+74/+111 및 각각의 +101/+211)가
+// 어떤 시드 오프셋도 겹치지 않아 네 필드가 서로 독립이다.
+const FILM_CHROMA_SEED_STRIDE = 37;
 
 /**
  * 필름 그레인 — 픽셀(또는 size 블록)별 결정적 노이즈를 휘도에 가산.
@@ -155,11 +172,17 @@ const FILM_TONE_FLOOR = 0.35;
  *   실제 필름처럼 잔입자가 많고 튀는 입자는 드물다(표준편차는 기존 균등과 동일하게 정규화).
  * 톤 반응: 실제 필름 입자는 중간톤에서 가장 굵게 보인다 — 픽셀 휘도의 midWeight
  *   (0.35 + 0.65·(1-|2L/255-1|))를 곱해 순흑/순백에서 입자가 과하게 끼지 않는다.
- * 같은 (블록,seed)는 항상 같은 노이즈(결정적).
+ * 크로마(chroma>0): 채널별 독립 시드(seed + ch·FILM_CHROMA_SEED_STRIDE)의 종형 노이즈를
+ *   휘도 노이즈와 (1-m)·luma + m·ch 비율로 혼합해 컬러 입자를 낸다. chroma 0/누락이면
+ *   기존 휘도 단일 경로를 그대로 타서 바이트 동일(항등 보존, 의도적 변경 2026-07-24).
+ * 같은 (블록,seed,chroma)는 항상 같은 노이즈(결정적, Math.random 없음).
  */
 function applyFilm(data: Uint8ClampedArray, width: number, height: number, g: Grain): void {
   const span = g.amount * 2.55; // 0..255 진폭(amount 비례)
   const block = g.size; // 노이즈 블록 크기(size가 클수록 굵은 입자)
+  // 크로마 혼합 비율 0..1 — normalize를 안 거친 직접 호출도 안전하게 클램프.
+  const rawChroma = typeof g.chroma === "number" && Number.isFinite(g.chroma) ? g.chroma : 0;
+  const mix = Math.min(100, Math.max(0, rawChroma)) / 100;
   for (let y = 0; y < height; y++) {
     const by = Math.floor(y / block); // 블록 좌표로 양자화
     for (let x = 0; x < width; x++) {
@@ -171,10 +194,21 @@ function applyFilm(data: Uint8ClampedArray, width: number, height: number, g: Gr
       // 필름 톤 반응 — 중간톤에서 최대, 순흑/순백으로 갈수록 바닥(FILM_TONE_FLOOR)까지 감쇠.
       const lum = 0.299 * data[i]! + 0.587 * data[i + 1]! + 0.114 * data[i + 2]!;
       const tone = FILM_TONE_FLOOR + (1 - FILM_TONE_FLOOR) * (1 - Math.abs((2 * lum) / 255 - 1));
-      const n = noise * tone;
-      data[i] = data[i]! + n;
-      data[i + 1] = data[i + 1]! + n;
-      data[i + 2] = data[i + 2]! + n;
+      if (mix <= 0) {
+        // 기존 휘도 단일 경로 — chroma 0/누락 문서는 이 분기라 결과가 바이트 동일하다.
+        const n = noise * tone;
+        data[i] = data[i]! + n;
+        data[i + 1] = data[i + 1]! + n;
+        data[i + 2] = data[i + 2]! + n;
+        continue;
+      }
+      // 채널 분리 경로 — r/g/b 각각 독립 시드의 종형 노이즈를 휘도 노이즈와 비율 혼합.
+      for (let ch = 0; ch < 3; ch++) {
+        const chSeed = g.seed + (ch + 1) * FILM_CHROMA_SEED_STRIDE;
+        const chBell = hash2(bx, by, chSeed) + hash2(bx, by, chSeed + 101) + hash2(bx, by, chSeed + 211) - 1.5;
+        const n = ((1 - mix) * bell + mix * chBell) * span * FILM_BELL_SCALE * tone;
+        data[i + ch] = data[i + ch]! + n;
+      }
     }
   }
 }
@@ -298,8 +332,8 @@ function attrNumber(value: unknown): number | undefined {
 
 /**
  * Konva 필터 함수 — node(`this`).attrs에서 grainType(string)과
- * grainAmount·grainSize·grainSeed(각 number)를 읽어 normalizeGrain으로 안전 변환 후 applyGrain.
- * 항등(amount 0)이거나 attrs가 비면 no-op.
+ * grainAmount·grainSize·grainSeed·grainChroma(각 number)를 읽어
+ * normalizeGrain으로 안전 변환 후 applyGrain. 항등(amount 0)이거나 attrs가 비면 no-op.
  */
 export function grainKonvaFilter(this: { attrs?: Record<string, unknown> }, imageData: StudioImageDataLike): void {
   const attrs = this.attrs;
@@ -309,6 +343,7 @@ export function grainKonvaFilter(this: { attrs?: Record<string, unknown> }, imag
     amount: attrNumber(attrs.grainAmount),
     size: attrNumber(attrs.grainSize),
     seed: attrNumber(attrs.grainSeed),
+    chroma: attrNumber(attrs.grainChroma),
   });
   if (isIdentityGrain(g)) return;
   applyGrain(imageData, g);

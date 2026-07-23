@@ -1,7 +1,8 @@
 /**
  * Studio Grain Panel
  * 선택된 이미지의 그레인/텍스처(Grain) 오버레이 인스펙터 — 원클릭 질감 프리셋 +
- * 질감 종류(필름/종이/주사선/도트) 선택 + 세기·크기 슬라이더 + 결정적 시드 재생성.
+ * 질감 종류(필름/종이/주사선/도트) 선택 + 세기·크기·크로마(film 전용) 슬라이더 +
+ * 결정적 시드 재생성.
  * studio-grain 엔진의 Grain을 props로 읽고 onPatch/onApplyPreset/onReset으로만 쓴다.
  * StudioPage에서 분리한 순수 프레젠테이션 컴포넌트(상태 없음).
  */
@@ -9,6 +10,7 @@ import { RotateCcw } from "lucide-react";
 
 import {
   GRAIN_AMOUNT_RANGE,
+  GRAIN_CHROMA_RANGE,
   GRAIN_PRESETS,
   GRAIN_SIZE_RANGE,
   GRAIN_TYPES,
@@ -100,6 +102,16 @@ export function StudioGrainPanel({
             onChange={(n) => onPatch({ [key]: n })}
           />
         ))}
+        {/* 크로마(색 노이즈) — film 전용이라 다른 질감에서는 비활성. 0이면 기존 휘도 입자와 동일. */}
+        <StudioSliderRow
+          label="크로마"
+          min={GRAIN_CHROMA_RANGE.min}
+          max={GRAIN_CHROMA_RANGE.max}
+          step={GRAIN_CHROMA_RANGE.step}
+          value={value.chroma ?? 0}
+          disabled={value.type !== "film"}
+          onChange={(n) => onPatch({ chroma: n })}
+        />
       </div>
 
       {/* 시드 — "새 시드"는 결정적으로 다음 시드를 뽑는다(Math.random 없음, 같은 시드=같은 노이즈). */}

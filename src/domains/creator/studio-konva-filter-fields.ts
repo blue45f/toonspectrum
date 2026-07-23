@@ -82,6 +82,10 @@ export type ImageFilterFields = {
   outline?: Outline;
   glow?: Glow;
   halftone?: Halftone;
+  /**
+   * 그레인/텍스처 — chroma(색 노이즈, 2026-07-24) 포함 객체 전체가 imageFilterCacheKey에
+   * JSON 직렬화되므로 Grain에 필드가 늘어도 캐시 키가 자동으로 함께 바뀐다(stale 캐시 없음).
+   */
   grain?: Grain;
   /** 수묵/수채 번짐, 한지 섬유, 안료 과립을 함께 합성하는 비파괴 재질 효과. */
   inkWash?: InkWash;

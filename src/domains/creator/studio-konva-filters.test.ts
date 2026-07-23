@@ -296,6 +296,33 @@ describe("buildImageFilters", () => {
     expect(attrs).toEqual({});
   });
 
+  // 의도적 변경(2026-07-24): grain.chroma → attrs.grainChroma 배선 — 0/누락은 attrs에
+  // 싣지 않아 기존 문서의 attrs 형태(grainType/Amount/Size/Seed 4개)가 그대로 유지된다.
+  it("grain.chroma>0 → attrs.grainChroma 포함, 0/누락 → 레거시 4개 attrs만", () => {
+    const konva = fakeKonva();
+    registerStudioKonvaFilters(konva);
+    const withChroma = buildImageFilters(
+      { grain: { type: "film", amount: 30, size: 1, seed: 7, chroma: 40 } },
+      konva,
+    );
+    expect(withChroma.filters).toContain(konva.Filters.Grain);
+    expect(withChroma.attrs).toEqual({
+      grainType: "film",
+      grainAmount: 30,
+      grainSize: 1,
+      grainSeed: 7,
+      grainChroma: 40,
+    });
+
+    for (const grain of [
+      { type: "film", amount: 30, size: 1, seed: 7 } as const,
+      { type: "film", amount: 30, size: 1, seed: 7, chroma: 0 } as const,
+    ]) {
+      const legacy = buildImageFilters({ grain }, konva);
+      expect(legacy.attrs).toEqual({ grainType: "film", grainAmount: 30, grainSize: 1, grainSeed: 7 });
+    }
+  });
+
   it("NaN/Infinity/음수 강도는 비활성이고 유한한 거대값은 UI 안전 범위로 제한한다", () => {
     const konva = fakeKonva();
     registerStudioKonvaFilters(konva);
@@ -665,5 +692,18 @@ describe("imageFilterCacheKey", () => {
 
   it("빈 객체와 명시적 undefined는 동일한 키", () => {
     expect(imageFilterCacheKey({})).toBe(imageFilterCacheKey({ blur: undefined, hue: undefined }));
+  });
+
+  // 의도적 변경(2026-07-24): grain 객체 전체가 직렬화되므로 새 chroma 필드도
+  // 캐시 키에 자동 포함된다 — chroma만 바뀌어도 재계산이 일어난다(stale 캐시 방지).
+  it("grain.chroma가 바뀌면 캐시 키도 바뀐다", () => {
+    const base: ImageFilterFields = { grain: { type: "film", amount: 30, size: 1, seed: 7 } };
+    const withChroma: ImageFilterFields = { grain: { type: "film", amount: 30, size: 1, seed: 7, chroma: 40 } };
+    const otherChroma: ImageFilterFields = { grain: { type: "film", amount: 30, size: 1, seed: 7, chroma: 80 } };
+    expect(imageFilterCacheKey(base)).not.toBe(imageFilterCacheKey(withChroma));
+    expect(imageFilterCacheKey(withChroma)).not.toBe(imageFilterCacheKey(otherChroma));
+    expect(imageFilterCacheKey(withChroma)).toBe(
+      imageFilterCacheKey({ grain: { type: "film", amount: 30, size: 1, seed: 7, chroma: 40 } }),
+    );
   });
 });

@@ -503,7 +503,7 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.Glow = glowKonvaFilter;
   // 컬러 하프톤 — this.attrs.htDot/htAngle/htMode/htStrength 적용(studio-halftone).
   F.Halftone = halftoneKonvaFilter;
-  // 그레인/텍스처 — this.attrs.grainType/grainAmount/grainSize/grainSeed 적용(studio-grain).
+  // 그레인/텍스처 — this.attrs.grainType/grainAmount/grainSize/grainSeed/grainChroma 적용(studio-grain).
   F.Grain = grainKonvaFilter;
   // 수묵/수채 번짐 — this.attrs.inkWash*로 안료 확산·한지 종이결·과립을 비파괴 적용.
   F.InkWash = inkWashKonvaFilter;
@@ -863,6 +863,9 @@ export function buildImageFilters(
     attrs.grainAmount = gr.amount;
     attrs.grainSize = gr.size;
     attrs.grainSeed = gr.seed;
+    // 크로마(채널 분리) 노이즈 — normalize가 0/누락을 키 생략으로 접으므로 존재=활성(>0).
+    // 0일 때 attrs를 아예 싣지 않아 기존 문서의 attrs 형태가 바이트 동일하게 유지된다.
+    if (gr.chroma !== undefined) attrs.grainChroma = gr.chroma;
   }
   if (hasActiveClouds(el)) {
     filters.push(F.Clouds!);

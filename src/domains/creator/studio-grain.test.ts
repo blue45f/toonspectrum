@@ -4,6 +4,7 @@ import { type StudioImageDataLike } from "./studio-filters";
 import {
   DEFAULT_GRAIN,
   GRAIN_AMOUNT_RANGE,
+  GRAIN_CHROMA_RANGE,
   GRAIN_PRESETS,
   GRAIN_SIZE_RANGE,
   GRAIN_TYPES,
@@ -67,6 +68,10 @@ describe("범위·종류 상수", () => {
   it("거칠기 범위는 1..8, step 1", () => {
     expect(GRAIN_SIZE_RANGE).toEqual({ min: 1, max: 8, step: 1 });
   });
+  // 의도적 변경(2026-07-24): film 크로마(색 노이즈) 슬라이더 범위 추가.
+  it("크로마 범위는 0..100, step 1", () => {
+    expect(GRAIN_CHROMA_RANGE).toEqual({ min: 0, max: 100, step: 1 });
+  });
   it("GRAIN_TYPES는 4종(film·paper·scanline·halftoneDot)과 한글 라벨", () => {
     expect(GRAIN_TYPES.map((t) => t.id)).toEqual(["film", "paper", "scanline", "halftoneDot"]);
     const labels = new Map(GRAIN_TYPES.map((t) => [t.id, t.label]));
@@ -124,6 +129,31 @@ describe("normalizeGrain", () => {
   it("소수 seed는 정수로 내림", () => {
     expect(normalizeGrain({ seed: 123.9 }).seed).toBe(123);
     expect(normalizeGrain({ seed: 0.7 }).seed).toBe(0);
+  });
+
+  // 의도적 변경(2026-07-24): film 크로마 필드 — 0/무효는 키 자체를 생략해
+  // 과거 저장본·캐시 키(JSON 직렬화)와 바이트 동일하게 유지한다.
+  describe("chroma", () => {
+    it("범위 안 값은 보존, 범위 밖은 0..100으로 클램프", () => {
+      expect(normalizeGrain({ chroma: 40 }).chroma).toBe(40);
+      expect(normalizeGrain({ chroma: 100 }).chroma).toBe(100);
+      expect(normalizeGrain({ chroma: 999 }).chroma).toBe(100);
+    });
+
+    it("0/음수/누락/숫자 아님은 키 자체가 생략된다(레거시 형태 보존)", () => {
+      expect("chroma" in normalizeGrain({ chroma: 0 })).toBe(false);
+      expect("chroma" in normalizeGrain({ chroma: -30 })).toBe(false);
+      expect("chroma" in normalizeGrain({ amount: 40 })).toBe(false);
+      expect("chroma" in normalizeGrain({ chroma: Number.NaN })).toBe(false);
+      expect("chroma" in normalizeGrain({ chroma: "50" as unknown as number })).toBe(false);
+      // 캐시 키가 JSON 직렬화라 chroma 0과 누락이 같은 문자열이어야 한다.
+      expect(JSON.stringify(normalizeGrain({ chroma: 0 }))).toBe(JSON.stringify(normalizeGrain({})));
+    });
+
+    it("chroma가 있어도 항등 판정은 amount 기준 그대로", () => {
+      expect(isIdentityGrain(normalizeGrain({ amount: 0, chroma: 100 }))).toBe(true);
+      expect(isIdentityGrain(normalizeGrain({ amount: 10, chroma: 100 }))).toBe(false);
+    });
   });
 });
 
@@ -257,6 +287,112 @@ describe("applyGrain — film(결정적 노이즈)", () => {
       return s / n;
     };
     expect(meanAbsDelta(mid, 128)).toBeGreaterThan(meanAbsDelta(dark, 4));
+  });
+});
+
+// 의도적 변경(2026-07-24): film 크로마(채널 분리) 노이즈 — chroma 0/누락은 기존 휘도
+// 단일 경로와 바이트 동일, chroma>0은 채널별 독립 시드(seed+ch·37) 종형 노이즈 혼합.
+describe("applyGrain — film chroma(채널 분리 색 노이즈)", () => {
+  it("chroma 0/누락은 기존 출력과 바이트 동일(항등 보존)", () => {
+    const legacy = makeSolid(16, 16, 128);
+    const zero = makeSolid(16, 16, 128);
+    const normalized = makeSolid(16, 16, 128);
+    applyGrain(legacy, { type: "film", amount: 60, size: 1, seed: 7 });
+    applyGrain(zero, { type: "film", amount: 60, size: 1, seed: 7, chroma: 0 });
+    applyGrain(normalized, normalizeGrain({ type: "film", amount: 60, size: 1, seed: 7, chroma: 0 }));
+    expect(dataEqual(zero, legacy)).toBe(true);
+    expect(dataEqual(normalized, legacy)).toBe(true);
+  });
+
+  it("chroma 0 경로는 세 채널이 같은 노이즈를 받는다(휘도 단일 노이즈)", () => {
+    const img = makeSolid(16, 16, 128);
+    applyGrain(img, { type: "film", amount: 60, size: 1, seed: 7 });
+    for (let i = 0; i < img.data.length; i += 4) {
+      expect(img.data[i]).toBe(img.data[i + 1]);
+      expect(img.data[i + 1]).toBe(img.data[i + 2]);
+    }
+  });
+
+  it("chroma 100이면 r/g/b 노이즈가 픽셀별로 서로 다르다(채널 비상관)", () => {
+    const img = makeSolid(32, 32, 128);
+    applyGrain(img, { type: "film", amount: 60, size: 1, seed: 7, chroma: 100 });
+    let decorrelated = 0;
+    const n = img.width * img.height;
+    for (let i = 0; i < img.data.length; i += 4) {
+      const r = img.data[i]!;
+      const g = img.data[i + 1]!;
+      const b = img.data[i + 2]!;
+      if (r !== g || g !== b || r !== b) decorrelated++;
+    }
+    // 독립 종형 노이즈 3개가 정확히 일치할 확률은 극히 낮다 — 대부분의 픽셀에서 채널이 갈라진다.
+    expect(decorrelated / n).toBeGreaterThan(0.9);
+  });
+
+  it("결정적 — 같은 (seed,chroma)는 항상 같은 출력, chroma가 다르면 출력이 다르다", () => {
+    const a = makeSolid(16, 16, 128);
+    const b = makeSolid(16, 16, 128);
+    const c = makeSolid(16, 16, 128);
+    const luma = makeSolid(16, 16, 128);
+    applyGrain(a, { type: "film", amount: 60, size: 1, seed: 7, chroma: 100 });
+    applyGrain(b, { type: "film", amount: 60, size: 1, seed: 7, chroma: 100 });
+    applyGrain(c, { type: "film", amount: 60, size: 1, seed: 7, chroma: 50 });
+    applyGrain(luma, { type: "film", amount: 60, size: 1, seed: 7 });
+    expect(dataEqual(a, b)).toBe(true); // 결정적
+    expect(dataEqual(a, c)).toBe(false); // chroma 비율이 결과에 반영
+    expect(dataEqual(a, luma)).toBe(false); // 휘도 단일 노이즈와도 다름
+  });
+
+  it("품질 지표 — chroma 100 채널 노이즈도 종형 분포(1σ 이내 비율 > 0.6)", () => {
+    const W = 64;
+    const H = 64;
+    const img = makeSolid(W, H, 128);
+    applyGrain(img, { type: "film", amount: 30, size: 1, seed: 7, chroma: 100 });
+    // 채널 노이즈도 해시 3합 Irwin-Hall — 휘도 경로와 동일하게 정규화된 표준편차를 갖는다.
+    const sigma = 0.289 * (30 * 2.55);
+    let within = 0;
+    const n = W * H;
+    for (let i = 0; i < n; i++) {
+      if (Math.abs(img.data[i * 4]! - 128) <= sigma) within++;
+    }
+    expect(within / n).toBeGreaterThan(0.6);
+  });
+
+  it("size 블록 양자화는 chroma 경로에서도 유지된다(같은 블록=같은 채널 노이즈)", () => {
+    const img = makeSolid(4, 2, 128);
+    applyGrain(img, { type: "film", amount: 80, size: 2, seed: 3, chroma: 100 });
+    // (0,0)과 (1,0)은 같은 블록(bx=0) → r/g/b 전부 동일.
+    expect(pixelAt(img, 0)).toEqual(pixelAt(img, 1));
+    // (2,0)은 다른 블록(bx=1) → 대체로 다름.
+    expect(pixelAt(img, 2)).not.toEqual(pixelAt(img, 0));
+  });
+
+  it("알파는 보존되고 채널은 유한 0..255로 클램프된다", () => {
+    const img = makeImage(4, 1, [
+      [250, 250, 250, 10],
+      [128, 128, 128, 90],
+      [4, 4, 4, 170],
+      [128, 128, 128, 250],
+    ]);
+    applyGrain(img, { type: "film", amount: 100, size: 1, seed: 13, chroma: 100 });
+    expect(pixelAt(img, 0)[3]).toBe(10);
+    expect(pixelAt(img, 1)[3]).toBe(90);
+    expect(pixelAt(img, 2)[3]).toBe(170);
+    expect(pixelAt(img, 3)[3]).toBe(250);
+    for (const v of img.data) {
+      expect(Number.isFinite(v)).toBe(true);
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(255);
+    }
+  });
+
+  it("film이 아닌 질감(paper 등)은 chroma를 무시한다", () => {
+    for (const type of ["paper", "scanline", "halftoneDot"] as const) {
+      const withChroma = makeSolid(16, 16, 200);
+      const without = makeSolid(16, 16, 200);
+      applyGrain(withChroma, { type, amount: 60, size: 2, seed: 4, chroma: 100 });
+      applyGrain(without, { type, amount: 60, size: 2, seed: 4 });
+      expect(dataEqual(withChroma, without)).toBe(true);
+    }
   });
 });
 
@@ -474,6 +610,39 @@ describe("grainKonvaFilter", () => {
     const img = makeImage(1, 1, [[55, 110, 165, 220]]);
     grainKonvaFilter.call({ attrs: { grainType: "scanline", grainAmount: 0, grainSize: 2, grainSeed: 1 } }, img);
     expect(pixelAt(img, 0)).toEqual([55, 110, 165, 220]);
+  });
+
+  // 의도적 변경(2026-07-24): grainChroma attr 배선 — applyGrain 직접 호출과 동일해야 한다.
+  it("grainChroma attr를 읽어 채널 분리 노이즈를 적용한다(applyGrain 패리티)", () => {
+    const img = makeSolid(8, 8, 128);
+    grainKonvaFilter.call(
+      { attrs: { grainType: "film", grainAmount: 60, grainSize: 1, grainSeed: 7, grainChroma: 100 } },
+      img,
+    );
+    const ref = makeSolid(8, 8, 128);
+    applyGrain(ref, normalizeGrain({ type: "film", amount: 60, size: 1, seed: 7, chroma: 100 }));
+    expect(dataEqual(img, ref)).toBe(true);
+    // 휘도 단일 노이즈(grainChroma 누락)와는 다른 출력.
+    const luma = makeSolid(8, 8, 128);
+    grainKonvaFilter.call({ attrs: { grainType: "film", grainAmount: 60, grainSize: 1, grainSeed: 7 } }, luma);
+    expect(dataEqual(img, luma)).toBe(false);
+  });
+
+  it("무효 grainChroma(NaN/문자열)는 휘도 경로와 동일(안전 폴백)", () => {
+    const nan = makeSolid(8, 8, 128);
+    const str = makeSolid(8, 8, 128);
+    const luma = makeSolid(8, 8, 128);
+    grainKonvaFilter.call(
+      { attrs: { grainType: "film", grainAmount: 60, grainSize: 1, grainSeed: 7, grainChroma: Number.NaN } },
+      nan,
+    );
+    grainKonvaFilter.call(
+      { attrs: { grainType: "film", grainAmount: 60, grainSize: 1, grainSeed: 7, grainChroma: "80" } },
+      str,
+    );
+    grainKonvaFilter.call({ attrs: { grainType: "film", grainAmount: 60, grainSize: 1, grainSeed: 7 } }, luma);
+    expect(dataEqual(nan, luma)).toBe(true);
+    expect(dataEqual(str, luma)).toBe(true);
   });
 });
 
