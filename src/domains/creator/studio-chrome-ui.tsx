@@ -97,13 +97,17 @@ export function StudioToolbarCluster({
       role="group"
       aria-label={label}
       className={cn(
-        "flex max-w-full shrink-0 flex-col items-stretch gap-px",
+        // The belt is a single-row horizontal scroller: clusters must keep their
+        // intrinsic width. A max-w-full cap resolves against the scrollport, so a
+        // cluster wider than the viewport clipped its own tail buttons under the
+        // next cluster (e.g. 그리기 도구 "프레임" under 참조·3D "3D 캐릭터" at 320px).
+        "flex shrink-0 flex-col items-stretch gap-px",
         className
       )}
     >
       <div
         className={cn(
-          "flex max-w-full items-center gap-0.5 rounded-xl border border-line/50 bg-card/40 p-0.5",
+          "flex items-center gap-0.5 rounded-xl border border-line/50 bg-card/40 p-0.5",
           "shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.05)]"
         )}
       >

@@ -132,6 +132,10 @@ const STUDIO_CANVAS_IMAGE_ACCEPT =
 
 const toolBtn = (active: boolean) => studioToolButtonClass(active, { dense: true });
 
+/** Icon-only belt buttons: keep the 44px touch-target contract on coarse pointers
+ *  (the dense px-3 padding alone leaves a 14–15px glyph at ~40px width). */
+const iconToolBtnTouch = "pointer-coarse:min-w-11 pointer-coarse:justify-center";
+
 // Group popovers stay viewport-fixed because the desktop ToolBelt is an inert zero-size host.
 const groupPopoverClass = (width: "w-72" | "w-80") =>
   cn(
@@ -832,7 +836,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
                 type="button"
                 onClick={undo}
                 disabled={hi === 0 || collaborationDocumentLocked}
-                className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
+                className={cn(toolBtn(false), iconToolBtnTouch, "h-8 px-1.5 disabled:opacity-40")}
                 aria-label="실행취소"
               >
                 <Undo2 size={15} strokeWidth={1.75} aria-hidden />
@@ -853,7 +857,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
                 type="button"
                 onClick={redo}
                 disabled={hi >= history.length - 1 || collaborationDocumentLocked}
-                className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
+                className={cn(toolBtn(false), iconToolBtnTouch, "h-8 px-1.5 disabled:opacity-40")}
                 aria-label="다시실행"
               >
                 <Redo2 size={15} strokeWidth={1.75} aria-hidden />
@@ -864,7 +868,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
                 type="button"
                 onClick={() => setHistoryPanelOpen((v) => !v)}
                 aria-pressed={historyPanelOpen}
-                className={cn(toolBtn(historyPanelOpen), "h-8 px-1.5")}
+                className={cn(toolBtn(historyPanelOpen), iconToolBtnTouch, "h-8 px-1.5")}
                 aria-label="작업 내역"
               >
                 <HistoryIcon size={15} strokeWidth={1.75} aria-hidden />
@@ -1291,7 +1295,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             onClick={() => setTimelapseOpen(true)}
             disabled={masterEditMode}
             aria-label="타임랩스 녹화"
-            className={cn(toolBtn(false), "disabled:opacity-40")}
+            className={cn(toolBtn(false), iconToolBtnTouch, "disabled:opacity-40")}
           >
             <Video size={14} aria-hidden />
           </button>
@@ -1301,7 +1305,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             type="button"
             onClick={() => setStoryboardGridOpen(true)}
             aria-label="스토리보드 그리드 보기"
-            className={toolBtn(false)}
+            className={cn(toolBtn(false), iconToolBtnTouch)}
           >
             <LayoutGrid size={14} aria-hidden />
           </button>
@@ -1318,7 +1322,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             onClick={() => setPageReviewOpen(true)}
             aria-pressed={pageReviewOpen}
             aria-label={pageEditLocked ? "페이지 검토, 현재 편집 잠금" : "페이지 검토와 편집 잠금"}
-            className={toolBtn(pageReviewOpen || pageEditLocked)}
+            className={cn(toolBtn(pageReviewOpen || pageEditLocked), iconToolBtnTouch)}
           >
             <ClipboardCheck size={14} aria-hidden />
           </button>
@@ -1356,7 +1360,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             aria-haspopup="dialog"
             aria-controls="studio-comments-review-dialog"
             aria-label={`문서 댓글${openStudioCommentCount > 0 ? `, 열림 ${openStudioCommentCount}개` : ""}`}
-            className={cn(toolBtn(commentsOpen), "relative disabled:cursor-not-allowed disabled:opacity-50")}
+            className={cn(toolBtn(commentsOpen), iconToolBtnTouch, "relative disabled:cursor-not-allowed disabled:opacity-50")}
           >
             <MessageCircle size={14} aria-hidden />
             {openStudioCommentCount > 0 ? (
@@ -1378,7 +1382,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             }}
             aria-pressed={teamPanelOpen}
             aria-label="팀 작업 공간"
-            className={toolBtn(teamPanelOpen)}
+            className={cn(toolBtn(teamPanelOpen), iconToolBtnTouch)}
           >
             <UsersRound size={14} aria-hidden />
           </button>
@@ -1389,7 +1393,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             onClick={() => setContinuityOpen(true)}
             aria-pressed={continuityOpen}
             aria-label="이야기 연속성 검사"
-            className={toolBtn(continuityOpen)}
+            className={cn(toolBtn(continuityOpen), iconToolBtnTouch)}
           >
             <CheckCircle2 size={14} aria-hidden />
           </button>
@@ -1399,7 +1403,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             type="button"
             onClick={() => setScrollPreviewOpen(true)}
             aria-label="세로 스크롤 미리보기"
-            className={toolBtn(false)}
+            className={cn(toolBtn(false), iconToolBtnTouch)}
           >
             <Smartphone size={14} aria-hidden />
           </button>
@@ -1415,7 +1419,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             disabled={masterEditMode}
             aria-pressed={timelineOpen}
             aria-label="다중 레이어 타임라인"
-            className={cn(toolBtn(timelineOpen), "disabled:opacity-40")}
+            className={cn(toolBtn(timelineOpen), iconToolBtnTouch, "disabled:opacity-40")}
           >
             <GanttChartSquare size={14} aria-hidden />
           </button>

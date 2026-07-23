@@ -525,6 +525,12 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           </StudioToolHintTarget>
           </div>
           <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line xl:block" />
+          {/* 모바일: 제목·작업공간 레인이 좁게 눌려 스크롤될 때 오른쪽 페이드로 이어짐을 알린다
+              (툴벨트의 좌측 페이드와 같은 계열, 스크롤바는 숨겨져 있음). */}
+          <span
+            aria-hidden
+            className="pointer-events-none sticky right-0 -mr-2 h-8 w-3 shrink-0 self-center bg-gradient-to-l from-panel to-transparent lg:hidden"
+          />
         </div>
         {/* 파일·내보내기 — 드로잉 앱 메뉴바 */}
         <div
@@ -570,10 +576,10 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           {mobileImmersive ? (
             <>
               <h1 className="sr-only">드로잉 전체화면</h1>
-              <span
-                className="min-w-0 max-w-40 flex-1 truncate px-1 text-xs font-semibold text-fg-2"
-                title={`${title.trim() || "무제"} · ${activePageLabel}`}
-              >
+              {/* 몰입 필은 콘텐츠 폭 기반의 컴팩트 플로팅 컨트롤이라 시각적 제목 자리가 없다
+                  (기존 flex-1 스팬은 항상 0폭으로 짜부라지며 게시하기 버튼만 잘랐다).
+                  문서 맥락은 보조기술에만 그대로 전달한다. */}
+              <span className="sr-only">
                 {title.trim() || "무제"} · {activePageLabel}
               </span>
             </>

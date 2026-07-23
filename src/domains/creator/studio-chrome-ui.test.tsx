@@ -52,6 +52,9 @@ describe("studio chrome UI", () => {
     expect(html).toContain('aria-label="그리기 도구"');
     expect(html).toContain("rounded-xl");
     expect(html).toContain("border-line");
+    // 스크롤 벨트 안에서 클러스터는 고유 폭을 유지해야 한다 — max-w-full 캡은
+    // 뷰포트보다 넓은 클러스터의 꼬리 버튼을 다음 클러스터 밑에 깔았다(320px 회귀).
+    expect(html).not.toContain("max-w-full");
   });
 
   it("floating tool popover is a portal host (closed renders nothing)", () => {

@@ -1140,7 +1140,10 @@ body[data-studio-app="true"] .route-stage::before,
     position: absolute;
     top: env(safe-area-inset-top);
     left: env(safe-area-inset-left);
-    width: min(14rem, calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 0.5rem));
+    /* 콘텐츠 기반 컴팩트 폭 — 고정 14rem 캡은 종료·임시저장·게시하기 묶음보다 ~2px 좁아
+       마지막 버튼이 overflow-hidden 레인에 잘렸다. 라벨이 바뀌어도 잘리지 않게 맞춤 폭 사용. */
+    width: fit-content;
+    max-width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 0.5rem);
     border-right: 1px solid var(--color-line);
     border-bottom: 1px solid var(--color-line);
     border-bottom-right-radius: 0.875rem;

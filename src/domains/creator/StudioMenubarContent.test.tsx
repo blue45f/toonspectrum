@@ -307,6 +307,23 @@ describe("StudioMenubarContent", () => {
     expect(screen.getByRole("tooltip").textContent).toContain("일반 작업 화면으로 돌아갑니다");
   });
 
+  it("keeps the immersive pill compact: document context is sr-only, actions stay reachable", () => {
+    render(
+      <StudioMenubarContent
+        {...createProps({ isMobile: true, mobileImmersive: true })}
+      />
+    );
+
+    // 몰입 필은 콘텐츠 폭 기반이라 제목 스팬이 flex-1 로 눌리며 마지막 버튼을 잘라선 안 된다.
+    // 문서 맥락은 보조기술 전용으로만 남긴다.
+    const context = screen.getByText("테스트 원고 · 첫 장면");
+    expect(context.className).toContain("sr-only");
+    expect(context.className).not.toContain("flex-1");
+    expect(screen.getByRole("button", { name: "전체 화면 드로잉 종료" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "임시저장" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "게시하기" })).toBeTruthy();
+  });
+
   it("preloads the asset surface before delegating the desktop insert shortcut", () => {
     const setMenu = vi.fn();
     render(<StudioMenubarContent {...createProps({ setMenu })} />);

@@ -55,9 +55,11 @@
     "verify:studio-launch": "tsx scripts/verify-studio-launch.mts",
     "verify:studio-brushes": "tsx scripts/verify-studio-brushes.mts",
     "verify:studio-gpu-committed-parity": "tsx scripts/verify-studio-gpu-committed-parity.mts",
+    "verify:studio-gpu-filters": "tsx scripts/verify-studio-gpu-filters.mts",
     "verify:studio-bg3d-physics": "tsx scripts/verify-studio-bg3d-physics.mts",
     "verify:studio-3d-console": "tsx scripts/verify-studio-3d-console.mts",
     "verify:studio-menus": "tsx scripts/verify-studio-menus.mts",
+    "verify:studio-mobile-top": "tsx scripts/verify-studio-mobile-top.mts",
     "verify:studio-icons": "tsx scripts/verify-studio-icons.mts",
     "verify:creator-logic": "tsx scripts/verify-creator-logic.mts"
   },
