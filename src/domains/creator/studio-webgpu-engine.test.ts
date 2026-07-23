@@ -2184,6 +2184,114 @@ describe("StudioWebGpuEngine", () => {
     expect(fake.device.queue.submit).not.toHaveBeenCalled();
   });
 
+  it("re-rasterizes tiles at the exact presentation density beyond 4x zoom-out", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const fake = fakeGpuDevice(neverLost);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+      onFrameReady,
+    });
+    // 10x zoom-out: presentation density 0.1 texel per logical pixel on both axes.
+    engine.resize({
+      logicalWidth: 2_000,
+      logicalHeight: 1_000,
+      cssWidth: 200,
+      cssHeight: 100,
+    });
+    await engine.initialize();
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      backend: "webgpu",
+    })));
+    onFrameReady.mockClear();
+
+    engine.render([stroke()], "tiles:zoom-out");
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "tiles:zoom-out",
+      backend: "webgpu",
+      complete: true,
+    })));
+    expect(engine.getBackend()).toBe("webgpu");
+
+    const tileTextureSizes = vi.mocked(fake.device.createTexture).mock.calls
+      .map(([descriptor]) => descriptor)
+      .filter((descriptor) => String(descriptor.label).startsWith("Studio retained tile "))
+      .map((descriptor) => descriptor.size as { width: number; height: number });
+    expect(tileTextureSizes.length).toBeGreaterThan(0);
+    // A 512-logical tile at the 0.1 presentation scale is 51 content texels plus one bleed texel
+    // per side. The old 0.25 raster floor allocated 130x130 here, which the non-mipmapped bilinear
+    // presentation sampler then minified 2.5x, causing shimmer on detailed strokes.
+    for (const size of tileTextureSizes) {
+      expect(size.width).toBe(53);
+      expect(size.height).toBe(53);
+    }
+  });
+
+  it("clamps degenerate near-zero viewport scales at the absolute raster floor", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const fake = fakeGpuDevice(neverLost);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+      onFrameReady,
+    });
+    // Raw presentation density 0.0125 sits below STUDIO_GPU_MIN_TILE_RESOLUTION_SCALE (1/64).
+    engine.resize({
+      logicalWidth: 8_000,
+      logicalHeight: 512,
+      cssWidth: 100,
+      cssHeight: 6,
+    });
+    await engine.initialize();
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      backend: "webgpu",
+    })));
+    onFrameReady.mockClear();
+
+    engine.render([stroke()], "tiles:raster-floor");
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "tiles:raster-floor",
+      backend: "webgpu",
+      complete: true,
+    })));
+
+    const tileTextureSizes = vi.mocked(fake.device.createTexture).mock.calls
+      .map(([descriptor]) => descriptor)
+      .filter((descriptor) => String(descriptor.label).startsWith("Studio retained tile "))
+      .map((descriptor) => descriptor.size as { width: number; height: number });
+    expect(tileTextureSizes.length).toBeGreaterThan(0);
+    // At the 1/64 floor a 512-logical tile keeps 8 content texels plus one bleed texel per side;
+    // following the raw 0.0125 scale would collapse it to 6 (and near-zero scales to 1).
+    for (const size of tileTextureSizes) {
+      expect(size.width).toBe(10);
+      expect(size.height).toBe(10);
+    }
+  });
+
   it("fails closed for empty or wholly non-finite strokes instead of approving a blank tile frame", async () => {
     const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
     const fake = fakeGpuDevice(neverLost);

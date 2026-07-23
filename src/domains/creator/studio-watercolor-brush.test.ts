@@ -219,6 +219,75 @@ describe("planWatercolorBrush — cap and roles", () => {
     expect(cores.at(-1)).toMatchObject({ x: 158, y: 0 });
   });
 
+  it("cap에 걸린 롱스트로크는 반경을 키워 인접 core가 겹치는 연속 커버리지를 유지한다", () => {
+    // 4000px 경로에 station 예산 6개 → 재분배 간격 800px. 반경 보정이 없으면 지름 ≤ 8.8px의
+    // 점이 800px 간격으로 놓여 구슬(string of pearls)이 된다.
+    const plan = planWatercolorBrush({
+      points: [0, 0, 4000, 0],
+      baseWidth: 8,
+      seed: 21,
+      spacing: 2,
+      maxDabs: 12,
+    });
+    const cores = coreDabs(plan.dabs);
+
+    expect(plan.capped).toBe(true);
+    expect(plan.dabs.length).toBeLessThanOrEqual(12);
+    expect(cores[0]).toMatchObject({ x: 0, y: 0 });
+    expect(cores.at(-1)).toMatchObject({ x: 4000, y: 0 });
+    expect(allFiniteDabs(plan.dabs)).toBe(true);
+    // 경로를 따라 어떤 간극도 dab 지름보다 클 수 없다: 인접 core 원이 실제로 겹쳐야 한다.
+    for (let index = 1; index < cores.length; index++) {
+      const previous = cores[index - 1]!;
+      const current = cores[index]!;
+      const distance = Math.hypot(current.x - previous.x, current.y - previous.y);
+      expect(distance).toBeLessThanOrEqual(previous.radius + current.radius);
+    }
+  });
+
+  it("반경 보정된 capped 계획도 완전히 결정적이며 대각 경로에서도 간극이 없다", () => {
+    const input: WatercolorBrushPlanInput = {
+      points: [0, 0, 3000, 1500, 6000, 0],
+      pressures: [0, 0.5, 1],
+      baseWidth: 10,
+      seed: 77,
+      spacing: 1,
+      maxDabs: 16,
+    };
+    const first = planWatercolorBrush(input);
+    const second = planWatercolorBrush(input);
+    expect(first).toEqual(second);
+    expect(first.capped).toBe(true);
+    expect(first.dabs.length).toBeLessThanOrEqual(16);
+
+    const cores = coreDabs(first.dabs);
+    for (let index = 1; index < cores.length; index++) {
+      const previous = cores[index - 1]!;
+      const current = cores[index]!;
+      const distance = Math.hypot(current.x - previous.x, current.y - previous.y);
+      expect(distance).toBeLessThanOrEqual(previous.radius + current.radius);
+    }
+  });
+
+  it("cap과 무관하게 작가가 고른 성긴 spacing(스티플 의도)은 반경을 키우지 않는다", () => {
+    // ideal station 수가 예산 안에 들어오면 재분배가 없으므로 기존 반경 상한을 그대로 지킨다.
+    const sparse = planWatercolorBrush({
+      points: [0, 0, 400, 0],
+      baseWidth: 8,
+      seed: 5,
+      spacing: 100,
+      maxDabs: 64,
+    });
+    expect(sparse.capped).toBe(false);
+    for (const dab of sparse.dabs) {
+      expect(dab.radius).toBeLessThanOrEqual(8 * 1.7);
+    }
+    const cores = coreDabs(sparse.dabs);
+    for (const core of cores) {
+      expect(core.radius).toBeLessThanOrEqual(8 * 1.1);
+    }
+  });
+
   it("cap을 1로 요청해도 endpoint 계약을 위해 2로 정규화하고 diffuse를 생략한다", () => {
     const plan = planWatercolorBrush({
       points: [3, 4, 30, 40],

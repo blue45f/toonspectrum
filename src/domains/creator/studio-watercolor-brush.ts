@@ -11,6 +11,8 @@
  * - 경로를 일정 호 길이로 한 번만 재표본화한다.
  * - 생성 dab 수는 hard cap 안에 묶여 긴 스트로크도 렌더 작업량이 폭증하지 않는다.
  * - cap에 걸리면 core 연속성을 우선하고, 두 종점을 표현할 수 있도록 cap의 하한은 2다.
+ * - cap 재분배로 station 간격이 core 직경을 넘어 구슬화(beading)될 상황이면 dab 수를 늘리지 않고
+ *   반경을 간격에 비례해 키워 커버리지 연속성을 유지한다(적은 수의 더 넓은 wash).
  *
  * `hash2`는 기존 grain 엔진의 검증된 결정적 좌표 해시를 재사용한다. Math.random/DOM/Konva는 없다.
  */
@@ -81,6 +83,16 @@ const DEFAULT_PRESSURE = 0.55;
 const MAX_COORDINATE_ABS = 1_000_000;
 const POINT_EPSILON = 1e-6;
 const TAU = Math.PI * 2;
+/**
+ * cap 재분배 후 station 간격이 "보장 최소 core 직경 × 이 비율"을 넘으면 구슬화로 판정한다.
+ * 0.9는 인접 core 원이 겹침을 유지하는 시각적 여유(≈10%)를 남기는 임계값이다.
+ */
+const BEADING_SPACING_DIAMETER_RATIO = 0.9;
+/**
+ * 압력 0(pressureScale 0.58)·반경 노이즈 최소(0.93)에서도 보장되는 core 직경 계수.
+ * `createCoreDab`의 radius 공식과 반드시 함께 갱신해야 한다.
+ */
+const MIN_CORE_DIAMETER_FACTOR = 0.58 * 0.93;
 
 type StrokePoint = {
   x: number;
@@ -271,13 +283,22 @@ function samplePolylineStations(points: readonly StrokePoint[], stationCount: nu
 // dab 생성 — core 중심은 고정, diffuse만 seed 기반으로 주변에 번진다.
 // ---------------------------------------------------------------------------
 
-function createCoreDab(station: StrokeStation, stationIndex: number, settings: WatercolorBrushPlanSettings): WatercolorBrushDab {
+function createCoreDab(
+  station: StrokeStation,
+  stationIndex: number,
+  settings: WatercolorBrushPlanSettings,
+  radiusScale: number,
+): WatercolorBrushDab {
   const radiusNoise = hash2(stationIndex, 11, settings.seed);
   const opacityNoise = hash2(stationIndex, 13, settings.seed);
   const baseRadius = settings.baseWidth * 0.5;
   // p=0.5일 때 대체로 입력 width와 같은 직경, p가 높을수록 자연스럽게 두꺼워진다.
   const pressureScale = 0.58 + station.pressure * 0.84;
-  const radius = clamp(baseRadius * pressureScale * (0.93 + radiusNoise * 0.14), 0.05, settings.baseWidth * 1.1);
+  const radius = clamp(
+    baseRadius * pressureScale * (0.93 + radiusNoise * 0.14) * radiusScale,
+    0.05,
+    settings.baseWidth * 1.1 * radiusScale,
+  );
   const opacity = clamp(0.16 + station.pressure * 0.38 + (opacityNoise - 0.5) * 0.06, 0.08, 0.72);
   return { x: station.x, y: station.y, radius, opacity, role: "core" };
 }
@@ -287,10 +308,15 @@ function createDiffuseDab(
   stationIndex: number,
   core: WatercolorBrushDab,
   settings: WatercolorBrushPlanSettings,
+  radiusScale: number,
 ): WatercolorBrushDab {
   const angle = hash2(stationIndex, 31, settings.seed) * TAU;
   const distance = core.radius * (0.16 + hash2(stationIndex, 37, settings.seed) * 0.54);
-  const radius = clamp(core.radius * (1.2 + hash2(stationIndex, 41, settings.seed) * 0.48), 0.05, settings.baseWidth * 1.7);
+  const radius = clamp(
+    core.radius * (1.2 + hash2(stationIndex, 41, settings.seed) * 0.48),
+    0.05,
+    settings.baseWidth * 1.7 * radiusScale,
+  );
   const opacity = clamp(core.opacity * (0.17 + hash2(stationIndex, 43, settings.seed) * 0.17), 0.02, 0.3);
   return {
     x: station.x + Math.cos(angle) * distance,
@@ -299,6 +325,23 @@ function createDiffuseDab(
     opacity,
     role: "diffuse",
   };
+}
+
+/**
+ * cap이 station 수를 줄여 재분배 간격이 구슬화 임계(보장 최소 core 직경의 90%)를 넘을 때만
+ * 1보다 큰 반경 배율을 돌려준다. dab 수(성능 예산)는 그대로 두고 반경만 간격에 비례해 키워
+ * 인접 core가 항상 겹치는 연속 wash를 보장한다. 순수 함수라 결정성은 그대로다.
+ */
+function beadingRadiusScale(
+  totalLength: number,
+  stationCount: number,
+  idealStationCount: number,
+  baseWidth: number,
+): number {
+  if (stationCount >= idealStationCount || stationCount < 2) return 1;
+  const cappedSpacing = totalLength / (stationCount - 1);
+  const beadingSpacing = baseWidth * MIN_CORE_DIAMETER_FACTOR * BEADING_SPACING_DIAMETER_RATIO;
+  return cappedSpacing > beadingSpacing ? cappedSpacing / beadingSpacing : 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -310,6 +353,8 @@ function createDiffuseDab(
  *
  * 결과는 늘 `maxDabs` 이하이며, 여러 유효 좌표가 있으면 첫·마지막 core dab의 x/y는
  * 각각 첫·마지막 유효 입력 좌표와 정확히 같다. 입력 배열은 절대 변경하지 않는다.
+ * cap으로 station이 줄어 간격이 구슬화 임계를 넘으면 반경을 간격에 비례해 키워 인접 core가
+ * 항상 겹치게 유지한다(동일 입력·seed 결정성은 그대로).
  */
 export function planWatercolorBrush(input?: Partial<WatercolorBrushPlanInput> | null): WatercolorBrushPlan {
   const settings = normalizeWatercolorBrushPlanSettings(input);
@@ -321,9 +366,9 @@ export function planWatercolorBrush(input?: Partial<WatercolorBrushPlanInput> | 
   const totalLength = polylineLength(points);
   if (points.length === 1 || totalLength <= POINT_EPSILON) {
     const station: StrokeStation = { ...points[0]!, progress: 0 };
-    const core = createCoreDab(station, 0, settings);
+    const core = createCoreDab(station, 0, settings, 1);
     const dabs = [core];
-    if (settings.diffuse && settings.maxDabs >= 2) dabs.push(createDiffuseDab(station, 0, core, settings));
+    if (settings.diffuse && settings.maxDabs >= 2) dabs.push(createDiffuseDab(station, 0, core, settings, 1));
     return { dabs, sourcePointCount: points.length, totalLength: 0, capped: false, settings };
   }
 
@@ -332,14 +377,17 @@ export function planWatercolorBrush(input?: Partial<WatercolorBrushPlanInput> | 
   const canEmitDiffuse = settings.diffuse && settings.maxDabs >= 4;
   const stationCapacity = canEmitDiffuse ? Math.floor(settings.maxDabs / 2) : settings.maxDabs;
   const stationCount = Math.min(idealStationCount, stationCapacity);
+  const radiusScale = beadingRadiusScale(totalLength, stationCount, idealStationCount, settings.baseWidth);
   const stations = samplePolylineStations(points, stationCount, totalLength);
   const dabs: WatercolorBrushDab[] = [];
 
   for (let stationIndex = 0; stationIndex < stations.length && dabs.length < settings.maxDabs; stationIndex++) {
     const station = stations[stationIndex]!;
-    const core = createCoreDab(station, stationIndex, settings);
+    const core = createCoreDab(station, stationIndex, settings, radiusScale);
     dabs.push(core);
-    if (canEmitDiffuse && dabs.length < settings.maxDabs) dabs.push(createDiffuseDab(station, stationIndex, core, settings));
+    if (canEmitDiffuse && dabs.length < settings.maxDabs) {
+      dabs.push(createDiffuseDab(station, stationIndex, core, settings, radiusScale));
+    }
   }
 
   const idealDabCount = idealStationCount * (settings.diffuse ? 2 : 1);

@@ -162,6 +162,15 @@ interface NormalizedStudioGpuViewport {
 
 const INSTANCE_BYTES = STUDIO_GPU_DAB_INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
 export const STUDIO_GPU_MAX_TILE_RESOLUTION_SCALE = 4;
+/**
+ * Tiles re-rasterize analytically at the presentation density, so the non-mipmapped bilinear
+ * presentation sampler always reads them at ~1:1 and deep zoom-out cannot shimmer. This floor only
+ * bounds degenerate viewport math (near-zero scales collapsing every tile to single texels); every
+ * zoom reachable through the studio UI (view zoom ≥ 0.2 × fit-width scale, normalized dpr ≥ 0.25)
+ * stays far above it. Below the floor the constant-scale minification of the old 0.25 floor
+ * resumes, which is acceptable for such synthetic viewports.
+ */
+export const STUDIO_GPU_MIN_TILE_RESOLUTION_SCALE = 1 / 64;
 export const STUDIO_GPU_MAX_CONCURRENT_READBACKS = 2;
 export const STUDIO_GPU_READBACK_SNAPSHOT_POOL_SIZE = 2;
 /** Includes the current authority texture, retired reader-held textures, and the reuse pool. */
@@ -1877,9 +1886,13 @@ export class StudioWebGpuEngine {
   private tileResolutionScale(): number {
     const horizontal = this.canvas.width / this.viewport.logicalWidth * this.viewport.scaleX;
     const vertical = this.canvas.height / this.viewport.logicalHeight * this.viewport.scaleY;
+    // The presentation sampler is bilinear without mip levels, so any raster density above the
+    // presented density undersamples on zoom-out and shimmers. Following the exact presentation
+    // scale keeps sampling ~1:1 (and shrinks tile textures); visible-tile count is scale-free, so
+    // the existing tile budget still bounds the work. See STUDIO_GPU_MIN_TILE_RESOLUTION_SCALE.
     return clamp(
       Math.max(horizontal, vertical),
-      0.25,
+      STUDIO_GPU_MIN_TILE_RESOLUTION_SCALE,
       STUDIO_GPU_MAX_TILE_RESOLUTION_SCALE
     );
   }
