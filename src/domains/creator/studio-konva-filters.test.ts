@@ -131,6 +131,35 @@ describe("registerStudioKonvaFilters", () => {
     F.Lineart!.call({ attrs: {} }, source);
     expect(source.data[3]).toBe(37);
   });
+
+  it("Chromatic 정수 오프셋은 정수 시프트와 동일하고 실수 오프셋은 서브픽셀 보간한다", () => {
+    const konva: KonvaLike = { Filters: {} };
+    registerStudioKonvaFilters(konva);
+    const F = konva.Filters as Record<string, (imageData: StudioImageDataLike) => void>;
+    // 가로 그라디언트: r = b = x*20, g = 100.
+    const gradient = (): StudioImageDataLike => {
+      const img = solidImage(8, 1, 0, 100, 0);
+      for (let x = 0; x < 8; x += 1) {
+        img.data[x * 4] = x * 20;
+        img.data[x * 4 + 2] = x * 20;
+      }
+      return img;
+    };
+
+    const integer = gradient();
+    F.Chromatic!.call({ attrs: { chromatic: 2 } }, integer);
+    // x=4: r은 x-2=2에서 40, b는 x+2=6에서 120 — 기존 정수 시프트 그대로.
+    expect(integer.data[4 * 4]).toBe(40);
+    expect(integer.data[4 * 4 + 2]).toBe(120);
+
+    const fractional = gradient();
+    F.Chromatic!.call({ attrs: { chromatic: 2.5 } }, fractional);
+    // x=4: r은 x-2.5=1.5 보간 (20+40)/2=30, b는 x+2.5=6.5 보간 (120+140)/2=130.
+    expect(fractional.data[4 * 4]).toBe(30);
+    expect(fractional.data[4 * 4 + 2]).toBe(130);
+    // 왼쪽 가장자리 클램프: x=1 → rx=max(0, -1.5)=0 → 보간 없이 0.
+    expect(fractional.data[1 * 4]).toBe(0);
+  });
 });
 
 describe("buildImageFilters", () => {

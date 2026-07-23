@@ -401,20 +401,27 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
     // `this`는 Konva.Node — node.attrs에서 색수차 오프셋을 읽는다.
     const rawOffset = this.attrs?.chromatic;
     if (typeof rawOffset !== "number" || !Number.isFinite(rawOffset) || rawOffset <= 0) return;
-    const offset = Math.min(12, Math.max(1, Math.round(rawOffset)));
+    // 실수 오프셋 + 가로 선형 보간 — 강도 슬라이더가 1px 단위로 끊기지 않는다.
+    // 정수 오프셋은 보간 가중치가 0이라 기존 정수 시프트와 바이트 동일(레거시 문서 보존).
+    const offset = Math.min(12, Math.max(1, rawOffset));
     const src = new Uint8ClampedArray(data);
 
     for (let y = 0; y < height; y++) {
+      const row = y * width;
       for (let x = 0; x < width; x++) {
-        const idx = (y * width + x) * 4;
+        const idx = (row + x) * 4;
         const rx = Math.max(0, x - offset);
-        const ridx = (y * width + rx) * 4;
+        const rx0 = Math.floor(rx);
+        const rx1 = Math.min(width - 1, rx0 + 1);
+        const rf = rx - rx0;
         const bx = Math.min(width - 1, x + offset);
-        const bidx = (y * width + bx) * 4;
+        const bx0 = Math.floor(bx);
+        const bx1 = Math.min(width - 1, bx0 + 1);
+        const bf = bx - bx0;
 
-        data[idx] = src[ridx]!;
+        data[idx] = src[(row + rx0) * 4]! * (1 - rf) + src[(row + rx1) * 4]! * rf;
         data[idx + 1] = src[idx + 1]!;
-        data[idx + 2] = src[bidx]!;
+        data[idx + 2] = src[(row + bx0) * 4 + 2]! * (1 - bf) + src[(row + bx1) * 4 + 2]! * bf;
       }
     }
   };
@@ -822,7 +829,8 @@ export function buildImageFilters(
   }
   if (isActivePositive(el.chromatic)) {
     filters.push(F.Chromatic!);
-    attrs.chromatic = clampFinite(Math.round(el.chromatic!), 1, 12);
+    // 의도적 변경(2026-07-24): 서브픽셀 색수차 — 반올림 없이 실수 오프셋을 그대로 전달한다.
+    attrs.chromatic = clampFinite(el.chromatic!, 1, 12);
   }
   if (isActivePositive(el.posterize)) {
     filters.push(F.Posterize!);
