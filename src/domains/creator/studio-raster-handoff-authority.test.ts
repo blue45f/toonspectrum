@@ -281,7 +281,8 @@ describe("studio raster handoff authority", () => {
       "eyedropperActive", "timelinePlaying",
       "advancedFillArmed", "pixelToolArmed", "cropArmed", "panelSplitArmed", "nodeEditArmed",
       "bubbleShapeArmed", "smudgeArmed", "dodgeBurnArmed", "wetMixArmed", "liquifyArmed",
-      "healCloneArmed", "layerMaskPaintArmed", "quickMaskArmed", "historyBrushArmed",
+      // 의도적 변경(2026-07-24): 필터 마스크 페인팅 툴 배선 — 새 armed 도구도 래스터 핸드오프를 veto.
+      "healCloneArmed", "layerMaskPaintArmed", "filterMaskPaintArmed", "quickMaskArmed", "historyBrushArmed",
       "puppetWarpArmed",
     ]) {
       expect(memo, `specialDraftActive must keep vetoing on ${flag}`).toContain(flag);

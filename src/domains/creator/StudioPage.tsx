@@ -267,6 +267,11 @@ import {
   removeBubbleShapePoint,
 } from "./studio-bubble-custom-shape";
 import {
+  BUBBLE_MERGE_MIN_COUNT,
+  bubbleMergeUnavailableReason,
+  mergeStudioBubbles,
+} from "./studio-bubble-merge";
+import {
   isStudioBrushCursorMode,
   isStudioCanvasInteractionBlocked,
   shouldShowStudioBrushCursor,
@@ -514,6 +519,13 @@ import {
   composeStudioFillReferenceImage,
   type StudioFillReferenceLayer,
 } from "./studio-fill-reference";
+import {
+  canFilterMask,
+  FILTER_MASK_BRUSH_HARDNESS_DEFAULT,
+  FILTER_MASK_BRUSH_RADIUS_DEFAULT,
+  FILTER_MASK_BRUSH_STRENGTH_DEFAULT,
+  type FilterMaskPaintMode,
+} from "./studio-filter-mask";
 import { hexToRgb } from "./studio-filters";
 import {
   createFixedRateStrokeFilter,
@@ -585,6 +597,7 @@ import {
   type IsometricAxisRay,
 } from "./studio-isometric-grid";
 import {
+  hasActiveImageFilters,
   imageFilterCacheKey,
   type ImageFilterFields,
 } from "./studio-konva-filter-fields";
@@ -1353,6 +1366,7 @@ import type {
   Tool,
 } from "./studio-editor-tool-model";
 import type {
+  BubbleEl,
   DrawEl,
   El,
   FrameEl,
@@ -10142,6 +10156,45 @@ function StudioCuttoonEditor() {
     clearLayerMaskDragPreview();
     setLayerMaskBusy(false);
   }, [selectedId]);
+  // ── 필터 마스크 브러시 — studio-filter-mask 통합 상태(레이어 마스크의 정확한 쌍둥이). ──
+  // 마스크 인코딩이 동일해 굽기 파이프라인(bakeLayerMaskStroke/createLayerMaskCanvas/
+  // invertLayerMaskAlpha)을 그대로 재사용한다. 레이어 마스크와 상호배제(disarmAllPixelTools).
+  const [filterMaskPaintActive, setFilterMaskPaintActive] = useState(false);
+  const [filterMaskPaintMode, setFilterMaskPaintMode] = useState<FilterMaskPaintMode>("reveal");
+  const [filterMaskRadius, setFilterMaskRadius] = useState(FILTER_MASK_BRUSH_RADIUS_DEFAULT);
+  const [filterMaskHardness, setFilterMaskHardness] = useState(FILTER_MASK_BRUSH_HARDNESS_DEFAULT);
+  const [filterMaskStrength, setFilterMaskStrength] = useState(FILTER_MASK_BRUSH_STRENGTH_DEFAULT);
+  const [filterMaskBusy, setFilterMaskBusy] = useState(false);
+  const filterMaskDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
+  const filterMaskRafRef = useRef<number | null>(null);
+  const pendingFilterMaskDragRef = useRef<{ points: SelPoint[] } | null>(null);
+  const [filterMaskDragPreview, setFilterMaskDragPreview] = useState<{ points: SelPoint[] } | null>(null);
+  const filterMaskCursorRef = useRef<Konva.Circle>(null);
+  const scheduleFilterMaskDragPreview = (next: { points: SelPoint[] } | null) => {
+    pendingFilterMaskDragRef.current = next;
+    if (filterMaskRafRef.current !== null) return;
+    filterMaskRafRef.current = globalThis.requestAnimationFrame(() => {
+      filterMaskRafRef.current = null;
+      setFilterMaskDragPreview(pendingFilterMaskDragRef.current);
+    });
+  };
+  const clearFilterMaskDragPreview = () => {
+    pendingFilterMaskDragRef.current = null;
+    if (filterMaskRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(filterMaskRafRef.current);
+      filterMaskRafRef.current = null;
+    }
+    setFilterMaskDragPreview(null);
+  };
+  useEffect(() => () => {
+    if (filterMaskRafRef.current !== null) globalThis.cancelAnimationFrame(filterMaskRafRef.current);
+  }, []);
+  useEffect(() => {
+    void selectedId;
+    filterMaskDragRef.current = null;
+    clearFilterMaskDragPreview();
+    setFilterMaskBusy(false);
+  }, [selectedId]);
   // ── 퀵 마스크(Q) — 픽셀 선택을 편집 가능한 알파 래스터로 잠시 전환하는 모달 세션. ──
   const [quickMaskActive, setQuickMaskActive] = useState(false);
   const [quickMaskBrushMode, setQuickMaskBrushMode] = useState<QuickMaskBrushMode>("paint");
@@ -12396,6 +12449,8 @@ function StudioCuttoonEditor() {
     healCloneTool !== null && selected?.type === "image" && !selectedContentMutationLocked;
   const layerMaskPaintArmed =
     layerMaskPaintActive && selected?.type === "image" && !selectedContentMutationLocked;
+  const filterMaskPaintArmed =
+    filterMaskPaintActive && selected?.type === "image" && !selectedContentMutationLocked;
   const quickMaskArmed =
     quickMaskActive && selected?.type === "image" && !selectedContentMutationLocked;
   const historyBrushArmed =
@@ -14689,6 +14744,9 @@ function StudioCuttoonEditor() {
     setQuickShapeActive(false);
     setColorWheelOpen(false);
     setLayerMaskPaintActive(false);
+    setFilterMaskPaintActive(false); // ← 추가(필터 마스크 브러시 — 레이어 마스크와 동일 상호배제 정책)
+    filterMaskDragRef.current = null;
+    clearFilterMaskDragPreview();
     setQuickMaskActive(false); // ← 추가(퀵 마스크 세션 — 편집 중 마스크는 폐기, 타 도구 전환과 동일 정책)
     quickMaskSessionRef.current = null;
     quickMaskDragRef.current = null;
@@ -16385,6 +16443,40 @@ function StudioCuttoonEditor() {
     }
     if (selectedId) deleteLayerElements([selectedId]);
   }
+  // 말풍선 병합 — 겹친 말풍선 2~6개를 하나의 외곽선으로 합친다(studio-bubble-merge). 생존자
+  // (z-순서 맨 뒤)에 병합 patch를 적용하고 나머지는 제거해 단일 undo로 커밋한다. theme는 문서
+  // 전역 webtoonTheme(모든 말풍선이 이 값으로 렌더). polygon-clipping 로드가 비동기라 await 뒤
+  // 커밋 티켓으로 세션 도중 변경을 방어한다(bake 계열과 동일 관례).
+  async function mergeSelectedBubbles() {
+    if (activeSurfaceReviewLocked) {
+      setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 말풍선을 병합해 주세요.");
+      return;
+    }
+    const idSet = new Set(marqueeIds);
+    const bubbles = elements.filter(
+      (el): el is BubbleEl => idSet.has(el.id) && el.type === "bubble"
+    );
+    const gate = bubbleMergeUnavailableReason(bubbles);
+    if (gate) {
+      setError(gate);
+      return;
+    }
+    const mutationTicket = captureStudioMutationTicket();
+    const result = await mergeStudioBubbles(bubbles, webtoonTheme);
+    if (!canApplyStudioMutation(mutationTicket)) return;
+    if (!result.ok) {
+      setError(result.reason);
+      return;
+    }
+    const removedSet = new Set(result.removedIds);
+    const nextElements = elements
+      .filter((el) => !removedSet.has(el.id))
+      .map((el) => (el.id === result.survivorId ? ({ ...el, ...result.patch } as El) : el));
+    if (!commit(nextElements)) return;
+    setMarqueeIds([]);
+    setSelectedId(result.survivorId);
+    setError(null);
+  }
   function moveLayer(id: string, dir: "up" | "down") {
     const next = reorderLayerItem(elements, id, dir === "up" ? "forward" : "backward");
     if (next === elements) return;
@@ -17620,6 +17712,10 @@ function StudioCuttoonEditor() {
           setLayerMaskPaintActive(false);
           layerMaskDragRef.current = null;
           clearLayerMaskDragPreview();
+        } else if (filterMaskPaintActive) {
+          setFilterMaskPaintActive(false);
+          filterMaskDragRef.current = null;
+          clearFilterMaskDragPreview();
         } else if (polyLassoSessionRef.current) {
           // 다각형 올가미 초안만 먼저 취소 — 다음 Esc 가 도구/완성 선택을 해제한다.
           e.preventDefault();
@@ -20560,6 +20656,112 @@ function StudioCuttoonEditor() {
     })();
   }
 
+  // ── 필터 마스크 브러시 스트로크 굽기 — bakeLayerMaskPaintStroke의 정확한 쌍둥이. 마스크
+  // 인코딩이 동일하므로 studio-layer-mask의 bake 파이프라인을 그대로 재사용하고, el.filterMaskSrc만
+  // 커밋한다(el.src·필터 파라미터는 절대 건드리지 않는다 — 비파괴). 이 마스크는 필터 체인의
+  // "적용 범위"만 자른다(가시성은 레이어 마스크 담당).
+  async function bakeFilterMaskPaintStroke(session: { elId: string; frame: SelectionFrame; points: SelPoint[] }) {
+    const target = elementById.get(session.elId);
+    if (
+      !target ||
+      target.type !== "image" ||
+      activeSurfaceReviewLocked ||
+      isEffectivelyLocked(target, groups)
+    ) return;
+    const mutationTicket = captureStudioMutationTicket();
+    setFilterMaskBusy(true);
+    try {
+      const img = await loadStudioPixelEditImage(target.src);
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      const scale = target.width > 0 ? w / target.width : 1;
+      const flipX = target.flipped ?? false;
+      const flipY = target.flippedY ?? false;
+      const pixelPoints = session.points.map((p) => {
+        const unflipped = flipNormalizedPoint(p, flipX, flipY);
+        return { x: unflipped.x * w, y: unflipped.y * h };
+      });
+      const radiusPx = Math.max(1, filterMaskRadius * scale);
+      const existingMask = target.filterMaskSrc ? await loadStudioPixelEditImage(target.filterMaskSrc) : null;
+      const out = bakeLayerMaskStroke(
+        existingMask,
+        w,
+        h,
+        { points: pixelPoints, radiusPx, hardness: filterMaskHardness, strength: filterMaskStrength, mode: filterMaskPaintMode },
+        createStudioPixelEditCanvas
+      );
+      if (!out) throw new Error("필터 마스크 결과를 만들지 못했습니다.");
+      const filterMaskSrc = (out as HTMLCanvasElement).toDataURL("image/png");
+      if (!canApplyStudioMutation(mutationTicket)) return;
+      if (isLatestLayerContentMutationLocked(target.id)) return;
+      patchEl(target.id, { filterMaskSrc, filterMaskEnabled: true } as Partial<El>);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to bake filter mask stroke:", err);
+      setError(err instanceof Error ? err.message : "필터 마스크 적용에 실패했습니다.");
+    } finally {
+      setFilterMaskBusy(false);
+    }
+  }
+  // ── 필터 마스크 즉시 실행(굽기) 액션 4개 — 전부 patchEl 1회로 히스토리 1건(addLayerMask 계열 미러). ──
+  function addFilterMask(fill: FilterMaskPaintMode) {
+    if (
+      selected?.type !== "image" ||
+      !canFilterMask(selected) ||
+      activeSurfaceReviewLocked ||
+      isEffectivelyLocked(selected, groups)
+    ) return;
+    const target = selected;
+    const mutationTicket = captureStudioMutationTicket();
+    void (async () => {
+      const img = await loadStudioPixelEditImage(target.src);
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      const out = createLayerMaskCanvas(w, h, fill, createStudioPixelEditCanvas);
+      if (!out) return;
+      if (!canApplyStudioMutation(mutationTicket)) return;
+      if (isLatestLayerContentMutationLocked(target.id)) return;
+      patchEl(target.id, { filterMaskSrc: (out as HTMLCanvasElement).toDataURL("image/png"), filterMaskEnabled: true } as Partial<El>);
+    })();
+  }
+  function deleteFilterMask() {
+    if (
+      selected?.type !== "image" ||
+      activeSurfaceReviewLocked ||
+      isEffectivelyLocked(selected, groups)
+    ) return;
+    patchEl(selected.id, { filterMaskSrc: undefined, filterMaskEnabled: undefined } as Partial<El>);
+  }
+  function toggleFilterMaskEnabled() {
+    if (
+      selected?.type !== "image" ||
+      activeSurfaceReviewLocked ||
+      isEffectivelyLocked(selected, groups)
+    ) return;
+    patchEl(selected.id, { filterMaskEnabled: selected.filterMaskEnabled === false } as Partial<El>);
+  }
+  function invertFilterMask() {
+    if (
+      selected?.type !== "image" ||
+      !selected.filterMaskSrc ||
+      activeSurfaceReviewLocked ||
+      isEffectivelyLocked(selected, groups)
+    ) return;
+    const target = selected;
+    const mutationTicket = captureStudioMutationTicket();
+    void (async () => {
+      const img = await loadStudioPixelEditImage(target.src);
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      const maskImg = await loadStudioPixelEditImage(target.filterMaskSrc!);
+      const out = invertLayerMaskAlpha(maskImg, w, h, createStudioPixelEditCanvas);
+      if (!out) return;
+      if (!canApplyStudioMutation(mutationTicket)) return;
+      if (isLatestLayerContentMutationLocked(target.id)) return;
+      patchEl(target.id, { filterMaskSrc: (out as HTMLCanvasElement).toDataURL("image/png") } as Partial<El>);
+    })();
+  }
+
   // ── 복구 브러시/도장 스트로크 굽기 — 스트로크 종료마다 자동 실행(별도 "적용" 버튼 없음, 붓처럼
   // 즉시 반영). 원본 자연 해상도로 dab 목록을 계산해 굽고, 결과를 data URL로 교체(patchEl)해
   // 히스토리 1건(⌘Z 1회)으로 남긴다. target은 elementById에서 다시 읽는다(session.elId 기준) —
@@ -22062,6 +22264,28 @@ function StudioCuttoonEditor() {
       scheduleLayerMaskDragPreview({ points: [p] });
       return;
     }
+    // 필터 마스크 브러시 무장 중: 레이어 마스크와 동일하게 스테이지 드래그를 마스크 스트로크
+    // 좌표 누적으로 가로챈다(filterMaskSrc가 없으면 bakeLayerMaskStroke가 흰 마스크를 자동 베이스로).
+    if (
+      filterMaskPaintArmed &&
+      selected?.type === "image" &&
+      !isSpacePressed &&
+      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
+    ) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (!pos) return;
+      const frame: SelectionFrame = {
+        x: selected.x,
+        y: selected.y,
+        width: selected.width,
+        height: selected.height,
+        rotation: selected.rotation,
+      };
+      const p = canvasPointToNormalized(pos.x, pos.y, frame);
+      filterMaskDragRef.current = { elId: selected.id, frame, points: [p] };
+      scheduleFilterMaskDragPreview({ points: [p] });
+      return;
+    }
     // 복구 브러시/도장 무장 중: Alt(Option)+클릭은 소스 앵커 지정, 일반 드래그는 페인트 스트로크.
     // crop/픽셀 선택과 동일한 정책 — 무장 중엔 다른 캔버스 제스처를 막는다. healCloneBusy 가드는
     // 직전 스트로크의 비동기 굽기가 끝나기 전에 새 스트로크를 시작해 patchEl 갱신이 서로를 덮어쓰는
@@ -22988,6 +23212,21 @@ function StudioCuttoonEditor() {
       }
       return;
     }
+    // 필터 마스크 브러시 드래그 중이면 좌표를 누적한다(레이어 마스크와 동일한 appendBrushPoint 재사용).
+    if (filterMaskDragRef.current) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos) {
+        const session = filterMaskDragRef.current;
+        const p = canvasPointToNormalized(pos.x, pos.y, session.frame);
+        const radiusNorm = filterMaskRadius / Math.max(1, session.frame.width);
+        const nextPoints = appendBrushPoint(session.points, p, radiusNorm);
+        if (nextPoints !== session.points) {
+          session.points = nextPoints;
+          scheduleFilterMaskDragPreview({ points: nextPoints });
+        }
+      }
+      return;
+    }
     // 복구 브러시/도장 드래그 중이면 좌표를 누적한다(브러시 간격 기반 최소 거리 필터).
     if (healCloneDragRef.current) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
@@ -23044,6 +23283,14 @@ function StudioCuttoonEditor() {
     } else if (layerMaskPaintArmed || quickMaskArmed) {
       const cursorPos = e.target.getStage()?.getRelativePointerPosition();
       const cursorNode = layerMaskCursorRef.current;
+      if (cursorPos && cursorNode) {
+        cursorNode.position(cursorPos);
+        if (!cursorNode.visible()) cursorNode.visible(true);
+        cursorNode.getLayer()?.batchDraw();
+      }
+    } else if (filterMaskPaintArmed) {
+      const cursorPos = e.target.getStage()?.getRelativePointerPosition();
+      const cursorNode = filterMaskCursorRef.current;
       if (cursorPos && cursorNode) {
         cursorNode.position(cursorPos);
         if (!cursorNode.visible()) cursorNode.visible(true);
@@ -24719,6 +24966,14 @@ function StudioCuttoonEditor() {
       if (session.points.length > 0) void bakeLayerMaskPaintStroke(session);
       return;
     }
+    // 필터 마스크 브러시 드래그 종료 — 누적된 좌표로 실제 마스크 스트로크를 굽는다.
+    if (filterMaskDragRef.current) {
+      const session = filterMaskDragRef.current;
+      filterMaskDragRef.current = null;
+      clearFilterMaskDragPreview();
+      if (session.points.length > 0) void bakeFilterMaskPaintStroke(session);
+      return;
+    }
     // 복구 브러시/도장 드래그 종료 — 누적된 좌표로 dab 목록을 계산해 굽는다.
     if (healCloneDragRef.current) {
       const session = healCloneDragRef.current;
@@ -24834,6 +25089,13 @@ function StudioCuttoonEditor() {
   }
   function hideLayerMaskCursor() {
     const cursorNode = layerMaskCursorRef.current;
+    if (cursorNode && cursorNode.visible()) {
+      cursorNode.visible(false);
+      cursorNode.getLayer()?.batchDraw();
+    }
+  }
+  function hideFilterMaskCursor() {
+    const cursorNode = filterMaskCursorRef.current;
     if (cursorNode && cursorNode.visible()) {
       cursorNode.visible(false);
       cursorNode.getLayer()?.batchDraw();
@@ -27954,13 +28216,13 @@ function StudioCuttoonEditor() {
       marqueeActive || userGuides.length > 0 ||
       advancedFillArmed || pixelToolArmed || cropArmed || panelSplitArmed ||
       nodeEditArmed || bubbleShapeArmed || smudgeArmed || dodgeBurnArmed || wetMixArmed || liquifyArmed || healCloneArmed ||
-      layerMaskPaintArmed || quickMaskArmed || historyBrushArmed || puppetWarpArmed,
+      layerMaskPaintArmed || filterMaskPaintArmed || quickMaskArmed || historyBrushArmed || puppetWarpArmed,
     postProcessingActive: pageGrade.vignette > 0,
   } as const), [
     isExporting, saving, timelapseCapturing, masterEditMode, selectedId, marqueeIds.length,
     editing, tool, canvasRotation, eyedropperActive, timelinePlaying, marqueeActive, userGuides.length,
     advancedFillArmed, pixelToolArmed, cropArmed, panelSplitArmed, nodeEditArmed,
-    bubbleShapeArmed, smudgeArmed, dodgeBurnArmed, wetMixArmed, liquifyArmed, healCloneArmed, layerMaskPaintArmed, quickMaskArmed, historyBrushArmed,
+    bubbleShapeArmed, smudgeArmed, dodgeBurnArmed, wetMixArmed, liquifyArmed, healCloneArmed, layerMaskPaintArmed, filterMaskPaintArmed, quickMaskArmed, historyBrushArmed,
     puppetWarpArmed, pageGrade.vignette,
   ]);
   const {
@@ -28005,6 +28267,7 @@ function StudioCuttoonEditor() {
   const studioInspectorAsideHandlers = useStudioStableHandlers<StudioInspectorAsideHandlers>({
     addAdvancedRuler,
     addBubbleShapePointFromInspector,
+    addFilterMask,
     addLayerGroup,
     addLayerMask,
     addVanishingPointHandler,
@@ -28025,6 +28288,7 @@ function StudioCuttoonEditor() {
     clearHealCloneSource,
     clearPolyLassoDraft,
     commit,
+    deleteFilterMask,
     deleteLayerMask,
     detachBubbleAnchor,
     disarmAllPixelTools,
@@ -28034,6 +28298,7 @@ function StudioCuttoonEditor() {
     fitBubbleToText,
     fitSelectedToFrame,
     handleLayerNavigatorAction,
+    invertFilterMask,
     invertLayerMask,
     insertIsometricPrimitive,
     insertIsometricSolid,
@@ -28083,6 +28348,7 @@ function StudioCuttoonEditor() {
     toggleWetMixTool,
     toggleBubbleAnchorPick,
     toggleEffectFavorite,
+    toggleFilterMaskEnabled,
     toggleIsometricGridActive,
     toggleLayerMaskEnabled,
     toggleLocalHidden,
@@ -28645,8 +28911,10 @@ function StudioCuttoonEditor() {
     enterCanvasOnlyMode,
     executeGenerateTranslations,
     groupSelectedElements,
+    mergeSelectedBubbles,
     handleTutorialTry,
     hideBrushCursor,
+    hideFilterMaskCursor,
     hideHealCloneCursors,
     hideHistoryBrushCursor,
     hideLayerMaskCursor,
@@ -29552,6 +29820,11 @@ function StudioCuttoonEditor() {
           isometricOriginY={isometricOriginY}
           isPanning={isPanning}
           isSpacePressed={isSpacePressed}
+          filterMaskCursorRef={filterMaskCursorRef}
+          filterMaskDragPreview={filterMaskDragPreview}
+          filterMaskPaintArmed={filterMaskPaintArmed}
+          filterMaskPaintMode={filterMaskPaintMode}
+          filterMaskRadius={filterMaskRadius}
           layerMaskCursorRef={layerMaskCursorRef}
           layerMaskDragPreview={layerMaskDragPreview}
           layerMaskPaintArmed={layerMaskPaintArmed}
@@ -29927,6 +30200,15 @@ function StudioCuttoonEditor() {
           isometricGridActive={isometricGridActive}
           isometricOriginX={isometricOriginX}
           isometricOriginY={isometricOriginY}
+          filterMaskBusy={filterMaskBusy}
+          filterMaskHardness={filterMaskHardness}
+          filterMaskPaintActive={filterMaskPaintActive}
+          filterMaskPaintMode={filterMaskPaintMode}
+          filterMaskRadius={filterMaskRadius}
+          filterMaskStrength={filterMaskStrength}
+          selectedImageHasActiveFilters={
+            selected?.type === "image" ? hasActiveImageFilters(selected) : false
+          }
           layerMaskBusy={layerMaskBusy}
           layerMaskHardness={layerMaskHardness}
           layerMaskPaintActive={layerMaskPaintActive}
@@ -30024,6 +30306,11 @@ function StudioCuttoonEditor() {
           setHistoryBrushSourceIndex={setHistoryBrushSourceIndex}
           setHistoryBrushSourceSrc={setHistoryBrushSourceSrc}
           setHistoryPanelOpen={setHistoryPanelOpen}
+          setFilterMaskHardness={setFilterMaskHardness}
+          setFilterMaskPaintActive={setFilterMaskPaintActive}
+          setFilterMaskPaintMode={setFilterMaskPaintMode}
+          setFilterMaskRadius={setFilterMaskRadius}
+          setFilterMaskStrength={setFilterMaskStrength}
           setLayerMaskHardness={setLayerMaskHardness}
           setLayerMaskPaintActive={setLayerMaskPaintActive}
           setLayerMaskPaintMode={setLayerMaskPaintMode}
@@ -30658,8 +30945,10 @@ interface StudioCanvasViewportHandlers {
   enterCanvasOnlyMode: () => void;
   executeGenerateTranslations: () => Promise<void>;
   groupSelectedElements: () => void;
+  mergeSelectedBubbles: () => void;
   handleTutorialTry: (action: StudioTutorialTryAction) => void;
   hideBrushCursor: () => void;
+  hideFilterMaskCursor: () => void;
   hideHealCloneCursors: () => void;
   hideHistoryBrushCursor: () => void;
   hideLayerMaskCursor: () => void;
@@ -30804,6 +31093,11 @@ interface StudioCanvasViewportProps {
   isometricOriginY: number;
   isPanning: boolean;
   isSpacePressed: boolean;
+  filterMaskCursorRef: import("react").RefObject<import("konva/lib/shapes/Circle").Circle | null>;
+  filterMaskDragPreview: { points: SelPoint[]; } | null;
+  filterMaskPaintArmed: boolean;
+  filterMaskPaintMode: FilterMaskPaintMode;
+  filterMaskRadius: number;
   layerMaskCursorRef: import("react").RefObject<import("konva/lib/shapes/Circle").Circle | null>;
   layerMaskDragPreview: { points: SelPoint[]; } | null;
   layerMaskPaintArmed: boolean;
@@ -31079,6 +31373,11 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   isometricOriginY,
   isPanning,
   isSpacePressed,
+  filterMaskCursorRef,
+  filterMaskDragPreview,
+  filterMaskPaintArmed,
+  filterMaskPaintMode,
+  filterMaskRadius,
   layerMaskCursorRef,
   layerMaskDragPreview,
   layerMaskPaintArmed,
@@ -31287,8 +31586,10 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     fitCanvasToWidth,
     executeGenerateTranslations,
     groupSelectedElements,
+    mergeSelectedBubbles,
     handleTutorialTry,
     hideBrushCursor,
+    hideFilterMaskCursor,
     hideHealCloneCursors,
     hideHistoryBrushCursor,
     hideLayerMaskCursor,
@@ -31432,11 +31733,23 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
       || healCloneArmed
       || historyBrushArmed
       || layerMaskPaintArmed
+      || filterMaskPaintArmed
       || quickMaskArmed,
   } as const;
   const viewportCursorClassName = studioCanvasViewportCursorClassName(canvasCursorInput);
   const canvasCursorClassName = studioCanvasCursorClassName(canvasCursorInput);
   const brushCursorStyle = appSettings.general.brushCursorStyle;
+  // 말풍선 병합 액션 게이트 — 다중 선택에 말풍선이 2개 이상 섞였을 때만 노출하고, 비활성
+  // 사유(혼합 선택·개수 범위)는 bubbleMergeUnavailableReason으로 툴팁에 안내한다.
+  const marqueeSelectedEls =
+    marqueeIds.length >= BUBBLE_MERGE_MIN_COUNT
+      ? marqueeIds.map((id) => elementById.get(id)).filter((el): el is El => el !== undefined)
+      : [];
+  const marqueeBubbleCount = marqueeSelectedEls.filter((el) => el.type === "bubble").length;
+  const showBubbleMerge = marqueeBubbleCount >= BUBBLE_MERGE_MIN_COUNT;
+  const bubbleMergeReason = showBubbleMerge
+    ? bubbleMergeUnavailableReason(marqueeSelectedEls)
+    : null;
   const zoomOutAtLimit = stepStudioViewZoom(zoom, -1) === zoom;
   const zoomInAtLimit = stepStudioViewZoom(zoom, 1) === zoom;
   const viewBusyReason = viewTransformSuppressed
@@ -31467,6 +31780,9 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
             onClearAutosave={clearAutosave}
             onGroupSelection={groupSelectedElements}
             onAlignSelection={alignSelected}
+            showBubbleMerge={showBubbleMerge}
+            bubbleMergeDisabledReason={bubbleMergeReason}
+            onMergeBubbles={mergeSelectedBubbles}
             onDuplicateSelection={duplicateSelected}
             onRemoveSelection={removeSelected}
             onClearSelection={() => setMarqueeIds([])}
@@ -31921,6 +32237,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               hideHealCloneCursors();
               hideHistoryBrushCursor();
               hideLayerMaskCursor();
+              hideFilterMaskCursor();
             }}
             onDragMove={onStageDragMove}
             onDragEnd={onStageDragEnd}
@@ -32068,6 +32385,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   !liquifyArmed &&
                   !healCloneArmed &&
                   !layerMaskPaintArmed &&
+                  !filterMaskPaintArmed &&
                   !quickMaskArmed &&
                   !historyBrushArmed &&
                   !bubbleShapeArmed &&
@@ -32091,6 +32409,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       !liquifyArmed &&
                       !healCloneArmed &&
                       !layerMaskPaintArmed &&
+                      !filterMaskPaintArmed &&
                       !quickMaskArmed &&
                       !historyBrushArmed &&
                       !bubbleShapeArmed &&
@@ -32586,6 +32905,19 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 />
               </Layer>
             )}
+            {!isExporting && filterMaskPaintArmed && (
+              <Layer listening={false}>
+                <KCircle
+                  ref={filterMaskCursorRef}
+                  visible={false}
+                  radius={Math.max(1.5, filterMaskRadius)}
+                  stroke="#8b5cf6"
+                  strokeWidth={1.25 / effScale}
+                  dash={[3 / effScale, 3 / effScale]}
+                  opacity={0.9}
+                />
+              </Layer>
+            )}
             {/* healCloneArmed 는 tool 과 무관하게 참일 수 있어(select 모드에서도 무장 가능) 기존
                 brushCursorRef Layer(tool==="draw" 로 게이팅됨)에 얹으면 select 모드에서 커서가
                 아예 안 그려진다 — smudge 커서와 동일하게 독립 게이팅 Layer로 둔다. */}
@@ -32745,6 +33077,21 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     drag={layerMaskDragPreview}
                     radiusPx={layerMaskRadius}
                     mode={layerMaskPaintMode}
+                  />
+                </Suspense>
+              </Layer>
+            )}
+            {/* 필터 마스크 페인트 프리뷰 — 레이어 마스크와 동일한 스트로크 미리보기 오버레이 재사용
+                (마스크 인코딩·규약이 같아 별도 컴포넌트 불필요). */}
+            {!isExporting && filterMaskPaintArmed && pixelOverlayFrame && (
+              <Layer listening={false}>
+                <Suspense fallback={null}>
+                  <StudioLayerMaskOverlay
+                    frame={pixelOverlayFrame}
+                    scale={effScale}
+                    drag={filterMaskDragPreview}
+                    radiusPx={filterMaskRadius}
+                    mode={filterMaskPaintMode}
                   />
                 </Suspense>
               </Layer>

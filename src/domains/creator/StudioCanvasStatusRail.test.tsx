@@ -130,6 +130,37 @@ describe("StudioCanvasStatusRail", () => {
     expect(props.onClearSelection).toHaveBeenCalledOnce();
   });
 
+  it("exposes the bubble-merge action only when armed and gates it on the reason", () => {
+    const hidden = createProps({ selectionCount: 2 });
+    const { rerender } = render(<StudioCanvasStatusRail {...hidden} />);
+    expect(screen.queryByRole("button", { name: "선택한 말풍선 병합" })).toBeNull();
+
+    const enabled = createProps({
+      selectionCount: 2,
+      showBubbleMerge: true,
+      bubbleMergeDisabledReason: null,
+      onMergeBubbles: vi.fn(),
+    });
+    rerender(<StudioCanvasStatusRail {...enabled} />);
+    const mergeButton = screen.getByRole("button", { name: "선택한 말풍선 병합" });
+    expect(mergeButton).toBeTruthy();
+    expect(mergeButton.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(mergeButton);
+    expect(enabled.onMergeBubbles).toHaveBeenCalledOnce();
+
+    const gated = createProps({
+      selectionCount: 3,
+      showBubbleMerge: true,
+      bubbleMergeDisabledReason: "말풍선만 함께 선택해야 병합할 수 있어요.",
+      onMergeBubbles: vi.fn(),
+    });
+    rerender(<StudioCanvasStatusRail {...gated} />);
+    const disabledButton = screen.getByRole("button", { name: "선택한 말풍선 병합" });
+    expect(disabledButton.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(disabledButton);
+    expect(gated.onMergeBubbles).not.toHaveBeenCalled();
+  });
+
   it("registers one exact rich preview per layout action without native titles", () => {
     const { container } = render(
       <StudioCanvasStatusRail {...createProps({ selectionCount: 3 })} />

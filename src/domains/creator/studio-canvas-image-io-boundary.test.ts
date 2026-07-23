@@ -105,8 +105,11 @@ describe("Studio canvas image I/O module boundary", () => {
 
     expect(callCount(page.sourceFile, "loadStudioCanvasImageFile")).toBe(4);
     expect(callCount(page.sourceFile, "downscaleStudioCanvasDataUrl")).toBe(1);
-    expect(callCount(page.sourceFile, "loadStudioPixelEditImage")).toBe(17);
-    expect(page.source.match(/\bcreateStudioPixelEditCanvas\b/gu)).toHaveLength(20);
+    // 의도적 변경(2026-07-24): 필터 마스크 페인팅 툴 배선 — bake/add/invert 3개 액션이 레이어
+    // 마스크와 대칭으로 이미지 로드·픽셀 캔버스를 재사용(loadStudioPixelEditImage 17 → 22,
+    // createStudioPixelEditCanvas 20 → 23).
+    expect(callCount(page.sourceFile, "loadStudioPixelEditImage")).toBe(22);
+    expect(page.source.match(/\bcreateStudioPixelEditCanvas\b/gu)).toHaveLength(23);
     expect(page.source).not.toContain('from "./studio-gif-element"');
     expect(page.source).not.toContain('from "./studio-upload-image-safety"');
   });

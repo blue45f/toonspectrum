@@ -84,7 +84,9 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     expect(onStageDown).not.toContain("const layeredFlowPaintEligible =");
     expect(onStageDown).not.toContain("const common = {");
     expect(onStageDown).not.toContain("const next: DrawEl =");
-    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(900);
+    // 의도적 변경(2026-07-24): 필터 마스크 페인팅 툴 배선 — onStageDown 에 레이어 마스크와
+    // 대칭인 필터 마스크 armed 포인터다운 분기를 추가(900 → 915).
+    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(915);
 
     expectTokenOrder(pointCommentHandler, [
       "if (pointCommentComposer) return true",

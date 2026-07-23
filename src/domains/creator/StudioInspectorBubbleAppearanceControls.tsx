@@ -1,6 +1,10 @@
 import { Suspense } from "react";
 
 import { BUBBLE_VARIANTS } from "./studio-assets";
+import {
+  BUBBLE_OUTLINE_STYLE_OPTIONS,
+  normalizeBubbleOutlineStyle,
+} from "./studio-bubble-outline-style";
 import { BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT } from "./studio-bubble-text-fit";
 import { bubbleAutoShrinkPreview } from "./studio-bubble-text-runtime";
 import {
@@ -25,6 +29,7 @@ export type BubbleAppearancePatch = Partial<
     | "stroke"
     | "strokeWidth"
     | "strokeStyle"
+    | "outlineStyle"
     | "gradient"
     | "autoShrinkText"
     | "autoShrinkMinFontSize"
@@ -221,6 +226,43 @@ export function StudioInspectorBubbleAppearanceControls({
             </label>
           </>
         )}
+
+        <div className="space-y-1.5 pt-0.5">
+          <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
+            외곽선 스타일
+          </p>
+          <div className="flex gap-1.5" role="group" aria-label="말풍선 외곽선 스타일">
+            {BUBBLE_OUTLINE_STYLE_OPTIONS.map((option) => {
+              const current = normalizeBubbleOutlineStyle(selected.outlineStyle);
+              const active =
+                option.id === "smooth" ? current === undefined : current === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  aria-pressed={active}
+                  title={option.tip}
+                  onClick={() =>
+                    onPatch({
+                      outlineStyle: option.id === "smooth" ? undefined : option.id,
+                    })
+                  }
+                  className={cn(
+                    "flex-1 rounded-lg border px-2 py-1.5 text-[0.7rem] font-semibold transition-colors",
+                    active
+                      ? "border-accent/50 bg-accent-soft/55 text-accent ring-1 ring-accent/25"
+                      : "border-line/55 bg-card/80 text-fg-2 hover:border-line-strong/50 hover:bg-raised"
+                  )}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[0.6rem] leading-snug text-fg-3">
+            손그림 스타일은 외곽선을 결정적으로 흔들어 손맛을 더해요(기본 매끈은 벡터 그대로).
+          </p>
+        </div>
       </div>
 
       <Suspense fallback={<StudioPanelLoading label="텍스트 크기 고정 패널을 여는 중..." />}>

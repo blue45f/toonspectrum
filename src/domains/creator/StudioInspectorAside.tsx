@@ -80,6 +80,7 @@ import {
   type TextEl,
 } from "./studio-element-model";
 import { type StudioExtendedBlendModeId } from "./studio-extended-blend";
+import { type FilterMaskPaintMode } from "./studio-filter-mask";
 import { legacyTextGradientToSpec } from "./studio-gradient-engine";
 import { type HealCloneMode } from "./studio-heal-clone";
 import { uid } from "./studio-id";
@@ -112,6 +113,7 @@ import {
   StudioCropPanel,
   StudioFloodFillPanel,
   StudioGradientEnginePanel,
+  StudioFilterMaskPanel,
   StudioHealClonePanel,
   StudioHistoryBrushPanel,
   StudioImageAdjustmentsPanel,
@@ -203,6 +205,7 @@ import { cn } from "@/lib/utils";
 export interface StudioInspectorAsideHandlers {
   addAdvancedRuler: (type: StudioAdvancedRuler["type"]) => void;
   addBubbleShapePointFromInspector: () => void;
+  addFilterMask: (fill: FilterMaskPaintMode) => void;
   addLayerGroup: (seedElId?: string) => void;
   addLayerMask: (fill: LayerMaskPaintMode) => void;
   addVanishingPointHandler: () => void;
@@ -223,6 +226,7 @@ export interface StudioInspectorAsideHandlers {
   clearHealCloneSource: () => void;
   clearPolyLassoDraft: () => void;
   commit: (nextElements: El[], extraPatch?: Partial<Omit<PageState, "id" | "elements">>, targetPageId?: string) => boolean;
+  deleteFilterMask: () => void;
   deleteLayerMask: () => void;
   detachBubbleAnchor: () => void;
   disarmAllPixelTools: () => void;
@@ -232,6 +236,7 @@ export interface StudioInspectorAsideHandlers {
   fitBubbleToText: () => Promise<void>;
   fitSelectedToFrame: () => Promise<void>;
   handleLayerNavigatorAction: (action: StudioLayerNavigatorAction) => void;
+  invertFilterMask: () => void;
   invertLayerMask: () => void;
   insertIsometricPrimitive: (spec: StudioIsometricPrimitiveSpec) => Promise<void>;
   insertIsometricSolid: () => void;
@@ -282,6 +287,7 @@ export interface StudioInspectorAsideHandlers {
   toggleWetMixTool: () => void;
   toggleEffectFavorite: (effectId: StudioEffectId) => void;
   toggleIsometricGridActive: () => void;
+  toggleFilterMaskEnabled: () => void;
   toggleLayerMaskEnabled: () => void;
   toggleLocalHidden: (id: string) => void;
   updateAdvancedFillSettings: (next: StudioAdvancedFillSettings) => void;
@@ -367,6 +373,14 @@ interface StudioInspectorAsideProps {
   isometricGridActive: boolean;
   isometricOriginX: number;
   isometricOriginY: number;
+  filterMaskBusy: boolean;
+  filterMaskHardness: number;
+  filterMaskPaintActive: boolean;
+  filterMaskPaintMode: FilterMaskPaintMode;
+  filterMaskRadius: number;
+  filterMaskStrength: number;
+  /** 선택 이미지에 활성 필터·보정이 하나라도 있는지(필터 마스크 효과 가시성 안내용). */
+  selectedImageHasActiveFilters: boolean;
   layerMaskBusy: boolean;
   layerMaskHardness: number;
   layerMaskPaintActive: boolean;
@@ -458,6 +472,11 @@ interface StudioInspectorAsideProps {
   setHistoryBrushSourceIndex: import("react").Dispatch<import("react").SetStateAction<number | null>>;
   setHistoryBrushSourceSrc: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setHistoryPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setFilterMaskHardness: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setFilterMaskPaintActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setFilterMaskPaintMode: import("react").Dispatch<import("react").SetStateAction<FilterMaskPaintMode>>;
+  setFilterMaskRadius: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setFilterMaskStrength: import("react").Dispatch<import("react").SetStateAction<number>>;
   setLayerMaskHardness: import("react").Dispatch<import("react").SetStateAction<number>>;
   setLayerMaskPaintActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setLayerMaskPaintMode: import("react").Dispatch<import("react").SetStateAction<LayerMaskPaintMode>>;
@@ -684,6 +703,13 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   isometricGridActive,
   isometricOriginX,
   isometricOriginY,
+  filterMaskBusy,
+  filterMaskHardness,
+  filterMaskPaintActive,
+  filterMaskPaintMode,
+  filterMaskRadius,
+  filterMaskStrength,
+  selectedImageHasActiveFilters,
   layerMaskBusy,
   layerMaskHardness,
   layerMaskPaintActive,
@@ -775,6 +801,11 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   setHistoryBrushSourceIndex,
   setHistoryBrushSourceSrc,
   setHistoryPanelOpen,
+  setFilterMaskHardness,
+  setFilterMaskPaintActive,
+  setFilterMaskPaintMode,
+  setFilterMaskRadius,
+  setFilterMaskStrength,
   setLayerMaskHardness,
   setLayerMaskPaintActive,
   setLayerMaskPaintMode,
@@ -920,6 +951,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   const {
     addAdvancedRuler,
     addBubbleShapePointFromInspector,
+    addFilterMask,
     addLayerGroup,
     addLayerMask,
     addVanishingPointHandler,
@@ -940,6 +972,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     clearHealCloneSource,
     clearPolyLassoDraft,
     commit,
+    deleteFilterMask,
     deleteLayerMask,
     detachBubbleAnchor,
     disarmAllPixelTools,
@@ -949,6 +982,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     fitBubbleToText,
     fitSelectedToFrame,
     handleLayerNavigatorAction,
+    invertFilterMask,
     invertLayerMask,
     insertIsometricPrimitive,
     insertIsometricSolid,
@@ -998,6 +1032,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     toggleDodgeBurnTool,
     toggleWetMixTool,
     toggleEffectFavorite,
+    toggleFilterMaskEnabled,
     toggleIsometricGridActive,
     toggleLayerMaskEnabled,
     toggleLocalHidden,
@@ -2492,6 +2527,37 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     onRadiusChange={setLayerMaskRadius}
                     onHardnessChange={setLayerMaskHardness}
                       onStrengthChange={setLayerMaskStrength}
+                    />
+                    </Suspense>
+                    {/* 필터 마스크 — 비파괴 필터 체인의 "적용 범위"를 칠하는 레이어 마스크의 쌍둥이.
+                        같은 마스크 탭 안에 나란히 둔다(가시성=레이어 마스크, 보정 범위=필터 마스크). */}
+                    <Suspense fallback={<StudioPanelLoading label="필터 마스크를 여는 중..." />}>
+                    <StudioFilterMaskPanel
+                    hasMask={!!selected.filterMaskSrc}
+                    enabled={selected.filterMaskEnabled !== false}
+                    hasActiveFilters={selectedImageHasActiveFilters}
+                    paintActive={filterMaskPaintActive}
+                    paintMode={filterMaskPaintMode}
+                    radiusPx={filterMaskRadius}
+                    hardness={filterMaskHardness}
+                    strength={filterMaskStrength}
+                    maskThumbnailSrc={selected.filterMaskSrc ?? null}
+                    busy={filterMaskBusy}
+                    onAddMask={addFilterMask}
+                    onDeleteMask={deleteFilterMask}
+                    onToggleEnabled={toggleFilterMaskEnabled}
+                    onInvert={invertFilterMask}
+                    onTogglePaintActive={() =>
+                      setFilterMaskPaintActive((v) => {
+                        const next = !v;
+                        if (next) disarmAllPixelTools();
+                        return next;
+                      })
+                    }
+                    onPaintModeChange={setFilterMaskPaintMode}
+                    onRadiusChange={setFilterMaskRadius}
+                    onHardnessChange={setFilterMaskHardness}
+                      onStrengthChange={setFilterMaskStrength}
                     />
                     </Suspense>
                   </div>

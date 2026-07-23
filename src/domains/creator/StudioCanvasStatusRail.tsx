@@ -2,6 +2,7 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  Combine,
   FolderPlus,
   Loader2,
   PaintBucket,
@@ -156,6 +157,11 @@ export interface StudioCanvasStatusRailProps {
   onClearAutosave: () => void;
   onGroupSelection: () => void;
   onAlignSelection: (alignment: StudioCanvasSelectionAlignment) => void;
+  /** 다중 선택에 병합 가능한 말풍선(2개 이상)이 있어 "말풍선 병합" 액션을 노출할지. */
+  showBubbleMerge?: boolean;
+  /** 병합 비활성 사유(null이면 활성) — 혼합 선택·개수 범위 초과 시 툴팁으로 안내. */
+  bubbleMergeDisabledReason?: string | null;
+  onMergeBubbles?: () => void;
   onDuplicateSelection: () => void;
   onRemoveSelection: () => void;
   onClearSelection: () => void;
@@ -177,6 +183,9 @@ export function StudioCanvasStatusRail({
   onClearAutosave,
   onGroupSelection,
   onAlignSelection,
+  showBubbleMerge = false,
+  bubbleMergeDisabledReason = null,
+  onMergeBubbles,
   onDuplicateSelection,
   onRemoveSelection,
   onClearSelection,
@@ -248,6 +257,22 @@ export function StudioCanvasStatusRail({
                 <FolderPlus size={13} aria-hidden />
                 <span>그룹화</span>
               </SelectionLayoutAction>
+            )}
+            {showBubbleMerge && onMergeBubbles && (
+              <button
+                type="button"
+                onClick={onMergeBubbles}
+                disabled={bubbleMergeDisabledReason !== null}
+                aria-label="선택한 말풍선 병합"
+                title={
+                  bubbleMergeDisabledReason ??
+                  "겹친 말풍선을 하나의 외곽선으로 병합합니다(실행취소 1회)."
+                }
+                className="flex items-center gap-1 rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-card"
+              >
+                <Combine size={13} aria-hidden />
+                <span>말풍선 병합</span>
+              </button>
             )}
             <div className="mx-1 h-4 w-px bg-line/60" />
             <div
