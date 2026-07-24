@@ -106,4 +106,22 @@ describe("StudioAnimTimelinePanel motion coach", () => {
   it("keeps wrapped onion-skin rows stretched to the inspector width", () => {
     expect(source.match(/className="w-full \[&>\*\]:w-full"/g)?.length ?? 0).toBe(4);
   });
+
+  it("wires extended ease options and clip rename without StudioPage glue", () => {
+    expect(source).toContain("setKeyframeEase");
+    expect(source).toContain("renameTimelineClip");
+    expect(source).toContain('data-testid="timeline-keyframe-ease"');
+    expect(source).toContain('data-testid="timeline-clip-add"');
+    expect(source).toContain('value: "ease-in"');
+    expect(source).toContain('value: "ease-out"');
+
+    const html = renderTimeline(4, {
+      locked: false,
+      playhead: 0,
+      track: [{ frameIndex: 0, frame: { id: "f0", src: "data:x" }, ease: "ease-out" }],
+    });
+    expect(html).toContain('data-testid="timeline-keyframe-ease"');
+    expect(html).toContain("가속 (ease-in)");
+    expect(html).toContain("클립 추가");
+  });
 });

@@ -38,7 +38,8 @@ export interface StudioAnimTransform {
   scaleY: number;
 }
 
-export type StudioAnimEase = "linear" | "ease-in-out";
+/** Shipped keyframe ease set (CSP-like small curve menu). */
+export type StudioAnimEase = "linear" | "ease-in" | "ease-out" | "ease-in-out";
 
 /** 트랙(레이어) 하나의 키프레임 하나. frameIndex는 공유 타임라인 위의 절대 위치(0..frameCount-1). */
 export interface StudioAnimKeyframe {
@@ -49,16 +50,42 @@ export interface StudioAnimKeyframe {
   ease?: StudioAnimEase;
 }
 
+const STUDIO_ANIM_EASE_SET = new Set<string>(["linear", "ease-in", "ease-out", "ease-in-out"]);
+
+export function isStudioAnimEase(value: unknown): value is StudioAnimEase {
+  return typeof value === "string" && STUDIO_ANIM_EASE_SET.has(value);
+}
+
+export function normalizeStudioAnimEase(value: unknown): StudioAnimEase {
+  return isStudioAnimEase(value) ? value : "linear";
+}
+
+/**
+ * Named exposure range (CLIP STUDIO–style clip) on the shared frame axis.
+ * Inclusive startFrame..endFrame; used for multi-timeline labels and export windows.
+ */
+export interface StudioAnimClipRange {
+  id: string;
+  name: string;
+  startFrame: number;
+  endFrame: number;
+}
+
 /**
  * 페이지 하나의 다중 레이어 타임라인. tracks는 layerElementId(El.id) → 오름차순 정렬된
  * StudioAnimKeyframe[] (sparse — "가장 최근 keyframe.frameIndex ≤ 조회 인덱스"가 그 프레임의
  * 표시값, held-until-next). 트랙이 없는 요소(레코드에 키가 없음)는 애니메이션과 무관한
  * "정지 레이어"로, 매 프레임 원래 모습 그대로 합성된다.
+ * clips는 이름 있는 노출 구간(다중 타임라인/클립) — 키프레임 데이터와 독립 레이블이다.
  */
 export interface AnimationTimelineDoc {
   fps: number;
   frameCount: number; // 공유 타임라인 총 길이(프레임 수). 각 트랙 키프레임의 frameIndex 상한.
   tracks: Record<string, StudioAnimKeyframe[]>;
+  /** Named multi-timeline / clip exposure ranges (optional for legacy docs). */
+  clips?: readonly StudioAnimClipRange[];
+  /** Active clip id for scrub/export focus; omitted = full timeline. */
+  activeClipId?: string;
 }
 
 export const DEFAULT_TIMELINE_FRAME_COUNT = 24; // 12fps 기준 2초 — 첫 화면에서 다루기 쉬운 길이
@@ -70,6 +97,8 @@ export const MAX_TIMELINE_FRAME_COUNT = MAX_ANIM_FRAMES; // 60
 // 키프레임은 frameIndex가 겹칠 수 없으므로 frameCount 이하로 자연히 제한되지만, 문서 크기
 // 폭주(N트랙 × 60키프레임 각각 PNG dataURL)를 명시적으로 방어하기 위해 트랙별로도 캡한다.
 export const MAX_TRACK_KEYFRAMES = MAX_ANIM_FRAMES;
+export const MAX_TIMELINE_CLIPS = 32;
+export const MAX_CLIP_NAME_LENGTH = 80;
 
 // ── 생성/정규화 ──────────────────────────────────────────────────────
 
@@ -82,6 +111,48 @@ export function createEmptyAnimationTimelineDoc(
     frameCount: Math.round(clamp(frameCount, MIN_TIMELINE_FRAME_COUNT, MAX_TIMELINE_FRAME_COUNT)),
     tracks: {},
   };
+}
+
+function normalizeClipName(value: unknown): string {
+  if (typeof value !== "string") return "클립";
+  const trimmed = value.replace(/\s+/gu, " ").trim().slice(0, MAX_CLIP_NAME_LENGTH);
+  return trimmed || "클립";
+}
+
+function normalizeClipRange(
+  value: unknown,
+  frameCount: number
+): StudioAnimClipRange | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const id = typeof record.id === "string" ? record.id.trim().slice(0, 80) : "";
+  if (!id) return null;
+  const start = Math.round(clamp(Number(record.startFrame), 0, Math.max(0, frameCount - 1)));
+  const end = Math.round(clamp(Number(record.endFrame), 0, Math.max(0, frameCount - 1)));
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end) return null;
+  return {
+    id,
+    name: normalizeClipName(record.name),
+    startFrame: start,
+    endFrame: end,
+  };
+}
+
+function normalizeTimelineClips(
+  clips: readonly unknown[] | undefined,
+  frameCount: number
+): StudioAnimClipRange[] | undefined {
+  if (!clips?.length) return undefined;
+  const seen = new Set<string>();
+  const next: StudioAnimClipRange[] = [];
+  for (const raw of clips) {
+    if (next.length >= MAX_TIMELINE_CLIPS) break;
+    const clip = normalizeClipRange(raw, frameCount);
+    if (!clip || seen.has(clip.id)) continue;
+    seen.add(clip.id);
+    next.push(clip);
+  }
+  return next.length > 0 ? next : undefined;
 }
 
 /**
@@ -102,7 +173,169 @@ export function normalizeAnimationTimelineDoc(doc: Partial<AnimationTimelineDoc>
       .slice(0, MAX_TRACK_KEYFRAMES);
     if (kept.length > 0) tracks[trackId] = kept;
   }
-  return { fps, frameCount, tracks };
+  const clips = normalizeTimelineClips(doc?.clips as readonly unknown[] | undefined, frameCount);
+  const activeClipId =
+    typeof doc?.activeClipId === "string"
+    && clips?.some((clip) => clip.id === doc.activeClipId)
+      ? doc.activeClipId
+      : undefined;
+  return {
+    fps,
+    frameCount,
+    tracks,
+    ...(clips ? { clips } : {}),
+    ...(activeClipId ? { activeClipId } : {}),
+  };
+}
+
+/** Inclusive frame window for the active clip, or the full timeline when none is selected. */
+export function resolveActiveClipExposure(
+  doc: AnimationTimelineDoc
+): { startFrame: number; endFrame: number; clip: StudioAnimClipRange | null } {
+  const clips = doc.clips ?? [];
+  const active = doc.activeClipId
+    ? clips.find((clip) => clip.id === doc.activeClipId) ?? null
+    : null;
+  if (active) {
+    return { startFrame: active.startFrame, endFrame: active.endFrame, clip: active };
+  }
+  return {
+    startFrame: 0,
+    endFrame: Math.max(0, doc.frameCount - 1),
+    clip: null,
+  };
+}
+
+/** Whether a global frame is inside the active exposure range (inclusive). */
+export function isFrameInActiveClipExposure(doc: AnimationTimelineDoc, frameIndex: number): boolean {
+  const { startFrame, endFrame } = resolveActiveClipExposure(doc);
+  return frameIndex >= startFrame && frameIndex <= endFrame;
+}
+
+/**
+ * Upsert a named clip exposure range. Replaces same id; rejects invalid ranges and max cap.
+ * No-op returns the original document reference.
+ */
+export function setTimelineClip(
+  doc: AnimationTimelineDoc,
+  clip: StudioAnimClipRange
+): AnimationTimelineDoc {
+  const normalized = normalizeClipRange(clip, doc.frameCount);
+  if (!normalized) return doc;
+  const existing = doc.clips ?? [];
+  const index = existing.findIndex((entry) => entry.id === normalized.id);
+  if (index === -1 && existing.length >= MAX_TIMELINE_CLIPS) return doc;
+  if (
+    index >= 0
+    && existing[index]!.name === normalized.name
+    && existing[index]!.startFrame === normalized.startFrame
+    && existing[index]!.endFrame === normalized.endFrame
+  ) {
+    return doc;
+  }
+  const clips =
+    index === -1
+      ? [...existing, normalized]
+      : existing.map((entry, i) => (i === index ? normalized : entry));
+  return { ...doc, clips };
+}
+
+export function removeTimelineClip(
+  doc: AnimationTimelineDoc,
+  clipId: string
+): AnimationTimelineDoc {
+  const existing = doc.clips ?? [];
+  if (!existing.some((clip) => clip.id === clipId)) return doc;
+  const clips = existing.filter((clip) => clip.id !== clipId);
+  const activeClipId = doc.activeClipId === clipId ? undefined : doc.activeClipId;
+  const next: AnimationTimelineDoc = { ...doc };
+  if (clips.length > 0) next.clips = clips;
+  else delete next.clips;
+  if (activeClipId) next.activeClipId = activeClipId;
+  else delete next.activeClipId;
+  return next;
+}
+
+export function setActiveTimelineClip(
+  doc: AnimationTimelineDoc,
+  clipId: string | null
+): AnimationTimelineDoc {
+  if (clipId == null || clipId === "") {
+    if (!doc.activeClipId) return doc;
+    const next = { ...doc };
+    delete next.activeClipId;
+    return next;
+  }
+  if (!(doc.clips ?? []).some((clip) => clip.id === clipId)) return doc;
+  if (doc.activeClipId === clipId) return doc;
+  return { ...doc, activeClipId: clipId };
+}
+
+/**
+ * Rename a named multi-timeline clip (CSP-style clip folder label). No-op when id missing or
+ * the name is unchanged after sanitization.
+ */
+export function renameTimelineClip(
+  doc: AnimationTimelineDoc,
+  clipId: string,
+  name: string
+): AnimationTimelineDoc {
+  const existing = doc.clips ?? [];
+  const index = existing.findIndex((clip) => clip.id === clipId);
+  if (index < 0) return doc;
+  const nextName = normalizeClipName(name);
+  if (existing[index]!.name === nextName) return doc;
+  const clips = existing.map((clip, i) => (i === index ? { ...clip, name: nextName } : clip));
+  return { ...doc, clips };
+}
+
+/**
+ * Ease curve sample for UI editors (0..1 → 0..1). Alias of the shipped ease set so keyframe
+ * panels can expose a small CSP-like curve menu without embedding a full graph editor.
+ */
+export type StudioAnimEaseExtended = StudioAnimEase;
+
+export function easeStudioAnimProgressExtended(
+  t: number,
+  ease: StudioAnimEaseExtended = "linear"
+): number {
+  return easeStudioAnimProgress(t, normalizeStudioAnimEase(ease));
+}
+
+/**
+ * Patch ease on an existing keyframe. `null` removes the ease field (defaults to linear at
+ * sample time). No-op when the track/keyframe is missing or the sanitized ease is unchanged.
+ */
+export function setKeyframeEase(
+  doc: AnimationTimelineDoc,
+  trackId: string,
+  frameIndex: number,
+  ease: StudioAnimEase | null
+): AnimationTimelineDoc {
+  const track = doc.tracks[trackId];
+  if (!track) return doc;
+  const pos = trackKeyframeIndexOf(track, frameIndex);
+  if (pos < 0) return doc;
+  const current = track[pos]!;
+  if (ease === null) {
+    if (current.ease === undefined) return doc;
+    const nextTrack = track.map((keyframe, index) => {
+      if (index !== pos) return keyframe;
+      const cleared: StudioAnimKeyframe = {
+        frameIndex: keyframe.frameIndex,
+        frame: keyframe.frame,
+        ...(keyframe.transform ? { transform: { ...keyframe.transform } } : {}),
+      };
+      return cleared;
+    });
+    return { ...doc, tracks: { ...doc.tracks, [trackId]: nextTrack } };
+  }
+  const nextEase = normalizeStudioAnimEase(ease);
+  if (current.ease === nextEase) return doc;
+  const nextTrack = track.map((keyframe, index) =>
+    index === pos ? { ...keyframe, ease: nextEase } : keyframe
+  );
+  return { ...doc, tracks: { ...doc.tracks, [trackId]: nextTrack } };
 }
 
 // ── 문서 레벨 변경(불변, no-op은 동일 참조) ───────────────────────────
@@ -162,7 +395,10 @@ export function normalizeStudioAnimTransform(value?: Partial<StudioAnimTransform
 
 export function easeStudioAnimProgress(t: number, ease: StudioAnimEase = "linear"): number {
   const x = clamp(t, 0, 1);
-  if (ease === "ease-in-out") {
+  const kind = normalizeStudioAnimEase(ease);
+  if (kind === "ease-in") return x * x;
+  if (kind === "ease-out") return 1 - (1 - x) * (1 - x);
+  if (kind === "ease-in-out") {
     return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
   }
   return x;

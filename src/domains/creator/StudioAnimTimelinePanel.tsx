@@ -10,16 +10,24 @@ import { Eye, EyeOff, GanttChartSquare, Ghost, Lock, Pause, Play, Plus, Trash2, 
 import { Fragment, useEffect } from "react";
 
 import {
+  MAX_CLIP_NAME_LENGTH,
+  MAX_TIMELINE_CLIPS,
   MAX_TIMELINE_FRAME_COUNT,
   MIN_TIMELINE_FRAME_COUNT,
   canAddKeyframe,
   hasTrack,
+  isStudioAnimEase,
   onionSkinLayersForTrack,
+  renameTimelineClip,
   resolveTrackFrameAt,
+  setActiveTimelineClip,
   setDocFps,
   setFrameCount,
+  setKeyframeEase,
+  setTimelineClip,
   trackKeyframeIndexOf,
   type AnimationTimelineDoc,
+  type StudioAnimEase,
 } from "./studio-anim-tracks";
 import { MAX_FRAME_FPS, MIN_FRAME_FPS, type OnionSkinSettings } from "./studio-frame-animation";
 import { PANEL_LABEL_ROW, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
@@ -36,6 +44,24 @@ import { cn } from "@/lib/utils";
 const LABEL_COL_PX = 132;
 const FRAME_COL_PX = 24;
 const ROW_H_PX = 30;
+
+const EASE_OPTIONS: ReadonlyArray<{ readonly value: StudioAnimEase; readonly label: string }> = [
+  { value: "linear", label: "선형" },
+  { value: "ease-in", label: "가속 (ease-in)" },
+  { value: "ease-out", label: "감속 (ease-out)" },
+  { value: "ease-in-out", label: "가감속 (ease-in-out)" },
+];
+
+function createTimelineClipId(): string {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return `clip-${crypto.randomUUID()}`;
+    }
+  } catch {
+    // fall through
+  }
+  return `clip-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 /** 타임라인 그리드 한 행("트랙 후보") — El.id/elementLabel(el) 상당을 StudioPage가 계산해 넘긴다. */
 export interface StudioAnimTimelineRow {
@@ -85,7 +111,11 @@ export function StudioAnimTimelinePanel({
 }: StudioAnimTimelinePanelProps): ReactElement {
   const focusedRow = focusedTrackId ? (rows.find((r) => r.id === focusedTrackId) ?? null) : null;
   const focusedTrack = focusedTrackId ? (doc.tracks[focusedTrackId] ?? []) : [];
-  const replacingKeyframe = trackKeyframeIndexOf(focusedTrack, playhead) !== -1;
+  const focusedKeyframePos = trackKeyframeIndexOf(focusedTrack, playhead);
+  const replacingKeyframe = focusedKeyframePos !== -1;
+  const focusedKeyframe = focusedKeyframePos !== -1 ? focusedTrack[focusedKeyframePos] ?? null : null;
+  const focusedKeyframeEase: StudioAnimEase = focusedKeyframe?.ease ?? "linear";
+  const clips = doc.clips ?? [];
   const playbackDisabledReason =
     doc.frameCount < 2 ? "재생하려면 타임라인이 2프레임 이상이어야 해요." : undefined;
   const addKeyframeDisabledReason = !focusedRow
@@ -200,6 +230,94 @@ export function StudioAnimTimelinePanel({
             <span className="text-[0.72rem] tabular-nums text-fg-3">
               재생헤드 {playhead + 1} / {doc.frameCount}
             </span>
+          </div>
+
+          {/* Named clip exposure ranges — rename/select without a full multi-timeline editor. */}
+          <div className="space-y-1.5 border-t border-line/60 pt-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[0.72rem] font-semibold text-fg-3 uppercase tracking-wider">
+                클립 ({clips.length}/{MAX_TIMELINE_CLIPS})
+              </p>
+              <button
+                type="button"
+                data-testid="timeline-clip-add"
+                disabled={clips.length >= MAX_TIMELINE_CLIPS}
+                title={
+                  clips.length >= MAX_TIMELINE_CLIPS
+                    ? `클립은 최대 ${MAX_TIMELINE_CLIPS}개까지 만들 수 있어요`
+                    : "전체 타임라인을 덮는 이름 있는 클립을 추가합니다"
+                }
+                onClick={() => {
+                  const id = createTimelineClipId();
+                  onDocChange(
+                    setActiveTimelineClip(
+                      setTimelineClip(doc, {
+                        id,
+                        name: `클립 ${clips.length + 1}`,
+                        startFrame: 0,
+                        endFrame: Math.max(0, doc.frameCount - 1),
+                      }),
+                      id,
+                    ),
+                  );
+                }}
+                className={cn(buttonClass({ size: "sm", variant: "outline" }), "gap-1 text-[0.7rem]")}
+              >
+                <Plus size={12} />
+                클립 추가
+              </button>
+            </div>
+            {clips.length === 0 ? (
+              <p className="text-[0.68rem] leading-relaxed text-fg-3" role="status">
+                이름 있는 클립으로 노출 구간을 표시·선택할 수 있어요. 키프레임 데이터와는 별개입니다.
+              </p>
+            ) : (
+              <ul className="space-y-1.5" data-testid="timeline-clip-list">
+                {clips.map((clip) => {
+                  const isActive = doc.activeClipId === clip.id;
+                  return (
+                    <li
+                      key={clip.id}
+                      className={cn(
+                        "flex flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1.5",
+                        isActive ? "border-accent/50 bg-accent-soft/40" : "border-line/60 bg-card/40",
+                      )}
+                    >
+                      <button
+                        type="button"
+                        aria-pressed={isActive}
+                        title={isActive ? "전체 타임라인으로 돌아가기" : "이 클립 구간을 활성 노출로 사용"}
+                        onClick={() =>
+                          onDocChange(setActiveTimelineClip(doc, isActive ? null : clip.id))
+                        }
+                        className={cn(
+                          "shrink-0 rounded-md border px-1.5 py-0.5 text-[0.65rem] font-semibold",
+                          isActive
+                            ? "border-accent/50 bg-accent text-on-accent"
+                            : "border-line bg-canvas text-fg-2 hover:bg-raised",
+                        )}
+                      >
+                        {isActive ? "활성" : "선택"}
+                      </button>
+                      <input
+                        type="text"
+                        value={clip.name}
+                        maxLength={MAX_CLIP_NAME_LENGTH}
+                        aria-label={`클립 ${clip.id} 이름`}
+                        data-testid={`timeline-clip-rename-${clip.id}`}
+                        onChange={(event) => {
+                          onDocChange(renameTimelineClip(doc, clip.id, event.target.value));
+                        }}
+                        className="min-w-0 flex-1 rounded-md border border-line bg-canvas px-2 py-1 text-xs text-fg outline-none focus:border-accent/50"
+                      />
+                      <span className="shrink-0 text-[0.62rem] tabular-nums text-fg-3">
+                        {clip.startFrame + 1}–{clip.endFrame + 1}f
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         </div>
 
@@ -421,6 +539,29 @@ export function StudioAnimTimelinePanel({
                 현재 프레임({playhead + 1}) 키프레임 {replacingKeyframe ? "갱신" : "추가"}
               </button>
             </StudioToolHintTarget>
+
+            {focusedKeyframe && focusedRow.eligible && !focusedRow.locked ? (
+              <label className={PANEL_LABEL_ROW}>
+                이징 (프레임 {playhead + 1})
+                <select
+                  value={focusedKeyframeEase}
+                  aria-label={`프레임 ${playhead + 1} 키프레임 이징`}
+                  data-testid="timeline-keyframe-ease"
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    if (!isStudioAnimEase(next)) return;
+                    onDocChange(setKeyframeEase(doc, focusedRow.id, playhead, next));
+                  }}
+                  className="min-w-0 flex-1 rounded-md border border-line bg-canvas px-2 py-1 text-xs text-fg outline-none focus:border-accent/50"
+                >
+                  {EASE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             {!focusedRow.eligible && (
               <p className="text-[0.7rem] text-fg-3" role="status">
                 이미지 레이어이면서 단일-셀 프레임 애니메이션을 쓰지 않을 때만 트랙을 만들 수 있어요.
