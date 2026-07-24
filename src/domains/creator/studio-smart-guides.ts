@@ -215,8 +215,9 @@ export interface PointObjectSnapResult {
  * Whether stroke/shape placement should consult object edges for this sample.
  *
  * - Eraser / directional rulers (perspective, isometric, advanced) stay out of the way.
- * - Freehand mid-samples stay raw (continuous edge-chasing is multi-hour UX); only the start
- *   sample and every shape/line endpoint snap.
+ * - Freehand: every sample (origin + mid). Mid samples use axis latch
+ *   (`planFreehandObjectSnapPoint`) so continuous nearest-edge chase cannot zigzag the stroke.
+ * - Shape/line: every endpoint.
  */
 export function shouldApplyStrokeObjectSnap(input: {
   readonly snapEnabled: boolean;
@@ -229,9 +230,164 @@ export function shouldApplyStrokeObjectSnap(input: {
   if (!input.snapEnabled) return false;
   if (input.mode === "eraser") return false;
   if (input.directionalRulerActive) return false;
-  const kind = input.kind ?? "freehand";
-  if (kind === "freehand") return input.sampleIndex === 0;
+  // sampleIndex is reserved for callers that still branch UI hints; freehand mid is eligible.
+  void input.sampleIndex;
+  void input.kind;
   return true;
+}
+
+/**
+ * Per-axis sticky latch for freehand object snap (CSP-class "draw along edge").
+ * Holding a guide while the tip stays inside the hold radius prevents zigzag hopping between
+ * nearby object edges during continuous freehand sampling.
+ */
+export interface FreehandObjectSnapLatch {
+  readonly guideX: number | null;
+  readonly guideY: number | null;
+}
+
+export const EMPTY_FREEHAND_OBJECT_SNAP_LATCH: FreehandObjectSnapLatch = Object.freeze({
+  guideX: null,
+  guideY: null,
+});
+
+/** Release radius = capture threshold × this factor (must be ≥ 1). */
+export const FREEHAND_OBJECT_SNAP_HOLD_FACTOR = 1.75;
+
+export interface FreehandObjectSnapPlanInput {
+  readonly x: number;
+  readonly y: number;
+  readonly others: readonly GuideBox[];
+  readonly latch: FreehandObjectSnapLatch;
+  readonly threshold?: number;
+  readonly holdFactor?: number;
+}
+
+export interface FreehandObjectSnapPlanResult extends PointObjectSnapResult {
+  readonly latch: FreehandObjectSnapLatch;
+}
+
+function resolveFreehandObjectSnapAxis(
+  raw: number,
+  latchedGuide: number | null,
+  nearestGuide: number | null,
+  nearestKind: "edge" | "center" | null,
+  captureThreshold: number,
+  holdThreshold: number
+): {
+  value: number;
+  guide: number | null;
+  kind: "edge" | "center" | null;
+  snapped: boolean;
+  nextLatch: number | null;
+} {
+  if (latchedGuide !== null && Number.isFinite(latchedGuide)) {
+    // Stick to the latched guide while the raw tip is still within the hold radius — even when
+    // another object edge is closer. That is the zigzag kill switch.
+    if (Math.abs(raw - latchedGuide) <= holdThreshold) {
+      const kind =
+        nearestGuide !== null && Math.abs(nearestGuide - latchedGuide) <= EXACT_EPS
+          ? nearestKind
+          : "edge";
+      return {
+        value: latchedGuide,
+        guide: latchedGuide,
+        kind,
+        snapped: true,
+        nextLatch: latchedGuide,
+      };
+    }
+  }
+
+  // Fresh capture only inside the tighter capture threshold (not the hold radius).
+  if (
+    nearestGuide !== null
+    && Number.isFinite(nearestGuide)
+    && Math.abs(raw - nearestGuide) <= captureThreshold
+  ) {
+    return {
+      value: nearestGuide,
+      guide: nearestGuide,
+      kind: nearestKind,
+      snapped: true,
+      nextLatch: nearestGuide,
+    };
+  }
+
+  return {
+    value: raw,
+    guide: null,
+    kind: null,
+    snapped: false,
+    nextLatch: null,
+  };
+}
+
+/**
+ * Freehand tip snap with per-axis latch: acquire within `threshold`, hold until
+ * `threshold * holdFactor` pull-away, never hop guides while latched.
+ */
+export function planFreehandObjectSnapPoint(
+  input: FreehandObjectSnapPlanInput
+): FreehandObjectSnapPlanResult {
+  const threshold = input.threshold ?? SMART_SNAP_THRESHOLD;
+  const holdFactor = Math.max(1, input.holdFactor ?? FREEHAND_OBJECT_SNAP_HOLD_FACTOR);
+  const holdThreshold = threshold * holdFactor;
+  const empty: FreehandObjectSnapPlanResult = {
+    x: input.x,
+    y: input.y,
+    snappedX: false,
+    snappedY: false,
+    guideX: null,
+    guideY: null,
+    kindX: null,
+    kindY: null,
+    latch: EMPTY_FREEHAND_OBJECT_SNAP_LATCH,
+  };
+  if (!Number.isFinite(input.x) || !Number.isFinite(input.y) || !(threshold > 0)) {
+    return empty;
+  }
+
+  // Search within the hold radius so we can re-detect kind while latched; capture still uses
+  // the tighter threshold inside resolveFreehandObjectSnapAxis.
+  const nearest = snapPointToObjectGuides(input.x, input.y, input.others, {
+    threshold: holdThreshold,
+  });
+  const axisX = resolveFreehandObjectSnapAxis(
+    input.x,
+    input.latch.guideX,
+    nearest.guideX,
+    nearest.kindX,
+    threshold,
+    holdThreshold
+  );
+  const axisY = resolveFreehandObjectSnapAxis(
+    input.y,
+    input.latch.guideY,
+    nearest.guideY,
+    nearest.kindY,
+    threshold,
+    holdThreshold
+  );
+  const nextLatch: FreehandObjectSnapLatch =
+    axisX.nextLatch === null && axisY.nextLatch === null
+      ? EMPTY_FREEHAND_OBJECT_SNAP_LATCH
+      : {
+          guideX: axisX.nextLatch,
+          guideY: axisY.nextLatch,
+        };
+
+  return {
+    x: axisX.value,
+    y: axisY.value,
+    snappedX: axisX.snapped,
+    snappedY: axisY.snapped,
+    guideX: axisX.guide,
+    guideY: axisY.guide,
+    kindX: axisX.kind,
+    kindY: axisY.kind,
+    latch: nextLatch,
+  };
 }
 
 /** Snap a document-space point to neighboring element edge/center guides. */

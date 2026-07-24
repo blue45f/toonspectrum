@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  EMPTY_FREEHAND_OBJECT_SNAP_LATCH,
   EMPTY_SMART_GUIDE_OVERLAY,
   SMART_GUIDE_EPSILON,
   SMART_SNAP_THRESHOLD,
   buildPointObjectSnapOverlay,
   buildSmartGuideOverlay,
   computeSmartSnap,
+  planFreehandObjectSnapPoint,
   shouldApplyStrokeObjectSnap,
   smartGuideOverlaysEqual,
   snapPointToObjectGuides,
@@ -297,7 +299,7 @@ describe("stroke/shape object snap — point placement", () => {
     expect(snap.y).toBe(200);
   });
 
-  it("gates freehand to the origin sample only while shapes always snap", () => {
+  it("allows freehand mid samples (latch path) while still blocking eraser and rulers", () => {
     expect(shouldApplyStrokeObjectSnap({
       snapEnabled: true,
       kind: "freehand",
@@ -307,7 +309,7 @@ describe("stroke/shape object snap — point placement", () => {
       snapEnabled: true,
       kind: "freehand",
       sampleIndex: 3,
-    })).toBe(false);
+    })).toBe(true);
     expect(shouldApplyStrokeObjectSnap({
       snapEnabled: true,
       kind: "line",
@@ -325,6 +327,47 @@ describe("stroke/shape object snap — point placement", () => {
       sampleIndex: 0,
       directionalRulerActive: true,
     })).toBe(false);
+  });
+
+  it("latches freehand mid samples to the acquired edge and refuses guide hopping", () => {
+    // Two vertical edges 8px apart; capture threshold 6, hold factor 1.75 → hold radius 10.5.
+    const others = [box("left", 0, 0, 100, 80), box("right", 108, 0, 40, 80)];
+    const origin = planFreehandObjectSnapPoint({
+      x: 103,
+      y: 40,
+      others,
+      latch: EMPTY_FREEHAND_OBJECT_SNAP_LATCH,
+      threshold: 6,
+      holdFactor: 1.75,
+    });
+    expect(origin.x).toBe(100);
+    expect(origin.latch.guideX).toBe(100);
+
+    // Closer to the right edge (108) raw, but still within hold radius of latched 100 → stick.
+    const mid = planFreehandObjectSnapPoint({
+      x: 106,
+      y: 55,
+      others,
+      latch: origin.latch,
+      threshold: 6,
+      holdFactor: 1.75,
+    });
+    expect(mid.x).toBe(100);
+    expect(mid.latch.guideX).toBe(100);
+    expect(mid.snappedX).toBe(true);
+
+    // Pull past hold radius → release and return raw (not auto-hop to 108 unless capture allows).
+    const released = planFreehandObjectSnapPoint({
+      x: 112,
+      y: 55,
+      others,
+      latch: origin.latch,
+      threshold: 6,
+      holdFactor: 1.75,
+    });
+    // |112-100|=12 > 10.5 hold; |112-108|=4 ≤ 6 capture → re-acquire right edge.
+    expect(released.x).toBe(108);
+    expect(released.latch.guideX).toBe(108);
   });
 
   it("builds an overlay for a snapped tip without spacing badges", () => {

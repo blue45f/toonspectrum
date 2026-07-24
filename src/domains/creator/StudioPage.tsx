@@ -1130,15 +1130,18 @@ import { verifyStudioSharedAssetContent } from "./studio-shared-asset-content";
 import { parseStudioAssetDragPayload } from "./studio-shared-asset-drag";
 import { sameCategoryItems } from "./studio-similar-style";
 import {
+  EMPTY_FREEHAND_OBJECT_SNAP_LATCH,
   EMPTY_SMART_GUIDE_OVERLAY,
   SMART_GUIDE_EPSILON,
   SMART_SNAP_THRESHOLD,
   buildPointObjectSnapOverlay,
   buildSmartGuideOverlay,
   computeSmartSnap,
+  planFreehandObjectSnapPoint,
   shouldApplyStrokeObjectSnap,
   smartGuideOverlaysEqual,
   snapPointToObjectGuides,
+  type FreehandObjectSnapLatch,
   type GuideBox,
   type SmartGuideOverlay,
 } from "./studio-smart-guides";
@@ -8052,6 +8055,8 @@ function StudioCuttoonEditor() {
   const advancedRulerSnapRef = useRef<StudioAdvancedRulerSnapState | null>(null);
   /** Frozen element bboxes for the active stroke contact (object snap). */
   const strokeObjectSnapCacheRef = useRef<StudioStrokeObjectSnapCache | null>(null);
+  /** Per-axis freehand object-snap latch for mid-sample stickiness (cleared with the stroke). */
+  const freehandObjectSnapLatchRef = useRef<FreehandObjectSnapLatch>(EMPTY_FREEHAND_OBJECT_SNAP_LATCH);
   const quickShapeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const quickShapeStillElapsedRef = useRef<number>(0);
   const quickShapeStillAnchorRef = useRef<{ x: number; y: number } | null>(null);
@@ -21990,6 +21995,7 @@ function StudioCuttoonEditor() {
     isometricAxisRayRef.current = null;
     advancedRulerSnapRef.current = null;
     strokeObjectSnapCacheRef.current = null;
+    freehandObjectSnapLatchRef.current = EMPTY_FREEHAND_OBJECT_SNAP_LATCH;
     stopQuickShapeTracking();
     // 취소 정리는 표면을 즉시 지우므로, 커밋 대기 중 획을 먼저 동기화해 잉크 유실을 막는다.
     flushPendingStrokeCommitsRef.current();
@@ -23121,7 +23127,7 @@ function StudioCuttoonEditor() {
       } = drawStartPlan;
       let { element: next, strokeOrigin } = drawStartPlan;
       // Snap the stroke origin to neighboring object edges (freehand start / shape origin) when
-      // no directional ruler is active. Mid freehand samples stay raw in appendFreehandStrokePoint.
+      // no directional ruler is active. Freehand mid samples use axis latch in appendFreehandStrokePoint.
       {
         const directionalRulerActive = Boolean(
           strokeAdvancedRuler
@@ -23515,9 +23521,23 @@ function StudioCuttoonEditor() {
     if (!strokeId) return { x, y };
     const others = strokeObjectSnapTargetsFor(strokeId, options.excludeId);
     if (others.length === 0) return { x, y };
-    const snap = snapPointToObjectGuides(x, y, others, {
-      threshold: SMART_SNAP_THRESHOLD / Math.max(effScale, 1e-6),
-    });
+    const threshold = SMART_SNAP_THRESHOLD / Math.max(effScale, 1e-6);
+    const kind = options.kind ?? "freehand";
+    // Freehand uses axis latch so mid-samples can stick to edges without nearest-edge zigzag.
+    // Shapes/lines keep pure nearest-edge snap (no latch state).
+    const snap = kind === "freehand"
+      ? (() => {
+          const planned = planFreehandObjectSnapPoint({
+            x,
+            y,
+            others,
+            latch: freehandObjectSnapLatchRef.current,
+            threshold,
+          });
+          freehandObjectSnapLatchRef.current = planned.latch;
+          return planned;
+        })()
+      : snapPointToObjectGuides(x, y, others, { threshold });
     if (snap.snappedX || snap.snappedY) {
       applySmartGuides(buildPointObjectSnapOverlay(
         snap.x,
@@ -24315,9 +24335,9 @@ function StudioCuttoonEditor() {
       }
       [targetX, targetY] = snapStrokePointToIsometricGrid(targetX, targetY, isometricAxisRayRef.current);
     } else if (current.mode !== "eraser" && !pointerSample.shiftKey) {
-      // CSP-class object snap: freehand origin (sample 0, applied at pointerdown) + every
-      // shape/line endpoint. Mid freehand samples stay raw so continuous edge-chasing cannot
-      // zigzag the stroke. This branch only runs when no directional ruler owns the sample.
+      // CSP-class object snap: freehand (origin + mid via axis latch) and shape/line endpoints.
+      // Freehand latch holds the acquired edge until pull-away so mid samples do not zigzag.
+      // This branch only runs when no directional ruler owns the sample.
       const sampleIndex = Math.max(0, Math.floor(current.points.length / 2));
       const snapped = applyStrokeObjectSnapToPoint(targetX, targetY, {
         mode: current.mode,
@@ -25390,6 +25410,7 @@ function StudioCuttoonEditor() {
       scheduleLiveDrawPressure(null);
       applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
       strokeObjectSnapCacheRef.current = null;
+      freehandObjectSnapLatchRef.current = EMPTY_FREEHAND_OBJECT_SNAP_LATCH;
       gpuFinalFallbackOrderIdsRef.current = immediateSurfaceHandoff?.strokeIds ?? null;
       clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup });
       // Re-rasterize the newest settled overlay stroke from the release-planner geometry so the

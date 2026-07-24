@@ -30,6 +30,7 @@ Finite shippable batch after CSP EX / Magma / Photopea / Procreate / SHAPER surv
 | CSP Size dynamics Min (pressure floor) | `pressureMinSize` snapshot + `studioBrushPressureWithMinSize` on hardware/velocity channels; Brush Studio “최소 굵기” |
 | CSP vector eraser erase-to-intersection | Pure plan + document apply + desktop dock scissors + **mobile eraser sheet** toggle; freehand pen click erases between nearest cuts |
 | CSP layer solo (client-only) | `studio-layer-solo.ts` pure toggle/clear + snapshot restore; navigator 「솔로」 next to 「나만 숨기기」; InspectorAside glue; localHidden only (no CRDT `hidden`) |
+| CSP freehand mid-sample object snap (axis latch) | `planFreehandObjectSnapPoint` capture/hold hysteresis; freehand mid samples stick to latched edge (no nearest-edge zigzag); shape/line endpoints unchanged |
 
 ## Still deferred (honest multi-hour / industry)
 
@@ -44,7 +45,7 @@ Finite shippable batch after CSP EX / Magma / Photopea / Procreate / SHAPER surv
 
 ## Stop condition
 
-Finite high-ROI shippable rows for this Clip-Studio-class batch are closed (including perspective eye-level/horizon lock, stroke/shape object snap for freehand origin + shape·line endpoints, object-snap target cache, mobile immersive menubar polish, CSP layer solo on localHidden, flicker fix, auto-color paths, erase-to-intersection, pressure min size). Remaining items are multi-hour poser runtime (frame-folder topology, SHAPER mesh paint UI), intentional freehand mid-sample non-snap, multi-year architecture (Magma CRDT / WebGPU rewrite), or policy exclusions (ABR/cs3*, cloud marketplace) — not open “in progress” glue.
+Finite high-ROI shippable rows for this Clip-Studio-class batch are closed (including perspective eye-level/horizon lock, stroke/shape object snap for freehand origin + **latched freehand mid samples** + shape·line endpoints, object-snap target cache, mobile immersive menubar polish, CSP layer solo on localHidden, flicker fix, auto-color paths, erase-to-intersection, pressure min size). Remaining items are multi-hour poser runtime (frame-folder topology, SHAPER mesh paint UI), multi-year architecture (Magma CRDT / WebGPU rewrite), or policy exclusions (ABR/cs3*, cloud marketplace) — not open “in progress” glue.
 
 ### Canvas engine decision (2026-07-24)
 
@@ -68,7 +69,7 @@ Re-scan of `docs/studio-clip-ex-benchmark-2026-07-22.md` “다음 경계” and
 | Frame-folder shared gutters / child clip topology | Separate document engine (M–L) |
 | Full rich-text / vertical 傍点 / SVG ruby | Multi-line measureText stack |
 | SHAPER texture paint on mesh | Poser surface not mounted |
-| Continuous freehand mid-sample object-edge snap | Origin + shape/line endpoints shipped; mid freehand stays raw by design (zigzag avoidance) |
+| Continuous freehand mid-sample object-edge snap | **Shipped** via axis latch (`planFreehandObjectSnapPoint`); nearest-edge chase still rejected |
 | Workspace cloud sync / shortcut marketplace | Policy + server |
 | ABR / cs3* marketplace | Policy exclusion |
 | Full Magma CRDT / WebGPU canvas rewrite | Multi-year architecture |
