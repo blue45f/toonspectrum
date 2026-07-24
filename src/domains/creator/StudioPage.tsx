@@ -5844,19 +5844,20 @@ function StudioCuttoonEditor() {
   // 자식(레일/툴벨트)에서 capturedElementIdsRef(prop)를 직접 변이하지 않도록 프레임 애니메이션
   // 진입을 에디터 핸들러로 승격 — 두 도구 버튼이 같은 로직을 공유한다.
   function openFrameAnimationForSelected() {
-    if (!selected || selected.type !== "image") return;
-    if (!selected.frames || selected.frames.length === 0) {
+    const target = ensurePixelToolTarget("프레임 애니메이션");
+    if (!target) return;
+    if (!target.frames || target.frames.length === 0) {
       const firstId = uid();
-      patchEl(selected.id, {
-        frames: [{ id: firstId, src: selected.src }],
+      patchEl(target.id, {
+        frames: [{ id: firstId, src: target.src }],
         frameFps: DEFAULT_FRAME_FPS,
         frameLoop: true,
         activeFrameId: firstId,
       });
     }
     capturedElementIdsRef.current = new Set(elements.map((e) => e.id));
-    setFrameAnimTargetId(selected.id);
-    setFrameAnimOpen((v) => (frameAnimTargetId === selected.id ? !v : true));
+    setFrameAnimTargetId(target.id);
+    setFrameAnimOpen((v) => (frameAnimTargetId === target.id ? !v : true));
   }
   const frameAnimTarget = frameAnimTargetId ? elementById.get(frameAnimTargetId) : null;
   const frameAnimEl = frameAnimTarget && frameAnimTarget.type === "image" ? (frameAnimTarget as ImageEl) : null;
@@ -25883,11 +25884,12 @@ function StudioCuttoonEditor() {
     removeSelected();
   }
   function openSelectedLayerCrop() {
-    if (selected?.type !== "image" || selectedContentMutationLocked) return;
+    const target = ensurePixelToolTarget("레이어 자르기");
+    if (!target) return;
     setTool("select");
     setEyedropperActive(false);
     disarmAllPixelTools();
-    resetPixelSelectionHistoryState(selected.id, null);
+    resetPixelSelectionHistoryState(target.id, null);
     setCropRect(initialCropRect());
     openInspectorRoute({ primary: "properties", image: "transform" });
     setRightPanelOpen(true);
@@ -25914,17 +25916,17 @@ function StudioCuttoonEditor() {
    * 버튼이 그냥 눌리게 한다). 여러 장이면 어느 것을 쓸지 알 수 없으므로 조용히 무시하지 않고
    * 무엇을 해야 하는지 안내한다 — 예전에는 아무 반응이 없어 "고장난 버튼"처럼 보였다.
    */
-  function ensurePixelToolTarget(toolLabel: string): boolean {
+  function ensurePixelToolTarget(toolLabel: string): ImageEl | null {
     if (activeSurfaceReviewLocked) {
       setError("현재 작업면의 검토 잠금을 먼저 해제하세요.");
-      return false;
+      return null;
     }
     if (selected?.type === "image") {
       if (selectedContentMutationLocked) {
         setError("선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요.");
-        return false;
+        return null;
       }
-      return true;
+      return selected;
     }
     const candidates = elements.filter(
       (el): el is ImageEl =>
@@ -25934,14 +25936,14 @@ function StudioCuttoonEditor() {
       setMarqueeIds([]);
       setSelectedId(candidates[0]!.id);
       setError(null);
-      return true;
+      return candidates[0]!;
     }
     setError(
       candidates.length === 0
         ? `${toolLabel}은(는) 이미지 레이어에 적용해요. 이미지를 먼저 추가하세요.`
         : `${toolLabel} 대상을 먼저 고르세요 — 편집 가능한 이미지가 ${candidates.length}장 있어요.`
     );
-    return false;
+    return null;
   }
   /** 픽셀 도구 버튼을 눌러볼 수 있는 상태인지(대상 자동 확보 가능 포함) — rail 비활성 판정용. */
   const pixelToolTargetAvailable =
@@ -25994,7 +25996,13 @@ function StudioCuttoonEditor() {
     }
   }
   function openPixelSelectionTransform() {
-    if (selected?.type !== "image" || !isSelectionUsable(pixelSel)) return;
+    const target = ensurePixelToolTarget("내용 변형");
+    if (!target) return;
+    if (!isSelectionUsable(pixelSel)) {
+      // 변형은 "선택 안 픽셀"을 다루므로 대상만으로는 부족하다 — 조용히 무시하지 않고 안내한다.
+      setError("변형할 픽셀 영역을 먼저 선택하세요(사각/올가미 선택 후 다시 누르면 됩니다).");
+      return;
+    }
     openInspectorRoute({ primary: "properties", image: "retouch" });
     setRightPanelOpen(true);
     announceDrawingShortcut("리터치 패널에서 내용 변형을 적용하세요");

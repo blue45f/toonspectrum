@@ -377,6 +377,8 @@ describe("StudioLeftToolRail", () => {
     const props = createProps({
       activeSurfaceReviewLocked: true,
       pixelSel: USABLE_SELECTION,
+      // StudioPage 파생식과 동일: 검토 잠금이거나 선택 이미지가 잠기면 대상 확보 불가.
+      pixelToolTargetAvailable: false,
       selected: IMAGE,
       selectedContentMutationLocked: true,
     });

@@ -447,11 +447,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="변형 (⇧T)"
               description="픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다."
               active={false}
-              disabled={
-                selected?.type !== "image"
-                || selectedContentMutationLocked
-                || !isSelectionUsable(pixelSel)
-              }
+              disabled={!pixelToolTargetAvailable || !isSelectionUsable(pixelSel)}
               unavailableReason={
                 selected?.type !== "image"
                   ? "변형할 이미지 레이어를 먼저 고르세요."
@@ -470,7 +466,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="자르기 (C)"
               description="선택한 이미지의 가장자리와 모서리를 끌어 필요한 영역만 남깁니다. 적용 전까지 원본은 바뀌지 않아요."
               active={cropActive}
-              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              disabled={!pixelToolTargetAvailable}
               unavailableReason={
                 selected?.type !== "image"
                   ? "자를 이미지 레이어를 먼저 고르세요."
@@ -912,7 +908,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="프레임 애니메이션"
               description="선택한 이미지에 여러 프레임을 쌓아 간단한 셀 애니메이션을 만듭니다."
               active={frameAnimOpen && frameAnimTargetId === selected?.id}
-              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              disabled={!pixelToolTargetAvailable}
               unavailableReason={
                 selected?.type !== "image"
                   ? "애니메이션으로 편집할 이미지 레이어를 먼저 선택하세요."
