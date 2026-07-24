@@ -1,0 +1,111 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  formatFrameFolderGroupName,
+  planBindSelectionToFrameFolder,
+  planSharedGutterSegments,
+} from "./studio-frame-folder";
+
+type Item = { id: string; groupId?: string; noClip?: boolean };
+
+describe("formatFrameFolderGroupName", () => {
+  it("prefixes a cut-folder label", () => {
+    expect(formatFrameFolderGroupName("1컷")).toBe("컷 폴더 · 1컷");
+  });
+
+  it("falls back when the frame label is empty", () => {
+    expect(formatFrameFolderGroupName("   ")).toBe("컷 폴더");
+  });
+});
+
+describe("planBindSelectionToFrameFolder", () => {
+  it("returns null when seeds are empty or only the frame itself", () => {
+    expect(
+      planBindSelectionToFrameFolder({
+        frameId: "frame-1",
+        frameLabel: "1컷",
+        groupId: "g1",
+        seedIds: ["frame-1"],
+        items: [{ id: "frame-1" }, { id: "ink" }],
+        groups: [],
+      })
+    ).toBeNull();
+  });
+
+  it("groups members contiguously and forces noClip off", () => {
+    const items: Item[] = [
+      { id: "bg" },
+      { id: "frame-1" },
+      { id: "ink", noClip: true },
+      { id: "tone" },
+    ];
+    const result = planBindSelectionToFrameFolder({
+      frameId: "frame-1",
+      frameLabel: "주인공 컷",
+      groupId: "folder-1",
+      seedIds: ["ink", "tone", "frame-1"],
+      items,
+      groups: [],
+    });
+    expect(result).not.toBeNull();
+    expect(result!.group.name).toBe("컷 폴더 · 주인공 컷");
+    expect([...result!.memberIds].sort()).toEqual(["ink", "tone"]);
+    expect(result!.clearedNoClipIds).toEqual(["ink"]);
+    const byId = new Map(result!.items.map((item) => [item.id, item]));
+    expect(byId.get("ink")?.groupId).toBe("folder-1");
+    expect(byId.get("tone")?.groupId).toBe("folder-1");
+    expect(byId.get("ink")?.noClip).toBe(false);
+    expect(byId.get("tone")?.noClip).toBe(false);
+    expect(byId.get("frame-1")?.groupId).toBeUndefined();
+    // Members stay contiguous in z-order after regroup.
+    const memberPositions = result!.items
+      .map((item, index) => (item.groupId === "folder-1" ? index : -1))
+      .filter((index) => index >= 0);
+    expect(memberPositions[memberPositions.length - 1]! - memberPositions[0]! + 1).toBe(
+      memberPositions.length
+    );
+  });
+});
+
+describe("planSharedGutterSegments", () => {
+  it("detects a vertical shared gutter between left and right frames", () => {
+    const segments = planSharedGutterSegments([
+      { id: "a", x: 0, y: 0, width: 100, height: 200 },
+      { id: "b", x: 124, y: 20, width: 100, height: 200 },
+    ]);
+    const vertical = segments.filter((segment) => segment.axis === "v");
+    expect(vertical).toHaveLength(1);
+    expect(vertical[0]!.gap).toBe(24);
+    expect(vertical[0]!.pos).toBe(112); // mid of 100..124
+    expect(vertical[0]!.from).toBe(20);
+    expect(vertical[0]!.to).toBe(200);
+    expect(vertical[0]!.frameAId).toBe("a");
+    expect(vertical[0]!.frameBId).toBe("b");
+  });
+
+  it("detects a horizontal shared gutter between stacked frames", () => {
+    const segments = planSharedGutterSegments([
+      { id: "top", x: 0, y: 0, width: 200, height: 100 },
+      { id: "bottom", x: 10, y: 124, width: 200, height: 80 },
+    ]);
+    const horizontal = segments.filter((segment) => segment.axis === "h");
+    expect(horizontal).toHaveLength(1);
+    expect(horizontal[0]!.gap).toBe(24);
+    expect(horizontal[0]!.pos).toBe(112);
+  });
+
+  it("ignores distant frames and non-overlapping edges", () => {
+    expect(
+      planSharedGutterSegments([
+        { id: "a", x: 0, y: 0, width: 50, height: 50 },
+        { id: "b", x: 400, y: 0, width: 50, height: 50 },
+      ])
+    ).toEqual([]);
+    expect(
+      planSharedGutterSegments([
+        { id: "a", x: 0, y: 0, width: 50, height: 50 },
+        { id: "b", x: 60, y: 200, width: 50, height: 50 },
+      ])
+    ).toEqual([]);
+  });
+});

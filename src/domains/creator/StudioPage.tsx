@@ -569,6 +569,7 @@ import {
   onionSkinLayers,
   type OnionSkinSettings,
 } from "./studio-frame-animation";
+import { planBindSelectionToFrameFolder } from "./studio-frame-folder";
 import {
   planGroupClickSelection,
   planGroupEnter,
@@ -15894,6 +15895,38 @@ function StudioCuttoonEditor() {
           groups: [...groups, group],
           elements: seedIds.length > 0 ? (groupItems(elements, seedIds, group.id) as El[]) : elements,
         });
+        return;
+      }
+      case "create-frame-folder": {
+        if (masterEditMode) return;
+        const frame = elements.find((el) => el.id === action.frameId && el.type === "frame");
+        if (!frame) {
+          setError("컷 폴더로 묶을 프레임을 찾지 못했어요.");
+          return;
+        }
+        const plan = planBindSelectionToFrameFolder({
+          frameId: frame.id,
+          frameLabel: ("name" in frame && typeof frame.name === "string" && frame.name.trim())
+            ? frame.name
+            : "컷",
+          groupId: uid(),
+          seedIds: action.seedIds,
+          items: elements,
+          groups,
+        });
+        if (!plan) {
+          setError("컷 폴더에 묶을 다른 레이어를 먼저 선택해 주세요.");
+          return;
+        }
+        updateActivePage({
+          groups: [...groups, plan.group],
+          elements: plan.items as El[],
+        });
+        announceDrawingShortcut(
+          plan.clearedNoClipIds.length > 0
+            ? `컷 폴더 · ${plan.memberIds.length}개 레이어 · 패널 클립 켬`
+            : `컷 폴더 · ${plan.memberIds.length}개 레이어`
+        );
         return;
       }
       case "rename-item":

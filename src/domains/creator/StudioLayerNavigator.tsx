@@ -81,6 +81,11 @@ export type StudioLayerNavigatorItemFlag = "alphaLocked" | "fillReference" | "ma
 
 export type StudioLayerNavigatorAction =
   | { type: "create-group"; seedIds: readonly string[] }
+  /**
+   * CSP-class frame folder seed: bind selected layers under a contiguous group for a frame cut,
+   * forcing panel clip (`noClip: false`). Shared-gutter edit topology is not included.
+   */
+  | { type: "create-frame-folder"; frameId: string; seedIds: readonly string[] }
   | { type: "rename-item"; id: string; name: string }
   | { type: "rename-group"; groupId: string; name: string }
   | {
@@ -1570,6 +1575,27 @@ export function StudioLayerNavigator({
               <button type="button" disabled={readOnly} onClick={() => beginRename("item", activeItem.id, activeItem.label)} className={compactControl}>
                 <TypeIcon size={13} /> 이름 변경
               </button>
+              {activeItem.type === "frame" ? (
+                <button
+                  type="button"
+                  disabled={
+                    readOnly
+                    || groupingDisabled
+                    || selectedIds.filter((id) => id !== activeItem.id).length === 0
+                  }
+                  onClick={() =>
+                    onAction({
+                      type: "create-frame-folder",
+                      frameId: activeItem.id,
+                      seedIds: selectedIds,
+                    })
+                  }
+                  className={compactControl}
+                  title="선택한 다른 레이어를 이 컷의 폴더로 묶고 패널 클립을 켭니다 (공유 거터 편집은 후속)"
+                >
+                  <FolderPlus size={13} /> 컷 폴더로 묶기
+                </button>
+              ) : null}
               <button
                 type="button"
                 disabled={readOnly || activeItemHiddenByGroup}

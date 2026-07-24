@@ -82,6 +82,27 @@ describe("StudioLayerNavigator selection interaction", () => {
     expect(screen.getByRole("toolbar", { name: "선택 레이어 일괄 작업" }).textContent).toContain("선택 2개");
   });
 
+  it("exposes frame-folder bind when the active layer is a frame with extra selection", () => {
+    const frameItems: StudioLayerNavigatorItem[] = [
+      { id: "frame-1", type: "frame", label: "1컷", zIndex: 0 },
+      { id: "ink", type: "draw", label: "선화", zIndex: 1 },
+    ];
+    render(
+      <StudioLayerNavigator
+        items={frameItems}
+        groups={[]}
+        selectedIds={["frame-1", "ink"]}
+        pageKey="page-frame-folder"
+        localHiddenIds={new Set()}
+        onToggleLocalHidden={() => {}}
+        onSelectionChange={() => {}}
+        onAction={() => {}}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "1컷 레이어 작업" }));
+    expect(screen.getByRole("button", { name: /컷 폴더로 묶기/ })).toBeTruthy();
+  });
+
   it("exposes CSP layer solo in the per-layer action panel and toggles aria-pressed", () => {
     function SoloHarness() {
       const [soloLayerId, setSoloLayerId] = useState<string | null>(null);
