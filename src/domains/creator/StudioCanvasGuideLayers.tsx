@@ -1,4 +1,4 @@
-import { Suspense, type Dispatch, type SetStateAction } from "react";
+import { Suspense, useRef, type Dispatch, type SetStateAction } from "react";
 import {
   Circle as KCircle,
   Ellipse,
@@ -17,6 +17,7 @@ import {
 } from "./studio-page-lazy-ui";
 
 import type { StudioAdvancedRuler, StudioAdvancedRulerDocument } from "./studio-advanced-ruler-document";
+import type { SharedGutterSegment } from "./studio-frame-folder";
 import type { IsometricGridConfig } from "./studio-isometric-grid";
 import type { VanishingPoint } from "./studio-perspective-guide";
 import type { SmartGuideOverlay } from "./studio-smart-guides";
@@ -158,6 +159,15 @@ export interface StudioCanvasGuideOverlayLayersProps {
   onCommitAdvancedRuler?: (id: string, patch: Partial<StudioAdvancedRuler>) => void;
   drawingAssistDisabled: boolean;
   onCancelDrawingAssistPreview: () => void;
+  /**
+   * CSP-class shared gutters between abutting frames. When handlers are provided, midlines are
+   * draggable (co-edit both frames + child reflow lives in the pure planner / page owner).
+   */
+  sharedGutters?: readonly SharedGutterSegment[];
+  /** Capture document snapshot before a gutter drag (required for correct cumulative deltas). */
+  onBeginSharedGutterDrag?: (segment: SharedGutterSegment) => void;
+  onPreviewSharedGutterDrag?: (segment: SharedGutterSegment, delta: number) => void;
+  onCommitSharedGutterDrag?: (segment: SharedGutterSegment, delta: number) => void;
 }
 
 /** Interactive and transient guides that must remain above every authored and tool overlay. */
@@ -194,11 +204,100 @@ export function StudioCanvasGuideOverlayLayers({
   onCommitAdvancedRuler = NOOP_ADVANCED_RULER_CHANGE,
   drawingAssistDisabled,
   onCancelDrawingAssistPreview,
+  sharedGutters = [],
+  onBeginSharedGutterDrag,
+  onPreviewSharedGutterDrag,
+  onCommitSharedGutterDrag,
 }: StudioCanvasGuideOverlayLayersProps) {
+  // Cumulative document deltas per gutter handle (node offsets are zeroed after each move).
+  const sharedGutterDragTotalsRef = useRef(new Map<string, number>());
   if (isExporting) return null;
+
+  const sharedGutterInteractive =
+    !drawingAssistDisabled
+    && typeof onBeginSharedGutterDrag === "function"
+    && typeof onPreviewSharedGutterDrag === "function"
+    && typeof onCommitSharedGutterDrag === "function"
+    && sharedGutters.length > 0;
 
   return (
     <>
+      {sharedGutters.length > 0 && (
+        <Layer listening={sharedGutterInteractive}>
+          {sharedGutters.map((segment) => {
+            const key = `${segment.axis}:${segment.frameAId}:${segment.frameBId}`;
+            const visual = (
+              <Line
+                key={`${key}-visual`}
+                points={segment.axis === "v"
+                  ? [segment.pos, segment.from, segment.pos, segment.to]
+                  : [segment.from, segment.pos, segment.to, segment.pos]}
+                stroke="rgba(14, 165, 233, 0.75)"
+                strokeWidth={1.5 / effScale}
+                dash={[6 / effScale, 4 / effScale]}
+                listening={false}
+              />
+            );
+            if (!sharedGutterInteractive) {
+              return <Group key={key} listening={false}>{visual}</Group>;
+            }
+            return (
+              <Group key={key}>
+                {visual}
+                <Line
+                  points={segment.axis === "v"
+                    ? [segment.pos, segment.from, segment.pos, segment.to]
+                    : [segment.from, segment.pos, segment.to, segment.pos]}
+                  stroke="transparent"
+                  strokeWidth={14 / effScale}
+                  hitStrokeWidth={14 / effScale}
+                  draggable
+                  name="shared-gutter-handle"
+                  dragBoundFunc={(pos) => (
+                    segment.axis === "v"
+                      ? { x: pos.x, y: 0 }
+                      : { x: 0, y: pos.y }
+                  )}
+                  onMouseEnter={(event) => {
+                    const stage = event.target.getStage();
+                    if (stage) {
+                      stage.container().style.cursor =
+                        segment.axis === "v" ? "ew-resize" : "ns-resize";
+                    }
+                  }}
+                  onMouseLeave={(event) => {
+                    const stage = event.target.getStage();
+                    if (stage) stage.container().style.cursor = "";
+                  }}
+                  onDragStart={() => {
+                    sharedGutterDragTotalsRef.current.set(key, 0);
+                    onBeginSharedGutterDrag!(segment);
+                  }}
+                  onDragMove={(event) => {
+                    const node = event.target;
+                    const step = segment.axis === "v" ? node.x() : node.y();
+                    const total = (sharedGutterDragTotalsRef.current.get(key) ?? 0) + step;
+                    sharedGutterDragTotalsRef.current.set(key, total);
+                    if (segment.axis === "v") node.x(0);
+                    else node.y(0);
+                    onPreviewSharedGutterDrag!(segment, total);
+                  }}
+                  onDragEnd={(event) => {
+                    const node = event.target;
+                    const step = segment.axis === "v" ? node.x() : node.y();
+                    const total = (sharedGutterDragTotalsRef.current.get(key) ?? 0) + step;
+                    sharedGutterDragTotalsRef.current.set(key, 0);
+                    node.position({ x: 0, y: 0 });
+                    onCommitSharedGutterDrag!(segment, total);
+                    const stage = event.target.getStage();
+                    if (stage) stage.container().style.cursor = "";
+                  }}
+                />
+              </Group>
+            );
+          })}
+        </Layer>
+      )}
       {(guides.x.length > 0 || guides.y.length > 0) && (
         <Layer listening={false}>
           {guides.x.map((guideX) => (

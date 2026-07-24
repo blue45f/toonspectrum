@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applySharedGutterDragPlan,
   formatFrameFolderGroupName,
   planBindSelectionToFrameFolder,
+  planSharedGutterDrag,
   planSharedGutterSegments,
 } from "./studio-frame-folder";
 
@@ -107,5 +109,83 @@ describe("planSharedGutterSegments", () => {
         { id: "b", x: 60, y: 200, width: 50, height: 50 },
       ])
     ).toEqual([]);
+  });
+});
+
+describe("planSharedGutterDrag + child reflow", () => {
+  const left = { id: "L", x: 0, y: 0, width: 100, height: 200 };
+  const right = { id: "R", x: 124, y: 0, width: 100, height: 200 };
+  const segment = planSharedGutterSegments([left, right])[0]!;
+
+  it("moves both frames while preserving the gutter gap", () => {
+    const framesById = new Map([
+      [left.id, left],
+      [right.id, right],
+    ]);
+    const plan = planSharedGutterDrag({
+      segment,
+      framesById,
+      delta: 10,
+      elements: [
+        { id: "ink-left", type: "image", x: 10, y: 10, width: 40, height: 40 },
+        { id: "ink-right", type: "image", x: 140, y: 20, width: 40, height: 40 },
+      ],
+    });
+    expect(plan).not.toBeNull();
+    expect(plan!.appliedDelta).toBe(10);
+    const byId = new Map(plan!.framePatches.map((patch) => [patch.id, patch]));
+    expect(byId.get("L")).toMatchObject({ x: 0, width: 110 });
+    expect(byId.get("R")).toMatchObject({ x: 134, width: 90 });
+    // Gap remains 24.
+    expect(byId.get("R")!.x - (byId.get("L")!.x + byId.get("L")!.width)).toBe(24);
+    expect(plan!.childTranslates).toEqual([{ id: "ink-right", dx: 10, dy: 0 }]);
+
+    const next = applySharedGutterDragPlan(
+      [
+        left,
+        right,
+        { id: "ink-left", type: "image", x: 10, y: 10, width: 40, height: 40 },
+        { id: "ink-right", type: "image", x: 140, y: 20, width: 40, height: 40 },
+      ],
+      plan!
+    );
+    const inkRight = next.find((el) => el.id === "ink-right")!;
+    expect(inkRight.x).toBe(150);
+    const inkLeft = next.find((el) => el.id === "ink-left")!;
+    expect(inkLeft.x).toBe(10);
+  });
+
+  it("clamps so neither frame collapses below min side", () => {
+    const framesById = new Map([
+      [left.id, left],
+      [right.id, right],
+    ]);
+    const plan = planSharedGutterDrag({
+      segment,
+      framesById,
+      delta: 1000,
+      minSidePx: 24,
+    });
+    expect(plan!.appliedDelta).toBe(76); // 100 - 24
+    const rightPatch = plan!.framePatches.find((patch) => patch.id === "R")!;
+    expect(rightPatch.width).toBe(24);
+  });
+
+  it("reflows freehand points when the host frame translates", () => {
+    const framesById = new Map([
+      [left.id, left],
+      [right.id, right],
+    ]);
+    const plan = planSharedGutterDrag({
+      segment,
+      framesById,
+      delta: 5,
+      elements: [{ id: "stroke", type: "draw", points: [130, 10, 150, 30] }],
+    });
+    const next = applySharedGutterDragPlan(
+      [{ id: "stroke", type: "draw", points: [130, 10, 150, 30] }],
+      plan!
+    );
+    expect(next[0]!.points).toEqual([135, 10, 155, 30]);
   });
 });

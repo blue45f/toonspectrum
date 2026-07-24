@@ -569,7 +569,14 @@ import {
   onionSkinLayers,
   type OnionSkinSettings,
 } from "./studio-frame-animation";
-import { planBindSelectionToFrameFolder } from "./studio-frame-folder";
+import {
+  applySharedGutterDragPlan,
+  planBindSelectionToFrameFolder,
+  planSharedGutterDrag,
+  planSharedGutterSegments,
+  sharedGutterSegmentKey,
+  type SharedGutterSegment,
+} from "./studio-frame-folder";
 import {
   planGroupClickSelection,
   planGroupEnter,
@@ -8058,6 +8065,11 @@ function StudioCuttoonEditor() {
   const strokeObjectSnapCacheRef = useRef<StudioStrokeObjectSnapCache | null>(null);
   /** Per-axis freehand object-snap latch for mid-sample stickiness (cleared with the stroke). */
   const freehandObjectSnapLatchRef = useRef<FreehandObjectSnapLatch>(EMPTY_FREEHAND_OBJECT_SNAP_LATCH);
+  /** Shared-gutter co-edit session: plan always from pre-drag snapshot + cumulative delta. */
+  const sharedGutterDragBaseRef = useRef<{
+    elements: El[];
+    segment: SharedGutterSegment;
+  } | null>(null);
   const quickShapeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const quickShapeStillElapsedRef = useRef<number>(0);
   const quickShapeStillAnchorRef = useRef<{ x: number; y: number } | null>(null);
@@ -17390,6 +17402,40 @@ function StudioCuttoonEditor() {
     if (!committed) return;
     if (active) setTool("draw");
     announceDrawingShortcut(active ? "원근 도우미 표시" : "원근 도우미 숨김");
+  }
+
+  function beginSharedGutterDrag(segment: SharedGutterSegment) {
+    sharedGutterDragBaseRef.current = {
+      elements: elements.map((el) => el),
+      segment,
+    };
+  }
+
+  function previewSharedGutterDrag(_segment: SharedGutterSegment, delta: number) {
+    const session = sharedGutterDragBaseRef.current;
+    if (!session) return;
+    const baseFrames = session.elements.filter(
+      (el): el is FrameEl => el.type === "frame" && !el.hidden
+    );
+    const framesById = new Map(baseFrames.map((frame) => [frame.id, frame]));
+    const plan = planSharedGutterDrag({
+      segment: session.segment,
+      framesById,
+      delta,
+      elements: session.elements,
+    });
+    if (!plan) return;
+    const next = applySharedGutterDragPlan(session.elements, plan) as El[];
+    commitCoalesced(next, `shared-gutter:${sharedGutterSegmentKey(session.segment)}`);
+  }
+
+  function commitSharedGutterDrag(segment: SharedGutterSegment, delta: number) {
+    previewSharedGutterDrag(segment, delta);
+    const session = sharedGutterDragBaseRef.current;
+    sharedGutterDragBaseRef.current = null;
+    if (session && delta !== 0) {
+      announceDrawingShortcut("공유 거터 조정 · 양 프레임 · 자식 리플로우");
+    }
   }
 
   function showAllLocallyHiddenLayers() {
@@ -29918,6 +29964,9 @@ function StudioCuttoonEditor() {
     toggleAdvancedFill,
     toggleHorizontalCanvasView,
     updateActivePage,
+    beginSharedGutterDrag,
+    previewSharedGutterDrag,
+    commitSharedGutterDrag,
     endLiveResourceEdit,
     nodeInteractionBegin,
     patchEl,
@@ -30939,6 +30988,13 @@ function StudioCuttoonEditor() {
           showQuickStart={showQuickStart}
           showWebtoonGuides={showWebtoonGuides}
           smartGuides={smartGuides}
+          sharedGutters={
+            masterEditMode
+              ? []
+              : planSharedGutterSegments(
+                  elements.filter((el): el is FrameEl => el.type === "frame" && !el.hidden)
+                )
+          }
           smudgeArmed={smudgeArmed}
           dodgeBurnArmed={dodgeBurnArmed}
           dodgeBurnRadius={dodgeBurnRadius}
@@ -32030,6 +32086,9 @@ interface StudioCanvasViewportHandlers {
   toggleAdvancedFill: () => void;
   toggleHorizontalCanvasView: () => void;
   updateActivePage: (patch: Partial<Omit<PageState, "id">>) => void;
+  beginSharedGutterDrag: (segment: SharedGutterSegment) => void;
+  previewSharedGutterDrag: (segment: SharedGutterSegment, delta: number) => void;
+  commitSharedGutterDrag: (segment: SharedGutterSegment, delta: number) => void;
 }
 
 interface StudioCanvasViewportProps {
@@ -32242,6 +32301,8 @@ interface StudioCanvasViewportProps {
   showQuickStart: boolean;
   showWebtoonGuides: boolean;
   smartGuides: SmartGuideOverlay;
+  /** Axis-aligned abutting frame gutters (CSP co-edit handles). */
+  sharedGutters: readonly SharedGutterSegment[];
   smudgeArmed: boolean;
   dodgeBurnArmed: boolean;
   dodgeBurnRadius: number;
@@ -32524,6 +32585,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   showQuickStart,
   showWebtoonGuides,
   smartGuides,
+  sharedGutters,
   smudgeArmed,
   dodgeBurnArmed,
   dodgeBurnRadius,
@@ -32676,6 +32738,9 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     toggleAdvancedFill,
     toggleHorizontalCanvasView,
     updateActivePage,
+    beginSharedGutterDrag,
+    previewSharedGutterDrag,
+    commitSharedGutterDrag,
     endLiveResourceEdit,
     nodeInteractionBegin,
     patchEl,
@@ -34310,6 +34375,10 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               onCommitAdvancedRuler={patchAdvancedRuler}
               drawingAssistDisabled={activeSurfaceReviewLocked || saving || masterEditMode}
               onCancelDrawingAssistPreview={cancelStudioDrawingAssistPreview}
+              sharedGutters={sharedGutters}
+              onBeginSharedGutterDrag={beginSharedGutterDrag}
+              onPreviewSharedGutterDrag={previewSharedGutterDrag}
+              onCommitSharedGutterDrag={commitSharedGutterDrag}
             />
           </Stage>
           </Profiler>

@@ -141,6 +141,10 @@ const OVERLAY_PROPS = [
   "onCommitAdvancedRuler",
   "drawingAssistDisabled",
   "onCancelDrawingAssistPreview",
+  "sharedGutters",
+  "onBeginSharedGutterDrag",
+  "onPreviewSharedGutterDrag",
+  "onCommitSharedGutterDrag",
 ] as const;
 
 describe("Studio canvas guide layer ownership boundary", () => {
@@ -160,6 +164,7 @@ describe("Studio canvas guide layer ownership boundary", () => {
     ]);
     expect(guides.typeImports).toEqual([
       "./studio-advanced-ruler-document",
+      "./studio-frame-folder",
       "./studio-isometric-grid",
       "./studio-perspective-guide",
       "./studio-smart-guides",

@@ -65,6 +65,290 @@ export const FRAME_FOLDER_SHARED_GUTTER_MAX_GAP_PX = 120;
 export const FRAME_FOLDER_SHARED_GUTTER_EPSILON_PX = 1.5;
 /** Minimum overlap along the shared edge axis to count as a gutter (px). */
 export const FRAME_FOLDER_SHARED_GUTTER_MIN_OVERLAP_PX = 8;
+/** Minimum frame side after a shared-gutter drag (matches panel-split floor). */
+export const FRAME_FOLDER_MIN_SIDE_PX = 24;
+
+export interface FrameBoxPatch {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface ElementTranslatePatch {
+  readonly id: string;
+  readonly dx: number;
+  readonly dy: number;
+}
+
+export interface SharedGutterDragPlan {
+  readonly framePatches: readonly FrameBoxPatch[];
+  /** Delta actually applied after min-side clamping (may be 0). */
+  readonly appliedDelta: number;
+  readonly nextSegmentPos: number;
+  readonly childTranslates: readonly ElementTranslatePatch[];
+}
+
+export interface SharedGutterDragElementLike {
+  readonly id: string;
+  readonly type?: string;
+  readonly x?: number;
+  readonly y?: number;
+  readonly width?: number;
+  readonly height?: number;
+  readonly points?: readonly number[];
+  readonly hidden?: boolean;
+}
+
+function clampMinSide(value: number, minSide: number): number {
+  if (!Number.isFinite(value)) return minSide;
+  return Math.max(minSide, value);
+}
+
+function frameCenterInside(
+  el: SharedGutterDragElementLike,
+  frame: FrameFolderFrameLike
+): boolean {
+  if (el.type === "frame") return false;
+  let x = el.x;
+  let y = el.y;
+  let w = el.width ?? 0;
+  let h = el.height ?? 0;
+  if (el.type === "draw" && el.points && el.points.length >= 2) {
+    let minX = el.points[0]!;
+    let minY = el.points[1]!;
+    let maxX = minX;
+    let maxY = minY;
+    for (let i = 2; i < el.points.length; i += 2) {
+      const px = el.points[i]!;
+      const py = el.points[i + 1]!;
+      if (px < minX) minX = px;
+      else if (px > maxX) maxX = px;
+      if (py < minY) minY = py;
+      else if (py > maxY) maxY = py;
+    }
+    x = minX;
+    y = minY;
+    w = maxX - minX;
+    h = maxY - minY;
+  }
+  if (
+    x === undefined ||
+    y === undefined ||
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    !Number.isFinite(w) ||
+    !Number.isFinite(h)
+  ) {
+    return false;
+  }
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  return (
+    cx >= frame.x &&
+    cx <= frame.x + frame.width &&
+    cy >= frame.y &&
+    cy <= frame.y + frame.height
+  );
+}
+
+/**
+ * Plan co-edit of a shared gutter: moving the midline resizes both frames while preserving
+ * gap, then reflows children whose center sat in the frame that translated (right / bottom).
+ *
+ * `delta` is document-space: for axis "v", positive grows the left frame into the gutter;
+ * for axis "h", positive grows the top frame into the gutter.
+ */
+export function planSharedGutterDrag(input: {
+  readonly segment: SharedGutterSegment;
+  readonly framesById: ReadonlyMap<string, FrameFolderFrameLike>;
+  readonly delta: number;
+  readonly minSidePx?: number;
+  readonly elements?: readonly SharedGutterDragElementLike[];
+}): SharedGutterDragPlan | null {
+  const minSide = Math.max(1, input.minSidePx ?? FRAME_FOLDER_MIN_SIDE_PX);
+  const leftOrTop = input.framesById.get(input.segment.frameAId);
+  const rightOrBottom = input.framesById.get(input.segment.frameBId);
+  if (!leftOrTop || !rightOrBottom) return null;
+  if (!Number.isFinite(input.delta) || input.delta === 0) {
+    return {
+      framePatches: [
+        {
+          id: leftOrTop.id,
+          x: leftOrTop.x,
+          y: leftOrTop.y,
+          width: leftOrTop.width,
+          height: leftOrTop.height,
+        },
+        {
+          id: rightOrBottom.id,
+          x: rightOrBottom.x,
+          y: rightOrBottom.y,
+          width: rightOrBottom.width,
+          height: rightOrBottom.height,
+        },
+      ],
+      appliedDelta: 0,
+      nextSegmentPos: input.segment.pos,
+      childTranslates: [],
+    };
+  }
+
+  let applied = input.delta;
+  if (input.segment.axis === "v") {
+    const maxGrow = rightOrBottom.width - minSide;
+    const maxShrink = leftOrTop.width - minSide;
+    applied = Math.max(-maxShrink, Math.min(maxGrow, applied));
+    if (applied === 0) {
+      return {
+        framePatches: [
+          {
+            id: leftOrTop.id,
+            x: leftOrTop.x,
+            y: leftOrTop.y,
+            width: leftOrTop.width,
+            height: leftOrTop.height,
+          },
+          {
+            id: rightOrBottom.id,
+            x: rightOrBottom.x,
+            y: rightOrBottom.y,
+            width: rightOrBottom.width,
+            height: rightOrBottom.height,
+          },
+        ],
+        appliedDelta: 0,
+        nextSegmentPos: input.segment.pos,
+        childTranslates: [],
+      };
+    }
+    const leftPatch: FrameBoxPatch = {
+      id: leftOrTop.id,
+      x: leftOrTop.x,
+      y: leftOrTop.y,
+      width: clampMinSide(leftOrTop.width + applied, minSide),
+      height: leftOrTop.height,
+    };
+    const rightPatch: FrameBoxPatch = {
+      id: rightOrBottom.id,
+      x: rightOrBottom.x + applied,
+      y: rightOrBottom.y,
+      width: clampMinSide(rightOrBottom.width - applied, minSide),
+      height: rightOrBottom.height,
+    };
+    const childTranslates: ElementTranslatePatch[] = [];
+    for (const el of input.elements ?? []) {
+      if (el.hidden || el.id === leftOrTop.id || el.id === rightOrBottom.id) continue;
+      if (frameCenterInside(el, rightOrBottom)) {
+        childTranslates.push({ id: el.id, dx: applied, dy: 0 });
+      }
+    }
+    return {
+      framePatches: [leftPatch, rightPatch],
+      appliedDelta: applied,
+      nextSegmentPos: input.segment.pos + applied,
+      childTranslates,
+    };
+  }
+
+  // Horizontal gutter
+  const maxGrow = rightOrBottom.height - minSide;
+  const maxShrink = leftOrTop.height - minSide;
+  applied = Math.max(-maxShrink, Math.min(maxGrow, applied));
+  if (applied === 0) {
+    return {
+      framePatches: [
+        {
+          id: leftOrTop.id,
+          x: leftOrTop.x,
+          y: leftOrTop.y,
+          width: leftOrTop.width,
+          height: leftOrTop.height,
+        },
+        {
+          id: rightOrBottom.id,
+          x: rightOrBottom.x,
+          y: rightOrBottom.y,
+          width: rightOrBottom.width,
+          height: rightOrBottom.height,
+        },
+      ],
+      appliedDelta: 0,
+      nextSegmentPos: input.segment.pos,
+      childTranslates: [],
+    };
+  }
+  const topPatch: FrameBoxPatch = {
+    id: leftOrTop.id,
+    x: leftOrTop.x,
+    y: leftOrTop.y,
+    width: leftOrTop.width,
+    height: clampMinSide(leftOrTop.height + applied, minSide),
+  };
+  const bottomPatch: FrameBoxPatch = {
+    id: rightOrBottom.id,
+    x: rightOrBottom.x,
+    y: rightOrBottom.y + applied,
+    width: rightOrBottom.width,
+    height: clampMinSide(rightOrBottom.height - applied, minSide),
+  };
+  const childTranslates: ElementTranslatePatch[] = [];
+  for (const el of input.elements ?? []) {
+    if (el.hidden || el.id === leftOrTop.id || el.id === rightOrBottom.id) continue;
+    if (frameCenterInside(el, rightOrBottom)) {
+      childTranslates.push({ id: el.id, dx: 0, dy: applied });
+    }
+  }
+  return {
+    framePatches: [topPatch, bottomPatch],
+    appliedDelta: applied,
+    nextSegmentPos: input.segment.pos + applied,
+    childTranslates,
+  };
+}
+
+/**
+ * Apply a gutter drag plan onto a flat element list (frames resized, children translated).
+ * Pure: returns a new array; unchanged elements keep identity.
+ */
+export function applySharedGutterDragPlan<T extends SharedGutterDragElementLike>(
+  elements: readonly T[],
+  plan: SharedGutterDragPlan
+): readonly T[] {
+  if (plan.appliedDelta === 0 && plan.childTranslates.length === 0) return elements;
+  const frames = new Map(plan.framePatches.map((patch) => [patch.id, patch]));
+  const moves = new Map(plan.childTranslates.map((patch) => [patch.id, patch]));
+  return elements.map((el) => {
+    const frame = frames.get(el.id);
+    if (frame) {
+      return {
+        ...el,
+        x: frame.x,
+        y: frame.y,
+        width: frame.width,
+        height: frame.height,
+      };
+    }
+    const move = moves.get(el.id);
+    if (!move || (move.dx === 0 && move.dy === 0)) return el;
+    if (el.type === "draw" && Array.isArray(el.points)) {
+      const points = el.points.map((value, index) =>
+        index % 2 === 0 ? value + move.dx : value + move.dy
+      );
+      return { ...el, points };
+    }
+    if (typeof el.x === "number" && typeof el.y === "number") {
+      return { ...el, x: el.x + move.dx, y: el.y + move.dy };
+    }
+    return el;
+  });
+}
+
+/** Stable key for a gutter segment (drag session / undo coalesce). */
+export function sharedGutterSegmentKey(segment: SharedGutterSegment): string {
+  return `${segment.axis}:${segment.frameAId}:${segment.frameBId}`;
+}
 
 function freezeGroup(group: LayerGroup): LayerGroup {
   return Object.freeze({ ...group });
