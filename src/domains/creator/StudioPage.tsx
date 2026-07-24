@@ -1146,6 +1146,10 @@ import {
   type StudioStagePointerFrameMapperCache,
 } from "./studio-stage-pointer-coordinate";
 import { resolveShiftFreehandTransition } from "./studio-stroke-constrain";
+import {
+  resolveStudioStrokeObjectSnapTargets,
+  type StudioStrokeObjectSnapCache,
+} from "./studio-stroke-object-snap-cache";
 import { StudioStrokePostprocessWorkerClient } from "./studio-stroke-postprocess-worker-client";
 import {
   DEFAULT_SHAPE_PARAMS,
@@ -8012,6 +8016,8 @@ function StudioCuttoonEditor() {
   const perspectiveRayRef = useRef<PerspectiveRay | null>(null);
   const isometricAxisRayRef = useRef<IsometricAxisRay | null>(null);
   const advancedRulerSnapRef = useRef<StudioAdvancedRulerSnapState | null>(null);
+  /** Frozen element bboxes for the active stroke contact (object snap). */
+  const strokeObjectSnapCacheRef = useRef<StudioStrokeObjectSnapCache | null>(null);
   const quickShapeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const quickShapeStillElapsedRef = useRef<number>(0);
   const quickShapeStillAnchorRef = useRef<{ x: number; y: number } | null>(null);
@@ -21941,6 +21947,7 @@ function StudioCuttoonEditor() {
     perspectiveRayRef.current = null;
     isometricAxisRayRef.current = null;
     advancedRulerSnapRef.current = null;
+    strokeObjectSnapCacheRef.current = null;
     stopQuickShapeTracking();
     // 취소 정리는 표면을 즉시 지우므로, 커밋 대기 중 획을 먼저 동기화해 잉크 유실을 막는다.
     flushPendingStrokeCommitsRef.current();
@@ -23426,6 +23433,20 @@ function StudioCuttoonEditor() {
     return targets;
   }
 
+  /**
+   * One getClientRect walk per stroke contact. Other layers are static while the pointer owns
+   * the stroke, so reusing the frozen target list keeps shape-endpoint moves O(1) in element count.
+   */
+  function strokeObjectSnapTargetsFor(strokeId: string, excludeId?: string | null): readonly GuideBox[] {
+    const resolved = resolveStudioStrokeObjectSnapTargets({
+      cache: strokeObjectSnapCacheRef.current,
+      strokeId,
+      collect: () => collectStrokeObjectSnapTargets(excludeId ?? strokeId),
+    });
+    strokeObjectSnapCacheRef.current = resolved.cache;
+    return resolved.targets;
+  }
+
   function applyStrokeObjectSnapToPoint(
     x: number,
     y: number,
@@ -23448,7 +23469,9 @@ function StudioCuttoonEditor() {
     ) {
       return { x, y };
     }
-    const others = collectStrokeObjectSnapTargets(options.excludeId);
+    const strokeId = options.excludeId ?? drawingRef.current?.id;
+    if (!strokeId) return { x, y };
+    const others = strokeObjectSnapTargetsFor(strokeId, options.excludeId);
     if (others.length === 0) return { x, y };
     const snap = snapPointToObjectGuides(x, y, others, {
       threshold: SMART_SNAP_THRESHOLD / Math.max(effScale, 1e-6),
@@ -25324,6 +25347,7 @@ function StudioCuttoonEditor() {
       advancedRulerSnapRef.current = null;
       scheduleLiveDrawPressure(null);
       applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
+      strokeObjectSnapCacheRef.current = null;
       gpuFinalFallbackOrderIdsRef.current = immediateSurfaceHandoff?.strokeIds ?? null;
       clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup });
       // Re-rasterize the newest settled overlay stroke from the release-planner geometry so the
