@@ -52,6 +52,7 @@ function createHandlers(): StudioMenubarContentHandlers {
     exportCurrentPageToRasterInterchange: vi.fn(async () => ({}) as never),
     exportCurrentPageToSvg: vi.fn(async () => ({}) as never),
     handleCapturePagesForPreset: vi.fn(async () => []),
+    handleCapturePagesForIndices: vi.fn(async () => []),
     handleCopyToClipboard: vi.fn(async () => undefined),
     handleDownload: vi.fn(async () => undefined),
     handleDownloadAll: vi.fn(async () => undefined),
@@ -225,28 +226,31 @@ describe("StudioMenubarContent", () => {
     expect(setProjectActionsOpen).toHaveBeenCalledWith(false);
   });
 
-  it("routes ORA/CBZ file selection and turns the busy control into an explicit cancel action", () => {
+  it("ref-clicks root import inputs and turns the busy control into an explicit cancel action", () => {
+    // File inputs live on StudioPage root (data-studio-document-import-inputs), not in menubar.
     const stableHandlers = createHandlers();
+    const interchangeImportInputRef = {
+      current: { click: vi.fn() } as unknown as HTMLInputElement,
+    };
     const view = render(
       <StudioMenubarContent
         {...createProps({
           projectActionsOpen: true,
+          interchangeImportInputRef,
           stableHandlers,
         })}
       />
     );
 
-    const input = screen.getByLabelText("OpenRaster 또는 CBZ 가져오기");
-    const archive = new File(["archive"], "episode.cbz", {
-      type: "application/vnd.comicbook+zip",
-    });
-    fireEvent.change(input, { target: { files: [archive] } });
-    expect(stableHandlers.handleImportInterchangeArchive).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "ORA / CBZ 가져오기" }));
+    expect(interchangeImportInputRef.current.click).toHaveBeenCalledOnce();
+    expect(screen.queryByLabelText("OpenRaster 또는 CBZ 가져오기")).toBeNull();
 
     view.rerender(
       <StudioMenubarContent
         {...createProps({
           interchangeImportBusy: true,
+          interchangeImportInputRef,
           projectActionsOpen: true,
           stableHandlers,
         })}
@@ -260,6 +264,7 @@ describe("StudioMenubarContent", () => {
       <StudioMenubarContent
         {...createProps({
           psdImportBusy: true,
+          interchangeImportInputRef,
           projectActionsOpen: true,
           stableHandlers,
         })}

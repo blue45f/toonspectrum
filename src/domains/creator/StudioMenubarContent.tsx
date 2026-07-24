@@ -166,6 +166,7 @@ export interface StudioMenubarContentHandlers {
   ) => Promise<StudioRasterEncoded>;
   exportCurrentPageToSvg: () => Promise<SvgExportResult>;
   handleCapturePagesForPreset: (scope: "current" | "all") => Promise<HTMLCanvasElement[]>;
+  handleCapturePagesForIndices: (indices: number[]) => Promise<HTMLCanvasElement[]>;
   handleCopyToClipboard: () => Promise<void>;
   handleDownload: () => Promise<void>;
   handleDownloadAll: (spacing?: number) => Promise<void>;
@@ -348,6 +349,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     exportCurrentPageToRasterInterchange,
     exportCurrentPageToSvg,
     handleCapturePagesForPreset,
+    handleCapturePagesForIndices,
   } = stableHandlers;
   return (
     <>
@@ -659,6 +661,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                       pageLabels={pageLabels}
                       dialoguePages={dialoguePages}
                       capturePagesForPreset={handleCapturePagesForPreset}
+                      capturePagesForIndices={handleCapturePagesForIndices}
                       exportCurrentPageToSvg={exportCurrentPageToSvg}
                       exportCurrentPageToPsd={exportCurrentPageToPsd}
                       exportCurrentPageToRasterInterchange={exportCurrentPageToRasterInterchange}

@@ -190,6 +190,61 @@ describe("planStudioExportDialogueTxt / preflightStudioExportPackage", () => {
     expect(plan?.text).not.toContain("frame");
   });
 
+  it("embeds 漢字(かんじ) ruby preview when the source element has rubySpans", () => {
+    const pagesWithRuby: DialoguePageLike[] = [
+      {
+        id: "p-ruby",
+        elements: [
+          {
+            id: "b-ruby",
+            type: "bubble",
+            text: "漢字テスト",
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 60,
+            // DialoguePageLike is structural; rubySpans live on elements at runtime.
+            ...({
+              rubySpans: [{ start: 0, end: 2, ruby: "かんじ" }],
+            } as object),
+          },
+          {
+            id: "t-plain",
+            type: "text",
+            text: "지문 그대로",
+            x: 0,
+            y: 80,
+            width: 100,
+          },
+        ],
+      },
+    ];
+    const plan = planStudioExportDialogueTxt({
+      pages: pagesWithRuby,
+      title: "ruby-export",
+    });
+    expect(plan).not.toBeNull();
+    expect(plan?.cueCount).toBe(2);
+    expect(plan?.text).toContain("漢字(かんじ)テスト");
+    // Sibling without rubySpans stays plain.
+    expect(plan?.text).toContain("지문 그대로");
+    expect(plan?.text).not.toContain("지문 그대로(");
+  });
+
+  it("keeps plain cue text when the source element has no rubySpans", () => {
+    const plan = planStudioExportDialogueTxt({
+      pages: dialoguePages,
+      title: "plain-export",
+      pageIndices: [0],
+    });
+    expect(plan).not.toBeNull();
+    expect(plan?.cueCount).toBe(2);
+    expect(plan?.text).toContain("안녕");
+    expect(plan?.text).toContain("지문");
+    // No furigana parentheticals when elements lack rubySpans.
+    expect(plan?.text).not.toMatch(/\S+\([^)]+\)/u);
+  });
+
   it("accepts a valid package and rejects bad range or missing required dialogue", () => {
     const ok = preflightStudioExportPackage({
       pageCount: 3,

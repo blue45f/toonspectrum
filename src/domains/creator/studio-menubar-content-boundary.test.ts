@@ -144,4 +144,21 @@ describe("Studio menubar ownership boundary", () => {
       /useStudioStableHandlers<StudioMenubarContentHandlers>\(\{[\s\S]{0,800}collaborationLockMessage/
     );
   });
+
+  it("wires multi-page range capture through indices mode (not all-then-slice residual)", () => {
+    const page = moduleEdges("./StudioPage.tsx").source;
+    const menubar = moduleEdges("./StudioMenubarContent.tsx").source;
+    const handlerContract = menubar.slice(
+      menubar.indexOf("export interface StudioMenubarContentHandlers"),
+      menubar.indexOf("export interface StudioMenubarContentProps")
+    );
+
+    expect(page).toContain("async function handleCapturePagesForIndices(indices: number[])");
+    expect(page).toContain("handleCapturePagesForIndices,");
+    expect(handlerContract).toContain(
+      "handleCapturePagesForIndices: (indices: number[]) => Promise<HTMLCanvasElement[]>"
+    );
+    expect(menubar).toContain("handleCapturePagesForIndices,");
+    expect(menubar).toContain("capturePagesForIndices={handleCapturePagesForIndices}");
+  });
 });

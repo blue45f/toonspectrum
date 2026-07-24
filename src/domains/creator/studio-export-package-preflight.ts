@@ -7,12 +7,18 @@
  */
 import {
   collectDialogueItems,
+  type DialogueBatchItem,
+  type DialogueElementLike,
   type DialoguePageLike,
 } from "./studio-dialogue-batch";
 import {
   serializeStudioDialogueInterchange,
   studioDialogueItemsToInterchange,
 } from "./studio-dialogue-interchange";
+import {
+  formatDialogueTextWithRubyPreview,
+  type DialogueRubySpan,
+} from "./studio-dialogue-ruby";
 
 export type StudioExportPageRange = {
   /** Inclusive 0-based index into the page list. */
@@ -376,6 +382,41 @@ export function planMultiPageExportCapture(input: {
   return { mode: "all-then-slice", indices };
 }
 
+type DialogueElementWithRuby = DialogueElementLike & {
+  rubySpans?: readonly DialogueRubySpan[];
+};
+
+/** pageId + element id → source element for ruby lookup (export-only, pure). */
+function dialogueElementLookup(
+  pages: readonly DialoguePageLike[]
+): Map<string, DialogueElementWithRuby> {
+  const map = new Map<string, DialogueElementWithRuby>();
+  for (const page of pages) {
+    for (const element of page.elements) {
+      map.set(`${page.id}\0${element.id}`, element as DialogueElementWithRuby);
+    }
+  }
+  return map;
+}
+
+/**
+ * Prefer 漢字(かんじ) plain-text ruby preview on cue text when the source element
+ * carries `rubySpans`. Items without spans keep raw text.
+ */
+function enrichDialogueItemsWithRubyPreview(
+  items: readonly DialogueBatchItem[],
+  pages: readonly DialoguePageLike[]
+): DialogueBatchItem[] {
+  const byKey = dialogueElementLookup(pages);
+  return items.map((item) => {
+    const element = byKey.get(`${item.pageId}\0${item.id}`);
+    const rubySpans = element?.rubySpans;
+    if (!rubySpans?.length) return item;
+    const text = formatDialogueTextWithRubyPreview(item.text, rubySpans);
+    return text === item.text ? item : { ...item, text };
+  });
+}
+
 /** Build a plain-text dialogue export from story pages (TXT interchange). */
 export function planStudioExportDialogueTxt(input: {
   pages: readonly DialoguePageLike[];
@@ -391,7 +432,8 @@ export function planStudioExportDialogueTxt(input: {
   if (pages.length === 0) return null;
   const items = collectDialogueItems(pages);
   if (items.length === 0) return null;
-  const document = studioDialogueItemsToInterchange(items, {
+  const enriched = enrichDialogueItemsWithRubyPreview(items, pages);
+  const document = studioDialogueItemsToInterchange(enriched, {
     title: input.title?.trim() || "toonspectrum-dialogue",
   });
   const serialized = serializeStudioDialogueInterchange("txt", document);

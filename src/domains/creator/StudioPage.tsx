@@ -416,11 +416,6 @@ import {
   type DialogueReplacePlan,
 } from "./studio-dialogue-batch";
 import {
-  mergeDialogueWithNext,
-  splitDialogueElement,
-  transferDialogueElement,
-} from "./studio-dialogue-structure";
-import {
   applyDialogueFormatPatch,
   convertTextElementsToBubbles,
 } from "./studio-dialogue-format";
@@ -428,6 +423,11 @@ import {
   applyDialogueRubySpan,
   clearDialogueRubyRange,
 } from "./studio-dialogue-ruby";
+import {
+  mergeDialogueWithNext,
+  splitDialogueElement,
+  transferDialogueElement,
+} from "./studio-dialogue-structure";
 import {
   formatDialogueSuggestionLine,
   joinDialogueContextLines,
@@ -662,6 +662,10 @@ import {
   isStudioLiquifyPointerOwner,
   type StudioLiquifyPointerSession,
 } from "./studio-liquify-pointer";
+import {
+  gateStudioCanvasMutation,
+  type StudioCanvasMutationIntent,
+} from "./studio-live-canvas-mutation-gate";
 import { projectStudioCanvasCommentPins } from "./studio-live-canvas-overlay-model";
 import {
   decideStudioLiveInkBackend,
@@ -678,10 +682,6 @@ import {
   selfHoldsStudioLiveLock,
   studioLiveMutationResources,
 } from "./studio-live-mutation-guard";
-import {
-  gateStudioCanvasMutation,
-  type StudioCanvasMutationIntent,
-} from "./studio-live-canvas-mutation-gate";
 import {
   releaseStudioLiveMutationLocks,
   replaceStudioLiveMutationLocks,
@@ -26959,7 +26959,9 @@ function StudioCuttoonEditor() {
   // 플랫폼 규격 슬라이스 내보내기용 페이지 캡처 — handleDownload/handleDownloadAll과 같은
   // 캡처 경로(stage.toCanvas + 색보정 합성)를 재사용한다. 리샘플·분할·저장은 내보내기 패널
   // (exportPresetSlices)이 수행하고, 워터마크도 슬라이스 단위로 그쪽에서 찍는다(중복 방지).
-  async function handleCapturePagesForPreset(scope: "current" | "all"): Promise<HTMLCanvasElement[]> {
+  // Multi-page package ranges prefer indices mode so only selected pages are rasterized
+  // (StudioExportMenuPanel capturePagesForIndices → planMultiPageExportCapture).
+  async function handleCapturePagesForIndices(indices: number[]): Promise<HTMLCanvasElement[]> {
     if (!ensureSharedDocumentAvailableForExport()) return [];
     setSelectedId(null);
     const originalPageId = currentPageId;
@@ -26969,19 +26971,42 @@ function StudioCuttoonEditor() {
     setIsExporting(true);
     const captured: HTMLCanvasElement[] = [];
     try {
-      if (scope === "current" || pages.length <= 1) {
-        const page = pages.find((item) => item.id === currentPageId) ?? activePage;
+      const seen = new Set<number>();
+      for (const index of indices) {
+        if (!Number.isInteger(index) || index < 0 || index >= pages.length) continue;
+        if (seen.has(index)) continue;
+        seen.add(index);
+        const page = pages[index]!;
+        setCurrentPageId(page.id);
         const stage = await captureReadyStageForPage(page);
         const raw = stage.toCanvas({ pixelRatio: exportScale / effScale });
         captured.push(bakeGradeIntoCanvas(raw, normalizePageGrade(page.grade)));
-      } else {
-        for (const page of pages) {
-          setCurrentPageId(page.id);
-          const stage = await captureReadyStageForPage(page);
-          const raw = stage.toCanvas({ pixelRatio: exportScale / effScale });
-          captured.push(bakeGradeIntoCanvas(raw, normalizePageGrade(page.grade)));
-        }
       }
+    } finally {
+      setCurrentPageId(originalPageId);
+      setMasterEditMode(originalMasterEditMode);
+      setIsExporting(false);
+    }
+    return captured;
+  }
+
+  async function handleCapturePagesForPreset(scope: "current" | "all"): Promise<HTMLCanvasElement[]> {
+    if (scope === "all" && pages.length > 1) {
+      return handleCapturePagesForIndices(pages.map((_, index) => index));
+    }
+    if (!ensureSharedDocumentAvailableForExport()) return [];
+    setSelectedId(null);
+    const originalPageId = currentPageId;
+    const originalMasterEditMode = masterEditMode;
+    setMasterEditMode(false);
+    preserveStudioViewBeforeCapture();
+    setIsExporting(true);
+    const captured: HTMLCanvasElement[] = [];
+    try {
+      const page = pages.find((item) => item.id === currentPageId) ?? activePage;
+      const stage = await captureReadyStageForPage(page);
+      const raw = stage.toCanvas({ pixelRatio: exportScale / effScale });
+      captured.push(bakeGradeIntoCanvas(raw, normalizePageGrade(page.grade)));
     } finally {
       setCurrentPageId(originalPageId);
       setMasterEditMode(originalMasterEditMode);
@@ -28813,6 +28838,7 @@ function StudioCuttoonEditor() {
     exportCurrentPageToRasterInterchange,
     exportCurrentPageToSvg,
     handleCapturePagesForPreset,
+    handleCapturePagesForIndices,
   });
 
   const studioLazyPanelStackHandlers = useStudioStableHandlers<StudioLazyPanelStackHandlers>({
