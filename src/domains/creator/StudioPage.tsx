@@ -175,6 +175,7 @@ import {
   type TemplateSpec,
   type FrameSpec,
 } from "./studio-assets";
+import { mapStudioDocumentPointToAutoColorSeed } from "./studio-auto-color-hints-canvas-seed";
 import {
   LEGACY_STUDIO_AUTOSAVE_KEY,
   readStudioAutosave,
@@ -5590,6 +5591,15 @@ function StudioCuttoonEditor() {
   const [eyedropperActive, setEyedropperActive] = useState(false);
   /** CSP vector eraser: click freehand ink and erase between nearest intersections. */
   const [eraseToIntersection, setEraseToIntersection] = useState(false);
+  /** Auto-color canvas scribble: click selected line art to drop color seeds. */
+  const [autoColorScribbleCanvasArmed, setAutoColorScribbleCanvasArmed] = useState(false);
+  const [autoColorCanvasSeedHit, setAutoColorCanvasSeedHit] = useState<{
+    x: number;
+    y: number;
+    nonce: number;
+  } | null>(null);
+  const autoColorCanvasSeedNonceRef = useRef(0);
+  const autoColorPlanImageSizeRef = useRef<{ width: number; height: number } | null>(null);
   const [bubbleAnchorPickActive, setBubbleAnchorPickActive] = useState(false);
   const [studioOptionalAssets, setStudioOptionalAssets] = useState<StudioOptionalAssetPacks>(
     EMPTY_STUDIO_OPTIONAL_ASSETS
@@ -14830,6 +14840,8 @@ function StudioCuttoonEditor() {
     setEyedropperActive(false);
     setBubbleAnchorPickActive(false);
     setColorRangePickActive(false); // ← 추가(샘플/허용량은 유지 — healClone "모드는 유지" 정책과 동일)
+    setAutoColorScribbleCanvasArmed(false);
+    setAutoColorCanvasSeedHit(null);
     setQuickShapeActive(false);
     setColorWheelOpen(false);
     setLayerMaskPaintActive(false);
@@ -22260,6 +22272,43 @@ function StudioCuttoonEditor() {
     if (tool === "draw" && drawMode === "eraser" && eraseToIntersection) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos && applyVectorEraseToIntersectionAt(pos.x, pos.y)) return;
+    }
+    // Auto-color canvas scribble — armed panel places color seeds on the selected line-art image.
+    if (autoColorScribbleCanvasArmed && selected?.type === "image") {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      const planSize = autoColorPlanImageSizeRef.current;
+      if (pos && planSize) {
+        const sample = mapStudioDocumentPointToAutoColorSeed({
+          documentX: pos.x,
+          documentY: pos.y,
+          image: {
+            x: selected.x,
+            y: selected.y,
+            width: selected.width,
+            height: selected.height,
+            rotation: selected.rotation,
+            flipped: selected.flipped,
+            flippedY: selected.flippedY,
+          },
+          pixelWidth: planSize.width,
+          pixelHeight: planSize.height,
+        });
+        if (sample) {
+          autoColorCanvasSeedNonceRef.current += 1;
+          setAutoColorCanvasSeedHit({
+            x: sample.x,
+            y: sample.y,
+            nonce: autoColorCanvasSeedNonceRef.current,
+          });
+          return;
+        }
+        setError("선화 이미지 안을 클릭해 시드를 찍어 주세요. (회전·반전 레이어는 아직 지원하지 않아요)");
+        return;
+      }
+      if (pos && !planSize) {
+        setError("먼저 자동 채색 힌트 계획을 한 번 실행해 선화 크기를 맞춰 주세요.");
+        return;
+      }
     }
     // 색상 범위 샘플 pick — 스포이드와 달리 다중 샘플 도구라 1회성 해제하지 않는다.
     // 무장 중엔 다른 스테이지 제스처를 차단한다(crop/heal-clone 정책과 동일).
@@ -30783,6 +30832,13 @@ function StudioCuttoonEditor() {
           selectedReadableImageSource={selectedReadableImageSource}
           selectedWorkAssetDestructiveEditReason={selectedWorkAssetDestructiveEditReason}
           setSelectedId={setSelectedId}
+          autoColorScribbleCanvasArmed={autoColorScribbleCanvasArmed}
+          setAutoColorScribbleCanvasArmed={setAutoColorScribbleCanvasArmed}
+          autoColorCanvasSeedHit={autoColorCanvasSeedHit}
+          setAutoColorCanvasSeedHit={setAutoColorCanvasSeedHit}
+          onAutoColorPlanImageSize={(size: { width: number; height: number } | null) => {
+            autoColorPlanImageSizeRef.current = size;
+          }}
           setAdvancedFillPreview={setAdvancedFillPreview}
           setAdvancedFillStatus={setAdvancedFillStatus}
           setAiColorizePrompt={setAiColorizePrompt}

@@ -449,6 +449,14 @@ interface StudioInspectorAsideProps {
   selectedReadableImageSource: string | null;
   selectedWorkAssetDestructiveEditReason: string | null;
   setSelectedId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
+  /** Auto-color canvas scribble arm + one-shot seed hits from the stage. */
+  autoColorScribbleCanvasArmed?: boolean;
+  setAutoColorScribbleCanvasArmed?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  autoColorCanvasSeedHit?: { x: number; y: number; nonce: number } | null;
+  setAutoColorCanvasSeedHit?: import("react").Dispatch<
+    import("react").SetStateAction<{ x: number; y: number; nonce: number } | null>
+  >;
+  onAutoColorPlanImageSize?: (size: { width: number; height: number } | null) => void;
   setAdvancedFillPreview: import("react").Dispatch<import("react").SetStateAction<StudioAdvancedFillPreview | null>>;
   setAdvancedFillStatus: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setAiColorizePrompt: import("react").Dispatch<import("react").SetStateAction<string>>;
@@ -781,6 +789,11 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   selectedReadableImageSource,
   selectedWorkAssetDestructiveEditReason,
   setSelectedId,
+  autoColorScribbleCanvasArmed = false,
+  setAutoColorScribbleCanvasArmed,
+  autoColorCanvasSeedHit = null,
+  setAutoColorCanvasSeedHit,
+  onAutoColorPlanImageSize,
   setAdvancedFillPreview,
   setAdvancedFillStatus,
   setAiColorizePrompt,
@@ -2279,6 +2292,11 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   */}
                   <StudioAutoColorHintsPanel
                     imageSrc={selected.src}
+                    scribbleCanvasArmed={autoColorScribbleCanvasArmed}
+                    onScribbleCanvasArmedChange={setAutoColorScribbleCanvasArmed}
+                    canvasSeedHit={autoColorCanvasSeedHit}
+                    onCanvasSeedHitConsumed={() => setAutoColorCanvasSeedHit?.(null)}
+                    onPlanImageSize={onAutoColorPlanImageSize}
                     onRun={async (request) => {
                       const { runStudioAutoColorHintsWorker } = await import(
                         "./studio-auto-color-hints-worker-client"

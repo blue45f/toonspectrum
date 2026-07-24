@@ -125,6 +125,26 @@ describe("StudioAutoColorHintsPanel module boundary", () => {
     expect(source).toContain('data-studio-auto-color-scribble="true"');
   });
 
+  it("arms canvas scribble and ingests one-shot seed hits with the active palette color", async () => {
+    const onArmed = vi.fn();
+    const onConsumed = vi.fn();
+    render(
+      <StudioAutoColorHintsPanel
+        onScribbleCanvasArmedChange={onArmed}
+        canvasSeedHit={{ x: 12, y: 8, nonce: 1 }}
+        onCanvasSeedHitConsumed={onConsumed}
+      />,
+    );
+    const arm = screen.getByRole("button", { name: /캔버스에 시드 찍기/ });
+    expect(arm.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(arm);
+    expect(onArmed).toHaveBeenCalledWith(true);
+    await waitFor(() => {
+      expect(onConsumed).toHaveBeenCalled();
+      expect(screen.getByText(/시드 1개/)).toBeTruthy();
+    });
+  });
+
   it("exposes scribble palette and apply only when onApplyResult is provided", async () => {
     const onApplyResult = vi.fn();
     // jsdom often lacks a real 2d context; pin the encode/document patch contract.

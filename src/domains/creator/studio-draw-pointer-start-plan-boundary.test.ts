@@ -95,7 +95,8 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // 의도적 변경(2026-07-24): CSP pressure min size — resolveBrushPressureSample/minSizeRatio 배선
     // 및 시작 플랜 입력 전달로 onStageDown 증가(936 → 940).
     // 의도적 변경(2026-07-24): CSP 교점까지 지우기 원샷 분기(지우개+토글) 추가(940 → 945).
-    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(945);
+    // 의도적 변경(2026-07-24): auto-color 캔버스 시드 찍기 분기 추가(945 → 1_000).
+    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(1_000);
 
     expectTokenOrder(pointCommentHandler, [
       "if (pointCommentComposer) return true",

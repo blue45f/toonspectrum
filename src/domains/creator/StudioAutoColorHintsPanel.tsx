@@ -6,8 +6,8 @@
  * apply requires an explicit user action and an `onApplyResult` parent handler.
  */
 
-import { Copy, Info, Loader2, Paintbrush, Sparkles, TriangleAlert } from "lucide-react";
-import { useId, useRef, useState } from "react";
+import { Copy, Crosshair, Info, Loader2, Paintbrush, Sparkles, TriangleAlert } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import {
   planStudioAutoColorHints,
@@ -28,6 +28,9 @@ import {
   type StudioAutoColorApplyTargetMode,
 } from "./studio-auto-color-hints-advanced-fill";
 import {
+  studioAutoColorCanvasSeedId,
+} from "./studio-auto-color-hints-canvas-seed";
+import {
   encodeStudioAutoColorHintImageToPngDataUrl,
   loadStudioAutoColorHintImageFromSrc,
 } from "./studio-auto-color-hints-image-source";
@@ -38,6 +41,13 @@ import {
 } from "./studio-auto-color-hints-summary";
 
 import { cx } from "@/lib/cx";
+
+export interface StudioAutoColorCanvasSeedHit {
+  readonly x: number;
+  readonly y: number;
+  /** Monotonic nonce so the same pixel can be re-seeded after a clear. */
+  readonly nonce: number;
+}
 
 const controlFocusClass =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
@@ -73,6 +83,18 @@ export interface StudioAutoColorHintsPanelProps {
     readonly height: number;
     readonly name: string;
   }) => void;
+  /**
+   * When true (or toggled via UI), the parent should intercept canvas clicks and feed
+   * `canvasSeedHit` image-local samples. Omitted handlers keep arming local-only (UI still works
+   * for demo, but stage clicks need the page wiring).
+   */
+  readonly scribbleCanvasArmed?: boolean;
+  readonly onScribbleCanvasArmedChange?: (armed: boolean) => void;
+  /** One-shot canvas seed from StudioPage stage click (image-local planner pixels). */
+  readonly canvasSeedHit?: StudioAutoColorCanvasSeedHit | null;
+  readonly onCanvasSeedHitConsumed?: () => void;
+  /** Planner pixel size of the last resolved line-art image (for parent stage mapping). */
+  readonly onPlanImageSize?: (size: { width: number; height: number } | null) => void;
 }
 
 async function copyTextToClipboard(text: string): Promise<boolean> {
@@ -150,6 +172,11 @@ export function StudioAutoColorHintsPanel({
   onRun,
   onApplyResult,
   onApplyNewLayer,
+  scribbleCanvasArmed,
+  onScribbleCanvasArmedChange,
+  canvasSeedHit = null,
+  onCanvasSeedHitConsumed,
+  onPlanImageSize,
 }: StudioAutoColorHintsPanelProps) {
   const titleId = useId();
   const helpId = useId();
@@ -161,6 +188,8 @@ export function StudioAutoColorHintsPanel({
   const [summary, setSummary] = useState<StudioAutoColorHintPlanSummary | null>(null);
   const planRef = useRef<StudioAutoColorHintPlan | null>(null);
   const plannedImageRef = useRef<StudioAutoColorHintImageDataLike | null>(null);
+  const canvasSeedSequenceRef = useRef(0);
+  const lastCanvasSeedNonceRef = useRef<number | null>(null);
   const [usingDemo, setUsingDemo] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [applyStatus, setApplyStatus] = useState<string | null>(null);
@@ -169,11 +198,47 @@ export function StudioAutoColorHintsPanel({
     STUDIO_AUTO_COLOR_SCRIBBLE_PALETTE[0]!.id,
   );
   const [applyTargetMode, setApplyTargetMode] = useState<StudioAutoColorApplyTargetMode>("selected");
+  const [localCanvasArmed, setLocalCanvasArmed] = useState(false);
 
   const activePalette =
     STUDIO_AUTO_COLOR_SCRIBBLE_PALETTE.find((entry) => entry.id === activePaletteId)
     ?? STUDIO_AUTO_COLOR_SCRIBBLE_PALETTE[0]!;
   const effectiveSeeds = seedsProp ?? scribbleSeeds;
+  const canvasArmed = scribbleCanvasArmed ?? localCanvasArmed;
+
+  function setCanvasArmed(next: boolean) {
+    setLocalCanvasArmed(next);
+    onScribbleCanvasArmedChange?.(next);
+  }
+
+  // Ingest one-shot canvas seed hits from StudioPage without re-processing the same nonce.
+  useEffect(() => {
+    if (!canvasSeedHit) return;
+    if (lastCanvasSeedNonceRef.current === canvasSeedHit.nonce) return;
+    lastCanvasSeedNonceRef.current = canvasSeedHit.nonce;
+    if (seedsProp) {
+      onCanvasSeedHitConsumed?.();
+      return;
+    }
+    const id = studioAutoColorCanvasSeedId(canvasSeedSequenceRef.current);
+    canvasSeedSequenceRef.current += 1;
+    const seed: StudioAutoColorHintSeed = {
+      id,
+      x: canvasSeedHit.x,
+      y: canvasSeedHit.y,
+      color: [
+        activePalette.color[0],
+        activePalette.color[1],
+        activePalette.color[2],
+        activePalette.color[3],
+      ],
+    };
+    setScribbleSeeds((prev) => appendStudioAutoColorScribbleSeed(prev, seed));
+    setApplyStatus(
+      `캔버스 시드 · ${activePalette.label} @ (${Math.round(canvasSeedHit.x)}, ${Math.round(canvasSeedHit.y)})`,
+    );
+    onCanvasSeedHitConsumed?.();
+  }, [canvasSeedHit, seedsProp, activePalette, onCanvasSeedHitConsumed]);
   // Enable from summary metrics only (refs are set synchronously before summary state).
   const canApplySelected =
     Boolean(onApplyResult)
@@ -201,6 +266,10 @@ export function StudioAutoColorHintsPanel({
       });
       setUsingDemo(resolved.usingDemo);
       plannedImageRef.current = resolved.image;
+      onPlanImageSize?.({
+        width: resolved.image.width,
+        height: resolved.image.height,
+      });
       const nextPlan = await Promise.resolve(
         onRun ? onRun(resolved.request) : planStudioAutoColorHints(resolved.request),
       );
@@ -211,6 +280,7 @@ export function StudioAutoColorHintsPanel({
       setSummary(null);
       planRef.current = null;
       plannedImageRef.current = null;
+      onPlanImageSize?.(null);
       setError(
         caught instanceof Error
           ? caught.message
@@ -361,7 +431,7 @@ export function StudioAutoColorHintsPanel({
           </span>
         </p>
 
-        {/* Scribble seed brush palette */}
+        {/* Scribble seed brush palette + optional canvas arm */}
         <div
           data-studio-auto-color-scribble="true"
           className="space-y-2 rounded-lg border border-line bg-card/40 p-2.5"
@@ -370,6 +440,31 @@ export function StudioAutoColorHintsPanel({
             <Paintbrush size={14} className="text-accent" aria-hidden="true" />
             스크리블 시드 색
           </div>
+          <button
+            type="button"
+            data-studio-auto-color-canvas-scribble="true"
+            aria-pressed={canvasArmed}
+            disabled={Boolean(seedsProp)}
+            onClick={() => setCanvasArmed(!canvasArmed)}
+            className={cx(
+              "flex min-h-11 w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[0.68rem] font-semibold transition-colors",
+              canvasArmed
+                ? "border-accent/50 bg-accent-soft/40 text-accent"
+                : "border-line bg-card text-fg-2 hover:bg-raised",
+              "disabled:cursor-not-allowed disabled:opacity-40",
+              controlFocusClass,
+            )}
+          >
+            <Crosshair size={15} aria-hidden="true" />
+            <span className="min-w-0">
+              <span className="block">캔버스에 시드 찍기</span>
+              <span className="mt-0.5 block font-normal leading-snug text-fg-3">
+                {canvasArmed
+                  ? "켜짐 · 선택 선화 위를 클릭하면 활성 색 시드가 추가됩니다"
+                  : "축 정렬된 선화 레이어 위에 클릭해 시드를 찍습니다"}
+              </span>
+            </span>
+          </button>
           <div
             role="radiogroup"
             aria-label="스크리블 시드 색"
