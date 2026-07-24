@@ -22,6 +22,8 @@
 import {
   advanceStudioResidualInk,
   planStudioCausalInkDabs,
+  selectStudioCausalInkSamples,
+  shouldAppendStudioCausalInkSample,
   startStudioResidualInk,
   STUDIO_CAUSAL_INK_MAX_DABS,
   type StudioCausalInkDab,
@@ -285,6 +287,37 @@ export class StudioLiveInkOverlayRenderer {
   }
 
   /**
+   * Replace the newest settled stroke with the document-authoritative sample sequence (same as
+   * Konva/committed causal planning) and re-rasterize. Call after end() once the release planner
+   * freezes geometry so the overlay→committed handoff does not pop/flicker from residual thinning
+   * drift or incomplete last-sample promotion.
+   */
+  reauthorLastSettledFromDocumentPoints(input: {
+    readonly style: StudioLiveInkStrokeStyle;
+    readonly points: readonly number[];
+    readonly pressures?: readonly number[];
+  }): boolean {
+    if (this.settled.length === 0) return false;
+    if (!studioLiveInkFastOverlaySupportsStyle(input.style)) return false;
+    const samples = selectStudioCausalInkSamples({
+      points: input.points,
+      pressures: input.pressures,
+      pressureModel: input.style.pressureModel,
+      minDistance: input.style.minDistanceDoc,
+      sealEndpoint: true,
+    });
+    if (samples.length === 0) return false;
+    this.settled[this.settled.length - 1] = {
+      style: input.style,
+      xs: samples.map((sample) => sample.x),
+      ys: samples.map((sample) => sample.y),
+      ps: samples.map((sample) => sample.pressure),
+    };
+    this.replay();
+    return true;
+  }
+
+  /**
    * FIFO 커밋이 실제 메인 표면에 그려진 settled 획 수만큼 앞에서 제거한다.
    *
    * backing canvas 를 같은 호출 안에서 지우고 남은 settled/active 획을 재생한다. 따라서 호출자가
@@ -352,8 +385,23 @@ export class StudioLiveInkOverlayRenderer {
     const n = this.keptX.length;
     const lastX = this.keptX[n - 1]!;
     const lastY = this.keptY[n - 1]!;
-    const distance = Math.hypot(x - lastX, y - lastY);
-    if (distance < (this.style?.minDistanceDoc ?? 0)) return;
+    const lastPressure = this.keptP[n - 1]!;
+    // Match selectStudioCausalInkSamples / shouldAppendStudioCausalInkSample so live residual V3
+    // keeps stationary pressure changes and the same min-distance gate as committed Konva dabs.
+    if (
+      !shouldAppendStudioCausalInkSample({
+        lastX,
+        lastY,
+        lastPressure,
+        nextX: x,
+        nextY: y,
+        nextPressure: pressure,
+        minDistance: this.style?.minDistanceDoc ?? 0,
+        pressureModel: this.style?.pressureModel,
+      })
+    ) {
+      return;
+    }
     this.keptX.push(x);
     this.keptY.push(y);
     this.keptP.push(pressure);

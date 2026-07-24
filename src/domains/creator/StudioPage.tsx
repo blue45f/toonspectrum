@@ -9263,6 +9263,15 @@ function StudioCuttoonEditor() {
       // 메인 레이어 전체 재래스터는 지우개 프리뷰 정리에만 필요하다 — 펜 계열까지 매번 돌리면
       // 문서가 커질수록 펜업마다 커밋 획 전부(스탬프 dab·수채 계획 포함)를 다시 그리게 된다.
       if (wasEraser) mainLayerRef.current?.batchDraw();
+    } else if (
+      wasDirect
+      && preserveInk
+      && !wasEraser
+      && liveInkOverlayRendererRef.current.hasSettledStrokes
+    ) {
+      // Overlay owns the fail-visible settled copy. Clear any leftover Konva direct-layer pixels so
+      // they cannot composite for a frame when handoff releases the overlay.
+      liveDraftLayerRef.current?.batchDraw();
     }
     // 비다이렉트 활성 초안 정리 — settled(커밋 대기 잉크)는 flush 의 표면 정리가 담당한다.
     draftPreviewStoreRef.current.setActive(null);
@@ -24636,6 +24645,8 @@ function StudioCuttoonEditor() {
     let deferInkCleanup = false;
     // GPU 지연 표면에는 후보정 이전의, 실제 라이브 표면과 동일한 권위 획을 유지한다.
     let authoritativeLiveStroke: DrawEl | null = null;
+    // Release-planner geometry used to reauthor settled live ink before handoff (anti-flicker).
+    let releaseAuthoritativeStroke: DrawEl | null = null;
     let immediateSurfaceHandoff: { pageId: string; strokeIds: string[] } | null = null;
     try {
       if (
@@ -24760,6 +24771,7 @@ function StudioCuttoonEditor() {
           releasePlan = planRelease(releasePostCorrectionStrength);
         }
         const finished = releasePlan.stroke;
+        releaseAuthoritativeStroke = finished;
         if (releasePlan.quickShapeAnnouncementKind) {
           const kind = releasePlan.quickShapeAnnouncementKind;
           announceDrawingShortcut(`스마트 도형 · ${QUICKSHAPE_KIND_LABELS[kind] ?? kind}`);
@@ -24935,6 +24947,22 @@ function StudioCuttoonEditor() {
       scheduleLiveDrawPressure(null);
       gpuFinalFallbackOrderIdsRef.current = immediateSurfaceHandoff?.strokeIds ?? null;
       clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup });
+      // Re-rasterize the newest settled overlay stroke from the release-planner geometry so the
+      // live Canvas footprint matches Konva/causal planning before committed-ink handoff. Without
+      // this, residual thinning / endpoint promotion can leave a one-frame pop when settled ink is
+      // released after mainLayer.draw().
+      if (
+        deferInkCleanup
+        && releaseAuthoritativeStroke
+        && releaseAuthoritativeStroke.mode !== "eraser"
+        && liveInkOverlayRendererRef.current.hasSettledStrokes
+      ) {
+        liveInkOverlayRendererRef.current.reauthorLastSettledFromDocumentPoints({
+          style: liveInkStyleFor(releaseAuthoritativeStroke),
+          points: releaseAuthoritativeStroke.points,
+          pressures: releaseAuthoritativeStroke.pressures,
+        });
+      }
       if (immediateSurfaceHandoff) {
         queueCommittedStrokeSurfaceHandoff(
           immediateSurfaceHandoff.pageId,

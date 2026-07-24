@@ -106,6 +106,7 @@ describe("studio draw pointer-release planning ownership boundary", () => {
       "finally {",
       "releaseDrawingPointerSession()",
       "clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup })",
+      "reauthorLastSettledFromDocumentPoints",
       "endLiveResourceEdit()",
     ]);
   });

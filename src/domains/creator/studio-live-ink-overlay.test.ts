@@ -165,6 +165,40 @@ describe("StudioLiveInkOverlayRenderer", () => {
     expect(recording.dabs).toEqual(settled);
   });
 
+  it("reauthors the last settled stroke from document points to match sealed causal planning", () => {
+    const style = {
+      ...STYLE,
+      strokeWidthDoc: 16,
+      minDistanceDoc: 2,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
+    } as const;
+    const points = [0, 0, 1, 0, 2, 0, 4, 0, 8, 0, 12, 0];
+    const pressures = [1, 1, 1, 1, 1, 1];
+    const recording = recordingCanvas();
+    // replay() clearRect must drop prior dab recordings so we only observe the sealed footprint.
+    recording.clearRect.mockImplementation(() => {
+      recording.dabs.length = 0;
+    });
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    expect(renderer.begin(style, points[0]!, points[1]!, pressures[0]!)).toBe(true);
+    renderer.appendFrom(points, pressures);
+    renderer.end();
+
+    expect(
+      renderer.reauthorLastSettledFromDocumentPoints({
+        style,
+        points,
+        pressures,
+      })
+    ).toBe(true);
+    expect(renderer.settledStrokeCount).toBe(1);
+    expect(recording.clearRect).toHaveBeenCalled();
+    // Sealed reauthor must equal a fresh full stroke planned from the same document points.
+    expect(recording.dabs).toEqual(canonicalStrokeDabs(points, pressures, style));
+  });
+
   it("finishes residual ink synchronously without scheduling a post-release reveal", () => {
     const requestAnimationFrame = vi.fn(() => 1);
     vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
