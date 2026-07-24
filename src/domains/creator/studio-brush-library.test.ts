@@ -65,6 +65,7 @@ const validSnapshot: StudioBrushSnapshot = {
   postCorrection: 7,
   preserveCorners: true,
   pressureCurve: 1.8,
+      pressureMinSize: 0,
   useVelocityPressure: true,
   velocitySensitivity: 0.5,
   tiltEnabled: true,
@@ -88,6 +89,15 @@ const brush = (id: string, createdAt = 1): StudioSavedBrush => ({
 });
 
 describe("sanitizeBrushSnapshot", () => {
+
+  it("defaults pressureMinSize to 0 and clamps out-of-range floors", () => {
+    const missing = sanitizeBrushSnapshot({ brushId: "pen", strokeWidth: 6, brushOpacity: 1, color: "#000000" });
+    expect(missing.snapshot.pressureMinSize).toBe(0);
+    const high = sanitizeBrushSnapshot({ ...missing.snapshot, pressureMinSize: 3 });
+    expect(high.snapshot.pressureMinSize).toBe(1);
+    const low = sanitizeBrushSnapshot({ ...missing.snapshot, pressureMinSize: -1 });
+    expect(low.snapshot.pressureMinSize).toBe(0);
+  });
   it("유효한 스냅샷은 그대로 통과시키고 adjustedFields는 비어있다", () => {
     const { snapshot, adjustedFields } = sanitizeBrushSnapshot(validSnapshot);
     expect(snapshot).toEqual(validSnapshot);
@@ -192,6 +202,7 @@ describe("sanitizeBrushSnapshot", () => {
       strokeWidth: Number.NaN,
       stabilizer: Number.POSITIVE_INFINITY,
       pressureCurve: "1.0" as unknown as number,
+      pressureMinSize: 0,
     });
     expect(snapshot.strokeWidth).toBe(6);
     expect(snapshot.stabilizer).toBe(0);
@@ -1125,6 +1136,7 @@ describe("내장 카탈로그 120종 저장 라이브러리 왕복", () => {
       postCorrection: 0,
       preserveCorners: true,
       pressureCurve: 1,
+      pressureMinSize: 0,
       useVelocityPressure: false,
       velocitySensitivity: 0.65,
       tiltEnabled: true,

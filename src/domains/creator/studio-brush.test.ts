@@ -16,6 +16,7 @@ import {
   processPencilPoints,
   pressureCurvePresetId,
   pressureCurveValueForPreset,
+  studioBrushPressureWithMinSize,
   resampleStrokePressures,
   resolveBrushPressureSample,
   resolveBrushReleasePressureSample,
@@ -336,6 +337,39 @@ describe("resolveBrushPressureSample", () => {
       velocitySensitivity: 1,
       pressureCurve: 1,
     })).toBeCloseTo(0.625, 10);
+  });
+});
+
+describe("studioBrushPressureWithMinSize (CSP Size Min)", () => {
+  it("maps pressure through min + (1-min)*p and clamps invalid ratios to Magma zero floor", () => {
+    expect(studioBrushPressureWithMinSize(0, 0.2)).toBeCloseTo(0.2, 10);
+    expect(studioBrushPressureWithMinSize(1, 0.2)).toBeCloseTo(1, 10);
+    expect(studioBrushPressureWithMinSize(0.5, 0.2)).toBeCloseTo(0.6, 10);
+    expect(studioBrushPressureWithMinSize(0, 0)).toBe(0);
+    expect(studioBrushPressureWithMinSize(0.4, Number.NaN)).toBeCloseTo(0.4, 10);
+    expect(studioBrushPressureWithMinSize(0.4, -1)).toBeCloseTo(0.4, 10);
+    expect(studioBrushPressureWithMinSize(0.4, 2)).toBeCloseTo(1, 10);
+  });
+
+  it("applies min size after the pressure curve on pen hardware samples only", () => {
+    // curve=2, p=0.5 → 0.25; min=0.2 → 0.2 + 0.8*0.25 = 0.4
+    expect(
+      resolveBrushPressureSample({
+        pointerType: "pen",
+        rawPressure: 0.5,
+        pressureCurve: 2,
+        minSizeRatio: 0.2,
+      })
+    ).toBeCloseTo(0.4, 10);
+    // Mouse fixed fallback must stay nominal (no min applied).
+    expect(
+      resolveBrushPressureSample({
+        pointerType: "mouse",
+        fallbackPressure: 0.5,
+        pressureCurve: 2,
+        minSizeRatio: 0.2,
+      })
+    ).toBe(0.5);
   });
 });
 

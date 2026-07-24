@@ -301,6 +301,8 @@ export interface StudioMobileEditingDockProps {
   postCorrection: number;
   preserveCorners: boolean;
   pressureCurve: number;
+  pressureMinSize?: number;
+  setPressureMinSize?: (value: number) => void;
   proDrawPrefs: StudioProDrawPrefs;
   quickActionsOpen: boolean;
   savedBrushes: StudioSavedBrush[];
@@ -388,6 +390,8 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   postCorrection,
   preserveCorners,
   pressureCurve,
+  pressureMinSize,
+  setPressureMinSize,
   proDrawPrefs,
   quickActionsOpen,
   savedBrushes,
@@ -984,6 +988,8 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     onVelocitySensitivityChange={setVelocitySensitivity}
                     pressureCurve={pressureCurve}
                     onPressureCurveChange={setPressureCurve}
+                    pressureMinSize={pressureMinSize ?? 0}
+                    onPressureMinSizeChange={setPressureMinSize ?? (() => undefined)}
                     tiltEnabled={tiltEnabled}
                     onTiltEnabledChange={setTiltEnabled}
                     tipAngle={tipAngle}

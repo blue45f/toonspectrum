@@ -24,6 +24,8 @@ Finite shippable batch after CSP EX / Magma / Photopea / Procreate / SHAPER surv
 | Live soft-lock canvas mutation gate | pure gate + boundary |
 | Auto-color hints panel (plan-only) | fill-tab mount; **worker `onRun`** dynamic import; demo fixture until selection ImageData; no silent overwrite |
 | Edit crop menu reachability | edit controls + menubar |
+| Live ink stroke-complete handoff flicker | residual sample admission + `reauthorLastSettledFromDocumentPoints` before committed release |
+| CSP Size dynamics Min (pressure floor) | `pressureMinSize` snapshot + `studioBrushPressureWithMinSize` on hardware/velocity channels; Brush Studio “최소 굵기” |
 
 ## Still deferred (honest multi-hour / industry)
 

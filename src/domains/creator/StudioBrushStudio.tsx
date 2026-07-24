@@ -117,6 +117,8 @@ export interface StudioBrushStudioProps {
   onVelocitySensitivityChange: (value: number) => void;
   pressureCurve: number;
   onPressureCurveChange: (value: number) => void;
+  pressureMinSize?: number;
+  onPressureMinSizeChange?: (value: number) => void;
   tiltEnabled: boolean;
   onTiltEnabledChange: (value: boolean) => void;
   tipAngle: number;
@@ -715,6 +717,8 @@ export function StudioBrushStudio({
   onVelocitySensitivityChange,
   pressureCurve,
   onPressureCurveChange,
+  pressureMinSize = 0,
+  onPressureMinSizeChange,
   tiltEnabled,
   onTiltEnabledChange,
   tipAngle,
@@ -1169,6 +1173,8 @@ export function StudioBrushStudio({
         onVelocitySensitivityChange={onVelocitySensitivityChange}
         pressureCurve={pressureCurve}
         onPressureCurveChange={onPressureCurveChange}
+        pressureMinSize={pressureMinSize}
+        onPressureMinSizeChange={onPressureMinSizeChange ?? (() => undefined)}
       />
       <div className="mt-3 grid grid-cols-2 gap-2 text-[0.66rem] text-fg-3 sm:grid-cols-4">
         {["필압", "속도", "기울기", "회전"].map((sensor) => (

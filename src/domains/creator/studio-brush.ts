@@ -299,6 +299,11 @@ export interface BrushPressureSampleInput {
   velocityFallbackEnabled?: boolean;
   velocitySensitivity?: unknown;
   pressureCurve?: unknown;
+  /**
+   * CSP Size dynamics Min — residual pen/marker floor as 0..1 of selected size.
+   * Applied after the pressure curve on hardware/velocity channels only (not mouse fixed fallback).
+   */
+  minSizeRatio?: unknown;
   /** 속도 폴백이 최소 압력에 도달하는 CSS px/ms. */
   maxVelocity?: unknown;
   /** elapsedMs가 없는 레거시 호출용 샘플 간 최대 거리. */
@@ -331,6 +336,20 @@ function clamp(value: number, min: number, max: number): number {
 
 function clamp01(value: number): number {
   return clamp(value, 0, 1);
+}
+
+/**
+ * Maps curved pressure into a CSP-style min-size floor: `min + (1 - min) * p`.
+ * Invalid ratios collapse to 0 (Magma-compatible zero-pressure coverage).
+ */
+export function studioBrushPressureWithMinSize(
+  pressure01: number,
+  minSizeRatio: unknown
+): number {
+  const pressure = clamp01(finiteNumber(pressure01, 0));
+  const min = clamp01(finiteNumber(minSizeRatio, 0));
+  if (min <= 0) return pressure;
+  return clamp01(min + (1 - min) * pressure);
 }
 
 function normalizeDegrees(value: number): number {
@@ -428,10 +447,11 @@ export function resolveBrushPressureSample(input: BrushPressureSampleInput = {})
   // A fixed mouse/touch fallback represents the nominal brush width, not simulated pressure.
   // Applying the stylus curve here would make the same cursor render 19% thicker (soft) or 30%
   // thinner (firm). Curves belong only to real pen pressure or the explicitly enabled velocity
-  // pressure channel.
+  // pressure channel. Min-size floor follows the same rule so mouse nominal width is unchanged.
   if (!applyPressureCurve) return clamp01(basePressure);
   const curve = clamp(finiteNumber(input.pressureCurve, 1), 0.05, 8);
-  return clamp01(Math.pow(clamp01(basePressure), curve));
+  const curved = clamp01(Math.pow(clamp01(basePressure), curve));
+  return studioBrushPressureWithMinSize(curved, input.minSizeRatio);
 }
 
 /**

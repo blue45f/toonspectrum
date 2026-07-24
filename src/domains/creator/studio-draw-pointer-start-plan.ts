@@ -70,6 +70,8 @@ export interface StudioDrawPointerStartInput {
   readonly stabilizerMode: StudioStabilizerMode;
   readonly velocitySensitivity: number;
   readonly pressureCurve: number;
+  /** CSP min size ratio (0..1) for residual pen/marker pressure floor. */
+  readonly pressureMinSize?: number;
   readonly positionScale: number;
   readonly brushTip: Readonly<{
     tiltEnabled: boolean;
@@ -161,6 +163,8 @@ export function planStudioDrawPointerStart(
     velocityFallbackEnabled: false,
     velocitySensitivity: input.velocitySensitivity,
     pressureCurve: input.pressureCurve,
+    // Residual pen/marker only: stamp/dynamics own independent min floors.
+    minSizeRatio: linearPressureEligible ? input.pressureMinSize : 0,
     // Versioned linear ink treats the selected size as full-pressure diameter. Specialty and
     // legacy engines retain their historical nominal-pressure contract.
     fallbackPressure: pressureModel ? 1 : 0.5,

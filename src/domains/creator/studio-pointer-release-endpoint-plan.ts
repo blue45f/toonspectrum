@@ -31,6 +31,7 @@ export interface StudioPointerReleaseEndpointPlanInput {
   readonly endpoint: Readonly<{ x: number; y: number }>;
   readonly pointer: StudioPointerReleaseEndpointSample;
   readonly pressureCurve: number;
+  readonly pressureMinSize?: number;
 }
 
 export interface StudioPointerReleaseEndpointPlan {
@@ -74,6 +75,7 @@ export function planStudioPointerReleaseEndpoint(
         lastContactPressure: lastPressure,
         velocityFallbackEnabled: false,
         pressureCurve: input.pressureCurve,
+        minSizeRatio: input.pressureMinSize,
         fallbackPressure: lastPressure,
       })
     : lastPressure;

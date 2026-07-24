@@ -23,6 +23,7 @@ function savedBrush(index: number): StudioSavedBrush {
     postCorrection: 3,
     preserveCorners: true,
     pressureCurve: 1,
+      pressureMinSize: 0,
     useVelocityPressure: true,
     velocitySensitivity: 0.5,
     tiltEnabled: true,

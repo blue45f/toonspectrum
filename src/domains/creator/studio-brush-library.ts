@@ -73,6 +73,11 @@ export interface StudioBrushSnapshot extends StudioBrushSourcePresetMetadata {
   /** StudioPage의 `pressureCurve` state에 대응. UI는 0.65(민감하게)/1.0(선형)/1.8(단단하게) 중 하나만
    *  설정하지만, 저장 데이터가 다른 값이어도 동작은 하므로 0.3~3 범위로만 clamp한다. */
   pressureCurve: number;
+  /**
+   * CSP Size dynamics Min for residual pen/marker — 0..1 fraction of selected size kept at p=0.
+   * Default 0 preserves Magma-compatible zero-pressure coverage.
+   */
+  pressureMinSize: number;
   /** StudioPage의 `useVelocityPressure` state에 대응. */
   useVelocityPressure: boolean;
   /** StudioPage의 `velocitySensitivity` state에 대응(0.1~1.0). */
@@ -202,6 +207,7 @@ export const DEFAULT_STUDIO_BRUSH_SNAPSHOT: StudioBrushSnapshot = {
   postCorrection: 0,
   preserveCorners: true,
   pressureCurve: 1.0,
+  pressureMinSize: 0,
   useVelocityPressure: false,
   velocitySensitivity: 0.65,
   tiltEnabled: true,
@@ -269,6 +275,7 @@ function replaceBrushSnapshot<T extends StudioBrushSnapshot>(
     postCorrection: _postCorrection,
     preserveCorners: _preserveCorners,
     pressureCurve: _pressureCurve,
+    pressureMinSize: _pressureMinSize,
     useVelocityPressure: _useVelocityPressure,
     velocitySensitivity: _velocitySensitivity,
     tiltEnabled: _tiltEnabled,
@@ -440,6 +447,14 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
     DEFAULT_SNAPSHOT.pressureCurve,
     adjustedFields
   );
+  const pressureMinSize = clampedNumberField(
+    o,
+    "pressureMinSize",
+    0,
+    1,
+    DEFAULT_SNAPSHOT.pressureMinSize,
+    adjustedFields
+  );
   const velocitySensitivity = clampedNumberField(
     o,
     "velocitySensitivity",
@@ -516,6 +531,7 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
       postCorrection,
       preserveCorners,
       pressureCurve,
+      pressureMinSize,
       useVelocityPressure,
       velocitySensitivity,
       tiltEnabled,
@@ -984,6 +1000,7 @@ export function brushMatchesSnapshot(
     && brush.postCorrection === snapshot.postCorrection
     && brush.preserveCorners === snapshot.preserveCorners
     && brush.pressureCurve === snapshot.pressureCurve
+    && brush.pressureMinSize === snapshot.pressureMinSize
     && brush.useVelocityPressure === snapshot.useVelocityPressure
     && brush.velocitySensitivity === snapshot.velocitySensitivity
     && brush.tiltEnabled === snapshot.tiltEnabled
@@ -1015,6 +1032,7 @@ export function writeBrushJson(brush: StudioSavedBrush): string {
     postCorrection: snapshot.postCorrection,
     preserveCorners: snapshot.preserveCorners,
     pressureCurve: snapshot.pressureCurve,
+    pressureMinSize: snapshot.pressureMinSize,
     useVelocityPressure: snapshot.useVelocityPressure,
     velocitySensitivity: snapshot.velocitySensitivity,
     tiltEnabled: snapshot.tiltEnabled,

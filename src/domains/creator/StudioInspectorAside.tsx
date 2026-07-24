@@ -429,6 +429,8 @@ interface StudioInspectorAsideProps {
   postCorrection: number;
   preserveCorners: boolean;
   pressureCurve: number;
+  pressureMinSize?: number;
+  setPressureMinSize?: (value: number) => void;
   propsSheetRef: import("react").RefObject<HTMLElement | null>;
   puppetWarpActive: boolean;
   puppetWarpBusy: boolean;
@@ -758,6 +760,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   postCorrection,
   preserveCorners,
   pressureCurve,
+  pressureMinSize,
+  setPressureMinSize,
   propsSheetRef,
   puppetWarpActive,
   puppetWarpBusy,
@@ -3035,6 +3039,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       onVelocitySensitivityChange={setVelocitySensitivity}
                       pressureCurve={pressureCurve}
                       onPressureCurveChange={setPressureCurve}
+                      pressureMinSize={pressureMinSize ?? 0}
+                      onPressureMinSizeChange={setPressureMinSize ?? (() => undefined)}
                       tiltEnabled={tiltEnabled}
                       onTiltEnabledChange={setTiltEnabled}
                       tipAngle={tipAngle}

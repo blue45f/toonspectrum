@@ -329,4 +329,17 @@ describe("planStudioDrawPointerStart", () => {
     expect(watercolor.element.watercolorPipeline).toBe("causal-walker-v2");
     expect(watercolor.element.stampPipeline).toBeUndefined();
   });
+
+  it("applies CSP pressure min size to residual pen first samples", () => {
+    const plan = planStudioDrawPointerStart(input({
+      pressureMinSize: 0.25,
+      pointer: { pointerType: "pen", pressure: 0, timeStamp: 1 },
+    }));
+    // Immediate residual pens may quantize the first sample; min floor must still bind near 0.25.
+    expect(plan.pressure).toBeGreaterThanOrEqual(0.25);
+    expect(plan.pressure).toBeLessThan(0.26);
+    expect(plan.element.pressures?.[0]).toBeGreaterThanOrEqual(0.25);
+    expect(plan.element.pressures?.[0]).toBeLessThan(0.26);
+  });
+
 });

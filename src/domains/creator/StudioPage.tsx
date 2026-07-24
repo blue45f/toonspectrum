@@ -5243,6 +5243,9 @@ function StudioCuttoonEditor() {
   const [pressureCurve, setPressureCurve] = useState<number>(
     () => loadStudioAppSettings(studioAppSettingsStorage()).other.pressureCurve
   );
+  const [pressureMinSize, setPressureMinSize] = useState<number>(
+    DEFAULT_STUDIO_BRUSH_SNAPSHOT.pressureMinSize
+  );
   const [useVelocityPressure, setUseVelocityPressure] = useState<boolean>(
     DEFAULT_STUDIO_BRUSH_SNAPSHOT.useVelocityPressure
   );
@@ -5330,6 +5333,7 @@ function StudioCuttoonEditor() {
     postCorrection,
     preserveCorners,
     pressureCurve,
+    pressureMinSize,
     useVelocityPressure,
     velocitySensitivity,
     tiltEnabled,
@@ -5370,6 +5374,7 @@ function StudioCuttoonEditor() {
     setPostCorrection(saved.postCorrection);
     setPreserveCorners(saved.preserveCorners);
     setPressureCurve(saved.pressureCurve);
+    setPressureMinSize(saved.pressureMinSize);
     setUseVelocityPressure(saved.useVelocityPressure);
     setVelocitySensitivity(saved.velocitySensitivity);
     setTiltEnabled(saved.tiltEnabled);
@@ -7903,6 +7908,7 @@ function StudioCuttoonEditor() {
     postCorrection: number;
     preserveCorners: boolean;
     pressureCurve: number;
+    pressureMinSize: number;
     useVelocityPressure: boolean;
     velocitySensitivity: number;
     coordinateScale: number;
@@ -22819,6 +22825,7 @@ function StudioCuttoonEditor() {
         postCorrection,
         preserveCorners,
         pressureCurve,
+        pressureMinSize,
         useVelocityPressure,
         velocitySensitivity,
         coordinateScale: effScale,
@@ -22847,6 +22854,7 @@ function StudioCuttoonEditor() {
         stabilizerMode,
         velocitySensitivity,
         pressureCurve,
+        pressureMinSize,
         positionScale: effScale,
         brushTip: { tiltEnabled, angleDeg: tipAngle, roundness: tipRoundness },
         symmetry: {
@@ -23779,6 +23787,7 @@ function StudioCuttoonEditor() {
           elapsedMs: velocitySample.elapsedMs,
           velocityFallbackEnabled: inputSettings?.useVelocityPressure ?? useVelocityPressure,
           velocitySensitivity: inputSettings?.velocitySensitivity ?? velocitySensitivity,
+          minSizeRatio: inputSettings?.pressureMinSize ?? pressureMinSize,
           pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
           fallbackPressure: current.pressureModel ? 1 : 0.5,
         });
@@ -24424,6 +24433,7 @@ function StudioCuttoonEditor() {
           elapsedMs: 0,
           velocityFallbackEnabled: false,
           velocitySensitivity: settings?.velocitySensitivity ?? velocitySensitivity,
+          minSizeRatio: settings?.pressureMinSize ?? pressureMinSize,
           pressureCurve: settings?.pressureCurve ?? pressureCurve,
           fallbackPressure: drawing.pressureModel ? 1 : 0.5,
         });
@@ -24676,6 +24686,7 @@ function StudioCuttoonEditor() {
                 rawPressure: pointerEvent.pressure,
                 lastContactPressure: releaseLastContactPressure,
                 pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
+                minSizeRatio: inputSettings?.pressureMinSize ?? pressureMinSize,
                 fallbackPressure: releaseLastContactPressure,
               })
             : undefined,
@@ -24704,6 +24715,7 @@ function StudioCuttoonEditor() {
               endpoint: { x: flushed.point[0], y: flushed.point[1] },
               pointer: pointerEvent,
               pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
+              pressureMinSize: inputSettings?.pressureMinSize ?? pressureMinSize,
             });
             if (endpointPlan.appended) drawingRef.current = endpointPlan.stroke;
           }
@@ -30798,6 +30810,8 @@ function StudioCuttoonEditor() {
           setPostCorrection={setPostCorrection}
           setPreserveCorners={setPreserveCorners}
           setPressureCurve={setPressureCurve}
+          pressureMinSize={pressureMinSize}
+          setPressureMinSize={setPressureMinSize}
           setPuppetWarpActive={setPuppetWarpActive}
           setPuppetWarpPins={setPuppetWarpPins}
           setQuickShapeActive={setQuickShapeActive}
@@ -30962,6 +30976,8 @@ function StudioCuttoonEditor() {
           setPostCorrection={setPostCorrection}
           setPreserveCorners={setPreserveCorners}
           setPressureCurve={setPressureCurve}
+          pressureMinSize={pressureMinSize}
+          setPressureMinSize={setPressureMinSize}
           setQuickStartOpen={setQuickStartOpen}
           setSavedBrushes={setSavedBrushes}
           setSelectedId={setSelectedId}

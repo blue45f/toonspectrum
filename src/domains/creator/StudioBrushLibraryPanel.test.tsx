@@ -17,6 +17,7 @@ const snapshot: StudioBrushSnapshot = {
   postCorrection: 4,
   preserveCorners: true,
   pressureCurve: 1,
+      pressureMinSize: 0,
   useVelocityPressure: true,
   velocitySensitivity: 0.65,
   tiltEnabled: true,
