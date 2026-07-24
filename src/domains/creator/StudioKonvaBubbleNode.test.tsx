@@ -262,6 +262,68 @@ describe("StudioKonvaBubbleNode variants", () => {
 });
 
 describe("StudioKonvaBubbleNode text and interaction", () => {
+  it("stacks horizontal ruby overlays above base dialogue without changing padding geometry", () => {
+    render(
+      <StudioKonvaBubbleNode
+        {...commonProps()}
+        el={bubbleElement({
+          align: "left",
+          fontSize: 20,
+          text: "AB漢字",
+          // Duck-typed dialogue annotation — not on BubbleEl, present at runtime.
+          ...({
+            rubySpans: [{ start: 2, end: 4, ruby: "かんじ" }],
+          } as Partial<BubbleElement>),
+        })}
+      />,
+    );
+
+    const horizontalPadding = bubbleHorizontalPadding(20);
+    const verticalPadding = bubbleVerticalPadding(20);
+    const texts = konvaCapture.texts;
+    expect(texts).toHaveLength(2);
+    expect(texts[0]).toMatchObject({
+      text: "AB漢字",
+      fontSize: 20,
+      x: horizontalPadding,
+      y: verticalPadding.top,
+      align: "left",
+    });
+    expect(texts[1]).toMatchObject({
+      text: "かんじ",
+      fontSize: 9,
+      listening: false,
+      align: "center",
+      wrap: "none",
+    });
+    // classic theme letterSpacing is 0.3 — "AB" ≈ 11+0.3+11 = 22.3 at 20px font.
+    expect(texts[1]!.x).toBeCloseTo(horizontalPadding + 22.3);
+    expect(texts[1]!.y).toBeCloseTo(verticalPadding.top - 9 * 0.9);
+  });
+
+  it("skips ruby overlays for vertical bubbles (base-only formatVerticalText)", () => {
+    const source = "漢字";
+    render(
+      <StudioKonvaBubbleNode
+        {...commonProps()}
+        el={bubbleElement({
+          fontSize: 24,
+          text: source,
+          vertical: true,
+          ...({
+            rubySpans: [{ start: 0, end: 2, ruby: "かんじ" }],
+          } as Partial<BubbleElement>),
+        })}
+      />,
+    );
+
+    expect(konvaCapture.texts).toHaveLength(1);
+    expect(konvaCapture.texts[0]).toMatchObject({
+      text: formatVerticalText(source),
+      fontSize: 24,
+    });
+  });
+
   it("preserves auto-shrink, vertical formatting, and the shared padding geometry", () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
       font: "",

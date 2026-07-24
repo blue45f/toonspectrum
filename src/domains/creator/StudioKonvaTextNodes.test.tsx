@@ -286,6 +286,79 @@ describe("StudioKonvaTextNode", () => {
     expect(props.onPatch).toHaveBeenCalledWith("text-1", { x: 71, y: 82 });
     expect(props.onInteractionEnd).toHaveBeenCalledTimes(1);
   });
+
+  it("stacks horizontal ruby overlays above base text without stealing the transform ref", () => {
+    const props = commonProps();
+    render(
+      <StudioKonvaTextNode
+        {...props}
+        el={textElement({
+          fontSize: 20,
+          text: "AB漢字CD",
+          // Duck-typed dialogue annotation — not on TextEl, present at runtime.
+          ...({
+            rubySpans: [{ start: 2, end: 4, ruby: "かんじ" }],
+          } as Partial<TextElement>),
+        })}
+      />,
+    );
+
+    const group = latest(konvaCapture.groups, "ruby group");
+    expect(group).toMatchObject({
+      studioElementId: "text-1",
+      width: 220,
+      x: 10,
+      y: 20,
+    });
+    expect(group.ref).toBe(props.innerRef);
+
+    const texts = konvaCapture.texts;
+    expect(texts).toHaveLength(2);
+    expect(texts[0]).toMatchObject({
+      text: "AB漢字CD",
+      fontSize: 20,
+      x: 0,
+      y: 0,
+      width: 220,
+    });
+    // "AB" ≈ 0.55em×2×20 = 22; ruby size 20×0.45 = 9.
+    expect(texts[1]).toMatchObject({
+      text: "かんじ",
+      fontSize: 9,
+      listening: false,
+      align: "center",
+      wrap: "none",
+    });
+    expect(texts[1]!.x).toBeCloseTo(22);
+    expect(texts[1]!.y).toBeCloseTo(-9 * 0.9);
+
+    const transformEvent = { target: "ruby-group" };
+    (group as { onTransformEnd: (event: unknown) => void }).onTransformEnd(transformEvent);
+    expect(props.onCommitTransform).toHaveBeenCalledWith("text-1", 20, transformEvent, {
+      minFontSize: 10,
+      patchWidth: true,
+    });
+  });
+
+  it("skips ruby overlays for vertical text (base-only columns)", () => {
+    render(
+      <StudioKonvaTextNode
+        {...commonProps()}
+        el={textElement({
+          fontSize: 20,
+          text: "漢字",
+          vertical: true,
+          ...({
+            rubySpans: [{ start: 0, end: 2, ruby: "かんじ" }],
+          } as Partial<TextElement>),
+        })}
+      />,
+    );
+
+    // Vertical path paints column runs only — no smaller furigana overlay Text.
+    expect(konvaCapture.texts.every((node) => node.fontSize === 20)).toBe(true);
+    expect(konvaCapture.texts.some((node) => node.text === "かんじ")).toBe(false);
+  });
 });
 
 describe("StudioKonvaStickerNode", () => {

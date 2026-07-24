@@ -41,6 +41,10 @@ import {
   BUBBLE_TEXT_MEASURER,
   formatVerticalText,
 } from "./studio-bubble-text-runtime";
+import {
+  planDialogueRubyOverlayPlacements,
+  readDialogueRubySpans,
+} from "./studio-dialogue-ruby-layout";
 import { konvaGradientProps } from "./studio-gradient-engine";
 import { withStudioNodeInteractionGuards } from "./studio-node-props";
 import { normalizeStrokeStyle, strokeDashArray } from "./studio-stroke-shapes";
@@ -335,6 +339,29 @@ export function StudioKonvaBubbleNode({
     { onInteractionBegin, onInteractionEnd }
   );
 
+  // Text box + optional horizontal ruby overlays (base stays one KText; vertical skips ruby paint).
+  const textBoxWidth = Math.max(8, el.width - bHPad * 2);
+  const textBoxHeight = Math.max(8, el.height - (bVPadTop + bVPadBot));
+  const bubbleAlign = el.align ?? "center";
+  const bubbleFontFamily = el.font ?? "Pretendard, sans-serif";
+  const bubbleFontStyle = el.fontStyle ?? "bold";
+  const baseText = el.vertical ? formatVerticalText(el.text) : el.text;
+  // Vertical bubbles keep base-only paint (formatVerticalText). Stacked ruby is horizontal-only
+  // in this MVP — column layout does not host furigana beside upright glyphs yet.
+  const rubySpans = !el.vertical
+    ? readDialogueRubySpans(
+        (el as Extract<El, { type: "bubble" }> & { rubySpans?: unknown }).rubySpans,
+      )
+    : undefined;
+  const rubyOverlays = rubySpans
+    ? planDialogueRubyOverlayPlacements(el.text, rubySpans, {
+        fontSize: bFs,
+        letterSpacing: bubbleLetterSpacing,
+        textWidth: textBoxWidth,
+        align: bubbleAlign,
+      })
+    : [];
+
   return (
     <Group
       studioElementId={el.id}
@@ -543,20 +570,38 @@ export function StudioKonvaBubbleNode({
         />
       )}
       <KText
-        text={el.vertical ? formatVerticalText(el.text) : el.text}
-        width={Math.max(8, el.width - bHPad * 2)}
-        height={Math.max(8, el.height - (bVPadTop + bVPadBot))}
+        text={baseText}
+        width={textBoxWidth}
+        height={textBoxHeight}
         x={bHPad}
         y={bVPadTop}
         fontSize={bFs}
-        fontFamily={el.font ?? "Pretendard, sans-serif"}
-        fontStyle={el.fontStyle ?? "bold"}
+        fontFamily={bubbleFontFamily}
+        fontStyle={bubbleFontStyle}
         fill={el.textFill}
-        align={el.align ?? "center"}
+        align={bubbleAlign}
         verticalAlign="middle"
         lineHeight={bubbleLineHeight}
         letterSpacing={bubbleLetterSpacing}
       />
+      {rubyOverlays.map((placement) => (
+        <KText
+          key={`bubble-ruby-${placement.start}-${placement.end}-${placement.ruby}`}
+          text={placement.ruby}
+          // First-line approximation: y is relative to the text box top (verticalAlign middle
+          // is not re-measured). Honest MVP — multi-line wrap is not modelled.
+          x={bHPad + placement.x}
+          y={bVPadTop + placement.y}
+          width={Math.max(placement.baseWidth, 1)}
+          align="center"
+          wrap="none"
+          fontSize={placement.rubyFontSize}
+          fontFamily={bubbleFontFamily}
+          fontStyle={bubbleFontStyle}
+          fill={el.textFill}
+          listening={false}
+        />
+      ))}
       {tailHandle}
     </Group>
   );

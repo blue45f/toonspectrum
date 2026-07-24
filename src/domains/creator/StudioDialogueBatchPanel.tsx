@@ -56,6 +56,10 @@ import {
   type DialogueReadAloudPlaybackState,
   type DialogueSpeechAdapter,
 } from "./studio-dialogue-read-aloud";
+import {
+  formatDialogueTextWithRubyPreview,
+  type DialogueRubySpan,
+} from "./studio-dialogue-ruby";
 import { downloadBlob } from "./studio-export";
 
 import { cx } from "@/lib/cx";
@@ -67,6 +71,11 @@ export type StudioDialogueBatchPanelProps = {
   currentPageId: string;
   /** 캔버스에서 선택된 요소 id(목록 하이라이트). */
   selectedId: string | null;
+  /**
+   * 마퀴/다중 선택 id — formatScope "selected" 에 우선 사용.
+   * 비어 있거나 미전달이면 selectedId 단일 선택으로 폴백한다.
+   */
+  selectedIds?: readonly string[] | null;
   onClose: () => void;
   /** 목록 행 클릭 → 해당 요소 선택(다른 페이지면 페이지 전환 포함). */
   onSelectElement: (pageId: string, elId: string) => void;
@@ -85,6 +94,37 @@ export type StudioDialogueBatchPanelProps = {
     targetPageId: string,
     mode: "move" | "copy",
     text: string
+  ) => void;
+  /** 선택한 자유 텍스트를 말풍선으로 변환(단일 undo). */
+  onConvertTextToBubble?: (pageId: string, elId: string) => void;
+  /** 여러 텍스트를 한 번의 문서 커밋으로 말풍선 변환. */
+  onConvertTextsToBubbles?: (requests: readonly { pageId: string; elementId: string }[]) => void;
+  /** 현재 목록에서 선택된 대사(또는 필터 결과)에 서식을 한 번에 적용. */
+  onApplyFormat?: (
+    elementIds: readonly string[],
+    patch: {
+      fontSize?: number;
+      fontStyle?: "normal" | "bold" | "italic" | "bold italic";
+      textColor?: string;
+      align?: "left" | "center" | "right";
+    }
+  ) => void;
+  /** 선택 구간에 루비(후리가나)를 단다 — 메인 루프가 단일 히스토리 커밋한다. */
+  onApplyDialogueRuby?: (
+    pageId: string,
+    elId: string,
+    text: string,
+    start: number,
+    end: number,
+    ruby: string
+  ) => void;
+  /** 선택 구간과 겹치는 루비 주석을 지운다. */
+  onClearDialogueRuby?: (
+    pageId: string,
+    elId: string,
+    text: string,
+    start: number,
+    end: number
   ) => void;
   /** 번역/대본 파일의 cue를 기존 말풍선에 한 번의 문서 커밋으로 반영한다. */
   onImportInterchange?: (
@@ -155,10 +195,23 @@ function playbackStatusText(
   }
 }
 
+function readRubySpansFromPages(
+  pages: readonly DialoguePageLike[],
+  pageId: string,
+  elementId: string
+): readonly DialogueRubySpan[] | undefined {
+  const page = pages.find((candidate) => candidate.id === pageId);
+  const element = page?.elements.find((candidate) => candidate.id === elementId) as
+    | (DialoguePageLike["elements"][number] & { rubySpans?: readonly DialogueRubySpan[] })
+    | undefined;
+  return element?.rubySpans;
+}
+
 export function StudioDialogueBatchPanel({
   pages,
   currentPageId,
   selectedId,
+  selectedIds,
   onClose,
   onSelectElement,
   onPatchText,
@@ -166,6 +219,11 @@ export function StudioDialogueBatchPanel({
   onSplitText,
   onMergeWithNext,
   onTransferElement,
+  onConvertTextToBubble,
+  onConvertTextsToBubbles,
+  onApplyFormat,
+  onApplyDialogueRuby,
+  onClearDialogueRuby,
   onImportInterchange,
   readAloudAdapter,
   mobileKeyboardInset = 0,
@@ -182,6 +240,12 @@ export function StudioDialogueBatchPanel({
   // 구조 작업은 한 행만 펼쳐 목록 밀도를 유지한다.
   const [structureMenuId, setStructureMenuId] = useState<string | null>(null);
   const [transferTargetByItem, setTransferTargetByItem] = useState<Record<string, string>>({});
+  /** 구조 메뉴 루비 읽기 입력(행별). */
+  const [rubyReadingByItem, setRubyReadingByItem] = useState<Record<string, string>>({});
+  /** textarea 선택 구간 — 선택 있을 때만 루비 컨트롤을 노출한다. */
+  const [selectionByItem, setSelectionByItem] = useState<
+    Record<string, { start: number; end: number } | null>
+  >({});
   const [interchangeOpen, setInterchangeOpen] = useState(false);
   const [interchangeFormat, setInterchangeFormat] = useState<StudioDialogueInterchangeFormat>("csv");
   const [interchangeMatchMode, setInterchangeMatchMode] = useState<StudioDialogueImportMatchMode>("auto");
@@ -190,6 +254,13 @@ export function StudioDialogueBatchPanel({
     text: string;
   } | null>(null);
   const [interchangeBusy, setInterchangeBusy] = useState(false);
+  /** Ephemeral action feedback for format / convert (not interchange). */
+  const [formatStatus, setFormatStatus] = useState<{
+    tone: "good" | "warn";
+    text: string;
+  } | null>(null);
+  /** Format target: listed unlocked rows vs current selection only. */
+  const [formatScope, setFormatScope] = useState<"visible" | "selected">("visible");
 
   const [speechAdapter] = useState<DialogueSpeechAdapter>(
     () => readAloudAdapter ?? createBrowserDialogueSpeechAdapter()
@@ -300,6 +371,74 @@ export function StudioDialogueBatchPanel({
 
   const items = collectDialogueItems(pages);
   const shown = filterDialogueItems(items, listQuery);
+  // 서식 "선택만" 범위: 마퀴 다중 id 우선, 없으면 selectedId 단일 폴백.
+  const formatSelectedIds =
+    selectedIds && selectedIds.length > 0
+      ? selectedIds
+      : selectedId
+        ? [selectedId]
+        : [];
+  const formatSelectedIdSet = new Set(formatSelectedIds);
+  const selectedDialogueAmongItems = items.filter((item) => formatSelectedIdSet.has(item.id));
+  const hasFormatSelection = selectedDialogueAmongItems.length > 0;
+  const formatSelectionCount = selectedDialogueAmongItems.length;
+  const applyFormatToVisible = (
+    patch: {
+      fontSize?: number;
+      fontStyle?: "normal" | "bold" | "italic" | "bold italic";
+      textColor?: string;
+      align?: "left" | "center" | "right";
+    },
+    label?: string
+  ) => {
+    if (!onApplyFormat) return;
+    const pool =
+      formatScope === "selected" && formatSelectedIds.length > 0
+        ? shown.filter((item) => formatSelectedIdSet.has(item.id) && !item.locked)
+        : shown.filter((item) => !item.locked);
+    const ids = pool.map((item) => item.id);
+    if (ids.length === 0) {
+      setFormatStatus({
+        tone: "warn",
+        text: formatScope === "selected"
+          ? "선택된 잠기지 않은 대사가 없어요. 목록에서 대사를 고르거나 범위를 ‘목록 전체’로 바꿔 주세요."
+          : "목록에 적용할 잠기지 않은 대사가 없어요.",
+      });
+      return;
+    }
+    onApplyFormat(ids, patch);
+    setFormatStatus({
+      tone: "good",
+      text: `${label ?? "서식"}을(를) 대사 ${ids.length}개에 적용했어요. ⌘/Ctrl+Z로 한 번에 되돌릴 수 있어요.`,
+    });
+  };
+
+  const convertAllVisibleTextToBubble = () => {
+    const targets = shown.filter((item) => item.elType === "text" && !item.locked);
+    if (targets.length === 0) {
+      setFormatStatus({
+        tone: "warn",
+        text: "말풍선으로 바꿀 자유 텍스트가 목록에 없어요.",
+      });
+      return;
+    }
+    if (onConvertTextsToBubbles) {
+      onConvertTextsToBubbles(
+        targets.map((item) => ({ pageId: item.pageId, elementId: item.id }))
+      );
+    } else if (onConvertTextToBubble) {
+      // Fallback: one commit per row (legacy). Prefer bulk prop for single undo.
+      for (const item of targets) {
+        onConvertTextToBubble(item.pageId, item.id);
+      }
+    } else {
+      return;
+    }
+    setFormatStatus({
+      tone: "good",
+      text: `자유 텍스트 ${targets.length}개를 말풍선으로 바꿨어요. 실행 취소 1회로 되돌릴 수 있어요.`,
+    });
+  };
   const readAloudQueue = buildDialogueReadAloudQueue(shown, drafts);
   const confirmedLocalVoices = voices.filter(isConfirmedLocalDialogueVoice);
   const onlineOrUnknownVoiceCount = voices.length - confirmedLocalVoices.length;
@@ -439,6 +578,57 @@ export function StudioDialogueBatchPanel({
     clearDraft(item.id);
     setStructureMenuId(null);
     onTransferElement(item.pageId, item.id, targetPageId, mode, text);
+  };
+
+  const convertTextToBubble = (item: DialogueBatchItem) => {
+    if (!onConvertTextToBubble || item.elType !== "text" || item.locked) return;
+    clearDraft(item.id);
+    setStructureMenuId(null);
+    onConvertTextToBubble(item.pageId, item.id);
+    setFormatStatus({
+      tone: "good",
+      text: "텍스트를 말풍선으로 바꿨어요. 내용·위치는 그대로이고 실행 취소로 되돌릴 수 있어요.",
+    });
+  };
+
+  const captureTextareaSelection = (itemId: string) => {
+    const editor = textareaRefs.current.get(itemId);
+    if (!editor) {
+      setSelectionByItem((current) => ({ ...current, [itemId]: null }));
+      return null;
+    }
+    const start = Math.min(editor.selectionStart, editor.selectionEnd);
+    const end = Math.max(editor.selectionStart, editor.selectionEnd);
+    const range = start < end ? { start, end } : null;
+    setSelectionByItem((current) => ({ ...current, [itemId]: range }));
+    return range;
+  };
+
+  const applyRubyAtSelection = (item: DialogueBatchItem) => {
+    if (!onApplyDialogueRuby || item.locked) return;
+    const range =
+      captureTextareaSelection(item.id) ?? selectionByItem[item.id] ?? null;
+    if (!range) return;
+    const text = drafts[item.id] ?? item.text;
+    const ruby = (rubyReadingByItem[item.id] ?? "").trim();
+    if (!ruby) return;
+    // 임시본 text와 루비를 한 커밋으로 반영한다(메인 루프 applyDialogueRubySpan이 text도 쓴다).
+    clearDraft(item.id);
+    setRubyReadingByItem((current) => {
+      const { [item.id]: _omit, ...rest } = current;
+      return rest;
+    });
+    onApplyDialogueRuby(item.pageId, item.id, text, range.start, range.end, ruby);
+  };
+
+  const clearRubyAtSelection = (item: DialogueBatchItem) => {
+    if (!onClearDialogueRuby || item.locked) return;
+    const range =
+      captureTextareaSelection(item.id) ?? selectionByItem[item.id] ?? null;
+    if (!range) return;
+    const text = drafts[item.id] ?? item.text;
+    clearDraft(item.id);
+    onClearDialogueRuby(item.pageId, item.id, text, range.start, range.end);
   };
 
   const exportInterchange = () => {
@@ -716,6 +906,140 @@ export function StudioDialogueBatchPanel({
         >
           <Replace size={12} /> 모두 바꾸기
         </button>
+        {onApplyFormat || onConvertTextToBubble ? (
+          <div
+            role="group"
+            aria-label="목록 대사 일괄 서식"
+            className="space-y-1.5 border-t border-line/60 pt-2"
+          >
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="text-[0.58rem] font-medium text-fg-3">서식 범위</span>
+              <button
+                type="button"
+                aria-pressed={formatScope === "visible"}
+                onClick={() => setFormatScope("visible")}
+                className={cx(
+                  "min-h-9 rounded-lg border px-2 text-[0.6rem] font-semibold transition-colors",
+                  formatScope === "visible"
+                    ? "border-accent bg-accent-soft text-fg"
+                    : "border-line bg-card text-fg-2 hover:bg-raised"
+                )}
+              >
+                목록 전체
+              </button>
+              <button
+                type="button"
+                aria-pressed={formatScope === "selected"}
+                onClick={() => setFormatScope("selected")}
+                disabled={!hasFormatSelection}
+                className={cx(
+                  "min-h-9 rounded-lg border px-2 text-[0.6rem] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                  formatScope === "selected"
+                    ? "border-accent bg-accent-soft text-fg"
+                    : "border-line bg-card text-fg-2 hover:bg-raised"
+                )}
+                title={
+                  formatSelectionCount > 1
+                    ? `캔버스에서 고른 대사 ${formatSelectionCount}개`
+                    : "캔버스/목록에서 고른 대사"
+                }
+              >
+                선택만
+              </button>
+              {formatSelectionCount > 1 ? (
+                <span className="text-[0.58rem] tabular-nums text-fg-3" role="status">
+                  {formatSelectionCount}개 선택
+                </span>
+              ) : null}
+            </div>
+            <div className="grid grid-cols-4 gap-1">
+              <button
+                type="button"
+                onClick={() => applyFormatToVisible({ fontStyle: "bold" }, "굵게")}
+                disabled={shown.every((item) => item.locked)}
+                className="flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-1 text-[0.62rem] font-bold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+                title="굵게"
+              >
+                굵게
+              </button>
+              <button
+                type="button"
+                onClick={() => applyFormatToVisible({ fontStyle: "italic" }, "기울임")}
+                disabled={shown.every((item) => item.locked)}
+                className="flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-1 text-[0.62rem] italic text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+                title="기울임"
+              >
+                기울임
+              </button>
+              <button
+                type="button"
+                onClick={() => applyFormatToVisible({ fontSize: 22 }, "22px")}
+                disabled={shown.every((item) => item.locked)}
+                className="flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-1 text-[0.62rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                22px
+              </button>
+              <button
+                type="button"
+                onClick={() => applyFormatToVisible({ fontSize: 28 }, "28px")}
+                disabled={shown.every((item) => item.locked)}
+                className="flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-1 text-[0.62rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                28px
+              </button>
+              <button
+                type="button"
+                onClick={() => applyFormatToVisible({ textColor: "#111111" }, "검정 글자")}
+                disabled={shown.every((item) => item.locked)}
+                className="flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-1 text-[0.62rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                검정
+              </button>
+              <button
+                type="button"
+                onClick={() => applyFormatToVisible({ textColor: "#c2410c" }, "강조 주황")}
+                disabled={shown.every((item) => item.locked)}
+                className="flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-1 text-[0.62rem] font-semibold text-accent hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                강조
+              </button>
+              <button
+                type="button"
+                onClick={() => applyFormatToVisible({ align: "center" }, "가운데 정렬")}
+                disabled={shown.every((item) => item.locked)}
+                className="col-span-2 flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-1 text-[0.62rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                가운데
+              </button>
+            </div>
+            {onConvertTextToBubble || onConvertTextsToBubbles ? (
+              <button
+                type="button"
+                onClick={convertAllVisibleTextToBubble}
+                disabled={!shown.some((item) => item.elType === "text" && !item.locked)}
+                className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft/40 px-2 text-[0.66rem] font-semibold text-fg hover:bg-accent-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+                title="목록에 보이는 자유 텍스트를 한 번에 말풍선으로 바꿉니다"
+              >
+                <MessageCircle size={13} aria-hidden /> 목록 텍스트 → 말풍선
+              </button>
+            ) : null}
+            {formatStatus ? (
+              <p
+                role="status"
+                className={cx(
+                  "rounded-md px-2 py-1.5 text-[0.6rem] leading-snug",
+                  formatStatus.tone === "good" ? "bg-good/10 text-good" : "bg-warn/10 text-warn"
+                )}
+              >
+                {formatStatus.text}
+              </p>
+            ) : (
+              <p className="text-[0.58rem] leading-snug text-fg-4">
+                서식·말풍선 변환은 문서에 바로 저장되며 실행 취소 1회로 되돌립니다.
+              </p>
+            )}
+          </div>
+        ) : null}
       </div>
 
       {/* 브라우저 내장 음성으로 페이지 순서의 대사를 들어보는 비파괴 검수 도구. */}
@@ -948,10 +1272,13 @@ export function StudioDialogueBatchPanel({
                             <Volume2 size={16} aria-hidden />
                           </button>
                         )}
-                        {(onSplitText || onMergeWithNext || onTransferElement) && !item.locked ? (
+                        {(onSplitText || onMergeWithNext || onTransferElement || onConvertTextToBubble || onApplyDialogueRuby || onClearDialogueRuby) && !item.locked ? (
                           <button
                             type="button"
-                            onClick={() => setStructureMenuId((current) => current === item.id ? null : item.id)}
+                            onClick={() => {
+                              setStructureMenuId((current) => current === item.id ? null : item.id);
+                              captureTextareaSelection(item.id);
+                            }}
                             aria-label={`${item.pageIndex + 1}페이지 ${dialogueItemTypeLabel(item)} "${dialogueExcerpt(item.text, 16)}" 구조 작업`}
                             aria-expanded={structureMenuId === item.id}
                             className={cx(
@@ -974,8 +1301,12 @@ export function StudioDialogueBatchPanel({
                         onChange={(e) =>
                           setDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))
                         }
+                        onSelect={() => captureTextareaSelection(item.id)}
+                        onKeyUp={() => captureTextareaSelection(item.id)}
+                        onMouseUp={() => captureTextareaSelection(item.id)}
                         onFocus={() => {
                           if (selectedId !== item.id) onSelectElement(item.pageId, item.id);
+                          captureTextareaSelection(item.id);
                         }}
                         onBlur={() => {
                           if (skipBlurCommitIdRef.current === item.id) {
@@ -1013,6 +1344,21 @@ export function StudioDialogueBatchPanel({
                           "resize-y py-1 leading-snug disabled:cursor-not-allowed disabled:opacity-50"
                         )}
                       />
+                      {(() => {
+                        const draftText = drafts[item.id] ?? item.text;
+                        const rubySpans = readRubySpansFromPages(pages, item.pageId, item.id);
+                        if (!rubySpans?.length) return null;
+                        const preview = formatDialogueTextWithRubyPreview(draftText, rubySpans);
+                        if (preview === draftText) return null;
+                        return (
+                          <p
+                            className="mt-1 rounded-md border border-line/50 bg-card/40 px-2 py-1 text-[0.62rem] leading-snug text-fg-3"
+                            aria-label={`${item.pageIndex + 1}페이지 루비 미리보기`}
+                          >
+                            {preview}
+                          </p>
+                        );
+                      })()}
                       {structureMenuId === item.id ? (
                         <div
                           role="group"
@@ -1042,7 +1388,68 @@ export function StudioDialogueBatchPanel({
                                 <Combine size={13} aria-hidden /> 다음과 합치기
                               </button>
                             ) : null}
+                            {onConvertTextToBubble && item.elType === "text" ? (
+                              <button
+                                type="button"
+                                onClick={() => convertTextToBubble(item)}
+                                className="col-span-2 flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-2 text-[0.64rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                                title="자유 텍스트를 말풍선으로 바꿉니다. 한 번의 실행 취소로 되돌릴 수 있어요."
+                              >
+                                <MessageCircle size={13} aria-hidden /> 텍스트 → 말풍선
+                              </button>
+                            ) : null}
                           </div>
+                          {(onApplyDialogueRuby || onClearDialogueRuby) &&
+                          (selectionByItem[item.id] ?? null) ? (
+                            <div className="mt-1.5 grid grid-cols-2 gap-1 border-t border-line/60 pt-1.5">
+                              {onApplyDialogueRuby ? (
+                                <>
+                                  <label className="col-span-2 text-[0.58rem] font-medium text-fg-3">
+                                    루비 읽기
+                                    <input
+                                      type="text"
+                                      value={rubyReadingByItem[item.id] ?? ""}
+                                      onChange={(event) =>
+                                        setRubyReadingByItem((current) => ({
+                                          ...current,
+                                          [item.id]: event.target.value,
+                                        }))
+                                      }
+                                      onPointerDown={(event) => event.stopPropagation()}
+                                      placeholder="예: かんじ"
+                                      maxLength={80}
+                                      aria-label={`${item.pageIndex + 1}페이지 선택 구간 루비 읽기`}
+                                      className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-2 text-[0.66rem] text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                                    />
+                                  </label>
+                                  <button
+                                    type="button"
+                                    onPointerDown={(event) => event.preventDefault()}
+                                    onClick={() => applyRubyAtSelection(item)}
+                                    disabled={!(rubyReadingByItem[item.id] ?? "").trim()}
+                                    className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent px-2 text-[0.64rem] font-semibold text-on-accent hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+                                    title="선택한 글자에 루비(후리가나)를 답니다"
+                                  >
+                                    루비 달기
+                                  </button>
+                                </>
+                              ) : null}
+                              {onClearDialogueRuby ? (
+                                <button
+                                  type="button"
+                                  onPointerDown={(event) => event.preventDefault()}
+                                  onClick={() => clearRubyAtSelection(item)}
+                                  className={cx(
+                                    "flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-[0.64rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+                                    !onApplyDialogueRuby && "col-span-2"
+                                  )}
+                                  title="선택 구간과 겹치는 루비를 지웁니다"
+                                >
+                                  선택 루비 지우기
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : null}
                           {onTransferElement && pages.length > 1 ? (
                             <div className="mt-1.5 grid grid-cols-2 gap-1 border-t border-line/60 pt-1.5">
                               <label className="col-span-2 text-[0.58rem] font-medium text-fg-3">

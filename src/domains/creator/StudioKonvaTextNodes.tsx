@@ -6,6 +6,10 @@ import {
   verticalTextLayout,
 } from "./studio-bubble-text-runtime";
 import {
+  planDialogueRubyOverlayPlacements,
+  readDialogueRubySpans,
+} from "./studio-dialogue-ruby-layout";
+import {
   estimateTextGradientBBox,
   konvaGradientProps,
   legacyTextGradientToSpec,
@@ -113,6 +117,8 @@ export function StudioKonvaTextNode({
   }
 
   if (el.vertical) {
+    // Vertical text keeps base-only paint: stacked ruby overlays are horizontal-only in this MVP
+    // (column/run geometry does not yet host furigana beside upright glyphs).
     return (
       <StudioKonvaVerticalTextNode
         el={el}
@@ -124,6 +130,103 @@ export function StudioKonvaTextNode({
   }
 
   const text = el.text;
+  const fontFamily = el.font ?? "Pretendard, sans-serif";
+  const fontStyle = el.fontStyle ?? "bold";
+  const letterSpacing = el.letterSpacing ?? 0;
+  const lineHeight = el.lineHeight ?? 1;
+  const align = el.align ?? "left";
+  const fill = el.fillType === "gradient" ? undefined : el.fill;
+  const gradientProps =
+    el.fillType === "gradient"
+      ? konvaGradientProps(
+          el.gradient ?? legacyTextGradientToSpec(el.gradientColorStart, el.gradientColorEnd, el.gradientDirection),
+          estimateTextGradientBBox({
+            width: el.width,
+            text,
+            fontSize: el.fontSize,
+            lineHeight,
+          }),
+        )
+      : {};
+  const shadowEnabled = !!el.shadowColor && (el.shadowOpacity ?? 0) > 0;
+
+  // Duck-typed rubySpans — dialogue elements may carry range annotations without a full rich-text model.
+  // Horizontal only: base stays one KText; each reading is a smaller overlay Text centered on its segment.
+  const rubySpans = readDialogueRubySpans(
+    (el as Extract<El, { type: "text" }> & { rubySpans?: unknown }).rubySpans,
+  );
+  const rubyOverlays = rubySpans
+    ? planDialogueRubyOverlayPlacements(text, rubySpans, {
+        fontSize: el.fontSize,
+        letterSpacing,
+        textWidth: el.width,
+        align,
+      })
+    : [];
+
+  if (rubyOverlays.length > 0) {
+    return (
+      <KGroup
+        studioElementId={el.id}
+        key={el.id}
+        ref={innerRef}
+        x={el.x}
+        y={el.y}
+        width={el.width}
+        rotation={el.rotation}
+        opacity={el.opacity ?? 1}
+        {...toKonvaSkewAttrs(el)}
+        {...interactionProps}
+        onTransformEnd={(event: Konva.KonvaEventObject<Event>) =>
+          onCommitTransform(el.id, el.fontSize, event, { minFontSize: 10, patchWidth: true })
+        }
+      >
+        <KText
+          text={text}
+          x={0}
+          y={0}
+          width={el.width}
+          fontSize={el.fontSize}
+          fill={fill}
+          {...gradientProps}
+          stroke={el.stroke}
+          strokeWidth={el.strokeWidth ?? 0}
+          fillAfterStrokeEnabled
+          lineJoin="round"
+          fontFamily={fontFamily}
+          fontStyle={fontStyle}
+          align={align}
+          letterSpacing={letterSpacing}
+          lineHeight={lineHeight}
+          shadowColor={el.shadowColor}
+          shadowBlur={el.shadowBlur}
+          shadowOffsetX={el.shadowOffsetX}
+          shadowOffsetY={el.shadowOffsetY}
+          shadowOpacity={el.shadowOpacity}
+          shadowEnabled={shadowEnabled}
+        />
+        {rubyOverlays.map((placement) => (
+          <KText
+            key={`ruby-${placement.start}-${placement.end}-${placement.ruby}`}
+            text={placement.ruby}
+            x={placement.x}
+            y={placement.y}
+            width={Math.max(placement.baseWidth, 1)}
+            align="center"
+            wrap="none"
+            fontSize={placement.rubyFontSize}
+            fontFamily={fontFamily}
+            fontStyle={fontStyle}
+            // Solid fill only — gradient on tiny ruby overlays is out of MVP scope.
+            fill={el.fill}
+            // listening=false so selection/transform stay on the group, not tiny ruby hits.
+            listening={false}
+          />
+        ))}
+      </KGroup>
+    );
+  }
+
   return (
     <KText
       studioElementId={el.id}
@@ -134,35 +237,25 @@ export function StudioKonvaTextNode({
       y={el.y}
       width={el.width}
       fontSize={el.fontSize}
-      fill={el.fillType === "gradient" ? undefined : el.fill}
-      {...(el.fillType === "gradient"
-        ? konvaGradientProps(
-            el.gradient ?? legacyTextGradientToSpec(el.gradientColorStart, el.gradientColorEnd, el.gradientDirection),
-            estimateTextGradientBBox({
-              width: el.width,
-              text,
-              fontSize: el.fontSize,
-              lineHeight: el.lineHeight ?? 1,
-            }),
-          )
-        : {})}
+      fill={fill}
+      {...gradientProps}
       stroke={el.stroke}
       strokeWidth={el.strokeWidth ?? 0}
       fillAfterStrokeEnabled
       lineJoin="round"
       rotation={el.rotation}
       opacity={el.opacity ?? 1}
-      fontFamily={el.font ?? "Pretendard, sans-serif"}
-      fontStyle={el.fontStyle ?? "bold"}
-      align={el.align ?? "left"}
-      letterSpacing={el.letterSpacing ?? 0}
-      lineHeight={el.lineHeight ?? 1}
+      fontFamily={fontFamily}
+      fontStyle={fontStyle}
+      align={align}
+      letterSpacing={letterSpacing}
+      lineHeight={lineHeight}
       shadowColor={el.shadowColor}
       shadowBlur={el.shadowBlur}
       shadowOffsetX={el.shadowOffsetX}
       shadowOffsetY={el.shadowOffsetY}
       shadowOpacity={el.shadowOpacity}
-      shadowEnabled={!!el.shadowColor && (el.shadowOpacity ?? 0) > 0}
+      shadowEnabled={shadowEnabled}
       {...toKonvaSkewAttrs(el)}
       {...interactionProps}
       onTransformEnd={(event) => onCommitTransform(el.id, el.fontSize, event, { minFontSize: 10, patchWidth: true })}

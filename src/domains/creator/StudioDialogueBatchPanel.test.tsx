@@ -305,10 +305,14 @@ describe("StudioDialogueBatchPanel EX-style structure editing", () => {
     },
   ];
 
-  function renderStructurePanel() {
+  function renderStructurePanel(
+    overrides: Partial<StudioDialogueBatchPanelProps> = {}
+  ) {
     const onSplitText = vi.fn();
     const onMergeWithNext = vi.fn();
     const onTransferElement = vi.fn();
+    const onApplyDialogueRuby = vi.fn();
+    const onClearDialogueRuby = vi.fn();
     render(
       <StudioDialogueBatchPanel
         pages={STRUCTURE_PAGES}
@@ -321,10 +325,19 @@ describe("StudioDialogueBatchPanel EX-style structure editing", () => {
         onSplitText={onSplitText}
         onMergeWithNext={onMergeWithNext}
         onTransferElement={onTransferElement}
+        onApplyDialogueRuby={onApplyDialogueRuby}
+        onClearDialogueRuby={onClearDialogueRuby}
         readAloudAdapter={speechAdapter(false)}
+        {...overrides}
       />
     );
-    return { onSplitText, onMergeWithNext, onTransferElement };
+    return {
+      onSplitText,
+      onMergeWithNext,
+      onTransferElement,
+      onApplyDialogueRuby,
+      onClearDialogueRuby,
+    };
   }
 
   it("keeps one inline structure menu open and splits the latest draft at the caret", () => {
@@ -376,6 +389,166 @@ describe("StudioDialogueBatchPanel EX-style structure editing", () => {
       "copy",
       "앞 대사",
     );
+  });
+
+  it("applies and clears ruby for the current textarea selection from the structure menu", () => {
+    const { onApplyDialogueRuby, onClearDialogueRuby } = renderStructurePanel();
+    const firstEditor = screen.getAllByRole<HTMLTextAreaElement>("textbox", {
+      name: "1페이지 말풍선·말하기 대사 수정",
+    })[0]!;
+    fireEvent.change(firstEditor, { target: { value: "漢字テスト" } });
+    firstEditor.setSelectionRange(0, 2);
+    fireEvent.select(firstEditor);
+    fireEvent.click(screen.getByRole("button", {
+      name: '1페이지 말풍선·말하기 "앞 대사" 구조 작업',
+    }));
+
+    const rubyInput = screen.getByLabelText("1페이지 선택 구간 루비 읽기");
+    fireEvent.change(rubyInput, { target: { value: "かんじ" } });
+    const applyRuby = screen.getByRole("button", { name: "루비 달기" });
+    fireEvent.pointerDown(applyRuby);
+    fireEvent.click(applyRuby);
+
+    expect(onApplyDialogueRuby).toHaveBeenCalledWith(
+      "page-1",
+      "bubble-1",
+      "漢字テスト",
+      0,
+      2,
+      "かんじ",
+    );
+
+    // Unit test pages are immutable; re-establish draft + selection after apply cleared the draft.
+    fireEvent.change(firstEditor, { target: { value: "漢字テスト" } });
+    firstEditor.setSelectionRange(0, 2);
+    fireEvent.select(firstEditor);
+    if (!screen.queryByRole("button", { name: "선택 루비 지우기" })) {
+      fireEvent.click(screen.getByRole("button", {
+        name: '1페이지 말풍선·말하기 "앞 대사" 구조 작업',
+      }));
+    }
+    const clearRuby = screen.getByRole("button", { name: "선택 루비 지우기" });
+    fireEvent.pointerDown(clearRuby);
+    fireEvent.click(clearRuby);
+
+    expect(onClearDialogueRuby).toHaveBeenCalledWith(
+      "page-1",
+      "bubble-1",
+      "漢字テスト",
+      0,
+      2,
+    );
+  });
+
+  it("shows a plain-text ruby preview when the element already has rubySpans", () => {
+    renderStructurePanel({
+      pages: [
+        {
+          id: "page-1",
+          elements: [
+            {
+              id: "bubble-1",
+              type: "bubble",
+              variant: "speech",
+              text: "漢字テスト",
+              // DialoguePageLike is structural; rubySpans live on elements at runtime.
+              ...({
+                rubySpans: [{ start: 0, end: 2, ruby: "かんじ" }],
+              } as object),
+              x: 20,
+              y: 20,
+            },
+          ],
+        },
+      ],
+    });
+    expect(screen.getByLabelText("1페이지 루비 미리보기").textContent).toBe(
+      "漢字(かんじ)テスト",
+    );
+  });
+});
+
+describe("StudioDialogueBatchPanel multi-select format scope", () => {
+  const FORMAT_PAGES: StudioDialogueBatchPanelProps["pages"] = [
+    {
+      id: "page-1",
+      elements: [
+        { id: "bubble-1", type: "bubble", variant: "speech", text: "하나", x: 20, y: 20 },
+        { id: "bubble-2", type: "bubble", variant: "speech", text: "둘", x: 20, y: 120 },
+        {
+          id: "bubble-locked",
+          type: "bubble",
+          variant: "speech",
+          text: "잠김",
+          x: 20,
+          y: 220,
+          locked: true,
+        },
+        { id: "bubble-3", type: "bubble", variant: "speech", text: "셋", x: 20, y: 320 },
+      ],
+    },
+  ];
+
+  function renderFormatPanel(overrides: Partial<StudioDialogueBatchPanelProps> = {}) {
+    const onApplyFormat = vi.fn();
+    render(
+      <StudioDialogueBatchPanel
+        pages={FORMAT_PAGES}
+        currentPageId="page-1"
+        selectedId={null}
+        onClose={vi.fn()}
+        onSelectElement={vi.fn()}
+        onPatchText={vi.fn()}
+        onApplyReplace={vi.fn()}
+        onApplyFormat={onApplyFormat}
+        readAloudAdapter={speechAdapter(false)}
+        {...overrides}
+      />
+    );
+    return { onApplyFormat };
+  }
+
+  it("applies format to all matching unlocked selectedIds when scope is 선택만", () => {
+    const { onApplyFormat } = renderFormatPanel({
+      selectedIds: ["bubble-1", "bubble-2", "bubble-locked", "bubble-missing"],
+    });
+
+    expect(screen.getByText("3개 선택")).toBeTruthy();
+    const selectedOnly = screen.getByRole("button", { name: "선택만" }) as HTMLButtonElement;
+    expect(selectedOnly.disabled).toBe(false);
+    fireEvent.click(selectedOnly);
+    fireEvent.click(screen.getByRole("button", { name: "굵게" }));
+
+    expect(onApplyFormat).toHaveBeenCalledTimes(1);
+    expect(onApplyFormat).toHaveBeenCalledWith(
+      ["bubble-1", "bubble-2"],
+      { fontStyle: "bold" }
+    );
+    expect(screen.getByText(/대사 2개에 적용/u)).toBeTruthy();
+  });
+
+  it("falls back to selectedId when selectedIds is empty and still enables 선택만", () => {
+    const { onApplyFormat } = renderFormatPanel({
+      selectedId: "bubble-3",
+      selectedIds: [],
+    });
+
+    expect(screen.queryByText(/개 선택/u)).toBeNull();
+    const selectedOnly = screen.getByRole("button", { name: "선택만" }) as HTMLButtonElement;
+    expect(selectedOnly.disabled).toBe(false);
+    fireEvent.click(selectedOnly);
+    fireEvent.click(screen.getByRole("button", { name: "굵게" }));
+
+    expect(onApplyFormat).toHaveBeenCalledWith(["bubble-3"], { fontStyle: "bold" });
+  });
+
+  it("disables 선택만 when no dialogue id is selected among items", () => {
+    renderFormatPanel({
+      selectedId: null,
+      selectedIds: ["not-a-dialogue"],
+    });
+    const selectedOnly = screen.getByRole("button", { name: "선택만" }) as HTMLButtonElement;
+    expect(selectedOnly.disabled).toBe(true);
   });
 });
 
