@@ -4,9 +4,12 @@ import {
   EMPTY_SMART_GUIDE_OVERLAY,
   SMART_GUIDE_EPSILON,
   SMART_SNAP_THRESHOLD,
+  buildPointObjectSnapOverlay,
   buildSmartGuideOverlay,
   computeSmartSnap,
+  shouldApplyStrokeObjectSnap,
   smartGuideOverlaysEqual,
+  snapPointToObjectGuides,
   type GuideBox,
   type SmartGuideOverlay,
 } from "./studio-smart-guides";
@@ -267,5 +270,68 @@ describe("스냅 → 오버레이 연동(통합 시나리오)", () => {
     const moved = { ...moving, x: moving.x + (snap.x?.delta ?? 0) };
     const overlay = buildSmartGuideOverlay(moved, others, { epsilon: SMART_GUIDE_EPSILON });
     expect(overlay.segments).toEqual([{ axis: "v", pos: 100, from: 0, to: 240, kind: "edge" }]);
+  });
+});
+
+describe("stroke/shape object snap — point placement", () => {
+  it("snaps a freehand tip to a neighboring right edge within threshold", () => {
+    const others = [box("a", 0, 0, 100, 80)];
+    const snap = snapPointToObjectGuides(103, 40, others, { threshold: 6 });
+    expect(snap).toEqual({
+      x: 100,
+      y: 40,
+      snappedX: true,
+      snappedY: true, // center y of a is 40
+      guideX: 100,
+      guideY: 40,
+      kindX: "edge",
+      kindY: "center",
+    });
+  });
+
+  it("does not invent a snap outside the threshold", () => {
+    const snap = snapPointToObjectGuides(120, 200, [box("a", 0, 0, 100, 50)], { threshold: 6 });
+    expect(snap.snappedX).toBe(false);
+    expect(snap.snappedY).toBe(false);
+    expect(snap.x).toBe(120);
+    expect(snap.y).toBe(200);
+  });
+
+  it("gates freehand to the origin sample only while shapes always snap", () => {
+    expect(shouldApplyStrokeObjectSnap({
+      snapEnabled: true,
+      kind: "freehand",
+      sampleIndex: 0,
+    })).toBe(true);
+    expect(shouldApplyStrokeObjectSnap({
+      snapEnabled: true,
+      kind: "freehand",
+      sampleIndex: 3,
+    })).toBe(false);
+    expect(shouldApplyStrokeObjectSnap({
+      snapEnabled: true,
+      kind: "line",
+      sampleIndex: 3,
+    })).toBe(true);
+    expect(shouldApplyStrokeObjectSnap({
+      snapEnabled: true,
+      mode: "eraser",
+      kind: "line",
+      sampleIndex: 0,
+    })).toBe(false);
+    expect(shouldApplyStrokeObjectSnap({
+      snapEnabled: true,
+      kind: "line",
+      sampleIndex: 0,
+      directionalRulerActive: true,
+    })).toBe(false);
+  });
+
+  it("builds an overlay for a snapped tip without spacing badges", () => {
+    const others = [box("a", 0, 0, 100, 80)];
+    const snap = snapPointToObjectGuides(100, 40, others);
+    const overlay = buildPointObjectSnapOverlay(snap.x, snap.y, others, snap);
+    expect(overlay.spacings).toEqual([]);
+    expect(overlay.segments.some((segment) => segment.axis === "v" && segment.pos === 100)).toBe(true);
   });
 });

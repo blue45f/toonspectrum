@@ -1128,9 +1128,12 @@ import {
   EMPTY_SMART_GUIDE_OVERLAY,
   SMART_GUIDE_EPSILON,
   SMART_SNAP_THRESHOLD,
+  buildPointObjectSnapOverlay,
   buildSmartGuideOverlay,
   computeSmartSnap,
+  shouldApplyStrokeObjectSnap,
   smartGuideOverlaysEqual,
+  snapPointToObjectGuides,
   type GuideBox,
   type SmartGuideOverlay,
 } from "./studio-smart-guides";
@@ -23064,11 +23067,50 @@ function StudioCuttoonEditor() {
       const {
         causalInitialSample,
         causalInputPlan,
-        element: next,
         pressure,
-        strokeOrigin,
         stylus,
       } = drawStartPlan;
+      let { element: next, strokeOrigin } = drawStartPlan;
+      // Snap the stroke origin to neighboring object edges (freehand start / shape origin) when
+      // no directional ruler is active. Mid freehand samples stay raw in appendFreehandStrokePoint.
+      {
+        const directionalRulerActive = Boolean(
+          strokeAdvancedRuler
+          || (!strokeAdvancedRuler && perspectiveRulerActive && vanishingPoints.length > 0)
+          || (!strokeAdvancedRuler && isometricGridActive)
+        );
+        if (
+          shouldApplyStrokeObjectSnap({
+            snapEnabled,
+            mode: next.mode,
+            kind: next.kind ?? "freehand",
+            sampleIndex: 0,
+            directionalRulerActive,
+          })
+        ) {
+          const snapped = applyStrokeObjectSnapToPoint(strokeOrigin.x, strokeOrigin.y, {
+            mode: next.mode,
+            kind: next.kind ?? "freehand",
+            sampleIndex: 0,
+            directionalRulerActive,
+            excludeId: next.id,
+          });
+          if (snapped.x !== strokeOrigin.x || snapped.y !== strokeOrigin.y) {
+            strokeOrigin = { x: snapped.x, y: snapped.y };
+            const points = next.points.slice();
+            if (points.length >= 2) {
+              points[0] = snapped.x;
+              points[1] = snapped.y;
+            }
+            // Shape origin is duplicated as the initial endpoint until the drag moves.
+            if ((next.kind ?? "freehand") !== "freehand" && points.length >= 4) {
+              points[2] = snapped.x;
+              points[3] = snapped.y;
+            }
+            next = { ...next, points };
+          }
+        }
+      }
       if (drawMode === "pen") scheduleLiveDrawPressure(pressure);
       // Pointer-up is a lifecycle signal, not a new freehand coordinate. Retain pointer-down now
       // so a tap and a stroke with no delivered move still have authoritative release metadata.
@@ -23348,6 +23390,83 @@ function StudioCuttoonEditor() {
     return snapped.point;
   }
 
+  /** Element bboxes used as object-snap targets while placing strokes/shapes (excludes active draft). */
+  function collectStrokeObjectSnapTargets(excludeId?: string | null): GuideBox[] {
+    const targets: GuideBox[] = [];
+    for (const el of elements) {
+      if (excludeId && el.id === excludeId) continue;
+      if (isEffectivelyHidden(el, groups)) continue;
+      const node = nodeRefsRef.current[el.id];
+      if (node && mainLayerRef.current) {
+        try {
+          const rect = node.getClientRect({ relativeTo: mainLayerRef.current });
+          if (Number.isFinite(rect.width) && Number.isFinite(rect.height)) {
+            targets.push({
+              id: el.id,
+              x: rect.x,
+              y: rect.y,
+              width: rect.width,
+              height: rect.height,
+            });
+            continue;
+          }
+        } catch {
+          // Fall through to document bounds when the node is mid-detach.
+        }
+      }
+      const bounds = elBounds(el);
+      targets.push({
+        id: el.id,
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.w,
+        height: bounds.h,
+      });
+    }
+    return targets;
+  }
+
+  function applyStrokeObjectSnapToPoint(
+    x: number,
+    y: number,
+    options: {
+      mode?: string;
+      kind?: string;
+      sampleIndex: number;
+      directionalRulerActive: boolean;
+      excludeId?: string | null;
+    }
+  ): { x: number; y: number } {
+    if (
+      !shouldApplyStrokeObjectSnap({
+        snapEnabled,
+        mode: options.mode,
+        kind: options.kind,
+        sampleIndex: options.sampleIndex,
+        directionalRulerActive: options.directionalRulerActive,
+      })
+    ) {
+      return { x, y };
+    }
+    const others = collectStrokeObjectSnapTargets(options.excludeId);
+    if (others.length === 0) return { x, y };
+    const snap = snapPointToObjectGuides(x, y, others, {
+      threshold: SMART_SNAP_THRESHOLD / Math.max(effScale, 1e-6),
+    });
+    if (snap.snappedX || snap.snappedY) {
+      applySmartGuides(buildPointObjectSnapOverlay(
+        snap.x,
+        snap.y,
+        others,
+        snap,
+        { epsilon: SMART_GUIDE_EPSILON / Math.max(effScale, 1e-6) }
+      ));
+    } else {
+      applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
+    }
+    return { x: snap.x, y: snap.y };
+  }
+
   function updateActiveShapeEndpoint(
     stage: Konva.Stage,
     pointerEvent: PointerEvent,
@@ -23375,6 +23494,7 @@ function StudioCuttoonEditor() {
     let y1 = pos.y + (livePointerOffset?.y ?? 0);
     const inputSettings = drawingInputSettingsRef.current;
     // Shift is the explicit gesture and therefore wins over perspective/isometric ruler locks.
+    let directionalRulerActive = false;
     if (inputSettings?.advancedRuler && kind === "line" && !pointerEvent.shiftKey) {
       const snapped = snapPointToAdvancedRuler(
         inputSettings.advancedRuler,
@@ -23384,17 +23504,31 @@ function StudioCuttoonEditor() {
       if (snapped) {
         x1 = snapped.x;
         y1 = snapped.y;
+        directionalRulerActive = true;
       }
     } else if (perspectiveRulerActive && kind === "line" && !pointerEvent.shiftKey && vanishingPoints.length > 0) {
       if (!perspectiveRayRef.current) {
         perspectiveRayRef.current = resolvePerspectiveRay(vanishingPoints, x0, y0, x1, y1);
       }
       [x1, y1] = snapStrokePointToPerspective(x1, y1, perspectiveRayRef.current);
+      directionalRulerActive = perspectiveRayRef.current !== null;
     } else if (isometricGridActive && kind === "line" && !pointerEvent.shiftKey) {
       if (!isometricAxisRayRef.current) {
         isometricAxisRayRef.current = resolveIsometricAxisRay(isometricAngleDeg, x0, y0, x1, y1);
       }
       [x1, y1] = snapStrokePointToIsometricGrid(x1, y1, isometricAxisRayRef.current);
+      directionalRulerActive = isometricAxisRayRef.current !== null;
+    }
+    if (!directionalRulerActive && !pointerEvent.shiftKey) {
+      const snapped = applyStrokeObjectSnapToPoint(x1, y1, {
+        mode: current.mode,
+        kind,
+        sampleIndex: 1,
+        directionalRulerActive: false,
+        excludeId: current.id,
+      });
+      x1 = snapped.x;
+      y1 = snapped.y;
     }
     if (pointerEvent.shiftKey) {
       const dx = x1 - x0;
@@ -24115,6 +24249,20 @@ function StudioCuttoonEditor() {
         );
       }
       [targetX, targetY] = snapStrokePointToIsometricGrid(targetX, targetY, isometricAxisRayRef.current);
+    } else if (current.mode !== "eraser" && !pointerSample.shiftKey) {
+      // CSP-class object snap: freehand origin (sample 0, applied at pointerdown) + every
+      // shape/line endpoint. Mid freehand samples stay raw so continuous edge-chasing cannot
+      // zigzag the stroke. This branch only runs when no directional ruler owns the sample.
+      const sampleIndex = Math.max(0, Math.floor(current.points.length / 2));
+      const snapped = applyStrokeObjectSnapToPoint(targetX, targetY, {
+        mode: current.mode,
+        kind: current.kind ?? "freehand",
+        sampleIndex,
+        directionalRulerActive: false,
+        excludeId: current.id,
+      });
+      targetX = snapped.x;
+      targetY = snapped.y;
     }
     const fixedRateState = drawingFixedRateFilterRef.current;
     if (fixedRateState) {
@@ -25175,6 +25323,7 @@ function StudioCuttoonEditor() {
       isometricAxisRayRef.current = null;
       advancedRulerSnapRef.current = null;
       scheduleLiveDrawPressure(null);
+      applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
       gpuFinalFallbackOrderIdsRef.current = immediateSurfaceHandoff?.strokeIds ?? null;
       clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup });
       // Re-rasterize the newest settled overlay stroke from the release-planner geometry so the

@@ -194,6 +194,129 @@ function spacingCandidate(
 }
 
 /**
+ * Point / stroke-endpoint object snap (CSP-class placement).
+ *
+ * Treats the pen tip as a zero-size box and snaps each axis independently to the nearest edge or
+ * center line of other element bboxes. Spacing candidates are intentionally omitted: a freehand
+ * tip has no width, so equal-gap placement is undefined.
+ */
+export interface PointObjectSnapResult {
+  readonly x: number;
+  readonly y: number;
+  readonly snappedX: boolean;
+  readonly snappedY: boolean;
+  readonly guideX: number | null;
+  readonly guideY: number | null;
+  readonly kindX: "edge" | "center" | null;
+  readonly kindY: "edge" | "center" | null;
+}
+
+/**
+ * Whether stroke/shape placement should consult object edges for this sample.
+ *
+ * - Eraser / directional rulers (perspective, isometric, advanced) stay out of the way.
+ * - Freehand mid-samples stay raw (continuous edge-chasing is multi-hour UX); only the start
+ *   sample and every shape/line endpoint snap.
+ */
+export function shouldApplyStrokeObjectSnap(input: {
+  readonly snapEnabled: boolean;
+  readonly mode?: string;
+  readonly kind?: string;
+  readonly directionalRulerActive?: boolean;
+  /** 0-based index of the sample about to be written (0 = stroke origin). */
+  readonly sampleIndex: number;
+}): boolean {
+  if (!input.snapEnabled) return false;
+  if (input.mode === "eraser") return false;
+  if (input.directionalRulerActive) return false;
+  const kind = input.kind ?? "freehand";
+  if (kind === "freehand") return input.sampleIndex === 0;
+  return true;
+}
+
+/** Snap a document-space point to neighboring element edge/center guides. */
+export function snapPointToObjectGuides(
+  x: number,
+  y: number,
+  others: readonly GuideBox[],
+  options: { threshold?: number } = {}
+): PointObjectSnapResult {
+  const threshold = options.threshold ?? SMART_SNAP_THRESHOLD;
+  const empty: PointObjectSnapResult = {
+    x,
+    y,
+    snappedX: false,
+    snappedY: false,
+    guideX: null,
+    guideY: null,
+    kindX: null,
+    kindY: null,
+  };
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !(threshold > 0)) return empty;
+
+  let bestXDist = Infinity;
+  let bestYDist = Infinity;
+  let bestX: number | null = null;
+  let bestY: number | null = null;
+  let kindX: "edge" | "center" | null = null;
+  let kindY: "edge" | "center" | null = null;
+
+  for (const other of others) {
+    if (!isValidBox(other)) continue;
+    const otherX = lines3(other.x, other.width);
+    const otherY = lines3(other.y, other.height);
+    for (let oi = 0; oi < 3; oi += 1) {
+      const lineKind: "edge" | "center" = oi === 1 ? "center" : "edge";
+      const dx = otherX[oi]! - x;
+      const adx = Math.abs(dx);
+      if (adx <= threshold && adx < bestXDist) {
+        bestXDist = adx;
+        bestX = otherX[oi]!;
+        kindX = lineKind;
+      }
+      const dy = otherY[oi]! - y;
+      const ady = Math.abs(dy);
+      if (ady <= threshold && ady < bestYDist) {
+        bestYDist = ady;
+        bestY = otherY[oi]!;
+        kindY = lineKind;
+      }
+    }
+    if (bestXDist <= EXACT_EPS && bestYDist <= EXACT_EPS) break;
+  }
+
+  const snappedX = bestX !== null;
+  const snappedY = bestY !== null;
+  return {
+    x: snappedX ? bestX! : x,
+    y: snappedY ? bestY! : y,
+    snappedX,
+    snappedY,
+    guideX: snappedX ? bestX : null,
+    guideY: snappedY ? bestY : null,
+    kindX: snappedX ? kindX : null,
+    kindY: snappedY ? kindY : null,
+  };
+}
+
+/**
+ * Build the alignment overlay for a snapped stroke tip (no spacing badges).
+ * Segments span from the tip to the matched object edges so artists see the lock.
+ */
+export function buildPointObjectSnapOverlay(
+  x: number,
+  y: number,
+  others: readonly GuideBox[],
+  snap: PointObjectSnapResult,
+  options: { epsilon?: number } = {}
+): SmartGuideOverlay {
+  if (!snap.snappedX && !snap.snappedY) return EMPTY_SMART_GUIDE_OVERLAY;
+  const epsilon = options.epsilon ?? SMART_GUIDE_EPSILON;
+  const pointBox: GuideBox = { id: "__stroke-tip__", x, y, width: 0, height: 0 };
+  return buildSmartGuideOverlay(pointBox, others, { epsilon });
+}
+
+/**
  * 드래그 중 스냅 오프셋 계산 — 축별로 (엣지/센터 정렬 ∪ 균등 간격) 최근접 후보를 돌려준다.
  * 반환된 delta 를 요소 위치에 더하면 스냅이 성립한다. 후보가 임계 밖이면 축별 null.
  * 호출부는 dist 로 기존 라인 스냅(그리드·캔버스)과 우선순위를 비교하면 된다.
