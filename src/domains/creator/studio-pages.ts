@@ -250,3 +250,106 @@ export function executeDeletePageTransition<P extends PageLike>(
   const nextActiveId = computeNextActiveIdAfterDelete(pages, deletedId);
   return { nextPages, nextActiveId };
 }
+
+/**
+ * CLIP STUDIO–style multi-select page ops (CSP EX page manager bulk move/delete).
+ * Selection order is ignored; document order is canonical. Always keeps ≥1 page.
+ */
+export function normalizeSelectedPageIds(
+  pages: readonly { id: string }[],
+  selectedIds: readonly string[]
+): string[] {
+  const allowed = new Set(pages.map((page) => page.id));
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const page of pages) {
+    if (!allowed.has(page.id) || !selectedIds.includes(page.id) || seen.has(page.id)) continue;
+    seen.add(page.id);
+    ordered.push(page.id);
+  }
+  return ordered;
+}
+
+/** Delete every selected page in one step; never removes the last remaining page. */
+export function deletePagesBulk<P extends PageLike>(
+  pages: readonly P[],
+  selectedIds: readonly string[]
+): { nextPages: P[]; removedIds: readonly string[]; keptIds: readonly string[] } {
+  const selected = new Set(normalizeSelectedPageIds(pages, selectedIds));
+  if (selected.size === 0 || pages.length <= 1) {
+    return { nextPages: pages.slice() as P[], removedIds: [], keptIds: pages.map((p) => p.id) };
+  }
+  // Preserve at least one page: if selection would wipe the document, keep the first unselected
+  // or the first page when everything is selected.
+  let next = pages.filter((page) => !selected.has(page.id));
+  if (next.length === 0) {
+    next = [pages[0]!];
+  }
+  const kept = new Set(next.map((page) => page.id));
+  const removedIds = pages.filter((page) => !kept.has(page.id)).map((page) => page.id);
+  return {
+    nextPages: next as P[],
+    removedIds,
+    keptIds: next.map((page) => page.id),
+  };
+}
+
+/**
+ * Move the selected contiguous/non-contiguous pages as a block by `delta` slots
+ * (negative = earlier in the list). Relative order among selected pages is preserved.
+ */
+export function movePagesBulk<P extends PageLike>(
+  pages: readonly P[],
+  selectedIds: readonly string[],
+  delta: number
+): P[] {
+  if (!Number.isFinite(delta) || delta === 0 || pages.length <= 1) {
+    return pages.slice() as P[];
+  }
+  const selected = normalizeSelectedPageIds(pages, selectedIds);
+  if (selected.length === 0) return pages.slice() as P[];
+  const selectedSet = new Set(selected);
+  const moving = pages.filter((page) => selectedSet.has(page.id));
+  const firstIndex = pages.findIndex((page) => selectedSet.has(page.id));
+  if (firstIndex < 0) return pages.slice() as P[];
+  const without = pages.filter((page) => !selectedSet.has(page.id));
+  // Insert relative to how many unselected pages sit before the first selected page.
+  let unselectedBefore = 0;
+  for (let i = 0; i < firstIndex; i += 1) {
+    if (!selectedSet.has(pages[i]!.id)) unselectedBefore += 1;
+  }
+  const insertAt = Math.max(0, Math.min(without.length, unselectedBefore + Math.trunc(delta)));
+  const next = without.slice();
+  next.splice(insertAt, 0, ...moving);
+  // no-op identity: same order
+  if (
+    next.length === pages.length &&
+    next.every((page, index) => page.id === pages[index]?.id)
+  ) {
+    return pages.slice() as P[];
+  }
+  return next as P[];
+}
+
+/** Active page after bulk delete: keep current if still present, else nearest surviving neighbour. */
+export function computeNextActiveIdAfterBulkDelete<P extends { id: string }>(
+  previousPages: readonly P[],
+  nextPages: readonly P[],
+  currentId: string | null
+): string | null {
+  if (nextPages.length === 0) return null;
+  if (currentId && nextPages.some((page) => page.id === currentId)) return currentId;
+  if (!currentId) return nextPages[0]?.id ?? null;
+  const prevIndex = previousPages.findIndex((page) => page.id === currentId);
+  if (prevIndex < 0) return nextPages[0]?.id ?? null;
+  // Walk backward then forward for a surviving neighbour.
+  for (let i = prevIndex - 1; i >= 0; i -= 1) {
+    const id = previousPages[i]!.id;
+    if (nextPages.some((page) => page.id === id)) return id;
+  }
+  for (let i = prevIndex + 1; i < previousPages.length; i += 1) {
+    const id = previousPages[i]!.id;
+    if (nextPages.some((page) => page.id === id)) return id;
+  }
+  return nextPages[0]?.id ?? null;
+}

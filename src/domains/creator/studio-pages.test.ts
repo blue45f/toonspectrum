@@ -5,15 +5,19 @@ import {
   applyBackgroundToAllPages,
   applyGradeToAllPages,
   clearPage,
+  computeNextActiveIdAfterBulkDelete,
   computeNextActiveIdAfterDelete,
   createBlankPage,
   deletePageSafe,
+  deletePagesBulk,
   duplicateMirroredPage,
   duplicatePageState,
   executeDeletePageTransition,
   findPageIndex,
   insertBlankPageAt,
   movePage,
+  movePagesBulk,
+  normalizeSelectedPageIds,
   reorderPages,
   type PageLike,
 } from "./studio-pages";
@@ -261,5 +265,57 @@ describe("studio-pages (pure, real exports)", () => {
     const res = executeDeletePageTransition(before, "p2", "p2");
     expect(res.nextPages.map((p: any) => p.id)).toEqual(["p1"]);
     expect(res.nextActiveId).toBe("p1");
+  });
+
+  it("normalizeSelectedPageIds keeps document order and drops unknown/dupes", () => {
+    const pages = [samplePage({ id: "a" }), samplePage({ id: "b" }), samplePage({ id: "c" })];
+    expect(normalizeSelectedPageIds(pages, ["c", "a", "c", "z"])).toEqual(["a", "c"]);
+    expect(normalizeSelectedPageIds(pages, [])).toEqual([]);
+  });
+
+  it("deletePagesBulk removes selected pages but always keeps ≥1", () => {
+    const a = samplePage({ id: "a" });
+    const b = samplePage({ id: "b" });
+    const c = samplePage({ id: "c" });
+    const bulk = deletePagesBulk([a, b, c], ["a", "c"]);
+    expect(bulk.nextPages.map((p) => p.id)).toEqual(["b"]);
+    expect(bulk.removedIds).toEqual(["a", "c"]);
+    expect(bulk.keptIds).toEqual(["b"]);
+
+    const wipe = deletePagesBulk([a, b], ["a", "b"]);
+    expect(wipe.nextPages.map((p) => p.id)).toEqual(["a"]);
+    expect(wipe.removedIds).toEqual(["b"]);
+
+    const single = deletePagesBulk([a], ["a"]);
+    expect(single.nextPages.map((p) => p.id)).toEqual(["a"]);
+    expect(single.removedIds).toEqual([]);
+  });
+
+  it("movePagesBulk shifts the selected block by delta while preserving relative order", () => {
+    const a = samplePage({ id: "a" });
+    const b = samplePage({ id: "b" });
+    const c = samplePage({ id: "c" });
+    const d = samplePage({ id: "d" });
+    const pages = [a, b, c, d];
+    expect(movePagesBulk(pages, ["a", "c"], 1).map((p) => p.id)).toEqual(["b", "a", "c", "d"]);
+    expect(movePagesBulk(pages, ["b", "c"], -1).map((p) => p.id)).toEqual(["b", "c", "a", "d"]);
+    // non-contiguous selection stays relative-ordered as a block
+    expect(movePagesBulk(pages, ["a", "d"], 1).map((p) => p.id)).toEqual(["b", "a", "d", "c"]);
+    // no-op / empty
+    expect(movePagesBulk(pages, [], 1).map((p) => p.id)).toEqual(["a", "b", "c", "d"]);
+    expect(movePagesBulk(pages, ["a"], 0).map((p) => p.id)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("computeNextActiveIdAfterBulkDelete keeps current when surviving, else nearest neighbour", () => {
+    const a = { id: "a" };
+    const b = { id: "b" };
+    const c = { id: "c" };
+    const d = { id: "d" };
+    const prev = [a, b, c, d];
+    const nextKeep = [a, c, d];
+    expect(computeNextActiveIdAfterBulkDelete(prev, nextKeep, "c")).toBe("c");
+    expect(computeNextActiveIdAfterBulkDelete(prev, nextKeep, "b")).toBe("a");
+    expect(computeNextActiveIdAfterBulkDelete(prev, [c, d], "a")).toBe("c");
+    expect(computeNextActiveIdAfterBulkDelete(prev, [a], "d")).toBe("a");
   });
 });

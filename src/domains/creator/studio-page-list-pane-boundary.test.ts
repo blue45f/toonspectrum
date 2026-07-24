@@ -108,6 +108,21 @@ describe("Studio page-list pane module boundary", () => {
     expect(page.source).toContain("<StudioPageListPane");
   });
 
+  it("wires multi-page bulk move/delete through pure studio-pages helpers", () => {
+    const page = moduleShape("./StudioPage.tsx");
+    const pane = moduleShape("./StudioPageListPane.tsx");
+
+    expect(page.source).toContain("deletePagesBulk as deletePagesBulkPure");
+    expect(page.source).toContain("movePagesBulk as movePagesBulkPure");
+    expect(page.source).toContain("computeNextActiveIdAfterBulkDelete");
+    expect(page.source).toContain("deletePagesBulk,");
+    expect(page.source).toContain("movePagesBulk,");
+    expect(pane.source).toContain("deletePagesBulk: (ids: string[]) => void");
+    expect(pane.source).toContain("movePagesBulk: (ids: string[], delta: number) => void");
+    expect(pane.source).toContain("selectedPageIds");
+    expect(pane.source).toContain("개 선택");
+  });
+
   it("moves the component and both contracts out of the page monolith", () => {
     const page = moduleShape("./StudioPage.tsx");
     const pane = moduleShape("./StudioPageListPane.tsx");

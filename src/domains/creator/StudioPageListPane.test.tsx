@@ -34,6 +34,14 @@ const PAGES: PageState[] = [
     bgGrad: null,
     canvasH: 2_000,
   },
+  {
+    id: "page-3",
+    name: "세 번째",
+    elements: [],
+    bg: "#ffffff",
+    bgGrad: null,
+    canvasH: 2_000,
+  },
 ];
 
 function createHandlers(): StudioPageListPaneHandlers {
@@ -44,11 +52,13 @@ function createHandlers(): StudioPageListPaneHandlers {
     clearPageFor: vi.fn(),
     commitPageMeta: vi.fn(),
     deletePage: vi.fn(),
+    deletePagesBulk: vi.fn(),
     duplicatePage: vi.fn(),
     duplicatePageMirrored: vi.fn(),
     insertPageAfter: vi.fn(),
     insertPageBefore: vi.fn(),
     movePageDown: vi.fn(),
+    movePagesBulk: vi.fn(),
     movePageToBottom: vi.fn(),
     movePageToTop: vi.fn(),
     movePageUp: vi.fn(),
@@ -170,10 +180,11 @@ describe("StudioPageListPane", () => {
     });
     render(<StudioPageListPane {...props} />);
 
-    expect(itemProps.mock.calls.map(([index]) => index)).toEqual([0, 1]);
-    expect(indicatorFor.mock.calls.map(([index]) => index)).toEqual([0, 1]);
+    expect(itemProps.mock.calls.map(([index]) => index)).toEqual([0, 1, 2]);
+    expect(indicatorFor.mock.calls.map(([index]) => index)).toEqual([0, 1, 2]);
 
-    const [firstPage, secondPage] = screen.getAllByTestId("studio-page-item");
+    const items = screen.getAllByTestId("studio-page-item");
+    const [firstPage, secondPage] = items;
     expect(firstPage?.getAttribute("draggable")).toBe("true");
     expect(secondPage?.classList.contains("opacity-50")).toBe(true);
     expect(
@@ -191,19 +202,24 @@ describe("StudioPageListPane", () => {
     expect(onDrop).toHaveBeenCalledOnce();
     expect(onDragEnd).toHaveBeenCalledOnce();
 
+    const thirdPage = items[2];
     fireEvent.click(within(firstPage!).getByRole("button", { name: "아래로 이동" }));
     fireEvent.click(within(firstPage!).getByRole("button", { name: "맨 아래로 이동" }));
     fireEvent.click(within(secondPage!).getByRole("button", { name: "위로 이동" }));
     fireEvent.click(within(secondPage!).getByRole("button", { name: "맨 위로 이동" }));
+    fireEvent.click(within(thirdPage!).getByRole("button", { name: "위로 이동" }));
+    fireEvent.click(within(thirdPage!).getByRole("button", { name: "맨 위로 이동" }));
 
     expect(props.stableHandlers.movePageDown).toHaveBeenCalledWith("page-1");
     expect(props.stableHandlers.movePageToBottom).toHaveBeenCalledWith("page-1");
     expect(props.stableHandlers.movePageUp).toHaveBeenCalledWith("page-2");
     expect(props.stableHandlers.movePageToTop).toHaveBeenCalledWith("page-2");
+    expect(props.stableHandlers.movePageUp).toHaveBeenCalledWith("page-3");
+    expect(props.stableHandlers.movePageToTop).toHaveBeenCalledWith("page-3");
     expect(within(firstPage!).getByRole<HTMLButtonElement>("button", { name: "위로 이동" }).disabled).toBe(true);
     expect(within(firstPage!).getByRole<HTMLButtonElement>("button", { name: "맨 위로 이동" }).disabled).toBe(true);
-    expect(within(secondPage!).getByRole<HTMLButtonElement>("button", { name: "아래로 이동" }).disabled).toBe(true);
-    expect(within(secondPage!).getByRole<HTMLButtonElement>("button", { name: "맨 아래로 이동" }).disabled).toBe(true);
+    expect(within(thirdPage!).getByRole<HTMLButtonElement>("button", { name: "아래로 이동" }).disabled).toBe(true);
+    expect(within(thirdPage!).getByRole<HTMLButtonElement>("button", { name: "맨 아래로 이동" }).disabled).toBe(true);
   });
 
   it("preserves batch actions and inline page metadata commits", () => {
@@ -305,5 +321,67 @@ describe("StudioPageListPane", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "페이지 시트 닫기" }));
     expect(props.setMobileSheet).toHaveBeenCalledWith(null);
+  });
+
+  it("multi-selects with meta/shift and routes bulk move/delete through stable handlers", () => {
+    const props = createProps();
+    const confirm = vi.spyOn(globalThis, "confirm").mockReturnValue(true);
+    render(<StudioPageListPane {...props} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "첫 장면 선택" }));
+    expect(props.setCurrentPageId).toHaveBeenCalledWith("page-1");
+    expect(screen.queryByTestId("studio-page-bulk-toolbar")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "두 번째 선택" }), { metaKey: true });
+    expect(props.setCurrentPageId).toHaveBeenCalledWith("page-2");
+    expect(screen.getByTestId("studio-page-bulk-toolbar")).toBeTruthy();
+    expect(screen.getByText("2개 선택")).toBeTruthy();
+
+    const items = screen.getAllByTestId("studio-page-item");
+    expect(items[0]?.getAttribute("data-selected")).toBe("true");
+    expect(items[1]?.getAttribute("data-selected")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "세 번째 선택" }), { shiftKey: true });
+    expect(screen.getByText("3개 선택")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("studio-page-bulk-move-up"));
+    fireEvent.click(screen.getByTestId("studio-page-bulk-move-down"));
+    expect(props.stableHandlers.movePagesBulk).toHaveBeenNthCalledWith(
+      1,
+      ["page-1", "page-2", "page-3"],
+      -1,
+    );
+    expect(props.stableHandlers.movePagesBulk).toHaveBeenNthCalledWith(
+      2,
+      ["page-1", "page-2", "page-3"],
+      1,
+    );
+
+    fireEvent.click(screen.getByTestId("studio-page-bulk-delete"));
+    expect(confirm).toHaveBeenCalledWith("선택한 3개 페이지를 삭제할까요?");
+    expect(props.stableHandlers.deletePagesBulk).toHaveBeenCalledWith([
+      "page-1",
+      "page-2",
+      "page-3",
+    ]);
+    // bulk delete clears multi-select toolbar
+    expect(screen.queryByTestId("studio-page-bulk-toolbar")).toBeNull();
+  });
+
+  it("plain click collapses multi-select to a single page", () => {
+    const props = createProps();
+    render(<StudioPageListPane {...props} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "첫 장면 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "두 번째 선택" }), { ctrlKey: true });
+    expect(screen.getByTestId("studio-page-bulk-toolbar")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "세 번째 선택" }));
+    expect(screen.queryByTestId("studio-page-bulk-toolbar")).toBeNull();
+    expect(props.setCurrentPageId).toHaveBeenLastCalledWith("page-3");
+    const items = screen.getAllByTestId("studio-page-item");
+    expect(items[2]?.getAttribute("data-selected")).toBe("true");
+    // Unselected rows omit the attribute or set it false depending on markup.
+    expect(items[0]?.getAttribute("data-selected")).not.toBe("true");
   });
 });

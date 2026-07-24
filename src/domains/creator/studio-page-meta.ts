@@ -421,7 +421,13 @@ function isClipboardAnimationKeyframe(
       !isFiniteClipboardNumber(frame.durationMs, true) || frame.durationMs > 60_000
     ))
   ) return false;
-  if (value.ease !== undefined && value.ease !== "linear" && value.ease !== "ease-in-out") {
+  if (
+    value.ease !== undefined
+    && value.ease !== "linear"
+    && value.ease !== "ease-in"
+    && value.ease !== "ease-out"
+    && value.ease !== "ease-in-out"
+  ) {
     return false;
   }
   if (value.transform !== undefined) {

@@ -87,11 +87,13 @@ export interface StudioPageListPaneHandlers {
   clearPageFor: (pageId: string) => void;
   commitPageMeta: (pageId: string, patch: { name?: string | null; note?: string | null; }) => void;
   deletePage: (pageId: string) => void;
+  deletePagesBulk: (ids: string[]) => void;
   duplicatePage: (pageId: string) => void;
   duplicatePageMirrored: (pageId: string) => void;
   insertPageAfter: (pageId: string) => void;
   insertPageBefore: (pageId: string) => void;
   movePageDown: (pageId: string) => void;
+  movePagesBulk: (ids: string[], delta: number) => void;
   movePageToBottom: (pageId: string) => void;
   movePageToTop: (pageId: string) => void;
   movePageUp: (pageId: string) => void;
@@ -155,11 +157,13 @@ export const StudioPageListPane = memo(function StudioPageListPane({
     clearPageFor,
     commitPageMeta,
     deletePage,
+    deletePagesBulk,
     duplicatePage,
     duplicatePageMirrored,
     insertPageAfter,
     insertPageBefore,
     movePageDown,
+    movePagesBulk,
     movePageToBottom,
     movePageToTop,
     movePageUp,
@@ -168,6 +172,11 @@ export const StudioPageListPane = memo(function StudioPageListPane({
   const [pagePreviewSize, setPagePreviewSize] = useState<StudioPagePreviewSize>(
     readPagePreviewSize
   );
+  // CSP EX 스타일 다중 페이지 선택 — currentPageId 와 별도로 벌크 이동/삭제 대상 id 목록.
+  const [selectedPageIds, setSelectedPageIds] = useState<string[]>([]);
+  const pageIdSet = new Set(pages.map((page) => page.id));
+  const liveSelectedPageIds = selectedPageIds.filter((id) => pageIdSet.has(id));
+  const multiSelectActive = liveSelectedPageIds.length > 1;
   const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
     ? Math.max(0, Math.round(mobileKeyboardInset))
     : 0;
@@ -317,20 +326,77 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                 <Maximize2 size={12} className="shrink-0 text-fg-3" aria-hidden />
               </div>
             </div>
+            {multiSelectActive ? (
+              <div
+                role="toolbar"
+                aria-label="선택한 페이지 일괄 작업"
+                data-testid="studio-page-bulk-toolbar"
+                className="mt-1.5 flex min-h-11 items-center gap-1 overflow-x-auto overscroll-x-contain rounded-lg border border-accent/40 bg-accent-soft/30 px-1.5 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
+                <span className="shrink-0 px-1.5 text-[0.7rem] font-bold tabular-nums text-accent lg:text-[10px]">
+                  {liveSelectedPageIds.length}개 선택
+                </span>
+                <button
+                  type="button"
+                  data-testid="studio-page-bulk-move-up"
+                  onClick={() => movePagesBulk(liveSelectedPageIds, -1)}
+                  className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-2 hover:bg-raised lg:size-auto lg:min-h-6 lg:rounded-lg lg:px-1.5"
+                  title="선택한 페이지 위로 이동"
+                  aria-label="선택한 페이지 위로 이동"
+                >
+                  <ChevronUp size={14} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  data-testid="studio-page-bulk-move-down"
+                  onClick={() => movePagesBulk(liveSelectedPageIds, 1)}
+                  className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-2 hover:bg-raised lg:size-auto lg:min-h-6 lg:rounded-lg lg:px-1.5"
+                  title="선택한 페이지 아래로 이동"
+                  aria-label="선택한 페이지 아래로 이동"
+                >
+                  <ChevronDown size={14} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  data-testid="studio-page-bulk-delete"
+                  onClick={() => {
+                    if (
+                      globalThis.confirm(
+                        `선택한 ${liveSelectedPageIds.length}개 페이지를 삭제할까요?`
+                      )
+                    ) {
+                      deletePagesBulk(liveSelectedPageIds);
+                      setSelectedPageIds([]);
+                    }
+                  }}
+                  disabled={pages.length <= 1}
+                  className="ml-auto grid size-11 shrink-0 place-items-center rounded-xl text-bad hover:bg-bad-soft/20 disabled:opacity-30 lg:size-auto lg:min-h-6 lg:rounded-lg lg:px-1.5"
+                  title="선택한 페이지 삭제"
+                  aria-label="선택한 페이지 삭제"
+                >
+                  <Trash2 size={14} aria-hidden />
+                </button>
+              </div>
+            ) : null}
           </div>
           <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain pr-0.5">
             {pages.map((p, idx) => {
               const isActive = p.id === currentPageId;
+              const isMultiSelected = liveSelectedPageIds.includes(p.id);
               const dropIndicator = pageDnd.indicatorFor(idx);
               return (
                 <div
                   key={p.id}
                   data-testid="studio-page-item"
+                  data-selected={isMultiSelected ? "true" : undefined}
                   {...pageDnd.itemProps(idx)}
-                  title="드래그하여 순서 변경"
+                  title="드래그하여 순서 변경 · Shift/⌘/Ctrl+클릭으로 다중 선택"
                   className={cn(
                     "relative flex w-full flex-col gap-0.5 rounded-lg border p-1.5 transition-all hover:bg-raised/50",
-                    isActive ? "border-accent bg-accent-soft/40" : "border-line bg-card",
+                    isActive || isMultiSelected
+                      ? "border-accent bg-accent-soft/40"
+                      : "border-line bg-card",
+                    isMultiSelected && !isActive && "ring-1 ring-accent/50",
                     pageDnd.dragIndex === idx && "opacity-50"
                   )}
                 >
@@ -339,9 +405,23 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                       액션 버튼은 z-index 로 그 위에 띄운다. 카드 div 는 드래그 정렬(draggable) 컨테이너로 유지. */}
                   <button
                     type="button"
-                    onClick={() => setCurrentPageId(p.id)}
+                    onClick={(event) => {
+                      const multi = event.metaKey || event.ctrlKey || event.shiftKey;
+                      if (multi) {
+                        setSelectedPageIds((prev) => {
+                          const kept = prev.filter((id) => pageIdSet.has(id));
+                          return kept.includes(p.id)
+                            ? kept.filter((id) => id !== p.id)
+                            : [...kept, p.id];
+                        });
+                        setCurrentPageId(p.id);
+                        return;
+                      }
+                      setSelectedPageIds([p.id]);
+                      setCurrentPageId(p.id);
+                    }}
                     aria-label={`${pageDisplayName(p, idx)} 선택`}
-                    aria-pressed={isActive}
+                    aria-pressed={isActive || isMultiSelected}
                     className="absolute inset-0 z-10 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   />
                   {/* 드롭 삽입선(PPT식) — 카드 위/아래 절반 판정 결과 시각화. overflow 클리핑 없게 카드 가장자리에 겹쳐 그린다. */}
