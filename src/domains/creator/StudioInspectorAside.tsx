@@ -2265,8 +2265,20 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       updateAdvancedFillSettings({ ...DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS })
                     }
                   />
-                  {/* Thin plan-only auto-color hints: demo fixture until selection pixels are wired. */}
-                  <StudioAutoColorHintsPanel />
+                  {/*
+                    Thin plan-only auto-color hints.
+                    Worker onRun (dynamic import keeps the main inspector chunk light).
+                    Demo fixture only: selected-layer ImageData is not available here without
+                    StudioPage pixel plumbing — parent can later pass `image` when that lands.
+                  */}
+                  <StudioAutoColorHintsPanel
+                    onRun={async (request) => {
+                      const { runStudioAutoColorHintsWorker } = await import(
+                        "./studio-auto-color-hints-worker-client"
+                      );
+                      return runStudioAutoColorHintsWorker(request);
+                    }}
+                  />
                   {!selectedWorkAssetDestructiveEditReason ? (
                     <StudioLineCleanupPanel
                       src={selected.src}

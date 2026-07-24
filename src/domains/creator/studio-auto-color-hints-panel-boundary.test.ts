@@ -51,14 +51,34 @@ describe("studio auto-color hints panel export boundary", () => {
     expect(panel).not.toContain("applyAdvancedFillPreview");
     expect(panel).toContain('data-studio-auto-color-hints-panel="true"');
 
-    // Product path: lazy-ui registers the panel; inspector fill-tab mounts it (demo fixture).
+    // Product path: lazy-ui registers the panel; inspector fill-tab mounts it.
     expect(lazyUi).toContain('import("./StudioAutoColorHintsPanel")');
     expect(lazyUi).toMatch(/const StudioAutoColorHintsPanel = lazyRetry\(/u);
     expect(lazyUi).toContain("StudioAutoColorHintsPanel,");
-    expect(inspector).toContain('StudioAutoColorHintsPanel,');
+    expect(inspector).toContain("StudioAutoColorHintsPanel,");
     expect(inspector).toContain('from "./studio-page-lazy-ui"');
     expect(inspector).toContain("<StudioAutoColorHintsPanel");
     // Guard against a second heavy page-level glue site.
     expect(inspector.match(/<StudioAutoColorHintsPanel\b/gu)).toHaveLength(1);
+
+    // Worker wiring reachability: inspector passes onRun via dynamic worker-client import
+    // (keeps the main inspector chunk free of a static worker-client edge). Demo fixture
+    // remains until selected-layer ImageData is plumbed without StudioPage surgery.
+    const mountAt = inspector.indexOf("<StudioAutoColorHintsPanel");
+    expect(mountAt).toBeGreaterThanOrEqual(0);
+    // Span the JSX open + onRun body (arrow `=>` must not truncate assertions).
+    const mountSnippet = inspector.slice(mountAt, mountAt + 700);
+    expect(mountSnippet).toMatch(/onRun=\{async\s*\(request\)\s*=>/u);
+    // Dynamic import may be multi-line (`import(\n  "./…")`); match the call shape.
+    expect(mountSnippet).toMatch(
+      /import\s*\(\s*["']\.\/studio-auto-color-hints-worker-client["']\s*\)/u,
+    );
+    expect(mountSnippet).toContain("runStudioAutoColorHintsWorker");
+    // Image prop not wired yet (would require selected-layer pixel plumbing).
+    expect(mountSnippet).not.toMatch(/\bimage=/u);
+    // No static (eager) worker-client import on the inspector module graph.
+    expect(inspector).not.toMatch(
+      /import\s*\{[^}]*runStudioAutoColorHintsWorker[^}]*\}\s*from\s*["']\.\/studio-auto-color-hints-worker-client["']/u,
+    );
   });
 });
