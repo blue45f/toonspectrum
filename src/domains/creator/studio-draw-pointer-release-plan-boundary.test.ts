@@ -107,7 +107,15 @@ describe("studio draw pointer-release planning ownership boundary", () => {
       "releaseDrawingPointerSession()",
       "clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup })",
       "reauthorLastSettledFromDocumentPoints",
+      "liveBrushPressureSamplesFor(releaseAuthoritativeStroke)",
       "endLiveResourceEdit()",
     ]);
+    // Reauthor must feed alias-mapped live pressures, not raw DrawEl.pressures — otherwise
+    // fineliner/marker strokes flash a different dab radius at stroke complete.
+    const reauthorCall = finish.slice(
+      finish.indexOf("reauthorLastSettledFromDocumentPoints")
+    );
+    expect(reauthorCall).toContain("liveBrushPressureSamplesFor(releaseAuthoritativeStroke)");
+    expect(reauthorCall).not.toContain("pressures: releaseAuthoritativeStroke.pressures");
   });
 });

@@ -103,6 +103,43 @@ interface SettledLiveInkStroke {
   readonly ps: readonly number[];
 }
 
+function liveInkStyleMatches(
+  left: StudioLiveInkStrokeStyle,
+  right: StudioLiveInkStrokeStyle
+): boolean {
+  return left.color === right.color
+    && left.strokeWidthDoc === right.strokeWidthDoc
+    && left.pressureModel === right.pressureModel
+    && left.paintModel === right.paintModel
+    && left.opacity === right.opacity
+    && left.minDistanceDoc === right.minDistanceDoc;
+}
+
+function liveInkNumberArraysEqual(
+  left: readonly number[],
+  right: readonly number[]
+): boolean {
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index += 1) {
+    if (!Object.is(left[index], right[index])) return false;
+  }
+  return true;
+}
+
+/** True when reauthor would paint the same settled samples already on the overlay. */
+function liveInkSettledStrokeMatches(
+  stroke: SettledLiveInkStroke,
+  style: StudioLiveInkStrokeStyle,
+  xs: readonly number[],
+  ys: readonly number[],
+  ps: readonly number[]
+): boolean {
+  return liveInkStyleMatches(stroke.style, style)
+    && liveInkNumberArraysEqual(stroke.xs, xs)
+    && liveInkNumberArraysEqual(stroke.ys, ys)
+    && liveInkNumberArraysEqual(stroke.ps, ps);
+}
+
 function liveInkDevicePixelRatio(surface: StudioLiveInkSurface): number {
   return typeof globalThis.devicePixelRatio === "number" && Number.isFinite(globalThis.devicePixelRatio)
     ? resolveStudioLiveSurfaceDevicePixelRatio({
@@ -291,6 +328,11 @@ export class StudioLiveInkOverlayRenderer {
    * Konva/committed causal planning) and re-rasterize. Call after end() once the release planner
    * freezes geometry so the overlay→committed handoff does not pop/flicker from residual thinning
    * drift or incomplete last-sample promotion.
+   *
+   * Callers must pass live-boundary pressures (brush-alias mapped) — the same channel
+   * `appendFrom` / Konva causal dabs use — not raw DrawEl.pressures. When the sealed samples
+   * already match the settled footprint, skip clearRect/replay so pointerup cannot flash an
+   * empty overlay for a frame.
    */
   reauthorLastSettledFromDocumentPoints(input: {
     readonly style: StudioLiveInkStrokeStyle;
@@ -307,11 +349,18 @@ export class StudioLiveInkOverlayRenderer {
       sealEndpoint: true,
     });
     if (samples.length === 0) return false;
+    const xs = samples.map((sample) => sample.x);
+    const ys = samples.map((sample) => sample.y);
+    const ps = samples.map((sample) => sample.pressure);
+    const previous = this.settled[this.settled.length - 1]!;
+    if (liveInkSettledStrokeMatches(previous, input.style, xs, ys, ps)) {
+      return true;
+    }
     this.settled[this.settled.length - 1] = {
       style: input.style,
-      xs: samples.map((sample) => sample.x),
-      ys: samples.map((sample) => sample.y),
-      ps: samples.map((sample) => sample.pressure),
+      xs,
+      ys,
+      ps,
     };
     this.replay();
     return true;

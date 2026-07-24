@@ -172,7 +172,10 @@ describe("StudioLiveInkOverlayRenderer", () => {
       minDistanceDoc: 2,
       pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
     } as const;
-    const points = [0, 0, 1, 0, 2, 0, 4, 0, 8, 0, 12, 0];
+    // Live append thins mid samples under minDistance=2; reauthor seals the full document route
+    // so the settled footprint jumps to the canonical sealed plan (intentional geometry fix).
+    const livePoints = [0, 0, 8, 0, 12, 0];
+    const documentPoints = [0, 0, 1, 0, 2, 0, 4, 0, 8, 0, 12, 0];
     const pressures = [1, 1, 1, 1, 1, 1];
     const recording = recordingCanvas();
     // replay() clearRect must drop prior dab recordings so we only observe the sealed footprint.
@@ -182,9 +185,41 @@ describe("StudioLiveInkOverlayRenderer", () => {
     const renderer = new StudioLiveInkOverlayRenderer();
     renderer.attach(recording.canvas);
     renderer.setSurface(SURFACE);
+    expect(renderer.begin(style, livePoints[0]!, livePoints[1]!, pressures[0]!)).toBe(true);
+    renderer.appendFrom(livePoints, pressures);
+    renderer.end();
+
+    expect(
+      renderer.reauthorLastSettledFromDocumentPoints({
+        style,
+        points: documentPoints,
+        pressures,
+      })
+    ).toBe(true);
+    expect(renderer.settledStrokeCount).toBe(1);
+    expect(recording.clearRect).toHaveBeenCalled();
+    // Sealed reauthor must equal a fresh full stroke planned from the same document points.
+    expect(recording.dabs).toEqual(canonicalStrokeDabs(documentPoints, pressures, style));
+  });
+
+  it("skips clearRect when reauthor samples already match the settled live footprint", () => {
+    const style = {
+      ...STYLE,
+      strokeWidthDoc: 16,
+      minDistanceDoc: 0,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
+    } as const;
+    const points = [0, 0, 4, 0, 8, 0, 12, 0];
+    const pressures = [1, 1, 1, 1];
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
     expect(renderer.begin(style, points[0]!, points[1]!, pressures[0]!)).toBe(true);
     renderer.appendFrom(points, pressures);
     renderer.end();
+    const settled = recording.dabs.map((dab) => ({ ...dab }));
+    recording.clearRect.mockClear();
 
     expect(
       renderer.reauthorLastSettledFromDocumentPoints({
@@ -193,10 +228,10 @@ describe("StudioLiveInkOverlayRenderer", () => {
         pressures,
       })
     ).toBe(true);
+    // Pointerup must not blank the overlay when live residual already matches sealed planning.
+    expect(recording.clearRect).not.toHaveBeenCalled();
+    expect(recording.dabs).toEqual(settled);
     expect(renderer.settledStrokeCount).toBe(1);
-    expect(recording.clearRect).toHaveBeenCalled();
-    // Sealed reauthor must equal a fresh full stroke planned from the same document points.
-    expect(recording.dabs).toEqual(canonicalStrokeDabs(points, pressures, style));
   });
 
   it("finishes residual ink synchronously without scheduling a post-release reveal", () => {

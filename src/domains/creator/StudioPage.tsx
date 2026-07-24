@@ -25091,6 +25091,8 @@ function StudioCuttoonEditor() {
       // live Canvas footprint matches Konva/causal planning before committed-ink handoff. Without
       // this, residual thinning / endpoint promotion can leave a one-frame pop when settled ink is
       // released after mainLayer.draw().
+      // Pressures must use the same brush-alias live channel as appendFrom / Konva causal dabs —
+      // raw DrawEl.pressures make alias brushes flash a different radius at pointerup.
       if (
         deferInkCleanup
         && releaseAuthoritativeStroke
@@ -25100,7 +25102,7 @@ function StudioCuttoonEditor() {
         liveInkOverlayRendererRef.current.reauthorLastSettledFromDocumentPoints({
           style: liveInkStyleFor(releaseAuthoritativeStroke),
           points: releaseAuthoritativeStroke.points,
-          pressures: releaseAuthoritativeStroke.pressures,
+          pressures: liveBrushPressureSamplesFor(releaseAuthoritativeStroke),
         });
       }
       if (immediateSurfaceHandoff) {
