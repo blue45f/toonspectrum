@@ -56,6 +56,10 @@ export type StudioLayerMaskPanelProps = {
   /** 굽기(bake) 진행 중 — 다른 픽셀 도구와 동일 관례로 잠그지 않고 표시만. */
   busy?: boolean;
   onAddMask: (fill: LayerMaskPaintMode) => void;
+  /** 현재 픽셀 선택으로 마스크 만들기(outside=true 면 선택 바깥만 남긴다). 없으면 버튼 미노출. */
+  onCreateFromSelection?: (outside: boolean) => void;
+  /** 쓸 수 있는 픽셀 선택이 있는지 — 없으면 선택 기반 버튼을 비활성화한다. */
+  hasUsableSelection?: boolean;
   onDeleteMask: () => void;
   onToggleEnabled: () => void;
   onInvert: () => void;
@@ -77,6 +81,8 @@ export function StudioLayerMaskPanel({
   maskThumbnailSrc,
   busy = false,
   onAddMask,
+  onCreateFromSelection,
+  hasUsableSelection = false,
   onDeleteMask,
   onToggleEnabled,
   onInvert,
@@ -127,7 +133,32 @@ export function StudioLayerMaskPanel({
             숨김으로 추가
           </button>
         </div>
-      ) : (
+      ) : null}
+
+      {!hasMask && onCreateFromSelection ? (
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => onCreateFromSelection(false)}
+            disabled={!hasUsableSelection}
+            title="현재 픽셀 선택 안쪽만 보이는 마스크를 만듭니다. 페더 경계는 부드럽게 이어집니다."
+            className={cn(PANEL_CHIP_CLASS, "flex flex-1 items-center justify-center gap-1")}
+          >
+            선택으로 마스크
+          </button>
+          <button
+            type="button"
+            onClick={() => onCreateFromSelection(true)}
+            disabled={!hasUsableSelection}
+            title="현재 픽셀 선택 바깥만 보이는 마스크를 만듭니다(선택한 부분이 가려집니다)."
+            className={cn(PANEL_CHIP_CLASS, "flex flex-1 items-center justify-center gap-1")}
+          >
+            선택 밖으로 마스크
+          </button>
+        </div>
+      ) : null}
+
+      {hasMask ? (
         <>
           <div className="flex items-center gap-2">
             {maskThumbnailSrc && (
@@ -211,7 +242,7 @@ export function StudioLayerMaskPanel({
             readout={`${Math.round(strength * 100)}%`}
           />
         </>
-      )}
+      ) : null}
 
       <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
         {statusText}

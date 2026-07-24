@@ -20703,6 +20703,56 @@ function StudioCuttoonEditor() {
       patchEl(target.id, { maskSrc: (out as HTMLCanvasElement).toDataURL("image/png"), maskEnabled: true } as Partial<El>);
     })();
   }
+  /**
+   * 픽셀 선택 → 레이어 마스크(2026-07-24, CSP "선택 범위에서 마스크 만들기").
+   * 선택 마스크와 레이어 마스크는 알파 규약이 같다(불투명 = 보임)라서 rasterizeSelectionMask 의
+   * 결과를 그대로 maskSrc 로 쓸 수 있다 — 페더의 부분 알파도 그대로 부드러운 마스크 경계가 된다.
+   * outside=true 면 선택 "바깥"만 남긴다(선택 밖 마스크).
+   */
+  function createLayerMaskFromSelection(outside: boolean) {
+    if (
+      selected?.type !== "image" ||
+      !canLayerMask(selected) ||
+      activeSurfaceReviewLocked ||
+      isEffectivelyLocked(selected, groups)
+    ) return;
+    if (!isSelectionUsable(pixelSel)) {
+      setError("마스크로 만들 픽셀 영역을 먼저 선택하세요.");
+      return;
+    }
+    const target = selected;
+    const sel = pixelSel;
+    const mutationTicket = captureStudioMutationTicket();
+    void (async () => {
+      try {
+        const img = await loadStudioPixelEditImage(target.src);
+        const w = img.naturalWidth || img.width;
+        const h = img.naturalHeight || img.height;
+        const maskPlan = buildSelectionMaskPlan(sel, w, h, {
+          featherScale: target.width > 0 ? w / target.width : 1,
+          flipX: target.flipped,
+          flipY: target.flippedY,
+        });
+        if (!maskPlan) return;
+        const selectionMask = rasterizeSelectionMask(maskPlan, createStudioPixelEditCanvas);
+        if (!selectionMask) throw new Error("선택 마스크를 만들지 못했습니다.");
+        const mask = outside
+          ? invertLayerMaskAlpha(selectionMask, w, h, createStudioPixelEditCanvas)
+          : selectionMask;
+        if (!mask) throw new Error("마스크를 반전하지 못했습니다.");
+        if (!canApplyStudioMutation(mutationTicket)) return;
+        if (isLatestLayerContentMutationLocked(target.id)) return;
+        patchEl(target.id, {
+          maskSrc: (mask as HTMLCanvasElement).toDataURL("image/png"),
+          maskEnabled: true,
+        } as Partial<El>);
+        setError(null);
+      } catch (err) {
+        console.error("Failed to create layer mask from selection:", err);
+        setError(err instanceof Error ? err.message : "선택 영역으로 마스크를 만들지 못했습니다.");
+      }
+    })();
+  }
   function deleteLayerMask() {
     if (
       selected?.type !== "image" ||
@@ -28407,6 +28457,7 @@ function StudioCuttoonEditor() {
     addFilterMask,
     addLayerGroup,
     addLayerMask,
+    createLayerMaskFromSelection,
     addVanishingPointHandler,
     alignSelected,
     announceDrawingShortcut,

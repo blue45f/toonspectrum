@@ -110,8 +110,9 @@ describe("Studio canvas image I/O module boundary", () => {
     // createStudioPixelEditCanvas 20 → 23).
     // 의도적 변경(2026-07-24): 선택 픽셀 → 새 레이어 복사/오려내기 추가 —
     // loadStudioPixelEditImage 22 → 23, createStudioPixelEditCanvas 23 → 26(마스크·추출·삭제).
-    expect(callCount(page.sourceFile, "loadStudioPixelEditImage")).toBe(23);
-    expect(page.source.match(/\bcreateStudioPixelEditCanvas\b/gu)).toHaveLength(26);
+    // 의도적 변경(2026-07-24): 선택 → 레이어 마스크 만들기 추가 — 24 / 28.
+    expect(callCount(page.sourceFile, "loadStudioPixelEditImage")).toBe(24);
+    expect(page.source.match(/\bcreateStudioPixelEditCanvas\b/gu)).toHaveLength(28);
     expect(page.source).not.toContain('from "./studio-gif-element"');
     expect(page.source).not.toContain('from "./studio-upload-image-safety"');
   });

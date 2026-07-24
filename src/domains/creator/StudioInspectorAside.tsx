@@ -161,6 +161,7 @@ import {
   rotateSelection,
   scaleSelection,
   selectAllPixels,
+  isSelectionUsable,
   setSelectionFeather,
   toggleSelectionInvert,
   translateSelection,
@@ -208,6 +209,7 @@ export interface StudioInspectorAsideHandlers {
   addFilterMask: (fill: FilterMaskPaintMode) => void;
   addLayerGroup: (seedElId?: string) => void;
   addLayerMask: (fill: LayerMaskPaintMode) => void;
+  createLayerMaskFromSelection: (outside: boolean) => void;
   addVanishingPointHandler: () => void;
   alignSelected: (mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom" | "distributeH" | "distributeV") => void;
   announceDrawingShortcut: (message: string) => void;
@@ -955,6 +957,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     addFilterMask,
     addLayerGroup,
     addLayerMask,
+    createLayerMaskFromSelection,
     addVanishingPointHandler,
     alignSelected,
     announceDrawingShortcut,
@@ -2517,6 +2520,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     maskThumbnailSrc={selected.maskSrc ?? null}
                     busy={layerMaskBusy}
                     onAddMask={addLayerMask}
+                    onCreateFromSelection={createLayerMaskFromSelection}
+                    hasUsableSelection={isSelectionUsable(pixelSel)}
                     onDeleteMask={deleteLayerMask}
                     onToggleEnabled={toggleLayerMaskEnabled}
                     onInvert={invertLayerMask}
