@@ -22524,6 +22524,32 @@ function StudioCuttoonEditor() {
       // 자동 획득 id 를 ref 에 남겨 선택 변경 이펙트가 진행 중 제스처를 살려 두게 한다.
       let pixelTarget: ImageEl | null =
         pixelToolArmed && selected?.type === "image" ? selected : null;
+      // 대상 재획득(2026-07-24) — 이미지 A가 선택된 채로 다른 이미지 B 위에서 드래그를 시작하면,
+      // 예전에는 마퀴가 A의 좌표계로 계산돼 면적이 무의미해지고 아무 선택도 생기지 않았다("선택이
+      // 됐다 안 됐다"의 원인). 시작점이 선택된 이미지 "밖"이면서 그 자리에 다른 편집 가능한
+      // 이미지가 있을 때만 대상을 옮긴다 — 사각/타원은 이미지 밖에서 시작하는 것도 정상이므로
+      // (좌표를 0..1 로 클램프한다) 아무것도 없는 빈 곳에서 시작하는 기존 동작은 그대로 둔다.
+      if (pixelTarget) {
+        const local = canvasPointToNormalized(pos.x, pos.y, {
+          x: pixelTarget.x,
+          y: pixelTarget.y,
+          width: pixelTarget.width,
+          height: pixelTarget.height,
+          rotation: pixelTarget.rotation,
+        });
+        if (local.x < 0 || local.x > 1 || local.y < 0 || local.y > 1) {
+          const under = acquirePixelSelectionAutoTarget(pos);
+          const retarget = under.kind === "target" && under.id !== pixelTarget.id
+            ? elementById.get(under.id) ?? null
+            : null;
+          if (retarget?.type === "image") {
+            pixelTarget = retarget;
+            pixelSelectionAutoTargetRef.current = retarget.id;
+            setMarqueeIds([]);
+            setSelectedId(retarget.id);
+          }
+        }
+      }
       if (!pixelTarget) {
         const resolution = acquirePixelSelectionAutoTarget(pos);
         if (resolution.kind === "locked") {

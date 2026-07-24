@@ -42,6 +42,7 @@ import {
   MAGIC_WAND_MAX_LOOPS,
   MAGIC_WAND_TRACE_MAX_DIM,
   traceMaskContours,
+  type MagicWandRegion,
 } from "./studio-magic-wand";
 import {
   isSelectionUsable,
@@ -468,21 +469,36 @@ export type QuickMaskToSelectionOptions = {
   maxRegions?: number;
 };
 
+export type TraceMaskRegionsOptions = {
+  /** 이진화 문턱(1..255, 기본 128). */
+  threshold?: number;
+  /** 유지할 최대 분리 영역 수(면적 상위) — 병적 마스크 폭주 방지. 기본 MAGIC_WAND_MAX_LOOPS. */
+  maxRegions?: number;
+};
+
 /**
- * 알파 마스크 → PixelSelection. 이진화(≥threshold) 후 4방향 연결 성분을 라벨링하고, 성분마다
- * 마술봉과 동일한 traceMaskContours→applyMagicWandRegionToSelection("add", 구멍은 subtract)으로
- * 접어 넣는다. 소프트 엣지는 전역 featherPx 하나로 근사 복원한다(모듈 docstring의 정직한 근사).
- * 선택할 것이 없으면 null(빈 선택). 크기 불일치·퇴화 입력도 null.
+ * 알파 마스크 → 분리 영역(외곽 1 + 구멍 n)의 배열. 이진화(≥threshold) 후 4방향 연결 성분을
+ * 라벨링하고, 성분마다 마술봉과 동일한 traceMaskContours로 윤곽을 뽑는다 — 마술봉은 클릭 지점
+ * 성분 1개만 다루지만 마스크 전체에는 성분이 여러 개일 수 있어서 이 라벨링 층이 필요하다.
+ *
+ * 반환 순서 계약(결정적, 두 호출자가 함께 의존한다):
+ *  - 영역은 **시드 픽셀(성분의 첫 전경 픽셀)의 래스터 스캔 순서** 오름차순이다. 어떤 성분이 다른
+ *    성분의 구멍 안에 들어 있으면 감싸는 쪽의 최상단 행이 항상 더 위이므로, 이 순서는 곧
+ *    "감싸는 영역이 감싸이는 영역보다 먼저"를 보장한다 — 서브패스를 순서대로 add/subtract로
+ *    접을 때(마지막 서브패스가 이긴다는 PixelSelection 규약) 섬이 구멍에 먹히지 않는다.
+ *  - 성분 수가 maxRegions를 넘으면 면적 상위만 남기되(동률은 시드 오름차순) 반환 순서는 다시
+ *    스캔 순서로 되돌린다.
+ * 선택할 것이 없거나 크기가 안 맞으면 빈 배열.
  */
-export function maskToSelection(
+export function traceMaskRegions(
   mask: Uint8ClampedArray,
   width: number,
   height: number,
-  opts?: QuickMaskToSelectionOptions
-): PixelSelection | null {
+  opts?: TraceMaskRegionsOptions
+): MagicWandRegion[] {
   const w = sanitizeDim(width);
   const h = sanitizeDim(height);
-  if (!w || !h || mask.length !== w * h) return null;
+  if (!w || !h || mask.length !== w * h) return [];
   const rawThreshold = opts?.threshold;
   const threshold =
     Number.isFinite(rawThreshold) && rawThreshold! >= 1 && rawThreshold! <= 255
@@ -490,6 +506,8 @@ export function maskToSelection(
       : QUICK_MASK_SELECTION_THRESHOLD;
 
   // 1) 연결 성분(4방향) 라벨링 — scanFloodRegionMask와 동일한 스택 순회(재귀 없음, 결정적 스캔 순서).
+  //    (아래 2~3단계와 함께 traceMaskRegions 안에 있다 — maskToSelection과 레이어 알파→선택 경로가
+  //     같은 구현을 나눠 쓴다.)
   const labels = new Int32Array(w * h);
   const seeds: number[] = [];
   const areas: number[] = [];
@@ -525,10 +543,10 @@ export function maskToSelection(
     }
     areas.push(area);
   }
-  if (seeds.length === 0) return null;
+  if (seeds.length === 0) return [];
 
   // 2) 영역 수 상한 — 면적 상위만 유지(타이브레이크는 시드 오름차순 = 스캔 순서, 결정적).
-  //    최종 서브패스 순서는 스캔 순서를 유지한다(분리 영역의 add 결합은 순서 무관이지만 결정성 유지).
+  //    최종 반환 순서는 스캔 순서를 유지한다(감싸는 영역 우선 규약 — 위 docstring 참고).
   const rawMax = opts?.maxRegions;
   const maxRegions =
     Number.isFinite(rawMax) && rawMax! >= 1 ? Math.round(rawMax!) : MAGIC_WAND_MAX_LOOPS;
@@ -543,20 +561,51 @@ export function maskToSelection(
     keep = seeds.map((_, i) => i + 1);
   }
 
-  // 3) 성분별 윤곽 추적(마술봉과 동일 코드) → add 서브패스로 결합(구멍은 subtract).
-  const flipX = !!opts?.flipX;
-  const flipY = !!opts?.flipY;
+  // 3) 성분별 윤곽 추적(마술봉과 동일 코드).
   const scratch = new Uint8Array(w * h);
-  let sel: PixelSelection | null = null;
+  const regions: MagicWandRegion[] = [];
   for (const id of keep) {
     for (let i = 0; i < scratch.length; i++) scratch[i] = labels[i] === id ? 1 : 0;
     const seed = seeds[id - 1]!;
     const region = traceMaskContours(scratch, w, h, seed % w, (seed / w) | 0);
+    if (region.outer.length >= 3) regions.push(region);
+  }
+  return regions;
+}
+
+/**
+ * 알파 마스크 → PixelSelection. traceMaskRegions로 분리 영역을 뽑고 마술봉과 동일한
+ * applyMagicWandRegionToSelection("add", 구멍은 subtract)으로 순서대로 접어 넣는다.
+ * 소프트 엣지는 전역 featherPx 하나로 근사 복원한다(모듈 docstring의 정직한 근사).
+ * 선택할 것이 없으면 null(빈 선택). 크기 불일치·퇴화 입력도 null.
+ */
+export function maskToSelection(
+  mask: Uint8ClampedArray,
+  width: number,
+  height: number,
+  opts?: QuickMaskToSelectionOptions
+): PixelSelection | null {
+  const w = sanitizeDim(width);
+  const h = sanitizeDim(height);
+  if (!w || !h || mask.length !== w * h) return null;
+  const rawThreshold = opts?.threshold;
+  const threshold =
+    Number.isFinite(rawThreshold) && rawThreshold! >= 1 && rawThreshold! <= 255
+      ? Math.round(rawThreshold!)
+      : QUICK_MASK_SELECTION_THRESHOLD;
+
+  const regions = traceMaskRegions(mask, w, h, { threshold, maxRegions: opts?.maxRegions });
+  if (regions.length === 0) return null;
+
+  const flipX = !!opts?.flipX;
+  const flipY = !!opts?.flipY;
+  let sel: PixelSelection | null = null;
+  for (const region of regions) {
     sel = applyMagicWandRegionToSelection(sel, flipMagicWandRegion(region, flipX, flipY), "add");
   }
   if (!sel || !isSelectionUsable(sel)) return null;
 
-  // 4) 소프트 엣지 → 균일 페더(표시 px) 근사 복원.
+  // 소프트 엣지 → 균일 페더(표시 px) 근사 복원.
   const featherScale = sanitizeFeatherScale(opts?.featherScale);
   const featherDevice = estimateQuickMaskFeatherDevicePx(mask, w, h, threshold);
   const featherPx = Math.min(

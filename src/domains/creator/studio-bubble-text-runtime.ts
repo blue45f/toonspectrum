@@ -3,13 +3,40 @@ import {
   createCanvasBubbleTextMeasurer,
   fitBubbleFontSize,
 } from "./studio-bubble-text-fit";
+import { layoutVerticalText, verticalBlockAlign, verticalTextItemGeometry } from "./studio-vertical-text";
 
 import type { BubbleEl } from "./studio-element-model";
+import type {
+  VerticalBlockAlign,
+  VerticalTextItem,
+  VerticalTextLayout,
+  VerticalTextLayoutInput,
+} from "./studio-vertical-text";
+
+export type { VerticalBlockAlign, VerticalTextItem, VerticalTextLayout };
+// 렌더러(Konva/SVG)가 같은 지오메트리 규약을 공유하도록 코어의 순수 헬퍼를 그대로 다시 내보낸다.
+export { verticalBlockAlign, verticalTextItemGeometry };
 
 // 말풍선 자동 축소(studio-bubble-text-fit) 실측 캔버스 측정기 — 모듈 스코프에 1회만 생성한다
 // (내부 공유 <canvas>를 감싸는 얇은 래퍼라 element/렌더별로 새로 만들 이유가 없다).
 export const BUBBLE_TEXT_MEASURER = createCanvasBubbleTextMeasurer();
 
+/**
+ * 세로쓰기 레이아웃 — 공유 캔버스 측정기를 묶은 렌더 경로용 얇은 래퍼.
+ * 코어는 studio-vertical-text.ts(순수·DOM 무의존)에 있고, 여기서는 측정기만 주입한다.
+ */
+export function verticalTextLayout(input: VerticalTextLayoutInput): VerticalTextLayout {
+  return layoutVerticalText(input, BUBBLE_TEXT_MEASURER);
+}
+
+/**
+ * 레거시 세로쓰기 근사 — 가로 문자열을 전치해 가로 렌더러에 먹인다(열 우→좌, 빈 칸은 전각 공백).
+ *
+ * @deprecated 새 코드는 `verticalTextLayout`(studio-vertical-text.ts 코어)을 쓴다. 이 함수는
+ * 아직 이 근사에 묶여 있는 렌더 경로(StudioKonvaBubbleNode / SVG 내보내기의 말풍선 텍스트)가
+ * 캔버스·내보내기 사이에서 **서로 같은 결과**를 내도록 유지하는 호환 셈법이다 — 그 두 곳이 새
+ * 코어로 넘어가는 순간 함께 삭제한다.
+ */
 export function formatVerticalText(text: string): string {
   const lines = text.split("\n");
   const maxLen = Math.max(...lines.map((line) => line.length));

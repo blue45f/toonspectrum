@@ -164,6 +164,14 @@ import {
 } from "./studio-stroke-shapes";
 import { buildTextPathData, isFlatTextPath, normalizeTextPath, type TextPathConfig } from "./studio-text-path";
 import {
+  layoutVerticalText,
+  verticalBlockAlign,
+  verticalTextItemGeometry,
+  type VerticalTextItem,
+  type VerticalTextLayout,
+  type VerticalTextMeasurer,
+} from "./studio-vertical-text";
+import {
   planWatercolorBrushDabs,
   watercolorBrushSeedFromKey,
 } from "./studio-watercolor-brush";
@@ -754,6 +762,68 @@ function textBlockMarkup(opts: TextBlockOptions): string {
     ` text-anchor="${anchor}" fill="${escapeXml(opts.fill)}"${strokeAttrs}${opts.filter ? att("filter", opts.filter) : ""}>` +
     `${spans}</text>`
   );
+}
+
+// ---------------------------------------------------------------------------
+// 세로쓰기(縦組み) — studio-vertical-text 코어를 캔버스와 같은 지오메트리로 SVG에 옮긴다
+// ---------------------------------------------------------------------------
+
+/**
+ * SVG 내보내기용 세로쓰기 글자 폭 측정기 — 이 모듈은 순수/Worker 안전이라 캔버스 measureText를
+ * 쓸 수 없으므로 `estimateLineWidth` 근사를 쓴다. 한글/한자만 있는 세로쓰기는 회전 런이 없어
+ * 폭 측정 자체가 호출되지 않으므로 화면과 열 나눔이 정확히 같다. 라틴/숫자 구간이 섞이면
+ * 그 런의 길이만 근사가 되어 열 나눔 지점이 화면과 달라질 수 있고, 그때는 정직하게 고지한다.
+ */
+const SVG_VERTICAL_MEASURER: VerticalTextMeasurer = {
+  measureWidth: (text, fontPx) => estimateLineWidth(text, fontPx, 0),
+};
+
+interface VerticalTextBlockOptions {
+  layout: VerticalTextLayout;
+  fontSize: number;
+  letterSpacing: number;
+  fontFamily: string;
+  fontStyle: "normal" | "bold" | "italic" | "bold italic";
+  /** 단색이면 그대로, 그라데이션이면 아이템 로컬 좌표계마다 새 def를 만들어야 해 콜백으로 받는다. */
+  fill: (item: VerticalTextItem) => string;
+  stroke?: string;
+  strokeWidth?: number;
+  filter?: string;
+}
+
+/**
+ * 세로쓰기 블록 마크업 — 아이템마다 `<g transform="translate(x y)[ rotate(90)]">` 안에 로컬
+ * 원점 기준 `textBlockMarkup`을 하나 넣는다. Konva 쪽(StudioKonvaTextNodes의 세로쓰기 노드)이
+ * 만드는 노드 트리와 **좌표계가 1:1로 대응**하므로(자식 노드 = 이 `<g>`), 그라데이션처럼 노드
+ * 로컬 좌표계에서 해석되는 값도 캔버스와 같은 결과가 된다.
+ */
+function verticalTextBlockMarkup(opts: VerticalTextBlockOptions): string {
+  const parts: string[] = [];
+  for (const column of opts.layout.columns) {
+    for (const item of column.items) {
+      const { boxWidth, lineHeight } = verticalTextItemGeometry(item, opts.fontSize);
+      const rotated = item.rotation === 90;
+      const block = textBlockMarkup({
+        text: item.text,
+        x: 0,
+        y: 0,
+        boxWidth: rotated ? 0 : boxWidth,
+        fontSize: opts.fontSize,
+        lineHeight,
+        letterSpacing: rotated ? opts.letterSpacing : 0,
+        align: rotated ? "left" : "center",
+        fontFamily: opts.fontFamily,
+        fontStyle: opts.fontStyle,
+        fill: opts.fill(item),
+        stroke: opts.stroke,
+        strokeWidth: opts.strokeWidth,
+        filter: opts.filter,
+      });
+      const transform = `translate(${fmt(item.x)} ${fmt(item.y)})${rotated ? " rotate(90)" : ""}`;
+      parts.push(`<g transform="${transform}">${block}</g>`);
+    }
+  }
+  return parts.join("");
 }
 
 // ---------------------------------------------------------------------------
@@ -1595,7 +1665,61 @@ function serializeText(ctx: ExportCtx, el: SvgTextElLike): string {
     );
   }
 
-  const content = el.vertical ? formatVerticalText(el.text) : el.text;
+  if (el.vertical) {
+    // 세로쓰기 — studio-vertical-text 코어가 캔버스와 같은 열/런 배치를 계산하고, 여기서는
+    // 그 좌표를 그대로 <g transform> 으로 옮긴다(StudioKonvaTextNodes 세로쓰기 노드와 1:1 대응).
+    // el.width 는 CSS 논리 속성 규약대로 inline size = **열 길이 예산**으로 읽는다.
+    const verticalLetterSpacing = el.letterSpacing ?? 0;
+    const verticalLayout = layoutVerticalText(
+      {
+        text: el.text,
+        fontSize: el.fontSize,
+        lineHeight: el.lineHeight ?? 1.4,
+        letterSpacing: verticalLetterSpacing,
+        fontFamily,
+        fontStyle: el.fontStyle ?? "bold",
+        maxColumnLength: el.width,
+        blockAlign: verticalBlockAlign(el.align),
+      },
+      SVG_VERTICAL_MEASURER
+    );
+    if (verticalLayout.columns.some((column) => column.items.some((item) => item.rotation === 90))) {
+      addSkip(
+        ctx,
+        el,
+        "approximated",
+        "세로쓰기 속 라틴/숫자 구간의 폭은 글꼴 실측 없이 근사해 열 나눔이 화면과 조금 다를 수 있어요."
+      );
+    }
+    const verticalBlock = verticalTextBlockMarkup({
+      layout: verticalLayout,
+      fontSize: el.fontSize,
+      letterSpacing: verticalLetterSpacing,
+      fontFamily,
+      fontStyle: el.fontStyle ?? "bold",
+      fill: (item) =>
+        gradientSpec
+          ? gradientDef(
+              ctx,
+              gradientSpec,
+              // 캔버스와 동일하게 "블록 전체 bbox를 아이템 로컬 원점으로 옮긴 것"을 쓴다.
+              {
+                x: -item.x,
+                y: -item.y,
+                width: Math.max(1, verticalLayout.width),
+                height: Math.max(1, verticalLayout.height),
+              },
+              { x: 0, y: 0 }
+            )
+          : el.fill,
+      stroke: el.stroke,
+      strokeWidth: el.strokeWidth,
+      filter,
+    });
+    return `<g${transform ? att("transform", transform) : ""}${opacity !== 1 ? att("opacity", opacity) : ""}>${verticalBlock}</g>`;
+  }
+
+  const content = el.text;
   const lineHeight = el.lineHeight ?? 1;
   const letterSpacing = el.letterSpacing ?? 0;
   const fill = gradientSpec

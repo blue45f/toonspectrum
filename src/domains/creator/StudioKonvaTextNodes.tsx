@@ -1,6 +1,10 @@
-import { Text as KText, TextPath as KTextPath } from "react-konva/lib/ReactKonvaCore";
+import { Group as KGroup, Text as KText, TextPath as KTextPath } from "react-konva/lib/ReactKonvaCore";
 
-import { formatVerticalText } from "./studio-bubble-text-runtime";
+import {
+  verticalBlockAlign,
+  verticalTextItemGeometry,
+  verticalTextLayout,
+} from "./studio-bubble-text-runtime";
 import {
   estimateTextGradientBBox,
   konvaGradientProps,
@@ -108,7 +112,18 @@ export function StudioKonvaTextNode({
     );
   }
 
-  const text = el.vertical ? formatVerticalText(el.text) : el.text;
+  if (el.vertical) {
+    return (
+      <StudioKonvaVerticalTextNode
+        el={el}
+        innerRef={innerRef}
+        interactionProps={interactionProps}
+        onCommitTransform={onCommitTransform}
+      />
+    );
+  }
+
+  const text = el.text;
   return (
     <KText
       studioElementId={el.id}
@@ -152,6 +167,115 @@ export function StudioKonvaTextNode({
       {...interactionProps}
       onTransformEnd={(event) => onCommitTransform(el.id, el.fontSize, event, { minFontSize: 10, patchWidth: true })}
     />
+  );
+}
+
+/**
+ * 세로쓰기(縦組み) 텍스트 노드 — studio-vertical-text.ts 코어가 계산한 열/런 배치를 Konva 노드로
+ * 옮긴다. 한 줄짜리 KText로는 표현할 수 없는 것들(라틴/숫자 런의 90° 회전, 、。의 우상단 이동,
+ * 열 단위 줄바꿈)이 있어 Group + 런별 노드로 그린다. 연속 직립 글자는 코어가 하나의 런으로 합쳐
+ * 주므로 보통 열마다 노드 1개면 끝난다.
+ *
+ * 상자 대응(CSS 논리 속성 규약): 세로쓰기에서 줄바꿈을 결정하는 축은 **열 길이(세로)** 이므로
+ * `el.width`(요소가 가진 유일한 상자 치수 = inline size)를 열 길이 예산으로 읽는다. CSS의
+ * `writing-mode: vertical-rl`에서 inline-size가 물리적 높이에 대응하는 것과 같은 매핑이다.
+ * 블록의 좌상단을 (el.x, el.y)에 두는 것은 다른 모든 요소와 동일하며, 레거시
+ * `formatVerticalText` 근사가 만들던 배치(마지막 열이 x=0에서 시작)와도 같은 방향이다.
+ */
+function StudioKonvaVerticalTextNode({
+  el,
+  innerRef,
+  interactionProps,
+  onCommitTransform,
+}: {
+  el: Extract<El, { type: "text" }>;
+  innerRef: (node: Konva.Node | null) => void;
+  interactionProps: Record<string, unknown>;
+  onCommitTransform: StudioKonvaTextInteractionProps["onCommitTransform"];
+}) {
+  const fontFamily = el.font ?? "Pretendard, sans-serif";
+  const fontStyle = el.fontStyle ?? "bold";
+  const layout = verticalTextLayout({
+    text: el.text,
+    fontSize: el.fontSize,
+    // 세로쓰기 기본 행간은 1.4 — 가로쓰기 기본값 1은 열이 서로 맞닿아 읽을 수 없다(말풍선의
+    // 세로쓰기 기본값 `el.vertical ? 1.4 : …`와 같은 값을 쓴다).
+    lineHeight: el.lineHeight ?? 1.4,
+    letterSpacing: el.letterSpacing ?? 0,
+    fontFamily,
+    fontStyle,
+    maxColumnLength: el.width,
+    blockAlign: verticalBlockAlign(el.align),
+  });
+  const gradientSpec =
+    el.fillType === "gradient"
+      ? (el.gradient ?? legacyTextGradientToSpec(el.gradientColorStart, el.gradientColorEnd, el.gradientDirection))
+      : null;
+
+  return (
+    <KGroup
+      studioElementId={el.id}
+      key={el.id}
+      ref={innerRef}
+      x={el.x}
+      y={el.y}
+      // Group의 width/height는 렌더에 쓰이지 않지만 StudioPage commitTextTransformEnd가
+      // node.width()로 새 el.width를 계산하므로 가로쓰기와 같은 의미(inline size)를 유지한다.
+      width={el.width}
+      height={layout.height}
+      rotation={el.rotation}
+      opacity={el.opacity ?? 1}
+      {...toKonvaSkewAttrs(el)}
+      {...interactionProps}
+      onTransformEnd={(event: Konva.KonvaEventObject<Event>) =>
+        onCommitTransform(el.id, el.fontSize, event, { minFontSize: 10, patchWidth: true })
+      }
+    >
+      {layout.columns.flatMap((column) =>
+        column.items.map((item, itemIndex) => {
+          const { boxWidth, lineHeight } = verticalTextItemGeometry(item, el.fontSize);
+          return (
+            <KText
+              key={`${column.index}-${itemIndex}`}
+              text={item.text}
+              x={item.x}
+              y={item.y}
+              rotation={item.rotation}
+              {...(item.rotation === 0
+                ? // 열 폭(1em) 상자에 글자를 가운데로. wrap="none" — 이 상자는 이미 열 코어가
+                  // 정한 조판 결과라 Konva가 다시 줄바꿈하면 안 된다(폭이 1em보다 넓은 이모지 등).
+                  { width: boxWidth, align: "center" as const, wrap: "none" as const }
+                : {})}
+              fontSize={el.fontSize}
+              fontFamily={fontFamily}
+              fontStyle={fontStyle}
+              lineHeight={lineHeight}
+              letterSpacing={item.rotation === 90 ? (el.letterSpacing ?? 0) : 0}
+              fill={gradientSpec ? undefined : el.fill}
+              {...(gradientSpec
+                ? konvaGradientProps(gradientSpec, {
+                    // 그라데이션은 블록 전체 기준 — 자식 로컬 좌표로 원점을 옮겨 이어붙인다.
+                    x: -item.x,
+                    y: -item.y,
+                    width: Math.max(1, layout.width),
+                    height: Math.max(1, layout.height),
+                  })
+                : {})}
+              stroke={el.stroke}
+              strokeWidth={el.strokeWidth ?? 0}
+              fillAfterStrokeEnabled
+              lineJoin="round"
+              shadowColor={el.shadowColor}
+              shadowBlur={el.shadowBlur}
+              shadowOffsetX={el.shadowOffsetX}
+              shadowOffsetY={el.shadowOffsetY}
+              shadowOpacity={el.shadowOpacity}
+              shadowEnabled={!!el.shadowColor && (el.shadowOpacity ?? 0) > 0}
+            />
+          );
+        }),
+      )}
+    </KGroup>
   );
 }
 

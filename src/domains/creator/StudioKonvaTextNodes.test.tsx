@@ -3,7 +3,6 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { formatVerticalText } from "./studio-bubble-text-runtime";
 import { buildTextPathData, normalizeTextPath } from "./studio-text-path";
 import {
   StudioKonvaStickerNode,
@@ -13,6 +12,7 @@ import {
 import type { El } from "./studio-element-model";
 
 const konvaCapture = vi.hoisted(() => ({
+  groups: [] as Record<string, unknown>[],
   textPaths: [] as Record<string, unknown>[],
   texts: [] as Record<string, unknown>[],
 }));
@@ -26,7 +26,15 @@ vi.mock("react-konva/lib/ReactKonvaCore", async () => {
     });
     return Component;
   };
+  const container = (target: Record<string, unknown>[]) => {
+    const Component = forwardRef<unknown, Record<string, unknown>>(({ children, ...props }, ref) => {
+      target.push({ ...props, ref });
+      return children as never;
+    });
+    return Component;
+  };
   return {
+    Group: container(konvaCapture.groups),
     Text: primitive(konvaCapture.texts),
     TextPath: primitive(konvaCapture.textPaths),
   };
@@ -85,6 +93,7 @@ function latest<T>(values: readonly T[], label: string): T {
 }
 
 beforeEach(() => {
+  konvaCapture.groups.length = 0;
   konvaCapture.textPaths.length = 0;
   konvaCapture.texts.length = 0;
 });
@@ -142,19 +151,49 @@ describe("StudioKonvaTextNode", () => {
     );
   });
 
-  it("formats vertical text before rendering and measuring its gradient bounds", () => {
-    const source = "가나\nABC";
+  it("typesets vertical text as right-to-left columns with rotated latin runs", () => {
+    const props = commonProps();
     render(
       <StudioKonvaTextNode
-        {...commonProps()}
-        el={textElement({ text: source, vertical: true })}
+        {...props}
+        el={textElement({ align: "left", fontSize: 20, text: "가나ABC。\n다", vertical: true })}
       />,
     );
 
-    expect(latest(konvaCapture.texts, "vertical text")).toMatchObject({
-      lineHeight: 1,
-      text: formatVerticalText(source),
-      width: 220,
+    const group = latest(konvaCapture.groups, "vertical group");
+    expect(group).toMatchObject({ studioElementId: "text-1", width: 220, x: 10, y: 20 });
+    expect(group.ref).toBe(props.innerRef);
+
+    expect(
+      konvaCapture.texts.map((text) => [text.text, text.rotation, text.x]),
+    ).toEqual([
+      // 1열(오른쪽, centerX=42): 직립 런 → 회전 런 → 우상단(+0.5em)으로 옮긴 마침표.
+      ["가\n나", 0, 32],
+      ["ABC", 90, 32],
+      ["。", 0, 42],
+      // 2열(왼쪽, centerX=14): 원문의 두 번째 줄.
+      ["다", 0, 4],
+    ]);
+    // 회전 런은 앞선 직립 두 글자(20px×2) 다음에 시작하고, 마침표는 그 런의 폭만큼 더 내려간
+    // 뒤 0.5em 위로 올라간다(가로쓰기 좌하단 → 세로쓰기 우상단).
+    expect(konvaCapture.texts.map((text) => text.y)).toEqual([0, 40, 63, 0]);
+  });
+
+  it("commits vertical transforms through the same width-patching contract", () => {
+    const props = commonProps();
+    render(
+      <StudioKonvaTextNode {...props} el={textElement({ text: "가나", vertical: true })} />,
+    );
+
+    const group = latest(konvaCapture.groups, "vertical group") as {
+      onTransformEnd: (event: unknown) => void;
+    };
+    const event = { target: "vertical-node" };
+    group.onTransformEnd(event);
+
+    expect(props.onCommitTransform).toHaveBeenCalledWith("text-1", 32, event, {
+      minFontSize: 10,
+      patchWidth: true,
     });
   });
 

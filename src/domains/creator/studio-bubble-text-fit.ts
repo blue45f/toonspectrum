@@ -25,7 +25,16 @@
  * 아주 병적인 입력(예: 특정 폭에서만 우연히 한 단어가 걸치는 경우)에서 아주 드물게 이 가정이
  * 깨질 수 있으나, 기존 studio-pdf-contact-sheet.ts의 fitLabelToWidth도 동일한 가정을 이미 쓰고
  * 있고 실사용 범위에서 문제된 적이 없다.
+ *
+ * 세로쓰기(`vertical: true`): 판정만 studio-vertical-text.ts의 `layoutVerticalText`로 갈아끼운다.
+ * 세로쓰기에서 줄바꿈을 결정하는 축은 **세로축(열 길이 ≤ 상자 높이)**이고, 넘칠지 말지는 그렇게
+ * 만들어진 **열 수 × 열 간격이 상자 폭 안에 들어오는가**로 판정된다 — 가로쓰기와 폭/높이의
+ * 역할이 정확히 뒤바뀐다. 이진 탐색의 단조성 가정은 그대로 성립한다(폰트가 작아질수록 열 길이도
+ * 열 간격도 함께 줄어 열 수는 늘지 않고 블록 폭은 단조 비증가). `vertical`이 없으면 기존 경로가
+ * 한 글자도 바뀌지 않는다(하위호환).
  */
+
+import { layoutVerticalText, type VerticalBlockAlign } from "./studio-vertical-text";
 
 export interface BubbleTextMeasurer {
   /** text를 (fontPx, fontFamily, fontStyle)로 그렸을 때의 렌더 폭(px). letterSpacing은 무시한다
@@ -164,12 +173,26 @@ export interface BubbleFontFitInput {
    * 이어질 수 있었다(검증 단계에서 발견·수정).
    */
   lineHeight: number;
+  /**
+   * 세로쓰기 조판으로 판정할지 여부. 미설정/false면 이 모듈의 기존 가로쓰기 경로가 그대로
+   * 쓰인다(하위호환 — 한 글자도 달라지지 않는다). true면 studio-vertical-text.ts의
+   * `layoutVerticalText`가 세로축으로 열을 끊고, 그 결과 블록 폭이 상자 폭에 맞는지로 판정한다.
+   * 이때 `text`에는 **원문 그대로** 넘겨야 한다(레거시 `formatVerticalText` 전치 문자열이 아니라).
+   */
+  vertical?: boolean;
+  /** 세로쓰기 전용 — 글자 사이 세로 간격(px). 가로쓰기 경로는 이 값을 쓰지 않는다(측정기가 무시). */
+  letterSpacing?: number;
+  /** 세로쓰기 전용 — 열 안 정렬(가로쓰기 align의 세로축 대응). 판정 결과에는 영향이 없다. */
+  blockAlign?: VerticalBlockAlign;
 }
 
 export interface BubbleFontFitResult {
   /** 선택된 폰트 크기(px) — [minFontSize, maxFontSize] 안, FONT_SEARCH_STEP 그리드에 스냅. */
   fontSize: number;
-  /** 참고/디버그용 — 실제 캔버스 렌더는 Konva Text 자체 워드랩에 맡긴다(약간 다를 수 있음). */
+  /**
+   * 참고/디버그용 — 가로쓰기는 워드랩 줄 배열(실제 캔버스 렌더는 Konva Text 자체 워드랩에
+   * 맡기므로 약간 다를 수 있다), 세로쓰기는 **열 배열**(오른쪽 열부터, 각 열의 글자를 이어붙인 것).
+   */
   lines: string[];
   /** minFontSize에서도 못 맞으면 true — 호출부가 경고 표시를 보여줄 수 있다. */
   overflow: boolean;
@@ -177,7 +200,18 @@ export interface BubbleFontFitResult {
 
 /** fontSize 하나가 박스 안에 들어가는지 판정 — 패딩은 그 fontSize 자체 기준(모듈 상단 docstring). */
 function fitsAtFontSize(
-  input: Pick<BubbleFontFitInput, "text" | "boxWidth" | "boxHeight" | "fontFamily" | "fontStyle" | "lineHeight">,
+  input: Pick<
+    BubbleFontFitInput,
+    | "text"
+    | "boxWidth"
+    | "boxHeight"
+    | "fontFamily"
+    | "fontStyle"
+    | "lineHeight"
+    | "vertical"
+    | "letterSpacing"
+    | "blockAlign"
+  >,
   fontSize: number,
   measurer: BubbleTextMeasurer
 ): { ok: boolean; lines: string[] } {
@@ -187,6 +221,24 @@ function fitsAtFontSize(
   const vPad = bubbleVerticalPadding(fontSize);
   const availW = Math.max(4, input.boxWidth - hPad * 2);
   const availH = Math.max(4, (input.boxHeight - (vPad.top + vPad.bottom)) * HEIGHT_SAFETY_MARGIN);
+  if (input.vertical) {
+    // 세로쓰기 — 열은 세로축(availH)으로 끊고, 그렇게 나온 블록 폭이 availW 안이면 맞는 것이다.
+    const layout = layoutVerticalText(
+      {
+        text: input.text || " ",
+        fontSize,
+        lineHeight,
+        letterSpacing: input.letterSpacing,
+        fontFamily: input.fontFamily,
+        fontStyle,
+        maxColumnLength: availH,
+        blockAlign: input.blockAlign,
+      },
+      measurer
+    );
+    const columns = layout.columns.map((column) => column.items.map((item) => item.text.split("\n").join("")).join(""));
+    return { ok: !layout.overflow && layout.width <= availW, lines: columns };
+  }
   const lines = wrapBubbleTextLines(input.text || " ", availW, fontSize, input.fontFamily, fontStyle, measurer);
   const blockHeight = lines.length * fontSize * lineHeight;
   return { ok: blockHeight <= availH, lines };

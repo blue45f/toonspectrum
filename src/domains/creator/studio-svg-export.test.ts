@@ -1298,10 +1298,52 @@ describe("텍스트 직렬화", () => {
     expect(svg).toMatch(/<textPath href="#stp\d+" startOffset="50%" text-anchor="middle">/);
   });
 
-  it("세로쓰기 — formatVerticalText 열 재배열(우→좌)을 그대로 담는다", () => {
-    const { svg } = exportPageToSvg(page([textEl({ text: "ab\ncd", vertical: true, align: "left" })]));
-    expect(svg).toContain(">c  a</tspan>");
-    expect(svg).toContain(">d  b</tspan>");
+  it("세로쓰기 — 열을 우→좌로 쌓고 각 열을 <g transform>으로 옮긴다", () => {
+    const { svg } = exportPageToSvg(
+      page([textEl({ text: "안녕\n웹툰", vertical: true, align: "left", lineHeight: 1.4, letterSpacing: 0 })])
+    );
+    // 1열(오른쪽, centerX=42) → 2열(왼쪽, centerX=14). 각 열은 글자를 "\n"으로 쌓은 한 노드.
+    expect(svg).toContain('<g transform="translate(32 0)">');
+    expect(svg).toContain('<g transform="translate(4 0)">');
+    expect(svg).toContain(">안</tspan>");
+    expect(svg).toContain(">녕</tspan>");
+    expect(svg).toContain(">웹</tspan>");
+    expect(svg).toContain(">툰</tspan>");
+    expect(svg).not.toContain("rotate(90)");
+  });
+
+  it("세로쓰기 — 라틴/숫자 런은 90° 회전, 마침표는 우상단으로 옮긴다", () => {
+    const { svg } = exportPageToSvg(
+      page([textEl({ text: "가OK9나。", vertical: true, align: "left", lineHeight: 1.4, letterSpacing: 0 })])
+    );
+    // 한 열(centerX=14, x=4) — 직립 "가" 다음 20px 지점에서 회전 런이 시작한다.
+    expect(svg).toContain('<g transform="translate(4 20) rotate(90)">');
+    expect(svg).toContain(">OK9</tspan>");
+    // 마침표는 (+0.5em, −0.5em): x는 4+10, y는 직립+회전 런(20+33) 다음에서 10px 위로.
+    expect(svg).toContain('<g transform="translate(14 63)">');
+    expect(svg).toContain(">。</tspan>");
+  });
+
+  it("세로쓰기 — 라틴 폭 근사를 정직하게 고지하고, 한글만이면 고지하지 않는다", () => {
+    const mixed = exportPageToSvg(page([textEl({ text: "가OK나", vertical: true })]));
+    expect(
+      mixed.skipped.some((s) => s.id === "t1" && s.mode === "approximated" && s.label.includes("세로쓰기"))
+    ).toBe(true);
+
+    const hangulOnly = exportPageToSvg(page([textEl({ text: "가나다", vertical: true })]));
+    expect(hangulOnly.skipped.some((s) => s.id === "t1" && s.label.includes("세로쓰기"))).toBe(false);
+  });
+
+  it("세로쓰기 — 열 길이 예산(el.width)을 넘기면 새 열로 넘긴다", () => {
+    const { svg } = exportPageToSvg(
+      page([
+        textEl({ text: "가나다라마바", vertical: true, align: "left", width: 60, lineHeight: 1.4, letterSpacing: 0 }),
+      ])
+    );
+    // 60px = 20px 글자 3개 → 2열. 열 폭 28px 이라 블록 폭 56px, 오른쪽 열이 x=32.
+    expect(svg).toContain('<g transform="translate(32 0)">');
+    expect(svg).toContain('<g transform="translate(4 0)">');
+    expect(svg.match(/<g transform="translate\(\d+(?:\.\d+)? 0\)">/gu)).toHaveLength(2);
   });
 
   it("자동 줄바꿈이 필요한 긴 문장은 근사로 정직하게 고지한다", () => {

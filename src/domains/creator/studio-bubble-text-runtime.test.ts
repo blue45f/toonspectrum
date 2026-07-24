@@ -8,7 +8,11 @@ import {
   BUBBLE_TEXT_MEASURER,
   bubbleAutoShrinkPreview,
   formatVerticalText,
+  verticalBlockAlign,
+  verticalTextItemGeometry,
+  verticalTextLayout,
 } from "./studio-bubble-text-runtime";
+import { layoutVerticalText } from "./studio-vertical-text";
 
 import type { BubbleEl } from "./studio-element-model";
 
@@ -38,6 +42,67 @@ describe("formatVerticalText", () => {
 
   it("orders multiline columns from right to left and pads shorter columns", () => {
     expect(formatVerticalText("가나\nABC")).toBe("A  가\nB  나\nC  　");
+  });
+});
+
+describe("verticalTextLayout", () => {
+  const layoutInput = {
+    text: "가나ABC。\n다",
+    fontSize: 20,
+    lineHeight: 1.4,
+    letterSpacing: 0,
+    fontFamily: "Pretendard, sans-serif",
+    fontStyle: "bold",
+    maxColumnLength: 200,
+  };
+
+  it("binds the shared canvas measurer to the pure core", () => {
+    expect(verticalTextLayout(layoutInput)).toEqual(layoutVerticalText(layoutInput, BUBBLE_TEXT_MEASURER));
+  });
+
+  it("produces right-to-left columns with a rotated latin run", () => {
+    const layout = verticalTextLayout(layoutInput);
+
+    expect(layout.columns).toHaveLength(2);
+    expect(layout.columns[0]!.centerX).toBeGreaterThan(layout.columns[1]!.centerX);
+    expect(layout.columns[0]!.items.map((item) => [item.text, item.rotation])).toEqual([
+      ["가\n나", 0],
+      ["ABC", 90],
+      ["。", 0],
+    ]);
+  });
+});
+
+describe("verticalBlockAlign / verticalTextItemGeometry", () => {
+  it("maps the horizontal align field onto the column axis", () => {
+    expect(verticalBlockAlign(undefined)).toBe("start");
+    expect(verticalBlockAlign("left")).toBe("start");
+    expect(verticalBlockAlign("center")).toBe("center");
+    expect(verticalBlockAlign("right")).toBe("end");
+  });
+
+  it("turns the per-glyph advance into a line-height multiplier for upright runs", () => {
+    const spaced = verticalTextLayout({
+      text: "가나",
+      fontSize: 20,
+      lineHeight: 1.4,
+      letterSpacing: 6,
+      fontFamily: "Pretendard, sans-serif",
+    });
+    expect(verticalTextItemGeometry(spaced.columns[0]!.items[0]!, 20)).toEqual({
+      boxWidth: 20,
+      lineHeight: 1.3, // (20 + 6) / 20
+    });
+  });
+
+  it("keeps rotated runs on a single line box", () => {
+    const layout = verticalTextLayout({
+      text: "ABC",
+      fontSize: 20,
+      lineHeight: 1.4,
+      fontFamily: "Pretendard, sans-serif",
+    });
+    expect(verticalTextItemGeometry(layout.columns[0]!.items[0]!, 20)).toEqual({ boxWidth: 20, lineHeight: 1 });
   });
 });
 

@@ -130,6 +130,84 @@ describe("fitBubbleFontSize", () => {
   });
 });
 
+describe("fitBubbleFontSize — 세로쓰기", () => {
+  // 세로쓰기는 판정 축이 뒤바뀐다: 열은 **상자 높이**로 끊고, 그렇게 나온 열 수 × 열 간격이
+  // **상자 폭** 안에 들어오는지로 맞는지를 정한다(모듈 docstring 참고).
+  const verticalInput = {
+    boxWidth: 120,
+    boxHeight: 200,
+    maxFontSize: 24,
+    fontFamily: "Pretendard, sans-serif",
+    lineHeight: 1.4,
+    vertical: true as const,
+  };
+
+  it("가로쓰기 경로를 바꾸지 않는다 — vertical 미설정/false는 완전히 동일한 결과", () => {
+    const text = "웹툰 대사가 이 정도로 길게 들어있는 말풍선 텍스트 예시입니다";
+    const legacy = fitBubbleFontSize(
+      { text, boxWidth: 260, boxHeight: 140, maxFontSize: 24, fontFamily: "Pretendard, sans-serif", lineHeight: 1.2 },
+      fakeMeasurer()
+    );
+    const explicitFalse = fitBubbleFontSize(
+      {
+        text,
+        boxWidth: 260,
+        boxHeight: 140,
+        maxFontSize: 24,
+        fontFamily: "Pretendard, sans-serif",
+        lineHeight: 1.2,
+        vertical: false,
+      },
+      fakeMeasurer()
+    );
+    expect(explicitFalse).toEqual(legacy);
+  });
+
+  it("짧은 대사는 상한 폰트를 그대로 쓰고 열 배열을 돌려준다", () => {
+    const result = fitBubbleFontSize({ ...verticalInput, text: "가나다" }, fakeMeasurer());
+    expect(result.fontSize).toBe(24);
+    expect(result.overflow).toBe(false);
+    expect(result.lines).toEqual(["가나다"]);
+  });
+
+  it("열이 늘어 상자 폭을 넘기면 폰트를 줄인다(세로축으로 끊고 가로로 판정)", () => {
+    const text = "세로쓰기 대사가 길어지면 열이 자꾸 늘어난다".repeat(2);
+    const result = fitBubbleFontSize({ ...verticalInput, text }, fakeMeasurer());
+    expect(result.fontSize).toBeLessThan(24);
+    expect(result.fontSize).toBeGreaterThanOrEqual(BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT);
+  });
+
+  it("좁고 낮은 상자에서는 하한까지 줄여도 못 맞춰 overflow를 보고한다", () => {
+    const result = fitBubbleFontSize(
+      { ...verticalInput, boxWidth: 60, boxHeight: 60, minFontSize: 12, text: "세로쓰기 대사".repeat(10) },
+      fakeMeasurer()
+    );
+    expect(result.fontSize).toBe(12);
+    expect(result.overflow).toBe(true);
+  });
+
+  it("같은 대사라도 상자가 넓어지면 같거나 더 큰 폰트를 고른다(단조성)", () => {
+    const text = "세로쓰기 자동 축소 단조성 확인용 대사입니다";
+    const narrow = fitBubbleFontSize({ ...verticalInput, boxWidth: 90, boxHeight: 160, text }, fakeMeasurer());
+    const wide = fitBubbleFontSize({ ...verticalInput, boxWidth: 260, boxHeight: 320, text }, fakeMeasurer());
+    expect(wide.fontSize).toBeGreaterThanOrEqual(narrow.fontSize);
+  });
+
+  it("결정적이다 — 같은 입력은 항상 같은 결과", () => {
+    const text = "가나다ABC라마。";
+    const a = fitBubbleFontSize({ ...verticalInput, text }, fakeMeasurer());
+    const b = fitBubbleFontSize({ ...verticalInput, text }, fakeMeasurer());
+    expect(a).toEqual(b);
+  });
+
+  it("자간이 커지면 열이 빨리 차서 같거나 더 작은 폰트를 고른다", () => {
+    const text = "세로쓰기 자간에 따른 자동 축소 확인 대사";
+    const tight = fitBubbleFontSize({ ...verticalInput, text, letterSpacing: 0 }, fakeMeasurer());
+    const loose = fitBubbleFontSize({ ...verticalInput, text, letterSpacing: 8 }, fakeMeasurer());
+    expect(loose.fontSize).toBeLessThanOrEqual(tight.fontSize);
+  });
+});
+
 describe("createCanvasBubbleTextMeasurer", () => {
   // vitest.config.ts는 environment:"node"라 document가 정의돼 있지 않다 — 즉 이 스위트 안에서는
   // 항상 SSR/캔버스 미지원 폴백 경로("글자당 fontPx*0.55px" 근사)만 결정적으로 탄다. 실제 브라우저
