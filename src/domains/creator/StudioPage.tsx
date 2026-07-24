@@ -1056,6 +1056,7 @@ import {
   commitPolyLassoSession,
   commitSelectionDrag,
   emptyPixelSelection,
+  extractSelectionToCanvas,
   isSelectionAdjustNoop,
   isSelectionContentTransformNoop,
   isSelectionUsable,
@@ -20139,6 +20140,89 @@ function StudioCuttoonEditor() {
     }
   }
 
+  // ── 선택 픽셀 → 새 레이어로 복사/오려내기(포토샵 ⌘J / ⇧⌘J 계열) ──
+  // 추출은 원본 자연 해상도에서 해 페더의 부분 알파를 그대로 보존하고, 새 레이어는 원본 요소의
+  // 표시 좌표계(회전·반전 포함)로 환산해 "있던 자리"에 그대로 놓는다. cut 은 원본에서 같은
+  // 영역을 지운 결과와 새 레이어를 한 번의 commit 으로 묶어 ⌘Z 한 번에 되돌아가게 한다.
+  async function extractPixelSelectionToLayer(mode: "copy" | "cut") {
+    if (pixelBusy) return;
+    if (selected?.type !== "image" || !pixelSel || !isSelectionUsable(pixelSel)) return;
+    const target = selected;
+    if (activeSurfaceReviewLocked || isEffectivelyLocked(target, groups)) return;
+    const sel = pixelSel;
+    const bounds = selectionBoundsNorm(sel);
+    if (!bounds) return;
+    const mutationTicket = captureStudioMutationTicket();
+    setPixelBusy(true);
+    try {
+      const img = await loadStudioPixelEditImage(target.src);
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      const maskPlan = buildSelectionMaskPlan(sel, w, h, {
+        featherScale: target.width > 0 ? w / target.width : 1,
+        flipX: target.flipped,
+        flipY: target.flippedY,
+      });
+      if (!maskPlan) return;
+      const mask = rasterizeSelectionMask(maskPlan, createStudioPixelEditCanvas);
+      const extracted =
+        mask && extractSelectionToCanvas(img, w, h, mask, bounds, createStudioPixelEditCanvas);
+      if (!extracted) throw new Error("선택 영역을 추출하지 못했습니다.");
+      const src = (extracted.canvas as HTMLCanvasElement).toDataURL("image/png");
+      // 원본 픽셀 박스 → 표시 정규화(반전 되돌림) → 페이지 좌표. 회전은 프레임이 흡수한다.
+      const nx = target.flipped ? 1 - (extracted.cropX + extracted.cropWidth) / w : extracted.cropX / w;
+      const ny = target.flippedY ? 1 - (extracted.cropY + extracted.cropHeight) / h : extracted.cropY / h;
+      const corner = normalizedPointToCanvas({ x: nx, y: ny }, {
+        x: target.x,
+        y: target.y,
+        width: target.width,
+        height: target.height,
+        rotation: target.rotation,
+      });
+      const scaleX = w > 0 ? target.width / w : 1;
+      const scaleY = h > 0 ? target.height / h : 1;
+      const layer: ImageEl = {
+        id: uid(),
+        type: "image",
+        src,
+        x: corner.x,
+        y: corner.y,
+        width: Math.max(1, extracted.cropWidth * scaleX),
+        height: Math.max(1, extracted.cropHeight * scaleY),
+        rotation: target.rotation,
+        ...(target.flipped ? { flipped: true } : {}),
+        ...(target.flippedY ? { flippedY: true } : {}),
+      };
+      let cutSrc: string | null = null;
+      if (mode === "cut") {
+        const cleared = applySelectionAdjustToCanvas(
+          img,
+          w,
+          h,
+          mask,
+          planSelectionAdjust("delete"),
+          createStudioPixelEditCanvas
+        );
+        if (!cleared) throw new Error("원본에서 선택 영역을 지우지 못했습니다.");
+        cutSrc = (cleared as HTMLCanvasElement).toDataURL("image/png");
+      }
+      if (!canApplyStudioMutation(mutationTicket)) return;
+      if (cutSrc !== null && isLatestLayerContentMutationLocked(target.id)) return;
+      const base = cutSrc === null
+        ? elements
+        : elements.map((el) => (el.id === target.id ? ({ ...el, src: cutSrc } as El) : el));
+      if (!commit([...base, layer])) return;
+      setSelectedId(layer.id);
+      setTool("select");
+      setError(null);
+    } catch (err) {
+      console.error("Failed to extract pixel selection:", err);
+      setError(err instanceof Error ? err.message : "선택 영역을 새 레이어로 만들지 못했습니다.");
+    } finally {
+      setPixelBusy(false);
+    }
+  }
+
   // ── 선택 변형 — 선택 안 픽셀을 이동/회전/스케일/반전하고 마퀴 기하도 동일 변환으로 맞춤.
   async function applyPixelSelectionContentTransform(transform: SelectionContentTransform) {
     if (pixelBusy || isSelectionContentTransformNoop(transform)) return;
@@ -25824,8 +25908,53 @@ function StudioCuttoonEditor() {
     setPixelForceCircle(kind === "circle");
     setPixelTool(kind === "circle" ? "ellipse" : "rect");
   }
+  /**
+   * 픽셀 도구 무장 전 대상 확보(2026-07-24) — 편집 가능한 이미지가 이미 선택돼 있으면 그대로 쓰고,
+   * 아니면 페이지에 편집 가능한 이미지가 "딱 한 장"일 때 그것을 자동 선택한다(가장 흔한 상황에서
+   * 버튼이 그냥 눌리게 한다). 여러 장이면 어느 것을 쓸지 알 수 없으므로 조용히 무시하지 않고
+   * 무엇을 해야 하는지 안내한다 — 예전에는 아무 반응이 없어 "고장난 버튼"처럼 보였다.
+   */
+  function ensurePixelToolTarget(toolLabel: string): boolean {
+    if (activeSurfaceReviewLocked) {
+      setError("현재 작업면의 검토 잠금을 먼저 해제하세요.");
+      return false;
+    }
+    if (selected?.type === "image") {
+      if (selectedContentMutationLocked) {
+        setError("선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요.");
+        return false;
+      }
+      return true;
+    }
+    const candidates = elements.filter(
+      (el): el is ImageEl =>
+        el.type === "image" && !isEffectivelyHidden(el, groups) && !isEffectivelyLocked(el, groups)
+    );
+    if (candidates.length === 1) {
+      setMarqueeIds([]);
+      setSelectedId(candidates[0]!.id);
+      setError(null);
+      return true;
+    }
+    setError(
+      candidates.length === 0
+        ? `${toolLabel}은(는) 이미지 레이어에 적용해요. 이미지를 먼저 추가하세요.`
+        : `${toolLabel} 대상을 먼저 고르세요 — 편집 가능한 이미지가 ${candidates.length}장 있어요.`
+    );
+    return false;
+  }
+  /** 픽셀 도구 버튼을 눌러볼 수 있는 상태인지(대상 자동 확보 가능 포함) — rail 비활성 판정용. */
+  const pixelToolTargetAvailable =
+    !activeSurfaceReviewLocked
+    && (
+      (selected?.type === "image" && !selectedContentMutationLocked)
+      || (selected?.type !== "image"
+        && elements.filter(
+          (el) => el.type === "image" && !isEffectivelyHidden(el, groups) && !isEffectivelyLocked(el, groups)
+        ).length === 1)
+    );
   function toggleSmudgeTool() {
-    if (selected?.type !== "image" || selectedContentMutationLocked || smudgeBusy) return;
+    if (smudgeBusy || !ensurePixelToolTarget("혼합(스머지)")) return;
     const next = !smudgeActive;
     disarmAllPixelTools();
     if (next) {
@@ -25835,7 +25964,7 @@ function StudioCuttoonEditor() {
     }
   }
   function toggleLiquifyTool() {
-    if (selected?.type !== "image" || selectedContentMutationLocked || liquifyBusy) return;
+    if (liquifyBusy || !ensurePixelToolTarget("리퀴파이")) return;
     const next = !liquifyActive;
     disarmAllPixelTools();
     if (next) {
@@ -25845,7 +25974,7 @@ function StudioCuttoonEditor() {
     }
   }
   function toggleDodgeBurnTool() {
-    if (selected?.type !== "image" || selectedContentMutationLocked || dodgeBurnBusy) return;
+    if (dodgeBurnBusy || !ensurePixelToolTarget("닷지/번")) return;
     const next = !dodgeBurnActive;
     disarmAllPixelTools();
     if (next) {
@@ -25855,7 +25984,7 @@ function StudioCuttoonEditor() {
     }
   }
   function toggleWetMixTool() {
-    if (selected?.type !== "image" || selectedContentMutationLocked || wetMixBusy) return;
+    if (wetMixBusy || !ensurePixelToolTarget("혼색 브러시")) return;
     const next = !wetMixActive;
     disarmAllPixelTools();
     if (next) {
@@ -28275,6 +28404,7 @@ function StudioCuttoonEditor() {
     announceDrawingShortcut,
     applyBgPreset,
     applyContentAwareFill,
+    extractPixelSelectionToLayer,
     applyCropToSelectedImage,
     applyDynamicsPreset,
     applyMagicResizePreset,
@@ -28997,9 +29127,12 @@ function StudioCuttoonEditor() {
       className={cn(
         // Default draw-app shell: fill the viewport without site chrome padding.
         "flex min-h-0 flex-col bg-canvas text-fg",
-        !isFullscreen && !maximized && !canvasOnlyMode && !mobileImmersive &&
+        // 전체화면도 평소와 같은 "뷰포트 높이 고정 + 내부만 스크롤" 셸을 쓴다. 예전에는
+        // min-h-screen + overflow-y-auto 였는데, 높이 상한이 없어 콘텐츠가 넘치면 셸 자체가
+        // 스크롤되면서 상단 메뉴바가 화면 밖으로 밀려났다(전체화면에서 메뉴 사라짐 버그).
+        !maximized && !canvasOnlyMode && !mobileImmersive &&
           "h-[100dvh] max-h-[100dvh] overflow-hidden",
-        isFullscreen && "min-h-screen overflow-y-auto bg-canvas",
+        isFullscreen && "bg-canvas",
         maximized && !isMobile && !mobileImmersive &&
           "fixed inset-0 z-[60] overflow-y-auto bg-canvas",
         canvasOnlyMode && !isMobile &&
@@ -29667,6 +29800,7 @@ function StudioCuttoonEditor() {
         {/* Left vertical toolbar — desktop only; mobile uses bottom dock / horizontal belt */}
         <StudioLeftToolRail
           activeSurfaceReviewLocked={activeSurfaceReviewLocked}
+          pixelToolTargetAvailable={pixelToolTargetAvailable}
           advancedFillActive={advancedFillActive}
           advancedFillUnsupportedReason={advancedFillUnsupportedReason}
           appSettings={appSettings}

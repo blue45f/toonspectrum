@@ -80,6 +80,8 @@ function renderPanel(overrides: Partial<Parameters<typeof StudioSelectionToolsPa
       onContentTransform={vi.fn()}
       onApplyAdjust={vi.fn()}
       onContentAwareFill={vi.fn()}
+      onCopyToNewLayer={vi.fn()}
+      onCutToNewLayer={vi.fn()}
       {...overrides}
     />
   );
@@ -138,7 +140,8 @@ describe("StudioSelectionToolsPanel", () => {
 
     const buttonCount = html.match(/<button\b/gu)?.length ?? 0;
     const richHintTargetCount = html.match(/data-hint-id=/gu)?.length ?? 0;
-    expect(buttonCount).toBe(36);
+    // 의도적 변경(2026-07-24): 선택 픽셀 → 새 레이어 복사/오려내기 버튼 2개 추가(36 → 38).
+    expect(buttonCount).toBe(38);
     expect(richHintTargetCount).toBe(buttonCount);
   });
 
@@ -229,8 +232,8 @@ describe("StudioSelectionToolsPanel", () => {
     const html = renderPanel({ busy: true });
     const busyReason = "다른 픽셀 작업을 적용하는 동안 기다려 주세요.";
 
-    expect(html.match(/data-hint-disabled="true"/gu)?.length).toBe(36);
-    expect(html.match(new RegExp(`data-unavailable-reason="${busyReason}"`, "gu"))?.length).toBe(36);
+    expect(html.match(/data-hint-disabled="true"/gu)?.length).toBe(38); // 의도적 변경(2026-07-24): 새 레이어 복사/오려내기 2개 추가
+    expect(html.match(new RegExp(`data-unavailable-reason="${busyReason}"`, "gu"))?.length).toBe(38); // 의도적 변경(2026-07-24): 새 레이어 복사/오려내기 2개 추가
   });
 });
 
@@ -254,7 +257,7 @@ describe("StudioSelectionToolsPanel — 색상 범위(Color Range)", () => {
     const html = renderPanel();
     expect(html).not.toContain("data-studio-color-range");
     expect(html).not.toContain("색상 범위");
-    expect(html.match(/<button\b/gu)?.length).toBe(36); // 기존 버튼 수 불변
+    expect(html.match(/<button\b/gu)?.length).toBe(38); // 기존 버튼 수 불변
   });
 
   it("renders sample chips, armed pick toggle, fuzziness slider, preview toggle, and apply", () => {
@@ -275,7 +278,7 @@ describe("StudioSelectionToolsPanel — 색상 범위(Color Range)", () => {
     // 새 버튼도 전부 리치 힌트 타깃과 1:1 — 기존 36개 + 색상 범위 6개(지우기+칩2+추출+미리보기+적용).
     const buttonCount = html.match(/<button\b/gu)?.length ?? 0;
     const hintTargetCount = html.match(/data-hint-id=/gu)?.length ?? 0;
-    expect(buttonCount).toBe(42);
+    expect(buttonCount).toBe(44); // 의도적 변경(2026-07-24): 새 레이어 복사/오려내기 2개 추가
     expect(hintTargetCount).toBe(buttonCount);
   });
 
@@ -308,7 +311,7 @@ describe("StudioSelectionToolsPanel — 색상 범위(Color Range)", () => {
     const html = renderPanel({ ...colorRangeProps, busy: true });
     const busyReason = "다른 픽셀 작업을 적용하는 동안 기다려 주세요.";
     // 기존 36개 + 색상 범위 힌트 타깃 6개 전부 busy 사유로 잠긴다.
-    expect(html.match(/data-hint-disabled="true"/gu)?.length).toBe(42);
-    expect(html.match(new RegExp(`data-unavailable-reason="${busyReason}"`, "gu"))?.length).toBe(42);
+    expect(html.match(/data-hint-disabled="true"/gu)?.length).toBe(44); // 의도적 변경(2026-07-24): 새 레이어 복사/오려내기 2개 추가
+    expect(html.match(new RegExp(`data-unavailable-reason="${busyReason}"`, "gu"))?.length).toBe(44); // 의도적 변경(2026-07-24): 새 레이어 복사/오려내기 2개 추가
   });
 });

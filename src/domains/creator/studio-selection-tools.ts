@@ -1595,3 +1595,57 @@ export function applySelectionAdjustToCanvas(
   out.ctx.drawImage(adjusted.canvas, 0, 0);
   return out.canvas;
 }
+
+/** 선택 픽셀 추출 결과 — 잘라낸 캔버스와 그 원본 픽셀 기준 박스(새 레이어 배치에 쓴다). */
+export type SelectionExtractResult = {
+  canvas: MaskCanvasLike & MaskImageSource;
+  cropX: number;
+  cropY: number;
+  cropWidth: number;
+  cropHeight: number;
+};
+
+/**
+ * 선택 영역 픽셀만 남겨 경계 박스로 잘라낸다("새 레이어로 복사/오려내기"의 추출 절반).
+ * 절차: (a) 원본을 그린 뒤 destination-in 으로 마스크 안만 남기고 (b) 경계 박스 크기의 캔버스에
+ * 음수 오프셋으로 옮겨 그려 크롭한다 — 페더의 부분 알파가 그대로 보존된다.
+ * boundsNorm 은 selectionBoundsNorm 의 0..1 박스이며, 픽셀로 환산 후 캔버스 안으로 클램프한다.
+ * 면적이 1px 미만이 되면 null(추출할 것이 없음). source/mask 는 같은 픽셀 크기라고 가정한다.
+ */
+export function extractSelectionToCanvas(
+  source: MaskImageSource,
+  width: number,
+  height: number,
+  mask: MaskImageSource,
+  boundsNorm: { x: number; y: number; w: number; h: number },
+  createCanvas: SelectionCanvasFactory
+): SelectionExtractResult | null {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
+  const w = Math.max(1, Math.round(width));
+  const h = Math.max(1, Math.round(height));
+  if (
+    !Number.isFinite(boundsNorm.x) || !Number.isFinite(boundsNorm.y)
+    || !Number.isFinite(boundsNorm.w) || !Number.isFinite(boundsNorm.h)
+  ) {
+    return null;
+  }
+  const left = Math.max(0, Math.min(w, Math.floor(boundsNorm.x * w)));
+  const top = Math.max(0, Math.min(h, Math.floor(boundsNorm.y * h)));
+  const right = Math.max(left, Math.min(w, Math.ceil((boundsNorm.x + boundsNorm.w) * w)));
+  const bottom = Math.max(top, Math.min(h, Math.ceil((boundsNorm.y + boundsNorm.h) * h)));
+  const cropWidth = right - left;
+  const cropHeight = bottom - top;
+  if (cropWidth < 1 || cropHeight < 1) return null;
+
+  const masked = createCanvas(w, h);
+  if (!masked) return null;
+  masked.ctx.drawImage(source, 0, 0);
+  masked.ctx.globalCompositeOperation = "destination-in";
+  masked.ctx.drawImage(mask, 0, 0);
+  masked.ctx.globalCompositeOperation = "source-over";
+
+  const out = createCanvas(cropWidth, cropHeight);
+  if (!out) return null;
+  out.ctx.drawImage(masked.canvas, -left, -top);
+  return { canvas: out.canvas, cropX: left, cropY: top, cropWidth, cropHeight };
+}

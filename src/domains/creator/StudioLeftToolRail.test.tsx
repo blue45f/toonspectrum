@@ -119,6 +119,7 @@ function createHandlers(): StudioLeftToolRailHandlers {
 function createProps(overrides: Partial<RailProps> = {}): RailProps {
   return {
     activeSurfaceReviewLocked: false,
+    pixelToolTargetAvailable: true,
     advancedFillActive: false,
     advancedFillUnsupportedReason: null,
     appSettings: defaultStudioAppSettings(),

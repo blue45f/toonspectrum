@@ -887,7 +887,10 @@ export function StudioBrushCatalogPortal({
         "fixed pointer-events-auto",
         placement === "desktop-dock"
           ? "bottom-auto left-auto top-auto"
-          : "inset-x-2 top-3 w-auto max-h-none"
+          // 상한을 완전히 풀면(max-h-none) 낮은 브라우저 창에서 시트가 뷰포트 밖으로 흘러
+          // 검색창 아래 카테고리·목록·버튼이 잘린다. 위/아래 여백을 뺀 값으로 상한을 걸어
+          // 시트는 화면 안에 머물고 목록(min-h-0 flex-1 overflow-y-auto)만 스크롤되게 한다.
+          : "inset-x-2 top-3 w-auto max-h-[calc(100dvh-1.5rem)]"
       )}
       style={placement === "desktop-dock" ? desktopStyle : mobileStyle}
     />,

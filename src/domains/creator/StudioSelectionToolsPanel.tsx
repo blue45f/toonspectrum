@@ -9,6 +9,7 @@ import {
   ArrowRight,
   ArrowUp,
   Circle,
+  Copy,
   Eraser,
   Eye,
   FlipHorizontal2,
@@ -22,6 +23,7 @@ import {
   Pipette,
   RotateCcw,
   RotateCw,
+  Scissors,
   Redo2,
   Square,
   Undo2,
@@ -255,6 +257,18 @@ const SELECTION_ACTION_HINTS = {
     preview: "selection-content-transform",
     previewVariant: "delete",
   },
+  copyToNewLayer: {
+    id: "pixel-selection-copy-to-new-layer",
+    title: "선택 영역을 새 레이어로 복사",
+    description: "선택한 픽셀을 원본에 그대로 둔 채 같은 자리에 새 레이어로 복사합니다. 페더 경계의 반투명도 그대로 옮겨집니다.",
+    tip: "복사한 레이어만 따로 옮기거나 보정하면 원본은 안전하게 남습니다.",
+  },
+  cutToNewLayer: {
+    id: "pixel-selection-cut-to-new-layer",
+    title: "선택 영역을 새 레이어로 오려내기",
+    description: "선택한 픽셀을 원본에서 지우고 같은 자리에 새 레이어로 옮깁니다. 두 변경은 되돌리기 한 번으로 함께 취소됩니다.",
+    tip: "인물만 배경에서 분리해 따로 보정할 때 좋아요.",
+  },
   contentAwareFill: {
     id: "pixel-selection-content-aware-fill",
     title: "콘텐츠 인식으로 채우기",
@@ -335,6 +349,10 @@ export type StudioSelectionToolsPanelProps = {
   onContentTransform: (transform: SelectionContentTransform) => void;
   onApplyAdjust: (plan: SelectionAdjustPlan) => void;
   onContentAwareFill: () => void;
+  /** 선택 픽셀을 새 레이어로 복사(원본 유지). 없으면 버튼이 렌더되지 않는다(하위호환). */
+  onCopyToNewLayer?: () => void;
+  /** 선택 픽셀을 새 레이어로 오려내기(원본에서 삭제) — 복사와 한 쌍으로만 노출한다. */
+  onCutToNewLayer?: () => void;
   // ── 색상 범위(Select > Color Range) — 전부 optional. onColorRangeApply 가 없으면 섹션 자체가
   //    렌더되지 않아 기존 렌더 사이트는 코드/마크업 변경 없이 그대로 컴파일·동작한다. ──
   /** 추출한 샘플 색 목록 — 페이지가 소유(캔버스 클릭 샘플링 결과). */
@@ -391,6 +409,8 @@ export function StudioSelectionToolsPanel({
   onContentTransform,
   onApplyAdjust,
   onContentAwareFill,
+  onCopyToNewLayer,
+  onCutToNewLayer,
   colorRangeSamples = [],
   colorRangeFuzziness = COLOR_RANGE_FUZZINESS_DEFAULT,
   colorRangePickArmed = false,
@@ -1306,6 +1326,46 @@ export function StudioSelectionToolsPanel({
             {busy ? "채우는 중..." : "콘텐츠 인식으로 채우기"}
           </button>
         </StudioToolHintTarget>
+        {onCopyToNewLayer && onCutToNewLayer ? (
+          <div className="flex w-full gap-1">
+            <StudioToolHintTarget
+              hint={SELECTION_ACTION_HINTS.copyToNewLayer}
+              disabled={Boolean(selectionUnavailableReason)}
+              unavailableReason={selectionUnavailableReason}
+              preferredSide="left"
+              className="flex-1"
+            >
+              <button
+                type="button"
+                onClick={onCopyToNewLayer}
+                disabled={!canAdjust}
+                className={cn(buttonClass({ size: "sm", variant: "outline" }), "w-full gap-1")}
+                aria-label="선택 영역을 새 레이어로 복사"
+              >
+                <Copy className="size-3.5" aria-hidden />
+                새 레이어로 복사
+              </button>
+            </StudioToolHintTarget>
+            <StudioToolHintTarget
+              hint={SELECTION_ACTION_HINTS.cutToNewLayer}
+              disabled={Boolean(selectionUnavailableReason)}
+              unavailableReason={selectionUnavailableReason}
+              preferredSide="left"
+              className="flex-1"
+            >
+              <button
+                type="button"
+                onClick={onCutToNewLayer}
+                disabled={!canAdjust}
+                className={cn(buttonClass({ size: "sm", variant: "outline" }), "w-full gap-1")}
+                aria-label="선택 영역을 새 레이어로 오려내기"
+              >
+                <Scissors className="size-3.5" aria-hidden />
+                새 레이어로 오려내기
+              </button>
+            </StudioToolHintTarget>
+          </div>
+        ) : null}
       </div>
     </div>
   );

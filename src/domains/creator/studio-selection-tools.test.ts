@@ -54,6 +54,7 @@ import {
   polyLassoCloseToStart,
   rasterizeSelectionMask,
   rectSelectionPolygon,
+  extractSelectionToCanvas,
   removeLastSubpath,
   resolvePixelSelectionAutoTarget,
   resolveSelectionCombineOverride,
@@ -1314,6 +1315,66 @@ describe("resolvePixelSelectionAutoTarget", () => {
     expect(resolvePixelSelectionAutoTarget([box("far", 500, 500)], { x: 50, y: 50 })).toEqual({ kind: "none" });
     expect(resolvePixelSelectionAutoTarget([], { x: 50, y: 50 })).toEqual({ kind: "none" });
     expect(resolvePixelSelectionAutoTarget([box("a", 0, 0)], { x: Number.NaN, y: 50 })).toEqual({ kind: "none" });
+  });
+});
+
+describe("extractSelectionToCanvas", () => {
+  const source = { id: 900 } as unknown as MaskImageSource;
+  const mask = { id: 901 } as unknown as MaskImageSource;
+
+  it("마스크 안만 남긴 뒤 경계 박스로 크롭한다(destination-in → 음수 오프셋 재그리기)", () => {
+    const log: string[] = [];
+    const result = extractSelectionToCanvas(
+      source,
+      100,
+      50,
+      mask,
+      { x: 0.2, y: 0.4, w: 0.5, h: 0.4 },
+      fakeFactory(log),
+    );
+    expect(result).not.toBeNull();
+    // 0.2*100=20 .. (0.2+0.5)*100=70 → 폭 50 / 0.4*50=20 .. 0.8*50=40 → 높이 20
+    expect(result!.cropX).toBe(20);
+    expect(result!.cropY).toBe(20);
+    expect(result!.cropWidth).toBe(50);
+    expect(result!.cropHeight).toBe(20);
+    expect(log).toEqual([
+      "create#1(100x50)",
+      "c1:drawImage(#900,0,0)",
+      "c1:gco=destination-in",
+      "c1:drawImage(#901,0,0)",
+      "c1:gco=source-over",
+      "create#2(50x20)",
+      "c2:drawImage(#1,-20,-20)",
+    ]);
+  });
+
+  it("박스를 캔버스 안으로 클램프한다(음수·초과 좌표 방어)", () => {
+    const result = extractSelectionToCanvas(
+      source,
+      100,
+      50,
+      mask,
+      { x: -0.5, y: -0.5, w: 3, h: 3 },
+      fakeFactory([]),
+    );
+    expect(result).toMatchObject({ cropX: 0, cropY: 0, cropWidth: 100, cropHeight: 50 });
+  });
+
+  it("면적이 없거나 비정상 입력·팩토리 실패는 null", () => {
+    expect(
+      extractSelectionToCanvas(source, 100, 50, mask, { x: 0.5, y: 0.5, w: 0, h: 0 }, fakeFactory([])),
+    ).toBeNull();
+    expect(
+      extractSelectionToCanvas(source, 0, 50, mask, { x: 0, y: 0, w: 1, h: 1 }, fakeFactory([])),
+    ).toBeNull();
+    expect(
+      extractSelectionToCanvas(source, 100, 50, mask, { x: Number.NaN, y: 0, w: 1, h: 1 }, fakeFactory([])),
+    ).toBeNull();
+    // 두 번째 캔버스(크롭 대상) 생성 실패
+    expect(
+      extractSelectionToCanvas(source, 100, 50, mask, { x: 0, y: 0, w: 1, h: 1 }, fakeFactory([], 2)),
+    ).toBeNull();
   });
 });
 

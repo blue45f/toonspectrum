@@ -150,6 +150,8 @@ export interface StudioLeftToolRailHandlers {
 
 interface StudioLeftToolRailProps {
   activeSurfaceReviewLocked: boolean;
+  /** 픽셀 도구 대상 자동 확보 가능(선택된 편집 가능 이미지 또는 페이지에 단 한 장) — 무장 버튼 활성 판정. */
+  pixelToolTargetAvailable: boolean;
   advancedFillActive: boolean;
   advancedFillUnsupportedReason: string | null;
   appSettings: StudioAppSettings;
@@ -201,6 +203,7 @@ interface StudioLeftToolRailProps {
 
 export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   activeSurfaceReviewLocked,
+  pixelToolTargetAvailable,
   advancedFillActive,
   advancedFillUnsupportedReason,
   appSettings,
@@ -537,7 +540,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="혼합 (스머지) (N)"
               description="이미지 픽셀을 문질러 색을 섞습니다."
               active={smudgeActive}
-              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              disabled={!pixelToolTargetAvailable}
               unavailableReason={
                 selected?.type !== "image"
                   ? "색을 섞을 이미지 레이어를 먼저 고르세요."
@@ -554,7 +557,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="혼색 브러시 (Shift+N)"
               description="바닥색을 묻혀 섞어가며 안료를 얹는 CSP식 색혼합 브러시입니다."
               active={wetMixActive}
-              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              disabled={!pixelToolTargetAvailable}
               unavailableReason={
                 selected?.type !== "image"
                   ? "칠할 이미지 레이어를 먼저 고르세요."
@@ -571,7 +574,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="닷지/번 (O)"
               description="어둡거나 밝은 영역을 브러시로 밝히거나 태우고, 스펀지로 채도를 조절합니다."
               active={dodgeBurnActive}
-              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              disabled={!pixelToolTargetAvailable}
               unavailableReason={
                 selected?.type !== "image"
                   ? "보정할 이미지 레이어를 먼저 고르세요."
@@ -588,7 +591,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="리퀴파이 (J)"
               description="이미지 위를 밀어 국소 왜곡합니다."
               active={liquifyActive}
-              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              disabled={!pixelToolTargetAvailable}
               unavailableReason={
                 selected?.type !== "image"
                   ? "왜곡할 이미지 레이어를 먼저 고르세요."

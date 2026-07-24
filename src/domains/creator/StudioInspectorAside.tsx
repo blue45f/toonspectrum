@@ -213,6 +213,7 @@ export interface StudioInspectorAsideHandlers {
   announceDrawingShortcut: (message: string) => void;
   applyBgPreset: (p: BgPreset) => void;
   applyContentAwareFill: () => Promise<void>;
+  extractPixelSelectionToLayer: (mode: "copy" | "cut") => Promise<void>;
   applyCropToSelectedImage: () => Promise<void>;
   applyDynamicsPreset: (id: StudioBrushDynamicsPresetId, settings: NormalizedStudioBrushDynamicsSettings) => void;
   applyMagicResizePreset: (preset: MagicResizePreset) => void;
@@ -959,6 +960,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     announceDrawingShortcut,
     applyBgPreset,
     applyContentAwareFill,
+    extractPixelSelectionToLayer,
     applyCropToSelectedImage,
     applyDynamicsPreset,
     applyMagicResizePreset,
@@ -2342,6 +2344,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     onContentTransform={(t) => void applyPixelSelectionContentTransform(t)}
                     onApplyAdjust={(plan) => void applyPixelSelectionAdjust(plan)}
                     onContentAwareFill={() => void applyContentAwareFill()}
+                    onCopyToNewLayer={() => void extractPixelSelectionToLayer("copy")}
+                    onCutToNewLayer={() => void extractPixelSelectionToLayer("cut")}
                     colorRangeSamples={colorRangeSamples}
                     colorRangeFuzziness={colorRangeFuzziness}
                     colorRangePickArmed={colorRangePickActive}
