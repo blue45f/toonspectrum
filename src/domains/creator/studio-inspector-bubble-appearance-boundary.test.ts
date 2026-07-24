@@ -98,7 +98,8 @@ describe("Studio inspector bubble-appearance boundary", () => {
     expect(leaf.source).not.toContain("./StudioBubbleStylePresetPanel");
     expect(leaf.source.split("\n").length).toBeLessThanOrEqual(450);
     // 의도적 변경(2026-07-24): auto-color 새 채색 레이어 onApplyNewLayer 배선(3_400 → 3_480).
-    expect(inspector.split("\n").length).toBeLessThanOrEqual(3_480);
+    // 의도적 변경(2026-07-24): layer solo props + navigator glue (3_480 → 3_500).
+    expect(inspector.split("\n").length).toBeLessThanOrEqual(3_500);
     expect(leaf.source).not.toContain('"use no memo"');
     expect(leaf.source).not.toMatch(/\b(?:memo|useCallback|useMemo)\s*\(/u);
     expect(leaf.source).toContain(
