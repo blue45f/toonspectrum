@@ -69,7 +69,9 @@ const budgets = {
   // route +54.6/+19.0 KiB, app-shell 이후 +54.0/+18.7 KiB, +8 requests(신규 패널·엔코더·3D
   // 모듈 전부 lazy 청크)였고, eager 증가는 InspectorAside 확장+메뉴/단축키 데이터뿐이다.
   // 두 웨이브 합산 추정치+약 2% 여유·request +2로 다시 잠근다.
-  studio: { raw: 2_935_000, gzip: 960_000 },
+  // 2026-07-24 2D 코어 웨이브: 사용자 글꼴·벡터 지우개 교점·선택 스텐실·세로쓰기 정적 임포트로
+  // route raw 2866.5/gzip 938.9 KiB, app-shell 이후 raw 2375.5 KiB·정적 요청 154 관측. 관측치+여유로 재고정.
+  studio: { raw: 2_965_000, gzip: 975_000 },
   studioEntry: { raw: 1_284_000, gzip: 384_500 },
   // 2026-07-23 저녁: roughjs 스케치 도형·polygon-clipping 패스 불리언 도입 — 두 라이브러리 본체는
   // 다이내믹 청크(예산 밖)이나 어댑터 공유 청크 +1로 정적 요청 149 관측. +1 여유로 재고정.
@@ -79,7 +81,8 @@ const budgets = {
   // 손그림 외곽선(studio-bubble-outline-style, KonvaBubbleNode 정적 임포트)로 정적 요청 152 관측.
   // 2026-07-24 배선: 필터마스크 페인팅 툴 + 말풍선 병합(StudioPage가 studio-bubble-merge 정적
   // 임포트)로 정적 요청 153·gzip 777.6 KiB 관측. 청크+1, gzip 예산 소폭 상향(+headroom)해 재고정.
-  studioIncremental: { raw: 2_425_000, gzip: 805_000, chunks: 153 },
+  // 2026-07-24 2D 코어 웨이브: app-shell 이후 raw 2375.5 KiB·정적 요청 154 관측. 청크+1·raw 상향 재고정.
+  studioIncremental: { raw: 2_455_000, gzip: 805_000, chunks: 154 },
   // Rapier deterministic compat is intentionally isolated in a user-triggered module Worker.
   // 2026-07-18 production output: 2,302,139 raw / 855,399 gzip. Keep ~2% version-drift headroom
   // without charging this optional engine to Studio or the 3D editor's initial graph.
