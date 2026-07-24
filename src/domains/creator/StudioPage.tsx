@@ -421,6 +421,14 @@ import {
   transferDialogueElement,
 } from "./studio-dialogue-structure";
 import {
+  applyDialogueFormatPatch,
+  convertTextElementsToBubbles,
+} from "./studio-dialogue-format";
+import {
+  applyDialogueRubySpan,
+  clearDialogueRubyRange,
+} from "./studio-dialogue-ruby";
+import {
   formatDialogueSuggestionLine,
   joinDialogueContextLines,
   type DialogueSuggestionCandidate,
@@ -666,11 +674,14 @@ import {
   type StudioLiveInkStrokeStyle,
 } from "./studio-live-ink-overlay";
 import {
-  canBeginStudioLiveMutation,
   planStudioLiveHeldResourceReplace,
   selfHoldsStudioLiveLock,
   studioLiveMutationResources,
 } from "./studio-live-mutation-guard";
+import {
+  gateStudioCanvasMutation,
+  type StudioCanvasMutationIntent,
+} from "./studio-live-canvas-mutation-gate";
 import {
   releaseStudioLiveMutationLocks,
   replaceStudioLiveMutationLocks,
@@ -834,12 +845,15 @@ import {
   applyBackgroundToAllPages,
   applyGradeToAllPages,
   clearPage,
+  computeNextActiveIdAfterBulkDelete,
   createBlankPage,
+  deletePagesBulk as deletePagesBulkPure,
   duplicateMirroredPage,
   duplicatePageState,
   executeDeletePageTransition,
   insertBlankPageAt,
   movePage as movePagePure,
+  movePagesBulk as movePagesBulkPure,
   reorderPages,
 } from "./studio-pages";
 import { createPalette, savePalette } from "./studio-palette-library";
@@ -2564,24 +2578,28 @@ function StudioCuttoonEditor() {
   }
   function liveMutationPreflight(
     room: StudioLiveRoom,
-    elementIds?: readonly string[] | null
+    elementIds?: readonly string[] | null,
+    intent: StudioCanvasMutationIntent = "transform"
   ): boolean {
-    const decision = canBeginStudioLiveMutation({
+    const decision = gateStudioCanvasMutation({
       locks: room.getLocks(),
       pageId: activePage.id,
       elementIds,
       selfSessionId: room.participant.sessionId,
+      intent,
+      allowSelectWithoutLease: false,
     });
     if (decision.ok) return true;
     setError(decision.reason);
     return false;
   }
   async function beginLiveResourceEditAsync(
-    elementIds?: readonly string[] | null
+    elementIds?: readonly string[] | null,
+    intent: StudioCanvasMutationIntent = "transform"
   ): Promise<boolean> {
     const room = studioLiveRoomRef.current;
     if (!room) return true;
-    if (!liveMutationPreflight(room, elementIds)) return false;
+    if (!liveMutationPreflight(room, elementIds, intent)) return false;
     const resources = liveMutationResources(elementIds);
     const key = JSON.stringify(resources);
     const pending = studioLivePendingMutationRef.current;
@@ -2618,10 +2636,13 @@ function StudioCuttoonEditor() {
     });
     return operation;
   }
-  function beginLiveResourceEdit(elementIds?: readonly string[] | null): boolean {
+  function beginLiveResourceEdit(
+    elementIds?: readonly string[] | null,
+    intent: StudioCanvasMutationIntent = "drag"
+  ): boolean {
     const room = studioLiveRoomRef.current;
     if (!room) return true;
-    if (!liveMutationPreflight(room, elementIds)) return false;
+    if (!liveMutationPreflight(room, elementIds, intent)) return false;
     const resources = liveMutationResources(elementIds);
 
     // Local-tab preview has a synchronous deterministic arbiter. Authenticated server rooms must
@@ -12321,7 +12342,7 @@ function StudioCuttoonEditor() {
   // 비동기 로드해 ref 에 캐시한다. 로드 전/실패 시엔 스냅 없는 일반 올가미로 조용히 폴백.
   const magneticLassoFieldKey =
     pixelMagneticLasso && pixelTool === "lasso" && selected?.type === "image" && selectedImageElementId
-      ? `${selectedImageElementId} ${selected.src} ${selected.flipped ? 1 : 0}${selected.flippedY ? 1 : 0}`
+      ? `${selectedImageElementId}${selected.src}${selected.flipped ? 1 : 0}${selected.flippedY ? 1 : 0}`
       : null;
   const magneticLassoFieldSrc = magneticLassoFieldKey && selected?.type === "image" ? selected.src : null;
   const magneticLassoFieldFlipX = selected?.type === "image" ? !!selected.flipped : false;
@@ -15855,6 +15876,16 @@ function StudioCuttoonEditor() {
       else if (nextPages[0]) setCurrentPageId(nextPages[0].id);
     }
   }
+  function deletePagesBulk(ids: string[]) {
+    if (pages.length <= 1 || ids.length === 0) return;
+    const { nextPages, removedIds } = deletePagesBulkPure(pages, ids);
+    if (removedIds.length === 0) return;
+    if (!commitPages(nextPages)) return;
+    const nextActiveId = computeNextActiveIdAfterBulkDelete(pages, nextPages, currentPageId);
+    if (nextActiveId && nextActiveId !== currentPageId) {
+      setCurrentPageId(nextActiveId);
+    }
+  }
   function movePageUp(pageId: string) {
     const idx = pages.findIndex((p) => p.id === pageId);
     if (idx <= 0) return; // boundary early return (prevents redundant history like pre-refactor)
@@ -15865,6 +15896,17 @@ function StudioCuttoonEditor() {
     const idx = pages.findIndex((p) => p.id === pageId);
     if (idx === -1 || idx >= pages.length - 1) return; // boundary early return
     const nextPages = movePagePure(pages, pageId, 1);
+    commitPages(nextPages);
+  }
+  function movePagesBulk(ids: string[], delta: number) {
+    if (ids.length === 0 || !Number.isFinite(delta) || delta === 0) return;
+    const nextPages = movePagesBulkPure(pages, ids, delta);
+    if (
+      nextPages.length === pages.length
+      && nextPages.every((page, index) => page.id === pages[index]?.id)
+    ) {
+      return;
+    }
     commitPages(nextPages);
   }
   function clearPageFor(pageId: string) {
@@ -17415,7 +17457,7 @@ function StudioCuttoonEditor() {
         return;
       }
       const editShortcut = resolveStudioEditShortcut(e);
-      const drawingShortcut = resolveStudioDrawingShortcut(e);
+      const drawingShortcut = resolveStudioDrawingShortcut(e, { shortcuts: appSettingsRef.current.shortcuts });
       const filterShortcut = mod && e.shiftKey && !e.altKey
         ? STUDIO_FILTER_SHORTCUTS[e.code]
         : undefined;
@@ -25511,7 +25553,7 @@ function StudioCuttoonEditor() {
     const mutationTicket = captureStudioMutationTicket();
     const targetPageId = activePage.id;
     const targetMasterEditMode = masterEditMode;
-    if (!(await beginLiveResourceEditAsync([id]))) return;
+    if (!(await beginLiveResourceEditAsync([id], "text-edit"))) return;
     if (
       !canApplyStudioMutation(mutationTicket) ||
       currentPageIdRef.current !== targetPageId ||
@@ -26365,6 +26407,8 @@ function StudioCuttoonEditor() {
     hasPixelEditing: menuHasPixelEditing,
     pixelBusy,
     selectedImage: selected?.type === "image",
+    // Same sole-image auto-select gate as the left rail Crop button (ensurePixelToolTarget).
+    pixelToolTargetAvailable,
     interactionLocked: timelapseCapturing,
     mutationLocked: activeSurfaceReviewLocked || timelapseCapturing,
     selectedContentMutationLocked: selectedContentMutationLocked || timelapseCapturing,
@@ -26484,9 +26528,27 @@ function StudioCuttoonEditor() {
             setProjectActionsOpen(false);
             setExportMenuOpen(true);
           },
-          requestProjectImport: () => projectImportInputRef.current?.click(),
-          requestInterchangeImport: () => interchangeImportInputRef.current?.click(),
-          requestPsdImport: () => psdImportInputRef.current?.click(),
+          requestProjectImport: () => {
+            if (!projectImportInputRef.current) {
+              setError("프로젝트 가져오기 입력을 아직 준비하지 못했어요. 잠시 후 다시 시도해 주세요.");
+              return;
+            }
+            projectImportInputRef.current.click();
+          },
+          requestInterchangeImport: () => {
+            if (!interchangeImportInputRef.current) {
+              setError("ORA/CBZ 가져오기 입력을 아직 준비하지 못했어요. 잠시 후 다시 시도해 주세요.");
+              return;
+            }
+            interchangeImportInputRef.current.click();
+          },
+          requestPsdImport: () => {
+            if (!psdImportInputRef.current) {
+              setError("PSD 가져오기 입력을 아직 준비하지 못했어요. 잠시 후 다시 시도해 주세요.");
+              return;
+            }
+            psdImportInputRef.current.click();
+          },
           openProjectTools: () => {
             setExportMenuOpen(false);
             setProjectActionsOpen(true);
@@ -28899,11 +28961,13 @@ function StudioCuttoonEditor() {
     clearPageFor,
     commitPageMeta,
     deletePage,
+    deletePagesBulk,
     duplicatePage,
     duplicatePageMirrored,
     insertPageAfter,
     insertPageBefore,
     movePageDown,
+    movePagesBulk,
     movePageToBottom,
     movePageToTop,
     movePageUp,
@@ -29303,6 +29367,49 @@ function StudioCuttoonEditor() {
       aria-label="편집 메뉴에서 이미지 파일 붙여넣기"
       onChange={onPickImage}
     />
+    {/* File-menu import pickers must live outside LazyStudioMenubarContent so clicks work
+        even while the menubar chunk is still loading or canvas-only chrome is remounting.
+        Same refs are still used by Menubar buttons. */}
+    <div data-studio-document-import-inputs="true" className="hidden" aria-hidden>
+      <input
+        ref={projectImportInputRef}
+        type="file"
+        accept=".json"
+        className="hidden"
+        disabled={collaborationDocumentLocked}
+        onChange={(event) => {
+          void handleImportProject(event);
+        }}
+        aria-label="프로젝트 JSON 가져오기"
+      />
+      <input
+        ref={projectArchiveImportInputRef}
+        type="file"
+        accept=".toonproject.zip,.zip,application/zip,application/vnd.toonspectrum.project+zip"
+        className="hidden"
+        disabled={projectArchiveBusy || collaborationDocumentLocked}
+        onChange={(event) => void handleImportProjectArchive(event)}
+        aria-label="프로젝트 아카이브 가져오기"
+      />
+      <input
+        ref={psdImportInputRef}
+        type="file"
+        accept=".psd,image/vnd.adobe.photoshop"
+        className="hidden"
+        disabled={psdImportBusy || interchangeImportBusy || collaborationDocumentLocked}
+        onChange={(event) => void handleImportPsd(event)}
+        aria-label="PSD 가져오기"
+      />
+      <input
+        ref={interchangeImportInputRef}
+        type="file"
+        accept=".ora,.cbz,image/openraster,application/vnd.comicbook+zip"
+        className="hidden"
+        disabled={interchangeImportBusy || psdImportBusy || collaborationDocumentLocked}
+        onChange={(event) => void handleImportInterchangeArchive(event)}
+        aria-label="OpenRaster 또는 CBZ 가져오기"
+      />
+    </div>
     {pendingInterchangeImport ? (
       <Suspense fallback={null}>
         <LazyStudioInterchangeLossPreviewDialog
@@ -29433,6 +29540,7 @@ function StudioCuttoonEditor() {
           historyPanelOpen={historyPanelOpen}
           pageCount={studioMenubarPageLabels.length}
           pageLabels={studioMenubarPageLabels}
+          dialoguePages={pages}
           projectActionsOpen={projectActionsOpen}
           projectActionsRef={projectActionsRef}
           projectArchiveBusy={projectArchiveBusy}
@@ -31978,6 +32086,93 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     setCurrentPageId(targetPageId);
     setSelectedId(nextElementId);
   }
+
+  function convertDialogueTextToBubble(pageId: string, elementId: string) {
+    const next = convertTextElementsToBubbles(pages, {
+      elementIds: [elementId],
+      variant: "speech",
+    });
+    if (next === pages || !commitPages(next as PageState[])) return;
+    setCurrentPageId(pageId);
+    setSelectedId(elementId);
+  }
+
+  /** One undo step for many free-text → bubble conversions (story panel bulk action). */
+  function convertDialogueTextsToBubbles(requests: readonly { pageId: string; elementId: string }[]) {
+    if (requests.length === 0) return;
+    const elementIds = requests.map((request) => request.elementId);
+    const next = convertTextElementsToBubbles(pages, {
+      elementIds,
+      variant: "speech",
+    });
+    if (next === pages || !commitPages(next as PageState[])) return;
+    const last = requests[requests.length - 1];
+    if (last) {
+      setCurrentPageId(last.pageId);
+      setSelectedId(last.elementId);
+    }
+  }
+
+  function applyDialogueMultiFormat(
+    elementIds: readonly string[],
+    patch: {
+      fontSize?: number;
+      fontStyle?: "normal" | "bold" | "italic" | "bold italic";
+      textColor?: string;
+      align?: "left" | "center" | "right";
+    }
+  ) {
+    const targets =
+      elementIds.length > 0
+        ? elementIds
+        : marqueeIds.length > 0
+          ? marqueeIds
+          : selectedId
+            ? [selectedId]
+            : [];
+    const next = applyDialogueFormatPatch(pages, { elementIds: targets, patch });
+    if (next === pages || !commitPages(next as PageState[])) return;
+  }
+
+  function applyDialogueRuby(
+    pageId: string,
+    elId: string,
+    text: string,
+    start: number,
+    end: number,
+    ruby: string
+  ) {
+    const next = applyDialogueRubySpan(pages, {
+      pageId,
+      elementId: elId,
+      text,
+      start,
+      end,
+      ruby,
+    });
+    if (next === pages || !commitPages(next as PageState[])) return;
+    setCurrentPageId(pageId);
+    setSelectedId(elId);
+  }
+
+  function clearDialogueRuby(
+    pageId: string,
+    elId: string,
+    text: string,
+    start: number,
+    end: number
+  ) {
+    const next = clearDialogueRubyRange(pages, {
+      pageId,
+      elementId: elId,
+      text,
+      start,
+      end,
+    });
+    if (next === pages || !commitPages(next as PageState[])) return;
+    setCurrentPageId(pageId);
+    setSelectedId(elId);
+  }
   // 텍스트 인라인 편집 — canvasFlipH(좌우 반전 미리보기)나 세로쓰기 요소는 캔버스 실시간 오버레이가
   // 안전하게 다룰 수 없어(StudioTextEditOverlay 상단 주석 참고) 예전 중앙 모달로 폴백한다.
   const editingTarget = editing ? elementById.get(editing.id) : null;
@@ -33744,7 +33939,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
 
           {shortcutsOpen ? (
             <Suspense fallback={null}>
-              <StudioShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+              <StudioShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} shortcuts={appSettings.shortcuts} />
             </Suspense>
           ) : null}
           {appSettingsOpen ? (
@@ -33883,6 +34078,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 pages={pages}
                 currentPageId={activePage.id}
                 selectedId={selectedId}
+                selectedIds={marqueeIds.length > 0 ? marqueeIds : selectedId ? [selectedId] : []}
                 mobileKeyboardInset={mobileKeyboardInset}
                 onClose={() => setDialogueBatchOpen(false)}
                 onSelectElement={selectDialogueElement}
@@ -33891,6 +34087,11 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 onSplitText={splitDialogueText}
                 onMergeWithNext={mergeDialogueTextWithNext}
                 onTransferElement={transferDialogueText}
+                onConvertTextToBubble={convertDialogueTextToBubble}
+                onConvertTextsToBubbles={convertDialogueTextsToBubbles}
+                onApplyFormat={applyDialogueMultiFormat}
+                onApplyDialogueRuby={applyDialogueRuby}
+                onClearDialogueRuby={clearDialogueRuby}
                 onImportInterchange={importDialogueInterchange}
               />
             </Suspense>

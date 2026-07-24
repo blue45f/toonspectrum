@@ -211,6 +211,8 @@ export interface StudioMenubarContentProps {
   historyPanelOpen: boolean;
   pageCount: number;
   pageLabels: string[];
+  /** Optional story pages for dialogue TXT package export preflight. */
+  dialoguePages?: readonly import("./studio-dialogue-batch").DialoguePageLike[] | null;
   projectActionsOpen: boolean;
   projectActionsRef: RefObject<HTMLDivElement | null>;
   projectArchiveBusy: boolean;
@@ -280,6 +282,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   historyPanelOpen,
   pageCount,
   pageLabels,
+  dialoguePages = null,
   projectActionsOpen,
   projectActionsRef,
   projectArchiveBusy,
@@ -332,10 +335,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     handleDownloadAll,
     handleExportProject,
     handleExportProjectArchive,
-    handleImportProject,
-    handleImportProjectArchive,
-    handleImportInterchangeArchive,
-    handleImportPsd,
+    // Import onChange handlers live on StudioPage root inputs (ref-click only here).
     handleSave,
     openAutoActions,
     openOwnerFxPanel,
@@ -351,47 +351,9 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   } = stableHandlers;
   return (
     <>
-        {/* 가져오기 파일 입력은 항상 마운트한다. 예전에는 "프로젝트 도구" 패널(projectActionsOpen)
-            안에서만 렌더돼, 파일 메뉴의 "프로젝트/PSD/ORA·CBZ 가져오기" 항목이 부르는
-            ref.current?.click() 이 패널이 닫혀 있을 땐 null 이라 조용히 무시됐다(가져오기가 아무
-            반응 없던 버그). 숨김 입력이라 항상 렌더해도 비용이 없다. */}
-        <input
-          ref={projectImportInputRef}
-          type="file"
-          accept=".json"
-          className="hidden"
-          disabled={collaborationDocumentLocked}
-          onChange={(event) => {
-            const hasFile = Boolean(event.currentTarget.files?.[0]);
-            handleImportProject(event);
-            if (hasFile) setProjectActionsOpen(false);
-          }}
-        />
-        <input
-          ref={projectArchiveImportInputRef}
-          type="file"
-          accept=".toonproject.zip,.zip,application/zip,application/vnd.toonspectrum.project+zip"
-          className="hidden"
-          disabled={projectArchiveBusy || collaborationDocumentLocked}
-          onChange={(event) => void handleImportProjectArchive(event)}
-        />
-        <input
-          ref={psdImportInputRef}
-          type="file"
-          accept=".psd,image/vnd.adobe.photoshop"
-          className="hidden"
-          disabled={psdImportBusy || interchangeImportBusy || collaborationDocumentLocked}
-          onChange={(event) => void handleImportPsd(event)}
-        />
-        <input
-          ref={interchangeImportInputRef}
-          type="file"
-          accept=".ora,.cbz,image/openraster,application/vnd.comicbook+zip"
-          className="hidden"
-          disabled={interchangeImportBusy || psdImportBusy || collaborationDocumentLocked}
-          aria-label="OpenRaster 또는 CBZ 가져오기"
-          onChange={(event) => void handleImportInterchangeArchive(event)}
-        />
+        {/* 가져오기 파일 입력은 StudioPage 루트(data-studio-document-import-inputs)에 상시 마운트한다.
+            메뉴바 lazy 청크/패널 게이트와 무관하게 파일 메뉴·프로젝트 도구 버튼이 같은 ref 를 클릭한다.
+            (2026-07-24: 패널 안 조건부 마운트 → 무반응 버그 수정 후, lazy menubar 레이스까지 제거) */}
         <div
           data-studio-menubar-primary="true"
           className={cn(
@@ -695,6 +657,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                       exportTitle={title}
                       pageCount={pageCount}
                       pageLabels={pageLabels}
+                      dialoguePages={dialoguePages}
                       capturePagesForPreset={handleCapturePagesForPreset}
                       exportCurrentPageToSvg={exportCurrentPageToSvg}
                       exportCurrentPageToPsd={exportCurrentPageToPsd}
