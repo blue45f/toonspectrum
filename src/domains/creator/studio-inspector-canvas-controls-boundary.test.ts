@@ -73,7 +73,9 @@ describe("Studio inspector canvas-controls boundary", () => {
     expect(leaf.split("\n").length).toBeLessThanOrEqual(450);
     // 의도적 변경(2026-07-24): 필터 마스크 페인팅 + 자동 채색 힌트 worker onRun 배선
     // (3_300 → 3_380 → 3_400).
-    expect(inspector.split("\n").length).toBeLessThanOrEqual(3_400);
+    // 의도적 변경(2026-07-24): auto-color 새 채색 레이어 onApplyNewLayer + setSelectedId 배선
+    // (3_400 → 3_480).
+    expect(inspector.split("\n").length).toBeLessThanOrEqual(3_480);
     expect(leaf).not.toContain('"use no memo"');
     expect(leaf).not.toMatch(/\b(?:memo|useCallback|useMemo)\s*\(/u);
     expect(leaf).toContain("export function StudioInspectorCanvasControls(");
