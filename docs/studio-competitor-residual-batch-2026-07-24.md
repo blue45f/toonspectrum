@@ -42,9 +42,9 @@ Finite shippable batch after CSP EX / Magma / Photopea / Procreate / SHAPER surv
 
 ## Stop condition
 
-Finite high-ROI shippable rows for this Clip-Studio-class batch are closed (including post-scan indices wire, ruby TXT, auto-color worker onRun). Remaining items are multi-hour poser runtime, multi-year architecture, or policy exclusions — not open “in progress” glue.
+Finite high-ROI shippable rows for this Clip-Studio-class batch are closed (including post-scan indices wire, ruby TXT, auto-color worker onRun, pressure min size, erase-to-intersection desktop+mobile, auto-color selected imageSrc + scribble seeds + Advanced Fill apply). Remaining items are multi-hour poser runtime, multi-year architecture, freehand-canvas scribble, or policy exclusions — not open “in progress” glue.
 
 ## Verification
 
 - Targeted Vitest residual suites + `tsc --noEmit` after landings.
-- Static reachability: export indices wire, auto-color worker onRun, ruby TXT enrichment.
+- Static reachability: export indices wire, auto-color worker onRun, ruby TXT enrichment, scribble apply `onApplyResult` → `patchEl`.
