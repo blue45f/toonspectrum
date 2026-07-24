@@ -160,6 +160,16 @@ import {
 } from "./studio-bg3d-capture-background";
 import { registerStudioBg3dCaptureExcludedObject } from "./studio-bg3d-capture-exclusion";
 import {
+  STUDIO_BG3D_CAPTURE_ASPECT_PRESETS,
+  createStudioBg3dDocumentCaptureAspectPreset,
+  matchStudioBg3dCaptureAspectPreset,
+  normalizeStudioBg3dCaptureAspectRatio,
+  resolveStudioBg3dCaptureFrame,
+  resolveStudioBg3dCaptureFrameCameraSettings,
+  resolveStudioBg3dCaptureViewOffset,
+  type StudioBg3dCaptureFrame,
+} from "./studio-bg3d-capture-frame-geometry";
+import {
   BgAnimationPlayhead,
   LtRangeControl,
   LtToggleRow,
@@ -491,6 +501,8 @@ export interface StudioBackground3DProps {
   ) => Promise<boolean>;
   onClose: () => void;
   onInsert: (result: StudioBackground3DInsertResult) => boolean | void;
+  /** 편집 중인 문서 캔버스 크기. 주어지면 "문서 캔버스 비율" 캡처 프리셋이 목록에 추가된다. */
+  documentCanvasSize?: { readonly width: number; readonly height: number };
 }
 
 type TransformModeId = "translate" | "rotate" | "scale";
@@ -507,7 +519,14 @@ type LtUserPresetNotice = {
   readonly tone: LtUserPresetNoticeTone;
   readonly message: string;
 };
-type CaptureState = { adapter: StudioBg3dCaptureAdapter | null };
+/**
+ * 캡처 어댑터와, 그 어댑터가 렌더에 쓰는 바로 그 카메라를 같은 스냅샷으로 묶는다. 캡처 프레임을
+ * 적용하려면 어댑터가 렌더하는 카메라의 view 창을 정확히 같은 프레임으로 잡아야 한다.
+ */
+type CaptureState = {
+  adapter: StudioBg3dCaptureAdapter | null;
+  camera: THREE.Camera | null;
+};
 
 const STUDIO_BG3D_SHOT_CONTACT_SHEET_PASS_PRIORITY: readonly StudioBg3dShotBatchPass[] = [
   "lt-composite",
@@ -1419,6 +1438,87 @@ function loadStudioBg3dThreeWebglCaptureRuntime(): Promise<StudioBg3dThreeWebglC
   return pending;
 }
 
+type StudioBg3dCameraWithView = THREE.Camera & {
+  view?: {
+    enabled: boolean;
+    fullWidth: number;
+    fullHeight: number;
+    offsetX: number;
+    offsetY: number;
+    width: number;
+    height: number;
+  } | null;
+  setViewOffset?: (
+    fullWidth: number,
+    fullHeight: number,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) => void;
+  clearViewOffset?: () => void;
+};
+
+/**
+ * 캡처 프레임을 Three 카메라의 view 창으로 잡고, 되돌리는 함수를 돌려준다. 크롭을 적용할 수 없으면
+ * null을 돌려준다 — 호출자는 늘어난 래스터를 삽입하는 대신 트랜잭션을 실패시켜야 한다.
+ *
+ * 뷰포트와 같은 프레임(자동/일치)이면 카메라를 전혀 건드리지 않는다. 크롭이 있을 때만 이전 view를
+ * 스냅샷해 두었다가 정확히 같은 상태로 복원하므로, 렌즈 시프트 같은 기존 설정이 살아남는다.
+ */
+function applyStudioBg3dCaptureFrameViewOffset(
+  camera: THREE.Camera | null,
+  frame: StudioBg3dCaptureFrame,
+  viewport: { readonly width: number; readonly height: number },
+): (() => void) | null {
+  if (frame.fit === "exact") return () => {};
+  const target = camera as StudioBg3dCameraWithView | null;
+  if (
+    !target ||
+    typeof target.setViewOffset !== "function" ||
+    typeof target.clearViewOffset !== "function"
+  ) {
+    return null;
+  }
+  const previous = target.view && target.view.enabled ? { ...target.view } : null;
+  const offset = resolveStudioBg3dCaptureViewOffset({
+    frame,
+    viewportWidth: viewport.width,
+    viewportHeight: viewport.height,
+    baseWindow: previous && previous.fullWidth > 0 && previous.fullHeight > 0
+      ? {
+          offsetX: previous.offsetX / previous.fullWidth,
+          offsetY: previous.offsetY / previous.fullHeight,
+          width: previous.width / previous.fullWidth,
+          height: previous.height / previous.fullHeight,
+        }
+      : null,
+  });
+  if (!offset) return null;
+  target.setViewOffset(
+    offset.fullWidth,
+    offset.fullHeight,
+    offset.offsetX,
+    offset.offsetY,
+    offset.width,
+    offset.height,
+  );
+  return () => {
+    if (previous) {
+      target.setViewOffset?.(
+        previous.fullWidth,
+        previous.fullHeight,
+        previous.offsetX,
+        previous.offsetY,
+        previous.width,
+        previous.height,
+      );
+      return;
+    }
+    target.clearViewOffset?.();
+  };
+}
+
 /* ── R3F Canvas 내부에서 렌더러/씬/카메라를 꺼내 캡처용 ref에 흘려보내는 다리.
    VRM 포저의 CaptureBridge와 동일한 패턴 — ref-not-state라 마운트마다 리렌더를 유발하지 않는다. */
 function CaptureBridge({
@@ -1439,13 +1539,13 @@ function CaptureBridge({
         renderer: gl,
         scene,
       });
-      updateCapture({ adapter });
+      updateCapture({ adapter, camera });
     }).catch(() => {
-      if (!disposed) updateCapture({ adapter: null });
+      if (!disposed) updateCapture({ adapter: null, camera: null });
     });
     return () => {
       disposed = true;
-      if (adapter) updateCapture({ adapter: null }, adapter);
+      if (adapter) updateCapture({ adapter: null, camera: null }, adapter);
     };
   }, [camera, gl, scene]);
 
@@ -2217,6 +2317,7 @@ export function StudioBackground3D({
   validateRecoveryAccess,
   onClose,
   onInsert,
+  documentCanvasSize,
 }: StudioBackground3DProps) {
   const [primitiveGeometryPool] = useState(() => new StudioBg3dPrimitiveGeometryPool());
   const [adaptiveDprScale, setAdaptiveDprScale] = useState(1);
@@ -2495,12 +2596,16 @@ export function StudioBackground3D({
     sceneBaseDocument.output.transparentBackground ||
     sceneBaseDocument.background.mode === "transparent";
 
-  const captureRef = useRef<CaptureState>({ adapter: null });
+  const captureRef = useRef<CaptureState>({ adapter: null, camera: null });
   const modalDialogRef = useRef<HTMLDivElement | null>(null);
   const modalRootRef = useRef<HTMLElement | null>(null);
   const viewportApiRef = useRef<BgViewportApi | null>(null);
   const pendingInitialCameraRef = useRef<StudioBg3dCameraSettings | null>(null);
   const viewportHostRef = useRef<HTMLDivElement>(null);
+  // 세이프 프레임 오버레이는 캡처와 같은 식을 쓰려면 살아 있는 뷰포트 CSS 박스를 알아야 한다.
+  const [viewportBoxSize, setViewportBoxSize] = useState<{ width: number; height: number } | null>(
+    null,
+  );
   const primitiveObjectsRef = useRef<Map<string, THREE.Group>>(new Map());
   const surfaceSnapArmedRef = useRef(false);
   const dragInitialSelectedTransformsRef = useRef<Map<string, {
@@ -3189,7 +3294,11 @@ export function StudioBackground3D({
   useEffect(() => {
     if (isRestoringScene || isBatchRenderingShots) return;
     const timer = setTimeout(() => {
-      const liveView = viewportApiRef.current?.readView() ?? sceneBaseDocument.camera;
+      // 캡처 트랜잭션 중에는 카메라 view 창이 캡처 프레임으로 잠깐 잡혀 있다. 그 순간의 라이브
+      // 시점을 히스토리에 적으면 렌즈 시프트가 크롭 값으로 오염되므로 문서 카메라를 쓴다.
+      const liveView = captureInFlightRef.current
+        ? sceneBaseDocument.camera
+        : viewportApiRef.current?.readView() ?? sceneBaseDocument.camera;
       const snap = createStudioBg3dHistorySnapshot({
         primitives,
         customModels,
@@ -4924,6 +5033,20 @@ export function StudioBackground3D({
     setError(null);
   }
 
+  /** null이면 "자동(뷰포트 추종)"이라 문서에서 키 자체를 지운다 — 레거시 표현과 같아진다. */
+  function updateLtExportAspectRatio(exportAspectRatio: number | null) {
+    setSceneBaseDocument((current) => {
+      const normalized = normalizeStudioBg3dCaptureAspectRatio(exportAspectRatio);
+      const { exportAspectRatio: _removed, ...output } = current.output;
+      const candidate: StudioBg3dSceneDocument = {
+        ...current,
+        output: normalized === null ? output : { ...output, exportAspectRatio: normalized },
+      };
+      return canonicalSceneDocument(candidate) ?? current;
+    });
+    setError(null);
+  }
+
   function updateBackgroundSettings(patch: Partial<StudioBg3dBackgroundSettings>) {
     setSceneBaseDocument((current) => {
       const candidate: StudioBg3dSceneDocument = {
@@ -6059,13 +6182,37 @@ export function StudioBackground3D({
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
+  // 세이프 프레임은 캡처와 같은 좌표계에서 계산돼야 하므로, 뷰포트 CSS 박스를 직접 관찰한다.
+  useEffect(() => {
+    const host = viewportHostRef.current;
+    if (!open || !host || typeof ResizeObserver === "undefined") {
+      setViewportBoxSize(null);
+      return;
+    }
+    const sync = () => {
+      const rect = host.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      setViewportBoxSize((previous) => (
+        previous &&
+          Math.abs(previous.width - rect.width) < 0.5 &&
+          Math.abs(previous.height - rect.height) < 0.5
+          ? previous
+          : { width: rect.width, height: rect.height }
+      ));
+    };
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, [open]);
+
   const onCaptureUpdate = (
     state: CaptureState,
     cleanupAdapter?: StudioBg3dCaptureAdapter | null
   ) => {
     if (cleanupAdapter) {
       if (captureRef.current.adapter === cleanupAdapter) {
-        captureRef.current = { adapter: null };
+        captureRef.current = { adapter: null, camera: null };
       }
     } else {
       captureRef.current = state;
@@ -6302,6 +6449,16 @@ export function StudioBackground3D({
       const captureAdapterIsStale = () => captureRef.current.adapter !== captureAdapter;
 
       const sourceSize = await getStudioBg3dCaptureSourceSize(captureAdapter);
+      // 캡처 비율은 뷰포트 캔버스 크기가 아니라 문서가 소유한 값에서 나온다. 값이 없는(레거시)
+      // 문서만 예전처럼 뷰포트 비율을 그대로 따르고, 그때 프레임은 뷰포트 전체와 정확히 같다.
+      const captureFrame = resolveStudioBg3dCaptureFrame({
+        viewportWidth: sourceSize.width,
+        viewportHeight: sourceSize.height,
+        aspectRatio: adapted.document.output.exportAspectRatio ?? null,
+      });
+      if (!captureFrame) {
+        throw new Error("LT capture frame admission failed.");
+      }
       // HiDPI 화면에서 프리뷰(디바이스 픽셀 밀도 렌더)와 삽입 결과의 선명도가 일치하도록
       // exportHeight에 dpr(1..3 클램프)만 곱한다 — 슈퍼샘플은 LT 주선/톤이 px 단위라 룩이
       // 변해 의도적으로 제외. 픽셀 예산·4096 edge 캡은 resolveStudioBg3dLtCaptureSize가 지킨다.
@@ -6309,6 +6466,7 @@ export function StudioBackground3D({
       const captureSize = resolveStudioBg3dLtCaptureSize({
         sourceWidth: sourceSize.width,
         sourceHeight: sourceSize.height,
+        aspectRatio: captureFrame.aspectRatio,
         requestedHeight: Math.min(
           4096,
           Math.round(adapted.document.output.exportHeight * captureDensity)
@@ -6318,6 +6476,17 @@ export function StudioBackground3D({
       if (!captureSize) {
         throw new Error("LT capture size admission failed.");
       }
+      // 프레임이 뷰포트와 다를 때만 카메라 view 창을 잡는다(렌즈 시프트와 선형 합성). 크롭 없는
+      // 자동 경로에서는 카메라를 아예 건드리지 않아 예전 결과와 완전히 동일하다. 크롭이 필요한데
+      // 카메라를 못 잡으면 늘어난 그림을 삽입하는 대신 실패한다(fail-closed).
+      const releaseCaptureFrameViewOffset = applyStudioBg3dCaptureFrameViewOffset(
+        captureRef.current.adapter === captureAdapter ? captureRef.current.camera : null,
+        captureFrame,
+        sourceSize,
+      );
+      if (!releaseCaptureFrameViewOffset) {
+        throw new Error("LT capture frame could not be applied to the live camera.");
+      }
       const captured = await captureStudioBg3dRaster(captureAdapter, {
         width: captureSize.width,
         height: captureSize.height,
@@ -6326,7 +6495,9 @@ export function StudioBackground3D({
           alpha: backgroundSnapshot.transparent ? 0 : 1,
         },
         includeDepth: ltSettingsSnapshot.line.depthEnabled,
-      }, { signal: insertController.signal, timeoutMs: 30_000 });
+      }, { signal: insertController.signal, timeoutMs: 30_000 })
+        // 성공·실패·취소 어느 쪽이든 라이브 카메라를 원래 view 창으로 되돌린다(멱등).
+        .finally(releaseCaptureFrameViewOffset);
       if (!isInsertCurrent() || captureAdapterIsStale()) return;
       const ltRenderInput = Object.freeze({
         width: captured.width,
@@ -6359,8 +6530,10 @@ export function StudioBackground3D({
       }
       const encoded = encodeStudioBg3dLtLayers(rendered.layers);
       if (!isInsertCurrent() || captureAdapterIsStale()) return;
+      // 소실점도 캡처 프레임 기준이어야 한다. 중앙 크롭은 NDC 선형 확대라 카메라 설정을 프레임
+      // 배율로 환산하면 잘린 래스터 좌표계에서 렌더러와 정확히 같은 위치가 나온다.
       const perspectiveGuides = deriveStudioBg3dVanishingPoints(
-        adapted.document.camera,
+        resolveStudioBg3dCaptureFrameCameraSettings(adapted.document.camera, captureFrame),
         rendered.width,
         rendered.height,
       ).map((point) => ({
@@ -7066,12 +7239,39 @@ export function StudioBackground3D({
   const managedLtUserPreset = ltManagedUserPresetId
     ? ltUserPresetPayload.presets.find((preset) => preset.id === ltManagedUserPresetId) ?? null
     : null;
+  const ltExportAspectRatio = sceneBaseDocument.output.exportAspectRatio ?? null;
+  // 세이프 프레임 오버레이와 라벨은 실제 캡처와 같은 식(같은 순수 함수)을 쓴다. 자동일 때만
+  // 뷰포트 비율을 따르고, 고정 비율이면 패널 크기와 무관하게 같은 결과가 나온다.
+  const ltCaptureSafeFrame = resolveStudioBg3dCaptureFrame({
+    viewportWidth: viewportBoxSize?.width ?? deviceQuality.renderWidth,
+    viewportHeight: viewportBoxSize?.height ?? deviceQuality.renderHeight,
+    aspectRatio: ltExportAspectRatio,
+  });
   const ltCaptureSizePreview = resolveStudioBg3dLtCaptureSize({
     sourceWidth: deviceQuality.renderWidth,
     sourceHeight: deviceQuality.renderHeight,
+    ...(ltCaptureSafeFrame ? { aspectRatio: ltCaptureSafeFrame.aspectRatio } : {}),
     requestedHeight: sceneBaseDocument.output.exportHeight,
     maxPixels: Math.min(deviceQuality.maxRenderPixels, STUDIO_BG3D_LT_RENDER_MAX_PIXELS),
   });
+  const ltDocumentAspectPreset = createStudioBg3dDocumentCaptureAspectPreset(
+    documentCanvasSize?.width,
+    documentCanvasSize?.height,
+  );
+  const ltCaptureAspectPresets = ltDocumentAspectPreset
+    ? [
+        STUDIO_BG3D_CAPTURE_ASPECT_PRESETS[0]!,
+        ltDocumentAspectPreset,
+        ...STUDIO_BG3D_CAPTURE_ASPECT_PRESETS.slice(1),
+      ]
+    : STUDIO_BG3D_CAPTURE_ASPECT_PRESETS;
+  const ltCaptureAspectPresetId = matchStudioBg3dCaptureAspectPreset(
+    ltExportAspectRatio,
+    ltCaptureAspectPresets,
+  );
+  const ltCaptureAspectLabel = ltCaptureAspectPresets.find(
+    (preset) => preset.id === ltCaptureAspectPresetId,
+  )?.label ?? `${(ltExportAspectRatio ?? 1).toFixed(2)} : 1`;
   const hideOnTab = (tab: BgPanelTab) => activePanelTab !== tab;
 
   const cancelPhysicsAnimationFrame = () => {
@@ -7879,6 +8079,42 @@ export function StudioBackground3D({
                     </Fragment>
                   )}
                 </Canvas>
+
+                {/* 세이프 프레임: 삽입될 사각형을 그대로 그리고, 잘려 나갈 영역을 레터/필러박스로
+                    덮는다. 캡처와 같은 순수 함수에서 나오므로 화면과 결과가 어긋날 수 없다.
+                    pointer-events-none이라 Orbit·선택 히트테스트에는 전혀 관여하지 않는다. */}
+                {!effectiveIsQuadView && !isCapturing && viewportBoxSize && ltCaptureSafeFrame ? (
+                  <div className="pointer-events-none absolute inset-0 z-20" aria-hidden="true">
+                    <div
+                      className={cx(
+                        "absolute border border-dashed",
+                        ltCaptureSafeFrame.fit === "exact"
+                          ? "border-accent/30"
+                          : "border-accent/75"
+                      )}
+                      style={{
+                        left: `${ltCaptureSafeFrame.x}px`,
+                        top: `${ltCaptureSafeFrame.y}px`,
+                        width: `${ltCaptureSafeFrame.width}px`,
+                        height: `${ltCaptureSafeFrame.height}px`,
+                        ...(ltCaptureSafeFrame.fit === "exact"
+                          ? {}
+                          : { boxShadow: "0 0 0 9999px oklch(0.16 0 0 / 0.5)" }),
+                      }}
+                    />
+                    {ltCaptureSafeFrame.fit === "exact" ? null : (
+                      <span
+                        className="absolute rounded-md bg-panel/90 px-1.5 py-0.5 text-[0.6rem] font-bold text-fg-2 shadow-sm"
+                        style={{
+                          left: `${ltCaptureSafeFrame.x + 4}px`,
+                          top: `${ltCaptureSafeFrame.y + 4}px`,
+                        }}
+                      >
+                        {ltCaptureAspectLabel}
+                      </span>
+                    )}
+                  </div>
+                ) : null}
 
                 {placementSession.phase === "preview" && placementPreviewAsset ? (
                   <div
@@ -11048,6 +11284,41 @@ export function StudioBackground3D({
                     ) : null}
                     {LT_EXPORT_HEIGHTS.map((height) => (
                       <option key={height} value={height}>{height.toLocaleString()} px</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-line bg-card/55 px-3 py-2">
+                  <div className="min-w-0">
+                    <label htmlFor="bg3d-lt-export-aspect" className="block text-xs font-bold text-fg">
+                      출력 비율
+                    </label>
+                    <p className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3" aria-live="polite">
+                      {ltExportAspectRatio === null
+                        ? "자동 — 3D 창 크기에 따라 삽입 구도가 달라집니다. 비율을 고정하세요."
+                        : "고정 — 뷰포트의 점선 안쪽만 삽입됩니다."}
+                    </p>
+                  </div>
+                  <select
+                    id="bg3d-lt-export-aspect"
+                    aria-label="LT 출력 비율"
+                    className="min-h-11 rounded-lg border border-line bg-panel px-2.5 text-xs font-semibold text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
+                    value={ltCaptureAspectPresetId}
+                    onChange={(event) => {
+                      const preset = ltCaptureAspectPresets.find(
+                        (candidate) => candidate.id === event.target.value,
+                      );
+                      if (!preset) return;
+                      updateLtExportAspectRatio(preset.ratio);
+                    }}
+                  >
+                    {ltCaptureAspectPresetId === "custom" ? (
+                      <option value="custom">
+                        {(ltExportAspectRatio ?? 1).toFixed(2)} : 1
+                      </option>
+                    ) : null}
+                    {ltCaptureAspectPresets.map((preset) => (
+                      <option key={preset.id} value={preset.id}>{preset.label}</option>
                     ))}
                   </select>
                 </div>

@@ -6,6 +6,7 @@
  * at the runtime boundary; this document stores only bounded GLB metadata and scene intent.
  */
 
+import { normalizeStudioBg3dCaptureAspectRatio } from "./studio-bg3d-capture-frame-geometry";
 import { normalizeStudioBg3dHierarchyParents } from "./studio-bg3d-hierarchy";
 
 export const STUDIO_BG3D_SCENE_DOCUMENT_KIND = "toonspectrum.bg3d-scene" as const;
@@ -280,6 +281,13 @@ export interface StudioBg3dToneOutputSettings {
 export interface StudioBg3dOutputSettings {
   readonly transparentBackground: boolean;
   readonly exportHeight: number;
+  /**
+   * 명시적 캡처 가로세로 비율(width / height).
+   *
+   * 이 키가 없는 문서는 예전과 똑같이 "라이브 뷰포트 비율"을 따른다(자동). 기본값을 넣어 버리면
+   * 이미 저장된 장면의 삽입 결과가 조용히 바뀌므로, 사용자가 비율을 고정했을 때만 기록한다.
+   */
+  readonly exportAspectRatio?: number;
   readonly line: StudioBg3dLineOutputSettings;
   readonly tone: StudioBg3dToneOutputSettings;
 }
@@ -1087,9 +1095,15 @@ function normalizeOutput(value: unknown): StudioBg3dOutputSettings {
   const candidate = isRecord(value) ? value : {};
   const line = isRecord(candidate.line) ? candidate.line : {};
   const tone = isRecord(candidate.tone) ? candidate.tone : {};
+  // 렌즈 시프트와 같은 선택 필드 규약: 값이 있을 때만 기록한다. 없는 문서는 자동(뷰포트 추종)으로
+  // 남아 예전 삽입 결과와 바이트 단위로 동일하고, strict 왕복도 그대로 통과한다.
+  const exportAspectRatio = hasOwn(candidate, "exportAspectRatio")
+    ? normalizeStudioBg3dCaptureAspectRatio(candidate.exportAspectRatio)
+    : null;
   return {
     transparentBackground: normalizedBoolean(candidate.transparentBackground, false),
     exportHeight: boundedInteger(candidate.exportHeight, 640, 256, 4096),
+    ...(exportAspectRatio === null ? {} : { exportAspectRatio }),
     line: {
       enabled: normalizedBoolean(line.enabled, true),
       layerType: normalizedEnum(line.layerType, LINE_LAYER_TYPE_SET, "raster"),

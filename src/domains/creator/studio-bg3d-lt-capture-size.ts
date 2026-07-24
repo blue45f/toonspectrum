@@ -14,6 +14,12 @@ export const STUDIO_BG3D_LT_CAPTURE_MAX_PIXELS = 16_777_216;
 export interface StudioBg3dLtCaptureSizeInput {
   readonly sourceWidth: number;
   readonly sourceHeight: number;
+  /**
+   * Explicit capture aspect (width / height). Omit to keep the legacy behaviour of following the
+   * live source aspect. An explicit ratio is what makes an insert reproducible: the same scene must
+   * not change composition because the 3D panel was resized.
+   */
+  readonly aspectRatio?: number;
   readonly requestedHeight: number;
   readonly maxPixels: number;
   readonly maxEdge?: number;
@@ -57,8 +63,14 @@ export function resolveStudioBg3dLtCaptureSize(
     return null;
   }
 
-  const aspectRatio = input.sourceWidth / input.sourceHeight;
-  if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) return null;
+  // An omitted ratio keeps the historical source-derived framing bit-for-bit; an explicit ratio
+  // replaces only the shape, never the budget guards below.
+  const aspectRatio = input.aspectRatio === undefined
+    ? input.sourceWidth / input.sourceHeight
+    : input.aspectRatio;
+  if (typeof aspectRatio !== "number" || !Number.isFinite(aspectRatio) || aspectRatio <= 0) {
+    return null;
+  }
 
   const heightByWidthEdge = Math.max(1, Math.floor(maxEdge / aspectRatio));
   const heightByPixels = Math.max(1, Math.floor(Math.sqrt(input.maxPixels / aspectRatio)));

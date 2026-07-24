@@ -111,6 +111,92 @@ describe("resolveStudioBg3dLtCaptureSize", () => {
     expect(resolveStudioBg3dLtCaptureSize(input)).toBeNull();
   });
 
+  it("uses an explicit aspect instead of the live source aspect", () => {
+    expect(
+      resolveStudioBg3dLtCaptureSize({
+        sourceWidth: 1_512,
+        sourceHeight: 851,
+        aspectRatio: 16 / 9,
+        requestedHeight: 1_080,
+        maxPixels: 8_294_400,
+      })
+    ).toEqual({
+      width: 1_920,
+      height: 1_080,
+      pixelCount: 2_073_600,
+      requestedHeight: 1_080,
+      wasReduced: false,
+    });
+  });
+
+  it("keeps every budget clamp when the aspect is explicit", () => {
+    const pixelBudget = resolveStudioBg3dLtCaptureSize({
+      sourceWidth: 1_512,
+      sourceHeight: 851,
+      aspectRatio: 16 / 9,
+      requestedHeight: 4_096,
+      maxPixels: 2_073_600,
+    });
+    expect(pixelBudget).not.toBeNull();
+    expect(pixelBudget!.pixelCount).toBeLessThanOrEqual(2_073_600);
+    expect(pixelBudget!.wasReduced).toBe(true);
+    expect(pixelBudget!.width / pixelBudget!.height).toBeCloseTo(16 / 9, 2);
+
+    const edgeBudget = resolveStudioBg3dLtCaptureSize({
+      sourceWidth: 800,
+      sourceHeight: 800,
+      aspectRatio: 4,
+      requestedHeight: 1_000,
+      maxPixels: 4_000_000,
+      maxEdge: 2_048,
+    });
+    expect(edgeBudget).toMatchObject({ width: 2_048, height: 512, wasReduced: true });
+
+    for (const input of [
+      { sourceWidth: 100, sourceHeight: 100, aspectRatio: Number.NaN, requestedHeight: 640, maxPixels: 1_000_000 },
+      { sourceWidth: 100, sourceHeight: 100, aspectRatio: 0, requestedHeight: 640, maxPixels: 1_000_000 },
+      { sourceWidth: 100, sourceHeight: 100, aspectRatio: -1, requestedHeight: 640, maxPixels: 1_000_000 },
+      { sourceWidth: 100, sourceHeight: 100, aspectRatio: 16 / 9, requestedHeight: 255, maxPixels: 1_000_000 },
+      { sourceWidth: 100, sourceHeight: 100, aspectRatio: 16 / 9, requestedHeight: 4_097, maxPixels: 1_000_000 },
+      {
+        sourceWidth: 100,
+        sourceHeight: 100,
+        aspectRatio: 16 / 9,
+        requestedHeight: 640,
+        maxPixels: STUDIO_BG3D_LT_CAPTURE_MAX_PIXELS + 1,
+      },
+      {
+        sourceWidth: 100,
+        sourceHeight: 100,
+        aspectRatio: 16 / 9,
+        requestedHeight: 640,
+        maxPixels: 1_000_000,
+        maxEdge: STUDIO_BG3D_LT_CAPTURE_MAX_EDGE + 1,
+      },
+    ]) {
+      expect(resolveStudioBg3dLtCaptureSize(input)).toBeNull();
+    }
+  });
+
+  it("stays byte-identical when the aspect is omitted (legacy documents)", () => {
+    const legacyInputs = [
+      { sourceWidth: 1_512, sourceHeight: 851, requestedHeight: 640, maxPixels: 2_073_600 },
+      { sourceWidth: 1_920, sourceHeight: 1_080, requestedHeight: 1_080, maxPixels: 8_294_400 },
+      { sourceWidth: 3_440, sourceHeight: 1_440, requestedHeight: 2_160, maxPixels: 8_388_608, maxEdge: 4_096 },
+      { sourceWidth: 741, sourceHeight: 1_333, requestedHeight: 4_096, maxPixels: 1_234_567 },
+      { sourceWidth: 1, sourceHeight: 1, requestedHeight: 1_024, maxPixels: 1_048_576 },
+    ] as const;
+    for (const input of legacyInputs) {
+      const legacy = resolveStudioBg3dLtCaptureSize(input);
+      const derived = resolveStudioBg3dLtCaptureSize({
+        ...input,
+        aspectRatio: input.sourceWidth / input.sourceHeight,
+      });
+      expect(legacy).not.toBeNull();
+      expect(derived).toEqual(legacy);
+    }
+  });
+
   it("never allocates beyond either limit at difficult rounding boundaries", () => {
     for (const [sourceWidth, sourceHeight] of [
       [1_919, 1_080],
