@@ -48,21 +48,12 @@ describe("mapStudioDocumentPointToAutoColorSeed", () => {
     ).toBeNull();
   });
 
-  it("fails closed for non-trivial rotation and flips", () => {
+  it("fails closed for non-axis-aligned free rotation", () => {
     expect(
       mapStudioDocumentPointToAutoColorSeed({
         documentX: 150,
         documentY: 80,
         image: { ...FRAME, rotation: 45 },
-        pixelWidth: 40,
-        pixelHeight: 20,
-      }),
-    ).toBeNull();
-    expect(
-      mapStudioDocumentPointToAutoColorSeed({
-        documentX: 150,
-        documentY: 80,
-        image: { ...FRAME, flipped: true },
         pixelWidth: 40,
         pixelHeight: 20,
       }),
@@ -80,6 +71,46 @@ describe("mapStudioDocumentPointToAutoColorSeed", () => {
     // 180° maps frame origin to the opposite planner corner.
     expect(sample).not.toBeNull();
     expect(sample!.x).toBeCloseTo(40 - 1e-6, 4);
+    expect(sample!.y).toBeCloseTo(20 - 1e-6, 4);
+  });
+
+  it("mirrors horizontal and vertical flips around the frame center", () => {
+    // Document point at the left edge mid-height → after H-flip becomes right edge in planner.
+    const hFlip = mapStudioDocumentPointToAutoColorSeed({
+      documentX: 100,
+      documentY: 100,
+      image: { ...FRAME, flipped: true },
+      pixelWidth: 40,
+      pixelHeight: 20,
+    });
+    expect(hFlip).not.toBeNull();
+    expect(hFlip!.x).toBeCloseTo(40 - 1e-6, 4);
+    expect(hFlip!.y).toBeCloseTo(10, 5);
+
+    // Document point at top edge mid-width → after V-flip becomes bottom edge in planner.
+    const vFlip = mapStudioDocumentPointToAutoColorSeed({
+      documentX: 200,
+      documentY: 50,
+      image: { ...FRAME, flippedY: true },
+      pixelWidth: 40,
+      pixelHeight: 20,
+    });
+    expect(vFlip).not.toBeNull();
+    expect(vFlip!.x).toBeCloseTo(20, 5);
+    expect(vFlip!.y).toBeCloseTo(20 - 1e-6, 4);
+  });
+
+  it("composes 180° rotation with horizontal flip", () => {
+    // 180° then H-flip: left-top doc corner → (right, bottom) after 180 → (left, bottom) after H-flip.
+    const sample = mapStudioDocumentPointToAutoColorSeed({
+      documentX: 100,
+      documentY: 50,
+      image: { ...FRAME, rotation: 180, flipped: true },
+      pixelWidth: 40,
+      pixelHeight: 20,
+    });
+    expect(sample).not.toBeNull();
+    expect(sample!.x).toBeCloseTo(0, 0);
     expect(sample!.y).toBeCloseTo(20 - 1e-6, 4);
   });
 });

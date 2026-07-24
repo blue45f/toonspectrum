@@ -1,8 +1,8 @@
 /**
  * Map a document-space pointer hit onto auto-color planner seed coordinates.
  *
- * Pure + deterministic. Supports axis-aligned (and optionally 180°) image layers only —
- * rotated/flipped non-trivial cases fail closed so the canvas never invents a seed.
+ * Pure + deterministic. Supports axis-aligned frames with optional 180° rotation and/or
+ * horizontal/vertical flips (Konva-style center flips). Other rotations fail closed.
  */
 
 export interface StudioAutoColorCanvasImageFrame {
@@ -68,18 +68,21 @@ export function mapStudioDocumentPointToAutoColorSeed(input: {
 
   const rotation = normalizeRotationDegrees(finite(frame.rotation, 0));
   if (rotation !== 0 && rotation !== 180) {
-    // Non-trivial rotation needs a full inverse matrix; fail closed for MVP seed placement.
-    return null;
-  }
-  if (frame.flipped || frame.flippedY) {
-    // Flips change sample axes; fail closed until a dedicated flip mapper ships.
+    // 90°/270° and free rotation need a full inverse matrix; fail closed.
     return null;
   }
 
   let localX = docX - x;
   let localY = docY - y;
+  // Inverse of display transform: unrotate first, then undo center-based flips.
   if (rotation === 180) {
     localX = w - localX;
+    localY = h - localY;
+  }
+  if (frame.flipped) {
+    localX = w - localX;
+  }
+  if (frame.flippedY) {
     localY = h - localY;
   }
 

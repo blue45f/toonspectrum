@@ -490,7 +490,7 @@ export function StudioAutoColorHintsPanel({
               <span className="mt-0.5 block font-normal leading-snug text-fg-3">
                 {canvasArmed
                   ? "켜짐 · 선화 위를 드래그하면 스트로크를 따라 시드가 찍힙니다"
-                  : "축 정렬된 선화 위에 클릭·드래그해 시드를 찍습니다"}
+                  : "축 정렬·반전 선화 위에 클릭·드래그해 시드를 찍습니다"}
               </span>
             </span>
           </button>

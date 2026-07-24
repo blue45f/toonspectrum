@@ -22325,7 +22325,7 @@ function StudioCuttoonEditor() {
           });
           return;
         }
-        setError("선화 이미지 안을 드래그해 시드를 찍어 주세요. (회전·반전 레이어는 아직 지원하지 않아요)");
+        setError("선화 이미지 안을 드래그해 시드를 찍어 주세요. (90°/자유 회전 레이어는 아직 지원하지 않아요)");
         return;
       }
       if (pos && !planSize) {
