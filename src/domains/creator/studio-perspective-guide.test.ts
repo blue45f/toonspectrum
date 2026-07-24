@@ -4,9 +4,14 @@ import {
   MAX_VANISHING_POINTS,
   PERSPECTIVE_LOCK_MIN_DRAG,
   addVanishingPoint,
+  alignVanishingPointsToEyeLevel,
   canAddVanishingPoint,
+  constrainVanishingPointToEyeLevel,
+  defaultPerspectiveEyeLevelY,
   defaultVanishingPointPosition,
+  movePerspectiveEyeLevel,
   moveVanishingPoint,
+  moveVanishingPointWithEyeLevel,
   perspectiveFanRays,
   projectPointOntoPerspectiveRay,
   removeVanishingPoint,
@@ -145,6 +150,56 @@ describe("addVanishingPoint / removeVanishingPoint / moveVanishingPoint — no-o
     expect(next).not.toBe(points);
     expect(next[0]).toEqual({ id: "a", x: 10, y: 20 });
     expect(next[1]).toEqual(points[1]);
+  });
+});
+
+describe("perspective eye level (CSP horizon)", () => {
+  it("defaults eye level to half canvas height", () => {
+    expect(defaultPerspectiveEyeLevelY(1200)).toBe(600);
+    expect(defaultPerspectiveEyeLevelY(0)).toBe(0);
+  });
+
+  it("constrains y to eye level only when horizon lock is on", () => {
+    expect(constrainVanishingPointToEyeLevel(10, 20, { eyeLevelY: 300, lockHorizon: false }))
+      .toEqual({ x: 10, y: 20 });
+    expect(constrainVanishingPointToEyeLevel(10, 20, { eyeLevelY: 300, lockHorizon: true }))
+      .toEqual({ x: 10, y: 300 });
+    expect(constrainVanishingPointToEyeLevel(10, 20, { eyeLevelY: null, lockHorizon: true }))
+      .toEqual({ x: 10, y: 20 });
+  });
+
+  it("moves only vanishing points that sit on the previous horizon", () => {
+    const points = [vp("a", 0, 300), vp("b", 100, 300), vp("c", 50, 10)];
+    const next = movePerspectiveEyeLevel(points, 300, 420);
+    expect(next).toEqual([
+      { id: "a", x: 0, y: 420 },
+      { id: "b", x: 100, y: 420 },
+      { id: "c", x: 50, y: 10 },
+    ]);
+    expect(movePerspectiveEyeLevel(points, null, 420)).toBe(points);
+  });
+
+  it("aligns every vanishing point to the eye level", () => {
+    const points = [vp("a", 0, 10), vp("b", 1, 20)];
+    expect(alignVanishingPointsToEyeLevel(points, 300)).toEqual([
+      { id: "a", x: 0, y: 300 },
+      { id: "b", x: 1, y: 300 },
+    ]);
+    expect(alignVanishingPointsToEyeLevel(points, Number.NaN)).toBe(points);
+  });
+
+  it("moveVanishingPointWithEyeLevel locks y when horizon lock is active", () => {
+    const points = [vp("a", 0, 0), vp("b", 1, 1)];
+    const locked = moveVanishingPointWithEyeLevel(points, "a", 40, 99, {
+      eyeLevelY: 250,
+      lockHorizon: true,
+    });
+    expect(locked[0]).toEqual({ id: "a", x: 40, y: 250 });
+    const free = moveVanishingPointWithEyeLevel(points, "a", 40, 99, {
+      eyeLevelY: 250,
+      lockHorizon: false,
+    });
+    expect(free[0]).toEqual({ id: "a", x: 40, y: 99 });
   });
 });
 

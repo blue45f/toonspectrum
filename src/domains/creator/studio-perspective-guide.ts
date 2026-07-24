@@ -59,8 +59,97 @@ export const PERSPECTIVE_LOCK_MIN_DRAG = 4;
 /** 소실점이 시작점과 사실상 같은 위치면 방향이 정의되지 않으므로 후보에서 제외한다. */
 const MIN_VP_DISTANCE = 1e-3;
 
+/**
+ * 소실점이 눈높이(수평선)에 "이미 올라가 있다"고 볼 최대 편차(문서 px).
+ * 눈높이 이동 시 같이 들어올릴 VP 판정과 잠금 시 no-op 판정에 쓴다.
+ */
+export const PERSPECTIVE_EYE_LEVEL_EPSILON = 0.5;
+
 function isFiniteNumber(n: number): boolean {
   return typeof n === "number" && Number.isFinite(n);
+}
+
+/** 캔버스 높이 기준 기본 눈높이(1점·2점 원근의 흔한 수평선). */
+export function defaultPerspectiveEyeLevelY(canvasHeight: number): number {
+  if (!isFiniteNumber(canvasHeight) || canvasHeight <= 0) return 0;
+  return canvasHeight / 2;
+}
+
+/**
+ * 수평선 잠금이 켜져 있으면 소실점 y를 눈높이로 고정한다.
+ * 잠금이 꺼져 있거나 눈높이가 비유효하면 입력 좌표를 그대로 돌려준다.
+ */
+export function constrainVanishingPointToEyeLevel(
+  x: number,
+  y: number,
+  options: { readonly eyeLevelY: number | null; readonly lockHorizon: boolean }
+): { x: number; y: number } {
+  if (!isFiniteNumber(x) || !isFiniteNumber(y)) return { x, y };
+  if (!options.lockHorizon || options.eyeLevelY === null || !isFiniteNumber(options.eyeLevelY)) {
+    return { x, y };
+  }
+  return { x, y: options.eyeLevelY };
+}
+
+/**
+ * 눈높이를 옮길 때, 이전 수평선 위에 있던 소실점만 새 눈높이로 같이 올린다.
+ * (3점 원근의 수직 VP처럼 수평선 밖 VP는 그대로 둔다.)
+ */
+export function movePerspectiveEyeLevel(
+  points: readonly VanishingPoint[],
+  previousEyeLevelY: number | null,
+  nextEyeLevelY: number,
+  options: { readonly epsilon?: number } = {}
+): VanishingPoint[] {
+  if (!isFiniteNumber(nextEyeLevelY)) return points as VanishingPoint[];
+  if (previousEyeLevelY === null || !isFiniteNumber(previousEyeLevelY)) {
+    // 이전 수평선이 없으면 모든 VP를 강제하지 않는다 — 호출부가 eyeLevelY 만 갱신한다.
+    return points as VanishingPoint[];
+  }
+  if (Object.is(previousEyeLevelY, nextEyeLevelY)) return points as VanishingPoint[];
+  const epsilon = options.epsilon ?? PERSPECTIVE_EYE_LEVEL_EPSILON;
+  let changed = false;
+  const next = points.map((point) => {
+    if (!isValidVanishingPoint(point)) return point;
+    if (Math.abs(point.y - previousEyeLevelY) > epsilon) return point;
+    changed = true;
+    return { ...point, y: nextEyeLevelY };
+  });
+  return changed ? next : (points as VanishingPoint[]);
+}
+
+/**
+ * 선택한 눈높이로 모든 소실점 y를 맞춘다(CSP "눈높이에 맞추기").
+ * 비유효 눈높이·변경 없음이면 원본 참조를 유지한다.
+ */
+export function alignVanishingPointsToEyeLevel(
+  points: readonly VanishingPoint[],
+  eyeLevelY: number
+): VanishingPoint[] {
+  if (!isFiniteNumber(eyeLevelY) || points.length === 0) return points as VanishingPoint[];
+  let changed = false;
+  const next = points.map((point) => {
+    if (!isValidVanishingPoint(point)) return point;
+    if (Object.is(point.y, eyeLevelY)) return point;
+    changed = true;
+    return { ...point, y: eyeLevelY };
+  });
+  return changed ? next : (points as VanishingPoint[]);
+}
+
+/**
+ * 소실점 드래그/입력 공용 — 수평선 잠금이 켜진 경우 y를 눈높이로 고정한 뒤 move한다.
+ * lock 이 꺼져 있으면 일반 moveVanishingPoint 와 동일하다.
+ */
+export function moveVanishingPointWithEyeLevel(
+  points: readonly VanishingPoint[],
+  id: string,
+  x: number,
+  y: number,
+  options: { readonly eyeLevelY: number | null; readonly lockHorizon: boolean }
+): VanishingPoint[] {
+  const constrained = constrainVanishingPointToEyeLevel(x, y, options);
+  return moveVanishingPoint(points, id, constrained.x, constrained.y);
 }
 
 function isValidVanishingPoint(vp: VanishingPoint): boolean {

@@ -14,6 +14,6 @@ describe("Studio perspective entry integration", () => {
     expect(setter).toContain("if (active && points.length === 0)");
     expect(setter).toContain("defaultVanishingPointPosition(points, CANVAS_W, canvasH)");
     expect(setter).toContain("points = addVanishingPoint(points");
-    expect(setter).toContain("perspective: { active, points }");
+    expect(setter).toContain("perspective: { ...current.perspective, active, points }");
   });
 });

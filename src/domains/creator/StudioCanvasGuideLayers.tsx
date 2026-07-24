@@ -143,8 +143,12 @@ export interface StudioCanvasGuideOverlayLayersProps {
   setSymmetryCenterY: Dispatch<SetStateAction<number>>;
   perspectiveRulerActive: boolean;
   vanishingPoints: VanishingPoint[];
+  perspectiveEyeLevelY?: number | null;
+  perspectiveLockHorizon?: boolean;
   onPreviewVanishingPoint: (id: string, x: number, y: number) => void;
   onCommitVanishingPoint: (id: string, x: number, y: number) => void;
+  onPreviewPerspectiveEyeLevelY?: (y: number) => void;
+  onCommitPerspectiveEyeLevelY?: (y: number) => void;
   isometricGridActive: boolean;
   isometricConfig: IsometricGridConfig;
   onPreviewIsometricOrigin: (x: number, y: number) => void;
@@ -175,8 +179,12 @@ export function StudioCanvasGuideOverlayLayers({
   setSymmetryCenterY,
   perspectiveRulerActive,
   vanishingPoints,
+  perspectiveEyeLevelY = null,
+  perspectiveLockHorizon = false,
   onPreviewVanishingPoint,
   onCommitVanishingPoint,
+  onPreviewPerspectiveEyeLevelY,
+  onCommitPerspectiveEyeLevelY,
   isometricGridActive,
   isometricConfig,
   onPreviewIsometricOrigin,
@@ -544,10 +552,15 @@ export function StudioCanvasGuideOverlayLayers({
               canvasWidth={canvasWidth}
               canvasHeight={canvasHeight}
               effScale={effScale}
+              eyeLevelY={perspectiveEyeLevelY}
+              lockHorizon={perspectiveLockHorizon}
               disabled={drawingAssistDisabled}
               onPreviewPoint={onPreviewVanishingPoint}
               onCommitPoint={onCommitVanishingPoint}
               onCancelPoint={onCancelDrawingAssistPreview}
+              onPreviewEyeLevelY={onPreviewPerspectiveEyeLevelY}
+              onCommitEyeLevelY={onCommitPerspectiveEyeLevelY}
+              onCancelEyeLevel={onCancelDrawingAssistPreview}
             />
           </Suspense>
         </Layer>

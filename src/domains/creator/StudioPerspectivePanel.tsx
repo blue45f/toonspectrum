@@ -7,7 +7,12 @@
 import { Plus, Sparkles, Trash2 } from "lucide-react";
 
 import { StudioCoordinateInput, StudioToggleChip } from "./studio-panel-ui";
-import { canAddVanishingPoint, MAX_VANISHING_POINTS, type VanishingPoint } from "./studio-perspective-guide";
+import {
+  canAddVanishingPoint,
+  defaultPerspectiveEyeLevelY,
+  MAX_VANISHING_POINTS,
+  type VanishingPoint,
+} from "./studio-perspective-guide";
 
 import type { ReactElement } from "react";
 
@@ -51,9 +56,19 @@ type MoveVanishingPoint = (id: string, x: number, y: number) => void;
 type StudioPerspectivePanelBaseProps = {
   active: boolean;
   points: VanishingPoint[];
+  /** Independent horizon line (document px). null = not authored yet. */
+  eyeLevelY?: number | null;
+  /** Pin vanishing-point y to eyeLevelY while dragging/editing. */
+  lockHorizon?: boolean;
+  /** Canvas height used only to seed a default eye level when none is authored. */
+  canvasHeight?: number;
   onToggleActive: () => void;
   onAddPoint: () => void;
   onRemovePoint: (id: string) => void;
+  onToggleLockHorizon?: (next: boolean) => void;
+  onCommitEyeLevelY?: (next: number) => void;
+  onPreviewEyeLevelY?: (next: number) => void;
+  onAlignToEyeLevel?: () => void;
   disabled?: boolean;
   disabledReason?: string;
   /** Optional transient canvas preview. It must not append undo/CRDT history. */
@@ -78,9 +93,16 @@ export type StudioPerspectivePanelProps = StudioPerspectivePanelBaseProps & Stud
 export function StudioPerspectivePanel({
   active,
   points,
+  eyeLevelY = null,
+  lockHorizon = false,
+  canvasHeight = 1200,
   onToggleActive,
   onAddPoint,
   onRemovePoint,
+  onToggleLockHorizon,
+  onCommitEyeLevelY,
+  onPreviewEyeLevelY,
+  onAlignToEyeLevel,
   disabled = false,
   disabledReason,
   onPreviewPoint,
@@ -89,6 +111,7 @@ export function StudioPerspectivePanel({
 }: StudioPerspectivePanelProps): ReactElement {
   const canAdd = canAddVanishingPoint(points);
   const commitPoint = onCommitPoint ?? onMovePoint;
+  const resolvedEyeLevelY = eyeLevelY ?? defaultPerspectiveEyeLevelY(canvasHeight);
   return (
     <div className="pt-2.5 border-t border-line/35 space-y-2">
       <div className="flex items-center justify-between gap-2">
@@ -129,8 +152,12 @@ export function StudioPerspectivePanel({
                     label="Y"
                     ariaLabel={`소실점 ${index + 1} Y`}
                     value={vp.y}
-                    disabled={disabled}
-                    onPreview={onPreviewPoint ? (next) => onPreviewPoint(vp.id, vp.x, next) : undefined}
+                    disabled={disabled || lockHorizon}
+                    onPreview={
+                      !lockHorizon && onPreviewPoint
+                        ? (next) => onPreviewPoint(vp.id, vp.x, next)
+                        : undefined
+                    }
                     onCommit={(next) => commitPoint(vp.id, vp.x, next)}
                   />
                   <button
@@ -162,9 +189,49 @@ export function StudioPerspectivePanel({
             소실점 추가
           </button>
 
+          <div className="space-y-1.5 rounded border border-line/50 bg-card/40 p-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[0.68rem] font-semibold text-fg-3">눈높이 (수평선)</span>
+              {onToggleLockHorizon && (
+                <StudioToggleChip
+                  active={lockHorizon}
+                  disabled={disabled}
+                  onClick={() => onToggleLockHorizon(!lockHorizon)}
+                  aria-label={`눈높이 잠금 ${lockHorizon ? "끄기" : "켜기"}`}
+                  title={disabledReason ?? "켜면 소실점 세로 위치가 눈높이에 고정됩니다."}
+                >
+                  {lockHorizon ? "잠금" : "자유"}
+                </StudioToggleChip>
+              )}
+            </div>
+            {onCommitEyeLevelY && (
+              <div className="flex items-center gap-1.5">
+                <VpCoordInput
+                  label="Y"
+                  ariaLabel="눈높이 Y"
+                  value={resolvedEyeLevelY}
+                  disabled={disabled}
+                  onPreview={onPreviewEyeLevelY}
+                  onCommit={onCommitEyeLevelY}
+                />
+                {onAlignToEyeLevel && (
+                  <button
+                    type="button"
+                    disabled={disabled || points.length === 0}
+                    onClick={onAlignToEyeLevel}
+                    title={disabledReason ?? "모든 소실점을 눈높이로 맞춥니다."}
+                    className="shrink-0 rounded border border-line px-1.5 py-1 text-[0.65rem] font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11"
+                  >
+                    맞추기
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
           <p className="flex items-start gap-1 text-[0.68rem] leading-relaxed text-fg-3">
             <Sparkles className="mt-0.5 shrink-0 size-3 text-accent" aria-hidden />
-            소실점을 1~3개 배치하면 펜·직선이 그 점을 향해 자동으로 정렬됩니다.
+            소실점 1~3개 + 독립 눈높이로 1·2점 원근 수평선을 맞춥니다. 잠그면 VP가 수평선 위에 유지됩니다.
           </p>
         </div>
       )}

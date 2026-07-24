@@ -304,6 +304,8 @@ describe("studio project file", () => {
     drawingAssist.perspective = {
       active: true,
       points: [{ id: "vp-a", x: 400, y: 320 }],
+      eyeLevelY: 320,
+      lockHorizon: false,
     };
     const parsed = parseStudioProjectFile({
       version: 2,

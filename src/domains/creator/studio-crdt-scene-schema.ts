@@ -435,6 +435,8 @@ export function validateStudioCrdtPagePayload(payload: StudioCrdtPagePayload): S
           x: point.x,
           y: point.y,
         })),
+        eyeLevelY: drawingAssist.perspective.eyeLevelY,
+        lockHorizon: drawingAssist.perspective.lockHorizon,
       },
       isometric: {
         active: drawingAssist.isometric.active,

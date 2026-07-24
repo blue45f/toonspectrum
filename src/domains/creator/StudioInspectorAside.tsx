@@ -247,6 +247,10 @@ export interface StudioInspectorAsideHandlers {
   patchAdvancedRuler: (id: string, patch: Partial<StudioAdvancedRuler>) => void;
   moveVanishingPointById: (id: string, x: number, y: number) => void;
   previewVanishingPointById: (id: string, x: number, y: number) => void;
+  setPerspectiveEyeLevelY: (y: number) => void;
+  previewPerspectiveEyeLevelY: (y: number) => void;
+  setPerspectiveLockHorizon: (next: boolean) => void;
+  alignPerspectiveToEyeLevel: () => void;
   previewIsometricOrigin: (x: number, y: number) => void;
   commitIsometricOrigin: (x: number, y: number) => void;
   onColorizeSelected: () => void;
@@ -417,6 +421,8 @@ interface StudioInspectorAsideProps {
   panelSplitHint: string | null;
   panelSplitRatio: number;
   perspectiveRulerActive: boolean;
+  perspectiveEyeLevelY: number | null;
+  perspectiveLockHorizon: boolean;
   pixelBrushRadius: number;
   pixelBusy: boolean;
   pixelCombine: SelectionCombineMode;
@@ -760,6 +766,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   panelSplitHint,
   panelSplitRatio,
   perspectiveRulerActive,
+  perspectiveEyeLevelY,
+  perspectiveLockHorizon,
   pixelBrushRadius,
   pixelBusy,
   pixelCombine,
@@ -1020,6 +1028,10 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     patchAdvancedRuler,
     moveVanishingPointById,
     previewVanishingPointById,
+    setPerspectiveEyeLevelY,
+    previewPerspectiveEyeLevelY,
+    setPerspectiveLockHorizon,
+    alignPerspectiveToEyeLevel,
     previewIsometricOrigin,
     commitIsometricOrigin,
     onColorizeSelected,
@@ -3203,6 +3215,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   <StudioPerspectivePanel
                     active={perspectiveRulerActive}
                     points={vanishingPoints}
+                    eyeLevelY={perspectiveEyeLevelY}
+                    lockHorizon={perspectiveLockHorizon}
+                    canvasHeight={canvasH}
                     disabled={drawingAssistControlsDisabled}
                     disabledReason={drawingAssistDisabledReason}
                     onToggleActive={() => {
@@ -3212,6 +3227,10 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     onRemovePoint={removeVanishingPointHandler}
                     onPreviewPoint={previewVanishingPointById}
                     onCommitPoint={moveVanishingPointById}
+                    onToggleLockHorizon={setPerspectiveLockHorizon}
+                    onCommitEyeLevelY={setPerspectiveEyeLevelY}
+                    onPreviewEyeLevelY={previewPerspectiveEyeLevelY}
+                    onAlignToEyeLevel={alignPerspectiveToEyeLevel}
                   />
                 </Suspense>
                 <Suspense fallback={null}>

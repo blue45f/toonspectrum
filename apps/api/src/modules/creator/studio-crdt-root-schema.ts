@@ -375,7 +375,14 @@ const STUDIO_CRDT_DRAWING_ASSIST_KEYS = new Set([
   "isometric",
   "advanced",
 ]);
-const STUDIO_CRDT_PERSPECTIVE_ASSIST_KEYS = new Set(["active", "points"]);
+const STUDIO_CRDT_PERSPECTIVE_ASSIST_KEYS_LEGACY = new Set(["active", "points"]);
+/** Canonical: independent eye-level horizon + optional VP horizon lock (CSP-class). */
+const STUDIO_CRDT_PERSPECTIVE_ASSIST_KEYS = new Set([
+  "active",
+  "points",
+  "eyeLevelY",
+  "lockHorizon",
+]);
 const STUDIO_CRDT_VANISHING_POINT_KEYS = new Set(["id", "x", "y"]);
 const STUDIO_CRDT_ISOMETRIC_ASSIST_KEYS = new Set([
   "active",
@@ -542,8 +549,10 @@ function isValidStudioCrdtDrawingAssist(value: unknown): boolean {
       : null;
   if (!expectedKeys || !isExactJsonObject(value, expectedKeys)) return false;
   const { perspective, isometric } = value;
+  const perspectiveKeysOk = isExactJsonObject(perspective, STUDIO_CRDT_PERSPECTIVE_ASSIST_KEYS)
+    || isExactJsonObject(perspective, STUDIO_CRDT_PERSPECTIVE_ASSIST_KEYS_LEGACY);
   if (
-    !isExactJsonObject(perspective, STUDIO_CRDT_PERSPECTIVE_ASSIST_KEYS) ||
+    !perspectiveKeysOk ||
     !isExactJsonObject(isometric, STUDIO_CRDT_ISOMETRIC_ASSIST_KEYS) ||
     typeof perspective.active !== "boolean" ||
     typeof isometric.active !== "boolean" ||
@@ -572,6 +581,20 @@ function isValidStudioCrdtDrawingAssist(value: unknown): boolean {
     )
   ) {
     return false;
+  }
+  if (Object.prototype.hasOwnProperty.call(perspective, "eyeLevelY")) {
+    const eyeLevelY = (perspective as { eyeLevelY: unknown }).eyeLevelY;
+    if (
+      eyeLevelY !== null
+      && !finiteNumberInRange(eyeLevelY, -STUDIO_CRDT_MAX_COORDINATE, STUDIO_CRDT_MAX_COORDINATE)
+    ) {
+      return false;
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(perspective, "lockHorizon")) {
+    if (typeof (perspective as { lockHorizon: unknown }).lockHorizon !== "boolean") {
+      return false;
+    }
   }
 
   const pointIds = new Set<string>();

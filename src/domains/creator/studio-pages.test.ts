@@ -183,6 +183,8 @@ describe("studio-pages (pure, real exports)", () => {
       perspective: {
         active: true,
         points: [{ id: "vp-a", x: 120, y: 300 }],
+        eyeLevelY: 300,
+        lockHorizon: true,
       },
       isometric: {
         active: false,
@@ -206,6 +208,8 @@ describe("studio-pages (pure, real exports)", () => {
       perspective: {
         active: true,
         points: [{ id: "vp-a", x: 600, y: 300 }],
+        eyeLevelY: 300,
+        lockHorizon: true,
       },
       isometric: { ...drawingAssist.isometric, originX: 520 },
     });

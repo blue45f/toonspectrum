@@ -33,13 +33,23 @@ const MAX_IDENTIFIER_LENGTH = 160;
 
 const LEGACY_ROOT_KEYS = ["version", "perspective", "isometric"] as const;
 const ROOT_KEYS = ["version", "perspective", "isometric", "advanced"] as const;
-const PERSPECTIVE_KEYS = ["active", "points"] as const;
+/** Pre-eye-level perspective envelope (v2 without horizon fields). */
+const PERSPECTIVE_KEYS_LEGACY = ["active", "points"] as const;
+/** Canonical perspective envelope: independent eye level + optional horizon lock (CSP-class). */
+const PERSPECTIVE_KEYS = ["active", "points", "eyeLevelY", "lockHorizon"] as const;
 const ISOMETRIC_KEYS = ["active", "angleDeg", "cellSize", "originX", "originY"] as const;
 const VANISHING_POINT_KEYS = ["id", "x", "y"] as const;
 
 export interface StudioPerspectiveAssistDocument {
   active: boolean;
   points: VanishingPoint[];
+  /**
+   * Independent horizon line in document pixels. `null` means no authored eye level yet
+   * (defaults are applied only when the artist enables horizon lock or edits the line).
+   */
+  eyeLevelY: number | null;
+  /** When true, vanishing-point moves keep y pinned to `eyeLevelY`. */
+  lockHorizon: boolean;
 }
 
 export interface StudioIsometricAssistDocument {
@@ -177,7 +187,7 @@ export function createDefaultStudioDrawingAssistDocument(
   const origin = defaultIsometricOrigin(safe.canvasWidth, safe.canvasHeight);
   return {
     version: STUDIO_DRAWING_ASSIST_DOCUMENT_VERSION,
-    perspective: { active: false, points: [] },
+    perspective: { active: false, points: [], eyeLevelY: null, lockHorizon: false },
     isometric: {
       active: false,
       angleDeg: DEFAULT_ISOMETRIC_ANGLE_DEG,
@@ -187,6 +197,16 @@ export function createDefaultStudioDrawingAssistDocument(
     },
     advanced: createDefaultStudioAdvancedRulerDocument(),
   };
+}
+
+function normalizePerspectiveEyeLevelY(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return boundedCoordinate(value, 0);
+}
+
+function normalizePerspectiveLockHorizon(value: unknown): boolean {
+  return value === true;
 }
 
 /**
@@ -220,6 +240,8 @@ export function normalizeStudioDrawingAssistDocument(
     perspective: {
       active: perspectiveActive,
       points: normalizeVanishingPoints(perspective.points),
+      eyeLevelY: normalizePerspectiveEyeLevelY(perspective.eyeLevelY),
+      lockHorizon: normalizePerspectiveLockHorizon(perspective.lockHorizon),
     },
     isometric: {
       active: isometricActive,
@@ -309,7 +331,9 @@ function parseLegacyDrawingAssistFields(source: Record<string, unknown>): Pick<
   StudioDrawingAssistDocument,
   "perspective" | "isometric"
 > | null {
-  const perspective = strictDataRecord(source.perspective, PERSPECTIVE_KEYS);
+  // Accept both pre-eye-level and canonical perspective envelopes so older shared docs still load.
+  const perspective = strictDataRecord(source.perspective, PERSPECTIVE_KEYS)
+    ?? strictDataRecord(source.perspective, PERSPECTIVE_KEYS_LEGACY);
   const isometric = strictDataRecord(source.isometric, ISOMETRIC_KEYS);
   if (!perspective || !isometric) return null;
   const pointValues = strictArrayValues(perspective.points);
@@ -352,8 +376,36 @@ function parseLegacyDrawingAssistFields(source: Record<string, unknown>): Pick<
   ) {
     return null;
   }
+  let eyeLevelY: number | null = null;
+  if (Object.prototype.hasOwnProperty.call(perspective, "eyeLevelY")) {
+    if (perspective.eyeLevelY === null) {
+      eyeLevelY = null;
+    } else if (
+      typeof perspective.eyeLevelY === "number"
+      && Number.isFinite(perspective.eyeLevelY)
+      && Math.abs(perspective.eyeLevelY) <= STUDIO_DRAWING_ASSIST_MAX_COORDINATE
+    ) {
+      eyeLevelY = perspective.eyeLevelY;
+    } else {
+      return null;
+    }
+  }
+  const lockHorizon = Object.prototype.hasOwnProperty.call(perspective, "lockHorizon")
+    ? perspective.lockHorizon === true
+    : false;
+  if (
+    Object.prototype.hasOwnProperty.call(perspective, "lockHorizon")
+    && typeof perspective.lockHorizon !== "boolean"
+  ) {
+    return null;
+  }
   return {
-    perspective: { active: perspective.active, points },
+    perspective: {
+      active: perspective.active,
+      points,
+      eyeLevelY,
+      lockHorizon,
+    },
     isometric: {
       active: isometric.active,
       angleDeg: isometric.angleDeg,
@@ -441,6 +493,8 @@ export function areStudioDrawingAssistDocumentsEqual(
   if (
     left.version !== right.version ||
     left.perspective.active !== right.perspective.active ||
+    left.perspective.eyeLevelY !== right.perspective.eyeLevelY ||
+    left.perspective.lockHorizon !== right.perspective.lockHorizon ||
     left.isometric.active !== right.isometric.active ||
     left.isometric.angleDeg !== right.isometric.angleDeg ||
     left.isometric.cellSize !== right.isometric.cellSize ||

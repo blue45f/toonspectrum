@@ -22,6 +22,32 @@ function baseProps(
 afterEach(cleanup);
 
 describe("StudioPerspectivePanel", () => {
+  it("toggles horizon lock and commits eye-level Y", () => {
+    const onToggleLockHorizon = vi.fn();
+    const onCommitEyeLevelY = vi.fn();
+    const onAlignToEyeLevel = vi.fn();
+    render(
+      <StudioPerspectivePanel
+        {...baseProps({
+          eyeLevelY: 240,
+          lockHorizon: false,
+          onToggleLockHorizon,
+          onCommitEyeLevelY,
+          onAlignToEyeLevel,
+        })}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "눈높이 잠금 켜기" }));
+    expect(onToggleLockHorizon).toHaveBeenCalledWith(true);
+    const eyeInput = screen.getByRole("textbox", { name: "눈높이 Y" });
+    fireEvent.focus(eyeInput);
+    fireEvent.change(eyeInput, { target: { value: "300" } });
+    fireEvent.keyDown(eyeInput, { key: "Enter" });
+    expect(onCommitEyeLevelY).toHaveBeenCalledWith(300);
+    fireEvent.click(screen.getByRole("button", { name: "맞추기" }));
+    expect(onAlignToEyeLevel).toHaveBeenCalledOnce();
+  });
+
   it("previews valid coordinate text but commits it only once on Enter", () => {
     const onPreviewPoint = vi.fn();
     const onCommitPoint = vi.fn();

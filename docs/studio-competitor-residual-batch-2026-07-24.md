@@ -24,7 +24,8 @@ Finite shippable batch after CSP EX / Magma / Photopea / Procreate / SHAPER surv
 | Live soft-lock canvas mutation gate | pure gate + boundary |
 | Auto-color hints panel + scribble/apply | fill-tab; worker `onRun`; selected `imageSrc`; **scribble seed palette + rec chips**; **canvas click + freehand stroke seed sampling** (axis-aligned + **H/V flip**, 180°); **Advanced Fill batch apply** via `onApplyResult` → `patchEl`; **새 채색 레이어** multi-layer target via `onApplyNewLayer` |
 | Edit crop menu reachability | edit controls + menubar |
-| Live ink stroke-complete handoff flicker | residual sample admission + `reauthorLastSettledFromDocumentPoints` before committed release |
+| Live ink stroke-complete handoff flicker | residual sample admission + `reauthorLastSettledFromDocumentPoints` before committed release; brush-alias mapped reauthor pressures + noop clear skip (`a069e708`) |
+| CSP perspective eye-level / horizon lock | Independent `eyeLevelY` + `lockHorizon` on drawing-assist document (legacy envelope still parses); pure constrain/align/co-move; panel + overlay horizon handle; CRDT dual-key validation |
 | CSP Size dynamics Min (pressure floor) | `pressureMinSize` snapshot + `studioBrushPressureWithMinSize` on hardware/velocity channels; Brush Studio “최소 굵기” |
 | CSP vector eraser erase-to-intersection | Pure plan + document apply + desktop dock scissors + **mobile eraser sheet** toggle; freehand pen click erases between nearest cuts |
 
@@ -52,7 +53,7 @@ Re-scan of `docs/studio-clip-ex-benchmark-2026-07-22.md` “다음 경계” and
 | Frame-folder shared gutters / child clip topology | Separate document engine (M–L) |
 | Full rich-text / vertical 傍点 / SVG ruby | Multi-line measureText stack |
 | SHAPER texture paint on mesh | Poser surface not mounted |
-| Independent perspective eye-level + object snap | Multi-hour geometry UX (no pure plan ready for glue) |
+| Object snap for stroke/shape placement (not selection) | Smart-guides already cover select-transform; freehand continuous object-edge snap is multi-hour UX without false-positive geometry |
 | Workspace cloud sync / shortcut marketplace | Policy + server |
 | ABR / cs3* marketplace | Policy exclusion |
 | Full Magma CRDT / WebGPU canvas rewrite | Multi-year architecture |

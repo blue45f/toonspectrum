@@ -887,8 +887,11 @@ import {
 } from "./studio-pending-stroke-durability";
 import {
   addVanishingPoint,
+  alignVanishingPointsToEyeLevel,
+  defaultPerspectiveEyeLevelY,
   defaultVanishingPointPosition,
-  moveVanishingPoint,
+  movePerspectiveEyeLevel,
+  moveVanishingPointWithEyeLevel,
   removeVanishingPoint,
   resolvePerspectiveRay,
   snapStrokePointToPerspective,
@@ -5588,6 +5591,8 @@ function StudioCuttoonEditor() {
   const perspectiveRulerActive = drawingAssistDocument.perspective.active;
   const [quickShapeActive, setQuickShapeActive] = useState(false); // 기본 꺼짐
   const vanishingPoints = drawingAssistDocument.perspective.points;
+  const perspectiveEyeLevelY = drawingAssistDocument.perspective.eyeLevelY;
+  const perspectiveLockHorizon = drawingAssistDocument.perspective.lockHorizon;
   const isometricGridActive = drawingAssistDocument.isometric.active;
   const isometricAngleDeg = drawingAssistDocument.isometric.angleDeg;
   const isometricCellSize = drawingAssistDocument.isometric.cellSize;
@@ -15018,11 +15023,15 @@ function StudioCuttoonEditor() {
       let points = current.perspective.points;
       if (active && points.length === 0) {
         const position = defaultVanishingPointPosition(points, CANVAS_W, canvasH);
-        points = addVanishingPoint(points, { id: uid(), x: position.x, y: position.y });
+        const y = current.perspective.lockHorizon
+          && (current.perspective.eyeLevelY ?? defaultPerspectiveEyeLevelY(canvasH)) !== null
+          ? (current.perspective.eyeLevelY ?? defaultPerspectiveEyeLevelY(canvasH))
+          : position.y;
+        points = addVanishingPoint(points, { id: uid(), x: position.x, y });
       }
       return {
         ...current,
-        perspective: { active, points },
+        perspective: { ...current.perspective, active, points },
         isometric: active ? { ...current.isometric, active: false } : current.isometric,
         advanced: active
           ? { ...current.advanced, activeSnapRulerId: null }
@@ -15051,13 +15060,19 @@ function StudioCuttoonEditor() {
   function addVanishingPointHandler() {
     commitStudioDrawingAssistDocument((current) => {
       const pos = defaultVanishingPointPosition(current.perspective.points, CANVAS_W, canvasH);
+      const eyeLevelY = current.perspective.eyeLevelY
+        ?? (current.perspective.lockHorizon ? defaultPerspectiveEyeLevelY(canvasH) : null);
+      const y = current.perspective.lockHorizon && eyeLevelY !== null ? eyeLevelY : pos.y;
       return {
         ...current,
         perspective: {
           ...current.perspective,
+          eyeLevelY: current.perspective.lockHorizon
+            ? (eyeLevelY ?? defaultPerspectiveEyeLevelY(canvasH))
+            : current.perspective.eyeLevelY,
           points: addVanishingPoint(
             current.perspective.points,
-            { id: uid(), x: pos.x, y: pos.y }
+            { id: uid(), x: pos.x, y }
           ),
         },
       };
@@ -15077,7 +15092,16 @@ function StudioCuttoonEditor() {
       ...current,
       perspective: {
         ...current.perspective,
-        points: moveVanishingPoint(current.perspective.points, id, x, y),
+        points: moveVanishingPointWithEyeLevel(
+          current.perspective.points,
+          id,
+          x,
+          y,
+          {
+            eyeLevelY: current.perspective.eyeLevelY,
+            lockHorizon: current.perspective.lockHorizon,
+          }
+        ),
       },
     }));
   }
@@ -15086,9 +15110,75 @@ function StudioCuttoonEditor() {
       ...current,
       perspective: {
         ...current.perspective,
-        points: moveVanishingPoint(current.perspective.points, id, x, y),
+        points: moveVanishingPointWithEyeLevel(
+          current.perspective.points,
+          id,
+          x,
+          y,
+          {
+            eyeLevelY: current.perspective.eyeLevelY,
+            lockHorizon: current.perspective.lockHorizon,
+          }
+        ),
       },
     }));
+  }
+  function setPerspectiveEyeLevelY(nextY: number) {
+    commitStudioDrawingAssistDocument((current) => {
+      const previous = current.perspective.eyeLevelY;
+      return {
+        ...current,
+        perspective: {
+          ...current.perspective,
+          eyeLevelY: nextY,
+          points: movePerspectiveEyeLevel(current.perspective.points, previous, nextY),
+        },
+      };
+    });
+  }
+  function previewPerspectiveEyeLevelY(nextY: number) {
+    previewStudioDrawingAssistDocument((current) => {
+      const previous = current.perspective.eyeLevelY;
+      return {
+        ...current,
+        perspective: {
+          ...current.perspective,
+          eyeLevelY: nextY,
+          points: movePerspectiveEyeLevel(current.perspective.points, previous, nextY),
+        },
+      };
+    });
+  }
+  function setPerspectiveLockHorizon(next: boolean) {
+    commitStudioDrawingAssistDocument((current) => {
+      const eyeLevelY = current.perspective.eyeLevelY
+        ?? defaultPerspectiveEyeLevelY(canvasH);
+      return {
+        ...current,
+        perspective: {
+          ...current.perspective,
+          lockHorizon: next,
+          eyeLevelY: next ? eyeLevelY : current.perspective.eyeLevelY,
+          points: next
+            ? alignVanishingPointsToEyeLevel(current.perspective.points, eyeLevelY)
+            : current.perspective.points,
+        },
+      };
+    });
+  }
+  function alignPerspectiveToEyeLevel() {
+    commitStudioDrawingAssistDocument((current) => {
+      const eyeLevelY = current.perspective.eyeLevelY
+        ?? defaultPerspectiveEyeLevelY(canvasH);
+      return {
+        ...current,
+        perspective: {
+          ...current.perspective,
+          eyeLevelY,
+          points: alignVanishingPointsToEyeLevel(current.perspective.points, eyeLevelY),
+        },
+      };
+    });
   }
   // 원근자와 동시에 켜지면 펜/직선 스냅이 어느 쪽을 따를지 모호해지므로 상호 배타적으로 만든다
   // (한쪽을 켜면 다른 쪽을 끈다).
@@ -17212,7 +17302,7 @@ function StudioCuttoonEditor() {
       }
       return {
         ...document,
-        perspective: { active, points },
+        perspective: { ...document.perspective, active, points },
         isometric: active ? { ...document.isometric, active: false } : document.isometric,
       };
     });
@@ -28839,6 +28929,7 @@ function StudioCuttoonEditor() {
     addLayerMask,
     createLayerMaskFromSelection,
     addVanishingPointHandler,
+    alignPerspectiveToEyeLevel,
     alignSelected,
     announceDrawingShortcut,
     applyBgPreset,
@@ -28874,6 +28965,9 @@ function StudioCuttoonEditor() {
     patchAdvancedRuler,
     moveVanishingPointById,
     previewVanishingPointById,
+    setPerspectiveEyeLevelY,
+    previewPerspectiveEyeLevelY,
+    setPerspectiveLockHorizon,
     previewIsometricOrigin,
     commitIsometricOrigin,
     onColorizeSelected,
@@ -29512,6 +29606,8 @@ function StudioCuttoonEditor() {
     jumpToHistoryIndex,
     moveVanishingPointById,
     previewVanishingPointById,
+    setPerspectiveEyeLevelY,
+    previewPerspectiveEyeLevelY,
     previewIsometricOrigin,
     commitIsometricOrigin,
     previewAdvancedRuler,
@@ -30631,6 +30727,8 @@ function StudioCuttoonEditor() {
           uiDensityMode={uiDensityMode}
           userGuides={userGuides}
           vanishingPoints={vanishingPoints}
+          perspectiveEyeLevelY={perspectiveEyeLevelY}
+          perspectiveLockHorizon={perspectiveLockHorizon}
           webGpuPreviewAuthorized={webGpuPreviewAuthorized}
           webGpuPreviewStrokes={webGpuPreviewStrokes}
           webGpuViewportSurface={webGpuViewportSurface}
@@ -30879,6 +30977,8 @@ function StudioCuttoonEditor() {
           panelSplitHint={panelSplitHint}
           panelSplitRatio={panelSplitRatio}
           perspectiveRulerActive={perspectiveRulerActive}
+          perspectiveEyeLevelY={perspectiveEyeLevelY}
+          perspectiveLockHorizon={perspectiveLockHorizon}
           pixelBrushRadius={pixelBrushRadius}
           pixelBusy={pixelBusy}
           pixelCombine={pixelCombine}
@@ -31615,6 +31715,8 @@ interface StudioCanvasViewportHandlers {
   jumpToHistoryIndex: (index: number) => void;
   moveVanishingPointById: (id: string, x: number, y: number) => void;
   previewVanishingPointById: (id: string, x: number, y: number) => void;
+  setPerspectiveEyeLevelY: (y: number) => void;
+  previewPerspectiveEyeLevelY: (y: number) => void;
   previewIsometricOrigin: (x: number, y: number) => void;
   commitIsometricOrigin: (x: number, y: number) => void;
   previewAdvancedRuler: (id: string, patch: Partial<StudioAdvancedRuler>) => void;
@@ -31927,6 +32029,8 @@ interface StudioCanvasViewportProps {
   uiDensityMode: "simple" | "full" | "focus";
   userGuides: { id: string; type: "v" | "h"; pos: number; }[];
   vanishingPoints: VanishingPoint[];
+  perspectiveEyeLevelY: number | null;
+  perspectiveLockHorizon: boolean;
   webGpuPreviewAuthorized: boolean;
   webGpuPreviewStrokes: readonly StudioGpuStroke[];
   webGpuViewportSurface: import("./studio-webgpu-viewport").StudioWebGpuViewportSurfacePlan | null;
@@ -32207,6 +32311,8 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   uiDensityMode,
   userGuides,
   vanishingPoints,
+  perspectiveEyeLevelY,
+  perspectiveLockHorizon,
   webGpuPreviewAuthorized,
   webGpuPreviewStrokes,
   webGpuViewportSurface,
@@ -32259,6 +32365,8 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     jumpToHistoryIndex,
     moveVanishingPointById,
     previewVanishingPointById,
+    setPerspectiveEyeLevelY,
+    previewPerspectiveEyeLevelY,
     previewIsometricOrigin,
     commitIsometricOrigin,
     previewAdvancedRuler,
@@ -33911,8 +34019,12 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               setSymmetryCenterY={setSymmetryCenterY}
               perspectiveRulerActive={perspectiveRulerActive}
               vanishingPoints={vanishingPoints}
+              perspectiveEyeLevelY={perspectiveEyeLevelY}
+              perspectiveLockHorizon={perspectiveLockHorizon}
               onPreviewVanishingPoint={previewVanishingPointById}
               onCommitVanishingPoint={moveVanishingPointById}
+              onPreviewPerspectiveEyeLevelY={previewPerspectiveEyeLevelY}
+              onCommitPerspectiveEyeLevelY={setPerspectiveEyeLevelY}
               isometricGridActive={isometricGridActive}
               isometricConfig={{
                 angleDeg: isometricAngleDeg,

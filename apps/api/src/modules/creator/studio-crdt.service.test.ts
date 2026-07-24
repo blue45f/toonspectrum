@@ -325,6 +325,8 @@ function createDrawingAssistDocument() {
         { id: "vp-center", x: 400, y: 320 },
         { id: "vp-right", x: 10_000_000, y: -10_000_000 },
       ],
+      eyeLevelY: 320,
+      lockHorizon: true,
     },
     isometric: {
       active: false,

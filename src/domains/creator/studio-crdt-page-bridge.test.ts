@@ -844,6 +844,8 @@ describe("studio CRDT page bridge", () => {
         { id: "vp-left", x: -900, y: 520 },
         { id: "vp-right", x: 1_700, y: 520 },
       ],
+      eyeLevelY: 520,
+      lockHorizon: true,
     };
     drawingAssist.advanced.rulers.push({
       id: "curve-a",

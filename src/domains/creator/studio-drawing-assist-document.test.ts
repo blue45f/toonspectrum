@@ -18,7 +18,7 @@ describe("studio drawing-assist document", () => {
   it("creates a page-centered, inactive v2 document with an empty advanced-ruler collection", () => {
     expect(createDefaultStudioDrawingAssistDocument(viewport)).toEqual({
       version: 2,
-      perspective: { active: false, points: [] },
+      perspective: { active: false, points: [], eyeLevelY: null, lockHorizon: false },
       isometric: {
         active: false,
         angleDeg: 30,
@@ -61,6 +61,8 @@ describe("studio drawing-assist document", () => {
           { id: "vp-a", x: 10, y: 20 },
           { id: "vp-b", x: STUDIO_DRAWING_ASSIST_MAX_COORDINATE, y: -30 },
         ],
+        eyeLevelY: null,
+        lockHorizon: false,
       },
       isometric: {
         active: false,
@@ -143,16 +145,39 @@ describe("studio drawing-assist document", () => {
   it("strictly accepts canonical documents and rejects ambiguous or unsafe shared data", () => {
     const document = {
       ...createDefaultStudioDrawingAssistDocument(viewport),
-      perspective: { active: true, points: [{ id: "vp-a", x: 100, y: 200 }] },
+      perspective: {
+        active: true,
+        points: [{ id: "vp-a", x: 100, y: 200 }],
+        eyeLevelY: 200,
+        lockHorizon: true,
+      },
     };
     expect(parseStudioDrawingAssistDocument(document)).toEqual(document);
+    // Legacy active+points envelopes still parse and gain default eye-level fields.
+    expect(parseStudioDrawingAssistDocument({
+      ...document,
+      perspective: { active: true, points: [{ id: "vp-a", x: 100, y: 200 }] },
+    })).toEqual({
+      ...document,
+      perspective: {
+        active: true,
+        points: [{ id: "vp-a", x: 100, y: 200 }],
+        eyeLevelY: null,
+        lockHorizon: false,
+      },
+    });
     expect(parseStudioDrawingAssistDocument({
       ...document,
       isometric: { ...document.isometric, active: true },
     })).toBeNull();
     expect(parseStudioDrawingAssistDocument({
       ...document,
-      perspective: { active: true, points: [{ id: "vp-a", x: Infinity, y: 0 }] },
+      perspective: {
+        active: true,
+        points: [{ id: "vp-a", x: Infinity, y: 0 }],
+        eyeLevelY: null,
+        lockHorizon: false,
+      },
     })).toBeNull();
     expect(parseStudioDrawingAssistDocument({ ...document, version: 3 })).toBeNull();
   });
@@ -170,8 +195,14 @@ describe("studio drawing-assist document", () => {
       },
     };
     expect(parseStudioDrawingAssistDocument(legacy)).toEqual({
-      ...legacy,
       version: 2,
+      perspective: {
+        active: true,
+        points: [{ id: "vp-a", x: -125, y: 240 }],
+        eyeLevelY: null,
+        lockHorizon: false,
+      },
+      isometric: legacy.isometric,
       advanced: {
         version: 1,
         rulers: [],
@@ -212,6 +243,8 @@ describe("studio drawing-assist document", () => {
       perspective: {
         active: true,
         points: [{ id: "vp-preview", x: 120, y: 240 }],
+        eyeLevelY: null,
+        lockHorizon: false,
       },
       isometric: { ...source.isometric, active: false },
     });
@@ -344,6 +377,8 @@ describe("studio drawing-assist document", () => {
       perspective: {
         active: false,
         points: [{ id: "vp-a", x: 100, y: 250 }],
+        eyeLevelY: 250,
+        lockHorizon: true,
       },
       isometric: { ...empty.isometric, originX: 300 },
     };
@@ -353,6 +388,8 @@ describe("studio drawing-assist document", () => {
       perspective: {
         active: false,
         points: [{ id: "vp-a", x: 700, y: 250 }],
+        eyeLevelY: 250,
+        lockHorizon: true,
       },
       isometric: { ...authored.isometric, originX: 500 },
       advanced: authored.advanced,
