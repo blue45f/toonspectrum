@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   mapStudioDocumentPointToAutoColorSeed,
+  sampleStudioAutoColorStrokeSeeds,
+  shouldKeepStudioAutoColorStrokeSample,
+  STUDIO_AUTO_COLOR_STROKE_SEED_MAX,
   studioAutoColorCanvasSeedId,
 } from "./studio-auto-color-hints-canvas-seed";
 
@@ -85,5 +88,97 @@ describe("studioAutoColorCanvasSeedId", () => {
   it("builds a stable ordered id", () => {
     expect(studioAutoColorCanvasSeedId(0)).toBe("canvas-scribble-0");
     expect(studioAutoColorCanvasSeedId(3)).toBe("canvas-scribble-3");
+  });
+});
+
+describe("sampleStudioAutoColorStrokeSeeds", () => {
+  it("thins a freehand polyline by document min-distance and maps into planner pixels", () => {
+    // Dense points along the horizontal midline of the frame (y=100).
+    const documentPoints: number[] = [];
+    for (let x = 100; x <= 300; x += 2) {
+      documentPoints.push(x, 100);
+    }
+    const samples = sampleStudioAutoColorStrokeSeeds({
+      documentPoints,
+      image: FRAME,
+      pixelWidth: 40,
+      pixelHeight: 20,
+      minDistanceDoc: 20,
+    });
+    expect(samples.length).toBeGreaterThan(1);
+    expect(samples.length).toBeLessThan(documentPoints.length / 2);
+    // First sample near left edge mid-height.
+    expect(samples[0]!.x).toBeCloseTo(0, 0);
+    expect(samples[0]!.y).toBeCloseTo(10, 0);
+    // Spacing roughly minDistanceDoc mapped into pixel space (20 doc / 200 frame * 40 px = 4).
+    for (let i = 1; i < samples.length; i += 1) {
+      expect(samples[i]!.x - samples[i - 1]!.x).toBeGreaterThanOrEqual(3.5);
+    }
+  });
+
+  it("drops points outside the image and respects maxSeeds", () => {
+    const samples = sampleStudioAutoColorStrokeSeeds({
+      documentPoints: [
+        50, 50, // outside
+        150, 80,
+        200, 80,
+        250, 80,
+        400, 80, // outside
+      ],
+      image: FRAME,
+      pixelWidth: 40,
+      pixelHeight: 20,
+      minDistanceDoc: 1,
+      maxSeeds: 2,
+    });
+    expect(samples).toHaveLength(2);
+    expect(samples[0]!.x).toBeGreaterThan(0);
+  });
+
+  it("caps at STUDIO_AUTO_COLOR_STROKE_SEED_MAX by default", () => {
+    const documentPoints: number[] = [];
+    for (let i = 0; i < 500; i += 1) {
+      documentPoints.push(100 + i * 0.4, 100);
+    }
+    const samples = sampleStudioAutoColorStrokeSeeds({
+      documentPoints,
+      image: FRAME,
+      pixelWidth: 200,
+      pixelHeight: 20,
+      minDistanceDoc: 0.5,
+    });
+    expect(samples.length).toBeLessThanOrEqual(STUDIO_AUTO_COLOR_STROKE_SEED_MAX);
+  });
+});
+
+describe("shouldKeepStudioAutoColorStrokeSample", () => {
+  it("always keeps the first sample and gates later ones by distance", () => {
+    expect(
+      shouldKeepStudioAutoColorStrokeSample({
+        hasLast: false,
+        lastDocX: 0,
+        lastDocY: 0,
+        nextDocX: 1,
+        nextDocY: 0,
+      }),
+    ).toBe(true);
+    expect(
+      shouldKeepStudioAutoColorStrokeSample({
+        lastDocX: 0,
+        lastDocY: 0,
+        nextDocX: 3,
+        nextDocY: 0,
+        minDistanceDoc: 8,
+      }),
+    ).toBe(false);
+    expect(
+      shouldKeepStudioAutoColorStrokeSample({
+        lastDocX: 0,
+        lastDocY: 0,
+        nextDocX: 10,
+        nextDocY: 0,
+        minDistanceDoc: 8,
+      }),
+    ).toBe(true);
   });
 });

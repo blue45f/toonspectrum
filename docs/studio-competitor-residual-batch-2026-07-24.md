@@ -22,7 +22,7 @@ Finite shippable batch after CSP EX / Magma / Photopea / Procreate / SHAPER surv
 | Pose material blend strength | strength slider + blend plan |
 | Anim named clip rename / ease set | timeline panel |
 | Live soft-lock canvas mutation gate | pure gate + boundary |
-| Auto-color hints panel + scribble/apply | fill-tab; worker `onRun`; selected `imageSrc`; **scribble seed palette + rec chips**; **canvas click seed** (axis-aligned image); **Advanced Fill batch apply** via `onApplyResult` → `patchEl`; **새 채색 레이어** multi-layer target via `onApplyNewLayer` |
+| Auto-color hints panel + scribble/apply | fill-tab; worker `onRun`; selected `imageSrc`; **scribble seed palette + rec chips**; **canvas click + freehand stroke seed sampling**; **Advanced Fill batch apply** via `onApplyResult` → `patchEl`; **새 채색 레이어** multi-layer target via `onApplyNewLayer` |
 | Edit crop menu reachability | edit controls + menubar |
 | Live ink stroke-complete handoff flicker | residual sample admission + `reauthorLastSettledFromDocumentPoints` before committed release |
 | CSP Size dynamics Min (pressure floor) | `pressureMinSize` snapshot + `studioBrushPressureWithMinSize` on hardware/velocity channels; Brush Studio “최소 굵기” |
@@ -35,14 +35,14 @@ Finite shippable batch after CSP EX / Magma / Photopea / Procreate / SHAPER surv
 | Frame-folder topology / shared gutters | Separate document engine (M–L) |
 | Full rich-text / measureText multi-line / vertical 傍点 / SVG ruby | Horizontal MVP only |
 | SHAPER texture paint on mesh UI | Pure paint stack exists; poser surface not mounted (multi-hour runtime) |
-| Auto-color freehand stroke scribble | Click-to-seed on axis-aligned line art shipped; continuous freehand stroke sampling still deferred |
+| Auto-color freehand stroke scribble | Click + **drag stroke sampling** (min-distance thinned seeds, max 48) on axis-aligned line art |
 | Full Magma CRDT / WebGPU scene authority | Architecture multi-year |
 | ABR marketplace, cs3* formats | Policy exclusion |
 | Workspace cloud sync / shortcut marketplace | Local chrome complete; cloud deferred |
 
 ## Stop condition
 
-Finite high-ROI shippable rows for this Clip-Studio-class batch are closed (including post-scan indices wire, ruby TXT, auto-color worker onRun, pressure min size, erase-to-intersection desktop+mobile, auto-color selected imageSrc + scribble seeds + canvas click seed + Advanced Fill apply + multi-layer paint target). Remaining items are multi-hour poser runtime, multi-year architecture, continuous freehand stroke scribble sampling, or policy exclusions — not open “in progress” glue.
+Finite high-ROI shippable rows for this Clip-Studio-class batch are closed (including post-scan indices wire, ruby TXT, auto-color worker onRun, pressure min size, erase-to-intersection desktop+mobile, auto-color selected imageSrc + scribble seeds + canvas click/stroke seed sampling + Advanced Fill apply + multi-layer paint target). Remaining items are multi-hour poser runtime, multi-year architecture, or policy exclusions — not open “in progress” glue.
 
 ## Verification
 

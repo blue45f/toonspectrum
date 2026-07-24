@@ -92,6 +92,8 @@ export interface StudioAutoColorHintsPanelProps {
   readonly onScribbleCanvasArmedChange?: (armed: boolean) => void;
   /** One-shot canvas seed from StudioPage stage click (image-local planner pixels). */
   readonly canvasSeedHit?: StudioAutoColorCanvasSeedHit | null;
+  /** Batch of freehand-stroke samples (processed once per nonce set). */
+  readonly canvasSeedHits?: readonly StudioAutoColorCanvasSeedHit[] | null;
   readonly onCanvasSeedHitConsumed?: () => void;
   /** Planner pixel size of the last resolved line-art image (for parent stage mapping). */
   readonly onPlanImageSize?: (size: { width: number; height: number } | null) => void;
@@ -175,6 +177,7 @@ export function StudioAutoColorHintsPanel({
   scribbleCanvasArmed,
   onScribbleCanvasArmedChange,
   canvasSeedHit = null,
+  canvasSeedHits = null,
   onCanvasSeedHitConsumed,
   onPlanImageSize,
 }: StudioAutoColorHintsPanelProps) {
@@ -211,34 +214,60 @@ export function StudioAutoColorHintsPanel({
     onScribbleCanvasArmedChange?.(next);
   }
 
-  // Ingest one-shot canvas seed hits from StudioPage without re-processing the same nonce.
+  // Ingest one-shot / freehand-stroke canvas seed hits without re-processing the same nonce.
   useEffect(() => {
-    if (!canvasSeedHit) return;
-    if (lastCanvasSeedNonceRef.current === canvasSeedHit.nonce) return;
-    lastCanvasSeedNonceRef.current = canvasSeedHit.nonce;
+    const batch: StudioAutoColorCanvasSeedHit[] = [];
+    if (canvasSeedHits && canvasSeedHits.length > 0) {
+      for (const hit of canvasSeedHits) batch.push(hit);
+    } else if (canvasSeedHit) {
+      batch.push(canvasSeedHit);
+    }
+    if (batch.length === 0) return;
+
+    const fresh = batch.filter((hit) => {
+      if (lastCanvasSeedNonceRef.current !== null && hit.nonce <= lastCanvasSeedNonceRef.current) {
+        return false;
+      }
+      return true;
+    });
+    if (fresh.length === 0) {
+      onCanvasSeedHitConsumed?.();
+      return;
+    }
+    lastCanvasSeedNonceRef.current = fresh[fresh.length - 1]!.nonce;
+
     if (seedsProp) {
       onCanvasSeedHitConsumed?.();
       return;
     }
-    const id = studioAutoColorCanvasSeedId(canvasSeedSequenceRef.current);
-    canvasSeedSequenceRef.current += 1;
-    const seed: StudioAutoColorHintSeed = {
-      id,
-      x: canvasSeedHit.x,
-      y: canvasSeedHit.y,
-      color: [
-        activePalette.color[0],
-        activePalette.color[1],
-        activePalette.color[2],
-        activePalette.color[3],
-      ],
-    };
-    setScribbleSeeds((prev) => appendStudioAutoColorScribbleSeed(prev, seed));
+
+    setScribbleSeeds((prev) => {
+      let next = prev;
+      for (const hit of fresh) {
+        const id = studioAutoColorCanvasSeedId(canvasSeedSequenceRef.current);
+        canvasSeedSequenceRef.current += 1;
+        next = appendStudioAutoColorScribbleSeed(next, {
+          id,
+          x: hit.x,
+          y: hit.y,
+          color: [
+            activePalette.color[0],
+            activePalette.color[1],
+            activePalette.color[2],
+            activePalette.color[3],
+          ],
+        });
+      }
+      return next;
+    });
+    const last = fresh[fresh.length - 1]!;
     setApplyStatus(
-      `캔버스 시드 · ${activePalette.label} @ (${Math.round(canvasSeedHit.x)}, ${Math.round(canvasSeedHit.y)})`,
+      fresh.length === 1
+        ? `캔버스 시드 · ${activePalette.label} @ (${Math.round(last.x)}, ${Math.round(last.y)})`
+        : `스트로크 시드 ${fresh.length.toLocaleString("ko-KR")}개 · ${activePalette.label}`,
     );
     onCanvasSeedHitConsumed?.();
-  }, [canvasSeedHit, seedsProp, activePalette, onCanvasSeedHitConsumed]);
+  }, [canvasSeedHit, canvasSeedHits, seedsProp, activePalette, onCanvasSeedHitConsumed]);
   // Enable from summary metrics only (refs are set synchronously before summary state).
   const canApplySelected =
     Boolean(onApplyResult)
@@ -460,8 +489,8 @@ export function StudioAutoColorHintsPanel({
               <span className="block">캔버스에 시드 찍기</span>
               <span className="mt-0.5 block font-normal leading-snug text-fg-3">
                 {canvasArmed
-                  ? "켜짐 · 선택 선화 위를 클릭하면 활성 색 시드가 추가됩니다"
-                  : "축 정렬된 선화 레이어 위에 클릭해 시드를 찍습니다"}
+                  ? "켜짐 · 선화 위를 드래그하면 스트로크를 따라 시드가 찍힙니다"
+                  : "축 정렬된 선화 위에 클릭·드래그해 시드를 찍습니다"}
               </span>
             </span>
           </button>

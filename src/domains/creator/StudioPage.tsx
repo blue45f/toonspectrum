@@ -175,7 +175,12 @@ import {
   type TemplateSpec,
   type FrameSpec,
 } from "./studio-assets";
-import { mapStudioDocumentPointToAutoColorSeed } from "./studio-auto-color-hints-canvas-seed";
+import {
+  mapStudioDocumentPointToAutoColorSeed,
+  sampleStudioAutoColorStrokeSeeds,
+  shouldKeepStudioAutoColorStrokeSample,
+  STUDIO_AUTO_COLOR_STROKE_MIN_DISTANCE_DOC_DEFAULT,
+} from "./studio-auto-color-hints-canvas-seed";
 import {
   LEGACY_STUDIO_AUTOSAVE_KEY,
   readStudioAutosave,
@@ -5591,15 +5596,23 @@ function StudioCuttoonEditor() {
   const [eyedropperActive, setEyedropperActive] = useState(false);
   /** CSP vector eraser: click freehand ink and erase between nearest intersections. */
   const [eraseToIntersection, setEraseToIntersection] = useState(false);
-  /** Auto-color canvas scribble: click selected line art to drop color seeds. */
+  /** Auto-color canvas scribble: click/drag selected line art to drop color seeds. */
   const [autoColorScribbleCanvasArmed, setAutoColorScribbleCanvasArmed] = useState(false);
   const [autoColorCanvasSeedHit, setAutoColorCanvasSeedHit] = useState<{
     x: number;
     y: number;
     nonce: number;
   } | null>(null);
+  const [autoColorCanvasSeedHits, setAutoColorCanvasSeedHits] = useState<
+    readonly { x: number; y: number; nonce: number }[] | null
+  >(null);
   const autoColorCanvasSeedNonceRef = useRef(0);
   const autoColorPlanImageSizeRef = useRef<{ width: number; height: number } | null>(null);
+  const autoColorScribbleStrokeRef = useRef<{
+    points: number[];
+    lastDocX: number;
+    lastDocY: number;
+  } | null>(null);
   const [bubbleAnchorPickActive, setBubbleAnchorPickActive] = useState(false);
   const [studioOptionalAssets, setStudioOptionalAssets] = useState<StudioOptionalAssetPacks>(
     EMPTY_STUDIO_OPTIONAL_ASSETS
@@ -14842,6 +14855,8 @@ function StudioCuttoonEditor() {
     setColorRangePickActive(false); // ← 추가(샘플/허용량은 유지 — healClone "모드는 유지" 정책과 동일)
     setAutoColorScribbleCanvasArmed(false);
     setAutoColorCanvasSeedHit(null);
+    setAutoColorCanvasSeedHits(null);
+    autoColorScribbleStrokeRef.current = null;
     setQuickShapeActive(false);
     setColorWheelOpen(false);
     setLayerMaskPaintActive(false);
@@ -22273,28 +22288,36 @@ function StudioCuttoonEditor() {
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos && applyVectorEraseToIntersectionAt(pos.x, pos.y)) return;
     }
-    // Auto-color canvas scribble — armed panel places color seeds on the selected line-art image.
+    // Auto-color canvas scribble — armed panel places color seeds on the selected line-art image
+    // (click starts a freehand path; move/up sample the stroke).
     if (autoColorScribbleCanvasArmed && selected?.type === "image") {
       const pos = e.target.getStage()?.getRelativePointerPosition();
       const planSize = autoColorPlanImageSizeRef.current;
       if (pos && planSize) {
+        const imageFrame = {
+          x: selected.x,
+          y: selected.y,
+          width: selected.width,
+          height: selected.height,
+          rotation: selected.rotation,
+          flipped: selected.flipped,
+          flippedY: selected.flippedY,
+        };
         const sample = mapStudioDocumentPointToAutoColorSeed({
           documentX: pos.x,
           documentY: pos.y,
-          image: {
-            x: selected.x,
-            y: selected.y,
-            width: selected.width,
-            height: selected.height,
-            rotation: selected.rotation,
-            flipped: selected.flipped,
-            flippedY: selected.flippedY,
-          },
+          image: imageFrame,
           pixelWidth: planSize.width,
           pixelHeight: planSize.height,
         });
         if (sample) {
+          autoColorScribbleStrokeRef.current = {
+            points: [pos.x, pos.y],
+            lastDocX: pos.x,
+            lastDocY: pos.y,
+          };
           autoColorCanvasSeedNonceRef.current += 1;
+          setAutoColorCanvasSeedHits(null);
           setAutoColorCanvasSeedHit({
             x: sample.x,
             y: sample.y,
@@ -22302,7 +22325,7 @@ function StudioCuttoonEditor() {
           });
           return;
         }
-        setError("선화 이미지 안을 클릭해 시드를 찍어 주세요. (회전·반전 레이어는 아직 지원하지 않아요)");
+        setError("선화 이미지 안을 드래그해 시드를 찍어 주세요. (회전·반전 레이어는 아직 지원하지 않아요)");
         return;
       }
       if (pos && !planSize) {
@@ -23319,6 +23342,27 @@ function StudioCuttoonEditor() {
           tool,
         });
       }
+    }
+    // Auto-color freehand scribble stroke — append document points while armed.
+    const scribbleStroke = autoColorScribbleStrokeRef.current;
+    if (scribbleStroke && autoColorScribbleCanvasArmed) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos) {
+        if (
+          shouldKeepStudioAutoColorStrokeSample({
+            lastDocX: scribbleStroke.lastDocX,
+            lastDocY: scribbleStroke.lastDocY,
+            nextDocX: pos.x,
+            nextDocY: pos.y,
+            minDistanceDoc: STUDIO_AUTO_COLOR_STROKE_MIN_DISTANCE_DOC_DEFAULT,
+          })
+        ) {
+          scribbleStroke.points.push(pos.x, pos.y);
+          scribbleStroke.lastDocX = pos.x;
+          scribbleStroke.lastDocY = pos.y;
+        }
+      }
+      return;
     }
     // 색상 휠 롱프레스 타이머가 아직 대기 중인데 임계값(6px) 넘게 움직였으면 드래그/클릭으로
     // 보고 취소한다. colorWheelOpen 이 이미 true 인 동안은 오버레이가 캔버스를 덮어 이 핸들러
@@ -25135,6 +25179,44 @@ function StudioCuttoonEditor() {
 
   function onStageUp(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     const pointerEvent = e.evt as PointerEvent;
+    // Flush freehand auto-color scribble samples collected during the drag.
+    const scribbleStroke = autoColorScribbleStrokeRef.current;
+    if (scribbleStroke) {
+      autoColorScribbleStrokeRef.current = null;
+      const planSize = autoColorPlanImageSizeRef.current;
+      const image = selected?.type === "image" ? selected : null;
+      if (planSize && image && scribbleStroke.points.length >= 4) {
+        const samples = sampleStudioAutoColorStrokeSeeds({
+          documentPoints: scribbleStroke.points,
+          image: {
+            x: image.x,
+            y: image.y,
+            width: image.width,
+            height: image.height,
+            rotation: image.rotation,
+            flipped: image.flipped,
+            flippedY: image.flippedY,
+          },
+          pixelWidth: planSize.width,
+          pixelHeight: planSize.height,
+        });
+        // Skip the first sample (already emitted on pointerdown as a single hit).
+        const rest = samples.slice(1);
+        if (rest.length > 0) {
+          const hits = rest.map((sample) => {
+            autoColorCanvasSeedNonceRef.current += 1;
+            return {
+              x: sample.x,
+              y: sample.y,
+              nonce: autoColorCanvasSeedNonceRef.current,
+            };
+          });
+          setAutoColorCanvasSeedHit(null);
+          setAutoColorCanvasSeedHits(hits);
+        }
+      }
+      return;
+    }
     if (liquifyHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     if (pixelSelectionHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     if (requireStudioDrawingPointerTransport(drawingPointerTransportRef).consumeHandledNativeEnd(pointerEvent)) return;
@@ -30836,6 +30918,8 @@ function StudioCuttoonEditor() {
           setAutoColorScribbleCanvasArmed={setAutoColorScribbleCanvasArmed}
           autoColorCanvasSeedHit={autoColorCanvasSeedHit}
           setAutoColorCanvasSeedHit={setAutoColorCanvasSeedHit}
+          autoColorCanvasSeedHits={autoColorCanvasSeedHits}
+          setAutoColorCanvasSeedHits={setAutoColorCanvasSeedHits}
           onAutoColorPlanImageSize={(size: { width: number; height: number } | null) => {
             autoColorPlanImageSizeRef.current = size;
           }}

@@ -145,6 +145,24 @@ describe("StudioAutoColorHintsPanel module boundary", () => {
     });
   });
 
+  it("ingests a freehand stroke seed batch in one pass", async () => {
+    const onConsumed = vi.fn();
+    render(
+      <StudioAutoColorHintsPanel
+        canvasSeedHits={[
+          { x: 1, y: 2, nonce: 10 },
+          { x: 5, y: 6, nonce: 11 },
+          { x: 9, y: 10, nonce: 12 },
+        ]}
+        onCanvasSeedHitConsumed={onConsumed}
+      />,
+    );
+    await waitFor(() => {
+      expect(onConsumed).toHaveBeenCalled();
+      expect(screen.getByText(/시드 3개/)).toBeTruthy();
+    });
+  });
+
   it("exposes scribble palette and apply only when onApplyResult is provided", async () => {
     const onApplyResult = vi.fn();
     // jsdom often lacks a real 2d context; pin the encode/document patch contract.

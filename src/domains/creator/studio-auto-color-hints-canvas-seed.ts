@@ -98,3 +98,98 @@ export function studioAutoColorCanvasSeedId(sequence: number): string {
   const n = Number.isSafeInteger(sequence) && sequence >= 0 ? sequence : 0;
   return `canvas-scribble-${n}`;
 }
+
+export const STUDIO_AUTO_COLOR_STROKE_SEED_MAX = 48;
+export const STUDIO_AUTO_COLOR_STROKE_MIN_DISTANCE_DOC_DEFAULT = 8;
+
+/**
+ * Thin a freehand document polyline and map each kept point into planner seeds.
+ * Spacing is in document pixels so zoom does not explode seed density; fails closed
+ * for non-seedable frames (same rules as single-point mapping).
+ */
+export function sampleStudioAutoColorStrokeSeeds(input: {
+  readonly documentPoints: readonly number[];
+  readonly image: StudioAutoColorCanvasImageFrame;
+  readonly pixelWidth: number;
+  readonly pixelHeight: number;
+  /** Minimum document-space distance between successive kept samples. */
+  readonly minDistanceDoc?: number;
+  /** Hard cap on seeds emitted for one stroke (default STUDIO_AUTO_COLOR_STROKE_SEED_MAX). */
+  readonly maxSeeds?: number;
+}): StudioAutoColorCanvasSeedSample[] {
+  const points = input.documentPoints;
+  if (!Array.isArray(points) || points.length < 2) return [];
+  const minDistance = Math.max(
+    0,
+    finite(input.minDistanceDoc, STUDIO_AUTO_COLOR_STROKE_MIN_DISTANCE_DOC_DEFAULT),
+  );
+  const maxSeeds = Math.max(
+    1,
+    Math.floor(finite(input.maxSeeds, STUDIO_AUTO_COLOR_STROKE_SEED_MAX)),
+  );
+
+  const out: StudioAutoColorCanvasSeedSample[] = [];
+  let lastKeptX = Number.NaN;
+  let lastKeptY = Number.NaN;
+
+  for (let i = 0; i + 1 < points.length; i += 2) {
+    const docX = finite(points[i]);
+    const docY = finite(points[i + 1]);
+    if (!Number.isFinite(docX) || !Number.isFinite(docY)) continue;
+
+    if (out.length > 0) {
+      const distance = Math.hypot(docX - lastKeptX, docY - lastKeptY);
+      if (distance < minDistance) continue;
+    }
+
+    const sample = mapStudioDocumentPointToAutoColorSeed({
+      documentX: docX,
+      documentY: docY,
+      image: input.image,
+      pixelWidth: input.pixelWidth,
+      pixelHeight: input.pixelHeight,
+    });
+    if (!sample) continue;
+
+    // Deduplicate near-identical planner samples (stationary pen / min-distance edge).
+    const previous = out[out.length - 1];
+    if (
+      previous
+      && Math.hypot(sample.x - previous.x, sample.y - previous.y) < 0.25
+    ) {
+      continue;
+    }
+
+    out.push(sample);
+    lastKeptX = docX;
+    lastKeptY = docY;
+    if (out.length >= maxSeeds) break;
+  }
+
+  return out;
+}
+
+/**
+ * Incremental freehand sampler: decide whether to keep the next document point given the
+ * last accepted sample. Pure helper for live pointer-move paths.
+ */
+export function shouldKeepStudioAutoColorStrokeSample(input: {
+  readonly lastDocX: number;
+  readonly lastDocY: number;
+  readonly nextDocX: number;
+  readonly nextDocY: number;
+  readonly minDistanceDoc?: number;
+  readonly hasLast?: boolean;
+}): boolean {
+  if (input.hasLast === false) return true;
+  const lastX = finite(input.lastDocX);
+  const lastY = finite(input.lastDocY);
+  const nextX = finite(input.nextDocX);
+  const nextY = finite(input.nextDocY);
+  if (![lastX, lastY, nextX, nextY].every(Number.isFinite)) return false;
+  const minDistance = Math.max(
+    0,
+    finite(input.minDistanceDoc, STUDIO_AUTO_COLOR_STROKE_MIN_DISTANCE_DOC_DEFAULT),
+  );
+  return Math.hypot(nextX - lastX, nextY - lastY) >= minDistance;
+}

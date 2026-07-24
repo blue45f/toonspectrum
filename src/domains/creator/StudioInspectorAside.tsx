@@ -456,6 +456,10 @@ interface StudioInspectorAsideProps {
   setAutoColorCanvasSeedHit?: import("react").Dispatch<
     import("react").SetStateAction<{ x: number; y: number; nonce: number } | null>
   >;
+  autoColorCanvasSeedHits?: readonly { x: number; y: number; nonce: number }[] | null;
+  setAutoColorCanvasSeedHits?: import("react").Dispatch<
+    import("react").SetStateAction<readonly { x: number; y: number; nonce: number }[] | null>
+  >;
   onAutoColorPlanImageSize?: (size: { width: number; height: number } | null) => void;
   setAdvancedFillPreview: import("react").Dispatch<import("react").SetStateAction<StudioAdvancedFillPreview | null>>;
   setAdvancedFillStatus: import("react").Dispatch<import("react").SetStateAction<string | null>>;
@@ -793,6 +797,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   setAutoColorScribbleCanvasArmed,
   autoColorCanvasSeedHit = null,
   setAutoColorCanvasSeedHit,
+  autoColorCanvasSeedHits = null,
+  setAutoColorCanvasSeedHits,
   onAutoColorPlanImageSize,
   setAdvancedFillPreview,
   setAdvancedFillStatus,
@@ -2295,7 +2301,11 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     scribbleCanvasArmed={autoColorScribbleCanvasArmed}
                     onScribbleCanvasArmedChange={setAutoColorScribbleCanvasArmed}
                     canvasSeedHit={autoColorCanvasSeedHit}
-                    onCanvasSeedHitConsumed={() => setAutoColorCanvasSeedHit?.(null)}
+                    canvasSeedHits={autoColorCanvasSeedHits}
+                    onCanvasSeedHitConsumed={() => {
+                      setAutoColorCanvasSeedHit?.(null);
+                      setAutoColorCanvasSeedHits?.(null);
+                    }}
                     onPlanImageSize={onAutoColorPlanImageSize}
                     onRun={async (request) => {
                       const { runStudioAutoColorHintsWorker } = await import(
