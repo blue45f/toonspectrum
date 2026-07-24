@@ -111,6 +111,7 @@ import {
   StudioBubbleTailControls,
   StudioColorPalettePanel,
   StudioCropPanel,
+  StudioAutoColorHintsPanel,
   StudioFloodFillPanel,
   StudioGradientEnginePanel,
   StudioFilterMaskPanel,
@@ -2264,6 +2265,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       updateAdvancedFillSettings({ ...DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS })
                     }
                   />
+                  {/* Thin plan-only auto-color hints: demo fixture until selection pixels are wired. */}
+                  <StudioAutoColorHintsPanel />
                   {!selectedWorkAssetDestructiveEditReason ? (
                     <StudioLineCleanupPanel
                       src={selected.src}

@@ -90,6 +90,13 @@ const StudioFloodFillPanel = lazyRetry(
   () => import("./StudioFloodFillPanel").then((mod) => ({ default: mod.StudioFloodFillPanel })),
   "StudioFloodFillPanel"
 );
+const StudioAutoColorHintsPanel = lazyRetry(
+  () =>
+    import("./StudioAutoColorHintsPanel").then((mod) => ({
+      default: mod.StudioAutoColorHintsPanel,
+    })),
+  "StudioAutoColorHintsPanel"
+);
 const StudioHealCloneOverlay = lazyRetry(
   () => import("./StudioHealCloneOverlay").then((mod) => ({ default: mod.StudioHealCloneOverlay })),
   "StudioHealCloneOverlay"
@@ -721,6 +728,7 @@ export {
   StudioAnimTimelinePanel,
   StudioAppSettingsPanel,
   StudioAssetMenuPanel,
+  StudioAutoColorHintsPanel,
   StudioAutoActionsPanel,
   StudioBackground3D,
   StudioBackgroundPanel,
