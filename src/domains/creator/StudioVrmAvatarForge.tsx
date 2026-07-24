@@ -88,6 +88,19 @@ export function countDetectedVrmHairMeshes(vrm: VRM | null): number {
   return detectReplaceableHairMeshes(vrm).length;
 }
 
+/**
+ * 헤어 메시 가시성 "리스"를 획득한다(참조 카운팅 + 원복).
+ *
+ * 계약:
+ *  1) 첫 획득 시에만 원래 visible 값을 기억한다.
+ *  2) 중첩 획득은 카운트만 올린다(같은 메시를 여러 이펙트가 숨겨도 안전).
+ *  3) 마지막 반납에서만 원래 값으로 되돌린다 → 다른 시스템이 `mesh.visible = true`로
+ *     덮어쓰는 사고를 막는다.
+ *
+ * 워드로브(studio-vrm-wardrobe-catalogue.ts)도 같은 규약을 쓰되 **대상 집합이 서로소**다.
+ * 여기서는 `classifyMeshName().protected === "hair"`인 메시만, 워드로브는 `slot !== null`인
+ * 메시만 잡는다. 그래서 두 시스템이 같은 메시의 visible을 두고 다투는 상황 자체가 없다.
+ */
 function acquireHiddenHair(meshes: readonly THREE.Mesh[]) {
   for (const mesh of meshes) {
     const lease = HAIR_VISIBILITY_LEASES.get(mesh);
@@ -180,13 +193,27 @@ function createTaperedStrandGeometry(part: AvatarForgeHairPart) {
   const indices: number[] = [];
   const base = new THREE.Color(part.baseColor);
   const tip = new THREE.Color(part.tipColor);
+  // v2 웨이브. 계획에 wave 키가 없으면(=v1 계획) 아래 분기가 통째로 꺼져 v1과 동일한 부동소수
+  // 결과가 나온다(+0 덧셈으로 -0 부호 비트가 바뀌는 일조차 없도록 분기로 차단).
+  const waveAmount = part.wave ?? 0;
+  const waveFrequency = part.waveFrequency ?? 2.4;
+  // 가닥은 X/Z가 눌리고 Y가 늘어난 비등방 스케일로 배치된다. 웨이브 진폭을 "가닥 폭"이 아니라
+  // "가닥 길이" 기준으로 잡아야 어떤 굵기에서도 같은 세기로 보인다 → 종횡비만큼 되돌려 준다.
+  const aspectX = clamp(part.scale[1] / Math.max(1e-4, Math.abs(part.scale[0])), 1, 10);
+  const aspectZ = clamp(part.scale[1] / Math.max(1e-4, Math.abs(part.scale[2])), 1, 10);
 
   for (let row = 0; row <= lengthSegments; row += 1) {
     const t = row / lengthSegments;
     const y = 1 - t * 2;
     const radius = Math.max(0.08, 1 - part.taper * Math.pow(t, 0.72));
-    const curveX = Math.sin(t * Math.PI * 2.15) * part.curl * 0.58 * t;
-    const curveZ = Math.sin(t * Math.PI) * part.curl * 0.34;
+    const spineCurveX = Math.sin(t * Math.PI * 2.15) * part.curl * 0.58 * t;
+    const spineCurveZ = Math.sin(t * Math.PI) * part.curl * 0.34;
+    const curveX = waveAmount > 0
+      ? spineCurveX + Math.sin(t * Math.PI * waveFrequency) * waveAmount * 0.17 * aspectX * t
+      : spineCurveX;
+    const curveZ = waveAmount > 0
+      ? spineCurveZ + Math.cos(t * Math.PI * waveFrequency) * waveAmount * 0.07 * aspectZ * t
+      : spineCurveZ;
     const color = base.clone().lerp(tip, t);
 
     for (let column = 0; column < radialSegments; column += 1) {
@@ -236,6 +263,15 @@ function createHairGeometry(part: AvatarForgeHairPart) {
     : new THREE.SphereGeometry(1, 24, 16);
   setGradientColors(geometry, part.baseColor, part.tipColor);
   return geometry;
+}
+
+/**
+ * 파츠 계획 하나를 실제 BufferGeometry로 굽는다. 컴포넌트 내부에서 쓰는 그대로를
+ * 노출해 헤드리스 테스트가 정점 수·좌표를 직접 검증할 수 있게 한다(테스트용 별도 경로 없음).
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function createAvatarForgeHairGeometry(part: AvatarForgeHairPart) {
+  return createHairGeometry(part);
 }
 
 function createHairMaterial(part: AvatarForgeHairPart) {

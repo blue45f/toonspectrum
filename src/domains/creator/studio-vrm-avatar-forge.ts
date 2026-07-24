@@ -1,4 +1,26 @@
-export const AVATAR_FORGE_VERSION = 1 as const;
+// 절차형 아바타 조형(헤어/얼굴 디테일)의 순수 코어.
+//
+// v2에서 헤어 스타일 7종 → 14종, 앞머리 형태(bangStyle)·웨이브(wave)·삐침머리(ahoge)·
+// 묶음 높이(tailHeight) 파라미터가 추가됐다.
+//
+// ⚠ 하위호환 계약(회귀 금지)
+//   v1로 저장된 AvatarForgeState는 buildAvatarForgeHairParts에서 **바이트 단위로 동일한**
+//   파츠 계획을 만들어야 한다. 그래서
+//     1) v2 신규 파라미터의 기본값은 전부 "v1 무동작" 값이고(bangStyle="full", wave=0,
+//        ahoge=0, tailHeight=0.5),
+//     2) 기본값일 때는 v1과 동일한 산술식(×1, +0)만 타도록 작성했으며,
+//     3) 파츠에 붙는 신규 필드(wave/waveFrequency)는 값이 0일 때 **키 자체를 만들지 않는다**
+//        (JSON.stringify 결과가 v1과 문자 단위로 같아야 하므로).
+//   studio-vrm-avatar-forge.test.ts의 V1_GEOMETRY_DIGESTS가 이 계약을 SHA-256으로 잠근다.
+export const AVATAR_FORGE_VERSION = 2 as const;
+
+/** v1 문서를 v2로 승격할 때 강제되는 "v1과 동일한 렌더" 파라미터. */
+const V1_EQUIVALENT_HAIR = {
+  bangStyle: "full",
+  wave: 0,
+  ahoge: 0,
+  tailHeight: 0.5,
+} as const;
 
 export type AvatarForgeHairStyle =
   | "none"
@@ -7,7 +29,18 @@ export type AvatarForgeHairStyle =
   | "long"
   | "ponytail"
   | "twintail"
-  | "bun";
+  | "bun"
+  // ── v2 추가 ──
+  | "wavy"
+  | "braid"
+  | "twin-braid"
+  | "hime"
+  | "wolf"
+  | "half-up"
+  | "pixie";
+
+/** 앞머리 형태 — 스타일과 독립적으로 조합된다(v2). */
+export type AvatarForgeBangStyle = "full" | "split" | "side-swept" | "curtain" | "blunt" | "none";
 
 export type AvatarForgeFaceAccentId = "blush" | "freckles" | "beauty-mark";
 
@@ -30,6 +63,14 @@ export type AvatarForgeHairParams = {
   shine: number;
   baseColor: string;
   tipColor: string;
+  /** v2: 앞머리 형태. "full"이 v1과 동일한 3가닥 뱅. */
+  bangStyle: AvatarForgeBangStyle;
+  /** v2: 웨이브 진폭(0=직모). 0일 때 파츠에 wave 키가 생기지 않는다. */
+  wave: number;
+  /** v2: 삐침머리 길이(0=없음). */
+  ahoge: number;
+  /** v2: 묶음(포니/트윈/번/하프업) 높이. 0.5가 v1 위치. */
+  tailHeight: number;
 };
 
 export type AvatarForgeFaceAccent = {
@@ -57,7 +98,7 @@ export type AvatarForgeNumericLimit = {
 
 export type AvatarForgeHairPart = {
   id: string;
-  role: "cap" | "bang" | "side" | "back" | "tail" | "bun";
+  role: "cap" | "bang" | "side" | "back" | "tail" | "bun" | "braid" | "ahoge";
   primitive: "ellipsoid" | "tapered-capsule" | "sphere";
   position: readonly [number, number, number];
   rotation: readonly [number, number, number];
@@ -67,6 +108,13 @@ export type AvatarForgeHairPart = {
   taper: number;
   curl: number;
   shine: number;
+  /**
+   * v2 웨이브 진폭. **0이면 이 키가 존재하지 않는다** — v1 계획과의 바이트 동일성 계약.
+   * 렌더러(StudioVrmAvatarForge.tsx)는 `part.wave ?? 0`으로 읽고 0이면 v1 경로를 그대로 탄다.
+   */
+  wave?: number;
+  /** v2 웨이브 주기(파장 수). wave와 항상 짝으로만 존재한다. */
+  waveFrequency?: number;
 };
 
 export type AvatarForgePreset = {
@@ -85,16 +133,27 @@ export const AVATAR_FORGE_FACE_LIMITS: Record<keyof AvatarForgeFaceParams, Avata
   chinLength: { label: "턱 길이", min: 0.88, max: 1.14, step: 0.01, unit: "×" },
 };
 
-export const AVATAR_FORGE_HAIR_LIMITS: Record<
-  "volume" | "length" | "strandWidth" | "fringe" | "curl" | "shine",
-  AvatarForgeNumericLimit
-> = {
+export type AvatarForgeHairLimitKey =
+  | "volume"
+  | "length"
+  | "strandWidth"
+  | "fringe"
+  | "curl"
+  | "shine"
+  | "wave"
+  | "ahoge"
+  | "tailHeight";
+
+export const AVATAR_FORGE_HAIR_LIMITS: Record<AvatarForgeHairLimitKey, AvatarForgeNumericLimit> = {
   volume: { label: "전체 볼륨", min: 0.72, max: 1.45, step: 0.01, unit: "×" },
   length: { label: "길이", min: 0.55, max: 1.7, step: 0.01, unit: "×" },
   strandWidth: { label: "모발 굵기", min: 0.68, max: 1.45, step: 0.01, unit: "×" },
   fringe: { label: "앞머리", min: 0.2, max: 1.35, step: 0.01, unit: "×" },
   curl: { label: "컬", min: 0, max: 1, step: 0.01 },
   shine: { label: "윤기", min: 0, max: 1, step: 0.01 },
+  wave: { label: "웨이브", min: 0, max: 1, step: 0.01 },
+  ahoge: { label: "삐침머리", min: 0, max: 1, step: 0.01 },
+  tailHeight: { label: "묶음 높이", min: 0, max: 1, step: 0.01 },
 };
 
 export const AVATAR_FORGE_HAIR_STYLE_OPTIONS: ReadonlyArray<{
@@ -110,6 +169,27 @@ export const AVATAR_FORGE_HAIR_STYLE_OPTIONS: ReadonlyArray<{
   { id: "ponytail", label: "포니테일", emoji: "◒", hint: "뒤로 묶은 활동적인 헤어" },
   { id: "twintail", label: "트윈테일", emoji: "◖◗", hint: "양쪽으로 묶은 헤어" },
   { id: "bun", label: "번", emoji: "◎", hint: "단정하게 올린 번 헤어" },
+  { id: "wavy", label: "웨이브 롱", emoji: "〰", hint: "굵은 웨이브가 흐르는 롱 헤어" },
+  { id: "braid", label: "땋은 머리", emoji: "⛓", hint: "뒤로 한 갈래로 땋아 내린 머리" },
+  { id: "twin-braid", label: "양갈래 땋기", emoji: "⋈", hint: "양쪽으로 땋아 내린 머리" },
+  { id: "hime", label: "히메컷", emoji: "▤", hint: "일자 사이드락 + 긴 생머리" },
+  { id: "wolf", label: "울프컷", emoji: "◤", hint: "윗머리는 짧고 뒷머리만 긴 레이어드" },
+  { id: "half-up", label: "반묶음", emoji: "◐", hint: "윗머리만 묶고 나머지는 흘려 내린 헤어" },
+  { id: "pixie", label: "픽시", emoji: "▵", hint: "짧게 친 경쾌한 커트" },
+] as const;
+
+export const AVATAR_FORGE_BANG_STYLE_OPTIONS: ReadonlyArray<{
+  id: AvatarForgeBangStyle;
+  label: string;
+  emoji: string;
+  hint: string;
+}> = [
+  { id: "full", label: "풀뱅", emoji: "▬", hint: "이마를 덮는 기본 3가닥 앞머리" },
+  { id: "split", label: "가르마", emoji: "◭", hint: "가운데를 갈라 양옆으로 넘긴 앞머리" },
+  { id: "side-swept", label: "사이드뱅", emoji: "◣", hint: "한쪽으로 길게 넘긴 비대칭 앞머리" },
+  { id: "curtain", label: "커튼뱅", emoji: "◫", hint: "얼굴을 감싸는 긴 커튼 앞머리" },
+  { id: "blunt", label: "일자뱅", emoji: "▭", hint: "가지런히 자른 일자 앞머리" },
+  { id: "none", label: "앞머리 없음", emoji: "◌", hint: "이마를 드러낸 올백" },
 ] as const;
 
 export const AVATAR_FORGE_FACE_ACCENT_OPTIONS: ReadonlyArray<{
@@ -141,6 +221,7 @@ const DEFAULT_HAIR: AvatarForgeHairParams = {
   shine: 0.42,
   baseColor: "#352a28",
   tipColor: "#6b5148",
+  ...V1_EQUIVALENT_HAIR,
 };
 
 const DEFAULT_ACCENTS: AvatarForgeFaceAccent[] = [
@@ -196,9 +277,18 @@ export const AVATAR_FORGE_PRESETS: ReadonlyArray<AvatarForgePreset> = [
   preset("ink-twin", "잉크 트윈", "🖤", "흑발 트윈테일", { headHeight: 1.03 }, { style: "twintail", volume: 1.08, curl: 0.4, baseColor: "#0f172a", tipColor: "#334155" }, { "beauty-mark": { enabled: true, intensity: 0.5 } }),
   preset("sakura-bun", "벚꽃 번", "🌸", "분홍 톤 올림머리", { cheekVolume: 0.7, headWidth: 1.04 }, { style: "bun", volume: 1.0, baseColor: "#9d174d", tipColor: "#fbcfe8" }, { blush: { enabled: true, intensity: 0.4 } }),
   preset("hero-crop", "히어로 크롭", "🦸", "단정한 액션 숏컷", { headWidth: 0.95, chinLength: 1.06 }, { style: "short", fringe: 0.4, volume: 0.88, baseColor: "#1e293b", tipColor: "#64748b" }),
+  // ── v2 신규 스타일 프리셋 ──
+  preset("wave-diva", "웨이브 디바", "💃", "굵은 웨이브가 흐르는 롱 헤어", { headWidth: 1.02 }, { style: "wavy", length: 1.35, volume: 1.18, wave: 0.7, bangStyle: "curtain", shine: 0.7, baseColor: "#3f1d2b", tipColor: "#b06a7a" }),
+  preset("braid-scholar", "브레이드 스칼라", "📚", "차분한 한 갈래 땋은 머리", { headHeight: 1.02 }, { style: "braid", length: 1.15, bangStyle: "split", tailHeight: 0.42, baseColor: "#2f2620", tipColor: "#6b5340" }),
+  preset("twin-braid-village", "트윈 브레이드", "🌾", "소박한 양갈래 땋기", { cheekVolume: 0.6, headWidth: 1.04 }, { style: "twin-braid", length: 1.05, bangStyle: "blunt", ahoge: 0.5, baseColor: "#6b4a22", tipColor: "#c99b52" }, { freckles: { enabled: true, intensity: 0.3 } }),
+  preset("hime-noble", "히메 노블", "🏮", "일자 사이드락의 정통 히메컷", { headHeight: 1.03 }, { style: "hime", length: 1.3, bangStyle: "blunt", shine: 0.62, baseColor: "#141024", tipColor: "#3f3663" }),
+  preset("wolf-rebel", "울프 레벨", "🎸", "거친 레이어드 울프컷", { headWidth: 0.96, chinLength: 1.05 }, { style: "wolf", length: 1.2, volume: 1.1, wave: 0.35, bangStyle: "side-swept", baseColor: "#1f2937", tipColor: "#9ca3af" }),
+  preset("halfup-idol", "하프업 아이돌", "🎤", "반묶음에 삐침머리 한 가닥", { cheekVolume: 0.6 }, { style: "half-up", length: 1.12, tailHeight: 0.74, ahoge: 0.65, bangStyle: "split", baseColor: "#4c1d95", tipColor: "#c4b5fd" }, { blush: { enabled: true, intensity: 0.3 } }),
+  preset("pixie-sport", "픽시 스포츠", "🏃", "짧고 가벼운 픽시 커트", { headWidth: 0.95, chinLength: 1.05 }, { style: "pixie", length: 0.7, volume: 0.86, bangStyle: "side-swept", baseColor: "#111827", tipColor: "#4b5563" }),
 ] as const;
 
 const HAIR_STYLE_IDS = new Set<AvatarForgeHairStyle>(AVATAR_FORGE_HAIR_STYLE_OPTIONS.map((option) => option.id));
+const BANG_STYLE_IDS = new Set<AvatarForgeBangStyle>(AVATAR_FORGE_BANG_STYLE_OPTIONS.map((option) => option.id));
 const ACCENT_IDS = new Set<AvatarForgeFaceAccentId>(AVATAR_FORGE_FACE_ACCENT_OPTIONS.map((option) => option.id));
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
@@ -218,13 +308,29 @@ function record(value: unknown): Record<string, unknown> {
     : {};
 }
 
+/**
+ * 문서에 적힌 스키마 버전. 숫자가 아니거나 비어 있으면 0(= v1 이전)으로 본다.
+ * v2 전용 필드는 이 값이 2 미만이면 **문서에 무엇이 적혀 있든 무시**하고 v1 등가값으로 고정한다
+ * (v1 문서가 신규 키를 가질 방법이 없으므로, 있다면 오염된 입력이다).
+ */
+function documentVersion(raw: unknown): number {
+  const numeric = typeof raw === "number" ? raw : Number(raw);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
 export function sanitizeAvatarForgeState(raw: unknown): AvatarForgeState {
   const source = record(raw);
   const face = record(source.face);
   const hair = record(source.hair);
+  const legacy = documentVersion(source.version) < 2;
   const style = HAIR_STYLE_IDS.has(hair.style as AvatarForgeHairStyle)
     ? (hair.style as AvatarForgeHairStyle)
     : DEFAULT_HAIR.style;
+  const bangStyle = legacy
+    ? V1_EQUIVALENT_HAIR.bangStyle
+    : BANG_STYLE_IDS.has(hair.bangStyle as AvatarForgeBangStyle)
+      ? (hair.bangStyle as AvatarForgeBangStyle)
+      : DEFAULT_HAIR.bangStyle;
   const rawAccents = Array.isArray(source.faceAccents) ? source.faceAccents : [];
   const byId = new Map<AvatarForgeFaceAccentId, Record<string, unknown>>();
   for (const entry of rawAccents) {
@@ -257,6 +363,16 @@ export function sanitizeAvatarForgeState(raw: unknown): AvatarForgeState {
       shine: clampNumber(hair.shine, AVATAR_FORGE_HAIR_LIMITS.shine, DEFAULT_HAIR.shine),
       baseColor: color(hair.baseColor, DEFAULT_HAIR.baseColor),
       tipColor: color(hair.tipColor, DEFAULT_HAIR.tipColor),
+      bangStyle,
+      wave: legacy
+        ? V1_EQUIVALENT_HAIR.wave
+        : clampNumber(hair.wave, AVATAR_FORGE_HAIR_LIMITS.wave, DEFAULT_HAIR.wave),
+      ahoge: legacy
+        ? V1_EQUIVALENT_HAIR.ahoge
+        : clampNumber(hair.ahoge, AVATAR_FORGE_HAIR_LIMITS.ahoge, DEFAULT_HAIR.ahoge),
+      tailHeight: legacy
+        ? V1_EQUIVALENT_HAIR.tailHeight
+        : clampNumber(hair.tailHeight, AVATAR_FORGE_HAIR_LIMITS.tailHeight, DEFAULT_HAIR.tailHeight),
     },
     faceAccents: DEFAULT_ACCENTS.map((fallback) => {
       const entry = byId.get(fallback.id) ?? {};
@@ -295,6 +411,9 @@ export function createAvatarForgeState(presetId?: string): AvatarForgeState {
   return sanitizeAvatarForgeState(selected?.state ?? DEFAULT_AVATAR_FORGE_STATE);
 }
 
+/** 웨이브 스펙. amount가 0이면 파츠에 키를 만들지 않는다(하위호환 계약). */
+type WaveSpec = { amount: number; frequency: number };
+
 function hairPart(
   hair: AvatarForgeHairParams,
   id: string,
@@ -303,7 +422,8 @@ function hairPart(
   position: AvatarForgeHairPart["position"],
   rotation: AvatarForgeHairPart["rotation"],
   scale: AvatarForgeHairPart["scale"],
-  taper = 0.25
+  taper = 0.25,
+  wave?: WaveSpec
 ): AvatarForgeHairPart {
   return {
     id,
@@ -317,67 +437,291 @@ function hairPart(
     taper,
     curl: hair.curl,
     shine: hair.shine,
+    // wave가 0이면 키 자체를 만들지 않는다 → v1 계획과 JSON 바이트 동일.
+    ...(wave && wave.amount > 0 ? { wave: wave.amount, waveFrequency: wave.frequency } : {}),
   };
+}
+
+/**
+ * 스타일별 캡(두상 덮개) 배율. v1 스타일은 반드시 1이어야 한다(x*1 === x 로 바이트 동일 유지).
+ */
+const STYLE_CAP_SCALE: Record<AvatarForgeHairStyle, number> = {
+  none: 1,
+  short: 1,
+  bob: 1,
+  long: 1,
+  ponytail: 1,
+  twintail: 1,
+  bun: 1,
+  wavy: 1,
+  braid: 1,
+  "twin-braid": 1,
+  hime: 1,
+  wolf: 1.06,
+  "half-up": 1,
+  pixie: 0.96,
+};
+
+/**
+ * 땋은 머리 마디 수 — 길이 파라미터에서 결정론적으로 유도한다.
+ * length 0.55 → 5마디, 1.0 → 6마디, 1.7 → 8마디.
+ */
+export function avatarForgeBraidSegmentCount(length: number): number {
+  const numeric = Number.isFinite(length) ? length : 1;
+  return Math.min(9, Math.max(4, Math.round(3 + numeric * 3)));
+}
+
+/** 앞머리 파츠. "full"은 v1과 완전히 동일한 3가닥을 만든다. */
+function buildBangParts(hair: AvatarForgeHairParams): AvatarForgeHairPart[] {
+  const w = hair.strandWidth;
+  const f = hair.fringe;
+
+  if (hair.bangStyle === "none") return [];
+
+  if (hair.bangStyle === "split") {
+    return [
+      hairPart(hair, "bang-split-left", "bang", "tapered-capsule", [-0.13, 0.05, 0.42], [0.05, 0, 0.3], [0.13 * w, 0.34 * f, 0.085 * w], 0.68),
+      hairPart(hair, "bang-split-right", "bang", "tapered-capsule", [0.13, 0.05, 0.42], [0.05, 0, -0.3], [0.13 * w, 0.34 * f, 0.085 * w], 0.68),
+      hairPart(hair, "bang-split-outer-left", "bang", "tapered-capsule", [-0.29, -0.01, 0.35], [0.04, 0, 0.14], [0.1 * w, 0.42 * f, 0.075 * w], 0.6),
+      hairPart(hair, "bang-split-outer-right", "bang", "tapered-capsule", [0.29, -0.01, 0.35], [0.04, 0, -0.14], [0.1 * w, 0.42 * f, 0.075 * w], 0.6),
+    ];
+  }
+
+  if (hair.bangStyle === "side-swept") {
+    return [
+      hairPart(hair, "bang-sweep-main", "bang", "tapered-capsule", [-0.06, 0.06, 0.42], [0.05, 0, 0.52], [0.16 * w, 0.4 * f, 0.09 * w], 0.66),
+      hairPart(hair, "bang-sweep-short", "bang", "tapered-capsule", [-0.27, 0.02, 0.37], [0.07, 0, 0.24], [0.09 * w, 0.24 * f, 0.07 * w], 0.76),
+      hairPart(hair, "bang-sweep-tail", "bang", "tapered-capsule", [0.23, 0, 0.38], [0.06, 0, -0.1], [0.09 * w, 0.3 * f, 0.07 * w], 0.74),
+    ];
+  }
+
+  if (hair.bangStyle === "curtain") {
+    return [
+      hairPart(hair, "bang-curtain-left", "bang", "tapered-capsule", [-0.16, 0, 0.41], [0.02, 0, 0.16], [0.12 * w, 0.52 * f, 0.085 * w], 0.5),
+      hairPart(hair, "bang-curtain-right", "bang", "tapered-capsule", [0.16, 0, 0.41], [0.02, 0, -0.16], [0.12 * w, 0.52 * f, 0.085 * w], 0.5),
+      hairPart(hair, "bang-curtain-wisp-left", "bang", "tapered-capsule", [-0.32, -0.07, 0.33], [0.02, 0, 0.1], [0.085 * w, 0.44 * f, 0.07 * w], 0.58),
+      hairPart(hair, "bang-curtain-wisp-right", "bang", "tapered-capsule", [0.32, -0.07, 0.33], [0.02, 0, -0.1], [0.085 * w, 0.44 * f, 0.07 * w], 0.58),
+    ];
+  }
+
+  if (hair.bangStyle === "blunt") {
+    const strands: AvatarForgeHairPart[] = [];
+    for (let index = 0; index < 5; index += 1) {
+      const x = -0.24 + index * 0.12;
+      strands.push(
+        hairPart(
+          hair,
+          `bang-blunt-${index}`,
+          "bang",
+          "tapered-capsule",
+          [x, 0.05, 0.43 - Math.abs(x) * 0.18],
+          [0.03, 0, 0],
+          [0.085 * w, 0.3 * f, 0.075 * w],
+          0.06
+        )
+      );
+    }
+    return strands;
+  }
+
+  // "full" — v1 기본값. 아래 세 줄은 v1 원본과 산술식까지 동일해야 한다.
+  return [
+    hairPart(hair, "bang-center", "bang", "tapered-capsule", [0, 0.03, 0.43], [0.04, 0, 0], [0.12 * w, 0.35 * f, 0.08 * w], 0.72),
+    hairPart(hair, "bang-left", "bang", "tapered-capsule", [-0.19, 0.04, 0.4], [0.08, 0, 0.18], [0.11 * w, 0.31 * f, 0.08 * w], 0.7),
+    hairPart(hair, "bang-right", "bang", "tapered-capsule", [0.19, 0.04, 0.4], [0.08, 0, -0.18], [0.11 * w, 0.31 * f, 0.08 * w], 0.7),
+  ];
+}
+
+/**
+ * 땋은 갈래 하나를 마디 체인으로 전개한다. 마디 수·형태 모두 파라미터 유도(결정론적).
+ * @param swaySign 좌우 갈래를 거울 대칭으로 만들기 위한 부호(+1 왼쪽 / -1 오른쪽).
+ */
+function buildBraidStrand(
+  hair: AvatarForgeHairParams,
+  prefix: string,
+  anchor: readonly [number, number, number],
+  totalLength: number,
+  rootRadius: number,
+  segments: number,
+  swaySign = 1
+): AvatarForgeHairPart[] {
+  const parts: AvatarForgeHairPart[] = [
+    hairPart(hair, `${prefix}-tie`, "bun", "sphere", anchor, [0, 0, 0], [rootRadius * 1.05, rootRadius * 0.7, rootRadius * 1.05], 0),
+  ];
+  const step = totalLength / segments;
+  for (let index = 0; index < segments; index += 1) {
+    const progress = (index + 0.5) / segments;
+    const radius = rootRadius * (1 - progress * 0.46);
+    const sway = swaySign * (index % 2 === 0 ? 1 : -1) * radius * 0.34;
+    parts.push(
+      hairPart(
+        hair,
+        `${prefix}-seg-${index}`,
+        "braid",
+        "sphere",
+        [anchor[0] + sway, anchor[1] - (index + 0.5) * step, anchor[2] - progress * 0.05],
+        [0, 0, sway * 1.6],
+        [radius, radius * 0.74, radius * 0.92],
+        0
+      )
+    );
+  }
+  return parts;
 }
 
 /**
  * Head-local, unit-scale procedural part plan. The Three renderer owns geometry creation;
  * this module stays deterministic, serializable and testable.
+ *
+ * 순수 함수 — 같은 입력이면 항상 같은 배열(난수·시간·전역 상태 없음).
  */
 export function buildAvatarForgeHairParts(
   stateOrHair: AvatarForgeState | AvatarForgeHairParams
 ): AvatarForgeHairPart[] {
   const hair = "hair" in stateOrHair
     ? sanitizeAvatarForgeState(stateOrHair).hair
-    : sanitizeAvatarForgeState({ hair: stateOrHair }).hair;
+    // 순수 헤어 파라미터 입력은 항상 현재 스키마로 본다(v2 필드가 legacy 강등되지 않도록).
+    : sanitizeAvatarForgeState({ version: AVATAR_FORGE_VERSION, hair: stateOrHair }).hair;
   if (hair.style === "none") return [];
 
   const v = hair.volume;
   const l = hair.length;
   const w = hair.strandWidth;
-  const f = hair.fringe;
+  const capScale = STYLE_CAP_SCALE[hair.style];
+  // tailHeight 0.5 = v1 위치. (x - 0.5) * k 는 기본값에서 정확히 0이라 +0으로 값이 보존된다.
+  const tailLift = (hair.tailHeight - 0.5) * 0.56;
+  const wave: WaveSpec | undefined = hair.wave > 0 ? { amount: hair.wave, frequency: 2.4 } : undefined;
+
   const parts: AvatarForgeHairPart[] = [
-    hairPart(hair, "cap", "cap", "ellipsoid", [0, 0.18, 0.015], [0, 0, 0], [0.56 * v, 0.46 * v, 0.54 * v], 0),
-    hairPart(hair, "bang-center", "bang", "tapered-capsule", [0, 0.03, 0.43], [0.04, 0, 0], [0.12 * w, 0.35 * f, 0.08 * w], 0.72),
-    hairPart(hair, "bang-left", "bang", "tapered-capsule", [-0.19, 0.04, 0.4], [0.08, 0, 0.18], [0.11 * w, 0.31 * f, 0.08 * w], 0.7),
-    hairPart(hair, "bang-right", "bang", "tapered-capsule", [0.19, 0.04, 0.4], [0.08, 0, -0.18], [0.11 * w, 0.31 * f, 0.08 * w], 0.7),
+    hairPart(hair, "cap", "cap", "ellipsoid", [0, 0.18, 0.015], [0, 0, 0], [0.56 * v * capScale, 0.46 * v * capScale, 0.54 * v * capScale], 0),
+    ...buildBangParts(hair),
   ];
 
   if (hair.style === "short") {
     parts.push(
-      hairPart(hair, "short-left", "side", "tapered-capsule", [-0.42, -0.03, 0.02], [0.06, 0, 0.08], [0.12 * w, 0.35 * l, 0.12 * w], 0.55),
-      hairPart(hair, "short-right", "side", "tapered-capsule", [0.42, -0.03, 0.02], [0.06, 0, -0.08], [0.12 * w, 0.35 * l, 0.12 * w], 0.55)
+      hairPart(hair, "short-left", "side", "tapered-capsule", [-0.42, -0.03, 0.02], [0.06, 0, 0.08], [0.12 * w, 0.35 * l, 0.12 * w], 0.55, wave),
+      hairPart(hair, "short-right", "side", "tapered-capsule", [0.42, -0.03, 0.02], [0.06, 0, -0.08], [0.12 * w, 0.35 * l, 0.12 * w], 0.55, wave)
     );
   }
 
   if (hair.style === "bob" || hair.style === "long") {
     const sideLength = (hair.style === "long" ? 0.82 : 0.5) * l;
     parts.push(
-      hairPart(hair, "side-left", "side", "tapered-capsule", [-0.43, -0.22 * l, 0.02], [0, 0, 0.05], [0.15 * w, sideLength, 0.13 * w], 0.38),
-      hairPart(hair, "side-right", "side", "tapered-capsule", [0.43, -0.22 * l, 0.02], [0, 0, -0.05], [0.15 * w, sideLength, 0.13 * w], 0.38),
+      hairPart(hair, "side-left", "side", "tapered-capsule", [-0.43, -0.22 * l, 0.02], [0, 0, 0.05], [0.15 * w, sideLength, 0.13 * w], 0.38, wave),
+      hairPart(hair, "side-right", "side", "tapered-capsule", [0.43, -0.22 * l, 0.02], [0, 0, -0.05], [0.15 * w, sideLength, 0.13 * w], 0.38, wave),
       hairPart(hair, "back", "back", "ellipsoid", [0, -0.25 * l, -0.34], [0, 0, 0], [0.47 * v, sideLength, 0.17 * v], 0.08)
     );
   }
 
   if (hair.style === "ponytail") {
     parts.push(
-      hairPart(hair, "pony-root", "bun", "sphere", [0, 0.13, -0.48], [0, 0, 0], [0.19 * v, 0.19 * v, 0.19 * v], 0),
-      hairPart(hair, "pony-tail", "tail", "tapered-capsule", [0, -0.42 * l, -0.58], [-0.22, 0, 0], [0.2 * w, 0.82 * l, 0.18 * w], 0.58)
+      hairPart(hair, "pony-root", "bun", "sphere", [0, 0.13 + tailLift, -0.48], [0, 0, 0], [0.19 * v, 0.19 * v, 0.19 * v], 0),
+      hairPart(hair, "pony-tail", "tail", "tapered-capsule", [0, -0.42 * l + tailLift, -0.58], [-0.22 + (hair.tailHeight - 0.5) * 0.3, 0, 0], [0.2 * w, 0.82 * l, 0.18 * w], 0.58, wave)
     );
   }
 
   if (hair.style === "twintail") {
     parts.push(
-      hairPart(hair, "twin-left", "tail", "tapered-capsule", [-0.48, -0.34 * l, -0.14], [0, 0, -0.2], [0.19 * w, 0.72 * l, 0.17 * w], 0.58),
-      hairPart(hair, "twin-right", "tail", "tapered-capsule", [0.48, -0.34 * l, -0.14], [0, 0, 0.2], [0.19 * w, 0.72 * l, 0.17 * w], 0.58)
+      hairPart(hair, "twin-left", "tail", "tapered-capsule", [-0.48, -0.34 * l + tailLift, -0.14], [0, 0, -0.2 - (hair.tailHeight - 0.5) * 0.24], [0.19 * w, 0.72 * l, 0.17 * w], 0.58, wave),
+      hairPart(hair, "twin-right", "tail", "tapered-capsule", [0.48, -0.34 * l + tailLift, -0.14], [0, 0, 0.2 + (hair.tailHeight - 0.5) * 0.24], [0.19 * w, 0.72 * l, 0.17 * w], 0.58, wave)
     );
   }
 
   if (hair.style === "bun") {
     parts.push(
-      hairPart(hair, "bun", "bun", "sphere", [0, 0.53 * v, -0.16], [0, 0, 0], [0.28 * v, 0.28 * v, 0.25 * v], 0),
-      hairPart(hair, "bun-wisp-left", "side", "tapered-capsule", [-0.39, -0.05, 0.12], [0.02, 0, 0.08], [0.07 * w, 0.28 * l, 0.06 * w], 0.78),
-      hairPart(hair, "bun-wisp-right", "side", "tapered-capsule", [0.39, -0.05, 0.12], [0.02, 0, -0.08], [0.07 * w, 0.28 * l, 0.06 * w], 0.78)
+      hairPart(hair, "bun", "bun", "sphere", [0, 0.53 * v + tailLift, -0.16], [0, 0, 0], [0.28 * v, 0.28 * v, 0.25 * v], 0),
+      hairPart(hair, "bun-wisp-left", "side", "tapered-capsule", [-0.39, -0.05, 0.12], [0.02, 0, 0.08], [0.07 * w, 0.28 * l, 0.06 * w], 0.78, wave),
+      hairPart(hair, "bun-wisp-right", "side", "tapered-capsule", [0.39, -0.05, 0.12], [0.02, 0, -0.08], [0.07 * w, 0.28 * l, 0.06 * w], 0.78, wave)
+    );
+  }
+
+  /* ── v2 신규 스타일 ─────────────────────────────────────────────────── */
+
+  if (hair.style === "wavy") {
+    // 스타일 자체가 기본 웨이브 0.45를 갖고, wave 파라미터가 그 위에 진폭을 더한다.
+    const spec: WaveSpec = { amount: Math.min(1, 0.45 + hair.wave * 0.55), frequency: 2.9 };
+    const sideLength = 0.86 * l;
+    parts.push(
+      hairPart(hair, "wavy-side-left", "side", "tapered-capsule", [-0.44, -0.26 * l, 0.03], [0, 0, 0.06], [0.16 * w, sideLength, 0.14 * w], 0.34, spec),
+      hairPart(hair, "wavy-side-right", "side", "tapered-capsule", [0.44, -0.26 * l, 0.03], [0, 0, -0.06], [0.16 * w, sideLength, 0.14 * w], 0.34, spec),
+      hairPart(hair, "wavy-back", "back", "ellipsoid", [0, -0.3 * l, -0.35], [0, 0, 0], [0.48 * v, 0.92 * l, 0.19 * v], 0.08),
+      hairPart(hair, "wavy-inner-left", "back", "tapered-capsule", [-0.24, -0.52 * l, -0.4], [0, 0, 0.03], [0.13 * w, 0.78 * l, 0.12 * w], 0.42, spec),
+      hairPart(hair, "wavy-inner-right", "back", "tapered-capsule", [0.24, -0.52 * l, -0.4], [0, 0, -0.03], [0.13 * w, 0.78 * l, 0.12 * w], 0.42, spec)
+    );
+  }
+
+  if (hair.style === "braid") {
+    const segments = avatarForgeBraidSegmentCount(l);
+    parts.push(
+      hairPart(hair, "braid-nape", "back", "ellipsoid", [0, -0.06, -0.36], [0, 0, 0], [0.4 * v, 0.3 * v, 0.18 * v], 0.1),
+      ...buildBraidStrand(hair, "braid", [0, -0.16 + tailLift, -0.46], 0.95 * l, 0.13 * w, segments)
+    );
+  }
+
+  if (hair.style === "twin-braid") {
+    const segments = avatarForgeBraidSegmentCount(l * 0.85);
+    parts.push(
+      ...buildBraidStrand(hair, "braid-left", [-0.42, -0.12 + tailLift, -0.2], 0.8 * l, 0.115 * w, segments, 1),
+      ...buildBraidStrand(hair, "braid-right", [0.42, -0.12 + tailLift, -0.2], 0.8 * l, 0.115 * w, segments, -1)
+    );
+  }
+
+  if (hair.style === "hime") {
+    // 히메컷: 턱선에서 뚝 끊기는 일자 사이드락 + 등까지 오는 긴 생머리.
+    parts.push(
+      hairPart(hair, "hime-lock-left", "side", "tapered-capsule", [-0.42, -0.3 * l, 0.16], [0, 0, 0.02], [0.15 * w, 0.34 * l, 0.12 * w], 0.04),
+      hairPart(hair, "hime-lock-right", "side", "tapered-capsule", [0.42, -0.3 * l, 0.16], [0, 0, -0.02], [0.15 * w, 0.34 * l, 0.12 * w], 0.04),
+      hairPart(hair, "hime-back", "back", "ellipsoid", [0, -0.44 * l, -0.33], [0, 0, 0], [0.5 * v, 1.02 * l, 0.19 * v], 0.05),
+      hairPart(hair, "hime-back-left", "back", "tapered-capsule", [-0.3, -0.5 * l, -0.3], [0, 0, 0.02], [0.12 * w, 0.9 * l, 0.11 * w], 0.12, wave),
+      hairPart(hair, "hime-back-right", "back", "tapered-capsule", [0.3, -0.5 * l, -0.3], [0, 0, -0.02], [0.12 * w, 0.9 * l, 0.11 * w], 0.12, wave)
+    );
+  }
+
+  if (hair.style === "wolf") {
+    // 울프컷: 윗머리 레이어 볼륨 + 목덜미에서만 길게 빠지는 얇은 가닥.
+    parts.push(
+      hairPart(hair, "wolf-layer", "back", "ellipsoid", [0, 0.06, -0.16], [0, 0, 0], [0.52 * v, 0.32 * v, 0.5 * v], 0.14),
+      hairPart(hair, "wolf-side-left", "side", "tapered-capsule", [-0.44, -0.08, 0.06], [0.05, 0, 0.1], [0.1 * w, 0.3 * l, 0.1 * w], 0.68, wave),
+      hairPart(hair, "wolf-side-right", "side", "tapered-capsule", [0.44, -0.08, 0.06], [0.05, 0, -0.1], [0.1 * w, 0.3 * l, 0.1 * w], 0.68, wave),
+      hairPart(hair, "wolf-nape-center", "tail", "tapered-capsule", [0, -0.5 * l, -0.44], [-0.06, 0, 0], [0.09 * w, 0.72 * l, 0.09 * w], 0.74, wave),
+      hairPart(hair, "wolf-nape-left", "tail", "tapered-capsule", [-0.19, -0.44 * l, -0.42], [-0.04, 0, 0.06], [0.075 * w, 0.62 * l, 0.075 * w], 0.78, wave),
+      hairPart(hair, "wolf-nape-right", "tail", "tapered-capsule", [0.19, -0.44 * l, -0.42], [-0.04, 0, -0.06], [0.075 * w, 0.62 * l, 0.075 * w], 0.78, wave)
+    );
+  }
+
+  if (hair.style === "half-up") {
+    parts.push(
+      hairPart(hair, "halfup-knot", "bun", "sphere", [0, 0.3 * v + tailLift, -0.42], [0, 0, 0], [0.19 * v, 0.17 * v, 0.17 * v], 0),
+      hairPart(hair, "halfup-back", "back", "ellipsoid", [0, -0.3 * l, -0.34], [0, 0, 0], [0.46 * v, 0.8 * l, 0.18 * v], 0.1),
+      hairPart(hair, "halfup-side-left", "side", "tapered-capsule", [-0.43, -0.24 * l, 0.05], [0, 0, 0.05], [0.13 * w, 0.62 * l, 0.12 * w], 0.44, wave),
+      hairPart(hair, "halfup-side-right", "side", "tapered-capsule", [0.43, -0.24 * l, 0.05], [0, 0, -0.05], [0.13 * w, 0.62 * l, 0.12 * w], 0.44, wave)
+    );
+  }
+
+  if (hair.style === "pixie") {
+    parts.push(
+      hairPart(hair, "pixie-nape", "back", "tapered-capsule", [0, -0.12 * l, -0.36], [-0.12, 0, 0], [0.16 * w, 0.2 * l, 0.1 * w], 0.66, wave),
+      hairPart(hair, "pixie-sideburn-left", "side", "tapered-capsule", [-0.41, -0.06, 0.14], [0.04, 0, 0.06], [0.06 * w, 0.19 * l, 0.055 * w], 0.82),
+      hairPart(hair, "pixie-sideburn-right", "side", "tapered-capsule", [0.41, -0.06, 0.14], [0.04, 0, -0.06], [0.06 * w, 0.19 * l, 0.055 * w], 0.82),
+      hairPart(hair, "pixie-crown-flick", "side", "tapered-capsule", [-0.22, 0.3 * v, -0.24], [-0.42, 0, 0.3], [0.07 * w, 0.2 * l, 0.06 * w], 0.8)
+    );
+  }
+
+  if (hair.ahoge > 0) {
+    // 삐침머리 — 정수리에서 한 가닥 튀어나온다. ahoge=0이면 파츠 자체가 없다(v1 동일).
+    const ahogeLength = 0.1 + hair.ahoge * 0.26;
+    parts.push(
+      hairPart(
+        hair,
+        "ahoge",
+        "ahoge",
+        "tapered-capsule",
+        [0, 0.18 + 0.46 * v + ahogeLength * 0.6, -0.04],
+        [0.36, 0, 0.14],
+        [0.035 * w, ahogeLength, 0.03 * w],
+        0.88,
+        { amount: 0.5 + hair.ahoge * 0.45, frequency: 1.35 }
+      )
     );
   }
 

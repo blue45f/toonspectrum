@@ -2,6 +2,7 @@ import { CircleUserRound, Palette, RotateCcw, Scissors, Sparkles, WandSparkles }
 import { useId, useState } from "react";
 
 import {
+  AVATAR_FORGE_BANG_STYLE_OPTIONS,
   AVATAR_FORGE_FACE_ACCENT_OPTIONS,
   AVATAR_FORGE_FACE_LIMITS,
   AVATAR_FORGE_HAIR_LIMITS,
@@ -13,6 +14,9 @@ import {
   type AvatarForgeHairParams,
   type AvatarForgeState,
 } from "./studio-vrm-avatar-forge";
+
+/** 정밀 파라미터 슬라이더 순서 — 라벨/범위는 AVATAR_FORGE_HAIR_LIMITS가 단일 소스. */
+const HAIR_DETAIL_KEYS = ["strandWidth", "fringe", "curl", "shine", "wave", "ahoge", "tailHeight"] as const;
 
 type ForgeView = "presets" | "hair" | "face";
 
@@ -193,6 +197,31 @@ export function StudioVrmAvatarForgePanel({
               </div>
             </div>
 
+            <div>
+              <p className="mb-2 text-[0.68rem] font-bold text-fg-2">앞머리 형태</p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {AVATAR_FORGE_BANG_STYLE_OPTIONS.map((option) => {
+                  const selected = state.hair.bangStyle === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      disabled={disabled || state.hair.style === "none"}
+                      aria-pressed={selected}
+                      title={option.hint}
+                      onClick={() => updateHair("bangStyle", option.id)}
+                      className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl border px-1.5 text-[0.62rem] font-bold transition-colors disabled:opacity-40 ${
+                        selected ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised"
+                      }`}
+                    >
+                      <span className="text-sm leading-none" aria-hidden>{option.emoji}</span>
+                      <span className="min-w-0 truncate">{option.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
               {(["baseColor", "tipColor"] as const).map((key) => (
                 <label key={key} className="flex min-h-12 items-center gap-2 rounded-xl border border-line bg-card px-2.5 text-[0.66rem] font-bold text-fg-2">
@@ -237,11 +266,13 @@ export function StudioVrmAvatarForgePanel({
             <details className="group rounded-xl border border-line bg-card/55 p-3">
               <summary className="flex min-h-6 cursor-pointer list-none items-center text-[0.68rem] font-bold text-fg-2 [&::-webkit-details-marker]:hidden">
                 정밀 헤어 파라미터
-                <span className="ml-auto text-[0.62rem] font-medium text-fg-3 group-open:hidden">4개</span>
+                <span className="ml-auto text-[0.62rem] font-medium text-fg-3 group-open:hidden">
+                  {HAIR_DETAIL_KEYS.length}개
+                </span>
                 <span className="ml-auto hidden text-accent group-open:inline">−</span>
               </summary>
               <div className="mt-3 space-y-3 border-t border-line/60 pt-3">
-                {(["strandWidth", "fringe", "curl", "shine"] as const).map((key) => {
+                {HAIR_DETAIL_KEYS.map((key) => {
                   const limit = AVATAR_FORGE_HAIR_LIMITS[key];
                   return (
                     <label key={key} className="block">
