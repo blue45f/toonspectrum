@@ -88,7 +88,9 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // 대칭인 필터 마스크 armed 포인터다운 분기를 추가(900 → 915).
     // 의도적 변경(2026-07-24): 선택 도구 대상 재획득 — 선택된 이미지 밖에서 시작했는데 그 자리에
     // 다른 편집 가능한 이미지가 있으면 대상을 옮긴다(선택이 간헐적으로 안 되던 버그 수정, 915 → 935).
-    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(935);
+    // 의도적 변경(2026-07-24): 그룹 선택 = 하나의 단위(PPT/Figma) — 빈 영역 클릭 시 그룹 진입 상태도
+    // 함께 해제(activeGroupIdRef/setActiveGroupId)하는 분기를 deselect 경로에 추가(935 → 936).
+    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(936);
 
     expectTokenOrder(pointCommentHandler, [
       "if (pointCommentComposer) return true",

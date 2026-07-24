@@ -556,6 +556,12 @@ import {
   type OnionSkinSettings,
 } from "./studio-frame-animation";
 import {
+  planGroupClickSelection,
+  planGroupEnter,
+  planGroupEscape,
+  type GroupSelectionState,
+} from "./studio-group-selection";
+import {
   computeHealCloneSourceOffset,
   healCloneSourcePoint,
   planHealCloneDabs,
@@ -4787,6 +4793,13 @@ function StudioCuttoonEditor() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // PPT식 드래그 다중선택 — 빈 영역에서 사각형을 끌어 겹치는 요소를 한꺼번에 선택.
   const [marqueeIds, setMarqueeIds] = useState<string[]>([]);
+  // 그룹 진입(PPT/Figma "그룹 안으로 들어가기") — 더블클릭으로 한 그룹의 내부 편집 모드에 들어가면
+  // 그 그룹 자식만 개별 선택되고, Escape/빈 영역 클릭/다른 그룹 선택으로 빠져나온다. 진입 상태는
+  // 이산적 클릭에서만 바뀌므로 상태로 두되, 이벤트 핸들러가 같은 렌더 안에서 최신값을 읽도록 ref로
+  // 미러링한다(핫패스 규칙: 프레임당 갱신 아님).
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const activeGroupIdRef = useRef<string | null>(null);
+  activeGroupIdRef.current = activeGroupId;
   // 마퀴 박스 프리뷰는 상시 마운트된 Konva Rect 를 임페러티브로 갱신한다 — 드래그 프레임마다
   // 페이지가 다시 렌더되지 않는다. 상태는 활성 여부(시작/종료 2회)만 승격한다.
   const [marqueeActive, setMarqueeActive] = useState(false);
@@ -4807,7 +4820,39 @@ function StudioCuttoonEditor() {
       const next = current.filter((id) => activeIds.has(id));
       return next.length === current.length ? current : next;
     });
+    // 작업면 전환 시 그룹 진입 상태는 항상 리셋 — 다른 페이지의 그룹 내부에 갇혀 있으면 안 된다.
+    activeGroupIdRef.current = null;
+    setActiveGroupId(null);
   }, [activePage.id, masterEditMode, pagesHi]);
+  // 그룹 선택 상태 3종을 한 번에 적용하는 어댑터. ref를 동기로 갱신해 같은 렌더 안에서 연달아
+  // 발생하는 포인터 이벤트(예: 더블클릭의 2연속 mousedown)도 최신 진입 상태를 읽게 한다.
+  function applyGroupSelectionState(next: GroupSelectionState) {
+    activeGroupIdRef.current = next.activeGroupId;
+    setActiveGroupId(next.activeGroupId);
+    setSelectedId(next.selectedId);
+    setMarqueeIds(next.marqueeIds);
+  }
+  // 캔버스에서 요소를 클릭/더블클릭했을 때 "그룹 = 하나의 단위"로 선택을 확장한다(PPT/Figma 동작).
+  // 순수 로직은 studio-group-selection 이 계산하고 여기서는 상태 적용만 한다.
+  function selectElementFromCanvas(
+    elementId: string,
+    evt?: Konva.KonvaEventObject<MouseEvent | TouchEvent>
+  ) {
+    const nativeEvent = evt?.evt as (MouseEvent & Partial<TouchEvent>) | undefined;
+    const additive = nativeEvent?.shiftKey === true;
+    // MouseEvent.detail 은 연속 클릭 횟수(더블클릭이면 2). 터치(onTap)는 detail 이 없어 항상 1.
+    const clickCount = typeof nativeEvent?.detail === "number" ? nativeEvent.detail : 1;
+    const current: GroupSelectionState = {
+      selectedId,
+      marqueeIds,
+      activeGroupId: activeGroupIdRef.current,
+    };
+    const next =
+      clickCount >= 2 && !additive
+        ? planGroupEnter({ items: elements, groups, clickedId: elementId })
+        : planGroupClickSelection({ items: elements, groups, clickedId: elementId, current, additive });
+    applyGroupSelectionState(next);
+  }
   // 필터 클립보드 — "필터 복사"로 담아 다른 요소에 "붙여넣기"(웹툰 컷 간 룩 통일용).
   const [filterClipboard, setFilterClipboard] = useState<Partial<ImageFilterFields> | null>(null);
   // Magma식 상단 필터 메뉴 — 다이얼로그의 draft는 히스토리/CRDT 밖에서 캔버스에만 투영한다.
@@ -17727,6 +17772,17 @@ function StudioCuttoonEditor() {
           setPixelTool(null);
           commitPixelSelectionState(null, "clear");
           clearPolyLassoDraft();
+        } else if (activeGroupIdRef.current) {
+          // 그룹 진입 중이면 Esc 는 한 단계 위로: 진입을 해제하고 그룹 전체를 다시 선택한다(Figma 관례).
+          const stepUp = planGroupEscape({
+            items: elements,
+            current: { selectedId, marqueeIds, activeGroupId: activeGroupIdRef.current },
+          });
+          if (stepUp) applyGroupSelectionState(stepUp);
+          else {
+            setSelectedId(null);
+            setMarqueeIds([]);
+          }
         } else {
           setSelectedId(null);
           setMarqueeIds([]);
@@ -22976,6 +23032,9 @@ function StudioCuttoonEditor() {
     if (e.target === e.target.getStage() || e.target.name() === "bg") {
       setSelectedId(null);
       setMarqueeIds([]);
+      // 빈 영역 클릭은 그룹 진입 상태도 함께 빠져나온다(PPT/Figma: 그룹 밖 클릭 = 그룹에서 나가기).
+      activeGroupIdRef.current = null;
+      setActiveGroupId(null);
       if (!isSpacePressed) {
         const pos = e.target.getStage()?.getRelativePointerPosition();
         if (pos) {
@@ -29100,6 +29159,7 @@ function StudioCuttoonEditor() {
   onWebGpuBackendChange,
   setWebGpuCanvasHandle,
   setElementNodeRef,
+  selectElementFromCanvas,
   commitTextTransformEnd,
     acknowledgeAiNotice,
     alignSelected,
@@ -30063,6 +30123,7 @@ function StudioCuttoonEditor() {
           liveInkOverlayRendererRef={liveInkOverlayRendererRef}
           mainLayerRef={mainLayerRef}
           marqueeIds={marqueeIds}
+          activeGroupId={activeGroupId}
           marqueeRectNodeRef={marqueeRectNodeRef}
           master={master}
           masterEditMode={masterEditMode}
@@ -31133,6 +31194,10 @@ interface StudioCanvasViewportHandlers {
   onWebGpuBackendChange: (backend: StudioGpuBackend) => void;
   setWebGpuCanvasHandle: (handle: StudioWebGpuCanvasHandle | null) => void;
   setElementNodeRef: (elId: string, node: Konva.Node | null) => void;
+  selectElementFromCanvas: (
+    elementId: string,
+    evt?: Konva.KonvaEventObject<MouseEvent | TouchEvent>
+  ) => void;
   commitTextTransformEnd: (elId: string, fontSize: number, e: Konva.KonvaEventObject<Event>, opts: { minFontSize: number; patchWidth?: boolean }) => void;
   acknowledgeAiNotice: () => void;
   alignSelected: (mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom" | "distributeH" | "distributeV") => void;
@@ -31337,6 +31402,8 @@ interface StudioCanvasViewportProps {
   liveInkOverlayRendererRef: import("react").RefObject<StudioLiveInkOverlayRenderer>;
   mainLayerRef: import("react").RefObject<import("konva/lib/Layer").Layer | null>;
   marqueeIds: string[];
+  /** 그룹 진입(더블클릭) 편집 중인 그룹 id — 경계 오버레이 표시용. */
+  activeGroupId: string | null;
   marqueeRectNodeRef: import("react").RefObject<import("konva/lib/shapes/Rect").Rect | null>;
   master: DocumentMaster<El>;
   masterEditMode: boolean;
@@ -31616,6 +31683,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   liveInkOverlayRendererRef,
   mainLayerRef,
   marqueeIds,
+  activeGroupId,
   marqueeRectNodeRef,
   master,
   masterEditMode,
@@ -31862,6 +31930,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     designateHistoryBrushSource,
     commitTextTransformEnd,
     setElementNodeRef,
+    selectElementFromCanvas,
     setWebGpuCanvasHandle,
     onWebGpuBackendChange,
     onWebGpuDeviceLost,
@@ -32614,26 +32683,33 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 // 무장 중 클릭 선택 전환도 잠근다 — 제스처 도중 대상 이미지가 바뀌면 선택 좌표계가 깨진다.
                 const onSelect = opts.asMask || isAdvancedFillVirtualPreview
                   ? () => {}
-                  : () =>
-                      !activeSurfaceReviewLocked &&
-                      tool === "select" &&
-                      !advancedFillArmed &&
-                      !pixelToolArmed &&
-                      !cropArmed &&
-                      !panelSplitArmed &&
-                      !nodeEditArmed &&
-                      !smudgeArmed &&
-                      !dodgeBurnArmed &&
-                      !wetMixArmed &&
-                      !liquifyArmed &&
-                      !healCloneArmed &&
-                      !layerMaskPaintArmed &&
-                      !filterMaskPaintArmed &&
-                      !quickMaskArmed &&
-                      !historyBrushArmed &&
-                      !bubbleShapeArmed &&
-                      !puppetWarpArmed &&
-                      setSelectedId(el.id);
+                  : (evt?: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+                      if (
+                        activeSurfaceReviewLocked ||
+                        tool !== "select" ||
+                        advancedFillArmed ||
+                        pixelToolArmed ||
+                        cropArmed ||
+                        panelSplitArmed ||
+                        nodeEditArmed ||
+                        smudgeArmed ||
+                        dodgeBurnArmed ||
+                        wetMixArmed ||
+                        liquifyArmed ||
+                        healCloneArmed ||
+                        layerMaskPaintArmed ||
+                        filterMaskPaintArmed ||
+                        quickMaskArmed ||
+                        historyBrushArmed ||
+                        bubbleShapeArmed ||
+                        puppetWarpArmed
+                      ) {
+                        return;
+                      }
+                      // 그룹으로 묶인 요소는 PPT/Figma처럼 그룹 전체가 한 단위로 선택된다. Shift=그룹 단위
+                      // 가산, 더블클릭=그룹 진입(개별 자식 편집). 순수 로직은 selectElementFromCanvas가 위임.
+                      selectElementFromCanvas(el.id, evt);
+                    };
                 const setRef = opts.asMask || isAdvancedFillVirtualPreview
                   ? () => {}
                   : (n: Konva.Node | null) => {
@@ -33040,6 +33116,30 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   <Suspense fallback={null}>
                     <StudioDrawSelectionOverlay els={drawSelectionEls} scale={effScale} />
                   </Suspense>
+                );
+              })()}
+              {/* 그룹 진입(더블클릭) 표시 — 편집 중인 그룹의 경계를 옅은 점선으로 그려 "지금 이 그룹
+                  안에서 개별 편집 중"임을 알린다(PPT/Figma 관례). listening=false 라 클릭을 가로채지 않는다. */}
+              {!isExporting && tool === "select" && !activeSurfaceReviewLocked && activeGroupId && (() => {
+                const memberBounds = elements
+                  .filter((el) => el.groupId === activeGroupId && !isEffectivelyHidden(el, groups))
+                  .map((el) => elBounds(el));
+                if (memberBounds.length === 0) return null;
+                const box = unionBounds(memberBounds);
+                if (box.w <= 0 || box.h <= 0) return null;
+                const pad = 6 / effScale;
+                return (
+                  <Rect
+                    x={box.x - pad}
+                    y={box.y - pad}
+                    width={box.w + pad * 2}
+                    height={box.h + pad * 2}
+                    stroke="oklch(0.62 0.02 250 / 0.7)"
+                    strokeWidth={1 / effScale}
+                    dash={[4 / effScale, 4 / effScale]}
+                    cornerRadius={4 / effScale}
+                    listening={false}
+                  />
                 );
               })()}
             </Layer>
