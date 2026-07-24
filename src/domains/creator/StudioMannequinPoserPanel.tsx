@@ -26,6 +26,7 @@ import {
   Sliders,
   Upload,
   UserRound,
+  Video,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -70,6 +71,10 @@ import {
   type StudioMannequinProjection,
   type StudioMannequinSceneHandle,
 } from "./studio-mannequin-scene";
+import {
+  solvePoseToMannequinJoints,
+  smoothMannequinJointRotations,
+} from "./studio-mannequin-webcam-tracking";
 import {
   StudioPanelChip,
   StudioSectionHeader,
@@ -376,6 +381,10 @@ export function StudioMannequinCameraSection({
   onResetCamera,
   onCapture,
   capturing,
+  webcamActive,
+  webcamLoading,
+  webcamError,
+  onToggleWebcam,
 }: {
   projection: StudioMannequinProjection;
   onProjectionChange: (projection: StudioMannequinProjection) => void;
@@ -385,6 +394,10 @@ export function StudioMannequinCameraSection({
   onResetCamera: () => void;
   onCapture: () => void;
   capturing: boolean;
+  webcamActive: boolean;
+  webcamLoading: boolean;
+  webcamError: string | null;
+  onToggleWebcam: () => void;
 }): ReactElement {
   return (
     <div className="space-y-3">
@@ -402,6 +415,29 @@ export function StudioMannequinCameraSection({
           </button>
         }
       />
+      <div className="space-y-1">
+        <span className="text-xs text-fg-2">실시간 웹캠 동작 인식 (Live Motion Tracking)</span>
+        <button
+          type="button"
+          onClick={onToggleWebcam}
+          disabled={webcamLoading}
+          className={buttonClass({
+            size: "sm",
+            variant: webcamActive ? "solid" : "quiet",
+            className: "w-full justify-center gap-1.5",
+          })}
+        >
+          {webcamLoading ? (
+            <Loader2 size={13} className="animate-spin" aria-hidden />
+          ) : (
+            <Video size={13} aria-hidden />
+          )}
+          {webcamActive ? "🔴 실시간 동작 인식 중지" : "📹 웹캠 실시간 동작 인식 시작"}
+        </button>
+        {webcamError ? (
+          <p className="text-[0.7rem] text-rose-500 mt-1">{webcamError}</p>
+        ) : null}
+      </div>
       <div className="space-y-1">
         <span className="text-xs text-fg-2">카메라 앵글 프리셋</span>
         <div className="grid grid-cols-3 gap-1" role="group" aria-label="카메라 앵글">
@@ -494,6 +530,113 @@ export function StudioMannequinPoserPanel({
   const [copiedLink, setCopiedLink] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sceneError, setSceneError] = useState<string | null>(null);
+
+  const [webcamActive, setWebcamActive] = useState(false);
+  const [webcamLoading, setWebcamLoading] = useState(false);
+  const [webcamError, setWebcamError] = useState<string | null>(null);
+
+  const webcamVideoRef = useRef<HTMLVideoElement | null>(null);
+  const webcamStreamRef = useRef<MediaStream | null>(null);
+  const webcamActiveRef = useRef(false);
+  webcamActiveRef.current = webcamActive;
+
+  const handleToggleWebcam = useCallback(async () => {
+    if (webcamActive) {
+      setWebcamActive(false);
+      if (webcamStreamRef.current) {
+        webcamStreamRef.current.getTracks().forEach((track) => track.stop());
+        webcamStreamRef.current = null;
+      }
+      return;
+    }
+
+    try {
+      setWebcamLoading(true);
+      setWebcamError(null);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480, facingMode: "user" },
+      });
+      webcamStreamRef.current = stream;
+      if (webcamVideoRef.current) {
+        webcamVideoRef.current.srcObject = stream;
+        await webcamVideoRef.current.play().catch(() => {});
+      }
+      setWebcamActive(true);
+    } catch {
+      setWebcamError("웹캠을 시작하지 못했습니다. 카메라 접근 권한을 확인해 주세요.");
+      setWebcamActive(false);
+    } finally {
+      setWebcamLoading(false);
+    }
+  }, [webcamActive]);
+
+  useEffect(() => {
+    if (!open && webcamStreamRef.current) {
+      webcamStreamRef.current.getTracks().forEach((track) => track.stop());
+      webcamStreamRef.current = null;
+      setWebcamActive(false);
+    }
+  }, [open]);
+
+  const poseRef = useRef(pose);
+  poseRef.current = pose;
+
+  useEffect(() => {
+    if (!webcamActive) return;
+    let animId: number;
+    let poseLandmarkerInstance: unknown = null;
+
+    async function startLoop() {
+      try {
+        const { initPoseLandmarker } = await import("./studio-vrm-webcam-tracking");
+        poseLandmarkerInstance = await initPoseLandmarker();
+
+        const loop = () => {
+          if (!webcamActiveRef.current) return;
+          const video = webcamVideoRef.current;
+          if (video && video.readyState >= 2 && poseLandmarkerInstance) {
+            const detection = (poseLandmarkerInstance as {
+              detectForVideo: (el: HTMLVideoElement, timestamp: number) => {
+                landmarks?: readonly (readonly { x: number; y: number; z: number; visibility?: number }[])[];
+              };
+            }).detectForVideo(video, performance.now());
+
+            if (detection.landmarks && detection.landmarks[0]) {
+              const rawJoints = solvePoseToMannequinJoints(detection.landmarks[0], {
+                mirrorMode: true,
+                smoothing: 0.35,
+              });
+              const smoothedJoints = smoothMannequinJointRotations(
+                poseRef.current.joints,
+                rawJoints,
+                0.35,
+              );
+              const updatedPose: StudioMannequinPose = {
+                ...poseRef.current,
+                joints: {
+                  ...poseRef.current.joints,
+                  ...smoothedJoints,
+                },
+              };
+              setPose(updatedPose);
+              sceneRef.current?.setPose(updatedPose);
+            }
+          }
+          animId = requestAnimationFrame(loop);
+        };
+        animId = requestAnimationFrame(loop);
+      } catch {
+        setWebcamError("실시간 동작 인식 엔진을 초기화하지 못했습니다.");
+        setWebcamActive(false);
+      }
+    }
+
+    startLoop();
+
+    return () => {
+      if (animId) cancelAnimationFrame(animId);
+    };
+  }, [webcamActive]);
 
   const spec = useMemo(() => buildStudioMannequinSpec(params), [params]);
 
@@ -867,8 +1010,13 @@ export function StudioMannequinPoserPanel({
                   onResetCamera={() => sceneRef.current?.resetCamera()}
                   onCapture={handleCapture}
                   capturing={capturing}
+                  webcamActive={webcamActive}
+                  webcamLoading={webcamLoading}
+                  webcamError={webcamError}
+                  onToggleWebcam={handleToggleWebcam}
                 />
               ) : null}
+              <video ref={webcamVideoRef} className="hidden" playsInline muted />
             </div>
           </aside>
         </div>
