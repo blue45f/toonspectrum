@@ -2272,10 +2272,11 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   {/*
                     Thin plan-only auto-color hints.
                     Worker onRun (dynamic import keeps the main inspector chunk light).
-                    Demo fixture only: selected-layer ImageData is not available here without
-                    StudioPage pixel plumbing — parent can later pass `image` when that lands.
+                    Selected image `src` is decoded on Run (with max-pixel downscale) —
+                    no StudioPage surgery; demo fixture remains only when src is empty.
                   */}
                   <StudioAutoColorHintsPanel
+                    imageSrc={selected.src}
                     onRun={async (request) => {
                       const { runStudioAutoColorHintsWorker } = await import(
                         "./studio-auto-color-hints-worker-client"

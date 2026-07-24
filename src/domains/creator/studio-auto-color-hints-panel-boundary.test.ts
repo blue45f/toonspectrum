@@ -62,8 +62,8 @@ describe("studio auto-color hints panel export boundary", () => {
     expect(inspector.match(/<StudioAutoColorHintsPanel\b/gu)).toHaveLength(1);
 
     // Worker wiring reachability: inspector passes onRun via dynamic worker-client import
-    // (keeps the main inspector chunk free of a static worker-client edge). Demo fixture
-    // remains until selected-layer ImageData is plumbed without StudioPage surgery.
+    // (keeps the main inspector chunk free of a static worker-client edge). Selected-layer
+    // pixels arrive via imageSrc (decoded on Run) without StudioPage surgery.
     const mountAt = inspector.indexOf("<StudioAutoColorHintsPanel");
     expect(mountAt).toBeGreaterThanOrEqual(0);
     // Span the JSX open + onRun body (arrow `=>` must not truncate assertions).
@@ -74,8 +74,9 @@ describe("studio auto-color hints panel export boundary", () => {
       /import\s*\(\s*["']\.\/studio-auto-color-hints-worker-client["']\s*\)/u,
     );
     expect(mountSnippet).toContain("runStudioAutoColorHintsWorker");
-    // Image prop not wired yet (would require selected-layer pixel plumbing).
-    expect(mountSnippet).not.toMatch(/\bimage=/u);
+    // Selected image layer src is plumbed for on-demand pixel decode (not raw ImageData props).
+    expect(mountSnippet).toMatch(/\bimageSrc=\{selected\.src\}/u);
+    expect(mountSnippet).not.toMatch(/\bimage=\{/u);
     // No static (eager) worker-client import on the inspector module graph.
     expect(inspector).not.toMatch(
       /import\s*\{[^}]*runStudioAutoColorHintsWorker[^}]*\}\s*from\s*["']\.\/studio-auto-color-hints-worker-client["']/u,

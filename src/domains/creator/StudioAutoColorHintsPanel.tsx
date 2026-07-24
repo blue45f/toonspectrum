@@ -16,6 +16,7 @@ import {
   type StudioAutoColorHintSeed,
   type StudioAutoColorHintImageDataLike,
 } from "./studio-auto-color-hints";
+import { loadStudioAutoColorHintImageFromSrc } from "./studio-auto-color-hints-image-source";
 import {
   createStudioAutoColorHintsDemoRequest,
   summarizeStudioAutoColorHintPlan,
@@ -30,6 +31,11 @@ const controlFocusClass =
 export interface StudioAutoColorHintsPanelProps {
   /** Optional line-art pixels. When omitted, the panel plans against a demo fixture. */
   readonly image?: StudioAutoColorHintImageDataLike | null;
+  /**
+   * Selected image layer `src` (data URL / same-origin URL). When `image`/`request` are absent,
+   * pixels are decoded on Run (with auto-color max-pixel downscale). Browser only.
+   */
+  readonly imageSrc?: string | null;
   /** Optional color seeds; ignored when `image` is absent (demo seeds are used). */
   readonly seeds?: readonly StudioAutoColorHintSeed[];
   /** Optional full request override (image/seeds/options). Wins over image/seeds props. */
@@ -52,10 +58,10 @@ async function copyTextToClipboard(text: string): Promise<boolean> {
   return false;
 }
 
-function resolveRequest(props: StudioAutoColorHintsPanelProps): {
+async function resolveRequest(props: StudioAutoColorHintsPanelProps): Promise<{
   request: StudioAutoColorHintRequest;
   usingDemo: boolean;
-} {
+}> {
   if (props.request) {
     return { request: props.request, usingDemo: false };
   }
@@ -68,11 +74,22 @@ function resolveRequest(props: StudioAutoColorHintsPanelProps): {
       usingDemo: false,
     };
   }
+  if (typeof props.imageSrc === "string" && props.imageSrc.length > 0) {
+    const image = await loadStudioAutoColorHintImageFromSrc(props.imageSrc);
+    return {
+      request: {
+        image,
+        seeds: props.seeds ?? [],
+      },
+      usingDemo: false,
+    };
+  }
   return { request: createStudioAutoColorHintsDemoRequest(), usingDemo: true };
 }
 
 export function StudioAutoColorHintsPanel({
   image = null,
+  imageSrc = null,
   seeds,
   request = null,
   onPlan,
@@ -94,7 +111,7 @@ export function StudioAutoColorHintsPanel({
     setError(null);
     setCopyStatus(null);
     try {
-      const resolved = resolveRequest({ image, seeds, request, onPlan, onRun });
+      const resolved = await resolveRequest({ image, imageSrc, seeds, request, onPlan, onRun });
       setUsingDemo(resolved.usingDemo);
       const plan = await Promise.resolve(
         onRun ? onRun(resolved.request) : planStudioAutoColorHints(resolved.request),
@@ -194,7 +211,7 @@ export function StudioAutoColorHintsPanel({
 
         {usingDemo && summary ? (
           <p className="text-center text-[0.64rem] leading-relaxed text-fg-3">
-            데모 선화로 계산했습니다. 선택 레이어 픽셀 연동은 이후 패스에서 연결됩니다.
+            데모 선화로 계산했습니다. 이미지 레이어를 선택한 뒤 다시 실행하면 선택 선화를 사용합니다.
           </p>
         ) : null}
 
