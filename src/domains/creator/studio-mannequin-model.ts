@@ -104,17 +104,28 @@ export const STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS: StudioMannequinBodyParams = O
   build: 1,
 });
 
-export type StudioMannequinBodyPresetId = "neutral" | "male" | "female";
+export type StudioMannequinBodyPresetId =
+  | "neutral"
+  | "male"
+  | "female"
+  | "hero"
+  | "chibi3"
+  | "chibi4"
+  | "model"
+  | "slender"
+  | "bodybuilder"
+  | "child"
+  | "anime7";
 
 export const STUDIO_MANNEQUIN_BODY_PRESETS: Readonly<
   Record<StudioMannequinBodyPresetId, { label: string; params: StudioMannequinBodyParams }>
 > = Object.freeze({
   neutral: {
-    label: "중성",
+    label: "중성 7등신",
     params: STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS,
   },
   male: {
-    label: "남성",
+    label: "남성 7.4등신",
     params: Object.freeze({
       heightCm: 178,
       headCount: 7.4,
@@ -126,7 +137,7 @@ export const STUDIO_MANNEQUIN_BODY_PRESETS: Readonly<
     }),
   },
   female: {
-    label: "여성",
+    label: "여성 6.8등신",
     params: Object.freeze({
       heightCm: 162,
       headCount: 6.8,
@@ -137,7 +148,124 @@ export const STUDIO_MANNEQUIN_BODY_PRESETS: Readonly<
       build: 0.85,
     }),
   },
+  hero: {
+    label: "슈퍼히어로 8.5등신",
+    params: Object.freeze({
+      heightCm: 188,
+      headCount: 8.5,
+      shoulderWidth: 1.25,
+      pelvisWidth: 0.9,
+      armLength: 1.05,
+      legLength: 1.1,
+      build: 2.2,
+    }),
+  },
+  chibi3: {
+    label: "SD 3등신 꼬마",
+    params: Object.freeze({
+      heightCm: 125,
+      headCount: 3.2,
+      shoulderWidth: 0.78,
+      pelvisWidth: 0.82,
+      armLength: 0.85,
+      legLength: 0.8,
+      build: 2.6,
+    }),
+  },
+  chibi4: {
+    label: "SD 4등신 쁘띠",
+    params: Object.freeze({
+      heightCm: 135,
+      headCount: 4.2,
+      shoulderWidth: 0.82,
+      pelvisWidth: 0.88,
+      armLength: 0.9,
+      legLength: 0.88,
+      build: 1.2,
+    }),
+  },
+  model: {
+    label: "패션모델 9등신",
+    params: Object.freeze({
+      heightCm: 182,
+      headCount: 8.8,
+      shoulderWidth: 1.02,
+      pelvisWidth: 0.96,
+      armLength: 1.08,
+      legLength: 1.18,
+      build: 0.4,
+    }),
+  },
+  slender: {
+    label: "슬림 틴에이저 7.5등신",
+    params: Object.freeze({
+      heightCm: 168,
+      headCount: 7.5,
+      shoulderWidth: 0.88,
+      pelvisWidth: 0.88,
+      armLength: 0.98,
+      legLength: 1.05,
+      build: 0.2,
+    }),
+  },
+  bodybuilder: {
+    label: "보디빌더 7.2등신",
+    params: Object.freeze({
+      heightCm: 185,
+      headCount: 7.2,
+      shoulderWidth: 1.3,
+      pelvisWidth: 0.95,
+      armLength: 1.05,
+      legLength: 0.95,
+      build: 3.0,
+    }),
+  },
+  child: {
+    label: "어린이 5.5등신",
+    params: Object.freeze({
+      heightCm: 140,
+      headCount: 5.5,
+      shoulderWidth: 0.85,
+      pelvisWidth: 0.88,
+      armLength: 0.92,
+      legLength: 0.92,
+      build: 1.0,
+    }),
+  },
+  anime7: {
+    label: "애니메 7.5등신",
+    params: Object.freeze({
+      heightCm: 165,
+      headCount: 7.5,
+      shoulderWidth: 0.95,
+      pelvisWidth: 1.02,
+      armLength: 1.0,
+      legLength: 1.08,
+      build: 0.8,
+    }),
+  },
 });
+
+export type StudioMannequinMaterialStyle =
+  | "wood"
+  | "clay"
+  | "wireframe"
+  | "shaded"
+  | "magma"
+  | "stencil";
+
+export const STUDIO_MANNEQUIN_MATERIAL_STYLES: readonly {
+  id: StudioMannequinMaterialStyle;
+  label: string;
+  desc: string;
+}[] = Object.freeze([
+  { id: "wood", label: "목조 인형", desc: "따뜻한 나무 원목 질감의 표준 3D 데생 인형" },
+  { id: "clay", label: "클레이", desc: "단색 석고상 형태의 무광 명암 체형" },
+  { id: "wireframe", label: "와이어프레임", desc: "격자망 형태의 입체 투시 가이드 모드" },
+  { id: "shaded", label: "2톤 셀 셰이딩", desc: "명확한 툰 음영 경계선 드로잉 가이드" },
+  { id: "magma", label: "네온 마그마", desc: "고대비 발광 앰비언트 실루엣 모드" },
+  { id: "stencil", label: "흑백 실루엣", desc: "외곽 형태 선명 추출용 스텐실 모드" },
+]);
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return fallback;

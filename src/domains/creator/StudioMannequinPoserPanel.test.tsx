@@ -17,6 +17,9 @@ const sceneHandle: StudioMannequinSceneHandle = {
   setJointRotation: vi.fn(),
   getJointRotation: vi.fn(() => [0, 0, 0] as const),
   selectJoint: vi.fn(),
+  setMaterialStyle: vi.fn(),
+  getMaterialStyle: vi.fn(() => "wood" as const),
+  setCameraPreset: vi.fn(),
   setProjection: vi.fn(),
   getProjection: vi.fn(() => "perspective" as const),
   resetCamera: vi.fn(),
@@ -79,7 +82,7 @@ describe("StudioMannequinPoserPanel", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
     expect(screen.getByText("3D 데생 인형")).toBeTruthy();
     for (const label of ["체형", "포즈", "관절", "카메라"]) {
-      expect(screen.getByRole("button", { name: new RegExp(label) })).toBeTruthy();
+      expect(screen.getByRole("button", { name: new RegExp(`^${label}`) })).toBeTruthy();
     }
     expect(createScene).toHaveBeenCalledTimes(1);
   });
@@ -97,7 +100,7 @@ describe("StudioMannequinPoserPanel", () => {
 
   it("체형 탭 슬라이더 조작이 새 스펙을 씬으로 보낸다", async () => {
     renderPanel();
-    fireEvent.click(screen.getByRole("button", { name: /체형/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^체형/ }));
     const heightSlider = screen.getByLabelText(/신장/);
     fireEvent.change(heightSlider, { target: { value: "190" } });
     await waitFor(() => {

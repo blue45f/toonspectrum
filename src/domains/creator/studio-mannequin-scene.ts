@@ -26,6 +26,7 @@ import {
   type StudioMannequinChainId,
   type StudioMannequinChainSpec,
   type StudioMannequinJointId,
+  type StudioMannequinMaterialStyle,
   type StudioMannequinSpec,
   type StudioMannequinVec3,
 } from "./studio-mannequin-model";
@@ -99,6 +100,9 @@ export interface StudioMannequinSceneHandle {
   setJointRotation(jointId: StudioMannequinJointId, rotation: StudioMannequinVec3): void;
   getJointRotation(jointId: StudioMannequinJointId): StudioMannequinVec3;
   selectJoint(jointId: StudioMannequinJointId | null): void;
+  setMaterialStyle(style: StudioMannequinMaterialStyle): void;
+  getMaterialStyle(): StudioMannequinMaterialStyle;
+  setCameraPreset(preset: "front" | "side" | "back" | "top" | "high" | "low"): void;
   setProjection(projection: StudioMannequinProjection): void;
   getProjection(): StudioMannequinProjection;
   resetCamera(): void;
@@ -185,7 +189,7 @@ export function createStudioMannequinScene(
 
   // 머티리얼 — 밝은 회색 툰 셰이딩(선택 시 accent 틴트).
   const gradientMap = createToonGradientTexture();
-  const bodyMaterial = new THREE.MeshToonMaterial({ color: 0xd2cec7, gradientMap });
+  let bodyMaterial: THREE.Material = new THREE.MeshToonMaterial({ color: 0xd2cec7, gradientMap });
   const selectedMaterial = new THREE.MeshToonMaterial({ color: 0xe0925c, gradientMap });
   const handleMaterial = new THREE.MeshBasicMaterial({
     color: 0xe0925c,
@@ -625,6 +629,52 @@ export function createStudioMannequinScene(
       if (disposed) return;
       selectedJointId = jointId;
       applySelectionTint();
+      invalidate();
+    },
+    setMaterialStyle(style) {
+      if (disposed) return;
+      const gradientMap = createToonGradientTexture();
+      let nextMaterial: THREE.Material;
+      if (style === "clay") {
+        nextMaterial = new THREE.MeshStandardMaterial({ color: 0xe6e2dd, roughness: 0.85, metalness: 0.05 });
+      } else if (style === "wireframe") {
+        nextMaterial = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true });
+      } else if (style === "shaded") {
+        nextMaterial = new THREE.MeshToonMaterial({ color: 0x94a3b8, gradientMap });
+      } else if (style === "magma") {
+        nextMaterial = new THREE.MeshStandardMaterial({ color: 0x18181b, emissive: 0xf97316, emissiveIntensity: 0.7, roughness: 0.3 });
+      } else if (style === "stencil") {
+        nextMaterial = new THREE.MeshBasicMaterial({ color: 0x09090b });
+      } else {
+        nextMaterial = new THREE.MeshToonMaterial({ color: 0xd2cec7, gradientMap });
+      }
+      bodyMaterial.dispose();
+      bodyMaterial = nextMaterial as THREE.MeshToonMaterial;
+      for (const mesh of bodyMeshes) {
+        if (mesh.userData.studioMannequinJointId !== selectedJointId) {
+          mesh.material = bodyMaterial;
+        }
+      }
+      invalidate();
+    },
+    getMaterialStyle() {
+      return "wood";
+    },
+    setCameraPreset(preset) {
+      if (disposed) return;
+      const target = new THREE.Vector3(0, 0.92, 0);
+      const pos = new THREE.Vector3(1.55, 1.45, 3.1);
+      if (preset === "front") pos.set(0, 1.1, 3.4);
+      else if (preset === "side") pos.set(3.4, 1.1, 0);
+      else if (preset === "back") pos.set(0, 1.1, -3.4);
+      else if (preset === "top") pos.set(0, 3.8, 0.01);
+      else if (preset === "high") pos.set(1.8, 3.2, 2.6);
+      else if (preset === "low") pos.set(1.4, 0.2, 2.8);
+      activeCamera.position.copy(pos);
+      if (controls) {
+        controls.target.copy(target);
+        controls.update();
+      }
       invalidate();
     },
     setProjection(nextProjection) {

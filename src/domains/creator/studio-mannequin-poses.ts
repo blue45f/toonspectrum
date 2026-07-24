@@ -24,9 +24,28 @@ export interface StudioMannequinPose {
   readonly pelvisOffset: StudioMannequinVec3;
 }
 
+export type StudioMannequinPoseCategory =
+  | "basic"
+  | "action"
+  | "daily"
+  | "sports"
+  | "webtoon";
+
+export const STUDIO_MANNEQUIN_POSE_CATEGORIES: readonly {
+  id: StudioMannequinPoseCategory;
+  label: string;
+}[] = Object.freeze([
+  { id: "basic", label: "기본" },
+  { id: "action", label: "액션·전투" },
+  { id: "daily", label: "일상·휴식" },
+  { id: "sports", label: "스포츠·동작" },
+  { id: "webtoon", label: "웹툰 연출" },
+]);
+
 export interface StudioMannequinPosePreset {
   readonly id: string;
   readonly label: string;
+  readonly category: StudioMannequinPoseCategory;
   readonly pose: StudioMannequinPose;
 }
 
@@ -55,6 +74,7 @@ export const STUDIO_MANNEQUIN_POSE_PRESETS: readonly StudioMannequinPosePreset[]
   {
     id: "stand",
     label: "서기",
+    category: "basic",
     pose: pose({
       spine: deg3(2, 0, 0),
       leftUpperArm: deg3(-4, 0, 8),
@@ -68,6 +88,7 @@ export const STUDIO_MANNEQUIN_POSE_PRESETS: readonly StudioMannequinPosePreset[]
   {
     id: "attention",
     label: "차렷",
+    category: "basic",
     pose: pose({
       leftUpperArm: deg3(0, 0, 3),
       rightUpperArm: deg3(0, 0, -3),
@@ -80,6 +101,7 @@ export const STUDIO_MANNEQUIN_POSE_PRESETS: readonly StudioMannequinPosePreset[]
   {
     id: "walk",
     label: "걷기",
+    category: "daily",
     pose: pose({
       pelvis: deg3(0, -6, 0),
       chest: deg3(0, 7, 0),
@@ -98,6 +120,7 @@ export const STUDIO_MANNEQUIN_POSE_PRESETS: readonly StudioMannequinPosePreset[]
   {
     id: "run",
     label: "달리기",
+    category: "sports",
     pose: pose({
       spine: deg3(14, 0, 0),
       chest: deg3(8, 6, 0),
@@ -116,6 +139,7 @@ export const STUDIO_MANNEQUIN_POSE_PRESETS: readonly StudioMannequinPosePreset[]
   {
     id: "sit-chair",
     label: "앉기(의자)",
+    category: "daily",
     pose: pose({
       spine: deg3(6, 0, 0),
       leftUpperLeg: deg3(-84, 0, 6),
@@ -133,6 +157,7 @@ export const STUDIO_MANNEQUIN_POSE_PRESETS: readonly StudioMannequinPosePreset[]
   {
     id: "kneel",
     label: "무릎앉기",
+    category: "daily",
     pose: pose({
       spine: deg3(4, 0, 0),
       leftUpperLeg: deg3(-72, 0, 4),
@@ -150,6 +175,7 @@ export const STUDIO_MANNEQUIN_POSE_PRESETS: readonly StudioMannequinPosePreset[]
   {
     id: "jump",
     label: "점프",
+    category: "sports",
     pose: pose({
       spine: deg3(-6, 0, 0),
       leftUpperArm: deg3(-10, 0, 150),
@@ -166,7 +192,8 @@ export const STUDIO_MANNEQUIN_POSE_PRESETS: readonly StudioMannequinPosePreset[]
   },
   {
     id: "punch",
-    label: "펀치",
+    label: "스트레이트 펀치",
+    category: "action",
     pose: pose({
       spine: deg3(0, -12, 0),
       chest: deg3(0, -28, 0),
@@ -182,8 +209,61 @@ export const STUDIO_MANNEQUIN_POSE_PRESETS: readonly StudioMannequinPosePreset[]
     }),
   },
   {
+    id: "kick-flying",
+    label: "플라잉 점프 킥",
+    category: "action",
+    pose: pose({
+      spine: deg3(-12, 10, 0),
+      rightUpperLeg: deg3(-82, 0, -6),
+      rightLowerLeg: deg3(10, 0, 0),
+      leftUpperLeg: deg3(18, 0, 6),
+      leftLowerLeg: deg3(98, 0, 0),
+      rightUpperArm: deg3(20, 0, -32),
+      rightLowerArm: deg3(-72, 0, 0),
+      leftUpperArm: deg3(-42, 0, 60),
+      leftLowerArm: deg3(-40, 0, 0),
+    }, [0, 0.35, 0]),
+  },
+  {
+    id: "sword-ready",
+    label: "검술 발도 자세",
+    category: "action",
+    pose: pose({
+      spine: deg3(12, -18, 0),
+      chest: deg3(4, -12, 0),
+      head: deg3(-4, 28, 0),
+      rightUpperArm: deg3(-58, 20, -42),
+      rightLowerArm: deg3(-88, 0, 0),
+      leftUpperArm: deg3(-48, -14, 28),
+      leftLowerArm: deg3(-102, 0, 0),
+      leftUpperLeg: deg3(-42, 0, 10),
+      leftLowerLeg: deg3(38, 0, 0),
+      rightUpperLeg: deg3(22, 0, -8),
+      rightLowerLeg: deg3(44, 0, 0),
+    }, [0, -0.15, 0]),
+  },
+  {
+    id: "hero-landing",
+    label: "히어로 착지 포즈",
+    category: "action",
+    pose: pose({
+      spine: deg3(44, 0, 0),
+      chest: deg3(24, 0, 0),
+      head: deg3(-32, 0, 0),
+      rightUpperArm: deg3(12, 0, -18),
+      rightLowerArm: deg3(-120, 0, 0),
+      leftUpperArm: deg3(28, 0, 24),
+      leftLowerArm: deg3(-48, 0, 0),
+      rightUpperLeg: deg3(-78, 0, -12),
+      rightLowerLeg: deg3(105, 0, 0),
+      leftUpperLeg: deg3(-62, 0, 14),
+      leftLowerLeg: deg3(88, 0, 0),
+    }, [0, -0.52, 0]),
+  },
+  {
     id: "arms-spread",
     label: "양팔벌리기",
+    category: "basic",
     pose: pose({
       leftUpperArm: deg3(0, 0, 86),
       rightUpperArm: deg3(0, 0, -86),
@@ -197,7 +277,8 @@ export const STUDIO_MANNEQUIN_POSE_PRESETS: readonly StudioMannequinPosePreset[]
   },
   {
     id: "selfie",
-    label: "셀카",
+    label: "셀카 포즈",
+    category: "daily",
     pose: pose({
       spine: deg3(0, 0, 6),
       chest: deg3(0, -6, 4),
@@ -212,20 +293,9 @@ export const STUDIO_MANNEQUIN_POSE_PRESETS: readonly StudioMannequinPosePreset[]
     }),
   },
   {
-    id: "lie-down",
-    label: "누움",
-    pose: pose({
-      pelvis: deg3(-90, 0, 0),
-      head: deg3(12, 0, 0),
-      leftUpperArm: deg3(4, 0, 10),
-      rightUpperArm: deg3(4, 0, -10),
-      leftUpperLeg: deg3(0, 0, 4),
-      rightUpperLeg: deg3(0, 0, -4),
-    }, [0, -0.72, 0]),
-  },
-  {
     id: "think",
-    label: "생각하기",
+    label: "생각하기(턱괴기)",
+    category: "daily",
     pose: pose({
       spine: deg3(4, 0, 0),
       neck: deg3(6, 6, 0),
@@ -238,8 +308,22 @@ export const STUDIO_MANNEQUIN_POSE_PRESETS: readonly StudioMannequinPosePreset[]
     }),
   },
   {
+    id: "smartphone",
+    label: "스마트폰 터치",
+    category: "daily",
+    pose: pose({
+      spine: deg3(8, 0, 0),
+      head: deg3(22, 0, 0),
+      leftUpperArm: deg3(-38, 12, 24),
+      leftLowerArm: deg3(-98, 0, 0),
+      rightUpperArm: deg3(-42, -12, -24),
+      rightLowerArm: deg3(-105, 0, 0),
+    }),
+  },
+  {
     id: "wave",
     label: "손흔들기",
+    category: "webtoon",
     pose: pose({
       head: deg3(0, 0, -8),
       rightUpperArm: deg3(-16, 0, -128),
@@ -252,8 +336,52 @@ export const STUDIO_MANNEQUIN_POSE_PRESETS: readonly StudioMannequinPosePreset[]
     }),
   },
   {
+    id: "heart-sign",
+    label: "손가락 하트 시그널",
+    category: "webtoon",
+    pose: pose({
+      spine: deg3(2, 4, 0),
+      head: deg3(-4, -6, 6),
+      leftUpperArm: deg3(-52, -14, 42),
+      leftLowerArm: deg3(-108, 0, 0),
+      rightUpperArm: deg3(-52, 14, -42),
+      rightLowerArm: deg3(-108, 0, 0),
+    }),
+  },
+  {
+    id: "surprised",
+    label: "깜짝 놀람 연출",
+    category: "webtoon",
+    pose: pose({
+      spine: deg3(-14, 0, 0),
+      chest: deg3(-12, 0, 0),
+      head: deg3(-10, 0, 0),
+      leftUpperArm: deg3(-18, 0, 68),
+      leftLowerArm: deg3(-72, 0, 0),
+      rightUpperArm: deg3(-18, 0, -68),
+      rightLowerArm: deg3(-72, 0, 0),
+      leftUpperLeg: deg3(12, 0, 8),
+      rightUpperLeg: deg3(12, 0, -8),
+    }, [0, 0.08, 0]),
+  },
+  {
+    id: "soccer-shot",
+    label: "축구 강력 슈팅",
+    category: "sports",
+    pose: pose({
+      spine: deg3(-8, -14, 0),
+      rightUpperLeg: deg3(-68, 0, -4),
+      rightLowerLeg: deg3(12, 0, 0),
+      leftUpperLeg: deg3(32, 0, 6),
+      leftLowerLeg: deg3(64, 0, 0),
+      leftUpperArm: deg3(-32, 0, 58),
+      rightUpperArm: deg3(24, 0, -42),
+    }),
+  },
+  {
     id: "bow",
-    label: "인사",
+    label: "정중한 정면 인사",
+    category: "webtoon",
     pose: pose({
       spine: deg3(32, 0, 0),
       chest: deg3(26, 0, 0),
@@ -416,4 +544,35 @@ export function parseStudioMannequinState(raw: unknown): StudioMannequinPersiste
     params: clampStudioMannequinBodyParams(doc.params),
     pose: normalizeStudioMannequinPose(doc.pose),
   };
+}
+
+// ── 공유 내보내기/가져오기 + 클립보드 해시 ────────────────────────────────
+
+export function exportStudioMannequinStateToJSON(input: StudioMannequinPersistentState): string {
+  return serializeStudioMannequinState(input);
+}
+
+export function importStudioMannequinStateFromJSON(raw: unknown): StudioMannequinPersistentState | null {
+  return parseStudioMannequinState(raw);
+}
+
+export function encodeStudioMannequinShareHash(input: StudioMannequinPersistentState): string {
+  const json = serializeStudioMannequinState(input);
+  try {
+    return `#mannequin=${encodeURIComponent(btoa(json))}`;
+  } catch {
+    return "";
+  }
+}
+
+export function parseStudioMannequinShareHash(hash: string): StudioMannequinPersistentState | null {
+  if (!hash.includes("mannequin=")) return null;
+  const match = /mannequin=([^&]+)/.exec(hash);
+  if (!match || !match[1]) return null;
+  try {
+    const json = atob(decodeURIComponent(match[1]));
+    return parseStudioMannequinState(json);
+  } catch {
+    return null;
+  }
 }
