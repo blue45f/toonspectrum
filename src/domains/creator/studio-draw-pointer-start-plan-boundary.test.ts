@@ -61,7 +61,9 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     ]) {
       expect(planner.source).not.toContain(pageOwnedAction);
     }
-    expect(planner.source.split("\n").length).toBeLessThanOrEqual(260);
+    // 의도적 변경(2026-07-24): CSP pressure min size — linear residual bake-at-capture
+    // minSizeRatio 배선으로 플래너 순수 모듈 라인 증가(260 → 265).
+    expect(planner.source.split("\n").length).toBeLessThanOrEqual(265);
   });
 
   it("leaves gesture priority, leases, transport, CRDT publication, and live surfaces in the Page", () => {
@@ -90,7 +92,9 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // 다른 편집 가능한 이미지가 있으면 대상을 옮긴다(선택이 간헐적으로 안 되던 버그 수정, 915 → 935).
     // 의도적 변경(2026-07-24): 그룹 선택 = 하나의 단위(PPT/Figma) — 빈 영역 클릭 시 그룹 진입 상태도
     // 함께 해제(activeGroupIdRef/setActiveGroupId)하는 분기를 deselect 경로에 추가(935 → 936).
-    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(936);
+    // 의도적 변경(2026-07-24): CSP pressure min size — resolveBrushPressureSample/minSizeRatio 배선
+    // 및 시작 플랜 입력 전달로 onStageDown 증가(936 → 940).
+    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(940);
 
     expectTokenOrder(pointCommentHandler, [
       "if (pointCommentComposer) return true",
