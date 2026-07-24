@@ -255,4 +255,57 @@ describe("Studio VRM portable pose-material adapter", () => {
       }),
     ).toBeNull();
   });
+
+  it("blends material rotations by optional strength toward rest identity", () => {
+    const sourceMaterial = material([
+      { bone: "head", rotation: [0, 0, 0.2, Math.sqrt(0.96)] },
+    ]);
+
+    const full = applyStudioVrmPoseMaterial(
+      createRuntime({ bones: ["head"] }).runtime,
+      sourceMaterial,
+      { bones: {}, fingerEdits: {}, strength: 1 },
+    );
+    const half = applyStudioVrmPoseMaterial(
+      createRuntime({ bones: ["head"] }).runtime,
+      sourceMaterial,
+      { bones: {}, fingerEdits: {}, strength: 0.5 },
+    );
+    const restRuntime = createRuntime({ bones: ["head"] });
+    const rest = applyStudioVrmPoseMaterial(restRuntime.runtime, sourceMaterial, {
+      bones: {},
+      fingerEdits: {},
+      strength: 0,
+    });
+    const omitted = applyStudioVrmPoseMaterial(
+      createRuntime({ bones: ["head"] }).runtime,
+      sourceMaterial,
+      { bones: {}, fingerEdits: {} },
+    );
+
+    expect(full?.appliedBones).toEqual(["head"]);
+    expect(half?.appliedBones).toEqual(["head"]);
+    expect(rest?.appliedBones).toEqual(["head"]);
+    expect(omitted?.appliedBones).toEqual(["head"]);
+
+    const fullEuler = full?.bones.head?.rotation;
+    const halfEuler = half?.bones.head?.rotation;
+    const restEuler = rest?.bones.head?.rotation;
+    const omittedEuler = omitted?.bones.head?.rotation;
+    expect(fullEuler).toBeDefined();
+    expect(halfEuler).toBeDefined();
+    expect(restEuler).toBeDefined();
+    expect(omittedEuler).toEqual(fullEuler);
+
+    const fullQ = quaternionFromEuler(fullEuler!);
+    const halfQ = quaternionFromEuler(halfEuler!);
+    const restQ = quaternionFromEuler(restEuler!);
+    // Half strength is closer to identity than full material rotation.
+    expect(Math.abs(halfQ.dot(new THREE.Quaternion()))).toBeGreaterThan(
+      Math.abs(fullQ.dot(new THREE.Quaternion())),
+    );
+    // Strength 0 is rest-relative identity → visible node near rest orientation.
+    expect(Math.abs(restQ.w)).toBeCloseTo(1, 5);
+    expect(Math.abs(restRuntime.nodes.get("head")!.quaternion.w)).toBeCloseTo(1, 5);
+  });
 });

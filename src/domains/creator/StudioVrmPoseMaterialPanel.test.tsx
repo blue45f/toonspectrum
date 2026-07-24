@@ -8,6 +8,7 @@ import {
   STUDIO_POSE_MATERIAL_KIND,
   STUDIO_POSE_MATERIAL_VERSION,
   STUDIO_POSE_ROTATION_CONVENTION,
+  type StudioPoseMaterial,
 } from "./studio-pose-material";
 import {
   STUDIO_POSE_MATERIAL_LIBRARY_KIND,
@@ -17,7 +18,11 @@ import {
 } from "./studio-pose-material-library";
 import { StudioVrmPoseMaterialPanel } from "./StudioVrmPoseMaterialPanel";
 
-import type { StudioVrmPoseMaterialCaptureOptions } from "./studio-vrm-pose-material-adapter";
+import type { StudioPoseScope } from "./studio-humanoid-bones";
+import type {
+  StudioVrmPoseMaterialApplyResult,
+  StudioVrmPoseMaterialCaptureOptions,
+} from "./studio-vrm-pose-material-adapter";
 
 class MemoryStorage implements StudioPoseMaterialStorage {
   readonly values = new Map<string, string>();
@@ -54,7 +59,11 @@ describe("StudioVrmPoseMaterialPanel", () => {
   it("saves a strict normalized pose material and applies it with a scoped result announcement", () => {
     const storage = new MemoryStorage();
     const onCapture = vi.fn(materialFromCapture);
-    const onApply = vi.fn((material, scope) => ({
+    const onApply = vi.fn((
+      material: StudioPoseMaterial,
+      scope: StudioPoseScope,
+      _strength?: number,
+    ): StudioVrmPoseMaterialApplyResult => ({
       materialId: material.id,
       requestedScope: scope,
       bones: { head: { rotation: [0, 0, 0] } },
@@ -63,7 +72,7 @@ describe("StudioVrmPoseMaterialPanel", () => {
       skippedLocked: ["neck"],
       skippedOutsideScope: [],
       skippedMissing: ["jaw"],
-    } as const));
+    }));
 
     render(
       <StudioVrmPoseMaterialPanel
@@ -93,7 +102,57 @@ describe("StudioVrmPoseMaterialPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "적용" }));
     expect(onApply).toHaveBeenCalledOnce();
     expect(onApply.mock.calls[0]?.[1]).toBe("upper");
+    expect(onApply.mock.calls[0]?.[2]).toBe(1);
     expect(screen.getByText(/1개 본 적용 · 잠금 1개 유지 · 모델 미지원 1개 건너뜀/)).toBeTruthy();
+  });
+
+  it("forwards the 적용 강도 slider value into onApply", () => {
+    const storage = new MemoryStorage();
+    const material = materialFromCapture({
+      id: "pose-strength",
+      name: "Strength pose",
+      scope: "full",
+    })!;
+    storage.setItem(
+      STUDIO_POSE_MATERIAL_LIBRARY_STORAGE_KEY,
+      JSON.stringify({
+        kind: STUDIO_POSE_MATERIAL_LIBRARY_KIND,
+        version: STUDIO_POSE_MATERIAL_LIBRARY_VERSION,
+        materials: [material],
+      }),
+    );
+    const onApply = vi.fn((
+      applied: StudioPoseMaterial,
+      scope: StudioPoseScope,
+      _strength?: number,
+    ): StudioVrmPoseMaterialApplyResult => ({
+      materialId: applied.id,
+      requestedScope: scope,
+      bones: {},
+      fingerEdits: {},
+      appliedBones: ["head"],
+      skippedLocked: [],
+      skippedOutsideScope: [],
+      skippedMissing: [],
+    }));
+
+    render(
+      <StudioVrmPoseMaterialPanel
+        disabled={false}
+        activeMaterialId={null}
+        lockedBoneCount={0}
+        storage={storage}
+        onCapture={vi.fn()}
+        onApply={onApply}
+      />,
+    );
+
+    const slider = screen.getByLabelText("적용 강도");
+    fireEvent.change(slider, { target: { value: "0.4" } });
+    fireEvent.click(screen.getByRole("button", { name: "적용" }));
+
+    expect(onApply).toHaveBeenCalledOnce();
+    expect(onApply.mock.calls[0]?.[2]).toBeCloseTo(0.4);
   });
 
   it("keeps corrupt and future storage read-only instead of silently replacing it", () => {
@@ -289,7 +348,7 @@ describe("StudioVrmPoseMaterialPanel", () => {
     expect((screen.getByLabelText("적용 범위") as HTMLSelectElement).value).toBe("upper");
     fireEvent.click(screen.getByRole("button", { name: "적용" }));
     expect(onApply).toHaveBeenCalledOnce();
-    expect(onApply).toHaveBeenCalledWith(replacement, "upper");
+    expect(onApply).toHaveBeenCalledWith(replacement, "upper", 1);
   });
 
   it("uses touch-sized action controls and disables runtime mutation during live operations", () => {

@@ -148,10 +148,12 @@ describe("Studio VRM raster capture", () => {
 
   it("renders the scene into an MSAA linear target, tone-maps through the straight-alpha output pass, and restores renderer state", () => {
     const renderer = new FakeRenderer();
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color("#ff00ff");
 
     const output = captureStudioVrmRgba(
       renderer as unknown as THREE.WebGLRenderer,
-      new THREE.Scene(),
+      scene,
       new THREE.PerspectiveCamera(),
       { width: 1, height: 2 },
     );
@@ -173,6 +175,9 @@ describe("Studio VRM raster capture", () => {
       "restore-target:3:2",
       "restore-clear-color",
     ]);
+    // Transparent cutouts suppress scene.background for the color pass, then restore it.
+    expect(scene.background).toBeInstanceOf(THREE.Color);
+    expect((scene.background as THREE.Color).getHexString()).toBe("ff00ff");
     const [sceneTarget, outputTarget] = renderer.captureTargets;
     // Scene pass: antialiased linear working buffer; no output color space of its own.
     expect(sceneTarget?.samples).toBe(4);
@@ -183,6 +188,25 @@ describe("Studio VRM raster capture", () => {
     expect(renderer.readTarget).toBe(outputTarget);
     expect(renderer.clearColor.getHexString()).toBe("234567");
     expect(renderer.clearAlpha).toBe(0.75);
+  });
+
+  it("honors an opaque capture clear without suppressing scene.background", () => {
+    const renderer = new FakeRenderer();
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color("#112233");
+
+    captureStudioVrmRgba(
+      renderer as unknown as THREE.WebGLRenderer,
+      scene,
+      new THREE.PerspectiveCamera(),
+      { width: 1, height: 2 },
+      { color: "#abcdef", alpha: 1 },
+    );
+
+    expect(renderer.clearAlpha).toBe(0.75);
+    expect(scene.background).toBeInstanceOf(THREE.Color);
+    expect((scene.background as THREE.Color).getHexString()).toBe("112233");
+    expect(renderer.calls).toContain("set-transparent-clear");
   });
 
   it("restores renderer state even when GPU readback fails", () => {

@@ -21,6 +21,14 @@ export interface StudioVrmRasterCaptureDimensions {
   readonly height: number;
 }
 
+/** Optional clear intent for subject-only (alpha 0) vs opaque character inserts. */
+export interface StudioVrmRasterCaptureBackground {
+  /** CSS hex `#rrggbb` or CSS color accepted by THREE.Color. Defaults to black. */
+  readonly color?: string;
+  /** Clear alpha in [0, 1]. Defaults to 0 (transparent subject cutout). */
+  readonly alpha?: number;
+}
+
 export interface StudioVrmRasterCaptureOptions {
   readonly signal?: AbortSignal;
   readonly timeoutMs?: number;
@@ -139,13 +147,23 @@ export function captureStudioVrmRgba(
   scene: THREE.Scene,
   camera: THREE.Camera,
   dimensions: StudioVrmRasterCaptureDimensions,
+  background: StudioVrmRasterCaptureBackground = {},
 ): Uint8ClampedArray {
   const { width, height } = assertDimensions(dimensions);
+  const clearAlpha = typeof background.alpha === "number" && Number.isFinite(background.alpha)
+    ? Math.min(1, Math.max(0, background.alpha))
+    : 0;
+  const clearColor = new THREE.Color(
+    typeof background.color === "string" && background.color.length > 0
+      ? background.color
+      : 0x000000,
+  );
   const previousRenderTarget = renderer.getRenderTarget();
   const previousActiveCubeFace = renderer.getActiveCubeFace();
   const previousActiveMipmapLevel = renderer.getActiveMipmapLevel();
   const previousClearColor = renderer.getClearColor(new THREE.Color()).clone();
   const previousClearAlpha = renderer.getClearAlpha();
+  const previousSceneBackground = scene.background;
   const sceneTarget = new THREE.WebGLRenderTarget(width, height, {
     depthBuffer: true,
     format: THREE.RGBAFormat,
@@ -174,7 +192,11 @@ export function captureStudioVrmRgba(
 
   try {
     renderer.setRenderTarget(sceneTarget);
-    renderer.setClearColor(0x000000, 0);
+    // Pass a numeric hex so engine adapters (and capture tests) can distinguish the capture
+    // clear from the subsequent restore of the previous THREE.Color instance.
+    renderer.setClearColor(clearColor.getHex(), clearAlpha);
+    // Transparent subject cutouts must not inherit a solid scene.background from the viewport.
+    if (clearAlpha === 0) scene.background = null;
     renderer.clear(true, true, true);
     renderer.render(scene, camera);
     // Sampling the MSAA scene texture resolves it; the pass writes display-ready straight-alpha
@@ -188,6 +210,7 @@ export function captureStudioVrmRgba(
       previousActiveMipmapLevel,
     );
     renderer.setClearColor(previousClearColor, previousClearAlpha);
+    scene.background = previousSceneBackground;
     // OutputPass owns a module-shared fullscreen geometry, so dispose only its per-capture
     // material. Its public dispose() would also dispose that shared geometry.
     outputPass.material.dispose();

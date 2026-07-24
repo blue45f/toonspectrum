@@ -14,6 +14,7 @@ import {
   STUDIO_POSE_ROTATION_CONVENTION,
   type StudioPoseMaterial,
 } from "./studio-pose-material";
+import { blendStudioPoseMaterialMergePlan } from "./studio-pose-material-blend";
 import { bakeStudioVrmRuntimeBoneRotation } from "./studio-vrm-pose-bake";
 
 import type { FingerRotationMap, PoseBoneMap } from "./studio-vrm-poser-utils";
@@ -38,6 +39,8 @@ export interface StudioVrmPoseMaterialCaptureOptions {
 export interface StudioVrmPoseMaterialApplyOptions {
   readonly scope?: StudioPoseScope;
   readonly lockedBones?: readonly StudioHumanoidBoneName[];
+  /** Strength in `[0, 1]` blending material rotations toward rest identity. Default `1`. */
+  readonly strength?: number;
   readonly bones: PoseBoneMap;
   readonly fingerEdits: FingerRotationMap;
 }
@@ -175,11 +178,15 @@ export function applyStudioVrmPoseMaterial(
 ): StudioVrmPoseMaterialApplyResult | null {
   const humanoid = runtime.humanoid;
   if (!humanoid) return null;
-  const plan = createStudioPoseMaterialMergePlan(material, {
+  const basePlan = createStudioPoseMaterialMergePlan(material, {
     scope: options.scope ?? material.scope,
     lockedBones: options.lockedBones ?? [],
   });
-  if (!plan) return null;
+  if (!basePlan) return null;
+  const plan =
+    options.strength === undefined
+      ? basePlan
+      : blendStudioPoseMaterialMergePlan(basePlan, options.strength);
 
   let currentPose: VRMPose;
   try {

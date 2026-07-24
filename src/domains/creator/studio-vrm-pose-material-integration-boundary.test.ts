@@ -20,7 +20,10 @@ describe("Studio VRM portable pose-material production boundary", () => {
     expect(poserSource).toContain("captureStudioVrmPoseMaterial(currentVrm, options)");
     expect(poserSource).toContain("applyStudioVrmPoseMaterial(currentVrm, material, {");
     expect(poserSource).toContain("lockedBones: portableLockedPoseBones()");
+    expect(poserSource).toContain("...(strength !== undefined ? { strength } : {})");
     expect(poserSource).toContain('const poseId = `pose-material:${result.materialId}`');
+    expect(panelSource).toContain("적용 강도");
+    expect(panelSource).toContain("onApply(material, scope, applyStrength)");
   });
 
   it("records one immediate before/after undo command and preserves non-pose state", () => {

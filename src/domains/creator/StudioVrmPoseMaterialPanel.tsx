@@ -39,6 +39,7 @@ interface StudioVrmPoseMaterialPanelProps {
   readonly onApply: (
     material: StudioPoseMaterial,
     scope: StudioPoseScope,
+    strength?: number,
   ) => StudioVrmPoseMaterialApplyResult | null;
   readonly onMaterialDeleted?: (materialId: string) => void;
   /** Invalidates pose provenance when merge-import replaces the content behind an existing id. */
@@ -183,7 +184,10 @@ export function StudioVrmPoseMaterialPanel({
   const [materialName, setMaterialName] = useState("");
   const [captureScope, setCaptureScope] = useState<StudioPoseScope>("full");
   const [applyScopes, setApplyScopes] = useState<Partial<Record<string, StudioPoseScope>>>({});
+  /** 적용 강도 0..1 — 1이면 소재 회전 전체, 0이면 rest-relative identity. */
+  const [applyStrength, setApplyStrength] = useState(1);
   const [importing, setImporting] = useState(false);
+  const strengthSliderId = useId();
 
   const storageReadOnly = ["future", "corrupt", "read-error", "unavailable"].includes(
     panelState.loadStatus
@@ -248,7 +252,7 @@ export function StudioVrmPoseMaterialPanel({
 
   function handleApply(material: StudioPoseMaterial): void {
     const scope = applicableScopeOrAuthored(material, applyScopes[material.id]);
-    const result = onApply(material, scope);
+    const result = onApply(material, scope, applyStrength);
     if (!result) {
       setPanelState((current) => ({
         ...current,
@@ -416,6 +420,36 @@ export function StudioVrmPoseMaterialPanel({
       {lockedBoneCount > 0 ? (
         <p className="mt-1 text-[0.65rem] text-fg-3">현재 잠금 본 {lockedBoneCount}개는 소재 적용 시 그대로 유지됩니다.</p>
       ) : null}
+
+      <div className="mt-3 rounded-lg border border-line/50 bg-card/40 px-2.5 py-2">
+        <label
+          htmlFor={strengthSliderId}
+          className="flex items-center justify-between gap-2 text-[0.68rem] font-semibold text-fg-2"
+        >
+          <span>적용 강도</span>
+          <span className="tabular-nums text-fg-3">{Math.round(applyStrength * 100)}%</span>
+        </label>
+        <input
+          id={strengthSliderId}
+          aria-label="적용 강도"
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={applyStrength}
+          disabled={disabled}
+          onChange={(event) => setApplyStrength(Number(event.target.value))}
+          className="mt-1.5 w-full accent-accent disabled:opacity-45"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(applyStrength * 100)}
+          aria-valuetext={`${Math.round(applyStrength * 100)}%`}
+        />
+        <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">
+          100%는 소재 자세 전체, 0%는 rest에 가깝게 섞입니다. 모든 적용 버튼에 공통으로 쓰입니다.
+        </p>
+      </div>
+
       {panelState.message ? (
         <p
           className={`mt-2 text-[0.65rem] leading-relaxed ${messageClass(panelState.messageTone)}`}

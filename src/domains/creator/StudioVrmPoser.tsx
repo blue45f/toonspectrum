@@ -37,6 +37,7 @@ import {
   type CostumeState,
   type CostumeSlot,
 } from "./studio-vrm-costume";
+import { createStudioVrmExpressionApplyPlan } from "./studio-vrm-expression-apply";
 import {
   solveStudioVrmFullBodyIk,
   type StudioVrmFullBodyIkResult,
@@ -53,6 +54,7 @@ import {
   studioVrmWorldPointToSceneLocal,
   upsertStudioVrmIkConstraint,
 } from "./studio-vrm-ik-constraints";
+import { resolveStudioVrmInsertBackgroundMode } from "./studio-vrm-insert-background-mode";
 import { clampStudioVrmJointRotation, getStudioVrmJointLimit } from "./studio-vrm-joint-limits";
 import {
   buildStudioVrmPersistentIkSignature,
@@ -68,6 +70,7 @@ import {
   PHYSICS_PREVIEW_MAX_DELTA,
   type VrmPhysicsSettings,
 } from "./studio-vrm-physics";
+import { createStudioVrmPoseApplyPlan } from "./studio-vrm-pose-apply";
 import {
   STUDIO_VRM_DIRECT_EDIT_BONES,
   bakeStudioVrmRuntimePose,
@@ -2262,7 +2265,18 @@ function VrmRuntimeCommit({
 
 type LightingTone = "morning" | "sunset" | "night" | "studio";
 
-function VrmLighting({ tone, lighting, env }: { tone: LightingTone; lighting?: LightingParams; env?: EnvVariant }) {
+function VrmLighting({
+  tone,
+  lighting,
+  env,
+  envRootRef,
+}: {
+  tone: LightingTone;
+  lighting?: LightingParams;
+  env?: EnvVariant;
+  /** Capture lease hides this group so subject-only inserts exclude floor/wall env. */
+  envRootRef?: { current: THREE.Group | null };
+}) {
   const li = lighting ? computeLightingUniforms(lighting) : null;
   const iMul = li ? li.intensity : 1;
   const col = li ? li.color : null;
@@ -2288,25 +2302,27 @@ function VrmLighting({ tone, lighting, env }: { tone: LightingTone; lighting?: L
       <directionalLight intensity={d2I} position={[-3.2, 2.6, 2.1]} color={c2} />
       <directionalLight intensity={d3I} position={[-1.6, 3.4, -3.2]} color={base.d3[1] as string} />
 
-      {/* Env variants (floor / wall / room / outdoor) */}
-      {(env === "floor" || env === "room" || env === "outdoor") && (
-        <mesh position={[0, -0.01, 0]} rotation={[-Math.PI/2, 0, 0]} receiveShadow>
-          <planeGeometry args={[8, 8]} />
-          <meshLambertMaterial color={env === "outdoor" ? "#3a5f3a" : "#3a3a3f"} />
-        </mesh>
-      )}
-      {(env === "wall" || env === "room") && (
-        <>
-          <mesh position={[0, 2.5, -2.8]}><planeGeometry args={[6, 5]} /><meshLambertMaterial color="#2b2b32" /></mesh>
-          <mesh position={[0, 2.5, 2.8]} rotation={[0, Math.PI, 0]}><planeGeometry args={[6, 5]} /><meshLambertMaterial color="#2b2b32" /></mesh>
-        </>
-      )}
-      {env === "room" && (
-        <>
-          <mesh position={[-3.2, 2.5, 0]} rotation={[0, Math.PI/2, 0]}><planeGeometry args={[6, 5]} /><meshLambertMaterial color="#2b2b32" /></mesh>
-          <mesh position={[3.2, 2.5, 0]} rotation={[0, -Math.PI/2, 0]}><planeGeometry args={[6, 5]} /><meshLambertMaterial color="#2b2b32" /></mesh>
-        </>
-      )}
+      {/* Env variants (floor / wall / room / outdoor) — excluded from subject-only capture. */}
+      <group ref={envRootRef}>
+        {(env === "floor" || env === "room" || env === "outdoor") && (
+          <mesh position={[0, -0.01, 0]} rotation={[-Math.PI/2, 0, 0]} receiveShadow>
+            <planeGeometry args={[8, 8]} />
+            <meshLambertMaterial color={env === "outdoor" ? "#3a5f3a" : "#3a3a3f"} />
+          </mesh>
+        )}
+        {(env === "wall" || env === "room") && (
+          <>
+            <mesh position={[0, 2.5, -2.8]}><planeGeometry args={[6, 5]} /><meshLambertMaterial color="#2b2b32" /></mesh>
+            <mesh position={[0, 2.5, 2.8]} rotation={[0, Math.PI, 0]}><planeGeometry args={[6, 5]} /><meshLambertMaterial color="#2b2b32" /></mesh>
+          </>
+        )}
+        {env === "room" && (
+          <>
+            <mesh position={[-3.2, 2.5, 0]} rotation={[0, Math.PI/2, 0]}><planeGeometry args={[6, 5]} /><meshLambertMaterial color="#2b2b32" /></mesh>
+            <mesh position={[3.2, 2.5, 0]} rotation={[0, -Math.PI/2, 0]}><planeGeometry args={[6, 5]} /><meshLambertMaterial color="#2b2b32" /></mesh>
+          </>
+        )}
+      </group>
     </>
   );
 }
@@ -2462,6 +2478,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const [fingerEdits, setFingerEdits] = useState<FingerRotationMap>({});
   const [lighting, setLighting] = useState<LightingParams>({ intensity: 1.2, colorTemp: 0.5, directionDeg: 45 });
   const [envVariant, setEnvVariant] = useState<EnvVariant>("none");
+  /** Insert cutout: transparent subject-only PNG (default). Off = solid backgroundColor clear. */
+  const [transparentBackground, setTransparentBackground] = useState(true);
+  const [insertBackgroundColor, setInsertBackgroundColor] = useState("#ffffff");
   const [fullStateName, setFullStateName] = useState("");
   const [savedFullStates, setSavedFullStates] = useState<Record<string, FullVrmState>>({});
   const [customColors, setCustomColors] = useState<Record<string, string>>({ ...DEFAULT_VRM_CUSTOM_COLORS });
@@ -2561,22 +2580,29 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const pendingPersistentIkCommandRef = useRef<PendingStudioVrmPersistentIkCommand | null>(null);
   const [persistentIkReconciling, setPersistentIkReconciling] = useState(false);
   const [captureSceneGeneration, setCaptureSceneGeneration] = useState(0);
-  // 캡처(투명 PNG 삽입) 순간에만 발밑 타원 그림자를 꺼서 캐릭터만 남긴다 — React state가 아니라
-  // three.js 객체를 직접 명령형으로 토글해야 gl.render() 호출 전에 확실히 반영된다(state 갱신은
-  // 다음 R3F 커밋을 기다려야 해서 같은 프레임 안에서 타이밍을 보장할 수 없다).
+  // 캡처(투명 PNG 삽입) 순간에만 발밑 타원 그림자·배경 환경을 꺼서 캐릭터만 남긴다 — React state가
+  // 아니라 three.js 객체를 직접 명령형으로 토글해야 gl.render() 호출 전에 확실히 반영된다(state
+  // 갱신은 다음 R3F 커밋을 기다려야 해서 같은 프레임 안에서 타이밍을 보장할 수 없다).
   const groundShadowRef = useRef<THREE.Mesh>(null);
+  const envRootRef = useRef<THREE.Group | null>(null);
   const captureHelperLeaseCountRef = useRef(0);
 
-  const acquireVrmCaptureHelperLease = useCallback((): (() => void) => {
+  const acquireVrmCaptureHelperLease = useCallback((options?: {
+    readonly subjectOnly?: boolean;
+  }): (() => void) => {
+    const subjectOnly = options?.subjectOnly !== false;
     captureHelperLeaseCountRef.current += 1;
     if (groundShadowRef.current) groundShadowRef.current.visible = false;
+    if (subjectOnly && envRootRef.current) envRootRef.current.visible = false;
     let released = false;
     return () => {
       if (released) return;
       released = true;
       captureHelperLeaseCountRef.current = Math.max(0, captureHelperLeaseCountRef.current - 1);
-      if (captureHelperLeaseCountRef.current === 0 && groundShadowRef.current) {
-        groundShadowRef.current.visible = true;
+      if (captureHelperLeaseCountRef.current === 0) {
+        if (groundShadowRef.current) groundShadowRef.current.visible = true;
+        // Env is always visible in the interactive viewport; only capture temporarily hides it.
+        if (envRootRef.current) envRootRef.current.visible = true;
       }
     };
   }, []);
@@ -3730,6 +3756,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   function handleApplyPoseMaterial(
     material: StudioPoseMaterial,
     scope: StudioPoseScope,
+    strength?: number,
   ): StudioVrmPoseMaterialApplyResult | null {
     const currentVrm = vrmRef.current;
     if (!currentVrm || poseMaterialRuntimeDisabled) return null;
@@ -3738,6 +3765,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     const result = applyStudioVrmPoseMaterial(currentVrm, material, {
       scope,
       lockedBones: portableLockedPoseBones(),
+      ...(strength !== undefined ? { strength } : {}),
       bones: customBones,
       fingerEdits,
     });
@@ -4083,6 +4111,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       };
       pendingPoseDataRef.current = poseData;
       pendingCameraRestoreRef.current = initialScene.camera;
+      setTransparentBackground(initialScene.render.transparentBackground);
+      setInsertBackgroundColor(initialScene.render.backgroundColor);
       setMannequinMode(initialScene.appearance.mannequin);
       setActiveCameraId("custom");
       if (poseData.modelId) setActiveModelId(poseData.modelId);
@@ -5087,6 +5117,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     thumbnailRequestRef.current += 1;
     captureHelperLeaseCountRef.current = 0;
     if (groundShadowRef.current) groundShadowRef.current.visible = true;
+    if (envRootRef.current) envRootRef.current.visible = true;
     clearCurrentVrm();
     captureRef.current = { camera: null, gl: null, scene: null };
     setStatus("empty");
@@ -5529,33 +5560,86 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   }
 
   function handlePoseSelect(poseId: string) {
-    setActivePoseId(poseId);
     const pose = findPose(poseId);
     const strippedBones = stripFingerBones(pose.bones);
     const poseFingers = extractStudioVrmFingerRotations(pose.bones);
-    const nextFingers = Object.keys(poseFingers).length > 0 ? poseFingers : fingerEdits;
-    setCustomBones(strippedBones);
-    if (nextFingers !== fingerEdits) setFingerEdits(nextFingers);
-    setCustomYOffset(pose.yOffset ?? 0);
-    setPoseTranslations(cloneStudioVrmPoseTranslations(EMPTY_STUDIO_VRM_POSE_TRANSLATIONS));
+    const nextYOffset = pose.yOffset ?? 0;
+    const nextTranslations = cloneStudioVrmPoseTranslations(EMPTY_STUDIO_VRM_POSE_TRANSLATIONS);
+    const before = captureFullState();
+    const plan = createStudioVrmPoseApplyPlan({
+      currentBones: customBones,
+      currentFingerEdits: fingerEdits,
+      incomingBones: strippedBones,
+      ...(Object.keys(poseFingers).length > 0 ? { incomingFingerEdits: poseFingers } : {}),
+      lockedBones: lockedPoseBones,
+      isBoneAvailable: (bone) => {
+        const humanoid = vrmRef.current?.humanoid;
+        if (!humanoid) return true;
+        return Boolean(humanoid.getNormalizedBoneNode(bone));
+      },
+      clampRotation: jointLimitsEnabled
+        ? (bone, axisIndex, radians) => d(clampStudioVrmJointDegrees(
+            bone,
+            axisIndex,
+            THREE.MathUtils.radToDeg(radians),
+          ))
+        : undefined,
+    });
+    const after = serializeFullVrmState({
+      ...before,
+      poseId,
+      bones: plan.bones,
+      fingerOverrides: plan.fingerEdits,
+      yOffset: nextYOffset,
+      poseTranslations: nextTranslations,
+      ...(preserveExpression
+        ? {}
+        : { expressionId: "neutral", expressionWeights: {} }),
+    });
+    const nextHistory = commitStudioVrmFullStateHistoryTransaction(
+      fullStateHistoryRef.current,
+      before,
+      after,
+      activeModelId,
+    );
+    fullStateHistoryRef.current = nextHistory;
+    setCanUndo(nextHistory.index > 0);
+    setCanRedo(nextHistory.index < nextHistory.entries.length - 1);
+
+    setActivePoseId(poseId);
+    setCustomBones(plan.bones);
+    setFingerEdits(plan.fingerEdits);
+    setCustomYOffset(nextYOffset);
+    setPoseTranslations(nextTranslations);
+    if (!preserveExpression) {
+      setExpressionWeights({});
+      setActiveExpressionId("neutral");
+    }
     const nextRecent = rememberStudioVrmRecent(recentPoseState, poseId);
     setRecentPoseState(nextRecent);
     saveStudioVrmRecentPoses(typeof localStorage === "undefined" ? null : localStorage, nextRecent);
     if (vrmRef.current) {
       applyPoserVisualState(vrmRef.current, {
-        bones: strippedBones,
-        yOffset: pose.yOffset ?? 0,
-        poseTranslations: EMPTY_STUDIO_VRM_POSE_TRANSLATIONS,
-        fingerEdits: nextFingers,
+        bones: plan.bones,
+        yOffset: nextYOffset,
+        poseTranslations: nextTranslations,
+        fingerEdits: plan.fingerEdits,
         bodyScale,
       });
-      if (preserveExpression) {
-        applyExpressionWeightsToVrm(vrmRef.current, expressionWeights);
-      } else {
-        setExpressionWeights({});
-        setActiveExpressionId("neutral");
-        applyExpressionWeightsToVrm(vrmRef.current, {});
-      }
+      applyExpressionWeightsToVrm(
+        vrmRef.current,
+        preserveExpression ? expressionWeights : {},
+      );
+    }
+    const appliedCount = plan.appliedBodyBones.length + plan.appliedFingerBones.length;
+    if (plan.skippedLocked.length > 0) {
+      setJointHandleStatus(
+        appliedCount > 0
+          ? `잠긴 관절 ${plan.skippedLocked.length}개는 유지하고 포즈를 적용했어요.`
+          : `잠긴 관절 ${plan.skippedLocked.length}개는 유지하고, 적용할 관절이 없어 높이만 반영했어요.`,
+      );
+    } else if (appliedCount === 0 && plan.skippedMissing.length + plan.skippedInvalid.length > 0) {
+      setJointHandleStatus("적용할 수 있는 관절이 없어 높이만 반영했어요.");
     }
   }
 
@@ -5690,24 +5774,67 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   }
 
   // 포즈 좌우 반전 — 전체뿐 아니라 팔/다리만 교환해 포즈 믹서처럼 사용할 수 있다.
+  // 회전은 lock-aware plan으로 잠긴 관절을 유지하고, 이동/IK 제약은 기존처럼 미러한다.
   function handleMirrorPose(scope: StudioVrmPoseMirrorScope = "all") {
     if (!vrm) return;
     const mirroredBones = mirrorStudioVrmPoseBones(customBones, scope);
     const mirroredFingers = mirrorStudioVrmFingerRotations(fingerEdits, scope);
     const mirroredTranslations = mirrorStudioVrmPoseTranslations(poseTranslations, scope);
     const mirroredConstraints = mirrorStudioVrmIkConstraints(ikConstraints, scope);
-    setCustomBones(mirroredBones);
-    setFingerEdits(mirroredFingers);
+    const before = captureFullState();
+    const plan = createStudioVrmPoseApplyPlan({
+      currentBones: customBones,
+      currentFingerEdits: fingerEdits,
+      incomingBones: mirroredBones,
+      incomingFingerEdits: mirroredFingers,
+      lockedBones: lockedPoseBones,
+      isBoneAvailable: (bone) => {
+        const humanoid = vrmRef.current?.humanoid;
+        if (!humanoid) return true;
+        return Boolean(humanoid.getNormalizedBoneNode(bone));
+      },
+      clampRotation: jointLimitsEnabled
+        ? (bone, axisIndex, radians) => d(clampStudioVrmJointDegrees(
+            bone,
+            axisIndex,
+            THREE.MathUtils.radToDeg(radians),
+          ))
+        : undefined,
+    });
+    const after = serializeFullVrmState({
+      ...before,
+      bones: plan.bones,
+      fingerOverrides: plan.fingerEdits,
+      poseTranslations: mirroredTranslations,
+      ikConstraints: mirroredConstraints,
+    });
+    const nextHistory = commitStudioVrmFullStateHistoryTransaction(
+      fullStateHistoryRef.current,
+      before,
+      after,
+      activeModelId,
+    );
+    fullStateHistoryRef.current = nextHistory;
+    setCanUndo(nextHistory.index > 0);
+    setCanRedo(nextHistory.index < nextHistory.entries.length - 1);
+
+    setCustomBones(plan.bones);
+    setFingerEdits(plan.fingerEdits);
     setPoseTranslations(mirroredTranslations);
     setIkConstraints(mirroredConstraints);
     if (vrmRef.current) {
       applyPoserVisualState(vrmRef.current, {
-        bones: mirroredBones,
+        bones: plan.bones,
         yOffset: customYOffset,
         poseTranslations: mirroredTranslations,
-        fingerEdits: mirroredFingers,
+        fingerEdits: plan.fingerEdits,
         bodyScale,
       });
+    }
+    if (plan.skippedLocked.length > 0) {
+      setJointHandleStatus(
+        `잠긴 관절 ${plan.skippedLocked.length}개는 유지하고 좌우 반전을 적용했어요.`,
+      );
     }
   }
 
@@ -5763,15 +5890,55 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   function handleStraightenUpperBody() {
     if (!vrm) return;
     const straightenedBones = straightenStudioVrmUpperBody(customBones);
-    setCustomBones(straightenedBones);
+    const before = captureFullState();
+    const plan = createStudioVrmPoseApplyPlan({
+      currentBones: customBones,
+      currentFingerEdits: fingerEdits,
+      incomingBones: straightenedBones,
+      lockedBones: lockedPoseBones,
+      isBoneAvailable: (bone) => {
+        const humanoid = vrmRef.current?.humanoid;
+        if (!humanoid) return true;
+        return Boolean(humanoid.getNormalizedBoneNode(bone));
+      },
+      clampRotation: jointLimitsEnabled
+        ? (bone, axisIndex, radians) => d(clampStudioVrmJointDegrees(
+            bone,
+            axisIndex,
+            THREE.MathUtils.radToDeg(radians),
+          ))
+        : undefined,
+    });
+    const after = serializeFullVrmState({
+      ...before,
+      bones: plan.bones,
+      fingerOverrides: plan.fingerEdits,
+    });
+    const nextHistory = commitStudioVrmFullStateHistoryTransaction(
+      fullStateHistoryRef.current,
+      before,
+      after,
+      activeModelId,
+    );
+    fullStateHistoryRef.current = nextHistory;
+    setCanUndo(nextHistory.index > 0);
+    setCanRedo(nextHistory.index < nextHistory.entries.length - 1);
+
+    setCustomBones(plan.bones);
+    setFingerEdits(plan.fingerEdits);
     if (vrmRef.current) {
       applyPoserVisualState(vrmRef.current, {
-        bones: straightenedBones,
+        bones: plan.bones,
         yOffset: customYOffset,
         poseTranslations,
-        fingerEdits,
+        fingerEdits: plan.fingerEdits,
         bodyScale,
       });
+    }
+    if (plan.skippedLocked.length > 0) {
+      setJointHandleStatus(
+        `잠긴 관절 ${plan.skippedLocked.length}개는 유지하고 상체를 곧게 펴 적용했어요.`,
+      );
     }
   }
 
@@ -6029,11 +6196,32 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   // 표정 프리셋(조합) 원클릭 적용 — VRM 표준 blendshape 가중치 믹스를 한 번에 입힌다.
   // 모델에 없는 표정 이름은 applyExpressionWeightsToVrm이 건너뛴다.
   function handleExpressionPresetSelect(preset: StudioExpressionPreset) {
-    setActiveExpressionId(`preset:${preset.id}`);
-    const newWeights = { ...preset.weights };
-    setExpressionWeights(newWeights);
+    const expressionId = `preset:${preset.id}`;
+    const before = captureFullState();
+    const plan = createStudioVrmExpressionApplyPlan({
+      current: expressionWeights,
+      incoming: preset.weights,
+    });
+    const nextWeights = { ...plan.weights };
+    const after = serializeFullVrmState({
+      ...before,
+      expressionId,
+      expressionWeights: nextWeights,
+    });
+    const nextHistory = commitStudioVrmFullStateHistoryTransaction(
+      fullStateHistoryRef.current,
+      before,
+      after,
+      activeModelId,
+    );
+    fullStateHistoryRef.current = nextHistory;
+    setCanUndo(nextHistory.index > 0);
+    setCanRedo(nextHistory.index < nextHistory.entries.length - 1);
+
+    setActiveExpressionId(expressionId);
+    setExpressionWeights(nextWeights);
     if (vrmRef.current) {
-      applyExpressionWeightsToVrm(vrmRef.current, newWeights);
+      applyExpressionWeightsToVrm(vrmRef.current, nextWeights);
     }
   }
 
@@ -6296,8 +6484,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       render: {
         width,
         height,
-        transparentBackground: true,
-        backgroundColor: "#ffffff",
+        transparentBackground,
+        backgroundColor: insertBackgroundColor,
       },
     });
     const serialized = serializeStudioVrmSceneDocument(normalized);
@@ -6306,6 +6494,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
   function handleInsert() {
     if (isCapturing || isSharingPose || isThumbnailCapturing) return;
+    const insertBackground = resolveStudioVrmInsertBackgroundMode({
+      transparent: transparentBackground,
+      backgroundColor: insertBackgroundColor,
+    });
+    if (!insertBackground.ok) {
+      setError(insertBackground.reason);
+      setStatus(vrmRef.current ? "ready" : "error");
+      return;
+    }
     const currentCapture = captureRef.current;
     const currentVrm = vrmRef.current;
 
@@ -6375,7 +6572,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
       void (async () => {
         let inserted = false;
-        let releaseCaptureHelpers: (() => void) | null = acquireVrmCaptureHelperLease();
+        let releaseCaptureHelpers: (() => void) | null = acquireVrmCaptureHelperLease({
+          subjectOnly: insertBackground.plan.subjectOnly,
+        });
         const releaseLocalCapture = () => {
           releaseCaptureHelpers?.();
           releaseCaptureHelpers = null;
@@ -6413,7 +6612,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
           if (!sceneDocument) {
             throw new Error("재편집 가능한 3D 데생 인형 장면을 만들지 못했습니다.");
           }
-          const rgba = captureStudioVrmRgba(gl, scene, camera, { width, height });
+          const rgba = captureStudioVrmRgba(gl, scene, camera, { width, height }, {
+            color: insertBackground.plan.backgroundColor,
+            alpha: insertBackground.plan.captureAlpha,
+          });
           releaseLocalCapture();
           const baseDataUrl = await encodeStudioVrmCapturePngDataUrl(
             rgba,
@@ -6515,7 +6717,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
             </p>
             <h2 id={dialogTitleId} className="mt-1 truncate text-lg font-bold tracking-tight text-fg sm:text-xl">3D 캐릭터 만들기</h2>
             <p id={dialogDescriptionId} className="mt-1 line-clamp-1 text-xs text-fg-3">
-              {displayModelName ? `${displayModelName} · 투명 PNG로 패널에 추가` : "내 VRM을 불러와 투명 PNG로 패널에 추가"}
+              {displayModelName
+                ? `${displayModelName} · ${transparentBackground ? "캐릭터만 투명 PNG로 패널에 추가" : "배경색 포함 PNG로 패널에 추가"}`
+                : "내 VRM을 불러와 패널에 추가"}
             </p>
           </div>
           <button
@@ -6558,7 +6762,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                   <CaptureBridge onCaptureUpdate={onCaptureUpdate} />
                   <CameraDirector presetId={activeCameraId} resetNonce={viewResetNonce} />
                   <ViewportController onReady={handleViewportReady} />
-                  <VrmLighting tone={lightingTone} lighting={lighting} env={envVariant} />
+                  <VrmLighting
+                    tone={lightingTone}
+                    lighting={lighting}
+                    env={envVariant}
+                    envRootRef={envRootRef}
+                  />
                   {vrm ? (
                     <VrmActor
                       bodyRotation={bodyRotation}
@@ -8320,6 +8529,36 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                         </button>
                       ))}
                     </div>
+                    <label className="mt-2 flex items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={transparentBackground}
+                        disabled={isCapturing || isSharingPose || isThumbnailCapturing}
+                        onChange={(event) => setTransparentBackground(event.target.checked)}
+                        className="mt-0.5 size-4 accent-accent"
+                      />
+                      <span className="block text-xs font-bold text-fg">
+                        캐릭터만 투명 추출
+                        <span className="mt-0.5 block text-[0.68rem] font-normal leading-relaxed text-fg-3">
+                          삽입 PNG에서 바닥·벽 환경을 빼고 캐릭터(및 소품)만 남깁니다. 끄면 단색
+                          배경색으로 불투명하게 넣습니다.
+                        </span>
+                      </span>
+                    </label>
+                    {!transparentBackground && (
+                      <label className="mt-1.5 flex items-center gap-2 text-xs text-fg-2">
+                        <span className="w-14 shrink-0 font-medium">배경색</span>
+                        <input
+                          type="color"
+                          value={insertBackgroundColor}
+                          disabled={isCapturing || isSharingPose || isThumbnailCapturing}
+                          onChange={(event) => setInsertBackgroundColor(event.target.value)}
+                          className="h-8 w-12 cursor-pointer rounded border border-line bg-card p-0.5"
+                          aria-label="삽입 배경색"
+                        />
+                        <span className="tabular-nums text-fg-3">{insertBackgroundColor}</span>
+                      </label>
+                    )}
                   </div>
 
                   {/* 손가락 굽힘 + 손모양 프리셋 */}
