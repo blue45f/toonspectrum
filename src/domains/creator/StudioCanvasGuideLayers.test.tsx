@@ -21,6 +21,7 @@ const capture = vi.hoisted(() => ({
   lines: [] as Record<string, unknown>[],
   perspective: [] as Record<string, unknown>[],
   rects: [] as Record<string, unknown>[],
+  shapes: [] as Record<string, unknown>[],
   texts: [] as Record<string, unknown>[],
 }));
 
@@ -50,6 +51,7 @@ vi.mock("react-konva/lib/ReactKonvaCore", async () => {
     Layer: container(capture.layers),
     Line: primitive(capture.lines),
     Rect: primitive(capture.rects),
+    Shape: primitive(capture.shapes),
     Text: primitive(capture.texts),
   };
 });
@@ -133,14 +135,10 @@ describe("StudioCanvasGuideUnderlay", () => {
 
     expect(safeAreaMargin).toHaveBeenCalledWith(100);
     expect(webtoonWidthGuides).toHaveBeenCalledWith(100);
-    expect(capture.groups.map((group) => group.listening)).toEqual([false, false]);
+    expect(capture.shapes).toHaveLength(1);
+    expect(capture.shapes[0]?.listening).toBe(false);
+    expect(capture.groups.map((group) => group.listening)).toEqual([false]);
     expect(capture.lines.map((line) => line.points)).toEqual([
-      [0, 0, 0, 50],
-      [25, 0, 25, 50],
-      [50, 0, 50, 50],
-      [75, 0, 75, 50],
-      [0, 0, 100, 0],
-      [0, 25, 100, 25],
       [20, 0, 20, 50],
     ]);
     expect(capture.rects).toMatchObject([

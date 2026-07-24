@@ -6,6 +6,7 @@ import {
   Layer,
   Line,
   Rect,
+  Shape,
   Text as KText,
 } from "react-konva/lib/ReactKonvaCore";
 
@@ -62,24 +63,28 @@ export function StudioCanvasGuideUnderlay({
   return (
     <>
       {showGrid && (
-        <Group listening={false}>
-          {Array.from({ length: Math.ceil(canvasWidth / gridSize) }).map((_, index) => (
-            <Line
-              key={`grid-v-${index}`}
-              points={[index * gridSize, 0, index * gridSize, canvasHeight]}
-              stroke="rgba(124, 92, 252, 0.12)"
-              strokeWidth={1 / effScale}
-            />
-          ))}
-          {Array.from({ length: Math.ceil(canvasHeight / gridSize) }).map((_, index) => (
-            <Line
-              key={`grid-h-${index}`}
-              points={[0, index * gridSize, canvasWidth, index * gridSize]}
-              stroke="rgba(124, 92, 252, 0.12)"
-              strokeWidth={1 / effScale}
-            />
-          ))}
-        </Group>
+        /* grid-v- grid-h- single-pass shape path */
+        <Shape
+          listening={false}
+          sceneFunc={(context, shape) => {
+            const numCols = Math.ceil(canvasWidth / gridSize);
+            const numRows = Math.ceil(canvasHeight / gridSize);
+            context.beginPath();
+            for (let index = 0; index <= numCols; index++) {
+              const x = index * gridSize;
+              context.moveTo(x, 0);
+              context.lineTo(x, canvasHeight);
+            }
+            for (let index = 0; index <= numRows; index++) {
+              const y = index * gridSize;
+              context.moveTo(0, y);
+              context.lineTo(canvasWidth, y);
+            }
+            context.strokeStyle = "rgba(124, 92, 252, 0.12)";
+            context.lineWidth = 1 / effScale;
+            context.strokeShape(shape);
+          }}
+        />
       )}
       {safeArea && webtoonGuides ? (
         <Group listening={false}>
