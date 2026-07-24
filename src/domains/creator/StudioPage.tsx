@@ -30782,6 +30782,7 @@ function StudioCuttoonEditor() {
           selectedId={selectedId}
           selectedReadableImageSource={selectedReadableImageSource}
           selectedWorkAssetDestructiveEditReason={selectedWorkAssetDestructiveEditReason}
+          setSelectedId={setSelectedId}
           setAdvancedFillPreview={setAdvancedFillPreview}
           setAdvancedFillStatus={setAdvancedFillStatus}
           setAiColorizePrompt={setAiColorizePrompt}

@@ -24,6 +24,26 @@ import type {
 
 export const STUDIO_AUTO_COLOR_SCRIBBLE_SEED_MAX = 64;
 
+/** Apply destination for auto-color paint. */
+export type StudioAutoColorApplyTargetMode = "selected" | "new-paint-layer";
+
+export const STUDIO_AUTO_COLOR_APPLY_TARGET_MODES: readonly {
+  readonly id: StudioAutoColorApplyTargetMode;
+  readonly label: string;
+  readonly description: string;
+}[] = [
+  {
+    id: "selected",
+    label: "선택 레이어",
+    description: "선화 레이어에 직접 칠합니다.",
+  },
+  {
+    id: "new-paint-layer",
+    label: "새 채색 레이어",
+    description: "투명 채색 레이어를 만들고 그 위에만 칠합니다(선화 보존).",
+  },
+];
+
 export const STUDIO_AUTO_COLOR_SCRIBBLE_PALETTE: readonly {
   readonly id: string;
   readonly label: string;
@@ -77,6 +97,51 @@ function cloneImageData(image: AdvancedFillImageDataLike): AdvancedFillImageData
     height: image.height,
     data: new Uint8ClampedArray(image.data),
   };
+}
+
+/**
+ * Blank paint target for multi-layer color workflows (CSP-style: keep line art, paint under/over).
+ * Default fill is fully transparent so the line-art layer remains visible beneath.
+ */
+export function createStudioAutoColorBlankPaintTarget(
+  width: number,
+  height: number,
+  fill: AdvancedFillRgba = [0, 0, 0, 0],
+): AdvancedFillImageDataLike {
+  const w = Math.max(1, Math.floor(width));
+  const h = Math.max(1, Math.floor(height));
+  const data = new Uint8ClampedArray(w * h * 4);
+  const r = fill[0];
+  const g = fill[1];
+  const b = fill[2];
+  const a = fill[3];
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = r;
+    data[i + 1] = g;
+    data[i + 2] = b;
+    data[i + 3] = a;
+  }
+  return { width: w, height: h, data };
+}
+
+/**
+ * Apply a ready plan onto a blank (or existing) paint target using the plan's labels.
+ * `reference` is only used for optional Advanced Fill diagnostics; paint authority is labels.
+ */
+export function applyStudioAutoColorHintsToPaintTarget(input: {
+  readonly plan: StudioAutoColorHintPlan;
+  /** Usually a transparent canvas matching the line-art plan size. */
+  readonly paintTarget: AdvancedFillImageDataLike;
+  /** Line-art (or same) raster used when planning; optional diagnostics path. */
+  readonly referenceImage?: AdvancedFillImageDataLike;
+  readonly options?: AdvancedFillOptions;
+}): StudioAutoColorAdvancedFillBatchResult {
+  return applyStudioAutoColorHintsAdvancedFillBatch({
+    plan: input.plan,
+    target: input.paintTarget,
+    referenceImage: input.referenceImage ?? input.paintTarget,
+    options: input.options,
+  });
 }
 
 function asFill(color: StudioAutoColorHintRgba): AdvancedFillRgba {

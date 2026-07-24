@@ -20,8 +20,12 @@ import {
 import {
   appendStudioAutoColorScribbleSeed,
   applyStudioAutoColorHintsAdvancedFillBatch,
+  applyStudioAutoColorHintsToPaintTarget,
+  createStudioAutoColorBlankPaintTarget,
+  STUDIO_AUTO_COLOR_APPLY_TARGET_MODES,
   STUDIO_AUTO_COLOR_SCRIBBLE_PALETTE,
   studioAutoColorScribbleSeedFromRecommendation,
+  type StudioAutoColorApplyTargetMode,
 } from "./studio-auto-color-hints-advanced-fill";
 import {
   encodeStudioAutoColorHintImageToPngDataUrl,
@@ -59,6 +63,16 @@ export interface StudioAutoColorHintsPanelProps {
    * Without this handler the apply button stays hidden (plan-only safety).
    */
   readonly onApplyResult?: (dataUrl: string) => void;
+  /**
+   * Multi-layer path: parent inserts a new transparent paint image above the line art.
+   * When omitted, only "선택 레이어" apply remains available.
+   */
+  readonly onApplyNewLayer?: (payload: {
+    readonly dataUrl: string;
+    readonly width: number;
+    readonly height: number;
+    readonly name: string;
+  }) => void;
 }
 
 async function copyTextToClipboard(text: string): Promise<boolean> {
@@ -135,6 +149,7 @@ export function StudioAutoColorHintsPanel({
   onPlan,
   onRun,
   onApplyResult,
+  onApplyNewLayer,
 }: StudioAutoColorHintsPanelProps) {
   const titleId = useId();
   const helpId = useId();
@@ -153,16 +168,23 @@ export function StudioAutoColorHintsPanel({
   const [activePaletteId, setActivePaletteId] = useState(
     STUDIO_AUTO_COLOR_SCRIBBLE_PALETTE[0]!.id,
   );
+  const [applyTargetMode, setApplyTargetMode] = useState<StudioAutoColorApplyTargetMode>("selected");
 
   const activePalette =
     STUDIO_AUTO_COLOR_SCRIBBLE_PALETTE.find((entry) => entry.id === activePaletteId)
     ?? STUDIO_AUTO_COLOR_SCRIBBLE_PALETTE[0]!;
   const effectiveSeeds = seedsProp ?? scribbleSeeds;
   // Enable from summary metrics only (refs are set synchronously before summary state).
-  const canApply =
+  const canApplySelected =
     Boolean(onApplyResult)
     && summary?.status === "ready"
     && (summary.operationCount ?? 0) > 0;
+  const canApplyNewLayer =
+    Boolean(onApplyNewLayer)
+    && summary?.status === "ready"
+    && (summary.operationCount ?? 0) > 0;
+  const canApply =
+    applyTargetMode === "new-paint-layer" ? canApplyNewLayer : canApplySelected;
 
   async function runPlanner() {
     if (busy || applying) return;
@@ -202,8 +224,6 @@ export function StudioAutoColorHintsPanel({
   async function applyPlan() {
     const activePlan = planRef.current;
     const plannedImage = plannedImageRef.current;
-    const apply = onApplyResult;
-    if (!apply) return;
     if (!activePlan || !plannedImage) {
       setError("적용할 계획이 없어요. 먼저 힌트 계획을 실행하세요.");
       return;
@@ -212,15 +232,33 @@ export function StudioAutoColorHintsPanel({
       setError("준비된 연산이 없어 적용할 수 없어요. 시드를 조정한 뒤 다시 계획하세요.");
       return;
     }
+    const useNewLayer = applyTargetMode === "new-paint-layer";
+    if (useNewLayer && !onApplyNewLayer) {
+      setError("새 채색 레이어 적용 경로가 연결되지 않았어요.");
+      return;
+    }
+    if (!useNewLayer && !onApplyResult) {
+      setError("선택 레이어 적용 경로가 연결되지 않았어요.");
+      return;
+    }
     setApplying(true);
     setError(null);
     setApplyStatus(null);
     try {
-      const batch = applyStudioAutoColorHintsAdvancedFillBatch({
-        plan: activePlan,
-        target: plannedImage,
-        referenceImage: plannedImage,
-      });
+      const batch = useNewLayer
+        ? applyStudioAutoColorHintsToPaintTarget({
+            plan: activePlan,
+            paintTarget: createStudioAutoColorBlankPaintTarget(
+              plannedImage.width,
+              plannedImage.height,
+            ),
+            referenceImage: plannedImage,
+          })
+        : applyStudioAutoColorHintsAdvancedFillBatch({
+            plan: activePlan,
+            target: plannedImage,
+            referenceImage: plannedImage,
+          });
       if (!batch.ok) {
         setError(batch.reason);
         return;
@@ -230,10 +268,22 @@ export function StudioAutoColorHintsPanel({
         return;
       }
       const dataUrl = encodeStudioAutoColorHintImageToPngDataUrl(batch.imageData);
-      apply(dataUrl);
-      setApplyStatus(
-        `고급 채우기 배치 적용 · 연산 ${batch.jobCount.toLocaleString("ko-KR")} · 픽셀 ${batch.paintedPixelCount.toLocaleString("ko-KR")}`,
-      );
+      if (useNewLayer) {
+        onApplyNewLayer!({
+          dataUrl,
+          width: batch.imageData.width,
+          height: batch.imageData.height,
+          name: "채색",
+        });
+        setApplyStatus(
+          `새 채색 레이어 생성 · 연산 ${batch.jobCount.toLocaleString("ko-KR")} · 픽셀 ${batch.paintedPixelCount.toLocaleString("ko-KR")}`,
+        );
+      } else {
+        onApplyResult!(dataUrl);
+        setApplyStatus(
+          `선택 레이어 적용 · 연산 ${batch.jobCount.toLocaleString("ko-KR")} · 픽셀 ${batch.paintedPixelCount.toLocaleString("ko-KR")}`,
+        );
+      }
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -500,31 +550,76 @@ export function StudioAutoColorHintsPanel({
                 계획 복사
               </button>
 
-              {onApplyResult ? (
-                <button
-                  type="button"
-                  data-studio-auto-color-apply="true"
-                  disabled={!canApply || applying || busy}
-                  onClick={() => {
-                    void applyPlan();
-                  }}
-                  className={cx(
-                    "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-good/50 bg-good/15 px-3 text-xs font-bold text-good transition-colors hover:bg-good/25",
-                    "disabled:cursor-not-allowed disabled:border-line disabled:bg-raised disabled:text-fg-3 disabled:opacity-60",
-                    controlFocusClass,
-                  )}
+              {onApplyResult || onApplyNewLayer ? (
+                <div
+                  data-studio-auto-color-apply-target="true"
+                  className="space-y-2 rounded-lg border border-line bg-panel/30 p-2"
                 >
-                  {applying ? (
-                    <Loader2
-                      size={16}
-                      className="animate-spin motion-reduce:animate-none"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <Paintbrush size={16} aria-hidden="true" />
-                  )}
-                  {applying ? "적용 중…" : "고급 채우기로 적용"}
-                </button>
+                  <p className="text-[0.64rem] font-semibold text-fg-2">적용 대상</p>
+                  <div
+                    role="radiogroup"
+                    aria-label="자동 채색 적용 대상"
+                    className="grid grid-cols-2 gap-1.5"
+                  >
+                    {STUDIO_AUTO_COLOR_APPLY_TARGET_MODES.map((mode) => {
+                      const available =
+                        mode.id === "new-paint-layer" ? Boolean(onApplyNewLayer) : Boolean(onApplyResult);
+                      const active = applyTargetMode === mode.id;
+                      return (
+                        <button
+                          key={mode.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={active}
+                          disabled={!available}
+                          title={mode.description}
+                          onClick={() => setApplyTargetMode(mode.id)}
+                          className={cx(
+                            "min-h-11 rounded-md border px-2 py-1.5 text-left text-[0.64rem] font-semibold transition-colors",
+                            active
+                              ? "border-accent/50 bg-accent-soft/40 text-accent"
+                              : "border-line bg-card text-fg-2 hover:bg-raised",
+                            "disabled:cursor-not-allowed disabled:opacity-40",
+                            controlFocusClass,
+                          )}
+                        >
+                          <span className="block">{mode.label}</span>
+                          <span className="mt-0.5 block font-normal leading-snug text-fg-3">
+                            {mode.description}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    data-studio-auto-color-apply="true"
+                    disabled={!canApply || applying || busy}
+                    onClick={() => {
+                      void applyPlan();
+                    }}
+                    className={cx(
+                      "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-good/50 bg-good/15 px-3 text-xs font-bold text-good transition-colors hover:bg-good/25",
+                      "disabled:cursor-not-allowed disabled:border-line disabled:bg-raised disabled:text-fg-3 disabled:opacity-60",
+                      controlFocusClass,
+                    )}
+                  >
+                    {applying ? (
+                      <Loader2
+                        size={16}
+                        className="animate-spin motion-reduce:animate-none"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <Paintbrush size={16} aria-hidden="true" />
+                    )}
+                    {applying
+                      ? "적용 중…"
+                      : applyTargetMode === "new-paint-layer"
+                        ? "새 채색 레이어에 적용"
+                        : "선택 레이어에 적용"}
+                  </button>
+                </div>
               ) : null}
             </div>
 

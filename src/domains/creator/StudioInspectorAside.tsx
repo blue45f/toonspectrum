@@ -448,6 +448,7 @@ interface StudioInspectorAsideProps {
   selectedId: string | null;
   selectedReadableImageSource: string | null;
   selectedWorkAssetDestructiveEditReason: string | null;
+  setSelectedId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setAdvancedFillPreview: import("react").Dispatch<import("react").SetStateAction<StudioAdvancedFillPreview | null>>;
   setAdvancedFillStatus: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setAiColorizePrompt: import("react").Dispatch<import("react").SetStateAction<string>>;
@@ -779,6 +780,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   selectedId,
   selectedReadableImageSource,
   selectedWorkAssetDestructiveEditReason,
+  setSelectedId,
   setAdvancedFillPreview,
   setAdvancedFillStatus,
   setAiColorizePrompt,
@@ -2287,6 +2289,35 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       selectedWorkAssetDestructiveEditReason
                         ? undefined
                         : (dataUrl) => patchEl(selected.id, { src: dataUrl })
+                    }
+                    onApplyNewLayer={
+                      selectedWorkAssetDestructiveEditReason
+                        ? undefined
+                        : ({ dataUrl, name }) => {
+                            if (selected.type !== "image") return;
+                            const paintEl = {
+                              id: uid(),
+                              type: "image" as const,
+                              src: dataUrl,
+                              x: selected.x,
+                              y: selected.y,
+                              width: selected.width,
+                              height: selected.height,
+                              rotation: selected.rotation ?? 0,
+                              opacity: 1,
+                              name: name || "채색",
+                              groupId: selected.groupId,
+                            };
+                            const index = elements.findIndex((el) => el.id === selected.id);
+                            const insertAt = index >= 0 ? index + 1 : elements.length;
+                            const next = [
+                              ...elements.slice(0, insertAt),
+                              paintEl,
+                              ...elements.slice(insertAt),
+                            ];
+                            if (!commit(next as typeof elements)) return;
+                            setSelectedId(paintEl.id);
+                          }
                     }
                   />
                   {!selectedWorkAssetDestructiveEditReason ? (

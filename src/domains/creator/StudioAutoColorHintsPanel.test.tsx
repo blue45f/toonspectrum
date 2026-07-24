@@ -146,13 +146,13 @@ describe("StudioAutoColorHintsPanel module boundary", () => {
       .mockReturnValue("data:image/png;base64,cW9p");
     render(<StudioAutoColorHintsPanel onApplyResult={onApplyResult} />);
     expect(screen.getByText("스크리블 시드 색")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "고급 채우기로 적용" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "선택 레이어에 적용" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "힌트 계획 실행" }));
     await waitFor(() => {
       expect(screen.getByText(/힌트 계획 준비됨/)).toBeTruthy();
     });
-    const applyButton = screen.getByRole("button", { name: "고급 채우기로 적용" });
+    const applyButton = screen.getByRole("button", { name: "선택 레이어에 적용" });
     // Surface plan metrics so failures show whether canApply should be true.
     expect(screen.getByText("제안 연산").parentElement?.textContent).toMatch(/[1-9]/);
     expect((applyButton as HTMLButtonElement).disabled).toBe(false);
@@ -167,6 +167,47 @@ describe("StudioAutoColorHintsPanel module boundary", () => {
     const dataUrl = onApplyResult.mock.calls[0]?.[0];
     expect(dataUrl).toBe("data:image/png;base64,cW9p");
     expect(toDataURL).toHaveBeenCalled();
+    getContext.mockRestore();
+    toDataURL.mockRestore();
+  });
+
+  it("applies ready plans to a new transparent paint layer when requested", async () => {
+    const onApplyNewLayer = vi.fn();
+    const fakeContext = {
+      createImageData: (width: number, height: number) => ({
+        data: new Uint8ClampedArray(width * height * 4),
+        width,
+        height,
+      }),
+      putImageData: vi.fn(),
+      fillRect: vi.fn(),
+      fillStyle: "",
+    };
+    const getContext = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(fakeContext as unknown as CanvasRenderingContext2D);
+    const toDataURL = vi
+      .spyOn(HTMLCanvasElement.prototype, "toDataURL")
+      .mockReturnValue("data:image/png;base64,bmV3");
+    render(
+      <StudioAutoColorHintsPanel
+        onApplyResult={vi.fn()}
+        onApplyNewLayer={onApplyNewLayer}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "힌트 계획 실행" }));
+    await waitFor(() => {
+      expect(screen.getByText(/힌트 계획 준비됨/)).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("radio", { name: /새 채색 레이어/ }));
+    fireEvent.click(screen.getByRole("button", { name: "새 채색 레이어에 적용" }));
+    await waitFor(() => {
+      expect(onApplyNewLayer).toHaveBeenCalled();
+    });
+    expect(onApplyNewLayer.mock.calls[0]?.[0]).toMatchObject({
+      dataUrl: "data:image/png;base64,bmV3",
+      name: "채색",
+    });
     getContext.mockRestore();
     toDataURL.mockRestore();
   });

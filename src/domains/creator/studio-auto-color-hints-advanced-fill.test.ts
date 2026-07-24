@@ -9,6 +9,8 @@ import {
 import {
   appendStudioAutoColorScribbleSeed,
   applyStudioAutoColorHintsAdvancedFillBatch,
+  applyStudioAutoColorHintsToPaintTarget,
+  createStudioAutoColorBlankPaintTarget,
   planStudioAutoColorHintsAdvancedFillJobs,
   STUDIO_AUTO_COLOR_SCRIBBLE_SEED_MAX,
   studioAutoColorScribbleSeedFromRecommendation,
@@ -188,5 +190,40 @@ describe("applyStudioAutoColorHintsAdvancedFillBatch", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(Array.from(result.imageData.data)).toEqual(Array.from(image.data));
+  });
+});
+
+describe("createStudioAutoColorBlankPaintTarget + multi-layer paint", () => {
+  it("builds a transparent canvas of the requested size", () => {
+    const blank = createStudioAutoColorBlankPaintTarget(3, 2);
+    expect(blank.width).toBe(3);
+    expect(blank.height).toBe(2);
+    expect(blank.data.length).toBe(3 * 2 * 4);
+    expect(Array.from(blank.data)).toEqual(new Array(24).fill(0));
+  });
+
+  it("paints plan colors onto a blank layer without mutating the line-art source", () => {
+    const { image, plan } = readyTwoRegionPlan();
+    const lineArtSnapshot = new Uint8ClampedArray(image.data);
+    const blank = createStudioAutoColorBlankPaintTarget(image.width, image.height);
+
+    const result = applyStudioAutoColorHintsToPaintTarget({
+      plan,
+      paintTarget: blank,
+      referenceImage: image,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.status).toBe("applied");
+    // Line art untouched.
+    expect(Array.from(image.data)).toEqual(Array.from(lineArtSnapshot));
+    // Blank layer received region paints.
+    expect(Array.from(result.imageData.data.slice(0, 4))).toEqual([...RED]);
+    const rightIndex = (0 * image.width + 3) * 4;
+    expect(Array.from(result.imageData.data.slice(rightIndex, rightIndex + 4))).toEqual([...BLUE]);
+    // Ink column stays transparent on the paint layer (label 0).
+    const inkIndex = (0 * image.width + 2) * 4;
+    expect(Array.from(result.imageData.data.slice(inkIndex, inkIndex + 4))).toEqual([0, 0, 0, 0]);
   });
 });
