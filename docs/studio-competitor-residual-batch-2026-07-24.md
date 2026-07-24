@@ -9,39 +9,39 @@ Finite shippable batch after CSP EX / Magma / Photopea / Procreate / SHAPER surv
 | --- | --- |
 | CSP EX multi-page multi-select move/delete | `deletePagesBulk` / `movePagesBulk` + `StudioPageListPane` multi-select toolbar |
 | CSP EX lettering 루비 + range format | `studio-dialogue-ruby.ts` + story panel 루비 UI |
-| CSP EX pure ruby glyph-run layout | `studio-dialogue-ruby-layout.ts` (`planDialogueRubyRuns` + overlay placements) + Vitest |
+| CSP EX pure ruby glyph-run layout | `studio-dialogue-ruby-layout.ts` (`planDialogueRubyRuns` + overlay placements) |
 | Konva horizontal ruby paint (MVP) | `StudioKonvaTextNodes` / `StudioKonvaBubbleNode` stacked overlays; vertical/path skipped |
-| Marquee multi-select lettering format | `selectedIds` → story batch 「선택만」 (`marqueeIds` glue on `StudioPage`) |
-| Export package DPI / trim / bleed editors | Presets + editable geometry in `StudioExportMenuPanel`; pure `studio-export-package-preflight` |
-| Export page-range multi-page capture | CBZ/PDF/contact/preset honor package range via `planMultiPageExportCapture` (indices prop or all-then-slice) |
-| Shortcut conflict UX + remap-aware drawing | `listStudioShortcutConflicts`, registry-aware `resolveStudioDrawingShortcut`, settings badges, help remaps |
-| Multi-object surface snap product path | `planStudioBg3dMultiSurfaceSnap` + multi pick (cap 64), one history step |
-| Multi-object placement recipe | `placeSelectedModelRecipe` multi custom models (cap 64), “N개 배치를 정리했어요” |
-| BG3D/VRM insert transparent subject | insert background mode pure + UI checkboxes |
-| Generic 3D workflow metadata | attach/parse + models-tab classification UI |
-| Pose material blend strength | strength slider + `blendStudioPoseMaterialMergePlan` |
-| Anim named clip rename / ease set | `renameTimelineClip`, extended ease on timeline panel |
-| Live soft-lock canvas mutation gate | `studio-live-canvas-mutation-gate` + integration boundary |
-| Auto-color hints panel (plan-only) | `StudioAutoColorHintsPanel` on inspector fill tab; demo fixture; plan copy; no silent pixel overwrite |
-| Edit crop menu reachability | crop gated correctly in edit controls + menubar |
+| Marquee multi-select lettering format | `selectedIds` → story batch 「선택만」 (`marqueeIds` glue) |
+| Export package DPI / trim / bleed editors | Presets + editable geometry in `StudioExportMenuPanel` |
+| Export page-range multi-page capture | `planMultiPageExportCapture` + **parent `capturePagesForIndices`** wired via StudioPage → menubar → export panel |
+| Dialogue package TXT with ruby preview | `planStudioExportDialogueTxt` emits `漢字(かんじ)` via `formatDialogueTextWithRubyPreview` |
+| Shortcut conflict UX + remap-aware drawing | `listStudioShortcutConflicts`, registry-aware drawing resolver, settings badges, help remaps |
+| Multi-object surface snap / placement recipe | multi pick (cap 64), one history step |
+| BG3D/VRM insert transparent subject | insert background mode pure + UI |
+| Generic 3D workflow metadata | models-tab classification UI |
+| Pose material blend strength | strength slider + blend plan |
+| Anim named clip rename / ease set | timeline panel |
+| Live soft-lock canvas mutation gate | pure gate + boundary |
+| Auto-color hints panel (plan-only) | fill-tab mount; **worker `onRun`** dynamic import; demo fixture until selection ImageData; no silent overwrite |
+| Edit crop menu reachability | edit controls + menubar |
 
 ## Still deferred (honest multi-hour / industry)
 
 | Item | Why deferred |
 | --- | --- |
 | Frame-folder topology / shared gutters | Separate document engine (M–L) |
-| Full rich-text / measureText-accurate ruby / vertical 傍点 | Horizontal MVP shipped; multi-line wrap, middle verticalAlign, SVG export, true measureText still approximate |
+| Full rich-text / measureText multi-line / vertical 傍点 / SVG ruby | Horizontal MVP only |
 | SHAPER texture paint on mesh UI | Pure paint stack exists; poser surface not mounted (multi-hour runtime) |
-| Auto-color scribble + selection-pixel apply | Panel + pure planner shipped; scribble brush tool, selected-layer ImageData wiring, Advanced Fill apply batch not glued (no silent overwrite) |
+| Auto-color scribble + selection-pixel apply | Panel + worker plan shipped; scribble brush, selected-layer ImageData, Advanced Fill apply batch not glued |
 | Full Magma CRDT / WebGPU scene authority | Architecture multi-year |
 | ABR marketplace, cs3* formats | Policy exclusion |
-| Workspace cloud sync / shortcut marketplace | Local chrome workspaces + settings registry are product-complete; cloud deferred |
+| Workspace cloud sync / shortcut marketplace | Local chrome complete; cloud deferred |
 
 ## Stop condition
 
-Finite high-ROI shippable rows for this batch are closed. Remaining items are multi-hour poser runtime, multi-year architecture, or policy exclusions — not open “in progress” glue.
+Finite high-ROI shippable rows for this Clip-Studio-class batch are closed (including post-scan indices wire, ruby TXT, auto-color worker onRun). Remaining items are multi-hour poser runtime, multi-year architecture, or policy exclusions — not open “in progress” glue.
 
 ## Verification
 
-- Targeted Vitest residual suites + `tsc --noEmit` after landings (evidence under goal scratch when run in goal harness).
-- Static reachability: export geometry testids, auto-color lazy/inspector mount, Konva ruby layout imports, multi placement recipe path.
+- Targeted Vitest residual suites + `tsc --noEmit` after landings.
+- Static reachability: export indices wire, auto-color worker onRun, ruby TXT enrichment.
