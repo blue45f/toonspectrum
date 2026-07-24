@@ -75,7 +75,9 @@ const budgets = {
   // live mutation gate, auto-color plan panel(lazy)+worker, indices capture glue.
   // production 관측: route raw 2905.0 KiB, app-shell 이후 raw 2413.9 / gzip 794.7 KiB, 156 requests.
   // 무거운 패널·export·3D는 lazy 유지. 관측치+약 2%/+2-request 여유로 재고정.
-  studio: { raw: 3_035_000, gzip: 975_000 },
+  // 2026-07-24 CSP 교점까지 지우기 문서 apply 배선(순수 플래너는 기존, StudioPage·dock 가시성):
+  // route gzip 956.5 KiB 관측 — gzip 상한만 관측치+약 2%로 재고정(raw·entry는 여유 유지).
+  studio: { raw: 3_035_000, gzip: 1_000_000 },
   studioEntry: { raw: 1_284_000, gzip: 384_500 },
   // 2026-07-23 저녁: roughjs 스케치 도형·polygon-clipping 패스 불리언 도입 — 두 라이브러리 본체는
   // 다이내믹 청크(예산 밖)이나 어댑터 공유 청크 +1로 정적 요청 149 관측. +1 여유로 재고정.
