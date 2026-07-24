@@ -1253,14 +1253,16 @@ describe("가져오기 UI accept ↔ 디코더 경계", () => {
     expect(dropRegex![1]!.split("|").sort()).toEqual(acceptExtensions);
   });
 
-  it("메뉴바 파일 입력의 accept가 각 디코더 게이트와 일치한다", () => {
-    const menubar = componentSource("StudioMenubarContent.tsx");
-    expect(menubar).toContain('accept=".json"');
-    expect(menubar).toContain(
+  it("문서 가져오기 파일 입력의 accept가 각 디코더 게이트와 일치한다", () => {
+    // Inputs live on StudioPage root (data-studio-document-import-inputs), not lazy menubar.
+    const page = componentSource("StudioPage.tsx");
+    expect(page).toContain('data-studio-document-import-inputs="true"');
+    expect(page).toContain('accept=".json"');
+    expect(page).toContain(
       'accept=".toonproject.zip,.zip,application/zip,application/vnd.toonspectrum.project+zip"'
     );
-    expect(menubar).toContain('accept=".psd,image/vnd.adobe.photoshop"');
-    expect(menubar).toContain('accept=".ora,.cbz,image/openraster,application/vnd.comicbook+zip"');
+    expect(page).toContain('accept=".psd,image/vnd.adobe.photoshop"');
+    expect(page).toContain('accept=".ora,.cbz,image/openraster,application/vnd.comicbook+zip"');
   });
 
   it("브러시 팁·브러시 팩·VRM 입력의 accept가 해당 디코더와 일치한다", () => {

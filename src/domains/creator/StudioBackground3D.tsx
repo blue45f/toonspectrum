@@ -8565,20 +8565,30 @@ export function StudioBackground3D({
                       <MoveDown size={16} aria-hidden />
                     </button>
                   </StudioToolHintTarget>
-                  <button
-                    type="button"
-                    aria-label="배치 정리"
-                    title="자동 맞춤 후 바닥에 붙입니다 (다중 선택 지원)"
+                  <StudioToolHintTarget
+                    hint={{
+                      id: "bg3d:object:placement-recipe",
+                      title: "배치 정리",
+                      description: "자동 맞춤 후 바닥에 붙입니다. 다중 선택 지원.",
+                      preview: "object-ground",
+                    }}
                     disabled={!canPlaceSelectedModelRecipe}
-                    className={cx(
-                      "inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-line/70 bg-panel/80 px-1.5 text-[0.65rem] font-semibold text-fg-2 shadow-sm backdrop-blur transition-colors",
-                      "hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-                      "disabled:cursor-not-allowed disabled:opacity-40",
-                    )}
-                    onClick={placeSelectedModelRecipe}
+                    preferredSide="right"
                   >
-                    배치 정리
-                  </button>
+                    <button
+                      type="button"
+                      aria-label="배치 정리"
+                      disabled={!canPlaceSelectedModelRecipe}
+                      className={cx(
+                        "inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-line/70 bg-panel/80 px-1.5 text-[0.65rem] font-semibold text-fg-2 shadow-sm backdrop-blur transition-colors",
+                        "hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                        "disabled:cursor-not-allowed disabled:opacity-40",
+                      )}
+                      onClick={placeSelectedModelRecipe}
+                    >
+                      배치 정리
+                    </button>
+                  </StudioToolHintTarget>
                   <StudioToolHintTarget
                     hint={BG3D_VIEWPORT_HINTS.originGround}
                     disabled={Boolean(centerGroundSelectionDisabledReason)}
@@ -8618,22 +8628,31 @@ export function StudioBackground3D({
                       <Crosshair size={17} aria-hidden />
                     </button>
                   </StudioToolHintTarget>
-                  <button
-                    type="button"
-                    aria-label="법선 정렬"
-                    aria-pressed={surfaceSnapAlignNormal}
-                    title="표면에 붙일 때 객체 위쪽을 법선 방향으로 맞춥니다"
-                    data-testid="bg3d-surface-snap-align-normal"
-                    className={cx(
-                      "inline-flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-2 text-[0.65rem] font-semibold text-fg-2 transition-colors",
-                      "hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-                      surfaceSnapAlignNormal &&
-                        "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent",
-                    )}
-                    onClick={() => setSurfaceSnapAlignNormal((prev) => !prev)}
+                  <StudioToolHintTarget
+                    hint={{
+                      id: "bg3d:object:surface-snap-normal",
+                      title: "법선 정렬",
+                      description: "표면에 붙일 때 객체 위쪽을 법선 방향으로 맞춥니다.",
+                      preview: "object-snap",
+                    }}
+                    preferredSide="right"
                   >
-                    법선 정렬
-                  </button>
+                    <button
+                      type="button"
+                      aria-label="법선 정렬"
+                      aria-pressed={surfaceSnapAlignNormal}
+                      data-testid="bg3d-surface-snap-align-normal"
+                      className={cx(
+                        "inline-flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-2 text-[0.65rem] font-semibold text-fg-2 transition-colors",
+                        "hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                        surfaceSnapAlignNormal &&
+                          "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent",
+                      )}
+                      onClick={() => setSurfaceSnapAlignNormal((prev) => !prev)}
+                    >
+                      법선 정렬
+                    </button>
+                  </StudioToolHintTarget>
                   <StudioToolHintTarget
                     hint={BG3D_VIEWPORT_HINTS.focus}
                     disabled={Boolean(focusSelectionDisabledReason)}

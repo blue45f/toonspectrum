@@ -71,9 +71,9 @@ describe("Studio inspector canvas-controls boundary", () => {
     const leaf = moduleEdges("./StudioInspectorCanvasControls.tsx").source;
 
     expect(leaf.split("\n").length).toBeLessThanOrEqual(450);
-    // 의도적 변경(2026-07-24): 필터 마스크 페인팅 툴 배선 — 마스크 탭에 레이어 마스크와 대칭인
-    // StudioFilterMaskPanel 마운트 + controlled props/핸들러/세터 추가(3_300 → 3_380).
-    expect(inspector.split("\n").length).toBeLessThanOrEqual(3_380);
+    // 의도적 변경(2026-07-24): 필터 마스크 페인팅 + 자동 채색 힌트 worker onRun 배선
+    // (3_300 → 3_380 → 3_400).
+    expect(inspector.split("\n").length).toBeLessThanOrEqual(3_400);
     expect(leaf).not.toContain('"use no memo"');
     expect(leaf).not.toMatch(/\b(?:memo|useCallback|useMemo)\s*\(/u);
     expect(leaf).toContain("export function StudioInspectorCanvasControls(");
