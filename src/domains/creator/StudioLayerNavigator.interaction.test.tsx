@@ -81,4 +81,38 @@ describe("StudioLayerNavigator selection interaction", () => {
     expect(front.className).toContain("pointer-coarse:min-h-11");
     expect(screen.getByRole("toolbar", { name: "선택 레이어 일괄 작업" }).textContent).toContain("선택 2개");
   });
+
+  it("exposes CSP layer solo in the per-layer action panel and toggles aria-pressed", () => {
+    function SoloHarness() {
+      const [soloLayerId, setSoloLayerId] = useState<string | null>(null);
+      return (
+        <StudioLayerNavigator
+          items={ITEMS}
+          groups={[]}
+          selectedIds={["front"]}
+          pageKey="page-solo"
+          localHiddenIds={new Set()}
+          onToggleLocalHidden={() => {}}
+          soloLayerId={soloLayerId}
+          onToggleLayerSolo={(id) => {
+            setSoloLayerId((current) => (current === id ? null : id));
+          }}
+          onSelectionChange={() => {}}
+          onAction={() => {}}
+        />
+      );
+    }
+
+    render(<SoloHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "주인공 대사 레이어 작업" }));
+    const solo = screen.getByRole("button", { name: /솔로/ });
+    expect(solo.getAttribute("aria-pressed")).toBe("false");
+    expect(solo.getAttribute("title")).toContain("협업 문서에는 반영되지 않");
+
+    fireEvent.click(solo);
+    const active = screen.getByRole("button", { name: /솔로 해제/ });
+    expect(active.getAttribute("aria-pressed")).toBe("true");
+    expect(active.className).toContain("border-accent/40");
+  });
 });

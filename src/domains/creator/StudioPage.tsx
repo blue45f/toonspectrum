@@ -645,6 +645,11 @@ import {
   normalizeStudioLayerRole,
 } from "./studio-layer-navigator";
 import {
+  EMPTY_STUDIO_LAYER_SOLO_STATE,
+  clearStudioLayerSolo,
+  toggleStudioLayerSolo,
+} from "./studio-layer-solo";
+import {
   createLayerGroup,
   emptyGroupIds,
   groupItems,
@@ -5071,13 +5076,42 @@ function StudioCuttoonEditor() {
   const [localHiddenElementIds, setLocalHiddenElementIds] = useState<ReadonlySet<string>>(() => new Set());
   const localHiddenElementIdsRef = useRef(localHiddenElementIds);
   localHiddenElementIdsRef.current = localHiddenElementIds;
+  const [layerSoloState, setLayerSoloState] = useState(() => EMPTY_STUDIO_LAYER_SOLO_STATE);
   function toggleLocalHidden(id: string) {
+    // Manual local-hide while solo is active exits solo so the two modes do not fight.
+    if (layerSoloState.soloId !== null) {
+      const cleared = clearStudioLayerSolo(layerSoloState);
+      setLayerSoloState(cleared.state);
+      setLocalHiddenElementIds(() => {
+        const next = new Set(cleared.localHiddenIds);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+      return;
+    }
     setLocalHiddenElementIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  }
+  function toggleLayerSolo(id: string) {
+    const allItemIds = elements.map((element) => element.id);
+    const result = toggleStudioLayerSolo({
+      state: layerSoloState,
+      targetId: id,
+      allItemIds,
+      currentLocalHidden: localHiddenElementIds,
+    });
+    setLayerSoloState(result.state);
+    setLocalHiddenElementIds(result.localHiddenIds);
+    announceDrawingShortcut(
+      result.state.soloId
+        ? "레이어 솔로 · 이 레이어만 표시"
+        : "레이어 솔로 해제"
+    );
   }
   // 최근 사용 색(색상 팝오버 공용) — 색상 선택기를 실제로 열 때만 복원해 초기 Studio 진입을 가볍게 유지한다.
   const [recentColors, setRecentColors] = useState<string[]>([]);
@@ -17321,8 +17355,16 @@ function StudioCuttoonEditor() {
   }
 
   function showAllLocallyHiddenLayers() {
+    // "모두 표시" clears solo view as well so the client is not stuck with a temporary solo mask.
+    if (layerSoloState.soloId !== null) {
+      setLayerSoloState(EMPTY_STUDIO_LAYER_SOLO_STATE);
+    }
     setLocalHiddenElementIds((current) => current.size === 0 ? current : new Set());
-    announceDrawingShortcut("나만 숨긴 레이어 모두 표시");
+    announceDrawingShortcut(
+      layerSoloState.soloId !== null
+        ? "레이어 솔로 해제 · 나만 숨긴 레이어 모두 표시"
+        : "나만 숨긴 레이어 모두 표시"
+    );
   }
 
   // 키보드 단축키: Magma식 보기 키 + ⌘Z/⌘⇧Z 실행취소·다시실행 + 편집/그리기 키.
@@ -29188,6 +29230,7 @@ function StudioCuttoonEditor() {
     toggleIsometricGridActive,
     toggleLayerMaskEnabled,
     toggleLocalHidden,
+    toggleLayerSolo,
     updateAdvancedFillSettings,
   });
 
@@ -31127,6 +31170,7 @@ function StudioCuttoonEditor() {
           layerMaskStrength={layerMaskStrength}
           layerNavigatorItems={layerNavigatorItems}
           localHiddenElementIds={localHiddenElementIds}
+          soloLayerId={layerSoloState.soloId}
           liquifyActive={liquifyActive}
           liquifyBusy={liquifyBusy}
           liquifyMode={liquifyMode}

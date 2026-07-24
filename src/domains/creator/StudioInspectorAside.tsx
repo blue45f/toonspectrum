@@ -298,6 +298,8 @@ export interface StudioInspectorAsideHandlers {
   toggleFilterMaskEnabled: () => void;
   toggleLayerMaskEnabled: () => void;
   toggleLocalHidden: (id: string) => void;
+  /** CSP-class layer solo — client-only temporary single-layer view. */
+  toggleLayerSolo: (id: string) => void;
   updateAdvancedFillSettings: (next: StudioAdvancedFillSettings) => void;
 }
 
@@ -398,6 +400,8 @@ interface StudioInspectorAsideProps {
   layerNavigatorItems: StudioLayerNavigatorItem[];
   /** "나만 숨기기" — 문서(CRDT)에 없는, 이 클라이언트에서만 켠 로컬 숨김 대상. */
   localHiddenElementIds: ReadonlySet<string>;
+  /** CSP-class solo target, or null when solo is off. */
+  soloLayerId: string | null;
   liquifyActive: boolean;
   liquifyBusy: boolean;
   liquifyMode: StudioLiquifyMode;
@@ -743,6 +747,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   layerMaskStrength,
   layerNavigatorItems,
   localHiddenElementIds,
+  soloLayerId,
   liquifyActive,
   liquifyBusy,
   liquifyMode,
@@ -1079,6 +1084,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     toggleIsometricGridActive,
     toggleLayerMaskEnabled,
     toggleLocalHidden,
+    toggleLayerSolo,
     updateAdvancedFillSettings,
   } = stableHandlers;
   const [activatedImageInspectorTabs, setActivatedImageInspectorTabs] = useState<
@@ -3330,6 +3336,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   groupingDisabled={masterEditMode}
                   localHiddenIds={localHiddenElementIds}
                   onToggleLocalHidden={toggleLocalHidden}
+                  soloLayerId={soloLayerId}
+                  onToggleLayerSolo={toggleLayerSolo}
                   onSelectionChange={selectLayersFromNavigator}
                   onAction={handleLayerNavigatorAction}
                 />

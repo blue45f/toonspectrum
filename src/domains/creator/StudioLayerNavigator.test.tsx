@@ -15,6 +15,9 @@ const noopAction: StudioLayerNavigatorProps["onAction"] = () => {
 const noopToggleLocalHidden: StudioLayerNavigatorProps["onToggleLocalHidden"] = () => {
   // 정적 SSR 계약 테스트에서는 이벤트를 실행하지 않는다.
 };
+const noopToggleLayerSolo: NonNullable<StudioLayerNavigatorProps["onToggleLayerSolo"]> = () => {
+  // 정적 SSR 계약 테스트에서는 이벤트를 실행하지 않는다.
+};
 
 function layer(
   id: string,
@@ -46,6 +49,8 @@ function renderNavigator(
       groupingDisabled={patch.groupingDisabled}
       localHiddenIds={patch.localHiddenIds ?? new Set()}
       onToggleLocalHidden={patch.onToggleLocalHidden ?? noopToggleLocalHidden}
+      soloLayerId={patch.soloLayerId}
+      onToggleLayerSolo={patch.onToggleLayerSolo ?? noopToggleLayerSolo}
       onSelectionChange={patch.onSelectionChange ?? noopSelection}
       onAction={patch.onAction ?? noopAction}
     />

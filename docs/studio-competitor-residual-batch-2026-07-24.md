@@ -29,6 +29,7 @@ Finite shippable batch after CSP EX / Magma / Photopea / Procreate / SHAPER surv
 | CSP stroke/shape object snap | `snapPointToObjectGuides` + freehand origin / shape·line endpoints when snapEnabled; mid freehand raw; smart-guide overlay during placement |
 | CSP Size dynamics Min (pressure floor) | `pressureMinSize` snapshot + `studioBrushPressureWithMinSize` on hardware/velocity channels; Brush Studio “최소 굵기” |
 | CSP vector eraser erase-to-intersection | Pure plan + document apply + desktop dock scissors + **mobile eraser sheet** toggle; freehand pen click erases between nearest cuts |
+| CSP layer solo (client-only) | `studio-layer-solo.ts` pure toggle/clear + snapshot restore; navigator 「솔로」 next to 「나만 숨기기」; InspectorAside glue; localHidden only (no CRDT `hidden`) |
 
 ## Still deferred (honest multi-hour / industry)
 
@@ -43,7 +44,20 @@ Finite shippable batch after CSP EX / Magma / Photopea / Procreate / SHAPER surv
 
 ## Stop condition
 
-Finite high-ROI shippable rows for this Clip-Studio-class batch are closed (including perspective eye-level/horizon lock, stroke/shape object snap for freehand origin + shape·line endpoints, flicker fix, auto-color paths, erase-to-intersection, pressure min size). Remaining items are multi-hour poser runtime (frame-folder topology, SHAPER mesh paint UI), intentional freehand mid-sample non-snap, multi-year architecture (Magma CRDT / WebGPU rewrite), or policy exclusions (ABR/cs3*, cloud marketplace) — not open “in progress” glue.
+Finite high-ROI shippable rows for this Clip-Studio-class batch are closed (including perspective eye-level/horizon lock, stroke/shape object snap for freehand origin + shape·line endpoints, object-snap target cache, mobile immersive menubar polish, CSP layer solo on localHidden, flicker fix, auto-color paths, erase-to-intersection, pressure min size). Remaining items are multi-hour poser runtime (frame-folder topology, SHAPER mesh paint UI), intentional freehand mid-sample non-snap, multi-year architecture (Magma CRDT / WebGPU rewrite), or policy exclusions (ABR/cs3*, cloud marketplace) — not open “in progress” glue.
+
+### Canvas engine decision (2026-07-24)
+
+Surveyed whiteboard kits (Excalidraw, tldraw) and low-level engines (Fabric.js, Konva, p5.js, PixiJS).
+
+| Option | Verdict for Studio body |
+| --- | --- |
+| **Konva / react-konva (current)** | **Keep.** Layer tree, transformers, masks, blend modes, mobile touch, and CRDT→committed scene path already ship here. |
+| Excalidraw / tldraw | **Do not replace the body.** Full whiteboard shells (hand-drawn UI, infinite canvas chrome) fight CSP-class plate editing. Optional future: isolated sketch/annotation embed only. |
+| Fabric.js | Overlaps Konva object model; migration cost without product upside. |
+| p5.js / PixiJS | Creative/WebGL effect engines — optional special-brush/FX path later, not document authority. |
+
+Hybrid policy: Konva remains durable interaction + committed-scene authority; Canvas2D live ink residual + optional WebGPU pin stay as performance overlays. No body rewrite to a whiteboard library.
 
 ### Why no further finite slices this pass
 

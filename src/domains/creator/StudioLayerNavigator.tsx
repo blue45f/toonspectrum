@@ -10,6 +10,7 @@ import {
   FolderMinus,
   FolderPlus,
   Ghost,
+  Crosshair,
   Grid2X2,
   Layers3,
   ListChecks,
@@ -121,6 +122,12 @@ export interface StudioLayerNavigatorProps {
   /** 문서(CRDT)에 반영되지 않는, 이 클라이언트에서만 켜진 "나만 숨기기" 대상. */
   localHiddenIds: ReadonlySet<string>;
   onToggleLocalHidden: (id: string) => void;
+  /**
+   * CSP-class solo: temporary local view of one layer (others hidden only on this client).
+   * Null when solo is off.
+   */
+  soloLayerId?: string | null;
+  onToggleLayerSolo?: (id: string) => void;
   onSelectionChange: (ids: readonly string[]) => void;
   onAction: (action: StudioLayerNavigatorAction) => void;
 }
@@ -191,6 +198,8 @@ export function StudioLayerNavigator({
   groupingDisabled = false,
   localHiddenIds,
   onToggleLocalHidden,
+  soloLayerId = null,
+  onToggleLayerSolo,
   onSelectionChange,
   onAction,
 }: StudioLayerNavigatorProps) {
@@ -1579,6 +1588,21 @@ export function StudioLayerNavigator({
               >
                 <Ghost size={13} /> {activeItemLocallyHidden ? "나만 숨기기 해제" : "나만 숨기기"}
               </button>
+              {onToggleLayerSolo ? (
+                <button
+                  type="button"
+                  onClick={() => onToggleLayerSolo(activeItem.id)}
+                  className={cn(
+                    compactControl,
+                    soloLayerId === activeItem.id && "border-accent/40 bg-accent-soft/50 text-accent"
+                  )}
+                  title="이 레이어만 내 화면에 남기고 나머지는 임시로 숨겨요 (협업 문서에는 반영되지 않아요)"
+                  aria-pressed={soloLayerId === activeItem.id}
+                >
+                  <Crosshair size={13} />
+                  {soloLayerId === activeItem.id ? "솔로 해제" : "솔로"}
+                </button>
+              ) : null}
               <button
                 type="button"
                 disabled={readOnly || activeItemLockedByGroup}
