@@ -47,6 +47,7 @@ describe("studio edit availability", () => {
     hasPixelEditing: false,
     pixelBusy: false,
     selectedImage: false,
+    pixelToolTargetAvailable: false,
     interactionLocked: false,
     mutationLocked: false,
     selectedContentMutationLocked: false,
@@ -103,6 +104,7 @@ describe("studio edit availability", () => {
       hasPixelSelection: true,
       hasPixelEditing: true,
       selectedImage: true,
+      pixelToolTargetAvailable: true,
       masterEditMode: true,
     })).toMatchObject({
       undoDisabled: true,
@@ -112,6 +114,31 @@ describe("studio edit availability", () => {
       clearSelectionDisabled: false,
       cropLayerDisabled: false,
     });
+  });
+
+  it("enables crop when the sole editable image can be auto-selected without a prior selection", () => {
+    // Rail Crop + keyboard C already work via ensurePixelToolTarget; the Edit menu must match.
+    expect(resolveStudioEditAvailability({
+      ...editableSelection,
+      hasElementSelection: false,
+      hasSingleElementSelection: false,
+      selectedImage: false,
+      pixelToolTargetAvailable: true,
+    }).cropLayerDisabled).toBe(false);
+  });
+
+  it("keeps crop disabled when no pixel-tool target is available or mutations are locked", () => {
+    expect(resolveStudioEditAvailability({
+      ...editableSelection,
+      selectedImage: true,
+      pixelToolTargetAvailable: false,
+    }).cropLayerDisabled).toBe(true);
+    expect(resolveStudioEditAvailability({
+      ...editableSelection,
+      selectedImage: true,
+      pixelToolTargetAvailable: true,
+      mutationLocked: true,
+    }).cropLayerDisabled).toBe(true);
   });
 
   it("never exposes destructive pixel deletion while the image is locked or already busy", () => {

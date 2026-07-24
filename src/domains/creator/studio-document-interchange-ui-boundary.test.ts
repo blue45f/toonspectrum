@@ -32,7 +32,19 @@ describe("Studio document interchange UI boundary", () => {
   // 들어가 있으면, 파일 메뉴의 가져오기 항목이 부르는 ref.current?.click()이 패널이 닫혀 있을 때
   // null 이라 조용히 무시된다(실측된 "가져오기 아무 반응 없음" 버그). 네 입력은 반드시 패널 게이트
   // 앞(=항상 마운트)에 있어야 한다.
-  it("always mounts the four import file inputs, not gated behind projectActionsOpen", () => {
+  it("always mounts the four import file inputs on StudioPage, not behind menubar/panel gates", () => {
+    // 2026-07-24 hardening: inputs live on StudioPage root so LazyStudioMenubarContent
+    // chunk load timing cannot leave File → 가져오기 as a silent no-op.
+    expect(studioPage).toContain('data-studio-document-import-inputs="true"');
+    for (const ref of [
+      "ref={projectImportInputRef}",
+      "ref={projectArchiveImportInputRef}",
+      "ref={psdImportInputRef}",
+      "ref={interchangeImportInputRef}",
+    ]) {
+      expect(studioPage.indexOf(ref), `${ref} must exist on StudioPage`).toBeGreaterThan(0);
+    }
+    // Menubar must not re-gate inputs behind projectActionsOpen (no duplicate JSX refs there).
     const gate = menubar.indexOf("projectActionsOpen &&");
     expect(gate).toBeGreaterThan(0);
     for (const ref of [
@@ -41,18 +53,12 @@ describe("Studio document interchange UI boundary", () => {
       "ref={psdImportInputRef}",
       "ref={interchangeImportInputRef}",
     ]) {
-      const at = menubar.indexOf(ref);
-      expect(at, `${ref} must exist`).toBeGreaterThan(0);
-      // 첫 등장이 패널 게이트보다 앞서야 항상 렌더된다.
-      expect(at, `${ref} must render before the projectActionsOpen gate`).toBeLessThan(gate);
+      expect(menubar.includes(ref), `${ref} must not re-mount inside menubar`).toBe(false);
     }
-    // 파일 메뉴 요청 핸들러가 각 ref 를 클릭한다.
-    expect(studioPage).toContain(
-      "requestProjectImport: () => projectImportInputRef.current?.click()",
-    );
-    expect(studioPage).toContain(
-      "requestPsdImport: () => psdImportInputRef.current?.click()",
-    );
+    // 파일 메뉴 요청 핸들러가 각 ref 를 직접 click 한다 (null 시 사용자에게 안내).
+    expect(studioPage).toContain("projectImportInputRef.current.click()");
+    expect(studioPage).toContain("psdImportInputRef.current.click()");
+    expect(studioPage).toContain("interchangeImportInputRef.current.click()");
   });
 
   it("connects the ORA/CBZ menu command to one format-scoped file input", () => {
@@ -62,17 +68,15 @@ describe("Studio document interchange UI boundary", () => {
       'id: "project"',
     );
     const input = sourceSection(
-      menubar,
-      "ref={interchangeImportInputRef}",
-      "{interchangeImportStatus ?",
+      studioPage,
+      'data-studio-document-import-inputs="true"',
+      "{pendingInterchangeImport ?",
     );
 
     expect(menuItem).toContain("state.interchangeImportBusy");
     expect(menuItem).toContain("state.collaborationDocumentLocked");
     expect(menuItem).toContain("ui.requestInterchangeImport()");
-    expect(studioPage).toContain(
-      "requestInterchangeImport: () => interchangeImportInputRef.current?.click()",
-    );
+    expect(studioPage).toContain("interchangeImportInputRef.current.click()");
     expect(input).toContain('accept=".ora,.cbz,image/openraster,application/vnd.comicbook+zip"');
     expect(input).toContain("handleImportInterchangeArchive(event)");
     expect(input).toContain('aria-label="OpenRaster 또는 CBZ 가져오기"');

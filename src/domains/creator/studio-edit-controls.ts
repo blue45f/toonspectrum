@@ -80,6 +80,12 @@ export interface StudioEditAvailabilityInput {
   hasPixelEditing: boolean;
   pixelBusy: boolean;
   selectedImage: boolean;
+  /**
+   * Same gate as the left tool rail / ensurePixelToolTarget: selected editable image, or
+   * exactly one editable image on the page that can be auto-selected (arm-anytime 2026-07-24).
+   * Crop must not stay hard-disabled when the sole-image auto-select path still works.
+   */
+  pixelToolTargetAvailable: boolean;
   /** Temporary capture/playback state where even read-only selection must not inspect transient data. */
   interactionLocked: boolean;
   mutationLocked: boolean;
@@ -128,7 +134,10 @@ export function resolveStudioEditAvailability(
       (input.hasPixelSelection && (input.pixelBusy || input.selectedContentMutationLocked)),
     duplicateDisabled: input.mutationLocked || !input.hasElementSelection,
     reorderDisabled: input.mutationLocked || !input.hasSingleElementSelection,
-    cropLayerDisabled: !input.selectedImage || input.selectedContentMutationLocked,
+    // Align with openSelectedLayerCrop → ensurePixelToolTarget and the rail Crop button.
+    // Requiring selectedImage alone made Edit → 레이어 자르기 a silent dead control when the
+    // page had exactly one editable image (keyboard C and the rail still worked).
+    cropLayerDisabled: input.mutationLocked || !input.pixelToolTargetAvailable,
   };
 }
 
