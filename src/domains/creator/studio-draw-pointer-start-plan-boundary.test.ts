@@ -94,7 +94,8 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // 함께 해제(activeGroupIdRef/setActiveGroupId)하는 분기를 deselect 경로에 추가(935 → 936).
     // 의도적 변경(2026-07-24): CSP pressure min size — resolveBrushPressureSample/minSizeRatio 배선
     // 및 시작 플랜 입력 전달로 onStageDown 증가(936 → 940).
-    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(940);
+    // 의도적 변경(2026-07-24): CSP 교점까지 지우기 원샷 분기(지우개+토글) 추가(940 → 945).
+    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(945);
 
     expectTokenOrder(pointCommentHandler, [
       "if (pointCommentComposer) return true",

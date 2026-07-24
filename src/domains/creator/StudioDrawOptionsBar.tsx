@@ -19,6 +19,7 @@ import {
   PaintBucket,
   Pencil,
   Pipette,
+  Scissors,
   Shapes,
   Sparkles,
   Star,
@@ -47,6 +48,10 @@ import {
 import { STUDIO_BRUSH_SIZE_RANGE } from "./studio-draw-ux";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { studioToolHintFromLabel } from "./studio-tool-hints";
+import {
+  STUDIO_ERASE_TO_INTERSECTION_LABEL,
+  STUDIO_ERASE_TO_INTERSECTION_TIP,
+} from "./studio-vector-erase-to-intersection-apply";
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
 import { StudioBrushTray } from "./StudioBrushTray";
 import { StudioDualColorWell } from "./StudioDualColorWell";
@@ -100,6 +105,9 @@ export interface StudioDrawOptionsBarProps {
   /** Canvas-native eyedropper. Kept beside the foreground/background well for one-hand access. */
   eyedropperActive?: boolean;
   onToggleEyedropper?: () => void;
+  /** CSP vector eraser: click freehand ink and erase between nearest intersections. */
+  eraseToIntersection?: boolean;
+  onToggleEraseToIntersection?: () => void;
   onToggleQuickShape: () => void;
   onToggleCanvasFlipH?: () => void;
   onOpenBrushStudio?: () => void;
@@ -219,6 +227,8 @@ export function StudioDrawOptionsBar({
   onSwapColors,
   eyedropperActive = false,
   onToggleEyedropper,
+  eraseToIntersection = false,
+  onToggleEraseToIntersection,
   onToggleQuickShape,
   onToggleCanvasFlipH,
   onOpenBrushStudio,
@@ -701,6 +711,35 @@ export function StudioDrawOptionsBar({
                 </StudioToolHintTarget>
               ) : null}
             </>
+          ) : onToggleEraseToIntersection ? (
+            <StudioToolHintTarget
+              preferredSide="top"
+              hint={studioToolHintFromLabel(
+                STUDIO_ERASE_TO_INTERSECTION_LABEL,
+                eraseToIntersection
+                  ? `${STUDIO_ERASE_TO_INTERSECTION_TIP} 다시 누르면 일반 지우개로 돌아갑니다.`
+                  : STUDIO_ERASE_TO_INTERSECTION_TIP,
+                undefined,
+                "erase"
+              )}
+            >
+              <button
+                type="button"
+                aria-label={STUDIO_ERASE_TO_INTERSECTION_LABEL}
+                aria-pressed={eraseToIntersection}
+                data-studio-erase-to-intersection="true"
+                onClick={onToggleEraseToIntersection}
+                className={cn(
+                  iconBtn,
+                  "size-8 pointer-coarse:size-11",
+                  eraseToIntersection
+                    ? "border-accent/70 bg-accent-soft text-accent shadow-[0_0_0_1px_oklch(0.72_0.16_295/0.18)]"
+                    : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+                )}
+              >
+                <Scissors size={14} aria-hidden />
+              </button>
+            </StudioToolHintTarget>
           ) : null}
 
           {/* Explicit overflow: unlike a hidden horizontal scroll, this control is always pinned. */}

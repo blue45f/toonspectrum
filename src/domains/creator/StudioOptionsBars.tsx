@@ -36,6 +36,8 @@ export interface StudioOptionsBarsDrawModel {
   }>;
   drawMode: StudioDrawModeUi;
   drawShape: DrawShapeKind;
+  /** CSP vector eraser mode: click freehand to erase between intersections. */
+  eraseToIntersection?: boolean;
   eyedropperActive?: boolean;
   favoriteBrushIds: readonly string[];
   opacityLocked: boolean;
@@ -91,6 +93,7 @@ export interface StudioOptionsBarsHandlers {
   toggleBrushCatalog: (trigger: HTMLButtonElement) => void;
   toggleCanvasFlip: () => void;
   toggleFavoriteBrush: (brushId: string) => void;
+  toggleEraseToIntersection?: () => void;
   toggleEyedropper?: () => void;
   toggleOpacityLock: () => void;
   toggleQuickShape: () => void;
@@ -151,6 +154,8 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
             onSwapColors={stableHandlers.swapColors}
             eyedropperActive={draw.eyedropperActive}
             onToggleEyedropper={stableHandlers.toggleEyedropper}
+            eraseToIntersection={draw.eraseToIntersection}
+            onToggleEraseToIntersection={stableHandlers.toggleEraseToIntersection}
             canvasFlipH={draw.canvasFlipH}
             onToggleCanvasFlipH={stableHandlers.toggleCanvasFlip}
             onOpenBrushStudio={stableHandlers.openBrushStudio}

@@ -1167,6 +1167,10 @@ import {
   type StudioUiDensityMode,
 } from "./studio-ui-density";
 import {
+  planStudioVectorEraseToIntersectionApply,
+  STUDIO_ERASE_TO_INTERSECTION_LABEL,
+} from "./studio-vector-erase-to-intersection-apply";
+import {
   currentStudioVectorReferenceBudgets,
   materializeStudioAdvancedFillVectorTarget,
   planStudioAdvancedFillVectorTarget,
@@ -5584,6 +5588,8 @@ function StudioCuttoonEditor() {
   const isometricOriginX = drawingAssistDocument.isometric.originX;
   const isometricOriginY = drawingAssistDocument.isometric.originY;
   const [eyedropperActive, setEyedropperActive] = useState(false);
+  /** CSP vector eraser: click freehand ink and erase between nearest intersections. */
+  const [eraseToIntersection, setEraseToIntersection] = useState(false);
   const [bubbleAnchorPickActive, setBubbleAnchorPickActive] = useState(false);
   const [studioOptionalAssets, setStudioOptionalAssets] = useState<StudioOptionalAssetPacks>(
     EMPTY_STUDIO_OPTIONAL_ASSETS
@@ -22166,6 +22172,30 @@ function StudioCuttoonEditor() {
     return true;
   }
 
+  /** One-shot CSP erase-to-intersection. Returns true when the pointer event is consumed. */
+  function applyVectorEraseToIntersectionAt(x: number, y: number): boolean {
+    const planned = planStudioVectorEraseToIntersectionApply({
+      elements,
+      point: { x, y },
+      allocateId: uid,
+      isEditable: (el) =>
+        !isEffectivelyLocked(el, groups) && !isEffectivelyHidden(el, groups),
+    });
+    if (!planned.ok) {
+      setError(planned.reason);
+      return true;
+    }
+    if (!commit(planned.nextElements)) return true;
+    announceDrawingShortcut(
+      planned.pieceCount === 0
+        ? `${STUDIO_ERASE_TO_INTERSECTION_LABEL} · 선 삭제`
+        : planned.pieceCount === 1
+          ? `${STUDIO_ERASE_TO_INTERSECTION_LABEL} · 구간 정리`
+          : `${STUDIO_ERASE_TO_INTERSECTION_LABEL} · ${planned.pieceCount}조각`
+    );
+    return true;
+  }
+
   function onStageDown(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     if (
       e.target.name() === "symmetry-handle"
@@ -22225,6 +22255,11 @@ function StudioCuttoonEditor() {
       }
       if (eyedropperActive) setEyedropperActive(false);
       return;
+    }
+    // CSP 교점까지 지우기 — 지우개 + 토글 시 자유선 클릭 한 번으로 교차 구간을 정리한다.
+    if (tool === "draw" && drawMode === "eraser" && eraseToIntersection) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos && applyVectorEraseToIntersectionAt(pos.x, pos.y)) return;
     }
     // 색상 범위 샘플 pick — 스포이드와 달리 다중 샘플 도구라 1회성 해제하지 않는다.
     // 무장 중엔 다른 스테이지 제스처를 차단한다(crop/heal-clone 정책과 동일).
@@ -29158,6 +29193,21 @@ function StudioCuttoonEditor() {
         return next;
       });
     },
+    toggleEraseToIntersection: () => {
+      setEraseToIntersection((prev) => {
+        const next = !prev;
+        announceDrawingShortcut(
+          next
+            ? `${STUDIO_ERASE_TO_INTERSECTION_LABEL} 켜짐`
+            : `${STUDIO_ERASE_TO_INTERSECTION_LABEL} 꺼짐`
+        );
+        if (next) {
+          setTool("draw");
+          setDrawMode("eraser");
+        }
+        return next;
+      });
+    },
   });
 
   const studioOptionsBarsDrawModel = useMemo<StudioOptionsBarsDrawModel>(
@@ -29195,6 +29245,7 @@ function StudioCuttoonEditor() {
               ? "pixel"
               : "pen",
       drawShape,
+      eraseToIntersection,
       favoriteBrushIds: proDrawPrefs.favoriteBrushIds,
       opacityLocked: proDrawPrefs.opacityLocked,
       postCorrection,
@@ -29222,6 +29273,7 @@ function StudioCuttoonEditor() {
       color,
       drawMode,
       drawShape,
+      eraseToIntersection,
       leftResize.width,
       postCorrection,
       presentationPanelsHidden,
