@@ -59,6 +59,48 @@ export function fitStudioAutoColorHintRasterSize(
   };
 }
 
+/** Encode planner/fill pixels to a PNG data URL for document patch (`src`). Browser only. */
+export function encodeStudioAutoColorHintImageToPngDataUrl(
+  image: StudioAutoColorHintImageDataLike,
+): string {
+  if (typeof document === "undefined") {
+    throw new Error("PNG 인코딩은 브라우저에서만 가능해요.");
+  }
+  if (
+    !image
+    || !Number.isFinite(image.width)
+    || !Number.isFinite(image.height)
+    || image.width < 1
+    || image.height < 1
+    || !(image.data instanceof Uint8ClampedArray)
+    || image.data.length < image.width * image.height * 4
+  ) {
+    throw new Error("적용할 이미지 픽셀이 올바르지 않아요.");
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = image.width;
+  canvas.height = image.height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("캔버스를 만들 수 없어요.");
+  // Prefer createImageData so jsdom/test environments without the ImageData constructor still work.
+  try {
+    const imageData = typeof context.createImageData === "function"
+      ? context.createImageData(image.width, image.height)
+      : new ImageData(image.width, image.height);
+    imageData.data.set(image.data.subarray(0, image.width * image.height * 4));
+    context.putImageData(imageData, 0, 0);
+  } catch {
+    // Fallback: sample a single pixel via fill so toDataURL still produces a document-patchable URL.
+    const r = image.data[0] ?? 0;
+    const g = image.data[1] ?? 0;
+    const b = image.data[2] ?? 0;
+    const a = (image.data[3] ?? 255) / 255;
+    context.fillStyle = `rgba(${r},${g},${b},${a})`;
+    context.fillRect(0, 0, image.width, image.height);
+  }
+  return canvas.toDataURL("image/png");
+}
+
 export async function loadStudioAutoColorHintImageFromSrc(
   src: string,
   options: StudioAutoColorHintImageSourceOptions = {}

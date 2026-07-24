@@ -1,22 +1,32 @@
 /**
  * Thin auto-color hints product panel.
  *
- * Runs the pure `planStudioAutoColorHints` planner (sync) and presents a Korean summary.
- * Never writes pixels — apply remains deferred to Advanced Fill / explicit user action.
- * When the parent has not supplied image pixels, a built-in demo fixture is used.
+ * Plans connected regions from line art + scribble seeds, then can apply a ready plan through
+ * the Advanced Fill batch bridge (label-authoritative paint). Never silently overwrites —
+ * apply requires an explicit user action and an `onApplyResult` parent handler.
  */
 
-import { Copy, Info, Loader2, Sparkles, TriangleAlert } from "lucide-react";
-import { useId, useState } from "react";
+import { Copy, Info, Loader2, Paintbrush, Sparkles, TriangleAlert } from "lucide-react";
+import { useId, useRef, useState } from "react";
 
 import {
   planStudioAutoColorHints,
   type StudioAutoColorHintPlan,
   type StudioAutoColorHintRequest,
+  type StudioAutoColorHintRgba,
   type StudioAutoColorHintSeed,
   type StudioAutoColorHintImageDataLike,
 } from "./studio-auto-color-hints";
-import { loadStudioAutoColorHintImageFromSrc } from "./studio-auto-color-hints-image-source";
+import {
+  appendStudioAutoColorScribbleSeed,
+  applyStudioAutoColorHintsAdvancedFillBatch,
+  STUDIO_AUTO_COLOR_SCRIBBLE_PALETTE,
+  studioAutoColorScribbleSeedFromRecommendation,
+} from "./studio-auto-color-hints-advanced-fill";
+import {
+  encodeStudioAutoColorHintImageToPngDataUrl,
+  loadStudioAutoColorHintImageFromSrc,
+} from "./studio-auto-color-hints-image-source";
 import {
   createStudioAutoColorHintsDemoRequest,
   summarizeStudioAutoColorHintPlan,
@@ -36,7 +46,7 @@ export interface StudioAutoColorHintsPanelProps {
    * pixels are decoded on Run (with auto-color max-pixel downscale). Browser only.
    */
   readonly imageSrc?: string | null;
-  /** Optional color seeds; ignored when `image` is absent (demo seeds are used). */
+  /** Optional color seeds; when omitted, the panel uses its scribble seed list. */
   readonly seeds?: readonly StudioAutoColorHintSeed[];
   /** Optional full request override (image/seeds/options). Wins over image/seeds props. */
   readonly request?: StudioAutoColorHintRequest | null;
@@ -44,6 +54,11 @@ export interface StudioAutoColorHintsPanelProps {
   readonly onPlan?: (plan: StudioAutoColorHintPlan) => void;
   /** Optional external runner; defaults to sync pure planner. */
   readonly onRun?: (request: StudioAutoColorHintRequest) => StudioAutoColorHintPlan | Promise<StudioAutoColorHintPlan>;
+  /**
+   * Explicit apply path: parent patches the selected image `src` with the painted PNG.
+   * Without this handler the apply button stays hidden (plan-only safety).
+   */
+  readonly onApplyResult?: (dataUrl: string) => void;
 }
 
 async function copyTextToClipboard(text: string): Promise<boolean> {
@@ -58,69 +73,122 @@ async function copyTextToClipboard(text: string): Promise<boolean> {
   return false;
 }
 
-async function resolveRequest(props: StudioAutoColorHintsPanelProps): Promise<{
+function rgbaCss(color: StudioAutoColorHintRgba): string {
+  return `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${(color[3] / 255).toFixed(3)})`;
+}
+
+async function resolveRequest(input: {
+  image?: StudioAutoColorHintImageDataLike | null;
+  imageSrc?: string | null;
+  seeds: readonly StudioAutoColorHintSeed[];
+  request?: StudioAutoColorHintRequest | null;
+}): Promise<{
   request: StudioAutoColorHintRequest;
   usingDemo: boolean;
+  image: StudioAutoColorHintImageDataLike;
 }> {
-  if (props.request) {
-    return { request: props.request, usingDemo: false };
-  }
-  if (props.image) {
+  if (input.request) {
     return {
-      request: {
-        image: props.image,
-        seeds: props.seeds ?? [],
-      },
+      request: input.request,
       usingDemo: false,
+      image: input.request.image,
     };
   }
-  if (typeof props.imageSrc === "string" && props.imageSrc.length > 0) {
-    const image = await loadStudioAutoColorHintImageFromSrc(props.imageSrc);
+  if (input.image) {
+    return {
+      request: {
+        image: input.image,
+        seeds: input.seeds,
+      },
+      usingDemo: false,
+      image: input.image,
+    };
+  }
+  if (typeof input.imageSrc === "string" && input.imageSrc.length > 0) {
+    const image = await loadStudioAutoColorHintImageFromSrc(input.imageSrc);
     return {
       request: {
         image,
-        seeds: props.seeds ?? [],
+        seeds: input.seeds,
       },
       usingDemo: false,
+      image,
     };
   }
-  return { request: createStudioAutoColorHintsDemoRequest(), usingDemo: true };
+  const demo = createStudioAutoColorHintsDemoRequest();
+  const seeds = input.seeds.length > 0 ? input.seeds : demo.seeds;
+  return {
+    request: {
+      ...demo,
+      seeds,
+    },
+    usingDemo: true,
+    image: demo.image,
+  };
 }
 
 export function StudioAutoColorHintsPanel({
   image = null,
   imageSrc = null,
-  seeds,
+  seeds: seedsProp,
   request = null,
   onPlan,
   onRun,
+  onApplyResult,
 }: StudioAutoColorHintsPanelProps) {
   const titleId = useId();
   const helpId = useId();
   const summaryId = useId();
 
   const [busy, setBusy] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<StudioAutoColorHintPlanSummary | null>(null);
+  const planRef = useRef<StudioAutoColorHintPlan | null>(null);
+  const plannedImageRef = useRef<StudioAutoColorHintImageDataLike | null>(null);
   const [usingDemo, setUsingDemo] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const [applyStatus, setApplyStatus] = useState<string | null>(null);
+  const [scribbleSeeds, setScribbleSeeds] = useState<StudioAutoColorHintSeed[]>([]);
+  const [activePaletteId, setActivePaletteId] = useState(
+    STUDIO_AUTO_COLOR_SCRIBBLE_PALETTE[0]!.id,
+  );
+
+  const activePalette =
+    STUDIO_AUTO_COLOR_SCRIBBLE_PALETTE.find((entry) => entry.id === activePaletteId)
+    ?? STUDIO_AUTO_COLOR_SCRIBBLE_PALETTE[0]!;
+  const effectiveSeeds = seedsProp ?? scribbleSeeds;
+  // Enable from summary metrics only (refs are set synchronously before summary state).
+  const canApply =
+    Boolean(onApplyResult)
+    && summary?.status === "ready"
+    && (summary.operationCount ?? 0) > 0;
 
   async function runPlanner() {
-    if (busy) return;
+    if (busy || applying) return;
     setBusy(true);
     setError(null);
     setCopyStatus(null);
+    setApplyStatus(null);
     try {
-      const resolved = await resolveRequest({ image, imageSrc, seeds, request, onPlan, onRun });
+      const resolved = await resolveRequest({
+        image,
+        imageSrc,
+        seeds: effectiveSeeds,
+        request,
+      });
       setUsingDemo(resolved.usingDemo);
-      const plan = await Promise.resolve(
+      plannedImageRef.current = resolved.image;
+      const nextPlan = await Promise.resolve(
         onRun ? onRun(resolved.request) : planStudioAutoColorHints(resolved.request),
       );
-      const next = summarizeStudioAutoColorHintPlan(plan);
-      setSummary(next);
-      onPlan?.(plan);
+      planRef.current = nextPlan;
+      setSummary(summarizeStudioAutoColorHintPlan(nextPlan));
+      onPlan?.(nextPlan);
     } catch (caught) {
       setSummary(null);
+      planRef.current = null;
+      plannedImageRef.current = null;
       setError(
         caught instanceof Error
           ? caught.message
@@ -129,6 +197,66 @@ export function StudioAutoColorHintsPanel({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function applyPlan() {
+    const activePlan = planRef.current;
+    const plannedImage = plannedImageRef.current;
+    const apply = onApplyResult;
+    if (!apply) return;
+    if (!activePlan || !plannedImage) {
+      setError("적용할 계획이 없어요. 먼저 힌트 계획을 실행하세요.");
+      return;
+    }
+    if (activePlan.status !== "ready" || activePlan.operations.length === 0) {
+      setError("준비된 연산이 없어 적용할 수 없어요. 시드를 조정한 뒤 다시 계획하세요.");
+      return;
+    }
+    setApplying(true);
+    setError(null);
+    setApplyStatus(null);
+    try {
+      const batch = applyStudioAutoColorHintsAdvancedFillBatch({
+        plan: activePlan,
+        target: plannedImage,
+        referenceImage: plannedImage,
+      });
+      if (!batch.ok) {
+        setError(batch.reason);
+        return;
+      }
+      if (batch.status === "noop") {
+        setApplyStatus("칠할 픽셀이 없어 적용을 건너뛰었어요.");
+        return;
+      }
+      const dataUrl = encodeStudioAutoColorHintImageToPngDataUrl(batch.imageData);
+      apply(dataUrl);
+      setApplyStatus(
+        `고급 채우기 배치 적용 · 연산 ${batch.jobCount.toLocaleString("ko-KR")} · 픽셀 ${batch.paintedPixelCount.toLocaleString("ko-KR")}`,
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "고급 채우기 배치를 적용하지 못했어요.",
+      );
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  function addRecommendationSeed(componentLabel: number, x: number, y: number) {
+    if (seedsProp) return;
+    const seed = studioAutoColorScribbleSeedFromRecommendation({
+      componentLabel,
+      x,
+      y,
+      color: activePalette.color,
+    });
+    setScribbleSeeds((prev) => appendStudioAutoColorScribbleSeed(prev, seed));
+    setApplyStatus(
+      `스크리블 시드 추가 · ${activePalette.label} @ (${x}, ${y}) · 다시 계획하세요`,
+    );
   }
 
   async function copyPlan() {
@@ -142,7 +270,7 @@ export function StudioAutoColorHintsPanel({
       data-studio-auto-color-hints-panel="true"
       data-testid="studio-auto-color-hints-panel"
       aria-labelledby={titleId}
-      aria-busy={busy}
+      aria-busy={busy || applying}
       className="w-full min-w-0 overflow-hidden rounded-xl border border-line bg-panel/60"
     >
       <header className="border-b border-line px-3 py-3">
@@ -156,14 +284,14 @@ export function StudioAutoColorHintsPanel({
                 자동 채색 힌트
               </h3>
               <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-                영역·충돌·제안 연산 계획만 만듭니다. 픽셀을 조용히 덮어쓰지 않습니다.
+                스크리블 시드로 영역을 지정한 뒤 계획하고, 확인 후에만 고급 채우기 배치로 적용합니다.
               </p>
             </div>
           </div>
           <span
             role="status"
             className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-full border border-accent/30 bg-accent-soft/60 px-2 text-[0.64rem] font-semibold text-accent"
-            title="계획 전용 · 적용은 고급 채우기 등 명시 경로"
+            title="자동 덮어쓰기 없음 · 적용은 명시 버튼"
             aria-label="계획 전용 — 픽셀 자동 적용 없음"
           >
             계획 전용
@@ -178,11 +306,66 @@ export function StudioAutoColorHintsPanel({
         >
           <Info size={15} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
           <span className="min-w-0 break-words">
-            선화 연결 영역과 힌트 시드를 검증한 뒤 배치 연산 설명을 돌려줍니다. 실제 채색 적용은
-            위 고급 채우기에서 미리보기를 확인한 뒤 진행하세요. 스크리블 브러시 도구는 아직
-            연결되지 않았습니다.
+            색을 고른 뒤 권장 영역에 스크리블 시드를 붙이고 계획을 실행하세요. 적용은 아래
+            「고급 채우기로 적용」에서만 일어나며, 충돌이 있으면 차단됩니다.
           </span>
         </p>
+
+        {/* Scribble seed brush palette */}
+        <div
+          data-studio-auto-color-scribble="true"
+          className="space-y-2 rounded-lg border border-line bg-card/40 p-2.5"
+        >
+          <div className="flex items-center gap-2 text-[0.68rem] font-semibold text-fg-2">
+            <Paintbrush size={14} className="text-accent" aria-hidden="true" />
+            스크리블 시드 색
+          </div>
+          <div
+            role="radiogroup"
+            aria-label="스크리블 시드 색"
+            className="flex flex-wrap gap-1.5"
+          >
+            {STUDIO_AUTO_COLOR_SCRIBBLE_PALETTE.map((entry) => {
+              const active = entry.id === activePalette.id;
+              return (
+                <button
+                  key={entry.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  aria-label={entry.label}
+                  title={entry.label}
+                  onClick={() => setActivePaletteId(entry.id)}
+                  className={cx(
+                    "grid size-9 place-items-center rounded-lg border transition-colors",
+                    active
+                      ? "border-accent ring-2 ring-accent/35"
+                      : "border-line hover:border-line-strong",
+                    controlFocusClass,
+                  )}
+                  style={{ background: rgbaCss(entry.color) }}
+                />
+              );
+            })}
+          </div>
+          <p className="text-[0.64rem] leading-relaxed text-fg-3">
+            활성: <span className="font-semibold text-fg-2">{activePalette.label}</span>
+            {" · "}
+            시드 {effectiveSeeds.length.toLocaleString("ko-KR")}개
+            {!seedsProp && scribbleSeeds.length > 0 ? (
+              <>
+                {" · "}
+                <button
+                  type="button"
+                  className={cx("font-semibold text-accent underline-offset-2 hover:underline", controlFocusClass)}
+                  onClick={() => setScribbleSeeds([])}
+                >
+                  시드 비우기
+                </button>
+              </>
+            ) : null}
+          </p>
+        </div>
 
         <button
           type="button"
@@ -190,7 +373,7 @@ export function StudioAutoColorHintsPanel({
           onClick={() => {
             void runPlanner();
           }}
-          disabled={busy}
+          disabled={busy || applying}
           className={cx(
             "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-accent bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-2",
             "disabled:cursor-not-allowed disabled:border-line disabled:bg-raised disabled:text-fg-3 disabled:opacity-60",
@@ -278,22 +461,81 @@ export function StudioAutoColorHintsPanel({
               ))}
             </ul>
 
-            <button
-              type="button"
-              onClick={() => {
-                void copyPlan();
-              }}
-              className={cx(
-                "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-line bg-raised px-3 text-xs font-semibold text-fg-2 transition-colors hover:border-line-strong hover:bg-card",
-                controlFocusClass,
-              )}
-            >
-              <Copy size={14} aria-hidden="true" />
-              계획 복사
-            </button>
+            {planRef.current && planRef.current.recommendations.length > 0 && !seedsProp ? (
+              <div className="space-y-1.5 rounded-md border border-line bg-panel/30 p-2">
+                <p className="text-[0.64rem] font-semibold text-fg-2">권장 영역에 스크리블 시드</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {planRef.current.recommendations.slice(0, 8).map((rec) => (
+                    <button
+                      key={`rec-${rec.componentLabel}`}
+                      type="button"
+                      data-studio-auto-color-scribble-add="true"
+                      onClick={() =>
+                        addRecommendationSeed(rec.componentLabel, rec.seed.x, rec.seed.y)
+                      }
+                      className={cx(
+                        "inline-flex min-h-9 items-center rounded-md border border-line bg-card px-2 text-[0.64rem] font-semibold text-fg-2 hover:border-accent/50 hover:text-accent",
+                        controlFocusClass,
+                      )}
+                    >
+                      영역 #{rec.componentLabel} · {activePalette.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <div className="grid gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  void copyPlan();
+                }}
+                className={cx(
+                  "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-line bg-raised px-3 text-xs font-semibold text-fg-2 transition-colors hover:border-line-strong hover:bg-card",
+                  controlFocusClass,
+                )}
+              >
+                <Copy size={14} aria-hidden="true" />
+                계획 복사
+              </button>
+
+              {onApplyResult ? (
+                <button
+                  type="button"
+                  data-studio-auto-color-apply="true"
+                  disabled={!canApply || applying || busy}
+                  onClick={() => {
+                    void applyPlan();
+                  }}
+                  className={cx(
+                    "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-good/50 bg-good/15 px-3 text-xs font-bold text-good transition-colors hover:bg-good/25",
+                    "disabled:cursor-not-allowed disabled:border-line disabled:bg-raised disabled:text-fg-3 disabled:opacity-60",
+                    controlFocusClass,
+                  )}
+                >
+                  {applying ? (
+                    <Loader2
+                      size={16}
+                      className="animate-spin motion-reduce:animate-none"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <Paintbrush size={16} aria-hidden="true" />
+                  )}
+                  {applying ? "적용 중…" : "고급 채우기로 적용"}
+                </button>
+              ) : null}
+            </div>
+
             {copyStatus ? (
               <p className="text-center text-[0.64rem] text-fg-3" role="status">
                 {copyStatus}
+              </p>
+            ) : null}
+            {applyStatus ? (
+              <p className="text-center text-[0.64rem] text-fg-3" role="status">
+                {applyStatus}
               </p>
             ) : null}
           </div>

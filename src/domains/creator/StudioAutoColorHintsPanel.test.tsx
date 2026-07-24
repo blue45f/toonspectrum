@@ -31,11 +31,12 @@ describe("StudioAutoColorHintsPanel presentation", () => {
       ),
     ).toBe("true");
     expect(screen.getByRole("heading", { name: "자동 채색 힌트" })).toBeTruthy();
-    expect(screen.getByText(/픽셀을 조용히 덮어쓰지 않습니다/)).toBeTruthy();
+    expect(screen.getByText(/확인 후에만 고급 채우기 배치로 적용/)).toBeTruthy();
     expect(
       screen.getByRole("status", { name: "계획 전용 — 픽셀 자동 적용 없음" }),
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "힌트 계획 실행" })).toBeTruthy();
+    expect(screen.getByText("스크리블 시드 색")).toBeTruthy();
     expect(document.body.textContent).not.toContain("자동으로 픽셀을 덮어씁니다");
   });
 
@@ -117,9 +118,57 @@ describe("StudioAutoColorHintsPanel module boundary", () => {
     expect(source).not.toContain("setPages");
     expect(source).toContain("planStudioAutoColorHints");
     expect(source).toContain("summarizeStudioAutoColorHintPlan");
-    // Apply is deferred — no advanced fill apply hooks in this thin glue.
-    expect(source).not.toContain("applyAdvancedFill");
+    // Explicit apply goes through the pure batch bridge; no StudioPage/worker fill glue.
+    expect(source).toContain("applyStudioAutoColorHintsAdvancedFillBatch");
+    expect(source).not.toContain("applyAdvancedFillPreview");
     expect(source).not.toContain("runStudioAdvancedFill");
+    expect(source).toContain('data-studio-auto-color-scribble="true"');
+  });
+
+  it("exposes scribble palette and apply only when onApplyResult is provided", async () => {
+    const onApplyResult = vi.fn();
+    // jsdom often lacks a real 2d context; pin the encode/document patch contract.
+    const fakeContext = {
+      createImageData: (width: number, height: number) => ({
+        data: new Uint8ClampedArray(width * height * 4),
+        width,
+        height,
+      }),
+      putImageData: vi.fn(),
+      fillRect: vi.fn(),
+      fillStyle: "",
+    };
+    const getContext = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(fakeContext as unknown as CanvasRenderingContext2D);
+    const toDataURL = vi
+      .spyOn(HTMLCanvasElement.prototype, "toDataURL")
+      .mockReturnValue("data:image/png;base64,cW9p");
+    render(<StudioAutoColorHintsPanel onApplyResult={onApplyResult} />);
+    expect(screen.getByText("스크리블 시드 색")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "고급 채우기로 적용" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "힌트 계획 실행" }));
+    await waitFor(() => {
+      expect(screen.getByText(/힌트 계획 준비됨/)).toBeTruthy();
+    });
+    const applyButton = screen.getByRole("button", { name: "고급 채우기로 적용" });
+    // Surface plan metrics so failures show whether canApply should be true.
+    expect(screen.getByText("제안 연산").parentElement?.textContent).toMatch(/[1-9]/);
+    expect((applyButton as HTMLButtonElement).disabled).toBe(false);
+    // Demo plan with one seed is ready — apply paints and reports PNG to parent.
+    fireEvent.click(applyButton);
+    await waitFor(() => {
+      if (screen.queryByRole("alert")) {
+        throw new Error(`apply error: ${screen.getByRole("alert").textContent}`);
+      }
+      expect(onApplyResult).toHaveBeenCalled();
+    });
+    const dataUrl = onApplyResult.mock.calls[0]?.[0];
+    expect(dataUrl).toBe("data:image/png;base64,cW9p");
+    expect(toDataURL).toHaveBeenCalled();
+    getContext.mockRestore();
+    toDataURL.mockRestore();
   });
 
   it("exports pure demo + summary entry points used by the panel", () => {

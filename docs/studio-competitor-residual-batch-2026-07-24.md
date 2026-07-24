@@ -22,7 +22,7 @@ Finite shippable batch after CSP EX / Magma / Photopea / Procreate / SHAPER surv
 | Pose material blend strength | strength slider + blend plan |
 | Anim named clip rename / ease set | timeline panel |
 | Live soft-lock canvas mutation gate | pure gate + boundary |
-| Auto-color hints panel (plan-only) | fill-tab mount; **worker `onRun`** dynamic import; **selected `imageSrc` decode on Run** (max-pixel downscale); demo only when src empty; no silent overwrite |
+| Auto-color hints panel + scribble/apply | fill-tab; worker `onRun`; selected `imageSrc`; **scribble seed palette + rec chips**; **Advanced Fill batch apply** via `onApplyResult` → `patchEl` (label-authoritative; no silent overwrite) |
 | Edit crop menu reachability | edit controls + menubar |
 | Live ink stroke-complete handoff flicker | residual sample admission + `reauthorLastSettledFromDocumentPoints` before committed release |
 | CSP Size dynamics Min (pressure floor) | `pressureMinSize` snapshot + `studioBrushPressureWithMinSize` on hardware/velocity channels; Brush Studio “최소 굵기” |
@@ -35,7 +35,7 @@ Finite shippable batch after CSP EX / Magma / Photopea / Procreate / SHAPER surv
 | Frame-folder topology / shared gutters | Separate document engine (M–L) |
 | Full rich-text / measureText multi-line / vertical 傍点 / SVG ruby | Horizontal MVP only |
 | SHAPER texture paint on mesh UI | Pure paint stack exists; poser surface not mounted (multi-hour runtime) |
-| Auto-color scribble + Advanced Fill apply batch | Selected-layer plan pixels shipped via `imageSrc`; scribble seeds + fill apply still multi-hour glue |
+| Auto-color freehand canvas scribble + multi-layer target | Seed chips from recommendations shipped; freehand paint-on-canvas scribble & multi-layer fill targets deferred |
 | Full Magma CRDT / WebGPU scene authority | Architecture multi-year |
 | ABR marketplace, cs3* formats | Policy exclusion |
 | Workspace cloud sync / shortcut marketplace | Local chrome complete; cloud deferred |

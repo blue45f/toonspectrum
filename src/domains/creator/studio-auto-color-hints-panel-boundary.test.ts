@@ -48,8 +48,11 @@ describe("studio auto-color hints panel export boundary", () => {
 
     // Panel is a leaf.
     expect(panel).not.toContain("./StudioPage");
+    // Explicit apply uses the pure Advanced Fill bridge — never StudioPage preview glue.
     expect(panel).not.toContain("applyAdvancedFillPreview");
+    expect(panel).toContain("applyStudioAutoColorHintsAdvancedFillBatch");
     expect(panel).toContain('data-studio-auto-color-hints-panel="true"');
+    expect(panel).toContain('data-studio-auto-color-scribble="true"');
 
     // Product path: lazy-ui registers the panel; inspector fill-tab mounts it.
     expect(lazyUi).toContain('import("./StudioAutoColorHintsPanel")');
@@ -77,6 +80,9 @@ describe("studio auto-color hints panel export boundary", () => {
     // Selected image layer src is plumbed for on-demand pixel decode (not raw ImageData props).
     expect(mountSnippet).toMatch(/\bimageSrc=\{selected\.src\}/u);
     expect(mountSnippet).not.toMatch(/\bimage=\{/u);
+    // Explicit apply patches selected.src; work-asset destructive lock removes the handler.
+    expect(mountSnippet).toMatch(/\bonApplyResult=/u);
+    expect(mountSnippet).toContain("patchEl(selected.id, { src: dataUrl })");
     // No static (eager) worker-client import on the inspector module graph.
     expect(inspector).not.toMatch(
       /import\s*\{[^}]*runStudioAutoColorHintsWorker[^}]*\}\s*from\s*["']\.\/studio-auto-color-hints-worker-client["']/u,

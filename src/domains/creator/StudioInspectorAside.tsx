@@ -2283,6 +2283,11 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       );
                       return runStudioAutoColorHintsWorker(request);
                     }}
+                    onApplyResult={
+                      selectedWorkAssetDestructiveEditReason
+                        ? undefined
+                        : (dataUrl) => patchEl(selected.id, { src: dataUrl })
+                    }
                   />
                   {!selectedWorkAssetDestructiveEditReason ? (
                     <StudioLineCleanupPanel
