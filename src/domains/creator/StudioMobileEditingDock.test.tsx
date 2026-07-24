@@ -166,6 +166,7 @@ function createProps(
     drawMode: "pen",
     drawShape: "rect",
     drawSheetRef: { current: null },
+    eraseToIntersection: false,
     filterMutationLocked: false,
     filterPreparationBusy: false,
     filterTargetLabel: "현재 페이지 합성본",
@@ -191,6 +192,7 @@ function createProps(
     setColorBlindPreview: vi.fn(),
     setDrawMode: vi.fn(),
     setDrawShape: vi.fn(),
+    setEraseToIntersection: vi.fn(),
     setMarqueeIds: vi.fn(),
     setMenu: vi.fn(),
     setMobileSheet: vi.fn(),
@@ -385,6 +387,72 @@ describe("StudioMobileEditingDock", () => {
     expect(scrollLane?.nextElementSibling).toBe(quickSlot);
     expect(within(quickSlot as HTMLElement).getByRole("button", { name: "빠른 작업" })).not.toBeNull();
     expect(quickSlot?.className).toContain("size-11");
+  });
+
+  it("exposes CSP erase-to-intersection toggle in the mobile eraser draw sheet", () => {
+    const setEraseToIntersection = vi.fn();
+    const setDrawMode = vi.fn();
+    const setTool = vi.fn();
+    const view = render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          tool: "draw",
+          drawMode: "eraser",
+          mobileSheet: "draw",
+          eraseToIntersection: false,
+          setEraseToIntersection,
+          setDrawMode,
+          setTool,
+        })}
+      />,
+    );
+
+    expect(document.querySelector('[data-studio-mobile-erase-to-intersection="true"]')).toBeTruthy();
+    const toggle = screen.getByRole("button", { name: "교점까지 지우기" });
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    expect(toggle.getAttribute("data-studio-erase-to-intersection")).toBe("true");
+    toggle.click();
+    expect(setTool).toHaveBeenCalledWith("draw");
+    expect(setDrawMode).toHaveBeenCalledWith("eraser");
+    expect(setEraseToIntersection).toHaveBeenCalledOnce();
+    const updater = setEraseToIntersection.mock.calls[0]?.[0];
+    expect(typeof updater).toBe("function");
+    expect(updater(false)).toBe(true);
+    expect(updater(true)).toBe(false);
+
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          tool: "draw",
+          drawMode: "eraser",
+          mobileSheet: "draw",
+          eraseToIntersection: true,
+          setEraseToIntersection,
+          setDrawMode,
+          setTool,
+        })}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "교점까지 지우기" }).getAttribute("aria-pressed")).toBe(
+      "true"
+    );
+
+    // Pen mode must not show the scissors control.
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          tool: "draw",
+          drawMode: "pen",
+          mobileSheet: "draw",
+          eraseToIntersection: false,
+          setEraseToIntersection,
+        })}
+      />,
+    );
+    expect(document.querySelector('[data-studio-mobile-erase-to-intersection="true"]')).toBeNull();
   });
 
   it("preserves the draw and brush-manager dialog contracts through stable handlers", () => {

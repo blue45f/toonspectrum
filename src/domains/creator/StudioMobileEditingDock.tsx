@@ -17,6 +17,7 @@ import {
   Pencil,
   Plus,
   Redo2,
+  Scissors,
   Shapes,
   SlidersHorizontal,
   Square,
@@ -51,6 +52,10 @@ import {
   type StudioMobileSheetSnap,
 } from "./studio-mobile-sheet-snap";
 import { STUDIO_EASE } from "./studio-panel-ui";
+import {
+  STUDIO_ERASE_TO_INTERSECTION_LABEL,
+  STUDIO_ERASE_TO_INTERSECTION_TIP,
+} from "./studio-vector-erase-to-intersection-apply";
 import { StudioColorBlindPreviewToggle } from "./StudioColorBlindPreviewToggle";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
 import { StudioSavedBrushShelf } from "./StudioSavedBrushShelf";
@@ -286,6 +291,8 @@ export interface StudioMobileEditingDockProps {
   drawMode: DrawMode;
   drawShape: DrawShapeKind;
   drawSheetRef: import("react").RefObject<HTMLDivElement | null>;
+  /** CSP vector eraser: click freehand to erase between nearest intersections. */
+  eraseToIntersection?: boolean;
   filterMutationLocked: boolean;
   filterPreparationBusy: boolean;
   filterTargetLabel: "선택 이미지" | "현재 페이지 합성본";
@@ -313,6 +320,7 @@ export interface StudioMobileEditingDockProps {
   setColorBlindPreview: import("react").Dispatch<import("react").SetStateAction<CvdMode>>;
   setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
   setDrawShape: import("react").Dispatch<import("react").SetStateAction<DrawShapeKind>>;
+  setEraseToIntersection?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setMarqueeIds: import("react").Dispatch<import("react").SetStateAction<string[]>>;
   setMenu: import("react").Dispatch<import("react").SetStateAction<StudioMenu | null>>;
   setMobileSheet: import("react").Dispatch<import("react").SetStateAction<StudioMobileSheet>>;
@@ -375,6 +383,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   drawMode,
   drawShape,
   drawSheetRef,
+  eraseToIntersection = false,
   filterMutationLocked,
   filterPreparationBusy,
   filterTargetLabel,
@@ -402,6 +411,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   setColorBlindPreview,
   setDrawMode,
   setDrawShape,
+  setEraseToIntersection,
   setMarqueeIds,
   setMenu,
   setMobileSheet,
@@ -783,6 +793,51 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     격자 정렬 · 안티앨리어싱 없음 · 필압 없음 · 선 보정 없음
                   </span>
                 </span>
+              </div>
+            ) : null}
+
+            {drawMode === "eraser" && setEraseToIntersection ? (
+              <div
+                data-studio-mobile-erase-to-intersection="true"
+                className="mb-2.5 rounded-2xl border border-line bg-card/60 p-3"
+              >
+                <button
+                  type="button"
+                  aria-pressed={eraseToIntersection}
+                  aria-label={STUDIO_ERASE_TO_INTERSECTION_LABEL}
+                  data-studio-erase-to-intersection="true"
+                  onClick={() => {
+                    setTool("draw");
+                    setDrawMode("eraser");
+                    setEraseToIntersection((prev) => !prev);
+                  }}
+                  className={cn(
+                    "flex min-h-12 w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors",
+                    eraseToIntersection
+                      ? "border-accent/60 bg-accent-soft/40 text-accent"
+                      : "border-line bg-card text-fg-2 hover:bg-raised"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "grid size-10 shrink-0 place-items-center rounded-xl",
+                      eraseToIntersection ? "bg-accent/15 text-accent" : "bg-raised text-fg-3"
+                    )}
+                    aria-hidden
+                  >
+                    <Scissors size={18} strokeWidth={1.9} />
+                  </span>
+                  <span className="min-w-0">
+                    <strong className="block text-xs font-extrabold text-fg">
+                      {STUDIO_ERASE_TO_INTERSECTION_LABEL}
+                    </strong>
+                    <span className="mt-0.5 block text-[0.68rem] leading-relaxed text-fg-3">
+                      {eraseToIntersection
+                        ? "켜짐 · 자유선 위를 탭하면 교차 사이만 지웁니다"
+                        : STUDIO_ERASE_TO_INTERSECTION_TIP}
+                    </span>
+                  </span>
+                </button>
               </div>
             ) : null}
 

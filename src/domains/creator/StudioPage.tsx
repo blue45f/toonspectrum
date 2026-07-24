@@ -30997,6 +30997,7 @@ function StudioCuttoonEditor() {
           drawMode={drawMode}
           drawShape={drawShape}
           drawSheetRef={drawSheetRef}
+          eraseToIntersection={eraseToIntersection}
           filterMutationLocked={menuFilterDisabled}
           filterPreparationBusy={studioFilterPreparationBusy}
           filterTargetLabel={studioFilterTargetLabel}
@@ -31022,6 +31023,7 @@ function StudioCuttoonEditor() {
           setColorBlindPreview={setColorBlindPreview}
           setDrawMode={setDrawMode}
           setDrawShape={setDrawShape}
+          setEraseToIntersection={setEraseToIntersection}
           setMarqueeIds={setMarqueeIds}
           setMenu={setMenu}
           setMobileSheet={setMobileSheet}

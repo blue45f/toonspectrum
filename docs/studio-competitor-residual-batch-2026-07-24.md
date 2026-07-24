@@ -26,7 +26,7 @@ Finite shippable batch after CSP EX / Magma / Photopea / Procreate / SHAPER surv
 | Edit crop menu reachability | edit controls + menubar |
 | Live ink stroke-complete handoff flicker | residual sample admission + `reauthorLastSettledFromDocumentPoints` before committed release |
 | CSP Size dynamics Min (pressure floor) | `pressureMinSize` snapshot + `studioBrushPressureWithMinSize` on hardware/velocity channels; Brush Studio “최소 굵기” |
-| CSP vector eraser erase-to-intersection | Pure plan + document apply + dock scissors toggle; freehand pen click erases between nearest cuts |
+| CSP vector eraser erase-to-intersection | Pure plan + document apply + desktop dock scissors + **mobile eraser sheet** toggle; freehand pen click erases between nearest cuts |
 
 ## Still deferred (honest multi-hour / industry)
 
