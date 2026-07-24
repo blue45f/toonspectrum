@@ -124,6 +124,22 @@ describe("StudioAppSettingsPanel", () => {
     expect(openingButtonTagByText(other, "기본값으로 재설정")).toContain("min-h-11");
   });
 
+  it("단축키 충돌 시 안내와 행 배지를 표시한다", () => {
+    const defaults = defaultStudioAppSettings();
+    const settings: StudioAppSettings = {
+      ...defaults,
+      shortcuts: {
+        ...defaults.shortcuts,
+        "tool-pen": "K",
+        "flip-canvas": "K",
+      },
+    };
+    const { html } = renderSettings("shortcuts", settings);
+    expect(html).toContain("같은 키 조합이");
+    expect(html).toContain("충돌");
+    expect(html).toContain("캔버스 좌우 반전");
+  });
+
   it("툴바 설정을 검색 가능한 두 개의 독립 스크롤 목록으로 제공한다", () => {
     const { html } = renderSettings("toolbar");
 

@@ -1,12 +1,22 @@
 // 창작 스튜디오 키보드 단축키 도움말 — "?" 키 또는 단축키 버튼으로 토글.
 // StudioPage 내부 상태에 의존하지 않는 자체완결 모달(open/onClose만 받음).
+// optional `shortcuts` prop이 있으면 커스터마이즈된 코드를 formatStudioShortcutChord로 표시.
 import { X } from "lucide-react";
 import { useEffect, useEffectEvent, useRef } from "react";
 import { createPortal } from "react-dom";
 
+import {
+  formatStudioShortcutChord,
+  type StudioShortcutActionId,
+} from "./studio-app-settings";
+
 interface ShortcutRow {
   keys: string;
   label: string;
+  /** Single customizable action (replaces keys when remapped). */
+  actionId?: StudioShortcutActionId;
+  /** Multi-chord rows (e.g. brush smaller/larger). */
+  actionIds?: readonly StudioShortcutActionId[];
 }
 
 interface ShortcutGroup {
@@ -19,34 +29,34 @@ const GROUPS: ShortcutGroup[] = [
   {
     title: "드로잉",
     rows: [
-      { keys: "B", label: "펜으로 전환" },
-      { keys: "E", label: "펜·지우개 전환" },
-      { keys: "N · ⇧N", label: "혼합(스머지) · 혼색 브러시" },
-      { keys: "O", label: "닷지/번/스펀지" },
-      { keys: "[ · ]", label: "브러시 크기 ±1px" },
+      { keys: "B", label: "펜으로 전환", actionId: "tool-pen" },
+      { keys: "E", label: "펜·지우개 전환", actionId: "tool-eraser" },
+      { keys: "N · ⇧N", label: "혼합(스머지) · 혼색 브러시", actionIds: ["tool-blend", "tool-wet-mix"] },
+      { keys: "O", label: "닷지/번/스펀지", actionId: "tool-dodge-burn" },
+      { keys: "[ · ]", label: "브러시 크기 ±1px", actionIds: ["brush-smaller", "brush-larger"] },
       { keys: "⇧ [ · ⇧ ]", label: "브러시 크기 ±5px" },
       { keys: "⌥ [ · ⌥ ]", label: "불투명도 ±5%" },
       { keys: "1–6", label: "최근 브러시 슬롯 호출" },
       { keys: "⇧ 1–6", label: "현재 브러시를 슬롯에 저장" },
       { keys: "⇧ + 드래그", label: "자유선 → 0°/45°/90° 직선" },
-      { keys: "X", label: "주 색 ↔ 보조 색 교체" },
+      { keys: "X", label: "주 색 ↔ 보조 색 교체", actionId: "swap-colors" },
     ],
   },
   {
     title: "편집",
     rows: [
-      { keys: "T", label: "선택 대사 편집 · 최근 레터링 삽입" },
+      { keys: "T", label: "선택 대사 편집 · 최근 레터링 삽입", actionId: "tool-lettering" },
       { keys: "⌘ Enter", label: "대사 입력 확정 · 일괄 말풍선 생성" },
-      { keys: "⌘Z", label: "실행취소" },
-      { keys: "⌘⇧Z · ⌘Y", label: "다시실행" },
+      { keys: "⌘Z", label: "실행취소", actionId: "undo" },
+      { keys: "⌘⇧Z · ⌘Y", label: "다시실행", actionId: "redo" },
       { keys: "⌘X · ⌘C", label: "잘라내기 · 복사" },
       { keys: "⌘V · ⌘⇧V", label: "붙여넣기 · 현재 위치에 붙여넣기" },
       { keys: "⌘A", label: "모두 선택" },
-      { keys: "⌘D", label: "선택 해제" },
-      { keys: "⌘⇧I", label: "픽셀 선택 반전" },
+      { keys: "⌘D", label: "선택 해제", actionId: "deselect-pixels" },
+      { keys: "⌘⇧I", label: "픽셀 선택 반전", actionId: "invert-pixels" },
       { keys: "Q", label: "퀵 마스크 켬 · 선택 영역으로 완료" },
       { keys: "⌘J", label: "요소 복제" },
-      { keys: "G", label: "고급 채우기 켜기·끄기" },
+      { keys: "G", label: "고급 채우기 켜기·끄기", actionId: "tool-fill" },
       { keys: "Delete · ⌫", label: "픽셀 선택 삭제 · 없으면 요소 삭제" },
       { keys: "Esc", label: "선택 해제" },
     ],
@@ -68,14 +78,48 @@ const GROUPS: ShortcutGroup[] = [
       { keys: "⌘ 0", label: "100%로 맞춤" },
       { keys: "⌘ + 휠", label: "포인터 기준 확대/축소" },
       { keys: "Space + 드래그", label: "화면 이동(팬)" },
-      { keys: "`", label: "캔버스만 / 도구 토글" },
-      { keys: "H", label: "캔버스 좌우 반전 (보기)" },
-      { keys: "?", label: "단축키 도움말" },
+      { keys: "`", label: "캔버스만 / 도구 토글", actionId: "toggle-chrome" },
+      { keys: "H", label: "캔버스 좌우 반전 (보기)", actionId: "flip-canvas" },
+      { keys: "?", label: "단축키 도움말", actionId: "shortcuts-help" },
     ],
   },
 ];
 
-export function StudioShortcutsHelp({ open, onClose }: { open: boolean; onClose: () => void }) {
+function displayKeysForRow(
+  row: ShortcutRow,
+  shortcuts: Partial<Record<StudioShortcutActionId, string>> | Record<string, string> | undefined
+): string {
+  if (!shortcuts) return row.keys;
+  if (row.actionId) {
+    if (!Object.prototype.hasOwnProperty.call(shortcuts, row.actionId)) return row.keys;
+    const chord = shortcuts[row.actionId];
+    if (typeof chord !== "string") return row.keys;
+    return formatStudioShortcutChord(chord);
+  }
+  if (row.actionIds && row.actionIds.length > 0) {
+    const parts = row.actionIds.map((id) => {
+      if (!Object.prototype.hasOwnProperty.call(shortcuts, id)) return null;
+      const chord = shortcuts[id];
+      if (typeof chord !== "string") return null;
+      return formatStudioShortcutChord(chord);
+    });
+    if (parts.every((p) => p !== null)) {
+      return parts.join(" · ");
+    }
+  }
+  return row.keys;
+}
+
+export function StudioShortcutsHelp({
+  open,
+  onClose,
+  shortcuts,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** Optional app-settings shortcut map; remapped chords are shown via formatStudioShortcutChord. */
+  shortcuts?: Partial<Record<StudioShortcutActionId, string>> | Record<string, string>;
+}) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -184,7 +228,7 @@ export function StudioShortcutsHelp({ open, onClose }: { open: boolean; onClose:
                   <li key={r.label} className="flex items-center justify-between gap-3 text-xs text-fg-2">
                     <span>{r.label}</span>
                     <kbd className="shrink-0 rounded-md border border-line bg-card px-1.5 py-0.5 font-mono text-[0.66rem] text-fg-3">
-                      {r.keys}
+                      {displayKeysForRow(r, shortcuts)}
                     </kbd>
                   </li>
                 ))}

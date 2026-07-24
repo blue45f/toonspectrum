@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { defaultStudioAppSettings } from "./studio-app-settings";
 import { StudioShortcutsHelp } from "./StudioShortcutsHelp";
 
 const { createPortalMock } = vi.hoisted(() => ({
@@ -78,5 +79,23 @@ describe("StudioShortcutsHelp", () => {
 
   it("닫힌 상태에서는 아무것도 렌더하지 않는다", () => {
     expect(renderToStaticMarkup(<StudioShortcutsHelp open={false} onClose={() => undefined} />)).toBe("");
+  });
+
+  it("optional shortcuts prop이 있으면 리맵된 코드를 formatStudioShortcutChord로 표시한다", () => {
+    const shortcuts = {
+      ...defaultStudioAppSettings().shortcuts,
+      "tool-pen": "K",
+      "flip-canvas": "Mod+H",
+      "swap-colors": "",
+    };
+    const html = renderToStaticMarkup(
+      <StudioShortcutsHelp open onClose={() => undefined} shortcuts={shortcuts} />
+    );
+    expect(html).toContain("펜으로 전환");
+    expect(html).toContain(">K<");
+    expect(html).toContain("⌘·H");
+    expect(html).toContain("없음");
+    // Unrelated static rows stay as documented defaults.
+    expect(html).toContain("1–6");
   });
 });

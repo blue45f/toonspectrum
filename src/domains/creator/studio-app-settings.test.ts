@@ -5,10 +5,12 @@ import {
   defaultStudioAppSettings,
   formatStudioShortcutChord,
   hideStudioRailTool,
+  listStudioShortcutConflicts,
   matchStudioShortcut,
   moveStudioRailTool,
   normalizeStudioAppSettings,
   normalizeStudioRailVisibleIds,
+  normalizeStudioShortcutChordKey,
   parseStudioShortcutChord,
   showStudioRailTool,
   studioRailHiddenIds,
@@ -210,5 +212,31 @@ describe("studio-app-settings", () => {
       .filter(({ id }) => matchStudioShortcut(shortcuts[id], { key: "k", code: "KeyK" }))
       .map(({ id }) => id);
     expect(matches).toEqual(["tool-pen", "flip-canvas"]);
+  });
+
+  it("listStudioShortcutConflicts maps multi-bound chords and skips empty/unbound", () => {
+    expect(listStudioShortcutConflicts(defaultStudioAppSettings().shortcuts).size).toBe(0);
+
+    const shortcuts = {
+      ...defaultStudioAppSettings().shortcuts,
+      "tool-pen": "K",
+      "flip-canvas": "k",
+      "tool-eraser": "",
+      "swap-colors": "  ",
+      "toggle-chrome": "Mod+Shift+z",
+      redo: "mod+shift+Z",
+    };
+    const conflicts = listStudioShortcutConflicts(shortcuts);
+    expect(conflicts.get("K")).toEqual(["tool-pen", "flip-canvas"]);
+    expect(conflicts.get("Mod+Shift+Z")).toEqual(["redo", "toggle-chrome"]);
+    expect(conflicts.has("E")).toBe(false);
+    expect(normalizeStudioShortcutChordKey("BracketLeft")).toBe("[");
+    expect(normalizeStudioShortcutChordKey("")).toBeNull();
+  });
+
+  it("matches Backquote / Space physical codes for registry chords", () => {
+    expect(matchStudioShortcut("`", { code: "Backquote" })).toBe(true);
+    expect(matchStudioShortcut("`", { key: "`" })).toBe(true);
+    expect(matchStudioShortcut("Space", { code: "Space" })).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { defaultStudioAppSettings } from "./studio-app-settings";
 import {
   adjustStudioBrushOpacity,
   adjustStudioBrushWidth,
@@ -122,6 +123,62 @@ describe("resolveStudioDrawingShortcut", () => {
     expect(resolveStudioDrawingShortcut({ code: "KeyF" })).toEqual({ type: "toggle-canvas-flip-h" });
     // Cmd+D is the document deselect command — not default colors.
     expect(resolveStudioDrawingShortcut({ code: "KeyD", metaKey: true })).toBeNull();
+  });
+
+  it("options.shortcuts가 있으면 레지스트리 코드를 우선하고 리맵·언바인드 시 하드코드를 막는다", () => {
+    const base = defaultStudioAppSettings().shortcuts;
+
+    // Default registry: pen stays B, flip is H (not legacy KeyF hard-code).
+    expect(
+      resolveStudioDrawingShortcut({ code: "KeyB", key: "b" }, { shortcuts: base })
+    ).toEqual({ type: "select-pen" });
+    expect(
+      resolveStudioDrawingShortcut({ code: "KeyH", key: "h" }, { shortcuts: base })
+    ).toEqual({ type: "toggle-canvas-flip-h" });
+    expect(
+      resolveStudioDrawingShortcut({ code: "KeyF", key: "f" }, { shortcuts: base })
+    ).toBeNull();
+    expect(
+      resolveStudioDrawingShortcut({ code: "Backquote", key: "`" }, { shortcuts: base })
+    ).toEqual({ type: "toggle-chrome" });
+
+    // Remap pen away from B → K; default B must not fire.
+    const remapped = { ...base, "tool-pen": "K" };
+    expect(
+      resolveStudioDrawingShortcut({ code: "KeyK", key: "k" }, { shortcuts: remapped })
+    ).toEqual({ type: "select-pen" });
+    expect(
+      resolveStudioDrawingShortcut({ code: "KeyB", key: "b" }, { shortcuts: remapped })
+    ).toBeNull();
+
+    // Unbound eraser: hard-code E must not fire.
+    const unbound = { ...base, "tool-eraser": "" };
+    expect(
+      resolveStudioDrawingShortcut({ code: "KeyE", key: "e" }, { shortcuts: unbound })
+    ).toBeNull();
+
+    // Brush size still on defaults: Shift±5 hard-code variants remain.
+    expect(
+      resolveStudioDrawingShortcut({ code: "BracketLeft", shiftKey: true }, { shortcuts: base })
+    ).toEqual({ type: "adjust-width", delta: -5 });
+
+    // Brush remapped: old bracket hard-code suppressed; new chord works.
+    const brushRemap = { ...base, "brush-smaller": "Q", "brush-larger": "W" };
+    expect(
+      resolveStudioDrawingShortcut({ code: "KeyQ", key: "q" }, { shortcuts: brushRemap })
+    ).toEqual({ type: "adjust-width", delta: -1 });
+    expect(
+      resolveStudioDrawingShortcut({ code: "BracketLeft" }, { shortcuts: brushRemap })
+    ).toBeNull();
+    // Opacity (not customizable) still uses Alt+bracket.
+    expect(
+      resolveStudioDrawingShortcut({ code: "BracketLeft", altKey: true }, { shortcuts: brushRemap })
+    ).toEqual({ type: "adjust-opacity", delta: -0.05 });
+
+    // Partial map: only remapped pen is owned; eraser hard-code still works.
+    expect(
+      resolveStudioDrawingShortcut({ code: "KeyE", key: "e" }, { shortcuts: { "tool-pen": "K" } })
+    ).toEqual({ type: "toggle-eraser" });
   });
 });
 

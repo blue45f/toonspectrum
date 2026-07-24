@@ -366,6 +366,12 @@ export function matchStudioShortcut(
   }
   if (parsed.key === "?") return key === "?" || (!!event.shiftKey && (key === "/" || code === "Slash"));
   if (parsed.key === "Tab") return code === "Tab" || key === "Tab";
+  if (parsed.key === "`" || parsed.key === "Backquote") {
+    return key === "`" || code === "Backquote";
+  }
+  if (parsed.key === " " || parsed.key === "Space" || parsed.key === "Spacebar") {
+    return key === " " || key === "Spacebar" || code === "Space";
+  }
   if (parsed.key.length === 1) {
     const expected = parsed.key.toUpperCase();
     const physicalCode = /^[A-Z]$/u.test(expected)
@@ -388,6 +394,52 @@ export function formatStudioShortcutChord(chord: string): string {
     .replace(/Shift/gi, "⇧")
     .replace(/Alt|Option/gi, "⌥")
     .replace(/\+/g, "·");
+}
+
+/**
+ * Canonical chord key for conflict detection (empty / unparseable → null).
+ * Collapses Mod synonyms, case, and BracketLeft/Right aliases.
+ */
+export function normalizeStudioShortcutChordKey(chord: string): string | null {
+  const parsed = parseStudioShortcutChord(chord.trim());
+  if (!parsed) return null;
+  let key = parsed.key;
+  if (key === "BracketLeft") key = "[";
+  else if (key === "BracketRight") key = "]";
+  else if (key === "Backquote") key = "`";
+  else if (key.length === 1) key = key.toUpperCase();
+  const parts: string[] = [];
+  if (parsed.mod) parts.push("Mod");
+  if (parsed.shift) parts.push("Shift");
+  if (parsed.alt) parts.push("Alt");
+  parts.push(key);
+  return parts.join("+");
+}
+
+/**
+ * Chords bound to more than one action → Map of canonical chord → action ids.
+ * Empty / unbound chords are skipped.
+ */
+export function listStudioShortcutConflicts(
+  shortcuts: Partial<Record<StudioShortcutActionId, string>> | Record<string, string>
+): Map<string, StudioShortcutActionId[]> {
+  const byChord = new Map<string, StudioShortcutActionId[]>();
+  for (const action of STUDIO_SHORTCUT_ACTIONS) {
+    const raw = shortcuts[action.id];
+    if (typeof raw !== "string") continue;
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const key = normalizeStudioShortcutChordKey(trimmed);
+    if (!key) continue;
+    const list = byChord.get(key);
+    if (list) list.push(action.id);
+    else byChord.set(key, [action.id]);
+  }
+  const conflicts = new Map<string, StudioShortcutActionId[]>();
+  for (const [chord, actionIds] of byChord) {
+    if (actionIds.length > 1) conflicts.set(chord, actionIds);
+  }
+  return conflicts;
 }
 
 export function normalizeStudioAppSettings(value?: unknown): StudioAppSettings {

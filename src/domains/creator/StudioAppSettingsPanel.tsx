@@ -28,7 +28,9 @@ import {
   DEFAULT_STUDIO_RAIL_TOOL_ORDER,
   formatStudioShortcutChord,
   hideStudioRailTool,
+  listStudioShortcutConflicts,
   moveStudioRailTool,
+  normalizeStudioShortcutChordKey,
   showStudioRailTool,
   STUDIO_APP_SETTINGS_TABS,
   STUDIO_PIXEL_GRID_SIZE_OPTIONS,
@@ -209,6 +211,9 @@ export function StudioAppSettingsPanel({
     || studioRailToolLabel(id).normalize("NFKC").toLocaleLowerCase().includes(normalizedToolbarQuery);
   const visibleMatches = visible.filter(matchesToolbarQuery);
   const hiddenMatches = hidden.filter(matchesToolbarQuery);
+  const shortcutConflicts = listStudioShortcutConflicts(settings.shortcuts);
+  const shortcutConflictCount = shortcutConflicts.size;
+  const actionLabelById = new Map(STUDIO_SHORTCUT_ACTIONS.map((a) => [a.id, a.label]));
 
   const body = (
     <div
@@ -348,19 +353,48 @@ export function StudioAppSettingsPanel({
                   행을 누른 뒤 원하는 키 조합을 입력하세요. Backspace로 해제, Esc로 녹화를 취소합니다.
                   Mod는 macOS ⌘ / Windows Ctrl입니다.
                 </p>
+                {shortcutConflictCount > 0 ? (
+                  <p
+                    role="status"
+                    className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[0.68rem] leading-relaxed text-amber-900 dark:text-amber-100"
+                  >
+                    같은 키 조합이 {shortcutConflictCount}곳 이상에 중복 할당되어 있습니다. 아래 행의
+                    「충돌」표시를 확인하세요.
+                  </p>
+                ) : null}
                 <ul className="divide-y divide-line/60 rounded-xl border border-line">
                   {STUDIO_SHORTCUT_ACTIONS.map((action) => {
                     const chord = settings.shortcuts[action.id] ?? "";
                     const recording = recordingAction === action.id;
+                    const chordKey = chord ? normalizeStudioShortcutChordKey(chord) : null;
+                    const conflictPeers = chordKey ? shortcutConflicts.get(chordKey) : undefined;
+                    const hasConflict = !!conflictPeers && conflictPeers.length > 1;
+                    const peerLabels = hasConflict
+                      ? conflictPeers
+                          .filter((id) => id !== action.id)
+                          .map((id) => actionLabelById.get(id) ?? id)
+                          .join(", ")
+                      : "";
                     return (
                       <li key={action.id} className="flex items-center justify-between gap-2 px-3 py-2">
-                        <span className="text-xs text-fg">{action.label}</span>
+                        <span className="min-w-0 text-xs text-fg">
+                          <span className="block">{action.label}</span>
+                          {hasConflict ? (
+                            <span
+                              className="mt-0.5 block text-[0.62rem] font-medium text-amber-700 dark:text-amber-200"
+                              title={peerLabels ? `충돌: ${peerLabels}` : "단축키 충돌"}
+                            >
+                              충돌{peerLabels ? ` · ${peerLabels}` : ""}
+                            </span>
+                          ) : null}
+                        </span>
                         <button
                           type="button"
                           className={cn(
                             buttonClass({ size: "sm", variant: recording ? "outline" : "quiet" }),
                             "min-h-11 min-w-[5.5rem] font-mono text-[0.7rem] sm:min-h-8 pointer-coarse:min-h-11",
-                            recording && "ring-2 ring-accent/40"
+                            recording && "ring-2 ring-accent/40",
+                            hasConflict && !recording && "ring-1 ring-amber-500/50"
                           )}
                           onClick={() => setRecordingAction(recording ? null : action.id)}
                         >
