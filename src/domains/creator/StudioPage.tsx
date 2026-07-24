@@ -27179,6 +27179,7 @@ function StudioCuttoonEditor() {
           requestImageInsert: () => {
             editMenuImageInputRef.current?.click();
           },
+          openMannequinPoser: () => setMannequinPoserOpen(true),
           openVrmPoser: () => setPoserVrmOpen(true),
           openBackground3d: () => setBg3dOpen(true),
           openReferencePanel: () => {
@@ -30477,6 +30478,7 @@ function StudioCuttoonEditor() {
           assetSortOrder={assetSortOrder}
           assetTab={assetTab}
           bg={bg}
+          bg3dOpen={bg3dOpen}
           bgGrad={bgGrad}
           bgSceneGenreFilter={bgSceneGenreFilter}
           bgSceneSearchQuery={bgSceneSearchQuery}
@@ -30742,6 +30744,9 @@ function StudioCuttoonEditor() {
           quickShapeActive={quickShapeActive}
           railMoreOpen={railMoreOpen}
           referencePanelOpen={referencePanelOpen}
+          mannequinPoserOpen={mannequinPoserOpen}
+          poserVrmOpen={poserVrmOpen}
+          bg3dOpen={bg3dOpen}
           selected={selected}
           selectedContentMutationLocked={selectedContentMutationLocked}
           setAppSettingsInitialTab={setAppSettingsInitialTab}
@@ -30756,6 +30761,9 @@ function StudioCuttoonEditor() {
           setQuickShapeActive={setQuickShapeActive}
           setRailMoreOpen={setRailMoreOpen}
           setReferencePanelOpen={setReferencePanelOpen}
+          setMannequinPoserOpen={setMannequinPoserOpen}
+          setPoserVrmOpen={setPoserVrmOpen}
+          setBg3dOpen={setBg3dOpen}
           setStrokeWidth={setStrokeWidth}
           setTool={setTool}
           setViewTool={setViewTool}

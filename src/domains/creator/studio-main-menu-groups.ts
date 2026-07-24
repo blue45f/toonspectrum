@@ -42,6 +42,7 @@ import {
   Paintbrush,
   Palette,
   Pencil,
+  PersonStanding,
   PictureInPicture2,
   Plus,
   Redo2,
@@ -178,6 +179,7 @@ export interface StudioMainMenuUiActions {
   openStudioMenu: (menu: StudioMenu) => unknown;
   openAssetMenu: () => unknown;
   requestImageInsert: () => unknown;
+  openMannequinPoser: () => unknown;
   openVrmPoser: () => unknown;
   openBackground3d: () => unknown;
   openReferencePanel: () => unknown;
@@ -533,6 +535,14 @@ export function buildStudioMainMenuGroups({
           separatorAfter: true,
           onSelect: () => {
             ui.requestImageInsert();
+          },
+        },
+        {
+          id: "mannequin3d",
+          label: "3D 데생 인형",
+          icon: PersonStanding,
+          onSelect: () => {
+            ui.openMannequinPoser();
           },
         },
         {

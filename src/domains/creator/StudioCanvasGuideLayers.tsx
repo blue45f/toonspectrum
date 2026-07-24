@@ -226,12 +226,11 @@ export function StudioCanvasGuideOverlayLayers({
         <Layer listening={sharedGutterInteractive}>
           {sharedGutters.map((segment) => {
             const key = `${segment.axis}:${segment.frameAId}:${segment.frameBId}`;
+            const points = [segment.x1, segment.y1, segment.x2, segment.y2];
             const visual = (
               <Line
                 key={`${key}-visual`}
-                points={segment.axis === "v"
-                  ? [segment.pos, segment.from, segment.pos, segment.to]
-                  : [segment.from, segment.pos, segment.to, segment.pos]}
+                points={points}
                 stroke="rgba(14, 165, 233, 0.75)"
                 strokeWidth={1.5 / effScale}
                 dash={[6 / effScale, 4 / effScale]}
@@ -241,28 +240,39 @@ export function StudioCanvasGuideOverlayLayers({
             if (!sharedGutterInteractive) {
               return <Group key={key} listening={false}>{visual}</Group>;
             }
+            const getStep = (node: { x: () => number; y: () => number }) => {
+              if (segment.axis === "v") return node.x();
+              if (segment.axis === "h") return node.y();
+              return node.x() * segment.nx + node.y() * segment.ny;
+            };
+            const cursor =
+              segment.axis === "v"
+                ? "ew-resize"
+                : segment.axis === "h"
+                  ? "ns-resize"
+                  : segment.nx * segment.ny > 0
+                    ? "nwse-resize"
+                    : "nesw-resize";
+
             return (
               <Group key={key}>
                 {visual}
                 <Line
-                  points={segment.axis === "v"
-                    ? [segment.pos, segment.from, segment.pos, segment.to]
-                    : [segment.from, segment.pos, segment.to, segment.pos]}
+                  points={points}
                   stroke="transparent"
                   strokeWidth={14 / effScale}
                   hitStrokeWidth={14 / effScale}
                   draggable
                   name="shared-gutter-handle"
-                  dragBoundFunc={(pos) => (
-                    segment.axis === "v"
-                      ? { x: pos.x, y: 0 }
-                      : { x: 0, y: pos.y }
-                  )}
+                  dragBoundFunc={(pos) => {
+                    if (segment.axis === "v") return { x: pos.x, y: 0 };
+                    if (segment.axis === "h") return { x: 0, y: pos.y };
+                    return pos;
+                  }}
                   onMouseEnter={(event) => {
                     const stage = event.target.getStage();
                     if (stage) {
-                      stage.container().style.cursor =
-                        segment.axis === "v" ? "ew-resize" : "ns-resize";
+                      stage.container().style.cursor = cursor;
                     }
                   }}
                   onMouseLeave={(event) => {
@@ -275,16 +285,15 @@ export function StudioCanvasGuideOverlayLayers({
                   }}
                   onDragMove={(event) => {
                     const node = event.target;
-                    const step = segment.axis === "v" ? node.x() : node.y();
+                    const step = getStep(node);
                     const total = (sharedGutterDragTotalsRef.current.get(key) ?? 0) + step;
                     sharedGutterDragTotalsRef.current.set(key, total);
-                    if (segment.axis === "v") node.x(0);
-                    else node.y(0);
+                    node.position({ x: 0, y: 0 });
                     onPreviewSharedGutterDrag!(segment, total);
                   }}
                   onDragEnd={(event) => {
                     const node = event.target;
-                    const step = segment.axis === "v" ? node.x() : node.y();
+                    const step = getStep(node);
                     const total = (sharedGutterDragTotalsRef.current.get(key) ?? 0) + step;
                     sharedGutterDragTotalsRef.current.set(key, 0);
                     node.position({ x: 0, y: 0 });

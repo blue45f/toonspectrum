@@ -63,6 +63,9 @@ export const STUDIO_RAIL_TOOL_CATALOG = [
   { id: "zoom-fit", label: "너비에 맞춤", defaultShortcut: "Home" },
   { id: "rotate-view", label: "보기 회전", defaultShortcut: "R" },
   { id: "frame-anim", label: "프레임 애니", defaultShortcut: "" },
+  { id: "mannequin3d", label: "3D 데생 인형", defaultShortcut: "" },
+  { id: "vrm3d", label: "3D 캐릭터", defaultShortcut: "" },
+  { id: "bg3d", label: "3D 배경", defaultShortcut: "" },
   { id: "reference", label: "참고 이미지", defaultShortcut: "" },
 ] as const;
 

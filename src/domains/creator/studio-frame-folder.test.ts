@@ -188,4 +188,48 @@ describe("planSharedGutterDrag + child reflow", () => {
     );
     expect(next[0]!.points).toEqual([135, 10, 155, 30]);
   });
+
+  it("detects and drags a diagonal shared gutter between polygon cut frames", () => {
+    // Frame A (left of cut): (0,0) to (200,0) to (150,200) to (0,200)
+    const frameA = {
+      id: "polyA",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 200,
+      points: [0, 0, 200, 0, 150, 200, 0, 200],
+    };
+    // Frame B (right of cut): (210,0) to (400,0) to (400,200) to (160,200)
+    const frameB = {
+      id: "polyB",
+      x: 160,
+      y: 0,
+      width: 240,
+      height: 200,
+      points: [50, 0, 240, 0, 240, 200, 0, 200],
+    };
+
+    const segments = planSharedGutterSegments([frameA, frameB]);
+    expect(segments).toHaveLength(1);
+    expect(segments[0]!.axis).toBe("d");
+    expect(segments[0]!.frameAId).toBe("polyA");
+    expect(segments[0]!.frameBId).toBe("polyB");
+    expect(segments[0]!.gap).toBeCloseTo(9.7, 1);
+
+    const framesById = new Map([
+      [frameA.id, frameA],
+      [frameB.id, frameB],
+    ]);
+
+    const plan = planSharedGutterDrag({
+      segment: segments[0]!,
+      framesById,
+      delta: 10,
+    });
+
+    expect(plan).not.toBeNull();
+    expect(plan!.appliedDelta).toBe(10);
+    expect(plan!.framePatches).toHaveLength(2);
+  });
 });
+

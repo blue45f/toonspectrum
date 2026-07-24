@@ -238,8 +238,8 @@ describe("Studio ToolBelt content module boundary", () => {
     ).toSorted();
     const wiredPropNames = findToolBeltJsxAttributes(page).toSorted();
 
-    expect(propNames).toHaveLength(205);
-    expect(wiredPropNames).toHaveLength(205);
+    expect(propNames).toHaveLength(206);
+    expect(wiredPropNames).toHaveLength(206);
     expect(wiredPropNames).toEqual(propNames);
   });
 

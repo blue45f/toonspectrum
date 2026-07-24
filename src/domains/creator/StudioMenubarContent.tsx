@@ -178,6 +178,7 @@ export interface StudioMenubarContentHandlers {
   handleImportPsd: (e: ChangeEvent<HTMLInputElement>) => Promise<void>;
   handleSave: (status: "published" | "draft") => Promise<void>;
   openAutoActions: () => Promise<void>;
+  openMannequinPoser?: () => void;
   openOwnerFxPanel: () => Promise<void>;
   redo: () => void;
   persistStudioWorkspaceState: (nextState: StudioWorkspaceState) => StudioWorkspaceSaveResult;

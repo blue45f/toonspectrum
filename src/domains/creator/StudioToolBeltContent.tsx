@@ -1,4 +1,5 @@
 import {
+  Boxes,
   CheckCircle2,
   ChevronDown,
   ClipboardCheck,
@@ -243,6 +244,12 @@ const TOOL_BELT_HINTS = {
     "모델 파일 없이 체형을 조절하고 포즈를 잡아 드로잉 참고 이미지로 캡처합니다.",
     undefined,
     "mannequin-3d"
+  ),
+  bg3d: studioToolHintFromLabel(
+    "3D 배경",
+    "3D 오브젝트와 씬을 배치하고 카메라 앵글을 조절해 웹툰 배경 이미지를 추출합니다.",
+    undefined,
+    "background-library"
   ),
   reference: studioToolHintFromLabel(
     "참고 이미지",
@@ -563,6 +570,7 @@ export interface StudioToolBeltContentProps {
   assetSortOrder: StudioAssetSortOrder;
   assetTab: StudioAssetTab;
   bg: string;
+  bg3dOpen: boolean;
   bgGrad: string[] | null;
   bgSceneGenreFilter: string;
   bgSceneSearchQuery: string;
@@ -738,6 +746,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     activeToolbarGroup,
     advancedFillActive,
     advancedFillUnsupportedReason,
+    bg3dOpen,
     canvasOnlyMode,
     collaborationDocumentLocked,
     collaborationLockMessage,
@@ -766,6 +775,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     referencePanelOpen,
     rightPanelOpen,
     selected,
+    setBg3dOpen,
     setColor,
     setCommentsOpen,
     setContinuityOpen,
@@ -1058,6 +1068,15 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             className={cn(toolBtn(mannequinPoserOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
           >
             <PersonStanding size={15} aria-hidden /> 3D 데생 인형
+          </button>
+        </StudioToolBeltHintTarget>
+        <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.bg3d}>
+          <button
+            type="button"
+            onClick={() => setBg3dOpen(true)}
+            className={cn(toolBtn(bg3dOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
+          >
+            <Boxes size={15} aria-hidden /> 3D 배경
           </button>
         </StudioToolBeltHintTarget>
         <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.reference}>

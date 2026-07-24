@@ -14,7 +14,7 @@ describe("studio main-menu catalogue ownership boundary", () => {
     expect(catalogue).not.toMatch(/\b(?:document|window|globalThis)\s*\./u);
     expect(catalogue).not.toContain("StudioPage");
     expect(catalogue).not.toMatch(/\buse(?:Memo|Callback|Effect|State|Ref)\b/u);
-    expect(catalogue.split("\n").length).toBeLessThanOrEqual(1_050);
+    expect(catalogue.split("\n").length).toBeLessThanOrEqual(1_070);
   });
 
   it("leaves only state projection and browser command composition in StudioPage", () => {

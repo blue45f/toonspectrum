@@ -1,4 +1,5 @@
 import {
+  Boxes,
   Circle,
   Crop,
   Droplets,
@@ -16,6 +17,7 @@ import {
   Paintbrush,
   Grid3X3,
   Pencil,
+  PersonStanding,
   PictureInPicture2,
   Pipette,
   RotateCw,
@@ -27,6 +29,7 @@ import {
   Sun,
   Triangle,
   Type as TypeIcon,
+  UsersRound,
   Wind,
 } from "lucide-react";
 import { memo, useEffect, useId, useRef, useState } from "react";
@@ -174,6 +177,9 @@ interface StudioLeftToolRailProps {
   quickShapeActive: boolean;
   railMoreOpen: boolean;
   referencePanelOpen: boolean;
+  mannequinPoserOpen?: boolean;
+  poserVrmOpen?: boolean;
+  bg3dOpen?: boolean;
   selected: El | null;
   selectedContentMutationLocked: boolean;
   setAppSettingsInitialTab: import("react").Dispatch<import("react").SetStateAction<StudioAppSettingsTab>>;
@@ -188,6 +194,9 @@ interface StudioLeftToolRailProps {
   setQuickShapeActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setRailMoreOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setReferencePanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setMannequinPoserOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setPoserVrmOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setBg3dOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setStrokeWidth: import("react").Dispatch<import("react").SetStateAction<number>>;
   setTool: import("react").Dispatch<import("react").SetStateAction<Tool>>;
   setViewTool: import("react").Dispatch<import("react").SetStateAction<"zoom" | "rotate" | null>>;
@@ -226,6 +235,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   quickShapeActive,
   railMoreOpen,
   referencePanelOpen,
+  mannequinPoserOpen = false,
+  poserVrmOpen = false,
+  bg3dOpen = false,
   selected,
   selectedContentMutationLocked,
   setAppSettingsInitialTab,
@@ -240,6 +252,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   setQuickShapeActive,
   setRailMoreOpen,
   setReferencePanelOpen,
+  setMannequinPoserOpen,
+  setPoserVrmOpen,
+  setBg3dOpen,
   setStrokeWidth,
   setTool,
   setViewTool,
@@ -919,6 +934,36 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               onClick={openFrameAnimationForSelected}
             />
             ) : null}
+            {isRailToolVisible("mannequin3d") ? (
+            <StudioRailToolButton
+              icon={PersonStanding}
+              label="3D 데생 인형"
+              description="모델 파일 없이 체형을 조절하고 포즈를 잡아 드로잉 참고 이미지로 캡처합니다."
+              active={mannequinPoserOpen}
+              accented
+              onClick={() => setMannequinPoserOpen?.((v) => !v)}
+            />
+            ) : null}
+            {isRailToolVisible("vrm3d") ? (
+            <StudioRailToolButton
+              icon={UsersRound}
+              label="3D 캐릭터"
+              description="베이스 캐릭터를 고른 뒤 포즈, 표정, 의상과 색상을 조정해 투명 배경 이미지로 추가합니다."
+              active={poserVrmOpen}
+              accented
+              onClick={() => setPoserVrmOpen?.((v) => !v)}
+            />
+            ) : null}
+            {isRailToolVisible("bg3d") ? (
+            <StudioRailToolButton
+              icon={Boxes}
+              label="3D 배경"
+              description="3D 오브젝트와 씬을 배치하고 카메라 앵글을 조절해 웹툰 배경 이미지를 추출합니다."
+              active={bg3dOpen}
+              accented
+              onClick={() => setBg3dOpen?.((v) => !v)}
+            />
+            ) : null}
             {studioUiDensityAllows(uiDensityMode, "toolbar-reference") && isRailToolVisible("reference") ? (
               <StudioRailToolButton
                 icon={PictureInPicture2}
@@ -1007,6 +1052,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                         "zoom-fit",
                         "rotate-view",
                         "frame-anim",
+                        "mannequin3d",
+                        "vrm3d",
+                        "bg3d",
                         "reference",
                       ] as StudioRailToolId[]
                     )
