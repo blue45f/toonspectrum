@@ -28,6 +28,33 @@ const interchangeCommit = source("./studio-document-interchange-commit.ts");
 const interchangePreview = source("./studio-document-interchange-preview.ts");
 
 describe("Studio document interchange UI boundary", () => {
+  // 회귀 가드(2026-07-24): 가져오기 파일 입력이 "프로젝트 도구" 패널(projectActionsOpen) 조건 안에
+  // 들어가 있으면, 파일 메뉴의 가져오기 항목이 부르는 ref.current?.click()이 패널이 닫혀 있을 때
+  // null 이라 조용히 무시된다(실측된 "가져오기 아무 반응 없음" 버그). 네 입력은 반드시 패널 게이트
+  // 앞(=항상 마운트)에 있어야 한다.
+  it("always mounts the four import file inputs, not gated behind projectActionsOpen", () => {
+    const gate = menubar.indexOf("projectActionsOpen &&");
+    expect(gate).toBeGreaterThan(0);
+    for (const ref of [
+      "ref={projectImportInputRef}",
+      "ref={projectArchiveImportInputRef}",
+      "ref={psdImportInputRef}",
+      "ref={interchangeImportInputRef}",
+    ]) {
+      const at = menubar.indexOf(ref);
+      expect(at, `${ref} must exist`).toBeGreaterThan(0);
+      // 첫 등장이 패널 게이트보다 앞서야 항상 렌더된다.
+      expect(at, `${ref} must render before the projectActionsOpen gate`).toBeLessThan(gate);
+    }
+    // 파일 메뉴 요청 핸들러가 각 ref 를 클릭한다.
+    expect(studioPage).toContain(
+      "requestProjectImport: () => projectImportInputRef.current?.click()",
+    );
+    expect(studioPage).toContain(
+      "requestPsdImport: () => psdImportInputRef.current?.click()",
+    );
+  });
+
   it("connects the ORA/CBZ menu command to one format-scoped file input", () => {
     const menuItem = sourceSection(
       menuCatalogue,

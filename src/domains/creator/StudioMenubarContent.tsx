@@ -351,6 +351,47 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   } = stableHandlers;
   return (
     <>
+        {/* 가져오기 파일 입력은 항상 마운트한다. 예전에는 "프로젝트 도구" 패널(projectActionsOpen)
+            안에서만 렌더돼, 파일 메뉴의 "프로젝트/PSD/ORA·CBZ 가져오기" 항목이 부르는
+            ref.current?.click() 이 패널이 닫혀 있을 땐 null 이라 조용히 무시됐다(가져오기가 아무
+            반응 없던 버그). 숨김 입력이라 항상 렌더해도 비용이 없다. */}
+        <input
+          ref={projectImportInputRef}
+          type="file"
+          accept=".json"
+          className="hidden"
+          disabled={collaborationDocumentLocked}
+          onChange={(event) => {
+            const hasFile = Boolean(event.currentTarget.files?.[0]);
+            handleImportProject(event);
+            if (hasFile) setProjectActionsOpen(false);
+          }}
+        />
+        <input
+          ref={projectArchiveImportInputRef}
+          type="file"
+          accept=".toonproject.zip,.zip,application/zip,application/vnd.toonspectrum.project+zip"
+          className="hidden"
+          disabled={projectArchiveBusy || collaborationDocumentLocked}
+          onChange={(event) => void handleImportProjectArchive(event)}
+        />
+        <input
+          ref={psdImportInputRef}
+          type="file"
+          accept=".psd,image/vnd.adobe.photoshop"
+          className="hidden"
+          disabled={psdImportBusy || interchangeImportBusy || collaborationDocumentLocked}
+          onChange={(event) => void handleImportPsd(event)}
+        />
+        <input
+          ref={interchangeImportInputRef}
+          type="file"
+          accept=".ora,.cbz,image/openraster,application/vnd.comicbook+zip"
+          className="hidden"
+          disabled={interchangeImportBusy || psdImportBusy || collaborationDocumentLocked}
+          aria-label="OpenRaster 또는 CBZ 가져오기"
+          onChange={(event) => void handleImportInterchangeArchive(event)}
+        />
         <div
           data-studio-menubar-primary="true"
           className={cn(
@@ -850,18 +891,6 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           >
             <Upload size={14} /> 복구 (.json)
           </button>
-          <input
-            ref={projectImportInputRef}
-            type="file"
-            accept=".json"
-            className="hidden"
-            disabled={collaborationDocumentLocked}
-            onChange={(event) => {
-              const hasFile = Boolean(event.currentTarget.files?.[0]);
-              handleImportProject(event);
-              if (hasFile) setProjectActionsOpen(false);
-            }}
-          />
           <button
             type="button"
             data-project-keep-open
@@ -880,14 +909,6 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           >
             <Upload size={14} /> 아카이브 복구
           </button>
-          <input
-            ref={projectArchiveImportInputRef}
-            type="file"
-            accept=".toonproject.zip,.zip,application/zip,application/vnd.toonspectrum.project+zip"
-            className="hidden"
-            disabled={projectArchiveBusy || collaborationDocumentLocked}
-            onChange={(event) => void handleImportProjectArchive(event)}
-          />
           {projectArchiveStatus ? (
             <span
               role="status"
@@ -918,14 +939,6 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             {psdImportBusy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
             PSD 가져오기
           </button>
-          <input
-            ref={psdImportInputRef}
-            type="file"
-            accept=".psd,image/vnd.adobe.photoshop"
-            className="hidden"
-            disabled={psdImportBusy || interchangeImportBusy || collaborationDocumentLocked}
-            onChange={(event) => void handleImportPsd(event)}
-          />
           {psdImportStatus && (
             <span
               className={cn(
@@ -973,15 +986,6 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               : <Files size={14} aria-hidden />}
             {interchangeImportBusy ? "문서 검사 취소" : "ORA / CBZ 가져오기"}
           </button>
-          <input
-            ref={interchangeImportInputRef}
-            type="file"
-            accept=".ora,.cbz,image/openraster,application/vnd.comicbook+zip"
-            className="hidden"
-            disabled={interchangeImportBusy || psdImportBusy || collaborationDocumentLocked}
-            aria-label="OpenRaster 또는 CBZ 가져오기"
-            onChange={(event) => void handleImportInterchangeArchive(event)}
-          />
           {interchangeImportStatus ? (
             <span
               role="status"
