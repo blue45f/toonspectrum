@@ -38,8 +38,15 @@ describe("StudioPage authoritative mutation-lock integration boundary", () => {
 
     expect(begin).toContain('if (room.mode !== "server")');
     expect(begin).toContain("selfHoldsStudioLiveLock(locks, resource, room.participant.sessionId)");
-    expect(begin).toContain("void beginLiveResourceEditAsync(elementIds)");
+    expect(begin).toContain("void beginLiveResourceEditAsync(elementIds");
     expect(begin.trimEnd().endsWith("return false;\n  }")).toBe(true);
+  });
+
+  it("routes canvas drag and text edits through the intent-aware soft-lock gate", () => {
+    expect(pageSource).toContain("gateStudioCanvasMutation({");
+    expect(pageSource).toContain('intent: StudioCanvasMutationIntent = "transform"');
+    expect(pageSource).toContain('intent: StudioCanvasMutationIntent = "drag"');
+    expect(pageSource).toContain('beginLiveResourceEditAsync([id], "text-edit")');
   });
 
   it("uses the async gate for durable actions and invalidates leases on end or room change", () => {
@@ -55,7 +62,7 @@ describe("StudioPage authoritative mutation-lock integration boundary", () => {
     );
 
     expect(merge).toContain("await beginLiveResourceEditAsync(result.plan.removeIds)");
-    expect(text).toContain("await beginLiveResourceEditAsync([id])");
+    expect(text).toContain('await beginLiveResourceEditAsync([id], "text-edit")');
     for (const cleanup of [end, roomChange]) {
       expect(cleanup).toContain("++studioLiveMutationGenerationRef.current");
       expect(cleanup).toContain("releaseStudioLiveMutationLocks(");
