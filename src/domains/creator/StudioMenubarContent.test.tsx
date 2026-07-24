@@ -324,9 +324,18 @@ describe("StudioMenubarContent", () => {
     const context = screen.getByText("테스트 원고 · 첫 장면");
     expect(context.className).toContain("sr-only");
     expect(context.className).not.toContain("flex-1");
-    expect(screen.getByRole("button", { name: "전체 화면 드로잉 종료" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "임시저장" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "게시하기" })).toBeTruthy();
+    const exit = screen.getByRole("button", { name: "전체 화면 드로잉 종료" });
+    const draft = screen.getByRole("button", { name: "임시저장" });
+    const publish = screen.getByRole("button", { name: "게시하기" });
+    expect(exit).toBeTruthy();
+    expect(draft).toBeTruthy();
+    expect(publish).toBeTruthy();
+    // Sticky canvas ring was painting over the draft button in the compact pill.
+    expect(exit.className).not.toContain("sticky");
+    expect(exit.className).not.toContain("shadow-[0_0_0_4px");
+    const actions = exit.closest("[data-studio-menubar-actions=\"true\"]");
+    expect(actions?.className).toContain("gap-1");
+    expect(actions?.className).not.toContain("gap-0.5");
   });
 
   it("preloads the asset surface before delegating the desktop insert shortcut", () => {

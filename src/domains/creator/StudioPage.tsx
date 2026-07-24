@@ -29998,7 +29998,7 @@ function StudioCuttoonEditor() {
         className={cn(
           canvasOnlyMode && "hidden",
           mobileImmersive &&
-            "min-h-8 gap-1 py-0.5 [&_[data-studio-app-menubar-scroll]]:px-1"
+            "h-auto min-h-11 border-0 bg-transparent shadow-none"
         )}
       >
         <Suspense

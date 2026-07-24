@@ -1134,28 +1134,43 @@ body[data-studio-app="true"] .route-stage::before,
   }
 
   /* 몰입 헤더는 44px 접근성 타깃을 보존하되 레이아웃 높이를 점유하지 않는 작은 플로팅
-     컨트롤로 만든다. 상태 메시지가 실제로 있을 때만 그 아래 공간을 다시 확보한다. */
+     컨트롤로 만든다. 상태 메시지가 실제로 있을 때만 그 아래 공간을 다시 확보한다.
+     셸이 이미 safe-area padding을 주므로 top/left는 0(이중 인셋 방지). */
   [data-studio-editor="true"][data-studio-mobile-immersive="true"]
     [data-studio-app-menubar="true"] {
     position: absolute;
-    top: env(safe-area-inset-top);
-    left: env(safe-area-inset-left);
+    top: 0.375rem;
+    left: 0.375rem;
     /* 콘텐츠 기반 컴팩트 폭 — 고정 14rem 캡은 종료·임시저장·게시하기 묶음보다 ~2px 좁아
        마지막 버튼이 overflow-hidden 레인에 잘렸다. 라벨이 바뀌어도 잘리지 않게 맞춤 폭 사용. */
     width: fit-content;
-    max-width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 0.5rem);
-    border-right: 1px solid var(--color-line);
-    border-bottom: 1px solid var(--color-line);
-    border-bottom-right-radius: 0.875rem;
-    background: color-mix(in oklab, var(--color-panel) 96%, transparent);
-    box-shadow: 0 12px 28px oklch(0.06 0.01 70 / 0.36);
-    backdrop-filter: blur(14px);
+    height: auto;
+    min-height: 2.75rem;
+    max-width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 0.75rem);
+    border: 1px solid color-mix(in oklab, var(--color-line) 80%, transparent);
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--color-panel) 92%, transparent);
+    box-shadow:
+      0 10px 28px oklch(0.06 0.01 70 / 0.32),
+      0 0 0 1px oklch(1 0 0 / 0.04) inset;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
 
   [data-studio-editor="true"][data-studio-mobile-immersive="true"]
     [data-studio-app-menubar-scroll="true"] {
+    /* Match the pill: no hard clip on the action cluster, real gaps between 44px targets. */
+    height: auto;
+    min-height: 2.75rem;
     gap: 0.25rem;
-    padding-inline: 0.375rem;
+    padding: 0.25rem 0.375rem;
+    overflow: visible;
+  }
+
+  [data-studio-editor="true"][data-studio-mobile-immersive="true"]
+    [data-studio-menubar-actions="true"] {
+    width: auto;
+    max-width: 100%;
   }
 
   [data-studio-editor="true"][data-studio-mobile-immersive="true"]

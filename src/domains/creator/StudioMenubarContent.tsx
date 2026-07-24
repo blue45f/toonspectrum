@@ -542,7 +542,9 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           data-studio-menubar-actions="true"
           className={cn(
             "flex shrink-0 flex-nowrap items-center gap-1",
-            mobileImmersive && "min-w-0 w-full gap-0.5"
+            // Immersive pill is content-width only — keep a real 4px gap so buttons never
+            // paint under each other (the old sticky canvas ring used to cover "임시저장").
+            mobileImmersive && "min-w-0 gap-1"
           )}
         >
           {isMobile ? (
@@ -563,10 +565,16 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 className={cn(
                   buttonClass({
                     size: "sm",
-                    variant: mobileImmersive ? "solid" : "quiet",
+                    // Quiet exit reads as chrome chrome, not a second primary CTA next to Publish.
+                    variant: mobileImmersive ? "quiet" : "quiet",
                     className: "min-h-11 shrink-0 gap-1.5 whitespace-nowrap",
                   }),
-                  "sticky left-0 z-20 shadow-[0_0_0_4px_var(--color-canvas)]"
+                  // Windowed: sticky exit keeps the control reachable while the long title lane
+                  // scrolls. Immersive: no sticky/ring — the compact pill has no scroll sibling.
+                  !mobileImmersive &&
+                    "sticky left-0 z-20 shadow-[0_0_0_4px_var(--color-canvas)]",
+                  mobileImmersive &&
+                    "rounded-full border border-line/70 bg-raised/80 px-2.5 text-fg"
                 )}
               >
                 {mobileImmersive ? (
@@ -1054,8 +1062,13 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               disabled={saving || collaborationDocumentLocked}
               aria-label={sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장"}
               className={cn(
-                buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" }),
-                isMobile && "min-h-11"
+                buttonClass({
+                  size: "sm",
+                  variant: "quiet",
+                  className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
+                }),
+                isMobile && "min-h-11",
+                mobileImmersive && "rounded-full border border-line/70 bg-raised/80 px-2.5"
               )}
             >
               {saving ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden /> : null}
@@ -1084,8 +1097,13 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 disabled={saving || collaborationDocumentLocked}
                 aria-label={workId ? "수정 게시" : "게시하기"}
                 className={cn(
-                  buttonClass({ size: "sm", variant: "solid", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" }),
-                  isMobile && "min-h-11"
+                  buttonClass({
+                    size: "sm",
+                    variant: "solid",
+                    className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
+                  }),
+                  isMobile && "min-h-11",
+                  mobileImmersive && "rounded-full px-3 shadow-none"
                 )}
               >
                 {saving ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden /> : null}

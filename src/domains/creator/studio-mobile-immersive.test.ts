@@ -114,6 +114,10 @@ describe("Studio mobile immersive preference", () => {
     expect(studioGlobalsSource).toContain("position: absolute");
     // 의도적 변경(2026-07-24): 고정 14rem 캡이 게시하기 버튼을 클립해 콘텐츠 기반 폭으로 교체.
     expect(studioGlobalsSource).toContain("width: fit-content");
+    // 의도적 변경(2026-07-24): 몰입 필은 셸 safe-area 패딩 위 둥근 칩 — 이중 top inset 제거,
+    // overflow visible + 실간격으로 종료/임시저장/게시 겹침 방지.
+    expect(studioGlobalsSource).toContain("border-radius: 9999px");
+    expect(studioGlobalsSource).toContain("overflow: visible");
     expect(studioGlobalsSource).toContain("padding-top: 2.75rem");
   });
 });
