@@ -45,10 +45,14 @@ describe("Studio BG3D generic model mode integration boundary", () => {
       'hasSelectedMtl ? "obj-mtl" : "obj"',
       "modelImportRuntime.convertStudioBg3dModelFilesToGlb(files",
       "await importVerifiedBg3dModelsAtomically(",
+      "withStudioGeneric3dWorkflowMetadata(",
       "await admitAndCacheModel({",
-      "setGenericModelSourceFormats((previous) =>",
+      "mergeStudioGeneric3dWorkflowMaps(previous, importedFormats)",
       "uploadCommitted = true",
     ]);
+    expect(source).toContain('from "./studio-generic-3d-workflow-metadata"');
+    expect(source).toContain("attachStudioGeneric3dWorkflowMetadata");
+    expect(source).toContain("parseStudioGeneric3dWorkflowMetadata");
   });
 
   it("profiles renderer structure once while keeping unsupported child transforms read-only", () => {
@@ -101,6 +105,18 @@ describe("Studio BG3D generic model mode integration boundary", () => {
       "selectedGenericModelProxies.find",
       'proxy?.operation === "bone-rotate"',
       "setPoseJointSelection({ modelId: selectedCustomModel.id, key: proxy.targetKey })",
+    ]);
+  });
+
+  it("persists classification changes onto attachment workflow metadata", () => {
+    const change = sourceBetween(
+      "function changeSelectedGenericModelClassification(",
+      "function changeGenericModelControlMode(",
+    );
+    expectInOrder(change, [
+      "normalizeStudioGeneric3dClassification(classification)",
+      "withStudioGeneric3dWorkflowMetadata(existing, {",
+      "mergeStudioGeneric3dWorkflowMaps(previous, new Map([[storageId, normalized]]))",
     ]);
   });
 

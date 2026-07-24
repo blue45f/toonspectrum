@@ -104,3 +104,43 @@ export function resolveStudioBg3dLtCaptureSize(
     wasReduced: height < input.requestedHeight,
   });
 }
+
+export interface StudioBg3dShotCaptureSizeInput {
+  readonly sourceWidth: number;
+  readonly sourceHeight: number;
+  /**
+   * Optional document/export aspect (width / height). When finite and > 0, capture composition
+   * freezes to this ratio regardless of the live source viewport — matching LT insert capture.
+   * null/undefined/non-finite values keep the legacy source-derived aspect.
+   */
+  readonly exportAspectRatio?: number | null;
+  readonly requestedHeight: number;
+  readonly maxPixels: number;
+  readonly maxEdge?: number;
+}
+
+/**
+ * Shot/batch capture size admission. Same budgets as {@link resolveStudioBg3dLtCaptureSize}; when
+ * `exportAspectRatio` is a finite positive number it is forwarded as an explicit aspect so two
+ * different source viewports produce the same raster for a fixed document ratio.
+ */
+export function resolveStudioBg3dShotCaptureSize(
+  input: StudioBg3dShotCaptureSizeInput,
+): StudioBg3dLtCaptureSize | null {
+  if (typeof input !== "object" || input === null) return null;
+  const exportAspectRatio = input.exportAspectRatio;
+  const aspectRatio =
+    typeof exportAspectRatio === "number" &&
+    Number.isFinite(exportAspectRatio) &&
+    exportAspectRatio > 0
+      ? exportAspectRatio
+      : undefined;
+  return resolveStudioBg3dLtCaptureSize({
+    sourceWidth: input.sourceWidth,
+    sourceHeight: input.sourceHeight,
+    requestedHeight: input.requestedHeight,
+    maxPixels: input.maxPixels,
+    maxEdge: input.maxEdge,
+    ...(aspectRatio === undefined ? {} : { aspectRatio }),
+  });
+}

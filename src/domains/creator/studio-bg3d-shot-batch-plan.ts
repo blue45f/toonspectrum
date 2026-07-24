@@ -8,8 +8,14 @@
  */
 
 import { getStudioBg3dCaptureBackendIdentity } from "./studio-bg3d-capture-adapter";
-import { createStudioBg3dCaptureBackgroundSnapshot } from "./studio-bg3d-capture-background";
-import { resolveStudioBg3dLtCaptureSize } from "./studio-bg3d-lt-capture-size";
+import {
+  createStudioBg3dCaptureBackgroundSnapshot,
+  studioBg3dCaptureBackgroundRequestFromSnapshot,
+} from "./studio-bg3d-capture-background";
+import {
+  resolveStudioBg3dShotCaptureSize,
+  type StudioBg3dLtCaptureSize,
+} from "./studio-bg3d-lt-capture-size";
 import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "./studio-bg3d-lt-render";
 import {
   STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS,
@@ -42,6 +48,24 @@ export const STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_SOURCE_DIMENSION = 32_768;
 export const STUDIO_BG3D_SHOT_BATCH_LT_PIPELINE_V1 = "studio-lt-color-tone-line-depth-v1";
 export const STUDIO_BG3D_SHOT_BATCH_PNG_ENCODING_V1 = "png-srgb-straight-alpha-v1";
 export const STUDIO_BG3D_SHOT_BATCH_PSD_ENCODING_V1 = "psd-rgba8-layered-v1";
+
+/**
+ * Resolve batch capture size with optional document aspect (insert-path parity).
+ * Thin alias of {@link resolveStudioBg3dShotCaptureSize} kept for existing call sites/tests.
+ */
+export function resolveStudioBg3dShotBatchCaptureSize(input: {
+  readonly sourceWidth: number;
+  readonly sourceHeight: number;
+  readonly requestedHeight: number;
+  readonly maxPixels: number;
+  readonly maxEdge?: number;
+  readonly exportAspectRatio?: number | null;
+}): StudioBg3dLtCaptureSize | null {
+  return resolveStudioBg3dShotCaptureSize(input);
+}
+
+export { resolveStudioBg3dShotCaptureSize };
+
 
 export interface StudioBg3dShotBatchSourceShot {
   readonly id: string;
@@ -78,6 +102,11 @@ export interface StudioBg3dShotBatchCaptureOwner {
   /** Source framebuffer sampled when every output size was frozen. */
   readonly sourceWidth: number;
   readonly sourceHeight: number;
+  /**
+   * Optional document panel aspect (width/height). When set, every shot freezes the same
+   * composition regardless of the live 3D panel viewport — matching LT insert capture.
+   */
+  readonly exportAspectRatio?: number;
   readonly maxPixels: number;
   readonly maxEdge: number;
   /** Output-affecting resolved quality values; timing-only values are intentionally excluded. */
@@ -287,11 +316,11 @@ function canonicalPasses(
 
 function validCaptureOwner(value: unknown): value is StudioBg3dShotBatchCaptureOwner {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const owner = value as Partial<StudioBg3dShotBatchCaptureOwner>;
+  const owner = value as Partial<StudioBg3dShotBatchCaptureOwner> & Record<string, unknown>;
   const expectedIdentity = owner.backend
     ? getStudioBg3dCaptureBackendIdentity(owner.backend)
     : null;
-  return hasExactKeys(value, [
+  const requiredKeys = [
     "backend",
     "engineId",
     "engineRevision",
@@ -308,8 +337,28 @@ function validCaptureOwner(value: unknown): value is StudioBg3dShotBatchCaptureO
     "ltPipelineId",
     "pngEncodingId",
     "psdEncodingId",
-  ]) &&
-    expectedIdentity !== null && owner.engineId === expectedIdentity[0] &&
+  ] as const;
+  const keys = Object.keys(owner);
+  const allowed = new Set<string>([...requiredKeys, "exportAspectRatio"]);
+  if (
+    keys.length < requiredKeys.length
+    || keys.length > requiredKeys.length + 1
+    || !keys.every((key) => allowed.has(key))
+    || !requiredKeys.every((key) => Object.prototype.hasOwnProperty.call(owner, key))
+  ) {
+    return false;
+  }
+  if (Object.prototype.hasOwnProperty.call(owner, "exportAspectRatio")) {
+    if (
+      typeof owner.exportAspectRatio !== "number"
+      || !Number.isFinite(owner.exportAspectRatio)
+      || owner.exportAspectRatio <= 0
+      || owner.exportAspectRatio > 32
+    ) {
+      return false;
+    }
+  }
+  return expectedIdentity !== null && owner.engineId === expectedIdentity[0] &&
     owner.graphicsApi === expectedIdentity[1] &&
     typeof owner.engineRevision === "string" && PROFILE_ID_PATTERN.test(owner.engineRevision) &&
     typeof owner.implementationRevision === "string" &&
@@ -374,7 +423,7 @@ function validCaptureSpec(value: unknown): value is StudioBg3dShotBatchCaptureSp
 }
 
 function copyCaptureOwner(owner: StudioBg3dShotBatchCaptureOwner): StudioBg3dShotBatchCaptureOwner {
-  return {
+  const next: StudioBg3dShotBatchCaptureOwner = {
     backend: owner.backend,
     engineId: owner.engineId,
     engineRevision: owner.engineRevision,
@@ -392,6 +441,14 @@ function copyCaptureOwner(owner: StudioBg3dShotBatchCaptureOwner): StudioBg3dSho
     pngEncodingId: owner.pngEncodingId,
     psdEncodingId: owner.psdEncodingId,
   };
+  if (
+    typeof owner.exportAspectRatio === "number"
+    && Number.isFinite(owner.exportAspectRatio)
+    && owner.exportAspectRatio > 0
+  ) {
+    return { ...next, exportAspectRatio: owner.exportAspectRatio };
+  }
+  return next;
 }
 
 function copyCaptureSpec(
@@ -622,12 +679,13 @@ export function isStudioBg3dShotBatchPlan(value: unknown): value is StudioBg3dSh
       !validCaptureSpec({ shotId: shot.shotId, ...shot.capture }) ||
       !Array.isArray(shot.files) || shot.files.length !== plan.passes.length
     ) return false;
-    const resolvedSize = resolveStudioBg3dLtCaptureSize({
+    const resolvedSize = resolveStudioBg3dShotCaptureSize({
       sourceWidth: plan.captureOwner.sourceWidth,
       sourceHeight: plan.captureOwner.sourceHeight,
       requestedHeight: shot.capture.requestedHeight,
       maxPixels: plan.captureOwner.maxPixels,
       maxEdge: plan.captureOwner.maxEdge,
+      exportAspectRatio: plan.captureOwner.exportAspectRatio,
     });
     if (!resolvedSize ||
       shot.capture.width !== resolvedSize.width ||
@@ -770,6 +828,8 @@ export async function createStudioBg3dShotBatchPlan(
     return failure("invalid-capture", "컷 배치 캡처 계획이 올바르지 않습니다.");
   }
   const captureByShotId = new Map<string, StudioBg3dShotBatchCaptureSpecInput>();
+  /** Aspects observed from applied shot output when the owner omits exportAspectRatio. */
+  const derivedAspects = new Set<number>();
   for (const capture of options.capture.shots) {
     if (captureByShotId.has(capture.shotId)) {
       return failure("duplicate-capture-shot", "컷 배치 캡처 계획에 중복 컷이 있습니다.");
@@ -791,12 +851,25 @@ export async function createStudioBg3dShotBatchPlan(
     const requestedHeight = exportHeight === "per-shot"
       ? applied.output.exportHeight
       : exportHeight;
-    const resolvedSize = resolveStudioBg3dLtCaptureSize({
+    // Owner freezes plan-level aspect; otherwise fall back to the applied shot document field.
+    const exportAspectRatio =
+      options.capture.owner.exportAspectRatio ??
+      applied.output.exportAspectRatio;
+    if (
+      options.capture.owner.exportAspectRatio === undefined &&
+      typeof applied.output.exportAspectRatio === "number" &&
+      Number.isFinite(applied.output.exportAspectRatio) &&
+      applied.output.exportAspectRatio > 0
+    ) {
+      derivedAspects.add(applied.output.exportAspectRatio);
+    }
+    const resolvedSize = resolveStudioBg3dShotCaptureSize({
       sourceWidth: options.capture.owner.sourceWidth,
       sourceHeight: options.capture.owner.sourceHeight,
       requestedHeight,
       maxPixels: options.capture.owner.maxPixels,
       maxEdge: options.capture.owner.maxEdge,
+      exportAspectRatio,
     });
     if (!resolvedSize ||
       capture.width !== resolvedSize.width ||
@@ -814,9 +887,10 @@ export async function createStudioBg3dShotBatchPlan(
       background: applied.background,
       transparent: applied.output.transparentBackground,
     });
+    const plannedBackground = studioBg3dCaptureBackgroundRequestFromSnapshot(background);
     if (
-      capture.background.color.toLowerCase() !== background.clearColor.toLowerCase() ||
-      capture.background.alpha !== (background.transparent ? 0 : 1)
+      capture.background.color.toLowerCase() !== plannedBackground.color.toLowerCase() ||
+      capture.background.alpha !== plannedBackground.alpha
     ) {
       return failure("invalid-capture", "컷 배치 배경 캡처가 canonical 장면 배경과 일치하지 않습니다.");
     }
@@ -877,7 +951,24 @@ export async function createStudioBg3dShotBatchPlan(
     pageId: options.scope.pageId,
     elementId: options.scope.elementId,
   };
-  const captureOwner = copyCaptureOwner(options.capture.owner);
+  // Stamp a single derived aspect onto the frozen owner so re-admission matches create-time sizes.
+  if (
+    options.capture.owner.exportAspectRatio === undefined &&
+    derivedAspects.size > 1
+  ) {
+    return failure(
+      "invalid-capture",
+      "컷 배치 캡처 비율이 컷마다 달라 고정 출력 계획을 만들 수 없습니다.",
+    );
+  }
+  const stampedAspect =
+    options.capture.owner.exportAspectRatio ??
+    (derivedAspects.size === 1 ? derivedAspects.values().next().value : undefined);
+  const captureOwner = copyCaptureOwner(
+    typeof stampedAspect === "number"
+      ? { ...options.capture.owner, exportAspectRatio: stampedAspect }
+      : options.capture.owner,
+  );
   const [sourceDigest, scopeDigest] = await Promise.all([
     sha256Hex(options.sourceRevision),
     sha256Hex(JSON.stringify(scope)),

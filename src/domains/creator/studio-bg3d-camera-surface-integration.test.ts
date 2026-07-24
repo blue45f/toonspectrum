@@ -58,7 +58,7 @@ describe("Studio BG3D Camera vNext and surface snap integration", () => {
     expect(source.match(/onClick=\{\(\) => zoomCameraBy\(1\.22\)\}/gu)).toHaveLength(2);
   });
 
-  it("keeps selection while resolving a real world hit and publishes one position-only history step", () => {
+  it("keeps selection while resolving a real world hit and publishes one history step with optional normal-align rotation", () => {
     const handler = sourceBetween(
       "function handleSurfaceSnapPick(",
       "let physicsSelectionUnavailableReason",
@@ -68,8 +68,13 @@ describe("Studio BG3D Camera vNext and surface snap integration", () => {
     expect(handler).toContain("readStudioBg3dObjectWorldBounds(selectionObject)");
     expect(handler).toContain("readStudioBg3dWorldSurfaceHit(event)");
     expect(handler).toContain("parentWorldMatrix: [...selectionObject.parent.matrixWorld.elements]");
-    expect(handler).toContain("resolveStudioBg3dSurfaceSnap({");
-    expect(handler).toContain('result.reason === "self-hit"');
+    expect(handler).toContain("planStudioBg3dMultiSurfaceSnap(snapInputs)");
+    expect(handler).toContain("alignRotationToNormal: surfaceSnapAlignNormal");
+    expect(handler).toContain("[...result.rotation]");
+    expect(handler).toContain("...(nextRotation ? { rotation: nextRotation } : {})");
+    expect(handler).toContain("표면에 붙이고 법선에 맞춰 회전했어요.");
+    expect(handler).toContain('reason === "self-hit"');
+    expect(handler).toContain("selectedIds: [entity.id]");
     expect(handler.match(/commitImmediateHistoryTransition/gu)).toHaveLength(1);
     expect(handler).not.toContain("setSelectedIds");
     expectInOrder(handler, [
@@ -77,6 +82,42 @@ describe("Studio BG3D Camera vNext and surface snap integration", () => {
       "commitImmediateHistoryTransition(nextPrimitives, nextCustomModels, sceneBaseDocument)",
       "setPrimitives(nextPrimitives)",
       "setCustomModels(nextCustomModels)",
+    ]);
+  });
+
+  it("wires normal-align toggle and multi-select one-click model placement recipe", () => {
+    expect(source).toContain('from "./studio-bg3d-placement-recipe"');
+    expect(source).toContain("planStudioBg3dModelPlacementRecipe");
+    expect(source).toContain("function placeSelectedModelRecipe()");
+    expect(source).toContain("alignRotationToNormal");
+    expect(source).toContain("surfaceSnapAlignNormal");
+    expect(source).toContain('data-testid="bg3d-surface-snap-align-normal"');
+    expect(source).toContain('aria-label="법선 정렬"');
+    expect(source).toContain('aria-label="배치 정리"');
+    expect(source).toContain("STUDIO_BG3D_SURFACE_SNAP_MAX_MULTI_INPUTS");
+    expect(source).toContain("planStudioBg3dMultiSurfaceSnap");
+    expect(source).toContain("canPlaceSelectedModelRecipe");
+    const recipe = sourceBetween(
+      "function placeSelectedModelRecipe()",
+      "function centerAndGroundSelectedEntity()",
+    );
+    // Multi path: iterate selection (cap 64), not single-id early return.
+    expect(recipe).toContain("for (const id of selectedIds)");
+    expect(recipe).toContain("selectedIds.size > STUDIO_BG3D_SURFACE_SNAP_MAX_MULTI_INPUTS");
+    expect(recipe).toContain("배치 정리는 한 번에 최대 ${STUDIO_BG3D_SURFACE_SNAP_MAX_MULTI_INPUTS}개까지 지원합니다.");
+    expect(recipe).toContain("planStudioBg3dModelPlacementRecipe({");
+    expect(recipe).toContain("autoFitTargetSize: 2");
+    expect(recipe).toContain("STUDIO_BG3D_SURFACE_SNAP_MAX_MULTI_INPUTS");
+    expect(recipe).toContain("commitImmediateHistoryTransition(primitives, nextCustomModels, sceneBaseDocument)");
+    expect(recipe).toContain("${successCount}개 배치를 정리했어요");
+    expect(recipe).not.toContain("selectedIds.size !== 1");
+    expect(recipe).not.toContain("updateCustomModelTransform(");
+    expectInOrder(recipe, [
+      "for (const id of selectedIds)",
+      "for (const model of models)",
+      "planStudioBg3dModelPlacementRecipe({",
+      "commitImmediateHistoryTransition(primitives, nextCustomModels, sceneBaseDocument)",
+      "${successCount}개 배치를 정리했어요",
     ]);
   });
 

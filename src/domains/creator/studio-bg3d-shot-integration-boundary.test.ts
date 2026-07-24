@@ -163,7 +163,7 @@ describe("Studio BG3D shot UI integration boundary", () => {
       "activeRunToken = await shotBatchRecoveryStore.startShot(recoverySession, shot.shotId)",
       "applyStudioBg3dShot(currentDocument, shot.shotId)",
       "freezeStudioBg3dShotAnimationsForBatch(appliedShot)",
-      "backgroundSnapshot.clearColor.toLowerCase() !== shot.capture.background.color.toLowerCase()",
+      "plannedBackground.color.toLowerCase() !== shot.capture.background.color.toLowerCase()",
       "appliedCaptureQuality.shadows !== shot.capture.shadows",
       "const projectionChanged = renderedProjection !== applied.camera.projection",
       "view: applied.camera",

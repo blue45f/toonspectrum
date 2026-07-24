@@ -4,8 +4,10 @@ import {
   STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
   STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1,
 } from "./studio-bg3d-capture-adapter";
-import { createStudioBg3dCaptureBackgroundSnapshot } from "./studio-bg3d-capture-background";
-import { resolveStudioBg3dLtCaptureSize } from "./studio-bg3d-lt-capture-size";
+import {
+  createStudioBg3dCaptureBackgroundSnapshot,
+  studioBg3dCaptureBackgroundRequestFromSnapshot,
+} from "./studio-bg3d-capture-background";
 import {
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
   applyStudioBg3dShot,
@@ -19,6 +21,7 @@ import {
   STUDIO_BG3D_SHOT_BATCH_PSD_ENCODING_V1,
   STUDIO_BG3D_SHOT_BATCH_PASSES,
   createStudioBg3dShotBatchPlan,
+  resolveStudioBg3dShotBatchCaptureSize,
   hydrateStudioBg3dShotBatchPlan,
   isStudioBg3dShotBatchPlan,
   pendingStudioBg3dShotBatchFiles,
@@ -104,12 +107,13 @@ function canonicalCapture(
       const requestedHeight = exportHeight === "per-shot"
         ? applied.output.exportHeight
         : exportHeight;
-      const size = resolveStudioBg3dLtCaptureSize({
+      const size = resolveStudioBg3dShotBatchCaptureSize({
         sourceWidth: owner.sourceWidth,
         sourceHeight: owner.sourceHeight,
         requestedHeight,
         maxPixels: owner.maxPixels,
         maxEdge: owner.maxEdge,
+        exportAspectRatio: owner.exportAspectRatio ?? applied.output.exportAspectRatio,
       });
       if (!size) throw new Error("canonical test capture size unavailable");
       const background = createStudioBg3dCaptureBackgroundSnapshot({
@@ -125,10 +129,7 @@ function canonicalCapture(
         includeDepth: applied.output.line.depthEnabled || passes.includes("depth"),
         shadows: true,
         shadowMapSize: 2_048,
-        background: {
-          color: background.clearColor,
-          alpha: background.transparent ? 0 : 1,
-        },
+        background: studioBg3dCaptureBackgroundRequestFromSnapshot(background),
       };
     }),
   };
@@ -543,5 +544,52 @@ describe("Studio BG3D shot batch plan v2", () => {
     const pending = pendingStudioBg3dShotBatchFiles(result.plan, completed);
     expect(pending).toHaveLength(STUDIO_BG3D_SHOT_BATCH_MAX_FILES - 2);
     expect(pending.some(({ key }) => completed.has(key))).toBe(false);
+  });
+});
+
+
+describe("resolveStudioBg3dShotBatchCaptureSize aspect parity", () => {
+  it("freezes the same raster for different source viewports when exportAspectRatio is set", () => {
+    const fixed = {
+      requestedHeight: 1024,
+      maxPixels: 16_777_216,
+      maxEdge: 4_096,
+      exportAspectRatio: 0.8, // 4:5 webtoon-ish
+    } as const;
+    const a = resolveStudioBg3dShotBatchCaptureSize({
+      sourceWidth: 800,
+      sourceHeight: 600,
+      ...fixed,
+    });
+    const b = resolveStudioBg3dShotBatchCaptureSize({
+      sourceWidth: 1920,
+      sourceHeight: 1080,
+      ...fixed,
+    });
+    expect(a).not.toBeNull();
+    expect(b).not.toBeNull();
+    expect(a).toEqual(b);
+    expect(a!.width / a!.height).toBeCloseTo(0.8, 2);
+  });
+
+  it("falls back to live source aspect when exportAspectRatio is omitted", () => {
+    const wide = resolveStudioBg3dShotBatchCaptureSize({
+      sourceWidth: 1920,
+      sourceHeight: 1080,
+      requestedHeight: 1080,
+      maxPixels: 16_777_216,
+      maxEdge: 4_096,
+    });
+    const tall = resolveStudioBg3dShotBatchCaptureSize({
+      sourceWidth: 800,
+      sourceHeight: 1600,
+      requestedHeight: 1080,
+      maxPixels: 16_777_216,
+      maxEdge: 4_096,
+    });
+    expect(wide).not.toBeNull();
+    expect(tall).not.toBeNull();
+    expect(wide!.width / wide!.height).toBeCloseTo(1920 / 1080, 2);
+    expect(tall!.width / tall!.height).toBeCloseTo(0.5, 2);
   });
 });

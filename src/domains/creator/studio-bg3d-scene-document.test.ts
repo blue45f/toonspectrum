@@ -1778,4 +1778,45 @@ describe("Studio BG3D scene migration and serialization", () => {
       version: STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
     }));
   });
+
+  it("round-trips sanitized generic3dWorkflow metadata on attachments", () => {
+    const serialized = serializeStudioBg3dSceneDocument(
+      currentDocument({
+        attachments: [
+          attachment(1, {
+            generic3dWorkflow: {
+              version: 1,
+              classification: "character",
+              sourceFormat: "obj-mtl",
+            },
+          }),
+        ],
+        nodes: [primitiveNode(1)],
+      }),
+    );
+    const parsed = parseStudioBg3dSceneDocument(serialized ?? "");
+    expect(parsed?.attachments[0]).toMatchObject({
+      generic3dWorkflow: {
+        version: 1,
+        classification: "character",
+        sourceFormat: "obj-mtl",
+      },
+    });
+
+    // Invalid classification fails closed for the whole workflow block (lenient normalize drops it).
+    const lenient = normalizeStudioBg3dSceneDocument(
+      currentDocument({
+        attachments: [
+          attachment(1, {
+            generic3dWorkflow: {
+              version: 1,
+              classification: "avatar",
+            },
+          }),
+        ],
+        nodes: [primitiveNode(1)],
+      }),
+    );
+    expect(lenient.attachments[0]?.generic3dWorkflow).toBeUndefined();
+  });
 });

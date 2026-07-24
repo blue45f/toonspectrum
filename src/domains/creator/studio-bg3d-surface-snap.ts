@@ -23,7 +23,10 @@ export interface ResolveStudioBg3dSurfaceSnapInput {
   readonly selectionSubtreeIds: readonly string[];
   readonly locked: boolean;
   readonly localPosition: StudioBg3dSurfaceSnapVec3;
-  /** Preserved byte-for-byte in a successful result; v1 never aligns rotation to a normal. */
+  /**
+   * Preserved byte-for-byte in a successful result when `alignRotationToNormal` is false/omitted.
+   * When alignment is requested, success.rotation is replaced by the normal orientation.
+   */
   readonly rotation: StudioBg3dSurfaceSnapVec3;
   /** Axis-aligned bounds measured in world space after the object's rotation and scale. */
   readonly worldBounds: StudioBg3dSurfaceSnapBounds;
@@ -38,6 +41,11 @@ export interface ResolveStudioBg3dSurfaceSnapInput {
   };
   /** Signed world-unit separation applied along the normalized hit normal. */
   readonly surfaceOffset?: number;
+  /**
+   * When true, success.rotation aligns local +Y with the hit normal (see
+   * `resolveStudioBg3dSurfaceSnapOrientation`). Default false preserves v1 rotation bytes.
+   */
+  readonly alignRotationToNormal?: boolean;
 }
 
 export type StudioBg3dSurfaceSnapFailureReason =
@@ -70,8 +78,20 @@ export type StudioBg3dSurfaceSnapResult =
   | StudioBg3dSurfaceSnapSuccess
   | StudioBg3dSurfaceSnapFailure;
 
+export type StudioBg3dMultiSurfaceSnapPlanResult =
+  | {
+      readonly ok: true;
+      readonly results: readonly StudioBg3dSurfaceSnapResult[];
+    }
+  | {
+      readonly ok: false;
+      readonly reason: StudioBg3dSurfaceSnapFailureReason | "empty-inputs";
+      readonly results?: readonly StudioBg3dSurfaceSnapResult[];
+    };
+
 export const STUDIO_BG3D_SURFACE_SNAP_MAX_WORLD_COORDINATE = 10_000;
 export const STUDIO_BG3D_SURFACE_SNAP_MAX_SUBTREE_IDS = 512;
+export const STUDIO_BG3D_SURFACE_SNAP_MAX_MULTI_INPUTS = 64;
 
 const MAX_DELTA = STUDIO_BG3D_SURFACE_SNAP_MAX_WORLD_COORDINATE * 2;
 const MAX_MATRIX_COMPONENT = 100_000_000;
@@ -221,8 +241,62 @@ function tuple(vector: THREE.Vector3): StudioBg3dSurfaceSnapVec3 {
 }
 
 /**
- * Resolves one placement patch. A success preserves rotation and moves the measured world-bounds
+ * Pure Euler XYZ (radians) that aligns local +Y with the hit normal.
+ *
+ * Builds an orthonormal basis (X, Y=normal, Z) using `up` (default world +Y) to resolve roll, then
+ * extracts XYZ Euler. Fails closed on zero-length normals or non-finite components.
+ */
+export function resolveStudioBg3dSurfaceSnapOrientation(
+  normal: StudioBg3dSurfaceSnapVec3,
+  options?: { readonly up?: StudioBg3dSurfaceSnapVec3 },
+): StudioBg3dSurfaceSnapVec3 | null {
+  if (!finiteVec3(normal, MAX_ROTATION_COMPONENT)) return null;
+  const yAxis = new THREE.Vector3(normal[0], normal[1], normal[2]);
+  const normalLength = yAxis.length();
+  if (!Number.isFinite(normalLength) || normalLength < MIN_NORMAL_LENGTH) return null;
+  yAxis.multiplyScalar(1 / normalLength);
+
+  const upRaw = options?.up ?? ([0, 1, 0] as const);
+  if (!finiteVec3(upRaw, MAX_ROTATION_COMPONENT)) return null;
+  const up = new THREE.Vector3(upRaw[0], upRaw[1], upRaw[2]);
+  const upLength = up.length();
+  if (!Number.isFinite(upLength) || upLength < MIN_NORMAL_LENGTH) return null;
+  up.multiplyScalar(1 / upLength);
+
+  // Prefer X = normalize(up × Y). When the normal is parallel to up, use the shortest rotation
+  // from local +Y → normal so a world-up hit stays near identity Euler (v1-friendly).
+  const xAxis = new THREE.Vector3().crossVectors(up, yAxis);
+  let euler: THREE.Euler;
+  if (xAxis.lengthSq() < MIN_NORMAL_LENGTH * MIN_NORMAL_LENGTH) {
+    const quaternion = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      yAxis,
+    );
+    euler = new THREE.Euler().setFromQuaternion(quaternion, "XYZ");
+  } else {
+    xAxis.normalize();
+    const zAxis = new THREE.Vector3().crossVectors(xAxis, yAxis);
+    if (zAxis.lengthSq() < MIN_NORMAL_LENGTH * MIN_NORMAL_LENGTH) return null;
+    zAxis.normalize();
+    const basis = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+    euler = new THREE.Euler().setFromRotationMatrix(basis, "XYZ");
+  }
+  if (
+    !Number.isFinite(euler.x) ||
+    !Number.isFinite(euler.y) ||
+    !Number.isFinite(euler.z)
+  ) {
+    return null;
+  }
+  return Object.freeze([euler.x, euler.y, euler.z] as const);
+}
+
+/**
+ * Resolves one placement patch. By default preserves rotation and moves the measured world-bounds
  * bottom centre to hit.point + normalized(hit.normal) * surfaceOffset.
+ *
+ * When `alignRotationToNormal` is true, success.rotation is the pure orientation that maps local
+ * +Y onto the hit normal; position math is otherwise unchanged.
  */
 export function resolveStudioBg3dSurfaceSnap(
   input: ResolveStudioBg3dSurfaceSnapInput,
@@ -236,6 +310,12 @@ export function resolveStudioBg3dSurfaceSnap(
   }
   if (typeof input.locked !== "boolean") return failure("invalid-input");
   if (input.locked) return failure("locked");
+  if (
+    input.alignRotationToNormal !== undefined &&
+    typeof input.alignRotationToNormal !== "boolean"
+  ) {
+    return failure("invalid-input");
+  }
 
   const subtreeIds = readUniqueIds(input.selectionSubtreeIds, false);
   const hitPathIds = readUniqueIds(input.hit?.targetPathIds, false);
@@ -287,6 +367,15 @@ export function resolveStudioBg3dSurfaceSnap(
     !finiteVec3(nextLocalPosition.toArray(), STUDIO_BG3D_SURFACE_SNAP_MAX_WORLD_COORDINATE)
   ) return failure("result-out-of-bounds");
 
+  let rotation: StudioBg3dSurfaceSnapVec3 = Object.freeze(
+    [...input.rotation] as [number, number, number],
+  );
+  if (input.alignRotationToNormal === true) {
+    const oriented = resolveStudioBg3dSurfaceSnapOrientation(input.hit.normal);
+    if (!oriented) return failure("invalid-hit");
+    rotation = oriented;
+  }
+
   return Object.freeze({
     ok: true,
     localPosition: tuple(nextLocalPosition),
@@ -294,6 +383,53 @@ export function resolveStudioBg3dSurfaceSnap(
     worldDelta: tuple(worldDelta),
     sourceBottomCenter: tuple(sourceBottomCenter),
     targetPoint: tuple(targetPoint),
-    rotation: Object.freeze([...input.rotation] as [number, number, number]),
+    rotation,
   });
+}
+
+/**
+ * Plans independent surface snaps for multiple objects. Each input is resolved with the single-
+ * selection contract; locked/self-hit siblings become individual `ok:false` results and do not
+ * abort neighbors. The plan succeeds when at least one input succeeds. Empty or oversized input
+ * lists fail closed without mutating caller arrays.
+ */
+export function planStudioBg3dMultiSurfaceSnap(
+  inputs: readonly ResolveStudioBg3dSurfaceSnapInput[],
+): StudioBg3dMultiSurfaceSnapPlanResult {
+  if (!Array.isArray(inputs)) {
+    return Object.freeze({ ok: false, reason: "invalid-input" as const });
+  }
+  if (inputs.length === 0) {
+    return Object.freeze({ ok: false, reason: "empty-inputs" as const });
+  }
+  if (inputs.length > STUDIO_BG3D_SURFACE_SNAP_MAX_MULTI_INPUTS) {
+    return Object.freeze({ ok: false, reason: "invalid-input" as const });
+  }
+
+  const results: StudioBg3dSurfaceSnapResult[] = [];
+  let successCount = 0;
+  for (const input of inputs) {
+    if (typeof input !== "object" || input === null) {
+      return Object.freeze({
+        ok: false,
+        reason: "invalid-input" as const,
+        results: Object.freeze([...results]),
+      });
+    }
+    const result = resolveStudioBg3dSurfaceSnap(input);
+    results.push(result);
+    if (result.ok) successCount += 1;
+  }
+
+  const frozenResults = Object.freeze(results.slice());
+  if (successCount === 0) {
+    return Object.freeze({
+      ok: false,
+      reason: frozenResults[0]?.ok === false
+        ? frozenResults[0].reason
+        : ("invalid-input" as const),
+      results: frozenResults,
+    });
+  }
+  return Object.freeze({ ok: true, results: frozenResults });
 }

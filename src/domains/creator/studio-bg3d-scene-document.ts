@@ -8,6 +8,11 @@
 
 import { normalizeStudioBg3dCaptureAspectRatio } from "./studio-bg3d-capture-frame-geometry";
 import { normalizeStudioBg3dHierarchyParents } from "./studio-bg3d-hierarchy";
+import {
+  attachStudioGeneric3dWorkflowMetadata,
+  parseStudioGeneric3dWorkflowMetadata,
+  type StudioGeneric3dWorkflowMetadataRecord,
+} from "./studio-generic-3d-workflow-metadata";
 
 export const STUDIO_BG3D_SCENE_DOCUMENT_KIND = "toonspectrum.bg3d-scene" as const;
 export const STUDIO_BG3D_SCENE_DOCUMENT_VERSION = 3 as const;
@@ -344,6 +349,11 @@ export interface StudioBg3dModelAttachment {
   readonly hash: string;
   readonly rights: StudioBg3dAttachmentRights;
   readonly source: StudioBg3dAttachmentSource;
+  /**
+   * Optional generic (non-VRM) workflow classification / source-format block.
+   * Sanitized via `studio-generic-3d-workflow-metadata` on parse; omitted when unknown.
+   */
+  readonly generic3dWorkflow?: StudioGeneric3dWorkflowMetadataRecord;
 }
 
 /**
@@ -1524,7 +1534,7 @@ function normalizeAttachment(value: unknown): StudioBg3dModelAttachment | null {
   ) {
     return null;
   }
-  return {
+  const base: StudioBg3dModelAttachment = {
     id,
     name: rawName.replace(/\.glb$/iu, ".glb"),
     mime: STUDIO_BG3D_GLB_MIME,
@@ -1533,6 +1543,16 @@ function normalizeAttachment(value: unknown): StudioBg3dModelAttachment | null {
     rights,
     source: value.source as StudioBg3dAttachmentSource,
   };
+  // Fail closed: corrupt/unknown workflow blocks are dropped; valid v1 fields re-attach sanitized.
+  const workflow = parseStudioGeneric3dWorkflowMetadata(value);
+  if (!workflow) return base;
+  if (!workflow.classification && !workflow.sourceFormat) {
+    return attachStudioGeneric3dWorkflowMetadata(base);
+  }
+  return attachStudioGeneric3dWorkflowMetadata(base, {
+    ...(workflow.classification ? { classification: workflow.classification } : {}),
+    ...(workflow.sourceFormat ? { sourceFormat: workflow.sourceFormat } : {}),
+  });
 }
 
 function normalizeAttachments(

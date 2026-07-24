@@ -56,8 +56,9 @@ describe("Studio 3D asynchronous capture integration boundary", () => {
     expect(handleInsert).toContain("captureInFlightRef.current || isCapturing");
     expect(handleInsert).toContain("createStudioBg3dCaptureBackgroundSnapshot");
     expect(handleInsert).toContain("setCaptureBackgroundSnapshot(backgroundSnapshot)");
-    expect(handleInsert).toContain("color: backgroundSnapshot.clearColor");
-    expect(handleInsert).toContain("alpha: backgroundSnapshot.transparent ? 0 : 1");
+    expect(handleInsert).toContain(
+      "background: studioBg3dCaptureBackgroundRequestFromSnapshot(backgroundSnapshot)",
+    );
     expect(handleInsert).toContain("captureInFlightRef.current = false");
     expect(background3dSource).toContain("inert={isCapturing}");
     expect(background3dSource).toContain("aria-busy={isCapturing || undefined}");

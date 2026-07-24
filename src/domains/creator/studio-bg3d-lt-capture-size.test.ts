@@ -6,6 +6,7 @@ import {
   STUDIO_BG3D_LT_CAPTURE_MAX_PIXELS,
   STUDIO_BG3D_LT_CAPTURE_MIN_HEIGHT,
   resolveStudioBg3dLtCaptureSize,
+  resolveStudioBg3dShotCaptureSize,
 } from "./studio-bg3d-lt-capture-size";
 
 describe("resolveStudioBg3dLtCaptureSize", () => {
@@ -215,5 +216,70 @@ describe("resolveStudioBg3dLtCaptureSize", () => {
       expect(result!.width).toBeLessThanOrEqual(2_049);
       expect(result!.height).toBeLessThanOrEqual(2_049);
     }
+  });
+});
+
+describe("resolveStudioBg3dShotCaptureSize", () => {
+  it("matches legacy LT capture size when export aspect is omitted", () => {
+    const input = {
+      sourceWidth: 1_512,
+      sourceHeight: 851,
+      requestedHeight: 720,
+      maxPixels: 8_294_400,
+    };
+    expect(resolveStudioBg3dShotCaptureSize(input)).toEqual(
+      resolveStudioBg3dLtCaptureSize(input),
+    );
+    expect(resolveStudioBg3dShotCaptureSize({
+      ...input,
+      exportAspectRatio: null,
+    })).toEqual(resolveStudioBg3dLtCaptureSize(input));
+  });
+
+  it("fixed export aspect yields the same size for two different source viewports", () => {
+    const budgets = {
+      requestedHeight: 720,
+      maxPixels: 8_294_400,
+      maxEdge: 4_096,
+      exportAspectRatio: 16 / 9,
+    } as const;
+    const wide = resolveStudioBg3dShotCaptureSize({
+      sourceWidth: 1_512,
+      sourceHeight: 851,
+      ...budgets,
+    });
+    const portrait = resolveStudioBg3dShotCaptureSize({
+      sourceWidth: 640,
+      sourceHeight: 900,
+      ...budgets,
+    });
+    expect(wide).not.toBeNull();
+    expect(portrait).not.toBeNull();
+    expect(wide).toEqual(portrait);
+    expect(wide!.width / wide!.height).toBeCloseTo(16 / 9, 2);
+  });
+
+  it("ignores non-finite export aspects and fails closed on invalid budgets", () => {
+    const base = {
+      sourceWidth: 1_000,
+      sourceHeight: 1_000,
+      requestedHeight: 720,
+      maxPixels: 2_000_000,
+    };
+    expect(resolveStudioBg3dShotCaptureSize({
+      ...base,
+      exportAspectRatio: Number.NaN,
+    })).toEqual(resolveStudioBg3dLtCaptureSize(base));
+    expect(resolveStudioBg3dShotCaptureSize({
+      ...base,
+      exportAspectRatio: 0,
+    })).toEqual(resolveStudioBg3dLtCaptureSize(base));
+    expect(resolveStudioBg3dShotCaptureSize({
+      sourceWidth: 0,
+      sourceHeight: 100,
+      requestedHeight: 720,
+      maxPixels: 1_000_000,
+      exportAspectRatio: 16 / 9,
+    })).toBeNull();
   });
 });

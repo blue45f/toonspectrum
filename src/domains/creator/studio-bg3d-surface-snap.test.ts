@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 import {
   collectStudioBg3dSurfaceSelectionSubtreeIds,
   collectStudioBg3dSurfaceTargetPathIds,
+  planStudioBg3dMultiSurfaceSnap,
   resolveStudioBg3dSurfaceSnap,
+  resolveStudioBg3dSurfaceSnapOrientation,
   type ResolveStudioBg3dSurfaceSnapInput,
 } from "./studio-bg3d-surface-snap";
 
@@ -223,5 +225,191 @@ describe("Studio BG3D surface snap", () => {
       },
       surfaceOffset: 0,
     }, "result-out-of-bounds");
+  });
+
+  it("preserves rotation by default and rejects non-boolean alignRotationToNormal", () => {
+    const defaultResult = resolveStudioBg3dSurfaceSnap(BASE);
+    expect(defaultResult.ok).toBe(true);
+    if (!defaultResult.ok) return;
+    expect(defaultResult.rotation).toEqual([0.1, -0.2, 0.3]);
+
+    const explicitFalse = resolveStudioBg3dSurfaceSnap({
+      ...BASE,
+      alignRotationToNormal: false,
+    });
+    expect(explicitFalse.ok).toBe(true);
+    if (!explicitFalse.ok) return;
+    expect(explicitFalse.rotation).toEqual([0.1, -0.2, 0.3]);
+
+    expectFailure({
+      ...BASE,
+      alignRotationToNormal: "yes" as unknown as boolean,
+    }, "invalid-input");
+  });
+
+  it("aligns local +Y to the hit normal when alignRotationToNormal is true", () => {
+    const result = resolveStudioBg3dSurfaceSnap({
+      ...BASE,
+      alignRotationToNormal: true,
+      hit: { ...BASE.hit, normal: [0, 0, 2] },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const expected = resolveStudioBg3dSurfaceSnapOrientation([0, 0, 2]);
+    expect(expected).not.toBeNull();
+    expect(result.rotation[0]).toBeCloseTo(expected![0], 9);
+    expect(result.rotation[1]).toBeCloseTo(expected![1], 9);
+    expect(result.rotation[2]).toBeCloseTo(expected![2], 9);
+    // Position path stays identical to the non-aligned case.
+    const unaligned = resolveStudioBg3dSurfaceSnap({
+      ...BASE,
+      hit: { ...BASE.hit, normal: [0, 0, 2] },
+    });
+    expect(unaligned.ok).toBe(true);
+    if (!unaligned.ok) return;
+    expect(result.localPosition).toEqual(unaligned.localPosition);
+    expect(result.worldPosition).toEqual(unaligned.worldPosition);
+  });
+});
+
+describe("resolveStudioBg3dSurfaceSnapOrientation", () => {
+  it("maps identity normal +Y to a near-zero Euler", () => {
+    const orientation = resolveStudioBg3dSurfaceSnapOrientation([0, 2, 0]);
+    expect(orientation).not.toBeNull();
+    expect(orientation![0]).toBeCloseTo(0, 9);
+    expect(orientation![1]).toBeCloseTo(0, 9);
+    expect(orientation![2]).toBeCloseTo(0, 9);
+    expect(Object.isFrozen(orientation)).toBe(true);
+  });
+
+  it("aligns local +Y with an arbitrary normal and fails closed on zero-length", () => {
+    const orientation = resolveStudioBg3dSurfaceSnapOrientation([1, 0, 0]);
+    expect(orientation).not.toBeNull();
+    const yAxis = new THREE.Vector3(0, 1, 0).applyEuler(
+      new THREE.Euler(orientation![0], orientation![1], orientation![2], "XYZ"),
+    );
+    expect(yAxis.x).toBeCloseTo(1, 6);
+    expect(yAxis.y).toBeCloseTo(0, 6);
+    expect(yAxis.z).toBeCloseTo(0, 6);
+
+    expect(resolveStudioBg3dSurfaceSnapOrientation([0, 0, 0])).toBeNull();
+    expect(resolveStudioBg3dSurfaceSnapOrientation([Number.NaN, 0, 1])).toBeNull();
+    expect(resolveStudioBg3dSurfaceSnapOrientation([0, 1, 0], { up: [0, 0, 0] })).toBeNull();
+  });
+
+  it("accepts a custom up vector when resolving roll", () => {
+    const withDefaultUp = resolveStudioBg3dSurfaceSnapOrientation([0, 0, 1]);
+    const withCustomUp = resolveStudioBg3dSurfaceSnapOrientation([0, 0, 1], { up: [1, 0, 0] });
+    expect(withDefaultUp).not.toBeNull();
+    expect(withCustomUp).not.toBeNull();
+    // Both map +Y to +Z; roll around the normal may differ.
+    for (const orientation of [withDefaultUp!, withCustomUp!]) {
+      const yAxis = new THREE.Vector3(0, 1, 0).applyEuler(
+        new THREE.Euler(orientation[0], orientation[1], orientation[2], "XYZ"),
+      );
+      expect(yAxis.x).toBeCloseTo(0, 6);
+      expect(yAxis.y).toBeCloseTo(0, 6);
+      expect(yAxis.z).toBeCloseTo(1, 6);
+    }
+  });
+});
+
+describe("planStudioBg3dMultiSurfaceSnap", () => {
+  it("returns per-input results and succeeds when at least one snap succeeds", () => {
+    const locked: ResolveStudioBg3dSurfaceSnapInput = { ...BASE, locked: true, selectionId: "subject", selectedIds: ["subject"] };
+    const okSibling: ResolveStudioBg3dSurfaceSnapInput = {
+      ...BASE,
+      selectionId: "prop",
+      selectedIds: ["prop"],
+      selectionSubtreeIds: ["prop"],
+      hit: {
+        targetPathIds: ["floor"],
+        point: [0, 0, 0],
+        normal: [0, 1, 0],
+      },
+      surfaceOffset: 0,
+    };
+
+    const plan = planStudioBg3dMultiSurfaceSnap([locked, okSibling]);
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.results).toHaveLength(2);
+    expect(plan.results[0]).toEqual({ ok: false, reason: "locked" });
+    expect(plan.results[1]?.ok).toBe(true);
+    expect(Object.isFrozen(plan)).toBe(true);
+    expect(Object.isFrozen(plan.results)).toBe(true);
+  });
+
+  it("keeps self-hit and locked failures isolated so siblings still resolve", () => {
+    const selfHit: ResolveStudioBg3dSurfaceSnapInput = {
+      ...BASE,
+      hit: { ...BASE.hit, targetPathIds: ["subject"] },
+    };
+    const good: ResolveStudioBg3dSurfaceSnapInput = {
+      ...BASE,
+      selectionId: "other",
+      selectedIds: ["other"],
+      selectionSubtreeIds: ["other"],
+      hit: {
+        targetPathIds: ["platform"],
+        point: [1, 2, 3],
+        normal: [0, 1, 0],
+      },
+      surfaceOffset: 0,
+    };
+    const plan = planStudioBg3dMultiSurfaceSnap([selfHit, good]);
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.results[0]).toEqual({ ok: false, reason: "self-hit" });
+    expect(plan.results[1]?.ok).toBe(true);
+  });
+
+  it("fails closed on empty input, oversized lists, and all-fail batches", () => {
+    expect(planStudioBg3dMultiSurfaceSnap([])).toEqual({
+      ok: false,
+      reason: "empty-inputs",
+    });
+    expect(planStudioBg3dMultiSurfaceSnap(null as unknown as [])).toEqual({
+      ok: false,
+      reason: "invalid-input",
+    });
+
+    const allLocked = planStudioBg3dMultiSurfaceSnap([
+      { ...BASE, locked: true },
+      {
+        ...BASE,
+        selectionId: "prop",
+        selectedIds: ["prop"],
+        selectionSubtreeIds: ["prop"],
+        locked: true,
+      },
+    ]);
+    expect(allLocked.ok).toBe(false);
+    if (allLocked.ok) return;
+    expect(allLocked.reason).toBe("locked");
+    expect(allLocked.results).toHaveLength(2);
+
+    const tooMany = Array.from({ length: 65 }, (_, index) => ({
+      ...BASE,
+      selectionId: `id${index}`,
+      selectedIds: [`id${index}`],
+      selectionSubtreeIds: [`id${index}`],
+    }));
+    expect(planStudioBg3dMultiSurfaceSnap(tooMany)).toMatchObject({
+      ok: false,
+      reason: "invalid-input",
+    });
+  });
+
+  it("never mutates caller-owned inputs", () => {
+    const input: ResolveStudioBg3dSurfaceSnapInput = {
+      ...BASE,
+      localPosition: [2, 4, 1],
+      rotation: [0.1, -0.2, 0.3],
+    };
+    const snapshot = structuredClone(input);
+    const plan = planStudioBg3dMultiSurfaceSnap([input]);
+    expect(plan.ok).toBe(true);
+    expect(input).toEqual(snapshot);
   });
 });

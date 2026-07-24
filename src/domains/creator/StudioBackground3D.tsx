@@ -156,6 +156,7 @@ import {
 import { applyOrDeferStudioBg3dHistoryCamera } from "./studio-bg3d-camera-history-transition";
 import {
   createStudioBg3dCaptureBackgroundSnapshot,
+  studioBg3dCaptureBackgroundRequestFromSnapshot,
   type StudioBg3dCaptureBackgroundSnapshot,
 } from "./studio-bg3d-capture-background";
 import { registerStudioBg3dCaptureExcludedObject } from "./studio-bg3d-capture-exclusion";
@@ -192,6 +193,10 @@ import {
   collectStudioBg3dEffectivelyVisibleEntityIds,
   resolveStudioBg3dHierarchy,
 } from "./studio-bg3d-hierarchy";
+import {
+  resolveStudioBg3dInsertBackgroundFromDocument,
+  resolveStudioBg3dInsertBackgroundMode,
+} from "./studio-bg3d-insert-background-mode";
 import {
   STUDIO_BG3D_LENS_MAX_FOCAL_MM,
   STUDIO_BG3D_LENS_MIN_FOCAL_MM,
@@ -298,6 +303,7 @@ import {
   type StudioBg3dPhysicsGravityPreset,
   type StudioBg3dPhysicsPhase,
 } from "./studio-bg3d-physics-ui";
+import { planStudioBg3dModelPlacementRecipe } from "./studio-bg3d-placement-recipe";
 import {
   createStudioBg3dPlacementSession,
   transitionStudioBg3dPlacementSession,
@@ -408,7 +414,9 @@ import {
 import {
   collectStudioBg3dSurfaceSelectionSubtreeIds,
   collectStudioBg3dSurfaceTargetPathIds,
-  resolveStudioBg3dSurfaceSnap,
+  planStudioBg3dMultiSurfaceSnap,
+  STUDIO_BG3D_SURFACE_SNAP_MAX_MULTI_INPUTS,
+  type ResolveStudioBg3dSurfaceSnapInput,
 } from "./studio-bg3d-surface-snap";
 import {
   calculateStudioBg3dThreeReparentTransform,
@@ -430,6 +438,13 @@ import {
   type StudioGeneric3dSourceFormat,
 } from "./studio-generic-3d-model-mode";
 import { createStudioGeneric3dPoseProxies } from "./studio-generic-3d-pose-proxy";
+import {
+  attachStudioGeneric3dWorkflowMetadata,
+  mergeStudioGeneric3dWorkflowMaps,
+  normalizeStudioGeneric3dClassification,
+  normalizeStudioGeneric3dSourceFormat,
+  parseStudioGeneric3dWorkflowMetadata,
+} from "./studio-generic-3d-workflow-metadata";
 import { createTwoBoneDefaultPoleTarget } from "./studio-rig-two-bone-ik";
 import {
   StudioBg3dPhysicsPanel,
@@ -1250,6 +1265,40 @@ function bindModelAttachment(
   maps.attachmentByStorageModelId.set(record.id, attachment);
   maps.storageModelIdByAttachmentId.set(attachment.id, record.id);
   return true;
+}
+
+/** Writes sanitized generic-3D workflow metadata onto a scene-local attachment (fail-closed). */
+function withStudioGeneric3dWorkflowMetadata(
+  attachment: StudioBg3dModelAttachment,
+  meta: {
+    readonly classification?: StudioGeneric3dClassification | null;
+    readonly sourceFormat?: StudioGeneric3dSourceFormat | null;
+  },
+): StudioBg3dModelAttachment {
+  return attachStudioGeneric3dWorkflowMetadata(
+    { ...attachment },
+    {
+      ...(meta.classification != null ? { classification: meta.classification } : {}),
+      ...(meta.sourceFormat != null ? { sourceFormat: meta.sourceFormat } : {}),
+    },
+  );
+}
+
+function readGenericWorkflowMapsFromAttachments(
+  attachmentByStorageModelId: ReadonlyMap<string, StudioBg3dModelAttachment>,
+): {
+  readonly sourceFormats: Map<string, StudioGeneric3dSourceFormat>;
+  readonly classifications: Map<string, StudioGeneric3dClassification>;
+} {
+  const sourceFormats = new Map<string, StudioGeneric3dSourceFormat>();
+  const classifications = new Map<string, StudioGeneric3dClassification>();
+  for (const [storageId, attachment] of attachmentByStorageModelId) {
+    const workflow = parseStudioGeneric3dWorkflowMetadata(attachment);
+    if (!workflow) continue;
+    if (workflow.sourceFormat) sourceFormats.set(storageId, workflow.sourceFormat);
+    if (workflow.classification) classifications.set(storageId, workflow.classification);
+  }
+  return { sourceFormats, classifications };
 }
 
 async function admitAndCacheModel(args: {
@@ -2408,6 +2457,7 @@ export function StudioBackground3D({
     ...DEFAULT_STUDIO_BG3D_SNAP_SETTINGS,
   }));
   const [surfaceSnapArmed, setSurfaceSnapArmed] = useState(false);
+  const [surfaceSnapAlignNormal, setSurfaceSnapAlignNormal] = useState(false);
   const [surfaceSnapStatus, setSurfaceSnapStatus] = useState<{
     readonly tone: "info" | "error" | "success";
     readonly message: string;
@@ -2592,9 +2642,13 @@ export function StudioBackground3D({
     useState<StudioBg3dCaptureBackgroundSnapshot | null>(null);
   const [deviceSignals, setDeviceSignals] = useState<StudioBg3dDeviceSignals>(() => collectDeviceSignals());
   const skyPresetId = sceneBaseDocument.background.skyPresetId;
-  const transparentInsert =
-    sceneBaseDocument.output.transparentBackground ||
-    sceneBaseDocument.background.mode === "transparent";
+  const insertBackgroundIntent = resolveStudioBg3dInsertBackgroundFromDocument({
+    transparentBackground: sceneBaseDocument.output.transparentBackground,
+    backgroundMode: sceneBaseDocument.background.mode,
+  });
+  const transparentInsert = insertBackgroundIntent.ok
+    ? insertBackgroundIntent.plan.transparent
+    : false;
 
   const captureRef = useRef<CaptureState>({ adapter: null, camera: null });
   const modalDialogRef = useRef<HTMLDivElement | null>(null);
@@ -3211,6 +3265,11 @@ export function StudioBackground3D({
         historyIndexRef.current = 0;
         setPrimitives(hydrated.primitives);
         setCustomModels(hydrated.customModels);
+        const restoredWorkflow = readGenericWorkflowMapsFromAttachments(
+          attachmentByStorageModelIdRef.current,
+        );
+        setGenericModelSourceFormats(restoredWorkflow.sourceFormats);
+        setGenericModelClassifications(restoredWorkflow.classifications);
         if (
           recoveryFailed ||
           !hydrated.ok ||
@@ -3963,6 +4022,99 @@ export function StudioBackground3D({
     }
   }
 
+  function placeSelectedModelRecipe() {
+    if (physicsInteractionLocked) {
+      setError("물리 미리보기 중에는 장면 변형 도구를 잠급니다.");
+      return;
+    }
+    if (selectedIds.size === 0) {
+      setError("배치 정리할 커스텀 모델을 선택해 주세요.");
+      return;
+    }
+    if (selectedIds.size > STUDIO_BG3D_SURFACE_SNAP_MAX_MULTI_INPUTS) {
+      setError(
+        `배치 정리는 한 번에 최대 ${STUDIO_BG3D_SURFACE_SNAP_MAX_MULTI_INPUTS}개까지 지원합니다.`,
+      );
+      return;
+    }
+
+    // Multi-select: independent per-model auto-fit → ground recipes, one history step (surface snap style).
+    const models: BgCustomModelInstance[] = [];
+    for (const id of selectedIds) {
+      const model = customModels.find((candidate) => candidate.id === id);
+      if (!model) {
+        setError("배치 정리는 커스텀 모델에만 사용할 수 있습니다.");
+        return;
+      }
+      models.push(model);
+    }
+    if (models.every((model) => isBgObjectTransformBlocked(model))) {
+      setError("선택한 객체의 잠금을 먼저 해제해 주세요.");
+      return;
+    }
+
+    const transformById = new Map<
+      string,
+      {
+        position: [number, number, number];
+        rotation: [number, number, number];
+        scale: [number, number, number];
+      }
+    >();
+    let successCount = 0;
+    let firstFailure: string | null = null;
+    for (const model of models) {
+      if (transformById.size >= STUDIO_BG3D_SURFACE_SNAP_MAX_MULTI_INPUTS) break;
+      if (isBgObjectTransformBlocked(model)) continue;
+      const root = modelRootCacheRef.current.get(model.modelId)?.root;
+      const boundingSize = root
+        ? measureBg3dObjectSize(root)
+        : ([2, 2, 2] as [number, number, number]);
+      const result = planStudioBg3dModelPlacementRecipe({
+        position: model.position,
+        rotation: model.rotation,
+        scale: model.scale,
+        boundingSize,
+        autoFitTargetSize: 2,
+        groundY: 0,
+        yawDegrees: 0,
+      });
+      if (!result.ok) {
+        firstFailure ??= result.reason;
+        continue;
+      }
+      successCount += 1;
+      transformById.set(model.id, {
+        position: [...result.position] as [number, number, number],
+        rotation: [...result.rotation] as [number, number, number],
+        scale: [...result.scale] as [number, number, number],
+      });
+    }
+
+    if (successCount === 0) {
+      setError(firstFailure ?? "배치 정리를 적용할 수 없습니다.");
+      return;
+    }
+
+    const nextCustomModels = customModels.map((model) => {
+      const next = transformById.get(model.id);
+      if (!next) return model;
+      return {
+        ...model,
+        position: next.position,
+        rotation: next.rotation,
+        scale: next.scale,
+      };
+    });
+    commitImmediateHistoryTransition(primitives, nextCustomModels, sceneBaseDocument);
+    setCustomModels(nextCustomModels);
+    setError(null);
+    setSurfaceSnapStatus({
+      tone: "success",
+      message: `${successCount}개 배치를 정리했어요`,
+    });
+  }
+
   function centerAndGroundSelectedEntity() {
     if (
       selectedIds.size !== 1 ||
@@ -4136,7 +4288,18 @@ export function StudioBackground3D({
     const record = await getStoredBg3dModel(modelId);
     if (!record) return null;
     const existingAttachment = attachmentByStorageModelIdRef.current.get(modelId);
-    const attachment = existingAttachment ?? createStudioBg3dModelAttachment(record);
+    const sourceFormat =
+      normalizeStudioGeneric3dSourceFormat(genericModelSourceFormats.get(modelId))
+      ?? parseStudioGeneric3dWorkflowMetadata(existingAttachment)?.sourceFormat
+      ?? "glb";
+    const classification =
+      normalizeStudioGeneric3dClassification(genericModelClassifications.get(modelId))
+      ?? parseStudioGeneric3dWorkflowMetadata(existingAttachment)?.classification
+      ?? null;
+    const attachment = withStudioGeneric3dWorkflowMetadata(
+      existingAttachment ?? createStudioBg3dModelAttachment(record),
+      { sourceFormat, classification },
+    );
     const live = physicsRuntimeSourceRef.current;
     const cumulativeUsedBytes = calculateStudioBg3dPlacedModelBytes(
       live.customModels,
@@ -4159,6 +4322,11 @@ export function StudioBackground3D({
     }, record, attachment)) {
       return null;
     }
+    setGenericModelSourceFormats((previous) =>
+      previous.get(modelId) === sourceFormat
+        ? previous
+        : mergeStudioGeneric3dWorkflowMaps(previous, new Map([[modelId, sourceFormat]])),
+    );
     return record;
   }
 
@@ -4648,9 +4816,18 @@ export function StudioBackground3D({
               return attachment ? [attachment.hash] : [];
             }),
           );
-          for (const record of saved) {
+          for (let index = 0; index < saved.length; index += 1) {
+            const record = saved[index]!;
             const existing = attachmentByStorageModelIdRef.current.get(record.id);
-            const attachment = existing ?? createStudioBg3dModelAttachment(record);
+            const sourceFormat =
+              normalizeStudioGeneric3dSourceFormat(plannedSourceFormats[index] ?? "glb") ?? "glb";
+            const attachment = withStudioGeneric3dWorkflowMetadata(
+              existing ?? createStudioBg3dModelAttachment(record),
+              {
+                sourceFormat,
+                classification: genericModelClassifications.get(record.id) ?? null,
+              },
+            );
             await admitAndCacheModel({
               record,
               document: sceneBaseDocument,
@@ -4708,13 +4885,16 @@ export function StudioBackground3D({
             storageModelIdByAttachmentIdRef.current.set(attachmentId, id);
           }
           setModelLibrary(libraryEntries);
-          setGenericModelSourceFormats((previous) => {
-            const next = new Map(previous);
-            for (let index = 0; index < saved.length; index += 1) {
-              next.set(saved[index]!.id, plannedSourceFormats[index] ?? "glb");
-            }
-            return next;
-          });
+          const importedFormats = new Map<string, StudioGeneric3dSourceFormat>();
+          for (let index = 0; index < saved.length; index += 1) {
+            importedFormats.set(
+              saved[index]!.id,
+              normalizeStudioGeneric3dSourceFormat(plannedSourceFormats[index] ?? "glb") ?? "glb",
+            );
+          }
+          setGenericModelSourceFormats((previous) =>
+            mergeStudioGeneric3dWorkflowMaps(previous, importedFormats),
+          );
           if (placements.length > 0) {
             const current = physicsRuntimeSourceRef.current;
             physicsRuntimeSourceRef.current = {
@@ -5528,10 +5708,7 @@ export function StudioBackground3D({
           includeDepth: applied.output.line.depthEnabled || selectedShotBatchPasses.includes("depth"),
           shadows: shotQuality.shadows,
           shadowMapSize: shotQuality.shadowMapSize,
-          background: {
-            color: background.clearColor,
-            alpha: background.transparent ? 0 : 1,
-          },
+          background: studioBg3dCaptureBackgroundRequestFromSnapshot(background),
         };
       });
       const batchPlanResult = await createStudioBg3dShotBatchPlan(shots, {
@@ -5663,9 +5840,10 @@ export function StudioBackground3D({
           background: applied.background,
           transparent: applied.output.transparentBackground,
         });
+        const plannedBackground = studioBg3dCaptureBackgroundRequestFromSnapshot(backgroundSnapshot);
         if (
-          backgroundSnapshot.clearColor.toLowerCase() !== shot.capture.background.color.toLowerCase() ||
-          (backgroundSnapshot.transparent ? 0 : 1) !== shot.capture.background.alpha
+          plannedBackground.color.toLowerCase() !== shot.capture.background.color.toLowerCase() ||
+          plannedBackground.alpha !== shot.capture.background.alpha
         ) {
           throw new Error("컷 배경이 동결된 캡처 계획과 달라졌습니다.");
         }
@@ -6111,16 +6289,21 @@ export function StudioBackground3D({
   }
 
   function updateBackgroundTransparency(transparent: boolean) {
+    const modeResult = resolveStudioBg3dInsertBackgroundMode({ transparent });
+    if (!modeResult.ok) {
+      setError(modeResult.reason);
+      return;
+    }
     setSceneBaseDocument((current) => {
       const candidate: StudioBg3dSceneDocument = {
         ...current,
         background: {
           ...current.background,
-          mode: transparent ? "transparent" : "sky-preset",
+          mode: modeResult.plan.documentBackgroundMode,
         },
         output: {
           ...current.output,
-          transparentBackground: transparent,
+          transparentBackground: modeResult.plan.transparent,
         },
       };
       return canonicalSceneDocument(candidate) ?? current;
@@ -6256,6 +6439,10 @@ export function StudioBackground3D({
       destructiveMutationGuardRef.current.blocksClose || insertBlocked ||
       isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)
     ) return;
+    if (!insertBackgroundIntent.ok) {
+      setError(insertBackgroundIntent.reason);
+      return;
+    }
     const currentCapture = captureRef.current;
     if (!currentCapture.adapter) {
       setError("캡처할 3D 장면이 아직 준비되지 않았습니다.");
@@ -6318,10 +6505,7 @@ export function StudioBackground3D({
       const captured = await captureStudioBg3dRaster(captureAdapter, {
         width: 320,
         height: 320,
-        background: {
-          color: backgroundSnapshot.clearColor,
-          alpha: backgroundSnapshot.transparent ? 0 : 1,
-        },
+        background: studioBg3dCaptureBackgroundRequestFromSnapshot(backgroundSnapshot),
         includeDepth: false,
       });
       if (!componentActiveRef.current || captureRef.current.adapter !== captureAdapter) return;
@@ -6367,6 +6551,10 @@ export function StudioBackground3D({
     }
     if (insertBlocked) {
       setError("3D 장면 복원과 모델 렌더 준비를 모두 마친 뒤 추가할 수 있습니다.");
+      return;
+    }
+    if (!insertBackgroundIntent.ok) {
+      setError(insertBackgroundIntent.reason);
       return;
     }
     const currentCapture = captureRef.current;
@@ -6490,10 +6678,7 @@ export function StudioBackground3D({
       const captured = await captureStudioBg3dRaster(captureAdapter, {
         width: captureSize.width,
         height: captureSize.height,
-        background: {
-          color: backgroundSnapshot.clearColor,
-          alpha: backgroundSnapshot.transparent ? 0 : 1,
-        },
+        background: studioBg3dCaptureBackgroundRequestFromSnapshot(backgroundSnapshot),
         includeDepth: ltSettingsSnapshot.line.depthEnabled,
       }, { signal: insertController.signal, timeoutMs: 30_000 })
         // 성공·실패·취소 어느 쪽이든 라이브 카메라를 원래 view 창으로 되돌린다(멱등).
@@ -6674,11 +6859,26 @@ export function StudioBackground3D({
     classification: StudioGeneric3dClassification,
   ): void {
     if (!selectedCustomModel) return;
-    setGenericModelClassifications((previous) => {
-      const next = new Map(previous);
-      next.set(selectedCustomModel.modelId, classification);
-      return next;
-    });
+    const normalized = normalizeStudioGeneric3dClassification(classification);
+    if (!normalized) return;
+    const storageId = selectedCustomModel.modelId;
+    const existing = attachmentByStorageModelIdRef.current.get(storageId);
+    if (existing) {
+      const sourceFormat =
+        normalizeStudioGeneric3dSourceFormat(genericModelSourceFormats.get(storageId)) ??
+        parseStudioGeneric3dWorkflowMetadata(existing)?.sourceFormat ??
+        null;
+      attachmentByStorageModelIdRef.current.set(
+        storageId,
+        withStudioGeneric3dWorkflowMetadata(existing, {
+          classification: normalized,
+          sourceFormat,
+        }),
+      );
+    }
+    setGenericModelClassifications((previous) =>
+      mergeStudioGeneric3dWorkflowMaps(previous, new Map([[storageId, normalized]])),
+    );
   }
 
   function changeGenericModelControlMode(mode: StudioGeneric3dControlMode): void {
@@ -6935,6 +7135,19 @@ export function StudioBackground3D({
     []
   );
   const canGroundSelection = selectedEntities.some((entity) => !isBgObjectTransformBlocked(entity));
+  const selectedPlaceableModels = selectedEntities.filter(
+    (entity): entity is BgCustomModelInstance =>
+      customModels.some((model) => model.id === entity.id),
+  );
+  // Placement recipe is custom-model only; multi is allowed when every selection is a model and at
+  // least one is unlocked (locked siblings are skipped inside the command).
+  const canPlaceSelectedModelRecipe =
+    !physicsInteractionLocked &&
+    selectedIds.size > 0 &&
+    selectedIds.size <= STUDIO_BG3D_SURFACE_SNAP_MAX_MULTI_INPUTS &&
+    selectedEntities.length === selectedIds.size &&
+    selectedPlaceableModels.length === selectedEntities.length &&
+    selectedPlaceableModels.some((model) => !isBgObjectTransformBlocked(model));
   const groundSelectionDisabledReason =
     physicsInteractionLocked
       ? "물리 미리보기 중에는 장면 변형 도구를 잠급니다."
@@ -7038,19 +7251,23 @@ export function StudioBackground3D({
         ? "3D 장면 또는 모델 작업이 끝난 뒤 표면 붙이기를 사용해 주세요."
         : physicsInteractionLocked || isTransforming
           ? "물리 미리보기나 변형 작업 중에는 표면 붙이기를 사용할 수 없습니다."
-          : selectedIds.size !== 1 || !selectedEntity
-            ? "표면에 붙일 객체를 하나만 선택해 주세요."
-            : selectedIsLocked
-              ? "선택한 객체의 잠금을 먼저 해제해 주세요."
-              : !effectivelyVisibleLayerIds.has(selectedEntity.id)
-                ? "숨겨진 객체는 표면에 붙일 수 없습니다."
-                : selectedCustomModel && !readyCloneIds.has(selectedCustomModel.id)
-                  ? failedCloneIds.has(selectedCustomModel.id)
-                    ? "선택한 모델 지오메트리를 불러오지 못했습니다."
-                    : "선택한 모델 지오메트리를 준비하는 중입니다."
-                  : !primitiveObjectsRef.current.has(selectedEntity.id)
-                    ? "선택한 객체의 지오메트리를 준비하는 중입니다."
-                    : null;
+          : selectedIds.size === 0
+            ? "표면에 붙일 객체를 선택해 주세요."
+            : selectedIds.size > STUDIO_BG3D_SURFACE_SNAP_MAX_MULTI_INPUTS
+              ? `표면 붙이기는 한 번에 최대 ${STUDIO_BG3D_SURFACE_SNAP_MAX_MULTI_INPUTS}개까지 지원합니다.`
+              : selectedEntities.length === 0
+                ? "표면에 붙일 객체를 선택해 주세요."
+                : selectedEntities.every((entity) => isBgObjectTransformBlocked(entity))
+                  ? "선택한 객체의 잠금을 먼저 해제해 주세요."
+                  : selectedEntities.every((entity) => !effectivelyVisibleLayerIds.has(entity.id))
+                    ? "숨겨진 객체는 표면에 붙일 수 없습니다."
+                    : selectedEntities.every((entity) => {
+                        const custom = customModels.find((model) => model.id === entity.id);
+                        if (custom && !readyCloneIds.has(custom.id)) return true;
+                        return !primitiveObjectsRef.current.has(entity.id);
+                      })
+                      ? "선택한 객체의 지오메트리를 준비하는 중입니다."
+                      : null;
   const focusSelectionDisabledReason = isCapturing || isBatchRenderingShots || isRestoringScene ||
       physicsInteractionLocked
     ? "다른 3D 작업이 끝난 뒤 화면 맞춤을 사용해 주세요."
@@ -7089,7 +7306,7 @@ export function StudioBackground3D({
     event: ThreeEvent<MouseEvent>,
   ): boolean {
     if (!surfaceSnapArmedRef.current) return false;
-    if (surfaceSnapDisabledReason || !selectedEntity) {
+    if (surfaceSnapDisabledReason || selectedEntities.length === 0) {
       cancelSurfaceSnap();
       setSurfaceSnapStatus({
         tone: "error",
@@ -7102,19 +7319,12 @@ export function StudioBackground3D({
       return true;
     }
 
-    const selectionObject = primitiveObjectsRef.current.get(selectedEntity.id);
-    const worldBounds = readStudioBg3dObjectWorldBounds(selectionObject);
     const worldHit = readStudioBg3dWorldSurfaceHit(event);
-    const selectionSubtreeIds = collectStudioBg3dSurfaceSelectionSubtreeIds(
-      selectedEntity.id,
-      sceneHierarchy.childrenByParent,
-    );
     const targetPathIds = collectStudioBg3dSurfaceTargetPathIds(
       targetId,
       sceneHierarchy.parentById,
     );
-    selectionObject?.parent?.updateWorldMatrix(true, false);
-    if (!selectionObject || !worldBounds || !worldHit || !selectionSubtreeIds || !targetPathIds) {
+    if (!worldHit || !targetPathIds) {
       setSurfaceSnapStatus({
         tone: "error",
         message: "클릭한 표면의 위치·법선 또는 객체 계층을 확인하지 못했습니다. 다른 면을 클릭해 주세요.",
@@ -7122,52 +7332,133 @@ export function StudioBackground3D({
       return true;
     }
 
-    const result = resolveStudioBg3dSurfaceSnap({
-      selectedIds: [...selectedIds],
-      selectionId: selectedEntity.id,
-      selectionSubtreeIds,
-      locked: selectedIsLocked,
-      localPosition: selectedEntity.position,
-      rotation: selectedEntity.rotation,
-      worldBounds,
-      ...(selectionObject.parent
-        ? { parentWorldMatrix: [...selectionObject.parent.matrixWorld.elements] }
-        : {}),
-      hit: {
-        targetPathIds,
-        point: worldHit.point,
-        normal: worldHit.normal,
-      },
-      surfaceOffset: 0.01,
-    });
-    if (!result.ok) {
+    // Multi-select: shared hit normal/point; each object keeps individual world bounds + subtree.
+    // Single-select still goes through planStudioBg3dMultiSurfaceSnap (1 input) for one code path.
+    const snapInputs: ResolveStudioBg3dSurfaceSnapInput[] = [];
+    const snapEntities: Array<BgPrimitive | BgCustomModelInstance> = [];
+    for (const entity of selectedEntities) {
+      if (snapInputs.length >= STUDIO_BG3D_SURFACE_SNAP_MAX_MULTI_INPUTS) break;
+      const selectionObject = primitiveObjectsRef.current.get(entity.id);
+      const worldBounds = readStudioBg3dObjectWorldBounds(selectionObject);
+      const selectionSubtreeIds = collectStudioBg3dSurfaceSelectionSubtreeIds(
+        entity.id,
+        sceneHierarchy.childrenByParent,
+      );
+      selectionObject?.parent?.updateWorldMatrix(true, false);
+      if (!selectionObject || !worldBounds || !selectionSubtreeIds) continue;
+      snapEntities.push(entity);
+      snapInputs.push({
+        // Per-object single-selection contract required by resolveStudioBg3dSurfaceSnap.
+        selectedIds: [entity.id],
+        selectionId: entity.id,
+        selectionSubtreeIds,
+        locked: isBgObjectTransformBlocked(entity),
+        localPosition: entity.position,
+        rotation: entity.rotation,
+        worldBounds,
+        ...(selectionObject.parent
+          ? { parentWorldMatrix: [...selectionObject.parent.matrixWorld.elements] }
+          : {}),
+        hit: {
+          targetPathIds,
+          point: worldHit.point,
+          normal: worldHit.normal,
+        },
+        surfaceOffset: 0.01,
+        alignRotationToNormal: surfaceSnapAlignNormal,
+      });
+    }
+
+    if (snapInputs.length === 0) {
       setSurfaceSnapStatus({
         tone: "error",
-        message: result.reason === "self-hit"
+        message: "선택한 객체의 지오메트리를 준비하지 못했습니다. 준비가 끝난 뒤 다시 시도해 주세요.",
+      });
+      return true;
+    }
+
+    const plan = planStudioBg3dMultiSurfaceSnap(snapInputs);
+    if (!plan.ok) {
+      const firstReason = plan.results?.find((result) => !result.ok && "reason" in result);
+      const reason = firstReason && !firstReason.ok ? firstReason.reason : plan.reason;
+      setSurfaceSnapStatus({
+        tone: "error",
+        message: reason === "self-hit"
           ? "선택한 객체나 그 자식 표면에는 붙일 수 없습니다. 다른 객체의 면을 클릭해 주세요."
           : "이 표면에는 객체를 안전하게 배치할 수 없습니다. 다른 면을 클릭해 주세요.",
       });
       return true;
     }
 
-    const nextPrimitives = selectedPrimitive
-      ? primitives.map((primitive) => primitive.id === selectedPrimitive.id
-        ? { ...primitive, position: [...result.localPosition] as [number, number, number] }
-        : primitive)
-      : primitives;
-    const nextCustomModels = selectedCustomModel
-      ? customModels.map((model) => model.id === selectedCustomModel.id
-        ? { ...model, position: [...result.localPosition] as [number, number, number] }
-        : model)
-      : customModels;
+    const positionById = new Map<string, [number, number, number]>();
+    const rotationById = new Map<string, [number, number, number]>();
+    let successCount = 0;
+    let selfHitCount = 0;
+    let lockedCount = 0;
+    for (let index = 0; index < plan.results.length; index += 1) {
+      const result = plan.results[index]!;
+      const entity = snapEntities[index];
+      if (!entity) continue;
+      if (!result.ok) {
+        if (result.reason === "self-hit") selfHitCount += 1;
+        if (result.reason === "locked") lockedCount += 1;
+        continue;
+      }
+      successCount += 1;
+      positionById.set(entity.id, [...result.localPosition] as [number, number, number]);
+      if (surfaceSnapAlignNormal) {
+        rotationById.set(entity.id, [...result.rotation] as [number, number, number]);
+      }
+    }
+
+    if (successCount === 0) {
+      setSurfaceSnapStatus({
+        tone: "error",
+        message: selfHitCount > 0
+          ? "선택한 객체나 그 자식 표면에는 붙일 수 없습니다. 다른 객체의 면을 클릭해 주세요."
+          : lockedCount > 0
+            ? "선택한 객체의 잠금을 먼저 해제해 주세요."
+            : "이 표면에는 객체를 안전하게 배치할 수 없습니다. 다른 면을 클릭해 주세요.",
+      });
+      return true;
+    }
+
+    const nextPrimitives = primitives.map((primitive) => {
+      const nextPosition = positionById.get(primitive.id);
+      if (!nextPosition) return primitive;
+      const nextRotation = rotationById.get(primitive.id);
+      return {
+        ...primitive,
+        position: nextPosition,
+        ...(nextRotation ? { rotation: nextRotation } : {}),
+      };
+    });
+    const nextCustomModels = customModels.map((model) => {
+      const nextPosition = positionById.get(model.id);
+      if (!nextPosition) return model;
+      const nextRotation = rotationById.get(model.id);
+      return {
+        ...model,
+        position: nextPosition,
+        ...(nextRotation ? { rotation: nextRotation } : {}),
+      };
+    });
     surfaceSnapArmedRef.current = false;
     setSurfaceSnapArmed(false);
     commitImmediateHistoryTransition(nextPrimitives, nextCustomModels, sceneBaseDocument);
     setPrimitives(nextPrimitives);
     setCustomModels(nextCustomModels);
+    const failedCount = snapInputs.length - successCount;
+    const multi = snapInputs.length > 1;
     setSurfaceSnapStatus({
       tone: "success",
-      message: "선택한 객체를 클릭한 표면에 붙였습니다. 회전은 그대로 유지했습니다.",
+      message: multi
+        ? surfaceSnapAlignNormal
+          ? `${successCount}개 객체를 표면에 붙이고 법선에 맞춰 회전했어요.${failedCount > 0 ? ` (${failedCount}개는 건너뜀)` : ""}`
+          : `${successCount}개 객체를 클릭한 표면에 붙였습니다.${failedCount > 0 ? ` (${failedCount}개는 건너뜀)` : ""}`
+        : surfaceSnapAlignNormal
+          ? "표면에 붙이고 법선에 맞춰 회전했어요."
+          : "선택한 객체를 클릭한 표면에 붙였습니다. 회전은 그대로 유지했습니다.",
     });
     setError(null);
     return true;
@@ -8274,6 +8565,20 @@ export function StudioBackground3D({
                       <MoveDown size={16} aria-hidden />
                     </button>
                   </StudioToolHintTarget>
+                  <button
+                    type="button"
+                    aria-label="배치 정리"
+                    title="자동 맞춤 후 바닥에 붙입니다 (다중 선택 지원)"
+                    disabled={!canPlaceSelectedModelRecipe}
+                    className={cx(
+                      "inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-line/70 bg-panel/80 px-1.5 text-[0.65rem] font-semibold text-fg-2 shadow-sm backdrop-blur transition-colors",
+                      "hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                      "disabled:cursor-not-allowed disabled:opacity-40",
+                    )}
+                    onClick={placeSelectedModelRecipe}
+                  >
+                    배치 정리
+                  </button>
                   <StudioToolHintTarget
                     hint={BG3D_VIEWPORT_HINTS.originGround}
                     disabled={Boolean(centerGroundSelectionDisabledReason)}
@@ -8313,6 +8618,22 @@ export function StudioBackground3D({
                       <Crosshair size={17} aria-hidden />
                     </button>
                   </StudioToolHintTarget>
+                  <button
+                    type="button"
+                    aria-label="법선 정렬"
+                    aria-pressed={surfaceSnapAlignNormal}
+                    title="표면에 붙일 때 객체 위쪽을 법선 방향으로 맞춥니다"
+                    data-testid="bg3d-surface-snap-align-normal"
+                    className={cx(
+                      "inline-flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-2 text-[0.65rem] font-semibold text-fg-2 transition-colors",
+                      "hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                      surfaceSnapAlignNormal &&
+                        "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent",
+                    )}
+                    onClick={() => setSurfaceSnapAlignNormal((prev) => !prev)}
+                  >
+                    법선 정렬
+                  </button>
                   <StudioToolHintTarget
                     hint={BG3D_VIEWPORT_HINTS.focus}
                     disabled={Boolean(focusSelectionDisabledReason)}
@@ -8885,6 +9206,20 @@ export function StudioBackground3D({
                             onClick={groundSelectedEntity}
                           >
                             <MoveDown size={14} aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="배치 정리"
+                            title="자동 맞춤 후 바닥에 붙입니다 (다중 선택 지원)"
+                            disabled={!canPlaceSelectedModelRecipe}
+                            className={cx(
+                              "inline-flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-2 text-[0.65rem] font-semibold text-fg-3 transition-colors",
+                              "hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                              "disabled:opacity-40 sm:min-h-9",
+                            )}
+                            onClick={placeSelectedModelRecipe}
+                          >
+                            배치 정리
                           </button>
                           <button
                             type="button"
