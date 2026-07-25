@@ -10,8 +10,8 @@ import {
 } from "./studio-assets";
 
 describe("studio canvas template catalog", () => {
-  it("provides 25 unique templates across six production-oriented groups", () => {
-    expect(TEMPLATES).toHaveLength(25);
+  it("provides 30 unique templates across six production-oriented groups", () => {
+    expect(TEMPLATES).toHaveLength(30);
     expect(new Set(TEMPLATES.map((template) => template.id)).size).toBe(TEMPLATES.length);
     expect(groupTemplates(TEMPLATES).map((group) => group.group)).toEqual([
       ...TEMPLATE_GROUP_ORDER,

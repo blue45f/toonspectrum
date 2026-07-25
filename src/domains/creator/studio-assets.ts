@@ -157,8 +157,34 @@ export const TEMPLATES: TemplateSpec[] = [
     ],
   },
   { id: "cover-square", label: "정사각 커버", hint: "썸네일·SNS", canvasH: 720, frames: insetFrame(720, 36) },
+  { id: "cover-instagram", label: "인스타툰 정사각", hint: "1080×1080 SNS 연재", canvasH: 720, frames: insetFrame(720, 24) },
   { id: "cover-poster", label: "세로 포스터", hint: "표지·키비주얼", canvasH: 1080, frames: insetFrame(1080, 42) },
   { id: "cover-story", label: "스토리 커버", hint: "긴 세로 프로모션", canvasH: 1280, frames: insetFrame(1280, 36) },
+  { id: "webtoon-character-sheet", label: "캐릭터 설정집", hint: "삼면도·표정 모음집", canvasH: 1440, frames: grid(2, 2, 1440) },
+  { id: "webtoon10", label: "세로 웹툰 · 10컷", hint: "장편 연재 표준 10컷", canvasH: 4500, frames: stack(10, 4500) },
+  {
+    id: "dynamic-action-zoom",
+    label: "액션 줌 · 4컷",
+    hint: "타격감 액션 연출",
+    canvasH: 1500,
+    frames: [
+      { x: M, y: M, width: CANVAS_W - M * 2, height: 400 },
+      { x: M, y: 448, width: 320, height: 500 },
+      { x: 368, y: 448, width: CANVAS_W - 368 - M, height: 500 },
+      { x: M, y: 972, width: CANVAS_W - M * 2, height: 504 },
+    ],
+  },
+  {
+    id: "dynamic-cinematic-banner",
+    label: "시네마틱 파노라마",
+    hint: "영화 같은 파노라마 연출",
+    canvasH: 1200,
+    frames: [
+      { x: M, y: M, width: CANVAS_W - M * 2, height: 350 },
+      { x: M, y: 398, width: CANVAS_W - M * 2, height: 350 },
+      { x: M, y: 796, width: CANVAS_W - M * 2, height: 380 },
+    ],
+  },
   { id: "single", label: "한 컷", hint: "일러스트·표지", canvasH: 900, frames: stack(1, 900) },
 ];
 
