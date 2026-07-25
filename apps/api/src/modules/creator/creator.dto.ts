@@ -194,11 +194,17 @@ export const CreatorWorkRevisionListParamsSchema = z
   .strict();
 
 export const CreatorWorkRevisionListQuerySchema = z
-  .object({ limit: z.coerce.number().int().min(1).max(20).default(20) })
+  .object({
+    limit: z.coerce.number().int().min(1).max(20).default(20),
+    path: z.unknown().optional(),
+  })
   .strict();
 
 export const CreatorTeamListQuerySchema = z
-  .object({ limit: z.coerce.number().int().min(1).max(50).default(20) })
+  .object({
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+    path: z.unknown().optional(),
+  })
   .strict();
 
 export const CreatorSharedWorksListQuerySchema = z
@@ -209,6 +215,7 @@ export const CreatorSharedWorksListQuerySchema = z
         (val) => (typeof val === "string" && !val.trim() ? undefined : val ?? undefined),
         CreatorSharedWorksCursorSchema.optional()
       ),
+    path: z.unknown().optional(),
   });
 
 export const RestoreCreatorWorkRevisionSchema = z
