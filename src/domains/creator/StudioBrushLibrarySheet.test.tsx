@@ -70,12 +70,12 @@ describe("StudioBrushLibrarySheet", () => {
     const coreItems = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "core");
     const proItems = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "pro");
 
-    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(157);
-    expect(coreItems).toHaveLength(37);
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(174);
+    expect(coreItems).toHaveLength(54);
     expect(proItems).toHaveLength(120);
     expect(new Set(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id))).toHaveProperty(
       "size",
-      157
+      174
     );
     expect(sheetSource).toContain('import("./studio-brush-pack-runtime")');
     expect(sheetSource).not.toMatch(/from\s+["']\.\/studio-brush-pack-runtime["']/);

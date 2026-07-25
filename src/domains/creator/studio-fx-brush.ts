@@ -195,7 +195,7 @@ export type FxGlitterPlanInput = {
   baseWidth: number;
   seed: number;
   /** "glitter" denser; "star-dust" sparser larger sparks. */
-  mode?: "glitter" | "star-dust";
+  mode?: "glitter" | "star-dust" | "sparkle-star";
   maxParticles?: number;
 };
 
@@ -206,15 +206,15 @@ export function planGlitterBrushParticles(input: FxGlitterPlanInput): FxGlitterP
   const seed = Math.floor(
     clamp(finiteNumber(input.seed, DEFAULT_FX_BRUSH_SEED), FX_BRUSH_SEED_RANGE.min, FX_BRUSH_SEED_RANGE.max)
   );
-  const mode = input.mode === "star-dust" ? "star-dust" : "glitter";
+  const mode = input.mode === "star-dust" ? "star-dust" : input.mode === "sparkle-star" ? "sparkle-star" : "glitter";
   const maxParticles = Math.floor(
     clamp(finiteNumber(input.maxParticles, FX_BRUSH_PARTICLE_CAP), 4, FX_BRUSH_PARTICLE_CAP)
   );
-  const spacing = mode === "star-dust" ? Math.max(2.2, baseWidth * 0.55) : Math.max(1.4, baseWidth * 0.28);
+  const spacing = mode === "star-dust" ? Math.max(2.2, baseWidth * 0.55) : mode === "sparkle-star" ? Math.max(1.8, baseWidth * 0.4) : Math.max(1.4, baseWidth * 0.28);
   const stations = sampleStations(points, spacing);
   const particles: FxGlitterParticle[] = [];
-  const scatter = baseWidth * (mode === "star-dust" ? 0.85 : 0.55);
-  const perStation = mode === "star-dust" ? 2 : 4;
+  const scatter = baseWidth * (mode === "star-dust" ? 0.85 : mode === "sparkle-star" ? 0.65 : 0.55);
+  const perStation = mode === "star-dust" ? 2 : mode === "sparkle-star" ? 3 : 4;
 
   for (let si = 0; si < stations.length; si++) {
     const st = stations[si]!;

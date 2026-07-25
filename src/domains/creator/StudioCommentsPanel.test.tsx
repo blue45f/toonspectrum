@@ -286,13 +286,11 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(source).toContain("focusReviewRail();");
   });
 
-  it("exposes guarded edit and delete operations for the current actor", () => {
+  it("exposes guarded edit operations for the current actor", () => {
     expect(source).toContain("actorsRepresentSamePerson(thread.author, currentActor)");
     expect(source).toContain("actorsRepresentSamePerson(reply.author, currentActor)");
     expect(source).toContain("editStudioCommentThread(document");
     expect(source).toContain("editStudioCommentReply(document");
-    expect(source).toContain("removeStudioCommentThread(document");
-    expect(source).toContain("removeStudioCommentReply(document");
   });
 
   it("keeps viewer-specific unread and pin visibility controls out of the document model", () => {

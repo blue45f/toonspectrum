@@ -2879,7 +2879,8 @@ function StudioCuttoonEditor() {
   const autosaveKey = studioAutosaveKey({ userId: studioAuthUserId, workId, remixId });
   const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId, remixId });
   const loggedIn = Boolean(studioAuthUserId);
-  const expectsSharedDocument = Boolean(workAuthScopeKey && workId && !remixId);
+  const liveRoomQueryParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("room") : null;
+  const expectsSharedDocument = Boolean((workAuthScopeKey && workId && !remixId) || liveRoomQueryParam);
   const [workHydrated, setWorkHydrated] = useState(!(workId || remixId));
   const [workHydrationFailed, setWorkHydrationFailed] = useState(false);
   const [workHydrationUnsupportedFormat, setWorkHydrationUnsupportedFormat] = useState(false);
@@ -2898,23 +2899,23 @@ function StudioCuttoonEditor() {
       : null;
   const sharedDocumentRef = useRef(sharedDocument);
   sharedDocumentRef.current = sharedDocument;
-  const effectiveWorkId = workId ?? "studio-live-demo";
+  const effectiveWorkId = workId ?? liveRoomQueryParam ?? "studio-live-demo";
   const studioLiveParticipant = useMemo(() => {
-    if (
-      !expectsSharedDocument ||
-      !workId ||
-      !studioAuthUserId ||
-      !sharedDocument ||
-      sharedDocument.status !== "active" ||
-      !sharedDocument.capabilities.view
-    ) {
-      return null;
+    if (sharedDocument && sharedDocument.status === "active" && sharedDocument.capabilities.view) {
+      return {
+        displayName: session?.user?.name ?? "내 작업",
+        role: sharedDocument.role,
+      };
     }
-    return {
-      displayName: session?.user?.name ?? "내 작업",
-      role: sharedDocument.role,
-    };
-  }, [expectsSharedDocument, workId, studioAuthUserId, sharedDocument, session?.user?.name]);
+    // Magma 스타일 무료/즉시 실시간 동시 편집 룸 지원 — URL room 쿼리 또는 로컬 라이브 모드
+    if (liveRoomQueryParam || expectsSharedDocument || !workId) {
+      return {
+        displayName: session?.user?.name ?? (studioAuthUserId ? "게스트 작가" : "익명 게스트"),
+        role: "editor" as const,
+      };
+    }
+    return null;
+  }, [expectsSharedDocument, workId, studioAuthUserId, sharedDocument, session?.user?.name, liveRoomQueryParam]);
   // 로그인한 기존 작품은 owner도 같은 팀 문서 계약을 사용한다. 응답 전·오류 상태 역시 잠가
   // 빈 초기 캔버스가 실제 원고 위로 저장되는 경쟁 상태를 막는다.
   const authorizedWorkAssetScopeId = resolveStudioWorkAssetHydrationScope({
@@ -30160,7 +30161,7 @@ function clearSelectionForEdit() {
       currentTool={tool}
       outboxScope={studioAuthUserId}
       transportFactory={studioLiveTransportFactory}
-      serverRequired={Boolean(studioLiveParticipant && expectsSharedDocument)}
+      serverRequired={Boolean(studioLiveParticipant && (expectsSharedDocument || Boolean(liveRoomQueryParam)))}
       onRoomChange={handleStudioLiveRoomChange}
       onCrdtDocumentChange={handleStudioCrdtDocumentChange}
       onEditSafetyChange={handleStudioLiveEditSafetyChange}

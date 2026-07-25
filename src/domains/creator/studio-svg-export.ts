@@ -1195,6 +1195,7 @@ function serializeFreehand(
       strokeSeed,
     }, normalizedDynamics.grain);
 
+    const dabScale = aliasStrokeWidth / 16;
     for (const dab of dabs) {
       const dabColor = escapeXml(resolveNormalizedStudioBrushDabColor(
         stroke,
@@ -1217,7 +1218,7 @@ function serializeFreehand(
         const alphaMap = tipAlphaMaps[tipIndex] ?? null;
         if (tipUsesEllipse[tipIndex] || !alphaMap) {
           // Canvas clamps the circular radius and then scales its Y axis by roundness.
-          const radius = Math.max(0.25, composedDab.size / 2);
+          const radius = Math.max(0.25, (composedDab.size * dabScale) / 2);
           const opacity = Math.min(
             1,
             Math.max(0, baseOpacity * grainAt(composedDab.x, composedDab.y))
@@ -1235,7 +1236,7 @@ function serializeFreehand(
             1,
             Math.max(0, baseOpacity * sample.alpha * grainAt(sample.x, sample.y))
           );
-          marks.push(`<circle cx="${fmt(sample.x)}" cy="${fmt(sample.y)}" r="${fmt(sample.radius)}" fill="${dabColor}" opacity="${fmtDabOpacity(opacity)}"/>`);
+          marks.push(`<circle cx="${fmt(sample.x)}" cy="${fmt(sample.y)}" r="${fmt(sample.radius * dabScale)}" fill="${dabColor}" opacity="${fmtDabOpacity(opacity)}"/>`);
         }
       }
     }
@@ -1332,11 +1333,11 @@ function serializeFreehand(
       smoothed,
       el.pressures,
       stylusSamples,
-      strokeWidth,
+      aliasStrokeWidth,
       el.brushTip
     );
     if (segments.length === 0) {
-      return `<circle cx="${fmt(smoothed[0])}" cy="${fmt(smoothed[1])}" r="${fmt(Math.max(0.5, strokeWidth * 0.18))}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
+      return `<circle cx="${fmt(smoothed[0])}" cy="${fmt(smoothed[1])}" r="${fmt(Math.max(0.5, aliasStrokeWidth * 0.18))}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
     }
     return `<g${opacityAttr}>${segments.map((segment) => (
       `<path d="M ${fmt(segment.x0)} ${fmt(segment.y0)} L ${fmt(segment.x1)} ${fmt(segment.y1)}" stroke="${escapeXml(stroke)}" stroke-width="${fmt(segment.width)}" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`
@@ -1348,8 +1349,8 @@ function serializeFreehand(
     const smoothed = processFreehandPoints(points, renderSampleDistance);
     if (smoothed.length < 2) return "";
     const angle = -Math.PI / 6;
-    const dx = (strokeWidth / 2) * Math.cos(angle);
-    const dy = (strokeWidth / 2) * Math.sin(angle);
+    const dx = (aliasStrokeWidth / 2) * Math.cos(angle);
+    const dy = (aliasStrokeWidth / 2) * Math.sin(angle);
     const sub: string[] = [];
     if (smoothed.length === 2) {
       sub.push(`M ${fmt(smoothed[0] - dx)} ${fmt(smoothed[1] - dy)} L ${fmt(smoothed[0] + dx)} ${fmt(smoothed[1] + dy)}`);
@@ -1391,8 +1392,8 @@ function serializeFreehand(
 
   if (brushFamily === "screentone") {
     // 스크린톤 — 전역 격자 정렬 망점(결정적)을 원으로 그대로 재현.
-    const pitch = Math.max(3, strokeWidth * 0.42);
-    const radius = Math.max(2, strokeWidth / 2);
+    const pitch = Math.max(3, aliasStrokeWidth * 0.42);
+    const radius = Math.max(2, aliasStrokeWidth / 2);
     const dots = screentoneDotsForStroke(points, radius, pitch);
     const dotR = screentoneDotRadius(pitch);
     const circles: string[] = [];
@@ -1414,7 +1415,7 @@ function serializeFreehand(
       ? configuredPasses
       : [{ role: "core" as const, widthScale: 1, opacityScale: 1, jitterRadius: 0.75 }];
     const paths = passes.map((pass) => {
-      const jittered = scaledPencilJitterPoints(renderPath.points, pass.jitterRadius);
+      const jittered = scaledPencilJitterPoints(renderPath.points, pass.jitterRadius * (pass.role === "soft-edge" ? 0.6 : 1.3));
       return `<path d="${tensionPathD(jittered, renderPath.tension)}" fill="none" stroke="${escapeXml(stroke)}" data-pencil-pass="${pass.role}" stroke-width="${fmt(aliasStrokeWidth * pass.widthScale)}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmtDabOpacity(strokeOpacity * pass.opacityScale)}"/>`;
     });
     return `<g data-brush-alias="${escapeXml(brush)}">${paths.join("")}</g>`;
@@ -1427,7 +1428,7 @@ function serializeFreehand(
       legacyMinDistance: renderSampleDistance,
       legacyTension: 0.4,
     });
-    return `<path d="${tensionPathD(renderPath.points, renderPath.tension)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeWidth)}" stroke-linecap="square" stroke-linejoin="miter" style="mix-blend-mode:multiply"${opacityAttr}/>`;
+    return `<path d="${tensionPathD(renderPath.points, renderPath.tension)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(aliasStrokeWidth)}" stroke-linecap="square" stroke-linejoin="miter" style="mix-blend-mode:multiply"${opacityAttr}/>`;
   }
 
   if (brushFamily === "neon") {
@@ -1472,7 +1473,7 @@ function serializeFreehand(
   }
 
   if (brushFamily === "glitter") {
-    const mode = (el.brush ?? "glitter") === "star-dust" ? "star-dust" : "glitter";
+    const mode = (el.brush ?? "glitter") === "star-dust" ? "star-dust" : (el.brush === "sparkle-star" ? "sparkle-star" : "glitter");
     const particles = planGlitterBrushParticles({
       points: processFreehandPoints(points, renderSampleDistance),
       pressures: el.pressures,
@@ -1495,7 +1496,7 @@ function serializeFreehand(
     const dabs = planOilBrushDabs({
       points: processFreehandPoints(points, renderSampleDistance),
       pressures: el.pressures,
-      baseWidth: strokeWidth,
+      baseWidth: aliasStrokeWidth,
       seed: fxBrushSeedFromKey(el.id),
       maxDabs: 512,
     });
@@ -1505,11 +1506,30 @@ function serializeFreehand(
     return `<g>${ellipses}</g>`;
   }
 
+  if (brushFamily === "airbrush") {
+    const isSplatter = el.brush === "splatter";
+    const dabs = planOilBrushDabs({
+      points: processFreehandPoints(points, renderSampleDistance),
+      pressures: el.pressures,
+      baseWidth: aliasStrokeWidth * (isSplatter ? 1.6 : 1.0),
+      seed: fxBrushSeedFromKey(el.id),
+      maxDabs: isSplatter ? 256 : 512,
+    });
+    const softId = nextId(ctx, isSplatter ? "spl" : "sa");
+    ctx.defs.push(
+      `<radialGradient id="${softId}" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="${escapeXml(stroke)}"/><stop offset="${isSplatter ? "40%" : "60%"}" stop-color="${escapeXml(stroke)}" stop-opacity="${isSplatter ? "0.9" : "0.6"}"/><stop offset="100%" stop-color="${escapeXml(stroke)}" stop-opacity="0"/></radialGradient>`
+    );
+    const circles = dabs.map((dab) => (
+      `<circle cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" r="${fmt(dab.radiusX * (isSplatter ? 0.7 : 1))}" fill="url(#${softId})" opacity="${fmtDabOpacity(dab.opacity * strokeOpacity)}"/>`
+    )).join("");
+    return `<g>${circles}</g>`;
+  }
+
   if (brushFamily === "pastel") {
     const dabs = planPastelBrushDabs({
       points: processFreehandPoints(points, renderSampleDistance),
       pressures: el.pressures,
-      baseWidth: strokeWidth,
+      baseWidth: aliasStrokeWidth,
       seed: fxBrushSeedFromKey(el.id),
       maxDabs: 512,
     });

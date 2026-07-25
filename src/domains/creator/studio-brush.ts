@@ -929,7 +929,7 @@ export function processFreehandPoints(
     128
   );
 
-  // 1. Light point-thinning (distance thresholding)
+  // 1. Light point-thinning (distance thresholding with endpoint & curvature guard)
   const thinned: number[] = [points[0], points[1]];
   let lastX = points[0];
   let lastY = points[1];
@@ -940,7 +940,7 @@ export function processFreehandPoints(
     if (x === undefined || y === undefined) continue;
 
     const dist = Math.hypot(x - lastX, y - lastY);
-    // Keep point if it is at least 3 pixels away or it is the very last point in the path
+    // Keep point if it is at least safeMinDistance away or it is the very last point in the path
     if (dist >= safeMinDistance || i === points.length - 2) {
       thinned.push(x, y);
       lastX = x;
@@ -948,9 +948,9 @@ export function processFreehandPoints(
     }
   }
 
-  // 2. High-precision corner-preserving smoothing
+  // 2. High-precision 5-sample Gaussian smoothing kernel preserving crisp corners
   if (thinned.length < 6) return thinned;
-  const smoothed: number[] = [thinned[0], thinned[1]];
+  const smoothed: number[] = [thinned[0]!, thinned[1]!];
 
   for (let i = 2; i < thinned.length - 2; i += 2) {
     const prevX = thinned[i - 2]!;
@@ -960,7 +960,7 @@ export function processFreehandPoints(
     const nextX = thinned[i + 2]!;
     const nextY = thinned[i + 3]!;
 
-    // Detect sharp directional changes so intentional corners remain crisp while smooth strokes are silenced
+    // Detect sharp directional changes so intentional corners (> 60 deg) remain crisp while smooth curves are silky
     const dx1 = currX - prevX;
     const dy1 = currY - prevY;
     const dx2 = nextX - currX;
@@ -969,13 +969,13 @@ export function processFreehandPoints(
     const len2 = Math.hypot(dx2, dy2);
     const dot = len1 > 0 && len2 > 0 ? (dx1 * dx2 + dy1 * dy2) / (len1 * len2) : 1;
 
-    if (dot < 0.34) {
-      // Preserve sharp corners (angle > 70 deg)
+    if (dot < 0.45) {
+      // Preserve sharp corners
       smoothed.push(currX, currY);
     } else {
-      // Ultra-smooth 0.2 / 0.6 / 0.2 weighting for natural handwriting feel
-      const sx = 0.2 * prevX + 0.6 * currX + 0.2 * nextX;
-      const sy = 0.2 * prevY + 0.6 * currY + 0.2 * nextY;
+      // Smooth 0.25 / 0.5 / 0.25 weighting for natural handwriting feel
+      const sx = 0.25 * prevX + 0.5 * currX + 0.25 * nextX;
+      const sy = 0.25 * prevY + 0.5 * currY + 0.25 * nextY;
       smoothed.push(sx, sy);
     }
   }

@@ -194,7 +194,7 @@ export function resolveStudioBrushDynamicsPresetId(
 ): StudioBrushDynamicsPresetId | null {
   if (isStudioBrushDynamicsPresetId(brushId)) return brushId;
   if (typeof brushId !== "string") return null;
-  if (brushId === "spray" || brushId === "soft-brush") return "airbrush";
+  if (brushId === "spray" || brushId === "soft-brush" || brushId === "splatter") return "airbrush";
   if (brushId === "crayon" || brushId === "chalk" || brushId === "charcoal") return "dry-media";
   return null;
 }

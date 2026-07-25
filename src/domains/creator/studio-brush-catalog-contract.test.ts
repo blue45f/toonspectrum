@@ -53,8 +53,8 @@ describe("37-preset brush catalog contract", () => {
     const filteredCatalog = filterStudioBrushLibraryItems({ category: "all" });
     const presetIds = BRUSH_PRESETS.map((preset) => preset.id);
 
-    expect(BRUSH_PRESETS).toHaveLength(37);
-    expect(new Set(presetIds).size).toBe(37);
+    expect(BRUSH_PRESETS).toHaveLength(54);
+    expect(new Set(presetIds).size).toBe(54);
     expect(catalog.map((item) => item.id)).toEqual(filteredCatalog.map((item) => item.id));
     expect(new Set(catalog.map((item) => item.id))).toEqual(new Set(presetIds));
     expect(STUDIO_BRUSH_RUNTIME_CONTRACT.map((contract) => contract.id)).toEqual(presetIds);

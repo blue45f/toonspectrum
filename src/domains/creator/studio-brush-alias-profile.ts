@@ -21,21 +21,56 @@ export type StudioBrushAliasId =
   | "pen"
   | "fineliner"
   | "ballpoint"
+  | "technical-pen"
   | "marker"
   | "felt-tip"
   | "marker-bold"
+  | "alcohol-marker"
   | "gpen"
+  | "mapping-pen"
+  | "kaburapen"
   | "liner"
+  | "calligraphy"
+  | "brush-pen"
+  | "highlighter"
+  | "chisel-highlighter"
+  | "pastel-highlighter"
+  | "glitter"
+  | "sparkle-star"
+  | "brush"
+  | "flat-brush"
   | "watercolor"
   | "ink-wash"
+  | "gouache"
+  | "oil"
+  | "acrylic"
+  | "airbrush"
+  | "splatter"
   | "pencil"
-  | "soft-pencil";
+  | "pencil-2b"
+  | "pencil-6b"
+  | "soft-pencil"
+  | "colored-pencil"
+  | "pastel"
+  | "oil-pastel"
+  | "screentone"
+  | "crosshatch";
 
 export type StudioBrushAliasFamily =
   | "causal-ink"
   | "gpen"
+  | "calligraphy"
+  | "highlighter"
+  | "glitter"
+  | "brush"
   | "watercolor"
-  | "pencil";
+  | "oil"
+  | "airbrush"
+  | "pencil"
+  | "dry-media"
+  | "pastel"
+  | "ink-particle"
+  | "screentone";
 
 export interface StudioBrushAliasPressureCurve {
   /** Output at a zero-pressure sample. */
@@ -116,6 +151,13 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     diameterScale: 0.68,
     pressure: { minimum: 0.34, maximum: 0.9, exponent: 1.35 },
   },
+  "technical-pen": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "technical-pen",
+    family: "causal-ink",
+    diameterScale: 0.55,
+    pressure: { minimum: 0.9, maximum: 1, exponent: 0.5 },
+  },
   marker: {
     version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
     id: "marker",
@@ -137,6 +179,13 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     diameterScale: 1.5,
     pressure: { minimum: 0.92, maximum: 1, exponent: 0.55 },
   },
+  "alcohol-marker": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "alcohol-marker",
+    family: "causal-ink",
+    diameterScale: 1.25,
+    pressure: { minimum: 0.75, maximum: 0.95, exponent: 0.8 },
+  },
   gpen: {
     version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
     id: "gpen",
@@ -144,12 +193,89 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     diameterScale: 1,
     pressure: IDENTITY_PRESSURE,
   },
+  "mapping-pen": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "mapping-pen",
+    family: "gpen",
+    diameterScale: 0.45,
+    pressure: { minimum: 0.2, maximum: 0.95, exponent: 1.1 },
+  },
+  kaburapen: {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "kaburapen",
+    family: "gpen",
+    diameterScale: 0.82,
+    pressure: { minimum: 0.6, maximum: 1, exponent: 0.7 },
+  },
   liner: {
     version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
     id: "liner",
     family: "gpen",
     diameterScale: 0.78,
     pressure: { minimum: 0.68, maximum: 0.92, exponent: 0.82 },
+  },
+  calligraphy: {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "calligraphy",
+    family: "causal-ink",
+    diameterScale: 1,
+    pressure: IDENTITY_PRESSURE,
+  },
+  "brush-pen": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "brush-pen",
+    family: "calligraphy",
+    diameterScale: 1.25,
+    pressure: { minimum: 0.1, maximum: 1.3, exponent: 1.4 },
+  },
+  highlighter: {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "highlighter",
+    family: "causal-ink",
+    diameterScale: 1,
+    pressure: IDENTITY_PRESSURE,
+  },
+  "chisel-highlighter": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "chisel-highlighter",
+    family: "causal-ink",
+    diameterScale: 1.35,
+    pressure: { minimum: 0.9, maximum: 1, exponent: 0.5 },
+  },
+  "pastel-highlighter": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "pastel-highlighter",
+    family: "causal-ink",
+    diameterScale: 1.1,
+    pressure: { minimum: 0.85, maximum: 1, exponent: 0.6 },
+  },
+  glitter: {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "glitter",
+    family: "causal-ink",
+    diameterScale: 1,
+    pressure: IDENTITY_PRESSURE,
+  },
+  "sparkle-star": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "sparkle-star",
+    family: "glitter",
+    diameterScale: 1.35,
+    pressure: IDENTITY_PRESSURE,
+  },
+  brush: {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "brush",
+    family: "causal-ink",
+    diameterScale: 1,
+    pressure: IDENTITY_PRESSURE,
+  },
+  "flat-brush": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "flat-brush",
+    family: "causal-ink",
+    diameterScale: 1.3,
+    pressure: { minimum: 0.5, maximum: 1, exponent: 0.9 },
   },
   watercolor: {
     version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
@@ -179,6 +305,48 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
       diffuseOpacityScale: 0.62,
     },
   },
+  gouache: {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "gouache",
+    family: "watercolor",
+    diameterScale: 0.95,
+    pressure: IDENTITY_PRESSURE,
+    watercolor: {
+      spacingRatio: 0.28,
+      coreRadiusScale: 0.9,
+      coreOpacityScale: 1.2,
+      diffuseRadiusScale: 1.1,
+      diffuseOpacityScale: 0.8,
+    },
+  },
+  oil: {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "oil",
+    family: "causal-ink",
+    diameterScale: 1,
+    pressure: IDENTITY_PRESSURE,
+  },
+  acrylic: {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "acrylic",
+    family: "oil",
+    diameterScale: 1.35,
+    pressure: IDENTITY_PRESSURE,
+  },
+  airbrush: {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "airbrush",
+    family: "causal-ink",
+    diameterScale: 1,
+    pressure: IDENTITY_PRESSURE,
+  },
+  splatter: {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "splatter",
+    family: "airbrush",
+    diameterScale: 1.45,
+    pressure: IDENTITY_PRESSURE,
+  },
   pencil: {
     version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
     id: "pencil",
@@ -187,6 +355,27 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     pressure: IDENTITY_PRESSURE,
     pencilPasses: [
       { role: "core", widthScale: 1, opacityScale: 1, jitterRadius: 0.75 },
+    ],
+  },
+  "pencil-2b": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "pencil-2b",
+    family: "pencil",
+    diameterScale: 1.1,
+    pressure: IDENTITY_PRESSURE,
+    pencilPasses: [
+      { role: "core", widthScale: 1.1, opacityScale: 0.9, jitterRadius: 0.8 },
+    ],
+  },
+  "pencil-6b": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "pencil-6b",
+    family: "pencil",
+    diameterScale: 1.4,
+    pressure: IDENTITY_PRESSURE,
+    pencilPasses: [
+      { role: "soft-edge", widthScale: 1.5, opacityScale: 0.4, jitterRadius: 1.0 },
+      { role: "core", widthScale: 1.1, opacityScale: 0.85, jitterRadius: 1.5 },
     ],
   },
   "soft-pencil": {
@@ -199,6 +388,51 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
       { role: "soft-edge", widthScale: 1.9, opacityScale: 0.18, jitterRadius: 0.3 },
       { role: "core", widthScale: 1, opacityScale: 0.72, jitterRadius: 1.2 },
     ],
+  },
+  "colored-pencil": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "colored-pencil",
+    family: "pencil",
+    diameterScale: 1.05,
+    pressure: IDENTITY_PRESSURE,
+    pencilPasses: [
+      { role: "core", widthScale: 1.0, opacityScale: 0.82, jitterRadius: 0.6 },
+    ],
+  },
+  pastel: {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "pastel",
+    family: "pencil",
+    diameterScale: 1,
+    pressure: IDENTITY_PRESSURE,
+    pencilPasses: [
+      { role: "core", widthScale: 1, opacityScale: 1, jitterRadius: 0.75 },
+    ],
+  },
+  "oil-pastel": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "oil-pastel",
+    family: "pencil",
+    diameterScale: 1.4,
+    pressure: IDENTITY_PRESSURE,
+    pencilPasses: [
+      { role: "soft-edge", widthScale: 1.7, opacityScale: 0.4, jitterRadius: 1.4 },
+      { role: "core", widthScale: 1.25, opacityScale: 0.85, jitterRadius: 2.0 },
+    ],
+  },
+  screentone: {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "screentone",
+    family: "causal-ink",
+    diameterScale: 1,
+    pressure: IDENTITY_PRESSURE,
+  },
+  crosshatch: {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "crosshatch",
+    family: "causal-ink",
+    diameterScale: 1.25,
+    pressure: IDENTITY_PRESSURE,
   },
 } as const satisfies Readonly<Record<StudioBrushAliasId, StudioBrushAliasProfile>>;
 

@@ -223,7 +223,12 @@ export type BubbleVariant =
   | "system"
   | "heart"
   | "phone"
-  | "angry";
+  | "angry"
+  | "explosive"
+  | "cloud-soft"
+  | "digital-code"
+  | "sparkle-magical"
+  | "comic-narrative";
 export const BUBBLE_VARIANTS: { id: BubbleVariant; label: string; hint: string }[] = [
   { id: "speech", label: "말하기", hint: "기본 대사" },
   { id: "double", label: "이어 말하기", hint: "긴 대사·시간차" },
@@ -236,13 +241,18 @@ export const BUBBLE_VARIANTS: { id: BubbleVariant; label: string; hint: string }
   { id: "phone", label: "메신저", hint: "채팅·문자" },
   { id: "angry", label: "격앙", hint: "분노·절규" },
   { id: "box", label: "내레이션", hint: "시간·장소 설명" },
+  { id: "explosive", label: "임팩트 폭발", hint: "격렬한 액션 충격" },
+  { id: "cloud-soft", label: "몽환 구름", hint: "꿈결·회상 독백" },
+  { id: "digital-code", label: "SF 디지털", hint: "게임·홀로그램 통신" },
+  { id: "sparkle-magical", label: "마법 반짝이", hint: "마법·신비로운 대사" },
+  { id: "comic-narrative", label: "만화 해설 띠", hint: "상단 긴 내레이션 띠" },
 ];
 
 /** 말풍선 라이브러리/인스펙터에서 종류를 역할별로 묶어 보여 다양성이 한눈에 들어오게 한다. */
 export const BUBBLE_VARIANT_GROUPS: { group: string; ids: BubbleVariant[] }[] = [
-  { group: "대사", ids: ["speech", "double", "whisper"] },
-  { group: "감정", ids: ["thought", "shout", "scared", "angry", "heart"] },
-  { group: "연출·UI", ids: ["system", "phone", "box"] },
+  { group: "대사", ids: ["speech", "double", "whisper", "comic-narrative"] },
+  { group: "감정", ids: ["thought", "shout", "scared", "angry", "heart", "explosive", "cloud-soft", "sparkle-magical"] },
+  { group: "연출·UI", ids: ["system", "phone", "box", "digital-code"] },
 ];
 
 export function groupBubbleVariants(
@@ -258,6 +268,7 @@ export function groupBubbleVariants(
 // 만화 효과 이모지(스티커).
 export const EFFECT_EMOJIS = [
   "💢", "💦", "✨", "💕", "💥", "😱", "🔥", "⚡", "😤", "💧", "❗", "❓", "💤", "🎶", "👊", "🌀",
+  "⭐", "🌸", "💬", "🗯️", "💭", "☀️", "🌙", "💫", "💘", "🎉", "📢", "⚠️", "🔮", "💡",
 ];
 
 // 효과음 텍스트(흰 글자 + 검은 외곽선의 만화 SFX).
@@ -268,6 +279,14 @@ export const SFX_PRESETS: { text: string; fill: string }[] = [
   { text: "팟", fill: "#ffd166" },
   { text: "콰광!", fill: "#ffffff" },
   { text: "반짝", fill: "#7ad7ff" },
+  { text: "피웅!", fill: "#ff5252" },
+  { text: "슉-", fill: "#e0e0e0" },
+  { text: "우르릉!", fill: "#ffb74d" },
+  { text: "샤라랑", fill: "#f48fb1" },
+  { text: "번쩍!", fill: "#ffff72" },
+  { text: "치이익", fill: "#81c784" },
+  { text: "콰아아", fill: "#4fc3f7" },
+  { text: "톡-", fill: "#ce93d8" },
 ];
 
 export interface BgPreset {
@@ -283,6 +302,11 @@ export const BG_PRESETS: BgPreset[] = [
   { id: "sky", label: "하늘", grad: ["#bfe6ff", "#eaf7ff"] },
   { id: "sunset", label: "노을", grad: ["#ffd9a0", "#ff9aa2"] },
   { id: "night", label: "밤", grad: ["#2a2350", "#0e0b1f"] },
+  { id: "cyberpunk-night", label: "사이버펑크 네온", grad: ["#2c003e", "#050014"] },
+  { id: "cherry-blossom", label: "벚꽃 분홍", grad: ["#ffdde1", "#ee9ca7"] },
+  { id: "emerald-forest", label: "에메랄드 숲", grad: ["#134e5e", "#71b280"] },
+  { id: "vintage-manga", label: "빈티지 갱지", fill: "#f4eedb" },
+  { id: "golden-noon", label: "따스한 햇살", grad: ["#ffe53b", "#ff2525"] },
 ];
 
 // ── 에셋 피커 검색(효과·배경 씬 메뉴) ──────────────────────────

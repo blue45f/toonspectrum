@@ -17,7 +17,6 @@ import {
   RotateCw,
   Search,
   Send,
-  Trash2,
   UserRoundCheck,
   X,
 } from "lucide-react";
@@ -148,7 +147,7 @@ const DEFAULT_CAPABILITIES: StudioCommentsPanelCapabilities = Object.freeze({
   create: true,
   reply: true,
   editOwn: true,
-  deleteOwn: true,
+  deleteOwn: false,
   resolve: true,
   assign: true,
 });
@@ -1285,9 +1284,7 @@ export function StudioCommentsPanel({
                 const threadTarget: CommentMessageTarget = { threadId: thread.id };
                 const ownsThread = actorsRepresentSamePerson(thread.author, currentActor);
                 const canEditThread = !isReadOnlyArchive && capabilities.editOwn && ownsThread && !saving;
-                const canDeleteThread = !isReadOnlyArchive && capabilities.deleteOwn && ownsThread && !saving;
                 const isEditingThread = !isReadOnlyArchive && messageTargetsEqual(editingMessage, threadTarget);
-                const isDeletingThread = !isReadOnlyArchive && messageTargetsEqual(pendingDelete, threadTarget);
                 const locationLabel = getAnchorLabel(thread.anchor, anchorOptions);
 
                 return (
@@ -1354,9 +1351,9 @@ export function StudioCommentsPanel({
                             </span>
                           )}
                         </div>
-                        {(canEditThread || canDeleteThread) && !isEditingThread && (
+                        {canEditThread && !isEditingThread && (
                           <span className="inline-flex shrink-0 items-center gap-1">
-                            {canEditThread ? <button
+                            <button
                               type="button"
                               onClick={() => beginEditing(threadTarget, thread.body)}
                               aria-label={`${thread.author.displayName}의 댓글 수정`}
@@ -1364,52 +1361,10 @@ export function StudioCommentsPanel({
                               className="grid size-11 place-items-center rounded-md text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-8"
                             >
                               <Edit3 size={12} aria-hidden />
-                            </button> : null}
-                            {canDeleteThread ? <button
-                              type="button"
-                              aria-expanded={isDeletingThread}
-                              aria-label={`${thread.author.displayName}의 댓글 삭제`}
-                              title="댓글 삭제"
-                              onClick={() => {
-                                if (!closeReplyEditor({ protectDraft: true })) return;
-                                setPendingDelete(isDeletingThread ? null : threadTarget);
-                                setEditingMessage(null);
-                                setEditBody("");
-                                setAssigningThreadId(null);
-                              }}
-                              className="grid size-11 place-items-center rounded-md text-fg-3 transition-colors hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-8"
-                            >
-                              <Trash2 size={12} aria-hidden />
-                            </button> : null}
+                            </button>
                           </span>
                         )}
                       </div>
-
-                      {isDeletingThread && (
-                        <div role="alert" className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-bad/30 bg-bad/10 px-3 py-2.5 text-xs text-fg-2">
-                          <span className="min-w-0 flex-1">
-                            이 스레드와 답글 {thread.replies.length}개를 삭제할까요?
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              focusReviewRail();
-                              setPendingDelete(null);
-                            }}
-                            className={QUIET_BUTTON_CLASS}
-                          >
-                            취소
-                          </button>
-                          <button
-                            ref={deleteConfirmRef}
-                            type="button"
-                            onClick={() => void confirmDelete(threadTarget)}
-                            className="inline-flex min-h-11 items-center rounded-lg bg-bad px-3 text-xs font-bold text-on-accent transition-colors hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bad sm:min-h-9"
-                          >
-                            스레드 삭제
-                          </button>
-                        </div>
-                      )}
 
                       {isEditingThread ? (
                         <form onSubmit={(event) => submitEdit(event, threadTarget)} className="mt-3 rounded-xl bg-raised/35 p-3">
@@ -1486,9 +1441,8 @@ export function StudioCommentsPanel({
                             };
                             const ownsReply = actorsRepresentSamePerson(reply.author, currentActor);
                             const canEditReply = !isReadOnlyArchive && capabilities.editOwn && ownsReply && !saving;
-                            const canDeleteReply = !isReadOnlyArchive && capabilities.deleteOwn && ownsReply && !saving;
                             const isEditingReply = !isReadOnlyArchive && messageTargetsEqual(editingMessage, replyTarget);
-                            const isDeletingReply = !isReadOnlyArchive && messageTargetsEqual(pendingDelete, replyTarget);
+                            const isDeletingReply = false;
                             return (
                               <li key={reply.id} className="border-t border-line/70 py-3">
                                 <div className="flex min-w-0 items-start gap-2.5 pl-4 sm:pl-6">
@@ -1504,9 +1458,9 @@ export function StudioCommentsPanel({
                                       {reply.updatedAt !== reply.createdAt && (
                                         <span className="text-[0.62rem] text-fg-3">수정됨</span>
                                       )}
-                                      {(canEditReply || canDeleteReply) && !isEditingReply && (
+                                      {canEditReply && !isEditingReply && (
                                         <span className="ml-auto inline-flex items-center gap-1">
-                                          {canEditReply ? <button
+                                          <button
                                             type="button"
                                             onClick={() => beginEditing(replyTarget, reply.body)}
                                             aria-label={`${reply.author.displayName}의 답글 수정`}
@@ -1514,23 +1468,7 @@ export function StudioCommentsPanel({
                                             className="grid size-11 place-items-center rounded-md text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-8"
                                           >
                                             <Edit3 size={12} aria-hidden />
-                                          </button> : null}
-                                          {canDeleteReply ? <button
-                                            type="button"
-                                            onClick={() => {
-                                              if (!closeReplyEditor({ protectDraft: true })) return;
-                                              setPendingDelete(isDeletingReply ? null : replyTarget);
-                                              setEditingMessage(null);
-                                              setEditBody("");
-                                              setAssigningThreadId(null);
-                                            }}
-                                            aria-expanded={isDeletingReply}
-                                            aria-label={`${reply.author.displayName}의 답글 삭제`}
-                                            title="답글 삭제"
-                                            className="grid size-11 place-items-center rounded-md text-fg-3 transition-colors hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-8"
-                                          >
-                                            <Trash2 size={12} aria-hidden />
-                                          </button> : null}
+                                          </button>
                                         </span>
                                       )}
                                     </div>
