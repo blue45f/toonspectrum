@@ -1,4 +1,5 @@
 import { readWorkFx } from "./studio-motion-fx";
+import { normalizePageReviewState } from "./studio-page-review";
 import { parseStudioProjectFile, type StudioProjectFile } from "./studio-project-file";
 import {
   collectStudioRevisionDocumentExtensions,
@@ -73,7 +74,11 @@ export function creatorWorkSnapshotToStudioProject(
     if (!Array.isArray(doc.pagesList) || doc.pagesList.length === 0) {
       throw new Error("비교할 작품 버전의 페이지 목록이 손상되었습니다.");
     }
-    rawPages = doc.pagesList;
+    rawPages = doc.pagesList.map((page) =>
+      isRecord(page) && Object.hasOwn(page, "review")
+        ? { ...page, review: normalizePageReviewState(page.review) }
+        : page
+    );
   } else {
     if (Object.hasOwn(doc, "elements") && !Array.isArray(doc.elements)) {
       throw new Error("비교할 작품 버전의 레거시 요소 목록이 손상되었습니다.");

@@ -124,6 +124,31 @@ describe("creatorWorkSnapshotToStudioProject", () => {
     });
   });
 
+  it("normalizes malformed page review lock payload into safe editable defaults", () => {
+    const project = creatorWorkSnapshotToStudioProject({
+      title: "검토 잠금 정합성",
+      doc: {
+        pagesList: [{
+          id: "page-1",
+          elements: [],
+          bg: "#fff",
+          bgGrad: null,
+          canvasH: 1080,
+          review: {
+            status: "unknown",
+            locked: "true",
+            assignee: 123,
+          },
+        }],
+      },
+    });
+
+    expect(project.pagesList[0].review).toMatchObject({
+      status: "draft",
+      locked: false,
+    });
+  });
+
   it("rejects non-object snapshots and invalid bounded project data", () => {
     expect(() => creatorWorkSnapshotToStudioProject(null)).toThrow("올바르지 않습니다");
     expect(() => creatorWorkSnapshotToStudioProject({ doc: "corrupt" })).toThrow("손상되었습니다");

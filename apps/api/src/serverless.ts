@@ -1,7 +1,7 @@
 import "./load-env"; // 첫 import — lib/db가 DATABASE_URL 읽기 전 주입(서버리스에선 .env 없고 플랫폼 env 사용)
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
-import { json, urlencoded } from "express";
+import { json, urlencoded, type Express, type Request, type Response, type NextFunction } from "express";
 import { Logger } from "nestjs-pino";
 
 import { AppModule } from "./app.module";
@@ -9,8 +9,6 @@ import { ZodValidationPipe } from "./common/zod-validation.pipe";
 import { configureCors } from "./config/cors";
 import { validateEnv } from "./config/env";
 import { sessionAuth } from "./session-middleware";
-
-import type { Express } from "express";
 
 // Vercel 서버리스용 — 콜드 컨테이너당 1회 부팅 후 캐시(웜 인스턴스 재사용).
 // 기본 platform-express 어댑터로 생성 → init() → 내부 Express 인스턴스를 핸들러로 반환.
@@ -27,6 +25,12 @@ async function create(): Promise<Express> {
   configureCors(app); // Vercel OPTIONS를 Nest가 204로 끝내고 Origin별 허용 헤더를 반환
   app.use(json({ limit: "16mb" }));
   app.use(urlencoded({ extended: true, limit: "16mb" }));
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    if (req.query && typeof req.query === "object" && "path" in req.query) {
+      delete (req.query as Record<string, unknown>).path;
+    }
+    next();
+  });
   app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)
   app.setGlobalPrefix("api");
   // 표준 Zod 검증 파이프(main.ts와 동일).

@@ -223,10 +223,8 @@ export function beginStudioStrokePointerSession(
 ): StudioStrokePointerSession | null {
   if (event.isPrimary === false) return null;
   // Mouse/pen/touch must start on left contact only (context menu / barrel stay free).
-  if (finiteNumber(event.button, 0) !== 0) return null;
-  if (typeof event.buttons === "number" && event.buttons !== 0 && (event.buttons & 1) === 0) {
-    return null;
-  }
+  // Some pen drivers emit `button: -1` on contact; honor that as active left contact.
+  if (!isStudioLeftContactDown(event)) return null;
   const pointerId = pointerIdOf(event);
   if (!Number.isFinite(pointerId)) return null;
   return {

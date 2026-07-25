@@ -1,7 +1,7 @@
 import "./load-env"; // 반드시 첫 import — lib/db가 DATABASE_URL을 읽기 전에 .env.local 주입
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
-import { json, urlencoded } from "express";
+import { json, urlencoded, type Request, type Response, type NextFunction } from "express";
 import { Logger } from "nestjs-pino";
 
 import { AppModule } from "./app.module";
@@ -25,6 +25,12 @@ async function bootstrap() {
   configureCors(app); // 구성된 웹 Origin의 preflight를 로컬·서버리스에서 동일하게 처리
   app.use(json({ limit: "16mb" }));
   app.use(urlencoded({ extended: true, limit: "16mb" }));
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    if (req.query && typeof req.query === "object" && "path" in req.query) {
+      delete (req.query as Record<string, unknown>).path;
+    }
+    next();
+  });
   app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)
   app.setGlobalPrefix("api");
   // 표준 Zod 검증 파이프. createZodDto DTO 만 검증하고 그 외(@Body() body: unknown)는 통과.

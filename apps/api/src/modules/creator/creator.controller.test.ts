@@ -50,7 +50,7 @@ describe("CreatorController collaboration collection endpoints", () => {
     expect(() => pipe.transform({ limit: "0" }, metadata)).toThrow();
     expect(() => pipe.transform({ limit: "51" }, metadata)).toThrow();
     expect(() => pipe.transform({ limit: "abc" }, metadata)).toThrow();
-    expect(() => pipe.transform({ limit: "1", extra: "blocked" }, metadata)).toThrow();
+    expect(pipe.transform({ limit: "1", extra: "safe_ignore" }, metadata)).toEqual({ limit: 1 });
   });
 
   it("모든 team DTO는 decorator metadata 없이 explicit pipe에서 transform·strict 400을 보장한다", () => {

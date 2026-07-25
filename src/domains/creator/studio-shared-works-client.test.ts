@@ -281,3 +281,24 @@ it("StudioSharedWork의 저장 판정은 정규화된 access만 따른다", () =
   expect(canSaveStudioSharedWork(work)).toBe(true);
   expect(canSaveStudioSharedWork({ ...work, access: "view" })).toBe(false);
 });
+
+describe("getStudioSharedWorks", () => {
+  it("cursor가 빈 문자열이거나 undefined일 때 params에서 cursor를 제거하여 400 Bad Request를 방지한다", async () => {
+    const apiGet = vi.spyOn(api, "get").mockResolvedValue({
+      items: [sharedWork()],
+      nextCursor: null,
+    });
+
+    await getStudioSharedWorks({ cursor: "  " });
+    expect(apiGet).toHaveBeenCalledWith(STUDIO_SHARED_WORKS_PATH, {
+      params: { limit: 20 },
+      signal: undefined,
+    });
+
+    await getStudioSharedWorks({ cursor: "cursor_abc" });
+    expect(apiGet).toHaveBeenLastCalledWith(STUDIO_SHARED_WORKS_PATH, {
+      params: { limit: 20, cursor: "cursor_abc" },
+      signal: undefined,
+    });
+  });
+});

@@ -204,9 +204,12 @@ export const CreatorTeamListQuerySchema = z
 export const CreatorSharedWorksListQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(50).default(20),
-    cursor: CreatorSharedWorksCursorSchema.optional(),
-  })
-  .strict();
+    cursor: z
+      .preprocess(
+        (val) => (typeof val === "string" && !val.trim() ? undefined : val ?? undefined),
+        CreatorSharedWorksCursorSchema.optional()
+      ),
+  });
 
 export const RestoreCreatorWorkRevisionSchema = z
   .object({ baseRevision: CreatorWorkRevisionSchema })

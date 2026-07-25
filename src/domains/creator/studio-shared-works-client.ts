@@ -291,12 +291,13 @@ export async function getStudioSharedWorks({
   signal,
 }: GetStudioSharedWorksOptions = {}): Promise<StudioSharedWorksPage> {
   const limitValue = boundedLimit(limit);
+  const cleanCursor = cursor && cursor.trim() ? cursor.trim() : undefined;
   try {
     const payload = await api.get<unknown>(STUDIO_SHARED_WORKS_PATH, {
-      params: { limit: limitValue, cursor },
+      params: cleanCursor ? { limit: limitValue, cursor: cleanCursor } : { limit: limitValue },
       signal,
     });
-    return normalizeStudioSharedWorksPage(payload, limitValue, cursor);
+    return normalizeStudioSharedWorksPage(payload, limitValue, cleanCursor);
   } catch (error) {
     if (error instanceof StudioSharedWorksResponseContractError) throw error;
     throw await toApiError(error, "공유 작품을 불러오지 못했습니다.");

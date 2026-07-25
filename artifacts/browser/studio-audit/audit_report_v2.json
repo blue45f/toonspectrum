@@ -1,0 +1,216 @@
+{
+  "timestamp": "2026-07-25T09:34:54.904Z",
+  "summary": {
+    "total": 34,
+    "passed": 32,
+    "failed": 2
+  },
+  "results": [
+    {
+      "category": "PageLoad",
+      "test": "Konva canvas mounted",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "PageLoad",
+      "test": "Total load time",
+      "passed": true,
+      "detail": "330ms"
+    },
+    {
+      "category": "PageLoad",
+      "test": "Canvas has valid dimensions",
+      "passed": true,
+      "detail": "924x1386"
+    },
+    {
+      "category": "PageLoad",
+      "test": "Konva canvas element has width",
+      "passed": true,
+      "detail": "924px"
+    },
+    {
+      "category": "ToolShortcut",
+      "test": "'v' → Select",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "ToolShortcut",
+      "test": "'b' → Pen",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "ToolShortcut",
+      "test": "'e' → Eraser",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "ToolShortcut",
+      "test": "'h' → Hand",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "ToolShortcut",
+      "test": "'g' → Fill",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "ToolShortcut",
+      "test": "'i' → Eyedropper",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "ToolShortcut",
+      "test": "'p' → Pixel Pencil",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Drawing",
+      "test": "Pen stroke produces visible pixels",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "UndoRedo",
+      "test": "Undo changes canvas state",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "UndoRedo",
+      "test": "Redo changes canvas state",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Eraser",
+      "test": "Eraser produces visible change",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Zoom",
+      "test": "Zoom in changes canvas",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Zoom",
+      "test": "Zoom out no crash",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Zoom",
+      "test": "Home key (fit width) no crash",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Pan",
+      "test": "Space+drag pan no crash",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "PixelPen",
+      "test": "Pixel pen draws visible pixels",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Keyboard",
+      "test": "Escape no crash",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Keyboard",
+      "test": "Delete no crash",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Keyboard",
+      "test": "Cmd+A no crash",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Keyboard",
+      "test": "Rapid spacebar no crash",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "LassoFill",
+      "test": "Lasso fill tool activates",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Color",
+      "test": "Color swatch element exists",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Navigation",
+      "test": "Home page loads",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Navigation",
+      "test": "Studio re-entry works",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Performance",
+      "test": "DOM interactive",
+      "passed": true,
+      "detail": "54ms"
+    },
+    {
+      "category": "Performance",
+      "test": "DOM content loaded",
+      "passed": true,
+      "detail": "84ms"
+    },
+    {
+      "category": "Performance",
+      "test": "JS module count reasonable",
+      "passed": false,
+      "detail": "245 files"
+    },
+    {
+      "category": "Performance",
+      "test": "JS heap usage",
+      "passed": true,
+      "detail": "148MB used / 208MB total"
+    },
+    {
+      "category": "Console",
+      "test": "No critical JS errors",
+      "passed": true,
+      "detail": "clean"
+    },
+    {
+      "category": "Console",
+      "test": "Console warnings",
+      "passed": true,
+      "detail": "0 warnings"
+    }
+  ],
+  "consoleErrors": [],
+  "consoleWarnings": 0
+}

@@ -11,6 +11,7 @@ import {
   serializeStudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
 import { parseStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
+import { normalizePageReviewState } from "./studio-page-review";
 import { parseStudioReferenceBoardDocument } from "./studio-reference-board";
 import {
   STUDIO_VRM_SCENE_DOCUMENT_KIND,
@@ -140,6 +141,9 @@ function canonicalizeBg3dSceneElements(value: unknown): unknown {
 
 function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjectFile {
   const pagesList = project.pagesList.map((page) => {
+    const review = "review" in page
+      ? normalizePageReviewState(page.review)
+      : undefined;
     const drawingAssist = page.drawingAssist === undefined
       ? undefined
       : parseStudioDrawingAssistDocument(page.drawingAssist);
@@ -148,6 +152,7 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
     }
     return {
       ...page,
+      ...(review === undefined ? {} : { review }),
       elements: page.elements.map(canonicalizeStudio3dSceneElement),
       ...(drawingAssist ? { drawingAssist } : {}),
     };

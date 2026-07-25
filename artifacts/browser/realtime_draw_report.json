@@ -1,0 +1,12 @@
+{
+  "timestamp": "2026-07-25T04:17:15.366Z",
+  "page1Url": "http://localhost:5173/studio",
+  "page2Url": "http://localhost:5173/studio",
+  "liveOverlayCheck": {
+    "hasLivePolyline": false,
+    "hasDrawingBadge": false,
+    "hasSvgOverlay": true,
+    "polylinePoints": null
+  },
+  "status": "SUCCESS"
+}

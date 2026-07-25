@@ -99,6 +99,24 @@ describe("studio project file", () => {
     });
   });
 
+  it("페이지 리뷰 메타데이터를 정규화해 잠금 상태를 안전 값으로 바꾼다", () => {
+    const parsed = parseStudioProjectFile({
+      version: 2,
+      title: "잠금 정규화",
+      description: "검증",
+      tagsText: "test",
+      pagesList: [{
+        ...page,
+        review: { status: "done", locked: "yes", assignee: 111 },
+      }],
+      currentPageId: "p1",
+      webtoonTheme: "classic",
+      panelGutter: 24,
+    });
+
+    expect(parsed.pagesList[0].review).toEqual({ status: "draft", locked: false });
+  });
+
   it("기존 1.0 pages 파일을 v2 형태로 마이그레이션한다", () => {
     expect(parseStudioProjectFile({ version: "1.0", title: "과거", pages: [page] })).toMatchObject({
       version: 2,

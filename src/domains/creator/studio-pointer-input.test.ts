@@ -51,6 +51,14 @@ describe("studio pointer input", () => {
     expect(beginStudioStrokePointerSession(sample(1, { isPrimary: false }))).toBeNull();
     expect(beginStudioStrokePointerSession(sample(1, { button: 2 }))).toBeNull();
     expect(beginStudioStrokePointerSession(sample(1, { button: 0, buttons: 2 }))).toBeNull();
+    expect(beginStudioStrokePointerSession(sample(1, { button: -1 }))).toMatchObject({
+      pointerId: 7,
+      pointerType: "pen",
+    });
+    expect(beginStudioStrokePointerSession(sample(1, { pointerType: "mouse", button: -1, buttons: 1 }))).toMatchObject({
+      pointerId: 7,
+      pointerType: "mouse",
+    });
     expect(beginStudioStrokePointerSession(sample(1, { pointerType: "mouse", buttons: 1 }))).toMatchObject({
       pointerId: 7,
       pointerType: "mouse",

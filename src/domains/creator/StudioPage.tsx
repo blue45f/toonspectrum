@@ -2879,6 +2879,7 @@ function StudioCuttoonEditor() {
   const autosaveKey = studioAutosaveKey({ userId: studioAuthUserId, workId, remixId });
   const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId, remixId });
   const loggedIn = Boolean(studioAuthUserId);
+  const expectsSharedDocument = Boolean(workAuthScopeKey && workId && !remixId);
   const [workHydrated, setWorkHydrated] = useState(!(workId || remixId));
   const [workHydrationFailed, setWorkHydrationFailed] = useState(false);
   const [workHydrationUnsupportedFormat, setWorkHydrationUnsupportedFormat] = useState(false);
@@ -2899,21 +2900,23 @@ function StudioCuttoonEditor() {
   sharedDocumentRef.current = sharedDocument;
   const effectiveWorkId = workId ?? "studio-live-demo";
   const studioLiveParticipant = useMemo(() => {
-    if (workId && studioAuthUserId && sharedDocument?.status === "active" && sharedDocument.capabilities.view) {
-      return {
-        displayName: session?.user?.name ?? "내 작업",
-        role: sharedDocument.role,
-      };
+    if (
+      !expectsSharedDocument ||
+      !workId ||
+      !studioAuthUserId ||
+      !sharedDocument ||
+      sharedDocument.status !== "active" ||
+      !sharedDocument.capabilities.view
+    ) {
+      return null;
     }
-    const tokenSuffix = guestSessionTokenRef.current ? guestSessionTokenRef.current.slice(-4) : "guest";
     return {
-      displayName: session?.user?.name ?? `게스트 작가 (${tokenSuffix})`,
-      role: "editor" as const,
+      displayName: session?.user?.name ?? "내 작업",
+      role: sharedDocument.role,
     };
-  }, [workId, studioAuthUserId, sharedDocument, session?.user?.name]);
+  }, [expectsSharedDocument, workId, studioAuthUserId, sharedDocument, session?.user?.name]);
   // 로그인한 기존 작품은 owner도 같은 팀 문서 계약을 사용한다. 응답 전·오류 상태 역시 잠가
   // 빈 초기 캔버스가 실제 원고 위로 저장되는 경쟁 상태를 막는다.
-  const expectsSharedDocument = Boolean(workAuthScopeKey && workId && !remixId);
   const authorizedWorkAssetScopeId = resolveStudioWorkAssetHydrationScope({
     workId,
     authUserId: studioAuthUserId,
@@ -2938,7 +2941,7 @@ function StudioCuttoonEditor() {
     studioCrdtReconciledDocument === studioCrdtDocument
   );
   const collaborationOperationSyncRequired = Boolean(
-    studioLiveParticipant && !collaborationReadOnly
+    expectsSharedDocument && studioLiveParticipant && !collaborationReadOnly
   );
   // A reconciled Y.Doc alone is insufficient: collaborative editing is exposed only while the
   // authoritative server or the browser-durable outbox can retain the next operation.
@@ -2947,7 +2950,7 @@ function StudioCuttoonEditor() {
   );
   const collaborationOperationSyncPending =
     collaborationOperationSyncRequired && !studioCrdtOperationSyncReady;
-  const collaborationDocumentLocked = isStudioEditorCollaborationLocked({
+  const collaborationDocumentLocked = expectsSharedDocument && isStudioEditorCollaborationLocked({
     documentAccessLocked:
       documentReloadRequired ||
       sourceHydrationPending ||
@@ -3283,7 +3286,9 @@ function StudioCuttoonEditor() {
       },
     [pages, activePageIndex, currentPageId]
   );
-  const pageEditLocked = isPageReviewLocked(activePage.review);
+  // 신규 캔버스(작업ID/리믹스 없음)에서는 페이지 리뷰 잠금이 편집 차단에 개입하지 않도록 스코프를 분리한다.
+  const reviewBoundPage = workId !== null || remixId !== null;
+  const pageEditLocked = reviewBoundPage && isPageReviewLocked(activePage.review);
   const activePageMutationLocked = pageEditLocked || collaborationDocumentLocked;
   const activeSurfaceReviewLocked =
     collaborationDocumentLocked || (pageEditLocked && !masterEditMode);
@@ -4402,7 +4407,7 @@ function StudioCuttoonEditor() {
     route: StudioInspectorRoute,
     mobileSheetTarget: StudioMobileSheet | null = isMobile ? "props" : null
   ) {
-    changeInspectorLayout(navigateStudioInspector(inspectorLayout, route));
+    setInspectorLayout((current) => navigateStudioInspector(current, route));
     setRightPanelOpenWithOverride(true);
     if (mobileSheetTarget !== null) {
       setMobileSheet(mobileSheetTarget);
@@ -4627,8 +4632,7 @@ function StudioCuttoonEditor() {
   function applyStudioWorkspaceLayout(layout: StudioWorkspaceLayout) {
     setInspectorLayout(layout.inspector);
     setLeftPanelOpen(layout.desktop.leftPanelOpen);
-    setRightPanelOpen(layout.desktop.rightPanelOpen);
-    setForceRightPanelOpen(false);
+    setRightPanelOpenWithOverride(layout.desktop.rightPanelOpen);
     leftResizeSetWidthRef.current(layout.desktop.leftPanelWidth);
     rightResizeSetWidthRef.current(layout.desktop.rightPanelWidth);
     setQuickActionsPreferences(layout.quickActions);
@@ -4674,7 +4678,7 @@ function StudioCuttoonEditor() {
     setWorkspacePersistence(nextPersistence);
     setInspectorLayout(layout.inspector);
     setLeftPanelOpen(layout.desktop.leftPanelOpen);
-    setRightPanelOpen(layout.desktop.rightPanelOpen);
+    setRightPanelOpenWithOverride(layout.desktop.rightPanelOpen);
     leftResizeSetWidthRef.current(layout.desktop.leftPanelWidth);
     rightResizeSetWidthRef.current(layout.desktop.rightPanelWidth);
     setQuickActionsPreferences(layout.quickActions);
@@ -4804,8 +4808,7 @@ function StudioCuttoonEditor() {
       setWorkspacePersistence(loaded);
       setInspectorLayout(layout.inspector);
       setLeftPanelOpen(layout.desktop.leftPanelOpen);
-      setRightPanelOpen(layout.desktop.rightPanelOpen);
-      setForceRightPanelOpen(false);
+      setRightPanelOpenWithOverride(layout.desktop.rightPanelOpen);
       leftResizeSetWidthRef.current(layout.desktop.leftPanelWidth);
       rightResizeSetWidthRef.current(layout.desktop.rightPanelWidth);
       setQuickActionsPreferences(layout.quickActions);
@@ -7519,7 +7522,12 @@ function StudioCuttoonEditor() {
           return;
         }
         if (parsed.pagesList.length > 0) {
-          const restoredPages = parsed.pagesList as PageState[];
+          const restoredPages = parsed.pagesList.map((page) => ({
+            ...page,
+            ...((page as Record<string, unknown>)?.review !== undefined
+              ? { review: normalizePageReviewState((page as Record<string, unknown>).review) }
+              : {}),
+          })) as PageState[];
           const currentHistory = pagesHistoryRef.current;
           const currentHistoryIndex = Math.max(
             0,
@@ -8313,6 +8321,12 @@ function StudioCuttoonEditor() {
   const canCreateStudioComment = workId
     ? studioTeamCommentCapabilities?.comment === true
     : !collaborationDocumentLocked;
+  const hardCanvasInteractionBlock =
+    saving
+    || documentReloadRequired
+    || sourceHydrationPending
+    || workHydrationFailed
+    || collaborationDocumentUnavailable;
   const canvasInteractionBlocked = isStudioCanvasInteractionBlocked({
     activeSurfaceReviewLocked,
     commentPinArmed,
@@ -12774,6 +12788,7 @@ const puppetWarpArmed =
       setWorkHydrationFailed(false);
       setWorkHydrationUnsupportedFormat(false);
       setWorkHydrated(true);
+      setDocumentReloadRequired(false);
       return;
     }
     const resolvedTargetId = targetId;
@@ -22587,6 +22602,7 @@ const puppetWarpArmed =
     // The first contact owns a bubble point drag. A palm/second finger cannot replace its owner.
     if (bubbleShapeDragRef.current) return;
     if (handleStudioPointCommentStageDown(e, stagePointerEvent)) return;
+    if (canvasInteractionBlocked && !commentPinArmed) return;
     // 색상 휠 롱프레스 무장 — 조건을 전부 만족할 때만 타이머를 건다. 이 블록은 return하지
     // 않는다(관찰만 함) — 아래 기존 분기들(스포이드/크롭/드로잉/마퀴 등)은 오늘과 동일하게
     // 그대로 실행된다. 타이머가 실제로 발화(450ms 정지 유지)했을 때만 openColorWheelAt 이
@@ -23221,13 +23237,19 @@ const puppetWarpArmed =
       }
       const activePointerSession = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
       if (activePointerSession || drawingRef.current) {
-        if (shouldCancelStudioFingerStrokeForAdditionalContact(activePointerSession, pointerSample)) {
-          // Two fingers mean navigation, not two simultaneous brush tips. Cancel the unfinished
-          // finger stroke before the existing wrap-level pinch/undo gesture consumes both touches.
-          // A pen plus a touch is deliberately different: the touch is treated as palm input.
-          discardDrawingPointerSession();
+        if (drawingRef.current) {
+          if (isStudioStrokePointerEvent(activePointerSession, pointerSample)) return;
+          if (shouldCancelStudioFingerStrokeForAdditionalContact(activePointerSession, pointerSample)) {
+            // Two fingers mean navigation, not two simultaneous brush tips. Cancel the unfinished
+            // finger stroke before the existing wrap-level pinch/undo gesture consumes both touches.
+            // A pen plus a touch is deliberately different: the touch is treated as palm input.
+            discardDrawingPointerSession();
+          }
+          return;
         }
-        return;
+        // Dangling transport state should never permanently block a new stroke.
+        // If drawingRef is already null, drop the stale stroke session and allow this input to proceed.
+        discardDrawingPointerSession();
       }
       if (zoomGestureRef.current) {
         // A wheel/pinch preview owns a temporary CSS transform for up to 170ms. Commit that view
@@ -25446,6 +25468,12 @@ const puppetWarpArmed =
         }
         const finished = releasePlan.stroke;
         releaseAuthoritativeStroke = finished;
+        const openCompletedStrokeProperties = (strokeId: string) => {
+          globalThis.requestAnimationFrame?.(() => {
+            setSelectedId(strokeId);
+            openInspectorRoute({ primary: "properties" }, isMobile ? "props" : null);
+          });
+        };
         if (releasePlan.quickShapeAnnouncementKind) {
           const kind = releasePlan.quickShapeAnnouncementKind;
           announceDrawingShortcut(`스마트 도형 · ${QUICKSHAPE_KIND_LABELS[kind] ?? kind}`);
@@ -25470,6 +25498,9 @@ const puppetWarpArmed =
               deferredPostprocessPlan.normalizedStrength,
               releasePreserveCorners,
             );
+          }
+          if (finished.mode !== "eraser") {
+            openCompletedStrokeProperties(finished.id);
           }
         } else {
           // Plan the bounded raster equivalent before the React commit, but keep the vector as a
@@ -25501,12 +25532,8 @@ const puppetWarpArmed =
           const merged = takePendingStrokeCommits();
           const baseElements = merged ? [...elements, ...merged.strokes] : elements;
           const committed = commit([...baseElements, finished]);
-          if (committed) {
-            const finishedId = finished.id;
-            globalThis.requestAnimationFrame?.(() => {
-              setSelectedId(finishedId);
-              openInspectorRoute({ primary: "properties" }, isMobile ? "props" : null);
-            });
+          if (committed && finished.mode !== "eraser") {
+            openCompletedStrokeProperties(finished.id);
           }
           if (committed && !masterEditMode && finished.mode !== "eraser") {
             if (liveDraftDirectRef.current) {
@@ -25536,6 +25563,9 @@ const puppetWarpArmed =
               strokes: [...(merged?.strokes ?? []), finished],
               retryCount: merged?.retryCount ?? 0,
             });
+            if (finished.mode !== "eraser") {
+              openCompletedStrokeProperties(finished.id);
+            }
             if (liveDraftDirectRef.current) {
               deferInkCleanup = true;
               if (gpuLiveInkPinnedRef.current) {
@@ -30124,7 +30154,7 @@ function clearSelectionForEdit() {
       currentTool={tool}
       outboxScope={studioAuthUserId}
       transportFactory={studioLiveTransportFactory}
-      serverRequired={Boolean(studioLiveParticipant)}
+      serverRequired={Boolean(studioLiveParticipant && expectsSharedDocument)}
       onRoomChange={handleStudioLiveRoomChange}
       onCrdtDocumentChange={handleStudioCrdtDocumentChange}
       onEditSafetyChange={handleStudioLiveEditSafetyChange}
@@ -30958,6 +30988,7 @@ function clearSelectionForEdit() {
           canvasH={canvasH}
           canvasOnlyMode={canvasOnlyMode}
           canvasInteractionBlocked={canvasInteractionBlocked}
+          hardCanvasInteractionBlock={hardCanvasInteractionBlock}
           collaborationDocumentLocked={collaborationDocumentLocked}
           collaborationDocumentUnavailable={collaborationDocumentUnavailable}
           collaborationLockMessage={collaborationLockMessage}
@@ -32279,6 +32310,7 @@ interface StudioCanvasViewportProps {
   canvasH: number;
   canvasOnlyMode: boolean;
   canvasInteractionBlocked: boolean;
+  hardCanvasInteractionBlock: boolean;
   collaborationDocumentLocked: boolean;
   collaborationDocumentUnavailable: boolean;
   commentQuickReplyActive: boolean;
@@ -32565,6 +32597,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   canvasH,
   canvasOnlyMode,
   canvasInteractionBlocked,
+  hardCanvasInteractionBlock,
   collaborationDocumentLocked,
   collaborationDocumentUnavailable,
   collaborationLockMessage,
@@ -33396,12 +33429,15 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.58rem] text-accent">복사</span>
             </div>
           </div>
-          <div className="pointer-events-none sticky top-2 z-40 flex h-0 items-start justify-end pr-2">
+          <div className="pointer-events-none sticky top-2 z-[56] flex h-0 items-start justify-end pr-2">
             <Suspense fallback={null}>
               <StudioLivePresenceDockConnected
                 operationSyncReady={studioCrdtOperationSyncReady}
                 followingSessionId={followingStudioSessionId}
-                onOpenTeam={() => setTeamPanelOpen(true)}
+                onOpenTeam={() => {
+                  dismissQuickStart();
+                  setTeamPanelOpen(true);
+                }}
                 onToggleFollow={(sessionId) =>
                   setFollowingStudioSessionId((current) =>
                     current === sessionId ? null : sessionId
@@ -33544,7 +33580,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
             className={cn(
               "relative rounded-sm shadow-[0_0_0_1px_oklch(0.3_0.012_64/0.55),0_18px_50px_oklch(0.08_0.01_70/0.45)]",
               canvasCursorClassName,
-              canvasInteractionBlocked && "pointer-events-none select-none",
+              hardCanvasInteractionBlock && "pointer-events-none select-none",
               (sourceHydrationPending || collaborationDocumentUnavailable) && "invisible absolute inset-0"
             )}
             style={{ width: stageViewLayout.width, height: stageViewLayout.height }}
