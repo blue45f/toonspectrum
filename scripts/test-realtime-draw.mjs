@@ -58,8 +58,6 @@ async function runTest() {
     // Inject cursor event listener into Page 2 window to inspect real-time WebSocket payloads
     await page2.evaluate(() => {
       window.__p2_cursor_payloads = [];
-      const origDispatch = window.dispatchEvent;
-      // Hook into custom events or window logs
     });
 
     await new Promise((r) => setTimeout(r, 3000));
