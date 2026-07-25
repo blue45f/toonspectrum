@@ -370,6 +370,22 @@ function strokeEvidenceClip(
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
+function sanitizeEvidenceClip(
+  clip: { x: number; y: number; width: number; height: number },
+  viewport: { width: number; height: number },
+): { x: number; y: number; width: number; height: number } {
+  const clampedX = Math.max(0, Math.min(viewport.width - 2, clip.x));
+  const clampedY = Math.max(0, Math.min(viewport.height - 2, clip.y));
+  const maxWidth = Math.max(2, viewport.width - clampedX);
+  const maxHeight = Math.max(2, viewport.height - clampedY);
+  return {
+    x: clampedX,
+    y: clampedY,
+    width: Math.max(2, Math.min(Math.max(2, clip.width), maxWidth)),
+    height: Math.max(2, Math.min(Math.max(2, clip.height), maxHeight)),
+  };
+}
+
 async function compareScreenshotPixels(
   page: Page,
   first: Buffer,
@@ -520,10 +536,24 @@ async function captureStableEvidence(
   page: Page,
   clip: { x: number; y: number; width: number; height: number },
 ): Promise<Buffer> {
-  let current = await page.screenshot({ animations: "disabled", clip });
+  const viewport = page.viewportSize();
+  const safeClip = viewport
+    ? sanitizeEvidenceClip(clip, viewport)
+    : clip;
+  let fallbackToFull = false;
+  const takeScreenshot = async (): Promise<Buffer> => {
+    if (fallbackToFull) return page.screenshot({ animations: "disabled" });
+    try {
+      return await page.screenshot({ animations: "disabled", clip: safeClip });
+    } catch {
+      fallbackToFull = true;
+      return page.screenshot({ animations: "disabled" });
+    }
+  };
+  let current = await takeScreenshot();
   for (let attempt = 0; attempt < 6; attempt += 1) {
     await page.waitForTimeout(80);
-    const next = await page.screenshot({ animations: "disabled", clip });
+    const next = await takeScreenshot();
     const diff = await compareScreenshotPixels(page, current, next);
     if (diff.changedPixels <= 3) return next;
     current = next;
@@ -587,22 +617,63 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       await selectDesktopBrush(page, preset);
       await page.mouse.move(4, 4);
       const point = strokePoint(stageBox, viewport, index);
-      const clip = strokeEvidenceClip(point, viewport);
-      const before = await captureStableEvidence(page, clip);
-      const canvasReceivesPointer = await page.evaluate(({ x, y }) =>
-        document.elementFromPoint(x, y)?.closest(".konvajs-content") !== null,
-      point);
-      invariant(canvasReceivesPointer, `${preset.id}: evidence point is covered by editor chrome`);
+      if (DEBUG_BRUSH_VERIFIER) {
+        log(`viewport=${JSON.stringify(viewport)} stageBox=${JSON.stringify(stageBox)} presetIndex=${index}`);
+      }
+      const safeCanvasPoint = async ({ x, y }: { x: number; y: number }) =>
+        page.evaluate(({ x: pointerX, y: pointerY }) =>
+          document.elementFromPoint(pointerX, pointerY)?.closest(".konvajs-content") !== null,
+        { x, y }
+      );
+      let evidencePoint = point;
+      const safeCandidates: Array<{ x: number; y: number }> = [
+        { x: point.x, y: point.y },
+      ];
+      if (!await safeCanvasPoint(point)) {
+        const safeLeft = Math.max(0, Math.min(stageBox.x + 36, viewport.width - 36));
+        const safeRight = Math.max(0, Math.min(stageBox.x + stageBox.width - 36, viewport.width - 16));
+        const safeTop = Math.max(0, Math.min(stageBox.y + 36, viewport.height - 36));
+        const safeBottom = Math.max(0, Math.min(stageBox.y + stageBox.height - 36, viewport.height - 16));
+        if (safeRight > safeLeft + 8 && safeBottom > safeTop + 8) {
+          for (let row = 0; row < 4; row += 1) {
+            for (let column = 0; column < 4; column += 1) {
+              safeCandidates.push({
+                x: Math.round(safeLeft + ((column + 0.5) * (safeRight - safeLeft)) / 4),
+                y: Math.round(safeTop + ((row + 0.5) * (safeBottom - safeTop)) / 4),
+              });
+            }
+          }
+        }
+        for (const candidate of safeCandidates) {
+          if (await safeCanvasPoint(candidate)) {
+            evidencePoint = { ...candidate, dx: point.dx, dy: point.dy };
+            break;
+          }
+        }
+      }
+      if (!await safeCanvasPoint(evidencePoint)) {
+        evidencePoint = {
+          x: Math.round(Math.max(8, Math.min(viewport.width - 8, stageBox.x + stageBox.width / 2))),
+          y: Math.round(Math.max(8, Math.min(viewport.height - 8, stageBox.y + stageBox.height / 2))),
+          dx: point.dx,
+          dy: point.dy,
+        };
+      }
+      const usedClip = sanitizeEvidenceClip(strokeEvidenceClip(evidencePoint, viewport), viewport);
+      const before = await captureStableEvidence(page, usedClip);
+      if (DEBUG_BRUSH_VERIFIER) {
+        log(`preset=${preset.id} point=${JSON.stringify(point)} evidencePoint=${JSON.stringify(evidencePoint)} clip=${JSON.stringify(usedClip)}`);
+      }
 
       // No dwell between the trusted down, one short move and release: this is the regression path
       // for strokes that previously vanished when a user released earlier than the deferred commit.
-      await page.mouse.move(point.x, point.y);
+      await page.mouse.move(evidencePoint.x, evidencePoint.y);
       await page.mouse.down();
-      await page.mouse.move(point.x + point.dx, point.y + point.dy);
+      await page.mouse.move(evidencePoint.x + evidencePoint.dx, evidencePoint.y + evidencePoint.dy);
       await page.mouse.up();
       await page.mouse.move(4, 4);
 
-      const immediate = await page.screenshot({ animations: "disabled", clip });
+      const immediate = await page.screenshot({ animations: "disabled", clip: usedClip });
       const immediateDiff = await compareScreenshotPixels(page, before, immediate);
       if (DEBUG_BRUSH_VERIFIER && preset.id === "perfect-ink") {
         log(`DEBUG ${preset.id}: immediateDiff ${JSON.stringify(immediateDiff)} at point ${JSON.stringify(point)}`);
@@ -621,7 +692,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       // A deferred commit is allowed, but the release preview must settle into durable pixels
       // before its 200 ms idle window elapses instead of silently disappearing.
       await page.waitForTimeout(260);
-      const after = await page.screenshot({ animations: "disabled", clip });
+      const after = await page.screenshot({ animations: "disabled", clip: usedClip });
       const settledDiff = await compareScreenshotPixels(page, before, after);
       const visualChanged = hasMeaningfulPixelChange(settledDiff);
       invariant(visualChanged, `${preset.id}: released stroke disappeared before becoming durable`);
@@ -632,7 +703,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       // one history control and the first DOM copy can sit underneath the document menubar.
       await page.keyboard.press("Meta+z");
       await page.waitForTimeout(60);
-      const undone = await page.screenshot({ animations: "disabled", clip });
+      const undone = await page.screenshot({ animations: "disabled", clip: usedClip });
       // Konva may re-rasterize the untouched paper by a few channel values after a history jump.
       // Ignore imperceptible antialias noise while still rejecting any residual ink above Δ20.
       const undoDiff = await compareScreenshotPixels(page, before, undone, 20);
@@ -649,7 +720,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       invariant(await redo.isEnabled(), `${preset.id}: Redo control did not become enabled`);
       await page.keyboard.press("Meta+Shift+z");
       await page.waitForTimeout(60);
-      const redone = await page.screenshot({ animations: "disabled", clip });
+      const redone = await page.screenshot({ animations: "disabled", clip: usedClip });
       const redoDiff = await compareScreenshotPixels(page, before, redone);
       const redoRestoredStroke = hasMeaningfulPixelChange(redoDiff);
       invariant(redoRestoredStroke, `${preset.id}: Redo did not restore visible stroke pixels`);

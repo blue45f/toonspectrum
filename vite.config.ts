@@ -224,7 +224,12 @@ export default defineConfig(({ mode }) => ({
       },
       "/socket.io": {
         target: apiTarget,
-        changeOrigin: true,
+        changeOrigin: false,
+        ws: true,
+      },
+      "/studio-live": {
+        target: apiTarget,
+        changeOrigin: false,
         ws: true,
       },
     },

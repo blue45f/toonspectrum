@@ -6,6 +6,8 @@ const LOCAL_CORS_ORIGINS = [
   "http://localhost:5181",
   "http://127.0.0.1:5173",
   "http://127.0.0.1:5181",
+  "http://localhost:4001",
+  "http://127.0.0.1:4001",
 ] as const;
 
 export const API_CORS_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] as const;

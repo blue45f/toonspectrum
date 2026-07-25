@@ -14435,6 +14435,16 @@ const puppetWarpArmed =
         batch.pageId,
         batch.strokes.map((stroke) => stroke.id)
       );
+      const lastDeferredStrokeId = batch.strokes[batch.strokes.length - 1]?.id;
+      if (
+        lastDeferredStrokeId !== undefined
+        && currentPageIdRef.current === batch.pageId
+      ) {
+        globalThis.requestAnimationFrame?.(() => {
+          setSelectedId(lastDeferredStrokeId);
+          openInspectorRoute({ primary: "properties" }, isMobile ? "props" : null);
+        });
+      }
       return true;
     };
     discardPendingStrokeCommitsRef.current = () => {
@@ -25492,7 +25502,11 @@ const puppetWarpArmed =
           const baseElements = merged ? [...elements, ...merged.strokes] : elements;
           const committed = commit([...baseElements, finished]);
           if (committed) {
-            setSelectedId(finished.id);
+            const finishedId = finished.id;
+            globalThis.requestAnimationFrame?.(() => {
+              setSelectedId(finishedId);
+              openInspectorRoute({ primary: "properties" }, isMobile ? "props" : null);
+            });
           }
           if (committed && !masterEditMode && finished.mode !== "eraser") {
             if (liveDraftDirectRef.current) {
