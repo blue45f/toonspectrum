@@ -64,6 +64,18 @@ describe("studioPerfectFreehandStrokeOptions", () => {
     expect(simulated.simulatePressure).toBe(true);
     expect(studioPerfectFreehandStrokeOptions(profile, 100_000, true).size).toBe(400);
   });
+
+  it("짧거나 무효한 segmentLength에서는 양끝 테이퍼를 비활성화한다", () => {
+    const profile = STUDIO_PERFECT_FREEHAND_PROFILES["perfect-ink"];
+    expect(studioPerfectFreehandStrokeOptions(profile, 12, true, 3).start?.taper).toBe(0);
+    expect(studioPerfectFreehandStrokeOptions(profile, 12, true, 12).end?.taper).toBe(0);
+    expect(studioPerfectFreehandStrokeOptions(profile, 12, true, Number.NaN).start?.taper).toBe(0);
+    expect(studioPerfectFreehandStrokeOptions(profile, 12, true, Number.POSITIVE_INFINITY).end?.taper).toBe(0);
+
+    const long = studioPerfectFreehandStrokeOptions(profile, 12, true, 40);
+    expect(long.start?.taper).toBe(12 * profile.taperStartFactor);
+    expect(long.end?.taper).toBe(12 * profile.taperEndFactor);
+  });
 });
 
 describe("studioPerfectFreehandOutlineToPathData", () => {
@@ -245,5 +257,27 @@ describe("buildStudioPerfectFreehandOutline / PathData (실제 getStroke 주입)
       profile: inkProfile,
     });
     expect(nanSamples.length).toBeGreaterThan(0);
+  });
+
+  it("짧은 두 점 획에서도 테이퍼 비활성 상태로 안정적인 바운딩 박스를 만든다", () => {
+    const shortStroke = buildStudioPerfectFreehandOutline(stroker, {
+      points: [20, 20, 27, 27],
+      pressures: [0.5, 0.5],
+      strokeWidth: 9,
+      profile: STUDIO_PERFECT_FREEHAND_PROFILES["perfect-ink"],
+    });
+    const xs = shortStroke.flatMap((point) => point[0] ?? []);
+    const ys = shortStroke.flatMap((point) => point[1] ?? []);
+    expect(shortStroke.length).toBeGreaterThan(0);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(6);
+    expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(1);
+    const shortPath = buildStudioPerfectFreehandPathData(stroker, {
+      points: [20, 20, 27, 27],
+      pressures: [0.5, 0.5],
+      strokeWidth: 9,
+      profile: STUDIO_PERFECT_FREEHAND_PROFILES["perfect-ink"],
+    });
+    expect(shortPath).toContain("Q");
+    expect(shortPath).toContain("Z");
   });
 });

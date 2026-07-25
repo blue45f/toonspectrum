@@ -107,6 +107,12 @@ export const StudioLiveCursorSchema = z
     pageId: PageIdSchema.nullable(),
     x: z.number().finite().min(0).max(1),
     y: z.number().finite().min(0).max(1),
+    tool: boundedIdentifier(48).nullable().optional(),
+    drawing: z.boolean().optional(),
+    strokeColor: z.string().max(64).optional(),
+    strokeWidth: z.number().finite().min(0).max(1000).optional(),
+    strokeOpacity: z.number().finite().min(0).max(1).optional(),
+    points: z.array(z.number().finite()).max(1024).optional(),
   })
   .strict();
 

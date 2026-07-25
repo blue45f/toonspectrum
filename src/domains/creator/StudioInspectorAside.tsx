@@ -298,7 +298,6 @@ export interface StudioInspectorAsideHandlers {
   toggleFilterMaskEnabled: () => void;
   toggleLayerMaskEnabled: () => void;
   toggleLocalHidden: (id: string) => void;
-  /** CSP-class layer solo — client-only temporary single-layer view. */
   toggleLayerSolo: (id: string) => void;
   updateAdvancedFillSettings: (next: StudioAdvancedFillSettings) => void;
 }
@@ -389,7 +388,6 @@ interface StudioInspectorAsideProps {
   filterMaskPaintMode: FilterMaskPaintMode;
   filterMaskRadius: number;
   filterMaskStrength: number;
-  /** 선택 이미지에 활성 필터·보정이 하나라도 있는지(필터 마스크 효과 가시성 안내용). */
   selectedImageHasActiveFilters: boolean;
   layerMaskBusy: boolean;
   layerMaskHardness: number;
@@ -398,9 +396,7 @@ interface StudioInspectorAsideProps {
   layerMaskRadius: number;
   layerMaskStrength: number;
   layerNavigatorItems: StudioLayerNavigatorItem[];
-  /** "나만 숨기기" — 문서(CRDT)에 없는, 이 클라이언트에서만 켠 로컬 숨김 대상. */
   localHiddenElementIds: ReadonlySet<string>;
-  /** CSP-class solo target, or null when solo is off. */
   soloLayerId: string | null;
   liquifyActive: boolean;
   liquifyBusy: boolean;
@@ -459,7 +455,6 @@ interface StudioInspectorAsideProps {
   selectedReadableImageSource: string | null;
   selectedWorkAssetDestructiveEditReason: string | null;
   setSelectedId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
-  /** Auto-color canvas scribble arm + one-shot seed hits from the stage. */
   autoColorScribbleCanvasArmed?: boolean;
   setAutoColorScribbleCanvasArmed?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   autoColorCanvasSeedHit?: { x: number; y: number; nonce: number } | null;
@@ -1093,10 +1088,37 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
     ? Math.max(0, Math.round(mobileKeyboardInset))
     : 0;
+  const selectedSupportsImageInspectorTabs =
+    selected?.type === "image" || selected?.type === "draw";
+  const activeFillRouteImagePanel = inspectorLayout.primary === "properties" &&
+    inspectorLayout.image === "fill";
   const activeImageInspectorTab =
-    inspectorLayout.primary === "properties" && selected?.type === "image"
+    inspectorLayout.primary === "properties" &&
+      (selectedSupportsImageInspectorTabs || (activeFillRouteImagePanel && advancedFillActive))
       ? inspectorLayout.image
       : null;
+  const advancedFillInspectorRouteWithoutImageSelection = activeFillRouteImagePanel &&
+    advancedFillActive &&
+    !selectedSupportsImageInspectorTabs;
+  const imageInspectorUnsupportedDrawMessage = {
+    quick: "빠른 수정은 래스터 이미지 레이어가 선택되어야 동작해요.",
+    fill: "채우기·선화 탭은 이미지 레이어를 대상으로 동작해요. 선화 요소는 픽셀 이미지로 전환하거나 다른 도구로 처리할 수 있어요.",
+    retouch: "선택·리터치 도구는 이미지를 선택했을 때만 동작해요.",
+    mask: "레이어 마스크는 이미지 레이어에서만 사용할 수 있어요.",
+    transform: "변형은 이미지 레이어를 선택해 실행할 수 있어요.",
+  } as const;
+  const imageOnlyImageInspectorFallback = (
+    tab: StudioImageInspectorSection,
+  ): React.ReactNode | null => {
+    if (selected?.type !== "draw") return null;
+    const message = imageInspectorUnsupportedDrawMessage[tab];
+    if (!message) return null;
+    return (
+      <p className="rounded-md border border-line/50 bg-card/45 px-3 py-2 text-[0.62rem] leading-relaxed text-fg-3">
+        {message}
+      </p>
+    );
+  };
 
   useEffect(() => {
     if (!activeImageInspectorTab) return;
@@ -1122,6 +1144,10 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     width: scrollPos.width / effScale,
     height: scrollPos.height / effScale,
   });
+  const canvasControlsDisabled = collaborationDocumentLocked
+    || activeSurfaceReviewLocked
+    || saving
+    || masterEditMode;
   const drawingAssistControlsDisabled = activeSurfaceReviewLocked || saving || masterEditMode;
   const drawingAssistDisabledReason = masterEditMode
     ? "마스터 편집을 마친 뒤 페이지 드로잉 가이드를 조정할 수 있어요."
@@ -1132,6 +1158,31 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
         : activeSurfaceReviewLocked
           ? "검토 잠금을 해제한 뒤 드로잉 가이드를 조정할 수 있어요."
           : undefined;
+  const rightPanelDisabledReasonCandidates = [
+    masterEditMode ? "마스터 편집 중에는 페이지 우측 패널의 일부 조작이 잠길 수 있어요." : null,
+    collaborationDocumentLocked ? "협업 문서 권한으로 편집 기능이 잠겨 있습니다." : null,
+    saving ? "저장이 진행 중이라 편집이 잠시 비활성화되어 있습니다." : null,
+    activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금이 활성화되어 있어 패널 편집이 제한됩니다." : null,
+    selectedContentMutationLocked
+      ? "선택한 레이어가 잠겨 있어 일부 우측 패널 조작이 제한됩니다."
+      : null,
+  ] as const;
+  type RightPanelDisabledReason = Exclude<
+    (typeof rightPanelDisabledReasonCandidates)[number],
+    null
+  >;
+  const rightPanelDisabledReasons = Array.from(
+    new Set(
+      rightPanelDisabledReasonCandidates.filter(
+        (reason): reason is RightPanelDisabledReason => reason !== null
+      )
+    )
+  );
+  const withCanvasControlsGuard = <TArgs extends readonly unknown[]>(callback: (...args: TArgs) => void) =>
+    (...args: TArgs) => {
+      if (canvasControlsDisabled) return;
+      callback(...args);
+    };
   return (
         <aside
           ref={propsSheetRef}
@@ -1146,9 +1197,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
           inert={isMobile && mobileSheet !== "props" ? true : undefined}
           className={cn(
             "flex min-h-0 flex-col gap-2 overscroll-contain [scrollbar-gutter:stable]",
-            // 모바일: 하단에서 올라오는 바텀시트
             "fixed inset-x-0 bottom-0 z-[60] overflow-y-auto rounded-t-3xl border border-line bg-panel p-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl transition-[transform,height,max-height] duration-300 ease-out motion-reduce:transition-none",
-            // 데스크톱: 뷰포트 높이 엣지 도크 — 메뉴바+툴벨트 높이만 빼고 캔버스와 나란히 채움.
             "lg:static lg:z-auto lg:max-h-none lg:min-h-0 lg:flex-none lg:self-stretch lg:overflow-y-auto lg:rounded-none lg:border lg:border-y-0 lg:border-r-0 lg:border-line lg:bg-panel/50 lg:p-2 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "props" ? "translate-y-0" : "translate-y-full",
             !visibleRightPanelOpen && "lg:hidden",
@@ -1198,10 +1247,25 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             onChange={changeInspectorLayout}
           />
 
+          {rightPanelDisabledReasons.length > 0 ? (
+            <section
+              role="status"
+              aria-live="polite"
+              className="rounded-xl border border-bad/35 bg-bad/10 px-3 py-2 text-[0.64rem] leading-relaxed text-bad"
+            >
+              <p className="font-semibold">우측 메뉴가 잠긴 이유</p>
+              <ul className="mt-1 space-y-0.5 pl-4 list-disc">
+                {rightPanelDisabledReasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
           <StudioInspectorCanvasControls
             background={bg}
             canvasHeight={canvasH}
-            controlsDisabled={collaborationDocumentLocked}
+            controlsDisabled={canvasControlsDisabled}
             gridSize={gridSize}
             hidden={
               inspectorLayout.primary !== "document" ||
@@ -1219,7 +1283,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             userGuides={userGuides}
             webtoonGuides={webtoonGuides}
             webtoonTheme={webtoonTheme}
-            onAddUserGuide={(type) => {
+            onAddUserGuide={withCanvasControlsGuard((type) =>
               setUserGuides((current) => [
                 ...current,
                 {
@@ -1227,48 +1291,51 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   type,
                   pos: type === "v" ? CANVAS_W / 2 : canvasH / 2,
                 },
-              ]);
-            }}
-            onApplyBackgroundPreset={applyBgPreset}
-            onApplyMagicResizePreset={applyMagicResizePreset}
-            onBackgroundChange={setBg}
-            onCanvasHeightDelta={(delta) => setCanvasH((height) => height + delta)}
-            onClearUserGuides={() => setUserGuides([])}
-            onDeleteUserGuide={(id) => {
-              setUserGuides((current) => current.filter((guide) => guide.id !== id));
-            }}
-            onGradientChange={setBgGrad}
-            onGridSizeChange={setGridSize}
-            onMagicResizeStrategyChange={setMagicResizeStrategy}
-            onMoveUserGuide={(id, pos) => {
+              ])
+            )}
+            onApplyBackgroundPreset={withCanvasControlsGuard(applyBgPreset)}
+            onApplyMagicResizePreset={withCanvasControlsGuard(applyMagicResizePreset)}
+            onBackgroundChange={withCanvasControlsGuard(setBg)}
+            onCanvasHeightDelta={withCanvasControlsGuard((delta: number) =>
+              setCanvasH((height) => height + delta)
+            )}
+            onClearUserGuides={withCanvasControlsGuard(() => setUserGuides([]))}
+            onDeleteUserGuide={withCanvasControlsGuard((nextId) =>
               setUserGuides((current) =>
-                current.map((guide) => (guide.id === id ? { ...guide, pos } : guide))
-              );
-            }}
-            onOpenBackgroundEditor={() => setMenu("bgFill")}
-            onPanelGutterChange={(nextGutter) => {
-              if (collaborationDocumentLocked) return;
+                current.filter((guide) => guide.id !== nextId)
+              )
+            )}
+            onGradientChange={withCanvasControlsGuard(setBgGrad)}
+            onGridSizeChange={withCanvasControlsGuard(setGridSize)}
+            onMagicResizeStrategyChange={withCanvasControlsGuard(setMagicResizeStrategy)}
+            onMoveUserGuide={withCanvasControlsGuard((id, pos: number) =>
+              setUserGuides((current) =>
+                current.map((guide) =>
+                  guide.id === id ? { ...guide, pos } : guide
+                )
+              )
+            )}
+            onOpenBackgroundEditor={withCanvasControlsGuard(() => setMenu("bgFill"))}
+            onPanelGutterChange={withCanvasControlsGuard((nextGutter) => {
               setPanelGutter(nextGutter);
               setSharedDocumentNotice(null);
               if (currentTemplate) {
                 const nextElements = regenerateTemplate(currentTemplate, nextGutter);
                 commit(nextElements);
               }
-            }}
-            onShowGridChange={setShowGrid}
-            onShowWebtoonGuidesChange={(visible) => {
+            })}
+            onShowGridChange={withCanvasControlsGuard(setShowGrid)}
+            onShowWebtoonGuidesChange={withCanvasControlsGuard((visible: boolean) => {
               if (visible) ensureWebtoonGuidesLoaded();
               setShowWebtoonGuides(visible);
-            }}
-            onSnapEnabledChange={setSnapEnabled}
-            onWarmWebtoonGuides={ensureWebtoonGuidesLoaded}
-            onWebtoonThemeChange={(theme) => {
-              if (collaborationDocumentLocked) return;
+            })}
+            onSnapEnabledChange={withCanvasControlsGuard(setSnapEnabled)}
+            onWarmWebtoonGuides={withCanvasControlsGuard(() => ensureWebtoonGuidesLoaded())}
+            onWebtoonThemeChange={withCanvasControlsGuard((theme) => {
               setWebtoonTheme(theme);
               setSharedDocumentNotice(null);
-            }}
+            })}
           />
-          {/* 페이지 전체 색보정(그레이드) — 무드 프리셋 + 밝기/대비/채도/색조/세피아/흑백/비네트 */}
           <div
             role="tabpanel"
             aria-label="페이지 색보정"
@@ -1370,8 +1437,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     </span>
                   </label>
 
-                  {/* 채우기 가능 도형(rect/ellipse/star/triangle/polygon) 색상·그라데이션·패턴 조절.
-                      우선순위: 패턴 > 그라데이션 > 단색. 그라데이션 렌더는 rect/ellipse/star만 지원해 그 3종에만 노출. */}
                   {(selected.kind === "rect" ||
                     selected.kind === "ellipse" ||
                     selected.kind === "star" ||
@@ -1405,7 +1470,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     </div>
                   )}
 
-                  {/* 선 스타일(점선/선 끝/화살촉) + 도형 파라미터(별/다각형/모서리) — 도형·선 전용 */}
                   {selected.kind && selected.kind !== "freehand" && (
                     <div className="mt-2.5 border-t border-line/40 pt-2.5">
                       <Suspense fallback={<StudioPanelLoading label="선 스타일 패널을 여는 중..." />}>
@@ -1426,7 +1490,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           }
                           onPatchSketch={(patch) =>
                             patchEl(selected.id, {
-                              // DrawEl.sketch 필드는 element-model 한 줄 추가 전까지 구조적으로 기록한다.
                               sketch: {
                                 ...(studioSketchStyleOfElement(selected) ?? DEFAULT_STUDIO_SKETCH_STYLE),
                                 ...patch,
@@ -1508,7 +1571,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                         title="그라데이션 편집"
                       />
                       
-                      {/* 시작/종료/방향 레거시 컨트롤은 멀티스톱 엔진 패널로 대체 */}
                     </div>
                   )}
                 </div>
@@ -1642,7 +1704,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     </div>
                   </div>
 
-                  {/* 정렬 및 스타일 설정 */}
                   <div className="mt-2.5 flex items-center justify-between gap-4 border-t border-line/30 pt-2.5">
                     <div>
                       <p className="mb-1 text-[0.66rem] font-medium text-fg-3">정렬</p>
@@ -1671,7 +1732,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     <div>
                       <p className="mb-1 text-[0.66rem] font-medium text-fg-3">스타일</p>
                       <div className="flex gap-0.5 rounded-lg border border-line bg-panel p-0.5">
-                        {/* Bold / Italic Toggle Buttons */}
                         {(() => {
                           const fsVal = selected.fontStyle ?? "bold";
                           const isBold = fsVal.includes("bold");
@@ -1731,7 +1791,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   </Suspense>
                 </div>
               )}
-              {/* 곡선 텍스트 — 아치/물결/원형 경로(Konva TextPath). */}
               {selected.type === "text" && (
                 <div className="mt-2.5 border-t border-line/40 pt-2.5">
                   <Suspense fallback={<StudioPanelLoading label="곡선 텍스트 패널을 여는 중..." />}>
@@ -2035,7 +2094,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 </label>
               )}
 
-              {/* 클리핑 마스크 — 바로 아래 레이어 영역으로 잘라낸다(채색·톤을 밑그림 안에 가두기). */}
               <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2" title="바로 아래 레이어의 영역 안으로만 보이게 잘라냅니다(채색·톤 가두기).">
                 아래 레이어에 클리핑
                 <input
@@ -2046,7 +2104,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 />
               </label>
 
-              {/* 레이어 그룹 지정 */}
               <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
                 그룹
                 <select
@@ -2108,7 +2165,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 </Suspense>
               )}
 
-              {/* 직접 좌표 및 크기 조정 (코미포 스타일) */}
               {selected.type !== "draw" && (
                 <div className="mt-3 border-t border-line/50 pt-3 space-y-2">
                   <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">위치 및 크기</p>
@@ -2217,516 +2273,529 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 />
               ) : null}
 
-              {selected.type === "image" && (
+              {(selected.type === "image" || selected.type === "draw") && (
                 <>
-                  {selectedWorkAssetDestructiveEditReason ? (
-                    <p
-                      role="status"
-                      className="rounded-lg border border-accent/35 bg-accent/10 px-3 py-2 text-xs leading-relaxed text-fg-2"
-                    >
-                      {selectedWorkAssetDestructiveEditReason}
-                    </p>
-                  ) : null}
-                  {shouldMountImageInspectorTab("quick") ? (
-                  <div className="space-y-3" hidden={activeImageInspectorTab !== "quick"}>
-                    <Suspense fallback={<StudioPanelLoading label="빠른 이미지 도구를 여는 중..." />}>
-                      {!selectedWorkAssetDestructiveEditReason ? (
-                        <>
-                          <StudioBgRemoveButton
-                            src={selected.src}
-                            onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
-                          />
-                          <StudioAiColorizePanel
-                            configured={isStudioAiConfigured(aiSettings)}
-                            prompt={aiColorizePrompt}
-                            onPromptChange={setAiColorizePrompt}
-                            busy={aiColorizeBusy}
-                            error={aiColorizeError}
-                            onColorize={onColorizeSelected}
-                          />
-                        </>
-                      ) : null}
-                      {selected.stockImageCredit && (
-                        <p className="rounded-md border border-line bg-card/50 px-2 py-1 text-[0.6rem] leading-relaxed text-fg-3">
-                          출처:{" "}
-                          <a
-                            href={selected.stockImageCredit.photographerProfileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="underline hover:text-fg-2"
-                          >
-                            {selected.stockImageCredit.photographerName}
-                          </a>{" "}
-                          ·{" "}
-                          <a
-                            href={selected.stockImageCredit.unsplashPhotoPageUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="underline hover:text-fg-2"
-                          >
-                            Unsplash
-                          </a>
+                  {selected.type === "image" && (
+                    <>
+                      {selectedWorkAssetDestructiveEditReason ? (
+                        <p
+                          role="status"
+                          className="rounded-lg border border-accent/35 bg-accent/10 px-3 py-2 text-xs leading-relaxed text-fg-2"
+                        >
+                          {selectedWorkAssetDestructiveEditReason}
                         </p>
-                      )}
-                      {/* 주요 색상 추출 — 스와치를 누르면 브러시·도형 색(전역 color 상태)으로 지정된다. */}
-                      {selectedReadableImageSource ? (
-                        <StudioColorPalettePanel
-                          src={selectedReadableImageSource}
-                          onPickColor={(hex) => setColor(hex)}
-                        />
                       ) : null}
-                    </Suspense>
-                  </div>
-                  ) : null}
+                      {shouldMountImageInspectorTab("quick") ? (
+                      <div className="space-y-3" hidden={activeImageInspectorTab !== "quick"}>
+                        <Suspense fallback={<StudioPanelLoading label="빠른 이미지 도구를 여는 중..." />}>
+                          {!selectedWorkAssetDestructiveEditReason ? (
+                            <>
+                              <StudioBgRemoveButton
+                                src={selected.src}
+                                onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
+                              />
+                              <StudioAiColorizePanel
+                                configured={isStudioAiConfigured(aiSettings)}
+                                prompt={aiColorizePrompt}
+                                onPromptChange={setAiColorizePrompt}
+                                busy={aiColorizeBusy}
+                                error={aiColorizeError}
+                                onColorize={onColorizeSelected}
+                              />
+                            </>
+                          ) : null}
+                          {selected.stockImageCredit && (
+                            <p className="rounded-md border border-line bg-card/50 px-2 py-1 text-[0.6rem] leading-relaxed text-fg-3">
+                              출처:{" "}
+                              <a
+                                href={selected.stockImageCredit.photographerProfileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline hover:text-fg-2"
+                              >
+                                {selected.stockImageCredit.photographerName}
+                              </a>{" "}
+                              ·{" "}
+                              <a
+                                href={selected.stockImageCredit.unsplashPhotoPageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline hover:text-fg-2"
+                              >
+                                Unsplash
+                              </a>
+                            </p>
+                          )}
+                          {selectedReadableImageSource ? (
+                            <StudioColorPalettePanel
+                              src={selectedReadableImageSource}
+                              onPickColor={(hex) => setColor(hex)}
+                            />
+                          ) : null}
+                        </Suspense>
+                      </div>
+                      ) : null}
+                    </>
+                  )}
                   {shouldMountImageInspectorTab("fill") ? (
                   <div className="space-y-3" hidden={activeImageInspectorTab !== "fill"}>
                     <Suspense fallback={<StudioPanelLoading label="채우기·선화 도구를 여는 중..." />}>
-                  <StudioFloodFillPanel
-                    active={advancedFillActive}
-                    busy={advancedFillBusy}
-                    fillColor={color}
-                    settings={advancedFillSettings}
-                    referenceLayerCount={advancedFillReferenceLayerCount}
-                    visibleRasterCount={advancedFillVisibleRasterCount}
-                    selectedIsReference={selected.fillReference === true}
-                    targetUnsupportedReason={advancedFillUnsupportedReason}
-                    statusMessage={advancedFillStatus}
-                    diagnostics={advancedFillPreview?.diagnostics}
-                    onToggleActive={toggleAdvancedFill}
-                    onFillColorChange={setColor}
-                    onSettingsChange={updateAdvancedFillSettings}
-                    onToggleSelectedReference={() => {
-                      setAdvancedFillPreview(null);
-                      patchEl(selected.id, { fillReference: !selected.fillReference } as Partial<El>);
-                      setAdvancedFillStatus(
-                        selected.fillReference
-                          ? "채우기 참조 지정을 해제했습니다."
-                          : "이 래스터를 채우기 참조 선화로 지정했습니다.",
-                      );
-                    }}
-                    onResetSettings={() =>
-                      updateAdvancedFillSettings({ ...DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS })
-                    }
-                  />
-                  {/*
-                    Thin plan-only auto-color hints.
-                    Worker onRun (dynamic import keeps the main inspector chunk light).
-                    Selected image `src` is decoded on Run (with max-pixel downscale) —
-                    no StudioPage surgery; demo fixture remains only when src is empty.
-                  */}
-                  <StudioAutoColorHintsPanel
-                    imageSrc={selected.src}
-                    scribbleCanvasArmed={autoColorScribbleCanvasArmed}
-                    onScribbleCanvasArmedChange={setAutoColorScribbleCanvasArmed}
-                    canvasSeedHit={autoColorCanvasSeedHit}
-                    canvasSeedHits={autoColorCanvasSeedHits}
-                    onCanvasSeedHitConsumed={() => {
-                      setAutoColorCanvasSeedHit?.(null);
-                      setAutoColorCanvasSeedHits?.(null);
-                    }}
-                    onPlanImageSize={onAutoColorPlanImageSize}
-                    onRun={async (request) => {
-                      const { runStudioAutoColorHintsWorker } = await import(
-                        "./studio-auto-color-hints-worker-client"
-                      );
-                      return runStudioAutoColorHintsWorker(request);
-                    }}
-                    onApplyResult={
-                      selectedWorkAssetDestructiveEditReason
-                        ? undefined
-                        : (dataUrl) => patchEl(selected.id, { src: dataUrl })
-                    }
-                    onApplyNewLayer={
-                      selectedWorkAssetDestructiveEditReason
-                        ? undefined
-                        : ({ dataUrl, name }) => {
-                            if (selected.type !== "image") return;
-                            const paintEl = {
-                              id: uid(),
-                              type: "image" as const,
-                              src: dataUrl,
-                              x: selected.x,
-                              y: selected.y,
-                              width: selected.width,
-                              height: selected.height,
-                              rotation: selected.rotation ?? 0,
-                              opacity: 1,
-                              name: name || "채색",
-                              groupId: selected.groupId,
-                            };
-                            const index = elements.findIndex((el) => el.id === selected.id);
-                            const insertAt = index >= 0 ? index + 1 : elements.length;
-                            const next = [
-                              ...elements.slice(0, insertAt),
-                              paintEl,
-                              ...elements.slice(insertAt),
-                            ];
-                            if (!commit(next as typeof elements)) return;
-                            setSelectedId(paintEl.id);
+                      <StudioFloodFillPanel
+                        active={advancedFillActive}
+                        busy={advancedFillBusy}
+                        fillColor={color}
+                        settings={advancedFillSettings}
+                        referenceLayerCount={advancedFillReferenceLayerCount}
+                        visibleRasterCount={advancedFillVisibleRasterCount}
+                        selectedIsReference={selected?.type === "image" ? selected.fillReference === true : false}
+                        targetUnsupportedReason={advancedFillUnsupportedReason}
+                        statusMessage={advancedFillStatus}
+                        diagnostics={advancedFillPreview?.diagnostics}
+                        onToggleActive={toggleAdvancedFill}
+                        onFillColorChange={setColor}
+                        onSettingsChange={updateAdvancedFillSettings}
+                        onToggleSelectedReference={() => {
+                          if (selected?.type === "image") {
+                            setAdvancedFillPreview(null);
+                            patchEl(selected.id, { fillReference: !selected.fillReference } as Partial<El>);
+                            setAdvancedFillStatus(
+                              selected.fillReference
+                                ? "채우기 참조 지정을 해제했습니다."
+                                : "이 래스터를 채우기 참조 선화로 지정했습니다.",
+                            );
                           }
-                    }
-                  />
-                  {!selectedWorkAssetDestructiveEditReason ? (
-                    <StudioLineCleanupPanel
-                      src={selected.src}
-                      onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
-                    />
-                  ) : null}
+                        }}
+                        onResetSettings={() =>
+                          updateAdvancedFillSettings({ ...DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS })
+                        }
+                      />
+                      {selected.type === "image" ? (
+                        <>
+                          <StudioAutoColorHintsPanel
+                            imageSrc={selected.src}
+                            scribbleCanvasArmed={autoColorScribbleCanvasArmed}
+                            onScribbleCanvasArmedChange={setAutoColorScribbleCanvasArmed}
+                            canvasSeedHit={autoColorCanvasSeedHit}
+                            canvasSeedHits={autoColorCanvasSeedHits}
+                            onCanvasSeedHitConsumed={() => {
+                              setAutoColorCanvasSeedHit?.(null);
+                              setAutoColorCanvasSeedHits?.(null);
+                            }}
+                            onPlanImageSize={onAutoColorPlanImageSize}
+                            onRun={async (request) => {
+                              const { runStudioAutoColorHintsWorker } = await import(
+                                "./studio-auto-color-hints-worker-client"
+                              );
+                              return runStudioAutoColorHintsWorker(request);
+                            }}
+                            onApplyResult={
+                              selectedWorkAssetDestructiveEditReason
+                                ? undefined
+                                : (dataUrl) => patchEl(selected.id, { src: dataUrl })
+                            }
+                            onApplyNewLayer={
+                              selectedWorkAssetDestructiveEditReason
+                                ? undefined
+                                : ({ dataUrl, name }) => {
+                                    if (selected.type !== "image") return;
+                                    const paintEl = {
+                                      id: uid(),
+                                      type: "image" as const,
+                                      src: dataUrl,
+                                      x: selected.x,
+                                      y: selected.y,
+                                      width: selected.width,
+                                      height: selected.height,
+                                      rotation: selected.rotation ?? 0,
+                                      opacity: 1,
+                                      name: name || "채색",
+                                      groupId: selected.groupId,
+                                    };
+                                    const index = elements.findIndex((el) => el.id === selected.id);
+                                    const insertAt = index >= 0 ? index + 1 : elements.length;
+                                    const next = [
+                                      ...elements.slice(0, insertAt),
+                                      paintEl,
+                                      ...elements.slice(insertAt),
+                                    ];
+                                    if (!commit(next as typeof elements)) return;
+                                    setSelectedId(paintEl.id);
+                                  }
+                            }
+                          />
+                          {!selectedWorkAssetDestructiveEditReason ? (
+                            <StudioLineCleanupPanel
+                              src={selected.src}
+                              onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
+                            />
+                          ) : null}
+                        </>
+                      ) : null}
                     </Suspense>
                   </div>
                   ) : null}
                   {shouldMountImageInspectorTab("quick") ? (
                   <div className="space-y-3" hidden={activeImageInspectorTab !== "quick"}>
                     <Suspense fallback={<StudioPanelLoading label="이미지 보정을 여는 중..." />}>
-                    <StudioImageAdjustmentsPanel
-                      selected={selected}
-                      filterClipboard={filterClipboard}
-                      onSetFilterClipboard={setFilterClipboard}
-                      onPatch={(patch) => patchEl(selected.id, patch)}
-                      effectFavoriteState={effectFavoriteState}
-                      onToggleEffectFavorite={toggleEffectFavorite}
-                      onRememberEffectRecent={rememberEffectRecent}
-                    />
+                      {selected.type === "image" ? (
+                        <StudioImageAdjustmentsPanel
+                          selected={selected}
+                          filterClipboard={filterClipboard}
+                          onSetFilterClipboard={setFilterClipboard}
+                          onPatch={(patch) => patchEl(selected.id, patch)}
+                          effectFavoriteState={effectFavoriteState}
+                          onToggleEffectFavorite={toggleEffectFavorite}
+                          onRememberEffectRecent={rememberEffectRecent}
+                        />
+                      ) : (
+                        imageOnlyImageInspectorFallback("quick")
+                      )}
                     </Suspense>
                   </div>
                   ) : null}
                   {shouldMountImageInspectorTab("retouch") ? (
                   <div className="space-y-3" hidden={activeImageInspectorTab !== "retouch"}>
                     <Suspense fallback={<StudioPanelLoading label="선택·리터치 도구를 여는 중..." />}>
-                    {/* 픽셀 선택 도구 — 사각/타원/자유·다각형 올가미/브러시 + 결합/페더/확장·축소. */}
-                    <StudioSelectionToolsPanel
-                    selection={pixelSel}
-                    activeTool={pixelTool === "wand" ? null : pixelTool}
-                    combineMode={pixelCombine}
-                    busy={pixelBusy}
-                    brushRadius={pixelBrushRadius}
-                    polyLassoPointCount={polyLassoSession?.points.length ?? 0}
-                    onBrushRadiusChange={setPixelBrushRadius}
-                    onPickTool={(t) => {
-                      clearPolyLassoDraft();
-                      if (t) disarmAllPixelTools();
-                      // 원형 선택은 ellipse + forceCircle 조합이다. 리터치 패널의 일반
-                      // 타원을 다시 고를 때 이전 원형 제약이 새 세션으로 새지 않게 한다.
-                      setPixelForceCircle(false);
-                      setPixelTool(t);
-                    }}
-                    onCombineModeChange={setPixelCombine}
-                    onFeatherChange={(px) => commitPixelSelectionState((selection) => selection ? setSelectionFeather(selection, px) : selection, "feather", "feather")}
-                    onToggleInvert={() => commitPixelSelectionState((selection) => toggleSelectionInvert(selection ?? emptyPixelSelection()), "invert")}
-                    magneticLasso={pixelMagneticLasso}
-                    onToggleMagnetic={onTogglePixelMagneticLasso}
-                    canUndoSelection={pixelSelectionCanUndo}
-                    canRedoSelection={pixelSelectionCanRedo}
-                    onUndoSelection={undoPixelSelectionState}
-                    onRedoSelection={redoPixelSelectionState}
-                    onUndoSubpath={() => commitPixelSelectionState((selection) => selection ? removeLastSubpath(selection) : selection, "remove-subpath")}
-                    onClearSelection={() => {
-                      clearPolyLassoDraft();
-                      commitPixelSelectionState(null, "clear");
-                    }}
-                    onSelectAll={() => {
-                      clearPolyLassoDraft();
-                      commitPixelSelectionState((selection) => selectAllPixels(selection), "select-all");
-                    }}
-                    onExpand={(amount) => commitPixelSelectionState((selection) => expandContractSelection(selection, amount), "transform")}
-                    onContract={(amount) => commitPixelSelectionState((selection) => expandContractSelection(selection, -amount), "transform")}
-                    onRotate={(degrees) => {
-                      const aspect =
-                        selected?.type === "image" && selected.width > 0
-                          ? selected.height / selected.width
-                          : 1;
-                      commitPixelSelectionState((selection) => rotateSelection(selection, degrees, { aspect }) ?? selection, "transform");
-                    }}
-                    onFlip={(axis) => commitPixelSelectionState((selection) => flipSelection(selection, axis) ?? selection, "transform")}
-                    onTranslate={(dx, dy) => commitPixelSelectionState((selection) => translateSelection(selection, dx, dy) ?? selection, "move")}
-                    onScale={(factor) => {
-                      const aspect =
-                        selected?.type === "image" && selected.width > 0
-                          ? selected.height / selected.width
-                          : 1;
-                      commitPixelSelectionState((selection) => scaleSelection(selection, factor, { aspect }) ?? selection, "transform");
-                    }}
-                    onContentTransform={(t) => void applyPixelSelectionContentTransform(t)}
-                    onApplyAdjust={(plan) => void applyPixelSelectionAdjust(plan)}
-                    onContentAwareFill={() => void applyContentAwareFill()}
-                    onCopyToNewLayer={() => void extractPixelSelectionToLayer("copy")}
-                    onCutToNewLayer={() => void extractPixelSelectionToLayer("cut")}
-                    colorRangeSamples={colorRangeSamples}
-                    colorRangeFuzziness={colorRangeFuzziness}
-                    colorRangePickArmed={colorRangePickActive}
-                    colorRangePreviewEnabled={colorRangePreviewEnabled}
-                    onColorRangeTogglePick={() => {
-                      const next = !colorRangePickActive;
-                      if (next) disarmAllPixelTools();
-                      setColorRangePickActive(next);
-                    }}
-                    onColorRangeFuzzinessChange={setColorRangeFuzziness}
-                    onColorRangeFuzzinessCommit={(v) => {
-                      setColorRangeFuzziness(v);
-                      if (colorRangePreviewEnabled) void runColorRangeApply({ fuzziness: v, coalesceKey: "color-range-preview" });
-                    }}
-                    onColorRangeTogglePreview={() => {
-                      const next = !colorRangePreviewEnabled;
-                      setColorRangePreviewEnabled(next);
-                      if (next) void runColorRangeApply({ coalesceKey: "color-range-preview" });
-                    }}
-                    onColorRangeRemoveSample={(i) => setColorRangeSamples((prev) => prev.filter((_, idx) => idx !== i))}
-                    onColorRangeClearSamples={() => setColorRangeSamples([])}
-                    onColorRangeApply={() => void runColorRangeApply()}
-                  />
-                  <StudioMagicWandPanel
-                    active={pixelTool === "wand"}
-                    tolerance={wandTolerance}
-                    busy={pixelBusy}
-                    onToggleActive={() => {
-                      const next = pixelTool === "wand" ? null : "wand";
-                      if (next) disarmAllPixelTools();
-                      setPixelTool(next);
-                    }}
-                    onToleranceChange={setWandTolerance}
-                  />
-                  <StudioQuickMaskPanel
-                    active={quickMaskActive}
-                    brushMode={quickMaskBrushMode}
-                    radiusPx={quickMaskRadius}
-                    hardness={quickMaskHardness}
-                    opacity={quickMaskOpacity}
-                    tintColor={quickMaskTintColor}
-                    tintOpacity={quickMaskTintOpacity}
-                    onEnter={enterQuickMask}
-                    onCommit={commitQuickMask}
-                    onCancel={exitQuickMask}
-                    onBrushModeChange={setQuickMaskBrushMode}
-                    onRadiusChange={setQuickMaskRadius}
-                    onHardnessChange={setQuickMaskHardness}
-                    onOpacityChange={setQuickMaskOpacity}
-                    onInvert={invertQuickMask}
-                    onTintColorChange={onQuickMaskTintColorChange}
-                    onTintOpacityChange={onQuickMaskTintOpacityChange}
-                  />
-                  <StudioSmudgePanel
-                    active={smudgeActive}
-                    radius={smudgeRadius}
-                    strength={smudgeStrength}
-                    busy={smudgeBusy}
-                    onToggleActive={toggleSmudgeTool}
-                    onRadiusChange={setSmudgeRadius}
-                    onStrengthChange={setSmudgeStrength}
-                  />
-                  <StudioDodgeBurnPanel
-                    active={dodgeBurnActive}
-                    mode={dodgeBurnMode}
-                    range={dodgeBurnRange}
-                    sponge={dodgeBurnSponge}
-                    radiusPx={dodgeBurnRadius}
-                    hardness={dodgeBurnHardness}
-                    exposure={dodgeBurnExposure}
-                    busy={dodgeBurnBusy}
-                    onToggleActive={toggleDodgeBurnTool}
-                    onModeChange={setDodgeBurnMode}
-                    onRangeChange={setDodgeBurnRange}
-                    onSpongeChange={setDodgeBurnSponge}
-                    onRadiusChange={setDodgeBurnRadius}
-                    onHardnessChange={setDodgeBurnHardness}
-                    onExposureChange={setDodgeBurnExposure}
-                  />
-                  <StudioWetMixPanel
-                    active={wetMixActive}
-                    radius={wetMixRadius}
-                    strength={wetMixStrength}
-                    wetness={wetMixWetness}
-                    pickup={wetMixPickup}
-                    hardness={wetMixHardness}
-                    paintColor={color}
-                    busy={wetMixBusy}
-                    onToggleActive={toggleWetMixTool}
-                    onRadiusChange={setWetMixRadius}
-                    onStrengthChange={setWetMixStrength}
-                    onWetnessChange={setWetMixWetness}
-                    onPickupChange={setWetMixPickup}
-                    onHardnessChange={setWetMixHardness}
-                  />
-                  <StudioLiquifyPanel
-                    active={liquifyActive}
-                    mode={liquifyMode}
-                    radius={Math.min(LIQUIFY_RADIUS_RANGE.max, Math.max(LIQUIFY_RADIUS_RANGE.min, liquifyRadius))}
-                    strength={Math.min(LIQUIFY_STRENGTH_RANGE.max, Math.max(LIQUIFY_STRENGTH_RANGE.min, liquifyStrength))}
-                    busy={liquifyBusy}
-                    onToggleActive={toggleLiquifyTool}
-                    onModeChange={setLiquifyMode}
-                    onRadiusChange={setLiquifyRadius}
-                    onStrengthChange={setLiquifyStrength}
-                  />
-                  <StudioHealClonePanel
-                    mode={healCloneTool}
-                    radiusPx={healCloneRadius}
-                    hardness={healCloneHardness}
-                    opacity={healCloneOpacity}
-                    aligned={healCloneAligned}
-                    hasSource={healCloneSourceAnchor !== null}
-                    busy={healCloneBusy}
-                    onPickMode={(mode) => {
-                      const next = healCloneTool === mode ? null : mode;
-                      if (next) {
-                        disarmAllPixelTools();
-                        resetPixelSelectionState(null); // 픽셀 선택 영역이 남아있으면 heal/clone 오버레이와 시각적으로 겹쳐 헷갈린다.
-                      }
-                      setHealCloneTool(next);
-                    }}
-                    onRadiusChange={setHealCloneRadius}
-                    onHardnessChange={setHealCloneHardness}
-                    onOpacityChange={setHealCloneOpacity}
-                    onAlignedChange={setHealCloneAligned}
-                    onClearSource={clearHealCloneSource}
-                  />
-                    <StudioHistoryBrushPanel
-                    active={historyBrushActive}
-                    radiusPx={historyBrushRadius}
-                    hardness={historyBrushHardness}
-                    opacity={historyBrushOpacity}
-                    hasSource={historyBrushSourceSrc !== null}
-                    busy={historyBrushBusy}
-                    onToggleActive={() =>
-                      setHistoryBrushActive((v) => {
-                        const next = !v;
-                        if (next) {
-                          disarmAllPixelTools();
-                          return true;
-                        }
-                        return false;
-                      })
-                    }
-                    onRadiusChange={setHistoryBrushRadius}
-                    onHardnessChange={setHistoryBrushHardness}
-                    onOpacityChange={setHistoryBrushOpacity}
-                    onClearSource={() => {
-                      setHistoryBrushSourceIndex(null);
-                      setHistoryBrushSourceSrc(null);
-                    }}
-                      onOpenHistoryPanel={historyPanelOpen ? undefined : () => setHistoryPanelOpen(true)}
-                    />
+                      {selected.type === "image" ? (
+                      <>
+                        {/* 픽셀 선택 도구 — 사각/타원/자유·다각형 올가미/브러시 + 결합/페더/확장·축소. */}
+                        <StudioSelectionToolsPanel
+                          selection={pixelSel}
+                          activeTool={pixelTool === "wand" ? null : pixelTool}
+                          combineMode={pixelCombine}
+                          busy={pixelBusy}
+                          brushRadius={pixelBrushRadius}
+                          polyLassoPointCount={polyLassoSession?.points.length ?? 0}
+                          onBrushRadiusChange={setPixelBrushRadius}
+                          onPickTool={(t) => {
+                            clearPolyLassoDraft();
+                            if (t) disarmAllPixelTools();
+                            setPixelForceCircle(false);
+                            setPixelTool(t);
+                          }}
+                          onCombineModeChange={setPixelCombine}
+                          onFeatherChange={(px) => commitPixelSelectionState((selection) => selection ? setSelectionFeather(selection, px) : selection, "feather", "feather")}
+                          onToggleInvert={() => commitPixelSelectionState((selection) => toggleSelectionInvert(selection ?? emptyPixelSelection()), "invert")}
+                          magneticLasso={pixelMagneticLasso}
+                          onToggleMagnetic={onTogglePixelMagneticLasso}
+                          canUndoSelection={pixelSelectionCanUndo}
+                          canRedoSelection={pixelSelectionCanRedo}
+                          onUndoSelection={undoPixelSelectionState}
+                          onRedoSelection={redoPixelSelectionState}
+                          onUndoSubpath={() => commitPixelSelectionState((selection) => selection ? removeLastSubpath(selection) : selection, "remove-subpath")}
+                          onClearSelection={() => {
+                            clearPolyLassoDraft();
+                            commitPixelSelectionState(null, "clear");
+                          }}
+                          onSelectAll={() => {
+                            clearPolyLassoDraft();
+                            commitPixelSelectionState((selection) => selectAllPixels(selection), "select-all");
+                          }}
+                          onExpand={(amount) => commitPixelSelectionState((selection) => expandContractSelection(selection, amount), "transform")}
+                          onContract={(amount) => commitPixelSelectionState((selection) => expandContractSelection(selection, -amount), "transform")}
+                          onRotate={(degrees) => {
+                            const aspect = selected.width > 0
+                              ? selected.height / selected.width
+                              : 1;
+                            commitPixelSelectionState((selection) => rotateSelection(selection, degrees, { aspect }) ?? selection, "transform");
+                          }}
+                          onFlip={(axis) => commitPixelSelectionState((selection) => flipSelection(selection, axis) ?? selection, "transform")}
+                          onTranslate={(dx, dy) => commitPixelSelectionState((selection) => translateSelection(selection, dx, dy) ?? selection, "move")}
+                          onScale={(factor) => {
+                            const aspect = selected.width > 0
+                              ? selected.height / selected.width
+                              : 1;
+                            commitPixelSelectionState((selection) => scaleSelection(selection, factor, { aspect }) ?? selection, "transform");
+                          }}
+                          onContentTransform={(t) => void applyPixelSelectionContentTransform(t)}
+                          onApplyAdjust={(plan) => void applyPixelSelectionAdjust(plan)}
+                          onContentAwareFill={() => void applyContentAwareFill()}
+                          onCopyToNewLayer={() => void extractPixelSelectionToLayer("copy")}
+                          onCutToNewLayer={() => void extractPixelSelectionToLayer("cut")}
+                          colorRangeSamples={colorRangeSamples}
+                          colorRangeFuzziness={colorRangeFuzziness}
+                          colorRangePickArmed={colorRangePickActive}
+                          colorRangePreviewEnabled={colorRangePreviewEnabled}
+                          onColorRangeTogglePick={() => {
+                            const next = !colorRangePickActive;
+                            if (next) disarmAllPixelTools();
+                            setColorRangePickActive(next);
+                          }}
+                          onColorRangeFuzzinessChange={setColorRangeFuzziness}
+                          onColorRangeFuzzinessCommit={(v) => {
+                            setColorRangeFuzziness(v);
+                            if (colorRangePreviewEnabled) void runColorRangeApply({ fuzziness: v, coalesceKey: "color-range-preview" });
+                          }}
+                          onColorRangeTogglePreview={() => {
+                            const next = !colorRangePreviewEnabled;
+                            setColorRangePreviewEnabled(next);
+                            if (next) void runColorRangeApply({ coalesceKey: "color-range-preview" });
+                          }}
+                          onColorRangeRemoveSample={(i) => setColorRangeSamples((prev) => prev.filter((_, idx) => idx !== i))}
+                          onColorRangeClearSamples={() => setColorRangeSamples([])}
+                          onColorRangeApply={() => void runColorRangeApply()}
+                        />
+                        <StudioMagicWandPanel
+                          active={pixelTool === "wand"}
+                          tolerance={wandTolerance}
+                          busy={pixelBusy}
+                          onToggleActive={() => {
+                            const next = pixelTool === "wand" ? null : "wand";
+                            if (next) disarmAllPixelTools();
+                            setPixelTool(next);
+                          }}
+                          onToleranceChange={setWandTolerance}
+                        />
+                        <StudioQuickMaskPanel
+                          active={quickMaskActive}
+                          brushMode={quickMaskBrushMode}
+                          radiusPx={quickMaskRadius}
+                          hardness={quickMaskHardness}
+                          opacity={quickMaskOpacity}
+                          tintColor={quickMaskTintColor}
+                          tintOpacity={quickMaskTintOpacity}
+                          onEnter={enterQuickMask}
+                          onCommit={commitQuickMask}
+                          onCancel={exitQuickMask}
+                          onBrushModeChange={setQuickMaskBrushMode}
+                          onRadiusChange={setQuickMaskRadius}
+                          onHardnessChange={setQuickMaskHardness}
+                          onOpacityChange={setQuickMaskOpacity}
+                          onInvert={invertQuickMask}
+                          onTintColorChange={onQuickMaskTintColorChange}
+                          onTintOpacityChange={onQuickMaskTintOpacityChange}
+                        />
+                        <StudioSmudgePanel
+                          active={smudgeActive}
+                          radius={smudgeRadius}
+                          strength={smudgeStrength}
+                          busy={smudgeBusy}
+                          onToggleActive={toggleSmudgeTool}
+                          onRadiusChange={setSmudgeRadius}
+                          onStrengthChange={setSmudgeStrength}
+                        />
+                        <StudioDodgeBurnPanel
+                          active={dodgeBurnActive}
+                          mode={dodgeBurnMode}
+                          range={dodgeBurnRange}
+                          sponge={dodgeBurnSponge}
+                          radiusPx={dodgeBurnRadius}
+                          hardness={dodgeBurnHardness}
+                          exposure={dodgeBurnExposure}
+                          busy={dodgeBurnBusy}
+                          onToggleActive={toggleDodgeBurnTool}
+                          onModeChange={setDodgeBurnMode}
+                          onRangeChange={setDodgeBurnRange}
+                          onSpongeChange={setDodgeBurnSponge}
+                          onRadiusChange={setDodgeBurnRadius}
+                          onHardnessChange={setDodgeBurnHardness}
+                          onExposureChange={setDodgeBurnExposure}
+                        />
+                        <StudioWetMixPanel
+                          active={wetMixActive}
+                          radius={wetMixRadius}
+                          strength={wetMixStrength}
+                          wetness={wetMixWetness}
+                          pickup={wetMixPickup}
+                          hardness={wetMixHardness}
+                          paintColor={color}
+                          busy={wetMixBusy}
+                          onToggleActive={toggleWetMixTool}
+                          onRadiusChange={setWetMixRadius}
+                          onStrengthChange={setWetMixStrength}
+                          onWetnessChange={setWetMixWetness}
+                          onPickupChange={setWetMixPickup}
+                          onHardnessChange={setWetMixHardness}
+                        />
+                        <StudioLiquifyPanel
+                          active={liquifyActive}
+                          mode={liquifyMode}
+                          radius={Math.min(LIQUIFY_RADIUS_RANGE.max, Math.max(LIQUIFY_RADIUS_RANGE.min, liquifyRadius))}
+                          strength={Math.min(LIQUIFY_STRENGTH_RANGE.max, Math.max(LIQUIFY_STRENGTH_RANGE.min, liquifyStrength))}
+                          busy={liquifyBusy}
+                          onToggleActive={toggleLiquifyTool}
+                          onModeChange={setLiquifyMode}
+                          onRadiusChange={setLiquifyRadius}
+                          onStrengthChange={setLiquifyStrength}
+                        />
+                        <StudioHealClonePanel
+                          mode={healCloneTool}
+                          radiusPx={healCloneRadius}
+                          hardness={healCloneHardness}
+                          opacity={healCloneOpacity}
+                          aligned={healCloneAligned}
+                          hasSource={healCloneSourceAnchor !== null}
+                          busy={healCloneBusy}
+                          onPickMode={(mode) => {
+                            const next = healCloneTool === mode ? null : mode;
+                            if (next) {
+                              disarmAllPixelTools();
+                              resetPixelSelectionState(null); // 픽셀 선택 영역이 남아있으면 heal/clone 오버레이와 시각적으로 겹쳐 헷갈린다.
+                            }
+                            setHealCloneTool(next);
+                          }}
+                          onRadiusChange={setHealCloneRadius}
+                          onHardnessChange={setHealCloneHardness}
+                          onOpacityChange={setHealCloneOpacity}
+                          onAlignedChange={setHealCloneAligned}
+                          onClearSource={clearHealCloneSource}
+                        />
+                        <StudioHistoryBrushPanel
+                          active={historyBrushActive}
+                          radiusPx={historyBrushRadius}
+                          hardness={historyBrushHardness}
+                          opacity={historyBrushOpacity}
+                          hasSource={historyBrushSourceSrc !== null}
+                          busy={historyBrushBusy}
+                          onToggleActive={() =>
+                            setHistoryBrushActive((v) => {
+                              const next = !v;
+                              if (next) {
+                                disarmAllPixelTools();
+                                return true;
+                              }
+                              return false;
+                            })
+                          }
+                          onRadiusChange={setHistoryBrushRadius}
+                          onHardnessChange={setHistoryBrushHardness}
+                          onOpacityChange={setHistoryBrushOpacity}
+                          onClearSource={() => {
+                            setHistoryBrushSourceIndex(null);
+                            setHistoryBrushSourceSrc(null);
+                          }}
+                          onOpenHistoryPanel={historyPanelOpen ? undefined : () => setHistoryPanelOpen(true)}
+                        />
+                      </>
+                      ) : (
+                        imageOnlyImageInspectorFallback("retouch")
+                      )}
                     </Suspense>
                   </div>
                   ) : null}
                   {shouldMountImageInspectorTab("mask") ? (
                   <div className="space-y-3" hidden={activeImageInspectorTab !== "mask"}>
                     <Suspense fallback={<StudioPanelLoading label="레이어 마스크를 여는 중..." />}>
-                    <StudioLayerMaskPanel
-                    hasMask={!!selected.maskSrc}
-                    enabled={selected.maskEnabled !== false}
-                    paintActive={layerMaskPaintActive}
-                    paintMode={layerMaskPaintMode}
-                    radiusPx={layerMaskRadius}
-                    hardness={layerMaskHardness}
-                    strength={layerMaskStrength}
-                    maskThumbnailSrc={selected.maskSrc ?? null}
-                    busy={layerMaskBusy}
-                    onAddMask={addLayerMask}
-                    onCreateFromSelection={createLayerMaskFromSelection}
-                    hasUsableSelection={isSelectionUsable(pixelSel)}
-                    onDeleteMask={deleteLayerMask}
-                    onToggleEnabled={toggleLayerMaskEnabled}
-                    onInvert={invertLayerMask}
-                    onTogglePaintActive={() =>
-                      setLayerMaskPaintActive((v) => {
-                        const next = !v;
-                        if (next) disarmAllPixelTools();
-                        return next;
-                      })
-                    }
-                    onPaintModeChange={setLayerMaskPaintMode}
-                    onRadiusChange={setLayerMaskRadius}
-                    onHardnessChange={setLayerMaskHardness}
-                      onStrengthChange={setLayerMaskStrength}
-                    />
-                    </Suspense>
-                    {/* 필터 마스크 — 비파괴 필터 체인의 "적용 범위"를 칠하는 레이어 마스크의 쌍둥이.
-                        같은 마스크 탭 안에 나란히 둔다(가시성=레이어 마스크, 보정 범위=필터 마스크). */}
-                    <Suspense fallback={<StudioPanelLoading label="필터 마스크를 여는 중..." />}>
-                    <StudioFilterMaskPanel
-                    hasMask={!!selected.filterMaskSrc}
-                    enabled={selected.filterMaskEnabled !== false}
-                    hasActiveFilters={selectedImageHasActiveFilters}
-                    paintActive={filterMaskPaintActive}
-                    paintMode={filterMaskPaintMode}
-                    radiusPx={filterMaskRadius}
-                    hardness={filterMaskHardness}
-                    strength={filterMaskStrength}
-                    maskThumbnailSrc={selected.filterMaskSrc ?? null}
-                    busy={filterMaskBusy}
-                    onAddMask={addFilterMask}
-                    onDeleteMask={deleteFilterMask}
-                    onToggleEnabled={toggleFilterMaskEnabled}
-                    onInvert={invertFilterMask}
-                    onTogglePaintActive={() =>
-                      setFilterMaskPaintActive((v) => {
-                        const next = !v;
-                        if (next) disarmAllPixelTools();
-                        return next;
-                      })
-                    }
-                    onPaintModeChange={setFilterMaskPaintMode}
-                    onRadiusChange={setFilterMaskRadius}
-                    onHardnessChange={setFilterMaskHardness}
-                      onStrengthChange={setFilterMaskStrength}
-                    />
+                      {selected.type === "image" ? (
+                        <>
+                          <StudioLayerMaskPanel
+                            hasMask={!!selected.maskSrc}
+                            enabled={selected.maskEnabled !== false}
+                            paintActive={layerMaskPaintActive}
+                            paintMode={layerMaskPaintMode}
+                            radiusPx={layerMaskRadius}
+                            hardness={layerMaskHardness}
+                            strength={layerMaskStrength}
+                            maskThumbnailSrc={selected.maskSrc ?? null}
+                            busy={layerMaskBusy}
+                            onAddMask={addLayerMask}
+                            onCreateFromSelection={createLayerMaskFromSelection}
+                            hasUsableSelection={isSelectionUsable(pixelSel)}
+                            onDeleteMask={deleteLayerMask}
+                            onToggleEnabled={toggleLayerMaskEnabled}
+                            onInvert={invertLayerMask}
+                            onTogglePaintActive={() =>
+                              setLayerMaskPaintActive((v) => {
+                                const next = !v;
+                                if (next) disarmAllPixelTools();
+                                return next;
+                              })
+                            }
+                            onPaintModeChange={setLayerMaskPaintMode}
+                            onRadiusChange={setLayerMaskRadius}
+                            onHardnessChange={setLayerMaskHardness}
+                            onStrengthChange={setLayerMaskStrength}
+                          />
+                          <StudioFilterMaskPanel
+                            hasMask={!!selected.filterMaskSrc}
+                            enabled={selected.filterMaskEnabled !== false}
+                            hasActiveFilters={selectedImageHasActiveFilters}
+                            paintActive={filterMaskPaintActive}
+                            paintMode={filterMaskPaintMode}
+                            radiusPx={filterMaskRadius}
+                            hardness={filterMaskHardness}
+                            strength={filterMaskStrength}
+                            maskThumbnailSrc={selected.filterMaskSrc ?? null}
+                            busy={filterMaskBusy}
+                            onAddMask={addFilterMask}
+                            onDeleteMask={deleteFilterMask}
+                            onToggleEnabled={toggleFilterMaskEnabled}
+                            onInvert={invertFilterMask}
+                            onTogglePaintActive={() =>
+                              setFilterMaskPaintActive((v) => {
+                                const next = !v;
+                                if (next) disarmAllPixelTools();
+                                return next;
+                              })
+                            }
+                            onPaintModeChange={setFilterMaskPaintMode}
+                            onRadiusChange={setFilterMaskRadius}
+                            onHardnessChange={setFilterMaskHardness}
+                            onStrengthChange={setFilterMaskStrength}
+                          />
+                        </>
+                      ) : (
+                        imageOnlyImageInspectorFallback("mask")
+                      )}
                     </Suspense>
                   </div>
                   ) : null}
                   {shouldMountImageInspectorTab("transform") ? (
                   <div className="space-y-3" hidden={activeImageInspectorTab !== "transform"}>
                     <Suspense fallback={<StudioPanelLoading label="이미지 변형 도구를 여는 중..." />}>
-                    {/* 이미지 크롭 — 캔버스 위 크롭 rect 를 조절해 원본 해상도로 자른다. */}
-                    <StudioCropPanel
-                    active={!!cropRect}
-                    aspect={cropAspect}
-                    busy={cropBusy}
-                    canApply={!!cropRect && !isCropRectNoop(cropRect)}
-                    onToggle={() => {
-                      if (cropRect) {
-                        setCropRect(null);
-                        return;
-                      }
-                      // 크롭 진입 — 스테이지 제스처가 겹치지 않게 다른 무장 도구를 함께 끈다.
-                      disarmAllPixelTools();
-                      resetPixelSelectionState(null);
-                      setCropRect(initialCropRect());
-                    }}
-                    onAspectChange={(id) => {
-                      setCropAspect(id);
-                      const ratio = cropAspectRatio(id);
-                      if (ratio !== null && selected.height > 0) {
-                        setCropRect((r) => (r ? applyCropAspect(r, ratio, selected.width / selected.height) : r));
-                      }
-                    }}
-                    onReset={() => setCropRect(initialCropRect())}
-                    onApply={() => void applyCropToSelectedImage()}
-                    onCancel={() => setCropRect(null)}
-                  />
-                  {/* 퍼펫 워프 — 핀을 놓고 드래그해 이미지를 관절 인형처럼 변형. 적용 전까지는 오버레이
-                      미리보기만 갱신되고 원본 픽셀은 그대로다. */}
-                    <StudioPuppetWarpPanel
-                    active={puppetWarpActive}
-                    pins={puppetWarpPins}
-                    busy={puppetWarpBusy}
-                    canApply={!isPuppetWarpNoop(puppetWarpPins)}
-                    onToggle={() => {
-                      if (puppetWarpActive) {
-                        setPuppetWarpActive(false);
-                        setPuppetWarpPins([]);
-                        return;
-                      }
-                      disarmAllPixelTools();
-                      setPuppetWarpActive(true);
-                    }}
-                    onRemovePin={(id) => setPuppetWarpPins((pins) => removePuppetPin(pins, id))}
-                    onResetPositions={() => setPuppetWarpPins((pins) => resetPuppetPinPositions(pins))}
-                    onApply={() => void applyPuppetWarpToSelectedImage()}
-                    onCancel={() => {
-                      setPuppetWarpActive(false);
-                      setPuppetWarpPins([]);
-                    }}
-                    />
+                      {selected.type === "image" ? (
+                        <>
+                          <StudioCropPanel
+                            active={!!cropRect}
+                            aspect={cropAspect}
+                            busy={cropBusy}
+                            canApply={!!cropRect && !isCropRectNoop(cropRect)}
+                            onToggle={() => {
+                              if (cropRect) {
+                                setCropRect(null);
+                                return;
+                              }
+                              disarmAllPixelTools();
+                              resetPixelSelectionState(null);
+                              setCropRect(initialCropRect());
+                            }}
+                            onAspectChange={(id) => {
+                              setCropAspect(id);
+                              const ratio = cropAspectRatio(id);
+                              if (ratio !== null && selected.height > 0) {
+                                setCropRect((r) => (r ? applyCropAspect(r, ratio, selected.width / selected.height) : r));
+                              }
+                            }}
+                            onReset={() => setCropRect(initialCropRect())}
+                            onApply={() => void applyCropToSelectedImage()}
+                            onCancel={() => setCropRect(null)}
+                          />
+                          <StudioPuppetWarpPanel
+                            active={puppetWarpActive}
+                            pins={puppetWarpPins}
+                            busy={puppetWarpBusy}
+                            canApply={!isPuppetWarpNoop(puppetWarpPins)}
+                            onToggle={() => {
+                              if (puppetWarpActive) {
+                                setPuppetWarpActive(false);
+                                setPuppetWarpPins([]);
+                                return;
+                              }
+                              disarmAllPixelTools();
+                              setPuppetWarpActive(true);
+                            }}
+                            onRemovePin={(id) => setPuppetWarpPins((pins) => removePuppetPin(pins, id))}
+                            onResetPositions={() => setPuppetWarpPins((pins) => resetPuppetPinPositions(pins))}
+                            onApply={() => void applyPuppetWarpToSelectedImage()}
+                            onCancel={() => {
+                              setPuppetWarpActive(false);
+                              setPuppetWarpPins([]);
+                            }}
+                          />
+                        </>
+                      ) : (
+                        imageOnlyImageInspectorFallback("transform")
+                      )}
                     </Suspense>
                   </div>
                   ) : null}
@@ -3281,7 +3350,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             </div>
           )}
 
-          {inspectorLayout.primary === "properties" && selected === null && tool !== "draw" ? (
+          {inspectorLayout.primary === "properties" && selected === null && tool !== "draw" &&
+            !activeFillRouteImagePanel ? (
             <div
               role="tabpanel"
               aria-label="선택 요소 속성"
@@ -3299,6 +3369,41 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 <span className="rounded-full border border-line bg-card px-2 py-1 font-semibold">검색 · 채우기/마스크</span>
                 <span className="rounded-full border border-line bg-card px-2 py-1 font-semibold">게시 · 내보내기</span>
               </div>
+            </div>
+          ) : null}
+
+          {advancedFillInspectorRouteWithoutImageSelection ? (
+            <div
+              role="tabpanel"
+              aria-label="선채움 패널"
+              hidden={inspectorLayout.primary !== "properties"}
+              className="rounded-xl border border-line bg-panel/40 p-3"
+            >
+              {shouldMountImageInspectorTab("fill") ? (
+                <div className="space-y-3" hidden={activeImageInspectorTab !== "fill"}>
+                  <Suspense fallback={<StudioPanelLoading label="채우기·선화 도구를 여는 중..." />}>
+                    <StudioFloodFillPanel
+                      active={advancedFillActive}
+                      busy={advancedFillBusy}
+                      fillColor={color}
+                      settings={advancedFillSettings}
+                      referenceLayerCount={advancedFillReferenceLayerCount}
+                      visibleRasterCount={advancedFillVisibleRasterCount}
+                      selectedIsReference={false}
+                      targetUnsupportedReason={advancedFillUnsupportedReason}
+                      statusMessage={advancedFillStatus}
+                      diagnostics={advancedFillPreview?.diagnostics}
+                      onToggleActive={toggleAdvancedFill}
+                      onFillColorChange={setColor}
+                      onSettingsChange={updateAdvancedFillSettings}
+                      onToggleSelectedReference={() => {}}
+                      onResetSettings={() =>
+                        updateAdvancedFillSettings({ ...DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS })
+                      }
+                    />
+                  </Suspense>
+                </div>
+              ) : null}
             </div>
           ) : null}
 

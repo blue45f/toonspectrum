@@ -975,31 +975,84 @@ export function StudioLiveCanvasOverlay({
           flipX,
           rotation
         );
+        const strokeColor = cursor.strokeColor || color;
+        const strokeWidth = cursor.strokeWidth || 4;
+        const isDrawing = Boolean(cursor.drawing);
+
+        let pointsString = "";
+        if (isDrawing && cursor.points && cursor.points.length >= 4) {
+          const pairs: string[] = [];
+          for (let i = 0; i < cursor.points.length - 1; i += 2) {
+            const px = cursor.points[i];
+            const py = cursor.points[i + 1];
+            if (typeof px === "number" && typeof py === "number") {
+              const proj = projectStudioLiveOverlayPoint(
+                clamp(px / canvasWidth, 0, 1),
+                clamp(py / canvasHeight, 0, 1),
+                0,
+                0,
+                flipX,
+                rotation
+              );
+              pairs.push(`${(proj.x * canvasWidth).toFixed(1)},${(proj.y * canvasHeight).toFixed(1)}`);
+            }
+          }
+          pointsString = pairs.join(" ");
+        }
+
         return (
-          <div
-            key={participant.sessionId}
-            className="absolute left-0 top-0 motion-safe:transition-[left,top] motion-safe:duration-75"
-            style={{
-              left: `${projected.x * 100}%`,
-              top: `${projected.y * 100}%`,
-            }}
-          >
-            <MousePointer2
-              aria-hidden
-              className="drop-shadow-[0_2px_2px_rgb(0_0_0/0.35)]"
-              fill={color}
-              size={22}
-              stroke="white"
-              strokeWidth={2}
-            />
-            <span
-              className="ml-3 -mt-0.5 block max-w-40 truncate rounded-md px-2 py-1 text-[0.65rem] font-bold leading-none text-white shadow-lg"
-              style={{ backgroundColor: color }}
+          <Fragment key={participant.sessionId}>
+            {pointsString ? (
+              <svg className="pointer-events-none absolute inset-0 size-full z-10">
+                <polyline
+                  points={pointsString}
+                  fill="none"
+                  stroke={strokeColor}
+                  strokeWidth={strokeWidth}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity={cursor.strokeOpacity ?? 0.9}
+                  className="motion-safe:transition-all motion-safe:duration-75"
+                />
+              </svg>
+            ) : null}
+            <div
+              className="absolute left-0 top-0 pointer-events-none z-20 motion-safe:transition-[left,top] motion-safe:duration-75"
+              style={{
+                left: `${projected.x * 100}%`,
+                top: `${projected.y * 100}%`,
+              }}
             >
-              {participant.displayName}
-              {cursor.tool ? <span className="ml-1 font-medium opacity-80">· {cursor.tool}</span> : null}
-            </span>
-          </div>
+              <div className="relative">
+                {isDrawing ? (
+                  <span
+                    className="absolute -left-3 -top-3 block rounded-full border-2 border-white shadow-md animate-pulse"
+                    style={{
+                      width: `${Math.max(12, strokeWidth * 2)}px`,
+                      height: `${Math.max(12, strokeWidth * 2)}px`,
+                      backgroundColor: strokeColor,
+                    }}
+                  />
+                ) : null}
+                <MousePointer2
+                  aria-hidden
+                  className="drop-shadow-[0_2px_2px_rgb(0_0_0/0.35)]"
+                  fill={color}
+                  size={22}
+                  stroke="white"
+                  strokeWidth={2}
+                />
+                <span
+                  className="ml-3 -mt-0.5 block max-w-40 truncate rounded-md px-2 py-1 text-[0.65rem] font-bold leading-none text-white shadow-lg"
+                  style={{ backgroundColor: color }}
+                >
+                  {participant.displayName}
+                  {cursor.tool ? <span className="ml-1 font-medium opacity-80">· {cursor.tool}</span> : null}
+                  {isDrawing ? <span className="ml-1 text-[0.6rem] font-bold animate-pulse">✏️ 그리는 중</span> : null}
+                </span>
+              </div>
+            </div>
+          </Fragment>
         );
       })}
     </div>

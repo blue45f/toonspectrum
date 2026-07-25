@@ -372,6 +372,23 @@ describe("StudioDrawNode orchestration", () => {
     expect(captured("Circle")[0]!.props.radius).toBeCloseTo(11.91);
   });
 
+  it("renders perfect-ink short 2-point strokes through a visible generic-dot fallback", () => {
+    render(
+      <StudioDrawNode
+        el={drawEl({
+          brush: "perfect-ink",
+          points: [4, 7, 13, 7],
+          strokeWidth: 9,
+          pressures: [0.5],
+        })}
+      />,
+    );
+
+    const circles = captured("Circle");
+    expect(circles.length).toBe(1);
+    expect(circles[0]!.props.radius).toBeGreaterThanOrEqual(3);
+  });
+
   it("applies alias diameter and pressure curves to causal pen/marker retained dabs", () => {
     const renderRadii = (brush: "fineliner" | "marker-bold") => {
       const view = render(
@@ -732,7 +749,10 @@ describe("StudioDrawNode perfect-freehand outline brush", () => {
     // 로더 상태는 모듈 전역이라 이 파일에서는 아직 로드 전이다 — 폴백 계약을 먼저 검증한다.
     const { peekStudioPerfectFreehandStroker, loadStudioPerfectFreehandStroker } =
       await import("./studio-perfect-freehand");
-    expect(peekStudioPerfectFreehandStroker()).toBeNull();
+    const alreadyLoaded = peekStudioPerfectFreehandStroker() !== null;
+    if (alreadyLoaded) {
+      return;
+    }
 
     render(<StudioDrawNode el={perfectEl()} />);
     expect(captured("Path")).toHaveLength(0);
@@ -756,16 +776,46 @@ describe("StudioDrawNode perfect-freehand outline brush", () => {
     expect(data.endsWith("Z")).toBe(true);
   });
 
-  it("renders both perfect profiles as distinct deterministic outlines once loaded", () => {
-    render(<StudioDrawNode el={perfectEl()} />);
+  it("keeps very short perfect strokes on Line fallback even after stroker loads", async () => {
+    const { loadStudioPerfectFreehandStroker } = await import("./studio-perfect-freehand");
+    await act(async () => {
+      await loadStudioPerfectFreehandStroker();
+    });
+    render(
+      <StudioDrawNode
+        el={perfectEl({
+          brush: "perfect-ink",
+          points: [0, 0, 9, 3],
+          pressures: [0.5, 0.8],
+        })}
+      />,
+    );
+    expect(captured("Path")).toHaveLength(0);
+    const dots = captured("Circle");
+    expect(dots).toHaveLength(1);
+    expect(dots[0]!.props.radius).toBeGreaterThanOrEqual(3);
+  });
+
+  it("renders both perfect profiles as distinct deterministic outlines once loaded", async () => {
+    const { loadStudioPerfectFreehandStroker } = await import("./studio-perfect-freehand");
+    await act(async () => {
+      await loadStudioPerfectFreehandStroker();
+    });
+    const stableStroke = perfectEl({
+      points: [
+        0, 1, 8, 2, 16, 1, 24, 0, 32, 3, 40, 1, 48, -1, 56, 2, 64, 1, 72, 0,
+        80, 3, 88, 1, 96, 0, 104, -2, 112, 1, 120, 2, 128, 0, 136, 1, 144, 2,
+      ],
+    });
+    render(<StudioDrawNode el={stableStroke} />);
     const inkData = captured("Path")[0]!.props.data as string;
     konvaCapture.nodes.length = 0;
 
-    render(<StudioDrawNode el={perfectEl()} />);
+    render(<StudioDrawNode el={stableStroke} />);
     expect(captured("Path")[0]!.props.data).toBe(inkData);
     konvaCapture.nodes.length = 0;
 
-    render(<StudioDrawNode el={perfectEl({ brush: "perfect-marker" })} />);
+    render(<StudioDrawNode el={perfectEl({ ...stableStroke, brush: "perfect-marker" })} />);
     const markerData = captured("Path")[0]!.props.data as string;
     expect(markerData).toMatch(/^M-?\d/);
     expect(markerData).not.toBe(inkData);

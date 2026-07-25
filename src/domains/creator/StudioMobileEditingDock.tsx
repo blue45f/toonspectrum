@@ -240,7 +240,10 @@ export interface StudioMobileEditingDockHandlers {
   duplicateSelected: () => void;
   fitCanvasToWidth: () => void;
   openBrushManager: (launcher: HTMLButtonElement) => void;
-  openInspectorRoute: (route: StudioInspectorRoute) => void;
+  openInspectorRoute: (
+    route: StudioInspectorRoute,
+    mobileSheetTarget?: StudioMobileSheet | null
+  ) => void;
   openStudioFilter: (kind: StudioFilterKind) => void;
   queueBrushDelete: (deleted: DeletedBrushRecord) => void;
   redo: () => void;
@@ -550,8 +553,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               icon={SlidersHorizontal}
               label="속성"
               onClick={() => {
-                openInspectorRoute({ primary: "properties" });
-                setMobileSheet("props");
+                openInspectorRoute({ primary: "properties" }, "props");
               }}
             />
             {selectedSupportsContextFilter ? (
@@ -1450,8 +1452,10 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                       setMobileSheet(null);
                       return;
                     }
-                    openInspectorRoute({ primary: selected ? "properties" : "layers" });
-                    setMobileSheet("props");
+                    openInspectorRoute(
+                      { primary: selected ? "properties" : "layers" },
+                      "props"
+                    );
                   }}
                 />
                 <StudioDockNavButton

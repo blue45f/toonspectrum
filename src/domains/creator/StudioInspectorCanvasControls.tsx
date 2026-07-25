@@ -98,7 +98,8 @@ export function StudioInspectorCanvasControls({
           type="color"
           value={background}
           onChange={(event) => onBackgroundChange(event.currentTarget.value)}
-          className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
+          disabled={controlsDisabled}
+          className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent disabled:cursor-not-allowed disabled:opacity-50"
         />
       </label>
       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -106,10 +107,11 @@ export function StudioInspectorCanvasControls({
           <button
             key={preset.id}
             type="button"
+            disabled={controlsDisabled}
             onClick={() => onApplyBackgroundPreset(preset)}
             title={preset.label}
             aria-label={`배경 ${preset.label}`}
-            className="h-6 w-6 rounded-md border border-line"
+            className="h-6 w-6 rounded-md border border-line disabled:cursor-not-allowed disabled:opacity-50"
             style={{
               background: preset.grad
                 ? `linear-gradient(${preset.grad[0]}, ${preset.grad[1]})`
@@ -127,10 +129,11 @@ export function StudioInspectorCanvasControls({
               <button
                 key={preset.id}
                 type="button"
+                disabled={controlsDisabled}
                 onClick={() => onGradientChange(gradientToBgGrad(preset))}
                 title={preset.tip}
                 aria-label={`그라디언트 ${preset.label}`}
-                className="h-6 w-6 rounded-md border border-line"
+                className="h-6 w-6 rounded-md border border-line disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ background: `linear-gradient(${start}, ${end})` }}
               />
             );
@@ -139,8 +142,9 @@ export function StudioInspectorCanvasControls({
       </div>
       <button
         type="button"
+        disabled={controlsDisabled}
         onClick={onOpenBackgroundEditor}
-        className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-accent/30 bg-accent-soft px-2 py-2 text-[0.7rem] font-bold text-accent hover:border-accent/50"
+        className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-accent/30 bg-accent-soft px-2 py-2 text-[0.7rem] font-bold text-accent hover:border-accent/50 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <Droplets size={13} aria-hidden />
         배경 편집기 · 리사이저 열기
@@ -151,8 +155,9 @@ export function StudioInspectorCanvasControls({
           <button
             type="button"
             aria-label="높이 240px 줄이기"
+            disabled={controlsDisabled}
             onClick={() => onCanvasHeightDelta(-240)}
-            className="rounded border border-line px-2 text-fg-2 hover:bg-raised"
+            className="rounded border border-line px-2 text-fg-2 hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
           >
             −
           </button>
@@ -165,8 +170,9 @@ export function StudioInspectorCanvasControls({
           <button
             type="button"
             aria-label="높이 240px 늘리기"
+            disabled={controlsDisabled}
             onClick={() => onCanvasHeightDelta(240)}
-            className="rounded border border-line px-2 text-fg-2 hover:bg-raised"
+            className="rounded border border-line px-2 text-fg-2 hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
           >
             +
           </button>
@@ -176,6 +182,7 @@ export function StudioInspectorCanvasControls({
         <div className="mt-3">
           <StudioMagicResizePanel
             currentSize={{ width: CANVAS_W, height: canvasHeight }}
+            disabled={controlsDisabled}
             strategy={magicResizeStrategy}
             onStrategyChange={onMagicResizeStrategyChange}
             onApplyPreset={onApplyMagicResizePreset}
@@ -192,7 +199,7 @@ export function StudioInspectorCanvasControls({
             step={2}
             value={panelGutter}
             onChange={(event) => onPanelGutterChange(Number(event.currentTarget.value))}
-            className="w-24 cursor-pointer accent-accent"
+            className="w-24 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
             disabled={controlsDisabled || !templateGutterAvailable}
           />
           <span className="w-5 text-right text-xs tabular-nums text-fg-3">{panelGutter}</span>
@@ -205,7 +212,8 @@ export function StudioInspectorCanvasControls({
             type="checkbox"
             checked={snapEnabled}
             onChange={(event) => onSnapEnabledChange(event.currentTarget.checked)}
-            className="size-3.5 accent-accent"
+            disabled={controlsDisabled}
+            className="size-3.5 accent-accent disabled:cursor-not-allowed disabled:opacity-60"
           />
         </label>
         <label className="flex items-center justify-between text-xs text-fg-2">
@@ -215,13 +223,15 @@ export function StudioInspectorCanvasControls({
               type="checkbox"
               checked={showGrid}
               onChange={(event) => onShowGridChange(event.currentTarget.checked)}
-              className="size-3.5 accent-accent"
+              disabled={controlsDisabled}
+              className="size-3.5 accent-accent disabled:cursor-not-allowed disabled:opacity-60"
             />
             {showGrid && (
               <select
                 value={gridSize}
                 onChange={(event) => onGridSizeChange(Number(event.currentTarget.value))}
-                className="rounded border border-line bg-card px-1 py-0.5 text-[10px]"
+                disabled={controlsDisabled}
+                className="rounded border border-line bg-card px-1 py-0.5 text-[10px] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {[20, 30, 40, 50, 60, 80].map((size) => (
                   <option key={size} value={size}>
@@ -241,7 +251,8 @@ export function StudioInspectorCanvasControls({
             onChange={(event) => onShowWebtoonGuidesChange(event.currentTarget.checked)}
             onPointerEnter={onWarmWebtoonGuides}
             onFocus={onWarmWebtoonGuides}
-            className="size-3.5 accent-accent"
+            disabled={controlsDisabled}
+            className="size-3.5 accent-accent disabled:cursor-not-allowed disabled:opacity-60"
           />
         </label>
         {showWebtoonGuides && (
@@ -266,15 +277,17 @@ export function StudioInspectorCanvasControls({
           <div className="flex gap-1.5">
             <button
               type="button"
+              disabled={controlsDisabled}
               onClick={() => onAddUserGuide("v")}
-              className="flex-1 cursor-pointer rounded border border-line bg-card py-1 text-[0.68rem] font-semibold text-fg transition-colors hover:bg-raised"
+              className="flex-1 cursor-pointer rounded border border-line bg-card py-1 text-[0.68rem] font-semibold text-fg transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
             >
               + 세로 가이드
             </button>
             <button
               type="button"
+              disabled={controlsDisabled}
               onClick={() => onAddUserGuide("h")}
-              className="flex-1 cursor-pointer rounded border border-line bg-card py-1 text-[0.68rem] font-semibold text-fg transition-colors hover:bg-raised"
+              className="flex-1 cursor-pointer rounded border border-line bg-card py-1 text-[0.68rem] font-semibold text-fg transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
             >
               + 가로 가이드
             </button>
@@ -300,12 +313,14 @@ export function StudioInspectorCanvasControls({
                       onChange={(event) =>
                         onMoveUserGuide(guide.id, Number(event.currentTarget.value))
                       }
-                      className="h-2 w-16 cursor-pointer accent-accent"
+                      disabled={controlsDisabled}
+                      className="h-2 w-16 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
                     />
                     <button
                       type="button"
+                      disabled={controlsDisabled}
                       onClick={() => onDeleteUserGuide(guide.id)}
-                      className="ml-1 cursor-pointer text-[9px] text-bad hover:underline"
+                      className="ml-1 cursor-pointer text-[9px] text-bad hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       삭제
                     </button>
@@ -314,8 +329,9 @@ export function StudioInspectorCanvasControls({
               ))}
               <button
                 type="button"
+                disabled={controlsDisabled}
                 onClick={onClearUserGuides}
-                className="w-full cursor-pointer border-t border-line/30 pt-1 text-center text-[9px] text-bad-light hover:underline"
+                className="w-full cursor-pointer border-t border-line/30 pt-1 text-center text-[9px] text-bad-light hover:underline disabled:cursor-not-allowed disabled:opacity-50"
               >
                 모든 가이드 삭제
               </button>

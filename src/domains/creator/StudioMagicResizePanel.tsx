@@ -41,6 +41,7 @@ function isSameAspect(a: MagicResizeCanvasSize, b: MagicResizeCanvasSize): boole
 
 export interface StudioMagicResizePanelProps {
   currentSize?: MagicResizeCanvasSize;
+  disabled?: boolean;
   strategy: MagicResizeStrategy;
   onStrategyChange: (next: MagicResizeStrategy) => void;
   onApplyPreset: (preset: MagicResizePreset) => void;
@@ -48,6 +49,7 @@ export interface StudioMagicResizePanelProps {
 
 export function StudioMagicResizePanel({
   currentSize,
+  disabled = false,
   strategy,
   onStrategyChange,
   onApplyPreset,
@@ -66,6 +68,7 @@ export function StudioMagicResizePanel({
           <StudioToggleChip
             key={s.id}
             active={strategy === s.id}
+            disabled={disabled}
             title={s.hint}
             onClick={() => onStrategyChange(s.id)}
           >
@@ -85,10 +88,12 @@ export function StudioMagicResizePanel({
               key={preset.id}
               type="button"
               onClick={() => onApplyPreset(preset)}
+              disabled={disabled}
               title={preset.hint}
               aria-pressed={active}
               className={cn(
                 "flex items-center gap-2 rounded-xl border px-2 py-2 text-left transition-colors",
+                disabled && "cursor-not-allowed disabled:opacity-50",
                 STUDIO_EASE,
                 STUDIO_FOCUS_RING,
                 active

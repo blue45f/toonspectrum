@@ -217,6 +217,7 @@ const IMAGE_ACTIONS: readonly StudioInspectorAction[] = [
   },
 ];
 
+
 export function studioInspectorActions(
   context: StudioInspectorActionContext
 ): readonly StudioInspectorAction[] {
@@ -241,6 +242,9 @@ export function studioInspectorActions(
   }
 
   if (context.selectedType === "image") contextual.push(...IMAGE_ACTIONS);
+  else if (context.selectedType === "draw") {
+    contextual.push(...IMAGE_ACTIONS);
+  }
   return [...contextual, ...ALWAYS_AVAILABLE_ACTIONS];
 }
 

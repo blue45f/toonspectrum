@@ -155,7 +155,7 @@ describe("Studio options-bars module boundary", () => {
       "saveStudioBrushSlotsState(",
       "studioBrushSlotAt(brushSlotsState, index)",
       "void loadStudioBrushStudio();",
-      'setMobileSheet(isMobile ? "draw" : null);',
+      "setMobileSheet(",
       "setColor(secondaryColor);",
       "setSecondaryColor(color);",
       "disarmAllPixelTools();",

@@ -351,7 +351,7 @@ export function normalizeStudioBrushCatalogIdentityMetadata(
   };
 }
 
-export interface DrawEl extends StudioBrushCatalogIdentityMetadata {
+export interface DrawEl extends StudioBrushCatalogIdentityMetadata, StudioElementLayerMetadata {
   id: string;
   type: "draw";
   kind?: "freehand" | DrawShapeKind;

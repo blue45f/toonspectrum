@@ -57,7 +57,7 @@ describe("Studio project snapshot boundary", () => {
     expect(pageSource).toContain('from "./studio-project-snapshot"');
     expect(pageSource).toContain("const { buildCurrentStudioProjectFileSnapshot } = useStudioStableHandlers<{");
     expect(pageSource).toContain("buildStudioProjectFileSnapshot({");
-    expect(pageSource.match(/resolveStudioDurableProjectPages\(\{/gu)).toHaveLength(3);
+    expect(pageSource.match(/resolveStudioDurableProjectPages\(\{/gu)).toHaveLength(4);
     expect(pageSource).toContain("studioProjectSnapshotHasMeaningfulContent(");
     expect(pageSource).not.toContain("studioWriterRoomHasContent(");
     expect(pageSource).not.toContain("studioReferenceBoardHasContent(");

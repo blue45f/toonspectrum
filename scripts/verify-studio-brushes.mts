@@ -50,6 +50,7 @@ const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/studio-ai/status",
   "/api/v1/apps/toonspectrum/visits/ping",
 ] as const;
+const DEBUG_BRUSH_VERIFIER = process.env.TOONSPECTRUM_DEBUG_BRUSH_VERIFIER === "1";
 
 interface BrowserErrorCollector {
   messages: string[];
@@ -204,10 +205,19 @@ function reportBrowserErrors(collector: BrowserErrorCollector): void {
 
 async function installCleanStudioState(page: Page): Promise<void> {
   await page.addInitScript(
-    ({ autosavePrefix, cleanSessionKey, mobileHintKey, quickstartKey }) => {
+    ({
+      autosavePrefix,
+      cleanSessionKey,
+      mobileHintKey,
+      quickstartKey,
+      debugPerfectInk,
+    }) => {
       try {
         window.localStorage.setItem(quickstartKey, "1");
         window.localStorage.setItem(mobileHintKey, "1");
+        if (debugPerfectInk) {
+          (window as { __debugPerfectInk?: boolean }).__debugPerfectInk = true;
+        }
         // Init scripts run before every navigation. Clear stale data only once per tab so the
         // durability scenario can navigate away and return without deleting its emergency save.
         if (window.sessionStorage.getItem(cleanSessionKey) !== "1") {
@@ -226,6 +236,7 @@ async function installCleanStudioState(page: Page): Promise<void> {
       cleanSessionKey: CLEAN_SESSION_KEY,
       mobileHintKey: MOBILE_HINT_KEY,
       quickstartKey: QUICKSTART_KEY,
+      debugPerfectInk: DEBUG_BRUSH_VERIFIER,
     },
   );
 }
@@ -336,9 +347,10 @@ function strokePoint(
   invariant(safeBottom - safeTop >= 220, "visible canvas is too short for the brush grid");
   const column = index % 7;
   const row = Math.floor(index / 7);
+  const rows = Math.max(1, Math.ceil(BRUSH_PRESETS.length / 7));
   return {
     x: safeLeft + ((safeRight - safeLeft) * column) / 6,
-    y: safeTop + ((safeBottom - safeTop) * row) / 4,
+    y: safeTop + ((safeBottom - safeTop) * (row + 0.5)) / rows,
     dx: index % 2 === 0 ? 9 : 7,
     dy: index % 3 === 0 ? 3 : -2,
   };
@@ -522,6 +534,11 @@ async function captureStableEvidence(
 async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promise<DesktopBrushResult> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const page = await context.newPage();
+  if (DEBUG_BRUSH_VERIFIER) {
+    page.on("console", (entry) => {
+      log(`console(${entry.type()}):${entry.text()}`);
+    });
+  }
   const errors = collectBrowserErrors(page, "desktop-brushes");
   const screenshot = join(SCRATCH, "studio-brush-desktop-37.png");
   const catalogScreenshot = join(SCRATCH, "studio-brush-desktop-catalog.png");
@@ -529,6 +546,12 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
   try {
     await prepareStudioPage(page, studioUrl);
     await activateDesktopPen(page);
+    if (DEBUG_BRUSH_VERIFIER) {
+      const flag = await page.evaluate(
+        () => (globalThis as { __debugPerfectInk?: boolean }).__debugPerfectInk,
+      );
+      log(`DEBUG global __debugPerfectInk=${String(flag)}`);
+    }
 
     const inspector = page.locator('[role="tabpanel"][aria-label="그리기 도구 설정"]');
     await inspector.waitFor({ state: "attached" });
@@ -581,6 +604,19 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
 
       const immediate = await page.screenshot({ animations: "disabled", clip });
       const immediateDiff = await compareScreenshotPixels(page, before, immediate);
+      if (DEBUG_BRUSH_VERIFIER && preset.id === "perfect-ink") {
+        log(`DEBUG ${preset.id}: immediateDiff ${JSON.stringify(immediateDiff)} at point ${JSON.stringify(point)}`);
+        const branchState = await page.evaluate(() =>
+          (globalThis as {
+            __perfectInkDebugState?: Record<string, unknown> | null;
+          }).__perfectInkDebugState ?? null,
+        );
+        log(`DEBUG ${preset.id}: branchState ${JSON.stringify(branchState)}`);
+        await page.evaluate(() => {
+          const globalState = globalThis as { __perfectInkDebugState?: Record<string, unknown> | null };
+          globalState.__perfectInkDebugState = null;
+        });
+      }
       invariant(hasMeaningfulPixelChange(immediateDiff), `${preset.id}: fast short stroke produced no visible pixels`);
       // A deferred commit is allowed, but the release preview must settle into durable pixels
       // before its 200 ms idle window elapses instead of silently disappearing.
@@ -853,7 +889,43 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         hasMeaningfulPixelChange(immediateCoverage),
         `${preset.id}: fast long stroke produced no immediate visible pixels`,
       );
+      if (DEBUG_BRUSH_VERIFIER && preset.id === "perfect-ink") {
+        const perfectDebugState = await page.evaluate(() =>
+          (globalThis as {
+            __perfectInkDebugState?: {
+              brush: string;
+              pointCount: number;
+              strokeDistance: number;
+              isVeryShort: boolean;
+              isSparseLong: boolean;
+              profile: string;
+              outlineDistance: number;
+              outlinePointCount: number;
+              isDegeneratePath: boolean;
+            } | null;
+          }).__perfectInkDebugState ?? null,
+        );
+          log(`DEBUG ${preset.id} long:${JSON.stringify(perfectDebugState)}`);
+      }
       await page.waitForTimeout(280);
+      if (DEBUG_BRUSH_VERIFIER && preset.id === "perfect-ink") {
+        const settledPerfectDebugState = await page.evaluate(() =>
+          (globalThis as {
+            __perfectInkDebugState?: {
+              brush: string;
+              pointCount: number;
+              strokeDistance: number;
+              isVeryShort: boolean;
+              isSparseLong: boolean;
+              profile: string;
+              outlineDistance: number;
+              outlinePointCount: number;
+              isDegeneratePath: boolean;
+            } | null;
+          }).__perfectInkDebugState ?? null,
+        );
+        log(`DEBUG ${preset.id} long-settled:${JSON.stringify(settledPerfectDebugState)}`);
+      }
       const settled = await page.screenshot({ animations: "disabled", clip });
       const coverage = await compareScreenshotCoverage(page, before, settled, 6);
       invariant(hasMeaningfulPixelChange(coverage), `${preset.id}: long stroke disappeared before commit`);

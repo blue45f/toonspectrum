@@ -151,6 +151,10 @@ export function StudioInspectorNavigator({
   const actions = studioInspectorActions({ hasSelection, selectedType, drawing });
   const results = filterStudioInspectorActions(actions, query);
   const normalizedLayerCount = safeLayerCount(layerCount);
+  const imageInspectorTabs = IMAGE_TABS;
+  const shouldShowImageInspectorTabs =
+    layout.primary === "properties" && (selectedType === "image" || selectedType === "draw");
+  const activeImageInspectorTab = layout.image;
 
   function navigate(route: StudioInspectorRoute, restoreSearchFocus = false) {
     onChange(navigateStudioInspector(layout, route));
@@ -278,15 +282,15 @@ export function StudioInspectorNavigator({
         })}
       </div>
 
-      {layout.primary === "properties" && selectedType === "image" ? (
+      {shouldShowImageInspectorTabs ? (
         <div
           role="tablist"
           aria-label="이미지 전문 도구"
           className="mt-2 flex min-w-0 gap-1 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          {IMAGE_TABS.map((tab) => {
+          {imageInspectorTabs.map((tab) => {
             const Icon = tab.icon;
-            const active = layout.image === tab.id;
+            const active = activeImageInspectorTab === tab.id;
             return (
               <button
                 key={tab.id}

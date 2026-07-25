@@ -99,9 +99,18 @@ describe("studio inspector layout", () => {
       selectedType: "text",
       drawing: false,
     });
+    const drawActions = studioInspectorActions({
+      hasSelection: true,
+      selectedType: "draw",
+      drawing: false,
+    });
 
     expect(imageActions.map((action) => action.id)).toContain("image-fill");
     expect(textActions.map((action) => action.id)).not.toContain("image-fill");
+    expect(drawActions.map((action) => action.id)).toContain("image-fill");
+    expect(drawActions.map((action) => action.id)).toContain("image-transform");
+    expect(drawActions.map((action) => action.id)).toContain("image-mask");
+    expect(drawActions.map((action) => action.id)).toContain("image-retouch");
     expect(filterStudioInspectorActions(imageActions, "참조 채우기")).toEqual([
       expect.objectContaining({ id: "image-fill" }),
     ]);

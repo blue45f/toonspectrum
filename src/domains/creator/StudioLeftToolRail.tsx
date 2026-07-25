@@ -181,7 +181,7 @@ interface StudioLeftToolRailProps {
   poserVrmOpen?: boolean;
   bg3dOpen?: boolean;
   selected: El | null;
-  selectedContentMutationLocked: boolean;
+  selectedImageMutationLocked: boolean;
   setAppSettingsInitialTab: import("react").Dispatch<import("react").SetStateAction<StudioAppSettingsTab>>;
   setAppSettingsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
@@ -239,7 +239,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   poserVrmOpen = false,
   bg3dOpen = false,
   selected,
-  selectedContentMutationLocked,
+  selectedImageMutationLocked,
   setAppSettingsInitialTab,
   setAppSettingsOpen,
   setDrawMode,
@@ -428,11 +428,11 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="사각 선택 (M)"
               description="이미지 픽셀을 사각형으로 선택합니다. Shift=정사각, Alt=중심 확장."
               active={pixelTool === "rect" && !pixelForceCircle}
-              disabled={activeSurfaceReviewLocked || (selected?.type === "image" && selectedContentMutationLocked)}
+              disabled={activeSurfaceReviewLocked || (selected?.type === "image" && selectedImageMutationLocked)}
               unavailableReason={
                 activeSurfaceReviewLocked
                   ? REVIEW_LOCK_REASON
-                  : selected?.type === "image" && selectedContentMutationLocked
+                  : selected?.type === "image" && selectedImageMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
@@ -445,11 +445,11 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="원형 선택"
               description="이미지 픽셀을 정원으로 선택합니다. Alt=중심 확장."
               active={pixelTool === "ellipse" && pixelForceCircle}
-              disabled={activeSurfaceReviewLocked || (selected?.type === "image" && selectedContentMutationLocked)}
+              disabled={activeSurfaceReviewLocked || (selected?.type === "image" && selectedImageMutationLocked)}
               unavailableReason={
                 activeSurfaceReviewLocked
                   ? REVIEW_LOCK_REASON
-                  : selected?.type === "image" && selectedContentMutationLocked
+                  : selected?.type === "image" && selectedImageMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
@@ -466,7 +466,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               unavailableReason={
                 selected?.type !== "image"
                   ? "변형할 이미지 레이어를 먼저 고르세요."
-                  : selectedContentMutationLocked
+                  : selectedImageMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
                     : !isSelectionUsable(pixelSel)
                       ? "이미지 안에서 변형할 픽셀 영역을 먼저 선택하세요."
@@ -485,7 +485,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               unavailableReason={
                 selected?.type !== "image"
                   ? "자를 이미지 레이어를 먼저 고르세요."
-                  : selectedContentMutationLocked
+                  : selectedImageMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
@@ -555,7 +555,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               unavailableReason={
                 selected?.type !== "image"
                   ? "색을 섞을 이미지 레이어를 먼저 고르세요."
-                  : selectedContentMutationLocked
+                  : selectedImageMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
@@ -572,7 +572,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               unavailableReason={
                 selected?.type !== "image"
                   ? "칠할 이미지 레이어를 먼저 고르세요."
-                  : selectedContentMutationLocked
+                  : selectedImageMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
@@ -589,7 +589,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               unavailableReason={
                 selected?.type !== "image"
                   ? "보정할 이미지 레이어를 먼저 고르세요."
-                  : selectedContentMutationLocked
+                  : selectedImageMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
@@ -606,7 +606,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               unavailableReason={
                 selected?.type !== "image"
                   ? "왜곡할 이미지 레이어를 먼저 고르세요."
-                  : selectedContentMutationLocked
+                  : selectedImageMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
@@ -672,16 +672,16 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               }
               {...lassoToolHintProps}
               active={(pixelTool === "lasso" || pixelTool === "poly-lasso") && !pixelForceCircle}
-              disabled={activeSurfaceReviewLocked || (selected?.type === "image" && selectedContentMutationLocked)}
+              disabled={activeSurfaceReviewLocked || (selected?.type === "image" && selectedImageMutationLocked)}
               unavailableReason={
                 activeSurfaceReviewLocked
                   ? REVIEW_LOCK_REASON
-                  : selected?.type === "image" && selectedContentMutationLocked
+                  : selected?.type === "image" && selectedImageMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
               onClick={() => {
-                if (activeSurfaceReviewLocked || (selected?.type === "image" && selectedContentMutationLocked)) return;
+                if (activeSurfaceReviewLocked || (selected?.type === "image" && selectedImageMutationLocked)) return;
                 setTool("select");
                 setMenu(null);
                 setPixelForceCircle(false);
@@ -927,7 +927,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               unavailableReason={
                 selected?.type !== "image"
                   ? "애니메이션으로 편집할 이미지 레이어를 먼저 선택하세요."
-                  : selectedContentMutationLocked
+                  : selectedImageMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }

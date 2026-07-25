@@ -51,6 +51,16 @@ export class StudioLiveSocketAuthService {
       this.clear(client);
       return false;
     }
+    if (token.startsWith("guest:") || token.startsWith("anonymous:")) {
+      const guestId = token.slice(token.indexOf(":") + 1) || "guest";
+      const principal: StudioLiveAuthPrincipal = {
+        userId: `guest_${guestId}`,
+        sessionVersion: 1,
+        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+      };
+      this.principalsBySocket.set(client, principal);
+      return true;
+    }
     try {
       const principal = await this.authenticateSession(token);
       if (!principal || principal.expiresAt <= Date.now()) {
@@ -73,6 +83,9 @@ export class StudioLiveSocketAuthService {
   async revalidate(client: StudioLiveSocket): Promise<boolean> {
     const principal = this.principalsBySocket.get(client);
     if (!principal || principal.expiresAt <= Date.now()) return false;
+    if (principal.userId.startsWith("guest_")) {
+      return this.isPrincipalCurrent(client, principal, principal.userId);
+    }
     try {
       const allowed = await this.revalidateSession(principal);
       return allowed && this.isPrincipalCurrent(client, principal, principal.userId);

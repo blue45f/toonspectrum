@@ -789,6 +789,12 @@ export class StudioLiveGateway
           pageId: parsed.data.pageId,
           x: parsed.data.x,
           y: parsed.data.y,
+          tool: parsed.data.tool ?? null,
+          drawing: parsed.data.drawing,
+          strokeColor: parsed.data.strokeColor,
+          strokeWidth: parsed.data.strokeWidth,
+          strokeOpacity: parsed.data.strokeOpacity,
+          points: parsed.data.points,
           sentAt: new Date().toISOString(),
         });
       }

@@ -2462,14 +2462,25 @@ function StudioCuttoonEditor() {
   const linkedChallengeId = creationLinks.challengeId;
   const studioAuthUserId = session?.user?.id ?? null;
   const studioSessionToken = session?.token ?? null;
+  const guestSessionTokenRef = useRef<string | null>(null);
+  if (!guestSessionTokenRef.current && typeof window !== "undefined") {
+    let stored: string | null = null;
+    try { stored = sessionStorage.getItem("toonspectrum_guest_live_token"); } catch {}
+    if (!stored) {
+      stored = `guest:${Math.random().toString(36).slice(2, 10)}`;
+      try { sessionStorage.setItem("toonspectrum_guest_live_token", stored); } catch {}
+    }
+    guestSessionTokenRef.current = stored;
+  }
+  const effectiveSessionToken = studioSessionToken ?? guestSessionTokenRef.current;
   // Factory identity controls the lifetime of the external Socket.IO resource. Keep it stable
   // across editor renders, but rotate it immediately when the signed session token changes.
   const studioLiveTransportFactory = useMemo(
     () =>
-      studioSessionToken
-        ? createStudioServerLiveTransportFactory(studioSessionToken)
+      effectiveSessionToken
+        ? createStudioServerLiveTransportFactory(effectiveSessionToken)
         : undefined,
-    [studioSessionToken]
+    [effectiveSessionToken]
   );
   // Command-only seam: high-frequency pointer publication does not subscribe this giant editor
   // to live cursor state. The always-mounted provider owns and rotates the actual room.
@@ -2886,16 +2897,20 @@ function StudioCuttoonEditor() {
       : null;
   const sharedDocumentRef = useRef(sharedDocument);
   sharedDocumentRef.current = sharedDocument;
-  const studioLiveParticipant =
-    workId &&
-    studioAuthUserId &&
-    sharedDocument?.status === "active" &&
-    sharedDocument.capabilities.view
-      ? {
-          displayName: session?.user?.name ?? "내 작업",
-          role: sharedDocument.role,
-        }
-      : null;
+  const effectiveWorkId = workId ?? "studio-live-demo";
+  const studioLiveParticipant = useMemo(() => {
+    if (workId && studioAuthUserId && sharedDocument?.status === "active" && sharedDocument.capabilities.view) {
+      return {
+        displayName: session?.user?.name ?? "내 작업",
+        role: sharedDocument.role,
+      };
+    }
+    const tokenSuffix = guestSessionTokenRef.current ? guestSessionTokenRef.current.slice(-4) : "guest";
+    return {
+      displayName: session?.user?.name ?? `게스트 작가 (${tokenSuffix})`,
+      role: "editor" as const,
+    };
+  }, [workId, studioAuthUserId, sharedDocument, session?.user?.name]);
   // 로그인한 기존 작품은 owner도 같은 팀 문서 계약을 사용한다. 응답 전·오류 상태 역시 잠가
   // 빈 초기 캔버스가 실제 원고 위로 저장되는 경쟁 상태를 막는다.
   const expectsSharedDocument = Boolean(workAuthScopeKey && workId && !remixId);
@@ -4278,6 +4293,7 @@ function StudioCuttoonEditor() {
   const [rightPanelOpen, setRightPanelOpen] = useState(
     workspaceState.liveLayout.desktop.rightPanelOpen
   );
+  const [forceRightPanelOpen, setForceRightPanelOpen] = useState(false);
   const [inspectorLayout, setInspectorLayout] = useState<StudioInspectorLayout>(() =>
     workspaceState.liveLayout.inspector
   );
@@ -4365,13 +4381,32 @@ function StudioCuttoonEditor() {
     brushManagerReturnFocusRef.current = launcher;
     setMobileSheet("brushes");
   }
+  function setRightPanelOpenWithOverride(next: SetStateAction<boolean>) {
+    if (typeof next === "function") {
+      setRightPanelOpen((current) => {
+        const nextValue = next(current);
+        setForceRightPanelOpen(nextValue);
+        return nextValue;
+      });
+      return;
+    }
+    setForceRightPanelOpen(next);
+    setRightPanelOpen(next);
+  }
   function changeInspectorLayout(next: StudioInspectorLayout) {
     setInspectorLayout(next);
     // 탭마다 독립적인 짧은 작업면처럼 느껴지도록 이전 장문 패널의 스크롤 위치를 이어받지 않는다.
     globalThis.requestAnimationFrame?.(() => propsSheetRef.current?.scrollTo({ top: 0 }));
   }
-  function openInspectorRoute(route: StudioInspectorRoute) {
+  function openInspectorRoute(
+    route: StudioInspectorRoute,
+    mobileSheetTarget: StudioMobileSheet | null = isMobile ? "props" : null
+  ) {
     changeInspectorLayout(navigateStudioInspector(inspectorLayout, route));
+    setRightPanelOpenWithOverride(true);
+    if (mobileSheetTarget !== null) {
+      setMobileSheet(mobileSheetTarget);
+    }
   }
   // 데스크톱으로 넘어가면 열린 바텀시트를 닫아 다시 모바일로 줄였을 때 시트가 떠 있지 않게 한다.
   useEffect(() => {
@@ -4544,7 +4579,10 @@ function StudioCuttoonEditor() {
   // 작업공간이 뜻하지 않게 "수정됨"으로 표시되므로 렌더링 가시성만 별도로 계산한다.
   const presentationPanelsHidden = isFullscreen || maximized || mobileImmersive || canvasOnlyMode;
   const densityHidesLeftPanel = !studioUiDensityAllows(uiDensityMode, "left-panel");
-  const densityHidesRightPanel = !studioUiDensityAllows(uiDensityMode, "right-panel");
+  // Focus(super-simple) 모드가 우측 패널을 숨겨도, 사용자가 실제로 속성/문서 패널을 요청한 경우
+  // 열린 패널은 우선 렌더링한다.
+  const rightPanelDensityAllows =
+    forceRightPanelOpen || studioUiDensityAllows(uiDensityMode, "right-panel");
   const densityHidesPageStrip = !studioUiDensityAllows(uiDensityMode, "page-strip");
   const densityShowsStatusRail = studioUiDensityAllows(uiDensityMode, "status-rail");
   // Focus density treats the left dock as the page strip (page-strip region).
@@ -4554,7 +4592,7 @@ function StudioCuttoonEditor() {
     !densityHidesLeftPanel &&
     !densityHidesPageStrip;
   const visibleRightPanelOpen =
-    rightPanelOpen && !presentationPanelsHidden && !densityHidesRightPanel;
+    rightPanelOpen && !presentationPanelsHidden && rightPanelDensityAllows;
   // useMemo: 렌더마다 새 정규화 객체가 메뉴바 memo 자식(작업공간 메뉴)을 재렌더시키지 않게.
   const liveWorkspaceLayout = useMemo(
     () =>
@@ -4590,6 +4628,7 @@ function StudioCuttoonEditor() {
     setInspectorLayout(layout.inspector);
     setLeftPanelOpen(layout.desktop.leftPanelOpen);
     setRightPanelOpen(layout.desktop.rightPanelOpen);
+    setForceRightPanelOpen(false);
     leftResizeSetWidthRef.current(layout.desktop.leftPanelWidth);
     rightResizeSetWidthRef.current(layout.desktop.rightPanelWidth);
     setQuickActionsPreferences(layout.quickActions);
@@ -4766,6 +4805,7 @@ function StudioCuttoonEditor() {
       setInspectorLayout(layout.inspector);
       setLeftPanelOpen(layout.desktop.leftPanelOpen);
       setRightPanelOpen(layout.desktop.rightPanelOpen);
+      setForceRightPanelOpen(false);
       leftResizeSetWidthRef.current(layout.desktop.leftPanelWidth);
       rightResizeSetWidthRef.current(layout.desktop.rightPanelWidth);
       setQuickActionsPreferences(layout.quickActions);
@@ -4872,7 +4912,17 @@ function StudioCuttoonEditor() {
   // 연속성 탐색처럼 페이지를 전환하면서 새 작업면의 요소를 의도적으로 선택하는 흐름은 보존한다.
   useEffect(() => {
     const activeIds = new Set(activeElementsRef.current.map((element) => element.id));
-    setSelectedId((current) => (current && activeIds.has(current) ? current : null));
+    const pendingBatch = pendingStrokeCommitsRef.current;
+    const pendingIds =
+      pendingBatch?.pageId === activePage.id
+        ? new Set(pendingBatch.strokes.map((stroke) => stroke.id))
+        : null;
+    setSelectedId((current) => {
+      if (!current) return null;
+      if (activeIds.has(current)) return current;
+      if (pendingIds?.has(current)) return current;
+      return null;
+    });
     setMarqueeIds((current) => {
       const next = current.filter((id) => activeIds.has(id));
       return next.length === current.length ? current : next;
@@ -11041,7 +11091,31 @@ function StudioCuttoonEditor() {
     return () => globalThis.removeEventListener("pointerdown", handlePointerDown);
   }, [menu]);
 
-  const selected = selectedId ? (elementById.get(selectedId) ?? null) : null;
+  const selected =
+    selectedId === null
+      ? null
+      : elementById.get(selectedId)
+        ?? (pendingStrokeCommitsRef.current?.pageId === activePage.id
+          ? pendingStrokeCommitsRef.current.strokes.find((stroke) => stroke.id === selectedId)
+          || null
+          : null);
+
+  const selectedForInspector: El | null = useMemo(() => {
+    if (selected === null || selected.type !== "draw") {
+      return selected;
+    }
+    return {
+      ...selected,
+      points: [],
+      pressures: undefined,
+      tiltXs: undefined,
+      tiltYs: undefined,
+      twists: undefined,
+      speeds: undefined,
+      tangentialPressures: undefined,
+    };
+  }, [selected]);
+
   const studioFilterDialogImage = studioFilterSession
     ? studioFilterSession.target === "page-composite"
       ? studioFilterSession.pageId === activePage.id &&
@@ -11086,13 +11160,13 @@ function StudioCuttoonEditor() {
     setStudioFilterSession(null);
     setStudioFilterPreview(null);
   }, [studioFilterDialogImage, studioFilterSession]);
-  const selectedWorkAssetDestructiveEditReason =
-    studioWorkAssetDestructiveEditReason(selected);
+  const selectedWorkAssetDestructiveEditReason = studioWorkAssetDestructiveEditReason(selected);
+  const selectedContentLockedByGroup = selected !== null && isEffectivelyLocked(selected, groups);
   const selectedReadableImageSource = selected?.type === "image"
     ? resolveStudioWorkAssetReadableImageSource(
-        selected,
-        (reference) => studioWorkAssetHydrator.get(reference)
-      )
+      selected,
+      (reference) => studioWorkAssetHydrator.get(reference)
+    )
     : null;
   // 요소 객체가 커밋을 넘어 reference-stable(불변 업데이트)인 점을 이용해 아이템 객체도
   // 요소별로 재사용한다 — 레이어 내비게이터 행 memo가 "새 획 1개 추가" 커밋에서 기존 행을
@@ -12380,6 +12454,12 @@ function StudioCuttoonEditor() {
   }
   const advancedFillHasVisibleVectorLineArt = elements.some(
     (element) => element.type === "draw" && !isEffectivelyHidden(element, groups),
+  ) || (
+    pendingStrokeCommitsRef.current?.pageId === activePage.id
+      ? pendingStrokeCommitsRef.current.strokes.some((stroke) =>
+        !isEffectivelyHidden(stroke, groups)
+      )
+      : false
   );
   const advancedFillEligibleRasterElements = elements.filter(
     (element): element is ImageEl & El =>
@@ -12408,13 +12488,13 @@ function StudioCuttoonEditor() {
     advancedFillVirtualTarget?.pageId === activePage.id && advancedFillDocumentUnsupportedReason === null;
   const advancedFillArmed =
     advancedFillActive && tool === "select" && (advancedFillRasterArmed || advancedFillVectorArmed);
-  const selectedContentMutationLocked =
-    activeSurfaceReviewLocked || selectedWorkAssetDestructiveEditReason !== null ||
-    (selected !== null && isEffectivelyLocked(selected, groups));
+const selectedContentMutationLocked = activeSurfaceReviewLocked || selectedContentLockedByGroup;
+const selectedWorkAssetMutationLocked = selectedWorkAssetDestructiveEditReason !== null;
+const selectedImageMutationLocked = selectedContentMutationLocked || selectedWorkAssetMutationLocked;
   // 픽셀 선택 도구가 실제로 무장된 상태(이미지 요소 선택 + 도구 on).
   // 무장 중엔 캔버스 드래그를 픽셀 선택으로 가로채므로 요소 드래그/클릭 선택 전환을 함께 잠근다.
-  const pixelToolArmed =
-    pixelTool !== null && !pixelBusy && selected?.type === "image" && !selectedContentMutationLocked;
+const pixelToolArmed =
+    pixelTool !== null && !pixelBusy && selected?.type === "image" && !selectedImageMutationLocked;
   // arm-anytime(2026-07-24) — 대상 이미지 없이 무장된 픽셀 선택 도구. 첫 캔버스 제스처가
   // 포인터 아래 최상단의 편집 가능 이미지를 자동 획득한다(Photoshop/CSP 관례). 검토 잠금은
   // 표면 전체 잠금이라 여기서도 무장 불가. 비이미지 요소(잠김 포함)가 선택돼 있어도 무장된다.
@@ -12495,8 +12575,8 @@ function StudioCuttoonEditor() {
   };
   // 크롭 모드 무장(이미지 요소 선택 + 크롭 rect 존재) — 무장 중엔 스테이지 드래그를 크롭 rect
   // 조작으로 가로채고, 요소 드래그/클릭 선택 전환을 함께 잠근다(픽셀 선택 도구와 동일 정책).
-  const cropArmed =
-    cropRect !== null && selected?.type === "image" && !selectedContentMutationLocked;
+const cropArmed =
+    cropRect !== null && selected?.type === "image" && !selectedImageMutationLocked;
   // 패널 손그림 컷 무장(패널 선택 + 도구 on, 잠긴 패널은 제외) — 크롭·픽셀 선택과 동일한 정책.
   const panelSplitArmed =
     panelSplitActive &&
@@ -12612,31 +12692,31 @@ function StudioCuttoonEditor() {
       announceDrawingShortcut("말풍선 외곽선에는 최소 3개의 점이 필요합니다");
     }
   }
-  const smudgeArmed =
-    smudgeActive && !smudgeBusy && selected?.type === "image" && !selectedContentMutationLocked;
-  const dodgeBurnArmed =
-    dodgeBurnActive && !dodgeBurnBusy && selected?.type === "image" && !selectedContentMutationLocked;
-  const wetMixArmed =
-    wetMixActive && !wetMixBusy && selected?.type === "image" && !selectedContentMutationLocked;
-  const liquifyArmed =
-    liquifyActive && !liquifyBusy && selected?.type === "image" && !selectedContentMutationLocked;
+const smudgeArmed =
+    smudgeActive && !smudgeBusy && selected?.type === "image" && !selectedImageMutationLocked;
+const dodgeBurnArmed =
+    dodgeBurnActive && !dodgeBurnBusy && selected?.type === "image" && !selectedImageMutationLocked;
+const wetMixArmed =
+    wetMixActive && !wetMixBusy && selected?.type === "image" && !selectedImageMutationLocked;
+const liquifyArmed =
+    liquifyActive && !liquifyBusy && selected?.type === "image" && !selectedImageMutationLocked;
   useEffect(() => {
     if (!liquifyArmed) cancelLiquifyPointerSession();
   }, [cancelLiquifyPointerSession, liquifyArmed]);
-  const healCloneArmed =
-    healCloneTool !== null && selected?.type === "image" && !selectedContentMutationLocked;
-  const layerMaskPaintArmed =
-    layerMaskPaintActive && selected?.type === "image" && !selectedContentMutationLocked;
-  const filterMaskPaintArmed =
-    filterMaskPaintActive && selected?.type === "image" && !selectedContentMutationLocked;
-  const quickMaskArmed =
-    quickMaskActive && selected?.type === "image" && !selectedContentMutationLocked;
-  const historyBrushArmed =
-    historyBrushActive && selected?.type === "image" && !selectedContentMutationLocked;
+const healCloneArmed =
+    healCloneTool !== null && selected?.type === "image" && !selectedImageMutationLocked;
+const layerMaskPaintArmed =
+    layerMaskPaintActive && selected?.type === "image" && !selectedImageMutationLocked;
+const filterMaskPaintArmed =
+    filterMaskPaintActive && selected?.type === "image" && !selectedImageMutationLocked;
+const quickMaskArmed =
+    quickMaskActive && selected?.type === "image" && !selectedImageMutationLocked;
+const historyBrushArmed =
+    historyBrushActive && selected?.type === "image" && !selectedImageMutationLocked;
   // 퍼펫 워프 무장(이미지 요소 선택 + 모드 on) — crop과 동일한 정책(무장 중 다른 스테이지
   // 제스처·요소 드래그/선택 전환을 막는다).
-  const puppetWarpArmed =
-    puppetWarpActive && selected?.type === "image" && !selectedContentMutationLocked;
+const puppetWarpArmed =
+    puppetWarpActive && selected?.type === "image" && !selectedImageMutationLocked;
   const contextMenuEl = contextMenu.elId ? (elementById.get(contextMenu.elId) ?? null) : null;
   const resolveBg3dEditSource = useCallback(
     (
@@ -16544,12 +16624,10 @@ function StudioCuttoonEditor() {
   function openPublishStep() {
     setTool("select");
     setMenu(null);
-    openInspectorRoute({ primary: "publish" });
-    setRightPanelOpen(true);
     if (isMobile) {
       mobileSheetAutofocusTargetRef.current = "publish-title";
-      setMobileSheet("props");
     }
+    openInspectorRoute({ primary: "publish" }, isMobile ? "props" : null);
     dismissQuickStart();
     globalThis.requestAnimationFrame(() => {
       propsSheetRef.current?.scrollTo({ top: 0, behavior: "smooth" });
@@ -17083,8 +17161,7 @@ function StudioCuttoonEditor() {
       setEyedropperActive(true);
       setMobileSheet(null);
     } else if (action === "properties") {
-      openInspectorRoute({ primary: "properties" });
-      setMobileSheet("props");
+      openInspectorRoute({ primary: "properties" }, isMobile ? "props" : null);
     } else if (action === "duplicate") duplicateSelected();
     else if (action === "delete") removeSelected();
     else if (action === "bring-front") reorder("front");
@@ -17552,7 +17629,7 @@ function StudioCuttoonEditor() {
       }
       if (matchStudioShortcut(sc["tool-lasso"], e)) {
         e.preventDefault();
-        if (selected?.type === "image" && !selectedContentMutationLocked) {
+        if (selected?.type === "image" && !selectedImageMutationLocked) {
           setTool("select");
           clearPolyLassoDraft();
           disarmAllPixelTools();
@@ -17680,7 +17757,7 @@ function StudioCuttoonEditor() {
           commitQuickMask();
           return;
         }
-        if (selected?.type === "image" && !selectedContentMutationLocked) {
+        if (selected?.type === "image" && !selectedImageMutationLocked) {
           e.preventDefault();
           enterQuickMask();
           return;
@@ -18001,7 +18078,7 @@ function StudioCuttoonEditor() {
         }
         // 픽셀 선택이 살아 있으면 요소 삭제 대신 선택 영역 픽셀 삭제(포토샵과 동일한 기대).
         if (selected?.type === "image" && isSelectionUsable(pixelSel)) {
-          if (!pixelBusy && !selectedContentMutationLocked) {
+          if (!pixelBusy && !selectedImageMutationLocked) {
             void applyPixelSelectionAdjust(planSelectionAdjust("delete"));
           }
           return;
@@ -20916,7 +20993,7 @@ function StudioCuttoonEditor() {
   }
   /** 진입 — 현재 픽셀 선택을 마스크 래스터로 전환(표시 공간이라 flip 되반전 불필요). 동기. */
   function enterQuickMask() {
-    if (selected?.type !== "image" || selectedContentMutationLocked) return;
+    if (selected?.type !== "image" || selectedImageMutationLocked) return;
     disarmAllPixelTools(); // 다른 armed 도구와 상호배제(기존 계약)
     const { width: maskW, height: maskH } = quickMaskRasterSize(selected.width, selected.height);
     const featherScale = selected.width > 0 ? maskW / selected.width : 1;
@@ -21466,11 +21543,23 @@ function StudioCuttoonEditor() {
     );
     const currentPages = currentHistory[currentHistoryIndex] ?? pages;
     const currentPage = currentPages.find((page) => page.id === currentPageIdRef.current);
+    const activeFillPendingBatch = pendingStrokeCommitsRef.current;
+    const fillSourcePages = activeFillPendingBatch && activeFillPendingBatch.pageId === currentPageIdRef.current
+      ? resolveStudioDurableProjectPages({
+          pagesHistory: pagesHistoryRef.current,
+          historyIndex: currentHistoryIndex,
+          fallbackPages: currentPages,
+          pendingStrokeCommits: activeFillPendingBatch,
+        })
+      : null;
+    const fillSourcePage = fillSourcePages
+      ? fillSourcePages.pagesList.find((page) => page.id === currentPageIdRef.current)
+      : currentPage;
     return {
       pageId: currentPage?.id ?? currentPageIdRef.current,
       width: CANVAS_W,
-      height: currentPage?.canvasH ?? canvasH,
-      elements: currentPage?.elements ?? activeElementsRef.current,
+      height: fillSourcePage?.canvasH ?? currentPage?.canvasH ?? canvasH,
+      elements: fillSourcePage?.elements ?? currentPage?.elements ?? activeElementsRef.current,
       groups: currentPage?.groups ?? activeGroupsRef.current,
       theme: webtoonTheme,
       name: "벡터 채색",
@@ -21479,6 +21568,7 @@ function StudioCuttoonEditor() {
   }
 
   function toggleAdvancedFill() {
+    const hasPendingFillStrokes = pendingStrokeCommitsRef.current?.pageId === activePage.id;
     if (advancedFillActive) {
       const hadPendingCalculation = advancedFillBusy;
       const hasReusablePreview = advancedFillPreview !== null;
@@ -21524,20 +21614,40 @@ function StudioCuttoonEditor() {
         return;
       }
       // Pending direct ink may have become the newest vector reference during the flush.
-      entry = resolveEntry();
+      if (!hasPendingFillStrokes) {
+        entry = resolveEntry();
+      }
     }
     if (entry.mode === "virtual-vector-fill") {
       disarmAllPixelTools();
       setTool("select");
       setMarqueeIds([]);
-      setAdvancedFillVirtualTarget(entry.target);
-      advancedFillVirtualReferenceRef.current = null;
-      setAdvancedFillActive(true);
-      setAdvancedFillStatus(
-        `표시 중인 벡터 선화 ${entry.target.sourceElementCount}개를 참조합니다. 닫힌 영역을 탭하세요. 적용 전까지 문서는 바뀌지 않습니다.`,
-      );
-      setMobileSheet(null);
-      setError(null);
+      const shouldAutoSelectLatestDraw = selected?.type !== "image" && selected?.type !== "draw";
+      const openInspector = () => {
+        if (shouldAutoSelectLatestDraw) {
+          for (let i = activeElementsRef.current.length - 1; i >= 0; i -= 1) {
+            const candidate = activeElementsRef.current[i];
+            if (candidate.type === "draw" && !isEffectivelyHidden(candidate, groups)) {
+              setSelectedId(candidate.id);
+              break;
+            }
+          }
+        }
+        setAdvancedFillVirtualTarget(entry.target);
+        advancedFillVirtualReferenceRef.current = null;
+        setAdvancedFillActive(true);
+        setAdvancedFillStatus(
+          `표시 중인 벡터 선화 ${entry.target.sourceElementCount}개를 참조합니다. 닫힌 영역을 탭하세요. 적용 전까지 문서는 바뀌지 않습니다.`,
+        );
+        setMobileSheet(null);
+        setError(null);
+        openInspectorRoute({ primary: "properties", image: "fill" }, null);
+      };
+      if (shouldAutoSelectLatestDraw) {
+        requestAnimationFrame(() => requestAnimationFrame(openInspector));
+      } else {
+        openInspector();
+      }
       return;
     }
     if (entry.mode === "ambiguous-raster") {
@@ -21576,9 +21686,9 @@ function StudioCuttoonEditor() {
       setMarqueeIds([]);
       setSelectedId(target.id);
     }
-    openInspectorRoute({ primary: "properties", image: "fill" });
     setAdvancedFillActive(true);
     setAdvancedFillStatus(readyStatus);
+    openInspectorRoute({ primary: "properties", image: "fill" }, null);
     setMobileSheet(null);
     setError(null);
   }
@@ -23723,11 +23833,23 @@ function StudioCuttoonEditor() {
     if (!isExporting && canvasH > 0) {
       const pointer = e.target.getStage()?.getRelativePointerPosition();
       if (pointer) {
+        const activeDrawing = drawingRef.current;
+        const isDrawing = Boolean(activeDrawing && (activeDrawing.kind ?? "freehand") === "freehand");
+        const strokeColor = activeDrawing?.stroke ?? color;
+        const strokeWidthVal = activeDrawing?.strokeWidth ?? strokeWidth;
+        const strokeOpacity = activeDrawing?.opacity ?? 1;
+        const pts = activeDrawing?.points;
+
         studioLiveRoomRef.current?.publishCursor({
           x: Math.max(0, Math.min(1, pointer.x / CANVAS_W)),
           y: Math.max(0, Math.min(1, pointer.y / canvasH)),
           pageId: activePage.id,
           tool,
+          drawing: isDrawing,
+          strokeColor,
+          strokeWidth: strokeWidthVal,
+          strokeOpacity,
+          points: isDrawing && pts && pts.length >= 2 ? pts.slice(-64) : undefined,
         });
       }
     }
@@ -25182,13 +25304,13 @@ function StudioCuttoonEditor() {
     // Callers historically stopped tracking first and wiped the refs used by release promotion.
     const quickShapeSnapshot = snapshotQuickShapeTracking();
     // 지연 커밋 경로에서만 true — finally 의 초안 정리가 라이브 잉크를 표면에 남기게 한다.
-    let deferInkCleanup = false;
-    // GPU 지연 표면에는 후보정 이전의, 실제 라이브 표면과 동일한 권위 획을 유지한다.
-    let authoritativeLiveStroke: DrawEl | null = null;
-    // Release-planner geometry used to reauthor settled live ink before handoff (anti-flicker).
-    let releaseAuthoritativeStroke: DrawEl | null = null;
-    let immediateSurfaceHandoff: { pageId: string; strokeIds: string[] } | null = null;
-    try {
+        let deferInkCleanup = false;
+        // GPU 지연 표면에는 후보정 이전의, 실제 라이브 표면과 동일한 권위 획을 유지한다.
+        let authoritativeLiveStroke: DrawEl | null = null;
+        // Release-planner geometry used to reauthor settled live ink before handoff (anti-flicker).
+        let releaseAuthoritativeStroke: DrawEl | null = null;
+        let immediateSurfaceHandoff: { pageId: string; strokeIds: string[] } | null = null;
+        try {
       if (
         options.consumeReleaseSample !== false
         && drawingRef.current
@@ -25368,8 +25490,10 @@ function StudioCuttoonEditor() {
           }
           const merged = takePendingStrokeCommits();
           const baseElements = merged ? [...elements, ...merged.strokes] : elements;
-          // Exactly one pointerup owns this single commit, hence one complete stroke equals one undo.
           const committed = commit([...baseElements, finished]);
+          if (committed) {
+            setSelectedId(finished.id);
+          }
           if (committed && !masterEditMode && finished.mode !== "eraser") {
             if (liveDraftDirectRef.current) {
               deferInkCleanup = overlayRenderer.isActive || gpuLiveInkPinnedRef.current;
@@ -26664,9 +26788,9 @@ function StudioCuttoonEditor() {
     );
     announceDrawingShortcut("선택 반전");
   }
-  function clearSelectionForEdit() {
-    if (selected?.type === "image" && isSelectionUsable(pixelSel)) {
-      if (!pixelBusy && !selectedContentMutationLocked) {
+function clearSelectionForEdit() {
+  if (selected?.type === "image" && isSelectionUsable(pixelSel)) {
+      if (!pixelBusy && !selectedImageMutationLocked) {
         void applyPixelSelectionAdjust(planSelectionAdjust("delete"));
       }
       return;
@@ -26681,14 +26805,16 @@ function StudioCuttoonEditor() {
     disarmAllPixelTools();
     resetPixelSelectionHistoryState(target.id, null);
     setCropRect(initialCropRect());
-    openInspectorRoute({ primary: "properties", image: "transform" });
-    setRightPanelOpen(true);
+    openInspectorRoute(
+      { primary: "properties", image: "transform" },
+      isMobile ? "props" : null
+    );
     announceDrawingShortcut("레이어 자르기");
   }
   function togglePixelMarquee(kind: "rect" | "circle") {
     // arm-anytime(2026-07-24) — 편집 가능한 이미지가 선택돼 있지 않아도 무장한다. 첫 캔버스
     // 제스처가 포인터 아래 이미지를 자동 획득한다. 검토 잠금이나 잠긴 이미지 선택 시에만 막는다.
-    if (activeSurfaceReviewLocked || (selected?.type === "image" && selectedContentMutationLocked)) return;
+    if (activeSurfaceReviewLocked || (selected?.type === "image" && selectedImageMutationLocked)) return;
     const isActive = kind === "circle"
       ? pixelTool === "ellipse" && pixelForceCircle
       : pixelTool === "rect" && !pixelForceCircle;
@@ -26712,7 +26838,7 @@ function StudioCuttoonEditor() {
       return null;
     }
     if (selected?.type === "image") {
-      if (selectedContentMutationLocked) {
+      if (selectedImageMutationLocked) {
         setError("선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요.");
         return null;
       }
@@ -26739,7 +26865,7 @@ function StudioCuttoonEditor() {
   const pixelToolTargetAvailable =
     !activeSurfaceReviewLocked
     && (
-      (selected?.type === "image" && !selectedContentMutationLocked)
+      (selected?.type === "image" && !selectedImageMutationLocked)
       || (selected?.type !== "image"
         && elements.filter(
           (el) => el.type === "image" && !isEffectivelyHidden(el, groups) && !isEffectivelyLocked(el, groups)
@@ -26793,8 +26919,10 @@ function StudioCuttoonEditor() {
       setError("변형할 픽셀 영역을 먼저 선택하세요(사각/올가미 선택 후 다시 누르면 됩니다).");
       return;
     }
-    openInspectorRoute({ primary: "properties", image: "retouch" });
-    setRightPanelOpen(true);
+    openInspectorRoute(
+      { primary: "properties", image: "retouch" },
+      isMobile ? "props" : null
+    );
     announceDrawingShortcut("리터치 패널에서 내용 변형을 적용하세요");
   }
   function openImagePastePicker() {
@@ -26847,12 +26975,12 @@ function StudioCuttoonEditor() {
       announceDrawingShortcut("현재 페이지 필터 미리보기를 준비하고 있어요");
       return;
     }
-    const selectedAnimated = selected?.type === "image" &&
-      (selected.isAnimatedGif || (selected.frames?.length ?? 0) > 1);
-    const directImageTarget = selected?.type === "image" &&
-      !selectedContentMutationLocked &&
-      !isEffectivelyHidden(selected, groups) &&
-      !selectedAnimated;
+  const selectedAnimated = selected?.type === "image" &&
+    (selected.isAnimatedGif || (selected.frames?.length ?? 0) > 1);
+  const directImageTarget = selected?.type === "image" &&
+    !selectedImageMutationLocked &&
+    !isEffectivelyHidden(selected, groups) &&
+    !selectedAnimated;
     if (directImageTarget) {
       if (timelinePlaying) {
         setError("타임라인 재생을 멈춘 뒤 선택 이미지에 필터를 적용해 주세요.");
@@ -27030,7 +27158,7 @@ function StudioCuttoonEditor() {
   const menuSelectedAnimatedImage = selected?.type === "image" &&
     (selected.isAnimatedGif || (selected.frames?.length ?? 0) > 1);
   const studioDirectImageFilterTarget = selected?.type === "image" &&
-    !selectedContentMutationLocked &&
+    !selectedImageMutationLocked &&
     !menuSelectedAnimatedImage &&
     !isEffectivelyHidden(selected, groups);
   const studioFilterTargetLabel: "선택 이미지" | "현재 페이지 합성본" =
@@ -27047,7 +27175,7 @@ function StudioCuttoonEditor() {
             ? "공동 작업 문서의 페이지 합성 필터는 준비 중입니다. 지금은 이미지 레이어를 선택해 필터를 적용하세요."
           : masterEditMode && selected?.type !== "image"
             ? "마스터 편집에서는 필터를 적용할 이미지 레이어를 선택하세요."
-            : masterEditMode && selectedContentMutationLocked
+            : masterEditMode && selectedImageMutationLocked
               ? "이미지와 상위 그룹의 잠금을 해제한 뒤 필터를 적용하세요."
               : masterEditMode && menuSelectedAnimatedImage
                 ? "애니메이션 이미지는 정적 프레임으로 만든 뒤 필터를 적용하세요."
@@ -27196,7 +27324,7 @@ function StudioCuttoonEditor() {
           openProductionInsights: () => setProductionInsightsOpen(true),
           collapseSidePanels: () => {
             setLeftPanelOpen(false);
-            setRightPanelOpen(false);
+            setRightPanelOpenWithOverride(false);
           },
           openToolsCompanion: () => openStudioToolsCompanionForMenu({
             ensureRuntime: ensureStudioToolsCompanionRuntime,
@@ -27205,7 +27333,7 @@ function StudioCuttoonEditor() {
             announce: studioMainMenuActions.announceDrawingShortcut,
           }),
           toggleLeftPanel: () => setLeftPanelOpen((current) => !current),
-          toggleRightPanel: () => setRightPanelOpen((current) => !current),
+          toggleRightPanel: () => setRightPanelOpenWithOverride((current) => !current),
           openShortcuts: () => setShortcutsOpen(true),
           selectDrawMode: (mode) => {
             setTool("draw");
@@ -27282,7 +27410,7 @@ function StudioCuttoonEditor() {
       disabled.add("add-bubble");
     }
     // 픽셀 보정 3종은 이미지 레이어 선택+편집 가능 상태에서만 의미가 있다.
-    if (selected?.type !== "image" || selectedContentMutationLocked) {
+    if (selected?.type !== "image" || selectedImageMutationLocked) {
       disabled.add("quick-mask");
       disabled.add("wet-mix");
       disabled.add("dodge-burn");
@@ -27296,7 +27424,7 @@ function StudioCuttoonEditor() {
     selected,
     marqueeIds,
     activePageMutationLocked,
-    selectedContentMutationLocked,
+    selectedImageMutationLocked,
   ]);
   // 모바일 한 손 모드에서 퀵 메뉴 트리거 자체를 DOM 순서로 좌/우 끝에 옮긴다.
   // flex-row-reverse를 쓰지 않아 보이는 순서와 키보드/스위치 제어 순서가 항상 일치한다.
@@ -29579,10 +29707,10 @@ function StudioCuttoonEditor() {
     toggleFavorite: toggleBuiltInBrushFavorite,
   });
 
-  const studioMobileEditingDockHandlers = useStudioStableHandlers<StudioMobileEditingDockHandlers>({
-    applyBuiltInBrushPreset,
-    applyDynamicsPreset,
-    applySavedBrush,
+    const studioMobileEditingDockHandlers = useStudioStableHandlers<StudioMobileEditingDockHandlers>({
+      applyBuiltInBrushPreset,
+      applyDynamicsPreset,
+      applySavedBrush,
     dismissBrushManager: dismissBrushManagerToDraw,
     dismissMobileHint,
     duplicateSelected,
@@ -29596,8 +29724,8 @@ function StudioCuttoonEditor() {
     reorder,
     toggleAdvancedFill,
     toggleStudioCommentPinPlacement,
-    undo,
-  });
+      undo,
+    });
 
   const studioPageListPaneHandlers = useStudioStableHandlers<StudioPageListPaneHandlers>({
     addPage,
@@ -29667,9 +29795,7 @@ function StudioCuttoonEditor() {
       void loadStudioBrushStudio();
       setTool("draw");
       setDrawMode("pen");
-      setRightPanelOpen(true);
-      setMobileSheet(isMobile ? "draw" : null);
-      openInspectorRoute({ primary: "properties" });
+      openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
     },
     recallBrushSlot: (index) => {
       const slot = studioBrushSlotAt(brushSlotsState, index);
@@ -29978,7 +30104,7 @@ function StudioCuttoonEditor() {
 
   return (
     <StudioLiveCollaborationProvider
-      workId={workId}
+      workId={effectiveWorkId}
       participant={studioLiveParticipant}
       currentPageId={activePage.id}
       currentTool={tool}
@@ -30551,7 +30677,7 @@ function StudioCuttoonEditor() {
           sceneTemplates={sceneTemplates}
           sceneTemplatesError={sceneTemplatesError}
           sceneTemplatesLoading={sceneTemplatesLoading}
-          selected={selected}
+          selected={selectedForInspector}
           serverAiProvider={serverAiProvider}
           serverAiStatus={serverAiStatus}
           setAiAssistTool={setAiAssistTool}
@@ -30600,7 +30726,7 @@ function StudioCuttoonEditor() {
           setReferencePanelOpen={setReferencePanelOpen}
           setRenamingAssetId={setRenamingAssetId}
           setRenamingAssetName={setRenamingAssetName}
-          setRightPanelOpen={setRightPanelOpen}
+          setRightPanelOpen={setRightPanelOpenWithOverride}
           setScale={setScale}
           setScenarioOpen={setScenarioOpen}
           setSceneSimilarAnchorId={setSceneSimilarAnchorId}
@@ -30748,7 +30874,7 @@ function StudioCuttoonEditor() {
           poserVrmOpen={poserVrmOpen}
           bg3dOpen={bg3dOpen}
           selected={selected}
-          selectedContentMutationLocked={selectedContentMutationLocked}
+          selectedImageMutationLocked={selectedImageMutationLocked}
           setAppSettingsInitialTab={setAppSettingsInitialTab}
           setAppSettingsOpen={setAppSettingsOpen}
           setDrawMode={setDrawMode}
@@ -30971,7 +31097,7 @@ function StudioCuttoonEditor() {
           setPuppetWarpPins={setPuppetWarpPins}
           setQuickShapeActive={setQuickShapeActive}
           setQuickStartOpen={setQuickStartOpen}
-          setRightPanelOpen={setRightPanelOpen}
+          setRightPanelOpen={setRightPanelOpenWithOverride}
           setSelectedId={setSelectedId}
           setSharedDocumentNotice={setSharedDocumentNotice}
           setShortcutsOpen={setShortcutsOpen}
@@ -31160,7 +31286,7 @@ function StudioCuttoonEditor() {
             side="right"
             label="속성"
             icon={SlidersHorizontal}
-            onClick={() => setRightPanelOpen(true)}
+            onClick={() => setRightPanelOpenWithOverride(true)}
             title="속성 패널 펼치기"
           />
         )}
@@ -31445,7 +31571,7 @@ function StudioCuttoonEditor() {
           setPuppetWarpActive={setPuppetWarpActive}
           setPuppetWarpPins={setPuppetWarpPins}
           setQuickShapeActive={setQuickShapeActive}
-          setRightPanelOpen={setRightPanelOpen}
+          setRightPanelOpen={setRightPanelOpenWithOverride}
           setSavedBrushes={setSavedBrushes}
           setShapeFill={setShapeFill}
           setSharedDocumentNotice={setSharedDocumentNotice}
@@ -32284,7 +32410,6 @@ interface StudioCanvasViewportProps {
   setPuppetWarpPins: import("react").Dispatch<import("react").SetStateAction<PuppetPin[]>>;
   setQuickShapeActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setQuickStartOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setRightPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setSelectedId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setSharedDocumentNotice: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setShortcutsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -32383,6 +32508,7 @@ interface StudioCanvasViewportProps {
   zoom: number;
   zoomHostRef: import("react").RefObject<HTMLDivElement | null>;
   stableHandlers: StudioCanvasViewportHandlers;
+  setRightPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
 }
 
 const StudioCanvasViewport = memo(function StudioCanvasViewport({
@@ -32568,7 +32694,6 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   setPuppetWarpPins,
   setQuickShapeActive,
   setQuickStartOpen,
-  setRightPanelOpen,
   setSelectedId,
   setSharedDocumentNotice,
   setShortcutsOpen,
@@ -32666,6 +32791,8 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   zoom,
   zoomHostRef,
   stableHandlers,
+  setRightPanelOpen: _setRightPanelOpen,
+  
 }: StudioCanvasViewportProps) {
   const {
     addPage,
@@ -34560,7 +34687,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 dismissQuickStart();
                 setStudioUiDensity("focus");
                 setLeftPanelOpen(false);
-                setRightPanelOpen(false);
+                _setRightPanelOpen(false);
               }}
               onOpenTutorials={() => {
                 dismissQuickStart();

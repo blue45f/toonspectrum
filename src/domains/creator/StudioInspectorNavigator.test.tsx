@@ -64,6 +64,22 @@ describe("StudioInspectorNavigator", () => {
     expect(textHtml).not.toContain('aria-label="이미지 전문 도구"');
   });
 
+  it("shows all image tabs for draw selections", () => {
+    const drawHtml = renderNavigator({
+      primary: "properties",
+      image: "fill",
+      document: "canvas",
+    }, "draw");
+
+    expect(drawHtml).toContain('aria-label="이미지 전문 도구"');
+    expect(drawHtml).toContain("채우기·선화");
+    expect(drawHtml).toContain("빠른 수정");
+    expect(drawHtml).toContain("선택·리터치");
+    expect(drawHtml).toContain("마스크");
+    expect(drawHtml).toContain("변형");
+    expect(drawHtml).toContain('aria-selected="true"');
+  });
+
   it("uses an independent compact sub-navigation for page settings", () => {
     const html = renderNavigator({
       primary: "document",

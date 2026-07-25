@@ -792,12 +792,21 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
           return true;
         case "cursor:update": {
           const payload = envelope.payload as StudioLivePayloadMap["cursor:update"];
-          this.emitWithAck("studio:cursor", {
+          const cursorData: Record<string, unknown> = {
             workId: this.context.workId,
             pageId: payload.pageId,
             x: payload.x,
             y: payload.y,
-          });
+          };
+          if (payload.drawing !== undefined) {
+            cursorData.drawing = payload.drawing;
+            if (payload.tool !== undefined) cursorData.tool = payload.tool;
+          }
+          if (payload.strokeColor !== undefined) cursorData.strokeColor = payload.strokeColor;
+          if (payload.strokeWidth !== undefined) cursorData.strokeWidth = payload.strokeWidth;
+          if (payload.strokeOpacity !== undefined) cursorData.strokeOpacity = payload.strokeOpacity;
+          if (payload.points !== undefined) cursorData.points = [...payload.points];
+          this.emitWithAck("studio:cursor", cursorData);
           return true;
         }
         case "lock:claim": {
@@ -1517,6 +1526,11 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       y: value.y,
       pageId: value.pageId,
       tool: value.tool === undefined ? participant.tool : value.tool,
+      drawing: typeof value.drawing === "boolean" ? value.drawing : undefined,
+      strokeColor: typeof value.strokeColor === "string" ? value.strokeColor : undefined,
+      strokeWidth: typeof value.strokeWidth === "number" ? value.strokeWidth : undefined,
+      strokeOpacity: typeof value.strokeOpacity === "number" ? value.strokeOpacity : undefined,
+      points: Array.isArray(value.points) ? (value.points as number[]) : undefined,
     });
   };
 

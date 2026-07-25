@@ -143,7 +143,7 @@ function createProps(overrides: Partial<RailProps> = {}): RailProps {
     railMoreOpen: false,
     referencePanelOpen: false,
     selected: null,
-    selectedContentMutationLocked: false,
+    selectedImageMutationLocked: false,
     setAppSettingsInitialTab: vi.fn(),
     setAppSettingsOpen: vi.fn(),
     setDrawMode: vi.fn(),
@@ -380,7 +380,7 @@ describe("StudioLeftToolRail", () => {
       // StudioPage 파생식과 동일: 검토 잠금이거나 선택 이미지가 잠기면 대상 확보 불가.
       pixelToolTargetAvailable: false,
       selected: IMAGE,
-      selectedContentMutationLocked: true,
+      selectedImageMutationLocked: true,
     });
     render(<StudioLeftToolRail {...props} />);
 

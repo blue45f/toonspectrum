@@ -694,8 +694,7 @@ describe("StudioMobileEditingDock", () => {
     within(toolbar).getByRole("button", { name: "삭제" }).click();
     within(toolbar).getByRole("button", { name: "해제" }).click();
 
-    expect(stableHandlers.openInspectorRoute).toHaveBeenCalledWith({ primary: "properties" });
-    expect(setMobileSheet).toHaveBeenCalledWith("props");
+    expect(stableHandlers.openInspectorRoute).toHaveBeenCalledWith({ primary: "properties" }, "props");
     expect(stableHandlers.duplicateSelected).toHaveBeenCalledOnce();
     expect(stableHandlers.reorder).toHaveBeenNthCalledWith(1, "front");
     expect(stableHandlers.reorder).toHaveBeenNthCalledWith(2, "back");

@@ -209,7 +209,30 @@ async function openMobileBackground3d(page: Page): Promise<Locator> {
   );
   const dock = page.locator('nav[aria-label="스튜디오 모바일 도구막대"]');
   await dock.waitFor({ state: "visible", timeout: 20_000 });
-  await dock.getByRole("button", { name: "추가", exact: true }).click();
+  const workspaceToggle = dock.locator('[data-studio-mobile-workspace-toggle="true"]');
+  const workspaceExpanded = await workspaceToggle.getAttribute("aria-expanded");
+  if (workspaceExpanded === "false") {
+    await workspaceToggle.click();
+    await poll(
+      "mobile workspace tools expanded",
+      () => workspaceToggle.getAttribute("aria-expanded"),
+      (value) => value === "true",
+      5_000,
+      75,
+    );
+  }
+  const workspaceToolbar = dock.getByRole("toolbar", { name: "작업 공간" });
+  const addToolButton = workspaceToolbar.getByRole("button", { name: "추가", exact: true });
+  await poll(
+    "mobile workspace add tool visible",
+    async () => {
+      return (await addToolButton.isVisible()) && (await addToolButton.isEnabled());
+    },
+    Boolean,
+    5_000,
+    50,
+  );
+  await addToolButton.click();
   const starter = page.locator('[data-studio-creative-starter="true"]');
   await starter.waitFor({ state: "visible", timeout: 5_000 });
   const backgroundCard = starter.locator('[data-studio-starter-card="background-3d"]');

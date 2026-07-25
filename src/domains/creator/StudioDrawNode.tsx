@@ -94,9 +94,10 @@ import {
   patternDataUrl,
 } from "./studio-pattern-fill";
 import {
-  buildStudioPerfectFreehandPathData,
+  buildStudioPerfectFreehandOutline,
   loadStudioPerfectFreehandStroker,
   peekStudioPerfectFreehandStroker,
+  studioPerfectFreehandOutlineToPathData,
   resolveStudioPerfectFreehandProfile,
 } from "./studio-perfect-freehand";
 import {
@@ -132,6 +133,26 @@ import type { DrawEl } from "./studio-element-model";
 import type { StudioPatternSpec } from "./studio-pattern-fill";
 import type { StudioPerfectFreehandStroker } from "./studio-perfect-freehand";
 import type { StudioRoughGeneratorHandle } from "./studio-rough-shape";
+
+type PerfectInkDebugState = {
+  brush: string;
+  pointCount: number;
+  strokeDistance: number;
+  isVeryShort: boolean;
+  isSparseLong: boolean;
+  profile: string;
+  outlineDistance?: number;
+  outlinePointCount?: number;
+  isDegeneratePath?: boolean;
+};
+
+function setPerfectInkDebugState(state: PerfectInkDebugState | null): void {
+  if (typeof globalThis === "undefined") {
+    return;
+  }
+  (globalThis as { __perfectInkDebugState?: PerfectInkDebugState | null }).__perfectInkDebugState =
+    state;
+}
 
 const STUDIO_PENCIL_DEFAULT_JITTER_RADIUS = 0.75;
 const dynamicBrushSettingsBySnapshot = new WeakMap<object, NormalizedStudioBrushDynamicsSettings>();
@@ -614,6 +635,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
         if (kind === "freehand") {
           const brush = el.brush ?? "pen";
           const brushFamily = resolveStudioBrushRenderFamily(brush);
+          const isPerfectAliasBrush = brush.startsWith("perfect-");
           const pixelPencil = isStudioPixelPencilRenderMode(brush);
           const aliasStrokeWidth = el.mode === "eraser"
             ? strokeWidth
@@ -623,7 +645,6 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             : resolveStudioBrushAliasPencilPasses(brush);
           const stampKind = stampBrushKind;
           const dynamicBrush = dynamicBrushId !== null;
-          const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
           // Legacy documents predate the explicit causal-walker marker, but their four stamp
           // brushes still need the exact dab renderer for a one-point tap. The shared pure route
           // keeps Canvas, SVG and the future WebGPU playback contract in agreement.
@@ -633,6 +654,35 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             causalInkEnabled:
               el.sampleSpacing !== undefined || el.pressureModel !== undefined,
           });
+          const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
+          const pointCount = Math.floor(points.length / 2);
+          const pointBounds = pointCount < 2
+            ? null
+            : points.reduce<{ minX: number; minY: number; maxX: number; maxY: number }>((
+              bounds,
+              point,
+              index,
+            ) => {
+              if (index % 2 === 1) return bounds;
+              return {
+                minX: Math.min(bounds.minX, point),
+                maxX: Math.max(bounds.maxX, point),
+                minY: Math.min(bounds.minY, points[index + 1]!),
+                maxY: Math.max(bounds.maxY, points[index + 1]!),
+              };
+            }, {
+              minX: points[0] ?? 0,
+              maxX: points[0] ?? 0,
+              minY: points[1] ?? 0,
+              maxY: points[1] ?? 0,
+            });
+          const strokeSpanX = pointBounds ? pointBounds.maxX - pointBounds.minX : 0;
+          const strokeSpanY = pointBounds ? pointBounds.maxY - pointBounds.minY : 0;
+          const strokeDistance = Math.hypot(strokeSpanX, strokeSpanY);
+          const isCompactPerfectDotRoute = isPerfectAliasBrush
+            && singlePointRoute === "generic-dot"
+            && pointCount <= 4
+            && strokeDistance < 16;
 
           if (pixelPencil && el.mode !== "eraser") {
             const pixelPlan = planStudioPixelPencilCells({ points });
@@ -657,6 +707,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           if (
             points.length === 2
             && singlePointRoute === "generic-dot"
+            && perfectProfile === null
             && aliasPencilPasses.length > 0
           ) {
             return (
@@ -680,6 +731,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           if (
             points.length === 2 &&
             singlePointRoute === "generic-dot"
+            && !isPerfectAliasBrush
           ) {
             const sourcePressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
             const pressure = el.mode === "eraser"
@@ -689,11 +741,75 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               || brushFamily === "pen"
               || brushFamily === "gpen"
               || brushFamily === "calligraphy"
-              || brushFamily === "perfect"
+              || isPerfectAliasBrush
               || brushFamily === "marker";
             const width = pressureAware
               ? aliasStrokeWidth * (0.3 + pressure * 1.4)
               : aliasStrokeWidth;
+            if (perfectProfile) {
+              const dotWidth = Math.max(Math.max(aliasStrokeWidth, 2), width);
+              const minimumDotRadius = brush === "perfect-ink" ? 3 : 1.4;
+              return (
+                <KCircle
+                  key={index}
+                  x={points[0]}
+                  y={points[1]}
+                  radius={Math.max(minimumDotRadius, dotWidth / 2)}
+                  fill={stroke}
+                  opacity={opacity}
+                  globalCompositeOperation={composite}
+                  listening={false}
+                />
+              );
+            }
+            return (
+              <KCircle
+                key={index}
+                x={points[0]}
+                y={points[1]}
+                radius={Math.max(0.35, width / 2)}
+                fill={stroke}
+                opacity={opacity}
+                globalCompositeOperation={composite}
+                listening={false}
+              />
+            );
+          }
+
+          if (
+            points.length <= 4 &&
+            singlePointRoute === "generic-dot"
+            && isCompactPerfectDotRoute
+          ) {
+            const sourcePressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
+            const pressure = el.mode === "eraser"
+              ? sourcePressure
+              : mapStudioBrushAliasPressure(brush, sourcePressure, 0.5);
+            const pressureAware = el.mode === "eraser"
+              || brushFamily === "pen"
+              || brushFamily === "gpen"
+              || brushFamily === "calligraphy"
+              || isPerfectAliasBrush
+              || brushFamily === "marker";
+            const width = pressureAware
+              ? aliasStrokeWidth * (0.3 + pressure * 1.4)
+              : aliasStrokeWidth;
+            if (perfectProfile) {
+              const dotWidth = Math.max(Math.max(aliasStrokeWidth, 2), width);
+              const minimumDotRadius = brush === "perfect-ink" ? 3 : 1.4;
+              return (
+                <KCircle
+                  key={index}
+                  x={points[0]}
+                  y={points[1]}
+                  radius={Math.max(minimumDotRadius, dotWidth / 2)}
+                  fill={stroke}
+                  opacity={opacity}
+                  globalCompositeOperation={composite}
+                  listening={false}
+                />
+              );
+            }
             return (
               <KCircle
                 key={index}
@@ -828,19 +944,139 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           }
 
           if (perfectProfile && el.mode !== "eraser") {
+            const debug = typeof globalThis !== "undefined"
+              && (globalThis as { __debugPerfectInk?: boolean }).__debugPerfectInk;
+            if (debug) {
+              console.log(
+                `[debug-perfect-ink] render brush=${brush} mode=${el.mode} points=${pointCount} stroker=${perfectStroker ? "loaded" : "missing"}`
+              );
+            }
             // 퍼펙트-프리핸드(tldraw 필기감): 필압·테이퍼가 새겨진 아웃라인 폴리곤을 선 색으로
             // 채운다(stroked Line 대체). getStroke는 순수 함수라 협업 복제본·재렌더에서 결정적.
             // 라이브 계약(§핫패스): 다이렉트 라이브 초안 파이프라인(임페러티브 sceneFunc/WebGPU)
             // 은 pen/marker 전용이며 여기서 건드리지 않는다 — "perfect" 패밀리 초안은 리테인드
             // 경로로 이 브랜치를 그대로 지나고, pointer-up 커밋 스왑 계약도 동일하게 유지된다.
+            // 아주 짧은 스토크는 경량 Line 폴백이 더 안정적이다.
+            // 퍼펙트 경로 생성은 짧은 이동에서 Path가 1픽셀 이하로만 변화해 보이지 않는 경우가 있다.
+            // 브러시 검증 시 false negative를 만들 수 있다.
+            const isVeryShortPerfectStroke = pointCount <= 3 && strokeDistance < 16;
+            const sparseSpacingPx = strokeDistance / Math.max(1, pointCount - 1);
+            const isSparseLongPerfectStroke = perfectProfile.id === "perfect-ink"
+              && pointCount >= 4
+              && strokeDistance >= 180
+              && sparseSpacingPx >= Math.max(20, aliasStrokeWidth * 4);
+            if (debug) {
+              setPerfectInkDebugState({
+                brush,
+                pointCount,
+                strokeDistance,
+                isVeryShort: isVeryShortPerfectStroke,
+                isSparseLong: isSparseLongPerfectStroke,
+                profile: perfectProfile.id,
+              });
+            }
+            if (isVeryShortPerfectStroke || isSparseLongPerfectStroke) {
+              const perfectFallback = resolveStudioFreehandRenderPath(points, {
+                sampleSpacing: el.sampleSpacing,
+                legacyMinDistance: renderSampleDistance,
+                legacyTension: 0.4,
+              });
+              const lineWidth = Math.max(aliasStrokeWidth, 2);
+              const dotRadius = Math.max(2, lineWidth * 0.22);
+              return (
+                <Group key={index} opacity={opacity} listening={false}>
+                  <Line
+                    points={perfectFallback.points}
+                    stroke={stroke}
+                    strokeWidth={lineWidth}
+                    lineCap="round"
+                    lineJoin="round"
+                    tension={perfectFallback.tension}
+                    globalCompositeOperation={composite}
+                    perfectDrawEnabled={false}
+                    shadowForStrokeEnabled={false}
+                  />
+                  {perfectFallback.points.length >= 4 ? (
+                    <>
+                      <KCircle
+                        x={perfectFallback.points[0]!}
+                        y={perfectFallback.points[1]!}
+                        radius={dotRadius}
+                        fill={stroke}
+                        opacity={opacity}
+                        globalCompositeOperation={composite}
+                        listening={false}
+                      />
+                      <KCircle
+                        x={perfectFallback.points[perfectFallback.points.length - 2]!}
+                        y={perfectFallback.points[perfectFallback.points.length - 1]!}
+                        radius={dotRadius}
+                        fill={stroke}
+                        opacity={opacity}
+                        globalCompositeOperation={composite}
+                        listening={false}
+                      />
+                    </>
+                  ) : null}
+                </Group>
+              );
+            }
             if (perfectStroker) {
-              const perfectPathData = buildStudioPerfectFreehandPathData(perfectStroker, {
+              const perfectOutline = buildStudioPerfectFreehandOutline(perfectStroker, {
                 points,
                 pressures: el.pressures,
                 strokeWidth: aliasStrokeWidth,
                 profile: perfectProfile,
               });
-              if (perfectPathData) {
+              const perfectPathData = studioPerfectFreehandOutlineToPathData(perfectOutline);
+              const perfectOutlineBounds = perfectOutline.length < 2
+                ? null
+                : perfectOutline.reduce<{ minX: number; maxX: number; minY: number; maxY: number }>(
+                  (bounds, point) => ({
+                    minX: Math.min(bounds.minX, point[0]),
+                    maxX: Math.max(bounds.maxX, point[0]),
+                    minY: Math.min(bounds.minY, point[1]),
+                    maxY: Math.max(bounds.maxY, point[1]),
+                  }),
+                  {
+                    minX: perfectOutline[0]?.[0] ?? 0,
+                    maxX: perfectOutline[0]?.[0] ?? 0,
+                    minY: perfectOutline[0]?.[1] ?? 0,
+                    maxY: perfectOutline[0]?.[1] ?? 0,
+                  },
+                );
+              const outlineSpanX = perfectOutlineBounds
+                ? perfectOutlineBounds.maxX - perfectOutlineBounds.minX
+                : 0;
+              const outlineSpanY = perfectOutlineBounds
+                ? perfectOutlineBounds.maxY - perfectOutlineBounds.minY
+                : 0;
+              const outlineDistance = Math.hypot(outlineSpanX, outlineSpanY);
+              const isDegeneratePerfectPath = perfectOutline.length < 12
+                && strokeDistance < 120
+                || outlineDistance < Math.max(6, strokeDistance * 0.35);
+              if (debug) {
+                console.log(
+                  `[debug-perfect-ink] pathDecision brush=${brush} points=${pointCount} ` +
+                    `strokeDistance=${strokeDistance.toFixed(1)} ` +
+                    `outlineDistance=${outlineDistance.toFixed(1)} ` +
+                    `outlinePoints=${perfectOutline.length} ` +
+                    `isDegenerate=${isDegeneratePerfectPath ? "true" : "false"} ` +
+                    `pathLen=${perfectPathData.length}`
+                );
+                setPerfectInkDebugState({
+                  brush,
+                  pointCount,
+                  strokeDistance,
+                  isVeryShort: isVeryShortPerfectStroke,
+                  isSparseLong: isSparseLongPerfectStroke,
+                  profile: perfectProfile.id,
+                  outlineDistance,
+                  outlinePointCount: perfectOutline.length,
+                  isDegeneratePath: isDegeneratePerfectPath,
+                });
+              }
+              if (perfectPathData && !isDegeneratePerfectPath) {
                 return (
                   <Path
                     key={index}

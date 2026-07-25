@@ -70,7 +70,7 @@ describe("studio auto-color hints panel export boundary", () => {
     const mountAt = inspector.indexOf("<StudioAutoColorHintsPanel");
     expect(mountAt).toBeGreaterThanOrEqual(0);
     // Span the JSX open + onRun body + multi-layer onApplyNewLayer handler.
-    const mountSnippet = inspector.slice(mountAt, mountAt + 2_800);
+    const mountSnippet = inspector.slice(mountAt, mountAt + 3_200);
     expect(mountSnippet).toMatch(/onRun=\{async\s*\(request\)\s*=>/u);
     // Dynamic import may be multi-line (`import(\n  "./…")`); match the call shape.
     expect(mountSnippet).toMatch(

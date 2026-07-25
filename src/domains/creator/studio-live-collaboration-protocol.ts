@@ -46,6 +46,11 @@ export interface StudioLiveCursorPayload {
   y: number;
   pageId: string | null;
   tool: string | null;
+  drawing?: boolean;
+  strokeColor?: string;
+  strokeWidth?: number;
+  strokeOpacity?: number;
+  points?: readonly number[];
 }
 
 export interface StudioLiveLockClaimPayload {
@@ -417,15 +422,32 @@ function isEmptyPayload(value: unknown): value is Record<string, never> {
   return isRecord(value) && hasExactKeys(value, []);
 }
 
+const CURSOR_ALLOWED_KEYS = new Set([
+  "x",
+  "y",
+  "pageId",
+  "tool",
+  "drawing",
+  "strokeColor",
+  "strokeWidth",
+  "strokeOpacity",
+  "points",
+]);
+
 function isCursorPayload(value: unknown): value is StudioLiveCursorPayload {
-  return (
-    isRecord(value) &&
-    hasExactKeys(value, ["x", "y", "pageId", "tool"]) &&
-    isNormalizedRatio(value.x) &&
-    isNormalizedRatio(value.y) &&
-    nullableId(value.pageId) &&
-    (value.tool === null || exactIdentifier(value.tool, MAX_TOOL_LENGTH))
-  );
+  if (!isRecord(value)) return false;
+  const keys = Object.keys(value);
+  if (!keys.includes("x") || !keys.includes("y") || !keys.includes("pageId") || !keys.includes("tool")) return false;
+  if (!keys.every((k) => CURSOR_ALLOWED_KEYS.has(k))) return false;
+  if (!isNormalizedRatio(value.x) || !isNormalizedRatio(value.y)) return false;
+  if (!nullableId(value.pageId)) return false;
+  if (value.tool !== null && value.tool !== undefined && !exactIdentifier(value.tool, MAX_TOOL_LENGTH)) return false;
+  if (value.drawing !== undefined && typeof value.drawing !== "boolean") return false;
+  if (value.strokeColor !== undefined && (typeof value.strokeColor !== "string" || value.strokeColor.length > 64)) return false;
+  if (value.strokeWidth !== undefined && (typeof value.strokeWidth !== "number" || !Number.isFinite(value.strokeWidth))) return false;
+  if (value.strokeOpacity !== undefined && (typeof value.strokeOpacity !== "number" || !Number.isFinite(value.strokeOpacity))) return false;
+  if (value.points !== undefined && (!Array.isArray(value.points) || value.points.length > 1024)) return false;
+  return true;
 }
 
 /** Cheap hot-path validation used before cursor throttling; full envelope/byte validation follows on send. */

@@ -101,9 +101,13 @@ function clampTo(raw: unknown, min: number, max: number, fallback: number): numb
 export function studioPerfectFreehandStrokeOptions(
   profile: StudioPerfectFreehandProfile,
   strokeWidth: number,
-  hasPressures: boolean
+  hasPressures: boolean,
+  segmentLength?: number
 ): StrokeOptions {
   const size = clampTo(strokeWidth, 0.5, 400, 6);
+  const safeShortLength = size * 1.4;
+  const shouldDisableTaper = segmentLength !== undefined
+    && (!Number.isFinite(segmentLength) || segmentLength <= 0 || segmentLength <= safeShortLength);
   return {
     size,
     thinning: profile.thinning,
@@ -113,11 +117,15 @@ export function studioPerfectFreehandStrokeOptions(
     last: true,
     start: {
       cap: profile.capStart,
-      taper: profile.taperStartFactor > 0 ? size * profile.taperStartFactor : 0,
+      taper: shouldDisableTaper || profile.taperStartFactor <= 0
+        ? 0
+        : size * profile.taperStartFactor,
     },
     end: {
       cap: profile.capEnd,
-      taper: profile.taperEndFactor > 0 ? size * profile.taperEndFactor : 0,
+      taper: shouldDisableTaper || profile.taperEndFactor <= 0
+        ? 0
+        : size * profile.taperEndFactor,
     },
   };
 }
@@ -207,10 +215,15 @@ export function buildStudioPerfectFreehandOutline(
     strokePoints.push([x, y, sampledPressures?.[index] ?? 0.5]);
   }
   if (strokePoints.length < 2) return [];
+  const firstPoint = strokePoints[0];
+  const lastPoint = strokePoints[strokePoints.length - 1];
+  const segmentLength = firstPoint && lastPoint
+    ? Math.hypot(lastPoint[0] - firstPoint[0], lastPoint[1] - firstPoint[1])
+    : 0;
 
   return stroker(
     strokePoints,
-    studioPerfectFreehandStrokeOptions(input.profile, input.strokeWidth, hasPressures)
+    studioPerfectFreehandStrokeOptions(input.profile, input.strokeWidth, hasPressures, segmentLength)
   );
 }
 
@@ -222,9 +235,20 @@ export function buildStudioPerfectFreehandPathData(
   stroker: StudioPerfectFreehandStroker,
   input: StudioPerfectFreehandStrokeInput
 ): string {
-  return studioPerfectFreehandOutlineToPathData(
+  const path = studioPerfectFreehandOutlineToPathData(
     buildStudioPerfectFreehandOutline(stroker, input)
   );
+  if (typeof globalThis !== "undefined") {
+    const debug = (globalThis as { __debugPerfectInk?: boolean }).__debugPerfectInk;
+    if (debug) {
+      const pointCount = Math.floor(input.points.length / 2);
+      const profileId = input.profile.id;
+      console.log(
+        `[debug-perfect-ink] ${profileId} points=${pointCount} inputWidth=${input.strokeWidth} pathLen=${path.length}`
+      );
+    }
+  }
+  return path;
 }
 
 // ---------------------------------------------------------------------------
