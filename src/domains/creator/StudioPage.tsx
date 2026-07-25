@@ -5543,6 +5543,8 @@ function StudioCuttoonEditor() {
     if (applied.color !== color) setColor(applied.color);
     if (selection.brushDynamics) {
       setBrushDynamics(normalizeStudioBrushDynamicsSettings(selection.brushDynamics));
+    } else {
+      setBrushDynamics(normalizeStudioBrushDynamicsSettings());
     }
     setProDrawPrefs((prev) => {
       const next = rememberRecentBrushId(prev, selection.catalogId);
@@ -29852,7 +29854,11 @@ function clearSelectionForEdit() {
     setDrawMode: (mode) => {
       setTool("draw");
       setDrawMode(mode);
-      if (mode === "pixel") setStrokeWidth(1);
+      if (mode === "pixel") {
+        setStrokeWidth(1);
+      } else if (mode === "pen" && isStudioPixelPencilRenderMode(brush)) {
+        setBrush("pen");
+      }
       setEyedropperActive(false);
     },
     setDrawShape,

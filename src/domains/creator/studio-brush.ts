@@ -49,33 +49,46 @@ export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRend
   pen: "pen",
   fineliner: "pen",
   ballpoint: "pen",
+  "technical-pen": "pen",
   gpen: "gpen",
   liner: "gpen",
+  "mapping-pen": "gpen",
+  kaburapen: "gpen",
   "ink-brush": "stamp",
   "airbrush-fine": "stamp",
   "pencil-grain": "stamp",
   "wash-brush": "stamp",
   calligraphy: "calligraphy",
+  "brush-pen": "calligraphy",
   // perfect-freehand(tldraw) 아웃라인 폴리곤 렌더 — studio-perfect-freehand.ts 어댑터가 그린다.
   "perfect-ink": "perfect",
   "perfect-marker": "perfect",
   marker: "marker",
   "felt-tip": "marker",
   "marker-bold": "marker",
+  "alcohol-marker": "marker",
   highlighter: "highlighter",
+  "chisel-highlighter": "highlighter",
+  "pastel-highlighter": "highlighter",
   neon: "neon",
   glow: "glow",
   "soft-glow": "glow",
   glitter: "glitter",
   "star-dust": "glitter",
+  "sparkle-star": "glitter",
   brush: "brush",
+  "flat-brush": "brush",
   watercolor: "watercolor",
   "ink-wash": "watercolor",
+  gouache: "watercolor",
   oil: "oil",
+  acrylic: "oil",
   pastel: "pastel",
+  "oil-pastel": "pastel",
   "ink-particle": "ink-particle",
   airbrush: "airbrush",
   spray: "airbrush",
+  splatter: "airbrush",
   "soft-brush": "airbrush",
   "dry-media": "dry-media",
   crayon: "dry-media",
@@ -83,7 +96,11 @@ export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRend
   charcoal: "dry-media",
   pencil: "pencil",
   "soft-pencil": "pencil",
+  "pencil-2b": "pencil",
+  "pencil-6b": "pencil",
+  "colored-pencil": "pencil",
   screentone: "screentone",
+  crosshatch: "screentone",
 };
 
 export function resolveStudioBrushRenderFamily(brushId: unknown): StudioBrushRenderFamily {
@@ -100,44 +117,61 @@ export const BRUSH_PRESETS: BrushPreset[] = [
   { id: "pen", name: "펜(매끈)", defaultWidth: 6, defaultOpacity: 1.0 },
   { id: "fineliner", name: "파인라이너", defaultWidth: 2.2, defaultOpacity: 1.0 },
   { id: "ballpoint", name: "볼펜", defaultWidth: 3.5, defaultOpacity: 0.95 },
+  { id: "technical-pen", name: "제도 펜", defaultWidth: 2.5, defaultOpacity: 1.0 },
   { id: "gpen", name: "G펜(필압)", defaultWidth: 7, defaultOpacity: 1.0 },
+  { id: "mapping-pen", name: "매핑 펜(세밀원고)", defaultWidth: 3.2, defaultOpacity: 1.0 },
+  { id: "kaburapen", name: "스푼 펜(스무스)", defaultWidth: 5.5, defaultOpacity: 1.0 },
   { id: "liner", name: "잉크 라이너", defaultWidth: 5, defaultOpacity: 1.0 },
   { id: "ink-brush", name: "잉크 붓(속도)", defaultWidth: 8, defaultOpacity: 1.0 },
   { id: "calligraphy", name: "캘리그래피(펜 기울기)", defaultWidth: 12, defaultOpacity: 1.0 },
+  { id: "brush-pen", name: "모필 붓펜", defaultWidth: 9, defaultOpacity: 1.0 },
   { id: "perfect-ink", name: "캘리 잉크펜(퍼펙트)", defaultWidth: 9, defaultOpacity: 1.0 },
   { id: "perfect-marker", name: "마커 펜(퍼펙트)", defaultWidth: 14, defaultOpacity: 1.0 },
-  // —— Markers (Canva Draw / Express / Picsart) ——
+  // —— Markers (Canva Draw / Express / Picsart / CSP) ——
   { id: "marker", name: "마커(굵고 반투명)", defaultWidth: 16, defaultOpacity: 0.6 },
   { id: "felt-tip", name: "펠트펜", defaultWidth: 10, defaultOpacity: 0.85 },
   { id: "marker-bold", name: "볼드 마커", defaultWidth: 28, defaultOpacity: 0.55 },
+  { id: "alcohol-marker", name: "알코올 코픽마커", defaultWidth: 20, defaultOpacity: 0.65 },
   { id: "highlighter", name: "형광펜", defaultWidth: 24, defaultOpacity: 0.45, defaultColor: "#ffd84d" },
+  { id: "chisel-highlighter", name: "사각 치즐 형광펜", defaultWidth: 28, defaultOpacity: 0.42, defaultColor: "#ff5252" },
+  { id: "pastel-highlighter", name: "파스텔 형광펜", defaultWidth: 22, defaultOpacity: 0.5, defaultColor: "#b388ff" },
   { id: "neon", name: "네온 마커", defaultWidth: 18, defaultOpacity: 0.75, defaultColor: "#39ff14" },
   // —— FX glow / sparkle (PicsArt Draw effects kit) ——
   { id: "glow", name: "글로우", defaultWidth: 16, defaultOpacity: 0.9, defaultColor: "#ff4fd8" },
   { id: "soft-glow", name: "소프트 글로우", defaultWidth: 28, defaultOpacity: 0.75, defaultColor: "#5ce1ff" },
   { id: "glitter", name: "글리터", defaultWidth: 22, defaultOpacity: 0.95, defaultColor: "#ffd24a" },
   { id: "star-dust", name: "스타 더스트", defaultWidth: 26, defaultOpacity: 0.9, defaultColor: "#e8f0ff" },
-  // —— Paint (Picsart / Express digital paint) ——
+  { id: "sparkle-star", name: "반짝이 별", defaultWidth: 24, defaultOpacity: 0.92, defaultColor: "#fff176" },
+  // —— Paint (Picsart / Procreate / Photoshop digital paint) ——
   { id: "brush", name: "붓", defaultWidth: 10, defaultOpacity: 1.0 },
+  { id: "flat-brush", name: "평붓(플랫)", defaultWidth: 18, defaultOpacity: 0.9 },
   { id: "watercolor", name: "수채 번짐", defaultWidth: 28, defaultOpacity: 0.55 },
   { id: "ink-wash", name: "수묵 번짐", defaultWidth: 30, defaultOpacity: 0.5 },
+  { id: "gouache", name: "과슈 붓", defaultWidth: 24, defaultOpacity: 0.88 },
   { id: "oil", name: "유화 붓", defaultWidth: 22, defaultOpacity: 0.92 },
+  { id: "acrylic", name: "아크릴 물감", defaultWidth: 20, defaultOpacity: 0.95 },
   { id: "airbrush", name: "소프트 에어브러시", defaultWidth: 32, defaultOpacity: 0.7 },
   { id: "airbrush-fine", name: "정밀 에어브러시", defaultWidth: 34, defaultOpacity: 0.85 },
   { id: "wash-brush", name: "물맛 붓(웻엣지)", defaultWidth: 26, defaultOpacity: 0.8 },
   { id: "soft-brush", name: "소프트 브러시", defaultWidth: 36, defaultOpacity: 0.55 },
   { id: "spray", name: "스프레이", defaultWidth: 40, defaultOpacity: 0.55 },
+  { id: "splatter", name: "스플래터(흩뿌리기)", defaultWidth: 45, defaultOpacity: 0.65 },
   // —— Texture / dry media ——
   { id: "pencil", name: "연필", defaultWidth: 2.5, defaultOpacity: 0.85 },
+  { id: "pencil-2b", name: "2B 드로잉 연필", defaultWidth: 3.5, defaultOpacity: 0.88 },
+  { id: "pencil-6b", name: "6B 흑연 연필", defaultWidth: 6, defaultOpacity: 0.9 },
   { id: "soft-pencil", name: "소프트 연필", defaultWidth: 5, defaultOpacity: 0.7 },
   { id: "pencil-grain", name: "그레인 연필", defaultWidth: 4, defaultOpacity: 0.9 },
+  { id: "colored-pencil", name: "색연필", defaultWidth: 4.5, defaultOpacity: 0.82 },
   { id: "dry-media", name: "드라이 미디어", defaultWidth: 7, defaultOpacity: 0.92 },
   { id: "crayon", name: "크레용", defaultWidth: 14, defaultOpacity: 0.88 },
   { id: "chalk", name: "초크", defaultWidth: 16, defaultOpacity: 0.8 },
   { id: "charcoal", name: "목탄", defaultWidth: 12, defaultOpacity: 0.88 },
   { id: "pastel", name: "파스텔", defaultWidth: 20, defaultOpacity: 0.72 },
+  { id: "oil-pastel", name: "오일 파스텔", defaultWidth: 18, defaultOpacity: 0.85 },
   { id: "ink-particle", name: "잉크 입자", defaultWidth: 8, defaultOpacity: 1.0 },
   { id: "screentone", name: "스크린톤(도트)", defaultWidth: 22, defaultOpacity: 1.0 },
+  { id: "crosshatch", name: "크로스 해치(사선)", defaultWidth: 20, defaultOpacity: 0.9 },
 ];
 
 /** Canva/PicsArt-style quick size chips (screen px brush width). */
@@ -914,7 +948,7 @@ export function processFreehandPoints(
     }
   }
 
-  // 2. Bezier-like smoothing (weighted moving average)
+  // 2. High-precision corner-preserving smoothing
   if (thinned.length < 6) return thinned;
   const smoothed: number[] = [thinned[0], thinned[1]];
 
@@ -926,10 +960,24 @@ export function processFreehandPoints(
     const nextX = thinned[i + 2]!;
     const nextY = thinned[i + 3]!;
 
-    // 25% prev, 50% current, 25% next
-    const sx = 0.25 * prevX + 0.5 * currX + 0.25 * nextX;
-    const sy = 0.25 * prevY + 0.5 * currY + 0.25 * nextY;
-    smoothed.push(sx, sy);
+    // Detect sharp directional changes so intentional corners remain crisp while smooth strokes are silenced
+    const dx1 = currX - prevX;
+    const dy1 = currY - prevY;
+    const dx2 = nextX - currX;
+    const dy2 = nextY - currY;
+    const len1 = Math.hypot(dx1, dy1);
+    const len2 = Math.hypot(dx2, dy2);
+    const dot = len1 > 0 && len2 > 0 ? (dx1 * dx2 + dy1 * dy2) / (len1 * len2) : 1;
+
+    if (dot < 0.34) {
+      // Preserve sharp corners (angle > 70 deg)
+      smoothed.push(currX, currY);
+    } else {
+      // Ultra-smooth 0.2 / 0.6 / 0.2 weighting for natural handwriting feel
+      const sx = 0.2 * prevX + 0.6 * currX + 0.2 * nextX;
+      const sy = 0.2 * prevY + 0.6 * currY + 0.2 * nextY;
+      smoothed.push(sx, sy);
+    }
   }
 
   smoothed.push(thinned[thinned.length - 2]!, thinned[thinned.length - 1]!);

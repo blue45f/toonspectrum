@@ -197,7 +197,7 @@ export function planStudioDrawPointerStart(
     strokeWidth,
     opacity: brushOpacity,
     brush: drawMode === "pen"
-      ? brush
+      ? (brush === STUDIO_PIXEL_PENCIL_RENDER_MODE ? "pen" : brush)
       : drawMode === "pixel"
         ? STUDIO_PIXEL_PENCIL_RENDER_MODE
         : undefined,

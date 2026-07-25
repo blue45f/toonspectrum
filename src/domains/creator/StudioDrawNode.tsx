@@ -685,7 +685,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             && strokeDistance < 16;
 
           if (pixelPencil && el.mode !== "eraser") {
-            const pixelPlan = planStudioPixelPencilCells({ points });
+            const pixelPlan = planStudioPixelPencilCells({ points, strokeWidth: aliasStrokeWidth });
             if (!pixelPlan.complete) return null;
             return (
               <Shape
@@ -1409,7 +1409,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             const renderPath = resolveStudioFreehandRenderPath(points, {
               sampleSpacing: el.sampleSpacing,
               legacyMinDistance: renderSampleDistance,
-              legacyTension: 0.4,
+              legacyTension: 0.35,
             });
             return (
               <Line
@@ -1418,8 +1418,8 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 stroke={stroke}
                 strokeWidth={strokeWidth}
                 opacity={opacity}
-                lineCap="square"
-                lineJoin="miter"
+                lineCap="round"
+                lineJoin="round"
                 tension={renderPath.tension}
                 globalCompositeOperation="multiply"
                 listening={false}

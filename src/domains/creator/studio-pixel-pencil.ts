@@ -51,6 +51,7 @@ export interface StudioPixelPencilPlan {
 export interface StudioPixelPencilPlanInput {
   /** Flat document-coordinate pairs. Plain arrays and numeric typed arrays are accepted. */
   readonly points: unknown;
+  readonly strokeWidth?: number;
   readonly maximumCells?: number;
   readonly maximumPointPairs?: number;
   readonly maximumCellVisits?: number;
@@ -280,11 +281,28 @@ export function planStudioPixelPencilCells(
     return true;
   };
 
+  const width = Math.max(1, Math.round(input.strokeWidth ?? 1));
+  const radius = Math.floor(width / 2);
+  const isEven = width % 2 === 0;
+
+  const visitStampedCell = (center: StudioPixelPencilCell): boolean => {
+    if (width <= 1) return visit(center);
+    const radiusSq = (width / 2) * (width / 2);
+    for (let dy = -radius; dy <= (isEven ? radius - 1 : radius); dy++) {
+      for (let dx = -radius; dx <= (isEven ? radius - 1 : radius); dx++) {
+        // Circle constraint for widths >= 3 to maintain smooth round pixel tips
+        if (width >= 3 && dx * dx + dy * dy > radiusSq + 0.25) continue;
+        if (!visit({ x: center.x + dx, y: center.y + dy })) return false;
+      }
+    }
+    return true;
+  };
+
   if (vertices.length === 1) {
-    visit(vertices[0]!);
+    visitStampedCell(vertices[0]!);
   } else {
     for (let index = 1; index < vertices.length; index += 1) {
-      if (!visitBresenhamCells(vertices[index - 1]!, vertices[index]!, visit)) break;
+      if (!visitBresenhamCells(vertices[index - 1]!, vertices[index]!, visitStampedCell)) break;
     }
   }
 

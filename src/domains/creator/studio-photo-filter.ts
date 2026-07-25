@@ -153,9 +153,51 @@ export const PHOTO_FILTER_PRESETS: PhotoFilterPreset[] = [
   },
   {
     id: "sunset",
-    label: "선셋",
+    label: "선셋 노을",
     tip: "짙은 주황빛으로 노을 진 해질녘 색조를 냅니다.",
     value: normalizePhotoFilter({ color: "#ff7b00", density: 45 }),
+  },
+  {
+    id: "golden-hour",
+    label: "골든 아워",
+    tip: "황금빛 햇살이 내리쬐는 클래식 감성 필터.",
+    value: normalizePhotoFilter({ color: "#ffb300", density: 38 }),
+  },
+  {
+    id: "cyberpunk",
+    label: "사이버펑크",
+    tip: "자줏빛과 네온의 조화로 미래지향적 도시 분위기를 극대화합니다.",
+    value: normalizePhotoFilter({ color: "#e040fb", density: 42 }),
+  },
+  {
+    id: "retro-anime",
+    label: "90s 셀 애니",
+    tip: "90년대 클래식 애니메이션의 맑은 원색 색조 느낌.",
+    value: normalizePhotoFilter({ color: "#40c4ff", density: 30 }),
+  },
+  {
+    id: "cherry-blossom",
+    label: "체리 블라썸",
+    tip: "은은한 핑크빛으로 화사하고 사랑스러운 로맨스 연출.",
+    value: normalizePhotoFilter({ color: "#ff80ab", density: 32 }),
+  },
+  {
+    id: "emerald-forest",
+    label: "에메랄드 숲",
+    tip: "싱그러운 청록 잎사귀 빛의 신비로운 자연 필터.",
+    value: normalizePhotoFilter({ color: "#00e676", density: 28 }),
+  },
+  {
+    id: "vintage-film",
+    label: "빈티지 필름",
+    tip: "아날로그 아카이브 잡지 느낌의 따스한 감성 필터.",
+    value: normalizePhotoFilter({ color: "#d7ccc8", density: 35 }),
+  },
+  {
+    id: "midnight-purple",
+    label: "미드나잇 보라",
+    tip: "깊은 보랏빛 밤하늘과 심야 판타지 연출.",
+    value: normalizePhotoFilter({ color: "#7c4dff", density: 40 }),
   },
   {
     id: "deep-blue",

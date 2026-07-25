@@ -217,7 +217,7 @@ export function drawLiveFreehandDraftToContext(context: Konva.Context, el: DrawE
   context.globalCompositeOperation = isEraser ? "destination-out" : "source-over";
   for (const points of variations) {
     if (!isEraser && isStudioPixelPencilRenderMode(el.brush)) {
-      const pixelPlan = planStudioPixelPencilCells({ points });
+      const pixelPlan = planStudioPixelPencilCells({ points, strokeWidth });
       if (!pixelPlan.complete) continue;
       context.fillStyle = strokeColor;
       fillStudioPixelPencilCells(context, pixelPlan.cells);

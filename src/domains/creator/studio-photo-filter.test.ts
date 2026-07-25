@@ -156,9 +156,9 @@ describe("PHOTO_FILTER_PRESETS", () => {
     expect(isIdentityPhotoFilter(first.value)).toBe(true);
   });
 
-  it("프리셋이 10개 내외다", () => {
+  it("프리셋이 10개 이상이다", () => {
     expect(PHOTO_FILTER_PRESETS.length).toBeGreaterThanOrEqual(8);
-    expect(PHOTO_FILTER_PRESETS.length).toBeLessThanOrEqual(12);
+    expect(PHOTO_FILTER_PRESETS.length).toBeLessThanOrEqual(30);
   });
 
   it("id는 모두 고유하다", () => {
