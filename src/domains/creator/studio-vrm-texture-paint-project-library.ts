@@ -225,6 +225,43 @@ export type ImportStudioVrmTexturePaintProjectLibraryResult =
       readonly diagnostics: readonly StudioVrmTexturePaintProjectLibraryDiagnostic[];
     };
 
+export interface StudioVrmTexturePaintProjectNotice {
+  readonly tone: "good" | "warn";
+  readonly text: string;
+}
+
+export interface StudioVrmTexturePaintJsonImportPresentation {
+  readonly notice: StudioVrmTexturePaintProjectNotice | null;
+  readonly alertSuffix: string;
+}
+
+export interface StudioVrmTexturePaintArchiveImportPresentationInput {
+  readonly isSelfContained: boolean;
+  readonly attachmentCount: number;
+  readonly warningCount: number;
+  readonly referenceInstalled: number;
+  readonly referenceReused: number;
+  readonly referenceUnresolved: number;
+  readonly vrmInstalled: number;
+  readonly vrmReused: number;
+  readonly vrmUnresolved: number;
+  readonly background3dInstalled: number;
+  readonly texturePaint: ImportStudioVrmTexturePaintProjectLibraryResult;
+}
+
+export interface StudioVrmTexturePaintArchiveExportPresentationInput {
+  readonly isSelfContained: boolean;
+  readonly attachmentCount: number;
+  readonly warningCount: number;
+  readonly missingReferenceCount: number;
+  readonly missingVrmCount: number;
+}
+
+export interface StudioVrmTexturePaintArchiveImportPresentation {
+  readonly fullyResolved: boolean;
+  readonly notice: StudioVrmTexturePaintProjectNotice;
+}
+
 interface StrictSceneScan {
   readonly pointer: string;
   readonly serialized: string;
@@ -1161,5 +1198,117 @@ export async function importStudioVrmTexturePaintProjectLibrary(
     installed,
     reused,
     diagnostics: EMPTY_RESULT_ITEMS,
+  });
+}
+
+/**
+ * JSON deliberately carries only immutable SHA-256 receipts. Keep the portability decision and
+ * its long user-facing copy in this user-triggered module so Studio's initial route does not pay
+ * for archive guidance before an export is requested.
+ */
+export async function inspectStudioVrmTexturePaintJsonExport(
+  project: unknown,
+): Promise<StudioVrmTexturePaintProjectNotice | null> {
+  try {
+    const plan = await collectStudioVrmTexturePaintProjectPlan(project);
+    if (plan.artifacts.length === 0) return null;
+    return Object.freeze({
+      tone: "warn",
+      text: `JSON에는 VRM 표면 페인팅 PNG ${plan.artifacts.length}개의 SHA-256 영수증만 저장됩니다. 다른 기기로 옮길 때는 원본 PNG가 포함되는 무결성 archive(.toonproject.zip)를 함께 저장해 주세요.`,
+    });
+  } catch {
+    return Object.freeze({
+      tone: "warn",
+      text: "JSON 파일은 저장했지만 VRM 표면 페인팅 영수증을 검사하지 못했습니다. 이 JSON만으로 3D 재편집이 가능하다고 보장할 수 없으므로 원본 PNG가 포함되는 무결성 archive(.toonproject.zip)도 저장해 주세요.",
+    });
+  }
+}
+
+export async function auditStudioVrmTexturePaintJsonImport(
+  project: unknown,
+): Promise<StudioVrmTexturePaintJsonImportPresentation> {
+  const availability = await auditStudioVrmTexturePaintProjectLibraryAvailability({
+    project,
+    canonicalProject: project,
+  });
+  if (availability.status === "unresolved") {
+    const missingCount = availability.diagnostics.length;
+    return Object.freeze({
+      notice: Object.freeze({
+        tone: "warn",
+        text: `JSON 프로젝트를 불러왔지만 VRM 표면 페인팅 PNG ${missingCount}개가 이 기기에 없습니다. 기존 캡처는 보이지만 3D 재편집을 위해 원본이 든 .toonproject.zip archive를 가져와 주세요.`,
+      }),
+      alertSuffix: `\n\nVRM 표면 페인팅 원본 ${missingCount}개가 없어 3D 재편집은 archive 복구 후 가능합니다.`,
+    });
+  }
+  if (availability.status === "unavailable") {
+    return Object.freeze({
+      notice: Object.freeze({
+        tone: "warn",
+        text: "JSON 프로젝트를 불러왔지만 이 브라우저의 VRM 표면 페인팅 로컬 저장소를 확인할 수 없습니다. 기존 캡처는 보이지만 3D 재편집 가능 여부를 보장할 수 없으므로 원본이 든 .toonproject.zip archive를 가져와 주세요.",
+      }),
+      alertSuffix: "\n\nVRM 표면 페인팅 로컬 저장소를 확인할 수 없어 3D 재편집 가능 여부가 불확실합니다. 원본 archive로 복구해 주세요.",
+    });
+  }
+  return Object.freeze({ notice: null, alertSuffix: "" });
+}
+
+export async function prepareStudioVrmTexturePaintProjectArchiveExport(
+  input: ExportStudioVrmTexturePaintProjectLibraryInput,
+): Promise<readonly StudioProjectArchiveAttachmentInput[]> {
+  const result = await exportStudioVrmTexturePaintProjectLibrary(input);
+  if (result.status !== "ready") {
+    throw new Error(
+      `VRM 표면 페인팅 PNG ${result.diagnostics.length}개를 이 기기의 검증 저장소에서 찾지 못해 휴대 가능한 archive를 만들지 않았습니다.`,
+    );
+  }
+  return result.attachments;
+}
+
+export function presentStudioVrmTexturePaintProjectArchiveExport(
+  input: StudioVrmTexturePaintArchiveExportPresentationInput,
+): StudioVrmTexturePaintProjectNotice {
+  return input.isSelfContained
+    ? Object.freeze({
+        tone: "good",
+        text: `프로젝트와 중복 제거 자산 ${input.attachmentCount}개를 무결성 검증형 archive로 저장 요청했어요.`,
+      })
+    : Object.freeze({
+        tone: "warn",
+        text: `archive를 저장했지만 외부 종속성 경고 ${input.warningCount}건이 있어 다른 기기에서 일부 원본 자산을 다시 연결해야 할 수 있어요.${
+          input.missingReferenceCount > 0
+            ? ` 참고 이미지 원본 ${input.missingReferenceCount}개를 이 기기에서 찾지 못했습니다.`
+            : ""
+        }${
+          input.missingVrmCount > 0
+            ? ` 업로드 VRM 원본 ${input.missingVrmCount}개를 이 기기에서 찾지 못했거나 검증하지 못했습니다.`
+            : ""
+        }`,
+      });
+}
+
+export function presentStudioVrmTexturePaintProjectArchiveImport(
+  input: StudioVrmTexturePaintArchiveImportPresentationInput,
+): StudioVrmTexturePaintArchiveImportPresentation {
+  const fullyResolved =
+    input.isSelfContained
+    && input.referenceUnresolved === 0
+    && input.vrmUnresolved === 0
+    && input.texturePaint.status === "ready";
+  if (fullyResolved && input.texturePaint.status === "ready") {
+    return Object.freeze({
+      fullyResolved: true,
+      notice: Object.freeze({
+        tone: "good",
+        text: `SHA-256·CRC-32·MIME 검증을 통과한 프로젝트와 자산 ${input.attachmentCount}개를 복구했어요. 참고 이미지 ${input.referenceInstalled}개 설치·${input.referenceReused}개 재사용, VRM ${input.vrmInstalled}개 설치·${input.vrmReused}개 재사용, VRM 표면 페인팅 PNG ${input.texturePaint.installed}개 설치·${input.texturePaint.reused}개 재사용, 3D 배경 모델 ${input.background3dInstalled}개를 로컬 라이브러리에 원자적으로 설치했어요.`,
+      }),
+    });
+  }
+  return Object.freeze({
+    fullyResolved: false,
+    notice: Object.freeze({
+      tone: "warn",
+      text: `프로젝트를 복구했지만 외부 종속성 경고 ${input.warningCount}건, 미해결 참고 이미지 ${input.referenceUnresolved}개, 미해결 VRM ${input.vrmUnresolved}개, 미해결 VRM 표면 페인팅 ${input.texturePaint.status === "unresolved" ? input.texturePaint.diagnostics.length : 0}개가 있어 원본 자산 확인이 필요해요.`,
+    }),
   });
 }

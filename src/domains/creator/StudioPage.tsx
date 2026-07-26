@@ -28884,7 +28884,7 @@ function clearSelectionForEdit() {
           captureStudioProjectDocumentSession,
           planStudioProjectDocumentSessionExport,
         },
-        { collectStudioVrmTexturePaintProjectPlan },
+        { inspectStudioVrmTexturePaintJsonExport },
       ] = await Promise.all([
         import("./studio-project-document"),
         import("./studio-document-envelope"),
@@ -28911,24 +28911,8 @@ function clearSelectionForEdit() {
         },
         readCurrentProject: currentStudioProjectSnapshot,
       });
-      let texturePaintPortability:
-        | { readonly status: "none" }
-        | { readonly status: "hash-only"; readonly artifactCount: number }
-        | { readonly status: "unavailable" };
-      try {
-        const texturePaintPlan = await collectStudioVrmTexturePaintProjectPlan(
-          sessionExport.project,
-        );
-        const texturePaintArtifactCount = texturePaintPlan.artifacts.length;
-        texturePaintPortability = texturePaintArtifactCount > 0
-          ? {
-              status: "hash-only",
-              artifactCount: texturePaintArtifactCount,
-            }
-          : { status: "none" };
-      } catch {
-        texturePaintPortability = { status: "unavailable" };
-      }
+      const texturePaintNotice =
+        await inspectStudioVrmTexturePaintJsonExport(sessionExport.project);
       const exportEnvelope = sessionExport.directEnvelope
         ?? createStudioProjectDocumentEnvelope(
           sessionExport.project,
@@ -28950,17 +28934,7 @@ function clearSelectionForEdit() {
         studioProjectDocumentSessionScopeKey,
         exportGeneration,
       );
-      if (texturePaintPortability.status === "hash-only") {
-        setProjectArchiveStatus({
-          tone: "warn",
-          text: `JSON에는 VRM 표면 페인팅 PNG ${texturePaintPortability.artifactCount}개의 SHA-256 영수증만 저장됩니다. 다른 기기로 옮길 때는 원본 PNG가 포함되는 무결성 archive(.toonproject.zip)를 함께 저장해 주세요.`,
-        });
-      } else if (texturePaintPortability.status === "unavailable") {
-        setProjectArchiveStatus({
-          tone: "warn",
-          text: "JSON 파일은 저장했지만 VRM 표면 페인팅 영수증을 검사하지 못했습니다. 이 JSON만으로 3D 재편집이 가능하다고 보장할 수 없으므로 원본 PNG가 포함되는 무결성 archive(.toonproject.zip)도 저장해 주세요.",
-        });
-      }
+      if (texturePaintNotice) setProjectArchiveStatus(texturePaintNotice);
       setError(null);
     } catch (cause) {
       setError(
@@ -28985,7 +28959,10 @@ function clearSelectionForEdit() {
         { buildStudioProjectArchiveWithVerifiedBg3dModels },
         { prepareStudioReferenceBoardArchiveExport },
         { prepareStudioVrmProjectArchiveExport },
-        { exportStudioVrmTexturePaintProjectLibrary },
+        {
+          prepareStudioVrmTexturePaintProjectArchiveExport,
+          presentStudioVrmTexturePaintProjectArchiveExport,
+        },
         { downloadBlob },
       ] = await Promise.all([
         import("./studio-bg3d-project-library"),
@@ -28996,22 +28973,18 @@ function clearSelectionForEdit() {
       ]);
       const referenceArchive = await prepareStudioReferenceBoardArchiveExport(project);
       const vrmArchive = await prepareStudioVrmProjectArchiveExport(project);
-      const texturePaintArchive = await exportStudioVrmTexturePaintProjectLibrary({
-        project,
-        canonicalProject: project,
-        limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
-      });
-      if (texturePaintArchive.status !== "ready") {
-        throw new Error(
-          `VRM 표면 페인팅 PNG ${texturePaintArchive.diagnostics.length}개를 이 기기의 검증 저장소에서 찾지 못해 휴대 가능한 archive를 만들지 않았습니다.`,
-        );
-      }
+      const texturePaintAttachments =
+        await prepareStudioVrmTexturePaintProjectArchiveExport({
+          project,
+          canonicalProject: project,
+          limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
+        });
       const result = await buildStudioProjectArchiveWithVerifiedBg3dModels({
         project,
         attachments: [
           ...referenceArchive.attachments,
           ...vrmArchive.attachments,
-          ...texturePaintArchive.attachments,
+          ...texturePaintAttachments,
         ],
       }, {
         limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
@@ -29021,20 +28994,15 @@ function clearSelectionForEdit() {
         fallback: "toonspectrum-studio-project",
       })}.toonproject.zip`;
       downloadBlob(result.blob, fileName);
-      setProjectArchiveStatus({
-        tone: result.isSelfContained ? "good" : "warn",
-        text: result.isSelfContained
-          ? `프로젝트와 중복 제거 자산 ${result.manifest.attachments.length}개를 무결성 검증형 archive로 저장 요청했어요.`
-          : `archive를 저장했지만 외부 종속성 경고 ${warningCount}건이 있어 다른 기기에서 일부 원본 자산을 다시 연결해야 할 수 있어요.${
-              referenceArchive.missing.length > 0
-                ? ` 참고 이미지 원본 ${referenceArchive.missing.length}개를 이 기기에서 찾지 못했습니다.`
-                : ""
-            }${
-              vrmArchive.missing.length > 0
-                ? ` 업로드 VRM 원본 ${vrmArchive.missing.length}개를 이 기기에서 찾지 못했거나 검증하지 못했습니다.`
-                : ""
-            }`,
-      });
+      setProjectArchiveStatus(
+        presentStudioVrmTexturePaintProjectArchiveExport({
+          isSelfContained: result.isSelfContained,
+          attachmentCount: result.manifest.attachments.length,
+          warningCount,
+          missingReferenceCount: referenceArchive.missing.length,
+          missingVrmCount: vrmArchive.missing.length,
+        }),
+      );
       setError(null);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "프로젝트 archive를 만들지 못했어요.";
@@ -29059,7 +29027,7 @@ function clearSelectionForEdit() {
         const [
           { parseStudioProjectDocument },
           { captureStudioProjectDocumentSession },
-          { auditStudioVrmTexturePaintProjectLibraryAvailability },
+          { auditStudioVrmTexturePaintJsonImport },
         ] = await Promise.all([
           import("./studio-project-document"),
           import("./studio-project-document-session"),
@@ -29068,11 +29036,8 @@ function clearSelectionForEdit() {
         if (!canApplyStudioMutation(mutationTicket)) return;
         const loaded = await parseStudioProjectDocument(text);
         if (!canApplyStudioMutation(mutationTicket)) return;
-        const texturePaintAvailability =
-          await auditStudioVrmTexturePaintProjectLibraryAvailability({
-            project: loaded.project,
-            canonicalProject: loaded.project,
-          });
+        const texturePaintPresentation =
+          await auditStudioVrmTexturePaintJsonImport(loaded.project);
         if (!canApplyStudioMutation(mutationTicket)) return;
         if (!(await applyStudioProjectSnapshot(loaded.project))) return;
         studioProjectDocumentSessionRef.current =
@@ -29085,33 +29050,13 @@ function clearSelectionForEdit() {
             : null;
         const migrated =
           loaded.source === "canonical-envelope" && loaded.receipt.migrated;
-        const missingTexturePaintCount =
-          texturePaintAvailability.status === "unresolved"
-            ? texturePaintAvailability.diagnostics.length
-            : 0;
-        const texturePaintLibraryUnavailable =
-          texturePaintAvailability.status === "unavailable";
-        if (missingTexturePaintCount > 0) {
-          setProjectArchiveStatus({
-            tone: "warn",
-            text: `JSON 프로젝트를 불러왔지만 VRM 표면 페인팅 PNG ${missingTexturePaintCount}개가 이 기기에 없습니다. 기존 캡처는 보이지만 3D 재편집을 위해 원본이 든 .toonproject.zip archive를 가져와 주세요.`,
-          });
-        } else if (texturePaintLibraryUnavailable) {
-          setProjectArchiveStatus({
-            tone: "warn",
-            text: "JSON 프로젝트를 불러왔지만 이 브라우저의 VRM 표면 페인팅 로컬 저장소를 확인할 수 없습니다. 기존 캡처는 보이지만 3D 재편집 가능 여부를 보장할 수 없으므로 원본이 든 .toonproject.zip archive를 가져와 주세요.",
-          });
+        if (texturePaintPresentation.notice) {
+          setProjectArchiveStatus(texturePaintPresentation.notice);
         }
         alert(
           `${migrated
             ? "이전 버전 프로젝트를 안전하게 변환해 불러왔습니다."
-            : "프로젝트 불러오기가 완료되었습니다."}${
-            missingTexturePaintCount > 0
-              ? `\n\nVRM 표면 페인팅 원본 ${missingTexturePaintCount}개가 없어 3D 재편집은 archive 복구 후 가능합니다.`
-              : texturePaintLibraryUnavailable
-                ? "\n\nVRM 표면 페인팅 로컬 저장소를 확인할 수 없어 3D 재편집 가능 여부가 불확실합니다. 원본 archive로 복구해 주세요."
-              : ""
-          }`
+            : "프로젝트 불러오기가 완료되었습니다."}${texturePaintPresentation.alertSuffix}`
         );
       } catch (err) {
         alert(err instanceof Error ? err.message : "프로젝트 파일을 읽는 도중 오류가 발생했습니다.");
@@ -29134,7 +29079,10 @@ function clearSelectionForEdit() {
         { installStudioBg3dProjectArchiveModelsAndApply },
         { restoreStudioReferenceBoardArchiveImport },
         { restoreStudioVrmProjectArchiveImport },
-        { importStudioVrmTexturePaintProjectLibrary },
+        {
+          importStudioVrmTexturePaintProjectLibrary,
+          presentStudioVrmTexturePaintProjectArchiveImport,
+        },
         { normalizeStudioReleaseSchedule },
       ] =
         await Promise.all([
@@ -29191,17 +29139,21 @@ function clearSelectionForEdit() {
       );
       if (!projectApplied) return;
       const warningCount = result.diagnostics.filter((item) => item.severity === "warning").length;
-      const fullyResolved =
-        result.isSelfContained
-        && restoredReferences.unresolved.length === 0
-        && restoredVrmModels.unresolved.length === 0
-        && restoredTexturePaint.status === "ready";
-      setProjectArchiveStatus({
-        tone: fullyResolved ? "good" : "warn",
-        text: fullyResolved
-          ? `SHA-256·CRC-32·MIME 검증을 통과한 프로젝트와 자산 ${result.attachments.size}개를 복구했어요. 참고 이미지 ${restoredReferences.installed.length}개 설치·${restoredReferences.reused.length}개 재사용, VRM ${restoredVrmModels.installed.length}개 설치·${restoredVrmModels.reused.length}개 재사용, VRM 표면 페인팅 PNG ${restoredTexturePaint.installed}개 설치·${restoredTexturePaint.reused}개 재사용, 3D 배경 모델 ${installed.records.length}개를 로컬 라이브러리에 원자적으로 설치했어요.`
-          : `프로젝트를 복구했지만 외부 종속성 경고 ${warningCount}건, 미해결 참고 이미지 ${restoredReferences.unresolved.length}개, 미해결 VRM ${restoredVrmModels.unresolved.length}개, 미해결 VRM 표면 페인팅 ${restoredTexturePaint.status === "unresolved" ? restoredTexturePaint.diagnostics.length : 0}개가 있어 원본 자산 확인이 필요해요.`,
-      });
+      const texturePaintArchivePresentation =
+        presentStudioVrmTexturePaintProjectArchiveImport({
+          isSelfContained: result.isSelfContained,
+          attachmentCount: result.attachments.size,
+          warningCount,
+          referenceInstalled: restoredReferences.installed.length,
+          referenceReused: restoredReferences.reused.length,
+          referenceUnresolved: restoredReferences.unresolved.length,
+          vrmInstalled: restoredVrmModels.installed.length,
+          vrmReused: restoredVrmModels.reused.length,
+          vrmUnresolved: restoredVrmModels.unresolved.length,
+          background3dInstalled: installed.records.length,
+          texturePaint: restoredTexturePaint,
+        });
+      setProjectArchiveStatus(texturePaintArchivePresentation.notice);
       setError(null);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "프로젝트 archive를 읽지 못했어요.";

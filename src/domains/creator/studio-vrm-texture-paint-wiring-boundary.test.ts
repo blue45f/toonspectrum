@@ -293,7 +293,7 @@ describe("Studio VRM texture-paint wiring boundary", () => {
     expect(interactionGate).toContain("texturePaintSceneSyncRequired");
   });
 
-  it("includes verified paint PNG attachments in archives and aborts unresolved export", () => {
+  it("prepares verified paint PNG attachments before building the archive", () => {
     const archiveExport = sourceBetween(
       studioPageSource,
       "async function handleExportProjectArchive()",
@@ -301,34 +301,25 @@ describe("Studio VRM texture-paint wiring boundary", () => {
     );
     const paintExport = requiredIndex(
       archiveExport,
-      "exportStudioVrmTexturePaintProjectLibrary({",
+      "prepareStudioVrmTexturePaintProjectArchiveExport({",
     );
-    const unresolvedGate = requiredIndex(
-      archiveExport,
-      'texturePaintArchive.status !== "ready"',
-      paintExport,
-    );
-    const unresolvedThrow = requiredIndex(archiveExport, "throw new Error(", unresolvedGate);
     const archiveBuild = requiredIndex(
       archiveExport,
       "buildStudioProjectArchiveWithVerifiedBg3dModels({",
-      unresolvedThrow,
+      paintExport,
     );
     const paintAttachments = requiredIndex(
       archiveExport,
-      "...texturePaintArchive.attachments",
+      "...texturePaintAttachments",
       archiveBuild,
     );
 
-    expect(archiveExport.slice(paintExport, unresolvedGate)).toContain(
+    expect(archiveExport.slice(paintExport, archiveBuild)).toContain(
       "canonicalProject: project",
     );
-    expect(archiveExport.slice(unresolvedThrow, archiveBuild)).toContain(
-      "texturePaintArchive.diagnostics.length",
+    expect(archiveExport.slice(paintExport, archiveBuild)).toContain(
+      "limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined",
     );
-    expect(paintExport).toBeLessThan(unresolvedGate);
-    expect(unresolvedGate).toBeLessThan(unresolvedThrow);
-    expect(unresolvedThrow).toBeLessThan(archiveBuild);
     expect(archiveBuild).toBeLessThan(paintAttachments);
   });
 
@@ -359,6 +350,16 @@ describe("Studio VRM texture-paint wiring boundary", () => {
       "applyStudioProjectSnapshotWithPreparedDocuments(",
       postRestoreMutationGate,
     );
+    const presentation = requiredIndex(
+      archiveImport,
+      "presentStudioVrmTexturePaintProjectArchiveImport({",
+      projectApply,
+    );
+    const statusUpdate = requiredIndex(
+      archiveImport,
+      "setProjectArchiveStatus(texturePaintArchivePresentation.notice)",
+      presentation,
+    );
 
     const restoreArguments = archiveImport.slice(paintRestore, postRestoreMutationGate);
     expect(restoreArguments).toContain("project: restoredVrmModels.project");
@@ -371,32 +372,32 @@ describe("Studio VRM texture-paint wiring boundary", () => {
     expect(vrmRestore).toBeLessThan(paintRestore);
     expect(paintRestore).toBeLessThan(postRestoreMutationGate);
     expect(postRestoreMutationGate).toBeLessThan(projectApply);
+    expect(projectApply).toBeLessThan(presentation);
+    expect(presentation).toBeLessThan(statusUpdate);
   });
 
-  it("warns that JSON carries paint hashes while the portable archive carries PNG originals", () => {
+  it("awaits the JSON paint inspection facade before download and publishes its notice afterward", () => {
     const jsonExport = sourceBetween(
       studioPageSource,
       "async function handleExportProject()",
       "async function handleExportProjectArchive()",
     );
-    const collectPlan = requiredIndex(
+    const inspection = requiredIndex(
       jsonExport,
-      "collectStudioVrmTexturePaintProjectPlan(",
+      "inspectStudioVrmTexturePaintJsonExport(",
     );
-    const artifactGate = requiredIndex(
+    const download = requiredIndex(
       jsonExport,
-      "texturePaintArtifactCount > 0",
-      collectPlan,
+      "link.click()",
+      inspection,
     );
-    const warning = requiredIndex(jsonExport, 'tone: "warn"', artifactGate);
-    const warningCopy = jsonExport.slice(warning, requiredIndex(jsonExport, "setError(null)", warning));
+    const notice = requiredIndex(
+      jsonExport,
+      "if (texturePaintNotice) setProjectArchiveStatus(texturePaintNotice)",
+      download,
+    );
 
-    expect(warningCopy).toContain("JSON");
-    expect(warningCopy).toContain("VRM");
-    expect(warningCopy).toContain("PNG");
-    expect(warningCopy).toContain("SHA-256");
-    expect(warningCopy).toContain("archive(.toonproject.zip)");
-    expect(collectPlan).toBeLessThan(artifactGate);
-    expect(artifactGate).toBeLessThan(warning);
+    expect(inspection).toBeLessThan(download);
+    expect(download).toBeLessThan(notice);
   });
 });

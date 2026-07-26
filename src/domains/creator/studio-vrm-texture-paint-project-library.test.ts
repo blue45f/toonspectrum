@@ -20,10 +20,15 @@ import {
   type StudioVrmTexturePaintArtifactHash,
 } from "./studio-vrm-texture-paint-artifact";
 import {
+  auditStudioVrmTexturePaintJsonImport,
   auditStudioVrmTexturePaintProjectLibraryAvailability,
   collectStudioVrmTexturePaintProjectPlan,
   exportStudioVrmTexturePaintProjectLibrary,
   importStudioVrmTexturePaintProjectLibrary,
+  inspectStudioVrmTexturePaintJsonExport,
+  prepareStudioVrmTexturePaintProjectArchiveExport,
+  presentStudioVrmTexturePaintProjectArchiveExport,
+  presentStudioVrmTexturePaintProjectArchiveImport,
   type StudioVrmTexturePaintProjectArtifactPlan,
   type StudioVrmTexturePaintProjectLibraryAdapter,
   type StudioVrmTexturePaintProjectPlan,
@@ -836,5 +841,187 @@ describe("studio VRM texture-paint project library bridge", () => {
       canonicalProject: imported.canonicalProject,
       dependencies: { libraryOptions: { indexedDb: factory } },
     })).resolves.toMatchObject({ status: "ready", attachments: [{ kind: "raster" }] });
+  });
+
+  it("presents JSON export portability only when surface-paint receipts exist", async () => {
+    await expect(
+      inspectStudioVrmTexturePaintJsonExport(project([])),
+    ).resolves.toBeNull();
+
+    const first = await artifact("json-export-first", 2, 2);
+    const second = await artifact(
+      "json-export-second",
+      3,
+      3,
+      Uint8Array.from([0x78, 0x9c, 4, 5, 6]),
+    );
+    await expect(inspectStudioVrmTexturePaintJsonExport(project([
+      image("json-export", scene([
+        texture(first, "json-export-first", "gltf-material:0"),
+        texture(second, "json-export-second", "gltf-material:1"),
+      ])),
+    ]))).resolves.toEqual({
+      tone: "warn",
+      text: expect.stringMatching(
+        /VRM 표면 페인팅 PNG 2개의 SHA-256 영수증.*\.toonproject\.zip/u,
+      ),
+    });
+
+    await expect(inspectStudioVrmTexturePaintJsonExport({ invalid: true })).resolves.toEqual({
+      tone: "warn",
+      text: expect.stringMatching(
+        /영수증을 검사하지 못했습니다.*\.toonproject\.zip/u,
+      ),
+    });
+  });
+
+  it("presents deterministic ready and missing-library states for JSON imports", async () => {
+    await expect(
+      auditStudioVrmTexturePaintJsonImport(project([])),
+    ).resolves.toEqual({ notice: null, alertSuffix: "" });
+
+    const factory = new IDBFactory();
+    const value = await artifact("json-import-missing", 2, 2);
+    vi.stubGlobal("indexedDB", factory);
+    try {
+      const presentation = await auditStudioVrmTexturePaintJsonImport(project([
+        image("json-import-missing", scene([
+          texture(value, "json-import-missing", "gltf-material:0"),
+        ])),
+      ]));
+      expect(presentation).toEqual({
+        notice: {
+          tone: "warn",
+          text: expect.stringMatching(
+            /VRM 표면 페인팅 PNG 1개가 이 기기에 없습니다.*\.toonproject\.zip/u,
+          ),
+        },
+        alertSuffix: expect.stringMatching(
+          /VRM 표면 페인팅 원본 1개가 없어.*archive 복구/u,
+        ),
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("returns authenticated archive attachments and refuses non-portable exports", async () => {
+    const value = await artifact("archive-export-facade", 3, 2);
+    const raw = project([image("archive-export-facade", scene([
+      texture(value, "archive-export-facade", "gltf-material:0"),
+    ]))]);
+
+    await expect(prepareStudioVrmTexturePaintProjectArchiveExport({
+      project: raw,
+      canonicalProject: raw,
+      library: { resolve: () => value.archiveEntry.data },
+    })).resolves.toEqual([
+      expect.objectContaining({
+        kind: "raster",
+        data: value.archiveEntry.data,
+        mimeType: "image/png",
+      }),
+    ]);
+
+    await expect(prepareStudioVrmTexturePaintProjectArchiveExport({
+      project: raw,
+      canonicalProject: raw,
+      library: { resolve: () => null },
+    })).rejects.toThrow(
+      "VRM 표면 페인팅 PNG 1개를 이 기기의 검증 저장소에서 찾지 못해 휴대 가능한 archive를 만들지 않았습니다.",
+    );
+  });
+
+  it("summarizes fully portable and partially unresolved archive imports", async () => {
+    const value = await artifact("archive-import-presentation", 1, 1);
+    const ready = presentStudioVrmTexturePaintProjectArchiveImport({
+      isSelfContained: true,
+      attachmentCount: 9,
+      warningCount: 0,
+      referenceInstalled: 2,
+      referenceReused: 1,
+      referenceUnresolved: 0,
+      vrmInstalled: 1,
+      vrmReused: 2,
+      vrmUnresolved: 0,
+      background3dInstalled: 3,
+      texturePaint: {
+        status: "ready",
+        sceneFingerprint: value.metadata.contentHash,
+        installed: 4,
+        reused: 5,
+        diagnostics: [],
+      },
+    });
+    expect(ready).toEqual({
+      fullyResolved: true,
+      notice: {
+        tone: "good",
+        text: expect.stringMatching(
+          /자산 9개.*참고 이미지 2개 설치·1개 재사용.*VRM 1개 설치·2개 재사용.*표면 페인팅 PNG 4개 설치·5개 재사용.*3D 배경 모델 3개/u,
+        ),
+      },
+    });
+
+    const unresolved = presentStudioVrmTexturePaintProjectArchiveImport({
+      isSelfContained: false,
+      attachmentCount: 1,
+      warningCount: 2,
+      referenceInstalled: 0,
+      referenceReused: 0,
+      referenceUnresolved: 3,
+      vrmInstalled: 0,
+      vrmReused: 0,
+      vrmUnresolved: 4,
+      background3dInstalled: 0,
+      texturePaint: {
+        status: "unresolved",
+        sceneFingerprint: value.metadata.contentHash,
+        installed: 0,
+        reused: 0,
+        diagnostics: [{
+          severity: "error",
+          code: "LIBRARY_ARTIFACT_MISSING",
+          message: "missing",
+          contentHash: value.metadata.contentHash,
+          pointers: ["/pagesList/0/elements/0/vrmScene/surfacePaint/textures/0/hash"],
+        }],
+      },
+    });
+    expect(unresolved).toEqual({
+      fullyResolved: false,
+      notice: {
+        tone: "warn",
+        text: expect.stringMatching(
+          /외부 종속성 경고 2건.*미해결 참고 이미지 3개.*미해결 VRM 4개.*미해결 VRM 표면 페인팅 1개/u,
+        ),
+      },
+    });
+  });
+
+  it("summarizes portable and dependency-bound archive exports outside Studio's initial route", () => {
+    expect(presentStudioVrmTexturePaintProjectArchiveExport({
+      isSelfContained: true,
+      attachmentCount: 7,
+      warningCount: 0,
+      missingReferenceCount: 0,
+      missingVrmCount: 0,
+    })).toEqual({
+      tone: "good",
+      text: expect.stringMatching(/중복 제거 자산 7개.*무결성 검증형 archive/u),
+    });
+
+    expect(presentStudioVrmTexturePaintProjectArchiveExport({
+      isSelfContained: false,
+      attachmentCount: 3,
+      warningCount: 2,
+      missingReferenceCount: 4,
+      missingVrmCount: 5,
+    })).toEqual({
+      tone: "warn",
+      text: expect.stringMatching(
+        /외부 종속성 경고 2건.*참고 이미지 원본 4개.*업로드 VRM 원본 5개/u,
+      ),
+    });
   });
 });

@@ -25,35 +25,27 @@ const archiveExportEnd = pageSource.indexOf(
 const archiveExportSource = pageSource.slice(archiveExportStart, archiveExportEnd);
 
 describe("Studio JSON VRM surface-paint availability boundary", () => {
-  it("never treats a failed JSON portability inspection as zero paint artifacts", () => {
+  it("awaits the lazy JSON portability facade before starting the download", () => {
     expect(jsonExportStart).toBeGreaterThanOrEqual(0);
     expect(jsonExportEnd).toBeGreaterThan(jsonExportStart);
     expect(jsonExportSource).toContain(
       'import("./studio-vrm-texture-paint-project-library")',
     );
     expect(jsonExportSource).toContain(
-      'readonly status: "none"',
-    );
-    expect(jsonExportSource).toContain(
-      'readonly status: "hash-only"',
-    );
-    expect(jsonExportSource).toContain(
-      'readonly status: "unavailable"',
-    );
-    expect(jsonExportSource).not.toMatch(
-      /\.then\(\(plan\) => plan\.artifacts\.length,\s*\(\) => 0\)/u,
+      "{ inspectStudioVrmTexturePaintJsonExport }",
     );
     const inspection = jsonExportSource.indexOf(
-      "await collectStudioVrmTexturePaintProjectPlan(",
+      "await inspectStudioVrmTexturePaintJsonExport(",
     );
     const download = jsonExportSource.indexOf("link.click()");
+    const notice = jsonExportSource.indexOf(
+      "if (texturePaintNotice) setProjectArchiveStatus(texturePaintNotice)",
+    );
     expect(inspection).toBeGreaterThanOrEqual(0);
     expect(download).toBeGreaterThan(inspection);
-    expect(jsonExportSource).toContain(
-      'texturePaintPortability.status === "unavailable"',
-    );
-    expect(jsonExportSource).toContain(
-      "이 JSON만으로 3D 재편집이 가능하다고 보장할 수 없으므로",
+    expect(notice).toBeGreaterThan(download);
+    expect(jsonExportSource).not.toMatch(
+      /inspectStudioVrmTexturePaintJsonExport\([\s\S]*?\)\.catch\(/u,
     );
   });
 
@@ -61,38 +53,59 @@ describe("Studio JSON VRM surface-paint availability boundary", () => {
     expect(importStart).toBeGreaterThanOrEqual(0);
     expect(importEnd).toBeGreaterThan(importStart);
     expect(jsonImportSource).toContain(
-      '{ auditStudioVrmTexturePaintProjectLibraryAvailability }',
+      "{ auditStudioVrmTexturePaintJsonImport }",
     );
     expect(jsonImportSource).toContain(
       'import("./studio-vrm-texture-paint-project-library")',
     );
     expect(jsonImportSource).toContain(
-      "await auditStudioVrmTexturePaintProjectLibraryAvailability({",
+      "await auditStudioVrmTexturePaintJsonImport(loaded.project)",
     );
     expect(jsonImportSource).not.toContain(
       "await exportStudioVrmTexturePaintProjectLibrary({",
     );
     expect(jsonImportSource).not.toMatch(
-      /auditStudioVrmTexturePaintProjectLibraryAvailability\([\s\S]*?\)\.catch\(/u,
+      /auditStudioVrmTexturePaintJsonImport\([\s\S]*?\)\.catch\(/u,
     );
   });
 
-  it("warns explicitly for both missing artifacts and unavailable browser storage", () => {
-    expect(jsonImportSource).toContain(
-      'texturePaintAvailability.status === "unresolved"',
+  it("keeps the import mutation gates around the async portability audit and project apply", () => {
+    const parse = jsonImportSource.indexOf(
+      "const loaded = await parseStudioProjectDocument(text)",
     );
-    expect(jsonImportSource).toContain(
-      'texturePaintAvailability.status === "unavailable"',
+    const audit = jsonImportSource.indexOf(
+      "await auditStudioVrmTexturePaintJsonImport(loaded.project)",
     );
-    expect(jsonImportSource).toContain("이 기기에 없습니다");
-    expect(jsonImportSource).toContain("로컬 저장소를 확인할 수 없습니다");
+    const postAuditMutationGate = jsonImportSource.indexOf(
+      "if (!canApplyStudioMutation(mutationTicket)) return;",
+      audit,
+    );
+    const apply = jsonImportSource.indexOf(
+      "await applyStudioProjectSnapshot(loaded.project)",
+      postAuditMutationGate,
+    );
+    const notice = jsonImportSource.indexOf(
+      "if (texturePaintPresentation.notice)",
+      apply,
+    );
+    const alertSuffix = jsonImportSource.indexOf(
+      "texturePaintPresentation.alertSuffix",
+      notice,
+    );
+
+    expect(parse).toBeGreaterThanOrEqual(0);
+    expect(audit).toBeGreaterThan(parse);
+    expect(postAuditMutationGate).toBeGreaterThan(audit);
+    expect(apply).toBeGreaterThan(postAuditMutationGate);
+    expect(notice).toBeGreaterThan(apply);
+    expect(alertSuffix).toBeGreaterThan(notice);
   });
 
   it("passes the mobile archive budget into the paint bridge before archive building", () => {
     expect(archiveExportStart).toBeGreaterThanOrEqual(0);
     expect(archiveExportEnd).toBeGreaterThan(archiveExportStart);
     const paintExport = archiveExportSource.indexOf(
-      "await exportStudioVrmTexturePaintProjectLibrary({",
+      "await prepareStudioVrmTexturePaintProjectArchiveExport({",
     );
     const archiveBuild = archiveExportSource.indexOf(
       "await buildStudioProjectArchiveWithVerifiedBg3dModels({",
@@ -101,6 +114,9 @@ describe("Studio JSON VRM surface-paint availability boundary", () => {
     expect(archiveBuild).toBeGreaterThan(paintExport);
     expect(archiveExportSource.slice(paintExport, archiveBuild)).toContain(
       "limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined",
+    );
+    expect(archiveExportSource.slice(archiveBuild)).toContain(
+      "...texturePaintAttachments",
     );
   });
 });
