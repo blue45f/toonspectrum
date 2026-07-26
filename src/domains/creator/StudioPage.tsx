@@ -833,6 +833,7 @@ import {
   preloadStudioPointCommentComposer,
   preloadStudioReferencePanel,
   preloadStudioTextEditOverlay,
+  StudioCanvasRulerBars,
   type StudioComipoAssemblyModule,
   type StudioWebtoonGuidesModule,
 } from "./studio-page-lazy-ui";
@@ -1321,7 +1322,6 @@ import {
   StudioCanvasGuideOverlayLayers,
   StudioCanvasGuideUnderlay,
 } from "./StudioCanvasGuideLayers";
-import { StudioCanvasRulerBars } from "./StudioCanvasRulerBars";
 import { StudioCanvasStatusRail } from "./StudioCanvasStatusRail";
 import {
   colorBlindFilterStyle,
@@ -31000,24 +31000,28 @@ function clearSelectionForEdit() {
 
         {/* 중앙: 캔버스 영역 (editor shell) — fills remaining viewport */}
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <StudioCanvasRulerBars
-            visible={showRulers && !canvasOnlyMode}
-            scale={effScale}
-            scrollLeft={scrollPos.left}
-            scrollTop={scrollPos.top}
-            canvasWidth={CANVAS_W}
-            canvasHeight={canvasH}
-            guides={canvasGuides}
-            onAddGuide={(axis, pos) => {
-              setCanvasGuides((g) => ({
-                ...g,
-                [axis === "h" ? "horizontal" : "vertical"]: [
-                  ...g[axis === "h" ? "horizontal" : "vertical"],
-                  pos,
-                ],
-              }));
-            }}
-          />
+          {showRulers && !canvasOnlyMode ? (
+            <Suspense fallback={null}>
+              <StudioCanvasRulerBars
+                visible
+                scale={effScale}
+                scrollLeft={scrollPos.left}
+                scrollTop={scrollPos.top}
+                canvasWidth={CANVAS_W}
+                canvasHeight={canvasH}
+                guides={canvasGuides}
+                onAddGuide={(axis, pos) => {
+                  setCanvasGuides((g) => ({
+                    ...g,
+                    [axis === "h" ? "horizontal" : "vertical"]: [
+                      ...g[axis === "h" ? "horizontal" : "vertical"],
+                      pos,
+                    ],
+                  }));
+                }}
+              />
+            </Suspense>
+          ) : null}
           <StudioCanvasViewport
           liveInkPredictionRenderer={liveInkPredictionRenderer}
           liveStampOverlayRenderer={liveStampOverlayRenderer}

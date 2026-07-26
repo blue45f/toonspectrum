@@ -113,6 +113,10 @@ const StudioAdvancedRulerOverlay = lazyRetry(
   () => import("./StudioAdvancedRulerOverlay").then((mod) => ({ default: mod.StudioAdvancedRulerOverlay })),
   "StudioAdvancedRulerOverlay"
 );
+export const StudioCanvasRulerBars = lazyRetry(
+  () => import("./StudioCanvasRulerBars").then((mod) => ({ default: mod.StudioCanvasRulerBars })),
+  "StudioCanvasRulerBars"
+);
 const StudioLayerMaskOverlay = lazyRetry(
   () => import("./StudioLayerMaskOverlay").then((mod) => ({ default: mod.StudioLayerMaskOverlay })),
   "StudioLayerMaskOverlay"
