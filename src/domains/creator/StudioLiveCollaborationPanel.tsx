@@ -8,9 +8,11 @@ import {
   MonitorUp,
   Radio,
   RefreshCw,
+  Copy,
   ScreenShareOff,
   SendHorizontal,
   ShieldCheck,
+  Sparkles,
   UserMinus,
   UsersRound,
   X,
@@ -252,6 +254,32 @@ export function StudioLiveCollaborationPanelView({
           )}
           {syncStatusCopy}
         </span>
+      </div>
+
+      {/* 마그마(Magma) 스타일 초간단 원클릭 브라우저 공유 카드 */}
+      <div className="mt-3.5 rounded-xl border border-accent/40 bg-card p-3 shadow-sm">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-accent" aria-hidden />
+            <span className="text-xs font-bold text-fg">마그마(Magma) 스타일 1클릭 공유</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const roomParam = typeof window !== "undefined" ? (new URLSearchParams(window.location.search).get("liveRoom") || `room-${Date.now().toString(36)}`) : `room-${Date.now().toString(36)}`;
+              const shareUrl = `${window.location.origin}/studio?liveRoom=${encodeURIComponent(roomParam)}`;
+              void navigator.clipboard.writeText(shareUrl);
+              alert("✨ 실시간 공유 링크가 복사되었습니다!\n상대방이 이 링크를 열면 웹 브라우저에서 곧바로 동시 편집에 참여할 수 있습니다.");
+            }}
+            className="flex min-h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-transform active:scale-95 hover:bg-accent/90"
+          >
+            <Copy size={13} aria-hidden />
+            초대 링크 복사
+          </button>
+        </div>
+        <p className="mt-2 text-[0.72rem] leading-relaxed text-fg-3">
+          복잡한 계정 등록 없이 원클릭으로 캔버스를 공유합니다. 링크를 받은 사용자는 브라우저에서 바로 실시간 획과 커서를 주고받으며 동시 작업을 시작할 수 있습니다.
+        </p>
       </div>
 
       <p className="mt-3 text-xs leading-relaxed text-fg-2">

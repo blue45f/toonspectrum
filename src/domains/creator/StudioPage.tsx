@@ -2899,7 +2899,11 @@ function StudioCuttoonEditor() {
       : null;
   const sharedDocumentRef = useRef(sharedDocument);
   sharedDocumentRef.current = sharedDocument;
-  const effectiveWorkId = workId ?? liveRoomQueryParam ?? "studio-live-demo";
+  const instantWorkIdRef = useRef<string | null>(null);
+  if (!instantWorkIdRef.current) {
+    instantWorkIdRef.current = `work-instant-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  }
+  const effectiveWorkId = workId ?? liveRoomQueryParam ?? instantWorkIdRef.current;
   const studioLiveParticipant = useMemo(() => {
     if (sharedDocument && sharedDocument.status === "active" && sharedDocument.capabilities.view) {
       return {
@@ -33557,27 +33561,40 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     : "이전 계정이나 다른 작품의 캔버스는 표시·내보내지 않습니다."}
                 </span>
                 {sourceHydrationPending && workHydrationFailed ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (workHydrationUnsupportedFormat && workId) {
-                        navigate(`/studio?mode=upload&id=${encodeURIComponent(workId)}`);
-                        return;
-                      }
-                      if (workHydrationUnsupportedFormat && remixId) {
-                        navigate(`/create/${encodeURIComponent(remixId)}`);
-                        return;
-                      }
-                      globalThis.location.reload();
-                    }}
-                    className="mt-4 min-h-11 rounded-lg border border-line bg-card px-4 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                  >
-                    {workHydrationUnsupportedFormat
-                      ? workId
-                        ? "업로드 편집기로 이동"
-                        : "원본 작품으로 이동"
-                      : "다시 불러오기"}
-                  </button>
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (workHydrationUnsupportedFormat && workId) {
+                          navigate(`/studio?mode=upload&id=${encodeURIComponent(workId)}`);
+                          return;
+                        }
+                        if (workHydrationUnsupportedFormat && remixId) {
+                          navigate(`/create/${encodeURIComponent(remixId)}`);
+                          return;
+                        }
+                        globalThis.location.reload();
+                      }}
+                      className="min-h-11 rounded-lg border border-line bg-card px-4 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                    >
+                      {workHydrationUnsupportedFormat
+                        ? workId
+                          ? "업로드 편집기로 이동"
+                          : "원본 작품으로 이동"
+                        : "다시 불러오기"}
+                    </button>
+                    {!workHydrationUnsupportedFormat && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          globalThis.location.href = "/studio";
+                        }}
+                        className="min-h-11 rounded-lg border border-accent/40 bg-accent-soft px-4 text-xs font-semibold text-accent transition-colors hover:bg-accent/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                      >
+                        새 작업 공간으로 이동
+                      </button>
+                    )}
+                  </div>
                 ) : null}
               </span>
             </div>
