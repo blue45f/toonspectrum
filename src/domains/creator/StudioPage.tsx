@@ -1321,6 +1321,7 @@ import {
   StudioCanvasGuideOverlayLayers,
   StudioCanvasGuideUnderlay,
 } from "./StudioCanvasGuideLayers";
+import { StudioCanvasRulerBars } from "./StudioCanvasRulerBars";
 import { StudioCanvasStatusRail } from "./StudioCanvasStatusRail";
 import {
   colorBlindFilterStyle,
@@ -3746,6 +3747,8 @@ function StudioCuttoonEditor() {
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [showGrid, setShowGrid] = useState(() => loadStudioAppSettings(studioAppSettingsStorage()).grids.showPixelGrid);
   const [gridSize, setGridSize] = useState(() => loadStudioAppSettings(studioAppSettingsStorage()).grids.pixelGridSize);
+  const [showRulers, setShowRulers] = useState(true);
+  const [canvasGuides, setCanvasGuides] = useState<{ horizontal: number[]; vertical: number[] }>({ horizontal: [], vertical: [] });
   // 웹툰 표준폭 가이드(네이버 690·카카오 720…)·세이프영역 표시 토글.
   const [showWebtoonGuides, setShowWebtoonGuides] = useState(false);
   const [webtoonGuides, setWebtoonGuides] = useState<StudioWebtoonGuidesModule | null>(null);
@@ -18231,6 +18234,14 @@ const puppetWarpArmed =
           patchEl(selected.id, { clipToBelow: nextClip } as Partial<El>);
           announceDrawingShortcut(nextClip ? "아래 레이어에 클리핑 마스크 적용 (Alt+Cmd+G)" : "클리핑 마스크 해제");
         }
+      } else if (mod && e.altKey && (e.key === "r" || e.key === "R" || e.key === "ㄱ")) {
+        // Photoshop / CSP / Figma: ⌥⌘R (Alt+Cmd+R) = 캔버스 눈금자(Rulers) 표시/숨기기 토글
+        e.preventDefault();
+        setShowRulers((v) => {
+          const next = !v;
+          announceDrawingShortcut(next ? "캔버스 눈금자 표시 (Alt+Cmd+R)" : "캔버스 눈금자 숨김");
+          return next;
+        });
       } else if (mod && !e.altKey && (e.key === "g" || e.key === "G")) {
         // Figma/Illustrator/ClipStudio: ⌘G = 그룹 생성, ⇧⌘G = 그룹 해제
         e.preventDefault();
@@ -30988,7 +30999,26 @@ function clearSelectionForEdit() {
         />
 
         {/* 중앙: 캔버스 영역 (editor shell) — fills remaining viewport */}
-        <StudioCanvasViewport
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <StudioCanvasRulerBars
+            visible={showRulers && !canvasOnlyMode}
+            scale={effScale}
+            scrollLeft={scrollPos.left}
+            scrollTop={scrollPos.top}
+            canvasWidth={CANVAS_W}
+            canvasHeight={canvasH}
+            guides={canvasGuides}
+            onAddGuide={(axis, pos) => {
+              setCanvasGuides((g) => ({
+                ...g,
+                [axis === "h" ? "horizontal" : "vertical"]: [
+                  ...g[axis === "h" ? "horizontal" : "vertical"],
+                  pos,
+                ],
+              }));
+            }}
+          />
+          <StudioCanvasViewport
           liveInkPredictionRenderer={liveInkPredictionRenderer}
           liveStampOverlayRenderer={liveStampOverlayRenderer}
           bubbleShapeActiveHandleIndex={bubbleShapeActiveHandleIndex}
@@ -32130,6 +32160,7 @@ function clearSelectionForEdit() {
           />
         </Suspense>
       ) : null}
+        </div>
 
       <StudioCanvasContextMenu
         open={contextMenu.visible}
