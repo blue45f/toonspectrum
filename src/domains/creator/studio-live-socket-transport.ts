@@ -239,11 +239,18 @@ function defaultRandomId(): string {
 }
 
 function eventMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message.trim()) return error.message.slice(0, 500);
-  if (isRecord(error) && typeof error.message === "string" && error.message.trim()) {
-    return error.message.slice(0, 500);
+  let rawMsg = "";
+  if (error instanceof Error && error.message.trim()) rawMsg = error.message;
+  else if (isRecord(error) && typeof error.message === "string" && error.message.trim()) {
+    rawMsg = error.message;
   }
-  return fallback;
+  if (rawMsg.includes("503") || rawMsg.toLowerCase().includes("service unavailable")) {
+    return "실시간 서버를 준비 중이거나 점검 상태입니다. 캔버스 편집은 지속되며 잠시 후 자동 연결됩니다.";
+  }
+  if (rawMsg.toLowerCase().includes("xhr poll error") || rawMsg.toLowerCase().includes("websocket error")) {
+    return "팀 네트워크 연결이 원활하지 않습니다. 작업 내용은 지속적으로 보존되며 자동 재연결을 시도합니다.";
+  }
+  return rawMsg ? rawMsg.slice(0, 500) : fallback;
 }
 
 function connectErrorCode(error: unknown): string | null {
