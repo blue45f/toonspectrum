@@ -18219,21 +18219,23 @@ const puppetWarpArmed =
         e.preventDefault();
         finishPolyLassoSession();
       } else if (mod && !e.altKey && (e.key === "g" || e.key === "G")) {
-        // Figma/Illustrator: ⌘G = 그룹 생성, ⇧⌘G = 그룹 해제
-        const targetIds = marqueeIds.length > 0 ? marqueeIds : selectedId ? [selectedId] : [];
-        if (targetIds.length > 0) {
-          e.preventDefault();
-          if (e.shiftKey) {
-            targetIds.forEach((id) => {
-              patchEl(id, { groupId: undefined } as Partial<El>);
-            });
+        // Figma/Illustrator/ClipStudio: ⌘G = 그룹 생성, ⇧⌘G = 그룹 해제
+        e.preventDefault();
+        if (e.shiftKey) {
+          const targetEl = selected || elements.find((el) => marqueeIds.includes(el.id));
+          if (targetEl?.groupId) {
+            deleteLayerGroup(targetEl.groupId);
             announceDrawingShortcut("그룹 해제 완료");
           } else {
-            const newGroupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-            targetIds.forEach((id) => {
-              patchEl(id, { groupId: newGroupId } as Partial<El>);
-            });
-            announceDrawingShortcut(`요소 ${targetIds.length}개 그룹화`);
+            announceDrawingShortcut("해제할 그룹이 없습니다");
+          }
+        } else {
+          if (marqueeIds.length >= 2) {
+            groupSelectedElements();
+            announceDrawingShortcut(`요소 ${marqueeIds.length}개 그룹화`);
+          } else if (selectedId) {
+            addLayerGroup(selectedId);
+            announceDrawingShortcut("그룹 생성 완료");
           }
         }
       } else if ((selectedId || marqueeIds.length > 0) && e.key.startsWith("Arrow")) {
