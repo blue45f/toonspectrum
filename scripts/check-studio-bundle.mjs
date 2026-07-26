@@ -88,8 +88,9 @@ const budgets = {
   // 2026-07-24 배선: 필터마스크 페인팅 툴 + 말풍선 병합(StudioPage가 studio-bubble-merge 정적
   // 임포트)로 정적 요청 153·gzip 777.6 KiB 관측. 청크+1, gzip 예산 소폭 상향(+headroom)해 재고정.
   // 2026-07-24 2D 코어 웨이브: app-shell 이후 raw 2375.5 KiB·정적 요청 154 관측. 청크+1·raw 상향 재고정.
-  // 2026-07-24 residual: app-shell 이후 raw 2413.9 / gzip 794.7 KiB·요청 156 관측.
-  studioIncremental: { raw: 2_525_000, gzip: 830_000, chunks: 158 },
+  // 2026-07-26: Cloud storage adapter (Google Drive & OneDrive) integration added:
+  // measured studioIncremental ~2469 KiB raw / 812.5 KiB gzip.
+  studioIncremental: { raw: 2_550_000, gzip: 840_000, chunks: 158 },
   // Rapier deterministic compat is intentionally isolated in a user-triggered module Worker.
   // 2026-07-18 production output: 2,302,139 raw / 855,399 gzip. Keep ~2% version-drift headroom
   // without charging this optional engine to Studio or the 3D editor's initial graph.
