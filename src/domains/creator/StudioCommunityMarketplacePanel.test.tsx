@@ -65,9 +65,15 @@ describe("StudioCommunityMarketplacePanel", () => {
     expect(source).toContain("await deleteCreatorMarketplaceResource(record.id)");
   });
 
-  it("에셋 메뉴의 커뮤니티 경로가 실제 캔버스 삽입 콜백을 전달한다", () => {
+  it("에셋 메뉴가 커뮤니티 활성화 뒤 패널을 지연 로드하고 캔버스 삽입 콜백을 전달한다", () => {
+    expect(assetMenuSource).not.toContain(
+      'from "./StudioCommunityMarketplacePanel"',
+    );
     expect(assetMenuSource).toContain(
-      "<StudioCommunityMarketplacePanel onUseAsset={onUseLocalAsset} />",
+      'import("./StudioCommunityMarketplacePanel")',
+    );
+    expect(assetMenuSource).toContain(
+      "<LazyStudioCommunityMarketplacePanel onUseAsset={onUseLocalAsset} />",
     );
   });
 });

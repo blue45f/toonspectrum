@@ -49,6 +49,16 @@ export const creatorMarketplaceResources = pgTable(
     manifestHash: text("manifestHash").notNull(),
     manifestByteSize: integer("manifestByteSize").notNull(),
     hidden: boolean("hidden").notNull().default(false),
+    // Lower-cased, bounded metadata projection for pg_trgm. The manifest contract caps every
+    // contributing field; binary/resource bodies are never copied into this search index.
+    searchText: text("searchText").generatedAlwaysAs(
+      sql`lower(
+        "name"
+        || ' ' || "description"
+        || ' ' || "packageId"
+        || ' ' || "tags"::text
+      )`
+    ),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -77,6 +87,12 @@ export const creatorMarketplaceResources = pgTable(
       table.createdAt.desc(),
       table.id.desc()
     ),
+    index("idx_creator_marketplace_resource_search")
+      .using("gin", table.searchText.asc().op("gin_trgm_ops"))
+      .where(sql`${table.hidden} = false`),
+    index("idx_creator_marketplace_resource_tags")
+      .using("gin", table.tags.asc().op("jsonb_path_ops"))
+      .where(sql`${table.hidden} = false`),
     check(
       "creator_marketplace_resource_kind_check",
       sql`${table.kind} in ('asset', 'brush', 'filter', 'palette', 'template', '3d-preset')`

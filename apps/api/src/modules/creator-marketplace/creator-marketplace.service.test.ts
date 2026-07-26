@@ -13,9 +13,16 @@ import {
   creatorMarketplaceJsonByteSize,
 } from "../../../../../lib/creator-marketplace-resource-contract";
 
+import {
+  creatorMarketplacePublisherGateKey,
+} from "./creator-marketplace-publish-gate";
 import { CreatorMarketplaceResourceDuplicateError } from "./creator-marketplace.repository-contract";
 import { CreatorMarketplaceService } from "./creator-marketplace.service";
 
+import type {
+  CreatorMarketplacePublishGate,
+  CreatorMarketplacePublishLease,
+} from "./creator-marketplace-publish-gate";
 import type { PublishCreatorMarketplaceResourceDto } from "./creator-marketplace.dto";
 import type {
   CreatorMarketplaceResourceRepository,
@@ -98,15 +105,31 @@ describe("CreatorMarketplaceService", () => {
     publish: vi.fn<CreatorMarketplaceResourceRepository["publish"]>(),
     deleteOwned: vi.fn<CreatorMarketplaceResourceRepository["deleteOwned"]>(),
   };
+  const lease: CreatorMarketplacePublishLease = {
+    publisherKeyHash: new Uint8Array(32).fill(7),
+    token: "test-creator-marketplace-publish-lease-token",
+    fence: "1",
+    expiresAt: new Date("2026-07-27T01:02:33.000Z"),
+  };
+  const publishGate = {
+    acquire: vi.fn<CreatorMarketplacePublishGate["acquire"]>(),
+    release: vi.fn<CreatorMarketplacePublishGate["release"]>(),
+  };
   let service: CreatorMarketplaceService;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new CreatorMarketplaceService(repository);
+    publishGate.acquire.mockResolvedValue({
+      status: "acquired",
+      lease,
+    });
+    publishGate.release.mockResolvedValue(true);
+    service = new CreatorMarketplaceService(repository, publishGate);
   });
 
   it("portable JSON 실제 콘텐츠를 보존해 게시하고 rights 확인 내부 필드는 응답에서 제거한다", async () => {
     const input = manifest();
+    const publisherId = `publisher-${randomUUID()}`;
     repository.publish.mockImplementation(async (write) =>
       storedRow(write.manifest, {
         id: write.id,
@@ -117,7 +140,7 @@ describe("CreatorMarketplaceService", () => {
     );
 
     const result = await service.publish(
-      `publisher-${randomUUID()}`,
+      publisherId,
       input as PublishCreatorMarketplaceResourceDto
     );
 
@@ -135,6 +158,9 @@ describe("CreatorMarketplaceService", () => {
         manifestByteSize: creatorMarketplaceJsonByteSize(input),
       })
     );
+    expect(publishGate.acquire).toHaveBeenCalledWith(
+      creatorMarketplacePublisherGateKey(publisherId)
+    );
   });
 
   it("항목 콘텐츠 hash 불일치를 fail-closed로 거절한다", async () => {
@@ -149,6 +175,7 @@ describe("CreatorMarketplaceService", () => {
         invalid as PublishCreatorMarketplaceResourceDto
       )
     ).rejects.toBeInstanceOf(BadRequestException);
+    expect(publishGate.acquire).not.toHaveBeenCalled();
     expect(repository.publish).not.toHaveBeenCalled();
   });
 
@@ -224,12 +251,55 @@ describe("CreatorMarketplaceService", () => {
       await service.publish(publisherId, input as PublishCreatorMarketplaceResourceDto);
     }
 
+    publishGate.acquire.mockResolvedValueOnce({ status: "rate_limited" });
     const error = await service
       .publish(publisherId, manifest() as PublishCreatorMarketplaceResourceDto)
       .catch((cause: unknown) => cause);
     expect(error).toBeInstanceOf(HttpException);
     expect((error as HttpException).getStatus()).toBe(429);
     expect(repository.publish).toHaveBeenCalledTimes(20);
+    expect(publishGate.release).toHaveBeenCalledTimes(20);
+  });
+
+  it("분산 gate 저장소가 없으면 resource write 전에 fail-closed 한다", async () => {
+    publishGate.acquire.mockRejectedValueOnce(
+      new Error("postgres connection secret detail")
+    );
+
+    const error = await service
+      .publish(
+        `publisher-${randomUUID()}`,
+        manifest() as PublishCreatorMarketplaceResourceDto
+      )
+      .catch((cause: unknown) => cause);
+
+    expect(error).toMatchObject({ status: 503 });
+    expect(JSON.stringify((error as HttpException).getResponse())).not.toContain(
+      "postgres connection secret detail"
+    );
+    expect(repository.publish).not.toHaveBeenCalled();
+    expect(publishGate.release).not.toHaveBeenCalled();
+  });
+
+  it("commit 뒤 release 장애는 성공을 모호하게 만들지 않고 짧은 lease 만료에 맡긴다", async () => {
+    const input = manifest();
+    repository.publish.mockImplementation(async (write) =>
+      storedRow(write.manifest, {
+        id: write.id,
+        publisherId: write.publisherId,
+        manifestHash: write.manifestHash,
+        manifestByteSize: write.manifestByteSize,
+      })
+    );
+    publishGate.release.mockRejectedValueOnce(new Error("release unavailable"));
+
+    await expect(
+      service.publish(
+        `publisher-${randomUUID()}`,
+        input as PublishCreatorMarketplaceResourceDto
+      )
+    ).resolves.toMatchObject({ packageId: input.packageId });
+    expect(publishGate.release).toHaveBeenCalledOnce();
   });
 
   it("keyset cursor를 발급하고 다음 요청에서 정확한 createdAt/id 경계로 복원한다", async () => {

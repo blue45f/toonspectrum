@@ -269,6 +269,23 @@ export function StudioDrawOptionsBar({
   const isFavorite = favoriteBrushIds.includes(catalogBrushId);
   const tipColor = drawMode === "eraser" ? "oklch(0.55 0.02 70)" : color;
   const pixelMode = drawMode === "pixel";
+  const brushPresetModified =
+    Boolean(catalogBrushItem) &&
+    ((!sizeLocked &&
+      Math.abs(strokeWidth - (catalogBrushItem?.defaultWidth ?? strokeWidth)) > 0.01) ||
+      (!opacityLocked &&
+        Math.abs(brushOpacity - (catalogBrushItem?.defaultOpacity ?? brushOpacity)) > 0.001));
+  const brushPresetResetDescription = catalogBrushItem
+    ? `${catalogBrushName} 프리셋의 촉 반응을 다시 적용합니다. ${
+        sizeLocked
+          ? `굵기는 ${strokeWidth}px 잠금 상태를 유지합니다.`
+          : `굵기는 권장값 ${catalogBrushItem.defaultWidth}px로 돌아갑니다.`
+      } ${
+        opacityLocked
+          ? `불투명도는 ${Math.round(brushOpacity * 100)}% 잠금 상태를 유지합니다.`
+          : `불투명도는 권장값 ${Math.round(catalogBrushItem.defaultOpacity * 100)}%로 돌아갑니다.`
+      } 현재 색은 유지돼요.`
+    : "";
   const safeDockLeft = Math.max(0, Math.round(dockInsets.left));
   const safeDockRight = Math.max(0, Math.round(dockInsets.right));
 
@@ -356,7 +373,16 @@ export function StudioDrawOptionsBar({
     >
       <div
         role="toolbar"
-        aria-label="그리기 옵션"
+        aria-label={`그리기 옵션 · 현재 ${
+          drawMode === "pen"
+            ? catalogBrushName
+            : drawMode === "pixel"
+              ? "픽셀 펜"
+              : drawMode === "eraser"
+                ? "지우개"
+                : "도형"
+        }`}
+        data-studio-active-draw-mode={drawMode}
         data-studio-draw-options="true"
         data-studio-icon-first="true"
         className={cn(
@@ -416,15 +442,26 @@ export function StudioDrawOptionsBar({
                   aria-pressed={drawMode === id}
                   aria-label={label}
                   onClick={() => onSetDrawMode(id)}
+                  data-studio-active-mode={drawMode === id ? id : undefined}
                   className={cn(
                     iconBtn,
                     "border-transparent",
+                    drawMode === id && "flex h-8 w-auto min-w-8 gap-1.5 px-2",
                     drawMode === id
                       ? "bg-accent text-on-accent shadow-[0_1px_4px_oklch(0.72_0.185_42/0.25)]"
                       : "text-fg-2 hover:bg-raised hover:text-fg"
                   )}
                 >
                   <Icon size={15} strokeWidth={1.75} aria-hidden />
+                  {drawMode === id ? (
+                    <span
+                      aria-hidden
+                      data-studio-active-mode-label="true"
+                      className="whitespace-nowrap text-[0.66rem] font-extrabold"
+                    >
+                      {label}
+                    </span>
+                  ) : null}
                 </button>
               </StudioToolHintTarget>
             ))}
@@ -436,6 +473,7 @@ export function StudioDrawOptionsBar({
             data-studio-pixel-pencil-identity="true"
             role="status"
             aria-label="픽셀 펜, 1픽셀 고정, 무보정, 필압 없음, 안티앨리어싱 없음"
+            data-studio-active-tool-summary="pixel"
             className="flex h-9 shrink-0 items-center gap-2 rounded-xl border border-accent/45 bg-accent-soft/35 px-2.5 text-accent shadow-[inset_0_1px_0_oklch(0.98_0.01_85/0.08)]"
           >
             <span className="grid size-6 place-items-center rounded-md bg-accent/12" aria-hidden>
@@ -467,11 +505,12 @@ export function StudioDrawOptionsBar({
                 onClick={(event) => toggleBrushCatalog(event.currentTarget)}
                 aria-expanded={brushCatalogOpen}
                 aria-haspopup="dialog"
-                aria-label={`현재 브러시 ${catalogBrushName}, 기본 프리셋 열기`}
+                aria-label={`현재 도구 ${catalogBrushName}, ${strokeWidth}px, 불투명도 ${Math.round(brushOpacity * 100)}%, 브러시 선택 열기`}
                 data-studio-brush-active-pill="true"
+                data-studio-active-tool-summary="pen"
                 data-studio-core-draw-control="brush"
                 className={cn(
-                  "flex h-9 max-w-[9.5rem] items-center gap-1.5 rounded-xl border px-2",
+                  "flex h-10 max-w-[12rem] items-center gap-1.5 rounded-xl border px-2",
                   STUDIO_EASE,
                   STUDIO_FOCUS_RING,
                   brushCatalogOpen
@@ -490,15 +529,58 @@ export function StudioDrawOptionsBar({
                 </span>
                 <span
                   aria-hidden
-                  className="size-2 shrink-0 rounded-full ring-1 ring-black/15"
+                  className="size-2.5 shrink-0 rounded-full ring-1 ring-black/15"
                   style={{ background: tipColor, opacity: brushOpacity }}
                 />
-                <span className="min-w-0 truncate text-[0.7rem] font-bold leading-none">
-                  {catalogBrushItem?.shortName ?? catalogBrushName.slice(0, 6)}
+                <span className="min-w-0 flex-1 text-left leading-none">
+                  <span className="block truncate text-[0.67rem] font-extrabold text-current">
+                    {catalogBrushName}
+                  </span>
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "mt-1 block truncate text-[0.54rem] font-semibold tabular-nums",
+                      brushCatalogOpen ? "text-on-accent/75" : "text-fg-3"
+                    )}
+                  >
+                    {strokeWidth}px · {Math.round(brushOpacity * 100)}%
+                  </span>
                 </span>
                 <LayoutGrid size={12} className="shrink-0 opacity-80" aria-hidden />
               </button>
             </StudioToolHintTarget>
+            {catalogBrushItem ? (
+              <StudioToolHintTarget
+                hint={studioToolHintFromLabel(
+                  brushPresetModified ? "브러시 기본값으로 복원" : "브러시 기본값 다시 적용",
+                  brushPresetResetDescription,
+                  undefined
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() => onSelectBrush(catalogBrushItem)}
+                  aria-label={
+                    brushPresetModified
+                      ? `${catalogBrushName} 기본값으로 복원`
+                      : `${catalogBrushName} 기본값 다시 적용`
+                  }
+                  data-studio-brush-preset-reset="true"
+                  data-studio-brush-preset-modified={brushPresetModified ? "true" : "false"}
+                  data-studio-draw-primary-control="preset-reset"
+                  className={cn(
+                    "h-8 shrink-0 rounded-lg border px-2 text-[0.6rem] font-bold",
+                    STUDIO_EASE,
+                    STUDIO_FOCUS_RING,
+                    brushPresetModified
+                      ? "border-accent/55 bg-accent-soft text-accent hover:border-accent"
+                      : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+                  )}
+                >
+                  기본값
+                </button>
+              </StudioToolHintTarget>
+            ) : null}
             {onToggleFavoriteBrush ? (
               <StudioToolHintTarget
                 hint={studioToolHintFromLabel(
@@ -619,7 +701,9 @@ export function StudioDrawOptionsBar({
                   aria-label="브러시 크기"
                   aria-valuetext={`${strokeWidth}픽셀`}
                 />
-                <span className="w-6 tabular-nums text-[0.68rem] font-bold text-fg">{strokeWidth}</span>
+                <span className="w-9 tabular-nums text-[0.68rem] font-bold text-fg">
+                  {strokeWidth}px
+                </span>
               </label>
             </StudioToolHintTarget>
           </>
@@ -654,8 +738,8 @@ export function StudioDrawOptionsBar({
               className="studio-range w-14 sm:w-16"
             aria-label={pixelMode ? "픽셀 불투명도" : "브러시 불투명도"}
             />
-            <span className="w-7 tabular-nums text-[0.68rem] font-bold text-fg">
-              {Math.round(brushOpacity * 100)}
+            <span className="w-9 tabular-nums text-[0.68rem] font-bold text-fg">
+              {Math.round(brushOpacity * 100)}%
             </span>
           </label>
         </StudioToolHintTarget>
@@ -759,17 +843,26 @@ export function StudioDrawOptionsBar({
               aria-expanded={advancedOpen}
               aria-controls="studio-draw-advanced"
               onClick={() => setAdvancedOpen((v) => !v)}
-              aria-label={advancedOpen ? "세부 옵션 접기" : "세부 옵션 펼치기"}
+              aria-label={advancedOpen ? "도구 속성 접기" : "도구 속성 펼치기"}
               data-studio-draw-advanced-toggle="true"
+              data-studio-tool-property-entry="true"
               className={cn(
-                iconBtn,
-                "size-8",
+                "flex h-8 min-w-8 items-center justify-center gap-1 rounded-lg border px-1.5",
+                STUDIO_EASE,
+                STUDIO_FOCUS_RING,
                 advancedOpen
                   ? "border-accent/50 bg-accent-soft text-accent"
                   : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
               )}
             >
               {advancedOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
+              <span
+                aria-hidden
+                data-studio-tool-property-label="true"
+                className="hidden whitespace-nowrap text-[0.6rem] font-extrabold xl:inline"
+              >
+                도구 속성
+              </span>
             </button>
           </StudioToolHintTarget> : null}
 

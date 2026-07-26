@@ -130,12 +130,8 @@ describe("StudioAssetMenuPanel mobile asset controls", () => {
   it("gives owned shared assets an always-visible management entry and accessible add action", () => {
     const html = renderPanel({ assetTab: "community" });
 
-    expect(html).toContain('data-studio-original-marketplace="local-phase-1"');
-    expect(html).toContain("독자 무료 스타터 마켓");
-    expect(html).toContain("32 FREE");
-    expect(html).toContain('data-studio-creator-pack-marketplace="local-phase-1"');
-    expect(html).toContain("Creator Pack 통합 마켓");
-    expect(html).toContain("13 FREE");
+    expect(html).toContain('data-studio-asset-marketplace-loading="true"');
+    expect(html).toContain("커뮤니티 소재를 불러오는 중");
     expect(html).toContain('aria-label="공유 에셋 선택한 컷 또는 현재 보이는 위치에 추가"');
     expect(html).toContain('aria-controls="shared-asset-actions-shared-1"');
     expect(html).toContain('aria-label="공유 에셋 공유 관리 작업 열기"');

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
+import { creatorMarketplacePublisherGateKey } from "../apps/api/src/modules/creator-marketplace/creator-marketplace-publish-gate";
 import {
   CREATOR_MARKETPLACE_RUNTIME_BY_KIND,
   CreatorMarketplaceResourceManifestSchema,
@@ -95,11 +96,18 @@ async function main() {
   const otherUserId = `market-other-${randomUUID()}`;
   const packageSuffix = randomUUID();
 
-  const [{ dbPool }, { DrizzleCreatorMarketplaceResourceRepository }] = await Promise.all([
+  const [
+    { dbPool },
+    { DrizzleCreatorMarketplaceResourceRepository },
+    { PostgresCreatorMarketplacePublishGate },
+  ] = await Promise.all([
     import("../lib/db/index"),
     import("../apps/api/src/modules/creator-marketplace/creator-marketplace.repository"),
+    import("../apps/api/src/modules/creator-marketplace/creator-marketplace-publish-gate.repository"),
   ]);
   const repository = new DrizzleCreatorMarketplaceResourceRepository();
+  const publishGate = new PostgresCreatorMarketplacePublishGate();
+  const publisherGateKey = creatorMarketplacePublisherGateKey(publisherId);
   let brushId: string | null = null;
   let paletteId: string | null = null;
 
@@ -111,11 +119,15 @@ async function main() {
         "avatar" text
       )
     `);
-    const migration = await readFile(
-      new URL("../lib/db/migrations/0021_creator_marketplace_resource.sql", import.meta.url),
-      "utf8"
+    const migrations = await Promise.all(
+      [
+        "0021_creator_marketplace_resource.sql",
+        "0022_creator_marketplace_distributed_gate_search.sql",
+      ].map((name) =>
+        readFile(new URL(`../lib/db/migrations/${name}`, import.meta.url), "utf8")
+      )
     );
-    await dbPool.query(migration);
+    for (const migration of migrations) await dbPool.query(migration);
     await dbPool.query(
       `INSERT INTO "user" ("id", "name", "avatar") VALUES ($1, $2, $3), ($4, $5, $6)`,
       [
@@ -182,6 +194,70 @@ async function main() {
     assert.equal(secondPage.length, 1);
     assert.notEqual(secondPage[0]?.id, first.id);
 
+    const searchRows = await repository.list({
+      limit: 10,
+      cursor: null,
+      search: "누아르",
+      publisherId,
+      viewerId: publisherId,
+    });
+    assert.equal(searchRows.length, 1);
+    assert.equal(searchRows[0]?.id, palette.id);
+    const tagRows = await repository.list({
+      limit: 10,
+      cursor: null,
+      tag: "brush",
+      publisherId,
+      viewerId: publisherId,
+    });
+    assert.equal(tagRows.length, 1);
+    assert.equal(tagRows[0]?.id, brush.id);
+
+    const indexRows = await dbPool.query<{ indexname: string }>(
+      `
+        SELECT "indexname"
+        FROM "pg_indexes"
+        WHERE "schemaname" = current_schema()
+          AND "tablename" = 'creator_marketplace_resource'
+          AND "indexname" = ANY($1::text[])
+      `,
+      [[
+        "idx_creator_marketplace_resource_search",
+        "idx_creator_marketplace_resource_tags",
+      ]]
+    );
+    assert.deepEqual(
+      indexRows.rows.map((row) => row.indexname).sort(),
+      [
+        "idx_creator_marketplace_resource_search",
+        "idx_creator_marketplace_resource_tags",
+      ]
+    );
+
+    const concurrentAdmissions = await Promise.all([
+      publishGate.acquire(publisherGateKey),
+      publishGate.acquire(publisherGateKey),
+    ]);
+    assert.deepEqual(
+      concurrentAdmissions.map((admission) => admission.status).sort(),
+      ["acquired", "rate_limited"]
+    );
+    const acquiredAdmission = concurrentAdmissions.find(
+      (admission) => admission.status === "acquired"
+    );
+    assert.ok(acquiredAdmission && acquiredAdmission.status === "acquired");
+    assert.equal(await publishGate.release(acquiredAdmission.lease), true);
+
+    for (let admittedCount = 1; admittedCount < 20; admittedCount += 1) {
+      const admission = await publishGate.acquire(publisherGateKey);
+      assert.equal(admission.status, "acquired");
+      if (admission.status !== "acquired") {
+        throw new Error("Publish gate rejected an admission before the hourly limit.");
+      }
+      assert.equal(await publishGate.release(admission.lease), true);
+    }
+    assert.equal((await publishGate.acquire(publisherGateKey)).status, "rate_limited");
+
     assert.equal(await repository.deleteOwned(otherUserId, brush.id), false);
     assert.equal(await repository.deleteOwned(publisherId, brush.id), true);
     brushId = null;
@@ -198,11 +274,16 @@ async function main() {
     assert.equal(remaining.length, 0);
     console.log(
       `creator marketplace DB verification passed: database=${target.pathname.slice(1)} ` +
-      "migration=0021 kinds=brush,palette cursor=keyset owner-delete=verified"
+      "migrations=0021+0022 kinds=brush,palette search=trigram+tags " +
+      "publish-gate=distributed-20-per-hour cursor=keyset owner-delete=verified"
     );
   } finally {
     if (brushId) await repository.deleteOwned(publisherId, brushId).catch(() => false);
     if (paletteId) await repository.deleteOwned(publisherId, paletteId).catch(() => false);
+    await dbPool.query(
+      `DELETE FROM "creator_marketplace_publish_gate" WHERE "keyHash" = $1::bytea`,
+      [publisherGateKey]
+    ).catch(() => undefined);
     await dbPool.query(`DELETE FROM "user" WHERE "id" = ANY($1::text[])`, [
       [publisherId, otherUserId],
     ]).catch(() => undefined);

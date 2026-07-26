@@ -39,7 +39,10 @@ export class CreatorMarketplaceController {
     @Query(new ZodValidationPipe(CreatorMarketplaceResourceListQueryDto))
     query: CreatorMarketplaceResourceListQueryDto
   ) {
-    // Public catalog is intentionally viewer-agnostic so edge caches never mix account state.
+    // Public catalog/search is intentionally viewer-agnostic so edge caches never mix account
+    // state. It remains ungated here: anonymous requests have no sound privacy-preserving actor
+    // key, and persisting raw or caller-supplied IP/identity would create a spoofable PII boundary.
+    // Volumetric protection belongs at the trusted edge, outside this ownership-aware API gate.
     return this.marketplaceService.list(query);
   }
 

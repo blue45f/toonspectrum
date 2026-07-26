@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, isNotNull, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, lt, or, sql } from "drizzle-orm";
 
 import { db, users } from "../../../../../lib/db";
 import { creatorMarketplaceResources } from "../../../../../lib/db/creator-marketplace-resource.schema";
@@ -55,11 +55,9 @@ export class DrizzleCreatorMarketplaceResourceRepository
     if (input.search) {
       const pattern = `%${escapeLikePattern(input.search)}%`;
       filters.push(
-        or(
-          ilike(creatorMarketplaceResources.name, pattern),
-          ilike(creatorMarketplaceResources.description, pattern),
-          sql`${creatorMarketplaceResources.tags}::text ILIKE ${pattern} ESCAPE '\\'`
-        )!
+        // This expression intentionally mirrors the lower-cased generated searchText column in
+        // migration 0022. pg_trgm keeps partial, Korean, tag, and package-id searches indexable.
+        sql`${creatorMarketplaceResources.searchText} LIKE lower(${pattern}) ESCAPE '\\'`
       );
     }
     if (input.cursor) {

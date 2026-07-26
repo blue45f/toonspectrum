@@ -46,7 +46,7 @@ describe("StudioDrawOptionsBar", () => {
     );
     expect(html).toContain('data-studio-draw-options="true"');
     expect(html).toContain('data-studio-icon-first="true"');
-    // Icon-first: labels live in aria/sr-only, not visible chip text
+    // Icon-first controls retain accessible names; only the selected mode gains a compact label.
     expect(html).toContain('aria-label="스마트 도형"');
     expect(html).toContain('aria-label="브러시 크기"');
     expect(html).toContain('aria-label="브러시 불투명도"');
@@ -88,7 +88,7 @@ describe("StudioDrawOptionsBar", () => {
         onToggleFavoriteBrush={vi.fn()}
       />
     );
-    expect(html).toContain("기본 프리셋");
+    expect(html).toContain("브러시 선택 열기");
     expect(html).toContain("네온");
   });
 
@@ -120,7 +120,7 @@ describe("StudioDrawOptionsBar", () => {
     );
 
     const activePill = screen.getByRole("button", {
-      name: "현재 브러시 하트 도장, 기본 프리셋 열기",
+      name: "현재 도구 하트 도장, 26px, 불투명도 94%, 브러시 선택 열기",
     });
     expect(activePill.textContent).toContain("하트");
     // Icon/raster routing stays on the canonical renderer id, never the catalogue id.
@@ -132,13 +132,154 @@ describe("StudioDrawOptionsBar", () => {
     fireEvent.click(favorite);
     expect(onToggleFavoriteBrush).toHaveBeenCalledWith("heart-stamp");
 
-    fireEvent.click(screen.getByRole("button", { name: "세부 옵션 펼치기" }));
+    fireEvent.click(screen.getByRole("button", { name: "도구 속성 펼치기" }));
     const activeQuickBrush = screen.getByRole("option", {
       name: /즐겨찾기 브러시 하트 도장/,
     });
     expect(activeQuickBrush.getAttribute("aria-selected")).toBe("true");
     fireEvent.click(screen.getByRole("option", { name: /최근 사용 브러시 머리카락 결/ }));
     expect(onSelectBrush.mock.calls[0]?.[0]).toMatchObject({ id: "hair-fiber" });
+  });
+
+  it("presents the selected brush as the current tool and reapplies its full preset in one click", () => {
+    const onSelectBrush = vi.fn();
+    render(
+      <StudioDrawOptionsBar
+        drawMode="pen"
+        brushId="marker"
+        strokeWidth={9}
+        brushOpacity={0.9}
+        stabilizer={4}
+        color="#224466"
+        quickShapeActive={false}
+        onSetDrawMode={vi.fn()}
+        onSelectBrush={onSelectBrush}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+      />
+    );
+
+    expect(
+      screen
+        .getByRole("toolbar", {
+          name: "그리기 옵션 · 현재 마커(굵고 반투명)",
+        })
+        .getAttribute("data-studio-active-draw-mode")
+    ).toBe("pen");
+    expect(screen.getByRole("button", { name: "펜" }).getAttribute("data-studio-active-mode")).toBe(
+      "pen"
+    );
+    expect(screen.getByText("펜", { selector: '[data-studio-active-mode-label="true"]' })).toBeTruthy();
+
+    const activeTool = screen.getByRole("button", {
+      name: "현재 도구 마커(굵고 반투명), 9px, 불투명도 90%, 브러시 선택 열기",
+    });
+    expect(activeTool.getAttribute("data-studio-active-tool-summary")).toBe("pen");
+    expect(activeTool.textContent).toContain("마커(굵고 반투명)");
+    expect(activeTool.textContent).toContain("9px · 90%");
+
+    const reset = screen.getByRole("button", {
+      name: "마커(굵고 반투명) 기본값으로 복원",
+    });
+    expect(reset.getAttribute("data-studio-brush-preset-modified")).toBe("true");
+    fireEvent.click(reset);
+    expect(onSelectBrush).toHaveBeenCalledOnce();
+    expect(onSelectBrush.mock.calls[0]?.[0]).toMatchObject({
+      id: "marker",
+      defaultWidth: 16,
+      defaultOpacity: 0.6,
+    });
+
+    const toolProperties = screen.getByRole("button", { name: "도구 속성 펼치기" });
+    expect(toolProperties.getAttribute("data-studio-tool-property-entry")).toBe("true");
+    expect(toolProperties.textContent).toContain("도구 속성");
+    fireEvent.click(toolProperties);
+    expect(
+      screen.getByRole("button", { name: "도구 속성 접기" }).getAttribute("aria-expanded")
+    ).toBe("true");
+  });
+
+  it("keeps preset reapplication available without falsely marking untouched defaults as changed", () => {
+    const html = renderToStaticMarkup(
+      <StudioDrawOptionsBar
+        drawMode="pen"
+        brushId="gpen"
+        strokeWidth={7}
+        brushOpacity={1}
+        stabilizer={5}
+        color="#111111"
+        quickShapeActive={false}
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('aria-label="G펜(필압) 기본값 다시 적용"');
+    expect(html).toContain('data-studio-brush-preset-modified="false"');
+    expect(html).toContain(">7px · 100%<");
+  });
+
+  it("does not claim locked size or opacity will be reset when reapplying a brush preset", () => {
+    const html = renderToStaticMarkup(
+      <StudioDrawOptionsBar
+        drawMode="pen"
+        brushId="marker"
+        strokeWidth={9}
+        brushOpacity={0.9}
+        stabilizer={4}
+        color="#111111"
+        quickShapeActive={false}
+        sizeLocked
+        opacityLocked
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('aria-label="마커(굵고 반투명) 기본값 다시 적용"');
+    expect(html).toContain('data-studio-brush-preset-modified="false"');
+    expect(drawOptionsSource).toContain("잠금 상태를 유지합니다.");
+  });
+
+  it.each([
+    ["pixel", "픽셀 펜"],
+    ["eraser", "지우개"],
+    ["shape", "도형"],
+  ] as const)("makes the active %s mode visible without relying on icon recognition", (drawMode, label) => {
+    const html = renderToStaticMarkup(
+      <StudioDrawOptionsBar
+        drawMode={drawMode}
+        brushId="pen"
+        strokeWidth={6}
+        brushOpacity={1}
+        stabilizer={4}
+        color="#112233"
+        quickShapeActive={false}
+        onSetDrawMode={vi.fn()}
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+      />
+    );
+
+    expect(html).toContain(`data-studio-active-draw-mode="${drawMode}"`);
+    expect(html).toContain(`data-studio-active-mode="${drawMode}"`);
+    expect(html).toContain('data-studio-active-mode-label="true"');
+    expect(html).toContain(`>${label}<`);
   });
 
   it("uses the StudioPage-owned catalog session instead of mounting a second sheet", () => {
@@ -304,7 +445,7 @@ describe("StudioDrawOptionsBar", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "세부 옵션 펼치기" }));
+    fireEvent.click(screen.getByRole("button", { name: "도구 속성 펼치기" }));
 
     const sizeGroup = screen.getByRole("group", { name: "브러시 크기 프리셋" });
     const activeSize = within(sizeGroup).getByRole("button", {

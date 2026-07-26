@@ -61,6 +61,8 @@ describe("Studio BG3D asset-library ownership boundary", () => {
     expect(editorImports.valueImports).not.toContain("./StudioBg3dAssetLibraryPanel");
     expect(editorImports.dynamicImports).toContain("./StudioBg3dAssetLibraryPanel");
     expect(editorSource).toContain("<LazyStudioBg3dAssetLibraryPanel");
+    expect(editorSource).toContain('if (tab === "models") setModelsPanelActivated(true)');
+    expect(editorSource).toContain("modelsPanelActivated ? (");
     for (const ownerToken of [
       "handleUploadModelFiles",
       "importVerifiedBg3dModelsAtomically",

@@ -19,13 +19,20 @@ import {
   canonicalizeCreatorMarketplaceJson,
   creatorMarketplaceJsonByteSize,
 } from "../../../../../lib/creator-marketplace-resource-contract";
-import { rateLimit } from "../../../../../lib/rate-limit";
 
+import {
+  CREATOR_MARKETPLACE_PUBLISH_GATE,
+  creatorMarketplacePublisherGateKey,
+} from "./creator-marketplace-publish-gate";
 import {
   CREATOR_MARKETPLACE_RESOURCE_REPOSITORY,
   CreatorMarketplaceResourceDuplicateError,
 } from "./creator-marketplace.repository-contract";
 
+import type {
+  CreatorMarketplacePublishGate,
+  CreatorMarketplacePublishLease,
+} from "./creator-marketplace-publish-gate";
 import type {
   CreatorMarketplaceResourceListQueryDto,
   PublishCreatorMarketplaceResourceDto,
@@ -144,7 +151,9 @@ function projectRecord(
 export class CreatorMarketplaceService {
   constructor(
     @Inject(CREATOR_MARKETPLACE_RESOURCE_REPOSITORY)
-    private readonly repository: CreatorMarketplaceResourceRepository
+    private readonly repository: CreatorMarketplaceResourceRepository,
+    @Inject(CREATOR_MARKETPLACE_PUBLISH_GATE)
+    private readonly publishGate: CreatorMarketplacePublishGate
   ) {}
 
   async list(
@@ -186,16 +195,6 @@ export class CreatorMarketplaceService {
     publisherId: string,
     body: PublishCreatorMarketplaceResourceDto
   ): Promise<CreatorMarketplaceResourceRecord> {
-    if (!rateLimit(`creator-marketplace-publish:${publisherId}`, 20, 60 * 60_000)) {
-      throw new HttpException(
-        {
-          code: "creator_marketplace_publish_rate_limited",
-          message: "공유 패키지를 너무 자주 게시하고 있습니다. 잠시 후 다시 시도해 주세요.",
-        },
-        HttpStatus.TOO_MANY_REQUESTS
-      );
-    }
-
     const parsedManifest = CreatorMarketplaceResourceManifestSchema.safeParse(body);
     if (!parsedManifest.success) {
       throw new BadRequestException({
@@ -214,6 +213,31 @@ export class CreatorMarketplaceService {
     const canonicalManifest = canonicalizeCreatorMarketplaceJson(manifest);
     const manifestByteSize = creatorMarketplaceJsonByteSize(manifest);
     const manifestHash = sha256(canonicalManifest);
+
+    let publishLease: CreatorMarketplacePublishLease;
+    try {
+      const admission = await this.publishGate.acquire(
+        creatorMarketplacePublisherGateKey(publisherId)
+      );
+      if (admission.status === "rate_limited") {
+        throw new HttpException(
+          {
+            code: "creator_marketplace_publish_rate_limited",
+            message:
+              "공유 패키지를 너무 자주 게시하고 있습니다. 잠시 후 다시 시도해 주세요.",
+          },
+          HttpStatus.TOO_MANY_REQUESTS
+        );
+      }
+      publishLease = admission.lease;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new ServiceUnavailableException({
+        code: "creator_marketplace_publish_gate_unavailable",
+        message:
+          "게시 요청을 안전하게 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+      });
+    }
 
     try {
       const row = await this.repository.publish({
@@ -236,6 +260,13 @@ export class CreatorMarketplaceService {
         code: "creator_marketplace_publish_unavailable",
         message: "공유 패키지를 게시할 수 없습니다. 잠시 후 다시 시도해 주세요.",
       });
+    } finally {
+      try {
+        await this.publishGate.release(publishLease);
+      } catch {
+        // The short database lease expires automatically. A release outage must not turn a
+        // committed resource into an ambiguous client retry, and cannot increase admission.
+      }
     }
   }
 

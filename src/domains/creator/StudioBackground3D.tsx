@@ -30,7 +30,6 @@ import {
   Maximize2,
   Move,
   MoveDown,
-  PackageOpen,
   PencilLine,
   Pill,
   Pyramid,
@@ -969,7 +968,7 @@ const BG_PANEL_TABS: Array<{ id: BgPanelTab; label: string; icon: typeof Boxes; 
   { id: "layers", label: "레이어", icon: Layers, hint: "목록 · 선택 · 복제 · 삭제" },
   { id: "view", label: "보기", icon: Camera, hint: "카메라 프리셋 · 선화 미리보기" },
   { id: "lt", label: "LT", icon: ScanLine, hint: "컬러 · 선화 · 톤 출력 설정" },
-  { id: "models", label: "범용 3D", icon: PackageOpen, hint: "GLB · glTF · OBJ/MTL 가져오기와 모델 조작" },
+  { id: "models", label: "범용 3D", icon: Hexagon, hint: "GLB · glTF · OBJ/MTL 가져오기와 모델 조작" },
 ];
 
 const TRANSFORM_MODES: Array<{
@@ -2438,6 +2437,7 @@ export function StudioBackground3D({
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activePanelTab, setActivePanelTab] = useState<BgPanelTab>("shapes");
+  const [modelsPanelActivated, setModelsPanelActivated] = useState(false);
   const [viewEditorSection, setViewEditorSection] = useState<ViewEditorSection>("camera");
   const [physicsPhase, setPhysicsPhase] = useState<StudioBg3dPhysicsPhase>("idle");
   const [physicsDurationSeconds, setPhysicsDurationSeconds] = useState<2 | 4 | 8>(4);
@@ -5225,6 +5225,7 @@ export function StudioBackground3D({
   }
 
   const handlePanelTabChange = (tab: BgPanelTab) => {
+    if (tab === "models") setModelsPanelActivated(true);
     setActivePanelTab(tab);
     if (panelScrollRef.current) panelScrollRef.current.scrollTop = 0;
   };
@@ -9402,7 +9403,7 @@ export function StudioBackground3D({
                                           aria-hidden
                                         />
                                       ) : (
-                                        <PackageOpen size={13} className="shrink-0 text-fg-3" aria-hidden />
+                                        <Hexagon size={13} className="shrink-0 text-fg-3" aria-hidden />
                                       )}
                                       <span className="truncate font-semibold">{item.label}</span>
                                       {item.locked ? <Lock size={11} className="shrink-0 opacity-80" aria-hidden /> : null}
@@ -9677,7 +9678,7 @@ export function StudioBackground3D({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
-                        <PackageOpen size={15} className="text-accent" aria-hidden />
+                        <Hexagon size={15} className="text-accent" aria-hidden />
                         범용 3D 모델
                       </h3>
                       <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
@@ -9804,30 +9805,32 @@ export function StudioBackground3D({
                 </div>
                 
 
-                <Suspense
-                  fallback={(
-                    <div
-                      aria-live="polite"
-                      className="rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3"
-                    >
-                      3D 에셋 라이브러리를 불러오는 중입니다.
-                    </div>
-                  )}
-                >
-                  <LazyStudioBg3dAssetLibraryPanel
-                    entries={modelLibrary}
-                    libraryStatus={modelLibraryStatus}
-                    deletingModelId={deletingModelId}
-                    isUploading={isUploadingModel}
-                    importProgress={modelImportProgress}
-                    isRestoringScene={isRestoringScene}
-                    deviceProfileLabel={deviceQuality.profile === "mobile" ? "모바일" : "데스크톱"}
-                    onFileChange={handleUploadModelFiles}
-                    onCancelImport={() => modelImportAbortRef.current?.abort()}
-                    onAdd={addCustomModelToScene}
-                    onDelete={handleDeleteModelFromLibrary}
-                  />
-                </Suspense>
+                {modelsPanelActivated ? (
+                  <Suspense
+                    fallback={(
+                      <div
+                        aria-live="polite"
+                        className="rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3"
+                      >
+                        3D 에셋 라이브러리를 불러오는 중입니다.
+                      </div>
+                    )}
+                  >
+                    <LazyStudioBg3dAssetLibraryPanel
+                      entries={modelLibrary}
+                      libraryStatus={modelLibraryStatus}
+                      deletingModelId={deletingModelId}
+                      isUploading={isUploadingModel}
+                      importProgress={modelImportProgress}
+                      isRestoringScene={isRestoringScene}
+                      deviceProfileLabel={deviceQuality.profile === "mobile" ? "모바일" : "데스크톱"}
+                      onFileChange={handleUploadModelFiles}
+                      onCancelImport={() => modelImportAbortRef.current?.abort()}
+                      onAdd={addCustomModelToScene}
+                      onDelete={handleDeleteModelFromLibrary}
+                    />
+                  </Suspense>
+                ) : null}
               </section>
             </div>
 

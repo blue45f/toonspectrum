@@ -49,13 +49,13 @@ describe("hasAttemptedChunkReload / markChunkReloadAttempted", () => {
     expect(hasAttemptedChunkReload()).toBe(false);
   });
 
-  it("sessionStorage 자체가 없는 환경(프라이빗 모드 등)에서도 던지지 않고 false로 폴백한다", () => {
+  it("sessionStorage 자체가 없으면 자동 새로고침 루프를 막기 위해 재시도 완료로 폴백한다", () => {
     // globalThis.sessionStorage가 아예 없는 상태(afterEach가 이미 지웠고, 이 테스트도 설정 안 함).
-    expect(hasAttemptedChunkReload()).toBe(false);
+    expect(hasAttemptedChunkReload()).toBe(true);
     expect(() => markChunkReloadAttempted()).not.toThrow();
   });
 
-  it("sessionStorage.getItem이 던지는 환경(일부 브라우저 프라이빗 모드)에서도 false로 폴백한다", () => {
+  it("sessionStorage.getItem이 던지는 환경에서도 자동 새로고침을 fail-closed 한다", () => {
     Object.defineProperty(globalThis, "sessionStorage", {
       value: {
         getItem: () => {
@@ -67,7 +67,7 @@ describe("hasAttemptedChunkReload / markChunkReloadAttempted", () => {
       },
       configurable: true,
     });
-    expect(hasAttemptedChunkReload()).toBe(false);
+    expect(hasAttemptedChunkReload()).toBe(true);
     expect(() => markChunkReloadAttempted()).not.toThrow();
   });
 });

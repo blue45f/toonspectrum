@@ -18,8 +18,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useState } from "react";
-
+import { Suspense, useState } from "react";
 
 import {
   createStudioAssetFavoriteId,
@@ -28,6 +27,7 @@ import {
   isStudioAssetFavorite,
 } from "./studio-asset-favorites";
 import { writeStudioAssetDragPayload } from "./studio-insert-drag-writer";
+import { createStudioIntentLazyLoader } from "./studio-intent-lazy-loader";
 import {
   evaluateStudioMarketplacePublishRights,
   type StudioMarketplaceOrigin,
@@ -36,9 +36,6 @@ import {
   serializeStudioCommunityAssetDragPayload,
   serializeStudioLocalAssetDragPayload,
 } from "./studio-shared-asset-drag";
-import { StudioCommunityMarketplacePanel } from "./StudioCommunityMarketplacePanel";
-import { StudioCreatorPackMarketplacePanel } from "./StudioCreatorPackMarketplacePanel";
-import { StudioOriginalAssetMarketplacePanel } from "./StudioOriginalAssetMarketplacePanel";
 
 import type {
   StudioAssetFavoriteId,
@@ -60,6 +57,7 @@ import {
   creatorAssetLicenseOf,
 } from "@/lib/creator-asset-contract";
 import { cx } from "@/lib/cx";
+import { lazyRetry } from "@/lib/lazy-retry";
 
 export type StudioAssetTab = "mine" | "community";
 export type StudioAssetSortOrder = "newest" | "popular" | "name" | "size";
@@ -73,6 +71,74 @@ const CONTROL_FOCUS_CLASS =
 const TOUCH_CONTROL_CLASS = `min-h-11 ${CONTROL_FOCUS_CLASS}`;
 const CARD_ACTION_CLASS =
   `flex min-h-11 w-full items-center justify-center gap-1 rounded-md px-1.5 text-[0.62rem] font-semibold transition-colors ${CONTROL_FOCUS_CLASS}`;
+
+const studioOriginalAssetMarketplaceLoader = createStudioIntentLazyLoader(() =>
+  import("./StudioOriginalAssetMarketplacePanel").then((module) => ({
+    default: module.StudioOriginalAssetMarketplacePanel,
+  }))
+);
+const studioCreatorPackMarketplaceLoader = createStudioIntentLazyLoader(() =>
+  import("./StudioCreatorPackMarketplacePanel").then((module) => ({
+    default: module.StudioCreatorPackMarketplacePanel,
+  }))
+);
+const studioCommunityMarketplaceLoader = createStudioIntentLazyLoader(() =>
+  import("./StudioCommunityMarketplacePanel").then((module) => ({
+    default: module.StudioCommunityMarketplacePanel,
+  }))
+);
+
+const LazyStudioOriginalAssetMarketplacePanel = lazyRetry(
+  studioOriginalAssetMarketplaceLoader.load,
+  "StudioOriginalAssetMarketplacePanel"
+);
+const LazyStudioCreatorPackMarketplacePanel = lazyRetry(
+  studioCreatorPackMarketplaceLoader.load,
+  "StudioCreatorPackMarketplacePanel"
+);
+const LazyStudioCommunityMarketplacePanel = lazyRetry(
+  studioCommunityMarketplaceLoader.load,
+  "StudioCommunityMarketplacePanel"
+);
+
+function preloadStudioAssetMarketplacePanels(): void {
+  studioOriginalAssetMarketplaceLoader.preload();
+  studioCreatorPackMarketplaceLoader.preload();
+  studioCommunityMarketplaceLoader.preload();
+}
+
+function StudioAssetMarketplaceLoading() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      data-studio-asset-marketplace-loading="true"
+      className="mb-2 min-h-[9.75rem] rounded-lg border border-line bg-card/70 p-2"
+    >
+      <span className="sr-only">
+        커뮤니티 소재를 불러오는 중. 브러시, 필터, 템플릿과 에셋 마켓을 준비하고 있습니다.
+      </span>
+      <div aria-hidden className="grid gap-2">
+        {(["w-24", "w-32", "w-28"] as const).map((labelWidth, index) => (
+          <div
+            key={labelWidth}
+            data-studio-asset-marketplace-skeleton-row={index + 1}
+            className="flex h-11 items-center gap-2.5 rounded-md border border-line/70 bg-canvas/45 px-2.5"
+          >
+            <span className="size-7 shrink-0 animate-pulse rounded-md bg-raised motion-reduce:animate-none" />
+            <span
+              className={cx(
+                "h-2.5 animate-pulse rounded-full bg-raised motion-reduce:animate-none",
+                labelWidth
+              )}
+            />
+            <span className="ml-auto h-2 w-8 animate-pulse rounded-full bg-raised/75 motion-reduce:animate-none" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export interface StudioAssetMenuPanelProps {
   assetTab: StudioAssetTab;
@@ -299,6 +365,9 @@ export function StudioAssetMenuPanel({
           <button
             type="button"
             onClick={() => setAssetTab("community")}
+            onPointerEnter={preloadStudioAssetMarketplacePanels}
+            onPointerDown={preloadStudioAssetMarketplacePanels}
+            onFocus={preloadStudioAssetMarketplacePanels}
             aria-pressed={assetTab === "community"}
             className={cx(
               TOUCH_CONTROL_CLASS,
@@ -452,11 +521,13 @@ export function StudioAssetMenuPanel({
       )}
 
       {assetTab === "community" ? (
-        <>
-          <StudioOriginalAssetMarketplacePanel onUseAsset={onUseLocalAsset} />
-          <StudioCreatorPackMarketplacePanel />
-          <StudioCommunityMarketplacePanel onUseAsset={onUseLocalAsset} />
-        </>
+        <Suspense fallback={<StudioAssetMarketplaceLoading />}>
+          <div data-studio-asset-marketplace-lazy-boundary="true">
+            <LazyStudioOriginalAssetMarketplacePanel onUseAsset={onUseLocalAsset} />
+            <LazyStudioCreatorPackMarketplacePanel />
+            <LazyStudioCommunityMarketplacePanel onUseAsset={onUseLocalAsset} />
+          </div>
+        </Suspense>
       ) : null}
 
       <div className="mb-2 grid grid-cols-2 gap-1.5">

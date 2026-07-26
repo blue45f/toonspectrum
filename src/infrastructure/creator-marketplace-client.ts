@@ -7,20 +7,14 @@ import type {
   CreatorMarketplaceResourceRecord,
 } from "@/lib/creator-marketplace-resource-contract";
 
+import { loadChunkWithReloadRecovery } from "@/lib/chunk-load-recovery";
 import {
   CREATOR_MARKETPLACE_BUILTIN_PREFIX_BY_KIND,
   CREATOR_MARKETPLACE_RUNTIME_BY_KIND,
   CreatorMarketplacePortablePayloadSchema,
-  CreatorMarketplaceResourceListPageSchema,
-  CreatorMarketplaceResourceManifestSchema,
-  CreatorMarketplaceResourceRecordSchema,
   canonicalizeCreatorMarketplaceJson,
   creatorMarketplaceJsonByteSize,
 } from "@/lib/creator-marketplace-resource-contract";
-import { api, toApiError } from "@/src/infrastructure/api";
-
-
-const BASE = "/creator/marketplace/resources";
 
 const MEDIA_TYPE_BY_KIND = {
   asset: "application/vnd.toonspectrum.asset+json",
@@ -38,6 +32,13 @@ export interface CreatorMarketplaceListParams {
   tag?: string;
   kind?: CreatorMarketplaceResourceKind;
   license?: CreatorMarketplaceResourceLicense;
+}
+
+function loadCreatorMarketplaceNetworkClient() {
+  return loadChunkWithReloadRecovery(
+    () => import("./creator-marketplace-client-network"),
+    "CreatorMarketplaceNetworkClient"
+  );
 }
 
 async function creatorMarketplaceSha256(value: string): Promise<string> {
@@ -101,63 +102,27 @@ export async function listCreatorMarketplaceResources(
   params: CreatorMarketplaceListParams = {},
   signal?: AbortSignal
 ): Promise<CreatorMarketplaceResourceListPage> {
-  try {
-    const response = await api.get<unknown>(BASE, {
-      params: {
-        limit: params.limit,
-        cursor: params.cursor,
-        search: params.search,
-        tag: params.tag,
-        kind: params.kind,
-        license: params.license,
-      },
-      signal,
-    });
-    return CreatorMarketplaceResourceListPageSchema.parse(response);
-  } catch (error) {
-    throw await toApiError(error, "공유 리소스 마켓을 불러오지 못했습니다.");
-  }
+  const client = await loadCreatorMarketplaceNetworkClient();
+  return client.listCreatorMarketplaceResources(params, signal);
 }
 
 export async function listMyCreatorMarketplaceResources(
   params: CreatorMarketplaceListParams = {},
   signal?: AbortSignal
 ): Promise<CreatorMarketplaceResourceListPage> {
-  try {
-    const response = await api.get<unknown>(`${BASE}/mine`, {
-      params: {
-        limit: params.limit,
-        cursor: params.cursor,
-        search: params.search,
-        tag: params.tag,
-        kind: params.kind,
-        license: params.license,
-      },
-      signal,
-    });
-    return CreatorMarketplaceResourceListPageSchema.parse(response);
-  } catch (error) {
-    throw await toApiError(error, "내 공유 리소스를 불러오지 못했습니다.");
-  }
+  const client = await loadCreatorMarketplaceNetworkClient();
+  return client.listMyCreatorMarketplaceResources(params, signal);
 }
 
 export async function publishCreatorMarketplaceResource(
   input: CreatorMarketplaceResourceManifest,
   signal?: AbortSignal
 ): Promise<CreatorMarketplaceResourceRecord> {
-  const manifest = CreatorMarketplaceResourceManifestSchema.parse(input);
-  try {
-    const response = await api.post<unknown>(BASE, manifest, { signal });
-    return CreatorMarketplaceResourceRecordSchema.parse(response);
-  } catch (error) {
-    throw await toApiError(error, "리소스 패키지를 공유하지 못했습니다.");
-  }
+  const client = await loadCreatorMarketplaceNetworkClient();
+  return client.publishCreatorMarketplaceResource(input, signal);
 }
 
 export async function deleteCreatorMarketplaceResource(id: string): Promise<void> {
-  try {
-    await api.delete(`${BASE}/${encodeURIComponent(id)}`);
-  } catch (error) {
-    throw await toApiError(error, "공유 리소스를 삭제하지 못했습니다.");
-  }
+  const client = await loadCreatorMarketplaceNetworkClient();
+  return client.deleteCreatorMarketplaceResource(id);
 }

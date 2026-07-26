@@ -282,7 +282,6 @@ import {
   createDurableStudioCheckpoint,
   deleteDurableStudioCheckpoint,
   listDurableStudioCheckpoints,
-  studioServerRestoreCheckpointName,
   studioCheckpointKey,
   type StudioCheckpoint,
 } from "./studio-checkpoints";
@@ -1420,6 +1419,7 @@ import { Container } from "@/components/container";
 import { buttonClass } from "@/components/ui/button-utils";
 import { useIsMobile } from "@/components/use-media-query";
 import { useResizable } from "@/components/use-resizable";
+import { loadChunkWithReloadRecovery } from "@/lib/chunk-load-recovery";
 import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/lib/studio-work-asset-contract";
 import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
@@ -11486,232 +11486,31 @@ function StudioCuttoonEditor() {
     };
   }
 
-  function studioTeamCommentMutationFlightKey(
-    workIdValue: string,
-    plan: StudioTeamCommentMutationPlan
-  ): string {
-    return plan.kind === "create"
-      ? `${workIdValue}:create:${plan.mutationId}`
-      : `${workIdValue}:thread:${plan.threadId}`;
-  }
-
   async function executeStudioTeamCommentMutationPlan(
     plan: StudioTeamCommentMutationPlan,
     expectedScope?: { workId: string; generation: number }
   ): Promise<boolean> {
-    const workIdValue = expectedScope?.workId ?? studioTeamCommentsScopeRef.current;
-    const generation = expectedScope?.generation ?? studioTeamCommentsLoadGenerationRef.current;
-    if (
-      !workIdValue
-      || studioTeamCommentsScopeRef.current !== workIdValue
-      || studioTeamCommentsLoadGenerationRef.current !== generation
-      || !editorMountedRef.current
-    ) return false;
-
-    const capabilities = studioTeamCommentCapabilitiesRef.current;
-    if ((plan.kind === "create" || plan.kind === "reply") && capabilities?.comment !== true) {
-      throw new Error("현재 팀 역할로는 댓글을 작성할 수 없어요.");
-    }
-    if ((plan.kind === "resolve" || plan.kind === "reopen") && capabilities?.resolve !== true) {
-      throw new Error("해결 상태는 소유자·관리자·편집자만 변경할 수 있어요.");
-    }
-    if (plan.kind !== "create") {
-      const currentThread = studioCommentViewDocumentRef.current.threads.find(
-        (thread) => thread.id === plan.threadId
-      );
-      if (!currentThread) throw new Error("댓글을 현재 문서에서 찾을 수 없어요.");
-      if (studioLegacyCommentThreadIdSet.has(plan.threadId)) {
-        throw new Error("이전 문서에 보관된 댓글은 전체 검토함에서 읽기 전용으로 확인할 수 있어요.");
-      }
-      if (plan.kind === "reply" && currentThread.resolved) {
-        throw new Error("이미 해결된 댓글에는 답글을 남길 수 없어요. 먼저 다시 열어 주세요.");
-      }
-      if (plan.kind === "resolve" && currentThread.resolved) return true;
-      if (plan.kind === "reopen" && !currentThread.resolved) return true;
-    }
-
-    const flightKey = studioTeamCommentMutationFlightKey(workIdValue, plan);
-    const signature = JSON.stringify(plan);
-    const existingFlight = studioTeamCommentMutationFlightRef.current.get(flightKey);
-    if (existingFlight) {
-      if (existingFlight.signature === signature) return existingFlight.promise;
-      throw new Error("이 댓글의 다른 변경을 저장하고 있어요. 완료된 뒤 다시 시도해 주세요.");
-    }
-
-    const pending = (async (): Promise<boolean> => {
-      const registry = studioTeamCommentOperationScopeRegistryRef.current;
-      const ticket = registry.begin(workIdValue, generation);
-      let admitted = false;
-      try {
-        const commentClient = await loadStudioTeamCommentClient();
-        if (!registry.isCurrent(ticket, currentStudioTeamCommentOperationContext())) {
-          registry.invalidate(ticket);
-          return false;
-        }
-
-        if (plan.kind === "create") {
-          const remoteThread = await commentClient.createStudioTeamCommentThread(workIdValue, {
-            mutationId: plan.mutationId,
-            anchor: plan.anchor,
-            body: plan.body,
-          }, ticket.signal);
-          admitted = registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
-          registry.finish(ticket);
-          if (!admitted) return false;
-          const receipt = mergeStudioTeamCommentMutationReceipt(
-            studioTeamCommentActivitySequenceRef.current,
-            studioTeamCommentReadSequenceRef.current,
-            remoteThread.id,
-            BigInt(remoteThread.latestActivitySequence)
-          );
-          if (!receipt.stale) {
-            const localThread = commentClient.studioTeamCommentThreadToLocalThread(remoteThread);
-            if (!localThread) {
-              throw new Error("등록된 팀 댓글을 화면에 안전하게 반영하지 못했어요.");
-            }
-            setStudioTeamCommentsState((current) => normalizeStudioCommentsDocument({
-              version: 1,
-              threads: current.threads.some((thread) =>
-                thread.id === localThread.id
-                || thread.replies.some((reply) => reply.id === localThread.id)
-              )
-                ? current.threads
-                : [localThread, ...current.threads],
-            }));
-            setStudioTeamUnreadCommentIds((current) => remoteThread.unread
-              ? current.includes(localThread.id)
-                ? current
-                : [...current, localThread.id].sort()
-              : current.filter((threadId) => threadId !== localThread.id));
-          }
-          setStudioCommentSyncError(null);
-          return true;
-        }
-
-        if (plan.kind === "reply") {
-          const response = await commentClient.addStudioTeamCommentReply(
-            workIdValue,
-            plan.threadId,
-            { mutationId: plan.mutationId, body: plan.body },
-            ticket.signal
-          );
-          admitted = registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
-          registry.finish(ticket);
-          if (!admitted) return false;
-          const receipt = mergeStudioTeamCommentMutationReceipt(
-            studioTeamCommentActivitySequenceRef.current,
-            studioTeamCommentReadSequenceRef.current,
-            plan.threadId,
-            BigInt(response.latestActivitySequence)
-          );
-          if (!receipt.stale) {
-            const reply = commentClient.studioTeamCommentMessageToLocalReply(response.message);
-            if (!reply) throw new Error("등록된 팀 답글을 화면에 안전하게 반영하지 못했어요.");
-            setStudioTeamCommentsState((current) => {
-              const alreadyProjected = current.threads.some((thread) =>
-                thread.id === reply.id
-                || thread.replies.some((candidate) => candidate.id === reply.id)
-              );
-              return alreadyProjected
-                ? current
-                : addStudioCommentReply(current, plan.threadId, {
-                    id: reply.id,
-                    author: reply.author,
-                    body: reply.body,
-                    mentions: reply.mentions,
-                  }, new Date(reply.createdAt));
-            });
-            setStudioTeamUnreadCommentIds((current) => current.filter(
-              (threadId) => threadId !== plan.threadId
-            ));
-          }
-          setStudioCommentSyncError(null);
-          return true;
-        }
-
-        if (plan.kind === "resolve") {
-          const response = await commentClient.resolveStudioTeamCommentThread(
-            workIdValue,
-            plan.threadId,
-            ticket.signal
-          );
-          admitted = registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
-          registry.finish(ticket);
-          if (!admitted) return false;
-          const receipt = mergeStudioTeamCommentMutationReceipt(
-            studioTeamCommentActivitySequenceRef.current,
-            studioTeamCommentReadSequenceRef.current,
-            plan.threadId,
-            BigInt(response.latestActivitySequence)
-          );
-          if (!receipt.stale) {
-            const resolver = response.resolvedBy
-              ? commentClient.studioTeamCommentUserToLocalActor(response.resolvedBy)
-              : null;
-            const resolvedAt = response.resolvedAt;
-            if (!resolver || !resolvedAt) {
-              throw new Error("팀 댓글 해결 정보를 화면에 안전하게 반영하지 못했어요.");
-            }
-            setStudioTeamCommentsState((current) => resolveStudioCommentThread(
-              current,
-              plan.threadId,
-              resolver,
-              new Date(resolvedAt)
-            ));
-            setStudioTeamUnreadCommentIds((current) => current.filter(
-              (threadId) => threadId !== plan.threadId
-            ));
-          }
-          setStudioCommentSyncError(null);
-          return true;
-        }
-
-        const response = await commentClient.reopenStudioTeamCommentThread(
-          workIdValue,
-          plan.threadId,
-          ticket.signal
-        );
-        admitted = registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
-        registry.finish(ticket);
-        if (!admitted) return false;
-        const receipt = mergeStudioTeamCommentMutationReceipt(
-          studioTeamCommentActivitySequenceRef.current,
-          studioTeamCommentReadSequenceRef.current,
-          plan.threadId,
-          BigInt(response.latestActivitySequence)
-        );
-        if (!receipt.stale) {
-          setStudioTeamCommentsState((current) => reopenStudioCommentThread(
-            current,
-            plan.threadId,
-            new Date(response.updatedAt)
-          ));
-          setStudioTeamUnreadCommentIds((current) => current.filter(
-            (threadId) => threadId !== plan.threadId
-          ));
-        }
-        setStudioCommentSyncError(null);
-        return true;
-      } catch (cause) {
-        const shouldReport = admitted
-          || registry.isCurrent(ticket, currentStudioTeamCommentOperationContext());
-        registry.invalidate(ticket);
-        if (!shouldReport) return false;
-        const message = cause instanceof Error
-          ? cause.message
-          : "팀 댓글 변경을 저장하지 못했어요.";
-        setStudioCommentSyncError(message);
-        throw new Error(message, { cause });
-      }
-    })();
-
-    studioTeamCommentMutationFlightRef.current.set(flightKey, { signature, promise: pending });
-    try {
-      return await pending;
-    } finally {
-      const current = studioTeamCommentMutationFlightRef.current.get(flightKey);
-      if (current?.promise === pending) studioTeamCommentMutationFlightRef.current.delete(flightKey);
-    }
+    const { executeStudioTeamCommentMutation } = await loadChunkWithReloadRecovery(
+      () => import("./studio-team-comment-mutation-controller"),
+      "StudioTeamCommentMutationController"
+    );
+    return executeStudioTeamCommentMutation({
+      plan,
+      ...(expectedScope ? { expectedScope } : {}),
+      readScope: currentStudioTeamCommentOperationContext,
+      readCapabilities: () => studioTeamCommentCapabilitiesRef.current,
+      readDocument: () => studioCommentViewDocumentRef.current,
+      legacyThreadIds: studioLegacyCommentThreadIdSet,
+      flights: studioTeamCommentMutationFlightRef.current,
+      operationRegistry: studioTeamCommentOperationScopeRegistryRef.current,
+      activitySequence: studioTeamCommentActivitySequenceRef.current,
+      readSequence: studioTeamCommentReadSequenceRef.current,
+      mergeMutationReceipt: mergeStudioTeamCommentMutationReceipt,
+      loadClient: loadStudioTeamCommentClient,
+      updateDocument: setStudioTeamCommentsState,
+      updateUnreadThreadIds: setStudioTeamUnreadCommentIds,
+      setSyncError: setStudioCommentSyncError,
+    });
   }
 
   function executeLocalStudioCommentMutationPlan(
@@ -28939,181 +28738,42 @@ function clearSelectionForEdit() {
     revision: WorkRevisionSummary,
     comparedBaseRevision: number
   ): Promise<boolean> {
-    if (!workId || !serverCurrentRevision || sharedDocument?.role !== "owner" || serverRevisionLoading) {
-      return false;
-    }
-    if (revision.revision === serverCurrentRevision) {
-      setServerRevisionError("현재 서버 revision은 다시 복원할 필요가 없어요.");
-      return false;
-    }
-    if (comparedBaseRevision !== serverCurrentRevision) {
-      setServerRevisionError("서버 revision이 변경 검토 후 달라졌어요. 최신 목록에서 다시 비교해 주세요.");
-      return false;
-    }
-    const restoreWorkId = workId;
-    const restoreAuthScopeKey = studioAuthUserId;
-    if (documentSaveInFlightRef.current) {
-      setServerRevisionError("다른 저장 또는 복원 작업이 끝난 뒤 다시 시도해 주세요.");
-      return false;
-    }
-    const restorePreparationGeneration = studioRevisionProjectGenerationRef.current;
-    if (!(await saveNamedCheckpoint(studioServerRestoreCheckpointName(revision.revision)))) {
-      setServerRevisionError(
-        "현재 편집본을 브라우저 복구 지점에 보관하지 못해 서버 복원을 시작하지 않았어요. 오래된 지점을 정리하거나 JSON 백업 후 다시 시도해 주세요."
-      );
-      return false;
-    }
-    if (studioRevisionProjectGenerationRef.current !== restorePreparationGeneration) {
-      setServerRevisionError(
-        "브라우저 복구 지점을 저장하는 동안 원고가 변경되어 서버 복원을 시작하지 않았어요. 최신 상태로 다시 비교해 주세요."
-      );
-      return false;
-    }
-    if (!markStudioDocumentChanged()) return false;
-    documentSaveInFlightRef.current = true;
-    const restoreMutationTicket = captureStudioMutationTicket();
-    let serverRestoreCommitted = false;
-    sharedDocumentRestoreAbortRef.current?.abort();
-    const restoreController = new AbortController();
-    sharedDocumentRestoreAbortRef.current = restoreController;
-    const restoreScopeStillCurrent = () =>
-      isStudioEditorAsyncScopeCurrent(
-        { authScopeKey: restoreAuthScopeKey, workId: restoreWorkId },
-        {
-          ...currentStudioDocumentScopeRef.current,
-          mounted: editorMountedRef.current,
-          aborted: restoreController.signal.aborted,
-        }
-      );
-    setServerRevisionLoading(true);
-    setServerRevisionError(null);
-    try {
-      const [{ getWork, restoreWorkRevision }, { getStudioSharedDocument, isStudioSharedDocumentScopeCurrent }] =
-        await Promise.all([
-          import("@/src/infrastructure/creator-client"),
-          import("./studio-shared-document-client"),
-        ]);
-      if (
-        !restoreScopeStillCurrent() ||
-        !canApplyStudioMutation(restoreMutationTicket, { allowDuringSave: true })
-      ) return false;
-      const committedRestore = await restoreWorkRevision(
-        restoreWorkId,
-        revision.revision,
-        comparedBaseRevision,
-        restoreController.signal
-      );
-      const committedRevision = committedRestore.revision;
-      if (
-        typeof committedRevision !== "number" ||
-        !Number.isSafeInteger(committedRevision) ||
-        committedRevision < 1
-      ) {
-        throw new Error("서버가 복원 커밋 버전을 반환하지 않아 안전하게 적용할 수 없어요.");
-      }
-      serverRestoreCommitted = true;
-      if (!restoreScopeStillCurrent()) return false;
-      const [restoredWork, restoredShared] = await Promise.all([
-        getWork(restoreWorkId, restoreController.signal),
-        getStudioSharedDocument(restoreWorkId, restoreController.signal),
-      ]);
-      if (
-        !restoreScopeStillCurrent() ||
-        !restoreAuthScopeKey ||
-        !isStudioSharedDocumentScopeCurrent(
-          { authScopeKey: restoreAuthScopeKey, workId: restoreWorkId },
-          currentStudioDocumentScopeRef.current
-        )
-      ) {
-        return false;
-      }
-      if (!canApplyStudioMutation(restoreMutationTicket, { allowDuringSave: true })) {
-        lockStudioMutationsNow();
-        setDocumentReloadRequired(true);
-        setServerRevisionError("서버 복원은 완료됐지만 로컬 상태가 달라 자동 적용하지 않았어요. 페이지를 다시 불러와 주세요.");
-        return false;
-      }
-      if (
-        restoredWork.revision !== committedRevision ||
-        restoredShared.revision !== committedRevision
-      ) {
-        throw new Error(
-          `복원은 서버 버전 r${committedRevision}로 기록됐지만 그 직후 공동 원고가 다시 변경됐어요. 최신 원고를 다시 열어 확인해 주세요.`
-        );
-      }
-      if (!isStudioCuttoonSourceFormat(restoredWork.format)) {
-        throw new Error("복원된 작품 형식은 컷툰 편집기와 호환되지 않아 자동 적용하지 않았어요.");
-      }
-      documentSaveInFlightRef.current = false;
-      if (!(await applyStudioProjectSnapshot(creatorWorkSnapshotToStudioProject(restoredWork)))) {
-        lockStudioMutationsNow();
-        setDocumentReloadRequired(true);
-        setServerRevisionError(
-          "서버 복원은 완료됐지만 로컬 편집 상태가 달라 자동 적용하지 않았어요. 페이지를 다시 불러와 주세요.",
-        );
-        return false;
-      }
-      setLoadedWork(restoredWork);
-      setSharedDocumentScope({
-        authScopeKey: restoreAuthScopeKey,
-        workId: restoreWorkId,
-        value: restoredShared,
-      });
-      // The pre-restore browser checkpoint now owns the old local state. Keeping the older
-      // autosave (whose sourceRevision is the just-replaced base) would immediately surface a
-      // false revision-mismatch banner and prevent the restored rN state from being autosaved.
-      try {
-        globalThis.localStorage.removeItem(autosaveKey);
-      } catch {
-        // The restore already committed and the named checkpoint succeeded; storage cleanup is
-        // best-effort, while the server/baseRevision guarantees remain authoritative.
-      }
-      setHasAutosave(false);
-      setAutosaveRestoreBlockedReason(null);
-      setAutosaveChecked(true);
-      await reloadServerRevisions();
-      return true;
-    } catch (cause) {
-      if (restoreScopeStillCurrent()) {
-        const isRevisionConflict =
-          cause instanceof Error &&
-          cause.name === "WorkRevisionConflictError" &&
-          typeof (cause as { currentRevision?: unknown }).currentRevision === "number";
-        if (isRevisionConflict && !serverRestoreCommitted) {
-          try {
-            const { getStudioSharedDocument } = await import("./studio-shared-document-client");
-            const latestShared = await getStudioSharedDocument(restoreWorkId, restoreController.signal);
-            if (restoreScopeStillCurrent() && restoreAuthScopeKey) {
-              setSharedDocumentScope({
-                authScopeKey: restoreAuthScopeKey,
-                workId: restoreWorkId,
-                value: latestShared,
-              });
-              setServerRevisionError(
-                `다른 창이 서버 버전 r${latestShared.revision}을 먼저 저장했어요. 로컬 편집본은 보존했으며 최신 버전을 기준으로 다시 검토해 주세요.`
-              );
-            }
-          } catch {
-            lockStudioMutationsNow();
-            setDocumentReloadRequired(true);
-            setServerRevisionError("서버 버전 충돌 후 최신 원고를 확인하지 못해 편집을 잠갔어요. 페이지를 다시 불러와 주세요.");
-          }
-        } else if (serverRestoreCommitted) {
-          lockStudioMutationsNow();
-          setDocumentReloadRequired(true);
-          setServerRevisionError(cause instanceof Error ? cause.message : "서버 복원 후 최신 상태를 확인하지 못했어요.");
-        } else {
-          setServerRevisionError(cause instanceof Error ? cause.message : "서버 버전을 복원하지 못했어요.");
-        }
-      }
-      return false;
-    } finally {
-      if (sharedDocumentRestoreAbortRef.current === restoreController) {
-        sharedDocumentRestoreAbortRef.current = null;
-      }
-      documentSaveInFlightRef.current = false;
-      if (editorMountedRef.current) setServerRevisionLoading(false);
-    }
+    const { restoreStudioServerRevision } = await loadChunkWithReloadRecovery(
+      () => import("./studio-server-revision-restore-controller"),
+      "StudioServerRevisionRestoreController"
+    );
+    return restoreStudioServerRevision({
+      revision,
+      comparedBaseRevision,
+      workId,
+      studioAuthUserId,
+      serverCurrentRevision,
+      sharedDocumentRole: sharedDocument?.role ?? null,
+      serverRevisionLoading,
+      autosaveKey,
+      documentSaveInFlightRef,
+      studioRevisionProjectGenerationRef,
+      sharedDocumentRestoreAbortRef,
+      currentStudioDocumentScopeRef,
+      editorMountedRef,
+      isAsyncScopeCurrent: isStudioEditorAsyncScopeCurrent,
+      isCuttoonSourceFormat: isStudioCuttoonSourceFormat,
+      saveNamedCheckpoint,
+      markStudioDocumentChanged,
+      captureStudioMutationTicket,
+      canApplyStudioMutation,
+      lockStudioMutationsNow,
+      applyStudioProjectSnapshot,
+      reloadServerRevisions,
+      setLoadedWork,
+      setSharedDocumentScope,
+      setDocumentReloadRequired,
+      setServerRevisionLoading,
+      setServerRevisionError,
+      setHasAutosave,
+      setAutosaveRestoreBlockedReason,
+      setAutosaveChecked,
+    });
   }
 
   async function openAutoActions() {

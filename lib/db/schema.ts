@@ -1661,6 +1661,78 @@ export const creatorAssetReports = pgTable(
   ]
 );
 
+// ── 창작 마켓 게시: 인스턴스 공용 고정 시간창 + 짧은 fencing lease ──────────────
+// 인증 사용자 id/IP 원문은 보관하지 않는다. keyHash는 API가 도메인 분리 SHA-256으로 만든
+// 32-byte digest이며, expiresAt 인덱스와 bounded lazy cleanup으로 오래된 gate 행을 제거한다.
+export const creatorMarketplacePublishGates = pgTable(
+  "creator_marketplace_publish_gate",
+  {
+    keyHash: bytea("keyHash").primaryKey(),
+    windowStartedAt: timestamp("windowStartedAt", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
+    requestCount: integer("requestCount").notNull(),
+    // Bearer lease token 원문은 API 프로세스에만 있고 DB에는 SHA-256 digest만 저장한다.
+    leaseTokenHash: bytea("leaseTokenHash"),
+    leaseFence: bigint("leaseFence", { mode: "bigint" }).notNull(),
+    leaseExpiresAt: timestamp("leaseExpiresAt", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("idx_creator_marketplace_publish_gate_expires").on(t.expiresAt),
+    check(
+      "creator_marketplace_publish_gate_key_hash_check",
+      sql`octet_length(${t.keyHash}) = 32`
+    ),
+    check(
+      "creator_marketplace_publish_gate_window_check",
+      sql`${t.windowStartedAt} = date_bin(
+        interval '1 hour',
+        ${t.windowStartedAt},
+        timestamptz '1970-01-01 00:00:00+00'
+      )`
+    ),
+    check(
+      "creator_marketplace_publish_gate_request_count_check",
+      sql`${t.requestCount} between 1 and 20`
+    ),
+    check(
+      "creator_marketplace_publish_gate_lease_fence_check",
+      sql`${t.leaseFence} >= 1`
+    ),
+    check(
+      "creator_marketplace_publish_gate_lease_state_check",
+      sql`(
+        ${t.leaseTokenHash} is null
+        and ${t.leaseExpiresAt} is null
+      ) or (
+        ${t.leaseTokenHash} is not null
+        and octet_length(${t.leaseTokenHash}) = 32
+        and ${t.leaseExpiresAt} is not null
+        and ${t.leaseExpiresAt} > ${t.updatedAt}
+      )`
+    ),
+    check(
+      "creator_marketplace_publish_gate_retention_check",
+      sql`${t.expiresAt} = ${t.windowStartedAt} + interval '2 hours'`
+    ),
+    check(
+      "creator_marketplace_publish_gate_timestamps_check",
+      sql`${t.updatedAt} >= ${t.createdAt}`
+    ),
+  ]
+);
+
 // ── 창작 스튜디오 서버 AI: 분산 일일 쿼터 + 최소 사용 이력 ──────────────
 // 원장에는 프롬프트/응답/API 키/제공자 오류 본문을 저장하지 않는다. 일일 집계 행은 외부 호출 전에
 // 토큰을 보수적으로 예약해 여러 API 인스턴스의 동시 요청도 짧은 Postgres 트랜잭션으로 제한한다.

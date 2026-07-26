@@ -56,6 +56,9 @@ import {
   canonicalizeCreatorMarketplaceJson,
   creatorMarketplaceJsonByteSize,
 } from "@/lib/creator-marketplace-resource-contract";
+import {
+  createCreatorMarketplacePortableDelivery,
+} from "@/src/infrastructure/creator-marketplace-client";
 
 export const STUDIO_CREATOR_FILTER_PRESET_LIBRARY_KEY =
   "toonspectrum.studio-creator-filter-presets.v1" as const;
@@ -815,9 +818,6 @@ export async function createStudioCreatorPackPortableDelivery(
   }
   const kind = entry.kind as Exclude<CreatorMarketplaceResourceKind, "asset" | "template" | "3d-preset">;
   const definition = entry.delivery.definition as Record<string, CreatorMarketplaceJsonValue>;
-  const { createCreatorMarketplacePortableDelivery } = await import(
-    "@/src/infrastructure/creator-marketplace-client"
-  );
   return createCreatorMarketplacePortableDelivery(kind, definition);
 }
 
