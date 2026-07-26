@@ -18218,6 +18218,24 @@ const puppetWarpArmed =
       ) {
         e.preventDefault();
         finishPolyLassoSession();
+      } else if (mod && !e.altKey && (e.key === "g" || e.key === "G")) {
+        // Figma/Illustrator: ⌘G = 그룹 생성, ⇧⌘G = 그룹 해제
+        const targetIds = marqueeIds.length > 0 ? marqueeIds : selectedId ? [selectedId] : [];
+        if (targetIds.length > 0) {
+          e.preventDefault();
+          if (e.shiftKey) {
+            targetIds.forEach((id) => {
+              patchEl(id, { groupId: undefined } as Partial<El>);
+            });
+            announceDrawingShortcut("그룹 해제 완료");
+          } else {
+            const newGroupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+            targetIds.forEach((id) => {
+              patchEl(id, { groupId: newGroupId } as Partial<El>);
+            });
+            announceDrawingShortcut(`요소 ${targetIds.length}개 그룹화`);
+          }
+        }
       } else if ((selectedId || marqueeIds.length > 0) && e.key.startsWith("Arrow")) {
         // 방향키 미세이동: 1px, Shift 동반 시 10px.
         e.preventDefault();

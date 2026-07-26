@@ -85,7 +85,7 @@ export function StudioPageSequenceStrip({
         data-studio-page-sequence-scroller="true"
         className="min-w-0 flex-1 touch-pan-x overflow-x-auto overscroll-x-contain scroll-px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <ol className="flex w-max min-w-full items-stretch gap-2 py-0.5 pr-1">
+        <ol className="flex w-max min-w-full items-stretch gap-2 py-0.5 pr-4">
           {pages.length === 0 ? (
             <li
               role="status"

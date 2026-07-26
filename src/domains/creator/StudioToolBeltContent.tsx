@@ -1395,15 +1395,25 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
         <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.team}>
           <button
             type="button"
+            data-studio-team-share-btn="true"
             onClick={() => {
               setCommentsOpen(false);
-              setTeamPanelOpen(true);
+              setTeamPanelOpen((prev) => !prev);
             }}
             aria-pressed={teamPanelOpen}
             aria-label="팀 작업 공간"
-            className={cn(toolBtn(teamPanelOpen), iconToolBtnTouch)}
+            className={cn(
+              toolBtn(teamPanelOpen),
+              iconToolBtnTouch,
+              "relative gap-1 px-2.5 font-medium text-xs text-accent hover:bg-accent/15 border border-accent/30 rounded-full transition-all shadow-sm"
+            )}
           >
-            <UsersRound size={14} aria-hidden />
+            <UsersRound size={15} className="shrink-0 text-accent" aria-hidden />
+            <span className="hidden sm:inline font-semibold text-[0.7rem] text-accent">팀 & 실시간 공유</span>
+            <span className="relative flex size-2 shrink-0">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-75" />
+              <span className="relative inline-flex size-2 rounded-full bg-accent" />
+            </span>
           </button>
         </StudioToolBeltHintTarget>
         <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.continuity}>
