@@ -182,7 +182,7 @@ describe("StudioDrawOptionsBar", () => {
     expect(activeTool.textContent).toContain("9px · 90%");
 
     const reset = screen.getByRole("button", {
-      name: "마커(굵고 반투명) 기본값으로 복원",
+      name: "마커(굵고 반투명) 기본값으로 복원, 변경된 설정 1개",
     });
     expect(reset.getAttribute("data-studio-brush-preset-modified")).toBe("true");
     fireEvent.click(reset);
@@ -200,6 +200,114 @@ describe("StudioDrawOptionsBar", () => {
     expect(
       screen.getByRole("button", { name: "도구 속성 접기" }).getAttribute("aria-expanded")
     ).toBe("true");
+  });
+
+  it("uses the canonical full-brush restore action and exposes its exact modified count", () => {
+    const onRestoreBrushDefaults = vi.fn();
+    render(
+      <StudioDrawOptionsBar
+        drawMode="pen"
+        brushId="gpen"
+        strokeWidth={11}
+        brushOpacity={0.72}
+        stabilizer={9}
+        color="#224466"
+        quickShapeActive={false}
+        brushDefaultRestore={{
+          sourceName: "G펜",
+          modifiedCount: 4,
+          loading: false,
+          available: true,
+        }}
+        onRestoreBrushDefaults={onRestoreBrushDefaults}
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+      />
+    );
+
+    const reset = screen.getByRole("button", {
+      name: "G펜 기본값으로 복원, 변경된 설정 4개",
+    });
+    expect(reset.getAttribute("data-studio-brush-preset-modified-count")).toBe("4");
+    fireEvent.click(reset);
+    expect(onRestoreBrushDefaults).toHaveBeenCalledOnce();
+  });
+
+  it("turns the clean post-restore control into an explicit one-step undo", () => {
+    const onRestoreBrushDefaults = vi.fn();
+    render(
+      <StudioDrawOptionsBar
+        drawMode="pen"
+        brushId="gpen"
+        strokeWidth={7}
+        brushOpacity={1}
+        stabilizer={5}
+        color="#111111"
+        quickShapeActive={false}
+        brushDefaultRestore={{
+          sourceName: "G펜",
+          modifiedCount: 0,
+          loading: false,
+          available: true,
+          undoAvailable: true,
+        }}
+        onRestoreBrushDefaults={onRestoreBrushDefaults}
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+      />
+    );
+
+    const undo = screen.getByRole("button", { name: "G펜 기본값 복원 취소" });
+    expect(undo.textContent).toContain("되돌리기");
+    fireEvent.click(undo);
+    expect(onRestoreBrushDefaults).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed with a clear reselect instruction when a safe brush baseline is unavailable", () => {
+    render(
+      <StudioDrawOptionsBar
+        drawMode="pen"
+        brushId="gpen"
+        strokeWidth={7}
+        brushOpacity={1}
+        stabilizer={5}
+        color="#111111"
+        quickShapeActive={false}
+        brushDefaultRestore={{
+          sourceName: "삭제된 저장 브러시",
+          modifiedCount: 0,
+          loading: false,
+          available: false,
+        }}
+        onRestoreBrushDefaults={vi.fn()}
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+      />
+    );
+
+    const reset = screen.getByRole("button", {
+      name: "삭제된 저장 브러시 기본값 없음, 브러시를 다시 선택하세요",
+    });
+    expect((reset as HTMLButtonElement).disabled).toBe(true);
+    expect(reset.textContent).toContain("기준 없음");
+    const recoveryHintTarget = screen.getByRole("group", {
+      name: "삭제된 저장 브러시 기본값 없음, 브러시를 다시 선택하세요",
+    });
+    expect(recoveryHintTarget.getAttribute("tabindex")).toBe("0");
+    recoveryHintTarget.focus();
+    expect(document.activeElement).toBe(recoveryHintTarget);
   });
 
   it("keeps preset reapplication available without falsely marking untouched defaults as changed", () => {
@@ -607,6 +715,9 @@ describe("StudioDrawOptionsBar", () => {
     expect(html).toContain("100vw - 752px");
     expect(html).toContain("max(calc(100vw - 752px), 20rem)");
     expect(html).toContain("clamp(10.75rem");
+    expect(drawOptionsSource).toContain(
+      'bottom: "max(0.75rem, env(safe-area-inset-bottom))"',
+    );
   });
 
   it("keeps the brush library a keyboard-friendly non-modal popover", () => {

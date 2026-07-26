@@ -175,6 +175,17 @@ describe("Studio canvas viewport module boundary", () => {
     );
   });
 
+  it("keeps desktop status controls above the measured drawing options dock", () => {
+    const viewport = moduleShape("./StudioCanvasViewport.tsx");
+
+    expect(viewport.source).toContain(
+      '"calc(var(--studio-draw-options-height, 3.75rem) + max(0.75rem, env(safe-area-inset-bottom)) + 0.75rem)"',
+    );
+    expect(viewport.source).not.toContain(
+      'tool === "draw" && !isMobile && "bottom-[4.75rem]"',
+    );
+  });
+
   it("preserves the neutral optional-UI registry instead of flattening lazy chunks", () => {
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
 

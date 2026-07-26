@@ -26,6 +26,13 @@ export interface StudioOptionsBarsDrawModel {
   activeCatalogBrushName?: string;
   brushCatalogItems?: readonly StudioBrushTrayItem[];
   brushCatalogOpen: boolean;
+  brushDefaultRestore: Readonly<{
+    sourceName: string;
+    modifiedCount: number;
+    loading: boolean;
+    available: boolean;
+    undoAvailable: boolean;
+  }> | null;
   brushOpacity: number;
   brushSlots: readonly (StudioBrushSlot | null)[];
   canvasFlipH: boolean;
@@ -75,6 +82,7 @@ export interface StudioOptionsBarsHandlers {
   openBrushStudio: () => void;
   recallBrushSlot: (index: number) => void;
   reorderSelection: (direction: "front" | "back") => void;
+  restoreBrushDefaults: () => void;
   selectBrushId: (brushId: string) => void;
   setBrushOpacity: (value: number) => void;
   setColor: (hex: string) => void;
@@ -128,6 +136,7 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
             activeCatalogBrushId={draw.activeCatalogBrushId}
             activeCatalogBrushName={draw.activeCatalogBrushName}
             brushCatalogItems={draw.brushCatalogItems}
+            brushDefaultRestore={draw.brushDefaultRestore}
             strokeWidth={draw.strokeWidth}
             brushOpacity={draw.brushOpacity}
             stabilizer={draw.stabilizer}
@@ -139,6 +148,7 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
             symmetryType={draw.symmetryType}
             quickShapeActive={draw.quickShapeActive}
             onSelectBrush={(item) => stableHandlers.selectBrushId(item.id)}
+            onRestoreBrushDefaults={stableHandlers.restoreBrushDefaults}
             onStrokeWidthChange={stableHandlers.setStrokeWidth}
             onOpacityChange={stableHandlers.setBrushOpacity}
             onStabilizerChange={stableHandlers.setStabilizer}

@@ -190,13 +190,11 @@ import {
   normalizeStudioBrushDynamicsSettings,
   resolveStudioBrushDynamicsPresetId,
   studioBrushDynamicsSettingsForBrushId,
-  studioBrushDynamicsPresetSettings,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
 import {
   browserBrushLibraryStorage,
-  brushMatchesSnapshot,
   BRUSH_LIBRARY_KEY,
   DEFAULT_STUDIO_BRUSH_SNAPSHOT,
   listBrushes,
@@ -213,6 +211,7 @@ import {
 } from "./studio-brush-mode-width";
 import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
 import {
+  materializeStudioBrushCatalogSelection,
   studioCoreBrushCatalogSelection,
   type StudioBrushCatalogSelection,
 } from "./studio-brush-selection";
@@ -1285,6 +1284,15 @@ import type {
 } from "./studio-auto-actions";
 import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 import type { StudioBg3dShotBatchRecoveryScope } from "./studio-bg3d-shot-batch-plan";
+import type {
+  StudioBrushBaseline,
+  StudioBrushBaselineInspection,
+  StudioBrushBaselineSelection,
+} from "./studio-brush-baseline-contract";
+import type {
+  StudioBrushDefaultRestoreDirection,
+  StudioBrushDefaultRestoreTransaction,
+} from "./studio-brush-default-restore";
 import type { StudioClip } from "./studio-clips";
 import type {
   ComipoAssemblyInput,
@@ -5177,15 +5185,11 @@ function StudioCuttoonEditor() {
     setTutorialHubOpen(false);
     switch (action) {
       case "pen":
-        disarmAllPixelTools();
-        setTool("draw");
-        setDrawMode("pen");
+        activatePrimaryCanvasTool("draw", "pen");
         announceDrawingShortcut("펜 모드 · 선을 그어 보세요");
         break;
       case "smart-shape":
-        disarmAllPixelTools();
-        setTool("draw");
-        setDrawMode("pen");
+        activatePrimaryCanvasTool("draw", "pen");
         setQuickShapeActive(true);
         announceDrawingShortcut("스마트 도형 켜짐 · 도형을 그리고 손을 떼 보세요");
         break;
@@ -5193,9 +5197,7 @@ function StudioCuttoonEditor() {
         setMenu("bubble");
         break;
       case "brush":
-        disarmAllPixelTools();
-        setTool("draw");
-        setDrawMode("pen");
+        activatePrimaryCanvasTool("draw", "pen");
         applyBuiltInBrushPreset(BRUSH_PRESETS.find((p) => p.id === "pencil") ?? BRUSH_PRESETS[0]);
         announceDrawingShortcut("브러시 · 옵션에서 질감을 바꿔 보세요");
         break;
@@ -5543,7 +5545,7 @@ function StudioCuttoonEditor() {
   const [tipAngle, setTipAngle] = useState<number>(-30);
   const [tipRoundness, setTipRoundness] = useState<number>(0.24);
   const [brushDynamics, setBrushDynamics] = useState<NormalizedStudioBrushDynamicsSettings>(() =>
-    studioBrushDynamicsPresetSettings("ink-particle")
+    normalizeStudioBrushDynamicsSettings(DEFAULT_STUDIO_BRUSH_SNAPSHOT.brushDynamics)
   );
   // 데스크톱 관리 패널과 모바일 퀵 선반이 같은 배열을 소비한다. 같은 탭의 localStorage 변경은
   // storage 이벤트를 발생시키지 않으므로 StudioPage가 단일 source of truth를 소유한다.
@@ -5551,6 +5553,17 @@ function StudioCuttoonEditor() {
     listBrushes(browserBrushLibraryStorage())
   );
   const [appliedSavedBrushId, setAppliedSavedBrushId] = useState<string | null>(null);
+  const [activeBrushBaseline, setActiveBrushBaseline] =
+    useState<StudioBrushBaseline | null>(null);
+  const [activeBrushBaselineInspection, setActiveBrushBaselineInspection] =
+    useState<StudioBrushBaselineInspection | null>(null);
+  const [brushDefaultRestoreLoading, setBrushDefaultRestoreLoading] = useState(true);
+  const [lastBrushDefaultRestore, setLastBrushDefaultRestore] = useState<Readonly<{
+    baselineKey: StudioBrushBaseline["identity"]["key"];
+    transaction: StudioBrushDefaultRestoreTransaction;
+  }> | null>(null);
+  const brushBaselineRequestRef = useRef(0);
+  const brushBaselineInspectionRequestRef = useRef(0);
   const [pendingBrushDeletes, setPendingBrushDeletes] = useState<PendingBrushDelete[]>([]);
   const [pausedBrushDeleteId, setPausedBrushDeleteId] = useState<string | null>(null);
   const brushUndoToastRef = useRef<HTMLDivElement>(null);
@@ -5631,20 +5644,165 @@ function StudioCuttoonEditor() {
     brushDynamics,
     stampTuning,
   };
+  const currentBrushSnapshotRef = useRef(currentBrushSnapshot);
+  currentBrushSnapshotRef.current = currentBrushSnapshot;
   const appliedSavedBrush = appliedSavedBrushId
     ? savedBrushes.find((savedBrush) => savedBrush.id === appliedSavedBrushId) ?? null
     : null;
-  const activeSavedBrushId =
-    appliedSavedBrush && brushMatchesSnapshot(appliedSavedBrush, currentBrushSnapshot)
-      ? appliedSavedBrush.id
-      : null;
+  // CLIP STUDIO처럼 속성을 수정해도 선택한 사용자 브러시의 정체성은 유지한다. 완전히 같은지
+  // 여부는 별도의 modified 상태로 표현하고, 다른 브러시를 명시적으로 선택하거나 원본이
+  // 삭제됐을 때만 이 기준선을 버린다.
+  const activeSavedBrushId = appliedSavedBrush?.id ?? null;
   useEffect(() => {
-    if (appliedSavedBrushId && !activeSavedBrushId) setAppliedSavedBrushId(null);
-  }, [activeSavedBrushId, appliedSavedBrushId]);
+    if (!appliedSavedBrushId || appliedSavedBrush) return;
+    setAppliedSavedBrushId(null);
+    invalidateStudioBrushBaseline();
+  }, [appliedSavedBrush, appliedSavedBrushId]);
+
+  function selectStudioBrushBaseline(selection: StudioBrushBaselineSelection) {
+    const requestId = brushBaselineRequestRef.current + 1;
+    brushBaselineRequestRef.current = requestId;
+    setLastBrushDefaultRestore(null);
+    setBrushDefaultRestoreLoading(true);
+    void import("./studio-brush-baseline-contract").then((contract) => {
+      if (brushBaselineRequestRef.current !== requestId) return;
+      const baseline = contract.createStudioBrushBaseline(selection);
+      setActiveBrushBaseline(baseline);
+      setActiveBrushBaselineInspection(null);
+      setBrushDefaultRestoreLoading(false);
+    }).catch(() => {
+      if (brushBaselineRequestRef.current !== requestId) return;
+      setActiveBrushBaseline(null);
+      setActiveBrushBaselineInspection(null);
+      setBrushDefaultRestoreLoading(false);
+    });
+  }
+
+  function selectStudioCatalogBrushBaseline(catalogId: string) {
+    const requestId = brushBaselineRequestRef.current + 1;
+    brushBaselineRequestRef.current = requestId;
+    setLastBrushDefaultRestore(null);
+    setBrushDefaultRestoreLoading(true);
+    void Promise.all([
+      import("./studio-brush-baseline-contract"),
+      materializeStudioBrushCatalogSelection(catalogId),
+    ]).then(([contract, selection]) => {
+      if (brushBaselineRequestRef.current !== requestId) return;
+      if (!selection) {
+        setActiveBrushBaseline(null);
+        setActiveBrushBaselineInspection(null);
+        setBrushDefaultRestoreLoading(false);
+        return;
+      }
+      setActiveBrushBaseline(contract.createStudioCatalogBrushBaseline(selection));
+      setActiveBrushBaselineInspection(null);
+      setBrushDefaultRestoreLoading(false);
+    }).catch(() => {
+      if (brushBaselineRequestRef.current !== requestId) return;
+      setActiveBrushBaseline(null);
+      setActiveBrushBaselineInspection(null);
+      setBrushDefaultRestoreLoading(false);
+    });
+  }
+
+  function invalidateStudioBrushBaseline() {
+    brushBaselineRequestRef.current += 1;
+    setLastBrushDefaultRestore(null);
+    setActiveBrushBaseline(null);
+    setActiveBrushBaselineInspection(null);
+    setBrushDefaultRestoreLoading(false);
+  }
+
+  useEffect(() => {
+    selectStudioCatalogBrushBaseline("pen");
+  }, []);
+
+  useEffect(() => {
+    const baseline = activeBrushBaseline;
+    if (baseline?.identity.kind !== "saved") return;
+    const requestId = brushBaselineRequestRef.current;
+    void import("./studio-brush-baseline-contract")
+      .then((contract) => {
+        if (brushBaselineRequestRef.current !== requestId) return;
+        const next = contract.transitionStudioBrushBaseline(baseline, {
+          type: "saved-library-reconciled",
+          brushes: savedBrushes,
+        });
+        if (next === baseline) return;
+        if (!next) {
+          invalidateStudioBrushBaseline();
+          return;
+        }
+        setActiveBrushBaseline(next);
+      })
+      .catch(() => {
+        // A failed optional contract chunk must not redefine or erase a valid in-memory baseline.
+      });
+  }, [activeBrushBaseline, savedBrushes]);
+
+  useEffect(() => {
+    const requestId = brushBaselineInspectionRequestRef.current + 1;
+    brushBaselineInspectionRequestRef.current = requestId;
+    if (!activeBrushBaseline) {
+      setActiveBrushBaselineInspection(null);
+      return;
+    }
+    void import("./studio-brush-baseline-contract")
+      .then((contract) => {
+        if (brushBaselineInspectionRequestRef.current !== requestId) return;
+        setActiveBrushBaselineInspection(
+          contract.inspectStudioBrushBaseline(
+            activeBrushBaseline,
+            currentBrushSnapshotRef.current,
+            {
+              preserveStrokeWidth: proDrawPrefs.sizeLocked,
+              preserveBrushOpacity: proDrawPrefs.opacityLocked,
+            },
+          ),
+        );
+      })
+      .catch(() => {
+        if (brushBaselineInspectionRequestRef.current === requestId) {
+          setActiveBrushBaselineInspection(null);
+        }
+      });
+    return () => {
+      if (brushBaselineInspectionRequestRef.current === requestId) {
+        brushBaselineInspectionRequestRef.current += 1;
+      }
+    };
+  }, [
+    activeBrushBaseline,
+    brush,
+    activeCatalogBrush.sourcePresetId,
+    strokeWidth,
+    brushOpacity,
+    stabilizer,
+    stabilizerMode,
+    postCorrection,
+    preserveCorners,
+    pressureCurve,
+    pressureMinSize,
+    useVelocityPressure,
+    velocitySensitivity,
+    tiltEnabled,
+    tipAngle,
+    tipRoundness,
+    brushDynamics,
+    stampTuning,
+    proDrawPrefs.sizeLocked,
+    proDrawPrefs.opacityLocked,
+  ]);
+
+  useEffect(() => {
+    if (activeBrushBaselineInspection?.status === "modified") {
+      setLastBrushDefaultRestore(null);
+    }
+  }, [activeBrushBaselineInspection]);
 
   function applySavedBrush(saved: StudioSavedBrush) {
-    setTool("draw");
-    setDrawMode("pen");
+    selectStudioBrushBaseline({ kind: "saved", brush: saved });
+    activatePrimaryCanvasTool("draw", "pen");
     setBrush(saved.brushId);
     setActiveCatalogBrush({
       id: saved.sourcePresetId ?? saved.brushId,
@@ -5677,6 +5835,7 @@ function StudioCuttoonEditor() {
     } else if (used.status === "missing") {
       setSavedBrushes(used.brushes);
       setAppliedSavedBrushId(null);
+      invalidateStudioBrushBaseline();
       announceDrawingShortcut("브러시는 적용했지만 다른 탭에서 삭제되어 저장 목록을 새로 맞췄어요.");
     } else if (used.status === "library-unreadable") {
       announceDrawingShortcut("브러시는 적용했지만 저장 데이터를 읽지 못해 최근 사용 기록은 남기지 못했어요.");
@@ -5698,8 +5857,9 @@ function StudioCuttoonEditor() {
       brushOpacity,
       color,
     });
-    setTool("draw");
-    setDrawMode("pen");
+    setAppliedSavedBrushId(null);
+    selectStudioBrushBaseline({ kind: "catalog", selection });
+    activatePrimaryCanvasTool("draw", "pen");
     setBrush(applied.brushId);
     const extendedSource = selection.catalogId !== selection.runtimeBrushId;
     setActiveCatalogBrush({
@@ -5747,6 +5907,98 @@ function StudioCuttoonEditor() {
 
   function applyBuiltInBrushPreset(preset: BrushPreset) {
     applyStudioBrushCatalogSelection(studioCoreBrushCatalogSelection(preset));
+  }
+
+  function applyBrushDefaultRestoreTransaction(
+    transaction: StudioBrushDefaultRestoreTransaction,
+    direction: StudioBrushDefaultRestoreDirection,
+  ) {
+    const values = direction === "undo" ? transaction.before : transaction.after;
+    if (!proDrawPrefs.sizeLocked) setStrokeWidth(values.strokeWidth);
+    if (!proDrawPrefs.opacityLocked) setBrushOpacity(values.brushOpacity);
+    setBrushDynamics(values.brushDynamics);
+    setStampTuning(values.stampTuning);
+    setStabilizer(values.stabilizer);
+    setStabilizerMode(values.stabilizerMode);
+    setPostCorrection(values.postCorrection);
+    setPreserveCorners(values.preserveCorners);
+    setPressureCurve(values.pressureCurve);
+    setPressureMinSize(values.pressureMinSize);
+    setUseVelocityPressure(values.useVelocityPressure);
+    setVelocitySensitivity(values.velocitySensitivity);
+    setTiltEnabled(values.tiltEnabled);
+    setTipAngle(values.tipAngle);
+    setTipRoundness(values.tipRoundness);
+    announceDrawingShortcut(
+      direction === "undo"
+        ? "브러시 기본값 복원을 되돌렸어요."
+        : `${transaction.changes.length}개 브러시 설정을 기본값으로 복원했어요.`,
+    );
+  }
+
+  async function restoreActiveBrushDefaults() {
+    const baseline = activeBrushBaseline;
+    const requestId = brushBaselineRequestRef.current;
+    const lastRestore = lastBrushDefaultRestore;
+    const requestedUndo =
+      lastRestore !== null
+      && baseline !== null
+      && lastRestore.baselineKey === baseline.identity.key
+      && activeBrushBaselineInspection?.status === "clean";
+    if (!baseline || brushDefaultRestoreLoading) {
+      announceDrawingShortcut("브러시 기본값을 확인하는 중이에요.");
+      return;
+    }
+
+    setBrushDefaultRestoreLoading(true);
+    try {
+      const contract = await import("./studio-brush-baseline-contract");
+      if (brushBaselineRequestRef.current !== requestId) return;
+      const inspection = contract.inspectStudioBrushBaseline(
+        baseline,
+        currentBrushSnapshotRef.current,
+        {
+          preserveStrokeWidth: proDrawPrefs.sizeLocked,
+          preserveBrushOpacity: proDrawPrefs.opacityLocked,
+        },
+      );
+      if (requestedUndo && lastRestore) {
+        if (inspection.status === "clean") {
+          applyBrushDefaultRestoreTransaction(lastRestore.transaction, "undo");
+          setLastBrushDefaultRestore(null);
+          return;
+        }
+        setLastBrushDefaultRestore(null);
+        if (inspection.status === "invalid") {
+          invalidateStudioBrushBaseline();
+          announceDrawingShortcut("브러시가 바뀌어 복원 되돌리기를 취소했어요.");
+          return;
+        }
+        setActiveBrushBaselineInspection(inspection);
+        announceDrawingShortcut("브러시 설정이 바뀌어 이전 복원 되돌리기를 취소했어요.");
+        return;
+      }
+      if (inspection.status === "invalid") {
+        invalidateStudioBrushBaseline();
+        announceDrawingShortcut("브러시가 바뀌어 기본값을 다시 확인해야 해요.");
+        return;
+      }
+      if (inspection.status === "clean") {
+        announceDrawingShortcut(`${baseline.profile.sourceName} 브러시는 이미 기본값이에요.`);
+        return;
+      }
+      applyBrushDefaultRestoreTransaction(inspection.transaction, "redo");
+      setLastBrushDefaultRestore({
+        baselineKey: baseline.identity.key,
+        transaction: inspection.transaction,
+      });
+    } catch {
+      announceDrawingShortcut("브러시 기본값을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      if (brushBaselineRequestRef.current === requestId) {
+        setBrushDefaultRestoreLoading(false);
+      }
+    }
   }
 
   function toggleBuiltInBrushFavorite(brushId: string) {
@@ -5799,6 +6051,8 @@ function StudioCuttoonEditor() {
   }, [brushCatalogSession, drawMode, isMobile, mobileSheet, tool]);
 
   function applyBrushSlot(slot: StudioBrushSlot) {
+    setAppliedSavedBrushId(null);
+    selectStudioCatalogBrushBaseline(slot.sourcePresetId ?? slot.brushId);
     const preset = BRUSH_PRESETS.find((p) => p.id === slot.brushId);
     if (preset) {
       setBrush(preset.id);
@@ -5823,8 +6077,7 @@ function StudioCuttoonEditor() {
     });
     setStrokeWidth(slot.strokeWidth);
     setBrushOpacity(slot.brushOpacity);
-    setTool("draw");
-    setDrawMode("pen");
+    activatePrimaryCanvasTool("draw", "pen");
   }
 
   function applyDynamicsPreset(
@@ -9956,12 +10209,14 @@ function StudioCuttoonEditor() {
   const [pixelBrushRadius, setPixelBrushRadius] = useState(SELECTION_BRUSH_RADIUS_DEFAULT);
   const [wandTolerance, setWandTolerance] = useState(MAGIC_WAND_TOLERANCE_DEFAULT);
   const pixelWandRunIdRef = useRef(0);
+  const pixelWandActiveRunIdRef = useRef<number | null>(null);
   // 색상 범위 선택(포토샵 Select > Color Range) — 샘플은 다중, pick 무장 상태만 disarm 대상.
   const [colorRangePickActive, setColorRangePickActive] = useState(false);
   const [colorRangeSamples, setColorRangeSamples] = useState<ColorRangeSample[]>([]);
   const [colorRangeFuzziness, setColorRangeFuzziness] = useState(COLOR_RANGE_FUZZINESS_DEFAULT);
   const [colorRangePreviewEnabled, setColorRangePreviewEnabled] = useState(false);
   const colorRangeRunIdRef = useRef(0);
+  const colorRangeActiveRunIdRef = useRef<number | null>(null);
   const [smudgeActive, setSmudgeActive] = useState(false);
   const [smudgeRadius, setSmudgeRadius] = useState(SMUDGE_RADIUS_DEFAULT);
   const [smudgeStrength, setSmudgeStrength] = useState(SMUDGE_STRENGTH_DEFAULT); // %
@@ -10182,8 +10437,10 @@ function StudioCuttoonEditor() {
     if (!keepAutoTargetGesture) {
       setPixelBusy(false);
       pixelWandRunIdRef.current += 1; // 요소가 바뀌면 진행 중인 매직완드 스캔 결과를 무효화한다.
+      pixelWandActiveRunIdRef.current = null;
     }
     colorRangeRunIdRef.current += 1; // 색상 범위 스캔도 함께 무효화 — 샘플은 다른 이미지 기준이라 비운다.
+    colorRangeActiveRunIdRef.current = null;
     setColorRangeSamples([]);
   }, [cancelLiquifyPointerSession, cancelPixelSelectionPointerSession, selectedImageElementId]);
   useEffect(() => {
@@ -15062,6 +15319,17 @@ const puppetWarpArmed =
   // bubbleAnchorPick/quickShape 토글이 다른 armed 도구를 안 껐고, pixelTool도 crop을 안 껐음).
   function disarmAllPixelTools() {
     cancelLiquifyPointerSession();
+    cancelPixelSelectionPointerSession();
+    if (pixelWandActiveRunIdRef.current !== null) {
+      pixelWandRunIdRef.current += 1;
+      pixelWandActiveRunIdRef.current = null;
+      setPixelBusy(false);
+    }
+    if (colorRangeActiveRunIdRef.current !== null) {
+      colorRangeRunIdRef.current += 1;
+      colorRangeActiveRunIdRef.current = null;
+      setPixelBusy(false);
+    }
     advancedFillRunIdRef.current += 1;
     advancedFillAbortRef.current?.abort();
     advancedFillAbortRef.current = null;
@@ -17320,15 +17588,13 @@ const puppetWarpArmed =
     if (action === "undo") undo();
     else if (action === "redo") redo();
     else if (action === "select") {
-      setTool("select");
+      activatePrimaryCanvasTool("select");
       setMobileSheet(null);
     } else if (action === "pen") {
-      setTool("draw");
-      setDrawMode("pen");
+      activatePrimaryCanvasTool("draw", "pen");
       setMobileSheet(null);
     } else if (action === "eraser") {
-      setTool("draw");
-      setDrawMode("eraser");
+      activatePrimaryCanvasTool("draw", "eraser");
       setMobileSheet(null);
     } else if (action === "eyedropper") {
       setEyedropperActive(true);
@@ -20677,6 +20943,7 @@ const puppetWarpArmed =
     const mutationTicket = captureStudioMutationTicket();
     const p = { x: (pos.x - frame.x) / frame.width, y: (pos.y - frame.y) / frame.height };
     const runId = ++pixelWandRunIdRef.current;
+    pixelWandActiveRunIdRef.current = runId;
     setPixelBusy(true);
     try {
       const { magicWandScanFromImage } = await loadStudioPixelEditBrushRuntime();
@@ -20695,6 +20962,9 @@ const puppetWarpArmed =
         setError(err instanceof Error ? err.message : "이 지점에서 선택할 영역을 찾지 못했어요.");
       }
     } finally {
+      if (pixelWandActiveRunIdRef.current === runId) {
+        pixelWandActiveRunIdRef.current = null;
+      }
       if (runId === pixelWandRunIdRef.current) setPixelBusy(false);
     }
   }
@@ -20722,6 +20992,7 @@ const puppetWarpArmed =
     const target = selected;
     const mutationTicket = captureStudioMutationTicket();
     const runId = ++colorRangeRunIdRef.current;
+    colorRangeActiveRunIdRef.current = runId;
     setPixelBusy(true);
     try {
       const { colorRangeScanFromImage } = await import("./studio-color-range-browser");
@@ -20744,6 +21015,9 @@ const puppetWarpArmed =
         setError(err instanceof Error ? err.message : "색상 범위 선택에 실패했어요.");
       }
     } finally {
+      if (colorRangeActiveRunIdRef.current === runId) {
+        colorRangeActiveRunIdRef.current = null;
+      }
       if (runId === colorRangeRunIdRef.current) setPixelBusy(false);
     }
   }
@@ -27339,6 +27613,7 @@ function clearSelectionForEdit() {
   // 메뉴 항목 onSelect 클로저가 참조하는 에디터 핸들러의 안정 번들 — 그룹 배열 useMemo가
   // 렌더마다 무효화되지 않게 하고, 이벤트 시점엔 항상 최신 클로저를 호출한다.
   const studioMainMenuActions = useStudioStableHandlers({
+    activatePrimaryCanvasTool,
     addPage,
     addText,
     announceDrawingShortcut,
@@ -27599,15 +27874,11 @@ function clearSelectionForEdit() {
           toggleRightPanel: () => setRightPanelOpenWithOverride((current) => !current),
           openShortcuts: () => setShortcutsOpen(true),
           selectDrawMode: (mode) => {
-            studioMainMenuActions.disarmAllPixelTools();
-            setTool("draw");
-            setDrawMode(mode);
+            studioMainMenuActions.activatePrimaryCanvasTool("draw", mode);
           },
           enableSmartShape: () => {
-            studioMainMenuActions.disarmAllPixelTools();
+            studioMainMenuActions.activatePrimaryCanvasTool("draw", "pen");
             setQuickShapeActive(true);
-            setTool("draw");
-            setDrawMode("pen");
           },
         },
       }),
@@ -30057,13 +30328,14 @@ function clearSelectionForEdit() {
       if (slot) applyBrushSlot(slot);
     },
     reorderSelection: (direction) => reorder(direction),
+    restoreBrushDefaults: () => {
+      void restoreActiveBrushDefaults();
+    },
     selectBrushId: studioBrushCatalogHandlers.selectBrushId,
     setBrushOpacity,
     setColor,
     setDrawMode: (mode) => {
-      disarmAllPixelTools();
-      setTool("draw");
-      setDrawMode(mode);
+      activatePrimaryCanvasTool("draw", mode);
       if (mode === "pen" && isStudioPixelPencilRenderMode(brush)) {
         setBrush("pen");
       }
@@ -30098,9 +30370,7 @@ function clearSelectionForEdit() {
     toggleQuickShape: () => {
       const next = !quickShapeActive;
       if (next) {
-        disarmAllPixelTools();
-        setTool("draw");
-        setDrawMode("pen");
+        activatePrimaryCanvasTool("draw", "pen");
         setEyedropperActive(false);
         announceDrawingShortcut("스마트 도형 켜짐 · 그려서 손을 떼면 다듬어요");
       } else {
@@ -30123,9 +30393,7 @@ function clearSelectionForEdit() {
     toggleEraseToIntersection: () => {
       const next = !eraseToIntersection;
       if (next) {
-        disarmAllPixelTools();
-        setTool("draw");
-        setDrawMode("eraser");
+        activatePrimaryCanvasTool("draw", "eraser");
       }
       setEraseToIntersection(next);
       announceDrawingShortcut(
@@ -30143,6 +30411,26 @@ function clearSelectionForEdit() {
       activeCatalogBrushName: activeCatalogBrush.name,
       brushId: brush,
       brushCatalogOpen: brushCatalogSession?.placement === "desktop-dock",
+      brushDefaultRestore: {
+        sourceName:
+          activeBrushBaseline?.profile.sourceName ?? activeCatalogBrush.name,
+        modifiedCount:
+          activeBrushBaselineInspection?.status === "modified"
+            ? activeBrushBaselineInspection.dirtyCount
+            : 0,
+        loading:
+          brushDefaultRestoreLoading
+          || Boolean(activeBrushBaseline && !activeBrushBaselineInspection),
+        available:
+          activeBrushBaseline !== null
+          && activeBrushBaselineInspection !== null
+          && activeBrushBaselineInspection.status !== "invalid",
+        undoAvailable:
+          lastBrushDefaultRestore !== null
+          && activeBrushBaseline !== null
+          && lastBrushDefaultRestore.baselineKey === activeBrushBaseline.identity.key
+          && activeBrushBaselineInspection?.status === "clean",
+      },
       brushOpacity,
       brushSlots: brushSlotsState.slots,
       canvasFlipH,
@@ -30189,8 +30477,12 @@ function clearSelectionForEdit() {
     [
       activeCatalogBrush.id,
       activeCatalogBrush.name,
+      activeBrushBaseline,
+      activeBrushBaselineInspection,
       brush,
       brushCatalogSession?.placement,
+      brushDefaultRestoreLoading,
+      lastBrushDefaultRestore,
       brushOpacity,
       brushSlotsState.slots,
       canvasFlipH,
@@ -32516,18 +32808,14 @@ function clearSelectionForEdit() {
         }}
         onDelete={removeSelected}
         onSelectPen={() => {
-          disarmAllPixelTools();
-          setTool("draw");
-          setDrawMode("pen");
+          activatePrimaryCanvasTool("draw", "pen");
         }}
         onAddSpeechBubble={() => addBubble("speech")}
         onAddText={() => addText()}
         onAddPage={addPage}
         onEnableQuickShape={() => {
-          disarmAllPixelTools();
+          activatePrimaryCanvasTool("draw", "pen");
           setQuickShapeActive(true);
-          setTool("draw");
-          setDrawMode("pen");
         }}
         onClose={() => setContextMenu((prev) => ({ ...prev, visible: false }))}
       />

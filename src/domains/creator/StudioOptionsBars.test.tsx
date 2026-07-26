@@ -38,6 +38,13 @@ const DRAW_MODEL: StudioOptionsBarsDrawModel = {
   activeCatalogBrushName: "머리카락 결",
   brushCatalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   brushCatalogOpen: true,
+  brushDefaultRestore: {
+    sourceName: "머리카락 결",
+    modifiedCount: 4,
+    loading: false,
+    available: true,
+    undoAvailable: false,
+  },
   brushOpacity: 0.72,
   brushSlots: [
     { brushId: "pen", strokeWidth: 8, brushOpacity: 0.9 },
@@ -86,6 +93,7 @@ function createHandlers(): StudioOptionsBarsHandlers {
     openBrushStudio: vi.fn(),
     recallBrushSlot: vi.fn(),
     reorderSelection: vi.fn(),
+    restoreBrushDefaults: vi.fn(),
     selectBrushId: vi.fn(),
     setBrushOpacity: vi.fn(),
     setColor: vi.fn(),
@@ -184,6 +192,13 @@ describe("StudioOptionsBars", () => {
     expect(drawProps.activeCatalogBrushName).toBe("머리카락 결");
     expect(drawProps.brushCatalogItems).toBe(STUDIO_ALL_BRUSH_CATALOG_ITEMS);
     expect(drawProps.brushCatalogOpen).toBe(true);
+    expect(drawProps.brushDefaultRestore).toEqual({
+      sourceName: "머리카락 결",
+      modifiedCount: 4,
+      loading: false,
+      available: true,
+      undoAvailable: false,
+    });
     expect(drawProps.brushOpacity).toBe(0.72);
     expect(drawProps.brushSlots).toEqual(DRAW_MODEL.brushSlots);
     expect(drawProps.canvasFlipH).toBe(true);
@@ -216,6 +231,7 @@ describe("StudioOptionsBars", () => {
 
     drawProps.onToggleBrushCatalog?.(trigger);
     drawProps.onSelectBrush({ id: "marker" } as Parameters<typeof drawProps.onSelectBrush>[0]);
+    drawProps.onRestoreBrushDefaults?.();
     drawProps.onStrokeWidthChange(22);
     drawProps.onOpacityChange(0.55);
     drawProps.onStabilizerChange(4);
@@ -234,6 +250,7 @@ describe("StudioOptionsBars", () => {
 
     expect(stableHandlers.toggleBrushCatalog).toHaveBeenCalledWith(trigger);
     expect(stableHandlers.selectBrushId).toHaveBeenCalledWith("marker");
+    expect(stableHandlers.restoreBrushDefaults).toHaveBeenCalledTimes(1);
     expect(stableHandlers.setStrokeWidth).toHaveBeenCalledWith(22);
     expect(stableHandlers.setBrushOpacity).toHaveBeenCalledWith(0.55);
     expect(stableHandlers.setStabilizer).toHaveBeenCalledWith(4);

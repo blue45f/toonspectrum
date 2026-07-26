@@ -31,6 +31,7 @@ export interface Resizable {
     "aria-valuetext": string;
     "aria-valuemin": number;
     "aria-valuemax": number;
+    "aria-keyshortcuts"?: string;
     tabIndex: 0;
     onPointerDown: (e: React.PointerEvent) => void;
     onKeyDown: (e: React.KeyboardEvent) => void;
@@ -40,26 +41,41 @@ export interface Resizable {
 }
 
 const clampTo = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+const DOUBLE_TAP_MAX_DELAY_MS = 350;
+const TAP_MAX_TRAVEL_PX = 8;
+const DOUBLE_TAP_MAX_DISTANCE_PX = 24;
+
+interface ResizeTap {
+  at: number;
+  clientX: number;
+  clientY: number;
+}
+
+function finiteCoordinate(value: number): number {
+  return Number.isFinite(value) ? value : 0;
+}
 
 /**
  * 드래그(또는 키보드)로 패널 너비를 조절하는 스플리터 훅.
- * - 더블클릭으로 기본 너비로 리셋.
- * - 좌/우 화살표로 step씩 조절(접근성).
+ * - 더블클릭·더블탭·Enter로 기본 너비로 리셋.
+ * - 좌/우 화살표로 step씩 조절하고 Home/End로 경계를 선택(접근성).
  * - 드래그 중 전역 pointermove/up을 듣고, 끝나면 정리한다.
  */
 export function useResizable(options: ResizableOptions): Resizable {
   const { initial, min, max, edge, storageKey, step = 16 } = options;
+  const defaultWidth = clampTo(initial, min, max);
 
   const [width, setWidthState] = useState<number>(() => {
     if (storageKey && typeof localStorage !== "undefined") {
       const saved = Number(localStorage.getItem(storageKey));
       if (Number.isFinite(saved) && saved >= min && saved <= max) return saved;
     }
-    return initial;
+    return defaultWidth;
   });
   const [dragging, setDragging] = useState(false);
   const mountedRef = useRef(true);
   const activeDragCleanupRef = useRef<(() => void) | null>(null);
+  const lastTapRef = useRef<ResizeTap | null>(null);
 
   const setWidth = (w: number) => setWidthState(clampTo(w, min, max));
 
@@ -92,7 +108,14 @@ export function useResizable(options: ResizableOptions): Resizable {
   }, []);
 
   const onPointerDown = (e: React.PointerEvent) => {
+    // 보조 버튼·멀티터치가 캔버스 옆의 얇은 핸들을 우연히 잡지 않도록 한다.
+    if (
+      e.isPrimary === false ||
+      (typeof e.button === "number" && e.button !== 0)
+    ) return;
     activeDragCleanupRef.current?.();
+    const pointerType = e.pointerType || "mouse";
+    if (pointerType === "mouse") lastTapRef.current = null;
     // preventDefault가 브라우저의 기본 포커스 이동도 막으므로 직접 포커스를 준다.
     // 마우스/펜으로 폭을 조절한 뒤에도 화살표·Home·End 조작을 바로 이어갈 수 있다.
     const target = e.currentTarget instanceof HTMLElement ? e.currentTarget : null;
@@ -100,8 +123,10 @@ export function useResizable(options: ResizableOptions): Resizable {
     e.preventDefault();
     const pointerId = e.pointerId;
     const startX = e.clientX;
+    const startY = finiteCoordinate(e.clientY);
     const startWidth = width;
     let latestClientX = startX;
+    let latestClientY = startY;
     let frame: number | null = null;
     let finished = false;
     setDragging(true);
@@ -114,6 +139,7 @@ export function useResizable(options: ResizableOptions): Resizable {
     const onMove = (ev: PointerEvent) => {
       if (ev.pointerId !== pointerId) return;
       latestClientX = ev.clientX;
+      latestClientY = finiteCoordinate(ev.clientY);
       if (frame !== null) return;
       if (typeof globalThis.requestAnimationFrame === "function") {
         frame = globalThis.requestAnimationFrame(applyPendingWidth);
@@ -125,9 +151,53 @@ export function useResizable(options: ResizableOptions): Resizable {
       if (ev && ev.pointerId !== pointerId) return;
       if (finished) return;
       finished = true;
-      if (frame !== null && typeof globalThis.cancelAnimationFrame === "function") {
-        globalThis.cancelAnimationFrame(frame);
+      const endedWithPointerUp = ev?.type === "pointerup";
+      if (endedWithPointerUp) {
+        // A quick drag can be coalesced directly into pointerup without a final pointermove.
+        // Treat the release sample as authoritative for both width and tap travel so that drag
+        // endpoints are not lost or accidentally remembered as the first half of a double-tap.
+        latestClientX = finiteCoordinate(ev.clientX);
+        latestClientY = finiteCoordinate(ev.clientY);
+      }
+      if (frame !== null) {
+        if (typeof globalThis.cancelAnimationFrame === "function") {
+          globalThis.cancelAnimationFrame(frame);
+        }
         applyPendingWidth();
+      } else if (endedWithPointerUp) {
+        applyPendingWidth();
+      }
+      if (pointerType !== "mouse" && endedWithPointerUp) {
+        const travel = Math.hypot(
+          latestClientX - startX,
+          latestClientY - startY
+        );
+        if (travel <= TAP_MAX_TRAVEL_PX) {
+          const now = Date.now();
+          const previousTap = lastTapRef.current;
+          const isDoubleTap = Boolean(
+            previousTap
+              && now - previousTap.at <= DOUBLE_TAP_MAX_DELAY_MS
+              && Math.hypot(
+                latestClientX - previousTap.clientX,
+                latestClientY - previousTap.clientY
+              ) <= DOUBLE_TAP_MAX_DISTANCE_PX
+          );
+          if (isDoubleTap) {
+            lastTapRef.current = null;
+            setWidthState(defaultWidth);
+          } else {
+            lastTapRef.current = {
+              at: now,
+              clientX: latestClientX,
+              clientY: latestClientY,
+            };
+          }
+        } else {
+          lastTapRef.current = null;
+        }
+      } else if (ev?.type === "pointercancel") {
+        lastTapRef.current = null;
       }
       if (mountedRef.current) setDragging(false);
       globalThis.removeEventListener("pointermove", onMove);
@@ -173,9 +243,14 @@ export function useResizable(options: ResizableOptions): Resizable {
     } else if (e.key === "End") {
       e.preventDefault();
       setWidthState(max);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      setWidthState(defaultWidth);
     }
   };
 
+  const roundedWidth = Math.round(width);
+  const roundedDefaultWidth = Math.round(defaultWidth);
   return {
     width,
     dragging,
@@ -183,14 +258,18 @@ export function useResizable(options: ResizableOptions): Resizable {
     handleProps: {
       role: "separator",
       "aria-orientation": "vertical",
-      "aria-valuenow": Math.round(width),
-      "aria-valuetext": `${Math.round(width)}픽셀`,
+      "aria-valuenow": roundedWidth,
+      "aria-valuetext":
+        roundedWidth === roundedDefaultWidth
+          ? `${roundedWidth}픽셀, 기본 너비`
+          : `${roundedWidth}픽셀`,
       "aria-valuemin": min,
       "aria-valuemax": max,
+      "aria-keyshortcuts": "ArrowLeft ArrowRight Home End Enter",
       tabIndex: 0,
       onPointerDown,
       onKeyDown,
-      onDoubleClick: () => setWidth(initial),
+      onDoubleClick: () => setWidth(defaultWidth),
     },
   };
 }

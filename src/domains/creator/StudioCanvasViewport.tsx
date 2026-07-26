@@ -1191,9 +1191,16 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
           {!canvasOnlyMode && !isMobile ? (
             <StudioStatusBar
               className={cn(
-                tool === "draw" && !isMobile && "bottom-[4.75rem]",
                 mobileImmersive && "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]"
               )}
+              style={
+                tool === "draw"
+                  ? {
+                      bottom:
+                        "calc(var(--studio-draw-options-height, 3.75rem) + max(0.75rem, env(safe-area-inset-bottom)) + 0.75rem)",
+                    }
+                  : undefined
+              }
             >
               <StudioHudPill>
                 <StudioToolHintTarget

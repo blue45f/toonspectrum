@@ -13,7 +13,13 @@
  *
  * Pure presentation only — no document state.
  */
-import { forwardRef, type ButtonHTMLAttributes, type ReactElement, type ReactNode } from "react";
+import {
+  forwardRef,
+  type ButtonHTMLAttributes,
+  type CSSProperties,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 
 import {
@@ -902,10 +908,12 @@ export function StudioQuickActionsBar({
 export function StudioStatusBar({
   children,
   className,
+  style,
   "aria-label": ariaLabel = "캔버스 상태 및 보기",
 }: {
   children: ReactNode;
   className?: string;
+  style?: CSSProperties;
   "aria-label"?: string;
 }): ReactElement {
   return (
@@ -913,6 +921,7 @@ export function StudioStatusBar({
       role="group"
       aria-label={ariaLabel}
       data-studio-status-bar="true"
+      style={style}
       className={cn(
         "pointer-events-auto absolute bottom-3.5 left-3.5 z-[10] flex max-w-[calc(100%-1.75rem)] flex-nowrap items-center gap-1.5 overflow-x-auto overscroll-x-contain",
         "touch-pan-x scroll-px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",

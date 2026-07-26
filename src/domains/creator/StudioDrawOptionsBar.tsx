@@ -19,6 +19,7 @@ import {
   PaintBucket,
   Pencil,
   Pipette,
+  RotateCcw,
   Scissors,
   Shapes,
   Sparkles,
@@ -124,6 +125,16 @@ export interface StudioDrawOptionsBarProps {
   onToggleFavoriteBrush?: (brushId: string) => void;
   brushCatalogOpen?: boolean;
   onToggleBrushCatalog?: (trigger: HTMLButtonElement) => void;
+  /** Canonical full-brush restore state owned by StudioPage. */
+  brushDefaultRestore?: Readonly<{
+    sourceName: string;
+    modifiedCount: number;
+    loading: boolean;
+    available?: boolean;
+    undoAvailable?: boolean;
+  }> | null;
+  /** Restores every feel-affecting field while preserving color and brush identity. */
+  onRestoreBrushDefaults?: () => void;
   onCycleStabilizer?: () => void;
   shapeKind?: string;
   onShapeKindChange?: (kind: string) => void;
@@ -245,6 +256,8 @@ export function StudioDrawOptionsBar({
   onToggleFavoriteBrush,
   brushCatalogOpen = false,
   onToggleBrushCatalog,
+  brushDefaultRestore = null,
+  onRestoreBrushDefaults,
   onCycleStabilizer,
   shapeKind = "line",
   onShapeKindChange,
@@ -269,23 +282,52 @@ export function StudioDrawOptionsBar({
   const isFavorite = favoriteBrushIds.includes(catalogBrushId);
   const tipColor = drawMode === "eraser" ? "oklch(0.55 0.02 70)" : color;
   const pixelMode = drawMode === "pixel";
-  const brushPresetModified =
+  const legacyBrushPresetModified =
     Boolean(catalogBrushItem) &&
     ((!sizeLocked &&
       Math.abs(strokeWidth - (catalogBrushItem?.defaultWidth ?? strokeWidth)) > 0.01) ||
       (!opacityLocked &&
         Math.abs(brushOpacity - (catalogBrushItem?.defaultOpacity ?? brushOpacity)) > 0.001));
-  const brushPresetResetDescription = catalogBrushItem
-    ? `${catalogBrushName} 프리셋의 촉 반응을 다시 적용합니다. ${
-        sizeLocked
-          ? `굵기는 ${strokeWidth}px 잠금 상태를 유지합니다.`
-          : `굵기는 권장값 ${catalogBrushItem.defaultWidth}px로 돌아갑니다.`
-      } ${
-        opacityLocked
-          ? `불투명도는 ${Math.round(brushOpacity * 100)}% 잠금 상태를 유지합니다.`
-          : `불투명도는 권장값 ${Math.round(catalogBrushItem.defaultOpacity * 100)}%로 돌아갑니다.`
-      } 현재 색은 유지돼요.`
-    : "";
+  const brushPresetModifiedCount =
+    brushDefaultRestore?.modifiedCount ?? (legacyBrushPresetModified ? 1 : 0);
+  const brushPresetModified = brushPresetModifiedCount > 0;
+  const brushPresetResetSource = brushDefaultRestore?.sourceName ?? catalogBrushName;
+  const brushPresetResetAvailable = brushDefaultRestore?.available ?? true;
+  const brushPresetUndoAvailable = brushDefaultRestore?.undoAvailable ?? false;
+  const brushPresetResetHintLabel = brushDefaultRestore?.loading
+    ? "브러시 기본값 불러오는 중"
+    : !brushPresetResetAvailable
+      ? "브러시 기본값 기준 없음"
+      : brushPresetUndoAvailable
+        ? "브러시 기본값 복원 취소"
+        : brushPresetModified
+          ? "브러시 기본값으로 복원"
+          : "브러시 기본값 다시 적용";
+  const brushPresetResetDescription = brushDefaultRestore
+    ? !brushPresetResetAvailable
+      ? "이 브러시의 안전한 기본값 기준이 없습니다. 브러시 목록에서 다시 선택하면 기준을 새로 불러옵니다."
+      : brushPresetUndoAvailable
+        ? `방금 적용한 ${brushPresetResetSource} 기본값 복원을 한 단계 되돌립니다. 현재 색상과 브러시 선택은 유지됩니다.`
+        : brushPresetModified
+          ? `${brushPresetResetSource}의 브러시 설정 중 ${brushPresetModifiedCount}개가 기본값과 다릅니다. 현재 색상과 브러시 선택은 유지한 채 복원합니다.${
+              sizeLocked ? ` 잠근 굵기 ${strokeWidth}px는 유지합니다.` : ""
+            }${
+              opacityLocked
+                ? ` 잠근 불투명도 ${Math.round(brushOpacity * 100)}%는 유지합니다.`
+                : ""
+            }`
+          : `${brushPresetResetSource}의 굵기·불투명도·필압·보정·촉 설정이 이미 기본값입니다. 현재 색상과 브러시 선택은 유지됩니다.`
+    : catalogBrushItem
+      ? `${catalogBrushName} 프리셋의 촉 반응을 다시 적용합니다. ${
+          sizeLocked
+            ? `굵기는 ${strokeWidth}px 잠금 상태를 유지합니다.`
+            : `굵기는 권장값 ${catalogBrushItem.defaultWidth}px로 돌아갑니다.`
+        } ${
+          opacityLocked
+            ? `불투명도는 ${Math.round(brushOpacity * 100)}% 잠금 상태를 유지합니다.`
+            : `불투명도는 권장값 ${Math.round(catalogBrushItem.defaultOpacity * 100)}%로 돌아갑니다.`
+        } 현재 색은 유지돼요.`
+      : "";
   const safeDockLeft = Math.max(0, Math.round(dockInsets.left));
   const safeDockRight = Math.max(0, Math.round(dockInsets.right));
 
@@ -361,6 +403,7 @@ export function StudioDrawOptionsBar({
       style={
         docked
           ? {
+              bottom: "max(0.75rem, env(safe-area-inset-bottom))",
               left: canvasDockFrame
                 ? `${canvasDockFrame.center}px`
                 : `clamp(10.75rem, calc(${safeDockLeft}px + (100vw - ${safeDockLeft + safeDockRight}px) / 2), calc(100vw - 10.75rem))`,
@@ -549,35 +592,91 @@ export function StudioDrawOptionsBar({
                 <LayoutGrid size={12} className="shrink-0 opacity-80" aria-hidden />
               </button>
             </StudioToolHintTarget>
-            {catalogBrushItem ? (
+            {catalogBrushItem || brushDefaultRestore ? (
               <StudioToolHintTarget
+                disabled={
+                  brushDefaultRestore?.loading
+                  || (brushDefaultRestore !== null && !brushPresetResetAvailable)
+                }
+                unavailableReason={
+                  brushDefaultRestore?.loading
+                    ? "브러시 기준값을 불러오는 중입니다. 잠시 뒤 다시 시도해 주세요."
+                    : brushDefaultRestore !== null && !brushPresetResetAvailable
+                      ? "브러시 목록에서 이 브러시를 다시 선택하면 안전한 기본값 기준을 새로 불러옵니다."
+                      : undefined
+                }
                 hint={studioToolHintFromLabel(
-                  brushPresetModified ? "브러시 기본값으로 복원" : "브러시 기본값 다시 적용",
+                  brushPresetResetHintLabel,
                   brushPresetResetDescription,
                   undefined
                 )}
               >
                 <button
                   type="button"
-                  onClick={() => onSelectBrush(catalogBrushItem)}
+                  disabled={
+                    brushDefaultRestore?.loading
+                    || (brushDefaultRestore !== null && !brushPresetResetAvailable)
+                  }
+                  onClick={() => {
+                    if (onRestoreBrushDefaults) {
+                      onRestoreBrushDefaults();
+                    } else if (catalogBrushItem) {
+                      onSelectBrush(catalogBrushItem);
+                    }
+                  }}
                   aria-label={
-                    brushPresetModified
-                      ? `${catalogBrushName} 기본값으로 복원`
-                      : `${catalogBrushName} 기본값 다시 적용`
+                    brushDefaultRestore?.loading
+                      ? `${brushPresetResetSource} 기본값을 불러오는 중`
+                      : !brushPresetResetAvailable
+                        ? `${brushPresetResetSource} 기본값 없음, 브러시를 다시 선택하세요`
+                        : brushPresetUndoAvailable
+                          ? `${brushPresetResetSource} 기본값 복원 취소`
+                          : brushPresetModified
+                            ? `${brushPresetResetSource} 기본값으로 복원, 변경된 설정 ${brushPresetModifiedCount}개`
+                            : `${brushPresetResetSource} 기본값 다시 적용`
                   }
                   data-studio-brush-preset-reset="true"
                   data-studio-brush-preset-modified={brushPresetModified ? "true" : "false"}
+                  data-studio-brush-preset-modified-count={brushPresetModifiedCount}
                   data-studio-draw-primary-control="preset-reset"
                   className={cn(
-                    "h-8 shrink-0 rounded-lg border px-2 text-[0.6rem] font-bold",
+                    "flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2 text-[0.6rem] font-bold disabled:opacity-55",
+                    brushDefaultRestore?.loading
+                      ? "disabled:cursor-wait"
+                      : "disabled:cursor-not-allowed",
                     STUDIO_EASE,
                     STUDIO_FOCUS_RING,
                     brushPresetModified
                       ? "border-accent/55 bg-accent-soft text-accent hover:border-accent"
-                      : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+                    : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
                   )}
                 >
-                  기본값
+                  <RotateCcw
+                    size={12}
+                    className={cn(
+                      "shrink-0",
+                      brushDefaultRestore?.loading &&
+                        "animate-spin motion-reduce:animate-none",
+                    )}
+                    aria-hidden
+                  />
+                  <span>
+                    {brushDefaultRestore?.loading
+                      ? "복원 중"
+                      : !brushPresetResetAvailable
+                        ? "기준 없음"
+                        : brushPresetUndoAvailable
+                          ? "되돌리기"
+                          : "기본값"}
+                  </span>
+                  {brushPresetModified ? (
+                    <span
+                      aria-hidden
+                      className="grid min-w-4 place-items-center rounded-full bg-accent/16 px-1 tabular-nums text-[0.55rem] text-accent"
+                    >
+                      {brushPresetModifiedCount}
+                    </span>
+                  ) : null}
                 </button>
               </StudioToolHintTarget>
             ) : null}

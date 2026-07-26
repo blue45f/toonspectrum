@@ -18,6 +18,13 @@ describe("StudioPage tool transition boundary", () => {
 
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
+    expect(disarm).toContain("cancelPixelSelectionPointerSession();");
+    expect(disarm).toContain("pixelWandRunIdRef.current += 1;");
+    expect(disarm).toContain("pixelWandActiveRunIdRef.current = null;");
+    expect(disarm).toContain("colorRangeActiveRunIdRef.current !== null");
+    expect(disarm).toContain("colorRangeRunIdRef.current += 1;");
+    expect(disarm).toContain("colorRangeActiveRunIdRef.current = null;");
+    expect(disarm).toContain("setPixelBusy(false);");
     for (const cleanup of [
       "setAdvancedFillActive(false);",
       "setAdvancedFillBusy(false);",
@@ -112,7 +119,7 @@ describe("StudioPage tool transition boundary", () => {
     expect(shortcut).not.toContain("setEyedropperActive((");
   });
 
-  it("disarms the previous canvas owner before top-menu drawing mode transitions", () => {
+  it("routes top-menu drawing modes through the stroke-safe primary transition", () => {
     const start = studioPageSource.indexOf("selectDrawMode: (mode) => {");
     const end = studioPageSource.indexOf("},\n        },", start);
     const drawingMenu = studioPageSource.slice(start, end);
@@ -120,15 +127,18 @@ describe("StudioPage tool transition boundary", () => {
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
     expect(drawingMenu).toContain(
-      "studioMainMenuActions.disarmAllPixelTools();",
+      'studioMainMenuActions.activatePrimaryCanvasTool("draw", mode);',
     );
-    expect(drawingMenu).toContain('setTool("draw");');
     expect(drawingMenu).toContain("setQuickShapeActive(true);");
-    expect(drawingMenu.match(/studioMainMenuActions\.disarmAllPixelTools\(\);/gu))
+    expect(
+      drawingMenu.match(
+        /studioMainMenuActions\.activatePrimaryCanvasTool\("draw", (?:mode|"pen")\);/gu,
+      ),
+    )
       .toHaveLength(2);
   });
 
-  it("disarms transient right-panel tools before tutorial drawing actions", () => {
+  it("routes tutorial drawing actions through the stroke-safe primary transition", () => {
     const start = studioPageSource.indexOf(
       "function handleTutorialTry(action: StudioTutorialTryAction)",
     );
@@ -145,12 +155,54 @@ describe("StudioPage tool transition boundary", () => {
       const caseEnd = tutorial.indexOf("break;", caseStart);
       const branch = tutorial.slice(caseStart, caseEnd);
       expect(caseStart).toBeGreaterThanOrEqual(0);
-      expect(branch).toContain("disarmAllPixelTools();");
-      expect(branch).toContain('setTool("draw");');
+      expect(branch).toContain('activatePrimaryCanvasTool("draw", "pen");');
     }
   });
 
-  it("disarms transient right-panel tools before options-bar and context-menu drawing actions", () => {
+  it("routes saved, catalogue, and slot brush application through the same transition", () => {
+    for (const [startMarker, endMarker] of [
+      ["function applySavedBrush(", "function applyStudioBrushCatalogSelection("],
+      ["function applyStudioBrushCatalogSelection(", "function applyBuiltInBrushPreset("],
+      ["function applyBrushSlot(", "function applyDynamicsPreset("],
+    ] as const) {
+      const start = studioPageSource.indexOf(startMarker);
+      const end = studioPageSource.indexOf(endMarker, start);
+      const branch = studioPageSource.slice(start, end);
+
+      expect(start, startMarker).toBeGreaterThanOrEqual(0);
+      expect(end, endMarker).toBeGreaterThan(start);
+      expect(branch).toContain('activatePrimaryCanvasTool("draw", "pen");');
+      expect(branch).not.toContain('setTool("draw");');
+      expect(branch).not.toContain('setDrawMode("pen");');
+    }
+  });
+
+  it("revalidates the live brush snapshot before applying a rendered one-step undo", () => {
+    const start = studioPageSource.indexOf("async function restoreActiveBrushDefaults()");
+    const end = studioPageSource.indexOf(
+      "function toggleBuiltInBrushFavorite(",
+      start,
+    );
+    const restore = studioPageSource.slice(start, end);
+    const freshInspection = restore.indexOf(
+      "contract.inspectStudioBrushBaseline(",
+    );
+    const undoBranch = restore.indexOf("if (requestedUndo && lastRestore)");
+    const undoApply = restore.indexOf(
+      'applyBrushDefaultRestoreTransaction(lastRestore.transaction, "undo");',
+    );
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    expect(freshInspection).toBeGreaterThanOrEqual(0);
+    expect(undoBranch).toBeGreaterThan(freshInspection);
+    expect(undoApply).toBeGreaterThan(undoBranch);
+    expect(restore).toContain(
+      "브러시 설정이 바뀌어 이전 복원 되돌리기를 취소했어요.",
+    );
+  });
+
+  it("routes options-bar and context-menu drawing actions through the stroke-safe transition", () => {
     const optionsStart = studioPageSource.indexOf(
       "const studioOptionsBarsHandlers = useStudioStableHandlers",
     );
@@ -166,7 +218,7 @@ describe("StudioPage tool transition boundary", () => {
     expect(optionsStart).toBeGreaterThanOrEqual(0);
     expect(optionsEnd).toBeGreaterThan(optionsStart);
     expect(options).toMatch(
-      /setDrawMode: \(mode\) => \{\s+disarmAllPixelTools\(\);\s+setTool\("draw"\);/u,
+      /setDrawMode: \(mode\) => \{\s+activatePrimaryCanvasTool\("draw", mode\);/u,
     );
     const brushSettingsStart = options.indexOf("openBrushStudio: () => {");
     const brushSettingsEnd = options.indexOf("recallBrushSlot:", brushSettingsStart);
@@ -182,7 +234,9 @@ describe("StudioPage tool transition boundary", () => {
 
     expect(contextStart).toBeGreaterThanOrEqual(0);
     expect(contextEnd).toBeGreaterThan(contextStart);
-    expect(contextMenu.match(/disarmAllPixelTools\(\);/gu)).toHaveLength(2);
+    expect(
+      contextMenu.match(/activatePrimaryCanvasTool\("draw", "pen"\);/gu),
+    ).toHaveLength(2);
     expect(contextMenu).toContain("onSelectPen={() => {");
     expect(contextMenu).toContain("onEnableQuickShape={() => {");
   });

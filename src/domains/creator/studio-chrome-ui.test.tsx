@@ -235,6 +235,21 @@ describe("studio chrome UI", () => {
     expect(html).toContain("100%");
   });
 
+  it("lets the canvas owner offset the status bar above a measured drawing dock", () => {
+    const bottom =
+      "calc(var(--studio-draw-options-height, 3.75rem) + max(0.75rem, env(safe-area-inset-bottom)) + 0.75rem)";
+    render(
+      <StudioStatusBar style={{ bottom }}>
+        <span>100%</span>
+      </StudioStatusBar>
+    );
+
+    expect(
+      (screen.getByRole("group", { name: "캔버스 상태 및 보기" }) as HTMLElement)
+        .style.bottom
+    ).toBe(bottom);
+  });
+
   it("renders CSP/Photopea dual color well with recent swatches and swap", () => {
     const html = renderToStaticMarkup(
       <StudioDualColorWell

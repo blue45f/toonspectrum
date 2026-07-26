@@ -1,3 +1,5 @@
+import { planStudioCanvasToolTransition } from "./studio-canvas-tool-state-machine";
+
 import type { DrawMode } from "./studio-editor-tool-model";
 
 export type StudioPrimaryCanvasTool =
@@ -25,8 +27,27 @@ export function executeStudioPrimaryCanvasToolTransition(
   const drawModeChanged =
     input.next.tool === "draw" &&
     (input.current.tool !== "draw" || input.current.drawMode !== input.next.drawMode);
+  const currentDrawMode =
+    input.current.tool === "draw"
+      ? input.current.drawMode
+      : input.next.tool === "draw"
+        ? input.next.drawMode
+        : "pen";
+  const event =
+    input.next.tool === "draw"
+      ? { type: "primary.draw" as const, drawMode: input.next.drawMode }
+      : { type: "primary.select" as const };
+  const plan = planStudioCanvasToolTransition(
+    {
+      tool: input.current.tool,
+      drawMode: currentDrawMode,
+      auxiliary: null,
+      unfinished: input.activeStroke ? ["drawing-stroke"] : [],
+    },
+    event,
+  );
   const changed = toolChanged || drawModeChanged;
-  const cancelledActiveStroke = changed && input.activeStroke;
+  const cancelledActiveStroke = plan.cancelledUnfinished.includes("drawing-stroke");
 
   if (cancelledActiveStroke) actions.cancelActiveStroke();
   // Repeating the current selection must still release a hidden owner such as fill or eyedropper.
