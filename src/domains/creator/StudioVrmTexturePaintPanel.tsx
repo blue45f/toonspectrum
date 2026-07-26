@@ -1,4 +1,4 @@
-import { Eraser, Paintbrush, Redo2, RotateCcw, Undo2 } from "lucide-react";
+import { AlertTriangle, Eraser, Paintbrush, Redo2, RotateCcw, Undo2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type {
@@ -26,6 +26,7 @@ export interface StudioVrmTexturePaintPanelProps {
   readonly activeTargetId: string | null;
   readonly activeTextureLabel: string | null;
   readonly status: string;
+  readonly restoreError?: string | null;
   readonly strokeActive: boolean;
   readonly targetCount: number;
   readonly canUndo: boolean;
@@ -38,6 +39,7 @@ export interface StudioVrmTexturePaintPanelProps {
   readonly onUndo: () => void;
   readonly onRedo: () => void;
   readonly onResetActiveTexture: () => void;
+  readonly onRetryRestore?: () => void;
 }
 
 const BRUSHES: ReadonlyArray<{
@@ -111,6 +113,7 @@ export function StudioVrmTexturePaintPanel({
   activeTargetId,
   activeTextureLabel,
   status,
+  restoreError,
   strokeActive,
   targetCount,
   canUndo,
@@ -119,6 +122,7 @@ export function StudioVrmTexturePaintPanel({
   onUndo,
   onRedo,
   onResetActiveTexture,
+  onRetryRestore,
 }: StudioVrmTexturePaintPanelProps) {
   const editingDisabled = disabled || strokeActive;
   const hasActiveTexture = activeTargetId !== null;
@@ -188,7 +192,8 @@ export function StudioVrmTexturePaintPanel({
           <div className="min-w-0">
             <h3 className="text-sm font-bold text-fg">3D 표면 페인트</h3>
             <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-              캐릭터 표면을 직접 끌어 색·명암·질감을 칠합니다. UV 심을 자동으로 감지하며 현재
+              캐릭터 표면을 직접 끌어 색·명암·질감을 칠합니다. UV 아일랜드를 감지해 멀리 떨어진
+              면 사이의 선 연결을 방지하며 현재
               삽입 이미지와 캡처에 바로 반영됩니다.
             </p>
           </div>
@@ -215,6 +220,28 @@ export function StudioVrmTexturePaintPanel({
             {targetCount}개 텍스처
           </span>
         </div>
+        {restoreError && onRetryRestore ? (
+          <div
+            className="mt-2 flex items-start justify-between gap-3 rounded-lg border border-bad/45 bg-[oklch(0.66_0.20_25/0.10)] px-3 py-2.5 text-[0.68rem] text-fg-2"
+            role="alert"
+          >
+            <span className="flex min-w-0 items-start gap-2 leading-relaxed">
+              <AlertTriangle className="mt-0.5 shrink-0 text-bad" size={14} aria-hidden />
+              <span>
+                <span className="block font-bold text-fg">원본 텍스처 복원이 중단됐습니다.</span>
+                <span className="mt-0.5 block">{restoreError}</span>
+              </span>
+            </span>
+            <button
+              type="button"
+              className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1 rounded-md border border-bad/45 bg-card px-2.5 font-bold text-bad transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+              onClick={onRetryRestore}
+            >
+              <RotateCcw size={13} aria-hidden />
+              다시 시도
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <fieldset disabled={editingDisabled} className="space-y-3 disabled:opacity-60">

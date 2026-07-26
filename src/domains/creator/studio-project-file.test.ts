@@ -273,10 +273,14 @@ describe("studio project file", () => {
       expressions: { happy: 0.7 },
       props: { items: [{ id: "book" }] },
     });
-    const { rig: _rig, ...versionOne } = JSON.parse(JSON.stringify(current)) as Record<
-      string,
-      unknown
-    > & { rig: unknown };
+    const {
+      rig: _rig,
+      surfacePaint: _surfacePaint,
+      ...versionOne
+    } = JSON.parse(JSON.stringify(current)) as Record<string, unknown> & {
+      rig: unknown;
+      surfacePaint: unknown;
+    };
     delete ((versionOne.pose as Record<string, unknown>).translations);
     delete ((versionOne.pose as Record<string, unknown>).ikConstraints);
     versionOne.version = 1;

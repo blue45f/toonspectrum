@@ -31,7 +31,14 @@ import {
   parseStudioVrmLegacyFragment,
   parseStudioVrmSceneDocument,
   serializeStudioVrmSceneDocument,
+  type StudioVrmSurfacePaintTexture,
 } from "./studio-vrm-scene-document";
+import {
+  STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_KIND,
+  STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_MIME,
+  STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_SCHEMA_VERSION,
+  verifyStudioVrmTexturePaintArtifact,
+} from "./studio-vrm-texture-paint-artifact";
 import { SAMPLE_VRMS } from "./vrm-library";
 
 /**
@@ -1669,6 +1676,198 @@ interface Bg3dArchiveAttachmentEvidence {
   readonly documentReferences: readonly StudioProjectArchiveDocumentReference[];
 }
 
+interface VrmSurfacePaintArchiveReference {
+  readonly sha256: string;
+  readonly bindingKey: string;
+  readonly byteSize: number;
+  readonly width: number;
+  readonly height: number;
+  readonly pointer: string;
+}
+
+interface VrmSurfacePaintArchiveAttachmentPlan {
+  readonly sha256: string;
+  readonly bindingKey: string;
+  readonly byteSize: number;
+  readonly width: number;
+  readonly height: number;
+  readonly documentReferences: readonly StudioProjectArchiveDocumentReference[];
+}
+
+function collectVrmSurfacePaintArchivePlan(
+  project: unknown,
+): readonly VrmSurfacePaintArchiveAttachmentPlan[] {
+  let parsed: StudioProjectFile;
+  try {
+    parsed = parseStudioProjectFile(project);
+  } catch {
+    fail("PROJECT_INVALID", "VRM 표면 페인팅 참조를 확인할 프로젝트가 올바르지 않습니다.");
+  }
+  const references: VrmSurfacePaintArchiveReference[] = [];
+  const visitElements = (elements: readonly unknown[], basePointer: string): void => {
+    elements.forEach((element, elementIndex) => {
+      if (!isRecord(element) || element.type !== "image" || element.vrmScene === undefined) return;
+      const serialized = serializeStudioVrmSceneDocument(element.vrmScene);
+      const scene = serialized ? parseStudioVrmSceneDocument(serialized) : null;
+      if (!scene) {
+        fail("PROJECT_INVALID", "VRM 표면 페인팅 장면 문서가 올바르지 않습니다.");
+      }
+      scene.surfacePaint.textures.forEach((
+        texture: StudioVrmSurfacePaintTexture,
+        textureIndex: number,
+      ) => {
+        references.push({
+          sha256: texture.hash.slice("sha256:".length),
+          bindingKey: texture.bindingKey,
+          byteSize: texture.byteSize,
+          width: texture.width,
+          height: texture.height,
+          pointer: `${basePointer}/${elementIndex}/vrmScene/surfacePaint/textures/${textureIndex}/hash`,
+        });
+      });
+    });
+  };
+  parsed.pagesList.forEach((page, pageIndex) => {
+    visitElements(page.elements, `/pagesList/${pageIndex}/elements`);
+  });
+  if (isRecord(parsed.master) && Array.isArray(parsed.master.elements)) {
+    visitElements(parsed.master.elements, "/master/elements");
+  }
+
+  const grouped = new Map<string, VrmSurfacePaintArchiveAttachmentPlan>();
+  for (const reference of references) {
+    const existing = grouped.get(reference.sha256);
+    if (
+      existing
+      && (
+        existing.byteSize !== reference.byteSize
+        || existing.width !== reference.width
+        || existing.height !== reference.height
+      )
+    ) {
+      fail(
+        "DOCUMENT_REFERENCE_MISMATCH",
+        "같은 VRM 표면 페인팅 PNG 해시에 서로 다른 무결성 정보가 선언되었습니다.",
+        { pointer: reference.pointer },
+      );
+    }
+    const documentReference: StudioProjectArchiveDocumentReference = {
+      pointer: reference.pointer,
+      usage: "raster",
+      mode: "sha256-prefixed",
+    };
+    if (existing) {
+      grouped.set(reference.sha256, {
+        ...existing,
+        documentReferences: [...existing.documentReferences, documentReference],
+      });
+    } else {
+      grouped.set(reference.sha256, {
+        sha256: reference.sha256,
+        bindingKey: reference.bindingKey,
+        byteSize: reference.byteSize,
+        width: reference.width,
+        height: reference.height,
+        documentReferences: [documentReference],
+      });
+    }
+  }
+  return [...grouped.values()].sort((left, right) => compareText(left.sha256, right.sha256));
+}
+
+function assertVrmSurfacePaintIntegrityReferencesCovered(
+  project: unknown,
+  attachmentsByHash: ReadonlyMap<string, Bg3dArchiveAttachmentEvidence>,
+): readonly VrmSurfacePaintArchiveAttachmentPlan[] {
+  const plan = collectVrmSurfacePaintArchivePlan(project);
+  for (const attachment of plan) {
+    const evidence = attachmentsByHash.get(attachment.sha256);
+    if (!evidence) {
+      fail(
+        "ATTACHMENT_MISSING",
+        "VRM 표면 페인팅 PNG 바이트가 프로젝트 archive에 없습니다.",
+        { pointer: attachment.documentReferences[0]?.pointer },
+      );
+    }
+    if (evidence.byteSize !== attachment.byteSize) {
+      fail(
+        "DOCUMENT_REFERENCE_MISMATCH",
+        "VRM 표면 페인팅 PNG 크기가 장면 문서와 다릅니다.",
+        { pointer: attachment.documentReferences[0]?.pointer },
+      );
+    }
+    if (evidence.mimeType !== "image/png" || !evidence.kinds.includes("raster")) {
+      fail(
+        "MIME_MISMATCH",
+        "VRM 표면 페인팅은 검증 가능한 PNG raster attachment만 참조할 수 있습니다.",
+        { pointer: attachment.documentReferences[0]?.pointer },
+      );
+    }
+    for (const reference of attachment.documentReferences) {
+      if (!evidence.documentReferences.some((candidate) =>
+        candidate.pointer === reference.pointer
+        && candidate.usage === "raster"
+        && documentReferenceMode(candidate) === "sha256-prefixed"
+      )) {
+        fail(
+          "ATTACHMENT_MISSING",
+          "VRM 표면 페인팅 해시가 archive PNG attachment와 연결되지 않았습니다.",
+          { pointer: reference.pointer },
+        );
+      }
+    }
+  }
+  return plan;
+}
+
+async function validateVrmSurfacePaintPng(
+  plan: VrmSurfacePaintArchiveAttachmentPlan,
+  bytes: Uint8Array,
+): Promise<void> {
+  const signature = [137, 80, 78, 71, 13, 10, 26, 10] as const;
+  if (
+    bytes.byteLength !== plan.byteSize
+    || bytes.byteLength < 24
+    || !signature.every((value, index) => bytes[index] === value)
+  ) {
+    fail("MIME_SIGNATURE_MISMATCH", "VRM 표면 페인팅 PNG 파일 서명이 올바르지 않습니다.");
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (
+    view.getUint32(8, false) !== 13
+    || bytes[12] !== 0x49
+    || bytes[13] !== 0x48
+    || bytes[14] !== 0x44
+    || bytes[15] !== 0x52
+    || view.getUint32(16, false) !== plan.width
+    || view.getUint32(20, false) !== plan.height
+  ) {
+    fail(
+      "DOCUMENT_REFERENCE_MISMATCH",
+      "VRM 표면 페인팅 PNG 크기가 장면 문서의 무결성 정보와 다릅니다.",
+      { pointer: plan.documentReferences[0]?.pointer },
+    );
+  }
+  try {
+    await verifyStudioVrmTexturePaintArtifact({
+      schemaVersion: STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_SCHEMA_VERSION,
+      kind: STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_KIND,
+      bindingKey: plan.bindingKey,
+      contentHash: `sha256:${plan.sha256}`,
+      mimeType: STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_MIME,
+      byteLength: plan.byteSize,
+      width: plan.width,
+      height: plan.height,
+    }, bytes);
+  } catch {
+    fail(
+      "MIME_SIGNATURE_MISMATCH",
+      "VRM 표면 페인팅 PNG가 구조·CRC·SHA-256 무결성 검사를 통과하지 못했습니다.",
+      { pointer: plan.documentReferences[0]?.pointer },
+    );
+  }
+}
+
 function assertBg3dIntegrityReferencesCovered(
   project: unknown,
   attachmentsByHash: ReadonlyMap<string, Bg3dArchiveAttachmentEvidence>,
@@ -1961,14 +2160,34 @@ export async function buildStudioProjectArchive(
     context.pointerOwners,
     new Set(context.attachments.keys())
   );
-  const bg3dPlan = assertBg3dIntegrityReferencesCovered(
-    canonicalProjectValue,
-    new Map([...context.attachments].map(([sha256, attachment]) => [sha256, {
+  const archiveAttachmentEvidence = new Map(
+    [...context.attachments].map(([sha256, attachment]) => [sha256, {
       byteSize: attachment.byteSize,
       mimeType: canonicalAttachmentMime(attachment),
       kinds: [...attachment.kinds],
       documentReferences: [...attachment.references.values()],
-    }])),
+    }]),
+  );
+  const surfacePaintPlan = assertVrmSurfacePaintIntegrityReferencesCovered(
+    canonicalProjectValue,
+    archiveAttachmentEvidence,
+  );
+  for (const planned of surfacePaintPlan) {
+    const source = context.attachments.get(planned.sha256);
+    if (!source) {
+      fail("ATTACHMENT_MISSING", "VRM 표면 페인팅 PNG 바이트를 찾지 못했습니다.");
+    }
+    let bytes: Uint8Array;
+    try {
+      bytes = new Uint8Array(await source.blob.arrayBuffer());
+    } catch {
+      fail("MIME_SIGNATURE_MISMATCH", "VRM 표면 페인팅 PNG 바이트를 읽지 못했습니다.");
+    }
+    await validateVrmSurfacePaintPng(planned, bytes);
+  }
+  const bg3dPlan = assertBg3dIntegrityReferencesCovered(
+    canonicalProjectValue,
+    archiveAttachmentEvidence,
     limits
   );
   let bg3dCumulativeBytes = 0;
@@ -2311,7 +2530,7 @@ function parseCanonicalJson<T>(
 }
 
 /**
- * Projects strict historical VRM scene v1/v2/v3 values to the current scene version for
+ * Projects strict historical VRM scene v1/v2/v3/v4 values to the current scene version for
  * archive-writer compatibility checks. Current documents pass through unchanged.
  * No other project defaults, redactions, or schema changes are introduced here.
  */
@@ -2332,6 +2551,7 @@ function promoteStrictHistoricalVrmScenes(
           element.vrmScene.version !== 1
           && element.vrmScene.version !== 2
           && element.vrmScene.version !== 3
+          && element.vrmScene.version !== 4
         )
       ) return element;
       const migrated = migrateStudioVrmSceneDocument(element.vrmScene);
@@ -2512,6 +2732,14 @@ export async function importStudioProjectArchive(
     attachment.sha256,
     attachment,
   ]));
+  const surfacePaintPlan = assertVrmSurfacePaintIntegrityReferencesCovered(
+    parsedProject.stored,
+    new Map(manifest.attachments.map((attachment) => [attachment.sha256, attachment])),
+  );
+  const surfacePaintPlanByHash = new Map(surfacePaintPlan.map((attachment) => [
+    attachment.sha256,
+    attachment,
+  ]));
   let bg3dCumulativeBytes = 0;
 
   for (const metadata of manifest.attachments) {
@@ -2537,6 +2765,10 @@ export async function importStudioProjectArchive(
     }
     if (attachmentPath(metadata.sha256, metadata.mimeType, detectedKinds) !== metadata.path) {
       fail("PATH_INVALID", "attachment content-addressed 경로가 올바르지 않습니다.", { path: metadata.path });
+    }
+    const plannedSurfacePaint = surfacePaintPlanByHash.get(metadata.sha256);
+    if (plannedSurfacePaint) {
+      await validateVrmSurfacePaintPng(plannedSurfacePaint, bytes);
     }
     let rehydratedDataUrl: string | undefined;
     for (const reference of metadata.documentReferences) {

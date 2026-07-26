@@ -64,11 +64,12 @@ describe("Studio VRM full-body editor integration boundary", () => {
       "persistentIkCurrentSignatureRef.current !== sharePoseSignature",
     );
     expect(source).toContain(
-      "persistentIkCurrentSignatureRef.current !== capturePoseSignature",
+      "persistentIkCurrentSignatureRef.current === capturePoseSignature",
     );
+    expect(source).toContain("capturePreconditionsAreCurrent()");
     expect(source).toContain("pendingPersistentIkCommandRef.current !== null");
     expect(source).toContain("hasLockedConstraint && (webcamActive || idleAnimation)");
     expect(source).toContain("dynamicPoseGenerationRef.current !== shareDynamicPoseGeneration");
-    expect(source).toContain("dynamicPoseGenerationRef.current !== captureDynamicPoseGeneration");
+    expect(source).toContain("dynamicPoseGenerationRef.current === captureDynamicPoseGeneration");
   });
 });

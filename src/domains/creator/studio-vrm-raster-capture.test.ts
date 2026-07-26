@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioBg3dShotPngWorkerError } from "./studio-bg3d-shot-png-worker-client";
 import {
   captureStudioVrmRgba,
+  encodeStudioVrmCapturePngBlob,
   encodeStudioVrmCapturePngDataUrl,
   flipStudioVrmCaptureRows,
   readStudioVrmPngBlobAsDataUrl,
@@ -246,6 +247,23 @@ describe("Studio VRM raster capture", () => {
     expect(deps.encodePngOnMainThread).not.toHaveBeenCalled();
     expect(deps.blobToDataUrl).toHaveBeenCalledOnce();
     expect(deps.blobToDataUrl).toHaveBeenCalledWith(expect.any(Blob), {});
+  });
+
+  it("returns a verified PNG Blob without data-URL serialization for artifact persistence", async () => {
+    const deps = dependencies();
+    const rgba = new Uint8ClampedArray([1, 2, 3, 4, 5, 6, 7, 8]);
+
+    const result = await encodeStudioVrmCapturePngBlob(
+      rgba,
+      { width: 2, height: 1 },
+      {},
+      deps,
+    );
+
+    expect(result.type).toBe("image/png");
+    expect(deps.encodePngInWorker).toHaveBeenCalledOnce();
+    expect(deps.blobToDataUrl).not.toHaveBeenCalled();
+    expect([...rgba]).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
 
   it("bounds and cancels a stalled PNG data URL read", async () => {

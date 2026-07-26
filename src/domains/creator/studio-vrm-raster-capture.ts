@@ -381,16 +381,18 @@ const DEFAULT_DEPENDENCIES: StudioVrmRasterCaptureDependencies = {
 };
 
 /**
- * Encode a top-down RGBA snapshot off-main, then serialize only the already-compressed Blob.
+ * Encode a top-down RGBA snapshot off-main and retain the verified PNG Blob. Surface-paint
+ * persistence uses this boundary so compressed bytes can be hashed and stored without first
+ * inflating them into a data URL.
  * Runtime Worker failures are fail-closed; only creation/capability failures may use the bounded
  * compatibility encoder.
  */
-export async function encodeStudioVrmCapturePngDataUrl(
+export async function encodeStudioVrmCapturePngBlob(
   rgba: Uint8ClampedArray,
   dimensions: StudioVrmRasterCaptureDimensions,
   options: StudioVrmRasterCaptureOptions = {},
   dependencies: StudioVrmRasterCaptureDependencies = DEFAULT_DEPENDENCIES,
-): Promise<string> {
+): Promise<Blob> {
   assertRgba(rgba, dimensions);
   if (options.signal?.aborted) throw abortError();
   const layer: StudioBg3dLtRasterLayer = {
@@ -411,5 +413,21 @@ export async function encodeStudioVrmCapturePngDataUrl(
     },
   );
   await validatePngBlob(png, dimensions, options.signal);
+  return png;
+}
+
+/** Encode off-main, then serialize only the already-compressed and verified PNG Blob. */
+export async function encodeStudioVrmCapturePngDataUrl(
+  rgba: Uint8ClampedArray,
+  dimensions: StudioVrmRasterCaptureDimensions,
+  options: StudioVrmRasterCaptureOptions = {},
+  dependencies: StudioVrmRasterCaptureDependencies = DEFAULT_DEPENDENCIES,
+): Promise<string> {
+  const png = await encodeStudioVrmCapturePngBlob(
+    rgba,
+    dimensions,
+    options,
+    dependencies,
+  );
   return dependencies.blobToDataUrl(png, options);
 }

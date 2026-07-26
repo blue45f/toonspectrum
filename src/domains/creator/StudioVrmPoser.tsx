@@ -197,6 +197,7 @@ import {
   type StudioVrmPoseTranslations,
   type StudioVrmSceneDocument,
   type StudioVrmSceneModel,
+  type StudioVrmSurfacePaintSettings,
 } from "./studio-vrm-scene-document";
 import {
   parseSceneProps,
@@ -348,11 +349,19 @@ type StudioVrmPoserProps = {
 
 type LoadStatus = "empty" | "loading" | "ready" | "error";
 type LibraryStatus = "loading" | "ready" | "error";
+type TexturePaintPersistenceStatus = "idle" | "restoring" | "ready" | "error";
 type CaptureState = {
   gl: THREE.WebGLRenderer | null;
   scene: THREE.Scene | null;
   camera: THREE.Camera | null;
 };
+
+function studioVrmTexturePaintSceneIdentity(
+  scene: StudioVrmSceneDocument | undefined,
+): string {
+  if (!scene) return "new-scene";
+  return JSON.stringify(scene.surfacePaint);
+}
 
 type CustomPose = {
   id: string;
@@ -1961,6 +1970,7 @@ function VrmActor({
   fingerEdits,
   bodyScale,
   texturePaintEnabled,
+  texturePaintMutationBlockedRef,
   texturePaintRuntime,
   texturePaintSettings,
 }: {
@@ -1978,6 +1988,7 @@ function VrmActor({
   fingerEdits: FingerRotationMap;
   bodyScale: BodyScale;
   texturePaintEnabled: boolean;
+  texturePaintMutationBlockedRef: React.RefObject<boolean>;
   texturePaintRuntime: StudioVrmTexturePaintRuntime | null;
   texturePaintSettings: StudioVrmTexturePaintPanelSettings;
 }) {
@@ -2226,6 +2237,8 @@ function VrmActor({
     const runtime = texturePaintRuntimeRef.current;
     const hit = studioVrmTexturePaintHit(event);
     if (
+      texturePaintMutationBlockedRef.current
+      ||
       !texturePaintEnabledRef.current
       || !runtime
       || !hit
@@ -2278,6 +2291,7 @@ function VrmActor({
     if (
       pointerId === null
       || event.pointerId !== pointerId
+      || texturePaintMutationBlockedRef.current
       || !texturePaintEnabledRef.current
     ) {
       return;
@@ -2692,6 +2706,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const dialogTitleId = useId();
   const dialogDescriptionId = useId();
   const viewportInstructionsId = useId();
+  const texturePaintSceneIdentity = studioVrmTexturePaintSceneIdentity(initialScene);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const [status, setStatus] = useState<LoadStatus>("empty");
@@ -2727,8 +2742,14 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     useState<StudioVrmTexturePaintPanelSettings>(DEFAULT_STUDIO_VRM_TEXTURE_PAINT_SETTINGS);
   const [texturePaintRuntime, setTexturePaintRuntime] =
     useState<StudioVrmTexturePaintRuntime | null>(null);
+  const [texturePaintRuntimeSceneIdentity, setTexturePaintRuntimeSceneIdentity] =
+    useState<string | null>(null);
   const [texturePaintSnapshot, setTexturePaintSnapshot] =
     useState<StudioVrmTexturePaintRuntimeSnapshot | null>(null);
+  const [texturePaintPersistenceStatus, setTexturePaintPersistenceStatus] =
+    useState<TexturePaintPersistenceStatus>("idle");
+  const [texturePaintPersistenceError, setTexturePaintPersistenceError] = useState("");
+  const [texturePaintRestoreRetryToken, setTexturePaintRestoreRetryToken] = useState(0);
   const [texturePaintDevicePlan] = useState(() =>
     planStudioVrmTexturePaintDeviceTier(readStudioVrmTexturePaintEnvironmentSignals()));
   const [poseQuery, setPoseQuery] = useState("");
@@ -2775,6 +2796,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const [libraryStatus, setLibraryStatus] = useState<LibraryStatus>("loading");
   const [libraryError, setLibraryError] = useState("");
   const [activeModelId, setActiveModelId] = useState(SAMPLE_VRM_ID);
+  const [installedModelId, setInstalledModelId] = useState<string | null>(null);
   const activeModelIdRef = useRef(activeModelId);
   activeModelIdRef.current = activeModelId;
   const [isUploading, setIsUploading] = useState(false);
@@ -2869,6 +2891,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const texturePaintRuntimeRef = useRef<StudioVrmTexturePaintRuntime | null>(null);
   const texturePaintSnapshotRef = useRef<StudioVrmTexturePaintRuntimeSnapshot | null>(null);
   const texturePaintInvalidateRef = useRef<(() => void) | null>(null);
+  const texturePaintRestoreGenerationRef = useRef(0);
+  const texturePaintRestoreAbortRef = useRef<AbortController | null>(null);
+  const texturePaintMutationBlockedRef = useRef(false);
   const loadRequestRef = useRef(0);
   const thumbnailRequestRef = useRef(0);
   const insertCaptureGenerationRef = useRef(0);
@@ -2923,6 +2948,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     texturePaintRuntimeRef.current = null;
     texturePaintSnapshotRef.current = null;
     setTexturePaintRuntime(null);
+    setTexturePaintRuntimeSceneIdentity(null);
     setTexturePaintSnapshot(null);
     if (!vrm) return;
 
@@ -2932,6 +2958,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     );
     texturePaintRuntimeRef.current = runtime;
     setTexturePaintRuntime(runtime);
+    setTexturePaintRuntimeSceneIdentity(texturePaintSceneIdentity);
     const initialSnapshot = runtime.getSnapshot();
     texturePaintSnapshotRef.current = initialSnapshot;
     setTexturePaintSnapshot(initialSnapshot);
@@ -2949,12 +2976,107 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       }
       runtime.dispose();
     };
-  }, [texturePaintDevicePlan, vrm]);
+  }, [texturePaintDevicePlan, texturePaintSceneIdentity, vrm]);
+
+  // 라이브러리 썸네일처럼 모델의 본질과 무관한 필드가 바뀌어도 복원을 취소하지 않는다.
+  // active id는 로드 시작 때 먼저 바뀌므로 실제로 install된 VRM id까지 함께 확인해 이전
+  // 런타임에 새 scene의 표면 텍스처를 적용하는 협업/원격 갱신 race도 막는다.
+  const activeTexturePaintRestoreEntry =
+    libraryEntries.find((entry) => entry.id === activeModelId) ?? null;
+  const texturePaintRestoreModelMatches = Boolean(
+    initialScene
+    && installedModelId === activeModelId
+    && (
+      initialScene.model.source === "bundled"
+        ? activeTexturePaintRestoreEntry?.source === "sample"
+          && activeTexturePaintRestoreEntry.id === initialScene.model.id
+        : activeTexturePaintRestoreEntry?.source === "indexed-db"
+          && canonicalizeVrmContentHash(activeTexturePaintRestoreEntry.contentHash)
+            === initialScene.model.hash
+    ),
+  );
+
+  useEffect(() => {
+    texturePaintRestoreGenerationRef.current += 1;
+    const generation = texturePaintRestoreGenerationRef.current;
+    texturePaintRestoreAbortRef.current?.abort();
+    texturePaintRestoreAbortRef.current = null;
+    setTexturePaintPersistenceError("");
+
+    if (
+      !open
+      || !initialScene
+      || !texturePaintRuntime
+      || !vrm
+      || texturePaintRuntimeSceneIdentity !== texturePaintSceneIdentity
+    ) {
+      setTexturePaintPersistenceStatus(initialScene ? "idle" : "ready");
+      return;
+    }
+    if (initialScene.surfacePaint.textures.length === 0) {
+      setTexturePaintPersistenceStatus("ready");
+      return;
+    }
+    if (!texturePaintRestoreModelMatches) {
+      setTexturePaintPersistenceStatus("idle");
+      return;
+    }
+
+    const controller = new AbortController();
+    texturePaintRestoreAbortRef.current = controller;
+    setTexturePaintPersistenceStatus("restoring");
+    void import("./studio-vrm-texture-paint-persistence")
+      .then(({ rehydrateStudioVrmTexturePaintRuntime }) =>
+        rehydrateStudioVrmTexturePaintRuntime(
+          texturePaintRuntime,
+          initialScene.surfacePaint,
+          { signal: controller.signal },
+        )
+      )
+      .then(() => {
+        if (
+          controller.signal.aborted
+          || generation !== texturePaintRestoreGenerationRef.current
+          || texturePaintRuntimeRef.current !== texturePaintRuntime
+        ) return;
+        setTexturePaintPersistenceStatus("ready");
+        texturePaintInvalidateRef.current?.();
+      })
+      .catch((cause: unknown) => {
+        if (
+          controller.signal.aborted
+          || generation !== texturePaintRestoreGenerationRef.current
+          || texturePaintRuntimeRef.current !== texturePaintRuntime
+        ) return;
+        setTexturePaintPersistenceStatus("error");
+        setTexturePaintPersistenceError(getErrorMessage(
+          cause,
+          "저장된 표면 페인팅 원본을 복원하지 못했습니다.",
+        ));
+      });
+
+    return () => {
+      controller.abort();
+      if (texturePaintRestoreAbortRef.current === controller) {
+        texturePaintRestoreAbortRef.current = null;
+      }
+    };
+  }, [
+    initialScene,
+    open,
+    texturePaintRuntime,
+    texturePaintRestoreModelMatches,
+    texturePaintRestoreRetryToken,
+    vrm,
+    texturePaintRuntimeSceneIdentity,
+    texturePaintSceneIdentity,
+  ]);
 
   const cancelPendingInsertCapture = useCallback((): void => {
     insertCaptureGenerationRef.current += 1;
     insertCaptureAbortRef.current?.abort();
     insertCaptureAbortRef.current = null;
+    texturePaintMutationBlockedRef.current = false;
     if (insertCaptureFrameRef.current !== null) {
       cancelAnimationFrame(insertCaptureFrameRef.current);
       insertCaptureFrameRef.current = null;
@@ -3177,16 +3299,19 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   );
 
   const handleTexturePaintUndo = useCallback(() => {
+    if (texturePaintMutationBlockedRef.current) return;
     const result = texturePaintRuntimeRef.current?.undo();
     if (result?.ok && result.value) texturePaintInvalidateRef.current?.();
   }, []);
 
   const handleTexturePaintRedo = useCallback(() => {
+    if (texturePaintMutationBlockedRef.current) return;
     const result = texturePaintRuntimeRef.current?.redo();
     if (result?.ok && result.value) texturePaintInvalidateRef.current?.();
   }, []);
 
   const handleTexturePaintReset = useCallback(() => {
+    if (texturePaintMutationBlockedRef.current) return;
     const result = texturePaintRuntimeRef.current?.resetActiveTarget();
     if (result?.ok && result.value) texturePaintInvalidateRef.current?.();
   }, []);
@@ -4080,8 +4205,23 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
   const texturePaintModeSelected =
     activePanelTab === "character" && activeCharacterSection === "surface";
+  const texturePaintSceneSyncRequired = Boolean(
+    initialScene
+    && texturePaintRuntimeSceneIdentity !== texturePaintSceneIdentity,
+  );
+  const texturePaintRestoreRequired =
+    texturePaintSceneSyncRequired
+    || (initialScene?.surfacePaint.textures.length ?? 0) > 0;
   const texturePaintDisabledReason = !vrm
     ? "표면을 칠할 VRM 모델을 먼저 불러오세요."
+    : texturePaintSceneSyncRequired
+      ? "새 장면의 표면 페인팅 런타임을 준비하는 중입니다."
+      : texturePaintRestoreRequired && texturePaintPersistenceStatus === "idle"
+      ? "저장된 표면 페인팅의 VRM 모델과 재질을 준비하는 중입니다."
+    : texturePaintPersistenceStatus === "restoring"
+      ? "저장된 표면 페인팅을 원본 재질에 복원하는 중입니다."
+      : texturePaintPersistenceStatus === "error"
+        ? texturePaintPersistenceError || "저장된 표면 페인팅을 복원하지 못했습니다."
     : webcamActive || webcamLoading
       ? "웹캠 트래킹을 멈춘 뒤 표면을 칠할 수 있습니다."
       : idleAnimation || physicsPreview
@@ -4163,7 +4303,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setCanRedo(transition.history.index < transition.history.entries.length - 1);
   };
   const doUndo = () => {
-    if (typeof texturePaintSnapshotRef.current?.activePointerId === "number") return;
+    if (
+      texturePaintMutationBlockedRef.current
+      || typeof texturePaintSnapshotRef.current?.activePointerId === "number"
+    ) return;
     if (
       texturePaintModeSelected
       && (texturePaintSnapshotRef.current?.history.undoCount ?? 0) > 0
@@ -4174,7 +4317,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     restoreHistoryStep(-1);
   };
   const doRedo = () => {
-    if (typeof texturePaintSnapshotRef.current?.activePointerId === "number") return;
+    if (
+      texturePaintMutationBlockedRef.current
+      || typeof texturePaintSnapshotRef.current?.activePointerId === "number"
+    ) return;
     if (
       texturePaintModeSelected
       && (texturePaintSnapshotRef.current?.history.redoCount ?? 0) > 0
@@ -4534,6 +4680,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   }
 
   const pendingPoseDataRef = useRef<PendingPoseData | null>(null);
+  const initialSceneModelIdentity = initialScene
+    ? initialScene.model.source === "bundled"
+      ? `bundled:${initialScene.model.id}`
+      : `attachment:${initialScene.model.hash}`
+    : "";
 
   useEffect(() => {
     if (open && initialScene) {
@@ -5686,10 +5837,17 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [initialSceneModelIdentity, open]);
 
   useEffect(() => {
-    if (!open || status !== "ready" || !vrm || !activeLibraryEntry || activeLibraryEntry.thumbnail) return;
+    if (
+      !open
+      || status !== "ready"
+      || texturePaintPersistenceStatus !== "ready"
+      || !vrm
+      || !activeLibraryEntry
+      || activeLibraryEntry.thumbnail
+    ) return;
     const hasLockedConstraint = ikConstraints.some((constraint) => (
       constraint.enabled && constraint.locked
     ));
@@ -5781,6 +5939,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     rigFloorHeight,
     rigJointProfile,
     status,
+    texturePaintPersistenceStatus,
     vrm,
   ]);
 
@@ -5799,6 +5958,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       disposeVrm(vrmRef.current);
       vrmRef.current = null;
     }
+    setInstalledModelId(null);
     setVrm(null);
   }
 
@@ -5809,6 +5969,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setVrm(nextVrm);
     setModelName(nextModelName);
     setActiveModelId(nextModelId);
+    setInstalledModelId(nextModelId);
     // 워드로브 실측 — 반드시 포즈 적용 전(정규화 rest)에 측정해 모델별 자동 핏의 기준으로 삼는다.
     setWardrobeMetrics(measureVrmWardrobeMetrics(nextVrm));
     setPropRigMetrics(measureVrmPropRigMetrics(nextVrm));
@@ -6870,7 +7031,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setSelectedVrmPropUid((cur) => (cur === uid ? null : cur));
   }
 
-  function createCurrentSceneDocument(width: number, height: number): StudioVrmSceneDocument | null {
+  function createCurrentSceneDocument(
+    width: number,
+    height: number,
+    surfacePaint: StudioVrmSurfacePaintSettings = { version: 1, textures: [] },
+  ): StudioVrmSceneDocument | null {
     const currentVrm = vrmRef.current;
     const currentEntry = libraryEntries.find((entry) => entry.id === activeModelId) ?? null;
     const camera = viewportApiRef.current?.readCamera() ?? null;
@@ -6958,6 +7123,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
         transparentBackground,
         backgroundColor: insertBackgroundColor,
       },
+      surfacePaint,
     });
     const serialized = serializeStudioVrmSceneDocument(normalized);
     return serialized ? parseStudioVrmSceneDocument(serialized) : null;
@@ -6972,6 +7138,24 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       setStatus("ready");
       return;
     }
+    if (texturePaintPersistenceStatus === "restoring") {
+      setError("저장된 표면 페인팅 복원이 끝난 뒤 이 포즈를 추가해 주세요.");
+      setStatus("ready");
+      return;
+    }
+    if (texturePaintPersistenceStatus === "error") {
+      setError(
+        texturePaintPersistenceError
+        || "저장된 표면 페인팅 원본을 복원하지 못해 재편집 장면을 안전하게 저장할 수 없습니다.",
+      );
+      setStatus("ready");
+      return;
+    }
+    if (texturePaintRestoreRequired && texturePaintPersistenceStatus !== "ready") {
+      setError("저장된 표면 페인팅의 모델 준비가 끝난 뒤 이 포즈를 추가해 주세요.");
+      setStatus("ready");
+      return;
+    }
     const insertBackground = resolveStudioVrmInsertBackgroundMode({
       transparent: transparentBackground,
       backgroundColor: insertBackgroundColor,
@@ -6983,6 +7167,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     }
     const currentCapture = captureRef.current;
     const currentVrm = vrmRef.current;
+    const currentTexturePaintRuntime = texturePaintRuntimeRef.current;
+    const captureTexturePaintRevision =
+      currentTexturePaintRuntime?.getContentRevision() ?? 0;
 
     if (!currentCapture.gl || !currentCapture.scene || !currentCapture.camera || !currentVrm) {
       setError("캡처할 VRM 장면이 아직 준비되지 않았습니다.");
@@ -7014,27 +7201,40 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     insertCaptureAbortRef.current?.abort();
     const captureController = new AbortController();
     insertCaptureAbortRef.current = captureController;
+    const capturePreconditionsAreCurrent = (): boolean => (
+      captureGeneration === insertCaptureGenerationRef.current
+      && captureRequest === captureRequestRef.current
+      && vrmRef.current === currentVrm
+      && captureRef.current.gl === gl
+      && captureRef.current.scene === scene
+      && captureRef.current.camera === camera
+      && texturePaintRuntimeRef.current === currentTexturePaintRuntime
+      && (currentTexturePaintRuntime?.getContentRevision() ?? 0)
+        === captureTexturePaintRevision
+      && persistentIkCurrentSignatureRef.current === capturePoseSignature
+      && pendingPersistentIkCommandRef.current === null
+      && dynamicPoseGenerationRef.current === captureDynamicPoseGeneration
+      && (!hasLockedConstraint
+        || (
+          persistentIkResolvedSignatureRef.current === capturePoseSignature
+          && !webcamActiveRef.current
+          && !idleAnimationRef.current
+        ))
+    );
+    const releaseTexturePaintCaptureLock = () => {
+      if (
+        captureGeneration === insertCaptureGenerationRef.current
+        && captureRequest === captureRequestRef.current
+      ) {
+        texturePaintMutationBlockedRef.current = false;
+      }
+    };
+    texturePaintMutationBlockedRef.current = true;
     setIsCapturing(true);
     setError("");
     insertCaptureFrameRef.current = requestAnimationFrame(() => {
       insertCaptureFrameRef.current = null;
-      if (
-        captureGeneration !== insertCaptureGenerationRef.current
-        || captureRequest !== captureRequestRef.current
-        || vrmRef.current !== currentVrm
-        || captureRef.current.gl !== gl
-        || captureRef.current.scene !== scene
-        || captureRef.current.camera !== camera
-        || persistentIkCurrentSignatureRef.current !== capturePoseSignature
-        || pendingPersistentIkCommandRef.current !== null
-        || dynamicPoseGenerationRef.current !== captureDynamicPoseGeneration
-        || (hasLockedConstraint
-          && (
-            persistentIkResolvedSignatureRef.current !== capturePoseSignature
-            || webcamActiveRef.current
-            || idleAnimationRef.current
-          ))
-      ) {
+      if (!capturePreconditionsAreCurrent()) {
         if (insertCaptureAbortRef.current === captureController) {
           captureController.abort();
           insertCaptureAbortRef.current = null;
@@ -7043,6 +7243,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
           captureGeneration === insertCaptureGenerationRef.current
           && captureRequest === captureRequestRef.current
         ) {
+          releaseTexturePaintCaptureLock();
           setIsCapturing(false);
         }
         return;
@@ -7050,14 +7251,29 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
       void (async () => {
         let inserted = false;
-        let releaseCaptureHelpers: (() => void) | null = acquireVrmCaptureHelperLease({
-          subjectOnly: insertBackground.plan.subjectOnly,
-        });
+        let releaseCaptureHelpers: (() => void) | null = null;
         const releaseLocalCapture = () => {
           releaseCaptureHelpers?.();
           releaseCaptureHelpers = null;
         };
         try {
+          // PNG 인코딩·해시·IndexedDB 저장은 여러 프레임이 걸릴 수 있다. 먼저 표면 텍스처를
+          // 영속화한 뒤 전체 캡처 전제를 다시 검사하고 pose bake→scene→RGBA 캡처를 같은
+          // 동기 구간에서 수행해 메타데이터와 실제 픽셀이 서로 다른 시점을 기록하지 않는다.
+          const surfacePaint: StudioVrmSurfacePaintSettings = currentTexturePaintRuntime
+            ? await import("./studio-vrm-texture-paint-persistence")
+              .then(({ persistStudioVrmTexturePaintRuntime }) =>
+                persistStudioVrmTexturePaintRuntime(
+                  currentTexturePaintRuntime,
+                  { signal: captureController.signal },
+                )
+              )
+            : { version: 1, textures: [] };
+          if (
+            captureController.signal.aborted
+            || !capturePreconditionsAreCurrent()
+          ) return;
+
           // 같은 설정은 물리 미리보기 여부와 무관하게 같은 정지 컷으로 재현되어야 한다.
           if (countSpringBoneJoints(currentVrm) > 0) {
             settleVrmPhysics(currentVrm);
@@ -7086,10 +7302,17 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
           const hashPayload = encodeURIComponent(JSON.stringify(poseMetadata));
           // Scene documents keep recording the logical viewport size — re-edit camera framing
           // depends only on the aspect, and this keeps parity with pre-HiDPI documents.
-          const sceneDocument = createCurrentSceneDocument(displayWidth, displayHeight);
+          const sceneDocument = createCurrentSceneDocument(
+            displayWidth,
+            displayHeight,
+            surfacePaint,
+          );
           if (!sceneDocument) {
             throw new Error("재편집 가능한 3D 데생 인형 장면을 만들지 못했습니다.");
           }
+          releaseCaptureHelpers = acquireVrmCaptureHelperLease({
+            subjectOnly: insertBackground.plan.subjectOnly,
+          });
           const rgba = captureStudioVrmRgba(gl, scene, camera, { width, height }, {
             color: insertBackground.plan.backgroundColor,
             alpha: insertBackground.plan.captureAlpha,
@@ -7105,16 +7328,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
           );
           const fullDataUrl = `${baseDataUrl}#${hashPayload}`;
           if (
-            captureController.signal.aborted ||
-            captureGeneration !== insertCaptureGenerationRef.current ||
-            captureRequest !== captureRequestRef.current ||
-            vrmRef.current !== currentVrm ||
-            captureRef.current.gl !== gl ||
-            captureRef.current.scene !== scene ||
-            captureRef.current.camera !== camera ||
-            persistentIkCurrentSignatureRef.current !== capturePoseSignature ||
-            pendingPersistentIkCommandRef.current !== null ||
-            dynamicPoseGenerationRef.current !== captureDynamicPoseGeneration
+            captureController.signal.aborted
+            || !capturePreconditionsAreCurrent()
           ) return;
 
           const accepted = await onInsert({
@@ -7153,6 +7368,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
             captureGeneration === insertCaptureGenerationRef.current
             && captureRequest === captureRequestRef.current
           ) {
+            releaseTexturePaintCaptureLock();
             setIsCapturing(false);
           }
         }
@@ -7301,6 +7517,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                       fingerEdits={effectiveFingerEdits}
                       bodyScale={bodyScale}
                       texturePaintEnabled={texturePaintInteractionEnabled}
+                      texturePaintMutationBlockedRef={texturePaintMutationBlockedRef}
                       texturePaintRuntime={texturePaintRuntime}
                       texturePaintSettings={texturePaintSettings}
                     />
@@ -7684,6 +7901,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                 activeTargetId={texturePaintSnapshot?.activeTargetId ?? null}
                 activeTextureLabel={texturePaintTargetLabel}
                 status={texturePaintStatus}
+                restoreError={
+                  texturePaintPersistenceStatus === "error"
+                    ? texturePaintPersistenceError || "저장된 표면 페인팅을 복원하지 못했습니다."
+                    : null
+                }
                 strokeActive={texturePaintStrokeActive}
                 targetCount={texturePaintSnapshot?.targets.length ?? 0}
                 canUndo={(texturePaintSnapshot?.history.undoCount ?? 0) > 0}
@@ -7692,6 +7914,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                 onUndo={handleTexturePaintUndo}
                 onRedo={handleTexturePaintRedo}
                 onResetActiveTexture={handleTexturePaintReset}
+                onRetryRestore={() => {
+                  texturePaintRestoreAbortRef.current?.abort();
+                  setTexturePaintPersistenceError("");
+                  setTexturePaintPersistenceStatus("restoring");
+                  setTexturePaintRestoreRetryToken((token) => token + 1);
+                }}
               />
 
               <section hidden={hideOnTab("face")}>

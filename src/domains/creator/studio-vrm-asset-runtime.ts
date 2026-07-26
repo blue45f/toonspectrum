@@ -1,5 +1,6 @@
 import * as THREE from "three";
 
+import { stampStudioVrmTexturePaintMaterialLocator } from "./studio-vrm-texture-paint-binding";
 import { isUsableVrmAssetResponse } from "./vrm-library";
 
 import type { VRM } from "@pixiv/three-vrm";
@@ -23,6 +24,36 @@ export type StudioVrmAssetRuntimeDependencies = {
   deepDispose: (scene: THREE.Object3D) => Promise<void>;
   fallbackDispose: (scene: THREE.Object3D) => void;
 };
+
+type StudioVrmGltfAssociation = Readonly<{
+  materials?: number;
+}>;
+
+/**
+ * Keeps GLTFLoader's stable material index after the parser is released. Runtime UUIDs and model
+ * names are deliberately not used because neither survives a project round trip reliably.
+ */
+export function stampStudioVrmGltfMaterialAssociations(
+  associations: ReadonlyMap<unknown, StudioVrmGltfAssociation> | null | undefined,
+): number {
+  if (!associations) return 0;
+  let stamped = 0;
+  for (const [candidate, association] of associations) {
+    const material = candidate as THREE.Material & { readonly isMaterial?: unknown };
+    const materialIndex = association?.materials;
+    if (
+      material?.isMaterial !== true
+      || !Number.isSafeInteger(materialIndex)
+      || (materialIndex ?? -1) < 0
+    ) {
+      continue;
+    }
+    if (stampStudioVrmTexturePaintMaterialLocator(material, materialIndex as number)) {
+      stamped += 1;
+    }
+  }
+  return stamped;
+}
 
 export function createStudioVrmAssetRuntime(
   dependencies: StudioVrmAssetRuntimeDependencies,
@@ -81,6 +112,11 @@ async function loadResolvedVrm(url: string): Promise<VRM> {
   const loader = new GLTFLoader();
   loader.register((parser) => new VRMLoaderPlugin(parser));
   const gltf = await loader.loadAsync(url);
+  stampStudioVrmGltfMaterialAssociations(
+    (gltf.parser as unknown as {
+      readonly associations?: ReadonlyMap<unknown, StudioVrmGltfAssociation>;
+    }).associations,
+  );
   VRMUtils.combineSkeletons?.(gltf.scene);
   const loadedVrm = gltf.userData.vrm as VRM | undefined;
   if (!loadedVrm) {

@@ -140,6 +140,20 @@ describe("StudioVrmTexturePaintPanel", () => {
     expect(screen.getByText("칠할 표면을 선택하세요")).toBeTruthy();
   });
 
+  it("offers an explicit retry action when persisted texture restoration fails", () => {
+    const onRetryRestore = vi.fn();
+    renderPanel({
+      disabled: true,
+      restoreError: "IndexedDB 원본을 읽지 못했습니다.",
+      onRetryRestore,
+    });
+
+    expect(screen.getByRole("alert").textContent).toContain("원본 텍스처 복원이 중단됐습니다.");
+    expect(screen.getByRole("alert").textContent).toContain("IndexedDB 원본을 읽지 못했습니다.");
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(onRetryRestore).toHaveBeenCalledOnce();
+  });
+
   it("requires a deliberate second activation before destructive source restoration", () => {
     const { props } = renderPanel();
 

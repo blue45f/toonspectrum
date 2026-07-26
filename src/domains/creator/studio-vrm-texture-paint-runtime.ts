@@ -1,9 +1,21 @@
 import * as THREE from "three";
 
 import {
+  getCachedStudioVrmTextureGeometryIndex,
   getStudioVrmTextureGeometryIndex,
   inspectStudioVrmTextureGeometryAdmission,
+  precomputeStudioVrmTextureGeometryIndex,
+  type StudioVrmTextureGeometryIndex,
+  type StudioVrmTextureGeometryLike,
+  type StudioVrmTextureGeometryPrecomputeOptions,
 } from "./studio-vrm-texture-geometry-index";
+import {
+  STUDIO_VRM_TEXTURE_PAINT_MATERIAL_LOCATOR_USER_DATA_KEY,
+  canonicalizeStudioVrmTexturePaintMaterialLocator as canonicalMaterialLocator,
+  createStudioVrmTexturePaintBindingDescriptor as createBindingDescriptor,
+  isCanonicalStudioVrmTexturePaintBindingDescriptor as isCanonicalBindingDescriptor,
+  type StudioVrmTexturePaintBindingDescriptor,
+} from "./studio-vrm-texture-paint-binding";
 import {
   applyStudioVrmTexturePaintOp,
   EMPTY_STUDIO_VRM_TEXTURE_RECT,
@@ -40,6 +52,7 @@ const RGBA_CHANNELS = 4;
 const DEFAULT_TARGET_RGBA_BYTES = STUDIO_VRM_TEXTURE_MAX_TEXELS * RGBA_CHANNELS;
 export const STUDIO_VRM_TEXTURE_PAINT_TARGET_RESIDENT_RGBA_COPIES = 4;
 export const STUDIO_VRM_TEXTURE_PAINT_STANDARD_GEOMETRY_MAX_TRIANGLES = 100_000;
+export const STUDIO_VRM_TEXTURE_PAINT_POINTER_SYNC_GEOMETRY_MAX_TRIANGLES = 4_096;
 const DEFAULT_HISTORY_BYTES = 32 * 1024 * 1024;
 const DEFAULT_TARGET_RESIDENT_BYTES =
   DEFAULT_TARGET_RGBA_BYTES * STUDIO_VRM_TEXTURE_PAINT_TARGET_RESIDENT_RGBA_COPIES;
@@ -71,6 +84,8 @@ export type StudioVrmTexturePaintRuntimeStatus =
 
 export type StudioVrmTexturePaintRuntimeErrorCode =
   | "aggregate-rgba-budget"
+  | "binding-conflict"
+  | "binding-missing"
   | "canvas-unavailable"
   | "disposed"
   | "history-budget"
@@ -150,6 +165,32 @@ export interface StudioVrmTexturePaintReadableImage {
   readonly data: Uint8ClampedArray;
 }
 
+export {
+  STUDIO_VRM_TEXTURE_PAINT_BASE_COLOR_SLOT,
+  STUDIO_VRM_TEXTURE_PAINT_MATERIAL_LOCATOR_USER_DATA_KEY,
+  stampStudioVrmTexturePaintMaterialLocator,
+} from "./studio-vrm-texture-paint-binding";
+export type { StudioVrmTexturePaintBindingDescriptor } from "./studio-vrm-texture-paint-binding";
+
+export interface StudioVrmTexturePaintExportTarget {
+  readonly id: string;
+  readonly width: number;
+  readonly height: number;
+  /**
+   * Caller-owned RGBA8 copy. The runtime never transfers or mutates this buffer after return.
+   * Exporters should encode one target at a time and release the buffer promptly.
+   */
+  readonly pixels: Uint8ClampedArray;
+  readonly bindings: readonly StudioVrmTexturePaintBindingDescriptor[];
+}
+
+export interface StudioVrmTexturePaintRehydrateTarget {
+  readonly binding: StudioVrmTexturePaintBindingDescriptor;
+  /** Ownership of the RGBA buffer is transferred for the duration of this call. */
+  readonly image: StudioVrmTexturePaintReadableImage;
+  readonly signal?: AbortSignal;
+}
+
 export type StudioVrmTexturePaintCanvasFactory = (
   width: number,
   height: number,
@@ -160,6 +201,11 @@ export type StudioVrmTexturePaintImageReader = (
   signal: AbortSignal,
 ) => Promise<StudioVrmTexturePaintReadableImage> | StudioVrmTexturePaintReadableImage;
 
+export type StudioVrmTexturePaintGeometryPrecomputer = (
+  geometry: StudioVrmTextureGeometryLike,
+  options: StudioVrmTextureGeometryPrecomputeOptions,
+) => Promise<StudioVrmTextureGeometryIndex>;
+
 export interface CreateStudioVrmTexturePaintRuntimeOptions {
   /**
    * Conservative resident footprint per target: original RGBA, editable ImageData,
@@ -168,7 +214,11 @@ export interface CreateStudioVrmTexturePaintRuntimeOptions {
   readonly maxTargetResidentBytes?: number;
   /** Prepared target resident bytes plus the reserved undo-history budget. */
   readonly maxAggregateResidentBytes?: number;
-  /** Synchronous UV-island indexing cap. Over-budget meshes use a face-local fallback. */
+  /**
+   * Worker UV-island indexing hard cap. Pointer input synchronously indexes only meshes up to
+   * `STUDIO_VRM_TEXTURE_PAINT_POINTER_SYNC_GEOMETRY_MAX_TRIANGLES`; larger admitted meshes require
+   * a completed prewarm cache and otherwise use a face-local fallback.
+   */
   readonly maxGeometryIndexTriangles?: number;
   /** @deprecated Logical RGBA compatibility alias. Prefer maxTargetResidentBytes. */
   readonly maxTargetRgbaBytes?: number;
@@ -183,6 +233,8 @@ export interface CreateStudioVrmTexturePaintRuntimeOptions {
   readonly undoTileSize?: number;
   readonly createCanvas?: StudioVrmTexturePaintCanvasFactory;
   readonly readTextureImage?: StudioVrmTexturePaintImageReader;
+  /** Test/host integration seam. The default uses the browser module Worker implementation. */
+  readonly precomputeGeometryIndex?: StudioVrmTexturePaintGeometryPrecomputer;
 }
 
 export interface StudioVrmTexturePaintTargetSnapshot {
@@ -238,6 +290,7 @@ interface BaseColorMaterial extends THREE.Material {
 interface MaterialBinding {
   readonly material: BaseColorMaterial;
   readonly originalMap: THREE.Texture | null;
+  readonly descriptor: StudioVrmTexturePaintBindingDescriptor;
 }
 
 interface PaintTarget {
@@ -312,6 +365,12 @@ interface NormalizedRuntimeOptions {
   readonly undoTileSize: number;
   readonly createCanvas: StudioVrmTexturePaintCanvasFactory;
   readonly readTextureImage: StudioVrmTexturePaintImageReader;
+  readonly precomputeGeometryIndex: StudioVrmTexturePaintGeometryPrecomputer;
+}
+
+interface GeometryPrewarmJob {
+  readonly geometry: StudioVrmTextureGeometryLike;
+  readonly uvAttribute: "uv" | "uv1";
 }
 
 class StudioVrmTexturePaintFault extends Error {
@@ -324,6 +383,8 @@ class StudioVrmTexturePaintFault extends Error {
 const ERROR_MESSAGES: Readonly<Record<StudioVrmTexturePaintRuntimeErrorCode, string>> =
   Object.freeze({
     "aggregate-rgba-budget": "텍스처와 실행 취소 기록의 전체 상주 메모리 한도를 초과합니다.",
+    "binding-conflict": "저장된 표면 텍스처와 현재 모델의 재질 결합이 서로 충돌합니다.",
+    "binding-missing": "저장된 표면 텍스처가 가리키는 모델 재질을 찾지 못했습니다.",
     "canvas-unavailable": "페인팅 캔버스를 사용할 수 없습니다.",
     disposed: "텍스처 페인팅이 이미 종료되었습니다.",
     "history-budget": "이 획은 실행 취소 메모리 한도를 초과합니다.",
@@ -578,6 +639,8 @@ function normalizeOptions(
     ),
     createCanvas,
     readTextureImage: options.readTextureImage ?? createDefaultImageReader(createCanvas),
+    precomputeGeometryIndex:
+      options.precomputeGeometryIndex ?? precomputeStudioVrmTextureGeometryIndex,
   });
 }
 
@@ -594,6 +657,113 @@ function isCompressedTexture(texture: THREE.Texture): boolean {
 
 function isBaseColorMaterial(material: unknown): material is BaseColorMaterial {
   return typeof material === "object" && material !== null && "map" in material;
+}
+
+function stableScenePathHash(value: string): string {
+  let hash = 0x811c_9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = Math.imul(hash ^ value.charCodeAt(index), 0x0100_0193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function createScenePathMaterialLocator(
+  objectPath: string,
+  materialIndex: number,
+): string {
+  const candidate = `scene-path:${objectPath}/material-${materialIndex}`;
+  return canonicalMaterialLocator(candidate)
+    ? candidate
+    : `scene-path:hashed-${stableScenePathHash(candidate)}`;
+}
+
+/**
+ * Returns one deterministic locator per material. GLTFLoader integrations may stamp the stable
+ * glTF material index in userData; hand-built/test scenes use a child-index path fallback.
+ */
+function collectSceneMaterialBindings(
+  scene: THREE.Object3D,
+): Map<BaseColorMaterial, StudioVrmTexturePaintBindingDescriptor> {
+  const bindings = new Map<BaseColorMaterial, StudioVrmTexturePaintBindingDescriptor>();
+  const stack: Array<Readonly<{ object: THREE.Object3D; path: string }>> = [
+    { object: scene, path: "root" },
+  ];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) break;
+    const mesh = current.object as THREE.Object3D & {
+      readonly isMesh?: unknown;
+      readonly material?: THREE.Material | THREE.Material[];
+    };
+    if (mesh.isMesh === true && mesh.material) {
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      materials.forEach((candidate, materialIndex) => {
+        if (!isBaseColorMaterial(candidate)) return;
+        const stamped = canonicalMaterialLocator(
+          candidate.userData?.[STUDIO_VRM_TEXTURE_PAINT_MATERIAL_LOCATOR_USER_DATA_KEY],
+        );
+        const descriptor = createBindingDescriptor(
+          stamped ?? createScenePathMaterialLocator(current.path, materialIndex),
+        );
+        if (!descriptor) return;
+        const previous = bindings.get(candidate);
+        if (!previous || descriptor.bindingKey < previous.bindingKey) {
+          bindings.set(candidate, descriptor);
+        }
+      });
+    }
+    for (let childIndex = current.object.children.length - 1; childIndex >= 0; childIndex -= 1) {
+      const child = current.object.children[childIndex];
+      if (!child) continue;
+      stack.push({ object: child, path: `${current.path}/child-${childIndex}` });
+    }
+  }
+  return bindings;
+}
+
+function collectGeometryPrewarmJobs(
+  scene: THREE.Object3D,
+  maxTriangles: number,
+): readonly GeometryPrewarmJob[] {
+  const jobs: GeometryPrewarmJob[] = [];
+  const seen = new WeakMap<StudioVrmTextureGeometryLike, Set<string>>();
+  scene.traverse((object) => {
+    const candidate = object as THREE.Object3D & {
+      readonly isMesh?: unknown;
+      readonly geometry?: StudioVrmTextureGeometryLike;
+    };
+    const geometry = candidate.isMesh === true ? candidate.geometry : undefined;
+    if (!geometry || typeof geometry.getAttribute !== "function") return;
+    for (const uvAttribute of ["uv", "uv1"] as const) {
+      try {
+        if (!geometry.getAttribute(uvAttribute)) continue;
+      } catch {
+        continue;
+      }
+      const admission = inspectStudioVrmTextureGeometryAdmission(geometry, {
+        uvAttribute,
+        maxTriangles,
+      });
+      if (!admission?.admitted) continue;
+      let attributes = seen.get(geometry);
+      if (!attributes) {
+        attributes = new Set();
+        seen.set(geometry, attributes);
+      }
+      if (attributes.has(uvAttribute)) continue;
+      attributes.add(uvAttribute);
+      jobs.push(Object.freeze({ geometry, uvAttribute }));
+    }
+  });
+  return Object.freeze(jobs);
+}
+
+function pixelsEqual(left: Uint8ClampedArray, right: Uint8ClampedArray): boolean {
+  if (left.byteLength !== right.byteLength) return false;
+  for (let index = 0; index < left.byteLength; index += 1) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
 }
 
 function materialAtHit(
@@ -763,6 +933,7 @@ export class StudioVrmTexturePaintRuntime {
   private readonly targetsByPainted = new Map<THREE.Texture, PaintTarget>();
   private readonly targets: PaintTarget[] = [];
   private readonly listeners = new Set<StudioVrmTexturePaintRuntimeListener>();
+  private readonly geometryPrewarmController = new AbortController();
   private readonly inFlightReadControllers = new Set<AbortController>();
   private readonly inFlightReadsBySource = new Map<THREE.Texture, number>();
   private inFlightReadCount = 0;
@@ -777,6 +948,7 @@ export class StudioVrmTexturePaintRuntime {
   private lastError: StudioVrmTexturePaintRuntimeError | null = null;
   private lastGuidance: StudioVrmTexturePaintRuntimeGuidance | null = null;
   private disposed = false;
+  private contentRevision = 0;
   private snapshot: StudioVrmTexturePaintRuntimeSnapshot;
 
   constructor(
@@ -786,9 +958,17 @@ export class StudioVrmTexturePaintRuntime {
     this.scene = scene;
     this.options = normalizeOptions(options);
     this.snapshot = this.createSnapshot();
+    void this.prewarmSceneGeometry();
   }
 
   getSnapshot = (): StudioVrmTexturePaintRuntimeSnapshot => this.snapshot;
+
+  /**
+   * Monotonic revision of canvas-visible/export-observable RGBA content. Unlike React snapshots,
+   * this advances for every successful incremental dirty-rect upload, including pointer moves that
+   * intentionally avoid publishing UI state.
+   */
+  getContentRevision = (): number => this.contentRevision;
 
   subscribe = (listener: StudioVrmTexturePaintRuntimeListener): (() => void) => {
     if (this.disposed) return () => undefined;
@@ -808,6 +988,146 @@ export class StudioVrmTexturePaintRuntime {
       this.publish();
     }
     return this.snapshot;
+  }
+
+  exportPaintedTargets():
+    StudioVrmTexturePaintRuntimeResult<readonly StudioVrmTexturePaintExportTarget[]> {
+    if (this.disposed) return this.fail("disposed");
+    if (this.pending || this.active) return this.fail("pointer-active");
+    const exported: StudioVrmTexturePaintExportTarget[] = [];
+    const bindingOwners = new Map<string, string>();
+    for (const target of this.targets) {
+      if (!target.valid) return this.fail("target-invalid");
+      if (pixelsEqual(target.imageData.data, target.originalPixels)) continue;
+      const bindingsByIdentity = new Map<string, StudioVrmTexturePaintBindingDescriptor>();
+      for (const { descriptor } of target.bindings.values()) {
+        const identity = `${descriptor.materialLocator}\u0000${descriptor.textureSlot}`;
+        const owner = bindingOwners.get(identity);
+        if (owner !== undefined && owner !== target.id) return this.fail("binding-conflict");
+        bindingOwners.set(identity, target.id);
+        bindingsByIdentity.set(identity, descriptor);
+      }
+      const bindings = [...bindingsByIdentity.values()]
+        .sort((left, right) => left.bindingKey.localeCompare(right.bindingKey));
+      if (bindings.length === 0) return this.fail("binding-missing");
+      exported.push(Object.freeze({
+        id: target.id,
+        width: target.size.width,
+        height: target.size.height,
+        pixels: target.imageData.data.slice(),
+        bindings: Object.freeze(bindings),
+      }));
+    }
+    exported.sort((left, right) =>
+      (left.bindings[0]?.bindingKey ?? "").localeCompare(
+        right.bindings[0]?.bindingKey ?? "",
+      ));
+    return success(Object.freeze(exported));
+  }
+
+  async rehydrateTarget(
+    input: StudioVrmTexturePaintRehydrateTarget,
+  ): Promise<
+    StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintRuntimeSnapshot>
+  > {
+    if (this.disposed) return this.fail("disposed");
+    if (this.pending || this.active) return this.fail("pointer-active");
+    if (!isCanonicalBindingDescriptor(input.binding)) return this.fail("binding-missing");
+    if (input.signal?.aborted) return this.fail("source-read-aborted");
+    const size = {
+      width: input.image?.width,
+      height: input.image?.height,
+    };
+    if (
+      !isStudioVrmTextureSize(size)
+      || !(input.image?.data instanceof Uint8ClampedArray)
+      || input.image.data.byteLength !== size.width * size.height * RGBA_CHANNELS
+    ) {
+      return this.fail("invalid-dimensions");
+    }
+
+    const materialEntries = [...collectSceneMaterialBindings(this.scene)]
+      .filter(([, descriptor]) =>
+        descriptor.materialLocator === input.binding.materialLocator
+        && descriptor.textureSlot === input.binding.textureSlot
+      );
+    if (materialEntries.length > 1) return this.fail("binding-conflict");
+    const materialEntry = materialEntries[0];
+    const material = materialEntry?.[0];
+    if (!material) return this.fail("binding-missing");
+    let currentMap: THREE.Texture | null;
+    try {
+      currentMap = material.map;
+    } catch {
+      return this.fail("binding-missing");
+    }
+    if (!currentMap?.isTexture) return this.fail("map-missing");
+
+    const existing =
+      this.targetsByPainted.get(currentMap)
+      ?? this.targetsByOriginal.get(currentMap)
+      ?? null;
+    if (existing) {
+      const boundDescriptor = existing.bindings.get(material)?.descriptor;
+      const ownsBinding =
+        boundDescriptor?.materialLocator === input.binding.materialLocator
+        && boundDescriptor.textureSlot === input.binding.textureSlot;
+      if (
+        !ownsBinding
+        || existing.size.width !== size.width
+        || existing.size.height !== size.height
+        || !pixelsEqual(existing.imageData.data, input.image.data)
+      ) {
+        return this.fail("binding-conflict");
+      }
+      this.selectedTarget = existing;
+      this.lastError = null;
+      this.publish();
+      return success(this.snapshot);
+    }
+
+    const controller = new AbortController();
+    const handleAbort = () => controller.abort();
+    input.signal?.addEventListener("abort", handleAbort, { once: true });
+    try {
+      const original = await this.readSourceTexture(currentMap, controller);
+      if (!original.ok) return this.fail(original.error.code);
+      if (input.signal?.aborted || this.disposed) {
+        return this.fail(this.disposed ? "disposed" : "source-read-aborted");
+      }
+      if (
+        original.value.width !== size.width
+        || original.value.height !== size.height
+      ) {
+        return this.fail("binding-conflict");
+      }
+      const targetResult = this.createTarget(currentMap, original.value);
+      if (!targetResult.ok) return this.fail(targetResult.error.code);
+      const created = targetResult.value;
+      const createdDescriptor = created.bindings.get(material)?.descriptor;
+      if (
+        createdDescriptor?.materialLocator !== input.binding.materialLocator
+        || createdDescriptor.textureSlot !== input.binding.textureSlot
+      ) {
+        this.invalidateTarget(created);
+        return this.fail("binding-missing");
+      }
+      if (input.signal?.aborted || this.disposed) {
+        this.invalidateTarget(created);
+        return this.fail(this.disposed ? "disposed" : "source-read-aborted");
+      }
+      created.imageData.data.set(input.image.data);
+      if (!this.syncTarget(created)) {
+        this.invalidateTarget(created);
+        return this.fail("canvas-unavailable");
+      }
+      this.selectedTarget = created;
+      this.lastError = null;
+      this.publish();
+      return success(this.snapshot);
+    } finally {
+      input.signal?.removeEventListener("abort", handleAbort);
+    }
   }
 
   async beginStroke(
@@ -1088,6 +1408,7 @@ export class StudioVrmTexturePaintRuntime {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.geometryPrewarmController.abort();
     for (const controller of this.inFlightReadControllers) controller.abort();
     this.pending = null;
     if (this.active) {
@@ -1132,6 +1453,37 @@ export class StudioVrmTexturePaintRuntime {
 
   private isPointerId(value: number): boolean {
     return Number.isSafeInteger(value) && value >= 0;
+  }
+
+  private async prewarmSceneGeometry(): Promise<void> {
+    // Construction stays deterministic and cheap; geometry snapshotting starts after the runtime
+    // is returned. Jobs are deliberately sequential to cap transferable copies and Worker memory.
+    await Promise.resolve();
+    const signal = this.geometryPrewarmController.signal;
+    if (this.disposed || signal.aborted) return;
+    let jobs: readonly GeometryPrewarmJob[];
+    try {
+      jobs = collectGeometryPrewarmJobs(
+        this.scene,
+        this.options.maxGeometryIndexTriangles,
+      );
+    } catch {
+      return;
+    }
+    for (const job of jobs) {
+      if (this.disposed || signal.aborted) return;
+      try {
+        await this.options.precomputeGeometryIndex(job.geometry, {
+          uvAttribute: job.uvAttribute,
+          maxTriangles: this.options.maxGeometryIndexTriangles,
+          signal,
+          allowSynchronousFallback: false,
+        });
+      } catch {
+        // Worker availability, abort, timeout, stale geometry, and malformed custom geometry all
+        // fail closed. Pointer input remains usable through the small-sync/face-local paths.
+      }
+    }
   }
 
   private appendStrokeSample(
@@ -1200,23 +1552,34 @@ export class StudioVrmTexturePaintRuntime {
     let texelsPerWorldUnit: number | undefined;
     if (isUsableFaceIndex(hit.faceIndex)) {
       const faceIndex = hit.faceIndex;
-      let geometryIndex: ReturnType<typeof getStudioVrmTextureGeometryIndex> = null;
+      let geometryIndex: StudioVrmTextureGeometryIndex | null = null;
       try {
         const geometry = (object as THREE.Mesh).geometry;
-        const admission = inspectStudioVrmTextureGeometryAdmission(geometry, {
+        const indexOptions = {
           uvAttribute,
           maxTriangles: this.options.maxGeometryIndexTriangles,
-        });
+        } as const;
+        const admission = inspectStudioVrmTextureGeometryAdmission(
+          geometry,
+          indexOptions,
+        );
         if (admission && !admission.admitted) {
           this.lastGuidance = frozenGeometryBudgetGuidance(
             admission.triangleCount,
             admission.maxTriangles,
           );
-        } else {
-          geometryIndex = getStudioVrmTextureGeometryIndex(geometry, {
-            uvAttribute,
-            maxTriangles: this.options.maxGeometryIndexTriangles,
-          });
+        } else if (admission?.admitted) {
+          geometryIndex = getCachedStudioVrmTextureGeometryIndex(
+            geometry,
+            indexOptions,
+          );
+          if (
+            !geometryIndex
+            && admission.triangleCount
+              <= STUDIO_VRM_TEXTURE_PAINT_POINTER_SYNC_GEOMETRY_MAX_TRIANGLES
+          ) {
+            geometryIndex = getStudioVrmTextureGeometryIndex(geometry, indexOptions);
+          }
         }
       } catch {
         // 손상된 custom geometry는 아래 face-specific fallback으로 격리한다.
@@ -1411,28 +1774,27 @@ export class StudioVrmTexturePaintRuntime {
     target: PaintTarget,
   ): StudioVrmTexturePaintRuntimeResult<boolean> {
     if (!target.valid) return failure("target-invalid");
-    const candidates = new Set<BaseColorMaterial>();
-    this.scene.traverse((object) => {
-      const mesh = object as THREE.Object3D & {
-        readonly isMesh?: unknown;
-        readonly material?: THREE.Material | THREE.Material[];
-      };
-      if (mesh.isMesh !== true || !mesh.material) return;
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      for (const material of materials) {
-        if (!isBaseColorMaterial(material) || target.bindings.has(material)) continue;
-        try {
-          if (material.map === target.originalTexture) candidates.add(material);
-        } catch {
-          // A throwing custom material is not a safe binding candidate.
-        }
+    const candidates = new Map<
+      BaseColorMaterial,
+      StudioVrmTexturePaintBindingDescriptor
+    >();
+    for (const [material, descriptor] of collectSceneMaterialBindings(this.scene)) {
+      if (target.bindings.has(material)) continue;
+      try {
+        if (material.map === target.originalTexture) candidates.set(material, descriptor);
+      } catch {
+        // A throwing custom material is not a safe binding candidate.
       }
-    });
+    }
 
     const changed: MaterialBinding[] = [];
     try {
-      for (const material of candidates) {
-        const binding = { material, originalMap: material.map } satisfies MaterialBinding;
+      for (const [material, descriptor] of candidates) {
+        const binding = {
+          material,
+          originalMap: material.map,
+          descriptor,
+        } satisfies MaterialBinding;
         material.map = target.paintedTexture;
         markMaterialChanged(material);
         target.bindings.set(material, binding);
@@ -1654,6 +2016,10 @@ export class StudioVrmTexturePaintRuntime {
         target.context.putImageData(target.imageData, 0, 0);
       }
       target.paintedTexture.needsUpdate = true;
+      this.contentRevision = Math.min(
+        Number.MAX_SAFE_INTEGER,
+        this.contentRevision + 1,
+      );
       return true;
     } catch {
       return false;

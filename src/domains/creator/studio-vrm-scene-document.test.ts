@@ -9,7 +9,13 @@ import {
   STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES,
   STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES,
   STUDIO_VRM_SCENE_DOCUMENT_V3_MAX_BYTES,
+  STUDIO_VRM_SCENE_DOCUMENT_V4_MAX_BYTES,
   STUDIO_VRM_SCENE_DOCUMENT_VERSION,
+  STUDIO_VRM_SURFACE_PAINT_MAX_DECODED_PIXELS,
+  STUDIO_VRM_SURFACE_PAINT_MAX_DIMENSION,
+  STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURES,
+  STUDIO_VRM_SURFACE_PAINT_TEXTURE_MAX_BYTES,
+  STUDIO_VRM_SURFACE_PAINT_TOTAL_MAX_BYTES,
   areStudioVrmSceneDocumentsEqual,
   createDefaultStudioVrmSceneDocument,
   migrateStudioVrmLegacyMetadata,
@@ -39,13 +45,14 @@ function canonicalVersionOne(
   const cloned = JSON.parse(JSON.stringify(scene)) as Record<string, unknown> & {
     pose: Record<string, unknown>;
     rig: unknown;
+    surfacePaint: unknown;
   };
   const {
     translations: _translations,
     ikConstraints: _ikConstraints,
     ...legacyPose
   } = cloned.pose;
-  const { rig: _rig, ...versionOne } = cloned;
+  const { rig: _rig, surfacePaint: _surfacePaint, ...versionOne } = cloned;
   return { ...versionOne, version: 1, pose: legacyPose };
 }
 
@@ -54,13 +61,15 @@ function canonicalVersionTwo(
 ): Record<string, unknown> {
   const cloned = JSON.parse(JSON.stringify(scene)) as Record<string, unknown> & {
     pose: Record<string, unknown>;
+    surfacePaint: unknown;
   };
   const {
     translations: _translations,
     ikConstraints: _ikConstraints,
     ...versionTwoPose
   } = cloned.pose;
-  return { ...cloned, version: 2, pose: versionTwoPose };
+  const { surfacePaint: _surfacePaint, ...versionTwo } = cloned;
+  return { ...versionTwo, version: 2, pose: versionTwoPose };
 }
 
 function canonicalVersionThree(
@@ -68,9 +77,21 @@ function canonicalVersionThree(
 ): Record<string, unknown> {
   const cloned = JSON.parse(JSON.stringify(scene)) as Record<string, unknown> & {
     pose: Record<string, unknown>;
+    surfacePaint: unknown;
   };
   const { ikConstraints: _ikConstraints, ...versionThreePose } = cloned.pose;
-  return { ...cloned, version: 3, pose: versionThreePose };
+  const { surfacePaint: _surfacePaint, ...versionThree } = cloned;
+  return { ...versionThree, version: 3, pose: versionThreePose };
+}
+
+function canonicalVersionFour(
+  scene: StudioVrmSceneDocument = createDefaultStudioVrmSceneDocument(),
+): Record<string, unknown> {
+  const cloned = JSON.parse(JSON.stringify(scene)) as Record<string, unknown> & {
+    surfacePaint: unknown;
+  };
+  const { surfacePaint: _surfacePaint, ...versionFour } = cloned;
+  return { ...versionFour, version: 4 };
 }
 
 describe("studio-vrm-scene-document", () => {
@@ -172,6 +193,31 @@ describe("studio-vrm-scene-document", () => {
         transparentBackground: false,
         backgroundColor: "#fafafa",
       },
+      surfacePaint: {
+        version: 1,
+        textures: [
+          {
+            bindingKey: "hero-face-base-color",
+            materialLocator: "gltf-material:3",
+            textureSlot: "baseColor",
+            hash: `sha256:${"bc".repeat(32)}`,
+            mime: "image/png",
+            byteSize: 1_234_567,
+            width: 2048,
+            height: 2048,
+          },
+          {
+            bindingKey: "hero-coat-base-color",
+            materialLocator: "scene-path:Avatar/Coat/Material-0",
+            textureSlot: "baseColor",
+            hash: `sha256:${"cd".repeat(32)}`,
+            mime: "image/png",
+            byteSize: 765_432,
+            width: 1024,
+            height: 2048,
+          },
+        ],
+      },
     });
 
     const serialized = serializeStudioVrmSceneDocument(scene);
@@ -190,6 +236,7 @@ describe("studio-vrm-scene-document", () => {
     expect(parsed?.camera.position).toEqual([1.25, 2.5, 3.75]);
     expect(parsed?.pose.bodyRotationY).toBe(1.234567890123);
     expect(parsed?.pose.translations).toEqual(scene.pose.translations);
+    expect(parsed?.surfacePaint).toEqual(scene.surfacePaint);
     expect(serializeStudioVrmSceneDocument(parsed)).toBe(serialized);
   });
 
@@ -282,7 +329,7 @@ describe("studio-vrm-scene-document", () => {
     expect(migrateStudioVrmSceneDocument(future)).toBeNull();
   });
 
-  it("losslessly promotes strict v1/v2/v3 scenes to v4 with neutral additions", () => {
+  it("losslessly promotes strict v1/v2/v3/v4 scenes to v5 with neutral additions", () => {
     const current = canonicalScene({
       pose: {
         bones: {
@@ -317,15 +364,18 @@ describe("studio-vrm-scene-document", () => {
     const versionOne = canonicalVersionOne(current);
     const versionTwo = canonicalVersionTwo(current);
     const versionThree = canonicalVersionThree(current);
+    const versionFour = canonicalVersionFour(current);
 
     const parsed = parseStudioVrmSceneDocument(JSON.stringify(versionOne));
     const migrated = migrateStudioVrmSceneDocument(versionOne);
     const migratedVersionTwo = parseStudioVrmSceneDocument(JSON.stringify(versionTwo));
     const migratedVersionThree = parseStudioVrmSceneDocument(JSON.stringify(versionThree));
+    const migratedVersionFour = parseStudioVrmSceneDocument(JSON.stringify(versionFour));
 
     expect(parsed).toEqual(migrated);
     expect(migratedVersionTwo).toEqual(parsed);
     expect(migratedVersionThree).toEqual(parsed);
+    expect(migratedVersionFour).toEqual(parsed);
     expect(parsed).toMatchObject({
       kind: STUDIO_VRM_SCENE_DOCUMENT_KIND,
       version: STUDIO_VRM_SCENE_DOCUMENT_VERSION,
@@ -343,6 +393,7 @@ describe("studio-vrm-scene-document", () => {
         footPlant: false,
         floorHeight: 0,
       },
+      surfacePaint: { version: 1, textures: [] },
     });
     expect(parsed?.pose.bones.leftUpperArm).toEqual(current.pose.bones.leftUpperArm);
     expect(parsed?.pose.bones.rightUpperArm).toEqual(current.pose.bones.rightUpperArm);
@@ -408,6 +459,260 @@ describe("studio-vrm-scene-document", () => {
     ]))).toBeNull();
   });
 
+  it("preserves authored v4 IK data while adding only an empty v5 surface-paint block", () => {
+    const current = canonicalScene({
+      pose: {
+        ...createDefaultStudioVrmSceneDocument().pose,
+        ikConstraints: [{
+          effector: "rightHand",
+          enabled: true,
+          locked: true,
+          target: [0.42, 1.31, -0.18],
+          pole: [0.75, 1.12, 0.24],
+        }],
+      },
+    });
+    const versionFour = canonicalVersionFour(current);
+    const migrated = parseStudioVrmSceneDocument(JSON.stringify(versionFour));
+
+    expect(migrated).not.toBeNull();
+    expect(migrated?.version).toBe(STUDIO_VRM_SCENE_DOCUMENT_VERSION);
+    expect(migrated?.pose).toEqual(current.pose);
+    expect(migrated?.surfacePaint).toEqual({ version: 1, textures: [] });
+    expect(serializeStudioVrmSceneDocument(migrated)).not.toBeNull();
+  });
+
+  it("canonicalizes deterministic PNG bindings while allowing shared content hashes", () => {
+    const sharedHash = `sha256:${"31".repeat(32)}`;
+    const face = {
+      bindingKey: "face-base-color",
+      materialLocator: "gltf-material:1",
+      textureSlot: "baseColor",
+      hash: sharedHash,
+      mime: "image/png",
+      byteSize: 60_000_000,
+      width: 1024,
+      height: 1024,
+    } as const;
+    const eye = {
+      ...face,
+      bindingKey: "eye-base-color",
+      materialLocator: "scene-path:Avatar/Face/Eye-Material",
+    };
+    const raw = {
+      ...mutableDefault(),
+      surfacePaint: {
+        version: 1,
+        textures: [eye, face, { ...face }],
+      },
+    };
+
+    const normalized = normalizeStudioVrmSceneDocument(raw);
+    expect(normalized.surfacePaint).toEqual({
+      version: 1,
+      textures: [face, eye],
+    });
+    expect(Object.isFrozen(normalized.surfacePaint.textures)).toBe(true);
+    expect(serializeStudioVrmSceneDocument(raw)).toBeNull();
+
+    const serialized = serializeStudioVrmSceneDocument(normalized);
+    expect(serialized).not.toBeNull();
+    expect(parseStudioVrmSceneDocument(serialized!)).toEqual(normalized);
+    expect(serializeStudioVrmSceneDocument(parseStudioVrmSceneDocument(serialized!)))
+      .toBe(serialized);
+  });
+
+  it("fails closed on conflicting surface bindings and inconsistent shared asset declarations", () => {
+    const first = {
+      bindingKey: "body-base-color",
+      materialLocator: "gltf-material:0",
+      textureSlot: "baseColor",
+      hash: `sha256:${"41".repeat(32)}`,
+      mime: "image/png",
+      byteSize: 256_000,
+      width: 512,
+      height: 512,
+    } as const;
+    const conflictingBinding = {
+      ...first,
+      bindingKey: "body-repaint",
+      hash: `sha256:${"42".repeat(32)}`,
+    };
+    const bindingConflict = {
+      ...mutableDefault(),
+      surfacePaint: { version: 1, textures: [first, conflictingBinding] },
+    };
+    expect(normalizeStudioVrmSceneDocument(bindingConflict).surfacePaint.textures).toEqual([]);
+    expect(serializeStudioVrmSceneDocument(bindingConflict)).toBeNull();
+    expect(parseStudioVrmSceneDocument(JSON.stringify(bindingConflict))).toBeNull();
+
+    const inconsistentSharedHash = {
+      ...mutableDefault(),
+      surfacePaint: {
+        version: 1,
+        textures: [
+          first,
+          {
+            ...first,
+            bindingKey: "coat-base-color",
+            materialLocator: "gltf-material:2",
+            width: 1024,
+          },
+        ],
+      },
+    };
+    expect(normalizeStudioVrmSceneDocument(inconsistentSharedHash).surfacePaint.textures).toEqual([]);
+    expect(serializeStudioVrmSceneDocument(inconsistentSharedHash)).toBeNull();
+  });
+
+  it("rejects unknown surface-paint keys, unsafe locators, non-PNG references, and raw payloads", () => {
+    const valid = {
+      bindingKey: "face-paint",
+      materialLocator: "scene-path:Avatar/Head/Face-Material",
+      textureSlot: "baseColor",
+      hash: `sha256:${"51".repeat(32)}`,
+      mime: "image/png",
+      byteSize: 12_345,
+      width: 256,
+      height: 512,
+    } as const;
+    const withTextures = (textures: readonly unknown[]) => ({
+      ...mutableDefault(),
+      surfacePaint: { version: 1, textures },
+    });
+
+    const unknownBlockKey = withTextures([valid]);
+    (unknownBlockKey.surfacePaint as Record<string, unknown>).future = true;
+    expect(serializeStudioVrmSceneDocument(unknownBlockKey)).toBeNull();
+    expect(serializeStudioVrmSceneDocument({
+      ...mutableDefault(),
+      surfacePaint: { version: 2, textures: [valid] },
+    })).toBeNull();
+    expect(serializeStudioVrmSceneDocument({
+      ...mutableDefault(),
+      surfacePaint: { version: 1 },
+    })).toBeNull();
+
+    expect(serializeStudioVrmSceneDocument(withTextures([{ ...valid, future: true }]))).toBeNull();
+    const { bindingKey: _bindingKey, ...missingBindingKey } = valid;
+    expect(serializeStudioVrmSceneDocument(withTextures([missingBindingKey]))).toBeNull();
+    expect(serializeStudioVrmSceneDocument(withTextures([{
+      ...valid,
+      rawPixels: [0, 0, 0, 255],
+    }]))).toBeNull();
+    expect(serializeStudioVrmSceneDocument(withTextures([{
+      ...valid,
+      materialLocator: "https://assets.example/material",
+    }]))).toBeNull();
+    expect(serializeStudioVrmSceneDocument(withTextures([{
+      ...valid,
+      materialLocator: "scene-path:Avatar/../Secret",
+    }]))).toBeNull();
+    expect(serializeStudioVrmSceneDocument(withTextures([{
+      ...valid,
+      bindingKey: "blob:runtime-object",
+    }]))).toBeNull();
+    expect(serializeStudioVrmSceneDocument(withTextures([{
+      ...valid,
+      textureSlot: "data:image/png",
+    }]))).toBeNull();
+    expect(serializeStudioVrmSceneDocument(withTextures([{
+      ...valid,
+      hash: `sha256:${"AB".repeat(32)}`,
+    }]))).toBeNull();
+    expect(serializeStudioVrmSceneDocument(withTextures([{
+      ...valid,
+      hash: "data:image/png;base64,AAAA",
+    }]))).toBeNull();
+    expect(serializeStudioVrmSceneDocument(withTextures([{
+      ...valid,
+      mime: "image/jpeg",
+    }]))).toBeNull();
+    expect(serializeStudioVrmSceneDocument(withTextures([{
+      ...valid,
+      bytes: new Uint8Array([137, 80, 78, 71]),
+    }]))).toBeNull();
+
+    expect(serializeStudioVrmSceneDocument(withTextures([valid]))).not.toBeNull();
+  });
+
+  it("enforces surface-paint record, archive-byte, dimension, and decoded-pixel budgets", () => {
+    const texture = (index: number, overrides: Record<string, unknown> = {}) => ({
+      bindingKey: `binding-${index}`,
+      materialLocator: `gltf-material:${index}`,
+      textureSlot: "baseColor",
+      hash: `sha256:${index.toString(16).padStart(64, "0")}`,
+      mime: "image/png",
+      byteSize: 1,
+      width: 1,
+      height: 1,
+      ...overrides,
+    });
+    const excessiveCount = {
+      ...mutableDefault(),
+      surfacePaint: {
+        version: 1,
+        textures: Array.from(
+          { length: STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURES + 1 },
+          (_, index) => texture(index + 1),
+        ),
+      },
+    };
+    expect(normalizeStudioVrmSceneDocument(excessiveCount).surfacePaint.textures)
+      .toHaveLength(STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURES);
+    expect(serializeStudioVrmSceneDocument(excessiveCount)).toBeNull();
+
+    const excessiveBytes = {
+      ...mutableDefault(),
+      surfacePaint: {
+        version: 1,
+        textures: [
+          texture(201, { byteSize: 50_000_000 }),
+          texture(202, {
+            byteSize: STUDIO_VRM_SURFACE_PAINT_TOTAL_MAX_BYTES - 50_000_000 + 1,
+          }),
+        ],
+      },
+    };
+    const byteBounded = normalizeStudioVrmSceneDocument(excessiveBytes).surfacePaint.textures;
+    expect(byteBounded).toHaveLength(1);
+    expect(byteBounded.reduce((sum, item) => sum + item.byteSize, 0))
+      .toBeLessThanOrEqual(STUDIO_VRM_SURFACE_PAINT_TOTAL_MAX_BYTES);
+    expect(serializeStudioVrmSceneDocument(excessiveBytes)).toBeNull();
+
+    const excessivePixels = {
+      ...mutableDefault(),
+      surfacePaint: {
+        version: 1,
+        textures: [301, 302, 303].map((index) => texture(index, {
+          width: STUDIO_VRM_SURFACE_PAINT_MAX_DIMENSION,
+          height: STUDIO_VRM_SURFACE_PAINT_MAX_DIMENSION,
+        })),
+      },
+    };
+    const pixelBounded = normalizeStudioVrmSceneDocument(excessivePixels).surfacePaint.textures;
+    expect(pixelBounded).toHaveLength(2);
+    expect(pixelBounded.reduce((sum, item) => sum + item.width * item.height, 0))
+      .toBe(STUDIO_VRM_SURFACE_PAINT_MAX_DECODED_PIXELS);
+    expect(serializeStudioVrmSceneDocument(excessivePixels)).toBeNull();
+
+    const invalidPerTexture = [
+      texture(401, { byteSize: STUDIO_VRM_SURFACE_PAINT_TEXTURE_MAX_BYTES + 1 }),
+      texture(402, { width: STUDIO_VRM_SURFACE_PAINT_MAX_DIMENSION + 1 }),
+      texture(403, { height: 0 }),
+      texture(404, { byteSize: 1.5 }),
+      texture(405, { textureSlot: "normal" }),
+    ];
+    for (const invalid of invalidPerTexture) {
+      const scene = {
+        ...mutableDefault(),
+        surfacePaint: { version: 1, textures: [invalid] },
+      };
+      expect(normalizeStudioVrmSceneDocument(scene).surfacePaint.textures).toEqual([]);
+      expect(serializeStudioVrmSceneDocument(scene)).toBeNull();
+    }
+  });
+
   it("keeps authored v2 rig data while adding only the canonical zero translation block", () => {
     const current = canonicalScene({
       rig: {
@@ -437,7 +742,7 @@ describe("studio-vrm-scene-document", () => {
     });
   });
 
-  it("rejects unknown v1/v2/v3 root, translation, or rig keys instead of dropping them", () => {
+  it("rejects unknown v1/v2/v3/v4 root, translation, rig, or surface keys", () => {
     const current = mutableDefault();
     expect(parseStudioVrmSceneDocument(JSON.stringify({ ...current, futureRoot: true }))).toBeNull();
     expect(serializeStudioVrmSceneDocument({ ...current, futureRoot: true })).toBeNull();
@@ -448,9 +753,15 @@ describe("studio-vrm-scene-document", () => {
 
     const versionOne = canonicalVersionOne();
     const versionTwo = canonicalVersionTwo();
+    const versionFour = canonicalVersionFour();
     expect(parseStudioVrmSceneDocument(JSON.stringify({ ...versionOne, rig: {} }))).toBeNull();
     expect(migrateStudioVrmSceneDocument({ ...versionOne, unknown: true })).toBeNull();
     expect(migrateStudioVrmSceneDocument({ ...versionTwo, unknown: true })).toBeNull();
+    expect(migrateStudioVrmSceneDocument({ ...versionFour, unknown: true })).toBeNull();
+    expect(migrateStudioVrmSceneDocument({
+      ...versionFour,
+      surfacePaint: { version: 1, textures: [] },
+    })).toBeNull();
     const pose = current.pose as Record<string, unknown>;
     expect(serializeStudioVrmSceneDocument({
       ...current,
@@ -505,7 +816,7 @@ describe("studio-vrm-scene-document", () => {
     expect(migrateStudioVrmSceneDocument(paddedVersionOne)).toBeNull();
   });
 
-  it("honors historical v2/v3 byte ceilings while reserving v4 migration headroom", () => {
+  it("honors historical v2/v3/v4 byte ceilings while reserving v5 migration headroom", () => {
     const compactVersionTwo = JSON.stringify(canonicalVersionTwo());
     const compactBytes = new TextEncoder().encode(compactVersionTwo).byteLength;
     const atCeiling = `${compactVersionTwo}${" ".repeat(
@@ -527,6 +838,17 @@ describe("studio-vrm-scene-document", () => {
     expect(parseStudioVrmSceneDocument(versionThreeAtCeiling)?.version)
       .toBe(STUDIO_VRM_SCENE_DOCUMENT_VERSION);
     expect(parseStudioVrmSceneDocument(`${versionThreeAtCeiling} `)).toBeNull();
+
+    const compactVersionFour = JSON.stringify(canonicalVersionFour());
+    const compactVersionFourBytes = new TextEncoder().encode(compactVersionFour).byteLength;
+    const versionFourAtCeiling = `${compactVersionFour}${" ".repeat(
+      STUDIO_VRM_SCENE_DOCUMENT_V4_MAX_BYTES - compactVersionFourBytes,
+    )}`;
+    expect(new TextEncoder().encode(versionFourAtCeiling).byteLength)
+      .toBe(STUDIO_VRM_SCENE_DOCUMENT_V4_MAX_BYTES);
+    expect(parseStudioVrmSceneDocument(versionFourAtCeiling)?.version)
+      .toBe(STUDIO_VRM_SCENE_DOCUMENT_VERSION);
+    expect(parseStudioVrmSceneDocument(`${versionFourAtCeiling} `)).toBeNull();
   });
 
   it("never invokes accessors while parsing, serializing, or normalizing", () => {

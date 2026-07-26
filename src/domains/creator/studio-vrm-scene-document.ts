@@ -14,10 +14,11 @@ import {
  */
 
 export const STUDIO_VRM_SCENE_DOCUMENT_KIND = "studio-vrm-scene" as const;
-export const STUDIO_VRM_SCENE_DOCUMENT_VERSION = 4 as const;
+export const STUDIO_VRM_SCENE_DOCUMENT_VERSION = 5 as const;
 export const STUDIO_VRM_SCENE_DOCUMENT_LEGACY_VERSION = 1 as const;
 export const STUDIO_VRM_SCENE_DOCUMENT_VERSION_TWO = 2 as const;
-export const STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION = 3 as const;
+export const STUDIO_VRM_SCENE_DOCUMENT_VERSION_THREE = 3 as const;
+export const STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION = 4 as const;
 export const STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES = 128 * 1024;
 export const STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES =
   STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES + 512;
@@ -28,14 +29,29 @@ export const STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES =
 export const STUDIO_VRM_SCENE_DOCUMENT_V3_MAX_BYTES =
   STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES + 512;
 /** v4 reserves bounded headroom for four persistent IK target/pole constraints. */
-export const STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES =
+export const STUDIO_VRM_SCENE_DOCUMENT_V4_MAX_BYTES =
   STUDIO_VRM_SCENE_DOCUMENT_V3_MAX_BYTES + 2 * 1024;
+/** v5 reserves bounded metadata headroom for deterministic surface-paint texture bindings. */
+export const STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES =
+  STUDIO_VRM_SCENE_DOCUMENT_V4_MAX_BYTES + 128 * 1024;
 /** Matches the default project-archive per-attachment ceiling so every accepted scene is portable. */
 export const STUDIO_VRM_MODEL_MAX_BYTES = 96 * 1024 * 1024;
 export const STUDIO_VRM_MAX_POSE_BONES = 64;
 export const STUDIO_VRM_MAX_FINGER_BONES = 32;
 export const STUDIO_VRM_MAX_EXPRESSIONS = 64;
 export const STUDIO_VRM_MAX_IK_CONSTRAINTS = 4;
+export const STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURES = 128;
+export const STUDIO_VRM_SURFACE_PAINT_BASE_COLOR_SLOT = "baseColor" as const;
+/** Mirrors the project archive's 96 MB per-attachment ceiling. */
+export const STUDIO_VRM_SURFACE_PAINT_TEXTURE_MAX_BYTES = 96_000_000;
+/** Content-addressed PNG bytes are counted once even when multiple bindings share a hash. */
+export const STUDIO_VRM_SURFACE_PAINT_TOTAL_MAX_BYTES = 96_000_000;
+export const STUDIO_VRM_SURFACE_PAINT_MAX_DIMENSION = 4_096;
+export const STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURE_PIXELS =
+  STUDIO_VRM_SURFACE_PAINT_MAX_DIMENSION * STUDIO_VRM_SURFACE_PAINT_MAX_DIMENSION;
+/** At most two full-resolution unique decoded textures may be admitted into one scene document. */
+export const STUDIO_VRM_SURFACE_PAINT_MAX_DECODED_PIXELS =
+  STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURE_PIXELS * 2;
 
 const MAX_WORLD_COORDINATE = 10_000;
 const MAX_DATA_DEPTH = 8;
@@ -52,6 +68,9 @@ const MAX_RENDER_PIXELS = 33_554_432;
 const UTF8_ENCODER = new TextEncoder();
 const HASH_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const SAFE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const GLTF_MATERIAL_LOCATOR_PATTERN = /^gltf-material:(?:0|[1-9][0-9]{0,5})$/;
+const SCENE_PATH_MATERIAL_LOCATOR_PATTERN =
+  /^scene-path:[A-Za-z0-9][A-Za-z0-9._-]{0,63}(?:\/[A-Za-z0-9][A-Za-z0-9._-]{0,63}){0,7}$/;
 const SAFE_DATA_KEY_PATTERN = /^[\p{L}\p{N}_. -]{1,64}$/u;
 const CSS_HEX_PATTERN = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const UNSAFE_REFERENCE_PATTERN = /^(?:data|blob|https?|file|javascript|vbscript):|^\/\//i;
@@ -276,6 +295,29 @@ export interface StudioVrmRigSettings {
   readonly floorHeight: number;
 }
 
+/**
+ * One portable PNG texture and its engine-neutral VRM material binding.
+ *
+ * The PNG bytes live in the project archive's content-addressed attachment store. Runtime object
+ * identities, object URLs, Blob/File values, raw pixels, and library-specific UUIDs are never
+ * persisted here. `materialLocator + textureSlot` is the authoritative binding identity.
+ */
+export interface StudioVrmSurfacePaintTexture {
+  readonly bindingKey: string;
+  readonly materialLocator: string;
+  readonly textureSlot: typeof STUDIO_VRM_SURFACE_PAINT_BASE_COLOR_SLOT;
+  readonly hash: string;
+  readonly mime: "image/png";
+  readonly byteSize: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface StudioVrmSurfacePaintSettings {
+  readonly version: 1;
+  readonly textures: readonly StudioVrmSurfacePaintTexture[];
+}
+
 export interface StudioVrmSceneDocument {
   readonly kind: typeof STUDIO_VRM_SCENE_DOCUMENT_KIND;
   readonly version: typeof STUDIO_VRM_SCENE_DOCUMENT_VERSION;
@@ -291,6 +333,7 @@ export interface StudioVrmSceneDocument {
   readonly physics: StudioVrmPhysicsSettings;
   readonly env: StudioVrmEnvironment;
   readonly render: StudioVrmRenderSettings;
+  readonly surfacePaint: StudioVrmSurfacePaintSettings;
 }
 
 export interface StudioVrmBundledModelDescriptor {
@@ -417,6 +460,10 @@ const DEFAULT_RAW_DOCUMENT: StudioVrmSceneDocument = {
     transparentBackground: true,
     backgroundColor: "#ffffff",
   },
+  surfacePaint: {
+    version: 1,
+    textures: [],
+  },
 };
 
 const VERSION_ONE_ROOT_KEYS = new Set([
@@ -435,9 +482,13 @@ const VERSION_ONE_ROOT_KEYS = new Set([
   "render",
 ]);
 
-const CURRENT_ROOT_KEYS = new Set([
+const VERSION_TWO_TO_FOUR_ROOT_KEYS = new Set([
   ...VERSION_ONE_ROOT_KEYS,
   "rig",
+]);
+const CURRENT_ROOT_KEYS = new Set([
+  ...VERSION_TWO_TO_FOUR_ROOT_KEYS,
+  "surfacePaint",
 ]);
 
 const VERSION_ONE_POSE_KEYS = new Set([
@@ -463,6 +514,17 @@ const RIG_KEYS = new Set([
   "fullBodyIk",
   "footPlant",
   "floorHeight",
+]);
+const SURFACE_PAINT_KEYS = new Set(["version", "textures"]);
+const SURFACE_PAINT_TEXTURE_KEYS = new Set([
+  "bindingKey",
+  "materialLocator",
+  "textureSlot",
+  "hash",
+  "mime",
+  "byteSize",
+  "width",
+  "height",
 ]);
 
 const LEGACY_ROOT_KEYS = new Set([
@@ -639,8 +701,11 @@ function exceedsHistoricalSourceLimit(raw: unknown, decoded: unknown): boolean {
   if (decoded.version === STUDIO_VRM_SCENE_DOCUMENT_VERSION_TWO) {
     return utf8ByteLength(raw) > STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES;
   }
+  if (decoded.version === STUDIO_VRM_SCENE_DOCUMENT_VERSION_THREE) {
+    return utf8ByteLength(raw) > STUDIO_VRM_SCENE_DOCUMENT_V3_MAX_BYTES;
+  }
   return decoded.version === STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION
-    && utf8ByteLength(raw) > STUDIO_VRM_SCENE_DOCUMENT_V3_MAX_BYTES;
+    && utf8ByteLength(raw) > STUDIO_VRM_SCENE_DOCUMENT_V4_MAX_BYTES;
 }
 
 function deepFreeze<T>(value: T): T {
@@ -1054,6 +1119,157 @@ function normalizeRig(value: unknown): StudioVrmRigSettings {
   };
 }
 
+function normalizeSurfacePaintIdentifier(value: unknown): string | null {
+  if (
+    typeof value !== "string"
+    || !SAFE_ID_PATTERN.test(value)
+    || FORBIDDEN_KEYS.has(value.toLowerCase())
+    || UNSAFE_REFERENCE_PATTERN.test(value)
+  ) return null;
+  return value;
+}
+
+function normalizeSurfacePaintMaterialLocator(value: unknown): string | null {
+  if (
+    typeof value !== "string"
+    || containsControlCharacter(value)
+    || Array.from(value).length > 256
+    || UNSAFE_REFERENCE_PATTERN.test(value)
+  ) return null;
+  return GLTF_MATERIAL_LOCATOR_PATTERN.test(value)
+    || SCENE_PATH_MATERIAL_LOCATOR_PATTERN.test(value)
+    ? value
+    : null;
+}
+
+function normalizeSurfacePaintTexture(value: unknown): StudioVrmSurfacePaintTexture | null {
+  if (!isRecord(value)) return null;
+  const bindingKey = normalizeSurfacePaintIdentifier(value.bindingKey);
+  const materialLocator = normalizeSurfacePaintMaterialLocator(value.materialLocator);
+  const textureSlot = value.textureSlot === STUDIO_VRM_SURFACE_PAINT_BASE_COLOR_SLOT
+    ? STUDIO_VRM_SURFACE_PAINT_BASE_COLOR_SLOT
+    : null;
+  if (
+    !bindingKey
+    || !materialLocator
+    || !textureSlot
+    || typeof value.hash !== "string"
+    || !HASH_PATTERN.test(value.hash)
+    || value.mime !== "image/png"
+    || !Number.isSafeInteger(value.byteSize)
+    || (value.byteSize as number) < 1
+    || (value.byteSize as number) > STUDIO_VRM_SURFACE_PAINT_TEXTURE_MAX_BYTES
+    || !Number.isSafeInteger(value.width)
+    || (value.width as number) < 1
+    || (value.width as number) > STUDIO_VRM_SURFACE_PAINT_MAX_DIMENSION
+    || !Number.isSafeInteger(value.height)
+    || (value.height as number) < 1
+    || (value.height as number) > STUDIO_VRM_SURFACE_PAINT_MAX_DIMENSION
+    || (value.width as number) * (value.height as number)
+      > STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURE_PIXELS
+  ) return null;
+  return {
+    bindingKey,
+    materialLocator,
+    textureSlot,
+    hash: value.hash,
+    mime: "image/png",
+    byteSize: value.byteSize as number,
+    width: value.width as number,
+    height: value.height as number,
+  };
+}
+
+function compareCanonicalStrings(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function compareSurfacePaintTextures(
+  left: StudioVrmSurfacePaintTexture,
+  right: StudioVrmSurfacePaintTexture,
+): number {
+  return compareCanonicalStrings(left.materialLocator, right.materialLocator)
+    || compareCanonicalStrings(left.textureSlot, right.textureSlot)
+    || compareCanonicalStrings(left.bindingKey, right.bindingKey)
+    || compareCanonicalStrings(left.hash, right.hash)
+    || left.byteSize - right.byteSize
+    || left.width - right.width
+    || left.height - right.height;
+}
+
+function surfacePaintBindingIdentity(texture: StudioVrmSurfacePaintTexture): string {
+  return `${texture.materialLocator}\u0000${texture.textureSlot}`;
+}
+
+function normalizeSurfacePaint(value: unknown): StudioVrmSurfacePaintSettings {
+  if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.textures)) {
+    return { version: 1, textures: [] };
+  }
+
+  const sorted = value.textures
+    .flatMap((texture) => {
+      const normalized = normalizeSurfacePaintTexture(texture);
+      return normalized ? [normalized] : [];
+    })
+    .sort(compareSurfacePaintTextures);
+  const byIdentity = new Map<string, StudioVrmSurfacePaintTexture>();
+  const conflictedIdentities = new Set<string>();
+  const byHash = new Map<string, StudioVrmSurfacePaintTexture>();
+  const conflictedHashes = new Set<string>();
+
+  for (const texture of sorted) {
+    const identity = surfacePaintBindingIdentity(texture);
+    const existingBinding = byIdentity.get(identity);
+    if (!existingBinding) {
+      byIdentity.set(identity, texture);
+    } else if (!jsonStructuresEqual(existingBinding, texture)) {
+      conflictedIdentities.add(identity);
+    }
+
+    const existingAsset = byHash.get(texture.hash);
+    if (!existingAsset) {
+      byHash.set(texture.hash, texture);
+    } else if (
+      existingAsset.mime !== texture.mime
+      || existingAsset.byteSize !== texture.byteSize
+      || existingAsset.width !== texture.width
+      || existingAsset.height !== texture.height
+    ) {
+      conflictedHashes.add(texture.hash);
+    }
+  }
+
+  const uniqueBindings = Array.from(byIdentity.values())
+    .filter((texture) => (
+      !conflictedIdentities.has(surfacePaintBindingIdentity(texture))
+      && !conflictedHashes.has(texture.hash)
+    ))
+    .sort(compareSurfacePaintTextures)
+    .slice(0, STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURES);
+  const assets = Array.from(new Set(uniqueBindings.map((texture) => texture.hash)))
+    .sort(compareCanonicalStrings);
+  const acceptedHashes = new Set<string>();
+  let totalBytes = 0;
+  let totalDecodedPixels = 0;
+  for (const hash of assets) {
+    const texture = byHash.get(hash);
+    if (!texture) continue;
+    const decodedPixels = texture.width * texture.height;
+    if (
+      totalBytes + texture.byteSize > STUDIO_VRM_SURFACE_PAINT_TOTAL_MAX_BYTES
+      || totalDecodedPixels + decodedPixels > STUDIO_VRM_SURFACE_PAINT_MAX_DECODED_PIXELS
+    ) continue;
+    acceptedHashes.add(hash);
+    totalBytes += texture.byteSize;
+    totalDecodedPixels += decodedPixels;
+  }
+
+  return {
+    version: 1,
+    textures: uniqueBindings.filter((texture) => acceptedHashes.has(texture.hash)),
+  };
+}
+
 function normalizeDecodedDocumentFields(value: Record<string, unknown>): StudioVrmSceneDocument {
   return {
     kind: STUDIO_VRM_SCENE_DOCUMENT_KIND,
@@ -1070,6 +1286,7 @@ function normalizeDecodedDocumentFields(value: Record<string, unknown>): StudioV
     physics: normalizePhysics(value.physics),
     env: isStudioVrmEnvironment(value.env) ? value.env : "none",
     render: normalizeRender(value.render),
+    surfacePaint: normalizeSurfacePaint(value.surfacePaint),
   };
 }
 
@@ -1099,6 +1316,24 @@ function hasStrictIkConstraints(value: unknown): boolean {
   return true;
 }
 
+function hasStrictSurfacePaint(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const keys = Object.keys(value);
+  if (
+    keys.length !== SURFACE_PAINT_KEYS.size
+    || keys.some((key) => !SURFACE_PAINT_KEYS.has(key))
+    || value.version !== 1
+    || !Array.isArray(value.textures)
+    || value.textures.length > STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURES
+  ) return false;
+  return value.textures.every((texture) => {
+    if (!isRecord(texture)) return false;
+    const textureKeys = Object.keys(texture);
+    return textureKeys.length === SURFACE_PAINT_TEXTURE_KEYS.size
+      && textureKeys.every((key) => SURFACE_PAINT_TEXTURE_KEYS.has(key));
+  });
+}
+
 function strictDecodedCurrentDocument(value: unknown): StudioVrmSceneDocument | null {
   if (!isRecord(value)) return null;
   const keys = Object.keys(value);
@@ -1118,6 +1353,7 @@ function strictDecodedCurrentDocument(value: unknown): StudioVrmSceneDocument | 
     || Object.keys(value.pose.translations).length !== POSE_TRANSLATION_KEYS.size
     || Object.keys(value.pose.translations).some((key) => !POSE_TRANSLATION_KEYS.has(key))
     || !hasStrictIkConstraints(value.pose.ikConstraints)
+    || !hasStrictSurfacePaint(value.surfacePaint)
   ) return null;
   const normalized = normalizeDecodedCurrentDocument(value);
   if (!normalized || !jsonStructuresEqual(value, normalized)) return null;
@@ -1181,7 +1417,7 @@ function versionThreeProjection(document: StudioVrmSceneDocument): Record<string
   const { ikConstraints: _ikConstraints, ...versionThreePose } = document.pose;
   return {
     kind: document.kind,
-    version: STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION,
+    version: STUDIO_VRM_SCENE_DOCUMENT_VERSION_THREE,
     model: document.model,
     pose: versionThreePose,
     expressions: document.expressions,
@@ -1197,7 +1433,26 @@ function versionThreeProjection(document: StudioVrmSceneDocument): Record<string
   };
 }
 
-/** Strict, lossless v1 reader. The only authored addition is the documented neutral rig default. */
+function versionFourProjection(document: StudioVrmSceneDocument): Record<string, unknown> {
+  return {
+    kind: document.kind,
+    version: STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION,
+    model: document.model,
+    pose: document.pose,
+    expressions: document.expressions,
+    camera: document.camera,
+    appearance: document.appearance,
+    rig: document.rig,
+    props: document.props,
+    sceneProps: document.sceneProps,
+    lighting: document.lighting,
+    physics: document.physics,
+    env: document.env,
+    render: document.render,
+  };
+}
+
+/** Strict v1 reader; all later-version fields are added with documented neutral defaults. */
 function migrateStrictDecodedVersionOneDocument(value: unknown): StudioVrmSceneDocument | null {
   if (
     !isRecord(value)
@@ -1219,6 +1474,7 @@ function migrateStrictDecodedVersionOneDocument(value: unknown): StudioVrmSceneD
         }
       : value.pose,
     rig: DEFAULT_RAW_DOCUMENT.rig,
+    surfacePaint: DEFAULT_RAW_DOCUMENT.surfacePaint,
   }));
   if (!jsonStructuresEqual(value, versionOneProjection(migrated))) return null;
   try {
@@ -1233,7 +1489,7 @@ function migrateStrictDecodedVersionOneDocument(value: unknown): StudioVrmSceneD
   }
 }
 
-/** Strict, lossless v2 reader. The only authored addition is the zero translation block. */
+/** Strict v2 reader; translation, IK, and surface-paint fields receive neutral defaults. */
 function migrateStrictDecodedVersionTwoDocument(value: unknown): StudioVrmSceneDocument | null {
   if (
     !isRecord(value)
@@ -1242,8 +1498,8 @@ function migrateStrictDecodedVersionTwoDocument(value: unknown): StudioVrmSceneD
   ) return null;
   const keys = Object.keys(value);
   if (
-    keys.length !== CURRENT_ROOT_KEYS.size
-    || keys.some((key) => !CURRENT_ROOT_KEYS.has(key))
+    keys.length !== VERSION_TWO_TO_FOUR_ROOT_KEYS.size
+    || keys.some((key) => !VERSION_TWO_TO_FOUR_ROOT_KEYS.has(key))
     || !isRecord(value.rig)
     || Object.keys(value.rig).length !== RIG_KEYS.size
     || Object.keys(value.rig).some((key) => !RIG_KEYS.has(key))
@@ -1257,6 +1513,7 @@ function migrateStrictDecodedVersionTwoDocument(value: unknown): StudioVrmSceneD
       translations: DEFAULT_RAW_DOCUMENT.pose.translations,
       ikConstraints: DEFAULT_RAW_DOCUMENT.pose.ikConstraints,
     },
+    surfacePaint: DEFAULT_RAW_DOCUMENT.surfacePaint,
   }));
   if (!jsonStructuresEqual(value, versionTwoProjection(migrated))) return null;
   try {
@@ -1271,17 +1528,17 @@ function migrateStrictDecodedVersionTwoDocument(value: unknown): StudioVrmSceneD
   }
 }
 
-/** Strict, lossless v3 reader. The only authored addition is the empty persistent-IK block. */
+/** Strict v3 reader; persistent IK and surface-paint fields receive neutral defaults. */
 function migrateStrictDecodedVersionThreeDocument(value: unknown): StudioVrmSceneDocument | null {
   if (
     !isRecord(value)
     || value.kind !== STUDIO_VRM_SCENE_DOCUMENT_KIND
-    || value.version !== STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION
+    || value.version !== STUDIO_VRM_SCENE_DOCUMENT_VERSION_THREE
   ) return null;
   const keys = Object.keys(value);
   if (
-    keys.length !== CURRENT_ROOT_KEYS.size
-    || keys.some((key) => !CURRENT_ROOT_KEYS.has(key))
+    keys.length !== VERSION_TWO_TO_FOUR_ROOT_KEYS.size
+    || keys.some((key) => !VERSION_TWO_TO_FOUR_ROOT_KEYS.has(key))
     || !isRecord(value.rig)
     || Object.keys(value.rig).length !== RIG_KEYS.size
     || Object.keys(value.rig).some((key) => !RIG_KEYS.has(key))
@@ -1298,12 +1555,52 @@ function migrateStrictDecodedVersionThreeDocument(value: unknown): StudioVrmScen
       ...value.pose,
       ikConstraints: DEFAULT_RAW_DOCUMENT.pose.ikConstraints,
     },
+    surfacePaint: DEFAULT_RAW_DOCUMENT.surfacePaint,
   }));
   if (!jsonStructuresEqual(value, versionThreeProjection(migrated))) return null;
   try {
     const sourceBytes = utf8ByteLength(JSON.stringify(value));
     const migratedBytes = utf8ByteLength(JSON.stringify(migrated));
     return sourceBytes <= STUDIO_VRM_SCENE_DOCUMENT_V3_MAX_BYTES
+      && migratedBytes <= STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES
+      ? migrated
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Strict, lossless v4 reader. The only authored addition is the empty surface-paint block. */
+function migrateStrictDecodedVersionFourDocument(value: unknown): StudioVrmSceneDocument | null {
+  if (
+    !isRecord(value)
+    || value.kind !== STUDIO_VRM_SCENE_DOCUMENT_KIND
+    || value.version !== STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION
+  ) return null;
+  const keys = Object.keys(value);
+  if (
+    keys.length !== VERSION_TWO_TO_FOUR_ROOT_KEYS.size
+    || keys.some((key) => !VERSION_TWO_TO_FOUR_ROOT_KEYS.has(key))
+    || !isRecord(value.rig)
+    || Object.keys(value.rig).length !== RIG_KEYS.size
+    || Object.keys(value.rig).some((key) => !RIG_KEYS.has(key))
+    || !isRecord(value.pose)
+    || Object.keys(value.pose).length !== CURRENT_POSE_KEYS.size
+    || Object.keys(value.pose).some((key) => !CURRENT_POSE_KEYS.has(key))
+    || !isRecord(value.pose.translations)
+    || Object.keys(value.pose.translations).length !== POSE_TRANSLATION_KEYS.size
+    || Object.keys(value.pose.translations).some((key) => !POSE_TRANSLATION_KEYS.has(key))
+    || !hasStrictIkConstraints(value.pose.ikConstraints)
+  ) return null;
+  const migrated = deepFreeze(normalizeDecodedDocumentFields({
+    ...value,
+    surfacePaint: DEFAULT_RAW_DOCUMENT.surfacePaint,
+  }));
+  if (!jsonStructuresEqual(value, versionFourProjection(migrated))) return null;
+  try {
+    const sourceBytes = utf8ByteLength(JSON.stringify(value));
+    const migratedBytes = utf8ByteLength(JSON.stringify(migrated));
+    return sourceBytes <= STUDIO_VRM_SCENE_DOCUMENT_V4_MAX_BYTES
       && migratedBytes <= STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES
       ? migrated
       : null;
@@ -1338,23 +1635,25 @@ export function normalizeStudioVrmSceneDocument(raw: unknown): StudioVrmSceneDoc
   const decoded = decodeBoundedDataGraph(raw);
   if (exceedsHistoricalSourceLimit(raw, decoded)) return createDefaultStudioVrmSceneDocument();
   return normalizeDecodedCurrentDocument(decoded)
+    ?? migrateStrictDecodedVersionFourDocument(decoded)
     ?? migrateStrictDecodedVersionThreeDocument(decoded)
     ?? migrateStrictDecodedVersionTwoDocument(decoded)
     ?? migrateStrictDecodedVersionOneDocument(decoded)
     ?? createDefaultStudioVrmSceneDocument();
 }
 
-/** Parses canonical v4 and losslessly promotes complete canonical v1/v2/v3 documents. */
+/** Parses canonical v5 and losslessly promotes complete canonical v1/v2/v3/v4 documents. */
 export function parseStudioVrmSceneDocument(raw: string): StudioVrmSceneDocument | null {
   const decoded = decodeBoundedDataGraph(raw);
   if (exceedsHistoricalSourceLimit(raw, decoded)) return null;
   return strictDecodedCurrentDocument(decoded)
+    ?? migrateStrictDecodedVersionFourDocument(decoded)
     ?? migrateStrictDecodedVersionThreeDocument(decoded)
     ?? migrateStrictDecodedVersionTwoDocument(decoded)
     ?? migrateStrictDecodedVersionOneDocument(decoded);
 }
 
-/** Serializes only complete, losslessly canonical version-4 documents. */
+/** Serializes only complete, losslessly canonical version-5 documents. */
 export function serializeStudioVrmSceneDocument(raw: unknown): string | null {
   const document = strictDecodedCurrentDocument(decodeBoundedDataGraph(raw));
   if (!document) return null;
@@ -1560,6 +1859,8 @@ export function migrateStudioVrmSceneDocument(
   if (exceedsHistoricalSourceLimit(raw, decoded)) return null;
   const current = strictDecodedCurrentDocument(decoded);
   if (current) return current;
+  const versionFour = migrateStrictDecodedVersionFourDocument(decoded);
+  if (versionFour) return versionFour;
   const versionThree = migrateStrictDecodedVersionThreeDocument(decoded);
   if (versionThree) return versionThree;
   const versionTwo = migrateStrictDecodedVersionTwoDocument(decoded);

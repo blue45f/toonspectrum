@@ -3,8 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createStudioVrmAssetRuntime,
+  stampStudioVrmGltfMaterialAssociations,
   type StudioVrmAssetRuntimeDependencies,
 } from "./studio-vrm-asset-runtime";
+import { STUDIO_VRM_TEXTURE_PAINT_MATERIAL_LOCATOR_USER_DATA_KEY } from "./studio-vrm-texture-paint-binding";
 
 import type { VRM } from "@pixiv/three-vrm";
 
@@ -28,6 +30,27 @@ function dependencies(
 }
 
 describe("studio VRM asset runtime", () => {
+  it("preserves stable glTF material indices for surface-paint rehydration", () => {
+    const first = new THREE.MeshStandardMaterial();
+    const second = new THREE.MeshStandardMaterial();
+    const invalid = new THREE.MeshStandardMaterial();
+    const notMaterial = new THREE.Group();
+    const associations = new Map<unknown, { materials?: number }>([
+      [first, { materials: 7 }],
+      [second, { materials: 2 }],
+      [invalid, { materials: -1 }],
+      [notMaterial, { materials: 1 }],
+    ]);
+
+    expect(stampStudioVrmGltfMaterialAssociations(associations)).toBe(2);
+    expect(first.userData[STUDIO_VRM_TEXTURE_PAINT_MATERIAL_LOCATOR_USER_DATA_KEY])
+      .toBe("gltf-material:7");
+    expect(second.userData[STUDIO_VRM_TEXTURE_PAINT_MATERIAL_LOCATOR_USER_DATA_KEY])
+      .toBe("gltf-material:2");
+    expect(invalid.userData[STUDIO_VRM_TEXTURE_PAINT_MATERIAL_LOCATOR_USER_DATA_KEY])
+      .toBeUndefined();
+  });
+
   it("resolves once and keeps preflight before loader and preparation after load", async () => {
     const order: string[] = [];
     const vrm = fakeVrm();

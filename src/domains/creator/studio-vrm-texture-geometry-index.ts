@@ -12,9 +12,21 @@
  */
 
 import {
-  isStudioVrmTextureSize,
-  type StudioVrmTextureSize,
-} from "./studio-vrm-texture-uv";
+  StudioVrmTextureGeometryWorkerClientError,
+  buildStudioVrmTextureGeometryTopologyInWorker,
+  type StudioVrmTextureGeometryFloatSource,
+  type StudioVrmTextureGeometryIndexSource,
+  type StudioVrmTextureGeometryWorkerBuildOptions,
+  type StudioVrmTextureGeometryWorkerFactory,
+  type StudioVrmTextureGeometryWorkerInput,
+} from "./studio-vrm-texture-geometry-worker-client";
+import {
+  STUDIO_VRM_TEXTURE_GEOMETRY_WORKER_MAX_VERTICES,
+  hasValidStudioVrmTextureGeometryWorkerTopologyNumbers,
+  isStudioVrmTextureGeometryWorkerTopology,
+  type StudioVrmTextureGeometryWorkerTopology,
+} from "./studio-vrm-texture-geometry-worker-protocol";
+import { isStudioVrmTextureSize, type StudioVrmTextureSize } from "./studio-vrm-texture-uv";
 
 export const STUDIO_VRM_TEXTURE_GEOMETRY_MAX_TRIANGLES = 500_000;
 
@@ -26,6 +38,9 @@ interface StudioVrmGeometryAttributeLike {
   readonly count: number;
   readonly itemSize: number;
   readonly version?: number;
+  /** THREE.BufferAttribute fast path. Interleaved/normalized integer attributes use getters. */
+  readonly array?: unknown;
+  readonly isInterleavedBufferAttribute?: boolean;
   getX(index: number): number;
   getY(index: number): number;
   getZ(index: number): number;
@@ -50,6 +65,26 @@ export interface StudioVrmTextureGeometryIndexOptions {
   readonly uvEpsilon?: number;
   /** 제품 하드 상한 이내에서 더 낮은 가져오기 예산을 적용할 때 사용한다. */
   readonly maxTriangles?: number;
+}
+
+export interface StudioVrmTextureGeometryPrecomputeOptions
+  extends StudioVrmTextureGeometryIndexOptions {
+  readonly signal?: AbortSignal;
+  readonly timeoutMs?: number;
+  readonly workerFactory?: StudioVrmTextureGeometryWorkerFactory | null;
+  readonly allowSynchronousFallback?: boolean;
+}
+
+export type StudioVrmTextureGeometryPrecomputeErrorCode =
+  | "geometry-invalid"
+  | "geometry-stale"
+  | "topology-invalid";
+
+export class StudioVrmTextureGeometryPrecomputeError extends Error {
+  constructor(readonly code: StudioVrmTextureGeometryPrecomputeErrorCode) {
+    super(code);
+    this.name = "StudioVrmTextureGeometryPrecomputeError";
+  }
 }
 
 export interface StudioVrmTextureGeometryAdmission {
@@ -129,6 +164,7 @@ const geometryIndexCache = new WeakMap<
   StudioVrmTextureGeometryLike,
   Map<string, GeometryCacheEntry>
 >();
+const geometryInvalidationEpoch = new WeakMap<StudioVrmTextureGeometryLike, number>();
 
 function finiteVersion(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
@@ -212,6 +248,139 @@ function optionCacheKey(options: StudioVrmTextureGeometryIndexOptions): string |
   const uvEpsilon = normalizedPositive(options.uvEpsilon, DEFAULT_UV_EPSILON);
   const maxTriangles = normalizedTriangleBudget(options.maxTriangles);
   return JSON.stringify([uvAttribute, positionEpsilon, uvEpsilon, maxTriangles]);
+}
+
+function precomputeFailure(code: StudioVrmTextureGeometryPrecomputeErrorCode): never {
+  throw new StudioVrmTextureGeometryPrecomputeError(code);
+}
+
+function throwIfPrecomputeAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw new StudioVrmTextureGeometryWorkerClientError("aborted");
+}
+
+function packedFloatView(
+  attribute: StudioVrmGeometryAttributeLike,
+  componentCount: number,
+  count: number,
+): StudioVrmTextureGeometryFloatSource | null {
+  const source = attribute.array;
+  if (
+    attribute.isInterleavedBufferAttribute === true ||
+    attribute.itemSize !== componentCount ||
+    attribute.count < count ||
+    !(source instanceof Float32Array || source instanceof Float64Array) ||
+    source.length < count * componentCount
+  ) return null;
+  return source.subarray(0, count * componentCount);
+}
+
+function readPackedAttribute(
+  attribute: StudioVrmGeometryAttributeLike,
+  componentCount: 2 | 3,
+  outputCount: number,
+  signal: AbortSignal | undefined,
+): StudioVrmTextureGeometryFloatSource {
+  const direct = packedFloatView(attribute, componentCount, outputCount);
+  if (direct) return direct;
+  const output = new Float64Array(outputCount * componentCount);
+  // UV count may be shorter than position count. NaN preserves the synchronous index's
+  // triangle-local invalidation instead of silently inventing zero UVs.
+  output.fill(Number.NaN);
+  const readableCount = Math.min(outputCount, attribute.count);
+  try {
+    for (let index = 0; index < readableCount; index += 1) {
+      if ((index & 0x1fff) === 0) throwIfPrecomputeAborted(signal);
+      const offset = index * componentCount;
+      output[offset] = attribute.getX(index);
+      output[offset + 1] = attribute.getY(index);
+      if (componentCount === 3) output[offset + 2] = attribute.getZ(index);
+    }
+  } catch (cause) {
+    if (cause instanceof Error && cause.name === "AbortError") throw cause;
+    precomputeFailure("geometry-invalid");
+  }
+  return output;
+}
+
+function packedIndexView(
+  index: StudioVrmGeometryAttributeLike,
+): StudioVrmTextureGeometryIndexSource | null {
+  const source = index.array;
+  if (
+    index.isInterleavedBufferAttribute === true ||
+    index.itemSize !== 1 ||
+    !(
+      source instanceof Uint8Array ||
+      source instanceof Uint16Array ||
+      source instanceof Uint32Array
+    ) ||
+    source.length < index.count
+  ) return null;
+  return source.subarray(0, index.count);
+}
+
+function readPackedIndex(
+  index: StudioVrmGeometryAttributeLike,
+  signal: AbortSignal | undefined,
+): StudioVrmTextureGeometryIndexSource {
+  const direct = packedIndexView(index);
+  if (direct) return direct;
+  const output = new Uint32Array(index.count);
+  try {
+    for (let offset = 0; offset < index.count; offset += 1) {
+      if ((offset & 0x1fff) === 0) throwIfPrecomputeAborted(signal);
+      const value = index.getX(offset);
+      // Invalid fractional/negative/oversized indices remain triangle-local invalid data in the
+      // Worker instead of being truncated into a potentially valid vertex.
+      output[offset] = Number.isSafeInteger(value) && value >= 0 && value <= 0xffff_ffff
+        ? value
+        : 0xffff_ffff;
+    }
+  } catch (cause) {
+    if (cause instanceof Error && cause.name === "AbortError") throw cause;
+    precomputeFailure("geometry-invalid");
+  }
+  return output;
+}
+
+function snapshotGeometryForWorker(
+  signature: GeometrySignature,
+  options: StudioVrmTextureGeometryIndexOptions,
+  signal: AbortSignal | undefined,
+): StudioVrmTextureGeometryWorkerInput {
+  const position = signature.position;
+  const uv = signature.uv;
+  if (
+    !position ||
+    !uv ||
+    position.itemSize < 3 ||
+    uv.itemSize < 2 ||
+    position.count < 3
+  ) precomputeFailure("geometry-invalid");
+  if (position.count > STUDIO_VRM_TEXTURE_GEOMETRY_WORKER_MAX_VERTICES) {
+    throw new StudioVrmTextureGeometryWorkerClientError("vertex-budget-exceeded");
+  }
+  const flatVertexCount = signature.index ? signature.indexCount : signature.positionCount;
+  if (flatVertexCount < 3 || flatVertexCount % 3 !== 0) {
+    precomputeFailure("geometry-invalid");
+  }
+  const maxTriangles = normalizedTriangleBudget(options.maxTriangles);
+  if (flatVertexCount / 3 > maxTriangles) {
+    throw new StudioVrmTextureGeometryWorkerClientError("triangle-budget-exceeded");
+  }
+  throwIfPrecomputeAborted(signal);
+  return {
+    positions: readPackedAttribute(position, 3, signature.positionCount, signal),
+    uvs: readPackedAttribute(uv, 2, signature.positionCount, signal),
+    indices: signature.index ? readPackedIndex(signature.index, signal) : null,
+    uvAttribute: options.uvAttribute ?? "uv",
+    positionEpsilon: options.positionEpsilon === undefined
+      ? undefined
+      : normalizedPositive(options.positionEpsilon, MIN_POSITION_EPSILON),
+    uvEpsilon: normalizedPositive(options.uvEpsilon, DEFAULT_UV_EPSILON),
+    // The client requires a positive limit. A zero caller budget has already failed above.
+    maxTriangles: Math.max(1, maxTriangles),
+  };
 }
 
 function resolvePositionEpsilon(
@@ -505,6 +674,101 @@ function buildGeometryIndex(
   });
 }
 
+function buildGeometryIndexFromWorkerTopology(
+  topology: StudioVrmTextureGeometryWorkerTopology,
+): StudioVrmTextureGeometryIndex {
+  if (
+    !isStudioVrmTextureGeometryWorkerTopology(topology) ||
+    !hasValidStudioVrmTextureGeometryWorkerTopologyNumbers(topology)
+  ) precomputeFailure("topology-invalid");
+  const {
+    triangleCount,
+    islandCount,
+    uvAttribute,
+    triangleIslandIds,
+    islandAnchors,
+    uvDoubleAreas,
+    localEdges,
+  } = topology;
+
+  function getIsland(faceIndex: number): StudioVrmTextureTriangleIsland | null {
+    if (!validFaceIndex(faceIndex, triangleCount)) return null;
+    const id = triangleIslandIds[faceIndex]!;
+    if (id < 0) return null;
+    const anchorFaceIndex = islandAnchors[id]!;
+    return Object.freeze({
+      id,
+      key: `${uvAttribute}:${anchorFaceIndex}`,
+      anchorFaceIndex,
+    });
+  }
+
+  function getTexelsPerWorldUnit(
+    faceIndex: number,
+    textureSize: StudioVrmTextureSize,
+    densityOptions: StudioVrmTextureTriangleDensityOptions = {},
+  ): number | null {
+    if (!validFaceIndex(faceIndex, triangleCount) || !isStudioVrmTextureSize(textureSize)) {
+      return null;
+    }
+    if (triangleIslandIds[faceIndex] === -1) return null;
+    const uvDoubleArea = uvDoubleAreas[faceIndex]!;
+    if (!(uvDoubleArea > 0)) return null;
+    const linear = matrixElements(densityOptions.matrixWorld);
+    if (linear === null) return null;
+    const offset = faceIndex * 6;
+    const first = transformedEdge(
+      localEdges[offset]!,
+      localEdges[offset + 1]!,
+      localEdges[offset + 2]!,
+      linear,
+    );
+    const second = transformedEdge(
+      localEdges[offset + 3]!,
+      localEdges[offset + 4]!,
+      localEdges[offset + 5]!,
+      linear,
+    );
+    const crossX = first[1] * second[2] - first[2] * second[1];
+    const crossY = first[2] * second[0] - first[0] * second[2];
+    const crossZ = first[0] * second[1] - first[1] * second[0];
+    const worldDoubleArea = Math.hypot(crossX, crossY, crossZ);
+    if (!(worldDoubleArea > 0)) return null;
+    const uvAreaScale =
+      densityOptions.uvAreaScale === undefined ? 1 : densityOptions.uvAreaScale;
+    if (!Number.isFinite(uvAreaScale) || !(uvAreaScale > 0)) return null;
+    const density = Math.sqrt(
+      (uvDoubleArea *
+        uvAreaScale *
+        textureSize.width *
+        textureSize.height) /
+        worldDoubleArea,
+    );
+    return Number.isFinite(density) && density > 0 ? density : null;
+  }
+
+  return Object.freeze({
+    triangleCount,
+    islandCount,
+    uvAttribute,
+    getIsland,
+    getTexelsPerWorldUnit,
+    resolvePaintClassification(
+      faceIndex: number,
+      textureSize: StudioVrmTextureSize,
+      densityOptions: StudioVrmTextureTriangleDensityOptions = {},
+    ): StudioVrmTextureTrianglePaintClassification | null {
+      const island = getIsland(faceIndex);
+      if (!island) return null;
+      return Object.freeze({
+        faceIndex,
+        island,
+        texelsPerWorldUnit: getTexelsPerWorldUnit(faceIndex, textureSize, densityOptions),
+      });
+    },
+  });
+}
+
 /**
  * UV 인덱스를 실제로 만들기 전에 삼각형 수만 상수 시간으로 검사한다.
  * 대형 메시가 동기 topology build에 진입하지 않도록 pointerdown 경로에서 사용한다.
@@ -539,6 +803,28 @@ export function inspectStudioVrmTextureGeometryAdmission(
 }
 
 /**
+ * Returns only an already-built, signature-current index.
+ *
+ * Unlike `getStudioVrmTextureGeometryIndex`, this function never scans vertex/index coordinates
+ * and never installs a negative cache entry. Pointer-input paths use it for Worker-prewarmed
+ * meshes so a cache miss can fall back to the hit face without blocking the main thread.
+ */
+export function getCachedStudioVrmTextureGeometryIndex(
+  geometry: StudioVrmTextureGeometryLike,
+  options: StudioVrmTextureGeometryIndexOptions = {},
+): StudioVrmTextureGeometryIndex | null {
+  if (typeof geometry !== "object" || geometry === null) return null;
+  const cacheKey = optionCacheKey(options);
+  if (!cacheKey) return null;
+  const signature = captureSignature(geometry, options.uvAttribute ?? "uv");
+  if (!signature) return null;
+  const cached = geometryIndexCache.get(geometry)?.get(cacheKey);
+  return cached && signaturesMatch(cached.signature, signature)
+    ? cached.index
+    : null;
+}
+
+/**
  * geometry + UV attribute + 허용오차 조합별 캐시된 인덱스를 반환한다.
  * 같은 attribute/index 버전에서는 참조 동일성도 보장된다.
  */
@@ -565,6 +851,60 @@ export function getStudioVrmTextureGeometryIndex(
 }
 
 /**
+ * Builds the same island/density lookup contract in a Worker before pointer input begins.
+ *
+ * Successful results enter the existing geometry/version/options cache, so later synchronous
+ * `getStudioVrmTextureGeometryIndex` calls return this object by identity and do no topology work.
+ * Worker/client abort, timeout, availability, and budget errors intentionally propagate unchanged.
+ */
+export async function precomputeStudioVrmTextureGeometryIndex(
+  geometry: StudioVrmTextureGeometryLike,
+  options: StudioVrmTextureGeometryPrecomputeOptions = {},
+): Promise<StudioVrmTextureGeometryIndex> {
+  throwIfPrecomputeAborted(options.signal);
+  if (typeof geometry !== "object" || geometry === null) {
+    precomputeFailure("geometry-invalid");
+  }
+  const cacheKey = optionCacheKey(options);
+  if (!cacheKey) precomputeFailure("geometry-invalid");
+  const uvAttribute = options.uvAttribute ?? "uv";
+  const signature = captureSignature(geometry, uvAttribute);
+  if (!signature) precomputeFailure("geometry-invalid");
+  const invalidationEpoch = geometryInvalidationEpoch.get(geometry) ?? 0;
+  const cached = geometryIndexCache.get(geometry)?.get(cacheKey);
+  if (cached && signaturesMatch(cached.signature, signature)) {
+    if (cached.index) return cached.index;
+    precomputeFailure("geometry-invalid");
+  }
+
+  const input = snapshotGeometryForWorker(signature, options, options.signal);
+  const workerOptions: StudioVrmTextureGeometryWorkerBuildOptions = {
+    signal: options.signal,
+    timeoutMs: options.timeoutMs,
+    workerFactory: options.workerFactory,
+    allowSynchronousFallback: options.allowSynchronousFallback,
+  };
+  const result = await buildStudioVrmTextureGeometryTopologyInWorker(input, workerOptions);
+  throwIfPrecomputeAborted(options.signal);
+  const currentSignature = captureSignature(geometry, uvAttribute);
+  if (
+    !currentSignature ||
+    !signaturesMatch(signature, currentSignature) ||
+    (geometryInvalidationEpoch.get(geometry) ?? 0) !== invalidationEpoch
+  ) {
+    precomputeFailure("geometry-stale");
+  }
+  const index = buildGeometryIndexFromWorkerTopology(result.topology);
+  let geometryCache = geometryIndexCache.get(geometry);
+  if (!geometryCache) {
+    geometryCache = new Map();
+    geometryIndexCache.set(geometry, geometryCache);
+  }
+  geometryCache.set(cacheKey, { signature: currentSignature, index });
+  return index;
+}
+
+/**
  * attribute 배열을 Three의 `needsUpdate` 없이 직접 바꾼 특수 경로에서만 필요하다.
  * 일반 BufferAttribute 갱신은 version 변경으로 자동 무효화된다.
  */
@@ -572,4 +912,9 @@ export function invalidateStudioVrmTextureGeometryIndex(
   geometry: StudioVrmTextureGeometryLike,
 ): void {
   geometryIndexCache.delete(geometry);
+  const epoch = geometryInvalidationEpoch.get(geometry) ?? 0;
+  geometryInvalidationEpoch.set(
+    geometry,
+    epoch >= Number.MAX_SAFE_INTEGER ? 1 : epoch + 1,
+  );
 }

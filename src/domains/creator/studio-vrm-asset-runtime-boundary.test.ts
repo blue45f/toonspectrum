@@ -75,13 +75,20 @@ describe("Studio VRM asset runtime ownership boundary", () => {
   it("keeps a one-way asset runtime import without pulling the editor back into the leaf", () => {
     const poser = moduleEdges("./StudioVrmPoser.tsx");
     const runtime = moduleEdges("./studio-vrm-asset-runtime.ts");
+    const binding = moduleEdges("./studio-vrm-texture-paint-binding.ts");
 
     expect(
       poser.valueImports.filter((specifier) => specifier === "./studio-vrm-asset-runtime"),
     ).toEqual(["./studio-vrm-asset-runtime"]);
     expect(runtime.allImports).not.toContain("./StudioVrmPoser");
-    expect(runtime.valueImports).toEqual(["three", "./vrm-library", "@/src/catalog-static"]);
+    expect(runtime.valueImports).toEqual([
+      "three",
+      "./studio-vrm-texture-paint-binding",
+      "./vrm-library",
+      "@/src/catalog-static",
+    ]);
     expect(runtime.typeImports).toEqual(["@pixiv/three-vrm"]);
+    expect(binding.allImports).toEqual([]);
     expect(runtime.dynamicImports).toEqual([
       "three/examples/jsm/loaders/GLTFLoader.js",
       "@pixiv/three-vrm",

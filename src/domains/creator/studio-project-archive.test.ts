@@ -65,6 +65,64 @@ function pngBytes(seed = 1): Uint8Array {
   return Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, seed]);
 }
 
+const SURFACE_PNG_CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let index = 0; index < table.length; index += 1) {
+    let value = index;
+    for (let bit = 0; bit < 8; bit += 1) {
+      value = (value & 1) === 1 ? 0xedb8_8320 ^ (value >>> 1) : value >>> 1;
+    }
+    table[index] = value >>> 0;
+  }
+  return table;
+})();
+
+function surfacePngCrc32(bytes: Uint8Array): number {
+  let crc = 0xffff_ffff;
+  for (const byte of bytes) {
+    crc = (crc >>> 8) ^ (SURFACE_PNG_CRC_TABLE[(crc ^ byte) & 0xff] ?? 0);
+  }
+  return (crc ^ 0xffff_ffff) >>> 0;
+}
+
+function surfacePngChunk(type: string, data: Uint8Array): Uint8Array {
+  const result = new Uint8Array(12 + data.byteLength);
+  const view = new DataView(result.buffer);
+  view.setUint32(0, data.byteLength, false);
+  result.set(encoder.encode(type), 4);
+  result.set(data, 8);
+  view.setUint32(
+    result.byteLength - 4,
+    surfacePngCrc32(result.subarray(4, result.byteLength - 4)),
+    false,
+  );
+  return result;
+}
+
+function surfacePaintPngBytes(width: number, height: number, seed = 1): Uint8Array {
+  const ihdr = new Uint8Array(13);
+  const view = new DataView(ihdr.buffer);
+  view.setUint32(0, width, false);
+  view.setUint32(4, height, false);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  const parts = [
+    Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    surfacePngChunk("IHDR", ihdr),
+    surfacePngChunk("IDAT", Uint8Array.from([
+      0x78, 0x9c, 0x63, 0x60, seed & 0xff, 0x02, 0, 0, 0x05, 0, 0x01,
+    ])),
+    surfacePngChunk("IEND", new Uint8Array()),
+  ];
+  const result = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
+  let offset = 0;
+  for (const part of parts) {
+    result.set(part, offset);
+    offset += part.byteLength;
+  }
+  return result;
+}
+
 function gifBytes(seed = 1): Uint8Array {
   return Uint8Array.from([...encoder.encode("GIF89a"), seed]);
 }
@@ -582,6 +640,125 @@ describe("studio-project-archive", () => {
     await expectArchiveError(
       buildStudioProjectArchive({ project: mismatchedProject, attachments: [attachment] }),
       "DOCUMENT_REFERENCE_MISMATCH"
+    );
+  });
+
+  it("VRM 표면 페인팅 PNG를 exact hash pointer로 연결하고 누락·크기 위조를 거부한다", async () => {
+    const png = surfacePaintPngBytes(2, 1, 17);
+    const rawHash = await sha256(png);
+    const scene = normalizeStudioVrmSceneDocument({
+      ...createStudioVrmSceneDocument(),
+      surfacePaint: {
+        version: 1,
+        textures: [{
+          bindingKey: "hero-face-base-color",
+          materialLocator: "gltf-material:0",
+          textureSlot: "baseColor",
+          hash: `sha256:${rawHash}`,
+          mime: "image/png",
+          byteSize: png.byteLength,
+          width: 2,
+          height: 1,
+        }],
+      },
+    });
+    const project = projectWith([{
+      id: "painted-vrm",
+      type: "image",
+      src: "",
+      vrmScene: scene,
+    }]);
+    const pointer = "/pagesList/0/elements/0/vrmScene/surfacePaint/textures/0/hash";
+    const attachment: StudioProjectArchiveAttachmentInput = {
+      kind: "raster",
+      data: png,
+      mimeType: "image/png",
+      documentReferences: [{
+        pointer,
+        usage: "raster",
+        mode: "sha256-prefixed",
+      }],
+    };
+
+    await expectArchiveError(
+      buildStudioProjectArchive({ project }),
+      "ATTACHMENT_MISSING",
+    );
+
+    const built = await buildStudioProjectArchive({
+      project,
+      attachments: [attachment],
+    });
+    expect(built.manifest.attachments).toHaveLength(1);
+    expect(built.manifest.attachments[0]).toMatchObject({
+      sha256: rawHash,
+      mimeType: "image/png",
+      kinds: ["raster"],
+      documentReferences: [{
+        pointer,
+        usage: "raster",
+        mode: "sha256-prefixed",
+      }],
+    });
+    const imported = await importStudioProjectArchive(built.blob);
+    const importedScene = (imported.project.pagesList[0]?.elements[0] as {
+      vrmScene: ReturnType<typeof createStudioVrmSceneDocument>;
+    }).vrmScene;
+    expect(importedScene.surfacePaint).toEqual(scene.surfacePaint);
+
+    const wrongDimensions = normalizeStudioVrmSceneDocument({
+      ...scene,
+      surfacePaint: {
+        version: 1,
+        textures: [{ ...scene.surfacePaint.textures[0], width: 1 }],
+      },
+    });
+    await expectArchiveError(
+      buildStudioProjectArchive({
+        project: projectWith([{
+          id: "painted-vrm-wrong-size",
+          type: "image",
+          src: "",
+          vrmScene: wrongDimensions,
+        }]),
+        attachments: [attachment],
+      }),
+      "DOCUMENT_REFERENCE_MISMATCH",
+    );
+
+    const crcTampered = png.slice();
+    crcTampered[crcTampered.length - 1] ^= 0xff;
+    const crcTamperedHash = await sha256(crcTampered);
+    const crcTamperedScene = normalizeStudioVrmSceneDocument({
+      ...scene,
+      surfacePaint: {
+        version: 1,
+        textures: [{
+          ...scene.surfacePaint.textures[0],
+          hash: `sha256:${crcTamperedHash}`,
+        }],
+      },
+    });
+    await expectArchiveError(
+      buildStudioProjectArchive({
+        project: projectWith([{
+          id: "painted-vrm-crc-tampered",
+          type: "image",
+          src: "",
+          vrmScene: crcTamperedScene,
+        }]),
+        attachments: [{
+          kind: "raster",
+          data: crcTampered,
+          mimeType: "image/png",
+          documentReferences: [{
+            pointer,
+            usage: "raster",
+            mode: "sha256-prefixed",
+          }],
+        }],
+      }),
+      "MIME_SIGNATURE_MISMATCH",
     );
   });
 
@@ -1164,6 +1341,7 @@ describe("studio-project-archive", () => {
     });
     const legacyScene = JSON.parse(JSON.stringify(currentScene)) as Record<string, unknown>;
     delete legacyScene.rig;
+    delete legacyScene.surfacePaint;
     delete (legacyScene.pose as Record<string, unknown>).translations;
     delete (legacyScene.pose as Record<string, unknown>).ikConstraints;
     legacyScene.version = 1;
@@ -1191,6 +1369,7 @@ describe("studio-project-archive", () => {
     });
 
     const versionTwoScene = JSON.parse(JSON.stringify(currentScene)) as Record<string, unknown>;
+    delete versionTwoScene.surfacePaint;
     delete (versionTwoScene.pose as Record<string, unknown>).translations;
     delete (versionTwoScene.pose as Record<string, unknown>).ikConstraints;
     versionTwoScene.version = 2;
