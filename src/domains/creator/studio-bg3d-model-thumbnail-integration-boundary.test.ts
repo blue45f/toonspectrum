@@ -2,10 +2,12 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(
-  new URL("./StudioBackground3D.tsx", import.meta.url),
-  "utf8",
-);
+const source = [
+  "./StudioBackground3D.tsx",
+  "./StudioBg3dShapesPanel.tsx",
+  "./StudioBg3dViewPanel.tsx",
+  "./StudioBg3dLtPanel.tsx",
+].map((fileName) => readFileSync(new URL(fileName, import.meta.url), "utf8")).join("\n");
 
 function functionSlice(name: string, nextName: string): string {
   const start = source.indexOf(`function ${name}(`);
@@ -28,7 +30,7 @@ describe("Studio BG3D imported-model thumbnail integration boundary", () => {
   it("keeps capture and isolated Three thumbnail runtimes behind the post-import lazy boundary", () => {
     const loader = functionSlice(
       "loadStudioBg3dModelThumbnailRuntime",
-      "cx",
+      "getBrowserLtPresetStorage",
     );
     const capture = functionSlice(
       "startModelThumbnailCaptureBatch",

@@ -2,7 +2,12 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const background3dSource = readFileSync(new URL("./StudioBackground3D.tsx", import.meta.url), "utf8");
+const background3dSource = [
+  "./StudioBackground3D.tsx",
+  "./StudioBg3dShapesPanel.tsx",
+  "./StudioBg3dViewPanel.tsx",
+  "./StudioBg3dLtPanel.tsx",
+].map((fileName) => readFileSync(new URL(fileName, import.meta.url), "utf8")).join("\n");
 const controlFieldsSource = readFileSync(
   new URL("./studio-bg3d-control-fields.tsx", import.meta.url),
   "utf8",

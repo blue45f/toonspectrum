@@ -30,7 +30,9 @@ import { join } from "node:path";
 
 import { chromium, type Browser, type Page } from "playwright";
 
-const SCRATCH = process.env.TOONSPECTRUM_VERIFY_DIR ?? join(tmpdir(), "toonspectrum-studio-mobile-top");
+const SCRATCH = process.env.TOONSPECTRUM_MOBILE_TOP_VERIFY_DIR ??
+  process.env.TOONSPECTRUM_VERIFY_DIR ??
+  join(tmpdir(), "toonspectrum-studio-mobile-top");
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const IMMERSIVE_SESSION_KEY = "toonspectrum-studio-mobile-immersive:v1";
@@ -46,11 +48,43 @@ const MAX_HEIGHT_RATIO = 1.6;
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
-  "/api/v1/apps/toonspectrum/visits/ping",
 ] as const;
 
-function isExpectedStaticPreviewApiError(message: string): boolean {
-  return OPTIONAL_STATIC_PREVIEW_API_PATHS.some((path) => message.includes(path));
+function isExpectedStaticPreviewError(message: string, studioUrl: string): boolean {
+  if (OPTIONAL_STATIC_PREVIEW_API_PATHS.some((path) => message.includes(path))) return true;
+
+  let previewUrl: URL;
+  try {
+    previewUrl = new URL(studioUrl);
+  } catch {
+    return false;
+  }
+  if (
+    previewUrl.protocol !== "http:" ||
+    previewUrl.hostname !== "127.0.0.1" ||
+    previewUrl.port.length === 0
+  ) {
+    return false;
+  }
+
+  const socketUrl =
+    `ws://127.0.0.1:${previewUrl.port}/socket.io/?EIO=4&transport=websocket`;
+  const expectedMessage =
+    `WebSocket connection to '${socketUrl}' failed: ` +
+    "Connection closed before receiving a handshake response";
+  if (message === expectedMessage) return true;
+
+  const sourcePrefix = `${expectedMessage} @ `;
+  if (!message.startsWith(sourcePrefix)) return false;
+  try {
+    const sourceUrl = new URL(message.slice(sourcePrefix.length));
+    return sourceUrl.origin === previewUrl.origin &&
+      /^\/assets\/[A-Za-z0-9._-]+\.js$/u.test(sourceUrl.pathname) &&
+      sourceUrl.search === "" &&
+      sourceUrl.hash === "";
+  } catch {
+    return false;
+  }
 }
 
 type ShellMode = "immersive" | "windowed";
@@ -551,7 +585,7 @@ async function runMode(
     if (message.type() !== "error") return;
     const location = message.location().url;
     const text = location ? `${message.text()} @ ${location}` : message.text();
-    if (!isExpectedStaticPreviewApiError(text)) consoleErrors.push(text);
+    if (!isExpectedStaticPreviewError(text, url)) consoleErrors.push(text);
   });
   page.on("pageerror", (error) => consoleErrors.push(String(error)));
 

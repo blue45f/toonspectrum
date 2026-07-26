@@ -35,7 +35,12 @@ describe("automatic raster publication feature gate", () => {
   });
 
   it("guards both draw promotion and raster history publication in the editor wiring", () => {
-    const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+    const pageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+    const viewportSource = readFileSync(
+      new URL("./StudioCanvasViewport.tsx", import.meta.url),
+      "utf8",
+    );
+    const source = `${pageSource}\n${viewportSource}`;
     expect(source).toMatch(
       /STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED\s*&&\s*studioAuthUserId/u
     );

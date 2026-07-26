@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const viewportSource = readFileSync(new URL("./StudioCanvasViewport.tsx", import.meta.url), "utf8");
 const inspectorSource = readFileSync(new URL("./StudioInspectorAside.tsx", import.meta.url), "utf8");
 const leftToolRailSource = readFileSync(new URL("./StudioLeftToolRail.tsx", import.meta.url), "utf8");
 const viewHudLoaderSource = readFileSync(
@@ -12,9 +13,11 @@ const viewHudLoaderSource = readFileSync(
 
 describe("StudioPage view integration contract", () => {
   it("wires the quarter-turn Stage and transformed collaboration overlay together", () => {
-    expect(source).toContain("width={stageViewLayout.width}");
-    expect(source).toContain("rotation={stageViewLayout.rotation}");
-    expect(source).toMatch(/<StudioRemoteCursorOverlay[\s\S]*?rotation=\{canvasRotation\}/u);
+    expect(viewportSource).toContain("width={stageViewLayout.width}");
+    expect(viewportSource).toContain("rotation={stageViewLayout.rotation}");
+    expect(viewportSource).toMatch(
+      /<StudioRemoteCursorOverlay[\s\S]*?rotation=\{canvasRotation\}/u,
+    );
   });
 
   it("fails GPU raster surfaces closed while a quarter-turn view is active", () => {
@@ -39,27 +42,29 @@ describe("StudioPage view integration contract", () => {
   });
 
   it("shows effective magnification and exposes an accessible rail-to-toolbar relationship", () => {
-    expect(source).toContain("magnification={effScale}");
+    expect(viewportSource).toContain("magnification={effScale}");
     expect(leftToolRailSource).toContain('aria-controls="studio-view-tools-hud-zoom"');
     expect(leftToolRailSource).toContain('data-studio-view-tool-trigger="rotate"');
   });
 
   it("keeps the legacy canvas zoom cluster out of the full editor dock", () => {
-    expect(source).toMatch(
+    expect(viewportSource).toMatch(
       /absolute bottom-3 left-3[\s\S]*?canvasOnlyMode && "lg:flex"[\s\S]*?aria-label="실제 픽셀 100% 보기"/u,
     );
-    expect(source).not.toContain('"absolute bottom-3 left-3 z-30 hidden lg:flex');
+    expect(viewportSource).not.toContain('"absolute bottom-3 left-3 z-30 hidden lg:flex');
   });
 
   it("loads the optional view HUD only after a zoom or rotate intent", () => {
-    expect(source).toContain(
+    expect(viewportSource).toContain(
       'import { StudioViewToolsHud } from "./studio-view-tools-hud-loader";',
     );
-    expect(source).not.toContain(
+    expect(viewportSource).not.toContain(
       'import { StudioViewToolsHud } from "./StudioViewToolsHud";',
     );
     expect(viewHudLoaderSource).toContain('import("./StudioViewToolsHud")');
-    expect(source).toMatch(/\{viewTool \? \([\s\S]*?<Suspense fallback=\{null\}>[\s\S]*?<StudioViewToolsHud/u);
+    expect(viewportSource).toMatch(
+      /\{viewTool \? \([\s\S]*?<Suspense fallback=\{null\}>[\s\S]*?<StudioViewToolsHud/u,
+    );
   });
 
   it("restores focus when shortcut or capture state closes a focused view HUD", () => {
@@ -70,7 +75,7 @@ describe("StudioPage view integration contract", () => {
     expect(source).toContain("closeViewToolWithFocusRef.current({ preferCanvas: true })");
     expect(source).toContain('if (viewTool === "zoom") closeViewToolWithFocus();');
     expect(source).toContain('if (viewTool === "rotate") closeViewToolWithFocus();');
-    expect(source).toContain("onClose={closeViewToolWithFocus}");
+    expect(viewportSource).toContain("onClose={closeViewToolWithFocus}");
   });
 
   it("keeps configurable flip dispatch before the hard-coded view resolver", () => {

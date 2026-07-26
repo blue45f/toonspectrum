@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const viewportSource = readFileSync(new URL("./StudioCanvasViewport.tsx", import.meta.url), "utf8");
 const guideSource = readFileSync(new URL("./StudioCanvasGuideLayers.tsx", import.meta.url), "utf8");
 const inspectorSource = readFileSync(new URL("./StudioInspectorAside.tsx", import.meta.url), "utf8");
 const isometricPanelSource = readFileSync(
@@ -26,7 +27,7 @@ describe("StudioPage drawing-assist integration contract", () => {
     );
     expect(inspectorSource).toMatch(/<StudioPerspectivePanel[\s\S]*?disabled=\{drawingAssistControlsDisabled\}/u);
     expect(inspectorSource).toMatch(/<StudioIsometricGridPanel[\s\S]*?disabled=\{drawingAssistControlsDisabled\}/u);
-    expect(source).toMatch(
+    expect(viewportSource).toMatch(
       /<StudioCanvasGuideOverlayLayers[\s\S]*?drawingAssistDisabled=\{activeSurfaceReviewLocked \|\| saving \|\| masterEditMode\}/u
     );
     expect(guideSource).toMatch(
@@ -38,7 +39,7 @@ describe("StudioPage drawing-assist integration contract", () => {
   });
 
   it("routes every guide drag through preview, one final commit, and explicit cancellation", () => {
-    expect(source).toMatch(
+    expect(viewportSource).toMatch(
       /<StudioCanvasGuideOverlayLayers[\s\S]*?onPreviewVanishingPoint=\{previewVanishingPointById\}[\s\S]*?onCommitVanishingPoint=\{moveVanishingPointById\}[\s\S]*?onPreviewIsometricOrigin=\{previewIsometricOrigin\}[\s\S]*?onCommitIsometricOrigin=\{commitIsometricOrigin\}[\s\S]*?onCancelDrawingAssistPreview=\{cancelStudioDrawingAssistPreview\}/u
     );
     expect(guideSource).toMatch(

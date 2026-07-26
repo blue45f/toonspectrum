@@ -77,7 +77,10 @@ const budgets = {
   // 무거운 패널·export·3D는 lazy 유지. 관측치+약 2%/+2-request 여유로 재고정.
   // 2026-07-24 CSP 교점까지 지우기 문서 apply 배선(순수 플래너는 기존, StudioPage·dock 가시성):
   // route gzip 956.5 KiB 관측 — gzip 상한만 관측치+약 2%로 재고정(raw·entry는 여유 유지).
-  studio: { raw: 3_035_000, gzip: 1_000_000 },
+  // 2026-07-26 캔버스 뷰포트 compiler boundary + 0%-기본 WebGPU cohort policy:
+  // route 3,036,277/994,984 bytes 관측. entry/incremental/gzip 예산은 기존 상한 안이며,
+  // raw의 0.04% 초과만 작은 코드젠 drift 여유와 함께 다시 잠근다.
+  studio: { raw: 3_045_000, gzip: 1_000_000 },
   studioEntry: { raw: 1_284_000, gzip: 384_500 },
   // 2026-07-23 저녁: roughjs 스케치 도형·polygon-clipping 패스 불리언 도입 — 두 라이브러리 본체는
   // 다이내믹 청크(예산 밖)이나 어댑터 공유 청크 +1로 정적 요청 149 관측. +1 여유로 재고정.
@@ -99,7 +102,11 @@ const budgets = {
   // activated only after the user opens StudioBackground3D; PSD/physics/engine labs stay isolated.
   // 2026-07-23 방 만들기·태양 릭·렌즈·단면·스케일 가이드(전부 lazy bg3d 청크) 반영:
   // 2,399,700/698,200 bytes, 42 requests 관측 — 관측치+약 2%/1-request 여유로 상향.
-  bg3dEditor: { raw: 2_448_000, gzip: 712_000, chunks: 43 },
+  // 2026-07-26 Shapes/View/LT를 500KB 미만 독립 모듈로 분리해 기존 Babel deopt를 제거했다.
+  // React Compiler memo-cache 코드젠과 명시적 패널 계약으로 activation closure가
+  // 2,466,516/727,099 bytes, 43 requests로 이동했다. Three/R3F·패널은 여전히 Studio route와
+  // 분리되고 optional runtime 경계도 불변이므로 관측치에 약 2% drift만 허용한다.
+  bg3dEditor: { raw: 2_516_000, gzip: 742_000, chunks: 43 },
   // Durable recovery, integrity verification, PNG/contact-sheet/PSD clients, and ZIP packaging load
   // only after explicit batch export. 2026-07-20 OffscreenCanvas pass-PNG Worker client/protocol:
   // measured incremental closure 164,352 raw / 43,602 gzip; retain ~2% raw headroom.

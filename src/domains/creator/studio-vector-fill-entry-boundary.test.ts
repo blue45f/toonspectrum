@@ -4,8 +4,10 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const pageUrl = new URL("./StudioPage.tsx", import.meta.url);
+const viewportUrl = new URL("./StudioCanvasViewport.tsx", import.meta.url);
 const previewUrl = new URL("./studio-advanced-fill-preview.ts", import.meta.url);
 const source = readFileSync(pageUrl, "utf8");
+const viewportSource = readFileSync(viewportUrl, "utf8");
 const previewSource = readFileSync(previewUrl, "utf8");
 const file = ts.createSourceFile(
   pageUrl.pathname,
@@ -66,12 +68,12 @@ describe("Studio vector line-art advanced fill entry boundary", () => {
   it("keeps preview paint-only and applies exactly one image layer in one history commit", () => {
     const apply = nestedFunction("applyAdvancedFillPreview");
     const cancel = nestedFunction("cancelAdvancedFillPreview");
-    const renderStart = source.indexOf("const authoredCanvasRenderElements =");
-    const renderEnd = source.indexOf("const timelineComposite =", renderStart);
-    const paintProjection = source.slice(renderStart, renderEnd);
-    const renderEl = source.slice(
-      source.indexOf("const renderEl =", renderEnd),
-      source.indexOf("const panelClip =", renderEnd),
+    const renderStart = viewportSource.indexOf("const authoredCanvasRenderElements =");
+    const renderEnd = viewportSource.indexOf("const timelineComposite =", renderStart);
+    const paintProjection = viewportSource.slice(renderStart, renderEnd);
+    const renderEl = viewportSource.slice(
+      viewportSource.indexOf("const renderEl =", renderEnd),
+      viewportSource.indexOf("const panelClip =", renderEnd),
     );
 
     expect(previewSource).toContain("virtualTarget?: StudioAdvancedFillVirtualTarget");

@@ -30,6 +30,7 @@ import {
   Suspense,
   memo,
   useId,
+  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -484,6 +485,11 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   const [brushManagerSheetSnap, setBrushManagerSheetSnap] =
     useState<StudioMobileSheetSnap>("medium");
   const [workspaceDockExpanded, setWorkspaceDockExpanded] = useState<boolean>(false);
+  const suppressBrushHintOnReturnFocusRef = useRef(false);
+  const dismissDrawSettings = () => {
+    suppressBrushHintOnReturnFocusRef.current = true;
+    setMobileSheet(null);
+  };
   const mobileControlSide = workspaceState.mobileControlSide === "left" ? "left" : "right";
   const colorVisionOpen = mobileSheet === "color-vision";
   const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
@@ -720,7 +726,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 active={mobileSheet === "draw"}
                 kind="draw"
                 label="브러시 설정"
-                onDismiss={() => setMobileSheet(null)}
+                onDismiss={dismissDrawSettings}
                 onSnapChange={setDrawSheetSnap}
                 sheetRef={drawSheetRef}
                 snap={drawSheetSnap}
@@ -737,7 +743,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 </p>
                 <button
                   type="button"
-                  onClick={() => setMobileSheet(null)}
+                  onClick={dismissDrawSettings}
                   className="grid size-11 place-items-center rounded-xl text-fg-3 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                   aria-label="브러시 설정 닫기"
                   data-autofocus
@@ -854,25 +860,30 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 />
                 <div className="mb-2.5">
                   <Suspense fallback={<div className="h-24 animate-pulse rounded-xl bg-raised/40 motion-reduce:animate-none" aria-hidden />}>
-                    <StudioUnifiedBrushPicker
-                      activeBrushId={brush}
-                      activeCatalogBrushId={activeCatalogBrushId}
-                      activeCatalogBrushName={activeCatalogBrushName}
-                      brushOpacity={brushOpacity}
-                      brushCatalogItems={brushCatalogItems}
-                      catalogOpen={brushCatalogOpen}
-                      color={color}
-                      proDrawPrefs={proDrawPrefs}
-                      stampTuning={stampTuning}
-                      strokeWidth={strokeWidth}
-                      onStampTuningChange={setStampTuning}
-                      onSelectBrush={applyBuiltInBrushPreset}
-                      onSelectBrushId={brushCatalogHandlers.selectBrushId}
-                      onToggleCatalog={(trigger) =>
-                        brushCatalogHandlers.toggle("mobile-sheet", trigger)
-                      }
-                      onToggleFavoriteBrush={brushCatalogHandlers.toggleFavorite}
-                    />
+                    <div
+                      data-studio-mobile-unified-brush-layout="true"
+                      className="min-w-0 [&_[data-studio-brush-tray=true]]:min-w-0 [&_[data-studio-brush-tray=true]>[role=listbox]]:min-w-0 [&_[data-studio-brush-tray=true]>[role=listbox]]:flex-1"
+                    >
+                      <StudioUnifiedBrushPicker
+                        activeBrushId={brush}
+                        activeCatalogBrushId={activeCatalogBrushId}
+                        activeCatalogBrushName={activeCatalogBrushName}
+                        brushOpacity={brushOpacity}
+                        brushCatalogItems={brushCatalogItems}
+                        catalogOpen={brushCatalogOpen}
+                        color={color}
+                        proDrawPrefs={proDrawPrefs}
+                        stampTuning={stampTuning}
+                        strokeWidth={strokeWidth}
+                        onStampTuningChange={setStampTuning}
+                        onSelectBrush={applyBuiltInBrushPreset}
+                        onSelectBrushId={brushCatalogHandlers.selectBrushId}
+                        onToggleCatalog={(trigger) =>
+                          brushCatalogHandlers.toggle("mobile-sheet", trigger)
+                        }
+                        onToggleFavoriteBrush={brushCatalogHandlers.toggleFavorite}
+                      />
+                    </div>
                   </Suspense>
                 </div>
               </>
@@ -1332,7 +1343,15 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 aria-controls={MOBILE_DRAW_SETTINGS_ID}
                 aria-label="브러시 설정 (굵기·색·프리셋)"
                 onPointerEnter={() => void loadStudioBrushStudio()}
-                onFocus={() => void loadStudioBrushStudio()}
+                onFocus={(event) => {
+                  void loadStudioBrushStudio();
+                  if (!suppressBrushHintOnReturnFocusRef.current) return;
+                  suppressBrushHintOnReturnFocusRef.current = false;
+                  // The non-modal sheet restores keyboard focus to this launcher after closing.
+                  // Keep that accessibility contract, but do not let the synthetic return-focus
+                  // bubble into StudioToolHint and cover the touch canvas with a rich coach.
+                  event.stopPropagation();
+                }}
                 onClick={() => {
                   setWorkspaceDockExpanded(false);
                   void loadStudioBrushStudio();

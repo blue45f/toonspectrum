@@ -12,6 +12,15 @@ const BASE = import.meta.env.VITE_DESK_PLATFORM_URL ?? "https://desk-platform.ve
 /** 이 앱의 슬러그(레포 이름). desk-platform이 앱별 집계를 구분하는 키. */
 export const APP_ID = "toonspectrum";
 
+/**
+ * 자동 방문 집계를 허용하는 정식 웹 origin.
+ *
+ * Vite preview도 운영 번들(`import.meta.env.PROD === true`)을 제공하므로 빌드 모드만으로는
+ * 로컬 preview와 정식 배포를 구분할 수 없다. 자동·비필수 ping은 정확한 정식 origin에서만
+ * 보내 개발 서버, 127.0.0.1, LAN preview, 테스트 및 Vercel preview의 잡음과 비용을 막는다.
+ */
+export const VISIT_PING_PRODUCTION_ORIGIN = "https://toonspectrum.vercel.app";
+
 /** 하루 1회 핑을 디바운스하기 위한 localStorage 키(YYYY-MM-DD 저장). */
 const LAST_PING_KEY = "visits:last-ping";
 
@@ -31,13 +40,46 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+export interface VisitPingEnvironment {
+  isProductionBuild: boolean;
+  origin?: string;
+}
+
+/**
+ * 자동 방문 핑을 보낼 수 있는 환경인지 순수하게 판정한다.
+ *
+ * 빌드 모드와 exact origin을 함께 확인해 Vite preview(`PROD=true`)도 자동으로 차단한다.
+ */
+export function shouldSendVisitPing({
+  isProductionBuild,
+  origin,
+}: VisitPingEnvironment): boolean {
+  if (!isProductionBuild || !origin) return false;
+
+  try {
+    return new URL(origin).origin === VISIT_PING_PRODUCTION_ORIGIN;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * 하루 한 번만 방문 핑을 보낸다(`POST …/visits/ping`).
  * - localStorage(`visits:last-ping`)로 같은 날 재핑을 막는다(없으면 항상 시도).
+ * - 정식 production origin 이외의 dev/preview/test 환경에서는 네트워크를 사용하지 않는다.
  * - 모든 에러를 삼킨다 — 네트워크/스토리지 실패가 앱에 새 나가지 않게 한다.
  * - 렌더를 막지 않도록 호출부에서 await 없이 fire-and-forget로 쓴다.
  */
 export async function pingVisit(): Promise<void> {
+  if (
+    !shouldSendVisitPing({
+      isProductionBuild: import.meta.env.PROD,
+      origin: typeof location !== "undefined" ? location.origin : undefined,
+    })
+  ) {
+    return;
+  }
+
   let last: string | null = null;
   try {
     last = localStorage.getItem(LAST_PING_KEY);

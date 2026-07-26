@@ -4,7 +4,9 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const fileUrl = new URL("./StudioPage.tsx", import.meta.url);
+const viewportUrl = new URL("./StudioCanvasViewport.tsx", import.meta.url);
 const source = readFileSync(fileUrl, "utf8");
+const viewportSource = readFileSync(viewportUrl, "utf8");
 const file = ts.createSourceFile(
   fileUrl.pathname,
   source,
@@ -42,9 +44,9 @@ describe("Studio AI generated asset fail-closed boundary", () => {
       "aiNoticePendingActionRef.current = null",
       "setAiNoticeOpen(false)",
     ]);
-    expect(source).toContain("<AiAssetNotice onCancel={cancelAiNotice}");
-    expect(source).toContain("cancelAiNotice: () => void;");
-    expect(source).not.toContain("setAiNoticeOpen={setAiNoticeOpen}");
+    expect(viewportSource).toContain("<AiAssetNotice onCancel={cancelAiNotice}");
+    expect(viewportSource).toContain("cancelAiNotice: () => void;");
+    expect(viewportSource).not.toContain("setAiNoticeOpen={setAiNoticeOpen}");
   });
 
   it("captures request provenance before image awaits and never derives it after completion", () => {

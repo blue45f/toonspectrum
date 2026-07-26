@@ -14,6 +14,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { chromium, type Locator, type Page } from "playwright";
 
@@ -23,7 +24,6 @@ const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
-  "/api/v1/apps/toonspectrum/visits/ping",
 ] as const;
 const VITE_ERROR_OVERLAY_SELECTOR = [
   "vite-error-overlay",
@@ -180,6 +180,31 @@ function isExpectedStaticPreviewApiMessage(message: string): boolean {
   return OPTIONAL_STATIC_PREVIEW_API_PATHS.some((path) => message.includes(path));
 }
 
+export function isExpectedStaticPreviewSocketIoHandshakeClose(
+  message: string,
+  studioUrl: string,
+): boolean {
+  let previewUrl: URL;
+  try {
+    previewUrl = new URL(studioUrl);
+  } catch {
+    return false;
+  }
+  if (
+    previewUrl.protocol !== "http:"
+    || previewUrl.hostname !== "127.0.0.1"
+    || !previewUrl.port
+  ) {
+    return false;
+  }
+
+  return message === [
+    "WebSocket connection to ",
+    `'ws://127.0.0.1:${previewUrl.port}/socket.io/?EIO=4&transport=websocket' failed: `,
+    "Connection closed before receiving a handshake response",
+  ].join("");
+}
+
 function isExpectedHeadlessGraphicsDiagnostic(message: string): boolean {
   return /GL Driver Message .*GPU stall due to ReadPixels/u.test(message) ||
     message.startsWith("No available adapters.");
@@ -306,7 +331,11 @@ async function run(page: Page, studioUrl: string): Promise<void> {
     if (type === "log" && value.includes(R3F_CONTEXT_LOSS_DIAGNOSTIC)) {
       if (expectingLiveContextLoss) liveContextLossDiagnostics += 1;
       else issues.push(`unexpected planned-context-loss diagnostic: ${value}`);
-    } else if (type === "error" && !isExpectedStaticPreviewApiMessage(value)) {
+    } else if (
+      type === "error"
+      && !isExpectedStaticPreviewApiMessage(value)
+      && !isExpectedStaticPreviewSocketIoHandshakeClose(message.text(), studioUrl)
+    ) {
       issues.push(`console.error: ${value}`);
     } else if (
       type === "warning"
@@ -546,7 +575,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.stack ?? error.message : String(error));
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.stack ?? error.message : String(error));
+    process.exitCode = 1;
+  });
+}

@@ -65,6 +65,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
 
   it("fails over synchronously when the engine rejects a compact command", () => {
     const page = source("./StudioPage.tsx");
+    const viewport = source("./StudioCanvasViewport.tsx");
 
     expect(page).toContain('if (outcome.status === "rejected") {');
     expect(page).toContain("gpuLiveSourceJournalRef.current = advanced.state");
@@ -77,7 +78,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(page).toContain(
       "beginGpuPinnedReceiptEpoch(gpuLiveAcceptedRequestIdRef.current)"
     );
-    expect(page).toContain("onFrameInvalid={onWebGpuFrameInvalid}");
+    expect(viewport).toContain("onFrameInvalid={onWebGpuFrameInvalid}");
   });
 
   it("assigns live operations a monotonic terminal key independent of random element ids", () => {

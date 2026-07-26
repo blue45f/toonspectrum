@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioCanvasViewportSource = readFileSync(
+  new URL("./StudioCanvasViewport.tsx", import.meta.url),
+  "utf8",
+);
 
 function sourceBetween(start: string, end: string): string {
   const startIndex = studioPageSource.indexOf(start);
@@ -79,7 +83,7 @@ describe("pending stroke lifecycle source contract", () => {
     expect(pageSelection).toContain("pendingBatch.pageId !== nextPageId");
     expect(pageSelection).toContain("!flushPendingStrokeCommitsRef.current()");
     expect(pageSelection).toContain("drawingRef.current || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()");
-    expect(studioPageSource).toContain("if (!setCurrentPageId(pageId)) return;");
+    expect(studioCanvasViewportSource).toContain("if (!setCurrentPageId(pageId)) return;");
     expect(drawingStart).toContain("pendingBatch.pageId !== activePage.id");
     expect(drawingStart).toContain("!flushPendingStrokeCommitsRef.current()");
     expect(flushPipeline).toContain("return false");

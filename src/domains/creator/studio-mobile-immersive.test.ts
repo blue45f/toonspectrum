@@ -9,6 +9,10 @@ import {
 } from "./studio-mobile-immersive";
 
 const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioCanvasViewportSource = readFileSync(
+  new URL("./StudioCanvasViewport.tsx", import.meta.url),
+  "utf8",
+);
 const studioMobileEditingDockSource = readFileSync(
   new URL("./StudioMobileEditingDock.tsx", import.meta.url),
   "utf8",
@@ -62,7 +66,7 @@ describe("Studio mobile immersive preference", () => {
     expect(studioPageSource).toContain('mobileImmersive && "max-lg:hidden"');
     expect(studioPageSource).toContain('"lg:hidden"');
     expect(studioPageSource).not.toContain("lg:h-0 lg:w-0 lg:overflow-visible");
-    expect(studioPageSource).toContain("!canvasOnlyMode && !isMobile");
+    expect(studioCanvasViewportSource).toContain("!canvasOnlyMode && !isMobile");
     expect(studioPageSource).toContain("<StudioMobileEditingDock");
     expect(studioMobileEditingDockSource).toContain('data-studio-mobile-editing-dock="true"');
     expect(studioMobileEditingDockSource).toContain('data-studio-canvas-transient="coach"');

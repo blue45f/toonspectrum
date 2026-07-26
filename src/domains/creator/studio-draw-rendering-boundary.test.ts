@@ -114,15 +114,17 @@ describe("studio draw rendering ownership boundary", () => {
 
   it("keeps the React-Konva node and draft preview runtime in one-way modules", () => {
     const page = moduleEdges("./StudioPage.tsx");
+    const viewport = moduleEdges("./StudioCanvasViewport.tsx");
     const drawNode = moduleEdges("./StudioDrawNode.tsx");
     const previewLayers = moduleEdges("./StudioDraftPreviewLayers.tsx");
     const previewStore = moduleEdges("./studio-draft-preview-store.ts");
     const rendering = moduleEdges("./studio-draw-rendering.ts");
 
     expect(
-      page.valueImports.filter((specifier) => specifier === "./StudioDrawNode"),
+      viewport.valueImports.filter((specifier) => specifier === "./StudioDrawNode"),
     ).toEqual(["./StudioDrawNode"]);
     expect(page.source).not.toContain("const StudioDrawNode = memo(function StudioDrawNode(");
+    expect(viewport.source).not.toContain("const StudioDrawNode = memo(function StudioDrawNode(");
     expect(drawNode.source).toContain(
       "export const StudioDrawNode = memo(function StudioDrawNode(",
     );
@@ -136,10 +138,14 @@ describe("studio draw rendering ownership boundary", () => {
 
     expect(page.valueImports.filter((specifier) => specifier === "./studio-draft-preview-store"))
       .toEqual(["./studio-draft-preview-store"]);
-    expect(page.valueImports.filter((specifier) => specifier === "./StudioDraftPreviewLayers"))
+    expect(viewport.valueImports.filter((specifier) => specifier === "./StudioDraftPreviewLayers"))
       .toEqual(["./StudioDraftPreviewLayers"]);
     expect(page.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewStore\b/);
     expect(page.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewLayers\b/);
+    expect(viewport.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewStore\b/);
+    expect(viewport.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewLayers\b/);
+    expect(viewport.typeImports).toContain("./studio-draft-preview-store");
+    expect(viewport.valueImports).not.toContain("./studio-draft-preview-store");
 
     expect(previewStore.source).toContain("export class StudioDraftPreviewStore");
     expect(previewStore.typeImports).toContain("./studio-element-model");

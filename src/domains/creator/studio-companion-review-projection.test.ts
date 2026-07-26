@@ -432,6 +432,74 @@ describe("studio companion review projection", () => {
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:first");
   });
 
+  it("retains the displayed navigator URL until a staged candidate commits", () => {
+    const createObjectURL = vi.fn()
+      .mockReturnValueOnce("blob:current")
+      .mockReturnValueOnce("blob:candidate")
+      .mockReturnValueOnce("blob:replacement");
+    const revokeObjectURL = vi.fn();
+    const owner = new StudioCompanionNavigatorObjectUrlOwner({ createObjectURL, revokeObjectURL });
+
+    expect(owner.replace(new Blob(["current"]))).toBe("blob:current");
+    const candidate = owner.stage(new Blob(["candidate"]))!;
+    expect(owner.current()?.url).toBe("blob:current");
+    expect(owner.pending()).toBe(candidate);
+    expect(owner.ownedCount()).toBe(2);
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+
+    expect(owner.reject(candidate)).toBe(true);
+    expect(owner.current()?.url).toBe("blob:current");
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:candidate");
+
+    const replacement = owner.stage(new Blob(["replacement"]))!;
+    expect(owner.commit(replacement)).toBe("blob:replacement");
+    expect(owner.current()).toBe(replacement);
+    expect(owner.pending()).toBeNull();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:current");
+  });
+
+  it("identity-fences stale navigator commits and rejects without disturbing live URLs", () => {
+    const createObjectURL = vi.fn()
+      .mockReturnValueOnce("blob:current")
+      .mockReturnValueOnce("blob:pending")
+      .mockReturnValueOnce("blob:newer");
+    const revokeObjectURL = vi.fn();
+    const owner = new StudioCompanionNavigatorObjectUrlOwner({ createObjectURL, revokeObjectURL });
+    owner.replace(new Blob(["current"]));
+    const stalePending = owner.stage(new Blob(["pending"]))!;
+    const newerPending = owner.stage(new Blob(["newer"]))!;
+
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:pending");
+    expect(owner.commit(stalePending)).toBeNull();
+    expect(owner.reject(stalePending)).toBe(false);
+    expect(owner.current()?.url).toBe("blob:current");
+    expect(owner.pending()).toBe(newerPending);
+    expect(owner.commit({ ...newerPending })).toBeNull();
+    expect(owner.commit(newerPending)).toBe("blob:newer");
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:current");
+  });
+
+  it("clears both pending and displayed navigator URLs exactly once", () => {
+    const createObjectURL = vi.fn()
+      .mockReturnValueOnce("blob:current")
+      .mockReturnValueOnce("blob:pending");
+    const revokeObjectURL = vi.fn();
+    const owner = new StudioCompanionNavigatorObjectUrlOwner({ createObjectURL, revokeObjectURL });
+    owner.replace(new Blob(["current"]));
+    owner.stage(new Blob(["pending"]));
+
+    owner.clear();
+    owner.clear();
+
+    expect(revokeObjectURL.mock.calls).toEqual([
+      ["blob:pending"],
+      ["blob:current"],
+    ]);
+    expect(owner.current()).toBeNull();
+    expect(owner.pending()).toBeNull();
+    expect(owner.ownedCount()).toBe(0);
+  });
+
   it("clamps viewport boxes to normalized preview bounds", () => {
     expect(normalizeStudioCompanionViewport({ x: -2, y: 0.9, width: 2, height: 0.5 }))
       .toEqual({ x: 0, y: 0.5, width: 1, height: 0.5 });

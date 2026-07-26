@@ -1,0 +1,236 @@
+import { readFileSync } from "node:fs";
+
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  STUDIO_LIVE_INK_ROLLOUT_BUCKET_STORAGE_KEY,
+  resolveStudioLiveInkRollout,
+  studioLiveInkRolloutInputFromGlobals,
+  type StudioLiveInkRolloutRandom,
+  type StudioLiveInkRolloutStorage,
+} from "./studio-live-ink-rollout";
+
+const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+
+function memoryStorage(initial?: string): StudioLiveInkRolloutStorage & {
+  readonly values: Map<string, string>;
+} {
+  const values = new Map<string, string>();
+  if (initial !== undefined) values.set(STUDIO_LIVE_INK_ROLLOUT_BUCKET_STORAGE_KEY, initial);
+  return {
+    values,
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => {
+      values.set(key, value);
+    },
+  };
+}
+
+function fixedRandom(value: number): StudioLiveInkRolloutRandom {
+  return {
+    getRandomValues: (array) => {
+      array[0] = value;
+      return array;
+    },
+  };
+}
+
+describe("Studio live-ink progressive rollout", () => {
+  it("wires both public deployment controls into the production Studio policy", () => {
+    expect(studioPageSource).toContain("resolveStudioLiveInkRollout(");
+    expect(studioPageSource).toContain("studioLiveInkRolloutInputFromGlobals(");
+    expect(studioPageSource).toContain("import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND");
+    expect(studioPageSource).toContain("import.meta.env.VITE_STUDIO_LIVE_INK_ROLLOUT_PERCENT");
+    expect(studioPageSource).toContain(
+      "STUDIO_VISIBLE_LIVE_INK_ROLLOUT.preference",
+    );
+  });
+
+  it("keeps the default and malformed configuration on Canvas2D without touching storage", () => {
+    const storage = memoryStorage();
+    const getItem = vi.spyOn(storage, "getItem");
+
+    expect(resolveStudioLiveInkRollout({
+      webgpuApiAvailable: true,
+      storage,
+      random: fixedRandom(1),
+    })).toEqual({
+      preference: "canvas2d",
+      reason: "rollout-disabled",
+      rolloutPercent: 0,
+      bucket: null,
+    });
+    expect(resolveStudioLiveInkRollout({
+      backendPreference: "auto",
+      rolloutPercent: "not-a-percent",
+      webgpuApiAvailable: true,
+      storage,
+      random: fixedRandom(1),
+    }).preference).toBe("canvas2d");
+    expect(resolveStudioLiveInkRollout({
+      backendPreference: "auto",
+      rolloutPercent: true,
+      webgpuApiAvailable: true,
+      storage,
+      random: fixedRandom(1),
+    }).preference).toBe("canvas2d");
+    expect(getItem).not.toHaveBeenCalled();
+  });
+
+  it("preserves explicit force and emergency rollback controls", () => {
+    expect(resolveStudioLiveInkRollout({
+      backendPreference: "webgpu",
+      rolloutPercent: 0,
+      webgpuApiAvailable: false,
+    })).toMatchObject({
+      preference: "webgpu",
+      reason: "webgpu-explicit",
+    });
+    expect(resolveStudioLiveInkRollout({
+      backendPreference: "canvas2d",
+      rolloutPercent: 100,
+      webgpuApiAvailable: true,
+    })).toMatchObject({
+      preference: "canvas2d",
+      reason: "canvas2d-forced",
+    });
+    expect(resolveStudioLiveInkRollout({
+      backendPreference: "web-gpu",
+      rolloutPercent: 100,
+      webgpuApiAvailable: true,
+    }).preference).toBe("canvas2d");
+  });
+
+  it("requires a WebGPU API before enrolling an automatic cohort", () => {
+    expect(resolveStudioLiveInkRollout({
+      backendPreference: "auto",
+      rolloutPercent: 20,
+      webgpuApiAvailable: false,
+      storage: memoryStorage("0"),
+      random: fixedRandom(0),
+    })).toEqual({
+      preference: "canvas2d",
+      reason: "webgpu-api-unavailable",
+      rolloutPercent: 20,
+      bucket: null,
+    });
+  });
+
+  it("uses a stable local percentile bucket and expands cohorts monotonically", () => {
+    const storage = memoryStorage("2499");
+    const base = {
+      backendPreference: "auto",
+      webgpuApiAvailable: true,
+      storage,
+      random: fixedRandom(9999),
+    } as const;
+
+    expect(resolveStudioLiveInkRollout({ ...base, rolloutPercent: 24.99 })).toMatchObject({
+      preference: "canvas2d",
+      reason: "cohort-excluded",
+      bucket: 2499,
+    });
+    expect(resolveStudioLiveInkRollout({ ...base, rolloutPercent: 25 })).toMatchObject({
+      preference: "webgpu",
+      reason: "cohort-included",
+      bucket: 2499,
+    });
+    expect(resolveStudioLiveInkRollout({ ...base, rolloutPercent: 50 }).preference).toBe("webgpu");
+  });
+
+  it("stores only a four-digit-or-smaller random bucket, never a user or device identifier", () => {
+    const storage = memoryStorage();
+    const decision = resolveStudioLiveInkRollout({
+      backendPreference: "auto",
+      rolloutPercent: 50,
+      webgpuApiAvailable: true,
+      storage,
+      random: fixedRandom(12_345),
+    });
+
+    expect(decision.bucket).toBe(2345);
+    expect(storage.values).toEqual(new Map([
+      [STUDIO_LIVE_INK_ROLLOUT_BUCKET_STORAGE_KEY, "2345"],
+    ]));
+  });
+
+  it("fails closed for hostile storage, Web Crypto, and invalid persisted buckets", () => {
+    const throwingStorage: StudioLiveInkRolloutStorage = {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("blocked");
+      },
+    };
+    expect(resolveStudioLiveInkRollout({
+      backendPreference: "auto",
+      rolloutPercent: 50,
+      webgpuApiAvailable: true,
+      storage: throwingStorage,
+      random: fixedRandom(0),
+    })).toMatchObject({
+      preference: "canvas2d",
+      reason: "cohort-unavailable",
+    });
+
+    const storage = memoryStorage("10000");
+    expect(resolveStudioLiveInkRollout({
+      backendPreference: "auto",
+      rolloutPercent: 50,
+      webgpuApiAvailable: true,
+      storage,
+      random: {
+        getRandomValues: () => {
+          throw new Error("unavailable");
+        },
+      },
+    })).toMatchObject({
+      preference: "canvas2d",
+      reason: "cohort-unavailable",
+    });
+  });
+
+  it("does not require local storage for a deliberate 100% capability canary", () => {
+    expect(resolveStudioLiveInkRollout({
+      backendPreference: "auto",
+      rolloutPercent: "100",
+      webgpuApiAvailable: true,
+    })).toEqual({
+      preference: "webgpu",
+      reason: "cohort-included",
+      rolloutPercent: 100,
+      bucket: null,
+    });
+  });
+
+  it("reads browser capabilities defensively without throwing in restricted globals", () => {
+    const globals = {
+      get navigator(): { readonly gpu?: unknown } {
+        throw new Error("denied");
+      },
+      get localStorage(): Storage {
+        throw new Error("denied");
+      },
+      get crypto(): Crypto {
+        throw new Error("denied");
+      },
+    };
+    const input = studioLiveInkRolloutInputFromGlobals("auto", 5, globals);
+
+    expect(input).toMatchObject({
+      backendPreference: "auto",
+      rolloutPercent: 5,
+      webgpuApiAvailable: false,
+      storage: null,
+      random: null,
+    });
+
+    expect(studioLiveInkRolloutInputFromGlobals("auto", 5, {
+      navigator: { gpu: {} },
+    }).webgpuApiAvailable).toBe(false);
+    expect(studioLiveInkRolloutInputFromGlobals("auto", 5, {
+      navigator: { gpu: { requestAdapter: () => Promise.resolve(null) } },
+    }).webgpuApiAvailable).toBe(true);
+  });
+});

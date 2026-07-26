@@ -1238,7 +1238,8 @@ export function StudioLivePresenceDock({
         type="button"
         aria-label="팀 작업 공간 열기"
         title="팀"
-        className="grid size-11 shrink-0 place-items-center rounded-lg border border-line/60 bg-card/80 text-fg-2 transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none"
+        data-studio-presence-team-action="true"
+        className="grid size-11 shrink-0 place-items-center rounded-lg border border-line/60 bg-card/80 text-fg-2 transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none max-[411px]:hidden"
         onClick={onOpenTeam}
       >
         <UsersRound size={16} strokeWidth={1.75} aria-hidden />
@@ -1248,20 +1249,23 @@ export function StudioLivePresenceDock({
         aria-label={`${collaborationLabel} 팀 작업 공간 열기`}
         title={`${syncPresentation.detail} · ${lastAckLabel}`}
         data-studio-presence-link={resolvedSync.phase}
+        data-studio-presence-sync-action="true"
         className={cn(
-          "inline-flex min-h-11 min-w-0 shrink items-center gap-1.5 rounded-full border px-3 text-[0.7rem] font-bold transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none",
+          "inline-flex size-11 min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border p-0 text-[0.7rem] font-bold transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none min-[412px]:h-auto min-[412px]:w-auto min-[412px]:min-w-0 min-[412px]:shrink min-[412px]:justify-start min-[412px]:px-3",
           syncToneClass(syncPresentation.tone)
         )}
         onClick={onOpenTeam}
       >
         <StudioSyncStatusIcon phase={resolvedSync.phase} />
-        <span className="max-w-40 truncate sm:max-w-56">{syncPresentation.shortLabel}</span>
+        <span className="max-w-40 truncate max-[411px]:hidden sm:max-w-56">
+          {syncPresentation.shortLabel}
+        </span>
       </button>
 
       {voiceControls}
 
       <div
-        className="flex items-center -space-x-1.5 pl-0.5"
+        className="flex items-center -space-x-1.5 pl-0.5 max-[411px]:hidden"
         role="group"
         aria-label="참여자"
         data-studio-presence-stack="true"
@@ -1312,7 +1316,7 @@ export function StudioLivePresenceDock({
         <button
           type="button"
           aria-label={`추가 팀원 ${mobileHiddenPeerCount}명, 팀 작업 공간 열기`}
-          className="grid size-11 shrink-0 place-items-center rounded-full border border-line bg-raised text-[0.65rem] font-bold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:hidden"
+          className="grid size-11 shrink-0 place-items-center rounded-full border border-line bg-raised text-[0.65rem] font-bold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent max-[411px]:hidden sm:hidden"
           onClick={onOpenTeam}
         >
           {mobileOverflow}
@@ -1334,7 +1338,7 @@ export function StudioLivePresenceDock({
         <button
           type="button"
           aria-label={`${followedPeer.displayName} 따라가기 중지`}
-          className="order-last ml-auto inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-lg border border-accent/35 bg-accent-soft px-2.5 text-[0.68rem] font-bold text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:ml-1 sm:max-w-40"
+          className="order-last ml-auto inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-lg border border-accent/35 bg-accent-soft px-2.5 text-[0.68rem] font-bold text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent max-[411px]:hidden sm:ml-1 sm:max-w-40"
           onClick={() => onToggleFollow(followedPeer.sessionId)}
         >
           <span className="truncate">{followedPeer.displayName} 따라가기</span>

@@ -41,7 +41,10 @@ const SUPPORTED_PREVIEW_KINDS = new Set([
   "tone",
 ]);
 
-describe("37-preset brush catalog contract", () => {
+const CORE_BRUSH_CATALOG_ITEMS = listStudioBrushTrayItems("all");
+const CORE_BRUSH_CATALOG_COUNT = CORE_BRUSH_CATALOG_ITEMS.length;
+
+describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
   // perfect-outline 엔진은 다이내믹 청크(perfect-freehand)를 쓴다 — 동기 SVG export가
   // 실제 아웃라인 경로(폴백 아님)를 감사하도록 스트로커를 선로드한다.
   beforeAll(async () => {
@@ -49,12 +52,12 @@ describe("37-preset brush catalog contract", () => {
   });
 
   it("maps every preset exactly once into selectable catalog metadata", () => {
-    const catalog = listStudioBrushTrayItems("all");
+    const catalog = CORE_BRUSH_CATALOG_ITEMS;
     const filteredCatalog = filterStudioBrushLibraryItems({ category: "all" });
     const presetIds = BRUSH_PRESETS.map((preset) => preset.id);
 
-    expect(BRUSH_PRESETS).toHaveLength(54);
-    expect(new Set(presetIds).size).toBe(54);
+    expect(BRUSH_PRESETS).toHaveLength(CORE_BRUSH_CATALOG_COUNT);
+    expect(new Set(presetIds).size).toBe(CORE_BRUSH_CATALOG_COUNT);
     expect(catalog.map((item) => item.id)).toEqual(filteredCatalog.map((item) => item.id));
     expect(new Set(catalog.map((item) => item.id))).toEqual(new Set(presetIds));
     expect(STUDIO_BRUSH_RUNTIME_CONTRACT.map((contract) => contract.id)).toEqual(presetIds);
@@ -150,7 +153,7 @@ describe("37-preset brush catalog contract", () => {
     }
   });
 
-  it("executes and exports a visible deterministic stroke for all 37 presets", () => {
+  it(`executes and exports a visible deterministic stroke for all ${CORE_BRUSH_CATALOG_COUNT} presets`, () => {
     for (const preset of BRUSH_PRESETS) {
       const runtime = resolveStudioBrushRuntimeContract(preset.id)!;
       const input = {

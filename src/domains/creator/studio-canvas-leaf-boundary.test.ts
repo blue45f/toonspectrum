@@ -38,9 +38,10 @@ function moduleEdges(relativePath: string): ModuleEdges {
 describe("Studio canvas leaf boundaries", () => {
   it("statically imports each leaf exactly once from StudioPage", () => {
     const page = moduleEdges("./StudioPage.tsx");
+    const viewport = moduleEdges("./StudioCanvasViewport.tsx");
 
     expect(
-      page.valueImports.filter((specifier) => specifier === "./StudioCanvasStatusRail")
+      viewport.valueImports.filter((specifier) => specifier === "./StudioCanvasStatusRail")
     ).toEqual(["./StudioCanvasStatusRail"]);
     expect(
       page.valueImports.filter((specifier) => specifier === "./StudioCanvasContextMenu")
@@ -64,12 +65,13 @@ describe("Studio canvas leaf boundaries", () => {
 
   it("keeps context-menu state, outside-click lifecycle, and 3D parsing in StudioPage", () => {
     const page = moduleEdges("./StudioPage.tsx");
+    const viewport = moduleEdges("./StudioCanvasViewport.tsx");
     const menu = moduleEdges("./StudioCanvasContextMenu.tsx");
 
     expect(page.source).toContain("const [contextMenu, setContextMenu] = useState");
     expect(page.source).toContain('globalThis.addEventListener("click", handleCloseMenu)');
     expect(page.source).toContain("parseStudio3dTool");
-    expect(page.source).toContain("onContextMenu={(e) =>");
+    expect(viewport.source).toContain("onContextMenu={(e) =>");
     expect(menu.valueImports).not.toContain("./studio-background-3d-metadata");
     expect(menu.valueImports).not.toContain("./studio-background-3d-loader");
     expect(menu.valueImports).not.toContain("./studio-element-model");
@@ -84,10 +86,10 @@ describe("Studio canvas leaf boundaries", () => {
   });
 
   it("passes only a fill preview message into the status leaf", () => {
-    const page = moduleEdges("./StudioPage.tsx").source;
+    const viewport = moduleEdges("./StudioCanvasViewport.tsx").source;
     const rail = moduleEdges("./StudioCanvasStatusRail.tsx").source;
 
-    expect(page).toContain("advancedFillPreviewMessage={advancedFillPreview?.message ?? null}");
+    expect(viewport).toContain("advancedFillPreviewMessage={advancedFillPreview?.message ?? null}");
     expect(rail).toContain("advancedFillPreviewMessage: string | null");
     expect(rail).not.toContain("StudioAdvancedFillPreview");
   });

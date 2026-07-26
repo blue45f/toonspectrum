@@ -23,6 +23,10 @@ vi.mock("react-dom", () => ({
 }));
 
 const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioCanvasViewportSource = readFileSync(
+  new URL("./StudioCanvasViewport.tsx", import.meta.url),
+  "utf8",
+);
 const appSettingsPanelSource = readFileSync(
   new URL("./StudioAppSettingsPanel.tsx", import.meta.url),
   "utf8"
@@ -172,8 +176,12 @@ describe("StudioAppSettingsPanel", () => {
     expect(html).toContain("브라우저 저장소에 저장하지 못해 현재 세션에만 적용됩니다.");
     expect(html).toContain("다시 저장");
     expect(html).not.toContain("변경 내용은 이 기기에 자동 저장됩니다.");
-    expect(studioPageSource).toContain("persistenceState={appSettingsPersistenceState}");
-    expect(studioPageSource).toContain("onRetryPersistence={retryAppSettingsPersistence}");
+    expect(studioCanvasViewportSource).toContain(
+      "persistenceState={appSettingsPersistenceState}",
+    );
+    expect(studioCanvasViewportSource).toContain(
+      "onRetryPersistence={retryAppSettingsPersistence}",
+    );
   });
 
   it("가로형 터치 화면에서도 툴바 설정의 모든 핵심 조작을 44px 이상으로 유지한다", () => {
@@ -210,9 +218,12 @@ describe("StudioAppSettingsPanel", () => {
   });
 
   it("설정 모달은 단축키 모달 상태와 독립적으로 마운트된다", () => {
-    const shortcutsStart = studioPageSource.indexOf("{shortcutsOpen ? (");
-    const appSettingsStart = studioPageSource.indexOf("{appSettingsOpen ? (", shortcutsStart);
-    const shortcutsClose = studioPageSource.indexOf(") : null}", shortcutsStart);
+    const shortcutsStart = studioCanvasViewportSource.indexOf("{shortcutsOpen ? (");
+    const appSettingsStart = studioCanvasViewportSource.indexOf(
+      "{appSettingsOpen ? (",
+      shortcutsStart,
+    );
+    const shortcutsClose = studioCanvasViewportSource.indexOf(") : null}", shortcutsStart);
 
     expect(shortcutsStart).toBeGreaterThanOrEqual(0);
     expect(shortcutsClose).toBeGreaterThan(shortcutsStart);

@@ -39,6 +39,13 @@ import type { StudioBrushTrayItem } from "./studio-creative-ux";
 
 import { cn } from "@/lib/utils";
 
+const STUDIO_CORE_BRUSH_CATALOG_COUNT = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
+  (item) => item.source === "core"
+).length;
+const STUDIO_PROCEDURAL_BRUSH_CATALOG_COUNT = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
+  (item) => item.source === "pro"
+).length;
+
 export interface StudioBrushLibrarySheetProps {
   open: boolean;
   activeBrushId: string;
@@ -588,7 +595,8 @@ export function StudioBrushLibrarySheet({
             앱 브러시
           </p>
           <p id={`${titleId}-description`} className="text-[0.62rem] text-fg-3">
-            코어 37 + 프로시저럴 120 · 내 브러시와 별개 · {items.length}개 표시
+            코어 {STUDIO_CORE_BRUSH_CATALOG_COUNT} + 프로시저럴{" "}
+            {STUDIO_PROCEDURAL_BRUSH_CATALOG_COUNT} · 내 브러시와 별개 · {items.length}개 표시
           </p>
         </div>
         <button

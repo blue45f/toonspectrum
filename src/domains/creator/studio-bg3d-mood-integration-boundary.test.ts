@@ -2,10 +2,12 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const background3dSource = readFileSync(
-  new URL("./StudioBackground3D.tsx", import.meta.url),
-  "utf8",
-);
+const background3dSource = [
+  "./StudioBackground3D.tsx",
+  "./StudioBg3dShapesPanel.tsx",
+  "./StudioBg3dViewPanel.tsx",
+  "./StudioBg3dLtPanel.tsx",
+].map((fileName) => readFileSync(new URL(fileName, import.meta.url), "utf8")).join("\n");
 
 describe("Studio BG3D mood/render integration boundary", () => {
   it("applies a mood only from the explicit preset command and records one immediate transition", () => {

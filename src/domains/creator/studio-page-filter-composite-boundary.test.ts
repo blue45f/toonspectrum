@@ -4,7 +4,9 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const pageUrl = new URL("./StudioPage.tsx", import.meta.url);
+const viewportUrl = new URL("./StudioCanvasViewport.tsx", import.meta.url);
 const pageSource = readFileSync(pageUrl, "utf8");
+const viewportSource = readFileSync(viewportUrl, "utf8");
 const pageFile = ts.createSourceFile(
   pageUrl.pathname,
   pageSource,
@@ -97,6 +99,15 @@ function sourceBetween(startToken: string, endToken: string): string {
     throw new Error(`Missing source boundary: ${startToken} -> ${endToken}`);
   }
   return pageSource.slice(start, end);
+}
+
+function viewportSourceBetween(startToken: string, endToken: string): string {
+  const start = viewportSource.indexOf(startToken);
+  const end = viewportSource.indexOf(endToken, start + startToken.length);
+  if (start < 0 || end <= start) {
+    throw new Error(`Missing viewport source boundary: ${startToken} -> ${endToken}`);
+  }
+  return viewportSource.slice(start, end);
 }
 
 function unwrapParentheses(expression: ts.Expression): ts.Expression {
@@ -214,7 +225,7 @@ describe("StudioPage page-composite filter integration boundary", () => {
   });
 
   it("projects the composite as a locked virtual ImageEl without mutating authored arrays", () => {
-    const projection = sourceBetween(
+    const projection = viewportSourceBetween(
       "const authoredCanvasRenderElements =",
       "const virtualFillPreviewTarget =",
     );

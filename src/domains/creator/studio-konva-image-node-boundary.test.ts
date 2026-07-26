@@ -170,12 +170,13 @@ const MOVED_DECLARATIONS = [
 describe("Studio Konva image node boundary", () => {
   it("moves the image renderer and its cache ownership out of StudioPage", () => {
     const page = moduleShape("./StudioPage.tsx");
+    const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const imageNode = moduleShape("./StudioKonvaImageNode.tsx");
 
     expect(
-      page.valueImports.filter((specifier) => specifier === "./StudioKonvaImageNode")
+      viewport.valueImports.filter((specifier) => specifier === "./StudioKonvaImageNode")
     ).toEqual(["./StudioKonvaImageNode"]);
-    expect(page.source.match(/<StudioKonvaImageNode\b/gu)).toHaveLength(1);
+    expect(viewport.source.match(/<StudioKonvaImageNode\b/gu)).toHaveLength(1);
     expect(imageNode.allImports).not.toContain("./StudioPage");
     for (const declaration of MOVED_DECLARATIONS) {
       expect(imageNode.topLevelDeclarations.has(declaration)).toBe(true);
@@ -187,12 +188,12 @@ describe("Studio Konva image node boundary", () => {
   });
 
   it("preserves the exact ten-prop effective image call contract", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const imageNode = moduleShape("./StudioKonvaImageNode.tsx");
     const contract = propertyNames(
       findInterface(imageNode, "StudioKonvaImageNodeProps").members
     );
-    const attributes = jsxAttributes(findImageNodeJsx(page));
+    const attributes = jsxAttributes(findImageNodeJsx(viewport));
 
     expect(contract).toEqual(IMAGE_NODE_PROPS);
     expect([...attributes.keys()]).toEqual(IMAGE_NODE_PROPS);

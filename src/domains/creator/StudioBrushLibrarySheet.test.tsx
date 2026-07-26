@@ -7,7 +7,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
+import {
+  STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+  STUDIO_CORE_BRUSH_CATALOG_ITEMS,
+  STUDIO_PRO_BRUSH_CATALOG_ITEMS,
+} from "./studio-brush-catalog";
 import { listStudioBrushTrayItems } from "./studio-creative-ux";
 import {
   LargeBrushPreview,
@@ -17,6 +21,12 @@ import {
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
 
 const catalog = new Map(listStudioBrushTrayItems("all").map((item) => [item.id, item]));
+const coreCatalogCount = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
+  (item) => item.source === "core"
+).length;
+const proceduralCatalogCount = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
+  (item) => item.source === "pro"
+).length;
 const sheetSource = readFileSync(
   resolve(process.cwd(), "src/domains/creator/StudioBrushLibrarySheet.tsx"),
   "utf8"
@@ -61,21 +71,26 @@ describe("StudioBrushLibrarySheet", () => {
 
     expect(html).toContain('data-studio-brush-catalog="built-in"');
     expect(html).toContain("앱 브러시");
-    expect(html).toContain("코어 37 + 프로시저럴 120 · 내 브러시와 별개");
+    expect(html).toContain(
+      `코어 ${coreCatalogCount} + 프로시저럴 ${proceduralCatalogCount} · 내 브러시와 별개`
+    );
     expect(html).toContain('aria-label="앱 브러시 닫기"');
     expect(html).not.toContain(">브러시 라이브러리<");
   });
 
-  it("publishes one unique 157-brush catalog while keeping the 120-profile runtime lazy", () => {
+  it(`publishes one unique ${STUDIO_ALL_BRUSH_CATALOG_ITEMS.length}-brush catalog while keeping the procedural runtime lazy`, () => {
     const coreItems = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "core");
     const proItems = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "pro");
 
-    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(174);
-    expect(coreItems).toHaveLength(54);
-    expect(proItems).toHaveLength(120);
+    expect(coreItems).toEqual(STUDIO_CORE_BRUSH_CATALOG_ITEMS);
+    expect(proItems).toEqual(STUDIO_PRO_BRUSH_CATALOG_ITEMS);
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toEqual([
+      ...STUDIO_CORE_BRUSH_CATALOG_ITEMS,
+      ...STUDIO_PRO_BRUSH_CATALOG_ITEMS,
+    ]);
     expect(new Set(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id))).toHaveProperty(
       "size",
-      174
+      STUDIO_ALL_BRUSH_CATALOG_ITEMS.length
     );
     expect(sheetSource).toContain('import("./studio-brush-pack-runtime")');
     expect(sheetSource).not.toMatch(/from\s+["']\.\/studio-brush-pack-runtime["']/);

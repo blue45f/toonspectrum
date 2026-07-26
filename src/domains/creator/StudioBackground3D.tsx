@@ -185,6 +185,11 @@ import {
   type StudioBg3dResolvedDeviceQuality,
 } from "./studio-bg3d-device-quality";
 import {
+  STUDIO_BG3D_CONTROL_BUTTON as CONTROL_BUTTON,
+  STUDIO_BG3D_ICON_BUTTON as ICON_BUTTON,
+  studioBg3dClassNames as cx,
+} from "./studio-bg3d-editor-ui";
+import {
   advanceStudioBg3dFrameQuality,
   createStudioBg3dFrameQualityState,
 } from "./studio-bg3d-frame-quality-governor";
@@ -446,6 +451,7 @@ import {
   parseStudioGeneric3dWorkflowMetadata,
 } from "./studio-generic-3d-workflow-metadata";
 import { createTwoBoneDefaultPoleTarget } from "./studio-rig-two-bone-ik";
+import { StudioBg3dLtPanel } from "./StudioBg3dLtPanel";
 import {
   StudioBg3dPhysicsPanel,
   StudioBg3dPhysicsTransport,
@@ -455,6 +461,8 @@ import { StudioBg3dRoomBuilderPanel } from "./StudioBg3dRoomBuilderPanel";
 import { StudioBg3dSceneFog } from "./StudioBg3dSceneFog";
 import { StudioBg3dScenePanorama } from "./StudioBg3dScenePanorama";
 import { StudioBg3dSceneTemplatePanel } from "./StudioBg3dSceneTemplatePanel";
+import { StudioBg3dShapesPanel } from "./StudioBg3dShapesPanel";
+import { StudioBg3dViewPanel } from "./StudioBg3dViewPanel";
 import {
   StudioGeneric3dModelModePanel,
   type StudioGeneric3dControlMode,
@@ -720,10 +728,6 @@ function loadStudioBg3dModelThumbnailRuntime(): Promise<StudioBg3dModelThumbnail
   return pending;
 }
 
-const CONTROL_BUTTON =
-  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-9";
-const ICON_BUTTON =
-  "inline-grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-9";
 const VIEWPORT_BTN =
   "grid size-11 place-items-center rounded-lg border border-line/70 bg-panel/80 text-fg-2 shadow-sm backdrop-blur transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-9";
 const DEFAULT_LT_USER_PRESET_DESCRIPTION = "현재 장면에서 저장한 LT 선화·톤 설정입니다.";
@@ -732,10 +736,6 @@ const EMPTY_THREE_JOINTS: readonly StudioBg3dThreeJointDescriptor[] = Object.fre
 const EMPTY_THREE_MORPH_TARGETS: readonly StudioBg3dThreeMorphDescriptor[] = Object.freeze([]);
 
 let fallbackLtUserPresetIdSequence = 0;
-
-function cx(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
-}
 
 function getBrowserLtPresetStorage(): StudioBg3dLtPresetStorage | null {
   if (typeof window === "undefined") return null;
@@ -1430,11 +1430,6 @@ function eulerDegreesToQuaternion(rotation: readonly [number, number, number]): 
   )).normalize();
   return [quaternion.x, quaternion.y, quaternion.z, quaternion.w];
 }
-function round(value: number, precision: number): number {
-  const factor = 10 ** precision;
-  return Math.round(value * factor) / factor;
-}
-
 async function acquireStudioBg3dCaptureAdapterAfterViewTransition(
   ...args: Parameters<StudioBg3dThreeWebglCaptureRuntime["acquireStudioBg3dCaptureAdapterAfterViewTransition"]>
 ) {
@@ -7826,6 +7821,11 @@ export function StudioBackground3D({
     }
   };
 
+  const handleStartPhysicsPreview = () => {
+    shouldTransferPhysicsFocusRef.current = true;
+    void startPhysicsPreview();
+  };
+
   const bakePhysicsPreview = () => {
     if (
       physicsPhaseRef.current !== "paused" && physicsPhaseRef.current !== "complete" &&
@@ -8845,1387 +8845,118 @@ export function StudioBackground3D({
               inert={physicsInteractionLocked}
               className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5"
             >
-              <section hidden={hideOnTab("shapes")}>
-                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
-                  <Boxes size={15} className="text-accent" aria-hidden />
-                  도형 추가
-                </h3>
-                <div className="grid grid-cols-3 gap-2">
-                  {ADD_BUTTONS.map((btn) => {
-                    const BtnIcon = btn.icon;
-                    return (
-                      <button
-                        key={btn.kind}
-                        type="button"
-                        aria-label={btn.label}
-                        className={cx(CONTROL_BUTTON, "flex-col gap-1 border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
-                        onClick={() => addPrimitive(btn.kind)}
-                      >
-                        <BtnIcon size={16} aria-hidden />
-                        <span className="text-[0.65rem]">{PRIMITIVE_DEFS[btn.kind].label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-5 border-t border-line pt-4">
-                  <h3 className="mb-2 text-sm font-bold text-fg">복합 오브젝트 추가</h3>
-                  <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
-                    건물·나무·차량·소품처럼 도형 여러 개가 조합된 배경 소재입니다. 추가 후에도 각 부품을 따로 선택해 다듬을 수 있어요.
-                  </p>
-                  <div className="mb-2.5 flex flex-wrap gap-1.5">
-                    <button
-                      type="button"
-                      className={cx(
-                        "min-h-11 rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold transition-colors sm:min-h-0",
-                        compositeCategory === null
-                          ? "border-accent/60 bg-accent-soft text-accent"
-                          : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
-                      )}
-                      onClick={() => setCompositeCategory(null)}
-                    >
-                      전체
-                    </button>
-                    {COMPOSITE_CATEGORIES.map((cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        className={cx(
-                          "min-h-11 rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold transition-colors sm:min-h-0",
-                          compositeCategory === cat
-                            ? "border-accent/60 bg-accent-soft text-accent"
-                            : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
-                        )}
-                        onClick={() => setCompositeCategory(cat)}
-                      >
-                        {COMPOSITE_CATEGORY_LABELS[cat]}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {COMPOSITE_PRESETS.filter((p) => compositeCategory === null || p.category === compositeCategory).map((preset) => (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        className={cx(
-                          CONTROL_BUTTON,
-                          "flex-col items-start gap-1 border-line bg-card px-2.5 py-2 text-left text-fg-2 hover:bg-raised hover:text-fg"
-                        )}
-                        onClick={() => addComposite(preset.id)}
-                      >
-                        <span className="flex items-center gap-1.5 text-xs font-semibold">
-                          <span className="inline-block size-2.5 rounded-full" style={{ backgroundColor: preset.parts[0]?.color }} aria-hidden />
-                          {preset.label}
-                        </span>
-                        <span className="text-[0.65rem] font-normal leading-snug text-fg-3">{preset.description}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-5 border-t border-line pt-4">
-                  <div className="mb-4 rounded-xl border border-line/80 bg-card/70 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-bold text-fg">변형 스냅</p>
-                      <button
-                        type="button"
-                        aria-pressed={snapSettings.enabled}
-                        className={cx(
-                          "inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 text-[0.68rem] font-semibold transition-colors",
-                          snapSettings.enabled
-                            ? "border-accent/55 bg-accent text-on-accent"
-                            : "border-line bg-panel text-fg-2 hover:bg-accent-soft hover:text-accent"
-                        )}
-                        onClick={() =>
-                          setSnapSettings((prev) =>
-                            normalizeStudioBg3dSnapSettings({ ...prev, enabled: !prev.enabled })
-                          )
-                        }
-                      >
-                        <Magnet size={13} aria-hidden />
-                        {snapSettings.enabled ? "켜짐" : "꺼짐"}
-                      </button>
-                    </div>
-                    <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
-                      {studioBg3dSnapSettingsSummary(snapSettings)} · 기즈모·수치 입력 모두 적용
-                    </p>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      <label className="text-[0.65rem] font-semibold text-fg-3">
-                        이동 간격
-                        <select
-                          className="mt-1 min-h-9 w-full rounded-lg border border-line bg-panel px-2 text-xs font-semibold text-fg"
-                          value={snapSettings.translateStep}
-                          disabled={!snapSettings.enabled}
-                          onChange={(e) =>
-                            setSnapSettings((prev) =>
-                              normalizeStudioBg3dSnapSettings({
-                                ...prev,
-                                translateStep: Number(e.target.value),
-                              })
-                            )
-                          }
-                        >
-                          {STUDIO_BG3D_TRANSLATE_STEP_OPTIONS.map((step) => (
-                            <option key={step} value={step}>
-                              {step}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="text-[0.65rem] font-semibold text-fg-3">
-                        회전 간격
-                        <select
-                          className="mt-1 min-h-9 w-full rounded-lg border border-line bg-panel px-2 text-xs font-semibold text-fg"
-                          value={snapSettings.rotateStepDegrees}
-                          disabled={!snapSettings.enabled}
-                          onChange={(e) =>
-                            setSnapSettings((prev) =>
-                              normalizeStudioBg3dSnapSettings({
-                                ...prev,
-                                rotateStepDegrees: Number(e.target.value),
-                              })
-                            )
-                          }
-                        >
-                          {STUDIO_BG3D_ROTATE_STEP_OPTIONS_DEG.map((step) => (
-                            <option key={step} value={step}>
-                              {step}°
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {(
-                        [
-                          { id: "xyz" as const, label: "XYZ" },
-                          { id: "xz" as const, label: "XZ(바닥)" },
-                          { id: "none" as const, label: "회전만" },
-                        ] as const
-                      ).map((axis) => (
-                        <button
-                          key={axis.id}
-                          type="button"
-                          disabled={!snapSettings.enabled}
-                          aria-pressed={snapSettings.translateAxes === axis.id}
-                          className={cx(
-                            "min-h-8 rounded-lg border px-2 text-[0.65rem] font-semibold transition-colors disabled:opacity-45",
-                            snapSettings.translateAxes === axis.id
-                              ? "border-accent/55 bg-accent-soft text-accent"
-                              : "border-line bg-panel text-fg-2 hover:bg-raised"
-                          )}
-                          onClick={() =>
-                            setSnapSettings((prev) =>
-                              normalizeStudioBg3dSnapSettings({ ...prev, translateAxes: axis.id })
-                            )
-                          }
-                        >
-                          {axis.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {selectedPrimitive ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-bold text-fg">선택한 도형</h3>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            aria-label={isBgObjectVisible(selectedPrimitive) ? "숨기기" : "보이기"}
-                            title={isBgObjectVisible(selectedPrimitive) ? "숨기기" : "보이기"}
-                            className={ICON_BUTTON}
-                            onClick={() => togglePrimitiveFlag(selectedPrimitive.id, "visible")}
-                          >
-                            {isBgObjectVisible(selectedPrimitive) ? (
-                              <Eye size={14} aria-hidden />
-                            ) : (
-                              <EyeOff size={14} aria-hidden />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            aria-label={isBgObjectLocked(selectedPrimitive) ? "잠금 해제" : "잠금"}
-                            title={isBgObjectLocked(selectedPrimitive) ? "잠금 해제" : "잠금"}
-                            className={cx(ICON_BUTTON, isBgObjectLocked(selectedPrimitive) && "border-accent/40 bg-accent-soft text-accent")}
-                            onClick={() => togglePrimitiveFlag(selectedPrimitive.id, "locked")}
-                          >
-                            {isBgObjectLocked(selectedPrimitive) ? (
-                              <Lock size={14} aria-hidden />
-                            ) : (
-                              <Unlock size={14} aria-hidden />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="바닥에 접지"
-                            title="바닥에 접지"
-                            disabled={selectedIsLocked}
-                            className={cx(ICON_BUTTON, "disabled:opacity-40")}
-                            onClick={groundSelectedEntity}
-                          >
-                            <MoveDown size={14} aria-hidden />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="원점 · 바닥 정렬"
-                            title={centerGroundSelectionDisabledReason ?? "원점 · 바닥 정렬"}
-                            disabled={Boolean(centerGroundSelectionDisabledReason)}
-                            className={cx(ICON_BUTTON, "disabled:opacity-40")}
-                            onClick={centerAndGroundSelectedEntity}
-                          >
-                            <LocateFixed size={14} aria-hidden />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="초점 맞춤"
-                            title="초점 맞춤"
-                            className={ICON_BUTTON}
-                            onClick={focusSelectedEntity}
-                          >
-                            <ScanLine size={14} aria-hidden />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="복제"
-                            title="복제"
-                            className={ICON_BUTTON}
-                            onClick={duplicateSelected}
-                          >
-                            <Copy size={14} aria-hidden />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="삭제"
-                            title="삭제 (Delete)"
-                            className={cx(ICON_BUTTON, "hover:border-accent/40 hover:bg-accent-soft hover:text-accent")}
-                            onClick={deleteSelected}
-                          >
-                            <Trash2 size={14} aria-hidden />
-                          </button>
-                        </div>
-                      </div>
-
-                      {selectedIsLocked ? (
-                        <p className="rounded-lg border border-line bg-raised/60 px-2.5 py-2 text-[0.68rem] leading-relaxed text-fg-3">
-                          잠긴 객체입니다. 위치·회전·크기를 바꾸려면 잠금을 해제하세요.
-                        </p>
-                      ) : null}
-
-                                            <div className="flex flex-col gap-1.5">
-                        <label className="flex flex-col gap-1.5 text-xs font-medium text-fg-2">부모 계층 (Parent)
-                        <select
-                          className="h-9 w-full rounded border border-line bg-card px-2 text-xs text-fg focus:border-accent"
-                          disabled={selectedIsLocked}
-                          value={selectedPrimitive.parentId || ""}
-                          onChange={(e) => {
-                            const newParentId = e.target.value || null;
-                            reparentSceneEntity(selectedPrimitive.id, newParentId);
-                          }}
-                        >
-                          <option value="">(최상위 / 없음)</option>
-                          {layerListItems.filter((item) =>
-                            canSetStudioBg3dParent(layerListItems, selectedPrimitive.id, item.id)
-                          ).map(item => (
-                            <option key={item.id} value={item.id}>
-                              {item.label}
-                            </option>
-                          ))}
-                        </select>
-                        </label>
-                      </div>
-
-                      <Vec3Field
-                        label="위치"
-                        values={selectedPrimitive.position}
-                        step={snapSettings.enabled ? snapSettings.translateStep : 0.1}
-                        precision={2}
-                        onCommit={(i, v) => {
-                          const next: [number, number, number] = [...selectedPrimitive.position];
-                          next[i] = v;
-                          updateTransform(selectedPrimitive.id, { position: next });
-                        }}
-                      />
-                      <Vec3Field
-                        label="회전"
-                        values={[radToDeg(selectedPrimitive.rotation[0]), radToDeg(selectedPrimitive.rotation[1]), radToDeg(selectedPrimitive.rotation[2])]}
-                        step={snapSettings.enabled ? snapSettings.rotateStepDegrees : 1}
-                        precision={0}
-                        suffix="°"
-                        onCommit={(i, v) => {
-                          const nextDeg: [number, number, number] = [
-                            radToDeg(selectedPrimitive.rotation[0]),
-                            radToDeg(selectedPrimitive.rotation[1]),
-                            radToDeg(selectedPrimitive.rotation[2]),
-                          ];
-                          nextDeg[i] = v;
-                          updateTransform(selectedPrimitive.id, { rotation: [degToRad(nextDeg[0]), degToRad(nextDeg[1]), degToRad(nextDeg[2])] });
-                        }}
-                      />
-                      <Vec3Field
-                        label="크기"
-                        values={selectedPrimitive.scale}
-                        step={0.1}
-                        precision={2}
-                        onCommit={(i, v) => {
-                          const next: [number, number, number] = [...selectedPrimitive.scale];
-                          next[i] = Math.max(0.01, v);
-                          updateTransform(selectedPrimitive.id, { scale: next });
-                        }}
-                      />
-
-                      <label className="flex items-center gap-2 text-xs font-medium text-fg-2">
-                        색상(셰이딩 미리보기 전용)
-                        <input
-                          type="color"
-                          value={selectedPrimitive.color}
-                          onChange={(e) => updateColor(selectedPrimitive.id, e.target.value)}
-                          className="h-11 w-11 cursor-pointer rounded border border-line bg-card sm:h-7 sm:w-10"
-                        />
-                      </label>
-                    </div>
-                  ) : selectedCustomModel ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-bold text-fg">선택한 모델</h3>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            aria-label={isBgObjectVisible(selectedCustomModel) ? "숨기기" : "보이기"}
-                            title={isBgObjectVisible(selectedCustomModel) ? "숨기기" : "보이기"}
-                            className={ICON_BUTTON}
-                            onClick={() => toggleCustomModelFlag(selectedCustomModel.id, "visible")}
-                          >
-                            {isBgObjectVisible(selectedCustomModel) ? (
-                              <Eye size={14} aria-hidden />
-                            ) : (
-                              <EyeOff size={14} aria-hidden />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            aria-label={isBgObjectLocked(selectedCustomModel) ? "잠금 해제" : "잠금"}
-                            title={isBgObjectLocked(selectedCustomModel) ? "잠금 해제" : "잠금"}
-                            className={cx(ICON_BUTTON, isBgObjectLocked(selectedCustomModel) && "border-accent/40 bg-accent-soft text-accent")}
-                            onClick={() => toggleCustomModelFlag(selectedCustomModel.id, "locked")}
-                          >
-                            {isBgObjectLocked(selectedCustomModel) ? (
-                              <Lock size={14} aria-hidden />
-                            ) : (
-                              <Unlock size={14} aria-hidden />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="바닥에 접지"
-                            title="바닥에 접지"
-                            disabled={selectedIsLocked}
-                            className={cx(ICON_BUTTON, "disabled:opacity-40")}
-                            onClick={groundSelectedEntity}
-                          >
-                            <MoveDown size={14} aria-hidden />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="배치 정리"
-                            title="자동 맞춤 후 바닥에 붙입니다 (다중 선택 지원)"
-                            disabled={!canPlaceSelectedModelRecipe}
-                            className={cx(
-                              "inline-flex min-h-11 items-center justify-center rounded-lg border border-line bg-card px-2 text-[0.65rem] font-semibold text-fg-3 transition-colors",
-                              "hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-                              "disabled:opacity-40 sm:min-h-9",
-                            )}
-                            onClick={placeSelectedModelRecipe}
-                          >
-                            배치 정리
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="원점 · 바닥 정렬"
-                            title={centerGroundSelectionDisabledReason ?? "원점 · 바닥 정렬"}
-                            disabled={Boolean(centerGroundSelectionDisabledReason)}
-                            className={cx(ICON_BUTTON, "disabled:opacity-40")}
-                            onClick={centerAndGroundSelectedEntity}
-                          >
-                            <LocateFixed size={14} aria-hidden />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="초점 맞춤"
-                            title="초점 맞춤"
-                            className={ICON_BUTTON}
-                            onClick={focusSelectedEntity}
-                          >
-                            <ScanLine size={14} aria-hidden />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="복제"
-                            title="복제"
-                            className={ICON_BUTTON}
-                            onClick={duplicateSelectedCustomModel}
-                          >
-                            <Copy size={14} aria-hidden />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="삭제"
-                            title="삭제 (Delete)"
-                            className={cx(ICON_BUTTON, "hover:border-accent/40 hover:bg-accent-soft hover:text-accent")}
-                            onClick={deleteSelectedCustomModel}
-                          >
-                            <Trash2 size={14} aria-hidden />
-                          </button>
-                        </div>
-                      </div>
-
-                      {selectedIsLocked ? (
-                        <p className="rounded-lg border border-line bg-raised/60 px-2.5 py-2 text-[0.68rem] leading-relaxed text-fg-3">
-                          잠긴 객체입니다. 위치·회전·크기를 바꾸려면 잠금을 해제하세요.
-                        </p>
-                      ) : null}
-
-                                            <div className="flex flex-col gap-1.5">
-                        <label className="flex flex-col gap-1.5 text-xs font-medium text-fg-2">부모 계층 (Parent)
-                        <select
-                          className="h-9 w-full rounded border border-line bg-card px-2 text-xs text-fg focus:border-accent"
-                          disabled={selectedIsLocked}
-                          value={selectedCustomModel.parentId || ""}
-                          onChange={(e) => {
-                            const newParentId = e.target.value || null;
-                            reparentSceneEntity(selectedCustomModel.id, newParentId);
-                          }}
-                        >
-                          <option value="">(최상위 / 없음)</option>
-                          {layerListItems.filter((item) =>
-                            canSetStudioBg3dParent(layerListItems, selectedCustomModel.id, item.id)
-                          ).map(item => (
-                            <option key={item.id} value={item.id}>
-                              {item.label}
-                            </option>
-                          ))}
-                        </select>
-                        </label>
-                      </div>
-
-                      <Vec3Field
-                        label="위치"
-                        values={selectedCustomModel.position}
-                        step={snapSettings.enabled ? snapSettings.translateStep : 0.1}
-                        precision={2}
-                        onCommit={(i, v) => {
-                          const next: [number, number, number] = [...selectedCustomModel.position];
-                          next[i] = v;
-                          updateCustomModelTransform(selectedCustomModel.id, { position: next });
-                        }}
-                      />
-                      <Vec3Field
-                        label="회전"
-                        values={[radToDeg(selectedCustomModel.rotation[0]), radToDeg(selectedCustomModel.rotation[1]), radToDeg(selectedCustomModel.rotation[2])]}
-                        step={snapSettings.enabled ? snapSettings.rotateStepDegrees : 1}
-                        precision={0}
-                        suffix="°"
-                        onCommit={(i, v) => {
-                          const nextDeg: [number, number, number] = [
-                            radToDeg(selectedCustomModel.rotation[0]),
-                            radToDeg(selectedCustomModel.rotation[1]),
-                            radToDeg(selectedCustomModel.rotation[2]),
-                          ];
-                          nextDeg[i] = v;
-                          updateCustomModelTransform(selectedCustomModel.id, { rotation: [degToRad(nextDeg[0]), degToRad(nextDeg[1]), degToRad(nextDeg[2])] });
-                        }}
-                      />
-                      <Vec3Field
-                        label="크기"
-                        values={selectedCustomModel.scale}
-                        step={0.1}
-                        precision={2}
-                        onCommit={(i, v) => {
-                          const next: [number, number, number] = [...selectedCustomModel.scale];
-                          next[i] = Math.max(0.01, v);
-                          updateCustomModelTransform(selectedCustomModel.id, { scale: next });
-                        }}
-                      />
-
-                      <div className="space-y-2 rounded-xl border border-line bg-card/55 p-2.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <label className="flex items-center gap-2 text-xs font-semibold text-fg-2">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(selectedCustomModel.materialOverride)}
-                              onChange={(event) => updateCustomModelMaterial(
-                                selectedCustomModel.id,
-                                event.target.checked ? { ...DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE } : null,
-                              )}
-                            />
-                            인스턴스 재질 편집
-                          </label>
-                          {selectedCustomModel.materialOverride ? (
-                            <button
-                              type="button"
-                              className="text-[0.68rem] font-semibold text-accent hover:underline"
-                              onClick={() => updateCustomModelMaterial(selectedCustomModel.id, null)}
-                            >
-                              원본 복원
-                            </button>
-                          ) : null}
-                        </div>
-
-                        {selectedCustomModel.materialOverride ? (
-                          <div className="space-y-2 border-t border-line/70 pt-2">
-                            <label className="grid grid-cols-[4.5rem_1fr] items-center gap-2 text-[0.68rem] text-fg-3">
-                              색상 방식
-                              <select
-                                className="h-8 rounded-lg border border-line bg-panel px-2 text-xs text-fg"
-                                value={selectedCustomModel.materialOverride.colorMode}
-                                onChange={(event) => updateCustomModelMaterial(
-                                  selectedCustomModel.id,
-                                  (current) => ({
-                                    ...current,
-                                    colorMode: event.target.value as StudioBg3dMaterialOverride["colorMode"],
-                                  }),
-                                )}
-                              >
-                                <option value="original">원본</option>
-                                <option value="multiply">곱하기</option>
-                                <option value="replace">교체</option>
-                              </select>
-                            </label>
-                            <label className="grid grid-cols-[4.5rem_2.75rem_1fr] items-center gap-2 text-[0.68rem] text-fg-3">
-                              재질 색
-                              <input
-                                type="color"
-                                className="h-8 w-11 cursor-pointer rounded border border-line bg-panel"
-                                disabled={selectedCustomModel.materialOverride.colorMode === "original"}
-                                value={selectedCustomModel.materialOverride.color}
-                                onChange={(event) => updateCustomModelMaterial(
-                                  selectedCustomModel.id,
-                                  (current) => ({ ...current, color: event.target.value }),
-                                )}
-                              />
-                              <input
-                                aria-label="재질 색상 혼합 강도"
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.01"
-                                disabled={selectedCustomModel.materialOverride.colorMode === "original"}
-                                value={selectedCustomModel.materialOverride.colorStrength}
-                                onChange={(event) => updateCustomModelMaterial(
-                                  selectedCustomModel.id,
-                                  (current) => ({ ...current, colorStrength: Number(event.target.value) }),
-                                )}
-                              />
-                            </label>
-                            <label className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-2 text-[0.68rem] text-fg-3">
-                              불투명도
-                              <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.01"
-                                value={selectedCustomModel.materialOverride.opacityMultiplier}
-                                onChange={(event) => updateCustomModelMaterial(
-                                  selectedCustomModel.id,
-                                  (current) => ({ ...current, opacityMultiplier: Number(event.target.value) }),
-                                )}
-                              />
-                              <span className="text-right tabular-nums text-fg-2">
-                                {Math.round(selectedCustomModel.materialOverride.opacityMultiplier * 100)}%
-                              </span>
-                            </label>
-                            <div className="flex flex-wrap gap-x-4 gap-y-2 text-[0.68rem] text-fg-2">
-                              <label className="flex items-center gap-1.5">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedCustomModel.materialOverride.wireframe}
-                                  onChange={(event) => updateCustomModelMaterial(
-                                    selectedCustomModel.id,
-                                    (current) => ({ ...current, wireframe: event.target.checked }),
-                                  )}
-                                />
-                                와이어프레임
-                              </label>
-                              <label className="flex items-center gap-1.5">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedCustomModel.materialOverride.doubleSided}
-                                  onChange={(event) => updateCustomModelMaterial(
-                                    selectedCustomModel.id,
-                                    (current) => ({ ...current, doubleSided: event.target.checked }),
-                                  )}
-                                />
-                                양면 렌더링
-                              </label>
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="text-[0.68rem] leading-relaxed text-fg-3">
-                            원본 재질과 텍스처는 보존한 채 이 배치에만 색·투명도·와이어 설정을 적용합니다.
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2 rounded-xl border border-line bg-card/55 p-2.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <div>
-                            <h4 className="text-xs font-semibold text-fg-2">의미 재질 분석</h4>
-                            <p className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3">
-                              재질·메시 이름을 로컬에서 분석해 캐릭터/배경 분리 패스 후보를 만듭니다.
-                            </p>
-                          </div>
-                          {selectedSemanticMaterials?.ok ? (
-                            <span className="shrink-0 rounded-full border border-line bg-panel px-2 py-1 text-[0.6rem] font-semibold tabular-nums text-fg-3">
-                              {selectedSemanticMaterials.counts.total} 재질
-                            </span>
-                          ) : null}
-                        </div>
-
-                        {selectedSemanticMaterials?.ok ? (
-                          <>
-                            <div className="grid grid-cols-2 gap-1.5 text-[0.65rem]">
-                              <div className="rounded-lg border border-line/70 bg-panel px-2 py-1.5 text-fg-3">
-                                캐릭터 후보
-                                <strong className="ml-1 text-fg">
-                                  {selectedCharacterPassPlan?.ok
-                                    ? selectedCharacterPassPlan.plan.counts.included
-                                    : 0}
-                                </strong>
-                              </div>
-                              <div className="rounded-lg border border-line/70 bg-panel px-2 py-1.5 text-fg-3">
-                                배경 후보
-                                <strong className="ml-1 text-fg">
-                                  {selectedBackgroundPassPlan?.ok
-                                    ? selectedBackgroundPassPlan.plan.counts.included
-                                    : 0}
-                                </strong>
-                              </div>
-                            </div>
-                            {selectedSemanticAssignments.length > 0 ? (
-                              <ul
-                                aria-label="의미 재질 자동 분류"
-                                className="max-h-40 space-y-1 overflow-y-auto overscroll-contain pr-1"
-                              >
-                                {selectedSemanticAssignments.slice(0, 24).map((assignment, index) => (
-                                  <li
-                                    key={assignment.materialKey}
-                                    className="flex items-center gap-2 rounded-lg border border-line/60 bg-panel px-2 py-1.5 text-[0.65rem]"
-                                  >
-                                    <span className="w-12 shrink-0 truncate text-fg-3">
-                                      재질 {index + 1}
-                                    </span>
-                                    <span className="min-w-0 flex-1 truncate font-semibold text-fg-2">
-                                      {SEMANTIC_MATERIAL_SLOT_LABELS[assignment.slot]}
-                                    </span>
-                                    <span className={cx(
-                                      "shrink-0 rounded-full px-1.5 py-0.5 text-[0.56rem] font-bold",
-                                      assignment.confidence === "high" || assignment.confidence === "medium"
-                                        ? "bg-accent-soft text-accent"
-                                        : "bg-raised text-fg-3",
-                                    )}>
-                                      {SEMANTIC_MATERIAL_CONFIDENCE_LABELS[assignment.confidence]}
-                                    </span>
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <p className="rounded-lg border border-dashed border-line px-2 py-2 text-[0.65rem] text-fg-3">
-                                이 모델에는 분류할 렌더 재질이 없습니다.
-                              </p>
-                            )}
-                            {selectedSemanticAssignments.length > 24 ? (
-                              <p className="text-[0.62rem] text-fg-3">
-                                성능을 위해 앞의 24개만 표시합니다. 전체 {selectedSemanticAssignments.length}개는 패스 계획에 반영됩니다.
-                              </p>
-                            ) : null}
-                            <p className="text-[0.62rem] leading-relaxed text-fg-3">
-                              자동 제안은 원본 모델이나 장면 문서에 덮어쓰지 않습니다. 낮은 신뢰도의 재질은 분리 출력 전에 사용자 검토 대상으로 유지됩니다.
-                            </p>
-                          </>
-                        ) : selectedSemanticMaterials ? (
-                          <p className="rounded-lg border border-dashed border-line px-2 py-2 text-[0.65rem] leading-relaxed text-fg-3">
-                            안전한 이름·개수 예산 안에서 재질을 분석할 수 없어 자동 분류를 건너뛰었습니다.
-                          </p>
-                        ) : (
-                          <p className="rounded-lg border border-dashed border-line px-2 py-2 text-[0.65rem] leading-relaxed text-fg-3">
-                            모델 렌더 준비가 끝나면 의미 재질 분석 결과가 표시됩니다.
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2 rounded-xl border border-line bg-card/55 p-2.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <label className="flex min-h-11 items-center gap-2 text-xs font-semibold text-fg-2 sm:min-h-8 pointer-coarse:min-h-11">
-                            <input
-                              type="checkbox"
-                              disabled={selectedModelJoints.length === 0}
-                              checked={Boolean(selectedCustomModel.constraints)}
-                              onChange={(event) => updateCustomModelConstraints(
-                                selectedCustomModel.id,
-                                event.target.checked ? { ...DEFAULT_STUDIO_BG3D_CONSTRAINT_LAYER } : null,
-                              )}
-                            />
-                            리그 제약
-                          </label>
-                          <span className="text-[0.68rem] tabular-nums text-fg-3">
-                            {selectedAimConstraints.length} 에임 · {selectedTwoBoneIkConstraints.length} IK
-                          </span>
-                        </div>
-
-                        {selectedCustomModel.constraints && selectedModelJoints.length > 0 ? (
-                          <div className="space-y-2 border-t border-line/70 pt-2">
-                            <div className="grid grid-cols-[1fr_auto] gap-2">
-                              <select
-                                aria-label="에임 조인트"
-                                className="h-11 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg sm:h-8 pointer-coarse:h-11"
-                                value={selectedPoseJointKey}
-                                onChange={(event) => setPoseJointSelection({
-                                  modelId: selectedCustomModel.id,
-                                  key: event.target.value,
-                                })}
-                              >
-                                {selectedModelJoints.map((joint) => (
-                                  <option key={joint.key} value={joint.key}>
-                                    {joint.name} · S{joint.skinIndex + 1}/J{joint.jointIndex + 1}
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                type="button"
-                                className="h-11 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-50 sm:h-8 pointer-coarse:h-11"
-                                disabled={!selectedAimConstraint}
-                                onClick={() => commitSelectedAimConstraint(null)}
-                              >
-                                에임 해제
-                              </button>
-                            </div>
-                            <Vec3Field
-                              label="모델 로컬 타깃"
-                              values={[...(selectedAimConstraint?.target ?? [0, 1, 1])]}
-                              step={0.1}
-                              precision={2}
-                              disabled={selectedAimSuppressedByIk}
-                              touchFriendly
-                              onCommit={(axis, value) => {
-                                const target: [number, number, number] = [
-                                  ...(selectedAimConstraint?.target ?? [0, 1, 1]),
-                                ];
-                                target[axis] = Math.max(-10_000, Math.min(10_000, value));
-                                commitSelectedAimConstraint({
-                                  target,
-                                  axis: selectedAimConstraint?.axis ?? "+z",
-                                  weight: selectedAimConstraint?.weight ?? 1,
-                                });
-                              }}
-                            />
-                            <div className="grid grid-cols-2 gap-2">
-                              <label className="space-y-1 text-[0.68rem] text-fg-3">
-                                향할 로컬 축
-                                <select
-                                  className="h-11 w-full rounded-lg border border-line bg-panel px-2 text-xs text-fg sm:h-8 pointer-coarse:h-11"
-                                  disabled={selectedAimSuppressedByIk}
-                                  value={selectedAimConstraint?.axis ?? "+z"}
-                                  onChange={(event) => commitSelectedAimConstraint({
-                                    target: [...(selectedAimConstraint?.target ?? [0, 1, 1])],
-                                    axis: event.target.value as "+x" | "-x" | "+y" | "-y" | "+z" | "-z",
-                                    weight: selectedAimConstraint?.weight ?? 1,
-                                  })}
-                                >
-                                  <option value="+x">+X</option><option value="-x">−X</option>
-                                  <option value="+y">+Y</option><option value="-y">−Y</option>
-                                  <option value="+z">+Z</option><option value="-z">−Z</option>
-                                </select>
-                              </label>
-                              <label className="space-y-1 text-[0.68rem] text-fg-3">
-                                강도 · {Math.round((selectedAimConstraint?.weight ?? 1) * 100)}%
-                                <input
-                                  className="block h-11 w-full sm:h-8 pointer-coarse:h-11"
-                                  type="range"
-                                  disabled={selectedAimSuppressedByIk}
-                                  min="0"
-                                  max="1"
-                                  step="0.01"
-                                  value={selectedAimConstraint?.weight ?? 1}
-                                  onChange={(event) => commitSelectedAimConstraint({
-                                    target: [...(selectedAimConstraint?.target ?? [0, 1, 1])],
-                                    axis: selectedAimConstraint?.axis ?? "+z",
-                                    weight: Number(event.target.value),
-                                  })}
-                                />
-                              </label>
-                            </div>
-                            {selectedAimSuppressedByIk ? (
-                              <p className="rounded-lg border border-warning/30 bg-warning/10 px-2 py-1.5 text-[0.64rem] leading-relaxed text-warning">
-                                이 조인트의 에임은 손·발 타깃을 보존하기 위해 활성 IK 뒤에서 자동 중지됩니다. 에임을 사용하려면 겹치는 IK를 먼저 해제해 주세요.
-                              </p>
-                            ) : null}
-                            <div className="space-y-2 border-t border-line/70 pt-2">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-[0.68rem] font-semibold text-fg-2">
-                                  2본 IK · 손/발 위치
-                                </span>
-                                <span className="text-[0.64rem] text-fg-3">
-                                  팔꿈치·무릎 자동 계산
-                                </span>
-                              </div>
-                              {selectedIkEndCandidates.length > 0 ? (
-                                <>
-                                  <div className="grid grid-cols-[1fr_auto] gap-2">
-                                    <select
-                                      aria-label="IK 끝 조인트"
-                                      className="h-11 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg sm:h-8 pointer-coarse:h-11"
-                                      value={selectedIkEndJointKey}
-                                      onChange={(event) => setIkEndJointSelection({
-                                        modelId: selectedCustomModel.id,
-                                        jointKey: event.target.value,
-                                      })}
-                                    >
-                                      {selectedIkEndCandidates.map((joint) => (
-                                        <option key={joint.key} value={joint.key}>
-                                          {joint.name} · S{joint.skinIndex + 1}/J{joint.jointIndex + 1}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <button
-                                      type="button"
-                                      className="h-11 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-50 sm:h-8 pointer-coarse:h-11"
-                                      disabled={
-                                        !selectedIkUpperJoint || !selectedIkMiddleJoint || !selectedIkEndJoint ||
-                                        (!selectedTwoBoneIkConstraint && (
-                                          selectedIkLimitReached || selectedIkHasOverlap ||
-                                          !selectedIkTransformSupported
-                                        ))
-                                      }
-                                      onClick={() => {
-                                        if (selectedTwoBoneIkConstraint) {
-                                          commitSelectedTwoBoneIkConstraint(null);
-                                          return;
-                                        }
-                                        if (!selectedIkUpperJoint || !selectedIkMiddleJoint) return;
-                                        commitSelectedTwoBoneIkConstraint({
-                                          upperJointKey: selectedIkUpperJoint.key,
-                                          middleJointKey: selectedIkMiddleJoint.key,
-                                          target: [...selectedIkDefaultTarget],
-                                          poleTarget: [...selectedIkDefaultPole],
-                                          weight: 1,
-                                        });
-                                      }}
-                                    >
-                                      {selectedTwoBoneIkConstraint ? "IK 해제" : "IK 적용"}
-                                    </button>
-                                  </div>
-                                  <p className="text-[0.64rem] leading-relaxed text-fg-3">
-                                    {selectedIkUpperJoint?.name ?? "상위"} →{
-                                      selectedIkMiddleJoint?.name ?? "중간"
-                                    } → {selectedIkEndJoint?.name ?? "끝"}
-                                  </p>
-                                  {!selectedIkTransformSupported ? (
-                                    <p className="rounded-lg border border-warning/30 bg-warning/10 px-2 py-1.5 text-[0.64rem] leading-relaxed text-warning">
-                                      현재 부모·모델·관절의 월드 변환에 비균일 크기, 반전 또는 전단이 있어 IK가 일시 중지됩니다. 계층 전체를 균일 크기로 맞춰 주세요.
-                                    </p>
-                                  ) : selectedIkHasOverlap ? (
-                                    <p className="rounded-lg border border-warning/30 bg-warning/10 px-2 py-1.5 text-[0.64rem] leading-relaxed text-warning">
-                                      다른 IK와 조인트를 공유하는 체인은 동시에 적용할 수 없습니다.
-                                    </p>
-                                  ) : selectedIkLimitReached && !selectedTwoBoneIkConstraint ? (
-                                    <p className="rounded-lg border border-warning/30 bg-warning/10 px-2 py-1.5 text-[0.64rem] leading-relaxed text-warning">
-                                      모델당 IK는 최대 {STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS}개까지 저장할 수 있습니다.
-                                    </p>
-                                  ) : null}
-                                  <Vec3Field
-                                    label="끝 위치 타깃"
-                                    values={[
-                                      ...(selectedTwoBoneIkConstraint?.target ?? selectedIkDefaultTarget),
-                                    ]}
-                                    step={0.05}
-                                    precision={2}
-                                    disabled={!selectedTwoBoneIkConstraint}
-                                    touchFriendly
-                                    onCommit={(axis, value) => {
-                                      if (!selectedTwoBoneIkConstraint) return;
-                                      const target: [number, number, number] = [
-                                        ...selectedTwoBoneIkConstraint.target,
-                                      ];
-                                      target[axis] = Math.max(-10_000, Math.min(10_000, value));
-                                      commitSelectedTwoBoneIkConstraint({
-                                        upperJointKey: selectedTwoBoneIkConstraint.upperJointKey,
-                                        middleJointKey: selectedTwoBoneIkConstraint.middleJointKey,
-                                        target,
-                                        poleTarget: [...selectedTwoBoneIkConstraint.poleTarget],
-                                        weight: selectedTwoBoneIkConstraint.weight,
-                                      });
-                                    }}
-                                  />
-                                  <Vec3Field
-                                    label="굽힘 폴 타깃"
-                                    values={[
-                                      ...(selectedTwoBoneIkConstraint?.poleTarget ?? selectedIkDefaultPole),
-                                    ]}
-                                    step={0.05}
-                                    precision={2}
-                                    disabled={!selectedTwoBoneIkConstraint}
-                                    touchFriendly
-                                    onCommit={(axis, value) => {
-                                      if (!selectedTwoBoneIkConstraint) return;
-                                      const poleTarget: [number, number, number] = [
-                                        ...selectedTwoBoneIkConstraint.poleTarget,
-                                      ];
-                                      poleTarget[axis] = Math.max(-10_000, Math.min(10_000, value));
-                                      commitSelectedTwoBoneIkConstraint({
-                                        upperJointKey: selectedTwoBoneIkConstraint.upperJointKey,
-                                        middleJointKey: selectedTwoBoneIkConstraint.middleJointKey,
-                                        target: [...selectedTwoBoneIkConstraint.target],
-                                        poleTarget,
-                                        weight: selectedTwoBoneIkConstraint.weight,
-                                      });
-                                    }}
-                                  />
-                                  <label className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-2 text-[0.68rem] text-fg-3">
-                                    IK 강도
-                                    <input
-                                      className="h-11 w-full sm:h-8 pointer-coarse:h-11"
-                                      type="range"
-                                      min="0"
-                                      max="1"
-                                      step="0.01"
-                                      disabled={!selectedTwoBoneIkConstraint}
-                                      value={selectedTwoBoneIkConstraint?.weight ?? 1}
-                                      onChange={(event) => {
-                                        if (!selectedTwoBoneIkConstraint) return;
-                                        commitSelectedTwoBoneIkConstraint({
-                                          upperJointKey: selectedTwoBoneIkConstraint.upperJointKey,
-                                          middleJointKey: selectedTwoBoneIkConstraint.middleJointKey,
-                                          target: [...selectedTwoBoneIkConstraint.target],
-                                          poleTarget: [...selectedTwoBoneIkConstraint.poleTarget],
-                                          weight: Number(event.target.value),
-                                        });
-                                      }}
-                                    />
-                                    <span className="text-right tabular-nums text-fg-2">
-                                      {Math.round((selectedTwoBoneIkConstraint?.weight ?? 1) * 100)}%
-                                    </span>
-                                  </label>
-                                </>
-                              ) : (
-                                <p className="text-[0.66rem] leading-relaxed text-fg-3">
-                                  같은 스킨에서 부모 → 중간 → 끝으로 이어지는 3개 조인트 체인이 없습니다.
-                                </p>
-                              )}
-                            </div>
-                            <label className="flex min-h-11 items-center gap-1.5 text-[0.68rem] text-fg-2 sm:min-h-8 pointer-coarse:min-h-11">
-                              <input
-                                type="checkbox"
-                                checked={selectedCustomModel.constraints.enabled}
-                                onChange={(event) => updateCustomModelConstraints(
-                                  selectedCustomModel.id,
-                                  (current) => ({ ...current, enabled: event.target.checked }),
-                                )}
-                              />
-                              애니메이션·포즈 뒤에 제약 적용
-                            </label>
-                            <button
-                              type="button"
-                              aria-describedby={
-                                selectedRigBakeDisabledReason
-                                  ? "bg3d-rig-bake-disabled-reason"
-                                  : "bg3d-rig-bake-description"
-                              }
-                              className="min-h-11 w-full rounded-lg border border-accent/35 bg-accent-soft px-3 text-[0.7rem] font-semibold text-accent hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9 pointer-coarse:min-h-11"
-                              disabled={selectedRigBakeDisabledReason !== null}
-                              onClick={() => bakeCustomModelRigConstraints(selectedCustomModel.id)}
-                            >
-                              현재 IK·에임을 포즈로 굽기
-                            </button>
-                            {selectedRigBakeDisabledReason ? (
-                              <p
-                                id="bg3d-rig-bake-disabled-reason"
-                                className="rounded-lg border border-warning/30 bg-warning/10 px-2 py-1.5 text-[0.64rem] leading-relaxed text-warning"
-                              >
-                                {selectedRigBakeDisabledReason}
-                              </p>
-                            ) : null}
-                            <p id="bg3d-rig-bake-description" className="text-[0.64rem] leading-relaxed text-fg-3">
-                              지금 보이는 한 프레임을 weight 1 포즈로 고정하고 모든 리그 제약을 제거합니다.
-                              애니메이션은 비본 트랙을 보존한 채 현재 시각에서 일시정지되며, 3D 실행 취소로
-                              원래 포즈와 제약을 되돌릴 수 있습니다.
-                            </p>
-                            <p className="text-[0.66rem] leading-relaxed text-fg-3">
-                              에임은 눈·머리·무기 방향을, 2본 IK는 손·발 위치와 굽힘 평면을 비파괴
-                              혼합합니다. 원본 스켈레톤과 애니메이션 키는 수정하지 않습니다.
-                            </p>
-                          </div>
-                        ) : (
-                          <p className="text-[0.68rem] leading-relaxed text-fg-3">
-                            모델에 스킨 조인트가 있으면 시선·머리 에임과 손·발 2본 IK를 추가할 수 있습니다.
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2 rounded-xl border border-line bg-card/55 p-2.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <label className="flex items-center gap-2 text-xs font-semibold text-fg-2">
-                            <input
-                              type="checkbox"
-                              disabled={selectedModelAnimations.length === 0}
-                              checked={Boolean(selectedCustomModel.animation)}
-                              onChange={(event) => updateCustomModelAnimation(
-                                selectedCustomModel.id,
-                                event.target.checked ? { ...DEFAULT_STUDIO_BG3D_ANIMATION_PLAYBACK } : null,
-                              )}
-                            />
-                            모델 애니메이션
-                          </label>
-                          <span className="text-[0.68rem] tabular-nums text-fg-3">
-                            {selectedModelAnimations.length}개 클립
-                          </span>
-                        </div>
-
-                        {selectedCustomModel.animation && selectedAnimationClip ? (
-                          <div className="space-y-2 border-t border-line/70 pt-2">
-                            <label className="grid grid-cols-[4.5rem_1fr] items-center gap-2 text-[0.68rem] text-fg-3">
-                              클립
-                              <select
-                                className="h-8 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg"
-                                value={Math.min(
-                                  selectedCustomModel.animation.clipIndex,
-                                  Math.max(0, selectedModelAnimations.length - 1),
-                                )}
-                                onChange={(event) => updateCustomModelAnimation(
-                                  selectedCustomModel.id,
-                                  (current) => ({
-                                    ...current,
-                                    clipIndex: Number(event.target.value),
-                                    timeSeconds: 0,
-                                  }),
-                                )}
-                              >
-                                {selectedModelAnimations.map((clip, index) => (
-                                  <option key={`${index}-${clip.uuid}`} value={index}>
-                                    {(clip.name || `클립 ${index + 1}`).slice(0, 80)} · {clip.duration.toFixed(2)}s
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <div className="grid grid-cols-[4.5rem_1fr] items-center gap-2">
-                              <button
-                                type="button"
-                                className="h-11 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised sm:h-8 pointer-coarse:h-11"
-                                onClick={() => updateCustomModelAnimation(
-                                  selectedCustomModel.id,
-                                  (current) => ({ ...current, playing: !current.playing }),
-                                )}
-                              >
-                                {selectedCustomModel.animation.playing ? "일시정지" : "재생"}
-                              </button>
-                              <BgAnimationPlayhead
-                                active={open && activePanelTab === "models"}
-                                modelId={selectedCustomModel.id}
-                                playback={selectedCustomModel.animation}
-                                durationSeconds={selectedAnimationDuration}
-                                readLiveTime={() => modelAnimationTimeReadersRef.current.get(
-                                  selectedCustomModel.id,
-                                )?.()}
-                                onCommit={(timeSeconds) => updateCustomModelAnimation(
-                                  selectedCustomModel.id,
-                                  (current) => ({ ...current, timeSeconds }),
-                                )}
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <label className="space-y-1 text-[0.68rem] text-fg-3">
-                                반복
-                                <select
-                                  className="h-8 w-full rounded-lg border border-line bg-panel px-2 text-xs text-fg"
-                                  value={selectedCustomModel.animation.loop}
-                                  onChange={(event) => updateCustomModelAnimation(
-                                    selectedCustomModel.id,
-                                    (current) => ({
-                                      ...current,
-                                      loop: event.target.value as StudioBg3dAnimationPlayback["loop"],
-                                    }),
-                                  )}
-                                >
-                                  <option value="once">한 번</option>
-                                  <option value="repeat">반복</option>
-                                  <option value="ping-pong">왕복</option>
-                                </select>
-                              </label>
-                              <label className="space-y-1 text-[0.68rem] text-fg-3">
-                                속도 · {selectedCustomModel.animation.timeScale.toFixed(1)}×
-                                <input
-                                  className="block h-8 w-full"
-                                  type="range"
-                                  min="-2"
-                                  max="2"
-                                  step="0.1"
-                                  value={selectedCustomModel.animation.timeScale}
-                                  onChange={(event) => updateCustomModelAnimation(
-                                    selectedCustomModel.id,
-                                    (current) => ({ ...current, timeScale: Number(event.target.value) }),
-                                  )}
-                                />
-                              </label>
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="text-[0.68rem] leading-relaxed text-fg-3">
-                            {selectedModelAnimations.length > 0
-                              ? "활성화하면 클립 선택·재생·스크럽·반복·역재생 속도를 이 배치에 저장합니다."
-                              : "이 모델에는 재생 가능한 glTF 애니메이션 클립이 없습니다."}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2 rounded-xl border border-line bg-card/55 p-2.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <label className="flex items-center gap-2 text-xs font-semibold text-fg-2">
-                            <input
-                              type="checkbox"
-                              disabled={selectedModelJoints.length === 0}
-                              checked={Boolean(selectedCustomModel.pose)}
-                              onChange={(event) => updateCustomModelPose(
-                                selectedCustomModel.id,
-                                event.target.checked ? { ...DEFAULT_STUDIO_BG3D_POSE_LAYER } : null,
-                              )}
-                            />
-                            비파괴 포즈 레이어
-                          </label>
-                          <span className="text-[0.68rem] tabular-nums text-fg-3">
-                            {selectedModelJoints.length}개 조인트
-                          </span>
-                        </div>
-
-                        {selectedCustomModel.pose && selectedModelJoints.length > 0 ? (
-                          <div className="space-y-2 border-t border-line/70 pt-2">
-                            <div className="grid grid-cols-[1fr_auto] gap-2">
-                              <select
-                                aria-label="포즈 조인트"
-                                className="h-11 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg sm:h-8 pointer-coarse:h-11"
-                                value={selectedPoseJointKey}
-                                onChange={(event) => setPoseJointSelection({
-                                  modelId: selectedCustomModel.id,
-                                  key: event.target.value,
-                                })}
-                              >
-                                {selectedModelJoints.map((joint) => (
-                                  <option key={joint.key} value={joint.key}>
-                                    {joint.name} · S{joint.skinIndex + 1}/J{joint.jointIndex + 1}
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                type="button"
-                                className="h-11 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-50 sm:h-8 pointer-coarse:h-11"
-                                disabled={!selectedPoseJoint}
-                                onClick={() => commitSelectedPoseOverride(null)}
-                              >
-                                조인트 초기화
-                              </button>
-                            </div>
-                            <Vec3Field
-                              label="회전 오프셋"
-                              values={selectedPoseEulerDegrees}
-                              step={1}
-                              precision={1}
-                              suffix="°"
-                              onCommit={(axis, value) => {
-                                const nextEuler: [number, number, number] = [...selectedPoseEulerDegrees];
-                                nextEuler[axis] = Math.max(-180, Math.min(180, value));
-                                const rotationOffset = eulerDegreesToQuaternion(nextEuler);
-                                commitSelectedPoseOverride({ rotationOffset });
-                              }}
-                            />
-                            <label className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-2 text-[0.68rem] text-fg-3">
-                              강도
-                              <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.01"
-                                value={selectedCustomModel.pose.weight}
-                                onChange={(event) => updateCustomModelPose(
-                                  selectedCustomModel.id,
-                                  (current) => ({ ...current, weight: Number(event.target.value) }),
-                                )}
-                              />
-                              <span className="text-right tabular-nums text-fg-2">
-                                {Math.round(selectedCustomModel.pose.weight * 100)}%
-                              </span>
-                            </label>
-                            <div className="flex items-center justify-between gap-2">
-                              <label className="flex items-center gap-1.5 text-[0.68rem] text-fg-2">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedCustomModel.pose.enabled}
-                                  onChange={(event) => updateCustomModelPose(
-                                    selectedCustomModel.id,
-                                    (current) => ({ ...current, enabled: event.target.checked }),
-                                  )}
-                                />
-                                레이어 적용
-                              </label>
-                              <button
-                                type="button"
-                                className="text-[0.68rem] font-semibold text-accent hover:underline"
-                                onClick={() => updateCustomModelPose(
-                                  selectedCustomModel.id,
-                                  { ...DEFAULT_STUDIO_BG3D_POSE_LAYER },
-                                )}
-                              >
-                                전체 포즈 초기화
-                              </button>
-                            </div>
-                            <p className="text-[0.66rem] leading-relaxed text-fg-3">
-                              애니메이션 또는 원본 휴지 자세를 먼저 계산한 뒤 로컬 회전 오프셋을 더합니다.
-                              원본 리깅과 클립은 변경하지 않습니다.
-                            </p>
-                          </div>
-                        ) : (
-                          <p className="text-[0.68rem] leading-relaxed text-fg-3">
-                            {selectedModelJoints.length > 0
-                              ? "활성화하면 본별 회전 오프셋과 혼합 강도를 이 배치에 저장합니다."
-                              : "이 모델에는 편집 가능한 스킨 조인트가 없습니다."}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2 rounded-xl border border-line bg-card/55 p-2.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <label className="flex items-center gap-2 text-xs font-semibold text-fg-2">
-                            <input
-                              type="checkbox"
-                              disabled={selectedModelMorphTargets.length === 0}
-                              checked={Boolean(selectedCustomModel.morph)}
-                              onChange={(event) => updateCustomModelMorph(
-                                selectedCustomModel.id,
-                                event.target.checked ? { ...DEFAULT_STUDIO_BG3D_MORPH_LAYER } : null,
-                              )}
-                            />
-                            표정·모프 레이어
-                          </label>
-                          <span className="text-[0.68rem] tabular-nums text-fg-3">
-                            {selectedModelMorphTargets.length}개 타깃
-                          </span>
-                        </div>
-
-                        {selectedCustomModel.morph && selectedModelMorphTargets.length > 0 ? (
-                          <div className="space-y-2 border-t border-line/70 pt-2">
-                            <div className="grid grid-cols-[1fr_auto] gap-2">
-                              <select
-                                aria-label="모프 타깃"
-                                className="h-8 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg"
-                                value={selectedMorphTargetKey}
-                                onChange={(event) => setMorphTargetSelection({
-                                  modelId: selectedCustomModel.id,
-                                  key: event.target.value,
-                                })}
-                              >
-                                {selectedModelMorphTargets.map((target) => (
-                                  <option key={target.key} value={target.key}>
-                                    {target.name} · M{target.meshIndex + 1}/T{target.targetIndex + 1}
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                type="button"
-                                className="h-8 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-50"
-                                disabled={!selectedMorphOverride}
-                                onClick={() => updateCustomModelMorph(
-                                  selectedCustomModel.id,
-                                  (current) => ({
-                                    ...current,
-                                    targets: current.targets.filter((target) => target.targetKey !== selectedMorphTargetKey),
-                                  }),
-                                )}
-                              >
-                                타깃 초기화
-                              </button>
-                            </div>
-                            <label className="grid grid-cols-[4.5rem_1fr_3rem] items-center gap-2 text-[0.68rem] text-fg-3">
-                              오프셋
-                              <input
-                                type="range"
-                                min="-1"
-                                max="1"
-                                step="0.01"
-                                value={selectedMorphOverride?.weightOffset ?? 0}
-                                onChange={(event) => updateCustomModelMorph(
-                                  selectedCustomModel.id,
-                                  (current) => ({
-                                    ...current,
-                                    targets: [
-                                      ...current.targets.filter((target) => target.targetKey !== selectedMorphTargetKey),
-                                      {
-                                        targetKey: selectedMorphTargetKey,
-                                        weightOffset: Number(event.target.value),
-                                      },
-                                    ],
-                                  }),
-                                )}
-                              />
-                              <span className="text-right tabular-nums text-fg-2">
-                                {(selectedMorphOverride?.weightOffset ?? 0).toFixed(2)}
-                              </span>
-                            </label>
-                            <label className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-2 text-[0.68rem] text-fg-3">
-                              전체 강도
-                              <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.01"
-                                value={selectedCustomModel.morph.weight}
-                                onChange={(event) => updateCustomModelMorph(
-                                  selectedCustomModel.id,
-                                  (current) => ({ ...current, weight: Number(event.target.value) }),
-                                )}
-                              />
-                              <span className="text-right tabular-nums text-fg-2">
-                                {Math.round(selectedCustomModel.morph.weight * 100)}%
-                              </span>
-                            </label>
-                            <div className="flex items-center justify-between gap-2">
-                              <label className="flex items-center gap-1.5 text-[0.68rem] text-fg-2">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedCustomModel.morph.enabled}
-                                  onChange={(event) => updateCustomModelMorph(
-                                    selectedCustomModel.id,
-                                    (current) => ({ ...current, enabled: event.target.checked }),
-                                  )}
-                                />
-                                레이어 적용
-                              </label>
-                              <button
-                                type="button"
-                                className="text-[0.68rem] font-semibold text-accent hover:underline"
-                                onClick={() => updateCustomModelMorph(
-                                  selectedCustomModel.id,
-                                  { ...DEFAULT_STUDIO_BG3D_MORPH_LAYER },
-                                )}
-                              >
-                                전체 모프 초기화
-                              </button>
-                            </div>
-                            <p className="text-[0.66rem] leading-relaxed text-fg-3">
-                              애니메이션이 만든 모프 값에 오프셋을 더하고 0–1 범위로 제한합니다.
-                            </p>
-                          </div>
-                        ) : (
-                          <p className="text-[0.68rem] leading-relaxed text-fg-3">
-                            {selectedModelMorphTargets.length > 0
-                              ? "활성화하면 표정·립싱크·변형 타깃을 배치별로 조절할 수 있습니다."
-                              : "이 모델에는 편집 가능한 모프 타깃이 없습니다."}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs leading-relaxed text-fg-3">도형이나 모델을 추가하거나 뷰포트·레이어 목록에서 선택하면 여기서 위치·회전·크기를 정확한 수치로 조정할 수 있습니다.</p>
-                  )}
-                </div>
-              </section>
+<StudioBg3dShapesPanel
+                hidden={hideOnTab("shapes")}
+                context={{
+                  Boxes,
+                  ADD_BUTTONS,
+                  addPrimitive,
+                  PRIMITIVE_DEFS,
+                  compositeCategory,
+                  setCompositeCategory,
+                  COMPOSITE_CATEGORIES,
+                  COMPOSITE_CATEGORY_LABELS,
+                  COMPOSITE_PRESETS,
+                  addComposite,
+                  snapSettings,
+                  setSnapSettings,
+                  normalizeStudioBg3dSnapSettings,
+                  Magnet,
+                  studioBg3dSnapSettingsSummary,
+                  STUDIO_BG3D_TRANSLATE_STEP_OPTIONS,
+                  STUDIO_BG3D_ROTATE_STEP_OPTIONS_DEG,
+                  selectedPrimitive,
+                  isBgObjectVisible,
+                  togglePrimitiveFlag,
+                  Eye,
+                  EyeOff,
+                  isBgObjectLocked,
+                  Lock,
+                  Unlock,
+                  selectedIsLocked,
+                  groundSelectedEntity,
+                  MoveDown,
+                  centerGroundSelectionDisabledReason,
+                  centerAndGroundSelectedEntity,
+                  LocateFixed,
+                  focusSelectedEntity,
+                  ScanLine,
+                  duplicateSelected,
+                  Copy,
+                  deleteSelected,
+                  Trash2,
+                  reparentSceneEntity,
+                  layerListItems,
+                  canSetStudioBg3dParent,
+                  Vec3Field,
+                  updateTransform,
+                  radToDeg,
+                  degToRad,
+                  updateColor,
+                  selectedCustomModel,
+                  toggleCustomModelFlag,
+                  canPlaceSelectedModelRecipe,
+                  placeSelectedModelRecipe,
+                  duplicateSelectedCustomModel,
+                  deleteSelectedCustomModel,
+                  updateCustomModelTransform,
+                  updateCustomModelMaterial,
+                  DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE,
+                  selectedSemanticMaterials,
+                  selectedCharacterPassPlan,
+                  selectedBackgroundPassPlan,
+                  selectedSemanticAssignments,
+                  SEMANTIC_MATERIAL_SLOT_LABELS,
+                  SEMANTIC_MATERIAL_CONFIDENCE_LABELS,
+                  selectedModelJoints,
+                  updateCustomModelConstraints,
+                  DEFAULT_STUDIO_BG3D_CONSTRAINT_LAYER,
+                  selectedAimConstraints,
+                  selectedTwoBoneIkConstraints,
+                  selectedPoseJointKey,
+                  setPoseJointSelection,
+                  selectedAimConstraint,
+                  commitSelectedAimConstraint,
+                  selectedAimSuppressedByIk,
+                  selectedIkEndCandidates,
+                  selectedIkEndJointKey,
+                  setIkEndJointSelection,
+                  selectedIkUpperJoint,
+                  selectedIkMiddleJoint,
+                  selectedIkEndJoint,
+                  selectedTwoBoneIkConstraint,
+                  selectedIkLimitReached,
+                  selectedIkHasOverlap,
+                  selectedIkTransformSupported,
+                  commitSelectedTwoBoneIkConstraint,
+                  selectedIkDefaultTarget,
+                  selectedIkDefaultPole,
+                  STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS,
+                  selectedRigBakeDisabledReason,
+                  bakeCustomModelRigConstraints,
+                  selectedModelAnimations,
+                  updateCustomModelAnimation,
+                  DEFAULT_STUDIO_BG3D_ANIMATION_PLAYBACK,
+                  selectedAnimationClip,
+                  BgAnimationPlayhead,
+                  open,
+                  activePanelTab,
+                  selectedAnimationDuration,
+                  modelAnimationTimeReadersRef,
+                  updateCustomModelPose,
+                  DEFAULT_STUDIO_BG3D_POSE_LAYER,
+                  selectedPoseJoint,
+                  commitSelectedPoseOverride,
+                  selectedPoseEulerDegrees,
+                  eulerDegreesToQuaternion,
+                  selectedModelMorphTargets,
+                  updateCustomModelMorph,
+                  DEFAULT_STUDIO_BG3D_MORPH_LAYER,
+                  selectedMorphTargetKey,
+                  setMorphTargetSelection,
+                  selectedMorphOverride,
+                }}
+              />
 
               <section hidden={hideOnTab("templates")}>
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
@@ -10432,1628 +9163,177 @@ export function StudioBackground3D({
                 )}
               </section>
 
-              <section hidden={hideOnTab("view")}>
-                <div
-                  role="tablist"
-                  aria-label="보기 도구"
-                  className="mb-4 grid grid-cols-2 gap-1 rounded-xl border border-line bg-card/70 p-1"
-                >
-                  {VIEW_EDITOR_SECTIONS.map((section, sectionIndex) => {
-                    const active = viewEditorSection === section.id;
-                    return (
-                      <button
-                        key={section.id}
-                        id={`bg3d-view-tab-${section.id}`}
-                        type="button"
-                        role="tab"
-                        aria-selected={active}
-                        aria-controls={`bg3d-view-section-${section.id}`}
-                        tabIndex={active ? 0 : -1}
-                        onClick={() => setViewEditorSection(section.id)}
-                        onKeyDown={(event) => {
-                          let nextIndex: number;
-                          if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-                            nextIndex = (sectionIndex + 1) % VIEW_EDITOR_SECTIONS.length;
-                          } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-                            nextIndex = (sectionIndex - 1 + VIEW_EDITOR_SECTIONS.length) % VIEW_EDITOR_SECTIONS.length;
-                          } else if (event.key === "Home") {
-                            nextIndex = 0;
-                          } else if (event.key === "End") {
-                            nextIndex = VIEW_EDITOR_SECTIONS.length - 1;
-                          } else {
-                            return;
-                          }
-                          event.preventDefault();
-                          const nextSection = VIEW_EDITOR_SECTIONS[nextIndex]!;
-                          setViewEditorSection(nextSection.id);
-                          requestAnimationFrame(() => {
-                            document.getElementById(`bg3d-view-tab-${nextSection.id}`)?.focus();
-                          });
-                        }}
-                        className={cx(
-                          "min-h-11 rounded-lg px-2 text-[0.68rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent sm:min-h-9",
-                          active
-                            ? "bg-accent text-on-accent shadow-sm"
-                            : "text-fg-3 hover:bg-raised hover:text-fg",
-                        )}
-                      >
-                        {section.label}
-                      </button>
-                    );
-                  })}
-                </div>
+<StudioBg3dViewPanel
+                hidden={hideOnTab("view")}
+                context={{
+                  VIEW_EDITOR_SECTIONS,
+                  viewEditorSection,
+                  setViewEditorSection,
+                  StudioBg3dPhysicsPanel,
+                  physicsStartButtonRef,
+                  selectedIds,
+                  physicsDurationSeconds,
+                  physicsGravityPreset,
+                  physicsGroundEnabled,
+                  physicsPhase,
+                  physicsProgress,
+                  physicsSelectionUnavailableReason,
+                  physicsError,
+                  setPhysicsDurationSeconds,
+                  setPhysicsGravityPreset,
+                  setPhysicsGroundEnabled,
+                  handleStartPhysicsPreview,
+                  Camera,
+                  sceneBaseDocument,
+                  STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS,
+                  shotNameDraft,
+                  isCapturing,
+                  isRestoringScene,
+                  physicsInteractionLocked,
+                  setShotNameDraft,
+                  captureCurrentShot,
+                  duplicateActiveShot,
+                  Copy,
+                  shotBatchSelectedIds,
+                  savedShots,
+                  setShotBatchExcludedIds,
+                  shotBatchExportHeight,
+                  setShotBatchExportHeight,
+                  LT_EXPORT_HEIGHTS,
+                  selectedShotBatchPasses,
+                  STUDIO_BG3D_SHOT_BATCH_PASSES,
+                  shotBatchPasses,
+                  setShotBatchPasses,
+                  STUDIO_BG3D_SHOT_BATCH_PASS_LABELS,
+                  shotBatchIncludeLayeredPsd,
+                  setShotBatchIncludeLayeredPsd,
+                  shotBatchIncludeContactSheet,
+                  setShotBatchIncludeContactSheet,
+                  recoveryScope,
+                  shotBatchBlockedReason,
+                  exportSavedShotsAsZip,
+                  isBatchRenderingShots,
+                  Loader2,
+                  Save,
+                  shotBatchRecoverySummary,
+                  shotBatchProgress,
+                  shotBatchExcludedIds,
+                  applySavedShot,
+                  moveSavedShot,
+                  removeSavedShot,
+                  Trash2,
+                  CAMERA_PRESETS,
+                  applyCameraPreset,
+                  zoomCameraBy,
+                  ZoomIn,
+                  ZoomOut,
+                  Aperture,
+                  isMainOrtho,
+                  LtRangeControl,
+                  STUDIO_BG3D_LENS_MIN_FOCAL_MM,
+                  STUDIO_BG3D_LENS_MAX_FOCAL_MM,
+                  currentFocalLengthMm,
+                  updateCameraLens,
+                  studioBg3dFocalLengthToFovDegrees,
+                  STUDIO_BG3D_LENS_PRESETS,
+                  LtToggleRow,
+                  twoPointPerspectiveActive,
+                  applyTwoPointPerspective,
+                  resetTwoPointPerspective,
+                  RotateCcw,
+                  lineArtPreview,
+                  setLineArtPreview,
+                  transparentInsert,
+                  updateBackgroundTransparency,
+                  SunMoon,
+                  STUDIO_BG3D_MOOD_RIGS,
+                  appliedMoodRig,
+                  applyMoodRig,
+                  sunLightState,
+                  STUDIO_BG3D_SUN_TIME_PRESETS,
+                  sunRigConfig,
+                  applySunRigConfig,
+                  formatBg3dSunTime,
+                  Globe,
+                  BG_SKY_PRESETS,
+                  skyPresetId,
+                  updateBackgroundSettings,
+                  selectedSky,
+                  panoramaRotation,
+                  normalizePanoramaRotationDegrees,
+                  PanoramaRotationNumberField,
+                  CircleDashed,
+                  STUDIO_BG3D_FOG_PRESETS,
+                  getSkyPreset,
+                  fogNear,
+                  fogSliderMax,
+                  STUDIO_BG3D_FOG_MIN_GAP,
+                  fogFar,
+                  Scissors,
+                  sectionPlane,
+                  setSectionPlane,
+                  STUDIO_BG3D_SECTION_AXES,
+                  STUDIO_BG3D_SECTION_AXIS_LABELS,
+                  STUDIO_BG3D_SECTION_OFFSET_LIMIT,
+                  scaleGuideVisible,
+                  setScaleGuideVisible,
+                  Ruler,
+                }}
+              />
 
-                <div
-                  id="bg3d-view-section-physics"
-                  role="tabpanel"
-                  aria-labelledby="bg3d-view-tab-physics"
-                  hidden={viewEditorSection !== "physics"}
-                >
-                  <StudioBg3dPhysicsPanel
-                    startButtonRef={physicsStartButtonRef}
-                    selectedCount={selectedIds.size}
-                    durationSeconds={physicsDurationSeconds}
-                    gravityPreset={physicsGravityPreset}
-                    groundEnabled={physicsGroundEnabled}
-                    phase={physicsPhase}
-                    progress={physicsProgress}
-                    unavailableReason={physicsSelectionUnavailableReason}
-                    errorMessage={physicsError}
-                    onDurationChange={setPhysicsDurationSeconds}
-                    onGravityPresetChange={setPhysicsGravityPreset}
-                    onGroundEnabledChange={setPhysicsGroundEnabled}
-                    onStart={() => {
-                      shouldTransferPhysicsFocusRef.current = true;
-                      void startPhysicsPreview();
-                    }}
-                  />
-                </div>
-
-                <div
-                  id="bg3d-view-section-camera"
-                  role="tabpanel"
-                  aria-labelledby="bg3d-view-tab-camera"
-                  hidden={viewEditorSection !== "camera"}
-                >
-                  <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
-                  <Camera size={15} className="text-accent" aria-hidden />
-                  카메라
-                  </h3>
-
-                <div className="mb-5 rounded-xl border border-line bg-card/60 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h4 className="text-xs font-bold text-fg">컷 · 샷 보드</h4>
-                      <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">
-                        카메라, 오브젝트 표시, 조명, 배경과 LT 설정을 한 장면 안에 기록합니다.
-                      </p>
-                    </div>
-                    <span className="shrink-0 rounded-full border border-line bg-raised px-2 py-1 text-[0.62rem] font-semibold tabular-nums text-fg-3">
-                      {sceneBaseDocument.shots?.length ?? 0}/{STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS}
-                    </span>
-                  </div>
-
-                  <label className="mt-3 block text-[0.68rem] font-semibold text-fg-2">
-                    컷 이름
-                    <input
-                      type="text"
-                      value={shotNameDraft}
-                      maxLength={80}
-                      disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
-                      placeholder={`컷 ${(sceneBaseDocument.shots?.length ?? 0) + 1}`}
-                      onChange={(event) => setShotNameDraft(event.target.value)}
-                      className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-3 text-xs text-fg placeholder:text-fg-3 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9"
-                    />
-                  </label>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      className={cx(CONTROL_BUTTON, "border-accent bg-accent text-on-accent hover:opacity-90")}
-                      disabled={
-                        isCapturing ||
-                        isRestoringScene ||
-                        physicsInteractionLocked ||
-                        (sceneBaseDocument.shots?.length ?? 0) >= STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS
-                      }
-                      onClick={captureCurrentShot}
-                    >
-                      <Camera size={14} aria-hidden />
-                      현재 컷 기록
-                    </button>
-                    <button
-                      type="button"
-                      className={cx(CONTROL_BUTTON, "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
-                      disabled={
-                        isCapturing ||
-                        isRestoringScene ||
-                        physicsInteractionLocked ||
-                        !sceneBaseDocument.activeShotId ||
-                        (sceneBaseDocument.shots?.length ?? 0) >= STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS
-                      }
-                      onClick={duplicateActiveShot}
-                    >
-                      <Copy size={14} aria-hidden />
-                      선택 컷 복제
-                    </button>
-                  </div>
-                  <div className="mt-3 rounded-lg border border-line bg-panel/70 p-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[0.66rem] font-bold text-fg-2">
-                        배치 대상 {shotBatchSelectedIds.length}/{savedShots.length}컷
-                      </span>
-                      <span className="flex gap-1">
-                        <button
-                          type="button"
-                          className="min-h-11 min-w-11 rounded-md border border-line bg-card px-2 text-[0.62rem] font-semibold text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-40 sm:min-h-8 sm:min-w-0"
-                          disabled={isCapturing || savedShots.length === 0}
-                          onClick={() => setShotBatchExcludedIds(new Set())}
-                        >
-                          전체
-                        </button>
-                        <button
-                          type="button"
-                          className="min-h-11 min-w-11 rounded-md border border-line bg-card px-2 text-[0.62rem] font-semibold text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-40 sm:min-h-8 sm:min-w-0"
-                          disabled={isCapturing || savedShots.length === 0}
-                          onClick={() => setShotBatchExcludedIds(new Set(savedShots.map(({ id }) => id)))}
-                        >
-                          해제
-                        </button>
-                      </span>
-                    </div>
-                    <label className="mt-2 flex min-h-10 items-center justify-between gap-2 border-t border-line/70 pt-2 text-[0.62rem] font-semibold text-fg-3">
-                      배치 출력 최대 높이
-                      <select
-                        value={String(shotBatchExportHeight)}
-                        disabled={isCapturing}
-                        onChange={(event) => setShotBatchExportHeight(
-                          event.target.value === "per-shot"
-                            ? "per-shot"
-                            : Number(event.target.value),
-                        )}
-                        className="min-h-11 rounded-lg border border-line bg-card px-2 text-[0.64rem] text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
-                      >
-                        <option value="per-shot">컷별 저장 최대값</option>
-                        {LT_EXPORT_HEIGHTS.map((height) => (
-                          <option key={height} value={height}>{height.toLocaleString()} px 최대</option>
-                        ))}
-                      </select>
-                    </label>
-                    <fieldset className="mt-2">
-                      <legend className="text-[0.62rem] font-semibold text-fg-3">
-                        PNG 렌더 패스 {selectedShotBatchPasses.length}/{STUDIO_BG3D_SHOT_BATCH_PASSES.length}
-                      </legend>
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {STUDIO_BG3D_SHOT_BATCH_PASSES.map((pass) => (
-                          <label
-                            key={pass}
-                            className={cx(
-                              "flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg border px-2 text-[0.62rem] font-semibold sm:min-h-9",
-                              shotBatchPasses.has(pass)
-                                ? "border-accent/60 bg-accent-soft text-accent"
-                                : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
-                              isCapturing && "cursor-not-allowed opacity-45",
-                            )}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={shotBatchPasses.has(pass)}
-                              disabled={isCapturing}
-                              onChange={(event) => setShotBatchPasses((current) => {
-                                const next = new Set(current);
-                                if (event.target.checked) next.add(pass);
-                                else next.delete(pass);
-                                return next;
-                              })}
-                              className="size-3.5 accent-accent"
-                            />
-                            {STUDIO_BG3D_SHOT_BATCH_PASS_LABELS[pass]}
-                          </label>
-                        ))}
-                      </div>
-                      <label className="mt-2 flex min-h-10 cursor-pointer items-start gap-2 rounded-lg border border-line bg-card px-2.5 py-2 text-[0.62rem] text-fg-2">
-                        <input
-                          type="checkbox"
-                          checked={shotBatchIncludeLayeredPsd}
-                          disabled={isCapturing}
-                          onChange={(event) => setShotBatchIncludeLayeredPsd(event.target.checked)}
-                          className="mt-0.5 size-3.5 accent-accent"
-                        />
-                        <span>
-                          컷별 레이어 PSD도 포함
-                          <span className="mt-0.5 block font-normal leading-relaxed text-fg-3">
-                            LT 레이어가 1080p급·합계 8.4Mpx 안일 때 Worker에서 생성합니다. 초과 시 PNG는
-                            유지하고 manifest에 예산 fallback을 기록합니다.
-                          </span>
-                        </span>
-                      </label>
-                      <label className="mt-2 flex min-h-10 cursor-pointer items-start gap-2 rounded-lg border border-line bg-card px-2.5 py-2 text-[0.62rem] text-fg-2">
-                        <input
-                          type="checkbox"
-                          checked={shotBatchIncludeContactSheet}
-                          disabled={isCapturing}
-                          onChange={(event) => setShotBatchIncludeContactSheet(event.target.checked)}
-                          className="mt-0.5 size-3.5 accent-accent"
-                        />
-                        <span>
-                          컷 검수용 콘택트 시트 포함
-                          <span className="mt-0.5 block font-normal leading-relaxed text-fg-3">
-                            컷당 LT 합성·원본·분리 패스 순으로 대표 PNG를 고르고, Worker에서 12컷씩
-                            검수 시트를 만듭니다. 미지원 브라우저에서는 PNG 패키지만 유지합니다.
-                          </span>
-                        </span>
-                      </label>
-                    </fieldset>
-                  </div>
-                  <button
-                    type="button"
-                    className={cx(CONTROL_BUTTON, "mt-2 w-full border-line bg-panel text-fg-2 hover:bg-raised hover:text-fg")}
-                    disabled={
-                      recoveryScope === null ||
-                      shotBatchBlockedReason !== null ||
-                      shotBatchSelectedIds.length === 0 ||
-                      selectedShotBatchPasses.length === 0
-                    }
-                    onClick={() => void exportSavedShotsAsZip()}
-                  >
-                    {isBatchRenderingShots ? (
-                      <Loader2 size={14} className="animate-spin" aria-hidden />
-                    ) : (
-                      <Save size={14} aria-hidden />
-                    )}
-                    {shotBatchRecoverySummary ? "보존 작업 확인 · " : ""}
-                    선택 {shotBatchSelectedIds.length}컷 · {selectedShotBatchPasses.length}패스
-                    {shotBatchIncludeContactSheet ? " + 콘택트" : ""}
-                    {shotBatchIncludeLayeredPsd ? " + PSD" : ""} ZIP
-                  </button>
-                  <p className="mt-1.5 text-[0.62rem] leading-relaxed text-fg-3">
-                    한 번의 GPU 캡처에서 원본·LT 분리 레이어·깊이를 만들고, 꺼진 레이어는 manifest에
-                    생략 사유를 기록합니다. 기기 예산으로 축소되면 artifact에 요청/실제 높이를 함께
-                    기록합니다. 최대 64컷·448 PNG·64 PSD·콘택트 6장(장당 12컷)·384 MiB입니다.
-                  </p>
-                  {shotBatchRecoverySummary ? (
-                    <p className="mt-1.5 rounded-lg border border-accent/35 bg-accent-soft px-2.5 py-2 text-[0.62rem] leading-relaxed text-accent">
-                      완료된 {shotBatchRecoverySummary.completedShots}/{shotBatchRecoverySummary.totalShots}컷을
-                      {shotBatchRecoverySummary.mode === "durable"
-                        ? " 브라우저 복구 저장소에"
-                        : " 현재 탭 메모리에"} 보존했습니다. 장면·선택·패스·해상도·엔진 및 캡처
-                      프로필까지 같아 새 계획의 digest가 일치할 때만 완료 컷을 재사용합니다.
-                      {shotBatchRecoverySummary.downloadRequested
-                        ? shotBatchRecoverySummary.mode === "durable"
-                          ? " 다운로드 요청 뒤에도 이 브라우저에서 최대 24시간 검증된 artifact를 다시 패키징할 수 있습니다."
-                          : " 다운로드 요청 뒤 현재 탭을 유지하는 동안 최대 24시간 다시 패키징할 수 있습니다. 새로고침하거나 탭을 닫으면 사라집니다."
-                        : ""}
-                      {shotBatchRecoverySummary.degradedReason
-                        ? ` ${shotBatchRecoverySummary.degradedReason} 새로고침 전에 ZIP을 저장해 주세요.`
-                        : ""}
-                    </p>
-                  ) : null}
-                  {shotBatchProgress ? (
-                    <div className="mt-2 rounded-lg border border-line bg-panel px-2.5 py-2" role="status" aria-live="polite">
-                      <div className="flex items-center justify-between gap-2 text-[0.64rem] text-fg-3">
-                        <span className="min-w-0 truncate">
-                          {shotBatchProgress.stage === "render"
-                            ? "렌더"
-                            : shotBatchProgress.stage === "contact"
-                              ? "콘택트"
-                              : "패키지"} · {shotBatchProgress.label}
-                        </span>
-                        <span className="shrink-0 tabular-nums">
-                          {shotBatchProgress.completed}/{shotBatchProgress.total}
-                        </span>
-                      </div>
-                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-raised">
-                        <div
-                          className="h-full rounded-full bg-accent transition-[width]"
-                          style={{
-                            width: `${Math.round(
-                              (shotBatchProgress.completed / Math.max(1, shotBatchProgress.total)) * 100,
-                            )}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {(sceneBaseDocument.shots?.length ?? 0) > 0 ? (
-                    <ul
-                      aria-label="저장된 컷"
-                      className="mt-3 max-h-48 space-y-1 overflow-y-auto overscroll-contain pr-1"
-                    >
-                      {sceneBaseDocument.shots?.map((shot, index) => {
-                        const active = sceneBaseDocument.activeShotId === shot.id;
-                        return (
-                          <li key={shot.id} className="flex items-stretch gap-1">
-                            <label className="grid min-h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-lg border border-transparent hover:border-line hover:bg-raised sm:min-h-9 sm:w-8">
-                              <span className="sr-only">{shot.name} 배치 렌더 선택</span>
-                              <input
-                                type="checkbox"
-                                aria-label={`${shot.name} 배치 렌더 선택`}
-                                checked={!shotBatchExcludedIds.has(shot.id)}
-                                disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
-                                onChange={(event) => setShotBatchExcludedIds((current) => {
-                                  const next = new Set(current);
-                                  if (event.target.checked) next.delete(shot.id);
-                                  else next.add(shot.id);
-                                  return next;
-                                })}
-                                className="size-4 accent-accent"
-                              />
-                            </label>
-                            <button
-                              type="button"
-                              aria-current={active ? "true" : undefined}
-                              disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
-                              onClick={() => applySavedShot(shot.id)}
-                              className={cx(
-                                "flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition-colors sm:min-h-9",
-                                active
-                                  ? "border-accent/60 bg-accent-soft font-bold text-accent"
-                                  : "border-transparent text-fg-2 hover:border-line hover:bg-raised hover:text-fg",
-                              )}
-                            >
-                              <span className="w-5 shrink-0 text-right text-[0.62rem] tabular-nums text-fg-3">
-                                {index + 1}
-                              </span>
-                              <span className="min-w-0 flex-1 truncate">{shot.name}</span>
-                              {active ? (
-                                <span className="shrink-0 rounded-full bg-accent px-1.5 py-0.5 text-[0.56rem] font-bold text-on-accent">
-                                  마지막 선택
-                                </span>
-                              ) : null}
-                            </button>
-                            <div className="flex shrink-0 items-stretch overflow-hidden rounded-lg border border-line bg-card">
-                              <button
-                                type="button"
-                                aria-label={`${shot.name} 위로 이동`}
-                                title="위로 이동"
-                                disabled={
-                                  index === 0 ||
-                                  isCapturing ||
-                                  isRestoringScene ||
-                                  physicsInteractionLocked
-                                }
-                                onClick={() => moveSavedShot(shot.id, index - 1)}
-                                className="grid min-h-11 w-11 place-items-center border-r border-line text-xs font-bold text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-9 sm:w-9"
-                              >
-                                ↑
-                              </button>
-                              <button
-                                type="button"
-                                aria-label={`${shot.name} 아래로 이동`}
-                                title="아래로 이동"
-                                disabled={
-                                  index === (sceneBaseDocument.shots?.length ?? 0) - 1 ||
-                                  isCapturing ||
-                                  isRestoringScene ||
-                                  physicsInteractionLocked
-                                }
-                                onClick={() => moveSavedShot(shot.id, index + 1)}
-                                className="grid min-h-11 w-11 place-items-center border-r border-line text-xs font-bold text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-9 sm:w-9"
-                              >
-                                ↓
-                              </button>
-                              <button
-                                type="button"
-                                aria-label={`${shot.name} 삭제`}
-                                title="삭제 · 실행 취소 가능"
-                                disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
-                                onClick={() => removeSavedShot(shot.id)}
-                                className="grid min-h-11 w-11 place-items-center text-fg-3 hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-9 sm:w-9"
-                              >
-                                <Trash2 size={13} aria-hidden />
-                              </button>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <p className="mt-3 rounded-lg border border-dashed border-line px-3 py-2.5 text-center text-[0.66rem] leading-relaxed text-fg-3">
-                      원하는 구도를 만든 뒤 현재 컷을 기록하세요. 같은 3D 장면에서 여러 웹툰 칸을 빠르게 오갈 수 있습니다.
-                    </p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(CAMERA_PRESETS).map(([id, preset]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      className={cx(CONTROL_BUTTON, "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
-                      disabled={isCapturing || isBatchRenderingShots || isRestoringScene || physicsInteractionLocked}
-                      onClick={() => applyCameraPreset(id)}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mt-4 flex items-center gap-2">
-                  <button
-                    type="button"
-                    className={cx(CONTROL_BUTTON, "flex-1 border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
-                    disabled={isCapturing || isBatchRenderingShots || isRestoringScene || physicsInteractionLocked}
-                    onClick={() => zoomCameraBy(0.82)}
-                  >
-                    <ZoomIn size={14} aria-hidden />
-                    확대
-                  </button>
-                  <button
-                    type="button"
-                    className={cx(CONTROL_BUTTON, "flex-1 border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
-                    disabled={isCapturing || isBatchRenderingShots || isRestoringScene || physicsInteractionLocked}
-                    onClick={() => zoomCameraBy(1.22)}
-                  >
-                    <ZoomOut size={14} aria-hidden />
-                    축소
-                  </button>
-                </div>
-
-                <div className="mt-5 border-t border-line pt-4">
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
-                      <Aperture size={15} className="text-accent" aria-hidden />
-                      렌즈 · 투영
-                    </h3>
-                    <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.62rem] font-semibold text-fg-3">
-                      35mm 환산
-                    </span>
-                  </div>
-                  <div
-                    className={cx(
-                      "rounded-xl border border-line bg-card/70 px-3 py-2",
-                      isMainOrtho && "opacity-45",
-                    )}
-                  >
-                    <LtRangeControl
-                      id="bg3d-lens-focal"
-                      label="초점거리"
-                      min={STUDIO_BG3D_LENS_MIN_FOCAL_MM}
-                      max={STUDIO_BG3D_LENS_MAX_FOCAL_MM}
-                      step={1}
-                      value={currentFocalLengthMm}
-                      valueText={`${currentFocalLengthMm}mm · ${Math.round(sceneBaseDocument.camera.fovDegrees)}°`}
-                      disabled={isCapturing || isBatchRenderingShots || isRestoringScene || physicsInteractionLocked || isMainOrtho}
-                      onChange={(focalLengthMm) => updateCameraLens(() => ({
-                        fovDegrees: studioBg3dFocalLengthToFovDegrees(focalLengthMm),
-                      }))}
-                    />
-                    <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="렌즈 프리셋">
-                      {STUDIO_BG3D_LENS_PRESETS.map((preset) => (
-                        <button
-                          key={preset.focalLengthMm}
-                          type="button"
-                          aria-pressed={currentFocalLengthMm === preset.focalLengthMm}
-                          disabled={isCapturing || isBatchRenderingShots || isRestoringScene || physicsInteractionLocked || isMainOrtho}
-                          className={cx(
-                            "rounded-full border border-line bg-card px-2.5 py-1 text-[0.64rem] font-semibold text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45",
-                            currentFocalLengthMm === preset.focalLengthMm &&
-                              "border-accent/60 bg-accent-soft text-accent",
-                          )}
-                          onClick={() => updateCameraLens(() => ({
-                            fovDegrees: studioBg3dFocalLengthToFovDegrees(preset.focalLengthMm),
-                          }))}
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <LtToggleRow
-                    label="직교 투영(설계도·아이소메트릭)"
-                    checked={isMainOrtho}
-                    disabled={isCapturing || isBatchRenderingShots || isRestoringScene || physicsInteractionLocked}
-                    onChange={(orthographic) => updateCameraLens(() => ({
-                      projection: orthographic ? "orthographic" : "perspective",
-                    }))}
-                  />
-
-                  <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                    <button
-                      type="button"
-                      aria-pressed={twoPointPerspectiveActive}
-                      disabled={isCapturing || isBatchRenderingShots || isRestoringScene || physicsInteractionLocked || isMainOrtho}
-                      className={cx(
-                        CONTROL_BUTTON,
-                        "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
-                        twoPointPerspectiveActive && "border-accent/60 bg-accent-soft text-accent",
-                      )}
-                      onClick={applyTwoPointPerspective}
-                    >
-                      2점 투시 보정
-                    </button>
-                    <button
-                      type="button"
-                      disabled={
-                        isCapturing || isBatchRenderingShots || isRestoringScene ||
-                        physicsInteractionLocked || isMainOrtho || !twoPointPerspectiveActive
-                      }
-                      className={cx(CONTROL_BUTTON, "border-line bg-panel px-3 text-fg-2 hover:bg-raised hover:text-fg")}
-                      onClick={resetTwoPointPerspective}
-                    >
-                      <RotateCcw size={14} aria-hidden />
-                      해제
-                    </button>
-                  </div>
-                  <p className="mt-1.5 text-[0.64rem] leading-relaxed text-fg-3">
-                    올려다보거나 내려다보는 구도에서 수직선을 화면과 평행하게 세웁니다(건축 컷).
-                    시선은 수평이 되고 원래 구도는 렌즈 시프트로 보존됩니다.
-                  </p>
-                </div>
-
-                <div className="mt-5 border-t border-line pt-4">
-                  <label className="flex items-start gap-2.5">
-                    <input
-                      type="checkbox"
-                      checked={lineArtPreview}
-                      disabled={isCapturing}
-                      onChange={(e) => setLineArtPreview(e.target.checked)}
-                      className="mt-0.5 size-4 accent-accent"
-                    />
-                    <span className="block text-xs font-bold text-fg">
-                      선화로 보기
-                      <span className="mt-0.5 block text-[0.68rem] font-normal leading-relaxed text-fg-3">
-                        화면용 선화 미리보기입니다. 실제 추가 시에는 LT 탭 설정으로 톤·재질선·주선을
-                        각각 계산해 별도 레이어로 만듭니다.
-                      </span>
-                    </span>
-                  </label>
-                  <label className="mt-3 flex items-start gap-2.5">
-                    <input
-                      type="checkbox"
-                      checked={transparentInsert}
-                      disabled={isCapturing}
-                      onChange={(e) => updateBackgroundTransparency(e.target.checked)}
-                      className="mt-0.5 size-4 accent-accent"
-                    />
-                    <span className="block text-xs font-bold text-fg">
-                      오브젝트 바깥을 투명하게 추출
-                      <span className="mt-0.5 block text-[0.68rem] font-normal leading-relaxed text-fg-3">
-                        하늘색을 LT 입력에서 빼고 건물·나무·도형의 알파 외곽을 또렷하게 잡습니다. 분리된
-                        선·톤을 다른 배경 위에 겹칠 때 적합해요.
-                      </span>
-                    </span>
-                  </label>
-                </div>
-
-                <div className="mt-5 border-t border-line pt-4">
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
-                      <SunMoon size={15} className="text-accent" aria-hidden />
-                      시간대 · 무드 리그
-                    </h3>
-                    <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.62rem] font-semibold text-fg-3">
-                      조명 연동
-                    </span>
-                  </div>
-                  <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
-                    하늘·안개·키/필 조명·노출을 한 번에 바꿉니다. 버튼을 누를 때만 적용되며 이후 값은
-                    개별 조정할 수 있습니다.
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {STUDIO_BG3D_MOOD_RIGS.map((rig) => (
-                      <button
-                        key={rig.id}
-                        type="button"
-                        aria-pressed={appliedMoodRig?.id === rig.id}
-                        disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
-                        title={rig.description}
-                        className={cx(
-                          CONTROL_BUTTON,
-                          "justify-start gap-2 border-line bg-card text-left text-fg-2 hover:bg-raised hover:text-fg",
-                          appliedMoodRig?.id === rig.id &&
-                            "border-accent/60 bg-accent-soft text-accent",
-                        )}
-                        onClick={() => applyMoodRig(rig.id)}
-                      >
-                        <span
-                          className="inline-block size-4 shrink-0 rounded-full border border-line/50 shadow-inner"
-                          style={{ backgroundColor: rig.swatch }}
-                          aria-hidden
-                        />
-                        <span className="truncate">{rig.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mt-2 text-[0.66rem] leading-relaxed text-fg-3" aria-live="polite">
-                    {appliedMoodRig?.description ??
-                      "현재 하늘·안개·조명·노출 값은 개별 조정된 사용자 설정입니다."}
-                  </p>
-                </div>
-
-                <div className="mt-5 border-t border-line pt-4">
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
-                      <SunMoon size={15} className="text-accent" aria-hidden />
-                      태양 · 시간대 릭
-                    </h3>
-                    <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.62rem] font-semibold text-fg-3">
-                      {sunLightState.mode === "sun" ? "태양광" : "달빛"}
-                    </span>
-                  </div>
-                  <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
-                    시각과 방위각에서 태양 방향·색온도·하늘을 절차 계산해 조명에 기록합니다.
-                    무드 리그와 달리 슬라이더로 연속 조정할 수 있어요.
-                  </p>
-                  <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="시간대 프리셋">
-                    {STUDIO_BG3D_SUN_TIME_PRESETS.map((preset) => (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        aria-pressed={Math.abs(sunRigConfig.timeOfDayHours - preset.timeOfDayHours) < 0.01}
-                        disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
-                        className={cx(
-                          "rounded-full border border-line bg-card px-2.5 py-1 text-[0.64rem] font-semibold text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45",
-                          Math.abs(sunRigConfig.timeOfDayHours - preset.timeOfDayHours) < 0.01 &&
-                            "border-accent/60 bg-accent-soft text-accent",
-                        )}
-                        onClick={() => applySunRigConfig({ timeOfDayHours: preset.timeOfDayHours })}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="rounded-xl border border-line bg-card/70 px-3 py-2">
-                    <LtRangeControl
-                      id="bg3d-sun-time"
-                      label="시각"
-                      min={0}
-                      max={24}
-                      step={0.25}
-                      value={sunRigConfig.timeOfDayHours}
-                      valueText={formatBg3dSunTime(sunRigConfig.timeOfDayHours)}
-                      disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
-                      onChange={(timeOfDayHours) => applySunRigConfig({ timeOfDayHours })}
-                    />
-                    <LtRangeControl
-                      id="bg3d-sun-azimuth"
-                      label="방위각"
-                      min={-180}
-                      max={180}
-                      step={5}
-                      value={sunRigConfig.azimuthDeg}
-                      valueText={`${sunRigConfig.azimuthDeg}°`}
-                      disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
-                      onChange={(azimuthDeg) => applySunRigConfig({ azimuthDeg })}
-                    />
-                    <LtToggleRow
-                      label="태양 그림자(기기 성능에 따라 자동 제한)"
-                      checked={sunRigConfig.shadowsEnabled}
-                      disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
-                      onChange={(shadowsEnabled) => applySunRigConfig({ shadowsEnabled })}
-                    />
-                  </div>
-                  <p className="mt-1.5 text-[0.64rem] leading-relaxed text-fg-3" aria-live="polite">
-                    {sunLightState.mode === "sun"
-                      ? `태양 고도 ${Math.round(sunLightState.sunElevationDeg)}° · 색온도 ${Math.round(sunLightState.colorTemperatureK)}K`
-                      : "지평선 아래 — 달빛과 야간 하늘로 전환되었습니다."}
-                  </p>
-                </div>
-
-                <div className="mt-5 border-t border-line pt-4">
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
-                      <Globe size={15} className="text-accent" aria-hidden />
-                      360° 환경 배경
-                    </h3>
-                    <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.62rem] font-semibold text-fg-3">
-                      절차적 생성
-                    </span>
-                  </div>
-                  <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
-                    외부 이미지 없이 생성되어 장면과 함께 안전하게 재현됩니다. 투명 추출에서는 빠지고,
-                    불투명 LT 톤에는 현재 보이는 환경이 포함됩니다.
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {BG_SKY_PRESETS.map((sky) => (
-                      <button
-                        key={sky.id}
-                        type="button"
-                        aria-pressed={skyPresetId === sky.id}
-                        disabled={isCapturing}
-                        title={sky.description}
-                        className={cx(
-                          CONTROL_BUTTON,
-                          "justify-start gap-2 border-line bg-card text-left text-fg-2 hover:bg-raised hover:text-fg",
-                          skyPresetId === sky.id && "border-accent/60 bg-accent-soft text-accent"
-                        )}
-                        onClick={() => {
-                          updateBackgroundSettings({
-                            mode: transparentInsert ? "transparent" : "sky-preset",
-                            color: sky.clearColor,
-                            skyPresetId: sky.id,
-                          });
-                        }}
-                      >
-                        <span
-                          className="inline-block size-4 shrink-0 rounded-full border border-line/50 shadow-inner"
-                          style={{ backgroundColor: sky.clearColor }}
-                          aria-hidden
-                        />
-                        <span className="truncate">{sky.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mt-2 text-[0.66rem] leading-relaxed text-fg-3" aria-live="polite">
-                    {selectedSky.description}
-                  </p>
-
-                  {selectedSky.kind === "procedural-panorama" ? (
-                    <div className="mt-3 rounded-xl border border-line bg-card/70 px-3 py-2">
-                      <LtRangeControl
-                        id="bg3d-panorama-rotation"
-                        label="수평 회전"
-                        min={-180}
-                        max={180}
-                        step={1}
-                        value={panoramaRotation}
-                        valueText={`${panoramaRotation}°`}
-                        disabled={isCapturing}
-                        onChange={(value) => updateBackgroundSettings({
-                          panoramaRotation: normalizePanoramaRotationDegrees(value),
-                        })}
-                      />
-                      <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                        <PanoramaRotationNumberField
-                          disabled={isCapturing}
-                          value={panoramaRotation}
-                          onCommit={(value) => updateBackgroundSettings({ panoramaRotation: value })}
-                        />
-                        <button
-                          type="button"
-                          className={cx(
-                            CONTROL_BUTTON,
-                            "border-line bg-panel px-3 text-fg-2 hover:bg-raised hover:text-fg",
-                          )}
-                          disabled={isCapturing || panoramaRotation === 0}
-                          onClick={() => updateBackgroundSettings({ panoramaRotation: 0 })}
-                        >
-                          <RotateCcw size={14} aria-hidden />
-                          정면 초기화
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="mt-5 border-t border-line pt-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
-                        <CircleDashed size={15} className="text-accent" aria-hidden />
-                        공간 안개
-                      </h3>
-                      <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                        멀어지는 건물과 소품을 대기색에 자연스럽게 섞어 웹툰 배경의 깊이감을 만듭니다.
-                      </p>
-                    </div>
-                    <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-fg-2 sm:min-h-9">
-                      <input
-                        type="checkbox"
-                        aria-label="3D 공간 안개 사용"
-                        checked={sceneBaseDocument.background.fogEnabled ?? false}
-                        onChange={(event) => updateBackgroundSettings({ fogEnabled: event.target.checked })}
-                        className="size-4 accent-accent"
-                      />
-                      {sceneBaseDocument.background.fogEnabled ? "켜짐" : "꺼짐"}
-                    </label>
-                  </div>
-
-                  <div
-                    className={cx(
-                      "mt-3 space-y-3 transition-opacity duration-150 motion-reduce:transition-none",
-                      !sceneBaseDocument.background.fogEnabled && "pointer-events-none opacity-45",
-                    )}
-                    aria-disabled={!sceneBaseDocument.background.fogEnabled}
-                  >
-                    <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                      {STUDIO_BG3D_FOG_PRESETS.map((preset) => (
-                        <button
-                          key={preset.id}
-                          type="button"
-                          disabled={!sceneBaseDocument.background.fogEnabled}
-                          className={cx(
-                            CONTROL_BUTTON,
-                            "min-h-10 shrink-0 border-line bg-card px-3 text-fg-2 hover:bg-raised hover:text-fg sm:min-h-9",
-                            sceneBaseDocument.background.fogNear === preset.near &&
-                              sceneBaseDocument.background.fogFar === preset.far &&
-                              "border-accent/60 bg-accent-soft text-accent",
-                          )}
-                          onClick={() => updateBackgroundSettings({
-                            fogEnabled: true,
-                            fogColor: getSkyPreset(skyPresetId).clearColor,
-                            fogNear: preset.near,
-                            fogFar: preset.far,
-                          })}
-                        >
-                          {preset.label}
-                          <span className="text-[0.62rem] font-normal text-fg-3">
-                            {preset.near}–{preset.far}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-
-                    <label className="grid grid-cols-[1fr_auto] items-center gap-3 text-xs font-semibold text-fg-2">
-                      대기색
-                      <input
-                        type="color"
-                        aria-label="3D 공간 안개 색"
-                        value={sceneBaseDocument.background.fogColor ?? sceneBaseDocument.background.color}
-                        disabled={!sceneBaseDocument.background.fogEnabled}
-                        onChange={(event) => updateBackgroundSettings({ fogColor: event.target.value })}
-                        className="size-11 cursor-pointer rounded-lg border border-line bg-transparent p-1 sm:size-9"
-                      />
-                    </label>
-
-                    <label className="block text-xs font-semibold text-fg-2">
-                      <span className="flex items-center justify-between gap-3">
-                        시작 거리
-                        <output className="tabular-nums text-fg">
-                          {round(fogNear, 2)}
-                        </output>
-                      </span>
-                      <input
-                        type="range"
-                        min="0"
-                        max={fogSliderMax}
-                        step="0.25"
-                        value={fogNear}
-                        disabled={!sceneBaseDocument.background.fogEnabled}
-                        onChange={(event) => {
-                          const fogNear = Number(event.target.value);
-                          updateBackgroundSettings({
-                            fogNear,
-                            fogFar: Math.max(
-                              fogNear + STUDIO_BG3D_FOG_MIN_GAP,
-                              sceneBaseDocument.background.fogFar ?? 50,
-                            ),
-                          });
-                        }}
-                        className="mt-2 w-full accent-accent"
-                      />
-                    </label>
-
-                    <label className="block text-xs font-semibold text-fg-2">
-                      <span className="flex items-center justify-between gap-3">
-                        완전 혼합 거리
-                        <output className="tabular-nums text-fg">
-                          {round(fogFar, 2)}
-                        </output>
-                      </span>
-                      <input
-                        type="range"
-                        min={fogNear + STUDIO_BG3D_FOG_MIN_GAP}
-                        max={fogSliderMax}
-                        step="0.25"
-                        value={fogFar}
-                        disabled={!sceneBaseDocument.background.fogEnabled}
-                        onChange={(event) => updateBackgroundSettings({
-                          fogFar: Math.max(
-                            Number(event.target.value),
-                            (sceneBaseDocument.background.fogNear ?? 10) + STUDIO_BG3D_FOG_MIN_GAP,
-                          ),
-                        })}
-                        className="mt-2 w-full accent-accent"
-                      />
-                    </label>
-                    <p className="text-[0.65rem] leading-relaxed text-fg-3">
-                      안개는 뷰포트와 컬러·톤 캡처에 함께 반영되며 선화 레이어의 투명 배경은 유지됩니다.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 border-t border-line pt-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
-                        <Scissors size={15} className="text-accent" aria-hidden />
-                        단면 컷
-                      </h3>
-                      <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                        벽이나 천장을 잘라내 바깥에서 실내를 들여다보는 컷을 만듭니다. 잘린 상태
-                        그대로 캡처됩니다.
-                      </p>
-                    </div>
-                    <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-fg-2 sm:min-h-9">
-                      <input
-                        type="checkbox"
-                        aria-label="단면 컷 사용"
-                        checked={sectionPlane.enabled}
-                        onChange={(event) => setSectionPlane((current) => ({
-                          ...current,
-                          enabled: event.target.checked,
-                        }))}
-                        className="size-4 accent-accent"
-                      />
-                      {sectionPlane.enabled ? "켜짐" : "꺼짐"}
-                    </label>
-                  </div>
-                  <div
-                    className={cx(
-                      "mt-3 space-y-2 transition-opacity duration-150 motion-reduce:transition-none",
-                      !sectionPlane.enabled && "pointer-events-none opacity-45",
-                    )}
-                    aria-disabled={!sectionPlane.enabled}
-                  >
-                    <div className="flex gap-1.5" role="group" aria-label="단면 축">
-                      {STUDIO_BG3D_SECTION_AXES.map((axis) => (
-                        <button
-                          key={axis}
-                          type="button"
-                          aria-pressed={sectionPlane.axis === axis}
-                          disabled={!sectionPlane.enabled}
-                          className={cx(
-                            CONTROL_BUTTON,
-                            "flex-1 border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
-                            sectionPlane.axis === axis && "border-accent/60 bg-accent-soft text-accent",
-                          )}
-                          onClick={() => setSectionPlane((current) => ({ ...current, axis }))}
-                        >
-                          {STUDIO_BG3D_SECTION_AXIS_LABELS[axis]}
-                        </button>
-                      ))}
-                    </div>
-                    <LtRangeControl
-                      id="bg3d-section-offset"
-                      label="절단 위치"
-                      min={-STUDIO_BG3D_SECTION_OFFSET_LIMIT}
-                      max={STUDIO_BG3D_SECTION_OFFSET_LIMIT}
-                      step={0.1}
-                      value={sectionPlane.offset}
-                      valueText={`${round(sectionPlane.offset, 1)}m`}
-                      disabled={!sectionPlane.enabled}
-                      onChange={(offset) => setSectionPlane((current) => ({ ...current, offset }))}
-                    />
-                    <LtToggleRow
-                      label="반대쪽 잘라내기"
-                      checked={sectionPlane.flip}
-                      disabled={!sectionPlane.enabled}
-                      onChange={(flip) => setSectionPlane((current) => ({ ...current, flip }))}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-5 border-t border-line pt-4">
-                  <label className="flex items-start gap-2.5">
-                    <input
-                      type="checkbox"
-                      checked={scaleGuideVisible}
-                      onChange={(event) => setScaleGuideVisible(event.target.checked)}
-                      className="mt-0.5 size-4 accent-accent"
-                    />
-                    <Ruler size={13} className="mt-0.5 shrink-0 text-accent" aria-hidden />
-                    <span className="block text-xs font-bold text-fg">
-                      160cm 인체 스케일 가이드
-                      <span className="mt-0.5 block text-[0.68rem] font-normal leading-relaxed text-fg-3">
-                        기준 인물 실루엣을 원점에 세워 벽 높이·가구 크기를 즉시 가늠합니다.
-                        바닥 그리드 한 칸은 1m이며, 가이드는 캡처 결과물에 포함되지 않습니다.
-                      </span>
-                    </span>
-                  </label>
-                </div>
-                </div>
-              </section>
-
-              <section hidden={hideOnTab("lt")}>
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
-                    <ScanLine size={15} className="text-accent" aria-hidden />
-                    렌더/LT 변환
-                  </h3>
-                  <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.64rem] font-semibold text-fg-3">
-                    장면 설정 v1
-                  </span>
-                </div>
-                <p className="mt-1.5 text-[0.68rem] leading-relaxed text-fg-3">
-                  3D 배경의 컬러·선화·톤 출력 의도를 저장합니다. 프리셋 적용 뒤 필요한 값만 조정하세요.
-                </p>
-
-                <label htmlFor="bg3d-lt-preset" className="mt-3 block text-xs font-semibold text-fg-2">
-                  변환 프리셋
-                  <select
-                    id="bg3d-lt-preset"
-                    value={appliedLtPresetId}
-                    className="mt-1.5 min-h-11 w-full rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
-                    onChange={(event) => {
-                      if (event.target.value !== "custom") applyLtPreset(event.target.value);
-                    }}
-                  >
-                    <option value="custom" disabled>
-                      사용자 설정
-                    </option>
-                    <optgroup label="기본 프리셋">
-                      {STUDIO_BG3D_LT_BUILT_IN_PRESETS.map((preset) => (
-                        <option key={preset.id} value={preset.id}>
-                          {preset.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                    {ltUserPresetPayload.presets.length > 0 ? (
-                      <optgroup label={`내 프리셋 · ${ltUserPresetPayload.presets.length}개`}>
-                        {ltUserPresetPayload.presets.map((preset) => (
-                          <option key={preset.id} value={preset.id}>
-                            {preset.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ) : null}
-                  </select>
-                </label>
-                <p className="mt-2 min-h-8 text-[0.68rem] leading-relaxed text-fg-3">
-                  {appliedLtPreset?.description ?? "프리셋을 기준으로 값을 직접 조정한 사용자 설정입니다."}
-                </p>
-                <p aria-live="polite" aria-atomic="true" className="sr-only">
-                  {appliedLtPreset ? `${appliedLtPreset.name} 프리셋 적용됨` : "LT 사용자 설정 적용됨"}
-                </p>
-
-                <details className="group mt-3 rounded-xl border border-line bg-card/45">
-                  <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-bold text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-                    <span className="flex items-center gap-1.5">
-                      <Save size={14} className="text-accent" aria-hidden />
-                      내 프리셋
-                    </span>
-                    <span className="flex items-center gap-1 text-[0.64rem] font-normal text-fg-3">
-                      {ltUserPresetPayload.presets.length}/{STUDIO_BG3D_LT_PRESET_MAX_COUNT}
-                      {ltUserPresetLibraryStatus === "idle" ? " · 불러오는 중" : ""}
-                      <ChevronDown className="transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" size={13} aria-hidden />
-                    </span>
-                  </summary>
-                  <div className="border-t border-line/70 px-3 py-3">
-                    <p className="text-[0.68rem] leading-relaxed text-fg-3">
-                      {managedLtUserPreset
-                        ? `“${managedLtUserPreset.name}”을 관리 중입니다. 현재 LT 값을 덮어쓰거나 이름만 바꿀 수 있어요.`
-                        : "현재 선화·톤 값을 새 사용자 프리셋으로 저장합니다."}
-                    </p>
-                    <label htmlFor="bg3d-lt-user-preset-name" className="mt-3 block text-xs font-semibold text-fg-2">
-                      이름
-                      <input
-                        id="bg3d-lt-user-preset-name"
-                        type="text"
-                        required
-                        maxLength={STUDIO_BG3D_LT_PRESET_MAX_NAME_LENGTH}
-                        value={ltUserPresetName}
-                        className="mt-1.5 min-h-11 w-full rounded-lg border border-line bg-panel px-3 text-xs text-fg placeholder:text-fg-3 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
-                        placeholder="예: 야간 골목 선화"
-                        onChange={(event) => {
-                          setLtUserPresetName(event.target.value);
-                          setLtDeleteConfirmId(null);
-                        }}
-                      />
-                    </label>
-                    <label htmlFor="bg3d-lt-user-preset-description" className="mt-3 block text-xs font-semibold text-fg-2">
-                      설명
-                      <textarea
-                        id="bg3d-lt-user-preset-description"
-                        required
-                        rows={2}
-                        maxLength={STUDIO_BG3D_LT_PRESET_MAX_DESCRIPTION_LENGTH}
-                        value={ltUserPresetDescription}
-                        className="mt-1.5 min-h-20 w-full resize-y rounded-lg border border-line bg-panel px-3 py-2.5 text-xs leading-relaxed text-fg placeholder:text-fg-3 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                        placeholder="어떤 장면과 작업 단계에 쓰는 설정인지 기록하세요."
-                        onChange={(event) => {
-                          setLtUserPresetDescription(event.target.value);
-                          setLtDeleteConfirmId(null);
-                        }}
-                      />
-                    </label>
-                    <div className="mt-1 flex justify-end gap-3 text-[0.62rem] tabular-nums text-fg-3">
-                      <span>이름 {Array.from(ltUserPresetName).length}/{STUDIO_BG3D_LT_PRESET_MAX_NAME_LENGTH}</span>
-                      <span>설명 {Array.from(ltUserPresetDescription).length}/{STUDIO_BG3D_LT_PRESET_MAX_DESCRIPTION_LENGTH}</span>
-                    </div>
-
-                    {managedLtUserPreset ? (
-                      <div className="mt-3 space-y-2">
-                        <button
-                          type="button"
-                          className={cx(CONTROL_BUTTON, "w-full border-accent/55 bg-accent text-on-accent hover:bg-accent/90")}
-                          disabled={ltUserPresetLibraryStatus === "idle" || ltUserPresetLibraryStatus === "unavailable"}
-                          onClick={updateManagedLtUserPreset}
-                        >
-                          <Save size={14} aria-hidden />
-                          현재 설정으로 업데이트
-                        </button>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            className={cx(CONTROL_BUTTON, "border-line bg-panel text-fg-2 hover:bg-raised hover:text-fg")}
-                            disabled={ltUserPresetLibraryStatus === "idle" || ltUserPresetLibraryStatus === "unavailable"}
-                            onClick={renameManagedLtUserPreset}
-                          >
-                            <PencilLine size={14} aria-hidden />
-                            이름만 변경
-                          </button>
-                          <button
-                            type="button"
-                            className={cx(
-                              CONTROL_BUTTON,
-                              ltDeleteConfirmId === managedLtUserPreset.id
-                                ? "border-bad/60 bg-[oklch(0.66_0.20_25/0.12)] text-bad"
-                                : "border-line bg-panel text-fg-3 hover:bg-raised hover:text-bad"
-                            )}
-                            disabled={ltUserPresetLibraryStatus === "idle" || ltUserPresetLibraryStatus === "unavailable"}
-                            onClick={deleteManagedLtUserPreset}
-                          >
-                            <Trash2 size={14} aria-hidden />
-                            {ltDeleteConfirmId === managedLtUserPreset.id ? "삭제 확인" : "삭제"}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className={cx(CONTROL_BUTTON, "mt-3 w-full border-accent/55 bg-accent text-on-accent hover:bg-accent/90")}
-                        disabled={
-                          ltUserPresetLibraryStatus === "idle" ||
-                          ltUserPresetLibraryStatus === "unavailable" ||
-                          ltUserPresetPayload.presets.length >= STUDIO_BG3D_LT_PRESET_MAX_COUNT
-                        }
-                        onClick={saveCurrentLtAsUserPreset}
-                      >
-                        <Save size={14} aria-hidden />
-                        현재 설정을 새 프리셋으로 저장
-                      </button>
-                    )}
-                  </div>
-                </details>
-
-                {ltUserPresetNotice ? (
-                  <p
-                    aria-live="polite"
-                    aria-atomic="true"
-                    className={cx(
-                      "mt-2 rounded-lg border px-3 py-2 text-[0.68rem] leading-relaxed",
-                      ltUserPresetNotice.tone === "success" && "border-good/35 bg-[oklch(0.80_0.15_150/0.08)] text-good",
-                      ltUserPresetNotice.tone === "error" && "border-bad/35 bg-[oklch(0.66_0.20_25/0.08)] text-bad",
-                      ltUserPresetNotice.tone === "info" && "border-line bg-card/55 text-fg-2"
-                    )}
-                  >
-                    {ltUserPresetNotice.message}
-                  </p>
-                ) : null}
-
-                <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-line bg-card/55 px-3 py-2">
-                  <div className="min-w-0">
-                    <label htmlFor="bg3d-lt-export-height" className="block text-xs font-bold text-fg">
-                      출력 해상도
-                    </label>
-                    <p className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3" aria-live="polite">
-                      {ltCaptureSizePreview
-                        ? `${ltCaptureSizePreview.width.toLocaleString()}×${ltCaptureSizePreview.height.toLocaleString()} px${ltCaptureSizePreview.wasReduced ? " · 기기 안전 한도 적용" : ""}`
-                        : "현재 기기에서 안전한 출력 크기를 계산할 수 없습니다."}
-                    </p>
-                  </div>
-                  <select
-                    id="bg3d-lt-export-height"
-                    aria-label="LT 출력 높이"
-                    className="min-h-11 rounded-lg border border-line bg-panel px-2.5 text-xs font-semibold text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
-                    value={sceneBaseDocument.output.exportHeight}
-                    onChange={(event) => updateLtExportHeight(Number(event.target.value))}
-                  >
-                    {!LT_EXPORT_HEIGHTS.includes(sceneBaseDocument.output.exportHeight as (typeof LT_EXPORT_HEIGHTS)[number]) ? (
-                      <option value={sceneBaseDocument.output.exportHeight}>
-                        {sceneBaseDocument.output.exportHeight.toLocaleString()} px
-                      </option>
-                    ) : null}
-                    {LT_EXPORT_HEIGHTS.map((height) => (
-                      <option key={height} value={height}>{height.toLocaleString()} px</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-line bg-card/55 px-3 py-2">
-                  <div className="min-w-0">
-                    <label htmlFor="bg3d-lt-export-aspect" className="block text-xs font-bold text-fg">
-                      출력 비율
-                    </label>
-                    <p className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3" aria-live="polite">
-                      {ltExportAspectRatio === null
-                        ? "자동 — 3D 창 크기에 따라 삽입 구도가 달라집니다. 비율을 고정하세요."
-                        : "고정 — 뷰포트의 점선 안쪽만 삽입됩니다."}
-                    </p>
-                  </div>
-                  <select
-                    id="bg3d-lt-export-aspect"
-                    aria-label="LT 출력 비율"
-                    className="min-h-11 rounded-lg border border-line bg-panel px-2.5 text-xs font-semibold text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
-                    value={ltCaptureAspectPresetId}
-                    onChange={(event) => {
-                      const preset = ltCaptureAspectPresets.find(
-                        (candidate) => candidate.id === event.target.value,
-                      );
-                      if (!preset) return;
-                      updateLtExportAspectRatio(preset.ratio);
-                    }}
-                  >
-                    {ltCaptureAspectPresetId === "custom" ? (
-                      <option value="custom">
-                        {(ltExportAspectRatio ?? 1).toFixed(2)} : 1
-                      </option>
-                    ) : null}
-                    {ltCaptureAspectPresets.map((preset) => (
-                      <option key={preset.id} value={preset.id}>{preset.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div
-                  role="group"
-                  className="mt-3 rounded-xl border border-line bg-card/55 p-3"
-                  aria-label={`LT 출력 의도: ${ltLineSettings.enabled ? `${ltLineSettings.widthPx}픽셀 선화` : "선화 없음"}, ${LT_TONE_MODE_LABELS[ltToneSettings.mode]}, ${LT_TONE_TYPE_LABELS[ltToneSettings.type]}`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-fg">출력 의도 미리보기</span>
-                    <button
-                      type="button"
-                      aria-pressed={lineArtPreview}
-                      className={cx(
-                        "min-h-11 rounded-lg border px-2.5 text-[0.68rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9",
-                        lineArtPreview
-                          ? "border-accent/60 bg-accent-soft text-accent"
-                          : "border-line bg-panel text-fg-3 hover:bg-raised hover:text-fg"
-                      )}
-                      onClick={() => setLineArtPreview((visible) => !visible)}
-                    >
-                      캔버스 선화 {lineArtPreview ? "켜짐" : "꺼짐"}
-                    </button>
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2" aria-hidden>
-                    <div className="relative h-12 overflow-hidden rounded-lg border border-line/80 bg-panel">
-                      {ltLineSettings.enabled ? (
-                        <>
-                          <span
-                            className="absolute inset-x-3 top-[38%] rounded-full"
-                            style={{
-                              backgroundColor: ltLineSettings.color,
-                              height: `${Math.max(1, Math.min(8, ltLineSettings.widthPx * 1.6))}px`,
-                              opacity: ltLineSettings.strength,
-                            }}
-                          />
-                          {ltLineSettings.textureLineEnabled ? (
-                            <span
-                              className="absolute inset-x-5 top-[66%] border-t border-dashed"
-                              style={{
-                                borderColor: ltLineSettings.color,
-                                opacity: ltLineSettings.textureLineStrength,
-                              }}
-                            />
-                          ) : null}
-                        </>
-                      ) : (
-                        <span className="absolute inset-0 grid place-items-center text-[0.64rem] text-fg-3">선화 꺼짐</span>
-                      )}
-                    </div>
-                    <div className="relative h-12 overflow-hidden rounded-lg border border-line/80" style={ltTonePreviewStyle(ltToneSettings)}>
-                      {ltToneSettings.mode === "none" ? (
-                        <span className="absolute inset-0 grid place-items-center text-[0.64rem] text-fg-3">선화만</span>
-                      ) : null}
-                    </div>
-                  </div>
-                  <dl className="mt-2 grid grid-cols-2 gap-x-3 text-[0.64rem] leading-relaxed text-fg-3">
-                    <div>
-                      <dt className="sr-only">선화 설정</dt>
-                      <dd>
-                        선 {ltLineSettings.enabled ? `${round(ltLineSettings.widthPx, 2)}px · ${Math.round(ltLineSettings.strength * 100)}%` : "없음"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="sr-only">컬러·톤 설정</dt>
-                      <dd>
-                        {LT_TONE_MODE_LABELS[ltToneSettings.mode]}
-                        {ltToneSettings.mode !== "none" ? ` · ${LT_TONE_TYPE_LABELS[ltToneSettings.type]}` : ""}
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-
-                <p className="mt-2 text-[0.66rem] leading-relaxed text-fg-3">
-                  결과는 컬러/톤·재질선·주선을 편집 가능한 별도 래스터 PNG 레이어로 묶어 추가합니다. 실제
-                  벡터 경로 추출은 아직 지원하지 않으므로 벡터로 표시하거나 내보내지 않습니다.
-                </p>
-
-                <div role="group" aria-label="LT 세부 설정" className="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-card p-1">
-                  {(["line", "tone"] as const).map((section) => {
-                    const active = ltEditorSection === section;
-                    return (
-                      <button
-                        key={section}
-                        type="button"
-                        aria-pressed={active}
-                        className={cx(
-                          "min-h-11 rounded-lg border px-3 text-xs font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9",
-                          active
-                            ? "border-accent/55 bg-accent-soft text-accent"
-                            : "border-transparent text-fg-3 hover:bg-raised hover:text-fg"
-                        )}
-                        onClick={() => setLtEditorSection(section)}
-                      >
-                        {section === "line" ? "선화" : "컬러·톤"}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div hidden={ltEditorSection !== "line"} className="mt-3">
-                  <LtToggleRow
-                    checked={ltLineSettings.enabled}
-                    label="선화 출력"
-                    onChange={(enabled) => {
-                      updateLtLineSettings({ enabled });
-                      setLineArtPreview(enabled);
-                    }}
-                  />
-                  <div className="flex min-h-11 items-center justify-between gap-3 border-b border-line/70 py-2 text-xs">
-                    <span className="font-semibold text-fg-2">레이어 의도</span>
-                    <span className="text-right text-[0.68rem] text-fg-3">
-                      {ltLineSettings.layerType === "vector" ? "벡터 요청 · 래스터 변환" : "래스터 PNG"}
-                    </span>
-                  </div>
-                  <label htmlFor="bg3d-lt-line-color" className={cx(
-                    "flex min-h-11 items-center justify-between gap-3 border-b border-line/70 py-1.5 text-xs",
-                    !ltLineSettings.enabled && "opacity-45"
-                  )}>
-                    <span className="font-semibold text-fg-2">선 색상</span>
-                    <span className="ml-auto font-mono text-[0.68rem] uppercase text-fg-3">{ltLineSettings.color}</span>
-                    <input
-                      id="bg3d-lt-line-color"
-                      type="color"
-                      aria-label="LT 선 색상"
-                      className="size-11 cursor-pointer rounded-lg border border-line bg-card p-1 disabled:cursor-not-allowed sm:size-9"
-                      disabled={!ltLineSettings.enabled}
-                      value={ltLineSettings.color}
-                      onChange={(event) => updateLtLineSettings({ color: event.target.value })}
-                    />
-                  </label>
-                  <LtRangeControl
-                    id="bg3d-lt-line-width"
-                    label="선 굵기"
-                    min={0.25}
-                    max={8}
-                    step={0.05}
-                    value={ltLineSettings.widthPx}
-                    valueText={`${round(ltLineSettings.widthPx, 2)} px`}
-                    disabled={!ltLineSettings.enabled}
-                    onChange={(widthPx) => updateLtLineSettings({ widthPx })}
-                  />
-                  <LtRangeControl
-                    id="bg3d-lt-line-strength"
-                    label="선 강도"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={ltLineSettings.strength}
-                    valueText={`${Math.round(ltLineSettings.strength * 100)}%`}
-                    disabled={!ltLineSettings.enabled}
-                    onChange={(strength) => updateLtLineSettings({ strength })}
-                  />
-
-                  <details className="group border-b border-line/70">
-                    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 py-2 text-xs font-semibold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-                      정밀 선 검출
-                      <span className="flex items-center gap-1 text-[0.64rem] font-normal text-fg-3">
-                        모서리 · 깊이 · 질감
-                        <ChevronDown className="transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" size={13} aria-hidden />
-                      </span>
-                    </summary>
-                    <div className="border-t border-line/60 pl-2">
-                      <LtRangeControl
-                        id="bg3d-lt-line-accuracy"
-                        label="검출 정밀도"
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        value={ltLineSettings.accuracy}
-                        valueText={`${Math.round(ltLineSettings.accuracy * 100)}%`}
-                        disabled={!ltLineSettings.enabled}
-                        onChange={(accuracy) => updateLtLineSettings({ accuracy })}
-                      />
-                      <LtRangeControl
-                        id="bg3d-lt-line-exterior"
-                        label="외곽선 강조"
-                        min={0}
-                        max={2}
-                        step={0.05}
-                        value={ltLineSettings.exteriorOutlineStrength}
-                        valueText={`${round(ltLineSettings.exteriorOutlineStrength, 2)}×`}
-                        disabled={!ltLineSettings.enabled}
-                        onChange={(exteriorOutlineStrength) => updateLtLineSettings({ exteriorOutlineStrength })}
-                      />
-                      <LtRangeControl
-                        id="bg3d-lt-line-smoothing"
-                        label="선 다듬기"
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        value={ltLineSettings.smoothing}
-                        valueText={`${Math.round(ltLineSettings.smoothing * 100)}%`}
-                        disabled={!ltLineSettings.enabled}
-                        onChange={(smoothing) => updateLtLineSettings({ smoothing })}
-                      />
-                      <LtRangeControl
-                        id="bg3d-lt-line-crease"
-                        label="모서리 각도"
-                        min={0}
-                        max={180}
-                        step={1}
-                        value={ltLineSettings.creaseAngleDegrees}
-                        valueText={`${Math.round(ltLineSettings.creaseAngleDegrees)}°`}
-                        disabled={!ltLineSettings.enabled}
-                        onChange={(creaseAngleDegrees) => updateLtLineSettings({ creaseAngleDegrees })}
-                      />
-                      <LtToggleRow
-                        checked={ltLineSettings.scaleAwareAccuracy}
-                        label="화면 크기 보정"
-                        disabled={!ltLineSettings.enabled}
-                        onChange={(scaleAwareAccuracy) => updateLtLineSettings({ scaleAwareAccuracy })}
-                      />
-                      <LtToggleRow
-                        checked={ltLineSettings.hiddenLineRemoval}
-                        label="가려진 선 제거"
-                        disabled={!ltLineSettings.enabled}
-                        onChange={(hiddenLineRemoval) => updateLtLineSettings({ hiddenLineRemoval })}
-                      />
-                      <LtToggleRow
-                        checked={ltLineSettings.depthEnabled}
-                        label="깊이선 검출"
-                        disabled={!ltLineSettings.enabled}
-                        onChange={(depthEnabled) => updateLtLineSettings({ depthEnabled })}
-                      />
-                      {ltLineSettings.depthEnabled ? (
-                        <>
-                          <LtRangeControl
-                            id="bg3d-lt-line-depth"
-                            label="깊이선 강도"
-                            min={0}
-                            max={1}
-                            step={0.01}
-                            value={ltLineSettings.depthStrength}
-                            valueText={`${Math.round(ltLineSettings.depthStrength * 100)}%`}
-                            disabled={!ltLineSettings.enabled}
-                            onChange={(depthStrength) => updateLtLineSettings({ depthStrength })}
-                          />
-                          <LtToggleRow
-                            checked={ltLineSettings.depthOutlineOnly}
-                            label="깊이 외곽선만"
-                            disabled={!ltLineSettings.enabled}
-                            onChange={(depthOutlineOnly) => updateLtLineSettings({ depthOutlineOnly })}
-                          />
-                        </>
-                      ) : null}
-                      <LtToggleRow
-                        checked={ltLineSettings.textureLineEnabled}
-                        label="재질선 검출"
-                        disabled={!ltLineSettings.enabled}
-                        onChange={(textureLineEnabled) => updateLtLineSettings({ textureLineEnabled })}
-                      />
-                      {ltLineSettings.textureLineEnabled ? (
-                        <LtRangeControl
-                          id="bg3d-lt-line-texture"
-                          label="재질선 강도"
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          value={ltLineSettings.textureLineStrength}
-                          valueText={`${Math.round(ltLineSettings.textureLineStrength * 100)}%`}
-                          disabled={!ltLineSettings.enabled}
-                          onChange={(textureLineStrength) => updateLtLineSettings({ textureLineStrength })}
-                        />
-                      ) : null}
-                    </div>
-                  </details>
-                </div>
-
-                <div hidden={ltEditorSection !== "tone"} className="mt-3">
-                  <label htmlFor="bg3d-lt-tone-mode" className="flex min-h-11 items-center justify-between gap-3 border-b border-line/70 py-1.5 text-xs font-semibold text-fg-2">
-                    베이스 방식
-                    <select
-                      id="bg3d-lt-tone-mode"
-                      value={ltToneSettings.mode}
-                      className="min-h-11 min-w-36 rounded-lg border border-line bg-card px-2.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
-                      onChange={(event) => {
-                        const mode = event.target.value as StudioBg3dToneOutputSettings["mode"];
-                        updateLtToneSettings({
-                          mode,
-                          ...(mode === "screentone" ? { type: "pattern" as const } : {}),
-                        });
-                      }}
-                    >
-                      {Object.entries(LT_TONE_MODE_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
-                      ))}
-                    </select>
-                  </label>
-
-                  {ltToneSettings.mode === "none" ? (
-                    <p className="py-4 text-center text-[0.68rem] leading-relaxed text-fg-3">
-                      베이스가 꺼져 선만 출력됩니다. 위에서 원본 렌더·셀 명암·스크린톤을 선택하면 채움
-                      레이어 설정이 열립니다.
-                    </p>
-                  ) : (
-                    <>
-                      <label htmlFor="bg3d-lt-tone-type" className="flex min-h-11 items-center justify-between gap-3 border-b border-line/70 py-1.5 text-xs font-semibold text-fg-2">
-                        출력 유형
-                        <select
-                          id="bg3d-lt-tone-type"
-                          value={ltToneSettings.type}
-                          className="min-h-11 min-w-36 rounded-lg border border-line bg-card px-2.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
-                          onChange={(event) => updateLtToneSettings({ type: event.target.value as StudioBg3dToneOutputSettings["type"] })}
-                        >
-                          {Object.entries(LT_TONE_TYPE_LABELS).map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
-                          ))}
-                        </select>
-                      </label>
-                      {ltToneSettings.type === "pattern" || ltToneSettings.mode === "screentone" ? (
-                        <label htmlFor="bg3d-lt-tone-pattern" className="flex min-h-11 items-center justify-between gap-3 border-b border-line/70 py-1.5 text-xs font-semibold text-fg-2">
-                          패턴
-                          <select
-                            id="bg3d-lt-tone-pattern"
-                            value={ltToneSettings.pattern}
-                            className="min-h-11 min-w-36 rounded-lg border border-line bg-card px-2.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
-                            onChange={(event) => updateLtToneSettings({ pattern: event.target.value as StudioBg3dToneOutputSettings["pattern"] })}
-                          >
-                            {Object.entries(LT_TONE_PATTERN_LABELS).map(([value, label]) => (
-                              <option key={value} value={value}>{label}</option>
-                            ))}
-                          </select>
-                        </label>
-                      ) : null}
-                      <LtRangeControl
-                        id="bg3d-lt-tone-levels"
-                        label="명암 단계"
-                        min={2}
-                        max={8}
-                        step={1}
-                        value={ltToneSettings.levels}
-                        valueText={`${ltToneSettings.levels}단계`}
-                        onChange={(levels) => updateLtToneSettings({ levels })}
-                      />
-                      <LtRangeControl
-                        id="bg3d-lt-tone-opacity"
-                        label="베이스 농도"
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        value={ltToneSettings.opacity}
-                        valueText={`${Math.round(ltToneSettings.opacity * 100)}%`}
-                        onChange={(opacity) => updateLtToneSettings({ opacity })}
-                      />
-                      <details className="group border-b border-line/70">
-                        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 py-2 text-xs font-semibold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-                          스크린 정밀 설정
-                          <span className="flex items-center gap-1 text-[0.64rem] font-normal text-fg-3">
-                            선수 · 각도
-                            <ChevronDown className="transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" size={13} aria-hidden />
-                          </span>
-                        </summary>
-                        <div className="border-t border-line/60 pl-2">
-                          <LtRangeControl
-                            id="bg3d-lt-tone-frequency"
-                            label="패턴 선수"
-                            min={1}
-                            max={200}
-                            step={1}
-                            value={ltToneSettings.frequency}
-                            valueText={`${Math.round(ltToneSettings.frequency)} LPI`}
-                            onChange={(frequency) => updateLtToneSettings({ frequency })}
-                          />
-                          <LtRangeControl
-                            id="bg3d-lt-tone-angle"
-                            label="패턴 각도"
-                            min={-180}
-                            max={180}
-                            step={1}
-                            value={ltToneSettings.angleDegrees}
-                            valueText={`${Math.round(ltToneSettings.angleDegrees)}°`}
-                            onChange={(angleDegrees) => updateLtToneSettings({ angleDegrees })}
-                          />
-                        </div>
-                      </details>
-                    </>
-                  )}
-                </div>
-              </section>
+<StudioBg3dLtPanel
+                hidden={hideOnTab("lt")}
+                context={{
+                  ScanLine,
+                  appliedLtPresetId,
+                  applyLtPreset,
+                  STUDIO_BG3D_LT_BUILT_IN_PRESETS,
+                  ltUserPresetPayload,
+                  appliedLtPreset,
+                  Save,
+                  STUDIO_BG3D_LT_PRESET_MAX_COUNT,
+                  ltUserPresetLibraryStatus,
+                  ChevronDown,
+                  managedLtUserPreset,
+                  STUDIO_BG3D_LT_PRESET_MAX_NAME_LENGTH,
+                  ltUserPresetName,
+                  setLtUserPresetName,
+                  setLtDeleteConfirmId,
+                  STUDIO_BG3D_LT_PRESET_MAX_DESCRIPTION_LENGTH,
+                  ltUserPresetDescription,
+                  setLtUserPresetDescription,
+                  updateManagedLtUserPreset,
+                  renameManagedLtUserPreset,
+                  PencilLine,
+                  ltDeleteConfirmId,
+                  deleteManagedLtUserPreset,
+                  Trash2,
+                  saveCurrentLtAsUserPreset,
+                  ltUserPresetNotice,
+                  ltCaptureSizePreview,
+                  sceneBaseDocument,
+                  updateLtExportHeight,
+                  LT_EXPORT_HEIGHTS,
+                  ltExportAspectRatio,
+                  ltCaptureAspectPresetId,
+                  ltCaptureAspectPresets,
+                  updateLtExportAspectRatio,
+                  ltLineSettings,
+                  LT_TONE_MODE_LABELS,
+                  ltToneSettings,
+                  LT_TONE_TYPE_LABELS,
+                  lineArtPreview,
+                  setLineArtPreview,
+                  ltTonePreviewStyle,
+                  ltEditorSection,
+                  setLtEditorSection,
+                  LtToggleRow,
+                  updateLtLineSettings,
+                  LtRangeControl,
+                  updateLtToneSettings,
+                  LT_TONE_PATTERN_LABELS,
+                }}
+              />
 
               <section hidden={hideOnTab("models")}>
                 <div className="mb-4">

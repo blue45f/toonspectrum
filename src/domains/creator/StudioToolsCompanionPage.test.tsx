@@ -263,6 +263,16 @@ function navigatorFrame(input: {
   });
 }
 
+async function emitDecodedNavigatorFrame(
+  channel: FakeBroadcastChannel,
+  message: ReturnType<typeof navigatorFrame>
+) {
+  await act(async () => {
+    channel.emit(message);
+    await Promise.resolve();
+  });
+}
+
 function SessionSwitchHarness() {
   const navigate = useNavigate();
   return (
@@ -281,6 +291,18 @@ function SessionSwitchHarness() {
 beforeEach(() => {
   FakeBroadcastChannel.instances.length = 0;
   vi.stubGlobal("BroadcastChannel", FakeBroadcastChannel);
+  vi.stubGlobal("Image", class {
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    naturalWidth = 640;
+    naturalHeight = 960;
+    width = 640;
+    height = 960;
+
+    set src(_value: string) {
+      this.onload?.();
+    }
+  });
   window.history.replaceState(null, "", `/studio/tools-companion?session=${sessionId}`);
   window.localStorage.clear();
 });
@@ -595,7 +617,7 @@ describe("StudioToolsCompanionPage", () => {
     });
   });
 
-  it("stops Navigator capture, revokes its URL, and rejects a late frame in presentation-safe mode", () => {
+  it("stops Navigator capture, revokes its URL, and rejects a late frame in presentation-safe mode", async () => {
     const { createObjectURL, revokeObjectURL } = installObjectUrlSpies();
     renderCompanion();
     const channel = FakeBroadcastChannel.instances[0]!;
@@ -609,7 +631,10 @@ describe("StudioToolsCompanionPage", () => {
         && message.control.kind === "navigator-demand"
       ));
 
-    act(() => channel.emit(navigatorFrame({ companionInstance, sequence: 1 })));
+    await emitDecodedNavigatorFrame(
+      channel,
+      navigatorFrame({ companionInstance, sequence: 1 })
+    );
     expect(screen.getByRole("img", { name: "현재 페이지 전체 캔버스" })).toBeTruthy();
     expect(createObjectURL).toHaveBeenCalledOnce();
 
@@ -799,13 +824,13 @@ describe("StudioToolsCompanionPage", () => {
     }));
   });
 
-  it("disconnects immediately only for an exact fresh primary goodbye", () => {
+  it("disconnects immediately only for an exact fresh primary goodbye", async () => {
     const { revokeObjectURL } = installObjectUrlSpies();
     renderCompanion(`/studio/tools-companion?session=${sessionId}&view=navigator`);
     const channel = FakeBroadcastChannel.instances[0]!;
     const companionInstance = companionInstanceId(channel);
     connectPrimary({ channel, companionInstance });
-    act(() => channel.emit(navigatorFrame({ companionInstance })));
+    await emitDecodedNavigatorFrame(channel, navigatorFrame({ companionInstance }));
     expect(screen.getByText(/연결됨/u)).toBeTruthy();
     expect(screen.getByAltText("현재 페이지 전체 캔버스")).toBeTruthy();
 
@@ -1596,14 +1621,17 @@ describe("StudioToolsCompanionPage", () => {
     expect(channel.close).toHaveBeenCalledOnce();
   });
 
-  it("fences navigator frames by target, generation, document revision and sequence", () => {
+  it("fences navigator frames by target, generation, document revision and sequence", async () => {
     const { createObjectURL, revokeObjectURL } = installObjectUrlSpies();
     renderCompanion();
     const channel = FakeBroadcastChannel.instances[0]!;
     const companionInstance = companionInstanceId(channel);
     connectPrimary({ channel, companionInstance });
 
-    act(() => channel.emit(navigatorFrame({ companionInstance, marker: "first" })));
+    await emitDecodedNavigatorFrame(
+      channel,
+      navigatorFrame({ companionInstance, marker: "first" })
+    );
     fireEvent.click(screen.getByRole("tab", { name: "Navigator" }));
     expect(screen.getByAltText("현재 페이지 전체 캔버스").getAttribute("src")).toContain("blob:frame");
     expect(createObjectURL).toHaveBeenCalledOnce();
@@ -1615,7 +1643,10 @@ describe("StudioToolsCompanionPage", () => {
     });
     expect(createObjectURL).toHaveBeenCalledOnce();
 
-    act(() => channel.emit(navigatorFrame({ companionInstance, sequence: 2, marker: "second" })));
+    await emitDecodedNavigatorFrame(
+      channel,
+      navigatorFrame({ companionInstance, sequence: 2, marker: "second" })
+    );
     expect(createObjectURL).toHaveBeenCalledTimes(2);
     expect(revokeObjectURL).toHaveBeenCalledTimes(1);
 
@@ -1631,7 +1662,10 @@ describe("StudioToolsCompanionPage", () => {
 
     act(() => channel.emit(navigatorFrame({ companionInstance, revision: 5, sequence: 3 })));
     expect(createObjectURL).toHaveBeenCalledTimes(2);
-    act(() => channel.emit(navigatorFrame({ companionInstance, revision: 6, sequence: 4 })));
+    await emitDecodedNavigatorFrame(
+      channel,
+      navigatorFrame({ companionInstance, revision: 6, sequence: 4 })
+    );
     expect(createObjectURL).toHaveBeenCalledTimes(3);
 
     act(() => channel.emit(buildStudioCompanionReviewState({
@@ -1644,7 +1678,87 @@ describe("StudioToolsCompanionPage", () => {
     expect(revokeObjectURL).toHaveBeenCalledTimes(3);
   });
 
-  it("shares command/control sequence and coalesces brush and navigator streams", () => {
+  it("keeps the decoded Navigator image visible across decode failure and racing frames", async () => {
+    class ControlledNavigatorImage {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      naturalWidth = 0;
+      naturalHeight = 0;
+      width = 0;
+      height = 0;
+      url = "";
+
+      set src(value: string) {
+        this.url = value;
+        pendingImages.push(this);
+      }
+
+      succeed(width = 640, height = 960) {
+        this.naturalWidth = width;
+        this.naturalHeight = height;
+        this.onload?.();
+      }
+    }
+    const pendingImages: ControlledNavigatorImage[] = [];
+    vi.stubGlobal("Image", ControlledNavigatorImage);
+    const { createObjectURL, revokeObjectURL } = installObjectUrlSpies();
+    renderCompanion();
+    const channel = FakeBroadcastChannel.instances[0]!;
+    const companionInstance = companionInstanceId(channel);
+    connectPrimary({ channel, companionInstance });
+    fireEvent.click(screen.getByRole("tab", { name: "Navigator" }));
+
+    act(() => channel.emit(navigatorFrame({ companionInstance, marker: "first" })));
+    const firstUrl = createObjectURL.mock.results[0]?.value as string;
+    expect(screen.queryByAltText("현재 페이지 전체 캔버스")).toBeNull();
+    await act(async () => {
+      pendingImages[0]?.succeed();
+      await Promise.resolve();
+    });
+    expect(screen.getByAltText("현재 페이지 전체 캔버스").getAttribute("src")).toBe(firstUrl);
+
+    act(() => channel.emit(navigatorFrame({
+      companionInstance,
+      sequence: 2,
+      marker: "bad-dimensions",
+    })));
+    const mismatchedUrl = createObjectURL.mock.results[1]?.value as string;
+    expect(screen.getByAltText("현재 페이지 전체 캔버스").getAttribute("src")).toBe(firstUrl);
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+    await act(async () => {
+      pendingImages[1]?.succeed(320, 480);
+      await Promise.resolve();
+    });
+    expect(screen.getByAltText("현재 페이지 전체 캔버스").getAttribute("src")).toBe(firstUrl);
+    expect(revokeObjectURL).toHaveBeenCalledWith(mismatchedUrl);
+
+    act(() => channel.emit(navigatorFrame({
+      companionInstance,
+      sequence: 3,
+      marker: "superseded",
+    })));
+    const supersededUrl = createObjectURL.mock.results[2]?.value as string;
+    act(() => channel.emit(navigatorFrame({
+      companionInstance,
+      sequence: 4,
+      marker: "newest",
+    })));
+    const newestUrl = createObjectURL.mock.results[3]?.value as string;
+    expect(revokeObjectURL).toHaveBeenCalledWith(supersededUrl);
+    await act(async () => {
+      pendingImages[2]?.succeed();
+      await Promise.resolve();
+    });
+    expect(screen.getByAltText("현재 페이지 전체 캔버스").getAttribute("src")).toBe(firstUrl);
+    await act(async () => {
+      pendingImages[3]?.succeed();
+      await Promise.resolve();
+    });
+    expect(screen.getByAltText("현재 페이지 전체 캔버스").getAttribute("src")).toBe(newestUrl);
+    expect(revokeObjectURL).toHaveBeenCalledWith(firstUrl);
+  });
+
+  it("shares command/control sequence and coalesces brush and navigator streams", async () => {
     vi.useFakeTimers();
     installObjectUrlSpies();
     renderCompanion();
@@ -1676,7 +1790,7 @@ describe("StudioToolsCompanionPage", () => {
       }),
     ]);
 
-    act(() => channel.emit(navigatorFrame({ companionInstance })));
+    await emitDecodedNavigatorFrame(channel, navigatorFrame({ companionInstance }));
     fireEvent.click(screen.getByRole("tab", { name: "Navigator" }));
     const navigator = screen.getByRole("button", {
       name: "전체 캔버스 미리보기에서 보이는 위치 이동",
@@ -1700,7 +1814,7 @@ describe("StudioToolsCompanionPage", () => {
     fireEvent(navigator, new Event("lostpointercapture", { bubbles: true }));
   });
 
-  it("revokes navigator URLs on expiry, session switch and unmount", () => {
+  it("revokes navigator URLs on expiry, session switch and unmount", async () => {
     vi.useFakeTimers();
     const { revokeObjectURL } = installObjectUrlSpies();
     const view = render(
@@ -1711,24 +1825,30 @@ describe("StudioToolsCompanionPage", () => {
     const first = FakeBroadcastChannel.instances[0]!;
     const firstCompanion = companionInstanceId(first);
     connectPrimary({ channel: first, companionInstance: firstCompanion });
-    act(() => first.emit(navigatorFrame({ companionInstance: firstCompanion })));
+    await emitDecodedNavigatorFrame(
+      first,
+      navigatorFrame({ companionInstance: firstCompanion })
+    );
 
     act(() => vi.advanceTimersByTime(12_001));
     expect(revokeObjectURL).toHaveBeenCalledTimes(1);
 
     connectPrimary({ channel: first, companionInstance: firstCompanion, generation: 2 });
-    act(() => first.emit(navigatorFrame({
+    await emitDecodedNavigatorFrame(first, navigatorFrame({
       companionInstance: firstCompanion,
       generation: 2,
       sequence: 2,
-    })));
+    }));
     fireEvent.click(screen.getByRole("button", { name: "세션 전환" }));
     expect(revokeObjectURL).toHaveBeenCalledTimes(2);
 
     const second = FakeBroadcastChannel.instances[1]!;
     const secondCompanion = companionInstanceId(second);
     connectPrimary({ channel: second, companionInstance: secondCompanion });
-    act(() => second.emit(navigatorFrame({ companionInstance: secondCompanion })));
+    await emitDecodedNavigatorFrame(
+      second,
+      navigatorFrame({ companionInstance: secondCompanion })
+    );
     view.unmount();
     expect(revokeObjectURL).toHaveBeenCalledTimes(3);
   });

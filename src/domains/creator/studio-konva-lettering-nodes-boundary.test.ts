@@ -137,18 +137,18 @@ const PAGE_PROPS = ["key", "el", ...INTERACTION_PROPS] as const;
 
 describe("Studio Konva lettering node boundary", () => {
   it("moves text, text-path, and sticker rendering out of StudioPage", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const nodes = moduleShape("./StudioKonvaTextNodes.tsx");
 
     expect(
-      page.valueImports.filter((specifier) => specifier === "./StudioKonvaTextNodes"),
+      viewport.valueImports.filter((specifier) => specifier === "./StudioKonvaTextNodes"),
     ).toEqual(["./StudioKonvaTextNodes"]);
-    expect(page.source.match(/<StudioKonvaTextNode\b/gu)).toHaveLength(1);
-    expect(page.source.match(/<StudioKonvaStickerNode\b/gu)).toHaveLength(1);
-    expect(page.source).not.toContain("<KTextPath");
-    expect(page.source).not.toContain("textNodeProps<Partial<El>>");
-    expect(page.source).not.toContain("buildTextPathData(");
-    expect(page.source).not.toMatch(/el\.type === "text"\s*&&\s*el\.textPath/u);
+    expect(viewport.source.match(/<StudioKonvaTextNode\b/gu)).toHaveLength(1);
+    expect(viewport.source.match(/<StudioKonvaStickerNode\b/gu)).toHaveLength(1);
+    expect(viewport.source).not.toContain("<KTextPath");
+    expect(viewport.source).not.toContain("textNodeProps<Partial<El>>");
+    expect(viewport.source).not.toContain("buildTextPathData(");
+    expect(viewport.source).not.toMatch(/el\.type === "text"\s*&&\s*el\.textPath/u);
     expect(nodes.exportedDeclarations).toEqual(new Set([
       "StudioTextTransformOptions",
       "StudioKonvaTextNodeProps",
@@ -159,17 +159,17 @@ describe("Studio Konva lettering node boundary", () => {
   });
 
   it("moves the complete bubble renderer behind one clipped Page call site", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const bubbleNode = moduleShape("./StudioKonvaBubbleNode.tsx");
 
     expect(
-      page.valueImports.filter((specifier) => specifier === "./StudioKonvaBubbleNode"),
+      viewport.valueImports.filter((specifier) => specifier === "./StudioKonvaBubbleNode"),
     ).toEqual(["./StudioKonvaBubbleNode"]);
-    expect(page.source.match(/<StudioKonvaBubbleNode\b/gu)).toHaveLength(1);
-    expect(page.source).not.toContain("const avgSize = (el.width + el.height) / 2;");
-    expect(page.source).not.toContain("const tailHandle =");
-    expect(page.source).not.toContain("bubblePathData(el.width");
-    expect(page.source).not.toContain("fitBubbleFontSize(");
+    expect(viewport.source.match(/<StudioKonvaBubbleNode\b/gu)).toHaveLength(1);
+    expect(viewport.source).not.toContain("const avgSize = (el.width + el.height) / 2;");
+    expect(viewport.source).not.toContain("const tailHandle =");
+    expect(viewport.source).not.toContain("bubblePathData(el.width");
+    expect(viewport.source).not.toContain("fitBubbleFontSize(");
     expect(bubbleNode.exportedDeclarations).toEqual(new Set([
       "StudioKonvaBubbleNodeProps",
       "StudioKonvaBubbleNode",
@@ -177,7 +177,7 @@ describe("Studio Konva lettering node boundary", () => {
   });
 
   it("locks the shared interaction contract, Extract element types, and both Page call sites", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const nodes = moduleShape("./StudioKonvaTextNodes.tsx");
 
     expect(propertyNames(findInterface(nodes, "StudioKonvaTextInteractionProps").members)).toEqual(
@@ -189,7 +189,7 @@ describe("Studio Konva lettering node boundary", () => {
     expect(nodes.source).toContain('el: Extract<El, { type: "sticker" }>;');
 
     for (const name of ["StudioKonvaTextNode", "StudioKonvaStickerNode"] as const) {
-      const attributes = jsxAttributes(findJsx(page, name));
+      const attributes = jsxAttributes(findJsx(viewport, name));
       expect([...attributes.keys()]).toEqual(PAGE_PROPS);
       expect(attributes.get("el")).toBe("{el}");
       expect(attributes.get("draggable")).toBe("{draggable}");
@@ -230,7 +230,7 @@ describe("Studio Konva lettering node boundary", () => {
   });
 
   it("locks the minimal bubble props and resolves the live draft at the Page boundary", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const bubbleNode = moduleShape("./StudioKonvaBubbleNode.tsx");
     const expectedProps = [
       "el",
@@ -253,7 +253,7 @@ describe("Studio Konva lettering node boundary", () => {
       expectedProps,
     );
     expect(bubbleNode.source).toContain('el: Extract<El, { type: "bubble" }>;');
-    const attributes = jsxAttributes(findJsx(page, "StudioKonvaBubbleNode"));
+    const attributes = jsxAttributes(findJsx(viewport, "StudioKonvaBubbleNode"));
     expect([...attributes.keys()]).toEqual(["key", ...expectedProps]);
     expect(attributes.get("el")).toBe("{el}");
     expect(attributes.get("theme")).toBe("{webtoonTheme}");

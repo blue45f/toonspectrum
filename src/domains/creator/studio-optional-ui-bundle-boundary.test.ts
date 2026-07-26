@@ -145,7 +145,7 @@ describe("Studio optional UI bundle boundaries", () => {
   });
 
   it("uses local passive Suspense boundaries for lazy Konva overlays", () => {
-    const source = moduleEdges("./StudioPage.tsx").source;
+    const source = moduleEdges("./StudioCanvasViewport.tsx").source;
     const guideSource = moduleEdges("./StudioCanvasGuideLayers.tsx").source;
 
     for (const component of [

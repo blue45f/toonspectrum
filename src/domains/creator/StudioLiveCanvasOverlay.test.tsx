@@ -1121,6 +1121,59 @@ describe("StudioLiveCanvasOverlay", () => {
     expect(html).not.toContain("안전하게 동기화됨");
   });
 
+  it("keeps save protection at 44px through 411px and expands presence chrome from 412px", () => {
+    const onOpenTeam = vi.fn();
+    render(
+      <StudioLivePresenceDock
+        connected={false}
+        alwaysOn
+        peers={[
+          {
+            sessionId: "peer-compact",
+            displayName: "민호",
+            role: "editor",
+            visibility: "active",
+            pageId: "page-1",
+            lastSeenAt: 1,
+          },
+        ]}
+        followingSessionId="peer-compact"
+        onOpenTeam={onOpenTeam}
+        onToggleFollow={noop}
+        syncSnapshot={syncedSnapshot({
+          phase: "durability-risk",
+          persistenceDurability: "degraded",
+          transportReady: false,
+          pendingCount: 3,
+          editsDurablyProtected: false,
+          message: "로컬 복구 저장소를 사용할 수 없습니다.",
+        })}
+      />
+    );
+
+    const team = screen.getByRole("button", { name: "팀 작업 공간 열기" });
+    expect(team.className).toContain("max-[411px]:hidden");
+
+    const sync = screen.getByRole("button", {
+      name: /저장 보호 필요.*팀 작업 공간 열기/u,
+    });
+    expect(sync.className).toContain("size-11");
+    expect(sync.className).toContain("min-h-11");
+    expect(sync.className).toContain("min-w-11");
+    expect(sync.className).toContain("min-[412px]:w-auto");
+    expect(sync.querySelector("span")?.className).toContain("max-[411px]:hidden");
+
+    expect(screen.getByRole("group", { name: "참여자" }).className)
+      .toContain("max-[411px]:hidden");
+    expect(
+      screen.getAllByRole("button", { name: "민호 따라가기 중지" })
+        .some((button) => button.className.includes("max-[411px]:hidden"))
+    ).toBe(true);
+
+    fireEvent.click(sync);
+    expect(onOpenTeam).toHaveBeenCalledOnce();
+  });
+
   it("shows a Korean offline queue count with reduced-motion-safe reconnect affordance", () => {
     const html = renderToStaticMarkup(
       <StudioLivePresenceDock

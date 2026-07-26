@@ -149,10 +149,10 @@ const OVERLAY_PROPS = [
 
 describe("Studio canvas guide layer ownership boundary", () => {
   it("keeps one-way guide rendering ownership outside StudioPage", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const guides = moduleShape("./StudioCanvasGuideLayers.tsx");
 
-    expect(page.valueImports.filter((specifier) => specifier === "./StudioCanvasGuideLayers"))
+    expect(viewport.valueImports.filter((specifier) => specifier === "./StudioCanvasGuideLayers"))
       .toEqual(["./StudioCanvasGuideLayers"]);
     expect(guides.allImports).not.toContain("./StudioPage");
     expect(guides.dynamicImports).toEqual([]);
@@ -175,17 +175,17 @@ describe("Studio canvas guide layer ownership boundary", () => {
   });
 
   it("locks both exported contracts and their Page call sites", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const guides = moduleShape("./StudioCanvasGuideLayers.tsx");
 
     expect(interfacePropNames(guides, "StudioCanvasGuideUnderlayProps")).toEqual(UNDERLAY_PROPS);
     expect(interfacePropNames(guides, "StudioCanvasGuideOverlayLayersProps")).toEqual(OVERLAY_PROPS);
-    expect(jsxPropNames(findJsx(page, "StudioCanvasGuideUnderlay"))).toEqual(UNDERLAY_PROPS);
-    expect(jsxPropNames(findJsx(page, "StudioCanvasGuideOverlayLayers"))).toEqual(OVERLAY_PROPS);
+    expect(jsxPropNames(findJsx(viewport, "StudioCanvasGuideUnderlay"))).toEqual(UNDERLAY_PROPS);
+    expect(jsxPropNames(findJsx(viewport, "StudioCanvasGuideOverlayLayers"))).toEqual(OVERLAY_PROPS);
   });
 
   it("preserves the underlay/document/overlay Stage z-order", () => {
-    const source = moduleShape("./StudioPage.tsx").source;
+    const source = moduleShape("./StudioCanvasViewport.tsx").source;
     const mainLayer = source.indexOf("<Layer ref={mainLayerRef}>");
     const underlay = source.indexOf("<StudioCanvasGuideUnderlay", mainLayer);
     const authoredDocument = source.indexOf("const authoredCanvasRenderElements", underlay);

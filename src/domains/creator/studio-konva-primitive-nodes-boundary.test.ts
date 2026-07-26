@@ -122,6 +122,7 @@ const RESIZABLE_PROPS = [
 describe("Studio Konva primitive node boundary", () => {
   it("owns every primitive implementation outside StudioPage", () => {
     const page = moduleShape("./StudioPage.tsx");
+    const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const primitives = moduleShape("./StudioKonvaPrimitiveNodes.tsx");
 
     for (const name of MOVED_FUNCTIONS) {
@@ -135,11 +136,11 @@ describe("Studio Konva primitive node boundary", () => {
     expect(primitives.exportedDeclarations.has("seededRandom")).toBe(false);
     for (const name of LEGACY_COMPONENT_NAMES) {
       expect(page.topLevelDeclarations.has(name)).toBe(false);
-      expect(page.source).not.toMatch(new RegExp(`<${name}\\b`, "u"));
+      expect(viewport.source).not.toMatch(new RegExp(`<${name}\\b`, "u"));
     }
-    expect(page.imports.filter((specifier) => specifier === "./StudioKonvaPrimitiveNodes")).toEqual([
-      "./StudioKonvaPrimitiveNodes",
-    ]);
+    expect(
+      viewport.imports.filter((specifier) => specifier === "./StudioKonvaPrimitiveNodes"),
+    ).toEqual(["./StudioKonvaPrimitiveNodes"]);
   });
 
   it("keeps the module independent from StudioPage and imports Konva only as a type", () => {
@@ -159,7 +160,7 @@ describe("Studio Konva primitive node boundary", () => {
   });
 
   it("locks the exported component prop contracts and all four Page call sites", () => {
-    const page = moduleShape("./StudioPage.tsx");
+    const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const primitives = moduleShape("./StudioKonvaPrimitiveNodes.tsx");
 
     expect(componentPropNames(primitives, "StudioWorkAssetPlaceholderNode")).toEqual([
@@ -174,29 +175,29 @@ describe("Studio Konva primitive node boundary", () => {
     expect(componentPropNames(primitives, "StudioFocusLinesNode")).toEqual(RESIZABLE_PROPS);
     expect(componentPropNames(primitives, "StudioSpeedLinesNode")).toEqual(RESIZABLE_PROPS);
 
-    expect(jsxAttributeNames(findJsx(page, "StudioWorkAssetPlaceholderNode"))).toEqual([
+    expect(jsxAttributeNames(findJsx(viewport, "StudioWorkAssetPlaceholderNode"))).toEqual([
       "key",
       "placeholder",
       "scale",
     ]);
-    expect(jsxAttributeNames(findJsx(page, "StudioFramePanel"))).toEqual([
+    expect(jsxAttributeNames(findJsx(viewport, "StudioFramePanel"))).toEqual([
       "key",
       "el",
       "theme",
       ...RESIZABLE_PROPS.slice(1),
     ]);
-    expect(jsxAttributeNames(findJsx(page, "StudioFocusLinesNode"))).toEqual([
+    expect(jsxAttributeNames(findJsx(viewport, "StudioFocusLinesNode"))).toEqual([
       "key",
       ...RESIZABLE_PROPS,
     ]);
-    expect(jsxAttributeNames(findJsx(page, "StudioSpeedLinesNode"))).toEqual([
+    expect(jsxAttributeNames(findJsx(viewport, "StudioSpeedLinesNode"))).toEqual([
       "key",
       ...RESIZABLE_PROPS,
     ]);
   });
 
   it("preserves the frame, focus-line, speed-line, and placeholder branch order", () => {
-    const source = moduleShape("./StudioPage.tsx").source;
+    const source = moduleShape("./StudioCanvasViewport.tsx").source;
     const frame = source.indexOf("<StudioFramePanel");
     const focus = source.indexOf("<StudioFocusLinesNode");
     const speed = source.indexOf("<StudioSpeedLinesNode");

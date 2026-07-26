@@ -42,7 +42,12 @@ Primary reference: [GPUWeb specification — devices and device loss](https://gp
 
 The live-ink default remains Canvas 2D until the GPU-owned chunk feed demonstrates a lower p95 on
 real Apple/Intel/AMD/NVIDIA/Adreno/Mali devices without growing recovery memory. `webgpu` remains an
-explicit rollout option during that evidence-gathering phase.
+explicit rollout option during that evidence-gathering phase. Production canaries can instead keep
+the backend on `auto` and set `VITE_STUDIO_LIVE_INK_ROLLOUT_PERCENT`: the browser stores only one
+local 0–9999 percentile bucket (not a user/device identifier), admits the same cohort as the
+percentage grows, and fails closed when storage, Web Crypto, the WebGPU API, the adapter, the device,
+the stroke contract, or its first-frame receipt is unavailable. Missing or malformed percentages
+remain 0%, while `canvas2d` is the fleet-wide rollback switch.
 
 ## Pointer Events policy
 
@@ -82,7 +87,7 @@ Primary reference: [WebAssembly specifications](https://webassembly.github.io/sp
 
 1. OffscreenCanvas Worker replay for settled specialty brushes, isolated from live pointer input.
 2. Worker/Wasm A/B for large magic-wand/fill masks and median/convolution filters.
-3. GPU-owned immutable chunk recovery feed, followed by WebGPU `auto` rollout only after real-device
-   gates pass.
+3. Expand the now-bounded WebGPU `auto` cohort only after each real-device gate passes; compare the
+   same locally captured corpus at every percentage step and roll back to `canvas2d` on regression.
 4. Run the WebGL2 live-strip boundary as a compatibility canary only after adding backend latency
    telemetry and round-cap parity; keep Canvas authoritative until it wins the release gates.

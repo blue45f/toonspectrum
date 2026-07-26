@@ -36,6 +36,7 @@ interface MockDockButtonProps {
   readonly hintUnavailableReason?: string;
   readonly label: string;
   readonly onClick?: () => void;
+  readonly onFocus?: (event: import("react").FocusEvent<HTMLButtonElement>) => void;
   readonly title?: string;
 }
 
@@ -54,6 +55,7 @@ vi.mock("./studio-chrome-ui", () => ({
     hintPreviewVariant,
     hintUnavailableReason,
     onClick,
+    onFocus,
     title,
   }: MockDockButtonProps) => (
     <button
@@ -67,6 +69,7 @@ vi.mock("./studio-chrome-ui", () => ({
       data-hint-unavailable-reason={hintUnavailableReason}
       disabled={disabled}
       onClick={onClick}
+      onFocus={onFocus}
       title={hintDescription ? undefined : title}
     >
       {label}
@@ -101,7 +104,14 @@ vi.mock("./studio-page-lazy-ui", () => ({
   StudioBrushLibraryPanel: () => null,
   StudioBrushStudio: () => null,
   StudioShapePickerGrid: () => null,
-  StudioUnifiedBrushPicker: () => null,
+  StudioUnifiedBrushPicker: () => (
+    <section data-studio-unified-brush-picker="mobile">
+      <div data-studio-brush-tray="true">
+        <div role="listbox" aria-label="기본 프리셋 빠른 선택" />
+        <span data-studio-open-brush-library="true" />
+      </div>
+    </section>
+  ),
   loadStudioBrushStudio: vi.fn(async () => undefined),
 }));
 
@@ -486,6 +496,71 @@ describe("StudioMobileEditingDock", () => {
     expect(brushManager.style.bottom).toBe("22px");
     within(brushManager).getByRole("button", { name: "브러시 관리 닫기" }).click();
     expect(stableHandlers.dismissBrushManager).toHaveBeenCalledOnce();
+  });
+
+  it("reserves a shrinkable mobile lane for brush chips beside the catalog exit", () => {
+    render(
+      <StudioMobileEditingDock
+        {...createProps({ isMobile: true, mobileSheet: "draw" })}
+      />,
+    );
+
+    const drawSheet = screen.getByRole("dialog", { name: "브러시 설정" });
+    const layout = drawSheet.querySelector<HTMLElement>(
+      '[data-studio-mobile-unified-brush-layout="true"]',
+    );
+    expect(layout).not.toBeNull();
+    expect(layout?.classList.contains("min-w-0")).toBe(true);
+    expect(layout?.className).toContain(
+      "[&_[data-studio-brush-tray=true]>[role=listbox]]:flex-1",
+    );
+    expect(layout?.className).toContain(
+      "[&_[data-studio-brush-tray=true]>[role=listbox]]:min-w-0",
+    );
+    expect(
+      layout?.querySelector('[data-studio-brush-tray="true"] > [role="listbox"]'),
+    ).not.toBeNull();
+  });
+
+  it("keeps launcher focus but suppresses the first rich hint after dismissing draw settings", () => {
+    const onFocusWithin = vi.fn();
+    const setMobileSheet = vi.fn();
+    const view = render(
+      <div onFocus={onFocusWithin}>
+        <StudioMobileEditingDock
+          {...createProps({
+            isMobile: true,
+            mobileSheet: "draw",
+            setMobileSheet,
+          })}
+        />
+      </div>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "브러시 설정 닫기" }));
+    expect(setMobileSheet).toHaveBeenCalledWith(null);
+
+    view.rerender(
+      <div onFocus={onFocusWithin}>
+        <StudioMobileEditingDock
+          {...createProps({
+            isMobile: true,
+            mobileSheet: null,
+            setMobileSheet,
+          })}
+        />
+      </div>,
+    );
+    const launcher = screen.getByRole("button", {
+      name: "브러시 설정 (굵기·색·프리셋)",
+    });
+    launcher.focus();
+    expect(document.activeElement).toBe(launcher);
+    expect(onFocusWithin).not.toHaveBeenCalled();
+
+    launcher.blur();
+    launcher.focus();
+    expect(onFocusWithin).toHaveBeenCalledOnce();
   });
 
   it("announces each mobile draw control's next settings-sheet action", () => {

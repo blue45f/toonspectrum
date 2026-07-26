@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioCanvasViewportSource = readFileSync(
+  new URL("./StudioCanvasViewport.tsx", import.meta.url),
+  "utf8",
+);
 const globalsSource = readFileSync(new URL("../../styles/globals.css", import.meta.url), "utf8");
 const perspectiveSource = readFileSync(new URL("./StudioPerspectiveOverlay.tsx", import.meta.url), "utf8");
 const isometricSource = readFileSync(new URL("./StudioIsometricGridOverlay.tsx", import.meta.url), "utf8");
@@ -18,11 +22,19 @@ function studioPageSourceBetween(startMarker: string, endMarker: string): string
 
 describe("Studio canvas cursor integration boundary", () => {
   it("projects pan cursors to the workspace and precision cursors only to the paper", () => {
-    expect(studioPageSource).toContain("studioCanvasViewportCursorClassName(canvasCursorInput)");
-    expect(studioPageSource).toContain("studioCanvasCursorClassName(canvasCursorInput)");
-    expect(studioPageSource).toContain("data-studio-comment-placement-active={commentPinArmed");
-    expect(studioPageSource).toContain("data-studio-viewport-cursor={viewportCursorClassName");
-    expect(studioPageSource).toContain("data-studio-canvas-cursor={canvasCursorClassName");
+    expect(studioCanvasViewportSource).toContain(
+      "studioCanvasViewportCursorClassName(canvasCursorInput)",
+    );
+    expect(studioCanvasViewportSource).toContain("studioCanvasCursorClassName(canvasCursorInput)");
+    expect(studioCanvasViewportSource).toContain(
+      "data-studio-comment-placement-active={commentPinArmed",
+    );
+    expect(studioCanvasViewportSource).toContain(
+      "data-studio-viewport-cursor={viewportCursorClassName",
+    );
+    expect(studioCanvasViewportSource).toContain(
+      "data-studio-canvas-cursor={canvasCursorClassName",
+    );
   });
 
   it("wires saved brush cursor preferences to a renderer-specific contact cursor", () => {
@@ -52,12 +64,14 @@ describe("Studio canvas cursor integration boundary", () => {
       "updateBrushCursor(stage, pointerEvent, contactPoint, true);",
     );
 
-    expect(studioPageSource).toContain(
+    expect(studioCanvasViewportSource).toContain(
       "const brushCursorStyle = appSettings.general.brushCursorStyle"
     );
-    expect(studioPageSource).toContain("brushCursorStyle !== \"none\"");
-    expect(studioPageSource).toContain("<StudioBrushCursor");
-    expect(studioPageSource).toContain("brushId={drawMode === \"eraser\" ? \"eraser\" : brush}");
+    expect(studioCanvasViewportSource).toContain("brushCursorStyle !== \"none\"");
+    expect(studioCanvasViewportSource).toContain("<StudioBrushCursor");
+    expect(studioCanvasViewportSource).toContain(
+      "brushId={drawMode === \"eraser\" ? \"eraser\" : brush}",
+    );
     expect(snapshot).toBeGreaterThanOrEqual(0);
     expect(mapper).toBeGreaterThan(snapshot);
     expect(contactPoint).toBeGreaterThan(mapper);
@@ -79,8 +93,11 @@ describe("Studio canvas cursor integration boundary", () => {
     expect(rawUpdate).not.toContain("drawingRef.current =");
     expect(rawUpdate).not.toContain("appendDrawingCrdtSampleSuffix(");
     expect(rawUpdate).not.toContain("scheduleDraft(");
+    expect(studioCanvasViewportSource).toContain(
+      "transientPenInkSurfaceEnabled && webGpuViewportSurface",
+    );
     expect(studioPageSource).toContain(
-      "STUDIO_TRANSIENT_PEN_INK_SURFACE_ENABLED && webGpuViewportSurface",
+      "transientPenInkSurfaceEnabled={STUDIO_TRANSIENT_PEN_INK_SURFACE_ENABLED}",
     );
     expect(cursorRenderer).toContain("if (brushCursorDrawRafRef.current !== null) return;");
     expect(cursorRenderer).toContain("globalThis.requestAnimationFrame(() => {");

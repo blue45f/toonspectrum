@@ -212,7 +212,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   });
 }
 
-function decodeStudioCompanionReferenceImage(
+function decodeStudioCompanionBlobImage(
   url: string
 ): Promise<{ width: number; height: number } | null> {
   return new Promise((resolve) => {
@@ -811,7 +811,7 @@ export function StudioToolsCompanionPage() {
         owner.reject(handle);
         return;
       }
-      const decoded = await decodeStudioCompanionReferenceImage(handle.url);
+      const decoded = await decodeStudioCompanionBlobImage(handle.url);
       if (
         !decoded
         || presentationSafeRef.current
@@ -824,6 +824,51 @@ export function StudioToolsCompanionPage() {
       const url = owner.commit(handle, decoded.width, decoded.height);
       if (!url) return;
       setReferencePreview({ ...handle, url });
+    };
+
+    const stageNavigatorFrame = async (
+      frame: Extract<StudioCompanionMessage, { type: "navigator-frame" }>
+    ) => {
+      const owner = navigatorUrlOwnerRef.current;
+      if (!owner || presentationSafeRef.current) return;
+      const handle = owner.stage(frame.blob);
+      if (!handle) return;
+      if (
+        presentationSafeRef.current
+        || frame.primaryInstanceId !== targetPrimaryInstanceIdRef.current
+        || frame.generation !== generationRef.current
+        || frame.sequence !== navigatorSequenceRef.current
+        || frame.revision !== projectionDocumentRevisionRef.current
+        || owner.pending() !== handle
+      ) {
+        owner.reject(handle);
+        return;
+      }
+      const decoded = await decodeStudioCompanionBlobImage(handle.url);
+      if (
+        !decoded
+        || decoded.width !== frame.width
+        || decoded.height !== frame.height
+        || presentationSafeRef.current
+        || frame.primaryInstanceId !== targetPrimaryInstanceIdRef.current
+        || frame.generation !== generationRef.current
+        || frame.sequence !== navigatorSequenceRef.current
+        || frame.revision !== projectionDocumentRevisionRef.current
+        || owner.pending() !== handle
+      ) {
+        owner.reject(handle);
+        return;
+      }
+      const url = owner.commit(handle);
+      if (!url) return;
+      navigatorRevisionRef.current = frame.revision;
+      setNavigatorImage({
+        url,
+        width: frame.width,
+        height: frame.height,
+        revision: frame.revision,
+      });
+      markPrimaryActivity();
     };
 
     channel.onmessage = (event: MessageEvent) => {
@@ -1013,11 +1058,7 @@ export function StudioToolsCompanionPage() {
         if (msg.revision !== projectionDocumentRevisionRef.current) return;
         if (presentationSafeRef.current) return;
         navigatorSequenceRef.current = msg.sequence;
-        const url = navigatorUrlOwnerRef.current?.replace(msg.blob);
-        if (!url) return;
-        navigatorRevisionRef.current = msg.revision;
-        setNavigatorImage({ url, width: msg.width, height: msg.height, revision: msg.revision });
-        markPrimaryActivity();
+        void stageNavigatorFrame(msg);
         return;
       }
       if (msg.type === "pong") {

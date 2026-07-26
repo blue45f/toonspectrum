@@ -2,12 +2,22 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import controlFieldsSource from "./studio-bg3d-control-fields.tsx?raw";
-import background3dSource from "./StudioBackground3D.tsx?raw";
+import background3dEditorSource from "./StudioBackground3D.tsx?raw";
+import ltPanelSource from "./StudioBg3dLtPanel.tsx?raw";
 import {
   StudioBg3dPhysicsPanel,
   StudioBg3dPhysicsTransport,
 } from "./StudioBg3dPhysicsControls";
 import physicsControlsSource from "./StudioBg3dPhysicsControls.tsx?raw";
+import shapesPanelSource from "./StudioBg3dShapesPanel.tsx?raw";
+import viewPanelSource from "./StudioBg3dViewPanel.tsx?raw";
+
+const background3dSource = [
+  background3dEditorSource,
+  shapesPanelSource,
+  viewPanelSource,
+  ltPanelSource,
+].join("\n");
 
 function renderTransport(phase: "loading" | "paused" | "complete"): string {
   return renderToStaticMarkup(

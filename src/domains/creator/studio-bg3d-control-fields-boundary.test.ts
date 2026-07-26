@@ -54,6 +54,11 @@ function moduleImports(fileName: string) {
 describe("Studio BG3D control-field ownership boundary", () => {
   it("keeps field behavior in the dedicated module and scene wiring in the editor", () => {
     const editorSource = moduleSource("./StudioBackground3D.tsx");
+    const panelSource = [
+      moduleSource("./StudioBg3dShapesPanel.tsx"),
+      moduleSource("./StudioBg3dViewPanel.tsx"),
+      moduleSource("./StudioBg3dLtPanel.tsx"),
+    ].join("\n");
     const controlSource = moduleSource("./studio-bg3d-control-fields.tsx");
     const editorImports = moduleImports("./StudioBackground3D.tsx");
 
@@ -61,7 +66,7 @@ describe("Studio BG3D control-field ownership boundary", () => {
     for (const controlName of CONTROL_NAMES) {
       expect(editorSource).not.toContain(`function ${controlName}(`);
       expect(controlSource).toContain(`export function ${controlName}(`);
-      expect(editorSource).toContain(`<${controlName}`);
+      expect(panelSource).toContain(`<${controlName}`);
     }
   });
 

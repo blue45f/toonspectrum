@@ -19,22 +19,65 @@ import { appendFileSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { chromium, type Browser, type Locator, type Page } from "playwright";
 
 const SCRATCH = process.env.TOONSPECTRUM_VERIFY_DIR ?? join(tmpdir(), "toonspectrum-studio-launch");
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-// 이 검증기는 `vite preview`만 띄우므로 Nest API를 의도적으로 기동하지 않는다. 아래 두 요청은
-// UI 부트에 필수가 아닌 best-effort 작업(카탈로그 병합·AI 제공자 상태·방문 집계)이고, API 부재가 Studio
-// 렌더/상호작용 회귀처럼 strict gate를 막아서는 안 된다. 다른 console error는 계속 실패 처리한다.
+// 이 검증기는 `vite preview`만 띄우므로 Nest API를 의도적으로 기동하지 않는다. 아래 요청과
+// 정확히 일치하는 로컬 Socket.IO handshake 종료는 UI 부트에 필수가 아닌 best-effort 작업이고,
+// API 부재가 Studio 렌더/상호작용 회귀처럼 strict gate를 막아서는 안 된다. 다른 console error는
+// 계속 실패 처리한다.
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
-  "/api/v1/apps/toonspectrum/visits/ping",
 ] as const;
 
-function isExpectedStaticPreviewApiError(message: string): boolean {
-  return OPTIONAL_STATIC_PREVIEW_API_PATHS.some((path) => message.includes(path));
+export function isExpectedStaticPreviewApiError(
+  message: string,
+  studioUrl: string,
+): boolean {
+  let preview: URL;
+  try {
+    preview = new URL(studioUrl);
+  } catch {
+    return false;
+  }
+  if (
+    preview.protocol !== "http:"
+    || preview.hostname !== "127.0.0.1"
+    || preview.port.length === 0
+  ) {
+    return false;
+  }
+
+  if (
+    OPTIONAL_STATIC_PREVIEW_API_PATHS.some(
+      (path) => message.includes(`${preview.origin}${path}`),
+    )
+  ) {
+    return true;
+  }
+
+  const expectedMessage = [
+    "WebSocket connection to ",
+    `'ws://127.0.0.1:${preview.port}/socket.io/?EIO=4&transport=websocket' failed: `,
+    "Connection closed before receiving a handshake response",
+  ].join("");
+  if (message === expectedMessage) return true;
+
+  const sourcePrefix = `${expectedMessage} @ `;
+  if (!message.startsWith(sourcePrefix)) return false;
+  try {
+    const source = new URL(message.slice(sourcePrefix.length));
+    return source.origin === preview.origin
+      && /^\/assets\/[A-Za-z0-9._-]+\.js$/u.test(source.pathname)
+      && source.search === ""
+      && source.hash === "";
+  } catch {
+    return false;
+  }
 }
 
 async function revealOverflowTarget(target: Locator): Promise<void> {
@@ -390,13 +433,18 @@ async function runOne(browser: Browser, run: number, url: string): Promise<RunRe
     if (m.type() === "error") {
       const location = m.location().url;
       const message = location ? `${m.text()} @ ${location}` : m.text();
-      if (!isExpectedStaticPreviewApiError(message)) consoleErrors.push(message);
+      if (!isExpectedStaticPreviewApiError(message, url)) consoleErrors.push(message);
     }
   });
   page.on("pageerror", (e) => consoleErrors.push(String(e)));
   page.on("response", (response) => {
     const message = `${response.status()} ${response.url()}`;
-    if (response.status() >= 500 && !isExpectedStaticPreviewApiError(message)) failedResponses.push(message);
+    if (
+      response.status() >= 500
+      && !isExpectedStaticPreviewApiError(message, url)
+    ) {
+      failedResponses.push(message);
+    }
   });
 
   // Dismiss quick-start before any navigation / storage init
@@ -517,7 +565,7 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     if (message.type() !== "error") return;
     const location = message.location().url;
     const text = location ? `${message.text()} @ ${location}` : message.text();
-    if (!isExpectedStaticPreviewApiError(text)) consoleErrors.push(text);
+    if (!isExpectedStaticPreviewApiError(text, url)) consoleErrors.push(text);
   });
   page.on("pageerror", (error) => consoleErrors.push(String(error)));
 
@@ -1037,7 +1085,7 @@ async function runMobileDockLayout(
     if (message.type() !== "error") return;
     const location = message.location().url;
     const value = location ? `${message.text()} @ ${location}` : message.text();
-    if (!isExpectedStaticPreviewApiError(value)) consoleErrors.push(value);
+    if (!isExpectedStaticPreviewApiError(value, url)) consoleErrors.push(value);
   });
   page.on("pageerror", (error) => consoleErrors.push(String(error)));
   await page.addInitScript(({ quickStartKey, mobileHintKey }) => {
@@ -1343,7 +1391,9 @@ async function main() {
   }
 }
 
-main().catch((error: unknown) => {
-  log(`FATAL: ${error instanceof Error ? error.message : String(error)}`);
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error: unknown) => {
+    log(`FATAL: ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+  });
+}

@@ -961,38 +961,118 @@ export function isStudioCompanionReviewProjection(
     && safeInteger(value.truncated.comments);
 }
 
+export type StudioCompanionNavigatorObjectUrlHandle = Readonly<{
+  url: string;
+}>;
+
+/**
+ * Owns one displayed Navigator Blob URL plus, at most, one decode candidate.
+ *
+ * The displayed URL is deliberately retained while the candidate is decoded. This prevents a
+ * fast frame cadence from revoking the `<img>` source before the browser has consumed it.
+ */
 export class StudioCompanionNavigatorObjectUrlOwner {
-  private currentUrl: string | null = null;
+  private currentValue: StudioCompanionNavigatorObjectUrlHandle | null = null;
+  private pendingValue: StudioCompanionNavigatorObjectUrlHandle | null = null;
 
   constructor(private readonly api: Pick<typeof URL, "createObjectURL" | "revokeObjectURL"> = URL) {}
 
-  replace(blob: Blob): string | null {
-    let next: string;
+  current(): StudioCompanionNavigatorObjectUrlHandle | null {
+    return this.currentValue;
+  }
+
+  pending(): StudioCompanionNavigatorObjectUrlHandle | null {
+    return this.pendingValue;
+  }
+
+  ownedCount(): number {
+    return Number(this.currentValue !== null) + Number(this.pendingValue !== null);
+  }
+
+  stage(blob: Blob): StudioCompanionNavigatorObjectUrlHandle | null {
+    const previousPending = this.pendingValue;
+    // Once a usable current image exists, discard an obsolete decode candidate before allocating
+    // another URL so the owner never transiently retains three URLs.
+    if (this.currentValue && previousPending) this.releasePending();
+
+    let url: string;
     try {
-      next = this.api.createObjectURL(blob);
+      url = this.api.createObjectURL(blob);
     } catch {
       return null;
     }
-    const previous = this.currentUrl;
-    this.currentUrl = next;
-    if (previous && previous !== next) {
-      try {
-        this.api.revokeObjectURL(previous);
-      } catch {
-        // The new URL remains owned even if an older browser URL was already revoked externally.
-      }
+
+    if (
+      typeof url !== "string"
+      || url.length === 0
+      || url.length > 2_048
+      || !url.startsWith("blob:")
+      || url === this.currentValue?.url
+      || url === previousPending?.url
+    ) {
+      const retainedPendingAlias = !this.currentValue && url === previousPending?.url;
+      if (
+        typeof url === "string"
+        && url
+        && url !== this.currentValue?.url
+        && !retainedPendingAlias
+      ) this.safeRevoke(url);
+      return null;
     }
-    return next;
+
+    const handle = Object.freeze({ url });
+    this.pendingValue = handle;
+    if (!this.currentValue && previousPending && previousPending.url !== url) {
+      this.safeRevoke(previousPending.url);
+    }
+    return handle;
+  }
+
+  commit(handle: StudioCompanionNavigatorObjectUrlHandle): string | null {
+    if (handle !== this.pendingValue) return null;
+    const previous = this.currentValue;
+    this.pendingValue = null;
+    this.currentValue = handle;
+    if (previous && previous.url !== handle.url) this.safeRevoke(previous.url);
+    return handle.url;
+  }
+
+  reject(handle: StudioCompanionNavigatorObjectUrlHandle): boolean {
+    if (handle !== this.pendingValue) return false;
+    this.releasePending();
+    return true;
+  }
+
+  /**
+   * Compatibility path for callers that do not need asynchronous decode fencing.
+   * Interactive Navigator rendering uses `stage` + `commit`.
+   */
+  replace(blob: Blob): string | null {
+    const handle = this.stage(blob);
+    return handle ? this.commit(handle) : null;
   }
 
   clear(): void {
-    if (!this.currentUrl) return;
+    const pending = this.pendingValue;
+    const current = this.currentValue;
+    this.pendingValue = null;
+    this.currentValue = null;
+    if (pending) this.safeRevoke(pending.url);
+    if (current && current.url !== pending?.url) this.safeRevoke(current.url);
+  }
+
+  private releasePending(): void {
+    const pending = this.pendingValue;
+    this.pendingValue = null;
+    if (pending) this.safeRevoke(pending.url);
+  }
+
+  private safeRevoke(url: string): void {
     try {
-      this.api.revokeObjectURL(this.currentUrl);
+      this.api.revokeObjectURL(url);
     } catch {
-      // Clearing ownership is more important than retaining a broken URL for another attempt.
+      // Ownership is cleared before revocation, so browser failures cannot retain stale state.
     }
-    this.currentUrl = null;
   }
 }
 

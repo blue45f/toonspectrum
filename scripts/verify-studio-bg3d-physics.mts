@@ -25,7 +25,8 @@ import { join } from "node:path";
 
 import { chromium, type Browser, type Locator, type Page } from "playwright";
 
-const ARTIFACT_DIR = process.env.TOONSPECTRUM_BG3D_VERIFY_DIR ??
+const ARTIFACT_DIR = process.env.TOONSPECTRUM_BG3D_PHYSICS_VERIFY_DIR ??
+  process.env.TOONSPECTRUM_BG3D_VERIFY_DIR ??
   join(process.cwd(), "artifacts", "browser", "studio-bg3d-physics");
 const LOG_PATH = join(ARTIFACT_DIR, "verify.log");
 const QUICK_START_KEY = "toonspectrum-studio-quick-start-dismissed";
@@ -34,7 +35,6 @@ const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
-  "/api/v1/apps/toonspectrum/visits/ping",
 ] as const;
 const VITE_ERROR_OVERLAY_SELECTOR = [
   "vite-error-overlay",
@@ -74,8 +74,41 @@ function log(message: string): void {
   }
 }
 
-function isExpectedStaticPreviewApiError(message: string): boolean {
-  return OPTIONAL_STATIC_PREVIEW_API_PATHS.some((path) => message.includes(path));
+function isExpectedStaticPreviewError(message: string, studioUrl: string): boolean {
+  if (OPTIONAL_STATIC_PREVIEW_API_PATHS.some((path) => message.includes(path))) return true;
+
+  let previewUrl: URL;
+  try {
+    previewUrl = new URL(studioUrl);
+  } catch {
+    return false;
+  }
+  if (
+    previewUrl.protocol !== "http:" ||
+    previewUrl.hostname !== "127.0.0.1" ||
+    previewUrl.port.length === 0
+  ) {
+    return false;
+  }
+
+  const socketUrl =
+    `ws://127.0.0.1:${previewUrl.port}/socket.io/?EIO=4&transport=websocket`;
+  const expectedMessage =
+    `WebSocket connection to '${socketUrl}' failed: ` +
+    "Connection closed before receiving a handshake response";
+  if (message === expectedMessage) return true;
+
+  const sourcePrefix = `${expectedMessage} @ `;
+  if (!message.startsWith(sourcePrefix)) return false;
+  try {
+    const sourceUrl = new URL(message.slice(sourcePrefix.length));
+    return sourceUrl.origin === previewUrl.origin &&
+      /^\/assets\/[A-Za-z0-9._-]+\.js$/u.test(sourceUrl.pathname) &&
+      sourceUrl.search === "" &&
+      sourceUrl.hash === "";
+  } catch {
+    return false;
+  }
 }
 
 function assertCondition(condition: unknown, message: string): asserts condition {
@@ -135,13 +168,13 @@ async function waitForServer(url: string, timeoutMs = 20_000): Promise<void> {
   throw new Error(`preview server did not become ready: ${url}`);
 }
 
-function collectBrowserErrors(page: Page): BrowserErrorCollector {
+function collectBrowserErrors(page: Page, studioUrl: string): BrowserErrorCollector {
   const errors: string[] = [];
   page.on("console", (message) => {
     if (message.type() !== "error") return;
     const location = message.location().url;
     const value = location ? `${message.text()} @ ${location}` : message.text();
-    if (!isExpectedStaticPreviewApiError(value)) errors.push(`console: ${value}`);
+    if (!isExpectedStaticPreviewError(value, studioUrl)) errors.push(`console: ${value}`);
   });
   page.on("pageerror", (error) => errors.push(`pageerror: ${String(error)}`));
   return { errors };
@@ -395,7 +428,7 @@ async function runDesktop(browser: Browser, url: string): Promise<string[]> {
   const screenshots: string[] = [];
   const context = await browser.newContext({ viewport: { width: 1_440, height: 1_100 } });
   const page = await context.newPage();
-  const collector = collectBrowserErrors(page);
+  const collector = collectBrowserErrors(page, url);
   await configureStudioPage(page);
   try {
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
@@ -541,7 +574,7 @@ async function runMobile(browser: Browser, url: string, width: 390 | 320): Promi
     isMobile: true,
   });
   const page = await context.newPage();
-  const collector = collectBrowserErrors(page);
+  const collector = collectBrowserErrors(page, url);
   await configureStudioPage(page);
   try {
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });

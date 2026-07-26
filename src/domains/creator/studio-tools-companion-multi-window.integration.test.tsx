@@ -81,6 +81,18 @@ let primaryRuntime: StudioCompanionPrimaryRuntime | null = null;
 beforeEach(() => {
   SharedBroadcastChannel.reset();
   vi.stubGlobal("BroadcastChannel", SharedBroadcastChannel);
+  vi.stubGlobal("Image", class {
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    naturalWidth = 640;
+    naturalHeight = 960;
+    width = 640;
+    height = 960;
+
+    set src(_value: string) {
+      queueMicrotask(() => this.onload?.());
+    }
+  });
   Object.defineProperty(URL, "createObjectURL", {
     configurable: true,
     value: vi.fn(() => "blob:multi-window-navigator-frame"),
