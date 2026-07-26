@@ -17624,6 +17624,7 @@ const puppetWarpArmed =
         });
         return;
       }
+
       // 앱 설정 → Shortcuts: user-bound chords (tool switchers etc.).
       const sc = appSettingsRef.current.shortcuts;
       if (matchStudioShortcut(sc["tool-select"], e)) {
@@ -18222,6 +18223,14 @@ const puppetWarpArmed =
       ) {
         e.preventDefault();
         finishPolyLassoSession();
+      } else if (mod && e.altKey && (e.key === "g" || e.key === "G" || e.key === "ㅎ")) {
+        // Photoshop / ClipStudio / Figma: ⌥⌘G (Alt+Cmd+G / Alt+Ctrl+G) = 클리핑 마스크 토글
+        e.preventDefault();
+        if (selected) {
+          const nextClip = !(selected as El & { clipToBelow?: boolean }).clipToBelow;
+          patchEl(selected.id, { clipToBelow: nextClip } as Partial<El>);
+          announceDrawingShortcut(nextClip ? "아래 레이어에 클리핑 마스크 적용 (Alt+Cmd+G)" : "클리핑 마스크 해제");
+        }
       } else if (mod && !e.altKey && (e.key === "g" || e.key === "G")) {
         // Figma/Illustrator/ClipStudio: ⌘G = 그룹 생성, ⇧⌘G = 그룹 해제
         e.preventDefault();
