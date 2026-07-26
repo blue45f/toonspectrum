@@ -22,6 +22,13 @@ const inspectorSources = [
     ),
   },
   {
+    file: "StudioPercentGuideControls.tsx",
+    source: readFileSync(
+      new URL("./StudioPercentGuideControls.tsx", import.meta.url),
+      "utf8"
+    ),
+  },
+  {
     file: "StudioInspectorBubbleAppearanceControls.tsx",
     source: readFileSync(
       new URL("./StudioInspectorBubbleAppearanceControls.tsx", import.meta.url),

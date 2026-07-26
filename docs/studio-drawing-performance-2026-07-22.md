@@ -47,7 +47,14 @@ the backend on `auto` and set `VITE_STUDIO_LIVE_INK_ROLLOUT_PERCENT`: the browse
 local 0–9999 percentile bucket (not a user/device identifier), admits the same cohort as the
 percentage grows, and fails closed when storage, Web Crypto, the WebGPU API, the adapter, the device,
 the stroke contract, or its first-frame receipt is unavailable. Missing or malformed percentages
-remain 0%, while `canvas2d` is the fleet-wide rollback switch.
+remain 0%. `VITE_STUDIO_LIVE_INK_KILL_SWITCH=on` dominates even an explicit `webgpu` build and is
+the immediate fleet-wide rollback path; `canvas2d` remains the explicit backend fallback.
+
+The cohort calculation now uses the common Studio feature-rollout core. That core also provides
+versioned and expiring validated-remote policies, checksum-protected last-known-good recovery,
+dependency gates, production-authorized QA overrides, and version-scoped failure cooldowns without
+adding a runtime network request. A remote policy is never admitted until its verification boundary
+marks it validated and the exact policy has been durably stored as last-known-good.
 
 ## Pointer Events policy
 

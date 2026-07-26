@@ -1,0 +1,291 @@
+import type {
+  StudioHistoryJournalNavigationTarget,
+  StudioHistoryJournalTransitionInput,
+  StudioPagesHistoryCommandJournal,
+} from "./studio-pages-history-command-journal";
+
+export type {
+  StudioHistoryJournalNavigationTarget,
+  StudioHistoryJournalTransitionInput,
+} from "./studio-pages-history-command-journal";
+
+const MAX_PENDING_HISTORY_JOURNAL_ACTIONS = 64;
+
+type StudioHistoryJournalClientAction =
+  | Readonly<{
+      kind: "transition";
+      input: StudioHistoryJournalTransitionInput;
+    }>
+  | Readonly<{
+      kind: "undo" | "redo" | "rebase";
+      target: StudioHistoryJournalNavigationTarget;
+    }>
+  | Readonly<{ kind: "reset" }>;
+
+interface StudioPagesHistoryCommandJournalRuntime {
+  recordTransition(input: StudioHistoryJournalTransitionInput): void;
+  recordUndo(target: StudioHistoryJournalNavigationTarget): unknown;
+  recordRedo(target: StudioHistoryJournalNavigationTarget): unknown;
+  rebase(target: StudioHistoryJournalNavigationTarget): void;
+  reset(): void;
+}
+
+export interface StudioPagesHistoryCommandJournalClientOptions {
+  readonly loadRuntime?: () => Promise<StudioPagesHistoryCommandJournalRuntime>;
+  readonly onError?: (cause: unknown) => void;
+}
+
+async function loadDefaultRuntime(): Promise<StudioPagesHistoryCommandJournal> {
+  const { createStudioPagesHistoryCommandJournal } = await import(
+    "./studio-pages-history-command-journal"
+  );
+  return createStudioPagesHistoryCommandJournal();
+}
+
+function actionTarget(
+  action: StudioHistoryJournalClientAction
+): StudioHistoryJournalNavigationTarget | null {
+  if (action.kind === "transition") {
+    return {
+      pages: action.input.nextPages,
+      historyIndex: action.input.nextHistoryIndex,
+    };
+  }
+  return action.kind === "reset" ? null : action.target;
+}
+
+/**
+ * Non-blocking facade for the integrity journal.
+ *
+ * The snapshot history remains authoritative, so Studio can accept the user's first edit while the
+ * journal chunk loads. Pending work is bounded; overload collapses to a checkpoint at the latest
+ * authoritative snapshot instead of retaining a large sequence of page graphs.
+ */
+export class StudioPagesHistoryCommandJournalClient {
+  private readonly loadRuntime: () => Promise<StudioPagesHistoryCommandJournalRuntime>;
+  private readonly onError: ((cause: unknown) => void) | undefined;
+  private runtime: StudioPagesHistoryCommandJournalRuntime | null = null;
+  private loadPromise: Promise<boolean> | null = null;
+  private pending: StudioHistoryJournalClientAction[] = [];
+  private latestTarget: StudioHistoryJournalNavigationTarget | null = null;
+  private lastReadinessError: unknown = null;
+  private disposed = false;
+
+  constructor(options: StudioPagesHistoryCommandJournalClientOptions = {}) {
+    this.loadRuntime = options.loadRuntime ?? loadDefaultRuntime;
+    this.onError = options.onError;
+  }
+
+  private apply(
+    runtime: StudioPagesHistoryCommandJournalRuntime,
+    action: StudioHistoryJournalClientAction
+  ): void {
+    if (action.kind === "transition") {
+      runtime.recordTransition(action.input);
+    } else if (action.kind === "undo") {
+      runtime.recordUndo(action.target);
+    } else if (action.kind === "redo") {
+      runtime.recordRedo(action.target);
+    } else if (action.kind === "rebase") {
+      runtime.rebase(action.target);
+    } else {
+      runtime.reset();
+    }
+  }
+
+  private reportError(cause: unknown): void {
+    try {
+      this.onError?.(cause);
+    } catch {
+      // Diagnostics must never escape into the creator's accepted edit path.
+    }
+  }
+
+  private retainLatestCheckpoint(): void {
+    if (this.disposed) {
+      this.pending = [];
+      return;
+    }
+    const checkpoint = this.latestTarget;
+    this.pending = checkpoint
+      ? [{ kind: "rebase", target: checkpoint }]
+      : [{ kind: "reset" }];
+  }
+
+  private recoverRuntime(
+    runtime: StudioPagesHistoryCommandJournalRuntime,
+    cause: unknown
+  ): boolean {
+    this.reportError(cause);
+    if (this.disposed) {
+      this.runtime = null;
+      return false;
+    }
+    try {
+      if (this.latestTarget) runtime.rebase(this.latestTarget);
+      else runtime.reset();
+      this.lastReadinessError = null;
+      return true;
+    } catch (recoveryCause) {
+      this.reportError(recoveryCause);
+      this.lastReadinessError = recoveryCause;
+      this.runtime = null;
+      this.retainLatestCheckpoint();
+      return false;
+    }
+  }
+
+  private ensureRuntime(): Promise<boolean> {
+    if (this.disposed) return Promise.resolve(false);
+    if (this.runtime) return Promise.resolve(true);
+    if (this.loadPromise) return this.loadPromise;
+    this.lastReadinessError = null;
+    const loadPromise = Promise.resolve()
+      // A custom loader is allowed for tests/alternate runtimes. Normalize a synchronous throw into
+      // this fail-open promise boundary rather than letting it escape from recordTransition().
+      .then(() => this.disposed ? null : this.loadRuntime())
+      .then((runtime) => {
+        if (this.disposed || !runtime) return false;
+        this.runtime = runtime;
+        const pending = this.pending;
+        this.pending = [];
+        for (const action of pending) {
+          if (this.disposed) {
+            this.runtime = null;
+            return false;
+          }
+          try {
+            this.apply(runtime, action);
+          } catch (cause) {
+            // A successful checkpoint recovery represents every remaining queued action because
+            // latestTarget always points at the authoritative final snapshot.
+            return this.recoverRuntime(runtime, cause);
+          }
+        }
+        this.lastReadinessError = null;
+        return true;
+      })
+      .catch((cause: unknown) => {
+        this.reportError(cause);
+        if (this.disposed) return false;
+        this.runtime = null;
+        this.lastReadinessError = cause;
+        this.retainLatestCheckpoint();
+        return false;
+      })
+      .finally(() => {
+        if (this.loadPromise === loadPromise) this.loadPromise = null;
+      });
+    this.loadPromise = loadPromise;
+    return loadPromise;
+  }
+
+  private enqueue(action: StudioHistoryJournalClientAction): void {
+    if (this.disposed) return;
+    const target = actionTarget(action);
+    if (action.kind === "reset") this.latestTarget = null;
+    else if (target) this.latestTarget = target;
+
+    const runtime = this.runtime;
+    if (runtime) {
+      try {
+        this.apply(runtime, action);
+      } catch (cause) {
+        if (!this.recoverRuntime(runtime, cause)) {
+          // One bounded retry may replace a runtime whose own recovery path failed. A failure while
+          // draining that retry remains checkpointed until the next action/ready() call.
+          void this.ensureRuntime();
+        }
+      }
+      return;
+    }
+
+    const previous = this.pending.at(-1);
+    if (
+      action.kind === "transition"
+      && previous?.kind === "transition"
+      && action.input.coalesceKey !== undefined
+      && action.input.coalesceKey === previous.input.coalesceKey
+      && (
+        previous.input.nextHistoryIndex === action.input.previousHistoryIndex
+        || previous.input.nextHistoryIndex === action.input.nextHistoryIndex
+      )
+    ) {
+      this.pending[this.pending.length - 1] = {
+        kind: "transition",
+        input: {
+          ...previous.input,
+          mutationKind: action.input.mutationKind,
+          nextPages: action.input.nextPages,
+          nextHistoryIndex: action.input.nextHistoryIndex,
+        },
+      };
+    } else {
+      this.pending.push(action);
+    }
+
+    if (this.pending.length > MAX_PENDING_HISTORY_JOURNAL_ACTIONS) {
+      this.pending = this.latestTarget
+        ? [{ kind: "rebase", target: this.latestTarget }]
+        : [{ kind: "reset" }];
+    }
+    void this.ensureRuntime();
+  }
+
+  recordTransition(input: StudioHistoryJournalTransitionInput): void {
+    this.enqueue({ kind: "transition", input });
+  }
+
+  recordUndo(target: StudioHistoryJournalNavigationTarget): void {
+    this.enqueue({ kind: "undo", target });
+  }
+
+  recordRedo(target: StudioHistoryJournalNavigationTarget): void {
+    this.enqueue({ kind: "redo", target });
+  }
+
+  rebase(target: StudioHistoryJournalNavigationTarget): void {
+    this.enqueue({ kind: "rebase", target });
+  }
+
+  reset(): void {
+    this.enqueue({ kind: "reset" });
+  }
+
+  /**
+   * Release queued page graphs and ignore a runtime that resolves after the owning Studio unmounts.
+   * Dynamic import itself cannot be aborted, but disposed clients never replay its pending work.
+   */
+  dispose(): void {
+    this.disposed = true;
+    this.runtime = null;
+    this.pending = [];
+    this.latestTarget = null;
+    this.lastReadinessError = null;
+  }
+
+  /** Await only in diagnostics/tests; Studio editing never blocks on journal loading. */
+  async ready(): Promise<void> {
+    if (this.disposed) {
+      throw new Error("Studio history journal client has been disposed.");
+    }
+    const ready = await this.ensureRuntime();
+    if (this.disposed) {
+      throw new Error("Studio history journal client has been disposed.");
+    }
+    if (!ready || !this.runtime) {
+      if (this.lastReadinessError instanceof Error) {
+        throw this.lastReadinessError;
+      }
+      throw new Error("Studio history journal runtime is not ready.", {
+        cause: this.lastReadinessError,
+      });
+    }
+  }
+}
+
+export function createStudioPagesHistoryCommandJournalClient(
+  options: StudioPagesHistoryCommandJournalClientOptions = {}
+): StudioPagesHistoryCommandJournalClient {
+  return new StudioPagesHistoryCommandJournalClient(options);
+}

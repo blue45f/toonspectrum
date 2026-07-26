@@ -172,6 +172,16 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks(id) {
           if (
+            id.endsWith("/src/domains/creator/studio-selection-tools.ts")
+            || id.endsWith("/src/domains/creator/studio-magic-wand.ts")
+            || id.endsWith("/src/domains/creator/studio-alpha-lock.ts")
+          ) {
+            // Advanced Fill's user-triggered browser engine shares alpha-lock and magic-wand
+            // primitives with the always-on selection graph. Keep those already-eager pure cores
+            // in one chunk so the dynamic boundary does not add two launch-time HTTP requests.
+            return "studio-selection-tools";
+          }
+          if (
             id.endsWith("/src/domains/creator/studio-tool-hints.ts")
             || id.endsWith("/src/domains/creator/studio-view-action-hints.ts")
             || id.endsWith("/src/domains/creator/studio-inspector-layout.ts")

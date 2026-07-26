@@ -4,6 +4,7 @@ import { BG_PRESETS, CANVAS_W, type BgPreset } from "./studio-assets";
 import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
 import { type MagicResizePreset, type MagicResizeStrategy } from "./studio-magic-resize";
 import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
+import { StudioPercentGuideControls } from "./StudioPercentGuideControls";
 
 import { cn } from "@/lib/utils";
 
@@ -29,7 +30,7 @@ export interface StudioInspectorCanvasControlsProps {
   readonly userGuides: readonly StudioInspectorUserGuide[];
   readonly webtoonGuides: typeof import("./studio-webtoon-guides") | null;
   readonly webtoonTheme: "classic" | "soft" | "vivid";
-  readonly onAddUserGuide: (type: "v" | "h") => void;
+  readonly onAddUserGuide: (type: "v" | "h", pos?: number) => void;
   readonly onApplyBackgroundPreset: (preset: BgPreset) => void;
   readonly onApplyMagicResizePreset: (preset: MagicResizePreset) => void;
   readonly onBackgroundChange: (color: string) => void;
@@ -292,6 +293,12 @@ export function StudioInspectorCanvasControls({
               + 가로 가이드
             </button>
           </div>
+
+          <StudioPercentGuideControls
+            canvasHeight={canvasHeight}
+            disabled={controlsDisabled}
+            onAddGuide={onAddUserGuide}
+          />
 
           {userGuides.length > 0 && (
             <div className="max-h-40 space-y-1.5 overflow-y-auto rounded-lg border border-line bg-card/30 p-2">

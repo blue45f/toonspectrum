@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   // Percentage of locally bucketed, WebGPU-capable browsers admitted when the backend is `auto`.
   // Missing/invalid values are 0; explicit backend controls remain the emergency override.
   readonly VITE_STUDIO_LIVE_INK_ROLLOUT_PERCENT?: string;
+  // Emergency build-time off switch. `1`, `true`, or `on` always forces Canvas2D.
+  readonly VITE_STUDIO_LIVE_INK_KILL_SWITCH?: string;
   // 장기 실행 Nest Socket.IO origin. Vercel serverless HTTP API와 realtime을 분리할 때 사용.
   readonly VITE_STUDIO_LIVE_ORIGIN?: string;
   // DeskCloud 네이티브 통합(@heejun/deskcloud) — 각 desk 의 API 베이스 URL.

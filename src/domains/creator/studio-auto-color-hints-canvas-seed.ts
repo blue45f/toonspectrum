@@ -1,9 +1,11 @@
 /**
  * Map a document-space pointer hit onto auto-color planner seed coordinates.
  *
- * Pure + deterministic. Supports axis-aligned frames with optional 180° rotation and/or
- * horizontal/vertical flips (Konva-style center flips). Other rotations fail closed.
+ * Pure + deterministic. Supports arbitrary Konva rotation plus the Studio image renderer's
+ * baked horizontal/vertical flips.
  */
+
+import { mapStudioAutoColorCanvasPointToSource } from "./studio-auto-color-image-mapping";
 
 export interface StudioAutoColorCanvasImageFrame {
   readonly x: number;
@@ -23,14 +25,6 @@ export interface StudioAutoColorCanvasSeedSample {
 
 function finite(value: unknown, fallback = Number.NaN): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-}
-
-function normalizeRotationDegrees(rotation: number): number {
-  const wrapped = ((rotation % 360) + 360) % 360;
-  // Snap near 0 / 180 for float noise from UI.
-  if (wrapped < 0.5 || wrapped > 359.5) return 0;
-  if (Math.abs(wrapped - 180) < 0.5) return 180;
-  return wrapped;
 }
 
 /**
@@ -66,34 +60,35 @@ export function mapStudioDocumentPointToAutoColorSeed(input: {
     return null;
   }
 
-  const rotation = normalizeRotationDegrees(finite(frame.rotation, 0));
-  if (rotation !== 0 && rotation !== 180) {
-    // 90°/270° and free rotation need a full inverse matrix; fail closed.
-    return null;
-  }
-
-  let localX = docX - x;
-  let localY = docY - y;
-  // Inverse of display transform: unrotate first, then undo center-based flips.
-  if (rotation === 180) {
-    localX = w - localX;
-    localY = h - localY;
-  }
-  if (frame.flipped) {
-    localX = w - localX;
-  }
-  if (frame.flippedY) {
-    localY = h - localY;
-  }
-
-  if (localX < 0 || localY < 0 || localX > w || localY > h) {
-    return null;
-  }
-
-  // Map into planner pixel space; clamp to last addressable pixel for the edge hit.
-  const sampleX = Math.min(pxW - 1e-6, Math.max(0, (localX / w) * pxW));
-  const sampleY = Math.min(pxH - 1e-6, Math.max(0, (localY / h) * pxH));
-  return { x: sampleX, y: sampleY };
+  const rotation = finite(frame.rotation, 0);
+  const radians = rotation * Math.PI / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const flipOffsetX = frame.flipped ? w : 0;
+  const flipOffsetY = frame.flippedY ? h : 0;
+  // StudioKonvaImageNode bakes flips into the image pixels and leaves the node frame at x/y.
+  // Express that visual result as an equivalent translated negative-scale Konva transform so the
+  // shared affine inverse handles flips and rotation in one deterministic path.
+  const originX = x + cos * flipOffsetX - sin * flipOffsetY;
+  const originY = y + sin * flipOffsetX + cos * flipOffsetY;
+  const mapped = mapStudioAutoColorCanvasPointToSource({
+    canvasX: docX,
+    canvasY: docY,
+    image: {
+      x: originX,
+      y: originY,
+      width: w,
+      height: h,
+      scaleX: frame.flipped ? -1 : 1,
+      scaleY: frame.flippedY ? -1 : 1,
+      rotation,
+      sourceWidth: pxW,
+      sourceHeight: pxH,
+    },
+  });
+  return mapped?.inside
+    ? { x: mapped.sourceX, y: mapped.sourceY }
+    : null;
 }
 
 /** Build a stable scribble seed id from canvas placement order. */

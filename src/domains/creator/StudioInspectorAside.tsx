@@ -1283,13 +1283,13 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             userGuides={userGuides}
             webtoonGuides={webtoonGuides}
             webtoonTheme={webtoonTheme}
-            onAddUserGuide={withCanvasControlsGuard((type) =>
+            onAddUserGuide={withCanvasControlsGuard((type, pos?: number) =>
               setUserGuides((current) => [
                 ...current,
                 {
                   id: uid(),
                   type,
-                  pos: type === "v" ? CANVAS_W / 2 : canvasH / 2,
+                  pos: pos ?? (type === "v" ? CANVAS_W / 2 : canvasH / 2),
                 },
               ])
             )}
@@ -2282,7 +2282,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           role="status"
                           className="rounded-lg border border-accent/35 bg-accent/10 px-3 py-2 text-xs leading-relaxed text-fg-2"
                         >
-                          {selectedWorkAssetDestructiveEditReason}
+                          {selectedWorkAssetDestructiveEditReason} 원본을 바꾸지 않는 새 채색 레이어 생성은
+                          계속 사용할 수 있어요.
                         </p>
                       ) : null}
                       {shouldMountImageInspectorTab("quick") ? (
@@ -2394,33 +2395,31 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                                 : (dataUrl) => patchEl(selected.id, { src: dataUrl })
                             }
                             onApplyNewLayer={
-                              selectedWorkAssetDestructiveEditReason
-                                ? undefined
-                                : ({ dataUrl, name }) => {
-                                    if (selected.type !== "image") return;
-                                    const paintEl = {
-                                      id: uid(),
-                                      type: "image" as const,
-                                      src: dataUrl,
-                                      x: selected.x,
-                                      y: selected.y,
-                                      width: selected.width,
-                                      height: selected.height,
-                                      rotation: selected.rotation ?? 0,
-                                      opacity: 1,
-                                      name: name || "채색",
-                                      groupId: selected.groupId,
-                                    };
-                                    const index = elements.findIndex((el) => el.id === selected.id);
-                                    const insertAt = index >= 0 ? index + 1 : elements.length;
-                                    const next = [
-                                      ...elements.slice(0, insertAt),
-                                      paintEl,
-                                      ...elements.slice(insertAt),
-                                    ];
-                                    if (!commit(next as typeof elements)) return;
-                                    setSelectedId(paintEl.id);
-                                  }
+                              ({ dataUrl, name }) => {
+                                if (selected.type !== "image") return;
+                                const paintEl = {
+                                  id: uid(),
+                                  type: "image" as const,
+                                  src: dataUrl,
+                                  x: selected.x,
+                                  y: selected.y,
+                                  width: selected.width,
+                                  height: selected.height,
+                                  rotation: selected.rotation ?? 0,
+                                  opacity: 1,
+                                  name: name || "채색",
+                                  groupId: selected.groupId,
+                                };
+                                const index = elements.findIndex((el) => el.id === selected.id);
+                                const insertAt = index >= 0 ? index + 1 : elements.length;
+                                const next = [
+                                  ...elements.slice(0, insertAt),
+                                  paintEl,
+                                  ...elements.slice(insertAt),
+                                ];
+                                if (!commit(next as typeof elements)) return;
+                                setSelectedId(paintEl.id);
+                              }
                             }
                           />
                           {!selectedWorkAssetDestructiveEditReason ? (

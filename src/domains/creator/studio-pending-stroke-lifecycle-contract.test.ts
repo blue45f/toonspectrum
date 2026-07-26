@@ -47,6 +47,63 @@ describe("pending stroke lifecycle source contract", () => {
     );
   });
 
+  it("같은 task의 coalesced 입력도 최신 ref snapshot을 교체하고 journal을 단조 전진시킨다", () => {
+    const commitCoalesced = sourceBetween(
+      "function commitCoalesced(",
+      "// 커밋 지연 파이프라인의 동기화/폐기"
+    );
+
+    expect(commitCoalesced).toContain("const currentHistory = pagesHistoryRef.current");
+    expect(commitCoalesced).toContain("const commitBasePages = currentHistory[currentHistoryIndex] ?? pages");
+    expect(commitCoalesced).toContain("previousHistoryIndex: currentHistoryIndex");
+    expect(commitCoalesced).toContain("nextHistoryIndex,");
+    expect(commitCoalesced).not.toContain("const localNextPages = pages.map");
+    expect(commitCoalesced.indexOf("pagesHistoryRef.current = nextHistory")).toBeLessThan(
+      commitCoalesced.indexOf("setPagesHistory(nextHistory)")
+    );
+    expect(commitCoalesced.indexOf("pagesHiRef.current = nextHistoryIndex")).toBeLessThan(
+      commitCoalesced.indexOf("setPagesHi(nextHistoryIndex)")
+    );
+  });
+
+  it("원격 CRDT·승인 자산 재조정은 state updater 밖에서 history ref와 journal을 함께 rebase한다", () => {
+    const admission = sourceBetween(
+      "studioWorkAssetAdmissionCoordinator.sync({",
+      "const observeSceneElements = ("
+    );
+    const remoteFrontier = sourceBetween(
+      "const applyFrontier = (",
+      "applyFrontier({"
+    );
+    const hydratedAssets = sourceBetween(
+      "const referenceSources = readyStudioWorkAssetImageSources(studioWorkAssetHydrator);",
+      "// useCallback: 렌더 중 호출되는 메시지 헬퍼"
+    );
+
+    expect(admission).toContain("pagesHistoryRef.current = admitted.history");
+    expect(admission).toContain("rebaseStudioHistoryJournal(");
+    expect(remoteFrontier).toContain("const currentHistory = pagesHistoryRef.current");
+    expect(remoteFrontier).toContain("pagesHistoryRef.current = reconciled.history");
+    expect(remoteFrontier).toContain('"remote CRDT reconciliation"');
+    expect(remoteFrontier).not.toContain("setPagesHistoryState((history)");
+    expect(hydratedAssets).toContain("const currentHistory = pagesHistoryRef.current");
+    expect(hydratedAssets).toContain("pagesHistoryRef.current = reconciled.history");
+    expect(hydratedAssets).toContain('"work asset hydration reconciliation"');
+    expect(hydratedAssets).not.toContain("setPagesHistoryState((history)");
+  });
+
+  it("비동기 journal client는 Studio effect 수명에 묶여 Strict Mode 재설정과 실제 unmount를 처리한다", () => {
+    const journalSetup = sourceBetween(
+      "const pagesHistoryCommandJournalRef = useRef",
+      "function rebaseStudioHistoryJournal("
+    );
+
+    expect(journalSetup).toContain("createStudioPageHistoryCommandJournalClient()");
+    expect(journalSetup).toContain("useLayoutEffect(() =>");
+    expect(journalSetup).toContain("client?.dispose()");
+    expect(journalSetup).toContain("pagesHistoryCommandJournalRef.current = null");
+  });
+
   it("route/page lifecycle은 안정 상태와 대기 획을 모두 동기 복구 슬롯에 기록한다", () => {
     const persistence = sourceBetween(
       "persistPendingStrokeEmergencyAutosaveRef.current = (reason) =>",

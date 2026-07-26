@@ -1,11 +1,17 @@
 # Studio full-area competitor benchmark — 2026-07-15
 
-> **2026-07-16 engine update:** the `WebGPU / CRDT` deferred row below records the state of this
-> historical UI pass. A durable Yjs operation engine and retained, viewport-tiled WebGPU ink
-> compositor now ship as bounded vertical slices; see
-> `docs/studio-crdt-webgpu-architecture-2026-07-16.md`.
+> **2026-07-26 implementation re-audit:** this remains the historical scorecard for the 2026-07-15
+> UI pass, but its current-status column has been reconciled against production code. The authority
+> map for realtime CRDT and WebGPU is
+> `docs/studio-crdt-webgpu-architecture-2026-07-16.md`; the broader shipped/backlog ledger is
+> `docs/studio-competitor-features.md`. PSD boundaries remain documented in
+> `docs/studio-psd-import-integration.md`, and 3D import history in
+> `docs/studio-bg3d-custom-model-upload.md`. “Shipped vertical slice” below never means every legacy
+> tool or scene type has migrated.
 
-IA + visual + drawing interaction only. **No brand clones**, no proprietary formats (ABR, cs3*).
+IA + visual + drawing interaction only. **No brand clones** and no direct parsing of closed native
+project formats such as `.clip`, `.skp`, or `.blend`. Bounded Photoshop ABR import now ships; an ABR
+marketplace does not.
 
 Sources: public Magma help, CSP/Photopea/Canva/Krita/Procreate/Ibis/MediBang/Pixlr/Sketchbook/Concepts/Fresco/AutoDraw product docs & screenshots; prior `docs/studio-competitor-features.md`, `docs/studio-commercial-gap-close-2026-07-15.md`.
 
@@ -30,12 +36,12 @@ Sources: public Magma help, CSP/Photopea/Canva/Krita/Procreate/Ibis/MediBang/Pix
 | Shape picker | — | Tools | Shape | Shapes | Tools | — | — | Shapes | — | **shipped** visual grid + options strip + mobile |
 | Density modes | Super Simple | Simple/Studio | — | — | — | — | — | — | — | **shipped** focus/simple/full |
 | Stabilizer UI | — | Correction | — | — | Stabilizer | StreamLine | — | — | — | **shipped** options + HUD readout |
-| Pressure HUD | — | Graph | — | — | — | Graph | — | — | — | **shipped** live meter + curve pill |
+| Pressure HUD | — | Graph | — | — | — | Graph | — | — | — | **shipped** live meter + continuous gamma graph |
 | Export/project | — | File | File | Download | — | Share | Export | Export | — | **shipped** portal panels |
-| Collab presence | Core | Teamwork | — | — | — | — | — | — | — | **partial** team/live (not full Magma) |
-| 3D / VRM | — | 3D | — | — | — | — | — | — | — | **shipped** poser/BG3D (engine residual) |
-| PSD smart objects | — | Partial | Strong | — | — | — | — | Partial | — | **deferred** partial PSD |
-| WebGPU / CRDT | — | Native | — | — | — | — | — | — | — | **deferred** |
+| Collab presence | Core | Teamwork | — | — | — | — | — | — | — | **shipped vertical slice** vector CRDT + point comments + consented screen share; raster pilot partial |
+| 3D / VRM | — | 3D | — | — | — | — | — | — | — | **shipped** poser/BG3D + GLB/glTF/OBJ/FBX/DAE/STL/PLY/3DS import; native SKP/BLEND absent |
+| PSD smart objects | — | Partial | Strong | — | — | — | — | Partial | — | **partial** layered raster/masks + bounded one-way editable horizontal text export ship; editable import/smart objects absent |
+| WebGPU / CRDT | — | Native | — | — | — | — | — | — | — | **shipped vertical slices** live/verified raster GPU + vector CRDT; full authority residual |
 
 ## Detail scores (visual / drawing UX, 1–5)
 
@@ -47,7 +53,7 @@ Scoring is **interaction craft** only — not full engine parity. 5 = commercial
 | Brush preview tiles | 3 | 5 | 2 | 4 | 4 | 5 | 5 | **5** | Stroke-preview tray shipped |
 | Size / opacity readouts | 3 | 5 | 4 | 5 | 5 | 5 | 4 | **5** | Size chips + locks + dual well |
 | Stabilizer discoverability | 2 | 5 | 2 | 1 | 5 | 5 | 3 | **5** | Slider + mode + HUD |
-| Live pressure feedback | 2 | 4 | 2 | 1 | 3 | 5 | 3 | **4** | Live meter + curve pill (no full graph editor) |
+| Live pressure feedback | 2 | 4 | 2 | 1 | 3 | 5 | 3 | **4** | Live meter + graph + continuous gamma; no arbitrary multi-point curve |
 | Brush cursor fidelity | 3 | 5 | 4 | 2 | 5 | 5 | 4 | **5** | Disc fill + ring + pen glow |
 | Shape kind visuals | 2 | 4 | 5 | 5 | 3 | 2 | 3 | **5** | Grid + strip + filled preview |
 | Smart-shape affordance | 1 | 3 | 2 | 5 | 3 | 2 | 2 | **4** | Kind row + HUD pill |
@@ -57,7 +63,7 @@ Scoring is **interaction craft** only — not full engine parity. 5 = commercial
 | Mobile draw sheet | 3 | — | 2 | 4 | — | 5 | 5 | **5** | Shape grid + large sliders |
 | Layer / asset chrome | 3 | 5 | 4 | 4 | 5 | 4 | 4 | **4** | Card + tiles (prior pass) |
 | Selection chrome | 3 | 4 | 4 | 3 | 4 | 3 | 3 | **4** | Badge cluster prior pass |
-| Collab live cursor | 5 | 3 | 1 | 1 | 1 | 1 | 1 | **3** | Partial — residual |
+| Collab live cursor | 5 | 3 | 1 | 1 | 1 | 1 | 1 | **3** | Cursor/comment/screen-share + vector CRDT ship; full raster-tool convergence remains |
 
 ## Drawing feature priorities (this pass)
 
@@ -78,9 +84,18 @@ Scoring is **interaction craft** only — not full engine parity. 5 = commercial
 | Brush tray previews | `StudioBrushTray.tsx` (prior) |
 | Dual color well / HUD pill chrome | `studio-chrome-ui.tsx` (prior) |
 
-## Explicit out-of-scope
+## Explicit remaining boundaries
 
-Full CSP EX / Photoshop feature parity, ABR marketplace, Firefly OAuth, full CRDT realtime, WebGPU rewrite, full pressure graph editor (Procreate-class), Magma always-on multiplayer rooms.
+- Full CSP EX / Photoshop feature parity and direct `.clip` parsing.
+- ABR marketplace and Firefly OAuth. ABR **file import** itself is shipped.
+- Magma-class raster parity across erase, fill, selection, filter, transform, merge, and flatten;
+  trusted raster-log compaction; and work-scoped remote image/VRM/3D hydration. Vector/stylus CRDT,
+  durable server updates, point comments, presence, and consented screen sharing are already shipped.
+- Full committed WebGPU ownership of images, text, bubbles, filters, selection, 3D, readback/export,
+  and the top interaction plane. Live ink and a verified raster-presentation slice already ship with
+  Canvas2D/Konva fail-closed fallback.
+- Arbitrary multi-point pressure transfer curves. The live meter and continuous gamma graph ship.
+- Native `.skp`/`.blend` import and Blender-class mesh/UV/sculpt/modifier authoring.
 
 ## Acceptance for this visual/drawing pass
 

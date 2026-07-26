@@ -1,4 +1,8 @@
 import {
+  STUDIO_FEATURE_ROLLOUT_BUCKET_COUNT,
+  resolveStudioFeatureRollout,
+} from "./studio-feature-rollout";
+import {
   resolveStudioLiveInkBackendPreference,
   type StudioLiveInkBackendPreference,
 } from "./studio-live-ink-backend";
@@ -7,7 +11,8 @@ import {
  * A cohort is a local percentile bucket, not a user or device identifier. It is never sent to the
  * server and deliberately contains too little information to identify a browser installation.
  */
-export const STUDIO_LIVE_INK_ROLLOUT_BUCKET_COUNT = 10_000;
+export const STUDIO_LIVE_INK_ROLLOUT_BUCKET_COUNT =
+  STUDIO_FEATURE_ROLLOUT_BUCKET_COUNT;
 export const STUDIO_LIVE_INK_ROLLOUT_BUCKET_STORAGE_KEY =
   "toonspectrum:studio:live-ink-rollout-bucket:v1";
 
@@ -23,6 +28,7 @@ export interface StudioLiveInkRolloutRandom {
 export type StudioLiveInkRolloutReason =
   | "canvas2d-forced"
   | "webgpu-explicit"
+  | "kill-switch"
   | "rollout-disabled"
   | "webgpu-api-unavailable"
   | "cohort-included"
@@ -40,6 +46,7 @@ export interface StudioLiveInkRolloutDecision {
 export interface StudioLiveInkRolloutInput {
   readonly backendPreference?: unknown;
   readonly rolloutPercent?: unknown;
+  readonly killSwitch?: unknown;
   /** A synchronous API check only. Adapter/device readiness remains the stroke-level hard gate. */
   readonly webgpuApiAvailable: boolean;
   readonly storage?: StudioLiveInkRolloutStorage | null;
@@ -60,43 +67,10 @@ function parseRolloutPercent(value: unknown): number {
   return parsed;
 }
 
-function validBucket(value: unknown): number | null {
-  if (typeof value !== "number" || !Number.isInteger(value)) return null;
-  return value >= 0 && value < STUDIO_LIVE_INK_ROLLOUT_BUCKET_COUNT ? value : null;
-}
-
-function readStoredBucket(storage: StudioLiveInkRolloutStorage): number | null {
-  try {
-    const raw = storage.getItem(STUDIO_LIVE_INK_ROLLOUT_BUCKET_STORAGE_KEY);
-    if (raw === null || !/^(?:0|[1-9]\d{0,3})$/u.test(raw)) return null;
-    return validBucket(Number(raw));
-  } catch {
-    return null;
-  }
-}
-
-function createStoredBucket(
-  storage: StudioLiveInkRolloutStorage,
-  random: StudioLiveInkRolloutRandom,
-): number | null {
-  try {
-    const word = new Uint32Array(new ArrayBuffer(Uint32Array.BYTES_PER_ELEMENT));
-    random.getRandomValues(word);
-    const bucket = (word[0] ?? 0) % STUDIO_LIVE_INK_ROLLOUT_BUCKET_COUNT;
-    storage.setItem(STUDIO_LIVE_INK_ROLLOUT_BUCKET_STORAGE_KEY, String(bucket));
-    return bucket;
-  } catch {
-    // Private browsing, quota policy, a sandboxed frame, or unavailable Web Crypto must never
-    // silently promote a browser into an experimental renderer cohort.
-    return null;
-  }
-}
-
-function resolveCohortBucket(input: StudioLiveInkRolloutInput): number | null {
-  const storage = input.storage;
-  const random = input.random;
-  if (!storage || !random) return null;
-  return readStoredBucket(storage) ?? createStoredBucket(storage, random);
+function parseKillSwitch(value: unknown): boolean {
+  if (value === true) return true;
+  if (typeof value !== "string") return false;
+  return /^(?:1|true|on)$/iu.test(value.trim());
 }
 
 /**
@@ -110,6 +84,14 @@ export function resolveStudioLiveInkRollout(
   const configuredPreference = resolveStudioLiveInkBackendPreference(input.backendPreference);
   const rolloutPercent = parseRolloutPercent(input.rolloutPercent);
 
+  if (parseKillSwitch(input.killSwitch)) {
+    return {
+      preference: "canvas2d",
+      reason: "kill-switch",
+      rolloutPercent,
+      bucket: null,
+    };
+  }
   if (configuredPreference === "canvas2d") {
     return {
       preference: "canvas2d",
@@ -151,8 +133,26 @@ export function resolveStudioLiveInkRollout(
     };
   }
 
-  const bucket = resolveCohortBucket(input);
-  if (bucket === null) {
+  const rollout = resolveStudioFeatureRollout({
+    featureId: "canvas.live-ink",
+    policy: {
+      schemaVersion: 1,
+      featureId: "canvas.live-ink",
+      policyVersion: 1,
+      authority: "build",
+      issuedAtMs: 0,
+      expiresAtMs: null,
+      rolloutPercent,
+      killSwitch: false,
+      dependencies: [],
+    },
+    environment: "production",
+    nowMs: 0,
+    storage: input.storage,
+    random: input.random,
+    bucketStorageKey: STUDIO_LIVE_INK_ROLLOUT_BUCKET_STORAGE_KEY,
+  });
+  if (rollout.reason === "cohort-unavailable") {
     return {
       preference: "canvas2d",
       reason: "cohort-unavailable",
@@ -160,12 +160,19 @@ export function resolveStudioLiveInkRollout(
       bucket: null,
     };
   }
-  const threshold = Math.floor(
-    rolloutPercent * STUDIO_LIVE_INK_ROLLOUT_BUCKET_COUNT / 100,
-  );
-  return bucket < threshold
-    ? { preference: "webgpu", reason: "cohort-included", rolloutPercent, bucket }
-    : { preference: "canvas2d", reason: "cohort-excluded", rolloutPercent, bucket };
+  return rollout.enabled
+    ? {
+        preference: "webgpu",
+        reason: "cohort-included",
+        rolloutPercent,
+        bucket: rollout.bucket,
+      }
+    : {
+        preference: "canvas2d",
+        reason: "cohort-excluded",
+        rolloutPercent,
+        bucket: rollout.bucket,
+      };
 }
 
 function safely<Value>(read: () => Value, fallback: Value): Value {
@@ -180,6 +187,7 @@ function safely<Value>(read: () => Value, fallback: Value): Value {
 export function studioLiveInkRolloutInputFromGlobals(
   backendPreference: unknown,
   rolloutPercent: unknown,
+  killSwitch: unknown,
   globals: StudioLiveInkRolloutGlobals = globalThis as StudioLiveInkRolloutGlobals,
 ): StudioLiveInkRolloutInput {
   const navigatorLike = safely(() => globals.navigator ?? null, null);
@@ -193,6 +201,7 @@ export function studioLiveInkRolloutInputFromGlobals(
   return {
     backendPreference,
     rolloutPercent,
+    killSwitch,
     webgpuApiAvailable,
     storage,
     random,

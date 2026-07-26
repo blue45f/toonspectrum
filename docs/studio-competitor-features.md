@@ -4,7 +4,15 @@
 > **창작 스튜디오(`src/domains/creator/StudioPage.tsx`, 컷툰 제작 캔버스 에디터)** 가 벤치마킹하는
 > 드로잉/만화 제작 소프트웨어 대상이다.
 >
-> 작성일: 2026-07-04, 최종 갱신: 2026-07-13(모바일 전용 앱 셸·전체 잔여 높이 캔버스 + 잔액 소진 자동 전환·실제 provider provenance + Writer Room→canvas +
+> **2026-07-26 구현 재감사:** 과거 §3/§4의 blanket `보류`/`스코프 밖` 기록을 현재 creator 코드와
+> 다시 대조했다. CRDT/WebGPU 권한의 기준 문서는
+> `docs/studio-crdt-webgpu-architecture-2026-07-16.md`, PSD 손실 경계는
+> `docs/studio-psd-import-integration.md`, 3D 가져오기 최초 설계 이력은
+> `docs/studio-bg3d-custom-model-upload.md`, 2026-07-15 유한 배치의 현재 해석은
+> `docs/studio-commercial-gap-close-2026-07-15.md`다. “vertical slice 완료”는 모든 레거시 도구가
+> 새 엔진으로 이동했다는 뜻이 아니다.
+>
+> 작성일: 2026-07-04, 대규모 기능 기록 기준 갱신: 2026-07-13(모바일 전용 앱 셸·전체 잔여 높이 캔버스 + 잔액 소진 자동 전환·실제 provider provenance + Writer Room→canvas +
 > 단일 ZIP Publish Package + self-contained 프로젝트 archive + 서버 revision/충돌 복구 + typed Auto Actions +
 > 캡처 readiness·모바일 복구 안전성 + 말풍선 꼬리/이중 로브/벡터 선택기 + 검수형 투명 소재·모바일
 > 자산 관리·통합 즐겨찾기 + Babylon.js 실측 ADR + 6방향 모바일 퀵 액션 + 브라우저 내장 대사 낭독
@@ -595,8 +603,11 @@ ibisPaint의 [타원자 말풍선 제작](https://ibispaint.com/lecture/index.js
 - **이메레스(스케치 밑그림) 고도화** — 삽입된 밑그림 원클릭 삭제 + 사용자 커스텀 스케치를 "내가 만든
   틀"로 저장/재사용(`studio-palette-library.ts`/`studio-brush-library.ts`와 동일 localStorage CRUD 패턴).
   커밋 `f9f5b7f`.
-- **3D 배경 커스텀 모델 업로드** — VRM 업로드와 동일한 IndexedDB 저장 아키텍처로 .glb/.gltf/.obj
-  업로드 지원(에이블러/SketchUp 벤치마크). `StudioBackground3D.tsx`에 "모델" 탭. 커밋 `00addb8`.
+- **3D 배경 커스텀 모델 업로드** — 최초 배치는 VRM 업로드와 동일한 IndexedDB 저장 아키텍처로
+  `.glb`/`.gltf`/`.obj`를 지원했다(에이블러/SketchUp 벤치마크, 커밋 `00addb8`). 현재
+  `studio-bg3d-model-import.ts`는 GLB, glTF, OBJ, FBX, DAE, STL, PLY, 3DS와 연결 BIN/MTL/PNG/JPEG/
+  WebP를 검증하고 self-contained canonical GLB로 변환한다. native `.skp`/`.blend` 파싱이나
+  Blender급 mesh/UV/sculpt/modifier 제작기는 제공하지 않는다.
 - **3D 배경 씬 템플릿** — "블록아웃 소품 배치"에 머물던 한계를 해소하기 위해, 여러 프리미티브/복합
   프리셋을 미리 정한 배치로 한 번에 생성하는 "완성된 공간" 카탈로그(교실/거리/카페/공원).
   `studio-background-3d-scene-templates.ts`. `StudioBackground3D.tsx` 통합: 커밋 `a4dce16`.
@@ -888,42 +899,105 @@ API 키를 등록해야 하는 곳이 AI 어시스트(baseURL/API키/모델)와 
 적용해야 한다는 점을 새 기능 추가 시 유념할 것**. tsc/eslint/vitest(201 files·3791 tests) 전부 재검증
 클린.
 
+### 2026-07-26 구현 재감사 — 과거 보류 기록의 현재 상태
+
+아래 항목은 과거 §3/§4에서 `보류` 또는 `스코프 밖`으로 기록됐지만, 현재 코드에는 제품에서 사용할 수
+있는 vertical slice가 존재한다. 다만 상용 제품 전체 범위와 동일하다는 뜻은 아니며, 각 항목의 잔여
+경계도 함께 적는다.
+
+- **Actions/매크로:** `studio-macro-recorder.ts`가 사용자 작업을 기록하고
+  `studio-macro-to-auto-actions.ts`가 typed Auto Actions로 변환하며, 재생 모델은
+  `studio-auto-actions.ts`를 사용한다. 모든 내부 상태 변경을 무차별 직렬화하는 Photoshop급 범용
+  플러그인 액션 런타임은 아니다.
+- **ABR 브러시 가져오기:** `studio-abr-import.ts`, `studio-abr-import-client.ts`,
+  `StudioBrushLibraryPanel.tsx`로 ABR 버전 6/7/9/10 가져오기와 라이브러리 편입이 배선돼 있다.
+  온라인 ABR 마켓플레이스·판매·DRM은 제공하지 않는다.
+- **심리스 타일:** `studio-seamless-tile.ts`와 `StudioPatternFillPanel.tsx`에 offset/preview/commit
+  변환 흐름이 있다. 브러시를 긋는 동안 캔버스 반대편에 즉시 복제되는 Krita급 live wrap-around
+  authority는 아직 없다.
+- **멀티터치 제스처:** `StudioAppSettingsPanel.tsx`에서 설정하고 `StudioPage.tsx`가 런타임에
+  해석한다. 따라서 “데스크톱 전용이라 미지원”이라는 과거 판단은 폐기한다.
+- **고급 자/어시스턴트:** `studio-advanced-ruler-document.ts`,
+  `studio-advanced-ruler-snap.ts`, `StudioAdvancedRulerPanel.tsx`에 평행·동심원·방사형 자의 문서
+  모델, 스냅, 편집 UI가 있다. 캔버스 가이드는
+  `StudioInspectorCanvasControls.tsx` / `studio-guide-percent.ts`에서 방향별 25·33.3·50·66.7·75%
+  프리셋과 직접 백분율 입력을 기존 px 문서 모델로 정규화한다.
+- **협업:** `StudioLiveCollaborationProvider.tsx`, `studio-comments.ts`,
+  `studio-screen-share.ts`에 presence, 점 앵커 댓글, 동의 기반 화면 공유와 벡터 CRDT 경로가 있다.
+  서버 durable update 경로도 제공한다. Magma급 모든 래스터 브러시의 픽셀 CRDT·compactor·asset
+  hydration까지 완료됐다는 뜻은 아니며 정확한 경계는
+  `docs/studio-crdt-webgpu-architecture-2026-07-16.md`를 따른다.
+- **WebGPU:** live-ink vertical slice와 폴백은 제공하지만, 모든 레거시 Canvas/Konva 도구가 WebGPU
+  committed ownership/readback/interaction authority로 이동한 상태는 아니다. 이 잔여 역시 위
+  아키텍처 문서가 기준이다.
+- **필압 편집:** `StudioPressureCurveGraph.tsx`가 현재 gamma/exponent 곡선을 시각화한다. 임의의
+  다중 제어점을 갖는 전문 curve editor까지 제공하는 것은 아니다.
+- **전체화면 모달 포털:** `StudioStoryboardGridPanel.tsx`, `StudioScrollPreviewPanel.tsx`,
+  `StudioTimelapsePanel.tsx`, `StudioBackground3D.tsx`의 전체화면 모달은 모두
+  `createPortal(..., document.body)` 경계를 사용한다. 과거의 `route-stage` stacking-context
+  잠재 버그 메모는 해결된 이력으로만 보존한다.
+- **3D 교환 포맷:** `studio-bg3d-model-import.ts`가 GLB/glTF/OBJ/FBX/DAE/STL/PLY/3DS와 연결
+  BIN/MTL/PNG/JPEG/WebP를 검증하고 canonical GLB로 정규화한다. native SKP/BLEND 파싱이나
+  Blender급 authoring은 잔여다.
+- **프레임 시간:** 단일 이미지 프레임 애니메이션에는 프레임별 duration이 있다. 공용
+  multi-track timeline은 여전히 global FPS 중심이므로 모든 패널/트랙의 독립 timing override가
+  완료됐다고 보지는 않는다.
+
 ---
 
-## 3. 백로그 — 보류/스코프 밖 (사유 포함)
+## 3. 남은 백로그와 구조적 잔여
 
-다음에 "이거 왜 안 했지?" 재고할 때 참고할 것 — 재조사 없이 사유부터 확인.
+다음에 “왜 안 했지?”를 재고할 때는 위 재감사 결과와 아래의 **정확한 잔여 범위**를 먼저 확인한다.
 
-### 2차 배치 선정 시 제외(3차 배치 후보로 유예)
-- **Actions/recordable batch automation**(Photoshop 매크로) — 범용 액션 녹화·재생 엔진 자체가 별도
-  인프라 필요(모든 상태변경 함수 호출을 직렬화 가능한 로그로 인터셉트). 이 앱은 이미 브랜드킷/브러시
-  라이브러리/룩 프리셋 등 "설정 저장·재적용" 패턴이 다수라 유사 가치를 상당 부분 커버 중.
+### 재감사에서 완료로 판정되어 백로그에서 제외
+
+- Actions/recordable automation vertical slice
+- ABR v6/7/9/10 가져오기와 브러시 라이브러리 편입
+- offset 기반 seamless tile preview/commit
+- 멀티터치 제스처 설정과 런타임 해석
+- 평행·동심원·방사형 고급 자
+- 네 개 전체화면 모달의 `document.body` portal
+- 여덟 개 주요 3D 교환 포맷의 canonical GLB 가져오기
+
+### 낮은 위험 또는 낮은 우선순위 잔여
+
 - **Blend-if 톤레인지 슬라이더**(Photoshop) — 니치 기능(정교한 사진 합성/리터칭용). freeform layer
   mask(2차 배치 완료)로 유사 니즈를 브러시로 수동 커버 가능.
-- **Wrap-around seamless tile mode**(Krita) — 웹툰 제작과 무관(텍스처/패턴 아티스트용). 기존
-  `studio-pattern-fill.ts`(패턴 채우기)로 반복 배경 니즈는 커버.
+- **Live wrap-around painting**(Krita) — offset/preview/commit 심리스 변환은 완료됐지만, 그리는
+  순간 반대쪽 경계에도 스트로크를 복제하는 캔버스 모드는 남아 있다.
 - **Bulk create/data-merge**(미리캔버스/Canva) — 스프레드시트 기반 대량 카드뉴스 생성. 웹툰(스토리
   기반 순차 컷)과 사용 사례 자체가 불일치(각 컷이 스토리상 고유함).
+- **Advanced-ruler-relative percentage editing** — 일반 캔버스 가이드의 백분율 프리셋·직접 입력은
+  완료됐다. 평행·동심원·방사형 자 자체의 다중 핸들을 각각 상대 백분율로 수치 편집하는 전문 UI는
+  별도 잔여다.
 
 ### 애초 "아키텍처 리스크 커서 별도 세션" 분류 → 3차 배치로 착수·완료함
 Liquify/Content-aware fill/Puppet warp — 위 §2 "3차 배치"(완료) 참고. 완벽한 상용 알고리즘 대신
 실용적 근사로 스코프를 좁혀 착수, StudioPage.tsx 배선까지 전부 완료.
 
-### 스코프 밖(명시적 제외, 원칙적으로 재고 안 함)
-- **Real-time collaborative co-editing** — 웹소켓/서버 인프라 필요, 이 프로젝트의 "$0 서버비용" 원칙과
-  정면 충돌. 사용자가 서버비용 감수를 명시적으로 승인하지 않는 한 착수 금지.
-- **Smart objects**(Photoshop) — `El` 유니언 타입 전체를 링크드-인스턴스 모델로 리팩토링해야 해서
-  리스크 과다. "클립" 라이브러리(재사용 요소 묶음)로 유사 가치 어느 정도 커버.
-- **Multi-finger touch gesture shortcuts**(Procreate) — 데스크톱 마우스/펜 우선 앱이라 가치 낮음.
-- **Rulers percentage-based snapping**(Photoshop) — 가치가 작음.
-- **Parallel-ruler/concentric-ellipse assistants**(Krita) — 기존 perspective-guide/symmetry와 상당
-  부분 겹침.
-- **Per-panel duration/timing override**(Storyboarder) — "재생 시간"이라는 개념이 이 앱(정적 컷 웹툰)
-  과 안 맞음.
+### 구조적 잔여(완료 vertical slice와 혼동 금지)
 
-### AI 생성 플랫폼(투닝/젠툰/투툰/WeToon/ComicAI)이 강조하는, 아직 미착수인 것
-5차 배치의 "AI 생성 BYOK 구조"(배경 생성/자동 채색/장면구성 제안) 완료 후, 그 인프라 위에 얹을 확장
-후보 — **완전한 구현이 아니라 다음 배치의 확장 지점으로 기록만 해둠**:
+- **Magma급 full raster CRDT:** 벡터 CRDT/presence/점 댓글/화면 공유/서버 durable update는
+  제공한다. 모든 래스터 도구의 충돌 병합, compaction, asset hydration과 배포 운영 경계는
+  `docs/studio-crdt-webgpu-architecture-2026-07-16.md`에 남아 있다.
+- **Full WebGPU canvas authority:** live-ink 경로가 존재해도 committed raster ownership,
+  readback, selection/filter/transform interaction 전체가 WebGPU로 이관된 것은 아니다.
+- **Editable PSD text/smart objects:** layered raster/mask PSD 가져오기와, 지원되는 가로쓰기
+  단색 텍스트의 one-way editable descriptor 내보내기는 제공한다. 현재 화면을 보존하는 래스터
+  프리뷰도 같은 레이어에 유지하며 회전·세로쓰기·곡선·그라데이션·효과·미지원 글꼴은 정확한
+  진단과 함께 래스터 폴백한다. editable text import와 smart object의 linked/embedded 의미론은
+  없다.
+- **Semantic AI colorizer:** `studio-auto-color-hints.ts`의 로컬 scribble/connected-region 색 힌트는
+  제공한다. 인물·의상·배경 의미를 추론하는 전용 AI 채색 모델은 별도 잔여다.
+- **Native SKP/BLEND와 Blender급 제작:** 넓은 3D 교환 포맷을 canonical GLB로 가져오는 경로와
+  native proprietary authoring은 다른 범위다.
+- **공용 타임라인의 독립 프레임 시간:** 단일 이미지 프레임 duration은 제공하지만 multi-track
+  timeline의 전 트랙/패널별 독립 duration 모델은 남아 있다.
+
+### AI 생성 플랫폼(투닝/젠툰/투툰/WeToon/ComicAI) 기존 미착수 기록의 현재 상태
+
+5차 배치의 “AI 생성 BYOK 구조”(배경 생성/자동 채색/장면구성 제안) 이후 구현된 범위와 다음 확장
+경계를 함께 기록한다.
 - **캐릭터 일관성 유지 생성**(젠툰 핵심 기능) — 완료됨(2026-07). 위 §2 "캐릭터 일관성 유지 생성" 참고
   (참고 이미지 image-to-image 근사로 착수·통합 완료됨). IP-Adapter/캐릭터 LoRA 같은 완전한 전문 기법은
   여전히 스코프 밖(이 프로젝트는 자체 추론 서버를 둘 수 없음).
@@ -958,16 +1032,12 @@ Liquify/Content-aware fill/Puppet warp — 위 §2 "3차 배치"(완료) 참고.
    단계와 필드별 제안 수락/거절을 갖춘 작가실 문서임.
 5. **Pexels/Pixabay 등 스톡 이미지 소스 추가** — Unsplash와 완전히 동일한 BYOK 아키텍처 복제 수준이라
    구현 리스크는 낮지만, 이미 Unsplash가 있어 한계효용은 "소스 다양화" 정도(우선순위 낮음).
-6. **전체화면 모달 4개의 사이트 헤더 가림 확인·수정**(StoryboardGrid/ScrollPreview/Timelapse/
-   Background3D) — 시나리오 자동 생성 개발 중 헤드리스 브라우저로 발견한 잠재 버그(§2 "시나리오 기반
-   자동 컷+말풍선 배치" 마지막 항목 참고): 이 앱의 라우트 콘텐츠 래퍼(`route-stage`)가
-   `isolation:isolate`를 걸어놔서, 그 안에 있는 z-[80] 전체화면 모달은 z-index를 아무리 높여도 사이트
-   전역 고정 헤더(z-50, route-stage 밖의 형제)보다 뒤에 그려질 가능성이 높다(제목표시줄이 사이트
-   헤더에 가려짐). 시나리오 모달/AI 최초 사용 고지는 `createPortal(..., document.body)`로 이번에
-   수정했지만, 이 4개 기존 모달은 실제로 재현되는지 확인 후 같은 방식으로 고쳐야 한다(이번 사이클은
-   범위 밖으로 남겨둠).
+6. ~~**전체화면 모달 4개의 사이트 헤더 가림 확인·수정**~~ — 완료(2026-07-26 재감사).
+   `StudioStoryboardGridPanel.tsx`, `StudioScrollPreviewPanel.tsx`, `StudioTimelapsePanel.tsx`,
+   `StudioBackground3D.tsx` 모두 `createPortal(..., document.body)`를 사용해 `route-stage`의
+   stacking context를 벗어난다.
 
-### 조사했으나 연동 불가로 확정된 것(재조사 불필요)
+### 외부 연동 불가 항목과 과거 기록 정정
 - **네이버 AI Painter 연동** — 실존하는 네이버웹툰 자동채색 도구(2021년 출시, WACV 2022 논문으로
   기술 검증됨)이나 **네이버웹툰 소속/계약 창작자 전용 내부 툴이라 외부 개발자용 API·SDK가 전혀
   없음**(2026-07 조사, WebSearch로 재확인해도 결과 동일할 가능성 높음). NAVER Cloud Platform이 공개
@@ -982,9 +1052,10 @@ Liquify/Content-aware fill/Puppet warp — 위 §2 "3차 배치"(완료) 참고.
 - **Clip Studio Paint(.clip) 포맷 직접 파싱** — CELSYS 공식 스펙 비공개, 커뮤니티 리버스엔지니어링
   스펙만 존재(법적 회색지대 + 유지보수 리스크). CSP가 이미 공식적으로 PSD 내보내기를 지원하므로,
   이 앱의 기존 PSD 가져오기(§2)로 이미 상호운용 가능 — 신규 연동 불필요.
-- **실시간 공동편집(팀 기능)** — 사용자에게 직접 확인 후 보류 결정(2026-07-04). 웹소켓 서버가 반드시
-  필요해 실제 호스팅 비용이 발생 — "$0 서버비용" 원칙과 정면 충돌. 대안으로 제시한 "비동기 공유
-  (.json 백업/복구를 공유 링크로 확장)"도 사용자가 보류를 택함 — 재제안 시 이 히스토리부터 확인.
+- ~~**실시간 공동편집(팀 기능) 전체 보류**~~ — 이 과거 판단은 현재 상태가 아니다. 벡터 CRDT,
+  presence, 점 앵커 댓글, 동의 기반 화면 공유, 서버 durable update가 제공된다. 아직 완료되지 않은
+  것은 모든 래스터 브러시의 Magma급 충돌 병합·compactor·asset hydration이며, 범위는
+  `docs/studio-crdt-webgpu-architecture-2026-07-16.md`를 기준으로 판단한다.
 
 관련 문서: `docs/design-content-aware-fill.md`, `docs/studio-puppet-warp-design.md`,
 `docs/studio-liquify-integration.md`, `docs/studio-kaleidoscope-integration.md`,

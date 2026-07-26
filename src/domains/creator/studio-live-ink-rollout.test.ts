@@ -11,6 +11,10 @@ import {
 } from "./studio-live-ink-rollout";
 
 const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const rolloutSource = readFileSync(
+  new URL("./studio-live-ink-rollout.ts", import.meta.url),
+  "utf8",
+);
 
 function memoryStorage(initial?: string): StudioLiveInkRolloutStorage & {
   readonly values: Map<string, string>;
@@ -36,13 +40,18 @@ function fixedRandom(value: number): StudioLiveInkRolloutRandom {
 }
 
 describe("Studio live-ink progressive rollout", () => {
-  it("wires both public deployment controls into the production Studio policy", () => {
+  it("wires all public deployment controls into the production Studio policy", () => {
     expect(studioPageSource).toContain("resolveStudioLiveInkRollout(");
     expect(studioPageSource).toContain("studioLiveInkRolloutInputFromGlobals(");
     expect(studioPageSource).toContain("import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND");
     expect(studioPageSource).toContain("import.meta.env.VITE_STUDIO_LIVE_INK_ROLLOUT_PERCENT");
+    expect(studioPageSource).toContain("import.meta.env.VITE_STUDIO_LIVE_INK_KILL_SWITCH");
     expect(studioPageSource).toContain(
       "STUDIO_VISIBLE_LIVE_INK_ROLLOUT.preference",
+    );
+    expect(rolloutSource).toContain("resolveStudioFeatureRollout({");
+    expect(rolloutSource).toContain(
+      "bucketStorageKey: STUDIO_LIVE_INK_ROLLOUT_BUCKET_STORAGE_KEY",
     );
   });
 
@@ -78,6 +87,15 @@ describe("Studio live-ink progressive rollout", () => {
   });
 
   it("preserves explicit force and emergency rollback controls", () => {
+    expect(resolveStudioLiveInkRollout({
+      backendPreference: "webgpu",
+      rolloutPercent: 100,
+      killSwitch: "on",
+      webgpuApiAvailable: true,
+    })).toMatchObject({
+      preference: "canvas2d",
+      reason: "kill-switch",
+    });
     expect(resolveStudioLiveInkRollout({
       backendPreference: "webgpu",
       rolloutPercent: 0,
@@ -216,20 +234,21 @@ describe("Studio live-ink progressive rollout", () => {
         throw new Error("denied");
       },
     };
-    const input = studioLiveInkRolloutInputFromGlobals("auto", 5, globals);
+    const input = studioLiveInkRolloutInputFromGlobals("auto", 5, "true", globals);
 
     expect(input).toMatchObject({
       backendPreference: "auto",
       rolloutPercent: 5,
+      killSwitch: "true",
       webgpuApiAvailable: false,
       storage: null,
       random: null,
     });
 
-    expect(studioLiveInkRolloutInputFromGlobals("auto", 5, {
+    expect(studioLiveInkRolloutInputFromGlobals("auto", 5, undefined, {
       navigator: { gpu: {} },
     }).webgpuApiAvailable).toBe(false);
-    expect(studioLiveInkRolloutInputFromGlobals("auto", 5, {
+    expect(studioLiveInkRolloutInputFromGlobals("auto", 5, undefined, {
       navigator: { gpu: { requestAdapter: () => Promise.resolve(null) } },
     }).webgpuApiAvailable).toBe(true);
   });

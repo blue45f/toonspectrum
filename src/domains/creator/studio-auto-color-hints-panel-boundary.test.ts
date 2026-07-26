@@ -80,11 +80,22 @@ describe("studio auto-color hints panel export boundary", () => {
     // Selected image layer src is plumbed for on-demand pixel decode (not raw ImageData props).
     expect(mountSnippet).toMatch(/\bimageSrc=\{selected\.src\}/u);
     expect(mountSnippet).not.toMatch(/\bimage=\{/u);
-    // Explicit apply patches selected.src; work-asset destructive lock removes the handler.
+    // Explicit apply patches selected.src; work-asset destructive lock removes only that handler.
     expect(mountSnippet).toMatch(/\bonApplyResult=/u);
     expect(mountSnippet).toContain("patchEl(selected.id, { src: dataUrl })");
-    // Multi-layer paint: new transparent color layer via onApplyNewLayer + commit.
-    expect(mountSnippet).toMatch(/\bonApplyNewLayer=/u);
+    expect(mountSnippet).toMatch(
+      /onApplyResult=\{\s*selectedWorkAssetDestructiveEditReason\s*\?\s*undefined/u,
+    );
+    // Multi-layer paint is non-destructive, so immutable team work-assets keep this path.
+    expect(mountSnippet).toMatch(
+      /onApplyNewLayer=\{\s*\(\{ dataUrl, name \}\) =>/u,
+    );
+    expect(mountSnippet).not.toMatch(
+      /onApplyNewLayer=\{\s*selectedWorkAssetDestructiveEditReason/u,
+    );
+    expect(inspector).toContain(
+      "원본을 바꾸지 않는 새 채색 레이어 생성은",
+    );
     expect(mountSnippet).toContain('type: "image" as const');
     expect(mountSnippet).toMatch(/commit\(/u);
     expect(mountSnippet).toContain("setSelectedId(paintEl.id)");

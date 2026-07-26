@@ -24,11 +24,6 @@ import {
   studioActiveStrokeRecoveryFingerprint,
   type StudioActiveStrokePointerType,
 } from "./studio-active-stroke-lifecycle";
-import {
-  runStudioAdvancedFillInBrowser,
-  studioAdvancedFillResultMessage,
-  summarizeStudioAdvancedFillPreview,
-} from "./studio-advanced-fill-browser";
 import { resolveStudioAdvancedFillEntry } from "./studio-advanced-fill-entry";
 import {
   loadStudioAdvancedFillSettings,
@@ -783,6 +778,10 @@ import {
   movePagesBulk as movePagesBulkPure,
   reorderPages,
 } from "./studio-pages";
+import {
+  createStudioPagesHistoryCommandJournalClient,
+  type StudioHistoryJournalTransitionInput,
+} from "./studio-pages-history-command-journal-client";
 import { createPalette, savePalette } from "./studio-palette-library";
 import { withShotTag } from "./studio-panel-shot-tags";
 import {
@@ -872,7 +871,6 @@ import { buildStudioProductionInsightsInput } from "./studio-production-projecti
 import {
   parseStudioProjectFile,
   resetStudioAiProvenanceForRemix,
-  serializeStudioProjectFile,
   STUDIO_PROJECT_MAX_CANVAS_HEIGHT,
   STUDIO_PROJECT_MAX_PAGES,
   type StudioProjectFile,
@@ -1794,6 +1792,7 @@ const STUDIO_VISIBLE_LIVE_INK_ROLLOUT = resolveStudioLiveInkRollout(
   studioLiveInkRolloutInputFromGlobals(
     import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND,
     import.meta.env.VITE_STUDIO_LIVE_INK_ROLLOUT_PERCENT,
+    import.meta.env.VITE_STUDIO_LIVE_INK_KILL_SWITCH,
   ),
 );
 const STUDIO_VISIBLE_LIVE_INK_PREFERENCE = STUDIO_VISIBLE_LIVE_INK_ROLLOUT.preference;
@@ -1811,6 +1810,15 @@ const STUDIO_RAW_PEN_INK_PREVIEW_ENABLED =
   && typeof globalThis.requestAnimationFrame === "function";
 const STUDIO_TRANSIENT_PEN_INK_SURFACE_ENABLED =
   STUDIO_POINTER_PREDICTION_ENABLED || STUDIO_RAW_PEN_INK_PREVIEW_ENABLED;
+
+function createStudioPageHistoryCommandJournalClient() {
+  return createStudioPagesHistoryCommandJournalClient({
+    onError: import.meta.env.DEV
+      ? (cause) => console.warn("Studio command journal client recovered.", cause)
+      : undefined,
+  });
+}
+
 // 모바일 첫 사용 안내(하단 도구막대 + 두 손가락 이동/확대) 1회만 노출.
 const MOBILE_HINT_DISMISSED_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const WATERMARK_KEY = "toonspectrum-studio-watermark";
@@ -2867,6 +2875,87 @@ function StudioCuttoonEditor() {
   pagesHiRef.current = pagesHi;
   const pagesHistoryRef = useRef(pagesHistory);
   pagesHistoryRef.current = pagesHistory;
+  const pagesHistoryCommandJournalRef = useRef<ReturnType<
+    typeof createStudioPagesHistoryCommandJournalClient
+  > | null>(null);
+  pagesHistoryCommandJournalRef.current ??=
+    createStudioPageHistoryCommandJournalClient();
+  useLayoutEffect(() => {
+    // React Strict Mode replays effect setup/cleanup without a render between them. Recreate a
+    // client during setup if the simulated cleanup disposed the render-created instance.
+    pagesHistoryCommandJournalRef.current ??=
+      createStudioPageHistoryCommandJournalClient();
+    const client = pagesHistoryCommandJournalRef.current;
+    return () => {
+      client?.dispose();
+      if (pagesHistoryCommandJournalRef.current === client) {
+        pagesHistoryCommandJournalRef.current = null;
+      }
+    };
+  }, []);
+  function rebaseStudioHistoryJournal(
+    resultingPages: StudioHistoryJournalTransitionInput["nextPages"],
+    resultingHistoryIndex: number,
+    reason: string
+  ): void {
+    try {
+      pagesHistoryCommandJournalRef.current?.rebase({
+        pages: resultingPages,
+        historyIndex: resultingHistoryIndex,
+      });
+    } catch (cause) {
+      // The snapshot history is the mutation authority. A diagnostic journal failure must never
+      // interrupt an accepted local/remote edit or escape a CRDT subscription callback.
+      if (import.meta.env.DEV) {
+        console.warn(`Studio command journal rebase failed (${reason}).`, cause);
+      }
+    }
+  }
+  function recordStudioHistoryTransition(
+    input: StudioHistoryJournalTransitionInput
+  ): void {
+    try {
+      pagesHistoryCommandJournalRef.current?.recordTransition(input);
+    } catch (cause) {
+      // The existing bounded snapshot history remains authoritative during this staged migration.
+      // A journal invariant failure retires only the audit/replay horizon and never drops the
+      // creator's accepted mutation.
+      rebaseStudioHistoryJournal(
+        input.nextPages,
+        input.nextHistoryIndex,
+        "transition recovery"
+      );
+      if (import.meta.env.DEV) {
+        console.warn("Studio command journal transition was reset.", cause);
+      }
+    }
+  }
+  function recordStudioHistoryUndoRedo(
+    action: "undo" | "redo",
+    resultingPages: PageState[],
+    resultingHistoryIndex: number
+  ): void {
+    const target = {
+      pages: resultingPages,
+      historyIndex: resultingHistoryIndex,
+    };
+    try {
+      if (action === "undo") {
+        pagesHistoryCommandJournalRef.current?.recordUndo(target);
+      } else {
+        pagesHistoryCommandJournalRef.current?.recordRedo(target);
+      }
+    } catch (cause) {
+      rebaseStudioHistoryJournal(
+        resultingPages,
+        resultingHistoryIndex,
+        `${action} recovery`
+      );
+      if (import.meta.env.DEV) {
+        console.warn(`Studio command journal ${action} was reset.`, cause);
+      }
+    }
+  }
   const comipoActionBusyRef = useRef(false);
   const pages = pagesHistory[pagesHi];
 
@@ -3118,6 +3207,11 @@ function StudioCuttoonEditor() {
         // Every undo snapshot switches source identity in one React update. Placement/filter edits
         // remain snapshot-specific; only the exact local source is replaced by the opaque URI.
         pagesHistoryRef.current = admitted.history;
+        rebaseStudioHistoryJournal(
+          admitted.nextCurrentPages,
+          currentIndex,
+          "work asset canonicalization"
+        );
         setPagesHistoryState(admitted.history);
         return true;
       },
@@ -3213,21 +3307,34 @@ function StudioCuttoonEditor() {
           : changedIds.strokeIds.size === 0 && changedIds.sceneElementIds.size === 0 &&
             changedIds.pageIds.size === 0 && changedIds.layerGroupIds.size === 0)
       ) return;
+      const runtime = studioCrdtSceneRuntimeRef.current;
+      if (!runtime) return;
+      const currentHistory = pagesHistoryRef.current;
+      const currentIndex = Math.max(
+        0,
+        Math.min(pagesHiRef.current, Math.max(0, currentHistory.length - 1))
+      );
+      const reconciled = runtime.reconcileHistory(
+        currentHistory,
+        currentIndex,
+        frontier,
+        changedIds,
+        readyStudioWorkAssetImageSources(studioWorkAssetHydrator)
+      );
+      if (!reconciled.changed) return;
       studioRevisionProjectGenerationRef.current += 1;
       collaborationAccessRef.current = {
         ...collaborationAccessRef.current,
         documentGeneration: collaborationAccessRef.current.documentGeneration + 1,
       };
-      setPagesHistoryState((history) => {
-        const reconciled = studioCrdtSceneRuntimeRef.current?.reconcileHistory(
-          history,
-          pagesHiRef.current,
-          frontier,
-          changedIds,
-          readyStudioWorkAssetImageSources(studioWorkAssetHydrator)
-        );
-        return reconciled?.changed ? reconciled.history : history;
-      });
+      pagesHistoryRef.current = reconciled.history;
+      pagesHiRef.current = currentIndex;
+      rebaseStudioHistoryJournal(
+        reconciled.history[currentIndex] ?? [],
+        currentIndex,
+        "remote CRDT reconciliation"
+      );
+      setPagesHistoryState(reconciled.history);
     };
 
     applyFrontier({
@@ -3289,21 +3396,32 @@ function StudioCuttoonEditor() {
       pages: studioCrdtDocument.getPages(true),
       layerGroups: studioCrdtDocument.getLayerGroups({ includeDeleted: true }),
     };
-    setPagesHistoryState((history) => {
-      const reconciled = runtime.reconcileHistory(
-        history,
-        pagesHiRef.current,
-        frontier,
-        {
-          strokeIds: new Set<string>(),
-          sceneElementIds: readyReferenceIds,
-          pageIds: new Set<string>(),
-          layerGroupIds: new Set<string>(),
-        },
-        referenceSources
-      );
-      return reconciled.changed ? reconciled.history : history;
-    });
+    const currentHistory = pagesHistoryRef.current;
+    const currentIndex = Math.max(
+      0,
+      Math.min(pagesHiRef.current, Math.max(0, currentHistory.length - 1))
+    );
+    const reconciled = runtime.reconcileHistory(
+      currentHistory,
+      currentIndex,
+      frontier,
+      {
+        strokeIds: new Set<string>(),
+        sceneElementIds: readyReferenceIds,
+        pageIds: new Set<string>(),
+        layerGroupIds: new Set<string>(),
+      },
+      referenceSources
+    );
+    if (!reconciled.changed) return;
+    pagesHistoryRef.current = reconciled.history;
+    pagesHiRef.current = currentIndex;
+    rebaseStudioHistoryJournal(
+      reconciled.history[currentIndex] ?? [],
+      currentIndex,
+      "work asset hydration reconciliation"
+    );
+    setPagesHistoryState(reconciled.history);
   }, [
     sourceHydrationPending,
     studioCrdtDocument,
@@ -7314,6 +7432,10 @@ function StudioCuttoonEditor() {
             return;
           }
           resetAdvancedFillForDocumentReplacement();
+          pagesHistoryCommandJournalRef.current?.rebase({
+            pages: restoredPages,
+            historyIndex: 0,
+          });
           pagesHistoryRef.current = [restoredPages];
           pagesHiRef.current = 0;
           setPagesHistory([restoredPages]);
@@ -12686,6 +12808,10 @@ const puppetWarpArmed =
         setAdvancedFillPreview(null);
         setAdvancedFillStatus(null);
         const hydratedPages = hydratedProject.pagesList as PageState[];
+        pagesHistoryCommandJournalRef.current?.rebase({
+          pages: hydratedPages,
+          historyIndex: 0,
+        });
         setPagesHistoryState([hydratedPages]);
         setPagesHiState(0);
         setCurrentPageId(
@@ -14103,6 +14229,13 @@ const puppetWarpArmed =
       currentHistoryIndex,
       nextPages
     );
+    recordStudioHistoryTransition({
+      mutationKind: "elements.commit",
+      previousPages: commitBasePages,
+      nextPages,
+      previousHistoryIndex: currentHistoryIndex,
+      nextHistoryIndex: appended.historyIndex,
+    });
     // Advance refs before scheduling React state. A second synchronous commit observes this exact
     // first snapshot even though React Compiler batching has not rendered it yet.
     pagesHistoryRef.current = appended.history;
@@ -14122,7 +14255,26 @@ const puppetWarpArmed =
       setError(collaborationLockMessage());
       return;
     }
-    const workAssetReason = studioWorkAssetSourceTransitionReason(elements, nextElements);
+    // A pointer stream may emit multiple coalesced samples before React commits a render. Always
+    // branch from the synchronously advanced refs so those samples form one monotonic history
+    // transition instead of repeatedly branching from the render closure.
+    const currentHistory = pagesHistoryRef.current;
+    const currentHistoryIndex = Math.max(
+      0,
+      Math.min(pagesHiRef.current, Math.max(0, currentHistory.length - 1))
+    );
+    const commitBasePages = currentHistory[currentHistoryIndex] ?? pages;
+    const commitPageId = currentPageIdRef.current || activePage.id;
+    const commitTargetPage = commitBasePages.find((page) => page.id === commitPageId);
+    if (!commitTargetPage) {
+      setError("현재 페이지를 찾지 못해 연속 편집을 적용하지 않았어요.");
+      return;
+    }
+    const commitBaseElements = commitTargetPage.elements;
+    const workAssetReason = studioWorkAssetSourceTransitionReason(
+      commitBaseElements,
+      nextElements
+    );
     if (workAssetReason) {
       setError(workAssetReason);
       return;
@@ -14141,24 +14293,43 @@ const puppetWarpArmed =
     if (!advancedFillApplyingRef.current) {
       invalidateAdvancedFillWork("문서가 바뀌어 진행 중인 계산과 채우기 미리보기를 취소했습니다.");
     }
-    const localNextPages = pages.map((p) =>
-      p.id === activePage.id ? { ...p, elements: resolved } : p
+    const localNextPages = commitBasePages.map((p) =>
+      p.id === commitPageId ? { ...p, elements: resolved } : p
     );
-    if (!publishStudioCrdtSceneTransition(pages, localNextPages)) return;
+    if (!publishStudioCrdtSceneTransition(commitBasePages, localNextPages)) return;
     const nextPages = mergeStudioCrdtFrontier(localNextPages);
-    if (coalesceKeyRef.current === key && pagesHi === pagesHistory.length - 1) {
-      setPagesHistory((h) => {
-        const c = h.slice();
-        c[pagesHi] = nextPages;
-        return c;
-      });
+    const replacesCurrentSnapshot =
+      coalesceKeyRef.current === key &&
+      currentHistoryIndex === currentHistory.length - 1;
+    let nextHistory: PageState[][];
+    let nextHistoryIndex: number;
+    if (replacesCurrentSnapshot) {
+      nextHistory = currentHistory.slice();
+      nextHistory[currentHistoryIndex] = nextPages;
+      nextHistoryIndex = currentHistoryIndex;
     } else {
-      const h = pagesHistory.slice(0, pagesHi + 1);
-      h.push(nextPages);
-      setPagesHistory(h);
-      setPagesHi(h.length - 1);
-      coalesceKeyRef.current = key;
+      const appended = appendStudioPagesHistorySnapshot(
+        currentHistory,
+        currentHistoryIndex,
+        nextPages
+      );
+      nextHistory = appended.history;
+      nextHistoryIndex = appended.historyIndex;
     }
+    recordStudioHistoryTransition({
+      mutationKind: "elements.coalesced-commit",
+      previousPages: commitBasePages,
+      nextPages,
+      previousHistoryIndex: currentHistoryIndex,
+      nextHistoryIndex,
+      coalesceKey: key,
+    });
+    // Advance refs before React setters so a second sample in this task sees this exact result.
+    pagesHistoryRef.current = nextHistory;
+    pagesHiRef.current = nextHistoryIndex;
+    setPagesHistory(nextHistory);
+    if (!replacesCurrentSnapshot) setPagesHi(nextHistoryIndex);
+    coalesceKeyRef.current = key;
   }
   // 커밋 지연 파이프라인의 동기화/폐기 — 타이머·이벤트 핸들러가 stale 클로저 없이 최신
   // 상태(commit/pages/elements)로 실행되도록 렌더마다 ref 에 재바인딩한다(updateScrollPosRef 패턴).
@@ -14702,6 +14873,13 @@ const puppetWarpArmed =
       currentHistoryIndex,
       resolvedPages
     );
+    recordStudioHistoryTransition({
+      mutationKind: "pages.commit",
+      previousPages: currentPages,
+      nextPages: resolvedPages,
+      previousHistoryIndex: currentHistoryIndex,
+      nextHistoryIndex: appended.historyIndex,
+    });
     pagesHistoryRef.current = appended.history;
     pagesHiRef.current = appended.historyIndex;
     setPagesHistory(appended.history);
@@ -16888,6 +17066,9 @@ const puppetWarpArmed =
     const nextIndex = Math.max(0, pagesHi - 1);
     const nextSnapshot = pagesHistory[nextIndex];
     if (nextSnapshot && !publishStudioCrdtHistoryTransition(pages, nextSnapshot)) return;
+    if (nextIndex !== pagesHi && nextSnapshot) {
+      recordStudioHistoryUndoRedo("undo", nextSnapshot, nextIndex);
+    }
     setPagesHi(nextIndex);
   };
   const redo = () => {
@@ -16906,6 +17087,9 @@ const puppetWarpArmed =
     const nextIndex = Math.min(pagesHistory.length - 1, pagesHi + 1);
     const nextSnapshot = pagesHistory[nextIndex];
     if (nextSnapshot && !publishStudioCrdtHistoryTransition(pages, nextSnapshot)) return;
+    if (nextIndex !== pagesHi && nextSnapshot) {
+      recordStudioHistoryUndoRedo("redo", nextSnapshot, nextIndex);
+    }
     setPagesHi(nextIndex);
   };
   companionHistoryHandlerRef.current = (action) => {
@@ -17082,6 +17266,12 @@ const puppetWarpArmed =
     const nextIndex = Math.max(0, Math.min(pagesHistory.length - 1, index));
     const nextSnapshot = pagesHistory[nextIndex];
     if (nextSnapshot && !publishStudioCrdtHistoryTransition(pages, nextSnapshot)) return;
+    if (nextIndex !== pagesHi && nextSnapshot) {
+      pagesHistoryCommandJournalRef.current?.rebase({
+        pages: nextSnapshot,
+        historyIndex: nextIndex,
+      });
+    }
     setPagesHi(nextIndex);
   };
 
@@ -21667,6 +21857,9 @@ const puppetWarpArmed =
     setAdvancedFillBusy(true);
     setAdvancedFillStatus("경계와 누수 가능성을 분석하고 있어요…");
     try {
+      // The browser raster engine is only needed after an explicit fill gesture. Start loading it
+      // beside the busy-state paint/reference preparation instead of charging every Studio launch.
+      const advancedFillBrowserModulePromise = import("./studio-advanced-fill-browser");
       // Give React one paint opportunity so large source scans do not hide the busy state.
       await new Promise<void>((resolve) => globalThis.requestAnimationFrame(() => resolve()));
       if (
@@ -21711,6 +21904,16 @@ const puppetWarpArmed =
         );
         referenceSrc = composed.dataUrl;
       }
+      if (
+        runId !== advancedFillRunIdRef.current ||
+        controller.signal.aborted ||
+        pagesHiRef.current !== historyIndex
+      ) return;
+      const {
+        runStudioAdvancedFillInBrowser,
+        studioAdvancedFillResultMessage,
+        summarizeStudioAdvancedFillPreview,
+      } = await advancedFillBrowserModulePromise;
       if (
         runId !== advancedFillRunIdRef.current ||
         controller.signal.aborted ||
@@ -22496,7 +22699,7 @@ const puppetWarpArmed =
           });
           return;
         }
-        setError("선화 이미지 안을 드래그해 시드를 찍어 주세요. (90°/자유 회전 레이어는 아직 지원하지 않아요)");
+        setError("선화 이미지 안을 드래그해 시드를 찍어 주세요.");
         return;
       }
       if (pos && !planSize) {
@@ -28128,6 +28331,13 @@ function clearSelectionForEdit() {
       currentHistoryIndex,
       restoredPages
     );
+    recordStudioHistoryTransition({
+      mutationKind: "project.replace",
+      previousPages: currentPages,
+      nextPages: restoredPages,
+      previousHistoryIndex: currentHistoryIndex,
+      nextHistoryIndex: appended.historyIndex,
+    });
     pagesHistoryRef.current = appended.history;
     pagesHiRef.current = appended.historyIndex;
     setPagesHistory(appended.history);
@@ -28633,19 +28843,44 @@ function clearSelectionForEdit() {
     autoActionAbortRef.current?.abort();
   }
 
-  // 스튜디오 프로젝트 내보내기 (.json)
-  function handleExportProject() {
+  // 스튜디오 프로젝트 내보내기 (.json). 새 파일은 버전·문서 식별자·revision을 명시한
+  // canonical envelope이고, 불러오기는 과거 raw v1/v2 JSON도 계속 지원한다.
+  async function handleExportProject() {
     if (!ensureSharedDocumentAvailableForExport()) return;
-    const projectData = currentStudioProjectSnapshot();
-    const blob = new Blob([serializeStudioProjectFile(projectData, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${title.trim() || "toonspectrum-studio-project"}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    try {
+      const { serializeStudioProjectDocument } = await import(
+        "./studio-project-document"
+      );
+      const projectData = currentStudioProjectSnapshot();
+      const exportedAt = new Date().toISOString();
+      const documentId = workId
+        ? `work:${workId}`
+        : remixId
+          ? `remix:${remixId}`
+          : `draft:${currentPageId}`;
+      const serialized = serializeStudioProjectDocument(projectData, {
+        documentId,
+        revision: sharedDocument?.revision ?? 0,
+        createdAt: exportedAt,
+        updatedAt: exportedAt,
+      });
+      const blob = new Blob([serialized], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${title.trim() || "toonspectrum-studio-project"}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setError(null);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? `프로젝트 JSON 내보내기: ${cause.message} 대용량 원본 자산은 무결성 archive를 이용해 주세요.`
+          : "프로젝트 JSON을 만들지 못했습니다. 대용량 원본 자산은 무결성 archive를 이용해 주세요."
+      );
+    }
   }
 
   // 이미지·마스크를 SHA-256 content-addressed attachment로 분리한 무결성 검증형 프로젝트 archive.
@@ -28717,9 +28952,20 @@ function clearSelectionForEdit() {
       try {
         if (!canApplyStudioMutation(mutationTicket)) return;
         const text = event.target?.result as string;
-        const projectData = parseStudioProjectFile(JSON.parse(text));
-        if (!(await applyStudioProjectSnapshot(projectData))) return;
-        alert("프로젝트 불러오기가 완료되었습니다.");
+        const { parseStudioProjectDocument } = await import(
+          "./studio-project-document"
+        );
+        if (!canApplyStudioMutation(mutationTicket)) return;
+        const loaded = await parseStudioProjectDocument(text);
+        if (!canApplyStudioMutation(mutationTicket)) return;
+        if (!(await applyStudioProjectSnapshot(loaded.project))) return;
+        const migrated =
+          loaded.source === "canonical-envelope" && loaded.receipt.migrated;
+        alert(
+          migrated
+            ? "이전 버전 프로젝트를 안전하게 변환해 불러왔습니다."
+            : "프로젝트 불러오기가 완료되었습니다."
+        );
       } catch (err) {
         console.error(err);
         alert(err instanceof Error ? err.message : "프로젝트 파일을 읽는 도중 오류가 발생했습니다.");

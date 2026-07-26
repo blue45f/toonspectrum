@@ -157,6 +157,44 @@ describe("StudioInspectorCanvasControls", () => {
     expect(props.onClearUserGuides).toHaveBeenCalledTimes(1);
   });
 
+  it("퍼센트 프리셋과 직접 입력을 방향별 캔버스 px 위치로 변환한다", () => {
+    const props = canvasProps();
+    render(<StudioInspectorCanvasControls {...props} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "세로 가이드 25% 추가" }));
+    expect(props.onAddUserGuide).toHaveBeenLastCalledWith("v", 180);
+
+    fireEvent.click(screen.getByRole("radio", { name: "가로 · 높이 기준" }));
+    fireEvent.click(screen.getByRole("button", { name: "가로 가이드 33.3% 추가" }));
+    expect(props.onAddUserGuide).toHaveBeenLastCalledWith("h", 3_996);
+
+    const directInput = screen.getByRole("textbox", { name: "직접 입력" });
+    fireEvent.change(directInput, { target: { value: " 66,7 % " } });
+    expect(screen.getByText("66.7% → 8004px")).toBeTruthy();
+    fireEvent.submit(directInput.closest("form")!);
+    expect(props.onAddUserGuide).toHaveBeenLastCalledWith("h", 8_004);
+  });
+
+  it("잘못된 퍼센트는 fail-closed하고 입력 오류를 접근 가능하게 알린다", () => {
+    const props = canvasProps();
+    render(<StudioInspectorCanvasControls {...props} />);
+
+    const directInput = screen.getByRole("textbox", { name: "직접 입력" });
+    const addButton = screen.getByRole("button", { name: "추가" });
+    const initialCalls = vi.mocked(props.onAddUserGuide).mock.calls.length;
+
+    for (const value of ["0", "100", "NaN", "Infinity", " "]) {
+      fireEvent.change(directInput, { target: { value } });
+      expect((addButton as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.submit(directInput.closest("form")!);
+    }
+
+    expect(props.onAddUserGuide).toHaveBeenCalledTimes(initialCalls);
+    fireEvent.change(directInput, { target: { value: "100" } });
+    expect(directInput.getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByRole("alert").textContent).toContain("100보다 작은");
+  });
+
   it("매직 리사이즈와 테마 변경을 위임하고 문서 제어 잠금을 UI에 반영한다", () => {
     const props = canvasProps();
     const { rerender } = render(<StudioInspectorCanvasControls {...props} />);
@@ -181,6 +219,10 @@ describe("StudioInspectorCanvasControls", () => {
     ).toBe(true);
     expect(
       (screen.getByRole("button", { name: "소프트" }) as HTMLButtonElement).disabled
+    ).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "세로 가이드 25% 추가" }) as HTMLButtonElement)
+        .disabled
     ).toBe(true);
 
     rerender(<StudioInspectorCanvasControls {...props} masterEditMode />);

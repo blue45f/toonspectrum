@@ -48,27 +48,31 @@ describe("mapStudioDocumentPointToAutoColorSeed", () => {
     ).toBeNull();
   });
 
-  it("fails closed for non-axis-aligned free rotation", () => {
-    expect(
-      mapStudioDocumentPointToAutoColorSeed({
-        documentX: 150,
-        documentY: 80,
-        image: { ...FRAME, rotation: 45 },
-        pixelWidth: 40,
-        pixelHeight: 20,
-      }),
-    ).toBeNull();
+  it("maps a free-rotation point through the inverse image transform", () => {
+    const radians = Math.PI / 4;
+    const localX = 50;
+    const localY = 30;
+    const sample = mapStudioDocumentPointToAutoColorSeed({
+      documentX: FRAME.x + Math.cos(radians) * localX - Math.sin(radians) * localY,
+      documentY: FRAME.y + Math.sin(radians) * localX + Math.cos(radians) * localY,
+      image: { ...FRAME, rotation: 45 },
+      pixelWidth: 40,
+      pixelHeight: 20,
+    });
+    expect(sample).not.toBeNull();
+    expect(sample!.x).toBeCloseTo(10, 5);
+    expect(sample!.y).toBeCloseTo(6, 5);
   });
 
-  it("supports 180° rotation as an axis-aligned special case", () => {
+  it("supports 180° rotation around the Konva node origin", () => {
     const sample = mapStudioDocumentPointToAutoColorSeed({
-      documentX: 100,
-      documentY: 50,
+      documentX: -100,
+      documentY: -50,
       image: { ...FRAME, rotation: 180 },
       pixelWidth: 40,
       pixelHeight: 20,
     });
-    // 180° maps frame origin to the opposite planner corner.
+    // The transformed local bottom-right corner maps to the opposite planner corner.
     expect(sample).not.toBeNull();
     expect(sample!.x).toBeCloseTo(40 - 1e-6, 4);
     expect(sample!.y).toBeCloseTo(20 - 1e-6, 4);
@@ -100,11 +104,10 @@ describe("mapStudioDocumentPointToAutoColorSeed", () => {
     expect(vFlip!.y).toBeCloseTo(20 - 1e-6, 4);
   });
 
-  it("composes 180° rotation with horizontal flip", () => {
-    // 180° then H-flip: left-top doc corner → (right, bottom) after 180 → (left, bottom) after H-flip.
+  it("composes 180° rotation with the baked horizontal flip", () => {
     const sample = mapStudioDocumentPointToAutoColorSeed({
-      documentX: 100,
-      documentY: 50,
+      documentX: -100,
+      documentY: -50,
       image: { ...FRAME, rotation: 180, flipped: true },
       pixelWidth: 40,
       pixelHeight: 20,

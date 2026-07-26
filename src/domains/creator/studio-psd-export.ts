@@ -4,10 +4,11 @@
  * 래스터 내보내기(studio-export, png/jpg/webp)는 스테이지를 한 장으로 평탄화하고,
  * SVG 내보내기(studio-svg-export)는 요소를 벡터로 재직렬화한다. 이 모듈은 그 중간 —
  * "포토샵에서 요소별로 다시 만질 수 있는" 결과가 목표라, 각 요소를 Konva 가 실제로 그린
- * 픽셀 그대로 **개별 래스터 레이어**로 캡처해 ag-psd 로 조립한다(요소를 재직렬화하지 않으므로
- * 화면과 100% 동일 출력이 보장된다). 대가로 텍스트를 포함해 전부 편집 불가 픽셀 레이어가
- * 된다 — ag-psd 자체가 "다시 열어도 편집 가능한" 텍스트 레이어 기록을 신뢰성 있게 지원하지
- * 않는다고 README 가 명시하므로, 전부 래스터화하는 편이 유일하게 안전한 경로다.
+ * 픽셀 그대로 **개별 래스터 레이어**로 캡처해 ag-psd 로 조립한다. 일반 가로쓰기 TextEl은
+ * 같은 레이어에 ag-psd `Layer.text` descriptor도 함께 기록해 단방향 편집성을 제공한다.
+ * 래스터 프리뷰는 항상 유지하므로 Photoshop이 텍스트 엔진 데이터를 다시 그리기 전에도 현재
+ * 화면이 보존된다. 회전·세로쓰기·곡선·그라데이션·효과·미지원 글꼴은 descriptor를 쓰지 않고
+ * 기존 래스터 경로를 유지하며 `skipped`에 정확한 손실 사유를 남긴다.
  *
  * 좌표계 규약(중요): 캡처는 Stage 의 **현재 화면 줌**(effScale)과 무관해야 한다 — 그렇지
  * 않으면 사용자가 줌인/줌아웃한 상태에서 내보내기 결과가 매번 달라진다.
@@ -33,7 +34,14 @@
  * 모아 반환한다(콜러가 사용자에게 고지).
  */
 
-import { writePsd, type BlendMode, type Layer, type Psd } from "ag-psd";
+import {
+  writePsd,
+  type BlendMode,
+  type Color,
+  type Layer,
+  type LayerTextData,
+  type Psd,
+} from "ag-psd";
 
 import type Konva from "konva";
 
@@ -75,10 +83,36 @@ export interface PsdBubbleElLike extends PsdElMeta {
 
 export interface PsdTextElLike extends PsdElMeta {
   type: "text";
+  text: string;
   x: number;
   y: number;
   width: number;
   fontSize: number;
+  fill: string;
+  rotation: number;
+  font?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  letterSpacing?: number;
+  lineHeight?: number;
+  vertical?: boolean;
+  align?: "left" | "center" | "right";
+  fontStyle?: "normal" | "bold" | "italic" | "bold italic";
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  shadowOpacity?: number;
+  fillType?: "solid" | "gradient";
+  gradientColorStart?: string;
+  gradientColorEnd?: string;
+  gradientDirection?: "vertical" | "horizontal";
+  gradient?: unknown;
+  textPath?: { shape?: string } | null;
+  skewX?: number;
+  skewY?: number;
+  /** 런타임은 dialogue ruby를 구조 타이핑으로 허용한다. PSD v1은 rich runs로 승격하지 않는다. */
+  rubySpans?: unknown;
 }
 
 export interface PsdStickerElLike extends PsdElMeta {
@@ -199,6 +233,226 @@ function mapBlendMode(mode: string | undefined): BlendMode {
 function clampOpacity(opacity: number | undefined): number {
   if (opacity === undefined || Number.isNaN(opacity)) return 1;
   return Math.min(1, Math.max(0, opacity));
+}
+
+// ---------------------------------------------------------------------------
+// 편집 가능한 PSD 텍스트 — ag-psd 31.x가 안정적으로 기록하는 bounded horizontal subset.
+// ---------------------------------------------------------------------------
+
+/** Photoshop 문자 패널이 허용하는 글자 크기의 상한. 그 이상은 안전하게 래스터 폴백한다. */
+export const PSD_EDITABLE_TEXT_MAX_FONT_SIZE = 1_296;
+
+/**
+ * Studio가 제공하는 큐레이션 글꼴 중 PostScript full name을 확정할 수 있는 목록.
+ * 사용자 업로드/임의 CSS family를 추측해 기록하면 Photoshop이 다른 글꼴로 자동 대체하면서
+ * 줄바꿈과 위치가 달라지므로, 목록 밖 글꼴은 현재 래스터 프리뷰를 유지한다.
+ */
+const PSD_EDITABLE_TEXT_FONT_NAMES: Readonly<Record<string, string>> = {
+  arial: "ArialMT",
+  "arial mt": "ArialMT",
+  "black and white picture": "BlackAndWhitePicture-Regular",
+  "black han sans": "BlackHanSans-Regular",
+  "courier new": "CourierNewPSMT",
+  "cute font": "CuteFont-Regular",
+  "do hyeon": "DoHyeon-Regular",
+  dokdo: "Dokdo-Regular",
+  "east sea dokdo": "EastSeaDokdo-Regular",
+  gaegu: "Gaegu-Regular",
+  "gamja flower": "GamjaFlower-Regular",
+  "gowun batang": "GowunBatang-Regular",
+  "gowun dodum": "GowunDodum-Regular",
+  gugi: "Gugi-Regular",
+  helvetica: "Helvetica",
+  "hi melody": "HiMelody-Regular",
+  "ibm plex sans kr": "IBMPlexSansKR-Regular",
+  jua: "Jua-Regular",
+  "kirang haerang": "KirangHaerang-Regular",
+  "nanum brush script": "NanumBrushScript-Regular",
+  "nanum gothic": "NanumGothic",
+  "nanum myeongjo": "NanumMyeongjo",
+  "nanum pen script": "NanumPenScript-Regular",
+  "noto sans kr": "NotoSansKR-Regular",
+  "noto serif kr": "NotoSerifKR-Regular",
+  "poor story": "PoorStory-Regular",
+  pretendard: "Pretendard-Regular",
+  "single day": "SingleDay-Regular",
+  "song myung": "SongMyung-Regular",
+  stylish: "Stylish-Regular",
+  sunflower: "Sunflower-Medium",
+  "times new roman": "TimesNewRomanPSMT",
+  "yeon sung": "YeonSung-Regular",
+};
+
+export interface PsdEditableTextDescriptorMetrics {
+  /** 텍스트 노드의 문서 좌표 bbox. 화면 줌은 제거된 값이다. */
+  documentX: number;
+  documentY: number;
+  documentHeight: number;
+  /** PSD 출력 배율. font/transform/box bounds에 동일하게 적용한다. */
+  scale: number;
+  /** 패널 경계 때문에 캡처 비트맵이 실제로 잘렸다면 editable 재렌더가 경계를 벗어날 수 있다. */
+  panelClipped?: boolean;
+}
+
+export interface PsdEditableTextDescriptorPlan {
+  /** null이면 동일 레이어의 래스터 프리뷰만 기록한다. */
+  text: LayerTextData | null;
+  /** 사용자에게 보여 줄 구체적인 래스터 폴백 사유. */
+  fallbackReasons: string[];
+}
+
+function firstCssFontFamily(value: string): string {
+  const first = value.split(",")[0] ?? "";
+  return first.trim().replace(/^['"]|['"]$/g, "").trim();
+}
+
+function resolvePsdEditableTextFont(value: string | undefined): { family: string; postScriptName: string } | null {
+  const family = firstCssFontFamily(value ?? "Pretendard, sans-serif");
+  const postScriptName = PSD_EDITABLE_TEXT_FONT_NAMES[family.toLowerCase()];
+  return postScriptName ? { family, postScriptName } : null;
+}
+
+function parsePsdSolidTextColor(value: string): Color | null {
+  const match = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/iu.exec(value.trim());
+  const compact = match?.[1];
+  if (!compact) return null;
+  const hex = compact.length <= 4
+    ? compact.split("").map((channel) => `${channel}${channel}`).join("")
+    : compact;
+  const r = Number.parseInt(hex.slice(0, 2), 16);
+  const g = Number.parseInt(hex.slice(2, 4), 16);
+  const b = Number.parseInt(hex.slice(4, 6), 16);
+  return hex.length === 8
+    ? { r, g, b, a: Number.parseInt(hex.slice(6, 8), 16) }
+    : { r, g, b };
+}
+
+function hasActiveTextShadow(el: PsdTextElLike): boolean {
+  return !!el.shadowColor && (el.shadowOpacity ?? 0) > 0;
+}
+
+function hasRichTextRuns(el: PsdTextElLike): boolean {
+  return Array.isArray(el.rubySpans) ? el.rubySpans.length > 0 : el.rubySpans != null;
+}
+
+/**
+ * 일반 가로쓰기 TextEl을 ag-psd `LayerTextData`로 승격한다.
+ *
+ * 이 함수는 eligibility와 descriptor 생성을 함께 수행해 “지원하지 않는 속성을 조용히
+ * 버리는” 경로를 없앤다. null이면 호출부는 이미 만든 Konva 래스터 레이어를 그대로 사용한다.
+ */
+export function planPsdEditableTextDescriptor(
+  el: PsdTextElLike,
+  metrics: PsdEditableTextDescriptorMetrics,
+): PsdEditableTextDescriptorPlan {
+  const fallbackReasons: string[] = [];
+  const rotation = Number(el.rotation);
+  if (!Number.isFinite(rotation) || Math.abs(rotation) > 1e-6) fallbackReasons.push("회전");
+  if (el.vertical) fallbackReasons.push("세로쓰기");
+  if (el.textPath && el.textPath.shape !== "none") fallbackReasons.push("곡선 텍스트");
+  if (el.fillType === "gradient") fallbackReasons.push("그라데이션 채우기");
+  if (el.stroke && (el.strokeWidth ?? 0) > 0) fallbackReasons.push("외곽선 효과");
+  if (hasActiveTextShadow(el)) fallbackReasons.push("그림자 효과");
+  if ((el.skewX ?? 0) !== 0 || (el.skewY ?? 0) !== 0) fallbackReasons.push("기울이기 효과");
+  if (hasRichTextRuns(el)) fallbackReasons.push("루비/리치 텍스트");
+  if (metrics.panelClipped) fallbackReasons.push("패널 경계 클리핑");
+
+  const font = resolvePsdEditableTextFont(el.font);
+  if (!font) {
+    const family = firstCssFontFamily(el.font ?? "Pretendard, sans-serif") || "(빈 글꼴)";
+    fallbackReasons.push(`지원하지 않는 글꼴(${family})`);
+  }
+
+  const scaledFontSize = el.fontSize * metrics.scale;
+  if (
+    !Number.isFinite(scaledFontSize)
+    || scaledFontSize <= 0
+    || scaledFontSize > PSD_EDITABLE_TEXT_MAX_FONT_SIZE
+  ) {
+    fallbackReasons.push(`지원하지 않는 글자 크기(${String(scaledFontSize)}px)`);
+  }
+
+  const fillColor = parsePsdSolidTextColor(el.fill);
+  if (!fillColor) fallbackReasons.push(`지원하지 않는 단색(${el.fill})`);
+
+  const align = el.align ?? "left";
+  if (align !== "left" && align !== "center" && align !== "right") {
+    fallbackReasons.push(`지원하지 않는 정렬(${String(align)})`);
+  }
+
+  const fontStyle = el.fontStyle ?? "bold";
+  if (
+    fontStyle !== "normal"
+    && fontStyle !== "bold"
+    && fontStyle !== "italic"
+    && fontStyle !== "bold italic"
+  ) {
+    fallbackReasons.push(`지원하지 않는 글꼴 스타일(${String(fontStyle)})`);
+  }
+
+  const lineHeight = el.lineHeight ?? 1;
+  if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
+    fallbackReasons.push(`지원하지 않는 행간(${String(lineHeight)})`);
+  }
+  const letterSpacing = el.letterSpacing ?? 0;
+  if (!Number.isFinite(letterSpacing)) {
+    fallbackReasons.push(`지원하지 않는 자간(${String(letterSpacing)})`);
+  }
+
+  const boxWidth = el.width * metrics.scale;
+  const boxHeight = metrics.documentHeight * metrics.scale;
+  const transformX = metrics.documentX * metrics.scale;
+  const transformY = metrics.documentY * metrics.scale;
+  if (
+    typeof el.text !== "string"
+    || !Number.isFinite(boxWidth)
+    || boxWidth <= 0
+    || !Number.isFinite(boxHeight)
+    || boxHeight <= 0
+    || !Number.isFinite(transformX)
+    || !Number.isFinite(transformY)
+    || !Number.isFinite(metrics.scale)
+    || metrics.scale <= 0
+  ) {
+    fallbackReasons.push("유효하지 않은 텍스트 상자 좌표/크기");
+  }
+
+  if (fallbackReasons.length > 0 || !font || !fillColor) {
+    return { text: null, fallbackReasons };
+  }
+
+  const bold = fontStyle === "bold" || fontStyle === "bold italic";
+  const italic = fontStyle === "italic" || fontStyle === "bold italic";
+  return {
+    text: {
+      text: el.text,
+      transform: [1, 0, 0, 1, transformX, transformY],
+      left: 0,
+      top: 0,
+      right: boxWidth,
+      bottom: boxHeight,
+      orientation: "horizontal",
+      antiAlias: "smooth",
+      shapeType: "box",
+      boxBounds: [0, 0, boxWidth, boxHeight],
+      warp: { style: "none", rotate: "horizontal" },
+      style: {
+        font: { name: font.postScriptName },
+        fontSize: scaledFontSize,
+        fillColor,
+        fillFlag: true,
+        strokeFlag: false,
+        fauxBold: bold,
+        fauxItalic: italic,
+        autoLeading: false,
+        leading: scaledFontSize * lineHeight,
+        tracking: scaledFontSize > 0 ? (letterSpacing * metrics.scale / scaledFontSize) * 1_000 : 0,
+      },
+      paragraphStyle: { justification: align },
+      useFractionalGlyphWidths: true,
+    },
+    fallbackReasons: [],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -426,20 +680,23 @@ export async function exportPagePsd(
     const originDocY = rawDoc.y - padLogical;
     let left = Math.round(originDocX * scale);
     let top = Math.round(originDocY * scale);
+    let panelClipped = false;
 
     // 태그된 노드를 직접 캡처하면 wrapClip 의 "패널 안으로 클리핑"이 반영되지 않는다 —
     // 같은 조건으로 패널을 찾아 캡처 캔버스를 사후에 잘라 복원한다.
     const panel = !el.noClip ? containingPanel(el, elements) : null;
     if (panel) {
+      const beforeCrop = canvas;
       const cropped = cropToPanel(canvas, originDocX, originDocY, scale, panel);
       if (cropped) {
         canvas = cropped.canvas;
         left += cropped.dx;
         top += cropped.dy;
+        panelClipped = canvas !== beforeCrop || cropped.dx !== 0 || cropped.dy !== 0;
       }
     }
 
-    layers.push({
+    const layer: Layer = {
       name: label,
       left,
       top,
@@ -447,7 +704,26 @@ export async function exportPagePsd(
       opacity: clampOpacity(el.opacity),
       blendMode: mapBlendMode(el.blendMode),
       clipping: !!el.clipBelow,
-    });
+    };
+
+    if (el.type === "text") {
+      const editable = planPsdEditableTextDescriptor(el, {
+        documentX: rawDoc.x,
+        documentY: rawDoc.y,
+        documentHeight: rawDoc.height,
+        scale,
+        panelClipped,
+      });
+      if (editable.text) {
+        layer.text = editable.text;
+      } else if (editable.fallbackReasons.length > 0) {
+        skipped.push(
+          `${label}: ${editable.fallbackReasons.join(", ")} 때문에 편집 가능한 PSD 텍스트로 보존할 수 없어 화면 그대로 래스터화했어요.`,
+        );
+      }
+    }
+
+    layers.push(layer);
 
     if (el.clipBelow && layers.length < 2) {
       // 맨 뒤 요소가 clipBelow 인 경우 클리핑할 "아래 레이어"가 없다 — ag-psd 는 이를 그대로
