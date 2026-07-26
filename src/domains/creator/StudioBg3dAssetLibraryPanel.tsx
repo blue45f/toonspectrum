@@ -501,8 +501,9 @@ export function StudioBg3dAssetLibraryPanel({
                   <button
                     type="button"
                     aria-label={`${entry.name} 삭제`}
+                    title={isRestoringScene ? "장면 원본 복원이 끝난 뒤 삭제할 수 있습니다." : undefined}
                     className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-1.5 text-[0.64rem] font-bold text-fg-3 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-8"
-                    disabled={isDeleting || isExporting}
+                    disabled={isDeleting || isExporting || isRestoringScene}
                     onClick={(event) => {
                       event.stopPropagation();
                       onDelete(entry.id);

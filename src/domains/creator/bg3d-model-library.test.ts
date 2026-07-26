@@ -12,7 +12,9 @@ import {
   createBg3dModelThumbnailCaptureRevision,
   createStudioBg3dModelAttachment,
   createUploadedBg3dModelRecord,
+  deleteStoredBg3dModel,
   detectBg3dModelFormat,
+  getBg3dModelDeletionReceiptByHash,
   getDeletableModelIds,
   getCachedBg3dModelThumbnail,
   getStoredBg3dModel,
@@ -24,6 +26,7 @@ import {
   normalizeBg3dModelRights,
   prepareVerifiedBg3dModelRecord,
   revalidateStoredBg3dModelForRendering,
+  resolveBg3dModelHash,
   SAMPLE_BG3D_MODEL_ENTRIES,
   SAMPLE_BG3D_MODELS,
   saveUploadedBg3dModel,
@@ -39,6 +42,7 @@ import {
   STUDIO_BG3D_GLB_MAX_BYTES,
   STUDIO_BG3D_GLB_MIME_TYPE,
 } from "./studio-bg3d-glb-validation";
+import { StudioBg3dModalOperationCoordinator } from "./studio-bg3d-modal-operation-coordinator";
 import {
   createDefaultStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
@@ -114,15 +118,22 @@ function thumbnailDataUrl(width = 320, height = 180): string {
   return `data:image/png;base64,${btoa(binary)}`;
 }
 
-type StoreName = "models" | "thumbnails";
+type StoreName = "deletion-journal" | "models" | "thumbnails";
 
 interface FakeIndexedDbState {
   readonly records: Map<string, unknown>;
   readonly thumbnails: Map<string, unknown>;
+  readonly deletionJournal: Map<string, unknown>;
+  readonly storeNames: Set<StoreName>;
   readonly transactionModes: IDBTransactionMode[];
   readonly requestedVersions: number[];
   readonly createdIndexes: string[];
+  readonly createdStores: StoreName[];
   readonly deletedKeys: string[];
+  readonly deletedJournalKeys: string[];
+  onDeleteRequest?: () => void;
+  onModelHashLookup?: () => void;
+  onTransactionCommit?: () => void;
 }
 
 class FakeRequest<T> {
@@ -148,28 +159,65 @@ class FakeTransaction {
   onabort: ((this: IDBTransaction, event: Event) => unknown) | null = null;
   private pending = 0;
   private completionQueued = false;
-  private completed = false;
+  private finished = false;
+  private aborting = false;
+  private readonly stores = new Map<StoreName, Map<string, unknown>>();
+  private readonly deletedKeys: string[] = [];
+  private readonly deletedJournalKeys: string[] = [];
 
   constructor(
     private readonly state: FakeIndexedDbState,
     readonly mode: IDBTransactionMode,
+    storeNames: readonly StoreName[],
   ) {
-    this.queueCompletion();
+    for (const name of storeNames) {
+      this.stores.set(name, new Map(this.stateStore(name)));
+    }
+    if (mode !== "versionchange") this.queueCompletion();
   }
 
   objectStore(name: string): IDBObjectStore {
+    if (!this.stores.has(name as StoreName)) throw new Error("fake store outside transaction scope");
     return new FakeObjectStore(this.state, this, name as StoreName) as unknown as IDBObjectStore;
+  }
+
+  store(name: StoreName): Map<string, unknown> {
+    const store = this.stores.get(name);
+    if (!store) throw new Error("missing fake transaction store");
+    return store;
+  }
+
+  recordDelete(name: StoreName, key: string): void {
+    if (name === "deletion-journal") this.deletedJournalKeys.push(key);
+    else this.deletedKeys.push(key);
+  }
+
+  abort(): void {
+    if (this.finished) throw new DOMException("Transaction already finished", "InvalidStateError");
+    if (this.aborting) return;
+    this.aborting = true;
+    queueMicrotask(() => {
+      if (this.finished) return;
+      this.finished = true;
+      this.onabort?.call(this as unknown as IDBTransaction, new Event("abort"));
+    });
   }
 
   request<T>(operation: () => T): IDBRequest<T> {
     const request = new FakeRequest<T>();
     this.pending += 1;
     queueMicrotask(() => {
+      if (this.aborting || this.finished) {
+        request.fail();
+        this.pending -= 1;
+        return;
+      }
       try {
         request.succeed(operation());
       } catch {
         request.fail();
         this.onerror?.call(this as unknown as IDBTransaction, new Event("error"));
+        this.abort();
       } finally {
         this.pending -= 1;
         this.queueCompletion();
@@ -179,14 +227,32 @@ class FakeTransaction {
   }
 
   private queueCompletion(): void {
-    if (this.completionQueued || this.completed) return;
+    if (this.completionQueued || this.finished || this.aborting || this.mode === "versionchange") {
+      return;
+    }
     this.completionQueued = true;
     queueMicrotask(() => {
       this.completionQueued = false;
-      if (this.pending > 0 || this.completed) return;
-      this.completed = true;
+      if (this.pending > 0 || this.finished || this.aborting) return;
+      this.finished = true;
+      if (this.mode === "readwrite") {
+        for (const [name, snapshot] of this.stores) {
+          const target = this.stateStore(name);
+          target.clear();
+          for (const [key, value] of snapshot) target.set(key, value);
+        }
+        this.state.deletedKeys.push(...this.deletedKeys);
+        this.state.deletedJournalKeys.push(...this.deletedJournalKeys);
+      }
+      this.state.onTransactionCommit?.();
       this.oncomplete?.call(this as unknown as IDBTransaction, new Event("complete"));
     });
+  }
+
+  private stateStore(name: StoreName): Map<string, unknown> {
+    if (name === "models") return this.state.records;
+    if (name === "thumbnails") return this.state.thumbnails;
+    return this.state.deletionJournal;
   }
 }
 
@@ -215,15 +281,17 @@ class FakeObjectStore {
     if (name !== "contentHash") throw new Error("missing fake index");
     return {
       get: (hash: IDBValidKey) =>
-        this.transaction.request(() =>
-          [...this.state.records.values()].find(
+        this.transaction.request(() => {
+          const result = [...this.transaction.store("models").values()].find(
             (value) =>
               typeof value === "object" &&
               value !== null &&
               "contentHash" in value &&
               value.contentHash === hash,
-          ),
-        ),
+          );
+          this.state.onModelHashLookup?.();
+          return result;
+        }),
     } as IDBIndex;
   }
 
@@ -268,15 +336,17 @@ class FakeObjectStore {
   }
 
   delete(key: IDBValidKey): IDBRequest<undefined> {
-    return this.transaction.request(() => {
+    const request = this.transaction.request(() => {
       this.store().delete(String(key));
-      this.state.deletedKeys.push(String(key));
+      this.transaction.recordDelete(this.name, String(key));
       return undefined;
     });
+    this.state.onDeleteRequest?.();
+    return request;
   }
 
   private store(): Map<string, unknown> {
-    return this.name === "models" ? this.state.records : this.state.thumbnails;
+    return this.transaction.store(this.name);
   }
 }
 
@@ -285,17 +355,28 @@ class FakeDatabase {
 
   constructor(private readonly state: FakeIndexedDbState) {
     this.objectStoreNames = {
-      contains: (name: string) => name === "models" || name === "thumbnails",
+      contains: (name: string) => state.storeNames.has(name as StoreName),
     } as unknown as DOMStringList;
   }
 
   createObjectStore(name: string): IDBObjectStore {
-    return new FakeObjectStore(this.state, new FakeTransaction(this.state, "versionchange"), name as StoreName) as unknown as IDBObjectStore;
+    const storeName = name as StoreName;
+    this.state.storeNames.add(storeName);
+    this.state.createdStores.push(storeName);
+    return new FakeObjectStore(
+      this.state,
+      new FakeTransaction(this.state, "versionchange", [storeName]),
+      storeName,
+    ) as unknown as IDBObjectStore;
   }
 
-  transaction(_stores: string | string[], mode: IDBTransactionMode = "readonly"): IDBTransaction {
+  transaction(stores: string | string[], mode: IDBTransactionMode = "readonly"): IDBTransaction {
+    const storeNames = (Array.isArray(stores) ? stores : [stores]) as StoreName[];
+    for (const name of storeNames) {
+      if (!this.state.storeNames.has(name)) throw new Error(`missing fake store: ${name}`);
+    }
     this.state.transactionModes.push(mode);
-    return new FakeTransaction(this.state, mode) as unknown as IDBTransaction;
+    return new FakeTransaction(this.state, mode, storeNames) as unknown as IDBTransaction;
   }
 
   close(): void {
@@ -307,10 +388,14 @@ function installFakeIndexedDb(seed: readonly Bg3dModelStoredRecord[] = []): Fake
   const state: FakeIndexedDbState = {
     records: new Map(seed.map((record) => [record.id, record] as const)),
     thumbnails: new Map(),
+    deletionJournal: new Map(),
+    storeNames: new Set<StoreName>(["models", "thumbnails"]),
     transactionModes: [],
     requestedVersions: [],
     createdIndexes: [],
+    createdStores: [],
     deletedKeys: [],
+    deletedJournalKeys: [],
   };
   const database = new FakeDatabase(state);
   let upgraded = false;
@@ -342,6 +427,7 @@ function installFakeIndexedDb(seed: readonly Bg3dModelStoredRecord[] = []): Fake
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -665,8 +751,8 @@ describe("renderer admission revalidation", () => {
   });
 });
 
-describe("V2 IndexedDB behavior", () => {
-  it("upgrades to DB V2 with a content-hash index without deleting legacy records", async () => {
+describe("V3 IndexedDB behavior", () => {
+  it("upgrades to DB V3 with hash lookup and a deletion journal without deleting legacy records", async () => {
     const legacy: Bg3dLegacyStoredRecord = {
       id: "legacy-obj",
       name: "Old OBJ",
@@ -681,6 +767,7 @@ describe("V2 IndexedDB behavior", () => {
     expect(await listStoredBg3dModels()).toEqual([legacy]);
     expect(state.requestedVersions).toEqual([BG3D_MODEL_LIBRARY_DB_VERSION]);
     expect(state.createdIndexes).toContain("contentHash");
+    expect(state.createdStores).toEqual(["deletion-journal"]);
     expect(state.deletedKeys).toEqual([]);
     expect(state.records.get("legacy-obj")).toBe(legacy);
 
@@ -852,7 +939,7 @@ describe("V2 IndexedDB behavior", () => {
       },
     );
     expect(duplicateOfExisting).toEqual([records[0]]);
-    expect(existingState.transactionModes).not.toContain("readwrite");
+    expect(existingState.transactionModes.filter((mode) => mode === "readwrite")).toHaveLength(1);
   });
 
   it("does not charge unrelated existing library bytes against the current batch budget", async () => {
@@ -1018,6 +1105,195 @@ describe("scene attachment isolation and library presentation", () => {
         },
       ]),
     ).toEqual(["verified", "legacy"]);
+  });
+
+  it("does not open or mutate IndexedDB when a persistent delete lease is already revoked", async () => {
+    const state = installFakeIndexedDb();
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      deleteStoredBg3dModel("verified", { signal: controller.signal }),
+    ).rejects.toMatchObject({ code: "aborted" });
+    expect(state.transactionModes).toEqual([]);
+    expect(state.deletedKeys).toEqual([]);
+  });
+
+  it("rolls back every store when a delete lease is revoked before the commit boundary", async () => {
+    const record = await prepareVerifiedBg3dModelRecord(glbFile(), {
+      idFactory: () => "rolled-back",
+      now: 1,
+    });
+    const state = installFakeIndexedDb([record]);
+    state.thumbnails.set(record.id, { id: record.id, thumbnail: thumbnailDataUrl(), updatedAt: 1 });
+    const controller = new AbortController();
+    state.onDeleteRequest = () => controller.abort("deadline-before-commit-boundary");
+
+    await expect(
+      deleteStoredBg3dModel(record.id, { signal: controller.signal, now: 77 }),
+    ).rejects.toMatchObject({ code: "aborted" });
+    expect(state.records.get(record.id)).toBe(record);
+    expect(state.thumbnails.has(record.id)).toBe(true);
+    expect(state.deletedKeys).toEqual([]);
+    expect(state.deletionJournal.has(record.contentHash)).toBe(false);
+  });
+
+  it("treats IndexedDB completion as authoritative when abort arrives after commit", async () => {
+    const record = await prepareVerifiedBg3dModelRecord(glbFile(), {
+      idFactory: () => "commit-won",
+      now: 1,
+    });
+    const state = installFakeIndexedDb([record]);
+    const controller = new AbortController();
+    state.onTransactionCommit = () => {
+      state.onTransactionCommit = undefined;
+      controller.abort("deadline-after-commit-boundary");
+    };
+
+    await expect(
+      deleteStoredBg3dModel(record.id, { signal: controller.signal, now: 77 }),
+    ).resolves.toBeUndefined();
+    expect(state.records.has(record.id)).toBe(false);
+    expect(state.deletedKeys).toEqual([record.id, record.id]);
+    expect(await getBg3dModelDeletionReceiptByHash(record.contentHash)).toEqual({
+      id: record.contentHash,
+      contentHash: record.contentHash,
+      storageModelId: record.id,
+      deletedAt: 77,
+    });
+  });
+
+  it("clears a durable deletion receipt when the same content is intentionally reimported", async () => {
+    const source = validGlb();
+    const record = await prepareVerifiedBg3dModelRecord(glbFile("deleted.glb", source), {
+      idFactory: () => "deleted-record",
+      now: 1,
+    });
+    const state = installFakeIndexedDb([record]);
+    await deleteStoredBg3dModel(record.id, { now: 2 });
+    expect(await getBg3dModelDeletionReceiptByHash(record.contentHash)).not.toBeNull();
+
+    const [reimported] = await importVerifiedBg3dModelsAtomically(
+      [glbFile("reimported.glb", source)],
+      { idFactory: () => "reimported-record", now: 3 },
+    );
+
+    expect(reimported?.id).toBe("reimported-record");
+    expect(await getBg3dModelDeletionReceiptByHash(record.contentHash)).toBeNull();
+    expect(state.deletedJournalKeys).toContain(record.contentHash);
+  });
+
+  it("reimports from the write-transaction state when delete commits after the initial snapshot", async () => {
+    const source = validGlb({ race: "delete-after-list" });
+    const existing = await prepareVerifiedBg3dModelRecord(glbFile("existing.glb", source), {
+      idFactory: () => "existing-race-record",
+      now: 1,
+    });
+    const state = installFakeIndexedDb([existing]);
+    let deletedBetweenSnapshotAndWrite = false;
+    const racingFile = {
+      name: "intentional-reimport.glb",
+      size: source.byteLength,
+      type: STUDIO_BG3D_GLB_MIME_TYPE,
+      async arrayBuffer(): Promise<ArrayBuffer> {
+        await deleteStoredBg3dModel(existing.id, { now: 2 });
+        deletedBetweenSnapshotAndWrite = true;
+        return Uint8Array.from(source).buffer;
+      },
+    };
+
+    const imported = await importVerifiedBg3dModelsAtomically([racingFile], {
+      idFactory: () => "reimported-after-delete",
+      now: 3,
+    });
+
+    expect(deletedBetweenSnapshotAndWrite).toBe(true);
+    expect(imported).toHaveLength(1);
+    expect(imported[0]?.id).toBe("reimported-after-delete");
+    expect(state.records.has(existing.id)).toBe(false);
+    expect(state.records.get("reimported-after-delete")).toBe(imported[0]);
+    expect(await getBg3dModelDeletionReceiptByHash(existing.contentHash)).toBeNull();
+  });
+
+  it("resolves the model and deletion receipt from one readonly transaction snapshot", async () => {
+    const record = await prepareVerifiedBg3dModelRecord(glbFile(), {
+      idFactory: () => "snapshot-record",
+      now: 1,
+    });
+    const state = installFakeIndexedDb();
+    state.deletionJournal.set(record.contentHash, {
+      id: record.contentHash,
+      contentHash: record.contentHash,
+      storageModelId: record.id,
+      deletedAt: 2,
+    });
+    state.onModelHashLookup = () => {
+      state.onModelHashLookup = undefined;
+      state.records.set(record.id, record);
+      state.deletionJournal.delete(record.contentHash);
+    };
+
+    const resolution = await resolveBg3dModelHash(record.contentHash);
+
+    expect(resolution.record).toBeNull();
+    expect(resolution.deletionReceipt).toMatchObject({
+      contentHash: record.contentHash,
+      storageModelId: record.id,
+    });
+    expect(state.records.get(record.id)).toBe(record);
+    expect(state.deletionJournal.has(record.contentHash)).toBe(false);
+  });
+
+  it("abandons a never-settling database open and releases the authoritative mutation lane", async () => {
+    vi.useFakeTimers();
+    const openRequest = new FakeRequest<IDBDatabase>() as FakeRequest<IDBDatabase> & {
+      transaction: IDBTransaction | null;
+      onupgradeneeded: ((this: IDBOpenDBRequest, event: IDBVersionChangeEvent) => unknown) | null;
+      onblocked: ((this: IDBOpenDBRequest, event: Event) => unknown) | null;
+    };
+    openRequest.transaction = null;
+    openRequest.onupgradeneeded = null;
+    openRequest.onblocked = null;
+    const close = vi.fn();
+    const transaction = vi.fn();
+    vi.stubGlobal("indexedDB", {
+      open: vi.fn(() => openRequest as unknown as IDBOpenDBRequest),
+    } as unknown as IDBFactory);
+    const coordinator = new StudioBg3dModalOperationCoordinator();
+    const session = coordinator.beginSession();
+    const deletion = coordinator.runSceneMutation(
+      session,
+      (lease) => deleteStoredBg3dModel("never-opened", { signal: lease.signal }),
+      vi.fn(),
+      { authoritativePersistence: true, timeoutMs: 25 },
+    );
+    const deletionOutcome = deletion.catch((reason: unknown) => reason);
+    const nextCommit = vi.fn();
+    const next = coordinator.runSceneMutation(
+      session,
+      () => "lane-recovered",
+      nextCommit,
+      { timeoutMs: 25 },
+    );
+
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(25);
+
+    expect(await deletionOutcome).toMatchObject({
+      code: "operation-lease-timeout",
+      scope: "scene-mutation",
+    });
+    await expect(next).resolves.toEqual({ status: "committed", value: "lane-recovered" });
+    expect(nextCommit).toHaveBeenCalledExactlyOnceWith("lane-recovered");
+    expect(transaction).not.toHaveBeenCalled();
+
+    openRequest.succeed({
+      close,
+      transaction,
+    } as unknown as IDBDatabase);
+    await Promise.resolve();
+    expect(close).toHaveBeenCalledOnce();
+    expect(transaction).not.toHaveBeenCalled();
   });
 
   it("rejects structurally forged V2 records", async () => {

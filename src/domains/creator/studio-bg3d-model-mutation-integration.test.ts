@@ -22,6 +22,42 @@ function expectInOrder(haystack: string, needles: readonly string[]): void {
 }
 
 describe("Studio BG3D model placement and persistent deletion integration", () => {
+  it("threads revocable leases through decode, cache ownership, and destructive persistence", () => {
+    const admission = sourceBetween(
+      "async function admitAndCacheModel(",
+      "function disposeModelCache(",
+    );
+    const add = sourceBetween(
+      "async function ensureModelRootCached(",
+      "function publishPlacementSession(",
+    );
+    const remove = sourceBetween(
+      "async function handleDeleteModelFromLibrary(",
+      "const handlePanelTabChange",
+    );
+
+    expectInOrder(admission, [
+      "studioBg3dGlobalAssetLoadGate.run(async (lease)",
+      "lease.throwIfRevoked()",
+      "const combinedSignal = combineStudioBg3dAbortSignals(",
+      "signal: combinedSignal.signal",
+      "if (!lease.isCurrent() || !args.isActive())",
+      "loaded.dispose()",
+      "args.cache.set(args.record.id, entry)",
+      "combinedSignal.dispose()",
+    ]);
+    expect(add).toContain(
+      "isActive: () => isModalAssetSessionCurrent(session) && isOperationCurrent()",
+    );
+    expectInOrder(remove, [
+      "async (lease) =>",
+      "lease.throwIfRevoked()",
+      "deleteStoredBg3dModel(storageModelId, { signal: lease.signal })",
+      "commitSceneEntityRemoval(plan, { resetHistory: true })",
+      "authoritativePersistence: true",
+    ]);
+  });
+
   it("runs cheap live-scene admission on every cache hit while caching only profile attestation", () => {
     const cachedBranch = sourceBetween(
       "const cached = args.cache.get(args.record.id);",
@@ -62,10 +98,12 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
     expectInOrder(handler, [
       "preflightAndDeleteStudioBg3dPersistedModel({",
       "snapshot: physicsRuntimeSourceRef.current",
-      "deletePersistedModel: deleteStoredBg3dModel",
+      "deletePersistedModel: (storageModelId) =>",
+      "deleteStoredBg3dModel(storageModelId, { signal: lease.signal })",
       "commitSceneEntityRemoval(plan, { resetHistory: true })",
       "attachmentByStorageModelIdRef.current.delete(id)",
       "modelRootCacheRef.current.delete(id)",
+      "authoritativePersistence: true",
     ]);
     expect(handler).not.toContain("removeSceneEntities(removedInstanceIds)");
     expectInOrder(commit, [
@@ -75,6 +113,22 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
       "setSceneBaseDocument(next.document)",
     ]);
     expect(commit).toContain("historyRef.current = [createStudioBg3dHistorySnapshot(next)]");
+  });
+
+  it("waits for a prior destructive lane and replays its durable journal before hydration", () => {
+    const restoration = sourceBetween(
+      "await studioBg3dModalOperationCoordinator.waitForSceneMutationLane()",
+      "}, [open, initialDataUrl, initialScene, modelRenderer]);",
+    );
+    expectInOrder(restoration, [
+      "await studioBg3dModalOperationCoordinator.waitForSceneMutationLane()",
+      "resolveBg3dModelHash(attachment.hash",
+      "const record = resolution.record",
+      "if (resolution.deletionReceipt)",
+      "planStudioBg3dDeletedAttachmentReconciliation({",
+      "hydrateStudioBg3dDocumentToRuntime({",
+      "document: restoredDocument",
+    ]);
   });
 
   it("hands undo and redo camera compositions to a replacement projection controller", () => {

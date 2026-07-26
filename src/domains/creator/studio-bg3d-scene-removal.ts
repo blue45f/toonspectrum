@@ -44,6 +44,52 @@ export type StudioBg3dReparentTransformResolver = (
   nextParentId: string | null,
 ) => StudioBg3dThreeLocalTransform | null;
 
+/**
+ * Replays durable model-deletion receipts against a scene before runtime hydration.
+ *
+ * The original deletion preflight already proved each affected attachment can be detached without
+ * changing retained children in that scene. Repeating the same deterministic hierarchy transform
+ * after a modal/session replacement closes the final gap between an authoritative IndexedDB commit
+ * and the React scene commit that the replacement intentionally discarded.
+ */
+export function planStudioBg3dDeletedAttachmentReconciliation(input: {
+  readonly document: StudioBg3dSceneDocument;
+  readonly attachmentIds: ReadonlySet<string>;
+  readonly resolveReparentTransform?: StudioBg3dReparentTransformResolver;
+}): StudioBg3dSceneRemovalPlan {
+  let snapshot: StudioBg3dLiveSceneSnapshot = {
+    primitives: [],
+    customModels: [],
+    document: input.document,
+  };
+  const removedEntityIds = new Set<string>();
+  const detachedEntityIds = new Set<string>();
+  for (const attachmentId of input.attachmentIds) {
+    const plan = planStudioBg3dSceneEntityRemoval({
+      snapshot,
+      entityIds: new Set(),
+      attachmentId,
+      ...(input.resolveReparentTransform
+        ? { resolveReparentTransform: input.resolveReparentTransform }
+        : {}),
+    });
+    if (!plan.ok) return plan;
+    snapshot = plan.snapshot;
+    for (const entityId of plan.removedEntityIds) removedEntityIds.add(entityId);
+    for (const entityId of plan.detachedEntityIds) detachedEntityIds.add(entityId);
+  }
+  return {
+    ok: true,
+    snapshot: {
+      primitives: [],
+      customModels: [],
+      document: snapshot.document,
+    },
+    removedEntityIds,
+    detachedEntityIds,
+  };
+}
+
 function documentHierarchyEntity(node: StudioBg3dSceneNode): StudioBg3dThreeHierarchyEntity {
   return {
     id: node.id,

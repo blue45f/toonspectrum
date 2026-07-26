@@ -20,6 +20,7 @@ interface LtRangeControlProps {
   readonly max: number;
   readonly min: number;
   readonly onChange: (value: number) => void;
+  readonly onChangeEnd?: () => void;
   readonly step: number;
   readonly value: number;
   readonly valueText: string;
@@ -32,6 +33,7 @@ export function LtRangeControl({
   max,
   min,
   onChange,
+  onChangeEnd,
   step,
   value,
   valueText,
@@ -60,6 +62,10 @@ export function LtRangeControl({
         step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
+        onBlur={onChangeEnd}
+        onKeyUp={onChangeEnd}
+        onPointerCancel={onChangeEnd}
+        onPointerUp={onChangeEnd}
       />
     </label>
   );

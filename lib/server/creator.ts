@@ -76,6 +76,19 @@ const MAX_PAGES = 200;
 // 남아 있어야 하며, QA 임시 계정만 공개 창작 피드에서 격리한다.
 const QA_USER_ID_PREFIX = "test-user-" as const;
 
+function postgresErrorCode(error: unknown): string | undefined {
+  let current = error;
+  const visited = new Set<unknown>();
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (typeof current !== "object" || current === null || visited.has(current)) return undefined;
+    visited.add(current);
+    const candidate = current as { cause?: unknown; code?: unknown };
+    if (typeof candidate.code === "string") return candidate.code;
+    current = candidate.cause;
+  }
+  return undefined;
+}
+
 export type CreatorWorkSort = "recent" | "likes" | "views";
 export type CreatorWorkFormat = "cuttoon" | "upload";
 export type CreatorWorkStatus = "draft" | "published";
@@ -1911,7 +1924,7 @@ export async function publishAsset(
       createdAt: now,
     });
   } catch (error) {
-    if ((error as { code?: string }).code === "23505") {
+    if (postgresErrorCode(error) === "23505") {
       throw new Error("같은 에셋을 이미 공유했습니다.", { cause: error });
     }
     throw error;
@@ -1948,6 +1961,8 @@ export async function deleteSharedAsset(userId: string, id: string, isAdmin: boo
         id: creatorAssets.id,
         ownerId: creatorAssets.userId,
         reportCount: creatorAssets.reportCount,
+        moderationStatus: creatorAssets.moderationStatus,
+        reviewedAt: creatorAssets.reviewedAt,
       })
       .from(creatorAssets)
       .where(eq(creatorAssets.id, id))
@@ -1958,15 +1973,47 @@ export async function deleteSharedAsset(userId: string, id: string, isAdmin: boo
 
     if (existing.reportCount > 0) {
       const now = new Date();
+      let approvedAssetHasOpenReport = false;
+      if (
+        !isAdmin &&
+        existing.moderationStatus === "published" &&
+        existing.reviewedAt !== null
+      ) {
+        const [openReport] = await tx
+          .select({ id: creatorAssetReports.id })
+          .from(creatorAssetReports)
+          .where(
+            and(
+              eq(creatorAssetReports.assetId, id),
+              eq(creatorAssetReports.status, "open")
+            )
+          )
+          .limit(1);
+        approvedAssetHasOpenReport = Boolean(openReport);
+      }
+      const ownerMustPreserveFinalModeration =
+        !isAdmin &&
+        (existing.moderationStatus === "rejected" ||
+          (existing.moderationStatus === "published" &&
+            existing.reviewedAt !== null &&
+            !approvedAssetHasOpenReport));
       await tx
         .update(creatorAssets)
         .set({
           hidden: true,
-          moderationStatus: isAdmin ? "rejected" : "under_review",
-          moderationNote: isAdmin
-            ? "관리자가 신고 증거를 보존한 채 에셋을 비공개 처리했습니다."
-            : "소유자가 신고 검수 중 공유를 철회했습니다.",
-          ...(isAdmin ? { reviewedBy: userId, reviewedAt: now } : {}),
+          ...(isAdmin
+            ? {
+                moderationStatus: "rejected" as const,
+                moderationNote: "관리자가 신고 증거를 보존한 채 에셋을 비공개 처리했습니다.",
+                reviewedBy: userId,
+                reviewedAt: now,
+              }
+            : ownerMustPreserveFinalModeration
+              ? {}
+              : {
+                  moderationStatus: "under_review" as const,
+                  moderationNote: "소유자가 신고 검수 중 공유를 철회했습니다.",
+                }),
         })
         .where(eq(creatorAssets.id, id));
       return { deleted: true };
@@ -1983,26 +2030,30 @@ export async function reportSharedAsset(
   input: { reason?: unknown; details?: unknown }
 ): Promise<{ reported: true; reportCount: number }> {
   if (!isCreatorAssetReportReason(input.reason)) throw new Error("신고 사유를 선택해 주세요.");
-  const [asset] = await db
-    .select({
-      id: creatorAssets.id,
-      ownerId: creatorAssets.userId,
-      hidden: creatorAssets.hidden,
-      moderationStatus: creatorAssets.moderationStatus,
-      reportCount: creatorAssets.reportCount,
-    })
-    .from(creatorAssets)
-    .where(eq(creatorAssets.id, assetId))
-    .limit(1);
-  if (!asset || asset.hidden || asset.moderationStatus !== "published") {
-    throw new Error("신고할 수 있는 공개 에셋을 찾지 못했습니다.");
-  }
-  if (asset.ownerId === reporterId) throw new Error("자신이 공유한 에셋은 신고할 수 없습니다.");
-
   const reportId = crypto.randomUUID();
   const details = normalizeMultiline(input.details, MAX_ASSET_REPORT_DETAILS);
   try {
-    await db.transaction(async (tx) => {
+    const reportCount = await db.transaction(async (tx) => {
+      // Serialize reporting, moderation, owner withdrawal, and admin deletion on the asset row.
+      // Eligibility must be checked after the lock is acquired so a report cannot slip in after
+      // the asset became hidden/rejected, and every caller observes the authoritative counter.
+      const [asset] = await tx
+        .select({
+          ownerId: creatorAssets.userId,
+          hidden: creatorAssets.hidden,
+          moderationStatus: creatorAssets.moderationStatus,
+        })
+        .from(creatorAssets)
+        .where(eq(creatorAssets.id, assetId))
+        .limit(1)
+        .for("update");
+      if (!asset || asset.hidden || asset.moderationStatus !== "published") {
+        throw new Error("신고할 수 있는 공개 에셋을 찾지 못했습니다.");
+      }
+      if (asset.ownerId === reporterId) {
+        throw new Error("자신이 공유한 에셋은 신고할 수 없습니다.");
+      }
+
       await tx.insert(creatorAssetReports).values({
         id: reportId,
         assetId,
@@ -2010,18 +2061,23 @@ export async function reportSharedAsset(
         reason: input.reason as CreatorAssetReportReason,
         details,
       });
-      await tx
+      const [updated] = await tx
         .update(creatorAssets)
         .set({ reportCount: sql`${creatorAssets.reportCount} + 1` })
-        .where(eq(creatorAssets.id, assetId));
+        .where(eq(creatorAssets.id, assetId))
+        .returning({ reportCount: creatorAssets.reportCount });
+      if (!updated) {
+        throw new Error("신고할 수 있는 공개 에셋을 찾지 못했습니다.");
+      }
+      return updated.reportCount;
     });
+    return { reported: true, reportCount };
   } catch (error) {
-    if ((error as { code?: string }).code === "23505") {
+    if (postgresErrorCode(error) === "23505") {
       throw new Error("이미 이 에셋을 신고했습니다.", { cause: error });
     }
     throw error;
   }
-  return { reported: true, reportCount: (asset.reportCount ?? 0) + 1 };
 }
 
 function creatorAssetReportStatusOf(value: unknown): "open" | "resolved" | "dismissed" {

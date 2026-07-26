@@ -1,4 +1,14 @@
 import {
+  STUDIO_BG3D_CAMERA_DEFAULT_NEAR_CLIP,
+  STUDIO_BG3D_CAMERA_MAX_DUTCH_ROLL_DEGREES,
+  STUDIO_BG3D_CAMERA_MAX_NEAR_CLIP,
+  STUDIO_BG3D_CAMERA_MIN_DUTCH_ROLL_DEGREES,
+  STUDIO_BG3D_CAMERA_MIN_NEAR_CLIP,
+  createStudioBg3dCameraUpForDutchRoll,
+  readStudioBg3dCameraDutchRollDegrees,
+  resolveStudioBg3dCameraNearClip,
+} from "./studio-bg3d-camera-orientation";
+import {
   STUDIO_BG3D_CONTROL_BUTTON as CONTROL_BUTTON,
   roundStudioBg3dNumber as round,
   studioBg3dClassNames as cx,
@@ -88,6 +98,8 @@ interface StudioBg3dViewPanelContext {
   readonly STUDIO_BG3D_LENS_MAX_FOCAL_MM: number;
   readonly currentFocalLengthMm: number;
   readonly updateCameraLens: (patch: (view: StudioBg3dCameraSettings) => Partial<StudioBg3dCameraSettings>) => void;
+  readonly previewCameraLens: (patch: (view: StudioBg3dCameraSettings) => Partial<StudioBg3dCameraSettings>) => void;
+  readonly finishCameraLensGesture: () => void;
   readonly studioBg3dFocalLengthToFovDegrees: (focalLengthMm: number) => number;
   readonly STUDIO_BG3D_LENS_PRESETS: readonly import("./studio-bg3d-lens").StudioBg3dLensPreset[];
   readonly LtToggleRow: typeof import("./studio-bg3d-control-fields").LtToggleRow;
@@ -212,6 +224,8 @@ export function StudioBg3dViewPanel({
     STUDIO_BG3D_LENS_MAX_FOCAL_MM,
     currentFocalLengthMm,
     updateCameraLens,
+    previewCameraLens,
+    finishCameraLensGesture,
     studioBg3dFocalLengthToFovDegrees,
     STUDIO_BG3D_LENS_PRESETS,
     LtToggleRow,
@@ -257,6 +271,15 @@ export function StudioBg3dViewPanel({
     setScaleGuideVisible,
     Ruler,
   } = context;
+  const cameraControlsDisabled =
+    isCapturing || isBatchRenderingShots || isRestoringScene || physicsInteractionLocked;
+  const currentNearClip = resolveStudioBg3dCameraNearClip(
+    sceneBaseDocument.camera.nearClip,
+  );
+  const currentNearClipLog = Math.log10(currentNearClip);
+  const currentDutchRollDegrees = Math.round(
+    readStudioBg3dCameraDutchRollDegrees(sceneBaseDocument.camera),
+  );
 
   return (
 <section hidden={hidden}>
@@ -738,9 +761,10 @@ export function StudioBg3dViewPanel({
                       value={currentFocalLengthMm}
                       valueText={`${currentFocalLengthMm}mm · ${Math.round(sceneBaseDocument.camera.fovDegrees)}°`}
                       disabled={isCapturing || isBatchRenderingShots || isRestoringScene || physicsInteractionLocked || isMainOrtho}
-                      onChange={(focalLengthMm) => updateCameraLens(() => ({
+                      onChange={(focalLengthMm) => previewCameraLens(() => ({
                         fovDegrees: studioBg3dFocalLengthToFovDegrees(focalLengthMm),
                       }))}
+                      onChangeEnd={finishCameraLensGesture}
                     />
                     <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="렌즈 프리셋">
                       {STUDIO_BG3D_LENS_PRESETS.map((preset) => (
@@ -767,11 +791,88 @@ export function StudioBg3dViewPanel({
                   <LtToggleRow
                     label="직교 투영(설계도·아이소메트릭)"
                     checked={isMainOrtho}
-                    disabled={isCapturing || isBatchRenderingShots || isRestoringScene || physicsInteractionLocked}
+                    disabled={cameraControlsDisabled}
                     onChange={(orthographic) => updateCameraLens(() => ({
                       projection: orthographic ? "orthographic" : "perspective",
                     }))}
                   />
+
+                  <div className="mt-2 rounded-xl border border-line bg-card/70 px-3 py-2">
+                    <LtRangeControl
+                      id="bg3d-camera-near-clip"
+                      label="근접 절단"
+                      min={Math.log10(STUDIO_BG3D_CAMERA_MIN_NEAR_CLIP)}
+                      max={Math.log10(STUDIO_BG3D_CAMERA_MAX_NEAR_CLIP)}
+                      step={0.01}
+                      value={currentNearClipLog}
+                      valueText={`${round(currentNearClip, currentNearClip < 1 ? 3 : 2)}m`}
+                      disabled={cameraControlsDisabled}
+                      onChange={(logValue) => {
+                        const nearClip = Math.min(
+                          STUDIO_BG3D_CAMERA_MAX_NEAR_CLIP,
+                          Math.max(
+                            STUDIO_BG3D_CAMERA_MIN_NEAR_CLIP,
+                            Number((10 ** logValue).toPrecision(6)),
+                          ),
+                        );
+                        previewCameraLens(() => ({ nearClip }));
+                      }}
+                      onChangeEnd={finishCameraLensGesture}
+                    />
+                    <LtRangeControl
+                      id="bg3d-camera-dutch-roll"
+                      label="더치 앵글"
+                      min={STUDIO_BG3D_CAMERA_MIN_DUTCH_ROLL_DEGREES}
+                      max={STUDIO_BG3D_CAMERA_MAX_DUTCH_ROLL_DEGREES}
+                      step={1}
+                      value={currentDutchRollDegrees}
+                      valueText={`${currentDutchRollDegrees}°`}
+                      disabled={cameraControlsDisabled}
+                      onChange={(degrees) => previewCameraLens((view) => {
+                        const up = createStudioBg3dCameraUpForDutchRoll(view, degrees);
+                        return up ? { up } : {};
+                      })}
+                      onChangeEnd={finishCameraLensGesture}
+                    />
+                    <div className="mt-1 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        disabled={
+                          cameraControlsDisabled ||
+                          currentNearClip === STUDIO_BG3D_CAMERA_DEFAULT_NEAR_CLIP
+                        }
+                        className={cx(
+                          CONTROL_BUTTON,
+                          "border-line bg-panel px-2 text-fg-2 hover:bg-raised hover:text-fg",
+                        )}
+                        onClick={() => updateCameraLens(() => ({
+                          nearClip: STUDIO_BG3D_CAMERA_DEFAULT_NEAR_CLIP,
+                        }))}
+                      >
+                        <RotateCcw size={14} aria-hidden />
+                        절단 초기화
+                      </button>
+                      <button
+                        type="button"
+                        disabled={cameraControlsDisabled || currentDutchRollDegrees === 0}
+                        className={cx(
+                          CONTROL_BUTTON,
+                          "border-line bg-panel px-2 text-fg-2 hover:bg-raised hover:text-fg",
+                        )}
+                        onClick={() => updateCameraLens((view) => {
+                          const up = createStudioBg3dCameraUpForDutchRoll(view, 0);
+                          return up ? { up } : {};
+                        })}
+                      >
+                        <RotateCcw size={14} aria-hidden />
+                        수평 맞춤
+                      </button>
+                    </div>
+                    <p className="mt-2 text-[0.64rem] leading-relaxed text-fg-3">
+                      근접 절단은 카메라 앞의 벽·천장을 잘라 실내 구도를 확보합니다. 더치 앵글은
+                      화면만 기울이며 컷 저장·실행 취소·LT 내보내기에 그대로 유지됩니다.
+                    </p>
+                  </div>
 
                   <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                     <button

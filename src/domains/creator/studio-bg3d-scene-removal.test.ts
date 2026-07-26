@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "./studio-bg3d-scene-document";
 import {
+  planStudioBg3dDeletedAttachmentReconciliation,
   preflightAndDeleteStudioBg3dPersistedModel,
 } from "./studio-bg3d-scene-removal";
 import { calculateStudioBg3dThreeWorldMatrix } from "./studio-bg3d-three-hierarchy";
@@ -132,6 +133,40 @@ describe("Studio BG3D persistent model scene-removal preflight", () => {
     expect(result.snapshot.document.nodes[0]?.transform.position).toEqual(
       result.snapshot.primitives[0]?.position,
     );
+    expect(result.snapshot.document.shots?.[0]?.nodeVisibility).toEqual([
+      { nodeId: child.id, visible: true },
+    ]);
+  });
+
+  it("replays a durable deletion receipt before hydration with the same lossless detachment", () => {
+    const child = childPrimitive();
+    const beforeWorld = calculateStudioBg3dThreeWorldMatrix(
+      [parentModel(), child],
+      child.id,
+    );
+
+    const result = planStudioBg3dDeletedAttachmentReconciliation({
+      document: sceneDocument(),
+      attachmentIds: new Set([ATTACHMENT.id]),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.document.attachments).toEqual([]);
+    expect(result.snapshot.document.nodes.map((node) => node.id)).toEqual([child.id]);
+    const retainedNode = result.snapshot.document.nodes[0];
+    expect(retainedNode?.parentId).toBeNull();
+    const afterWorld = retainedNode && calculateStudioBg3dThreeWorldMatrix(
+      [{
+        ...child,
+        parentId: retainedNode.parentId,
+        position: [...retainedNode.transform.position],
+        rotation: [...retainedNode.transform.rotation],
+        scale: [...retainedNode.transform.scale],
+      }],
+      child.id,
+    );
+    expect(afterWorld?.elements).toEqual(beforeWorld?.elements);
     expect(result.snapshot.document.shots?.[0]?.nodeVisibility).toEqual([
       { nodeId: child.id, visible: true },
     ]);

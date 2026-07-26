@@ -39,11 +39,14 @@ describe("Studio BG3D generic model mode integration boundary", () => {
     );
 
     expectInOrder(upload, [
+      "deriveStudioBg3dGlbValidationPolicy(sceneBaseDocument, deviceQuality)",
       "modelImportRuntime.planStudioBg3dModelImports(files)",
       'item.format === "gltf"',
       'item.format === "obj"',
       'hasSelectedMtl ? "obj-mtl" : "obj"',
       "modelImportRuntime.convertStudioBg3dModelFilesToGlb(files",
+      "profile: policy.profile",
+      "budgets: policy.budgets",
       "await importVerifiedBg3dModelsAtomically(",
       "withStudioGeneric3dWorkflowMetadata(",
       "await admitAndCacheModel({",

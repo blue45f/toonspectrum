@@ -1,6 +1,12 @@
 import * as THREE from "three";
 
 import { resolveStudioBg3dOrthographicZoom } from "./studio-bg3d-camera-framing";
+import {
+  isStudioBg3dCameraNearClip,
+  isStudioBg3dCameraUpVectorValid,
+  resolveStudioBg3dCameraNearClip,
+  resolveStudioBg3dCameraUpVector,
+} from "./studio-bg3d-camera-orientation";
 import { waitForStudioBg3dCapturePhase } from "./studio-bg3d-capture-adapter";
 
 import type { StudioBg3dCameraSettings } from "./studio-bg3d-scene-document";
@@ -47,6 +53,7 @@ export interface StudioBg3dWorldSurfaceHit {
 
 const STUDIO_BG3D_CAMERA_APPLICATION_MAX_COORDINATE = 10_000;
 const STUDIO_BG3D_CAMERA_APPLICATION_MIN_NORMAL_LENGTH = 1e-6;
+const STUDIO_BG3D_CAMERA_APPLICATION_MIN_VIEW_DISTANCE = 0.01;
 const STUDIO_BG3D_VIEWPORT_CONTROL_SELECTOR = '[data-bg3d-viewport-control="true"]';
 
 /**
@@ -65,6 +72,50 @@ function finiteWorldVector(vector: THREE.Vector3): boolean {
     Number.isFinite(component) &&
     Math.abs(component) <= STUDIO_BG3D_CAMERA_APPLICATION_MAX_COORDINATE
   ));
+}
+
+function finiteCameraTuple(value: unknown): value is readonly [number, number, number] {
+  return Array.isArray(value) && value.length === 3 && value.every((component) => (
+    typeof component === "number" &&
+    Number.isFinite(component) &&
+    Math.abs(component) <= STUDIO_BG3D_CAMERA_APPLICATION_MAX_COORDINATE
+  ));
+}
+
+function finiteInRange(value: unknown, minimum: number, maximum: number): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= minimum && value <= maximum;
+}
+
+function validStudioBg3dCameraView(
+  camera: THREE.PerspectiveCamera | THREE.OrthographicCamera,
+  view: StudioBg3dCameraSettings,
+): boolean {
+  if (
+    typeof view !== "object" || view === null ||
+    !finiteCameraTuple(view.position) ||
+    !finiteCameraTuple(view.target) ||
+    Math.hypot(
+      view.position[0] - view.target[0],
+      view.position[1] - view.target[1],
+      view.position[2] - view.target[2],
+    ) < STUDIO_BG3D_CAMERA_APPLICATION_MIN_VIEW_DISTANCE ||
+    !finiteInRange(view.fovDegrees, 10, 120) ||
+    !finiteInRange(view.zoom ?? 1, 0.1, 100) ||
+    (view.projection !== undefined &&
+      view.projection !== "perspective" && view.projection !== "orthographic") ||
+    (view.lensShift !== undefined && (
+      !Array.isArray(view.lensShift) ||
+      view.lensShift.length !== 2 ||
+      !finiteInRange(view.lensShift[0], -2, 2) ||
+      !finiteInRange(view.lensShift[1], -2, 2)
+    )) ||
+    (view.nearClip !== undefined && !isStudioBg3dCameraNearClip(view.nearClip)) ||
+    (view.up !== undefined && !isStudioBg3dCameraUpVectorValid(view.up, view))
+  ) {
+    return false;
+  }
+  const nearClip = resolveStudioBg3dCameraNearClip(view.nearClip);
+  return Number.isFinite(camera.far) && nearClip < camera.far;
 }
 
 /** Reads the precise rendered world AABB. Empty, detached, and non-finite geometry fails closed. */
@@ -173,10 +224,11 @@ export function applyStudioBg3dViewToThreeCamera(
   const projectionMatches = view.projection === "orthographic"
     ? camera instanceof THREE.OrthographicCamera
     : camera instanceof THREE.PerspectiveCamera;
-  if (!projectionMatches) return false;
+  if (!projectionMatches || !validStudioBg3dCameraView(camera, view)) return false;
 
   if (camera instanceof THREE.PerspectiveCamera) camera.fov = view.fovDegrees;
   camera.zoom = view.zoom ?? 1;
+  camera.near = resolveStudioBg3dCameraNearClip(view.nearClip);
   if (view.lensShift) {
     const [shiftX, shiftY] = view.lensShift;
     if (shiftX === 0 && shiftY === 0) camera.clearViewOffset();
@@ -186,13 +238,15 @@ export function applyStudioBg3dViewToThreeCamera(
   }
   camera.updateProjectionMatrix();
   camera.position.set(view.position[0], view.position[1], view.position[2]);
-  camera.updateMatrixWorld();
+  const up = resolveStudioBg3dCameraUpVector(view);
+  camera.up.set(up[0], up[1], up[2]);
   if (controls?.target) {
     controls.target.set(view.target[0], view.target[1], view.target[2]);
     controls.update?.();
   } else {
     camera.lookAt(view.target[0], view.target[1], view.target[2]);
   }
+  camera.updateMatrixWorld();
   return true;
 }
 

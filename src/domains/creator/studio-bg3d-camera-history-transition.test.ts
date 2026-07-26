@@ -5,7 +5,10 @@ import {
   applyStudioBg3dViewToThreeCamera,
   type BgViewportApi,
 } from "./studio-bg3d-camera-application";
-import { applyOrDeferStudioBg3dHistoryCamera } from "./studio-bg3d-camera-history-transition";
+import {
+  applyOrDeferStudioBg3dHistoryCamera,
+  resolveStudioBg3dCameraGestureCommitView,
+} from "./studio-bg3d-camera-history-transition";
 import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "./studio-bg3d-scene-document";
 
 import type { StudioBg3dCameraSettings } from "./studio-bg3d-scene-document";
@@ -36,6 +39,42 @@ function expectLensShift(
 }
 
 describe("Studio BG3D cross-projection history camera handoff", () => {
+  it("commits the canonical gesture value without reading a one-frame-stale renderer", () => {
+    const latestGestureView: StudioBg3dCameraSettings = {
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+      nearClip: 0.102329,
+    };
+    const staleRendererView: StudioBg3dCameraSettings = {
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+      nearClip: 0.1,
+    };
+    let readCount = 0;
+    const viewport = {
+      readView: () => {
+        readCount += 1;
+        return staleRendererView;
+      },
+    };
+
+    expect(resolveStudioBg3dCameraGestureCommitView(
+      latestGestureView,
+      viewport,
+      DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+    )).toBe(latestGestureView);
+    expect(readCount).toBe(0);
+    expect(resolveStudioBg3dCameraGestureCommitView(
+      null,
+      viewport,
+      DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+    )).toBe(staleRendererView);
+    expect(readCount).toBe(1);
+    expect(resolveStudioBg3dCameraGestureCommitView(
+      null,
+      null,
+      DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+    )).toBe(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera);
+  });
+
   it("restores the exact Perspective ↔ Orthographic composition after controller remounts", () => {
     const perspectiveView: StudioBg3dCameraSettings = {
       ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
@@ -45,6 +84,8 @@ describe("Studio BG3D cross-projection history camera handoff", () => {
       fovDegrees: 37,
       zoom: 1.75,
       lensShift: [0.13, -0.21],
+      nearClip: 0.025,
+      up: [0, 0.8, 0.6],
     };
     const orthographicView: StudioBg3dCameraSettings = {
       ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
@@ -54,6 +95,8 @@ describe("Studio BG3D cross-projection history camera handoff", () => {
       fovDegrees: 61,
       zoom: 3.25,
       lensShift: [-0.18, 0.16],
+      nearClip: 0.75,
+      up: [1, 0, 0],
     };
     const pending = { current: null as StudioBg3dCameraSettings | null };
 
@@ -78,6 +121,8 @@ describe("Studio BG3D cross-projection history camera handoff", () => {
     expect(replacementOrthographic.position.toArray()).toEqual(orthographicView.position);
     expect(replacementOrthographicTarget.toArray()).toEqual(orthographicView.target);
     expect(replacementOrthographic.zoom).toBe(orthographicView.zoom);
+    expect(replacementOrthographic.near).toBe(orthographicView.nearClip);
+    expect(replacementOrthographic.up.toArray()).toEqual(orthographicView.up);
     expectLensShift(replacementOrthographic, orthographicView.lensShift!);
 
     expect(applyOrDeferStudioBg3dHistoryCamera(
@@ -99,6 +144,8 @@ describe("Studio BG3D cross-projection history camera handoff", () => {
     expect(replacementPerspectiveTarget.toArray()).toEqual(perspectiveView.target);
     expect(replacementPerspective.fov).toBe(perspectiveView.fovDegrees);
     expect(replacementPerspective.zoom).toBe(perspectiveView.zoom);
+    expect(replacementPerspective.near).toBe(perspectiveView.nearClip);
+    expect(replacementPerspective.up.toArray()).toEqual(perspectiveView.up);
     expectLensShift(replacementPerspective, perspectiveView.lensShift!);
   });
 });

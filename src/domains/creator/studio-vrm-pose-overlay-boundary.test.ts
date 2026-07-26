@@ -16,7 +16,7 @@ describe("Studio VRM visual pose bone boundary", () => {
     expect(source).toContain('depthTest={false}');
     expect(source).toContain('depthWrite={false}');
     expect(source).toContain(
-      "vrm && showPoseBoneOverlay && !isCapturing && !isSharingPose && !isThumbnailCapturing && !webcamActive",
+      "vrm && showPoseBoneOverlay && !texturePaintModeSelected && !isCapturing && !isSharingPose && !isThumbnailCapturing && !webcamActive",
     );
     expect(source).toContain("const releaseCaptureHelpers = acquireVrmCaptureHelperLease()");
     expect(source).toContain("await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))");
@@ -39,7 +39,15 @@ describe("Studio VRM visual pose bone boundary", () => {
     expect(source).toContain("applyVrmTwoBoneGrip(");
     expect(source).toContain('if (phase !== "end") return;');
     expect(source).toContain("setCustomBones(nextBones)");
-    expect(source).toContain("enabled={!isViewportHandIkDragging && !jointHandleInteracting}");
+    const orbitControlsStart = source.indexOf("<OrbitControls");
+    const orbitControlsEnd = source.indexOf("</Canvas>", orbitControlsStart);
+    const orbitControls = source.slice(orbitControlsStart, orbitControlsEnd);
+    expect(orbitControlsStart).toBeGreaterThanOrEqual(0);
+    expect(orbitControlsEnd).toBeGreaterThan(orbitControlsStart);
+    expect(orbitControls).toContain("!isViewportHandIkDragging");
+    expect(orbitControls).toContain("!jointHandleInteracting");
+    expect(orbitControls).toContain("!texturePaintStrokeActive");
+    expect(orbitControls).toContain("enableRotate={!texturePaintInteractionEnabled}");
     expect(source).toContain("onPointerCancel={(event) => {");
     expect(source).toContain("const pointerTarget = event.currentTarget as unknown as");
     expect(source).toContain("pointerTarget.setPointerCapture(event.pointerId)");

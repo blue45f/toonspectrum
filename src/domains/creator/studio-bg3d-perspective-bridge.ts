@@ -1,3 +1,5 @@
+import { resolveStudioBg3dCameraUpVector } from "./studio-bg3d-camera-orientation";
+
 import type { StudioBg3dCameraSettings } from "./studio-bg3d-scene-document";
 
 export type StudioBg3dVanishingAxis = "world-x" | "world-y" | "world-z";
@@ -88,10 +90,10 @@ export function deriveStudioBg3dVanishingPoints(
 
   const forward = normalize(subtract(cameraSettings.target, cameraSettings.position));
   if (!forward) return [];
-  // Three's camera uses world Y as up. At the pole choose a deterministic Z fallback, matching
-  // look-at's intent while avoiding a zero-length right vector.
-  const right = normalize(cross(forward, [0, 1, 0]))
-    ?? normalize(cross(forward, [0, 0, 1]));
+  // Use the same persisted up reference as the live Three camera so capture guides rotate with a
+  // Dutch-angle render rather than silently reverting to world Y.
+  const persistedUp = resolveStudioBg3dCameraUpVector(cameraSettings);
+  const right = normalize(cross(forward, persistedUp));
   if (!right) return [];
   const cameraUp = normalize(cross(right, forward));
   if (!cameraUp) return [];

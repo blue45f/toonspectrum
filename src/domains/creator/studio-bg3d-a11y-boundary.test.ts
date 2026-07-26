@@ -34,6 +34,19 @@ describe("Studio BG3D accessibility boundary", () => {
     expect(viewPanelSource).toContain("?.focus();");
   });
 
+  it("exposes Camera vNext values and gesture completion with mobile-size controls", () => {
+    expect(viewPanelSource).toContain('label="근접 절단"');
+    expect(viewPanelSource).toContain('label="더치 앵글"');
+    expect(viewPanelSource).toContain("valueText={`${currentDutchRollDegrees}°`}");
+    expect(viewPanelSource).toContain("절단 초기화");
+    expect(viewPanelSource).toContain("수평 맞춤");
+    expect(viewPanelSource.match(/onChangeEnd=\{finishCameraLensGesture\}/gu)).toHaveLength(3);
+    expect(controlSource).toContain("aria-valuetext={valueText}");
+    expect(controlSource).toContain("h-11 w-full");
+    expect(controlSource).toContain("onKeyUp={onChangeEnd}");
+    expect(controlSource).toContain("onPointerUp={onChangeEnd}");
+  });
+
   it("names imported model files and template deletion with a touch-size target", () => {
     expect(assetLibrarySource).toContain('aria-label="3D 모델 및 연결 파일 선택"');
     expect(editorSource).toContain('aria-label={`${entry.name} 템플릿 삭제`}');

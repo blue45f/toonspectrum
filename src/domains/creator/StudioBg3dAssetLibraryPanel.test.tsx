@@ -362,12 +362,15 @@ describe("StudioBg3dAssetLibraryPanel", () => {
     const deletingAdd = screen.getByRole("button", { name: "삭제 중 모델 장면에 추가" }) as HTMLButtonElement;
     const unsafeAdd = screen.getByRole("button", { name: "사용 불가 모델 장면에 추가" }) as HTMLButtonElement;
     const deleteButton = screen.getByRole("button", { name: "삭제 중 모델 삭제" }) as HTMLButtonElement;
+    const unsafeDeleteButton = screen.getByRole("button", { name: "사용 불가 모델 삭제" }) as HTMLButtonElement;
     const search = screen.getByLabelText("3D 모델 라이브러리 검색");
     const filter = screen.getByRole("button", { name: "전체" });
 
     expect(deletingAdd.disabled).toBe(true);
     expect(unsafeAdd.disabled).toBe(true);
     expect(deleteButton.disabled).toBe(true);
+    expect(unsafeDeleteButton.disabled).toBe(true);
+    expect(unsafeDeleteButton.title).toBe("장면 원본 복원이 끝난 뒤 삭제할 수 있습니다.");
     expect(deleteButton.querySelector(".animate-spin")).toBeTruthy();
     expect(deleteButton.className).toContain("min-h-11");
     expect(deleteButton.className).toContain("sm:min-h-8");

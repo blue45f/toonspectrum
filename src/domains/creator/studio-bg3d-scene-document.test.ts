@@ -97,17 +97,27 @@ function schemaV1Budgets(): Record<string, unknown> {
 
 /** A genuine v1 fixture: it predates every animation/rig/accessor budget added by v2. */
 function schemaV1Document(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const candidate = currentDocument(overrides);
+  const camera = { ...(candidate.camera as Record<string, unknown>) };
+  delete camera.nearClip;
+  delete camera.up;
   return {
-    ...currentDocument(overrides),
+    ...candidate,
     version: 1,
+    camera,
     budgets: overrides.budgets ?? schemaV1Budgets(),
   };
 }
 
 function schemaV2Document(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const candidate = currentDocument(overrides);
+  const camera = { ...(candidate.camera as Record<string, unknown>) };
+  delete camera.nearClip;
+  delete camera.up;
   return {
-    ...currentDocument(overrides),
+    ...candidate,
     version: 2,
+    camera,
   };
 }
 
@@ -170,6 +180,8 @@ describe("Studio BG3D scene document defaults", () => {
       fovDegrees: 50,
       projection: "perspective",
       zoom: 1,
+      nearClip: 0.1,
+      up: [0, 1, 0],
     });
     expect(document.quality.desktop.targetFps).toBe(60);
     expect(document.quality.mobile.targetFps).toBe(30);
@@ -191,7 +203,50 @@ describe("Studio BG3D scene document defaults", () => {
     expect(first).not.toBe(second);
     expect(first.camera).not.toBe(second.camera);
     expect(first.camera.position).not.toBe(second.camera.position);
+    expect(first.camera.up).not.toBe(second.camera.up);
     expect(first.budgets).not.toBe(second.budgets);
+  });
+
+  it("keeps pre-Camera-vNext v3 documents byte-compatible while new cameras persist bounded orientation", () => {
+    const legacy = JSON.parse(JSON.stringify(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT)) as {
+      camera: Record<string, unknown>;
+    };
+    delete legacy.camera.nearClip;
+    delete legacy.camera.up;
+    const legacyJson = JSON.stringify(legacy);
+    const parsedLegacy = parseStudioBg3dSceneDocument(legacyJson);
+
+    expect(parsedLegacy).not.toBeNull();
+    expect(parsedLegacy?.camera).not.toHaveProperty("nearClip");
+    expect(parsedLegacy?.camera).not.toHaveProperty("up");
+    expect(serializeStudioBg3dSceneDocument(parsedLegacy)).toBe(legacyJson);
+
+    const rolled = normalizeStudioBg3dSceneDocument(currentDocument({
+      camera: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+        nearClip: 0.025,
+        up: [0.6, 0.8, 0],
+      },
+    }));
+    const serialized = serializeStudioBg3dSceneDocument(rolled);
+    expect(serialized).not.toBeNull();
+    expect(parseStudioBg3dSceneDocument(serialized!)?.camera).toMatchObject({
+      nearClip: 0.025,
+      up: [0.6, 0.8, 0],
+    });
+
+    expect(serializeStudioBg3dSceneDocument(currentDocument({
+      camera: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+        nearClip: 0,
+      },
+    }))).toBeNull();
+    expect(serializeStudioBg3dSceneDocument(currentDocument({
+      camera: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+        up: [0, 0, 0],
+      },
+    }))).toBeNull();
   });
 });
 
@@ -454,6 +509,21 @@ describe("Studio BG3D scene document normalization", () => {
           ...((legacy.budgets as { complexity: Record<string, unknown> }).complexity),
           maxAnimations: 1,
         },
+      },
+    })).toBeNull();
+    expect(migrateStudioBg3dSceneDocument({
+      ...legacy,
+      camera: {
+        ...(legacy.camera as Record<string, unknown>),
+        nearClip: 0.1,
+      },
+    })).toBeNull();
+    const legacyV2 = schemaV2Document();
+    expect(migrateStudioBg3dSceneDocument({
+      ...legacyV2,
+      camera: {
+        ...(legacyV2.camera as Record<string, unknown>),
+        up: [0, 1, 0],
       },
     })).toBeNull();
 
@@ -1282,7 +1352,12 @@ describe("Studio BG3D bounded storyboard shots", () => {
         {
           id: "shot-wide",
           name: "전경 와이드",
-          camera: { position: [8, 4, 8], fovDegrees: 35 },
+          camera: {
+            position: [8, 4, 8],
+            fovDegrees: 35,
+            nearClip: 0.04,
+            up: [0, 0.8, 0.6],
+          },
           nodeVisibility: [{ nodeId: "node-2", visible: false }],
           render: { exposure: 1.5, toneMapping: "aces" },
           background: {
@@ -1308,7 +1383,12 @@ describe("Studio BG3D bounded storyboard shots", () => {
     expect(parsed?.shots?.[0]).toMatchObject({
       id: "shot-wide",
       name: "전경 와이드",
-      camera: { position: [8, 4, 8], fovDegrees: 35 },
+      camera: {
+        position: [8, 4, 8],
+        fovDegrees: 35,
+        nearClip: 0.04,
+        up: [0, 0.8, 0.6],
+      },
       nodeVisibility: [{ nodeId: "node-2", visible: false }],
       render: { exposure: 1.5, toneMapping: "aces" },
       background: { skyPresetId: "sunset", fogEnabled: true, fogColor: "#112233" },
@@ -1321,6 +1401,17 @@ describe("Studio BG3D bounded storyboard shots", () => {
     expect(parsed?.activeShotId).toBe("shot-wide");
     expect(Object.isFrozen(parsed?.shots)).toBe(true);
     expect(Object.isFrozen(parsed?.shots?.[0]?.camera)).toBe(true);
+    expect(serializeStudioBg3dSceneDocument(currentDocument({
+      shots: [{
+        id: "shot-singular",
+        name: "잘못된 수직 컷",
+        camera: {
+          position: [0, 10, 0],
+          target: [0, 0, 0],
+          up: [0, 1, 0],
+        },
+      }],
+    }))).toBeNull();
   });
 
   it("applies a shot without mutating geometry, assets, or unspecified presentation fields", () => {
@@ -1329,7 +1420,12 @@ describe("Studio BG3D bounded storyboard shots", () => {
       shots: [{
         id: "shot-night",
         name: "야간 컷",
-        camera: { position: [2, 1.5, 3], fovDegrees: 28 },
+        camera: {
+          position: [2, 1.5, 3],
+          fovDegrees: 28,
+          nearClip: 0.2,
+          up: [1, 0, 0],
+        },
         nodeVisibility: [{ nodeId: "node-2", visible: false }],
         render: { exposure: 0.7 },
         background: { skyPresetId: "night", fogEnabled: true },
@@ -1341,7 +1437,12 @@ describe("Studio BG3D bounded storyboard shots", () => {
 
     expect(applied).not.toBeNull();
     expect(applied?.activeShotId).toBe("shot-night");
-    expect(applied?.camera).toMatchObject({ position: [2, 1.5, 3], fovDegrees: 28 });
+    expect(applied?.camera).toMatchObject({
+      position: [2, 1.5, 3],
+      fovDegrees: 28,
+      nearClip: 0.2,
+      up: [1, 0, 0],
+    });
     expect(applied?.nodes.map(({ id, visible }) => [id, visible])).toEqual([
       ["node-1", true],
       ["node-2", false],
@@ -1363,7 +1464,12 @@ describe("Studio BG3D bounded storyboard shots", () => {
 
   it("captures and duplicates immutable full-state shot snapshots through pure helpers", () => {
     const original = normalizeStudioBg3dSceneDocument(currentDocument({
-      camera: { ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera, fovDegrees: 42 },
+      camera: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+        fovDegrees: 42,
+        nearClip: 0.05,
+        up: [0, 0.8, 0.6],
+      },
       background: {
         ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.background,
         skyPresetId: "clear_day",
@@ -1381,7 +1487,7 @@ describe("Studio BG3D bounded storyboard shots", () => {
     expect(captured?.shots?.[0]).toMatchObject({
       id: "shot-a",
       name: "설정 컷",
-      camera: { fovDegrees: 42 },
+      camera: { fovDegrees: 42, nearClip: 0.05, up: [0, 0.8, 0.6] },
       background: { skyPresetId: "clear_day" },
       nodeVisibility: [
         { nodeId: "node-1", visible: true },
@@ -1396,6 +1502,7 @@ describe("Studio BG3D bounded storyboard shots", () => {
     });
     expect(duplicated?.activeShotId).toBe("shot-b");
     expect(Object.isFrozen(duplicated?.shots?.[1]?.output?.line)).toBe(true);
+    expect(Object.isFrozen(duplicated?.shots?.[1]?.camera?.up)).toBe(true);
     expect(original).not.toHaveProperty("shots");
     expect(duplicateStudioBg3dShot(captured, "shot-a", {
       id: "shot-a",

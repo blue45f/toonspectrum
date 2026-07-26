@@ -176,6 +176,23 @@ describe("studio-vrm-texture-paint-ops rects", () => {
     expect(repeated.some((rect) => rect.x + rect.width === SIZE.width)).toBe(true);
   });
 
+  it("preserves independent sampler modes for U and V, including mirrored repeat", () => {
+    const corner: StudioVrmTexturePaintOp = { ...DAB, x: 0.5, y: 0.5 };
+    const mixed = studioVrmTexturePaintOpRects(corner, SIZE, {
+      wrapU: "repeat",
+      wrapV: "clamp",
+    });
+    expect(mixed.some((rect) => rect.x + rect.width === SIZE.width)).toBe(true);
+    expect(mixed.every((rect) => rect.y === 0)).toBe(true);
+
+    const mirrored = studioVrmTexturePaintOpRects(corner, SIZE, {
+      wrapU: "mirror",
+      wrapV: "mirror",
+    });
+    expect(mirrored.every((rect) => rect.x < SIZE.width / 2)).toBe(true);
+    expect(mirrored.every((rect) => rect.y < SIZE.height / 2)).toBe(true);
+  });
+
   it("covers every texel the dab actually touches", () => {
     const target = buffer();
     applyStudioVrmTexturePaintOp(target, SIZE, DAB);
@@ -221,6 +238,54 @@ describe("studio-vrm-texture-paint-ops application", () => {
     expect(texel(target, SIZE, 0, 0)[3]).toBe(255);
   });
 
+  it("restores an opaque painted texel partially and fully from a safe original buffer", () => {
+    const originalPixels = buffer();
+    fill(originalPixels, 20, 100, 180, 255);
+    const target = originalPixels.slice();
+
+    applyStudioVrmTexturePaintOp(target, SIZE, DAB);
+    expect(texel(target, SIZE, 8, 8)).toEqual([255, 0, 0, 255]);
+
+    applyStudioVrmTexturePaintOp(
+      target,
+      SIZE,
+      { ...DAB, opacity: 0.25, blend: "erase" },
+      { originalPixels },
+    );
+    expect(texel(target, SIZE, 8, 8)).toEqual([196, 25, 45, 255]);
+
+    applyStudioVrmTexturePaintOp(
+      target,
+      SIZE,
+      { ...DAB, blend: "erase" },
+      { originalPixels },
+    );
+    expect(texel(target, SIZE, 8, 8)).toEqual([20, 100, 180, 255]);
+    expect(texel(target, SIZE, 0, 0)).toEqual([20, 100, 180, 255]);
+  });
+
+  it("falls back to destination-out when the optional original buffer is malformed or aliased", () => {
+    const malformedTarget = buffer();
+    fill(malformedTarget, 10, 20, 30, 255);
+    applyStudioVrmTexturePaintOp(
+      malformedTarget,
+      SIZE,
+      { ...DAB, blend: "erase" },
+      { originalPixels: new Uint8ClampedArray(4) },
+    );
+    expect(texel(malformedTarget, SIZE, 8, 8)).toEqual([0, 0, 0, 0]);
+
+    const aliasedTarget = buffer();
+    fill(aliasedTarget, 10, 20, 30, 255);
+    applyStudioVrmTexturePaintOp(
+      aliasedTarget,
+      SIZE,
+      { ...DAB, blend: "erase" },
+      { originalPixels: aliasedTarget },
+    );
+    expect(texel(aliasedTarget, SIZE, 8, 8)).toEqual([0, 0, 0, 0]);
+  });
+
   it("clamps at the border but wraps with repeat", () => {
     const clampTarget = buffer();
     applyStudioVrmTexturePaintOp(clampTarget, SIZE, { ...DAB, x: 0.5 }, { wrap: "clamp" });
@@ -231,6 +296,55 @@ describe("studio-vrm-texture-paint-ops application", () => {
     applyStudioVrmTexturePaintOp(repeatTarget, SIZE, { ...DAB, x: 0.5 }, { wrap: "repeat" });
     expect(texel(repeatTarget, SIZE, 0, 8)[3]).toBeGreaterThan(0);
     expect(texel(repeatTarget, SIZE, SIZE.width - 1, 8)[3]).toBeGreaterThan(0);
+  });
+
+  it("applies repeat, clamp, and mirror independently on each axis", () => {
+    const mixed = buffer();
+    applyStudioVrmTexturePaintOp(
+      mixed,
+      SIZE,
+      { ...DAB, x: 0.5, y: 0.5 },
+      { wrapU: "repeat", wrapV: "clamp" },
+    );
+    expect(texel(mixed, SIZE, SIZE.width - 1, 0)[3]).toBeGreaterThan(0);
+    expect(texel(mixed, SIZE, 0, SIZE.height - 1)[3]).toBe(0);
+
+    const mirrored = buffer();
+    applyStudioVrmTexturePaintOp(
+      mirrored,
+      SIZE,
+      { ...DAB, x: 0.5, y: 8 },
+      { wrapU: "mirror", wrapV: "clamp" },
+    );
+    expect(texel(mirrored, SIZE, 0, 8)[3]).toBeGreaterThan(0);
+    expect(texel(mirrored, SIZE, SIZE.width - 1, 8)[3]).toBe(0);
+  });
+
+  it("restores from the mapped original texel with independent U and V wrapping", () => {
+    const originalPixels = buffer();
+    fill(originalPixels, 20, 100, 180, 255);
+
+    const repeatU = buffer();
+    fill(repeatU, 255, 0, 0, 255);
+    applyStudioVrmTexturePaintOp(
+      repeatU,
+      SIZE,
+      { ...DAB, x: 0.5, y: 1.5, radius: 2, blend: "erase" },
+      { wrapU: "repeat", wrapV: "clamp", originalPixels },
+    );
+    expect(texel(repeatU, SIZE, SIZE.width - 1, 1)).toEqual([20, 100, 180, 255]);
+    expect(texel(repeatU, SIZE, 0, SIZE.height - 1)).toEqual([255, 0, 0, 255]);
+
+    const repeatV = buffer();
+    fill(repeatV, 255, 0, 0, 255);
+    applyStudioVrmTexturePaintOp(
+      repeatV,
+      SIZE,
+      { ...DAB, x: 1.5, y: 0.5, radius: 2, blend: "erase" },
+      { wrapU: "clamp", wrapV: "repeat", originalPixels },
+    );
+    expect(texel(repeatV, SIZE, 1, SIZE.height - 1)).toEqual([20, 100, 180, 255]);
+    expect(texel(repeatV, SIZE, SIZE.width - 1, 0)).toEqual([255, 0, 0, 255]);
   });
 
   it("rejects malformed ops and buffers instead of corrupting pixels", () => {

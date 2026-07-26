@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { createStudioBg3dCameraUpForDutchRoll } from "./studio-bg3d-camera-orientation";
 import {
   deriveStudioBg3dVanishingPoints,
   mapStudioBg3dVanishingPointsToCanvas,
@@ -56,6 +57,24 @@ describe("studio-bg3d-perspective-bridge", () => {
     )[0];
     expect(shifted?.x).not.toBeCloseTo(centered?.x ?? 0);
     expect(shifted?.y).not.toBeCloseTo(centered?.y ?? 0);
+  });
+
+  it("rotates exported perspective guides with the persisted Dutch angle", () => {
+    const camera = { ...FRONT_CAMERA, position: [5, 3, 5] as const };
+    const up = createStudioBg3dCameraUpForDutchRoll(camera, 90);
+    expect(up).not.toBeNull();
+    const normal = deriveStudioBg3dVanishingPoints(camera, 1_000, 1_000);
+    const rolled = deriveStudioBg3dVanishingPoints({ ...camera, up: up! }, 1_000, 1_000);
+    expect(rolled.map(({ axis }) => axis)).toEqual(normal.map(({ axis }) => axis));
+    for (const normalPoint of normal) {
+      const rolledPoint = rolled.find(({ axis }) => axis === normalPoint.axis)!;
+      const normalOffset = [normalPoint.x - 500, normalPoint.y - 500] as const;
+      const rolledOffset = [rolledPoint.x - 500, rolledPoint.y - 500] as const;
+      expect(Math.hypot(...rolledOffset)).toBeCloseTo(Math.hypot(...normalOffset), 7);
+      expect(
+        normalOffset[0] * rolledOffset[0] + normalOffset[1] * rolledOffset[1],
+      ).toBeCloseTo(0, 6);
+    }
   });
 
   it("applies perspective zoom without moving the optical center", () => {

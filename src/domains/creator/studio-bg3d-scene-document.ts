@@ -6,6 +6,15 @@
  * at the runtime boundary; this document stores only bounded GLB metadata and scene intent.
  */
 
+import {
+  STUDIO_BG3D_CAMERA_DEFAULT_NEAR_CLIP,
+  STUDIO_BG3D_CAMERA_DEFAULT_UP,
+  STUDIO_BG3D_CAMERA_MAX_NEAR_CLIP,
+  STUDIO_BG3D_CAMERA_MIN_NEAR_CLIP,
+  isStudioBg3dCameraUpVectorValid,
+  normalizeStudioBg3dCameraUpVector,
+  resolveStudioBg3dCameraUpVector,
+} from "./studio-bg3d-camera-orientation";
 import { normalizeStudioBg3dCaptureAspectRatio } from "./studio-bg3d-capture-frame-geometry";
 import { normalizeStudioBg3dHierarchyParents } from "./studio-bg3d-hierarchy";
 import {
@@ -201,6 +210,10 @@ export interface StudioBg3dCameraSettings {
   readonly projection?: "perspective" | "orthographic";
   readonly zoom?: number;
   readonly lensShift?: readonly [number, number];
+  /** Positive scene-unit near plane. Absent only on canonical pre-Camera-vNext v3 documents. */
+  readonly nearClip?: number;
+  /** Unit look-at up reference. It represents Dutch roll without persisting engine quaternions. */
+  readonly up?: StudioBg3dVec3;
 }
 
 export interface StudioBg3dRenderSettings {
@@ -488,6 +501,8 @@ export interface StudioBg3dShotCameraOverride {
   readonly projection?: "perspective" | "orthographic";
   readonly zoom?: number;
   readonly lensShift?: readonly [number, number];
+  readonly nearClip?: number;
+  readonly up?: StudioBg3dVec3;
 }
 
 export interface StudioBg3dShotRenderOverride {
@@ -639,6 +654,8 @@ const DEFAULT_RAW_DOCUMENT = {
     fovDegrees: 50,
     projection: "perspective",
     zoom: 1,
+    nearClip: STUDIO_BG3D_CAMERA_DEFAULT_NEAR_CLIP,
+    up: STUDIO_BG3D_CAMERA_DEFAULT_UP,
   },
   render: {
     antialias: true,
@@ -986,7 +1003,8 @@ function normalizedShadowMapSize(
 }
 
 function normalizeCamera(value: unknown): StudioBg3dCameraSettings {
-  const candidate = isRecord(value) ? value : {};
+  const hasCameraRecord = isRecord(value);
+  const candidate = hasCameraRecord ? value : {};
   let position = normalizedVec3(
     candidate.position,
     DEFAULT_CAMERA_POSITION,
@@ -1015,6 +1033,26 @@ function normalizeCamera(value: unknown): StudioBg3dCameraSettings {
   };
   if (Array.isArray(candidate.lensShift) && candidate.lensShift.length === 2 && typeof candidate.lensShift[0] === "number" && typeof candidate.lensShift[1] === "number") {
     result.lensShift = [boundedNumber(candidate.lensShift[0], 0, -2, 2), boundedNumber(candidate.lensShift[1], 0, -2, 2)] as readonly [number, number];
+  }
+  // Camera vNext is an additive v3 extension. Keep both fields absent when reading an older
+  // canonical v3 graph so strict parse/serialize remains byte-compatible without weakening the
+  // unknown-version guard. New defaults and every live viewport snapshot persist both fields.
+  if (hasOwn(candidate, "nearClip") || !hasCameraRecord) {
+    result.nearClip = boundedNumber(
+      hasCameraRecord ? candidate.nearClip : STUDIO_BG3D_CAMERA_DEFAULT_NEAR_CLIP,
+      STUDIO_BG3D_CAMERA_DEFAULT_NEAR_CLIP,
+      STUDIO_BG3D_CAMERA_MIN_NEAR_CLIP,
+      STUDIO_BG3D_CAMERA_MAX_NEAR_CLIP,
+    );
+  }
+  if (hasOwn(candidate, "up") || !hasCameraRecord) {
+    const normalizedUp = normalizeStudioBg3dCameraUpVector(
+      hasCameraRecord ? candidate.up : STUDIO_BG3D_CAMERA_DEFAULT_UP,
+    );
+    const resolvedUp = isStudioBg3dCameraUpVectorValid(normalizedUp, { position, target })
+      ? normalizedUp
+      : resolveStudioBg3dCameraUpVector({ position, target, up: normalizedUp });
+    result.up = [...resolvedUp] as StudioBg3dVec3;
   }
   return result as unknown as StudioBg3dCameraSettings;
 }
@@ -1180,6 +1218,27 @@ function normalizeShotCameraOverride(value: unknown): StudioBg3dShotCameraOverri
             boundedNumber(candidate.lensShift[1], 0, -2, 2),
           ]
         : [0, 0];
+  }
+  if (hasOwn(candidate, "nearClip")) {
+    result.nearClip = boundedNumber(
+      candidate.nearClip,
+      STUDIO_BG3D_CAMERA_DEFAULT_NEAR_CLIP,
+      STUDIO_BG3D_CAMERA_MIN_NEAR_CLIP,
+      STUDIO_BG3D_CAMERA_MAX_NEAR_CLIP,
+    );
+  }
+  if (hasOwn(candidate, "up")) {
+    // A partial shot may override orientation without position/target; when it owns the complete
+    // view ray, reject singular up intent now. Merge-time full-camera normalization covers the
+    // inherited-ray case.
+    const normalizedUp = normalizeStudioBg3dCameraUpVector(candidate.up);
+    const position = result.position as StudioBg3dVec3 | undefined;
+    const target = result.target as StudioBg3dVec3 | undefined;
+    const resolvedUp = position && target &&
+      !isStudioBg3dCameraUpVectorValid(normalizedUp, { position, target })
+      ? resolveStudioBg3dCameraUpVector({ position, target, up: normalizedUp })
+      : normalizedUp;
+    result.up = [...resolvedUp] as StudioBg3dVec3;
   }
   return result as StudioBg3dShotCameraOverride;
 }
@@ -2190,6 +2249,10 @@ function migrateSchemaV2Nodes(value: readonly unknown[]): readonly unknown[] | n
 function migrateDecodedSchemaV2Document(value: unknown): StudioBg3dSceneDocument | null {
   if (
     !hasCompleteRootShapeForVersion(value, STUDIO_BG3D_SCHEMA_V2_SCENE_DOCUMENT_VERSION) ||
+    (isRecord(value.camera) && (
+      hasOwn(value.camera, "nearClip") ||
+      hasOwn(value.camera, "up")
+    )) ||
     hasOwn(value, "shots") ||
     hasOwn(value, "activeShotId")
   ) {
@@ -2207,6 +2270,10 @@ function migrateDecodedSchemaV2Document(value: unknown): StudioBg3dSceneDocument
 function migrateDecodedSchemaV1Document(value: unknown): StudioBg3dSceneDocument | null {
   if (
     !hasCompleteRootShapeForVersion(value, STUDIO_BG3D_LEGACY_SCENE_DOCUMENT_VERSION) ||
+    (isRecord(value.camera) && (
+      hasOwn(value.camera, "nearClip") ||
+      hasOwn(value.camera, "up")
+    )) ||
     hasOwn(value, "shots") ||
     hasOwn(value, "activeShotId")
   ) {
@@ -2249,6 +2316,13 @@ function migrateDecodedSchemaPanoramaDocument(
       isRecord(node) && (
         hasOwn(node, "materialOverride") || hasOwn(node, "animation") || hasOwn(node, "pose") || hasOwn(node, "morph") || hasOwn(node, "constraints")
       ))
+  ) {
+    return null;
+  }
+  if (
+    value.version !== STUDIO_BG3D_SCENE_DOCUMENT_VERSION &&
+    isRecord(value.camera) &&
+    (hasOwn(value.camera, "nearClip") || hasOwn(value.camera, "up"))
   ) {
     return null;
   }

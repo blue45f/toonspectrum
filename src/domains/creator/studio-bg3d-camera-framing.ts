@@ -6,6 +6,12 @@
  * move a mounted Three camera.
  */
 
+import {
+  isStudioBg3dCameraNearClip,
+  isStudioBg3dCameraUpVectorValid,
+  resolveStudioBg3dCameraNearClip,
+} from "./studio-bg3d-camera-orientation";
+
 import type { StudioBg3dCameraSettings } from "./studio-bg3d-scene-document";
 
 export type StudioBg3dCameraFramingVec3 = readonly [number, number, number];
@@ -156,6 +162,9 @@ function freezeView(
   const lensShift = camera.lensShift
     ? Object.freeze([camera.lensShift[0], camera.lensShift[1]] as const)
     : undefined;
+  const up = camera.up
+    ? Object.freeze([camera.up[0], camera.up[1], camera.up[2]] as const)
+    : undefined;
   return Object.freeze({
     position: Object.freeze([...position] as [number, number, number]),
     target: Object.freeze([...target] as [number, number, number]),
@@ -163,6 +172,8 @@ function freezeView(
     projection: camera.projection === "orthographic" ? "orthographic" : "perspective",
     zoom,
     ...(lensShift ? { lensShift } : {}),
+    ...(camera.nearClip !== undefined ? { nearClip: camera.nearClip } : {}),
+    ...(up ? { up } : {}),
   });
 }
 
@@ -202,7 +213,7 @@ export function resolveStudioBg3dOrthographicZoom(
 /**
  * Fits one world-space AABB without changing view direction, projection, FOV, or lens shift.
  * A bounding sphere is used deliberately: it is conservative for an AABB but remains correct for
- * any camera roll or future orientation representation that is not present in the current schema.
+ * any persisted camera roll/up-vector orientation.
  */
 export function fitStudioBg3dCameraToBounds(
   input: FitStudioBg3dCameraToBoundsInput,
@@ -220,6 +231,8 @@ export function fitStudioBg3dCameraToBounds(
       STUDIO_BG3D_CAMERA_MIN_ZOOM,
       STUDIO_BG3D_CAMERA_MAX_ZOOM,
     ) ||
+    (camera.nearClip !== undefined && !isStudioBg3dCameraNearClip(camera.nearClip)) ||
+    (camera.up !== undefined && !isStudioBg3dCameraUpVectorValid(camera.up, camera)) ||
     !finiteInRange(input.viewportAspect, MIN_VIEWPORT_ASPECT, MAX_VIEWPORT_ASPECT)
   ) return null;
 
@@ -242,6 +255,8 @@ export function fitStudioBg3dCameraToBounds(
 
   const paddedRadius = Math.max(bounds.radius, minimumRadius) * padding;
   if (!Number.isFinite(paddedRadius) || paddedRadius <= 0) return null;
+  const nearSafeDistance = resolveStudioBg3dCameraNearClip(camera.nearClip) + paddedRadius;
+  if (!Number.isFinite(nearSafeDistance) || nearSafeDistance > maxDistance) return null;
   const projection = camera.projection === "orthographic" ? "orthographic" : "perspective";
   const currentZoom = camera.zoom ?? 1;
 
@@ -254,7 +269,7 @@ export function fitStudioBg3dCameraToBounds(
     const limitingHalfAngle = Math.atan(limitingTangent);
     const sine = Math.sin(limitingHalfAngle);
     if (!Number.isFinite(sine) || sine <= 0) return null;
-    const requiredDistance = paddedRadius / sine;
+    const requiredDistance = Math.max(paddedRadius / sine, nearSafeDistance);
     if (!Number.isFinite(requiredDistance) || requiredDistance > maxDistance) return null;
     const distance = Math.max(minDistance, requiredDistance);
     const position = positionedAlongDirection(bounds.center, direction.unit, distance);
@@ -276,6 +291,8 @@ export function fitStudioBg3dCameraToBounds(
   // Zooming farther out than the supported minimum is the only bounded case that cannot fit.
   if (!Number.isFinite(requiredZoom) || requiredZoom < zoomBounds.minZoom) return null;
   const zoom = Math.min(requiredZoom, zoomBounds.maxZoom);
-  const position = positionedAlongDirection(bounds.center, direction.unit, direction.distance);
+  const distance = Math.max(direction.distance, minDistance, nearSafeDistance);
+  if (!Number.isFinite(distance) || distance > maxDistance) return null;
+  const position = positionedAlongDirection(bounds.center, direction.unit, distance);
   return position ? freezeView(camera, position, bounds.center, zoom) : null;
 }

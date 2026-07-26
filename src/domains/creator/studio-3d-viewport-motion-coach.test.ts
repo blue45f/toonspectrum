@@ -146,13 +146,17 @@ describe("Studio 3D viewport Motion Coach integration", () => {
     const toolbar = sliceBetween(
       vrmSource,
       '<div className="absolute left-2.5 top-2.5 z-10 flex flex-col gap-1.5">',
-      "{!viewportHinted ?"
+      "{texturePaintModeSelected || !viewportHinted ?"
     );
     expect(toolbar).toContain("VRM_VIEWPORT_HINTS.undo");
     expect(toolbar).toContain("hint={turntableHint}");
     expect(toolbar).not.toContain("title=");
-    expect(toolbar).toContain('unavailableReason={!canUndo ? "되돌릴 캐릭터 변경이 없습니다."');
-    expect(toolbar).toContain('unavailableReason={!canRedo ? "다시 적용할 캐릭터 변경이 없습니다."');
+    expect(toolbar).toContain('!viewportCanUndo');
+    expect(toolbar).toContain('"표면 페인트 획을 마친 뒤 실행 취소할 수 있습니다."');
+    expect(toolbar).toContain('"되돌릴 캐릭터 변경이 없습니다."');
+    expect(toolbar).toContain('!viewportCanRedo');
+    expect(toolbar).toContain('"표면 페인트 획을 마친 뒤 다시 실행할 수 있습니다."');
+    expect(toolbar).toContain('"다시 적용할 캐릭터 변경이 없습니다."');
   });
 
   it("switches the active turntable coach to the stop action", () => {

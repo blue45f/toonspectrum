@@ -21,7 +21,12 @@ const UNIT_BOUNDS = Object.freeze({
 describe("Studio BG3D camera framing", () => {
   it("fits a perspective bounding sphere while preserving the camera direction and composition fields", () => {
     const result = fitStudioBg3dCameraToBounds({
-      camera: { ...CAMERA, lensShift: [0.1, -0.05] },
+      camera: {
+        ...CAMERA,
+        lensShift: [0.1, -0.05],
+        nearClip: 0.025,
+        up: [0, 0.8, 0.6],
+      },
       bounds: { min: [9, 19, 29], max: [11, 21, 31] },
       viewportAspect: 16 / 9,
       padding: 1,
@@ -34,6 +39,8 @@ describe("Studio BG3D camera framing", () => {
       projection: "perspective",
       zoom: 1,
       lensShift: [0.1, -0.05],
+      nearClip: 0.025,
+      up: [0, 0.8, 0.6],
     });
     const originalDirection = CAMERA.position.map((value, index) => value - CAMERA.target[index]);
     const nextDirection = result!.position.map((value, index) => value - result!.target[index]);
@@ -46,6 +53,7 @@ describe("Studio BG3D camera framing", () => {
     expect(Object.isFrozen(result)).toBe(true);
     expect(Object.isFrozen(result?.position)).toBe(true);
     expect(Object.isFrozen(result?.target)).toBe(true);
+    expect(Object.isFrozen(result?.up)).toBe(true);
   });
 
   it("moves farther back for a narrow viewport and an off-centre lens shift", () => {
@@ -116,6 +124,47 @@ describe("Studio BG3D camera framing", () => {
     )).toBeCloseTo(Math.hypot(4, 3, 6));
   });
 
+  it("moves a perspective fit beyond the persisted near plane", () => {
+    const nearClip = 50;
+    const result = fitStudioBg3dCameraToBounds({
+      camera: { ...CAMERA, nearClip },
+      bounds: UNIT_BOUNDS,
+      viewportAspect: 16 / 9,
+      padding: 1,
+    });
+
+    expect(result).not.toBeNull();
+    const distance = Math.hypot(
+      result!.position[0] - result!.target[0],
+      result!.position[1] - result!.target[1],
+      result!.position[2] - result!.target[2],
+    );
+    expect(distance).toBeCloseTo(nearClip + Math.sqrt(3));
+    expect(distance - Math.sqrt(3)).toBeGreaterThanOrEqual(nearClip);
+  });
+
+  it("moves an orthographic fit beyond the near plane without changing its fitted zoom", () => {
+    const nearClip = 50;
+    const result = fitStudioBg3dCameraToBounds({
+      camera: { ...CAMERA, projection: "orthographic", nearClip, zoom: 7 },
+      bounds: UNIT_BOUNDS,
+      viewportAspect: 2,
+      orthographicFrustumAtZoomOne: { width: 20, height: 10 },
+      padding: 1,
+    });
+
+    expect(result).not.toBeNull();
+    const radius = Math.sqrt(3);
+    const distance = Math.hypot(
+      result!.position[0] - result!.target[0],
+      result!.position[1] - result!.target[1],
+      result!.position[2] - result!.target[2],
+    );
+    expect(result?.zoom).toBeCloseTo(10 / (radius * 2));
+    expect(distance).toBeCloseTo(nearClip + radius);
+    expect(distance - radius).toBeGreaterThanOrEqual(nearClip);
+  });
+
   it("clamps orthographic button zoom with the perspective distance-factor convention", () => {
     expect(resolveStudioBg3dOrthographicZoom({
       currentZoom: 1,
@@ -147,6 +196,19 @@ describe("Studio BG3D camera framing", () => {
       bounds: { min: [9_998, -1, -1], max: [10_000, 1, 1] },
       viewportAspect: 1,
     })).toBeNull();
+    expect(fitStudioBg3dCameraToBounds({
+      camera: { ...CAMERA, nearClip: 50 },
+      bounds: UNIT_BOUNDS,
+      viewportAspect: 1,
+      maxDistance: 40,
+    })).toBeNull();
+    expect(fitStudioBg3dCameraToBounds({
+      camera: { ...CAMERA, projection: "orthographic", nearClip: 50 },
+      bounds: UNIT_BOUNDS,
+      viewportAspect: 1,
+      orthographicFrustumAtZoomOne: { width: 20, height: 10 },
+      maxDistance: 40,
+    })).toBeNull();
   });
 
   it.each([
@@ -154,6 +216,8 @@ describe("Studio BG3D camera framing", () => {
     ["non-finite bounds", { camera: CAMERA, bounds: { min: [0, 0, 0], max: [1, Number.NaN, 1] }, viewportAspect: 1 }],
     ["degenerate direction", { camera: { ...CAMERA, position: [0, 0, 0] }, bounds: UNIT_BOUNDS, viewportAspect: 1 }],
     ["invalid FOV", { camera: { ...CAMERA, fovDegrees: 180 }, bounds: UNIT_BOUNDS, viewportAspect: 1 }],
+    ["invalid near plane", { camera: { ...CAMERA, nearClip: 0 }, bounds: UNIT_BOUNDS, viewportAspect: 1 }],
+    ["invalid up vector", { camera: { ...CAMERA, up: [0, 0, 0] }, bounds: UNIT_BOUNDS, viewportAspect: 1 }],
     ["invalid aspect", { camera: CAMERA, bounds: UNIT_BOUNDS, viewportAspect: 0 }],
     ["unframeable lens shift", { camera: { ...CAMERA, lensShift: [0.5, 0] }, bounds: UNIT_BOUNDS, viewportAspect: 1 }],
     ["missing ortho frustum", { camera: { ...CAMERA, projection: "orthographic" }, bounds: UNIT_BOUNDS, viewportAspect: 1 }],

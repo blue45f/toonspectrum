@@ -149,6 +149,7 @@ export interface StudioVrmJointHandlesProps {
 interface DragSession {
   pointerId: number;
   bone: StudioVrmIkEffectorBone;
+  captureTarget: HTMLButtonElement;
   startClientX: number;
   startClientY: number;
   startWorld: THREE.Vector3;
@@ -203,6 +204,16 @@ function stopKeyboardEvent(event: ReactKeyboardEvent<HTMLButtonElement>) {
   event.preventDefault();
   event.stopPropagation();
   event.nativeEvent.stopImmediatePropagation?.();
+}
+
+function releaseStudioVrmJointPointerCapture(session: DragSession) {
+  try {
+    if (session.captureTarget.hasPointerCapture?.(session.pointerId)) {
+      session.captureTarget.releasePointerCapture?.(session.pointerId);
+    }
+  } catch {
+    // pointercancel/lostpointercapture 또는 오래된 WebView가 이미 캡처를 해제했을 수 있다.
+  }
 }
 
 /** 누락되거나 예외를 던지는 비표준 VRM 본은 개별적으로 건너뛴다. */
@@ -423,6 +434,7 @@ function Handle({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const dragRef = useRef<DragSession | null>(null);
+  const dragWindowCleanupRef = useRef<(() => void) | null>(null);
   const previewFrameRef = useRef<number | null>(null);
   const scratchWorldRef = useRef(new THREE.Vector3());
   const [hovered, setHovered] = useState(false);
@@ -447,9 +459,15 @@ function Handle({
     const previewFrame = previewFrameRef.current;
     previewFrameRef.current = null;
     if (previewFrame !== null) cancelAnimationFrame(previewFrame);
+    const cleanupWindowFallbacks = dragWindowCleanupRef.current;
+    dragWindowCleanupRef.current = null;
+    cleanupWindowFallbacks?.();
     const session = dragRef.current;
     dragRef.current = null;
-    if (session) rollbackOnUnmount(session);
+    if (session) {
+      releaseStudioVrmJointPointerCapture(session);
+      rollbackOnUnmount(session);
+    }
   }, []);
 
   useFrame(() => {
@@ -507,19 +525,25 @@ function Handle({
     });
   };
 
-  const finishDrag = (
-    pointerId: number,
-    cancelled: boolean,
-    captureTarget?: HTMLButtonElement
-  ) => {
+  const clearDragWindowFallbacks = () => {
+    const cleanup = dragWindowCleanupRef.current;
+    dragWindowCleanupRef.current = null;
+    cleanup?.();
+  };
+
+  const finishDrag = (pointerId: number, cancelled: boolean) => {
     const session = dragRef.current;
     if (!session || session.pointerId !== pointerId) return;
+    // Claim completion before releasing capture or invoking callbacks. A synchronous
+    // lostpointercapture and every late local/window event then become deterministic no-ops.
+    dragRef.current = null;
+    clearDragWindowFallbacks();
     cancelPendingPreviewFrame();
     if (cancelled) session.pendingWorld = null;
     else flushPendingPreview(session);
-    dragRef.current = null;
     setDragging(false);
     onInteractionActiveChange?.(false);
+    releaseStudioVrmJointPointerCapture(session);
 
     const outcome = resolveStudioVrmJointDragOutcome({
       bone: session.bone,
@@ -533,14 +557,27 @@ function Handle({
     } else if (outcome.kind === "commit") {
       onCommit?.(outcome.bone, outcome.worldPosition);
     }
+  };
 
-    if (captureTarget?.hasPointerCapture?.(pointerId)) {
-      try {
-        captureTarget.releasePointerCapture(pointerId);
-      } catch {
-        // 브라우저가 pointercancel 처리 중 이미 캡처를 해제할 수 있다.
-      }
-    }
+  const installDragWindowFallbacks = () => {
+    clearDragWindowFallbacks();
+    const finishMatchingPointer = (event: PointerEvent) => {
+      const session = dragRef.current;
+      if (!session || event.pointerId !== session.pointerId) return;
+      finishDrag(event.pointerId, event.type === "pointercancel");
+    };
+    const finishOnWindowBlur = () => {
+      const session = dragRef.current;
+      if (session) finishDrag(session.pointerId, true);
+    };
+    window.addEventListener("pointerup", finishMatchingPointer);
+    window.addEventListener("pointercancel", finishMatchingPointer);
+    window.addEventListener("blur", finishOnWindowBlur);
+    dragWindowCleanupRef.current = () => {
+      window.removeEventListener("pointerup", finishMatchingPointer);
+      window.removeEventListener("pointercancel", finishMatchingPointer);
+      window.removeEventListener("blur", finishOnWindowBlur);
+    };
   };
 
   const handleKeyboardNudge = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
@@ -654,12 +691,14 @@ function Handle({
             stopPointerEvent(event);
             onSelect?.();
             if (!effectorBone) return;
+            if (dragRef.current) return;
 
             const startWorld = readCurrentWorldPosition();
             if (!startWorld) return;
             dragRef.current = {
               pointerId: event.pointerId,
               bone: effectorBone,
+              captureTarget: event.currentTarget,
               startClientX: event.clientX,
               startClientY: event.clientY,
               startWorld: startWorld.clone(),
@@ -670,6 +709,7 @@ function Handle({
             };
             setDragging(true);
             onInteractionActiveChange?.(true);
+            installDragWindowFallbacks();
             try {
               event.currentTarget.setPointerCapture?.(event.pointerId);
             } catch {
@@ -705,15 +745,15 @@ function Handle({
           }}
           onPointerUp={(event) => {
             stopPointerEvent(event);
-            finishDrag(event.pointerId, false, event.currentTarget);
+            finishDrag(event.pointerId, false);
           }}
           onPointerCancel={(event) => {
             stopPointerEvent(event);
-            finishDrag(event.pointerId, true, event.currentTarget);
+            finishDrag(event.pointerId, true);
           }}
           onLostPointerCapture={(event) => {
             stopPointerEvent(event);
-            finishDrag(event.pointerId, true, event.currentTarget);
+            finishDrag(event.pointerId, true);
           }}
           onClick={(event) => {
             event.preventDefault();
@@ -727,7 +767,7 @@ function Handle({
             }
             if (event.key === "Escape" && dragRef.current) {
               stopKeyboardEvent(event);
-              finishDrag(dragRef.current.pointerId, true, event.currentTarget);
+              finishDrag(dragRef.current.pointerId, true);
               return;
             }
             handleKeyboardNudge(event);

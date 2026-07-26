@@ -1327,6 +1327,7 @@ import type { MotionCutImage } from "./studio-motion-export";
 import type { PageState } from "./studio-page-state";
 import type { PaletteSuggestion } from "./studio-palette-suggest";
 import type { PanelLayoutPreset } from "./studio-panel-layouts";
+import type { StudioProjectDocumentSessionProvenance } from "./studio-project-document-session";
 import type { PsdExportEl, PsdExportResult } from "./studio-psd-export";
 import type { StudioPublicationAnalyticsDocument } from "./studio-publication-analytics";
 import type {
@@ -2765,6 +2766,16 @@ function StudioCuttoonEditor() {
   // Monotonic snapshot token dedicated to revision review. Unlike async mutation tickets, this
   // also advances for provenance bookkeeping that changes persisted project data.
   const studioRevisionProjectGenerationRef = useRef(0);
+  const studioProjectDocumentSessionRef =
+    useRef<StudioProjectDocumentSessionProvenance | null>(null);
+  const studioProjectDocumentSessionScopeKey = JSON.stringify([
+    studioAuthUserId,
+    workId,
+    remixId,
+  ]);
+  const studioProjectDocumentSessionScopeRef = useRef(
+    studioProjectDocumentSessionScopeKey
+  );
   const sharedDocumentSaveAbortRef = useRef<AbortController | null>(null);
   const sharedDocumentRestoreAbortRef = useRef<AbortController | null>(null);
   const ownerDetailAbortRef = useRef<AbortController | null>(null);
@@ -10427,6 +10438,17 @@ function StudioCuttoonEditor() {
     wrap.scrollTop = restored.scrollTop;
     updateScrollPosRef.current();
   }, [activePage.id, canvasH, viewTransformSuppressed]);
+  useLayoutEffect(() => {
+    if (
+      studioProjectDocumentSessionScopeRef.current
+      === studioProjectDocumentSessionScopeKey
+    ) {
+      return;
+    }
+    studioProjectDocumentSessionScopeRef.current =
+      studioProjectDocumentSessionScopeKey;
+    studioProjectDocumentSessionRef.current = null;
+  }, [studioProjectDocumentSessionScopeKey]);
   const mutationScopeKey = JSON.stringify([studioAuthUserId, workId]);
   useLayoutEffect(() => {
     if (previousMutationScopeRef.current === mutationScopeKey) return;
@@ -12674,6 +12696,9 @@ const puppetWarpArmed =
 
   // 기존 작품 로드 또는 리믹스 대상 로드.
   useEffect(() => {
+    // Route/server hydration establishes a different document authority than a downloaded JSON.
+    // Clear before either the empty-draft or remote-document branch can become exportable.
+    studioProjectDocumentSessionRef.current = null;
     const targetId = workId || remixId;
     if (!targetId) {
       setSharedDocumentScope(null);
@@ -28324,6 +28349,10 @@ function clearSelectionForEdit() {
       setError(workAssetReason);
       return false;
     }
+    // Every replacement starts without import provenance. A successful canonical JSON import
+    // installs its own detached envelope metadata after this transaction returns; legacy,
+    // archive, checkpoint, and server restore paths intentionally leave the session cleared.
+    studioProjectDocumentSessionRef.current = null;
     resetAdvancedFillForDocumentReplacement();
     // 히스토리에 새 페이지 상태를 추가해 JSON/복구 지점 복원도 ⌘Z 흐름과 충돌하지 않게 한다.
     const appended = appendStudioPagesHistorySnapshot(
@@ -28848,22 +28877,45 @@ function clearSelectionForEdit() {
   async function handleExportProject() {
     if (!ensureSharedDocumentAvailableForExport()) return;
     try {
-      const { serializeStudioProjectDocument } = await import(
-        "./studio-project-document"
-      );
-      const projectData = currentStudioProjectSnapshot();
+      const [
+        { createStudioProjectDocumentEnvelope },
+        { serializeCanonicalStudioDocumentEnvelope },
+        {
+          captureStudioProjectDocumentSession,
+          planStudioProjectDocumentSessionExport,
+        },
+      ] = await Promise.all([
+        import("./studio-project-document"),
+        import("./studio-document-envelope"),
+        import("./studio-project-document-session"),
+      ]);
       const exportedAt = new Date().toISOString();
       const documentId = workId
         ? `work:${workId}`
         : remixId
           ? `remix:${remixId}`
           : `draft:${currentPageId}`;
-      const serialized = serializeStudioProjectDocument(projectData, {
-        documentId,
-        revision: sharedDocument?.revision ?? 0,
-        createdAt: exportedAt,
-        updatedAt: exportedAt,
+      const exportGeneration = studioRevisionProjectGenerationRef.current;
+      const sessionExport = planStudioProjectDocumentSessionExport({
+        session: studioProjectDocumentSessionRef.current,
+        scopeKey: studioProjectDocumentSessionScopeKey,
+        currentGeneration: exportGeneration,
+        exportedAt,
+        fallbackMetadata: {
+          documentId,
+          revision: sharedDocument?.revision ?? 0,
+          createdAt: exportedAt,
+          updatedAt: exportedAt,
+        },
+        readCurrentProject: currentStudioProjectSnapshot,
       });
+      const exportEnvelope = sessionExport.directEnvelope
+        ?? createStudioProjectDocumentEnvelope(
+          sessionExport.project,
+          sessionExport.metadata,
+          sessionExport.extensions,
+        );
+      const serialized = serializeCanonicalStudioDocumentEnvelope(exportEnvelope);
       const blob = new Blob([serialized], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -28873,6 +28925,11 @@ function clearSelectionForEdit() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      studioProjectDocumentSessionRef.current = captureStudioProjectDocumentSession(
+        exportEnvelope,
+        studioProjectDocumentSessionScopeKey,
+        exportGeneration,
+      );
       setError(null);
     } catch (cause) {
       setError(
@@ -28952,13 +29009,25 @@ function clearSelectionForEdit() {
       try {
         if (!canApplyStudioMutation(mutationTicket)) return;
         const text = event.target?.result as string;
-        const { parseStudioProjectDocument } = await import(
-          "./studio-project-document"
-        );
+        const [
+          { parseStudioProjectDocument },
+          { captureStudioProjectDocumentSession },
+        ] = await Promise.all([
+          import("./studio-project-document"),
+          import("./studio-project-document-session"),
+        ]);
         if (!canApplyStudioMutation(mutationTicket)) return;
         const loaded = await parseStudioProjectDocument(text);
         if (!canApplyStudioMutation(mutationTicket)) return;
         if (!(await applyStudioProjectSnapshot(loaded.project))) return;
+        studioProjectDocumentSessionRef.current =
+          loaded.source === "canonical-envelope"
+            ? captureStudioProjectDocumentSession(
+                loaded.envelope,
+                studioProjectDocumentSessionScopeKey,
+                studioRevisionProjectGenerationRef.current,
+              )
+            : null;
         const migrated =
           loaded.source === "canonical-envelope" && loaded.receipt.migrated;
         alert(
@@ -28967,7 +29036,6 @@ function clearSelectionForEdit() {
             : "프로젝트 불러오기가 완료되었습니다."
         );
       } catch (err) {
-        console.error(err);
         alert(err instanceof Error ? err.message : "프로젝트 파일을 읽는 도중 오류가 발생했습니다.");
       }
     };

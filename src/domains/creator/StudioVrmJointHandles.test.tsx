@@ -49,6 +49,19 @@ function makeVrm(
   } as unknown as Pick<VRM, "humanoid">;
 }
 
+function rejectPointerCapture(handle: HTMLButtonElement) {
+  const setPointerCapture = vi.fn(() => {
+    throw new Error("pointer capture unavailable");
+  });
+  const releasePointerCapture = vi.fn();
+  Object.defineProperties(handle, {
+    setPointerCapture: { configurable: true, value: setPointerCapture },
+    hasPointerCapture: { configurable: true, value: vi.fn(() => false) },
+    releasePointerCapture: { configurable: true, value: releasePointerCapture },
+  });
+  return { setPointerCapture, releasePointerCapture };
+}
+
 beforeEach(() => {
   animationFrameMock.nextId = 1;
   animationFrameMock.callbacks.clear();
@@ -79,6 +92,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   fiberMock.frameCallbacks.length = 0;
+  vi.restoreAllMocks();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
@@ -372,6 +386,167 @@ describe("StudioVrmJointHandles interaction boundary", () => {
     expect(onEffectorCommit.mock.calls[0]?.[1][2]).toBeCloseTo(expected.z);
   });
 
+  it("commits exactly once from a matching window pointerup when pointer capture throws", () => {
+    const onEffectorPreview = vi.fn();
+    const onEffectorCommit = vi.fn();
+    const onEffectorRollback = vi.fn();
+    const onInteractionActiveChange = vi.fn();
+    const vrm = makeVrm({ leftHand: new THREE.Object3D() });
+    render(
+      <StudioVrmJointHandles
+        vrm={vrm}
+        onEffectorPreview={onEffectorPreview}
+        onEffectorCommit={onEffectorCommit}
+        onEffectorRollback={onEffectorRollback}
+        onInteractionActiveChange={onInteractionActiveChange}
+      />,
+    );
+    const handle = screen.getByRole("button", {
+      name: "왼손 관절 IK 목표 이동",
+    }) as HTMLButtonElement;
+    const pointerCapture = rejectPointerCapture(handle);
+    const addEventListener = vi.spyOn(window, "addEventListener");
+    const removeEventListener = vi.spyOn(window, "removeEventListener");
+
+    fireEvent.pointerDown(handle, {
+      pointerId: 21,
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(handle, {
+      pointerId: 21,
+      clientX: 150,
+      clientY: 130,
+    });
+    fireEvent.pointerUp(window, { pointerId: 99 });
+
+    expect(pointerCapture.setPointerCapture).toHaveBeenCalledWith(21);
+    expect(onEffectorCommit).not.toHaveBeenCalled();
+    expect(onInteractionActiveChange.mock.calls).toEqual([[true]]);
+
+    fireEvent.pointerUp(window, { pointerId: 21 });
+
+    expect(onEffectorPreview).toHaveBeenCalledOnce();
+    expect(onEffectorCommit).toHaveBeenCalledOnce();
+    expect(onEffectorRollback).not.toHaveBeenCalled();
+    expect(onEffectorPreview.mock.calls[0]).toEqual(onEffectorCommit.mock.calls[0]);
+    expect(onInteractionActiveChange.mock.calls).toEqual([[true], [false]]);
+    expect(pointerCapture.releasePointerCapture).not.toHaveBeenCalled();
+    for (const eventName of ["pointerup", "pointercancel", "blur"]) {
+      expect(addEventListener).toHaveBeenCalledWith(eventName, expect.any(Function));
+      expect(removeEventListener).toHaveBeenCalledWith(eventName, expect.any(Function));
+    }
+
+    // A late local release and every removed window fallback must be harmless.
+    fireEvent.pointerUp(handle, { pointerId: 21, button: 0 });
+    fireEvent.pointerCancel(window, { pointerId: 21 });
+    fireEvent(window, new Event("blur"));
+    expect(onEffectorPreview).toHaveBeenCalledOnce();
+    expect(onEffectorCommit).toHaveBeenCalledOnce();
+    expect(onEffectorRollback).not.toHaveBeenCalled();
+    expect(onInteractionActiveChange.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it("rolls back exactly once from a matching window pointercancel", () => {
+    const onEffectorPreview = vi.fn();
+    const onEffectorCommit = vi.fn();
+    const onEffectorRollback = vi.fn();
+    const onInteractionActiveChange = vi.fn();
+    const hand = new THREE.Object3D();
+    hand.position.set(0.25, 1.1, -0.2);
+    render(
+      <StudioVrmJointHandles
+        vrm={makeVrm({ rightHand: hand })}
+        onEffectorPreview={onEffectorPreview}
+        onEffectorCommit={onEffectorCommit}
+        onEffectorRollback={onEffectorRollback}
+        onInteractionActiveChange={onInteractionActiveChange}
+      />,
+    );
+    const handle = screen.getByRole("button", {
+      name: "오른손 관절 IK 목표 이동",
+    }) as HTMLButtonElement;
+    rejectPointerCapture(handle);
+
+    fireEvent.pointerDown(handle, {
+      pointerId: 22,
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(handle, {
+      pointerId: 22,
+      clientX: 145,
+      clientY: 135,
+    });
+    fireEvent.pointerCancel(window, { pointerId: 22 });
+
+    expect(cancelAnimationFrame).toHaveBeenCalledOnce();
+    expect(animationFrameMock.callbacks).toHaveLength(0);
+    expect(onEffectorPreview).not.toHaveBeenCalled();
+    expect(onEffectorCommit).not.toHaveBeenCalled();
+    expect(onEffectorRollback).toHaveBeenCalledOnce();
+    expect(onEffectorRollback).toHaveBeenCalledWith("rightHand", [0.25, 1.1, -0.2]);
+    expect(onInteractionActiveChange.mock.calls).toEqual([[true], [false]]);
+
+    fireEvent.pointerUp(window, { pointerId: 22 });
+    fireEvent.pointerCancel(handle, { pointerId: 22 });
+    expect(onEffectorCommit).not.toHaveBeenCalled();
+    expect(onEffectorRollback).toHaveBeenCalledOnce();
+    expect(onInteractionActiveChange.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it("rolls a pole back exactly once when the window blurs", () => {
+    const onPolePreview = vi.fn();
+    const onPoleCommit = vi.fn();
+    const onPoleRollback = vi.fn();
+    const onInteractionActiveChange = vi.fn();
+    const vrm = makeVrm({ leftFoot: new THREE.Object3D() });
+    render(
+      <StudioVrmJointHandles
+        vrm={vrm}
+        poleSceneTargets={{ leftFoot: [0.2, 0.6, 0.4] }}
+        onPolePreview={onPolePreview}
+        onPoleCommit={onPoleCommit}
+        onPoleRollback={onPoleRollback}
+        onInteractionActiveChange={onInteractionActiveChange}
+      />,
+    );
+    const pole = screen.getByRole("button", {
+      name: "왼발 IK 폴 방향 이동",
+    }) as HTMLButtonElement;
+    rejectPointerCapture(pole);
+
+    fireEvent.pointerDown(pole, {
+      pointerId: 23,
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(pole, {
+      pointerId: 23,
+      clientX: 145,
+      clientY: 130,
+    });
+    fireEvent(window, new Event("blur"));
+
+    expect(cancelAnimationFrame).toHaveBeenCalledOnce();
+    expect(animationFrameMock.callbacks).toHaveLength(0);
+    expect(onPolePreview).not.toHaveBeenCalled();
+    expect(onPoleCommit).not.toHaveBeenCalled();
+    expect(onPoleRollback).toHaveBeenCalledOnce();
+    expect(onPoleRollback).toHaveBeenCalledWith("leftFoot", [0.2, 0.6, 0.4]);
+    expect(onInteractionActiveChange.mock.calls).toEqual([[true], [false]]);
+
+    fireEvent.pointerUp(window, { pointerId: 23 });
+    fireEvent.pointerCancel(pole, { pointerId: 23 });
+    fireEvent(window, new Event("blur"));
+    expect(onPoleCommit).not.toHaveBeenCalled();
+    expect(onPoleRollback).toHaveBeenCalledOnce();
+    expect(onInteractionActiveChange.mock.calls).toEqual([[true], [false]]);
+  });
+
   it("cancels a queued preview when the handle session is remounted", () => {
     const onEffectorPreview = vi.fn();
     const onEffectorRollback = vi.fn();
@@ -417,12 +592,20 @@ describe("StudioVrmJointHandles interaction boundary", () => {
       />
     );
     const handle = screen.getByRole("button", { name: "오른손 관절 IK 목표 이동" });
+    const removeEventListener = vi.spyOn(window, "removeEventListener");
 
     fireEvent.pointerDown(handle, { pointerId: 3, button: 0, clientX: 80, clientY: 90 });
     view.unmount();
 
     expect(onEffectorRollback).toHaveBeenCalledOnce();
     expect(onEffectorRollback).toHaveBeenCalledWith("rightHand", [0.25, 1.1, -0.2]);
+    expect(onInteractionActiveChange.mock.calls).toEqual([[true], [false]]);
+    for (const eventName of ["pointerup", "pointercancel", "blur"]) {
+      expect(removeEventListener).toHaveBeenCalledWith(eventName, expect.any(Function));
+    }
+    fireEvent.pointerUp(window, { pointerId: 3 });
+    fireEvent(window, new Event("blur"));
+    expect(onEffectorRollback).toHaveBeenCalledOnce();
     expect(onInteractionActiveChange.mock.calls).toEqual([[true], [false]]);
   });
 

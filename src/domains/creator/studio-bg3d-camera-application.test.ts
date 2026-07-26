@@ -63,7 +63,7 @@ describe("Studio BG3D complete camera application", () => {
     expect(events).toEqual(["paint:1", "apply:replacement", "paint:2"]);
   });
 
-  it("preserves perspective fov, zoom, lens shift, position, and a non-default target", () => {
+  it("preserves perspective fov, zoom, near plane, Dutch roll, position, and target", () => {
     const camera = new THREE.PerspectiveCamera(80, 16 / 9, 0.1, 200);
     const target = new THREE.Vector3(0, 0, 0);
     const update = vi.fn();
@@ -75,11 +75,15 @@ describe("Studio BG3D complete camera application", () => {
       projection: "perspective" as const,
       zoom: 1.75,
       lensShift: [0.125, -0.2] as const,
+      nearClip: 0.025,
+      up: [0, 0.8, 0.6] as const,
     };
 
     expect(applyStudioBg3dViewToThreeCamera(camera, { target, update }, view)).toBe(true);
     expect(camera.fov).toBe(37);
     expect(camera.zoom).toBe(1.75);
+    expect(camera.near).toBe(0.025);
+    expect(camera.up.toArray()).toEqual([0, 0.8, 0.6]);
     expect(camera.position.toArray()).toEqual([8, 5, 11]);
     expect(target.toArray()).toEqual([1.5, 2.25, -3]);
     expect(camera.view?.enabled).toBe(true);
@@ -98,6 +102,8 @@ describe("Studio BG3D complete camera application", () => {
       projection: "orthographic" as const,
       zoom: 3.5,
       lensShift: [-0.1, 0.15] as const,
+      nearClip: 0.5,
+      up: [1, 0, 0] as const,
     };
 
     expect(applyStudioBg3dViewToThreeCamera(stalePerspective, { target }, view)).toBe(false);
@@ -107,6 +113,8 @@ describe("Studio BG3D complete camera application", () => {
     const replacement = new THREE.OrthographicCamera(-4, 4, 3, -3, 0.1, 200);
     expect(applyStudioBg3dViewToThreeCamera(replacement, { target }, view)).toBe(true);
     expect(replacement.zoom).toBe(3.5);
+    expect(replacement.near).toBe(0.5);
+    expect(replacement.up.toArray()).toEqual([1, 0, 0]);
     expect(replacement.position.toArray()).toEqual([4, 7, 10]);
     expect(target.toArray()).toEqual([-2, 1, 3]);
     expect((replacement.view?.offsetX ?? 0) / (replacement.view?.fullWidth ?? 1)).toBeCloseTo(-0.1);
@@ -123,6 +131,31 @@ describe("Studio BG3D complete camera application", () => {
 
     expect(applyStudioBg3dViewToThreeCamera(camera, null, view)).toBe(true);
     expect(camera.view?.enabled).toBe(false);
+  });
+
+  it("fails malformed clipping and up vectors closed before mutating the live camera", () => {
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+    camera.position.set(1, 2, 3);
+    const target = new THREE.Vector3(4, 5, 6);
+    const baseline = {
+      position: camera.position.clone(),
+      target: target.clone(),
+      near: camera.near,
+      up: camera.up.clone(),
+    };
+
+    expect(applyStudioBg3dViewToThreeCamera(camera, { target }, {
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+      nearClip: 0,
+    })).toBe(false);
+    expect(applyStudioBg3dViewToThreeCamera(camera, { target }, {
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+      up: [0, 0, 0],
+    })).toBe(false);
+    expect(camera.position).toEqual(baseline.position);
+    expect(target).toEqual(baseline.target);
+    expect(camera.near).toBe(baseline.near);
+    expect(camera.up).toEqual(baseline.up);
   });
 
   it("uses camera.zoom for orthographic buttons and preserves the current target", () => {

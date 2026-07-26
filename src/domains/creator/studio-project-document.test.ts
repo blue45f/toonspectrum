@@ -1,17 +1,31 @@
+import { readFileSync } from "node:fs";
+import { inspect } from "node:util";
+
 import { describe, expect, it } from "vitest";
 
+import {
+  appendStudioAiOperation,
+  createEmptyStudioAiProvenanceDocument,
+} from "./studio-ai-provenance";
 import {
   createCanonicalStudioDocumentEnvelope,
   serializeCanonicalStudioDocumentEnvelope,
 } from "./studio-document-envelope";
 import {
+  buildStudioProjectDocumentSaveArtifact,
   createStudioProjectDocumentEnvelope,
   parseStudioProjectDocument,
   serializeStudioProjectDocument,
+  StudioProjectDocumentError,
   STUDIO_PROJECT_DOCUMENT_CURRENT_VERSION,
   STUDIO_PROJECT_DOCUMENT_FORMAT_ID,
   STUDIO_PROJECT_DOCUMENT_PAYLOAD_TYPE,
 } from "./studio-project-document";
+
+const studioPageSource = readFileSync(
+  new URL("./StudioPage.tsx", import.meta.url),
+  "utf8"
+);
 
 const metadata = {
   documentId: "work:project-1",
@@ -28,6 +42,24 @@ function page(id = "page-1") {
     bgGrad: null,
     canvasH: 2_000,
   };
+}
+
+function retainedAiProvenance(rawPrompt: string) {
+  return appendStudioAiOperation(
+    createEmptyStudioAiProvenanceDocument(),
+    {
+      id: "operation-1",
+      kind: "image",
+      task: "background-image",
+      provider: "image-provider",
+      model: "image-v1",
+      transport: "byok",
+      promptVersion: 2,
+      prompt: rawPrompt,
+      createdAt: "2026-07-10T00:00:00.000Z",
+    },
+    { retainRawPrompt: true }
+  );
 }
 
 describe("studio project canonical document boundary", () => {
@@ -58,6 +90,22 @@ describe("studio project canonical document boundary", () => {
       version: 2,
       title: "과거 프로젝트",
       currentPageId: "page-1",
+    });
+  });
+
+  it("keeps a legitimate raw project format field on the legacy path", async () => {
+    const loaded = await parseStudioProjectDocument({
+      version: 2,
+      format: "cuttoon",
+      title: "컷툰 프로젝트",
+      pagesList: [page()],
+    });
+
+    expect(loaded.source).toBe("legacy-project");
+    expect(loaded.project).toMatchObject({
+      version: 2,
+      format: "cuttoon",
+      title: "컷툰 프로젝트",
     });
   });
 
@@ -215,5 +263,271 @@ describe("studio project canonical document boundary", () => {
     expect(envelope.payload.data).toMatchObject({ title: "분리" });
     expect(Object.isFrozen(envelope)).toBe(true);
     expect(Object.isFrozen(envelope.payload.data)).toBe(true);
+  });
+
+  it("builds deterministic save bytes and a checksum from the established export boundary", async () => {
+    const value = {
+      version: 2,
+      title: "checksum 프로젝트",
+      pagesList: [page()],
+    };
+    const extensions = {
+      "vendor.example": { retained: true },
+    };
+    const first = await buildStudioProjectDocumentSaveArtifact(
+      value,
+      metadata,
+      extensions
+    );
+    const second = await buildStudioProjectDocumentSaveArtifact(
+      value,
+      metadata,
+      extensions
+    );
+
+    expect(first.canonicalJson).toBe(
+      serializeStudioProjectDocument(value, metadata, extensions)
+    );
+    expect(first.canonicalJson).toBe(second.canonicalJson);
+    expect(first.checksum).toBe(second.checksum);
+    expect(first.checksum).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(first.project).toMatchObject({
+      version: 2,
+      title: "checksum 프로젝트",
+    });
+    expect(first.envelope.extensions).toEqual(extensions);
+    expect(Object.isFrozen(first)).toBe(true);
+  });
+
+  it("redacts retained AI raw prompts before canonical save bytes are produced", async () => {
+    const rawPrompt = "작가의 비공개 반전 프롬프트";
+    const artifact = await buildStudioProjectDocumentSaveArtifact(
+      {
+        version: 2,
+        title: "AI 이력 프로젝트",
+        pagesList: [page()],
+        aiProvenance: retainedAiProvenance(rawPrompt),
+      },
+      metadata
+    );
+
+    expect(artifact.canonicalJson).not.toContain(rawPrompt);
+    expect(JSON.stringify(artifact.project)).not.toContain(rawPrompt);
+    expect(artifact.project.aiProvenance?.operations[0].prompt).toMatchObject({
+      retention: "hash-only",
+    });
+    expect(artifact.project.aiProvenance?.operations[0].prompt).not.toHaveProperty(
+      "raw"
+    );
+  });
+
+  it("fails closed, preserves a future raw source, and keeps recovery bytes off error surfaces", async () => {
+    const rawPrompt = "비공개 미래 AI 프롬프트 · 절대 오류 로그에 남기지 않기";
+    const privateContact = "future-creator-private@example.invalid";
+    const future = {
+      version: 3,
+      format: "cuttoon",
+      title: "미래 프로젝트",
+      pagesList: [page()],
+      futureEditingState: { mode: "next-generation" },
+      aiProvenance: {
+        version: 3,
+        operations: [
+          {
+            prompt: { retention: "raw-opt-in", raw: rawPrompt },
+            collaboratorContact: privateContact,
+          },
+        ],
+      },
+    };
+    const futureSource = JSON.stringify(future, null, 2);
+
+    let caught: unknown;
+    try {
+      await parseStudioProjectDocument(futureSource);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(StudioProjectDocumentError);
+    const documentError = caught as StudioProjectDocumentError;
+    expect(documentError).toMatchObject({
+      diagnostic: {
+        code: "UNKNOWN_FUTURE_VERSION",
+        recoverable: true,
+        recovery: "upgrade-client",
+        actualVersion: 3,
+        currentVersion: 2,
+      },
+    });
+    expect(documentError.preservedSource).toBe(futureSource);
+
+    expect(Object.keys(documentError)).not.toContain("preservedSource");
+    expect(Object.getOwnPropertyNames(documentError)).not.toContain(
+      "preservedSource"
+    );
+    expect(Reflect.ownKeys(documentError)).not.toContain("preservedSource");
+    expect(
+      Object.getOwnPropertyDescriptor(
+        Object.getPrototypeOf(documentError) as object,
+        "preservedSource"
+      )?.enumerable
+    ).toBe(false);
+
+    const consoleProjection = documentError.toJSON();
+    const exposedSurfaces = JSON.stringify({
+      enumerable: { ...documentError },
+      json: JSON.parse(JSON.stringify(documentError)) as unknown,
+      string: String(documentError),
+      message: documentError.message,
+      stack: documentError.stack ?? "",
+      consoleInspection: inspect(documentError),
+      consoleProjection,
+    });
+    expect(consoleProjection).toMatchObject({
+      name: "StudioProjectDocumentError",
+      diagnostic: { code: "UNKNOWN_FUTURE_VERSION" },
+    });
+    expect(exposedSurfaces).not.toContain(rawPrompt);
+    expect(exposedSurfaces).not.toContain(privateContact);
+    expect(exposedSurfaces).not.toContain(futureSource);
+  });
+
+  it.each(["3.0", "3.1"])(
+    "fails closed and preserves future string-version raw projects (%s)",
+    async (version) => {
+      const futureSource = JSON.stringify({
+        version,
+        format: "cuttoon",
+        title: "미래 문자열 프로젝트",
+        pagesList: [page()],
+      });
+
+      await expect(parseStudioProjectDocument(futureSource)).rejects.toMatchObject({
+        diagnostic: {
+          code: "UNKNOWN_FUTURE_VERSION",
+          actualVersion: 3,
+          currentVersion: 2,
+          recoverable: true,
+        },
+        preservedSource: futureSource,
+      });
+    }
+  );
+
+  it("keeps StudioPage export and import on the established dynamic module contract", async () => {
+    expect(studioPageSource).not.toMatch(
+      /import\s+[^;]*from\s+["']\.\/studio-project-document["']/u
+    );
+    expect(studioPageSource).toContain("{ createStudioProjectDocumentEnvelope },");
+    expect(studioPageSource).toContain('import("./studio-project-document")');
+    expect(studioPageSource).toContain("{ serializeCanonicalStudioDocumentEnvelope },");
+    expect(studioPageSource).toContain('import("./studio-document-envelope")');
+    expect(studioPageSource).not.toMatch(
+      /import\s+\{\s*(?:captureStudioProjectDocumentSession|planStudioProjectDocumentSessionExport)/u
+    );
+    expect(studioPageSource).toContain(
+      'import("./studio-project-document-session")'
+    );
+    expect(studioPageSource).toContain(
+      "planStudioProjectDocumentSessionExport({"
+    );
+    expect(studioPageSource).toContain("sessionExport.metadata");
+    expect(studioPageSource).toContain("sessionExport.extensions");
+    expect(studioPageSource).toContain("sessionExport.directEnvelope");
+    expect(studioPageSource).toContain("sessionExport.project");
+    expect(studioPageSource).toContain(
+      "readCurrentProject: currentStudioProjectSnapshot"
+    );
+    expect(studioPageSource).toContain("{ parseStudioProjectDocument },");
+    expect(studioPageSource).toContain(
+      "const loaded = await parseStudioProjectDocument(text);"
+    );
+    expect(studioPageSource).toContain(
+      "applyStudioProjectSnapshot(loaded.project)"
+    );
+    expect(studioPageSource).toContain(
+      'loaded.source === "canonical-envelope"'
+    );
+    expect(studioPageSource).toContain(
+      "captureStudioProjectDocumentSession("
+    );
+
+    const canonicalExport = studioPageSource.slice(
+      studioPageSource.indexOf("async function handleExportProject()"),
+      studioPageSource.indexOf("async function handleExportProjectArchive()")
+    );
+    const serializedAt = canonicalExport.indexOf(
+      "serializeCanonicalStudioDocumentEnvelope(exportEnvelope)"
+    );
+    const downloadPreparedAt = canonicalExport.indexOf("URL.createObjectURL(blob)");
+    const downloadRequestedAt = canonicalExport.indexOf("link.click()");
+    const sessionInstalledAt = canonicalExport.indexOf(
+      "studioProjectDocumentSessionRef.current = captureStudioProjectDocumentSession("
+    );
+    expect(serializedAt).toBeGreaterThanOrEqual(0);
+    expect(downloadPreparedAt).toBeGreaterThan(serializedAt);
+    expect(downloadRequestedAt).toBeGreaterThan(downloadPreparedAt);
+    expect(sessionInstalledAt).toBeGreaterThan(downloadRequestedAt);
+    expect(canonicalExport).not.toContain("sessionExport.nextSession");
+
+    const replacement = studioPageSource.slice(
+      studioPageSource.indexOf(
+        "function applyStudioProjectSnapshotWithPreparedDocuments("
+      ),
+      studioPageSource.indexOf(
+        "async function applyStudioProjectSnapshot("
+      )
+    );
+    expect(replacement).toContain(
+      "studioProjectDocumentSessionRef.current = null;"
+    );
+    const scopeClear = studioPageSource.slice(
+      studioPageSource.indexOf(
+        "studioProjectDocumentSessionScopeRef.current"
+      ),
+      studioPageSource.indexOf(
+        "const mutationScopeKey = JSON.stringify"
+      )
+    );
+    expect(scopeClear).toContain(
+      "studioProjectDocumentSessionRef.current = null;"
+    );
+    const canonicalImport = studioPageSource.slice(
+      studioPageSource.indexOf("function handleImportProject("),
+      studioPageSource.indexOf(
+        "async function handleImportProjectArchive("
+      )
+    );
+    expect(canonicalImport).toContain(
+      'loaded.source === "canonical-envelope"'
+    );
+    expect(canonicalImport).toContain(": null;");
+    expect(canonicalImport).not.toContain("console.error(err)");
+    const archiveImport = studioPageSource.slice(
+      studioPageSource.indexOf(
+        "async function handleImportProjectArchive("
+      ),
+      studioPageSource.indexOf("function cancelInterchangeImport(")
+    );
+    expect(archiveImport).toContain(
+      "applyStudioProjectSnapshotWithPreparedDocuments("
+    );
+    const serverHydration = studioPageSource.slice(
+      studioPageSource.indexOf("// 기존 작품 로드 또는 리믹스 대상 로드."),
+      studioPageSource.indexOf("// 시리즈·챌린지 딥링크로 들어온 경우")
+    );
+    expect(serverHydration).toContain(
+      "studioProjectDocumentSessionRef.current = null;"
+    );
+
+    const runtime = await import("./studio-project-document");
+    const serialized = runtime.serializeStudioProjectDocument(
+      { version: 2, title: "동적 계약", pagesList: [page()] },
+      metadata
+    );
+    const loaded = await runtime.parseStudioProjectDocument(serialized);
+    expect(loaded.source).toBe("canonical-envelope");
+    expect(loaded.project.title).toBe("동적 계약");
   });
 });

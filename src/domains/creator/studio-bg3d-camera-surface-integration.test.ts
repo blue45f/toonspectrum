@@ -7,6 +7,7 @@ const source = [
   "./StudioBg3dShapesPanel.tsx",
   "./StudioBg3dViewPanel.tsx",
   "./StudioBg3dLtPanel.tsx",
+  "./studio-bg3d-control-fields.tsx",
 ].map((fileName) => readFileSync(new URL(fileName, import.meta.url), "utf8")).join("\n");
 
 function sourceBetween(startNeedle: string, endNeedle: string): string {
@@ -27,6 +28,49 @@ function expectInOrder(haystack: string, needles: readonly string[]): void {
 }
 
 describe("Studio BG3D Camera vNext and surface snap integration", () => {
+  it("round-trips near clipping and Dutch up through the live camera and React camera nodes", () => {
+    const viewport = sourceBetween("function BgViewportController(", "function BgGroundHelper(");
+    expect(viewport).toContain("nearClip: resolveStudioBg3dCameraNearClip(camera.near)");
+    expect(viewport).toContain("up: camera.up.toArray()");
+    expect(viewport).toContain("createStudioBg3dCameraUpForDutchRoll({");
+    expect(viewport).toContain("applyStudioBg3dViewToThreeCamera(camera, controls");
+
+    expect(source).toContain("const mainCameraNearClip = resolveStudioBg3dCameraNearClip(");
+    expect(source).toContain("const mainCameraUp = resolveStudioBg3dCameraUpVector(");
+    expect(source.match(/near=\{mainCameraNearClip\}/gu)).toHaveLength(2);
+    expect(source).toContain("up: [...mainCameraUp]");
+    expect(source).toContain('id="bg3d-camera-near-clip"');
+    expect(source).toContain('id="bg3d-camera-dutch-roll"');
+    expect(source).toContain("Math.log10(STUDIO_BG3D_CAMERA_MIN_NEAR_CLIP)");
+  });
+
+  it("coalesces each lens slider gesture into one exact before/after history command", () => {
+    const preview = sourceBetween(
+      "function previewCameraLens(",
+      "function updateCameraLens(",
+    );
+    const finish = sourceBetween(
+      "function finishCameraLensGesture()",
+      "function previewCameraLens(",
+    );
+    expect(preview).toContain("cameraLensGestureBeforeViewRef.current ??= liveView");
+    expect(preview).toContain("cameraLensGestureLatestViewRef.current = nextDocument.camera");
+    expect(preview).toContain("setTimeout(finishCameraLensGesture, 800)");
+    expect(finish).toContain("resolveStudioBg3dCameraGestureCommitView(");
+    expectInOrder(finish, [
+      "resolveStudioBg3dCameraGestureCommitView(",
+      "latestView",
+      "viewportApiRef.current",
+      "sceneBaseDocument.camera",
+    ]);
+    expect(finish).toContain("cameraLensGestureLatestViewRef.current = null");
+    expect(finish).toContain("commitCameraLensView(beforeView, nextDocument)");
+    expect(source).toContain("if (cameraLensGestureBeforeViewRef.current) return;");
+    expect(source.match(/onChangeEnd=\{finishCameraLensGesture\}/gu)).toHaveLength(3);
+    expect(source).toContain("onPointerUp={onChangeEnd}");
+    expect(source).toContain("{ preserveBeforeCamera: true }");
+  });
+
   it("fits one registered Object3D AABB through the live projection and records one camera command", () => {
     const fit = sourceBetween(
       "function focusSelectedEntity()",

@@ -27,7 +27,7 @@ import {
 } from "./studio-bg3d-scene-document";
 
 const DB_NAME = "toonspectrum-studio-bg3d-model-library";
-export const BG3D_MODEL_LIBRARY_DB_VERSION = 2;
+export const BG3D_MODEL_LIBRARY_DB_VERSION = 3;
 export const BG3D_MODEL_STORAGE_VERSION = 2 as const;
 export const BG3D_MODEL_VALIDATION_VERSION = 1 as const;
 /** 12-byte header + 8-byte JSON chunk header + the smallest 4-byte-aligned JSON object. */
@@ -35,6 +35,7 @@ export const BG3D_MODEL_MIN_GLB_BYTES = 24;
 
 const MODEL_STORE = "models";
 const THUMBNAIL_STORE = "thumbnails";
+const DELETION_JOURNAL_STORE = "deletion-journal";
 const MODEL_HASH_INDEX = "contentHash";
 const MAX_NAME_LENGTH = 160;
 const MAX_ATTACHMENT_BASE_NAME_LENGTH = 116;
@@ -161,6 +162,29 @@ interface Bg3dModelThumbnailRecord {
 export interface Bg3dModelThumbnailSaveOptions {
   readonly captureRevision?: number;
   readonly now?: number;
+}
+
+/**
+ * Durable evidence that a verified binary was authoritatively removed.
+ *
+ * The canonical content hash is both the key and the scene-facing identity. A reopened editor can
+ * therefore distinguish an intentional delete from corruption/missing storage and deterministically
+ * remove the corresponding attachment after the preceding mutation lane becomes quiescent.
+ */
+export interface Bg3dModelDeletionReceipt {
+  readonly id: `sha256:${string}`;
+  readonly contentHash: `sha256:${string}`;
+  readonly storageModelId: string;
+  readonly deletedAt: number;
+}
+
+export interface Bg3dModelHashResolution {
+  readonly record: Bg3dVerifiedStoredRecord | null;
+  readonly deletionReceipt: Bg3dModelDeletionReceipt | null;
+}
+
+interface Bg3dModelDatabaseOperationOptions {
+  readonly signal?: AbortSignal;
 }
 
 let lastThumbnailCaptureRevision = 0;
@@ -438,6 +462,17 @@ export function isVerifiedBg3dModelRecord(value: unknown): value is Bg3dVerified
   );
 }
 
+function isBg3dModelDeletionReceipt(value: unknown): value is Bg3dModelDeletionReceipt {
+  if (!value || typeof value !== "object") return false;
+  const receipt = value as Partial<Bg3dModelDeletionReceipt>;
+  return Boolean(
+    canonicalizeBg3dModelHash(receipt.id ?? "") === receipt.id &&
+      receipt.contentHash === receipt.id &&
+      isSafeBg3dModelStorageId(receipt.storageModelId ?? "") &&
+      isSafeTimestamp(receipt.deletedAt),
+  );
+}
+
 function isBaseStoredRecord(value: unknown): value is Bg3dModelStoredRecord {
   if (!value || typeof value !== "object") return false;
   const record = value as Partial<Bg3dLegacyStoredRecord>;
@@ -483,13 +518,49 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
   });
 }
 
-function openLibraryDatabase(): Promise<IDBDatabase> {
+function openLibraryDatabase(
+  options: Bg3dModelDatabaseOperationOptions = {},
+): Promise<IDBDatabase> {
+  try {
+    throwIfBg3dOperationAborted(options.signal);
+  } catch (error) {
+    return Promise.reject(error);
+  }
   if (!hasIndexedDb()) return Promise.reject(createIndexedDbError());
 
   return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, BG3D_MODEL_LIBRARY_DB_VERSION);
-    let blocked = false;
+    let abandoned = false;
+    let settled = false;
+    const cleanup = () => {
+      options.signal?.removeEventListener("abort", abandonOpen);
+    };
+    const rejectOnce = (reason: unknown) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(reason);
+    };
+    const abandonOpen = () => {
+      abandoned = true;
+      try {
+        request.transaction?.abort();
+      } catch {
+        // No versionchange transaction exists yet, or it already completed.
+      }
+      rejectOnce(new StudioBg3dValidationWorkerError("aborted"));
+    };
+    options.signal?.addEventListener("abort", abandonOpen, { once: true });
+    if (options.signal?.aborted) abandonOpen();
     request.onupgradeneeded = () => {
+      if (abandoned) {
+        try {
+          request.transaction?.abort();
+        } catch {
+          // A cancelled open must never proceed into a library operation.
+        }
+        return;
+      }
       const database = request.result;
       const modelStore = database.objectStoreNames.contains(MODEL_STORE)
         ? request.transaction?.objectStore(MODEL_STORE)
@@ -501,28 +572,48 @@ function openLibraryDatabase(): Promise<IDBDatabase> {
       if (!database.objectStoreNames.contains(THUMBNAIL_STORE)) {
         database.createObjectStore(THUMBNAIL_STORE, { keyPath: "id" });
       }
+      if (!database.objectStoreNames.contains(DELETION_JOURNAL_STORE)) {
+        database.createObjectStore(DELETION_JOURNAL_STORE, { keyPath: "id" });
+      }
     };
     request.onsuccess = () => {
-      if (blocked) {
+      if (abandoned || settled) {
         request.result.close();
       } else {
+        settled = true;
+        cleanup();
         resolve(request.result);
       }
     };
-    request.onerror = () => reject(createIndexedDbError());
+    request.onerror = () => {
+      if (abandoned || options.signal?.aborted) {
+        rejectOnce(new StudioBg3dValidationWorkerError("aborted"));
+      } else {
+        rejectOnce(createIndexedDbError());
+      }
+    };
     request.onblocked = () => {
-      blocked = true;
-      reject(createIndexedDbError());
+      abandoned = true;
+      rejectOnce(createIndexedDbError());
     };
   });
 }
 
-async function withDatabase<T>(callback: (database: IDBDatabase) => Promise<T>): Promise<T> {
-  const database = await openLibraryDatabase();
+async function withDatabase<T>(
+  callback: (database: IDBDatabase) => Promise<T>,
+  options: Bg3dModelDatabaseOperationOptions = {},
+): Promise<T> {
+  const database = await openLibraryDatabase(options);
   try {
+    throwIfBg3dOperationAborted(options.signal);
     return await callback(database);
   } catch (error) {
-    if (error instanceof Bg3dModelLibraryError) throw error;
+    if (
+      error instanceof Bg3dModelLibraryError ||
+      error instanceof StudioBg3dValidationWorkerError
+    ) {
+      throw error;
+    }
     throw createIndexedDbError();
   } finally {
     database.close();
@@ -876,6 +967,74 @@ export async function getStoredBg3dModelByHash(hash: string): Promise<Bg3dVerifi
   });
 }
 
+/** Reads only canonical, bounded deletion evidence; malformed journal rows fail closed. */
+export async function getBg3dModelDeletionReceiptByHash(
+  hash: string,
+): Promise<Bg3dModelDeletionReceipt | null> {
+  const canonicalHash = canonicalizeBg3dModelHash(hash);
+  if (!canonicalHash) return null;
+  return withDatabase(async (database) => {
+    const transaction = database.transaction(DELETION_JOURNAL_STORE, "readonly");
+    const done = transactionDone(transaction);
+    const value = await requestResult<unknown>(
+      transaction.objectStore(DELETION_JOURNAL_STORE).get(canonicalHash),
+    );
+    await done;
+    return isBg3dModelDeletionReceipt(value) ? value : null;
+  });
+}
+
+/**
+ * Resolves model bytes and durable deletion evidence from one IndexedDB snapshot.
+ *
+ * Both requests share one readonly transaction so restoration cannot combine values from opposite
+ * sides of a concurrent delete or intentional reimport.
+ */
+export async function resolveBg3dModelHash(
+  hash: string,
+  options: Bg3dModelDatabaseOperationOptions = {},
+): Promise<Bg3dModelHashResolution> {
+  const canonicalHash = canonicalizeBg3dModelHash(hash);
+  if (!canonicalHash) return { record: null, deletionReceipt: null };
+  throwIfBg3dOperationAborted(options.signal);
+  return withDatabase(async (database) => {
+    throwIfBg3dOperationAborted(options.signal);
+    const transaction = database.transaction(
+      [MODEL_STORE, DELETION_JOURNAL_STORE],
+      "readonly",
+    );
+    const done = transactionDone(transaction);
+    const abortTransaction = () => {
+      try {
+        transaction.abort();
+      } catch {
+        // A completed readonly snapshot is already authoritative.
+      }
+    };
+    options.signal?.addEventListener("abort", abortTransaction, { once: true });
+    try {
+      const [recordValue, receiptValue] = await Promise.all([
+        requestResult<unknown>(
+          transaction.objectStore(MODEL_STORE).index(MODEL_HASH_INDEX).get(canonicalHash),
+        ),
+        requestResult<unknown>(
+          transaction.objectStore(DELETION_JOURNAL_STORE).get(canonicalHash),
+        ),
+        done,
+      ]);
+      return {
+        record: isVerifiedBg3dModelRecord(recordValue) ? recordValue : null,
+        deletionReceipt: isBg3dModelDeletionReceipt(receiptValue) ? receiptValue : null,
+      };
+    } catch (error) {
+      throwIfBg3dOperationAborted(options.signal);
+      throw error;
+    } finally {
+      options.signal?.removeEventListener("abort", abortTransaction);
+    }
+  }, options);
+}
+
 function uniqueVerifiedRecords(records: readonly Bg3dVerifiedStoredRecord[]): Bg3dVerifiedStoredRecord[] {
   const byHash = new Map<string, Bg3dVerifiedStoredRecord>();
   for (const record of records) if (!byHash.has(record.contentHash)) byHash.set(record.contentHash, record);
@@ -900,9 +1059,13 @@ async function putVerifiedRecordsAtomically(
   if (unique.length === 0) return [];
 
   return withDatabase(async (database) => {
-    const transaction = database.transaction(MODEL_STORE, "readwrite");
+    const transaction = database.transaction(
+      [MODEL_STORE, DELETION_JOURNAL_STORE],
+      "readwrite",
+    );
     const done = transactionDone(transaction);
     const store = transaction.objectStore(MODEL_STORE);
+    const deletionJournal = transaction.objectStore(DELETION_JOURNAL_STORE);
     const results = unique.slice();
     // Recheck within the write transaction to close a concurrent-import dedupe race. Each put is
     // queued synchronously from the IDB success callback; awaiting between get() and put() can make
@@ -913,6 +1076,7 @@ async function putVerifiedRecordsAtomically(
         if (isVerifiedBg3dModelRecord(lookup.result)) {
           if (rightsMatch(lookup.result.rights, record.rights)) {
             results[index] = lookup.result;
+            deletionJournal.delete(record.contentHash);
           } else {
             // `add` intentionally hits the unique hash index and aborts the whole transaction.
             store.add(record);
@@ -920,6 +1084,7 @@ async function putVerifiedRecordsAtomically(
         } else {
           // `add`, unlike `put`, can never overwrite a concurrent primary-key collision.
           store.add(record);
+          deletionJournal.delete(record.contentHash);
         }
       };
       lookup.onerror = () => transaction.abort();
@@ -966,9 +1131,14 @@ export async function importVerifiedBg3dModelsAtomically(
     if (duplicate && !rightsMatch(duplicate.rights, prepared.rights)) {
       throw createLibraryError("rights-conflict");
     }
-    if (!duplicate) {
-      if (occupiedStorageIds.has(prepared.id)) throw createLibraryError("storage-id-conflict");
-      occupiedStorageIds.add(prepared.id);
+    if (!preparedByHash.has(prepared.contentHash)) {
+      if (!duplicate && occupiedStorageIds.has(prepared.id)) {
+        throw createLibraryError("storage-id-conflict");
+      }
+      if (!duplicate) occupiedStorageIds.add(prepared.id);
+      // An initially existing hash can be deleted while validation is running. It must still enter
+      // the write transaction so that transaction either resolves the current row or re-adds this
+      // candidate and clears the durable deletion receipt.
       preparedByHash.set(prepared.contentHash, prepared);
     }
     if (!countedHashes.has(prepared.contentHash)) {
@@ -980,8 +1150,9 @@ export async function importVerifiedBg3dModelsAtomically(
   // Every validation above has completed successfully before this sole write transaction begins.
   throwIfBg3dOperationAborted(options.signal);
   const committed = await putVerifiedRecordsAtomically([...preparedByHash.values()]);
-  const resolvedByHash = new Map(existingByHash);
-  for (const record of committed) resolvedByHash.set(record.contentHash, record);
+  const resolvedByHash = new Map(
+    committed.map((record) => [record.contentHash, record] as const),
+  );
 
   const result: Bg3dVerifiedStoredRecord[] = [];
   const emitted = new Set<string>();
@@ -1225,15 +1396,61 @@ export async function saveBg3dModelThumbnail(
   await saveBg3dModelThumbnailIfCurrent(id, thumbnail, options);
 }
 
-export async function deleteStoredBg3dModel(id: string): Promise<void> {
+export async function deleteStoredBg3dModel(
+  id: string,
+  options: { readonly signal?: AbortSignal; readonly now?: number } = {},
+): Promise<void> {
+  throwIfBg3dOperationAborted(options.signal);
   if (isSampleBg3dModelId(id)) return;
   return withDatabase(async (database) => {
-    const transaction = database.transaction([MODEL_STORE, THUMBNAIL_STORE], "readwrite");
+    throwIfBg3dOperationAborted(options.signal);
+    const transaction = database.transaction(
+      [MODEL_STORE, THUMBNAIL_STORE, DELETION_JOURNAL_STORE],
+      "readwrite",
+    );
     const done = transactionDone(transaction);
-    transaction.objectStore(MODEL_STORE).delete(id);
-    transaction.objectStore(THUMBNAIL_STORE).delete(id);
-    await done;
-  });
+    const abortTransaction = () => {
+      try {
+        transaction.abort();
+      } catch {
+        // The transaction may already have crossed IndexedDB's irreversible commit boundary.
+        // In that case its eventual `complete` event, rather than the later abort signal, is the
+        // authoritative persistence result.
+      }
+    };
+    options.signal?.addEventListener("abort", abortTransaction, { once: true });
+    try {
+      const modelStore = transaction.objectStore(MODEL_STORE);
+      const thumbnailStore = transaction.objectStore(THUMBNAIL_STORE);
+      const deletionJournal = transaction.objectStore(DELETION_JOURNAL_STORE);
+      const modelLookup = modelStore.get(id);
+      modelLookup.onsuccess = () => {
+        const record = modelLookup.result;
+        if (isVerifiedBg3dModelRecord(record)) {
+          const deletedAt = options.now ?? Date.now();
+          if (!isSafeTimestamp(deletedAt)) {
+            transaction.abort();
+            return;
+          }
+          deletionJournal.put({
+            id: record.contentHash,
+            contentHash: record.contentHash,
+            storageModelId: record.id,
+            deletedAt,
+          } satisfies Bg3dModelDeletionReceipt);
+        }
+        modelStore.delete(id);
+        thumbnailStore.delete(id);
+      };
+      modelLookup.onerror = () => transaction.abort();
+      await done;
+    } catch (error) {
+      throwIfBg3dOperationAborted(options.signal);
+      throw error;
+    } finally {
+      options.signal?.removeEventListener("abort", abortTransaction);
+    }
+  }, options);
 }
 
 /** Creates a scene-local attachment without exposing or reusing the IndexedDB storage key. */

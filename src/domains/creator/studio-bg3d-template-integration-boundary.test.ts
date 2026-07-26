@@ -112,7 +112,7 @@ describe("Studio BG3D user-template integration boundary", () => {
     expect(deletion.indexOf("destructiveMutationGuardRef.current.begin()")).toBeLessThan(
       deletion.indexOf("preflightAndDeleteStudioBg3dPersistedModel({"),
     );
-    expect(deletion.indexOf("deletePersistedModel: deleteStoredBg3dModel")).toBeLessThan(
+    expect(deletion.indexOf("deleteStoredBg3dModel(storageModelId, { signal: lease.signal })")).toBeLessThan(
       deletion.indexOf("destructiveMutationGuardRef.current.finish(destructiveLease)"),
     );
     expect(dismiss).toContain("if (destructiveMutationGuardRef.current.blocksClose) return;");

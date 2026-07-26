@@ -99,7 +99,7 @@ const EMPTY_PLAN: StudioVrmTextureStrokePlan = Object.freeze({
   dabs: 0,
 });
 
-interface ResolvedSample {
+export interface StudioVrmTextureResolvedStrokeSample {
   readonly point: StudioVrmTexelPoint;
   readonly pressure: number;
   readonly islandKey: string;
@@ -130,16 +130,16 @@ function worldDistance(a: StudioVrmVector3, b: StudioVrmVector3): number {
   return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 }
 
-interface SeamPolicy {
+export interface StudioVrmTextureStrokeSeamPolicy {
   readonly seamBreakTexels: number;
   readonly seamStretchRatio: number;
   readonly brushSizeTexels: number;
 }
 
-function isSeamBreak(
-  previous: ResolvedSample,
-  current: ResolvedSample,
-  policy: SeamPolicy,
+export function isStudioVrmTextureStrokeSeamBreak(
+  previous: StudioVrmTextureResolvedStrokeSample,
+  current: StudioVrmTextureResolvedStrokeSample,
+  policy: StudioVrmTextureStrokeSeamPolicy,
 ): boolean {
   if (previous.islandKey !== current.islandKey) return true;
   const step = Math.hypot(current.point.x - previous.point.x, current.point.y - previous.point.y);
@@ -161,36 +161,46 @@ function isSeamBreak(
   return step > policy.seamBreakTexels;
 }
 
+export function resolveStudioVrmTextureStrokeSample(
+  sample: StudioVrmTextureStrokeSample,
+  size: StudioVrmTextureSize,
+  options: StudioVrmTextureStrokePlanOptions,
+): StudioVrmTextureResolvedStrokeSample | null {
+  const point = resolveStudioVrmTexelPoint(sample.uv, size, options);
+  if (!point) return null;
+  const density =
+    typeof sample.texelsPerWorldUnit === "number" &&
+    Number.isFinite(sample.texelsPerWorldUnit) &&
+    sample.texelsPerWorldUnit > 0
+      ? sample.texelsPerWorldUnit
+      : undefined;
+  return {
+    point,
+    pressure: normalizedPressure(sample.pressure),
+    islandKey: sample.islandId === undefined ? "" : String(sample.islandId),
+    ...(sample.world ? { world: sample.world } : {}),
+    ...(density === undefined ? {} : { density }),
+  };
+}
+
 function resolveSamples(
   samples: readonly StudioVrmTextureStrokeSample[],
   size: StudioVrmTextureSize,
   options: StudioVrmTextureStrokePlanOptions,
-): { readonly resolved: (ResolvedSample | null)[]; readonly skipped: number } {
+): {
+  readonly resolved: (StudioVrmTextureResolvedStrokeSample | null)[];
+  readonly skipped: number;
+} {
   let skipped = 0;
   const resolved = samples.map((sample) => {
-    const point = resolveStudioVrmTexelPoint(sample.uv, size, options);
-    if (!point) {
-      skipped += 1;
-      return null;
-    }
-    const density =
-      typeof sample.texelsPerWorldUnit === "number" &&
-      Number.isFinite(sample.texelsPerWorldUnit) &&
-      sample.texelsPerWorldUnit > 0
-        ? sample.texelsPerWorldUnit
-        : undefined;
-    return {
-      point,
-      pressure: normalizedPressure(sample.pressure),
-      islandKey: sample.islandId === undefined ? "" : String(sample.islandId),
-      ...(sample.world ? { world: sample.world } : {}),
-      ...(density === undefined ? {} : { density }),
-    } satisfies ResolvedSample;
+    const resolvedSample = resolveStudioVrmTextureStrokeSample(sample, size, options);
+    if (!resolvedSample) skipped += 1;
+    return resolvedSample;
   });
   return { resolved, skipped };
 }
 
-function dabToOps(
+export function studioVrmTextureStrokeDabToOps(
   dab: StudioStampBrushDab,
   globalIndex: number,
   style: StudioVrmTextureStrokeStyle,
@@ -239,6 +249,24 @@ function dabToOps(
   return ops;
 }
 
+export function resolveStudioVrmTextureStrokeSeamPolicy(
+  brush: StudioStampBrushStyle,
+  size: StudioVrmTextureSize,
+  options: StudioVrmTextureStrokePlanOptions,
+): StudioVrmTextureStrokeSeamPolicy {
+  return {
+    brushSizeTexels: brush.size,
+    seamBreakTexels:
+      typeof options.seamBreakTexels === "number" && Number.isFinite(options.seamBreakTexels)
+        ? Math.max(1, options.seamBreakTexels)
+        : Math.max(64, Math.min(size.width, size.height) * 0.25),
+    seamStretchRatio:
+      typeof options.seamStretchRatio === "number" && Number.isFinite(options.seamStretchRatio)
+        ? Math.max(1.5, options.seamStretchRatio)
+        : 4,
+  };
+}
+
 /**
  * 히트 시퀀스를 텍스처 공간 페인트 op 으로 계획한다. GPU/DOM 을 전혀 쓰지 않으므로
  * 라이브 페인트, 커밋 재생, 헤드리스 테스트가 완전히 같은 픽셀 규약을 공유한다.
@@ -254,21 +282,11 @@ export function planStudioVrmTextureStroke(
   const brush = resolveStudioVrmTextureStrokeBrush(style);
 
   const { resolved, skipped } = resolveSamples(samples, size, options);
-  const policy: SeamPolicy = {
-    brushSizeTexels: brush.size,
-    seamBreakTexels:
-      typeof options.seamBreakTexels === "number" && Number.isFinite(options.seamBreakTexels)
-        ? Math.max(1, options.seamBreakTexels)
-        : Math.max(64, Math.min(size.width, size.height) * 0.25),
-    seamStretchRatio:
-      typeof options.seamStretchRatio === "number" && Number.isFinite(options.seamStretchRatio)
-        ? Math.max(1.5, options.seamStretchRatio)
-        : 4,
-  };
+  const policy = resolveStudioVrmTextureStrokeSeamPolicy(brush, size, options);
 
-  const runs: ResolvedSample[][] = [];
+  const runs: StudioVrmTextureResolvedStrokeSample[][] = [];
   let seamBreaks = 0;
-  let current: ResolvedSample[] = [];
+  let current: StudioVrmTextureResolvedStrokeSample[] = [];
   for (const sample of resolved) {
     if (!sample) {
       if (current.length > 0) runs.push(current);
@@ -276,7 +294,7 @@ export function planStudioVrmTextureStroke(
       continue;
     }
     const previous = current[current.length - 1];
-    if (previous && isSeamBreak(previous, sample, policy)) {
+    if (previous && isStudioVrmTextureStrokeSeamBreak(previous, sample, policy)) {
       runs.push(current);
       seamBreaks += 1;
       current = [];
@@ -308,7 +326,13 @@ export function planStudioVrmTextureStroke(
     }
     const dabs = planStudioStampBrushDabs(brush, points, pressures, maxDabs - dabCount);
     for (const dab of dabs) {
-      for (const op of dabToOps(dab, globalIndex, style, brush, seedSalt)) {
+      for (const op of studioVrmTextureStrokeDabToOps(
+        dab,
+        globalIndex,
+        style,
+        brush,
+        seedSalt,
+      )) {
         if (ops.length >= STUDIO_VRM_TEXTURE_STROKE_MAX_OPS) break;
         ops.push(op);
       }

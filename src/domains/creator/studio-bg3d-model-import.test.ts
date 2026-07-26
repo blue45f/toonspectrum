@@ -8,6 +8,10 @@ import {
   disposeSharedStudioBg3dGeometryWorkerClient,
 } from "./studio-bg3d-geometry-worker-client";
 import {
+  DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
+  type StudioBg3dGlbValidationBudget,
+} from "./studio-bg3d-glb-validation";
+import {
   STUDIO_BG3D_IMPORT_MAX_ANIMATION_DURATION_SECONDS,
   STUDIO_BG3D_IMPORT_MAX_ANIMATION_KEYFRAMES,
   STUDIO_BG3D_IMPORT_MAX_ANIMATION_TRACKS,
@@ -636,6 +640,24 @@ async function expectReloadedTexturedTriangle(
   }
 }
 
+function preExportBudget(
+  complexity: Partial<StudioBg3dGlbValidationBudget["complexity"]> = {},
+  textures: Partial<StudioBg3dGlbValidationBudget["textures"]> = {},
+): StudioBg3dGlbValidationBudget {
+  return {
+    complexity: {
+      ...DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES.desktop.complexity,
+      maxModelBytes: 512 * 1024 * 1024,
+      ...complexity,
+    },
+    textures: {
+      ...DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES.desktop.textures,
+      maxTotalBytes: 512 * 1024 * 1024,
+      ...textures,
+    },
+  };
+}
+
 afterEach(() => {
   disposeSharedStudioBg3dGeometryWorkerClient();
   disposeSharedStudioBg3dObjWorkerClient();
@@ -753,6 +775,429 @@ describe("planStudioBg3dModelImports", () => {
 });
 
 describe("convertStudioBg3dModelFilesToGlb", () => {
+  it("enforces every active-profile light, rig, morph, and unique-texture boundary", async () => {
+    const {
+      Bone,
+      BufferGeometry,
+      DirectionalLight,
+      Float32BufferAttribute,
+      Group,
+      MeshStandardMaterial,
+      Skeleton,
+      SkinnedMesh,
+      Texture,
+    } = await import("three");
+    const root = new Group();
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new Float32BufferAttribute([
+      0, 0, 0,
+      1, 0, 0,
+      0, 1, 0,
+    ], 3));
+    geometry.morphAttributes.position = [new Float32BufferAttribute([
+      0, 0, 0,
+      1, 0, 0,
+      0, 1, 0.25,
+    ], 3)];
+    const texture = new Texture({ width: 4, height: 2 });
+    texture.generateMipmaps = false;
+    const material = new MeshStandardMaterial({
+      alphaMap: texture,
+      map: texture,
+    });
+    const skinnedMesh = new SkinnedMesh(geometry, material);
+    const rootBone = new Bone();
+    const childBone = new Bone();
+    rootBone.add(childBone);
+    skinnedMesh.add(rootBone);
+    skinnedMesh.bind(new Skeleton([rootBone, childBone]));
+    root.add(skinnedMesh, new DirectionalLight());
+
+    const exact: StudioBg3dGlbValidationBudget = {
+      complexity: {
+        ...DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES.desktop.complexity,
+        maxJoints: 2,
+        maxLights: 1,
+        maxModelBytes: 1024 * 1024,
+        maxMorphTargets: 1,
+        maxSkins: 1,
+      },
+      textures: {
+        maxDimension: 4,
+        maxTextures: 1,
+        maxTotalBytes: 32,
+      },
+    };
+    const candidate = { root, animations: [] };
+
+    try {
+      expect(() => assertStudioBg3dPreExportBudgets(candidate, undefined, exact))
+        .not.toThrow();
+      for (const [budget, code] of [
+        [{
+          ...exact,
+          complexity: { ...exact.complexity, maxLights: 0 },
+        }, "light-budget-exceeded"],
+        [{
+          ...exact,
+          complexity: { ...exact.complexity, maxSkins: 0 },
+        }, "skin-count-budget-exceeded"],
+        [{
+          ...exact,
+          complexity: { ...exact.complexity, maxJoints: 1 },
+        }, "joint-count-budget-exceeded"],
+        [{
+          ...exact,
+          complexity: { ...exact.complexity, maxMorphTargets: 0 },
+        }, "morph-target-budget-exceeded"],
+        [{
+          ...exact,
+          textures: { ...exact.textures, maxTextures: 0 },
+        }, "texture-count-budget-exceeded"],
+        [{
+          ...exact,
+          textures: { ...exact.textures, maxDimension: 3 },
+        }, "texture-dimension-budget-exceeded"],
+        [{
+          ...exact,
+          textures: { ...exact.textures, maxTotalBytes: 31 },
+        }, "texture-byte-budget-exceeded"],
+      ] as const) {
+        expect(() => assertStudioBg3dPreExportBudgets(candidate, undefined, budget))
+          .toThrowError(expect.objectContaining({ code }));
+      }
+    } finally {
+      geometry.dispose();
+      material.dispose();
+      texture.dispose();
+    }
+  });
+
+  it("rejects shared-skeleton skins and multi-group morph primitives before exporter entry", async () => {
+    const {
+      Bone,
+      BufferGeometry,
+      Float32BufferAttribute,
+      Group,
+      Mesh,
+      MeshBasicMaterial,
+      Skeleton,
+      SkinnedMesh,
+    } = await import("three");
+    const { GLTFExporter } = await import("three/examples/jsm/exporters/GLTFExporter.js");
+    const parseAsync = vi.spyOn(GLTFExporter.prototype, "parseAsync");
+    const root = new Group();
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new Float32BufferAttribute([
+      0, 0, 0,
+      1, 0, 0,
+      0, 1, 0,
+    ], 3));
+    const material = new MeshBasicMaterial();
+    const skeletonRoot = new Bone();
+    const skeletonChild = new Bone();
+    skeletonRoot.add(skeletonChild);
+    const skeleton = new Skeleton([skeletonRoot, skeletonChild]);
+    const first = new SkinnedMesh(geometry, material);
+    const second = new SkinnedMesh(geometry, material);
+    first.add(skeletonRoot);
+    first.bind(skeleton);
+    second.bind(skeleton);
+    root.add(first, second);
+
+    const morphGeometry = new BufferGeometry();
+    morphGeometry.setAttribute("position", new Float32BufferAttribute([
+      0, 0, 0,
+      1, 0, 0,
+      0, 1, 0,
+      1, 0, 0,
+      1, 1, 0,
+      0, 1, 0,
+    ], 3));
+    morphGeometry.morphAttributes.position = [new Float32BufferAttribute([
+      0, 0, 0.1,
+      1, 0, 0.1,
+      0, 1, 0.1,
+      1, 0, 0.1,
+      1, 1, 0.1,
+      0, 1, 0.1,
+    ], 3)];
+    morphGeometry.addGroup(0, 3, 0);
+    morphGeometry.addGroup(3, 3, 1);
+    const morphMaterials = [new MeshBasicMaterial(), new MeshBasicMaterial()];
+    const morphMesh = new Mesh(morphGeometry, morphMaterials);
+
+    try {
+      expect(() => assertStudioBg3dPreExportBudgets(
+        { root, animations: [] },
+        undefined,
+        preExportBudget({ maxJoints: 4, maxSkins: 1 }),
+      )).toThrowError(expect.objectContaining({ code: "skin-count-budget-exceeded" }));
+      expect(() => assertStudioBg3dPreExportBudgets(
+        { root, animations: [] },
+        undefined,
+        preExportBudget({ maxJoints: 3, maxSkins: 2 }),
+      )).toThrowError(expect.objectContaining({ code: "joint-count-budget-exceeded" }));
+
+      expect(() => assertStudioBg3dPreExportBudgets(
+        { root: morphMesh, animations: [] },
+        undefined,
+        preExportBudget({ maxMorphTargets: 1 }),
+      )).toThrowError(expect.objectContaining({ code: "morph-target-budget-exceeded" }));
+      expect(parseAsync).not.toHaveBeenCalled();
+    } finally {
+      geometry.dispose();
+      material.dispose();
+      morphGeometry.dispose();
+      for (const candidate of morphMaterials) candidate.dispose();
+    }
+  });
+
+  it("measures an export base image even when a tiny manual mipmap is present", async () => {
+    const {
+      BufferGeometry,
+      Float32BufferAttribute,
+      Mesh,
+      MeshBasicMaterial,
+      Texture,
+    } = await import("three");
+    const { GLTFExporter } = await import("three/examples/jsm/exporters/GLTFExporter.js");
+    const parseAsync = vi.spyOn(GLTFExporter.prototype, "parseAsync");
+    const texture = new Texture({ width: 4_096, height: 4_096 });
+    texture.mipmaps = [{
+      data: new Uint8Array(4),
+      height: 1,
+      width: 1,
+    }];
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new Float32BufferAttribute([
+      0, 0, 0,
+      1, 0, 0,
+      0, 1, 0,
+    ], 3));
+    const material = new MeshBasicMaterial({ map: texture });
+    const mesh = new Mesh(geometry, material);
+
+    try {
+      expect(() => assertStudioBg3dPreExportBudgets(
+        { root: mesh, animations: [] },
+        undefined,
+        preExportBudget({}, {
+          maxDimension: 64,
+          maxTextures: 1,
+        }),
+      )).toThrowError(expect.objectContaining({
+        code: "texture-dimension-budget-exceeded",
+      }));
+      expect(() => assertStudioBg3dPreExportBudgets(
+        { root: mesh, animations: [] },
+        undefined,
+        preExportBudget({}, {
+          maxDimension: 4_096,
+          maxTextures: 1,
+          maxTotalBytes: 1024,
+        }),
+      )).toThrowError(expect.objectContaining({
+        code: "texture-byte-budget-exceeded",
+      }));
+      expect(() => assertStudioBg3dPreExportBudgets(
+        { root: mesh, animations: [] },
+        undefined,
+        preExportBudget({ maxModelBytes: 1024 * 1024 }, {
+          maxDimension: 4_096,
+          maxTextures: 1,
+        }),
+      )).toThrowError(expect.objectContaining({
+        code: "model-byte-budget-exceeded",
+      }));
+      expect(parseAsync).not.toHaveBeenCalled();
+    } finally {
+      geometry.dispose();
+      material.dispose();
+      texture.dispose();
+    }
+  });
+
+  it("bounds serializable custom-extension metadata without invoking getters before exporter entry", async () => {
+    const { Group } = await import("three");
+    const { GLTFExporter } = await import("three/examples/jsm/exporters/GLTFExporter.js");
+    const parseAsync = vi.spyOn(GLTFExporter.prototype, "parseAsync");
+    const metadataBudget = preExportBudget({ maxModelBytes: 8 * 1024 });
+    const gltfWithLargeExtras = sourceFile("metadata.gltf", JSON.stringify({
+      asset: { version: "2.0" },
+      nodes: [{
+        extras: {
+          payload: "x".repeat(16 * 1024),
+        },
+      }],
+      scene: 0,
+      scenes: [{ nodes: [0] }],
+    }));
+
+    await expect(convertStudioBg3dModelFilesToGlb([gltfWithLargeExtras], {
+      budgets: {
+        desktop: metadataBudget,
+        mobile: metadataBudget,
+      },
+      profile: "desktop",
+    })).rejects.toMatchObject({ code: "model-byte-budget-exceeded" });
+
+    const root = new Group();
+    root.userData = {
+      gltfExtensions: {
+        EXT_large_payload: {
+          payload: "가".repeat(3 * 1024),
+        },
+      },
+    };
+
+    expect(() => assertStudioBg3dPreExportBudgets(
+      { root, animations: [] },
+      undefined,
+      metadataBudget,
+    )).toThrowError(expect.objectContaining({ code: "model-byte-budget-exceeded" }));
+
+    const getter = vi.fn(() => "must-not-run");
+    const hostileUserData = {};
+    Object.defineProperty(hostileUserData, "payload", {
+      enumerable: true,
+      get: getter,
+    });
+    root.userData = hostileUserData;
+    expect(() => assertStudioBg3dPreExportBudgets(
+      { root, animations: [] },
+      undefined,
+      preExportBudget(),
+    )).toThrowError(expect.objectContaining({ code: "parse-failed" }));
+    expect(getter).not.toHaveBeenCalled();
+
+    const cyclicUserData: { self?: unknown } = {};
+    cyclicUserData.self = cyclicUserData;
+    root.userData = cyclicUserData;
+    expect(() => assertStudioBg3dPreExportBudgets(
+      { root, animations: [] },
+      undefined,
+      preExportBudget(),
+    )).toThrowError(expect.objectContaining({ code: "parse-failed" }));
+    expect(parseAsync).not.toHaveBeenCalled();
+  });
+
+  it("rejects combined geometry and animation accessor or decoded-byte totals before exporter entry", async () => {
+    const {
+      BufferGeometry,
+      Float32BufferAttribute,
+      Group,
+      Mesh,
+      MeshBasicMaterial,
+      NumberKeyframeTrack,
+      AnimationClip,
+    } = await import("three");
+    const { GLTFExporter } = await import("three/examples/jsm/exporters/GLTFExporter.js");
+    const parseAsync = vi.spyOn(GLTFExporter.prototype, "parseAsync");
+    const root = new Group();
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new Float32BufferAttribute([
+      0, 0, 0,
+      1, 0, 0,
+      0, 1, 0,
+    ], 3));
+    const material = new MeshBasicMaterial();
+    root.add(new Mesh(geometry, material));
+    const animation = new AnimationClip("move", 1, [
+      new NumberKeyframeTrack(".position[x]", [0, 1], [0, 1]),
+    ]);
+
+    try {
+      expect(() => assertStudioBg3dPreExportBudgets(
+        { root, animations: [animation] },
+        undefined,
+        preExportBudget({
+          maxAccessorElements: 5,
+          maxDecodedGeometryBytes: 1024,
+        }),
+      )).toThrowError(expect.objectContaining({ code: "geometry-memory-too-large" }));
+      expect(() => assertStudioBg3dPreExportBudgets(
+        { root, animations: [animation] },
+        undefined,
+        preExportBudget({
+          maxAccessorElements: 1024,
+          maxDecodedGeometryBytes: 40,
+        }),
+      )).toThrowError(expect.objectContaining({ code: "geometry-memory-too-large" }));
+      expect(parseAsync).not.toHaveBeenCalled();
+    } finally {
+      geometry.dispose();
+      material.dispose();
+    }
+  });
+
+  it("enforces the conservative pre-export model-byte estimate at its exact boundary", async () => {
+    const { Group } = await import("three");
+    const candidate = { root: new Group(), animations: [] };
+    const exactEstimate = 4_608;
+    const budget = (maxModelBytes: number): StudioBg3dGlbValidationBudget => ({
+      complexity: {
+        ...DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES.desktop.complexity,
+        maxModelBytes,
+      },
+      textures: {
+        ...DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES.desktop.textures,
+      },
+    });
+
+    expect(() => assertStudioBg3dPreExportBudgets(
+      candidate,
+      undefined,
+      budget(exactEstimate),
+    )).not.toThrow();
+    expect(() => assertStudioBg3dPreExportBudgets(
+      candidate,
+      undefined,
+      budget(exactEstimate - 1),
+    )).toThrowError(expect.objectContaining({
+      code: "model-byte-budget-exceeded",
+    }));
+  });
+
+  it("never calls GLTFExporter.parseAsync or exporting progress after mobile preflight rejects", async () => {
+    vi.stubGlobal("FileReader", TestFileReader);
+    const { GLTFExporter } = await import("three/examples/jsm/exporters/GLTFExporter.js");
+    const parseAsync = vi.spyOn(GLTFExporter.prototype, "parseAsync");
+    const progress = vi.fn();
+    const mobile = {
+      complexity: {
+        ...DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES.mobile.complexity,
+        maxModelBytes: 0,
+      },
+      textures: {
+        ...DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES.mobile.textures,
+      },
+    };
+    const obj = sourceFile("mobile-preflight.obj", [
+      "v 0 0 0",
+      "v 1 0 0",
+      "v 0 1 0",
+      "f 1 2 3",
+    ].join("\n"));
+
+    await expect(convertStudioBg3dModelFilesToGlb([obj], {
+      profile: "mobile",
+      budgets: {
+        mobile,
+        desktop: DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES.desktop,
+      },
+      onProgress: progress,
+    })).rejects.toMatchObject({
+      code: "model-byte-budget-exceeded",
+    });
+    expect(parseAsync).not.toHaveBeenCalled();
+    expect(progress.mock.calls.map(([event]) => event.stage)).toEqual([
+      "planning",
+      "reading",
+      "parsing",
+    ]);
+  });
+
   it("bounds material and animation work before the GLB exporter is entered", async () => {
     const {
       AnimationClip,
@@ -791,9 +1236,58 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
       source.indexOf("async function convertPlanItem("),
       source.indexOf("export async function convertStudioBg3dModelFilesToGlb("),
     );
-    expect(conversion.indexOf("assertStudioBg3dPreExportBudgets(parsed, signal)")).toBeLessThan(
-      conversion.indexOf("exportParsedImportToGlb(parsed, item.primaryPath, signal)"),
+    const preExportAdmission = conversion.indexOf(
+      "assertStudioBg3dPreExportBudgets(parsed, signal, preExportBudget)",
     );
+    const exporterInvocation = conversion.indexOf(
+      "exportParsedImportToGlb(parsed, item.primaryPath, signal)",
+    );
+    expect(preExportAdmission).toBeGreaterThanOrEqual(0);
+    expect(exporterInvocation).toBeGreaterThan(preExportAdmission);
+  });
+
+  it("rejects a mobile-profile OBJ before export while the desktop profile converts it", async () => {
+    vi.stubGlobal("FileReader", TestFileReader);
+    const materialCount =
+      DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES.mobile.complexity.maxMaterials + 1;
+    const obj = sourceFile("profiled.obj", [
+      "mtllib profiled.mtl",
+      "v 0 0 0",
+      "v 1 0 0",
+      "v 0 1 0",
+      ...Array.from(
+        { length: materialCount },
+        (_, index) => `usemtl material-${index}\nf 1 2 3`,
+      ),
+    ].join("\n"));
+    const mtl = sourceFile(
+      "profiled.mtl",
+      Array.from(
+        { length: materialCount },
+        (_, index) => `newmtl material-${index}\nKd 0.5 0.5 0.5`,
+      ).join("\n"),
+    );
+    const desktopStages: string[] = [];
+
+    const [desktop] = await convertStudioBg3dModelFilesToGlb([obj, mtl], {
+      profile: "desktop",
+      budgets: DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
+      onProgress: ({ stage }) => desktopStages.push(stage),
+    });
+
+    expect(desktop?.name).toBe("profiled.glb");
+    expect(desktopStages).toContain("exporting");
+
+    const mobileStages: string[] = [];
+    await expect(convertStudioBg3dModelFilesToGlb([obj, mtl], {
+      profile: "mobile",
+      budgets: DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
+      onProgress: ({ stage }) => mobileStages.push(stage),
+    })).rejects.toMatchObject({
+      code: "material-budget-exceeded",
+    });
+    expect(mobileStages).toContain("parsing");
+    expect(mobileStages).not.toContain("exporting");
   });
 
   it("rejects excessive OBJ/MTL material sets before conversion", async () => {
@@ -882,6 +1376,16 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
       { stage: "reading", completedModels: 0, totalModels: 1, sourceName: "prop.glb" },
       { stage: "ready", completedModels: 1, totalModels: 1, sourceName: "prop.glb" },
     ]);
+  });
+
+  it("fails closed on an incomplete profile policy before source materialization", async () => {
+    const read = vi.fn(async () => new ArrayBuffer(1));
+    const file = virtualFile("profile-required.obj", 1, read);
+
+    await expect(convertStudioBg3dModelFilesToGlb([file], {
+      profile: "mobile",
+    })).rejects.toMatchObject({ code: "parse-failed" });
+    expect(read).not.toHaveBeenCalled();
   });
 
   it("rejects network references, missing local resources, and unsupported required extensions", async () => {

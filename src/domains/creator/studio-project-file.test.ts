@@ -28,10 +28,20 @@ const PRIVATE_PROMPT = "원작자의 비공개 결말 프롬프트";
 
 function schemaV1Scene(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   const current = createDefaultStudioBg3dSceneDocument();
+  const candidateCamera =
+    overrides.camera && typeof overrides.camera === "object" && !Array.isArray(overrides.camera)
+      ? overrides.camera as Record<string, unknown>
+      : current.camera as unknown as Record<string, unknown>;
+  const {
+    nearClip: _discardedNearClip,
+    up: _discardedUp,
+    ...schemaV1Camera
+  } = candidateCamera;
   return {
     ...current,
     ...overrides,
     version: 1,
+    camera: schemaV1Camera,
     budgets: {
       complexity: {
         maxNodes: current.budgets.complexity.maxNodes,

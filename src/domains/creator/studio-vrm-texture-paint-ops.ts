@@ -13,6 +13,7 @@ import {
   isStudioVrmTextureSize,
   type StudioVrmTextureRect,
   type StudioVrmTextureSize,
+  type StudioVrmTextureWrapMode,
 } from "./studio-vrm-texture-uv";
 
 /** W3C compositing 의 separable 블렌드 모드 중 웹툰 작업에 실제로 쓰이는 집합. */
@@ -23,8 +24,8 @@ export type StudioVrmTexturePaintBlendMode =
   | "overlay"
   | "erase";
 
-/** dab 이 텍스처 경계를 넘을 때의 처리. mirror 는 캐릭터 아틀라스에 쓰이지 않아 지원하지 않는다. */
-export type StudioVrmTexturePaintWrap = "clamp" | "repeat";
+/** dab 이 텍스처 경계를 넘을 때의 처리. glTF sampler의 세 모드를 축별로 그대로 보존한다. */
+export type StudioVrmTexturePaintWrap = StudioVrmTextureWrapMode;
 
 export interface StudioVrmTexturePaintOp {
   /** 연속 텍셀 좌표(픽셀). 텍셀 (i, j) 의 중심은 (i + 0.5, j + 0.5). */
@@ -41,7 +42,18 @@ export interface StudioVrmTexturePaintOp {
 }
 
 export interface StudioVrmTexturePaintApplyOptions {
+  /** Legacy shorthand that applies the same sampler mode to both axes. */
   readonly wrap?: StudioVrmTexturePaintWrap;
+  readonly wrapU?: StudioVrmTexturePaintWrap;
+  readonly wrapV?: StudioVrmTexturePaintWrap;
+  /**
+   * Optional immutable baseline for non-destructive erase.
+   *
+   * A valid, non-overlapping full-size RGBA buffer makes an erase dab restore each destination
+   * channel toward this baseline by the dab coverage × opacity. Missing, malformed, or aliased
+   * buffers intentionally retain the legacy destination-out contract.
+   */
+  readonly originalPixels?: Uint8ClampedArray;
 }
 
 export interface StudioVrmRgba {
@@ -276,7 +288,7 @@ interface WrapSegment {
 
 /**
  * 언랩 인덱스 구간 [from, to] 을 텍스처 범위 안의 세그먼트로 접는다.
- * clamp 는 잘라내고, repeat 는 최대 2 조각으로 감싼다(구간이 텍스처보다 넓으면 전체 1 조각).
+ * clamp 는 잘라내고, repeat/mirror 는 실제로 대응하는 destination 인덱스의 연속 구간으로 접는다.
  */
 function wrapSegments(
   from: number,
@@ -292,12 +304,66 @@ function wrapSegments(
   }
   const length = to - from + 1;
   if (length >= extent) return [{ from: 0, to: extent - 1 }];
+  if (wrap === "mirror") {
+    const mapped = new Set<number>();
+    for (let index = from; index <= to; index += 1) {
+      mapped.add(wrapTextureIndex(index, extent, wrap));
+    }
+    const sorted = [...mapped].sort((left, right) => left - right);
+    const segments: WrapSegment[] = [];
+    for (const index of sorted) {
+      const previous = segments.at(-1);
+      if (previous && previous.to + 1 === index) {
+        segments[segments.length - 1] = { from: previous.from, to: index };
+      } else {
+        segments.push({ from: index, to: index });
+      }
+    }
+    return segments;
+  }
   const start = ((from % extent) + extent) % extent;
   if (start + length <= extent) return [{ from: start, to: start + length - 1 }];
   return [
     { from: start, to: extent - 1 },
     { from: 0, to: start + length - extent - 1 },
   ];
+}
+
+function wrapTextureIndex(
+  index: number,
+  extent: number,
+  wrap: Exclude<StudioVrmTexturePaintWrap, "clamp">,
+): number {
+  if (wrap === "repeat") return ((index % extent) + extent) % extent;
+  const period = extent * 2;
+  const mirrored = ((index % period) + period) % period;
+  return mirrored < extent ? mirrored : period - mirrored - 1;
+}
+
+function axisWrap(
+  options: StudioVrmTexturePaintApplyOptions,
+  axis: "u" | "v",
+): StudioVrmTexturePaintWrap {
+  return (axis === "u" ? options.wrapU : options.wrapV) ?? options.wrap ?? "clamp";
+}
+
+function textureBuffersOverlap(
+  first: Uint8ClampedArray,
+  second: Uint8ClampedArray,
+): boolean {
+  if (first.buffer !== second.buffer) return false;
+  const firstEnd = first.byteOffset + first.byteLength;
+  const secondEnd = second.byteOffset + second.byteLength;
+  return first.byteOffset < secondEnd && second.byteOffset < firstEnd;
+}
+
+function safeOriginalPixels(
+  target: Uint8ClampedArray,
+  size: StudioVrmTextureSize,
+  candidate: unknown,
+): Uint8ClampedArray | null {
+  if (!isStudioVrmTextureBuffer(candidate, size)) return null;
+  return textureBuffersOverlap(target, candidate) ? null : candidate;
 }
 
 function paintOpBounds(
@@ -325,9 +391,8 @@ export function studioVrmTexturePaintOpRects(
   if (!isStudioVrmTextureSize(size)) return [];
   const bounds = paintOpBounds(op);
   if (!bounds) return [];
-  const wrap = options.wrap ?? "clamp";
-  const xs = wrapSegments(bounds.minX, bounds.maxX, size.width, wrap);
-  const ys = wrapSegments(bounds.minY, bounds.maxY, size.height, wrap);
+  const xs = wrapSegments(bounds.minX, bounds.maxX, size.width, axisWrap(options, "u"));
+  const ys = wrapSegments(bounds.minY, bounds.maxY, size.height, axisWrap(options, "v"));
   const rects: StudioVrmTextureRect[] = [];
   for (const y of ys) {
     for (const x of xs) {
@@ -355,7 +420,12 @@ export function applyStudioVrmTexturePaintOp(
   const color = parseStudioVrmTextureColor(op.color);
   if (!color && op.blend !== "erase") return 0;
 
-  const wrap = options.wrap ?? "clamp";
+  const wrapU = axisWrap(options, "u");
+  const wrapV = axisWrap(options, "v");
+  const originalPixels =
+    op.blend === "erase"
+      ? safeOriginalPixels(target, size, options.originalPixels)
+      : null;
   const sourceRed = (color?.r ?? 0) / 255;
   const sourceGreen = (color?.g ?? 0) / 255;
   const sourceBlue = (color?.b ?? 0) / 255;
@@ -363,8 +433,8 @@ export function applyStudioVrmTexturePaintOp(
 
   for (let py = bounds.minY; py <= bounds.maxY; py += 1) {
     let ty: number;
-    if (wrap === "repeat") {
-      ty = ((py % size.height) + size.height) % size.height;
+    if (wrapV !== "clamp") {
+      ty = wrapTextureIndex(py, size.height, wrapV);
     } else {
       if (py < 0 || py >= size.height) continue;
       ty = py;
@@ -372,8 +442,8 @@ export function applyStudioVrmTexturePaintOp(
     const dy = py + 0.5 - op.y;
     for (let px = bounds.minX; px <= bounds.maxX; px += 1) {
       let tx: number;
-      if (wrap === "repeat") {
-        tx = ((px % size.width) + size.width) % size.width;
+      if (wrapU !== "clamp") {
+        tx = wrapTextureIndex(px, size.width, wrapU);
       } else {
         if (px < 0 || px >= size.width) continue;
         tx = px;
@@ -385,6 +455,25 @@ export function applyStudioVrmTexturePaintOp(
       if (sourceAlpha <= 0) continue;
 
       const offset = (ty * size.width + tx) * 4;
+      if (originalPixels) {
+        target[offset] = Math.round(
+          target[offset]! + (originalPixels[offset]! - target[offset]!) * sourceAlpha,
+        );
+        target[offset + 1] = Math.round(
+          target[offset + 1]!
+            + (originalPixels[offset + 1]! - target[offset + 1]!) * sourceAlpha,
+        );
+        target[offset + 2] = Math.round(
+          target[offset + 2]!
+            + (originalPixels[offset + 2]! - target[offset + 2]!) * sourceAlpha,
+        );
+        target[offset + 3] = Math.round(
+          target[offset + 3]!
+            + (originalPixels[offset + 3]! - target[offset + 3]!) * sourceAlpha,
+        );
+        touched += 1;
+        continue;
+      }
       const blended = blendStudioVrmTexel(
         op.blend,
         { r: sourceRed, g: sourceGreen, b: sourceBlue, a: sourceAlpha },

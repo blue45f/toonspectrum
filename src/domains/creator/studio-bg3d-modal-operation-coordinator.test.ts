@@ -1,9 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  combineStudioBg3dAbortSignals,
   StudioBg3dAssetLoadGate,
   StudioBg3dModalOperationCoordinator,
 } from "./studio-bg3d-modal-operation-coordinator";
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function deferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -16,6 +21,32 @@ function deferred<T>() {
 }
 
 describe("StudioBg3dModalOperationCoordinator", () => {
+  it("combines abort signals without native AbortSignal.any and forwards the first reason", () => {
+    const first = new AbortController();
+    const second = new AbortController();
+    const combined = combineStudioBg3dAbortSignals([first.signal, second.signal]);
+
+    second.abort("outer-scene-closed");
+
+    expect(combined.signal.aborted).toBe(true);
+    expect(combined.signal.reason).toBe("outer-scene-closed");
+    first.abort("late-asset-timeout");
+    expect(combined.signal.reason).toBe("outer-scene-closed");
+    combined.dispose();
+  });
+
+  it("returns an already-aborted combined signal and preserves its reason", () => {
+    const stale = new AbortController();
+    const live = new AbortController();
+    stale.abort("stale-before-admission");
+
+    const combined = combineStudioBg3dAbortSignals([stale.signal, live.signal]);
+
+    expect(combined.signal.aborted).toBe(true);
+    expect(combined.signal.reason).toBe("stale-before-admission");
+    combined.dispose();
+  });
+
   it("accepts commits only from the exact active modal epoch", () => {
     const coordinator = new StudioBg3dModalOperationCoordinator();
     const first = coordinator.beginSession();
@@ -128,6 +159,258 @@ describe("StudioBg3dModalOperationCoordinator", () => {
     await expect(current).resolves.toEqual({ status: "committed", value: "current" });
     expect(reopenedCommit).toHaveBeenCalledExactlyOnceWith("current");
   });
+
+  it("expires a never-settling head without blocking the next mutation", async () => {
+    vi.useFakeTimers();
+    const coordinator = new StudioBg3dModalOperationCoordinator();
+    const session = coordinator.beginSession();
+    const headResult = deferred<string>();
+    const headCommit = vi.fn();
+    let headSignal: AbortSignal | undefined;
+    const head = coordinator.runSceneMutation(
+      session,
+      (lease) => {
+        headSignal = lease.signal;
+        return headResult.promise;
+      },
+      headCommit,
+      { timeoutMs: 50 },
+    );
+    const headOutcome = head.catch((reason: unknown) => reason);
+    const nextCommit = vi.fn();
+    const next = coordinator.runSceneMutation(
+      session,
+      () => "after-timeout",
+      nextCommit,
+      { timeoutMs: 50 },
+    );
+
+    await Promise.resolve();
+    expect(headSignal?.aborted).toBe(false);
+    expect(nextCommit).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(50);
+    expect(await headOutcome).toMatchObject({
+      code: "operation-lease-timeout",
+      name: "TimeoutError",
+      scope: "scene-mutation",
+      timeoutMs: 50,
+    });
+    await expect(next).resolves.toEqual({
+      status: "committed",
+      value: "after-timeout",
+    });
+    expect(headSignal?.aborted).toBe(true);
+    expect(nextCommit).toHaveBeenCalledExactlyOnceWith("after-timeout");
+
+    headResult.resolve("late-head");
+    await Promise.resolve();
+    expect(headCommit).not.toHaveBeenCalled();
+  });
+
+  it("quarantines an authoritative delete through timeout and commits when persistence wins abort", async () => {
+    vi.useFakeTimers();
+    const coordinator = new StudioBg3dModalOperationCoordinator();
+    const session = coordinator.beginSession();
+    const persistedDelete = deferred<string>();
+    const deleteCommit = vi.fn();
+    let deleteSignal: AbortSignal | undefined;
+    let deleteSettled = false;
+    const deletion = coordinator.runSceneMutation(
+      session,
+      (lease) => {
+        deleteSignal = lease.signal;
+        return persistedDelete.promise;
+      },
+      deleteCommit,
+      { authoritativePersistence: true, timeoutMs: 50 },
+    );
+    void deletion.finally(() => {
+      deleteSettled = true;
+    });
+    const nextPrepare = vi.fn(() => "next-mutation");
+    const nextCommit = vi.fn();
+    const next = coordinator.runSceneMutation(session, nextPrepare, nextCommit);
+
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(deleteSignal?.aborted).toBe(true);
+    expect(deleteSettled).toBe(false);
+    expect(deleteCommit).not.toHaveBeenCalled();
+    expect(nextPrepare).not.toHaveBeenCalled();
+
+    // IndexedDB's complete event arrives after the deadline: this value is authoritative.
+    persistedDelete.resolve("delete-committed");
+
+    await expect(deletion).resolves.toEqual({
+      status: "committed",
+      value: "delete-committed",
+    });
+    expect(deleteCommit).toHaveBeenCalledExactlyOnceWith("delete-committed");
+    await expect(next).resolves.toEqual({
+      status: "committed",
+      value: "next-mutation",
+    });
+    expect(nextPrepare).toHaveBeenCalledOnce();
+    expect(nextCommit).toHaveBeenCalledExactlyOnceWith("next-mutation");
+  });
+
+  it("reports timeout only after an authoritative delete confirms that abort rolled persistence back", async () => {
+    vi.useFakeTimers();
+    const coordinator = new StudioBg3dModalOperationCoordinator();
+    const session = coordinator.beginSession();
+    const persistedDelete = deferred<string>();
+    const deleteCommit = vi.fn();
+    let callerSettled = false;
+    const deletion = coordinator.runSceneMutation(
+      session,
+      () => persistedDelete.promise,
+      deleteCommit,
+      { authoritativePersistence: true, timeoutMs: 25 },
+    );
+    void deletion.catch(() => undefined).finally(() => {
+      callerSettled = true;
+    });
+    const nextPrepare = vi.fn(() => "after-rollback");
+    const next = coordinator.runSceneMutation(session, nextPrepare, vi.fn());
+
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(25);
+    expect(callerSettled).toBe(false);
+    expect(nextPrepare).not.toHaveBeenCalled();
+
+    persistedDelete.reject(new Error("indexeddb-abort-confirmed"));
+
+    await expect(deletion).rejects.toMatchObject({
+      code: "operation-lease-timeout",
+      scope: "scene-mutation",
+    });
+    await expect(next).resolves.toEqual({
+      status: "committed",
+      value: "after-rollback",
+    });
+    expect(deleteCommit).not.toHaveBeenCalled();
+  });
+
+  it("keeps a revoked authoritative delete in the physical lane until its journal commit settles", async () => {
+    const coordinator = new StudioBg3dModalOperationCoordinator();
+    const oldSession = coordinator.beginSession();
+    const persistedDelete = deferred<string>();
+    const oldCommit = vi.fn();
+    const deletion = coordinator.runSceneMutation(
+      oldSession,
+      () => persistedDelete.promise,
+      oldCommit,
+      { authoritativePersistence: true },
+    );
+
+    await Promise.resolve();
+    expect(coordinator.endSession(oldSession)).toBe(true);
+    const reopened = coordinator.beginSession();
+    const reopenedPrepare = vi.fn(() => "restored-after-journal");
+    const reopenedCommit = vi.fn();
+    const reopenedMutation = coordinator.runSceneMutation(
+      reopened,
+      reopenedPrepare,
+      reopenedCommit,
+    );
+    let laneReady = false;
+    void coordinator.waitForSceneMutationLane().then(() => {
+      laneReady = true;
+    });
+
+    await expect(deletion).resolves.toEqual({ status: "stale" });
+    expect(reopenedPrepare).not.toHaveBeenCalled();
+    expect(laneReady).toBe(false);
+
+    persistedDelete.resolve("journal-committed");
+    await expect(reopenedMutation).resolves.toEqual({
+      status: "committed",
+      value: "restored-after-journal",
+    });
+    await coordinator.waitForSceneMutationLane();
+    expect(laneReady).toBe(true);
+    expect(oldCommit).not.toHaveBeenCalled();
+    expect(reopenedCommit).toHaveBeenCalledExactlyOnceWith("restored-after-journal");
+  });
+
+  it("revokes a never-settling old lease on close and reopen before its deadline", async () => {
+    vi.useFakeTimers();
+    const coordinator = new StudioBg3dModalOperationCoordinator();
+    const oldSession = coordinator.beginSession();
+    const oldResult = deferred<string>();
+    const oldCommit = vi.fn();
+    let oldSignal: AbortSignal | undefined;
+    const oldMutation = coordinator.runSceneMutation(
+      oldSession,
+      (lease) => {
+        oldSignal = lease.signal;
+        return oldResult.promise;
+      },
+      oldCommit,
+      { timeoutMs: 5_000 },
+    );
+
+    await Promise.resolve();
+    expect(coordinator.endSession(oldSession)).toBe(true);
+    const reopened = coordinator.beginSession();
+    const reopenedCommit = vi.fn();
+    const reopenedMutation = coordinator.runSceneMutation(
+      reopened,
+      () => "reopened",
+      reopenedCommit,
+      { timeoutMs: 5_000 },
+    );
+
+    await expect(oldMutation).resolves.toEqual({ status: "stale" });
+    await expect(reopenedMutation).resolves.toEqual({
+      status: "committed",
+      value: "reopened",
+    });
+    expect(oldSignal?.aborted).toBe(true);
+    expect(reopenedCommit).toHaveBeenCalledExactlyOnceWith("reopened");
+    expect(vi.getTimerCount()).toBe(0);
+
+    oldResult.resolve("late-old-value");
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(oldCommit).not.toHaveBeenCalled();
+  });
+
+  it("keeps recovering after a timed-out head and a later prepare failure", async () => {
+    vi.useFakeTimers();
+    const coordinator = new StudioBg3dModalOperationCoordinator();
+    const session = coordinator.beginSession();
+    const timedOut = coordinator.runSceneMutation(
+      session,
+      () => new Promise<never>(() => undefined),
+      vi.fn(),
+      { timeoutMs: 25 },
+    );
+    const timedOutOutcome = timedOut.catch((reason: unknown) => reason);
+    const failed = coordinator.runSceneMutation(
+      session,
+      () => {
+        throw new Error("prepare-failed");
+      },
+      vi.fn(),
+      { timeoutMs: 25 },
+    );
+    const failedOutcome = failed.catch((reason: unknown) => reason);
+    const finalCommit = vi.fn();
+    const final = coordinator.runSceneMutation(
+      session,
+      () => "recovered",
+      finalCommit,
+      { timeoutMs: 25 },
+    );
+
+    await vi.advanceTimersByTimeAsync(25);
+    expect(await timedOutOutcome).toMatchObject({ code: "operation-lease-timeout" });
+    expect(await failedOutcome).toEqual(new Error("prepare-failed"));
+    await expect(final).resolves.toEqual({ status: "committed", value: "recovered" });
+    expect(finalCommit).toHaveBeenCalledExactlyOnceWith("recovered");
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });
 
 describe("StudioBg3dAssetLoadGate", () => {
@@ -184,6 +467,84 @@ describe("StudioBg3dAssetLoadGate", () => {
       name: "AbortError",
     });
     expect(staleTask).not.toHaveBeenCalled();
+    expect(gate.activeCount).toBe(0);
+  });
+
+  it("rejects a timed-out load but quarantines its slot until physical settlement", async () => {
+    vi.useFakeTimers();
+    const gate = new StudioBg3dAssetLoadGate(1);
+    const headResult = deferred<string>();
+    let headSignal: AbortSignal | undefined;
+    const head = gate.run(
+      (lease) => {
+        headSignal = lease.signal;
+        return headResult.promise;
+      },
+      { timeoutMs: 40 },
+    );
+    const headOutcome = head.catch((reason: unknown) => reason);
+    const starts: string[] = [];
+    const next = gate.run(
+      () => {
+        starts.push("next");
+        return "next-value";
+      },
+      { timeoutMs: 40 },
+    );
+
+    await Promise.resolve();
+    expect(gate.activeCount).toBe(1);
+    expect(gate.queuedCount).toBe(1);
+    expect(headSignal?.aborted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(40);
+    expect(await headOutcome).toMatchObject({
+      code: "operation-lease-timeout",
+      name: "TimeoutError",
+      scope: "asset-load",
+      timeoutMs: 40,
+    });
+    expect(starts).toEqual([]);
+    expect(gate.activeCount).toBe(1);
+    expect(gate.queuedCount).toBe(1);
+    expect(headSignal?.aborted).toBe(true);
+
+    headResult.resolve("late-head-value");
+    await Promise.resolve();
+    await expect(next).resolves.toBe("next-value");
+    expect(starts).toEqual(["next"]);
+    expect(gate.activeCount).toBe(0);
+    expect(gate.queuedCount).toBe(0);
+  });
+
+  it("reports a stale timeout when an in-flight asset generation was closed", async () => {
+    vi.useFakeTimers();
+    const gate = new StudioBg3dAssetLoadGate(1);
+    let current = true;
+    let signal: AbortSignal | undefined;
+    const physicalLoad = deferred<void>();
+    const load = gate.run(
+      (lease) => {
+        signal = lease.signal;
+        return physicalLoad.promise;
+      },
+      { isCurrent: () => current, timeoutMs: 30 },
+    );
+    const loadOutcome = load.catch((reason: unknown) => reason);
+
+    await Promise.resolve();
+    current = false;
+    await vi.advanceTimersByTimeAsync(30);
+    expect(await loadOutcome).toMatchObject({
+      code: "stale-modal-epoch",
+      name: "AbortError",
+    });
+    expect(signal?.aborted).toBe(true);
+    expect(gate.activeCount).toBe(1);
+
+    physicalLoad.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(gate.activeCount).toBe(0);
   });
 

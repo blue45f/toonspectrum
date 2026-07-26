@@ -1,0 +1,1398 @@
+import { readFileSync } from "node:fs";
+
+import * as THREE from "three";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  applyStudioVrmTexturePaintOps,
+  createStudioVrmTextureBuffer,
+} from "./studio-vrm-texture-paint-ops";
+import {
+  createStudioVrmTexturePaintRuntime,
+  estimateStudioVrmTexturePaintTargetResidentBytes,
+  type StudioVrmTexturePaintCanvasFactory,
+  type StudioVrmTexturePaintImageReader,
+  type StudioVrmTexturePaintRayHit,
+  type StudioVrmTexturePaintReadableImage,
+  type StudioVrmTexturePaintRuntimeResult,
+} from "./studio-vrm-texture-paint-runtime";
+import {
+  planStudioVrmTextureStroke,
+  type StudioVrmTextureStrokeSample,
+  type StudioVrmTextureStrokeStyle,
+} from "./studio-vrm-texture-stroke";
+
+class MemoryCanvas {
+  width: number;
+  height: number;
+  frame: Uint8ClampedArray;
+  putCount = 0;
+  putAttempts = 0;
+  dirtyRects: Array<Readonly<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }> | null> = [];
+  closeCount = 0;
+  failAllPuts = false;
+
+  constructor(width: number, height: number) {
+    this.width = width;
+    this.height = height;
+    this.frame = new Uint8ClampedArray(width * height * 4);
+  }
+
+  readonly context = {
+    createImageData: (width: number, height: number) => ({
+      width,
+      height,
+      data: new Uint8ClampedArray(width * height * 4),
+      colorSpace: "srgb",
+    }),
+    putImageData: (
+      imageData: ImageData,
+      _dx?: number,
+      _dy?: number,
+      dirtyX?: number,
+      dirtyY?: number,
+      dirtyWidth?: number,
+      dirtyHeight?: number,
+    ) => {
+      this.putAttempts += 1;
+      if (this.failAllPuts) throw new DOMException("Canvas context lost", "InvalidStateError");
+      this.frame = Uint8ClampedArray.from(imageData.data);
+      this.putCount += 1;
+      this.dirtyRects.push(
+        dirtyX !== undefined &&
+        dirtyY !== undefined &&
+        dirtyWidth !== undefined &&
+        dirtyHeight !== undefined
+          ? { x: dirtyX, y: dirtyY, width: dirtyWidth, height: dirtyHeight }
+          : null,
+      );
+    },
+  };
+
+  getContext(contextId: string) {
+    return contextId === "2d" ? this.context : null;
+  }
+
+  close() {
+    this.closeCount += 1;
+  }
+}
+
+const INK: StudioVrmTextureStrokeStyle = Object.freeze({
+  kind: "ink",
+  color: "#e23b2f",
+  sizeTexels: 3,
+  opacity: 1,
+  blend: "normal",
+  tuning: Object.freeze({ flow: 1, hardness: 1, minSize: 1 }),
+});
+
+function rgba(
+  width: number,
+  height: number,
+  color: readonly [number, number, number, number] = [0, 0, 0, 0],
+): Uint8ClampedArray {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let offset = 0; offset < data.length; offset += 4) {
+    data.set(color, offset);
+  }
+  return data;
+}
+
+function readable(
+  width: number,
+  height: number,
+  data = rgba(width, height),
+): StudioVrmTexturePaintReadableImage {
+  return { width, height, data: Uint8ClampedArray.from(data) };
+}
+
+function unwrap<T>(result: StudioVrmTexturePaintRuntimeResult<T>): T {
+  expect(result.ok).toBe(true);
+  if (!result.ok) throw new Error(result.error.code);
+  return result.value;
+}
+
+function expectFailure<T>(
+  result: StudioVrmTexturePaintRuntimeResult<T>,
+  code: string,
+): void {
+  expect(result.ok).toBe(false);
+  if (result.ok) throw new Error("Expected failure");
+  expect(result.error.code).toBe(code);
+}
+
+function hit(
+  mesh: THREE.Mesh,
+  u = 0.5,
+  v = 0.5,
+  materialIndex = 0,
+  faceIndex?: number,
+  point: THREE.Vector3 = new THREE.Vector3(u, v, 0),
+): StudioVrmTexturePaintRayHit {
+  return {
+    object: mesh,
+    uv: new THREE.Vector2(u, v),
+    face: { materialIndex },
+    ...(faceIndex === undefined ? {} : { faceIndex }),
+    point,
+  };
+}
+
+function canvasHarness() {
+  const canvases: MemoryCanvas[] = [];
+  const createCanvas = vi.fn((width: number, height: number) => {
+    const canvas = new MemoryCanvas(width, height);
+    canvases.push(canvas);
+    return canvas as unknown as HTMLCanvasElement;
+  }) satisfies StudioVrmTexturePaintCanvasFactory;
+  return { canvases, createCanvas };
+}
+
+function imageReader(
+  images: ReadonlyMap<THREE.Texture, StudioVrmTexturePaintReadableImage>,
+): StudioVrmTexturePaintImageReader {
+  return vi.fn((texture: THREE.Texture) => {
+    const image = images.get(texture);
+    if (!image) throw new Error("Missing test image");
+    return readable(image.width, image.height, image.data);
+  });
+}
+
+function meshWithMap(texture: THREE.Texture) {
+  const material = new THREE.MeshBasicMaterial({ map: texture });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+  return { material, mesh };
+}
+
+describe("Studio VRM texture-paint runtime", () => {
+  it("rebinds every shared base-color material, preserves sampling, and restores conditionally", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    source.name = "Face";
+    source.flipY = false;
+    source.wrapS = THREE.RepeatWrapping;
+    source.wrapT = THREE.MirroredRepeatWrapping;
+    source.magFilter = THREE.NearestFilter;
+    source.minFilter = THREE.NearestMipmapNearestFilter;
+    source.anisotropy = 8;
+    source.colorSpace = THREE.SRGBColorSpace;
+    source.offset.set(0.17, 0.23);
+    source.repeat.set(1.5, 0.75);
+    source.center.set(0.5, 0.5);
+    source.rotation = 0.3;
+    source.updateMatrix();
+
+    const first = meshWithMap(source);
+    const second = meshWithMap(source);
+    const unrelatedSource = new THREE.Texture();
+    const unrelated = meshWithMap(unrelatedSource);
+    scene.add(first.mesh, second.mesh, unrelated.mesh);
+
+    const { canvases, createCanvas } = canvasHarness();
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas,
+      readTextureImage: imageReader(new Map([[source, readable(8, 8, rgba(8, 8, [9, 18, 27, 255]))]])),
+    });
+
+    const snapshot = unwrap(await runtime.beginStroke({
+      pointerId: 7,
+      hit: hit(first.mesh),
+      pressure: 0.8,
+      style: INK,
+    }));
+    const painted = first.material.map;
+
+    expect(painted).toBeInstanceOf(THREE.CanvasTexture);
+    expect(second.material.map).toBe(painted);
+    expect(unrelated.material.map).toBe(unrelatedSource);
+    expect(painted).not.toBe(source);
+    expect(painted).toMatchObject({
+      flipY: false,
+      wrapS: source.wrapS,
+      wrapT: source.wrapT,
+      magFilter: source.magFilter,
+      minFilter: source.minFilter,
+      anisotropy: source.anisotropy,
+      colorSpace: source.colorSpace,
+      channel: source.channel,
+    });
+    expect(painted?.offset.equals(source.offset)).toBe(true);
+    expect(painted?.repeat.equals(source.repeat)).toBe(true);
+    expect(painted?.center.equals(source.center)).toBe(true);
+    expect(painted?.matrix.equals(source.matrix)).toBe(true);
+    expect(snapshot.activeTarget).toEqual({
+      id: `vrm-texture:${source.uuid}`,
+      sourceName: "Face",
+      width: 8,
+      height: 8,
+      bindingCount: 2,
+      valid: true,
+      invalidReason: null,
+    });
+    expect(Object.isFrozen(snapshot)).toBe(true);
+    expect(Object.isFrozen(snapshot.activeTarget)).toBe(true);
+    expect(canvases[0]!.dirtyRects.at(-1)).toMatchObject({
+      width: expect.any(Number),
+      height: expect.any(Number),
+    });
+
+    const paintedTexture = painted as THREE.CanvasTexture;
+    const dispose = vi.spyOn(paintedTexture, "dispose");
+    const externalReplacement = new THREE.Texture();
+    second.material.map = externalReplacement;
+    runtime.dispose();
+
+    expect(first.material.map).toBe(source);
+    expect(second.material.map).toBe(externalReplacement);
+    expect(unrelated.material.map).toBe(unrelatedSource);
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(canvases[0]).toMatchObject({ width: 0, height: 0, closeCount: 1 });
+    expect(runtime.getSnapshot()).toMatchObject({
+      status: "disposed",
+      activeTarget: null,
+      activeTargetId: null,
+      targets: [],
+    });
+  });
+
+  it("copies only a bounded dirty rectangle into the canvas during an ordinary dab", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    const { mesh } = meshWithMap(source);
+    scene.add(mesh);
+    const canvas = canvasHarness();
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas: canvas.createCanvas,
+      readTextureImage: imageReader(new Map([[source, readable(32, 32)]])),
+    });
+
+    unwrap(await runtime.beginStroke({
+      pointerId: 70,
+      hit: hit(mesh, 0.5, 0.5),
+      style: INK,
+    }));
+
+    const dirty = canvas.canvases[0]!.dirtyRects.at(-1);
+    expect(dirty).not.toBeNull();
+    expect(dirty?.width).toBeLessThan(32);
+    expect(dirty?.height).toBeLessThan(32);
+    unwrap(runtime.cancelStroke(70));
+  });
+
+  it("keeps the geometry-island id stable before and after an asynchronous target read", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    const { mesh } = meshWithMap(source);
+    scene.add(mesh);
+    const canvas = canvasHarness();
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas: canvas.createCanvas,
+      readTextureImage: imageReader(new Map([[source, readable(32, 32)]])),
+    });
+
+    unwrap(await runtime.beginStroke({
+      pointerId: 701,
+      hit: hit(mesh, 0.1, 0.1, 0, 0),
+      style: { ...INK, sizeTexels: 2 },
+    }));
+    unwrap(runtime.moveStroke({
+      pointerId: 701,
+      hit: hit(mesh, 0.9, 0.9, 0, 0),
+    }));
+
+    const centerAlpha = canvas.canvases[0]!.frame[(16 * 32 + 16) * 4 + 3]!;
+    expect(centerAlpha).toBeGreaterThan(0);
+    unwrap(runtime.cancelStroke(701));
+  });
+
+  it("fails closed to face-specific islands when geometry classification is unavailable", async () => {
+    const paintAcrossMissingGeometryIndex = async (includeFaceIndex: boolean) => {
+      const scene = new THREE.Group();
+      const source = new THREE.Texture();
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute([
+          0, 0, 0,
+          1, 0, 0,
+          0, 1, 0,
+          2, 0, 0,
+          3, 0, 0,
+          2, 1, 0,
+        ], 3),
+      );
+      const material = new THREE.MeshBasicMaterial({ map: source });
+      const mesh = new THREE.Mesh(geometry, material);
+      scene.add(mesh);
+      const canvas = canvasHarness();
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        createCanvas: canvas.createCanvas,
+        readTextureImage: imageReader(new Map([[source, readable(32, 32)]])),
+      });
+
+      unwrap(await runtime.beginStroke({
+        pointerId: 702,
+        hit: hit(mesh, 0.1, 0.1, 0, includeFaceIndex ? 0 : undefined),
+        style: { ...INK, sizeTexels: 2 },
+      }));
+      unwrap(runtime.moveStroke({
+        pointerId: 702,
+        hit: hit(mesh, 0.9, 0.9, 0, includeFaceIndex ? 1 : undefined),
+      }));
+      const centerAlpha = canvas.canvases[0]!.frame[(16 * 32 + 16) * 4 + 3]!;
+      unwrap(runtime.cancelStroke(702));
+      runtime.dispose();
+      geometry.dispose();
+      material.dispose();
+      return centerAlpha;
+    };
+
+    expect(await paintAcrossMissingGeometryIndex(true)).toBe(0);
+    expect(await paintAcrossMissingGeometryIndex(false)).toBeGreaterThan(0);
+  });
+
+  it("uses texture-matrix area when enriching face samples with world texel density", async () => {
+    const paintVerticalStroke = async (repeatX: number) => {
+      const scene = new THREE.Group();
+      const source = new THREE.Texture();
+      source.image = { width: 64, height: 64 };
+      source.repeat.set(repeatX, 1);
+      source.center.set(0.5, 0.5);
+      const { mesh } = meshWithMap(source);
+      scene.add(mesh);
+      const canvas = canvasHarness();
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        createCanvas: canvas.createCanvas,
+        readTextureImage: imageReader(new Map([[source, readable(64, 64)]])),
+      });
+
+      unwrap(await runtime.beginStroke({
+        pointerId: 703,
+        hit: hit(mesh, 0.5, 0.1, 0, 0, new THREE.Vector3(0, 0, 0)),
+        style: { ...INK, sizeTexels: 3 },
+      }));
+      unwrap(runtime.moveStroke({
+        pointerId: 703,
+        hit: hit(mesh, 0.5, 0.9, 0, 0, new THREE.Vector3(0.001, 0, 0)),
+      }));
+      let centerAlpha = 0;
+      for (let y = 28; y <= 36; y += 1) {
+        for (let x = 28; x <= 36; x += 1) {
+          centerAlpha = Math.max(
+            centerAlpha,
+            canvas.canvases[0]!.frame[(y * 64 + x) * 4 + 3]!,
+          );
+        }
+      }
+      unwrap(runtime.cancelStroke(703));
+      runtime.dispose();
+      return centerAlpha;
+    };
+
+    // 보통 matrix(det=1)는 월드 이동 대비 큰 UV 점프를 심으로 끊는다.
+    expect(await paintVerticalStroke(1)).toBe(0);
+    // 퇴화 matrix(det=0)는 밀도를 만들 수 없어 안전한 legacy 거리 임계값을 쓴다.
+    expect(await paintVerticalStroke(0)).toBeGreaterThan(0);
+  });
+
+  it("matches one canonical batch plan across long pending and active move streams", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    const { mesh } = meshWithMap(source);
+    scene.add(mesh);
+    const size = { width: 96, height: 96 } as const;
+    const original = rgba(size.width, size.height);
+    const canvas = canvasHarness();
+    let resolveRead: ((image: StudioVrmTexturePaintReadableImage) => void) | null = null;
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas: canvas.createCanvas,
+      readTextureImage: () =>
+        new Promise<StudioVrmTexturePaintReadableImage>((resolve) => {
+          resolveRead = resolve;
+        }),
+    });
+    const strokeStyle: StudioVrmTextureStrokeStyle = {
+      kind: "pencil",
+      color: "#4263eb",
+      sizeTexels: 7,
+      opacity: 0.72,
+      blend: "normal",
+      tuning: { flow: 0.61, hardness: 0.82, minSize: 0.14 },
+    };
+    const samples = Array.from({ length: 180 }, (_, index) => {
+      const progress = index / 179;
+      return {
+        uv: {
+          u: 0.06 + progress * 0.88,
+          v: 0.5 + Math.sin(index * 0.19) * 0.22,
+        },
+        pressure: 0.08 + ((index * 17) % 89) / 100,
+      } satisfies StudioVrmTextureStrokeSample;
+    });
+    const pointerId = 704;
+    const completion = runtime.beginStroke({
+      pointerId,
+      hit: hit(mesh, samples[0]!.uv.u, samples[0]!.uv.v),
+      pressure: samples[0]!.pressure,
+      style: strokeStyle,
+      planOptions: { seed: 321 },
+    });
+
+    // Target read가 끝나기 전 입력도 유실·중복 없이 walker로 한 번만 전달되어야 한다.
+    for (const sample of samples.slice(1, 70)) {
+      expect(unwrap(runtime.moveStroke({
+        pointerId,
+        hit: hit(mesh, sample.uv.u, sample.uv.v),
+        pressure: sample.pressure,
+      }))).toBe(true);
+    }
+    const finishRead = resolveRead as
+      | ((image: StudioVrmTexturePaintReadableImage) => void)
+      | null;
+    if (!finishRead) throw new Error("reader did not start");
+    finishRead(readable(size.width, size.height, original));
+    unwrap(await completion);
+
+    for (const sample of samples.slice(70)) {
+      expect(unwrap(runtime.moveStroke({
+        pointerId,
+        hit: hit(mesh, sample.uv.u, sample.uv.v),
+        pressure: sample.pressure,
+      }))).toBe(true);
+    }
+    expect(unwrap(runtime.commitStroke(pointerId))).toBe(true);
+
+    const canonicalPlan = planStudioVrmTextureStroke(
+      strokeStyle,
+      samples,
+      size,
+      {
+        seed: 321,
+        wrapU: "clamp",
+        wrapV: "clamp",
+        flipV: false,
+      },
+    );
+    const expected = createStudioVrmTextureBuffer(size);
+    if (!expected) throw new Error("expected buffer");
+    applyStudioVrmTexturePaintOps(expected, size, canonicalPlan.ops, {
+      wrapU: "clamp",
+      wrapV: "clamp",
+      originalPixels: original,
+    });
+
+    expect(canvas.canvases[0]!.frame).toEqual(expected);
+    expect(runtime.getSnapshot()).toMatchObject({
+      status: "ready",
+      activePointerId: null,
+      history: { undoCount: 1, redoCount: 0 },
+    });
+  });
+
+  it("keeps active strokes suffix-only without retaining the full sample prefix", () => {
+    const source = readFileSync(
+      new URL("./studio-vrm-texture-paint-runtime.ts", import.meta.url),
+      "utf8",
+    );
+    const activeStart = source.indexOf("interface ActiveStroke {");
+    const activeEnd = source.indexOf("interface HistoryRecord", activeStart);
+    const applyStart = source.indexOf("private applyIncrementalSample(");
+    const applyEnd = source.indexOf("private rollbackActiveStroke(", applyStart);
+
+    expect(activeStart).toBeGreaterThan(-1);
+    expect(activeEnd).toBeGreaterThan(activeStart);
+    expect(applyStart).toBeGreaterThan(-1);
+    expect(applyEnd).toBeGreaterThan(applyStart);
+    expect(source.slice(activeStart, activeEnd)).toContain(
+      "readonly walker: StudioVrmTextureStrokeWalker",
+    );
+    expect(source.slice(activeStart, activeEnd)).not.toContain(
+      "readonly samples: StudioVrmTextureStrokeSample[]",
+    );
+    expect(source.slice(applyStart, applyEnd)).toContain("stroke.walker.append(sample)");
+    expect(source.slice(applyStart, applyEnd)).not.toContain("planStudioVrmTextureStroke(");
+  });
+
+  it("rejects pointer mismatches without stealing or completing the owned stroke", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    const { material, mesh } = meshWithMap(source);
+    scene.add(mesh);
+    const { canvases, createCanvas } = canvasHarness();
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas,
+      readTextureImage: imageReader(new Map([[source, readable(8, 8)]])),
+    });
+
+    unwrap(await runtime.beginStroke({ pointerId: 11, hit: hit(mesh), style: INK }));
+    const beforeMismatch = canvases[0]!.frame.slice();
+    expectFailure(runtime.moveStroke({ pointerId: 12, hit: hit(mesh, 0.8, 0.8) }), "pointer-mismatch");
+    expectFailure(runtime.commitStroke(12), "pointer-mismatch");
+    expectFailure(runtime.cancelStroke(12), "pointer-mismatch");
+
+    expect(runtime.getSnapshot()).toMatchObject({
+      status: "painting",
+      activePointerId: 11,
+    });
+    expect(canvases[0]!.frame).toEqual(beforeMismatch);
+    expect(material.map).not.toBe(source);
+    expect(unwrap(runtime.cancelStroke(11))).toBe(true);
+    expect(unwrap(runtime.cancelStroke(11))).toBe(false);
+  });
+
+  it("rolls an incremental stroke back exactly on cancel and never adds history", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    const { mesh } = meshWithMap(source);
+    scene.add(mesh);
+    const original = rgba(12, 12, [14, 28, 42, 255]);
+    const { canvases, createCanvas } = canvasHarness();
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas,
+      readTextureImage: imageReader(new Map([[source, readable(12, 12, original)]])),
+    });
+
+    unwrap(await runtime.beginStroke({
+      pointerId: 3,
+      hit: hit(mesh, 0.15, 0.2),
+      pressure: 0.2,
+      style: { ...INK, sizeTexels: 5 },
+    }));
+    unwrap(runtime.moveStroke({ pointerId: 3, hit: hit(mesh, 0.8, 0.75), pressure: 1 }));
+    expect(canvases[0]!.frame).not.toEqual(original);
+
+    expect(unwrap(runtime.cancelStroke(3))).toBe(true);
+    expect(canvases[0]!.frame).toEqual(original);
+    expect(runtime.getSnapshot().history).toMatchObject({
+      undoCount: 0,
+      redoCount: 0,
+      retainedBytes: 0,
+    });
+  });
+
+  it("undoes and redoes an exact tile-recorded delta", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    const { mesh } = meshWithMap(source);
+    scene.add(mesh);
+    const original = rgba(16, 16, [32, 48, 64, 255]);
+    const { canvases, createCanvas } = canvasHarness();
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas,
+      readTextureImage: imageReader(new Map([[source, readable(16, 16, original)]])),
+      undoTileSize: 8,
+    });
+
+    unwrap(await runtime.beginStroke({
+      pointerId: 4,
+      hit: hit(mesh, 0.2, 0.25),
+      style: { ...INK, color: "#f2c94c", sizeTexels: 5 },
+    }));
+    unwrap(runtime.moveStroke({ pointerId: 4, hit: hit(mesh, 0.75, 0.7), pressure: 0.7 }));
+    unwrap(runtime.commitStroke(4));
+    const painted = canvases[0]!.frame.slice();
+    expect(painted).not.toEqual(original);
+    expect(runtime.getSnapshot().history.undoCount).toBe(1);
+
+    expect(unwrap(runtime.undo())).toBe(true);
+    expect(canvases[0]!.frame).toEqual(original);
+    expect(runtime.getSnapshot().history).toMatchObject({ undoCount: 0, redoCount: 1 });
+
+    expect(unwrap(runtime.redo())).toBe(true);
+    expect(canvases[0]!.frame).toEqual(painted);
+    expect(runtime.getSnapshot().history).toMatchObject({ undoCount: 1, redoCount: 0 });
+  });
+
+  it("commits a long sparse diagonal below a budget that rejects its union rectangle", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    const { mesh } = meshWithMap(source);
+    scene.add(mesh);
+    const size = 512;
+    const original = rgba(size, size, [7, 11, 13, 255]);
+    const canvas = canvasHarness();
+    const maxHistoryBytes = 128 * 1024;
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas: canvas.createCanvas,
+      readTextureImage: imageReader(new Map([
+        [source, readable(size, size, original)],
+      ])),
+      maxHistoryBytes,
+      undoTileSize: 16,
+    });
+
+    unwrap(await runtime.beginStroke({
+      pointerId: 401,
+      hit: hit(mesh, 0.01, 0.01),
+      style: { ...INK, sizeTexels: 3 },
+    }));
+    unwrap(runtime.moveStroke({
+      pointerId: 401,
+      hit: hit(mesh, 0.99, 0.99),
+    }));
+    expect(unwrap(runtime.commitStroke(401))).toBe(true);
+    const painted = canvas.canvases[0]!.frame.slice();
+    const history = runtime.getSnapshot().history;
+
+    expect(history).toMatchObject({ undoCount: 1, redoCount: 0 });
+    expect(history.retainedBytes).toBeLessThanOrEqual(maxHistoryBytes);
+    expect(size * size * 4 * 2).toBeGreaterThan(maxHistoryBytes);
+    expect(painted).not.toEqual(original);
+
+    expect(unwrap(runtime.undo())).toBe(true);
+    expect(canvas.canvases[0]!.frame).toEqual(original);
+    expect(unwrap(runtime.redo())).toBe(true);
+    expect(canvas.canvases[0]!.frame).toEqual(painted);
+  });
+
+  it("evicts the oldest committed deltas by count while preserving the reachable undo floor", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    const { mesh } = meshWithMap(source);
+    scene.add(mesh);
+    const { canvases, createCanvas } = canvasHarness();
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas,
+      readTextureImage: imageReader(new Map([[source, readable(12, 12)]])),
+      maxHistoryEntries: 2,
+      maxHistoryBytes: 1024 * 1024,
+      undoTileSize: 8,
+    });
+
+    const states: Uint8ClampedArray[] = [];
+    for (const [index, stroke] of [
+      { u: 0.15, color: "#ff0000" },
+      { u: 0.5, color: "#00ff00" },
+      { u: 0.85, color: "#0000ff" },
+    ].entries()) {
+      unwrap(await runtime.beginStroke({
+        pointerId: index + 1,
+        hit: hit(mesh, stroke.u, 0.5),
+        style: { ...INK, color: stroke.color, sizeTexels: 2 },
+      }));
+      unwrap(runtime.commitStroke(index + 1));
+      states.push(canvases[0]!.frame.slice());
+    }
+
+    expect(runtime.getSnapshot().history).toMatchObject({ undoCount: 2, redoCount: 0 });
+    expect(unwrap(runtime.undo())).toBe(true);
+    expect(canvases[0]!.frame).toEqual(states[1]);
+    expect(unwrap(runtime.undo())).toBe(true);
+    expect(canvases[0]!.frame).toEqual(states[0]);
+    expect(unwrap(runtime.undo())).toBe(false);
+    expect(unwrap(runtime.redo())).toBe(true);
+    expect(unwrap(runtime.redo())).toBe(true);
+    expect(canvases[0]!.frame).toEqual(states[2]);
+  });
+
+  it("rolls over oldest history before active COW allocation without locking later strokes", async () => {
+    const cappedScene = new THREE.Group();
+    const cappedSource = new THREE.Texture();
+    const cappedMesh = meshWithMap(cappedSource);
+    cappedScene.add(cappedMesh.mesh);
+    const cappedCanvas = canvasHarness();
+    const cappedRuntime = createStudioVrmTexturePaintRuntime(cappedScene, {
+      createCanvas: cappedCanvas.createCanvas,
+      readTextureImage: imageReader(new Map([[cappedSource, readable(12, 12)]])),
+      maxHistoryEntries: 50,
+      maxHistoryBytes: 1024,
+      undoTileSize: 8,
+    });
+
+    const committedFrames: Uint8ClampedArray[] = [];
+    for (let index = 0; index < 20; index += 1) {
+      const u = 0.1 + (index % 5) * 0.2;
+      unwrap(await cappedRuntime.beginStroke({
+        pointerId: index + 1,
+        hit: hit(cappedMesh.mesh, u, 0.5),
+        style: {
+          ...INK,
+          color: index % 2 === 0 ? "#ff0000" : "#0000ff",
+          sizeTexels: 2,
+        },
+      }));
+      unwrap(cappedRuntime.commitStroke(index + 1));
+      committedFrames.push(cappedCanvas.canvases[0]!.frame.slice());
+    }
+    expect(cappedRuntime.getSnapshot().history.undoCount).toBeGreaterThan(0);
+    expect(cappedRuntime.getSnapshot().history.undoCount).toBeLessThan(20);
+    expect(cappedRuntime.getSnapshot().history.redoCount).toBe(0);
+    expect(cappedRuntime.getSnapshot().history.retainedBytes).toBeLessThanOrEqual(1024);
+    expect(unwrap(cappedRuntime.undo())).toBe(true);
+    expect(cappedCanvas.canvases[0]!.frame).toEqual(committedFrames.at(-2));
+    expect(unwrap(cappedRuntime.redo())).toBe(true);
+    expect(cappedCanvas.canvases[0]!.frame).toEqual(committedFrames.at(-1));
+
+    const rejectScene = new THREE.Group();
+    const rejectSource = new THREE.Texture();
+    const rejectMesh = meshWithMap(rejectSource);
+    rejectScene.add(rejectMesh.mesh);
+    const original = rgba(8, 8, [31, 47, 63, 255]);
+    const rejectCanvas = canvasHarness();
+    const rejectRuntime = createStudioVrmTexturePaintRuntime(rejectScene, {
+      createCanvas: rejectCanvas.createCanvas,
+      readTextureImage: imageReader(new Map([[rejectSource, readable(8, 8, original)]])),
+      maxHistoryBytes: 16,
+      undoTileSize: 8,
+    });
+    expectFailure(await rejectRuntime.beginStroke({
+      pointerId: 9,
+      hit: hit(rejectMesh.mesh),
+      style: { ...INK, sizeTexels: 5 },
+    }), "history-budget");
+    expect(unwrap(rejectRuntime.commitStroke(9))).toBe(false);
+    expect(rejectCanvas.canvases[0]!.frame).toEqual(original);
+    expect(rejectRuntime.getSnapshot().history).toMatchObject({
+      undoCount: 0,
+      redoCount: 0,
+      retainedBytes: 0,
+    });
+  });
+
+  it("rejects per-target and aggregate RGBA budget overages before rebinding", async () => {
+    const perTargetScene = new THREE.Group();
+    const perTargetSource = new THREE.Texture();
+    const perTarget = meshWithMap(perTargetSource);
+    perTargetScene.add(perTarget.mesh);
+    const perTargetCanvases = canvasHarness();
+    const perTargetRuntime = createStudioVrmTexturePaintRuntime(perTargetScene, {
+      createCanvas: perTargetCanvases.createCanvas,
+      readTextureImage: imageReader(new Map([[perTargetSource, readable(4, 4)]])),
+      maxTargetRgbaBytes: 63,
+    });
+
+    expectFailure(await perTargetRuntime.beginStroke({
+      pointerId: 1,
+      hit: hit(perTarget.mesh),
+      style: INK,
+    }), "target-rgba-budget");
+    expect(perTarget.material.map).toBe(perTargetSource);
+    expect(perTargetCanvases.canvases).toHaveLength(0);
+
+    const aggregateScene = new THREE.Group();
+    const firstSource = new THREE.Texture();
+    const secondSource = new THREE.Texture();
+    const first = meshWithMap(firstSource);
+    const second = meshWithMap(secondSource);
+    aggregateScene.add(first.mesh, second.mesh);
+    const aggregateCanvases = canvasHarness();
+    const aggregateRuntime = createStudioVrmTexturePaintRuntime(aggregateScene, {
+      createCanvas: aggregateCanvases.createCanvas,
+      readTextureImage: imageReader(new Map([
+        [firstSource, readable(4, 4)],
+        [secondSource, readable(4, 4)],
+      ])),
+      maxTargetRgbaBytes: 64,
+      maxAggregateRgbaBytes: 64,
+    });
+
+    unwrap(await aggregateRuntime.beginStroke({
+      pointerId: 2,
+      hit: hit(first.mesh),
+      style: INK,
+    }));
+    unwrap(aggregateRuntime.commitStroke(2));
+    expectFailure(await aggregateRuntime.beginStroke({
+      pointerId: 3,
+      hit: hit(second.mesh),
+      style: INK,
+    }), "aggregate-rgba-budget");
+    expect(second.material.map).toBe(secondSource);
+    expect(aggregateRuntime.getSnapshot()).toMatchObject({
+      aggregateRgbaBytes: 64,
+      targets: [expect.objectContaining({ sourceTextureUuid: firstSource.uuid })],
+    });
+    expect(aggregateCanvases.canvases).toHaveLength(1);
+  });
+
+  it("rejects a known oversized source before reader, Canvas, or GPU allocation", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    source.image = { width: 2_048, height: 2_048 };
+    const target = meshWithMap(source);
+    scene.add(target.mesh);
+    const canvas = canvasHarness();
+    const reader = vi.fn(() => readable(1, 1));
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas: canvas.createCanvas,
+      readTextureImage: reader,
+      maxTargetResidentBytes: 56 * 1024 * 1024,
+      maxAggregateResidentBytes: 64 * 1024 * 1024,
+      maxHistoryBytes: 8 * 1024 * 1024,
+    });
+
+    expect(estimateStudioVrmTexturePaintTargetResidentBytes({
+      width: 2_048,
+      height: 2_048,
+    })).toBe(64 * 1024 * 1024);
+    expectFailure(await runtime.beginStroke({
+      pointerId: 4,
+      hit: hit(target.mesh),
+      style: INK,
+    }), "target-rgba-budget");
+    expect(reader).not.toHaveBeenCalled();
+    expect(canvas.createCanvas).not.toHaveBeenCalled();
+    expect(target.material.map).toBe(source);
+    expect(runtime.getSnapshot()).toMatchObject({
+      aggregateTargetResidentBytes: 0,
+      residentBytes: 0,
+      targets: [],
+    });
+  });
+
+  it("caps synchronous geometry indexing and exposes the face-local fallback guidance", async () => {
+    const overScene = new THREE.Group();
+    const overSource = new THREE.Texture();
+    const overTarget = meshWithMap(overSource);
+    overScene.add(overTarget.mesh);
+    const overCanvas = canvasHarness();
+    const overRuntime = createStudioVrmTexturePaintRuntime(overScene, {
+      createCanvas: overCanvas.createCanvas,
+      readTextureImage: imageReader(new Map([[overSource, readable(8, 8)]])),
+      maxGeometryIndexTriangles: 1,
+    });
+
+    const overSnapshot = unwrap(await overRuntime.beginStroke({
+      pointerId: 5,
+      hit: hit(overTarget.mesh, 0.5, 0.5, 0, 0),
+      style: INK,
+    }));
+    expect(overSnapshot.guidance).toMatchObject({
+      code: "geometry-triangle-budget",
+      triangleCount: 2,
+      maxTriangles: 1,
+    });
+    expect(Object.isFrozen(overSnapshot.guidance)).toBe(true);
+    expect(unwrap(overRuntime.cancelStroke(5))).toBe(true);
+    expect(overRuntime.clearError().guidance).toBeNull();
+
+    const boundaryScene = new THREE.Group();
+    const boundarySource = new THREE.Texture();
+    const boundaryTarget = meshWithMap(boundarySource);
+    boundaryScene.add(boundaryTarget.mesh);
+    const boundaryCanvas = canvasHarness();
+    const boundaryRuntime = createStudioVrmTexturePaintRuntime(boundaryScene, {
+      createCanvas: boundaryCanvas.createCanvas,
+      readTextureImage: imageReader(new Map([[boundarySource, readable(8, 8)]])),
+      maxGeometryIndexTriangles: 2,
+    });
+    const boundarySnapshot = unwrap(await boundaryRuntime.beginStroke({
+      pointerId: 6,
+      hit: hit(boundaryTarget.mesh, 0.5, 0.5, 0, 0),
+      style: INK,
+    }));
+    expect(boundarySnapshot.guidance).toBeNull();
+    expect(unwrap(boundaryRuntime.cancelStroke(6))).toBe(true);
+  });
+
+  it("resets the selected target to its captured source and removes only its history", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    source.name = "Coat";
+    const { material, mesh } = meshWithMap(source);
+    scene.add(mesh);
+    const original = rgba(10, 10, [77, 88, 99, 255]);
+    const { canvases, createCanvas } = canvasHarness();
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas,
+      readTextureImage: imageReader(new Map([[source, readable(10, 10, original)]])),
+    });
+
+    unwrap(await runtime.beginStroke({
+      pointerId: 5,
+      hit: hit(mesh),
+      style: { ...INK, color: "#ffffff", sizeTexels: 6 },
+    }));
+    unwrap(runtime.commitStroke(5));
+    const paintedTexture = material.map;
+    expect(canvases[0]!.frame).not.toEqual(original);
+    expect(runtime.getSnapshot().history.undoCount).toBe(1);
+
+    expect(unwrap(runtime.resetActiveTarget())).toBe(true);
+    expect(canvases[0]!.frame).toEqual(original);
+    expect(material.map).toBe(paintedTexture);
+    expect(runtime.getSnapshot()).toMatchObject({
+      activeTarget: {
+        sourceName: "Coat",
+        width: 10,
+        height: 10,
+      },
+      history: { undoCount: 0, redoCount: 0, retainedBytes: 0 },
+    });
+    expect(unwrap(runtime.undo())).toBe(false);
+  });
+
+  it("aborts a cancelled source read and auto-commits one early completion exactly once", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    const { material, mesh } = meshWithMap(source);
+    scene.add(mesh);
+    const resolvers: Array<(image: StudioVrmTexturePaintReadableImage) => void> = [];
+    const signals: AbortSignal[] = [];
+    const reader = vi.fn((
+      _texture: THREE.Texture,
+      signal: AbortSignal,
+    ) => new Promise<StudioVrmTexturePaintReadableImage>((resolve, reject) => {
+      signals.push(signal);
+      resolvers.push(resolve);
+      signal.addEventListener(
+        "abort",
+        () => reject(new DOMException("Cancelled", "AbortError")),
+        { once: true },
+      );
+    }));
+    const { canvases, createCanvas } = canvasHarness();
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas,
+      readTextureImage: reader,
+    });
+
+    const cancelledBegin = runtime.beginStroke({
+      pointerId: 21,
+      hit: hit(mesh, 0.2, 0.2),
+      style: INK,
+    });
+    expect(runtime.getSnapshot()).toMatchObject({ status: "loading", activePointerId: 21 });
+    expect(unwrap(runtime.cancelStroke(21))).toBe(true);
+    expect(signals[0]?.aborted).toBe(true);
+    expectFailure(await cancelledBegin, "stale-completion");
+    expect(material.map).toBe(source);
+
+    const committedBegin = runtime.beginStroke({
+      pointerId: 22,
+      hit: hit(mesh, 0.2, 0.2),
+      pressure: 0.1,
+      style: { ...INK, sizeTexels: 5 },
+    });
+    unwrap(runtime.moveStroke({ pointerId: 22, hit: hit(mesh, 0.8, 0.8), pressure: 1 }));
+    expect(unwrap(runtime.commitStroke(22))).toBe(true);
+    expect(unwrap(runtime.commitStroke(22))).toBe(false);
+
+    resolvers[1]!(readable(12, 12));
+    const completion = unwrap(await committedBegin);
+    expect(completion).toMatchObject({
+      status: "ready",
+      activePointerId: null,
+      history: { undoCount: 1, redoCount: 0 },
+    });
+    expect(material.map).not.toBe(source);
+    expect(canvases).toHaveLength(1);
+    expect(reader).toHaveBeenCalledTimes(2);
+    expect(unwrap(runtime.commitStroke(22))).toBe(false);
+  });
+
+  it("can still cancel and abort a pending read after pointerup requested an early commit", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    const { material, mesh } = meshWithMap(source);
+    scene.add(mesh);
+    let observedSignal: AbortSignal | null = null;
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      readTextureImage: (_texture, signal) => new Promise((_, reject) => {
+        observedSignal = signal;
+        signal.addEventListener(
+          "abort",
+          () => reject(new DOMException("Cancelled", "AbortError")),
+          { once: true },
+        );
+      }),
+    });
+
+    const completion = runtime.beginStroke({
+      pointerId: 23,
+      hit: hit(mesh),
+      style: INK,
+    });
+    expect(unwrap(runtime.commitStroke(23))).toBe(true);
+    expect(unwrap(runtime.cancelStroke(23))).toBe(true);
+
+    expect((observedSignal as AbortSignal | null)?.aborted).toBe(true);
+    expectFailure(await completion, "stale-completion");
+    expect(material.map).toBe(source);
+    expect(runtime.getSnapshot()).toMatchObject({
+      status: "idle",
+      activePointerId: null,
+      history: { undoCount: 0, redoCount: 0 },
+    });
+  });
+
+  it("bounds non-cooperative stale reads per source and across the runtime", async () => {
+    const scene = new THREE.Group();
+    const sources = [new THREE.Texture(), new THREE.Texture(), new THREE.Texture()];
+    const meshes = sources.map((source) => meshWithMap(source));
+    scene.add(...meshes.map(({ mesh }) => mesh));
+    const resolvers: Array<(image: StudioVrmTexturePaintReadableImage) => void> = [];
+    const signals: AbortSignal[] = [];
+    const reader = vi.fn((
+      _texture: THREE.Texture,
+      signal: AbortSignal,
+    ) => new Promise<StudioVrmTexturePaintReadableImage>((resolve) => {
+      signals.push(signal);
+      resolvers.push(resolve);
+    }));
+    const canvas = canvasHarness();
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas: canvas.createCanvas,
+      maxConcurrentReads: 2,
+      readTextureImage: reader,
+    });
+
+    const firstBegin = runtime.beginStroke({
+      pointerId: 41,
+      hit: hit(meshes[0]!.mesh),
+      style: INK,
+    });
+    expect(unwrap(runtime.cancelStroke(41))).toBe(true);
+    expectFailure(await runtime.beginStroke({
+      pointerId: 42,
+      hit: hit(meshes[0]!.mesh),
+      style: INK,
+    }), "source-read-active");
+
+    const secondBegin = runtime.beginStroke({
+      pointerId: 43,
+      hit: hit(meshes[1]!.mesh),
+      style: INK,
+    });
+    expect(unwrap(runtime.cancelStroke(43))).toBe(true);
+    expectFailure(await runtime.beginStroke({
+      pointerId: 44,
+      hit: hit(meshes[2]!.mesh),
+      style: INK,
+    }), "read-concurrency-budget");
+
+    expect(reader).toHaveBeenCalledTimes(2);
+    expect(signals).toHaveLength(2);
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+    resolvers[0]!(readable(8, 8));
+    resolvers[1]!(readable(8, 8));
+    expectFailure(await firstBegin, "stale-completion");
+    expectFailure(await secondBegin, "stale-completion");
+    expect(canvas.canvases).toHaveLength(0);
+  });
+
+  it("aborts an unsettled reader when the runtime is disposed", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    const { mesh } = meshWithMap(source);
+    scene.add(mesh);
+    const observedSignals: AbortSignal[] = [];
+    const reader = vi.fn((
+      _texture: THREE.Texture,
+      signal: AbortSignal,
+    ) => new Promise<StudioVrmTexturePaintReadableImage>((_resolve, reject) => {
+      observedSignals.push(signal);
+      signal.addEventListener(
+        "abort",
+        () => reject(new DOMException("Disposed", "AbortError")),
+        { once: true },
+      );
+    }));
+    const runtime = createStudioVrmTexturePaintRuntime(scene, { readTextureImage: reader });
+    const completion = runtime.beginStroke({
+      pointerId: 45,
+      hit: hit(mesh),
+      style: INK,
+    });
+
+    runtime.dispose();
+    expect(observedSignals[0]?.aborted).toBe(true);
+    expectFailure(await completion, "stale-completion");
+    expect(runtime.getSnapshot()).toMatchObject({ status: "disposed", targets: [] });
+  });
+
+  it("does not bind shared materials when the originating map changes during an asynchronous read", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    const origin = meshWithMap(source);
+    const shared = meshWithMap(source);
+    scene.add(origin.mesh, shared.mesh);
+    let resolveImage: ((image: StudioVrmTexturePaintReadableImage) => void) | null = null;
+    const reader = vi.fn(() => new Promise<StudioVrmTexturePaintReadableImage>((resolve) => {
+      resolveImage = resolve;
+    }));
+    const canvas = canvasHarness();
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas: canvas.createCanvas,
+      readTextureImage: reader,
+    });
+
+    const completion = runtime.beginStroke({
+      pointerId: 31,
+      hit: hit(origin.mesh),
+      style: INK,
+    });
+    const externalReplacement = new THREE.Texture();
+    origin.material.map = externalReplacement;
+    const finishRead = resolveImage as
+      | ((image: StudioVrmTexturePaintReadableImage) => void)
+      | null;
+    expect(finishRead).not.toBeNull();
+    finishRead?.(readable(8, 8));
+
+    expectFailure(await completion, "source-changed");
+    expect(origin.material.map).toBe(externalReplacement);
+    expect(shared.material.map).toBe(source);
+    expect(canvas.canvases).toHaveLength(0);
+    expect(runtime.getSnapshot()).toMatchObject({
+      status: "idle",
+      targets: [],
+      aggregateRgbaBytes: 0,
+    });
+  });
+
+  it("uses pressure in the paint plan and does not notify subscribers for successful moves", async () => {
+    const paintWithPressure = async (pressure: number) => {
+      const scene = new THREE.Group();
+      const source = new THREE.Texture();
+      const { mesh } = meshWithMap(source);
+      scene.add(mesh);
+      const canvas = canvasHarness();
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        createCanvas: canvas.createCanvas,
+        readTextureImage: imageReader(new Map([[source, readable(16, 16)]])),
+      });
+      const listener = vi.fn();
+      runtime.subscribe(listener);
+      unwrap(await runtime.beginStroke({
+        pointerId: 1,
+        hit: hit(mesh, 0.25, 0.5),
+        pressure,
+        style: {
+          ...INK,
+          sizeTexels: 8,
+          tuning: { flow: 1, hardness: 1, minSize: 0 },
+        },
+      }));
+      listener.mockClear();
+      unwrap(runtime.moveStroke({ pointerId: 1, hit: hit(mesh, 0.75, 0.5), pressure }));
+      expect(listener).not.toHaveBeenCalled();
+      return canvas.canvases[0]!.frame;
+    };
+
+    const low = await paintWithPressure(0);
+    const high = await paintWithPressure(1);
+    const alphaCoverage = (pixels: Uint8ClampedArray) => {
+      let covered = 0;
+      for (let offset = 3; offset < pixels.length; offset += 4) {
+        if (pixels[offset]! > 0) covered += 1;
+      }
+      return covered;
+    };
+    expect(alphaCoverage(high)).toBeGreaterThan(alphaCoverage(low));
+  });
+
+  it("coalesces duplicate samples and enforces a hard per-stroke sample cap", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    const { mesh } = meshWithMap(source);
+    scene.add(mesh);
+    const canvas = canvasHarness();
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas: canvas.createCanvas,
+      maxStrokeSamples: 3,
+      readTextureImage: imageReader(new Map([[source, readable(24, 24)]])),
+    });
+
+    unwrap(await runtime.beginStroke({
+      pointerId: 51,
+      hit: hit(mesh, 0.1, 0.1),
+      pressure: 0.5,
+      style: INK,
+    }));
+    const putsAfterBegin = canvas.canvases[0]!.putCount;
+    expect(unwrap(runtime.moveStroke({
+      pointerId: 51,
+      hit: hit(mesh, 0.1, 0.1),
+      pressure: 0.5,
+    }))).toBe(false);
+    expect(canvas.canvases[0]!.putCount).toBe(putsAfterBegin);
+
+    expect(unwrap(runtime.moveStroke({
+      pointerId: 51,
+      hit: hit(mesh, 0.35, 0.35),
+      pressure: 0.6,
+    }))).toBe(true);
+    expect(unwrap(runtime.moveStroke({
+      pointerId: 51,
+      hit: hit(mesh, 0.6, 0.6),
+      pressure: 0.7,
+    }))).toBe(true);
+    expectFailure(runtime.moveStroke({
+      pointerId: 51,
+      hit: hit(mesh, 0.85, 0.85),
+      pressure: 0.8,
+    }), "stroke-sample-budget");
+    expect(runtime.getSnapshot()).toMatchObject({ status: "painting", activePointerId: 51 });
+    expect(unwrap(runtime.commitStroke(51))).toBe(true);
+    expect(runtime.getSnapshot().history.undoCount).toBe(1);
+  });
+
+  it("releases a failed target and can rebuild it safely from the original texture", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    const { material, mesh } = meshWithMap(source);
+    scene.add(mesh);
+    const canvas = canvasHarness();
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas: canvas.createCanvas,
+      readTextureImage: imageReader(new Map([[source, readable(12, 12)]])),
+    });
+
+    unwrap(await runtime.beginStroke({
+      pointerId: 61,
+      hit: hit(mesh, 0.4, 0.4),
+      style: { ...INK, sizeTexels: 5 },
+    }));
+    expect(material.map).not.toBe(source);
+    canvas.canvases[0]!.failAllPuts = true;
+
+    expectFailure(runtime.cancelStroke(61), "target-invalid");
+    expect(material.map).toBe(source);
+    expect(runtime.getSnapshot()).toMatchObject({
+      status: "idle",
+      activePointerId: null,
+      activeTarget: null,
+      aggregateRgbaBytes: 0,
+      history: { undoCount: 0, redoCount: 0, retainedBytes: 0 },
+      targets: [],
+      error: { code: "target-invalid" },
+    });
+    expect(canvas.canvases[0]!.closeCount).toBeGreaterThan(0);
+
+    unwrap(await runtime.beginStroke({
+      pointerId: 62,
+      hit: hit(mesh, 0.4, 0.4),
+      style: INK,
+    }));
+    expect(material.map).not.toBe(source);
+    expect(runtime.getSnapshot()).toMatchObject({
+      status: "painting",
+      activePointerId: 62,
+      targets: [expect.objectContaining({ valid: true })],
+    });
+    unwrap(runtime.cancelStroke(62));
+  });
+
+  it("paints repeat-U and mirrored-V edges with their independent sampler modes", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    source.flipY = false;
+    source.wrapS = THREE.RepeatWrapping;
+    source.wrapT = THREE.MirroredRepeatWrapping;
+    const { mesh } = meshWithMap(source);
+    scene.add(mesh);
+    const canvas = canvasHarness();
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas: canvas.createCanvas,
+      readTextureImage: imageReader(new Map([[source, readable(8, 8)]])),
+    });
+
+    unwrap(await runtime.beginStroke({
+      pointerId: 71,
+      hit: hit(mesh, 0.02, 1.02),
+      style: { ...INK, sizeTexels: 6 },
+    }));
+    const frame = canvas.canvases[0]!.frame;
+    const alphaAt = (x: number, y: number) => frame[(y * 8 + x) * 4 + 3]!;
+    expect(alphaAt(7, 7)).toBeGreaterThan(0);
+    expect(alphaAt(0, 0)).toBe(0);
+    unwrap(runtime.cancelStroke(71));
+  });
+
+  it("exposes frozen error state, clears it explicitly, and fails closed on unsafe sources", async () => {
+    const scene = new THREE.Group();
+    const source = new THREE.Texture();
+    const { mesh } = meshWithMap(source);
+    scene.add(mesh);
+    const canvas = canvasHarness();
+    const unreadableRuntime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas: canvas.createCanvas,
+      readTextureImage: vi.fn(async () => {
+        throw new DOMException("The canvas has been tainted", "SecurityError");
+      }),
+    });
+
+    expectFailure(await unreadableRuntime.beginStroke({
+      pointerId: 1,
+      hit: hit(mesh),
+      style: INK,
+    }), "source-unreadable");
+    const failed = unreadableRuntime.getSnapshot();
+    expect(failed.status).toBe("idle");
+    expect(failed.error).toMatchObject({
+      code: "source-unreadable",
+      message: "텍스처를 읽을 수 없습니다. CORS 설정을 확인하세요.",
+    });
+    expect(Object.isFrozen(failed.error)).toBe(true);
+    expect(unreadableRuntime.clearError().error).toBeNull();
+
+    const compressedScene = new THREE.Group();
+    const compressed = new THREE.CompressedTexture([], 4, 4);
+    const compressedMesh = meshWithMap(compressed);
+    compressedScene.add(compressedMesh.mesh);
+    const compressedReader = vi.fn(() => readable(4, 4));
+    const compressedRuntime = createStudioVrmTexturePaintRuntime(compressedScene, {
+      createCanvas: canvas.createCanvas,
+      readTextureImage: compressedReader,
+    });
+    expectFailure(await compressedRuntime.beginStroke({
+      pointerId: 2,
+      hit: hit(compressedMesh.mesh),
+      style: INK,
+    }), "source-compressed");
+    expect(compressedReader).not.toHaveBeenCalled();
+    expect(compressedMesh.material.map).toBe(compressed);
+
+    const invalidScene = new THREE.Group();
+    const invalidSource = new THREE.Texture();
+    const invalidMesh = meshWithMap(invalidSource);
+    invalidScene.add(invalidMesh.mesh);
+    const invalidRuntime = createStudioVrmTexturePaintRuntime(invalidScene, {
+      createCanvas: canvas.createCanvas,
+      readTextureImage: () => ({
+        width: 4,
+        height: 4,
+        data: new Uint8ClampedArray(7),
+      }),
+    });
+    expectFailure(await invalidRuntime.beginStroke({
+      pointerId: 3,
+      hit: hit(invalidMesh.mesh),
+      style: INK,
+    }), "invalid-dimensions");
+    expect(invalidMesh.material.map).toBe(invalidSource);
+
+    const noUvRuntime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas: canvas.createCanvas,
+      readTextureImage: imageReader(new Map([[source, readable(4, 4)]])),
+    });
+    expectFailure(await noUvRuntime.beginStroke({
+      pointerId: 4,
+      hit: { object: mesh, face: { materialIndex: 0 } },
+      style: INK,
+    }), "uv-missing");
+
+    const noMapScene = new THREE.Group();
+    const noMapMaterial = new THREE.MeshBasicMaterial({ map: null });
+    const noMapMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), noMapMaterial);
+    noMapScene.add(noMapMesh);
+    const noMapReader = vi.fn(() => readable(4, 4));
+    const noMapRuntime = createStudioVrmTexturePaintRuntime(noMapScene, {
+      createCanvas: canvas.createCanvas,
+      readTextureImage: noMapReader,
+    });
+    expectFailure(await noMapRuntime.beginStroke({
+      pointerId: 5,
+      hit: hit(noMapMesh),
+      style: INK,
+    }), "map-missing");
+    expect(noMapReader).not.toHaveBeenCalled();
+  });
+});

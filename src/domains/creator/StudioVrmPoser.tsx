@@ -1,11 +1,12 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
-import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
+import { Canvas, useFrame, useThree, createPortal, type ThreeEvent } from "@react-three/fiber";
 import { AlertTriangle, Camera, ChevronDown, Clapperboard, FlipHorizontal2, ImagePlus, Loader2, Maximize2, Paintbrush, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Shirt, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import { createPortal as createDomPortal } from "react-dom";
 import * as THREE from "three";
 
 import { planStudio3dInsertCaptureSize } from "./studio-3d-insert-capture-plan";
+import { STUDIO_STAMP_BRUSH_DEFAULTS } from "./studio-brush-stamp-engine";
 import {
   isStudioHumanoidBoneName,
   type StudioHumanoidBoneName,
@@ -213,6 +214,17 @@ import {
   resetStudioVrmFullStateHistory,
   stepStudioVrmFullStateHistory,
 } from "./studio-vrm-state-history";
+import { createStudioVrmTexturePaintCursor } from "./studio-vrm-texture-paint-cursor";
+import {
+  planStudioVrmTexturePaintDeviceTier,
+  type StudioVrmTexturePaintEnvironmentSignals,
+} from "./studio-vrm-texture-paint-device-tier";
+import {
+  createStudioVrmTexturePaintRuntime,
+  type StudioVrmTexturePaintRayHit,
+  type StudioVrmTexturePaintRuntime,
+  type StudioVrmTexturePaintRuntimeSnapshot,
+} from "./studio-vrm-texture-paint-runtime";
 import {
   applyCalibration,
   CALIBRATION_STORAGE_KEY,
@@ -291,6 +303,10 @@ import {
 import { StudioVrmPoseMaterialPanel } from "./StudioVrmPoseMaterialPanel";
 import { StudioVrmPropPanel } from "./StudioVrmPropPanel";
 import { StudioVrmRigAssistPanel } from "./StudioVrmRigAssistPanel";
+import {
+  StudioVrmTexturePaintPanel,
+  type StudioVrmTexturePaintPanelSettings,
+} from "./StudioVrmTexturePaintPanel";
 import {
   canonicalizeVrmContentHash,
   deleteStoredVrmModel,
@@ -743,7 +759,7 @@ const PANEL_TABS: Array<{ id: PanelTab; label: string; icon: typeof UserRound; h
   { id: "props", label: "소품", icon: Swords, hint: "부착 · 배치" },
 ];
 
-type CharacterPanelSection = "library" | "forge" | "appearance" | "wardrobe";
+type CharacterPanelSection = "library" | "forge" | "appearance" | "wardrobe" | "surface";
 const CHARACTER_PANEL_SECTIONS: Array<{
   id: CharacterPanelSection;
   label: string;
@@ -753,7 +769,53 @@ const CHARACTER_PANEL_SECTIONS: Array<{
   { id: "forge", label: "조형", icon: Sparkles },
   { id: "appearance", label: "체형·색", icon: Sliders },
   { id: "wardrobe", label: "의상", icon: Shirt },
+  { id: "surface", label: "표면", icon: Paintbrush },
 ];
+
+const DEFAULT_STUDIO_VRM_TEXTURE_PAINT_SETTINGS: StudioVrmTexturePaintPanelSettings = {
+  brushKind: "ink",
+  color: "#d85f48",
+  sizeTexels: 48,
+  opacity: 1,
+  blend: "normal",
+  tuning: {
+    flow: STUDIO_STAMP_BRUSH_DEFAULTS.ink.flow,
+    hardness: STUDIO_STAMP_BRUSH_DEFAULTS.ink.hardness,
+    minSize: STUDIO_STAMP_BRUSH_DEFAULTS.ink.minSizeRatio,
+  },
+};
+
+type StudioVrmTexturePaintSettingsUpdate =
+  Partial<Omit<StudioVrmTexturePaintPanelSettings, "tuning">> & {
+    readonly tuning?: Partial<StudioVrmTexturePaintPanelSettings["tuning"]>;
+  };
+
+function readStudioVrmTexturePaintEnvironmentSignals(): StudioVrmTexturePaintEnvironmentSignals {
+  if (typeof window === "undefined") {
+    return {
+      coarsePointer: false,
+      viewportWidthCssPixels: null,
+      deviceMemoryGb: null,
+    };
+  }
+  const navigatorWithDeviceMemory = window.navigator as Navigator & {
+    readonly deviceMemory?: number;
+  };
+  const deviceMemory = navigatorWithDeviceMemory.deviceMemory;
+  return {
+    coarsePointer:
+      typeof window.matchMedia === "function"
+      && window.matchMedia("(pointer: coarse)").matches,
+    viewportWidthCssPixels:
+      Number.isFinite(window.innerWidth) && window.innerWidth > 0
+        ? window.innerWidth
+        : null,
+    deviceMemoryGb:
+      typeof deviceMemory === "number" && Number.isFinite(deviceMemory)
+        ? deviceMemory
+        : null,
+  };
+}
 
 const ENV_VARIANTS: Array<{ id: EnvVariant; label: string }> = [
   { id: "none", label: "없음" },
@@ -1845,6 +1907,45 @@ function applyLookAtToVrm(vrm: VRM, lookAt: { yawDeg: number; pitchDeg: number }
   vrm.lookAt.pitch = lookAt.pitchDeg;
 }
 
+function StudioVrmTexturePaintInvalidateBridge({
+  onReady,
+}: {
+  readonly onReady: (invalidate: (() => void) | null) => void;
+}) {
+  const invalidate = useThree((state) => state.invalidate);
+
+  useEffect(() => {
+    const requestFrame = () => invalidate();
+    onReady(requestFrame);
+    return () => onReady(null);
+  }, [invalidate, onReady]);
+
+  return null;
+}
+
+function studioVrmTexturePaintHit(
+  event: ThreeEvent<PointerEvent>,
+): StudioVrmTexturePaintRayHit | null {
+  if (!(event.object instanceof THREE.Mesh) || !event.uv) return null;
+  const hit = {
+    object: event.object,
+    uv: event.uv,
+    ...(event.uv1 ? { uv1: event.uv1 } : {}),
+    face: event.face,
+    faceIndex: event.faceIndex,
+    point: event.point,
+  };
+  return hit;
+}
+
+function studioVrmTexturePaintPressure(event: ThreeEvent<PointerEvent>): number {
+  const pressure = event.pressure;
+  if (Number.isFinite(pressure) && pressure > 0) {
+    return Math.min(1, Math.max(0.01, pressure));
+  }
+  return event.pointerType === "pen" ? 0.01 : 0.5;
+}
+
 function VrmActor({
   bodyRotation,
   customBones,
@@ -1859,6 +1960,9 @@ function VrmActor({
   idleAnimation,
   fingerEdits,
   bodyScale,
+  texturePaintEnabled,
+  texturePaintRuntime,
+  texturePaintSettings,
 }: {
   bodyRotation: number;
   customBones: PoseBoneMap;
@@ -1873,7 +1977,98 @@ function VrmActor({
   idleAnimation: boolean;
   fingerEdits: FingerRotationMap;
   bodyScale: BodyScale;
+  texturePaintEnabled: boolean;
+  texturePaintRuntime: StudioVrmTexturePaintRuntime | null;
+  texturePaintSettings: StudioVrmTexturePaintPanelSettings;
 }) {
+  const gl = useThree((state) => state.gl);
+  const invalidate = useThree((state) => state.invalidate);
+  const texturePaintRuntimeRef = useRef(texturePaintRuntime);
+  const texturePaintSettingsRef = useRef(texturePaintSettings);
+  const texturePaintEnabledRef = useRef(texturePaintEnabled);
+  const texturePaintPointerIdRef = useRef<number | null>(null);
+  const texturePaintCaptureTargetRef = useRef<{
+    releasePointerCapture(pointerId: number): void;
+  } | null>(null);
+  const finishTexturePaintRef = useRef<(pointerId?: number) => void>(() => undefined);
+  const cancelTexturePaintRef = useRef<(pointerId?: number) => void>(() => undefined);
+
+  useEffect(() => {
+    texturePaintRuntimeRef.current = texturePaintRuntime;
+    texturePaintSettingsRef.current = texturePaintSettings;
+    texturePaintEnabledRef.current = texturePaintEnabled;
+  }, [texturePaintEnabled, texturePaintRuntime, texturePaintSettings]);
+
+  useEffect(() => {
+    const releaseCapture = (pointerId: number) => {
+      const captureTarget = texturePaintCaptureTargetRef.current;
+      texturePaintCaptureTargetRef.current = null;
+      if (!captureTarget) return;
+      try {
+        captureTarget.releasePointerCapture(pointerId);
+      } catch {
+        // The browser may already have released capture before the fallback event arrives.
+      }
+    };
+    const finishTexturePaint = (matchingPointerId?: number) => {
+      const pointerId = texturePaintPointerIdRef.current;
+      if (
+        pointerId === null
+        || (matchingPointerId !== undefined && matchingPointerId !== pointerId)
+      ) {
+        return;
+      }
+      texturePaintPointerIdRef.current = null;
+      releaseCapture(pointerId);
+      const result = texturePaintRuntimeRef.current?.commitStroke(pointerId);
+      if (result?.ok && result.value) invalidate();
+    };
+    const cancelTexturePaint = (matchingPointerId?: number) => {
+      const pointerId = texturePaintPointerIdRef.current;
+      if (
+        pointerId === null
+        || (matchingPointerId !== undefined && matchingPointerId !== pointerId)
+      ) {
+        return;
+      }
+      texturePaintPointerIdRef.current = null;
+      releaseCapture(pointerId);
+      const result = texturePaintRuntimeRef.current?.cancelStroke(pointerId);
+      if (result?.ok && result.value) invalidate();
+    };
+    finishTexturePaintRef.current = finishTexturePaint;
+    cancelTexturePaintRef.current = cancelTexturePaint;
+
+    const finishMatchingPointer = (event: PointerEvent) => {
+      finishTexturePaint(event.pointerId);
+    };
+    const cancelMatchingPointer = (event: PointerEvent) => {
+      cancelTexturePaint(event.pointerId);
+    };
+    const cancelOnWindowBlur = () => cancelTexturePaint();
+    window.addEventListener("pointerup", finishMatchingPointer);
+    window.addEventListener("pointercancel", cancelMatchingPointer);
+    window.addEventListener("blur", cancelOnWindowBlur);
+    gl.domElement.addEventListener("lostpointercapture", cancelMatchingPointer);
+    return () => {
+      window.removeEventListener("pointerup", finishMatchingPointer);
+      window.removeEventListener("pointercancel", cancelMatchingPointer);
+      window.removeEventListener("blur", cancelOnWindowBlur);
+      gl.domElement.removeEventListener("lostpointercapture", cancelMatchingPointer);
+      cancelTexturePaint();
+      if (finishTexturePaintRef.current === finishTexturePaint) {
+        finishTexturePaintRef.current = () => undefined;
+      }
+      if (cancelTexturePaintRef.current === cancelTexturePaint) {
+        cancelTexturePaintRef.current = () => undefined;
+      }
+    };
+  }, [gl, invalidate]);
+
+  useEffect(() => {
+    if (!texturePaintEnabled) cancelTexturePaintRef.current();
+  }, [texturePaintEnabled]);
+
   useEffect(() => {
     applyPoserVisualState(vrm, {
       bones: customBones,
@@ -2014,7 +2209,112 @@ function VrmActor({
 
   }, VRM_FRAME_BASE_PRIORITY);
 
-  return <primitive object={vrm.scene} />;
+  const releaseFailedTexturePaintPointer = (pointerId: number) => {
+    if (texturePaintPointerIdRef.current !== pointerId) return;
+    texturePaintPointerIdRef.current = null;
+    const captureTarget = texturePaintCaptureTargetRef.current;
+    texturePaintCaptureTargetRef.current = null;
+    if (!captureTarget) return;
+    try {
+      captureTarget.releasePointerCapture(pointerId);
+    } catch {
+      // A native pointerup/lostpointercapture may have won the race.
+    }
+  };
+
+  const beginTexturePaint = (event: ThreeEvent<PointerEvent>) => {
+    const runtime = texturePaintRuntimeRef.current;
+    const hit = studioVrmTexturePaintHit(event);
+    if (
+      !texturePaintEnabledRef.current
+      || !runtime
+      || !hit
+      || !event.isPrimary
+      || event.button !== 0
+      || texturePaintPointerIdRef.current !== null
+    ) {
+      return;
+    }
+
+    event.stopPropagation();
+    const pointerId = event.pointerId;
+    texturePaintPointerIdRef.current = pointerId;
+    const captureTarget = event.currentTarget as unknown as {
+      setPointerCapture(pointerId: number): void;
+      releasePointerCapture(pointerId: number): void;
+    };
+    try {
+      captureTarget.setPointerCapture(pointerId);
+      texturePaintCaptureTargetRef.current = captureTarget;
+    } catch {
+      texturePaintCaptureTargetRef.current = null;
+    }
+
+    const settings = texturePaintSettingsRef.current;
+    runtime.clearError();
+    void runtime.beginStroke({
+      pointerId,
+      hit,
+      pressure: studioVrmTexturePaintPressure(event),
+      style: {
+        kind: settings.brushKind,
+        color: settings.color,
+        sizeTexels: settings.sizeTexels,
+        opacity: settings.opacity,
+        blend: settings.blend,
+        tuning: settings.tuning,
+      },
+    }).then((result) => {
+      if (!result.ok) releaseFailedTexturePaintPointer(pointerId);
+      invalidate();
+    }).catch(() => {
+      releaseFailedTexturePaintPointer(pointerId);
+      invalidate();
+    });
+  };
+
+  const moveTexturePaint = (event: ThreeEvent<PointerEvent>) => {
+    const pointerId = texturePaintPointerIdRef.current;
+    if (
+      pointerId === null
+      || event.pointerId !== pointerId
+      || !texturePaintEnabledRef.current
+    ) {
+      return;
+    }
+    const hit = studioVrmTexturePaintHit(event);
+    if (!hit) return;
+    event.stopPropagation();
+    const result = texturePaintRuntimeRef.current?.moveStroke({
+      pointerId,
+      hit,
+      pressure: studioVrmTexturePaintPressure(event),
+    });
+    if (result?.ok && result.value) invalidate();
+  };
+
+  const finishTexturePaint = (event: ThreeEvent<PointerEvent>) => {
+    if (texturePaintPointerIdRef.current !== event.pointerId) return;
+    event.stopPropagation();
+    finishTexturePaintRef.current(event.pointerId);
+  };
+
+  const cancelTexturePaint = (event: ThreeEvent<PointerEvent>) => {
+    if (texturePaintPointerIdRef.current !== event.pointerId) return;
+    event.stopPropagation();
+    cancelTexturePaintRef.current(event.pointerId);
+  };
+
+  return (
+    <primitive
+      object={vrm.scene}
+      onPointerDown={beginTexturePaint}
+      onPointerMove={moveTexturePaint}
+      onPointerUp={finishTexturePaint}
+      onPointerCancel={cancelTexturePaint}
+      onLostPointerCapture={cancelTexturePaint}
+    />
+  );
 }
 
 function VrmPoseBoneMarker({
@@ -2391,6 +2691,7 @@ function normalizeCatalogNextOffset(currentOffset: number, page: SharedAssetCata
 export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initialScene }: StudioVrmPoserProps) {
   const dialogTitleId = useId();
   const dialogDescriptionId = useId();
+  const viewportInstructionsId = useId();
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const [status, setStatus] = useState<LoadStatus>("empty");
@@ -2422,6 +2723,14 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const [activeCameraId, setActiveCameraId] = useState("front");
   const [activePanelTab, setActivePanelTab] = useState<PanelTab>("character");
   const [activeCharacterSection, setActiveCharacterSection] = useState<CharacterPanelSection>("library");
+  const [texturePaintSettings, setTexturePaintSettings] =
+    useState<StudioVrmTexturePaintPanelSettings>(DEFAULT_STUDIO_VRM_TEXTURE_PAINT_SETTINGS);
+  const [texturePaintRuntime, setTexturePaintRuntime] =
+    useState<StudioVrmTexturePaintRuntime | null>(null);
+  const [texturePaintSnapshot, setTexturePaintSnapshot] =
+    useState<StudioVrmTexturePaintRuntimeSnapshot | null>(null);
+  const [texturePaintDevicePlan] = useState(() =>
+    planStudioVrmTexturePaintDeviceTier(readStudioVrmTexturePaintEnvironmentSignals()));
   const [poseQuery, setPoseQuery] = useState("");
   const [poseBucket, setPoseBucket] = useState<StudioVrmPoseBucketId>("all");
   const [recentPoseState, setRecentPoseState] = useState<StudioVrmRecentState>(() =>
@@ -2557,6 +2866,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const dynamicPoseStateRef = useRef({ webcamActive: false, idleAnimation: false });
   const trackingDataRef = useRef<VrmTrackingData | null>(null);
   const vrmRef = useRef<VRM | null>(null);
+  const texturePaintRuntimeRef = useRef<StudioVrmTexturePaintRuntime | null>(null);
+  const texturePaintSnapshotRef = useRef<StudioVrmTexturePaintRuntimeSnapshot | null>(null);
+  const texturePaintInvalidateRef = useRef<(() => void) | null>(null);
   const loadRequestRef = useRef(0);
   const thumbnailRequestRef = useRef(0);
   const insertCaptureGenerationRef = useRef(0);
@@ -2606,6 +2918,38 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       }
     };
   }, []);
+
+  useEffect(() => {
+    texturePaintRuntimeRef.current = null;
+    texturePaintSnapshotRef.current = null;
+    setTexturePaintRuntime(null);
+    setTexturePaintSnapshot(null);
+    if (!vrm) return;
+
+    const runtime = createStudioVrmTexturePaintRuntime(
+      vrm.scene,
+      texturePaintDevicePlan.runtimeOptions,
+    );
+    texturePaintRuntimeRef.current = runtime;
+    setTexturePaintRuntime(runtime);
+    const initialSnapshot = runtime.getSnapshot();
+    texturePaintSnapshotRef.current = initialSnapshot;
+    setTexturePaintSnapshot(initialSnapshot);
+    const unsubscribe = runtime.subscribe((snapshot) => {
+      texturePaintSnapshotRef.current = snapshot;
+      setTexturePaintSnapshot(snapshot);
+      texturePaintInvalidateRef.current?.();
+    });
+
+    return () => {
+      unsubscribe();
+      if (texturePaintRuntimeRef.current === runtime) {
+        texturePaintRuntimeRef.current = null;
+        texturePaintSnapshotRef.current = null;
+      }
+      runtime.dispose();
+    };
+  }, [texturePaintDevicePlan, vrm]);
 
   const cancelPendingInsertCapture = useCallback((): void => {
     insertCaptureGenerationRef.current += 1;
@@ -2756,6 +3100,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
   const handleCharacterSectionChange = (section: CharacterPanelSection) => {
     setActiveCharacterSection(section);
+    if (section === "surface") {
+      setTurntable(false);
+      setMannequinMode(false);
+    }
     if (panelScrollRef.current) panelScrollRef.current.scrollTop = 0;
   };
 
@@ -2790,6 +3138,64 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
   const handleViewportReady = useCallback((api: ViewportApi | null) => {
     viewportApiRef.current = api;
+  }, []);
+
+  const handleTexturePaintInvalidateReady = useCallback(
+    (requestFrame: (() => void) | null) => {
+      texturePaintInvalidateRef.current = requestFrame;
+    },
+    [],
+  );
+
+  const handleTexturePaintSettingsChange = useCallback(
+    (update: StudioVrmTexturePaintSettingsUpdate) => {
+      setTexturePaintSettings((current) => {
+        const brushKind = update.brushKind ?? current.brushKind;
+        const brushChanged =
+          update.brushKind !== undefined && update.brushKind !== current.brushKind;
+        const defaults = STUDIO_STAMP_BRUSH_DEFAULTS[brushKind];
+        const tuning = brushChanged
+          ? {
+              flow: defaults.flow,
+              hardness: defaults.hardness,
+              minSize: defaults.minSizeRatio,
+              ...update.tuning,
+            }
+          : {
+              ...current.tuning,
+              ...update.tuning,
+            };
+        return {
+          ...current,
+          ...update,
+          brushKind,
+          tuning,
+        };
+      });
+    },
+    [],
+  );
+
+  const handleTexturePaintUndo = useCallback(() => {
+    const result = texturePaintRuntimeRef.current?.undo();
+    if (result?.ok && result.value) texturePaintInvalidateRef.current?.();
+  }, []);
+
+  const handleTexturePaintRedo = useCallback(() => {
+    const result = texturePaintRuntimeRef.current?.redo();
+    if (result?.ok && result.value) texturePaintInvalidateRef.current?.();
+  }, []);
+
+  const handleTexturePaintReset = useCallback(() => {
+    const result = texturePaintRuntimeRef.current?.resetActiveTarget();
+    if (result?.ok && result.value) texturePaintInvalidateRef.current?.();
+  }, []);
+
+  const cancelActiveTexturePaintStroke = useCallback(() => {
+    const pointerId = texturePaintSnapshotRef.current?.activePointerId;
+    if (typeof pointerId !== "number") return;
+    const result = texturePaintRuntimeRef.current?.cancelStroke(pointerId);
+    if (result?.ok && result.value) texturePaintInvalidateRef.current?.();
   }, []);
 
   const zoomViewport = useCallback((factor: number) => {
@@ -3672,6 +4078,54 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setCanRedo(false);
   }, []);
 
+  const texturePaintModeSelected =
+    activePanelTab === "character" && activeCharacterSection === "surface";
+  const texturePaintDisabledReason = !vrm
+    ? "표면을 칠할 VRM 모델을 먼저 불러오세요."
+    : webcamActive || webcamLoading
+      ? "웹캠 트래킹을 멈춘 뒤 표면을 칠할 수 있습니다."
+      : idleAnimation || physicsPreview
+        ? "대기 애니메이션과 물리 미리보기를 멈춘 뒤 표면을 칠할 수 있습니다."
+        : isCapturing || isSharingPose || isThumbnailCapturing
+          ? "캡처·공유 처리가 끝난 뒤 표면을 칠할 수 있습니다."
+          : persistentIkReconciling || jointHandleInteracting || isViewportHandIkDragging
+            ? "포즈 계산과 관절 이동이 끝난 뒤 표면을 칠할 수 있습니다."
+            : mannequinMode
+              ? "중립 데생 인형 보기를 끄면 원래 텍스처를 칠할 수 있습니다."
+              : "";
+  const texturePaintInteractionEnabled =
+    texturePaintModeSelected && texturePaintDisabledReason.length === 0;
+  const texturePaintStrokeActive =
+    texturePaintSnapshot?.status === "loading" || texturePaintSnapshot?.status === "painting";
+  const texturePaintTargetLabel = texturePaintSnapshot?.activeTarget
+    ? `${texturePaintSnapshot.activeTarget.sourceName || "Base color"} · ${texturePaintSnapshot.activeTarget.width}×${texturePaintSnapshot.activeTarget.height}`
+    : null;
+  const texturePaintBudgetErrorStatus =
+    texturePaintDevicePlan.tier === "constrained"
+    && texturePaintSnapshot?.error?.code === "target-rgba-budget"
+      ? "이 기기는 실행 취소 기록을 포함해 64 MiB 안에서 표면을 칠합니다. 텍스처를 줄이거나 데스크톱에서 편집해 주세요."
+      : texturePaintDevicePlan.tier === "constrained"
+        && texturePaintSnapshot?.error?.code === "aggregate-rgba-budget"
+        ? "추가 텍스처가 이 기기의 64 MiB 상주 메모리 한도를 넘습니다. 현재 결과를 캡처한 뒤 모델을 다시 열어 다음 텍스처를 편집해 주세요."
+        : "";
+  const texturePaintStatus = texturePaintDisabledReason
+    || texturePaintBudgetErrorStatus
+    || texturePaintSnapshot?.error?.message
+    || texturePaintSnapshot?.guidance?.message
+    || (texturePaintSnapshot?.status === "loading"
+      ? "텍스처를 안전한 편집 사본으로 준비하는 중입니다. 그대로 계속 그려도 입력이 보존됩니다."
+      : texturePaintSnapshot?.status === "painting"
+        ? "표면 페인팅 중 · 포인터를 놓으면 한 획으로 저장됩니다."
+        : texturePaintSnapshot?.activeTarget
+          ? "표면을 끌어 칠하세요. Ctrl/⌘+Z로 이 텍스처 획을 되돌릴 수 있습니다."
+          : "뷰포트에서 옷·피부·머리 표면을 누르면 해당 텍스처를 선택합니다.");
+  const viewportCanUndo =
+    !texturePaintStrokeActive
+    && (canUndo || (texturePaintModeSelected && (texturePaintSnapshot?.history.undoCount ?? 0) > 0));
+  const viewportCanRedo =
+    !texturePaintStrokeActive
+    && (canRedo || (texturePaintModeSelected && (texturePaintSnapshot?.history.redoCount ?? 0) > 0));
+
   const restoreHistoryStep = (direction: -1 | 1) => {
     if (
       pendingPersistentIkCommandRef.current
@@ -3709,9 +4163,25 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setCanRedo(transition.history.index < transition.history.entries.length - 1);
   };
   const doUndo = () => {
+    if (typeof texturePaintSnapshotRef.current?.activePointerId === "number") return;
+    if (
+      texturePaintModeSelected
+      && (texturePaintSnapshotRef.current?.history.undoCount ?? 0) > 0
+    ) {
+      handleTexturePaintUndo();
+      return;
+    }
     restoreHistoryStep(-1);
   };
   const doRedo = () => {
+    if (typeof texturePaintSnapshotRef.current?.activePointerId === "number") return;
+    if (
+      texturePaintModeSelected
+      && (texturePaintSnapshotRef.current?.history.redoCount ?? 0) > 0
+    ) {
+      handleTexturePaintRedo();
+      return;
+    }
     restoreHistoryStep(1);
   };
 
@@ -3932,6 +4402,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
         e.preventDefault();
         e.stopPropagation();
         if (isCapturing) return;
+        cancelActiveTexturePaintStroke();
         sharePoseAbortRef.current?.abort();
         onClose();
         return;
@@ -3974,7 +4445,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [isCapturing, open, onClose]);
+  }, [cancelActiveTexturePaintStroke, isCapturing, open, onClose, texturePaintStrokeActive]);
 
   // 소품 그립은 저장되는 수동 손가락 편집을 오염시키지 않고 파생한다. 사용자가 명시적으로
   // 조정한 손가락 값은 마지막에 병합해 자동 그립보다 항상 우선한다.
@@ -6494,6 +6965,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
   function handleInsert() {
     if (isCapturing || isSharingPose || isThumbnailCapturing) return;
+    const activeTexturePaintPointerId =
+      texturePaintSnapshotRef.current?.activePointerId;
+    if (typeof activeTexturePaintPointerId === "number") {
+      setError("표면 페인트 획을 마친 뒤 이 포즈를 추가해 주세요.");
+      setStatus("ready");
+      return;
+    }
     const insertBackground = resolveStudioVrmInsertBackgroundMode({
       transparent: transparentBackground,
       backgroundColor: insertBackgroundColor,
@@ -6726,10 +7204,17 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
             ref={closeButtonRef}
             type="button"
             aria-label="닫기"
-            title={isCapturing ? "삽입 캡처가 끝난 뒤 닫을 수 있습니다." : "닫기 (Esc)"}
+            title={
+              isCapturing
+                ? "캡처가 끝난 뒤 닫을 수 있습니다."
+                : texturePaintStrokeActive
+                  ? "닫기 · 진행 중인 표면 페인트 획은 취소됩니다. (Esc)"
+                : "닫기 (Esc)"
+            }
             className={ICON_BUTTON}
             disabled={isCapturing}
             onClick={() => {
+              cancelActiveTexturePaintStroke();
               cancelPendingPoseShare();
               onClose();
             }}
@@ -6740,17 +7225,46 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
         {/* 모바일: 뷰포트(상단)+컨트롤(하단) 두 행을 명시적으로 나눠 컨트롤 패널이 자체 스크롤되게 한다
             (행을 안 잡으면 패널이 모달 밖으로 흘러 하단의 웹캠/푸터가 잘림). 데스크톱(lg): 2단 컬럼. */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,36dvh)_minmax(0,1fr)] sm:grid-rows-[minmax(0,40dvh)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-1">
+        <div
+          className={cx(
+            "grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-1",
+            texturePaintModeSelected
+              ? "grid-rows-[minmax(0,60dvh)_minmax(0,1fr)] sm:grid-rows-[minmax(0,58dvh)_minmax(0,1fr)]"
+              : "grid-rows-[minmax(0,36dvh)_minmax(0,1fr)] sm:grid-rows-[minmax(0,40dvh)_minmax(0,1fr)]",
+          )}
+        >
           <section className="relative min-h-0 overflow-hidden bg-card lg:min-h-0">
             <div
               aria-hidden
               className="absolute inset-0 opacity-80 [background-image:linear-gradient(45deg,oklch(0.75_0.01_80/0.16)_25%,transparent_25%),linear-gradient(-45deg,oklch(0.75_0.01_80/0.16)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,oklch(0.75_0.01_80/0.16)_75%),linear-gradient(-45deg,transparent_75%,oklch(0.75_0.01_80/0.16)_75%)] [background-position:0_0,0_12px,12px_-12px,-12px_0] [background-size:24px_24px]"
             />
             <div className="relative mx-auto flex h-full max-h-full min-h-0 w-full max-w-[min(82vw,720px)] items-center justify-center p-2 sm:p-5 lg:max-h-[calc(100dvh-12rem)] lg:min-h-[420px]">
-              <div className="relative aspect-[9/13] h-full max-h-full min-h-0 w-auto overflow-hidden rounded-xl border border-line/80 bg-transparent shadow-[inset_0_0_0_1px_oklch(1_0_0/0.04)] lg:min-h-[390px]">
+              <div
+                className={cx(
+                  "relative aspect-[9/13] h-full max-h-full min-h-0 w-auto overflow-hidden rounded-xl border border-line/80 bg-transparent shadow-[inset_0_0_0_1px_oklch(1_0_0/0.04)] lg:min-h-[390px]",
+                )}
+                style={{
+                  cursor: texturePaintInteractionEnabled
+                    ? createStudioVrmTexturePaintCursor(texturePaintSettings)
+                    : undefined,
+                }}
+              >
+                <p id={viewportInstructionsId} className="sr-only">
+                  {texturePaintModeSelected
+                    ? "3D 캐릭터 표면 페인트 모드입니다. 캐릭터 회전은 잠겨 있습니다. 캐릭터 표면을 포인터로 끌어 칠하고, 뷰포트 오른쪽의 확대·축소 버튼으로 시점을 조절하세요."
+                    : "3D 캐릭터 편집 뷰포트입니다. 포인터로 끌어 캐릭터를 회전하고, 휠·핀치 또는 뷰포트 오른쪽의 확대·축소 버튼으로 시점을 조절하세요."}
+                </p>
                 <Canvas
+                  role="group"
+                  tabIndex={0}
+                  aria-label={
+                    texturePaintModeSelected
+                      ? "3D 캐릭터 표면 페인트 뷰포트"
+                      : "3D 캐릭터 편집 뷰포트"
+                  }
+                  aria-describedby={viewportInstructionsId}
                   camera={{ fov: activeCamera.fov, position: [...activeCamera.position], near: 0.1, far: 20 }}
-                  className="h-full w-full"
+                  className="h-full w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
                   dpr={[1, 2]}
                   frameloop={vrmFrameLoop}
                   gl={{ alpha: true, antialias: true }}
@@ -6760,6 +7274,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                   }}
                 >
                   <CaptureBridge onCaptureUpdate={onCaptureUpdate} />
+                  <StudioVrmTexturePaintInvalidateBridge
+                    onReady={handleTexturePaintInvalidateReady}
+                  />
                   <CameraDirector presetId={activeCameraId} resetNonce={viewResetNonce} />
                   <ViewportController onReady={handleViewportReady} />
                   <VrmLighting
@@ -6783,9 +7300,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                       idleAnimation={idleAnimation}
                       fingerEdits={effectiveFingerEdits}
                       bodyScale={bodyScale}
+                      texturePaintEnabled={texturePaintInteractionEnabled}
+                      texturePaintRuntime={texturePaintRuntime}
+                      texturePaintSettings={texturePaintSettings}
                     />
                   ) : null}
-                  {vrm && showPoseBoneOverlay && !isCapturing && !isSharingPose && !isThumbnailCapturing && !webcamActive ? (
+                  {vrm && showPoseBoneOverlay && !texturePaintModeSelected && !isCapturing && !isSharingPose && !isThumbnailCapturing && !webcamActive ? (
                     <VrmPoseBoneOverlay
                       vrm={vrm}
                       selectedBone={selectedViewportPoseBone}
@@ -6872,11 +7392,21 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                   </mesh>
                   <OrbitControls
                     makeDefault
-                    enabled={!isViewportHandIkDragging && !jointHandleInteracting}
+                    enabled={
+                      !isViewportHandIkDragging
+                      && !jointHandleInteracting
+                      && !texturePaintStrokeActive
+                    }
+                    enableRotate={!texturePaintInteractionEnabled}
                     enableDamping
                     dampingFactor={0.08}
                     enablePan={false}
-                    autoRotate={turntable && !jointHandleInteracting && !isViewportHandIkDragging}
+                    autoRotate={
+                      turntable
+                      && !texturePaintModeSelected
+                      && !jointHandleInteracting
+                      && !isViewportHandIkDragging
+                    }
                     autoRotateSpeed={1.6}
                     minDistance={1.3}
                     maxDistance={5.2}
@@ -6890,14 +7420,20 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                     <div className="absolute left-2.5 top-2.5 z-10 flex flex-col gap-1.5">
                       <StudioToolHintTarget
                         hint={VRM_VIEWPORT_HINTS.undo}
-                        disabled={!canUndo}
-                        unavailableReason={!canUndo ? "되돌릴 캐릭터 변경이 없습니다." : undefined}
+                        disabled={!viewportCanUndo}
+                        unavailableReason={
+                          texturePaintStrokeActive
+                            ? "표면 페인트 획을 마친 뒤 실행 취소할 수 있습니다."
+                            : !viewportCanUndo
+                              ? "되돌릴 캐릭터 변경이 없습니다."
+                              : undefined
+                        }
                         preferredSide="right"
                       >
                         <button
                           type="button"
                           aria-label="실행 취소"
-                          disabled={!canUndo}
+                          disabled={!viewportCanUndo}
                           className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
                           onClick={doUndo}
                         >
@@ -6906,14 +7442,20 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                       </StudioToolHintTarget>
                       <StudioToolHintTarget
                         hint={VRM_VIEWPORT_HINTS.redo}
-                        disabled={!canRedo}
-                        unavailableReason={!canRedo ? "다시 적용할 캐릭터 변경이 없습니다." : undefined}
+                        disabled={!viewportCanRedo}
+                        unavailableReason={
+                          texturePaintStrokeActive
+                            ? "표면 페인트 획을 마친 뒤 다시 실행할 수 있습니다."
+                            : !viewportCanRedo
+                              ? "다시 적용할 캐릭터 변경이 없습니다."
+                              : undefined
+                        }
                         preferredSide="right"
                       >
                         <button
                           type="button"
                           aria-label="다시 실행"
-                          disabled={!canRedo}
+                          disabled={!viewportCanRedo}
                           className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
                           onClick={doRedo}
                         >
@@ -6937,12 +7479,26 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                           <Maximize2 size={16} aria-hidden />
                         </button>
                       </StudioToolHintTarget>
-                      <StudioToolHintTarget hint={turntableHint} preferredSide="left">
+                      <StudioToolHintTarget
+                        hint={turntableHint}
+                        disabled={texturePaintModeSelected}
+                        unavailableReason={
+                          texturePaintModeSelected
+                            ? "표면 페인트 중에는 캐릭터가 움직이지 않도록 턴테이블을 잠급니다."
+                            : undefined
+                        }
+                        preferredSide="left"
+                      >
                         <button
                           type="button"
                           aria-label={turntable ? "턴테이블 회전 중지" : "턴테이블 회전 시작"}
                           aria-pressed={turntable}
-                          className={cx(VIEWPORT_BTN, turntable && "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent")}
+                          disabled={texturePaintModeSelected}
+                          className={cx(
+                            VIEWPORT_BTN,
+                            turntable && "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent",
+                            "disabled:cursor-not-allowed disabled:opacity-40",
+                          )}
                           onClick={() => {
                             setTurntable((v) => !v);
                             setViewportHinted(true);
@@ -6952,10 +7508,19 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                         </button>
                       </StudioToolHintTarget>
                     </div>
-                    {!viewportHinted ? (
+                    {texturePaintModeSelected || !viewportHinted ? (
                       <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">
-                        <span className="rounded-full border border-line/70 bg-panel/85 px-3 py-1 text-[0.66rem] font-medium text-fg-3 shadow-sm backdrop-blur">
-                          끌어서 회전 · 휠·핀치로 확대/축소
+                        <span
+                          className={cx(
+                            "rounded-full border px-3 py-1 text-[0.66rem] font-medium shadow-sm backdrop-blur",
+                            texturePaintModeSelected
+                              ? "border-accent/40 bg-panel/92 text-fg-2"
+                              : "border-line/70 bg-panel/85 text-fg-3",
+                          )}
+                        >
+                          {texturePaintModeSelected
+                            ? "표면 칠하기 · 회전 잠김 · 휠·핀치 또는 우측 줌 버튼"
+                            : "끌어서 회전 · 휠·핀치로 확대/축소"}
                         </span>
                       </div>
                     ) : null}
@@ -7049,7 +7614,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
             <div ref={panelScrollRef} id="vrm-panel-body" role="tabpanel" aria-labelledby={`vrm-tab-${activePanelTab}`} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-gutter:stable] sm:px-5">
               {activePanelTab === "character" ? (
                 <div className="sticky -top-4 z-20 -mx-4 -mt-4 border-b border-line bg-panel/95 px-4 py-2 backdrop-blur sm:-mx-5 sm:px-5">
-                  <div role="tablist" aria-label="캐릭터 빌더 단계" className="grid grid-cols-4 gap-1">
+                  <div role="tablist" aria-label="캐릭터 빌더 단계" className="grid grid-cols-5 gap-1">
                     {CHARACTER_PANEL_SECTIONS.map((section) => {
                       const SectionIcon = section.icon;
                       const selected = activeCharacterSection === section.id;
@@ -7111,6 +7676,23 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                   onChange={setAvatarForgeState}
                 />
               </section>
+
+              <StudioVrmTexturePaintPanel
+                hidden={hideOnCharacterSection("surface")}
+                disabled={!texturePaintRuntime || texturePaintDisabledReason.length > 0}
+                settings={texturePaintSettings}
+                activeTargetId={texturePaintSnapshot?.activeTargetId ?? null}
+                activeTextureLabel={texturePaintTargetLabel}
+                status={texturePaintStatus}
+                strokeActive={texturePaintStrokeActive}
+                targetCount={texturePaintSnapshot?.targets.length ?? 0}
+                canUndo={(texturePaintSnapshot?.history.undoCount ?? 0) > 0}
+                canRedo={(texturePaintSnapshot?.history.redoCount ?? 0) > 0}
+                onSettingsChange={handleTexturePaintSettingsChange}
+                onUndo={handleTexturePaintUndo}
+                onRedo={handleTexturePaintRedo}
+                onResetActiveTexture={handleTexturePaintReset}
+              />
 
               <section hidden={hideOnTab("face")}>
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
@@ -9546,6 +10128,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                 className={cx(CONTROL_BUTTON, "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-45")}
                 disabled={isCapturing}
                 onClick={() => {
+                  cancelActiveTexturePaintStroke();
                   cancelPendingPoseShare();
                   onClose();
                 }}
@@ -9555,7 +10138,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
               <button
                 type="button"
                 className={cx(CONTROL_BUTTON, "min-w-36 border-accent/60 bg-accent text-on-accent hover:bg-accent/90")}
-                disabled={!vrm || status === "loading" || isCapturing || isSharingPose || isThumbnailCapturing || persistentIkReconciling}
+                disabled={!vrm || status === "loading" || isCapturing || isSharingPose || isThumbnailCapturing || persistentIkReconciling || texturePaintStrokeActive}
                 onClick={handleInsert}
               >
                 {isCapturing ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <ImagePlus size={14} aria-hidden />}

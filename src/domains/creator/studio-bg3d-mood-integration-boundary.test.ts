@@ -13,7 +13,7 @@ describe("Studio BG3D mood/render integration boundary", () => {
   it("applies a mood only from the explicit preset command and records one immediate transition", () => {
     const handlerStart = background3dSource.indexOf("function applyMoodRig(");
     const handlerEnd = background3dSource.indexOf(
-      "function readCurrentCanonicalSceneForShot",
+      "function applySunRigConfig",
       handlerStart,
     );
     const handler = background3dSource.slice(handlerStart, handlerEnd);
