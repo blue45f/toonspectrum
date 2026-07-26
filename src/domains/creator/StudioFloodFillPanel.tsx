@@ -233,12 +233,22 @@ export function StudioFloodFillPanel({
             ) : (
               <PaintBucket size={16} aria-hidden="true" />
             )}
-            {busy ? "계산 취소" : active ? "채우기 도구 종료" : "캔버스에서 채우기"}
+            {busy
+              ? active
+                ? "계산 취소"
+                : "계산 중…"
+              : active
+                ? "채우기 도구 종료"
+                : "캔버스에서 채우기"}
           </button>
           <p id={toolHelpId} className="mt-1.5 text-center text-[0.67rem] leading-relaxed text-fg-3">
-            {active
-              ? "캔버스를 탭하면 현재 설정으로 채웁니다."
-              : "도구를 켠 다음 채울 영역을 캔버스에서 탭하세요."}
+            {busy
+              ? active
+                ? "진행 중에도 이 버튼으로 계산과 채우기 도구를 종료할 수 있습니다."
+                : "이전 계산이 끝나면 채우기 도구를 다시 켤 수 있습니다."
+              : active
+                ? "캔버스를 탭하면 현재 설정으로 채웁니다."
+                : "도구를 켠 다음 채울 영역을 캔버스에서 탭하세요."}
           </p>
         </div>
 

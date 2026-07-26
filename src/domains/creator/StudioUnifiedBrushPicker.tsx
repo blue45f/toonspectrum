@@ -5,15 +5,17 @@
  * component presentational prevents a hidden desktop inspector and the mobile
  * sheet from opening competing dialogs or maintaining divergent favorites.
  */
-import { Bookmark, Paintbrush } from "lucide-react";
+import { Bookmark } from "lucide-react";
 import { type ReactElement } from "react";
 
 import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
+import { StudioActiveBrushSummary } from "./StudioActiveBrushSummary";
 import { StudioBrushTray } from "./StudioBrushTray";
 
 import type { StudioBrushStampTuning } from "./studio-brush-library";
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
 import type { StudioProDrawPrefs } from "./studio-pro-draw-prefs";
+import type { StudioStabilizerMode } from "./studio-stroke-stabilizer";
 
 import { cn } from "@/lib/utils";
 
@@ -27,7 +29,11 @@ export interface StudioUnifiedBrushPickerProps {
   color: string;
   proDrawPrefs: StudioProDrawPrefs;
   stampTuning?: StudioBrushStampTuning | null;
+  stabilizer: number;
+  stabilizerMode: StudioStabilizerMode;
   strokeWidth: number;
+  tipAngle: number;
+  tipRoundness: number;
   onStampTuningChange?: (tuning: StudioBrushStampTuning) => void;
   onSelectBrush: (preset: BrushPreset) => void;
   onSelectBrushId?: (brushId: string) => void;
@@ -55,7 +61,11 @@ export function StudioUnifiedBrushPicker({
   color,
   proDrawPrefs,
   stampTuning,
+  stabilizer,
+  stabilizerMode,
   strokeWidth,
+  tipAngle,
+  tipRoundness,
   onStampTuningChange,
   onSelectBrush,
   onSelectBrushId,
@@ -88,42 +98,35 @@ export function StudioUnifiedBrushPicker({
         <p className="text-[0.68rem] font-bold text-fg-2">기본 프리셋</p>
         <p className="text-[0.6rem] text-fg-3">앱 제공 · 내 브러시와 별도</p>
       </div>
-      <div
-        className="flex min-h-12 items-center gap-2 rounded-xl border border-line/70 bg-card/75 px-2.5"
-      >
-        <span
-          aria-hidden
-          className="grid size-8 shrink-0 place-items-center rounded-lg border border-line/70 shadow-inner"
-          style={{ backgroundColor: color }}
-        >
-          <Paintbrush className="size-4 text-white mix-blend-difference" strokeWidth={1.8} />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[0.58rem] font-semibold uppercase text-fg-3">현재 브러시</span>
-          <span aria-live="polite" className="block truncate text-xs font-bold text-fg">
-            {activeName}
-          </span>
-        </span>
-        <span className="shrink-0 text-right text-[0.62rem] tabular-nums text-fg-3">
-          <span className="block">{strokeWidth}px</span>
-          <span className="block">{Math.round(brushOpacity * 100)}%</span>
-        </span>
-        <button
-          type="button"
-          onClick={() => onToggleFavoriteBrush(catalogBrushId)}
-          aria-label={activeFavorite ? `${activeName} 즐겨찾기 해제` : `${activeName} 즐겨찾기`}
-          aria-pressed={activeFavorite}
-          title={activeFavorite ? "현재 브러시 즐겨찾기 해제" : "현재 브러시 즐겨찾기"}
-          className={cn(
-            "grid size-11 shrink-0 place-items-center rounded-xl border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-            activeFavorite
-              ? "border-accent/50 bg-accent-soft text-accent"
-              : "border-line/70 text-fg-3 hover:bg-raised hover:text-fg"
-          )}
-        >
-          <Bookmark size={14} fill={activeFavorite ? "currentColor" : "none"} aria-hidden />
-        </button>
-      </div>
+      <StudioActiveBrushSummary
+        brushId={catalogBrushId}
+        brushName={activeName}
+        brushCatalogItems={brushCatalogItems}
+        color={color}
+        opacity={brushOpacity}
+        stabilizer={stabilizer}
+        stabilizerMode={stabilizerMode}
+        strokeWidth={strokeWidth}
+        tipAngle={tipAngle}
+        tipRoundness={tipRoundness}
+        trailing={(
+          <button
+            type="button"
+            onClick={() => onToggleFavoriteBrush(catalogBrushId)}
+            aria-label={activeFavorite ? `${activeName} 즐겨찾기 해제` : `${activeName} 즐겨찾기`}
+            aria-pressed={activeFavorite}
+            title={activeFavorite ? "현재 브러시 즐겨찾기 해제" : "현재 브러시 즐겨찾기"}
+            className={cn(
+              "grid size-11 shrink-0 place-items-center rounded-xl border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+              activeFavorite
+                ? "border-accent/50 bg-accent-soft text-accent"
+                : "border-line/70 text-fg-3 hover:bg-raised hover:text-fg"
+            )}
+          >
+            <Bookmark size={14} fill={activeFavorite ? "currentColor" : "none"} aria-hidden />
+          </button>
+        )}
+      />
 
       <StudioBrushTray
         activeBrushId={catalogBrushId}

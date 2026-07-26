@@ -51,8 +51,13 @@ export function StudioSmudgePanel({
 
       <StudioToggleChip
         active={active}
+        disabled={busy}
         onClick={onToggleActive}
-        title="켜고 이미지를 드래그하면 지나간 자리의 색이 옆으로 번지듯 섞입니다."
+        title={
+          busy
+            ? "현재 문지르기 스트로크를 반영하는 중입니다."
+            : "켜고 이미지를 드래그하면 지나간 자리의 색이 옆으로 번지듯 섞입니다."
+        }
       >
         <span className="inline-flex items-center gap-1">
           <Blend className="size-3" aria-hidden />
@@ -66,6 +71,7 @@ export function StudioSmudgePanel({
         max={SMUDGE_RADIUS_RANGE.max}
         step={SMUDGE_RADIUS_RANGE.step}
         value={radius}
+        disabled={busy}
         onChange={onRadiusChange}
         readout={`${radius}px`}
       />
@@ -76,6 +82,7 @@ export function StudioSmudgePanel({
         max={SMUDGE_STRENGTH_RANGE.max}
         step={SMUDGE_STRENGTH_RANGE.step}
         value={strength}
+        disabled={busy}
         onChange={onStrengthChange}
         readout={`${strength}%`}
       />

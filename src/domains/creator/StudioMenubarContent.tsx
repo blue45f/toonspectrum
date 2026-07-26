@@ -1,5 +1,6 @@
 import {
   Bookmark,
+  Camera,
   ChevronDown,
   Clapperboard,
   ClipboardCheck,
@@ -9,11 +10,13 @@ import {
   GanttChartSquare,
   History as HistoryIcon,
   Loader2,
+  MapPinned,
   Maximize2,
   MessageCircle,
   Minimize2,
   Music4,
   Package,
+  PlaySquare,
   ShieldCheck,
   Redo2,
   Undo2,
@@ -230,8 +233,12 @@ export interface StudioMenubarContentProps {
   saving: boolean;
   redoDisabled: boolean;
   setAiProvenanceOpen: Dispatch<SetStateAction<boolean>>;
+  setAnimaticTimelineOpen: Dispatch<SetStateAction<boolean>>;
+  setAssetRightsAuditOpen: Dispatch<SetStateAction<boolean>>;
   setCharacterBibleOpen: Dispatch<SetStateAction<boolean>>;
   setCheckpointPanelOpen: Dispatch<SetStateAction<boolean>>;
+  setProductionBibleOpen: Dispatch<SetStateAction<boolean>>;
+  setSceneSnapshotOpen: Dispatch<SetStateAction<boolean>>;
   setExportFormat: Dispatch<SetStateAction<ExportFormat>>;
   setExportMenuOpen: Dispatch<SetStateAction<boolean>>;
   setExportPresetId: Dispatch<SetStateAction<string | null>>;
@@ -300,8 +307,12 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   saving,
   redoDisabled,
   setAiProvenanceOpen,
+  setAnimaticTimelineOpen,
+  setAssetRightsAuditOpen,
   setCharacterBibleOpen,
   setCheckpointPanelOpen,
+  setProductionBibleOpen,
+  setSceneSnapshotOpen,
   setExportFormat,
   setExportMenuOpen,
   setExportPresetId,
@@ -802,7 +813,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             className={buttonClass({
               size: "sm",
               variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5",
+              className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5",
             })}
             title="AI 작업의 공급자·모델·상태·토큰 사용량을 확인하고 공개 가능한 요약만 내보내기"
           >
@@ -812,6 +823,30 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 {aiProvenance.operations.length}
               </span>
             ) : null}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAnimaticTimelineOpen(true)}
+            className={buttonClass({
+              size: "sm",
+              variant: "quiet",
+              className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5",
+            })}
+            title="페이지·컷의 무음 타이밍, 전환, 카메라 팬·줌과 대사·효과음 큐를 브라우저에서 검수"
+          >
+            <PlaySquare size={14} /> 애니매틱
+          </button>
+          <button
+            type="button"
+            onClick={() => setAssetRightsAuditOpen(true)}
+            className={buttonClass({
+              size: "sm",
+              variant: "quiet",
+              className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5",
+            })}
+            title="현재 작품에 실제 배치된 에셋의 출처·사용권·페이지 위치를 게시 전에 로컬에서 점검"
+          >
+            <ShieldCheck size={14} /> 에셋 권리 감사
           </button>
           <button
             type="button"
@@ -830,6 +865,35 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 {characterBible.characters.length}
               </span>
             ) : null}
+          </button>
+          <button
+            type="button"
+            onClick={() => setProductionBibleOpen(true)}
+            disabled={collaborationDocumentLocked}
+            className={buttonClass({
+              size: "sm",
+              variant: "quiet",
+              className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
+            })}
+            title={
+              collaborationDocumentLocked
+                ? collaborationLockMessage()
+                : "반복 등장하는 장면·장소·소품의 안정 ID, 빛·색·참고 에셋 연결을 로컬 바이블로 관리"
+            }
+          >
+            <MapPinned size={14} /> 제작 바이블
+          </button>
+          <button
+            type="button"
+            onClick={() => setSceneSnapshotOpen(true)}
+            className={buttonClass({
+              size: "sm",
+              variant: "quiet",
+              className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5",
+            })}
+            title="현재 페이지 전체를 이름과 태그가 있는 개인 장면으로 보관하거나 이전 장면을 다시 적용"
+          >
+            <Camera size={14} /> 장면 스냅샷
           </button>
           <button
             type="button"

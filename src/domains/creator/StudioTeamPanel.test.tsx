@@ -18,6 +18,11 @@ import {
   type StudioTeamPanelViewProps,
 } from "./StudioTeamPanel";
 
+import type {
+  StudioDraftCollaborationIdentity,
+  StudioDraftCollaborationReadiness,
+} from "./studio-draft-collaboration";
+
 const noop = () => {
   // Node SSR 회귀 테스트에서는 이벤트를 실행하지 않는다.
 };
@@ -74,6 +79,28 @@ function teamActivity(): StudioTeamActivityItem {
     after: { role: "editor", status: "active" },
     createdAt: "2026-07-12T02:00:00.000Z",
   };
+}
+
+function draftIdentity(
+  overrides: Partial<StudioDraftCollaborationIdentity> = {}
+): StudioDraftCollaborationIdentity {
+  return {
+    version: 1,
+    draftDocumentId: "draft_11111111-1111-4111-8111-111111111111",
+    documentScopeKey: "autosave:new-work",
+    ownerScopeKey: "account-a",
+    createdAt: "2026-07-12T01:00:00.000Z",
+    lastOpenedAt: "2026-07-12T01:00:00.000Z",
+    expiresAt: "2026-08-11T01:00:00.000Z",
+    persistence: "persistent",
+    ...overrides,
+  };
+}
+
+function draftReadiness(
+  overrides: Partial<Extract<StudioDraftCollaborationReadiness, { status: "local" }>> = {}
+): StudioDraftCollaborationReadiness {
+  return { status: "local", identity: draftIdentity(), ...overrides };
 }
 
 function renderView(overrides: Partial<StudioTeamPanelViewProps> = {}): string {
@@ -169,6 +196,72 @@ describe("StudioTeamPanel shell and first-use states", () => {
 });
 
 describe("StudioTeamPanelView unsaved invitation inbox", () => {
+  it("안정적인 로컬 초안 ID와 lazy 서버 생성 상태를 저장 전부터 안내한다", () => {
+    const html = renderView({
+      workId: null,
+      snapshot: null,
+      draftCollaboration: draftReadiness(),
+      onDraftShareRequest: noop,
+    });
+
+    expect(html).toContain('data-studio-draft-collaboration-state="local"');
+    expect(html).toContain("저장 전 협업을 준비할 수 있어요");
+    expect(html).toContain("초안 11111111");
+    expect(html).toContain("작업실을 여는 것만으로 서버 리소스를 만들지 않습니다");
+    expect(html).toContain("서버 작업실과 초대는 아직 생성되지 않았습니다");
+    expect(html).toContain("공유 링크 만들기");
+    expect(html).not.toContain("작품을 먼저 저장해 주세요");
+  });
+
+  it("임시 작업실 준비 중·완료·메모리 전용 상태를 과장 없이 구분한다", () => {
+    const provisioningHtml = renderView({
+      workId: null,
+      snapshot: null,
+      draftCollaboration: {
+        status: "provisioning",
+        identity: draftIdentity(),
+        intent: "share-link",
+      },
+      onDraftShareRequest: noop,
+    });
+    expect(provisioningHtml).toContain('data-studio-draft-collaboration-state="provisioning"');
+    expect(provisioningHtml).toContain("공유 링크 준비 중");
+    expect(provisioningHtml).toContain("disabled");
+
+    const readyHtml = renderView({
+      workId: null,
+      snapshot: null,
+      draftCollaboration: {
+        status: "ready",
+        identity: draftIdentity(),
+        room: {
+          version: 1,
+          roomId: "draft-room_22222222-2222-4222-8222-222222222222",
+          provisionalWorkId: "work-1",
+          draftDocumentId: "draft_11111111-1111-4111-8111-111111111111",
+          ownerScopeKey: "account-a",
+          graphRevision: 1,
+          provisionedAt: "2026-07-12T01:30:00.000Z",
+          expiresAt: "2026-07-19T01:30:00.000Z",
+        },
+      },
+      onDraftShareRequest: noop,
+    });
+    expect(readyHtml).toContain('data-studio-draft-collaboration-state="ready"');
+    expect(readyHtml).toContain("임시 협업 작업실이 준비됐어요");
+    expect(readyHtml).toContain("임시 작업실 만료 예정");
+    expect(readyHtml).not.toContain("공유 링크 만들기");
+
+    const memoryOnlyHtml = renderView({
+      workId: null,
+      snapshot: null,
+      draftCollaboration: draftReadiness({
+        identity: draftIdentity({ persistence: "memory-only" }),
+      }),
+    });
+    expect(memoryOnlyHtml).toContain("이 탭을 닫으면 초안 협업 ID가 바뀔 수 있습니다");
+  });
+
   it("로딩·오류·빈 초대 상태에 각각 이해 가능한 안내와 복구 경로가 있다", () => {
     const loadingHtml = renderView({
       workId: null,

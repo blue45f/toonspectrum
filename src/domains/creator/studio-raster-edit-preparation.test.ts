@@ -320,6 +320,23 @@ describe("editable raster copy planning", () => {
       budgets: { maxSvgBytes: 8 },
     })).toMatchObject({ ok: false, code: "svg-budget-exceeded" });
   });
+
+  it("fails closed when circular source data cannot be canonically fingerprinted", () => {
+    const circular = line() as Extract<El, { type: "draw" }> & {
+      circularOwner?: unknown;
+    };
+    circular.circularOwner = circular;
+
+    expect(planStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [circular],
+    })).toMatchObject({
+      ok: false,
+      code: "source-budget-exceeded",
+    });
+  });
 });
 
 describe("editable raster copy rendering", () => {
@@ -349,6 +366,15 @@ describe("editable raster copy rendering", () => {
     );
     expect(rasterize).toHaveBeenCalledOnce();
     expect(rasterize.mock.calls[0]?.[0].svg).toContain("#f3e9d2");
+    expect(rendered.fingerprint).toBe(planned.plan.sourceFingerprint);
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, {
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: planned.plan.sourceElements,
+      bg: "#f3e9d2",
+      name: "필터 합성 레이어",
+    })).toBe(true);
     expect(materializeStudioEditableRasterCopy({
       plan: planned.plan,
       rendered,
@@ -389,6 +415,62 @@ describe("editable raster copy rendering", () => {
     );
     expect(rasterize).toHaveBeenCalledOnce();
     expect(rasterize.mock.calls[0]?.[0].svg).toContain("#f3e9d2");
+  });
+
+  it("keeps document ownership stable across a lazy outline renderer fingerprint change", async () => {
+    const current = {
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [line()],
+      includeBackground: false,
+    } as const;
+    const planned = planStudioEditableRasterCopy(current);
+    expect(planned.ok).toBe(true);
+    if (!planned.ok) return;
+
+    const rendered = await renderStudioEditableRasterCopy(
+      planned.plan,
+      async () => ({
+        dataUrl: PNG,
+        fingerprint: "editable-raster-copy-v1:0000000000000000",
+        elementCount: planned.plan.sourceElementCount,
+        width: planned.plan.width,
+        height: planned.plan.height,
+        svgByteLength: 1,
+        pngByteLength: 8,
+        execution: "direct",
+      }),
+    );
+
+    expect(rendered.fingerprint).toBe(planned.plan.sourceFingerprint);
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, current)).toBe(true);
+  });
+
+  it("rejects rendered outline dimension and element-count mismatches", async () => {
+    const context = pageRasterContext();
+    const planned = planStudioEditableRasterCopy(context.input);
+    expect(planned.ok).toBe(true);
+    if (!planned.ok) return;
+    const result = {
+      dataUrl: PNG,
+      fingerprint: planned.plan.sourceFingerprint,
+      elementCount: planned.plan.sourceElementCount,
+      width: planned.plan.width,
+      height: planned.plan.height,
+      svgByteLength: 1,
+      pngByteLength: 8,
+      execution: "direct" as const,
+    };
+
+    await expect(renderStudioEditableRasterCopy(
+      planned.plan,
+      async () => ({ ...result, width: result.width + 1 }),
+    )).rejects.toThrow(/해상도/u);
+    await expect(renderStudioEditableRasterCopy(
+      planned.plan,
+      async () => ({ ...result, elementCount: result.elementCount + 1 }),
+    )).rejects.toThrow(/레이어 수/u);
   });
 
   it("rejects an injected renderer result that exceeds the plan PNG budget", async () => {

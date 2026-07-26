@@ -1,29 +1,93 @@
+// @vitest-environment jsdom
+
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-const source = readFileSync(new URL("./StudioCommentsPanel.tsx", import.meta.url), "utf8");
-const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+import {
+  StudioCommentsPanel,
+  type StudioCommentsPanelProps,
+} from "./StudioCommentsPanel";
+
+import type {
+  StudioCommentActor,
+  StudioCommentThread,
+  StudioCommentsDocument,
+} from "./studio-comments";
+
+const source = readFileSync(resolve("src/domains/creator/StudioCommentsPanel.tsx"), "utf8");
+const studioPageSource = readFileSync(resolve("src/domains/creator/StudioPage.tsx"), "utf8");
 const studioLazyPanelStackSource = readFileSync(
-  new URL("./StudioLazyPanelStack.tsx", import.meta.url),
+  resolve("src/domains/creator/StudioLazyPanelStack.tsx"),
   "utf8"
 );
 const studioCommentsPanelSessionSource = readFileSync(
-  new URL("./StudioCommentsPanelSession.tsx", import.meta.url),
+  resolve("src/domains/creator/StudioCommentsPanelSession.tsx"),
   "utf8"
 );
 const studioCanvasOverlaySource = readFileSync(
-  new URL("./StudioLiveCanvasOverlay.tsx", import.meta.url),
+  resolve("src/domains/creator/StudioLiveCanvasOverlay.tsx"),
   "utf8"
 );
 const studioPointCommentComposerSource = readFileSync(
-  new URL("./StudioPointCommentComposer.tsx", import.meta.url),
+  resolve("src/domains/creator/StudioPointCommentComposer.tsx"),
   "utf8"
 );
 const studioPageLazyUiSource = readFileSync(
-  new URL("./studio-page-lazy-ui.ts", import.meta.url),
+  resolve("src/domains/creator/studio-page-lazy-ui.ts"),
   "utf8"
 );
+
+const NOW = "2026-07-26T00:00:00.000Z";
+const CURRENT_ACTOR: StudioCommentActor = { id: "actor-self", displayName: "김작가" };
+const REVIEWER: StudioCommentActor = { id: "actor-reviewer", displayName: "검토자" };
+
+function makeThread(
+  overrides: Partial<StudioCommentThread> = {}
+): StudioCommentThread {
+  return {
+    id: "thread-1",
+    author: REVIEWER,
+    body: "말풍선 줄바꿈과 오탈자를 확인해 주세요.",
+    mentions: [],
+    createdAt: NOW,
+    updatedAt: NOW,
+    anchor: { type: "frame", pageId: "page-1", frameId: "frame-2" },
+    replies: [],
+    resolved: false,
+    ...overrides,
+  };
+}
+
+function makeDocument(
+  threads: readonly StudioCommentThread[] = [makeThread()]
+): StudioCommentsDocument {
+  return { version: 1, threads: [...threads] };
+}
+
+function makePanelProps(
+  overrides: Partial<StudioCommentsPanelProps> = {}
+): StudioCommentsPanelProps {
+  return {
+    open: true,
+    onClose: vi.fn(),
+    document: makeDocument(),
+    onChange: vi.fn().mockResolvedValue(true),
+    activeAnchor: null,
+    currentActor: CURRENT_ACTOR,
+    anchorOptions: [
+      {
+        anchor: { type: "frame", pageId: "page-1", frameId: "frame-2" },
+        label: "1페이지 · 2컷",
+      },
+    ],
+    ...overrides,
+  };
+}
+
+afterEach(cleanup);
 
 describe("StudioCommentsPanel review rail contract", () => {
   it("coexists with the canvas instead of blocking the viewport as a modal", () => {
@@ -370,5 +434,133 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(source).toContain("sr-only sm:not-sr-only");
     expect(source).toContain('aria-label="댓글 정렬"');
     expect(source).not.toContain('className="basis-full"');
+  });
+});
+
+describe("StudioCommentsPanel review-to-task suggestions", () => {
+  it("expands one local task proposal with evidence, scope, and completion conditions", () => {
+    render(<StudioCommentsPanel {...makePanelProps()} />);
+
+    const toggle = screen.getByRole("button", { name: "작업 제안" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.className).toContain("min-h-11");
+    expect(toggle.className).toContain("pointer-coarse:min-h-11");
+    fireEvent.click(toggle);
+
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    const proposal = screen.getByRole("region", { name: "식자와 대사 표현 점검" });
+    expect(within(proposal).getByText("식자")).toBeTruthy();
+    expect(within(proposal).getByText("우선순위 보통")).toBeTruthy();
+    expect(within(proposal).getByText("1페이지 · 2컷")).toBeTruthy();
+    expect(within(proposal).getByText("로컬 규칙 기반")).toBeTruthy();
+    expect(within(proposal).getByText("완료 조건")).toBeTruthy();
+    expect(
+      within(proposal).getByText("말풍선 안에서 글자가 잘리지 않고 읽기 순서가 자연스럽습니다.")
+    ).toBeTruthy();
+  });
+
+  it("converts an open mutable suggestion to the current actor in one document change", async () => {
+    const onChange = vi.fn().mockResolvedValue(true);
+    const originalDocument = makeDocument();
+    render(<StudioCommentsPanel {...makePanelProps({ document: originalDocument, onChange })} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "작업 제안" }));
+    const convert = screen.getByRole("button", { name: "내 작업으로 전환" });
+    expect((convert as HTMLButtonElement).disabled).toBe(false);
+    expect(convert.className).toContain("min-h-11");
+    fireEvent.click(convert);
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
+    const nextDocument = onChange.mock.calls[0]?.[0] as StudioCommentsDocument;
+    expect(nextDocument).not.toBe(originalDocument);
+    expect(nextDocument.threads[0]?.assignee).toEqual(CURRENT_ACTOR);
+    expect(nextDocument.threads[0]?.resolved).toBe(false);
+  });
+
+  it.each([
+    {
+      name: "read-only archive",
+      props: {
+        readOnlyThreadIds: new Set(["thread-1"]),
+      } satisfies Partial<StudioCommentsPanelProps>,
+      buttonName: "내 작업으로 전환",
+      reason: "읽기 전용 보관 댓글은 작업으로 전환할 수 없습니다.",
+    },
+    {
+      name: "resolved thread",
+      props: {
+        document: makeDocument([
+          makeThread({
+            resolved: true,
+            resolvedAt: NOW,
+            resolvedBy: REVIEWER,
+          }),
+        ]),
+      } satisfies Partial<StudioCommentsPanelProps>,
+      buttonName: "내 작업으로 전환",
+      reason: "해결된 댓글은 다시 연 뒤 작업으로 전환할 수 있습니다.",
+    },
+    {
+      name: "missing assignment permission",
+      props: {
+        capabilities: { assign: false },
+        mutationDisabledReason: "검토자 권한에서는 담당자를 바꿀 수 없습니다.",
+      } satisfies Partial<StudioCommentsPanelProps>,
+      buttonName: "내 작업으로 전환",
+      reason: "검토자 권한에서는 담당자를 바꿀 수 없습니다.",
+    },
+    {
+      name: "already assigned to self",
+      props: {
+        document: makeDocument([makeThread({ assignee: CURRENT_ACTOR })]),
+      } satisfies Partial<StudioCommentsPanelProps>,
+      buttonName: "내 작업으로 지정됨",
+      reason: "이미 내 작업으로 지정되어 있습니다.",
+    },
+  ])("keeps $name suggestions inspectable but mutation-safe", ({ props, buttonName, reason }) => {
+    const onChange = vi.fn().mockResolvedValue(true);
+    render(<StudioCommentsPanel {...makePanelProps({ ...props, onChange })} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "작업 제안" }));
+    const convert = screen.getByRole("button", { name: buttonName });
+    expect((convert as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(reason)).toBeTruthy();
+    fireEvent.click(convert);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps only one task proposal expanded to control comment-card density", () => {
+    const second = makeThread({
+      id: "thread-2",
+      body: "3D 원근과 소실점을 확인해 주세요.",
+      anchor: { type: "page", pageId: "page-1" },
+    });
+    render(
+      <StudioCommentsPanel
+        {...makePanelProps({ document: makeDocument([makeThread(), second]) })}
+      />
+    );
+
+    const letteringThread = globalThis.document.querySelector<HTMLElement>(
+      '[data-studio-comment-thread-id="thread-1"]'
+    );
+    const perspectiveThread = globalThis.document.querySelector<HTMLElement>(
+      '[data-studio-comment-thread-id="thread-2"]'
+    );
+    expect(letteringThread).not.toBeNull();
+    expect(perspectiveThread).not.toBeNull();
+
+    fireEvent.click(
+      within(letteringThread as HTMLElement).getByRole("button", { name: "작업 제안" })
+    );
+    expect(globalThis.document.querySelectorAll("[data-studio-review-task=true]")).toHaveLength(1);
+    expect(screen.getByRole("region", { name: "식자와 대사 표현 점검" })).toBeTruthy();
+
+    fireEvent.click(
+      within(perspectiveThread as HTMLElement).getByRole("button", { name: "작업 제안" })
+    );
+    expect(globalThis.document.querySelectorAll("[data-studio-review-task=true]")).toHaveLength(1);
+    expect(screen.queryByRole("region", { name: "식자와 대사 표현 점검" })).toBeNull();
+    expect(screen.getByRole("region", { name: "3D와 원근 구성 보정" })).toBeTruthy();
   });
 });

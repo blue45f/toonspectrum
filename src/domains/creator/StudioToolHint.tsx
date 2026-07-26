@@ -34,6 +34,7 @@ import {
   type StudioToolHintExposureManager,
   type StudioToolHintRevealIntent,
 } from "./studio-tool-hint-exposure";
+import { consumeStudioToolHintFocusSuppression } from "./studio-tool-hint-focus-suppression";
 import {
   DEFAULT_STUDIO_TOOL_HINT_MODE,
   DEFAULT_STUDIO_TOOL_HINT_TOUCH_HOLD_MS,
@@ -52,10 +53,56 @@ const EXPAND_DELAY_MS = 620;
 // Entering the bubble cancels this timer, satisfying hoverable-content accessibility.
 const HIDE_DELAY_MS = 280;
 const TOUCH_HOLD_MOVE_TOLERANCE_PX = 10;
+const TOUCH_PAN_SUPPRESSION_DISTANCE_PX = 8;
 const FALLBACK_WIDTH = 240;
 const FALLBACK_HEIGHT = 92;
 const FALLBACK_GAP = 10;
 const VIEWPORT_PADDING = 10;
+
+export const STUDIO_TOOL_HINT_SCROLL_HOVER_SUPPRESSION_MS = 720;
+
+type StudioToolHintInteractionManager = {
+  suppressHover: (now?: number) => void;
+  isHoverSuppressed: (now?: number) => boolean;
+  markReveal: (hintId: string, intent: StudioToolHintRevealIntent) => void;
+  getRevealIntent: (hintId: string) => StudioToolHintRevealIntent | null;
+  clearReveal: (hintId?: string) => void;
+  reset: () => void;
+};
+
+function createStudioToolHintInteractionManager(): StudioToolHintInteractionManager {
+  let hoverSuppressedUntil = 0;
+  let activeReveal: Readonly<{
+    hintId: string;
+    intent: StudioToolHintRevealIntent;
+  }> | null = null;
+
+  return {
+    suppressHover(now = Date.now()) {
+      hoverSuppressedUntil = Math.max(
+        hoverSuppressedUntil,
+        now + STUDIO_TOOL_HINT_SCROLL_HOVER_SUPPRESSION_MS
+      );
+    },
+    isHoverSuppressed(now = Date.now()) {
+      return now < hoverSuppressedUntil;
+    },
+    markReveal(hintId, intent) {
+      activeReveal = { hintId, intent };
+    },
+    getRevealIntent(hintId) {
+      return activeReveal?.hintId === hintId ? activeReveal.intent : null;
+    },
+    clearReveal(hintId) {
+      if (hintId && activeReveal?.hintId !== hintId) return;
+      activeReveal = null;
+    },
+    reset() {
+      hoverSuppressedUntil = 0;
+      activeReveal = null;
+    },
+  };
+}
 
 type StudioToolHintPreferences = {
   mode: StudioToolHintMode;
@@ -66,10 +113,12 @@ type StudioToolHintPreferences = {
 type StudioToolHintContextValue = StudioToolHintPreferences & {
   coordinator: StudioToolHintCoordinator;
   exposure: StudioToolHintExposureManager;
+  interaction: StudioToolHintInteractionManager;
 };
 
 const defaultStudioToolHintCoordinator = createStudioToolHintCoordinator();
 const defaultStudioToolHintExposure = createStudioToolHintExposureManager();
+const defaultStudioToolHintInteraction = createStudioToolHintInteractionManager();
 
 const StudioToolHintPreferencesContext = createContext<StudioToolHintContextValue>({
   mode: DEFAULT_STUDIO_TOOL_HINT_MODE,
@@ -77,6 +126,7 @@ const StudioToolHintPreferencesContext = createContext<StudioToolHintContextValu
   reduceMotion: false,
   coordinator: defaultStudioToolHintCoordinator,
   exposure: defaultStudioToolHintExposure,
+  interaction: defaultStudioToolHintInteraction,
 });
 
 export function StudioToolHintPreferencesProvider({
@@ -91,12 +141,44 @@ export function StudioToolHintPreferencesProvider({
   const exposureRef = useRef<StudioToolHintExposureManager | null>(null);
   exposureRef.current ??= createStudioToolHintExposureManager();
   const exposure = exposureRef.current;
+  const interactionRef = useRef<StudioToolHintInteractionManager | null>(null);
+  interactionRef.current ??= createStudioToolHintInteractionManager();
+  const interaction = interactionRef.current;
 
   useEffect(() => {
+    let touchPanStart: Readonly<{
+      pointerId: number;
+      x: number;
+      y: number;
+    }> | null = null;
+
+    function dismissAll() {
+      dismissToolHintsImmediately(coordinator, interaction);
+    }
+
+    function suppressPassivePointerHints() {
+      interaction.suppressHover();
+      const activeHintId = coordinator.getActiveHintId();
+      if (
+        activeHintId &&
+        interaction.getRevealIntent(activeHintId) === "focus"
+      ) {
+        return;
+      }
+      dismissAll();
+    }
+
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") dismissToolHintsImmediately(coordinator);
+      if (event.key === "Escape") dismissAll();
     }
     function onPointerDown(event: PointerEvent) {
+      touchPanStart = event.pointerType === "touch"
+        ? {
+            pointerId: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+          }
+        : null;
       const target = event.target;
       if (
         target instanceof Element &&
@@ -105,7 +187,24 @@ export function StudioToolHintPreferencesProvider({
         return;
       }
       clearPointerSuppression();
-      dismissToolHintsImmediately(coordinator);
+      dismissAll();
+    }
+    function onPointerMove(event: PointerEvent) {
+      const start = touchPanStart;
+      if (
+        event.pointerType !== "touch" ||
+        !start ||
+        start.pointerId !== event.pointerId ||
+        Math.hypot(event.clientX - start.x, event.clientY - start.y)
+          <= TOUCH_PAN_SUPPRESSION_DISTANCE_PX
+      ) {
+        return;
+      }
+      touchPanStart = null;
+      suppressPassivePointerHints();
+    }
+    function onPointerEnd(event: PointerEvent) {
+      if (touchPanStart?.pointerId === event.pointerId) touchPanStart = null;
     }
     function onPointerOver(event: PointerEvent) {
       const target = event.target;
@@ -118,7 +217,7 @@ export function StudioToolHintPreferencesProvider({
       ) {
         return;
       }
-      dismissToolHintsImmediately(coordinator);
+      dismissAll();
     }
     function onFocusIn(event: FocusEvent) {
       const target = event.target;
@@ -129,25 +228,46 @@ export function StudioToolHintPreferencesProvider({
       ) {
         return;
       }
-      dismissToolHintsImmediately(coordinator);
+      dismissAll();
     }
 
     globalThis.addEventListener("keydown", onKeyDown);
     globalThis.addEventListener("pointerdown", onPointerDown, true);
+    globalThis.addEventListener("pointermove", onPointerMove, true);
+    globalThis.addEventListener("pointerup", onPointerEnd, true);
+    globalThis.addEventListener("pointercancel", onPointerEnd, true);
     globalThis.addEventListener("pointerover", onPointerOver, true);
     globalThis.addEventListener("focusin", onFocusIn, true);
+    globalThis.addEventListener("wheel", suppressPassivePointerHints, {
+      capture: true,
+      passive: true,
+    });
+    globalThis.addEventListener("scroll", suppressPassivePointerHints, true);
     return () => {
       globalThis.removeEventListener("keydown", onKeyDown);
       globalThis.removeEventListener("pointerdown", onPointerDown, true);
+      globalThis.removeEventListener("pointermove", onPointerMove, true);
+      globalThis.removeEventListener("pointerup", onPointerEnd, true);
+      globalThis.removeEventListener("pointercancel", onPointerEnd, true);
       globalThis.removeEventListener("pointerover", onPointerOver, true);
       globalThis.removeEventListener("focusin", onFocusIn, true);
+      globalThis.removeEventListener("wheel", suppressPassivePointerHints, true);
+      globalThis.removeEventListener("scroll", suppressPassivePointerHints, true);
+      interaction.reset();
       clearPointerSuppression();
     };
-  }, [coordinator]);
+  }, [coordinator, interaction]);
 
   return (
     <StudioToolHintPreferencesContext.Provider
-      value={{ mode, touchHoldDelayMs, reduceMotion, coordinator, exposure }}
+      value={{
+        mode,
+        touchHoldDelayMs,
+        reduceMotion,
+        coordinator,
+        exposure,
+        interaction,
+      }}
     >
       {children}
     </StudioToolHintPreferencesContext.Provider>
@@ -187,8 +307,12 @@ function hideRenderedToolHintElement(hintId: string | null) {
   if (rendered?.matches('[data-studio-tool-hint="true"]')) rendered.hidden = true;
 }
 
-function dismissToolHintsImmediately(coordinator: StudioToolHintCoordinator): number {
+function dismissToolHintsImmediately(
+  coordinator: StudioToolHintCoordinator,
+  interaction?: StudioToolHintInteractionManager
+): number {
   hideRenderedToolHintElement(coordinator.getActiveHintId());
+  interaction?.clearReveal();
   return coordinator.dismissAll();
 }
 
@@ -340,6 +464,7 @@ export function StudioToolHintTarget({
   const tipId = useId();
   const coordinator = preferences.coordinator;
   const exposure = preferences.exposure;
+  const interaction = preferences.interaction;
   const open = useSyncExternalStore(
     coordinator.subscribe,
     () => coordinator.getActiveHintId() === tipId,
@@ -362,6 +487,7 @@ export function StudioToolHintTarget({
   }> | null>(null);
   const touchHoldOpened = useRef(false);
   const pointerDismissed = useRef(false);
+  const activeRevealIntent = useRef<StudioToolHintRevealIntent | null>(null);
   const describedFocusTarget = useRef<HTMLElement | null>(null);
   const observedDismissEpoch = useRef(dismissEpoch);
   const [expanded, setExpanded] = useState(false);
@@ -384,7 +510,8 @@ export function StudioToolHintTarget({
   }
 
   function dismissCoordinatedHintsImmediately() {
-    observedDismissEpoch.current = dismissToolHintsImmediately(coordinator);
+    activeRevealIntent.current = null;
+    observedDismissEpoch.current = dismissToolHintsImmediately(coordinator, interaction);
   }
 
   function readAnchor(): DOMRect | null {
@@ -395,6 +522,18 @@ export function StudioToolHintTarget({
   function reveal(expandImmediately: boolean, intent: StudioToolHintRevealIntent) {
     if (!hint || preferences.mode === "off") return;
     const alreadyOpen = coordinator.getActiveHintId() === tipId;
+    const previousIntent = interaction.getRevealIntent(tipId);
+    if (
+      intent === "hover" &&
+      interaction.isHoverSuppressed() &&
+      previousIntent !== "focus"
+    ) {
+      coordinator.clearPending(tipId);
+      return;
+    }
+    const effectiveIntent = alreadyOpen && previousIntent === "focus" && intent === "hover"
+      ? "focus"
+      : intent;
     // A usage condition is operational accessibility information, not passive
     // coaching. Keep it available on every deliberate hover/focus even after
     // ordinary feature coaches have reached their repetition cooldown.
@@ -411,12 +550,22 @@ export function StudioToolHintTarget({
     const nextAnchor = readAnchor();
     if (!nextAnchor) return;
     setAnchor(nextAnchor);
+    activeRevealIntent.current = effectiveIntent;
+    interaction.markReveal(tipId, effectiveIntent);
     const previousHintId = coordinator.claim(tipId);
     if (!alreadyOpen && !unavailableReason) exposure.markRevealed(hint.id, intent);
     if (previousHintId && previousHintId !== tipId) {
       hideRenderedTooltipImmediately(previousHintId);
     }
     if (!richCoachEnabled) {
+      if (expandTimer.current) globalThis.clearTimeout(expandTimer.current);
+      expandTimer.current = 0;
+      setExpanded(false);
+      return;
+    }
+    if (effectiveIntent === "touch") {
+      if (expandTimer.current) globalThis.clearTimeout(expandTimer.current);
+      expandTimer.current = 0;
       setExpanded(false);
       return;
     }
@@ -437,6 +586,7 @@ export function StudioToolHintTarget({
   function scheduleShow() {
     if (!hint || preferences.mode === "off") return;
     if (suppressedPointerHintAt) return;
+    if (interaction.isHoverSuppressed()) return;
     if (!open && !unavailableReason && !exposure.canReveal(hint.id, "hover")) return;
     void loadStudioToolHintBubbleModule();
     if (hideTimer.current) {
@@ -471,6 +621,8 @@ export function StudioToolHintTarget({
     hideTimer.current = globalThis.setTimeout(() => {
       if (coordinator.getActiveHintId() === tipId) hideRenderedTooltipImmediately();
       coordinator.release(tipId);
+      interaction.clearReveal(tipId);
+      activeRevealIntent.current = null;
       setExpanded(false);
       hideTimer.current = 0;
     }, HIDE_DELAY_MS) as unknown as number;
@@ -530,7 +682,7 @@ export function StudioToolHintTarget({
       touchHoldOpened.current = true;
       pointerDismissed.current = false;
       clearPointerSuppression();
-      reveal(richCoachEnabled, "touch");
+      reveal(false, "touch");
     }, preferences.touchHoldDelayMs) as unknown as number;
   }
 
@@ -609,6 +761,12 @@ export function StudioToolHintTarget({
   }
 
   function handleFocus(event: React.FocusEvent<HTMLSpanElement>) {
+    if (consumeStudioToolHintFocusSuppression(event.target)) {
+      pointerDismissed.current = true;
+      clearFocusedDescription();
+      dismissCoordinatedHintsImmediately();
+      return;
+    }
     if (pointerDismissed.current || preferences.mode === "off") return;
     // Pointer focus is already filtered by pointerdown suppression. Opening on
     // every remaining focus path clears any suppression left by a previously
@@ -654,27 +812,32 @@ export function StudioToolHintTarget({
       if (preferences.mode === "off") {
         if (coordinator.getActiveHintId() === tipId) hideRenderedToolHintElement(tipId);
         coordinator.release(tipId);
+        interaction.clearReveal(tipId);
+        activeRevealIntent.current = null;
       }
     }
     return () => {
       clearTimers();
       coordinator.clearPending(tipId);
     };
-  }, [coordinator, preferences.mode, tipId]);
+  }, [coordinator, interaction, preferences.mode, tipId]);
 
   useEffect(
     () => () => {
       const target = describedFocusTarget.current;
       if (target) removeAriaDescription(target, tipId);
       coordinator.release(tipId);
+      interaction.clearReveal(tipId);
+      activeRevealIntent.current = null;
     },
-    [coordinator, tipId]
+    [coordinator, interaction, tipId]
   );
 
   useEffect(() => {
     if (observedDismissEpoch.current === dismissEpoch) return;
     observedDismissEpoch.current = dismissEpoch;
     clearTimers();
+    activeRevealIntent.current = null;
     setExpanded(false);
     const target = describedFocusTarget.current;
     if (target) removeAriaDescription(target, tipId);
@@ -684,12 +847,14 @@ export function StudioToolHintTarget({
   useEffect(() => {
     if (open) return;
     clearTimers();
+    interaction.clearReveal(tipId);
+    activeRevealIntent.current = null;
     setExpanded(false);
     const target = describedFocusTarget.current;
     if (!target) return;
     removeAriaDescription(target, tipId);
     describedFocusTarget.current = null;
-  }, [open, tipId]);
+  }, [interaction, open, tipId]);
 
   useEffect(() => {
     if (!open) return;
@@ -785,7 +950,9 @@ export function StudioToolHintTarget({
                 hint={hint}
                 anchor={anchor}
                 expanded={expanded}
-                richPreviewEnabled={richCoachEnabled}
+                richPreviewEnabled={
+                  richCoachEnabled && activeRevealIntent.current !== "touch"
+                }
                 reducedMotion={preferences.reduceMotion}
                 unavailableReason={unavailableReason}
                 preferredSide={preferredSide}

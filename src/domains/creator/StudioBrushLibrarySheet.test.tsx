@@ -3,12 +3,13 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+  STUDIO_BRUSH_CATALOG_COUNTS,
   STUDIO_CORE_BRUSH_CATALOG_ITEMS,
   STUDIO_PRO_BRUSH_CATALOG_ITEMS,
 } from "./studio-brush-catalog";
@@ -29,6 +30,10 @@ const proceduralCatalogCount = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
 ).length;
 const sheetSource = readFileSync(
   resolve(process.cwd(), "src/domains/creator/StudioBrushLibrarySheet.tsx"),
+  "utf8"
+);
+const selectionSource = readFileSync(
+  resolve(process.cwd(), "src/domains/creator/studio-brush-selection.ts"),
   "utf8"
 );
 
@@ -66,16 +71,18 @@ describe("StudioBrushLibrarySheet", () => {
     expect(renderSheet({ open: false })).toBe("");
   });
 
-  it("names the built-in catalog separately from the saved My Brushes library", () => {
+  it("separates the full built-in catalogue from quick sub-tools and saved brushes", () => {
     const html = renderSheet();
 
     expect(html).toContain('data-studio-brush-catalog="built-in"');
-    expect(html).toContain("앱 브러시");
+    expect(html).toContain('data-studio-brush-surface-role="full-catalog-management"');
+    expect(html).toContain("브러시 전체 라이브러리");
     expect(html).toContain(
-      `코어 ${coreCatalogCount} + 프로시저럴 ${proceduralCatalogCount} · 내 브러시와 별개`
+      `앱 제공 ${STUDIO_BRUSH_CATALOG_COUNTS.total}종 · 코어 ${coreCatalogCount} + 프로시저럴 ${proceduralCatalogCount}`
     );
-    expect(html).toContain('aria-label="앱 브러시 닫기"');
-    expect(html).not.toContain(">브러시 라이브러리<");
+    expect(html).toContain('aria-label="브러시 전체 라이브러리 닫기"');
+    expect(html).toContain('data-studio-brush-library-close="true"');
+    expect(html).not.toContain('data-studio-brush-surface-role="quick-subtools"');
   });
 
   it(`publishes one unique ${STUDIO_ALL_BRUSH_CATALOG_ITEMS.length}-brush catalog while keeping the procedural runtime lazy`, () => {
@@ -92,7 +99,9 @@ describe("StudioBrushLibrarySheet", () => {
       "size",
       STUDIO_ALL_BRUSH_CATALOG_ITEMS.length
     );
-    expect(sheetSource).toContain('import("./studio-brush-pack-runtime")');
+    expect(selectionSource).toContain('import("./studio-brush-pack-runtime")');
+    expect(sheetSource).toContain("materializeStudioBrushCatalogSelection");
+    expect(sheetSource).not.toContain('import("./studio-brush-pack-runtime")');
     expect(sheetSource).not.toMatch(/from\s+["']\.\/studio-brush-pack-runtime["']/);
   });
 
@@ -130,12 +139,33 @@ describe("StudioBrushLibrarySheet", () => {
     expect(html.match(/role="tab"[^>]*tabindex="0"/g)).toHaveLength(1);
     expect(html.match(/role="tab"[^>]*tabindex="-1"/g)).toHaveLength(9);
     expect(html).toMatch(/role="tabpanel" aria-labelledby="[^"]+" tabindex="0"/);
-    expect(html).toMatch(/aria-label="브러시 검색" aria-controls="[^"]+"/);
+    expect(html).toMatch(/aria-label="전체 브러시 검색" aria-controls="[^"]+"/);
+    expect(html).toContain('data-studio-brush-search-scope="all"');
     expect(html).toContain('role="status" aria-live="polite"');
-    expect(html).toContain("8개의 브러시가 표시됩니다.");
+    expect(html).toContain("8/8개의 브러시가 표시됩니다.");
   });
 
-  it("opens the Pro 120 tab, labels every extended profile, and lazily materializes a durable selection", async () => {
+  it("searches the full brush catalog regardless of the currently selected category", () => {
+    render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole("tab", { name: "기본" }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.change(screen.getByRole("searchbox", { name: "전체 브러시 검색" }), {
+      target: { value: "heart-stamp" },
+    });
+
+    expect(screen.getByText(`분류와 관계없이 전체 ${STUDIO_BRUSH_CATALOG_COUNTS.total}종에서 검색 중`)).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("1/1개의 브러시가 표시됩니다.");
+    expect(screen.getByRole("button", { name: "하트 도장 선택" })).toBeTruthy();
+  });
+
+  it("shows brush-kind badges and re-applies the active catalogue defaults", async () => {
     const onSelect = vi.fn();
     const onClose = vi.fn();
     const { container } = render(
@@ -147,11 +177,53 @@ describe("StudioBrushLibrarySheet", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "프로 120" }));
+    expect(container.querySelector('[data-studio-brush-kind-badge="line"]')?.textContent).toBe(
+      "선화"
+    );
+    fireEvent.click(screen.getByRole("button", { name: "펜(매끈) 기본값 다시 적용" }));
 
-    expect(screen.getByRole("status").textContent).toBe("120개의 브러시가 표시됩니다.");
-    expect(container.querySelectorAll('[data-studio-brush-source="pro"]')).toHaveLength(120);
-    expect(screen.getAllByText("PRO")).toHaveLength(120);
+    await waitFor(() => expect(onSelect).toHaveBeenCalledTimes(1));
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({
+      catalogId: "pen",
+      catalogName: "펜(매끈)",
+      runtimeBrushId: "pen",
+      defaultWidth: 6,
+      defaultOpacity: 1,
+    }));
+    expect(onClose).toHaveBeenCalledWith("selection");
+  });
+
+  it("progressively opens the Pro catalog and lazily materializes a durable selection", async () => {
+    const onSelect = vi.fn();
+    const onClose = vi.fn();
+    const { container } = render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={onClose}
+        onSelect={onSelect}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("tab", {
+      name: `프로 ${STUDIO_BRUSH_CATALOG_COUNTS.pro}`,
+    }));
+
+    expect(screen.getByRole("status").textContent).toBe(
+      `48/${STUDIO_BRUSH_CATALOG_COUNTS.pro}개의 브러시가 표시됩니다.`
+    );
+    expect(container.querySelectorAll('[data-studio-brush-source="pro"]')).toHaveLength(48);
+    expect(screen.getAllByText("PRO")).toHaveLength(48);
+    while (container.querySelector('[data-studio-brush-load-more="true"]')) {
+      fireEvent.click(container.querySelector('[data-studio-brush-load-more="true"]')!);
+    }
+    expect(screen.getByRole("status").textContent).toBe(
+      `${STUDIO_BRUSH_CATALOG_COUNTS.pro}/${STUDIO_BRUSH_CATALOG_COUNTS.pro}개의 브러시가 표시됩니다.`
+    );
+    expect(container.querySelectorAll('[data-studio-brush-source="pro"]')).toHaveLength(
+      STUDIO_BRUSH_CATALOG_COUNTS.pro
+    );
+    expect(screen.getAllByText("PRO")).toHaveLength(STUDIO_BRUSH_CATALOG_COUNTS.pro);
 
     fireEvent.click(screen.getByRole("button", { name: "하트 도장 선택" }));
 
@@ -170,6 +242,85 @@ describe("StudioBrushLibrarySheet", () => {
       })
     );
     expect(onClose).toHaveBeenCalledWith("selection");
+  });
+
+  it("keeps one brush-selection tab stop and moves it with arrows", () => {
+    render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+
+    const selections = screen.getAllByRole("button", { name: /선택$/ });
+    expect(selections.filter((button) => button.tabIndex === 0)).toHaveLength(1);
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(selections[1]!, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    selections[0]?.focus();
+    fireEvent.keyDown(selections[0]!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(selections[1]);
+    expect(selections[1]?.tabIndex).toBe(0);
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", inline: "nearest" });
+    fireEvent.keyDown(selections[1]!, { key: "Home" });
+    expect(document.activeElement).toBe(selections[0]);
+  });
+
+  it("keeps favorite actions out of the tab sequence and exposes F on the roving tile", () => {
+    const onToggleFavorite = vi.fn();
+    render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+        onToggleFavorite={onToggleFavorite}
+      />
+    );
+
+    const favoriteActions = screen.getAllByRole("button", { name: /즐겨찾기/u });
+    expect(favoriteActions.every((button) => button.tabIndex === -1)).toBe(true);
+
+    const penTile = screen.getByRole("button", { name: "펜(매끈) 선택" });
+    expect(penTile.getAttribute("aria-keyshortcuts")).toBe("F");
+    penTile.focus();
+    fireEvent.keyDown(penTile, { key: "f" });
+    expect(onToggleFavorite).toHaveBeenCalledOnce();
+    expect(onToggleFavorite).toHaveBeenCalledWith("pen");
+    expect(document.activeElement).toBe(penTile);
+  });
+
+  it("cancels an in-flight selection when the controlled sheet closes", async () => {
+    const onSelect = vi.fn();
+    const onClose = vi.fn();
+    const { rerender } = render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={onClose}
+        onSelect={onSelect}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "펜(매끈) 선택" }));
+    rerender(
+      <StudioBrushLibrarySheet
+        open={false}
+        activeBrushId="pen"
+        onClose={onClose}
+        onSelect={onSelect}
+      />
+    );
+    await act(async () => {
+      await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
+    });
+
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it("renders distinct motif details for patterned, foliage, and stamp profiles", () => {
@@ -202,6 +353,17 @@ describe("StudioBrushLibrarySheet", () => {
       const html = renderToStaticMarkup(<LargeBrushPreview item={item} active={false} />);
       expect(html, item.id).not.toMatch(/\b(?:width|height|rx|ry|r)="-/);
     }
+  });
+
+  it("does not make a deliberately translucent catalogue brush opaque in preview", () => {
+    const colorlessMarker = renderToStaticMarkup(
+      <LargeBrushPreview item={catalogBrush("marker-colorless-blender")} active={false} />
+    );
+
+    expect(catalogBrush("marker-colorless-blender").defaultOpacity).toBe(0.2);
+    expect(colorlessMarker).toContain('data-studio-brush-preview-opacity="0.2"');
+    expect(colorlessMarker).toContain('opacity="0.048"');
+    expect(colorlessMarker).toContain('opacity="0.096"');
   });
 
   it("marks the active preset and favorite action independently", () => {

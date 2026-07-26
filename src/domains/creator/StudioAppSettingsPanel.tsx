@@ -708,6 +708,21 @@ export function StudioAppSettingsPanel({
             {tab === "grids" ? (
               <>
                 <SectionLabel>그리드</SectionLabel>
+                <Row label="캔버스 px 눈금자" hint="캔버스 위·왼쪽에 실제 문서 좌표 표시">
+                  <StudioToggleChip
+                    active={settings.grids.showCanvasRulers}
+                    onClick={() =>
+                      patch({
+                        grids: {
+                          ...settings.grids,
+                          showCanvasRulers: !settings.grids.showCanvasRulers,
+                        },
+                      })
+                    }
+                  >
+                    {settings.grids.showCanvasRulers ? "켜짐" : "꺼짐"}
+                  </StudioToggleChip>
+                </Row>
                 <Row label="픽셀 격자 표시" hint="확대 시 정렬용 격자">
                   <StudioToggleChip
                     active={settings.grids.showPixelGrid}

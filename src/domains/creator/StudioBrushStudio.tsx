@@ -6,11 +6,13 @@ import {
   Gauge,
   ImagePlus,
   LoaderCircle,
+  RotateCcw,
   RotateCw,
   SlidersHorizontal,
   Sparkles,
   Stamp,
   Trash2,
+  Undo2,
   X,
 } from "lucide-react";
 import {
@@ -26,6 +28,14 @@ import {
 import { createPortal } from "react-dom";
 
 import { BRUSH_PRESETS } from "./studio-brush";
+import {
+  createStudioBuiltInBrushDefaultRestoreProfile,
+  createStudioSavedBrushDefaultRestoreProfile,
+  planStudioBrushDefaultRestore,
+  resolveStudioCoreBrushDefaultRestoreProfile,
+  type StudioBrushDefaultRestoreDirection,
+  type StudioBrushDefaultRestoreTransaction,
+} from "./studio-brush-default-restore";
 import {
   STUDIO_BRUSH_DYNAMICS_PRESETS,
   normalizeStudioBrushDynamicsSettings,
@@ -52,7 +62,7 @@ import {
   resolveNormalizedStudioBrushGrainAlphaMultiplier,
   studioBrushGrainIsActive,
 } from "./studio-brush-material-dynamics";
-import { studioBrushStudioDefaultPresetId } from "./studio-brush-studio-contract";
+import { materializeStudioBrushCatalogSelection } from "./studio-brush-selection";
 import {
   STUDIO_BRUSH_DUAL_BRUSH_BLEND_MODES,
   STUDIO_BRUSH_DUAL_BRUSH_SIZE_RATIO_LIMITS,
@@ -82,11 +92,35 @@ import {
   StudioContextPill,
   StudioSectionHeader,
 } from "./studio-panel-ui";
+import {
+  StudioBrushDynamicsInputMatrix,
+  StudioBrushGrainControls,
+  StudioBrushTaperAdvancedControls,
+} from "./StudioBrushDynamicsControls";
 import { StudioBrushInputControls } from "./StudioBrushInputControls";
+
+import type {
+  StudioBrushSnapshot,
+  StudioSavedBrush,
+} from "./studio-brush-library";
 
 import { cn } from "@/lib/utils";
 
 type BrushStudioCategory = "presets" | "response" | "stamp" | "tip" | "input";
+
+type BrushDefaultRestoreSession =
+  | Readonly<{
+      status: "confirm";
+      transaction: StudioBrushDefaultRestoreTransaction;
+    }>
+  | Readonly<{
+      status: "applied";
+      transaction: StudioBrushDefaultRestoreTransaction;
+    }>
+  | Readonly<{
+      status: "unchanged" | "unavailable";
+      message: string;
+    }>;
 
 const CATEGORY_ITEMS: readonly {
   id: BrushStudioCategory;
@@ -105,6 +139,8 @@ export interface StudioBrushStudioProps {
   brushId: string;
   strokeWidth: number;
   color: string;
+  currentSnapshot: StudioBrushSnapshot;
+  savedBrushBaseline?: StudioSavedBrush | null;
   settings: NormalizedStudioBrushDynamicsSettings;
   onSettingsChange: (settings: NormalizedStudioBrushDynamicsSettings) => void;
   onSelectDynamicsPreset: (
@@ -125,6 +161,11 @@ export interface StudioBrushStudioProps {
   onTipAngleChange: (value: number) => void;
   tipRoundness: number;
   onTipRoundnessChange: (value: number) => void;
+  onRestoreDefaults: (
+    transaction: StudioBrushDefaultRestoreTransaction,
+    direction: StudioBrushDefaultRestoreDirection,
+  ) => void;
+  onBeforeOpen?: () => void;
   density?: "compact" | "touch";
 }
 
@@ -708,6 +749,8 @@ export function StudioBrushStudio({
   brushId,
   strokeWidth,
   color,
+  currentSnapshot,
+  savedBrushBaseline = null,
   settings,
   onSettingsChange,
   onSelectDynamicsPreset,
@@ -725,14 +768,19 @@ export function StudioBrushStudio({
   onTipAngleChange,
   tipRoundness,
   onTipRoundnessChange,
+  onRestoreDefaults,
+  onBeforeOpen,
   density = "compact",
 }: StudioBrushStudioProps) {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState<BrushStudioCategory>("presets");
   const [tipImporting, setTipImporting] = useState(false);
+  const [restoreLoading, setRestoreLoading] = useState(false);
+  const [restoreSession, setRestoreSession] = useState<BrushDefaultRestoreSession | null>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const restoreRequestRef = useRef(0);
   const titleId = useId();
   const descriptionId = useId();
   const tabIdBase = useId();
@@ -745,7 +793,10 @@ export function StudioBrushStudio({
   const touch = density === "touch";
 
   function closeStudio() {
+    restoreRequestRef.current += 1;
     setTipImporting(false);
+    setRestoreLoading(false);
+    setRestoreSession(null);
     setOpen(false);
     globalThis.requestAnimationFrame?.(() => launcherRef.current?.focus({ preventScroll: true }));
   }
@@ -753,6 +804,16 @@ export function StudioBrushStudio({
   useEffect(() => {
     if (category !== "tip" && tipImporting) setTipImporting(false);
   }, [category, tipImporting]);
+
+  useEffect(() => {
+    restoreRequestRef.current += 1;
+    setRestoreLoading(false);
+    setRestoreSession(null);
+  }, [
+    brushId,
+    currentSnapshot.sourcePresetId,
+    savedBrushBaseline?.id,
+  ]);
 
   function handleCategoryKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
     const tabs = Array.from(
@@ -816,6 +877,73 @@ export function StudioBrushStudio({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
+
+  async function resolveDefaultRestoreProfile() {
+    if (
+      savedBrushBaseline
+      && savedBrushBaseline.brushId === currentSnapshot.brushId
+    ) {
+      return createStudioSavedBrushDefaultRestoreProfile(savedBrushBaseline);
+    }
+    const sourcePresetId = currentSnapshot.sourcePresetId;
+    if (sourcePresetId) {
+      const selection = await materializeStudioBrushCatalogSelection(sourcePresetId);
+      return selection
+        ? createStudioBuiltInBrushDefaultRestoreProfile(selection)
+        : null;
+    }
+    return resolveStudioCoreBrushDefaultRestoreProfile(currentSnapshot.brushId);
+  }
+
+  async function requestDefaultRestore() {
+    if (restoreLoading) return;
+    const requestId = restoreRequestRef.current + 1;
+    restoreRequestRef.current = requestId;
+    setRestoreLoading(true);
+    setRestoreSession(null);
+    try {
+      const profile = await resolveDefaultRestoreProfile();
+      if (restoreRequestRef.current !== requestId) return;
+      if (!profile) {
+        setRestoreSession({
+          status: "unavailable",
+          message: currentSnapshot.sourcePresetId
+            ? "가져온 브러시는 저장된 브러시 라이브러리에서 다시 적용해 원본 설정으로 돌아갈 수 있습니다."
+            : "이 브러시의 검증된 기본 프로필을 찾지 못했습니다.",
+        });
+        return;
+      }
+      const transaction = planStudioBrushDefaultRestore(currentSnapshot, profile);
+      setRestoreSession(
+        transaction.changes.length === 0
+          ? { status: "unchanged", message: transaction.summary }
+          : { status: "confirm", transaction },
+      );
+    } catch {
+      if (restoreRequestRef.current !== requestId) return;
+      setRestoreSession({
+        status: "unavailable",
+        message: "기본 프로필을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      });
+    } finally {
+      if (restoreRequestRef.current === requestId) setRestoreLoading(false);
+    }
+  }
+
+  function confirmDefaultRestore(transaction: StudioBrushDefaultRestoreTransaction) {
+    const latest = planStudioBrushDefaultRestore(currentSnapshot, transaction.profile);
+    if (latest.changes.length === 0) {
+      setRestoreSession({ status: "unchanged", message: latest.summary });
+      return;
+    }
+    onRestoreDefaults(latest, "redo");
+    setRestoreSession({ status: "applied", transaction: latest });
+  }
+
+  function undoDefaultRestore(transaction: StudioBrushDefaultRestoreTransaction) {
+    onRestoreDefaults(transaction, "undo");
+    setRestoreSession(null);
+  }
 
   const launcherSummary = dynamicsActive
     ? `${matchedPreset ? STUDIO_BRUSH_DYNAMICS_PRESETS.find((preset) => preset.id === matchedPreset)?.name : "사용자 지정"} · ${mappingCount}개 연결`
@@ -933,6 +1061,10 @@ export function StudioBrushStudio({
           hint="한 도장마다 쌓이는 색의 양이며, 획 투명도와 함께 최종 농도를 결정합니다."
           onChange={(base) => onSettingsChange(updateStudioBrushDynamicsPropertyBase(settings, "flow", base))}
         />
+        <StudioBrushDynamicsInputMatrix
+          settings={settings}
+          onSettingsChange={onSettingsChange}
+        />
       </div>
     ) : <DynamicsRequiredNotice />
   ) : category === "stamp" ? (
@@ -1006,6 +1138,10 @@ export function StudioBrushStudio({
           step={0.01}
           display={`${Math.round(settings.taper.minSizeRatio * 100)}%`}
           onChange={(minSizeRatio) => onSettingsChange(updateStudioBrushDynamicsTaper(settings, { minSizeRatio }))}
+        />
+        <StudioBrushTaperAdvancedControls
+          settings={settings}
+          onSettingsChange={onSettingsChange}
         />
       </div>
     ) : <DynamicsRequiredNotice />
@@ -1125,6 +1261,10 @@ export function StudioBrushStudio({
               )
             : removeStudioBrushDynamicsMapping(settings, "roundness", "tilt-magnitude"))}
         />
+        <StudioBrushGrainControls
+          settings={settings}
+          onSettingsChange={onSettingsChange}
+        />
         <StudioBrushDualBrushControls settings={settings} onSettingsChange={onSettingsChange} />
       </div>
     ) : brushId === "calligraphy" ? (
@@ -1192,25 +1332,141 @@ export function StudioBrushStudio({
     </div>
   );
 
+  const restoreAction = (
+    <div
+      aria-live="polite"
+      className="shrink-0 border-b border-line bg-card/35 px-3 py-2 sm:px-4"
+    >
+      {restoreSession?.status === "confirm" ? (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-fg">
+              {restoreSession.transaction.profile.sourceName} 기본값으로 복원할까요?
+            </p>
+            <p className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3">
+              {restoreSession.transaction.summary} · 현재 색상과 브러시 선택은 유지됩니다.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:flex">
+            <button
+              type="button"
+              onClick={() => setRestoreSession(null)}
+              className={cn(
+                "min-h-11 rounded-xl border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised",
+                STUDIO_FOCUS_RING,
+              )}
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={() => confirmDefaultRestore(restoreSession.transaction)}
+              className={cn(
+                "min-h-11 rounded-xl border border-accent bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-2",
+                STUDIO_FOCUS_RING,
+              )}
+            >
+              {restoreSession.transaction.changes.length}개 설정 복원
+            </button>
+          </div>
+        </div>
+      ) : restoreSession?.status === "applied" ? (
+        <div className="flex min-h-11 items-center gap-3">
+          <CheckCircle2 size={17} className="shrink-0 text-good" aria-hidden />
+          <p className="min-w-0 flex-1 text-xs text-fg-2">
+            {restoreSession.transaction.changes.length}개 설정을 복원했습니다.
+          </p>
+          <button
+            type="button"
+            onClick={() => undoDefaultRestore(restoreSession.transaction)}
+            className={cn(
+              "flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised",
+              STUDIO_FOCUS_RING,
+            )}
+          >
+            <Undo2 size={14} aria-hidden />
+            되돌리기
+          </button>
+        </div>
+      ) : restoreSession ? (
+        <div
+          role="status"
+          data-studio-brush-default-restore-status={restoreSession.status}
+          className="flex min-h-11 items-center gap-3"
+        >
+          <CheckCircle2
+            size={17}
+            className={cn(
+              "shrink-0",
+              restoreSession.status === "unchanged" ? "text-good" : "text-warn",
+            )}
+            aria-hidden
+          />
+          <p className="min-w-0 flex-1 text-xs leading-relaxed text-fg-2">
+            {restoreSession.message}
+          </p>
+          {restoreSession.status === "unavailable" ? (
+            <button
+              type="button"
+              onClick={() => void requestDefaultRestore()}
+              className={cn(
+                "min-h-11 shrink-0 rounded-xl border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised",
+                STUDIO_FOCUS_RING,
+              )}
+            >
+              다시 시도
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-fg-2">선택 브러시 전체 설정</p>
+            <p className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3">
+              굵기·불투명도·필압·보정·촉을 함께 복원하며 현재 색상은 유지합니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={restoreLoading}
+            onClick={() => void requestDefaultRestore()}
+            className={cn(
+              "flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-line-strong bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:border-accent/55 hover:bg-raised disabled:cursor-wait disabled:opacity-55",
+              STUDIO_FOCUS_RING,
+            )}
+          >
+            {restoreLoading ? (
+              <LoaderCircle size={15} className="animate-spin motion-reduce:animate-none" aria-hidden />
+            ) : (
+              <RotateCcw size={15} aria-hidden />
+            )}
+            {restoreLoading ? "기본값 불러오는 중" : "이 브러시 기본값 복원"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   const modal = open ? (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
+      data-studio-brush-studio-dialog="true"
       data-no-fx
-      className="fixed inset-0 z-[120] flex items-end justify-center bg-[oklch(0.08_0.01_70/0.78)] p-0 pb-[calc(7rem+env(safe-area-inset-bottom))] text-fg sm:items-center sm:p-4"
+      className="fixed inset-0 isolate z-[180] flex items-end justify-center overflow-hidden overscroll-none bg-[oklch(0.08_0.01_70/0.78)] p-0 pb-[env(safe-area-inset-bottom)] text-fg sm:items-center sm:p-4"
     >
       <button
         type="button"
         aria-hidden="true"
         tabIndex={-1}
         onClick={closeStudio}
-        className="absolute inset-0 cursor-default"
+        className="absolute inset-0 z-0 cursor-default"
       />
       <div
         ref={dialogRef}
-        className="relative flex h-[calc(100dvh-7rem-env(safe-area-inset-bottom))] w-full flex-col overflow-hidden rounded-t-2xl border border-line bg-panel shadow-2xl sm:h-[min(44rem,calc(100dvh-2rem))] sm:max-w-5xl sm:rounded-2xl"
+        className="relative z-10 flex h-[calc(100dvh-env(safe-area-inset-bottom))] max-h-full w-full flex-col overflow-hidden overscroll-contain rounded-t-2xl border border-line bg-panel shadow-2xl sm:h-[min(44rem,calc(100dvh-2rem))] sm:max-w-5xl sm:rounded-2xl"
       >
         <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-line px-3 sm:px-4">
           <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
@@ -1223,16 +1479,6 @@ export function StudioBrushStudio({
             </p>
           </div>
           <button
-            type="button"
-            onClick={() => {
-              const presetId = studioBrushStudioDefaultPresetId(brushId);
-              onSelectDynamicsPreset(presetId, studioBrushDynamicsPresetSettings(presetId));
-            }}
-            className="hidden min-h-[44px] rounded-xl border border-line bg-card px-3 text-xs font-semibold text-fg-2 hover:bg-raised sm:block"
-          >
-            기본값 복원
-          </button>
-          <button
             ref={closeRef}
             type="button"
             onClick={closeStudio}
@@ -1242,6 +1488,8 @@ export function StudioBrushStudio({
             <X size={17} aria-hidden />
           </button>
         </header>
+
+        {restoreAction}
 
         <div className="shrink-0 border-b border-line p-2 sm:hidden">
           <StudioBrushDynamicsPreview settings={settings} strokeWidth={strokeWidth} color={color} />
@@ -1313,7 +1561,10 @@ export function StudioBrushStudio({
       <button
         ref={launcherRef}
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          onBeforeOpen?.();
+          setOpen(true);
+        }}
         aria-haspopup="dialog"
         aria-expanded={open}
         className={cn(

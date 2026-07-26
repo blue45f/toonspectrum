@@ -473,7 +473,10 @@ export function StudioAutoColorHintsPanel({
             type="button"
             data-studio-auto-color-canvas-scribble="true"
             aria-pressed={canvasArmed}
-            disabled={Boolean(seedsProp)}
+            disabled={
+              Boolean(seedsProp) ||
+              ((busy || applying) && !canvasArmed)
+            }
             onClick={() => setCanvasArmed(!canvasArmed)}
             className={cx(
               "flex min-h-11 w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-[0.68rem] font-semibold transition-colors",

@@ -189,7 +189,8 @@ describe("studio draw rendering ownership boundary", () => {
     expect(drawNode.source).toContain("<StudioStampDrawShape");
     expect(drawNode.valueImports).toContain("./StudioStampDrawShape");
     expect(stampShape.source).toContain('el.stampPipeline === "causal-walker-v2"');
-    expect(stampShape.source).toContain("? el.points\n    : processFreehandPoints(el.points, renderSampleDistance)");
+    expect(stampShape.source).toContain("resolveStudioFreehandRenderPath(el.points");
+    expect(stampShape.source).toContain("const sourceAligned = causalStamp || stampPoints === el.points");
     expect(stampShape.source).toContain("drawStudioStampStrokeWithSymmetry(");
     expect(drawNode.source).toContain('el.watercolorPipeline === "causal-walker-v2"');
     expect(drawNode.source).toContain("planCausalWatercolorBrushDabs(watercolorInput, !activeDraft)");

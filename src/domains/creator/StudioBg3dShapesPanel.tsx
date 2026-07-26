@@ -3,6 +3,7 @@ import {
   STUDIO_BG3D_ICON_BUTTON as ICON_BUTTON,
   studioBg3dClassNames as cx,
 } from "./studio-bg3d-editor-ui";
+import { StudioBg3dProceduralStarterPanel } from "./StudioBg3dProceduralStarterPanel";
 
 import type { BgCompositeCategory } from "./studio-background-3d-composites";
 import type {
@@ -18,6 +19,7 @@ import type {
   StudioBg3dLayerListItem,
   StudioBg3dSnapSettings,
 } from "./studio-bg3d-object-ops";
+import type { StudioBg3dProceduralInsertionPlan } from "./studio-bg3d-procedural-starter-pack";
 import type { StudioBg3dRigSelectionState } from "./studio-bg3d-rig-selection";
 import type {
   StudioBg3dAnimationPlayback,
@@ -50,6 +52,10 @@ interface StudioBg3dShapesPanelContext {
   readonly COMPOSITE_CATEGORY_LABELS: Record<BgCompositeCategory, string>;
   readonly COMPOSITE_PRESETS: import("./studio-background-3d-composites").BgCompositePreset[];
   readonly addComposite: (presetId: string) => void;
+  readonly addProceduralStarterAsset: (
+    assetId: string,
+  ) => StudioBg3dProceduralInsertionPlan;
+  readonly proceduralStarterDisabledReason: string | null;
   readonly snapSettings: StudioBg3dSnapSettings;
   readonly setSnapSettings: import("react").Dispatch<import("react").SetStateAction<StudioBg3dSnapSettings>>;
   readonly normalizeStudioBg3dSnapSettings: (raw: unknown) => StudioBg3dSnapSettings;
@@ -169,6 +175,8 @@ export function StudioBg3dShapesPanel({
     COMPOSITE_CATEGORY_LABELS,
     COMPOSITE_PRESETS,
     addComposite,
+    addProceduralStarterAsset,
+    proceduralStarterDisabledReason,
     snapSettings,
     setSnapSettings,
     normalizeStudioBg3dSnapSettings,
@@ -290,6 +298,13 @@ export function StudioBg3dShapesPanel({
                       </button>
                     );
                   })}
+                </div>
+
+                <div className="mt-5 border-t border-line pt-4">
+                  <StudioBg3dProceduralStarterPanel
+                    disabledReason={proceduralStarterDisabledReason}
+                    onInsert={addProceduralStarterAsset}
+                  />
                 </div>
 
                 <div className="mt-5 border-t border-line pt-4">

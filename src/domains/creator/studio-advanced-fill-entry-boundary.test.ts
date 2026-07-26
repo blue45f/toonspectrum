@@ -68,7 +68,10 @@ describe("Studio advanced fill entry boundary", () => {
     expect(editor).toContain("const pendingAutoArm = advancedFillAutoArmTargetRef.current");
     expect(editor).toContain("if (pendingAutoArm?.targetId === selectedId)");
     expect(editor).toContain("setAdvancedFillStatus(pendingAutoArm.status)");
-    expect(toggle).toContain('openInspectorRoute({ primary: "properties", image: "fill" }');
+    expect(toggle).toContain('selectInspectorRoute({ primary: "properties", image: "fill" }');
+    expect(toggle).not.toContain(
+      'openInspectorRoute({ primary: "properties", image: "fill" }, null)',
+    );
     expect(toggle).toContain("setAdvancedFillActive(true)");
     expect(toggle).toContain("레이어에서 하나를 선택한 뒤 채우기를 다시 누르세요");
     expect(toggle).toContain("flushPendingStrokeCommitsRef.current()");

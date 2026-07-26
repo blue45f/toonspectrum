@@ -7,6 +7,26 @@ const panelSource = readFileSync(
   new URL("./StudioVrmTexturePaintPanel.tsx", import.meta.url),
   "utf8",
 );
+const runtimeSource = readFileSync(
+  new URL("./studio-vrm-texture-paint-runtime.ts", import.meta.url),
+  "utf8",
+);
+const fillWorkerClientSource = readFileSync(
+  new URL("./studio-vrm-texture-fill-worker-client.ts", import.meta.url),
+  "utf8",
+);
+
+function requiredIndex(source: string, token: string, from = 0): number {
+  const index = source.indexOf(token, from);
+  if (index < 0) throw new Error(`Expected source token was not found: ${token}`);
+  return index;
+}
+
+function sourceBetween(source: string, startToken: string, endToken: string): string {
+  const start = requiredIndex(source, startToken);
+  const end = requiredIndex(source, endToken, start + startToken.length);
+  return source.slice(start, end);
+}
 
 describe("Studio VRM texture-paint production integration boundary", () => {
   it("mounts one compact surface workflow and owns one runtime per loaded VRM", () => {
@@ -94,6 +114,497 @@ describe("Studio VRM texture-paint production integration boundary", () => {
     expect(poserSource.slice(move, finish)).toContain(
       "const hit = studioVrmTexturePaintHit(event)",
     );
+  });
+
+  it("accepts uv1-only R3F hits and lets the runtime select the texture channel", () => {
+    const hitSource = sourceBetween(
+      poserSource,
+      "function studioVrmTexturePaintHit(",
+      "function studioVrmTexturePaintPressure(",
+    );
+    const resolveBaseColorHit = sourceBetween(
+      runtimeSource,
+      "private resolveBaseColorHit(",
+      "private resolveHit(",
+    );
+
+    expect(hitSource).toContain("(!event.uv && !event.uv1)");
+    expect(hitSource).toContain("...(event.uv ? { uv: event.uv } : {})");
+    expect(hitSource).toContain("...(event.uv1 ? { uv1: event.uv1 } : {})");
+    expect(runtimeSource).toContain(
+      "readonly uv1?: THREE.Vector2 | Readonly<{ x: number; y: number }>;",
+    );
+    expect(resolveBaseColorHit).toContain("let textureChannel: number");
+    expect(resolveBaseColorHit).toContain(
+      "textureChannel = effectiveTexture.channel",
+    );
+    expect(resolveBaseColorHit).toContain(
+      "finiteUv(textureChannel === 1 ? hit.uv1 : hit.uv)",
+    );
+  });
+
+  it("arms Alt and explicit eyedropper samples on down but executes only after a confirmed up", () => {
+    const begin = sourceBetween(
+      poserSource,
+      "const beginTexturePaint =",
+      "const moveTexturePaint =",
+    );
+    const finish = sourceBetween(
+      poserSource,
+      "const finishTexturePaint = (event: ThreeEvent<PointerEvent>)",
+      "const cancelTexturePaint = (event: ThreeEvent<PointerEvent>)",
+    );
+    const oneShot = sourceBetween(
+      poserSource,
+      "const runTexturePaintOneShot =",
+      "const finishTexturePaintPendingOneShotTap =",
+    );
+    const explicitEyedropper = requiredIndex(
+      begin,
+      "const explicitEyedropper = texturePaintEyedropperActiveRef.current",
+    );
+    const sampleIntent = requiredIndex(
+      begin,
+      "event.altKey || explicitEyedropper",
+      explicitEyedropper,
+    );
+    const pendingOwnership = requiredIndex(
+      begin,
+      "texturePaintPendingOneShotTapRef.current = pending",
+      sampleIntent,
+    );
+    const tapCapture = requiredIndex(
+      begin,
+      "captureTarget.setPointerCapture(event.pointerId)",
+      pendingOwnership,
+    );
+    const pendingReturn = requiredIndex(begin, "return;", tapCapture);
+    const brushStart = requiredIndex(begin, "runtime.beginStroke({", pendingReturn);
+
+    expect(explicitEyedropper).toBeLessThan(sampleIntent);
+    expect(sampleIntent).toBeLessThan(pendingOwnership);
+    expect(pendingOwnership).toBeLessThan(tapCapture);
+    expect(tapCapture).toBeLessThan(pendingReturn);
+    expect(pendingReturn).toBeLessThan(brushStart);
+    expect(begin).not.toContain("runtime.sampleBaseColor(");
+    expect(begin).not.toContain("runtime.fillBaseColor(");
+    expect(oneShot).toContain("pending.runtime.sampleBaseColor({");
+    expect(finish).toContain("finishTexturePaintPendingOneShotTap(");
+  });
+
+  it("owns and aborts asynchronous surface samples without accepting stale completion", () => {
+    const actorSetup = sourceBetween(
+      poserSource,
+      "function VrmActor({",
+      "useEffect(() => {",
+    );
+    const oneShot = sourceBetween(
+      poserSource,
+      "const runTexturePaintOneShot =",
+      "const finishTexturePaintPendingOneShotTap =",
+    );
+    const runtimeSample = sourceBetween(
+      runtimeSource,
+      "async sampleBaseColor(",
+      "async beginStroke(",
+    );
+
+    expect(actorSetup).toContain(
+      "const texturePaintOneShotGenerationRef = useRef(0)",
+    );
+    expect(actorSetup).toContain(
+      "const texturePaintOneShotAbortRef = useRef<AbortController | null>(null)",
+    );
+    expect(oneShot).toContain("const controller = new AbortController()");
+    expect(oneShot).toContain(
+      "texturePaintOneShotAbortRef.current = controller",
+    );
+    expect(oneShot).toContain(
+      "pending.runtime.sampleBaseColor({",
+    );
+    expect(oneShot).toContain(
+      "signal: controller.signal",
+    );
+    expect(oneShot).toContain(
+      "generation !== texturePaintOneShotGenerationRef.current",
+    );
+    expect(oneShot).toContain(
+      "texturePaintOneShotAbortRef.current === controller",
+    );
+    expect(poserSource).toContain("texturePaintOneShotAbortRef.current?.abort()");
+
+    expect(runtimeSample).toContain("const controller = new AbortController()");
+    expect(runtimeSample).toContain("const abortFromCaller = () => controller.abort()");
+    expect(runtimeSample).toContain(
+      'input.signal?.addEventListener("abort", abortFromCaller, { once: true })',
+    );
+    expect(runtimeSample).toContain(
+      'input.signal?.removeEventListener("abort", abortFromCaller)',
+    );
+    expect(runtimeSample).toContain(
+      "if (this.sampling !== request || this.disposed)",
+    );
+    expect(runtimeSample).toContain(
+      "!sameResolvedBaseColorHit(resolved, currentHit.value)",
+    );
+  });
+
+  it("updates only the selected colour and disarms only a successful armed sample", () => {
+    const oneShot = sourceBetween(
+      poserSource,
+      "const runTexturePaintOneShot =",
+      "const finishTexturePaintPendingOneShotTap =",
+    );
+    const colorHandler = sourceBetween(
+      poserSource,
+      "const handleTexturePaintColorSampled =",
+      "const handleTexturePaintUndo =",
+    );
+    const actorWiring = sourceBetween(
+      poserSource,
+      "<VrmActor",
+      "{vrm && showPoseBoneOverlay",
+    );
+
+    const success = requiredIndex(
+      oneShot,
+      'pending.kind === "sample" && result.ok',
+    );
+    const colorUpdate = requiredIndex(
+      oneShot,
+      "texturePaintColorSampledRef.current(result.value.color)",
+      success,
+    );
+    const oneShotCompletion = requiredIndex(
+      oneShot,
+      "if (pending.explicitEyedropper) texturePaintEyedropperCompleteRef.current()",
+      colorUpdate,
+    );
+    const successEnd = requiredIndex(oneShot, "invalidate();", oneShotCompletion);
+    const catchStart = requiredIndex(oneShot, ".catch(", successEnd);
+
+    expect(colorUpdate).toBeLessThan(oneShotCompletion);
+    expect(oneShotCompletion).toBeLessThan(successEnd);
+    expect(successEnd).toBeLessThan(catchStart);
+    expect(oneShot.slice(catchStart)).not.toContain(
+      "texturePaintEyedropperCompleteRef.current()",
+    );
+    expect(colorHandler).toContain(
+      "setTexturePaintSettings((current) => ({ ...current, color }))",
+    );
+    expect(colorHandler).not.toContain("opacity");
+    expect(colorHandler).not.toContain("blend");
+    expect(colorHandler).not.toContain("tuning");
+    expect(actorWiring).toContain(
+      "onTexturePaintColorSampled={handleTexturePaintColorSampled}",
+    );
+    expect(actorWiring).toContain(
+      "onTexturePaintEyedropperComplete={() =>",
+    );
+    expect(actorWiring).toContain(
+      "setTexturePaintEyedropperActive(false)",
+    );
+  });
+
+  it("wires one 44px panel eyedropper through the poser and runtime", () => {
+    const panelButton = sourceBetween(
+      panelSource,
+      'aria-label={eyedropperActive ? "표면 스포이드 취소" : "표면 스포이드"}',
+      '<input',
+    );
+    const panelWiring = sourceBetween(
+      poserSource,
+      "<StudioVrmTexturePaintPanel\n",
+      "/>",
+    );
+
+    expect(panelSource).toContain("readonly eyedropperActive: boolean");
+    expect(panelSource).toContain("readonly onEyedropperToggle: () => void");
+    expect(panelButton).toContain("aria-pressed={eyedropperActive}");
+    expect(panelButton).toContain("size-11");
+    expect(panelButton).toContain("onClick={onEyedropperToggle}");
+    expect(panelWiring).toContain(
+      "eyedropperActive={texturePaintEyedropperActive}",
+    );
+    expect(panelWiring).toContain(
+      "onEyedropperToggle={() =>",
+    );
+    expect(runtimeSource).toContain("async sampleBaseColor(");
+    expect(runtimeSource).toContain(
+      "if (this.sampling || this.filling || this.pending || this.active) {",
+    );
+  });
+
+  it("arms ColorDrop as a pending tap while preserving brush pointerdown latency", () => {
+    const begin = sourceBetween(
+      poserSource,
+      "const beginTexturePaint =",
+      "const moveTexturePaint =",
+    );
+    const oneShot = sourceBetween(
+      poserSource,
+      "const runTexturePaintOneShot =",
+      "const finishTexturePaintPendingOneShotTap =",
+    );
+    const settings = requiredIndex(begin, "const settings = texturePaintSettingsRef.current");
+    const fillIntent = requiredIndex(begin, 'settings.tool === "fill"', settings);
+    const pendingOwnership = requiredIndex(
+      begin,
+      "texturePaintPendingOneShotTapRef.current = pending",
+      fillIntent,
+    );
+    const pendingReturn = requiredIndex(begin, "return;", pendingOwnership);
+    const brushPointerOwnership = requiredIndex(
+      begin,
+      "const pointerId = event.pointerId",
+      pendingReturn,
+    );
+    const brushPointerCapture = requiredIndex(
+      begin,
+      "captureTarget.setPointerCapture(pointerId)",
+      brushPointerOwnership,
+    );
+    const brushStart = requiredIndex(begin, "runtime.beginStroke({", brushPointerCapture);
+
+    expect(settings).toBeLessThan(fillIntent);
+    expect(fillIntent).toBeLessThan(pendingOwnership);
+    expect(pendingOwnership).toBeLessThan(pendingReturn);
+    expect(pendingReturn).toBeLessThan(brushPointerOwnership);
+    expect(brushPointerOwnership).toBeLessThan(brushPointerCapture);
+    expect(brushPointerCapture).toBeLessThan(brushStart);
+    expect(begin).not.toContain("runtime.fillBaseColor({");
+    expect(oneShot).toContain("pending.runtime.fillBaseColor({");
+    expect(oneShot).toContain("color: pending.settings.color");
+    expect(oneShot).toContain("tolerance: pending.settings.fillTolerance");
+    expect(oneShot).toContain("scope: pending.settings.fillScope");
+  });
+
+  it("owns ColorDrop as one abortable generation and rejects stale completion", () => {
+    const actorSetup = sourceBetween(
+      poserSource,
+      "function VrmActor({",
+      "useEffect(() => {",
+    );
+    const oneShot = sourceBetween(
+      poserSource,
+      "const runTexturePaintOneShot =",
+      "const finishTexturePaintPendingOneShotTap =",
+    );
+    const unmountCleanup = sourceBetween(
+      poserSource,
+      "useEffect(() => () => {",
+      "useEffect(() => {\n    const releaseCapture",
+    );
+    const disabledCleanup = sourceBetween(
+      poserSource,
+      "useEffect(() => {\n    if (texturePaintEnabled) return;",
+      "useEffect(() => {\n    applyPoserVisualState",
+    );
+
+    expect(actorSetup).toContain(
+      "const texturePaintOneShotGenerationRef = useRef(0)",
+    );
+    expect(actorSetup).toContain(
+      "const texturePaintOneShotAbortRef = useRef<AbortController | null>(null)",
+    );
+    expect(actorSetup).toContain(
+      "const texturePaintOneShotBusyRef = useRef(false)",
+    );
+    expect(oneShot).toContain(
+      "const generation = texturePaintOneShotGenerationRef.current + 1",
+    );
+    expect(oneShot).toContain(
+      "texturePaintOneShotGenerationRef.current = generation",
+    );
+    expect(oneShot).toContain("texturePaintOneShotBusyRef.current = true");
+    expect(oneShot).toContain("const controller = new AbortController()");
+    expect(oneShot).toContain("texturePaintOneShotAbortRef.current = controller");
+    expect(oneShot).toContain("signal: controller.signal");
+    expect(oneShot).toContain(
+      "generation === texturePaintOneShotGenerationRef.current",
+    );
+    expect(oneShot).toContain(
+      "texturePaintOneShotAbortRef.current === controller",
+    );
+    expect(oneShot).toContain("texturePaintOneShotAbortRef.current = null");
+    expect(oneShot).toContain("texturePaintOneShotBusyRef.current = false");
+    expect(unmountCleanup).toContain("texturePaintOneShotGenerationRef.current += 1");
+    expect(unmountCleanup).toContain("texturePaintOneShotAbortRef.current?.abort()");
+    expect(disabledCleanup).toContain("texturePaintOneShotGenerationRef.current += 1");
+    expect(disabledCleanup).toContain("texturePaintOneShotAbortRef.current?.abort()");
+    expect(disabledCleanup).toContain("texturePaintOneShotBusyRef.current = false");
+  });
+
+  it("cancels pending one-shot taps on movement, pinch, cancellation, capture loss, and mode cleanup", () => {
+    const movement = sourceBetween(
+      poserSource,
+      "function studioVrmTexturePaintOneShotTapMoved(",
+      "function VrmActor({",
+    );
+    const begin = sourceBetween(
+      poserSource,
+      "const beginTexturePaint =",
+      "const moveTexturePaint =",
+    );
+    const move = sourceBetween(
+      poserSource,
+      "const moveTexturePaint =",
+      "const finishTexturePaint =",
+    );
+    const finishPending = sourceBetween(
+      poserSource,
+      "const finishTexturePaintPendingOneShotTap =",
+      "useEffect(() => {",
+    );
+    const cancelPending = sourceBetween(
+      poserSource,
+      "const cancelTexturePaintPendingOneShotTap =",
+      "const runTexturePaintOneShot =",
+    );
+    const cancel = sourceBetween(
+      poserSource,
+      "const cancelTexturePaint =",
+      "return (",
+    );
+    const pointerLifecycle = sourceBetween(
+      poserSource,
+      "useEffect(() => {\n    const releaseCapture",
+      "useEffect(() => {\n    cancelTexturePaintPendingOneShotTap();",
+    );
+    const unmountCleanup = sourceBetween(
+      poserSource,
+      "useEffect(() => () => {",
+      "useEffect(() => {\n    const releaseCapture",
+    );
+    const disabledCleanup = sourceBetween(
+      poserSource,
+      "useEffect(() => {\n    if (texturePaintEnabled) return;",
+      "useEffect(() => {\n    applyPoserVisualState",
+    );
+
+    expect(poserSource).toContain(
+      "STUDIO_VRM_TEXTURE_PAINT_ONE_SHOT_TAP_MAX_DISTANCE_CSS_PX = 10",
+    );
+    expect(movement).toContain(
+      "> STUDIO_VRM_TEXTURE_PAINT_ONE_SHOT_TAP_MAX_DISTANCE_SQUARED",
+    );
+    expect(begin).toContain("const existingPendingTap =");
+    expect(begin).toContain(
+      "existingPendingTap.pointerId !== event.pointerId",
+    );
+    expect(begin).toContain("cancelTexturePaintPendingOneShotTap()");
+    expect(begin).not.toContain("runtime.sampleBaseColor(");
+    expect(begin).not.toContain("runtime.fillBaseColor(");
+    expect(move).toContain("studioVrmTexturePaintOneShotTapMoved(");
+    expect(move).toContain(
+      "cancelTexturePaintPendingOneShotTap(event.pointerId)",
+    );
+    expect(move).not.toContain("runTexturePaintOneShot");
+    expect(cancelPending).toContain(
+      "releaseTexturePaintPendingOneShotCapture(pending)",
+    );
+
+    const release = requiredIndex(
+      finishPending,
+      "releaseTexturePaintPendingOneShotCapture(pending)",
+    );
+    const movementGate = requiredIndex(
+      finishPending,
+      "studioVrmTexturePaintOneShotTapMoved(",
+      release,
+    );
+    const execute = requiredIndex(
+      finishPending,
+      "runTexturePaintOneShot(pending)",
+      movementGate,
+    );
+    expect(release).toBeLessThan(movementGate);
+    expect(movementGate).toBeLessThan(execute);
+
+    expect(pointerLifecycle).toContain(
+      'window.addEventListener("pointermove", cancelPendingTapOnMove)',
+    );
+    expect(pointerLifecycle).toContain(
+      "pending.pointerId !== event.pointerId",
+    );
+    expect(pointerLifecycle).toContain(
+      '"pointerdown",\n      cancelPendingTapOnAdditionalPointer,\n      true',
+    );
+    expect(pointerLifecycle).toContain(
+      'window.addEventListener("pointercancel", cancelMatchingPointer)',
+    );
+    expect(pointerLifecycle).toContain(
+      'gl.domElement.addEventListener("lostpointercapture", cancelMatchingPointer)',
+    );
+    expect(pointerLifecycle).toContain("cancelTexturePaintPendingOneShotTap()");
+    expect(cancel).toContain(
+      "cancelTexturePaintPendingOneShotTap(event.pointerId)",
+    );
+    expect(cancel).not.toContain("runTexturePaintOneShot");
+    expect(unmountCleanup).toContain("cancelTexturePaintPendingOneShotTap()");
+    expect(disabledCleanup).toContain("cancelTexturePaintPendingOneShotTap()");
+  });
+
+  it("keeps idle and eyedropper guidance aligned with the selected tool", () => {
+    expect(poserSource).toContain(
+      'texturePaintSettings.tool === "fill" ? "ColorDrop" : "브러시"',
+    );
+    expect(poserSource).toContain(
+      "표면을 한 번 눌러 ColorDrop으로 채우세요. Ctrl/⌘+Z로 이 채우기를 되돌릴 수 있습니다.",
+    );
+    expect(poserSource).toContain(
+      "표면을 끌어 칠하세요. Ctrl/⌘+Z로 이 텍스처 획을 되돌릴 수 있습니다.",
+    );
+  });
+
+  it("offers an accessible F shortcut that toggles brush and ColorDrop safely", () => {
+    const keyboard = sourceBetween(
+      poserSource,
+      'aria-keyshortcuts="F I"',
+      "camera={{",
+    );
+    const keyNormalization = requiredIndex(
+      keyboard,
+      "const key = event.key.toLowerCase()",
+    );
+    const fillShortcut = requiredIndex(
+      keyboard,
+      'else if (key === "f")',
+      keyNormalization,
+    );
+
+    expect(keyboard).toContain("!texturePaintInteractionEnabled");
+    expect(keyboard).toContain("texturePaintStrokeActive");
+    expect(keyboard).toContain("event.metaKey");
+    expect(keyboard).toContain("event.ctrlKey");
+    expect(keyboard).toContain("event.altKey");
+    expect(fillShortcut).toBeGreaterThan(keyNormalization);
+    expect(keyboard.slice(fillShortcut)).toContain("event.preventDefault()");
+    expect(keyboard.slice(fillShortcut)).toContain(
+      "setTexturePaintEyedropperActive(false)",
+    );
+    expect(keyboard.slice(fillShortcut)).toContain(
+      'tool: current.tool === "brush" ? "fill" : "brush"',
+    );
+  });
+
+  it("keeps production ColorDrop behind the module Worker with no direct main-thread fallback", () => {
+    expect(runtimeSource).toContain(
+      'from "./studio-vrm-texture-fill-worker-client"',
+    );
+    expect(runtimeSource).toContain(
+      "runTextureFill: options.runTextureFill ?? runStudioVrmTextureFillWorker",
+    );
+    expect(runtimeSource).toContain(
+      "fillResult = await this.options.runTextureFill({",
+    );
+    expect(runtimeSource).not.toContain("computeStudioVrmTextureFillMask");
+    expect(fillWorkerClientSource).toContain(
+      'new URL("./studio-vrm-texture-fill.worker.ts", import.meta.url)',
+    );
+    expect(fillWorkerClientSource).toContain('type: "module",');
+    expect(fillWorkerClientSource).toContain("intentionally has no direct");
+    expect(fillWorkerClientSource).not.toContain("computeStudioVrmTextureFillMask");
   });
 
   it("guards every history command and capture boundary during an unfinished stroke", () => {

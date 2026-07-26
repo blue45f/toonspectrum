@@ -29,6 +29,7 @@ import {
 import {
   Suspense,
   memo,
+  useEffect,
   useId,
   useRef,
   useState,
@@ -114,12 +115,83 @@ function clampZoom(z: number): number {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 20) / 20));
 }
 
+function syncStudioMobileScrollCue(scroller: HTMLDivElement | null): void {
+  if (!scroller) return;
+  const host = scroller.closest<HTMLElement>("[data-studio-mobile-scroll-host]");
+  if (!host) return;
+
+  const maxScrollLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+  const overflow = maxScrollLeft > 1;
+  const before = overflow && scroller.scrollLeft > 1;
+  const after = overflow && scroller.scrollLeft < maxScrollLeft - 1;
+  host.style.setProperty("--studio-mobile-scroll-before", before ? "1" : "0");
+  host.style.setProperty("--studio-mobile-scroll-after", after ? "1" : "0");
+  scroller.dataset.studioMobileOverflow = !overflow
+    ? "none"
+    : before && after
+      ? "both"
+      : before
+        ? "before"
+        : "after";
+
+  const status = host.querySelector<HTMLElement>("[data-studio-mobile-scroll-status]");
+  if (!status) return;
+  status.textContent = !overflow
+    ? "현재 도구막대의 모든 도구가 표시되어 있습니다."
+    : before && after
+      ? "왼쪽과 오른쪽에 도구가 더 있습니다. 도구막대를 좌우로 밀어 이동하세요."
+      : before
+        ? "왼쪽에 도구가 더 있습니다. 도구막대를 오른쪽으로 밀어 이동하세요."
+        : "오른쪽에 도구가 더 있습니다. 도구막대를 왼쪽으로 밀어 이동하세요.";
+}
+
+function StudioMobileScrollCues({
+  descriptionId,
+  placement,
+}: {
+  descriptionId: string;
+  placement: "primary" | "secondary";
+}) {
+  return (
+    <>
+      <span
+        aria-hidden
+        data-studio-mobile-scroll-cue={`${placement}-before`}
+        className="pointer-events-none absolute inset-y-0 left-0 z-[2] grid w-5 place-items-center bg-gradient-to-r from-panel via-panel/80 to-transparent text-[0.65rem] font-black text-fg-2/70 opacity-0 transition-opacity"
+        style={{ opacity: "var(--studio-mobile-scroll-before, 0)" }}
+      >
+        ‹
+      </span>
+      <span
+        aria-hidden
+        data-studio-mobile-scroll-cue={`${placement}-after`}
+        className="pointer-events-none absolute inset-y-0 right-0 z-[2] grid w-5 place-items-center bg-gradient-to-l from-panel via-panel/80 to-transparent text-[0.65rem] font-black text-fg-2/70 opacity-0 transition-opacity"
+        style={{ opacity: "var(--studio-mobile-scroll-after, 0)" }}
+      >
+        ›
+      </span>
+      <span
+        id={descriptionId}
+        data-studio-mobile-scroll-status={placement}
+        className="sr-only"
+      >
+        도구막대를 좌우로 밀면 숨은 도구를 볼 수 있습니다.
+      </span>
+    </>
+  );
+}
+
 function studioDrawSheetSizeStyle(
   snap: StudioMobileSheetSnap,
   keyboardInset: number,
 ): StudioDrawSheetStyle {
   const baseSize = studioMobileSheetSizeStyle(snap, keyboardInset);
-  const reservedBottom = `calc(var(--studio-canvas-bottom-inset, 7rem) + ${keyboardInset}px)`;
+  // Some compact editor breakpoints intentionally reduce the root rem size while the dock keeps
+  // 44px touch targets plus borders/padding. A rem-only inset can therefore become shorter than
+  // the physical dock and let the draw sheet cover its top edge. Keep a pixel floor that reflects
+  // the real one-row dock while retaining the larger expanded/safe-area CSS variable.
+  const reservedBottom =
+    `calc(max(var(--studio-canvas-bottom-inset, 7rem), calc(72px + env(safe-area-inset-bottom))) + ${keyboardInset}px)`;
   const height = `min(${String(baseSize.height)}, calc(100dvh - env(safe-area-inset-top) - 0.75rem - ${reservedBottom}))`;
   return {
     "--studio-draw-sheet-height": height,
@@ -233,6 +305,10 @@ export interface StudioBrushCatalogHandlers {
 }
 
 export interface StudioMobileEditingDockHandlers {
+  activateCanvasTool: (
+    tool: "select" | "draw",
+    drawMode?: DrawMode
+  ) => void;
   applyBuiltInBrushPreset: (preset: BrushPreset) => void;
   applyDynamicsPreset: (id: StudioBrushDynamicsPresetId, settings: NormalizedStudioBrushDynamicsSettings) => void;
   applySavedBrush: (saved: StudioSavedBrush) => void;
@@ -281,7 +357,7 @@ export interface StudioMobileEditingDockProps {
   advancedFillUnsupportedReason: string | null;
   brush: string;
   brushCatalogHandlers: StudioBrushCatalogHandlers;
-  brushCatalogItems: readonly StudioBrushTrayItem[];
+  brushCatalogItems?: readonly StudioBrushTrayItem[];
   brushCatalogOpen: boolean;
   brushDynamics: NormalizedStudioBrushDynamicsSettings;
   brushManagerSheetRef: import("react").RefObject<HTMLDivElement | null>;
@@ -413,7 +489,6 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   setBrushOpacity,
   setColor,
   setColorBlindPreview,
-  setDrawMode,
   setDrawShape,
   setEraseToIntersection,
   setMarqueeIds,
@@ -433,7 +508,6 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   setTiltEnabled,
   setTipAngle,
   setTipRoundness,
-  setTool,
   setUseVelocityPressure,
   setVelocitySensitivity,
   setZoom,
@@ -463,6 +537,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     loadStudioBrushStudio,
   } = ui;
   const {
+    activateCanvasTool,
     applyBuiltInBrushPreset,
     applyDynamicsPreset,
     applySavedBrush,
@@ -485,6 +560,9 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   const [brushManagerSheetSnap, setBrushManagerSheetSnap] =
     useState<StudioMobileSheetSnap>("medium");
   const [workspaceDockExpanded, setWorkspaceDockExpanded] = useState<boolean>(false);
+  const scrollDescriptionId = useId();
+  const primaryDockScrollRef = useRef<HTMLDivElement>(null);
+  const secondaryDockScrollRef = useRef<HTMLDivElement>(null);
   const suppressBrushHintOnReturnFocusRef = useRef(false);
   const dismissDrawSettings = () => {
     suppressBrushHintOnReturnFocusRef.current = true;
@@ -496,6 +574,8 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     ? Math.max(0, Math.round(mobileKeyboardInset))
     : 0;
   const drawSettingsOpen = mobileSheet === "draw";
+  const drawSettingsVisible = drawSettingsOpen && !brushCatalogOpen;
+  const selectionModeActive = tool === "select" && !advancedFillActive;
   const penModeActive = tool === "draw" && drawMode === "pen";
   const pixelModeActive = tool === "draw" && drawMode === "pixel";
   const shapeModeActive = tool === "draw" && drawMode === "shape";
@@ -516,6 +596,42 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     mobileSheet === "pages" ||
     mobileSheet === "props" ||
     mobileSheet === "color-vision";
+
+  useEffect(() => {
+    if (!isMobile || mobileSheet === null) return;
+    setQuickStartOpen(false);
+  }, [isMobile, mobileSheet, setQuickStartOpen]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    const scrollers = [
+      primaryDockScrollRef.current,
+      secondaryDockScrollRef.current,
+    ].filter((scroller): scroller is HTMLDivElement => scroller !== null);
+    const update = () => {
+      for (const scroller of scrollers) syncStudioMobileScrollCue(scroller);
+    };
+    update();
+    const frame = globalThis.requestAnimationFrame?.(update) ?? null;
+    const observer = typeof globalThis.ResizeObserver === "function"
+      ? new globalThis.ResizeObserver(update)
+      : null;
+    for (const scroller of scrollers) {
+      scroller.addEventListener("scroll", update, { passive: true });
+      observer?.observe(scroller);
+    }
+    globalThis.addEventListener("resize", update);
+    return () => {
+      if (frame !== null) globalThis.cancelAnimationFrame?.(frame);
+      for (const scroller of scrollers) {
+        scroller.removeEventListener("scroll", update);
+        observer?.unobserve(scroller);
+      }
+      observer?.disconnect();
+      globalThis.removeEventListener("resize", update);
+    };
+  }, [isMobile, workspaceDockExpanded]);
+
   const penHintPreviewProps = penModeActive
     ? {
         hintPreview: "draw-settings" as const,
@@ -703,19 +819,21 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
           <div
             id={MOBILE_DRAW_SETTINGS_ID}
             ref={drawSheetRef}
-            role="dialog"
-            aria-label="브러시 설정"
-            aria-modal={false}
+            role={drawSettingsVisible ? "dialog" : undefined}
+            aria-label={drawSettingsVisible ? "브러시 설정" : undefined}
+            aria-modal={drawSettingsVisible ? false : undefined}
+            aria-hidden={drawSettingsVisible ? undefined : true}
+            tabIndex={drawSettingsVisible ? -1 : undefined}
             data-studio-sheet-id="draw"
             data-studio-mobile-sheet={mobileSheet === "draw" ? "draw" : undefined}
             data-studio-sheet-snap={drawSheetSnap}
             className={cn(
               "fixed inset-x-0 z-[54] mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-[transform,opacity,height,max-height] duration-300 ease-out motion-reduce:transition-none lg:hidden",
-              mobileSheet === "draw"
+              drawSettingsVisible
                 ? "pointer-events-auto translate-y-0 opacity-100"
                 : "pointer-events-none translate-y-3 opacity-0"
             )}
-            inert={mobileSheet === "draw" ? undefined : true}
+            inert={drawSettingsVisible ? undefined : true}
             style={studioDrawSheetSizeStyle(
               drawSheetSnap,
               safeMobileKeyboardInset,
@@ -768,9 +886,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     key={m.v}
                     type="button"
                     onClick={() => {
-                      setTool("draw");
-                      setDrawMode(m.v);
-                      if (m.v === "pixel") setStrokeWidth(1);
+                      if (!active) activateCanvasTool("draw", m.v);
                     }}
                     aria-pressed={active}
                     aria-label={m.label}
@@ -815,8 +931,6 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   aria-label={STUDIO_ERASE_TO_INTERSECTION_LABEL}
                   data-studio-erase-to-intersection="true"
                   onClick={() => {
-                    setTool("draw");
-                    setDrawMode("eraser");
                     setEraseToIntersection((prev) => !prev);
                   }}
                   className={cn(
@@ -874,7 +988,11 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                         color={color}
                         proDrawPrefs={proDrawPrefs}
                         stampTuning={stampTuning}
+                        stabilizer={stabilizer}
+                        stabilizerMode={stabilizerMode}
                         strokeWidth={strokeWidth}
+                        tipAngle={tipAngle}
+                        tipRoundness={tipRoundness}
                         onStampTuningChange={setStampTuning}
                         onSelectBrush={applyBuiltInBrushPreset}
                         onSelectBrushId={brushCatalogHandlers.selectBrushId}
@@ -1047,6 +1165,13 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     brushId={brush}
                     strokeWidth={strokeWidth}
                     color={color}
+                    currentSnapshot={currentBrushSnapshot}
+                    savedBrushBaseline={
+                      activeSavedBrushId
+                        ? savedBrushes.find((candidate) => candidate.id === activeSavedBrushId)
+                          ?? null
+                        : null
+                    }
                     settings={brushDynamics}
                     onSettingsChange={setBrushDynamics}
                     onSelectDynamicsPreset={applyDynamicsPreset}
@@ -1064,6 +1189,26 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     onTipAngleChange={setTipAngle}
                     tipRoundness={tipRoundness}
                     onTipRoundnessChange={setTipRoundness}
+                    onRestoreDefaults={(transaction, direction) => {
+                      const values =
+                        direction === "undo" ? transaction.before : transaction.after;
+                      setStrokeWidth(values.strokeWidth);
+                      setBrushOpacity(values.brushOpacity);
+                      setBrushDynamics(values.brushDynamics);
+                      setStampTuning(values.stampTuning);
+                      setStabilizer(values.stabilizer);
+                      setStabilizerMode(values.stabilizerMode);
+                      setPostCorrection(values.postCorrection);
+                      setPreserveCorners(values.preserveCorners);
+                      setPressureCurve(values.pressureCurve);
+                      setPressureMinSize?.(values.pressureMinSize);
+                      setUseVelocityPressure(values.useVelocityPressure);
+                      setVelocitySensitivity(values.velocitySensitivity);
+                      setTiltEnabled(values.tiltEnabled);
+                      setTipAngle(values.tipAngle);
+                      setTipRoundness(values.tipRoundness);
+                    }}
+                    onBeforeOpen={() => setQuickStartOpen(false)}
                   />
                 </Suspense>
               </>
@@ -1079,11 +1224,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   <StudioShapePickerGrid
                     activeKind={drawShape}
                     filled={shapeFill}
-                    onSelect={(kind) => {
-                      setTool("draw");
-                      setDrawMode("shape");
-                      setDrawShape(kind as DrawShapeKind);
-                    }}
+                    onSelect={(kind) => setDrawShape(kind as DrawShapeKind)}
                     kinds={STUDIO_DRAW_SHAPE_PICKER_KINDS}
                     className="grid-cols-4"
                   />
@@ -1159,11 +1300,16 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             style={{ bottom: safeMobileKeyboardInset }}
           >
             {/* 1행: 핵심 드로잉 도구 — 선택 | 펜/지우개/채우기/도형 | 히스토리 | 브러시 (CSP/Procreate 도크 IA) */}
-            <div className="relative min-w-0">
+            <div
+              className="relative min-w-0"
+              data-studio-mobile-scroll-host="primary"
+            >
               <div
-                className="mr-12 flex min-w-0 touch-pan-x items-stretch gap-0.5 overflow-x-auto overscroll-x-contain pr-1 [scrollbar-width:none] min-[360px]:gap-1 [&::-webkit-scrollbar]:hidden"
+                ref={primaryDockScrollRef}
+                className="flex min-w-0 touch-pan-x items-stretch gap-0.5 overflow-x-auto overscroll-x-contain pr-1 [scrollbar-width:none] min-[360px]:gap-1 [&::-webkit-scrollbar]:hidden"
                 role="toolbar"
                 aria-label="드로잉 도구"
+                aria-describedby={`${scrollDescriptionId}-primary`}
                 data-studio-mobile-dock-scroll="primary"
               >
               <StudioDockButton
@@ -1171,14 +1317,14 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 label="선택"
                 hintDescription="요소를 선택해 이동·크기 조절·정렬하고 속성 패널에서 세부 값을 편집합니다."
                 hintShortcut="V"
-                active={tool === "select"}
+                active={selectionModeActive}
                 onClick={() => {
                   setWorkspaceDockExpanded(false);
-                  setTool("select");
+                  activateCanvasTool("select");
                   setMenu(null);
                   setMobileSheet(null);
                 }}
-                aria-pressed={tool === "select"}
+                aria-pressed={selectionModeActive}
               />
               <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
               <StudioDockButton
@@ -1200,8 +1346,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     setMobileSheet((s) => (s === "draw" ? null : "draw"));
                     return;
                   }
-                  setTool("draw");
-                  setDrawMode("pen");
+                  activateCanvasTool("draw", "pen");
                   setMenu(null);
                   setMobileSheet(null);
                 }}
@@ -1228,9 +1373,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     setMobileSheet((sheet) => (sheet === "draw" ? null : "draw"));
                     return;
                   }
-                  setTool("draw");
-                  setDrawMode("pixel");
-                  setStrokeWidth(1);
+                  activateCanvasTool("draw", "pixel");
                   setMenu(null);
                   setMobileSheet(null);
                 }}
@@ -1248,8 +1391,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요" : "지우개 (E)"}
                 onClick={() => {
                   setWorkspaceDockExpanded(false);
-                  setTool("draw");
-                  setDrawMode("eraser");
+                  activateCanvasTool("draw", "eraser");
                   setMenu(null);
                   setMobileSheet(null);
                 }}
@@ -1292,8 +1434,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     setMobileSheet((s) => (s === "draw" ? null : "draw"));
                     return;
                   }
-                  setTool("draw");
-                  setDrawMode("shape");
+                  activateCanvasTool("draw", "shape");
                   setMenu(null);
                   setMobileSheet(null);
                 }}
@@ -1337,8 +1478,6 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   : "브러시 설정을 열어 굵기·불투명도·색·보정·프리셋을 한곳에서 조절합니다."}
                 hintPreview="draw-settings"
                 hintPreviewVariant={drawSettingsOpen ? "collapse" : "expand"}
-                active={mobileSheet === "draw" || mobileSheet === "brushes"}
-                aria-pressed={mobileSheet === "draw" || mobileSheet === "brushes"}
                 aria-expanded={drawSettingsOpen}
                 aria-controls={MOBILE_DRAW_SETTINGS_ID}
                 aria-label="브러시 설정 (굵기·색·프리셋)"
@@ -1355,11 +1494,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 onClick={() => {
                   setWorkspaceDockExpanded(false);
                   void loadStudioBrushStudio();
-                  if (tool !== "draw") {
-                    setTool("draw");
-                    setDrawMode("pen");
-                    setMenu(null);
-                  }
+                  setMenu(null);
                   setMobileSheet((s) => (s === "draw" ? null : "draw"));
                 }}
                 swatch={(
@@ -1370,7 +1505,6 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   />
                 )}
               />
-              </div>
               <button
                 type="button"
                 aria-controls={MOBILE_WORKSPACE_TOOLS_ID}
@@ -1380,8 +1514,9 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 data-studio-mobile-workspace-toggle="true"
                 onClick={() => setWorkspaceDockExpanded((expanded) => !expanded)}
                 className={cn(
-                  "absolute inset-y-0 right-0 z-10 flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-xl border-l border-line/70 bg-panel/98 px-1 text-[0.6rem] font-bold leading-none text-fg-2 shadow-[-10px_0_16px_-10px_oklch(0.06_0.01_70/0.85)]",
+                  "relative flex min-h-11 min-w-11 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-line/70 bg-raised/75 px-1 text-[0.6rem] font-bold leading-none text-fg-2",
                   STUDIO_EASE,
+                  "hover:bg-raised",
                   "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
                   (workspaceDockExpanded || workspaceDockHasActiveTool) && "text-accent",
                 )}
@@ -1399,6 +1534,11 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   />
                 ) : null}
               </button>
+              </div>
+              <StudioMobileScrollCues
+                descriptionId={`${scrollDescriptionId}-primary`}
+                placement="primary"
+              />
             </div>
 
             {/* 2행: 보조 내비 — 페이지·추가·6방향 퀵 메뉴·속성(레이어)·줌 */}
@@ -1408,6 +1548,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               className="flex min-w-0 items-stretch overflow-hidden border-t border-line/60 pt-1"
               role="toolbar"
               aria-label="작업 공간"
+              aria-describedby={`${scrollDescriptionId}-secondary`}
               data-studio-mobile-control-side={mobileControlSide}
             >
               <StudioDockNavButton
@@ -1433,9 +1574,14 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 </div>
               ) : null}
               <div
-                className="flex min-w-0 flex-1 touch-pan-x items-stretch gap-0 overflow-x-auto overscroll-x-contain [scrollbar-width:none] min-[360px]:gap-0.5 [&::-webkit-scrollbar]:hidden"
-                data-studio-mobile-dock-scroll="secondary"
+                className="relative min-w-0 flex-1"
+                data-studio-mobile-scroll-host="secondary"
               >
+                <div
+                  ref={secondaryDockScrollRef}
+                  className="flex h-full min-w-0 touch-pan-x items-stretch gap-0 overflow-x-auto overscroll-x-contain [scrollbar-width:none] min-[360px]:gap-0.5 [&::-webkit-scrollbar]:hidden"
+                  data-studio-mobile-dock-scroll="secondary"
+                >
                 <StudioDockNavButton
                   icon={Files}
                   label="페이지"
@@ -1516,6 +1662,11 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     <Plus size={16} aria-hidden />
                   </button>
                 </div>
+                </div>
+                <StudioMobileScrollCues
+                  descriptionId={`${scrollDescriptionId}-secondary`}
+                  placement="secondary"
+                />
               </div>
               {mobileControlSide === "right" ? (
                 <div

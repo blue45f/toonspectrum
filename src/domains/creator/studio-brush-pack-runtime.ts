@@ -48,6 +48,25 @@ export const STUDIO_BRUSH_PACK_CUSTOM_TIP_MOTIFS = [
   "weave",
   "fold",
   "pine",
+  "fan-bristle",
+  "knife-edge",
+  "salt-crystal",
+  "bloom-ring",
+  "ribbon-fold",
+  "chain-link",
+  "lace-scallop",
+  "stitch-dash",
+  "knit-loop",
+  "metal-scratch",
+  "smoke-wisp",
+  "flame-tongue",
+  "bokeh-ring",
+  "flower-petal",
+  "rock-shard",
+  "brick",
+  "curl",
+  "sesame",
+  "focus-ray",
 ] as const;
 
 export type StudioBrushPackCustomTipMotif =
@@ -210,6 +229,47 @@ const COMPACT_PROFILE_ROWS: readonly CompactProfileRow[] = [
   ["hard", 0.45, 0.8, 0.9, 0, WIDTH_GRAIN],
   ["hair", 0.06, 0.1, 0.5, 0, FOLLOW_DIRECTION | TAPER | ANGLE_GRAIN],
   ["fold", 0.08, 0.02, 0.6, 0, FOLLOW_DIRECTION | WIDTH_GRAIN | SPEED_SPACING],
+  // ── 2026-07 재료·장식·효과 확장 웨이브(40) ───────────────────────────
+  ["bristle", -0.03, 0.02, 0.82, 0, FOLLOW_DIRECTION | TAPER | PRESSURE_OPACITY | WIDTH_GRAIN],
+  ["fan-bristle", 0.11, 0.04, 0.42, 0, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["rake", 0.03, 0.02, 0.38, 0, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN | SPEED_SPACING],
+  ["knife-edge", -0.02, 0.01, 0.22, -18, FOLLOW_DIRECTION | PRESSURE_OPACITY | ANGLE_GRAIN],
+  ["grain", 0.1, 0.06, 0.82, 0, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN | SPEED_SPACING],
+  ["salt-crystal", 0.32, 0.22, 0.88, 0, WIDTH_GRAIN | ANGLE_GRAIN],
+  ["bloom-ring", 0.24, 0.12, 0.94, 0, PRESSURE_OPACITY | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["soft", 0.12, 0.04, 0.72, -8, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN],
+  ["chisel", 0.02, 0.02, 0.48, -10, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN],
+  ["chisel", -0.02, 0, 0.34, -14, FOLLOW_DIRECTION | PRESSURE_OPACITY | TAPER],
+  ["bristle", -0.04, 0.015, 0.58, -6, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["sumi", 0.04, 0.03, 0.54, -4, FOLLOW_DIRECTION | TAPER | PRESSURE_OPACITY | WIDTH_GRAIN | SPEED_SPACING],
+  ["ribbon-fold", 0.18, 0, 0.52, 0, FOLLOW_DIRECTION | PRESSURE_OPACITY | ANGLE_GRAIN],
+  ["fold", 0.28, 0, 0.5, 0, FOLLOW_DIRECTION | WIDTH_GRAIN],
+  ["chain-link", 0.62, 0.01, 0.7, 0, FOLLOW_DIRECTION | ANGLE_GRAIN],
+  ["lace-scallop", 0.44, 0.02, 0.66, 0, FOLLOW_DIRECTION | WIDTH_GRAIN],
+  ["stitch-dash", 0.48, 0.01, 0.36, 0, FOLLOW_DIRECTION | TAPER],
+  ["cross-hatch", 0.38, 0.01, 0.72, 0, FOLLOW_DIRECTION | WIDTH_GRAIN],
+  ["knit-loop", 0.2, 0.015, 0.78, 0, FOLLOW_DIRECTION | WIDTH_GRAIN],
+  ["metal-scratch", 0.16, 0.08, 0.48, -22, FOLLOW_DIRECTION | WIDTH_GRAIN | ANGLE_GRAIN | SPEED_SPACING],
+  ["smoke-wisp", 0.2, 0.12, 0.84, 0, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["flame-tongue", 0.32, 0.22, 0.58, 0, FOLLOW_DIRECTION | TAPER | PRESSURE_OPACITY | WIDTH_GRAIN],
+  ["hair", 0.24, 0.34, 0.32, -68, SPEED_SPACING | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["flake", 0.4, 0.62, 0.9, 0, WIDTH_GRAIN | ANGLE_GRAIN | SPEED_SPACING],
+  ["grain", 0.38, 0.76, 0.95, 0, WIDTH_GRAIN | ANGLE_GRAIN],
+  ["hard", 0.3, 0.84, 0.86, 0, PRESSURE_OPACITY | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["bokeh-ring", 0.56, 0.46, 1, 0, WIDTH_GRAIN | ANGLE_GRAIN],
+  ["smoke-wisp", 0.11, 0.06, 0.42, 0, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN | SPEED_SPACING],
+  ["leaf-cluster", 0.25, 0.42, 0.68, 0, FOLLOW_DIRECTION | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["fold", 0.08, 0.025, 0.5, 0, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN | SPEED_SPACING],
+  ["flower-petal", 0.42, 0.58, 0.76, 0, WIDTH_GRAIN | ANGLE_GRAIN],
+  ["rock-shard", 0.24, 0.26, 0.74, 0, WIDTH_GRAIN | ANGLE_GRAIN],
+  ["brick", 0.5, 0, 0.84, 0, FOLLOW_DIRECTION],
+  ["rake", 0.09, 0.035, 0.48, 0, FOLLOW_DIRECTION | PRESSURE_OPACITY | WIDTH_GRAIN | SPEED_SPACING],
+  ["hair", 0.05, 0.08, 0.56, 0, FOLLOW_DIRECTION | TAPER | PRESSURE_OPACITY | ANGLE_GRAIN],
+  ["curl", 0.11, 0.02, 0.46, 0, FOLLOW_DIRECTION | TAPER | PRESSURE_OPACITY | ANGLE_GRAIN],
+  ["sesame", 0.58, 0.46, 0.78, 0, WIDTH_GRAIN | ANGLE_GRAIN],
+  ["halftone", 0.2, 0.01, 1, 0, FOLLOW_DIRECTION | PRESSURE_OPACITY | SPEED_SPACING],
+  ["rake", 0.08, 0.03, 0.44, 0, FOLLOW_DIRECTION | TAPER | WIDTH_GRAIN | ANGLE_GRAIN],
+  ["focus-ray", 0.14, 0.04, 0.3, 0, FOLLOW_DIRECTION | TAPER | WIDTH_GRAIN | SPEED_SPACING],
 ];
 
 if (COMPACT_PROFILE_ROWS.length !== STUDIO_BRUSH_PACK_CATALOG_IDS.length) {
@@ -434,6 +494,356 @@ function customTipAlpha(
       }
       return alpha * smoothEdge(Math.max(absX, absY), 0.86, 1);
     }
+    case "fan-bristle": {
+      // Seven dry bristle rays opening from a loaded ferrule. Fixed loop keeps tip generation
+      // cheap and deterministic while producing a true fan rather than a stretched round stamp.
+      const count = 6 + (variant % 3);
+      let alpha = 0;
+      for (let bristle = 0; bristle < count; bristle++) {
+        const amount = count === 1 ? 0.5 : bristle / (count - 1);
+        const endX = -0.82 + amount * 1.64;
+        const endY = -0.7 + Math.abs(amount - 0.5) * 0.16;
+        const distance = distanceToSegment(x, y, 0, 0.72, endX, endY);
+        const width = 0.018 + ((bristle + variant) % 3) * 0.008;
+        alpha = Math.max(alpha, smoothEdge(distance, width * 0.28, width));
+      }
+      const ferrule = rotatedEllipseAlpha(x, y, 0, 0.66, 0.28, 0.16, 0);
+      return clamp01(Math.max(alpha, ferrule * 0.7) * smoothEdge(radius, 0.9, 1.04));
+    }
+    case "knife-edge": {
+      const angle = -0.24 + (variant % 4) * 0.025;
+      const cosine = Math.cos(angle);
+      const sine = Math.sin(angle);
+      const localX = x * cosine + y * sine;
+      const localY = -x * sine + y * cosine;
+      const blade = smoothEdge(
+        Math.max(Math.abs(localX + 0.05) / 0.88, Math.abs(localY) / 0.105),
+        0.72,
+        1
+      );
+      const loadedCorner = rotatedEllipseAlpha(localX, localY, 0.63, 0.08, 0.24, 0.18, -0.28);
+      const scrapedGap = rotatedEllipseAlpha(localX, localY, -0.14, -0.015, 0.18, 0.055, 0);
+      return clamp01(Math.max(blade, loadedCorner * 0.92) * (1 - scrapedGap * 0.72));
+    }
+    case "salt-crystal": {
+      let alpha = 0;
+      const crystalCount = 5 + (variant % 3);
+      for (let crystal = 0; crystal < crystalCount; crystal++) {
+        const turn = crystal * 2.399_963 + phase;
+        const orbit = crystal === 0 ? 0 : 0.26 + (crystal % 3) * 0.19;
+        const centerX = Math.cos(turn) * orbit;
+        const centerY = Math.sin(turn) * orbit;
+        const arm = 0.1 + (crystal % 2) * 0.035;
+        const horizontal = distanceToSegment(
+          x,
+          y,
+          centerX - arm,
+          centerY,
+          centerX + arm,
+          centerY
+        );
+        const vertical = distanceToSegment(
+          x,
+          y,
+          centerX,
+          centerY - arm,
+          centerX,
+          centerY + arm
+        );
+        const diagonal = distanceToSegment(
+          x,
+          y,
+          centerX - arm * 0.7,
+          centerY - arm * 0.7,
+          centerX + arm * 0.7,
+          centerY + arm * 0.7
+        );
+        alpha = Math.max(
+          alpha,
+          smoothEdge(Math.min(horizontal, vertical, diagonal), 0.012, 0.04)
+        );
+      }
+      return alpha * smoothEdge(radius, 0.84, 1);
+    }
+    case "bloom-ring": {
+      const angle = Math.atan2(y, x);
+      const irregularRadius = 0.62
+        + Math.sin(angle * (5 + variant % 3) + phase) * 0.08
+        + Math.sin(angle * 3 - phase) * 0.035;
+      const ring = smoothEdge(Math.abs(radius - irregularRadius), 0.025, 0.11);
+      const pigmentPool = smoothEdge(radius, 0.05, irregularRadius * 0.88) * 0.18;
+      const brokenEdge = 0.72 + hashUnit(
+        Math.round(x * 37),
+        Math.round(y * 37),
+        variant + 0x3d
+      ) * 0.28;
+      return clamp01(Math.max(ring * brokenEdge, pigmentPool));
+    }
+    case "ribbon-fold": {
+      const wave = Math.sin((y + 1) * (2.2 + (variant % 3) * 0.18) + phase) * 0.28;
+      const bandDistance = Math.abs(x - wave);
+      const band = smoothEdge(bandDistance, 0.16, 0.28);
+      const highlight = smoothEdge(Math.abs(x - wave + 0.09), 0.012, 0.045) * 0.42;
+      const foldShadow = smoothEdge(
+        Math.abs(x - wave - Math.sin(y * 5 + phase) * 0.035),
+        0.04,
+        0.09
+      ) * (0.42 + clamp01((y + 1) / 2) * 0.36);
+      return clamp01(Math.max(band * (0.62 + foldShadow), highlight))
+        * smoothEdge(Math.max(absX, absY), 0.86, 1);
+    }
+    case "chain-link": {
+      let alpha = 0;
+      for (const [centerX, centerY, linkAngle] of [
+        [-0.27, 0.18, -0.48],
+        [0.28, -0.18, 0.48],
+      ] as const) {
+        const outer = rotatedEllipseAlpha(x, y, centerX, centerY, 0.42, 0.25, linkAngle);
+        const inner = rotatedEllipseAlpha(x, y, centerX, centerY, 0.26, 0.105, linkAngle);
+        alpha = Math.max(alpha, outer * (1 - inner * 0.96));
+      }
+      return alpha * smoothEdge(radius, 0.86, 1.04);
+    }
+    case "lace-scallop": {
+      let alpha = smoothEdge(Math.abs(y + 0.34), 0.018, 0.05)
+        * smoothEdge(absX, 0.82, 0.98);
+      for (let scallop = 0; scallop < 4; scallop++) {
+        const centerX = -0.66 + scallop * 0.44;
+        const ringRadius = Math.hypot((x - centerX) / 0.23, (y - 0.02) / 0.32);
+        const lowerHalf = y >= -0.06 ? 1 : smoothEdge(Math.abs(y + 0.06), 0, 0.08);
+        alpha = Math.max(alpha, smoothEdge(Math.abs(ringRadius - 1), 0.03, 0.12) * lowerHalf);
+        alpha = Math.max(
+          alpha,
+          rotatedEllipseAlpha(x, y, centerX, 0.48, 0.055, 0.055, 0) * 0.86
+        );
+      }
+      return alpha * smoothEdge(Math.max(absX, absY), 0.88, 1);
+    }
+    case "stitch-dash": {
+      let alpha = 0;
+      for (let stitch = 0; stitch < 4; stitch++) {
+        const centerY = -0.72 + stitch * 0.48;
+        const offset = stitch % 2 === 0 ? -0.08 : 0.08;
+        const distance = distanceToSegment(
+          x,
+          y,
+          -0.52 + offset,
+          centerY,
+          0.52 + offset,
+          centerY + 0.06
+        );
+        alpha = Math.max(alpha, smoothEdge(distance, 0.018, 0.055));
+        alpha = Math.max(alpha, rotatedEllipseAlpha(x, y, -0.55 + offset, centerY, 0.06, 0.06, 0));
+        alpha = Math.max(alpha, rotatedEllipseAlpha(x, y, 0.55 + offset, centerY + 0.06, 0.06, 0.06, 0));
+      }
+      return alpha * smoothEdge(Math.max(absX, absY), 0.88, 1);
+    }
+    case "knit-loop": {
+      let alpha = 0;
+      for (let row = 0; row < 3; row++) {
+        for (let column = 0; column < 3; column++) {
+          const centerX = -0.58 + column * 0.58 + (row % 2) * 0.08;
+          const centerY = -0.58 + row * 0.58;
+          const left = distanceToSegment(
+            x,
+            y,
+            centerX - 0.2,
+            centerY - 0.2,
+            centerX,
+            centerY + 0.23
+          );
+          const right = distanceToSegment(
+            x,
+            y,
+            centerX + 0.2,
+            centerY - 0.2,
+            centerX,
+            centerY + 0.23
+          );
+          alpha = Math.max(alpha, smoothEdge(Math.min(left, right), 0.018, 0.055));
+        }
+      }
+      return alpha * smoothEdge(Math.max(absX, absY), 0.87, 1);
+    }
+    case "metal-scratch": {
+      let alpha = 0;
+      const count = 6 + (variant % 4);
+      for (let scratch = 0; scratch < count; scratch++) {
+        const centerY = -0.72 + scratch * (1.44 / Math.max(1, count - 1));
+        const startX = -0.78 + hashUnit(scratch, variant, 91) * 0.35;
+        const length = 0.72 + hashUnit(scratch, variant, 193) * 0.82;
+        const rise = ((scratch + variant) % 3 - 1) * 0.12;
+        const distance = distanceToSegment(
+          x,
+          y,
+          startX,
+          centerY,
+          Math.min(0.88, startX + length),
+          centerY + rise
+        );
+        const width = 0.014 + (scratch % 3) * 0.007;
+        alpha = Math.max(alpha, smoothEdge(distance, width * 0.25, width));
+      }
+      return alpha * smoothEdge(Math.max(absX, absY), 0.86, 1);
+    }
+    case "smoke-wisp": {
+      let alpha = 0;
+      for (let strand = 0; strand < 3; strand++) {
+        const center = (strand - 1) * 0.28;
+        const wave = center
+          + Math.sin((y + 1) * (2.3 + strand * 0.37) + phase + strand) * (0.16 + strand * 0.025);
+        const width = 0.09 + strand * 0.035 + (1 - clamp01((y + 1) / 2)) * 0.04;
+        alpha = Math.max(
+          alpha,
+          smoothEdge(Math.abs(x - wave), width * 0.28, width) * (0.52 + strand * 0.16)
+        );
+      }
+      const haze = smoothEdge(Math.hypot(x * 0.84, y), 0.35, 0.96) * 0.18;
+      return clamp01(Math.max(alpha, haze) * smoothEdge(Math.max(absX, absY), 0.88, 1));
+    }
+    case "flame-tongue": {
+      const normalizedY = clamp01((y + 0.92) / 1.84);
+      const halfWidth = Math.max(
+        0.04,
+        Math.sin(normalizedY * Math.PI) * 0.52 * (1 - normalizedY * 0.48)
+      );
+      const center = Math.sin(normalizedY * 5.2 + phase) * (0.05 + normalizedY * 0.14);
+      const body = smoothEdge(Math.abs(x - center), halfWidth * 0.66, halfWidth);
+      const inner = smoothEdge(
+        Math.hypot((x + 0.08) / 0.22, (y - 0.3) / 0.5),
+        0.45,
+        1
+      ) * 0.36;
+      const spark = rotatedEllipseAlpha(x, y, 0.56, -0.55, 0.055, 0.12, -0.28) * 0.82;
+      return clamp01(Math.max(body * smoothEdge(absY, 0.78, 0.98), inner, spark));
+    }
+    case "bokeh-ring": {
+      const irregularity = Math.sin(Math.atan2(y, x) * 6 + phase) * 0.015;
+      const ring = smoothEdge(Math.abs(radius - 0.64 - irregularity), 0.035, 0.11);
+      const highlight = rotatedEllipseAlpha(x, y, -0.3, -0.34, 0.11, 0.07, -0.4) * 0.7;
+      const centerGlow = smoothEdge(radius, 0, 0.54) * 0.1;
+      return clamp01(Math.max(ring, highlight, centerGlow));
+    }
+    case "flower-petal": {
+      let alpha = 0;
+      const petalCount = 5 + (variant % 2);
+      for (let petal = 0; petal < petalCount; petal++) {
+        const turn = -Math.PI / 2 + petal * ((Math.PI * 2) / petalCount) + phase * 0.08;
+        alpha = Math.max(
+          alpha,
+          rotatedEllipseAlpha(
+            x,
+            y,
+            Math.cos(turn) * 0.38,
+            Math.sin(turn) * 0.38,
+            0.2,
+            0.43,
+            turn + Math.PI / 2
+          )
+        );
+      }
+      const center = smoothEdge(radius, 0.08, 0.2);
+      return clamp01(Math.max(alpha * 0.86, center));
+    }
+    case "rock-shard": {
+      const skewX = x + y * 0.22;
+      const outer = smoothEdge(
+        Math.max(
+          Math.abs(skewX) / (0.72 - y * 0.08),
+          Math.abs(y + x * 0.09) / (0.78 + x * 0.05)
+        ),
+        0.72,
+        0.98
+      );
+      const crackA = distanceToSegment(x, y, -0.5, -0.2, 0.12, 0.12);
+      const crackB = distanceToSegment(x, y, 0.12, 0.12, 0.48, -0.46);
+      const cracks = Math.max(
+        smoothEdge(crackA, 0.012, 0.045),
+        smoothEdge(crackB, 0.012, 0.04)
+      );
+      const chip = rotatedEllipseAlpha(x, y, 0.54, 0.52, 0.17, 0.12, 0.45);
+      return clamp01(Math.max(outer * (1 - cracks * 0.82), chip * 0.74));
+    }
+    case "brick": {
+      const columns = 3;
+      const rows = 4;
+      const gridX = ((x + 1) / 2) * columns;
+      const gridY = ((y + 1) / 2) * rows;
+      const row = Math.floor(gridY);
+      const shiftedX = gridX + (row % 2 === 0 ? 0 : 0.5);
+      const mortarX = Math.abs(shiftedX - Math.round(shiftedX));
+      const mortarY = Math.abs(gridY - Math.round(gridY));
+      const mortar = Math.max(
+        smoothEdge(mortarX, 0.025, 0.095),
+        smoothEdge(mortarY, 0.025, 0.095)
+      );
+      const faceNoise = 0.5 + hashUnit(
+        Math.floor(shiftedX),
+        Math.floor(gridY),
+        variant + 0x51
+      ) * 0.34;
+      return clamp01(Math.max(mortar, faceNoise * 0.28))
+        * smoothEdge(Math.max(absX, absY), 0.88, 1);
+    }
+    case "curl": {
+      const polarAngle = Math.atan2(y, x);
+      const turns = 1.55 + (variant % 3) * 0.12;
+      let alpha = 0;
+      for (let turn = 0; turn < 3; turn++) {
+        const unwrappedAngle = polarAngle + turn * Math.PI * 2;
+        const targetRadius = 0.12 + unwrappedAngle / (Math.PI * 2 * turns) * 0.76;
+        if (targetRadius < 0 || targetRadius > 0.96) continue;
+        alpha = Math.max(
+          alpha,
+          smoothEdge(Math.abs(radius - targetRadius), 0.018, 0.055)
+        );
+      }
+      const tail = smoothEdge(distanceToSegment(x, y, 0.72, -0.2, 0.88, -0.72), 0.016, 0.05);
+      return Math.max(alpha, tail) * smoothEdge(radius, 0.88, 1);
+    }
+    case "sesame": {
+      let alpha = 0;
+      const seedCount = 7 + (variant % 4);
+      for (let seedIndex = 0; seedIndex < seedCount; seedIndex++) {
+        const turn = seedIndex * 2.399_963 + phase;
+        const orbit = 0.18 + (seedIndex % 4) * 0.18;
+        const centerX = Math.cos(turn) * orbit;
+        const centerY = Math.sin(turn) * orbit;
+        alpha = Math.max(
+          alpha,
+          rotatedEllipseAlpha(
+            x,
+            y,
+            centerX,
+            centerY,
+            0.07 + (seedIndex % 2) * 0.012,
+            0.16,
+            turn + 0.4
+          )
+        );
+      }
+      return alpha * smoothEdge(radius, 0.88, 1);
+    }
+    case "focus-ray": {
+      let alpha = 0;
+      const rayCount = 7 + (variant % 3);
+      for (let ray = 0; ray < rayCount; ray++) {
+        const turn = -0.86 + ray * (1.72 / Math.max(1, rayCount - 1));
+        const startRadius = 0.18 + (ray % 3) * 0.07;
+        const endRadius = 0.94;
+        const distance = distanceToSegment(
+          x,
+          y,
+          Math.cos(turn) * startRadius,
+          Math.sin(turn) * startRadius,
+          Math.cos(turn) * endRadius,
+          Math.sin(turn) * endRadius
+        );
+        const width = 0.012 + (ray % 3) * 0.006;
+        alpha = Math.max(alpha, smoothEdge(distance, width * 0.25, width));
+      }
+      return alpha * smoothEdge(radius, 0.86, 1);
+    }
     case "footstep": {
       let alpha = 0;
       for (const [centerX, centerY, mirror] of [
@@ -583,6 +993,73 @@ function tipLayersFor(
   motif: StudioBrushPackTipMotif,
   index: number
 ): readonly StudioBrushTipLayerSettings[] | undefined {
+  if (
+    motif === "salt-crystal"
+    || motif === "bloom-ring"
+    || motif === "smoke-wisp"
+    || motif === "flame-tongue"
+    || motif === "bokeh-ring"
+  ) {
+    const secondaryMotif: StudioBrushPackTipMotif = motif === "salt-crystal"
+      ? "sponge"
+      : motif === "flame-tongue"
+        ? "star"
+        : "soft";
+    return [
+      {
+        tip: materializeStudioBrushPackTipSettings(secondaryMotif, index + 131, 0.54),
+        scale: motif === "smoke-wisp" ? 1.42 : 0.72,
+        opacity: motif === "smoke-wisp" || motif === "bloom-ring" ? 0.28 : 0.48,
+        offsetX: 0.26,
+        offsetY: -0.34,
+        angle: 18,
+        roundness: 0.82,
+      },
+      {
+        tip: materializeStudioBrushPackTipSettings(motif, index + 257, 0.16),
+        scale: 0.5,
+        opacity: 0.38,
+        offsetX: -0.4,
+        offsetY: 0.38,
+        angle: -24,
+        roundness: 0.68,
+      },
+    ];
+  }
+  if (
+    motif === "ribbon-fold"
+    || motif === "chain-link"
+    || motif === "lace-scallop"
+    || motif === "stitch-dash"
+    || motif === "knit-loop"
+    || motif === "brick"
+  ) {
+    return [{
+      tip: materializeStudioBrushPackTipSettings(motif, index + 97, 0.08),
+      scale: 0.58,
+      opacity: 0.48,
+      offsetY: 0.48,
+      angle: motif === "chain-link" ? 90 : 8,
+      roundness: 0.76,
+    }];
+  }
+  if (
+    motif === "flower-petal"
+    || motif === "rock-shard"
+    || motif === "curl"
+    || motif === "sesame"
+    || motif === "focus-ray"
+  ) {
+    return [{
+      tip: materializeStudioBrushPackTipSettings(motif, index + 149, 0.08),
+      scale: 0.56,
+      opacity: 0.52,
+      offsetX: 0.36,
+      offsetY: -0.32,
+      angle: 26,
+      roundness: 0.74,
+    }];
+  }
   if (descriptor.category === "rake") {
     return [
       {

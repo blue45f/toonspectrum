@@ -43,6 +43,7 @@ const BASE_STATE: StudioMainMenuBuilderState = {
   canvasFlipH: false,
   canvasRotation: 0,
   fullscreen: false,
+  canvasRulersVisible: true,
   colorVisionMode: "none",
   referencePanelOpen: false,
   pageSequenceOpen: false,
@@ -81,6 +82,7 @@ function createEditorActions(): StudioMainMenuEditorActions {
     fitCanvasToWidth: vi.fn(),
     setActualPixelView: vi.fn(),
     toggleFullscreen: vi.fn(),
+    toggleCanvasRulers: vi.fn(),
     setColorVisionMode: vi.fn(),
     saveCurrentStudioView: vi.fn(),
     restoreSavedStudioView: vi.fn(),
@@ -224,6 +226,7 @@ describe("buildStudioMainMenuGroups", () => {
         "reset-rotation",
         "fit",
         "actual-pixels",
+        "canvas-rulers",
         "fullscreen",
         "color-vision-original",
         "color-vision-grayscale",
@@ -295,6 +298,7 @@ describe("buildStudioMainMenuGroups", () => {
       canvasFlipH: true,
       canvasRotation: 90,
       fullscreen: true,
+      canvasRulersVisible: false,
       colorVisionMode: "deuteranopia",
       referencePanelOpen: true,
       pageSequenceOpen: true,
@@ -348,6 +352,11 @@ describe("buildStudioMainMenuGroups", () => {
     expect(menuItem(groups, "view", "fullscreen")).toMatchObject({
       checked: true,
       disabled: true,
+    });
+    expect(menuItem(groups, "view", "canvas-rulers")).toMatchObject({
+      label: "캔버스 px 눈금자",
+      checked: false,
+      shortcut: "⌥⌘R",
     });
     expect(menuItem(groups, "view", "color-vision-deuteranopia")).toMatchObject({
       checked: true,
@@ -442,6 +451,7 @@ describe("buildStudioMainMenuGroups", () => {
     menuItem(groups, "view", "zoom-in").onSelect();
     menuItem(groups, "view", "zoom-out").onSelect();
     menuItem(groups, "view", "rotate-left").onSelect();
+    menuItem(groups, "view", "canvas-rulers").onSelect();
     menuItem(groups, "view", "color-vision-tritanopia").onSelect();
     menuItem(groups, "view", "density-focus").onSelect();
     menuItem(groups, "view", "density-full").onSelect();
@@ -454,6 +464,7 @@ describe("buildStudioMainMenuGroups", () => {
     expect(ui.stepZoom).toHaveBeenNthCalledWith(1, 1);
     expect(ui.stepZoom).toHaveBeenNthCalledWith(2, -1);
     expect(editor.rotateCanvasView).toHaveBeenCalledWith("left");
+    expect(editor.toggleCanvasRulers).toHaveBeenCalledOnce();
     expect(editor.setColorVisionMode).toHaveBeenCalledWith("tritanopia");
     expect(editor.setStudioUiDensity).toHaveBeenNthCalledWith(1, "focus");
     expect(ui.collapseSidePanels).toHaveBeenCalledOnce();

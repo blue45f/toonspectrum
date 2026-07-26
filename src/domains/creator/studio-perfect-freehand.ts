@@ -29,11 +29,24 @@ export type StudioPerfectFreehandStroker = (
 // 브러시 프로필 — 카탈로그 id → getStroke 옵션 튜닝(단일 정의처)
 // ---------------------------------------------------------------------------
 
-export type StudioPerfectFreehandBrushId = "perfect-ink" | "perfect-marker";
+export type StudioPerfectFreehandProfileId = "perfect-ink" | "perfect-marker" | "gpen";
+
+/**
+ * Selectable brushes backed by the outline stroker.
+ *
+ * The four manga nibs deliberately share one geometry profile: their exact diameter and pressure
+ * response still comes from `studio-brush-alias-profile.ts`. Keeping the geometric smoothing in one
+ * profile prevents the aliases from drifting back to the old per-segment capsule renderer.
+ */
+export type StudioPerfectFreehandBrushId =
+  | StudioPerfectFreehandProfileId
+  | "mapping-pen"
+  | "kaburapen"
+  | "liner";
 
 /** 퍼펙트-프리핸드 렌더 경로를 쓰는 브러시의 획 성격 — 카탈로그 계약과 함께 감사된다. */
 export interface StudioPerfectFreehandProfile {
-  readonly id: StudioPerfectFreehandBrushId;
+  readonly id: StudioPerfectFreehandProfileId;
   /** 필압이 굵기에 미치는 영향(0=균일 굵기, 1=최대) — getStroke thinning. */
   readonly thinning: number;
   /** 아웃라인 모서리 연화 정도 — getStroke smoothing. */
@@ -55,7 +68,7 @@ export interface StudioPerfectFreehandProfile {
  *  - perfect-marker: 약한 thinning + 캡 마감 — 균일에 가까운 매끈한 마커 획.
  */
 export const STUDIO_PERFECT_FREEHAND_PROFILES: Readonly<
-  Record<StudioPerfectFreehandBrushId, StudioPerfectFreehandProfile>
+  Record<StudioPerfectFreehandProfileId, StudioPerfectFreehandProfile>
 > = {
   "perfect-ink": {
     id: "perfect-ink",
@@ -77,16 +90,42 @@ export const STUDIO_PERFECT_FREEHAND_PROFILES: Readonly<
     capStart: true,
     capEnd: true,
   },
+  gpen: {
+    id: "gpen",
+    // perfect-freehand's pressure diameter is `1 + 2 * thinning * (p - .5)`.
+    // 0.775 therefore reproduces the historical G-pen curve (0.225 + 1.55p) while replacing
+    // discrete constant-width capsules with one continuous variable-width outline.
+    thinning: 0.775,
+    smoothing: 0.68,
+    // Upstream input stabilization already owns centre-line correction. A very small streamline
+    // value avoids moving the visible prefix again whenever a live stroke appends one sample.
+    streamline: 0.06,
+    taperStartFactor: 0.85,
+    taperEndFactor: 1.2,
+    capStart: true,
+    capEnd: true,
+  },
 };
 
-/** 브러시 id가 퍼펙트-프리핸드 렌더 경로를 쓰면 프로필, 아니면 null — 렌더러의 단일 판정 지점. */
+const STUDIO_PERFECT_FREEHAND_PROFILE_BY_BRUSH: Readonly<
+  Record<StudioPerfectFreehandBrushId, StudioPerfectFreehandProfileId>
+> = {
+  "perfect-ink": "perfect-ink",
+  "perfect-marker": "perfect-marker",
+  gpen: "gpen",
+  "mapping-pen": "gpen",
+  kaburapen: "gpen",
+  liner: "gpen",
+};
+
+/** 브러시 id가 연속 가변 폭 아웃라인 경로를 쓰면 프로필, 아니면 null — 렌더러의 단일 판정 지점. */
 export function resolveStudioPerfectFreehandProfile(
   brushId: unknown
 ): StudioPerfectFreehandProfile | null {
   if (typeof brushId !== "string" || !brushId) return null;
-  return (
-    STUDIO_PERFECT_FREEHAND_PROFILES[brushId as StudioPerfectFreehandBrushId] ?? null
-  );
+  const profileId =
+    STUDIO_PERFECT_FREEHAND_PROFILE_BY_BRUSH[brushId as StudioPerfectFreehandBrushId];
+  return profileId ? STUDIO_PERFECT_FREEHAND_PROFILES[profileId] : null;
 }
 
 function clampTo(raw: unknown, min: number, max: number, fallback: number): number {
@@ -215,15 +254,16 @@ export function buildStudioPerfectFreehandOutline(
     strokePoints.push([x, y, sampledPressures?.[index] ?? 0.5]);
   }
   if (strokePoints.length < 2) return [];
-  const firstPoint = strokePoints[0];
-  const lastPoint = strokePoints[strokePoints.length - 1];
-  const segmentLength = firstPoint && lastPoint
-    ? Math.hypot(lastPoint[0] - firstPoint[0], lastPoint[1] - firstPoint[1])
-    : 0;
+  let pathLength = 0;
+  for (let index = 1; index < strokePoints.length; index += 1) {
+    const previous = strokePoints[index - 1]!;
+    const current = strokePoints[index]!;
+    pathLength += Math.hypot(current[0]! - previous[0]!, current[1]! - previous[1]!);
+  }
 
   return stroker(
     strokePoints,
-    studioPerfectFreehandStrokeOptions(input.profile, input.strokeWidth, hasPressures, segmentLength)
+    studioPerfectFreehandStrokeOptions(input.profile, input.strokeWidth, hasPressures, pathLength)
   );
 }
 

@@ -51,6 +51,7 @@ export function StudioInspectorDrawModeControls({
             aria-label={label}
             aria-pressed={drawMode === value}
             onClick={() => {
+              if (drawMode === value) return;
               onDrawModeChange(value);
               if (value === "pixel") {
                 onStrokeWidthChange(1);

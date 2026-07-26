@@ -101,3 +101,79 @@ describe("StudioAiAssistHub prompt reveal", () => {
     });
   });
 });
+
+describe("StudioAiAssistHub execution preflight", () => {
+  it("places a compact, reduced-motion disclosure before the active tool panel", () => {
+    const view = render(<StudioAiAssistHub {...createProps()} />);
+    const preflight = view.container.querySelector<HTMLElement>(
+      "[data-studio-ai-execution-preflight]"
+    );
+    const panel = view.container.querySelector<HTMLElement>(
+      "[data-studio-ai-assist-tool-panel]"
+    );
+    const summary = preflight?.querySelector("summary");
+
+    expect(preflight).not.toBeNull();
+    expect(panel).not.toBeNull();
+    expect(preflight?.dataset.executionReady).toBe("true");
+    expect(summary?.className).toContain("min-h-11");
+    expect(
+      preflight?.querySelector('[class*="motion-reduce:transition-none"]')
+    ).not.toBeNull();
+    expect(preflight?.textContent).toContain("실행 전 확인");
+    expect(preflight?.textContent).toContain("제공자 과금 가능");
+    expect(
+      preflight!.compareDocumentPosition(panel!) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+
+    fireEvent.click(summary!);
+
+    expect(preflight?.hasAttribute("open")).toBe(true);
+    expect(preflight?.textContent).toContain("처리 경로");
+    expect(preflight?.textContent).toContain("배경 이미지 1개");
+    expect(preflight?.textContent).toContain("원본 캔버스를 덮어쓰지 않고");
+  });
+
+  it("labels a server text route as server quota", () => {
+    const view = render(
+      <StudioAiAssistHub
+        {...createProps({
+          activeTool: "composition",
+          connectionLabel: "DeepSeek 연결됨",
+          imageConfigured: false,
+          textConfigured: true,
+        })}
+      />
+    );
+    const preflight = view.container.querySelector<HTMLElement>(
+      "[data-studio-ai-execution-preflight]"
+    );
+
+    expect(preflight?.dataset.executionReady).toBe("true");
+    expect(preflight?.textContent).toContain("서버 쿼터");
+    expect(preflight?.textContent).toContain("구도 제안 1세트");
+  });
+
+  it("keeps the relevant missing-provider reason visible without opening details", () => {
+    const view = render(
+      <StudioAiAssistHub
+        {...createProps({
+          activeTool: "background",
+          connectionLabel: "Z.ai 연결됨",
+          connectionOk: true,
+          imageConfigured: false,
+          textConfigured: true,
+        })}
+      />
+    );
+    const preflight = view.container.querySelector<HTMLElement>(
+      "[data-studio-ai-execution-preflight]"
+    );
+
+    expect(preflight?.dataset.executionReady).toBe("false");
+    expect(screen.getByRole("alert").textContent).toContain(
+      "이미지 API가 연결되지 않아"
+    );
+    expect(preflight?.textContent).toContain("실행 불가");
+  });
+});

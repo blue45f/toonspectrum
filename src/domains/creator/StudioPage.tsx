@@ -7,7 +7,7 @@ import {
   SlidersHorizontal,
   Undo2,
 } from "lucide-react";
-import { Profiler, Suspense, lazy, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
+import { Profiler, Suspense, lazy, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode, type SetStateAction } from "react";
 import { flushSync } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -186,7 +186,6 @@ import {
 import {
   isStudioBrushAliasId,
 } from "./studio-brush-alias-profile";
-import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
 import {
   normalizeStudioBrushDynamicsSettings,
   resolveStudioBrushDynamicsPresetId,
@@ -208,6 +207,10 @@ import {
   type StudioBrushSnapshot,
   type StudioSavedBrush,
 } from "./studio-brush-library";
+import {
+  planStudioDrawModeChange,
+  planStudioStrokeWidthChange,
+} from "./studio-brush-mode-width";
 import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
 import {
   studioCoreBrushCatalogSelection,
@@ -546,6 +549,12 @@ import {
 import {
   studioInkFallbackPressure,
 } from "./studio-ink-pressure-model";
+import {
+  consumeStudioInsertDropTransfer,
+  resolveStudioInsertTarget,
+  STUDIO_ASSET_DRAG_MIME,
+  STUDIO_INSERT_DRAG_MIME,
+} from "./studio-insert-drag-core";
 import { LazyStudioInspectorAside } from "./studio-inspector-aside-loader";
 import {
   navigateStudioInspector,
@@ -856,6 +865,7 @@ import {
   replaceStudioPredictedInkTail,
   type StudioPredictedInkTailState,
 } from "./studio-predicted-ink-tail";
+import { executeStudioPrimaryCanvasToolTransition } from "./studio-primary-canvas-tool-transition";
 import {
   applyBrushPresetWithLocks,
   cycleStudioStabilizerStrength,
@@ -1039,7 +1049,6 @@ import {
 } from "./studio-server-ai-client";
 import { createSfxTextConfig, SFX_LIBRARY } from "./studio-sfx-presets";
 import { verifyStudioSharedAssetContent } from "./studio-shared-asset-content";
-import { parseStudioAssetDragPayload } from "./studio-shared-asset-drag";
 import { sameCategoryItems } from "./studio-similar-style";
 import {
   EMPTY_FREEHAND_OBJECT_SNAP_LATCH,
@@ -1094,6 +1103,7 @@ import {
   createStudioTeamCommentRefreshSession,
   type StudioTeamCommentRefreshSession,
 } from "./studio-team-comment-refresh-session";
+import { suppressNextStudioToolHintFocus } from "./studio-tool-hint-focus-suppression";
 import {
   loadStudioUiDensityState,
   saveStudioUiDensityState,
@@ -1237,7 +1247,6 @@ import {
   type StudioCrdtAuthoritativeSaveBarrier,
   type StudioCrdtSceneGraphRuntime,
 } from "./StudioLiveCollaborationProvider";
-import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import {
   StudioOptionsBars,
   type StudioOptionsBarsDrawModel,
@@ -1278,7 +1287,10 @@ import type {
 import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 import type { StudioBg3dShotBatchRecoveryScope } from "./studio-bg3d-shot-batch-plan";
 import type { StudioClip } from "./studio-clips";
-import type { ComipoAssemblySeed } from "./studio-comipo-assembly";
+import type {
+  ComipoAssemblyInput,
+  ComipoAssemblySeed,
+} from "./studio-comipo-assembly";
 import type {
   StudioElementLike,
   StudioPageInsertState,
@@ -1296,6 +1308,10 @@ import type {
   PendingStudioInterchangeImport,
   StudioInterchangeImportChoice,
 } from "./studio-document-interchange-commit";
+import type {
+  StudioDraftCollaborationProvisionGate,
+  StudioDraftCollaborationReadiness,
+} from "./studio-draft-collaboration";
 import type {
   DrawMode,
   DrawShapeKind,
@@ -1421,6 +1437,42 @@ const LazyStudioInterchangeLossPreviewDialog = lazy(() =>
   }))
 );
 
+const LazyStudioQuickComicWizard = lazy(() =>
+  import("./StudioQuickComicWizard").then(({ StudioQuickComicWizard }) => ({
+    default: StudioQuickComicWizard,
+  }))
+);
+
+const LazyStudioSceneSnapshotDialog = lazy(() =>
+  import("./StudioSceneSnapshotDialog").then(({ StudioSceneSnapshotDialog }) => ({
+    default: StudioSceneSnapshotDialog,
+  }))
+);
+
+const LazyStudioProductionBibleWorkspace = lazy(() =>
+  import("./StudioProductionBibleWorkspace").then(
+    ({ StudioProductionBibleWorkspace }) => ({
+      default: StudioProductionBibleWorkspace,
+    })
+  )
+);
+
+const LazyStudioAssetRightsAuditDialog = lazy(() =>
+  import("./StudioAssetRightsAuditDialog").then(
+    ({ StudioAssetRightsAuditDialog }) => ({
+      default: StudioAssetRightsAuditDialog,
+    })
+  )
+);
+
+const LazyStudioAnimaticTimelineDialog = lazy(() =>
+  import("./StudioAnimaticTimelineDialog").then(
+    ({ StudioAnimaticTimelineDialog }) => ({
+      default: StudioAnimaticTimelineDialog,
+    })
+  )
+);
+
 // Keep the browser image codec off Studio's startup graph. Import/clipboard and pixel-edit
 // operations already cross an async user-action boundary, so the full GIF/raster decoder is
 // fetched only when one of those operations is requested.
@@ -1495,10 +1547,26 @@ function StudioInspectorAsideFallback({
   );
 }
 
+const LazyStudioMobileSheetHandle = lazy(() =>
+  import("./StudioMobileSheetHandle").then(({ StudioMobileSheetHandle }) => ({
+    default: StudioMobileSheetHandle,
+  }))
+);
+
+function StudioMobileSheetHandleBoundary(
+  props: ComponentProps<typeof import("./StudioMobileSheetHandle").StudioMobileSheetHandle>
+) {
+  return (
+    <Suspense fallback={<div aria-hidden className="min-h-11 lg:hidden" />}>
+      <LazyStudioMobileSheetHandle {...props} />
+    </Suspense>
+  );
+}
+
 const STUDIO_MOBILE_EDITING_DOCK_UI: StudioMobileEditingDockUi = {
   StudioBrushLibraryPanel,
   StudioBrushStudio,
-  StudioMobileSheetHandle,
+  StudioMobileSheetHandle: StudioMobileSheetHandleBoundary,
   StudioShapePickerGrid,
   StudioUnifiedBrushPicker,
   loadStudioBrushStudio,
@@ -2351,6 +2419,7 @@ function StudioCuttoonEditor() {
     return saved;
   }
   function setStudioUiDensity(mode: StudioUiDensityMode) {
+    if (mode === "focus") setForceRightPanelOpen(false);
     setUiDensityMode(mode);
     const current = appSettingsRef.current;
     const next = current.general.densityMode === mode
@@ -2365,6 +2434,7 @@ function StudioCuttoonEditor() {
     // Mirror high-impact prefs into existing live state (avoid recursive setStudioUiDensity).
     setUiDensityMode(next.general.densityMode);
     setShowGrid(next.grids.showPixelGrid);
+    setShowRulers(next.grids.showCanvasRulers);
     setGridSize(next.grids.pixelGridSize);
     setPressureCurve(next.other.pressureCurve);
     if (next.grids.snapToPixelGrid) setSnapEnabled(true);
@@ -2651,6 +2721,133 @@ function StudioCuttoonEditor() {
   const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId, remixId });
   const loggedIn = Boolean(studioAuthUserId);
   const liveRoomQueryParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("room") : null;
+  const [draftCollaboration, setDraftCollaboration] =
+    useState<StudioDraftCollaborationReadiness | null>(null);
+  const draftCollaborationProvisionGateRef =
+    useRef<StudioDraftCollaborationProvisionGate | null>(null);
+  const draftCollaborationProvisionAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => {
+    draftCollaborationProvisionAbortRef.current?.abort();
+    draftCollaborationProvisionAbortRef.current = null;
+    draftCollaborationProvisionGateRef.current = null;
+    if (workId || liveRoomQueryParam || !studioAuthUserId) {
+      setDraftCollaboration(null);
+      return;
+    }
+    let current = true;
+    void import("./studio-draft-collaboration")
+      .then(({ loadOrCreateStudioDraftCollaborationIdentity }) => {
+        if (!current) return;
+        const identity = loadOrCreateStudioDraftCollaborationIdentity(
+          studioWorkspaceStorage(),
+          {
+            documentScopeKey: autosaveKey,
+            ownerScopeKey: studioAuthUserId,
+          }
+        );
+        if (current) setDraftCollaboration({ status: "local", identity });
+      })
+      .catch((error: unknown) => {
+        if (!current) return;
+        console.error("Failed to prepare the unsaved Studio collaboration identity:", error);
+        setDraftCollaboration(null);
+      });
+    return () => {
+      current = false;
+      draftCollaborationProvisionAbortRef.current?.abort();
+      draftCollaborationProvisionAbortRef.current = null;
+    };
+  }, [autosaveKey, liveRoomQueryParam, studioAuthUserId, workId]);
+  async function copyStudioDraftCollaborationShareLink(
+    provisionalWorkId: string
+  ): Promise<void> {
+    const shareUrl = new URL("/studio", window.location.origin);
+    shareUrl.searchParams.set("id", provisionalWorkId);
+    await navigator.clipboard.writeText(shareUrl.toString());
+    announceDrawingShortcut("팀 초대 링크를 복사했습니다 · 팀원 권한을 추가한 뒤 전달하세요");
+  }
+  async function requestStudioDraftCollaborationShare(): Promise<void> {
+    const readiness = draftCollaboration;
+    const actorAuthScopeKey = studioAuthUserId;
+    if (!readiness || !actorAuthScopeKey || readiness.status === "provisioning") return;
+    if (readiness.status === "ready") {
+      try {
+        await copyStudioDraftCollaborationShareLink(readiness.room.provisionalWorkId);
+      } catch {
+        setError("초대 링크를 복사하지 못했어요. 브라우저 클립보드 권한을 확인해 주세요.");
+      }
+      return;
+    }
+
+    const identity = readiness.identity;
+    const controller = new AbortController();
+    draftCollaborationProvisionAbortRef.current?.abort();
+    draftCollaborationProvisionAbortRef.current = controller;
+    try {
+      const [
+        {
+          consumeStudioDraftCollaborationProvisionAttempt,
+          createStudioDraftCollaborationProvisionRequest,
+        },
+        { provisionCreatorDraftCollaborationRoom },
+      ] = await Promise.all([
+        import("./studio-draft-collaboration"),
+        import("./creator-draft-collaboration-client"),
+      ]);
+      if (controller.signal.aborted) return;
+      const gate = consumeStudioDraftCollaborationProvisionAttempt(
+        draftCollaborationProvisionGateRef.current,
+        { identity }
+      );
+      draftCollaborationProvisionGateRef.current = gate.next;
+      if (!gate.allowed) {
+        const retrySeconds = Math.max(1, Math.ceil(gate.retryAfterMs / 1_000));
+        setDraftCollaboration({
+          status: "error",
+          identity,
+          message: `공유 작업실 요청이 너무 잦아요. ${retrySeconds}초 뒤 다시 시도해 주세요.`,
+        });
+        return;
+      }
+      const snapshotJson = JSON.stringify(currentStudioProjectSnapshot());
+      const request = createStudioDraftCollaborationProvisionRequest({
+        identity,
+        actorAuthScopeKey,
+        intent: "share-link",
+        initialSnapshotByteLength: new TextEncoder().encode(snapshotJson).byteLength,
+      });
+      setDraftCollaboration({ status: "provisioning", identity, intent: "share-link" });
+      const room = await provisionCreatorDraftCollaborationRoom(request, {
+        signal: controller.signal,
+      });
+      if (
+        controller.signal.aborted
+        || draftCollaborationProvisionAbortRef.current !== controller
+      ) return;
+      setDraftCollaboration({ status: "ready", identity, room });
+      try {
+        await copyStudioDraftCollaborationShareLink(room.provisionalWorkId);
+      } catch {
+        announceDrawingShortcut("임시 팀 작업실이 준비됐습니다 · 팀 패널에서 멤버를 추가하세요");
+      }
+    } catch (cause) {
+      if (
+        controller.signal.aborted
+        || draftCollaborationProvisionAbortRef.current !== controller
+      ) return;
+      setDraftCollaboration({
+        status: "error",
+        identity,
+        message: cause instanceof Error
+          ? cause.message
+          : "임시 협업 작업실을 준비하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+      });
+    } finally {
+      if (draftCollaborationProvisionAbortRef.current === controller) {
+        draftCollaborationProvisionAbortRef.current = null;
+      }
+    }
+  }
   const expectsSharedDocument = Boolean((workAuthScopeKey && workId && !remixId) || liveRoomQueryParam);
   const [workHydrated, setWorkHydrated] = useState(!(workId || remixId));
   const [workHydrationFailed, setWorkHydrationFailed] = useState(false);
@@ -2674,7 +2871,14 @@ function StudioCuttoonEditor() {
   if (!instantWorkIdRef.current) {
     instantWorkIdRef.current = `work-instant-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   }
-  const effectiveWorkId = workId ?? liveRoomQueryParam ?? instantWorkIdRef.current;
+  const draftCollaborationWorkId = draftCollaboration?.status === "ready"
+    ? draftCollaboration.room.provisionalWorkId
+    : draftCollaboration?.identity.draftDocumentId;
+  const effectiveWorkId =
+    workId ??
+    liveRoomQueryParam ??
+    draftCollaborationWorkId ??
+    instantWorkIdRef.current;
   const studioLiveParticipant = useMemo(() => {
     if (sharedDocument && sharedDocument.status === "active" && sharedDocument.capabilities.view) {
       return {
@@ -3637,7 +3841,31 @@ function StudioCuttoonEditor() {
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [showGrid, setShowGrid] = useState(() => loadStudioAppSettings(studioAppSettingsStorage()).grids.showPixelGrid);
   const [gridSize, setGridSize] = useState(() => loadStudioAppSettings(studioAppSettingsStorage()).grids.pixelGridSize);
-  const [showRulers, setShowRulers] = useState(true);
+  const [showRulers, setShowRulers] = useState(
+    () => loadStudioAppSettings(studioAppSettingsStorage()).grids.showCanvasRulers
+  );
+  function setCanvasRulersVisible(next: boolean) {
+    setShowRulers(next);
+    const current = appSettingsRef.current;
+    if (current.grids.showCanvasRulers === next) return;
+    const settings = {
+      ...current,
+      grids: { ...current.grids, showCanvasRulers: next },
+    };
+    appSettingsRef.current = settings;
+    setAppSettings(settings);
+    persistAppSettings(settings);
+  }
+  function toggleCanvasRulers() {
+    const next = !appSettingsRef.current.grids.showCanvasRulers;
+    setCanvasRulersVisible(next);
+    announceDrawingShortcut(
+      next ? "캔버스 px 눈금자 표시 (Alt+Cmd+R)" : "캔버스 px 눈금자 숨김"
+    );
+  }
+  const studioCanvasRulerHandlers = useStudioStableHandlers({
+    toggleCanvasRulers,
+  });
   const [canvasGuides, setCanvasGuides] = useState<{ horizontal: number[]; vertical: number[] }>({ horizontal: [], vertical: [] });
   // 웹툰 표준폭 가이드(네이버 690·카카오 720…)·세이프영역 표시 토글.
   const [showWebtoonGuides, setShowWebtoonGuides] = useState(false);
@@ -3672,6 +3900,10 @@ function StudioCuttoonEditor() {
   // 작업 내역(히스토리) 패널 — 단계 목록 클릭으로 특정 시점 점프(포토샵 히스토리식).
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
   const [checkpointPanelOpen, setCheckpointPanelOpen] = useState(false);
+  const [sceneSnapshotOpen, setSceneSnapshotOpen] = useState(false);
+  const [animaticTimelineOpen, setAnimaticTimelineOpen] = useState(false);
+  const [productionBibleOpen, setProductionBibleOpen] = useState(false);
+  const [assetRightsAuditOpen, setAssetRightsAuditOpen] = useState(false);
   const [autoActionsOpen, setAutoActionsOpen] = useState(false);
   const [autoActionSet, setAutoActionSet] = useState<StudioAutoActionSet | null>(null);
   const [autoActionScope, setAutoActionScope] = useState<StudioAutoActionScope>({ kind: "current" });
@@ -4086,6 +4318,7 @@ function StudioCuttoonEditor() {
     setMasterEditMode(false);
     setMasterPanelOpen(false);
     setCharacterBibleOpen(false);
+    setProductionBibleOpen(false);
     setWriterRoomOpen(false);
     setPublicationOperationsOpen(false);
     setPublishPreflightOpen(false);
@@ -4301,11 +4534,14 @@ function StudioCuttoonEditor() {
     // 탭마다 독립적인 짧은 작업면처럼 느껴지도록 이전 장문 패널의 스크롤 위치를 이어받지 않는다.
     globalThis.requestAnimationFrame?.(() => propsSheetRef.current?.scrollTo({ top: 0 }));
   }
+  function selectInspectorRoute(route: StudioInspectorRoute) {
+    setInspectorLayout((current) => navigateStudioInspector(current, route));
+  }
   function openInspectorRoute(
     route: StudioInspectorRoute,
     mobileSheetTarget: StudioMobileSheet | null = isMobile ? "props" : null
   ) {
-    setInspectorLayout((current) => navigateStudioInspector(current, route));
+    selectInspectorRoute(route);
     setRightPanelOpenWithOverride(true);
     if (mobileSheetTarget !== null) {
       setMobileSheet(mobileSheetTarget);
@@ -4384,6 +4620,11 @@ function StudioCuttoonEditor() {
           returnTarget?.isConnected && !returnTarget.closest("[inert]")
             ? returnTarget
             : fallbackReturnTarget;
+        focusTarget?.scrollIntoView({
+          behavior: "auto",
+          block: "nearest",
+          inline: "nearest",
+        });
         focusTarget?.focus({ preventScroll: true });
       });
     };
@@ -4936,15 +5177,15 @@ function StudioCuttoonEditor() {
     setTutorialHubOpen(false);
     switch (action) {
       case "pen":
+        disarmAllPixelTools();
         setTool("draw");
         setDrawMode("pen");
-        setEyedropperActive(false);
         announceDrawingShortcut("펜 모드 · 선을 그어 보세요");
         break;
       case "smart-shape":
+        disarmAllPixelTools();
         setTool("draw");
         setDrawMode("pen");
-        setEyedropperActive(false);
         setQuickShapeActive(true);
         announceDrawingShortcut("스마트 도형 켜짐 · 도형을 그리고 손을 떼 보세요");
         break;
@@ -4952,9 +5193,9 @@ function StudioCuttoonEditor() {
         setMenu("bubble");
         break;
       case "brush":
+        disarmAllPixelTools();
         setTool("draw");
         setDrawMode("pen");
-        setEyedropperActive(false);
         applyBuiltInBrushPreset(BRUSH_PRESETS.find((p) => p.id === "pencil") ?? BRUSH_PRESETS[0]);
         announceDrawingShortcut("브러시 · 옵션에서 질감을 바꿔 보세요");
         break;
@@ -5193,8 +5434,40 @@ function StudioCuttoonEditor() {
         console.error("Failed to store studio recent color:", err);
       });
   };
-  const [strokeWidth, setStrokeWidth] = useState(6);
-  const [drawMode, setDrawMode] = useState<DrawMode>("pen");
+  const [strokeWidth, setStrokeWidthState] = useState(6);
+  const [drawMode, setDrawModeState] = useState<DrawMode>("pen");
+  // Pixel pencil is intentionally fixed to one device-independent document pixel, but that
+  // temporary constraint must never overwrite the artist's last raster/vector brush size.
+  // Synchronous refs make rapid keyboard/menu transitions deterministic inside one React batch.
+  const strokeWidthRef = useRef(strokeWidth);
+  const drawModeRef = useRef<DrawMode>(drawMode);
+  const lastNonPixelStrokeWidthRef = useRef(strokeWidth);
+  const setStrokeWidth = (update: SetStateAction<number>) => {
+    const current = strokeWidthRef.current;
+    const requested = typeof update === "function" ? update(current) : update;
+    const plan = planStudioStrokeWidthChange({
+      drawMode: drawModeRef.current,
+      strokeWidth: current,
+      lastNonPixelStrokeWidth: lastNonPixelStrokeWidthRef.current,
+    }, requested);
+    strokeWidthRef.current = plan.strokeWidth;
+    lastNonPixelStrokeWidthRef.current = plan.lastNonPixelStrokeWidth;
+    setStrokeWidthState(plan.strokeWidth);
+  };
+  const setDrawMode = (update: SetStateAction<DrawMode>) => {
+    const current = drawModeRef.current;
+    const next = typeof update === "function" ? update(current) : update;
+    const plan = planStudioDrawModeChange({
+      drawMode: current,
+      strokeWidth: strokeWidthRef.current,
+      lastNonPixelStrokeWidth: lastNonPixelStrokeWidthRef.current,
+    }, next);
+    drawModeRef.current = plan.drawMode;
+    strokeWidthRef.current = plan.strokeWidth;
+    lastNonPixelStrokeWidthRef.current = plan.lastNonPixelStrokeWidth;
+    setDrawModeState(plan.drawMode);
+    setStrokeWidthState(plan.strokeWidth);
+  };
   const [brushOpacity, setBrushOpacity] = useState(1);
   const [brush, setBrush] = useState<string>("pen");
   const [activeCatalogBrush, setActiveCatalogBrush] = useState(() => ({
@@ -5505,6 +5778,7 @@ function StudioCuttoonEditor() {
     if (reason === "outside-pointer") return;
     globalThis.requestAnimationFrame?.(() => {
       if (returnTarget?.isConnected && !returnTarget.closest("[inert]")) {
+        if (reason === "selection") suppressNextStudioToolHintFocus(returnTarget);
         returnTarget.focus({ preventScroll: true });
       }
     });
@@ -5512,12 +5786,15 @@ function StudioCuttoonEditor() {
 
   useEffect(() => {
     if (!brushCatalogSession) return;
-    const wrongSurface =
-      drawMode !== "pen" ||
-      tool !== "draw" ||
-      (brushCatalogSession.placement === "mobile-sheet"
+    // The mobile settings button intentionally lets artists inspect brush properties without
+    // silently switching away from Selection/Hand. Its catalogue is therefore valid whenever the
+    // visible draw sheet owns the launcher; selecting an entry activates Draw atomically below.
+    // Desktop still requires the Draw workspace because its launcher belongs to that inspector.
+    const wrongSurface = drawMode !== "pen" || (
+      brushCatalogSession.placement === "mobile-sheet"
         ? !isMobile || mobileSheet !== "draw"
-        : isMobile);
+        : isMobile || tool !== "draw"
+    );
     if (wrongSurface) setBrushCatalogSession(null);
   }, [brushCatalogSession, drawMode, isMobile, mobileSheet, tool]);
 
@@ -6028,6 +6305,7 @@ function StudioCuttoonEditor() {
   }, [timelinePlaying, animTimeline]);
   const [quickStartDismissed, setQuickStartDismissed] = useState(readQuickStartDismissed);
   const [quickStartOpen, setQuickStartOpen] = useState(false);
+  const [quickComicOpen, setQuickComicOpen] = useState(false);
   const [mobileHintDismissed, setMobileHintDismissed] = useState(readMobileHintDismissed);
 
   const [title, setTitleState] = useState("");
@@ -6421,6 +6699,7 @@ function StudioCuttoonEditor() {
     count: number;
     lastAt: number;
   } | null>(null);
+  const consumedInsertDropTransfersRef = useRef(new WeakSet<object>());
   const lastNonViewHudFocusRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     function rememberViewToolOpener(event: FocusEvent) {
@@ -7655,40 +7934,33 @@ function StudioCuttoonEditor() {
     center: { x: number; y: number };
     placement: CanvasImagePlacement;
   } {
-    if (selected?.type === "frame") {
-      const inset = Math.max(10, Math.min(28, Math.min(selected.width, selected.height) * 0.04));
-      return {
-        key: `${activePage.id}:${masterEditMode ? "master" : "page"}:frame:${selected.id}`,
-        center: {
-          x: selected.x + selected.width / 2,
-          y: selected.y + selected.height / 2,
-        },
-        placement: {
-          anchor: {
-            x: selected.x + selected.width / 2,
-            y: selected.y + selected.height / 2,
-          },
-          bounds: {
-            x: selected.x,
-            y: selected.y,
-            width: selected.width,
-            height: selected.height,
-          },
-          inset,
-        },
-      };
-    }
-
-    const visible = currentVisibleCanvasPlacement();
-    const center = visible?.center ?? { x: CANVAS_W / 2, y: canvasH / 2 };
-    const bounds = visible?.bounds ?? { x: 0, y: 0, width: CANVAS_W, height: canvasH };
-    const inset = Math.max(16, Math.min(40, Math.min(bounds.width, bounds.height) * 0.05));
+    const selectedFrame = selected?.type === "frame"
+      ? {
+          x: selected.x,
+          y: selected.y,
+          width: selected.width,
+          height: selected.height,
+        }
+      : null;
+    const visible = selectedFrame ? null : currentVisibleCanvasPlacement();
+    const target = resolveStudioInsertTarget({
+      documentWidth: CANVAS_W,
+      documentHeight: canvasH,
+      selectedFrame,
+      viewport: visible,
+    });
+    const inset = target.source === "selected-frame"
+      ? Math.max(10, Math.min(28, Math.min(target.bounds.width, target.bounds.height) * 0.04))
+      : Math.max(16, Math.min(40, Math.min(target.bounds.width, target.bounds.height) * 0.05));
+    const key = target.source === "selected-frame" && selected?.type === "frame"
+      ? `${activePage.id}:${masterEditMode ? "master" : "page"}:frame:${selected.id}`
+      : `${activePage.id}:${masterEditMode ? "master" : "page"}:view:${Math.round(target.anchor.x / 80)}:${Math.round(target.anchor.y / 80)}`;
     return {
-      key: `${activePage.id}:${masterEditMode ? "master" : "page"}:view:${Math.round(center.x / 80)}:${Math.round(center.y / 80)}`,
-      center,
+      key,
+      center: target.anchor,
       placement: {
-        anchor: center,
-        bounds,
+        anchor: target.anchor,
+        bounds: target.bounds,
         inset,
       },
     };
@@ -7775,6 +8047,12 @@ function StudioCuttoonEditor() {
     const hasFiles = studioTransferHasFiles(e.dataTransfer);
     if (!studioTransferCanInsert(e.dataTransfer) && !hasFiles) return;
     e.preventDefault();
+    if (
+      !consumeStudioInsertDropTransfer(
+        consumedInsertDropTransfersRef.current,
+        e.dataTransfer
+      )
+    ) return;
     const mutationTicket = captureStudioMutationTicket();
     const wrap = wrapRef.current;
     if (!wrap) return;
@@ -7784,41 +8062,50 @@ function StudioCuttoonEditor() {
     const imageFile = e.dataTransfer.files
       ? Array.from(e.dataTransfer.files).find((f) => f.type.startsWith("image/") || isStudioOpenRasterDropFile(f))
       : undefined;
-    const assetData = e.dataTransfer.getData("application/json-asset");
-    const insertData = e.dataTransfer.getData("application/json-insert");
+    const assetData = e.dataTransfer.getData(STUDIO_ASSET_DRAG_MIME);
+    const insertData = e.dataTransfer.getData(STUDIO_INSERT_DRAG_MIME);
     if (hasFiles && !imageFile && !assetData && !insertData) {
       setError("캔버스에는 PNG, JPEG, WebP, GIF, BMP, TGA, PPM, PAM, QOI, TIFF 이미지만 놓을 수 있어요.");
       return;
     }
 
     const dropStagePoint = () => {
-      const projected = projectStudioClientPointToDocument(cx, cy);
-      if (projected) return projected;
       const rect = wrap.getBoundingClientRect();
-      return projectStudioViewPointToDocument({
+      const pointer = projectStudioClientPointToDocument(cx, cy)
+        ?? projectStudioViewPointToDocument({
+          documentWidth: CANVAS_W,
+          documentHeight: canvasH,
+          canvasFlipH,
+          canvasRotation,
+          x: (cx - rect.left + wrap.scrollLeft) / effScale,
+          y: (cy - rect.top + wrap.scrollTop) / effScale,
+        });
+      return resolveStudioInsertTarget({
         documentWidth: CANVAS_W,
         documentHeight: canvasH,
-        canvasFlipH,
-        canvasRotation,
-        x: (cx - rect.left + wrap.scrollLeft) / effScale,
-        y: (cy - rect.top + wrap.scrollTop) / effScale,
-      });
+        pointer,
+      }).anchor;
     };
 
     // 메뉴 타일을 캔버스로 끌어다 놓기 — 클릭 삽입(중앙/패널 규칙)과 달리 드롭 지점에 배치한다.
     if (insertData) {
-      try {
-        const parsed = JSON.parse(insertData) as
-          | { kind: "bubble"; variant: BubbleVariant }
-          | { kind: "sticker"; emoji: string }
-          | { kind: "text" };
-        const at = dropStagePoint();
-        if (parsed.kind === "bubble") addBubble(parsed.variant, at);
-        else if (parsed.kind === "sticker") addSticker(parsed.emoji, at);
-        else if (parsed.kind === "text") addText(at);
-      } catch {
-        // 형식이 깨진 내부 드래그 페이로드는 조용히 무시한다(외부 드롭 경로와 동일한 태도).
-      }
+      const targetPageId = activePage.id;
+      const targetMasterEditMode = masterEditMode;
+      const insertDropPoint = dropStagePoint();
+      const { parseStudioInsertDragPayload } = await import("./studio-insert-drag");
+      if (!isStudioPasteScopeCurrent({
+        mutationAllowed: canApplyStudioMutation(mutationTicket),
+        reviewLocked: activeSurfaceReviewLockedRef.current,
+        targetPageId,
+        currentPageId: currentPageIdRef.current,
+        targetMasterEditMode,
+        currentMasterEditMode: masterEditModeRef.current,
+      })) return;
+      const parsed = parseStudioInsertDragPayload(insertData);
+      if (!parsed) return;
+      if (parsed.kind === "bubble") addBubble(parsed.variant, insertDropPoint);
+      else if (parsed.kind === "sticker") addSticker(parsed.emoji, insertDropPoint);
+      else addText(insertDropPoint);
       return;
     }
 
@@ -7878,6 +8165,20 @@ function StudioCuttoonEditor() {
     // 2) 내부 에셋 패널에서 드래그한 경우.
     if (!assetData) return;
     try {
+      const targetPageId = activePage.id;
+      const targetMasterEditMode = masterEditMode;
+      // Freeze the visual target before the lazy parser boundary. Zoom, scroll or page changes
+      // while the chunk arrives must not move a drop that the artist already completed.
+      const assetDropPoint = dropStagePoint();
+      const { parseStudioAssetDragPayload } = await import("./studio-shared-asset-drag");
+      if (!isStudioPasteScopeCurrent({
+        mutationAllowed: canApplyStudioMutation(mutationTicket),
+        reviewLocked: activeSurfaceReviewLockedRef.current,
+        targetPageId,
+        currentPageId: currentPageIdRef.current,
+        targetMasterEditMode,
+        currentMasterEditMode: masterEditModeRef.current,
+      })) return;
       const payload = parseStudioAssetDragPayload(assetData);
       if (!payload) return;
       if (payload.source === "community") {
@@ -7899,11 +8200,6 @@ function StudioCuttoonEditor() {
           setError("사용권을 확인할 수 없는 커뮤니티 에셋은 캔버스에 추가할 수 없습니다.");
           return;
         }
-        const targetPageId = activePage.id;
-        const targetMasterEditMode = masterEditMode;
-        // Freeze document coordinates before network I/O so later scroll/zoom/rotation changes
-        // cannot move a drop that the user already placed.
-        const communityDropPoint = dropStagePoint();
         const content = await loadCommunityAssetContent(asset);
         if (!isStudioPasteScopeCurrent({
           mutationAllowed: canApplyStudioMutation(mutationTicket),
@@ -7916,12 +8212,12 @@ function StudioCuttoonEditor() {
         const inserted = placeAt(content.dataUrl, content.width, content.height, false, {
           name: asset.name,
           communityAssetCredit,
-        }, communityDropPoint);
+        }, assetDropPoint);
         if (inserted) recordCommunityAssetUse(asset.id);
         return;
       }
       if (payload.source === "local") {
-        placeAt(payload.src, payload.width, payload.height);
+        placeAt(payload.src, payload.width, payload.height, false, undefined, assetDropPoint);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "공유 에셋 원본을 불러오지 못했어요.");
@@ -11126,6 +11422,10 @@ function StudioCuttoonEditor() {
       const item: StudioLayerNavigatorItem = {
         id: element.id,
         type: element.type,
+        semanticKind:
+          element.type === "image" && (element.bg3dScene || element.vrmScene)
+            ? "three-d"
+            : undefined,
         label: element.name?.trim() || elementLabel(element),
         textContent:
           element.type === "text" || element.type === "bubble" || element.type === "sticker"
@@ -12407,6 +12707,8 @@ function StudioCuttoonEditor() {
           ? null
           : advancedFillEligibleRasterElements.length > 1
             ? `채울 수 있는 래스터가 ${advancedFillEligibleRasterElements.length}개예요. 레이어에서 하나를 선택하세요.`
+            : advancedFillRasterLayers.length === 0
+              ? null
             : advancedFillHasVisibleVectorLineArt
               ? null
               : selectedAdvancedFillRasterReason
@@ -12675,7 +12977,7 @@ const puppetWarpArmed =
     [selected, resolveBg3dEditSource]
   );
   const contextMenuBg3dEditSource = resolveBg3dEditSource(contextMenuEl);
-  const showQuickStart = !canvasOnlyMode && !menu && (
+  const showQuickStart = !canvasOnlyMode && !menu && !quickComicOpen && (
     quickStartOpen ||
     (workHydrated && !hasAutosave && elements.length === 0 && !quickStartDismissed)
   );
@@ -14417,16 +14719,6 @@ const puppetWarpArmed =
         batch.pageId,
         batch.strokes.map((stroke) => stroke.id)
       );
-      const lastDeferredStrokeId = batch.strokes[batch.strokes.length - 1]?.id;
-      if (
-        lastDeferredStrokeId !== undefined
-        && currentPageIdRef.current === batch.pageId
-      ) {
-        globalThis.requestAnimationFrame?.(() => {
-          setSelectedId(lastDeferredStrokeId);
-          openInspectorRoute({ primary: "properties" }, isMobile ? "props" : null);
-        });
-      }
       return true;
     };
     discardPendingStrokeCommitsRef.current = () => {
@@ -15060,14 +15352,9 @@ const puppetWarpArmed =
       setError("말풍선 또는 상위 그룹의 잠금을 해제한 뒤 꼬리 대상을 지정해 주세요.");
       return;
     }
-    setBubbleAnchorPickActive((v) => {
-      const next = !v;
-      if (next) {
-        disarmAllPixelTools();
-        return true;
-      }
-      return false;
-    });
+    const next = !bubbleAnchorPickActive;
+    if (next) disarmAllPixelTools();
+    setBubbleAnchorPickActive(next);
   }
   function detachBubbleAnchor() {
     if (!selected || selected.type !== "bubble") return;
@@ -16601,6 +16888,11 @@ const puppetWarpArmed =
     setQuickStartDismissed(true);
     storeQuickStartDismissed();
   }
+  function openQuickComicWizard() {
+    dismissQuickStart();
+    setMenu(null);
+    setQuickComicOpen(true);
+  }
   function dismissMobileHint() {
     setMobileHintDismissed(true);
     storeMobileHintDismissed();
@@ -16736,6 +17028,83 @@ const puppetWarpArmed =
       return false;
     }
     return true;
+  }
+  async function applyQuickComicInput(input: ComipoAssemblyInput) {
+    if (collaborationDocumentLocked) {
+      setError(collaborationLockMessage());
+      return;
+    }
+    if (comipoActionBusyRef.current) return;
+    if (
+      elements.length > 0 &&
+      !globalThis.confirm("현재 페이지를 빠른 웹툰 결과로 교체할까요?")
+    ) {
+      return;
+    }
+
+    const deferredAction = captureDeferredComipoAction();
+    comipoActionBusyRef.current = true;
+    try {
+      const { assembleComipoPage } = await loadStudioComipoAssembly();
+      if (!canApplyDeferredComipoAction(deferredAction)) return;
+      const assembled = assembleComipoPage(input);
+      if (!assembled?.composable) {
+        setError("컷 안에 장면과 대사를 배치하지 못했어요. 이전 단계에서 구성을 조정해 주세요.");
+        return;
+      }
+      setCanvasH(assembled.canvasH);
+      setBg("#ffffff");
+      setBgGrad(null);
+      setWebtoonTheme("soft");
+      setCurrentTemplate(null);
+      setTool("select");
+      setMenu(null);
+      setSelectedId(null);
+      if (!commit(comipoSeedsToEls(assembled.seeds))) return;
+      setQuickComicOpen(false);
+      announceDrawingShortcut(
+        `빠른 웹툰 완성 · ${assembled.frameCount}컷 · 말풍선 ${assembled.bubbleCount}개`
+      );
+    } catch (error) {
+      console.error("Failed to apply the Quick Comic assembly:", error);
+      if (canApplyDeferredComipoAction(deferredAction)) {
+        setError("빠른 웹툰 조립 엔진을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
+      }
+    } finally {
+      comipoActionBusyRef.current = false;
+    }
+  }
+  function applySceneSnapshot(
+    snapshot: import("./studio-scene-snapshot-library").StudioSceneSnapshot
+  ) {
+    if (collaborationDocumentLocked) {
+      setError(collaborationLockMessage());
+      return;
+    }
+    if (
+      !globalThis.confirm(
+        `현재 ${pageDisplayName(activePage, activePageIndex)} 전체를 “${snapshot.name}” 장면으로 교체할까요?`
+      )
+    ) {
+      return;
+    }
+    const restoredPage: PageState = {
+      ...snapshot.page,
+      id: activePage.id,
+    };
+    const nextPages = pages.map((page) =>
+      page.id === activePage.id ? restoredPage : page
+    );
+    if (!commitPages(nextPages)) return;
+    setWebtoonTheme(snapshot.theme);
+    setSelectedId(null);
+    setMarqueeIds([]);
+    setTool("select");
+    setMenu(null);
+    setSceneSnapshotOpen(false);
+    announceDrawingShortcut(
+      `장면 스냅샷 적용 · ${snapshot.name} · 레이어 ${restoredPage.elements.length}개`
+    );
   }
   async function startFromExample() {
     if (collaborationDocumentLocked) {
@@ -17608,25 +17977,17 @@ const puppetWarpArmed =
       const sc = appSettingsRef.current.shortcuts;
       if (matchStudioShortcut(sc["tool-select"], e)) {
         e.preventDefault();
-        disarmAllPixelTools();
-        setTool("select");
-        setEyedropperActive(false);
+        activatePrimaryCanvasTool("select");
         return;
       }
       if (matchStudioShortcut(sc["tool-pen"], e)) {
         e.preventDefault();
-        disarmAllPixelTools();
-        setTool("draw");
-        setDrawMode("pen");
-        setEyedropperActive(false);
+        activatePrimaryCanvasTool("draw", "pen");
         return;
       }
       if (matchStudioShortcut(sc["tool-eraser"], e)) {
         e.preventDefault();
-        disarmAllPixelTools();
-        setTool("draw");
-        setDrawMode("eraser");
-        setEyedropperActive(false);
+        activatePrimaryCanvasTool("draw", "eraser");
         return;
       }
       if (matchStudioShortcut(sc["tool-fill"], e)) {
@@ -17636,15 +17997,16 @@ const puppetWarpArmed =
       }
       if (matchStudioShortcut(sc["tool-eyedropper"], e)) {
         e.preventDefault();
-        setEyedropperActive((v) => !v);
+        const nextEyedropperActive = !eyedropperActive;
+        if (nextEyedropperActive) disarmAllPixelTools();
+        setEyedropperActive(nextEyedropperActive);
         return;
       }
       if (matchStudioShortcut(sc["tool-lasso"], e)) {
         e.preventDefault();
         if (selected?.type === "image" && !selectedImageMutationLocked) {
-          setTool("select");
+          activatePrimaryCanvasTool("select");
           clearPolyLassoDraft();
-          disarmAllPixelTools();
           setPixelTool("lasso");
         }
         return;
@@ -17653,11 +18015,7 @@ const puppetWarpArmed =
       if (matchStudioShortcut(sc["tool-pixel"], e)) {
         e.preventDefault();
         if (!activeSurfaceReviewLocked) {
-          disarmAllPixelTools();
-          setTool("draw");
-          setDrawMode("pixel");
-          setStrokeWidth(1);
-          setEyedropperActive(false);
+          activatePrimaryCanvasTool("draw", "pixel");
         }
         return;
       }
@@ -17948,16 +18306,14 @@ const puppetWarpArmed =
         if (drawingShortcut.type === "select-pen") {
           drawingShortcutStateRef.current.tool = "draw";
           drawingShortcutStateRef.current.drawMode = "pen";
-          setTool("draw");
-          setDrawMode("pen");
+          activatePrimaryCanvasTool("draw", "pen");
           announceDrawingShortcut("펜");
         } else if (drawingShortcut.type === "toggle-eraser") {
           const currentDrawing = drawingShortcutStateRef.current;
           const nextMode = currentDrawing.tool === "draw" && currentDrawing.drawMode === "eraser" ? "pen" : "eraser";
           currentDrawing.tool = "draw";
           currentDrawing.drawMode = nextMode;
-          setTool("draw");
-          setDrawMode(nextMode);
+          activatePrimaryCanvasTool("draw", nextMode);
           announceDrawingShortcut(nextMode === "eraser" ? "지우개" : "펜");
         } else if (drawingShortcut.type === "swap-colors") {
           setColor(secondaryColor);
@@ -18100,7 +18456,11 @@ const puppetWarpArmed =
         e.preventDefault();
         setShortcutsOpen((v) => !v);
       } else if (e.key === "Escape") {
-        if (mobileSheet) dismissActiveMobileSheet();
+        if (hasActiveDrawingPointerSession()) {
+          e.preventDefault();
+          discardDrawingPointerSession();
+          announceDrawingShortcut("진행 중인 획을 취소했습니다");
+        } else if (mobileSheet) dismissActiveMobileSheet();
         else if (shortcutsOpen) setShortcutsOpen(false);
         else if (menu) {
           // 위 레이어부터 닫기: 단축키 오버레이 → 열린 툴바 드롭다운 → 선택해제.
@@ -18213,11 +18573,7 @@ const puppetWarpArmed =
       } else if (mod && e.altKey && (e.key === "r" || e.key === "R" || e.key === "ㄱ")) {
         // Photoshop / CSP / Figma: ⌥⌘R (Alt+Cmd+R) = 캔버스 눈금자(Rulers) 표시/숨기기 토글
         e.preventDefault();
-        setShowRulers((v) => {
-          const next = !v;
-          announceDrawingShortcut(next ? "캔버스 눈금자 표시 (Alt+Cmd+R)" : "캔버스 눈금자 숨김");
-          return next;
-        });
+        toggleCanvasRulers();
       } else if (mod && !e.altKey && (e.key === "g" || e.key === "G")) {
         // Figma/Illustrator/ClipStudio: ⌘G = 그룹 생성, ⇧⌘G = 그룹 해제
         e.preventDefault();
@@ -21603,11 +21959,16 @@ const puppetWarpArmed =
     const fillSourcePage = fillSourcePages
       ? fillSourcePages.pagesList.find((page) => page.id === currentPageIdRef.current)
       : currentPage;
+    const fillElements =
+      fillSourcePage?.elements
+      ?? currentPage?.elements
+      ?? activeElementsRef.current;
     return {
       pageId: currentPage?.id ?? currentPageIdRef.current,
       width: CANVAS_W,
       height: fillSourcePage?.canvasH ?? currentPage?.canvasH ?? canvasH,
-      elements: fillSourcePage?.elements ?? currentPage?.elements ?? activeElementsRef.current,
+      elements: fillElements,
+      allowBlankPage: !fillElements.some((element) => element.type === "image"),
       groups: currentPage?.groups ?? activeGroupsRef.current,
       theme: webtoonTheme,
       name: "벡터 채색",
@@ -21685,11 +22046,13 @@ const puppetWarpArmed =
         advancedFillVirtualReferenceRef.current = null;
         setAdvancedFillActive(true);
         setAdvancedFillStatus(
-          `표시 중인 벡터 선화 ${entry.target.sourceElementCount}개를 참조합니다. 닫힌 영역을 탭하세요. 적용 전까지 문서는 바뀌지 않습니다.`,
+          entry.target.sourceElementCount > 0
+            ? `표시 중인 벡터 선화 ${entry.target.sourceElementCount}개를 참조합니다. 닫힌 영역을 탭하세요. 적용 전까지 문서는 바뀌지 않습니다.`
+            : "빈 페이지 전체를 채울 준비가 됐어요. 캔버스를 탭하면 가장 아래에 색 레이어를 만들고, 적용 전까지 문서는 바뀌지 않습니다.",
         );
         setMobileSheet(null);
         setError(null);
-        openInspectorRoute({ primary: "properties", image: "fill" }, null);
+        selectInspectorRoute({ primary: "properties", image: "fill" });
       };
       if (shouldAutoSelectLatestDraw) {
         requestAnimationFrame(() => requestAnimationFrame(openInspector));
@@ -21736,7 +22099,7 @@ const puppetWarpArmed =
     }
     setAdvancedFillActive(true);
     setAdvancedFillStatus(readyStatus);
-    openInspectorRoute({ primary: "properties", image: "fill" }, null);
+    selectInspectorRoute({ primary: "properties", image: "fill" });
     setMobileSheet(null);
     setError(null);
   }
@@ -21857,7 +22220,11 @@ const puppetWarpArmed =
     const displayPoint = canvasPointToNormalized(pos.x, pos.y, targetFrame);
     if (displayPoint.x < 0 || displayPoint.x > 1 || displayPoint.y < 0 || displayPoint.y > 1) {
       setAdvancedFillStatus(
-        vectorTarget ? "페이지 안쪽의 닫힌 선화 영역을 탭하세요." : "선택한 래스터 레이어 안쪽을 탭하세요.",
+        vectorTarget
+          ? vectorTarget.sourceElementCount > 0
+            ? "페이지 안쪽의 닫힌 선화 영역을 탭하세요."
+            : "페이지 안쪽을 탭하세요."
+          : "선택한 래스터 레이어 안쪽을 탭하세요.",
       );
       return;
     }
@@ -21948,6 +22315,7 @@ const puppetWarpArmed =
         targetSrc: workingSrc,
         referenceSrc,
         alphaLockSrc: rasterTarget && shouldClipToExistingAlpha(rasterTarget) ? rasterTarget.src : undefined,
+        intentionalWholeCanvasFill: vectorTarget?.sourceElementCount === 0,
         xRatio: sourcePoint.x,
         yRatio: sourcePoint.y,
         fillColor: color,
@@ -22253,6 +22621,34 @@ const puppetWarpArmed =
     scheduleLiveDrawPressure(null);
     releaseDrawingPointerSession();
     endLiveResourceEdit();
+  }
+  function hasActiveDrawingPointerSession() {
+    return drawingRef.current !== null || requireStudioDrawingPointerTransport(
+      drawingPointerTransportRef
+    ).getSession() !== null;
+  }
+  function activatePrimaryCanvasTool(
+    nextTool: "select" | "draw",
+    nextDrawMode?: DrawMode
+  ) {
+    const next = nextTool === "draw"
+      ? { tool: "draw" as const, drawMode: nextDrawMode ?? drawModeRef.current }
+      : { tool: "select" as const };
+    return executeStudioPrimaryCanvasToolTransition(
+      {
+        current: tool === "draw"
+          ? { tool: "draw", drawMode: drawModeRef.current }
+          : { tool },
+        next,
+        activeStroke: hasActiveDrawingPointerSession(),
+      },
+      {
+        cancelActiveStroke: discardDrawingPointerSession,
+        disarm: disarmAllPixelTools,
+        setTool,
+        setDrawMode,
+      }
+    );
   }
   function readActiveStrokeLifecycleRecovery() {
     const activeStroke = drawingRef.current;
@@ -25504,12 +25900,6 @@ const puppetWarpArmed =
         }
         const finished = releasePlan.stroke;
         releaseAuthoritativeStroke = finished;
-        const openCompletedStrokeProperties = (strokeId: string) => {
-          globalThis.requestAnimationFrame?.(() => {
-            setSelectedId(strokeId);
-            openInspectorRoute({ primary: "properties" }, isMobile ? "props" : null);
-          });
-        };
         if (releasePlan.quickShapeAnnouncementKind) {
           const kind = releasePlan.quickShapeAnnouncementKind;
           announceDrawingShortcut(`스마트 도형 · ${QUICKSHAPE_KIND_LABELS[kind] ?? kind}`);
@@ -25534,9 +25924,6 @@ const puppetWarpArmed =
               deferredPostprocessPlan.normalizedStrength,
               releasePreserveCorners,
             );
-          }
-          if (finished.mode !== "eraser") {
-            openCompletedStrokeProperties(finished.id);
           }
         } else {
           // Plan the bounded raster equivalent before the React commit, but keep the vector as a
@@ -25568,9 +25955,6 @@ const puppetWarpArmed =
           const merged = takePendingStrokeCommits();
           const baseElements = merged ? [...elements, ...merged.strokes] : elements;
           const committed = commit([...baseElements, finished]);
-          if (committed && finished.mode !== "eraser") {
-            openCompletedStrokeProperties(finished.id);
-          }
           if (committed && !masterEditMode && finished.mode !== "eraser") {
             if (liveDraftDirectRef.current) {
               deferInkCleanup = overlayRenderer.isActive || gpuLiveInkPinnedRef.current;
@@ -25599,9 +25983,6 @@ const puppetWarpArmed =
               strokes: [...(merged?.strokes ?? []), finished],
               retryCount: merged?.retryCount ?? 0,
             });
-            if (finished.mode !== "eraser") {
-              openCompletedStrokeProperties(finished.id);
-            }
             if (liveDraftDirectRef.current) {
               deferInkCleanup = true;
               if (gpuLiveInkPinnedRef.current) {
@@ -27166,6 +27547,7 @@ function clearSelectionForEdit() {
     copySelectedElements,
     cutSelectedElements,
     deselectForEdit,
+    disarmAllPixelTools,
     duplicateSelected,
     enterCanvasOnlyMode,
     fitCanvasToWidth,
@@ -27297,6 +27679,7 @@ function clearSelectionForEdit() {
           canvasFlipH,
           canvasRotation,
           fullscreen: isFullscreen,
+          canvasRulersVisible: showRulers,
           colorVisionMode: colorBlindPreview,
           referencePanelOpen,
           pageSequenceOpen,
@@ -27333,6 +27716,7 @@ function clearSelectionForEdit() {
           fitCanvasToWidth: studioMainMenuActions.fitCanvasToWidth,
           setActualPixelView: studioMainMenuActions.setActualPixelView,
           toggleFullscreen: studioMainMenuActions.toggleFullscreen,
+          toggleCanvasRulers: studioCanvasRulerHandlers.toggleCanvasRulers,
           setColorVisionMode: setColorBlindPreview,
           saveCurrentStudioView: studioMainMenuActions.saveCurrentStudioView,
           restoreSavedStudioView: studioMainMenuActions.restoreSavedStudioView,
@@ -27416,10 +27800,12 @@ function clearSelectionForEdit() {
           toggleRightPanel: () => setRightPanelOpenWithOverride((current) => !current),
           openShortcuts: () => setShortcutsOpen(true),
           selectDrawMode: (mode) => {
+            studioMainMenuActions.disarmAllPixelTools();
             setTool("draw");
             setDrawMode(mode);
           },
           enableSmartShape: () => {
+            studioMainMenuActions.disarmAllPixelTools();
             setQuickShapeActive(true);
             setTool("draw");
             setDrawMode("pen");
@@ -27460,6 +27846,8 @@ function clearSelectionForEdit() {
       referencePanelOpen,
       rightPanelOpen,
       saving,
+      showRulers,
+      studioCanvasRulerHandlers,
       studioMainMenuActions,
       viewTransformSuppressed,
       workId,
@@ -29722,6 +30110,7 @@ function clearSelectionForEdit() {
     applyTemplate,
     beginTrackedStudioAiOperation,
     deleteClip,
+    disarmAllPixelTools,
     ensureRecentColorsLoaded,
     enterCanvasOnlyMode,
     executeSuggestColorPalette,
@@ -29888,6 +30277,7 @@ function clearSelectionForEdit() {
     currentStudioProjectSnapshot,
     reloadServerRevisions,
     requestWriterRoomAiDraft,
+    requestStudioDraftCollaborationShare,
     restoreServerRevision,
   });
 
@@ -29914,6 +30304,7 @@ function clearSelectionForEdit() {
   });
 
     const studioMobileEditingDockHandlers = useStudioStableHandlers<StudioMobileEditingDockHandlers>({
+      activateCanvasTool: activatePrimaryCanvasTool,
       applyBuiltInBrushPreset,
       applyDynamicsPreset,
       applySavedBrush,
@@ -29999,8 +30390,6 @@ function clearSelectionForEdit() {
     },
     openBrushStudio: () => {
       void loadStudioBrushStudio();
-      setTool("draw");
-      setDrawMode("pen");
       openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
     },
     recallBrushSlot: (index) => {
@@ -30012,14 +30401,12 @@ function clearSelectionForEdit() {
     setBrushOpacity,
     setColor,
     setDrawMode: (mode) => {
+      disarmAllPixelTools();
       setTool("draw");
       setDrawMode(mode);
-      if (mode === "pixel") {
-        setStrokeWidth(1);
-      } else if (mode === "pen" && isStudioPixelPencilRenderMode(brush)) {
+      if (mode === "pen" && isStudioPixelPencilRenderMode(brush)) {
         setBrush("pen");
       }
-      setEyedropperActive(false);
     },
     setDrawShape,
     setPostCorrection,
@@ -30074,19 +30461,18 @@ function clearSelectionForEdit() {
       });
     },
     toggleEraseToIntersection: () => {
-      setEraseToIntersection((prev) => {
-        const next = !prev;
-        announceDrawingShortcut(
-          next
-            ? `${STUDIO_ERASE_TO_INTERSECTION_LABEL} 켜짐`
-            : `${STUDIO_ERASE_TO_INTERSECTION_LABEL} 꺼짐`
-        );
-        if (next) {
-          setTool("draw");
-          setDrawMode("eraser");
-        }
-        return next;
-      });
+      const next = !eraseToIntersection;
+      if (next) {
+        disarmAllPixelTools();
+        setTool("draw");
+        setDrawMode("eraser");
+      }
+      setEraseToIntersection(next);
+      announceDrawingShortcut(
+        next
+          ? `${STUDIO_ERASE_TO_INTERSECTION_LABEL} 켜짐`
+          : `${STUDIO_ERASE_TO_INTERSECTION_LABEL} 꺼짐`
+      );
     },
   });
 
@@ -30096,7 +30482,6 @@ function clearSelectionForEdit() {
       activeCatalogBrushId: activeCatalogBrush.id,
       activeCatalogBrushName: activeCatalogBrush.name,
       brushId: brush,
-      brushCatalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
       brushCatalogOpen: brushCatalogSession?.placement === "desktop-dock",
       brushOpacity,
       brushSlots: brushSlotsState.slots,
@@ -30279,6 +30664,7 @@ function clearSelectionForEdit() {
     onWrapMouseMove,
     onWrapMouseUp,
     openFeatureTutorial,
+    openQuickComicWizard,
     openQuickStartMenu,
     patchDialogueText,
     patchElCoalesced,
@@ -30312,6 +30698,29 @@ function clearSelectionForEdit() {
     designateHistoryBrushSource,
   });
 
+  const productionBibleAssetOptions = productionBibleOpen
+    ? Array.from(
+        new Map(
+          pages.flatMap((page, pageIndex) =>
+            page.elements.flatMap((element) => {
+              if (element.type !== "image") return [];
+              const id =
+                element.communityAssetCredit?.assetId
+                ?? element.builtinRasterAssetId
+                ?? element.id;
+              return [[
+                id,
+                {
+                  id,
+                  label: `${pageDisplayName(page, pageIndex)} · ${element.name?.trim() || id}`,
+                },
+              ] as const];
+            })
+          )
+        ).values()
+      )
+    : [];
+
   return (
     <StudioLiveCollaborationProvider
       workId={effectiveWorkId}
@@ -30320,7 +30729,14 @@ function clearSelectionForEdit() {
       currentTool={tool}
       outboxScope={studioAuthUserId}
       transportFactory={studioLiveTransportFactory}
-      serverRequired={Boolean(studioLiveParticipant && (expectsSharedDocument || Boolean(liveRoomQueryParam)))}
+      serverRequired={Boolean(
+        studioLiveParticipant
+        && (
+          expectsSharedDocument
+          || Boolean(liveRoomQueryParam)
+          || draftCollaboration?.status === "ready"
+        )
+      )}
       onRoomChange={handleStudioLiveRoomChange}
       onCrdtDocumentChange={handleStudioCrdtDocumentChange}
       onEditSafetyChange={handleStudioLiveEditSafetyChange}
@@ -30413,6 +30829,111 @@ function clearSelectionForEdit() {
         aria-label="OpenRaster 또는 CBZ 가져오기"
       />
     </div>
+    {quickComicOpen ? (
+      <Suspense
+        fallback={(
+          <div
+            className="fixed inset-0 z-[110] grid place-items-center bg-canvas/80 p-4 text-sm font-semibold text-fg"
+            role="status"
+            aria-live="polite"
+          >
+            빠른 웹툰 조립 화면을 여는 중…
+          </div>
+        )}
+      >
+        <LazyStudioQuickComicWizard
+          onApply={(input) => void applyQuickComicInput(input)}
+          onCancel={() => setQuickComicOpen(false)}
+        />
+      </Suspense>
+    ) : null}
+    {sceneSnapshotOpen ? (
+      <Suspense
+        fallback={(
+          <div
+            className="fixed inset-0 z-[110] grid place-items-center bg-canvas/80 p-4 text-sm font-semibold text-fg"
+            role="status"
+            aria-live="polite"
+          >
+            장면 스냅샷 라이브러리를 여는 중…
+          </div>
+        )}
+      >
+        <LazyStudioSceneSnapshotDialog
+          sourcePage={activePage}
+          sourceWorkId={workId}
+          theme={webtoonTheme}
+          onApply={applySceneSnapshot}
+          onClose={() => setSceneSnapshotOpen(false)}
+        />
+      </Suspense>
+    ) : null}
+    {animaticTimelineOpen ? (
+      <Suspense
+        fallback={(
+          <div
+            className="fixed inset-0 z-[120] grid place-items-center bg-canvas/80 p-4 text-sm font-semibold text-fg"
+            role="status"
+            aria-live="polite"
+          >
+            애니매틱 타임라인을 여는 중…
+          </div>
+        )}
+      >
+        <LazyStudioAnimaticTimelineDialog
+          open
+          workScope={effectiveWorkId}
+          pages={pages}
+          reducedMotion={appSettings.other.reduceMotion}
+          onClose={() => setAnimaticTimelineOpen(false)}
+        />
+      </Suspense>
+    ) : null}
+    {productionBibleOpen ? (
+      <Suspense
+        fallback={(
+          <div
+            className="fixed inset-0 z-[110] grid place-items-center bg-canvas/80 p-4 text-sm font-semibold text-fg"
+            role="status"
+            aria-live="polite"
+          >
+            제작 바이블을 여는 중…
+          </div>
+        )}
+      >
+        <LazyStudioProductionBibleWorkspace
+          open
+          onClose={() => setProductionBibleOpen(false)}
+          userId={studioAuthUserId}
+          workId={workId}
+          characterOptions={characterBible.characters.map((character) => ({
+            id: character.id,
+            label: character.name.trim() || character.id,
+          }))}
+          assetOptions={productionBibleAssetOptions}
+        />
+      </Suspense>
+    ) : null}
+    {assetRightsAuditOpen ? (
+      <Suspense
+        fallback={(
+          <div
+            className="fixed inset-0 z-[110] grid place-items-center bg-canvas/80 p-4 text-sm font-semibold text-fg"
+            role="status"
+            aria-live="polite"
+          >
+            에셋 권리 대장을 만드는 중…
+          </div>
+        )}
+      >
+        <LazyStudioAssetRightsAuditDialog
+          open
+          onClose={() => setAssetRightsAuditOpen(false)}
+          workId={workId}
+          pages={pages}
+        />
+      </Suspense>
+    ) : null}
     {pendingInterchangeImport ? (
       <Suspense fallback={null}>
         <LazyStudioInterchangeLossPreviewDialog
@@ -30559,8 +31080,12 @@ function clearSelectionForEdit() {
           redoDisabled={menuEditRedoDisabled}
           saving={saving}
           setAiProvenanceOpen={setAiProvenanceOpen}
+          setAnimaticTimelineOpen={setAnimaticTimelineOpen}
+          setAssetRightsAuditOpen={setAssetRightsAuditOpen}
           setCharacterBibleOpen={setCharacterBibleOpen}
           setCheckpointPanelOpen={setCheckpointPanelOpen}
+          setProductionBibleOpen={setProductionBibleOpen}
+          setSceneSnapshotOpen={setSceneSnapshotOpen}
           setExportFormat={setExportFormat}
           setExportMenuOpen={setExportMenuOpen}
           setExportPresetId={setExportPresetId}
@@ -31115,6 +31640,15 @@ function clearSelectionForEdit() {
 
         {/* 중앙: 캔버스 + 우측 인스펙터 — 데스크톱에서는 한 행으로 남은 높이를 공유한다. */}
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">
+          <div
+            className={cn(
+              "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
+              showRulers && !canvasOnlyMode && "lg:pl-[22px] lg:pt-[22px]"
+            )}
+            data-studio-canvas-ruler-layout={
+              showRulers && !canvasOnlyMode ? "inset-top-left" : "off"
+            }
+          >
           {showRulers && !canvasOnlyMode ? (
             <Suspense fallback={null}>
               <StudioCanvasRulerBars
@@ -31509,6 +32043,7 @@ function clearSelectionForEdit() {
             />
           </Suspense>
         ) : null}
+          </div>
 
         {/* 캔버스 ↔ 속성 패널 너비 스플리터(데스크톱) */}
         {visibleRightPanelOpen && (
@@ -31922,7 +32457,6 @@ function clearSelectionForEdit() {
           advancedFillUnsupportedReason={advancedFillUnsupportedReason}
           brush={brush}
           brushCatalogHandlers={studioBrushCatalogHandlers}
-          brushCatalogItems={STUDIO_ALL_BRUSH_CATALOG_ITEMS}
           brushCatalogOpen={brushCatalogSession?.placement === "mobile-sheet"}
           brushDynamics={brushDynamics}
           brushManagerSheetRef={brushManagerSheetRef}
@@ -32052,6 +32586,7 @@ function clearSelectionForEdit() {
           continuityScenes={continuityScenes}
           currentPageId={currentPageId}
           currentPublishPackageCreditsText={currentPublishPackageCreditsText}
+          draftCollaboration={draftCollaboration}
           effectivePublishPackageSettings={effectivePublishPackageSettings}
           elementById={elementById}
           fxPanelOpen={fxPanelOpen}
@@ -32321,6 +32856,7 @@ function clearSelectionForEdit() {
         }}
         onDelete={removeSelected}
         onSelectPen={() => {
+          disarmAllPixelTools();
           setTool("draw");
           setDrawMode("pen");
         }}
@@ -32328,6 +32864,7 @@ function clearSelectionForEdit() {
         onAddText={() => addText()}
         onAddPage={addPage}
         onEnableQuickShape={() => {
+          disarmAllPixelTools();
           setQuickShapeActive(true);
           setTool("draw");
           setDrawMode("pen");

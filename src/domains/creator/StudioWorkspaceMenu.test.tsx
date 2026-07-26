@@ -72,10 +72,12 @@ describe("StudioWorkspaceMenu selector and built-in workspaces", () => {
     expect(html).toContain('hidden=""');
   });
 
-  it("shows all six immutable task presets without edit controls", () => {
+  it("preserves all six classic presets and adds the immutable professional comic preset", () => {
     const html = renderMenu();
 
-    expect(html.match(/data-workspace-kind="builtin"/g)).toHaveLength(6);
+    expect(html.match(/data-workspace-kind="builtin"/g)).toHaveLength(
+      STUDIO_DEFAULT_WORKSPACE_IDS.length
+    );
     for (const id of STUDIO_DEFAULT_WORKSPACE_IDS) {
       expect(html).toContain(`data-workspace-id="${id}"`);
     }
@@ -85,11 +87,34 @@ describe("StudioWorkspaceMenu selector and built-in workspaces", () => {
     expect(html).toContain("대사·레터링");
     expect(html).toContain("검수");
     expect(html).toContain("게시");
+    expect(html).toContain("프로 만화");
+    expect(html).toContain('data-workspace-id="pro-comic"');
     expect(html).toContain("수정 불가");
     expect(html).not.toContain("변경 저장");
     expect(html).not.toContain("이름 변경");
     expect(html).not.toContain("작업공간 삭제");
     expect(html).toContain('id="_R_0_-builtin-list" hidden=""');
+  });
+
+  it("explains the professional palette order, dock geometry, quick order, and mobile fallback", () => {
+    const html = renderMenu();
+
+    expect(html).toContain('data-testid="studio-pro-comic-palette-plan"');
+    expect(html).toContain('aria-label="프로 만화 팔레트 우선순위"');
+    expect(html).toContain("권장 시작");
+    expect(html).toContain("1 도구 속성");
+    expect(html).toContain("2 레이어");
+    expect(html).toContain("3 페이지");
+    expect(html).toContain("4 소재·빠른 실행");
+    expect(html).toContain(
+      "왼쪽 페이지 216px · 오른쪽 도구 속성 344px · 모바일은 캔버스 우선 시트"
+    );
+    expect(html).toContain('title="1. 되돌리기"');
+    expect(html).toContain('title="2. 다시 실행"');
+    expect(html).toContain('title="3. 펜"');
+    expect(html).toContain('title="4. 고급 채우기"');
+    expect(html).toContain('title="5. 말풍선"');
+    expect(html).toContain('title="6. 폭 맞춤"');
   });
 
   it("marks the selector and dialog when the live layout differs from the active preset", () => {
@@ -169,7 +194,7 @@ describe("StudioWorkspaceMenu guarded switching and compact navigation", () => {
     expect(html).toContain("Esc를 누르면 전환을 취소합니다.");
   });
 
-  it("uses current/recent hierarchy, collapsible catalogs, and local search at eight workspaces", () => {
+  it("uses current/recent hierarchy, collapsible catalogs, and local search for larger catalogs", () => {
     let state = saveStudioWorkspace(DEFAULT_STUDIO_WORKSPACE_STATE, "야간 채색");
     state = saveStudioWorkspace(state, "레터링 집중");
     const html = renderMenu(state);
@@ -179,7 +204,7 @@ describe("StudioWorkspaceMenu guarded switching and compact navigation", () => {
     expect(html).toContain('aria-controls="_R_0_-custom-list"');
     expect(html).toContain('role="search"');
     expect(html).toContain("작업공간 이름 또는 용도 검색");
-    expect(html).toContain("검색 결과 8개");
+    expect(html).toContain("검색 결과 9개");
   });
 
   it("separates quick switching from the workspace management and preferences views", () => {
@@ -206,6 +231,21 @@ describe("StudioWorkspaceMenu guarded switching and compact navigation", () => {
 });
 
 describe("StudioWorkspaceMenu responsive settings", () => {
+  it("shows the actual current dock geometry and a responsive icon/name quick-access summary", () => {
+    const html = renderMenu();
+
+    expect(html).toContain('data-testid="studio-workspace-layout-preview"');
+    expect(html).toContain('data-mobile-fallback="canvas-first-sheets"');
+    expect(html).toContain("페이지 160px");
+    expect(html).toContain("페이지 설정 280px");
+    expect(html).toContain(
+      "모바일은 캔버스 우선 · 페이지/속성 시트 · 오른손 주요 도구"
+    );
+    expect(html).toContain('data-quick-access-density="responsive-icon-name"');
+    expect(html).toContain("max-[359px]:sr-only");
+    expect(html).toContain("주요 도구 순서");
+  });
+
   it("provides device-scoped quick-action and mobile hand preferences", () => {
     const html = renderMenu();
 

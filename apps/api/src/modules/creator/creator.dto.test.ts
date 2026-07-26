@@ -4,6 +4,8 @@ import {
   CreateCreatorWorkSchema,
   CreatorAssetListQuerySchema,
   CreatorAssetModerationQuerySchema,
+  CreatorDraftCollaborationRoomParamsSchema,
+  CreatorDraftCollaborationRoomResponseSchema,
   ModerateCreatorAssetSchema,
   PublishCreatorAssetSchema,
   ReportCreatorAssetSchema,
@@ -19,12 +21,18 @@ import {
   CreatorWorkRevisionComparisonResponseSchema,
   CreatorWorkRevisionParamsSchema,
   InviteCreatorTeamMemberSchema,
+  PromoteCreatorDraftCollaborationRoomSchema,
+  ProvisionCreatorDraftCollaborationRoomSchema,
   RespondCreatorTeamInvitationSchema,
   RestoreCreatorWorkRevisionSchema,
   UpdateCreatorSharedDocumentSchema,
   UpdateCreatorTeamMemberSchema,
   UpdateCreatorWorkSchema,
 } from "./creator.dto";
+
+const DRAFT_ID = "draft_11111111-1111-4111-8111-111111111111";
+const ROOM_ID = "draft-room_22222222-2222-4222-8222-222222222222";
+const MUTATION_ID = "33333333-3333-4333-8333-333333333333";
 
 describe("creator asset marketplace zod contracts", () => {
   const publishBody = {
@@ -376,5 +384,104 @@ describe("creator work zod contracts", () => {
         updatedAt: "2026-07-12T00:01:00.000Z",
       }).success
     ).toBe(true);
+  });
+});
+
+describe("creator draft collaboration zod contracts", () => {
+  it("provision requires an exact draft UUID, owner, explicit intent and 16 MiB snapshot cap", () => {
+    const valid = {
+      draftDocumentId: DRAFT_ID,
+      ownerScopeKey: "owner-a",
+      intent: "share-link",
+      clientMutationId: MUTATION_ID,
+      initialSnapshotByteLength: 16 * 1_024 * 1_024,
+    };
+    expect(ProvisionCreatorDraftCollaborationRoomSchema.parse(valid)).toEqual(valid);
+    expect(
+      ProvisionCreatorDraftCollaborationRoomSchema.safeParse({
+        ...valid,
+        draftDocumentId: ` ${DRAFT_ID}`,
+      }).success
+    ).toBe(false);
+    expect(
+      ProvisionCreatorDraftCollaborationRoomSchema.safeParse({
+        ...valid,
+        intent: "open-panel",
+      }).success
+    ).toBe(false);
+    expect(
+      ProvisionCreatorDraftCollaborationRoomSchema.safeParse({
+        ...valid,
+        initialSnapshotByteLength: 16 * 1_024 * 1_024 + 1,
+      }).success
+    ).toBe(false);
+    expect(
+      ProvisionCreatorDraftCollaborationRoomSchema.safeParse({
+        ...valid,
+        leaseToken: "forged",
+      }).success
+    ).toBe(false);
+  });
+
+  it("promotion strictly binds room, draft, owner, target work and graph CAS", () => {
+    const valid = {
+      draftDocumentId: DRAFT_ID,
+      ownerScopeKey: "owner-a",
+      targetWorkId: "work-a",
+      expectedGraphRevision: 0,
+      clientMutationId: MUTATION_ID,
+    };
+    expect(CreatorDraftCollaborationRoomParamsSchema.parse({ roomId: ROOM_ID })).toEqual({
+      roomId: ROOM_ID,
+    });
+    expect(PromoteCreatorDraftCollaborationRoomSchema.parse(valid)).toEqual(valid);
+    expect(
+      PromoteCreatorDraftCollaborationRoomSchema.safeParse({
+        ...valid,
+        expectedGraphRevision: -1,
+      }).success
+    ).toBe(false);
+    expect(
+      PromoteCreatorDraftCollaborationRoomSchema.safeParse({
+        ...valid,
+        targetWorkId: "",
+      }).success
+    ).toBe(false);
+    expect(
+      CreatorDraftCollaborationRoomParamsSchema.safeParse({
+        roomId: "draft-room_predictable",
+      }).success
+    ).toBe(false);
+  });
+
+  it("room responses expose no invitation, lease secret or document payload", () => {
+    const response = {
+      version: 1,
+      roomId: ROOM_ID,
+      draftDocumentId: DRAFT_ID,
+      provisionalWorkId: "work-a",
+      ownerScopeKey: "owner-a",
+      status: "active",
+      graphRevision: 0,
+      initialSnapshotByteLength: 1_024,
+      provisionIntent: "invite-member",
+      provisionedAt: "2026-07-26T00:00:00.000Z",
+      expiresAt: "2026-08-02T00:00:00.000Z",
+      promotedAt: null,
+    };
+    expect(CreatorDraftCollaborationRoomResponseSchema.parse(response)).toEqual(response);
+    for (const secret of [
+      { invitationId: MUTATION_ID },
+      { leaseToken: "secret" },
+      { document: { pagesList: [] } },
+      { members: [] },
+    ]) {
+      expect(
+        CreatorDraftCollaborationRoomResponseSchema.safeParse({
+          ...response,
+          ...secret,
+        }).success
+      ).toBe(false);
+    }
   });
 });

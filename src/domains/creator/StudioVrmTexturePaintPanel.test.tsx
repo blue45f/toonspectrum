@@ -11,11 +11,14 @@ import {
 } from "./StudioVrmTexturePaintPanel";
 
 const SETTINGS: StudioVrmTexturePaintPanelSettings = {
+  tool: "brush",
   brushKind: "ink",
   color: "#3a7bd5",
   sizeTexels: 48,
   opacity: 0.8,
   blend: "normal",
+  fillScope: "contiguous",
+  fillTolerance: 24,
   tuning: {
     flow: 0.7,
     hardness: 0.9,
@@ -32,10 +35,12 @@ function renderPanel(overrides: Partial<StudioVrmTexturePaintPanelProps> = {}) {
     activeTextureLabel: "Face · 2048×2048",
     status: "표면을 끌어 칠하세요.",
     strokeActive: false,
+    eyedropperActive: false,
     targetCount: 1,
     canUndo: true,
     canRedo: true,
     onSettingsChange: vi.fn(),
+    onEyedropperToggle: vi.fn(),
     onUndo: vi.fn(),
     onRedo: vi.fn(),
     onResetActiveTexture: vi.fn(),
@@ -73,6 +78,147 @@ describe("StudioVrmTexturePaintPanel", () => {
     }
   });
 
+  it("offers a 44px accessible one-shot surface eyedropper toggle", () => {
+    const { props } = renderPanel();
+    const eyedropper = screen.getByRole("button", { name: "표면 스포이드" });
+
+    expect(eyedropper.className).toContain("size-11");
+    expect(eyedropper.getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(eyedropper);
+
+    expect(props.onEyedropperToggle).toHaveBeenCalledOnce();
+    expect(props.onSettingsChange).not.toHaveBeenCalled();
+    expect(eyedropper.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("offers a controlled 44px brush and ColorDrop tool switch", () => {
+    const { props, rerender } = renderPanel();
+    const brush = screen.getByRole("button", { name: "브러시" });
+    const fill = screen.getByRole("button", { name: "ColorDrop" });
+
+    expect(brush.className).toContain("min-h-11");
+    expect(fill.className).toContain("min-h-11");
+    expect(brush.getAttribute("aria-pressed")).toBe("true");
+    expect(fill.getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(fill);
+    expect(props.onSettingsChange).toHaveBeenNthCalledWith(1, { tool: "fill" });
+
+    rerender(
+      <StudioVrmTexturePaintPanel
+        {...props}
+        settings={{ ...SETTINGS, tool: "fill" }}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "브러시" }).getAttribute("aria-pressed")).toBe(
+      "false",
+    );
+    expect(screen.getByRole("button", { name: "ColorDrop" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "브러시" }));
+    expect(props.onSettingsChange).toHaveBeenNthCalledWith(2, { tool: "brush" });
+    expect(props.onSettingsChange).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows only ColorDrop controls and keeps colour editable after eraser use", () => {
+    renderPanel({
+      settings: {
+        ...SETTINGS,
+        tool: "fill",
+        blend: "erase",
+        fillScope: "whole-material",
+        fillTolerance: 87,
+      },
+    });
+
+    expect(screen.getByRole("slider", { name: "ColorDrop 색상 허용치" })).toHaveProperty(
+      "value",
+      "87",
+    );
+    expect(screen.getByRole("button", { name: "연결 영역" }).getAttribute("aria-pressed")).toBe(
+      "false",
+    );
+    const wholeMaterial = screen.getByRole("button", { name: "텍스처 전체" });
+    expect(wholeMaterial.getAttribute("aria-pressed")).toBe("true");
+    expect(wholeMaterial.className).toContain("min-h-11");
+
+    expect(screen.queryByRole("button", { name: "잉크" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "지우개" })).toBeNull();
+    expect(screen.queryByRole("slider", { name: "크기" })).toBeNull();
+    expect(screen.queryByRole("slider", { name: "불투명" })).toBeNull();
+    expect(screen.queryByRole("slider", { name: "도포량" })).toBeNull();
+    expect(screen.queryByRole("slider", { name: "경도" })).toBeNull();
+    expect(screen.queryByRole("slider", { name: "최소 굵기" })).toBeNull();
+
+    expect((screen.getByLabelText("표면 페인트 색상 선택") as HTMLInputElement).disabled).toBe(
+      false,
+    );
+    expect((screen.getByLabelText("표면 페인트 HEX 색상") as HTMLInputElement).disabled).toBe(
+      false,
+    );
+  });
+
+  it("reports precise ColorDrop tolerance and scope updates", () => {
+    const { props } = renderPanel({
+      settings: { ...SETTINGS, tool: "fill" },
+    });
+
+    fireEvent.change(screen.getByRole("slider", { name: "ColorDrop 색상 허용치" }), {
+      target: { value: "143" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "텍스처 전체" }));
+
+    expect(props.onSettingsChange).toHaveBeenNthCalledWith(1, { fillTolerance: 143 });
+    expect(props.onSettingsChange).toHaveBeenNthCalledWith(2, {
+      fillScope: "whole-material",
+    });
+    expect(props.onSettingsChange).toHaveBeenCalledTimes(2);
+  });
+
+  it("disables every ColorDrop editing control while texture work is busy", () => {
+    const { props } = renderPanel({
+      settings: { ...SETTINGS, tool: "fill" },
+      strokeActive: true,
+    });
+
+    for (const label of ["브러시", "ColorDrop", "연결 영역", "텍스처 전체"]) {
+      expect(screen.getByRole("button", { name: label }).matches(":disabled")).toBe(true);
+    }
+    expect(
+      (screen.getByRole("slider", { name: "ColorDrop 색상 허용치" }) as HTMLInputElement)
+        .disabled,
+    ).toBe(true);
+    expect((screen.getByLabelText("표면 페인트 색상 선택") as HTMLInputElement).disabled).toBe(
+      true,
+    );
+    expect((screen.getByLabelText("표면 페인트 HEX 색상") as HTMLInputElement).disabled).toBe(
+      true,
+    );
+    expect(props.onSettingsChange).not.toHaveBeenCalled();
+  });
+
+  it("exposes the controlled active eyedropper state with selected styling", () => {
+    renderPanel({ eyedropperActive: true });
+    const eyedropper = screen.getByRole("button", { name: "표면 스포이드 취소" });
+
+    expect(eyedropper.getAttribute("aria-pressed")).toBe("true");
+    expect(eyedropper.className).toContain("border-accent/60");
+    expect(eyedropper.className).toContain("bg-accent-soft");
+    expect(eyedropper.className).toContain("text-accent");
+  });
+
+  it("prevents eyedropper mode changes while a surface stroke is active", () => {
+    const { props } = renderPanel({ strokeActive: true });
+    const eyedropper = screen.getByRole("button", { name: "표면 스포이드" });
+
+    expect((eyedropper as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(eyedropper);
+    expect(props.onEyedropperToggle).not.toHaveBeenCalled();
+  });
+
   it("reports brush, blend, colour, size, and pressure-style changes", () => {
     const { props } = renderPanel();
 
@@ -101,6 +247,8 @@ describe("StudioVrmTexturePaintPanel", () => {
     expect(props.onSettingsChange).toHaveBeenCalledWith({ tuning: { flow: 0.42 } });
     expect(props.onSettingsChange).toHaveBeenCalledWith({ tuning: { hardness: 0.55 } });
     expect(props.onSettingsChange).toHaveBeenCalledWith({ tuning: { minSize: 0.16 } });
+    expect(props.onSettingsChange).toHaveBeenCalledTimes(7);
+    expect(props.onEyedropperToggle).not.toHaveBeenCalled();
   });
 
   it("keeps an incremental HEX draft editable and commits only a complete color", () => {

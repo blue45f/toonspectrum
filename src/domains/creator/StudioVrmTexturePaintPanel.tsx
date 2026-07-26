@@ -1,21 +1,34 @@
-import { AlertTriangle, Eraser, Paintbrush, Redo2, RotateCcw, Undo2 } from "lucide-react";
+import {
+  AlertTriangle,
+  Eraser,
+  PaintBucket,
+  Paintbrush,
+  Pipette,
+  Redo2,
+  RotateCcw,
+  Undo2,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type {
   StudioStampBrushKind,
   StudioStampBrushTuning,
 } from "./studio-brush-stamp-engine";
+import type { StudioVrmTextureFillScope } from "./studio-vrm-texture-fill";
 import type { StudioVrmTexturePaintBlendMode } from "./studio-vrm-texture-paint-ops";
 
 import { cn } from "@/lib/utils";
 
 export interface StudioVrmTexturePaintPanelSettings {
+  readonly tool: "brush" | "fill";
   readonly brushKind: StudioStampBrushKind;
   readonly color: string;
   /** Texture-space diameter in texels. */
   readonly sizeTexels: number;
   readonly opacity: number;
   readonly blend: StudioVrmTexturePaintBlendMode;
+  readonly fillScope: StudioVrmTextureFillScope;
+  readonly fillTolerance: number;
   readonly tuning: Required<StudioStampBrushTuning>;
 }
 
@@ -31,6 +44,7 @@ export interface StudioVrmTexturePaintPanelProps {
   readonly targetCount: number;
   readonly canUndo: boolean;
   readonly canRedo: boolean;
+  readonly eyedropperActive: boolean;
   readonly onSettingsChange: (
     update: Partial<Omit<StudioVrmTexturePaintPanelSettings, "tuning">> & {
       tuning?: Partial<StudioVrmTexturePaintPanelSettings["tuning"]>;
@@ -38,6 +52,7 @@ export interface StudioVrmTexturePaintPanelProps {
   ) => void;
   readonly onUndo: () => void;
   readonly onRedo: () => void;
+  readonly onEyedropperToggle: () => void;
   readonly onResetActiveTexture: () => void;
   readonly onRetryRestore?: () => void;
 }
@@ -118,9 +133,11 @@ export function StudioVrmTexturePaintPanel({
   targetCount,
   canUndo,
   canRedo,
+  eyedropperActive,
   onSettingsChange,
   onUndo,
   onRedo,
+  onEyedropperToggle,
   onResetActiveTexture,
   onRetryRestore,
 }: StudioVrmTexturePaintPanelProps) {
@@ -192,9 +209,9 @@ export function StudioVrmTexturePaintPanel({
           <div className="min-w-0">
             <h3 className="text-sm font-bold text-fg">3D 표면 페인트</h3>
             <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-              캐릭터 표면을 직접 끌어 색·명암·질감을 칠합니다. UV 아일랜드를 감지해 멀리 떨어진
-              면 사이의 선 연결을 방지하며 현재
-              삽입 이미지와 캡처에 바로 반영됩니다.
+              표면을 직접 칠하거나 ColorDrop으로 연결 영역을 한 번에 채웁니다. UV 아일랜드를
+              감지해 멀리 떨어진 면 사이의 선 연결을 막고, 결과는 삽입 이미지와 캡처에 바로
+              반영됩니다. 스포이드 버튼 또는 Alt+클릭으로 현재 baseColor 색을 가져올 수 있습니다.
             </p>
           </div>
         </div>
@@ -244,31 +261,73 @@ export function StudioVrmTexturePaintPanel({
         ) : null}
       </div>
 
-      <fieldset disabled={editingDisabled} className="space-y-3 disabled:opacity-60">
-        <legend className="mb-2 text-xs font-bold text-fg">브러시 촉</legend>
-        <div className="grid grid-cols-4 gap-1" role="group" aria-label="표면 페인트 브러시">
-          {BRUSHES.map((brush) => {
-            const selected = settings.brushKind === brush.id;
-            return (
-              <button
-                key={brush.id}
-                type="button"
-                aria-pressed={selected}
-                title={brush.description}
-                className={cn(
-                  "min-h-11 rounded-lg border px-1 text-[0.66rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-                  selected
-                    ? "border-accent/60 bg-accent-soft text-accent"
-                    : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
-                )}
-                onClick={() => onSettingsChange({ brushKind: brush.id })}
-              >
-                {brush.label}
-              </button>
-            );
-          })}
+      <fieldset disabled={editingDisabled} className="space-y-2 disabled:opacity-60">
+        <legend className="mb-2 text-xs font-bold text-fg">표면 도구</legend>
+        <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="표면 페인트 도구">
+          <button
+            type="button"
+            aria-pressed={settings.tool === "brush"}
+            className={cn(
+              "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-2 text-[0.68rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+              settings.tool === "brush"
+                ? "border-accent/60 bg-accent-soft text-accent"
+                : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
+            )}
+            onClick={() => onSettingsChange({ tool: "brush" })}
+          >
+            <Paintbrush size={15} aria-hidden />
+            브러시
+          </button>
+          <button
+            type="button"
+            aria-pressed={settings.tool === "fill"}
+            title="표면의 비슷한 색 영역을 서버 전송 없이 로컬 Worker에서 채웁니다."
+            className={cn(
+              "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-2 text-[0.68rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+              settings.tool === "fill"
+                ? "border-accent/60 bg-accent-soft text-accent"
+                : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
+            )}
+            onClick={() => onSettingsChange({ tool: "fill" })}
+          >
+            <PaintBucket size={15} aria-hidden />
+            ColorDrop
+          </button>
         </div>
+        <p className="text-[0.64rem] leading-relaxed text-fg-3">
+          {settings.tool === "fill"
+            ? "표면을 한 번 눌러 채웁니다. 계산은 기기 안에서 처리되며 텍스처 경계를 넘어 번지지 않습니다."
+            : "표면을 끌어 칠합니다. 캔버스에 포커스한 뒤 F로 도구를 빠르게 전환할 수 있습니다."}
+        </p>
       </fieldset>
+
+      {settings.tool === "brush" ? (
+        <fieldset disabled={editingDisabled} className="space-y-3 disabled:opacity-60">
+          <legend className="mb-2 text-xs font-bold text-fg">브러시 촉</legend>
+          <div className="grid grid-cols-4 gap-1" role="group" aria-label="표면 페인트 브러시">
+            {BRUSHES.map((brush) => {
+              const selected = settings.brushKind === brush.id;
+              return (
+                <button
+                  key={brush.id}
+                  type="button"
+                  aria-pressed={selected}
+                  title={brush.description}
+                  className={cn(
+                    "min-h-11 rounded-lg border px-1 text-[0.66rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+                    selected
+                      ? "border-accent/60 bg-accent-soft text-accent"
+                      : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
+                  )}
+                  onClick={() => onSettingsChange({ brushKind: brush.id })}
+                >
+                  {brush.label}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+      ) : null}
 
       <div className="space-y-3 border-t border-line pt-3">
         <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
@@ -280,7 +339,9 @@ export function StudioVrmTexturePaintPanel({
               id="vrm-surface-paint-color"
               type="color"
               value={settings.color}
-              disabled={editingDisabled || settings.blend === "erase"}
+              disabled={
+                editingDisabled || (settings.tool === "brush" && settings.blend === "erase")
+              }
               aria-label="표면 페인트 색상 선택"
               className="size-11 shrink-0 cursor-pointer rounded-lg border border-line bg-card p-1 disabled:cursor-not-allowed disabled:opacity-45"
               onChange={(event) => {
@@ -288,10 +349,28 @@ export function StudioVrmTexturePaintPanel({
                 onSettingsChange({ color: event.target.value });
               }}
             />
+            <button
+              type="button"
+              disabled={editingDisabled}
+              aria-label={eyedropperActive ? "표면 스포이드 취소" : "표면 스포이드"}
+              aria-pressed={eyedropperActive}
+              title="한 번 눌러 표면 색을 선택합니다. 데스크톱에서는 Alt+클릭으로 잠시 사용할 수 있습니다."
+              className={cn(
+                "inline-flex size-11 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45",
+                eyedropperActive
+                  ? "border-accent/60 bg-accent-soft text-accent"
+                  : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
+              )}
+              onClick={onEyedropperToggle}
+            >
+              <Pipette size={17} aria-hidden />
+            </button>
             <input
               type="text"
               value={colorDraft}
-              disabled={editingDisabled || settings.blend === "erase"}
+              disabled={
+                editingDisabled || (settings.tool === "brush" && settings.blend === "erase")
+              }
               inputMode="text"
               maxLength={7}
               pattern="#[0-9A-Fa-f]{6}"
@@ -320,80 +399,137 @@ export function StudioVrmTexturePaintPanel({
           </div>
         </div>
 
-        <label htmlFor="vrm-surface-paint-size" className="grid grid-cols-[3rem_minmax(0,1fr)_3.5rem] items-center gap-2 text-xs">
-          <span className="font-semibold text-fg-2">크기</span>
-          <input
-            id="vrm-surface-paint-size"
-            type="range"
-            min="2"
-            max="256"
-            step="1"
-            value={settings.sizeTexels}
-            disabled={editingDisabled}
-            aria-label="크기"
-            className="h-2 min-w-0 accent-accent disabled:cursor-not-allowed disabled:opacity-45"
-            onChange={(event) => onSettingsChange({ sizeTexels: Number(event.target.value) })}
-          />
-          <output htmlFor="vrm-surface-paint-size" className="text-right text-[0.68rem] tabular-nums text-fg-3">
-            {Math.round(settings.sizeTexels)} px
-          </output>
-        </label>
+        {settings.tool === "brush" ? (
+          <>
+            <label htmlFor="vrm-surface-paint-size" className="grid grid-cols-[3rem_minmax(0,1fr)_3.5rem] items-center gap-2 text-xs">
+              <span className="font-semibold text-fg-2">크기</span>
+              <input
+                id="vrm-surface-paint-size"
+                type="range"
+                min="2"
+                max="256"
+                step="1"
+                value={settings.sizeTexels}
+                disabled={editingDisabled}
+                aria-label="크기"
+                className="h-2 min-w-0 accent-accent disabled:cursor-not-allowed disabled:opacity-45"
+                onChange={(event) => onSettingsChange({ sizeTexels: Number(event.target.value) })}
+              />
+              <output htmlFor="vrm-surface-paint-size" className="text-right text-[0.68rem] tabular-nums text-fg-3">
+                {Math.round(settings.sizeTexels)} px
+              </output>
+            </label>
 
-        <PercentageSlider
-          id="vrm-surface-paint-opacity"
-          label="불투명"
-          value={settings.opacity}
-          disabled={editingDisabled}
-          onChange={(opacity) => onSettingsChange({ opacity })}
-        />
-        <PercentageSlider
-          id="vrm-surface-paint-flow"
-          label="도포량"
-          value={settings.tuning.flow}
-          disabled={editingDisabled}
-          onChange={(flow) => onSettingsChange({ tuning: { flow } })}
-        />
-        <PercentageSlider
-          id="vrm-surface-paint-hardness"
-          label="경도"
-          value={settings.tuning.hardness}
-          disabled={editingDisabled}
-          onChange={(hardness) => onSettingsChange({ tuning: { hardness } })}
-        />
-        <PercentageSlider
-          id="vrm-surface-paint-min-size"
-          label="최소 굵기"
-          value={settings.tuning.minSize}
-          disabled={editingDisabled}
-          onChange={(minSize) => onSettingsChange({ tuning: { minSize } })}
-        />
+            <PercentageSlider
+              id="vrm-surface-paint-opacity"
+              label="불투명"
+              value={settings.opacity}
+              disabled={editingDisabled}
+              onChange={(opacity) => onSettingsChange({ opacity })}
+            />
+            <PercentageSlider
+              id="vrm-surface-paint-flow"
+              label="도포량"
+              value={settings.tuning.flow}
+              disabled={editingDisabled}
+              onChange={(flow) => onSettingsChange({ tuning: { flow } })}
+            />
+            <PercentageSlider
+              id="vrm-surface-paint-hardness"
+              label="경도"
+              value={settings.tuning.hardness}
+              disabled={editingDisabled}
+              onChange={(hardness) => onSettingsChange({ tuning: { hardness } })}
+            />
+            <PercentageSlider
+              id="vrm-surface-paint-min-size"
+              label="최소 굵기"
+              value={settings.tuning.minSize}
+              disabled={editingDisabled}
+              onChange={(minSize) => onSettingsChange({ tuning: { minSize } })}
+            />
+          </>
+        ) : (
+          <>
+            <label htmlFor="vrm-surface-fill-tolerance" className="grid grid-cols-[3rem_minmax(0,1fr)_3.5rem] items-center gap-2 text-xs">
+              <span className="font-semibold text-fg-2">허용치</span>
+              <input
+                id="vrm-surface-fill-tolerance"
+                type="range"
+                min="0"
+                max="255"
+                step="1"
+                value={settings.fillTolerance}
+                disabled={editingDisabled}
+                aria-label="ColorDrop 색상 허용치"
+                className="h-2 min-w-0 accent-accent disabled:cursor-not-allowed disabled:opacity-45"
+                onChange={(event) =>
+                  onSettingsChange({ fillTolerance: Number(event.target.value) })}
+              />
+              <output htmlFor="vrm-surface-fill-tolerance" className="text-right text-[0.68rem] tabular-nums text-fg-3">
+                {Math.round(settings.fillTolerance)}
+              </output>
+            </label>
+            <fieldset disabled={editingDisabled} className="space-y-2 disabled:opacity-60">
+              <legend className="text-xs font-semibold text-fg-2">채울 범위</legend>
+              <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="ColorDrop 채울 범위">
+                {([
+                  ["contiguous", "연결 영역"],
+                  ["whole-material", "텍스처 전체"],
+                ] as const).map(([scope, label]) => (
+                  <button
+                    key={scope}
+                    type="button"
+                    aria-pressed={settings.fillScope === scope}
+                    className={cn(
+                      "min-h-11 rounded-lg border px-2 text-[0.66rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+                      settings.fillScope === scope
+                        ? "border-accent/60 bg-accent-soft text-accent"
+                        : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
+                    )}
+                    onClick={() => onSettingsChange({ fillScope: scope })}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[0.62rem] leading-relaxed text-fg-3">
+                {settings.fillScope === "contiguous"
+                  ? "누른 지점과 이어진 비슷한 색만 채웁니다."
+                  : "현재 텍스처 전체에서 비슷한 색을 찾습니다. 떨어진 UV 조각도 함께 바뀔 수 있습니다."}
+              </p>
+            </fieldset>
+          </>
+        )}
       </div>
 
-      <fieldset disabled={editingDisabled} className="border-t border-line pt-3 disabled:opacity-60">
-        <legend className="mb-2 text-xs font-bold text-fg">합성 방식</legend>
-        <div className="grid grid-cols-3 gap-1 sm:grid-cols-5" role="group" aria-label="표면 페인트 합성 방식">
-          {BLENDS.map((blend) => {
-            const selected = settings.blend === blend.id;
-            return (
-              <button
-                key={blend.id}
-                type="button"
-                aria-pressed={selected}
-                className={cn(
-                  "inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border px-1 text-[0.64rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-                  selected
-                    ? "border-accent/60 bg-accent-soft text-accent"
-                    : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
-                )}
-                onClick={() => onSettingsChange({ blend: blend.id })}
-              >
-                {blend.id === "erase" ? <Eraser size={12} aria-hidden /> : null}
-                {blend.label}
-              </button>
-            );
-          })}
-        </div>
-      </fieldset>
+      {settings.tool === "brush" ? (
+        <fieldset disabled={editingDisabled} className="border-t border-line pt-3 disabled:opacity-60">
+          <legend className="mb-2 text-xs font-bold text-fg">합성 방식</legend>
+          <div className="grid grid-cols-3 gap-1 sm:grid-cols-5" role="group" aria-label="표면 페인트 합성 방식">
+            {BLENDS.map((blend) => {
+              const selected = settings.blend === blend.id;
+              return (
+                <button
+                  key={blend.id}
+                  type="button"
+                  aria-pressed={selected}
+                  className={cn(
+                    "inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border px-1 text-[0.64rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+                    selected
+                      ? "border-accent/60 bg-accent-soft text-accent"
+                      : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
+                  )}
+                  onClick={() => onSettingsChange({ blend: blend.id })}
+                >
+                  {blend.id === "erase" ? <Eraser size={12} aria-hidden /> : null}
+                  {blend.label}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+      ) : null}
 
       <div className="grid grid-cols-3 gap-2 border-t border-line pt-3">
         <button

@@ -25,6 +25,13 @@ export interface StudioAdvancedFillBrowserRequest {
   referenceSrc?: string;
   /** Immutable alpha silhouette. Equal to targetSrc on the first fill and separate on previews. */
   alphaLockSrc?: string;
+  /**
+   * Explicit full-page paint operation for a newly synthesized blank color layer.
+   *
+   * This is deliberately separate from the user's leak-guard preference: normal raster and
+   * line-art fills must still fail closed when they unexpectedly escape to most of the canvas.
+   */
+  intentionalWholeCanvasFill?: boolean;
   xRatio: number;
   yRatio: number;
   fillColor: string;
@@ -45,6 +52,30 @@ export interface StudioAdvancedFillPreviewSummary {
   message: string;
   paintedPixelCount: number;
   regionCount: number;
+}
+
+export interface StudioAdvancedFillGuardPlan {
+  maxAreaRatio: number;
+  blockCanvasEdge: boolean;
+}
+
+export function planStudioAdvancedFillGuard(
+  settings: Pick<
+    StudioAdvancedFillSettings,
+    "leakGuard" | "leakGuardMaxFillRatio" | "treatCanvasEdgeAsBoundary"
+  >,
+  intentionalWholeCanvasFill = false,
+): StudioAdvancedFillGuardPlan {
+  if (intentionalWholeCanvasFill) {
+    return {
+      maxAreaRatio: 1,
+      blockCanvasEdge: false,
+    };
+  }
+  return {
+    maxAreaRatio: settings.leakGuard ? settings.leakGuardMaxFillRatio : 1,
+    blockCanvasEdge: settings.leakGuard && !settings.treatCanvasEdgeAsBoundary,
+  };
 }
 
 export function countChangedStudioAdvancedFillPixels(
@@ -237,6 +268,10 @@ export async function runStudioAdvancedFillInBrowser(
     const fill: AdvancedFillRgba = [r, g, b, 255];
     const selectionMask =
       request.selectionMask ?? request.createSelectionMask?.(target.width, target.height);
+    const guard = planStudioAdvancedFillGuard(
+      request.settings,
+      request.intentionalWholeCanvasFill,
+    );
     const execution = await runStudioAdvancedFillWorker(
       {
         target,
@@ -256,9 +291,7 @@ export async function runStudioAdvancedFillInBrowser(
           connectivity: 4,
           closeGapRadius: request.settings.closeGapPx,
           areaAdjustment: request.settings.expansionPx,
-          maxAreaRatio: request.settings.leakGuard
-            ? request.settings.leakGuardMaxFillRatio
-            : 1,
+          maxAreaRatio: guard.maxAreaRatio,
         },
         softenEdges: request.settings.antiAlias,
         enforceAlphaLock: request.alphaLockSrc !== undefined,
@@ -271,8 +304,7 @@ export async function runStudioAdvancedFillInBrowser(
     const blockedReason: StudioAdvancedFillBlockedReason =
       result.diagnostics.status === "leak-guarded"
         ? "area"
-        : request.settings.leakGuard &&
-            !request.settings.treatCanvasEdgeAsBoundary &&
+        : guard.blockCanvasEdge &&
             result.diagnostics.final.touchesCanvasEdge
           ? "canvas-edge"
           : null;

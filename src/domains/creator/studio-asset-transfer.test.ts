@@ -47,4 +47,22 @@ describe("studio asset transfer acceptance", () => {
     expect(studioTransferHasFiles(textTransfer)).toBe(false);
     expect(studioTransferCanInsert(textTransfer)).toBe(false);
   });
+
+  it("fails closed instead of throwing for malformed synthetic transfer lists", () => {
+    const throwingList = {
+      [Symbol.iterator]() {
+        throw new Error("foreign drag");
+      },
+    };
+    const malformed = {
+      types: throwingList,
+      items: null,
+      files: undefined,
+    } as unknown as StudioAssetTransferLike;
+
+    expect(() => studioTransferHasFiles(malformed)).not.toThrow();
+    expect(() => studioTransferCanInsert(malformed)).not.toThrow();
+    expect(studioTransferHasFiles(malformed)).toBe(false);
+    expect(studioTransferCanInsert(malformed)).toBe(false);
+  });
 });

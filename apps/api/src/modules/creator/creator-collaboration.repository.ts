@@ -43,6 +43,7 @@ import type {
 import type { CreatorWorkRevisionSnapshot } from "../../../../../lib/server/creator-work-revisions";
 
 export {
+  buildCreatorCollaborationWorkQuery,
   buildCreatorCrdtServerSequenceQuery,
   buildCreatorSharedDocumentMetaQuery,
   buildCreatorSharedDocumentUpdateQuery,
@@ -88,6 +89,11 @@ export interface CreatorCollaborationTeamSnapshot {
     invitationId?: string;
   };
   members: CreatorCollaborationTeamMember[];
+  /**
+   * Only active save-before-collaboration rooms carry a finite authorization lease. Ordinary
+   * saved works and promoted rooms omit it and continue through the established ACL path.
+   */
+  authorizationExpiresAt?: string;
 }
 
 /**
@@ -97,10 +103,10 @@ export interface CreatorCollaborationTeamSnapshot {
  * collaborator list. The repository still serializes it through the work-row
  * lock so a completed role change/removal is visible before authorization.
  */
-export type CreatorCollaborationAuthorizationSnapshot = Pick<
-  CreatorCollaborationTeamSnapshot,
-  "workId" | "viewer"
->;
+export interface CreatorCollaborationAuthorizationSnapshot
+  extends Pick<CreatorCollaborationTeamSnapshot, "workId" | "viewer"> {
+  authorizationExpiresAt?: string;
+}
 
 export interface CreatorCollaborationInvitation {
   workId: string;
@@ -246,6 +252,7 @@ interface CreatorCollaborationContext {
   work: CreatorCollaborationWorkRecord;
   membership: CreatorCollaborationMembershipRecord | null;
   access: CreatorCollaborationAccess;
+  authorizationExpiresAt?: string;
 }
 
 function optionalIsoString(value: Date | null): string | undefined {
@@ -839,12 +846,18 @@ export class CreatorCollaborationRepository {
     return this.persistence.transaction(async (unit) => {
       const context = await this.loadContext(unit, actorUserId, workId, true);
       if (context.access.manageMembers) {
-        return this.buildSnapshot(unit, actorUserId, context, "all");
+        const snapshot = await this.buildSnapshot(unit, actorUserId, context, "all");
+        return context.authorizationExpiresAt
+          ? { ...snapshot, authorizationExpiresAt: context.authorizationExpiresAt }
+          : snapshot;
       }
       const membershipRole = normalizeCreatorCollaborationRole(context.membership?.role);
       const membershipStatus = normalizeCreatorCollaborationStatus(context.membership?.status);
       if (membershipRole && membershipStatus) {
-        return this.buildSnapshot(unit, actorUserId, context, "self");
+        const snapshot = await this.buildSnapshot(unit, actorUserId, context, "self");
+        return context.authorizationExpiresAt
+          ? { ...snapshot, authorizationExpiresAt: context.authorizationExpiresAt }
+          : snapshot;
       }
       throw new CreatorCollaborationForbiddenError("team_access_denied");
     });
@@ -865,10 +878,14 @@ export class CreatorCollaborationRepository {
           throw new CreatorCollaborationForbiddenError("team_access_denied");
         }
       }
-      return {
+      const snapshot: CreatorCollaborationAuthorizationSnapshot = {
         workId: context.work.id,
         viewer: this.viewerProjection(actorUserId, context),
       };
+      if (context.authorizationExpiresAt) {
+        snapshot.authorizationExpiresAt = context.authorizationExpiresAt;
+      }
+      return snapshot;
     });
   }
 
@@ -1150,6 +1167,7 @@ export class CreatorCollaborationRepository {
   ): Promise<CreatorCollaborationContext> {
     const work = await unit.findWork(workId, lock);
     if (!work) throw new CreatorCollaborationNotFoundError("work_not_found");
+    const authorizationExpiresAt = this.activeDraftAuthorizationExpiresAt(work);
     const membership =
       actorUserId === work.ownerUserId ? null : await unit.findMembership(workId, actorUserId);
     return {
@@ -1160,7 +1178,36 @@ export class CreatorCollaborationRepository {
         ownerUserId: work.ownerUserId,
         membership,
       }),
+      ...(authorizationExpiresAt ? { authorizationExpiresAt } : {}),
     };
+  }
+
+  /**
+   * Validate the provisional room in the same locked work read used by live ACL admission.
+   * A missing marker (ordinary saved work) and a promoted marker both use the normal durable ACL.
+   * Unknown/corrupt marker states and active leases at or before `now` fail closed.
+   */
+  private activeDraftAuthorizationExpiresAt(
+    work: CreatorCollaborationWorkRecord
+  ): string | undefined {
+    const status = work.draftCollaborationStatus;
+    if (status === undefined || status === null) return undefined;
+    if (work.draftCollaborationOwnerUserId !== work.ownerUserId) {
+      throw new CreatorCollaborationForbiddenError("team_access_denied");
+    }
+    if (status === "promoted") return undefined;
+    const expiresAt = work.draftCollaborationExpiresAt;
+    if (
+      status !== "active" ||
+      work.status !== "draft" ||
+      work.hidden !== true ||
+      !(expiresAt instanceof Date) ||
+      !Number.isFinite(expiresAt.getTime()) ||
+      expiresAt.getTime() <= this.now().getTime()
+    ) {
+      throw new CreatorCollaborationForbiddenError("team_access_denied");
+    }
+    return expiresAt.toISOString();
   }
 
   private requireManageAccess(access: CreatorCollaborationAccess): void {

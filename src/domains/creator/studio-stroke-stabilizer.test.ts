@@ -7,6 +7,7 @@ import {
   flushStudioStrokeStabilizerEndpoint,
   normalizeStudioStabilizerMode,
   sampleStudioPointerVelocity,
+  STUDIO_POINTER_DEFAULT_SAMPLE_INTERVAL_MS,
   stabilizeStudioStrokeSample,
 } from "./studio-stroke-stabilizer";
 
@@ -69,6 +70,7 @@ describe("studio stroke stabilizer", () => {
       outputX: 0,
       outputY: 0,
       timeStamp: 0,
+      sampleIntervalMs: STUDIO_POINTER_DEFAULT_SAMPLE_INTERVAL_MS,
     });
   });
 
@@ -78,10 +80,15 @@ describe("studio stroke stabilizer", () => {
     expect(result.distance).toBe(13);
     expect(result.elapsedMs).toBe(10);
     expect(result.speed).toBe(1.3);
-    expect(result.state).toEqual({ clientX: 22, clientY: 25, timeStamp: 110 });
+    expect(result.state).toEqual({
+      clientX: 22,
+      clientY: 25,
+      timeStamp: 110,
+      sampleIntervalMs: 10,
+    });
   });
 
-  it("normalizes non-monotonic pointer timing without producing infinities", () => {
+  it("normalizes non-monotonic pointer timing at the neutral pen cadence without producing infinities", () => {
     const start = createStudioPointerVelocityState({ clientX: 0, clientY: 0, timeStamp: 30 });
     const result = sampleStudioPointerVelocity(start, {
       clientX: Number.NaN,
@@ -89,9 +96,46 @@ describe("studio stroke stabilizer", () => {
       timeStamp: 20,
     });
     expect(result.distance).toBe(0);
-    expect(result.elapsedMs).toBeCloseTo(1000 / 60, 10);
+    expect(result.elapsedMs).toBeCloseTo(STUDIO_POINTER_DEFAULT_SAMPLE_INTERVAL_MS, 10);
+    expect(result.state.timeStamp).toBeCloseTo(
+      30 + STUDIO_POINTER_DEFAULT_SAMPLE_INTERVAL_MS,
+      10
+    );
     expect(Object.values(result.state).every(Number.isFinite)).toBe(true);
     expect(Number.isFinite(result.speed)).toBe(true);
+  });
+
+  it("learns a valid hardware cadence and reuses it for repeated or regressing timestamps", () => {
+    const initial = createStudioPointerVelocityState({
+      clientX: 0,
+      clientY: 0,
+      timeStamp: 100,
+    });
+    const learned = sampleStudioPointerVelocity(initial, {
+      clientX: 4,
+      clientY: 0,
+      timeStamp: 104,
+    });
+    const repeated = sampleStudioPointerVelocity(learned.state, {
+      clientX: 8,
+      clientY: 0,
+      timeStamp: 104,
+    });
+    const regressed = sampleStudioPointerVelocity(repeated.state, {
+      clientX: 12,
+      clientY: 0,
+      timeStamp: 90,
+    });
+
+    expect(learned.elapsedMs).toBe(4);
+    expect(repeated.elapsedMs).toBe(4);
+    expect(regressed.elapsedMs).toBe(4);
+    expect([learned.speed, repeated.speed, regressed.speed]).toEqual([1, 1, 1]);
+    expect([
+      learned.state.timeStamp,
+      repeated.state.timeStamp,
+      regressed.state.timeStamp,
+    ]).toEqual([104, 108, 112]);
   });
 
   it("keeps standard mode compatible with the fixed live stabilizer", () => {
@@ -201,6 +245,38 @@ describe("studio stroke stabilizer", () => {
     expect(first.state.timeStamp).toBe(10);
   });
 
+  it("keeps adaptive stabilization monotonic when a reduced-precision clock repeats", () => {
+    const initial = createStudioStrokeStabilizerState({ x: 0, y: 0, timeStamp: 100 });
+    const learned = stabilizeStudioStrokeSample(
+      initial,
+      { x: 4, y: 0, timeStamp: 104 },
+      { strength: 6, mode: "adaptive" }
+    );
+    const repeated = stabilizeStudioStrokeSample(
+      learned.state,
+      { x: 8, y: 0, timeStamp: 104 },
+      { strength: 6, mode: "adaptive" }
+    );
+    const regressed = stabilizeStudioStrokeSample(
+      repeated.state,
+      { x: 12, y: 0, timeStamp: 80 },
+      { strength: 6, mode: "adaptive" }
+    );
+
+    expect([
+      learned.state.sampleIntervalMs,
+      repeated.state.sampleIntervalMs,
+      regressed.state.sampleIntervalMs,
+    ]).toEqual([4, 4, 4]);
+    expect([
+      learned.state.timeStamp,
+      repeated.state.timeStamp,
+      regressed.state.timeStamp,
+    ]).toEqual([104, 108, 112]);
+    expect([learned.speed, repeated.speed, regressed.speed]).toEqual([1, 1, 1]);
+    expect(regressed.point[0]).toBeGreaterThan(repeated.point[0]);
+  });
+
   it("returns raw points when strength is zero in every mode", () => {
     for (const mode of ["standard", "adaptive", "precision"] as const) {
       const state = createStudioStrokeStabilizerState({ x: 1, y: 2, timeStamp: 0 });
@@ -226,6 +302,7 @@ describe("studio stroke stabilizer", () => {
       outputX: 100,
       outputY: 35,
       timeStamp: 16,
+      sampleIntervalMs: 16,
     });
   });
 
@@ -236,6 +313,7 @@ describe("studio stroke stabilizer", () => {
       outputX: 7,
       outputY: 9,
       timeStamp: -1,
+      sampleIntervalMs: Number.NaN,
     });
     expect(flushed.point).toEqual([7, 9]);
     expect(Object.values(flushed.state).every(Number.isFinite)).toBe(true);
@@ -248,6 +326,7 @@ describe("studio stroke stabilizer", () => {
       outputX: 5,
       outputY: 7,
       timeStamp: Number.NaN,
+      sampleIntervalMs: Number.NaN,
     };
     const input = { x: Number.NaN, y: Infinity, timeStamp: Number.NaN };
     const options = { strength: Number.POSITIVE_INFINITY, mode: "adaptive" as const };

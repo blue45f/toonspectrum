@@ -66,6 +66,26 @@ class AliasSceneContext {
   }
 }
 
+class CalligraphySceneContext {
+  readonly arcs: Array<{ radius: number; x: number; y: number }> = [];
+  readonly lines: Array<{ x: number; y: number }> = [];
+  fillCount = 0;
+  fillStyle: string | CanvasGradient | CanvasPattern = "";
+
+  beginPath(): void {}
+  closePath(): void {}
+  moveTo(): void {}
+  lineTo(x: number, y: number): void {
+    this.lines.push({ x, y });
+  }
+  arc(x: number, y: number, radius: number): void {
+    this.arcs.push({ radius, x, y });
+  }
+  fill(): void {
+    this.fillCount += 1;
+  }
+}
+
 const konvaCapture = vi.hoisted(() => ({
   nodes: [] as CapturedKonvaNode[],
 }));
@@ -420,33 +440,65 @@ describe("StudioDrawNode orchestration", () => {
     expect(Math.max(...boldMarker)).toBeGreaterThan(Math.max(...fineliner) * 3);
   });
 
-  it("keeps liner narrower than G-pen at full pressure in committed segment rendering", () => {
-    const renderWidths = (brush: "gpen" | "liner") => {
+  it("renders G-pen aliases as distinct single-outline curves instead of capped segments", async () => {
+    const { loadStudioPerfectFreehandStroker } = await import("./studio-perfect-freehand");
+    await act(async () => {
+      await loadStudioPerfectFreehandStroker();
+    });
+    const renderPath = (brush: "gpen" | "mapping-pen" | "kaburapen" | "liner") => {
       const view = render(
         <StudioDrawNode
           el={drawEl({
             brush,
             mode: "pen",
-            points: [0, 0, 10, 0, 20, 0, 30, 0, 40, 0],
-            pressures: [1, 1, 1, 1, 1],
+            points: [0, 24, 8, 8, 20, 2, 34, 8, 42, 24, 38, 39, 24, 47, 10, 41],
+            pressures: [0.2, 0.36, 0.7, 0.92, 0.74, 0.5, 0.28, 0.14],
+            sampleSpacing: 1,
           })}
         />,
       );
-      const context = new AliasSceneContext();
-      const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
-        context: CanvasRenderingContext2D
-      ) => void;
-      sceneFunc(context as unknown as CanvasRenderingContext2D);
+      const paths = captured("Path");
+      expect(paths).toHaveLength(1);
+      const data = paths[0]!.props.data as string;
       view.unmount();
       konvaCapture.nodes.length = 0;
-      return context.strokeWidths;
+      return data;
     };
 
-    const gpen = renderWidths("gpen");
-    const liner = renderWidths("liner");
-    expect(gpen.length).toBeGreaterThan(0);
-    expect(liner.length).toBeGreaterThan(0);
-    expect(Math.max(...liner)).toBeLessThan(Math.max(...gpen));
+    const gpen = renderPath("gpen");
+    const mapping = renderPath("mapping-pen");
+    const kabura = renderPath("kaburapen");
+    const liner = renderPath("liner");
+    for (const outline of [gpen, mapping, kabura, liner]) {
+      expect(outline.match(/M/g)).toHaveLength(1);
+      expect(outline.match(/Q/g)?.length).toBeGreaterThan(4);
+      expect(outline.match(/Z/g)).toHaveLength(1);
+    }
+    expect(new Set([gpen, mapping, kabura, liner]).size).toBe(4);
+  });
+
+  it("fills a multi-sample calligraphy stroke once instead of compounding round-cap opacity", () => {
+    render(
+      <StudioDrawNode
+        el={drawEl({
+          brush: "calligraphy",
+          mode: "pen",
+          points: [0, 0, 12, 0, 24, 10, 38, 10],
+          pressures: [0.2, 0.45, 0.7, 0.9],
+          strokeWidth: 12,
+        })}
+      />,
+    );
+
+    const context = new CalligraphySceneContext();
+    const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D
+    ) => void;
+    sceneFunc(context as unknown as CanvasRenderingContext2D);
+
+    expect(context.lines.length).toBeGreaterThan(3);
+    expect(context.arcs).toHaveLength(2);
+    expect(context.fillCount).toBe(1);
   });
 
   it("applies ink-wash spacing, pressure, and material scales to retained watercolor", () => {
@@ -794,6 +846,49 @@ describe("StudioDrawNode perfect-freehand outline brush", () => {
     const dots = captured("Circle");
     expect(dots).toHaveLength(1);
     expect(dots[0]!.props.radius).toBeGreaterThanOrEqual(3);
+  });
+
+  it("keeps pressure geometry for a very short G-pen flick", async () => {
+    const { loadStudioPerfectFreehandStroker } = await import("./studio-perfect-freehand");
+    await act(async () => {
+      await loadStudioPerfectFreehandStroker();
+    });
+    render(
+      <StudioDrawNode
+        el={perfectEl({
+          brush: "gpen",
+          points: [0, 0, 9, 3],
+          pressures: [0.18, 0.92],
+        })}
+      />,
+    );
+    expect(captured("Line")).toHaveLength(0);
+    expect(captured("Path")).toHaveLength(1);
+    expect(captured("Path")[0]!.props.data).toMatch(/^M.*Q.*Z$/);
+  });
+
+  it("keeps legacy missing-pressure G-pen at the historical 0.6 fallback without draft drift", async () => {
+    const { loadStudioPerfectFreehandStroker } = await import("./studio-perfect-freehand");
+    await act(async () => {
+      await loadStudioPerfectFreehandStroker();
+    });
+    const points = [0, 4, 12, 0, 24, 6, 36, 18, 48, 22, 60, 16, 72, 5];
+    const renderData = (pressures: number[] | undefined, activeDraft: boolean) => {
+      const view = render(
+        <StudioDrawNode
+          activeDraft={activeDraft}
+          el={perfectEl({ brush: "gpen", points, pressures })}
+        />,
+      );
+      const data = captured("Path")[0]!.props.data as string;
+      view.unmount();
+      konvaCapture.nodes.length = 0;
+      return data;
+    };
+
+    const missing = renderData(undefined, false);
+    expect(renderData(Array(points.length / 2).fill(0.6), false)).toBe(missing);
+    expect(renderData(undefined, true)).toBe(missing);
   });
 
   it("renders both perfect profiles as distinct deterministic outlines once loaded", async () => {

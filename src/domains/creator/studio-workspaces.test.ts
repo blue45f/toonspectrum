@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import { STUDIO_INSPECTOR_LAYOUT_STORAGE_KEY } from "./studio-inspector-layout";
-import { STUDIO_QUICK_ACTIONS_STORAGE_KEY } from "./studio-quick-actions";
+import {
+  QUICK_ACTION_SLOTS,
+  STUDIO_QUICK_ACTIONS_STORAGE_KEY,
+} from "./studio-quick-actions";
 import {
   DEFAULT_STUDIO_WORKSPACE_STATE,
+  STUDIO_CLASSIC_WORKSPACE_IDS,
   STUDIO_DEFAULT_WORKSPACE_IDS,
   STUDIO_DEFAULT_WORKSPACES,
   STUDIO_LEGACY_LEFT_PANEL_WIDTH_STORAGE_KEY,
   STUDIO_LEGACY_RIGHT_PANEL_WIDTH_STORAGE_KEY,
+  STUDIO_PRO_COMIC_PALETTE_PRIORITY,
   STUDIO_WORKSPACE_LEFT_PANEL_WIDTH,
   STUDIO_WORKSPACE_MAX_CUSTOM,
   STUDIO_WORKSPACE_NAME_MAX_LENGTH,
@@ -92,11 +97,24 @@ function withLeftPanelWidth(
 }
 
 describe("built-in Studio workspaces", () => {
-  it("provides exactly six immutable task presets with complete layouts", () => {
+  it("preserves the six classic presets and adds one immutable professional comic preset", () => {
+    expect(STUDIO_CLASSIC_WORKSPACE_IDS).toEqual([
+      "storyboard",
+      "lineart",
+      "coloring",
+      "lettering",
+      "review",
+      "publish",
+    ]);
     expect(STUDIO_DEFAULT_WORKSPACES.map((workspace) => workspace.id)).toEqual(
       STUDIO_DEFAULT_WORKSPACE_IDS
     );
-    expect(new Set(STUDIO_DEFAULT_WORKSPACES.map((workspace) => workspace.name)).size).toBe(6);
+    expect(STUDIO_DEFAULT_WORKSPACE_IDS).toEqual([
+      ...STUDIO_CLASSIC_WORKSPACE_IDS,
+      "pro-comic",
+    ]);
+    expect(new Set(STUDIO_DEFAULT_WORKSPACES.map((workspace) => workspace.name)).size)
+      .toBe(7);
 
     for (const workspace of STUDIO_DEFAULT_WORKSPACES) {
       expect(Object.isFrozen(workspace)).toBe(true);
@@ -105,21 +123,62 @@ describe("built-in Studio workspaces", () => {
       expect(Object.isFrozen(workspace.layout.desktop)).toBe(true);
       expect(Object.isFrozen(workspace.layout.quickActions.slots)).toBe(true);
       expect(Object.keys(workspace.layout.quickActions.slots)).toHaveLength(6);
-      expect(workspace.layout.desktop.leftPanelWidth).toBe(
-        STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.default
-      );
-      expect(workspace.layout.desktop.rightPanelWidth).toBe(
-        STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.default
-      );
+      if (workspace.id !== "pro-comic") {
+        expect(workspace.layout.desktop.leftPanelWidth).toBe(
+          STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.default
+        );
+        expect(workspace.layout.desktop.rightPanelWidth).toBe(
+          STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.default
+        );
+      }
     }
+
+    const professional = STUDIO_DEFAULT_WORKSPACES.find(
+      ({ id }) => id === "pro-comic"
+    );
+    expect(professional).toMatchObject({
+      name: "프로 만화",
+      layout: {
+        inspector: {
+          primary: "properties",
+          image: "fill",
+          document: "navigator",
+        },
+        desktop: {
+          leftPanelOpen: true,
+          rightPanelOpen: true,
+          leftPanelWidth: 216,
+          rightPanelWidth: 344,
+        },
+        quickActions: {
+          version: 1,
+          slots: {
+            north: "undo",
+            northEast: "redo",
+            southEast: "pen",
+            south: "advanced-fill",
+            southWest: "add-bubble",
+            northWest: "fit-width",
+          },
+        },
+      },
+    });
+    expect(STUDIO_PRO_COMIC_PALETTE_PRIORITY).toEqual([
+      "tool-properties",
+      "layers",
+      "pages",
+      "materials-quick-access",
+    ]);
   });
 
   it("keeps built-ins outside owner storage and lists custom workspaces after them", () => {
     const custom = saveStudioWorkspace(DEFAULT_STUDIO_WORKSPACE_STATE, "내 선화 공간");
     const listed = listStudioWorkspaces(custom);
 
-    expect(listed).toHaveLength(7);
-    expect(listed.slice(0, 6).map((workspace) => workspace.id)).toEqual(
+    expect(listed).toHaveLength(STUDIO_DEFAULT_WORKSPACES.length + 1);
+    expect(
+      listed.slice(0, STUDIO_DEFAULT_WORKSPACES.length).map((workspace) => workspace.id)
+    ).toEqual(
       STUDIO_DEFAULT_WORKSPACE_IDS
     );
     expect(listed.at(-1)?.id).toBe("custom-1");
@@ -321,6 +380,42 @@ describe("Studio workspace owner-scoped persistence", () => {
     expect(envelope.payloadVersion).toBe(STUDIO_WORKSPACE_PAYLOAD_VERSION);
     expect(envelope.ownerScope).toBe(studioWorkspaceOwnerScope("owner-a"));
     expect(JSON.stringify(envelope)).not.toContain("owner-a");
+  });
+
+  it("round-trips the professional comic widths, open state, quick order, and mobile fallback", () => {
+    const storage = memoryStorage();
+    const owner = "professional-comic-owner";
+    const configured = updateStudioWorkspacePreferences(
+      switchStudioWorkspace(DEFAULT_STUDIO_WORKSPACE_STATE, "pro-comic"),
+      { mobileControlSide: "left" }
+    );
+    const saved = saveStudioWorkspaceState(storage, owner, configured);
+    const loaded = loadStudioWorkspacePersistence(storage, owner);
+
+    expect(saved).toMatchObject({ status: "persisted", failure: null });
+    expect(loaded.state.activeWorkspaceId).toBe("pro-comic");
+    expect(loaded.state.mobileControlSide).toBe("left");
+    expect(loaded.state.liveLayout).toEqual(
+      resolveStudioWorkspace(loaded.state, "pro-comic")?.layout
+    );
+    expect(loaded.state.liveLayout.desktop).toEqual({
+      leftPanelOpen: true,
+      rightPanelOpen: true,
+      leftPanelWidth: 216,
+      rightPanelWidth: 344,
+    });
+    expect(
+      QUICK_ACTION_SLOTS.map(
+        (slot) => loaded.state.liveLayout.quickActions.slots[slot]
+      )
+    ).toEqual([
+      "undo",
+      "redo",
+      "pen",
+      "advanced-fill",
+      "add-bubble",
+      "fit-width",
+    ]);
   });
 
   it("reports storage absence, quota errors, silent writes, and verification reads truthfully", () => {

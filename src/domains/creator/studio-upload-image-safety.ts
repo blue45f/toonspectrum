@@ -1,3 +1,5 @@
+/** 브라우저 저장·드래그 경계가 공유하는 data URL 직렬화 상한. */
+export const STUDIO_ASSET_DATA_URL_MAX_CHARS = 32 * 1024 * 1024;
 export const STUDIO_UPLOAD_MAX_SOURCE_FILE_BYTES = 12 * 1024 * 1024;
 export const STUDIO_UPLOAD_MAX_SOURCE_BATCH_BYTES = 48 * 1024 * 1024;
 export const STUDIO_UPLOAD_DESKTOP_MAX_DECODED_PIXELS = 16_777_216;

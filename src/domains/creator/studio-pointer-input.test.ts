@@ -403,6 +403,75 @@ describe("studio pointer input", () => {
     expect(collectStudioStrokePointerBatch(away.session, loopBack).authoritative).toEqual([loopBack]);
   });
 
+  it("drops a browser's overlapping coalesced replay while preserving the new suffix", () => {
+    const down = sample(0);
+    const session = beginStudioStrokePointerSession(down)!;
+    const a = sample(1);
+    const b = sample(2);
+    const c = sample(3);
+    const firstParent = sample(3.5, { getCoalescedEvents: () => [a, b, c] });
+    const first = collectStudioStrokePointerBatch(session, firstParent);
+    expect(first.authoritative).toEqual([a, b, c]);
+
+    const d = sample(4);
+    const secondParent = sample(4.5, { getCoalescedEvents: () => [b, c, d] });
+    const second = collectStudioStrokePointerBatch(first.session, secondParent);
+
+    expect(second.authoritative).toEqual([d]);
+    expect(second.diagnostics).toMatchObject({
+      authoritativeCandidateCount: 3,
+      authoritativeAcceptedCount: 1,
+      duplicateCount: 1,
+      overlapReplayCount: 1,
+      maximumAuthoritativeGap: Math.hypot(1, 1),
+    });
+  });
+
+  it("measures duplicate, regression, and large-gap input without reordering new geometry", () => {
+    const session = beginStudioStrokePointerSession(sample(0, { timeStamp: 100 }))!;
+    const a = sample(10, { timeStamp: 90 });
+    const duplicateA = sample(10, { timeStamp: 90 });
+    const b = sample(30, { timeStamp: 80 });
+    const current = sample(31, {
+      timeStamp: 70,
+      getCoalescedEvents: () => [a, duplicateA, b],
+    });
+
+    const batch = collectStudioStrokePointerBatch(session, current);
+
+    expect(batch.authoritative).toEqual([a, b]);
+    expect(batch.diagnostics).toMatchObject({
+      authoritativeCandidateCount: 3,
+      authoritativeAcceptedCount: 2,
+      duplicateCount: 1,
+      authoritativeTimeRegressionCount: 2,
+      maximumAuthoritativeGap: Math.hypot(20, 20),
+    });
+  });
+
+  it("keeps prediction preview causal and removes repeated estimates", () => {
+    const session = beginStudioStrokePointerSession(sample(0, { timeStamp: 100 }))!;
+    const authority = sample(10, { timeStamp: 110 });
+    const behind = sample(11, { timeStamp: 105 });
+    const future = sample(12, { timeStamp: 120 });
+    const duplicateFuture = sample(12, { timeStamp: 120 });
+    const current = sample(10, {
+      timeStamp: 110,
+      getCoalescedEvents: () => [authority],
+      getPredictedEvents: () => [behind, future, duplicateFuture],
+    });
+
+    const batch = collectStudioStrokePointerBatch(session, current, { includePredicted: true });
+
+    expect(batch.authoritative).toEqual([authority]);
+    expect(batch.predicted).toEqual([future]);
+    expect(batch.diagnostics).toMatchObject({
+      predictedAcceptedCount: 1,
+      predictedDuplicateCount: 1,
+      predictedBehindAuthorityCount: 1,
+    });
+  });
+
   it("falls back to the current event when coalesced APIs are absent, throw, or return junk", () => {
     const session = beginStudioStrokePointerSession(sample(1))!;
     const absent = sample(2);

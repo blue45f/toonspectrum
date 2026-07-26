@@ -53,6 +53,12 @@ import {
   normalizeVignetteFx,
   vignetteFxKonvaFilter,
 } from "./studio-filter-pack";
+import {
+  isIdentityStudioFilterUnionWave,
+  normalizeStudioFilterUnionWave,
+  studioFilterUnionWaveKonvaFilter,
+  type StudioFilterUnionWave,
+} from "./studio-filter-union-wave";
 import { STUDIO_PIXEL_FILTERS, type StudioImageDataLike } from "./studio-filters";
 import { glowKonvaFilter, normalizeGlow, isIdentityGlow } from "./studio-glow";
 import { gradientMapKonvaFilter, normalizeGradientMap, gradientMapToFlat } from "./studio-gradient-map";
@@ -111,6 +117,32 @@ function hasActiveGlitchFx(el: ImageFilterFields): boolean {
 // 비네트가 항등(어둡기0)이 아니면 활성.
 function hasActiveVignetteFx(el: ImageFilterFields): boolean {
   return !!el.vignetteFx && !isIdentityVignetteFx(normalizeVignetteFx(el.vignetteFx));
+}
+function activeFilterUnionWave(el: ImageFilterFields): StudioFilterUnionWave | null {
+  const normalized = normalizeStudioFilterUnionWave(el.filterUnionWave);
+  return isIdentityStudioFilterUnionWave(normalized) ? null : normalized;
+}
+function filterUnionWaveStage(
+  effect: StudioFilterUnionWave,
+): "geometry" | "texture" | "stylize" | "light" {
+  switch (effect.kind) {
+    case "wave-warp":
+    case "ripple-warp":
+    case "fisheye":
+    case "twirl":
+    case "pinch-bloat":
+    case "lens-distortion":
+      return "geometry";
+    case "film-grain-pro":
+    case "salt-pepper":
+    case "rgb-noise":
+    case "perlin-texture":
+      return "texture";
+    case "god-rays":
+      return "light";
+    default:
+      return "stylize";
+  }
 }
 // 조명 효과가 항등(세기0)이 아니면 활성.
 function hasActiveLight(el: ImageFilterFields): boolean {
@@ -529,6 +561,7 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   // 필터 팩 — this.attrs.glitch*/vignette* 적용(studio-filter-pack).
   F.GlitchFx = glitchFxKonvaFilter;
   F.VignetteFx = vignetteFxKonvaFilter;
+  F.FilterUnionWave = studioFilterUnionWaveKonvaFilter;
 }
 
 /** 활성 보정이 하나라도 있으면 true (캐시 on/off 판단용). */
@@ -569,6 +602,7 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActiveClouds(el) ||
     hasActiveGlitchFx(el) ||
     hasActiveVignetteFx(el) ||
+    activeFilterUnionWave(el) !== null ||
     hasActiveSmartFilterProgram(el) ||
     hasActiveColorToAlpha(el) ||
     isActiveNumber(el.saturation) ||
@@ -601,6 +635,19 @@ export function buildImageFilters(
   const F = konva.Filters as Record<string, KonvaFilterFn>;
   const filters: Array<(imageData: StudioImageDataLike) => void> = [];
   const attrs: Record<string, number | string | number[]> = {};
+  const filterUnionWave = activeFilterUnionWave(el);
+  const appendFilterUnionWave = () => {
+    if (!filterUnionWave) return;
+    filters.push(F.FilterUnionWave!);
+    attrs.filterUnionKind = filterUnionWave.kind;
+    attrs.filterUnionAmount = filterUnionWave.amount;
+    attrs.filterUnionScale = filterUnionWave.scale;
+    attrs.filterUnionDetail = filterUnionWave.detail;
+    attrs.filterUnionSeed = filterUnionWave.seed;
+    attrs.filterUnionCenterX = filterUnionWave.centerX;
+    attrs.filterUnionCenterY = filterUnionWave.centerY;
+    attrs.filterUnionAngle = filterUnionWave.angle;
+  };
 
   // --- 픽셀 이동·기하 왜곡 → 흐림을 가장 먼저 ---
   if (hasActivePixelOffset(el)) {
@@ -616,6 +663,9 @@ export function buildImageFilters(
     attrs.dsType = ds.type;
     attrs.dsAmount = ds.amount;
     attrs.dsScale = ds.scale;
+  }
+  if (filterUnionWave && filterUnionWaveStage(filterUnionWave) === "geometry") {
+    appendFilterUnionWave();
   }
   // 글리치 — 픽셀 이동 계열이라 기하 왜곡 직후에 태운다(색 보정 전에 조각이 흩어져야 자연).
   if (hasActiveGlitchFx(el)) {
@@ -875,6 +925,9 @@ export function buildImageFilters(
     attrs.cloudSeed = clouds.seed;
     attrs.cloudMode = clouds.mode;
   }
+  if (filterUnionWave && filterUnionWaveStage(filterUnionWave) === "texture") {
+    appendFilterUnionWave();
+  }
   // 스타일라이즈(엠보스/외곽선/솔라리/유화) — 톤·질감 위에 얹는 스타일 변환.
   if (hasActiveStylize(el)) {
     filters.push(F.Stylize!);
@@ -890,6 +943,9 @@ export function buildImageFilters(
     attrs.skType = sk.type;
     attrs.skStrength = sk.strength;
     attrs.skDetail = sk.detail;
+  }
+  if (filterUnionWave && filterUnionWaveStage(filterUnionWave) === "stylize") {
+    appendFilterUnionWave();
   }
   // 글로우는 최종 밝은 영역에서 번지므로 늦게, 테두리는 실루엣 바깥에 그리므로 가장 마지막.
   if (hasActiveGlow(el)) {
@@ -909,6 +965,9 @@ export function buildImageFilters(
     attrs.ltX = lt.x;
     attrs.ltY = lt.y;
     attrs.ltHue = lt.hue;
+  }
+  if (filterUnionWave && filterUnionWaveStage(filterUnionWave) === "light") {
+    appendFilterUnionWave();
   }
   // 비네트 — 조명까지 끝난 결과의 가장자리를 어둡히는 마무리 연출(테두리 직전).
   if (hasActiveVignetteFx(el)) {

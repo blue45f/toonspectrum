@@ -140,6 +140,7 @@ function projectImageFilterFields(el: ImageFilterFields): ImageFilterFields {
     clouds: el.clouds,
     glitchFx: el.glitchFx,
     vignetteFx: el.vignetteFx,
+    filterUnionWave: el.filterUnionWave,
     // The persisted stack can carry disabled/corrupt entries. Send only one normalized ordered
     // program across the clone boundary so the Worker cannot apply it twice.
     smartFilters: undefined,

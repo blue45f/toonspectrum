@@ -136,6 +136,11 @@ export interface StudioAdvancedFillVectorTargetInput {
   readonly width: number;
   readonly height: number;
   readonly elements: readonly El[];
+  /**
+   * Standard bucket fallback for a document that has no raster layer yet. The whole transparent
+   * page becomes one fill region and the materialized color layer is inserted at the bottom.
+   */
+  readonly allowBlankPage?: boolean;
   readonly groups?: readonly LayerGroup[];
   readonly theme?: SvgExportTheme;
   readonly name?: string;
@@ -535,7 +540,11 @@ function prepareAdvancedFillVectorInput(
   const insertionIndex = input.elements.findIndex(
     (element) => element.type === "draw" && !isEffectivelyHidden(element, groups),
   );
-  const safeInsertionIndex = insertionIndex >= 0 ? insertionIndex : input.elements.length;
+  const safeInsertionIndex = insertionIndex >= 0
+    ? insertionIndex
+    : input.allowBlankPage
+      ? 0
+      : input.elements.length;
   const pageId = input.pageId.trim();
   if (!pageId) {
     return {
@@ -549,7 +558,7 @@ function prepareAdvancedFillVectorInput(
     (element): element is Extract<El, { type: "draw" }> =>
       element.type === "draw" && !isEffectivelyHidden(element, groups),
   );
-  if (elements.length === 0) {
+  if (elements.length === 0 && !input.allowBlankPage) {
     return {
       ok: false,
       code: "no-visible-vector-draw",

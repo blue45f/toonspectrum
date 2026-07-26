@@ -4,12 +4,22 @@ import {
   studioBrushChipSurface,
   studioBrushPreviewDashArray,
   studioBrushPreviewDotCenters,
+  studioBrushPreviewOpacity,
   studioBrushPreviewPathD,
   studioBrushPreviewRibbonD,
   studioBrushPreviewStrokeWidth,
 } from "./studio-brush-visual";
 
 describe("studio brush commercial visuals", () => {
+  it("shows the exact catalogue outer opacity instead of an opaque decorative preview", () => {
+    expect(studioBrushPreviewOpacity(0.2)).toBe(0.2);
+    expect(studioBrushPreviewOpacity(0.55)).toBe(0.55);
+    expect(studioBrushPreviewOpacity(1)).toBe(1);
+    expect(studioBrushPreviewOpacity(-2)).toBe(0);
+    expect(studioBrushPreviewOpacity(4)).toBe(1);
+    expect(studioBrushPreviewOpacity(Number.NaN)).toBe(1);
+  });
+
   it("returns warm-ink chip surfaces per media family", () => {
     for (const media of ["line", "marker", "paint", "texture"] as const) {
       const surface = studioBrushChipSurface(media);

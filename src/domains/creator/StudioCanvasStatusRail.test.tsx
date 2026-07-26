@@ -227,5 +227,6 @@ describe("StudioCanvasStatusRail", () => {
     const rail = container.querySelector("[data-studio-canvas-status-rail]");
     expect(rail?.className).toContain("overflow-y-auto");
     expect(rail?.className).not.toContain("contents");
+    expect((rail as HTMLElement | null)?.style.paddingTop).toBe("3.75rem");
   });
 });

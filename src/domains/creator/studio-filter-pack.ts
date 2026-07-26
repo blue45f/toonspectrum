@@ -13,6 +13,13 @@
  * Konva/DOM 의존 없음 — 다이얼로그와 단위 테스트가 공유한다.
  */
 
+import {
+  STUDIO_FILTER_UNION_WAVE_KINDS,
+  isIdentityStudioFilterUnionWave,
+  normalizeStudioFilterUnionWave,
+  type StudioFilterUnionWave,
+  type StudioFilterUnionWaveKind,
+} from "./studio-filter-union-wave";
 import { hash2 } from "./studio-grain";
 
 import type { StudioImageDataLike } from "./studio-filters";
@@ -289,6 +296,7 @@ export const STUDIO_FILTER_PACK_KINDS = [
   "surface-blur",
   "duotone",
   "noise-add",
+  ...STUDIO_FILTER_UNION_WAVE_KINDS,
 ] as const;
 
 export type StudioFilterPackKind = (typeof STUDIO_FILTER_PACK_KINDS)[number];
@@ -318,6 +326,7 @@ export type StudioFilterPackParam =
 export type StudioFilterPackPatch = Partial<ImageFilterFields> & {
   glitchFx?: StudioGlitchFx;
   vignetteFx?: StudioVignetteFx;
+  filterUnionWave?: StudioFilterUnionWave;
 };
 
 export interface StudioFilterPackDef {
@@ -343,6 +352,51 @@ function slider(
   return suffix === undefined
     ? { key, label, control: "slider", min, max, step }
     : { key, label, control: "slider", min, max, step, suffix };
+}
+
+function unionWaveDef(
+  kind: StudioFilterUnionWaveKind,
+  label: string,
+  params: readonly StudioFilterPackParam[],
+  defaults: Readonly<StudioFilterPackValues>,
+): StudioFilterPackDef {
+  return {
+    kind,
+    label,
+    params,
+    defaults,
+    fromImage: (image) => {
+      const normalized = normalizeStudioFilterUnionWave(image.filterUnionWave);
+      if (
+        !normalized ||
+        normalized.kind !== kind ||
+        isIdentityStudioFilterUnionWave(normalized)
+      ) {
+        return null;
+      }
+      const values: StudioFilterPackValues = {};
+      for (const param of params) {
+        const value = normalized[param.key as keyof StudioFilterUnionWave];
+        if (typeof value === "number") values[param.key] = value;
+      }
+      return values;
+    },
+    toPatch: (values) => {
+      const numberValue = (key: string): number | undefined =>
+        typeof values[key] === "number" ? values[key] : undefined;
+      const normalized = normalizeStudioFilterUnionWave({
+        kind,
+        amount: numberValue("amount"),
+        scale: numberValue("scale"),
+        detail: numberValue("detail"),
+        seed: numberValue("seed"),
+        centerX: numberValue("centerX"),
+        centerY: numberValue("centerY"),
+        angle: numberValue("angle"),
+      });
+      return normalized ? { filterUnionWave: normalized } : {};
+    },
+  };
 }
 
 // stylize 필드 되읽기 — 지정 타입이고 strength>0일 때만 값 반환.
@@ -696,6 +750,172 @@ export const STUDIO_FILTER_PACK_DEFS: Readonly<
       noiseSeed: clampToInt(values.seed, PACK_SEED_MIN, PACK_SEED_MAX, 1337),
     }),
   },
+  "wave-warp": unionWaveDef(
+    "wave-warp",
+    "사인 웨이브",
+    [
+      slider("amount", "진폭", 1, 100, "%"),
+      slider("scale", "파장", 4, 120, "px"),
+      slider("angle", "위상", -180, 180, "°"),
+    ],
+    { amount: 42, scale: 28, angle: 0 },
+  ),
+  "ripple-warp": unionWaveDef(
+    "ripple-warp",
+    "원형 리플",
+    [
+      slider("amount", "진폭", 1, 100, "%"),
+      slider("scale", "파장", 4, 120, "px"),
+      slider("centerX", "중심 X", 0, 100, "%"),
+      slider("centerY", "중심 Y", 0, 100, "%"),
+      slider("angle", "위상", -180, 180, "°"),
+    ],
+    { amount: 38, scale: 22, centerX: 50, centerY: 50, angle: 0 },
+  ),
+  fisheye: unionWaveDef(
+    "fisheye",
+    "어안 렌즈",
+    [
+      slider("amount", "곡률", -100, 100, "%"),
+      slider("centerX", "중심 X", 0, 100, "%"),
+      slider("centerY", "중심 Y", 0, 100, "%"),
+    ],
+    { amount: 52, centerX: 50, centerY: 50 },
+  ),
+  twirl: unionWaveDef(
+    "twirl",
+    "트월 회전",
+    [
+      slider("amount", "회전", -100, 100, "%"),
+      slider("centerX", "중심 X", 0, 100, "%"),
+      slider("centerY", "중심 Y", 0, 100, "%"),
+    ],
+    { amount: 46, centerX: 50, centerY: 50 },
+  ),
+  "pinch-bloat": unionWaveDef(
+    "pinch-bloat",
+    "핀치 / 블로트",
+    [
+      slider("amount", "수축 / 팽창", -100, 100, "%"),
+      slider("centerX", "중심 X", 0, 100, "%"),
+      slider("centerY", "중심 Y", 0, 100, "%"),
+    ],
+    { amount: 44, centerX: 50, centerY: 50 },
+  ),
+  "lens-distortion": unionWaveDef(
+    "lens-distortion",
+    "렌즈 왜곡 보정",
+    [
+      slider("amount", "배럴 / 핀쿠션", -100, 100, "%"),
+      slider("scale", "광학 배율", 50, 150, "%"),
+      slider("centerX", "광학 중심 X", 0, 100, "%"),
+      slider("centerY", "광학 중심 Y", 0, 100, "%"),
+    ],
+    { amount: 34, scale: 100, centerX: 50, centerY: 50 },
+  ),
+  "film-grain-pro": unionWaveDef(
+    "film-grain-pro",
+    "시네마 필름 그레인",
+    [
+      slider("amount", "입자 강도", 1, 100, "%"),
+      slider("scale", "입자 크기", 1, 6, "px"),
+      slider("seed", "시드", PACK_SEED_MIN, PACK_SEED_MAX),
+    ],
+    { amount: 34, scale: 1, seed: 1337 },
+  ),
+  "salt-pepper": unionWaveDef(
+    "salt-pepper",
+    "소금·후추 노이즈",
+    [
+      slider("amount", "밀도", 1, 100, "%"),
+      slider("seed", "시드", PACK_SEED_MIN, PACK_SEED_MAX),
+    ],
+    { amount: 22, seed: 7331 },
+  ),
+  "rgb-noise": unionWaveDef(
+    "rgb-noise",
+    "RGB 채널 노이즈",
+    [
+      slider("amount", "채널 강도", 1, 100, "%"),
+      slider("scale", "입자 크기", 1, 8, "px"),
+      slider("seed", "시드", PACK_SEED_MIN, PACK_SEED_MAX),
+    ],
+    { amount: 30, scale: 1, seed: 2048 },
+  ),
+  "perlin-texture": unionWaveDef(
+    "perlin-texture",
+    "프랙탈 밸류 텍스처",
+    [
+      slider("amount", "혼합", 1, 100, "%"),
+      slider("scale", "기본 스케일", 4, 120, "px"),
+      slider("detail", "옥타브", 51, 255),
+      slider("seed", "시드", PACK_SEED_MIN, PACK_SEED_MAX),
+    ],
+    { amount: 42, scale: 32, detail: 153, seed: 404 },
+  ),
+  pointillize: unionWaveDef(
+    "pointillize",
+    "포인틸리즘",
+    [
+      slider("amount", "점 혼합", 1, 100, "%"),
+      slider("scale", "점 간격", 3, 32, "px"),
+      slider("seed", "배치 시드", PACK_SEED_MIN, PACK_SEED_MAX),
+    ],
+    { amount: 86, scale: 9, seed: 1886 },
+  ),
+  "stained-glass": unionWaveDef(
+    "stained-glass",
+    "스테인드글라스",
+    [
+      slider("amount", "색면 혼합", 1, 100, "%"),
+      slider("scale", "조각 크기", 4, 40, "px"),
+      slider("detail", "납선 두께", 0, 255),
+      slider("seed", "분할 시드", PACK_SEED_MIN, PACK_SEED_MAX),
+    ],
+    { amount: 88, scale: 12, detail: 96, seed: 1440 },
+  ),
+  "poster-edges": unionWaveDef(
+    "poster-edges",
+    "포스터 엣지",
+    [
+      slider("amount", "효과 강도", 1, 100, "%"),
+      slider("scale", "색상 단계", 2, 12),
+      slider("detail", "경계 감도", 1, 255),
+    ],
+    { amount: 82, scale: 6, detail: 92 },
+  ),
+  photocopy: unionWaveDef(
+    "photocopy",
+    "고대비 포토카피",
+    [
+      slider("amount", "복사 강도", 1, 100, "%"),
+      slider("scale", "국소 반경", 1, 5, "px"),
+      slider("detail", "용지 임계값", 1, 254),
+    ],
+    { amount: 94, scale: 2, detail: 148 },
+  ),
+  "normal-map": unionWaveDef(
+    "normal-map",
+    "노멀 맵 변환",
+    [
+      slider("amount", "변환 강도", 1, 100, "%"),
+      slider("scale", "샘플 반경", 1, 4, "px"),
+      slider("detail", "표면 깊이", 1, 255),
+    ],
+    { amount: 100, scale: 1, detail: 110 },
+  ),
+  "god-rays": unionWaveDef(
+    "god-rays",
+    "볼류메트릭 광선",
+    [
+      slider("amount", "광선 강도", 1, 100, "%"),
+      slider("scale", "샘플 수", 2, 10),
+      slider("detail", "발광 임계값", 0, 255),
+      slider("centerX", "광원 X", 0, 100, "%"),
+      slider("centerY", "광원 Y", 0, 100, "%"),
+    ],
+    { amount: 68, scale: 7, detail: 152, centerX: 28, centerY: 20 },
+  ),
 };
 
 /** 메뉴/라벨 소비자용 — kind → 한국어 라벨. */

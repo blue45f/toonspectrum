@@ -12,17 +12,13 @@ import {
   ArrowUpToLine,
   Bold,
   Boxes,
-  ChevronDown,
   ChevronRight,
-  ChevronUp,
   Copy,
   FlipHorizontal2,
   FlipVertical2,
   Italic,
   Loader2,
-  MousePointer2,
   PaintBucket,
-  Paintbrush,
   Pipette,
   Sparkles,
   Trash2,
@@ -84,7 +80,19 @@ import { type FilterMaskPaintMode } from "./studio-filter-mask";
 import { legacyTextGradientToSpec } from "./studio-gradient-engine";
 import { type HealCloneMode } from "./studio-heal-clone";
 import { uid } from "./studio-id";
+import {
+  resolveStudioInspectorContentMode,
+  resolveStudioInspectorInteractionPolicy,
+} from "./studio-inspector-interaction-policy";
 import { type StudioImageInspectorSection, type StudioInspectorLayout } from "./studio-inspector-layout";
+import {
+  executeStudioInspectorArmedChange,
+  executeStudioInspectorArmedToggle,
+  executeStudioInspectorDrawModeTransition,
+  executeStudioInspectorRouteTransition,
+  studioInspectorTransientOwners,
+  type StudioInspectorTransientState,
+} from "./studio-inspector-tool-transition";
 import { type StudioIsometricPrimitiveSpec } from "./studio-isometric-primitive-contract";
 import { type ImageFilterFields } from "./studio-konva-filter-fields";
 import { type LayerMaskPaintMode } from "./studio-layer-mask";
@@ -93,7 +101,12 @@ import {
   type StudioLayerNavigatorItem,
   type StudioLayerRole,
 } from "./studio-layer-navigator";
-import { groupOfItem, isEffectivelyHidden, type LayerGroup } from "./studio-layers";
+import {
+  groupOfItem,
+  isEffectivelyHidden,
+  isEffectivelyLocked,
+  type LayerGroup,
+} from "./studio-layers";
 import { LIQUIFY_RADIUS_RANGE, LIQUIFY_STRENGTH_RANGE, type StudioLiquifyMode } from "./studio-liquify-contract";
 import { type MagicResizePreset, type MagicResizeStrategy } from "./studio-magic-resize";
 import {
@@ -122,7 +135,6 @@ import {
   StudioLayerMaskPanel,
   StudioLayerNavigator,
   StudioLiquifyPanel,
-  StudioPageGradePanel,
   StudioPatternFillPanel,
   StudioPerspectivePanel,
   StudioPuppetWarpPanel,
@@ -185,6 +197,14 @@ import { StudioInspectorCanvasControls } from "./StudioInspectorCanvasControls";
 import { StudioInspectorDrawModeControls } from "./StudioInspectorDrawModeControls";
 import { StudioInspectorFocusSpeedFrameControls } from "./StudioInspectorFocusSpeedFrameControls";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
+import {
+  StudioInspectorCurrentBrushSummary,
+  StudioInspectorDisabledReasons,
+  StudioInspectorEmptySelection,
+  StudioInspectorMutationLockNotice,
+  StudioInspectorPageGradeSurface,
+  StudioInspectorPublishPanel,
+} from "./StudioInspectorUtilityPanels";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
@@ -1088,18 +1108,71 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
     ? Math.max(0, Math.round(mobileKeyboardInset))
     : 0;
+  const inspectorContentMode = resolveStudioInspectorContentMode({
+    tool,
+    hasSelection: selected !== null,
+  });
+  const inspectorDrawing = inspectorContentMode === "drawing";
   const selectedSupportsImageInspectorTabs =
-    selected?.type === "image" || selected?.type === "draw";
+    !inspectorDrawing && (selected?.type === "image" || selected?.type === "draw");
   const activeFillRouteImagePanel = inspectorLayout.primary === "properties" &&
     inspectorLayout.image === "fill";
   const activeImageInspectorTab =
     inspectorLayout.primary === "properties" &&
-      (selectedSupportsImageInspectorTabs || (activeFillRouteImagePanel && advancedFillActive))
+      (
+        selectedSupportsImageInspectorTabs ||
+        (!inspectorDrawing && activeFillRouteImagePanel && advancedFillActive)
+      )
       ? inspectorLayout.image
       : null;
   const advancedFillInspectorRouteWithoutImageSelection = activeFillRouteImagePanel &&
     advancedFillActive &&
+    !inspectorDrawing &&
     !selectedSupportsImageInspectorTabs;
+  const inspectorTransientState: StudioInspectorTransientState = {
+    advancedFillActive,
+    advancedFillBusy,
+    advancedFillPreviewActive: advancedFillPreview !== null,
+    autoColorScribbleArmed: autoColorScribbleCanvasArmed,
+    pixelToolActive: pixelTool !== null,
+    polyLassoSessionActive: polyLassoSession !== null,
+    colorRangePickActive,
+    quickMaskActive,
+    smudgeActive,
+    dodgeBurnActive,
+    wetMixActive,
+    liquifyActive,
+    healCloneActive: healCloneTool !== null,
+    historyBrushActive,
+    layerMaskPaintActive,
+    filterMaskPaintActive,
+    cropActive: cropRect !== null,
+    puppetWarpActive,
+    eyedropperActive,
+    quickShapeActive,
+    nodeEditActive: nodeEditTool !== null,
+    bubbleAnchorPickActive,
+    bubbleShapeEditActive,
+    panelSplitActive,
+  };
+  const inspectorTransientOwners =
+    studioInspectorTransientOwners(inspectorTransientState);
+  const inspectorInteractionPolicy = resolveStudioInspectorInteractionPolicy({
+    saving,
+    collaborationDocumentLocked,
+    activeSurfaceReviewLocked,
+    selectedContentMutationLocked,
+    masterEditMode,
+  });
+  const marqueeSelectionMutationLocked = marqueeIds.some((id) => {
+    const element = elementById.get(id);
+    return element ? isEffectivelyLocked(element, groups) : false;
+  });
+  const pathBooleanInspectorUnavailableReason =
+    inspectorInteractionPolicy.global.reason ??
+    (marqueeSelectionMutationLocked
+      ? "선택한 도형 레이어의 잠금을 해제한 뒤 결합할 수 있어요."
+      : pathBooleanUnavailableReason);
   const imageInspectorUnsupportedDrawMessage = {
     quick: "빠른 수정은 래스터 이미지 레이어가 선택되어야 동작해요.",
     fill: "채우기·선화 탭은 이미지 레이어를 대상으로 동작해요. 선화 요소는 픽셀 이미지로 전환하거나 다른 도구로 처리할 수 있어요.",
@@ -1132,8 +1205,11 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
 
   const shouldMountImageInspectorTab = (tab: StudioImageInspectorSection) =>
     activeImageInspectorTab === tab || activatedImageInspectorTabs.has(tab);
+  const activeInspectorBrushId = currentBrushSnapshot.sourcePresetId ?? brush;
   const activeInspectorBrushName =
-    BRUSH_PRESETS.find((preset) => preset.id === brush)?.name ?? brush;
+    currentBrushSnapshot.sourcePresetName
+    ?? BRUSH_PRESETS.find((preset) => preset.id === brush)?.name
+    ?? brush;
   const minimapViewportRect = projectStudioViewRectToDocumentRect({
     documentWidth: CANVAS_W,
     documentHeight: canvasH,
@@ -1144,40 +1220,10 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     width: scrollPos.width / effScale,
     height: scrollPos.height / effScale,
   });
-  const canvasControlsDisabled = collaborationDocumentLocked
-    || activeSurfaceReviewLocked
-    || saving
-    || masterEditMode;
-  const drawingAssistControlsDisabled = activeSurfaceReviewLocked || saving || masterEditMode;
-  const drawingAssistDisabledReason = masterEditMode
-    ? "마스터 편집을 마친 뒤 페이지 드로잉 가이드를 조정할 수 있어요."
-    : saving
-      ? "저장이 끝난 뒤 드로잉 가이드를 조정할 수 있어요."
-      : collaborationDocumentLocked
-        ? "공동 문서 편집 권한이 없어 드로잉 가이드가 잠겼어요."
-        : activeSurfaceReviewLocked
-          ? "검토 잠금을 해제한 뒤 드로잉 가이드를 조정할 수 있어요."
-          : undefined;
-  const rightPanelDisabledReasonCandidates = [
-    masterEditMode ? "마스터 편집 중에는 페이지 우측 패널의 일부 조작이 잠길 수 있어요." : null,
-    collaborationDocumentLocked ? "협업 문서 권한으로 편집 기능이 잠겨 있습니다." : null,
-    saving ? "저장이 진행 중이라 편집이 잠시 비활성화되어 있습니다." : null,
-    activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금이 활성화되어 있어 패널 편집이 제한됩니다." : null,
-    selectedContentMutationLocked
-      ? "선택한 레이어가 잠겨 있어 일부 우측 패널 조작이 제한됩니다."
-      : null,
-  ] as const;
-  type RightPanelDisabledReason = Exclude<
-    (typeof rightPanelDisabledReasonCandidates)[number],
-    null
-  >;
-  const rightPanelDisabledReasons = Array.from(
-    new Set(
-      rightPanelDisabledReasonCandidates.filter(
-        (reason): reason is RightPanelDisabledReason => reason !== null
-      )
-    )
-  );
+  const canvasControlsDisabled = inspectorInteractionPolicy.page.disabled;
+  const drawingAssistControlsDisabled = inspectorInteractionPolicy.page.disabled;
+  const drawingAssistDisabledReason = inspectorInteractionPolicy.page.reason;
+  const rightPanelDisabledReasons = inspectorInteractionPolicy.reasons;
   const withCanvasControlsGuard = <TArgs extends readonly unknown[]>(callback: (...args: TArgs) => void) =>
     (...args: TArgs) => {
       if (canvasControlsDisabled) return;
@@ -1228,9 +1274,15 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
           </div>
           <StudioInspectorNavigator
             layout={inspectorLayout}
-            selectedType={selected?.type ?? null}
-            selectionLabel={selected ? elementLabel(selected) : null}
-            drawing={selected === null && tool === "draw"}
+            selectedType={
+              inspectorContentMode === "selection" ? selected?.type ?? null : null
+            }
+            selectionLabel={
+              inspectorContentMode === "selection" && selected
+                ? elementLabel(selected)
+                : null
+            }
+            drawing={inspectorDrawing}
             layerCount={elements.length}
             mobileSheetHandle={
               <StudioMobileSheetHandle
@@ -1244,23 +1296,23 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               />
             }
             onRequestClose={() => setMobileSheet(null)}
-            onChange={changeInspectorLayout}
+            onChange={(next) => {
+              executeStudioInspectorRouteTransition(
+                {
+                  current: inspectorLayout,
+                  next,
+                  transient: inspectorTransientState,
+                  drawing: inspectorDrawing,
+                },
+                {
+                  disarm: disarmAllPixelTools,
+                  navigate: changeInspectorLayout,
+                },
+              );
+            }}
           />
 
-          {rightPanelDisabledReasons.length > 0 ? (
-            <section
-              role="status"
-              aria-live="polite"
-              className="rounded-xl border border-bad/35 bg-bad/10 px-3 py-2 text-[0.64rem] leading-relaxed text-bad"
-            >
-              <p className="font-semibold">우측 메뉴가 잠긴 이유</p>
-              <ul className="mt-1 space-y-0.5 pl-4 list-disc">
-                {rightPanelDisabledReasons.map((reason) => (
-                  <li key={reason}>{reason}</li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
+          <StudioInspectorDisabledReasons reasons={rightPanelDisabledReasons} />
 
           <StudioInspectorCanvasControls
             background={bg}
@@ -1336,62 +1388,40 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               setSharedDocumentNotice(null);
             })}
           />
-          <div
-            role="tabpanel"
-            aria-label="페이지 색보정"
-            hidden={
-              inspectorLayout.primary !== "document" ||
-              inspectorLayout.document !== "grade"
+          <StudioInspectorPageGradeSurface
+            active={
+              inspectorLayout.primary === "document" &&
+              inspectorLayout.document === "grade"
             }
-            className="rounded-xl border border-line bg-panel/40 p-3"
-          >
-            {pageGradePanelOpen ? (
-              <>
-                <div className="mb-2 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setPageGradePanelOpen(false)}
-                    className="inline-flex items-center gap-0.5 rounded text-[0.68rem] text-fg-3 transition-colors hover:text-fg"
-                    title="색보정 패널 접기"
-                  >
-                    접기 <ChevronUp size={13} />
-                  </button>
-                </div>
-                <Suspense fallback={<StudioPanelLoading label="색보정 패널을 여는 중..." />}>
-                  <StudioPageGradePanel
-                    grade={pageGrade}
-                    onPatch={patchPageGrade}
-                    onApplyPreset={applyPageGrade}
-                    onReset={resetPageGrade}
-                  />
-                </Suspense>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setPageGradePanelOpen(true)}
-                aria-expanded={false}
-                className="flex w-full items-center justify-between gap-3 rounded-xl border border-line/70 bg-card/65 px-3 py-2 text-left transition-colors hover:bg-raised"
-              >
-                <span className="min-w-0">
-                  <span className="block text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">페이지 색보정</span>
-                  <span className="mt-0.5 block text-xs text-fg-2">
-                    {pageGradeActive ? "보정 적용됨" : "무드 프리셋·밝기·대비"}
-                  </span>
-                </span>
-                <ChevronDown size={14} className="shrink-0 text-fg-3" />
-              </button>
-            )}
-          </div>
+            expanded={pageGradePanelOpen}
+            grade={pageGrade}
+            gradeActive={pageGradeActive}
+            gate={inspectorInteractionPolicy.page}
+            onApplyPreset={applyPageGrade}
+            onExpandedChange={setPageGradePanelOpen}
+            onPatch={patchPageGrade}
+            onReset={resetPageGrade}
+          />
 
-          {selected && (
+          {inspectorContentMode === "selection" && selected && (
             <div
               role="tabpanel"
               aria-label="선택 요소 속성"
               hidden={inspectorLayout.primary !== "properties"}
               className="rounded-xl border border-line bg-panel/40 p-3"
             >
-              <Suspense fallback={<StudioPanelLoading label="속성 패널을 여는 중..." />}>
+              <StudioInspectorMutationLockNotice
+                gate={inspectorInteractionPolicy.selection}
+                hasActiveSession={inspectorTransientOwners.length > 0}
+                onExit={disarmAllPixelTools}
+              />
+              <fieldset
+                disabled={inspectorInteractionPolicy.selection.disabled}
+                title={inspectorInteractionPolicy.selection.reason}
+                className="m-0 min-w-0 border-0 p-0 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50 disabled:[&_input]:cursor-not-allowed disabled:[&_input]:opacity-55 disabled:[&_select]:cursor-not-allowed disabled:[&_select]:opacity-55 disabled:[&_textarea]:cursor-not-allowed disabled:[&_textarea]:opacity-55"
+              >
+                <legend className="sr-only">선택 요소 편집 설정</legend>
+                <Suspense fallback={<StudioPanelLoading label="속성 패널을 여는 중..." />}>
                 <p className="mb-2 text-xs font-semibold text-fg-3">선택한 요소</p>
               {selected.type === "draw" && (
                 <div className="space-y-3">
@@ -1589,7 +1619,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 <StudioInspectorBubbleShapeControls
                   active={bubbleShapeArmed}
                   editActive={bubbleShapeEditActive}
-                  mutationLocked={selectedContentMutationLocked}
+                  mutationLocked={inspectorInteractionPolicy.selection.disabled}
                   onAddPoint={addBubbleShapePointFromInspector}
                   onDisarmPixelTools={disarmAllPixelTools}
                   onPatch={(patch) => patchEl(selected.id, patch as Partial<El>)}
@@ -2157,7 +2187,10 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     mode={extendedBlendMode}
                     opacity={extendedBlendOpacity}
                     busy={extendedBlendBusy}
-                    unavailableReason={extendedBlendUnavailableReason}
+                    unavailableReason={
+                      inspectorInteractionPolicy.selection.reason ??
+                      extendedBlendUnavailableReason
+                    }
                     onModeChange={setExtendedBlendMode}
                     onOpacityChange={setExtendedBlendOpacity}
                     onApply={() => void applyExtendedBlendMergeDown()}
@@ -2259,10 +2292,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   onSplitFrame={splitFrameSelected}
                   onTogglePanelSplit={() => {
                     setPanelSplitHint(null);
-                    setPanelSplitActive((active) => {
-                      const next = !active;
-                      if (next) disarmAllPixelTools();
-                      return next;
+                    executeStudioInspectorArmedToggle(panelSplitActive, {
+                      disarm: disarmAllPixelTools,
+                      setActive: setPanelSplitActive,
                     });
                   }}
                   onPanelGutterChange={(value) => {
@@ -2349,7 +2381,10 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                         referenceLayerCount={advancedFillReferenceLayerCount}
                         visibleRasterCount={advancedFillVisibleRasterCount}
                         selectedIsReference={selected?.type === "image" ? selected.fillReference === true : false}
-                        targetUnsupportedReason={advancedFillUnsupportedReason}
+                        targetUnsupportedReason={
+                          inspectorInteractionPolicy.selection.reason ??
+                          advancedFillUnsupportedReason
+                        }
                         statusMessage={advancedFillStatus}
                         diagnostics={advancedFillPreview?.diagnostics}
                         onToggleActive={toggleAdvancedFill}
@@ -2375,7 +2410,15 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           <StudioAutoColorHintsPanel
                             imageSrc={selected.src}
                             scribbleCanvasArmed={autoColorScribbleCanvasArmed}
-                            onScribbleCanvasArmedChange={setAutoColorScribbleCanvasArmed}
+                            onScribbleCanvasArmedChange={
+                              setAutoColorScribbleCanvasArmed
+                                ? (next) =>
+                                    executeStudioInspectorArmedChange(next, {
+                                      disarm: disarmAllPixelTools,
+                                      setActive: setAutoColorScribbleCanvasArmed,
+                                    })
+                                : undefined
+                            }
                             canvasSeedHit={autoColorCanvasSeedHit}
                             canvasSeedHits={autoColorCanvasSeedHits}
                             onCanvasSeedHitConsumed={() => {
@@ -2646,16 +2689,12 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           opacity={historyBrushOpacity}
                           hasSource={historyBrushSourceSrc !== null}
                           busy={historyBrushBusy}
-                          onToggleActive={() =>
-                            setHistoryBrushActive((v) => {
-                              const next = !v;
-                              if (next) {
-                                disarmAllPixelTools();
-                                return true;
-                              }
-                              return false;
-                            })
-                          }
+                          onToggleActive={() => {
+                            executeStudioInspectorArmedToggle(historyBrushActive, {
+                              disarm: disarmAllPixelTools,
+                              setActive: setHistoryBrushActive,
+                            });
+                          }}
                           onRadiusChange={setHistoryBrushRadius}
                           onHardnessChange={setHistoryBrushHardness}
                           onOpacityChange={setHistoryBrushOpacity}
@@ -2693,13 +2732,12 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                             onDeleteMask={deleteLayerMask}
                             onToggleEnabled={toggleLayerMaskEnabled}
                             onInvert={invertLayerMask}
-                            onTogglePaintActive={() =>
-                              setLayerMaskPaintActive((v) => {
-                                const next = !v;
-                                if (next) disarmAllPixelTools();
-                                return next;
-                              })
-                            }
+                            onTogglePaintActive={() => {
+                              executeStudioInspectorArmedToggle(layerMaskPaintActive, {
+                                disarm: disarmAllPixelTools,
+                                setActive: setLayerMaskPaintActive,
+                              });
+                            }}
                             onPaintModeChange={setLayerMaskPaintMode}
                             onRadiusChange={setLayerMaskRadius}
                             onHardnessChange={setLayerMaskHardness}
@@ -2720,13 +2758,12 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                             onDeleteMask={deleteFilterMask}
                             onToggleEnabled={toggleFilterMaskEnabled}
                             onInvert={invertFilterMask}
-                            onTogglePaintActive={() =>
-                              setFilterMaskPaintActive((v) => {
-                                const next = !v;
-                                if (next) disarmAllPixelTools();
-                                return next;
-                              })
-                            }
+                            onTogglePaintActive={() => {
+                              executeStudioInspectorArmedToggle(filterMaskPaintActive, {
+                                disarm: disarmAllPixelTools,
+                                setActive: setFilterMaskPaintActive,
+                              });
+                            }}
                             onPaintModeChange={setFilterMaskPaintMode}
                             onRadiusChange={setFilterMaskRadius}
                             onHardnessChange={setFilterMaskHardness}
@@ -2890,11 +2927,12 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   <Trash2 size={14} /> 삭제
                 </button>
                 </div>
-              </Suspense>
+                </Suspense>
+              </fieldset>
             </div>
           )}
 
-          {marqueeIds.length === 2 && (
+          {inspectorContentMode === "selection" && marqueeIds.length === 2 && (
             <div
               role="tabpanel"
               aria-label="도형 결합"
@@ -2904,14 +2942,14 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               <Suspense fallback={null}>
                 <StudioPathBooleanPanel
                   busy={pathBooleanBusy}
-                  unavailableReason={pathBooleanUnavailableReason}
+                  unavailableReason={pathBooleanInspectorUnavailableReason}
                   onApply={(op) => applyPathBooleanCombine(op)}
                 />
               </Suspense>
             </div>
           )}
 
-          {selected === null && tool === "draw" && (
+          {inspectorContentMode === "drawing" && (
             <div
               role="tabpanel"
               aria-label="그리기 도구 설정"
@@ -2920,7 +2958,12 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             >
               <StudioInspectorDrawModeControls
                 drawMode={drawMode}
-                onDrawModeChange={setDrawMode}
+                onDrawModeChange={(next) => {
+                  executeStudioInspectorDrawModeTransition(drawMode, next, {
+                    disarm: disarmAllPixelTools,
+                    setDrawMode,
+                  });
+                }}
                 onDrawShapeChange={setDrawShape}
                 onStrokeWidthChange={setStrokeWidth}
                 onSymmetryChange={setSymmetryType}
@@ -2929,34 +2972,17 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               {/* 기본 프리셋 탐색은 하단 도크 한 곳에만 둔다. 인스펙터는 현재 상태와
                   사용자 저장 브러시·고급 동역학에 집중해 긴 중복 메뉴를 만들지 않는다. */}
               {drawMode === "pen" && inspectorLayout.primary === "properties" ? (
-                <section
-                  aria-label="현재 기본 프리셋 요약"
-                  data-studio-inspector-brush-summary="true"
-                  className="rounded-xl border border-line/70 bg-card/65 p-2.5"
-                >
-                  <div className="flex min-h-11 items-center gap-2">
-                    <span
-                      aria-hidden
-                      className="grid size-9 shrink-0 place-items-center rounded-lg border border-line/70 shadow-inner"
-                      style={{ backgroundColor: color }}
-                    >
-                      <Paintbrush className="size-4 text-white mix-blend-difference" strokeWidth={1.8} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[0.58rem] font-semibold text-fg-3">현재 기본 프리셋</span>
-                      <span className="block truncate text-xs font-bold text-fg">
-                        {activeInspectorBrushName}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-right text-[0.62rem] tabular-nums text-fg-3">
-                      <span className="block">{strokeWidth}px</span>
-                      <span className="block">{Math.round(brushOpacity * 100)}%</span>
-                    </span>
-                  </div>
-                  <p className="mt-1.5 border-t border-line/45 pt-1.5 text-[0.62rem] leading-relaxed text-fg-3">
-                    기본 프리셋 변경은 캔버스 하단 브러시 도크에서 할 수 있어요.
-                  </p>
-                </section>
+                <StudioInspectorCurrentBrushSummary
+                  brushId={activeInspectorBrushId}
+                  brushName={activeInspectorBrushName}
+                  color={color}
+                  opacity={brushOpacity}
+                  stabilizer={stabilizer}
+                  stabilizerMode={stabilizerMode}
+                  strokeWidth={strokeWidth}
+                  tipAngle={tipAngle}
+                  tipRoundness={tipRoundness}
+                />
               ) : null}
 
               {/* 저장된 브러시 라이브러리 — ibisPaint 브러시/머티리얼 라이브러리 대응.
@@ -3181,6 +3207,13 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       brushId={brush}
                       strokeWidth={strokeWidth}
                       color={color}
+                      currentSnapshot={currentBrushSnapshot}
+                      savedBrushBaseline={
+                        activeSavedBrushId
+                          ? savedBrushes.find((candidate) => candidate.id === activeSavedBrushId)
+                            ?? null
+                          : null
+                      }
                       settings={brushDynamics}
                       onSettingsChange={setBrushDynamics}
                       onSelectDynamicsPreset={applyDynamicsPreset}
@@ -3198,6 +3231,30 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       onTipAngleChange={setTipAngle}
                       tipRoundness={tipRoundness}
                       onTipRoundnessChange={setTipRoundness}
+                      onRestoreDefaults={(transaction, direction) => {
+                        const values =
+                          direction === "undo" ? transaction.before : transaction.after;
+                        setStrokeWidth(values.strokeWidth);
+                        setBrushOpacity(values.brushOpacity);
+                        setBrushDynamics(values.brushDynamics);
+                        setStampTuning(values.stampTuning);
+                        setStabilizer(values.stabilizer);
+                        setStabilizerMode(values.stabilizerMode);
+                        setPostCorrection(values.postCorrection);
+                        setPreserveCorners(values.preserveCorners);
+                        setPressureCurve(values.pressureCurve);
+                        setPressureMinSize?.(values.pressureMinSize);
+                        setUseVelocityPressure(values.useVelocityPressure);
+                        setVelocitySensitivity(values.velocitySensitivity);
+                        setTiltEnabled(values.tiltEnabled);
+                        setTipAngle(values.tipAngle);
+                        setTipRoundness(values.tipRoundness);
+                        announceDrawingShortcut(
+                          direction === "undo"
+                            ? "브러시 기본값 복원을 되돌렸어요."
+                            : `${transaction.changes.length}개 브러시 설정을 기본값으로 복원했어요.`,
+                        );
+                      }}
                     />
                   </Suspense>
                 ) : null}
@@ -3349,27 +3406,13 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             </div>
           )}
 
-          {inspectorLayout.primary === "properties" && selected === null && tool !== "draw" &&
-            !activeFillRouteImagePanel ? (
-            <div
-              role="tabpanel"
-              aria-label="선택 요소 속성"
-              className="rounded-xl border border-line bg-panel/40 px-4 py-8 text-center"
-            >
-              <div className="mx-auto mb-2 grid size-11 place-items-center rounded-xl border border-line bg-card text-fg-3">
-                <MousePointer2 size={20} aria-hidden />
-              </div>
-              <p className="text-xs font-semibold text-fg-2 text-pretty">편집할 요소를 선택하세요</p>
-              <p className="mx-auto mt-1.5 max-w-[30ch] text-[0.68rem] leading-relaxed text-fg-3 text-pretty">
-                캔버스에서 프레임·말풍선·획을 고르면 여기에 기본·전문 설정이 나타납니다. 펜 도구(B)로 바로 그릴 수도 있어요.
-              </p>
-              <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5 text-[0.62rem] text-fg-3">
-                <span className="rounded-full border border-line bg-card px-2 py-1 font-semibold">레이어 탭 · 순서</span>
-                <span className="rounded-full border border-line bg-card px-2 py-1 font-semibold">검색 · 채우기/마스크</span>
-                <span className="rounded-full border border-line bg-card px-2 py-1 font-semibold">게시 · 내보내기</span>
-              </div>
-            </div>
-          ) : null}
+          <StudioInspectorEmptySelection
+            visible={
+              inspectorLayout.primary === "properties" &&
+              inspectorContentMode === "empty" &&
+              !activeFillRouteImagePanel
+            }
+          />
 
           {advancedFillInspectorRouteWithoutImageSelection ? (
             <div
@@ -3389,7 +3432,10 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       referenceLayerCount={advancedFillReferenceLayerCount}
                       visibleRasterCount={advancedFillVisibleRasterCount}
                       selectedIsReference={false}
-                      targetUnsupportedReason={advancedFillUnsupportedReason}
+                      targetUnsupportedReason={
+                        inspectorInteractionPolicy.page.reason ??
+                        advancedFillUnsupportedReason
+                      }
                       statusMessage={advancedFillStatus}
                       diagnostics={advancedFillPreview?.diagnostics}
                       onToggleActive={toggleAdvancedFill}
@@ -3436,7 +3482,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   groups={masterEditMode ? [] : groups}
                   selectedIds={marqueeIds.length > 0 ? marqueeIds : selectedId ? [selectedId] : []}
                   pageKey={`${masterEditMode ? "master" : currentPageId}:${inspectorLayout.primary}`}
-                  readOnly={activeSurfaceReviewLocked}
+                  readOnly={inspectorInteractionPolicy.global.disabled}
                   groupingDisabled={masterEditMode}
                   localHiddenIds={localHiddenElementIds}
                   onToggleLocalHidden={toggleLocalHidden}
@@ -3534,52 +3580,26 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             </div>
           </div>
 
-          <div
-            role="tabpanel"
-            aria-label="게시 정보"
-            hidden={inspectorLayout.primary !== "publish"}
-            className="rounded-xl border border-line bg-panel/40 p-3"
-          >
-            <p className="mb-2 text-xs font-semibold text-fg-3">게시 정보</p>
-            <input
-              ref={titleInputRef}
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                setSharedDocumentNotice(null);
-              }}
-              aria-label="게시 제목 (필수)"
-              placeholder="제목 *"
-              maxLength={80}
-              spellCheck
-              readOnly={collaborationDocumentLocked || saving}
-              className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent read-only:cursor-default read-only:text-fg-2"
-            />
-            <textarea
-              value={description}
-              onChange={(e) => {
-                setDescription(e.target.value);
-                setSharedDocumentNotice(null);
-              }}
-              aria-label="게시 설명 (선택)"
-              placeholder="설명 (선택)"
-              spellCheck
-              rows={2}
-              readOnly={collaborationDocumentLocked || saving}
-              className="mt-2 w-full resize-none rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent read-only:cursor-default read-only:text-fg-2"
-            />
-            <input
-              value={tagsText}
-              onChange={(e) => {
-                setTagsText(e.target.value);
-                setSharedDocumentNotice(null);
-              }}
-              aria-label="게시 태그 (쉼표로 구분, 선택)"
-              placeholder="태그 (쉼표로 구분)"
-              readOnly={collaborationDocumentLocked || saving}
-              className="mt-2 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent read-only:cursor-default read-only:text-fg-2"
-            />
-          </div>
+          <StudioInspectorPublishPanel
+            active={inspectorLayout.primary === "publish"}
+            description={description}
+            readOnly={inspectorInteractionPolicy.global.disabled}
+            tags={tagsText}
+            title={title}
+            titleInputRef={titleInputRef}
+            onDescriptionChange={(value) => {
+              setDescription(value);
+              setSharedDocumentNotice(null);
+            }}
+            onTagsChange={(value) => {
+              setTagsText(value);
+              setSharedDocumentNotice(null);
+            }}
+            onTitleChange={(value) => {
+              setTitle(value);
+              setSharedDocumentNotice(null);
+            }}
+          />
         </aside>
   );
 });

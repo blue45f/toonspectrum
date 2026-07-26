@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   findStudioElement,
+  listStudioElementLibrary,
   listStudioElements,
   STUDIO_ELEMENT_CATEGORY_CHIPS,
   STUDIO_ELEMENT_ITEMS,
@@ -59,6 +60,14 @@ describe("studio-elements-catalog", () => {
     ]) {
       expect(ids.has(id), `missing asset: ${id}`).toBe(true);
     }
+  });
+
+  it("keeps editable speech balloons in the dedicated balloon tool", () => {
+    expect(STUDIO_ELEMENT_CATEGORY_CHIPS.some((chip) => chip.id === "bubble")).toBe(false);
+    expect(listStudioElementLibrary("all").some((item) => item.category === "bubble")).toBe(false);
+    expect(listStudioElements("bubble").length).toBeGreaterThan(0);
+    expect(findStudioElement("bubble-shout")).not.toBeNull();
+    expect(findStudioElement("decor-speech")?.label).toBe("캡션 카드");
   });
 
   it("finds by id", () => {

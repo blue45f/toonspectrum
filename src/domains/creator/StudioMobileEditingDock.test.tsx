@@ -48,6 +48,7 @@ vi.mock("./studio-chrome-ui", () => ({
     "aria-controls": ariaControls,
     "aria-expanded": ariaExpanded,
     "aria-label": ariaLabel,
+    "aria-pressed": ariaPressed,
     label,
     disabled,
     hintDescription,
@@ -63,6 +64,7 @@ vi.mock("./studio-chrome-ui", () => ({
       aria-controls={ariaControls}
       aria-expanded={ariaExpanded}
       aria-label={ariaLabel ?? label}
+      aria-pressed={ariaPressed}
       data-hint-description={hintDescription}
       data-hint-preview={hintPreview}
       data-hint-preview-variant={hintPreviewVariant}
@@ -125,6 +127,7 @@ vi.mock("./StudioSavedBrushShelf", () => ({
 
 function createHandlers(): StudioMobileEditingDockHandlers {
   return {
+    activateCanvasTool: vi.fn(),
     applyBuiltInBrushPreset: vi.fn(),
     applyDynamicsPreset: vi.fn(),
     applySavedBrush: vi.fn(),
@@ -264,6 +267,23 @@ describe("StudioMobileEditingDock", () => {
     expect(screen.queryByRole("navigation", { name: "스튜디오 모바일 도구막대" })).toBeNull();
   });
 
+  it("dismisses the quick-start surface whenever a mobile editing sheet is active", () => {
+    const setQuickStartOpen = vi.fn();
+
+    render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          mobileSheet: "draw",
+          setQuickStartOpen,
+        })}
+      />,
+    );
+
+    expect(setQuickStartOpen).toHaveBeenCalledOnce();
+    expect(setQuickStartOpen).toHaveBeenCalledWith(false);
+  });
+
   it("preserves dock rows, safe-area placement, and history disabled semantics", () => {
     const props = createProps({ isMobile: true, mobileKeyboardInset: 18 });
     const view = render(<StudioMobileEditingDock {...props} />);
@@ -273,14 +293,18 @@ describe("StudioMobileEditingDock", () => {
     expect(dock.className).toContain("env(safe-area-inset-bottom)");
     expect(dock.style.bottom).toBe("18px");
     expect(dock.getAttribute("data-studio-mobile-dock-expanded")).toBe("false");
-    expect(within(dock).getByRole("toolbar", { name: "드로잉 도구" })).toBeTruthy();
+    const drawingToolbar = within(dock).getByRole("toolbar", { name: "드로잉 도구" });
+    expect(drawingToolbar).toBeTruthy();
     const workspaceToggle = within(dock).getByRole<HTMLButtonElement>("button", {
       name: "작업 공간 도구 펼치기",
     });
+    expect(workspaceToggle.parentElement).toBe(drawingToolbar);
     expect(workspaceToggle.getAttribute("aria-controls")).toBe("studio-mobile-workspace-tools");
     expect(workspaceToggle.getAttribute("aria-expanded")).toBe("false");
     expect(workspaceToggle.className).toContain("min-h-11");
     expect(workspaceToggle.className).toContain("min-w-11");
+    expect(workspaceToggle.className).toContain("shrink-0");
+    expect(workspaceToggle.className).not.toContain("absolute");
     expect(dock.querySelector("#studio-mobile-workspace-tools")?.hasAttribute("hidden")).toBe(true);
     fireEvent.click(workspaceToggle);
     expect(dock.getAttribute("data-studio-mobile-dock-expanded")).toBe("true");
@@ -313,6 +337,46 @@ describe("StudioMobileEditingDock", () => {
     expect(within(dock).getByRole<HTMLButtonElement>("button", { name: "다시실행" }).disabled).toBe(true);
     expect(within(dock).getByRole("button", { name: "실행취소" }).getAttribute("data-hint-unavailable-reason")).toContain("문서 잠금");
     expect(within(dock).getByRole("button", { name: "다시실행" }).getAttribute("data-hint-unavailable-reason")).toContain("문서 잠금");
+  });
+
+  it("signals horizontally hidden tools without overlaying the scroll lane", () => {
+    render(<StudioMobileEditingDock {...createProps({ isMobile: true })} />);
+
+    const drawingTools = screen.getByRole("toolbar", { name: "드로잉 도구" });
+    const scroller = drawingTools.closest<HTMLDivElement>(
+      '[data-studio-mobile-dock-scroll="primary"]',
+    );
+    const host = scroller?.closest<HTMLElement>(
+      '[data-studio-mobile-scroll-host="primary"]',
+    );
+    expect(scroller).not.toBeNull();
+    expect(host).not.toBeNull();
+    expect(drawingTools.getAttribute("aria-describedby")).toBe(
+      host?.querySelector("[data-studio-mobile-scroll-status]")?.id,
+    );
+    expect(host?.querySelectorAll("[data-studio-mobile-scroll-cue]")).toHaveLength(2);
+    expect(
+      host?.querySelector('[data-studio-mobile-scroll-cue="primary-after"]')?.className,
+    ).toContain("pointer-events-none");
+
+    Object.defineProperties(scroller!, {
+      clientWidth: { configurable: true, value: 378 },
+      scrollLeft: { configurable: true, value: 0, writable: true },
+      scrollWidth: { configurable: true, value: 492 },
+    });
+    fireEvent.scroll(scroller!);
+    expect(scroller?.getAttribute("data-studio-mobile-overflow")).toBe("after");
+    expect(host?.style.getPropertyValue("--studio-mobile-scroll-after")).toBe("1");
+    expect(host?.style.getPropertyValue("--studio-mobile-scroll-before")).toBe("0");
+    expect(host?.querySelector("[data-studio-mobile-scroll-status]")?.textContent).toContain(
+      "오른쪽에 도구가 더 있습니다",
+    );
+
+    scroller!.scrollLeft = 114;
+    fireEvent.scroll(scroller!);
+    expect(scroller?.getAttribute("data-studio-mobile-overflow")).toBe("before");
+    expect(host?.style.getPropertyValue("--studio-mobile-scroll-after")).toBe("0");
+    expect(host?.style.getPropertyValue("--studio-mobile-scroll-before")).toBe("1");
   });
 
   it("keeps the comment first and pins the quick menu beside it for a left-hand layout", () => {
@@ -394,7 +458,9 @@ describe("StudioMobileEditingDock", () => {
     expect(workspace.getAttribute("data-studio-mobile-control-side")).toBe("right");
     expect(workspace.firstElementChild).toBe(comment);
     expect(workspace.lastElementChild).toBe(quickSlot);
-    expect(scrollLane?.nextElementSibling).toBe(quickSlot);
+    expect(
+      scrollLane?.closest('[data-studio-mobile-scroll-host="secondary"]')?.nextElementSibling,
+    ).toBe(quickSlot);
     expect(within(quickSlot as HTMLElement).getByRole("button", { name: "빠른 작업" })).not.toBeNull();
     expect(quickSlot?.className).toContain("size-11");
   });
@@ -403,6 +469,7 @@ describe("StudioMobileEditingDock", () => {
     const setEraseToIntersection = vi.fn();
     const setDrawMode = vi.fn();
     const setTool = vi.fn();
+    const stableHandlers = createHandlers();
     const view = render(
       <StudioMobileEditingDock
         {...createProps({
@@ -414,6 +481,7 @@ describe("StudioMobileEditingDock", () => {
           setEraseToIntersection,
           setDrawMode,
           setTool,
+          stableHandlers,
         })}
       />,
     );
@@ -423,8 +491,9 @@ describe("StudioMobileEditingDock", () => {
     expect(toggle.getAttribute("aria-pressed")).toBe("false");
     expect(toggle.getAttribute("data-studio-erase-to-intersection")).toBe("true");
     toggle.click();
-    expect(setTool).toHaveBeenCalledWith("draw");
-    expect(setDrawMode).toHaveBeenCalledWith("eraser");
+    expect(setTool).not.toHaveBeenCalled();
+    expect(setDrawMode).not.toHaveBeenCalled();
+    expect(stableHandlers.activateCanvasTool).not.toHaveBeenCalled();
     expect(setEraseToIntersection).toHaveBeenCalledOnce();
     const updater = setEraseToIntersection.mock.calls[0]?.[0];
     expect(typeof updater).toBe("function");
@@ -442,6 +511,7 @@ describe("StudioMobileEditingDock", () => {
           setEraseToIntersection,
           setDrawMode,
           setTool,
+          stableHandlers,
         })}
       />,
     );
@@ -688,6 +758,9 @@ describe("StudioMobileEditingDock", () => {
     expect(
       drawSheet.style.getPropertyValue("--studio-draw-sheet-reserved-bottom"),
     ).toContain("20px");
+    expect(
+      drawSheet.style.getPropertyValue("--studio-draw-sheet-reserved-bottom"),
+    ).toContain("72px");
     expect(handle.getAttribute("aria-valuenow")).toBe("1");
 
     fireEvent.click(handle);
@@ -709,6 +782,62 @@ describe("StudioMobileEditingDock", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "브러시 설정 닫기" }));
     expect(setMobileSheet).toHaveBeenCalledWith(null);
+  });
+
+  it("isolates and visually clears the draw sheet while the full brush catalog is open", () => {
+    const view = render(
+      <StudioMobileEditingDock
+        {...createProps({
+          brushCatalogOpen: false,
+          isMobile: true,
+          mobileSheet: "draw",
+        })}
+      />,
+    );
+
+    const drawSheet = screen.getByRole("dialog", { name: "브러시 설정" });
+    expect(drawSheet.hasAttribute("inert")).toBe(false);
+    expect(drawSheet.getAttribute("aria-hidden")).toBeNull();
+    expect(drawSheet.getAttribute("aria-modal")).toBe("false");
+    expect(drawSheet.getAttribute("tabindex")).toBe("-1");
+
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({
+          brushCatalogOpen: true,
+          isMobile: true,
+          mobileSheet: "draw",
+        })}
+      />,
+    );
+
+    const isolatedSheet = document.querySelector<HTMLElement>('[data-studio-sheet-id="draw"]');
+    expect(isolatedSheet?.hasAttribute("inert")).toBe(true);
+    expect(isolatedSheet?.getAttribute("aria-hidden")).toBe("true");
+    expect(isolatedSheet?.getAttribute("role")).toBeNull();
+    expect(isolatedSheet?.getAttribute("aria-label")).toBeNull();
+    expect(isolatedSheet?.getAttribute("aria-modal")).toBeNull();
+    expect(isolatedSheet?.getAttribute("tabindex")).toBeNull();
+    expect(isolatedSheet?.className).toContain("pointer-events-none");
+    expect(isolatedSheet?.className).toContain("opacity-0");
+
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({
+          brushCatalogOpen: false,
+          isMobile: true,
+          mobileSheet: null,
+        })}
+      />,
+    );
+
+    const dormantSheet = document.querySelector<HTMLElement>('[data-studio-sheet-id="draw"]');
+    expect(screen.queryByRole("dialog", { name: "브러시 설정" })).toBeNull();
+    expect(dormantSheet?.hasAttribute("inert")).toBe(true);
+    expect(dormantSheet?.getAttribute("aria-hidden")).toBe("true");
+    expect(dormantSheet?.getAttribute("role")).toBeNull();
+    expect(dormantSheet?.getAttribute("aria-label")).toBeNull();
+    expect(dormantSheet?.getAttribute("tabindex")).toBeNull();
   });
 
   it("uses the same three snap levels for the mobile brush manager", () => {
@@ -981,6 +1110,101 @@ describe("StudioMobileEditingDock", () => {
     expect(setMenu).toHaveBeenCalledWith(null);
     expect(setMobileSheet).toHaveBeenCalledWith(null);
     expect(stableHandlers.toggleAdvancedFill).toHaveBeenCalledOnce();
+  });
+
+  it("presents fill as the only pressed canvas owner while its internal selection target is armed", () => {
+    render(
+      <StudioMobileEditingDock
+        {...createProps({
+          advancedFillActive: true,
+          isMobile: true,
+          tool: "select",
+        })}
+      />,
+    );
+
+    const drawingToolbar = screen.getByRole("toolbar", { name: "드로잉 도구" });
+    expect(
+      within(drawingToolbar).getByRole("button", { name: "선택" }).getAttribute("aria-pressed"),
+    ).toBe("false");
+    expect(
+      within(drawingToolbar).getByRole("button", { name: "채우기" }).getAttribute("aria-pressed"),
+    ).toBe("true");
+  });
+
+  it.each([
+    [{ tool: "select" as const, drawMode: "pen" as const, advancedFillActive: false }, "선택"],
+    [{ tool: "draw" as const, drawMode: "pen" as const, advancedFillActive: false }, "펜"],
+    [{ tool: "draw" as const, drawMode: "pixel" as const, advancedFillActive: false }, "픽셀"],
+    [{ tool: "draw" as const, drawMode: "eraser" as const, advancedFillActive: false }, "지우개"],
+    [{ tool: "draw" as const, drawMode: "shape" as const, advancedFillActive: false }, "도형"],
+    [{ tool: "select" as const, drawMode: "pen" as const, advancedFillActive: true }, "채우기"],
+  ])("exposes exactly one pressed primary canvas owner for %s", (state, expectedLabel) => {
+    render(<StudioMobileEditingDock {...createProps({ ...state, isMobile: true })} />);
+
+    const toolbar = screen.getByRole("toolbar", { name: "드로잉 도구" });
+    const pressed = [...toolbar.querySelectorAll<HTMLButtonElement>('button[aria-pressed="true"]')];
+    expect(pressed).toHaveLength(1);
+    expect(pressed[0]?.getAttribute("aria-label") ?? pressed[0]?.textContent).toContain(expectedLabel);
+  });
+
+  it("routes primary tool changes through the exclusive canvas transition owner", () => {
+    const stableHandlers = createHandlers();
+    render(
+      <StudioMobileEditingDock
+        {...createProps({ isMobile: true, tool: "select", stableHandlers })}
+      />,
+    );
+    const toolbar = within(screen.getByRole("toolbar", { name: "드로잉 도구" }));
+
+    fireEvent.click(toolbar.getByRole("button", { name: "펜" }));
+    fireEvent.click(toolbar.getByRole("button", { name: "픽셀" }));
+    fireEvent.click(toolbar.getByRole("button", { name: "지우개" }));
+    fireEvent.click(toolbar.getByRole("button", { name: "도형" }));
+    fireEvent.click(toolbar.getByRole("button", { name: "선택" }));
+
+    expect(stableHandlers.activateCanvasTool).toHaveBeenNthCalledWith(1, "draw", "pen");
+    expect(stableHandlers.activateCanvasTool).toHaveBeenNthCalledWith(2, "draw", "pixel");
+    expect(stableHandlers.activateCanvasTool).toHaveBeenNthCalledWith(3, "draw", "eraser");
+    expect(stableHandlers.activateCanvasTool).toHaveBeenNthCalledWith(4, "draw", "shape");
+    expect(stableHandlers.activateCanvasTool).toHaveBeenNthCalledWith(5, "select");
+  });
+
+  it("opens brush settings without turning selection into a drawing tool", () => {
+    const stableHandlers = createHandlers();
+    const setDrawMode = vi.fn();
+    const setMenu = vi.fn();
+    const setMobileSheet = vi.fn();
+    const setTool = vi.fn();
+    render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          tool: "select",
+          stableHandlers,
+          setDrawMode,
+          setMenu,
+          setMobileSheet,
+          setTool,
+        })}
+      />,
+    );
+
+    const settings = screen.getByRole("button", {
+      name: "브러시 설정 (굵기·색·프리셋)",
+    });
+    expect(settings.getAttribute("aria-pressed")).toBeNull();
+    fireEvent.click(settings);
+
+    expect(setTool).not.toHaveBeenCalled();
+    expect(setDrawMode).not.toHaveBeenCalled();
+    expect(stableHandlers.activateCanvasTool).not.toHaveBeenCalled();
+    expect(setMenu).toHaveBeenCalledWith(null);
+    expect(setMobileSheet).toHaveBeenCalledOnce();
+    const updater = setMobileSheet.mock.calls[0]?.[0];
+    expect(typeof updater).toBe("function");
+    expect(updater(null)).toBe("draw");
+    expect(updater("draw")).toBeNull();
   });
 
   it("keeps the first-use coach close action at the 44px mobile target minimum", () => {

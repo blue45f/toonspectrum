@@ -208,7 +208,7 @@ describe("Studio ToolBelt content module boundary", () => {
     expect(toolBelt.source).not.toContain('"use no memo"');
   });
 
-  it("preserves all 72 stable handlers without key drift", () => {
+  it("preserves all 73 stable handlers without key drift", () => {
     const page = moduleShape("./StudioPage.tsx");
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx");
     const handlerNames = propertyNames(
@@ -224,10 +224,20 @@ describe("Studio ToolBelt content module boundary", () => {
       initializer.arguments[0] as ts.ObjectLiteralExpression
     ).toSorted();
 
-    expect(handlerNames).toHaveLength(72);
-    expect(wiredHandlerNames).toHaveLength(72);
+    expect(handlerNames).toHaveLength(73);
+    expect(wiredHandlerNames).toHaveLength(73);
     expect(wiredHandlerNames).toEqual(handlerNames);
     expect(page.source).toContain("stableHandlers={studioToolBeltContentHandlers}");
+  });
+
+  it("disarms transient canvas tools before mobile select, pen, and eraser transitions", () => {
+    const page = moduleShape("./StudioPage.tsx").source;
+    const toolBelt = moduleShape("./StudioToolBeltContent.tsx").source;
+
+    expect(page).toContain("disarmAllPixelTools,");
+    expect(toolBelt).toContain("disarmAllPixelTools: () => void;");
+    expect(toolBelt.match(/disarmAllPixelTools\(\);\s+setTool\("select"\)/gu)).toHaveLength(1);
+    expect(toolBelt.match(/disarmAllPixelTools\(\);\s+setTool\("draw"\)/gu)).toHaveLength(2);
   });
 
   it("preserves all 203 props at the single Page call site", () => {

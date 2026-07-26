@@ -66,11 +66,26 @@ import {
   CreatorCollaborationRevisionConflictError,
 } from "./creator-collaboration.repository";
 import {
+  CREATOR_DRAFT_COLLABORATION_REPOSITORY,
+  CreatorDraftCollaborationAlreadyPromotedError,
+  CreatorDraftCollaborationGraphConflictError,
+  CreatorDraftCollaborationMutationReuseError,
+  CreatorDraftCollaborationRateLimitError,
+  CreatorDraftCollaborationRepository,
+  CreatorDraftCollaborationRoomExpiredError,
+  CreatorDraftCollaborationRoomLimitError,
+  CreatorDraftCollaborationRoomNotFoundError,
+  CreatorDraftCollaborationTargetMismatchError,
+} from "./creator-draft-collaboration.repository";
+import {
+  CreatorDraftCollaborationRoomResponseSchema,
   CreatorSharedDocumentMetaResponseSchema,
   CreatorSharedDocumentResponseSchema,
   CreatorSharedDocumentSaveResponseSchema,
   CreatorSharedWorksResponseSchema,
   CreatorWorkRevisionComparisonResponseSchema,
+  PromoteCreatorDraftCollaborationRoomSchema,
+  ProvisionCreatorDraftCollaborationRoomSchema,
   UpdateCreatorSharedDocumentSchema,
 } from "./creator.dto";
 
@@ -83,7 +98,9 @@ import type {
   CreatorAssetModerationQueryDto,
   CreateCreatorWorkDto,
   ModerateCreatorAssetDto,
+  PromoteCreatorDraftCollaborationRoomDto,
   PublishCreatorAssetDto,
+  ProvisionCreatorDraftCollaborationRoomDto,
   ReportCreatorAssetDto,
   UpdateCreatorSharedDocumentDto,
   UpdateCreatorWorkDto,
@@ -104,7 +121,9 @@ export class CreatorService {
 
   constructor(
     @Inject(CreatorCollaborationRepository)
-    private readonly creatorCollaborationRepository: CreatorCollaborationRepository
+    private readonly creatorCollaborationRepository: CreatorCollaborationRepository,
+    @Inject(CREATOR_DRAFT_COLLABORATION_REPOSITORY)
+    private readonly creatorDraftCollaborationRepository: CreatorDraftCollaborationRepository
   ) {}
 
   async listWorks(q: ListQuery, viewerId?: string) {
@@ -208,6 +227,59 @@ export class CreatorService {
     return this.runCreatorCollaborationOperation("get_team", workId, () =>
       this.creatorCollaborationRepository.getTeam(userId, workId)
     );
+  }
+
+  async provisionDraftCollaborationRoom(
+    userId: string,
+    body: ProvisionCreatorDraftCollaborationRoomDto
+  ) {
+    const validated = ProvisionCreatorDraftCollaborationRoomSchema.parse(body);
+    if (validated.ownerScopeKey !== userId) {
+      throw new ForbiddenException({
+        code: "creator_draft_collaboration_owner_mismatch",
+        message: "현재 계정의 초안만 공유할 수 있습니다.",
+      });
+    }
+    try {
+      return CreatorDraftCollaborationRoomResponseSchema.parse(
+        await this.creatorDraftCollaborationRepository.provision({
+          ownerUserId: userId,
+          ownerScopeKey: validated.ownerScopeKey,
+          draftDocumentId: validated.draftDocumentId,
+          intent: validated.intent,
+          clientMutationId: validated.clientMutationId,
+          initialSnapshotByteLength: validated.initialSnapshotByteLength,
+        })
+      );
+    } catch (error) {
+      this.throwDraftCollaborationError("provision", error);
+    }
+  }
+
+  async promoteDraftCollaborationRoom(
+    userId: string,
+    roomId: string,
+    body: PromoteCreatorDraftCollaborationRoomDto
+  ) {
+    const validated = PromoteCreatorDraftCollaborationRoomSchema.parse(body);
+    if (validated.ownerScopeKey !== userId) {
+      throw new NotFoundException("임시 협업 작업실을 찾을 수 없습니다.");
+    }
+    try {
+      return CreatorDraftCollaborationRoomResponseSchema.parse(
+        await this.creatorDraftCollaborationRepository.promote({
+          ownerUserId: userId,
+          ownerScopeKey: validated.ownerScopeKey,
+          roomId,
+          draftDocumentId: validated.draftDocumentId,
+          targetWorkId: validated.targetWorkId,
+          expectedGraphRevision: validated.expectedGraphRevision,
+          clientMutationId: validated.clientMutationId,
+        })
+      );
+    } catch (error) {
+      this.throwDraftCollaborationError("promote", error);
+    }
   }
 
   async getWorkAuthorization(userId: string, workId: string) {
@@ -546,6 +618,84 @@ export class CreatorService {
   // 팔로잉 피드 — 팔로우한 창작자의 최신 작품.
   async listFollowingFeed(viewerId: string) {
     return listWorks({ followedBy: viewerId, viewerId, sort: "recent" });
+  }
+
+  private throwDraftCollaborationError(
+    operation: "provision" | "promote",
+    error: unknown
+  ): never {
+    if (error instanceof CreatorDraftCollaborationRateLimitError) {
+      throw new HttpException(
+        {
+          code: "creator_draft_collaboration_rate_limited",
+          message: "임시 협업 작업실을 너무 자주 만들고 있습니다. 잠시 후 다시 시도해 주세요.",
+          retryAfterSeconds: Math.ceil(error.retryAfterMs / 1_000),
+        },
+        HttpStatus.TOO_MANY_REQUESTS
+      );
+    }
+    if (error instanceof CreatorDraftCollaborationRoomLimitError) {
+      throw new HttpException(
+        {
+          code: "creator_draft_collaboration_room_limit",
+          message: "사용 중인 임시 협업 작업실이 너무 많습니다. 기존 초안을 저장하거나 정리해 주세요.",
+        },
+        HttpStatus.TOO_MANY_REQUESTS
+      );
+    }
+    if (error instanceof CreatorDraftCollaborationRoomNotFoundError) {
+      throw new NotFoundException("임시 협업 작업실을 찾을 수 없습니다.");
+    }
+    if (error instanceof CreatorDraftCollaborationRoomExpiredError) {
+      throw new HttpException(
+        {
+          code: "creator_draft_collaboration_room_expired",
+          message: "임시 협업 작업실이 만료되었습니다. 새 공유 작업실을 만들어 주세요.",
+        },
+        HttpStatus.GONE
+      );
+    }
+    if (error instanceof CreatorDraftCollaborationMutationReuseError) {
+      throw new ConflictException({
+        code: "creator_draft_collaboration_mutation_reused",
+        message: "같은 요청 식별자가 다른 초안 작업에 이미 사용되었습니다.",
+      });
+    }
+    if (error instanceof CreatorDraftCollaborationTargetMismatchError) {
+      throw new ConflictException({
+        code: "creator_draft_collaboration_target_mismatch",
+        message:
+          operation === "promote"
+            ? "임시 작업실과 저장할 작품이 일치하지 않습니다."
+            : "초안 협업 요청 범위가 현재 계정과 일치하지 않습니다.",
+      });
+    }
+    if (error instanceof CreatorDraftCollaborationGraphConflictError) {
+      throw new ConflictException({
+        code: "creator_draft_collaboration_graph_conflict",
+        message: "협업 상태가 먼저 변경되었습니다. 최신 작업실 상태를 다시 확인해 주세요.",
+        currentGraphRevision: error.currentGraphRevision,
+      });
+    }
+    if (error instanceof CreatorDraftCollaborationAlreadyPromotedError) {
+      throw new ConflictException({
+        code: "creator_draft_collaboration_already_promoted",
+        message: "이미 다른 저장 요청으로 작품 승격이 완료되었습니다.",
+        currentGraphRevision: error.currentGraphRevision,
+      });
+    }
+
+    const errorType =
+      error instanceof Error
+        ? error.name.replace(/[^A-Za-z0-9_$.-]/g, "?").slice(0, 80)
+        : typeof error;
+    this.logger.error(
+      `Creator draft collaboration ${operation} failed; cause=${errorType}`
+    );
+    throw new ServiceUnavailableException({
+      code: "creator_draft_collaboration_unavailable",
+      message: "임시 협업 작업실을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+    });
   }
 
   private async runCreatorCollaborationOperation<T>(

@@ -410,9 +410,24 @@ async function openDesktopCatalog(page: Page): Promise<Locator> {
   return catalog;
 }
 
+async function expandFullBrushCatalog(catalog: Locator): Promise<void> {
+  // The product UI progressively mounts large catalogues so 200+ SVG previews do not block
+  // the first open. Expand every page before checking the complete shipped catalogue.
+  for (let pageIndex = 0; pageIndex < 20; pageIndex += 1) {
+    const loadMore = catalog.locator('[data-studio-brush-load-more="true"]');
+    if (await loadMore.count() === 0) return;
+    await loadMore.click();
+  }
+  invariant(
+    await catalog.locator('[data-studio-brush-load-more="true"]').count() === 0,
+    "brush catalogue still has hidden pages after the bounded expansion audit",
+  );
+}
+
 async function assertUiBrushCatalogMatchesProductCatalog(catalog: Locator): Promise<void> {
   await catalog.getByRole("tab", { name: "전체", exact: true }).click();
   await catalog.getByRole("searchbox", { name: "브러시 검색" }).fill("");
+  await expandFullBrushCatalog(catalog);
   const expectedSelections = STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => ({
     label: `${item.name} 선택`,
     source: item.source,
@@ -742,7 +757,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       .count();
     await assertUiBrushCatalogMatchesProductCatalog(firstCatalog);
     await page.screenshot({ path: catalogScreenshot, animations: "disabled" });
-    await firstCatalog.getByRole("button", { name: "앱 브러시 닫기", exact: true }).click();
+    await firstCatalog.locator('[data-studio-brush-library-close="true"]').click();
     await firstCatalog.waitFor({ state: "detached" });
 
     const stage = page.locator(".konvajs-content").first();
@@ -1670,11 +1685,12 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     }).click();
     const drawSheet = page.locator('[data-studio-sheet-id="draw"][data-studio-mobile-sheet="draw"]');
     await drawSheet.waitFor({ state: "visible" });
-    await drawSheet.getByRole("button", { name: "기본 프리셋 전체 보기", exact: true }).click();
+    await drawSheet.locator('[data-studio-open-brush-library="true"]').click();
     const catalog = page.locator('[data-studio-brush-catalog-session="true"]');
     await catalog.waitFor({ state: "visible" });
     invariant(await catalog.count() === 1, "mobile opened more than one built-in catalogue session");
     await catalog.getByRole("tab", { name: "전체", exact: true }).click();
+    await expandFullBrushCatalog(catalog);
     const selectionCount = await catalog.locator('button[aria-label$=" 선택"]').count();
     const expectedCatalogCount = STUDIO_ALL_BRUSH_CATALOG_ITEMS.length;
     invariant(

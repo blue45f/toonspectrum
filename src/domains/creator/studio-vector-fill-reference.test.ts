@@ -135,6 +135,33 @@ describe("planStudioAdvancedFillVectorTarget", () => {
     });
   });
 
+  it("offers an explicit bottom-layer whole-page bucket target for a raster-free page", async () => {
+    const blankInput = input([], {
+      allowBlankPage: true,
+      name: "페이지 채색",
+    });
+    const plan = planStudioAdvancedFillVectorTarget(blankInput);
+    expect(plan).toMatchObject({
+      ok: true,
+      target: {
+        sourceElementCount: 0,
+        insertionIndex: 0,
+        name: "페이지 채색",
+      },
+    });
+    if (!plan.ok) return;
+
+    const rendered = await renderStudioAdvancedFillVectorReference(blankInput, {
+      workerFactory: null,
+      rasterize: rasterizer(),
+    });
+    expect(rendered).toMatchObject({
+      elementCount: 0,
+      width: 720,
+      height: 1_000,
+    });
+  });
+
   it("is deterministic for the same visible source and ignores hidden/non-draw document changes", () => {
     const source = draw("line");
     const first = planStudioAdvancedFillVectorTarget(input([source]));

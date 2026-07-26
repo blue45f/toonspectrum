@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_ASSET_DATA_URL_MAX_CHARS,
   STUDIO_UPLOAD_DESKTOP_MAX_DECODED_PIXELS,
   STUDIO_UPLOAD_MAX_SOURCE_FILE_BYTES,
   STUDIO_UPLOAD_MOBILE_MAX_DECODED_PIXELS,
@@ -32,6 +33,10 @@ function jpeg(width: number, height: number): Uint8Array {
 }
 
 describe("studio upload source image safety", () => {
+  it("keeps the shared asset data URL budget at 32 MiB", () => {
+    expect(STUDIO_ASSET_DATA_URL_MAX_CHARS).toBe(32 * 1024 * 1024);
+  });
+
   it("PNG/JPEG 헤더에서 decode 전 실제 픽셀 수를 읽는다", () => {
     expect(parseStudioUploadImageDimensions(png(720, 12_000))).toEqual({
       format: "png",

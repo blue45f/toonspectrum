@@ -782,11 +782,14 @@ const CHARACTER_PANEL_SECTIONS: Array<{
 ];
 
 const DEFAULT_STUDIO_VRM_TEXTURE_PAINT_SETTINGS: StudioVrmTexturePaintPanelSettings = {
+  tool: "brush",
   brushKind: "ink",
   color: "#d85f48",
   sizeTexels: 48,
   opacity: 1,
   blend: "normal",
+  fillScope: "contiguous",
+  fillTolerance: 24,
   tuning: {
     flow: STUDIO_STAMP_BRUSH_DEFAULTS.ink.flow,
     hardness: STUDIO_STAMP_BRUSH_DEFAULTS.ink.hardness,
@@ -1935,10 +1938,10 @@ function StudioVrmTexturePaintInvalidateBridge({
 function studioVrmTexturePaintHit(
   event: ThreeEvent<PointerEvent>,
 ): StudioVrmTexturePaintRayHit | null {
-  if (!(event.object instanceof THREE.Mesh) || !event.uv) return null;
+  if (!(event.object instanceof THREE.Mesh) || (!event.uv && !event.uv1)) return null;
   const hit = {
     object: event.object,
-    uv: event.uv,
+    ...(event.uv ? { uv: event.uv } : {}),
     ...(event.uv1 ? { uv1: event.uv1 } : {}),
     face: event.face,
     faceIndex: event.faceIndex,
@@ -1953,6 +1956,47 @@ function studioVrmTexturePaintPressure(event: ThreeEvent<PointerEvent>): number 
     return Math.min(1, Math.max(0.01, pressure));
   }
   return event.pointerType === "pen" ? 0.01 : 0.5;
+}
+
+const STUDIO_VRM_TEXTURE_PAINT_ONE_SHOT_TAP_MAX_DISTANCE_CSS_PX = 10;
+const STUDIO_VRM_TEXTURE_PAINT_ONE_SHOT_TAP_MAX_DISTANCE_SQUARED =
+  STUDIO_VRM_TEXTURE_PAINT_ONE_SHOT_TAP_MAX_DISTANCE_CSS_PX
+  * STUDIO_VRM_TEXTURE_PAINT_ONE_SHOT_TAP_MAX_DISTANCE_CSS_PX;
+
+interface StudioVrmTexturePaintPointerCaptureTarget {
+  setPointerCapture(pointerId: number): void;
+  releasePointerCapture(pointerId: number): void;
+}
+
+interface StudioVrmTexturePaintPendingOneShotTap {
+  readonly kind: "fill" | "sample";
+  readonly pointerId: number;
+  readonly startClientX: number;
+  readonly startClientY: number;
+  readonly hit: StudioVrmTexturePaintRayHit;
+  readonly runtime: StudioVrmTexturePaintRuntime;
+  readonly settings: StudioVrmTexturePaintPanelSettings;
+  readonly explicitEyedropper: boolean;
+  captureTarget: StudioVrmTexturePaintPointerCaptureTarget | null;
+}
+
+function studioVrmTexturePaintOneShotTapMoved(
+  pending: StudioVrmTexturePaintPendingOneShotTap,
+  clientX: number,
+  clientY: number,
+): boolean {
+  if (
+    !Number.isFinite(pending.startClientX)
+    || !Number.isFinite(pending.startClientY)
+    || !Number.isFinite(clientX)
+    || !Number.isFinite(clientY)
+  ) {
+    return true;
+  }
+  const deltaX = clientX - pending.startClientX;
+  const deltaY = clientY - pending.startClientY;
+  return deltaX * deltaX + deltaY * deltaY
+    > STUDIO_VRM_TEXTURE_PAINT_ONE_SHOT_TAP_MAX_DISTANCE_SQUARED;
 }
 
 function VrmActor({
@@ -1973,6 +2017,9 @@ function VrmActor({
   texturePaintMutationBlockedRef,
   texturePaintRuntime,
   texturePaintSettings,
+  texturePaintEyedropperActive,
+  onTexturePaintColorSampled,
+  onTexturePaintEyedropperComplete,
 }: {
   bodyRotation: number;
   customBones: PoseBoneMap;
@@ -1991,12 +2038,23 @@ function VrmActor({
   texturePaintMutationBlockedRef: React.RefObject<boolean>;
   texturePaintRuntime: StudioVrmTexturePaintRuntime | null;
   texturePaintSettings: StudioVrmTexturePaintPanelSettings;
+  texturePaintEyedropperActive: boolean;
+  onTexturePaintColorSampled: (color: string) => void;
+  onTexturePaintEyedropperComplete: () => void;
 }) {
   const gl = useThree((state) => state.gl);
   const invalidate = useThree((state) => state.invalidate);
   const texturePaintRuntimeRef = useRef(texturePaintRuntime);
   const texturePaintSettingsRef = useRef(texturePaintSettings);
   const texturePaintEnabledRef = useRef(texturePaintEnabled);
+  const texturePaintEyedropperActiveRef = useRef(texturePaintEyedropperActive);
+  const texturePaintColorSampledRef = useRef(onTexturePaintColorSampled);
+  const texturePaintEyedropperCompleteRef = useRef(onTexturePaintEyedropperComplete);
+  const texturePaintOneShotGenerationRef = useRef(0);
+  const texturePaintOneShotAbortRef = useRef<AbortController | null>(null);
+  const texturePaintOneShotBusyRef = useRef(false);
+  const texturePaintPendingOneShotTapRef =
+    useRef<StudioVrmTexturePaintPendingOneShotTap | null>(null);
   const texturePaintPointerIdRef = useRef<number | null>(null);
   const texturePaintCaptureTargetRef = useRef<{
     releasePointerCapture(pointerId: number): void;
@@ -2004,11 +2062,127 @@ function VrmActor({
   const finishTexturePaintRef = useRef<(pointerId?: number) => void>(() => undefined);
   const cancelTexturePaintRef = useRef<(pointerId?: number) => void>(() => undefined);
 
+  const releaseTexturePaintPendingOneShotCapture = useCallback(
+    (pending: StudioVrmTexturePaintPendingOneShotTap) => {
+      const captureTarget = pending.captureTarget;
+      pending.captureTarget = null;
+      if (!captureTarget) return;
+      try {
+        captureTarget.releasePointerCapture(pending.pointerId);
+      } catch {
+        // Pointer cancellation or native pointerup may already have released capture.
+      }
+    },
+    [],
+  );
+
+  const cancelTexturePaintPendingOneShotTap = useCallback(
+    (matchingPointerId?: number): boolean => {
+      const pending = texturePaintPendingOneShotTapRef.current;
+      if (
+        !pending
+        || (matchingPointerId !== undefined && pending.pointerId !== matchingPointerId)
+      ) {
+        return false;
+      }
+      texturePaintPendingOneShotTapRef.current = null;
+      releaseTexturePaintPendingOneShotCapture(pending);
+      return true;
+    },
+    [releaseTexturePaintPendingOneShotCapture],
+  );
+
+  const runTexturePaintOneShot = useCallback(
+    (pending: StudioVrmTexturePaintPendingOneShotTap) => {
+      if (
+        texturePaintMutationBlockedRef.current
+        || !texturePaintEnabledRef.current
+        || texturePaintRuntimeRef.current !== pending.runtime
+        || texturePaintOneShotBusyRef.current
+      ) {
+        return;
+      }
+
+      const generation = texturePaintOneShotGenerationRef.current + 1;
+      texturePaintOneShotGenerationRef.current = generation;
+      texturePaintOneShotBusyRef.current = true;
+      const controller = new AbortController();
+      texturePaintOneShotAbortRef.current = controller;
+      pending.runtime.clearError();
+      const operation = pending.kind === "sample"
+        ? pending.runtime.sampleBaseColor({
+            hit: pending.hit,
+            signal: controller.signal,
+          })
+        : pending.runtime.fillBaseColor({
+            hit: pending.hit,
+            color: pending.settings.color,
+            tolerance: pending.settings.fillTolerance,
+            scope: pending.settings.fillScope,
+            signal: controller.signal,
+          });
+
+      void operation.then((result) => {
+        if (generation !== texturePaintOneShotGenerationRef.current) return;
+        if (pending.kind === "sample" && result.ok && typeof result.value !== "boolean") {
+          texturePaintColorSampledRef.current(result.value.color);
+          if (pending.explicitEyedropper) texturePaintEyedropperCompleteRef.current();
+        }
+        invalidate();
+      }).catch(() => {
+        if (generation === texturePaintOneShotGenerationRef.current) invalidate();
+      }).finally(() => {
+        if (generation === texturePaintOneShotGenerationRef.current) {
+          if (texturePaintOneShotAbortRef.current === controller) {
+            texturePaintOneShotAbortRef.current = null;
+          }
+          texturePaintOneShotBusyRef.current = false;
+        }
+      });
+    },
+    [invalidate, texturePaintMutationBlockedRef],
+  );
+
+  const finishTexturePaintPendingOneShotTap = useCallback(
+    (
+      pointerId: number,
+      clientX: number,
+      clientY: number,
+    ): boolean => {
+      const pending = texturePaintPendingOneShotTapRef.current;
+      if (!pending || pending.pointerId !== pointerId) return false;
+      texturePaintPendingOneShotTapRef.current = null;
+      releaseTexturePaintPendingOneShotCapture(pending);
+      if (studioVrmTexturePaintOneShotTapMoved(pending, clientX, clientY)) return true;
+      runTexturePaintOneShot(pending);
+      return true;
+    },
+    [releaseTexturePaintPendingOneShotCapture, runTexturePaintOneShot],
+  );
+
   useEffect(() => {
     texturePaintRuntimeRef.current = texturePaintRuntime;
     texturePaintSettingsRef.current = texturePaintSettings;
     texturePaintEnabledRef.current = texturePaintEnabled;
-  }, [texturePaintEnabled, texturePaintRuntime, texturePaintSettings]);
+    texturePaintEyedropperActiveRef.current = texturePaintEyedropperActive;
+    texturePaintColorSampledRef.current = onTexturePaintColorSampled;
+    texturePaintEyedropperCompleteRef.current = onTexturePaintEyedropperComplete;
+  }, [
+    onTexturePaintColorSampled,
+    onTexturePaintEyedropperComplete,
+    texturePaintEnabled,
+    texturePaintEyedropperActive,
+    texturePaintRuntime,
+    texturePaintSettings,
+  ]);
+
+  useEffect(() => () => {
+    cancelTexturePaintPendingOneShotTap();
+    texturePaintOneShotGenerationRef.current += 1;
+    texturePaintOneShotAbortRef.current?.abort();
+    texturePaintOneShotAbortRef.current = null;
+    texturePaintOneShotBusyRef.current = false;
+  }, [cancelTexturePaintPendingOneShotTap]);
 
   useEffect(() => {
     const releaseCapture = (pointerId: number) => {
@@ -2051,21 +2225,59 @@ function VrmActor({
     cancelTexturePaintRef.current = cancelTexturePaint;
 
     const finishMatchingPointer = (event: PointerEvent) => {
+      finishTexturePaintPendingOneShotTap(
+        event.pointerId,
+        event.clientX,
+        event.clientY,
+      );
       finishTexturePaint(event.pointerId);
     };
     const cancelMatchingPointer = (event: PointerEvent) => {
+      cancelTexturePaintPendingOneShotTap(event.pointerId);
       cancelTexturePaint(event.pointerId);
     };
-    const cancelOnWindowBlur = () => cancelTexturePaint();
+    const cancelPendingTapOnMove = (event: PointerEvent) => {
+      const pending = texturePaintPendingOneShotTapRef.current;
+      if (
+        pending
+        && pending.pointerId === event.pointerId
+        && studioVrmTexturePaintOneShotTapMoved(pending, event.clientX, event.clientY)
+      ) {
+        cancelTexturePaintPendingOneShotTap(event.pointerId);
+      }
+    };
+    const cancelPendingTapOnAdditionalPointer = (event: PointerEvent) => {
+      const pending = texturePaintPendingOneShotTapRef.current;
+      if (pending && pending.pointerId !== event.pointerId) {
+        cancelTexturePaintPendingOneShotTap();
+      }
+    };
+    const cancelOnWindowBlur = () => {
+      cancelTexturePaintPendingOneShotTap();
+      cancelTexturePaint();
+    };
+    window.addEventListener("pointermove", cancelPendingTapOnMove);
     window.addEventListener("pointerup", finishMatchingPointer);
     window.addEventListener("pointercancel", cancelMatchingPointer);
     window.addEventListener("blur", cancelOnWindowBlur);
+    gl.domElement.addEventListener(
+      "pointerdown",
+      cancelPendingTapOnAdditionalPointer,
+      true,
+    );
     gl.domElement.addEventListener("lostpointercapture", cancelMatchingPointer);
     return () => {
+      window.removeEventListener("pointermove", cancelPendingTapOnMove);
       window.removeEventListener("pointerup", finishMatchingPointer);
       window.removeEventListener("pointercancel", cancelMatchingPointer);
       window.removeEventListener("blur", cancelOnWindowBlur);
+      gl.domElement.removeEventListener(
+        "pointerdown",
+        cancelPendingTapOnAdditionalPointer,
+        true,
+      );
       gl.domElement.removeEventListener("lostpointercapture", cancelMatchingPointer);
+      cancelTexturePaintPendingOneShotTap();
       cancelTexturePaint();
       if (finishTexturePaintRef.current === finishTexturePaint) {
         finishTexturePaintRef.current = () => undefined;
@@ -2074,11 +2286,31 @@ function VrmActor({
         cancelTexturePaintRef.current = () => undefined;
       }
     };
-  }, [gl, invalidate]);
+  }, [
+    cancelTexturePaintPendingOneShotTap,
+    finishTexturePaintPendingOneShotTap,
+    gl,
+    invalidate,
+  ]);
 
   useEffect(() => {
-    if (!texturePaintEnabled) cancelTexturePaintRef.current();
-  }, [texturePaintEnabled]);
+    cancelTexturePaintPendingOneShotTap();
+  }, [
+    cancelTexturePaintPendingOneShotTap,
+    texturePaintEyedropperActive,
+    texturePaintRuntime,
+    texturePaintSettings.tool,
+  ]);
+
+  useEffect(() => {
+    if (texturePaintEnabled) return;
+    cancelTexturePaintPendingOneShotTap();
+    cancelTexturePaintRef.current();
+    texturePaintOneShotGenerationRef.current += 1;
+    texturePaintOneShotAbortRef.current?.abort();
+    texturePaintOneShotAbortRef.current = null;
+    texturePaintOneShotBusyRef.current = false;
+  }, [cancelTexturePaintPendingOneShotTap, texturePaintEnabled]);
 
   useEffect(() => {
     applyPoserVisualState(vrm, {
@@ -2234,6 +2466,13 @@ function VrmActor({
   };
 
   const beginTexturePaint = (event: ThreeEvent<PointerEvent>) => {
+    const existingPendingTap = texturePaintPendingOneShotTapRef.current;
+    if (existingPendingTap) {
+      if (existingPendingTap.pointerId !== event.pointerId) {
+        cancelTexturePaintPendingOneShotTap();
+      }
+      return;
+    }
     const runtime = texturePaintRuntimeRef.current;
     const hit = studioVrmTexturePaintHit(event);
     if (
@@ -2245,11 +2484,43 @@ function VrmActor({
       || !event.isPrimary
       || event.button !== 0
       || texturePaintPointerIdRef.current !== null
+      || texturePaintOneShotBusyRef.current
     ) {
       return;
     }
 
     event.stopPropagation();
+    const settings = texturePaintSettingsRef.current;
+    const explicitEyedropper = texturePaintEyedropperActiveRef.current;
+    const oneShotKind =
+      event.altKey || explicitEyedropper
+        ? "sample"
+        : settings.tool === "fill"
+          ? "fill"
+          : null;
+    if (oneShotKind) {
+      const captureTarget =
+        event.currentTarget as unknown as StudioVrmTexturePaintPointerCaptureTarget;
+      const pending: StudioVrmTexturePaintPendingOneShotTap = {
+        kind: oneShotKind,
+        pointerId: event.pointerId,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        hit,
+        runtime,
+        settings,
+        explicitEyedropper,
+        captureTarget: null,
+      };
+      texturePaintPendingOneShotTapRef.current = pending;
+      try {
+        captureTarget.setPointerCapture(event.pointerId);
+        pending.captureTarget = captureTarget;
+      } catch {
+        // Window pointer listeners still finish/cancel the tap if capture is unavailable.
+      }
+      return;
+    }
     const pointerId = event.pointerId;
     texturePaintPointerIdRef.current = pointerId;
     const captureTarget = event.currentTarget as unknown as {
@@ -2263,7 +2534,6 @@ function VrmActor({
       texturePaintCaptureTargetRef.current = null;
     }
 
-    const settings = texturePaintSettingsRef.current;
     runtime.clearError();
     void runtime.beginStroke({
       pointerId,
@@ -2287,6 +2557,14 @@ function VrmActor({
   };
 
   const moveTexturePaint = (event: ThreeEvent<PointerEvent>) => {
+    const pendingTap = texturePaintPendingOneShotTapRef.current;
+    if (pendingTap?.pointerId === event.pointerId) {
+      event.stopPropagation();
+      if (studioVrmTexturePaintOneShotTapMoved(pendingTap, event.clientX, event.clientY)) {
+        cancelTexturePaintPendingOneShotTap(event.pointerId);
+      }
+      return;
+    }
     const pointerId = texturePaintPointerIdRef.current;
     if (
       pointerId === null
@@ -2308,12 +2586,26 @@ function VrmActor({
   };
 
   const finishTexturePaint = (event: ThreeEvent<PointerEvent>) => {
+    if (
+      finishTexturePaintPendingOneShotTap(
+        event.pointerId,
+        event.clientX,
+        event.clientY,
+      )
+    ) {
+      event.stopPropagation();
+      return;
+    }
     if (texturePaintPointerIdRef.current !== event.pointerId) return;
     event.stopPropagation();
     finishTexturePaintRef.current(event.pointerId);
   };
 
   const cancelTexturePaint = (event: ThreeEvent<PointerEvent>) => {
+    if (cancelTexturePaintPendingOneShotTap(event.pointerId)) {
+      event.stopPropagation();
+      return;
+    }
     if (texturePaintPointerIdRef.current !== event.pointerId) return;
     event.stopPropagation();
     cancelTexturePaintRef.current(event.pointerId);
@@ -2740,6 +3032,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const [activeCharacterSection, setActiveCharacterSection] = useState<CharacterPanelSection>("library");
   const [texturePaintSettings, setTexturePaintSettings] =
     useState<StudioVrmTexturePaintPanelSettings>(DEFAULT_STUDIO_VRM_TEXTURE_PAINT_SETTINGS);
+  const [texturePaintEyedropperActive, setTexturePaintEyedropperActive] = useState(false);
   const [texturePaintRuntime, setTexturePaintRuntime] =
     useState<StudioVrmTexturePaintRuntime | null>(null);
   const [texturePaintRuntimeSceneIdentity, setTexturePaintRuntimeSceneIdentity] =
@@ -3217,11 +3510,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
   const handlePanelTabChange = useCallback((tab: PanelTab) => {
     setActivePanelTab(tab);
+    if (tab !== "character") setTexturePaintEyedropperActive(false);
     if (panelScrollRef.current) panelScrollRef.current.scrollTop = 0;
   }, []);
 
   const handleCharacterSectionChange = (section: CharacterPanelSection) => {
     setActiveCharacterSection(section);
+    if (section !== "surface") setTexturePaintEyedropperActive(false);
     if (section === "surface") {
       setTurntable(false);
       setMannequinMode(false);
@@ -3271,6 +3566,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
   const handleTexturePaintSettingsChange = useCallback(
     (update: StudioVrmTexturePaintSettingsUpdate) => {
+      if (update.tool !== undefined) setTexturePaintEyedropperActive(false);
       setTexturePaintSettings((current) => {
         const brushKind = update.brushKind ?? current.brushKind;
         const brushChanged =
@@ -3297,6 +3593,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     },
     [],
   );
+
+  const handleTexturePaintColorSampled = useCallback((color: string) => {
+    setTexturePaintSettings((current) => ({ ...current, color }));
+  }, []);
 
   const handleTexturePaintUndo = useCallback(() => {
     if (texturePaintMutationBlockedRef.current) return;
@@ -4235,6 +4535,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
               : "";
   const texturePaintInteractionEnabled =
     texturePaintModeSelected && texturePaintDisabledReason.length === 0;
+  const texturePaintSampling = texturePaintSnapshot?.activeOperation === "sample";
+  const texturePaintFilling = texturePaintSnapshot?.activeOperation === "fill";
   const texturePaintStrokeActive =
     texturePaintSnapshot?.status === "loading" || texturePaintSnapshot?.status === "painting";
   const texturePaintTargetLabel = texturePaintSnapshot?.activeTarget
@@ -4253,11 +4555,21 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     || texturePaintSnapshot?.error?.message
     || texturePaintSnapshot?.guidance?.message
     || (texturePaintSnapshot?.status === "loading"
-      ? "텍스처를 안전한 편집 사본으로 준비하는 중입니다. 그대로 계속 그려도 입력이 보존됩니다."
+      ? texturePaintSampling
+        ? "표면의 baseColor 채널에서 정확한 색상을 읽는 중입니다."
+        : texturePaintFilling
+          ? "ColorDrop 영역을 기기 안에서 계산하고 있습니다. 완료 전에는 원본을 변경하지 않습니다."
+        : "텍스처를 안전한 편집 사본으로 준비하는 중입니다. 그대로 계속 그려도 입력이 보존됩니다."
       : texturePaintSnapshot?.status === "painting"
         ? "표면 페인팅 중 · 포인터를 놓으면 한 획으로 저장됩니다."
+        : texturePaintEyedropperActive
+          ? `스포이드가 준비됐습니다. 캐릭터 표면을 한 번 누르면 색상만 가져오고 ${
+              texturePaintSettings.tool === "fill" ? "ColorDrop" : "브러시"
+            }로 돌아갑니다.`
         : texturePaintSnapshot?.activeTarget
-          ? "표면을 끌어 칠하세요. Ctrl/⌘+Z로 이 텍스처 획을 되돌릴 수 있습니다."
+          ? texturePaintSettings.tool === "fill"
+            ? "표면을 한 번 눌러 ColorDrop으로 채우세요. Ctrl/⌘+Z로 이 채우기를 되돌릴 수 있습니다."
+            : "표면을 끌어 칠하세요. Ctrl/⌘+Z로 이 텍스처 획을 되돌릴 수 있습니다."
           : "뷰포트에서 옷·피부·머리 표면을 누르면 해당 텍스처를 선택합니다.");
   const viewportCanUndo =
     !texturePaintStrokeActive
@@ -5747,6 +6059,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setIsCapturing(false);
     setIsThumbnailCapturing(false);
     setIsSharingPose(false);
+    setTexturePaintEyedropperActive(false);
     setIsViewportHandIkDragging(false);
     setJointHandleInteracting(false);
     setJointHandleStatus("");
@@ -7424,7 +7737,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
               isCapturing
                 ? "캡처가 끝난 뒤 닫을 수 있습니다."
                 : texturePaintStrokeActive
-                  ? "닫기 · 진행 중인 표면 페인트 획은 취소됩니다. (Esc)"
+                  ? "닫기 · 진행 중인 표면 페인트 작업은 취소됩니다. (Esc)"
                 : "닫기 (Esc)"
             }
             className={ICON_BUTTON}
@@ -7461,24 +7774,52 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                 )}
                 style={{
                   cursor: texturePaintInteractionEnabled
-                    ? createStudioVrmTexturePaintCursor(texturePaintSettings)
+                    ? texturePaintEyedropperActive
+                      ? "crosshair"
+                      : texturePaintSettings.tool === "fill"
+                        ? "cell"
+                        : createStudioVrmTexturePaintCursor(texturePaintSettings)
                     : undefined,
                 }}
               >
                 <p id={viewportInstructionsId} className="sr-only">
                   {texturePaintModeSelected
-                    ? "3D 캐릭터 표면 페인트 모드입니다. 캐릭터 회전은 잠겨 있습니다. 캐릭터 표면을 포인터로 끌어 칠하고, 뷰포트 오른쪽의 확대·축소 버튼으로 시점을 조절하세요."
+                    ? "3D 캐릭터 표면 페인트 모드입니다. 캐릭터 회전은 잠겨 있습니다. 브러시로 끌어 칠하거나 ColorDrop으로 한 번에 채우고, 스포이드 버튼 또는 Alt+클릭으로 baseColor 색상을 가져오며, 뷰포트 오른쪽의 확대·축소 버튼으로 시점을 조절하세요."
                     : "3D 캐릭터 편집 뷰포트입니다. 포인터로 끌어 캐릭터를 회전하고, 휠·핀치 또는 뷰포트 오른쪽의 확대·축소 버튼으로 시점을 조절하세요."}
                 </p>
                 <Canvas
                   role="group"
                   tabIndex={0}
+                  aria-keyshortcuts="F I"
                   aria-label={
                     texturePaintModeSelected
                       ? "3D 캐릭터 표면 페인트 뷰포트"
                       : "3D 캐릭터 편집 뷰포트"
                   }
                   aria-describedby={viewportInstructionsId}
+                  onKeyDown={(event) => {
+                    if (
+                      !texturePaintInteractionEnabled
+                      || texturePaintStrokeActive
+                      || event.metaKey
+                      || event.ctrlKey
+                      || event.altKey
+                    ) {
+                      return;
+                    }
+                    const key = event.key.toLowerCase();
+                    if (key === "i") {
+                      event.preventDefault();
+                      setTexturePaintEyedropperActive((active) => !active);
+                    } else if (key === "f") {
+                      event.preventDefault();
+                      setTexturePaintEyedropperActive(false);
+                      setTexturePaintSettings((current) => ({
+                        ...current,
+                        tool: current.tool === "brush" ? "fill" : "brush",
+                      }));
+                    }
+                  }}
                   camera={{ fov: activeCamera.fov, position: [...activeCamera.position], near: 0.1, far: 20 }}
                   className="h-full w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
                   dpr={[1, 2]}
@@ -7520,6 +7861,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                       texturePaintMutationBlockedRef={texturePaintMutationBlockedRef}
                       texturePaintRuntime={texturePaintRuntime}
                       texturePaintSettings={texturePaintSettings}
+                      texturePaintEyedropperActive={texturePaintEyedropperActive}
+                      onTexturePaintColorSampled={handleTexturePaintColorSampled}
+                      onTexturePaintEyedropperComplete={() =>
+                        setTexturePaintEyedropperActive(false)}
                     />
                   ) : null}
                   {vrm && showPoseBoneOverlay && !texturePaintModeSelected && !isCapturing && !isSharingPose && !isThumbnailCapturing && !webcamActive ? (
@@ -7910,9 +8255,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                 targetCount={texturePaintSnapshot?.targets.length ?? 0}
                 canUndo={(texturePaintSnapshot?.history.undoCount ?? 0) > 0}
                 canRedo={(texturePaintSnapshot?.history.redoCount ?? 0) > 0}
+                eyedropperActive={texturePaintEyedropperActive}
                 onSettingsChange={handleTexturePaintSettingsChange}
                 onUndo={handleTexturePaintUndo}
                 onRedo={handleTexturePaintRedo}
+                onEyedropperToggle={() =>
+                  setTexturePaintEyedropperActive((active) => !active)}
                 onResetActiveTexture={handleTexturePaintReset}
                 onRetryRestore={() => {
                   texturePaintRestoreAbortRef.current?.abort();

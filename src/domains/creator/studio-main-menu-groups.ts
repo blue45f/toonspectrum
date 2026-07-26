@@ -48,6 +48,7 @@ import {
   Redo2,
   RotateCcw,
   RotateCw,
+  Ruler,
   ScanLine,
   Scissors,
   Settings2,
@@ -116,6 +117,7 @@ export interface StudioMainMenuBuilderState {
   canvasFlipH: boolean;
   canvasRotation: StudioViewRotation;
   fullscreen: boolean;
+  canvasRulersVisible: boolean;
   colorVisionMode: CvdMode;
   referencePanelOpen: boolean;
   pageSequenceOpen: boolean;
@@ -153,6 +155,7 @@ export interface StudioMainMenuEditorActions {
   fitCanvasToWidth: () => unknown;
   setActualPixelView: () => unknown;
   toggleFullscreen: () => unknown;
+  toggleCanvasRulers: () => unknown;
   setColorVisionMode: (mode: CvdMode) => unknown;
   saveCurrentStudioView: () => unknown;
   restoreSavedStudioView: () => unknown;
@@ -663,6 +666,16 @@ export function buildStudioMainMenuGroups({
             editor.setActualPixelView();
           },
           separatorAfter: true,
+        },
+        {
+          id: "canvas-rulers",
+          label: "캔버스 px 눈금자",
+          icon: Ruler,
+          shortcut: "⌥⌘R",
+          checked: state.canvasRulersVisible,
+          onSelect: () => {
+            editor.toggleCanvasRulers();
+          },
         },
         {
           id: "fullscreen",

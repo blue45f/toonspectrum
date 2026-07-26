@@ -1,3 +1,4 @@
+import { loadStudioPerfectFreehandStroker } from "./studio-perfect-freehand";
 import { exportPageToSvg } from "./studio-svg-export";
 import {
   STUDIO_SVG_EXPORT_WORKER_PROTOCOL_VERSION,
@@ -26,7 +27,7 @@ function serializeWorkerError(error: unknown): StudioSvgExportWorkerFailureMessa
   return { name: "Error", message: "SVG 내보내기 Worker 실행에 실패했습니다." };
 }
 
-workerScope.onmessage = (event) => {
+workerScope.onmessage = async (event) => {
   const message = event.data;
   if (
     message.type !== "studio-svg-export/run" ||
@@ -36,6 +37,10 @@ workerScope.onmessage = (event) => {
   }
 
   try {
+    // This worker is intentionally short-lived, so its dynamic-module cache starts empty for every
+    // export. Wait for the outline stroker before the first serialization; otherwise G-pen and
+    // perfect-* strokes would silently fall back to a uniform-width SVG only in exported files.
+    await loadStudioPerfectFreehandStroker();
     const result = exportPageToSvg(message.input);
     const response: StudioSvgExportWorkerSuccessMessage = {
       type: "studio-svg-export/success",

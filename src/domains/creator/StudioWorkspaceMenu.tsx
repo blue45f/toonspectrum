@@ -1,27 +1,41 @@
 import {
   ArrowDown,
   ArrowUp,
+  BringToFront,
   Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Copy,
+  Contrast,
+  Droplets,
+  Eraser,
   LayoutPanelTop,
   LockKeyhole,
+  Maximize2,
   MessageCircle,
   MoreHorizontal,
+  MousePointer2,
+  PaintBucket,
   Palette,
   PanelLeft,
   PanelRight,
+  PanelsTopLeft,
   PencilLine,
   PenTool,
+  Pipette,
+  Redo2,
   RotateCcw,
   Save,
+  Scan,
   ScanSearch,
   Search,
   Send,
   Settings2,
+  SlidersHorizontal,
+  Smartphone,
   Trash2,
+  Undo2,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -38,7 +52,12 @@ import {
 import { createPortal } from "react-dom";
 
 import {
+  QUICK_ACTION_SLOTS,
+  type StudioQuickActionId,
+} from "./studio-quick-actions";
+import {
   STUDIO_DEFAULT_WORKSPACES,
+  STUDIO_PRO_COMIC_PALETTE_PRIORITY,
   STUDIO_WORKSPACE_MAX_CUSTOM,
   STUDIO_WORKSPACE_NAME_MAX_LENGTH,
   deleteStudioWorkspace,
@@ -98,6 +117,49 @@ const DEFAULT_WORKSPACE_ICONS: Record<StudioDefaultWorkspaceId, LucideIcon> = {
   lettering: MessageCircle,
   review: ScanSearch,
   publish: Send,
+  "pro-comic": PanelsTopLeft,
+};
+
+const INSPECTOR_PRIMARY_LABELS: Record<
+  StudioWorkspaceLayout["inspector"]["primary"],
+  string
+> = {
+  properties: "도구 속성",
+  layers: "레이어",
+  document: "페이지 설정",
+  publish: "게시 정보",
+};
+
+const PRO_COMIC_PALETTE_LABELS: Record<
+  (typeof STUDIO_PRO_COMIC_PALETTE_PRIORITY)[number],
+  string
+> = {
+  "tool-properties": "도구 속성",
+  layers: "레이어",
+  pages: "페이지",
+  "materials-quick-access": "소재·빠른 실행",
+};
+
+const QUICK_ACTION_PREVIEW: Record<
+  StudioQuickActionId,
+  { label: string; Icon: LucideIcon }
+> = {
+  undo: { label: "되돌리기", Icon: Undo2 },
+  redo: { label: "다시 실행", Icon: Redo2 },
+  select: { label: "선택", Icon: MousePointer2 },
+  pen: { label: "펜", Icon: PenTool },
+  eraser: { label: "지우개", Icon: Eraser },
+  eyedropper: { label: "스포이트", Icon: Pipette },
+  properties: { label: "속성", Icon: SlidersHorizontal },
+  duplicate: { label: "복제", Icon: Copy },
+  delete: { label: "삭제", Icon: Trash2 },
+  "bring-front": { label: "맨 앞으로", Icon: BringToFront },
+  "fit-width": { label: "폭 맞춤", Icon: Maximize2 },
+  "add-bubble": { label: "말풍선", Icon: MessageCircle },
+  "advanced-fill": { label: "고급 채우기", Icon: PaintBucket },
+  "quick-mask": { label: "퀵 마스크", Icon: Scan },
+  "wet-mix": { label: "혼색", Icon: Droplets },
+  "dodge-burn": { label: "닷지·번", Icon: Contrast },
 };
 
 const FOCUSABLE_SELECTOR = [
@@ -115,6 +177,128 @@ const COPY_SUFFIX = " 사본";
 const AUXILIARY_TEXT_CLASS = "text-[0.6875rem]";
 const focusClass =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 focus-visible:ring-offset-2 focus-visible:ring-offset-panel";
+
+function StudioWorkspaceQuickAccessPreview({
+  layout,
+  compact = false,
+}: {
+  readonly layout: StudioWorkspaceLayout;
+  readonly compact?: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "flex min-w-0 flex-wrap gap-1",
+        compact ? "mt-1.5" : "mt-2"
+      )}
+      data-quick-access-density="responsive-icon-name"
+      aria-label="주요 도구 순서"
+    >
+      {QUICK_ACTION_SLOTS.map((slot, index) => {
+        const action = layout.quickActions.slots[slot];
+        const presentation = QUICK_ACTION_PREVIEW[action];
+        const Icon = presentation.Icon;
+        return (
+          <span
+            key={slot}
+            className={cn(
+              "inline-flex min-h-8 min-w-8 items-center justify-center gap-1 rounded-md border border-line bg-raised px-1.5 text-[0.6875rem] font-semibold text-fg-2",
+              compact && "min-[360px]:min-h-7"
+            )}
+            title={`${index + 1}. ${presentation.label}`}
+            aria-label={`${index + 1}. ${presentation.label}`}
+          >
+            <Icon size={12} aria-hidden className="shrink-0" />
+            <span className="max-[359px]:sr-only">{presentation.label}</span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+function StudioWorkspaceLayoutPreview({
+  layout,
+  mobileControlSide,
+}: {
+  readonly layout: StudioWorkspaceLayout;
+  readonly mobileControlSide: StudioWorkspaceState["mobileControlSide"];
+}) {
+  const desktop = layout.desktop;
+  const mobileSide = mobileControlSide === "left" ? "왼손" : "오른손";
+  return (
+    <span
+      className="mt-2 block border-t border-line pt-2"
+      data-testid="studio-workspace-layout-preview"
+      data-mobile-fallback="canvas-first-sheets"
+    >
+      <span className="grid min-w-0 grid-cols-2 gap-x-2 gap-y-1 text-[0.6875rem] text-fg-3">
+        <span className="inline-flex min-w-0 items-center gap-1">
+          <PanelLeft size={12} aria-hidden className="shrink-0" />
+          <span className="truncate">
+            페이지 {desktop.leftPanelOpen ? `${desktop.leftPanelWidth}px` : "접힘"}
+          </span>
+        </span>
+        <span className="inline-flex min-w-0 items-center gap-1">
+          <PanelRight size={12} aria-hidden className="shrink-0" />
+          <span className="truncate">
+            {INSPECTOR_PRIMARY_LABELS[layout.inspector.primary]}{" "}
+            {desktop.rightPanelOpen ? `${desktop.rightPanelWidth}px` : "접힘"}
+          </span>
+        </span>
+        <span className="col-span-2 inline-flex min-w-0 items-center gap-1">
+          <Smartphone size={12} aria-hidden className="shrink-0" />
+          <span className="truncate">
+            모바일은 캔버스 우선 · 페이지/속성 시트 · {mobileSide} 주요 도구
+          </span>
+        </span>
+      </span>
+      <span className="mt-2 block text-[0.6875rem] font-bold text-fg-3">
+        주요 도구 순서
+      </span>
+      <StudioWorkspaceQuickAccessPreview layout={layout} />
+    </span>
+  );
+}
+
+function StudioProComicPresetPreview({
+  layout,
+}: {
+  readonly layout: StudioWorkspaceLayout;
+}) {
+  return (
+    <span
+      className="mt-2 block border-t border-accent/25 pt-2"
+      data-testid="studio-pro-comic-palette-plan"
+    >
+      <span className="flex flex-wrap items-center gap-1">
+        <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.6875rem] font-bold text-accent">
+          권장 시작
+        </span>
+        <span className="text-[0.6875rem] font-bold text-fg-2">
+          팔레트 우선순위
+        </span>
+      </span>
+      <span
+        className="mt-1.5 flex flex-wrap gap-1"
+        aria-label="프로 만화 팔레트 우선순위"
+      >
+        {STUDIO_PRO_COMIC_PALETTE_PRIORITY.map((priority, index) => (
+          <span
+            key={priority}
+            className="rounded-md bg-raised px-1.5 py-1 text-[0.6875rem] font-semibold text-fg-2"
+          >
+            {index + 1} {PRO_COMIC_PALETTE_LABELS[priority]}
+          </span>
+        ))}
+      </span>
+      <span className="mt-1.5 block text-[0.6875rem] leading-relaxed text-fg-3">
+        왼쪽 페이지 216px · 오른쪽 도구 속성 344px · 모바일은 캔버스 우선 시트
+      </span>
+      <StudioWorkspaceQuickAccessPreview layout={layout} compact />
+    </span>
+  );
+}
 
 function StudioWorkspaceOverlayLayer({
   portal,
@@ -1061,6 +1245,10 @@ export function StudioWorkspaceMenu({
                   </span>
                   <Check size={15} aria-hidden className="shrink-0 text-accent" />
                 </div>
+                <StudioWorkspaceLayoutPreview
+                  layout={syncedState.liveLayout}
+                  mobileControlSide={syncedState.mobileControlSide}
+                />
                 {dirty ? (
                   <div className="mt-2 grid min-w-0 grid-cols-2 gap-1.5">
                     <button
@@ -1218,6 +1406,9 @@ export function StudioWorkspaceMenu({
                         <span className="mt-0.5 block line-clamp-2 text-[0.6875rem] leading-snug text-fg-3">
                           {workspace.description}
                         </span>
+                        {workspace.id === "pro-comic" ? (
+                          <StudioProComicPresetPreview layout={workspace.layout} />
+                        ) : null}
                       </span>
                     </button>
                   );

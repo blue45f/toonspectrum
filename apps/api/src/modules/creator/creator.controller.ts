@@ -6,6 +6,8 @@ import {
   Get,
   Header,
   Headers,
+  HttpCode,
+  HttpStatus,
   Inject,
   Param,
   Patch,
@@ -21,6 +23,7 @@ import {
   CreatorAssetListQueryDto,
   CreatorAssetModerationQueryDto,
   CreatorAssetParamsDto,
+  CreatorDraftCollaborationRoomParamsDto,
   CreatorSharedWorksListQueryDto,
   CreatorTeamListQueryDto,
   CreatorTeamMemberParamsDto,
@@ -30,7 +33,9 @@ import {
   CreatorWorkRevisionParamsDto,
   InviteCreatorTeamMemberDto,
   ModerateCreatorAssetDto,
+  PromoteCreatorDraftCollaborationRoomDto,
   PublishCreatorAssetDto,
+  ProvisionCreatorDraftCollaborationRoomDto,
   ReportCreatorAssetDto,
   RespondCreatorTeamInvitationDto,
   RestoreCreatorWorkRevisionDto,
@@ -76,6 +81,32 @@ export class CreatorController {
   async createWork(@Body() body: CreateCreatorWorkDto, @Headers("x-user-id") userId?: string) {
     const uid = enforceUserOrError(userId);
     return this.creatorService.createWork(uid, body);
+  }
+
+  @Post("/creator/draft-collaboration/rooms")
+  @HttpCode(HttpStatus.OK)
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  async provisionDraftCollaborationRoom(
+    @Body(new ZodValidationPipe(ProvisionCreatorDraftCollaborationRoomDto))
+    body: ProvisionCreatorDraftCollaborationRoomDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.provisionDraftCollaborationRoom(uid, body);
+  }
+
+  @Post("/creator/draft-collaboration/rooms/:roomId/promote")
+  @HttpCode(HttpStatus.OK)
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  async promoteDraftCollaborationRoom(
+    @Param(new ZodValidationPipe(CreatorDraftCollaborationRoomParamsDto))
+    params: CreatorDraftCollaborationRoomParamsDto,
+    @Body(new ZodValidationPipe(PromoteCreatorDraftCollaborationRoomDto))
+    body: PromoteCreatorDraftCollaborationRoomDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.promoteDraftCollaborationRoom(uid, params.roomId, body);
   }
 
   @Patch("/creator/works/:id")

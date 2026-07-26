@@ -23,9 +23,19 @@ import {
   CreatorCollaborationRepository,
   CreatorCollaborationRevisionConflictError,
 } from "./creator-collaboration.repository";
+import {
+  CreatorDraftCollaborationGraphConflictError,
+  CreatorDraftCollaborationRateLimitError,
+  CreatorDraftCollaborationRepository,
+  CreatorDraftCollaborationRoomExpiredError,
+} from "./creator-draft-collaboration.repository";
 import { CreatorService } from "./creator.service";
 
 const INVITATION_ID = "5f6f6d5c-58f1-4e2c-a228-4b670f470e2b";
+const DRAFT_ID = "draft_11111111-1111-4111-8111-111111111111";
+const ROOM_ID = "draft-room_22222222-2222-4222-8222-222222222222";
+const PROVISION_MUTATION_ID = "33333333-3333-4333-8333-333333333333";
+const PROMOTION_MUTATION_ID = "44444444-4444-4444-8444-444444444444";
 
 const {
   getWork,
@@ -101,9 +111,15 @@ const collaborationRepository = {
   respondToInvitation: vi.fn(),
 };
 
+const draftCollaborationRepository = {
+  provision: vi.fn(),
+  promote: vi.fn(),
+};
+
 function createService(): CreatorService {
   return new CreatorService(
-    collaborationRepository as unknown as CreatorCollaborationRepository
+    collaborationRepository as unknown as CreatorCollaborationRepository,
+    draftCollaborationRepository as unknown as CreatorDraftCollaborationRepository
   );
 }
 
@@ -132,6 +148,8 @@ describe("CreatorService safety gates", () => {
     collaborationRepository.updateMemberRole.mockReset();
     collaborationRepository.removeMember.mockReset();
     collaborationRepository.respondToInvitation.mockReset();
+    draftCollaborationRepository.provision.mockReset();
+    draftCollaborationRepository.promote.mockReset();
     delete process.env.CREATOR_IMAGE_AI_ENABLED;
   });
 
@@ -280,6 +298,146 @@ describe("CreatorService safety gates", () => {
       code: "creator_work_revision_conflict",
       currentRevision: 11,
     });
+  });
+
+  it("임시 협업 작업실 provision과 promotion을 인증 소유자 범위로만 위임한다", async () => {
+    const activeRoom = {
+      version: 1 as const,
+      roomId: ROOM_ID,
+      draftDocumentId: DRAFT_ID,
+      provisionalWorkId: "work-provisional",
+      ownerScopeKey: "owner",
+      status: "active" as const,
+      graphRevision: 0,
+      initialSnapshotByteLength: 2_048,
+      provisionIntent: "share-link" as const,
+      provisionedAt: "2026-07-26T00:00:00.000Z",
+      expiresAt: "2026-08-02T00:00:00.000Z",
+      promotedAt: null,
+    };
+    const promotedRoom = {
+      ...activeRoom,
+      status: "promoted" as const,
+      graphRevision: 1,
+      promotedAt: "2026-07-26T00:01:00.000Z",
+    };
+    draftCollaborationRepository.provision.mockResolvedValue(activeRoom);
+    draftCollaborationRepository.promote.mockResolvedValue(promotedRoom);
+    const service = createService();
+
+    await expect(
+      service.provisionDraftCollaborationRoom("owner", {
+        draftDocumentId: DRAFT_ID,
+        ownerScopeKey: "owner",
+        intent: "share-link",
+        clientMutationId: PROVISION_MUTATION_ID,
+        initialSnapshotByteLength: 2_048,
+      })
+    ).resolves.toEqual(activeRoom);
+    await expect(
+      service.promoteDraftCollaborationRoom("owner", ROOM_ID, {
+        draftDocumentId: DRAFT_ID,
+        ownerScopeKey: "owner",
+        targetWorkId: "work-provisional",
+        expectedGraphRevision: 0,
+        clientMutationId: PROMOTION_MUTATION_ID,
+      })
+    ).resolves.toEqual(promotedRoom);
+
+    expect(draftCollaborationRepository.provision).toHaveBeenCalledWith({
+      ownerUserId: "owner",
+      ownerScopeKey: "owner",
+      draftDocumentId: DRAFT_ID,
+      intent: "share-link",
+      clientMutationId: PROVISION_MUTATION_ID,
+      initialSnapshotByteLength: 2_048,
+    });
+    expect(draftCollaborationRepository.promote).toHaveBeenCalledWith({
+      ownerUserId: "owner",
+      ownerScopeKey: "owner",
+      roomId: ROOM_ID,
+      draftDocumentId: DRAFT_ID,
+      targetWorkId: "work-provisional",
+      expectedGraphRevision: 0,
+      clientMutationId: PROMOTION_MUTATION_ID,
+    });
+  });
+
+  it("임시 협업 ownerScopeKey 스푸핑은 저장소 호출 전에 닫는다", async () => {
+    const service = createService();
+    await expect(
+      service.provisionDraftCollaborationRoom("owner", {
+        draftDocumentId: DRAFT_ID,
+        ownerScopeKey: "other-owner",
+        intent: "invite-member",
+        clientMutationId: PROVISION_MUTATION_ID,
+        initialSnapshotByteLength: 0,
+      })
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      service.promoteDraftCollaborationRoom("owner", ROOM_ID, {
+        draftDocumentId: DRAFT_ID,
+        ownerScopeKey: "other-owner",
+        targetWorkId: "work-provisional",
+        expectedGraphRevision: 0,
+        clientMutationId: PROMOTION_MUTATION_ID,
+      })
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(draftCollaborationRepository.provision).not.toHaveBeenCalled();
+    expect(draftCollaborationRepository.promote).not.toHaveBeenCalled();
+  });
+
+  it("임시 협업 분산 제한과 graph CAS·TTL 오류를 최소 상태만 포함한 HTTP 오류로 변환한다", async () => {
+    draftCollaborationRepository.provision.mockRejectedValue(
+      new CreatorDraftCollaborationRateLimitError(1_501)
+    );
+    draftCollaborationRepository.promote
+      .mockRejectedValueOnce(new CreatorDraftCollaborationGraphConflictError(7))
+      .mockRejectedValueOnce(new CreatorDraftCollaborationRoomExpiredError());
+    const service = createService();
+    const provisionBody = {
+      draftDocumentId: DRAFT_ID,
+      ownerScopeKey: "owner",
+      intent: "share-link" as const,
+      clientMutationId: PROVISION_MUTATION_ID,
+      initialSnapshotByteLength: 128,
+    };
+    const promotionBody = {
+      draftDocumentId: DRAFT_ID,
+      ownerScopeKey: "owner",
+      targetWorkId: "work-provisional",
+      expectedGraphRevision: 0,
+      clientMutationId: PROMOTION_MUTATION_ID,
+    };
+
+    const rateLimited = await service
+      .provisionDraftCollaborationRoom("owner", provisionBody)
+      .catch((cause: unknown) => cause);
+    const graphConflict = await service
+      .promoteDraftCollaborationRoom("owner", ROOM_ID, promotionBody)
+      .catch((cause: unknown) => cause);
+    const expired = await service
+      .promoteDraftCollaborationRoom("owner", ROOM_ID, promotionBody)
+      .catch((cause: unknown) => cause);
+
+    expect(rateLimited).toBeInstanceOf(HttpException);
+    expect((rateLimited as HttpException).getStatus()).toBe(429);
+    expect((rateLimited as HttpException).getResponse()).toEqual({
+      code: "creator_draft_collaboration_rate_limited",
+      message: "임시 협업 작업실을 너무 자주 만들고 있습니다. 잠시 후 다시 시도해 주세요.",
+      retryAfterSeconds: 2,
+    });
+    expect(graphConflict).toBeInstanceOf(ConflictException);
+    expect((graphConflict as ConflictException).getResponse()).toEqual({
+      code: "creator_draft_collaboration_graph_conflict",
+      message: "협업 상태가 먼저 변경되었습니다. 최신 작업실 상태를 다시 확인해 주세요.",
+      currentGraphRevision: 7,
+    });
+    expect(expired).toBeInstanceOf(HttpException);
+    expect((expired as HttpException).getStatus()).toBe(410);
+    expect(JSON.stringify((expired as HttpException).getResponse())).not.toContain(
+      "work-provisional"
+    );
   });
 
   it("팀 조회와 변경 요청을 repository에 사용자·작품 범위 그대로 위임한다", async () => {

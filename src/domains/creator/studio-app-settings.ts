@@ -146,6 +146,7 @@ export type StudioAppSettings = {
     visibleIds: StudioRailToolId[];
   };
   grids: {
+    showCanvasRulers: boolean;
     showPixelGrid: boolean;
     pixelGridSize: number;
     snapToPixelGrid: boolean;
@@ -212,6 +213,9 @@ export function defaultStudioAppSettings(): StudioAppSettings {
       visibleIds: [...DEFAULT_STUDIO_RAIL_TOOL_ORDER],
     },
     grids: {
+      // Precision chrome should never reduce the first-open canvas. Artists opt in from View
+      // or the shortcut, and the choice is then persisted per browser.
+      showCanvasRulers: false,
       showPixelGrid: false,
       pixelGridSize: 40,
       snapToPixelGrid: false,
@@ -498,6 +502,7 @@ export function normalizeStudioAppSettings(value?: unknown): StudioAppSettings {
       visibleIds: normalizeStudioRailVisibleIds(tb.visibleIds),
     },
     grids: {
+      showCanvasRulers: asBool(gr.showCanvasRulers, d.grids.showCanvasRulers),
       showPixelGrid: asBool(gr.showPixelGrid, d.grids.showPixelGrid),
       pixelGridSize: nearest,
       snapToPixelGrid: asBool(gr.snapToPixelGrid, d.grids.snapToPixelGrid),

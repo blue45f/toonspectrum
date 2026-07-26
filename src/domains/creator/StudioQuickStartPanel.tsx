@@ -27,6 +27,7 @@ const StudioStarterCardArt = lazyRetry(
 
 export function StudioQuickStartPanel({
   onDismiss,
+  onQuickComic,
   onExample,
   onOpenTemplate,
   onOpenCharacter,
@@ -39,6 +40,7 @@ export function StudioQuickStartPanel({
   onOpenTutorials,
 }: {
   onDismiss: () => void;
+  onQuickComic: () => void;
   onExample: () => void;
   onOpenTemplate: () => void;
   onOpenCharacter: () => void;
@@ -128,13 +130,13 @@ export function StudioQuickStartPanel({
           <div>
             <p className="text-sm font-bold tracking-tight">도구 빠른 실행</p>
             <p className="mt-0.5 max-w-[40ch] text-[0.7rem] leading-snug text-fg-3">
-              그릴 준비 완료. 아래에서 바로 도구를 고르세요.
+              4단계로 한 페이지를 조립하거나 아래에서 바로 도구를 고르세요.
             </p>
           </div>
           <button
             type="button"
             onClick={onDismiss}
-            className="pointer-events-auto grid size-8 shrink-0 place-items-center rounded-lg border border-line text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="pointer-events-auto grid size-11 shrink-0 place-items-center rounded-xl border border-line text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             aria-label="닫기"
             title="닫기"
           >
@@ -145,14 +147,26 @@ export function StudioQuickStartPanel({
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={onExample}
+            onClick={onQuickComic}
             className={cn(
               "pointer-events-auto",
               buttonClass({ size: "sm", variant: "solid" }),
-              "min-h-9 justify-center gap-1.5 px-3 text-sm"
+              "min-h-11 justify-center gap-1.5 px-3 text-sm"
             )}
           >
             <Sparkles size={15} aria-hidden />
+            빠른 웹툰 만들기
+          </button>
+          <button
+            type="button"
+            onClick={onExample}
+            className={cn(
+              "pointer-events-auto",
+              buttonClass({ size: "sm", variant: "quiet" }),
+              "min-h-11 justify-center gap-1.5 px-3 text-sm"
+            )}
+          >
+            <LayoutTemplate size={15} aria-hidden />
             예시 캔버스
           </button>
           <button
@@ -161,7 +175,7 @@ export function StudioQuickStartPanel({
             className={cn(
               "pointer-events-auto",
               buttonClass({ size: "sm", variant: "quiet" }),
-              "min-h-9 justify-center gap-1.5 px-3 text-sm"
+              "min-h-11 justify-center gap-1.5 px-3 text-sm"
             )}
           >
             <Pencil size={15} aria-hidden />
@@ -173,7 +187,7 @@ export function StudioQuickStartPanel({
             className={cn(
               "pointer-events-auto",
               buttonClass({ size: "sm", variant: "outline" }),
-              "min-h-9 justify-center gap-1.5 px-3 text-sm"
+              "min-h-11 justify-center gap-1.5 px-3 text-sm"
             )}
           >
             <BookOpen size={15} aria-hidden />

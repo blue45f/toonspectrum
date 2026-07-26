@@ -61,6 +61,8 @@ export interface StudioStrokeStabilizerState {
   outputX: number;
   outputY: number;
   timeStamp: number;
+  /** Last trustworthy hardware cadence, reused when a browser timestamp repeats or regresses. */
+  sampleIntervalMs: number;
 }
 
 /** 화면 CSS 좌표 기준 속도 추적 상태. 캔버스 줌과 기기 샘플 주기의 영향을 분리한다. */
@@ -68,6 +70,8 @@ export interface StudioPointerVelocityState {
   clientX: number;
   clientY: number;
   timeStamp: number;
+  /** Last trustworthy hardware cadence, reused when a browser timestamp repeats or regresses. */
+  sampleIntervalMs: number;
 }
 
 export interface StudioPointerVelocityResult {
@@ -107,13 +111,22 @@ export function flushStudioStrokeStabilizerEndpoint(
   const timeStamp = safeTimeStamp(state.timeStamp, 0);
   return {
     point: [rawX, rawY],
-    state: { rawX, rawY, outputX: rawX, outputY: rawY, timeStamp },
+    state: {
+      rawX,
+      rawY,
+      outputX: rawX,
+      outputY: rawY,
+      timeStamp,
+      sampleIntervalMs: safeSampleInterval(state.sampleIntervalMs),
+    },
     effectiveStrength: 0,
     speed: 0,
   };
 }
 
 const DEFAULT_FRAME_MS = 1000 / 60;
+/** Neutral starting estimate for common 120Hz pen hardware. It is replaced by the first valid dt. */
+export const STUDIO_POINTER_DEFAULT_SAMPLE_INTERVAL_MS = 1000 / 120;
 const MIN_SAMPLE_MS = 1;
 const MAX_SAMPLE_MS = 64;
 const ADAPTIVE_SLOW_SPEED = 0.08;
@@ -138,6 +151,45 @@ function safeCoordinateScale(value: unknown): number {
 function safeTimeStamp(value: unknown, fallback: number): number {
   const timeStamp = finiteNumber(value, fallback);
   return timeStamp >= 0 ? timeStamp : fallback;
+}
+
+function safeSampleInterval(value: unknown): number {
+  return clamp(
+    finiteNumber(value, STUDIO_POINTER_DEFAULT_SAMPLE_INTERVAL_MS),
+    MIN_SAMPLE_MS,
+    MAX_SAMPLE_MS
+  );
+}
+
+interface StudioMonotonicSampleTiming {
+  readonly elapsedMs: number;
+  readonly timeStamp: number;
+}
+
+/**
+ * Browser clocks may repeat under timer precision reduction or regress when mixed native clocks
+ * enter one coalesced delivery. Keep geometry in delivery order, but advance the timing state by the
+ * last observed hardware cadence so velocity pressure and adaptive stabilization never see a
+ * negative clock or a fabricated 16.7ms pause.
+ */
+function monotonicSampleTiming(
+  previousTimeStamp: number,
+  previousSampleIntervalMs: number,
+  sampleTimeStamp: unknown
+): StudioMonotonicSampleTiming {
+  const rawTimeStamp = safeTimeStamp(sampleTimeStamp, previousTimeStamp);
+  const rawElapsed = rawTimeStamp - previousTimeStamp;
+  if (Number.isFinite(rawElapsed) && rawElapsed > 0) {
+    return {
+      elapsedMs: clamp(rawElapsed, MIN_SAMPLE_MS, MAX_SAMPLE_MS),
+      timeStamp: rawTimeStamp,
+    };
+  }
+  const elapsedMs = safeSampleInterval(previousSampleIntervalMs);
+  return {
+    elapsedMs,
+    timeStamp: previousTimeStamp + elapsedMs,
+  };
 }
 
 export function isStudioStabilizerMode(value: unknown): value is StudioStabilizerMode {
@@ -234,6 +286,7 @@ export function createStudioStrokeStabilizerState(
     outputX: x,
     outputY: y,
     timeStamp: safeTimeStamp(sample.timeStamp, 0),
+    sampleIntervalMs: STUDIO_POINTER_DEFAULT_SAMPLE_INTERVAL_MS,
   };
 }
 
@@ -246,6 +299,7 @@ export function createStudioPointerVelocityState(sample: {
     clientX: finiteNumber(sample.clientX, 0),
     clientY: finiteNumber(sample.clientY, 0),
     timeStamp: safeTimeStamp(sample.timeStamp, 0),
+    sampleIntervalMs: STUDIO_POINTER_DEFAULT_SAMPLE_INTERVAL_MS,
   };
 }
 
@@ -258,19 +312,22 @@ export function sampleStudioPointerVelocity(
   const previousTime = safeTimeStamp(previous.timeStamp, 0);
   const clientX = finiteNumber(sample.clientX, previousX);
   const clientY = finiteNumber(sample.clientY, previousY);
-  const timeStamp = safeTimeStamp(sample.timeStamp, previousTime + DEFAULT_FRAME_MS);
-  const rawElapsed = timeStamp - previousTime;
-  const elapsedMs = clamp(
-    Number.isFinite(rawElapsed) && rawElapsed > 0 ? rawElapsed : DEFAULT_FRAME_MS,
-    MIN_SAMPLE_MS,
-    MAX_SAMPLE_MS
+  const timing = monotonicSampleTiming(
+    previousTime,
+    previous.sampleIntervalMs,
+    sample.timeStamp
   );
   const distance = Math.hypot(clientX - previousX, clientY - previousY);
   return {
     distance,
-    elapsedMs,
-    speed: distance / elapsedMs,
-    state: { clientX, clientY, timeStamp },
+    elapsedMs: timing.elapsedMs,
+    speed: distance / timing.elapsedMs,
+    state: {
+      clientX,
+      clientY,
+      timeStamp: timing.timeStamp,
+      sampleIntervalMs: timing.elapsedMs,
+    },
   };
 }
 
@@ -278,16 +335,19 @@ function sampleTiming(
   state: StudioStrokeStabilizerState,
   rawX: number,
   rawY: number,
-  timeStamp: number
-): { elapsedMs: number; speed: number } {
-  const rawElapsed = timeStamp - state.timeStamp;
-  const elapsedMs = clamp(
-    Number.isFinite(rawElapsed) && rawElapsed > 0 ? rawElapsed : DEFAULT_FRAME_MS,
-    MIN_SAMPLE_MS,
-    MAX_SAMPLE_MS
+  sampleTimeStamp: unknown
+): { elapsedMs: number; speed: number; timeStamp: number } {
+  const timing = monotonicSampleTiming(
+    state.timeStamp,
+    state.sampleIntervalMs,
+    sampleTimeStamp
   );
   const distance = Math.hypot(rawX - state.rawX, rawY - state.rawY);
-  return { elapsedMs, speed: distance / elapsedMs };
+  return {
+    elapsedMs: timing.elapsedMs,
+    speed: distance / timing.elapsedMs,
+    timeStamp: timing.timeStamp,
+  };
 }
 
 function adaptiveStrength(strength: number, speed: number): number {
@@ -358,17 +418,21 @@ export function stabilizeStudioStrokeSample(
   const rawX = finiteNumber(sample.x, fallbackX);
   const rawY = finiteNumber(sample.y, fallbackY);
   const previousTimeStamp = safeTimeStamp(previous.timeStamp, 0);
-  const timeStamp = safeTimeStamp(sample.timeStamp, previousTimeStamp + DEFAULT_FRAME_MS);
   const safePrevious: StudioStrokeStabilizerState = {
     rawX: finiteNumber(previous.rawX, fallbackX),
     rawY: finiteNumber(previous.rawY, fallbackY),
     outputX: fallbackX,
     outputY: fallbackY,
     timeStamp: previousTimeStamp,
+    sampleIntervalMs: safeSampleInterval(previous.sampleIntervalMs),
   };
   const strength = clampStrength(options.strength);
   const mode = normalizeStudioStabilizerMode(options.mode);
-  const { elapsedMs, speed: logicalSpeed } = sampleTiming(safePrevious, rawX, rawY, timeStamp);
+  const {
+    elapsedMs,
+    speed: logicalSpeed,
+    timeStamp,
+  } = sampleTiming(safePrevious, rawX, rawY, sample.timeStamp);
   const coordinateScale = safeCoordinateScale(options.coordinateScale);
   const speed = logicalSpeed * coordinateScale;
 
@@ -394,7 +458,14 @@ export function stabilizeStudioStrokeSample(
   const outputY = finiteNumber(point[1], fallbackY);
   return {
     point: [outputX, outputY],
-    state: { rawX, rawY, outputX, outputY, timeStamp },
+    state: {
+      rawX,
+      rawY,
+      outputX,
+      outputY,
+      timeStamp,
+      sampleIntervalMs: elapsedMs,
+    },
     effectiveStrength,
     speed,
   };

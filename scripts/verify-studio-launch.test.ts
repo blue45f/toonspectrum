@@ -1,8 +1,11 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { isExpectedStaticPreviewApiError } from "./verify-studio-launch.mts";
 
 const STUDIO_URL = "http://127.0.0.1:51758/studio";
+const launchHarness = readFileSync(new URL("./verify-studio-launch.mts", import.meta.url), "utf8");
 const EXPECTED_HANDSHAKE_CLOSE = [
   "WebSocket connection to ",
   "'ws://127.0.0.1:51758/socket.io/?EIO=4&transport=websocket' failed: ",
@@ -10,6 +13,24 @@ const EXPECTED_HANDSHAKE_CLOSE = [
 ].join("");
 
 describe("Studio launch static-preview diagnostics", () => {
+  it("drives the current unified brush catalogue rather than retired mobile copy", () => {
+    expect(launchHarness).toContain('sheet.locator(\'[data-studio-open-brush-library="true"]\')');
+    expect(launchHarness).toContain(
+      'page.locator(\'[data-studio-brush-catalog-session="true"]\')',
+    );
+    expect(launchHarness).not.toContain('name: "기본 프리셋 전체 보기"');
+    expect(launchHarness).not.toContain('name: "앱 브러시"');
+  });
+
+  it("accepts only an above-dock sheet or a full modal cover over the inert dock", () => {
+    expect(launchHarness).toContain(
+      "const panelDockIsolation = panelEndsBeforeDock || (rootInert && panelCoversDock);",
+    );
+    expect(launchHarness).toContain("panelBox.x + panelBox.width >= dockBox.x + dockBox.width - 1");
+    expect(launchHarness).toContain("panelBox.y + panelBox.height >= dockBox.y + dockBox.height - 1");
+    expect(launchHarness).not.toContain("noPanelDockOverlap");
+  });
+
   it("allows the exact active-preview Socket.IO handshake close", () => {
     expect(
       isExpectedStaticPreviewApiError(EXPECTED_HANDSHAKE_CLOSE, STUDIO_URL),

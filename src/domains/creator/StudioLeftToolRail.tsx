@@ -390,10 +390,130 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     requestAnimationFrame(() => document.getElementById(railMoreTriggerId)?.focus());
   }
 
+  const railMoreFooter = (
+    <div className="relative" data-studio-tool-rail-settings="true">
+      <StudioRailToolButton
+        id={railMoreTriggerId}
+        icon={Settings2}
+        label="더보기 · 툴바 설정"
+        description="숨긴 도구를 열거나 애플리케이션 설정에서 툴바·단축키·마우스·터치를 맞춤 설정합니다."
+        active={railMoreOpen || appSettingsOpen}
+        aria-controls={railMoreOpen ? railMoreDialogId : undefined}
+        aria-expanded={railMoreOpen}
+        aria-haspopup="dialog"
+        onClick={() => {
+          if (!railMoreOpen) {
+            const rect = document.getElementById(railMoreTriggerId)?.getBoundingClientRect();
+            if (rect) {
+              setRailMorePosition(measureStudioRailMorePosition(rect));
+            }
+          }
+          setRailMoreOpen((v) => !v);
+        }}
+      />
+      {railMoreOpen && typeof document !== "undefined" ? createPortal((
+        <div
+          ref={railMoreDialogRef}
+          id={railMoreDialogId}
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby={railMoreTitleId}
+          tabIndex={-1}
+          className="fixed z-[80] max-h-[min(28rem,calc(100dvh-1rem))] w-52 overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel p-1.5 shadow-2xl [scrollbar-gutter:stable]"
+          style={{
+            left: railMorePosition.left,
+            maxHeight: railMorePosition.maxHeight,
+            top: railMorePosition.top,
+          }}
+        >
+          <p id={railMoreTitleId} className="px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-fg-3">
+            숨긴 도구
+          </p>
+          {appSettings.toolbar.visibleIds.length >= DEFAULT_STUDIO_RAIL_TOOL_ORDER.length ? (
+            <p className="px-2 py-1.5 text-[0.6875rem] text-fg-3">모두 표시 중</p>
+          ) : (
+            (
+              [
+                "select",
+                "hand",
+                "pen",
+                "pixel-pencil",
+                "eraser",
+                "blend",
+                "wet-mix",
+                "dodge-burn",
+                "liquify",
+                "fill",
+                "lasso-fill",
+                "eyedropper",
+                "marquee-rect",
+                "marquee-circle",
+                "lasso",
+                "transform",
+                "crop",
+                "smart-shape",
+                "shape-rect",
+                "shape-ellipse",
+                "text",
+                "bubble",
+                "image",
+                "comment",
+                "perspective",
+                "zoom",
+                "zoom-fit",
+                "rotate-view",
+                "frame-anim",
+                "mannequin3d",
+                "vrm3d",
+                "bg3d",
+                "reference",
+              ] as StudioRailToolId[]
+            )
+              .filter((id) => !isRailToolVisible(id))
+              .map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className="flex min-h-11 w-full items-center rounded-lg px-2 py-2 text-left text-xs text-fg hover:bg-raised sm:min-h-9 sm:py-1.5 pointer-coarse:min-h-11 pointer-coarse:py-2"
+                  onClick={() => {
+                    commitAppSettings({
+                      ...appSettings,
+                      toolbar: {
+                        visibleIds: [...appSettings.toolbar.visibleIds, id],
+                      },
+                    });
+                    closeRailMoreAndRestoreFocus();
+                  }}
+                >
+                  {studioRailToolLabel(id)}
+                </button>
+              ))
+          )}
+          <button
+            type="button"
+            className="mt-1 flex min-h-11 w-full items-center gap-1 rounded-lg border border-line px-2 py-2 text-left text-xs font-medium text-accent hover:bg-accent-soft sm:min-h-9 sm:py-1.5 pointer-coarse:min-h-11 pointer-coarse:py-2"
+            onClick={() => {
+              document.getElementById(railMoreTriggerId)?.focus({ preventScroll: true });
+              setRailMoreOpen(false);
+              setAppSettingsInitialTab("toolbar");
+              setAppSettingsOpen(true);
+            }}
+          >
+            <Settings2 className="size-3.5" aria-hidden />
+            애플리케이션 설정
+          </button>
+        </div>
+      ), document.body) : null}
+    </div>
+  );
+
   return (
     <>
         {studioUiDensityAllows(uiDensityMode, "tool-rail") && !canvasOnlyMode ? (
-          <StudioVerticalToolRail className={cn(mobileImmersive && "hidden")}>
+          <StudioVerticalToolRail
+            className={cn(mobileImmersive && "hidden")}
+            footer={railMoreFooter}
+          >
             {isRailToolVisible("select") ? (
             <StudioRailToolButton
               icon={MousePointer2}
@@ -631,7 +751,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               description="캔버스 색을 샘플링해 주 색으로 가져옵니다. 펜으로 그리는 중엔 Alt+클릭으로도 동작해요."
               active={eyedropperActive}
               onClick={() => {
-                setEyedropperActive((v) => !v);
+                const next = !eyedropperActive;
+                if (next) disarmAllPixelTools();
+                setEyedropperActive(next);
                 setMenu(null);
               }}
             />
@@ -979,121 +1101,6 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 onFocus={preloadStudioReferencePanel}
               />
             ) : null}
-            {/* More tools — hidden rail tools + Application Settings */}
-            <div className="relative">
-              <StudioRailToolButton
-                id={railMoreTriggerId}
-                icon={Settings2}
-                label="더보기 · 툴바 설정"
-                description="숨긴 도구를 열거나 애플리케이션 설정에서 툴바·단축키·마우스·터치를 맞춤 설정합니다."
-                active={railMoreOpen || appSettingsOpen}
-                aria-controls={railMoreOpen ? railMoreDialogId : undefined}
-                aria-expanded={railMoreOpen}
-                aria-haspopup="dialog"
-                onClick={() => {
-                  if (!railMoreOpen) {
-                    const rect = document.getElementById(railMoreTriggerId)?.getBoundingClientRect();
-                    if (rect) {
-                      setRailMorePosition(measureStudioRailMorePosition(rect));
-                    }
-                  }
-                  setRailMoreOpen((v) => !v);
-                }}
-              />
-              {railMoreOpen && typeof document !== "undefined" ? createPortal((
-                <div
-                  ref={railMoreDialogRef}
-                  id={railMoreDialogId}
-                  role="dialog"
-                  aria-modal="false"
-                  aria-labelledby={railMoreTitleId}
-                  tabIndex={-1}
-                  className="fixed z-[80] max-h-[min(28rem,calc(100dvh-1rem))] w-52 overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel p-1.5 shadow-2xl [scrollbar-gutter:stable]"
-                  style={{
-                    left: railMorePosition.left,
-                    maxHeight: railMorePosition.maxHeight,
-                    top: railMorePosition.top,
-                  }}
-                >
-                  <p id={railMoreTitleId} className="px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-fg-3">
-                    숨긴 도구
-                  </p>
-                  {appSettings.toolbar.visibleIds.length >= DEFAULT_STUDIO_RAIL_TOOL_ORDER.length ? (
-                    <p className="px-2 py-1.5 text-[0.6875rem] text-fg-3">모두 표시 중</p>
-                  ) : (
-                    (
-                      [
-                        "select",
-                        "hand",
-                        "pen",
-                        "pixel-pencil",
-                        "eraser",
-                        "blend",
-                        "wet-mix",
-                        "dodge-burn",
-                        "liquify",
-                        "fill",
-                        "lasso-fill",
-                        "eyedropper",
-                        "marquee-rect",
-                        "marquee-circle",
-                        "lasso",
-                        "transform",
-                        "crop",
-                        "smart-shape",
-                        "shape-rect",
-                        "shape-ellipse",
-                        "text",
-                        "bubble",
-                        "image",
-                        "comment",
-                        "perspective",
-                        "zoom",
-                        "zoom-fit",
-                        "rotate-view",
-                        "frame-anim",
-                        "mannequin3d",
-                        "vrm3d",
-                        "bg3d",
-                        "reference",
-                      ] as StudioRailToolId[]
-                    )
-                      .filter((id) => !isRailToolVisible(id))
-                      .map((id) => (
-                        <button
-                          key={id}
-                          type="button"
-                          className="flex min-h-11 w-full items-center rounded-lg px-2 py-2 text-left text-xs text-fg hover:bg-raised sm:min-h-9 sm:py-1.5 pointer-coarse:min-h-11 pointer-coarse:py-2"
-                          onClick={() => {
-                            commitAppSettings({
-                              ...appSettings,
-                              toolbar: {
-                                visibleIds: [...appSettings.toolbar.visibleIds, id],
-                              },
-                            });
-                            closeRailMoreAndRestoreFocus();
-                          }}
-                        >
-                          {studioRailToolLabel(id)}
-                        </button>
-                      ))
-                  )}
-                  <button
-                    type="button"
-                    className="mt-1 flex min-h-11 w-full items-center gap-1 rounded-lg border border-line px-2 py-2 text-left text-xs font-medium text-accent hover:bg-accent-soft sm:min-h-9 sm:py-1.5 pointer-coarse:min-h-11 pointer-coarse:py-2"
-                    onClick={() => {
-                      document.getElementById(railMoreTriggerId)?.focus({ preventScroll: true });
-                      setRailMoreOpen(false);
-                      setAppSettingsInitialTab("toolbar");
-                      setAppSettingsOpen(true);
-                    }}
-                  >
-                    <Settings2 className="size-3.5" aria-hidden />
-                    애플리케이션 설정
-                  </button>
-                </div>
-              ), document.body) : null}
-            </div>
           </StudioVerticalToolRail>
         ) : null}
     </>

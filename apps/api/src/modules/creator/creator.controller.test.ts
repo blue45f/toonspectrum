@@ -5,16 +5,24 @@ import { ZodValidationPipe } from "../../common/zod-validation.pipe";
 
 import { CreatorController } from "./creator.controller";
 import {
+  CreatorDraftCollaborationRoomParamsDto,
   CreatorSharedWorksListQueryDto,
   CreatorTeamListQueryDto,
   CreatorTeamMemberParamsDto,
   CreatorTeamWorkParamsDto,
   InviteCreatorTeamMemberDto,
+  PromoteCreatorDraftCollaborationRoomDto,
+  ProvisionCreatorDraftCollaborationRoomDto,
   RespondCreatorTeamInvitationDto,
   UpdateCreatorSharedDocumentDto,
   UpdateCreatorTeamMemberDto,
 } from "./creator.dto";
 import { CreatorService } from "./creator.service";
+
+const DRAFT_ID = "draft_11111111-1111-4111-8111-111111111111";
+const ROOM_ID = "draft-room_22222222-2222-4222-8222-222222222222";
+const PROVISION_MUTATION_ID = "33333333-3333-4333-8333-333333333333";
+const PROMOTION_MUTATION_ID = "44444444-4444-4444-8444-444444444444";
 
 const { isAdminUser } = vi.hoisted(() => ({
   isAdminUser: vi.fn(),
@@ -31,6 +39,8 @@ const creatorService = {
   getWorkRevisionComparison: vi.fn(),
   getSharedAssetContent: vi.fn(),
   saveSharedWorkDocument: vi.fn(),
+  provisionDraftCollaborationRoom: vi.fn(),
+  promoteDraftCollaborationRoom: vi.fn(),
   listWorkTeamInvitations: vi.fn(),
   getWorkTeamActivity: vi.fn(),
   respondToWorkTeamInvitation: vi.fn(),
@@ -125,6 +135,56 @@ describe("CreatorController collaboration collection endpoints", () => {
     ).toThrow(BadRequestException);
   });
 
+  it("임시 협업 DTO는 decorator metadata 없이도 exact UUID·16 MiB·strict 경계를 검증한다", () => {
+    const paramMetadata = { type: "param" as const, metatype: undefined, data: undefined };
+    const bodyMetadata = { type: "body" as const, metatype: undefined, data: undefined };
+    const provision = {
+      draftDocumentId: DRAFT_ID,
+      ownerScopeKey: "owner",
+      intent: "share-link",
+      clientMutationId: PROVISION_MUTATION_ID,
+      initialSnapshotByteLength: 16 * 1_024 * 1_024,
+    };
+    const promotion = {
+      draftDocumentId: DRAFT_ID,
+      ownerScopeKey: "owner",
+      targetWorkId: "work-provisional",
+      expectedGraphRevision: 0,
+      clientMutationId: PROMOTION_MUTATION_ID,
+    };
+
+    expect(
+      new ZodValidationPipe(ProvisionCreatorDraftCollaborationRoomDto).transform(
+        provision,
+        bodyMetadata
+      )
+    ).toEqual(provision);
+    expect(
+      new ZodValidationPipe(CreatorDraftCollaborationRoomParamsDto).transform(
+        { roomId: ROOM_ID },
+        paramMetadata
+      )
+    ).toEqual({ roomId: ROOM_ID });
+    expect(
+      new ZodValidationPipe(PromoteCreatorDraftCollaborationRoomDto).transform(
+        promotion,
+        bodyMetadata
+      )
+    ).toEqual(promotion);
+    expect(() =>
+      new ZodValidationPipe(ProvisionCreatorDraftCollaborationRoomDto).transform(
+        { ...provision, initialSnapshotByteLength: 16 * 1_024 * 1_024 + 1 },
+        bodyMetadata
+      )
+    ).toThrow(BadRequestException);
+    expect(() =>
+      new ZodValidationPipe(PromoteCreatorDraftCollaborationRoomDto).transform(
+        { ...promotion, leaseToken: "forged" },
+        bodyMetadata
+      )
+    ).toThrow(BadRequestException);
+  });
+
   beforeEach(() => {
     creatorService.listSharedWorks.mockReset();
     creatorService.getSharedWorkDocument.mockReset();
@@ -132,12 +192,82 @@ describe("CreatorController collaboration collection endpoints", () => {
     creatorService.getWorkRevisionComparison.mockReset();
     creatorService.getSharedAssetContent.mockReset();
     creatorService.saveSharedWorkDocument.mockReset();
+    creatorService.provisionDraftCollaborationRoom.mockReset();
+    creatorService.promoteDraftCollaborationRoom.mockReset();
     creatorService.listWorkTeamInvitations.mockReset();
     creatorService.getWorkTeamActivity.mockReset();
     creatorService.respondToWorkTeamInvitation.mockReset();
     creatorService.useSharedAsset.mockReset();
     isAdminUser.mockReset();
     isAdminUser.mockResolvedValue(false);
+  });
+
+  it("임시 협업 provision·promotion은 인증 사용자와 검증된 식별자만 서비스에 전달한다", async () => {
+    const activeRoom = { roomId: ROOM_ID, status: "active" };
+    const promotedRoom = { roomId: ROOM_ID, status: "promoted" };
+    const provision = {
+      draftDocumentId: DRAFT_ID,
+      ownerScopeKey: "owner",
+      intent: "share-link" as const,
+      clientMutationId: PROVISION_MUTATION_ID,
+      initialSnapshotByteLength: 1_024,
+    };
+    const promotion = {
+      draftDocumentId: DRAFT_ID,
+      ownerScopeKey: "owner",
+      targetWorkId: "work-provisional",
+      expectedGraphRevision: 0,
+      clientMutationId: PROMOTION_MUTATION_ID,
+    };
+    creatorService.provisionDraftCollaborationRoom.mockResolvedValue(activeRoom);
+    creatorService.promoteDraftCollaborationRoom.mockResolvedValue(promotedRoom);
+    const controller = createController();
+
+    await expect(
+      controller.provisionDraftCollaborationRoom(provision, "owner")
+    ).resolves.toBe(activeRoom);
+    await expect(
+      controller.promoteDraftCollaborationRoom(
+        { roomId: ROOM_ID },
+        promotion,
+        "owner"
+      )
+    ).resolves.toBe(promotedRoom);
+    expect(creatorService.provisionDraftCollaborationRoom).toHaveBeenCalledWith(
+      "owner",
+      provision
+    );
+    expect(creatorService.promoteDraftCollaborationRoom).toHaveBeenCalledWith(
+      "owner",
+      ROOM_ID,
+      promotion
+    );
+  });
+
+  it("임시 협업 API는 인증 헤더가 없으면 서비스 호출 전에 닫는다", async () => {
+    await expect(
+      createController().provisionDraftCollaborationRoom({
+        draftDocumentId: DRAFT_ID,
+        ownerScopeKey: "owner",
+        intent: "share-link",
+        clientMutationId: PROVISION_MUTATION_ID,
+        initialSnapshotByteLength: 0,
+      })
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      createController().promoteDraftCollaborationRoom(
+        { roomId: ROOM_ID },
+        {
+          draftDocumentId: DRAFT_ID,
+          ownerScopeKey: "owner",
+          targetWorkId: "work-provisional",
+          expectedGraphRevision: 0,
+          clientMutationId: PROMOTION_MUTATION_ID,
+        }
+      )
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(creatorService.provisionDraftCollaborationRoom).not.toHaveBeenCalled();
+    expect(creatorService.promoteDraftCollaborationRoom).not.toHaveBeenCalled();
   });
 
   it("인증 사용자와 Zod가 정규화한 limit만 초대함 서비스에 전달한다", async () => {

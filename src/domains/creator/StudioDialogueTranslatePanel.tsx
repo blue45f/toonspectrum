@@ -4,10 +4,14 @@
 // studio-dialogue-translate.ts(청크 분할·프롬프트·병합)와 studio-dialogue-batch.ts(목록화),
 // 실제 BYOK 호출은 studio-ai-client.ts, 상태·히스토리 커밋은 StudioPage(메인 루프)가 담당한다.
 // 자체완결 플로팅 패널: StudioDialogueBatchPanel과 동일한 셸(우측 상단, Esc로 닫힘).
-import { Check, Globe2, Languages, Loader2, X } from "lucide-react";
-import { useEffect } from "react";
+import { BookOpenCheck, Check, Globe2, Languages, Loader2, X } from "lucide-react";
+import { lazy, Suspense, useEffect, useState } from "react";
 
-import { collectDialogueItems, type DialoguePageLike } from "./studio-dialogue-batch";
+import {
+  collectDialogueItems,
+  type DialogueBatchItem,
+  type DialoguePageLike,
+} from "./studio-dialogue-batch";
 import { DIALOGUE_LOCALE_PRESETS, SOURCE_LOCALE, localeLabel } from "./studio-dialogue-translate";
 
 import { cx } from "@/lib/cx";
@@ -39,7 +43,15 @@ export type StudioDialogueTranslatePanelProps = {
   /** 재생성 없이 이미 만들어진 번역 사이를 토글(로케일 칩 클릭). */
   onSwitchLocale: (locale: string) => void;
   onClose: () => void;
+  /** Stable local/server document scope used to isolate translation-memory entries. */
+  workScope?: string;
 };
+
+const StudioDialogueTranslationMemoryPanel = lazy(() =>
+  import("./StudioDialogueTranslationMemoryPanel").then((module) => ({
+    default: module.StudioDialogueTranslationMemoryPanel,
+  }))
+);
 
 // select 의 "직접 입력…" 옵션 값 — 실제 로케일 코드로 저장되지 않는 내부 센티널.
 const CUSTOM_LOCALE_OPTION = "__custom__";
@@ -74,7 +86,9 @@ export function StudioDialogueTranslatePanel({
   onDiscardDraft,
   onSwitchLocale,
   onClose,
+  workScope,
 }: StudioDialogueTranslatePanelProps) {
+  const [memoryEntry, setMemoryEntry] = useState<DialogueBatchItem | null>(null);
   // Esc 로 닫기 — 입력 필드 안의 Esc 는 무시한다(StudioDialogueBatchPanel 과 동일 관례).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -106,6 +120,7 @@ export function StudioDialogueTranslatePanel({
   }
 
   const canGenerate = configured && !busy && items.length > 0;
+  const resolvedWorkScope = workScope?.trim() || `local:${pages[0]?.id ?? "untitled"}`;
 
   return (
     <section
@@ -272,9 +287,20 @@ export function StudioDialogueTranslatePanel({
                     <ul className="space-y-1.5">
                       {group.items.map((entry) => (
                         <li key={entry.id} className="rounded-lg border border-line bg-card/45 p-1.5">
-                          <p className="mb-1 truncate text-[0.64rem] text-fg-4" title={entry.text}>
-                            원문: {entry.text}
-                          </p>
+                          <div className="mb-1 flex min-w-0 items-center gap-1.5">
+                            <p className="min-w-0 flex-1 truncate text-[0.64rem] text-fg-4" title={entry.text}>
+                              원문: {entry.text}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setMemoryEntry(entry)}
+                              className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-line bg-panel px-2 text-[0.62rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                              title="이 대사와 유사한 검토·승인 번역을 찾거나 현재 번역을 로컬 메모리에 저장"
+                            >
+                              <BookOpenCheck size={12} aria-hidden />
+                              메모리
+                            </button>
+                          </div>
                           <textarea
                             value={draft.get(entry.id) ?? entry.text}
                             onChange={(e) => onDraftChange(entry.id, e.target.value)}
@@ -308,6 +334,32 @@ export function StudioDialogueTranslatePanel({
           </div>
         </>
       )}
+      {memoryEntry && draft ? (
+        <div className="absolute inset-0 z-50 overflow-y-auto overscroll-contain bg-panel/98 p-2 backdrop-blur">
+          <Suspense
+            fallback={
+              <div
+                role="status"
+                className="grid min-h-40 place-items-center text-xs text-fg-3"
+              >
+                번역 메모리를 여는 중…
+              </div>
+            }
+          >
+            <StudioDialogueTranslationMemoryPanel
+              workScope={resolvedWorkScope}
+              sourceText={memoryEntry.text}
+              sourceLocale={SOURCE_LOCALE}
+              targetLocale={targetLocale}
+              sourceRevision={`${memoryEntry.pageId}:${memoryEntry.id}:${memoryEntry.text}`}
+              glossaryText={glossary}
+              initialTranslation={draft.get(memoryEntry.id) ?? memoryEntry.text}
+              onReuse={(translation) => onDraftChange(memoryEntry.id, translation)}
+              onClose={() => setMemoryEntry(null)}
+            />
+          </Suspense>
+        </div>
+      ) : null}
     </section>
   );
 }

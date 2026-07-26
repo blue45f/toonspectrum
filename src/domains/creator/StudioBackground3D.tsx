@@ -328,6 +328,12 @@ import {
   type StudioBg3dPlacementPreviewState,
   type StudioBg3dPlacementSessionState,
 } from "./studio-bg3d-placement-session";
+import { calculateStudioBg3dProceduralSceneUsage } from "./studio-bg3d-procedural-scene-usage";
+import {
+  getStudioBg3dProceduralStarterAsset,
+  planStudioBg3dProceduralStarterInsertion,
+  type StudioBg3dProceduralInsertionPlan,
+} from "./studio-bg3d-procedural-starter-pack";
 import {
   StudioBg3dPrimitiveGeometryPool,
   synchronizeStudioBg3dRootMatrix,
@@ -3604,6 +3610,62 @@ export function StudioBackground3D({
     const parts = instantiateCompositePreset(preset, primitives.length);
     setPrimitives((prev) => [...prev, ...parts]);
     setSelectedIds(new Set([parts[0].id]));
+  };
+
+  const proceduralStarterDisabledReason = isRestoringScene
+    ? "3D 장면을 복원하는 중입니다. 복원이 끝난 뒤 추가할 수 있습니다."
+    : isUploadingModel || applyingTemplateId !== null || deletingModelId !== null ||
+        isSavingTemplate
+      ? "다른 3D 에셋 작업이 끝난 뒤 추가할 수 있습니다."
+      : isCapturing || isBatchRenderingShots
+        ? "3D 장면을 캡처하는 동안에는 에셋을 추가할 수 없습니다."
+        : physicsInteractionLocked || isTransforming
+          ? "물리 미리보기 또는 변형 작업을 마친 뒤 추가할 수 있습니다."
+          : null;
+
+  const addProceduralStarterAsset = (
+    assetId: string,
+  ): StudioBg3dProceduralInsertionPlan => {
+    if (proceduralStarterDisabledReason) {
+      return { ok: false, reason: "invalid-budget" };
+    }
+    const live = physicsRuntimeSourceRef.current;
+    const currentUsage = calculateStudioBg3dProceduralSceneUsage(
+      live.primitives,
+      live.customModels,
+      (modelId) => modelRootCacheRef.current.get(modelId)?.metrics ?? null,
+    );
+    if (!currentUsage) return { ok: false, reason: "invalid-budget" };
+
+    const asset = getStudioBg3dProceduralStarterAsset(assetId);
+    const policy = deriveStudioBg3dGlbValidationPolicy(live.document, deviceQuality);
+    const limits = policy.budgets[policy.profile].complexity;
+    const placementOrdinal = live.primitives.length + live.customModels.length;
+    const column = placementOrdinal % 3;
+    const row = Math.floor(placementOrdinal / 3) % 3;
+    const plan = planStudioBg3dProceduralStarterInsertion({
+      assetId,
+      occupiedNodeIds: [
+        ...live.primitives.map((primitive) => primitive.id),
+        ...live.customModels.map((model) => model.id),
+      ],
+      currentUsage,
+      limits,
+      origin: asset
+        ? [
+            column * (asset.bounds.width + 0.75),
+            0,
+            -row * (asset.bounds.depth + 0.75),
+          ]
+        : [0, 0, 0],
+    });
+    if (!plan.ok) return plan;
+
+    const nextPrimitives = [...live.primitives, ...plan.primitives];
+    physicsRuntimeSourceRef.current = { ...live, primitives: nextPrimitives };
+    setPrimitives(nextPrimitives);
+    setSelectedIds(new Set([plan.primitives[0].id]));
+    return plan;
   };
 
   // 씬 템플릿(교실/카페/거리 등 완성된 공간) 추가 — addComposite와 동일한 "추가 = 선택" UX.
@@ -9129,6 +9191,8 @@ export function StudioBackground3D({
                   COMPOSITE_CATEGORY_LABELS,
                   COMPOSITE_PRESETS,
                   addComposite,
+                  addProceduralStarterAsset,
+                  proceduralStarterDisabledReason,
                   snapSettings,
                   setSnapSettings,
                   normalizeStudioBg3dSnapSettings,

@@ -24,16 +24,28 @@ describe("shared asset lazy-content integration boundary", () => {
     );
   });
 
-  it("community drop은 네트워크 전에 문서 좌표를 고정하고 성공 삽입 뒤에만 사용을 집계한다", () => {
-    const start = source.indexOf('if (payload.source === "community")');
-    const end = source.indexOf('if (payload.source === "local")', start);
-    const branch = source.slice(start, end);
-    const pointIndex = branch.indexOf("const communityDropPoint = dropStagePoint();");
-    const awaitIndex = branch.indexOf("await loadCommunityAssetContent(asset)");
+  it("asset drop은 lazy parser 전에 좌표·scope를 고정하고 await 직후 stale mutation을 거부한다", () => {
+    const start = source.indexOf("// 2) 내부 에셋 패널에서 드래그한 경우.");
+    const end = source.indexOf("// 우클릭 컨텍스트 메뉴", start);
+    const handler = source.slice(start, end);
+    const pointIndex = handler.indexOf("const assetDropPoint = dropStagePoint();");
+    const parserAwaitIndex = handler.indexOf(
+      'await import("./studio-shared-asset-drag")'
+    );
+    const scopeGuardIndex = handler.indexOf("isStudioPasteScopeCurrent({", parserAwaitIndex);
+    const contentAwaitIndex = handler.indexOf("await loadCommunityAssetContent(asset)");
 
+    expect(source).not.toContain(
+      'import { parseStudioAssetDragPayload } from "./studio-shared-asset-drag"'
+    );
     expect(pointIndex).toBeGreaterThan(0);
-    expect(awaitIndex).toBeGreaterThan(pointIndex);
-    expect(branch).toContain("}, communityDropPoint);");
-    expect(branch).toContain("if (inserted) recordCommunityAssetUse(asset.id)");
+    expect(parserAwaitIndex).toBeGreaterThan(pointIndex);
+    expect(scopeGuardIndex).toBeGreaterThan(parserAwaitIndex);
+    expect(contentAwaitIndex).toBeGreaterThan(scopeGuardIndex);
+    expect(handler).toContain("mutationAllowed: canApplyStudioMutation(mutationTicket)");
+    expect(handler).toContain("currentPageId: currentPageIdRef.current");
+    expect(handler).toContain("currentMasterEditMode: masterEditModeRef.current");
+    expect(handler).toContain("}, assetDropPoint);");
+    expect(handler).toContain("if (inserted) recordCommunityAssetUse(asset.id)");
   });
 });

@@ -124,6 +124,8 @@ describe("StudioAppSettingsPanel", () => {
 
     expect(openingButtonTagByText(shortcuts, "V")).toContain("min-h-11");
     expect(openingButtonTagByText(shortcuts, "단축키 기본값")).toContain("min-h-11");
+    expect(grids).toContain("캔버스 px 눈금자");
+    expect(grids).toContain("실제 문서 좌표 표시");
     expect(gridSelect).toContain("min-h-11");
     expect(openingButtonTagByText(other, "기본값으로 재설정")).toContain("min-h-11");
   });

@@ -75,6 +75,14 @@ describe("Studio mobile immersive preference", () => {
     expect(studioGlobalsSource).toContain("--studio-canvas-bottom-inset");
   });
 
+  it("clears a temporary inspector override when entering the super-simple layout", () => {
+    const densitySetter = studioPageSource.slice(
+      studioPageSource.indexOf("function setStudioUiDensity("),
+      studioPageSource.indexOf("function commitAppSettings("),
+    );
+    expect(densitySetter).toContain('if (mode === "focus") setForceRightPanelOpen(false);');
+  });
+
   it("keeps every 320px dock target at 44px and scrolls only the two tool rows", () => {
     expect(studioChromeSource).toContain(
       '"flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center',

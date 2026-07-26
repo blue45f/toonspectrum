@@ -87,6 +87,14 @@ function renderPanel(overrides: Partial<Parameters<typeof StudioSelectionToolsPa
   );
 }
 
+function openingButtonForAriaLabel(html: string, ariaLabel: string): string {
+  const labelIndex = html.indexOf(`aria-label="${ariaLabel}"`);
+  if (labelIndex < 0) return "";
+  const start = html.lastIndexOf("<button", labelIndex);
+  const end = html.indexOf(">", labelIndex);
+  return html.slice(start, end + 1);
+}
+
 describe("StudioSelectionToolsPanel", () => {
   it("labels subpath removal independently from document undo", () => {
     const html = renderPanel();
@@ -228,12 +236,27 @@ describe("StudioSelectionToolsPanel", () => {
     expect(componentSource).toContain('shortcut: "⌘/Ctrl+⇧+Z"');
   });
 
-  it("makes every compact control explain a busy state through the hint target", () => {
+  it("locks new work while keeping the active selection tool available as an exit", () => {
     const html = renderPanel({ busy: true });
     const busyReason = "다른 픽셀 작업을 적용하는 동안 기다려 주세요.";
+    const activeToolHint =
+      html.match(/<span[^>]*data-hint-id="pixel-selection-lasso"[^>]*>/u)?.[0] ?? "";
+    const activeToolButton = openingButtonForAriaLabel(html, "올가미 종료");
+    const inactiveToolButton = openingButtonForAriaLabel(html, "사각형");
+    const rangeCount = html.match(/<input[^>]*type="range"[^>]*>/gu)?.length ?? 0;
+    const disabledRangeCount =
+      html.match(/<input[^>]*type="range"[^>]*disabled=""[^>]*>/gu)?.length ?? 0;
 
-    expect(html.match(/data-hint-disabled="true"/gu)?.length).toBe(38); // 의도적 변경(2026-07-24): 새 레이어 복사/오려내기 2개 추가
-    expect(html.match(new RegExp(`data-unavailable-reason="${busyReason}"`, "gu"))?.length).toBe(38); // 의도적 변경(2026-07-24): 새 레이어 복사/오려내기 2개 추가
+    expect(html).toContain('aria-busy="true"');
+    expect(activeToolHint).not.toContain('data-hint-disabled="true"');
+    expect(activeToolButton).not.toContain('disabled=""');
+    expect(inactiveToolButton).toContain('disabled=""');
+    expect(html).toContain("현재 선택 도구는 종료할 수 있습니다.");
+    expect(html.match(/data-hint-disabled="true"/gu)?.length).toBe(37);
+    expect(html.match(new RegExp(`data-unavailable-reason="${busyReason}"`, "gu"))?.length).toBe(37);
+    expect(disabledRangeCount).toBe(rangeCount);
+    expect(html).toContain("pointer-coarse:min-h-11");
+    expect(html).toContain("pointer-coarse:min-w-11");
   });
 });
 
@@ -284,7 +307,7 @@ describe("StudioSelectionToolsPanel — 색상 범위(Color Range)", () => {
 
   it("mirrors the armed pick state from props (page-owned, fully controlled)", () => {
     const armed = renderPanel({ ...colorRangeProps, colorRangePickArmed: true });
-    expect(armed).toMatch(/aria-pressed="true"[^>]*aria-label="캔버스에서 색 추출"/u);
+    expect(armed).toMatch(/aria-pressed="true"[^>]*aria-label="캔버스 색 추출 종료"/u);
     expect(armed).toContain("이미지 위를 클릭하면 그 지점의 색이 샘플로 추가됩니다.");
 
     const disarmed = renderPanel(colorRangeProps);
@@ -310,8 +333,25 @@ describe("StudioSelectionToolsPanel — 색상 범위(Color Range)", () => {
   it("disables the whole section with the shared busy reason while pixel work runs", () => {
     const html = renderPanel({ ...colorRangeProps, busy: true });
     const busyReason = "다른 픽셀 작업을 적용하는 동안 기다려 주세요.";
-    // 기존 36개 + 색상 범위 힌트 타깃 6개 전부 busy 사유로 잠긴다.
-    expect(html.match(/data-hint-disabled="true"/gu)?.length).toBe(44); // 의도적 변경(2026-07-24): 새 레이어 복사/오려내기 2개 추가
-    expect(html.match(new RegExp(`data-unavailable-reason="${busyReason}"`, "gu"))?.length).toBe(44); // 의도적 변경(2026-07-24): 새 레이어 복사/오려내기 2개 추가
+    // 활성 올가미 종료 1개만 열어 두고 나머지 43개를 같은 busy 사유로 잠근다.
+    expect(html.match(/data-hint-disabled="true"/gu)?.length).toBe(43);
+    expect(html.match(new RegExp(`data-unavailable-reason="${busyReason}"`, "gu"))?.length).toBe(43);
+  });
+
+  it("keeps armed color-range toggles closable during a busy calculation", () => {
+    const html = renderPanel({
+      ...colorRangeProps,
+      busy: true,
+      colorRangePickArmed: true,
+      colorRangePreviewEnabled: true,
+    });
+
+    expect(openingButtonForAriaLabel(html, "캔버스 색 추출 종료")).not.toContain(
+      'disabled=""'
+    );
+    expect(openingButtonForAriaLabel(html, "색상 범위 미리보기 종료")).not.toContain(
+      'disabled=""'
+    );
+    expect(html).toContain("색 추출 도구는 지금 종료할 수 있습니다.");
   });
 });

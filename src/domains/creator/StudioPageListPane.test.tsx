@@ -278,7 +278,7 @@ describe("StudioPageListPane", () => {
     ).toBe("0");
   });
 
-  it("keeps the mobile sheet inert while closed and restores modal semantics when opened", () => {
+  it("keeps the mobile sheet inert while closed and restores modal semantics when opened", async () => {
     const props = createProps({
       isMobile: true,
       mobileKeyboardInset: 24,
@@ -289,27 +289,35 @@ describe("StudioPageListPane", () => {
 
     expect(sheet).not.toBeNull();
     expect(sheet?.hasAttribute("inert")).toBe(true);
+    expect(sheet?.getAttribute("aria-hidden")).toBe("true");
     expect(sheet?.getAttribute("aria-modal")).toBeNull();
+    expect(sheet?.getAttribute("role")).toBeNull();
+    expect(sheet?.getAttribute("aria-label")).toBeNull();
+    expect(sheet?.getAttribute("tabindex")).toBeNull();
     expect(sheet?.style.bottom).toBe("24px");
 
     view.rerender(<StudioPageListPane {...props} mobileSheet="pages" />);
     sheet = document.querySelector<HTMLElement>('[data-studio-sheet-id="pages"]');
     expect(sheet?.hasAttribute("inert")).toBe(false);
+    expect(sheet?.getAttribute("aria-hidden")).toBeNull();
     expect(sheet?.getAttribute("aria-modal")).toBe("true");
+    expect(sheet?.getAttribute("role")).toBe("dialog");
+    expect(sheet?.getAttribute("aria-label")).toBe("페이지 목록");
+    expect(sheet?.getAttribute("tabindex")).toBe("-1");
     expect(sheet?.getAttribute("data-popup-kind")).toBe("sheet");
     expect(sheet?.getAttribute("data-studio-sheet-snap")).toBe("medium");
 
-    fireEvent.click(screen.getByRole("slider", { name: /페이지 시트 크기 조절/ }));
+    fireEvent.click(await screen.findByRole("slider", { name: /페이지 시트 크기 조절/ }));
     expect(sheet?.getAttribute("data-studio-sheet-snap")).toBe("full");
   });
 
-  it("uses arrow keys to resize one level, clamps at compact, and closes explicitly", () => {
+  it("uses arrow keys to resize one level, clamps at compact, and closes explicitly", async () => {
     const props = createProps({
       isMobile: true,
       mobileSheet: "pages",
     });
     render(<StudioPageListPane {...props} />);
-    const handle = screen.getByRole("slider", { name: /페이지 시트 크기 조절/ });
+    const handle = await screen.findByRole("slider", { name: /페이지 시트 크기 조절/ });
     const sheet = document.querySelector<HTMLElement>('[data-studio-sheet-id="pages"]');
 
     fireEvent.keyDown(handle, { key: "ArrowDown" });

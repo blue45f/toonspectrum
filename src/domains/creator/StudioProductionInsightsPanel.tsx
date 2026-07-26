@@ -14,6 +14,8 @@ import {
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
+import { StudioProjectHealthSummary } from "./StudioProjectHealthSummary";
+
 import type {
   StudioProductionInsights,
   StudioProductionIssueSeverity,
@@ -289,8 +291,14 @@ export function StudioProductionInsightsPanel({
             </section>
           )}
 
+          {!hasDocumentStructure && <div className="my-5 border-t border-line" />}
+
+          <StudioProjectHealthSummary insights={insights} />
+
           {hasDocumentStructure && (
             <>
+              <div className="my-5 border-t border-line" />
+
               <section aria-labelledby="production-volume-title">
                 <div className="flex flex-wrap items-end justify-between gap-2">
                   <div>

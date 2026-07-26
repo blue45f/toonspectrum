@@ -16,9 +16,11 @@ import {
 } from "lucide-react";
 import { Suspense } from "react";
 
+import { completeStudioAssetInsertion } from "./studio-asset-insertion-outcome";
 import { CANVAS_W, TEMPLATES, groupTemplates } from "./studio-assets";
 import { svgToDataUrl } from "./studio-characters";
 import { StudioMenuPopoverHeader, StudioMenuSubtabs } from "./studio-chrome-ui";
+import { writeStudioInsertDragPayload } from "./studio-insert-drag-writer";
 import {
   StudioAssetMenuPanel,
   StudioCollagePanel,
@@ -208,6 +210,10 @@ export function StudioAssetToolPopoverBody({
               {menu === "template" && (
                 <div className="grid gap-1.5 lg:max-h-80 lg:overflow-y-auto lg:pr-1">
                   <p className="px-1 text-[0.66rem] font-medium text-fg-3">캔버스 템플릿</p>
+                  <p className="rounded-xl border border-line bg-card/75 px-2.5 py-2 text-[0.62rem] leading-relaxed text-fg-3">
+                    캔버스 전체를 바꾸는 템플릿은 <strong className="font-semibold text-fg-2">클릭·탭으로 적용</strong>합니다.
+                    위치를 고르는 도형·말풍선·에셋은 각 라이브러리에서 끌어 놓을 수 있어요.
+                  </p>
                   {TEMPLATE_GROUPS.map((group) => (
                     <div key={group.group} className="grid gap-1">
                       <p className="px-1 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{group.group}</p>
@@ -216,7 +222,7 @@ export function StudioAssetToolPopoverBody({
                           key={t.id}
                           type="button"
                           onClick={() => applyTemplate(t)}
-                          className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
+                          className="flex min-h-11 items-center justify-between gap-2 rounded-lg px-3 text-left text-xs hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                         >
                           <span className="font-medium text-fg">{t.label}</span>
                           <span className="text-fg-3">{t.hint}</span>
@@ -238,7 +244,7 @@ export function StudioAssetToolPopoverBody({
                         key={layout.id}
                         type="button"
                         onClick={() => void applyPanelLayout(layout)}
-                        className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
+                        className="flex min-h-11 items-center justify-between gap-2 rounded-lg px-3 text-left text-xs hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                       >
                         <span className="font-medium text-fg">{layout.label}</span>
                         <span className="text-fg-3">{layout.hint}</span>
@@ -268,6 +274,7 @@ export function StudioAssetToolPopoverBody({
                     onAdd={(item) => {
                       addCatalogElement(item);
                     }}
+                    onOpenBubbles={() => setMenu("bubble")}
                   />
                 </Suspense>
               )}
@@ -487,9 +494,9 @@ export function StudioAssetToolPopoverBody({
                             {items.map((t) => (
                               <div
                                 key={t.id}
-                                className="rounded-lg border border-line bg-card px-2 py-1.5 transition-colors hover:border-accent/50 hover:bg-raised"
+                                className="rounded-lg border border-line bg-card px-2 transition-colors hover:border-accent/50 hover:bg-raised"
                               >
-                                <button type="button" onClick={() => void addSceneTemplate(t)} className="block w-full text-left">
+                                <button type="button" onClick={() => void addSceneTemplate(t)} className="block min-h-11 w-full py-1.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
                                   <span className="block text-xs font-semibold text-fg">{t.label}</span>
                                   <span className="block text-[0.68rem] text-fg-3">{t.description}</span>
                                 </button>
@@ -654,11 +661,10 @@ export function StudioAssetToolPopoverBody({
                             onClick={() => addSticker(em)}
                             draggable
                             onDragStart={(event) => {
-                              event.dataTransfer.setData(
-                                "application/json-insert",
-                                JSON.stringify({ kind: "sticker", emoji: em })
-                              );
-                              event.dataTransfer.effectAllowed = "copy";
+                              writeStudioInsertDragPayload(event.dataTransfer, {
+                                kind: "sticker",
+                                emoji: em,
+                              });
                             }}
                             title="클릭해 추가하거나 캔버스로 끌어다 원하는 위치에 놓으세요"
                             className="grid size-9 place-items-center rounded-md text-lg hover:bg-raised pointer-coarse:size-11"
@@ -770,10 +776,10 @@ export function StudioAssetToolPopoverBody({
                     renamingAssetName={renamingAssetName}
                     setRenamingAssetName={setRenamingAssetName}
                     handleRenameAsset={handleRenameAsset}
-                    onUseLocalAsset={(asset) => {
-                      addRenderedImage(asset.dataUrl, asset.width, asset.height);
-                      setMenu(null);
-                    }}
+                    onUseLocalAsset={(asset) => completeStudioAssetInsertion(
+                      () => addRenderedImage(asset.dataUrl, asset.width, asset.height),
+                      () => setMenu(null)
+                    )}
                     onShareAsset={onShareAsset}
                     onDeleteAsset={onDeleteAsset}
                     publishingId={publishingId}

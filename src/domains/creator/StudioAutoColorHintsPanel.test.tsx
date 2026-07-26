@@ -145,6 +145,48 @@ describe("StudioAutoColorHintsPanel module boundary", () => {
     });
   });
 
+  it("blocks a new canvas arm while busy but keeps the armed exit action available", async () => {
+    const onArmed = vi.fn();
+    let finishRun: ((plan: ReturnType<typeof planStudioAutoColorHints>) => void) | undefined;
+    const onRun = vi.fn(
+      () =>
+        new Promise<ReturnType<typeof planStudioAutoColorHints>>((resolve) => {
+          finishRun = resolve;
+        }),
+    );
+    const { rerender } = render(
+      <StudioAutoColorHintsPanel
+        onRun={onRun}
+        scribbleCanvasArmed={false}
+        onScribbleCanvasArmedChange={onArmed}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "힌트 계획 실행" }));
+    await waitFor(() => expect(onRun).toHaveBeenCalledTimes(1));
+    expect(
+      (
+        screen.getByRole("button", {
+          name: /캔버스에 시드 찍기/,
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+
+    rerender(
+      <StudioAutoColorHintsPanel
+        onRun={onRun}
+        scribbleCanvasArmed
+        onScribbleCanvasArmedChange={onArmed}
+      />,
+    );
+    const exit = screen.getByRole("button", { name: /캔버스에 시드 찍기/ });
+    expect((exit as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(exit);
+    expect(onArmed).toHaveBeenLastCalledWith(false);
+
+    finishRun?.(planStudioAutoColorHints(createStudioAutoColorHintsDemoRequest()));
+  });
+
   it("ingests a freehand stroke seed batch in one pass", async () => {
     const onConsumed = vi.fn();
     render(

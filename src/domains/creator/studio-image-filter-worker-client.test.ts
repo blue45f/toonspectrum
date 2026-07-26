@@ -230,6 +230,34 @@ describe("runStudioImageFilterWorker", () => {
     expect(Array.from(output.imageData.data)).toEqual(Array.from(expected));
   });
 
+  it("preserves deterministic union-wave fields and matches direct pixels in the Worker path", async () => {
+    const el: ImageFilterFields = {
+      filterUnionWave: {
+        kind: "film-grain-pro",
+        amount: 48,
+        scale: 1,
+        detail: 50,
+        seed: 4242,
+        centerX: 50,
+        centerY: 50,
+        angle: 0,
+      },
+    };
+    const request = requestFixture(el);
+    const expected = expectedPixels(el);
+    const worker = new ApplyingWorker();
+
+    const output = await runStudioImageFilterWorker(request, {
+      workerFactory: () => worker,
+    });
+
+    expect(output.execution).toBe("worker");
+    expect(Array.from(output.imageData.data)).toEqual(Array.from(expected));
+    expect(Array.from(output.imageData.data)).not.toEqual(
+      Array.from(makeImageData(3, 2).data),
+    );
+  });
+
   it("copies a partial ArrayBuffer view so unrelated caller bytes and sibling views are not detached", async () => {
     const backing = new ArrayBuffer(40);
     const pixels = new Uint8ClampedArray(backing, 8, 24);
@@ -281,6 +309,16 @@ describe("runStudioImageFilterWorker", () => {
       pixelOffset: { x: 2, y: -1, edge: "wrap" },
       convolution: { kernel: [0, -1, 0, -1, 5, -1, 0, -1, 0], divisor: 1, bias: 0 },
       clouds: { amount: 0.2, scale: 64, seed: 42, mode: "overlay" },
+      filterUnionWave: {
+        kind: "wave-warp",
+        amount: 42,
+        scale: 28,
+        detail: 50,
+        seed: 1337,
+        centerX: 50,
+        centerY: 50,
+        angle: 0,
+      },
       src: "blob:large-source",
       frames: [{ src: "blob:animation-frame" }],
       scene3d: { render() {} },
@@ -312,6 +350,16 @@ describe("runStudioImageFilterWorker", () => {
       pixelOffset: { x: 2, y: -1, edge: "wrap" },
       convolution: { kernel: [0, -1, 0, -1, 5, -1, 0, -1, 0], divisor: 1, bias: 0 },
       clouds: { amount: 0.2, scale: 64, seed: 42, mode: "overlay" },
+      filterUnionWave: {
+        kind: "wave-warp",
+        amount: 42,
+        scale: 28,
+        detail: 50,
+        seed: 1337,
+        centerX: 50,
+        centerY: 50,
+        angle: 0,
+      },
     });
   });
 

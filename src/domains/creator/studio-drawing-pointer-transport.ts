@@ -79,6 +79,33 @@ export interface StartStudioDrawingPointerTransportResult {
   readonly started: boolean;
 }
 
+export interface StudioDrawingPointerTransportDiagnostics {
+  readonly authoritativeMoveDeliveries: number;
+  readonly rawPreviewDeliveries: number;
+  readonly finishRequests: number;
+  readonly discardRequests: number;
+  /** Native move/end deliveries suppressed after this session had already claimed its terminal path. */
+  readonly deliveriesAfterTerminalClaim: number;
+}
+
+interface MutableStudioDrawingPointerTransportDiagnostics {
+  authoritativeMoveDeliveries: number;
+  rawPreviewDeliveries: number;
+  finishRequests: number;
+  discardRequests: number;
+  deliveriesAfterTerminalClaim: number;
+}
+
+function emptyTransportDiagnostics(): MutableStudioDrawingPointerTransportDiagnostics {
+  return {
+    authoritativeMoveDeliveries: 0,
+    rawPreviewDeliveries: 0,
+    finishRequests: 0,
+    discardRequests: 0,
+    deliveriesAfterTerminalClaim: 0,
+  };
+}
+
 const EMPTY_PORTS: StudioDrawingPointerTransportPorts = {
   getLastAuthoritativePointer: () => null,
   onAuthoritativeMove: () => undefined,
@@ -140,6 +167,8 @@ export function resolveStudioDrawingPointerCaptureTarget(
  */
 export class StudioDrawingPointerTransportController {
   private captureTarget: StudioDrawingPointerCaptureTarget | null = null;
+  private diagnostics = emptyTransportDiagnostics();
+  private terminalClaimed = false;
   private readonly handledNativeEndEvents = new WeakSet<PointerEvent>();
   private ports: StudioDrawingPointerTransportPorts = EMPTY_PORTS;
   private safetyCleanup: (() => void) | null = null;
@@ -159,6 +188,10 @@ export class StudioDrawingPointerTransportController {
 
   getCaptureTarget(): StudioDrawingPointerCaptureTarget | null {
     return this.captureTarget;
+  }
+
+  getDiagnostics(): StudioDrawingPointerTransportDiagnostics {
+    return { ...this.diagnostics };
   }
 
   owns(pointerEvent: PointerEvent): boolean {
@@ -184,6 +217,8 @@ export class StudioDrawingPointerTransportController {
       input.stage,
       input.pointerEvent
     );
+    this.diagnostics = emptyTransportDiagnostics();
+    this.terminalClaimed = false;
     this.session = input.session;
     this.captureTarget = captureTarget;
     const captured = tryCaptureStudioStrokePointer(captureTarget, input.session.pointerId);
@@ -206,6 +241,7 @@ export class StudioDrawingPointerTransportController {
     this.session = null;
     this.captureTarget = null;
     this.safetyCleanup = null;
+    this.terminalClaimed = false;
     safetyCleanup?.();
     if (session) tryReleaseStudioStrokePointer(captureTarget, session.pointerId);
   }
@@ -213,6 +249,46 @@ export class StudioDrawingPointerTransportController {
   /** StrictMode-safe lifecycle cleanup; the stable controller can be armed again after replay. */
   dispose(): void {
     this.release();
+  }
+
+  private noteDeliveryAfterTerminalClaim(): void {
+    this.diagnostics.deliveriesAfterTerminalClaim += 1;
+  }
+
+  private requestFinish(
+    pointerEvent: PointerEvent,
+    request: StudioDrawingPointerFinishRequest
+  ): boolean {
+    if (this.terminalClaimed) {
+      this.noteDeliveryAfterTerminalClaim();
+      return false;
+    }
+    this.terminalClaimed = true;
+    this.diagnostics.finishRequests += 1;
+    try {
+      this.ports.onFinish(pointerEvent, request);
+    } catch (cause) {
+      // A throwing consumer must not leave a captured pointer and high-rate listeners armed.
+      this.release();
+      throw cause;
+    }
+    return true;
+  }
+
+  private requestDiscard(): boolean {
+    if (this.terminalClaimed) {
+      this.noteDeliveryAfterTerminalClaim();
+      return false;
+    }
+    this.terminalClaimed = true;
+    this.diagnostics.discardRequests += 1;
+    try {
+      this.ports.onDiscard();
+    } catch (cause) {
+      this.release();
+      throw cause;
+    }
+    return true;
   }
 
   private installSafetyListeners(
@@ -247,8 +323,12 @@ export class StudioDrawingPointerTransportController {
       const pointerEvent = event as PointerEvent;
       const session = this.session;
       if (!session || session.pointerId !== pointerId) return;
+      if (this.terminalClaimed) {
+        this.noteDeliveryAfterTerminalClaim();
+        return;
+      }
       if (shouldEndStudioStrokeForReleasedContact(session, pointerEvent)) {
-        this.ports.onFinish(pointerEvent, {
+        this.requestFinish(pointerEvent, {
           cancelled: false,
           consumeReleaseSample: false,
           reason: "released-contact",
@@ -257,17 +337,25 @@ export class StudioDrawingPointerTransportController {
       }
       const claim = claimStudioStrokeMoveTransport(session, pointerEvent, "pointermove");
       this.session = claim.session;
-      if (claim.accepted) this.ports.onAuthoritativeMove(pointerEvent);
+      if (claim.accepted) {
+        this.diagnostics.authoritativeMoveDeliveries += 1;
+        this.ports.onAuthoritativeMove(pointerEvent);
+      }
     };
     const onGlobalRawPreviewMove: EventListener = (event) => {
       const pointerEvent = event as PointerEvent;
       const session = this.session;
       if (!session || session.pointerId !== pointerId) return;
+      if (this.terminalClaimed) {
+        this.noteDeliveryAfterTerminalClaim();
+        return;
+      }
       const claim = claimStudioStrokeMoveTransport(session, pointerEvent, "pointerrawupdate");
       this.session = claim.session;
       // Pointer Events guarantees rawupdate before its corresponding processed move. Keep this
       // channel visual-only: the later pointermove/coalesced batch remains the sole ink authority.
       if (isStudioStrokePointerEvent(session, pointerEvent)) {
+        this.diagnostics.rawPreviewDeliveries += 1;
         this.ports.onRawPreviewMove(pointerEvent);
       }
     };
@@ -279,17 +367,17 @@ export class StudioDrawingPointerTransportController {
       this.handledNativeEndEvents.add(pointerEvent);
       if (event.type === "pointercancel") {
         if (shouldCommitStudioStrokeOnPointerCancel(session, pointerEvent)) {
-          this.ports.onFinish(pointerEvent, {
+          this.requestFinish(pointerEvent, {
             cancelled: true,
             consumeReleaseSample: false,
             reason: "pointercancel-prefix",
           });
         } else {
-          this.ports.onDiscard();
+          this.requestDiscard();
         }
         return;
       }
-      this.ports.onFinish(pointerEvent, {
+      this.requestFinish(pointerEvent, {
         cancelled: false,
         consumeReleaseSample: true,
         reason: "pointerup",
@@ -305,14 +393,14 @@ export class StudioDrawingPointerTransportController {
         && lastPointerSample
         && isStudioStrokePointerEvent(session, lastPointerSample)
       ) {
-        this.ports.onFinish(lastPointerSample, {
+        this.requestFinish(lastPointerSample, {
           cancelled: true,
           consumeReleaseSample: false,
           reason: "transport-abort",
         });
         return;
       }
-      this.ports.onDiscard();
+      this.requestDiscard();
     };
     const onVisibilityChange: EventListener = (event) => {
       if (documentTarget?.visibilityState !== "visible") onGlobalAbort(event);
@@ -325,7 +413,7 @@ export class StudioDrawingPointerTransportController {
       // the browser has already reported lost.
       this.captureTarget = null;
       if (outcome === "finish") {
-        this.ports.onFinish(pointerEvent, {
+        this.requestFinish(pointerEvent, {
           cancelled: false,
           consumeReleaseSample: false,
           reason: "lost-capture",

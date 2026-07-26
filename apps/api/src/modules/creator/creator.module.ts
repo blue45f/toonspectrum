@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { creatorAssetSchemaPreflightProvider } from "./creator-asset-schema-preflight";
 import { creatorCollaborationRepositoryProvider } from "./creator-collaboration.repository";
+import { creatorDraftCollaborationRepositoryProvider } from "./creator-draft-collaboration.repository";
 import { CreatorController } from "./creator.controller";
 import { CreatorService } from "./creator.service";
 import {
@@ -62,6 +63,7 @@ import { StudioWorkAssetService } from "./studio-work-asset.service";
   providers: [
     creatorAssetSchemaPreflightProvider,
     creatorCollaborationRepositoryProvider,
+    creatorDraftCollaborationRepositoryProvider,
     studioCrdtClusterLoadRepositoryProvider,
     studioCrdtRasterCheckpointRepositoryProvider,
     studioCrdtRepositoryProvider,

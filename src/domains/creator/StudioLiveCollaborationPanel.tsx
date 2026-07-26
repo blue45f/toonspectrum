@@ -87,11 +87,13 @@ export interface StudioLiveCollaborationPanelViewProps {
   usingLocalFallback: boolean;
   busyAction: string | null;
   error: string | null;
+  inviteLinkNotice?: string | null;
   syncSnapshot?: StudioLiveSyncSnapshot;
   recovery?: StudioLiveRecoveryState | null;
   videoRef?: Ref<HTMLVideoElement>;
   onChatDraftChange: (value: string) => void;
   onChatSubmit: () => void;
+  onCopyInviteLink?: () => void;
   onStartShare: () => void;
   onStopShare: () => void;
   onRetryServer: () => void;
@@ -173,11 +175,13 @@ export function StudioLiveCollaborationPanelView({
   usingLocalFallback,
   busyAction,
   error,
+  inviteLinkNotice,
   syncSnapshot,
   recovery,
   videoRef,
   onChatDraftChange,
   onChatSubmit,
+  onCopyInviteLink,
   onStartShare,
   onStopShare,
   onRetryServer,
@@ -256,31 +260,34 @@ export function StudioLiveCollaborationPanelView({
         </span>
       </div>
 
-      {/* 마그마(Magma) 스타일 초간단 원클릭 브라우저 공유 카드 */}
+      {/* 초안/저장 작품 모두 동일한 서버 ACL 작품 ID를 공유한다. */}
+      {onCopyInviteLink ? (
       <div className="mt-3.5 rounded-xl border border-accent/40 bg-card p-3 shadow-sm">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Sparkles size={16} className="text-accent" aria-hidden />
-            <span className="text-xs font-bold text-fg">마그마(Magma) 스타일 1클릭 공유</span>
+            <span className="text-xs font-bold text-fg">팀 초대 링크</span>
           </div>
           <button
             type="button"
-            onClick={() => {
-              const roomParam = typeof window !== "undefined" ? (new URLSearchParams(window.location.search).get("liveRoom") || `room-${Date.now().toString(36)}`) : `room-${Date.now().toString(36)}`;
-              const shareUrl = `${window.location.origin}/studio?liveRoom=${encodeURIComponent(roomParam)}`;
-              void navigator.clipboard.writeText(shareUrl);
-              alert("✨ 실시간 공유 링크가 복사되었습니다!\n상대방이 이 링크를 열면 웹 브라우저에서 곧바로 동시 편집에 참여할 수 있습니다.");
-            }}
-            className="flex min-h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-transform active:scale-95 hover:bg-accent/90"
+            onClick={onCopyInviteLink}
+            className="flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-transform active:scale-95 hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-card"
           >
             <Copy size={13} aria-hidden />
             초대 링크 복사
           </button>
         </div>
         <p className="mt-2 text-[0.72rem] leading-relaxed text-fg-3">
-          복잡한 계정 등록 없이 원클릭으로 캔버스를 공유합니다. 링크를 받은 사용자는 브라우저에서 바로 실시간 획과 커서를 주고받으며 동시 작업을 시작할 수 있습니다.
+          링크는 현재 작품의 서버 권한을 우회하지 않습니다. 팀원으로 추가된 사용자가 로그인한 뒤
+          열면 같은 캔버스에서 실시간 획과 커서를 안전하게 동기화합니다.
         </p>
+        {inviteLinkNotice ? (
+          <p aria-live="polite" className="mt-2 text-xs font-medium text-good" role="status">
+            {inviteLinkNotice}
+          </p>
+        ) : null}
       </div>
+      ) : null}
 
       <p className="mt-3 text-xs leading-relaxed text-fg-2">
         {mode === "server"
@@ -803,7 +810,7 @@ export function StudioLiveCollaborationPanelView({
   );
 }
 
-export function StudioLiveCollaborationPanel() {
+export function StudioLiveCollaborationPanel({ workId }: { workId: string }) {
   const live = useStudioLiveCollaboration();
   const screenControllerRef = useRef<StudioScreenShareController | null>(null);
   const screenIceSessionRef = useRef<{
@@ -820,6 +827,7 @@ export function StudioLiveCollaborationPanel() {
   const [screenError, setScreenError] = useState<string | null>(null);
   const [chatDraft, setChatDraft] = useState("");
   const [chatNotice, setChatNotice] = useState<string | null>(null);
+  const [inviteLinkNotice, setInviteLinkNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const room = live.room;
@@ -834,6 +842,7 @@ export function StudioLiveCollaborationPanel() {
     setScreenError(null);
     setChatDraft("");
     setChatNotice(null);
+    setInviteLinkNotice(null);
     if (!room) return;
 
     const attachController = (): StudioScreenShareController => {
@@ -1061,6 +1070,18 @@ export function StudioLiveCollaborationPanel() {
     }
   }
 
+  async function handleCopyInviteLink() {
+    setInviteLinkNotice(null);
+    try {
+      const shareUrl = new URL("/studio", window.location.origin);
+      shareUrl.searchParams.set("id", workId);
+      await navigator.clipboard.writeText(shareUrl.toString());
+      setInviteLinkNotice("초대 링크를 복사했습니다.");
+    } catch {
+      setScreenError("초대 링크를 복사하지 못했습니다. 브라우저 클립보드 권한을 확인해 주세요.");
+    }
+  }
+
   return (
     <StudioLiveCollaborationPanelView
       availability={live.availability}
@@ -1070,6 +1091,7 @@ export function StudioLiveCollaborationPanel() {
       chatMessages={live.chatMessages}
       chatNotice={chatNotice}
       error={screenError ?? live.error}
+      inviteLinkNotice={inviteLinkNotice}
       syncSnapshot={live.sync}
       recovery={live.recovery}
       mode={live.mode}
@@ -1088,6 +1110,7 @@ export function StudioLiveCollaborationPanel() {
         if (chatNotice) setChatNotice(null);
       }}
       onChatSubmit={handleChatSubmit}
+      onCopyInviteLink={() => void handleCopyInviteLink()}
       onRejectRequest={handleRejectRequest}
       onStartShare={() => void handleStartShare()}
       onStopShare={() => screenControllerRef.current?.stopShare()}

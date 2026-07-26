@@ -17,6 +17,7 @@
  * 알파 높은 픽셀=흰색 그대로).
  */
 import { Contrast, Eye, EyeOff, Loader2, Plus, SquareDashedMousePointer, Trash2 } from "lucide-react";
+import { useId } from "react";
 
 import {
   LAYER_MASK_BRUSH_HARDNESS_RANGE,
@@ -53,7 +54,7 @@ export type StudioLayerMaskPanelProps = {
   strength: number;
   /** 마스크 썸네일 미리보기용 — el.maskSrc 그대로(없으면 null). */
   maskThumbnailSrc: string | null;
-  /** 굽기(bake) 진행 중 — 다른 픽셀 도구와 동일 관례로 잠그지 않고 표시만. */
+  /** 굽기(bake) 진행 중 — 활성 그리기 도구의 종료를 제외한 변경 액션은 잠근다. */
   busy?: boolean;
   onAddMask: (fill: LayerMaskPaintMode) => void;
   /** 현재 픽셀 선택으로 마스크 만들기(outside=true 면 선택 바깥만 남긴다). 없으면 버튼 미노출. */
@@ -92,10 +93,15 @@ export function StudioLayerMaskPanel({
   onHardnessChange,
   onStrengthChange,
 }: StudioLayerMaskPanelProps): ReactElement {
+  const statusId = useId();
   const statusText = busy
-    ? "마스크를 적용하는 중..."
+    ? paintActive
+      ? "마스크를 적용하는 중이에요. 새 작업은 잠겼지만 ‘그리기 종료’로 도구를 해제할 수 있습니다."
+      : "마스크를 적용하는 중이에요. 완료될 때까지 다른 마스크 변경은 잠시 기다려 주세요."
     : !hasMask
-      ? "마스크를 추가하면 브러시로 이 레이어의 일부를 비파괴로 가리거나 드러낼 수 있습니다(원본 이미지는 바뀌지 않아요)."
+      ? onCreateFromSelection && !hasUsableSelection
+        ? "마스크를 바로 추가하거나, 먼저 이미지에서 픽셀 영역을 선택해 선택 기반 마스크를 만드세요."
+        : "마스크를 추가하면 브러시로 이 레이어의 일부를 비파괴로 가리거나 드러낼 수 있습니다(원본 이미지는 바뀌지 않아요)."
       : !enabled
         ? "마스크가 꺼져 있어요(데이터는 남아있음) — 다시 켜면 이전 상태 그대로 적용됩니다."
         : !paintActive
@@ -103,22 +109,34 @@ export function StudioLayerMaskPanel({
           : "이미지를 드래그해 칠하세요. 흰색(보이기)은 드러내고 검정(숨기기)은 감춥니다 — 손을 뗀 시점에 한 번에 반영됩니다(⌘Z로 되돌리기 가능).";
 
   return (
-    <div className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5">
+    <section
+      aria-label="레이어 마스크"
+      aria-busy={busy}
+      className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5"
+    >
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
           <SquareDashedMousePointer size={12} aria-hidden />
           레이어 마스크
         </p>
-        {busy && <Loader2 size={13} className="animate-spin text-accent" aria-hidden />}
+        {busy && (
+          <Loader2
+            size={13}
+            className="animate-spin text-accent motion-reduce:animate-none"
+            aria-hidden
+          />
+        )}
       </div>
 
       {!hasMask ? (
-        <div className="flex gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5">
           <button
             type="button"
             onClick={() => onAddMask("reveal")}
+            disabled={busy}
+            aria-describedby={statusId}
             title="전체가 보이는 흰 마스크를 추가합니다(기본 — 이후 검정으로 칠한 부분만 가려집니다)."
-            className={cn(PANEL_CHIP_CLASS, "flex flex-1 items-center justify-center gap-1")}
+            className={cn(PANEL_CHIP_CLASS, "flex min-w-0 items-center justify-center gap-1")}
           >
             <Plus className="size-3" aria-hidden />
             마스크 추가
@@ -126,8 +144,10 @@ export function StudioLayerMaskPanel({
           <button
             type="button"
             onClick={() => onAddMask("conceal")}
+            disabled={busy}
+            aria-describedby={statusId}
             title="전체가 가려지는 검정 마스크를 추가합니다(이후 흰색으로 칠한 부분만 드러납니다)."
-            className={cn(PANEL_CHIP_CLASS, "flex flex-1 items-center justify-center gap-1")}
+            className={cn(PANEL_CHIP_CLASS, "flex min-w-0 items-center justify-center gap-1")}
           >
             <EyeOff className="size-3" aria-hidden />
             숨김으로 추가
@@ -136,22 +156,24 @@ export function StudioLayerMaskPanel({
       ) : null}
 
       {!hasMask && onCreateFromSelection ? (
-        <div className="flex gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5">
           <button
             type="button"
             onClick={() => onCreateFromSelection(false)}
-            disabled={!hasUsableSelection}
+            disabled={busy || !hasUsableSelection}
+            aria-describedby={statusId}
             title="현재 픽셀 선택 안쪽만 보이는 마스크를 만듭니다. 페더 경계는 부드럽게 이어집니다."
-            className={cn(PANEL_CHIP_CLASS, "flex flex-1 items-center justify-center gap-1")}
+            className={cn(PANEL_CHIP_CLASS, "flex min-w-0 items-center justify-center gap-1")}
           >
             선택으로 마스크
           </button>
           <button
             type="button"
             onClick={() => onCreateFromSelection(true)}
-            disabled={!hasUsableSelection}
+            disabled={busy || !hasUsableSelection}
+            aria-describedby={statusId}
             title="현재 픽셀 선택 바깥만 보이는 마스크를 만듭니다(선택한 부분이 가려집니다)."
-            className={cn(PANEL_CHIP_CLASS, "flex flex-1 items-center justify-center gap-1")}
+            className={cn(PANEL_CHIP_CLASS, "flex min-w-0 items-center justify-center gap-1")}
           >
             선택 밖으로 마스크
           </button>
@@ -160,7 +182,7 @@ export function StudioLayerMaskPanel({
 
       {hasMask ? (
         <>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {maskThumbnailSrc && (
               <span className="grid size-8 shrink-0 place-items-center rounded border border-line bg-black">
                 <img src={maskThumbnailSrc} alt="" className="size-full rounded object-cover" />
@@ -169,6 +191,8 @@ export function StudioLayerMaskPanel({
             <StudioToggleChip
               active={enabled}
               onClick={onToggleEnabled}
+              disabled={busy}
+              aria-describedby={statusId}
               title={enabled ? "마스크를 끕니다(데이터는 보존 — 잠깐 원본을 보고 싶을 때)." : "마스크를 다시 켭니다."}
             >
               {enabled ? "사용 중" : "꺼짐"}
@@ -176,6 +200,8 @@ export function StudioLayerMaskPanel({
             <button
               type="button"
               onClick={onInvert}
+              disabled={busy}
+              aria-describedby={statusId}
               title="마스크의 보이는/가려진 영역을 뒤집습니다(즉시 적용, ⌘Z로 되돌리기 가능)."
               className={cn(PANEL_CHIP_CLASS, "flex items-center gap-1")}
             >
@@ -185,6 +211,8 @@ export function StudioLayerMaskPanel({
             <button
               type="button"
               onClick={onDeleteMask}
+              disabled={busy}
+              aria-describedby={statusId}
               title="마스크를 삭제합니다(원본 이미지는 영향 없음)."
               className={cn(PANEL_CHIP_CLASS, "ml-auto flex items-center gap-1 text-fg-3 hover:text-fg")}
             >
@@ -193,10 +221,21 @@ export function StudioLayerMaskPanel({
             </button>
           </div>
 
-          <StudioToggleChip active={paintActive} onClick={onTogglePaintActive} title="켜고 이미지를 드래그하면 마스크에 직접 그릴 수 있습니다.">
+          <StudioToggleChip
+            active={paintActive}
+            disabled={busy && !paintActive}
+            onClick={onTogglePaintActive}
+            aria-label={paintActive ? "레이어 마스크 그리기 종료" : "레이어 마스크에 그리기"}
+            aria-describedby={statusId}
+            title={
+              paintActive
+                ? "마스크 그리기 도구를 종료합니다."
+                : "켜고 이미지를 드래그하면 마스크에 직접 그릴 수 있습니다."
+            }
+          >
             <span className="inline-flex items-center gap-1">
               <SquareDashedMousePointer className="size-3" aria-hidden />
-              마스크에 그리기
+              {paintActive ? "그리기 종료" : "마스크에 그리기"}
             </span>
           </StudioToggleChip>
 
@@ -204,7 +243,14 @@ export function StudioLayerMaskPanel({
             {PAINT_MODES.map((m) => {
               const Icon = MODE_ICONS[m.id];
               return (
-                <StudioToggleChip key={m.id} active={paintMode === m.id} onClick={() => onPaintModeChange(m.id)} title={m.tip}>
+                <StudioToggleChip
+                  key={m.id}
+                  active={paintMode === m.id}
+                  disabled={busy}
+                  onClick={() => onPaintModeChange(m.id)}
+                  aria-describedby={statusId}
+                  title={m.tip}
+                >
                   <span className="inline-flex items-center gap-1">
                     <Icon className="size-3" aria-hidden />
                     {m.label}
@@ -221,6 +267,7 @@ export function StudioLayerMaskPanel({
             step={LAYER_MASK_BRUSH_RADIUS_RANGE.step}
             value={radiusPx}
             onChange={onRadiusChange}
+            disabled={busy}
             readout={`${radiusPx}px`}
           />
           <StudioSliderRow
@@ -230,6 +277,7 @@ export function StudioLayerMaskPanel({
             step={LAYER_MASK_BRUSH_HARDNESS_RANGE.step}
             value={hardness}
             onChange={onHardnessChange}
+            disabled={busy}
             readout={`${Math.round(hardness * 100)}%`}
           />
           <StudioSliderRow
@@ -239,14 +287,21 @@ export function StudioLayerMaskPanel({
             step={LAYER_MASK_BRUSH_STRENGTH_RANGE.step}
             value={strength}
             onChange={onStrengthChange}
+            disabled={busy}
             readout={`${Math.round(strength * 100)}%`}
           />
         </>
       ) : null}
 
-      <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
+      <p
+        id={statusId}
+        className="text-[0.72rem] leading-relaxed text-fg-3"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
         {statusText}
       </p>
-    </div>
+    </section>
   );
 }

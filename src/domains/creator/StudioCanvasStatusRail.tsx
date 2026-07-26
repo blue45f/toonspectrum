@@ -198,6 +198,7 @@ export function StudioCanvasStatusRail({
   return (
     <div
       data-studio-canvas-status-rail
+      style={mobileImmersive ? { paddingTop: "3.75rem" } : undefined}
       className={cn(
         mobileImmersive
           ? "max-h-[min(30dvh,12rem)] shrink-0 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"

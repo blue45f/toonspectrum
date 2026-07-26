@@ -25,7 +25,12 @@ describe("Studio lettering workflow boundary", () => {
     expect(bubblePopover).toContain("addBubble(v.id, undefined, true)");
     expect(bubblePopover).toContain('data-studio-shortcut-boundary="true"');
     expect(bubblePopover).toContain('(event.metaKey || event.ctrlKey) && event.key === "Enter"');
-    expect(bubblePopover).toContain('JSON.stringify({ kind: "bubble", variant: v.id })');
+    expect(bubblePopover).toContain("writeStudioInsertDragPayload(event.dataTransfer");
+    expect(bubblePopover).toContain('id="studio-bubble-placement-help"');
+    expect(bubblePopover.indexOf('id="studio-bubble-placement-help"')).toBeLessThan(
+      bubblePopover.indexOf('role="menu" aria-label="말풍선 종류"')
+    );
+    expect(bubblePopover.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(4);
     expect(rail).toContain('addBubble("speech", undefined, true)');
     expect(rail).toContain("addText(undefined, true)");
   });

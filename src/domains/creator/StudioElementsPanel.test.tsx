@@ -18,12 +18,38 @@ describe("StudioElementsPanel expanded catalog UX", () => {
     expect(screen.getByRole("searchbox", { name: "요소 검색" }).className).toContain("min-h-10");
     expect(screen.getByRole("tab", { name: "도형" }).className).toContain("pointer-coarse:min-h-11");
     expect(screen.getByRole("tab", { name: "컷 패널" })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "말풍선" })).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: "말풍선" })).toBeNull();
     expect(screen.getByRole("tab", { name: "효과음" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "효과선" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "배경 패턴" })).toBeTruthy();
     expect(screen.getByTitle("슈퍼타원")).toBeTruthy();
     expect(screen.getByTitle("베지어 곡선")).toBeTruthy();
+  });
+
+  it("routes editable balloons to one canonical tool and explains placement modes", () => {
+    const onOpenBubbles = vi.fn();
+    render(<StudioElementsPanel onAdd={vi.fn()} onOpenBubbles={onOpenBubbles} />);
+
+    expect(screen.getByText("클릭·탭")).toBeTruthy();
+    expect(screen.getByText("끌어 놓기")).toBeTruthy();
+    expect(screen.getByText(/Esc 취소/u)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /편집 가능한 말풍선/u }));
+    expect(onOpenBubbles).toHaveBeenCalledOnce();
+  });
+
+  it("exports element tiles through the shared image-backed drag contract", () => {
+    render(<StudioElementsPanel onAdd={vi.fn()} />);
+    const tile = screen.getByTitle("슈퍼타원");
+    const setData = vi.fn();
+    fireEvent.dragStart(tile, { dataTransfer: { effectAllowed: "none", setData } });
+
+    expect(setData).toHaveBeenCalledOnce();
+    expect(setData.mock.calls[0]?.[0]).toBe("application/json-asset");
+    expect(JSON.parse(setData.mock.calls[0]?.[1])).toMatchObject({
+      source: "local",
+      width: expect.any(Number),
+      height: expect.any(Number),
+    });
   });
 
   it("switches packs and places the selected SVG asset", () => {

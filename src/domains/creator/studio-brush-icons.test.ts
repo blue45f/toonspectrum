@@ -90,6 +90,7 @@ const ICONS_BY_PROCEDURAL_CATEGORY = {
     "cloud",
     "cloud-fog",
     "asterisk",
+    "flame",
   ]),
 } satisfies Readonly<Record<StudioBrushPackCategory, ReadonlySet<StudioBrushIconId>>>;
 

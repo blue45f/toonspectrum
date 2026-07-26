@@ -9,6 +9,7 @@ if (!databaseUrl) {
 export default defineConfig({
   schema: [
     "./lib/db/schema.ts",
+    "./lib/db/creator-marketplace-resource.schema.ts",
     "./lib/db/studio-crdt-raster-checkpoint.schema.ts",
     "./lib/db/studio-raster-asset.schema.ts",
   ],

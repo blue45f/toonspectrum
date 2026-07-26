@@ -50,6 +50,14 @@ describe("Studio brush browser harness catalogue boundary", () => {
     expect(harness).toContain("assertProductBrushCatalogContract()");
     expect(harness).toContain("assertUiBrushCatalogMatchesProductCatalog(firstCatalog)");
     expect(harness).toContain(
+      'firstCatalog.locator(\'[data-studio-brush-library-close="true"]\')',
+    );
+    expect(harness).toContain(
+      'drawSheet.locator(\'[data-studio-open-brush-library="true"]\')',
+    );
+    expect(harness).not.toContain('name: "앱 브러시 닫기"');
+    expect(harness).not.toContain('name: "기본 프리셋 전체 보기"');
+    expect(harness).toContain(
       'JSON.stringify(actualSelections) === JSON.stringify(expectedSelections)',
     );
     expect(harness).toContain(

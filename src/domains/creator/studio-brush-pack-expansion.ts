@@ -5,7 +5,7 @@
  * index, which is perfect for bulk variety but too coarse for presets that imitate a specific
  * physical tool (a G-pen's dramatic pressure swell, a pastel's canvas-pinned paper tooth, rain
  * falling at one fixed angle...). This module carries explicit, hand-tuned dynamics overrides for
- * the 33 expansion ids ONLY. Ids outside the wave never receive an entry, so the 87 original
+ * the 73 expansion ids ONLY. Ids outside the waves never receive an entry, so the 87 original
  * catalogue brushes keep byte-identical materialized dynamics and saved strokes replay unchanged.
  *
  * Determinism: no override introduces a new random stream. Jitters/mappings run through the
@@ -21,8 +21,53 @@ import type {
   StudioBrushGrainSettings,
 } from "./studio-brush-material-dynamics";
 import type { StudioBrushPackCatalogId } from "./studio-brush-pack-id";
+import type { StudioBrushDualBrushSettings } from "./studio-brush-tip-composition";
 
-/** Ids appended by the 2026-07 expansion, in catalogue order. Used by tests and the tuning table. */
+/** Original procedural material/effect wave. Kept separate for coverage and visual regression. */
+export const STUDIO_BRUSH_PACK_MATERIAL_WAVE_IDS = [
+  "bristle-round-loaded",
+  "bristle-fan-dry",
+  "bristle-flat-streak",
+  "palette-knife-edge",
+  "watercolor-dry-granule",
+  "watercolor-salt-bloom",
+  "watercolor-backrun-ring",
+  "watercolor-wet-wash",
+  "gouache-grain-flat",
+  "acrylic-stiff-flat",
+  "oil-linen-filbert",
+  "sumi-wash-fray",
+  "ribbon-satin-fold",
+  "rope-double-cord",
+  "chain-link-alternate",
+  "lace-scallop-trim",
+  "stitch-running-thread",
+  "stitch-cross-seam",
+  "fabric-knit-loop",
+  "metal-scratch-brush",
+  "smoke-wisp-layered",
+  "flame-tongue-spark",
+  "rain-mist-combo",
+  "snow-powder-drift",
+  "dust-mote-depth",
+  "stage-safe-splatter",
+  "bokeh-ring-glow",
+  "cloud-cirrus-stream",
+  "foliage-broad-canopy",
+  "tree-bark-crack",
+  "flower-petal-scatter",
+  "rock-shard-texture",
+  "brick-mortar-pattern",
+  "wood-knot-rake",
+  "fur-undercoat-soft",
+  "hair-curl-ribbon",
+  "food-sesame-sprinkle",
+  "halftone-gradient-dot",
+  "hatching-contour-rake",
+  "focus-ray-streak",
+] as const satisfies readonly StudioBrushPackCatalogId[];
+
+/** Ids appended by the 2026-07 expansions, in catalogue order. Used by tests and tuning. */
 export const STUDIO_BRUSH_PACK_EXPANSION_WAVE_IDS = [
   "pencil-4b-rough",
   "pencil-hb-mechanical",
@@ -57,6 +102,7 @@ export const STUDIO_BRUSH_PACK_EXPANSION_WAVE_IDS = [
   "ink-splatter-burst",
   "fur-soft-clumps",
   "wood-grain-flow",
+  ...STUDIO_BRUSH_PACK_MATERIAL_WAVE_IDS,
 ] as const satisfies readonly StudioBrushPackCatalogId[];
 
 export type StudioBrushPackExpansionWaveId =
@@ -80,6 +126,7 @@ export interface StudioBrushPackExpansionTuning {
   taper?: StudioBrushTaperSettings;
   colorDynamics?: StudioBrushColorDynamicsSettings;
   grain?: StudioBrushGrainSettings;
+  dualBrush?: StudioBrushDualBrushSettings;
   width?: StudioBrushDynamicsPropertySettings;
   opacity?: StudioBrushDynamicsPropertySettings;
   flow?: StudioBrushDynamicsPropertySettings;
@@ -464,6 +511,782 @@ const EXPANSION_TUNING: Readonly<
     roundness: { jitter: { mode: "multiply", amount: 0.06 } },
     flow: { base: 0.62, mappings: [{ source: "pressure", from: 0.55, to: 1 }] },
   },
+
+  // ── 재료 확장: 강모·나이프·수채·불투명 물감 ─────────────────────────
+  "bristle-round-loaded": {
+    tipSoftness: 0.1,
+    spacingRatio: 0.055,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.28, to: 1.72, curve: 1.22 },
+        { source: "tilt-magnitude", from: 0.9, to: 1.28, amount: 0.45 },
+      ],
+      jitter: { mode: "multiply", amount: 0.07 },
+    },
+    flow: { base: 0.86, mappings: [{ source: "pressure", from: 0.46, to: 1 }] },
+    angle: {
+      mappings: [
+        { source: "direction", mode: "add", from: 0, to: 360 },
+        { source: "tilt-azimuth", mode: "add", from: 0, to: 360, amount: 0.18 },
+      ],
+    },
+    grain: { space: "stroke-fixed", amount: 0.22, scale: 3.8, contrast: 0.46, seed: 0x4b0a_2101 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "bristle", softness: 0.12 },
+      blendMode: "multiply",
+      sizeRatio: 0.72,
+    },
+  },
+  "bristle-fan-dry": {
+    tipSoftness: 0.04,
+    spacingRatio: 0.2,
+    scatterRatio: 0.09,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.42, to: 1.38, curve: 1.1 },
+        { source: "tilt-magnitude", from: 0.88, to: 1.42, amount: 0.7 },
+      ],
+      jitter: { mode: "multiply", amount: 0.16 },
+    },
+    opacity: { jitter: { mode: "multiply", amount: 0.18 } },
+    flow: {
+      base: 0.58,
+      mappings: [
+        { source: "pressure", from: 0.38, to: 1 },
+        { source: "speed", from: 1.08, to: 0.62 },
+      ],
+    },
+    grain: { space: "canvas-fixed", amount: 0.48, scale: 5.6, contrast: 0.72, seed: 0x4b0a_2102 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "grain", softness: 0.04 },
+      blendMode: "multiply",
+      sizeRatio: 0.82,
+    },
+  },
+  "bristle-flat-streak": {
+    tipSoftness: 0.06,
+    spacingRatio: 0.07,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.52, to: 1.36 },
+        { source: "speed", from: 1.08, to: 0.76, amount: 0.75 },
+      ],
+      jitter: { mode: "multiply", amount: 0.08 },
+    },
+    roundness: {
+      mappings: [{ source: "tilt-magnitude", from: 0.82, to: 0.38, amount: 0.7 }],
+      jitter: { mode: "multiply", amount: 0.04 },
+    },
+    flow: { base: 0.76, mappings: [{ source: "pressure", from: 0.48, to: 1 }] },
+    grain: { space: "stroke-fixed", amount: 0.36, scale: 4.4, contrast: 0.58, seed: 0x4b0a_2103 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "bristle", softness: 0.02 },
+      blendMode: "multiply",
+      sizeRatio: 1.18,
+    },
+  },
+  "palette-knife-edge": {
+    tipSoftness: 0.015,
+    spacingRatio: 0.045,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.72, to: 1.42, curve: 0.82 },
+        { source: "tilt-magnitude", from: 0.78, to: 1.24, amount: 0.55 },
+      ],
+      jitter: null,
+    },
+    angle: {
+      mappings: [
+        { source: "direction", mode: "add", from: 0, to: 360 },
+        { source: "twist", mode: "add", from: 0, to: 360, amount: 0.34 },
+      ],
+      jitter: { mode: "add", amount: 1.5 },
+    },
+    flow: { base: 0.92, mappings: [{ source: "speed", from: 1, to: 0.7 }] },
+    grain: { space: "canvas-fixed", amount: 0.28, scale: 7.2, contrast: 0.68, seed: 0x4b0a_2104 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "grain", softness: 0 },
+      blendMode: "multiply",
+      sizeRatio: 0.58,
+    },
+  },
+  "watercolor-dry-granule": {
+    tipSoftness: 0.2,
+    spacingRatio: 0.18,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.48, to: 1.4 },
+        { source: "speed", from: 1.12, to: 0.74 },
+      ],
+      jitter: { mode: "multiply", amount: 0.16 },
+    },
+    opacity: { jitter: { mode: "multiply", amount: 0.2 } },
+    flow: { base: 0.42, mappings: [{ source: "pressure", from: 0.42, to: 1 }] },
+    grain: { space: "canvas-fixed", amount: 0.62, scale: 4.8, contrast: 0.66, seed: 0x4b0a_2105 },
+    colorDynamics: { hueJitter: 2.5, saturationJitter: 0.025, valueJitter: 0.045 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "sponge", softness: 0.18 },
+      blendMode: "multiply",
+      sizeRatio: 1.12,
+    },
+  },
+  "watercolor-salt-bloom": {
+    tipSoftness: 0.08,
+    spacingRatio: 0.48,
+    scatterRatio: 0.34,
+    width: {
+      mappings: [{ source: "pressure", from: 0.54, to: 1.52 }],
+      jitter: { mode: "multiply", amount: 0.34 },
+    },
+    opacity: { jitter: { mode: "multiply", amount: 0.24 } },
+    flow: { base: 0.34, mappings: [{ source: "pressure", from: 0.36, to: 0.92 }] },
+    angle: { jitter: { mode: "add", amount: 180 } },
+    scatter: {
+      mappings: [{ source: "speed", from: 0.74, to: 1.34 }],
+      jitter: { mode: "add", amount: 0.34 },
+    },
+    grain: { space: "canvas-fixed", amount: 0.44, scale: 9.5, contrast: 0.58, seed: 0x4b0a_2106 },
+    colorDynamics: { hueJitter: 3, saturationJitter: 0.02, valueJitter: 0.08 },
+  },
+  "watercolor-backrun-ring": {
+    tipSoftness: 0.42,
+    spacingRatio: 0.34,
+    scatterRatio: 0.16,
+    width: {
+      mappings: [{ source: "pressure", from: 0.66, to: 1.55, curve: 0.9 }],
+      jitter: { mode: "multiply", amount: 0.22 },
+    },
+    flow: { base: 0.28, mappings: [{ source: "pressure", from: 0.3, to: 0.9 }] },
+    opacity: { jitter: { mode: "multiply", amount: 0.16 } },
+    angle: { jitter: { mode: "add", amount: 140 } },
+    grain: { space: "canvas-fixed", amount: 0.24, scale: 14, contrast: 0.5, seed: 0x4b0a_2107 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "soft", softness: 0.78 },
+      blendMode: "screen",
+      sizeRatio: 1.35,
+    },
+  },
+  "watercolor-wet-wash": {
+    tipSoftness: 0.88,
+    spacingRatio: 0.11,
+    maxSpeed: 1.05,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.76, to: 1.3 },
+        { source: "tilt-magnitude", from: 0.86, to: 1.48, amount: 0.62 },
+      ],
+      jitter: { mode: "multiply", amount: 0.1 },
+    },
+    flow: {
+      base: 0.18,
+      mappings: [
+        { source: "pressure", from: 0.3, to: 1 },
+        { source: "speed", from: 1.08, to: 0.62 },
+      ],
+    },
+    grain: { space: "canvas-fixed", amount: 0.18, scale: 18, contrast: 0.36, seed: 0x4b0a_2108 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "sponge", softness: 0.64 },
+      blendMode: "screen",
+      sizeRatio: 1.5,
+    },
+  },
+  "gouache-grain-flat": {
+    tipSoftness: 0.08,
+    spacingRatio: 0.06,
+    width: {
+      mappings: [{ source: "pressure", from: 0.62, to: 1.34 }],
+      jitter: { mode: "multiply", amount: 0.06 },
+    },
+    flow: { base: 0.84, mappings: [{ source: "pressure", from: 0.7, to: 1 }] },
+    opacity: { jitter: { mode: "multiply", amount: 0.05 } },
+    grain: { space: "canvas-fixed", amount: 0.34, scale: 3.2, contrast: 0.62, seed: 0x4b0a_2109 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "grain", softness: 0.05 },
+      blendMode: "multiply",
+      sizeRatio: 0.9,
+    },
+  },
+  "acrylic-stiff-flat": {
+    tipSoftness: 0.025,
+    spacingRatio: 0.045,
+    width: {
+      mappings: [{ source: "pressure", from: 0.68, to: 1.32, curve: 0.82 }],
+      jitter: null,
+    },
+    angle: {
+      mappings: [
+        { source: "direction", mode: "add", from: 0, to: 360 },
+        { source: "tilt-azimuth", mode: "add", from: 0, to: 360, amount: 0.26 },
+      ],
+      jitter: null,
+    },
+    roundness: { mappings: [{ source: "tilt-magnitude", from: 0.86, to: 0.42, amount: 0.75 }] },
+    flow: { base: 0.96, mappings: [] },
+    taper: { startLength: 0.025, endLength: 0.08, minSizeRatio: 0.36, curve: 1.2 },
+  },
+  "oil-linen-filbert": {
+    tipSoftness: 0.1,
+    spacingRatio: 0.035,
+    width: {
+      mappings: [{ source: "pressure", from: 0.44, to: 1.58, curve: 1.14 }],
+      jitter: { mode: "multiply", amount: 0.08 },
+    },
+    flow: { base: 0.88, mappings: [{ source: "pressure", from: 0.62, to: 1 }] },
+    grain: { space: "canvas-fixed", amount: 0.46, scale: 5.2, contrast: 0.7, seed: 0x4b0a_210b },
+    roundness: {
+      mappings: [{ source: "tilt-magnitude", from: 0.92, to: 0.56, amount: 0.66 }],
+      jitter: { mode: "multiply", amount: 0.035 },
+    },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "bristle", softness: 0.08 },
+      blendMode: "multiply",
+      sizeRatio: 1.08,
+    },
+  },
+  "sumi-wash-fray": {
+    tipSoftness: 0.14,
+    spacingRatio: 0.08,
+    maxSpeed: 1.1,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.2, to: 1.86, curve: 1.34 },
+        { source: "speed", from: 1.08, to: 0.7 },
+      ],
+      jitter: { mode: "multiply", amount: 0.1 },
+    },
+    flow: {
+      base: 0.72,
+      mappings: [
+        { source: "pressure", from: 0.42, to: 1 },
+        { source: "speed", from: 1.04, to: 0.54 },
+      ],
+    },
+    taper: { startLength: 0.05, endLength: 0.32, minSizeRatio: 0.04, minOpacityRatio: 0.3, curve: 1.7 },
+    grain: { space: "stroke-fixed", amount: 0.38, scale: 4.1, contrast: 0.64, seed: 0x4b0a_210c },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "bristle", softness: 0.04 },
+      blendMode: "multiply",
+      sizeRatio: 0.76,
+    },
+  },
+
+  // ── 장식·직물·소재 패턴 ───────────────────────────────────────────────
+  "ribbon-satin-fold": {
+    tipSoftness: 0.12,
+    spacingRatio: 0.24,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.72, to: 1.32 },
+        { source: "tilt-magnitude", from: 0.92, to: 1.18, amount: 0.35 },
+      ],
+      jitter: null,
+    },
+    flow: { base: 0.96, mappings: [] },
+    angle: {
+      mappings: [
+        { source: "direction", mode: "add", from: 0, to: 360 },
+        { source: "twist", mode: "add", from: 0, to: 360, amount: 0.18 },
+      ],
+    },
+    colorDynamics: { hueJitter: 1.5, saturationJitter: 0.015, valueJitter: 0.09 },
+  },
+  "rope-double-cord": {
+    tipSoftness: 0.04,
+    spacingRatio: 0.48,
+    width: {
+      mappings: [{ source: "pressure", from: 0.82, to: 1.18 }],
+      jitter: { mode: "multiply", amount: 0.045 },
+    },
+    flow: { base: 1, mappings: [] },
+    grain: { space: "stroke-fixed", amount: 0.24, scale: 2.8, contrast: 0.52, seed: 0x4b0a_2202 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "bristle", softness: 0.06 },
+      blendMode: "multiply",
+      sizeRatio: 0.52,
+    },
+  },
+  "chain-link-alternate": {
+    tipSoftness: 0.025,
+    spacingRatio: 0.74,
+    width: {
+      mappings: [{ source: "pressure", from: 0.88, to: 1.12 }],
+      jitter: null,
+    },
+    angle: {
+      mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
+      jitter: { mode: "add", amount: 2 },
+    },
+    flow: { base: 1, mappings: [] },
+    colorDynamics: { hueJitter: 1, saturationJitter: 0.01, valueJitter: 0.12 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "hard", softness: 0 },
+      blendMode: "screen",
+      sizeRatio: 0.36,
+    },
+  },
+  "lace-scallop-trim": {
+    tipSoftness: 0.045,
+    spacingRatio: 0.58,
+    width: {
+      mappings: [{ source: "pressure", from: 0.78, to: 1.24 }],
+      jitter: { mode: "multiply", amount: 0.035 },
+    },
+    angle: { mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }] },
+    flow: { base: 0.94, mappings: [{ source: "pressure", from: 0.72, to: 1 }] },
+    colorDynamics: { hueJitter: 2, saturationJitter: 0.015, valueJitter: 0.055 },
+  },
+  "stitch-running-thread": {
+    tipSoftness: 0.02,
+    spacingRatio: 0.62,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.7, to: 1.24 },
+        { source: "speed", from: 0.96, to: 1.12 },
+      ],
+      jitter: null,
+    },
+    taper: { startLength: 0.02, endLength: 0.08, minSizeRatio: 0.3, curve: 1.1 },
+    flow: { base: 1, mappings: [] },
+  },
+  "stitch-cross-seam": {
+    tipSoftness: 0.025,
+    spacingRatio: 0.52,
+    width: {
+      mappings: [{ source: "pressure", from: 0.8, to: 1.18 }],
+      jitter: { mode: "multiply", amount: 0.025 },
+    },
+    angle: { mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }] },
+    grain: { space: "canvas-fixed", amount: 0.16, scale: 2.2, contrast: 0.48, seed: 0x4b0a_2206 },
+    flow: { base: 0.98, mappings: [] },
+  },
+  "fabric-knit-loop": {
+    tipSoftness: 0.08,
+    spacingRatio: 0.34,
+    width: {
+      mappings: [{ source: "pressure", from: 0.78, to: 1.22 }],
+      jitter: { mode: "multiply", amount: 0.06 },
+    },
+    opacity: { jitter: { mode: "multiply", amount: 0.08 } },
+    grain: { space: "canvas-fixed", amount: 0.42, scale: 3.4, contrast: 0.58, seed: 0x4b0a_2207 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "bristle", softness: 0.16 },
+      blendMode: "multiply",
+      sizeRatio: 0.48,
+    },
+  },
+  "metal-scratch-brush": {
+    tipSoftness: 0.015,
+    spacingRatio: 0.24,
+    scatterRatio: 0.16,
+    maxSpeed: 0.95,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.38, to: 1.28 },
+        { source: "speed", from: 0.74, to: 1.42 },
+      ],
+      jitter: { mode: "multiply", amount: 0.24 },
+    },
+    opacity: { jitter: { mode: "multiply", amount: 0.26 } },
+    angle: { jitter: { mode: "add", amount: 14 } },
+    grain: { space: "stroke-fixed", amount: 0.3, scale: 6.5, contrast: 0.72, seed: 0x4b0a_2208 },
+  },
+
+  // ── 날씨·빛·입자 효과 ─────────────────────────────────────────────────
+  "smoke-wisp-layered": {
+    tipSoftness: 0.72,
+    spacingRatio: 0.24,
+    scatterRatio: 0.18,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.7, to: 1.38 },
+        { source: "speed", from: 1.08, to: 0.76 },
+      ],
+      jitter: { mode: "multiply", amount: 0.2 },
+    },
+    flow: { base: 0.14, mappings: [{ source: "pressure", from: 0.32, to: 1 }] },
+    angle: { jitter: { mode: "add", amount: 32 } },
+    grain: { space: "canvas-fixed", amount: 0.28, scale: 20, contrast: 0.4, seed: 0x4b0a_2301 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "soft", softness: 0.92 },
+      blendMode: "screen",
+      sizeRatio: 1.45,
+    },
+  },
+  "flame-tongue-spark": {
+    tipSoftness: 0.08,
+    spacingRatio: 0.34,
+    scatterRatio: 0.28,
+    maxSpeed: 1,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.42, to: 1.48 },
+        { source: "speed", from: 0.72, to: 1.38 },
+      ],
+      jitter: { mode: "multiply", amount: 0.28 },
+    },
+    flow: { base: 0.88, mappings: [{ source: "pressure", from: 0.48, to: 1 }] },
+    taper: { startLength: 0.04, endLength: 0.3, minSizeRatio: 0.05, minOpacityRatio: 0.34, curve: 1.8 },
+    angle: { mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }], jitter: { mode: "add", amount: 18 } },
+    colorDynamics: { hueJitter: 12, saturationJitter: 0.08, valueJitter: 0.12 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "star", softness: 0.06 },
+      blendMode: "screen",
+      sizeRatio: 0.34,
+    },
+  },
+  "rain-mist-combo": {
+    tipSoftness: 0.28,
+    spacingRatio: 0.42,
+    scatterRatio: 0.52,
+    maxSpeed: 0.9,
+    width: {
+      mappings: [{ source: "speed", from: 0.62, to: 1.58 }],
+      jitter: { mode: "multiply", amount: 0.22 },
+    },
+    opacity: { jitter: { mode: "multiply", amount: 0.28 } },
+    spacing: { mappings: [{ source: "speed", from: 0.72, to: 1.62 }] },
+    scatter: { mappings: [{ source: "speed", from: 0.64, to: 1.56 }], jitter: { mode: "add", amount: 0.42 } },
+    angle: { base: -68, mappings: [], jitter: { mode: "add", amount: 5 } },
+    flow: { base: 0.54 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "soft", softness: 0.9 },
+      blendMode: "screen",
+      sizeRatio: 0.58,
+    },
+  },
+  "snow-powder-drift": {
+    tipSoftness: 0.38,
+    spacingRatio: 0.62,
+    scatterRatio: 0.88,
+    width: {
+      mappings: [{ source: "pressure", from: 0.62, to: 1.32 }],
+      jitter: { mode: "multiply", amount: 0.52 },
+    },
+    opacity: { jitter: { mode: "multiply", amount: 0.26 } },
+    angle: { jitter: { mode: "add", amount: 180 } },
+    scatter: { mappings: [{ source: "speed", from: 0.58, to: 1.62 }], jitter: { mode: "add", amount: 0.5 } },
+    colorDynamics: { hueJitter: 2, saturationJitter: 0.015, valueJitter: 0.1 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "soft", softness: 0.86 },
+      blendMode: "screen",
+      sizeRatio: 0.72,
+    },
+  },
+  "dust-mote-depth": {
+    tipSoftness: 0.62,
+    spacingRatio: 0.58,
+    scatterRatio: 1.18,
+    width: {
+      mappings: [{ source: "pressure", from: 0.48, to: 1.3 }],
+      jitter: { mode: "multiply", amount: 0.68 },
+    },
+    opacity: { jitter: { mode: "multiply", amount: 0.56 } },
+    angle: { jitter: { mode: "add", amount: 180 } },
+    scatter: { mappings: [{ source: "speed", from: 0.7, to: 1.34 }], jitter: { mode: "add", amount: 0.58 } },
+    flow: { base: 0.36 },
+    colorDynamics: { hueJitter: 4, saturationJitter: 0.025, valueJitter: 0.16 },
+  },
+  "stage-safe-splatter": {
+    tipSoftness: 0.04,
+    spacingRatio: 0.46,
+    scatterRatio: 1.05,
+    width: {
+      mappings: [{ source: "pressure", from: 0.42, to: 1.46, curve: 1.26 }],
+      jitter: { mode: "multiply", amount: 0.62 },
+    },
+    opacity: { jitter: { mode: "multiply", amount: 0.18 } },
+    scatter: {
+      mappings: [{ source: "pressure", from: 0.52, to: 1.72, curve: 1.25 }],
+      jitter: { mode: "add", amount: 0.44 },
+    },
+    angle: { jitter: { mode: "add", amount: 180 } },
+    flow: { base: 0.92 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "grain", softness: 0.02 },
+      blendMode: "screen",
+      sizeRatio: 0.44,
+    },
+  },
+  "bokeh-ring-glow": {
+    tipSoftness: 0.48,
+    spacingRatio: 0.72,
+    scatterRatio: 0.72,
+    width: {
+      mappings: [{ source: "pressure", from: 0.64, to: 1.28 }],
+      jitter: { mode: "multiply", amount: 0.48 },
+    },
+    opacity: { jitter: { mode: "multiply", amount: 0.32 } },
+    angle: { jitter: { mode: "add", amount: 180 } },
+    colorDynamics: { hueJitter: 10, saturationJitter: 0.06, valueJitter: 0.18 },
+    flow: { base: 0.46 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "soft", softness: 0.94 },
+      blendMode: "screen",
+      sizeRatio: 1.22,
+    },
+  },
+  "cloud-cirrus-stream": {
+    tipSoftness: 0.82,
+    spacingRatio: 0.18,
+    scatterRatio: 0.12,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.78, to: 1.28 },
+        { source: "speed", from: 1.12, to: 0.68 },
+      ],
+      jitter: { mode: "multiply", amount: 0.16 },
+    },
+    flow: { base: 0.12, mappings: [{ source: "pressure", from: 0.28, to: 1 }] },
+    spacing: { mappings: [{ source: "speed", from: 0.78, to: 1.28 }] },
+    grain: { space: "canvas-fixed", amount: 0.22, scale: 26, contrast: 0.34, seed: 0x4b0a_2308 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "soft", softness: 0.96 },
+      blendMode: "screen",
+      sizeRatio: 1.7,
+    },
+  },
+
+  // ── 자연·재질·음식 소재 ───────────────────────────────────────────────
+  "foliage-broad-canopy": {
+    tipSoftness: 0.08,
+    spacingRatio: 0.42,
+    scatterRatio: 0.62,
+    width: {
+      mappings: [{ source: "pressure", from: 0.5, to: 1.46 }],
+      jitter: { mode: "multiply", amount: 0.4 },
+    },
+    angle: { jitter: { mode: "add", amount: 150 } },
+    scatter: { mappings: [{ source: "speed", from: 0.74, to: 1.42 }], jitter: { mode: "add", amount: 0.38 } },
+    colorDynamics: { hueJitter: 12, saturationJitter: 0.1, valueJitter: 0.12 },
+    flow: { base: 0.86, mappings: [{ source: "pressure", from: 0.56, to: 1 }] },
+  },
+  "tree-bark-crack": {
+    tipSoftness: 0.05,
+    spacingRatio: 0.13,
+    scatterRatio: 0.05,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.5, to: 1.38 },
+        { source: "speed", from: 1.08, to: 0.78 },
+      ],
+      jitter: { mode: "multiply", amount: 0.14 },
+    },
+    opacity: { jitter: { mode: "multiply", amount: 0.16 } },
+    grain: { space: "canvas-fixed", amount: 0.5, scale: 8.4, contrast: 0.74, seed: 0x4b0a_2402 },
+    flow: { base: 0.72, mappings: [{ source: "pressure", from: 0.5, to: 1 }] },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "grain", softness: 0.03 },
+      blendMode: "multiply",
+      sizeRatio: 0.64,
+    },
+  },
+  "flower-petal-scatter": {
+    tipSoftness: 0.045,
+    spacingRatio: 0.58,
+    scatterRatio: 0.82,
+    width: {
+      mappings: [{ source: "pressure", from: 0.56, to: 1.38 }],
+      jitter: { mode: "multiply", amount: 0.42 },
+    },
+    angle: { jitter: { mode: "add", amount: 180 } },
+    scatter: { mappings: [{ source: "speed", from: 0.58, to: 1.6 }], jitter: { mode: "add", amount: 0.44 } },
+    colorDynamics: { hueJitter: 14, saturationJitter: 0.09, valueJitter: 0.1 },
+    flow: { base: 0.9 },
+  },
+  "rock-shard-texture": {
+    tipSoftness: 0.025,
+    spacingRatio: 0.36,
+    scatterRatio: 0.42,
+    width: {
+      mappings: [{ source: "pressure", from: 0.5, to: 1.48 }],
+      jitter: { mode: "multiply", amount: 0.42 },
+    },
+    opacity: { jitter: { mode: "multiply", amount: 0.18 } },
+    angle: { jitter: { mode: "add", amount: 180 } },
+    grain: { space: "canvas-fixed", amount: 0.48, scale: 11, contrast: 0.72, seed: 0x4b0a_2404 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "grain", softness: 0.02 },
+      blendMode: "multiply",
+      sizeRatio: 0.5,
+    },
+  },
+  "brick-mortar-pattern": {
+    tipSoftness: 0.025,
+    spacingRatio: 0.82,
+    scatterRatio: 0,
+    width: {
+      mappings: [{ source: "pressure", from: 0.92, to: 1.08 }],
+      jitter: null,
+    },
+    angle: { mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }], jitter: null },
+    flow: { base: 1, mappings: [] },
+    grain: { space: "canvas-fixed", amount: 0.2, scale: 5, contrast: 0.46, seed: 0x4b0a_2405 },
+  },
+  "wood-knot-rake": {
+    tipSoftness: 0.06,
+    spacingRatio: 0.12,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.48, to: 1.36 },
+        { source: "speed", from: 1.06, to: 0.74 },
+      ],
+      jitter: { mode: "multiply", amount: 0.1 },
+    },
+    flow: { base: 0.68, mappings: [{ source: "pressure", from: 0.48, to: 1 }] },
+    grain: { space: "stroke-fixed", amount: 0.48, scale: 7.6, contrast: 0.66, seed: 0x4b0a_2406 },
+    angle: { mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }], jitter: { mode: "add", amount: 4 } },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "bristle", softness: 0.06 },
+      blendMode: "multiply",
+      sizeRatio: 0.74,
+    },
+  },
+  "fur-undercoat-soft": {
+    tipSoftness: 0.56,
+    spacingRatio: 0.12,
+    scatterRatio: 0.18,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.44, to: 1.34 },
+        { source: "tilt-magnitude", from: 0.9, to: 1.28, amount: 0.48 },
+      ],
+      jitter: { mode: "multiply", amount: 0.18 },
+    },
+    flow: { base: 0.32, mappings: [{ source: "pressure", from: 0.36, to: 1 }] },
+    angle: { jitter: { mode: "add", amount: 28 } },
+    taper: { startLength: 0.05, endLength: 0.24, minSizeRatio: 0.08, minOpacityRatio: 0.34, curve: 1.46 },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "bristle", softness: 0.08 },
+      blendMode: "screen",
+      sizeRatio: 0.52,
+    },
+  },
+  "hair-curl-ribbon": {
+    tipSoftness: 0.035,
+    spacingRatio: 0.1,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.3, to: 1.46, curve: 1.26 },
+        { source: "tilt-magnitude", from: 0.9, to: 1.2, amount: 0.42 },
+      ],
+      jitter: { mode: "multiply", amount: 0.08 },
+    },
+    flow: { base: 0.9, mappings: [{ source: "pressure", from: 0.58, to: 1 }] },
+    taper: { startLength: 0.05, endLength: 0.3, minSizeRatio: 0.045, minOpacityRatio: 0.52, curve: 1.55 },
+    angle: {
+      mappings: [
+        { source: "direction", mode: "add", from: 0, to: 360 },
+        { source: "twist", mode: "add", from: 0, to: 360, amount: 0.22 },
+      ],
+      jitter: { mode: "add", amount: 8 },
+    },
+    dualBrush: {
+      enabled: true,
+      tip: { shape: "bristle", softness: 0.04 },
+      blendMode: "screen",
+      sizeRatio: 0.4,
+    },
+  },
+  "food-sesame-sprinkle": {
+    tipSoftness: 0.025,
+    spacingRatio: 0.72,
+    scatterRatio: 0.74,
+    width: {
+      mappings: [{ source: "pressure", from: 0.68, to: 1.24 }],
+      jitter: { mode: "multiply", amount: 0.34 },
+    },
+    angle: { jitter: { mode: "add", amount: 180 } },
+    scatter: { jitter: { mode: "add", amount: 0.42 } },
+    colorDynamics: { hueJitter: 7, saturationJitter: 0.06, valueJitter: 0.16 },
+    flow: { base: 0.96 },
+  },
+
+  // ── 만화 톤·해칭·집중선 ───────────────────────────────────────────────
+  "halftone-gradient-dot": {
+    tipSoftness: 0.015,
+    spacingRatio: 0.34,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.42, to: 1.62, curve: 1.24 },
+        { source: "speed", from: 1.08, to: 0.78, amount: 0.5 },
+      ],
+      jitter: null,
+    },
+    spacing: {
+      mappings: [
+        { source: "pressure", from: 1.24, to: 0.76, curve: 1.12 },
+        { source: "speed", from: 0.9, to: 1.24 },
+      ],
+    },
+    opacity: { mappings: [{ source: "pressure", from: 0.54, to: 1 }] },
+    flow: { base: 1, mappings: [] },
+  },
+  "hatching-contour-rake": {
+    tipSoftness: 0.02,
+    spacingRatio: 0.11,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.42, to: 1.38 },
+        { source: "tilt-magnitude", from: 0.88, to: 1.24, amount: 0.5 },
+      ],
+      jitter: { mode: "multiply", amount: 0.06 },
+    },
+    angle: {
+      mappings: [
+        { source: "direction", mode: "add", from: 0, to: 360 },
+        { source: "tilt-azimuth", mode: "add", from: 0, to: 360, amount: 0.28 },
+      ],
+      jitter: { mode: "add", amount: 3 },
+    },
+    flow: { base: 0.84, mappings: [{ source: "pressure", from: 0.58, to: 1 }] },
+    taper: { startLength: 0.035, endLength: 0.2, minSizeRatio: 0.08, minOpacityRatio: 0.66, curve: 1.4 },
+    grain: { space: "canvas-fixed", amount: 0.18, scale: 3, contrast: 0.48, seed: 0x4b0a_2502 },
+  },
+  "focus-ray-streak": {
+    tipSoftness: 0.015,
+    spacingRatio: 0.1,
+    scatterRatio: 0.09,
+    maxSpeed: 0.82,
+    width: {
+      mappings: [
+        { source: "pressure", from: 0.3, to: 1.24 },
+        { source: "speed", from: 0.52, to: 1.76, curve: 1.2 },
+      ],
+      jitter: { mode: "multiply", amount: 0.14 },
+    },
+    opacity: {
+      mappings: [{ source: "speed", from: 0.64, to: 1 }],
+      jitter: { mode: "multiply", amount: 0.12 },
+    },
+    spacing: { mappings: [{ source: "speed", from: 0.68, to: 1.42 }] },
+    flow: { base: 0.96, mappings: [] },
+    taper: { startLength: 0.025, endLength: 0.34, minSizeRatio: 0.025, minOpacityRatio: 0.48, curve: 1.9 },
+  },
 };
 
 /** Tuning lookup. Returns null for every pre-expansion catalogue id — their physics never change. */
@@ -500,6 +1323,7 @@ export function applyStudioBrushPackExpansionTuning(
     ...(tuning.taper ? { taper: { ...settings.taper, ...tuning.taper } } : {}),
     ...(tuning.colorDynamics ? { colorDynamics: tuning.colorDynamics } : {}),
     ...(tuning.grain ? { grain: tuning.grain } : {}),
+    ...(tuning.dualBrush ? { dualBrush: tuning.dualBrush } : {}),
     width: mergeChannel(settings.width, tuning.width),
     opacity: mergeChannel(settings.opacity, tuning.opacity),
     flow: mergeChannel(settings.flow, tuning.flow),

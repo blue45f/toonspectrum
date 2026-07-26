@@ -218,6 +218,58 @@ function fingerprintEditableRasterCopy(value: string): string {
   return `${EDITABLE_RASTER_COPY_NAMESPACE}:${first.toString(16).padStart(8, "0")}${second.toString(16).padStart(8, "0")}`;
 }
 
+/**
+ * Builds a key-order-independent JSON payload for document ownership.
+ *
+ * The SVG serializer can gain an outline stroker after its lazy chunk loads. That improves the
+ * rendered SVG without changing the authored document, so an SVG hash cannot be the durable
+ * plan/current fingerprint. This payload deliberately contains only render-affecting source
+ * state and remains identical before and after optional renderer modules initialize.
+ */
+function canonicalFingerprintJson(value: unknown): string {
+  const ancestors = new Set<object>();
+  const normalize = (entry: unknown): unknown => {
+    if (entry === null || typeof entry !== "object") return entry;
+    if (ancestors.has(entry)) throw new TypeError("circular raster fingerprint source");
+    ancestors.add(entry);
+    try {
+      if (Array.isArray(entry)) return entry.map(normalize);
+      const record = entry as Record<string, unknown>;
+      return Object.fromEntries(
+        Object.keys(record)
+          .filter((key) => record[key] !== undefined)
+          .toSorted()
+          .map((key) => [key, normalize(record[key])]),
+      );
+    } finally {
+      ancestors.delete(entry);
+    }
+  };
+  const serialized = JSON.stringify(normalize(value));
+  if (serialized === undefined) throw new TypeError("empty raster fingerprint source");
+  return serialized;
+}
+
+function fingerprintEditableRasterCopySource(input: {
+  readonly width: number;
+  readonly height: number;
+  readonly sourceElements: readonly El[];
+  readonly theme?: SvgExportTheme;
+  readonly includeBackground: boolean;
+  readonly bg?: string;
+  readonly bgGrad?: readonly string[] | null;
+}): string {
+  return fingerprintEditableRasterCopy(canonicalFingerprintJson({
+    width: input.width,
+    height: input.height,
+    elements: input.sourceElements,
+    theme: input.theme ?? null,
+    background: input.includeBackground
+      ? { color: input.bg ?? null, gradient: input.bgGrad ?? null }
+      : null,
+  }));
+}
+
 function selectCopySources(input: StudioEditableRasterCopyInput): readonly El[] {
   const groups = [...(input.groups ?? [])];
   const requested = input.sourceIds ? new Set(input.sourceIds) : null;
@@ -402,8 +454,18 @@ export function planStudioEditableRasterCopy(
     };
   }
   let serializedSource: string;
+  let sourceFingerprint: string;
   try {
     serializedSource = JSON.stringify(sourceElements);
+    sourceFingerprint = fingerprintEditableRasterCopySource({
+      width: input.width,
+      height: input.height,
+      sourceElements,
+      theme: input.theme,
+      includeBackground,
+      bg: input.bg,
+      bgGrad: input.bgGrad,
+    });
   } catch {
     return {
       ok: false,
@@ -465,7 +527,7 @@ export function planStudioEditableRasterCopy(
       bgGrad: input.bgGrad,
       name: normalizeCopyName(input.name),
       insertionIndex: normalizeInsertionIndex(input.insertionIndex, input.elements.length),
-      sourceFingerprint: fingerprintEditableRasterCopy(exported.svg),
+      sourceFingerprint,
       sourceElementCount: exported.elementCount,
       budgets: input.budgets,
     },
@@ -492,11 +554,14 @@ export async function renderStudioEditableRasterCopy(
     budgets: plan.budgets,
   }, options);
   const pngByteLength = pngDataUrlByteLength(result.dataUrl);
-  if (result.fingerprint !== plan.sourceFingerprint) {
+  if (!new RegExp(`^${EDITABLE_RASTER_COPY_NAMESPACE}:[0-9a-f]{16}$`, "u").test(result.fingerprint)) {
     throw new Error("필터를 준비하는 동안 페이지 내용이 바뀌었습니다. 최신 화면에서 다시 시도해 주세요.");
   }
   if (result.width !== plan.width || result.height !== plan.height) {
     throw new Error("필터 합성 결과의 해상도가 현재 페이지와 다릅니다. 페이지 크기를 확인한 뒤 다시 시도해 주세요.");
+  }
+  if (result.elementCount !== plan.sourceElementCount) {
+    throw new Error("필터 합성 결과의 레이어 수가 현재 페이지와 다릅니다. 최신 화면에서 다시 시도해 주세요.");
   }
   if (pngByteLength === null) {
     throw new Error("필터 합성 결과가 올바른 PNG가 아닙니다. 레이어를 단순화한 뒤 다시 시도해 주세요.");
@@ -508,7 +573,13 @@ export async function renderStudioEditableRasterCopy(
   if (pngByteLength > maxPngBytes) {
     throw new Error(`필터 합성 PNG가 ${pngByteLength}바이트로 허용치 ${maxPngBytes}바이트를 넘습니다. 페이지를 나누거나 해상도와 레이어 복잡도를 낮춰 주세요.`);
   }
-  return result;
+  return {
+    ...result,
+    // Downstream materialization and commit compare document ownership, not the renderer's
+    // pre/post-lazy SVG implementation fingerprint.
+    fingerprint: plan.sourceFingerprint,
+    pngByteLength,
+  };
 }
 
 export function materializeStudioEditableRasterCopy(input: {

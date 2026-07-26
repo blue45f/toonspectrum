@@ -24,13 +24,18 @@ describe("loadStudioPerfectFreehandStroker / peekStudioPerfectFreehandStroker", 
 });
 
 describe("resolveStudioPerfectFreehandProfile", () => {
-  it("퍼펙트 브러시 id에만 프로필을 반환한다(그 외 렌더러는 기존 경로 유지)", () => {
+  it("퍼펙트 브러시와 네 가지 만화 펜을 연속 아웃라인 프로필로 해석한다", () => {
     expect(resolveStudioPerfectFreehandProfile("perfect-ink")).toBe(
       STUDIO_PERFECT_FREEHAND_PROFILES["perfect-ink"]
     );
     expect(resolveStudioPerfectFreehandProfile("perfect-marker")).toBe(
       STUDIO_PERFECT_FREEHAND_PROFILES["perfect-marker"]
     );
+    for (const brushId of ["gpen", "mapping-pen", "kaburapen", "liner"]) {
+      expect(resolveStudioPerfectFreehandProfile(brushId)).toBe(
+        STUDIO_PERFECT_FREEHAND_PROFILES.gpen
+      );
+    }
     expect(resolveStudioPerfectFreehandProfile("pen")).toBeNull();
     expect(resolveStudioPerfectFreehandProfile("calligraphy")).toBeNull();
     expect(resolveStudioPerfectFreehandProfile("")).toBeNull();
@@ -46,6 +51,20 @@ describe("resolveStudioPerfectFreehandProfile", () => {
     expect(marker.taperStartFactor).toBe(0);
     expect(marker.taperEndFactor).toBe(0);
     expect(ink.thinning).toBeGreaterThan(marker.thinning);
+  });
+
+  it("G펜 프로필은 기존 0.22 + 1.55p 폭 곡선을 연속 outline thinning으로 보존한다", () => {
+    const gpen = STUDIO_PERFECT_FREEHAND_PROFILES.gpen;
+    const perfectFreehandDiameterFactor = (pressure: number) =>
+      1 + 2 * gpen.thinning * (pressure - 0.5);
+    for (const pressure of [0, 0.1, 0.5, 0.9, 1]) {
+      expect(perfectFreehandDiameterFactor(pressure)).toBeCloseTo(
+        0.225 + pressure * 1.55,
+        10
+      );
+    }
+    expect(gpen.smoothing).toBeGreaterThan(0.6);
+    expect(gpen.streamline).toBeLessThan(0.3);
   });
 });
 
@@ -119,6 +138,7 @@ describe("studioPerfectFreehandOutlineToPathData", () => {
 describe("buildStudioPerfectFreehandOutline / PathData (실제 getStroke 주입)", () => {
   const inkProfile = STUDIO_PERFECT_FREEHAND_PROFILES["perfect-ink"];
   const markerProfile = STUDIO_PERFECT_FREEHAND_PROFILES["perfect-marker"];
+  const gpenProfile = STUDIO_PERFECT_FREEHAND_PROFILES.gpen;
   // 수평 직선 — 아웃라인 굵기(y 범위) 측정이 쉬운 기준 지오메트리.
   const linePoints = Array.from({ length: 21 }, (_, i) => [i * 5, 50]).flat();
   let stroker: StudioPerfectFreehandStroker;
@@ -225,6 +245,24 @@ describe("buildStudioPerfectFreehandOutline / PathData (실제 getStroke 주입)
     }
   });
 
+  it("G펜 급커브도 독립 캡슐 묶음이 아닌 하나의 닫힌 이차곡선 윤곽으로 만든다", () => {
+    const arcPoints = Array.from({ length: 25 }, (_, index) => {
+      const angle = Math.PI * 0.12 + (Math.PI * 1.35 * index) / 24;
+      return [90 + Math.cos(angle) * 58, 90 + Math.sin(angle) * 58];
+    }).flat();
+    const path = buildStudioPerfectFreehandPathData(stroker, {
+      points: arcPoints,
+      pressures: Array(25).fill(0.68),
+      strokeWidth: 11,
+      profile: gpenProfile,
+    });
+
+    expect(path.match(/M/g)).toHaveLength(1);
+    expect(path.match(/Q/g)?.length).toBeGreaterThan(12);
+    expect(path.match(/Z/g)).toHaveLength(1);
+    expect(path).not.toContain(" L");
+  });
+
   it("유효한 점이 2개 미만이거나 비유한 좌표뿐이면 빈 결과로 폴백을 알린다", () => {
     const base = { pressures: null, strokeWidth: 9, profile: inkProfile };
     expect(buildStudioPerfectFreehandOutline(stroker, { ...base, points: [] })).toEqual([]);
@@ -279,5 +317,26 @@ describe("buildStudioPerfectFreehandOutline / PathData (실제 getStroke 주입)
     });
     expect(shortPath).toContain("Q");
     expect(shortPath).toContain("Z");
+  });
+
+  it("끝점이 시작점 근처로 돌아오는 긴 G펜도 누적 경로 길이로 테이퍼를 유지한다", () => {
+    let receivedStartTaper: boolean | number | undefined;
+    let receivedEndTaper: boolean | number | undefined;
+    const captureOptions: StudioPerfectFreehandStroker = (_points, options) => {
+      receivedStartTaper = options?.start?.taper;
+      receivedEndTaper = options?.end?.taper;
+      return [[0, 0], [2, 0], [1, 2]];
+    };
+
+    buildStudioPerfectFreehandOutline(captureOptions, {
+      // 시작↔끝 chord는 1.4px뿐이지만 실제 C/loop 경로는 120px를 넘는다.
+      points: [0, 0, 40, 0, 40, 40, 0, 40, 1, 1],
+      pressures: Array(5).fill(0.6),
+      strokeWidth: 12,
+      profile: gpenProfile,
+    });
+
+    expect(receivedStartTaper).toBe(12 * gpenProfile.taperStartFactor);
+    expect(receivedEndTaper).toBe(12 * gpenProfile.taperEndFactor);
   });
 });

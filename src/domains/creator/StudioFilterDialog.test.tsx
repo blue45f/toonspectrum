@@ -4,6 +4,11 @@ import { createRef } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { STUDIO_CREATOR_PACK_CATALOG } from "./studio-creator-pack-catalog";
+import {
+  installStudioCreatorPack,
+  type StudioCreatorPackStorage,
+} from "./studio-creator-pack-runtime";
 import { StudioFilterDialog } from "./StudioFilterDialog";
 
 const filterDialogSource = readFileSync(
@@ -161,6 +166,42 @@ describe("StudioFilterDialog", () => {
     expect(filterDialogSource).toMatch(/label="대비"[\s\S]*?min=\{-80\}[\s\S]*?max=\{80\}/u);
   });
 
+  it("surfaces an installed Creator Pack preset in the matching live filter dialog", () => {
+    const values = new Map<string, string>();
+    const target: StudioCreatorPackStorage = {
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => {
+        values.set(key, value);
+      },
+      removeItem: (key) => {
+        values.delete(key);
+      },
+    };
+    const filterPack = STUDIO_CREATOR_PACK_CATALOG.find(
+      (pack) => pack.metadata.kind === "filter",
+    )!;
+    expect(installStudioCreatorPack(filterPack, target, 1_000).status).toBe("installed");
+    vi.stubGlobal("localStorage", target);
+    try {
+      const html = renderToStaticMarkup(
+        <StudioFilterDialog
+          activeKey="filter:vignette"
+          kind="vignette"
+          image={{}}
+          rootRef={createRef<HTMLElement>()}
+          onPreview={vi.fn()}
+          onApply={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      );
+      expect(html).toContain("설치한 Creator Pack 프리셋");
+      expect(html).toContain("대사 집중 비네트");
+      expect(html).not.toContain("야간 듀오톤");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("renders schema-driven sliders for filter-pack kinds (vignette)", () => {
     const html = renderToStaticMarkup(
       <StudioFilterDialog
@@ -203,6 +244,28 @@ describe("StudioFilterDialog", () => {
     expect(html).toContain('value="#f0e0d0"');
     expect(html).toContain("어두운 영역 색");
     expect(html).toContain("밝은 영역 색");
+  });
+
+  it("renders deterministic union-wave controls with edge and alpha behavior explained", () => {
+    const html = renderToStaticMarkup(
+      <StudioFilterDialog
+        activeKey="filter:ripple-warp"
+        kind="ripple-warp"
+        image={{}}
+        rootRef={createRef<HTMLElement>()}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain(">원형 리플</h2>");
+    for (const label of ["진폭", "파장", "중심 X", "중심 Y", "위상"]) {
+      expect(html).toContain(`>${label}</label>`);
+    }
+    expect(html).toContain("가장자리는 반복 없이 고정해 빈 틈을 막고");
+    expect(html).toContain("투명도는 원본 그대로");
+    expect(html).toContain("같은 시드는 언제나 같은 결과");
   });
 
   it("reopens a filter-pack kind from a stored last-filter draft", () => {

@@ -189,6 +189,11 @@ interface StudioLiveParticipantInternal extends StudioLiveParticipant {
   workId: string;
   authorizedAt: number;
   authorizationSequence: number;
+  /**
+   * Finite only while this work is an active save-before-collaboration room. Promoted and ordinary
+   * saved works use null so the established ACL remains authoritative without a synthetic lease.
+   */
+  authorizationExpiresAt: number | null;
 }
 
 interface StudioLiveVoiceMemberInternal extends StudioLiveVoiceMember {
@@ -336,6 +341,21 @@ function normalizedMemberName(value: unknown): string {
   if (typeof value !== "string") return "팀원";
   const name = value.trim();
   return name.length > 0 ? name.slice(0, 80) : "팀원";
+}
+
+function studioLiveAuthorizationExpiresAt(value: string | undefined): number | null {
+  if (value === undefined) return null;
+  return Date.parse(value);
+}
+
+function isStudioLiveAuthorizationLeaseCurrent(
+  authorizationExpiresAt: number | null,
+  now = Date.now()
+): boolean {
+  return (
+    authorizationExpiresAt === null ||
+    (Number.isFinite(authorizationExpiresAt) && authorizationExpiresAt > now)
+  );
 }
 
 const studioLiveAllowedOrigins = new Set(allowedCorsOrigins());
@@ -568,8 +588,17 @@ export class StudioLiveGateway
       ) {
         return reply(ack, failure("forbidden", "이 작품의 실시간 작업실에 참여할 권한이 없습니다."));
       }
-      const member = team.members.find((candidate) => candidate.userId === userId);
+      const authorizationExpiresAt = studioLiveAuthorizationExpiresAt(
+        team.authorizationExpiresAt
+      );
       const now = Date.now();
+      if (!isStudioLiveAuthorizationLeaseCurrent(authorizationExpiresAt, now)) {
+        return reply(
+          ack,
+          failure("forbidden", "임시 협업 작업실이 만료되었습니다. 새 작업실을 만들어 주세요.")
+        );
+      }
+      const member = team.members.find((candidate) => candidate.userId === userId);
       const existingBeforeRoomJoin = this.participantsBySocket.get(client.id);
       const nextRoom = studioLiveRoom(input.workId);
       const joinedNewRoom = existingBeforeRoomJoin?.workId !== input.workId;
@@ -677,12 +706,22 @@ export class StudioLiveGateway
         updatedAt: new Date(now).toISOString(),
         authorizedAt: now,
         authorizationSequence: 0,
+        authorizationExpiresAt,
       };
       // No asynchronous boundary may occur between this final identity check and the authoritative
       // participant/room-index commit below. This prevents a session that expired during adapter
       // I/O from becoming a valid in-memory participant even briefly.
       if (!this.isSocketPrincipalCurrent(client, principal, userId)) {
         return rejectInvalidSession(joinedNewRoom ? nextRoom : undefined);
+      }
+      if (!isStudioLiveAuthorizationLeaseCurrent(participant.authorizationExpiresAt)) {
+        if (joinedNewRoom) {
+          this.roomTransitions.leaveJoinedRoomBestEffort(client, nextRoom);
+        }
+        return reply(
+          ack,
+          failure("forbidden", "임시 협업 작업실이 만료되었습니다. 새 작업실을 만들어 주세요.")
+        );
       }
       if (existing?.workId === input.workId && existing.capabilities.edit && !participant.capabilities.edit) {
         void this.releaseSocketLocks(existing, "revoked");
@@ -713,8 +752,12 @@ export class StudioLiveGateway
         !this.isCurrentJoinTransition(client, transitionSequence) ||
         !this.isSocketCurrent(client) ||
         this.participantsBySocket.get(client.id) !== participant ||
-        !this.isSocketPrincipalCurrent(client, principal, userId)
+        !this.isSocketPrincipalCurrent(client, principal, userId) ||
+        !isStudioLiveAuthorizationLeaseCurrent(participant.authorizationExpiresAt)
       ) {
+        if (!isStudioLiveAuthorizationLeaseCurrent(participant.authorizationExpiresAt)) {
+          this.revokeParticipant(client.id);
+        }
         return reply(ack, failure("not_joined", "더 최신 작업실 상태로 대체되었습니다."));
       }
 
@@ -2871,6 +2914,7 @@ export class StudioLiveGateway
     return Boolean(
       principal &&
       principal.expiresAt > Date.now() &&
+      isStudioLiveAuthorizationLeaseCurrent(participant.authorizationExpiresAt) &&
       principal.userId === participant.userId &&
       this.participantsBySocket.get(client.id) === participant &&
       this.isSocketCurrent(client) &&
@@ -2948,7 +2992,8 @@ export class StudioLiveGateway
       } else if (
         !recheck &&
         mode === "cached" &&
-        Date.now() - participant.authorizedAt < STUDIO_LIVE_ACCESS_CACHE_MS
+        Date.now() - participant.authorizedAt < STUDIO_LIVE_ACCESS_CACHE_MS &&
+        isStudioLiveAuthorizationLeaseCurrent(participant.authorizationExpiresAt)
       ) {
         return !requireEdit || participant.capabilities.edit ? participant : null;
       } else if (!recheck) {
@@ -3063,6 +3108,13 @@ export class StudioLiveGateway
         this.revokeParticipant(socketId);
         return null;
       }
+      const authorizationExpiresAt = studioLiveAuthorizationExpiresAt(
+        authorization.authorizationExpiresAt
+      );
+      if (!isStudioLiveAuthorizationLeaseCurrent(authorizationExpiresAt)) {
+        this.revokeParticipant(socketId);
+        return null;
+      }
       const previousRole = participant.role;
       const previousComment = participant.capabilities.comment;
       const previousEdit = participant.capabilities.edit;
@@ -3075,6 +3127,7 @@ export class StudioLiveGateway
         manageMembers: authorization.viewer.capabilities.manageMembers,
       };
       participant.authorizedAt = Date.now();
+      participant.authorizationExpiresAt = authorizationExpiresAt;
       participant.updatedAt = new Date().toISOString();
       const safeParticipant = this.publishParticipantToSocketData(socket, participant);
       if (!participant.capabilities.edit) void this.releaseSocketLocks(participant, "revoked");

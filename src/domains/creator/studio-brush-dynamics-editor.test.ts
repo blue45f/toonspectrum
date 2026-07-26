@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   normalizeStudioBrushDynamicsSettings,
+  resolveStudioBrushDynamics,
+  serializeStudioBrushDynamicsSettingsCanonical,
   studioBrushDynamicsPresetSettings,
 } from "./studio-brush-dynamics";
 import {
@@ -9,6 +11,7 @@ import {
   removeStudioBrushDynamicsMapping,
   studioBrushDynamicsActiveMappingCount,
   studioBrushDynamicsPresetMatch,
+  updateStudioBrushDynamicsGrain,
   updateStudioBrushDynamicsJitter,
   updateStudioBrushDynamicsMapping,
   updateStudioBrushDynamicsPropertyBase,
@@ -84,5 +87,83 @@ describe("studio brush dynamics editor", () => {
     const tipped = updateStudioBrushDynamicsTip(tapered, { shape: "star", softness: 0.55 });
     expect(tipped.tip).toMatchObject({ shape: "star", softness: 0.55, alphaMapBase64: null });
     expect(studioBrushDynamicsPresetMatch(tipped)).toBeNull();
+  });
+
+  it("round-trips sensor routing, seeded random, taper and grain without losing runtime behavior", () => {
+    const base = studioBrushDynamicsPresetSettings("ink-particle");
+    let configured = removeStudioBrushDynamicsMapping(base, "width", "pressure");
+    configured = updateStudioBrushDynamicsMapping(
+      configured,
+      "width",
+      "speed",
+      { from: 0.5, to: 1.5, amount: 0.8, curve: 1.4, invert: false },
+      { source: "speed", from: 0.5, to: 1.5 }
+    );
+    configured = updateStudioBrushDynamicsJitter(configured, "width", 0.18);
+    configured = updateStudioBrushDynamicsTaper(configured, {
+      enabled: true,
+      minOpacityRatio: 0.22,
+      curve: 1.75,
+    });
+    configured = updateStudioBrushDynamicsGrain(configured, {
+      space: "stroke-fixed",
+      amount: 0.42,
+      scale: 12,
+      contrast: 0.73,
+    });
+
+    const serialized = serializeStudioBrushDynamicsSettingsCanonical(configured);
+    const restored = normalizeStudioBrushDynamicsSettings(JSON.parse(serialized));
+    expect(restored).toEqual(configured);
+    expect(findStudioBrushDynamicsMapping(restored, "width", "speed")).toMatchObject({
+      from: 0.5,
+      to: 1.5,
+      amount: 0.8,
+      curve: 1.4,
+      invert: false,
+    });
+    expect(restored.taper).toMatchObject({ minOpacityRatio: 0.22, curve: 1.75 });
+    expect(restored.grain).toMatchObject({
+      space: "stroke-fixed",
+      amount: 0.42,
+      scale: 12,
+      contrast: 0.73,
+    });
+
+    const slow = resolveStudioBrushDynamics(
+      { pressure: 0.5, speed: 0, stampIndex: 7 },
+      restored
+    );
+    const fast = resolveStudioBrushDynamics(
+      { pressure: 0.5, speed: restored.maxSpeed, stampIndex: 7 },
+      restored
+    );
+    expect(fast.width).toBeGreaterThan(slow.width);
+    expect(resolveStudioBrushDynamics(
+      { pressure: 0.5, speed: restored.maxSpeed, stampIndex: 7 },
+      restored
+    )).toEqual(fast);
+    expect(resolveStudioBrushDynamics(
+      { pressure: 0.5, speed: restored.maxSpeed, stampIndex: 8 },
+      restored
+    ).width).not.toBe(fast.width);
+  });
+
+  it("normalizes grain edits without mutating the source settings", () => {
+    const before = studioBrushDynamicsPresetSettings("dry-media");
+    const next = updateStudioBrushDynamicsGrain(before, {
+      amount: 4,
+      scale: -2,
+      contrast: 0.65,
+      space: "stroke-fixed",
+    });
+
+    expect(next.grain).toMatchObject({
+      amount: 1,
+      scale: 0.25,
+      contrast: 0.65,
+      space: "stroke-fixed",
+    });
+    expect(before.grain.amount).not.toBe(1);
   });
 });

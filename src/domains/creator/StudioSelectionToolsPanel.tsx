@@ -63,8 +63,15 @@ import type { StudioToolHintPreviewKind } from "./studio-tool-hint-preview-kind"
 import type { StudioToolHintSpec } from "./studio-tool-hints";
 import type { ReactElement } from "react";
 
-import { buttonClass } from "@/components/ui/button-utils";
+import { buttonClass as baseButtonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
+
+function buttonClass(options: Parameters<typeof baseButtonClass>[0] = {}): string {
+  return cn(
+    baseButtonClass(options),
+    "pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+  );
+}
 
 const TOOL_ICONS: Record<SelectionToolKind, typeof Square> = {
   rect: Square,
@@ -462,6 +469,9 @@ export function StudioSelectionToolsPanel({
   const colorRangeNoSamplesReason =
     colorRangeSamples.length === 0 ? "먼저 캔버스에서 색을 추출하세요." : undefined;
   const colorRangeApplyUnavailableReason = busyUnavailableReason ?? colorRangeNoSamplesReason;
+  const colorRangePickDisabled = busy && !colorRangePickArmed;
+  const colorRangePreviewDisabled =
+    !colorRangePreviewEnabled && (busy || colorRangeSamples.length === 0);
   const combineLabel =
     SELECTION_COMBINE_MODES.find((mode) => mode.id === combineMode)?.label ?? combineMode;
 
@@ -471,7 +481,9 @@ export function StudioSelectionToolsPanel({
   };
 
   return (
-    <div
+    <section
+      aria-label="픽셀 선택"
+      aria-busy={busy}
       className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5"
       data-studio-pixel-selection="true"
     >
@@ -518,6 +530,8 @@ export function StudioSelectionToolsPanel({
         {tools.map((tool) => {
           const Icon = TOOL_ICONS[tool.id];
           const active = activeTool === tool.id;
+          const toolDisabled = busy && !active;
+          const toolUnavailableReason = toolDisabled ? busyUnavailableReason : undefined;
           return (
             <StudioToolHintTarget
               key={tool.id}
@@ -531,20 +545,20 @@ export function StudioSelectionToolsPanel({
                     ? "Enter 또는 더블클릭으로 닫고, Esc로 그리던 경로를 취소할 수 있어요."
                     : undefined,
               }}
-              disabled={busy}
-              unavailableReason={busyUnavailableReason}
+              disabled={toolDisabled}
+              unavailableReason={toolUnavailableReason}
               preferredSide="left"
             >
               <span className="inline-flex">
                 <StudioToggleChip
                   active={active}
-                  disabled={busy}
+                  disabled={toolDisabled}
                   onClick={() => onPickTool(active ? null : tool.id)}
-                  aria-label={tool.label}
+                  aria-label={active ? `${tool.label} 종료` : tool.label}
                 >
                   <span className="inline-flex items-center gap-1">
                     <Icon className="size-3" aria-hidden />
-                    {tool.label}
+                    {active ? `${tool.label} 종료` : tool.label}
                   </span>
                 </StudioToggleChip>
               </span>
@@ -561,6 +575,7 @@ export function StudioSelectionToolsPanel({
           step={SELECTION_BRUSH_RADIUS_RANGE.step}
           value={brushRadius}
           onChange={onBrushRadiusChange}
+          disabled={busy}
           readout={`${brushRadius}px`}
         />
       ) : null}
@@ -626,6 +641,7 @@ export function StudioSelectionToolsPanel({
         step={SELECTION_FEATHER_RANGE.step}
         value={selection?.featherPx ?? 0}
         onChange={onFeatherChange}
+        disabled={busy}
         readout={`${selection?.featherPx ?? 0}px`}
       />
 
@@ -783,40 +799,50 @@ export function StudioSelectionToolsPanel({
           <div className="flex flex-wrap items-center gap-1.5">
             <StudioToolHintTarget
               hint={COLOR_RANGE_HINTS.pick}
-              disabled={busy}
-              unavailableReason={busyUnavailableReason}
+              disabled={colorRangePickDisabled}
+              unavailableReason={colorRangePickDisabled ? busyUnavailableReason : undefined}
               preferredSide="left"
             >
               <span className="inline-flex">
                 <StudioToggleChip
                   active={colorRangePickArmed}
-                  disabled={busy}
+                  disabled={colorRangePickDisabled}
                   onClick={() => onColorRangeTogglePick?.()}
-                  aria-label="캔버스에서 색 추출"
+                  aria-label={
+                    colorRangePickArmed ? "캔버스 색 추출 종료" : "캔버스에서 색 추출"
+                  }
                 >
                   <span className="inline-flex items-center gap-1">
                     <Pipette className="size-3" aria-hidden />
-                    캔버스에서 색 추출
+                    {colorRangePickArmed ? "색 추출 종료" : "캔버스에서 색 추출"}
                   </span>
                 </StudioToggleChip>
               </span>
             </StudioToolHintTarget>
             <StudioToolHintTarget
               hint={COLOR_RANGE_HINTS.preview}
-              disabled={Boolean(busyUnavailableReason ?? colorRangeNoSamplesReason)}
-              unavailableReason={busyUnavailableReason ?? colorRangeNoSamplesReason}
+              disabled={colorRangePreviewDisabled}
+              unavailableReason={
+                colorRangePreviewDisabled
+                  ? busyUnavailableReason ?? colorRangeNoSamplesReason
+                  : undefined
+              }
               preferredSide="left"
             >
               <span className="inline-flex">
                 <StudioToggleChip
                   active={colorRangePreviewEnabled}
-                  disabled={busy || colorRangeSamples.length === 0}
+                  disabled={colorRangePreviewDisabled}
                   onClick={() => onColorRangeTogglePreview?.()}
-                  aria-label="색상 범위 미리보기"
+                  aria-label={
+                    colorRangePreviewEnabled
+                      ? "색상 범위 미리보기 종료"
+                      : "색상 범위 미리보기"
+                  }
                 >
                   <span className="inline-flex items-center gap-1">
                     <Eye className="size-3" aria-hidden />
-                    미리보기
+                    {colorRangePreviewEnabled ? "미리보기 종료" : "미리보기"}
                   </span>
                 </StudioToggleChip>
               </span>
@@ -831,6 +857,7 @@ export function StudioSelectionToolsPanel({
             value={colorRangeFuzziness}
             onChange={onColorRangeFuzzinessChange ?? (() => undefined)}
             onCommit={onColorRangeFuzzinessCommit}
+            disabled={busy}
             readout={String(colorRangeFuzziness)}
           />
 
@@ -861,11 +888,15 @@ export function StudioSelectionToolsPanel({
           </StudioToolHintTarget>
 
           <p className="text-[0.68rem] leading-relaxed text-fg-3" role="status">
-            {colorRangePickArmed
-              ? "이미지 위를 클릭하면 그 지점의 색이 샘플로 추가됩니다."
-              : colorRangeSamples.length > 0
-                ? `샘플 ${colorRangeSamples.length}개 · 허용량 ${colorRangeFuzziness} · 마술봉과 달리 떨어져 있는 같은 색도 한 번에 선택됩니다.`
-                : "색을 추출한 뒤 적용하면 이미지 전체에서 비슷한 색이 모두 선택됩니다."}
+            {busy
+              ? colorRangePickArmed
+                ? "색상 범위를 계산 중입니다. 색 추출 도구는 지금 종료할 수 있습니다."
+                : "색상 범위를 계산 중입니다. 완료될 때까지 설정 변경은 잠시 기다려 주세요."
+              : colorRangePickArmed
+                ? "이미지 위를 클릭하면 그 지점의 색이 샘플로 추가됩니다."
+                : colorRangeSamples.length > 0
+                  ? `샘플 ${colorRangeSamples.length}개 · 허용량 ${colorRangeFuzziness} · 마술봉과 달리 떨어져 있는 같은 색도 한 번에 선택됩니다.`
+                  : "색을 추출한 뒤 적용하면 이미지 전체에서 비슷한 색이 모두 선택됩니다."}
           </p>
         </div>
       ) : null}
@@ -879,6 +910,7 @@ export function StudioSelectionToolsPanel({
           step={SELECTION_EXPAND_RANGE.step}
           value={expandAmount}
           onChange={setExpandAmount}
+          disabled={busy}
           readout={`${Math.round(expandAmount * 1000) / 10}‰`}
         />
         <StudioToolHintTarget
@@ -926,6 +958,7 @@ export function StudioSelectionToolsPanel({
           step={SELECTION_ROTATE_RANGE.step}
           value={rotateAmount}
           onChange={setRotateAmount}
+          disabled={busy}
           readout={`${rotateAmount}°`}
         />
         <div className="flex flex-wrap items-center gap-1.5">
@@ -1118,6 +1151,7 @@ export function StudioSelectionToolsPanel({
           step={0.05}
           value={contentScale}
           onChange={setContentScale}
+          disabled={busy}
           readout={`×${contentScale.toFixed(2)}`}
         />
         <StudioSliderRow
@@ -1127,6 +1161,7 @@ export function StudioSelectionToolsPanel({
           step={SELECTION_ROTATE_RANGE.step}
           value={contentRotate}
           onChange={setContentRotate}
+          disabled={busy}
           readout={`${contentRotate}°`}
         />
         <div className="flex flex-wrap items-center gap-1.5">
@@ -1210,19 +1245,23 @@ export function StudioSelectionToolsPanel({
       </div>
 
       <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
-        {usable
-          ? `영역 ${subpathCount}개 · 페더 ${selection!.featherPx}px${selection!.invert ? " · 반전" : ""}`
-          : activeTool === "poly-lasso"
-            ? polyLassoPointCount > 0
-              ? `꼭짓점 ${polyLassoPointCount}개 · 더블클릭 또는 Enter로 닫기 · Esc 취소`
-              : "이미지 위를 클릭해 꼭짓점을 찍으세요. 더블클릭/Enter로 닫습니다."
-            : activeTool === "brush"
-              ? "이미지 위를 붓으로 칠하면 칠한 자리가 선택됩니다."
-              : activeTool === "lasso"
-                ? "이미지 위에서 드래그해 자유 올가미로 감싸세요. 손을 떼면 자동으로 닫힙니다."
-                : activeTool
-                  ? "이미지 위에서 드래그해 영역을 그리세요. 점선 선택 경계가 영역을 표시합니다."
-                  : "도구를 켜고 이미지 위에서 드래그(또는 다각형 올가미는 클릭)하면 픽셀을 선택할 수 있습니다."}
+        {busy
+          ? activeTool
+            ? "픽셀 작업을 적용하는 중이에요. 새 작업은 잠겼지만 현재 선택 도구는 종료할 수 있습니다."
+            : "픽셀 작업을 적용하는 중이에요. 완료될 때까지 다른 선택 작업은 잠시 기다려 주세요."
+          : usable
+            ? `영역 ${subpathCount}개 · 페더 ${selection!.featherPx}px${selection!.invert ? " · 반전" : ""}`
+            : activeTool === "poly-lasso"
+              ? polyLassoPointCount > 0
+                ? `꼭짓점 ${polyLassoPointCount}개 · 더블클릭 또는 Enter로 닫기 · Esc 취소`
+                : "이미지 위를 클릭해 꼭짓점을 찍으세요. 더블클릭/Enter로 닫습니다."
+              : activeTool === "brush"
+                ? "이미지 위를 붓으로 칠하면 칠한 자리가 선택됩니다."
+                : activeTool === "lasso"
+                  ? "이미지 위에서 드래그해 자유 올가미로 감싸세요. 손을 떼면 자동으로 닫힙니다."
+                  : activeTool
+                    ? "이미지 위에서 드래그해 영역을 그리세요. 점선 선택 경계가 영역을 표시합니다."
+                    : "도구를 켜고 이미지 위에서 드래그(또는 다각형 올가미는 클릭)하면 픽셀을 선택할 수 있습니다."}
       </p>
 
       <div className="space-y-1.5 border-t border-line/40 pt-2">
@@ -1234,6 +1273,7 @@ export function StudioSelectionToolsPanel({
             step={SELECTION_BRIGHTNESS_RANGE.step}
             value={brightness}
             onChange={setBrightness}
+            disabled={busy}
             readout={String(brightness)}
           />
           <StudioToolHintTarget
@@ -1266,6 +1306,7 @@ export function StudioSelectionToolsPanel({
             step={SELECTION_HUE_RANGE.step}
             value={hue}
             onChange={setHue}
+            disabled={busy}
             readout={`${hue}°`}
           />
           <StudioToolHintTarget
@@ -1367,6 +1408,6 @@ export function StudioSelectionToolsPanel({
           </div>
         ) : null}
       </div>
-    </div>
+    </section>
   );
 }

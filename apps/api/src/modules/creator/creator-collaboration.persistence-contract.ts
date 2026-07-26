@@ -30,6 +30,16 @@ export interface CreatorCollaborationWorkRecord {
   title: string;
   createdAt: Date | null;
   updatedAt: Date | null;
+  status?: string;
+  hidden?: boolean;
+  /**
+   * Present only when the work is backed by the lazy save-before-collaboration marker.
+   * Older/in-memory persistence adapters may omit both fields and are treated as ordinary saved
+   * works; the production Drizzle adapter always projects explicit nulls for that case.
+   */
+  draftCollaborationStatus?: string | null;
+  draftCollaborationExpiresAt?: Date | null;
+  draftCollaborationOwnerUserId?: string | null;
 }
 
 export interface CreatorSharedWorkRecord {

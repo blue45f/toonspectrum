@@ -55,9 +55,12 @@ export function StudioCropPanel({
         <p className="text-[0.72rem] font-semibold text-fg-3 uppercase tracking-wider">크롭</p>
         <StudioToggleChip
           active={active}
+          disabled={busy}
           onClick={onToggle}
           title={
-            active
+            busy
+              ? "현재 크롭을 적용하는 중입니다."
+              : active
               ? "크롭 모드를 끕니다(조절 중인 영역은 버려집니다)."
               : "크롭 모드를 켜고 이미지에서 남길 영역을 조절합니다."
           }
@@ -79,8 +82,9 @@ export function StudioCropPanel({
                 <StudioToggleChip
                   key={a.id}
                   active={aspect === a.id}
+                  disabled={busy}
                   onClick={() => onAspectChange(a.id)}
-                  title={a.tip}
+                  title={busy ? "현재 크롭을 적용하는 중입니다." : a.tip}
                 >
                   {a.label}
                 </StudioToggleChip>

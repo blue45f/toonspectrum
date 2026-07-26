@@ -39,6 +39,7 @@ import {
   StudioToolbarCluster,
   StudioToolbarDivider,
 } from "./studio-chrome-ui";
+import { writeStudioInsertDragPayload } from "./studio-insert-drag-writer";
 import {
   preloadStudioAssetMenuPanel,
   preloadStudioPaletteLibraryPanel,
@@ -468,7 +469,7 @@ export interface StudioToolBeltContentHandlers {
     aiProvenance?: StudioPublishAiProvenance,
     isAnimatedGif?: boolean,
     elementPatch?: Partial<ImageEl> & { name?: string }
-  ) => void;
+  ) => boolean;
   addSceneTemplate: (template: SceneTemplate) => Promise<void>;
   addSfxPreset: (preset: SfxPreset) => Promise<void>;
   addSpeedLines: () => void;
@@ -486,6 +487,7 @@ export interface StudioToolBeltContentHandlers {
   applyTemplate: (tpl: TemplateSpec) => void;
   beginTrackedStudioAiOperation: (scope: string, input: Omit<StudioAiPendingOperationInput, "id">) => string;
   deleteClip: (id: string) => Promise<void>;
+  disarmAllPixelTools: () => void;
   ensureRecentColorsLoaded: () => void;
   enterCanvasOnlyMode: () => void;
   executeSuggestColorPalette: () => Promise<void>;
@@ -809,6 +811,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     addDiagonalSplit,
     addFrame,
     addText,
+    disarmAllPixelTools,
     ensureRecentColorsLoaded,
     enterCanvasOnlyMode,
     fitCanvasToWidth,
@@ -973,7 +976,16 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
         <StudioToolbarDivider label="도구" className="lg:hidden" />
         <StudioToolbarCluster label="그리기 도구" className="lg:hidden">
         <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.select}>
-          <button type="button" onClick={() => setTool("select")} className={toolBtn(tool === "select")} aria-pressed={tool === "select"}>
+          <button
+            type="button"
+            onClick={() => {
+              disarmAllPixelTools();
+              setTool("select");
+              setMenu(null);
+            }}
+            className={toolBtn(tool === "select")}
+            aria-pressed={tool === "select"}
+          >
             <MousePointer2 size={15} aria-hidden /> 선택
           </button>
         </StudioToolBeltHintTarget>
@@ -986,6 +998,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             type="button"
             disabled={activeSurfaceReviewLocked}
             onClick={() => {
+              disarmAllPixelTools();
               setTool("draw");
               setDrawMode("pen");
               setMenu(null);
@@ -1005,6 +1018,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             type="button"
             disabled={activeSurfaceReviewLocked}
             onClick={() => {
+              disarmAllPixelTools();
               setTool("draw");
               setDrawMode("eraser");
               setMenu(null);
@@ -1237,8 +1251,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             onClick={() => addText()}
             draggable
             onDragStart={(event) => {
-              event.dataTransfer.setData("application/json-insert", JSON.stringify({ kind: "text" }));
-              event.dataTransfer.effectAllowed = "copy";
+              writeStudioInsertDragPayload(event.dataTransfer, { kind: "text" });
             }}
             className={toolBtn(false)}
           >

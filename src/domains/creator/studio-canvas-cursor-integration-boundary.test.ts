@@ -115,18 +115,32 @@ describe("Studio canvas cursor integration boundary", () => {
     expect(globalsSource).toContain('9 9, crosshair !important');
   });
 
-  it.each(["tool-select", "tool-pen", "tool-eraser", "tool-pixel"])(
-    "disarms transient editing tools before the %s shortcut changes the base tool",
-    (shortcut) => {
+  it.each([
+    ["tool-select", 'activatePrimaryCanvasTool("select");'],
+    ["tool-pen", 'activatePrimaryCanvasTool("draw", "pen");'],
+    ["tool-eraser", 'activatePrimaryCanvasTool("draw", "eraser");'],
+    ["tool-pixel", 'activatePrimaryCanvasTool("draw", "pixel");'],
+  ])(
+    "routes the %s shortcut through the stroke-safe primary tool transition",
+    (shortcut, expectedTransition) => {
       const shortcutStart = studioPageSource.indexOf(`matchStudioShortcut(sc["${shortcut}"], e)`);
       expect(shortcutStart).toBeGreaterThan(-1);
       const shortcutBlock = studioPageSource.slice(shortcutStart, shortcutStart + 360);
-      expect(shortcutBlock.indexOf("disarmAllPixelTools();")).toBeGreaterThan(-1);
-      expect(shortcutBlock.indexOf("disarmAllPixelTools();")).toBeLessThan(
-        shortcutBlock.indexOf("setTool(")
-      );
+      expect(shortcutBlock).toContain(expectedTransition);
+      expect(shortcutBlock).not.toContain("setTool(");
     }
   );
+
+  it("keeps transient disarm inside the shared primary tool transition", () => {
+    const transition = studioPageSourceBetween(
+      "function activatePrimaryCanvasTool(",
+      "function readActiveStrokeLifecycleRecovery()",
+    );
+
+    expect(transition).toContain("executeStudioPrimaryCanvasToolTransition(");
+    expect(transition).toContain("cancelActiveStroke: discardDrawingPointerSession,");
+    expect(transition).toContain("disarm: disarmAllPixelTools,");
+  });
 
   it("lets guide handles restore the inherited mode cursor after hover", () => {
     for (const source of [perspectiveSource, isometricSource, guideSource]) {

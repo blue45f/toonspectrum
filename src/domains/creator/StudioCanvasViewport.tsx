@@ -257,6 +257,7 @@ export interface StudioCanvasViewportHandlers {
   onWrapMouseMove: (e: React.MouseEvent) => void;
   onWrapMouseUp: () => void;
   openFeatureTutorial: (tutorialId?: string | null) => void;
+  openQuickComicWizard: () => void;
   openQuickStartMenu: (nextMenu: Extract<StudioMenu, "template" | "char" | "bubble">) => void;
   patchDialogueText: (pageId: string, elId: string, text: string) => void;
   patchEl: (id: string, patch: Partial<El>) => void;
@@ -917,6 +918,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     onWrapMouseMove,
     onWrapMouseUp,
     openFeatureTutorial,
+    openQuickComicWizard,
     openQuickStartMenu,
     patchDialogueText,
     patchElCoalesced,
@@ -2733,6 +2735,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             <Suspense fallback={null}>
               <QuickStartPanel
               onDismiss={dismissQuickStart}
+              onQuickComic={openQuickComicWizard}
               onExample={() => void startFromExample()}
               onOpenTemplate={() => openQuickStartMenu("template")}
               onOpenCharacter={() => {
@@ -3053,6 +3056,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 onDiscardDraft={() => setTranslateDraft(null)}
                 onSwitchLocale={switchToDialogueLocale}
                 onClose={() => setDialogueTranslateOpen(false)}
+                workScope={workId ?? authorizedWorkAssetScopeId ?? undefined}
               />
             </Suspense>
           )}

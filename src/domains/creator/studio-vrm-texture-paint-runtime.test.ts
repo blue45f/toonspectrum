@@ -4,6 +4,11 @@ import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  computeStudioVrmTextureFillMask,
+  type StudioVrmTextureFillRequest,
+  type StudioVrmTextureFillResult,
+} from "./studio-vrm-texture-fill";
+import {
   getCachedStudioVrmTextureGeometryIndex,
   getStudioVrmTextureGeometryIndex,
   type StudioVrmTextureGeometryIndex,
@@ -17,6 +22,7 @@ import {
   estimateStudioVrmTexturePaintTargetResidentBytes,
   STUDIO_VRM_TEXTURE_PAINT_STANDARD_GEOMETRY_MAX_TRIANGLES,
   stampStudioVrmTexturePaintMaterialLocator,
+  type StudioVrmTextureFillRunner,
   type StudioVrmTexturePaintCanvasFactory,
   type StudioVrmTexturePaintGeometryPrecomputer,
   type StudioVrmTexturePaintImageReader,
@@ -172,6 +178,102 @@ function imageReader(
   });
 }
 
+function deferredImageReader() {
+  let observedSignal: AbortSignal | null = null;
+  let resolveRead: ((image: StudioVrmTexturePaintReadableImage) => void) | null = null;
+  const reader = vi.fn((
+    _texture: THREE.Texture,
+    signal: AbortSignal,
+  ) => new Promise<StudioVrmTexturePaintReadableImage>((resolve, reject) => {
+    observedSignal = signal;
+    resolveRead = resolve;
+    signal.addEventListener(
+      "abort",
+      () => reject(new DOMException("Cancelled", "AbortError")),
+      { once: true },
+    );
+  })) satisfies StudioVrmTexturePaintImageReader;
+  return {
+    reader,
+    get signal(): AbortSignal | null {
+      return observedSignal;
+    },
+    resolve(image: StudioVrmTexturePaintReadableImage): void {
+      if (!resolveRead) throw new Error("Deferred image reader has not started");
+      resolveRead(image);
+    },
+  };
+}
+
+function fillResultForPositions(
+  width: number,
+  height: number,
+  positions: readonly number[],
+  seedRgba: StudioVrmTextureFillResult["seedRgba"] = [0, 0, 0, 0],
+): StudioVrmTextureFillResult {
+  const bitMask = new Uint8Array(Math.ceil((width * height) / 8));
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  for (const position of positions) {
+    bitMask[position >>> 3] = bitMask[position >>> 3]! | (1 << (position & 7));
+    const x = position % width;
+    const y = Math.floor(position / width);
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  }
+  return {
+    bitMask,
+    bounds: positions.length === 0
+      ? null
+      : {
+          x: minX,
+          y: minY,
+          width: maxX - minX + 1,
+          height: maxY - minY + 1,
+    },
+    matchedCount: positions.length,
+    seedRgba,
+  };
+}
+
+function deferredFillRunner() {
+  let resolveRun:
+    | ((value: Awaited<ReturnType<StudioVrmTextureFillRunner>>) => void)
+    | null = null;
+  let rejectRun: ((reason?: unknown) => void) | null = null;
+  let observedRequest: StudioVrmTextureFillRequest | null = null;
+  let observedSignal: AbortSignal | undefined;
+  const runner = vi.fn<StudioVrmTextureFillRunner>((request, options) => {
+    observedRequest = request;
+    observedSignal = options?.signal;
+    return new Promise((resolve, reject) => {
+      resolveRun = resolve;
+      rejectRun = reject;
+    });
+  });
+  return {
+    runner,
+    get request(): StudioVrmTextureFillRequest | null {
+      return observedRequest;
+    },
+    get signal(): AbortSignal | undefined {
+      return observedSignal;
+    },
+    resolve(result: StudioVrmTextureFillResult): void {
+      if (!resolveRun) throw new Error("Deferred fill runner has not started");
+      resolveRun({ execution: "worker", result });
+    },
+    reject(error: unknown): void {
+      if (!rejectRun) throw new Error("Deferred fill runner has not started");
+      rejectRun(error);
+    },
+  };
+}
+
 function meshWithMap(texture: THREE.Texture) {
   const material = new THREE.MeshBasicMaterial({ map: texture });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
@@ -224,6 +326,1027 @@ describe("Studio VRM texture-paint runtime", () => {
 
     expect(() => stampStudioVrmTexturePaintMaterialLocator(material, 2)).not.toThrow();
     expect(stampStudioVrmTexturePaintMaterialLocator(material, 2)).toBeNull();
+  });
+
+  describe("base-color eyedropper", () => {
+    it("samples an unprepared source without creating a target, history, or content revision", async () => {
+      const source = new THREE.Texture();
+      source.name = "Palette";
+      source.flipY = false;
+      const scene = new THREE.Group();
+      const { material, mesh } = meshWithMap(source);
+      scene.add(mesh);
+      const pixels = Uint8ClampedArray.from([
+        10, 20, 30, 40,
+        50, 60, 70, 80,
+        90, 100, 110, 120,
+        130, 140, 150, 160,
+      ]);
+      const canvas = canvasHarness();
+      const reader = imageReader(new Map([[source, readable(2, 2, pixels)]]));
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        createCanvas: canvas.createCanvas,
+        readTextureImage: reader,
+      });
+      const revisionBefore = runtime.getContentRevision();
+
+      const sampled = unwrap(await runtime.sampleBaseColor({
+        hit: hit(mesh, 0.25, 0.25),
+      }));
+
+      expect(sampled).toEqual({
+        color: "#0a141e",
+        rgba: { r: 10, g: 20, b: 30, a: 40 },
+        texel: { x: 0, y: 0 },
+        sourceTextureUuid: source.uuid,
+        sourceName: "Palette",
+        targetId: null,
+      });
+      expect(reader).toHaveBeenCalledOnce();
+      expect(canvas.createCanvas).not.toHaveBeenCalled();
+      expect(material.map).toBe(source);
+      expect(runtime.getContentRevision()).toBe(revisionBefore);
+      expect(runtime.getSnapshot()).toMatchObject({
+        status: "idle",
+        activeTarget: null,
+        activeTargetId: null,
+        targets: [],
+        history: { undoCount: 0, redoCount: 0, retainedBytes: 0 },
+        error: null,
+      });
+      expect(unwrap(runtime.exportPaintedTargets())).toEqual([]);
+    });
+
+    it("samples the latest prepared editable pixels without changing history or revision", async () => {
+      const source = new THREE.Texture();
+      source.name = "Coat";
+      source.flipY = false;
+      const scene = new THREE.Group();
+      const { material, mesh } = meshWithMap(source);
+      const binding = stampStudioVrmTexturePaintMaterialLocator(material, 5);
+      if (!binding) throw new Error("binding");
+      scene.add(mesh);
+      const original = rgba(2, 2, [1, 2, 3, 255]);
+      const painted = Uint8ClampedArray.from([
+        7, 8, 9, 10,
+        21, 22, 23, 24,
+        31, 32, 33, 34,
+        41, 42, 43, 44,
+      ]);
+      const canvas = canvasHarness();
+      const reader = imageReader(new Map([[source, readable(2, 2, original)]]));
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        createCanvas: canvas.createCanvas,
+        readTextureImage: reader,
+      });
+      unwrap(await runtime.rehydrateTarget({
+        binding,
+        image: readable(2, 2, painted),
+      }));
+      const revisionBefore = runtime.getContentRevision();
+      const historyBefore = runtime.getSnapshot().history;
+
+      const sampled = unwrap(await runtime.sampleBaseColor({
+        hit: hit(mesh, 0.25, 0.25),
+      }));
+
+      expect(sampled).toMatchObject({
+        color: "#070809",
+        rgba: { r: 7, g: 8, b: 9, a: 10 },
+        texel: { x: 0, y: 0 },
+        targetId: `vrm-texture:${source.uuid}`,
+      });
+      expect(reader).toHaveBeenCalledOnce();
+      expect(canvas.canvases[0]?.frame).toEqual(painted);
+      expect(runtime.getContentRevision()).toBe(revisionBefore);
+      expect(runtime.getSnapshot().history).toEqual(historyBefore);
+      expect(runtime.getSnapshot()).toMatchObject({
+        status: "ready",
+        activeTargetId: `vrm-texture:${source.uuid}`,
+        history: { undoCount: 0, redoCount: 0, retainedBytes: 0 },
+        error: null,
+      });
+    });
+
+    it("uses uv1 when the base-color texture selects channel one", async () => {
+      const source = new THREE.Texture();
+      source.flipY = false;
+      source.channel = 1;
+      const scene = new THREE.Group();
+      const { mesh } = meshWithMap(source);
+      scene.add(mesh);
+      const pixels = Uint8ClampedArray.from([
+        11, 12, 13, 14,
+        21, 22, 23, 24,
+        31, 32, 33, 34,
+        41, 42, 43, 44,
+      ]);
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        readTextureImage: imageReader(new Map([[source, readable(2, 2, pixels)]])),
+      });
+
+      const sampled = unwrap(await runtime.sampleBaseColor({
+        hit: {
+          object: mesh,
+          uv: new THREE.Vector2(0.75, 0.75),
+          uv1: new THREE.Vector2(0.25, 0.25),
+          face: { materialIndex: 0 },
+        },
+      }));
+
+      expect(sampled).toMatchObject({
+        color: "#0b0c0d",
+        rgba: { r: 11, g: 12, b: 13, a: 14 },
+        texel: { x: 0, y: 0 },
+      });
+    });
+
+    it("applies the texture matrix before independent repeat-U and mirrored-V wrapping", async () => {
+      const source = new THREE.Texture();
+      source.flipY = false;
+      source.wrapS = THREE.RepeatWrapping;
+      source.wrapT = THREE.MirroredRepeatWrapping;
+      source.matrixAutoUpdate = false;
+      source.matrix.set(
+        1, 0, 0.5,
+        0, 1, 0,
+        0, 0, 1,
+      );
+      const scene = new THREE.Group();
+      const { mesh } = meshWithMap(source);
+      scene.add(mesh);
+      const pixels = Uint8ClampedArray.from([
+        10, 20, 30, 40,
+        50, 60, 70, 80,
+        90, 100, 110, 120,
+        130, 140, 150, 160,
+      ]);
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        readTextureImage: imageReader(new Map([[source, readable(2, 2, pixels)]])),
+      });
+
+      const sampled = unwrap(await runtime.sampleBaseColor({
+        hit: hit(mesh, 0.75, 1.25),
+      }));
+
+      expect(sampled).toMatchObject({
+        color: "#5a646e",
+        rgba: { r: 90, g: 100, b: 110, a: 120 },
+        texel: { x: 0, y: 1 },
+      });
+    });
+
+    it("normalizes flipY source rows before resolving the sampled texel", async () => {
+      const source = new THREE.Texture();
+      source.flipY = true;
+      const scene = new THREE.Group();
+      const { mesh } = meshWithMap(source);
+      scene.add(mesh);
+      const pixels = Uint8ClampedArray.from([
+        200, 10, 20, 255,
+        20, 30, 220, 128,
+      ]);
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        readTextureImage: imageReader(new Map([[source, readable(1, 2, pixels)]])),
+      });
+
+      const sampled = unwrap(await runtime.sampleBaseColor({
+        hit: hit(mesh, 0.5, 0.25),
+      }));
+
+      expect(sampled).toMatchObject({
+        color: "#141edc",
+        rgba: { r: 20, g: 30, b: 220, a: 128 },
+        texel: { x: 0, y: 0 },
+      });
+    });
+
+    it("fails closed for pre-aborted and in-flight aborted source reads", async () => {
+      const preAbortedSource = new THREE.Texture();
+      preAbortedSource.flipY = false;
+      const preAbortedScene = new THREE.Group();
+      const preAbortedMesh = meshWithMap(preAbortedSource);
+      preAbortedScene.add(preAbortedMesh.mesh);
+      const preAbortedReader = vi.fn(() => readable(2, 2));
+      const preAbortedRuntime = createStudioVrmTexturePaintRuntime(preAbortedScene, {
+        readTextureImage: preAbortedReader,
+      });
+      const preAbortedController = new AbortController();
+      preAbortedController.abort();
+
+      expectFailure(await preAbortedRuntime.sampleBaseColor({
+        hit: hit(preAbortedMesh.mesh),
+        signal: preAbortedController.signal,
+      }), "source-read-aborted");
+      expect(preAbortedReader).not.toHaveBeenCalled();
+
+      const source = new THREE.Texture();
+      source.flipY = false;
+      const scene = new THREE.Group();
+      const { material, mesh } = meshWithMap(source);
+      scene.add(mesh);
+      const deferred = deferredImageReader();
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        readTextureImage: deferred.reader,
+      });
+      const controller = new AbortController();
+      const pending = runtime.sampleBaseColor({
+        hit: hit(mesh),
+        signal: controller.signal,
+      });
+      expect(runtime.getSnapshot()).toMatchObject({ status: "loading", activePointerId: null });
+
+      controller.abort();
+
+      expectFailure(await pending, "source-read-aborted");
+      expect(deferred.signal?.aborted).toBe(true);
+      expect(material.map).toBe(source);
+      expect(runtime.getContentRevision()).toBe(0);
+      expect(runtime.getSnapshot()).toMatchObject({
+        status: "idle",
+        targets: [],
+        history: { undoCount: 0, redoCount: 0, retainedBytes: 0 },
+        error: { code: "source-read-aborted" },
+      });
+    });
+
+    const staleMutations: ReadonlyArray<readonly [
+      string,
+      (context: {
+        readonly material: THREE.MeshBasicMaterial;
+        readonly source: THREE.Texture;
+      }) => void,
+    ]> = [
+      [
+        "material map",
+        ({ material }) => {
+          material.map = new THREE.Texture();
+        },
+      ],
+      [
+        "texture transform",
+        ({ source }) => {
+          source.offset.set(0.25, 0.125);
+        },
+      ],
+      [
+        "image identity",
+        ({ source }) => {
+          source.image = { width: 2, height: 2, generation: 2 };
+        },
+      ],
+      [
+        "texture version",
+        ({ source }) => {
+          source.needsUpdate = true;
+        },
+      ],
+      [
+        "sampler flags",
+        ({ source }) => {
+          source.wrapS = THREE.RepeatWrapping;
+          source.flipY = true;
+        },
+      ],
+    ];
+
+    it.each(staleMutations)(
+      "rejects a stale asynchronous sample after %s changes",
+      async (_label, mutate) => {
+        const source = new THREE.Texture();
+        source.flipY = false;
+        const scene = new THREE.Group();
+        const { material, mesh } = meshWithMap(source);
+        scene.add(mesh);
+        const deferred = deferredImageReader();
+        const runtime = createStudioVrmTexturePaintRuntime(scene, {
+          readTextureImage: deferred.reader,
+        });
+        const pending = runtime.sampleBaseColor({
+          hit: hit(mesh, 0.25, 0.25),
+        });
+
+        mutate({ material, source });
+        deferred.resolve(readable(2, 2, rgba(2, 2, [9, 8, 7, 255])));
+
+        expectFailure(await pending, "source-changed");
+        expect(runtime.getContentRevision()).toBe(0);
+        expect(runtime.getSnapshot()).toMatchObject({
+          status: "idle",
+          activeTarget: null,
+          targets: [],
+          history: { undoCount: 0, redoCount: 0, retainedBytes: 0 },
+          error: { code: "source-changed" },
+        });
+      },
+    );
+
+    it("serializes mutations behind sampling and aborts the reader on dispose", async () => {
+      const source = new THREE.Texture();
+      source.flipY = false;
+      const scene = new THREE.Group();
+      const { material, mesh } = meshWithMap(source);
+      scene.add(mesh);
+      const deferred = deferredImageReader();
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        readTextureImage: deferred.reader,
+      });
+      const pending = runtime.sampleBaseColor({ hit: hit(mesh) });
+
+      expect(runtime.getSnapshot()).toMatchObject({ status: "loading" });
+      expectFailure(runtime.exportPaintedTargets(), "pointer-active");
+      expectFailure(runtime.undo(), "pointer-active");
+      expectFailure(runtime.redo(), "pointer-active");
+      expectFailure(runtime.resetActiveTarget(), "pointer-active");
+      expectFailure(await runtime.beginStroke({
+        pointerId: 90,
+        hit: hit(mesh),
+        style: INK,
+      }), "pointer-active");
+
+      runtime.dispose();
+
+      expect(deferred.signal?.aborted).toBe(true);
+      expectFailure(await pending, "disposed");
+      expect(material.map).toBe(source);
+      expect(runtime.getContentRevision()).toBe(0);
+      expect(runtime.getSnapshot()).toMatchObject({
+        status: "disposed",
+        targets: [],
+        history: { undoCount: 0, redoCount: 0, retainedBytes: 0 },
+      });
+    });
+  });
+
+  describe("base-color ColorDrop", () => {
+    it("fills a prepared contiguous selection, preserves alpha, and records one atomic undo step", async () => {
+      const source = new THREE.Texture();
+      source.flipY = false;
+      const scene = new THREE.Group();
+      const { material, mesh } = meshWithMap(source);
+      const binding = stampStudioVrmTexturePaintMaterialLocator(material, 0);
+      if (!binding) throw new Error("binding");
+      scene.add(mesh);
+      const original = Uint8ClampedArray.from([
+        1, 2, 3, 10,
+        250, 200, 150, 20,
+        90, 80, 70, 30,
+        0, 255, 0, 40,
+      ]);
+      const canvas = canvasHarness();
+      const reader = imageReader(new Map([[source, readable(2, 2, original)]]));
+      const runTextureFill = vi.fn<StudioVrmTextureFillRunner>(async (request) => ({
+        execution: "worker",
+        result: computeStudioVrmTextureFillMask(request),
+      }));
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        createCanvas: canvas.createCanvas,
+        readTextureImage: reader,
+        runTextureFill,
+      });
+      unwrap(await runtime.rehydrateTarget({
+        binding,
+        image: readable(2, 2, original),
+      }));
+      const revisionBefore = runtime.getContentRevision();
+
+      expect(unwrap(await runtime.fillBaseColor({
+        hit: hit(mesh, 0.25, 0.25),
+        color: "#a1b2c3",
+        tolerance: 255,
+        scope: "contiguous",
+      }))).toBe(true);
+
+      expect(reader).toHaveBeenCalledOnce();
+      expect(runTextureFill).toHaveBeenCalledOnce();
+      expect(runTextureFill.mock.calls[0]?.[0]).toMatchObject({
+        width: 2,
+        height: 2,
+        seed: { x: 0, y: 0 },
+        tolerance: 255,
+        scope: "contiguous",
+      });
+      const filled = Uint8ClampedArray.from(original);
+      for (let offset = 0; offset < filled.length; offset += 4) {
+        filled.set([0xa1, 0xb2, 0xc3], offset);
+      }
+      expect(canvas.canvases[0]?.frame).toEqual(filled);
+      expect([
+        canvas.canvases[0]?.frame[3],
+        canvas.canvases[0]?.frame[7],
+        canvas.canvases[0]?.frame[11],
+        canvas.canvases[0]?.frame[15],
+      ]).toEqual([10, 20, 30, 40]);
+      expect(canvas.canvases[0]?.dirtyRects.at(-1)).toEqual({
+        x: 0,
+        y: 0,
+        width: 2,
+        height: 2,
+      });
+      const historyAfterFill = runtime.getSnapshot().history;
+      expect(historyAfterFill).toMatchObject({
+        undoCount: 1,
+        redoCount: 0,
+      });
+      expect(historyAfterFill.retainedBytes).toBeGreaterThan(0);
+      expect(runtime.getContentRevision()).toBe(revisionBefore + 1);
+
+      expect(unwrap(runtime.undo())).toBe(true);
+      expect(canvas.canvases[0]?.frame).toEqual(original);
+      expect(runtime.getSnapshot().history).toMatchObject({
+        undoCount: 0,
+        redoCount: 1,
+        retainedBytes: historyAfterFill.retainedBytes,
+      });
+      expect(unwrap(runtime.redo())).toBe(true);
+      expect(canvas.canvases[0]?.frame).toEqual(filled);
+      expect(runtime.getSnapshot().history).toMatchObject({
+        undoCount: 1,
+        redoCount: 0,
+        retainedBytes: historyAfterFill.retainedBytes,
+      });
+      expect(runtime.getContentRevision()).toBe(revisionBefore + 3);
+    });
+
+    it("fills non-contiguous matches across the whole material", async () => {
+      const source = new THREE.Texture();
+      source.flipY = false;
+      const scene = new THREE.Group();
+      const { material, mesh } = meshWithMap(source);
+      scene.add(mesh);
+      const original = Uint8ClampedArray.from([
+        10, 20, 30, 101,
+        70, 80, 90, 102,
+        100, 110, 120, 103,
+        10, 20, 30, 101,
+      ]);
+      const canvas = canvasHarness();
+      const runTextureFill = vi.fn<StudioVrmTextureFillRunner>(async (request) => ({
+        execution: "worker",
+        result: computeStudioVrmTextureFillMask(request),
+      }));
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        createCanvas: canvas.createCanvas,
+        readTextureImage: imageReader(new Map([[source, readable(2, 2, original)]])),
+        runTextureFill,
+      });
+
+      expect(unwrap(await runtime.fillBaseColor({
+        hit: hit(mesh, 0.25, 0.25),
+        color: "#112233",
+        tolerance: 0,
+        scope: "whole-material",
+      }))).toBe(true);
+
+      expect(runTextureFill.mock.calls[0]?.[0]).toMatchObject({
+        seed: { x: 0, y: 0 },
+        tolerance: 0,
+        scope: "whole-material",
+      });
+      expect(canvas.canvases[0]?.frame).toEqual(Uint8ClampedArray.from([
+        0x11, 0x22, 0x33, 101,
+        70, 80, 90, 102,
+        100, 110, 120, 103,
+        0x11, 0x22, 0x33, 101,
+      ]));
+      expect(material.map).toBeInstanceOf(THREE.CanvasTexture);
+      expect(runtime.getSnapshot()).toMatchObject({
+        activeOperation: null,
+        history: { undoCount: 1, redoCount: 0 },
+        targets: [expect.objectContaining({ width: 2, height: 2 })],
+      });
+    });
+
+    it("keeps an unprepared source unbound until Worker success and gates every competing mutation", async () => {
+      const source = new THREE.Texture();
+      source.flipY = false;
+      const scene = new THREE.Group();
+      const { material, mesh } = meshWithMap(source);
+      const binding = stampStudioVrmTexturePaintMaterialLocator(material, 3);
+      if (!binding) throw new Error("binding");
+      scene.add(mesh);
+      const canvas = canvasHarness();
+      const deferred = deferredFillRunner();
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        createCanvas: canvas.createCanvas,
+        readTextureImage: imageReader(new Map([[
+          source,
+          readable(2, 2, rgba(2, 2, [10, 20, 30, 255])),
+        ]])),
+        runTextureFill: deferred.runner,
+      });
+      const pending = runtime.fillBaseColor({
+        hit: hit(mesh, 0.25, 0.25),
+        color: "#abcdef",
+        tolerance: 0,
+        scope: "contiguous",
+      });
+      await vi.waitFor(() => expect(deferred.runner).toHaveBeenCalledOnce());
+
+      expect(deferred.request).toMatchObject({
+        width: 2,
+        height: 2,
+        seed: { x: 0, y: 0 },
+      });
+      expect(material.map).toBe(source);
+      expect(canvas.createCanvas).not.toHaveBeenCalled();
+      expect(runtime.getSnapshot()).toMatchObject({
+        status: "loading",
+        activeOperation: "fill",
+        activePointerId: null,
+        targets: [],
+        history: { undoCount: 0, redoCount: 0, retainedBytes: 0 },
+      });
+      expectFailure(runtime.exportPaintedTargets(), "pointer-active");
+      expectFailure(runtime.undo(), "pointer-active");
+      expectFailure(runtime.redo(), "pointer-active");
+      expectFailure(runtime.resetActiveTarget(), "pointer-active");
+      expectFailure(await runtime.sampleBaseColor({ hit: hit(mesh) }), "pointer-active");
+      expectFailure(await runtime.fillBaseColor({
+        hit: hit(mesh),
+        color: "#ffffff",
+        tolerance: 0,
+        scope: "contiguous",
+      }), "pointer-active");
+      expectFailure(await runtime.beginStroke({
+        pointerId: 501,
+        hit: hit(mesh),
+        style: INK,
+      }), "pointer-active");
+      expectFailure(await runtime.rehydrateTarget({
+        binding,
+        image: readable(2, 2),
+      }), "pointer-active");
+
+      deferred.resolve(fillResultForPositions(2, 2, [0], [10, 20, 30, 255]));
+
+      expect(unwrap(await pending)).toBe(true);
+      expect(canvas.createCanvas).toHaveBeenCalledOnce();
+      expect(material.map).toBeInstanceOf(THREE.CanvasTexture);
+      expect(runtime.getSnapshot()).toMatchObject({
+        status: "ready",
+        activeOperation: null,
+        activePointerId: null,
+        history: { undoCount: 1, redoCount: 0 },
+        error: null,
+      });
+    });
+
+    it("does not allocate, bind, revise, or record history for an RGB no-op", async () => {
+      const source = new THREE.Texture();
+      source.flipY = false;
+      const scene = new THREE.Group();
+      const { material, mesh } = meshWithMap(source);
+      scene.add(mesh);
+      const canvas = canvasHarness();
+      const runTextureFill = vi.fn<StudioVrmTextureFillRunner>(async () => ({
+        execution: "worker",
+        result: fillResultForPositions(2, 2, [0, 1, 2, 3], [0x11, 0x22, 0x33, 77]),
+      }));
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        createCanvas: canvas.createCanvas,
+        readTextureImage: imageReader(new Map([[
+          source,
+          readable(2, 2, rgba(2, 2, [0x11, 0x22, 0x33, 77])),
+        ]])),
+        runTextureFill,
+      });
+
+      expect(unwrap(await runtime.fillBaseColor({
+        hit: hit(mesh),
+        color: "#112233",
+        tolerance: 32,
+        scope: "contiguous",
+      }))).toBe(false);
+
+      expect(runTextureFill).toHaveBeenCalledOnce();
+      expect(canvas.createCanvas).not.toHaveBeenCalled();
+      expect(material.map).toBe(source);
+      expect(runtime.getContentRevision()).toBe(0);
+      expect(runtime.getSnapshot()).toMatchObject({
+        status: "idle",
+        activeOperation: null,
+        activeTarget: null,
+        targets: [],
+        history: { undoCount: 0, redoCount: 0, retainedBytes: 0 },
+        error: null,
+      });
+    });
+
+    it.each([
+      [
+        "unavailable",
+        () => new DOMException("Worker unavailable", "NotSupportedError"),
+        "fill-worker-unavailable",
+      ],
+      [
+        "runtime failure",
+        () => new Error("Worker crashed"),
+        "fill-worker-failed",
+      ],
+    ] as const)(
+      "fails closed on Worker %s without creating an unprepared target",
+      async (_label, createError, expectedCode) => {
+        const source = new THREE.Texture();
+        source.flipY = false;
+        const scene = new THREE.Group();
+        const { material, mesh } = meshWithMap(source);
+        scene.add(mesh);
+        const canvas = canvasHarness();
+        const runTextureFill = vi.fn<StudioVrmTextureFillRunner>(async () => {
+          throw createError();
+        });
+        const runtime = createStudioVrmTexturePaintRuntime(scene, {
+          createCanvas: canvas.createCanvas,
+          readTextureImage: imageReader(new Map([[source, readable(2, 2)]])),
+          runTextureFill,
+        });
+
+        expectFailure(await runtime.fillBaseColor({
+          hit: hit(mesh),
+          color: "#abcdef",
+          tolerance: 0,
+          scope: "contiguous",
+        }), expectedCode);
+        expect(runTextureFill).toHaveBeenCalledOnce();
+        expect(canvas.createCanvas).not.toHaveBeenCalled();
+        expect(material.map).toBe(source);
+        expect(runtime.getSnapshot()).toMatchObject({
+          status: "idle",
+          activeOperation: null,
+          targets: [],
+          history: { undoCount: 0, redoCount: 0, retainedBytes: 0 },
+          error: { code: expectedCode },
+        });
+      },
+    );
+
+    it("propagates caller abort to the Worker and releases the fill gate", async () => {
+      const source = new THREE.Texture();
+      source.flipY = false;
+      const scene = new THREE.Group();
+      const { material, mesh } = meshWithMap(source);
+      scene.add(mesh);
+      const canvas = canvasHarness();
+      const deferred = deferredFillRunner();
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        createCanvas: canvas.createCanvas,
+        readTextureImage: imageReader(new Map([[source, readable(2, 2)]])),
+        runTextureFill: deferred.runner,
+      });
+      const controller = new AbortController();
+      const pending = runtime.fillBaseColor({
+        hit: hit(mesh),
+        color: "#abcdef",
+        tolerance: 0,
+        scope: "contiguous",
+        signal: controller.signal,
+      });
+      await vi.waitFor(() => expect(deferred.runner).toHaveBeenCalledOnce());
+
+      controller.abort();
+      expect(deferred.signal?.aborted).toBe(true);
+      deferred.reject(new DOMException("Cancelled", "AbortError"));
+
+      expectFailure(await pending, "source-read-aborted");
+      expect(canvas.createCanvas).not.toHaveBeenCalled();
+      expect(material.map).toBe(source);
+      expect(runtime.getSnapshot()).toMatchObject({
+        status: "idle",
+        activeOperation: null,
+        targets: [],
+        history: { undoCount: 0, redoCount: 0 },
+      });
+    });
+
+    it("aborts a non-cooperative Worker on dispose and quarantines its late success", async () => {
+      const source = new THREE.Texture();
+      source.flipY = false;
+      const scene = new THREE.Group();
+      const { material, mesh } = meshWithMap(source);
+      scene.add(mesh);
+      const canvas = canvasHarness();
+      const deferred = deferredFillRunner();
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        createCanvas: canvas.createCanvas,
+        readTextureImage: imageReader(new Map([[source, readable(2, 2)]])),
+        runTextureFill: deferred.runner,
+      });
+      const pending = runtime.fillBaseColor({
+        hit: hit(mesh),
+        color: "#abcdef",
+        tolerance: 0,
+        scope: "contiguous",
+      });
+      await vi.waitFor(() => expect(deferred.runner).toHaveBeenCalledOnce());
+
+      runtime.dispose();
+      expect(deferred.signal?.aborted).toBe(true);
+      deferred.resolve(fillResultForPositions(2, 2, [0]));
+
+      expectFailure(await pending, "disposed");
+      expect(canvas.createCanvas).not.toHaveBeenCalled();
+      expect(material.map).toBe(source);
+      expect(runtime.getSnapshot()).toMatchObject({
+        status: "disposed",
+        activeOperation: null,
+        targets: [],
+        history: { undoCount: 0, redoCount: 0 },
+      });
+    });
+
+    it("keeps a disposed snapshot clean when a cooperative Worker rejects on abort", async () => {
+      const source = new THREE.Texture();
+      source.flipY = false;
+      const scene = new THREE.Group();
+      const { material, mesh } = meshWithMap(source);
+      scene.add(mesh);
+      const deferred = deferredFillRunner();
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        createCanvas: canvasHarness().createCanvas,
+        readTextureImage: imageReader(new Map([[source, readable(2, 2)]])),
+        runTextureFill: deferred.runner,
+      });
+      const pending = runtime.fillBaseColor({
+        hit: hit(mesh),
+        color: "#abcdef",
+        tolerance: 0,
+        scope: "contiguous",
+      });
+      await vi.waitFor(() => expect(deferred.runner).toHaveBeenCalledOnce());
+
+      runtime.dispose();
+      deferred.reject(new DOMException("Cancelled", "AbortError"));
+
+      expectFailure(await pending, "disposed");
+      expect(material.map).toBe(source);
+      expect(runtime.getSnapshot()).toMatchObject({
+        status: "disposed",
+        activeOperation: null,
+        targets: [],
+        history: { undoCount: 0, redoCount: 0, retainedBytes: 0 },
+        error: null,
+      });
+    });
+
+    it("rejects stale material identity and content revision after Worker completion", async () => {
+      const staleSource = new THREE.Texture();
+      staleSource.flipY = false;
+      const staleScene = new THREE.Group();
+      const staleTarget = meshWithMap(staleSource);
+      staleScene.add(staleTarget.mesh);
+      const staleCanvas = canvasHarness();
+      const staleDeferred = deferredFillRunner();
+      const staleRuntime = createStudioVrmTexturePaintRuntime(staleScene, {
+        createCanvas: staleCanvas.createCanvas,
+        readTextureImage: imageReader(new Map([[staleSource, readable(2, 2)]])),
+        runTextureFill: staleDeferred.runner,
+      });
+      const stalePending = staleRuntime.fillBaseColor({
+        hit: hit(staleTarget.mesh),
+        color: "#abcdef",
+        tolerance: 0,
+        scope: "contiguous",
+      });
+      await vi.waitFor(() => expect(staleDeferred.runner).toHaveBeenCalledOnce());
+      const replacement = new THREE.Texture();
+      staleTarget.material.map = replacement;
+      staleDeferred.resolve(fillResultForPositions(2, 2, [0]));
+
+      expectFailure(await stalePending, "source-changed");
+      expect(staleCanvas.createCanvas).not.toHaveBeenCalled();
+      expect(staleTarget.material.map).toBe(replacement);
+      expect(staleRuntime.getSnapshot()).toMatchObject({
+        targets: [],
+        history: { undoCount: 0, redoCount: 0 },
+      });
+
+      const source = new THREE.Texture();
+      source.flipY = false;
+      const scene = new THREE.Group();
+      const { material, mesh } = meshWithMap(source);
+      const binding = stampStudioVrmTexturePaintMaterialLocator(material, 9);
+      if (!binding) throw new Error("binding");
+      scene.add(mesh);
+      const original = rgba(2, 2, [5, 6, 7, 200]);
+      const canvas = canvasHarness();
+      const deferred = deferredFillRunner();
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        createCanvas: canvas.createCanvas,
+        readTextureImage: imageReader(new Map([[source, readable(2, 2, original)]])),
+        runTextureFill: deferred.runner,
+      });
+      unwrap(await runtime.rehydrateTarget({
+        binding,
+        image: readable(2, 2, original),
+      }));
+      const frameBefore = Uint8ClampedArray.from(canvas.canvases[0]!.frame);
+      const pending = runtime.fillBaseColor({
+        hit: hit(mesh),
+        color: "#abcdef",
+        tolerance: 0,
+        scope: "contiguous",
+      });
+      await vi.waitFor(() => expect(deferred.runner).toHaveBeenCalledOnce());
+      const internal = runtime as unknown as { contentRevision: number };
+      internal.contentRevision += 1;
+      deferred.resolve(fillResultForPositions(2, 2, [0]));
+
+      expectFailure(await pending, "source-changed");
+      expect(canvas.canvases[0]?.frame).toEqual(frameBefore);
+      expect(runtime.getSnapshot()).toMatchObject({
+        activeOperation: null,
+        history: { undoCount: 0, redoCount: 0, retainedBytes: 0 },
+        error: { code: "source-changed" },
+      });
+    });
+
+    it("enforces transient and atomic history budgets before any target mutation", async () => {
+      const transientSource = new THREE.Texture();
+      transientSource.flipY = false;
+      transientSource.image = { width: 4, height: 4 };
+      const transientScene = new THREE.Group();
+      const transientTarget = meshWithMap(transientSource);
+      transientScene.add(transientTarget.mesh);
+      const transientReader = vi.fn(() => readable(4, 4));
+      const transientRunner = vi.fn<StudioVrmTextureFillRunner>(async () => ({
+        execution: "worker",
+        result: fillResultForPositions(4, 4, [0]),
+      }));
+      const transientCanvas = canvasHarness();
+      const transientRuntime = createStudioVrmTexturePaintRuntime(transientScene, {
+        createCanvas: transientCanvas.createCanvas,
+        maxAggregateResidentBytes: 1,
+        readTextureImage: transientReader,
+        runTextureFill: transientRunner,
+      });
+
+      expectFailure(await transientRuntime.fillBaseColor({
+        hit: hit(transientTarget.mesh),
+        color: "#abcdef",
+        tolerance: 0,
+        scope: "contiguous",
+      }), "fill-memory-budget");
+      expect(transientReader).not.toHaveBeenCalled();
+      expect(transientRunner).not.toHaveBeenCalled();
+      expect(transientCanvas.createCanvas).not.toHaveBeenCalled();
+      expect(transientTarget.material.map).toBe(transientSource);
+
+      const historySource = new THREE.Texture();
+      historySource.flipY = false;
+      const historyScene = new THREE.Group();
+      const historyTarget = meshWithMap(historySource);
+      historyScene.add(historyTarget.mesh);
+      const historyCanvas = canvasHarness();
+      const historyRuntime = createStudioVrmTexturePaintRuntime(historyScene, {
+        createCanvas: historyCanvas.createCanvas,
+        maxHistoryBytes: 1,
+        readTextureImage: imageReader(new Map([[historySource, readable(2, 2)]])),
+        runTextureFill: vi.fn(async () => ({
+          execution: "worker" as const,
+          result: fillResultForPositions(2, 2, [0]),
+        })),
+      });
+
+      expectFailure(await historyRuntime.fillBaseColor({
+        hit: hit(historyTarget.mesh, 0.25, 0.25),
+        color: "#abcdef",
+        tolerance: 0,
+        scope: "contiguous",
+      }), "history-budget");
+      expect(historyCanvas.createCanvas).not.toHaveBeenCalled();
+      expect(historyTarget.material.map).toBe(historySource);
+      expect(historyRuntime.getSnapshot()).toMatchObject({
+        targets: [],
+        history: { undoCount: 0, redoCount: 0, retainedBytes: 0 },
+      });
+    });
+
+    it.each([
+      {
+        label: "mask byte length",
+        result: {
+          ...fillResultForPositions(2, 2, [0]),
+          bitMask: new Uint8Array(2),
+        },
+      },
+      {
+        label: "matched count",
+        result: {
+          ...fillResultForPositions(2, 2, [0]),
+          matchedCount: 2,
+        },
+      },
+      {
+        label: "out-of-range bounds",
+        result: {
+          ...fillResultForPositions(2, 2, [0]),
+          bounds: { x: 1, y: 0, width: 2, height: 1 },
+        },
+      },
+      {
+        label: "missing seed RGBA tuple",
+        result: {
+          ...fillResultForPositions(2, 2, [0]),
+          seedRgba: undefined,
+        } as unknown as StudioVrmTextureFillResult,
+      },
+      {
+        label: "set bit outside declared bounds",
+        result: {
+          ...fillResultForPositions(2, 2, [0, 3]),
+          bounds: { x: 0, y: 0, width: 1, height: 1 },
+          matchedCount: 1,
+        },
+      },
+      {
+        label: "padding bit past the texture end",
+        result: {
+          ...fillResultForPositions(2, 2, [0]),
+          bitMask: Uint8Array.of(0b1000_0001),
+        },
+      },
+    ] satisfies ReadonlyArray<{
+      readonly label: string;
+      readonly result: StudioVrmTextureFillResult;
+    }>)("rejects malformed Worker $label without binding a target", async ({ result }) => {
+      const source = new THREE.Texture();
+      source.flipY = false;
+      const scene = new THREE.Group();
+      const { material, mesh } = meshWithMap(source);
+      scene.add(mesh);
+      const canvas = canvasHarness();
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        createCanvas: canvas.createCanvas,
+        readTextureImage: imageReader(new Map([[source, readable(2, 2)]])),
+        runTextureFill: vi.fn(async () => ({
+          execution: "worker" as const,
+          result,
+        })),
+      });
+
+      expectFailure(await runtime.fillBaseColor({
+        hit: hit(mesh, 0.25, 0.25),
+        color: "#abcdef",
+        tolerance: 0,
+        scope: "contiguous",
+      }), "fill-worker-failed");
+      expect(canvas.createCanvas).not.toHaveBeenCalled();
+      expect(material.map).toBe(source);
+      expect(runtime.getSnapshot()).toMatchObject({
+        activeOperation: null,
+        targets: [],
+        history: { undoCount: 0, redoCount: 0, retainedBytes: 0 },
+        error: { code: "fill-worker-failed" },
+      });
+    });
+
+    it("rolls back a custom material map setter that stores the painted map before throwing", async () => {
+      const source = new THREE.Texture();
+      source.flipY = false;
+      const scene = new THREE.Group();
+      const { material, mesh } = meshWithMap(source);
+      scene.add(mesh);
+      let backingMap: THREE.Texture | null = source;
+      let throwAfterNextAssignment = true;
+      Object.defineProperty(material, "map", {
+        configurable: true,
+        get: () => backingMap,
+        set: (next: THREE.Texture | null) => {
+          backingMap = next;
+          if (throwAfterNextAssignment) {
+            throwAfterNextAssignment = false;
+            throw new Error("hostile map setter");
+          }
+        },
+      });
+      const canvas = canvasHarness();
+      const runtime = createStudioVrmTexturePaintRuntime(scene, {
+        createCanvas: canvas.createCanvas,
+        readTextureImage: imageReader(new Map([[source, readable(2, 2)]])),
+        runTextureFill: vi.fn(async () => ({
+          execution: "worker" as const,
+          result: fillResultForPositions(2, 2, [0]),
+        })),
+      });
+
+      expectFailure(await runtime.fillBaseColor({
+        hit: hit(mesh, 0.25, 0.25),
+        color: "#abcdef",
+        tolerance: 0,
+        scope: "contiguous",
+      }), "source-changed");
+
+      expect(material.map).toBe(source);
+      expect(backingMap).toBe(source);
+      expect(canvas.canvases[0]?.closeCount).toBe(1);
+      expect(runtime.getSnapshot()).toMatchObject({
+        targets: [],
+        aggregateRgbaBytes: 0,
+        aggregateTargetResidentBytes: 0,
+        history: { undoCount: 0, redoCount: 0, retainedBytes: 0 },
+      });
+    });
   });
 
   it("exports only changed targets with stable sorted glTF bindings and exact RGBA", async () => {
@@ -1003,7 +2126,7 @@ describe("Studio VRM texture-paint runtime", () => {
       "utf8",
     );
     const activeStart = source.indexOf("interface ActiveStroke {");
-    const activeEnd = source.indexOf("interface HistoryRecord", activeStart);
+    const activeEnd = source.indexOf("interface PendingColorSample", activeStart);
     const applyStart = source.indexOf("private applyIncrementalSample(");
     const applyEnd = source.indexOf("private rollbackActiveStroke(", applyStart);
 

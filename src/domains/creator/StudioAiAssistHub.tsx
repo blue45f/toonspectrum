@@ -7,16 +7,19 @@
  */
 import {
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   Clapperboard,
   ImageIcon,
   MessageCircle,
   Palette,
+  ShieldCheck,
   Settings2,
+  TriangleAlert,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
-import { useRef } from "react";
+import { useId, useRef } from "react";
 
 import {
   presetsForAssistTool,
@@ -25,6 +28,7 @@ import {
   type StudioAiAssistToolId,
   type StudioAiRecentPromptsState,
 } from "./studio-ai-assist-ux";
+import { planStudioAiExecutionPreflight } from "./studio-ai-execution-preflight";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 
 import type { ReactElement, ReactNode } from "react";
@@ -74,14 +78,17 @@ export function StudioAiAssistHub({
   className,
 }: StudioAiAssistHubProps): ReactElement {
   const toolPanelRef = useRef<HTMLDivElement>(null);
+  const preflightDetailsId = useId();
   const toolMeta = STUDIO_AI_ASSIST_TOOLS.find((t) => t.id === activeTool) ?? STUDIO_AI_ASSIST_TOOLS[0]!;
   const presets = presetsForAssistTool(activeTool);
   const recents = recentPromptsForTool(recentState, activeTool, 3);
-  const toolReady = toolMeta.needsImageApi
-    ? imageConfigured
-    : toolMeta.needsTextApi
-      ? textConfigured
-      : true;
+  const executionPreflight = planStudioAiExecutionPreflight({
+    activeTool,
+    imageConfigured,
+    textConfigured,
+    connectionLabel,
+    connectionOk,
+  });
 
   const applyPromptAndRevealToolPanel = (prompt: string) => {
     onApplyPresetPrompt(activeTool, prompt);
@@ -168,13 +175,107 @@ export function StudioAiAssistHub({
         <span className="mt-0.5 block text-fg-3/90">예시 칩을 누르거나 직접 입력 · ⌘/Ctrl+Enter</span>
       </p>
 
-      {!toolReady ? (
-        <div className="shrink-0 rounded-xl border border-dashed border-line bg-canvas/30 px-3 py-2 text-[0.62rem] leading-snug text-fg-3">
-          {toolMeta.needsImageApi
-            ? "이미지 생성은 내 API 키(BYOK)가 필요해요. 위 설정에서 키를 등록해 주세요."
-            : "텍스트 AI가 아직 연결되지 않았어요. 로그인(서버 AI) 또는 API 키를 등록해 주세요."}
-        </div>
-      ) : null}
+      {/* Local-only disclosure: this describes execution but never calls a model. */}
+      <details
+        className={cn(
+          "group shrink-0 overflow-hidden rounded-xl border",
+          executionPreflight.available
+            ? "border-line bg-card/75"
+            : "border-warn/40 bg-warn/10"
+        )}
+        data-studio-ai-execution-preflight="true"
+        data-execution-ready={executionPreflight.available ? "true" : "false"}
+      >
+        <summary
+          className={cn(
+            "flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-2 text-left",
+            "[&::-webkit-details-marker]:hidden",
+            STUDIO_FOCUS_RING
+          )}
+          aria-controls={preflightDetailsId}
+        >
+          {executionPreflight.available ? (
+            <ShieldCheck size={15} className="shrink-0 text-good" aria-hidden />
+          ) : (
+            <TriangleAlert size={15} className="shrink-0 text-warn" aria-hidden />
+          )}
+          <span className="min-w-0 flex-1">
+            <span className="block text-[0.68rem] font-bold text-fg">실행 전 확인</span>
+            <span className="block truncate text-[0.58rem] text-fg-3">
+              {executionPreflight.processingRoute}
+            </span>
+          </span>
+          <span
+            className={cn(
+              "shrink-0 rounded-full border px-2 py-0.5 text-[0.56rem] font-bold",
+              executionPreflight.available
+                ? "border-accent/30 bg-accent/10 text-accent"
+                : "border-warn/35 bg-warn/10 text-warn"
+            )}
+          >
+            {executionPreflight.available
+              ? executionPreflight.costCategory
+              : "실행 불가"}
+          </span>
+          <ChevronDown
+            size={14}
+            className="shrink-0 text-fg-3 transition-transform group-open:rotate-180 motion-reduce:transition-none"
+            aria-hidden
+          />
+        </summary>
+
+        {!executionPreflight.available && executionPreflight.unavailableReason ? (
+          <p
+            className="mx-3 mb-2 rounded-lg border border-warn/25 bg-warn/10 px-2.5 py-2 text-[0.61rem] leading-relaxed text-fg-2"
+            role="alert"
+          >
+            {executionPreflight.unavailableReason}
+          </p>
+        ) : null}
+
+        <dl
+          id={preflightDetailsId}
+          className="grid max-h-56 grid-cols-[5.25rem_minmax(0,1fr)] gap-x-2 gap-y-1.5 overflow-y-auto border-t border-line/70 px-3 py-2.5 text-[0.59rem] leading-relaxed"
+          data-studio-ai-execution-preflight-details="true"
+        >
+          <dt className="font-semibold text-fg-3">처리 경로</dt>
+          <dd className="min-w-0 text-fg-2">{executionPreflight.processingRoute}</dd>
+
+          <dt className="font-semibold text-fg-3">외부 전송</dt>
+          <dd className="min-w-0 text-fg-2">
+            {executionPreflight.externalTransfer ? "있음 · " : "없음 · "}
+            {executionPreflight.externalTransferLabel}
+          </dd>
+
+          <dt className="font-semibold text-fg-3">비용 범주</dt>
+          <dd className="min-w-0 font-semibold text-fg-2">
+            {executionPreflight.costCategory}
+          </dd>
+
+          <dt className="font-semibold text-fg-3">예상 시간</dt>
+          <dd className="min-w-0 text-fg-2">
+            {executionPreflight.estimatedTimeCategory}
+            {" · "}
+            {executionPreflight.estimatedTimeLabel}
+          </dd>
+
+          <dt className="font-semibold text-fg-3">출력 수</dt>
+          <dd className="min-w-0 text-fg-2">{executionPreflight.outputCountLabel}</dd>
+
+          <dt className="font-semibold text-fg-3">실패 정책</dt>
+          <dd className="min-w-0 text-fg-2">
+            {executionPreflight.fallbackRetryPolicy}
+          </dd>
+
+          <dt className="flex items-start gap-1 font-semibold text-fg-3">
+            <ShieldCheck size={11} className="mt-0.5 shrink-0 text-good" aria-hidden />
+            원본 보호
+          </dt>
+          <dd className="min-w-0 text-fg-2">
+            {executionPreflight.sourceNonDestructivePolicy}
+          </dd>
+        </dl>
+      </details>
 
       {/* Scrollable body: presets + recent + active tool form */}
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pr-0.5">

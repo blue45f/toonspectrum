@@ -566,6 +566,62 @@ describe("도형 직렬화", () => {
     expect(outputs[3]).toContain('fill="none" stroke="#315f73"');
   });
 
+  it("G펜 4종을 첫 화면과 같은 단일 가변 폭 outline으로 결정적 내보내기한다", async () => {
+    const { loadStudioPerfectFreehandStroker } = await import("./studio-perfect-freehand");
+    await loadStudioPerfectFreehandStroker();
+    const brushes = ["gpen", "mapping-pen", "kaburapen", "liner"] as const;
+    const points = [4, 28, 14, 8, 30, 2, 48, 12, 56, 30, 48, 48, 28, 55, 10, 44];
+    const pressures = [0.18, 0.35, 0.72, 0.94, 0.76, 0.52, 0.3, 0.16];
+    const outputs = brushes.map((brush) => {
+      const input = page([rectEl({
+        id: `outline-${brush}`,
+        kind: "freehand",
+        brush,
+        points,
+        pressures,
+        sampleSpacing: 1,
+        stroke: "#203040",
+        strokeWidth: 12,
+        fill: undefined,
+      })]);
+      const first = exportPageToSvg(input).svg;
+      expect(first).toBe(exportPageToSvg(input).svg);
+      expect(first).toContain('data-brush-engine="perfect-outline"');
+      expect(first).toContain(`data-brush-variant="${brush}"`);
+      const outline = /<path d="([^"]+)" fill="#203040" data-brush-engine="perfect-outline"/.exec(first)?.[1];
+      expect(outline).toBeDefined();
+      expect(outline?.match(/M/g)).toHaveLength(1);
+      expect(outline?.match(/Q/g)?.length).toBeGreaterThan(4);
+      expect(outline?.match(/Z/g)).toHaveLength(1);
+      return first;
+    });
+
+    expect(new Set(outputs).size).toBe(4);
+  });
+
+  it("누락된 레거시 G펜 필압은 명시적 0.6 배열과 같은 SVG를 만든다", async () => {
+    const { loadStudioPerfectFreehandStroker } = await import("./studio-perfect-freehand");
+    await loadStudioPerfectFreehandStroker();
+    const points = [0, 8, 16, 0, 32, 5, 48, 18, 64, 12];
+    const base = rectEl({
+      id: "legacy-gpen-pressure",
+      kind: "freehand",
+      brush: "gpen",
+      points,
+      sampleSpacing: 1,
+      stroke: "#203040",
+      strokeWidth: 9,
+      fill: undefined,
+    });
+
+    expect(exportPageToSvg(page([base])).svg).toBe(
+      exportPageToSvg(page([{
+        ...base,
+        pressures: Array(points.length / 2).fill(0.6),
+      }])).svg
+    );
+  });
+
   it("스탬프 튜닝 — flow·hardness·minSize를 SVG 농도·팁 경도·탭 반경에 반영한다", () => {
     const { svg } = exportPageToSvg(page([rectEl({
       id: "stamp-tuning-svg",
@@ -611,23 +667,24 @@ describe("도형 직렬화", () => {
     }
   });
 
-  it("causal 스탬프는 raw 급회전을 보존하고 legacy 스탬프만 과거 평활화를 유지한다", () => {
+  it("현대 스탬프는 pipeline 태그가 없어도 sampleSpacing으로 raw 급회전을 복원한다", () => {
     const base = rectEl({
       id: "stamp-stream-contract",
       kind: "freehand",
       brush: "airbrush-fine",
-      points: [0, 0, 0, 10, 10, 10],
+      points: [0, 0, 0, 10, 4, 20],
       pressures: [0.3, 0.6, 0.9],
-      sampleSpacing: 128,
       stroke: "#3f6280",
       strokeWidth: 10,
       fill: undefined,
     });
     const legacy = exportPageToSvg(page([base])).svg;
+    const modern = exportPageToSvg(page([{ ...base, sampleSpacing: 128 }])).svg;
     const causalInput = page([{ ...base, stampPipeline: "causal-walker-v2" }]);
     const causal = exportPageToSvg(causalInput).svg;
 
     expect(causal).toBe(exportPageToSvg(causalInput).svg);
+    expect(modern).toBe(causal);
     expect(causal).not.toBe(legacy);
     expect(causal).toMatch(/<circle cx="0" cy="[1-9][^"]*"/);
     expect(legacy).not.toMatch(/<circle cx="0" cy="[1-9][^"]*"/);
@@ -1123,7 +1180,7 @@ describe("도형 직렬화", () => {
     expect((svg.match(/<circle /g) ?? []).length).toBe(3);
   });
 
-  it("캘리그래피 — 포인트별 필압·틸트·회전을 가변 굵기 벡터 선분으로 보존한다", () => {
+  it("캘리그래피 — 포인트별 필압·틸트·회전을 겹침 없는 단일 리본으로 보존한다", () => {
     const calligraphy = rectEl({
       id: "calligraphy-1",
       kind: "freehand",
@@ -1139,9 +1196,10 @@ describe("도형 직렬화", () => {
     const first = exportPageToSvg(page([calligraphy]));
     const second = exportPageToSvg(page([calligraphy]));
     expect(first.svg).toBe(second.svg);
-    expect((first.svg.match(/stroke-linecap="round"/g) ?? []).length).toBeGreaterThanOrEqual(2);
-    const widths = Array.from(first.svg.matchAll(/stroke-width="([0-9.]+)"/g), (match) => match[1]);
-    expect(new Set(widths).size).toBeGreaterThan(1);
+    expect(first.svg).toContain('data-brush-engine="calligraphy-ribbon"');
+    expect(first.svg).toContain('fill-rule="nonzero"');
+    expect(first.svg).not.toContain('stroke-linecap="round"');
+    expect((first.svg.match(/ A /g) ?? []).length).toBe(4);
     expect(first.skipped).toEqual([]);
   });
 

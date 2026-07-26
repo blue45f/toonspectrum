@@ -935,7 +935,12 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
         mappings: [{ source: "speed", from: 0.75, to: 1.7 }],
         jitter: { mode: "multiply", amount: 0.18 },
       },
-      scatterRatio: 1.15,
+      // The catalogue exposes this tool as a 40 px spray footprint. A ratio above 1 scattered the
+      // only dab of a tap well outside both the cursor and the user's hand on roughly one third of
+      // seeds, so a quick click could look as if it had not painted at all. Keep the flake/noise tip
+      // character, but constrain its centre to the visible footprint; `splatter` remains the wide
+      // throw alternative.
+      scatterRatio: 0.2,
       scatter: {
         mappings: [{ source: "pressure", from: 1.6, to: 0.75 }],
         jitter: { mode: "multiply", amount: 0.35 },

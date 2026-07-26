@@ -246,6 +246,68 @@ export const RespondCreatorTeamInvitationSchema = z
   })
   .strict();
 
+const CreatorDraftCollaborationDraftIdSchema = z
+  .string()
+  .regex(
+    /^draft_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+  );
+const CreatorDraftCollaborationRoomIdSchema = z
+  .string()
+  .regex(
+    /^draft-room_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+  );
+const CreatorDraftCollaborationMutationIdSchema = z.string().uuid();
+const CreatorDraftCollaborationGraphRevisionSchema = z
+  .number()
+  .int()
+  .min(0)
+  .max(2_147_483_647);
+const CreatorDraftCollaborationProvisionIntentSchema = z.enum([
+  "share-link",
+  "invite-member",
+]);
+
+export const ProvisionCreatorDraftCollaborationRoomSchema = z
+  .object({
+    draftDocumentId: CreatorDraftCollaborationDraftIdSchema,
+    ownerScopeKey: CreatorCollaborationUserIdSchema,
+    intent: CreatorDraftCollaborationProvisionIntentSchema,
+    clientMutationId: CreatorDraftCollaborationMutationIdSchema,
+    initialSnapshotByteLength: z.number().int().min(0).max(16 * 1_024 * 1_024),
+  })
+  .strict();
+
+export const CreatorDraftCollaborationRoomParamsSchema = z
+  .object({ roomId: CreatorDraftCollaborationRoomIdSchema })
+  .strict();
+
+export const PromoteCreatorDraftCollaborationRoomSchema = z
+  .object({
+    draftDocumentId: CreatorDraftCollaborationDraftIdSchema,
+    ownerScopeKey: CreatorCollaborationUserIdSchema,
+    targetWorkId: CreatorCollaborationUserIdSchema,
+    expectedGraphRevision: CreatorDraftCollaborationGraphRevisionSchema,
+    clientMutationId: CreatorDraftCollaborationMutationIdSchema,
+  })
+  .strict();
+
+export const CreatorDraftCollaborationRoomResponseSchema = z
+  .object({
+    version: z.literal(1),
+    roomId: CreatorDraftCollaborationRoomIdSchema,
+    draftDocumentId: CreatorDraftCollaborationDraftIdSchema,
+    provisionalWorkId: CreatorCollaborationUserIdSchema,
+    ownerScopeKey: CreatorCollaborationUserIdSchema,
+    status: z.enum(["active", "promoted"]),
+    graphRevision: CreatorDraftCollaborationGraphRevisionSchema,
+    initialSnapshotByteLength: z.number().int().min(0).max(16 * 1_024 * 1_024),
+    provisionIntent: CreatorDraftCollaborationProvisionIntentSchema,
+    provisionedAt: CreatorIsoDateTimeSchema,
+    expiresAt: CreatorIsoDateTimeSchema,
+    promotedAt: CreatorIsoDateTimeSchema.nullable(),
+  })
+  .strict();
+
 const CreatorAssetLicenseSchema = z.enum([
   "toonspectrum-standard",
   "cc0-1.0",
@@ -329,6 +391,15 @@ export class CreatorTeamMemberParamsDto extends createZodDto(CreatorTeamMemberPa
 export class InviteCreatorTeamMemberDto extends createZodDto(InviteCreatorTeamMemberSchema) {}
 export class UpdateCreatorTeamMemberDto extends createZodDto(UpdateCreatorTeamMemberSchema) {}
 export class RespondCreatorTeamInvitationDto extends createZodDto(RespondCreatorTeamInvitationSchema) {}
+export class ProvisionCreatorDraftCollaborationRoomDto extends createZodDto(
+  ProvisionCreatorDraftCollaborationRoomSchema
+) {}
+export class CreatorDraftCollaborationRoomParamsDto extends createZodDto(
+  CreatorDraftCollaborationRoomParamsSchema
+) {}
+export class PromoteCreatorDraftCollaborationRoomDto extends createZodDto(
+  PromoteCreatorDraftCollaborationRoomSchema
+) {}
 export class CreatorAssetParamsDto extends createZodDto(CreatorAssetParamsSchema) {}
 export class CreatorAssetListQueryDto extends createZodDto(CreatorAssetListQuerySchema) {}
 export class PublishCreatorAssetDto extends createZodDto(PublishCreatorAssetSchema) {}

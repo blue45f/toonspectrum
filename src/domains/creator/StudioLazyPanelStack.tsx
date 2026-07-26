@@ -60,6 +60,7 @@ import type {
   StudioContinuityIssue,
   StudioStoryBeat,
 } from "./studio-continuity";
+import type { StudioDraftCollaborationReadiness } from "./studio-draft-collaboration";
 import type { Tool } from "./studio-editor-tool-model";
 import type { El } from "./studio-element-model";
 import type { StudioMacroSession } from "./studio-macro-recorder";
@@ -181,6 +182,7 @@ export interface StudioLazyPanelStackHandlers {
   reloadServerRevisions: () => Promise<void>;
   rememberColor: (c: string) => void;
   removeNamedCheckpoint: (checkpoint: StudioCheckpoint) => Promise<void>;
+  requestStudioDraftCollaborationShare: () => Promise<void> | void;
   requestWriterRoomAiDraft: (stage: StudioWriterRoomStage) => Promise<void>;
   restoreNamedCheckpoint: (checkpoint: StudioCheckpoint) => Promise<void>;
   restoreServerRevision: (revision: WorkRevisionSummary, comparedBaseRevision: number) => Promise<boolean>;
@@ -250,6 +252,7 @@ export interface StudioLazyPanelStackProps {
   continuityScenes: StudioLazyContinuityScene[];
   currentPageId: string;
   currentPublishPackageCreditsText: () => string;
+  draftCollaboration?: StudioDraftCollaborationReadiness | null;
   effectivePublishPackageSettings: StudioPublishPackageSettings;
   elementById: Map<string, El>;
   fxPanelOpen: boolean;
@@ -417,6 +420,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   continuityScenes,
   currentPageId,
   currentPublishPackageCreditsText,
+  draftCollaboration = null,
   effectivePublishPackageSettings,
   elementById,
   fxPanelOpen,
@@ -574,9 +578,15 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
     updatePublishPackageSettings,
     currentStudioProjectSnapshot,
     reloadServerRevisions,
+    requestStudioDraftCollaborationShare,
     requestWriterRoomAiDraft,
     restoreServerRevision,
   } = stableHandlers;
+  const teamWorkId = workId ?? (
+    draftCollaboration?.status === "ready"
+      ? draftCollaboration.room.provisionalWorkId
+      : null
+  );
   return (
     <>
       <StudioThreeDPreviewPanelStack
@@ -658,8 +668,10 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
             key={studioAuthUserId ?? "guest"}
             open
             authScopeKey={studioAuthUserId}
+            draftCollaboration={draftCollaboration}
             onClose={() => setTeamPanelOpen(false)}
-            workId={workId}
+            onDraftShareRequest={() => void requestStudioDraftCollaborationShare()}
+            workId={teamWorkId}
             loggedIn={loggedIn}
           />
         ) : null}

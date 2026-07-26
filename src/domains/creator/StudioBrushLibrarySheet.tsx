@@ -2,7 +2,7 @@
  * StudioBrushLibrarySheet — searchable built-in brush catalog popover.
  * Search · category · favorites · recent · render-faithful preview tiles.
  */
-import { LoaderCircle, Search, Star, X } from "lucide-react";
+import { LoaderCircle, RotateCcw, Search, Star, X } from "lucide-react";
 import {
   useEffect,
   useId,
@@ -15,36 +15,36 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
+import {
+  filterStudioBrushCatalogItems,
+  STUDIO_BRUSH_CATALOG_COUNTS,
+  studioBrushCatalogItemById,
+  studioBrushCatalogKindLabel,
+} from "./studio-brush-catalog";
 import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
-import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
+import {
+  materializeStudioBrushCatalogSelection,
+  preloadStudioBrushCatalogSelection,
+} from "./studio-brush-selection";
 import {
   studioBrushChipSurface,
   studioBrushPreviewDashArray,
   studioBrushPreviewDotCenters,
+  studioBrushPreviewOpacity,
   studioBrushPreviewPathD,
   studioBrushPreviewRibbonD,
   studioBrushPreviewStrokeWidth,
 } from "./studio-brush-visual";
-import {
-  filterStudioBrushLibraryItems,
-  STUDIO_BRUSH_LIBRARY_TABS,
-} from "./studio-draw-ux";
+import { STUDIO_BRUSH_LIBRARY_TABS } from "./studio-draw-ux";
 import { planGlowBrushPasses, planNeonBrushPasses } from "./studio-fx-brush";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
 
+import type { StudioBrushCatalogItem } from "./studio-brush-catalog";
 import type { StudioBrushCatalogSelection } from "./studio-brush-selection";
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
 
 import { cn } from "@/lib/utils";
-
-const STUDIO_CORE_BRUSH_CATALOG_COUNT = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
-  (item) => item.source === "core"
-).length;
-const STUDIO_PROCEDURAL_BRUSH_CATALOG_COUNT = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
-  (item) => item.source === "pro"
-).length;
 
 export interface StudioBrushLibrarySheetProps {
   open: boolean;
@@ -93,16 +93,6 @@ export type StudioBrushCatalogPreviewKind =
   | "glow"
   | "particle"
   | "tone";
-
-let studioBrushPackRuntimePromise: Promise<typeof import("./studio-brush-pack-runtime")> | null = null;
-
-function loadStudioBrushPackRuntime() {
-  studioBrushPackRuntimePromise ??= import("./studio-brush-pack-runtime").catch((error) => {
-    studioBrushPackRuntimePromise = null;
-    throw error;
-  });
-  return studioBrushPackRuntimePromise;
-}
 
 function studioBrushPreviewHash(value: string): number {
   let hash = 2166136261;
@@ -283,7 +273,7 @@ export function LargeBrushPreview({
   // preset still preserves the artist's working color (the apply contract lives outside this view).
   const ink = active ? "currentColor" : item.defaultColor ?? surface.ink;
   const kind = studioBrushCatalogPreviewKind(item);
-  const opacity = Math.max(0.35, Math.min(1, item.defaultOpacity));
+  const opacity = studioBrushPreviewOpacity(item.defaultOpacity);
 
   let brushSample: ReactElement;
   if (kind === "square-marker") {
@@ -373,7 +363,7 @@ export function LargeBrushPreview({
           strokeDasharray={dashArray ?? "1.6 1.3"}
           opacity={opacity * 0.88}
         />
-        <g fill={ink} opacity={kind === "texture" ? 0.52 : 0.34}>
+        <g fill={ink} opacity={opacity * (kind === "texture" ? 0.52 : 0.34)}>
           {dots.map((dot, index) => (
             <circle key={index} cx={dot.x} cy={dot.y} r={Math.max(0.45, dot.r * 0.48)} />
           ))}
@@ -383,8 +373,8 @@ export function LargeBrushPreview({
   } else if (kind === "soft-air") {
     brushSample = (
       <g data-studio-brush-preview-layer="soft-air">
-        <path d={pathD} fill="none" stroke={ink} strokeWidth={Math.max(10, strokeW * 3.3)} strokeLinecap="round" opacity={0.08} />
-        <path d={pathD} fill="none" stroke={ink} strokeWidth={Math.max(7, strokeW * 2.35)} strokeLinecap="round" opacity={0.16} />
+        <path d={pathD} fill="none" stroke={ink} strokeWidth={Math.max(10, strokeW * 3.3)} strokeLinecap="round" opacity={opacity * 0.08} />
+        <path d={pathD} fill="none" stroke={ink} strokeWidth={Math.max(7, strokeW * 2.35)} strokeLinecap="round" opacity={opacity * 0.16} />
         <path d={pathD} fill="none" stroke={ink} strokeWidth={Math.max(3.5, strokeW * 1.15)} strokeLinecap="round" opacity={opacity * 0.42} />
       </g>
     );
@@ -410,7 +400,7 @@ export function LargeBrushPreview({
           opacity={opacity * 0.48}
         />
         {wash ? (
-          <g fill="none" stroke={ink} opacity={0.25}>
+          <g fill="none" stroke={ink} opacity={opacity * 0.25}>
             <circle cx={22} cy={h / 2 - 1.5} r={Math.max(3.6, strokeW)} />
             <circle cx={68} cy={h / 2 + 0.5} r={Math.max(4.2, strokeW * 1.15)} />
           </g>
@@ -421,8 +411,8 @@ export function LargeBrushPreview({
     brushSample = (
       <g data-studio-brush-preview-layer="oil">
         <path d={ribbonD ?? pathD} fill={ribbonD ? ink : "none"} stroke={ribbonD ? "none" : ink} opacity={opacity * 0.92} />
-        <path d={pathD} fill="none" stroke={active ? "currentColor" : surface.paper} strokeWidth={1.1} strokeDasharray="7 2" opacity={0.72} />
-        <path d={pathD} fill="none" stroke={ink} strokeWidth={0.7} strokeDasharray="2 3" opacity={0.58} transform="translate(0 2.2)" />
+        <path d={pathD} fill="none" stroke={active ? "currentColor" : surface.paper} strokeWidth={1.1} strokeDasharray="7 2" opacity={opacity * 0.72} />
+        <path d={pathD} fill="none" stroke={ink} strokeWidth={0.7} strokeDasharray="2 3" opacity={opacity * 0.58} transform="translate(0 2.2)" />
       </g>
     );
   } else {
@@ -454,6 +444,7 @@ export function LargeBrushPreview({
       viewBox={`0 0 ${w} ${h}`}
       data-studio-brush-preview="true"
       data-studio-brush-preview-kind={kind}
+      data-studio-brush-preview-opacity={opacity}
       className={cn("block h-[2.125rem] w-full", active && "text-on-accent")}
     >
       <rect
@@ -488,11 +479,28 @@ export function StudioBrushLibrarySheet({
   const tabsId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
   const tabListRef = useRef<HTMLDivElement>(null);
+  const itemGridRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
+  const selectionRequestEpochRef = useRef(0);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<(typeof STUDIO_BRUSH_LIBRARY_TABS)[number]["id"]>("beginner");
+  const [visibleLimit, setVisibleLimit] = useState(48);
+  const [focusedBrushId, setFocusedBrushId] = useState<string | null>(null);
   const [pendingSelectionId, setPendingSelectionId] = useState<string | null>(null);
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const panelId = `${tabsId}-panel`;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      selectionRequestEpochRef.current += 1;
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) selectionRequestEpochRef.current += 1;
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -506,6 +514,8 @@ export function StudioBrushLibrarySheet({
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.preventDefault();
+        selectionRequestEpochRef.current += 1;
+        setPendingSelectionId(null);
         onClose("escape");
       }
     }
@@ -515,39 +525,56 @@ export function StudioBrushLibrarySheet({
 
   if (!open) return null;
 
-  const items = filterStudioBrushLibraryItems({
+  const normalizedQuery = query.trim();
+  const items = filterStudioBrushCatalogItems({
     category: tab,
-    query,
+    query: normalizedQuery,
     favoriteIds,
     recentIds,
-    catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   });
+  const visibleItems = items.slice(0, visibleLimit);
+  const hasMoreItems = visibleItems.length < items.length;
+  const rovingBrushId = visibleItems.some((item) => item.id === focusedBrushId)
+    ? focusedBrushId
+    : visibleItems.some((item) => item.id === activeBrushId)
+      ? activeBrushId
+      : visibleItems[0]?.id ?? null;
+  const activeCatalogItem = studioBrushCatalogItemById(activeBrushId);
 
-  async function selectCatalogItem(item: StudioBrushTrayItem): Promise<void> {
+  function chooseTab(
+    nextTab: (typeof STUDIO_BRUSH_LIBRARY_TABS)[number]["id"],
+  ): void {
+    setTab(nextTab);
+    setVisibleLimit(48);
+    setFocusedBrushId(null);
+  }
+
+  async function selectCatalogItem(item: StudioBrushCatalogItem): Promise<void> {
     if (pendingSelectionId) return;
+    const requestEpoch = selectionRequestEpochRef.current + 1;
+    selectionRequestEpochRef.current = requestEpoch;
+    const requestIsCurrent = () =>
+      mountedRef.current && requestEpoch === selectionRequestEpochRef.current;
     setSelectionError(null);
     setPendingSelectionId(item.id);
     try {
-      const selection = isStudioBrushPackCatalogId(item.id)
-        ? (await loadStudioBrushPackRuntime()).materializeStudioBrushPackSelection(item.id)
-        : studioCoreBrushCatalogSelection({
-            id: item.id,
-            name: item.name,
-            defaultWidth: item.defaultWidth,
-            defaultOpacity: item.defaultOpacity,
-            ...(item.defaultColor ? { defaultColor: item.defaultColor } : {}),
-          });
+      const selection = await materializeStudioBrushCatalogSelection(item.id);
+      if (!requestIsCurrent()) return;
       if (!selection) throw new Error("브러시 프로필을 찾을 수 없습니다.");
       onSelect(selection);
+      if (!requestIsCurrent()) return;
+      selectionRequestEpochRef.current += 1;
+      setPendingSelectionId(null);
       onClose("selection");
     } catch (error) {
+      if (!requestIsCurrent()) return;
       setSelectionError(
         error instanceof Error && error.message
           ? error.message
           : "브러시를 불러오지 못했습니다. 다시 시도해 주세요."
       );
     } finally {
-      setPendingSelectionId(null);
+      if (requestIsCurrent()) setPendingSelectionId(null);
     }
   }
 
@@ -571,8 +598,50 @@ export function StudioBrushLibrarySheet({
     const nextTab = STUDIO_BRUSH_LIBRARY_TABS[nextIndex];
     if (!nextTab) return;
     event.preventDefault();
-    setTab(nextTab.id);
+    chooseTab(nextTab.id);
     tabListRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[nextIndex]?.focus();
+  }
+
+  function onBrushKeyDown(
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    currentIndex: number,
+  ): void {
+    const currentBrush = visibleItems[currentIndex];
+    if (
+      currentBrush
+      && onToggleFavorite
+      && event.key.toLowerCase() === "f"
+      && !event.metaKey
+      && !event.ctrlKey
+      && !event.altKey
+    ) {
+      event.preventDefault();
+      onToggleFavorite(currentBrush.id);
+      return;
+    }
+    const lastIndex = visibleItems.length - 1;
+    let nextIndex: number;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = currentIndex === lastIndex ? 0 : currentIndex + 1;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = currentIndex === 0 ? lastIndex : currentIndex - 1;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = lastIndex;
+    } else {
+      return;
+    }
+
+    const nextBrush = visibleItems[nextIndex];
+    if (!nextBrush) return;
+    event.preventDefault();
+    setFocusedBrushId(nextBrush.id);
+    const nextButton = itemGridRef.current
+      ?.querySelectorAll<HTMLButtonElement>("[data-studio-brush-select]")
+      [nextIndex];
+    nextButton?.focus({ preventScroll: true });
+    nextButton?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }
 
   return (
@@ -583,6 +652,7 @@ export function StudioBrushLibrarySheet({
       data-studio-brush-library="true"
       data-studio-brush-catalog="built-in"
       data-studio-brush-catalog-session="true"
+      data-studio-brush-surface-role="full-catalog-management"
       style={style}
       className={cn(
         "absolute left-2 top-[calc(100%+0.35rem)] z-[60] flex max-h-[min(32rem,calc(100dvh-1rem))] w-[min(22rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_16px_48px_oklch(0.12_0.02_70/0.55)]",
@@ -592,17 +662,23 @@ export function StudioBrushLibrarySheet({
       <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
         <div className="min-w-0">
           <p id={titleId} className="text-sm font-bold text-fg">
-            앱 브러시
+            브러시 전체 라이브러리
           </p>
           <p id={`${titleId}-description`} className="text-[0.62rem] text-fg-3">
-            코어 {STUDIO_CORE_BRUSH_CATALOG_COUNT} + 프로시저럴{" "}
-            {STUDIO_PROCEDURAL_BRUSH_CATALOG_COUNT} · 내 브러시와 별개 · {items.length}개 표시
+            앱 제공 {STUDIO_BRUSH_CATALOG_COUNTS.total}종 · 코어{" "}
+            {STUDIO_BRUSH_CATALOG_COUNTS.core} + 프로시저럴{" "}
+            {STUDIO_BRUSH_CATALOG_COUNTS.pro} · {visibleItems.length}/{items.length}개 표시
           </p>
         </div>
         <button
           type="button"
-          onClick={() => onClose("explicit")}
-          aria-label="앱 브러시 닫기"
+          onClick={() => {
+            selectionRequestEpochRef.current += 1;
+            setPendingSelectionId(null);
+            onClose("explicit");
+          }}
+          aria-label="브러시 전체 라이브러리 닫기"
+          data-studio-brush-library-close="true"
           className={cn(
             "grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised hover:text-fg",
             STUDIO_FOCUS_RING
@@ -612,18 +688,31 @@ export function StudioBrushLibrarySheet({
         </button>
       </div>
 
-      <div className="relative border-b border-line px-2 py-2">
-        <Search className="absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-3" aria-hidden />
-        <input
-          ref={searchRef}
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="브러시 검색 (네온, 수채, G펜…)"
-          className="min-h-11 w-full rounded-xl border border-line bg-card py-1.5 pl-9 pr-3 text-xs outline-none placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/40"
-          aria-label="브러시 검색"
-          aria-controls={panelId}
-        />
+      <div className="border-b border-line px-2 py-2">
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-3" aria-hidden />
+          <input
+            ref={searchRef}
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setVisibleLimit(48);
+              setFocusedBrushId(null);
+            }}
+            placeholder={`전체 ${STUDIO_BRUSH_CATALOG_COUNTS.total}종 검색 (네온, 수채, G펜…)`}
+            className="min-h-11 w-full rounded-xl border border-line bg-card py-1.5 pl-9 pr-3 text-xs outline-none placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/40"
+            aria-label="전체 브러시 검색"
+            aria-controls={panelId}
+            aria-describedby={`${titleId}-search-scope`}
+            data-studio-brush-search-scope="all"
+          />
+        </div>
+        <p id={`${titleId}-search-scope`} className="mt-1 px-1 text-[0.6rem] leading-relaxed text-fg-3">
+          {normalizedQuery
+            ? `분류와 관계없이 전체 ${STUDIO_BRUSH_CATALOG_COUNTS.total}종에서 검색 중`
+            : "분류를 고르거나 이름·용도·종류로 전체 검색"}
+        </p>
       </div>
 
       <div
@@ -644,7 +733,7 @@ export function StudioBrushLibrarySheet({
               aria-controls={panelId}
               tabIndex={active ? 0 : -1}
               title={chip.title}
-              onClick={() => setTab(chip.id)}
+              onClick={() => chooseTab(chip.id)}
               onKeyDown={(event) => onTabKeyDown(event, chipIndex)}
               className={cn(
                 "min-h-11 min-w-11 shrink-0 rounded-xl border px-3 py-1 text-[0.64rem] font-semibold",
@@ -677,7 +766,7 @@ export function StudioBrushLibrarySheet({
           </div>
         ) : null}
         <p role="status" aria-live="polite" className="sr-only">
-          {items.length}개의 브러시가 표시됩니다.
+          {visibleItems.length}/{items.length}개의 브러시가 표시됩니다.
         </p>
         {items.length === 0 ? (
           <div className="flex h-28 flex-col items-center justify-center rounded-xl border border-dashed border-line text-center">
@@ -690,14 +779,21 @@ export function StudioBrushLibrarySheet({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-            {items.map((item) => {
+          <>
+          <div
+            ref={itemGridRef}
+            data-studio-brush-progressive-grid="true"
+            className="grid grid-cols-2 gap-1.5 sm:grid-cols-3"
+          >
+            {visibleItems.map((item, itemIndex) => {
               const active = item.id === activeBrushId;
               const fav = favoriteIds.includes(item.id);
+              const kindLabel = studioBrushCatalogKindLabel(item);
               return (
                 <div
                   key={item.id}
-                  data-studio-brush-source={isStudioBrushPackCatalogId(item.id) ? "pro" : "core"}
+                  data-studio-brush-source={item.source}
+                  data-studio-brush-kind={item.mediaGroup}
                   className={cn(
                     "group relative flex flex-col rounded-xl border p-1.5 [contain-intrinsic-size:7.25rem] [content-visibility:auto]",
                     STUDIO_EASE,
@@ -709,21 +805,21 @@ export function StudioBrushLibrarySheet({
                   <button
                     type="button"
                     onPointerEnter={() => {
-                      if (isStudioBrushPackCatalogId(item.id)) {
-                        void loadStudioBrushPackRuntime().catch(() => undefined);
-                      }
+                      void preloadStudioBrushCatalogSelection(item.id).catch(() => undefined);
                     }}
                     onFocus={() => {
-                      if (isStudioBrushPackCatalogId(item.id)) {
-                        void loadStudioBrushPackRuntime().catch(() => undefined);
-                      }
+                      void preloadStudioBrushCatalogSelection(item.id).catch(() => undefined);
                     }}
                     onClick={() => void selectCatalogItem(item)}
                     title={item.hint}
                     aria-label={`${item.name} 선택`}
                     aria-pressed={active}
+                    aria-keyshortcuts={onToggleFavorite ? "F" : undefined}
+                    tabIndex={item.id === rovingBrushId ? 0 : -1}
                     aria-busy={pendingSelectionId === item.id || undefined}
                     disabled={pendingSelectionId !== null}
+                    data-studio-brush-select={item.id}
+                    onKeyDown={(event) => onBrushKeyDown(event, itemIndex)}
                     className={cn(
                       "flex flex-col items-stretch gap-1 rounded-lg text-left disabled:cursor-wait disabled:opacity-70",
                       STUDIO_FOCUS_RING
@@ -740,27 +836,40 @@ export function StudioBrushLibrarySheet({
                       <span className="truncate text-[0.68rem] font-bold leading-tight">{item.name}</span>
                       {pendingSelectionId === item.id ? (
                         <LoaderCircle size={12} className="ml-auto shrink-0 animate-spin motion-reduce:animate-none" aria-hidden />
-                      ) : isStudioBrushPackCatalogId(item.id) ? (
-                        <span className="ml-auto shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[0.48rem] font-black text-accent">
+                      ) : item.source === "pro" ? (
+                        <span className="ml-auto shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[0.58rem] font-black text-accent">
                           PRO
                         </span>
                       ) : null}
                     </span>
                     <span
                       className={cn(
-                        "truncate text-[0.55rem] leading-tight",
+                        "flex min-w-0 items-center justify-between gap-1 text-[0.6rem] leading-tight",
                         active ? "text-on-accent/75" : "text-fg-3"
                       )}
                     >
-                      {item.defaultWidth}px · {Math.round(item.defaultOpacity * 100)}%
+                      <span className="truncate">
+                        {item.defaultWidth}px · {Math.round(item.defaultOpacity * 100)}%
+                      </span>
+                      <span
+                        data-studio-brush-kind-badge={item.mediaGroup}
+                        className={cn(
+                          "shrink-0 rounded-full px-1.5 py-0.5 font-bold",
+                          active ? "bg-on-accent/15 text-on-accent" : "bg-raised text-fg-2"
+                        )}
+                      >
+                        {kindLabel}
+                      </span>
                     </span>
                   </button>
                   {onToggleFavorite ? (
                     <button
                       type="button"
-                      title={fav ? "즐겨찾기 해제" : "즐겨찾기"}
+                      title={`${fav ? "즐겨찾기 해제" : "즐겨찾기"} · 타일에서 F`}
                       aria-label={fav ? `${item.name} 즐겨찾기 해제` : `${item.name} 즐겨찾기`}
                       aria-pressed={fav}
+                      tabIndex={-1}
+                      data-studio-brush-favorite={item.id}
                       onClick={(e) => {
                         e.stopPropagation();
                         onToggleFavorite(item.id);
@@ -784,7 +893,54 @@ export function StudioBrushLibrarySheet({
               );
             })}
           </div>
+          {hasMoreItems ? (
+            <button
+              type="button"
+              onClick={() => setVisibleLimit((current) => current + 48)}
+              className={cn(
+                "mt-2 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-[0.68rem] font-bold text-fg-2 hover:border-accent/40 hover:bg-raised hover:text-fg",
+                STUDIO_EASE,
+                STUDIO_FOCUS_RING,
+              )}
+              aria-label={`브러시 더 보기, ${items.length - visibleItems.length}개 남음`}
+              data-studio-brush-load-more="true"
+            >
+              더 보기 · {visibleItems.length}/{items.length}
+            </button>
+          ) : null}
+          </>
         )}
+      </div>
+      <div className="border-t border-line bg-panel px-2 py-2">
+        <button
+          type="button"
+          disabled={!activeCatalogItem || pendingSelectionId !== null}
+          onClick={() => {
+            if (activeCatalogItem) void selectCatalogItem(activeCatalogItem);
+          }}
+          aria-label={
+            activeCatalogItem
+              ? `${activeCatalogItem.name} 기본값 다시 적용`
+              : "현재 브러시 기본값을 찾을 수 없음"
+          }
+          className={cn(
+            "flex min-h-11 w-full items-center gap-2 rounded-xl border border-line bg-card px-3 text-left text-fg-2 hover:border-accent/40 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-50",
+            STUDIO_EASE,
+            STUDIO_FOCUS_RING
+          )}
+        >
+          <RotateCcw size={14} className="shrink-0" aria-hidden />
+          <span className="min-w-0">
+            <span className="block truncate text-[0.68rem] font-bold">
+              현재 브러시 기본값 다시 적용
+            </span>
+            <span className="block truncate text-[0.6rem] text-fg-3">
+              {activeCatalogItem
+                ? `${activeCatalogItem.name}의 굵기·불투명도·촉 반응`
+                : "사용자 저장 브러시는 내 브러시에서 다시 적용"}
+            </span>
+          </span>
+        </button>
       </div>
     </div>
   );

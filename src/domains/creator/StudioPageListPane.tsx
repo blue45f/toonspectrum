@@ -13,7 +13,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { Suspense, memo, useState } from "react";
+import { Suspense, lazy, memo, useState } from "react";
 
 import { StudioEdgeRailButton } from "./studio-chrome-ui";
 import {
@@ -28,7 +28,6 @@ import {
   pageDisplayName,
 } from "./studio-page-meta";
 import { shotTagBadgeText, shotTagBadgeTitle } from "./studio-panel-shot-tags";
-import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import { StudioPanelResizeHandle } from "./StudioPanelResizeHandle";
 
 import type { El } from "./studio-element-model";
@@ -40,6 +39,12 @@ import type { Resizable } from "@/components/use-resizable";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 
 import { cn } from "@/lib/utils";
+
+const LazyStudioMobileSheetHandle = lazy(() =>
+  import("./StudioMobileSheetHandle").then(({ StudioMobileSheetHandle }) => ({
+    default: StudioMobileSheetHandle,
+  }))
+);
 
 type StudioPagePreviewSize = "compact" | "comfortable" | "large";
 
@@ -193,14 +198,15 @@ export const StudioPageListPane = memo(function StudioPageListPane({
         )}
         <div
           ref={pagesSheetRef}
-          role={isMobile ? "dialog" : undefined}
+          role={isMobile && mobileSheet === "pages" ? "dialog" : undefined}
           aria-modal={isMobile && mobileSheet === "pages" ? true : undefined}
           data-studio-sheet-id="pages"
           data-studio-mobile-sheet={isMobile && mobileSheet === "pages" ? "true" : undefined}
           data-studio-sheet-snap={isMobile ? mobileSnap : undefined}
           data-popup-kind={isMobile && mobileSheet === "pages" ? "sheet" : undefined}
-          aria-label={isMobile ? "페이지 목록" : undefined}
-          tabIndex={isMobile ? -1 : undefined}
+          aria-label={isMobile && mobileSheet === "pages" ? "페이지 목록" : undefined}
+          aria-hidden={isMobile && mobileSheet !== "pages" ? true : undefined}
+          tabIndex={isMobile && mobileSheet === "pages" ? -1 : undefined}
           inert={isMobile && mobileSheet !== "pages" ? true : undefined}
           className={cn(
             "flex flex-col gap-1.5 border border-line p-2",
@@ -221,15 +227,19 @@ export const StudioPageListPane = memo(function StudioPageListPane({
           }
         >
           <div className="shrink-0 border-b border-line/50 pb-1.5">
-            <StudioMobileSheetHandle
-              active={isMobile && mobileSheet === "pages"}
-              kind="pages"
-              label="페이지 시트"
-              onDismiss={() => setMobileSheet(null)}
-              onSnapChange={setMobileSnap}
-              sheetRef={pagesSheetRef}
-              snap={mobileSnap}
-            />
+            {isMobile ? (
+              <Suspense fallback={<div aria-hidden className="min-h-11" />}>
+                <LazyStudioMobileSheetHandle
+                  active={mobileSheet === "pages"}
+                  kind="pages"
+                  label="페이지 시트"
+                  onDismiss={() => setMobileSheet(null)}
+                  onSnapChange={setMobileSnap}
+                  sheetRef={pagesSheetRef}
+                  snap={mobileSnap}
+                />
+              </Suspense>
+            ) : null}
             <div className="flex min-h-11 items-center justify-between gap-2 lg:min-h-6">
               <span className="flex items-center gap-1 text-[0.7rem] font-bold text-fg-2">
                 <button

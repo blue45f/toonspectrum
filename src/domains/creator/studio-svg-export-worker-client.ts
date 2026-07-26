@@ -1,3 +1,4 @@
+import { loadStudioPerfectFreehandStroker } from "./studio-perfect-freehand";
 import { exportPageToSvg, type SvgExportPageInput, type SvgExportResult } from "./studio-svg-export";
 import {
   STUDIO_SVG_EXPORT_WORKER_PROTOCOL_VERSION,
@@ -53,10 +54,14 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw createAbortError();
 }
 
-function runSvgExportDirect(
+async function runSvgExportDirect(
   input: SvgExportPageInput,
   signal: AbortSignal | undefined,
-): StudioSvgExportWorkerClientResult {
+): Promise<StudioSvgExportWorkerClientResult> {
+  throwIfAborted(signal);
+  // Match the short-lived module worker: a CSP/Worker fallback must not downgrade outline brushes
+  // to a uniform Line merely because its dynamic chunk has not been requested on this thread yet.
+  await loadStudioPerfectFreehandStroker();
   throwIfAborted(signal);
   return { execution: "direct", result: exportPageToSvg(input) };
 }
@@ -100,11 +105,7 @@ function runSvgExportWithWorker(
     };
     const onAbort = () => finish(() => reject(createAbortError()));
     const resolveDirectFallback = () => finish(() => {
-      try {
-        resolve(runSvgExportDirect(input, signal));
-      } catch (error) {
-        reject(error);
-      }
+      void runSvgExportDirect(input, signal).then(resolve, reject);
     });
 
     worker.onmessage = (event) => {
@@ -162,7 +163,7 @@ function runSvgExportWithWorker(
 /**
  * 벡터 SVG 직렬화를 모듈 Worker에서 실행한다. 입력(요소 트리)·출력(SVG 문자열) 모두 구조적
  * 복제만으로 충분한 순수 JSON이라 transferable은 쓰지 않는다. Worker를 못 만들면(구형
- * 브라우저·CSP) 동일한 exportPageToSvg를 메인 스레드에서 동기 실행해 폴백한다.
+ * 브라우저·CSP) outline 엔진 준비 뒤 동일한 exportPageToSvg를 메인 스레드에서 실행한다.
  */
 export async function runStudioSvgExportWorker(
   input: SvgExportPageInput,

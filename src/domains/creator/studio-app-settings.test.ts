@@ -44,6 +44,7 @@ describe("studio-app-settings", () => {
     expect(d.touch.toolHintHoldMs).toBe(480);
     expect(d.mouse.wheel).toBe("zoom");
     expect(d.touch.oneFingerDrag).toBe("draw");
+    expect(d.grids.showCanvasRulers).toBe(false);
   });
 
   it("keeps the new selection, retouch, and view tools aligned across both catalogs", () => {
@@ -141,6 +142,11 @@ describe("studio-app-settings", () => {
     expect(n.general.toolHintMode).toBe("rich");
     expect(n.toolbar.visibleIds).toEqual(["pen", "eraser"]);
     expect(n.grids.pixelGridSize).toBe(50);
+    expect(n.grids.showCanvasRulers).toBe(false);
+    expect(
+      normalizeStudioAppSettings({ grids: { showCanvasRulers: true } }).grids
+        .showCanvasRulers
+    ).toBe(true);
     expect(n.other.pressureCurve).toBe(2.5);
     expect(n.shortcuts["tool-pen"]).toBe("P");
     expect(normalizeStudioAppSettings({ shortcuts: { "toggle-chrome": "Tab" } }).shortcuts["toggle-chrome"]).toBe("`");

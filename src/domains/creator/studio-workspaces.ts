@@ -46,7 +46,8 @@ export const STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH = Object.freeze({
 export const STUDIO_LEGACY_LEFT_PANEL_WIDTH_STORAGE_KEY = "studio:leftW";
 export const STUDIO_LEGACY_RIGHT_PANEL_WIDTH_STORAGE_KEY = "studio:rightW";
 
-export const STUDIO_DEFAULT_WORKSPACE_IDS = [
+/** The original six presets remain stable for existing shortcuts, help copy, and saved state. */
+export const STUDIO_CLASSIC_WORKSPACE_IDS = [
   "storyboard",
   "lineart",
   "coloring",
@@ -55,9 +56,24 @@ export const STUDIO_DEFAULT_WORKSPACE_IDS = [
   "publish",
 ] as const;
 
+export const STUDIO_DEFAULT_WORKSPACE_IDS = [
+  ...STUDIO_CLASSIC_WORKSPACE_IDS,
+  "pro-comic",
+] as const;
+
+export const STUDIO_PRO_COMIC_PALETTE_PRIORITY = [
+  "tool-properties",
+  "layers",
+  "pages",
+  "materials-quick-access",
+] as const;
+
+export type StudioClassicWorkspaceId = (typeof STUDIO_CLASSIC_WORKSPACE_IDS)[number];
 export const STUDIO_MOBILE_CONTROL_SIDES = ["left", "right"] as const;
 
 export type StudioDefaultWorkspaceId = (typeof STUDIO_DEFAULT_WORKSPACE_IDS)[number];
+export type StudioProComicPalettePriority =
+  (typeof STUDIO_PRO_COMIC_PALETTE_PRIORITY)[number];
 export type StudioMobileControlSide = (typeof STUDIO_MOBILE_CONTROL_SIDES)[number];
 export type StudioWorkspaceId = StudioDefaultWorkspaceId | string;
 export type StudioWorkspaceMoveDirection = "up" | "down";
@@ -262,21 +278,32 @@ function createQuickActions(
 
 function createBuiltinLayout(
   inspector: StudioInspectorLayout,
-  desktop: Pick<StudioWorkspaceDesktopLayout, "leftPanelOpen" | "rightPanelOpen">,
+  desktop: Pick<StudioWorkspaceDesktopLayout, "leftPanelOpen" | "rightPanelOpen"> &
+    Partial<
+      Pick<
+        StudioWorkspaceDesktopLayout,
+        "leftPanelWidth" | "rightPanelWidth"
+      >
+    >,
   actions: Parameters<typeof createQuickActions>[0]
 ): StudioWorkspaceLayout {
   return freezeLayout({
     inspector,
     desktop: {
       ...desktop,
-      leftPanelWidth: STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.default,
-      rightPanelWidth: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.default,
+      leftPanelWidth:
+        desktop.leftPanelWidth ?? STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.default,
+      rightPanelWidth:
+        desktop.rightPanelWidth ?? STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.default,
     },
     quickActions: createQuickActions(actions),
   });
 }
 
-/** Six immutable, task-oriented workspaces. They are never copied into local storage. */
+/**
+ * Immutable, task-oriented workspaces. The original six remain byte-for-byte equivalent; the
+ * professional comic preset only composes fields already understood by StudioPage.
+ */
 export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Object.freeze([
   Object.freeze({
     id: "storyboard",
@@ -336,6 +363,22 @@ export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Obje
       { primary: "publish", image: "quick", document: "canvas" },
       { leftPanelOpen: false, rightPanelOpen: true },
       ["fit-width", "properties", "select", "undo", "redo", "eyedropper"]
+    ),
+  }),
+  Object.freeze({
+    id: "pro-comic",
+    name: "프로 만화",
+    description:
+      "도구 속성·레이어·페이지 동선을 유지하고 자주 쓰는 제작 명령을 가까이 둡니다.",
+    layout: createBuiltinLayout(
+      { primary: "properties", image: "fill", document: "navigator" },
+      {
+        leftPanelOpen: true,
+        rightPanelOpen: true,
+        leftPanelWidth: 216,
+        rightPanelWidth: 344,
+      },
+      ["undo", "redo", "pen", "advanced-fill", "add-bubble", "fit-width"]
     ),
   }),
 ]);

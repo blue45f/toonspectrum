@@ -116,6 +116,7 @@ describe("studio chrome UI", () => {
     expect(html).toContain('aria-selected="true"');
     expect(html).toContain("템플릿");
     expect(html).toContain("text-on-accent");
+    expect(html).toContain("max-lg:min-h-11");
   });
 
   it("keeps mobile dock targets at least 44px in both axes and marks active state", () => {
@@ -202,7 +203,7 @@ describe("studio chrome UI", () => {
   it("renders the vertical tool rail, quick actions, and status bar", () => {
     const html = renderToStaticMarkup(
       <>
-        <StudioVerticalToolRail>
+        <StudioVerticalToolRail footer={<button type="button">도구 설정</button>}>
           <StudioRailToolButton icon={Pencil} label="펜 (B)" active grouped />
         </StudioVerticalToolRail>
         <StudioQuickActionsBar>
@@ -214,6 +215,11 @@ describe("studio chrome UI", () => {
       </>
     );
     expect(html).toContain('data-studio-tool-rail="true"');
+    expect(html).toContain('data-studio-tool-rail-scroll="true"');
+    expect(html).toContain('data-studio-tool-rail-footer="true"');
+    expect(html).toContain("도구 설정");
+    expect(html).toContain("overflow-hidden");
+    expect(html).toContain("overflow-y-auto");
     expect(html).toContain('aria-orientation="vertical"');
     expect(html).toContain('aria-label="펜 (B)"');
     expect(html).toContain('aria-pressed="true"');

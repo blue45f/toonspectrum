@@ -1,3 +1,4 @@
+import type { StudioLayerSemanticKind } from "./studio-layer-palette-visual";
 import type { LayerGroup } from "./studio-layers";
 
 export const STUDIO_LAYER_KINDS = [
@@ -55,6 +56,11 @@ export interface StudioLayerNavigatorFilters {
 export interface StudioLayerNavigatorItem {
   id: string;
   type?: string;
+  /**
+   * Optional visual classification for document types that share a render container.
+   * Studio 3D/VRM outputs currently persist as image elements and should project `three-d`.
+   */
+  semanticKind?: StudioLayerSemanticKind;
   label: string;
   textContent?: string;
   zIndex: number;

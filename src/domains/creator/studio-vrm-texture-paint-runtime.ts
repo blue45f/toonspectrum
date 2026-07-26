@@ -1,6 +1,11 @@
 import * as THREE from "three";
 
 import {
+  runStudioVrmTextureFillWorker,
+  type StudioVrmTextureFillWorkerClientOptions,
+  type StudioVrmTextureFillWorkerClientResult,
+} from "./studio-vrm-texture-fill-worker-client";
+import {
   getCachedStudioVrmTextureGeometryIndex,
   getStudioVrmTextureGeometryIndex,
   inspectStudioVrmTextureGeometryAdmission,
@@ -42,11 +47,20 @@ import {
 } from "./studio-vrm-texture-undo";
 import {
   isStudioVrmTextureSize,
+  resolveStudioVrmTexelIndex,
   STUDIO_VRM_TEXTURE_MAX_DIMENSION,
   STUDIO_VRM_TEXTURE_MAX_TEXELS,
   type StudioVrmTextureSize,
+  type StudioVrmTextureRect,
+  type StudioVrmUvPoint,
   type StudioVrmTextureWrapMode,
 } from "./studio-vrm-texture-uv";
+
+import type {
+  StudioVrmTextureFillRequest,
+  StudioVrmTextureFillResult,
+  StudioVrmTextureFillScope,
+} from "./studio-vrm-texture-fill";
 
 const RGBA_CHANNELS = 4;
 const DEFAULT_TARGET_RGBA_BYTES = STUDIO_VRM_TEXTURE_MAX_TEXELS * RGBA_CHANNELS;
@@ -88,6 +102,9 @@ export type StudioVrmTexturePaintRuntimeErrorCode =
   | "binding-missing"
   | "canvas-unavailable"
   | "disposed"
+  | "fill-memory-budget"
+  | "fill-worker-failed"
+  | "fill-worker-unavailable"
   | "history-budget"
   | "hit-outside-scene"
   | "invalid-dimensions"
@@ -156,6 +173,35 @@ export interface StudioVrmTexturePaintStrokeMove {
   readonly pressure?: number;
 }
 
+export interface StudioVrmTexturePaintColorSampleInput {
+  readonly hit: StudioVrmTexturePaintRayHit;
+  readonly signal?: AbortSignal;
+}
+
+export interface StudioVrmTexturePaintColorSample {
+  /** Byte-exact baseColor RGB channel values encoded as a portable HEX field. */
+  readonly color: string;
+  readonly rgba: Readonly<{
+    readonly r: number;
+    readonly g: number;
+    readonly b: number;
+    readonly a: number;
+  }>;
+  readonly texel: Readonly<{ readonly x: number; readonly y: number }>;
+  readonly sourceTextureUuid: string;
+  readonly sourceName: string;
+  /** Present when the sample came from the latest editable paint buffer. */
+  readonly targetId: string | null;
+}
+
+export interface StudioVrmTexturePaintFillInput {
+  readonly hit: StudioVrmTexturePaintRayHit;
+  readonly color: string;
+  readonly tolerance: number;
+  readonly scope: StudioVrmTextureFillScope;
+  readonly signal?: AbortSignal;
+}
+
 export interface StudioVrmTexturePaintReadableImage {
   readonly width: number;
   readonly height: number;
@@ -206,6 +252,11 @@ export type StudioVrmTexturePaintGeometryPrecomputer = (
   options: StudioVrmTextureGeometryPrecomputeOptions,
 ) => Promise<StudioVrmTextureGeometryIndex>;
 
+export type StudioVrmTextureFillRunner = (
+  request: StudioVrmTextureFillRequest,
+  options?: StudioVrmTextureFillWorkerClientOptions,
+) => Promise<StudioVrmTextureFillWorkerClientResult>;
+
 export interface CreateStudioVrmTexturePaintRuntimeOptions {
   /**
    * Conservative resident footprint per target: original RGBA, editable ImageData,
@@ -233,6 +284,8 @@ export interface CreateStudioVrmTexturePaintRuntimeOptions {
   readonly undoTileSize?: number;
   readonly createCanvas?: StudioVrmTexturePaintCanvasFactory;
   readonly readTextureImage?: StudioVrmTexturePaintImageReader;
+  /** Test/host integration seam. Production uses the fail-closed one-shot module Worker. */
+  readonly runTextureFill?: StudioVrmTextureFillRunner;
   /** Test/host integration seam. The default uses the browser module Worker implementation. */
   readonly precomputeGeometryIndex?: StudioVrmTexturePaintGeometryPrecomputer;
 }
@@ -261,6 +314,7 @@ export interface StudioVrmTexturePaintHistorySnapshot {
 
 export interface StudioVrmTexturePaintRuntimeSnapshot {
   readonly status: StudioVrmTexturePaintRuntimeStatus;
+  readonly activeOperation: "fill" | "sample" | "stroke" | "stroke-read" | null;
   readonly activePointerId: number | null;
   readonly activeTargetId: string | null;
   readonly activeTarget: Readonly<Pick<
@@ -309,13 +363,33 @@ interface PaintTarget {
   invalidReason: "canvas-unavailable" | null;
 }
 
-interface ResolvedPaintHit {
+interface TextureSamplingSignature {
+  readonly channel: number;
+  readonly flipY: boolean;
+  readonly format: THREE.AnyPixelFormat;
+  readonly image: unknown;
+  readonly matrixAutoUpdate: boolean;
+  readonly matrixElements: readonly number[];
+  readonly version: number;
+  readonly type: THREE.TextureDataType;
+  readonly wrapS: THREE.Wrapping;
+  readonly wrapT: THREE.Wrapping;
+}
+
+interface ResolvedBaseColorHit {
   readonly material: BaseColorMaterial;
   readonly sourceTexture: THREE.Texture;
+  readonly effectiveTexture: THREE.Texture;
   readonly target: PaintTarget | null;
-  readonly sample: StudioVrmTextureStrokeSample;
+  readonly uv: StudioVrmUvPoint;
   readonly wrapU: StudioVrmTextureWrapMode;
   readonly wrapV: StudioVrmTextureWrapMode;
+  /** Captured only for asynchronous color sampling stale checks, never for hot brush moves. */
+  readonly samplingSignature: TextureSamplingSignature | null;
+}
+
+interface ResolvedPaintHit extends ResolvedBaseColorHit {
+  readonly sample: StudioVrmTextureStrokeSample;
   readonly paintWrap: StudioVrmTexturePaintApplyOptions;
 }
 
@@ -348,10 +422,38 @@ interface ActiveStroke {
   changedTexels: number;
 }
 
-interface HistoryRecord {
+interface PendingColorSample {
+  readonly controller: AbortController;
+}
+
+interface PendingFill {
+  readonly controller: AbortController;
+}
+
+interface StrokeHistoryRecord {
+  readonly kind: "stroke";
   readonly target: PaintTarget;
   readonly entry: StudioVrmTextureUndoEntry;
   readonly bytes: number;
+}
+
+interface FillHistoryRecord {
+  readonly kind: "fill";
+  readonly target: PaintTarget;
+  /** LSB-first mask local to `rect`, not the full atlas. */
+  readonly bitMask: Uint8Array;
+  /** RGB before values in local-mask scan order. Alpha is intentionally preserved. */
+  readonly beforeRgb: Uint8Array;
+  readonly fillRgb: Readonly<{ readonly r: number; readonly g: number; readonly b: number }>;
+  readonly rect: StudioVrmTextureRect;
+  readonly bytes: number;
+}
+
+type HistoryRecord = StrokeHistoryRecord | FillHistoryRecord;
+
+interface HistoryCheckpoint {
+  readonly past: readonly HistoryRecord[];
+  readonly future: readonly HistoryRecord[];
 }
 
 interface NormalizedRuntimeOptions {
@@ -365,6 +467,7 @@ interface NormalizedRuntimeOptions {
   readonly undoTileSize: number;
   readonly createCanvas: StudioVrmTexturePaintCanvasFactory;
   readonly readTextureImage: StudioVrmTexturePaintImageReader;
+  readonly runTextureFill: StudioVrmTextureFillRunner;
   readonly precomputeGeometryIndex: StudioVrmTexturePaintGeometryPrecomputer;
 }
 
@@ -387,6 +490,9 @@ const ERROR_MESSAGES: Readonly<Record<StudioVrmTexturePaintRuntimeErrorCode, str
     "binding-missing": "저장된 표면 텍스처가 가리키는 모델 재질을 찾지 못했습니다.",
     "canvas-unavailable": "페인팅 캔버스를 사용할 수 없습니다.",
     disposed: "텍스처 페인팅이 이미 종료되었습니다.",
+    "fill-memory-budget": "이 텍스처는 안전한 ColorDrop 메모리 한도를 초과합니다.",
+    "fill-worker-failed": "ColorDrop 영역 계산을 완료하지 못했습니다.",
+    "fill-worker-unavailable": "이 브라우저에서는 안전한 ColorDrop Worker를 사용할 수 없습니다.",
     "history-budget": "이 획은 실행 취소 메모리 한도를 초과합니다.",
     "hit-outside-scene": "현재 캐릭터 밖의 지점입니다.",
     "invalid-dimensions": "텍스처 크기 또는 RGBA 데이터가 올바르지 않습니다.",
@@ -639,6 +745,7 @@ function normalizeOptions(
     ),
     createCanvas,
     readTextureImage: options.readTextureImage ?? createDefaultImageReader(createCanvas),
+    runTextureFill: options.runTextureFill ?? runStudioVrmTextureFillWorker,
     precomputeGeometryIndex:
       options.precomputeGeometryIndex ?? precomputeStudioVrmTextureGeometryIndex,
   });
@@ -847,6 +954,61 @@ function paintWrapOptions(texture: THREE.Texture): StudioVrmTexturePaintApplyOpt
   });
 }
 
+function textureSamplingSignature(texture: THREE.Texture): TextureSamplingSignature {
+  return Object.freeze({
+    channel: texture.channel,
+    flipY: texture.flipY,
+    format: texture.format,
+    image: texture.image,
+    matrixAutoUpdate: texture.matrixAutoUpdate,
+    matrixElements: Object.freeze([...texture.matrix.elements]),
+    version: texture.version,
+    type: texture.type,
+    wrapS: texture.wrapS,
+    wrapT: texture.wrapT,
+  });
+}
+
+function sameTextureSamplingSignature(
+  left: TextureSamplingSignature,
+  right: TextureSamplingSignature,
+): boolean {
+  if (
+    left.channel !== right.channel
+    || left.flipY !== right.flipY
+    || left.format !== right.format
+    || left.image !== right.image
+    || left.matrixAutoUpdate !== right.matrixAutoUpdate
+    || left.version !== right.version
+    || left.type !== right.type
+    || left.wrapS !== right.wrapS
+    || left.wrapT !== right.wrapT
+    || left.matrixElements.length !== right.matrixElements.length
+  ) {
+    return false;
+  }
+  return left.matrixElements.every((value, index) => value === right.matrixElements[index]);
+}
+
+function sameResolvedBaseColorHit(
+  left: ResolvedBaseColorHit,
+  right: ResolvedBaseColorHit,
+): boolean {
+  return (
+    left.material === right.material
+    && left.sourceTexture === right.sourceTexture
+    && left.effectiveTexture === right.effectiveTexture
+    && left.target === right.target
+    && left.uv.u === right.uv.u
+    && left.uv.v === right.uv.v
+    && left.wrapU === right.wrapU
+    && left.wrapV === right.wrapV
+    && left.samplingSignature !== null
+    && right.samplingSignature !== null
+    && sameTextureSamplingSignature(left.samplingSignature, right.samplingSignature)
+  );
+}
+
 function copyStrokeStyle(style: StudioVrmTextureStrokeStyle): StudioVrmTextureStrokeStyle {
   return Object.freeze({
     ...style,
@@ -910,6 +1072,260 @@ function sourceTargetId(texture: THREE.Texture): string {
   return `vrm-texture:${texture.uuid}`;
 }
 
+function byteHex(value: number): string {
+  return value.toString(16).padStart(2, "0");
+}
+
+function sampleResolvedTextureColor(
+  resolved: ResolvedBaseColorHit,
+  pixels: Uint8ClampedArray,
+  size: StudioVrmTextureSize,
+): StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintColorSample> {
+  if (pixels.byteLength !== size.width * size.height * RGBA_CHANNELS) {
+    return failure("invalid-dimensions");
+  }
+  const texel = resolveStudioVrmTexelIndex(resolved.uv, size, {
+    wrapU: resolved.wrapU,
+    wrapV: resolved.wrapV,
+    flipV: false,
+  });
+  if (!texel) return failure("uv-missing");
+  const offset = texel.index * RGBA_CHANNELS;
+  const r = pixels[offset];
+  const g = pixels[offset + 1];
+  const b = pixels[offset + 2];
+  const a = pixels[offset + 3];
+  if (r === undefined || g === undefined || b === undefined || a === undefined) {
+    return failure("invalid-dimensions");
+  }
+  return success(Object.freeze({
+    color: `#${byteHex(r)}${byteHex(g)}${byteHex(b)}`,
+    rgba: Object.freeze({ r, g, b, a }),
+    texel: Object.freeze({ x: texel.x, y: texel.y }),
+    sourceTextureUuid: resolved.sourceTexture.uuid,
+    sourceName: resolved.sourceTexture.name,
+    targetId: resolved.target?.id ?? null,
+  }));
+}
+
+interface PreparedFillSelection {
+  readonly bitMask: Uint8Array;
+  readonly changedCount: number;
+  readonly rect: StudioVrmTextureRect;
+}
+
+function textureFillBitIsSet(mask: Uint8Array, position: number): boolean {
+  return (mask[position >>> 3]! & (1 << (position & 7))) !== 0;
+}
+
+function setTextureFillBit(mask: Uint8Array, position: number): void {
+  const byteIndex = position >>> 3;
+  mask[byteIndex] = mask[byteIndex]! | (1 << (position & 7));
+}
+
+function countTextureFillBits(mask: Uint8Array): number {
+  let count = 0;
+  for (const byte of mask) {
+    let value = byte;
+    value -= (value >>> 1) & 0x55;
+    value = (value & 0x33) + ((value >>> 2) & 0x33);
+    count += (value + (value >>> 4)) & 0x0f;
+  }
+  return count;
+}
+
+function isValidTextureFillRect(
+  rect: StudioVrmTextureRect,
+  size: StudioVrmTextureSize,
+): boolean {
+  return Number.isSafeInteger(rect.x)
+    && Number.isSafeInteger(rect.y)
+    && Number.isSafeInteger(rect.width)
+    && Number.isSafeInteger(rect.height)
+    && rect.x >= 0
+    && rect.y >= 0
+    && rect.width > 0
+    && rect.height > 0
+    && rect.x + rect.width <= size.width
+    && rect.y + rect.height <= size.height;
+}
+
+/**
+ * Validates the Worker mask, removes pixels already equal to the requested RGB, and crops the
+ * retained history mask to the actually changed rectangle. Alpha is intentionally not compared or
+ * changed because VRM baseColor transparency usually controls cutout hair/clothes.
+ */
+function prepareTextureFillSelection(
+  pixels: Uint8ClampedArray,
+  size: StudioVrmTextureSize,
+  result: StudioVrmTextureFillResult,
+  color: Readonly<{ r: number; g: number; b: number }>,
+): PreparedFillSelection | null {
+  const pixelCount = size.width * size.height;
+  if (
+    !(result.bitMask instanceof Uint8Array)
+    || result.bitMask.byteLength !== Math.ceil(pixelCount / 8)
+    || !Number.isSafeInteger(result.matchedCount)
+    || result.matchedCount <= 0
+    || result.matchedCount > pixelCount
+    || !result.bounds
+    || !isValidTextureFillRect(result.bounds, size)
+    // A Worker result is an untrusted transaction proposal. Its declared count must cover every
+    // set bit, including bits outside the declared bounds and padding bits past the texture end.
+    || countTextureFillBits(result.bitMask) !== result.matchedCount
+  ) {
+    return null;
+  }
+
+  let observedMatches = 0;
+  let changedCount = 0;
+  let minX = size.width;
+  let minY = size.height;
+  let maxX = -1;
+  let maxY = -1;
+  const right = result.bounds.x + result.bounds.width;
+  const bottom = result.bounds.y + result.bounds.height;
+  for (let y: number = result.bounds.y; y < bottom; y += 1) {
+    for (let x: number = result.bounds.x; x < right; x += 1) {
+      const atlasPosition: number = y * size.width + x;
+      if (!textureFillBitIsSet(result.bitMask, atlasPosition)) continue;
+      observedMatches += 1;
+      const offset = atlasPosition * RGBA_CHANNELS;
+      if (
+        pixels[offset] === color.r
+        && pixels[offset + 1] === color.g
+        && pixels[offset + 2] === color.b
+      ) {
+        continue;
+      }
+      changedCount += 1;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (observedMatches !== result.matchedCount) return null;
+  if (changedCount === 0) {
+    return {
+      bitMask: new Uint8Array(0),
+      changedCount: 0,
+      rect: EMPTY_STUDIO_VRM_TEXTURE_RECT,
+    };
+  }
+
+  const rect = {
+    x: minX,
+    y: minY,
+    width: maxX - minX + 1,
+    height: maxY - minY + 1,
+  };
+  const localMask = new Uint8Array(Math.ceil((rect.width * rect.height) / 8));
+  const changedRight = rect.x + rect.width;
+  const changedBottom = rect.y + rect.height;
+  for (let y = rect.y; y < changedBottom; y += 1) {
+    for (let x = rect.x; x < changedRight; x += 1) {
+      const atlasPosition = y * size.width + x;
+      if (!textureFillBitIsSet(result.bitMask, atlasPosition)) continue;
+      const offset = atlasPosition * RGBA_CHANNELS;
+      if (
+        pixels[offset] === color.r
+        && pixels[offset + 1] === color.g
+        && pixels[offset + 2] === color.b
+      ) {
+        continue;
+      }
+      setTextureFillBit(localMask, (y - rect.y) * rect.width + x - rect.x);
+    }
+  }
+  return { bitMask: localMask, changedCount, rect };
+}
+
+function textureFillHistoryBytes(
+  selection: PreparedFillSelection,
+): number | null {
+  const beforeBytes = selection.changedCount * 3;
+  if (!Number.isSafeInteger(beforeBytes) || beforeBytes < 0) return null;
+  const bytes = saturatedByteSum(selection.bitMask.byteLength, beforeBytes, 32);
+  return bytes === Number.MAX_SAFE_INTEGER ? null : bytes;
+}
+
+function textureFillResultMatchesSeed(
+  pixels: Uint8ClampedArray,
+  size: StudioVrmTextureSize,
+  seed: Readonly<{ readonly x: number; readonly y: number; readonly index: number }>,
+  result: StudioVrmTextureFillResult,
+): boolean {
+  const pixelCount = size.width * size.height;
+  const seedRgba = result.seedRgba as unknown;
+  if (
+    !(result.bitMask instanceof Uint8Array)
+    || result.bitMask.byteLength !== Math.ceil(pixelCount / 8)
+    || !textureFillBitIsSet(result.bitMask, seed.index)
+    || !result.bounds
+    || seed.x < result.bounds.x
+    || seed.y < result.bounds.y
+    || seed.x >= result.bounds.x + result.bounds.width
+    || seed.y >= result.bounds.y + result.bounds.height
+    || !Array.isArray(seedRgba)
+    || seedRgba.length !== RGBA_CHANNELS
+    || seedRgba.some(
+      (channel) =>
+        typeof channel !== "number"
+        || !Number.isSafeInteger(channel)
+        || channel < 0
+        || channel > 255,
+    )
+  ) {
+    return false;
+  }
+  const seedOffset = seed.index * RGBA_CHANNELS;
+  return seedRgba[0] === pixels[seedOffset]
+    && seedRgba[1] === pixels[seedOffset + 1]
+    && seedRgba[2] === pixels[seedOffset + 2]
+    && seedRgba[3] === pixels[seedOffset + 3];
+}
+
+function applyTextureFillHistoryPixels(
+  record: FillHistoryRecord,
+  direction: "redo" | "undo",
+): boolean {
+  if (
+    !record.target.valid
+    || !isValidTextureFillRect(record.rect, record.target.size)
+    || record.bitMask.byteLength !== Math.ceil(
+      (record.rect.width * record.rect.height) / 8,
+    )
+  ) {
+    return false;
+  }
+  let beforeOffset = 0;
+  const right = record.rect.x + record.rect.width;
+  const bottom = record.rect.y + record.rect.height;
+  for (let y = record.rect.y; y < bottom; y += 1) {
+    for (let x = record.rect.x; x < right; x += 1) {
+      const localPosition = (y - record.rect.y) * record.rect.width + x - record.rect.x;
+      if (!textureFillBitIsSet(record.bitMask, localPosition)) continue;
+      const pixelOffset = (y * record.target.size.width + x) * RGBA_CHANNELS;
+      if (direction === "undo") {
+        const r = record.beforeRgb[beforeOffset];
+        const g = record.beforeRgb[beforeOffset + 1];
+        const b = record.beforeRgb[beforeOffset + 2];
+        if (r === undefined || g === undefined || b === undefined) return false;
+        record.target.imageData.data[pixelOffset] = r;
+        record.target.imageData.data[pixelOffset + 1] = g;
+        record.target.imageData.data[pixelOffset + 2] = b;
+      } else {
+        record.target.imageData.data[pixelOffset] = record.fillRgb.r;
+        record.target.imageData.data[pixelOffset + 1] = record.fillRgb.g;
+        record.target.imageData.data[pixelOffset + 2] = record.fillRgb.b;
+      }
+      beforeOffset += 3;
+    }
+  }
+  return beforeOffset === record.beforeRgb.byteLength;
+}
+
 function flipRgbaRowsInPlace(
   data: Uint8ClampedArray,
   size: StudioVrmTextureSize,
@@ -943,6 +1359,8 @@ export class StudioVrmTexturePaintRuntime {
   private aggregateRgbaBytes = 0;
   private aggregateTargetResidentBytes = 0;
   private selectedTarget: PaintTarget | null = null;
+  private sampling: PendingColorSample | null = null;
+  private filling: PendingFill | null = null;
   private pending: PendingStroke | null = null;
   private active: ActiveStroke | null = null;
   private lastError: StudioVrmTexturePaintRuntimeError | null = null;
@@ -993,7 +1411,9 @@ export class StudioVrmTexturePaintRuntime {
   exportPaintedTargets():
     StudioVrmTexturePaintRuntimeResult<readonly StudioVrmTexturePaintExportTarget[]> {
     if (this.disposed) return this.fail("disposed");
-    if (this.pending || this.active) return this.fail("pointer-active");
+    if (this.sampling || this.filling || this.pending || this.active) {
+      return this.fail("pointer-active");
+    }
     const exported: StudioVrmTexturePaintExportTarget[] = [];
     const bindingOwners = new Map<string, string>();
     for (const target of this.targets) {
@@ -1031,7 +1451,9 @@ export class StudioVrmTexturePaintRuntime {
     StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintRuntimeSnapshot>
   > {
     if (this.disposed) return this.fail("disposed");
-    if (this.pending || this.active) return this.fail("pointer-active");
+    if (this.sampling || this.filling || this.pending || this.active) {
+      return this.fail("pointer-active");
+    }
     if (!isCanonicalBindingDescriptor(input.binding)) return this.fail("binding-missing");
     if (input.signal?.aborted) return this.fail("source-read-aborted");
     const size = {
@@ -1130,13 +1552,287 @@ export class StudioVrmTexturePaintRuntime {
     }
   }
 
+  async sampleBaseColor(
+    input: StudioVrmTexturePaintColorSampleInput,
+  ): Promise<StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintColorSample>> {
+    if (this.disposed) return this.fail("disposed");
+    if (this.sampling || this.filling || this.pending || this.active) {
+      return this.fail("pointer-active");
+    }
+    if (input.signal?.aborted) return this.fail("source-read-aborted");
+
+    this.lastGuidance = null;
+    const hitResult = this.resolveBaseColorHit(input.hit, true);
+    if (!hitResult.ok) return this.fail(hitResult.error.code);
+    const resolved = hitResult.value;
+    if (resolved.target) {
+      const sampled = sampleResolvedTextureColor(
+        resolved,
+        resolved.target.imageData.data,
+        resolved.target.size,
+      );
+      if (!sampled.ok) return this.fail(sampled.error.code);
+      this.lastError = null;
+      this.lastGuidance = null;
+      this.publish();
+      return sampled;
+    }
+
+    const controller = new AbortController();
+    const abortFromCaller = () => controller.abort();
+    input.signal?.addEventListener("abort", abortFromCaller, { once: true });
+    const request = Object.freeze({ controller });
+    this.sampling = request;
+    this.publish();
+    try {
+      const readable = await this.readSourceTexture(resolved.sourceTexture, controller);
+      if (this.sampling !== request || this.disposed) {
+        return failure(this.disposed ? "disposed" : "stale-completion");
+      }
+      if (!readable.ok) {
+        this.sampling = null;
+        return this.fail(readable.error.code);
+      }
+      const currentHit = this.resolveBaseColorHit(input.hit, true);
+      if (!currentHit.ok || !sameResolvedBaseColorHit(resolved, currentHit.value)) {
+        this.sampling = null;
+        return this.fail("source-changed");
+      }
+      const sampled = sampleResolvedTextureColor(
+        resolved,
+        readable.value.data,
+        readable.value,
+      );
+      this.sampling = null;
+      if (!sampled.ok) return this.fail(sampled.error.code);
+      this.lastError = null;
+      this.lastGuidance = null;
+      this.publish();
+      return sampled;
+    } finally {
+      input.signal?.removeEventListener("abort", abortFromCaller);
+      if (this.sampling === request) {
+        this.sampling = null;
+        this.publish();
+      }
+    }
+  }
+
+  async fillBaseColor(
+    input: StudioVrmTexturePaintFillInput,
+  ): Promise<StudioVrmTexturePaintRuntimeResult<boolean>> {
+    if (this.disposed) return this.fail("disposed");
+    if (this.sampling || this.filling || this.pending || this.active) {
+      return this.fail("pointer-active");
+    }
+    if (input.signal?.aborted) return this.fail("source-read-aborted");
+    const color = parseStudioVrmTextureColor(input.color);
+    if (
+      !color
+      || !Number.isSafeInteger(input.tolerance)
+      || input.tolerance < 0
+      || input.tolerance > 255
+      || (input.scope !== "contiguous" && input.scope !== "whole-material")
+    ) {
+      return this.fail("invalid-style");
+    }
+
+    this.lastGuidance = null;
+    const hitResult = this.resolveBaseColorHit(input.hit, true);
+    if (!hitResult.ok) return this.fail(hitResult.error.code);
+    const resolved = hitResult.value;
+    const initialContentRevision = this.contentRevision;
+    const knownSize = resolved.target?.size ?? textureImageDimensions(resolved.sourceTexture);
+    if (
+      knownSize
+      && !this.admitTextureFillTransient(knownSize, resolved.target === null)
+    ) {
+      return this.fail("fill-memory-budget");
+    }
+
+    const controller = new AbortController();
+    const abortFromCaller = () => controller.abort();
+    input.signal?.addEventListener("abort", abortFromCaller, { once: true });
+    const request = Object.freeze({ controller });
+    this.filling = request;
+    this.publish();
+    try {
+      let readable: StudioVrmTexturePaintReadableImage;
+      if (resolved.target) {
+        readable = {
+          width: resolved.target.size.width,
+          height: resolved.target.size.height,
+          data: resolved.target.imageData.data,
+        };
+      } else {
+        const readResult = await this.readSourceTexture(resolved.sourceTexture, controller);
+        if (this.filling !== request || this.disposed) {
+          return failure(this.disposed ? "disposed" : "stale-completion");
+        }
+        if (!readResult.ok) return this.fail(readResult.error.code);
+        readable = readResult.value;
+      }
+      if (controller.signal.aborted) return this.fail("source-read-aborted");
+
+      const size = { width: readable.width, height: readable.height };
+      if (
+        !isStudioVrmTextureSize(size)
+        || !this.admitTextureFillTransient(size, resolved.target === null)
+      ) {
+        return this.fail("fill-memory-budget");
+      }
+      const currentBeforeWorker = this.resolveBaseColorHit(input.hit, true);
+      if (
+        !currentBeforeWorker.ok
+        || !sameResolvedBaseColorHit(resolved, currentBeforeWorker.value)
+        || this.contentRevision !== initialContentRevision
+      ) {
+        return this.fail("source-changed");
+      }
+      const seed = resolveStudioVrmTexelIndex(resolved.uv, size, {
+        wrapU: resolved.wrapU,
+        wrapV: resolved.wrapV,
+        flipV: false,
+      });
+      if (!seed) return this.fail("uv-missing");
+
+      let fillResult: StudioVrmTextureFillWorkerClientResult;
+      try {
+        let workerPixels: Uint8ClampedArray;
+        try {
+          workerPixels = readable.data.slice();
+        } catch {
+          return this.fail("fill-memory-budget");
+        }
+        fillResult = await this.options.runTextureFill({
+          pixels: workerPixels,
+          width: size.width,
+          height: size.height,
+          seed: { x: seed.x, y: seed.y },
+          tolerance: input.tolerance,
+          scope: input.scope,
+        }, {
+          signal: controller.signal,
+        });
+      } catch (error) {
+        if (this.filling !== request || this.disposed) {
+          return failure(this.disposed ? "disposed" : "stale-completion");
+        }
+        if (controller.signal.aborted) return this.fail("source-read-aborted");
+        const name =
+          typeof error === "object" && error !== null && "name" in error
+            ? String((error as { readonly name?: unknown }).name)
+            : "";
+        return this.fail(
+          name === "NotSupportedError"
+            ? "fill-worker-unavailable"
+            : "fill-worker-failed",
+        );
+      }
+      if (this.filling !== request || this.disposed) {
+        return failure(this.disposed ? "disposed" : "stale-completion");
+      }
+      if (controller.signal.aborted) return this.fail("source-read-aborted");
+
+      const currentAfterWorker = this.resolveBaseColorHit(input.hit, true);
+      if (
+        !currentAfterWorker.ok
+        || !sameResolvedBaseColorHit(resolved, currentAfterWorker.value)
+        || this.contentRevision !== initialContentRevision
+      ) {
+        return this.fail("source-changed");
+      }
+      if (
+        fillResult.execution !== "worker"
+        || !textureFillResultMatchesSeed(readable.data, size, seed, fillResult.result)
+      ) {
+        return this.fail("fill-worker-failed");
+      }
+      const selection = prepareTextureFillSelection(
+        readable.data,
+        size,
+        fillResult.result,
+        color,
+      );
+      if (!selection) return this.fail("fill-worker-failed");
+      if (selection.changedCount === 0) {
+        this.selectedTarget = resolved.target;
+        this.lastError = null;
+        this.lastGuidance = null;
+        this.publish();
+        return success(false);
+      }
+      const historyBytes = textureFillHistoryBytes(selection);
+      if (historyBytes === null) {
+        return this.fail("history-budget");
+      }
+
+      const historyCheckpoint = this.captureHistoryCheckpoint();
+      if (!this.admitHistoryPeak(historyBytes)) {
+        this.restoreHistoryCheckpoint(historyCheckpoint);
+        return this.fail("history-budget");
+      }
+
+      let target = resolved.target;
+      let createdTarget: PaintTarget | null = null;
+      if (!target) {
+        const targetResult = this.createTarget(resolved.sourceTexture, readable);
+        if (!targetResult.ok) {
+          this.restoreHistoryCheckpoint(historyCheckpoint);
+          return this.fail(targetResult.error.code);
+        }
+        target = targetResult.value;
+        createdTarget = target;
+      } else {
+        const rebound = this.bindUnownedSourceMaterials(target);
+        if (!rebound.ok) {
+          this.restoreHistoryCheckpoint(historyCheckpoint);
+          return this.fail(rebound.error.code);
+        }
+      }
+      if (!target.valid) {
+        this.restoreHistoryCheckpoint(historyCheckpoint);
+        return this.fail("target-invalid");
+      }
+
+      const history = this.applyInitialTextureFill(
+        target,
+        selection,
+        color,
+        historyBytes,
+      );
+      if (!history.ok) {
+        if (createdTarget?.valid) this.invalidateTarget(createdTarget);
+        this.restoreHistoryCheckpoint(historyCheckpoint);
+        return this.fail(history.error.code);
+      }
+      this.clearFutureHistory();
+      this.historyPast.push(history.value);
+      this.historyBytes += history.value.bytes;
+      this.evictHistory();
+      this.selectedTarget = target;
+      this.lastError = null;
+      this.lastGuidance = null;
+      this.publish();
+      return success(true);
+    } finally {
+      input.signal?.removeEventListener("abort", abortFromCaller);
+      if (this.filling === request) {
+        this.filling = null;
+        this.publish();
+      }
+    }
+  }
+
   async beginStroke(
     input: StudioVrmTexturePaintStrokeBegin,
   ): Promise<StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintRuntimeSnapshot>> {
     if (this.disposed) return this.fail("disposed");
     if (!this.isPointerId(input.pointerId)) return this.fail("invalid-pointer");
     if (!isValidStrokeStyle(input.style)) return this.fail("invalid-style");
-    if (this.pending || this.active) return this.fail("pointer-active");
+    if (this.sampling || this.filling || this.pending || this.active) {
+      return this.fail("pointer-active");
+    }
 
     this.lastGuidance = null;
     const hitResult = this.resolveHit(input.hit, input.pressure);
@@ -1323,25 +2019,20 @@ export class StudioVrmTexturePaintRuntime {
 
   undo(): StudioVrmTexturePaintRuntimeResult<boolean> {
     if (this.disposed) return this.fail("disposed");
-    if (this.pending || this.active) return this.fail("pointer-active");
+    if (this.sampling || this.filling || this.pending || this.active) {
+      return this.fail("pointer-active");
+    }
     const record = this.historyPast.at(-1);
     if (!record) return success(false);
     if (!record.target.valid) return this.fail("target-invalid");
-    if (!applyStudioVrmTextureUndoEntry(
-      record.target.imageData.data,
-      record.target.size,
-      record.entry,
-      "undo",
-    )) {
+    if (!this.applyHistoryRecord(record, "undo")) {
       return this.fail("invalid-dimensions");
     }
-    if (!this.syncTarget(record.target)) {
-      const rolledBack = applyStudioVrmTextureUndoEntry(
-        record.target.imageData.data,
-        record.target.size,
-        record.entry,
-        "redo",
-      ) && this.syncTarget(record.target);
+    const dirtyRect = this.historyRecordDirtyRect(record);
+    if (!this.syncTarget(record.target, dirtyRect)) {
+      const rolledBack =
+        this.applyHistoryRecord(record, "redo")
+        && this.syncTarget(record.target, dirtyRect);
       if (!rolledBack) {
         this.invalidateTarget(record.target);
         return this.fail("target-invalid");
@@ -1357,25 +2048,20 @@ export class StudioVrmTexturePaintRuntime {
 
   redo(): StudioVrmTexturePaintRuntimeResult<boolean> {
     if (this.disposed) return this.fail("disposed");
-    if (this.pending || this.active) return this.fail("pointer-active");
+    if (this.sampling || this.filling || this.pending || this.active) {
+      return this.fail("pointer-active");
+    }
     const record = this.historyFuture.at(-1);
     if (!record) return success(false);
     if (!record.target.valid) return this.fail("target-invalid");
-    if (!applyStudioVrmTextureUndoEntry(
-      record.target.imageData.data,
-      record.target.size,
-      record.entry,
-      "redo",
-    )) {
+    if (!this.applyHistoryRecord(record, "redo")) {
       return this.fail("invalid-dimensions");
     }
-    if (!this.syncTarget(record.target)) {
-      const rolledBack = applyStudioVrmTextureUndoEntry(
-        record.target.imageData.data,
-        record.target.size,
-        record.entry,
-        "undo",
-      ) && this.syncTarget(record.target);
+    const dirtyRect = this.historyRecordDirtyRect(record);
+    if (!this.syncTarget(record.target, dirtyRect)) {
+      const rolledBack =
+        this.applyHistoryRecord(record, "undo")
+        && this.syncTarget(record.target, dirtyRect);
       if (!rolledBack) {
         this.invalidateTarget(record.target);
         return this.fail("target-invalid");
@@ -1391,7 +2077,9 @@ export class StudioVrmTexturePaintRuntime {
 
   resetActiveTarget(): StudioVrmTexturePaintRuntimeResult<boolean> {
     if (this.disposed) return this.fail("disposed");
-    if (this.pending || this.active) return this.fail("pointer-active");
+    if (this.sampling || this.filling || this.pending || this.active) {
+      return this.fail("pointer-active");
+    }
     const target = this.selectedTarget;
     if (!target) return success(false);
     if (!target.valid) return this.fail("target-invalid");
@@ -1409,7 +2097,11 @@ export class StudioVrmTexturePaintRuntime {
     if (this.disposed) return;
     this.disposed = true;
     this.geometryPrewarmController.abort();
+    this.sampling?.controller.abort();
+    this.filling?.controller.abort();
     for (const controller of this.inFlightReadControllers) controller.abort();
+    this.sampling = null;
+    this.filling = null;
     this.pending = null;
     if (this.active) {
       this.active.recorder.cancel();
@@ -1486,6 +2178,138 @@ export class StudioVrmTexturePaintRuntime {
     }
   }
 
+  private admitTextureFillTransient(
+    size: StudioVrmTextureSize,
+    includeUnpreparedTarget: boolean,
+  ): boolean {
+    const pixelCount = size.width * size.height;
+    const rgbaBytes = pixelCount * RGBA_CHANNELS;
+    if (
+      !Number.isSafeInteger(pixelCount)
+      || !Number.isSafeInteger(rgbaBytes)
+      || pixelCount <= 0
+      || rgbaBytes <= 0
+    ) {
+      return false;
+    }
+    // Transient peak: transferred RGBA input + worker Uint32 queue + returned 1-bit mask.
+    const transientBytes = saturatedByteSum(
+      rgbaBytes,
+      rgbaBytes,
+      Math.ceil(pixelCount / 8),
+    );
+    const unpreparedTargetBytes = includeUnpreparedTarget
+      ? estimateStudioVrmTexturePaintTargetResidentBytes(size)
+      : 0;
+    if (
+      transientBytes === Number.MAX_SAFE_INTEGER
+      || unpreparedTargetBytes === null
+    ) {
+      return false;
+    }
+    return saturatedByteSum(
+      this.aggregateTargetResidentBytes,
+      this.historyBytes,
+      unpreparedTargetBytes,
+      transientBytes,
+    ) <= this.options.maxAggregateResidentBytes;
+  }
+
+  private applyInitialTextureFill(
+    target: PaintTarget,
+    selection: PreparedFillSelection,
+    color: Readonly<{ r: number; g: number; b: number }>,
+    bytes: number,
+  ): StudioVrmTexturePaintRuntimeResult<FillHistoryRecord> {
+    if (
+      !target.valid
+      || !isValidTextureFillRect(selection.rect, target.size)
+      || selection.bitMask.byteLength !== Math.ceil(
+        (selection.rect.width * selection.rect.height) / 8,
+      )
+      || !Number.isSafeInteger(selection.changedCount)
+      || selection.changedCount <= 0
+    ) {
+      return failure("fill-worker-failed");
+    }
+    let beforeRgb: Uint8Array;
+    try {
+      beforeRgb = new Uint8Array(selection.changedCount * 3);
+    } catch {
+      return failure("fill-memory-budget");
+    }
+    const record: FillHistoryRecord = {
+      kind: "fill",
+      target,
+      bitMask: selection.bitMask,
+      beforeRgb,
+      fillRgb: Object.freeze({ r: color.r, g: color.g, b: color.b }),
+      rect: selection.rect,
+      bytes,
+    };
+
+    // Snapshot and validate every addressed pixel before the first mutation. A malformed mask can
+    // therefore never leave a partially recolored texture behind.
+    let beforeOffset = 0;
+    const right = selection.rect.x + selection.rect.width;
+    const bottom = selection.rect.y + selection.rect.height;
+    for (let y = selection.rect.y; y < bottom; y += 1) {
+      for (let x = selection.rect.x; x < right; x += 1) {
+        const localPosition =
+          (y - selection.rect.y) * selection.rect.width + x - selection.rect.x;
+        if (!textureFillBitIsSet(selection.bitMask, localPosition)) continue;
+        const pixelOffset = (y * target.size.width + x) * RGBA_CHANNELS;
+        const r = target.imageData.data[pixelOffset];
+        const g = target.imageData.data[pixelOffset + 1];
+        const b = target.imageData.data[pixelOffset + 2];
+        if (r === undefined || g === undefined || b === undefined) {
+          return failure("invalid-dimensions");
+        }
+        beforeRgb[beforeOffset] = r;
+        beforeRgb[beforeOffset + 1] = g;
+        beforeRgb[beforeOffset + 2] = b;
+        beforeOffset += 3;
+      }
+    }
+    if (beforeOffset !== beforeRgb.byteLength) return failure("fill-worker-failed");
+    if (!applyTextureFillHistoryPixels(record, "redo")) {
+      const rolledBack = applyTextureFillHistoryPixels(record, "undo");
+      if (!rolledBack) {
+        this.invalidateTarget(target);
+        return failure("target-invalid");
+      }
+      return failure("fill-worker-failed");
+    }
+    if (this.syncTarget(target, selection.rect)) return success(record);
+    const rolledBack =
+      applyTextureFillHistoryPixels(record, "undo")
+      && this.syncTarget(target, selection.rect);
+    if (!rolledBack) {
+      this.invalidateTarget(target);
+      return failure("target-invalid");
+    }
+    return failure("canvas-unavailable");
+  }
+
+  private applyHistoryRecord(
+    record: HistoryRecord,
+    direction: "redo" | "undo",
+  ): boolean {
+    if (record.kind === "stroke") {
+      return applyStudioVrmTextureUndoEntry(
+        record.target.imageData.data,
+        record.target.size,
+        record.entry,
+        direction,
+      );
+    }
+    return applyTextureFillHistoryPixels(record, direction);
+  }
+
+  private historyRecordDirtyRect(record: HistoryRecord): StudioVrmTextureRect {
+    return record.kind === "stroke" ? record.entry.rect : record.rect;
+  }
+
   private appendStrokeSample(
     samples: StudioVrmTextureStrokeSample[],
     sample: StudioVrmTextureStrokeSample,
@@ -1507,10 +2331,10 @@ export class StudioVrmTexturePaintRuntime {
     return "appended";
   }
 
-  private resolveHit(
+  private resolveBaseColorHit(
     hit: StudioVrmTexturePaintRayHit,
-    pressure: number | undefined,
-  ): StudioVrmTexturePaintRuntimeResult<ResolvedPaintHit> {
+    captureSamplingSignature = false,
+  ): StudioVrmTexturePaintRuntimeResult<ResolvedBaseColorHit> {
     const object = hit.object as THREE.Object3D & { readonly isMesh?: unknown };
     if (object?.isMesh !== true) return failure("mesh-missing");
     if (!objectBelongsToScene(object, this.scene)) return failure("hit-outside-scene");
@@ -1528,11 +2352,15 @@ export class StudioVrmTexturePaintRuntime {
     if (target && !target.valid) return failure("target-invalid");
     const sourceTexture = target?.originalTexture ?? map;
     const effectiveTexture = target?.paintedTexture ?? map;
-    const textureChannel = effectiveTexture.channel;
+    let textureChannel: number;
+    try {
+      textureChannel = effectiveTexture.channel;
+    } catch {
+      return failure("source-unreadable");
+    }
     if (textureChannel !== 0 && textureChannel !== 1) {
       return failure("uv-missing");
     }
-    const uvAttribute = textureChannel === 1 ? "uv1" : "uv";
     const uv = finiteUv(textureChannel === 1 ? hit.uv1 : hit.uv);
     if (!uv) return failure("uv-missing");
     try {
@@ -1542,6 +2370,51 @@ export class StudioVrmTexturePaintRuntime {
       return failure("uv-missing");
     }
     if (!Number.isFinite(uv.x) || !Number.isFinite(uv.y)) return failure("uv-missing");
+    let samplingSignature: TextureSamplingSignature | null = null;
+    let wrapS: THREE.Wrapping;
+    let wrapT: THREE.Wrapping;
+    try {
+      if (captureSamplingSignature) {
+        samplingSignature = textureSamplingSignature(effectiveTexture);
+        wrapS = samplingSignature.wrapS;
+        wrapT = samplingSignature.wrapT;
+      } else {
+        // A matrix-array signature is necessary only across an async sample read. Avoid allocating
+        // it for every high-frequency brush pointermove.
+        wrapS = effectiveTexture.wrapS;
+        wrapT = effectiveTexture.wrapT;
+      }
+    } catch {
+      return failure("source-unreadable");
+    }
+    return success({
+      material,
+      sourceTexture,
+      effectiveTexture,
+      target,
+      uv: Object.freeze({ u: uv.x, v: uv.y }),
+      wrapU: textureWrapMode(wrapS),
+      wrapV: textureWrapMode(wrapT),
+      samplingSignature,
+    });
+  }
+
+  private resolveHit(
+    hit: StudioVrmTexturePaintRayHit,
+    pressure: number | undefined,
+  ): StudioVrmTexturePaintRuntimeResult<ResolvedPaintHit> {
+    const baseResult = this.resolveBaseColorHit(hit);
+    if (!baseResult.ok) return baseResult;
+    const base = baseResult.value;
+    const object = hit.object as THREE.Mesh;
+    const {
+      effectiveTexture,
+      material,
+      sourceTexture,
+      target,
+      uv,
+    } = base;
+    const uvAttribute = effectiveTexture.channel === 1 ? "uv1" : "uv";
 
     const world = finiteWorld(hit.point);
     const faceIndexProvided = hit.faceIndex !== undefined && hit.faceIndex !== null;
@@ -1615,18 +2488,14 @@ export class StudioVrmTexturePaintRuntime {
       }
     }
     return success({
-      material,
-      sourceTexture,
-      target,
+      ...base,
       sample: {
-        uv: { u: uv.x, v: uv.y },
+        uv,
         ...(pressure === undefined ? {} : { pressure }),
         islandId,
         ...(world ? { world } : {}),
         ...(texelsPerWorldUnit === undefined ? {} : { texelsPerWorldUnit }),
       },
-      wrapU: textureWrapMode(effectiveTexture.wrapS),
-      wrapV: textureWrapMode(effectiveTexture.wrapT),
       paintWrap: paintWrapOptions(effectiveTexture),
     });
   }
@@ -1795,10 +2664,13 @@ export class StudioVrmTexturePaintRuntime {
           originalMap: material.map,
           descriptor,
         } satisfies MaterialBinding;
+        // Register rollback ownership before invoking a potentially hostile custom setter. A
+        // setter may store the new map and then throw; recording afterwards would strand a
+        // disposed CanvasTexture on the material.
+        changed.push(binding);
         material.map = target.paintedTexture;
         markMaterialChanged(material);
         target.bindings.set(material, binding);
-        changed.push(binding);
       }
       return success(changed.length > 0);
     } catch {
@@ -1895,7 +2767,12 @@ export class StudioVrmTexturePaintRuntime {
     }
 
     this.clearFutureHistory();
-    const record = { target: stroke.target, entry, bytes };
+    const record: StrokeHistoryRecord = {
+      kind: "stroke",
+      target: stroke.target,
+      entry,
+      bytes,
+    };
     this.historyPast.push(record);
     this.historyBytes += bytes;
     this.evictHistory();
@@ -1908,6 +2785,23 @@ export class StudioVrmTexturePaintRuntime {
     this.historyFuture = [];
   }
 
+  private captureHistoryCheckpoint(): HistoryCheckpoint {
+    return {
+      past: this.historyPast.slice(),
+      future: this.historyFuture.slice(),
+    };
+  }
+
+  private restoreHistoryCheckpoint(checkpoint: HistoryCheckpoint): void {
+    // A failed canvas upload can invalidate one target. Restore every still-valid record while
+    // deliberately omitting records that can no longer be replayed safely.
+    this.historyPast = checkpoint.past.filter((record) => record.target.valid);
+    this.historyFuture = checkpoint.future.filter((record) => record.target.valid);
+    this.historyBytes = 0;
+    for (const record of this.historyPast) this.historyBytes += record.bytes;
+    for (const record of this.historyFuture) this.historyBytes += record.bytes;
+  }
+
   private admitHistoryPeak(requiredPeakBytes: number): boolean {
     if (
       !Number.isSafeInteger(requiredPeakBytes)
@@ -1917,17 +2811,14 @@ export class StudioVrmTexturePaintRuntime {
       return false;
     }
     const retainedHistoryLimit = this.options.maxHistoryBytes - requiredPeakBytes;
-    let evicted = false;
     while (this.historyBytes > retainedHistoryLimit) {
       // 새 획이 완료되면 redo branch는 어차피 무효화된다. 가장 가까운 redo를 최대한
       // 보존하도록 먼 redo부터, 그 다음 가장 오래된 undo부터 필요한 만큼만 제거한다.
       const record = this.historyFuture.shift() ?? this.historyPast.shift();
       if (!record) break;
       this.historyBytes -= record.bytes;
-      evicted = true;
     }
     this.historyBytes = Math.max(0, this.historyBytes);
-    if (evicted) this.publish();
     return this.historyBytes <= retainedHistoryLimit;
   }
 
@@ -2061,7 +2952,7 @@ export class StudioVrmTexturePaintRuntime {
     }));
     const status: StudioVrmTexturePaintRuntimeStatus = this.disposed
       ? "disposed"
-      : this.pending
+      : this.sampling || this.filling || this.pending
         ? "loading"
         : this.active
           ? "painting"
@@ -2081,8 +2972,18 @@ export class StudioVrmTexturePaintRuntime {
           invalidReason: this.selectedTarget.invalidReason,
         })
       : null;
+    const activeOperation = this.sampling
+      ? "sample"
+      : this.filling
+        ? "fill"
+        : this.pending
+          ? "stroke-read"
+          : this.active
+            ? "stroke"
+            : null;
     return Object.freeze({
       status,
+      activeOperation,
       activePointerId: this.pending?.pointerId ?? this.active?.pointerId ?? null,
       activeTargetId: this.selectedTarget?.id ?? null,
       activeTarget,

@@ -300,7 +300,7 @@ describe("StudioToolHint", () => {
     expect(source).toContain("coordinator.claim(tipId)");
     expect(source).toContain("coordinator.release(tipId)");
     expect(source).toContain("const open = useSyncExternalStore(");
-    expect(source).toContain("dismissToolHintsImmediately(coordinator)");
+    expect(source).toContain("dismissToolHintsImmediately(coordinator, interaction)");
   });
 
   it("provides compact, rich, and off help modes without changing disabled semantics", () => {

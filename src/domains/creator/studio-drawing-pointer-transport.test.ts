@@ -242,6 +242,42 @@ describe("studio drawing pointer transport", () => {
     controller.release();
   });
 
+  it("delivers processed and raw pen samples synchronously without a frame-queue wait", () => {
+    const windowTarget = new TestEventTarget();
+    const controller = createStudioDrawingPointerTransportController({ windowTarget });
+    const down = pointerEvent("pointerdown");
+    const order: string[] = [];
+    const spies = portSpies({
+      onAuthoritativeMove: () => {
+        order.push("authoritative");
+      },
+      onRawPreviewMove: () => {
+        order.push("raw-preview");
+      },
+    });
+    controller.updatePorts(spies.ports);
+    controller.start({ pointerEvent: down, session: pointerSession(down), stage: null });
+
+    order.push("before-raw");
+    windowTarget.emit("pointerrawupdate", pointerEvent("pointerrawupdate", { timeStamp: 2 }));
+    order.push("after-raw");
+    windowTarget.emit("pointermove", pointerEvent("pointermove", { timeStamp: 3 }));
+    order.push("after-move");
+
+    expect(order).toEqual([
+      "before-raw",
+      "raw-preview",
+      "after-raw",
+      "authoritative",
+      "after-move",
+    ]);
+    expect(controller.getDiagnostics()).toMatchObject({
+      authoritativeMoveDeliveries: 1,
+      rawPreviewDeliveries: 1,
+    });
+    controller.release();
+  });
+
   it("uses pen raw updates for cursor preview without advancing authoritative ink", () => {
     const windowTarget = new TestEventTarget();
     const controller = createStudioDrawingPointerTransportController({ windowTarget });
@@ -330,6 +366,69 @@ describe("studio drawing pointer transport", () => {
     expect(controller.consumeHandledNativeEnd(up)).toBe(true);
     expect(controller.consumeHandledNativeEnd(up)).toBe(false);
     expect(controller.getSession()).toBeNull();
+  });
+
+  it("claims the final pointerup endpoint exactly once even before a consumer releases", () => {
+    const windowTarget = new TestEventTarget();
+    const controller = createStudioDrawingPointerTransportController({ windowTarget });
+    const down = pointerEvent("pointerdown");
+    const spies = portSpies();
+    controller.updatePorts(spies.ports);
+    controller.start({ pointerEvent: down, session: pointerSession(down), stage: null });
+
+    const up = pointerEvent("pointerup", {
+      buttons: 0,
+      clientX: 127,
+      clientY: 233,
+      pressure: 0,
+      timeStamp: 9,
+    });
+    windowTarget.emit("pointerup", up);
+    windowTarget.emit("pointerup", up);
+    windowTarget.emit("pointermove", pointerEvent("pointermove", { timeStamp: 10 }));
+
+    expect(spies.onFinish).toHaveBeenCalledTimes(1);
+    expect(spies.onFinish).toHaveBeenCalledWith(up, {
+      cancelled: false,
+      consumeReleaseSample: true,
+      reason: "pointerup",
+    });
+    expect(spies.onFinish.mock.calls[0]?.[0]).toMatchObject({
+      clientX: 127,
+      clientY: 233,
+      pressure: 0,
+    });
+    expect(controller.getDiagnostics()).toEqual({
+      authoritativeMoveDeliveries: 0,
+      rawPreviewDeliveries: 0,
+      finishRequests: 1,
+      discardRequests: 0,
+      deliveriesAfterTerminalClaim: 2,
+    });
+    controller.release();
+  });
+
+  it("releases capture and high-rate listeners when a terminal consumer throws", () => {
+    const windowTarget = new TestEventTarget();
+    const captureTarget = new TestCaptureTarget();
+    const controller = createStudioDrawingPointerTransportController({ windowTarget });
+    const down = pointerEvent("pointerdown", {
+      target: captureTarget as unknown as EventTarget,
+    });
+    const expected = new Error("finish failed");
+    controller.updatePorts(portSpies({
+      onFinish: () => {
+        throw expected;
+      },
+    }).ports);
+    controller.start({ pointerEvent: down, session: pointerSession(down), stage: null });
+
+    expect(() => {
+      windowTarget.emit("pointerup", pointerEvent("pointerup", { buttons: 0 }));
+    }).toThrow(expected);
+    expect(controller.getSession()).toBeNull();
+    expect(windowTarget.listenerCount()).toBe(0);
+    expect(captureTarget.releasePointerCapture).toHaveBeenCalledWith(7);
   });
 
   it.each([

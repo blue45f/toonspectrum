@@ -179,7 +179,7 @@ export const STUDIO_ELEMENT_ITEMS: readonly StudioElementItem[] = Object.freeze(
     })()),
   item("decor-cloud", "구름", "decor", ["cloud"], 260, 140,
     `<ellipse cx="90" cy="80" rx="50" ry="36" fill="${FILL}" stroke="${INK}" stroke-width="6"/><ellipse cx="140" cy="70" rx="58" ry="42" fill="${FILL}" stroke="${INK}" stroke-width="6"/><ellipse cx="190" cy="84" rx="44" ry="32" fill="${FILL}" stroke="${INK}" stroke-width="6"/><ellipse cx="130" cy="96" rx="70" ry="28" fill="${FILL}" stroke="${INK}" stroke-width="6"/>`),
-  item("decor-speech", "말풍선 틀", "decor", ["speech", "말풍선"], 220, 180,
+  item("decor-speech", "캡션 카드", "decor", ["speech", "캡션", "라벨"], 220, 180,
     `<rect x="16" y="16" width="188" height="120" rx="24" fill="${FILL}" stroke="${INK}" stroke-width="7"/><path d="M70 136 L58 168 L98 136 Z" fill="${FILL}" stroke="${INK}" stroke-width="7" stroke-linejoin="round"/>`),
   item("decor-check", "체크", "decor", ["check", "완료"], 160, 160,
     `<circle cx="80" cy="80" r="68" fill="${FILL}" stroke="${INK}" stroke-width="7"/><path d="M48 82 L72 106 L116 54" fill="none" stroke="${ACCENT}" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>`),
@@ -196,7 +196,6 @@ export const STUDIO_ELEMENT_CATEGORY_CHIPS: readonly {
   { id: "all", label: "전체" },
   { id: "shape", label: "도형" },
   { id: "panel", label: "컷 패널" },
-  { id: "bubble", label: "말풍선" },
   { id: "sfx", label: "효과음" },
   { id: "effect", label: "효과선" },
   { id: "pattern", label: "배경 패턴" },
@@ -218,6 +217,21 @@ export function listStudioElements(
     const searchable = [el.label, el.id, el.category, ...el.keywords].join(" ").toLowerCase();
     return terms.every((term) => searchable.includes(term));
   });
+}
+
+/**
+ * Items shown in the generic element browser.
+ *
+ * Asset-pack speech balloons are flattened SVG images and cannot edit dialogue, tails,
+ * or balloon geometry. Hiding them here keeps the dedicated native balloon tool as the
+ * single, predictable speech-balloon entry point while preserving the pack for legacy
+ * documents and direct lookup.
+ */
+export function listStudioElementLibrary(
+  category: StudioElementCategory | "all" = "all",
+  query = ""
+): StudioElementItem[] {
+  return listStudioElements(category, query).filter((item) => item.category !== "bubble");
 }
 
 export function findStudioElement(id: unknown): StudioElementItem | null {

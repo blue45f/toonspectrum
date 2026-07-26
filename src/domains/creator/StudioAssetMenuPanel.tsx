@@ -27,10 +27,18 @@ import {
   favoriteOnly as filterFavoriteOnly,
   isStudioAssetFavorite,
 } from "./studio-asset-favorites";
+import { writeStudioAssetDragPayload } from "./studio-insert-drag-writer";
+import {
+  evaluateStudioMarketplacePublishRights,
+  type StudioMarketplaceOrigin,
+} from "./studio-marketplace-packages";
 import {
   serializeStudioCommunityAssetDragPayload,
   serializeStudioLocalAssetDragPayload,
 } from "./studio-shared-asset-drag";
+import { StudioCommunityMarketplacePanel } from "./StudioCommunityMarketplacePanel";
+import { StudioCreatorPackMarketplacePanel } from "./StudioCreatorPackMarketplacePanel";
+import { StudioOriginalAssetMarketplacePanel } from "./StudioOriginalAssetMarketplacePanel";
 
 import type {
   StudioAssetFavoriteId,
@@ -95,7 +103,7 @@ export interface StudioAssetMenuPanelProps {
   renamingAssetName: string;
   setRenamingAssetName: Dispatch<SetStateAction<string>>;
   handleRenameAsset: (id: string) => void;
-  onUseLocalAsset: (asset: StudioAsset) => void;
+  onUseLocalAsset: (asset: StudioAsset) => boolean;
   onShareAsset: (asset: StudioAsset, options: StudioAssetShareOptions) => void;
   onDeleteAsset: (id: string) => void;
   publishingId: string | null;
@@ -154,19 +162,14 @@ function sortSharedAssets(
 }
 
 function dragLocalAssetData(event: DragEvent<HTMLElement>, asset: Pick<StudioAsset, "dataUrl" | "width" | "height">) {
-  event.dataTransfer.effectAllowed = "copy";
-  event.dataTransfer.setData(
-    "application/json-asset",
+  writeStudioAssetDragPayload(
+    event.dataTransfer,
     serializeStudioLocalAssetDragPayload({ src: asset.dataUrl, width: asset.width, height: asset.height })
   );
 }
 
 function dragSharedAssetData(event: DragEvent<HTMLElement>, asset: Pick<SharedAssetCatalogItem, "id">) {
-  event.dataTransfer.effectAllowed = "copy";
-  event.dataTransfer.setData(
-    "application/json-asset",
-    serializeStudioCommunityAssetDragPayload(asset.id)
-  );
+  writeStudioAssetDragPayload(event.dataTransfer, serializeStudioCommunityAssetDragPayload(asset.id));
 }
 
 function AssetFavoriteButton({
@@ -323,13 +326,13 @@ export function StudioAssetMenuPanel({
         data-studio-asset-placement-help="true"
         className="mb-2 grid grid-cols-2 gap-1 rounded-xl border border-accent/20 bg-accent-soft/45 p-1.5 text-[0.58rem] leading-snug text-fg-2"
       >
-        <div className="flex min-h-9 items-center gap-1.5 rounded-lg bg-panel/60 px-2">
+        <div className="flex min-h-11 items-center gap-1.5 rounded-lg bg-panel/60 px-2">
           <Plus size={12} className="shrink-0 text-accent" aria-hidden />
           <span><strong className="font-bold text-fg">클릭·탭</strong><br />선택 컷 또는 현재 화면</span>
         </div>
-        <div className="flex min-h-9 items-center gap-1.5 rounded-lg bg-panel/60 px-2">
+        <div className="flex min-h-11 items-center gap-1.5 rounded-lg bg-panel/60 px-2">
           <ImagePlus size={12} className="shrink-0 text-accent" aria-hidden />
-          <span><strong className="font-bold text-fg">끌어 놓기</strong><br />포인터 위치에 정확히</span>
+          <span><strong className="font-bold text-fg">끌어 놓기</strong><br />정확한 위치 · Esc 취소</span>
         </div>
       </div>
 
@@ -447,6 +450,14 @@ export function StudioAssetMenuPanel({
           </div>
         </div>
       )}
+
+      {assetTab === "community" ? (
+        <>
+          <StudioOriginalAssetMarketplacePanel onUseAsset={onUseLocalAsset} />
+          <StudioCreatorPackMarketplacePanel />
+          <StudioCommunityMarketplacePanel onUseAsset={onUseLocalAsset} />
+        </>
+      ) : null}
 
       <div className="mb-2 grid grid-cols-2 gap-1.5">
         <div className="relative col-span-2">
@@ -820,7 +831,27 @@ function PublishAssetDialog({
   const [attributionText, setAttributionText] = useState("");
   const [containsAi, setContainsAi] = useState(asset.kind === "ai");
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
+  const [publishOrigin, setPublishOrigin] = useState<StudioMarketplaceOrigin>(
+    "original-handmade"
+  );
+  const [containsThirdPartyContent, setContainsThirdPartyContent] = useState(false);
+  const [marketplaceDerivativeFree, setMarketplaceDerivativeFree] = useState(false);
+  const [redistributionPermission, setRedistributionPermission] = useState(false);
+  const [sourceReference, setSourceReference] = useState("");
+  const [permissionEvidence, setPermissionEvidence] = useState("");
   const selectedLicense = creatorAssetLicenseOf(license);
+  const externalOrigin = publishOrigin === "cc0"
+    || publishOrigin === "permissive"
+    || publishOrigin === "explicit-permission";
+  const rightsDecision = evaluateStudioMarketplacePublishRights({
+    origin: publishOrigin,
+    creatorOwnsRights: rightsConfirmed,
+    containsThirdPartyContent,
+    recognizableMarketplaceDerivative: !marketplaceDerivativeFree,
+    redistributionPermission,
+    sourceReference,
+    permissionEvidence,
+  });
 
   return (
     <div
@@ -904,15 +935,122 @@ function PublishAssetDialog({
           <input type="checkbox" checked={containsAi} onChange={(event) => setContainsAi(event.target.checked)} />
           생성형 AI가 만든 이미지 또는 요소를 포함합니다.
         </label>
+
+        <div className="mt-3 rounded-lg border border-warn/30 bg-warn/5 p-3">
+          <div className="flex items-start gap-2">
+            <BadgeCheck size={15} className="mt-0.5 shrink-0 text-warn" aria-hidden />
+            <div>
+              <p className="text-xs font-bold text-fg">공유 권리 사전 점검</p>
+              <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">
+                원본·CC0·재배포 허용 라이선스·명시적 허가만 통과합니다. 이 입력은 현재 로컬 정책 점검용이며 증빙 원문을 서버에 저장하지 않습니다.
+              </p>
+            </div>
+          </div>
+          <label className="mt-2 block text-[0.65rem] font-semibold text-fg-2">
+            자료 출처
+            <select
+              value={publishOrigin}
+              onChange={(event) => setPublishOrigin(
+                event.target.value as StudioMarketplaceOrigin
+              )}
+              className={cx(
+                TOUCH_CONTROL_CLASS,
+                "mt-1 w-full rounded-lg border border-line bg-card px-2 text-xs font-normal text-fg outline-none focus:border-accent"
+              )}
+            >
+              <option value="original-handmade">직접 만든 원본</option>
+              <option value="original-procedural">직접 만든 절차형 원본</option>
+              <option value="cc0">CC0 자료</option>
+              <option value="permissive">재배포 허용 퍼미시브 라이선스</option>
+              <option value="explicit-permission">권리자의 명시적 허가</option>
+            </select>
+          </label>
+          {externalOrigin ? (
+            <>
+              <label className="mt-2 block text-[0.65rem] font-semibold text-fg-2">
+                라이선스·출처 원문
+                <input
+                  type="text"
+                  value={sourceReference}
+                  onChange={(event) => setSourceReference(event.target.value.slice(0, 500))}
+                  placeholder="원문 URL 또는 출처 식별자"
+                  className={cx(
+                    TOUCH_CONTROL_CLASS,
+                    "mt-1 w-full rounded-lg border border-line bg-card px-2 text-xs font-normal text-fg outline-none focus:border-accent"
+                  )}
+                />
+              </label>
+              {(publishOrigin === "permissive" || publishOrigin === "explicit-permission") ? (
+                <label className="mt-2 block text-[0.65rem] font-semibold text-fg-2">
+                  재배포 허가 근거
+                  <input
+                    type="text"
+                    value={permissionEvidence}
+                    onChange={(event) => setPermissionEvidence(event.target.value.slice(0, 500))}
+                    placeholder="원본 파일 재배포 허용 조항·허가 문구"
+                    className={cx(
+                      TOUCH_CONTROL_CLASS,
+                      "mt-1 w-full rounded-lg border border-line bg-card px-2 text-xs font-normal text-fg outline-none focus:border-accent"
+                    )}
+                  />
+                </label>
+              ) : null}
+              <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-card p-2.5 text-xs leading-relaxed text-fg-2">
+                <input
+                  className="mt-0.5"
+                  type="checkbox"
+                  checked={redistributionPermission}
+                  onChange={(event) => setRedistributionPermission(event.target.checked)}
+                />
+                <span>라이선스 또는 권리자가 원본 파일의 재배포를 허용합니다.</span>
+              </label>
+            </>
+          ) : null}
+          <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-card p-2.5 text-xs leading-relaxed text-fg-2">
+            <input
+              className="mt-0.5"
+              type="checkbox"
+              checked={containsThirdPartyContent}
+              onChange={(event) => setContainsThirdPartyContent(event.target.checked)}
+            />
+            <span>제3자가 만든 요소가 포함되어 있습니다.</span>
+          </label>
+          <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-card p-2.5 text-xs leading-relaxed text-fg-2">
+            <input
+              className="mt-0.5"
+              type="checkbox"
+              checked={marketplaceDerivativeFree}
+              onChange={(event) => setMarketplaceDerivativeFree(event.target.checked)}
+            />
+            <span>다른 에셋 마켓의 유·무료 상품을 복제하거나 알아볼 수 있게 변형한 자료가 아닙니다.</span>
+          </label>
+        </div>
+
         <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-card p-3 text-xs leading-relaxed text-fg-2">
           <input className="mt-0.5" type="checkbox" checked={rightsConfirmed} onChange={(event) => setRightsConfirmed(event.target.checked)} />
-          <span>직접 제작했거나 이 조건으로 공유할 권한이 있으며, 타인의 권리를 침해하지 않음을 확인합니다.</span>
+          <span>직접 제작했거나 이 조건으로 공유·재배포할 권한이 있으며, 타인의 권리를 침해하지 않음을 확인합니다.</span>
         </label>
+        <ul className="mt-2 grid gap-1" aria-label="공유 권리 검사 결과">
+          {rightsDecision.checks.map((check) => (
+            <li
+              key={check.id}
+              className={cx(
+                "flex items-start gap-1.5 rounded-md px-2 py-1.5 text-[0.6rem] leading-relaxed",
+                check.passed ? "bg-good/8 text-good" : "bg-warn/8 text-warn"
+              )}
+            >
+              {check.passed
+                ? <Check size={12} className="mt-0.5 shrink-0" aria-hidden />
+                : <Flag size={12} className="mt-0.5 shrink-0" aria-hidden />}
+              <span><strong className="font-bold">{check.label}</strong> · {check.message}</span>
+            </li>
+          ))}
+        </ul>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button type="button" onClick={onClose} className={cx(TOUCH_CONTROL_CLASS, "rounded-lg border border-line bg-card text-xs font-semibold text-fg-2 hover:bg-raised")}>취소</button>
           <button
             type="button"
-            disabled={!rightsConfirmed || publishing}
+            disabled={!rightsDecision.allowed || publishing}
             onClick={() => onPublish({
               description,
               tags: tags.split(","),

@@ -14,7 +14,8 @@ describe("studio main-menu catalogue ownership boundary", () => {
     expect(catalogue).not.toMatch(/\b(?:document|window|globalThis)\s*\./u);
     expect(catalogue).not.toContain("StudioPage");
     expect(catalogue).not.toMatch(/\buse(?:Memo|Callback|Effect|State|Ref)\b/u);
-    expect(catalogue.split("\n").length).toBeLessThanOrEqual(1_070);
+    // 캔버스 px 눈금자 메뉴 계약을 포함해도 카탈로그가 독립 모듈 경계를 유지한다.
+    expect(catalogue.split("\n").length).toBeLessThanOrEqual(1_090);
   });
 
   it("leaves only state projection and browser command composition in StudioPage", () => {

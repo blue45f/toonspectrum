@@ -1,6 +1,7 @@
 import {
   Check,
   CircleDot,
+  CornerDownRight,
   Eye,
   EyeOff,
   Film,
@@ -11,6 +12,7 @@ import {
   MoreHorizontal,
   ScanLine,
   Sparkles,
+  type LucideIcon,
 } from "lucide-react";
 import {
   memo,
@@ -21,7 +23,6 @@ import {
 
 import {
   STUDIO_LAYER_COLOR_LABELS,
-  STUDIO_LAYER_KIND_LABELS,
   STUDIO_LAYER_ROLE_LABELS,
   type StudioLayerColor,
   type StudioLayerKind,
@@ -32,6 +33,14 @@ import {
   STUDIO_LAYER_NAVIGATOR_FOCUS_RING,
   STUDIO_LAYER_NAVIGATOR_KIND_ICONS,
 } from "./studio-layer-navigator-row-ui";
+import {
+  buildStudioLayerPaletteStatuses,
+  resolveStudioLayerSemanticKind,
+  STUDIO_LAYER_SEMANTIC_KIND_CLASSES,
+  STUDIO_LAYER_SEMANTIC_KIND_LABELS,
+  visibleStudioLayerPaletteStatuses,
+  type StudioLayerPaletteStatusKind,
+} from "./studio-layer-palette-visual";
 
 import { cn } from "@/lib/utils";
 
@@ -42,6 +51,32 @@ const COLOR_DOT_CLASS: Record<StudioLayerColor, string> = {
   green: "bg-good",
   blue: "bg-cool",
   violet: "bg-[oklch(0.68_0.18_312)]",
+};
+
+const STATUS_ICONS: Record<StudioLayerPaletteStatusKind, LucideIcon> = {
+  "local-hidden": Ghost,
+  hidden: EyeOff,
+  locked: Lock,
+  reference: ScanLine,
+  mask: Layers3,
+  "mask-disabled": Layers3,
+  clipping: CornerDownRight,
+  "alpha-locked": Grid2X2,
+  ai: Sparkles,
+  animated: Film,
+};
+
+const STATUS_CLASSES: Record<StudioLayerPaletteStatusKind, string> = {
+  "local-hidden": "border-line-strong bg-raised text-fg-2",
+  hidden: "border-line-strong bg-raised text-fg-3",
+  locked: "border-accent/30 bg-accent-soft/35 text-accent",
+  reference: "border-cool/30 bg-cool/10 text-cool",
+  mask: "border-good/30 bg-good/10 text-good",
+  "mask-disabled": "border-line bg-card text-fg-3/60",
+  clipping: "border-[oklch(0.68_0.16_312/0.3)] bg-[oklch(0.68_0.16_312/0.1)] text-[oklch(0.76_0.13_312)]",
+  "alpha-locked": "border-accent/30 bg-accent-soft/35 text-accent",
+  ai: "border-warning/30 bg-warning/10 text-warning",
+  animated: "border-cool/30 bg-cool/10 text-cool",
 };
 
 export interface LayerNavigatorRowHandlers {
@@ -119,9 +154,10 @@ export const StudioLayerNavigatorItemRow = memo(
     ]
       .filter(Boolean)
       .join(", ");
+    const semanticKind = resolveStudioLayerSemanticKind(item);
     const accessibleMetadata = [
       current ? "현재 작업 레이어" : selected ? "다중 선택됨" : null,
-      STUDIO_LAYER_KIND_LABELS[kind],
+      STUDIO_LAYER_SEMANTIC_KIND_LABELS[semanticKind],
       groupName ? `그룹 ${groupName}` : null,
       item.role ? `역할 ${STUDIO_LAYER_ROLE_LABELS[item.role]}` : null,
       item.color ? `색 라벨 ${STUDIO_LAYER_COLOR_LABELS[item.color]}` : null,
@@ -132,6 +168,20 @@ export const StudioLayerNavigatorItemRow = memo(
     const visuallyHidden = effectivelyHidden || locallyHidden;
     const multipleSelection = selectionCount > 1;
     const selectionState = current ? "current" : selected ? "selected" : "none";
+    const statuses = buildStudioLayerPaletteStatuses({
+      effectivelyHidden,
+      locallyHidden,
+      effectivelyLocked,
+      fillReference: item.fillReference,
+      masked: item.masked,
+      maskEnabled: item.maskEnabled,
+      clipBelow: item.clipBelow,
+      alphaLocked: item.alphaLocked,
+      aiGenerated: item.aiGenerated,
+      animated: item.animated,
+    });
+    const visibleStatuses = visibleStudioLayerPaletteStatuses(statuses);
+    const statusSummary = statuses.map((status) => status.label).join(", ");
 
     return (
       <li role="none">
@@ -205,8 +255,8 @@ export const StudioLayerNavigatorItemRow = memo(
               "flex min-w-0 flex-1 items-center gap-1.5 px-0.5"
             )}
           >
-            {renameInput ?? (
-              <span className="min-w-0 flex-1">
+            <span className="min-w-0 flex-1">
+              {renameInput ?? (
                 <span
                   className={cn(
                     "block truncate text-[0.72rem] font-semibold",
@@ -216,47 +266,65 @@ export const StudioLayerNavigatorItemRow = memo(
                 >
                   {item.label}
                 </span>
-                <span className={cn(
-                  "flex min-w-0 items-center gap-1 text-[0.68rem] lg:text-[0.58rem]",
-                  selected ? "text-fg-2" : "text-fg-3"
-                )}>
-                  <span className="truncate">
-                    {groupName ?? STUDIO_LAYER_KIND_LABELS[kind]}
-                  </span>
-                  {item.role ? (
-                    <span className="shrink-0 rounded bg-raised px-1 py-0.5">
-                      {STUDIO_LAYER_ROLE_LABELS[item.role]}
-                    </span>
-                  ) : null}
+              )}
+              <span className={cn(
+                "flex min-w-0 items-center gap-1 text-[0.68rem] lg:text-[0.58rem]",
+                selected ? "text-fg-2" : "text-fg-3"
+              )}>
+                <span
+                  data-studio-layer-kind-badge={semanticKind}
+                  className={cn(
+                    "inline-flex h-4 shrink-0 items-center rounded border px-1 text-[0.58rem] font-bold leading-none",
+                    STUDIO_LAYER_SEMANTIC_KIND_CLASSES[semanticKind]
+                  )}
+                >
+                  {STUDIO_LAYER_SEMANTIC_KIND_LABELS[semanticKind]}
                 </span>
+                {groupName ? (
+                  <span className="truncate">{groupName}</span>
+                ) : null}
+                {item.role ? (
+                  <span className="shrink-0 rounded bg-raised px-1 py-0.5">
+                    {STUDIO_LAYER_ROLE_LABELS[item.role]}
+                  </span>
+                ) : null}
               </span>
-            )}
+            </span>
           </span>
-          <span
-            className="hidden shrink-0 items-center gap-0.5 min-[330px]:flex"
-            aria-hidden
-          >
-            {locallyHidden ? <Ghost size={12} className="text-fg-3" /> : null}
-            {effectivelyLocked ? <Lock size={12} className={selected ? "text-accent" : "text-fg-3"} /> : null}
-            {item.fillReference ? (
-              <ScanLine size={12} className="text-cool" />
-            ) : null}
-            {item.alphaLocked ? (
-              <Grid2X2 size={12} className="text-accent" />
-            ) : null}
-            {item.masked ? (
-              <Layers3
-                size={12}
-                className={
-                  item.maskEnabled === false ? "text-fg-3/45" : "text-good"
-                }
-              />
-            ) : null}
-            {item.aiGenerated ? (
-              <Sparkles size={12} className="text-accent" />
-            ) : null}
-            {item.animated ? <Film size={12} className="text-cool" /> : null}
-          </span>
+          {visibleStatuses.visible.length > 0 ? (
+            <span
+              data-studio-layer-status-strip="true"
+              aria-label={statusSummary}
+              title={statusSummary}
+              className="flex max-w-[6.5rem] shrink-0 items-center gap-0.5 overflow-hidden"
+            >
+              {visibleStatuses.visible.map((status) => {
+                const StatusIcon = STATUS_ICONS[status.kind];
+                return (
+                  <span
+                    key={status.kind}
+                    data-studio-layer-status={status.kind}
+                    aria-hidden
+                    className={cn(
+                      "grid size-4 shrink-0 place-items-center rounded border",
+                      STATUS_CLASSES[status.kind]
+                    )}
+                  >
+                    <StatusIcon size={10} strokeWidth={2} />
+                  </span>
+                );
+              })}
+              {visibleStatuses.hiddenCount > 0 ? (
+                <span
+                  aria-hidden
+                  data-studio-layer-status-overflow={visibleStatuses.hiddenCount}
+                  className="inline-flex h-4 shrink-0 items-center rounded border border-line bg-card px-1 text-[0.52rem] font-bold tabular-nums text-fg-3"
+                >
+                  +{visibleStatuses.hiddenCount}
+                </span>
+              ) : null}
+            </span>
+          ) : null}
           <button
             type="button"
             tabIndex={-1}

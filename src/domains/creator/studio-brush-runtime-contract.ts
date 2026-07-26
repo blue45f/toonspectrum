@@ -17,7 +17,6 @@ import type { StudioBrushPreviewStyle } from "./studio-brush-visual";
 
 export type StudioBrushRuntimeEngine =
   | "causal-ink"
-  | "pressure-segments"
   | "stamp-dabs"
   | "calligraphy-segments"
   | "perfect-outline"
@@ -67,7 +66,6 @@ export type StudioBrushRuntimeTexture =
 /** Input/settings model consumed by the renderer rather than merely exposed by the UI. */
 export type StudioBrushRuntimeDynamics =
   | "causal-pressure"
-  | "segment-pressure"
   | "stamp-pressure-flow"
   | "tilt-pressure"
   | "outline-pressure"
@@ -111,10 +109,10 @@ export const STUDIO_BRUSH_RUNTIME_CONTRACT = [
   { id: "fineliner", family: "pen", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "profile-variant" },
   { id: "ballpoint", family: "pen", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "profile-variant" },
   { id: "technical-pen", family: "pen", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "profile-variant" },
-  { id: "gpen", family: "gpen", engine: "pressure-segments", engineVariant: "round", canonicalId: "gpen", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "segment-pressure", distinctness: "unique" },
-  { id: "mapping-pen", family: "gpen", engine: "pressure-segments", engineVariant: "round", canonicalId: "gpen", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "segment-pressure", distinctness: "profile-variant" },
-  { id: "kaburapen", family: "gpen", engine: "pressure-segments", engineVariant: "round", canonicalId: "gpen", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "segment-pressure", distinctness: "profile-variant" },
-  { id: "liner", family: "gpen", engine: "pressure-segments", engineVariant: "round", canonicalId: "gpen", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "segment-pressure", distinctness: "profile-variant" },
+  { id: "gpen", family: "gpen", engine: "perfect-outline", engineVariant: "gpen-taper", canonicalId: "gpen", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "outline-pressure", distinctness: "unique" },
+  { id: "mapping-pen", family: "gpen", engine: "perfect-outline", engineVariant: "gpen-taper", canonicalId: "gpen", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "outline-pressure", distinctness: "profile-variant" },
+  { id: "kaburapen", family: "gpen", engine: "perfect-outline", engineVariant: "gpen-taper", canonicalId: "gpen", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "outline-pressure", distinctness: "profile-variant" },
+  { id: "liner", family: "gpen", engine: "perfect-outline", engineVariant: "gpen-taper", canonicalId: "gpen", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "outline-pressure", distinctness: "profile-variant" },
   { id: "ink-brush", family: "stamp", engine: "stamp-dabs", engineVariant: "ink", canonicalId: "ink-brush", preview: "solid", tip: "stamp-ink", texture: "none", dynamics: "stamp-pressure-flow", distinctness: "unique" },
   { id: "calligraphy", family: "calligraphy", engine: "calligraphy-segments", engineVariant: "tilt-chisel", canonicalId: "calligraphy", preview: "calligraphy", tip: "chisel", texture: "none", dynamics: "tilt-pressure", distinctness: "unique" },
   { id: "brush-pen", family: "calligraphy", engine: "calligraphy-segments", engineVariant: "tilt-chisel", canonicalId: "calligraphy", preview: "calligraphy", tip: "chisel", texture: "none", dynamics: "tilt-pressure", distinctness: "profile-variant" },
@@ -187,9 +185,6 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
   "causal-ink": {
     round: { families: ["pen", "marker"], previews: ["solid"], tip: "round", texture: "none", dynamics: "causal-pressure" },
   },
-  "pressure-segments": {
-    round: { families: ["gpen"], previews: ["calligraphy"], tip: "pressure-round", texture: "none", dynamics: "segment-pressure" },
-  },
   "stamp-dabs": {
     ink: { families: ["stamp"], previews: ["solid"], tip: "stamp-ink", texture: "none", dynamics: "stamp-pressure-flow" },
     airbrush: { families: ["stamp"], previews: ["soft"], tip: "stamp-airbrush", texture: "soft-gradient", dynamics: "stamp-pressure-flow" },
@@ -199,11 +194,12 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
   "calligraphy-segments": {
     "tilt-chisel": { families: ["calligraphy"], previews: ["calligraphy"], tip: "chisel", texture: "none", dynamics: "tilt-pressure" },
   },
-  // perfect-freehand 아웃라인 폴리곤(studio-perfect-freehand.ts). 두 variant는 실제 getStroke
-  // 옵션(thinning/taper 프로필)이 다른 별개 실행 시그니처다.
+  // perfect-freehand 아웃라인 폴리곤(studio-perfect-freehand.ts). 각 variant는 실제
+  // getStroke 옵션(thinning/smoothing/taper 프로필)이 다른 별개 실행 시그니처다.
   "perfect-outline": {
     "ink-taper": { families: ["perfect"], previews: ["calligraphy"], tip: "pressure-round", texture: "none", dynamics: "outline-pressure" },
     "marker-flat": { families: ["perfect"], previews: ["solid"], tip: "round", texture: "none", dynamics: "outline-pressure" },
+    "gpen-taper": { families: ["gpen"], previews: ["calligraphy"], tip: "pressure-round", texture: "none", dynamics: "outline-pressure" },
   },
   "highlighter-path": {
     "multiply-square": { families: ["highlighter"], previews: ["solid"], tip: "square", texture: "none", dynamics: "fixed-path" },
@@ -518,7 +514,6 @@ export function resolveStudioBrushSinglePointRoute({
     case "causal-ink":
       return causalInkEnabled ? "causal-ink" : "generic-dot";
     // perfect-outline 도 최소 한 세그먼트가 필요하다(테이퍼가 탭을 지워버리는 것 방지).
-    case "pressure-segments":
     case "calligraphy-segments":
     case "perfect-outline":
     case "highlighter-path":

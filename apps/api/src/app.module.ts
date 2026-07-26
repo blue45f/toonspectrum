@@ -8,6 +8,7 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { CatalogModule } from "./modules/catalog/catalog.module";
 import { CommunityModule } from "./modules/community/community.module";
 import { CreatorModule } from "./modules/creator/creator.module";
+import { CreatorMarketplaceModule } from "./modules/creator-marketplace/creator-marketplace.module";
 import { FeedbackModule } from "./modules/feedback/feedback.module";
 import { FortuneModule } from "./modules/fortune/fortune.module";
 import { LegalModule } from "./modules/legal/legal.module";
@@ -30,6 +31,7 @@ import { StudioAiModule } from "./modules/studio-ai/studio-ai.module";
     CatalogModule,
     AdminModule,
     FeedbackModule,
+    CreatorMarketplaceModule,
     CreatorModule,
     LegalModule,
     FortuneModule,

@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   countChangedStudioAdvancedFillPixels,
+  planStudioAdvancedFillGuard,
   softenStudioAdvancedFillEdges,
   studioAdvancedFillResultMessage,
   summarizeStudioAdvancedFillPreview,
   type StudioAdvancedFillBrowserResult,
 } from "./studio-advanced-fill-browser";
+import { DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS } from "./studio-advanced-fill-settings";
 
 function pixels(values: number[]): Uint8ClampedArray {
   return new Uint8ClampedArray(values);
@@ -114,6 +116,27 @@ describe("advanced fill preview messages", () => {
       message: "누적 미리보기 · 2개 영역 · 55.0% · 55px",
       paintedPixelCount: 55,
       regionCount: 2,
+    });
+  });
+});
+
+describe("advanced fill leak guard planning", () => {
+  it("keeps the user's leak and canvas-edge preferences for ordinary fills", () => {
+    expect(planStudioAdvancedFillGuard({
+      ...DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS,
+      treatCanvasEdgeAsBoundary: false,
+    })).toEqual({
+      maxAreaRatio: 0.65,
+      blockCanvasEdge: true,
+    });
+  });
+
+  it("allows an explicitly requested blank-page color layer to cover the whole canvas", () => {
+    expect(
+      planStudioAdvancedFillGuard(DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS, true),
+    ).toEqual({
+      maxAreaRatio: 1,
+      blockCanvasEdge: false,
     });
   });
 });

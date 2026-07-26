@@ -54,4 +54,27 @@ describe("StudioInspectorDrawModeControls", () => {
     expect(onDrawModeChange).toHaveBeenLastCalledWith("shape");
     expect(onDrawShapeChange).toHaveBeenCalledWith("line");
   });
+
+  it("does not reset tool settings when the selected mode is clicked again", () => {
+    const onDrawModeChange = vi.fn();
+    const onDrawShapeChange = vi.fn();
+    const onStrokeWidthChange = vi.fn();
+    const onSymmetryChange = vi.fn();
+    render(
+      <StudioInspectorDrawModeControls
+        drawMode="shape"
+        onDrawModeChange={onDrawModeChange}
+        onDrawShapeChange={onDrawShapeChange}
+        onStrokeWidthChange={onStrokeWidthChange}
+        onSymmetryChange={onSymmetryChange}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "도형" }));
+
+    expect(onDrawModeChange).not.toHaveBeenCalled();
+    expect(onDrawShapeChange).not.toHaveBeenCalled();
+    expect(onStrokeWidthChange).not.toHaveBeenCalled();
+    expect(onSymmetryChange).not.toHaveBeenCalled();
+  });
 });

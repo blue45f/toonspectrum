@@ -6,6 +6,7 @@ import {
   Inbox,
   LoaderCircle,
   RefreshCw,
+  Share2,
   ShieldCheck,
   Trash2,
   UserPlus,
@@ -55,6 +56,8 @@ import {
 import { StudioLiveCollaborationPanel } from "./StudioLiveCollaborationPanel";
 import { StudioSharedWorksPanel } from "./StudioSharedWorksPanel";
 
+import type { StudioDraftCollaborationReadiness } from "./studio-draft-collaboration";
+
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -64,6 +67,8 @@ export interface StudioTeamPanelProps {
   workId: string | null;
   loggedIn: boolean;
   authScopeKey: string | null;
+  draftCollaboration?: StudioDraftCollaborationReadiness | null;
+  onDraftShareRequest?: () => void;
 }
 
 const ROLE_COPY: Record<StudioTeamRole, { label: string; description: string }> = {
@@ -214,25 +219,122 @@ function InvitationOwnerAvatar({ invitation }: { invitation: StudioTeamInvitatio
   );
 }
 
+function DraftCollaborationReadinessCard({
+  readiness,
+  onShareRequest,
+}: {
+  readiness: StudioDraftCollaborationReadiness;
+  onShareRequest?: () => void;
+}) {
+  const { identity } = readiness;
+  const suffix = identity.draftDocumentId.slice(-8);
+  const isProvisioning = readiness.status === "provisioning";
+  const isReady = readiness.status === "ready";
+
+  return (
+    <section
+      aria-labelledby="studio-team-unsaved-title"
+      className="border-b border-line pb-4"
+      data-studio-draft-collaboration-state={readiness.status}
+    >
+      <div className="flex items-start gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-accent-soft text-accent">
+          {isProvisioning ? (
+            <LoaderCircle
+              className="animate-spin motion-reduce:animate-none"
+              size={19}
+              aria-hidden="true"
+            />
+          ) : (
+            <ShieldCheck size={19} aria-hidden="true" />
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 id="studio-team-unsaved-title" className="text-sm font-bold text-fg">
+              {isReady
+                ? "임시 협업 작업실이 준비됐어요"
+                : isProvisioning
+                  ? "임시 협업 작업실을 준비하고 있어요"
+                  : "저장 전 협업을 준비할 수 있어요"}
+            </h3>
+            <span className="inline-flex min-h-6 items-center rounded-full border border-accent/30 bg-accent-soft px-2 font-mono text-[10px] font-semibold text-accent">
+              초안 {suffix}
+            </span>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-fg-2">
+            {isReady
+              ? "초안 ID와 협업 관계를 유지한 채 링크 공유와 팀원 초대를 이어갈 수 있습니다."
+              : "작업실을 여는 것만으로 서버 리소스를 만들지 않습니다. 처음 링크를 공유하거나 팀원을 초대할 때만 임시 작업실을 요청합니다."}
+          </p>
+          {readiness.status === "ready" ? (
+            <p className="mt-2 text-[11px] leading-relaxed text-fg-3">
+              임시 작업실 만료 예정 · {formatTeamDate(readiness.room.expiresAt)}
+            </p>
+          ) : readiness.status === "error" ? (
+            <p className="mt-2 text-xs leading-relaxed text-bad" role="alert">
+              {readiness.message}
+            </p>
+          ) : identity.persistence === "memory-only" ? (
+            <p className="mt-2 text-[11px] leading-relaxed text-warn">
+              브라우저 저장소를 사용할 수 없어 이 탭을 닫으면 초안 협업 ID가 바뀔 수 있습니다.
+            </p>
+          ) : (
+            <p className="mt-2 text-[11px] leading-relaxed text-fg-3">
+              초안 ID는 이 브라우저와 현재 계정에만 저장되며, 서버 작업실과 초대는 아직 생성되지
+              않았습니다.
+            </p>
+          )}
+          {!isReady && onShareRequest ? (
+            <Button
+              className="mt-3 min-h-11"
+              disabled={isProvisioning}
+              size="sm"
+              type="button"
+              variant="outline"
+              onClick={onShareRequest}
+            >
+              {isProvisioning ? (
+                <LoaderCircle
+                  className="animate-spin motion-reduce:animate-none"
+                  size={15}
+                  aria-hidden="true"
+                />
+              ) : (
+                <Share2 size={15} aria-hidden="true" />
+              )}
+              {isProvisioning ? "공유 링크 준비 중" : "공유 링크 만들기"}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function UnsavedInvitationInbox({
   actionError,
   busyAction,
+  draftCollaboration,
   invitations,
   invitationsError,
   invitationsLoading,
   focusTarget,
   notice,
+  onDraftShareRequest,
   onFocusHandled,
   onInvitationRespond,
   onRetry,
 }: {
   actionError: string | null;
   busyAction: string | null;
+  draftCollaboration: StudioDraftCollaborationReadiness | null;
   invitations: StudioTeamInvitationSummary[];
   invitationsError: string | null;
   invitationsLoading: boolean;
   focusTarget: StudioTeamInboxFocusTarget;
   notice: string | null;
+  onDraftShareRequest?: () => void;
   onFocusHandled: () => void;
   onInvitationRespond: (
     workId: string,
@@ -257,22 +359,29 @@ function UnsavedInvitationInbox({
 
   return (
     <div className="space-y-5 px-4 py-4 sm:px-5">
-      <section aria-labelledby="studio-team-unsaved-title" className="border-b border-line pb-4">
-        <div className="flex items-start gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-accent-soft text-accent">
-            <ShieldCheck size={19} aria-hidden="true" />
-          </span>
-          <div className="min-w-0">
-            <h3 id="studio-team-unsaved-title" className="text-sm font-bold text-fg">
-              작품을 먼저 저장해 주세요
-            </h3>
-            <p className="mt-1 text-xs leading-relaxed text-fg-2">
-              현재 원고는 아직 서버에 저장되지 않았어요. 새 팀원을 초대하려면 이 작품을 한 번
-              저장해야 하지만, 다른 작품에서 받은 초대는 지금 확인할 수 있습니다.
-            </p>
+      {draftCollaboration ? (
+        <DraftCollaborationReadinessCard
+          readiness={draftCollaboration}
+          onShareRequest={onDraftShareRequest}
+        />
+      ) : (
+        <section aria-labelledby="studio-team-unsaved-title" className="border-b border-line pb-4">
+          <div className="flex items-start gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-accent-soft text-accent">
+              <ShieldCheck size={19} aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <h3 id="studio-team-unsaved-title" className="text-sm font-bold text-fg">
+                작품을 먼저 저장해 주세요
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-fg-2">
+                현재 원고는 아직 서버에 저장되지 않았어요. 새 팀원을 초대하려면 이 작품을 한 번
+                저장해야 하지만, 다른 작품에서 받은 초대는 지금 확인할 수 있습니다.
+              </p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <ActionFeedback actionError={actionError} notice={notice} />
 
@@ -533,6 +642,7 @@ function TeamActivityDetails({
 export interface StudioTeamPanelViewProps {
   loggedIn: boolean;
   workId: string | null;
+  draftCollaboration?: StudioDraftCollaborationReadiness | null;
   snapshot: StudioTeamSnapshot | null;
   loading: boolean;
   loadError: string | null;
@@ -550,6 +660,7 @@ export interface StudioTeamPanelViewProps {
   activityLoading: boolean;
   activityError: string | null;
   onRetry: () => void;
+  onDraftShareRequest?: () => void;
   onInvitationsRetry: () => void;
   onInboxFocusHandled: () => void;
   onInboxInvitationRespond: (
@@ -573,6 +684,7 @@ export interface StudioTeamPanelViewProps {
 export function StudioTeamPanelView({
   loggedIn,
   workId,
+  draftCollaboration = null,
   snapshot,
   loading,
   loadError,
@@ -590,6 +702,7 @@ export function StudioTeamPanelView({
   activityLoading,
   activityError,
   onRetry,
+  onDraftShareRequest,
   onInvitationsRetry,
   onInboxFocusHandled,
   onInboxInvitationRespond,
@@ -630,11 +743,13 @@ export function StudioTeamPanelView({
       <UnsavedInvitationInbox
         actionError={actionError}
         busyAction={busyAction}
+        draftCollaboration={draftCollaboration}
         invitations={invitations}
         invitationsError={invitationsError}
         invitationsLoading={invitationsLoading}
         focusTarget={inboxFocusTarget}
         notice={notice}
+        onDraftShareRequest={onDraftShareRequest}
         onFocusHandled={onInboxFocusHandled}
         onInvitationRespond={onInboxInvitationRespond}
         onRetry={onInvitationsRetry}
@@ -1023,6 +1138,8 @@ export function StudioTeamPanel({
   workId,
   loggedIn,
   authScopeKey,
+  draftCollaboration = null,
+  onDraftShareRequest,
 }: StudioTeamPanelProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -1576,6 +1693,7 @@ export function StudioTeamPanel({
           visibleSnapshot?.viewer.status === "active" &&
           visibleSnapshot.viewer.capabilities.view ? (
             <StudioLiveCollaborationPanel
+              workId={workId}
             />
           ) : null}
           <StudioTeamPanelView
@@ -1585,6 +1703,7 @@ export function StudioTeamPanel({
             actionError={actionError}
             busyAction={busyAction}
             confirmRemoveUserId={confirmRemoveUserId}
+            draftCollaboration={draftCollaboration}
             inviteRole={inviteRole}
             inviteUserId={inviteUserId}
             inboxFocusTarget={inboxFocusTarget}
@@ -1600,6 +1719,7 @@ export function StudioTeamPanel({
             onActivityOpenChange={handleActivityOpenChange}
             onActivityRefresh={handleActivityRefresh}
             onInboxFocusHandled={() => setInboxFocusTarget(null)}
+            onDraftShareRequest={onDraftShareRequest}
             onInboxInvitationRespond={handleInboxInvitationRespond}
             onInvitationRespond={handleInvitationRespond}
             onInvite={handleInvite}

@@ -465,6 +465,105 @@ export const creatorWorks = pgTable(
   ]
 );
 
+// 저장 전 협업은 첫 공유/초대 시점에만 hidden draft creator_work를 만들고 이 marker를 붙인다.
+// 멤버십·댓글·CRDT는 처음부터 workId를 참조하므로, 실제 저장 승격에서는 FK를 복사하거나 재키잉하지
+// 않는다. active marker의 expiresAt은 임시 작업실 lease이며 cleanup은 work 삭제 cascade로 수행한다.
+export const creatorDraftCollaborationRooms = pgTable(
+  "creator_draft_collaboration_room",
+  {
+    roomId: text("roomId").primaryKey(),
+    draftDocumentId: text("draftDocumentId").notNull(),
+    ownerUserId: text("ownerUserId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    workId: text("workId")
+      .notNull()
+      .references(() => creatorWorks.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("active"),
+    graphRevision: integer("graphRevision").notNull().default(0),
+    initialSnapshotByteLength: integer("initialSnapshotByteLength").notNull(),
+    provisionIntent: text("provisionIntent").notNull(),
+    provisionMutationId: text("provisionMutationId").notNull(),
+    promotionMutationId: text("promotionMutationId"),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastActivityAt: timestamp("lastActivityAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }).notNull(),
+    promotedAt: timestamp("promotedAt", { mode: "date", withTimezone: true }),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("creator_draft_collaboration_room_owner_draft_unique").on(
+      t.ownerUserId,
+      t.draftDocumentId
+    ),
+    unique("creator_draft_collaboration_room_work_unique").on(t.workId),
+    unique("creator_draft_collaboration_room_owner_provision_mutation_unique").on(
+      t.ownerUserId,
+      t.provisionMutationId
+    ),
+    uniqueIndex("creator_draft_collaboration_room_owner_promotion_mutation_unique")
+      .on(t.ownerUserId, t.promotionMutationId)
+      .where(sql`${t.promotionMutationId} is not null`),
+    index("idx_creator_draft_collaboration_room_owner_created").on(
+      t.ownerUserId,
+      t.createdAt.desc()
+    ),
+    index("idx_creator_draft_collaboration_room_owner_active_lease")
+      .on(t.ownerUserId, t.expiresAt)
+      .where(sql`${t.status} = 'active'`),
+    index("idx_creator_draft_collaboration_room_active_expiry")
+      .on(t.expiresAt, t.roomId)
+      .where(sql`${t.status} = 'active'`),
+    check(
+      "creator_draft_collaboration_room_room_id_check",
+      sql`${t.roomId} ~ '^draft-room_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'`
+    ),
+    check(
+      "creator_draft_collaboration_room_draft_document_id_check",
+      sql`${t.draftDocumentId} ~ '^draft_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'`
+    ),
+    check(
+      "creator_draft_collaboration_room_provision_intent_check",
+      sql`${t.provisionIntent} in ('share-link', 'invite-member')`
+    ),
+    check(
+      "creator_draft_collaboration_room_status_check",
+      sql`${t.status} in ('active', 'promoted')`
+    ),
+    check(
+      "creator_draft_collaboration_room_graph_revision_check",
+      sql`${t.graphRevision} between 0 and 2147483647`
+    ),
+    check(
+      "creator_draft_collaboration_room_snapshot_bytes_check",
+      sql`${t.initialSnapshotByteLength} between 0 and 16777216`
+    ),
+    check(
+      "creator_draft_collaboration_room_provision_mutation_check",
+      sql`${t.provisionMutationId} ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'`
+    ),
+    check(
+      "creator_draft_collaboration_room_promotion_mutation_check",
+      sql`${t.promotionMutationId} is null or ${t.promotionMutationId} ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'`
+    ),
+    check(
+      "creator_draft_collaboration_room_time_order_check",
+      sql`${t.lastActivityAt} >= ${t.createdAt} and ${t.expiresAt} > ${t.lastActivityAt} and ${t.updatedAt} >= ${t.createdAt}`
+    ),
+    check(
+      "creator_draft_collaboration_room_state_check",
+      sql`(${t.status} = 'active' and ${t.promotedAt} is null and ${t.promotionMutationId} is null)
+        or (${t.status} = 'promoted' and ${t.promotedAt} is not null and ${t.promotionMutationId} is not null and ${t.graphRevision} >= 1)`
+    ),
+  ]
+);
+
 // 작품 편집 revision의 전체 snapshot. owner-only API에서만 읽고 복원하며 공개 작품 투영에는 포함하지 않는다.
 // PK(workId, revision)는 작품별 최신순 조회를 역방향 index scan으로 처리하고 FK cascade도 빠르게 만든다.
 export const creatorWorkRevisions = pgTable(

@@ -38,6 +38,15 @@ export interface StudioStrokePointerSession {
   readonly moveTransport: "pointermove";
   /** Exact normalized identity of the last stored sample, used only for adjacent deduplication. */
   readonly lastAuthoritativeSample: StudioPointerSampleIdentity;
+  /**
+   * Unique identities exposed by the immediately preceding processed delivery.
+   *
+   * Browser coalescing windows commonly overlap (`[a,b,c]` then `[b,c,d]`). Remembering one
+   * delivery removes that replay without suppressing a genuine later loop-back. This is deliberately
+   * not a whole-stroke set: devices with reduced/zero timestamps must still be able to revisit the
+   * same coordinate after another delivery.
+   */
+  readonly previousAuthoritativeDelivery: readonly StudioPointerSampleIdentity[];
 }
 
 export interface StudioPointerSampleIdentity {
@@ -63,6 +72,26 @@ export interface StudioStrokePointerBatch<T extends StudioPointerEventLike> {
   /** Forward estimates safe only for the transient preview. */
   readonly predicted: readonly T[];
   readonly session: StudioStrokePointerSession;
+  /** Hot-path counters used by correctness/performance tests and optional input telemetry. */
+  readonly diagnostics: StudioStrokePointerBatchDiagnostics;
+}
+
+export interface StudioStrokePointerBatchDiagnostics {
+  /** Valid hardware candidates exposed by the browser, before replay/duplicate filtering. */
+  readonly authoritativeCandidateCount: number;
+  readonly authoritativeAcceptedCount: number;
+  /** Exact identities repeated inside one delivery or at the previous authoritative endpoint. */
+  readonly duplicateCount: number;
+  /** Exact identities replayed from the immediately preceding coalesced delivery. */
+  readonly overlapReplayCount: number;
+  /** New coordinates whose native timestamp moved backwards. Geometry remains in delivery order. */
+  readonly authoritativeTimeRegressionCount: number;
+  /** Largest accepted hardware gap in CSS pixels, including the prior authoritative endpoint. */
+  readonly maximumAuthoritativeGap: number;
+  readonly predictedAcceptedCount: number;
+  readonly predictedDuplicateCount: number;
+  /** Predictions behind the authoritative timestamp are suppressed instead of kinking the tip. */
+  readonly predictedBehindAuthorityCount: number;
 }
 
 export interface StudioPointerCaptureTarget {
@@ -79,6 +108,7 @@ export interface StudioStrokeMoveTransportClaim {
 export type StudioPointerCaptureLossOutcome = "foreign" | "retain" | "finish";
 
 const LEGACY_POINTER_ID = 1;
+const PREVIOUS_DELIVERY_SAMPLE_LIMIT = 128;
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -140,6 +170,28 @@ function samePointerSampleIdentity(
     && left.width === right.width
     && left.height === right.height
   );
+}
+
+function includesPointerSampleIdentity(
+  identities: readonly StudioPointerSampleIdentity[],
+  candidate: StudioPointerSampleIdentity
+): boolean {
+  for (const identity of identities) {
+    if (samePointerSampleIdentity(identity, candidate)) return true;
+  }
+  return false;
+}
+
+function appendUniquePointerSampleIdentity(
+  identities: StudioPointerSampleIdentity[],
+  candidate: StudioPointerSampleIdentity
+): boolean {
+  if (includesPointerSampleIdentity(identities, candidate)) return false;
+  identities.push(candidate);
+  if (identities.length > PREVIOUS_DELIVERY_SAMPLE_LIMIT) {
+    identities.splice(0, identities.length - PREVIOUS_DELIVERY_SAMPLE_LIMIT);
+  }
+  return true;
 }
 
 /**
@@ -227,11 +279,13 @@ export function beginStudioStrokePointerSession(
   if (!isStudioLeftContactDown(event)) return null;
   const pointerId = pointerIdOf(event);
   if (!Number.isFinite(pointerId)) return null;
+  const initialSample = pointerSampleIdentity(event, pointerId);
   return {
     pointerId,
     pointerType: pointerTypeOf(event),
     moveTransport: "pointermove",
-    lastAuthoritativeSample: pointerSampleIdentity(event, pointerId),
+    lastAuthoritativeSample: initialSample,
+    previousAuthoritativeDelivery: [initialSample],
   };
 }
 
@@ -351,11 +405,33 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
   } = {}
 ): StudioStrokePointerBatch<T> {
   if (!isStudioStrokePointerEvent(session, event)) {
-    return { authoritative: [], predicted: [], session };
+    return {
+      authoritative: [],
+      predicted: [],
+      session,
+      diagnostics: {
+        authoritativeCandidateCount: 0,
+        authoritativeAcceptedCount: 0,
+        duplicateCount: 0,
+        overlapReplayCount: 0,
+        authoritativeTimeRegressionCount: 0,
+        maximumAuthoritativeGap: 0,
+        predictedAcceptedCount: 0,
+        predictedDuplicateCount: 0,
+        predictedBehindAuthorityCount: 0,
+      },
+    };
   }
 
   const authoritative: T[] = [];
   let previousSample = session.lastAuthoritativeSample;
+  const previousDelivery = session.previousAuthoritativeDelivery ?? [previousSample];
+  const currentDelivery: StudioPointerSampleIdentity[] = [];
+  let authoritativeCandidateCount = 0;
+  let duplicateCount = 0;
+  let overlapReplayCount = 0;
+  let authoritativeTimeRegressionCount = 0;
+  let maximumAuthoritativeGap = 0;
   const coalesced = options.authoritativeSource === "parent-only"
     ? []
     : safeRelatedEvents(event, "getCoalescedEvents");
@@ -367,7 +443,26 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
       ? pointerSampleIdentity(candidate, session.pointerId)
       : safeRelatedPointerSampleIdentity(session, candidate);
     if (identity === null) continue;
-    if (samePointerSampleIdentity(identity, previousSample)) continue;
+    authoritativeCandidateCount += 1;
+    const firstInCurrentDelivery = appendUniquePointerSampleIdentity(currentDelivery, identity);
+    if (!firstInCurrentDelivery || samePointerSampleIdentity(identity, previousSample)) {
+      duplicateCount += 1;
+      continue;
+    }
+    if (includesPointerSampleIdentity(previousDelivery, identity)) {
+      overlapReplayCount += 1;
+      continue;
+    }
+    if (identity.timeStamp < previousSample.timeStamp) {
+      authoritativeTimeRegressionCount += 1;
+    }
+    maximumAuthoritativeGap = Math.max(
+      maximumAuthoritativeGap,
+      Math.hypot(
+        identity.clientX - previousSample.clientX,
+        identity.clientY - previousSample.clientY
+      )
+    );
     authoritative.push(candidate);
     previousSample = identity;
   }
@@ -377,7 +472,22 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
   // fallback. Preserve the usual adjacent dedupe rule so a repeated parent does not invent ink.
   if (coalesced.length > 0 && authoritative.length === 0) {
     const parentIdentity = pointerSampleIdentity(event, session.pointerId);
-    if (!samePointerSampleIdentity(parentIdentity, previousSample)) {
+    authoritativeCandidateCount += 1;
+    appendUniquePointerSampleIdentity(currentDelivery, parentIdentity);
+    if (
+      !samePointerSampleIdentity(parentIdentity, previousSample)
+      && !includesPointerSampleIdentity(previousDelivery, parentIdentity)
+    ) {
+      if (parentIdentity.timeStamp < previousSample.timeStamp) {
+        authoritativeTimeRegressionCount += 1;
+      }
+      maximumAuthoritativeGap = Math.max(
+        maximumAuthoritativeGap,
+        Math.hypot(
+          parentIdentity.clientX - previousSample.clientX,
+          parentIdentity.clientY - previousSample.clientY
+        )
+      );
       authoritative.push(event);
       previousSample = parentIdentity;
     }
@@ -386,21 +496,53 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
   const nextSession: StudioStrokePointerSession = {
     ...session,
     lastAuthoritativeSample: previousSample,
+    previousAuthoritativeDelivery: currentDelivery.length > 0
+      ? currentDelivery
+      : previousDelivery,
   };
 
   const predicted: T[] = [];
+  let predictedDuplicateCount = 0;
+  let predictedBehindAuthorityCount = 0;
   if (options.includePredicted) {
     let previousPredictedSample = previousSample;
+    const predictedDelivery: StudioPointerSampleIdentity[] = [];
     for (const candidate of safeRelatedEvents(event, "getPredictedEvents")) {
       const identity = safeRelatedPointerSampleIdentity(session, candidate);
       if (identity === null) continue;
-      if (samePointerSampleIdentity(identity, previousPredictedSample)) continue;
+      if (
+        !appendUniquePointerSampleIdentity(predictedDelivery, identity)
+        || samePointerSampleIdentity(identity, previousPredictedSample)
+        || includesPointerSampleIdentity(currentDelivery, identity)
+      ) {
+        predictedDuplicateCount += 1;
+        continue;
+      }
+      if (identity.timeStamp < previousSample.timeStamp) {
+        predictedBehindAuthorityCount += 1;
+        continue;
+      }
       predicted.push(candidate);
       previousPredictedSample = identity;
     }
   }
 
-  return { authoritative, predicted, session: nextSession };
+  return {
+    authoritative,
+    predicted,
+    session: nextSession,
+    diagnostics: {
+      authoritativeCandidateCount,
+      authoritativeAcceptedCount: authoritative.length,
+      duplicateCount,
+      overlapReplayCount,
+      authoritativeTimeRegressionCount,
+      maximumAuthoritativeGap,
+      predictedAcceptedCount: predicted.length,
+      predictedDuplicateCount,
+      predictedBehindAuthorityCount,
+    },
+  };
 }
 
 /** Pointer capture is a progressive enhancement; unsupported/detached DOM nodes fail closed. */

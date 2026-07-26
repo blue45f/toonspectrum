@@ -8,6 +8,14 @@ import {
   resolveStudioBrushRenderFamily,
 } from "./studio-brush";
 import {
+  filterStudioBrushCatalogItems,
+  listStudioQuickBrushCatalogItems,
+  STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+  STUDIO_BRUSH_CATALOG_COUNTS,
+  studioBrushCatalogItemById,
+  studioBrushCatalogKindLabel,
+} from "./studio-brush-catalog";
+import {
   resolveStudioBrushDynamicsPresetId,
   studioBrushDynamicsSettingsForBrushId,
 } from "./studio-brush-dynamics";
@@ -61,6 +69,41 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     expect(catalog.map((item) => item.id)).toEqual(filteredCatalog.map((item) => item.id));
     expect(new Set(catalog.map((item) => item.id))).toEqual(new Set(presetIds));
     expect(STUDIO_BRUSH_RUNTIME_CONTRACT.map((contract) => contract.id)).toEqual(presetIds);
+  });
+
+  it("keeps all 214 identities behind one searchable quick/full catalogue source", () => {
+    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 54, pro: 160, total: 214 });
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(214);
+    expect(new Set(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id))).toHaveProperty(
+      "size",
+      214
+    );
+
+    for (const item of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {
+      expect(studioBrushCatalogItemById(item.id), `${item.id}: lookup drift`).toBe(item);
+      expect(studioBrushCatalogKindLabel(item), `${item.id}: missing kind label`).toMatch(
+        /^(선화|마커|채색|효과|질감)$/u
+      );
+      expect(
+        filterStudioBrushCatalogItems({
+          // Exact-id search must be global even while the UI still has another category selected.
+          category: "beginner",
+          query: item.id,
+        }).some((candidate) => candidate.id === item.id),
+        `${item.id}: hidden behind category during search`
+      ).toBe(true);
+    }
+
+    const quick = listStudioQuickBrushCatalogItems({
+      favoriteIds: ["heart-stamp"],
+      recentIds: ["hair-fiber", "pen"],
+      limit: 3,
+    });
+    expect(quick.map(({ id, quickSource }) => [id, quickSource])).toEqual([
+      ["heart-stamp", "favorite"],
+      ["hair-fiber", "recent"],
+      ["pen", "recent"],
+    ]);
   });
 
   it("gives every preset an explicit renderer, engine route, preview, and exact-id search result", () => {
@@ -150,6 +193,18 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
         expect(canonical?.engine).toBe(contract.engine);
         expect(studioBrushRuntimeExecutionSignature(canonical!)).not.toBe(signature);
       }
+    }
+  });
+
+  it("routes every manga nib through the continuous pressure-outline engine", () => {
+    for (const brushId of ["gpen", "mapping-pen", "kaburapen", "liner"] as const) {
+      expect(resolveStudioBrushRuntimeContract(brushId)).toMatchObject({
+        family: "gpen",
+        engine: "perfect-outline",
+        engineVariant: "gpen-taper",
+        dynamics: "outline-pressure",
+      });
+      expect(resolveStudioBrushSinglePointRoute({ brushId })).toBe("generic-dot");
     }
   });
 

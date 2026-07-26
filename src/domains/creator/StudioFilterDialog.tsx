@@ -9,6 +9,10 @@ import {
 } from "react";
 
 import {
+  browserStudioCreatorPackStorage,
+  listStudioCreatorFilterPresets,
+} from "./studio-creator-filter-preset-reader";
+import {
   STUDIO_FILTER_LABELS,
   cloneStudioFilterDraft,
   createStudioFilterDraft,
@@ -20,8 +24,10 @@ import {
 } from "./studio-filter-menu";
 import {
   STUDIO_FILTER_PACK_DEFS,
+  isStudioFilterPackKind,
   type StudioFilterPackValues,
 } from "./studio-filter-pack";
+import { isStudioFilterUnionWaveKind } from "./studio-filter-union-wave";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioCurvePanel } from "./StudioCurvePanel";
 import { useStudioHistogramSource } from "./useStudioHistogramSource";
@@ -253,6 +259,13 @@ export function StudioFilterDialog({
       : createStudioFilterDraft(kind, image),
   );
   const [previewEnabled, setPreviewEnabled] = useState(true);
+  const [installedPackPresets] = useState(() =>
+    isStudioFilterPackKind(kind)
+      ? listStudioCreatorFilterPresets(
+        browserStudioCreatorPackStorage(),
+      ).filter((preset) => preset.engine === kind)
+      : [],
+  );
   const reportPreview = useEffectEvent(onPreview);
 
   useStudioModalSheet({
@@ -351,10 +364,53 @@ export function StudioFilterDialog({
             ) : null}
 
             {isStudioFilterPackDraft(draft) ? (
-              <FilterPackControls
-                draft={draft}
-                onChange={(values) => setDraft({ ...draft, values })}
-              />
+              <>
+                {installedPackPresets.length > 0 ? (
+                  <section
+                    aria-label="설치한 Creator Pack 필터 프리셋"
+                    className="rounded-lg border border-accent/25 bg-accent-soft/35 p-2.5"
+                  >
+                    <p className="text-[0.68rem] font-bold text-fg">
+                      설치한 Creator Pack 프리셋
+                    </p>
+                    <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">
+                      선택하면 현재 다이얼로그 값과 비파괴 미리보기에 즉시 반영됩니다.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {installedPackPresets.map((preset) => (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => setDraft({
+                            kind: preset.engine,
+                            values: { ...preset.values },
+                          })}
+                          className={cn(
+                            "min-h-11 rounded-lg border border-line bg-card px-3 text-[0.68rem] font-semibold text-fg-2 hover:border-accent/45 hover:bg-raised",
+                            STUDIO_EASE,
+                            STUDIO_FOCUS_RING,
+                          )}
+                        >
+                          {preset.name}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+                {isStudioFilterUnionWaveKind(draft.kind) ? (
+                  <p
+                    role="note"
+                    className="rounded-lg border border-line bg-card/70 px-3 py-2 text-[0.68rem] leading-relaxed text-fg-3"
+                  >
+                    가장자리는 반복 없이 고정해 빈 틈을 막고, 투명도는 원본 그대로
+                    보존합니다. 같은 시드는 언제나 같은 결과를 만듭니다.
+                  </p>
+                ) : null}
+                <FilterPackControls
+                  draft={draft}
+                  onChange={(values) => setDraft({ ...draft, values })}
+                />
+              </>
             ) : null}
 
             {draft.kind === "gaussian-blur" ? (

@@ -79,6 +79,17 @@ export interface StudioBrushPreviewModel {
   height: number;
 }
 
+/**
+ * Catalogue previews use the same outer opacity that a newly-authored stroke stores. Avoid a
+ * decorative minimum: that made transparent markers and airbrushes look opaque in the picker even
+ * though the canvas correctly rendered a light first mark.
+ */
+export function studioBrushPreviewOpacity(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(1, Math.max(0, value))
+    : 1;
+}
+
 /** Deterministic path d for solid/wavy/calligraphy-like strokes (viewBox 0..w × 0..h). */
 export function studioBrushPreviewPathD(
   style: StudioBrushPreviewStyle,

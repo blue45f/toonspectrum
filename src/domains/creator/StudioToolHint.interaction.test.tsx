@@ -5,6 +5,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  STUDIO_TOOL_HINT_SCROLL_HOVER_SUPPRESSION_MS,
   StudioToolHintPreferencesProvider,
   StudioToolHintTarget,
 } from "./StudioToolHint";
@@ -25,10 +26,10 @@ function renderHint(id: string, touchHoldDelayMs = 480) {
   );
 }
 
-function renderHintPair() {
+function renderHintPair(mode: "compact" | "rich" = "compact") {
   return render(
     <StudioToolHintPreferencesProvider
-      mode="compact"
+      mode={mode}
       touchHoldDelayMs={480}
       reduceMotion
     >
@@ -248,6 +249,107 @@ describe("StudioToolHint touch intent", () => {
     fireEvent.mouseEnter(selectedTarget);
     act(() => vi.advanceTimersByTime(320));
 
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("closes passive hover help on wheel and suppresses remount-under-pointer noise briefly", () => {
+    vi.useFakeTimers();
+    renderHintPair();
+    const pen = screen.getByRole("button", { name: "펜" });
+    const eraser = screen.getByRole("button", { name: "지우개" });
+
+    fireEvent.mouseEnter(pen);
+    act(() => vi.advanceTimersByTime(280));
+    expect(screen.getByRole("tooltip").textContent).toContain("선을 그립니다.");
+
+    fireEvent.wheel(window);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+
+    fireEvent.mouseEnter(eraser);
+    act(() => vi.advanceTimersByTime(320));
+    expect(screen.queryByRole("tooltip")).toBeNull();
+
+    act(() =>
+      vi.advanceTimersByTime(STUDIO_TOOL_HINT_SCROLL_HOVER_SUPPRESSION_MS + 1)
+    );
+    fireEvent.mouseLeave(eraser, { clientX: 500, clientY: 500 });
+    fireEvent.mouseEnter(eraser);
+    act(() => vi.advanceTimersByTime(280));
+
+    expect(screen.getByRole("tooltip").textContent).toContain("선을 지웁니다.");
+  });
+
+  it("keeps deliberate keyboard help open while scroll suppresses passive replacement", () => {
+    vi.useFakeTimers();
+    renderHintPair("rich");
+    const pen = screen.getByRole("button", { name: "펜" });
+    const eraser = screen.getByRole("button", { name: "지우개" });
+
+    fireEvent.focus(pen);
+    const focusedTooltip = screen.getByRole("tooltip");
+    expect(focusedTooltip.textContent).toContain("선을 그립니다.");
+
+    fireEvent.scroll(window);
+    expect(screen.getByRole("tooltip").textContent).toContain("선을 그립니다.");
+
+    fireEvent.mouseEnter(eraser);
+    act(() => vi.advanceTimersByTime(320));
+    expect(screen.getByRole("tooltip").textContent).toContain("선을 그립니다.");
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("treats touch movement as a pan and suppresses the hover that follows it", () => {
+    vi.useFakeTimers();
+    renderHintPair();
+    const pen = screen.getByRole("button", { name: "펜" });
+    const eraser = screen.getByRole("button", { name: "지우개" });
+
+    fireEvent.pointerDown(pen, {
+      pointerId: 21,
+      pointerType: "touch",
+      clientX: 20,
+      clientY: 20,
+    });
+    fireEvent.pointerMove(window, {
+      pointerId: 21,
+      pointerType: "touch",
+      clientX: 32,
+      clientY: 20,
+    });
+    fireEvent.pointerUp(window, {
+      pointerId: 21,
+      pointerType: "touch",
+      clientX: 32,
+      clientY: 20,
+    });
+
+    fireEvent.mouseEnter(eraser);
+    act(() => vi.advanceTimersByTime(320));
+
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("keeps touch long-press help compact even when rich previews are enabled", () => {
+    vi.useFakeTimers();
+    renderHintPair("rich");
+    const pen = screen.getByRole("button", { name: "펜" });
+
+    fireEvent.pointerDown(pen, {
+      pointerId: 31,
+      pointerType: "touch",
+      clientX: 20,
+      clientY: 20,
+    });
+    act(() => vi.advanceTimersByTime(480));
+
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip.getAttribute("data-studio-tool-hint-expanded")).toBe("false");
+    expect(tooltip.textContent).not.toContain("동작 미리보기");
+    expect(tooltip.textContent).not.toContain("잠시 머물러 미리보기");
+
+    fireEvent.scroll(window);
     expect(screen.queryByRole("tooltip")).toBeNull();
   });
 });

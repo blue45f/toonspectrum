@@ -1,8 +1,8 @@
 import { Shape } from "react-konva/lib/ReactKonvaCore";
 
 import {
-  processFreehandPoints,
   resampleStrokePressures,
+  resolveStudioFreehandRenderPath,
 } from "./studio-brush";
 import { resolveStudioStampBrushStyle } from "./studio-brush-stamp-engine";
 import { drawStudioStampStrokeWithSymmetry } from "./studio-stamp-symmetry-rendering";
@@ -43,8 +43,15 @@ export function StudioStampDrawShape({
   const causalStamp = el.stampPipeline === "causal-walker-v2";
   const stampPoints = causalStamp
     ? el.points
-    : processFreehandPoints(el.points, renderSampleDistance);
-  const stampPressures = causalStamp
+    : resolveStudioFreehandRenderPath(el.points, {
+        sampleSpacing: el.sampleSpacing,
+        legacyMinDistance: renderSampleDistance,
+        legacyTension: 0,
+      }).points;
+  // A finite sampleSpacing marks an already accepted new-stroke stream even when an imported
+  // document predates the explicit stampPipeline tag. Keep its point/pressure indices paired.
+  const sourceAligned = causalStamp || stampPoints === el.points;
+  const stampPressures = sourceAligned
     ? el.pressures
     : resampleStrokePressures(
         el.pressures ?? [],

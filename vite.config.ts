@@ -195,12 +195,12 @@ export default defineConfig(({ mode }) => ({
             || id.endsWith("/src/domains/creator/studio-background-gradient-color-stops.ts")
             || id.endsWith("/src/domains/creator/studio-characters.ts")
             || id.endsWith("/src/domains/creator/studio-brush-pack-id.ts")
-            || id.endsWith("/src/domains/creator/studio-brush-pack-index.ts")
             || id.endsWith("/src/domains/creator/studio-brush-selection.ts")
           ) {
             // These lightweight contracts are shared by several Studio lazy entries. Keeping
-            // them together avoids small HTTP requests on every editor launch; the procedural
-            // alpha-tip runtime itself remains behind its explicit dynamic-import boundary.
+            // them together avoids small HTTP requests on every editor launch. The procedural
+            // descriptor index is deliberately excluded so its 160 labels/previews stay behind
+            // the full-library and saved-pro-brush dynamic boundaries.
             return "studio-core-micro-contracts";
           }
           if (

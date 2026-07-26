@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   DrizzleCreatorCollaborationPersistence,
+  buildCreatorCollaborationWorkQuery as directCollaborationWorkQuery,
   buildCreatorCrdtServerSequenceQuery as directCrdtServerSequenceQuery,
   buildCreatorSharedDocumentMetaQuery as directSharedDocumentMetaQuery,
   buildCreatorSharedDocumentUpdateQuery as directSharedDocumentUpdateQuery,
@@ -13,6 +14,7 @@ import {
 } from "./creator-collaboration.drizzle-persistence";
 import {
   CreatorCollaborationRepository,
+  buildCreatorCollaborationWorkQuery as compatibilityCollaborationWorkQuery,
   buildCreatorCrdtServerSequenceQuery as compatibilityCrdtServerSequenceQuery,
   buildCreatorSharedDocumentMetaQuery as compatibilitySharedDocumentMetaQuery,
   buildCreatorSharedDocumentUpdateQuery as compatibilitySharedDocumentUpdateQuery,
@@ -94,7 +96,19 @@ describe("creator collaboration persistence boundary", () => {
     expect(repository.source).not.toMatch(/from\s+["'](?:drizzle-orm|\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/lib\/db)["']/u);
   });
 
+  it("joins the optional draft-room marker while locking only the non-null creator work row", () => {
+    const adapter = moduleFacts("./creator-collaboration.drizzle-persistence.ts");
+
+    expect(adapter.source).toContain("creatorDraftCollaborationRooms");
+    expect(adapter.source).toContain(
+      "eq(creatorDraftCollaborationRooms.workId, creatorWorks.id)"
+    );
+    expect(adapter.source).toContain('.for("update", { of: creatorWorks })');
+    expect(adapter.source).not.toContain('.for("update", { of: creatorDraftCollaborationRooms })');
+  });
+
   it("preserves query-builder exports and default repository/provider construction", () => {
+    expect(compatibilityCollaborationWorkQuery).toBe(directCollaborationWorkQuery);
     expect(compatibilityCrdtServerSequenceQuery).toBe(directCrdtServerSequenceQuery);
     expect(compatibilitySharedDocumentMetaQuery).toBe(directSharedDocumentMetaQuery);
     expect(compatibilitySharedDocumentUpdateQuery).toBe(directSharedDocumentUpdateQuery);

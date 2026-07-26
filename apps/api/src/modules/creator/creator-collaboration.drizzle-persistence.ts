@@ -2,6 +2,7 @@ import { and, asc, count, desc, eq, lt, lte, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import {
+  creatorDraftCollaborationRooms,
   creatorWorkCollaborationEvents,
   creatorWorkCollaborators,
   creatorWorkCrdtSnapshots,
@@ -343,6 +344,40 @@ const validCollaborationEventPredicate = sql`(
   )
 )`;
 
+/**
+ * Constant-cardinality work/lease probe used by collaboration authorization.
+ * The optional marker covers active save-before-collaboration rooms without excluding ordinary
+ * saved works. Lock mode targets only creator_work because PostgreSQL cannot lock a nullable
+ * outer-join side.
+ */
+export function buildCreatorCollaborationWorkQuery(
+  executor: DrizzleCreatorCollaborationExecutor,
+  workId: string,
+  lock = false
+) {
+  const query = executor
+    .select({
+      id: creatorWorks.id,
+      ownerUserId: creatorWorks.userId,
+      title: creatorWorks.title,
+      createdAt: creatorWorks.createdAt,
+      updatedAt: creatorWorks.updatedAt,
+      status: creatorWorks.status,
+      hidden: creatorWorks.hidden,
+      draftCollaborationStatus: creatorDraftCollaborationRooms.status,
+      draftCollaborationExpiresAt: creatorDraftCollaborationRooms.expiresAt,
+      draftCollaborationOwnerUserId: creatorDraftCollaborationRooms.ownerUserId,
+    })
+    .from(creatorWorks)
+    .leftJoin(
+      creatorDraftCollaborationRooms,
+      eq(creatorDraftCollaborationRooms.workId, creatorWorks.id)
+    )
+    .where(eq(creatorWorks.id, workId))
+    .limit(1);
+  return lock ? query.for("update", { of: creatorWorks }) : query;
+}
+
 export class DrizzleCreatorCollaborationUnitOfWork implements CreatorCollaborationUnitOfWork {
   constructor(private readonly executor: DrizzleCreatorCollaborationExecutor) {}
 
@@ -364,20 +399,9 @@ export class DrizzleCreatorCollaborationUnitOfWork implements CreatorCollaborati
   }
 
   async findWork(workId: string, lock = false): Promise<CreatorCollaborationWorkRecord | null> {
-    const selectWork = () =>
-      this.executor
-        .select({
-          id: creatorWorks.id,
-          ownerUserId: creatorWorks.userId,
-          title: creatorWorks.title,
-          createdAt: creatorWorks.createdAt,
-          updatedAt: creatorWorks.updatedAt,
-        })
-        .from(creatorWorks)
-        .where(eq(creatorWorks.id, workId))
-        .limit(1);
-
-    const rows = lock ? await selectWork().for("update") : await selectWork();
+    // Lock only creator_work. PostgreSQL rejects FOR UPDATE against the nullable side of an outer
+    // join, and the work row is already the shared first lock for ACL/member mutations.
+    const rows = await buildCreatorCollaborationWorkQuery(this.executor, workId, lock);
     return rows[0] ?? null;
   }
 

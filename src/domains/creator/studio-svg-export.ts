@@ -27,7 +27,6 @@
 
 import {
   buildCalligraphySegments,
-  gpenSegmentWidths,
   processFreehandPoints,
   processPencilPoints,
   resampleStrokePressures,
@@ -104,6 +103,7 @@ import {
   thoughtBubbleBodyPath,
   type BubbleTailSpec,
 } from "./studio-bubble-path";
+import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
 import { planStudioCausalInk } from "./studio-causal-ink";
 import {
   DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
@@ -1125,6 +1125,19 @@ function serializeFreehand(
     const width = pressureAware
       ? aliasStrokeWidth * (0.3 + pressure * 1.4)
       : aliasStrokeWidth;
+    if (brushFamily === "highlighter") {
+      const half = aliasStrokeWidth / 2;
+      return `<rect x="${fmt(points[0] - half)}" y="${fmt(points[1] - half)}" width="${fmt(aliasStrokeWidth)}" height="${fmt(aliasStrokeWidth)}" fill="${escapeXml(stroke)}" style="mix-blend-mode:multiply"${opacityAttr}/>`;
+    }
+    if (brushFamily === "brush" || brushFamily === "calligraphy") {
+      const roundness = brushFamily === "calligraphy"
+        ? Math.min(1, Math.max(0.08, el.brushTip?.roundness ?? 0.35))
+        : 0.36;
+      const angle = brushFamily === "calligraphy"
+        ? el.brushTip?.angleDeg ?? -30
+        : -30;
+      return `<ellipse cx="${fmt(points[0])}" cy="${fmt(points[1])}" rx="${fmt(Math.max(0.35, width / 2))}" ry="${fmt(Math.max(0.35, width * roundness / 2))}" fill="${escapeXml(stroke)}" transform="rotate(${fmt(angle)} ${fmt(points[0])} ${fmt(points[1])})"${opacityAttr}/>`;
+    }
     const radius = pressureAware && el.pressureModel !== undefined
       ? studioInkPressureRadius(aliasStrokeWidth, pressure, el.pressureModel)
       : Math.max(0.35, width / 2);
@@ -1141,8 +1154,13 @@ function serializeFreehand(
     const causal = el.stampPipeline === "causal-walker-v2";
     const stampPoints = causal
       ? points
-      : processFreehandPoints(points, renderSampleDistance);
-    const stampPressures = causal
+      : resolveStudioFreehandRenderPath(points, {
+          sampleSpacing: el.sampleSpacing,
+          legacyMinDistance: renderSampleDistance,
+          legacyTension: 0,
+        }).points;
+    const sourceAligned = causal || stampPoints === points;
+    const stampPressures = sourceAligned
       ? el.pressures
       : resampleStrokePressures(
           el.pressures ?? [],
@@ -1243,15 +1261,24 @@ function serializeFreehand(
     return `<g>${marks.join("")}</g>`;
   }
 
-  if (brushFamily === "perfect") {
-    // 퍼펙트-프리핸드(tldraw) — 캔버스와 같은 어댑터가 만든 아웃라인 폴리곤을 선 색으로 채운다.
+  const perfectProfile = resolveStudioPerfectFreehandProfile(brush);
+  if (perfectProfile) {
+    // perfect 잉크와 G펜 계열 — 캔버스와 같은 연속 가변 폭 아웃라인을 선 색으로 채운다.
     // getStroke는 순수 함수라 같은 입력이면 바이트가 동일하다(내보내기 결정성 규약 유지).
-    const perfectProfile = resolveStudioPerfectFreehandProfile(brush);
     const perfectStroker = peekStudioPerfectFreehandStroker();
-    if (perfectProfile && perfectStroker) {
+    if (perfectStroker) {
+      const outlinePressures = brushFamily === "gpen"
+        || (el.pressures && el.pressures.length > 0)
+        ? mapStudioBrushAliasPressureSamples(
+            brush,
+            el.pressures,
+            Math.floor(points.length / 2),
+            brushFamily === "gpen" ? 0.6 : 0.5
+          )
+        : el.pressures;
       const pathD = buildStudioPerfectFreehandPathData(perfectStroker, {
         points,
-        pressures: el.pressures,
+        pressures: outlinePressures,
         strokeWidth: aliasStrokeWidth,
         profile: perfectProfile,
       });
@@ -1261,7 +1288,7 @@ function serializeFreehand(
     }
     // 모듈 미로드(드문 경우: 해당 브러시 획을 화면에 그린 적 없이 곧바로 내보내기) — 다음
     // 내보내기를 위해 백그라운드 로드를 걸고, 이번에는 깨끗한 라인 폴백으로 근사한다.
-    if (perfectProfile && !perfectStroker) {
+    if (!perfectStroker) {
       void loadStudioPerfectFreehandStroker().catch(() => {});
     }
     const renderPath = resolveStudioFreehandRenderPath(points, {
@@ -1313,7 +1340,11 @@ function serializeFreehand(
   }
 
   if (brushFamily === "calligraphy") {
-    const smoothed = processFreehandPoints(points, renderSampleDistance);
+    const smoothed = resolveStudioFreehandRenderPath(points, {
+      sampleSpacing: el.sampleSpacing,
+      legacyMinDistance: renderSampleDistance,
+      legacyTension: 0,
+    }).points;
     if (smoothed.length < 2) return "";
     const sourcePointCount = Math.floor(points.length / 2);
     const sampleCount = Math.min(
@@ -1331,7 +1362,12 @@ function serializeFreehand(
     );
     const segments = buildCalligraphySegments(
       smoothed,
-      el.pressures,
+      mapStudioBrushAliasPressureSamples(
+        brush,
+        el.pressures,
+        sourcePointCount,
+        0.5,
+      ),
       stylusSamples,
       aliasStrokeWidth,
       el.brushTip
@@ -1339,14 +1375,34 @@ function serializeFreehand(
     if (segments.length === 0) {
       return `<circle cx="${fmt(smoothed[0])}" cy="${fmt(smoothed[1])}" r="${fmt(Math.max(0.5, aliasStrokeWidth * 0.18))}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
     }
-    return `<g${opacityAttr}>${segments.map((segment) => (
-      `<path d="M ${fmt(segment.x0)} ${fmt(segment.y0)} L ${fmt(segment.x1)} ${fmt(segment.y1)}" stroke="${escapeXml(stroke)}" stroke-width="${fmt(segment.width)}" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`
-    )).join("")}</g>`;
+    const ribbon = planStudioCalligraphyRibbon(segments);
+    const subpaths = ribbon.runs.map((run) => {
+      const outline = run.outlinePoints;
+      const polygon = outline.length >= 4
+        ? `M ${fmt(outline[0])} ${fmt(outline[1])} ${Array.from(
+            { length: Math.max(0, outline.length / 2 - 1) },
+            (_, pointIndex) => {
+              const offset = (pointIndex + 1) * 2;
+              return `L ${fmt(outline[offset])} ${fmt(outline[offset + 1])}`;
+            }
+          ).join(" ")} Z`
+        : "";
+      const start = run.startCap;
+      const end = run.endCap;
+      const startCircle = `M ${fmt(start.x + start.radius)} ${fmt(start.y)} A ${fmt(start.radius)} ${fmt(start.radius)} 0 1 0 ${fmt(start.x - start.radius)} ${fmt(start.y)} A ${fmt(start.radius)} ${fmt(start.radius)} 0 1 0 ${fmt(start.x + start.radius)} ${fmt(start.y)} Z`;
+      const endCircle = `M ${fmt(end.x + end.radius)} ${fmt(end.y)} A ${fmt(end.radius)} ${fmt(end.radius)} 0 1 0 ${fmt(end.x - end.radius)} ${fmt(end.y)} A ${fmt(end.radius)} ${fmt(end.radius)} 0 1 0 ${fmt(end.x + end.radius)} ${fmt(end.y)} Z`;
+      return `${polygon} ${startCircle} ${endCircle}`;
+    }).join(" ");
+    return `<path d="${subpaths}" fill="${escapeXml(stroke)}" fill-rule="nonzero"${opacityAttr} data-brush-engine="calligraphy-ribbon"/>`;
   }
 
   if (brushFamily === "brush") {
     // 붓 — 기울인 펜촉(-30°) 리본 쿼드 채움(캔버스 sceneFunc 포트).
-    const smoothed = processFreehandPoints(points, renderSampleDistance);
+    const smoothed = resolveStudioFreehandRenderPath(points, {
+      sampleSpacing: el.sampleSpacing,
+      legacyMinDistance: renderSampleDistance,
+      legacyTension: 0,
+    }).points;
     if (smoothed.length < 2) return "";
     const angle = -Math.PI / 6;
     const dx = (aliasStrokeWidth / 2) * Math.cos(angle);
@@ -1366,28 +1422,6 @@ function serializeFreehand(
       }
     }
     return `<path d="${sub.join(" ")}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
-  }
-
-  if (brushFamily === "gpen") {
-    // G펜 — 세그먼트별 굵기(필압 테이퍼)를 세그먼트 path 로 그대로 재현.
-    const smoothed = processFreehandPoints(points, renderSampleDistance);
-    const segmentCount = Math.floor(smoothed.length / 2);
-    const rawPressures = el.pressures ?? [];
-    const sampled = mapStudioBrushAliasPressureSamples(
-      brush,
-      resampleStrokePressures(rawPressures, segmentCount, 0.6),
-      segmentCount,
-      0.6
-    );
-    const widths = gpenSegmentWidths(sampled, aliasStrokeWidth);
-    const segs: string[] = [];
-    for (let i = 2; i < smoothed.length; i += 2) {
-      const w = widths[Math.floor(i / 2)] ?? aliasStrokeWidth;
-      segs.push(
-        `<path d="M ${fmt(smoothed[i - 2])} ${fmt(smoothed[i - 1])} L ${fmt(smoothed[i])} ${fmt(smoothed[i + 1])}" stroke="${escapeXml(stroke)}" stroke-width="${fmt(w)}" stroke-linecap="round" fill="none"/>`
-      );
-    }
-    return `<g${opacityAttr}>${segs.join("")}</g>`;
   }
 
   if (brushFamily === "screentone") {
@@ -1475,9 +1509,13 @@ function serializeFreehand(
   if (brushFamily === "glitter") {
     const mode = (el.brush ?? "glitter") === "star-dust" ? "star-dust" : (el.brush === "sparkle-star" ? "sparkle-star" : "glitter");
     const particles = planGlitterBrushParticles({
-      points: processFreehandPoints(points, renderSampleDistance),
+      points: resolveStudioFreehandRenderPath(points, {
+        sampleSpacing: el.sampleSpacing,
+        legacyMinDistance: renderSampleDistance,
+        legacyTension: 0,
+      }).points,
       pressures: el.pressures,
-      baseWidth: strokeWidth,
+      baseWidth: aliasStrokeWidth,
       seed: fxBrushSeedFromKey(el.id),
       mode,
       maxParticles: 512,
@@ -1494,7 +1532,11 @@ function serializeFreehand(
 
   if (brushFamily === "oil") {
     const dabs = planOilBrushDabs({
-      points: processFreehandPoints(points, renderSampleDistance),
+      points: resolveStudioFreehandRenderPath(points, {
+        sampleSpacing: el.sampleSpacing,
+        legacyMinDistance: renderSampleDistance,
+        legacyTension: 0,
+      }).points,
       pressures: el.pressures,
       baseWidth: aliasStrokeWidth,
       seed: fxBrushSeedFromKey(el.id),
@@ -1509,7 +1551,11 @@ function serializeFreehand(
   if (brushFamily === "airbrush") {
     const isSplatter = el.brush === "splatter";
     const dabs = planOilBrushDabs({
-      points: processFreehandPoints(points, renderSampleDistance),
+      points: resolveStudioFreehandRenderPath(points, {
+        sampleSpacing: el.sampleSpacing,
+        legacyMinDistance: renderSampleDistance,
+        legacyTension: 0,
+      }).points,
       pressures: el.pressures,
       baseWidth: aliasStrokeWidth * (isSplatter ? 1.6 : 1.0),
       seed: fxBrushSeedFromKey(el.id),
@@ -1527,7 +1573,11 @@ function serializeFreehand(
 
   if (brushFamily === "pastel") {
     const dabs = planPastelBrushDabs({
-      points: processFreehandPoints(points, renderSampleDistance),
+      points: resolveStudioFreehandRenderPath(points, {
+        sampleSpacing: el.sampleSpacing,
+        legacyMinDistance: renderSampleDistance,
+        legacyTension: 0,
+      }).points,
       pressures: el.pressures,
       baseWidth: aliasStrokeWidth,
       seed: fxBrushSeedFromKey(el.id),

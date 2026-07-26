@@ -271,7 +271,12 @@ class MemoryStudioLiveLockRepository implements StudioLiveLockRepository {
 function teamSnapshot(
   userId: string,
   workId: string,
-  options: { edit?: boolean; view?: boolean; role?: "owner" | "admin" | "editor" | "commenter" | "viewer" } = {}
+  options: {
+    edit?: boolean;
+    view?: boolean;
+    role?: "owner" | "admin" | "editor" | "commenter" | "viewer";
+    authorizationExpiresAt?: string;
+  } = {}
 ) {
   const role = options.role ?? (userId === "owner" ? "owner" : "editor");
   const edit = options.edit ?? (role === "owner" || role === "admin" || role === "editor");
@@ -299,6 +304,9 @@ function teamSnapshot(
         isOwner: role === "owner",
       },
     ],
+    ...(options.authorizationExpiresAt
+      ? { authorizationExpiresAt: options.authorizationExpiresAt }
+      : {}),
   };
 }
 
@@ -367,7 +375,13 @@ function createHarness(
       // Keep existing race fixtures source-compatible while independently asserting that the
       // gateway uses the constant-cardinality production authorization boundary.
       const team = await getWorkTeamMock(userId, workId);
-      return { workId: team.workId, viewer: team.viewer };
+      return {
+        workId: team.workId,
+        viewer: team.viewer,
+        ...(team.authorizationExpiresAt
+          ? { authorizationExpiresAt: team.authorizationExpiresAt }
+          : {}),
+      };
     }),
   };
   const crdtService = {
@@ -1278,6 +1292,105 @@ describe("StudioLiveGateway", () => {
       message: "이 작품의 실시간 작업실에 참여할 수 없습니다.",
     });
     expect(socket.joined.size).toBe(0);
+  });
+
+  it("rejects an expired provisional-room lease before entering the Socket.IO work room", async () => {
+    const expiresAt = new Date(Date.now() - 1).toISOString();
+    const harness = createHarness(async (userId, workId) =>
+      teamSnapshot(userId, workId, {
+        role: "editor",
+        edit: true,
+        authorizationExpiresAt: expiresAt,
+      })
+    );
+    const socket = harness.socket("editor");
+
+    const response = await connectAndJoin(harness, socket);
+
+    expect(response).toEqual({
+      ok: false,
+      code: "forbidden",
+      message: "임시 협업 작업실이 만료되었습니다. 새 작업실을 만들어 주세요.",
+    });
+    expect(socket.joined.size).toBe(0);
+    expect(harness.service.getWorkAuthorization).not.toHaveBeenCalled();
+  });
+
+  it("rechecks an expired provisional lease instead of accepting it from the short ACL cache", async () => {
+    vi.useFakeTimers();
+    try {
+      const now = new Date("2026-07-26T00:00:00.000Z");
+      vi.setSystemTime(now);
+      const expiresAt = new Date(now.getTime() + 1_000).toISOString();
+      const harness = createHarness(async (userId, workId) =>
+        teamSnapshot(userId, workId, {
+          role: "editor",
+          edit: true,
+          authorizationExpiresAt: expiresAt,
+        })
+      );
+      const socket = harness.socket("editor");
+      await connectAndJoin(harness, socket);
+      vi.setSystemTime(now.getTime() + 1_001);
+
+      const response = await harness.gateway.updateCursor(
+        socket as never,
+        { workId: "work-1", pageId: null, x: 0.5, y: 0.5 },
+        undefined
+      );
+
+      expect(response).toMatchObject({ ok: false, code: "not_joined" });
+      expect(harness.service.getWorkAuthorization).toHaveBeenCalledTimes(1);
+      expect(socket.disconnected).toBe(true);
+      expect(socket.left).toContain("studio-live:work-1");
+      expect(
+        harness.emissions.some(
+          ({ event, target }) =>
+            event === "studio:cursor" && target.includes("studio-live:work-1")
+        )
+      ).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rechecks at the old lease boundary and naturally adopts a promoted same-workId saved ACL", async () => {
+    vi.useFakeTimers();
+    try {
+      const now = new Date("2026-07-26T00:00:00.000Z");
+      vi.setSystemTime(now);
+      const provisionalExpiry = new Date(now.getTime() + 1_000).toISOString();
+      let provisional = true;
+      const harness = createHarness(async (userId, workId) =>
+        teamSnapshot(userId, workId, {
+          role: "editor",
+          edit: true,
+          ...(provisional ? { authorizationExpiresAt: provisionalExpiry } : {}),
+        })
+      );
+      const socket = harness.socket("editor");
+      await connectAndJoin(harness, socket);
+      provisional = false;
+
+      vi.setSystemTime(now.getTime() + 1_001);
+      await expect(
+        harness.gateway.updateCursor(
+          socket as never,
+          { workId: "work-1", pageId: null, x: 0.5, y: 0.5 },
+          undefined
+        )
+      ).resolves.toEqual({ ok: true, data: { accepted: true } });
+      const internals = harness.gateway as unknown as {
+        participantsBySocket: Map<string, { authorizationExpiresAt: number | null }>;
+      };
+      expect(
+        internals.participantsBySocket.get(socket.id)?.authorizationExpiresAt
+      ).toBeNull();
+      expect(socket.disconnected).toBe(false);
+      expect(harness.service.getWorkAuthorization).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not retain a ghost participant when the Socket.IO room join rejects", async () => {

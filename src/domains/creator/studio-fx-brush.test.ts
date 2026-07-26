@@ -90,7 +90,7 @@ describe("planGlitterBrushParticles", () => {
     expect(dust.length).toBeLessThan(glitter.length);
   });
 
-  it.each(["glitter", "star-dust"] as const)(
+  it.each(["glitter", "star-dust", "sparkle-star"] as const)(
     "guarantees a deterministic visible %s particle for every supported seed on a point tap",
     (mode) => {
       const missingSeeds: number[] = [];
@@ -120,9 +120,55 @@ describe("planGlitterBrushParticles", () => {
       expect(minimumOpacity).toBeGreaterThanOrEqual(0.35);
     }
   );
+
+  it.each(["glitter", "star-dust", "sparkle-star"] as const)(
+    "spreads a capped %s plan across the complete long stroke for every tested seed",
+    (mode) => {
+      for (let seed = 0; seed < 128; seed += 1) {
+        const particles = planGlitterBrushParticles({
+          points: [0, 0, 500, 0, 1_000, 0],
+          pressures: [0.5, 0.5, 0.5],
+          baseWidth: 20,
+          seed,
+          mode,
+          maxParticles: 4,
+        });
+
+        expect(particles.length).toBeGreaterThan(0);
+        expect(particles.length).toBeLessThanOrEqual(4);
+        expect(Math.min(...particles.map((particle) => particle.x))).toBeLessThan(50);
+        expect(Math.max(...particles.map((particle) => particle.x))).toBeGreaterThan(950);
+      }
+    }
+  );
 });
 
 describe("planOilBrushDabs", () => {
+  it("renders a deterministic pressure-sensitive dab for a point tap", () => {
+    const low = planOilBrushDabs({
+      points: [10, 12],
+      pressures: [0],
+      baseWidth: 22,
+      seed: 3,
+    });
+    const high = planOilBrushDabs({
+      points: [10, 12],
+      pressures: [1],
+      baseWidth: 22,
+      seed: 3,
+    });
+
+    expect(low).toHaveLength(1);
+    expect(planOilBrushDabs({
+      points: [10, 12],
+      pressures: [0],
+      baseWidth: 22,
+      seed: 3,
+    })).toEqual(low);
+    expect(high[0]!.radiusX).toBeGreaterThan(low[0]!.radiusX);
+    expect(high[0]!.opacity).toBeGreaterThan(low[0]!.opacity);
+  });
+
   it("emits elliptical dabs with finite geometry", () => {
     const dabs = planOilBrushDabs({
       points: [10, 10, 50, 30, 90, 20],
@@ -138,9 +184,49 @@ describe("planOilBrushDabs", () => {
       expect(Number.isFinite(d.angleRad)).toBe(true);
     }
   });
+
+  it("preserves both ends and their aligned pressures when a long stroke hits the dab budget", () => {
+    const dabs = planOilBrushDabs({
+      points: [0, 0, 500, 0, 1_000, 0],
+      pressures: [0, 0.5, 1],
+      baseWidth: 20,
+      seed: 17,
+      maxDabs: 2,
+    });
+
+    expect(dabs).toHaveLength(2);
+    expect(Math.hypot(dabs[0]!.x, dabs[0]!.y)).toBeLessThan(2);
+    expect(Math.hypot(dabs[1]!.x - 1_000, dabs[1]!.y)).toBeLessThan(2);
+    expect(dabs[1]!.radiusX).toBeGreaterThan(dabs[0]!.radiusX);
+  });
 });
 
 describe("planPastelBrushDabs", () => {
+  it("renders a deterministic pressure-sensitive tooth for a point tap", () => {
+    const low = planPastelBrushDabs({
+      points: [10, 12],
+      pressures: [0],
+      baseWidth: 18,
+      seed: 11,
+    });
+    const high = planPastelBrushDabs({
+      points: [10, 12],
+      pressures: [1],
+      baseWidth: 18,
+      seed: 11,
+    });
+
+    expect(low).toHaveLength(2);
+    expect(planPastelBrushDabs({
+      points: [10, 12],
+      pressures: [0],
+      baseWidth: 18,
+      seed: 11,
+    })).toEqual(low);
+    expect(high[0]!.radius).toBeGreaterThan(low[0]!.radius);
+    expect(high[0]!.opacity).toBeGreaterThan(low[0]!.opacity);
+  });
+
   it("builds soft low-opacity build-up dabs", () => {
     const dabs = planPastelBrushDabs({
       points: [0, 0, 60, 0],
@@ -149,5 +235,21 @@ describe("planPastelBrushDabs", () => {
     });
     expect(dabs.length).toBeGreaterThan(2);
     expect(dabs.every((d) => d.opacity <= 0.5)).toBe(true);
+  });
+
+  it("reserves a visible end dab instead of exhausting a tiny cap at the stroke head", () => {
+    const dabs = planPastelBrushDabs({
+      points: [0, 0, 500, 0, 1_000, 0],
+      pressures: [0, 0.5, 1],
+      baseWidth: 20,
+      seed: 23,
+      maxDabs: 2,
+    });
+
+    expect(dabs).toHaveLength(2);
+    expect(Math.hypot(dabs[0]!.x, dabs[0]!.y)).toBeLessThan(6);
+    expect(Math.hypot(dabs[1]!.x - 1_000, dabs[1]!.y)).toBeLessThan(6);
+    expect(dabs[1]!.radius).toBeGreaterThan(dabs[0]!.radius);
+    expect(dabs[1]!.opacity).toBeGreaterThan(dabs[0]!.opacity);
   });
 });

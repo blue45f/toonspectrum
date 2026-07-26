@@ -1,4 +1,23 @@
-import { useEffect, useRef, type PointerEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent,
+} from "react";
+
+import {
+  createStudioCanvasRulerTicks,
+  normalizeStudioCanvasRulerDpr,
+  normalizeStudioCanvasRulerScale,
+  shouldStartStudioCanvasRulerGuideDrag,
+  snapStudioCanvasRulerDevicePixel,
+  STUDIO_CANVAS_RULER_THICKNESS,
+  studioCanvasRulerBackingPixels,
+  studioCanvasRulerDocumentCoordinate,
+  type StudioCanvasRulerAxis,
+  type StudioCanvasRulerRect,
+} from "./studio-canvas-ruler";
 
 export interface StudioCanvasRulerBarsProps {
   visible: boolean;
@@ -13,7 +32,70 @@ export interface StudioCanvasRulerBarsProps {
   onToggleRulers?: () => void;
 }
 
-const RULER_THICKNESS = 22; // px
+interface RulerGuideDragSession {
+  readonly axis: StudioCanvasRulerAxis;
+  readonly pointerId: number;
+  readonly rect: StudioCanvasRulerRect;
+}
+
+type RulerCssProperties = CSSProperties & {
+  "--studio-ruler-thickness": string;
+};
+
+const RULER_STYLE: RulerCssProperties = {
+  "--studio-ruler-thickness": `${STUDIO_CANVAS_RULER_THICKNESS}px`,
+};
+
+function rulerCanvasColors(
+  canvas: HTMLCanvasElement,
+  axis: StudioCanvasRulerAxis
+): {
+  readonly background: string;
+  readonly line: string;
+  readonly text: string;
+  readonly fontFamily: string;
+} {
+  const style = window.getComputedStyle(canvas);
+  return {
+    background: style.backgroundColor,
+    line:
+      axis === "x"
+        ? style.borderBottomColor || style.color
+        : style.borderRightColor || style.color,
+    text: style.color,
+    fontFamily: style.fontFamily,
+  };
+}
+
+function prepareRulerCanvas(
+  canvas: HTMLCanvasElement,
+  cssWidth: number,
+  cssHeight: number,
+  dpr: number,
+  axis: StudioCanvasRulerAxis
+): CanvasRenderingContext2D | null {
+  const backingWidth = studioCanvasRulerBackingPixels(cssWidth, dpr);
+  const backingHeight = studioCanvasRulerBackingPixels(cssHeight, dpr);
+  if (canvas.width !== backingWidth) canvas.width = backingWidth;
+  if (canvas.height !== backingHeight) canvas.height = backingHeight;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+
+  const ratio = normalizeStudioCanvasRulerDpr(dpr);
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  context.clearRect(0, 0, Math.max(0, cssWidth), Math.max(0, cssHeight));
+  const colors = rulerCanvasColors(canvas, axis);
+  if (colors.background) {
+    context.fillStyle = colors.background;
+    context.fillRect(0, 0, Math.max(0, cssWidth), Math.max(0, cssHeight));
+  }
+  context.strokeStyle = colors.line || colors.text;
+  context.fillStyle = colors.text;
+  context.lineWidth = 1 / ratio;
+  context.font = `9px ${colors.fontFamily || "ui-sans-serif, system-ui, sans-serif"}`;
+  context.textBaseline = "alphabetic";
+  return context;
+}
 
 export function StudioCanvasRulerBars({
   visible,
@@ -26,143 +108,257 @@ export function StudioCanvasRulerBars({
 }: StudioCanvasRulerBarsProps) {
   const topCanvasRef = useRef<HTMLCanvasElement>(null);
   const leftCanvasRef = useRef<HTMLCanvasElement>(null);
+  const dragSessionRef = useRef<RulerGuideDragSession | null>(null);
+  const observedSizeRef = useRef("");
+  const [sizeRevision, setSizeRevision] = useState(0);
 
-  // 상단 눈금자 렌더링
   useEffect(() => {
-    if (!visible || !topCanvasRef.current) return;
-    const canvas = topCanvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!visible) return;
+    const topCanvas = topCanvasRef.current;
+    const leftCanvas = leftCanvasRef.current;
+    if (!topCanvas || !leftCanvas) return;
 
-    const width = canvas.clientWidth;
-    const height = RULER_THICKNESS;
-    const dpr = window.devicePixelRatio || 1;
+    const measure = () => {
+      const signature = [
+        topCanvas.clientWidth,
+        topCanvas.clientHeight,
+        leftCanvas.clientWidth,
+        leftCanvas.clientHeight,
+        normalizeStudioCanvasRulerDpr(window.devicePixelRatio),
+      ].join(":");
+      if (signature === observedSizeRef.current) return;
+      observedSizeRef.current = signature;
+      setSizeRevision((revision) => revision + 1);
+    };
+    measure();
+    const observer =
+      typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
+    observer?.observe(topCanvas);
+    observer?.observe(leftCanvas);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [visible]);
 
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    ctx.scale(dpr, dpr);
-
-    ctx.fillStyle = "rgba(18, 18, 26, 0.92)";
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
-    ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-    ctx.font = "9px sans-serif";
-
-    // 픽셀 간격 계산
-    let step = 50;
-    if (scale > 2) step = 10;
-    else if (scale > 1) step = 20;
-    else if (scale < 0.5) step = 100;
-    else if (scale < 0.25) step = 200;
-
-    const startX = Math.floor(scrollLeft / scale / step) * step;
-    const endX = startX + width / scale + step * 2;
-
-    ctx.beginPath();
-    for (let px = startX; px <= endX; px += step / 5) {
-      const screenX = (px * scale) - scrollLeft;
-      if (screenX < 0 || screenX > width) continue;
-
-      const isMajor = Math.abs(px % step) < 0.001;
-      const markHeight = isMajor ? 12 : 5;
-      ctx.moveTo(screenX, height);
-      ctx.lineTo(screenX, height - markHeight);
-
-      if (isMajor && screenX + 30 <= width) {
-        ctx.fillText(`${Math.round(px)}`, screenX + 3, 11);
-      }
-    }
-    ctx.stroke();
-  }, [visible, scale, scrollLeft, canvasWidth]);
-
-  // 좌측 눈금자 렌더링
   useEffect(() => {
-    if (!visible || !leftCanvasRef.current) return;
-    const canvas = leftCanvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!visible) return;
+    const topCanvas = topCanvasRef.current;
+    const leftCanvas = leftCanvasRef.current;
+    if (!topCanvas || !leftCanvas) return;
+    const dpr = normalizeStudioCanvasRulerDpr(window.devicePixelRatio);
+    const thickness = STUDIO_CANVAS_RULER_THICKNESS;
 
-    const width = RULER_THICKNESS;
-    const height = canvas.clientHeight;
-    const dpr = window.devicePixelRatio || 1;
-
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    ctx.scale(dpr, dpr);
-
-    ctx.fillStyle = "rgba(18, 18, 26, 0.92)";
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
-    ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-    ctx.font = "9px sans-serif";
-
-    let step = 50;
-    if (scale > 2) step = 10;
-    else if (scale > 1) step = 20;
-    else if (scale < 0.5) step = 100;
-    else if (scale < 0.25) step = 200;
-
-    const startY = Math.floor(scrollTop / scale / step) * step;
-    const endY = startY + height / scale + step * 2;
-
-    ctx.beginPath();
-    for (let py = startY; py <= endY; py += step / 5) {
-      const screenY = (py * scale) - scrollTop;
-      if (screenY < 0 || screenY > height) continue;
-
-      const isMajor = Math.abs(py % step) < 0.001;
-      const markWidth = isMajor ? 12 : 5;
-      ctx.moveTo(width, screenY);
-      ctx.lineTo(width - markWidth, screenY);
-
-      if (isMajor && screenY + 10 <= height) {
-        ctx.save();
-        ctx.translate(11, screenY + 12);
-        ctx.rotate(-Math.PI / 2);
-        ctx.fillText(`${Math.round(py)}`, 0, 0);
-        ctx.restore();
+    const topWidth = Math.max(0, topCanvas.clientWidth);
+    const topContext = prepareRulerCanvas(
+      topCanvas,
+      topWidth,
+      thickness,
+      dpr,
+      "x"
+    );
+    if (topContext) {
+      const ticks = createStudioCanvasRulerTicks({
+        viewportPixels: topWidth,
+        scrollPixels: scrollLeft,
+        scale,
+        documentExtent: canvasWidth,
+      });
+      topContext.beginPath();
+      for (const tick of ticks) {
+        const x = snapStudioCanvasRulerDevicePixel(tick.screenPosition, dpr);
+        const markHeight = tick.major ? 12 : 5;
+        topContext.moveTo(x, thickness);
+        topContext.lineTo(x, thickness - markHeight);
+        if (tick.label && tick.screenPosition + 34 <= topWidth) {
+          topContext.fillText(tick.label, tick.screenPosition + 3, 10.5);
+        }
       }
+      topContext.stroke();
     }
-    ctx.stroke();
-  }, [visible, scale, scrollTop, canvasHeight]);
+
+    const leftHeight = Math.max(0, leftCanvas.clientHeight);
+    const leftContext = prepareRulerCanvas(
+      leftCanvas,
+      thickness,
+      leftHeight,
+      dpr,
+      "y"
+    );
+    if (leftContext) {
+      const ticks = createStudioCanvasRulerTicks({
+        viewportPixels: leftHeight,
+        scrollPixels: scrollTop,
+        scale,
+        documentExtent: canvasHeight,
+      });
+      leftContext.beginPath();
+      for (const tick of ticks) {
+        const y = snapStudioCanvasRulerDevicePixel(tick.screenPosition, dpr);
+        const markWidth = tick.major ? 12 : 5;
+        leftContext.moveTo(thickness, y);
+        leftContext.lineTo(thickness - markWidth, y);
+        if (tick.label && tick.screenPosition + 14 <= leftHeight) {
+          leftContext.save();
+          leftContext.translate(10.5, tick.screenPosition + 12);
+          leftContext.rotate(-Math.PI / 2);
+          leftContext.fillText(tick.label, 0, 0);
+          leftContext.restore();
+        }
+      }
+      leftContext.stroke();
+    }
+  }, [
+    visible,
+    scale,
+    scrollLeft,
+    scrollTop,
+    canvasWidth,
+    canvasHeight,
+    sizeRevision,
+  ]);
 
   if (!visible) return null;
 
-  function handleTopPointerDown(e: PointerEvent<HTMLCanvasElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const docX = (e.clientX - rect.left + scrollLeft) / scale;
-    onAddGuide?.("v", docX);
+  function beginGuideDrag(
+    axis: StudioCanvasRulerAxis,
+    event: PointerEvent<HTMLCanvasElement>
+  ): void {
+    if (
+      !onAddGuide
+      || event.button !== 0
+      || event.isPrimary === false
+      || !normalizeStudioCanvasRulerScale(scale)
+    ) {
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (
+      !Number.isFinite(rect.left)
+      || !Number.isFinite(rect.top)
+      || !Number.isFinite(rect.right)
+      || !Number.isFinite(rect.bottom)
+    ) {
+      return;
+    }
+    event.preventDefault();
+    dragSessionRef.current = {
+      axis,
+      pointerId: event.pointerId,
+      rect: {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+      },
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
   }
 
-  function handleLeftPointerDown(e: PointerEvent<HTMLCanvasElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const docY = (e.clientY - rect.top + scrollTop) / scale;
-    onAddGuide?.("h", docY);
+  function continueGuideDrag(
+    axis: StudioCanvasRulerAxis,
+    event: PointerEvent<HTMLCanvasElement>
+  ): void {
+    const session = dragSessionRef.current;
+    if (
+      !session
+      || session.axis !== axis
+      || session.pointerId !== event.pointerId
+      || !shouldStartStudioCanvasRulerGuideDrag(
+        axis,
+        { clientX: event.clientX, clientY: event.clientY },
+        session.rect
+      )
+    ) {
+      return;
+    }
+    const position = studioCanvasRulerDocumentCoordinate({
+      clientCoordinate: axis === "x" ? event.clientX : event.clientY,
+      rulerStart: axis === "x" ? session.rect.left : session.rect.top,
+      scrollPixels: axis === "x" ? scrollLeft : scrollTop,
+      scale,
+      documentExtent: axis === "x" ? canvasWidth : canvasHeight,
+    });
+    dragSessionRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    if (position !== null) onAddGuide?.(axis === "x" ? "v" : "h", position);
   }
+
+  function endGuideDrag(event: PointerEvent<HTMLCanvasElement>): void {
+    const session = dragSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    dragSessionRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  }
+
+  const topInstruction =
+    "세로 가이드선을 만들려면 상단 눈금자에서 캔버스 안으로 아래 방향으로 드래그하세요.";
+  const leftInstruction =
+    "가로 가이드선을 만들려면 왼쪽 눈금자에서 캔버스 안으로 오른쪽 방향으로 드래그하세요.";
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-30 select-none overflow-hidden">
-      {/* 교차 코너 픽셀 사각형 */}
-      <div className="pointer-events-auto absolute left-0 top-0 flex size-[22px] items-center justify-center border-b border-r border-white/20 bg-neutral-900/90 text-[9px] text-white/50">
+    <div
+      data-studio-canvas-rulers="true"
+      data-studio-ruler-state="on"
+      data-studio-ruler-layout-contract="inset-top-left"
+      data-studio-ruler-thickness={STUDIO_CANVAS_RULER_THICKNESS}
+      data-studio-ruler-hit-contract="desktop-fine-pointer-22px"
+      style={RULER_STYLE}
+      className="pointer-events-none absolute inset-0 z-30 hidden select-none overflow-hidden lg:block"
+    >
+      <div
+        aria-hidden="true"
+        data-studio-ruler-corner="true"
+        className="pointer-events-none absolute left-0 top-0 flex items-center justify-center border-b border-r border-line bg-panel text-[9px] text-fg-3"
+        style={{
+          width: "var(--studio-ruler-thickness)",
+          height: "var(--studio-ruler-thickness)",
+        }}
+      >
         px
       </div>
 
-      {/* 상단 가로 눈금자 */}
       <canvas
         ref={topCanvasRef}
-        onPointerDown={handleTopPointerDown}
-        className="pointer-events-auto absolute left-[22px] top-0 h-[22px] w-[calc(100%-22px)] cursor-ns-resize border-b border-white/10"
-        title="드래그하여 세로 가이드선 생성 (Alt/Cmd+R: 눈금자 토글)"
+        onPointerDown={(event) => beginGuideDrag("x", event)}
+        onPointerMove={(event) => continueGuideDrag("x", event)}
+        onPointerUp={endGuideDrag}
+        onPointerCancel={endGuideDrag}
+        data-studio-ruler-axis="x"
+        data-studio-ruler-guide-gesture="drag-to-canvas"
+        aria-label={topInstruction}
+        aria-disabled={onAddGuide ? undefined : true}
+        className={`pointer-events-auto absolute top-0 touch-none border-b border-line bg-panel text-fg-3 ${
+          onAddGuide ? "cursor-ns-resize" : "cursor-default"
+        }`}
+        style={{
+          left: "var(--studio-ruler-thickness)",
+          width: "calc(100% - var(--studio-ruler-thickness))",
+          height: "var(--studio-ruler-thickness)",
+        }}
+        title={topInstruction}
       />
 
-      {/* 좌측 세로 눈금자 */}
       <canvas
         ref={leftCanvasRef}
-        onPointerDown={handleLeftPointerDown}
-        className="pointer-events-auto absolute left-0 top-[22px] h-[calc(100%-22px)] w-[22px] cursor-ew-resize border-r border-white/10"
-        title="드래그하여 가로 가이드선 생성 (Alt/Cmd+R: 눈금자 토글)"
+        onPointerDown={(event) => beginGuideDrag("y", event)}
+        onPointerMove={(event) => continueGuideDrag("y", event)}
+        onPointerUp={endGuideDrag}
+        onPointerCancel={endGuideDrag}
+        data-studio-ruler-axis="y"
+        data-studio-ruler-guide-gesture="drag-to-canvas"
+        aria-label={leftInstruction}
+        aria-disabled={onAddGuide ? undefined : true}
+        className={`pointer-events-auto absolute left-0 touch-none border-r border-line bg-panel text-fg-3 ${
+          onAddGuide ? "cursor-ew-resize" : "cursor-default"
+        }`}
+        style={{
+          top: "var(--studio-ruler-thickness)",
+          width: "var(--studio-ruler-thickness)",
+          height: "calc(100% - var(--studio-ruler-thickness))",
+        }}
+        title={leftInstruction}
       />
     </div>
   );

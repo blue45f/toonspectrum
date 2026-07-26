@@ -4,6 +4,7 @@ import {
   CheckCheck,
   ChevronDown,
   CircleDot,
+  ClipboardList,
   CornerDownRight,
   Edit3,
   Eye,
@@ -17,6 +18,7 @@ import {
   RotateCw,
   Search,
   Send,
+  ShieldCheck,
   UserRoundCheck,
   X,
 } from "lucide-react";
@@ -47,6 +49,10 @@ import {
   type StudioCommentAnchor,
   type StudioCommentsDocument,
 } from "./studio-comments";
+import {
+  compileStudioReviewTask,
+  type StudioReviewTaskPriority,
+} from "./studio-review-task-compiler";
 
 export interface StudioCommentAnchorOption {
   anchor: StudioCommentAnchor;
@@ -156,7 +162,7 @@ const FIELD_CLASS =
   "w-full rounded-lg border border-line bg-card px-3 py-2 text-sm leading-relaxed text-fg outline-none transition-colors placeholder:text-fg-3 hover:border-line-strong focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
 
 const QUIET_BUTTON_CLASS =
-  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9";
+  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9 pointer-coarse:min-h-11";
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   year: "numeric",
@@ -169,6 +175,13 @@ const DATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
 function formatDate(value: string): string {
   const time = Date.parse(value);
   return Number.isFinite(time) ? DATE_FORMATTER.format(time) : value;
+}
+
+function reviewTaskPriorityClass(priority: StudioReviewTaskPriority): string {
+  if (priority === "urgent") return "border-bad/40 bg-bad/10 text-bad";
+  if (priority === "high") return "border-warn/40 bg-warn/10 text-warn";
+  if (priority === "low") return "border-line bg-raised text-fg-3";
+  return "border-cool/35 bg-cool/10 text-cool";
 }
 
 function actorInitial(actor: StudioCommentActor): string {
@@ -285,6 +298,7 @@ export function StudioCommentsPanel({
   const [dismissedSharedReplyThreadId, setDismissedSharedReplyThreadId] = useState<string | null>(
     null
   );
+  const [expandedTaskThreadId, setExpandedTaskThreadId] = useState<string | null>(null);
   const [assigningThreadId, setAssigningThreadId] = useState<string | null>(null);
   const [assigneeName, setAssigneeName] = useState("");
   const [editingMessage, setEditingMessage] = useState<CommentMessageTarget | null>(null);
@@ -417,6 +431,7 @@ export function StudioCommentsPanel({
       pendingReplyIdRef.current = null;
     }
     setAssigningThreadId(null);
+    setExpandedTaskThreadId(null);
     setEditingMessage(null);
     setPendingDelete(null);
     if (!newComment.trim() && !preserveReplyDraft) setError(null);
@@ -455,6 +470,7 @@ export function StudioCommentsPanel({
       pendingReplyIdRef.current = null;
     }
     setAssigningThreadId(null);
+    setExpandedTaskThreadId(null);
     setEditingMessage(null);
     setPendingDelete(null);
     setError(null);
@@ -1286,6 +1302,30 @@ export function StudioCommentsPanel({
                 const canEditThread = !isReadOnlyArchive && capabilities.editOwn && ownsThread && !saving;
                 const isEditingThread = !isReadOnlyArchive && messageTargetsEqual(editingMessage, threadTarget);
                 const locationLabel = getAnchorLabel(thread.anchor, anchorOptions);
+                const taskSuggestion = compileStudioReviewTask(thread, {
+                  anchorLabel: locationLabel,
+                });
+                const taskExpanded = expandedTaskThreadId === thread.id;
+                const assignedToCurrentActor = Boolean(
+                  thread.assignee
+                  && actorsRepresentSamePerson(thread.assignee, currentActor)
+                );
+                const taskConversionDisabledReason = isReadOnlyArchive
+                  ? "읽기 전용 보관 댓글은 작업으로 전환할 수 없습니다."
+                  : thread.resolved
+                    ? "해결된 댓글은 다시 연 뒤 작업으로 전환할 수 있습니다."
+                    : assignedToCurrentActor
+                      ? "이미 내 작업으로 지정되어 있습니다."
+                      : !capabilities.assign
+                        ? mutationDisabledReason
+                          ?? "현재 권한으로는 담당 작업을 지정할 수 없습니다."
+                        : mutationDisabledReason
+                          ? mutationDisabledReason
+                          : saving || syncing
+                            ? "댓글을 동기화하는 동안 잠시 기다려 주세요."
+                            : null;
+                const taskProposalId = `${titleId}-task-proposal-${thread.id}`;
+                const taskConversionHelpId = `${titleId}-task-conversion-help-${thread.id}`;
 
                 return (
                   <li key={thread.id} className="border-b border-line last:border-b-0">
@@ -1553,6 +1593,28 @@ export function StudioCommentsPanel({
                             {readMutation === thread.id ? "읽음 처리 중" : "읽음으로 표시"}
                           </button>
                         ) : null}
+                        <button
+                          type="button"
+                          data-studio-review-task-toggle="true"
+                          aria-expanded={taskExpanded}
+                          aria-controls={taskProposalId}
+                          onClick={() =>
+                            setExpandedTaskThreadId(taskExpanded ? null : thread.id)
+                          }
+                          className={`${QUIET_BUTTON_CLASS} ${
+                            taskExpanded ? "border-accent/50 bg-accent-soft text-accent" : ""
+                          }`}
+                        >
+                          <ClipboardList size={13} aria-hidden />
+                          작업 제안
+                          <ChevronDown
+                            size={13}
+                            className={`transition-transform duration-150 motion-reduce:transition-none ${
+                              taskExpanded ? "rotate-180" : ""
+                            }`}
+                            aria-hidden
+                          />
+                        </button>
                         {!isReadOnlyArchive && capabilities.assign ? <button
                           type="button"
                           aria-expanded={isAssigning}
@@ -1604,6 +1666,111 @@ export function StudioCommentsPanel({
                           {thread.resolved ? "다시 열기" : "해결"}
                         </button> : null}
                       </div>
+
+                      {taskExpanded ? (
+                        <section
+                          id={taskProposalId}
+                          data-studio-review-task="true"
+                          aria-labelledby={`${taskProposalId}-title`}
+                          className="mt-3 border-y border-line/70 py-3"
+                        >
+                          <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="inline-flex min-h-6 items-center rounded-md border border-accent/35 bg-accent-soft px-2 text-[0.65rem] font-bold text-accent">
+                                  {taskSuggestion.kindLabel}
+                                </span>
+                                <span
+                                  className={`inline-flex min-h-6 items-center rounded-md border px-2 text-[0.65rem] font-bold ${reviewTaskPriorityClass(taskSuggestion.priority)}`}
+                                >
+                                  우선순위 {taskSuggestion.priorityLabel}
+                                </span>
+                              </div>
+                              <h3
+                                id={`${taskProposalId}-title`}
+                                className="mt-2 text-sm font-bold leading-5 text-fg text-pretty"
+                              >
+                                {taskSuggestion.title}
+                              </h3>
+                            </div>
+                            <span
+                              className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-md border border-good/30 bg-good/10 px-2 text-[0.62rem] font-semibold text-good"
+                              title="댓글 내용은 서버나 외부 AI로 전송되지 않습니다."
+                            >
+                              <ShieldCheck size={11} aria-hidden />
+                              로컬 규칙 기반
+                            </span>
+                          </div>
+
+                          <dl className="mt-3 space-y-2 text-xs leading-relaxed">
+                            <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-2">
+                              <dt className="font-semibold text-fg-3">대상 범위</dt>
+                              <dd className="min-w-0 break-words font-semibold text-fg-2">
+                                {taskSuggestion.targetScope}
+                              </dd>
+                            </div>
+                            <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-2">
+                              <dt className="font-semibold text-fg-3">제안 근거</dt>
+                              <dd className="min-w-0">
+                                <ul className="space-y-1 text-fg-2">
+                                  {taskSuggestion.rationale.map((item) => (
+                                    <li key={item} className="flex min-w-0 items-start gap-1.5">
+                                      <CircleDot
+                                        size={10}
+                                        className="mt-1 shrink-0 text-cool"
+                                        aria-hidden
+                                      />
+                                      <span className="min-w-0 break-words">{item}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </dd>
+                            </div>
+                          </dl>
+
+                          <div className="mt-3">
+                            <p className="text-[0.7rem] font-bold text-fg-2">완료 조건</p>
+                            <ul className="mt-1.5 space-y-1.5">
+                              {taskSuggestion.completionChecklist.map((item) => (
+                                <li
+                                  key={item}
+                                  className="flex min-w-0 items-start gap-2 text-xs leading-relaxed text-fg-2"
+                                >
+                                  <span
+                                    className="mt-0.5 size-3.5 shrink-0 rounded border border-line-strong bg-card"
+                                    aria-hidden
+                                  />
+                                  <span className="min-w-0 break-words">{item}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+
+                          <div className="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                            <p
+                              id={taskConversionHelpId}
+                              className="min-w-0 flex-1 text-[0.68rem] leading-relaxed text-fg-3"
+                              role={taskConversionDisabledReason ? "status" : undefined}
+                            >
+                              {taskConversionDisabledReason
+                                ?? (thread.assignee
+                                  ? `현재 담당자 ${thread.assignee.displayName}에서 ${currentActor.displayName}(으)로 변경합니다.`
+                                  : `${currentActor.displayName}을(를) 이 댓글의 담당자로 지정합니다.`)}
+                            </p>
+                            <button
+                              type="button"
+                              data-studio-review-task-convert="true"
+                              disabled={taskConversionDisabledReason !== null}
+                              aria-describedby={taskConversionHelpId}
+                              onClick={() => void assignToCurrentActor(thread.id)}
+                              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:bg-raised disabled:text-fg-3 disabled:opacity-55 sm:min-h-9 pointer-coarse:min-h-11"
+                            >
+                              <UserRoundCheck size={13} aria-hidden />
+                              {assignedToCurrentActor ? "내 작업으로 지정됨" : "내 작업으로 전환"}
+                            </button>
+                          </div>
+                        </section>
+                      ) : null}
 
                       {isReplying && (
                         <form

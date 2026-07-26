@@ -163,6 +163,21 @@ describe("StudioFloodFillPanel advanced-fill presentation", () => {
     expect(html).toContain('role="status"');
   });
 
+  it("keeps cancellation available only when the fill tool is active", () => {
+    const activeBusyHtml = renderPanel({ active: true, busy: true });
+    const cancelButton = openingButtonForText(activeBusyHtml, "계산 취소");
+    expect(cancelButton).not.toContain('disabled=""');
+    expect(activeBusyHtml).toContain(
+      "진행 중에도 이 버튼으로 계산과 채우기 도구를 종료할 수 있습니다."
+    );
+
+    const inactiveBusyHtml = renderPanel({ active: false, busy: true });
+    const busyButton = openingButtonForText(inactiveBusyHtml, "계산 중…");
+    expect(busyButton).toContain('disabled=""');
+    expect(inactiveBusyHtml).not.toContain("계산 취소");
+    expect(inactiveBusyHtml).toContain("이전 계산이 끝나면 채우기 도구를 다시 켤 수 있습니다.");
+  });
+
   it("documents the current compositing boundary and summarizes engine diagnostics", () => {
     const html = renderPanel({
       referenceLayerCount: 1,

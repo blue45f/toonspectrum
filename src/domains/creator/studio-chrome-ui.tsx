@@ -367,7 +367,7 @@ export function StudioMenuSubtabs({
             className={cn(
               studioSegmentChipClass(active),
               // 8탭 이상 에셋 메뉴에서도 라벨이 잘리지 않게 최소 터치·가독 폭 확보
-              "min-h-8 px-2 text-[0.68rem] sm:min-h-9",
+              "min-h-8 px-2 text-[0.68rem] max-lg:min-h-11 lg:min-h-9",
               item.disabled && "cursor-not-allowed opacity-40"
             )}
           >
@@ -599,10 +599,12 @@ export function StudioContextActionButton({
 export function StudioVerticalToolRail({
   children,
   className,
+  footer,
   "aria-label": ariaLabel = "그리기 도구",
 }: {
   children: ReactNode;
   className?: string;
+  footer?: ReactNode;
   "aria-label"?: string;
 }): ReactElement {
   return (
@@ -613,14 +615,34 @@ export function StudioVerticalToolRail({
       data-studio-tool-rail="true"
       className={cn(
         // xl: slightly wider like Krita docker / Ibis tool column
-        "hidden w-12 shrink-0 flex-col items-center gap-1.5 overflow-y-auto overscroll-contain",
-        "border-r border-line py-2.5 xl:w-[3.25rem] xl:gap-2 xl:py-3",
-        "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "hidden min-h-0 w-12 shrink-0 flex-col overflow-hidden border-r border-line",
+        "xl:w-[3.25rem]",
         "lg:flex",
         className
       )}
     >
-      {children}
+      <div
+        data-studio-tool-rail-scroll="true"
+        className={cn(
+          "flex min-h-0 flex-1 flex-col items-center gap-1.5 overflow-y-auto overscroll-contain py-2.5",
+          "xl:gap-2 xl:py-3",
+          "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        )}
+      >
+        {children}
+      </div>
+      {footer ? (
+        <div
+          data-studio-tool-rail-footer="true"
+          className="relative z-[1] flex shrink-0 justify-center border-t border-line/70 bg-panel px-1 py-1.5 shadow-[0_-10px_20px_-16px_oklch(0.08_0.015_70/0.9)]"
+        >
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 -top-3 h-3 bg-gradient-to-t from-panel/90 to-transparent"
+          />
+          {footer}
+        </div>
+      ) : null}
     </div>
   );
 }

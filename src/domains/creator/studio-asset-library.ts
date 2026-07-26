@@ -1,11 +1,14 @@
 // 회원 커스텀 에셋 라이브러리 — 업로드한 이미지를 브라우저(IndexedDB)에 저장해 재사용.
 // (멤버 간 공유 서버 동기화는 추후 백엔드 작업; 현재는 기기-로컬 개인 라이브러리.)
 
+import { STUDIO_ASSET_DATA_URL_MAX_CHARS } from "./studio-upload-image-safety";
+
+export { STUDIO_ASSET_DATA_URL_MAX_CHARS } from "./studio-upload-image-safety";
+
 const DB_NAME = "toonspectrum-studio-asset-library";
 export const STUDIO_ASSET_LIBRARY_DB_VERSION = 2;
 const STORE = "assets";
 const CONTENT_HASH_INDEX = "contentHash";
-export const STUDIO_ASSET_DATA_URL_MAX_CHARS = 32 * 1024 * 1024;
 export const STUDIO_ASSET_DATA_URL_MAX_DECODED_BYTES = 64 * 1024 * 1024;
 export const STUDIO_ASSET_CONTENT_IDENTITY_MAX_CANDIDATES_PER_HASH = 8;
 export const STUDIO_ASSET_CONTENT_IDENTITY_MAX_RETURN_CANDIDATES = 64;

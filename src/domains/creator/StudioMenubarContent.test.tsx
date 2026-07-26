@@ -117,8 +117,12 @@ function createProps(
     redoDisabled: true,
     saving: false,
     setAiProvenanceOpen: vi.fn(),
+    setAnimaticTimelineOpen: vi.fn(),
+    setAssetRightsAuditOpen: vi.fn(),
     setCharacterBibleOpen: vi.fn(),
     setCheckpointPanelOpen: vi.fn(),
+    setProductionBibleOpen: vi.fn(),
+    setSceneSnapshotOpen: vi.fn(),
     setExportFormat: vi.fn(),
     setExportMenuOpen: vi.fn(),
     setExportPresetId: vi.fn(),
@@ -224,6 +228,72 @@ describe("StudioMenubarContent", () => {
 
     vi.runAllTimers();
     expect(setProjectActionsOpen).toHaveBeenCalledWith(false);
+  });
+
+  it("opens the reusable scene snapshot library from project actions", () => {
+    const setSceneSnapshotOpen = vi.fn();
+    render(
+      <StudioMenubarContent
+        {...createProps({
+          projectActionsOpen: true,
+          setSceneSnapshotOpen,
+        })}
+      />
+    );
+
+    const trigger = screen.getByRole("button", { name: "장면 스냅샷" });
+    expect(trigger.className).toContain("min-h-11");
+    fireEvent.click(trigger);
+    expect(setSceneSnapshotOpen).toHaveBeenCalledWith(true);
+  });
+
+  it("opens the local animatic timeline from project actions", () => {
+    const setAnimaticTimelineOpen = vi.fn();
+    render(
+      <StudioMenubarContent
+        {...createProps({
+          projectActionsOpen: true,
+          setAnimaticTimelineOpen,
+        })}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "애니매틱" });
+    expect(trigger.className).toContain("min-h-11");
+    fireEvent.click(trigger);
+    expect(setAnimaticTimelineOpen).toHaveBeenCalledWith(true);
+  });
+
+  it("opens the production bible from project actions without crowding the main toolbar", () => {
+    const setProductionBibleOpen = vi.fn();
+    render(
+      <StudioMenubarContent
+        {...createProps({
+          projectActionsOpen: true,
+          setProductionBibleOpen,
+        })}
+      />
+    );
+
+    const trigger = screen.getByRole("button", { name: "제작 바이블" });
+    expect(trigger.className).toContain("min-h-11");
+    fireEvent.click(trigger);
+    expect(setProductionBibleOpen).toHaveBeenCalledWith(true);
+  });
+
+  it("opens the placed-asset rights ledger from project actions", () => {
+    const setAssetRightsAuditOpen = vi.fn();
+    render(
+      <StudioMenubarContent
+        {...createProps({
+          projectActionsOpen: true,
+          setAssetRightsAuditOpen,
+        })}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "에셋 권리 감사" }));
+    expect(setAssetRightsAuditOpen).toHaveBeenCalledWith(true);
   });
 
   it("ref-clicks root import inputs and turns the busy control into an explicit cancel action", () => {

@@ -3,6 +3,7 @@
 // 앱 전용 JSON과 Photoshop ABR 팩을 가져오고, 안전한 앱 전용 JSON으로 내보낸다.
 import {
   Check,
+  ChevronDown,
   Copy,
   Download,
   LoaderCircle,
@@ -10,6 +11,7 @@ import {
   Pin,
   RefreshCw,
   Save,
+  Share2,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -292,17 +294,47 @@ export function StudioBrushLibraryPanel({
     );
   }
 
+  async function handleShare(brush: StudioSavedBrush) {
+    setError(null);
+    setDoneMsg(null);
+    const file = new File(
+      [writeBrushJson(brush)],
+      brushFileName(brush),
+      { type: "application/json;charset=utf-8" }
+    );
+    const canShareFile =
+      typeof navigator.share === "function"
+      && (typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] }));
+    if (!canShareFile) {
+      downloadBlob(file, file.name);
+      setDoneMsg(`공유 시트를 지원하지 않아 "${brush.name}" 파일을 내려받았어요.`);
+      return;
+    }
+    try {
+      await navigator.share({
+        title: `${brush.name} · ToonSpectrum 브러시`,
+        text: "이 브러시 설정을 ToonSpectrum에서 가져올 수 있어요.",
+        files: [file],
+      });
+      setDoneMsg(`"${brush.name}" 브러시를 공유했어요.`);
+    } catch (caught) {
+      if (caught instanceof DOMException && caught.name === "AbortError") return;
+      setError("브러시 공유를 열지 못했어요. 내보내기로 파일을 저장해 다시 시도해 주세요.");
+    }
+  }
+
   return (
     <section
       className="space-y-2 border-t border-line/35 pt-2"
       aria-label="내 브러시"
       data-studio-brush-library-scope="saved"
+      data-studio-brush-surface-role="user-library-management"
     >
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-[0.68rem] font-semibold text-fg-2">내 브러시</p>
+          <p className="text-[0.68rem] font-semibold text-fg-2">내 브러시 · 사용자 설정</p>
           <p className="text-[0.6rem] tabular-nums text-fg-3">
-            사용자 저장 · {brushes.length}/{MAX_BRUSHES} · 고정과 최근 사용 우선
+            저장·가져오기·공유·재적용 · {brushes.length}/{MAX_BRUSHES}
           </p>
         </div>
         <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-line px-2 text-[0.62rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-within:outline focus-within:outline-2 focus-within:outline-accent lg:min-h-8">
@@ -443,7 +475,25 @@ export function StudioBrushLibraryPanel({
                 </span>
               </button>
 
-              <div className="mt-1.5 grid grid-cols-5 gap-1 border-t border-line/50 pt-1.5">
+              <details className="group mt-1.5 border-t border-line/50 pt-1.5">
+                <summary
+                  onKeyDown={(event) => {
+                    if (event.key !== "Escape") return;
+                    event.preventDefault();
+                    const details = event.currentTarget.parentElement;
+                    if (details instanceof HTMLDetailsElement) details.open = false;
+                    event.currentTarget.focus({ preventScroll: true });
+                  }}
+                  className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-lg px-2 text-[0.62rem] font-semibold text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8 [&::-webkit-details-marker]:hidden"
+                >
+                  <span>관리 · 덮어쓰기, 복제, 공유</span>
+                  <ChevronDown
+                    size={13}
+                    className="transition-transform group-open:rotate-180"
+                    aria-hidden
+                  />
+                </summary>
+                <div className="grid grid-cols-3 gap-1 pt-1 sm:grid-cols-6">
                 <button type="button" onClick={() => handleOverwrite(brush)} aria-label={`${brush.name} 브러시를 지금 설정으로 덮어쓰기`} title="지금 설정으로 덮어쓰기 (같은 브러시에 저장)" className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
                   <RefreshCw size={12} aria-hidden /> 덮어쓰기
                 </button>
@@ -456,10 +506,14 @@ export function StudioBrushLibraryPanel({
                 <button type="button" onClick={() => handleExport(brush)} aria-label={`${brush.name} 내보내기`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
                   <Download size={12} aria-hidden /> 내보내기
                 </button>
+                <button type="button" onClick={() => void handleShare(brush)} aria-label={`${brush.name} 브러시 공유`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
+                  <Share2 size={12} aria-hidden /> 공유
+                </button>
                 <button type="button" onClick={() => handleDelete(brush.id)} aria-label={`${brush.name} 브러시 삭제`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
                   <Trash2 size={12} aria-hidden /> 삭제
                 </button>
-              </div>
+                </div>
+              </details>
             </li>
           ))}
         </ul>

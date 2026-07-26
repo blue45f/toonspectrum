@@ -3,17 +3,25 @@
  * Pure presentation; the complete searchable catalog lives in StudioBrushLibrarySheet.
  */
 import { History, LayoutGrid, Star } from "lucide-react";
+import { useEffect, useState, type KeyboardEvent, type ReactElement } from "react";
 
+import {
+  listStudioCoreQuickBrushCatalogItems,
+  STUDIO_BRUSH_CATALOG_COUNTS,
+  studioBrushCatalogKindLabel,
+} from "./studio-brush-catalog-core";
+import { loadStudioFullBrushCatalogItems } from "./studio-brush-catalog-loader";
+import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
 import {
   studioBrushChipSurface,
   studioBrushPreviewDashArray,
   studioBrushPreviewDotCenters,
+  studioBrushPreviewOpacity,
   studioBrushPreviewPathD,
   studioBrushPreviewRibbonD,
   studioBrushPreviewStrokeWidth,
 } from "./studio-brush-visual";
 import {
-  listStudioQuickBrushTrayItems,
   type StudioBrushTrayItem,
   type StudioQuickBrushSource,
 } from "./studio-creative-ux";
@@ -21,14 +29,12 @@ import { planNeonBrushPasses } from "./studio-fx-brush";
 import { STUDIO_FOCUS_RING, STUDIO_EASE } from "./studio-panel-ui";
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
 
-import type { ReactElement } from "react";
-
 import { cn } from "@/lib/utils";
 
 export interface StudioBrushTrayProps {
   activeBrushId: string;
   onSelect: (item: StudioBrushTrayItem) => void;
-  /** Combined core + procedural catalogue; omitted callers retain the core-only shelf. */
+  /** Combined core + procedural catalogue; omitted callers use the canonical built-in catalogue. */
   brushCatalogItems?: readonly StudioBrushTrayItem[];
   recentBrushIds?: readonly string[];
   favoriteBrushIds?: readonly string[];
@@ -59,6 +65,7 @@ function BrushPreviewGlyph({
   const pathD = studioBrushPreviewPathD(item.previewStyle, PREVIEW_W, PREVIEW_H);
   const dash = studioBrushPreviewDashArray(item.previewStyle);
   const dots = studioBrushPreviewDotCenters(item.previewStyle, PREVIEW_W, PREVIEW_H);
+  const previewOpacity = studioBrushPreviewOpacity(item.defaultOpacity);
   // 필압 테이퍼 리본: 균일 선 아이콘 대신 실제 획감(얇게 시작→부풀고→빠짐)을 보여준다.
   const ribbonD = studioBrushPreviewRibbonD(
     item.previewStyle,
@@ -103,7 +110,7 @@ function BrushPreviewGlyph({
           </g>
         )}
       {dots.length > 0 ? (
-        <g fill={ink} opacity={active ? 0.95 : 0.8}>
+        <g fill={ink} opacity={previewOpacity}>
           {dots.map((d, i) => (
             <circle key={i} cx={d.x} cy={d.y} r={d.r} />
           ))}
@@ -119,7 +126,7 @@ function BrushPreviewGlyph({
                 stroke={pass.tone === "white-core" ? "oklch(0.97 0.015 85)" : ink}
                 strokeWidth={Math.max(1, strokeW * pass.widthScale)}
                 strokeLinecap="round"
-                opacity={pass.opacity * (active ? 1 : 0.82)}
+                opacity={pass.opacity * previewOpacity}
               />
             ))}
           </g>
@@ -132,7 +139,7 @@ function BrushPreviewGlyph({
               stroke={ink}
               strokeWidth={strokeW * 1.85}
               strokeLinecap="round"
-              opacity={active ? 0.32 : 0.22}
+              opacity={0.25 * previewOpacity}
             />
           )}
           {item.previewStyle === "calligraphy" && (
@@ -142,12 +149,12 @@ function BrushPreviewGlyph({
               stroke={ink}
               strokeWidth={strokeW * 0.55}
               strokeLinecap="round"
-              opacity={active ? 0.4 : 0.28}
+              opacity={0.32 * previewOpacity}
               transform="translate(0 1.2)"
             />
           )}
           {ribbonD ? (
-            <path d={ribbonD} fill={ink} opacity={active ? 0.98 : 0.88} />
+            <path d={ribbonD} fill={ink} opacity={previewOpacity} />
           ) : (
             <path
               d={pathD}
@@ -157,7 +164,7 @@ function BrushPreviewGlyph({
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeDasharray={dash}
-              opacity={active ? 0.98 : 0.88}
+              opacity={previewOpacity}
             />
           )}
           </>
@@ -176,39 +183,127 @@ export function StudioBrushTray({
   onOpenLibrary,
   libraryOpen = false,
   className,
-  "aria-label": ariaLabel = "빠른 브러시 — 즐겨찾기, 최근 사용, 추천",
+  "aria-label": ariaLabel = "빠른 보조 도구 — 즐겨찾기, 최근 사용, 추천",
 }: StudioBrushTrayProps): ReactElement {
-  const visible = listStudioQuickBrushTrayItems({
-    catalogItems: brushCatalogItems,
+  const [focusedBrushId, setFocusedBrushId] = useState<string | null>(null);
+  const [deferredCatalogItems, setDeferredCatalogItems] =
+    useState<readonly StudioBrushTrayItem[] | null>(null);
+  const [failedProMetadataKey, setFailedProMetadataKey] = useState<string | null>(null);
+  const proMetadataRequestKey = brushCatalogItems
+    ? ""
+    : [activeBrushId, ...favoriteBrushIds, ...recentBrushIds]
+        .filter(isStudioBrushPackCatalogId)
+        .join("\u0000");
+  const needsProMetadata = proMetadataRequestKey.length > 0;
+
+  useEffect(() => {
+    if (!needsProMetadata) return;
+    let live = true;
+    void loadStudioFullBrushCatalogItems()
+      .then((items) => {
+        if (live) setDeferredCatalogItems(items);
+      })
+      .catch(() => {
+        if (live) setFailedProMetadataKey(proMetadataRequestKey);
+      });
+    return () => {
+      live = false;
+    };
+  }, [needsProMetadata, proMetadataRequestKey]);
+
+  const resolvedCatalogItems =
+    brushCatalogItems ?? (needsProMetadata ? deferredCatalogItems ?? undefined : undefined);
+  const proMetadataFailed =
+    deferredCatalogItems === null && failedProMetadataKey === proMetadataRequestKey;
+  const proMetadataLoading =
+    needsProMetadata && deferredCatalogItems === null && !proMetadataFailed;
+  const visible = listStudioCoreQuickBrushCatalogItems({
+    catalogItems: resolvedCatalogItems,
     favoriteIds: favoriteBrushIds,
     recentIds: recentBrushIds,
   });
+  const rovingBrushId = visible.some((item) => item.id === focusedBrushId)
+    ? focusedBrushId
+    : visible.some((item) => item.id === activeBrushId)
+      ? activeBrushId
+      : visible[0]?.id ?? null;
+
+  function onBrushKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    currentIndex: number,
+  ): void {
+    const lastIndex = visible.length - 1;
+    let nextIndex: number;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = currentIndex === lastIndex ? 0 : currentIndex + 1;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = currentIndex === 0 ? lastIndex : currentIndex - 1;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = lastIndex;
+    } else {
+      return;
+    }
+
+    const nextBrush = visible[nextIndex];
+    if (!nextBrush) return;
+    event.preventDefault();
+    setFocusedBrushId(nextBrush.id);
+    const nextButton = event.currentTarget
+      .closest('[role="listbox"]')
+      ?.querySelectorAll<HTMLButtonElement>('[role="option"]')[nextIndex];
+    nextButton?.focus({ preventScroll: true });
+    nextButton?.scrollIntoView?.({ block: "nearest" });
+  }
 
   return (
     <div
       data-studio-brush-tray="true"
+      data-studio-brush-surface-role="quick-subtools"
+      data-studio-pro-catalog-state={
+        needsProMetadata
+          ? proMetadataFailed
+            ? "error"
+            : deferredCatalogItems
+              ? "loaded"
+              : "loading"
+          : "core"
+      }
+      aria-busy={proMetadataLoading ? true : undefined}
       className={cn("flex min-w-0 max-w-full items-center gap-1", className)}
     >
+      {proMetadataFailed ? (
+        <span role="status" className="sr-only">
+          프로 브러시 정보를 불러오지 못해 코어 브러시를 표시합니다. 라이브러리를 열어 다시
+          시도할 수 있습니다.
+        </span>
+      ) : null}
       <div
         role="listbox"
         aria-label={ariaLabel}
         className="flex min-w-0 max-w-full items-center gap-1 overflow-x-auto py-0.5 [scrollbar-width:thin]"
       >
-        {visible.map((item) => {
+        {visible.map((item, itemIndex) => {
           const active = activeBrushId === item.id;
           const surface = studioBrushChipSurface(item.mediaGroup);
           const sourceLabel = QUICK_SOURCE_LABEL[item.quickSource];
+          const kindLabel = studioBrushCatalogKindLabel(item);
           return (
             <button
               key={item.id}
               type="button"
               role="option"
               aria-selected={active}
-              aria-label={`${sourceLabel} 브러시 ${item.name} — ${item.hint}`}
-              title={`${sourceLabel} · ${item.name} — ${item.hint}`}
+              tabIndex={item.id === rovingBrushId ? 0 : -1}
+              aria-label={`${sourceLabel} 브러시 ${item.name} · ${kindLabel} — ${item.hint}`}
+              title={`${sourceLabel} · ${kindLabel} · ${item.name} — ${item.hint}`}
               onClick={() => onSelect(item)}
+              onFocus={() => setFocusedBrushId(item.id)}
+              onKeyDown={(event) => onBrushKeyDown(event, itemIndex)}
               data-studio-brush-chip={item.id}
               data-studio-brush-media={item.mediaGroup}
+              data-studio-brush-kind={kindLabel}
               data-studio-quick-source={item.quickSource}
               className={cn(
                 // Icon + stroke preview tile (Ibis/Picsart/CSP)
@@ -261,8 +356,8 @@ export function StudioBrushTray({
         onClick={(event) => onOpenLibrary(event.currentTarget)}
         aria-expanded={libraryOpen}
         aria-haspopup="dialog"
-        aria-label="기본 프리셋 전체 보기"
-        title="기본 프리셋 전체 보기"
+        aria-label="브러시 전체 라이브러리와 관리 열기"
+        title={`${brushCatalogItems?.length ?? STUDIO_BRUSH_CATALOG_COUNTS.total}종 검색·분류·즐겨찾기·기본값 다시 적용`}
         data-studio-open-brush-library="true"
         className={cn(
           "flex h-11 shrink-0 items-center gap-1 rounded-xl border border-line/70 bg-card/80 px-2 text-[0.62rem] font-bold text-fg-2 hover:border-accent/40 hover:bg-raised hover:text-fg",
@@ -271,7 +366,7 @@ export function StudioBrushTray({
         )}
       >
         <LayoutGrid size={13} strokeWidth={1.75} aria-hidden />
-        <span className="whitespace-nowrap">전체 보기</span>
+        <span className="whitespace-nowrap">라이브러리</span>
       </button>
     </div>
   );

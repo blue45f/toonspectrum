@@ -58,8 +58,17 @@ vi.mock("./studio-chrome-ui", () => ({
       {label}
     </button>
   ),
-  StudioVerticalToolRail: ({ children }: { children: ReactNode }) => (
-    <div role="toolbar" aria-label="그리기 도구">{children}</div>
+  StudioVerticalToolRail: ({
+    children,
+    footer,
+  }: {
+    children: ReactNode;
+    footer?: ReactNode;
+  }) => (
+    <div role="toolbar" aria-label="그리기 도구">
+      <div data-studio-tool-rail-scroll="true">{children}</div>
+      {footer ? <div data-studio-tool-rail-footer="true">{footer}</div> : null}
+    </div>
   ),
 }));
 
@@ -268,6 +277,26 @@ describe("StudioLeftToolRail", () => {
     expect(props.stableHandlers.toggleAdvancedFill).toHaveBeenCalledOnce();
   });
 
+  it("gives the eyedropper exclusive pointer ownership and still allows a direct exit", () => {
+    const activating = createProps({ advancedFillActive: true });
+    const view = render(<StudioLeftToolRail {...activating} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "스포이드 (I / Alt+클릭)" }));
+    expect(activating.stableHandlers.disarmAllPixelTools).toHaveBeenCalledOnce();
+    expect(activating.setEyedropperActive).toHaveBeenCalledWith(true);
+    expect(activating.setMenu).toHaveBeenCalledWith(null);
+
+    const exiting = createProps({
+      eyedropperActive: true,
+      stableHandlers: activating.stableHandlers,
+      setEyedropperActive: activating.setEyedropperActive,
+    });
+    view.rerender(<StudioLeftToolRail {...exiting} />);
+    fireEvent.click(screen.getByRole("button", { name: "스포이드 (I / Alt+클릭)" }));
+    expect(activating.stableHandlers.disarmAllPixelTools).toHaveBeenCalledOnce();
+    expect(activating.setEyedropperActive).toHaveBeenLastCalledWith(false);
+  });
+
   it("keeps remapped and unbound view shortcut labels synchronized with app settings", () => {
     const appSettings = defaultStudioAppSettings();
     appSettings.shortcuts = {
@@ -402,6 +431,20 @@ describe("StudioLeftToolRail", () => {
       expect(screen.getByRole<HTMLButtonElement>("button", { name }).disabled).toBe(true);
     }
     expect(screen.getByLabelText<HTMLInputElement>("이미지 추가").disabled).toBe(true);
+  });
+
+  it("keeps toolbar settings outside the independently scrolling tool list", () => {
+    render(<StudioLeftToolRail {...createProps()} />);
+
+    const rail = screen.getByRole("toolbar", { name: "그리기 도구" });
+    const scrollRegion = rail.querySelector('[data-studio-tool-rail-scroll="true"]');
+    const footer = rail.querySelector('[data-studio-tool-rail-footer="true"]');
+    const settings = screen.getByRole("button", { name: "더보기 · 툴바 설정" });
+
+    expect(scrollRegion).not.toBeNull();
+    expect(footer).not.toBeNull();
+    expect(scrollRegion?.contains(settings)).toBe(false);
+    expect(footer?.contains(settings)).toBe(true);
   });
 
   it("ports the More dialog to the body and restores focus after choosing a hidden tool", () => {

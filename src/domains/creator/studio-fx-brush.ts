@@ -86,11 +86,73 @@ function sanitizePoints(rawPoints: unknown, rawPressures: unknown): StrokePoint[
 /** Arc-length resample stations along a polyline. */
 function sampleStations(
   points: readonly StrokePoint[],
-  spacing: number
+  spacing: number,
+  maximumStations = Number.POSITIVE_INFINITY
 ): StrokePoint[] {
   if (points.length === 0) return [];
   if (points.length === 1) return [points[0]!];
   const step = Math.max(0.35, spacing);
+  const stationLimit = Number.isFinite(maximumStations)
+    ? Math.max(1, Math.floor(maximumStations))
+    : Number.POSITIVE_INFINITY;
+  if (stationLimit === 1) return [points[0]!];
+
+  let totalLength = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1]!;
+    const current = points[index]!;
+    totalLength += Math.hypot(current.x - previous.x, current.y - previous.y);
+  }
+  if (totalLength <= POINT_EPS) return [points.at(-1)!];
+
+  const naturalStepCount = Math.floor(totalLength / step);
+  const naturalTail = totalLength - naturalStepCount * step;
+  const naturalStationCount =
+    1 + naturalStepCount + (naturalTail > POINT_EPS ? 1 : 0);
+
+  // A hard dab/particle budget must not make a long stroke disappear halfway through. Once the
+  // natural spacing exceeds the caller's station budget, fit a bounded set across the complete
+  // arc length and preserve both source endpoints exactly. Ordinary strokes keep the historical
+  // prefix-stable spacing path below.
+  if (naturalStationCount > stationLimit) {
+    const stations: StrokePoint[] = [];
+    let segmentIndex = 1;
+    let segmentStartDistance = 0;
+    for (let stationIndex = 0; stationIndex < stationLimit; stationIndex += 1) {
+      if (stationIndex === 0) {
+        stations.push(points[0]!);
+        continue;
+      }
+      if (stationIndex === stationLimit - 1) {
+        stations.push(points.at(-1)!);
+        continue;
+      }
+      const targetDistance = totalLength * (stationIndex / (stationLimit - 1));
+      let start = points[segmentIndex - 1]!;
+      let end = points[segmentIndex]!;
+      let segmentLength = Math.hypot(end.x - start.x, end.y - start.y);
+      while (
+        segmentIndex < points.length - 1
+        && segmentStartDistance + segmentLength < targetDistance
+      ) {
+        segmentStartDistance += segmentLength;
+        segmentIndex += 1;
+        start = points[segmentIndex - 1]!;
+        end = points[segmentIndex]!;
+        segmentLength = Math.hypot(end.x - start.x, end.y - start.y);
+      }
+      const amount = segmentLength > POINT_EPS
+        ? clamp((targetDistance - segmentStartDistance) / segmentLength, 0, 1)
+        : 0;
+      stations.push({
+        x: start.x + (end.x - start.x) * amount,
+        y: start.y + (end.y - start.y) * amount,
+        pressure: start.pressure + (end.pressure - start.pressure) * amount,
+      });
+    }
+    return stations;
+  }
+
   const stations: StrokePoint[] = [points[0]!];
   let carry = 0;
   for (let i = 1; i < points.length; i++) {
@@ -211,15 +273,24 @@ export function planGlitterBrushParticles(input: FxGlitterPlanInput): FxGlitterP
     clamp(finiteNumber(input.maxParticles, FX_BRUSH_PARTICLE_CAP), 4, FX_BRUSH_PARTICLE_CAP)
   );
   const spacing = mode === "star-dust" ? Math.max(2.2, baseWidth * 0.55) : mode === "sparkle-star" ? Math.max(1.8, baseWidth * 0.4) : Math.max(1.4, baseWidth * 0.28);
-  const stations = sampleStations(points, spacing);
+  const perStation = mode === "star-dust" ? 2 : mode === "sparkle-star" ? 3 : 4;
+  const stations = sampleStations(
+    points,
+    spacing,
+    Math.max(2, Math.floor(maxParticles / perStation))
+  );
   const particles: FxGlitterParticle[] = [];
   const scatter = baseWidth * (mode === "star-dust" ? 0.85 : mode === "sparkle-star" ? 0.65 : 0.55);
-  const perStation = mode === "star-dust" ? 2 : mode === "sparkle-star" ? 3 : 4;
+  const perStationBudget = Math.max(1, Math.floor(maxParticles / stations.length));
 
   for (let si = 0; si < stations.length; si++) {
     const st = stations[si]!;
+    const stationParticleStart = particles.length;
     const density = 0.55 + st.pressure * 0.55;
-    const count = Math.max(1, Math.round(perStation * density));
+    const count = Math.min(
+      perStationBudget,
+      Math.max(1, Math.round(perStation * density))
+    );
     for (let k = 0; k < count; k++) {
       if (particles.length >= maxParticles) return particles;
       const n1 = hash2(si, k * 3 + 1, seed);
@@ -241,34 +312,29 @@ export function planGlitterBrushParticles(input: FxGlitterPlanInput): FxGlitterP
         kind: n3 > 0.62 ? 1 : 0,
       });
     }
+    // Organic thinning must not erase a whole bounded station. In particular, when a long stroke
+    // is LOD-fitted to the particle budget, losing its final station makes the visible stroke look
+    // truncated again. Every station owns `perStationBudget` slots, so this deterministic fallback
+    // cannot steal capacity reserved for later stations.
+    if (particles.length === stationParticleStart && particles.length < maxParticles) {
+      const n1 = hash2(si, 101, seed);
+      const n2 = hash2(si, 103, seed);
+      const n3 = hash2(si, 107, seed);
+      const angle = n1 * TAU;
+      const distance = scatter * Math.sqrt(n2);
+      const radiusScale = mode === "star-dust"
+        ? 0.08 + n3 * 0.22
+        : 0.04 + n3 * 0.14;
+      particles.push({
+        x: st.x + Math.cos(angle) * distance,
+        y: st.y + Math.sin(angle) * distance,
+        radius: Math.max(0.35, baseWidth * radiusScale),
+        opacity: clamp(0.55 + n2 * 0.35, 0.55, 0.9),
+        kind: n3 > 0.62 ? 1 : 0,
+      });
+    }
   }
 
-  // A point tap has only one station, so the organic sparsity filter above can reject every
-  // candidate for some otherwise valid seeds. Keep the stochastic look for normal strokes, but
-  // guarantee one deterministic fallback spark for every non-empty input. This is deliberately
-  // derived from the same stroke seed (rather than Math.random) so replay, collaboration and SVG
-  // export all produce the exact same visible tap.
-  if (particles.length === 0) {
-    const stationNoise = hash2(31, 47, seed);
-    const stationIndex = Math.min(stations.length - 1, Math.floor(stationNoise * stations.length));
-    const station = stations[stationIndex]!;
-    const angleNoise = hash2(stationIndex + 53, 61, seed);
-    const distanceNoise = hash2(stationIndex + 67, 71, seed);
-    const sizeNoise = hash2(stationIndex + 73, 79, seed);
-    const kindNoise = hash2(stationIndex + 83, 89, seed);
-    const angle = angleNoise * TAU;
-    const distance = scatter * Math.sqrt(distanceNoise);
-    const radiusScale = mode === "star-dust"
-      ? 0.08 + sizeNoise * 0.22
-      : 0.04 + sizeNoise * 0.14;
-    particles.push({
-      x: station.x + Math.cos(angle) * distance,
-      y: station.y + Math.sin(angle) * distance,
-      radius: Math.max(0.35, baseWidth * radiusScale),
-      opacity: clamp(0.55 + distanceNoise * 0.35, 0.55, 0.9),
-      kind: kindNoise > 0.62 ? 1 : 0,
-    });
-  }
   return particles;
 }
 
@@ -302,7 +368,7 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
   );
   const maxDabs = Math.floor(clamp(finiteNumber(input.maxDabs, FX_BRUSH_DAB_CAP), 2, FX_BRUSH_DAB_CAP));
   const spacing = Math.max(0.8, baseWidth * 0.22);
-  const stations = sampleStations(points, spacing);
+  const stations = sampleStations(points, spacing, maxDabs);
   const dabs: FxOilDab[] = [];
 
   for (let si = 0; si < stations.length; si++) {
@@ -365,14 +431,23 @@ export function planPastelBrushDabs(input: FxPastelPlanInput): FxPastelDab[] {
   );
   const maxDabs = Math.floor(clamp(finiteNumber(input.maxDabs, FX_BRUSH_DAB_CAP), 2, FX_BRUSH_DAB_CAP));
   const spacing = Math.max(0.7, baseWidth * 0.18);
-  const stations = sampleStations(points, spacing);
+  // Reserve at least one dab for every bounded station before adding the second tooth dab. This
+  // keeps both endpoints visible even with a tiny imported/test budget such as maxDabs=2.
+  const stations = sampleStations(
+    points,
+    spacing,
+    Math.max(2, Math.ceil(maxDabs / 2))
+  );
   const dabs: FxPastelDab[] = [];
 
   for (let si = 0; si < stations.length; si++) {
     if (dabs.length >= maxDabs) break;
     const st = stations[si]!;
-    // 2 soft dabs per station for tooth
-    for (let k = 0; k < 2; k++) {
+    const remainingDabs = maxDabs - dabs.length;
+    const remainingStations = stations.length - si - 1;
+    const dabsAtStation = Math.min(2, Math.max(1, remainingDabs - remainingStations));
+    // Up to 2 soft dabs per station for tooth; a capped plan reserves one for every later station.
+    for (let k = 0; k < dabsAtStation; k++) {
       if (dabs.length >= maxDabs) break;
       const n1 = hash2(si, k * 7 + 3, seed);
       const n2 = hash2(si, k * 7 + 5, seed);

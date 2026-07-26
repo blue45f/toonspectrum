@@ -140,7 +140,7 @@ interface MobileRunResult {
   immersive: boolean;
   controlsReady: boolean;
   dynamicBrushReady: boolean;
-  noPanelDockOverlap: boolean;
+  panelDockIsolation: boolean;
   noHorizontalOverflow: boolean;
   categoryTargetsReady: boolean;
   rootInert: boolean;
@@ -598,9 +598,14 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
   await lineCorrection.scrollIntoViewIfNeeded();
   // The unified picker intentionally keeps only starter/favorite/recent presets in the quick row.
   // Exercise the shipped catalog path for an expressive brush instead of depending on tray order.
-  await sheet.getByRole("button", { name: "기본 프리셋 전체 보기", exact: true }).click();
-  const builtInBrushCatalog = page.getByRole("dialog", { name: "앱 브러시", exact: true });
-  await builtInBrushCatalog.waitFor({ state: "visible", timeout: 3000 });
+  // The quick shelf and the complete catalogue now share one CSP-style picker contract. Use its
+  // stable product boundary instead of the retired starter-preset copy so this launch gate follows
+  // the same path artists use on both desktop and mobile.
+  await sheet.locator('[data-studio-open-brush-library="true"]').click();
+  const builtInBrushCatalog = page.locator('[data-studio-brush-catalog-session="true"]');
+  // The 160-profile Pro catalogue is an intentional lazy boundary. Cold CI and a concurrently
+  // exercised preview can legitimately need more than one materialization animation to mount it.
+  await builtInBrushCatalog.waitFor({ state: "visible", timeout: 10_000 });
   await builtInBrushCatalog.getByRole("tab", { name: "페인트", exact: true }).click();
   await builtInBrushCatalog.getByRole("button", { name: "소프트 에어브러시 선택", exact: true }).click();
   await builtInBrushCatalog.waitFor({ state: "detached", timeout: 3000 });
@@ -668,9 +673,21 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     !siteFooterVisible;
   const panelBox = await brushStudioPanel.boundingBox();
   const dockBox = await dock.boundingBox();
-  const noPanelDockOverlap = Boolean(
+  const panelEndsBeforeDock = Boolean(
     panelBox && dockBox && panelBox.y + panelBox.height <= dockBox.y + 1
   );
+  // Brush Studio is now a genuine full-screen aria-modal editor on phone widths. In that mode the
+  // correct contract is not "stop above the app dock"; the portalled panel must fully cover the
+  // inert dock so no disabled controls peek through or receive input. Keep accepting the compact
+  // above-dock geometry as well in case a smaller responsive treatment returns later.
+  const panelCoversDock = Boolean(
+    panelBox && dockBox &&
+    panelBox.x <= dockBox.x + 1 &&
+    panelBox.y <= dockBox.y + 1 &&
+    panelBox.x + panelBox.width >= dockBox.x + dockBox.width - 1 &&
+    panelBox.y + panelBox.height >= dockBox.y + dockBox.height - 1
+  );
+  const panelDockIsolation = panelEndsBeforeDock || (rootInert && panelCoversDock);
   const horizontalOverflow = await page.evaluate(() => ({
     document: Math.max(
       0,
@@ -719,7 +736,7 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
   const ok =
     immersive &&
     controlsReady &&
-    noPanelDockOverlap &&
+    panelDockIsolation &&
     noHorizontalOverflow &&
     categoryTargetsReady &&
     rootInert &&
@@ -733,7 +750,8 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     `rootValue=${mobileImmersiveValue} preference=${mobileImmersivePreference} ` +
     `siteBrand=${siteBrandVisible} siteFooter=${siteFooterVisible} controlsReady=${controlsReady} ` +
     `dynamicBrushReady=${dynamicBrushReady} ` +
-    `noPanelDockOverlap=${noPanelDockOverlap} noHorizontalOverflow=${noHorizontalOverflow} ` +
+    `panelDockIsolation=${panelDockIsolation} panelEndsBeforeDock=${panelEndsBeforeDock} ` +
+    `panelCoversDock=${panelCoversDock} noHorizontalOverflow=${noHorizontalOverflow} ` +
     `categoryTargetsReady=${categoryTargetsReady} categoryTabHeights=${categoryTabHeights.join(",")} ` +
     `rootInert=${rootInert} ` +
     `launcherFocusRestored=${launcherFocusRestored} dotRecorded=${dotRecorded} dotRendered=${dotRendered} ` +
@@ -752,7 +770,7 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     immersive,
     controlsReady,
     dynamicBrushReady,
-    noPanelDockOverlap,
+    panelDockIsolation,
     noHorizontalOverflow,
     categoryTargetsReady,
     rootInert,

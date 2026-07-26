@@ -1118,9 +1118,9 @@ describe("brushFileName", () => {
 // ── 내장 프로시저럴 카탈로그(120종) × 저장 라이브러리 계약 ──────────────────
 // 카탈로그 프리셋을 "내 브러시"로 저장하면 StudioPage는 brushId=런타임 엔진 id,
 // sourcePreset* = 카탈로그 정체성, brushDynamics = 완전한 정규화 스냅샷으로 기록한다.
-// 이 블록은 120개 전부가 라이브러리 정규화를 보정 없이 통과하고, 내보내기/가져오기
+// 이 블록은 160개 전부가 라이브러리 정규화를 보정 없이 통과하고, 내보내기/가져오기
 // 왕복이 무손실이며, 각 파라미터가 엔진 안전 범위 안에 있음을 프리셋 단위로 고정한다.
-describe("내장 카탈로그 120종 저장 라이브러리 왕복", () => {
+describe("내장 카탈로그 160종 저장 라이브러리 왕복", () => {
   const selections = materializeAllStudioBrushPackSelections();
 
   function catalogSnapshot(selection: (typeof selections)[number]): StudioBrushSnapshot {
@@ -1147,9 +1147,9 @@ describe("내장 카탈로그 120종 저장 라이브러리 왕복", () => {
     };
   }
 
-  it("120개 전 프리셋이 sanitizeBrushSnapshot을 무보정 통과한다", () => {
-    expect(selections).toHaveLength(120);
-    expect(new Set(selections.map((selection) => selection.catalogId)).size).toBe(120);
+  it("160개 전 프리셋이 sanitizeBrushSnapshot을 무보정 통과한다", () => {
+    expect(selections).toHaveLength(160);
+    expect(new Set(selections.map((selection) => selection.catalogId)).size).toBe(160);
     for (const selection of selections) {
       const { snapshot, adjustedFields } = sanitizeBrushSnapshot(catalogSnapshot(selection));
       expect(adjustedFields, `${selection.catalogId}: sanitized fields`).toEqual([]);
@@ -1157,7 +1157,7 @@ describe("내장 카탈로그 120종 저장 라이브러리 왕복", () => {
     }
   });
 
-  it("확장 웨이브 33종을 포함해 전 프리셋 파라미터가 스냅샷 안전 범위 안이다", () => {
+  it("확장 웨이브 73종을 포함해 전 프리셋 파라미터가 스냅샷 안전 범위 안이다", () => {
     expect(
       STUDIO_BRUSH_PACK_EXPANSION_WAVE_IDS.every((id) =>
         selections.some((selection) => selection.catalogId === id)

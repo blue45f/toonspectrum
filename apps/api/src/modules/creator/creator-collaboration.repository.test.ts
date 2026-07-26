@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { db } from "../../../../../lib/db";
 
 import {
+  buildCreatorCollaborationWorkQuery,
   buildCreatorCrdtServerSequenceQuery,
   buildCreatorSharedDocumentMetaQuery,
   buildCreatorSharedDocumentUpdateQuery,
@@ -33,6 +34,7 @@ interface MemoryWork {
   title: string;
   createdAt: Date | null;
   updatedAt: Date | null;
+  hidden?: boolean;
   titleId?: string | null;
   description?: string;
   cover?: string;
@@ -46,6 +48,9 @@ interface MemoryWork {
   challengeId?: string | null;
   remixFromId?: string | null;
   revision?: number;
+  draftCollaborationStatus?: string | null;
+  draftCollaborationExpiresAt?: Date | null;
+  draftCollaborationOwnerUserId?: string | null;
 }
 
 interface MemoryUser {
@@ -618,6 +623,15 @@ function createFixture(now = DEFAULT_NOW) {
 }
 
 describe("CreatorCollaborationRepository", () => {
+  it("Studio work probe는 optional marker를 left join하고 작품 행만 잠근다", () => {
+    const query = buildCreatorCollaborationWorkQuery(db, "work-1", true).toSQL();
+
+    expect(query.sql).toContain('left join "creator_draft_collaboration_room"');
+    expect(query.sql).toContain('for update of "creator_work"');
+    expect(query.sql).not.toContain('for update of "creator_draft_collaboration_room"');
+    expect(query.params).toEqual(["work-1", 1]);
+  });
+
   it("공동 문서 primitive는 raw format 전환을 SQL 생성 전에 거부한다", () => {
     const rawPatch = { format: "upload" } as unknown as CreatorSharedDocumentPatch;
     expect(() =>
@@ -817,6 +831,123 @@ describe("CreatorCollaborationRepository", () => {
     expect(store.membershipReadKeys).toEqual([membershipKey("work-1", "editor")]);
     expect(store.userReadIds).toEqual([]);
     expect(store.membershipListWorkIds).toEqual([]);
+  });
+
+  it("active 임시 room은 join·hot-path authorization에 동일한 유한 lease를 투영한다", async () => {
+    const { repository, store } = createFixture();
+    const expiresAt = new Date(DEFAULT_NOW.getTime() + 60_000);
+    Object.assign(store.works.get("work-1")!, {
+      status: "draft",
+      hidden: true,
+      draftCollaborationStatus: "active",
+      draftCollaborationExpiresAt: expiresAt,
+      draftCollaborationOwnerUserId: "owner",
+    });
+
+    await expect(repository.getTeam("owner", "work-1")).resolves.toMatchObject({
+      workId: "work-1",
+      authorizationExpiresAt: expiresAt.toISOString(),
+      viewer: { userId: "owner", status: "active" },
+    });
+    await expect(repository.getAuthorization("editor", "work-1")).resolves.toMatchObject({
+      workId: "work-1",
+      authorizationExpiresAt: expiresAt.toISOString(),
+      viewer: { userId: "editor", status: "active", capabilities: { edit: true } },
+    });
+  });
+
+  it("active 임시 room은 owner와 active member 모두 expiresAt 경계부터 fail-closed한다", async () => {
+    const ownerFixture = createFixture();
+    Object.assign(ownerFixture.store.works.get("work-1")!, {
+      status: "draft",
+      hidden: true,
+      draftCollaborationStatus: "active",
+      draftCollaborationExpiresAt: new Date(DEFAULT_NOW),
+      draftCollaborationOwnerUserId: "owner",
+    });
+    const memberFixture = createFixture();
+    Object.assign(memberFixture.store.works.get("work-1")!, {
+      status: "draft",
+      hidden: true,
+      draftCollaborationStatus: "active",
+      draftCollaborationExpiresAt: new Date(DEFAULT_NOW.getTime() - 1),
+      draftCollaborationOwnerUserId: "owner",
+    });
+
+    await expect(
+      ownerFixture.repository.getTeam("owner", "work-1")
+    ).rejects.toEqual(new CreatorCollaborationForbiddenError("team_access_denied"));
+    await expect(
+      memberFixture.repository.getAuthorization("editor", "work-1")
+    ).rejects.toEqual(new CreatorCollaborationForbiddenError("team_access_denied"));
+    expect(ownerFixture.store.lockedWorkIds).toEqual(["work-1"]);
+    expect(memberFixture.store.lockedWorkIds).toEqual(["work-1"]);
+    expect(memberFixture.store.membershipReadKeys).toEqual([]);
+  });
+
+  it("promoted 동일 workId는 과거 임시 expiry를 무시하고 일반 saved-work ACL로 전환한다", async () => {
+    const { repository, store } = createFixture();
+    Object.assign(store.works.get("work-1")!, {
+      draftCollaborationStatus: "promoted",
+      draftCollaborationExpiresAt: new Date(DEFAULT_NOW.getTime() - 60_000),
+      draftCollaborationOwnerUserId: "owner",
+    });
+
+    const authorization = await repository.getAuthorization("editor", "work-1");
+
+    expect(authorization).toMatchObject({
+      workId: "work-1",
+      viewer: { userId: "editor", status: "active", capabilities: { edit: true } },
+    });
+    expect(authorization).not.toHaveProperty("authorizationExpiresAt");
+  });
+
+  it("알 수 없는 marker 상태와 손상된 active expiry는 saved work로 우회하지 않는다", async () => {
+    const corruptStatus = createFixture();
+    Object.assign(corruptStatus.store.works.get("work-1")!, {
+      status: "draft",
+      hidden: true,
+      draftCollaborationStatus: "unknown",
+      draftCollaborationExpiresAt: new Date(DEFAULT_NOW.getTime() + 60_000),
+      draftCollaborationOwnerUserId: "owner",
+    });
+    const missingExpiry = createFixture();
+    Object.assign(missingExpiry.store.works.get("work-1")!, {
+      status: "draft",
+      hidden: true,
+      draftCollaborationStatus: "active",
+      draftCollaborationExpiresAt: null,
+      draftCollaborationOwnerUserId: "owner",
+    });
+    const wrongOwner = createFixture();
+    Object.assign(wrongOwner.store.works.get("work-1")!, {
+      status: "draft",
+      hidden: true,
+      draftCollaborationStatus: "active",
+      draftCollaborationExpiresAt: new Date(DEFAULT_NOW.getTime() + 60_000),
+      draftCollaborationOwnerUserId: "other-owner",
+    });
+    const visibleProvisional = createFixture();
+    Object.assign(visibleProvisional.store.works.get("work-1")!, {
+      status: "draft",
+      hidden: false,
+      draftCollaborationStatus: "active",
+      draftCollaborationExpiresAt: new Date(DEFAULT_NOW.getTime() + 60_000),
+      draftCollaborationOwnerUserId: "owner",
+    });
+
+    await expect(
+      corruptStatus.repository.getAuthorization("owner", "work-1")
+    ).rejects.toEqual(new CreatorCollaborationForbiddenError("team_access_denied"));
+    await expect(
+      missingExpiry.repository.getAuthorization("owner", "work-1")
+    ).rejects.toEqual(new CreatorCollaborationForbiddenError("team_access_denied"));
+    await expect(
+      wrongOwner.repository.getAuthorization("owner", "work-1")
+    ).rejects.toEqual(new CreatorCollaborationForbiddenError("team_access_denied"));
+    await expect(
+      visibleProvisional.repository.getAuthorization("owner", "work-1")
+    ).rejects.toEqual(new CreatorCollaborationForbiddenError("team_access_denied"));
   });
 
   it("Studio 권한 probe는 대기·거절 상태를 fail-closed projection하고 없는 멤버는 거절한다", async () => {

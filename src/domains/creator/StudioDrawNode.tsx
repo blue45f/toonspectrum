@@ -13,7 +13,6 @@ import {
 
 import {
   buildCalligraphySegments,
-  gpenSegmentWidths,
   processFreehandPoints,
   processPencilPoints,
   resampleStrokePressures,
@@ -68,6 +67,7 @@ import {
   studioBrushTipUsesSolidEllipse,
   type NormalizedStudioBrushTipSettings,
 } from "./studio-brush-tip-stamp";
+import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
 import {
   DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
   planCausalWatercolorBrushDabs,
@@ -311,8 +311,9 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   // 손그림(스케치) 스타일 — 켜진 도형은 rough.js 패스로 그린다(요소 id 시드로 결정적).
   const sketchStyle = kind !== "freehand" ? studioSketchStyleOfElement(el) : null;
   const roughGenerator = useStudioRoughGenerator(sketchStyle?.enabled === true);
-  // 퍼펙트-프리핸드 브러시 — 커밋/리테인드 초안 렌더 전용(다이렉트 핫패스 라이브 잉크는
-  // pen/marker 패밀리만 대상이라 이 패밀리는 건드리지 않는다). 프로필이 있으면 스트로커 로드.
+  // 연속 가변 폭 아웃라인 브러시 — perfect 잉크뿐 아니라 G펜 계열도 같은 곡선 스트로커를
+  // 사용한다. 짧은 직선 캡슐을 겹치던 과거 G펜 경로와 달리 급커브·필압 전환이 하나의
+  // 닫힌 윤곽으로 이어진다. 프로필이 있으면 스트로커를 지연 로드한다.
   const perfectProfile = kind === "freehand" && el.mode !== "eraser"
     ? resolveStudioPerfectFreehandProfile(el.brush)
     : null;
@@ -746,6 +747,43 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             const width = pressureAware
               ? aliasStrokeWidth * (0.3 + pressure * 1.4)
               : aliasStrokeWidth;
+            if (brushFamily === "highlighter") {
+              return (
+                <Rect
+                  key={index}
+                  x={points[0] - aliasStrokeWidth / 2}
+                  y={points[1] - aliasStrokeWidth / 2}
+                  width={aliasStrokeWidth}
+                  height={aliasStrokeWidth}
+                  fill={stroke}
+                  opacity={opacity}
+                  globalCompositeOperation="multiply"
+                  listening={false}
+                />
+              );
+            }
+            if (brushFamily === "brush" || brushFamily === "calligraphy") {
+              const calligraphyRoundness = brushFamily === "calligraphy"
+                ? Math.min(1, Math.max(0.08, el.brushTip?.roundness ?? 0.35))
+                : 0.36;
+              const angle = brushFamily === "calligraphy"
+                ? el.brushTip?.angleDeg ?? -30
+                : -30;
+              return (
+                <Ellipse
+                  key={index}
+                  x={points[0]}
+                  y={points[1]}
+                  radiusX={Math.max(0.35, width / 2)}
+                  radiusY={Math.max(0.35, width * calligraphyRoundness / 2)}
+                  rotation={angle}
+                  fill={stroke}
+                  opacity={opacity}
+                  globalCompositeOperation={composite}
+                  listening={false}
+                />
+              );
+            }
             if (perfectProfile) {
               const dotWidth = Math.max(Math.max(aliasStrokeWidth, 2), width);
               const minimumDotRadius = brush === "perfect-ink" ? 3 : 1.4;
@@ -959,7 +997,11 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             // 아주 짧은 스토크는 경량 Line 폴백이 더 안정적이다.
             // 퍼펙트 경로 생성은 짧은 이동에서 Path가 1픽셀 이하로만 변화해 보이지 않는 경우가 있다.
             // 브러시 검증 시 false negative를 만들 수 있다.
-            const isVeryShortPerfectStroke = pointCount <= 3 && strokeDistance < 16;
+            // The historical perfect-* profiles deliberately keep their compact tap fallback.
+            // G-pen nibs must not use it: even a two-point flick needs pressure and taper geometry.
+            const isVeryShortPerfectStroke = brushFamily === "perfect"
+              && pointCount <= 3
+              && strokeDistance < 16;
             const sparseSpacingPx = strokeDistance / Math.max(1, pointCount - 1);
             const isSparseLongPerfectStroke = perfectProfile.id === "perfect-ink"
               && pointCount >= 4
@@ -1022,9 +1064,18 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               );
             }
             if (perfectStroker) {
+              const outlinePressures = brushFamily === "gpen"
+                || (el.pressures && el.pressures.length > 0)
+                ? mapStudioBrushAliasPressureSamples(
+                    brush,
+                    el.pressures,
+                    pointCount,
+                    brushFamily === "gpen" ? 0.6 : 0.5,
+                  )
+                : el.pressures;
               const perfectOutline = buildStudioPerfectFreehandOutline(perfectStroker, {
                 points,
-                pressures: el.pressures,
+                pressures: outlinePressures,
                 strokeWidth: aliasStrokeWidth,
                 profile: perfectProfile,
               });
@@ -1115,7 +1166,11 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           }
 
           if (brushFamily === "calligraphy" && el.mode !== "eraser") {
-            const smoothed = processFreehandPoints(points, renderSampleDistance);
+            const smoothed = resolveStudioFreehandRenderPath(points, {
+              sampleSpacing: el.sampleSpacing,
+              legacyMinDistance: renderSampleDistance,
+              legacyTension: 0,
+            }).points;
             const sourcePointCount = Math.floor(points.length / 2);
             const sampleCount = Math.min(
               sourcePointCount,
@@ -1132,32 +1187,59 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             );
             const segments = buildCalligraphySegments(
               smoothed,
-              el.pressures,
+              mapStudioBrushAliasPressureSamples(
+                brush,
+                el.pressures,
+                sourcePointCount,
+                0.5,
+              ),
               stylusSamples,
-              strokeWidth,
+              aliasStrokeWidth,
               el.brushTip
             );
+            const ribbon = planStudioCalligraphyRibbon(segments);
             return (
               <Shape
                 key={index}
                 sceneFunc={(context) => {
-                  if (segments.length === 0 && smoothed.length >= 2) {
+                  if (ribbon.runs.length === 0 && smoothed.length >= 2) {
                     context.beginPath();
-                    context.arc(smoothed[0]!, smoothed[1]!, Math.max(0.5, strokeWidth * 0.18), 0, Math.PI * 2);
+                    context.arc(smoothed[0]!, smoothed[1]!, Math.max(0.5, aliasStrokeWidth * 0.18), 0, Math.PI * 2);
                     context.fillStyle = stroke;
                     context.fill();
                     return;
                   }
-                  for (const segment of segments) {
-                    context.beginPath();
-                    context.moveTo(segment.x0, segment.y0);
-                    context.lineTo(segment.x1, segment.y1);
-                    context.lineWidth = segment.width;
-                    context.lineCap = "round";
-                    context.lineJoin = "round";
-                    context.strokeStyle = stroke;
-                    context.stroke();
+                  context.beginPath();
+                  for (const run of ribbon.runs) {
+                    const [firstX, firstY, ...outlineTail] = run.outlinePoints;
+                    if (firstX === undefined || firstY === undefined) continue;
+                    context.moveTo(firstX, firstY);
+                    for (let pointIndex = 0; pointIndex < outlineTail.length; pointIndex += 2) {
+                      context.lineTo(
+                        outlineTail[pointIndex]!,
+                        outlineTail[pointIndex + 1]!,
+                      );
+                    }
+                    context.closePath();
+                    context.moveTo(run.startCap.x + run.startCap.radius, run.startCap.y);
+                    context.arc(
+                      run.startCap.x,
+                      run.startCap.y,
+                      run.startCap.radius,
+                      0,
+                      Math.PI * 2,
+                    );
+                    context.moveTo(run.endCap.x + run.endCap.radius, run.endCap.y);
+                    context.arc(
+                      run.endCap.x,
+                      run.endCap.y,
+                      run.endCap.radius,
+                      0,
+                      Math.PI * 2,
+                    );
                   }
+                  context.fillStyle = stroke;
+                  context.fill();
                 }}
                 opacity={opacity}
                 globalCompositeOperation={composite}
@@ -1167,7 +1249,11 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           }
 
           if (brushFamily === "brush" && el.mode !== "eraser") {
-            const smoothed = processFreehandPoints(points, renderSampleDistance);
+            const smoothed = resolveStudioFreehandRenderPath(points, {
+              sampleSpacing: el.sampleSpacing,
+              legacyMinDistance: renderSampleDistance,
+              legacyTension: 0,
+            }).points;
             return (
               <Shape
                 key={index}
@@ -1175,8 +1261,8 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                   if (smoothed.length < 2) return;
                   context.beginPath();
                   const angle = -Math.PI / 6;
-                  const dx = (strokeWidth / 2) * Math.cos(angle);
-                  const dy = (strokeWidth / 2) * Math.sin(angle);
+                  const dx = (aliasStrokeWidth / 2) * Math.cos(angle);
+                  const dy = (aliasStrokeWidth / 2) * Math.sin(angle);
 
                   if (smoothed.length === 2) {
                     const x0 = smoothed[0]!;
@@ -1278,66 +1364,10 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             );
           }
 
-          if (brushFamily === "gpen" && el.mode !== "eraser") {
-            // G펜: 필압(또는 속도 기반 의사 필압)에 따라 굵기가 변하고 양 끝이 가늘어지는 만화 잉크 선.
-            const smoothed = processFreehandPoints(points, renderSampleDistance);
-            const segmentCount = Math.floor(smoothed.length / 2);
-            const aliasPressures = mapStudioBrushAliasPressureSamples(
-              brush,
-              el.pressures,
-              Math.floor(points.length / 2),
-              0.6,
-            );
-            const sampled = resampleStrokePressures(aliasPressures, segmentCount, 0.6);
-            const widths = gpenSegmentWidths(sampled, aliasStrokeWidth);
-            return (
-              <Shape
-                key={index}
-                sceneFunc={(context) => {
-                  context.lineCap = "round";
-                  context.lineJoin = "round";
-                  context.strokeStyle = stroke;
-                  // 세그먼트마다 개별 stroke() 네이티브 호출을 내는 대신, 육안으로 구분되지
-                  // 않는 굵기 변화(<0.4px)는 같은 서브패스로 묶어 한 번에 stroke() 한다
-                  // (라이브 프레임당 캔버스 API 호출량이 병목이지 굵기 보간 자체는 저렴하다).
-                  const WIDTH_BUCKET_PX = 0.4;
-                  let bucketWidth: number | null = null;
-                  let pathOpen = false;
-                  const flush = () => {
-                    if (!pathOpen) return;
-                    context.lineWidth = bucketWidth!;
-                    context.stroke();
-                    pathOpen = false;
-                  };
-                  for (let i = 2; i < smoothed.length; i += 2) {
-                    const x0 = smoothed[i - 2]!;
-                    const y0 = smoothed[i - 1]!;
-                    const x1 = smoothed[i]!;
-                    const y1 = smoothed[i + 1]!;
-                    const w = widths[Math.floor(i / 2)] ?? aliasStrokeWidth;
-                    const bucket = Math.round(w / WIDTH_BUCKET_PX) * WIDTH_BUCKET_PX;
-                    if (bucket !== bucketWidth) {
-                      flush();
-                      bucketWidth = bucket;
-                      context.beginPath();
-                      pathOpen = true;
-                    }
-                    context.moveTo(x0, y0);
-                    context.lineTo(x1, y1);
-                  }
-                  flush();
-                }}
-                opacity={opacity}
-                globalCompositeOperation={composite}
-                listening={false}
-              />
-            );
-          }
-
           if (brushFamily === "screentone" && el.mode !== "eraser") {
             // 스크린톤: 전역 격자에 정렬된 망점 도트를 스트로크 경로에 찍는다(겹쳐도 패턴 유지).
-            const pitch = Math.max(3, strokeWidth * 0.42);
-            const radius = Math.max(2, strokeWidth / 2);
+            const pitch = Math.max(3, aliasStrokeWidth * 0.42);
+            const radius = Math.max(2, aliasStrokeWidth / 2);
             const dots = screentoneDotsForStroke(points, radius, pitch);
             const dotR = screentoneDotRadius(pitch);
             return (
@@ -1416,10 +1446,10 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 key={index}
                 points={renderPath.points}
                 stroke={stroke}
-                strokeWidth={strokeWidth}
+                strokeWidth={aliasStrokeWidth}
                 opacity={opacity}
-                lineCap="round"
-                lineJoin="round"
+                lineCap="square"
+                lineJoin="miter"
                 tension={renderPath.tension}
                 globalCompositeOperation="multiply"
                 listening={false}
@@ -1511,11 +1541,19 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           }
 
           if (brushFamily === "glitter" && el.mode !== "eraser") {
-            const mode = (el.brush ?? "glitter") === "star-dust" ? "star-dust" : "glitter";
+            const mode = (el.brush ?? "glitter") === "star-dust"
+              ? "star-dust"
+              : el.brush === "sparkle-star"
+                ? "sparkle-star"
+                : "glitter";
             const particles = planGlitterBrushParticles({
-              points: processFreehandPoints(points, renderSampleDistance),
+              points: resolveStudioFreehandRenderPath(points, {
+                sampleSpacing: el.sampleSpacing,
+                legacyMinDistance: renderSampleDistance,
+                legacyTension: 0,
+              }).points,
               pressures: el.pressures,
-              baseWidth: strokeWidth,
+              baseWidth: aliasStrokeWidth,
               seed: fxBrushSeedFromKey(el.id),
               mode,
               maxParticles: 512,
@@ -1551,9 +1589,13 @@ export const StudioDrawNode = memo(function StudioDrawNode({
 
           if (brushFamily === "oil" && el.mode !== "eraser") {
             const dabs = planOilBrushDabs({
-              points: processFreehandPoints(points, renderSampleDistance),
+              points: resolveStudioFreehandRenderPath(points, {
+                sampleSpacing: el.sampleSpacing,
+                legacyMinDistance: renderSampleDistance,
+                legacyTension: 0,
+              }).points,
               pressures: el.pressures,
-              baseWidth: strokeWidth,
+              baseWidth: aliasStrokeWidth,
               seed: fxBrushSeedFromKey(el.id),
               maxDabs: 512,
             });
@@ -1584,9 +1626,13 @@ export const StudioDrawNode = memo(function StudioDrawNode({
 
           if (brushFamily === "pastel" && el.mode !== "eraser") {
             const dabs = planPastelBrushDabs({
-              points: processFreehandPoints(points, renderSampleDistance),
+              points: resolveStudioFreehandRenderPath(points, {
+                sampleSpacing: el.sampleSpacing,
+                legacyMinDistance: renderSampleDistance,
+                legacyTension: 0,
+              }).points,
               pressures: el.pressures,
-              baseWidth: strokeWidth,
+              baseWidth: aliasStrokeWidth,
               seed: fxBrushSeedFromKey(el.id),
               maxDabs: 512,
             });

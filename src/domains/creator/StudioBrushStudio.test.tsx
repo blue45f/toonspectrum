@@ -1,10 +1,20 @@
-import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+// @vitest-environment jsdom
 
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import {
+  resolveStudioCoreBrushDefaultRestoreProfile,
+} from "./studio-brush-default-restore";
 import {
   normalizeStudioBrushDynamicsSettings,
   studioBrushDynamicsPresetSettings,
 } from "./studio-brush-dynamics";
+import {
+  DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+  type StudioSavedBrush,
+} from "./studio-brush-library";
 import { studioBrushStudioDefaultPresetId } from "./studio-brush-studio-contract";
 import { studioBrushTipAlphaMapToBase64 } from "./studio-brush-tip-stamp";
 import {
@@ -15,12 +25,22 @@ import {
   type StudioBrushStudioProps,
 } from "./StudioBrushStudio";
 
+afterEach(cleanup);
+
 function props(overrides: Partial<StudioBrushStudioProps> = {}): StudioBrushStudioProps {
+  const settings = studioBrushDynamicsPresetSettings("ink-particle");
   return {
     brushId: "ink-particle",
     strokeWidth: 8,
     color: "#281d18",
-    settings: studioBrushDynamicsPresetSettings("ink-particle"),
+    currentSnapshot: {
+      ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+      brushId: "ink-particle",
+      strokeWidth: 8,
+      color: "#281d18",
+      brushDynamics: settings,
+    },
+    settings,
     onSettingsChange: vi.fn(),
     onSelectDynamicsPreset: vi.fn(),
     useVelocityPressure: true,
@@ -35,6 +55,7 @@ function props(overrides: Partial<StudioBrushStudioProps> = {}): StudioBrushStud
     onTipAngleChange: vi.fn(),
     tipRoundness: 0.24,
     onTipRoundnessChange: vi.fn(),
+    onRestoreDefaults: vi.fn(),
     ...overrides,
   };
 }
@@ -49,6 +70,188 @@ describe("StudioBrushStudio", () => {
     expect(html).toContain("개 연결");
     expect(html).toContain("min-h-[44px]");
     expect(html).not.toContain('role="dialog"');
+  });
+
+  it("offers the same explicit 44px full-profile restore action on touch layouts", async () => {
+    const onBeforeOpen = vi.fn();
+    render(
+      <StudioBrushStudio
+        {...props({ density: "touch", onBeforeOpen })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/ }));
+    const restore = await screen.findByRole("button", {
+      name: "이 브러시 기본값 복원",
+    });
+    const dialog = screen.getByRole("dialog", { name: "브러시 스튜디오" });
+    const panel = dialog.querySelector<HTMLElement>(":scope > div");
+
+    expect(onBeforeOpen).toHaveBeenCalledOnce();
+    expect(dialog.getAttribute("data-studio-brush-studio-dialog")).toBe("true");
+    expect(dialog.className).toContain("z-[180]");
+    expect(dialog.className).toContain("pb-[env(safe-area-inset-bottom)]");
+    expect(panel?.className).toContain("h-[calc(100dvh-env(safe-area-inset-bottom))]");
+    expect(panel?.className).toContain("overscroll-contain");
+    expect(restore.className).toContain("min-h-11");
+    expect(screen.getByText(/굵기·불투명도·필압·보정·촉을 함께 복원/)).toBeTruthy();
+  });
+
+  it("confirms one atomic transaction, preserves identity/color, and offers one-step undo", async () => {
+    const onRestoreDefaults = vi.fn();
+    const currentSnapshot = {
+      ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+      brushId: "spray",
+      strokeWidth: 9,
+      brushOpacity: 0.95,
+      color: "#123456",
+      stabilizer: 7,
+      pressureCurve: 1.8,
+      tipAngle: 85,
+      brushDynamics: studioBrushDynamicsPresetSettings("ink-particle"),
+    };
+    render(
+      <StudioBrushStudio
+        {...props({
+          brushId: "spray",
+          strokeWidth: currentSnapshot.strokeWidth,
+          color: currentSnapshot.color,
+          settings: currentSnapshot.brushDynamics,
+          currentSnapshot,
+          onRestoreDefaults,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/ }));
+    fireEvent.click(screen.getByRole("button", { name: "이 브러시 기본값 복원" }));
+
+    expect(await screen.findByText("스프레이 기본값으로 복원할까요?")).toBeTruthy();
+    const confirm = screen.getByRole("button", { name: /개 설정 복원/ });
+    fireEvent.click(confirm);
+
+    expect(onRestoreDefaults).toHaveBeenCalledOnce();
+    const [transaction, direction] = onRestoreDefaults.mock.calls[0]!;
+    expect(direction).toBe("redo");
+    expect(transaction.after).toMatchObject({
+      strokeWidth: 40,
+      brushOpacity: 0.55,
+      stabilizer: 0,
+      pressureCurve: 1,
+      tipAngle: -30,
+    });
+    expect(transaction.profile.sourceId).toBe("spray");
+    expect(transaction).not.toHaveProperty("color");
+
+    fireEvent.click(screen.getByRole("button", { name: "되돌리기" }));
+    expect(onRestoreDefaults).toHaveBeenLastCalledWith(transaction, "undo");
+  });
+
+  it("uses an explicitly supplied saved-brush snapshot instead of guessing a built-in default", async () => {
+    const settings = studioBrushDynamicsPresetSettings("dry-media");
+    const savedBrush: StudioSavedBrush = {
+      ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+      id: "saved-lettering",
+      name: "내 레터링 붓",
+      createdAt: 1,
+      updatedAt: 2,
+      pinned: false,
+      lastUsedAt: null,
+      brushId: "calligraphy",
+      strokeWidth: 18,
+      brushOpacity: 0.7,
+      pressureCurve: 0.65,
+      tipAngle: -50,
+      color: "#765432",
+      brushDynamics: settings,
+    };
+    const currentSnapshot = {
+      ...savedBrush,
+      strokeWidth: 42,
+      pressureCurve: 2.2,
+      tipAngle: 90,
+    };
+    const onRestoreDefaults = vi.fn();
+    render(
+      <StudioBrushStudio
+        {...props({
+          brushId: "calligraphy",
+          strokeWidth: currentSnapshot.strokeWidth,
+          color: currentSnapshot.color,
+          settings,
+          currentSnapshot,
+          savedBrushBaseline: savedBrush,
+          onRestoreDefaults,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/ }));
+    fireEvent.click(screen.getByRole("button", { name: "이 브러시 기본값 복원" }));
+
+    expect(await screen.findByText("내 레터링 붓 기본값으로 복원할까요?")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /개 설정 복원/ }));
+    expect(onRestoreDefaults.mock.calls[0]?.[0].after).toMatchObject({
+      strokeWidth: 18,
+      brushOpacity: 0.7,
+      pressureCurve: 0.65,
+      tipAngle: -50,
+    });
+    expect(onRestoreDefaults.mock.calls[0]?.[0].profile.source).toBe("saved");
+  });
+
+  it("reports a no-op instead of emitting a redundant restore callback", async () => {
+    const onRestoreDefaults = vi.fn();
+    const profile = resolveStudioCoreBrushDefaultRestoreProfile("ink-particle")!;
+    const currentSnapshot = {
+      ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+      brushId: "ink-particle",
+      ...profile.values,
+    };
+    render(
+      <StudioBrushStudio
+        {...props({
+          strokeWidth: currentSnapshot.strokeWidth,
+          settings: currentSnapshot.brushDynamics,
+          currentSnapshot,
+          onRestoreDefaults,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/ }));
+    fireEvent.click(screen.getByRole("button", { name: "이 브러시 기본값 복원" }));
+
+    await waitFor(() => {
+      const status = screen.getByRole("status");
+      expect(status.getAttribute("data-studio-brush-default-restore-status")).toBe(
+        "unchanged",
+      );
+      expect(status.textContent).toContain("이미 이 브러시의 기본값입니다.");
+    });
+    expect(onRestoreDefaults).not.toHaveBeenCalled();
+  });
+
+  it("fails safely for an imported custom source without a saved baseline", async () => {
+    const currentSnapshot = {
+      ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+      brushId: "ink-particle",
+      sourcePresetId: "external-custom-brush",
+      sourcePresetName: "외부 브러시",
+      brushDynamics: studioBrushDynamicsPresetSettings("ink-particle"),
+    };
+    const onRestoreDefaults = vi.fn();
+    render(
+      <StudioBrushStudio
+        {...props({ currentSnapshot, onRestoreDefaults })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/ }));
+    fireEvent.click(screen.getByRole("button", { name: "이 브러시 기본값 복원" }));
+
+    expect(await screen.findByText(/저장된 브러시 라이브러리에서 다시 적용/)).toBeTruthy();
+    expect(onRestoreDefaults).not.toHaveBeenCalled();
   });
 
   it("uses a 44px-or-larger launcher in touch density and summarizes calligraphy", () => {

@@ -138,4 +138,43 @@ describe("StudioFilterMaskPanel", () => {
     );
     expect(screen.getByRole("status").textContent).toContain("이미지를 드래그해 칠하세요");
   });
+
+  it("busy 중에는 중복 변경을 잠그고 활성 그리기 도구 종료만 허용한다", () => {
+    const props = makeProps({ hasMask: true, paintActive: true, busy: true });
+    render(<StudioFilterMaskPanel {...props} />);
+
+    const region = screen.getByRole("region", { name: "필터 마스크" });
+    const exitButton = screen.getByRole("button", { name: "필터 마스크 그리기 종료" });
+    expect(region.getAttribute("aria-busy")).toBe("true");
+    expect((exitButton as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(exitButton);
+    expect(props.onTogglePaintActive).toHaveBeenCalledTimes(1);
+
+    for (const name of ["사용 중", "반전", "삭제", "필터 적용", "원본 유지"]) {
+      expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(true);
+    }
+    expect(
+      screen.getAllByRole("slider").every((slider) => (slider as HTMLInputElement).disabled)
+    ).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "반전" }));
+    fireEvent.click(screen.getByRole("button", { name: "삭제" }));
+    expect(props.onInvert).not.toHaveBeenCalled();
+    expect(props.onDeleteMask).not.toHaveBeenCalled();
+    expect(screen.getByRole("status").textContent).toContain("‘그리기 종료’");
+  });
+
+  it("busy 중 새 마스크 추가를 막고 터치 환경에서 44px 타깃 계약을 유지한다", () => {
+    const props = makeProps({ busy: true });
+    render(<StudioFilterMaskPanel {...props} />);
+
+    const addButton = screen.getByRole("button", { name: /마스크 추가/ });
+    const concealButton = screen.getByRole("button", { name: /원본으로 추가/ });
+    expect((addButton as HTMLButtonElement).disabled).toBe(true);
+    expect((concealButton as HTMLButtonElement).disabled).toBe(true);
+    expect(addButton.className).toContain("pointer-coarse:min-h-11");
+    fireEvent.click(addButton);
+    fireEvent.click(concealButton);
+    expect(props.onAddMask).not.toHaveBeenCalled();
+  });
 });

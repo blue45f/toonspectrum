@@ -23,7 +23,10 @@ describe("StudioPage drawing-assist integration contract", () => {
 
   it("keeps panel and canvas guide interactions behind the same edit locks", () => {
     expect(inspectorSource).toContain(
-      "const drawingAssistControlsDisabled = activeSurfaceReviewLocked || saving || masterEditMode"
+      "const drawingAssistControlsDisabled = inspectorInteractionPolicy.page.disabled"
+    );
+    expect(inspectorSource).toContain(
+      "const drawingAssistDisabledReason = inspectorInteractionPolicy.page.reason"
     );
     expect(inspectorSource).toMatch(/<StudioPerspectivePanel[\s\S]*?disabled=\{drawingAssistControlsDisabled\}/u);
     expect(inspectorSource).toMatch(/<StudioIsometricGridPanel[\s\S]*?disabled=\{drawingAssistControlsDisabled\}/u);

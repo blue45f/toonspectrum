@@ -115,7 +115,7 @@ describe("StudioLayerNavigatorItemRow", () => {
     );
 
     const treeItem = screen.getByRole("treeitem", {
-      name: /주인공 원화, 현재 작업 레이어, 이미지, 그룹 주인공, 역할 채색, 색 라벨 파랑, 숨김, 잠김.+마스크 꺼짐.+나만 숨김/,
+      name: /주인공 원화, 현재 작업 레이어, 래스터, 그룹 주인공, 역할 채색, 색 라벨 파랑, 숨김, 잠김.+마스크 꺼짐.+나만 숨김/,
     });
     expect(treeItem.getAttribute("aria-selected")).toBe("true");
     expect(treeItem.getAttribute("aria-current")).toBe("true");
@@ -129,6 +129,22 @@ describe("StudioLayerNavigatorItemRow", () => {
     expect(treeItem.className).toContain("border-accent/75");
     expect(treeItem.className).toContain("focus-visible:outline-cool");
     expect(screen.getByLabelText("색 라벨 파랑").className).toContain("bg-cool");
+    const kindBadge = treeItem.querySelector(
+      '[data-studio-layer-kind-badge="raster"]'
+    );
+    expect(kindBadge?.textContent).toBe("래스터");
+    const statusStrip = treeItem.querySelector(
+      '[data-studio-layer-status-strip="true"]'
+    );
+    expect(statusStrip?.getAttribute("aria-label")).toContain(
+      "아래 레이어에 클리핑"
+    );
+    expect(
+      statusStrip?.querySelector('[data-studio-layer-status="clipping"]')
+    ).not.toBeNull();
+    expect(
+      statusStrip?.querySelector('[data-studio-layer-status-overflow="3"]')
+    ).not.toBeNull();
     expect(
       treeItem.querySelector('[data-studio-layer-selection-marker="current"]')
     ).not.toBeNull();
@@ -165,7 +181,7 @@ describe("StudioLayerNavigatorItemRow", () => {
     }));
 
     const treeItem = screen.getByRole("treeitem", {
-      name: /주인공 원화, 다중 선택됨, 이미지.+숨김, 잠김/,
+      name: /주인공 원화, 다중 선택됨, 래스터.+숨김, 잠김/,
     });
     expect(treeItem.getAttribute("aria-selected")).toBe("true");
     expect(treeItem.hasAttribute("aria-current")).toBe(false);
@@ -177,6 +193,45 @@ describe("StudioLayerNavigatorItemRow", () => {
     ).not.toBeNull();
     expect(treeItem.textContent).toContain("주인공 원화");
     expect(treeItem.innerHTML).not.toContain("opacity-55");
+  });
+
+  it("keeps vector and explicit 3D kind badges visible even inside a named group", () => {
+    const vector = renderRow(
+      rowProps({
+        item: { ...ITEM, id: "ink", type: "draw", label: "벡터 선화" },
+        rowKey: "item:ink",
+        kind: "draw",
+        groupName: "주인공 폴더",
+      })
+    );
+    const vectorRow = screen.getByRole("treeitem", { name: /벡터 선화/ });
+    expect(
+      vectorRow.querySelector('[data-studio-layer-kind-badge="vector"]')
+        ?.textContent
+    ).toBe("벡터");
+    expect(vectorRow.textContent).toContain("주인공 폴더");
+    vector.unmount();
+
+    renderRow(
+      rowProps({
+        item: {
+          ...ITEM,
+          id: "bg3d",
+          type: "image",
+          semanticKind: "three-d",
+          label: "교실 3D",
+        },
+        rowKey: "item:bg3d",
+        kind: "image",
+        groupName: "배경 폴더",
+      })
+    );
+    const threeDRow = screen.getByRole("treeitem", { name: /교실 3D/ });
+    expect(
+      threeDRow.querySelector('[data-studio-layer-kind-badge="three-d"]')
+        ?.textContent
+    ).toBe("3D");
+    expect(threeDRow.textContent).toContain("배경 폴더");
   });
 
   it("dispatches visibility and action controls exactly once without selecting the row", () => {

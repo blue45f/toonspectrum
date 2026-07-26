@@ -38,7 +38,7 @@ const saved: StudioSavedBrush = {
 };
 
 describe("StudioBrushLibraryPanel", () => {
-  it("controlled 목록과 고정·복제·이름·내보내기·삭제 접근 가능한 액션을 렌더한다", () => {
+  it("controlled 목록과 고정·복제·이름·내보내기·공유·삭제 액션을 렌더한다", () => {
     const html = renderToStaticMarkup(
       <StudioBrushLibraryPanel
         currentSnapshot={snapshot}
@@ -50,8 +50,10 @@ describe("StudioBrushLibraryPanel", () => {
       />
     );
     expect(html).toContain('data-studio-brush-library-scope="saved"');
+    expect(html).toContain('data-studio-brush-surface-role="user-library-management"');
     expect(html).toContain('aria-label="내 브러시"');
-    expect(html).toContain("사용자 저장");
+    expect(html).toContain("내 브러시 · 사용자 설정");
+    expect(html).toContain("저장·가져오기·공유·재적용");
     expect(html).toContain(`1/${MAX_BRUSHES}`);
     expect(html).toContain('aria-label="브러시 설정 또는 Photoshop ABR 가져오기"');
     expect(html).toContain('accept=".json,.abr,application/json,application/octet-stream,application/x-photoshop"');
@@ -59,7 +61,13 @@ describe("StudioBrushLibraryPanel", () => {
     expect(html).toContain("주력 펜 복제");
     expect(html).toContain("주력 펜 이름 변경");
     expect(html).toContain("주력 펜 내보내기");
+    expect(html).toContain("주력 펜 브러시 공유");
     expect(html).toContain("주력 펜 브러시 삭제");
+    expect(html).toContain("<details");
+    expect(html).toContain("관리 · 덮어쓰기, 복제, 공유");
+    expect(html).not.toContain("<details open");
+    expect(html).toContain("grid-cols-3");
+    expect(html).toContain("sm:grid-cols-6");
     expect(html).toContain('aria-label="주력 펜 브러시 적용, 펜(매끈), 6px, 100퍼센트"');
     expect(html).toContain('aria-pressed="true"');
   });

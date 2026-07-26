@@ -21,6 +21,7 @@ import type { CurvePoint, CurveRgbChannels } from "./studio-curves";
 import type { Detail } from "./studio-detail";
 import type { Distort } from "./studio-distort";
 import type { StudioGlitchFx, StudioVignetteFx } from "./studio-filter-pack";
+import type { StudioFilterUnionWave } from "./studio-filter-union-wave";
 import type { Glow } from "./studio-glow";
 import type { GradientMap } from "./studio-gradient-map";
 import type { Grain } from "./studio-grain";
@@ -96,6 +97,8 @@ export type ImageFilterFields = {
   glitchFx?: StudioGlitchFx;
   /** 비네트 — smoothstep 가장자리 어둡히기(studio-filter-pack, type-only 의존). */
   vignetteFx?: StudioVignetteFx;
+  /** Deterministic inverse-warp/noise/stylize union wave. */
+  filterUnionWave?: StudioFilterUnionWave;
   light?: Light;
   sketch?: Sketch;
   detail?: Detail;
@@ -168,6 +171,11 @@ function hasActiveExposureCandidate(value: unknown): boolean {
 function hasActiveAmountCandidate(value: unknown): boolean {
   const source = candidateRecord(value);
   return !!source && candidateFinite(source.amount) && source.amount > 0;
+}
+
+function hasActiveSignedAmountCandidate(value: unknown): boolean {
+  const source = candidateRecord(value);
+  return !!source && candidateFinite(source.amount) && source.amount !== 0;
 }
 
 function hasActiveIntensityCandidate(value: unknown): boolean {
@@ -346,6 +354,7 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActiveAmountCandidate(el.clouds) ||
     hasActiveIntensityCandidate(el.glitchFx) ||
     hasActiveDarknessCandidate(el.vignetteFx) ||
+    hasActiveSignedAmountCandidate(el.filterUnionWave) ||
     hasActiveSmartFilterProgram(el) ||
     hasObjectFilter(el.colorToAlpha) ||
     isActiveNumber(el.saturation) ||
@@ -430,6 +439,7 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.clouds ?? null,
     el.glitchFx ?? null,
     el.vignetteFx ?? null,
+    el.filterUnionWave ?? null,
     smartFilterProgram,
   ]);
 }

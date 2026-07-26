@@ -94,8 +94,8 @@ describe("studio creative ux", () => {
     expect(listStudioQuickBrushTrayItems({ limit: 0 })).toEqual([]);
   });
 
-  it("resolves Pro favorites and recent brushes from the expanded 157-item catalogue", () => {
-    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(174);
+  it("resolves Pro favorites and recent brushes from the expanded 214-item catalogue", () => {
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(214);
 
     const quick = listStudioQuickBrushTrayItems({
       catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,

@@ -143,8 +143,11 @@ describe("Studio mobile editing dock module boundary", () => {
       expect(page.namedValueImports.get(name)).toBe("./studio-page-lazy-ui");
       expect(dock.namedValueImports.has(name)).toBe(false);
     }
-    expect(page.namedValueImports.get("StudioMobileSheetHandle")).toBe(
-      "./StudioMobileSheetHandle",
+    expect(page.namedValueImports.has("StudioMobileSheetHandle")).toBe(false);
+    expect(page.dynamicImports).toContain("./StudioMobileSheetHandle");
+    expect(page.source).toContain("function StudioMobileSheetHandleBoundary(");
+    expect(page.source).toContain(
+      "StudioMobileSheetHandle: StudioMobileSheetHandleBoundary",
     );
     for (const directModule of [
       "./studio-page-lazy-ui",
@@ -185,5 +188,28 @@ describe("Studio mobile editing dock module boundary", () => {
     expect(dock.source).not.toContain("useStudioModalSheet");
     expect(page.source).toContain("dismissBrushManager: dismissBrushManagerToDraw,");
     expect(page.source).not.toContain("dismissBrushManager={dismissBrushManagerToDraw}");
+  });
+
+  it("exposes draw-sheet dialog semantics only while the non-modal sheet is visible", () => {
+    const dock = moduleShape("./StudioMobileEditingDock.tsx");
+
+    expect(dock.source).toContain(
+      'const drawSettingsVisible = drawSettingsOpen && !brushCatalogOpen;',
+    );
+    expect(dock.source).toContain(
+      'role={drawSettingsVisible ? "dialog" : undefined}',
+    );
+    expect(dock.source).toContain(
+      'aria-label={drawSettingsVisible ? "브러시 설정" : undefined}',
+    );
+    expect(dock.source).toContain(
+      "tabIndex={drawSettingsVisible ? -1 : undefined}",
+    );
+    expect(dock.source).toContain(
+      "aria-hidden={drawSettingsVisible ? undefined : true}",
+    );
+    expect(dock.source).toContain(
+      "inert={drawSettingsVisible ? undefined : true}",
+    );
   });
 });

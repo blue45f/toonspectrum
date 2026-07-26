@@ -1,6 +1,7 @@
 import { MessageCircle } from "lucide-react";
 
 import { groupBubbleVariants } from "./studio-assets";
+import { writeStudioInsertDragPayload } from "./studio-insert-drag-writer";
 import { StudioBubbleVariantGlyph } from "./StudioBubbleVariantGlyph";
 
 import type { StudioToolBeltContentProps } from "./StudioToolBeltContent";
@@ -54,7 +55,7 @@ export function StudioBubbleToolPopoverBody({
                         setMenu(null);
                         openFeatureTutorial("bubble");
                       }}
-                      className="mt-1.5 text-[0.65rem] font-medium text-accent/90 underline-offset-2 transition-colors hover:text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      className="mt-1 inline-flex min-h-11 items-center text-[0.65rem] font-medium text-accent/90 underline-offset-2 transition-colors hover:text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                     >
                       말풍선 튜토리얼 보기
                     </button>
@@ -95,7 +96,7 @@ export function StudioBubbleToolPopoverBody({
                   onClick={insertDialogueScript}
                   disabled={!dialogueScript.trim()}
                   className={cn(
-                    "w-full rounded-xl py-2 text-xs font-semibold transition-[opacity,transform,background] duration-150",
+                    "min-h-11 w-full rounded-xl px-2 text-xs font-semibold transition-[opacity,transform,background] duration-150",
                     dialogueScript.trim()
                       ? "bg-accent text-on-accent shadow-sm hover:opacity-95 active:scale-[0.99]"
                       : "cursor-not-allowed bg-card text-fg-3 ring-1 ring-line/50"
@@ -110,7 +111,7 @@ export function StudioBubbleToolPopoverBody({
                       setMenu(null);
                       setDialogueBatchOpen(true);
                     }}
-                    className="rounded-xl border border-line/60 bg-card/70 py-1.5 text-[0.7rem] font-medium text-fg-2 transition-colors hover:bg-raised"
+                    className="min-h-11 rounded-xl border border-line/60 bg-card/70 px-2 text-[0.7rem] font-medium text-fg-2 transition-colors hover:bg-raised"
                   >
                     배치 대사 편집
                   </button>
@@ -121,12 +122,21 @@ export function StudioBubbleToolPopoverBody({
                       setDialogueBatchOpen(false);
                       setDialogueTranslateOpen(true);
                     }}
-                    className="rounded-xl border border-line/60 bg-card/70 py-1.5 text-[0.7rem] font-medium text-fg-2 transition-colors hover:bg-raised"
+                    className="min-h-11 rounded-xl border border-line/60 bg-card/70 px-2 text-[0.7rem] font-medium text-fg-2 transition-colors hover:bg-raised"
                   >
                     번역 (내 API 키)
                   </button>
                 </div>
               </div>
+
+              <p
+                id="studio-bubble-placement-help"
+                className="mx-2.5 mt-2.5 rounded-xl border border-accent/20 bg-accent-soft/35 px-2.5 py-2 text-[0.62rem] leading-relaxed text-fg-2"
+              >
+                <strong className="font-semibold text-fg">클릭·탭</strong>은 선택 컷 또는 현재 화면에
+                스마트 배치하고, <strong className="font-semibold text-fg">끌어 놓기</strong>는
+                포인터 위치에 배치합니다. 드래그는 <kbd className="font-semibold">Esc</kbd>로 취소할 수 있어요.
+              </p>
 
               <div className="space-y-3 p-2.5" role="menu" aria-label="말풍선 종류">
                 {groupBubbleVariants().map((section) => (
@@ -145,13 +155,13 @@ export function StudioBubbleToolPopoverBody({
                           // 클릭=중앙/패널 규칙, 드래그=캔버스 드롭 지점 배치(onWrapDrop 이 처리).
                           draggable
                           onDragStart={(event) => {
-                            event.dataTransfer.setData(
-                              "application/json-insert",
-                              JSON.stringify({ kind: "bubble", variant: v.id })
-                            );
-                            event.dataTransfer.effectAllowed = "copy";
+                            writeStudioInsertDragPayload(event.dataTransfer, {
+                              kind: "bubble",
+                              variant: v.id,
+                            });
                           }}
-                          title={`${v.label} — 클릭해 추가하거나 캔버스로 끌어다 원하는 위치에 놓으세요`}
+                          aria-describedby="studio-bubble-placement-help"
+                          title={`${v.label} — 클릭·탭하면 선택 컷/현재 화면에, 끌면 놓은 위치에 추가됩니다`}
                           className="group flex min-h-[5.75rem] flex-col rounded-2xl border border-line/55 bg-gradient-to-b from-card/90 to-canvas/30 p-2 text-left shadow-[inset_0_1px_0_oklch(0.95_0.02_85_/_0.04)] transition-[border-color,background,transform,box-shadow] duration-200 ease-out hover:-translate-y-px hover:border-accent/40 hover:bg-raised/80 hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0"
                         >
                           <span className="flex h-12 items-center justify-center rounded-xl bg-canvas/45 ring-1 ring-line/35 transition-colors group-hover:bg-accent-soft/25 group-hover:ring-accent/20">

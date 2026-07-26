@@ -93,8 +93,10 @@ describe("Studio inspector focus, speed, and frame boundary", () => {
     expect(inspector).toContain("onPatch={(patch) => patchEl(selected.id, patch)}");
     expect(inspector).toContain("if (collaborationDocumentLocked) return;");
     expect(inspector).toContain("setSharedDocumentNotice(null);");
-    expect(inspector).toContain("setPanelSplitActive((active) => {");
-    expect(inspector).toContain("if (next) disarmAllPixelTools();");
+    expect(inspector).toContain(
+      "executeStudioInspectorArmedToggle(panelSplitActive, {",
+    );
+    expect(inspector).toContain("setActive: setPanelSplitActive");
   });
 
   it("retains optional continuity and panel split loading in the neutral registry", () => {
