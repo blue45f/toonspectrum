@@ -63,23 +63,86 @@ describe("Studio brush browser harness catalogue boundary", () => {
     expect(harness).toContain(
       "coreCatalogIds.every((id) => presetById.has(id))",
     );
+    expect(harness).toContain(
+      "for (const [index, preset] of STUDIO_ALL_BRUSH_CATALOG_ITEMS.entries())",
+    );
+    expect(harness).toContain(
+      "evidence.length === PRODUCT_BRUSH_CATALOG_COUNT",
+    );
+    expect(harness).toContain(
+      "post-redo cleanup left perceptible stroke pixels behind",
+    );
+    expect(harness).toContain(
+      "waitForPersistedSingleCatalogStroke(page, expectedSelection)",
+    );
+    expect(harness).toContain(
+      "persisted dynamics do not match the selected catalogue profile",
+    );
+    expect(harness).toContain(
+      'preset.source === "core" || expectedSelection.brushDynamics',
+    );
+    expect(harness).toContain(
+      "draw?.brushCatalogId === catalogId",
+    );
+    expect(harness).toContain(
+      "draw.brush === runtimeBrushId",
+    );
+    expect(harness).toContain(
+      "serializeStudioBrushDynamicsSettingsCanonical(persistedProStroke.brushDynamics)",
+    );
+    expect(harness).toContain(
+      "Math.ceil(PRODUCT_BRUSH_CATALOG_COUNT / 7)",
+    );
+    expect(harness).not.toContain(
+      "Math.ceil(BRUSH_PRESETS.length / 7)",
+    );
     expect(harness).not.toContain("BRUSH_PRESETS.length === 37");
     expect(harness).not.toContain("evidence.length === 37");
     expect(harness).not.toContain("/37 long strokes");
   });
 
-  it("isolates every sparse long route and makes drawing-only run both short and long matrices", () => {
+  it("isolates every sparse long route and offers an exhaustive long-only catalogue audit", () => {
     expect(harness).toContain(
-      "const desktop = shapesOnly ? null : await runDesktopBrushMatrix(browser, studioUrl);",
+      "const desktop = shapesOnly || longOnly ? null : await runDesktopBrushMatrix(browser, studioUrl);",
     );
     expect(harness).toContain(
       "const longBrushes = shapesOnly ? null : await runLongBrushMatrix(browser, studioUrl);",
     );
     expect(harness).toContain(
-      "const smartShapes = drawingOnly ? null : await runSmartShapeMatrix(browser, studioUrl);",
+      "const smartShapes = drawingOnly || longOnly",
     );
     expect(harness).toContain("const y = safeTop + (safeBottom - safeTop) / 2;");
-    expect(harness).toContain("waitForPersistedSingleLongStroke(page, preset.id)");
+    expect(harness).toContain("const ALL_BRUSH_LONG_MATRIX =");
+    expect(harness).toContain(
+      'process.env.TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX === "1"',
+    );
+    expect(harness).toContain(
+      "? STUDIO_ALL_BRUSH_CATALOG_ITEMS",
+    );
+    expect(harness).toContain(
+      ': STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "core")',
+    );
+    expect(harness).toContain(
+      'const longOnly = process.env.TOONSPECTRUM_BRUSH_LONG_ONLY === "1";',
+    );
+    expect(harness).toContain(
+      "for (const [index, preset] of LONG_BRUSH_CATALOG_ITEMS.entries())",
+    );
+    expect(harness).toContain(
+      "materializeStudioBrushCatalogSelection(preset.id)",
+    );
+    expect(harness).toContain(
+      "saved.brush === expectedSelection.runtimeBrushId",
+    );
+    expect(harness).toContain(
+      "entry.persistedBrushId === entry.expectedRuntimeBrushId",
+    );
+    expect(harness).toContain(
+      "entry.persistedCatalogId === entry.id",
+    );
+    expect(harness).toContain(
+      "entry.persistedDynamicsMatched === true",
+    );
     expect(harness).toContain("persistedPathDistance >= 300");
     expect(harness).toContain('await page.keyboard.press("Meta+z")');
     expect(harness).not.toContain(

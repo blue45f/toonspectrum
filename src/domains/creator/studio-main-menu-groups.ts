@@ -124,6 +124,8 @@ export interface StudioMainMenuBuilderState {
   hasSavedView: boolean;
   perspectiveRulerActive: boolean;
   hasLocallyHiddenLayers: boolean;
+  quickAccessPaletteOpen: boolean;
+  quickAccessPaletteLoading: boolean;
   leftPanelOpen: boolean;
   rightPanelOpen: boolean;
   lastFilterDraft: StudioFilterDraft | null;
@@ -192,6 +194,7 @@ export interface StudioMainMenuUiActions {
   openProductionInsights: () => unknown;
   collapseSidePanels: () => unknown;
   openToolsCompanion: () => unknown;
+  toggleQuickAccessPalette: () => unknown;
   toggleLeftPanel: () => unknown;
   toggleRightPanel: () => unknown;
   openShortcuts: () => unknown;
@@ -825,6 +828,20 @@ export function buildStudioMainMenuGroups({
             editor.enterCanvasOnlyMode();
           },
           separatorAfter: true,
+        },
+        {
+          id: "quick-access-palette",
+          label: state.quickAccessPaletteLoading
+            ? "빠른 액세스 불러오는 중…"
+            : state.quickAccessPaletteOpen
+              ? "빠른 액세스 팔레트 숨기기"
+              : "빠른 액세스 팔레트 표시",
+          icon: Command,
+          shortcut: "⇧Q",
+          checked: state.quickAccessPaletteOpen,
+          disabled: state.quickAccessPaletteLoading,
+          separatorAfter: true,
+          onSelect: ui.toggleQuickAccessPalette,
         },
         {
           id: "left-panel",

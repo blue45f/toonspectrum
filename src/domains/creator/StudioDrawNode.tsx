@@ -657,7 +657,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           });
           const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
           const pointCount = Math.floor(points.length / 2);
-          const pointBounds = pointCount < 2
+          const pointBounds = perfectProfile === null || pointCount < 2
             ? null
             : points.reduce<{ minX: number; minY: number; maxX: number; maxY: number }>((
               bounds,
@@ -1020,6 +1020,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             if (isVeryShortPerfectStroke || isSparseLongPerfectStroke) {
               const perfectFallback = resolveStudioFreehandRenderPath(points, {
                 sampleSpacing: el.sampleSpacing,
+                acceptedTension: 0.32,
                 legacyMinDistance: renderSampleDistance,
                 legacyTension: 0.4,
               });
@@ -1144,6 +1145,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             // 스트로커 로드 전/지오메트리 부족 — 깨끗한 Line 폴백(로드 완료 시 훅 상태로 재렌더).
             const perfectFallback = resolveStudioFreehandRenderPath(points, {
               sampleSpacing: el.sampleSpacing,
+              acceptedTension: 0.32,
               legacyMinDistance: renderSampleDistance,
               legacyTension: 0.4,
             });
@@ -1392,6 +1394,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           if (brushFamily === "pencil" && el.mode !== "eraser") {
             const renderPath = resolveStudioFreehandRenderPath(points, {
               sampleSpacing: el.sampleSpacing,
+              acceptedTension: 0.18,
               legacyMinDistance: renderSampleDistance,
               legacyTension: 0.2,
             });
@@ -1438,6 +1441,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           if (brushFamily === "highlighter" && el.mode !== "eraser") {
             const renderPath = resolveStudioFreehandRenderPath(points, {
               sampleSpacing: el.sampleSpacing,
+              acceptedTension: 0.35,
               legacyMinDistance: renderSampleDistance,
               legacyTension: 0.35,
             });
@@ -1449,7 +1453,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 strokeWidth={aliasStrokeWidth}
                 opacity={opacity}
                 lineCap="square"
-                lineJoin="miter"
+                lineJoin={brush === "chisel-highlighter" ? "bevel" : "round"}
                 tension={renderPath.tension}
                 globalCompositeOperation="multiply"
                 listening={false}
@@ -1460,6 +1464,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           if (brushFamily === "neon" && el.mode !== "eraser") {
             const renderPath = resolveStudioFreehandRenderPath(points, {
               sampleSpacing: el.sampleSpacing,
+              acceptedTension: 0.3,
               legacyMinDistance: renderSampleDistance,
               legacyTension: 0.35,
             });
@@ -1502,6 +1507,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           if (brushFamily === "glow" && el.mode !== "eraser") {
             const renderPath = resolveStudioFreehandRenderPath(points, {
               sampleSpacing: el.sampleSpacing,
+              acceptedTension: 0.3,
               legacyMinDistance: renderSampleDistance,
               legacyTension: 0.35,
             });

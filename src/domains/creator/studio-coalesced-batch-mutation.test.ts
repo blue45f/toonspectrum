@@ -43,6 +43,30 @@ describe("studio coalesced batch mutation", () => {
     })).toBe(true);
   });
 
+  it("owns one immutable publication boundary for a coalesced legacy outline/material suffix", () => {
+    expect(shouldOwnStudioCoalescedBatchDraft({
+      ...base,
+      immediateCausalInput: false,
+      authoritativeSampleCount: 4,
+    })).toBe(true);
+  });
+
+  it("leaves a single legacy sample on its existing one-copy append path", () => {
+    expect(shouldOwnStudioCoalescedBatchDraft({
+      ...base,
+      immediateCausalInput: false,
+      authoritativeSampleCount: 1,
+    })).toBe(false);
+  });
+
+  it("does not mutate a draft already owned by a mutable presentation surface", () => {
+    expect(shouldOwnStudioCoalescedBatchDraft({
+      ...base,
+      authoritativeSampleCount: 4,
+      mutableDirectSurfaceActive: true,
+    })).toBe(false);
+  });
+
   it("does not allocate an owned batch when no authoritative sample arrived", () => {
     expect(shouldOwnStudioCoalescedBatchDraft({
       ...base,

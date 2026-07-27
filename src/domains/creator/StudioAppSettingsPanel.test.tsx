@@ -93,6 +93,14 @@ describe("StudioAppSettingsPanel", () => {
     expect(html).toMatch(/<button[^>]*aria-pressed="true"[^>]*>동작 미리보기<\/button>/);
   });
 
+  it("입력 안정화 지연을 확인할 수 있는 필기 보조선 토글을 제공한다", () => {
+    const { html } = renderSettings();
+
+    expect(html).toContain("필기 보조선");
+    expect(html).toContain("실제 포인터와 잉크 끝점을 연결합니다");
+    expect(openingButtonTagByText(html, "숨김")).toContain('aria-pressed="false"');
+  });
+
   it("터치 탭에서 조절 가능한 Motion Coach 길게 누르기 시간을 제공한다", () => {
     const { html } = renderSettings("touch");
     const range = html.match(

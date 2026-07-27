@@ -3,6 +3,7 @@ import {
   Ellipse,
   Group,
   Layer,
+  Line as KLine,
   Rect,
 } from "react-konva/lib/ReactKonvaCore";
 
@@ -17,11 +18,12 @@ import type { RefObject } from "react";
 
 interface StudioBrushCursorProps {
   cursorRef: RefObject<Konva.Group | null>;
+  guideRef?: RefObject<Konva.Line | null>;
   brushId: string;
   diameter: number;
   effectiveScale: number;
   mode: StudioBrushCursorMode;
-  style: Exclude<StudioBrushCursorStyle, "none">;
+  style: StudioBrushCursorStyle;
   tipAngleDeg: number;
   tipRoundness: number;
 }
@@ -74,6 +76,7 @@ function StudioBrushCursorOutline({
  */
 export function StudioBrushCursor({
   cursorRef,
+  guideRef,
   brushId,
   diameter,
   effectiveScale,
@@ -94,6 +97,23 @@ export function StudioBrushCursor({
 
   return (
     <Layer listening={false} name="studio-brush-cursor-layer">
+      {guideRef ? (
+        <KLine
+          ref={guideRef}
+          visible={false}
+          points={[0, 0, 0, 0]}
+          stroke="oklch(0.63 0.19 285 / 0.86)"
+          strokeWidth={1}
+          dash={[4, 3]}
+          lineCap="round"
+          listening={false}
+          perfectDrawEnabled={false}
+          shadowColor="oklch(0.98 0.01 85 / 0.9)"
+          shadowBlur={1}
+          shadowOpacity={0.8}
+          name="studio-stroke-guide"
+        />
+      ) : null}
       <Group
         ref={cursorRef}
         visible={false}

@@ -2,7 +2,16 @@
  * StudioBrushLibrarySheet — searchable built-in brush catalog popover.
  * Search · category · favorites · recent · render-faithful preview tiles.
  */
-import { LoaderCircle, RotateCcw, Search, Star, X } from "lucide-react";
+import {
+  Grid2X2,
+  LoaderCircle,
+  RotateCcw,
+  Rows3,
+  Search,
+  Star,
+  Waves,
+  X,
+} from "lucide-react";
 import {
   useEffect,
   useId,
@@ -49,6 +58,12 @@ import { cn } from "@/lib/utils";
 export interface StudioBrushLibrarySheetProps {
   open: boolean;
   activeBrushId: string;
+  /**
+   * Forces the short-surface layout when the visual viewport is occluded by a software keyboard.
+   * A height media query covers genuinely short viewports without requiring a resize render.
+   */
+  compact?: boolean;
+  triggerElement?: HTMLElement | null;
   favoriteIds?: readonly string[];
   recentIds?: readonly string[];
   onClose: (reason: StudioBrushCatalogCloseReason) => void;
@@ -93,6 +108,138 @@ export type StudioBrushCatalogPreviewKind =
   | "glow"
   | "particle"
   | "tone";
+
+export type StudioBrushCatalogViewMode = "stroke" | "tile" | "text";
+
+type StudioBrushGridNavigationKey =
+  | "ArrowLeft"
+  | "ArrowRight"
+  | "ArrowUp"
+  | "ArrowDown"
+  | "Home"
+  | "End";
+
+const STUDIO_BRUSH_GRID_FALLBACK_COLUMNS = {
+  stroke: 2,
+  tile: 3,
+  text: 1,
+} as const satisfies Record<StudioBrushCatalogViewMode, number>;
+
+function countCssGridTracks(template: string): number | null {
+  const normalizedTemplate = template.trim();
+  if (!normalizedTemplate || normalizedTemplate === "none") return null;
+
+  const tracks: string[] = [];
+  let depth = 0;
+  let trackStart = 0;
+  for (let index = 0; index <= normalizedTemplate.length; index += 1) {
+    const character = normalizedTemplate[index];
+    if (character === "(" || character === "[") depth += 1;
+    if (character === ")" || character === "]") depth = Math.max(0, depth - 1);
+    if (
+      index === normalizedTemplate.length
+      || (depth === 0 && character !== undefined && /\s/u.test(character))
+    ) {
+      const track = normalizedTemplate.slice(trackStart, index).trim();
+      if (track) tracks.push(track);
+      trackStart = index + 1;
+    }
+  }
+
+  let count = 0;
+  for (const track of tracks) {
+    const repeatMatch = /^repeat\(\s*(\d+)\s*,([\s\S]+)\)$/u.exec(track);
+    if (!repeatMatch) {
+      count += 1;
+      continue;
+    }
+    const repetitions = Number.parseInt(repeatMatch[1] ?? "", 10);
+    const repeatedTrackCount = countCssGridTracks(repeatMatch[2] ?? "");
+    count += repetitions * (repeatedTrackCount ?? 1);
+  }
+  return count > 0 ? count : null;
+}
+
+/**
+ * Reads the resolved CSS grid on every keyboard event so responsive column
+ * changes do not leave navigation using a stale viewport-derived value.
+ */
+function studioBrushGridColumnCount(
+  grid: HTMLElement | null,
+  viewMode: StudioBrushCatalogViewMode,
+): number {
+  if (grid && typeof globalThis.getComputedStyle === "function") {
+    try {
+      const computedColumns = countCssGridTracks(
+        globalThis.getComputedStyle(grid).gridTemplateColumns
+      );
+      if (computedColumns) return computedColumns;
+    } catch {
+      // Detached test nodes and older webviews can reject computed-style reads.
+    }
+  }
+  return STUDIO_BRUSH_GRID_FALLBACK_COLUMNS[viewMode];
+}
+
+/**
+ * Brush-grid navigation uses linear left/right movement and row-sized
+ * up/down movement. Every edge clamps instead of wrapping, including a
+ * partially filled final row, so a repeated arrow key never jumps away.
+ */
+function nextStudioBrushGridIndex({
+  currentIndex,
+  itemCount,
+  columns,
+  key,
+}: {
+  currentIndex: number;
+  itemCount: number;
+  columns: number;
+  key: StudioBrushGridNavigationKey;
+}): number | null {
+  if (itemCount <= 0 || currentIndex < 0 || currentIndex >= itemCount) return null;
+  const lastIndex = itemCount - 1;
+  const safeColumns = Math.max(1, Math.floor(columns));
+  if (key === "ArrowRight") return Math.min(lastIndex, currentIndex + 1);
+  if (key === "ArrowLeft") return Math.max(0, currentIndex - 1);
+  if (key === "ArrowDown") {
+    const nextIndex = currentIndex + safeColumns;
+    return nextIndex <= lastIndex ? nextIndex : currentIndex;
+  }
+  if (key === "ArrowUp") {
+    const nextIndex = currentIndex - safeColumns;
+    return nextIndex >= 0 ? nextIndex : currentIndex;
+  }
+  if (key === "Home") return 0;
+  if (key === "End") return lastIndex;
+  return null;
+}
+
+const STUDIO_BRUSH_CATALOG_VIEW_OPTIONS = [
+  {
+    id: "stroke",
+    label: "획",
+    title: "획 미리보기",
+    Icon: Waves,
+  },
+  {
+    id: "tile",
+    label: "타일",
+    title: "작은 타일",
+    Icon: Grid2X2,
+  },
+  {
+    id: "text",
+    label: "목록",
+    title: "이름 목록",
+    Icon: Rows3,
+  },
+] as const satisfies readonly {
+  id: StudioBrushCatalogViewMode;
+  label: string;
+  title: string;
+  Icon: typeof Waves;
+}[];
 
 function studioBrushPreviewHash(value: string): number {
   let hash = 2166136261;
@@ -249,9 +396,13 @@ function studioBrushCatalogPreviewKind(
 export function LargeBrushPreview({
   item,
   active,
+  compact = false,
+  density = "stroke",
 }: {
   item: StudioBrushTrayItem;
   active: boolean;
+  compact?: boolean;
+  density?: Exclude<StudioBrushCatalogViewMode, "text">;
 }): ReactElement {
   const w = 96;
   const h = 34;
@@ -445,7 +596,14 @@ export function LargeBrushPreview({
       data-studio-brush-preview="true"
       data-studio-brush-preview-kind={kind}
       data-studio-brush-preview-opacity={opacity}
-      className={cn("block h-[2.125rem] w-full", active && "text-on-accent")}
+      data-studio-brush-preview-density={density}
+      className={cn(
+        "block w-full",
+        density === "tile" ? "h-7" : "h-[2.125rem]",
+        compact && "h-7",
+        "[@media(max-height:32rem)]:h-7",
+        active && "text-on-accent"
+      )}
     >
       <rect
         x={0.5}
@@ -467,6 +625,8 @@ export function LargeBrushPreview({
 export function StudioBrushLibrarySheet({
   open,
   activeBrushId,
+  compact = false,
+  triggerElement = null,
   favoriteIds = [],
   recentIds = [],
   onClose,
@@ -478,12 +638,14 @@ export function StudioBrushLibrarySheet({
   const titleId = useId();
   const tabsId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const tabListRef = useRef<HTMLDivElement>(null);
   const itemGridRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
   const selectionRequestEpochRef = useRef(0);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<(typeof STUDIO_BRUSH_LIBRARY_TABS)[number]["id"]>("beginner");
+  const [viewMode, setViewMode] = useState<StudioBrushCatalogViewMode>("stroke");
   const [visibleLimit, setVisibleLimit] = useState(48);
   const [focusedBrushId, setFocusedBrushId] = useState<string | null>(null);
   const [pendingSelectionId, setPendingSelectionId] = useState<string | null>(null);
@@ -522,6 +684,22 @@ export function StudioBrushLibrarySheet({
     globalThis.addEventListener("keydown", onKey);
     return () => globalThis.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(event: PointerEvent) {
+      if (!(event.target instanceof Node)) return;
+      if (
+        rootRef.current?.contains(event.target)
+        || triggerElement?.contains(event.target)
+      ) return;
+      selectionRequestEpochRef.current += 1;
+      setPendingSelectionId(null);
+      onClose("outside-pointer");
+    }
+    globalThis.addEventListener("pointerdown", onPointerDown, true);
+    return () => globalThis.removeEventListener("pointerdown", onPointerDown, true);
+  }, [open, onClose, triggerElement]);
 
   if (!open) return null;
 
@@ -619,23 +797,25 @@ export function StudioBrushLibrarySheet({
       onToggleFavorite(currentBrush.id);
       return;
     }
-    const lastIndex = visibleItems.length - 1;
-    let nextIndex: number;
-    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-      nextIndex = currentIndex === lastIndex ? 0 : currentIndex + 1;
-    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-      nextIndex = currentIndex === 0 ? lastIndex : currentIndex - 1;
-    } else if (event.key === "Home") {
-      nextIndex = 0;
-    } else if (event.key === "End") {
-      nextIndex = lastIndex;
-    } else {
-      return;
-    }
-
+    if (
+      event.key !== "ArrowLeft"
+      && event.key !== "ArrowRight"
+      && event.key !== "ArrowUp"
+      && event.key !== "ArrowDown"
+      && event.key !== "Home"
+      && event.key !== "End"
+    ) return;
+    const nextIndex = nextStudioBrushGridIndex({
+      currentIndex,
+      itemCount: visibleItems.length,
+      columns: studioBrushGridColumnCount(itemGridRef.current, viewMode),
+      key: event.key,
+    });
+    if (nextIndex === null) return;
+    event.preventDefault();
+    if (nextIndex === currentIndex) return;
     const nextBrush = visibleItems[nextIndex];
     if (!nextBrush) return;
-    event.preventDefault();
     setFocusedBrushId(nextBrush.id);
     const nextButton = itemGridRef.current
       ?.querySelectorAll<HTMLButtonElement>("[data-studio-brush-select]")
@@ -646,6 +826,7 @@ export function StudioBrushLibrarySheet({
 
   return (
     <div
+      ref={rootRef}
       role="dialog"
       aria-labelledby={titleId}
       aria-describedby={`${titleId}-description`}
@@ -653,18 +834,33 @@ export function StudioBrushLibrarySheet({
       data-studio-brush-catalog="built-in"
       data-studio-brush-catalog-session="true"
       data-studio-brush-surface-role="full-catalog-management"
+      data-studio-brush-compact={compact ? "true" : undefined}
       style={style}
       className={cn(
         "absolute left-2 top-[calc(100%+0.35rem)] z-[60] flex max-h-[min(32rem,calc(100dvh-1rem))] w-[min(22rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_16px_48px_oklch(0.12_0.02_70/0.55)]",
         className
       )}
     >
-      <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
+      <div
+        data-studio-brush-catalog-header="true"
+        className={cn(
+          "flex shrink-0 items-center justify-between gap-2 border-b border-line px-3 py-2",
+          compact && "px-2 py-0",
+          "[@media(max-height:32rem)]:px-2 [@media(max-height:32rem)]:py-0"
+        )}
+      >
         <div className="min-w-0">
           <p id={titleId} className="text-sm font-bold text-fg">
             브러시 전체 라이브러리
           </p>
-          <p id={`${titleId}-description`} className="text-[0.62rem] text-fg-3">
+          <p
+            id={`${titleId}-description`}
+            className={cn(
+              "text-[0.62rem] text-fg-3",
+              compact && "hidden",
+              "[@media(max-height:32rem)]:hidden"
+            )}
+          >
             앱 제공 {STUDIO_BRUSH_CATALOG_COUNTS.total}종 · 코어{" "}
             {STUDIO_BRUSH_CATALOG_COUNTS.core} + 프로시저럴{" "}
             {STUDIO_BRUSH_CATALOG_COUNTS.pro} · {visibleItems.length}/{items.length}개 표시
@@ -688,8 +884,15 @@ export function StudioBrushLibrarySheet({
         </button>
       </div>
 
-      <div className="border-b border-line px-2 py-2">
-        <div className="relative">
+      <div
+        data-studio-brush-catalog-controls="true"
+        className={cn(
+          "shrink-0 border-b border-line px-2 py-2",
+          compact && "flex items-center gap-1 px-1 py-0",
+          "[@media(max-height:32rem)]:flex [@media(max-height:32rem)]:items-center [@media(max-height:32rem)]:gap-1 [@media(max-height:32rem)]:px-1 [@media(max-height:32rem)]:py-0"
+        )}
+      >
+        <div className="relative min-w-0 flex-1">
           <Search className="absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-3" aria-hidden />
           <input
             ref={searchRef}
@@ -708,16 +911,87 @@ export function StudioBrushLibrarySheet({
             data-studio-brush-search-scope="all"
           />
         </div>
-        <p id={`${titleId}-search-scope`} className="mt-1 px-1 text-[0.6rem] leading-relaxed text-fg-3">
+        <p
+          id={`${titleId}-search-scope`}
+          className={cn(
+            "mt-1 px-1 text-[0.6rem] leading-relaxed text-fg-3",
+            compact && "hidden",
+            "[@media(max-height:32rem)]:hidden"
+          )}
+        >
           {normalizedQuery
             ? `분류와 관계없이 전체 ${STUDIO_BRUSH_CATALOG_COUNTS.total}종에서 검색 중`
             : "분류를 고르거나 이름·용도·종류로 전체 검색"}
         </p>
+        <div
+          className={cn(
+            "mt-1.5 flex min-w-0 items-center justify-between gap-2 px-1",
+            compact && "mt-0 shrink-0 gap-0 px-0",
+            "[@media(max-height:32rem)]:mt-0 [@media(max-height:32rem)]:shrink-0 [@media(max-height:32rem)]:gap-0 [@media(max-height:32rem)]:px-0"
+          )}
+        >
+          <span
+            className={cn(
+              "shrink-0 text-[0.62rem] font-semibold text-fg-3",
+              compact && "hidden",
+              "[@media(max-height:32rem)]:hidden"
+            )}
+          >
+            표시
+          </span>
+          <div
+            role="group"
+            aria-label="브러시 표시 방식"
+            className={cn(
+              "grid min-w-0 flex-1 grid-cols-3 rounded-xl border border-line bg-card p-0.5",
+              compact && "w-[8.5rem] flex-none",
+              "[@media(max-height:32rem)]:w-[8.5rem] [@media(max-height:32rem)]:flex-none"
+            )}
+          >
+            {STUDIO_BRUSH_CATALOG_VIEW_OPTIONS.map(({ id, label, title, Icon }) => {
+              const active = viewMode === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  title={title}
+                  aria-label={title}
+                  aria-pressed={active}
+                  data-studio-brush-view-option={id}
+                  onClick={() => setViewMode(id)}
+                  className={cn(
+                    "flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg px-1.5 text-[0.62rem] font-bold",
+                    STUDIO_EASE,
+                    STUDIO_FOCUS_RING,
+                    active
+                      ? "bg-raised text-fg shadow-[inset_0_0_0_1px_oklch(0.42_0.013_64)]"
+                      : "text-fg-3 hover:bg-raised/70 hover:text-fg"
+                  )}
+                >
+                  <Icon size={13} strokeWidth={1.8} aria-hidden />
+                  <span
+                    className={cn(
+                      compact && "sr-only",
+                      "[@media(max-height:32rem)]:sr-only"
+                    )}
+                  >
+                    {label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <div
         ref={tabListRef}
-        className="flex gap-1 overflow-x-auto border-b border-line px-2 py-1.5 [scrollbar-width:thin]"
+        data-studio-brush-catalog-tabs="true"
+        className={cn(
+          "flex shrink-0 gap-1 overflow-x-auto border-b border-line px-2 py-1.5 [scrollbar-width:thin]",
+          compact && "px-1 py-0",
+          "[@media(max-height:32rem)]:px-1 [@media(max-height:32rem)]:py-0"
+        )}
         role="tablist"
         aria-label="브러시 분류"
       >
@@ -755,7 +1029,12 @@ export function StudioBrushLibrarySheet({
         role="tabpanel"
         aria-labelledby={`${tabsId}-${tab}`}
         tabIndex={0}
-        className="min-h-0 flex-1 overflow-y-auto p-2 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+        data-studio-brush-catalog-scrollport="true"
+        className={cn(
+          "min-h-0 flex-1 overflow-y-auto p-2 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent",
+          compact && "min-h-16 p-1",
+          "[@media(max-height:32rem)]:min-h-16 [@media(max-height:32rem)]:p-1"
+        )}
       >
         {selectionError ? (
           <div
@@ -783,7 +1062,15 @@ export function StudioBrushLibrarySheet({
           <div
             ref={itemGridRef}
             data-studio-brush-progressive-grid="true"
-            className="grid grid-cols-2 gap-1.5 sm:grid-cols-3"
+            data-studio-brush-view={viewMode}
+            className={cn(
+              "grid",
+              viewMode === "stroke"
+                ? "grid-cols-2 gap-1.5 sm:grid-cols-3"
+                : viewMode === "tile"
+                  ? "grid-cols-3 gap-1"
+                  : "grid-cols-1 gap-1"
+            )}
           >
             {visibleItems.map((item, itemIndex) => {
               const active = item.id === activeBrushId;
@@ -795,8 +1082,17 @@ export function StudioBrushLibrarySheet({
                   data-studio-brush-source={item.source}
                   data-studio-brush-kind={item.mediaGroup}
                   className={cn(
-                    "group relative flex flex-col rounded-xl border p-1.5 [contain-intrinsic-size:7.25rem] [content-visibility:auto]",
+                    "group relative flex border [content-visibility:auto]",
                     STUDIO_EASE,
+                    viewMode === "stroke"
+                      ? cn(
+                          "flex-col rounded-xl p-1.5 [contain-intrinsic-size:7.25rem]",
+                          compact && "p-1 [contain-intrinsic-size:4rem]",
+                          "[@media(max-height:32rem)]:p-1 [@media(max-height:32rem)]:[contain-intrinsic-size:4rem]"
+                        )
+                      : viewMode === "tile"
+                        ? "min-h-[5.25rem] flex-col rounded-lg p-1 [contain-intrinsic-size:5.25rem]"
+                        : "min-h-11 rounded-lg px-1 [contain-intrinsic-size:2.75rem]",
                     active
                       ? "border-accent bg-accent text-on-accent shadow-[0_2px_10px_oklch(0.72_0.185_42/0.25)]"
                       : "border-line bg-card hover:border-accent/40 hover:bg-raised"
@@ -821,19 +1117,60 @@ export function StudioBrushLibrarySheet({
                     data-studio-brush-select={item.id}
                     onKeyDown={(event) => onBrushKeyDown(event, itemIndex)}
                     className={cn(
-                      "flex flex-col items-stretch gap-1 rounded-lg text-left disabled:cursor-wait disabled:opacity-70",
+                      "flex min-w-0 flex-1 rounded-lg text-left disabled:cursor-wait disabled:opacity-70",
+                      viewMode === "stroke"
+                        ? "flex-col items-stretch gap-1"
+                        : viewMode === "tile"
+                          ? "min-h-[4.75rem] flex-col items-stretch gap-0.5"
+                          : "min-h-11 items-center gap-2 pr-11",
                       STUDIO_FOCUS_RING
                     )}
                   >
-                    <LargeBrushPreview item={item} active={active} />
-                    <span className="flex min-w-0 items-center gap-1 pr-5">
+                    {viewMode === "text" ? null : (
+                      <LargeBrushPreview
+                        item={item}
+                        active={active}
+                        compact={compact}
+                        density={viewMode}
+                      />
+                    )}
+                    <span
+                      data-studio-brush-text-row={viewMode === "text" ? "true" : undefined}
+                      className={cn(
+                        "flex min-w-0 items-center gap-1",
+                        viewMode === "text" ? "flex-1" : "pr-5"
+                      )}
+                    >
                       <StudioBrushPresetIcon
                         brushId={item.id}
-                        size={12}
+                        size={viewMode === "text" ? 15 : 12}
                         strokeWidth={2}
-                        className={active ? "text-on-accent" : "text-fg-2"}
+                        className={cn(
+                          "shrink-0",
+                          active ? "text-on-accent" : "text-fg-2"
+                        )}
                       />
-                      <span className="truncate text-[0.68rem] font-bold leading-tight">{item.name}</span>
+                      <span
+                        className={cn(
+                          "min-w-0 flex-1",
+                          active ? "text-on-accent" : "text-fg-2"
+                        )}
+                      >
+                        <span className="block truncate text-[0.68rem] font-bold leading-tight">
+                          {item.name}
+                        </span>
+                        {viewMode === "text" ? (
+                          <span
+                            className={cn(
+                              "block truncate text-[0.58rem] font-medium leading-tight",
+                              active ? "text-on-accent/75" : "text-fg-3"
+                            )}
+                          >
+                            {kindLabel} · {item.defaultWidth}px ·{" "}
+                            {Math.round(item.defaultOpacity * 100)}%
+                          </span>
+                        ) : null}
+                      </span>
                       {pendingSelectionId === item.id ? (
                         <LoaderCircle size={12} className="ml-auto shrink-0 animate-spin motion-reduce:animate-none" aria-hidden />
                       ) : item.source === "pro" ? (
@@ -842,30 +1179,35 @@ export function StudioBrushLibrarySheet({
                         </span>
                       ) : null}
                     </span>
-                    <span
-                      className={cn(
-                        "flex min-w-0 items-center justify-between gap-1 text-[0.6rem] leading-tight",
-                        active ? "text-on-accent/75" : "text-fg-3"
-                      )}
-                    >
-                      <span className="truncate">
-                        {item.defaultWidth}px · {Math.round(item.defaultOpacity * 100)}%
-                      </span>
+                    {viewMode === "stroke" ? (
                       <span
-                        data-studio-brush-kind-badge={item.mediaGroup}
+                        data-studio-brush-stroke-details="true"
                         className={cn(
-                          "shrink-0 rounded-full px-1.5 py-0.5 font-bold",
-                          active ? "bg-on-accent/15 text-on-accent" : "bg-raised text-fg-2"
+                          "flex min-w-0 items-center justify-between gap-1 text-[0.6rem] leading-tight",
+                          compact && "hidden",
+                          "[@media(max-height:32rem)]:hidden",
+                          active ? "text-on-accent/75" : "text-fg-3"
                         )}
                       >
-                        {kindLabel}
+                        <span className="truncate">
+                          {item.defaultWidth}px · {Math.round(item.defaultOpacity * 100)}%
+                        </span>
+                        <span
+                          data-studio-brush-kind-badge={item.mediaGroup}
+                          className={cn(
+                            "shrink-0 rounded-full px-1.5 py-0.5 font-bold",
+                            active ? "bg-on-accent/15 text-on-accent" : "bg-raised text-fg-2"
+                          )}
+                        >
+                          {kindLabel}
+                        </span>
                       </span>
-                    </span>
+                    ) : null}
                   </button>
                   {onToggleFavorite ? (
                     <button
                       type="button"
-                      title={`${fav ? "즐겨찾기 해제" : "즐겨찾기"} · 타일에서 F`}
+                      title={`${fav ? "즐겨찾기 해제" : "즐겨찾기"} · 선택 항목에서 F`}
                       aria-label={fav ? `${item.name} 즐겨찾기 해제` : `${item.name} 즐겨찾기`}
                       aria-pressed={fav}
                       tabIndex={-1}
@@ -911,7 +1253,14 @@ export function StudioBrushLibrarySheet({
           </>
         )}
       </div>
-      <div className="border-t border-line bg-panel px-2 py-2">
+      <div
+        data-studio-brush-catalog-reset="true"
+        className={cn(
+          "shrink-0 border-t border-line bg-panel px-2 py-2",
+          compact && "px-1 py-0",
+          "[@media(max-height:32rem)]:px-1 [@media(max-height:32rem)]:py-0"
+        )}
+      >
         <button
           type="button"
           disabled={!activeCatalogItem || pendingSelectionId !== null}
@@ -934,7 +1283,13 @@ export function StudioBrushLibrarySheet({
             <span className="block truncate text-[0.68rem] font-bold">
               현재 브러시 기본값 다시 적용
             </span>
-            <span className="block truncate text-[0.6rem] text-fg-3">
+            <span
+              className={cn(
+                "block truncate text-[0.6rem] text-fg-3",
+                compact && "hidden",
+                "[@media(max-height:32rem)]:hidden"
+              )}
+            >
               {activeCatalogItem
                 ? `${activeCatalogItem.name}의 굵기·불투명도·촉 반응`
                 : "사용자 저장 브러시는 내 브러시에서 다시 적용"}
@@ -1018,30 +1373,21 @@ export function StudioBrushCatalogPortal({
     };
   }, [open, placement, triggerElement]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!(event.target instanceof Node)) return;
-      const catalog = globalThis.document?.querySelector<HTMLElement>(
-        '[data-studio-brush-catalog-session="true"]'
-      );
-      if (catalog?.contains(event.target) || triggerElement?.contains(event.target)) return;
-      onClose("outside-pointer");
-    };
-    globalThis.addEventListener("pointerdown", onPointerDown, true);
-    return () => globalThis.removeEventListener("pointerdown", onPointerDown, true);
-  }, [open, onClose, triggerElement]);
-
   if (!open || !globalThis.document) return null;
 
+  const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
+    ? Math.max(0, Math.round(mobileKeyboardInset))
+    : 0;
   const mobileStyle: CSSProperties = {
-    bottom: `calc(7.5rem + env(safe-area-inset-bottom) + ${Math.max(0, mobileKeyboardInset)}px)`,
+    bottom: `calc(7.5rem + env(safe-area-inset-bottom) + ${safeMobileKeyboardInset}px)`,
   };
 
   return createPortal(
     <StudioBrushLibrarySheet
       open
       activeBrushId={activeBrushId}
+      compact={placement === "mobile-sheet" && safeMobileKeyboardInset >= 80}
+      triggerElement={triggerElement}
       favoriteIds={favoriteIds}
       recentIds={recentIds}
       onClose={onClose}

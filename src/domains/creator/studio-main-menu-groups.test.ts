@@ -50,6 +50,8 @@ const BASE_STATE: StudioMainMenuBuilderState = {
   hasSavedView: false,
   perspectiveRulerActive: false,
   hasLocallyHiddenLayers: false,
+  quickAccessPaletteOpen: false,
+  quickAccessPaletteLoading: false,
   leftPanelOpen: true,
   rightPanelOpen: true,
   lastFilterDraft: null,
@@ -118,6 +120,7 @@ function createUiActions(): StudioMainMenuUiActions {
     openProductionInsights: vi.fn(),
     collapseSidePanels: vi.fn(),
     openToolsCompanion: vi.fn(),
+    toggleQuickAccessPalette: vi.fn(),
     toggleLeftPanel: vi.fn(),
     toggleRightPanel: vi.fn(),
     openShortcuts: vi.fn(),
@@ -245,6 +248,7 @@ describe("buildStudioMainMenuGroups", () => {
         "wide",
         "tools-companion",
         "canvas-only",
+        "quick-access-palette",
         "left-panel",
         "right-panel",
         "feature-tutorials",
@@ -305,6 +309,8 @@ describe("buildStudioMainMenuGroups", () => {
       hasSavedView: true,
       perspectiveRulerActive: true,
       hasLocallyHiddenLayers: true,
+      quickAccessPaletteOpen: true,
+      quickAccessPaletteLoading: true,
       leftPanelOpen: false,
       rightPanelOpen: false,
       lastFilterDraft,
@@ -389,6 +395,12 @@ describe("buildStudioMainMenuGroups", () => {
     expect(menuItem(groups, "view", "restore-view").disabled).toBe(true);
     expect(menuItem(groups, "view", "perspective-guide").checked).toBe(true);
     expect(menuItem(groups, "view", "reset-local-visibility").disabled).toBe(false);
+    expect(menuItem(groups, "view", "quick-access-palette")).toMatchObject({
+      label: "빠른 액세스 불러오는 중…",
+      shortcut: "⇧Q",
+      checked: true,
+      disabled: true,
+    });
     expect(menuItem(groups, "view", "left-panel").label).toBe("왼쪽 패널 보이기");
     expect(menuItem(groups, "view", "right-panel").label).toBe("속성 패널 보이기");
     expect(menuItem(groups, "filter", "last-filter")).toMatchObject({
@@ -456,6 +468,7 @@ describe("buildStudioMainMenuGroups", () => {
     menuItem(groups, "view", "density-focus").onSelect();
     menuItem(groups, "view", "density-full").onSelect();
     menuItem(groups, "view", "tools-companion").onSelect();
+    menuItem(groups, "view", "quick-access-palette").onSelect();
     menuItem(groups, "view", "feature-tutorials").onSelect();
     menuItem(groups, "view", "app-settings").onSelect();
     menuItem(groups, "filter", "last-filter").onSelect();
@@ -473,6 +486,7 @@ describe("buildStudioMainMenuGroups", () => {
       "멀티 디스플레이 작업공간…"
     );
     expect(ui.openToolsCompanion).toHaveBeenCalledOnce();
+    expect(ui.toggleQuickAccessPalette).toHaveBeenCalledOnce();
     expect(editor.openFeatureTutorial).toHaveBeenCalledOnce();
     expect(ui.openAppSettings).toHaveBeenCalledWith();
     expect(editor.openStudioFilter).toHaveBeenNthCalledWith(

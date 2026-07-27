@@ -17,7 +17,13 @@ export function shouldOwnStudioCoalescedBatchDraft(
   if (!Number.isFinite(input.authoritativeSampleCount) || input.authoritativeSampleCount < 1) {
     return false;
   }
-  if (input.gpuPinned) return !input.fixedRateFilterActive;
-  return input.immediateCausalInput
-    && !input.mutableDirectSurfaceActive;
+  if (input.fixedRateFilterActive) return false;
+  if (input.gpuPinned) return true;
+  if (input.mutableDirectSurfaceActive) return false;
+  // Legacy outline/material brushes (G-pen, perfect ink, calligraphy and dynamic dabs) can receive
+  // several 120/240Hz hardware samples in one browser delivery too. Letting each sample clone the
+  // complete accumulated draft made a long stroke O(samples × points) before the next paint. Own a
+  // private batch whenever there is a real coalesced suffix; a single legacy sample already pays
+  // exactly one immutable append in appendFreehandStrokePoint and needs no extra outer clone.
+  return input.immediateCausalInput || input.authoritativeSampleCount > 1;
 }

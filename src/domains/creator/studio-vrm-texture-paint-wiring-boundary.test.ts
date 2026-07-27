@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const poserSource = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
-const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const projectArchiveSource = readFileSync(
+  new URL("./studio-project-archive-orchestration-runtime.ts", import.meta.url),
+  "utf8",
+);
 
 function requiredIndex(source: string, token: string, from = 0): number {
   const index = source.indexOf(token, from);
@@ -295,9 +298,9 @@ describe("Studio VRM texture-paint wiring boundary", () => {
 
   it("prepares verified paint PNG attachments before building the archive", () => {
     const archiveExport = sourceBetween(
-      studioPageSource,
+      projectArchiveSource,
       "async function handleExportProjectArchive()",
-      "// 스튜디오 프로젝트 불러오기 (.json)",
+      "function handleImportProject(",
     );
     const paintExport = requiredIndex(
       archiveExport,
@@ -325,9 +328,9 @@ describe("Studio VRM texture-paint wiring boundary", () => {
 
   it("restores archive paint PNGs to the local library before applying the project", () => {
     const archiveImport = sourceBetween(
-      studioPageSource,
+      projectArchiveSource,
       "async function handleImportProjectArchive(",
-      "function cancelInterchangeImport()",
+      "return {",
     );
     const archiveRead = requiredIndex(archiveImport, "importStudioProjectArchive(file");
     const vrmRestore = requiredIndex(
@@ -378,7 +381,7 @@ describe("Studio VRM texture-paint wiring boundary", () => {
 
   it("awaits the JSON paint inspection facade before download and publishes its notice afterward", () => {
     const jsonExport = sourceBetween(
-      studioPageSource,
+      projectArchiveSource,
       "async function handleExportProject()",
       "async function handleExportProjectArchive()",
     );

@@ -1,11 +1,10 @@
-/* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex -- WAI-ARIA focusable separators are adjustable widgets with required pointer and keyboard input. */
+/* eslint-disable jsx-a11y/no-noninteractive-element-interactions -- WAI-ARIA focusable separators are adjustable widgets with required pointer and keyboard input. */
 import {
   ArrowDown,
   ArrowUp,
   ChevronDown,
   ChevronRight,
-  SlidersHorizontal,
-  SwatchBook,
+  MoreHorizontal,
 } from "lucide-react";
 import {
   useEffect,
@@ -19,18 +18,30 @@ import {
   type ReactNode,
 } from "react";
 
-import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import {
   DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
+  STUDIO_DRAWING_PALETTE_IDS,
   STUDIO_DRAWING_PALETTE_MAX_PERCENT,
   STUDIO_DRAWING_PALETTE_MIN_PERCENT,
   moveStudioDrawingPalette,
   normalizeStudioDrawingPaletteLayout,
   resizeStudioDrawingPalettes,
+  toggleStudioDrawingPaletteLock,
   toggleStudioDrawingPalette,
   type StudioDrawingPaletteId,
   type StudioDrawingPaletteLayout,
-} from "./studio-workspaces";
+  type StudioDrawingPaletteLockKind,
+} from "./studio-drawing-palettes";
+import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
+import {
+  STUDIO_DRAWING_PALETTES,
+  StudioDrawingPaletteOverlayPortal,
+  paletteBody,
+  studioDrawingPaletteOverlayId,
+  useStudioDrawingPaletteOverlay,
+  type StudioDrawingPaletteOverlay,
+  type StudioDrawingPalettePresentation,
+} from "./StudioDrawingPaletteOptions";
 
 import { cn } from "@/lib/utils";
 
@@ -46,6 +57,10 @@ export interface StudioDrawingPaletteStackProps {
    */
   readonly mobilePrimaryPaletteId?: StudioDrawingPaletteId;
   readonly mobileHeaderAction?: ReactNode;
+  /** Controlled presentation; omit it to let the transient palette-options action own the mode. */
+  readonly presentation?: StudioDrawingPalettePresentation;
+  readonly defaultPresentation?: StudioDrawingPalettePresentation;
+  readonly onPresentationChange?: (presentation: StudioDrawingPalettePresentation) => void;
   /**
    * Increment when the owning workspace/account changes. An active splitter drag is discarded
    * synchronously so a release from the previous owner can never overwrite the next layout.
@@ -54,25 +69,7 @@ export interface StudioDrawingPaletteStackProps {
   readonly className?: string;
 }
 
-interface PaletteDefinition {
-  readonly id: StudioDrawingPaletteId;
-  readonly label: string;
-  readonly Icon: typeof SwatchBook;
-}
-
-const PALETTES: Readonly<Record<StudioDrawingPaletteId, PaletteDefinition>> = {
-  "sub-tools": {
-    id: "sub-tools",
-    label: "서브 도구",
-    Icon: SwatchBook,
-  },
-  "tool-properties": {
-    id: "tool-properties",
-    label: "도구 속성",
-    Icon: SlidersHorizontal,
-  },
-};
-
+export type { StudioDrawingPalettePresentation } from "./StudioDrawingPaletteOptions";
 const SPLIT_KEYBOARD_STEP = 2;
 const SPLIT_KEYBOARD_LARGE_STEP = 8;
 const DOUBLE_TAP_MAX_DELAY_MS = 350;
@@ -100,14 +97,6 @@ function paletteCollapsed(
   return values[id];
 }
 
-function paletteBody(
-  id: StudioDrawingPaletteId,
-  subTools: ReactNode,
-  toolProperties: ReactNode,
-): ReactNode {
-  return id === "sub-tools" ? subTools : toolProperties;
-}
-
 function joinKoreanLabels(first: string, second: string): string {
   const lastCodePoint = first.codePointAt(first.length - 1);
   const hasFinalConsonant =
@@ -118,12 +107,7 @@ function joinKoreanLabels(first: string, second: string): string {
   return `${first}${hasFinalConsonant ? "과" : "와"} ${second}`;
 }
 
-/**
- * CLIP-familiar, ToonSpectrum-native drawing palette dock.
- *
- * The component owns interaction only. Order, collapse state, and split percentages remain
- * controlled workspace state so switching accounts, tabs, or saved workspaces cannot fork layout.
- */
+/** CLIP-familiar, controlled drawing palette dock for ordering and split interaction. */
 export function StudioDrawingPaletteStack({
   layout,
   subTools,
@@ -132,6 +116,9 @@ export function StudioDrawingPaletteStack({
   onDraggingChange,
   mobilePrimaryPaletteId,
   mobileHeaderAction,
+  presentation: controlledPresentation,
+  defaultPresentation = "full",
+  onPresentationChange,
   cancelEpoch,
   className,
 }: StudioDrawingPaletteStackProps) {
@@ -155,6 +142,10 @@ export function StudioDrawingPaletteStack({
   const previousCancelEpochRef = useRef(cancelEpoch);
   const lastTapRef = useRef<ResizeTap | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [uncontrolledPresentation, setUncontrolledPresentation] =
+    useState<StudioDrawingPalettePresentation>(defaultPresentation);
+  const paletteOverlay = useStudioDrawingPaletteOverlay();
+  const presentation = controlledPresentation ?? uncontrolledPresentation;
   const openIds = normalizedLayout.order.filter((id) =>
     mobilePrimaryPaletteId
       ? id === mobilePrimaryPaletteId
@@ -191,7 +182,8 @@ export function StudioDrawingPaletteStack({
     if (Object.is(previousCancelEpochRef.current, cancelEpoch)) return;
     previousCancelEpochRef.current = cancelEpoch;
     activeDragCleanupRef.current?.(true, normalizedLayout);
-  }, [cancelEpoch, normalizedLayout]);
+    paletteOverlay.dismiss();
+  }, [cancelEpoch, normalizedLayout, paletteOverlay]);
 
   useLayoutEffect(
     () => () => {
@@ -202,8 +194,25 @@ export function StudioDrawingPaletteStack({
     [],
   );
 
+  function changePresentation(
+    nextPresentation: StudioDrawingPalettePresentation,
+  ): void {
+    if (controlledPresentation === undefined) {
+      setUncontrolledPresentation(nextPresentation);
+    }
+    onPresentationChange?.(nextPresentation);
+    paletteOverlay.dismiss();
+  }
+
   function emit(next: StudioDrawingPaletteLayout): void {
     onLayoutChange(normalizeStudioDrawingPaletteLayout(next));
+  }
+
+  function toggleLock(
+    id: StudioDrawingPaletteId,
+    kind: StudioDrawingPaletteLockKind,
+  ): void {
+    emit(toggleStudioDrawingPaletteLock(normalizedLayout, id, kind));
   }
 
   function resetSplit(firstId: StudioDrawingPaletteId): void {
@@ -220,6 +229,13 @@ export function StudioDrawingPaletteStack({
     event: ReactKeyboardEvent<HTMLDivElement>,
     firstId: StudioDrawingPaletteId,
   ): void {
+    if (
+      STUDIO_DRAWING_PALETTE_IDS.some(
+        (id) => normalizedLayout.locks[id].height,
+      )
+    ) {
+      return;
+    }
     const current = normalizedLayout.sizes[firstId];
     const step = event.shiftKey
       ? SPLIT_KEYBOARD_LARGE_STEP
@@ -247,6 +263,8 @@ export function StudioDrawingPaletteStack({
     secondId: StudioDrawingPaletteId,
   ): void {
     if (
+      normalizedLayout.locks[firstId].height ||
+      normalizedLayout.locks[secondId].height ||
       event.isPrimary === false ||
       (typeof event.button === "number" && event.button !== 0)
     ) {
@@ -293,7 +311,7 @@ export function StudioDrawingPaletteStack({
       target.setAttribute("aria-valuenow", String(previewPercent));
       target.setAttribute(
         "aria-valuetext",
-        `${PALETTES[firstId].label} ${previewPercent}%, ${PALETTES[secondId].label} ${Math.round(100 - previewPercent)}%`,
+        `${STUDIO_DRAWING_PALETTES[firstId].label} ${previewPercent}%, ${STUDIO_DRAWING_PALETTES[secondId].label} ${Math.round(100 - previewPercent)}%`,
       );
     };
     const restoreControlledLayout = (
@@ -317,7 +335,7 @@ export function StudioDrawingPaletteStack({
       target.setAttribute("aria-valuenow", String(controlledPercent));
       target.setAttribute(
         "aria-valuetext",
-        `${PALETTES[controlledFirstId].label} ${controlledPercent}%, ${PALETTES[controlledSecondId].label} ${Math.round(100 - controlledPercent)}%`,
+        `${STUDIO_DRAWING_PALETTES[controlledFirstId].label} ${controlledPercent}%, ${STUDIO_DRAWING_PALETTES[controlledSecondId].label} ${Math.round(100 - controlledPercent)}%`,
       );
     };
     const applyLatestPreview = (): void => {
@@ -372,7 +390,7 @@ export function StudioDrawingPaletteStack({
     };
     const cancel = (
       updateDraggingState = true,
-      restoreLayout = startLayout,
+      restoreLayout: StudioDrawingPaletteLayout = startLayout,
     ): void => {
       lastTapRef.current = null;
       teardown(updateDraggingState, restoreLayout);
@@ -449,24 +467,122 @@ export function StudioDrawingPaletteStack({
     onDraggingChange?.(true);
   }
 
+  if (presentation === "icon-popup") {
+    return (
+      <>
+        <div
+          ref={rootRef}
+          data-studio-drawing-palette-stack={true}
+          data-studio-drawing-palette-presentation="icon-popup"
+          data-studio-drawing-palette-dragging="false"
+          className={cn(
+            "flex min-w-0 shrink-0 items-center gap-1 overflow-visible rounded-xl border border-line bg-panel/80 p-1",
+            "lg:flex-col lg:items-stretch lg:rounded-none lg:border-x-0",
+            className,
+          )}
+        >
+          {normalizedLayout.order.map((id) => {
+            const definition = STUDIO_DRAWING_PALETTES[id];
+            const Icon = definition.Icon;
+            const overlay: StudioDrawingPaletteOverlay = {
+              kind: "palette",
+              id,
+            };
+            const popupId = studioDrawingPaletteOverlayId(stackId, overlay);
+            const expanded =
+              paletteOverlay.openOverlay?.kind === "palette" &&
+              paletteOverlay.openOverlay.id === id;
+            return (
+              <button
+                key={id}
+                ref={(node) => {
+                  paletteOverlay.setTrigger(overlay, node);
+                }}
+                type="button"
+                aria-haspopup="dialog"
+                aria-expanded={expanded}
+                aria-controls={popupId}
+                aria-label={`${definition.label} 팝업 ${expanded ? "닫기" : "열기"}`}
+                data-studio-drawing-palette-icon-trigger={id}
+                data-position-locked={
+                  normalizedLayout.locks[id].position ? "true" : "false"
+                }
+                data-height-locked={
+                  normalizedLayout.locks[id].height ? "true" : "false"
+                }
+                onClick={(event) =>
+                  paletteOverlay.toggle(overlay, event.currentTarget)
+                }
+                className={cn(
+                  "relative grid size-11 shrink-0 place-items-center rounded-lg text-fg-2 hover:bg-raised hover:text-fg lg:size-9",
+                  expanded && "bg-accent-soft text-accent",
+                  STUDIO_EASE,
+                  STUDIO_FOCUS_RING,
+                )}
+              >
+                <Icon size={17} strokeWidth={1.8} aria-hidden />
+                {normalizedLayout.locks[id].position ||
+                normalizedLayout.locks[id].height ? (
+                  <span
+                    aria-hidden
+                    className="absolute bottom-1 right-1 size-1.5 rounded-full bg-accent"
+                  />
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+        <StudioDrawingPaletteOverlayPortal
+          controller={paletteOverlay}
+          stackId={stackId}
+          layout={normalizedLayout}
+          presentation={presentation}
+          subTools={subTools}
+          toolProperties={toolProperties}
+          onLockToggle={toggleLock}
+          onPresentationChange={changePresentation}
+        />
+      </>
+    );
+  }
+
   return (
-    <div
-      ref={rootRef}
-      data-studio-drawing-palette-stack="true"
-      data-studio-drawing-palette-dragging={dragging ? "true" : "false"}
-      className={cn(
-        "flex min-w-0 flex-col gap-2",
-        "lg:min-h-0 lg:flex-1 lg:gap-0 lg:overflow-hidden",
-        className,
-      )}
-    >
+    <>
+      <div
+        ref={rootRef}
+        data-studio-drawing-palette-stack="true"
+        data-studio-drawing-palette-presentation="full"
+        data-studio-drawing-palette-dragging={dragging ? "true" : "false"}
+        className={cn(
+          "flex min-w-0 flex-col gap-2",
+          "lg:min-h-0 lg:flex-1 lg:gap-0 lg:overflow-hidden",
+          className,
+        )}
+      >
       {normalizedLayout.order.map((id, index) => {
-        const definition = PALETTES[id];
+        const definition = STUDIO_DRAWING_PALETTES[id];
         const Icon = definition.Icon;
         const collapsed = mobilePrimaryPaletteId
           ? id !== mobilePrimaryPaletteId
           : paletteCollapsed(normalizedLayout.collapsed, id);
         const onlyOpenPalette = openIds.length === 1 && !collapsed;
+        const previousId = normalizedLayout.order[index - 1];
+        const nextId = normalizedLayout.order[index + 1];
+        const moveUpDisabled =
+          !previousId ||
+          normalizedLayout.locks[id].position ||
+          normalizedLayout.locks[previousId].position;
+        const moveDownDisabled =
+          !nextId ||
+          normalizedLayout.locks[id].position ||
+          normalizedLayout.locks[nextId].position;
+        const optionsOverlay: StudioDrawingPaletteOverlay = {
+          kind: "options",
+          id,
+        };
+        const optionsOpen =
+          paletteOverlay.openOverlay?.kind === "options" &&
+          paletteOverlay.openOverlay.id === id;
         const contentId = `${stackId}-${id}-content`;
         const titleId = `${stackId}-${id}-title`;
         const style: PaletteSectionStyle = {
@@ -481,6 +597,12 @@ export function StudioDrawingPaletteStack({
             aria-labelledby={titleId}
             data-studio-drawing-palette={id}
             data-studio-drawing-palette-collapsed={collapsed ? "true" : "false"}
+            data-position-locked={
+              normalizedLayout.locks[id].position ? "true" : "false"
+            }
+            data-height-locked={
+              normalizedLayout.locks[id].height ? "true" : "false"
+            }
             style={style}
             className={cn(
               "flex min-w-0 flex-none flex-col rounded-xl border border-line bg-panel/70 shadow-sm",
@@ -527,7 +649,7 @@ export function StudioDrawingPaletteStack({
               >
                 <button
                   type="button"
-                  disabled={index === 0}
+                  disabled={moveUpDisabled}
                   onClick={() =>
                     emit(moveStudioDrawingPalette(normalizedLayout, id, "up"))
                   }
@@ -543,7 +665,7 @@ export function StudioDrawingPaletteStack({
                 </button>
                 <button
                   type="button"
-                  disabled={index === normalizedLayout.order.length - 1}
+                  disabled={moveDownDisabled}
                   onClick={() =>
                     emit(moveStudioDrawingPalette(normalizedLayout, id, "down"))
                   }
@@ -556,6 +678,31 @@ export function StudioDrawingPaletteStack({
                   )}
                 >
                   <ArrowDown size={14} aria-hidden />
+                </button>
+                <button
+                  ref={(node) => {
+                    paletteOverlay.setTrigger(optionsOverlay, node);
+                  }}
+                  type="button"
+                  aria-haspopup="menu"
+                  aria-expanded={optionsOpen}
+                  aria-controls={studioDrawingPaletteOverlayId(
+                    stackId,
+                    optionsOverlay,
+                  )}
+                  onClick={(event) =>
+                    paletteOverlay.toggle(optionsOverlay, event.currentTarget)
+                  }
+                  aria-label={`${definition.label} 팔레트 옵션`}
+                  title="위치·높이 잠금 및 표시 방식"
+                  className={cn(
+                    "grid size-11 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg lg:size-8",
+                    optionsOpen && "bg-accent-soft text-accent",
+                    STUDIO_EASE,
+                    STUDIO_FOCUS_RING,
+                  )}
+                >
+                  <MoreHorizontal size={15} aria-hidden />
                 </button>
                 <button
                   ref={(node) => {
@@ -616,9 +763,12 @@ export function StudioDrawingPaletteStack({
           firstOpenId &&
           secondOpenId
         ) {
-          const firstDefinition = PALETTES[firstOpenId];
-          const secondDefinition = PALETTES[secondOpenId];
+          const firstDefinition = STUDIO_DRAWING_PALETTES[firstOpenId];
+          const secondDefinition = STUDIO_DRAWING_PALETTES[secondOpenId];
           const currentPercent = normalizedLayout.sizes[firstOpenId];
+          const splitHeightLocked =
+            normalizedLayout.locks[firstOpenId].height ||
+            normalizedLayout.locks[secondOpenId].height;
           nodes.push(
             <div
               key="palette-splitter"
@@ -629,20 +779,39 @@ export function StudioDrawingPaletteStack({
               aria-valuemax={STUDIO_DRAWING_PALETTE_MAX_PERCENT}
               aria-valuenow={Math.round(currentPercent)}
               aria-valuetext={`${firstDefinition.label} ${Math.round(currentPercent)}%, ${secondDefinition.label} ${Math.round(100 - currentPercent)}%`}
-              aria-keyshortcuts="ArrowUp ArrowDown Home End Enter"
-              tabIndex={0}
+              aria-keyshortcuts={
+                splitHeightLocked
+                  ? undefined
+                  : "ArrowUp ArrowDown Home End Enter"
+              }
+              aria-disabled={splitHeightLocked}
+              tabIndex={splitHeightLocked ? -1 : 0}
               data-studio-drawing-palette-splitter="true"
               data-dragging={dragging ? "true" : "false"}
+              data-height-locked={splitHeightLocked ? "true" : "false"}
               onPointerDown={(event) =>
-                handleSplitPointerDown(event, firstOpenId, secondOpenId)
+                splitHeightLocked
+                  ? undefined
+                  : handleSplitPointerDown(event, firstOpenId, secondOpenId)
               }
-              onKeyDown={(event) => handleSplitKeyDown(event, firstOpenId)}
-              onDoubleClick={() => resetSplit(firstOpenId)}
-              title="위·아래로 드래그 · 방향키로 조절 · Enter/더블클릭/더블탭으로 기본 비율"
+              onKeyDown={(event) =>
+                splitHeightLocked
+                  ? undefined
+                  : handleSplitKeyDown(event, firstOpenId)
+              }
+              onDoubleClick={() => {
+                if (!splitHeightLocked) resetSplit(firstOpenId);
+              }}
+              title={
+                splitHeightLocked
+                  ? "팔레트 높이 잠금을 해제하면 크기를 조절할 수 있습니다"
+                  : "위·아래로 드래그 · 방향키로 조절 · Enter/더블클릭/더블탭으로 기본 비율"
+              }
               className={cn(
                 "group relative z-10 hidden h-2 shrink-0 touch-none cursor-row-resize select-none place-items-center border-0 bg-transparent p-0",
                 "before:absolute before:inset-x-0 before:top-1/2 before:h-6 before:-translate-y-1/2 before:content-['']",
                 "lg:grid",
+                splitHeightLocked && "cursor-not-allowed",
                 STUDIO_EASE,
                 "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
               )}
@@ -651,7 +820,9 @@ export function StudioDrawingPaletteStack({
                 aria-hidden
                 className={cn(
                   "h-1 w-14 rounded-full border border-line bg-raised transition-[width,background-color,border-color] motion-reduce:transition-none",
-                  dragging
+                  splitHeightLocked
+                    ? "border-accent/45 bg-accent-soft"
+                    : dragging
                     ? "w-20 border-accent bg-accent"
                     : "group-hover:w-20 group-hover:border-accent/60 group-hover:bg-accent-soft group-focus-visible:w-20 group-focus-visible:border-accent group-focus-visible:bg-accent-soft",
                 )}
@@ -660,7 +831,18 @@ export function StudioDrawingPaletteStack({
           );
         }
         return nodes;
-      }, [])}
-    </div>
+        }, [])}
+      </div>
+      <StudioDrawingPaletteOverlayPortal
+        controller={paletteOverlay}
+        stackId={stackId}
+        layout={normalizedLayout}
+        presentation={presentation}
+        subTools={subTools}
+        toolProperties={toolProperties}
+        onLockToggle={toggleLock}
+        onPresentationChange={changePresentation}
+      />
+    </>
   );
 }

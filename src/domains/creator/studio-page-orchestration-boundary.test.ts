@@ -1,0 +1,146 @@
+import { readFileSync } from "node:fs";
+
+import { describe, expect, it } from "vitest";
+
+const studioPageSource = readFileSync(
+  new URL("./StudioPage.tsx", import.meta.url),
+  "utf8",
+);
+const rasterExportSource = readFileSync(
+  new URL("./studio-raster-export-orchestration-runtime.ts", import.meta.url),
+  "utf8",
+);
+const projectArchiveSource = readFileSync(
+  new URL("./studio-project-archive-orchestration-runtime.ts", import.meta.url),
+  "utf8",
+);
+const rasterExportLoaderSource = readFileSync(
+  new URL("./useStudioRasterExportOrchestration.ts", import.meta.url),
+  "utf8",
+);
+const projectArchiveLoaderSource = readFileSync(
+  new URL("./useStudioProjectArchiveOrchestration.ts", import.meta.url),
+  "utf8",
+);
+const sharedRuntimeSource = readFileSync(
+  new URL("./studio-page-orchestration-runtime.ts", import.meta.url),
+  "utf8",
+);
+
+describe("StudioPage user-action orchestration boundary", () => {
+  it("keeps the editor coordinator on a one-way source-size ratchet", () => {
+    // Quick Access live integration and same-frame retained ink added a deliberate ~8 KiB
+    // coordinator seam; keep the new ceiling tight until the next StudioPage split.
+    expect(Buffer.byteLength(studioPageSource, "utf8")).toBeLessThan(1_403_000);
+    expect(studioPageSource).toContain(
+      'import { useStudioRasterExportOrchestration } from "./useStudioRasterExportOrchestration";',
+    );
+    expect(studioPageSource).toContain(
+      'import { useStudioProjectArchiveOrchestration } from "./useStudioProjectArchiveOrchestration";',
+    );
+  });
+
+  it("does not inline the extracted rare handlers back into StudioPage", () => {
+    expect(studioPageSource).not.toContain("async function handleDownload(");
+    expect(studioPageSource).not.toContain(
+      "async function exportCurrentPageToRasterInterchange(",
+    );
+    expect(studioPageSource).not.toContain("async function handleDownloadAll(");
+    expect(studioPageSource).not.toContain("async function handleExportProject(");
+    expect(studioPageSource).not.toContain(
+      "async function handleExportProjectArchive(",
+    );
+    expect(studioPageSource).toContain(
+      "return rasterExportOrchestration.handleCopyToClipboard();",
+    );
+    expect(studioPageSource).toContain(
+      "return projectArchiveOrchestration.handleImportProject(event);",
+    );
+  });
+
+  it("keeps heavy export and archive codecs behind analyzable action boundaries", () => {
+    expect(rasterExportSource).toContain('await import("./studio-export")');
+    expect(rasterExportSource).toContain(
+      '"./studio-raster-interchange-worker-client"',
+    );
+    expect(projectArchiveSource).toContain('import("./studio-project-archive")');
+    expect(projectArchiveSource).toContain(
+      'import("./studio-vrm-texture-paint-project-library")',
+    );
+    expect(projectArchiveSource).not.toMatch(
+      /import\s+[^;]*from\s+["']\.\/studio-project-archive["']/u,
+    );
+    expect(projectArchiveSource).not.toMatch(
+      /import\s+[^;]*from\s+["']\.\/studio-vrm-texture-paint-project-library["']/u,
+    );
+    expect(projectArchiveSource).not.toMatch(
+      /import\s+\{\s*loadStudioReleaseScheduleRuntime\s*\}\s+from\s+["']\.\/studio-release-schedule-loader["']/u,
+    );
+    expect(projectArchiveSource).not.toMatch(
+      /import\s+\{\s*normalizeStudioPublicationAnalyticsDeferred\s*\}\s+from\s+["']\.\/studio-publication-analytics-loader["']/u,
+    );
+    expect(studioPageSource).toContain(
+      "loadStudioReleaseScheduleRuntime,",
+    );
+    expect(studioPageSource).toContain(
+      "normalizeStudioPublicationAnalyticsDeferred,",
+    );
+    expect(rasterExportLoaderSource).toContain(
+      'import("./studio-page-orchestration-runtime")',
+    );
+    expect(projectArchiveLoaderSource).toContain(
+      'import("./studio-page-orchestration-runtime")',
+    );
+    expect(sharedRuntimeSource).toContain(
+      'from "./studio-raster-export-orchestration-runtime"',
+    );
+    expect(sharedRuntimeSource).toContain(
+      'from "./studio-project-archive-orchestration-runtime"',
+    );
+    expect(rasterExportLoaderSource).not.toContain(
+      "loadChunkWithReloadRecovery",
+    );
+    expect(projectArchiveLoaderSource).not.toContain(
+      "loadChunkWithReloadRecovery",
+    );
+  });
+
+  it("captures the import mutation fence before crossing the lazy runtime boundary", () => {
+    const importStart = projectArchiveLoaderSource.indexOf(
+      "handleImportProject: async (event) =>",
+    );
+    const archiveImportStart = projectArchiveLoaderSource.indexOf(
+      "handleImportProjectArchive: async (event) =>",
+    );
+    const importSource = projectArchiveLoaderSource.slice(
+      importStart,
+      archiveImportStart,
+    );
+    const archiveImportSource = projectArchiveLoaderSource.slice(
+      archiveImportStart,
+    );
+    for (const source of [importSource, archiveImportSource]) {
+      const fileCapture = source.indexOf(
+        "const file = event.currentTarget.files?.[0] ?? null;",
+      );
+      const mutationFence = source.indexOf(
+        "const mutationTicket = input.captureStudioMutationTicket();",
+      );
+      const lazyBoundary = source.indexOf("await load()");
+      const promiseLazyBoundary = source.indexOf("void load()");
+      expect(fileCapture).toBeGreaterThanOrEqual(0);
+      expect(mutationFence).toBeGreaterThan(fileCapture);
+      expect(Math.max(lazyBoundary, promiseLazyBoundary)).toBeGreaterThan(
+        mutationFence,
+      );
+    }
+  });
+
+  it("keeps each compiler-owned orchestration module far below Babel's deopt size", () => {
+    expect(Buffer.byteLength(rasterExportSource, "utf8")).toBeLessThan(50_000);
+    expect(Buffer.byteLength(projectArchiveSource, "utf8")).toBeLessThan(50_000);
+    expect(Buffer.byteLength(rasterExportLoaderSource, "utf8")).toBeLessThan(8_000);
+    expect(Buffer.byteLength(projectArchiveLoaderSource, "utf8")).toBeLessThan(8_000);
+    expect(Buffer.byteLength(sharedRuntimeSource, "utf8")).toBeLessThan(5_000);
+  });
+});

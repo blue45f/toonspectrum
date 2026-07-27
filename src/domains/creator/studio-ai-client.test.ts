@@ -587,6 +587,103 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
+    it("honors one bounded scenario importer retry before making exactly one paid request", async () => {
+      const content = JSON.stringify({
+        characterDescription: "단발머리 주인공",
+        scenes: [{ imagePrompt: "비 오는 골목", dialogue: "주인공: 늦었어." }],
+      });
+      const mockFetch = vi.fn(
+        async () =>
+          new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
+            status: 200,
+          })
+      );
+      const importScenarioCodec = vi.fn(async () => {
+        if (importScenarioCodec.mock.calls.length === 1) {
+          throw new Error("scenario chunk temporarily unavailable");
+        }
+        return import("./studio-scenario-scenes");
+      });
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateScenarioScenes(
+        CONFIGURED,
+        "비 오는 골목에서 재회한다.",
+        {},
+        { mode: "byok" },
+        importScenarioCodec
+      );
+
+      expect(result.ok).toBe(true);
+      expect(importScenarioCodec).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("maps two scenario chunk failures to network_error without starting a provider request", async () => {
+      const mockFetch = vi.fn();
+      const importScenarioCodec = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("scenario chunk offline"))
+        .mockRejectedValueOnce(new Error("scenario chunk still offline"));
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateScenarioScenes(
+        CONFIGURED,
+        "옥상 장면",
+        {},
+        { mode: "byok" },
+        importScenarioCodec
+      );
+
+      expect(result).toEqual({
+        ok: false,
+        code: "network_error",
+        error: "scenario chunk still offline",
+      });
+      expect(importScenarioCodec).toHaveBeenCalledTimes(2);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("does not load the scenario chunk for invalid, unconfigured, or already-aborted work", async () => {
+      const mockFetch = vi.fn();
+      const importScenarioCodec = vi.fn(() => import("./studio-scenario-scenes"));
+      const controller = new AbortController();
+      controller.abort();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const invalid = await generateScenarioScenes(
+        CONFIGURED,
+        "   ",
+        {},
+        { mode: "byok" },
+        importScenarioCodec
+      );
+      const unconfigured = await generateScenarioScenes(
+        STUDIO_AI_DEFAULT_SETTINGS,
+        "유효한 스토리",
+        {},
+        { mode: "byok" },
+        importScenarioCodec
+      );
+      const aborted = await generateScenarioScenes(
+        CONFIGURED,
+        "유효한 스토리",
+        { signal: controller.signal },
+        { mode: "byok" },
+        importScenarioCodec
+      );
+
+      expect(invalid).toMatchObject({ ok: false, code: "invalid_input" });
+      expect(unconfigured).toMatchObject({ ok: false, code: "not_configured" });
+      expect(aborted).toEqual({
+        ok: false,
+        code: "network_error",
+        error: "요청이 취소되었습니다.",
+      });
+      expect(importScenarioCodec).not.toHaveBeenCalled();
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
     it("sends a Chat Completions request carrying the sceneCountHint and parses the JSON scene plan", async () => {
       const content = JSON.stringify({
         characterDescription: "단발머리 여고생, 교복 차림",
@@ -903,6 +1000,80 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
       const result = await suggestColorPalette(CONFIGURED, "   ");
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.code).toBe("invalid_input");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("honors one bounded palette importer retry before making exactly one paid request", async () => {
+      const content = JSON.stringify({
+        name: "비 오는 밤",
+        colors: [
+          { hex: "#101820", role: "주조색" },
+          { hex: "#5f7ea8", role: "보조색" },
+        ],
+      });
+      const mockFetch = vi.fn(
+        async () =>
+          new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
+            status: 200,
+          })
+      );
+      const importPaletteCodec = vi.fn(async () => {
+        if (importPaletteCodec.mock.calls.length === 1) {
+          throw new Error("palette chunk temporarily unavailable");
+        }
+        return import("./studio-palette-suggest");
+      });
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await suggestColorPalette(
+        CONFIGURED,
+        "비 오는 밤",
+        { mode: "byok" },
+        importPaletteCodec
+      );
+
+      expect(result.ok).toBe(true);
+      expect(importPaletteCodec).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("maps two palette chunk failures to network_error and skips invalid/configless chunk loads", async () => {
+      const mockFetch = vi.fn();
+      const failingImport = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("palette chunk offline"))
+        .mockRejectedValueOnce(new Error("palette chunk still offline"));
+      const unusedImport = vi.fn(() => import("./studio-palette-suggest"));
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const failed = await suggestColorPalette(
+        CONFIGURED,
+        "차가운 스릴러",
+        { mode: "byok" },
+        failingImport
+      );
+      const invalid = await suggestColorPalette(
+        CONFIGURED,
+        "   ",
+        { mode: "byok" },
+        unusedImport
+      );
+      const unconfigured = await suggestColorPalette(
+        STUDIO_AI_DEFAULT_SETTINGS,
+        "차가운 스릴러",
+        { mode: "byok" },
+        unusedImport
+      );
+
+      expect(failed).toEqual({
+        ok: false,
+        code: "network_error",
+        error: "palette chunk still offline",
+      });
+      expect(failingImport).toHaveBeenCalledTimes(2);
+      expect(invalid).toMatchObject({ ok: false, code: "invalid_input" });
+      expect(unconfigured).toMatchObject({ ok: false, code: "not_configured" });
+      expect(unusedImport).not.toHaveBeenCalled();
       expect(mockFetch).not.toHaveBeenCalled();
     });
 

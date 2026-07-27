@@ -124,6 +124,8 @@ export type StudioAppSettings = {
     densityMode: StudioUiDensityMode;
     toolHintMode: StudioToolHintMode;
     brushCursorStyle: StudioBrushCursorStyle;
+    /** Show the transient pointer-to-ink tether while an input stabilizer is visibly trailing. */
+    showStrokeGuide: boolean;
     confirmBeforeClearLayer: boolean;
   };
   /** actionId → key chord string (e.g. "Mod+Shift+Z", "B"). Empty = unbound. */
@@ -193,6 +195,9 @@ export function defaultStudioAppSettings(): StudioAppSettings {
       densityMode: "full",
       toolHintMode: DEFAULT_STUDIO_TOOL_HINT_MODE,
       brushCursorStyle: "outline",
+      // Keep the latency-critical surface opt-in. Artists who use strong stabilization can enable
+      // the guide explicitly; zero-cost drawing remains the default on mouse, pen and mobile.
+      showStrokeGuide: false,
       confirmBeforeClearLayer: true,
     },
     shortcuts: defaultStudioShortcuts(),
@@ -474,6 +479,7 @@ export function normalizeStudioAppSettings(value?: unknown): StudioAppSettings {
         ["outline", "dot", "none"] as const,
         d.general.brushCursorStyle
       ),
+      showStrokeGuide: asBool(g.showStrokeGuide, d.general.showStrokeGuide),
       confirmBeforeClearLayer: asBool(g.confirmBeforeClearLayer, d.general.confirmBeforeClearLayer),
     },
     shortcuts: normalizeStudioShortcuts(r.shortcuts),

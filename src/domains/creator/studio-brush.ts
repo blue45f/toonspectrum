@@ -270,6 +270,48 @@ export function strokeSampleDistanceForScale(scale: unknown): number {
   return STROKE_SAMPLE_SCREEN_DISTANCE / safeScale;
 }
 
+/**
+ * Input density for non-pixel brush families, expressed in CSS pixels then converted to document
+ * space. Thin outline engines need the native sub-pixel route: dropping every other 120/240Hz
+ * sample before a G-pen/perfect-freehand stroker turns small curves into visible chords. Broad
+ * pigment/particle tools interpolate their own dabs, so a slightly wider admission distance avoids
+ * feeding expensive material planners redundant stationary points.
+ *
+ * This changes only newly-authored source density. Persisted `sampleSpacing` remains versioned with
+ * the stroke, pixel pencil keeps its exact one-document-pixel grid, and no renderer is asked to
+ * retroactively move an already-visible prefix.
+ */
+export function strokeSampleDistanceForBrushFamily(
+  scale: unknown,
+  family: StudioBrushRenderFamily
+): number {
+  const screenDistance = (
+    family === "pen"
+    || family === "gpen"
+    || family === "calligraphy"
+    || family === "perfect"
+    || family === "pencil"
+  )
+    ? 0.5
+    : (
+        family === "marker"
+        || family === "highlighter"
+        || family === "neon"
+        || family === "glow"
+      )
+      ? 0.75
+      : (
+          family === "brush"
+          || family === "dry-media"
+          || family === "pastel"
+          || family === "ink-particle"
+        )
+        ? 0.8
+        : 1;
+  const safeScale = clamp(finiteNumber(scale, 1), 0.01, 64);
+  return screenDistance / safeScale;
+}
+
 /** 새 획은 라이브 채택 간격의 두 배로 가볍게 정리하고, 기존 문서는 과거 3px 결과를 유지한다. */
 export function strokeRenderDistance(sampleDistance: unknown): number {
   if (typeof sampleDistance !== "number" || !Number.isFinite(sampleDistance) || sampleDistance <= 0) {
@@ -992,6 +1034,11 @@ export interface StudioFreehandRenderPathOptions {
   sampleSpacing: unknown;
   /** 기존 문서에만 적용할 과거 Konva tension 값. */
   legacyTension: number;
+  /**
+   * 이미 채택된 새 입력점을 다시 이동평균하지 않으면서 연결형 Line 엔진이 적용할 장력.
+   * 생략하면 causal prefix의 과거 픽셀을 고정하는 기존 값 0을 유지한다.
+   */
+  acceptedTension?: number;
   /** 기존 문서의 점 정리에 적용할 최소 거리. 생략하면 과거 3px 규칙을 쓴다. */
   legacyMinDistance?: number;
 }
@@ -1014,11 +1061,17 @@ export function resolveStudioFreehandRenderPath(
   {
     sampleSpacing,
     legacyTension,
+    acceptedTension = 0,
     legacyMinDistance = LEGACY_STROKE_RENDER_DISTANCE,
   }: StudioFreehandRenderPathOptions
 ): StudioFreehandRenderPath {
   if (typeof sampleSpacing === "number" && Number.isFinite(sampleSpacing)) {
-    return { points, tension: 0 };
+    return {
+      points,
+      tension: typeof acceptedTension === "number" && Number.isFinite(acceptedTension)
+        ? Math.min(1, Math.max(0, acceptedTension))
+        : 0,
+    };
   }
 
   return {

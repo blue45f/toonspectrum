@@ -26,6 +26,10 @@ const studioPageSource = readFileSync(
   new URL("./StudioPage.tsx", import.meta.url),
   "utf8"
 );
+const projectArchiveSource = readFileSync(
+  new URL("./studio-project-archive-orchestration-runtime.ts", import.meta.url),
+  "utf8",
+);
 
 const metadata = {
   documentId: "work:project-1",
@@ -415,47 +419,47 @@ describe("studio project canonical document boundary", () => {
     }
   );
 
-  it("keeps StudioPage export and import on the established dynamic module contract", async () => {
-    expect(studioPageSource).not.toMatch(
+  it("keeps project export and import on the established dynamic module contract", async () => {
+    expect(projectArchiveSource).not.toMatch(
       /import\s+[^;]*from\s+["']\.\/studio-project-document["']/u
     );
-    expect(studioPageSource).toContain("{ createStudioProjectDocumentEnvelope },");
-    expect(studioPageSource).toContain('import("./studio-project-document")');
-    expect(studioPageSource).toContain("{ serializeCanonicalStudioDocumentEnvelope },");
-    expect(studioPageSource).toContain('import("./studio-document-envelope")');
-    expect(studioPageSource).not.toMatch(
+    expect(projectArchiveSource).toContain("{ createStudioProjectDocumentEnvelope },");
+    expect(projectArchiveSource).toContain('import("./studio-project-document")');
+    expect(projectArchiveSource).toContain("{ serializeCanonicalStudioDocumentEnvelope },");
+    expect(projectArchiveSource).toContain('import("./studio-document-envelope")');
+    expect(projectArchiveSource).not.toMatch(
       /import\s+\{\s*(?:captureStudioProjectDocumentSession|planStudioProjectDocumentSessionExport)/u
     );
-    expect(studioPageSource).toContain(
+    expect(projectArchiveSource).toContain(
       'import("./studio-project-document-session")'
     );
-    expect(studioPageSource).toContain(
+    expect(projectArchiveSource).toContain(
       "planStudioProjectDocumentSessionExport({"
     );
-    expect(studioPageSource).toContain("sessionExport.metadata");
-    expect(studioPageSource).toContain("sessionExport.extensions");
-    expect(studioPageSource).toContain("sessionExport.directEnvelope");
-    expect(studioPageSource).toContain("sessionExport.project");
-    expect(studioPageSource).toContain(
+    expect(projectArchiveSource).toContain("sessionExport.metadata");
+    expect(projectArchiveSource).toContain("sessionExport.extensions");
+    expect(projectArchiveSource).toContain("sessionExport.directEnvelope");
+    expect(projectArchiveSource).toContain("sessionExport.project");
+    expect(projectArchiveSource).toContain(
       "readCurrentProject: currentStudioProjectSnapshot"
     );
-    expect(studioPageSource).toContain("{ parseStudioProjectDocument },");
-    expect(studioPageSource).toContain(
+    expect(projectArchiveSource).toContain("{ parseStudioProjectDocument },");
+    expect(projectArchiveSource).toContain(
       "const loaded = await parseStudioProjectDocument(text);"
     );
-    expect(studioPageSource).toContain(
+    expect(projectArchiveSource).toContain(
       "applyStudioProjectSnapshot(loaded.project)"
     );
-    expect(studioPageSource).toContain(
+    expect(projectArchiveSource).toContain(
       'loaded.source === "canonical-envelope"'
     );
-    expect(studioPageSource).toContain(
+    expect(projectArchiveSource).toContain(
       "captureStudioProjectDocumentSession("
     );
 
-    const canonicalExport = studioPageSource.slice(
-      studioPageSource.indexOf("async function handleExportProject()"),
-      studioPageSource.indexOf("async function handleExportProjectArchive()")
+    const canonicalExport = projectArchiveSource.slice(
+      projectArchiveSource.indexOf("async function handleExportProject()"),
+      projectArchiveSource.indexOf("async function handleExportProjectArchive()")
     );
     const serializedAt = canonicalExport.indexOf(
       "serializeCanonicalStudioDocumentEnvelope(exportEnvelope)"
@@ -463,7 +467,7 @@ describe("studio project canonical document boundary", () => {
     const downloadPreparedAt = canonicalExport.indexOf("URL.createObjectURL(blob)");
     const downloadRequestedAt = canonicalExport.indexOf("link.click()");
     const sessionInstalledAt = canonicalExport.indexOf(
-      "studioProjectDocumentSessionRef.current = captureStudioProjectDocumentSession("
+      "projectDocumentSessionRef.current = captureStudioProjectDocumentSession("
     );
     expect(serializedAt).toBeGreaterThanOrEqual(0);
     expect(downloadPreparedAt).toBeGreaterThan(serializedAt);
@@ -493,9 +497,9 @@ describe("studio project canonical document boundary", () => {
     expect(scopeClear).toContain(
       "studioProjectDocumentSessionRef.current = null;"
     );
-    const canonicalImport = studioPageSource.slice(
-      studioPageSource.indexOf("function handleImportProject("),
-      studioPageSource.indexOf(
+    const canonicalImport = projectArchiveSource.slice(
+      projectArchiveSource.indexOf("function handleImportProject("),
+      projectArchiveSource.indexOf(
         "async function handleImportProjectArchive("
       )
     );
@@ -504,11 +508,11 @@ describe("studio project canonical document boundary", () => {
     );
     expect(canonicalImport).toContain(": null;");
     expect(canonicalImport).not.toContain("console.error(err)");
-    const archiveImport = studioPageSource.slice(
-      studioPageSource.indexOf(
+    const archiveImport = projectArchiveSource.slice(
+      projectArchiveSource.indexOf(
         "async function handleImportProjectArchive("
       ),
-      studioPageSource.indexOf("function cancelInterchangeImport(")
+      projectArchiveSource.indexOf("return {")
     );
     expect(archiveImport).toContain(
       "applyStudioProjectSnapshotWithPreparedDocuments("

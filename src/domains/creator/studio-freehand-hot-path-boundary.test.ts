@@ -62,6 +62,28 @@ describe("Studio freehand hot-path boundary", () => {
     expect(transport).toContain("predictedInkTailStateRef.current !== null");
   });
 
+  it("skips raw pen coordinate mapping when prediction, cursor, and guide have no consumer", () => {
+    const rawPreview = functionBody(
+      "onRawPreviewMove: (pointerEvent) => {",
+      "onDiscard: () => {"
+    );
+    const earlyReturnIndex = rawPreview.indexOf(
+      "if (!rawState && !rawCursorWanted && !rawGuideWanted) return"
+    );
+    const stageIndex = rawPreview.indexOf("const stage = stageRef.current");
+    const mapperIndex = rawPreview.indexOf(
+      "const coordinateMapper = pointerMapperCache.mapperFor(stage)"
+    );
+
+    expect(earlyReturnIndex).toBeGreaterThan(-1);
+    expect(earlyReturnIndex).toBeLessThan(stageIndex);
+    expect(earlyReturnIndex).toBeLessThan(mapperIndex);
+    expect(rawPreview).toContain("rawPenInkPreviewStateRef.current");
+    expect(rawPreview).toContain('brushCursorStyle !== "none"');
+    expect(rawPreview).toContain("general.showStrokeGuide");
+    expect(rawPreview).toContain("drawingInputSettingsRef.current?.stabilizer ?? stabilizer");
+  });
+
   it("coalesces active cursor draws to one latest-position frame while hover stays immediate", () => {
     const cursorDrawing = functionBody(
       "function drawBrushCursorLayer(",
@@ -70,7 +92,9 @@ describe("Studio freehand hot-path boundary", () => {
 
     expect(cursorDrawing).toContain("if (!deferToFrame)");
     expect(cursorDrawing).toContain("globalThis.cancelAnimationFrame(brushCursorDrawRafRef.current)");
-    expect(cursorDrawing).toContain("brushCursorRef.current?.getLayer()?.drawScene()");
+    expect(cursorDrawing).toContain(
+      "(brushCursorRef.current?.getLayer() ?? strokeGuideRef.current?.getLayer())?.drawScene()"
+    );
     expect(cursorDrawing).toContain("if (brushCursorDrawRafRef.current !== null) return");
     expect(cursorDrawing).toContain("globalThis.requestAnimationFrame(() =>");
     expect(cursorDrawing).toContain("drawBrushCursorLayer(deferToFrame)");
@@ -102,6 +126,23 @@ describe("Studio freehand hot-path boundary", () => {
     expect(gpuStart).toContain(
       "const gpuStartPlan = gpuStartEligible ? buildGpuLiveStrokePlan(next) : null"
     );
+  });
+
+  it("commits one retained freehand preview and paints it inside the same coalesced frame", () => {
+    const schedule = functionBody(
+      "const scheduleDraft =",
+      "const clearDraftPreview ="
+    );
+
+    expect(schedule).toContain("globalThis.requestAnimationFrame(() =>");
+    expect(schedule).toContain('(pending.kind ?? "freehand") === "freehand"');
+    expect(schedule).toContain("KonvaRuntime.autoDrawEnabled = false");
+    expect(schedule).toContain("flushSync(() => {");
+    expect(schedule).toContain("draftPreviewStoreRef.current.setActive(pending)");
+    expect(schedule).toContain("KonvaRuntime.autoDrawEnabled = autoDrawEnabled");
+    expect(schedule).toContain("draftPreviewDynamicLayerRef.current");
+    expect(schedule).toContain("draftPreviewNormalLayerRef.current");
+    expect(schedule).toContain(")?.drawScene()");
   });
 
   it("presents local ink and schedules CRDT encoding behind a paint opportunity", () => {

@@ -328,6 +328,24 @@ export function StudioAppSettingsPanel({
                     }
                   />
                 </Row>
+                <Row
+                  label="필기 보조선"
+                  hint="입력 안정화가 펜을 따라오는 동안 실제 포인터와 잉크 끝점을 연결합니다"
+                >
+                  <StudioToggleChip
+                    active={settings.general.showStrokeGuide}
+                    onClick={() =>
+                      patch({
+                        general: {
+                          ...settings.general,
+                          showStrokeGuide: !settings.general.showStrokeGuide,
+                        },
+                      })
+                    }
+                  >
+                    {settings.general.showStrokeGuide ? "표시" : "숨김"}
+                  </StudioToggleChip>
+                </Row>
                 <Row label="레이어 비우기 확인">
                   <StudioToggleChip
                     active={settings.general.confirmBeforeClearLayer}

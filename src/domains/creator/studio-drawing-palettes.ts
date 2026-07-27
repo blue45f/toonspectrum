@@ -13,20 +13,48 @@ export const STUDIO_DRAWING_PALETTE_IDS = [
 
 export type StudioDrawingPaletteId = (typeof STUDIO_DRAWING_PALETTE_IDS)[number];
 export type StudioDrawingPaletteMoveDirection = "up" | "down";
+export type StudioDrawingPaletteLockKind = "position" | "height";
 
 export const STUDIO_DRAWING_PALETTE_MIN_PERCENT = 20;
 export const STUDIO_DRAWING_PALETTE_MAX_PERCENT = 80;
+
+export interface StudioDrawingPaletteLockState {
+  readonly position: boolean;
+  readonly height: boolean;
+}
+
+export type StudioDrawingPaletteLocks = Readonly<
+  Record<StudioDrawingPaletteId, StudioDrawingPaletteLockState>
+>;
 
 export interface StudioDrawingPaletteLayout {
   readonly order: readonly StudioDrawingPaletteId[];
   readonly collapsed: Readonly<Record<StudioDrawingPaletteId, boolean>>;
   readonly sizes: Readonly<Record<StudioDrawingPaletteId, number>>;
+  /**
+   * Optional only at the untrusted/migration boundary. Every normalized layout contains this
+   * explicit immutable field, while pre-lock workspace snapshots migrate to both flags `false`.
+   */
+  readonly locks?: StudioDrawingPaletteLocks;
+}
+
+export interface StudioCanonicalDrawingPaletteLayout
+  extends StudioDrawingPaletteLayout {
+  readonly locks: StudioDrawingPaletteLocks;
 }
 
 const PALETTE_ID_SET = new Set<string>(STUDIO_DRAWING_PALETTE_IDS);
+const CANONICAL_LAYOUTS = new WeakSet<object>();
 
-export const DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT: StudioDrawingPaletteLayout =
-  Object.freeze({
+function registerCanonicalLayout(
+  layout: StudioCanonicalDrawingPaletteLayout,
+): StudioCanonicalDrawingPaletteLayout {
+  CANONICAL_LAYOUTS.add(layout);
+  return layout;
+}
+
+export const DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT: StudioCanonicalDrawingPaletteLayout =
+  registerCanonicalLayout(Object.freeze({
     order: Object.freeze([...STUDIO_DRAWING_PALETTE_IDS]),
     collapsed: Object.freeze({
       "sub-tools": false,
@@ -36,10 +64,31 @@ export const DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT: StudioDrawingPaletteLayout =
       "sub-tools": 36,
       "tool-properties": 64,
     }),
-  });
+    locks: Object.freeze({
+      "sub-tools": Object.freeze({
+        position: false,
+        height: false,
+      }),
+      "tool-properties": Object.freeze({
+        position: false,
+        height: false,
+      }),
+    }),
+  }));
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Recognizes only layouts produced by this boundary. Frozen values reconstructed by storage still
+ * pass through the allowlist once; accepting them by shape would need a larger duplicate validator
+ * and risks treating accessor-backed input as trusted.
+ */
+function isCanonicalLayout(
+  value: unknown,
+): value is StudioCanonicalDrawingPaletteLayout {
+  return isRecord(value) && CANONICAL_LAYOUTS.has(value);
 }
 
 function clampPercent(value: number): number {
@@ -111,21 +160,46 @@ function normalizeSizes(
   });
 }
 
+function normalizeLocks(value: unknown): StudioDrawingPaletteLocks {
+  const candidate = isRecord(value) ? value : {};
+  const normalized = Object.fromEntries(
+    STUDIO_DRAWING_PALETTE_IDS.map((id) => {
+      const lockCandidate = isRecord(candidate[id]) ? candidate[id] : {};
+      return [
+        id,
+        Object.freeze({
+          position:
+            typeof lockCandidate.position === "boolean"
+              ? lockCandidate.position
+              : false,
+          height:
+            typeof lockCandidate.height === "boolean"
+              ? lockCandidate.height
+              : false,
+        }),
+      ];
+    }),
+  ) as Record<StudioDrawingPaletteId, StudioDrawingPaletteLockState>;
+  return Object.freeze(normalized);
+}
+
 /**
  * Rebuilds the exact allowlist, removes duplicate/unknown IDs, appends missing palettes in fallback
- * order, and guarantees integer 20..80 shares whose sum is exactly 100.
+ * order, migrates missing locks to false, and guarantees integer 20..80 shares summing to 100.
  */
 export function normalizeStudioDrawingPaletteLayout(
   value: unknown,
   fallback: StudioDrawingPaletteLayout =
     DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
-): StudioDrawingPaletteLayout {
+): StudioCanonicalDrawingPaletteLayout {
+  if (isCanonicalLayout(value)) return value;
+
   const candidate = isRecord(value) ? value : {};
   const collapsedCandidate = isRecord(candidate.collapsed)
     ? candidate.collapsed
     : {};
 
-  return Object.freeze({
+  return registerCanonicalLayout(Object.freeze({
     order: normalizeOrder(candidate.order, fallback),
     collapsed: Object.freeze({
       "sub-tools":
@@ -138,7 +212,8 @@ export function normalizeStudioDrawingPaletteLayout(
           : fallback.collapsed["tool-properties"],
     }),
     sizes: normalizeSizes(candidate.sizes, fallback),
-  });
+    locks: normalizeLocks(candidate.locks),
+  }));
 }
 
 /**
@@ -149,9 +224,13 @@ export function resizeStudioDrawingPalettes(
   layout: StudioDrawingPaletteLayout,
   firstId: StudioDrawingPaletteId,
   sizePercent: number,
-): StudioDrawingPaletteLayout {
+): StudioCanonicalDrawingPaletteLayout {
   const normalized = normalizeStudioDrawingPaletteLayout(layout);
-  if (!PALETTE_ID_SET.has(firstId) || !Number.isFinite(sizePercent)) {
+  if (
+    !PALETTE_ID_SET.has(firstId) ||
+    !Number.isFinite(sizePercent) ||
+    STUDIO_DRAWING_PALETTE_IDS.some((id) => normalized.locks[id].height)
+  ) {
     return normalized;
   }
   const secondId = STUDIO_DRAWING_PALETTE_IDS.find((id) => id !== firstId)!;
@@ -168,7 +247,7 @@ export function resizeStudioDrawingPalettes(
 export function toggleStudioDrawingPalette(
   layout: StudioDrawingPaletteLayout,
   id: StudioDrawingPaletteId,
-): StudioDrawingPaletteLayout {
+): StudioCanonicalDrawingPaletteLayout {
   const normalized = normalizeStudioDrawingPaletteLayout(layout);
   if (!PALETTE_ID_SET.has(id)) return normalized;
   return normalizeStudioDrawingPaletteLayout({
@@ -184,7 +263,7 @@ export function moveStudioDrawingPalette(
   layout: StudioDrawingPaletteLayout,
   id: StudioDrawingPaletteId,
   direction: StudioDrawingPaletteMoveDirection,
-): StudioDrawingPaletteLayout {
+): StudioCanonicalDrawingPaletteLayout {
   const normalized = normalizeStudioDrawingPaletteLayout(layout);
   const index = normalized.order.indexOf(id);
   const targetIndex = direction === "up" ? index - 1 : index + 1;
@@ -192,11 +271,60 @@ export function moveStudioDrawingPalette(
     index < 0 ||
     (direction !== "up" && direction !== "down") ||
     targetIndex < 0 ||
-    targetIndex >= normalized.order.length
+    targetIndex >= normalized.order.length ||
+    normalized.locks[id].position ||
+    normalized.locks[normalized.order[targetIndex]!].position
   ) {
     return normalized;
   }
   const order = [...normalized.order];
   [order[index], order[targetIndex]] = [order[targetIndex]!, order[index]!];
   return normalizeStudioDrawingPaletteLayout({ ...normalized, order });
+}
+
+export function setStudioDrawingPaletteLock(
+  layout: StudioDrawingPaletteLayout,
+  id: StudioDrawingPaletteId,
+  kind: StudioDrawingPaletteLockKind,
+  locked: boolean,
+): StudioCanonicalDrawingPaletteLayout {
+  const normalized = normalizeStudioDrawingPaletteLayout(layout);
+  if (
+    !PALETTE_ID_SET.has(id) ||
+    (kind !== "position" && kind !== "height") ||
+    typeof locked !== "boolean" ||
+    normalized.locks[id][kind] === locked
+  ) {
+    return normalized;
+  }
+  return normalizeStudioDrawingPaletteLayout({
+    ...normalized,
+    locks: {
+      ...normalized.locks,
+      [id]: {
+        ...normalized.locks[id],
+        [kind]: locked,
+      },
+    },
+  });
+}
+
+export function toggleStudioDrawingPaletteLock(
+  layout: StudioDrawingPaletteLayout,
+  id: StudioDrawingPaletteId,
+  kind: StudioDrawingPaletteLockKind,
+): StudioCanonicalDrawingPaletteLayout {
+  const normalized = normalizeStudioDrawingPaletteLayout(layout);
+  if (
+    !PALETTE_ID_SET.has(id) ||
+    (kind !== "position" && kind !== "height")
+  ) {
+    return normalized;
+  }
+  return setStudioDrawingPaletteLock(
+    normalized,
+    id,
+    kind,
+    !normalized.locks[id][kind],
+  );
 }

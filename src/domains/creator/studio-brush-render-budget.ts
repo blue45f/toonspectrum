@@ -22,8 +22,14 @@ export const STUDIO_DYNAMIC_BRUSH_RENDER_STAMP_GRIDS = [7, 5, 3] as const;
 export type StudioDynamicBrushRenderStampGrid =
   (typeof STUDIO_DYNAMIC_BRUSH_RENDER_STAMP_GRIDS)[number];
 
-/** Keeps live pointer frames below roughly 16k Canvas arc/fill marks. */
-export const STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET = 16_384;
+/**
+ * Keeps live pointer frames below roughly 4k Canvas arc/fill marks.
+ *
+ * The previous 16k ceiling let complex alpha tips consume most of a 60Hz frame by themselves on
+ * desktop and several frames on mobile. This budget affects only the replaceable pointer-down
+ * preview; the committed document and SVG keep the 65k fidelity ceiling below.
+ */
+export const STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET = 4_096;
 /** Retained Canvas and SVG use the same higher-fidelity deterministic ceiling. */
 export const STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET = 65_536;
 /** Prefer at least this many full-path stations before retaining a denser alpha-tip grid. */

@@ -30,17 +30,20 @@ describe("Studio AI on-demand codec boundary", () => {
       /import\s*{[\s\S]*?buildScenarioScenesPrompt[\s\S]*?}\s*from\s*"\.\/studio-scenario-scenes"/,
     );
     expect(generateScenario).toContain(
-      'await import("./studio-scenario-scenes")',
+      'import("./studio-scenario-scenes")',
     );
     expect(generateScenario.indexOf("if (!trimmed)")).toBeLessThan(
-      generateScenario.indexOf('await import("./studio-scenario-scenes")'),
+      generateScenario.indexOf("loadOptionalStudioAiCodec(importScenarioCodec"),
     );
     expect(
       generateScenario.indexOf(
         "if (!isStudioTextAiConfigured(settings, transport))",
       ),
     ).toBeLessThan(
-      generateScenario.indexOf('await import("./studio-scenario-scenes")'),
+      generateScenario.indexOf("loadOptionalStudioAiCodec(importScenarioCodec"),
+    );
+    expect(generateScenario).toContain(
+      "loadOptionalStudioAiCodec(importScenarioCodec, signal)",
     );
     expect(generateScenario).toContain(
       'return { ok: false, code: "network_error", error: networkErrorMessage(error) };',
@@ -60,17 +63,20 @@ describe("Studio AI on-demand codec boundary", () => {
       /import\s*{[\s\S]*?buildPaletteSuggestPrompt[\s\S]*?}\s*from\s*"\.\/studio-palette-suggest"/,
     );
     expect(suggestPalette).toContain(
-      'await import("./studio-palette-suggest")',
+      'import("./studio-palette-suggest")',
     );
     expect(suggestPalette.indexOf("if (!trimmed)")).toBeLessThan(
-      suggestPalette.indexOf('await import("./studio-palette-suggest")'),
+      suggestPalette.indexOf("loadOptionalStudioAiCodec(importPaletteCodec"),
     );
     expect(
       suggestPalette.indexOf(
         "if (!isStudioTextAiConfigured(settings, transport))",
       ),
     ).toBeLessThan(
-      suggestPalette.indexOf('await import("./studio-palette-suggest")'),
+      suggestPalette.indexOf("loadOptionalStudioAiCodec(importPaletteCodec"),
+    );
+    expect(suggestPalette).toContain(
+      "loadOptionalStudioAiCodec(importPaletteCodec, transport.signal)",
     );
     expect(suggestPalette).toContain(
       'return { ok: false, code: "network_error", error: networkErrorMessage(error) };',

@@ -180,6 +180,19 @@ describe("Studio brush cursor", () => {
     expect(dot.centerStrokeWidth * 2).toBe(0.75);
   });
 
+  it("never synthesizes a tiny fallback dot when the cursor preference is none", () => {
+    const hidden = planStudioBrushCursorVisual({
+      brushId: "g-pen",
+      diameter: 1,
+      effectiveScale: 1,
+      mode: "pen",
+      style: "none",
+    });
+
+    expect(hidden.showOutline).toBe(false);
+    expect(hidden.centerRadius).toBeNull();
+  });
+
   it("matches cursor geometry and texture to the active brush renderer", () => {
     const calligraphy = planStudioBrushCursorVisual({
       brushId: "calligraphy",

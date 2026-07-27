@@ -4,8 +4,9 @@
  * The harness intentionally drives the shipped UI rather than importing renderer internals:
  * - exactly one desktop built-in catalogue session and no inspector quick-shelf duplicate,
  * - every current built-in preset selected, fast-drawn, visually changed, undone, and redone,
- * - every current preset survives a sparse 300 px move with visible ink in every route segment and the
- *   exact selected brush id in autosave,
+ * - every core preset (or every product preset in opt-in exhaustive mode) survives a sparse
+ *   300 px move with visible ink in every route segment and the exact selected runtime brush id
+ *   in autosave,
  * - the shipped UI selection list exactly matches the unique full product catalogue, whose core
  *   partition must exactly match BRUSH_PRESETS,
  * - line/rect/ellipse/triangle/polygon Smart Shape gestures persist as the selected brush's exact
@@ -17,6 +18,9 @@
  *
  * Run after `pnpm build`:
  *   pnpm verify:studio-brushes
+ * Exhaustive 214-brush long-route audit without repeating the short matrix:
+ *   TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX=1 TOONSPECTRUM_BRUSH_LONG_ONLY=1 \
+ *     pnpm verify:studio-brushes
  * Screenshots/logs:
  *   TOONSPECTRUM_BRUSH_VERIFY_DIR=/tmp/my-run pnpm verify:studio-brushes
  */
@@ -35,8 +39,16 @@ import {
   type Page,
 } from "playwright";
 
-import { BRUSH_PRESETS, type BrushPreset } from "../src/domains/creator/studio-brush";
-import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "../src/domains/creator/studio-brush-catalog";
+import { BRUSH_PRESETS } from "../src/domains/creator/studio-brush";
+import {
+  STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+  type StudioBrushCatalogItem,
+} from "../src/domains/creator/studio-brush-catalog";
+import { serializeStudioBrushDynamicsSettingsCanonical } from "../src/domains/creator/studio-brush-dynamics";
+import {
+  materializeStudioBrushCatalogSelection,
+  type StudioBrushCatalogSelection,
+} from "../src/domains/creator/studio-brush-selection";
 
 const BUILT_IN_BRUSH_PRESET_COUNT = BRUSH_PRESETS.length;
 const PRODUCT_BRUSH_CATALOG_COUNT = STUDIO_ALL_BRUSH_CATALOG_ITEMS.length;
@@ -54,6 +66,13 @@ const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/studio-ai/status",
 ] as const;
 const DEBUG_BRUSH_VERIFIER = process.env.TOONSPECTRUM_DEBUG_BRUSH_VERIFIER === "1";
+const ALL_BRUSH_LONG_MATRIX =
+  process.env.TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX === "1";
+const LONG_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  ALL_BRUSH_LONG_MATRIX
+    ? STUDIO_ALL_BRUSH_CATALOG_ITEMS
+    : STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "core");
+const LONG_BRUSH_CATALOG_COUNT = LONG_BRUSH_CATALOG_ITEMS.length;
 
 interface BrowserErrorCollector {
   messages: string[];
@@ -62,19 +81,27 @@ interface BrowserErrorCollector {
 
 interface BrushStrokeEvidence {
   id: string;
+  source: StudioBrushCatalogItem["source"];
   selected: boolean;
   visualChanged: boolean;
   undoEnabled: boolean;
   undoRestoredPixels: boolean;
   redoRestoredStroke: boolean;
+  persistedCatalogId: string | null;
+  persistedRuntimeBrushId: string | null;
+  persistedDynamicsMatched: boolean | null;
 }
 
 interface LongBrushStrokeEvidence {
   id: string;
+  source: StudioBrushCatalogItem["source"];
+  expectedRuntimeBrushId: string;
   visualChanged: boolean;
   visibleSegments: number;
   totalSegments: number;
   persistedBrushId: string | null;
+  persistedCatalogId: string | null;
+  persistedDynamicsMatched: boolean | null;
   persistedPathDistance: number;
   undoRestoredPixels: boolean;
 }
@@ -455,7 +482,10 @@ async function assertUiBrushCatalogMatchesProductCatalog(catalog: Locator): Prom
   );
 }
 
-async function selectDesktopBrush(page: Page, preset: BrushPreset): Promise<void> {
+async function selectDesktopBrush(
+  page: Page,
+  preset: Pick<StudioBrushCatalogItem, "id" | "name">,
+): Promise<void> {
   const catalog = await openDesktopCatalog(page);
   await catalog.getByRole("tab", { name: "전체", exact: true }).click();
   await catalog.getByRole("searchbox", { name: "브러시 검색" }).fill(preset.id);
@@ -501,7 +531,7 @@ function strokePoint(
   invariant(safeBottom - safeTop >= 220, "visible canvas is too short for the brush grid");
   const column = index % 7;
   const row = Math.floor(index / 7);
-  const rows = Math.max(1, Math.ceil(BRUSH_PRESETS.length / 7));
+  const rows = Math.max(1, Math.ceil(PRODUCT_BRUSH_CATALOG_COUNT / 7));
   return {
     x: safeLeft + ((safeRight - safeLeft) * column) / 6,
     y: safeTop + ((safeBottom - safeTop) * (row + 0.5)) / rows,
@@ -724,7 +754,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
     });
   }
   const errors = collectBrowserErrors(page, "desktop-brushes", studioUrl);
-  const screenshot = join(SCRATCH, `studio-brush-desktop-${BUILT_IN_BRUSH_PRESET_COUNT}.png`);
+  const screenshot = join(SCRATCH, `studio-brush-desktop-${PRODUCT_BRUSH_CATALOG_COUNT}.png`);
   const catalogScreenshot = join(SCRATCH, "studio-brush-desktop-catalog.png");
 
   try {
@@ -767,7 +797,13 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
     invariant(stageBox && viewport, "could not measure the desktop canvas");
 
     const evidence: BrushStrokeEvidence[] = [];
-    for (const [index, preset] of BRUSH_PRESETS.entries()) {
+    for (const [index, preset] of STUDIO_ALL_BRUSH_CATALOG_ITEMS.entries()) {
+      const expectedSelection = await materializeStudioBrushCatalogSelection(preset.id);
+      invariant(expectedSelection, `${preset.id}: product catalogue selection did not materialize`);
+      invariant(
+        preset.source === "core" || expectedSelection.brushDynamics,
+        `${preset.id}: pro catalogue selection has no runtime dynamics`,
+      );
       await selectDesktopBrush(page, preset);
       await page.mouse.move(4, 4);
       const point = strokePoint(stageBox, viewport, index);
@@ -897,6 +933,22 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       const settledDiff = await compareScreenshotPixels(page, before, after);
       const visualChanged = hasMeaningfulPixelChange(settledDiff);
       invariant(visualChanged, `${preset.id}: released stroke disappeared before becoming durable`);
+      // Extended catalogue ids intentionally materialize onto three stable renderer ids. A pill
+      // can therefore show the requested pro-brush name while a stale dynamics snapshot still
+      // paints visible pixels through the same renderer. Verify the durable identity + exact
+      // normalized dynamics before history removes the isolated stroke. Core identities receive
+      // the same persistence audit in the long-route matrix below.
+      const persistedProStroke = preset.source === "pro"
+        ? await waitForPersistedSingleCatalogStroke(page, expectedSelection)
+        : null;
+      const persistedDynamicsMatched = persistedProStroke
+        ? serializeStudioBrushDynamicsSettingsCanonical(persistedProStroke.brushDynamics)
+          === serializeStudioBrushDynamicsSettingsCanonical(expectedSelection.brushDynamics)
+        : null;
+      invariant(
+        persistedDynamicsMatched !== false,
+        `${preset.id}: persisted dynamics do not match the selected catalogue profile`,
+      );
 
       const undo = await enabledHistoryButton(page, "실행취소");
       invariant(await undo.isEnabled(), `${preset.id}: Undo control did not become enabled`);
@@ -928,14 +980,28 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
 
       evidence.push({
         id: preset.id,
+        source: preset.source,
         selected: true,
         visualChanged,
         undoEnabled: true,
         undoRestoredPixels,
         redoRestoredStroke,
+        persistedCatalogId: persistedProStroke?.brushCatalogId ?? null,
+        persistedRuntimeBrushId: persistedProStroke?.brush ?? null,
+        persistedDynamicsMatched,
       });
+      // Keep every catalogue entry isolated. Broad texture/pro brushes must not cover the next
+      // brush's evidence lane and turn a real no-op into an apparent pixel change.
+      await page.keyboard.press("Meta+z");
+      await page.waitForTimeout(40);
+      const cleaned = await page.screenshot({ animations: "disabled", clip: usedClip });
+      const cleanupDiff = await compareScreenshotPixels(page, before, cleaned, 20);
+      invariant(
+        cleanupDiff.changedPixels <= 3,
+        `${preset.id}: post-redo cleanup left perceptible stroke pixels behind`,
+      );
       log(
-        `desktop ${index + 1}/${BUILT_IN_BRUSH_PRESET_COUNT} `
+        `desktop ${index + 1}/${PRODUCT_BRUSH_CATALOG_COUNT} `
           + `${preset.id}: select/draw/undo/redo OK`,
       );
     }
@@ -944,12 +1010,20 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
     reportBrowserErrors(errors);
     invariant(errors.messages.length === 0, "desktop browser emitted console/page errors");
     invariant(errors.failedResponses.length === 0, "desktop browser received unexpected 5xx responses");
-    const ok = evidence.length === BUILT_IN_BRUSH_PRESET_COUNT && evidence.every((entry) =>
+    const ok = evidence.length === PRODUCT_BRUSH_CATALOG_COUNT && evidence.every((entry) =>
       entry.selected
       && entry.visualChanged
       && entry.undoEnabled
       && entry.undoRestoredPixels
       && entry.redoRestoredStroke
+      && (
+        entry.source === "core"
+        || (
+          entry.persistedCatalogId === entry.id
+          && entry.persistedRuntimeBrushId !== null
+          && entry.persistedDynamicsMatched === true
+        )
+      )
     );
     return {
       ok,
@@ -972,6 +1046,9 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
 
 interface PersistedDrawElement {
   brush: string | null;
+  brushCatalogId: string | null;
+  brushCatalogName: string | null;
+  brushDynamics: unknown;
   kind: string | null;
   polygonSides: number | null;
   points: number[];
@@ -1012,6 +1089,13 @@ async function persistedDrawElements(page: Page): Promise<PersistedDrawElement[]
         : null;
       return [{
         brush: typeof record.brush === "string" ? record.brush : null,
+        brushCatalogId: typeof record.brushCatalogId === "string"
+          ? record.brushCatalogId
+          : null,
+        brushCatalogName: typeof record.brushCatalogName === "string"
+          ? record.brushCatalogName
+          : null,
+        brushDynamics: record.brushDynamics,
         kind: typeof record.kind === "string" ? record.kind : "freehand",
         polygonSides,
         points: Array.isArray(record.points)
@@ -1020,6 +1104,71 @@ async function persistedDrawElements(page: Page): Promise<PersistedDrawElement[]
       }];
     });
   }, AUTOSAVE_PREFIX);
+}
+
+async function waitForPersistedSingleCatalogStroke(
+  page: Page,
+  expected: StudioBrushCatalogSelection,
+): Promise<PersistedDrawElement> {
+  await page.waitForFunction(({ prefix, catalogId, catalogName, runtimeBrushId }) => {
+    let newest: { savedAt?: string; pagesList?: Array<{ elements?: unknown[] }> } | null = null;
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (!key?.startsWith(prefix) || key.endsWith(":lifecycle")) continue;
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      try {
+        const value = JSON.parse(raw) as {
+          savedAt?: string;
+          pagesList?: Array<{ elements?: unknown[] }>;
+        };
+        if (
+          value.pagesList
+          && (!newest || String(value.savedAt ?? "") >= String(newest.savedAt ?? ""))
+        ) {
+          newest = value;
+        }
+      } catch {
+        // Keep waiting for the normal debounced autosave.
+      }
+    }
+    const draws = (newest?.pagesList ?? [])
+      .flatMap((candidate) => candidate.elements ?? [])
+      .filter((element): element is Record<string, unknown> =>
+        Boolean(element)
+        && typeof element === "object"
+        && (element as { type?: unknown }).type === "draw"
+      );
+    const draw = draws[0];
+    return draws.length === 1
+      && draw?.brushCatalogId === catalogId
+      && draw.brushCatalogName === catalogName
+      && draw.brush === runtimeBrushId
+      && Array.isArray(draw.points)
+      && draw.points.length >= 4
+      && Boolean(draw.brushDynamics)
+      && typeof draw.brushDynamics === "object";
+  }, {
+    prefix: AUTOSAVE_PREFIX,
+    catalogId: expected.catalogId,
+    catalogName: expected.catalogName,
+    runtimeBrushId: expected.runtimeBrushId,
+  }, { timeout: 5_000 });
+  const [saved] = await persistedDrawElements(page);
+  invariant(saved, `${expected.catalogId}: autosave did not expose the isolated pro stroke`);
+  invariant(
+    saved.brushCatalogId === expected.catalogId,
+    `${expected.catalogId}: persisted catalogue id is ${saved.brushCatalogId ?? "missing"}`,
+  );
+  invariant(
+    saved.brushCatalogName === expected.catalogName,
+    `${expected.catalogId}: persisted catalogue name is ${saved.brushCatalogName ?? "missing"}`,
+  );
+  invariant(
+    saved.brush === expected.runtimeBrushId,
+    `${expected.catalogId}: persisted runtime brush is ${saved.brush ?? "missing"}, expected ${expected.runtimeBrushId}`,
+  );
+  return saved;
 }
 
 function pointsEqual(
@@ -1110,9 +1259,16 @@ async function waitForPersistedDrawCount(page: Page, expectedCount: number): Pro
 
 async function waitForPersistedSingleLongStroke(
   page: Page,
-  expectedBrush: string,
+  expected: StudioBrushCatalogSelection,
+  requireCatalogIdentity: boolean,
 ): Promise<PersistedDrawElement> {
-  await page.waitForFunction(({ prefix, brush }) => {
+  await page.waitForFunction(({
+    prefix,
+    catalogId,
+    catalogName,
+    runtimeBrushId,
+    requireCatalog,
+  }) => {
     let newest: { savedAt?: string; pagesList?: Array<{ elements?: unknown[] }> } | null = null;
     for (let index = 0; index < window.localStorage.length; index += 1) {
       const key = window.localStorage.key(index);
@@ -1141,13 +1297,29 @@ async function waitForPersistedSingleLongStroke(
         && typeof element === "object"
         && (element as { type?: unknown }).type === "draw"
       );
+    const draw = draws[0] as Record<string, unknown> | undefined;
     return draws.length === 1
-      && draws[0]?.brush === brush
-      && Array.isArray(draws[0]?.points)
-      && draws[0]!.points.length >= 4;
-  }, { prefix: AUTOSAVE_PREFIX, brush: expectedBrush }, { timeout: 5_000 });
+      && draw?.brush === runtimeBrushId
+      && Array.isArray(draw.points)
+      && draw.points.length >= 4
+      && (
+        !requireCatalog
+        || (
+          draw.brushCatalogId === catalogId
+          && draw.brushCatalogName === catalogName
+          && Boolean(draw.brushDynamics)
+          && typeof draw.brushDynamics === "object"
+        )
+      );
+  }, {
+    prefix: AUTOSAVE_PREFIX,
+    catalogId: expected.catalogId,
+    catalogName: expected.catalogName,
+    runtimeBrushId: expected.runtimeBrushId,
+    requireCatalog: requireCatalogIdentity,
+  }, { timeout: 5_000 });
   const [saved] = await persistedDrawElements(page);
-  invariant(saved, `${expectedBrush}: autosave did not expose the isolated long stroke`);
+  invariant(saved, `${expected.catalogId}: autosave did not expose the isolated long stroke`);
   return saved;
 }
 
@@ -1168,7 +1340,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
   const errors = collectBrowserErrors(page, "long-brushes", studioUrl);
   const screenshot = join(
     SCRATCH,
-    `studio-brush-desktop-long-${BUILT_IN_BRUSH_PRESET_COUNT}.png`,
+    `studio-brush-desktop-long-${LONG_BRUSH_CATALOG_COUNT}.png`,
   );
 
   try {
@@ -1192,7 +1364,13 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
     );
 
     const evidence: LongBrushStrokeEvidence[] = [];
-    for (const [index, preset] of BRUSH_PRESETS.entries()) {
+    for (const [index, preset] of LONG_BRUSH_CATALOG_ITEMS.entries()) {
+      const expectedSelection = await materializeStudioBrushCatalogSelection(preset.id);
+      invariant(expectedSelection, `${preset.id}: long-route catalogue selection did not materialize`);
+      invariant(
+        preset.source === "core" || expectedSelection.brushDynamics,
+        `${preset.id}: long-route pro selection has no runtime dynamics`,
+      );
       await selectDesktopBrush(page, preset);
       await page.mouse.move(4, 4);
       // Every preset gets the same clean lane. Packing all brushes into the visible 300 px height
@@ -1302,15 +1480,33 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         coverage.visibleSegments === 6,
         `${preset.id}: long stroke has missing visual segments (${coverage.visibleSegments}/6; ${coverage.segmentChangedPixels.join(",")})`,
       );
-      const saved = await waitForPersistedSingleLongStroke(page, preset.id);
+      const saved = await waitForPersistedSingleLongStroke(
+        page,
+        expectedSelection,
+        preset.source === "pro",
+      );
+      const persistedDynamicsMatched = preset.source === "pro"
+        ? serializeStudioBrushDynamicsSettingsCanonical(saved.brushDynamics)
+          === serializeStudioBrushDynamicsSettingsCanonical(expectedSelection.brushDynamics)
+        : null;
       const persistedPathDistance = persistedStrokePathDistance(saved.points);
       invariant(
         saved.kind === "freehand",
         `${preset.id}: isolated long stroke persisted as ${saved.kind ?? "missing"}, not freehand`,
       );
       invariant(
-        saved.brush === preset.id,
-        `${preset.id}: isolated long stroke persisted with brush ${saved.brush ?? "missing"}`,
+        saved.brush === expectedSelection.runtimeBrushId,
+        `${preset.id}: isolated long stroke persisted with runtime brush `
+          + `${saved.brush ?? "missing"}, expected ${expectedSelection.runtimeBrushId}`,
+      );
+      invariant(
+        preset.source === "core" || saved.brushCatalogId === preset.id,
+        `${preset.id}: isolated long stroke persisted with catalogue id `
+          + `${saved.brushCatalogId ?? "missing"}`,
+      );
+      invariant(
+        persistedDynamicsMatched !== false,
+        `${preset.id}: long-route persisted dynamics do not match the selected catalogue profile`,
       );
       invariant(
         persistedPathDistance >= 300,
@@ -1334,16 +1530,21 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
       );
       evidence.push({
         id: preset.id,
+        source: preset.source,
+        expectedRuntimeBrushId: expectedSelection.runtimeBrushId,
         visualChanged: true,
         visibleSegments: coverage.visibleSegments,
         totalSegments: 6,
         persistedBrushId: saved.brush,
+        persistedCatalogId: saved.brushCatalogId,
+        persistedDynamicsMatched,
         persistedPathDistance,
         undoRestoredPixels,
       });
       log(
-        `long ${index + 1}/${BUILT_IN_BRUSH_PRESET_COUNT} `
-          + `${preset.id}: 6/6 visible + ${persistedPathDistance.toFixed(1)}px persisted + Undo OK`,
+        `long ${index + 1}/${LONG_BRUSH_CATALOG_COUNT} `
+          + `${preset.id} → ${expectedSelection.runtimeBrushId}: 6/6 visible + `
+          + `${persistedPathDistance.toFixed(1)}px persisted + Undo OK`,
       );
     }
 
@@ -1352,12 +1553,19 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
     invariant(errors.messages.length === 0, "long-brush browser emitted console/page errors");
     invariant(errors.failedResponses.length === 0, "long-brush browser received unexpected 5xx responses");
     return {
-      ok: evidence.length === BRUSH_PRESETS.length && evidence.every((entry) =>
+      ok: evidence.length === LONG_BRUSH_CATALOG_COUNT && evidence.every((entry) =>
         entry.visualChanged
         && entry.visibleSegments === entry.totalSegments
-        && entry.persistedBrushId === entry.id
+        && entry.persistedBrushId === entry.expectedRuntimeBrushId
         && entry.persistedPathDistance >= 300
         && entry.undoRestoredPixels
+        && (
+          entry.source === "core"
+          || (
+            entry.persistedCatalogId === entry.id
+            && entry.persistedDynamicsMatched === true
+          )
+        )
       ),
       presetCount: evidence.length,
       evidence,
@@ -1934,6 +2142,11 @@ async function main(): Promise<void> {
   );
   const drawingOnly = process.env.TOONSPECTRUM_DRAWING_ONLY === "1";
   const shapesOnly = process.env.TOONSPECTRUM_SHAPES_ONLY === "1";
+  const longOnly = process.env.TOONSPECTRUM_BRUSH_LONG_ONLY === "1";
+  invariant(
+    !(shapesOnly && longOnly),
+    "TOONSPECTRUM_SHAPES_ONLY and TOONSPECTRUM_BRUSH_LONG_ONLY cannot be combined",
+  );
   const externalOrigin = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim();
   const port = externalOrigin ? null : await findFreePort();
   const origin = externalOrigin
@@ -1962,30 +2175,40 @@ async function main(): Promise<void> {
   try {
     await waitForServer(origin);
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
-    const desktop = shapesOnly ? null : await runDesktopBrushMatrix(browser, studioUrl);
+    const desktop = shapesOnly || longOnly ? null : await runDesktopBrushMatrix(browser, studioUrl);
     if (desktop) {
       invariant(
         desktop.ok,
-        `desktop ${BUILT_IN_BRUSH_PRESET_COUNT}-brush matrix failed`,
+        `desktop ${PRODUCT_BRUSH_CATALOG_COUNT}-brush matrix failed`,
       );
     }
     const longBrushes = shapesOnly ? null : await runLongBrushMatrix(browser, studioUrl);
     if (longBrushes) {
       invariant(
         longBrushes.ok,
-        `long ${BUILT_IN_BRUSH_PRESET_COUNT}-brush matrix failed`,
+        `long ${LONG_BRUSH_CATALOG_COUNT}-brush matrix failed`,
       );
     }
-    const smartShapes = drawingOnly ? null : await runSmartShapeMatrix(browser, studioUrl);
+    const smartShapes = drawingOnly || longOnly
+      ? null
+      : await runSmartShapeMatrix(browser, studioUrl);
     if (smartShapes) invariant(smartShapes.ok, "Smart Shape matrix failed");
-    const mobile = drawingOnly || shapesOnly ? null : await runMobileTouchAudit(browser, studioUrl);
+    const mobile = drawingOnly || shapesOnly || longOnly
+      ? null
+      : await runMobileTouchAudit(browser, studioUrl);
     if (mobile) invariant(mobile.ok, "mobile catalogue touch audit failed");
-    const durability = drawingOnly || shapesOnly ? null : await runDeferredDurabilityAudit(browser, origin, studioUrl);
+    const durability = drawingOnly || shapesOnly || longOnly
+      ? null
+      : await runDeferredDurabilityAudit(browser, origin, studioUrl);
     if (durability) invariant(durability.ok, "deferred stroke durability audit failed");
 
     await browser.close();
     browser = null;
-    log("ALL BRUSH AND SMART SHAPE BROWSER GATES OK");
+    log(
+      longOnly
+        ? `ALL ${LONG_BRUSH_CATALOG_COUNT} LONG-ROUTE BRUSH GATES OK`
+        : "ALL BRUSH AND SMART SHAPE BROWSER GATES OK",
+    );
     console.log(JSON.stringify({ scratch: SCRATCH, desktop, longBrushes, smartShapes, mobile, durability }, null, 2));
   } finally {
     if (browser) await browser.close().catch(() => undefined);

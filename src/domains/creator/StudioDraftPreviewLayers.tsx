@@ -1,18 +1,23 @@
-import { memo, useSyncExternalStore } from "react";
+import { memo, useSyncExternalStore, type RefObject } from "react";
 import { Layer } from "react-konva/lib/ReactKonvaCore";
 
 import { resolveStudioBrushDynamicsPresetId } from "./studio-brush-dynamics";
 import { StudioDrawNode } from "./StudioDrawNode";
 
 import type { StudioDraftPreviewSource } from "./studio-draft-preview-store";
+import type Konva from "konva";
 
 export interface StudioDraftPreviewLayersProps {
   store: StudioDraftPreviewSource;
+  normalLayerRef?: RefObject<Konva.Layer | null>;
+  dynamicLayerRef?: RefObject<Konva.Layer | null>;
 }
 
 /** 비다이렉트 초안 전용 격리 레이어 — 스토어 구독으로 페이지 본문 렌더 없이 프레임을 그린다. */
 export const StudioDraftPreviewLayers = memo(function StudioDraftPreviewLayers({
   store,
+  normalLayerRef,
+  dynamicLayerRef,
 }: StudioDraftPreviewLayersProps) {
   const { active, settled } = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const isolatedDynamic =
@@ -30,7 +35,7 @@ export const StudioDraftPreviewLayers = memo(function StudioDraftPreviewLayers({
   return (
     <>
       {settled.length > 0 || normalActive ? (
-        <Layer listening={false}>
+        <Layer ref={normalLayerRef} listening={false}>
           {settled.map((el) => (
             <StudioDrawNode key={el.id} el={el} />
           ))}
@@ -40,7 +45,7 @@ export const StudioDraftPreviewLayers = memo(function StudioDraftPreviewLayers({
       {/* 라이브 입자 획은 독립 레이어에서만 다시 그린다 — committed 입자 획이 포인터 RAF마다
           수천 개의 dab 을 재실행하지 않는다. */}
       {isolatedDynamic ? (
-        <Layer listening={false}>
+        <Layer ref={dynamicLayerRef} listening={false}>
           <StudioDrawNode el={isolatedDynamic} activeDraft />
         </Layer>
       ) : null}

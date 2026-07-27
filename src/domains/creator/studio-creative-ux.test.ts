@@ -54,7 +54,7 @@ describe("studio creative ux", () => {
     expect(studioBrushTrayItem(BRUSH_PRESETS.find((p) => p.id === "liner")!).previewStyle).toBe("calligraphy");
     expect(studioBrushTrayItem(BRUSH_PRESETS.find((p) => p.id === "marker-bold")!).previewStyle).toBe("solid");
     expect(studioBrushTrayItem(BRUSH_PRESETS.find((p) => p.id === "highlighter")!).previewStyle).toBe("solid");
-    expect(studioBrushTrayItem(BRUSH_PRESETS.find((p) => p.id === "spray")!).previewStyle).toBe("soft");
+    expect(studioBrushTrayItem(BRUSH_PRESETS.find((p) => p.id === "spray")!).previewStyle).toBe("dots");
   });
 
   it("builds a deduplicated favorite and recent quick shelf with beginner fallback", () => {

@@ -48,7 +48,7 @@ describe("Studio canvas cursor integration boundary", () => {
     );
     const cursorRenderer = studioPageSourceBetween(
       "function drawBrushCursorLayer(deferToFrame: boolean)",
-      "// 포인터가 캔버스를 벗어나면 브러시 커서 프리뷰를 숨긴다.",
+      "function hideStrokeGuide(deferToFrame = false)",
     );
     const snapshot = authoritativeMove.indexOf(
       "const pointerMapperCache = stagePointerFrameMapperCacheRef.current;",
@@ -67,7 +67,7 @@ describe("Studio canvas cursor integration boundary", () => {
     expect(studioCanvasViewportSource).toContain(
       "const brushCursorStyle = appSettings.general.brushCursorStyle"
     );
-    expect(studioCanvasViewportSource).toContain("brushCursorStyle !== \"none\"");
+    expect(studioCanvasViewportSource).toContain('brushCursorStyle !== "none"');
     expect(studioCanvasViewportSource).toContain("<StudioBrushCursor");
     expect(studioCanvasViewportSource).toContain(
       "brushId={drawMode === \"eraser\" ? \"eraser\" : brush}",
@@ -101,7 +101,11 @@ describe("Studio canvas cursor integration boundary", () => {
     );
     expect(cursorRenderer).toContain("if (brushCursorDrawRafRef.current !== null) return;");
     expect(cursorRenderer).toContain("globalThis.requestAnimationFrame(() => {");
-    expect(cursorRenderer.match(/brushCursorRef\.current\?\.getLayer\(\)\?\.drawScene\(\)/gu)).toHaveLength(2);
+    expect(
+      cursorRenderer.match(
+        /\(brushCursorRef\.current\?\.getLayer\(\) \?\? strokeGuideRef\.current\?\.getLayer\(\)\)\?\.drawScene\(\)/gu,
+      ),
+    ).toHaveLength(2);
     expect(studioPageSource).toContain("drawBrushCursorLayer(deferToFrame);");
     expect(studioPageSource).toContain("if (!nativeFreehandMoveOwnsCursor)");
     expect(studioPageSource).not.toContain("Hide the hover-only size preview");

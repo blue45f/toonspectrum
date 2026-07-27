@@ -62,7 +62,7 @@ describe("studio dynamic brush render budget", () => {
     });
   });
 
-  it("counts exact multi-tip samples and reduces the grid before dropping full-path dabs", () => {
+  it("counts exact multi-tip samples and bounds both grid quality and live stations", () => {
     const settings = worstCaseSettings();
     expect(countStudioDynamicBrushMarksPerDab(settings, 7)).toBe(147);
     expect(countStudioDynamicBrushMarksPerDab(settings, 5)).toBe(75);
@@ -75,10 +75,10 @@ describe("studio dynamic brush render budget", () => {
       markBudget: STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
     });
     expect(plan).toMatchObject({
-      stampGrid: 5,
-      maxDabsPerVariation: 100,
-      estimatedMarks: 15_000,
-      dabCapped: false,
+      stampGrid: 3,
+      maxDabsPerVariation: 75,
+      estimatedMarks: 4_050,
+      dabCapped: true,
       stampGridReduced: true,
       capped: true,
     });
@@ -98,9 +98,9 @@ describe("studio dynamic brush render budget", () => {
     expect(second).toEqual(first);
     expect(first).toMatchObject({
       stampGrid: 3,
-      maxDabsPerVariation: 9,
+      maxDabsPerVariation: 2,
       marksPerDab: 27,
-      estimatedMarks: 15_552,
+      estimatedMarks: 3_456,
       dabCapped: true,
       stampGridReduced: true,
       capped: true,

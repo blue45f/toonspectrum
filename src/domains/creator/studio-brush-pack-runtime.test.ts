@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { planNormalizedStudioDynamicBrushDabs } from "./studio-brush-dynamics";
 import {
   STUDIO_BRUSH_PACK_EXPANSION_WAVE_IDS,
+  STUDIO_BRUSH_PACK_VISIBILITY_TUNING_IDS,
   STUDIO_BRUSH_PACK_MATERIAL_WAVE_IDS,
   studioBrushPackExpansionTuningById,
 } from "./studio-brush-pack-expansion";
@@ -245,15 +246,16 @@ describe("procedural brush pack runtime", () => {
     expect(studioBrushPackRuntimeSignature(null)).toBeNull();
   });
 
-  it("hand-tunes the 2026-07 expansion wave without touching pre-expansion physics", () => {
-    // Tuning strictly targets appended ids; every original catalogue id must resolve to null so
-    // saved strokes recorded before the expansion replay byte-identically.
-    const waveIds = new Set<string>(STUDIO_BRUSH_PACK_EXPANSION_WAVE_IDS);
+  it("hand-tunes the 2026-07 expansion wave and the bounded legacy visibility corrections", () => {
+    const tunedIds = new Set<string>([
+      ...STUDIO_BRUSH_PACK_EXPANSION_WAVE_IDS,
+      ...STUDIO_BRUSH_PACK_VISIBILITY_TUNING_IDS,
+    ]);
     for (const id of STUDIO_BRUSH_PACK_CATALOG_IDS) {
       expect(
         studioBrushPackExpansionTuningById(id) !== null,
         `${id}: tuning table membership drift`
-      ).toBe(waveIds.has(id));
+      ).toBe(tunedIds.has(id));
     }
 
     const dynamicsById = (id: (typeof STUDIO_BRUSH_PACK_CATALOG_IDS)[number]) =>
@@ -447,7 +449,7 @@ describe("procedural brush pack runtime", () => {
       { id: "palette-knife-edge", tip: "978be8a0", dabs: "ae46755f", count: 70 },
       { id: "watercolor-salt-bloom", tip: "fd721c85", dabs: "c11da11a", count: 7 },
       { id: "ribbon-satin-fold", tip: "458348db", dabs: "ac5ec2b4", count: 17 },
-      { id: "smoke-wisp-layered", tip: "9db6b2bc", dabs: "830e911b", count: 11 },
+      { id: "smoke-wisp-layered", tip: "9db6b2bc", dabs: "5d523b4f", count: 11 },
       { id: "flower-petal-scatter", tip: "9e485c99", dabs: "616763b3", count: 9 },
       { id: "halftone-gradient-dot", tip: "a5d799e5", dabs: "96b49af2", count: 13 },
       { id: "focus-ray-streak", tip: "226b1a65", dabs: "9d9ff412", count: 27 },

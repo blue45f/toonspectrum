@@ -29,6 +29,7 @@ import {
   smoothStrokePoints,
   stabilizePoint,
   strokeRenderDistance,
+  strokeSampleDistanceForBrushFamily,
   strokeSampleDistanceForScale,
 } from "./studio-brush";
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
@@ -749,6 +750,39 @@ describe("legacy point processors stay intact", () => {
     expect(strokeRenderDistance(Number.NaN)).toBe(3);
   });
 
+  it("keeps outline brush source routes sub-pixel across zoom while material brushes stay bounded", () => {
+    for (const scale of [0.25, 0.5, 1, 2, 4]) {
+      expect(strokeSampleDistanceForBrushFamily(scale, "gpen") * scale).toBe(0.5);
+      expect(strokeSampleDistanceForBrushFamily(scale, "perfect") * scale).toBe(0.5);
+      expect(strokeSampleDistanceForBrushFamily(scale, "calligraphy") * scale).toBe(0.5);
+      expect(strokeSampleDistanceForBrushFamily(scale, "marker") * scale).toBe(0.75);
+      expect(strokeSampleDistanceForBrushFamily(scale, "dry-media") * scale).toBe(0.8);
+      expect(strokeSampleDistanceForBrushFamily(scale, "airbrush") * scale).toBe(1);
+    }
+  });
+
+  it("retains more than twice the small-curve detail for G-pen without changing the pixel grid", () => {
+    const route = Array.from({ length: 41 }, (_, index) => {
+      const angle = Math.PI * 0.5 * (index / 40);
+      return { x: 8 * Math.cos(angle), y: 8 * Math.sin(angle) };
+    });
+    const admittedCount = (minimumDistance: number) => {
+      let last = route[0]!;
+      let count = 1;
+      for (const candidate of route.slice(1)) {
+        if (Math.hypot(candidate.x - last.x, candidate.y - last.y) < minimumDistance) continue;
+        last = candidate;
+        count += 1;
+      }
+      return count;
+    };
+
+    const oldGenericCount = admittedCount(strokeSampleDistanceForScale(1));
+    const gpenCount = admittedCount(strokeSampleDistanceForBrushFamily(1, "gpen"));
+    expect(gpenCount).toBeGreaterThan(oldGenericCount * 2);
+    expect(strokeSampleDistanceForBrushFamily(1, "pixel")).toBe(1);
+  });
+
   it("processFreehandPoints thins dense points and keeps endpoints", () => {
     const pts: number[] = [];
     for (let i = 0; i <= 50; i++) pts.push(i, 0); // 1px 간격 → 3px 미만은 솎아짐
@@ -810,6 +844,32 @@ describe("legacy point processors stay intact", () => {
       expect(path.tension).toBe(legacyTension);
     }
   );
+
+  it("lets connected-path brushes smooth accepted points without reprocessing their geometry", () => {
+    const points = [0, 0, 8, 5, 16, 1, 24, 8];
+    const path = resolveStudioFreehandRenderPath(points, {
+      sampleSpacing: 0.75,
+      acceptedTension: 0.35,
+      legacyTension: 0.9,
+    });
+
+    expect(path.points).toBe(points);
+    expect(path.tension).toBe(0.35);
+  });
+
+  it("clamps invalid or excessive accepted-point tension at the render boundary", () => {
+    const points = [0, 0, 8, 5, 16, 1];
+    expect(resolveStudioFreehandRenderPath(points, {
+      sampleSpacing: 0.75,
+      acceptedTension: Number.NaN,
+      legacyTension: 0.4,
+    }).tension).toBe(0);
+    expect(resolveStudioFreehandRenderPath(points, {
+      sampleSpacing: 0.75,
+      acceptedTension: 4,
+      legacyTension: 0.4,
+    }).tension).toBe(1);
+  });
 
   it("uses the historical render distance when a legacy caller omits one", () => {
     const points = [0, 0, 1, 0, 2, 0, 3, 0, 4, 0];

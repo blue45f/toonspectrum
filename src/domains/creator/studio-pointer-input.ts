@@ -39,12 +39,12 @@ export interface StudioStrokePointerSession {
   /** Exact normalized identity of the last stored sample, used only for adjacent deduplication. */
   readonly lastAuthoritativeSample: StudioPointerSampleIdentity;
   /**
-   * Unique identities exposed by the immediately preceding processed delivery.
+   * Identities exposed by the immediately preceding processed delivery, in native order.
    *
    * Browser coalescing windows commonly overlap (`[a,b,c]` then `[b,c,d]`). Remembering one
-   * delivery removes that replay without suppressing a genuine later loop-back. This is deliberately
-   * not a whole-stroke set: devices with reduced/zero timestamps must still be able to revisit the
-   * same coordinate after another delivery.
+   * ordered delivery lets us remove only the contiguous replay prefix. It is deliberately not a
+   * whole-stroke set: reduced/zero-timestamp devices must be able to revisit the same coordinate
+   * later in the delivery or after moving away.
    */
   readonly previousAuthoritativeDelivery: readonly StudioPointerSampleIdentity[];
 }
@@ -80,10 +80,12 @@ export interface StudioStrokePointerBatchDiagnostics {
   /** Valid hardware candidates exposed by the browser, before replay/duplicate filtering. */
   readonly authoritativeCandidateCount: number;
   readonly authoritativeAcceptedCount: number;
-  /** Exact identities repeated inside one delivery or at the previous authoritative endpoint. */
+  /** Adjacent exact identities repeated inside one delivery or at the authoritative endpoint. */
   readonly duplicateCount: number;
   /** Exact identities replayed from the immediately preceding coalesced delivery. */
   readonly overlapReplayCount: number;
+  /** Equality comparisons spent finding the ordered overlap; bounded linearly by both deliveries. */
+  readonly overlapComparisonCount: number;
   /** New coordinates whose native timestamp moved backwards. Geometry remains in delivery order. */
   readonly authoritativeTimeRegressionCount: number;
   /** Largest accepted hardware gap in CSS pixels, including the prior authoritative endpoint. */
@@ -182,16 +184,80 @@ function includesPointerSampleIdentity(
   return false;
 }
 
-function appendUniquePointerSampleIdentity(
-  identities: StudioPointerSampleIdentity[],
-  candidate: StudioPointerSampleIdentity
-): boolean {
-  if (includesPointerSampleIdentity(identities, candidate)) return false;
-  identities.push(candidate);
-  if (identities.length > PREVIOUS_DELIVERY_SAMPLE_LIMIT) {
-    identities.splice(0, identities.length - PREVIOUS_DELIVERY_SAMPLE_LIMIT);
+function boundedPointerDelivery(
+  identities: readonly StudioPointerSampleIdentity[]
+): readonly StudioPointerSampleIdentity[] {
+  return identities.length <= PREVIOUS_DELIVERY_SAMPLE_LIMIT
+    ? identities
+    : identities.slice(identities.length - PREVIOUS_DELIVERY_SAMPLE_LIMIT);
+}
+
+/**
+ * Returns the longest previous-delivery suffix that is the current-delivery prefix.
+ *
+ * Matching an identity anywhere in the previous/current arrays dropped genuine loop-backs and
+ * tight curves, especially on privacy-reduced clocks where many samples share timestamp 0. A
+ * browser replay is ordered and contiguous, so only this suffix/prefix shape is safe to suppress.
+ * KMP keeps the pointer hot path linear even for the maximum 128-sample defensive window.
+ */
+function overlappingDeliveryPrefixLength(
+  previous: readonly StudioPointerSampleIdentity[],
+  current: readonly StudioPointerSampleIdentity[]
+): Readonly<{ length: number; comparisons: number }> {
+  if (previous.length === 0 || current.length === 0) {
+    return { length: 0, comparisons: 0 };
   }
-  return true;
+  // No overlap can be longer than the retained previous delivery. Avoid allocating/scanning a
+  // hostile or broken polyfill's arbitrarily large coalesced list just to classify its prefix.
+  const pattern = current.length <= previous.length
+    ? current
+    : current.slice(0, previous.length);
+  let comparisons = 0;
+  const same = (
+    left: StudioPointerSampleIdentity,
+    right: StudioPointerSampleIdentity
+  ) => {
+    comparisons += 1;
+    return samePointerSampleIdentity(left, right);
+  };
+  // The ordinary browser stream is non-overlapping. Any suffix/prefix replay must place the
+  // previous endpoint somewhere in the bounded current prefix; reject the common case without
+  // allocating a KMP prefix table.
+  const previousEndpoint = previous[previous.length - 1]!;
+  let endpointCanOverlap = false;
+  for (const identity of pattern) {
+    if (same(previousEndpoint, identity)) {
+      endpointCanOverlap = true;
+      break;
+    }
+  }
+  if (!endpointCanOverlap) return { length: 0, comparisons };
+  const prefix = new Array<number>(pattern.length).fill(0);
+  for (let index = 1, matched = 0; index < pattern.length; index += 1) {
+    while (
+      matched > 0
+      && !same(pattern[index]!, pattern[matched]!)
+    ) {
+      matched = prefix[matched - 1]!;
+    }
+    if (same(pattern[index]!, pattern[matched]!)) matched += 1;
+    prefix[index] = matched;
+  }
+
+  let matched = 0;
+  for (let index = 0; index < previous.length; index += 1) {
+    while (
+      matched > 0
+      && !same(previous[index]!, pattern[matched]!)
+    ) {
+      matched = prefix[matched - 1]!;
+    }
+    if (same(previous[index]!, pattern[matched]!)) matched += 1;
+    if (matched === pattern.length && index < previous.length - 1) {
+      matched = prefix[matched - 1]!;
+    }
+  }
+  return { length: matched, comparisons };
 }
 
 /**
@@ -414,6 +480,7 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
         authoritativeAcceptedCount: 0,
         duplicateCount: 0,
         overlapReplayCount: 0,
+        overlapComparisonCount: 0,
         authoritativeTimeRegressionCount: 0,
         maximumAuthoritativeGap: 0,
         predictedAcceptedCount: 0,
@@ -438,19 +505,28 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
   // A trusted parent pointer event is the processed aggregate of its coalesced list, not an extra
   // hardware sample. Consume one representation only; empty/throwing APIs fall back to parent.
   const candidates = coalesced.length > 0 ? coalesced : [event];
+  const authoritativeSamples: T[] = [];
   for (const candidate of candidates) {
     const identity = candidate === event
       ? pointerSampleIdentity(candidate, session.pointerId)
       : safeRelatedPointerSampleIdentity(session, candidate);
     if (identity === null) continue;
     authoritativeCandidateCount += 1;
-    const firstInCurrentDelivery = appendUniquePointerSampleIdentity(currentDelivery, identity);
-    if (!firstInCurrentDelivery || samePointerSampleIdentity(identity, previousSample)) {
-      duplicateCount += 1;
+    currentDelivery.push(identity);
+    authoritativeSamples.push(candidate);
+  }
+  const overlap = overlappingDeliveryPrefixLength(
+    previousDelivery,
+    currentDelivery
+  );
+  for (let candidateIndex = 0; candidateIndex < authoritativeSamples.length; candidateIndex += 1) {
+    const identity = currentDelivery[candidateIndex]!;
+    if (candidateIndex < overlap.length) {
+      overlapReplayCount += 1;
       continue;
     }
-    if (includesPointerSampleIdentity(previousDelivery, identity)) {
-      overlapReplayCount += 1;
+    if (samePointerSampleIdentity(identity, previousSample)) {
+      duplicateCount += 1;
       continue;
     }
     if (identity.timeStamp < previousSample.timeStamp) {
@@ -463,7 +539,7 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
         identity.clientY - previousSample.clientY
       )
     );
-    authoritative.push(candidate);
+    authoritative.push(authoritativeSamples[candidateIndex]!);
     previousSample = identity;
   }
 
@@ -473,11 +549,8 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
   if (coalesced.length > 0 && authoritative.length === 0) {
     const parentIdentity = pointerSampleIdentity(event, session.pointerId);
     authoritativeCandidateCount += 1;
-    appendUniquePointerSampleIdentity(currentDelivery, parentIdentity);
-    if (
-      !samePointerSampleIdentity(parentIdentity, previousSample)
-      && !includesPointerSampleIdentity(previousDelivery, parentIdentity)
-    ) {
+    currentDelivery.push(parentIdentity);
+    if (!samePointerSampleIdentity(parentIdentity, previousSample)) {
       if (parentIdentity.timeStamp < previousSample.timeStamp) {
         authoritativeTimeRegressionCount += 1;
       }
@@ -497,7 +570,7 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
     ...session,
     lastAuthoritativeSample: previousSample,
     previousAuthoritativeDelivery: currentDelivery.length > 0
-      ? currentDelivery
+      ? boundedPointerDelivery(currentDelivery)
       : previousDelivery,
   };
 
@@ -510,8 +583,11 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
     for (const candidate of safeRelatedEvents(event, "getPredictedEvents")) {
       const identity = safeRelatedPointerSampleIdentity(session, candidate);
       if (identity === null) continue;
+      const previousPredictedIdentity = predictedDelivery.at(-1);
+      predictedDelivery.push(identity);
       if (
-        !appendUniquePointerSampleIdentity(predictedDelivery, identity)
+        (previousPredictedIdentity !== undefined
+          && samePointerSampleIdentity(identity, previousPredictedIdentity))
         || samePointerSampleIdentity(identity, previousPredictedSample)
         || includesPointerSampleIdentity(currentDelivery, identity)
       ) {
@@ -536,6 +612,7 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
       authoritativeAcceptedCount: authoritative.length,
       duplicateCount,
       overlapReplayCount,
+      overlapComparisonCount: overlap.comparisons,
       authoritativeTimeRegressionCount,
       maximumAuthoritativeGap,
       predictedAcceptedCount: predicted.length,

@@ -269,6 +269,37 @@ function networkErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "네트워크 요청에 실패했습니다.";
 }
 
+function createStudioAiAbortError(): Error {
+  const error = new Error("The Studio AI operation was aborted.");
+  error.name = "AbortError";
+  return error;
+}
+
+/**
+ * Optional prompt/parser chunks are pure client modules, so one bounded importer retry never
+ * repeats a provider/model request. A browser may recover a transient module fetch failure on the
+ * second import; parse/evaluation failures still fail closed. Validation and configuration checks
+ * stay at each callsite, while an already-aborted request does not start a chunk load.
+ */
+async function loadOptionalStudioAiCodec<T>(
+  importCodec: () => Promise<T>,
+  signal?: AbortSignal
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (signal?.aborted) throw createStudioAiAbortError();
+    try {
+      const codec = await importCodec();
+      if (signal?.aborted) throw createStudioAiAbortError();
+      return codec;
+    } catch (error) {
+      if (signal?.aborted || isAbortError(error)) throw createStudioAiAbortError();
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
 async function parseHttpResponse(res: Response, signal?: AbortSignal): Promise<StudioAiResult<unknown>> {
   let text: string;
   try {
@@ -728,16 +759,19 @@ export async function generateScenarioScenes(
   settings: StudioAiSettings,
   storyText: string,
   opts: { sceneCountHint?: number; characterContext?: string; signal?: AbortSignal } = {},
-  transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT
+  transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT,
+  importScenarioCodec: () => Promise<typeof import("./studio-scenario-scenes")> = () =>
+    import("./studio-scenario-scenes")
 ): Promise<StudioAiResult<StudioTextAiData<ScenarioScenesPlan>>> {
   const trimmed = storyText.trim();
   if (!trimmed) return { ok: false, code: "invalid_input", error: "스토리 아이디어를 입력하세요." };
   if (!isStudioTextAiConfigured(settings, transport)) {
     return { ok: false, code: "not_configured", error: "서버 AI에 로그인하거나 설정에서 API 키를 등록하세요." };
   }
+  const signal = opts.signal ?? transport.signal;
   let scenarioCodec: typeof import("./studio-scenario-scenes");
   try {
-    scenarioCodec = await import("./studio-scenario-scenes");
+    scenarioCodec = await loadOptionalStudioAiCodec(importScenarioCodec, signal);
   } catch (error) {
     return { ok: false, code: "network_error", error: networkErrorMessage(error) };
   }
@@ -750,7 +784,7 @@ export async function generateScenarioScenes(
     temperature: 0.7,
     maxTokens: 1800,
     responseFormat: "json",
-  }, { ...transport, signal: opts.signal ?? transport.signal });
+  }, { ...transport, signal });
   if (!result.ok) return result;
   const content = extractFirstChatContent(result.data);
   if (!content) return { ok: false, code: "parse_error", error: "응답에서 장면 구성 텍스트를 찾을 수 없습니다." };
@@ -914,7 +948,9 @@ export async function suggestDialogueLines(
 export async function suggestColorPalette(
   settings: StudioAiSettings,
   moodText: string,
-  transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT
+  transport: StudioTextAiTransport = DEFAULT_TEXT_AI_TRANSPORT,
+  importPaletteCodec: () => Promise<typeof import("./studio-palette-suggest")> = () =>
+    import("./studio-palette-suggest")
 ): Promise<StudioAiResult<StudioTextAiData<PaletteSuggestion>>> {
   const trimmed = moodText.trim();
   if (!trimmed) return { ok: false, code: "invalid_input", error: "장르/무드를 입력하세요." };
@@ -923,7 +959,7 @@ export async function suggestColorPalette(
   }
   let paletteCodec: typeof import("./studio-palette-suggest");
   try {
-    paletteCodec = await import("./studio-palette-suggest");
+    paletteCodec = await loadOptionalStudioAiCodec(importPaletteCodec, transport.signal);
   } catch (error) {
     return { ok: false, code: "network_error", error: networkErrorMessage(error) };
   }

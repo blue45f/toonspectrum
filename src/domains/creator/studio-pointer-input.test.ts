@@ -309,6 +309,27 @@ describe("studio pointer input", () => {
     ]);
   });
 
+  it("preserves a genuine loop-back inside one coalesced delivery", () => {
+    const session = beginStudioStrokePointerSession(sample(0, { timeStamp: 0 }))!;
+    const a = sample(1, { timeStamp: 0 });
+    const b = sample(2, { timeStamp: 0 });
+    const loopBack = sample(1, { timeStamp: 0 });
+    const c = sample(3, { timeStamp: 0 });
+    const parent = sample(4, {
+      timeStamp: 0,
+      getCoalescedEvents: () => [a, b, loopBack, c],
+    });
+
+    const batch = collectStudioStrokePointerBatch(session, parent);
+
+    expect(batch.authoritative).toEqual([a, b, loopBack, c]);
+    expect(batch.diagnostics).toMatchObject({
+      authoritativeAcceptedCount: 4,
+      duplicateCount: 0,
+      overlapReplayCount: 0,
+    });
+  });
+
   it("deduplicates normalized scalar identities without JSON allocation in the hardware hot path", () => {
     const down = sample(0, {
       pointerType: "PEN",
@@ -421,10 +442,50 @@ describe("studio pointer input", () => {
     expect(second.diagnostics).toMatchObject({
       authoritativeCandidateCount: 3,
       authoritativeAcceptedCount: 1,
-      duplicateCount: 1,
-      overlapReplayCount: 1,
+      duplicateCount: 0,
+      overlapReplayCount: 2,
       maximumAuthoritativeGap: Math.hypot(1, 1),
     });
+  });
+
+  it("does not mistake a non-contiguous prior coordinate for browser replay", () => {
+    const session = beginStudioStrokePointerSession(sample(0))!;
+    const a = sample(1);
+    const b = sample(2);
+    const c = sample(3);
+    const first = collectStudioStrokePointerBatch(
+      session,
+      sample(3.5, { getCoalescedEvents: () => [a, b, c] })
+    );
+    const loopBack = sample(1);
+    const d = sample(4);
+    const second = collectStudioStrokePointerBatch(
+      first.session,
+      sample(4.5, { getCoalescedEvents: () => [loopBack, d] })
+    );
+
+    expect(second.authoritative).toEqual([loopBack, d]);
+    expect(second.diagnostics.overlapReplayCount).toBe(0);
+  });
+
+  it("keeps overlap classification linear at the full retained delivery window", () => {
+    const session = beginStudioStrokePointerSession(sample(0))!;
+    const firstSamples = Array.from({ length: 128 }, (_, index) => sample(index + 1));
+    const first = collectStudioStrokePointerBatch(
+      session,
+      sample(129, { getCoalescedEvents: () => firstSamples })
+    );
+    const secondSamples = Array.from({ length: 128 }, (_, index) => sample(index + 129));
+    const second = collectStudioStrokePointerBatch(
+      first.session,
+      sample(257, { getCoalescedEvents: () => secondSamples })
+    );
+
+    expect(second.authoritative).toEqual(secondSamples);
+    // The former any-match scans needed 8,128 current-delivery + 16,384 previous-delivery
+    // comparisons for this input. Ordered overlap rejects it in one bounded 128-sample pass.
+    expect(second.diagnostics.overlapComparisonCount).toBe(128);
+    expect(second.diagnostics.overlapReplayCount).toBe(0);
   });
 
   it("measures duplicate, regression, and large-gap input without reordering new geometry", () => {

@@ -10,14 +10,17 @@ import {
   Pencil,
   Pin,
   RefreshCw,
+  Rows3,
   Save,
   Share2,
   Trash2,
   Upload,
+  Waves,
 } from "lucide-react";
 import { useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 
 import { BRUSH_PRESETS } from "./studio-brush";
+import { studioCoreBrushCatalogItemById } from "./studio-brush-catalog-core";
 import {
   browserBrushLibraryStorage,
   brushFileName,
@@ -37,6 +40,15 @@ import {
   type StudioBrushSnapshot,
   type StudioSavedBrush,
 } from "./studio-brush-library";
+import { studioBrushPackDescriptorById } from "./studio-brush-pack-index";
+import {
+  studioBrushPreviewDashArray,
+  studioBrushPreviewDotCenters,
+  studioBrushPreviewOpacity,
+  studioBrushPreviewPathD,
+  studioBrushPreviewRibbonD,
+  studioBrushPreviewStrokeWidth,
+} from "./studio-brush-visual";
 import { downloadBlob } from "./studio-export";
 import { STUDIO_STABILIZER_MODES } from "./studio-stroke-stabilizer";
 
@@ -45,9 +57,18 @@ import { cx } from "@/lib/cx";
 const MAX_IMPORT_FILE_BYTES = 2 * 1024 * 1024;
 const PREVIEW_SWATCH_MIN = 10;
 const PREVIEW_SWATCH_MAX = 30;
+const SAVED_PREVIEW_WIDTH = 84;
+const SAVED_PREVIEW_HEIGHT = 28;
 
 function brushPresetLabel(brushId: string): string {
   return BRUSH_PRESETS.find((preset) => preset.id === brushId)?.name ?? brushId;
+}
+
+function savedBrushPresetLabel(brush: StudioSavedBrush): string {
+  const sourcePresetName = brush.sourcePresetName?.trim();
+  if (sourcePresetName) return sourcePresetName;
+  return studioBrushPackDescriptorById(brush.sourcePresetId)?.catalogName
+    ?? brushPresetLabel(brush.brushId);
 }
 
 function stabilizerModeLabel(mode: StudioSavedBrush["stabilizerMode"]): string {
@@ -58,6 +79,106 @@ function previewSize(strokeWidth: number): number {
   return Math.round(
     PREVIEW_SWATCH_MIN
       + (Math.min(48, Math.max(1, strokeWidth)) / 48) * (PREVIEW_SWATCH_MAX - PREVIEW_SWATCH_MIN)
+  );
+}
+
+function SavedBrushStrokePreview({ brush }: { brush: StudioSavedBrush }) {
+  const sourceDescriptor = studioBrushPackDescriptorById(brush.sourcePresetId);
+  const catalogItem = studioCoreBrushCatalogItemById(
+    brush.sourcePresetId ?? brush.brushId
+  ) ?? studioCoreBrushCatalogItemById(brush.brushId);
+  const style = sourceDescriptor?.previewStyle ?? catalogItem?.previewStyle ?? "solid";
+  const weight = Math.min(1, Math.max(0.18, brush.strokeWidth / 36));
+  const strokeWidth = studioBrushPreviewStrokeWidth(weight, style);
+  const path = studioBrushPreviewPathD(style, SAVED_PREVIEW_WIDTH, SAVED_PREVIEW_HEIGHT);
+  const ribbon = studioBrushPreviewRibbonD(
+    style,
+    SAVED_PREVIEW_WIDTH,
+    SAVED_PREVIEW_HEIGHT,
+    weight
+  );
+  const dash = studioBrushPreviewDashArray(style);
+  const opacity = studioBrushPreviewOpacity(brush.brushOpacity);
+  const dotStyle = style === "dashed" ? "texture" : style;
+  const dots = studioBrushPreviewDotCenters(dotStyle, 36, 16).map((dot) => ({
+    x: 4 + dot.x * ((SAVED_PREVIEW_WIDTH - 8) / 36),
+    y: 3 + dot.y * ((SAVED_PREVIEW_HEIGHT - 6) / 16),
+    r: dot.r * Math.min(
+      (SAVED_PREVIEW_WIDTH - 8) / 36,
+      (SAVED_PREVIEW_HEIGHT - 6) / 16
+    ),
+  }));
+  const diffuse = style === "soft" || style === "glow" || style === "neon";
+
+  return (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      viewBox={`0 0 ${SAVED_PREVIEW_WIDTH} ${SAVED_PREVIEW_HEIGHT}`}
+      data-studio-saved-brush-preview={style}
+      data-studio-saved-brush-preview-opacity={opacity}
+      className="h-9 w-24 shrink-0"
+    >
+      <rect
+        x={0.5}
+        y={0.5}
+        width={(SAVED_PREVIEW_WIDTH - 1) / 2}
+        height={SAVED_PREVIEW_HEIGHT - 1}
+        rx={5}
+        fill="oklch(0.9 0.008 70)"
+      />
+      <rect
+        x={SAVED_PREVIEW_WIDTH / 2}
+        y={0.5}
+        width={(SAVED_PREVIEW_WIDTH - 1) / 2}
+        height={SAVED_PREVIEW_HEIGHT - 1}
+        rx={5}
+        fill="oklch(0.19 0.009 68)"
+      />
+      <rect
+        x={0.5}
+        y={0.5}
+        width={SAVED_PREVIEW_WIDTH - 1}
+        height={SAVED_PREVIEW_HEIGHT - 1}
+        rx={5}
+        fill="none"
+        stroke="oklch(0.42 0.013 64 / 0.7)"
+      />
+      {dots.length > 0 ? (
+        <g fill={brush.color} opacity={opacity}>
+          {dots.map((dot, index) => (
+            <circle key={index} cx={dot.x} cy={dot.y} r={dot.r} />
+          ))}
+        </g>
+      ) : (
+        <>
+          {diffuse ? (
+            <path
+              d={path}
+              fill="none"
+              stroke={brush.color}
+              strokeWidth={strokeWidth * 2.1}
+              strokeLinecap="round"
+              opacity={opacity * 0.18}
+            />
+          ) : null}
+          {ribbon ? (
+            <path d={ribbon} fill={brush.color} opacity={opacity} />
+          ) : (
+            <path
+              d={path}
+              fill="none"
+              stroke={brush.color}
+              strokeWidth={strokeWidth}
+              strokeLinecap={brush.tipRoundness < 0.35 ? "butt" : "round"}
+              strokeLinejoin="round"
+              strokeDasharray={dash}
+              opacity={opacity}
+            />
+          )}
+        </>
+      )}
+    </svg>
   );
 }
 
@@ -89,6 +210,7 @@ export function StudioBrushLibraryPanel({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renamingName, setRenamingName] = useState("");
   const [importing, setImporting] = useState(false);
+  const [viewMode, setViewMode] = useState<"stroke" | "text">("stroke");
   const saveTriggerRef = useRef<HTMLButtonElement>(null);
   const renameReturnFocusRef = useRef<HTMLButtonElement | null>(null);
   const orderedBrushes = sortBrushesForLibrary(brushes);
@@ -393,12 +515,64 @@ export function StudioBrushLibraryPanel({
         </div>
       ) : null}
 
+      {orderedBrushes.length > 0 ? (
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <span className="shrink-0 text-[0.62rem] font-semibold text-fg-3">표시</span>
+          <div
+            role="group"
+            aria-label="내 브러시 표시 방식"
+            className="grid min-w-0 flex-1 grid-cols-2 rounded-xl border border-line bg-card p-0.5"
+          >
+            <button
+              type="button"
+              title="저장 브러시 획 미리보기"
+              aria-label="저장 브러시 획 미리보기"
+              aria-pressed={viewMode === "stroke"}
+              data-studio-saved-brush-view-option="stroke"
+              onClick={() => setViewMode("stroke")}
+              className={cx(
+                "flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg px-2 text-[0.62rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8",
+                viewMode === "stroke"
+                  ? "bg-raised text-fg"
+                  : "text-fg-3 hover:bg-raised/70 hover:text-fg"
+              )}
+            >
+              <Waves size={13} strokeWidth={1.8} aria-hidden />
+              획
+            </button>
+            <button
+              type="button"
+              title="저장 브러시 이름 목록"
+              aria-label="저장 브러시 이름 목록"
+              aria-pressed={viewMode === "text"}
+              data-studio-saved-brush-view-option="text"
+              onClick={() => setViewMode("text")}
+              className={cx(
+                "flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg px-2 text-[0.62rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8",
+                viewMode === "text"
+                  ? "bg-raised text-fg"
+                  : "text-fg-3 hover:bg-raised/70 hover:text-fg"
+              )}
+            >
+              <Rows3 size={13} strokeWidth={1.8} aria-hidden />
+              목록
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {orderedBrushes.length === 0 ? (
         <p className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-[0.64rem] leading-relaxed text-fg-3">
           현재 펜 설정을 저장하면 모바일에서도 바로 꺼내 쓸 수 있어요.
         </p>
       ) : (
-        <ul className="space-y-1.5 lg:max-h-80 lg:overflow-y-auto lg:pr-1">
+        <ul
+          data-studio-saved-brush-view={viewMode}
+          className={cx(
+            "lg:max-h-80 lg:overflow-y-auto lg:pr-1",
+            viewMode === "stroke" ? "space-y-1.5" : "space-y-1"
+          )}
+        >
           {orderedBrushes.map((brush) => (
             <li
               key={brush.id}
@@ -449,29 +623,40 @@ export function StudioBrushLibraryPanel({
                 type="button"
                 onClick={() => onApplyBrush(brush)}
                 aria-pressed={activeBrushId === brush.id}
-                aria-label={`${brush.name} 브러시 적용, ${brushPresetLabel(brush.brushId)}, ${brush.strokeWidth}px, ${Math.round(brush.brushOpacity * 100)}퍼센트`}
-                className="flex min-h-12 w-full items-center gap-2 rounded-lg border border-line/60 bg-panel/50 px-2 text-left transition-colors hover:border-accent hover:bg-accent-soft/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                aria-label={`${brush.name} 브러시 적용, ${savedBrushPresetLabel(brush)}, ${brush.strokeWidth}px, ${Math.round(brush.brushOpacity * 100)}퍼센트`}
+                className={cx(
+                  "flex w-full items-center gap-2 rounded-lg border border-line/60 bg-panel/50 px-2 text-left transition-colors hover:border-accent hover:bg-accent-soft/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+                  viewMode === "stroke" ? "min-h-16" : "min-h-12"
+                )}
               >
-                <span
-                  className="grid shrink-0 place-items-center overflow-hidden rounded-full border border-line bg-[linear-gradient(135deg,#f8fafc_0_50%,#242936_50%_100%)] p-px"
-                  style={{
-                    width: previewSize(brush.strokeWidth),
-                    height: previewSize(brush.strokeWidth),
-                  }}
-                  aria-hidden
-                >
+                {viewMode === "stroke" ? (
+                  <SavedBrushStrokePreview brush={brush} />
+                ) : (
                   <span
-                    className="block size-full rounded-full"
+                    className="grid shrink-0 place-items-center overflow-hidden rounded-full border border-line bg-[linear-gradient(135deg,#f8fafc_0_50%,#242936_50%_100%)] p-px"
                     style={{
-                      background: brush.color,
-                      opacity: brush.brushOpacity,
+                      width: previewSize(brush.strokeWidth),
+                      height: previewSize(brush.strokeWidth),
                     }}
-                  />
-                </span>
+                    aria-hidden
+                  >
+                    <span
+                      className="block size-full rounded-full"
+                      style={{
+                        background: brush.color,
+                        opacity: brush.brushOpacity,
+                      }}
+                    />
+                  </span>
+                )}
                 <span className="min-w-0 flex-1 text-[0.62rem] leading-snug text-fg-3">
-                  <span className="block truncate text-fg-2">{brushPresetLabel(brush.brushId)} · {brush.strokeWidth}px · {Math.round(brush.brushOpacity * 100)}%</span>
-                  <span className="block">{stabilizerModeLabel(brush.stabilizerMode)} {brush.stabilizer} · 후보정 {brush.postCorrection}</span>
-                  {brush.brushId === "calligraphy" ? <span className="block">촉 {Math.round(brush.tipAngle)}° · 원형도 {Math.round(brush.tipRoundness * 100)}%</span> : null}
+                  <span className="block truncate text-fg-2">{savedBrushPresetLabel(brush)} · {brush.strokeWidth}px · {Math.round(brush.brushOpacity * 100)}%</span>
+                  {viewMode === "stroke" ? (
+                    <>
+                      <span className="block">{stabilizerModeLabel(brush.stabilizerMode)} {brush.stabilizer} · 후보정 {brush.postCorrection}</span>
+                      {brush.brushId === "calligraphy" ? <span className="block">촉 {Math.round(brush.tipAngle)}° · 원형도 {Math.round(brush.tipRoundness * 100)}%</span> : null}
+                    </>
+                  ) : null}
                 </span>
               </button>
 

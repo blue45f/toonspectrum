@@ -11,6 +11,7 @@ import {
   normalizeCalligraphyStylusInput,
   resolveBrushPressureSample,
   resolveStudioBrushRenderFamily,
+  strokeSampleDistanceForBrushFamily,
   strokeSampleDistanceForScale,
   type NormalizedCalligraphyStylusInput,
 } from "./studio-brush";
@@ -241,7 +242,12 @@ export function planStudioDrawPointerStart(
           : undefined,
         sampleSpacing: drawMode === "pixel"
           ? 1
-          : causalInputPlan.sampleSpacing ?? strokeSampleDistanceForScale(positionScale),
+          : causalInputPlan.sampleSpacing
+            ?? (
+              drawMode === "pen"
+                ? strokeSampleDistanceForBrushFamily(positionScale, brushFamily)
+                : strokeSampleDistanceForScale(positionScale)
+            ),
         tiltXs: captureStylus ? [stylus.tiltX] : undefined,
         tiltYs: captureStylus ? [stylus.tiltY] : undefined,
         twists: captureStylus ? [stylus.twist] : undefined,

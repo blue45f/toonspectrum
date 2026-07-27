@@ -14,7 +14,7 @@ describe("studio main-menu catalogue ownership boundary", () => {
     expect(catalogue).not.toMatch(/\b(?:document|window|globalThis)\s*\./u);
     expect(catalogue).not.toContain("StudioPage");
     expect(catalogue).not.toMatch(/\buse(?:Memo|Callback|Effect|State|Ref)\b/u);
-    // 캔버스 px 눈금자 메뉴 계약을 포함해도 카탈로그가 독립 모듈 경계를 유지한다.
+    // 캔버스 px 눈금자와 빠른 액세스 항목을 소유해도 카탈로그가 독립 모듈 경계를 유지한다.
     expect(catalogue.split("\n").length).toBeLessThanOrEqual(1_090);
   });
 
@@ -43,7 +43,9 @@ describe("studio main-menu catalogue ownership boundary", () => {
     expect(composition).toContain("windowRef: companionWindowRef");
     expect(composition).not.toContain("items: [");
     expect(composition).not.toContain("STUDIO_EDIT_MENU_COMMANDS");
-    // Null-guarded root import clicks add a few lines vs optional-chaining form.
+    expect(composition).not.toContain('id: "quick-access-palette"');
+    // Null-guarded root import clicks add a few lines vs optional-chaining form. Menu item
+    // definitions, including Quick Access, remain owned by the pure catalogue.
     expect(composition.split("\n").length).toBeLessThanOrEqual(210);
   });
 });

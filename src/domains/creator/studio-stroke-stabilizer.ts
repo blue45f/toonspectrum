@@ -161,34 +161,49 @@ function safeSampleInterval(value: unknown): number {
   );
 }
 
-interface StudioMonotonicSampleTiming {
+interface StudioSampleTiming {
   readonly elapsedMs: number;
+  /** Last native timestamp. This deliberately re-anchors after a reduced/regressing clock. */
   readonly timeStamp: number;
+  /** Last trustworthy native cadence, excluding pauses and synthetic fallbacks. */
+  readonly sampleIntervalMs: number;
 }
 
 /**
  * Browser clocks may repeat under timer precision reduction or regress when mixed native clocks
- * enter one coalesced delivery. Keep geometry in delivery order, but advance the timing state by the
- * last observed hardware cadence so velocity pressure and adaptive stabilization never see a
- * negative clock or a fabricated 16.7ms pause.
+ * enter one coalesced delivery. Keep geometry in delivery order and reuse the last trustworthy
+ * cadence for that one sample, but retain the native timestamp as the next comparison baseline.
+ *
+ * Advancing the stored timestamp by a synthetic cadence is subtly wrong: after one repeated
+ * timestamp the synthetic clock can remain ahead of every following native sample, classifying an
+ * otherwise healthy stream as permanently regressing. Adaptive stabilization then underestimates
+ * speed and feels progressively heavier. Re-anchoring to the latest native timestamp lets the very
+ * next valid delta recover without ever feeding a negative/zero elapsed time to the brush math.
  */
-function monotonicSampleTiming(
+function resolveSampleTiming(
   previousTimeStamp: number,
   previousSampleIntervalMs: number,
   sampleTimeStamp: unknown
-): StudioMonotonicSampleTiming {
+): StudioSampleTiming {
   const rawTimeStamp = safeTimeStamp(sampleTimeStamp, previousTimeStamp);
   const rawElapsed = rawTimeStamp - previousTimeStamp;
   if (Number.isFinite(rawElapsed) && rawElapsed > 0) {
+    const elapsedMs = clamp(rawElapsed, MIN_SAMPLE_MS, MAX_SAMPLE_MS);
     return {
-      elapsedMs: clamp(rawElapsed, MIN_SAMPLE_MS, MAX_SAMPLE_MS),
+      elapsedMs,
       timeStamp: rawTimeStamp,
+      // A long pause is not a hardware cadence. Keep the prior estimate for a subsequent
+      // reduced-timestamp sample instead of making that sample look artificially slow.
+      sampleIntervalMs: rawElapsed <= MAX_SAMPLE_MS
+        ? elapsedMs
+        : safeSampleInterval(previousSampleIntervalMs),
     };
   }
   const elapsedMs = safeSampleInterval(previousSampleIntervalMs);
   return {
     elapsedMs,
-    timeStamp: previousTimeStamp + elapsedMs,
+    timeStamp: rawTimeStamp,
+    sampleIntervalMs: elapsedMs,
   };
 }
 
@@ -312,7 +327,7 @@ export function sampleStudioPointerVelocity(
   const previousTime = safeTimeStamp(previous.timeStamp, 0);
   const clientX = finiteNumber(sample.clientX, previousX);
   const clientY = finiteNumber(sample.clientY, previousY);
-  const timing = monotonicSampleTiming(
+  const timing = resolveSampleTiming(
     previousTime,
     previous.sampleIntervalMs,
     sample.timeStamp
@@ -326,7 +341,7 @@ export function sampleStudioPointerVelocity(
       clientX,
       clientY,
       timeStamp: timing.timeStamp,
-      sampleIntervalMs: timing.elapsedMs,
+      sampleIntervalMs: timing.sampleIntervalMs,
     },
   };
 }
@@ -336,8 +351,13 @@ function sampleTiming(
   rawX: number,
   rawY: number,
   sampleTimeStamp: unknown
-): { elapsedMs: number; speed: number; timeStamp: number } {
-  const timing = monotonicSampleTiming(
+): {
+  elapsedMs: number;
+  speed: number;
+  timeStamp: number;
+  sampleIntervalMs: number;
+} {
+  const timing = resolveSampleTiming(
     state.timeStamp,
     state.sampleIntervalMs,
     sampleTimeStamp
@@ -347,6 +367,7 @@ function sampleTiming(
     elapsedMs: timing.elapsedMs,
     speed: distance / timing.elapsedMs,
     timeStamp: timing.timeStamp,
+    sampleIntervalMs: timing.sampleIntervalMs,
   };
 }
 
@@ -432,6 +453,7 @@ export function stabilizeStudioStrokeSample(
     elapsedMs,
     speed: logicalSpeed,
     timeStamp,
+    sampleIntervalMs,
   } = sampleTiming(safePrevious, rawX, rawY, sample.timeStamp);
   const coordinateScale = safeCoordinateScale(options.coordinateScale);
   const speed = logicalSpeed * coordinateScale;
@@ -464,7 +486,7 @@ export function stabilizeStudioStrokeSample(
       outputX,
       outputY,
       timeStamp,
-      sampleIntervalMs: elapsedMs,
+      sampleIntervalMs,
     },
     effectiveStrength,
     speed,

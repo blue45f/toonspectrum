@@ -279,7 +279,7 @@ describe("planStudioDrawPointerStart", () => {
 
     expect(plan.causalInputPlan.mode).toBe("legacy");
     expect(plan.capturePointerDynamics).toBe(true);
-    expect(plan.element.sampleSpacing).toBe(0.75);
+    expect(plan.element.sampleSpacing).toBe(0.5);
     expect(plan.element.paintModel).toBeUndefined();
     expect(plan.element.brushDynamics?.version).toBe(1);
     expect(plan.element.tiltXs).toEqual([20]);
@@ -287,6 +287,19 @@ describe("planStudioDrawPointerStart", () => {
     expect(plan.element.twists).toEqual([90]);
     expect(plan.element.speeds).toEqual([0]);
     expect(plan.element.tangentialPressures).toEqual([1]);
+  });
+
+  it("captures a denser versioned source route for pressure outlines than broad material brushes", () => {
+    const gpen = planStudioDrawPointerStart(input({ brush: "gpen" }));
+    const calligraphy = planStudioDrawPointerStart(input({ brush: "calligraphy" }));
+    const highlighter = planStudioDrawPointerStart(input({ brush: "highlighter" }));
+    const airbrush = planStudioDrawPointerStart(input({ brush: "airbrush" }));
+
+    expect(gpen.element.sampleSpacing).toBe(0.25);
+    expect(calligraphy.element.sampleSpacing).toBe(0.25);
+    expect(highlighter.element.sampleSpacing).toBe(0.375);
+    expect(airbrush.element.sampleSpacing).toBe(0.5);
+    expect(gpen.element.sampleSpacing).toBeLessThan(airbrush.element.sampleSpacing!);
   });
 
   it("captures a sanitized, bounded catalog identity only for authored pen strokes", () => {

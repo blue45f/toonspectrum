@@ -16,6 +16,7 @@ import {
 import { listStudioBrushTrayItems } from "./studio-creative-ux";
 import {
   LargeBrushPreview,
+  StudioBrushCatalogPortal,
   StudioBrushLibrarySheet,
 } from "./StudioBrushLibrarySheet";
 
@@ -127,6 +128,141 @@ describe("StudioBrushLibrarySheet", () => {
     expect(html).toContain("min-h-11");
     expect(html).toContain("min-w-11");
     expect(html).toContain("grid size-11 place-items-center");
+    expect(html).toContain('role="group" aria-label="브러시 표시 방식"');
+    expect(html).toContain('data-studio-brush-view-option="stroke"');
+    expect(html).toContain('data-studio-brush-view-option="tile"');
+    expect(html).toContain('data-studio-brush-view-option="text"');
+  });
+
+  it("compacts fixed chrome without shrinking 44px controls or the brush scrollport", () => {
+    const html = renderSheet({ compact: true, onToggleFavorite: vi.fn() });
+
+    expect(html).toContain('data-studio-brush-compact="true"');
+    expect(html).toContain('data-studio-brush-catalog-header="true"');
+    expect(html).toContain('data-studio-brush-catalog-controls="true"');
+    expect(html).toContain('data-studio-brush-catalog-tabs="true"');
+    expect(html).toContain('data-studio-brush-catalog-scrollport="true"');
+    expect(html).toContain('data-studio-brush-catalog-reset="true"');
+    expect(html).toContain("min-h-16 p-1");
+    expect(html).toContain("w-[8.5rem] flex-none");
+    expect(html).toContain("min-h-11 min-w-11");
+    expect(html).toContain("shrink-0 border-t");
+    expect(html).toContain('data-studio-brush-stroke-details="true"');
+    expect(html).toContain("[@media(max-height:32rem)]:hidden");
+  });
+
+  it("keeps the compact fallback available for a genuinely short viewport", () => {
+    const html = renderSheet();
+
+    expect(html).toContain("[@media(max-height:32rem)]:min-h-16");
+    expect(html).toContain("[@media(max-height:32rem)]:flex");
+    expect(html).toContain("[@media(max-height:32rem)]:sr-only");
+    expect(html).toContain("[@media(max-height:32rem)]:py-0");
+  });
+
+  it("forces the compact mobile layout while a software keyboard occludes the viewport", () => {
+    render(
+      <StudioBrushCatalogPortal
+        open
+        placement="mobile-sheet"
+        triggerElement={null}
+        activeBrushId="pen"
+        mobileKeyboardInset={180.4}
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+        onToggleFavorite={vi.fn()}
+      />
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "브러시 전체 라이브러리" });
+    expect(dialog.dataset.studioBrushCompact).toBe("true");
+    expect(dialog.style.bottom).toContain("180px");
+    expect(
+      dialog.querySelector<HTMLElement>("[data-studio-brush-catalog-scrollport]")?.className
+    ).toContain("min-h-16");
+    expect(
+      dialog.querySelector<HTMLElement>("[data-studio-brush-catalog-reset]")
+    ).toBeTruthy();
+  });
+
+  it("switches between CLIP-style stroke, small-tile, and text views without changing results", () => {
+    const { container } = render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+        onToggleFavorite={vi.fn()}
+      />
+    );
+
+    const viewGrid = () =>
+      container.querySelector<HTMLElement>("[data-studio-brush-progressive-grid]");
+    expect(viewGrid()?.dataset.studioBrushView).toBe("stroke");
+    expect(screen.getByRole("button", { name: "획 미리보기" }).getAttribute("aria-pressed"))
+      .toBe("true");
+    expect(container.querySelector('[data-studio-brush-preview-density="stroke"]')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "작은 타일" }));
+    expect(viewGrid()?.dataset.studioBrushView).toBe("tile");
+    expect(viewGrid()?.className).toContain("grid-cols-3");
+    expect(screen.getByRole("button", { name: "작은 타일" }).getAttribute("aria-pressed"))
+      .toBe("true");
+    expect(container.querySelector('[data-studio-brush-preview-density="tile"]')).toBeTruthy();
+    expect(screen.getByRole("button", { name: "펜(매끈) 선택" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "이름 목록" }));
+    expect(viewGrid()?.dataset.studioBrushView).toBe("text");
+    expect(viewGrid()?.className).toContain("grid-cols-1");
+    expect(container.querySelector("[data-studio-brush-preview]")).toBeNull();
+    expect(container.querySelectorAll('[data-studio-brush-text-row="true"]')).toHaveLength(8);
+    expect(screen.getByRole("button", { name: "펜(매끈) 선택" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "펜(매끈) 즐겨찾기" })).toBeTruthy();
+  });
+
+  it("keeps full-catalog search and roving selection intact after a density change", () => {
+    render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "이름 목록" }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "전체 브러시 검색" }), {
+      target: { value: "heart-stamp" },
+    });
+
+    const result = screen.getByRole("button", { name: "하트 도장 선택" });
+    expect(result.tabIndex).toBe(0);
+    expect(screen.getByRole("status").textContent).toBe("1/1개의 브러시가 표시됩니다.");
+    expect(screen.getByText(`분류와 관계없이 전체 ${STUDIO_BRUSH_CATALOG_COUNTS.total}종에서 검색 중`)).toBeTruthy();
+  });
+
+  it("keeps a long brush name inside the 320px text-row flex boundary", () => {
+    const longestNameItem = STUDIO_ALL_BRUSH_CATALOG_ITEMS.reduce((longest, item) =>
+      item.name.length > longest.name.length ? item : longest
+    );
+    render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "이름 목록" }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "전체 브러시 검색" }), {
+      target: { value: longestNameItem.name },
+    });
+
+    const result = screen.getByRole("button", { name: `${longestNameItem.name} 선택` });
+    expect(result.className).toContain("pr-11");
+    expect(result.querySelector("span.min-w-0.flex-1")).toBeTruthy();
+    expect(result.querySelector("span.truncate")).toBeTruthy();
   });
 
   it("exposes a non-modal dialog, one-tab-stop tablist, named panel, and live result count", () => {
@@ -257,17 +393,116 @@ describe("StudioBrushLibrarySheet", () => {
     const selections = screen.getAllByRole("button", { name: /선택$/ });
     expect(selections.filter((button) => button.tabIndex === 0)).toHaveLength(1);
     const scrollIntoView = vi.fn();
-    Object.defineProperty(selections[1]!, "scrollIntoView", {
+    Object.defineProperty(selections[2]!, "scrollIntoView", {
       configurable: true,
       value: scrollIntoView,
     });
     selections[0]?.focus();
     fireEvent.keyDown(selections[0]!, { key: "ArrowDown" });
-    expect(document.activeElement).toBe(selections[1]);
-    expect(selections[1]?.tabIndex).toBe(0);
+    expect(document.activeElement).toBe(selections[2]);
+    expect(selections[2]?.tabIndex).toBe(0);
     expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", inline: "nearest" });
-    fireEvent.keyDown(selections[1]!, { key: "Home" });
+    fireEvent.keyDown(selections[2]!, { key: "Home" });
     expect(document.activeElement).toBe(selections[0]);
+  });
+
+  it("uses live rendered columns after responsive resize and keeps the same roving brush across view changes", () => {
+    const { container } = render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+
+    const grid = container.querySelector<HTMLElement>(
+      "[data-studio-brush-progressive-grid]"
+    );
+    expect(grid).toBeTruthy();
+    const selections = screen.getAllByRole("button", { name: /선택$/ });
+    const originalGetComputedStyle = globalThis.getComputedStyle;
+    let renderedColumns = "100px 100px";
+    vi.spyOn(globalThis, "getComputedStyle").mockImplementation((element, pseudoElement) => {
+      if (element === grid) {
+        return {
+          gridTemplateColumns: renderedColumns,
+        } as CSSStyleDeclaration;
+      }
+      return originalGetComputedStyle(element, pseudoElement);
+    });
+
+    selections[0]!.focus();
+    fireEvent.keyDown(selections[0]!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(selections[2]);
+
+    renderedColumns = "100px 100px 100px";
+    fireEvent.keyDown(selections[2]!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(selections[5]);
+
+    fireEvent.click(screen.getByRole("button", { name: "작은 타일" }));
+    const tileSelections = screen.getAllByRole("button", { name: /선택$/ });
+    expect(tileSelections[5]!.tabIndex).toBe(0);
+    fireEvent.keyDown(tileSelections[5]!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(tileSelections[5]);
+
+    renderedColumns = "100px";
+    fireEvent.click(screen.getByRole("button", { name: "이름 목록" }));
+    const textSelections = screen.getAllByRole("button", { name: /선택$/ });
+    expect(textSelections[5]!.tabIndex).toBe(0);
+    fireEvent.keyDown(textSelections[5]!, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(textSelections[4]);
+  });
+
+  it("keeps linear row edges and leaves focus in place when a vertical grid cell is missing", () => {
+    const { container } = render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+
+    const grid = container.querySelector<HTMLElement>(
+      "[data-studio-brush-progressive-grid]"
+    );
+    const selections = screen.getAllByRole("button", { name: /선택$/ });
+    const originalGetComputedStyle = globalThis.getComputedStyle;
+    vi.spyOn(globalThis, "getComputedStyle").mockImplementation((element, pseudoElement) => {
+      if (element === grid) {
+        return {
+          gridTemplateColumns: "repeat(3, minmax(0px, 1fr))",
+        } as CSSStyleDeclaration;
+      }
+      return originalGetComputedStyle(element, pseudoElement);
+    });
+
+    selections[0]!.focus();
+    fireEvent.keyDown(selections[0]!, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(selections[0]);
+    fireEvent.keyDown(selections[0]!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(selections[3]);
+    fireEvent.keyDown(selections[3]!, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(selections[2]);
+    fireEvent.keyDown(selections[2]!, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(selections[2]);
+
+    selections[0]!.focus();
+    fireEvent.keyDown(selections[0]!, { key: "End" });
+    expect(document.activeElement).toBe(selections[7]);
+    fireEvent.keyDown(selections[7]!, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(selections[7]);
+    fireEvent.keyDown(selections[7]!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(selections[7]);
+    fireEvent.keyDown(selections[7]!, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(selections[4]);
+    fireEvent.keyDown(selections[4]!, { key: "Home" });
+    expect(document.activeElement).toBe(selections[0]);
+
+    selections[6]!.focus();
+    fireEvent.keyDown(selections[6]!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(selections[6]);
   });
 
   it("keeps favorite actions out of the tab sequence and exposes F on the roving tile", () => {
@@ -323,6 +558,29 @@ describe("StudioBrushLibrarySheet", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("invalidates an in-flight selection before reporting an outside-pointer close", async () => {
+    const onSelect = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={onClose}
+        onSelect={onSelect}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "펜(매끈) 선택" }));
+    fireEvent.pointerDown(document.body);
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(onClose).toHaveBeenCalledWith("outside-pointer");
+
+    await act(async () => {
+      await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
+    });
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it("renders distinct motif details for patterned, foliage, and stamp profiles", () => {
     const heart = renderToStaticMarkup(
       <LargeBrushPreview item={catalogBrush("heart-stamp")} active={false} />
@@ -355,15 +613,16 @@ describe("StudioBrushLibrarySheet", () => {
     }
   });
 
-  it("does not make a deliberately translucent catalogue brush opaque in preview", () => {
-    const colorlessMarker = renderToStaticMarkup(
+  it("keeps the low-flow glaze marker visibly translucent in preview", () => {
+    const glazeMarker = renderToStaticMarkup(
       <LargeBrushPreview item={catalogBrush("marker-colorless-blender")} active={false} />
     );
 
-    expect(catalogBrush("marker-colorless-blender").defaultOpacity).toBe(0.2);
-    expect(colorlessMarker).toContain('data-studio-brush-preview-opacity="0.2"');
-    expect(colorlessMarker).toContain('opacity="0.048"');
-    expect(colorlessMarker).toContain('opacity="0.096"');
+    expect(catalogBrush("marker-colorless-blender").name).toBe("저유량 글레이즈 마커");
+    expect(catalogBrush("marker-colorless-blender").defaultOpacity).toBe(0.4);
+    expect(glazeMarker).toContain('data-studio-brush-preview-opacity="0.4"');
+    expect(glazeMarker).toContain('opacity="0.096"');
+    expect(glazeMarker).toContain('opacity="0.192"');
   });
 
   it("marks the active preset and favorite action independently", () => {
@@ -385,7 +644,8 @@ describe("StudioBrushLibrarySheet", () => {
     ["pencil", "pencil"],
     ["charcoal", "texture"],
     ["airbrush-fine", "soft-air"],
-    ["spray", "soft-air"],
+    ["spray", "particle"],
+    ["splatter", "particle"],
     ["wash-brush", "soft-wash"],
     ["pastel", "soft-pigment"],
     ["oil", "oil"],
@@ -432,6 +692,16 @@ describe("StudioBrushLibrarySheet", () => {
     expect(html).toContain("text-on-accent");
     expect(html).toContain('stroke="currentColor"');
     expect(html).not.toContain("oklch(0.96 0.02 85)");
+  });
+
+  it("keeps the same renderer-faithful preview in compact tile density", () => {
+    const html = renderToStaticMarkup(
+      <LargeBrushPreview item={brush("gpen")} active={false} density="tile" />
+    );
+
+    expect(html).toContain('data-studio-brush-preview-kind="calligraphy"');
+    expect(html).toContain('data-studio-brush-preview-density="tile"');
+    expect(html).toContain("h-7");
   });
 
   it("uses a preset's suggested effect color only while the preview is inactive", () => {

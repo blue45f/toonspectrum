@@ -317,6 +317,7 @@ export interface StudioCanvasViewportProps {
   bgGrad: string[] | null;
   brush: string;
   brushCursorRef: import("react").RefObject<import("konva/lib/Group").Group | null>;
+  strokeGuideRef: import("react").RefObject<import("konva/lib/shapes/Line").Line | null>;
   brushOpacity: number;
   bubbleShapeArmed: boolean;
   bubbleShapeDraft: { elId: string; points: number[]; } | null;
@@ -400,6 +401,8 @@ export interface StudioCanvasViewportProps {
   /** "나만 숨기기" — 문서(CRDT)에 없는, 이 클라이언트에서만 켠 로컬 숨김 대상. */
   localHiddenElementIds: ReadonlySet<string>;
   liveDraftDirectRef: import("react").RefObject<boolean>;
+  draftPreviewDynamicLayerRef: import("react").RefObject<import("konva/lib/Layer").Layer | null>;
+  draftPreviewNormalLayerRef: import("react").RefObject<import("konva/lib/Layer").Layer | null>;
   liveDraftLayerRef: import("react").RefObject<import("konva/lib/Layer").Layer | null>;
   liveDraftVisualRef: import("react").RefObject<DrawEl | null>;
   liveInkOverlayRendererRef: import("react").RefObject<StudioLiveInkOverlayRenderer>;
@@ -605,6 +608,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   bgGrad,
   brush,
   brushCursorRef,
+  strokeGuideRef,
   brushOpacity,
   bubbleShapeArmed,
   bubbleShapeDraft,
@@ -687,6 +691,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   layerMaskRadius,
   localHiddenElementIds,
   liveDraftDirectRef,
+  draftPreviewDynamicLayerRef,
+  draftPreviewNormalLayerRef,
   liveDraftLayerRef,
   liveDraftVisualRef,
   liveInkOverlayRendererRef,
@@ -2304,6 +2310,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 프레임은 이 서브트리만 다시 렌더한다. */}
             <StudioDraftPreviewLayers
               store={draftPreviewStore}
+              dynamicLayerRef={draftPreviewDynamicLayerRef}
+              normalLayerRef={draftPreviewNormalLayerRef}
             />
             {/* 브러시 렌더 종류와 실제 범위를 반영하는 고대비 포인터. */}
             {!isExporting
@@ -2312,9 +2320,17 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               && !isPanning
               && tool === "draw"
               && isStudioBrushCursorMode(drawMode)
-              && brushCursorStyle !== "none" ? (
+              && (
+                brushCursorStyle !== "none"
+                || (appSettings.general.showStrokeGuide && stabilizer > 0)
+              ) ? (
                 <StudioBrushCursor
                   cursorRef={brushCursorRef}
+                  guideRef={
+                    appSettings.general.showStrokeGuide
+                      ? strokeGuideRef
+                      : undefined
+                  }
                   brushId={drawMode === "eraser" ? "eraser" : brush}
                   diameter={
                     drawMode === "pen"

@@ -2,27 +2,33 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const pageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
-const jsonExportStart = pageSource.indexOf("async function handleExportProject()");
-const jsonExportEnd = pageSource.indexOf(
+const projectArchiveSource = readFileSync(
+  new URL("./studio-project-archive-orchestration-runtime.ts", import.meta.url),
+  "utf8",
+);
+const jsonExportStart = projectArchiveSource.indexOf("async function handleExportProject()");
+const jsonExportEnd = projectArchiveSource.indexOf(
   "async function handleExportProjectArchive(",
   jsonExportStart,
 );
-const jsonExportSource = pageSource.slice(jsonExportStart, jsonExportEnd);
-const importStart = pageSource.indexOf("function handleImportProject(");
-const importEnd = pageSource.indexOf(
+const jsonExportSource = projectArchiveSource.slice(jsonExportStart, jsonExportEnd);
+const importStart = projectArchiveSource.indexOf("function handleImportProject(");
+const importEnd = projectArchiveSource.indexOf(
   "async function handleImportProjectArchive(",
   importStart,
 );
-const jsonImportSource = pageSource.slice(importStart, importEnd);
-const archiveExportStart = pageSource.indexOf(
+const jsonImportSource = projectArchiveSource.slice(importStart, importEnd);
+const archiveExportStart = projectArchiveSource.indexOf(
   "async function handleExportProjectArchive(",
 );
-const archiveExportEnd = pageSource.indexOf(
+const archiveExportEnd = projectArchiveSource.indexOf(
   "function handleImportProject(",
   archiveExportStart,
 );
-const archiveExportSource = pageSource.slice(archiveExportStart, archiveExportEnd);
+const archiveExportSource = projectArchiveSource.slice(
+  archiveExportStart,
+  archiveExportEnd,
+);
 
 describe("Studio JSON VRM surface-paint availability boundary", () => {
   it("awaits the lazy JSON portability facade before starting the download", () => {

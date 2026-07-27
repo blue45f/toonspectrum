@@ -148,12 +148,32 @@ describe("Studio menubar ownership boundary", () => {
   it("wires multi-page range capture through indices mode (not all-then-slice residual)", () => {
     const page = moduleEdges("./StudioPage.tsx").source;
     const menubar = moduleEdges("./StudioMenubarContent.tsx").source;
+    const rasterIntent = moduleEdges("./useStudioRasterExportOrchestration.ts").source;
+    const rasterRuntime = moduleEdges(
+      "./studio-raster-export-orchestration-runtime.ts"
+    ).source;
     const handlerContract = menubar.slice(
       menubar.indexOf("export interface StudioMenubarContentHandlers"),
       menubar.indexOf("export interface StudioMenubarContentProps")
     );
 
-    expect(page).toContain("async function handleCapturePagesForIndices(indices: number[])");
+    expect(page).not.toContain(
+      "async function handleCapturePagesForIndices(indices: number[])"
+    );
+    expect(rasterRuntime).toContain(
+      "async function handleCapturePagesForIndices("
+    );
+    expect(rasterRuntime).toContain(
+      "return handleCapturePagesForIndices(pages.map((_, index) => index));"
+    );
+    expect(rasterIntent).toContain("handleCapturePagesForIndices: (indices) =>");
+    expect(rasterIntent).toContain(
+      "(await load()).handleCapturePagesForIndices(indices)"
+    );
+    expect(page).toContain(
+      "const rasterExportOrchestration = useStudioRasterExportOrchestration({"
+    );
+    expect(page).toContain("} = rasterExportOrchestration;");
     expect(page).toContain("handleCapturePagesForIndices,");
     expect(handlerContract).toContain(
       "handleCapturePagesForIndices: (indices: number[]) => Promise<HTMLCanvasElement[]>"

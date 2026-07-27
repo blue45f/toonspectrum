@@ -28,11 +28,13 @@ function Harness({
   onDraggingChange,
   onLayoutChange,
   cancelEpoch,
+  defaultPresentation,
 }: {
   initial?: StudioDrawingPaletteLayout;
   onDraggingChange?: (dragging: boolean) => void;
   onLayoutChange?: (layout: StudioDrawingPaletteLayout) => void;
   cancelEpoch?: number;
+  defaultPresentation?: "full" | "icon-popup";
 }) {
   const [layout, setLayout] = useState(initial);
   return (
@@ -46,6 +48,7 @@ function Harness({
       }}
       onDraggingChange={onDraggingChange}
       cancelEpoch={cancelEpoch}
+      defaultPresentation={defaultPresentation}
     />
   );
 }
@@ -177,6 +180,166 @@ describe("StudioDrawingPaletteStack", () => {
         name: /도구 속성과 서브 도구 크기 조절/,
       }),
     ).toBeTruthy();
+  });
+
+  it("groups durable position and height locks in one palette-options menu", () => {
+    const onLayoutChange = vi.fn();
+    const { container } = render(
+      <Harness onLayoutChange={onLayoutChange} />,
+    );
+    const optionsTrigger = screen.getByRole("button", {
+      name: "서브 도구 팔레트 옵션",
+    });
+    expect(optionsTrigger.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(optionsTrigger);
+
+    const menu = screen.getByRole("menu", {
+      name: "서브 도구 팔레트 옵션",
+    });
+    expect(optionsTrigger.getAttribute("aria-expanded")).toBe("true");
+    expect(optionsTrigger.getAttribute("aria-controls")).toBe(menu.id);
+    const positionLock = within(menu).getByRole("menuitemcheckbox", {
+      name: /위치 잠금/,
+    });
+    const heightLock = within(menu).getByRole("menuitemcheckbox", {
+      name: /높이 잠금/,
+    });
+    expect(positionLock.getAttribute("aria-checked")).toBe("false");
+    expect(heightLock.getAttribute("aria-checked")).toBe("false");
+
+    fireEvent.click(positionLock);
+
+    const subTools = container.querySelector<HTMLElement>(
+      '[data-studio-drawing-palette="sub-tools"]',
+    )!;
+    const toolProperties = container.querySelector<HTMLElement>(
+      '[data-studio-drawing-palette="tool-properties"]',
+    )!;
+    expect(subTools.dataset.positionLocked).toBe("true");
+    expect(
+      within(subTools).getByRole<HTMLButtonElement>("button", {
+        name: "서브 도구 아래로 이동",
+      }).disabled,
+    ).toBe(true);
+    expect(
+      within(toolProperties).getByRole<HTMLButtonElement>("button", {
+        name: "도구 속성 위로 이동",
+      }).disabled,
+    ).toBe(true);
+
+    fireEvent.click(
+      within(
+        screen.getByRole("menu", {
+          name: "서브 도구 팔레트 옵션",
+        }),
+      ).getByRole("menuitemcheckbox", { name: /높이 잠금/ }),
+    );
+
+    const lockedSplitter = splitter();
+    expect(lockedSplitter.getAttribute("aria-disabled")).toBe("true");
+    expect(lockedSplitter.getAttribute("tabindex")).toBe("-1");
+    expect(lockedSplitter.dataset.heightLocked).toBe("true");
+    fireEvent.keyDown(lockedSplitter, { key: "ArrowDown" });
+    expect(splitter().getAttribute("aria-valuenow")).toBe("36");
+    expect(onLayoutChange).toHaveBeenCalledTimes(2);
+
+    fireEvent.pointerDown(document.body);
+    expect(
+      screen.queryByRole("menu", { name: "서브 도구 팔레트 옵션" }),
+    ).toBeNull();
+    expect(optionsTrigger.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("switches presentation through palette options without crowding the header", () => {
+    const { container } = render(<Harness />);
+    const subTools = container.querySelector<HTMLElement>(
+      '[data-studio-drawing-palette="sub-tools"]',
+    )!;
+    const headerControls = within(subTools).getByRole("group", {
+      name: "서브 도구 팔레트 배치",
+    });
+    expect(
+      within(headerControls)
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label")),
+    ).toEqual([
+      "서브 도구 위로 이동",
+      "서브 도구 아래로 이동",
+      "서브 도구 팔레트 옵션",
+      "서브 도구 접기",
+    ]);
+
+    fireEvent.click(
+      within(subTools).getByRole("button", {
+        name: "서브 도구 팔레트 옵션",
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: "아이콘 팝업으로 보기" }),
+    );
+
+    expect(
+      container.querySelector<HTMLElement>(
+        '[data-studio-drawing-palette-stack="true"]',
+      )?.dataset.studioDrawingPalettePresentation,
+    ).toBe("icon-popup");
+    expect(
+      screen.getByRole("button", { name: "서브 도구 팝업 열기" }).className,
+    ).toContain("size-11");
+    expect(
+      screen.getByRole("button", { name: "도구 속성 팝업 열기" }).className,
+    ).toContain("size-11");
+  });
+
+  it("opens only one icon palette popup and dismisses outside or by Escape with focus return", () => {
+    render(<Harness defaultPresentation="icon-popup" />);
+    const subToolsTrigger = screen.getByRole("button", {
+      name: "서브 도구 팝업 열기",
+    });
+    const controlledPopupId = subToolsTrigger.getAttribute("aria-controls");
+    expect(subToolsTrigger.getAttribute("aria-expanded")).toBe("false");
+    expect(controlledPopupId).not.toBeNull();
+
+    fireEvent.click(subToolsTrigger);
+
+    const subToolsDialog = screen.getByRole("dialog", {
+      name: "서브 도구 팝업",
+    });
+    expect(subToolsTrigger.getAttribute("aria-expanded")).toBe("true");
+    expect(subToolsDialog.id).toBe(controlledPopupId);
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "G펜 선택" })).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "도구 속성 팝업 열기" }),
+    );
+
+    expect(
+      screen.queryByRole("dialog", { name: "서브 도구 팝업" }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("dialog", { name: "도구 속성 팝업" }),
+    ).toBeTruthy();
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "G펜 선택" })).toBeNull();
+    expect(screen.getByRole("button", { name: "필압 설정" })).toBeTruthy();
+
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    const reopenedTrigger = screen.getByRole("button", {
+      name: "서브 도구 팝업 열기",
+    });
+    fireEvent.click(reopenedTrigger);
+    const bodyAction = screen.getByRole("button", { name: "G펜 선택" });
+    bodyAction.focus();
+    expect(document.activeElement).toBe(bodyAction);
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(reopenedTrigger);
+    expect(reopenedTrigger.getAttribute("aria-expanded")).toBe("false");
   });
 
   it("supports precise separator keyboard resizing and default restoration", () => {

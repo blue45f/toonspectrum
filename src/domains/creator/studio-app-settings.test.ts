@@ -41,10 +41,20 @@ describe("studio-app-settings", () => {
       defaultShortcut: "Home",
     });
     expect(d.general.toolHintMode).toBe("rich");
+    expect(d.general.showStrokeGuide).toBe(false);
     expect(d.touch.toolHintHoldMs).toBe(480);
     expect(d.mouse.wheel).toBe("zoom");
     expect(d.touch.oneFingerDrag).toBe("draw");
     expect(d.grids.showCanvasRulers).toBe(false);
+  });
+
+  it("migrates legacy settings to a visible stroke guide and preserves an explicit opt-out", () => {
+    expect(normalizeStudioAppSettings({ general: {} }).general.showStrokeGuide).toBe(false);
+    expect(
+      normalizeStudioAppSettings({
+        general: { showStrokeGuide: false },
+      }).general.showStrokeGuide
+    ).toBe(false);
   });
 
   it("keeps the new selection, retouch, and view tools aligned across both catalogs", () => {

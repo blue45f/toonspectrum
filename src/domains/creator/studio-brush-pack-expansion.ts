@@ -5,8 +5,7 @@
  * index, which is perfect for bulk variety but too coarse for presets that imitate a specific
  * physical tool (a G-pen's dramatic pressure swell, a pastel's canvas-pinned paper tooth, rain
  * falling at one fixed angle...). This module carries explicit, hand-tuned dynamics overrides for
- * the 73 expansion ids ONLY. Ids outside the waves never receive an entry, so the 87 original
- * catalogue brushes keep byte-identical materialized dynamics and saved strokes replay unchanged.
+ * the 73 expansion ids plus a deliberately tiny visibility-correction set for legacy soft media.
  *
  * Determinism: no override introduces a new random stream. Jitters/mappings run through the
  * engine's seeded planner and every grain override pins an explicit constant seed.
@@ -109,6 +108,21 @@ export type StudioBrushPackExpansionWaveId =
   (typeof STUDIO_BRUSH_PACK_EXPANSION_WAVE_IDS)[number];
 
 /**
+ * Original soft-media profiles whose first browser stroke fell below a useful contrast floor.
+ * Keeping this set explicit prevents a general opacity multiplier from flattening the catalogue.
+ */
+export const STUDIO_BRUSH_PACK_VISIBILITY_TUNING_IDS = [
+  "mist-soft",
+  "bokeh-scatter",
+] as const satisfies readonly StudioBrushPackCatalogId[];
+
+type StudioBrushPackVisibilityTuningId =
+  (typeof STUDIO_BRUSH_PACK_VISIBILITY_TUNING_IDS)[number];
+type StudioBrushPackTuningId =
+  | StudioBrushPackExpansionWaveId
+  | StudioBrushPackVisibilityTuningId;
+
+/**
  * Additive override applied on top of the formula-built settings snapshot before normalization.
  * Channel objects merge shallowly (`{ ...formula, ...override }`), so an override that only sets
  * `jitter` keeps the formula's mappings. `width.base`/`opacity.base` are re-asserted by the
@@ -137,8 +151,20 @@ export interface StudioBrushPackExpansionTuning {
 }
 
 const EXPANSION_TUNING: Readonly<
-  Record<StudioBrushPackExpansionWaveId, StudioBrushPackExpansionTuning>
+  Record<StudioBrushPackTuningId, StudioBrushPackExpansionTuning>
 > = {
+  // ── Legacy soft-media visibility corrections ──────────────────────────
+  "mist-soft": {
+    // Remains a build-up brush, but no longer starts below the browser's perceptual floor.
+    tipSoftness: 0.72,
+    flow: { base: 0.32, mappings: [{ source: "pressure", from: 0.52, to: 1, curve: 0.92 }] },
+  },
+  "bokeh-scatter": {
+    // Preserve sparse light orbs while making a single pass legible on white paper.
+    tipSoftness: 0.68,
+    flow: { base: 0.38, mappings: [{ source: "pressure", from: 0.54, to: 1, curve: 0.96 }] },
+  },
+
   // ── 연필/스케치 ─────────────────────────────────────────────────────────
   "pencil-4b-rough": {
     // Soft 4B lead: wide pressure swell, heavy canvas-pinned paper tooth.
@@ -239,6 +265,10 @@ const EXPANSION_TUNING: Readonly<
   "brush-pen-ink": {
     // Sumi brush pen: pressure loads ink, speed starves the bristles.
     tipSoftness: 0.12,
+    // The compact profile's inherited 0.1217 tip ratio left visible holes when both speed
+    // starvation and the long exit taper made the tip narrow. Keep the expressive width/flow
+    // response, but stamp densely enough that a fast curved stroke remains one continuous mark.
+    spacingRatio: 0.06,
     width: {
       mappings: [
         { source: "pressure", from: 0.18, to: 2, curve: 1.3 },
@@ -279,12 +309,12 @@ const EXPANSION_TUNING: Readonly<
   // ── 채색 ───────────────────────────────────────────────────────────────
   "watercolor-wet-bleed": {
     // Wet-on-wet wash: slow strokes deposit more water, fast strokes dry out.
-    tipSoftness: 0.9,
+    tipSoftness: 0.86,
     flow: {
-      base: 0.3,
+      base: 0.46,
       mappings: [
         { source: "pressure", from: 0.5, to: 1 },
-        { source: "speed", from: 1.15, to: 0.6 },
+        { source: "speed", from: 1.12, to: 0.78 },
       ],
     },
     opacity: { mappings: [{ source: "pressure", from: 0.35, to: 1, curve: 0.8 }] },
@@ -343,8 +373,8 @@ const EXPANSION_TUNING: Readonly<
   },
   "airbrush-grand-soft": {
     // Grand airbrush: size stays stable; pressure only meters the paint.
-    tipSoftness: 0.95,
-    flow: { base: 0.16, mappings: [{ source: "pressure", from: 0.35, to: 1, curve: 0.85 }] },
+    tipSoftness: 0.82,
+    flow: { base: 0.52, mappings: [{ source: "pressure", from: 0.38, to: 1, curve: 0.85 }] },
     width: { mappings: [{ source: "pressure", from: 0.85, to: 1.15 }], jitter: null },
     taper: { enabled: false },
     scatterRatio: 0.12,
@@ -361,9 +391,10 @@ const EXPANSION_TUNING: Readonly<
     flow: { base: 0.75, mappings: [{ source: "pressure", from: 0.6, to: 1 }] },
   },
   "marker-colorless-blender": {
-    // Colorless blender: almost no pigment, exists to soften edges by layering.
-    tipSoftness: 0.8,
-    flow: { base: 0.14, mappings: [{ source: "pressure", from: 0.4, to: 1 }] },
+    // Low-flow glaze marker: softly layers the selected colour without pretending to sample
+    // or redistribute destination pixels like a true blender/smudge engine.
+    tipSoftness: 0.7,
+    flow: { base: 0.4, mappings: [{ source: "pressure", from: 0.44, to: 1 }] },
     opacity: { mappings: [{ source: "pressure", from: 0.3, to: 1 }] },
     width: { mappings: [{ source: "pressure", from: 0.9, to: 1.1 }], jitter: null },
   },
@@ -419,7 +450,8 @@ const EXPANSION_TUNING: Readonly<
   },
   "cloud-billow-soft": {
     // Cumulus smoke: giant soft dabs shaped by very large canvas-pinned noise.
-    flow: { base: 0.14, mappings: [{ source: "pressure", from: 0.35, to: 1, curve: 0.75 }] },
+    tipSoftness: 0.58,
+    flow: { base: 0.28, mappings: [{ source: "pressure", from: 0.38, to: 1, curve: 0.75 }] },
     width: {
       mappings: [{ source: "pressure", from: 0.8, to: 1.2 }],
       jitter: { mode: "multiply", amount: 0.25 },
@@ -684,7 +716,7 @@ const EXPANSION_TUNING: Readonly<
       jitter: { mode: "multiply", amount: 0.1 },
     },
     flow: {
-      base: 0.18,
+      base: 0.28,
       mappings: [
         { source: "pressure", from: 0.3, to: 1 },
         { source: "speed", from: 1.08, to: 0.62 },
@@ -917,7 +949,7 @@ const EXPANSION_TUNING: Readonly<
       ],
       jitter: { mode: "multiply", amount: 0.2 },
     },
-    flow: { base: 0.14, mappings: [{ source: "pressure", from: 0.32, to: 1 }] },
+    flow: { base: 0.24, mappings: [{ source: "pressure", from: 0.32, to: 1 }] },
     angle: { jitter: { mode: "add", amount: 32 } },
     grain: { space: "canvas-fixed", amount: 0.28, scale: 20, contrast: 0.4, seed: 0x4b0a_2301 },
     dualBrush: {
@@ -1056,7 +1088,7 @@ const EXPANSION_TUNING: Readonly<
       ],
       jitter: { mode: "multiply", amount: 0.16 },
     },
-    flow: { base: 0.12, mappings: [{ source: "pressure", from: 0.28, to: 1 }] },
+    flow: { base: 0.22, mappings: [{ source: "pressure", from: 0.28, to: 1 }] },
     spacing: { mappings: [{ source: "speed", from: 0.78, to: 1.28 }] },
     grain: { space: "canvas-fixed", amount: 0.22, scale: 26, contrast: 0.34, seed: 0x4b0a_2308 },
     dualBrush: {
@@ -1289,12 +1321,12 @@ const EXPANSION_TUNING: Readonly<
   },
 };
 
-/** Tuning lookup. Returns null for every pre-expansion catalogue id — their physics never change. */
+/** Tuning lookup for the expansion wave and the explicit legacy visibility-correction set. */
 export function studioBrushPackExpansionTuningById(
   catalogId: StudioBrushPackCatalogId
 ): StudioBrushPackExpansionTuning | null {
   return Object.prototype.hasOwnProperty.call(EXPANSION_TUNING, catalogId)
-    ? EXPANSION_TUNING[catalogId as StudioBrushPackExpansionWaveId]
+    ? EXPANSION_TUNING[catalogId as StudioBrushPackTuningId]
     : null;
 }
 

@@ -183,11 +183,13 @@ export function planStudioBrushCursorVisual(input: {
     outerStrokeWidth: 3.25 / effectiveScale,
     innerStrokeWidth: 1.25 / effectiveScale,
     dash,
-    centerRadius: style === "dot"
-      ? 2 / effectiveScale
-      : screenDiameter * extentScale < 8
-        ? 1.5 / effectiveScale
-        : null,
+    centerRadius: style === "none"
+      ? null
+      : style === "dot"
+        ? 2 / effectiveScale
+        : screenDiameter * extentScale < 8
+          ? 1.5 / effectiveScale
+          : null,
     centerStrokeWidth: 0.75 / effectiveScale,
     innerBoundaryScale,
     showOutline: style === "outline",

@@ -1,0 +1,427 @@
+import {
+  drawVignette,
+  isDefaultPageGrade,
+  normalizePageGrade,
+  pageGradeToCssFilter,
+  type PageGrade,
+} from "./studio-page-grade";
+
+import type { ExportFormat } from "./studio-export";
+import type { PageState } from "./studio-page-state";
+import type {
+  StudioRasterEncoded,
+  StudioRasterInterchangeFormat,
+} from "./studio-raster-interchange";
+import type { WatermarkSettings } from "./studio-watermark";
+import type Konva from "konva";
+
+export function bakeStudioPageGradeIntoCanvas(
+  source: HTMLCanvasElement,
+  grade: PageGrade
+): HTMLCanvasElement {
+  if (isDefaultPageGrade(grade)) return source;
+  const output = document.createElement("canvas");
+  output.width = source.width;
+  output.height = source.height;
+  const context = output.getContext("2d");
+  if (!context) return source;
+  const cssFilter = pageGradeToCssFilter(grade);
+  if (cssFilter) context.filter = cssFilter;
+  context.drawImage(source, 0, 0);
+  context.filter = "none";
+  drawVignette(context, output.width, output.height, grade.vignette);
+  return output;
+}
+
+export interface StudioRasterExportOrchestrationInput {
+  readonly activePage: PageState;
+  readonly pages: readonly PageState[];
+  readonly currentPageId: string;
+  readonly masterEditMode: boolean;
+  readonly exportTransparent: boolean;
+  readonly exportFormat: ExportFormat;
+  readonly exportScale: number;
+  readonly effectiveScale: number;
+  readonly pageGrade: PageGrade;
+  readonly title: string;
+  readonly ensureSharedDocumentAvailableForExport: () => boolean;
+  readonly ensureWatermarkLoaded: () => WatermarkSettings;
+  readonly drawWatermarkOnCanvas: (
+    canvas: HTMLCanvasElement,
+    settings: WatermarkSettings,
+  ) => void;
+  readonly captureReadyStageForPage: (page: PageState) => Promise<Konva.Stage>;
+  readonly preserveStudioViewBeforeCapture: () => void;
+  readonly setExportMenuOpen: (open: boolean) => void;
+  readonly setSelectedId: (id: string | null) => void;
+  readonly setMasterEditMode: (active: boolean) => void;
+  readonly setIsExporting: (exporting: boolean) => void;
+  readonly setError: (message: string | null) => void;
+  readonly setCurrentPageId: (pageId: string) => void;
+}
+
+export interface StudioRasterExportOrchestration {
+  readonly handleDownload: () => Promise<void>;
+  readonly exportCurrentPageToRasterInterchange: (
+    format: StudioRasterInterchangeFormat
+  ) => Promise<StudioRasterEncoded>;
+  readonly handleCopyToClipboard: () => Promise<void>;
+  readonly handleDownloadAll: (spacing?: number) => Promise<void>;
+  readonly handleCapturePagesForPreset: (
+    scope: "current" | "all"
+  ) => Promise<HTMLCanvasElement[]>;
+  readonly handleCapturePagesForIndices: (
+    indices: number[]
+  ) => Promise<HTMLCanvasElement[]>;
+}
+
+/**
+ * Rare raster-export work lives in an intent-loaded runtime factory outside the editor's
+ * interaction coordinator. StudioPage therefore keeps the capture/download implementation out of
+ * its compilation unit and initial rendering graph.
+ */
+export function createStudioRasterExportOrchestration({
+  activePage,
+  pages,
+  currentPageId,
+  masterEditMode,
+  exportTransparent,
+  exportFormat,
+  exportScale,
+  effectiveScale,
+  pageGrade,
+  title,
+  ensureSharedDocumentAvailableForExport,
+  ensureWatermarkLoaded,
+  drawWatermarkOnCanvas,
+  captureReadyStageForPage,
+  preserveStudioViewBeforeCapture,
+  setExportMenuOpen,
+  setSelectedId,
+  setMasterEditMode,
+  setIsExporting,
+  setError,
+  setCurrentPageId,
+}: StudioRasterExportOrchestrationInput): StudioRasterExportOrchestration {
+  async function handleDownload() {
+    if (!ensureSharedDocumentAvailableForExport()) return;
+    const watermarkForExport = ensureWatermarkLoaded();
+    setExportMenuOpen(false);
+    setSelectedId(null);
+    const originalMasterEditMode = masterEditMode;
+    setMasterEditMode(false);
+    preserveStudioViewBeforeCapture();
+    setIsExporting(true);
+    try {
+      const stage = await captureReadyStageForPage(activePage);
+      const transparent = exportTransparent && exportFormat !== "jpg";
+      const backgroundNode = transparent ? stage.findOne(".bg") : null;
+      if (backgroundNode) {
+        backgroundNode.hide();
+        stage.batchDraw();
+      }
+      let canvas: HTMLCanvasElement;
+      try {
+        const rawCanvas = stage.toCanvas({ pixelRatio: exportScale / effectiveScale });
+        canvas = bakeStudioPageGradeIntoCanvas(rawCanvas, pageGrade);
+      } finally {
+        if (backgroundNode) {
+          backgroundNode.show();
+          stage.batchDraw();
+        }
+      }
+      drawWatermarkOnCanvas(canvas, watermarkForExport);
+      const {
+        canvasToBlob,
+        downloadBlob,
+        exportMimeType,
+        exportQuality,
+        pageExportFileName,
+      } = await import("./studio-export");
+      const blob = await canvasToBlob(
+        canvas,
+        exportMimeType(exportFormat),
+        exportQuality(exportFormat)
+      );
+      downloadBlob(blob, pageExportFileName(title, exportFormat, transparent));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "이미지 내보내기에 실패했어요.");
+    } finally {
+      setMasterEditMode(originalMasterEditMode);
+      setIsExporting(false);
+    }
+  }
+
+  async function exportCurrentPageToRasterInterchange(
+    format: StudioRasterInterchangeFormat
+  ): Promise<StudioRasterEncoded> {
+    if (!ensureSharedDocumentAvailableForExport()) {
+      throw new Error("공유 문서를 불러온 뒤 내보낼 수 있습니다.");
+    }
+    const watermarkForExport = ensureWatermarkLoaded();
+    const originalMasterEditMode = masterEditMode;
+    setSelectedId(null);
+    setMasterEditMode(false);
+    preserveStudioViewBeforeCapture();
+    setIsExporting(true);
+    try {
+      await new Promise<void>((resolve) => {
+        if (typeof globalThis.requestAnimationFrame === "function") {
+          globalThis.requestAnimationFrame(() => resolve());
+        } else {
+          globalThis.setTimeout(resolve, 0);
+        }
+      });
+      const stage = await captureReadyStageForPage(activePage);
+      const alphaCapable = format === "qoi" || format === "tga" || format === "pam";
+      const transparent = exportTransparent && alphaCapable;
+      const backgroundNode = transparent ? stage.findOne(".bg") : null;
+      if (backgroundNode) {
+        backgroundNode.hide();
+        stage.batchDraw();
+      }
+      let canvas: HTMLCanvasElement;
+      try {
+        const rawCanvas = stage.toCanvas({ pixelRatio: exportScale / effectiveScale });
+        canvas = bakeStudioPageGradeIntoCanvas(rawCanvas, pageGrade);
+      } finally {
+        if (backgroundNode) {
+          backgroundNode.show();
+          stage.batchDraw();
+        }
+      }
+      drawWatermarkOnCanvas(canvas, watermarkForExport);
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) throw new Error("출력 픽셀을 읽을 수 없습니다.");
+      const image = context.getImageData(0, 0, canvas.width, canvas.height);
+      const { encodeStudioRasterInterchangeAsync } = await import(
+        "./studio-raster-interchange-worker-client"
+      );
+      const encoded = await encodeStudioRasterInterchangeAsync(format, {
+        width: image.width,
+        height: image.height,
+        data: image.data,
+      });
+      return encoded.encoded;
+    } finally {
+      setMasterEditMode(originalMasterEditMode);
+      setIsExporting(false);
+    }
+  }
+
+  async function handleCopyToClipboard() {
+    if (!ensureSharedDocumentAvailableForExport()) return;
+    const watermarkForExport = ensureWatermarkLoaded();
+    setExportMenuOpen(false);
+    setSelectedId(null);
+    const originalMasterEditMode = masterEditMode;
+    setMasterEditMode(false);
+    preserveStudioViewBeforeCapture();
+    setIsExporting(true);
+    try {
+      const stage = await captureReadyStageForPage(activePage);
+      const rawCanvas = stage.toCanvas({ pixelRatio: exportScale / effectiveScale });
+      const canvas = bakeStudioPageGradeIntoCanvas(rawCanvas, pageGrade);
+      drawWatermarkOnCanvas(canvas, watermarkForExport);
+      const { copyCanvasToClipboard } = await import("./studio-export");
+      await copyCanvasToClipboard(canvas);
+      setError(null);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "클립보드 복사에 실패했어요.");
+    } finally {
+      setMasterEditMode(originalMasterEditMode);
+      setIsExporting(false);
+    }
+  }
+
+  async function handleDownloadAll(spacing = 24) {
+    if (!ensureSharedDocumentAvailableForExport()) return;
+    const watermarkForExport = ensureWatermarkLoaded();
+    setExportMenuOpen(false);
+    const {
+      MAX_CANVAS_DIM,
+      canvasToBlob,
+      downloadBlob,
+      exportMimeType,
+      exportQuality,
+      maxFittingScale,
+      splitPagesForExport,
+      stripExportFileName,
+      stripTotalHeight,
+    } = await import("./studio-export");
+    const pageHeights = pages.map((page) => page.canvasH);
+    let scale = exportScale;
+    let split = false;
+    if (stripTotalHeight(pageHeights, spacing, scale) > MAX_CANVAS_DIM) {
+      const fittingScale = maxFittingScale(pageHeights, spacing, scale);
+      const plannedParts = splitPagesForExport(pageHeights, spacing, scale).length;
+      if (fittingScale !== null) {
+        split = globalThis.confirm(
+          `${scale}×로 한 장에 합치면 브라우저 캔버스 한계(약 ${MAX_CANVAS_DIM.toLocaleString()}px)를 넘어요.\n` +
+            `확인: ${plannedParts}개 파일로 나눠 저장 / 취소: ${fittingScale}×로 낮춰 한 파일로 저장`
+        );
+        if (!split) scale = fittingScale;
+      } else {
+        if (
+          !globalThis.confirm(
+            `페이지가 길어 ${scale}× 한 파일로는 저장할 수 없어요.\n${plannedParts}개 파일로 나눠 저장할까요?`
+          )
+        ) {
+          return;
+        }
+        split = true;
+      }
+    }
+
+    setSelectedId(null);
+    const originalPageId = currentPageId;
+    const originalMasterEditMode = masterEditMode;
+    setMasterEditMode(false);
+    preserveStudioViewBeforeCapture();
+    setIsExporting(true);
+    const pageCanvases: HTMLCanvasElement[] = [];
+
+    try {
+      for (const page of pages) {
+        setCurrentPageId(page.id);
+        const stage = await captureReadyStageForPage(page);
+        const rawPageCanvas = stage.toCanvas({ pixelRatio: scale / effectiveScale });
+        pageCanvases.push(
+          bakeStudioPageGradeIntoCanvas(rawPageCanvas, normalizePageGrade(page.grade))
+        );
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "페이지 캡처를 준비하지 못했어요.");
+      return;
+    } finally {
+      setCurrentPageId(originalPageId);
+      setMasterEditMode(originalMasterEditMode);
+      setIsExporting(false);
+    }
+
+    if (pageCanvases.length === 0) return;
+    const chunks = split
+      ? splitPagesForExport(
+          pageCanvases.map((canvas) => canvas.height),
+          spacing * scale,
+          1
+        )
+      : [pageCanvases.map((_, index) => index)];
+
+    try {
+      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+        const chunk = chunks[chunkIndex]!;
+        const compositeCanvas = document.createElement("canvas");
+        const firstPageIndex = chunk[0];
+        if (firstPageIndex === undefined) continue;
+        const width = pageCanvases[firstPageIndex]!.width;
+        let totalHeight = 0;
+        for (let index = 0; index < chunk.length; index += 1) {
+          totalHeight += pageCanvases[chunk[index]!]!.height;
+          if (index < chunk.length - 1) totalHeight += spacing * scale;
+        }
+        compositeCanvas.width = width;
+        compositeCanvas.height = totalHeight;
+        const context = compositeCanvas.getContext("2d");
+        if (!context) return;
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, width, totalHeight);
+        let currentY = 0;
+        for (const pageIndex of chunk) {
+          const pageCanvas = pageCanvases[pageIndex]!;
+          context.drawImage(pageCanvas, 0, currentY);
+          currentY += pageCanvas.height + spacing * scale;
+        }
+        drawWatermarkOnCanvas(compositeCanvas, watermarkForExport);
+        const blob = await canvasToBlob(
+          compositeCanvas,
+          exportMimeType(exportFormat),
+          exportQuality(exportFormat)
+        );
+        downloadBlob(
+          blob,
+          stripExportFileName(title, exportFormat, {
+            index: chunkIndex,
+            total: chunks.length,
+          })
+        );
+        if (chunkIndex < chunks.length - 1) {
+          await new Promise((resolve) => globalThis.setTimeout(resolve, 250));
+        }
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "이미지 내보내기에 실패했어요.");
+    }
+  }
+
+  async function handleCapturePagesForIndices(
+    indices: number[]
+  ): Promise<HTMLCanvasElement[]> {
+    if (!ensureSharedDocumentAvailableForExport()) return [];
+    setSelectedId(null);
+    const originalPageId = currentPageId;
+    const originalMasterEditMode = masterEditMode;
+    setMasterEditMode(false);
+    preserveStudioViewBeforeCapture();
+    setIsExporting(true);
+    const captured: HTMLCanvasElement[] = [];
+    try {
+      const seen = new Set<number>();
+      for (const index of indices) {
+        if (!Number.isInteger(index) || index < 0 || index >= pages.length) continue;
+        if (seen.has(index)) continue;
+        seen.add(index);
+        const page = pages[index]!;
+        setCurrentPageId(page.id);
+        const stage = await captureReadyStageForPage(page);
+        const rawCanvas = stage.toCanvas({ pixelRatio: exportScale / effectiveScale });
+        captured.push(
+          bakeStudioPageGradeIntoCanvas(rawCanvas, normalizePageGrade(page.grade))
+        );
+      }
+    } finally {
+      setCurrentPageId(originalPageId);
+      setMasterEditMode(originalMasterEditMode);
+      setIsExporting(false);
+    }
+    return captured;
+  }
+
+  async function handleCapturePagesForPreset(
+    scope: "current" | "all"
+  ): Promise<HTMLCanvasElement[]> {
+    if (scope === "all" && pages.length > 1) {
+      return handleCapturePagesForIndices(pages.map((_, index) => index));
+    }
+    if (!ensureSharedDocumentAvailableForExport()) return [];
+    setSelectedId(null);
+    const originalPageId = currentPageId;
+    const originalMasterEditMode = masterEditMode;
+    setMasterEditMode(false);
+    preserveStudioViewBeforeCapture();
+    setIsExporting(true);
+    const captured: HTMLCanvasElement[] = [];
+    try {
+      const page = pages.find((item) => item.id === currentPageId) ?? activePage;
+      const stage = await captureReadyStageForPage(page);
+      const rawCanvas = stage.toCanvas({ pixelRatio: exportScale / effectiveScale });
+      captured.push(
+        bakeStudioPageGradeIntoCanvas(rawCanvas, normalizePageGrade(page.grade))
+      );
+    } finally {
+      setCurrentPageId(originalPageId);
+      setMasterEditMode(originalMasterEditMode);
+      setIsExporting(false);
+    }
+    return captured;
+  }
+
+  return {
+    handleDownload,
+    exportCurrentPageToRasterInterchange,
+    handleCopyToClipboard,
+    handleDownloadAll,
+    handleCapturePagesForPreset,
+    handleCapturePagesForIndices,
+  };
+}

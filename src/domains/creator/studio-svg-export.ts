@@ -1441,6 +1441,7 @@ function serializeFreehand(
     // 연필 — 새 획은 append-only raw 샘플, 레거시는 과거 평활화+tension을 유지한다.
     const renderPath = resolveStudioFreehandRenderPath(points, {
       sampleSpacing: el.sampleSpacing,
+      acceptedTension: 0.18,
       legacyMinDistance: renderSampleDistance,
       legacyTension: 0.2,
     });
@@ -1459,15 +1460,18 @@ function serializeFreehand(
     // 형광펜 — 사각 끝 + multiply 합성(SVG mix-blend-mode 로 동일 표현).
     const renderPath = resolveStudioFreehandRenderPath(points, {
       sampleSpacing: el.sampleSpacing,
+      acceptedTension: 0.35,
       legacyMinDistance: renderSampleDistance,
       legacyTension: 0.4,
     });
-    return `<path d="${tensionPathD(renderPath.points, renderPath.tension)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(aliasStrokeWidth)}" stroke-linecap="square" stroke-linejoin="miter" style="mix-blend-mode:multiply"${opacityAttr}/>`;
+    const lineJoin = brush === "chisel-highlighter" ? "bevel" : "round";
+    return `<path d="${tensionPathD(renderPath.points, renderPath.tension)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(aliasStrokeWidth)}" stroke-linecap="square" stroke-linejoin="${lineJoin}" style="mix-blend-mode:multiply"${opacityAttr}/>`;
   }
 
   if (brushFamily === "neon") {
     const renderPath = resolveStudioFreehandRenderPath(points, {
       sampleSpacing: el.sampleSpacing,
+      acceptedTension: 0.3,
       legacyMinDistance: renderSampleDistance,
       legacyTension: 0.35,
     });
@@ -1488,6 +1492,7 @@ function serializeFreehand(
   if (brushFamily === "glow") {
     const renderPath = resolveStudioFreehandRenderPath(points, {
       sampleSpacing: el.sampleSpacing,
+      acceptedTension: 0.3,
       legacyMinDistance: renderSampleDistance,
       legacyTension: 0.35,
     });

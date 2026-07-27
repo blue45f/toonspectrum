@@ -754,7 +754,7 @@ describe("StudioDrawNode orchestration", () => {
     const sceneFunc = shapes[0]!.props.sceneFunc as (context: CanvasRenderingContext2D) => void;
     sceneFunc(context as unknown as CanvasRenderingContext2D);
 
-    expect(context.arcs).toHaveLength(15_552);
+    expect(context.arcs).toHaveLength(3_456);
     expect(context.arcs.length).toBeLessThanOrEqual(STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET);
     expect(context.fills).toHaveLength(context.arcs.length);
   });

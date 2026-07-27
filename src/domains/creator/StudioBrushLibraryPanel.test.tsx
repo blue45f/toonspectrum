@@ -1,5 +1,8 @@
+// @vitest-environment jsdom
+
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { studioBrushDynamicsPresetSettings } from "./studio-brush-dynamics";
 import { MAX_BRUSHES } from "./studio-brush-library";
@@ -36,6 +39,8 @@ const saved: StudioSavedBrush = {
   lastUsedAt: 3,
   ...snapshot,
 };
+
+afterEach(cleanup);
 
 describe("StudioBrushLibraryPanel", () => {
   it("controlled 목록과 고정·복제·이름·내보내기·공유·삭제 액션을 렌더한다", () => {
@@ -84,12 +89,73 @@ describe("StudioBrushLibraryPanel", () => {
     );
     expect(html).toContain("min-h-11");
     expect(html).toContain("size-11");
-    expect(html).toContain("min-h-12");
-    expect(html).toContain(
-      "bg-[linear-gradient(135deg,#f8fafc_0_50%,#242936_50%_100%)]"
+    expect(html).toContain("min-h-16");
+    expect(html).toContain('role="group" aria-label="내 브러시 표시 방식"');
+    expect(html).toContain('data-studio-saved-brush-view="stroke"');
+    expect(html).toContain('data-studio-saved-brush-preview="solid"');
+    expect(html).toContain('data-studio-saved-brush-preview-opacity="1"');
+    expect(html).toContain('fill="#ff6600"');
+    expect(html).toContain("oklch(0.9 0.008 70)");
+  });
+
+  it("저장한 프로 브러시는 런타임 펜이 아니라 원본 프리셋 이름과 획 스타일로 표시한다", () => {
+    const proSaved: StudioSavedBrush = {
+      ...saved,
+      id: "saved-pro",
+      name: "반짝임 장식",
+      brushId: "ink-particle",
+      sourcePresetId: "heart-stamp",
+      sourcePresetName: "하트 도장",
+    };
+    const html = renderToStaticMarkup(
+      <StudioBrushLibraryPanel
+        currentSnapshot={snapshot}
+        brushes={[proSaved]}
+        onBrushesChange={() => undefined}
+        onApplyBrush={() => undefined}
+        onBrushDeleted={() => undefined}
+      />
     );
-    expect(html).toContain("background:#ff6600");
-    expect(html).toContain("opacity:1");
+
+    expect(html).toContain('data-studio-saved-brush-preview="glitter"');
+    expect(html).toContain(
+      'aria-label="반짝임 장식 브러시 적용, 하트 도장, 6px, 100퍼센트"'
+    );
+    expect(html).toContain("하트 도장 · 6px · 100%");
+    expect(html).not.toContain("입자");
+  });
+
+  it("획과 이름 목록을 바꿔도 저장 브러시 적용·관리 계약을 유지한다", () => {
+    const onApplyBrush = vi.fn();
+    const { container } = render(
+      <StudioBrushLibraryPanel
+        currentSnapshot={snapshot}
+        brushes={[saved]}
+        onBrushesChange={vi.fn()}
+        onApplyBrush={onApplyBrush}
+        onBrushDeleted={vi.fn()}
+      />
+    );
+
+    const list = () => container.querySelector<HTMLElement>("[data-studio-saved-brush-view]");
+    expect(list()?.dataset.studioSavedBrushView).toBe("stroke");
+    expect(screen.getByRole("button", { name: "저장 브러시 획 미리보기" }).getAttribute("aria-pressed"))
+      .toBe("true");
+    expect(container.querySelector("[data-studio-saved-brush-preview]")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "저장 브러시 이름 목록" }));
+    expect(list()?.dataset.studioSavedBrushView).toBe("text");
+    expect(screen.getByRole("button", { name: "저장 브러시 이름 목록" }).getAttribute("aria-pressed"))
+      .toBe("true");
+    expect(container.querySelector("[data-studio-saved-brush-preview]")).toBeNull();
+    expect(container.querySelector('span[style*="background"]')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "주력 펜 브러시 적용, 펜(매끈), 6px, 100퍼센트",
+    }));
+    expect(onApplyBrush).toHaveBeenCalledOnce();
+    expect(onApplyBrush).toHaveBeenCalledWith(saved);
+    expect(screen.getByText("관리 · 덮어쓰기, 복제, 공유")).toBeTruthy();
   });
 
   it("빈 상태는 모바일에서도 저장 브러시를 재사용할 수 있음을 안내한다", () => {

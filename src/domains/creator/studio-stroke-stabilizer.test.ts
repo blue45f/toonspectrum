@@ -88,7 +88,7 @@ describe("studio stroke stabilizer", () => {
     });
   });
 
-  it("normalizes non-monotonic pointer timing at the neutral pen cadence without producing infinities", () => {
+  it("uses a safe cadence for one non-monotonic sample and re-anchors to its native clock", () => {
     const start = createStudioPointerVelocityState({ clientX: 0, clientY: 0, timeStamp: 30 });
     const result = sampleStudioPointerVelocity(start, {
       clientX: Number.NaN,
@@ -97,15 +97,12 @@ describe("studio stroke stabilizer", () => {
     });
     expect(result.distance).toBe(0);
     expect(result.elapsedMs).toBeCloseTo(STUDIO_POINTER_DEFAULT_SAMPLE_INTERVAL_MS, 10);
-    expect(result.state.timeStamp).toBeCloseTo(
-      30 + STUDIO_POINTER_DEFAULT_SAMPLE_INTERVAL_MS,
-      10
-    );
+    expect(result.state.timeStamp).toBe(20);
     expect(Object.values(result.state).every(Number.isFinite)).toBe(true);
     expect(Number.isFinite(result.speed)).toBe(true);
   });
 
-  it("learns a valid hardware cadence and reuses it for repeated or regressing timestamps", () => {
+  it("learns a valid hardware cadence without letting a synthetic clock outrun native input", () => {
     const initial = createStudioPointerVelocityState({
       clientX: 0,
       clientY: 0,
@@ -135,7 +132,39 @@ describe("studio stroke stabilizer", () => {
       learned.state.timeStamp,
       repeated.state.timeStamp,
       regressed.state.timeStamp,
-    ]).toEqual([104, 108, 112]);
+    ]).toEqual([104, 104, 90]);
+  });
+
+  it("recovers the very next native delta after a repeated timestamp", () => {
+    const initial = createStudioPointerVelocityState({
+      clientX: 0,
+      clientY: 0,
+      timeStamp: 100,
+    });
+    const learned = sampleStudioPointerVelocity(initial, {
+      clientX: 4,
+      clientY: 0,
+      timeStamp: 104,
+    });
+    const repeated = sampleStudioPointerVelocity(learned.state, {
+      clientX: 8,
+      clientY: 0,
+      timeStamp: 104,
+    });
+    const recovered = sampleStudioPointerVelocity(repeated.state, {
+      clientX: 12,
+      clientY: 0,
+      timeStamp: 106,
+    });
+
+    expect(repeated.elapsedMs).toBe(4);
+    expect(repeated.state.timeStamp).toBe(104);
+    expect(recovered.elapsedMs).toBe(2);
+    expect(recovered.speed).toBe(2);
+    expect(recovered.state).toMatchObject({
+      timeStamp: 106,
+      sampleIntervalMs: 2,
+    });
   });
 
   it("keeps standard mode compatible with the fixed live stabilizer", () => {
@@ -245,7 +274,7 @@ describe("studio stroke stabilizer", () => {
     expect(first.state.timeStamp).toBe(10);
   });
 
-  it("keeps adaptive stabilization monotonic when a reduced-precision clock repeats", () => {
+  it("keeps adaptive geometry monotonic while its timing baseline follows the native clock", () => {
     const initial = createStudioStrokeStabilizerState({ x: 0, y: 0, timeStamp: 100 });
     const learned = stabilizeStudioStrokeSample(
       initial,
@@ -272,7 +301,7 @@ describe("studio stroke stabilizer", () => {
       learned.state.timeStamp,
       repeated.state.timeStamp,
       regressed.state.timeStamp,
-    ]).toEqual([104, 108, 112]);
+    ]).toEqual([104, 104, 80]);
     expect([learned.speed, repeated.speed, regressed.speed]).toEqual([1, 1, 1]);
     expect(regressed.point[0]).toBeGreaterThan(repeated.point[0]);
   });

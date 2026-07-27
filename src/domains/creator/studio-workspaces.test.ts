@@ -4,6 +4,7 @@ import {
   DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
   moveStudioDrawingPalette,
   resizeStudioDrawingPalettes,
+  setStudioDrawingPaletteLock,
   toggleStudioDrawingPalette,
 } from "./studio-drawing-palettes";
 import { STUDIO_INSPECTOR_LAYOUT_STORAGE_KEY } from "./studio-inspector-layout";
@@ -1100,7 +1101,7 @@ describe("workspace switching and dirty comparison", () => {
     expect(isStudioWorkspaceDirty(reloaded)).toBe(false);
   });
 
-  it("includes drawing palette order, collapse, and sizes in save, switch, reload, and dirty state", () => {
+  it("includes drawing palette order, collapse, sizes, and locks in save, switch, reload, and dirty state", () => {
     const editedLayout = withEditedDrawingPalettes(
       DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout
     );
@@ -1148,6 +1149,39 @@ describe("workspace switching and dirty comparison", () => {
       editedLayout.drawingPalettes
     );
     expect(isStudioWorkspaceDirty(reloaded)).toBe(false);
+
+    const lockOnlyLayout = normalizeStudioWorkspaceLayout({
+      ...switchedBack.liveLayout,
+      drawingPalettes: setStudioDrawingPaletteLock(
+        switchedBack.liveLayout.drawingPalettes,
+        "sub-tools",
+        "position",
+        true
+      ),
+    });
+    const lockOnlyDirty = updateStudioWorkspaceLiveLayout(
+      switchedBack,
+      lockOnlyLayout
+    );
+    expect(isStudioWorkspaceDirty(lockOnlyDirty)).toBe(true);
+    expect(
+      areStudioWorkspaceLayoutsEqual(
+        lockOnlyDirty.liveLayout,
+        switchedBack.liveLayout
+      )
+    ).toBe(false);
+
+    const lockSaved = overwriteStudioWorkspace(lockOnlyDirty, customId);
+    expect(isStudioWorkspaceDirty(lockSaved)).toBe(false);
+    const lockSwitchedAway = switchStudioWorkspace(lockSaved, "coloring");
+    const lockSwitchedBack = switchStudioWorkspace(
+      lockSwitchedAway,
+      customId
+    );
+    expect(
+      lockSwitchedBack.liveLayout.drawingPalettes.locks?.["sub-tools"].position
+    ).toBe(true);
+    expect(isStudioWorkspaceDirty(lockSwitchedBack)).toBe(false);
   });
 });
 

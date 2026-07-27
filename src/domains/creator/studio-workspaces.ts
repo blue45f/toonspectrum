@@ -32,8 +32,13 @@ export {
   toggleStudioDrawingPalette,
 } from "./studio-drawing-palettes";
 export type {
+  StudioCanonicalDrawingPaletteLayout,
   StudioDrawingPaletteId,
   StudioDrawingPaletteLayout,
+  StudioDrawingPaletteLockKind,
+  StudioDrawingPaletteLocks,
+  StudioDrawingPaletteLockState,
+  StudioDrawingPaletteMoveDirection,
 } from "./studio-drawing-palettes";
 
 /**
@@ -1441,7 +1446,15 @@ export function areStudioWorkspaceLayoutsEqual(
     left.drawingPalettes.sizes["sub-tools"] !==
       right.drawingPalettes.sizes["sub-tools"] ||
     left.drawingPalettes.sizes["tool-properties"] !==
-      right.drawingPalettes.sizes["tool-properties"]
+      right.drawingPalettes.sizes["tool-properties"] ||
+    left.drawingPalettes.locks?.["sub-tools"].position !==
+      right.drawingPalettes.locks?.["sub-tools"].position ||
+    left.drawingPalettes.locks?.["sub-tools"].height !==
+      right.drawingPalettes.locks?.["sub-tools"].height ||
+    left.drawingPalettes.locks?.["tool-properties"].position !==
+      right.drawingPalettes.locks?.["tool-properties"].position ||
+    left.drawingPalettes.locks?.["tool-properties"].height !==
+      right.drawingPalettes.locks?.["tool-properties"].height
   ) {
     return false;
   }

@@ -61,9 +61,9 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     ]) {
       expect(planner.source).not.toContain(pageOwnedAction);
     }
-    // 의도적 변경(2026-07-24): CSP pressure min size — linear residual bake-at-capture
-    // minSizeRatio 배선으로 플래너 순수 모듈 라인 증가(260 → 265).
-    expect(planner.source.split("\n").length).toBeLessThanOrEqual(265);
+    // 의도적 변경(2026-07-27): CSP pressure min size + brush-family input cadence remain pure
+    // capture-time policy. The planner stays below 270 lines without taking renderer ownership.
+    expect(planner.source.split("\n").length).toBeLessThanOrEqual(270);
   });
 
   it("leaves gesture priority, leases, transport, CRDT publication, and live surfaces in the Page", () => {

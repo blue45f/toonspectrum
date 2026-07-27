@@ -178,7 +178,7 @@ describe("procedural brush pack catalogue", () => {
       ["crayon-wax-bold", "그림책"],
       ["airbrush-grand-soft", "분사 노즐"],
       ["sponge-stipple-dab", "두들김"],
-      ["marker-colorless-blender", "무색 혼합"],
+      ["marker-colorless-blender", "저유량 마커"],
       ["marker-wide-chisel", "포스터"],
       ["spray-noise-fine", "노이즈 질감"],
       ["stardust-star-scatter", "별 조각"],

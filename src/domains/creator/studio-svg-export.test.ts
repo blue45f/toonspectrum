@@ -1118,11 +1118,12 @@ describe("도형 직렬화", () => {
     const hl = rectEl({ id: "h1", kind: "freehand", brush: "highlighter", points: [0, 0, 10, 0, 20, 10, 30, 30] });
     const { svg } = exportPageToSvg(page([hl]));
     expect(svg).toContain('stroke-linecap="square"');
+    expect(svg).toContain('stroke-linejoin="round"');
     expect(svg).toContain("mix-blend-mode:multiply");
   });
 
   it.each(["pencil", "highlighter", "neon", "glow"] as const)(
-    "%s — modern sampleSpacing은 raw 직선 샘플, legacy는 과거 평활화+tension을 유지한다",
+    "%s — modern sampleSpacing은 원본 샘플을 유지하면서 연결 곡선을 부드럽게 내보낸다",
     (brush) => {
       const base = rectEl({
         id: `render-path-${brush}`,
@@ -1144,9 +1145,9 @@ describe("도형 직렬화", () => {
 
       expect(modernPaths.length).toBeGreaterThan(0);
       expect(legacyPaths).toHaveLength(modernPaths.length);
-      expect(modernPaths.every((pathD) => pathD.includes(" L "))).toBe(true);
-      expect(modernPaths.every((pathD) => !pathD.includes(" Q ") && !pathD.includes(" C "))).toBe(true);
+      expect(modernPaths.every((pathD) => pathD.includes(" Q ") || pathD.includes(" C "))).toBe(true);
       expect(legacyPaths.every((pathD) => pathD.includes(" Q ") || pathD.includes(" C "))).toBe(true);
+      expect(modernPaths).not.toEqual(legacyPaths);
     }
   );
 
