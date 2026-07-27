@@ -11,7 +11,6 @@ import { Profiler, Suspense, lazy, useCallback, useEffect, useEffectEvent, useLa
 import { flushSync } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-
 import { studioCreationLinkParams } from "./creator-studio-links";
 import {
   applyStudioBg3dInsertResult,
@@ -562,6 +561,7 @@ import {
   clampIsometricCellSize,
   defaultIsometricOrigin,
   resolveIsometricAxisRay,
+  shouldSnapStrokeToIsometricAxis,
   snapStrokePointToIsometricGrid,
   type IsometricAxisRay,
 } from "./studio-isometric-grid";
@@ -1427,6 +1427,7 @@ import { buttonClass } from "@/components/ui/button-utils";
 import { useIsMobile } from "@/components/use-media-query";
 import { useResizable } from "@/components/use-resizable";
 import { loadChunkWithReloadRecovery } from "@/lib/chunk-load-recovery";
+import { useT } from "@/lib/i18n";
 import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/lib/studio-work-asset-contract";
 import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
@@ -2201,7 +2202,12 @@ function openStudioToolsCompanionForMenu(input: {
   runtimeRef: { current: StudioToolsCompanionPrimaryRuntime | null };
   windowRef: { current: Window | null };
   announce: (message: string) => void;
+  t: (key: string) => string;
 }): void {
+  const localize = (key: string, fallback: string) => {
+    const translated = input.t(key);
+    return translated === key ? fallback : translated;
+  };
   const ready = input.runtimeRef.current;
   if (ready) {
     ready.protocol.openReadyStudioToolsCompanionForMenu({
@@ -2209,6 +2215,7 @@ function openStudioToolsCompanionForMenu(input: {
       binding: ready.binding,
       windowRef: input.windowRef,
       announce: input.announce,
+      t: input.t,
     });
     return;
   }
@@ -2220,7 +2227,12 @@ function openStudioToolsCompanionForMenu(input: {
     } catch {
       // Browsers may deny focus while the reserved popup is still loading.
     }
-    input.announce("도구 창을 준비 중입니다 · 잠시만 기다려 주세요");
+    input.announce(
+      localize(
+        "studio.toolsCompanion.open.readyMessage",
+        "도구 창을 준비 중입니다 · 잠시만 기다려 주세요",
+      ),
+    );
     return;
   }
 
@@ -2231,7 +2243,12 @@ function openStudioToolsCompanionForMenu(input: {
     reservation = null;
   }
   if (!reservation) {
-    input.announce("팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.");
+    input.announce(
+      localize(
+        "studio.toolsCompanion.open.popupBlocked",
+        "팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.",
+      ),
+    );
     return;
   }
   try {
@@ -2240,7 +2257,12 @@ function openStudioToolsCompanionForMenu(input: {
     // The lazy companion protocol retries this before navigation; keep the popup usable here.
   }
   input.windowRef.current = reservation;
-  input.announce("도구 창을 준비 중입니다 · 연결이 끝나면 자동으로 열립니다");
+  input.announce(
+    localize(
+      "studio.toolsCompanion.open.readyToOpen",
+      "도구 창을 준비 중입니다 · 연결이 끝나면 자동으로 열립니다",
+    ),
+  );
 
   const abandonReservation = (message: string) => {
     try {
@@ -2253,9 +2275,17 @@ function openStudioToolsCompanionForMenu(input: {
     input.announce(message);
   };
   const reservationTimeout = globalThis.setTimeout(() => {
-    abandonReservation("도구 창 준비 시간이 초과됐습니다. 다시 시도해 주세요.");
+    abandonReservation(
+      localize(
+        "studio.toolsCompanion.open.prepareTimeout",
+        "도구 창 준비 시간이 초과됐습니다. 다시 시도해 주세요.",
+      ),
+    );
   }, 8_000);
-  const unavailableMessage = "도구 창을 사용할 수 없습니다. 다시 시도해 주세요.";
+  const unavailableMessage = localize(
+    "studio.toolsCompanion.open.unavailable",
+    "도구 창을 사용할 수 없습니다. 다시 시도해 주세요.",
+  );
 
   void input.ensureRuntime().then((runtime) => {
     globalThis.clearTimeout(reservationTimeout);
@@ -2268,6 +2298,7 @@ function openStudioToolsCompanionForMenu(input: {
       reservation,
       windowRef: input.windowRef,
       announce: input.announce,
+      t: input.t,
     });
   }).catch(() => {
     globalThis.clearTimeout(reservationTimeout);
@@ -2282,6 +2313,7 @@ function StudioCuttoonEditor() {
   // 옮겨 정착 커밋 렌더 비용을 자식 캐시로 흡수한다.
   "use no memo";
   const navigate = useNavigate();
+  const t = useT();
   const [params] = useSearchParams();
   const { data: session } = useSession();
   const workId = params.get("id");
@@ -2432,8 +2464,9 @@ function StudioCuttoonEditor() {
     setShowGrid(next.grids.showPixelGrid);
     setShowRulers(next.grids.showCanvasRulers);
     setGridSize(next.grids.pixelGridSize);
+    setShowAlignmentGuides(next.grids.showAlignmentGuides);
     setPressureCurve(next.other.pressureCurve);
-    if (next.grids.snapToPixelGrid) setSnapEnabled(true);
+    setSnapEnabled(next.grids.snapToPixelGrid);
   }
   const setStudioUiDensityFromCompanion = useEffectEvent(setStudioUiDensity);
   // useCallback: 좌측 레일 memo 자식에서 렌더 중 호출 — prop 안정성 유지.
@@ -3834,11 +3867,12 @@ function StudioCuttoonEditor() {
   }, [colorBlindPreview]);
 
   // 그리드 스냅 상태
-  const [snapEnabled, setSnapEnabled] = useState(true);
-  const [showGrid, setShowGrid] = useState(() => loadStudioAppSettings(studioAppSettingsStorage()).grids.showPixelGrid);
-  const [gridSize, setGridSize] = useState(() => loadStudioAppSettings(studioAppSettingsStorage()).grids.pixelGridSize);
-  const [showRulers, setShowRulers] = useState(
-    () => loadStudioAppSettings(studioAppSettingsStorage()).grids.showCanvasRulers
+  const [snapEnabled, setSnapEnabled] = useState(() => appSettings.grids.snapToPixelGrid);
+  const [showGrid, setShowGrid] = useState(() => appSettings.grids.showPixelGrid);
+  const [gridSize, setGridSize] = useState(() => appSettings.grids.pixelGridSize);
+  const [showRulers, setShowRulers] = useState(() => appSettings.grids.showCanvasRulers);
+  const [showAlignmentGuides, setShowAlignmentGuides] = useState(
+    () => appSettings.grids.showAlignmentGuides
   );
   function setCanvasRulersVisible(next: boolean) {
     setShowRulers(next);
@@ -3847,6 +3881,34 @@ function StudioCuttoonEditor() {
     const settings = {
       ...current,
       grids: { ...current.grids, showCanvasRulers: next },
+    };
+    appSettingsRef.current = settings;
+    setAppSettings(settings);
+    persistAppSettings(settings);
+  }
+  function setAlignmentGuidesVisible(next: boolean) {
+    setShowAlignmentGuides(next);
+    const current = appSettingsRef.current;
+    if (current.grids.showAlignmentGuides === next) return;
+    const settings = {
+      ...current,
+      grids: { ...current.grids, showAlignmentGuides: next },
+    };
+    appSettingsRef.current = settings;
+    setAppSettings(settings);
+    persistAppSettings(settings);
+  }
+  function setSnapEnabledVisible(
+    next: boolean | ((prev: boolean) => boolean),
+  ) {
+    const resolvedNext =
+      typeof next === "function" ? next(appSettingsRef.current.grids.snapToPixelGrid) : next;
+    setSnapEnabled(resolvedNext);
+    const current = appSettingsRef.current;
+    if (current.grids.snapToPixelGrid === resolvedNext) return;
+    const settings = {
+      ...current,
+      grids: { ...current.grids, snapToPixelGrid: resolvedNext },
     };
     appSettingsRef.current = settings;
     setAppSettings(settings);
@@ -5585,12 +5647,12 @@ function StudioCuttoonEditor() {
     switch (action) {
       case "pen":
         activatePrimaryCanvasTool("draw", "pen");
-        announceDrawingShortcut("펜 모드 · 선을 그어 보세요");
+        announceDrawingShortcut(t("studio.tutorialTry.pen"));
         break;
       case "smart-shape":
         activatePrimaryCanvasTool("draw", "pen");
         setQuickShapeActive(true);
-        announceDrawingShortcut("스마트 도형 켜짐 · 도형을 그리고 손을 떼 보세요");
+        announceDrawingShortcut(t("studio.tutorialTry.smartShape"));
         break;
       case "bubble":
         setMenu("bubble");
@@ -5598,7 +5660,7 @@ function StudioCuttoonEditor() {
       case "brush":
         activatePrimaryCanvasTool("draw", "pen");
         applyBuiltInBrushPreset(BRUSH_PRESETS.find((p) => p.id === "pencil") ?? BRUSH_PRESETS[0]);
-        announceDrawingShortcut("브러시 · 옵션에서 질감을 바꿔 보세요");
+        announceDrawingShortcut(t("studio.tutorialTry.brush"));
         break;
       case "template":
         setMenu("template");
@@ -5606,7 +5668,7 @@ function StudioCuttoonEditor() {
       case "layers":
         setLeftPanelOpen(true);
         if (uiDensityMode === "focus") setStudioUiDensity("simple");
-        announceDrawingShortcut("레이어 패널을 열었어요");
+        announceDrawingShortcut(t("studio.tutorialTry.layers"));
         break;
       case "character":
         setPoserVrmOpen(true);
@@ -7194,7 +7256,14 @@ function StudioCuttoonEditor() {
   }, [canvasOnlyMode, isFullscreen, maximized, mobileImmersive]);
 
   // 사용자 줌(폭맞춤 스케일에 곱함). effScale로 Stage·내보내기 해상도를 함께 보정.
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoomState] = useState(1);
+  const [zoomLocked, setZoomLocked] = useState(false);
+  const zoomLockedRef = useRef(zoomLocked);
+  zoomLockedRef.current = zoomLocked;
+  const setZoom = useCallback((action: SetStateAction<number>) => {
+    if (zoomLockedRef.current) return;
+    setZoomState(action);
+  }, []);
   // Magma식 현재 보기 저장 — 문서/히스토리와 분리된 이 탭 세션의 뷰포트 스냅샷이다.
   const [savedStudioView, setSavedStudioView] = useState<StudioViewSnapshot | null>(null);
   // 핀치 줌 제스처가 최신 zoom을 stale 없이 읽도록 ref로 동기화.
@@ -7229,6 +7298,18 @@ function StudioCuttoonEditor() {
     raf: number;
     settleTimer: ReturnType<typeof setTimeout> | null;
   } | null>(null);
+  useEffect(() => {
+    if (!zoomLocked) return;
+    const gesture = zoomGestureRef.current;
+    zoomGestureRef.current = null;
+    if (gesture?.raf) globalThis.cancelAnimationFrame(gesture.raf);
+    if (gesture?.settleTimer) globalThis.clearTimeout(gesture.settleTimer);
+    const host = zoomHostRef.current;
+    if (host) {
+      host.style.transform = "";
+      host.style.willChange = "";
+    }
+  }, [zoomLocked]);
   const zoomSettleAnchorRef = useRef<{
     docX: number;
     docY: number;
@@ -7509,6 +7590,7 @@ function StudioCuttoonEditor() {
       const wheelMode = modZoom ? "zoom" : prefs.wheel;
       if (wheelMode === "zoom") {
         e.preventDefault();
+        if (zoomLockedRef.current) return;
         // 틱마다 리렌더하지 않는다 — 제스처 transform 으로 즉시 반응하고 정착 시 한 번만 커밋.
         stepZoomGestureRef.current(
           (target) => stepStudioViewWheelZoom(
@@ -7664,7 +7746,9 @@ function StudioCuttoonEditor() {
         return;
       }
       e.preventDefault(); // 브라우저 페이지 줌 차단
-      const target = clampZoom(pinchStartZoom * (dist(e.touches) / pinchStartDist));
+      const target = zoomLockedRef.current
+        ? pinchStartZoom
+        : clampZoom(pinchStartZoom * (dist(e.touches) / pinchStartDist));
       const currentCenter = center(e.touches);
       // 프레임마다 리렌더하지 않는다. 거리 변화는 줌, 중심점 이동은 두 손가락 팬으로 같은
       // transform에 합쳐 실제 pan-zoom 설정과 경쟁 드로잉 앱의 제스처를 일치시킨다.
@@ -17772,7 +17856,7 @@ const puppetWarpArmed =
     redo();
   };
   function fitCanvasToWidth() {
-    if (viewTransformSuppressed) return;
+    if (viewTransformSuppressed || zoomLockedRef.current) return;
     const wrap = wrapRef.current;
     const maximumScale = isFullscreen || maximized || mobileImmersive || canvasOnlyMode ? 4 : 2.5;
     if (wrap) setScale(fitStudioViewToWidth(wrap.clientWidth, studioViewDocumentWidth, maximumScale));
@@ -17966,7 +18050,7 @@ const puppetWarpArmed =
   }
 
   function resetView() {
-    if (viewTransformSuppressed) return;
+    if (viewTransformSuppressed || zoomLockedRef.current) return;
     const wrap = wrapRef.current;
     if (wrap) {
       const maximumScale = isFullscreen || maximized || mobileImmersive || canvasOnlyMode ? 4 : 2.5;
@@ -17981,7 +18065,7 @@ const puppetWarpArmed =
   }
 
   function setActualPixelView() {
-    if (viewTransformSuppressed) return;
+    if (viewTransformSuppressed || zoomLockedRef.current) return;
     // effScale = scale × zoom. 두 값을 1로 맞춰 문서 1px을 CSS 1px로 정확히 표시한다.
     setScale(1);
     setZoom(1);
@@ -18067,7 +18151,7 @@ const puppetWarpArmed =
   }
 
   function restoreSavedStudioView() {
-    if (viewTransformSuppressed) return;
+    if (viewTransformSuppressed || zoomLockedRef.current) return;
     const wrap = wrapRef.current;
     if (!savedStudioView || !wrap) {
       announceDrawingShortcut("저장된 보기가 없습니다");
@@ -24095,13 +24179,20 @@ const puppetWarpArmed =
         stylus,
       } = drawStartPlan;
       let { element: next, strokeOrigin } = drawStartPlan;
-      // Snap the stroke origin to neighboring object edges (freehand start / shape origin) when
-      // no directional ruler is active. Freehand mid samples use axis latch in appendFreehandStrokePoint.
+      // Snap explicit shape origins to neighboring object edges when no directional ruler is
+      // active. Freehand coordinates must remain untouched so acquiring a guide cannot kink ink.
       {
         const directionalRulerActive = Boolean(
           strokeAdvancedRuler
           || (!strokeAdvancedRuler && perspectiveRulerActive && vanishingPoints.length > 0)
-          || (!strokeAdvancedRuler && isometricGridActive)
+          || (
+            !strokeAdvancedRuler
+            && shouldSnapStrokeToIsometricAxis({
+              active: isometricGridActive,
+              mode: next.mode,
+              kind: next.kind ?? "freehand",
+            })
+          )
         );
         if (
           shouldApplyStrokeObjectSnap({
@@ -24492,8 +24583,8 @@ const puppetWarpArmed =
     if (others.length === 0) return { x, y };
     const threshold = SMART_SNAP_THRESHOLD / Math.max(effScale, 1e-6);
     const kind = options.kind ?? "freehand";
-    // Freehand uses axis latch so mid-samples can stick to edges without nearest-edge zigzag.
-    // Shapes/lines keep pure nearest-edge snap (no latch state).
+    // The policy above excludes freehand. Keep the defensive branch for older persisted/custom
+    // kinds, while normal shape/line placement uses nearest-edge snap.
     const snap = kind === "freehand"
       ? (() => {
           const planned = planFreehandObjectSnapPoint({
@@ -24507,7 +24598,7 @@ const puppetWarpArmed =
           return planned;
         })()
       : snapPointToObjectGuides(x, y, others, { threshold });
-    if (snap.snappedX || snap.snappedY) {
+    if (showAlignmentGuides && (snap.snappedX || snap.snappedY)) {
       applySmartGuides(buildPointObjectSnapOverlay(
         snap.x,
         snap.y,
@@ -24566,7 +24657,14 @@ const puppetWarpArmed =
       }
       [x1, y1] = snapStrokePointToPerspective(x1, y1, perspectiveRayRef.current);
       directionalRulerActive = perspectiveRayRef.current !== null;
-    } else if (isometricGridActive && kind === "line" && !pointerEvent.shiftKey) {
+    } else if (
+      shouldSnapStrokeToIsometricAxis({
+        active: isometricGridActive,
+        mode: current.mode,
+        kind,
+      })
+      && !pointerEvent.shiftKey
+    ) {
       if (!isometricAxisRayRef.current) {
         isometricAxisRayRef.current = resolveIsometricAxisRay(isometricAngleDeg, x0, y0, x1, y1);
       }
@@ -25303,7 +25401,13 @@ const puppetWarpArmed =
         perspectiveRayRef.current = resolvePerspectiveRay(strokeVanishingPoints, startX, startY, pos.x, pos.y);
       }
       [targetX, targetY] = snapStrokePointToPerspective(targetX, targetY, perspectiveRayRef.current);
-    } else if ((inputSettings?.isometricActive ?? isometricGridActive) && current.mode !== "eraser") {
+    } else if (
+      shouldSnapStrokeToIsometricAxis({
+        active: inputSettings?.isometricActive ?? isometricGridActive,
+        mode: current.mode,
+        kind: current.kind ?? "freehand",
+      })
+    ) {
       if (!isometricAxisRayRef.current) {
         const startX = current.points[0] ?? pos.x;
         const startY = current.points[1] ?? pos.y;
@@ -25317,9 +25421,8 @@ const puppetWarpArmed =
       }
       [targetX, targetY] = snapStrokePointToIsometricGrid(targetX, targetY, isometricAxisRayRef.current);
     } else if (current.mode !== "eraser" && !pointerSample.shiftKey) {
-      // CSP-class object snap: freehand (origin + mid via axis latch) and shape/line endpoints.
-      // Freehand latch holds the acquired edge until pull-away so mid samples do not zigzag.
-      // This branch only runs when no directional ruler owns the sample.
+      // Object snapping is restricted to explicit shape/line placement by
+      // shouldApplyStrokeObjectSnap. Freehand samples pass through unchanged.
       const sampleIndex = Math.max(0, Math.floor(current.points.length / 2));
       const snapped = applyStrokeObjectSnapToPoint(targetX, targetY, {
         mode: current.mode,
@@ -27097,13 +27200,13 @@ const puppetWarpArmed =
       else hLines.push(guide.pos);
     }
 
-    if (showGrid) {
-      for (let x = gridSize; x < CANVAS_W; x += gridSize) {
-        if (Math.abs(x - CANVAS_W / 2) > 1) vLines.push(x);
-      }
-      for (let y = gridSize; y < canvasH; y += gridSize) {
-        if (Math.abs(y - canvasH / 2) > 1) hLines.push(y);
-      }
+    // Grid visibility is presentation-only. Reaching this branch already means snapping is on,
+    // so hidden grid lines remain valid placement targets without altering the display toggle.
+    for (let x = gridSize; x < CANVAS_W; x += gridSize) {
+      if (Math.abs(x - CANVAS_W / 2) > 1) vLines.push(x);
+    }
+    for (let y = gridSize; y < canvasH; y += gridSize) {
+      if (Math.abs(y - canvasH / 2) > 1) hLines.push(y);
     }
     let panel: FrameEl | null = null;
     const boxCenterX = box.x + box.width / 2;
@@ -27186,13 +27289,16 @@ const puppetWarpArmed =
     if (dy !== 0) node.y(node.y() + dy);
     // 스냅 확정 위치 기준으로 요소 정렬 선분·균등 간격 배지를 그린다(그리드/캔버스 스냅
     // 결과가 우연히 요소와 정렬된 경우도 함께 드러난다 — PPT 동작).
-    if (smartOthers && draggedId) {
+    if (smartOthers && draggedId && showAlignmentGuides) {
       const movedBox: GuideBox = { id: draggedId, x: box.x + dx, y: box.y + dy, width: box.width, height: box.height };
       applySmartGuides(buildSmartGuideOverlay(movedBox, smartOthers, { epsilon: SMART_GUIDE_EPSILON / effScale }));
     } else {
       applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
     }
-    applyGuides(gx != null ? [gx] : [], gy != null ? [gy] : []);
+    applyGuides(
+      showAlignmentGuides && gx != null ? [gx] : [],
+      showAlignmentGuides && gy != null ? [gy] : []
+    );
   }
   function onStageDragEnd() {
     applyGuides([], []);
@@ -28228,7 +28334,7 @@ function clearSelectionForEdit() {
           openStudioFilter: studioMainMenuActions.openStudioFilter,
           toggleAdvancedFill: studioMainMenuActions.toggleAdvancedFill,
         },
-        ui: {
+          ui: {
           openExportDownload: () => {
             setProjectActionsOpen(false);
             setExportMenuOpen(true);
@@ -28295,6 +28401,7 @@ function clearSelectionForEdit() {
             runtimeRef: companionRuntimeRef,
             windowRef: companionWindowRef,
             announce: studioMainMenuActions.announceDrawingShortcut,
+            t,
           }),
           toggleQuickAccessPalette: studioMainMenuActions.toggleStudioQuickAccessPalette,
           toggleLeftPanel: () => setLeftPanelOpen((current) => !current),
@@ -28308,6 +28415,7 @@ function clearSelectionForEdit() {
             setQuickShapeActive(true);
           },
         },
+      t,
       });
     },
     [
@@ -28346,10 +28454,12 @@ function clearSelectionForEdit() {
       referencePanelOpen,
       rightPanelOpen,
       saving,
+      setZoom,
       showRulers,
       studioCanvasRulerHandlers,
       studioMainMenuActions,
       viewTransformSuppressed,
+      t,
       workId,
     ],
   );
@@ -31900,6 +32010,8 @@ function clearSelectionForEdit() {
           workId={workId}
           wrapRef={wrapRef}
           zoom={zoom}
+          zoomLocked={zoomLocked}
+          setZoomLocked={setZoomLocked}
           zoomHostRef={zoomHostRef}
           stableHandlers={studioCanvasViewportHandlers}
         />
@@ -32282,6 +32394,7 @@ function clearSelectionForEdit() {
           setShapeFill={setShapeFill}
           setSharedDocumentNotice={setSharedDocumentNotice}
           setShowGrid={setShowGrid}
+          setShowAlignmentGuides={setAlignmentGuidesVisible}
           setShowWebtoonGuides={setShowWebtoonGuides}
           setSmudgeRadius={setSmudgeRadius}
           setSmudgeStrength={setSmudgeStrength}
@@ -32296,7 +32409,7 @@ function clearSelectionForEdit() {
           setWetMixRadius={setWetMixRadius}
           setWetMixStrength={setWetMixStrength}
           setWetMixWetness={setWetMixWetness}
-          setSnapEnabled={setSnapEnabled}
+          setSnapEnabled={setSnapEnabledVisible}
           setStabilizer={setStabilizer}
           setStabilizerMode={setStabilizerMode}
           setStampTuning={setStampTuning}
@@ -32354,6 +32467,7 @@ function clearSelectionForEdit() {
           wetMixStrength={wetMixStrength}
           wetMixWetness={wetMixWetness}
           snapEnabled={snapEnabled}
+          showAlignmentGuides={showAlignmentGuides}
           stabilizer={stabilizer}
           stabilizerMode={stabilizerMode}
           stampTuning={stampTuning}
