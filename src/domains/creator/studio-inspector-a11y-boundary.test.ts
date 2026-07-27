@@ -40,7 +40,9 @@ const inspectorSource = inspectorSources.map(({ source }) => source).join("\n");
 
 describe("Studio inspector accessibility boundary", () => {
   it("keeps inspector-only form controls explicitly named", () => {
-    expect(inspectorSource).toContain('가이드 #${index + 1} 위치');
+    expect(inspectorSource).toContain('t("studio.canvas.guideLabel")');
+    expect(inspectorSource).toContain('t("studio.canvas.guidesPosition")');
+    expect(inspectorSource).toContain("#${index + 1}");
     expect(inspectorSource).toContain('aria-label="선 색상"');
     expect(inspectorSource).toContain('aria-label="채우기 색상"');
     expect(inspectorSource).toContain('aria-label="말풍선 배경 투명"');

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_STUDIO_RAIL_TOOL_ORDER,
+  DEFAULT_STUDIO_SHOW_ALIGNMENT_GUIDES,
+  DEFAULT_STUDIO_SNAP_TO_PIXEL_GRID,
   defaultStudioAppSettings,
   formatStudioShortcutChord,
   hideStudioRailTool,
@@ -46,6 +48,8 @@ describe("studio-app-settings", () => {
     expect(d.mouse.wheel).toBe("zoom");
     expect(d.touch.oneFingerDrag).toBe("draw");
     expect(d.grids.showCanvasRulers).toBe(false);
+    expect(d.grids.snapToPixelGrid).toBe(DEFAULT_STUDIO_SNAP_TO_PIXEL_GRID);
+    expect(d.grids.showAlignmentGuides).toBe(DEFAULT_STUDIO_SHOW_ALIGNMENT_GUIDES);
   });
 
   it("migrates legacy settings to a visible stroke guide and preserves an explicit opt-out", () => {

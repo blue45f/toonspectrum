@@ -91,12 +91,13 @@ export async function pingVisit(): Promise<void> {
   if (last === day) return; // 오늘 이미 핑함 — 조용히 종료.
 
   try {
-    const res = await fetch(`${BASE}/api/v1/apps/${APP_ID}/visits/ping`, {
+    const path = typeof location !== "undefined" ? location.pathname : "";
+    const endpoint = new URL(`${BASE}/api/v1/apps/${APP_ID}/visits/ping`);
+    if (path) {
+      endpoint.searchParams.set("path", path);
+    }
+    const res = await fetch(endpoint.toString(), {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        path: typeof location !== "undefined" ? location.pathname : undefined,
-      }),
       keepalive: true,
     });
     // 성공(2xx)일 때만 디바운스 기록 — 실패하면 다음 마운트에서 재시도한다.

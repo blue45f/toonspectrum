@@ -16,6 +16,7 @@ import {
   MAX_LINES_PER_AXIS,
   projectPointOntoIsometricAxis,
   resolveIsometricAxisRay,
+  shouldSnapStrokeToIsometricAxis,
   snapStrokePointToIsometricGrid,
   type IsometricAxisRay,
   type IsometricGridConfig,
@@ -225,5 +226,30 @@ describe("snapStrokePointToIsometricGrid", () => {
   it("ray 가 있으면 투영된 좌표를 돌려준다", () => {
     const ray: IsometricAxisRay = { axisIndex: 0, originX: 0, originY: 0, dirX: 1, dirY: 0 };
     expect(snapStrokePointToIsometricGrid(5, 7, ray)).toEqual([5, 0]);
+  });
+});
+
+describe("shouldSnapStrokeToIsometricAxis", () => {
+  it("treats the grid as a visual hint for freehand and constrains only the line tool", () => {
+    expect(shouldSnapStrokeToIsometricAxis({
+      active: true,
+      mode: "pen",
+      kind: "freehand",
+    })).toBe(false);
+    expect(shouldSnapStrokeToIsometricAxis({
+      active: true,
+      mode: "pen",
+      kind: "line",
+    })).toBe(true);
+    expect(shouldSnapStrokeToIsometricAxis({
+      active: true,
+      mode: "eraser",
+      kind: "line",
+    })).toBe(false);
+    expect(shouldSnapStrokeToIsometricAxis({
+      active: false,
+      mode: "pen",
+      kind: "line",
+    })).toBe(false);
   });
 });

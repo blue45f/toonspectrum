@@ -64,6 +64,21 @@ export const ISOMETRIC_ANGLE_MAX_DEG = 89;
 export const ISOMETRIC_CELL_SIZE_MIN = 8;
 export const ISOMETRIC_CELL_SIZE_MAX = 200;
 
+/**
+ * Isometric visibility and stroke constraint are separate concerns.
+ *
+ * Freehand brushes use the grid as a visual hint only. Projecting their sampled points onto an
+ * axis turns a smooth curve into a straight/angular stroke as soon as the hint becomes active.
+ * Only the explicit line tool opts into axis locking.
+ */
+export function shouldSnapStrokeToIsometricAxis(input: {
+  readonly active: boolean;
+  readonly mode?: string;
+  readonly kind?: string;
+}): boolean {
+  return input.active && input.mode !== "eraser" && input.kind === "line";
+}
+
 function isFiniteNumber(n: number): boolean {
   return typeof n === "number" && Number.isFinite(n);
 }

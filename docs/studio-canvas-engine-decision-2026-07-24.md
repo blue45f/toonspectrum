@@ -1,5 +1,9 @@
 # Studio canvas engine decision — 2026-07-24
 
+> **Superseded for the long-term target:** See
+> `studio-browser-native-engine-vnext-2026-07-27.md`. Konva remains the shipping recovery
+> authority during the staged migration, but it is no longer the final engine authority.
+
 ## Question
 
 Should ToonSpectrum Studio replace the Konva/react-konva editor body with a ready-made whiteboard (Excalidraw, tldraw) or another canvas stack (Fabric, p5, Pixi)?

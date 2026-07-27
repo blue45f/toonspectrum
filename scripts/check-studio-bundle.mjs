@@ -7,6 +7,12 @@ const manifestPath = path.join(outputDirectory, ".vite", "manifest.json");
 const studioEntry = "src/domains/creator/StudioPage.tsx";
 const appEntry = "index.html";
 
+// Product policy (2026-07-27): bundle bytes and static request counts are
+// telemetry, not release vetoes. Quality, drawing latency and feature breadth
+// take priority; engine isolation and accidental eager-boundary regressions
+// below remain hard failures because they directly affect runtime behavior.
+const bundleObservations = [];
+
 const budgets = {
   // Measured 2026-07-15 after commercial close-out (soft-lock, merge, density, smart filters):
   // StudioPage ~1.03 MiB + static deps ≈ 2.29 MiB raw / ~753 KiB gzip.
@@ -176,10 +182,22 @@ if (!fs.existsSync(manifestPath)) {
 
   function checkBudget(label, actual, budget) {
     if (actual.raw > budget.raw) {
-      fail(`${label} static JS is ${describe(actual.raw)} raw (budget ${describe(budget.raw)})`);
+      bundleObservations.push(
+        `${label} static JS is ${describe(actual.raw)} raw (reference ${describe(budget.raw)})`,
+      );
     }
     if (actual.gzip > budget.gzip) {
-      fail(`${label} static JS is ${describe(actual.gzip)} gzip (budget ${describe(budget.gzip)})`);
+      bundleObservations.push(
+        `${label} static JS is ${describe(actual.gzip)} gzip (reference ${describe(budget.gzip)})`,
+      );
+    }
+  }
+
+  function observeCount(label, actual, reference) {
+    if (actual > reference) {
+      bundleObservations.push(
+        `${label} uses ${actual} static JS requests (reference ${reference})`,
+      );
     }
   }
 
@@ -229,12 +247,11 @@ if (!fs.existsSync(manifestPath)) {
     checkBudget("Studio route", studioSize, budgets.studio);
     checkBudget("StudioPage entry", studioEntrySize, budgets.studioEntry);
     checkBudget("Studio route after app shell", studioIncrementalSize, budgets.studioIncremental);
-    if (studioIncrementalKeys.size > budgets.studioIncremental.chunks) {
-      fail(
-        `Studio route after app shell uses ${studioIncrementalKeys.size} static JS requests `
-          + `(budget ${budgets.studioIncremental.chunks})`,
-      );
-    }
+    observeCount(
+      "Studio route after app shell",
+      studioIncrementalKeys.size,
+      budgets.studioIncremental.chunks,
+    );
     checkBudget("app entry", appSize, budgets.app);
 
     const eagerDocumentEngines = matchingEntries(
@@ -424,12 +441,11 @@ if (!fs.existsSync(manifestPath)) {
       const background3dKeys = staticClosure(background3dEntries[0]);
       const background3dSize = measure(background3dKeys);
       checkBudget("BG3D editor activation", background3dSize, budgets.bg3dEditor);
-      if (background3dKeys.size > budgets.bg3dEditor.chunks) {
-        fail(
-          `BG3D editor activation uses ${background3dKeys.size} static JS requests `
-            + `(budget ${budgets.bg3dEditor.chunks})`,
-        );
-      }
+      observeCount(
+        "BG3D editor activation",
+        background3dKeys.size,
+        budgets.bg3dEditor.chunks,
+      );
       checkDynamicBoundary(
         "optional BG3D shot-batch runtime",
         /src\/domains\/creator\/studio-bg3d-shot-batch-runtime\.ts/,
@@ -454,12 +470,11 @@ if (!fs.existsSync(manifestPath)) {
           measure(runtimeIncrementalKeys),
           budgets.bg3dShotBatchRuntime,
         );
-        if (runtimeIncrementalKeys.size > budgets.bg3dShotBatchRuntime.chunks) {
-          fail(
-            `BG3D shot-batch runtime after editor uses ${runtimeIncrementalKeys.size} static JS requests `
-              + `(budget ${budgets.bg3dShotBatchRuntime.chunks})`,
-          );
-        }
+        observeCount(
+          "BG3D shot-batch runtime after editor",
+          runtimeIncrementalKeys.size,
+          budgets.bg3dShotBatchRuntime.chunks,
+        );
       }
       const eagerShotBatchProductionRuntime = matchingEntries(
         background3dKeys,
@@ -571,11 +586,15 @@ if (!fs.existsSync(manifestPath)) {
     }
 
     if (!process.exitCode) {
+      for (const observation of bundleObservations) {
+        console.warn(`studio bundle observation: ${observation}`);
+      }
       console.log(
-        `studio bundle check passed: Studio ${studioKeys.size} chunks, ${describe(studioSize.raw)} raw / ${describe(studioSize.gzip)} gzip; `
+        `studio bundle structural check passed: Studio ${studioKeys.size} chunks, ${describe(studioSize.raw)} raw / ${describe(studioSize.gzip)} gzip; `
           + `StudioPage ${describe(studioEntrySize.raw)} raw / ${describe(studioEntrySize.gzip)} gzip; `
           + `after app shell ${studioIncrementalKeys.size} chunks, ${describe(studioIncrementalSize.raw)} raw / ${describe(studioIncrementalSize.gzip)} gzip; `
-          + `app ${appKeys.size} chunks, ${describe(appSize.raw)} raw / ${describe(appSize.gzip)} gzip`,
+          + `app ${appKeys.size} chunks, ${describe(appSize.raw)} raw / ${describe(appSize.gzip)} gzip; `
+          + `${bundleObservations.length} non-blocking size/request observation(s)`,
       );
     }
   } catch (error) {

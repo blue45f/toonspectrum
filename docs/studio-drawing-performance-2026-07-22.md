@@ -1,5 +1,9 @@
 # Studio drawing performance track — 2026-07-22
 
+> **Historical rollout policy:** The measured safety requirements remain active, but the
+> long-term main-thread ownership decision is superseded by
+> `studio-browser-native-engine-vnext-2026-07-27.md`.
+
 ## Outcome
 
 ToonSpectrum keeps the interactive canvas, pointer capture, hit testing, brush cursor, accessible

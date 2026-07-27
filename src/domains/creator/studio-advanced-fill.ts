@@ -6,9 +6,25 @@
  * 레이어를 참조하면서 별도 채색 레이어를 칠하는 워크플로에도 사용할 수 있다.
  */
 
+import { createStudioPersistentBinaryMaskScanner } from "./studio-wasm-connected-components-kernel";
+import {
+  createStudioPersistentMaskMorphologyExecutor,
+  STUDIO_WASM_MASK_MORPHOLOGY_DEFAULT_MINIMUM_INPUT_BYTES,
+  type StudioMaskMorphologyOperation,
+} from "./studio-wasm-mask-morphology-kernel";
+
 export const ADVANCED_FILL_MAX_PIXELS = 32 * 1024 * 1024;
 export const ADVANCED_FILL_MAX_CLOSE_GAP_RADIUS = 32;
 export const ADVANCED_FILL_MAX_AREA_ADJUSTMENT = 64;
+
+/**
+ * Kept for the lifetime of the Advanced Fill worker/module. Large diagnostic
+ * scans use an actual Memory64 kernel instead of repeating another JS pixel
+ * loop for both the matched and final masks.
+ */
+const ADVANCED_FILL_MASK_SCANNER = createStudioPersistentBinaryMaskScanner();
+const ADVANCED_FILL_MORPHOLOGY =
+  createStudioPersistentMaskMorphologyExecutor();
 
 export type AdvancedFillRgba = readonly [red: number, green: number, blue: number, alpha: number];
 
@@ -370,6 +386,47 @@ function cloneImageData(image: AdvancedFillImageDataLike): AdvancedFillImageData
   return { data: image.data.slice(), width: image.width, height: image.height };
 }
 
+function runAcceleratedMorphologyPass(
+  input: Uint8Array,
+  width: number,
+  height: number,
+  operation: StudioMaskMorphologyOperation,
+  outsideIsOne: boolean,
+  checkpoint: Checkpoint,
+): Uint8Array | null {
+  if (
+    input.byteLength
+    < STUDIO_WASM_MASK_MORPHOLOGY_DEFAULT_MINIMUM_INPUT_BYTES
+  ) {
+    return null;
+  }
+  checkpoint(true);
+  const result = ADVANCED_FILL_MORPHOLOGY.process(
+    input,
+    width,
+    height,
+    operation,
+  );
+  checkpoint(true);
+  if (!result.ok) return null;
+
+  // The 3×3 kernel ignores samples outside the canvas. That is equivalent to
+  // zero-padding for dilation and one-padding for erosion. Explicit zero-padding
+  // erosion additionally clears its one-pixel boundary.
+  if (operation === "erode" && !outsideIsOne) {
+    result.pixels.fill(0, 0, width);
+    if (height > 1) {
+      result.pixels.fill(0, (height - 1) * width, height * width);
+    }
+    for (let y = 1; y < height - 1; y += 1) {
+      const row = y * width;
+      result.pixels[row] = 0;
+      if (width > 1) result.pixels[row + width - 1] = 0;
+    }
+  }
+  return result.pixels;
+}
+
 /** O(width*height) 정사각 커널 팽창. */
 function dilateSquare(
   input: Uint8Array,
@@ -379,6 +436,17 @@ function dilateSquare(
   checkpoint: Checkpoint,
 ): Uint8Array {
   if (radius === 0) return input.slice();
+  if (radius === 1) {
+    const accelerated = runAcceleratedMorphologyPass(
+      input,
+      width,
+      height,
+      "dilate",
+      false,
+      checkpoint,
+    );
+    if (accelerated) return accelerated;
+  }
   const horizontal = new Uint8Array(input.length);
   const output = new Uint8Array(input.length);
 
@@ -421,6 +489,17 @@ function erodeSquare(
   checkpoint: Checkpoint,
 ): Uint8Array {
   if (radius === 0) return input.slice();
+  if (radius === 1) {
+    const accelerated = runAcceleratedMorphologyPass(
+      input,
+      width,
+      height,
+      "erode",
+      outsideIsOne,
+      checkpoint,
+    );
+    if (accelerated) return accelerated;
+  }
   const horizontal = new Uint8Array(input.length);
   const output = new Uint8Array(input.length);
   const diameter = radius * 2 + 1;
@@ -483,6 +562,39 @@ function selectionSummary(
   height: number,
   checkpoint?: Checkpoint,
 ): AdvancedFillSelectionDiagnostics {
+  checkpoint?.(true);
+  const accelerated = ADVANCED_FILL_MASK_SCANNER.scan({
+    mask,
+    width,
+    height,
+  });
+  checkpoint?.(true);
+  if (accelerated.ok) {
+    const pixelCount = Number(accelerated.scan.foregroundPixelCount);
+    const bounds = accelerated.scan.bounds;
+    return {
+      pixelCount,
+      areaRatio: pixelCount / (width * height),
+      touchesCanvasEdge: Boolean(
+        bounds
+        && (
+          bounds.minX === 0
+          || bounds.minY === 0
+          || bounds.maxXExclusive === width
+          || bounds.maxYExclusive === height
+        )
+      ),
+      bounds: bounds
+        ? {
+            x: bounds.minX,
+            y: bounds.minY,
+            width: bounds.width,
+            height: bounds.height,
+          }
+        : null,
+    };
+  }
+
   let pixelCount = 0;
   let minX = width;
   let minY = height;

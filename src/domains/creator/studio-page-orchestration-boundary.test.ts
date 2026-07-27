@@ -29,9 +29,9 @@ const sharedRuntimeSource = readFileSync(
 
 describe("StudioPage user-action orchestration boundary", () => {
   it("keeps the editor coordinator on a one-way source-size ratchet", () => {
-    // Quick Access live integration and same-frame retained ink added a deliberate ~8 KiB
-    // coordinator seam; keep the new ceiling tight until the next StudioPage split.
-    expect(Buffer.byteLength(studioPageSource, "utf8")).toBeLessThan(1_403_000);
+    // Quick Access, same-frame retained ink, independent guide/snap preferences and zoom locking
+    // added deliberate coordinator seams; keep the ceiling tight until the next StudioPage split.
+    expect(Buffer.byteLength(studioPageSource, "utf8")).toBeLessThan(1_407_000);
     expect(studioPageSource).toContain(
       'import { useStudioRasterExportOrchestration } from "./useStudioRasterExportOrchestration";',
     );

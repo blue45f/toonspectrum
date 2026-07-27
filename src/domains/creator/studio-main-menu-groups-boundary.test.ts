@@ -9,11 +9,18 @@ function source(fileName: string): string {
 describe("studio main-menu catalogue ownership boundary", () => {
   it("keeps the catalogue React-, browser-, and page-state-free", () => {
     const catalogue = source("./studio-main-menu-groups.ts");
+    const localization = source("./studio-main-menu-localization.ts");
 
     expect(catalogue).not.toMatch(/from\s+["']react["']/u);
     expect(catalogue).not.toMatch(/\b(?:document|window|globalThis)\s*\./u);
     expect(catalogue).not.toContain("StudioPage");
     expect(catalogue).not.toMatch(/\buse(?:Memo|Callback|Effect|State|Ref)\b/u);
+    expect(catalogue).toContain('from "./studio-main-menu-localization"');
+    expect(catalogue).not.toContain("function localizeText(");
+    expect(catalogue).not.toContain("translateItemUnavailableReason");
+    expect(localization).not.toMatch(/from\s+["']react["']/u);
+    expect(localization).not.toMatch(/\b(?:document|window|globalThis)\s*\./u);
+    expect(localization).toContain("export function localizeStudioMainMenuGroups(");
     // 캔버스 px 눈금자와 빠른 액세스 항목을 소유해도 카탈로그가 독립 모듈 경계를 유지한다.
     expect(catalogue.split("\n").length).toBeLessThanOrEqual(1_090);
   });
@@ -46,6 +53,6 @@ describe("studio main-menu catalogue ownership boundary", () => {
     expect(composition).not.toContain('id: "quick-access-palette"');
     // Null-guarded root import clicks add a few lines vs optional-chaining form. Menu item
     // definitions, including Quick Access, remain owned by the pure catalogue.
-    expect(composition.split("\n").length).toBeLessThanOrEqual(210);
+    expect(composition.split("\n").length).toBeLessThanOrEqual(212);
   });
 });

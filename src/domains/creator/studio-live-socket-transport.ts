@@ -56,6 +56,15 @@ import {
   type StudioLiveVoiceIcePayload,
   type StudioLiveWebRtcIcePayload,
 } from "./studio-live-collaboration-protocol";
+import {
+  createStudioLocalLiveTransport,
+  type StudioLiveAuthoritativeLockEvent,
+  type StudioLiveTransport,
+  type StudioLiveTransportContext,
+  type StudioLiveTransportControlEvent,
+  type StudioLiveTransportFactory,
+  type StudioLiveTransportStatus,
+} from "./studio-live-collaboration-transport";
 import { resolveStudioLiveSocketEndpoint } from "./studio-live-socket-endpoint";
 import {
   isRecord,
@@ -81,15 +90,6 @@ import {
 } from "./studio-live-socket-wire";
 import { parseStudioTeamCommentLiveEvent } from "./studio-team-comment-live-event";
 
-import type {
-  StudioLiveAuthoritativeLockEvent,
-  StudioLiveTransport,
-  StudioLiveTransportContext,
-  StudioLiveTransportControlEvent,
-  StudioLiveTransportFactory,
-  StudioLiveTransportStatus,
-} from "./studio-live-collaboration-transport";
-
 import { studioLiveLockResourcesConflict } from "@/lib/studio-live-lock-resource";
 import { getRuntimeApiBase } from "@/src/infrastructure/runtime-api-base";
 
@@ -112,6 +112,16 @@ const ABANDONED_LOCK_ACQUISITION_TTL_MS = 90_000;
 const JOIN_RESYNC_RETRY_BASE_MS = 500;
 const JOIN_RESYNC_RETRY_MAX_MS = 10_000;
 const JOIN_RATE_LIMIT_RETRY_MS = 60_000;
+
+/** Bounded reconnects prevent an unavailable configured server from logging forever. */
+export const STUDIO_LIVE_SOCKET_RETRY_POLICY = Object.freeze({
+  reconnection: true,
+  reconnectionAttempts: 3,
+  reconnectionDelay: 1_000,
+  reconnectionDelayMax: 5_000,
+  randomizationFactor: 0.25,
+  timeout: CONNECT_TIMEOUT_MS,
+});
 
 type PendingPresenceDelta =
   | { kind: "update"; participant: ServerParticipant }
@@ -213,6 +223,12 @@ export interface StudioLiveSocketLike {
 
 export interface StudioLiveSocketTransportDependencies {
   createSocket?: (auth: { sessionToken: string }) => StudioLiveSocketLike;
+  /**
+   * Test/deployment seam. `null` explicitly keeps collaboration local without
+   * constructing Socket.IO; omitted uses the environment/location policy.
+   */
+  socketEndpoint?: string | null;
+  createLocalTransport?: StudioLiveTransportFactory;
   now?: () => number;
   randomId?: () => string;
   setTimeout?: (handler: () => void, delay: number) => unknown;
@@ -221,23 +237,41 @@ export interface StudioLiveSocketTransportDependencies {
   lockAckTimeoutMs?: number;
 }
 
-function defaultCreateSocket(auth: { sessionToken: string }): StudioLiveSocketLike {
+function runtimeSocketEndpoint(): string | null {
+  return resolveStudioLiveSocketEndpoint({
+    explicitOrigin: import.meta.env.VITE_STUDIO_LIVE_ORIGIN,
+    viteApiBase: import.meta.env.VITE_API_BASE,
+    runtimeApiBase: getRuntimeApiBase(),
+    locationOrigin: globalThis.location?.origin,
+    allowInsecureLoopback: import.meta.env.DEV,
+    localDevelopment: import.meta.env.DEV,
+  });
+}
+
+function createSocketAtEndpoint(
+  endpoint: string,
+  auth: { sessionToken: string },
+): StudioLiveSocketLike {
   return io(
-    resolveStudioLiveSocketEndpoint({
-      explicitOrigin: import.meta.env.VITE_STUDIO_LIVE_ORIGIN,
-      viteApiBase: import.meta.env.VITE_API_BASE,
-      runtimeApiBase: getRuntimeApiBase(),
-      locationOrigin: globalThis.location?.origin,
-      allowInsecureLoopback: import.meta.env.DEV,
-    }),
+    endpoint,
     {
       path: SOCKET_PATH,
       transports: ["websocket"],
       autoConnect: false,
-      reconnection: true,
+      ...STUDIO_LIVE_SOCKET_RETRY_POLICY,
       auth,
     }
   ) as unknown as StudioLiveSocketLike;
+}
+
+function defaultCreateSocket(auth: { sessionToken: string }): StudioLiveSocketLike {
+  const endpoint = runtimeSocketEndpoint();
+  if (!endpoint) {
+    throw new Error(
+      "실시간 서버가 구성되지 않아 네트워크 연결 대신 로컬 공동작업을 사용해야 합니다.",
+    );
+  }
+  return createSocketAtEndpoint(endpoint, auth);
 }
 
 function defaultSetTimeout(handler: () => void, delay: number): unknown {
@@ -4271,5 +4305,31 @@ export function createStudioServerLiveTransportFactory(
   sessionToken: string,
   dependencies: StudioLiveSocketTransportDependencies = {}
 ): StudioLiveTransportFactory {
-  return (context) => new StudioLiveSocketTransport(context, sessionToken, dependencies);
+  const hasEndpointOverride = Object.prototype.hasOwnProperty.call(
+    dependencies,
+    "socketEndpoint",
+  );
+  const endpoint =
+    hasEndpointOverride
+      ? dependencies.socketEndpoint ?? null
+      : dependencies.createSocket
+        ? "/studio-live"
+        : runtimeSocketEndpoint();
+  const localTransportFactory =
+    dependencies.createLocalTransport ?? createStudioLocalLiveTransport;
+  const {
+    socketEndpoint: _socketEndpoint,
+    createLocalTransport: _createLocalTransport,
+    ...transportDependencies
+  } = dependencies;
+
+  if (!endpoint) return localTransportFactory;
+  const serverDependencies: StudioLiveSocketTransportDependencies = {
+    ...transportDependencies,
+    createSocket:
+      dependencies.createSocket
+      ?? ((auth) => createSocketAtEndpoint(endpoint, auth)),
+  };
+  return (context) =>
+    new StudioLiveSocketTransport(context, sessionToken, serverDependencies);
 }

@@ -11,7 +11,14 @@ import {
 
 describe("studio edit menu catalog", () => {
   it("keeps the production command order and Magma-compatible shortcuts in one contract", () => {
-    expect(STUDIO_EDIT_MENU_COMMAND_ORDER.map((id) => STUDIO_EDIT_MENU_COMMANDS[id])).toEqual([
+    const legacyCommandContract = STUDIO_EDIT_MENU_COMMAND_ORDER.map((id) => {
+      const command = STUDIO_EDIT_MENU_COMMANDS[id];
+      return "shortcut" in command
+        ? { id: command.id, label: command.label, shortcut: command.shortcut }
+        : { id: command.id, label: command.label };
+    });
+
+    expect(legacyCommandContract).toEqual([
       { id: "undo", label: "실행취소", shortcut: "⌘Z" },
       { id: "redo", label: "다시실행", shortcut: "⌘⇧Z" },
       { id: "cut", label: "잘라내기", shortcut: "⌘X" },
@@ -33,6 +40,14 @@ describe("studio edit menu catalog", () => {
       { id: "pen-pressure", label: "펜 압력 설정…" },
       { id: "app-settings", label: "애플리케이션 설정…" },
     ]);
+  });
+
+  it("provides a stable translation key for every production command", () => {
+    expect(
+      STUDIO_EDIT_MENU_COMMAND_ORDER.map((id) => STUDIO_EDIT_MENU_COMMANDS[id].labelKey),
+    ).toEqual(
+      STUDIO_EDIT_MENU_COMMAND_ORDER.map((id) => `studio.mainMenu.edit.command.${id}`),
+    );
   });
 });
 

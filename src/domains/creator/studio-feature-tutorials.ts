@@ -4,12 +4,12 @@
  */
 
 export type StudioTutorialCategory =
-  | "그리기"
-  | "보정·선택"
-  | "대사"
-  | "구성"
-  | "3D"
-  | "AI·내보내기";
+  | "drawing"
+  | "adjustments"
+  | "dialogue"
+  | "composition"
+  | "threed"
+  | "aiExport";
 
 /** 튜토리얼 한 단계 — 짧고 행동 가능한 문장. */
 export type StudioTutorialStep = {
@@ -55,18 +55,18 @@ export type StudioFeatureTutorial = {
 };
 
 export const STUDIO_TUTORIAL_CATEGORY_ORDER: StudioTutorialCategory[] = [
-  "그리기",
-  "보정·선택",
-  "대사",
-  "구성",
-  "3D",
-  "AI·내보내기",
+  "drawing",
+  "adjustments",
+  "dialogue",
+  "composition",
+  "threed",
+  "aiExport",
 ];
 
 export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   {
     id: "pen",
-    category: "그리기",
+    category: "drawing",
     title: "펜으로 스케치",
     summary: "빈 캔버스에 바로 선을 긋고 크기·불투명도를 조절해요.",
     badge: "펜",
@@ -91,7 +91,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "smart-shape",
-    category: "그리기",
+    category: "drawing",
     title: "스마트 도형",
     summary: "선·네모·원·삼각을 대충 그려도 손을 떼면 단정한 도형으로 다듬어요.",
     badge: "도형",
@@ -116,7 +116,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "brush",
-    category: "그리기",
+    category: "drawing",
     title: "브러시 키트",
     summary: "연필·마커·붓·형광펜 등 용도별 브러시로 분위기를 바꿔요.",
     badge: "붓",
@@ -139,7 +139,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "wet-mix",
-    category: "그리기",
+    category: "drawing",
     title: "혼색 브러시",
     summary: "바닥색을 붓에 묻혀 섞어 가며 칠하는 물감 느낌 브러시예요.",
     badge: "혼",
@@ -163,7 +163,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "dual-brush",
-    category: "그리기",
+    category: "drawing",
     title: "듀얼 브러시",
     summary: "두 브러시 팁을 겹쳐 종이·수채 같은 복합 질감을 만들어요.",
     badge: "듀",
@@ -187,7 +187,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "sketch-shape",
-    category: "그리기",
+    category: "drawing",
     title: "스케치 도형",
     summary: "도형을 손으로 그린 듯 흔들리는 선(rough.js)으로 바꿔요.",
     badge: "낙",
@@ -209,7 +209,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "special-rulers",
-    category: "그리기",
+    category: "drawing",
     title: "특수 자 3종",
     summary: "평행선·동심원·방사선 자에 선을 스냅해 배경 선을 편하게 그어요.",
     badge: "자",
@@ -232,7 +232,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "dodge-burn",
-    category: "보정·선택",
+    category: "adjustments",
     title: "닷지/번/스펀지",
     summary: "브러시로 문질러 밝기와 채도를 부분 보정해요.",
     badge: "닷",
@@ -256,7 +256,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "quick-mask",
-    category: "보정·선택",
+    category: "adjustments",
     title: "퀵 마스크",
     summary: "선택 영역을 브러시로 칠해 다듬는 포토샵식 Q 모드예요.",
     badge: "Q",
@@ -280,7 +280,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "color-range",
-    category: "보정·선택",
+    category: "adjustments",
     title: "색상 범위 선택",
     summary: "비슷한 색 픽셀을 한 번에 선택 영역으로 잡아요.",
     badge: "색",
@@ -302,7 +302,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "bubble",
-    category: "대사",
+    category: "dialogue",
     title: "말풍선",
     summary: "말하기·생각·외침 등 장면에 맞는 목소리를 골라 넣어요.",
     badge: "말",
@@ -326,7 +326,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "dialogue",
-    category: "대사",
+    category: "dialogue",
     title: "대사 한 번에 넣기",
     summary: "스크립트를 붙여 넣으면 말풍선이 줄줄이 배치됩니다.",
     badge: "대본",
@@ -349,7 +349,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "template",
-    category: "구성",
+    category: "composition",
     title: "컷 템플릿",
     summary: "세로 웹툰·4컷·그리드 등 레이아웃을 한 번에 깔아요.",
     badge: "컷",
@@ -372,7 +372,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "layers",
-    category: "구성",
+    category: "composition",
     title: "레이어와 선택",
     summary: "겹친 요소를 고르고, 순서·숨김·잠금으로 정리해요.",
     badge: "겹",
@@ -396,7 +396,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "path-boolean",
-    category: "구성",
+    category: "composition",
     title: "도형 결합",
     summary: "도형 두 개를 합치기·빼기·교집합으로 한 도형으로 만들어요.",
     badge: "합",
@@ -418,7 +418,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "character",
-    category: "3D",
+    category: "threed",
     title: "3D 캐릭터",
     summary: "VRM 캐릭터 포즈·의상·소품으로 장면을 잡아요.",
     badge: "캐",
@@ -441,7 +441,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "bg3d",
-    category: "3D",
+    category: "threed",
     title: "3D 배경",
     summary: "방·거리·세트 템플릿으로 배경 공간을 빠르게 깔아요.",
     badge: "배경",
@@ -464,7 +464,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "mannequin",
-    category: "3D",
+    category: "threed",
     title: "3D 데생 인형",
     summary: "관절 인형으로 포즈를 잡아 인체 밑그림으로 넣어요.",
     badge: "인",
@@ -488,7 +488,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "room-builder",
-    category: "3D",
+    category: "threed",
     title: "방 만들기",
     summary: "치수를 바꿔 가며 방 구조를 빠르게 블로킹해요.",
     badge: "방",
@@ -511,7 +511,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "ai-assist",
-    category: "AI·내보내기",
+    category: "aiExport",
     title: "AI 어시스트",
     summary: "대사 제안·리라이트 등 보조 도구로 막힌 장면을 풀어요.",
     badge: "AI",
@@ -535,7 +535,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "export",
-    category: "AI·내보내기",
+    category: "aiExport",
     title: "내보내기",
     summary: "PNG·JSON 백업 등으로 작업을 저장하고 공유해요.",
     badge: "저장",
@@ -558,7 +558,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   },
   {
     id: "gif-export",
-    category: "AI·내보내기",
+    category: "aiExport",
     title: "GIF·APNG 내보내기",
     summary: "프레임 애니메이션을 어디서나 재생되는 움짤 파일로 저장해요.",
     badge: "움",

@@ -70,13 +70,11 @@ import {
 } from "lucide-react";
 
 import { STUDIO_EDIT_MENU_COMMANDS } from "./studio-edit-controls";
+import { localizeStudioMainMenuGroups } from "./studio-main-menu-localization";
 
 import type { CvdMode } from "./studio-color-vision-model";
 import type { DrawMode, StudioMenu } from "./studio-editor-tool-model";
-import type {
-  StudioFilterDraft,
-  StudioFilterKind,
-} from "./studio-filter-menu";
+import type { StudioFilterDraft, StudioFilterKind } from "./studio-filter-menu";
 import type { StudioMainMenuGroup } from "./studio-main-menu-model";
 import type { StudioUiDensityMode } from "./studio-ui-density";
 import type { StudioViewRotation } from "./studio-view-controls";
@@ -206,21 +204,21 @@ export interface BuildStudioMainMenuGroupsInput {
   state: StudioMainMenuBuilderState;
   editor: StudioMainMenuEditorActions;
   ui: StudioMainMenuUiActions;
+  t: (key: string) => string;
 }
 
-/**
- * Builds the product menu catalogue from render-safe state and injected commands.
- * Browser/React state mutations stay at the editor-page composition boundary.
- */
+/** Builds the render-safe product catalogue; browser/React mutations stay at the page boundary. */
 export function buildStudioMainMenuGroups({
   state,
   editor,
   ui,
+  t,
 }: BuildStudioMainMenuGroupsInput): StudioMainMenuGroup[] {
   const filterUnavailableReason = state.filterDisabled
     ? state.filterUnavailableReason ?? "현재 편집 상태에서는 필터를 적용할 수 없습니다."
     : undefined;
-  return [
+
+  const groups = [
     {
       id: "file",
       label: "파일",
@@ -1086,4 +1084,6 @@ export function buildStudioMainMenuGroups({
       ],
     },
   ];
+
+  return localizeStudioMainMenuGroups(groups, state, t);
 }

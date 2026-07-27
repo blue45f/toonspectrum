@@ -23,6 +23,7 @@ export interface StudioSolidBackground {
   kind: "solid";
   id: string;
   label: string;
+  labelKey: string;
   color: string;
   keywords: readonly string[];
 }
@@ -31,6 +32,7 @@ export interface StudioGradientBackground {
   kind: "gradient";
   id: string;
   label: string;
+  labelKey: string;
   /** 2–4 stop hex colors, top→bottom (or left→right when horizontal). */
   stops: readonly string[];
   direction: "vertical" | "horizontal";
@@ -41,6 +43,7 @@ export interface StudioSvgBackground {
   kind: "pattern" | "atmosphere";
   id: string;
   label: string;
+  labelKey: string;
   keywords: readonly string[];
   /** Build full-bleed SVG for the page size. */
   buildSvg: (width: number, height: number) => string;
@@ -73,22 +76,134 @@ export type StudioBackgroundApply =
 // ---------------------------------------------------------------------------
 
 export const STUDIO_SOLID_BACKGROUNDS: readonly StudioSolidBackground[] = Object.freeze([
-  { kind: "solid", id: "s-white", label: "화이트", color: "#ffffff", keywords: ["white", "흰"] },
-  { kind: "solid", id: "s-paper", label: "원고지", color: "#f7f1e6", keywords: ["paper", "종이"] },
-  { kind: "solid", id: "s-cream", label: "크림", color: "#fbf3e4", keywords: ["cream"] },
-  { kind: "solid", id: "s-warm-gray", label: "웜 그레이", color: "#e8e2d8", keywords: ["gray"] },
-  { kind: "solid", id: "s-ink", label: "잉크", color: "#1a1410", keywords: ["ink", "검정", "dark"] },
-  { kind: "solid", id: "s-charcoal", label: "차콜", color: "#2c2620", keywords: ["charcoal"] },
-  { kind: "solid", id: "s-navy", label: "네이비", color: "#1a2744", keywords: ["navy", "밤"] },
-  { kind: "solid", id: "s-sky", label: "스카이", color: "#c8e8ff", keywords: ["sky", "하늘"] },
-  { kind: "solid", id: "s-mint", label: "민트", color: "#d4f5ea", keywords: ["mint"] },
-  { kind: "solid", id: "s-blush", label: "블러시", color: "#ffd6e0", keywords: ["pink", "분홍"] },
-  { kind: "solid", id: "s-peach", label: "피치", color: "#ffd8c2", keywords: ["peach", "살구"] },
-  { kind: "solid", id: "s-lavender", label: "라벤더", color: "#e4d8ff", keywords: ["lavender", "보라"] },
-  { kind: "solid", id: "s-lemon", label: "레몬", color: "#fff3b0", keywords: ["yellow", "노랑"] },
-  { kind: "solid", id: "s-coral", label: "코랄", color: "#ff8f70", keywords: ["coral", "accent"] },
-  { kind: "solid", id: "s-teal", label: "틸", color: "#1f6f6a", keywords: ["teal", "청록"] },
-  { kind: "solid", id: "s-wine", label: "와인", color: "#5c1f2e", keywords: ["wine", "버건디"] },
+  {
+    kind: "solid",
+    id: "s-white",
+    label: "화이트",
+    labelKey: "studio.background.preset.s-white",
+    color: "#ffffff",
+    keywords: ["white", "흰"],
+  },
+  {
+    kind: "solid",
+    id: "s-paper",
+    label: "원고지",
+    labelKey: "studio.background.preset.s-paper",
+    color: "#f7f1e6",
+    keywords: ["paper", "종이"],
+  },
+  {
+    kind: "solid",
+    id: "s-cream",
+    label: "크림",
+    labelKey: "studio.background.preset.s-cream",
+    color: "#fbf3e4",
+    keywords: ["cream"],
+  },
+  {
+    kind: "solid",
+    id: "s-warm-gray",
+    label: "웜 그레이",
+    labelKey: "studio.background.preset.s-warm-gray",
+    color: "#e8e2d8",
+    keywords: ["gray"],
+  },
+  {
+    kind: "solid",
+    id: "s-ink",
+    label: "잉크",
+    labelKey: "studio.background.preset.s-ink",
+    color: "#1a1410",
+    keywords: ["ink", "검정", "dark"],
+  },
+  {
+    kind: "solid",
+    id: "s-charcoal",
+    label: "차콜",
+    labelKey: "studio.background.preset.s-charcoal",
+    color: "#2c2620",
+    keywords: ["charcoal"],
+  },
+  {
+    kind: "solid",
+    id: "s-navy",
+    label: "네이비",
+    labelKey: "studio.background.preset.s-navy",
+    color: "#1a2744",
+    keywords: ["navy", "밤"],
+  },
+  {
+    kind: "solid",
+    id: "s-sky",
+    label: "스카이",
+    labelKey: "studio.background.preset.s-sky",
+    color: "#c8e8ff",
+    keywords: ["sky", "하늘"],
+  },
+  {
+    kind: "solid",
+    id: "s-mint",
+    label: "민트",
+    labelKey: "studio.background.preset.s-mint",
+    color: "#d4f5ea",
+    keywords: ["mint"],
+  },
+  {
+    kind: "solid",
+    id: "s-blush",
+    label: "블러시",
+    labelKey: "studio.background.preset.s-blush",
+    color: "#ffd6e0",
+    keywords: ["pink", "분홍"],
+  },
+  {
+    kind: "solid",
+    id: "s-peach",
+    label: "피치",
+    labelKey: "studio.background.preset.s-peach",
+    color: "#ffd8c2",
+    keywords: ["peach", "살구"],
+  },
+  {
+    kind: "solid",
+    id: "s-lavender",
+    label: "라벤더",
+    labelKey: "studio.background.preset.s-lavender",
+    color: "#e4d8ff",
+    keywords: ["lavender", "보라"],
+  },
+  {
+    kind: "solid",
+    id: "s-lemon",
+    label: "레몬",
+    labelKey: "studio.background.preset.s-lemon",
+    color: "#fff3b0",
+    keywords: ["yellow", "노랑"],
+  },
+  {
+    kind: "solid",
+    id: "s-coral",
+    label: "코랄",
+    labelKey: "studio.background.preset.s-coral",
+    color: "#ff8f70",
+    keywords: ["coral", "accent"],
+  },
+  {
+    kind: "solid",
+    id: "s-teal",
+    label: "틸",
+    labelKey: "studio.background.preset.s-teal",
+    color: "#1f6f6a",
+    keywords: ["teal", "청록"],
+  },
+  {
+    kind: "solid",
+    id: "s-wine",
+    label: "와인",
+    labelKey: "studio.background.preset.s-wine",
+    color: "#5c1f2e",
+    keywords: ["wine", "버건디"],
+  },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -100,6 +215,7 @@ export const STUDIO_GRADIENT_BACKGROUNDS: readonly StudioGradientBackground[] = 
     kind: "gradient",
     id: "g-dawn",
     label: "새벽",
+    labelKey: "studio.background.preset.g-dawn",
     stops: ["#1b2a52", "#f3b7c4"],
     direction: "vertical",
     keywords: ["dawn", "새벽"],
@@ -108,6 +224,7 @@ export const STUDIO_GRADIENT_BACKGROUNDS: readonly StudioGradientBackground[] = 
     kind: "gradient",
     id: "g-sunrise",
     label: "일출",
+    labelKey: "studio.background.preset.g-sunrise",
     stops: ["#ff9a62", "#ffd7a8", "#87c5ff"],
     direction: "vertical",
     keywords: ["sunrise", "아침"],
@@ -116,6 +233,7 @@ export const STUDIO_GRADIENT_BACKGROUNDS: readonly StudioGradientBackground[] = 
     kind: "gradient",
     id: "g-midday",
     label: "한낮",
+    labelKey: "studio.background.preset.g-midday",
     stops: ["#4aa6e8", "#eaf6ff"],
     direction: "vertical",
     keywords: ["day", "하늘"],
@@ -124,6 +242,7 @@ export const STUDIO_GRADIENT_BACKGROUNDS: readonly StudioGradientBackground[] = 
     kind: "gradient",
     id: "g-sunset",
     label: "노을",
+    labelKey: "studio.background.preset.g-sunset",
     stops: ["#ff7a3d", "#ff9aa2", "#3a1d52"],
     direction: "vertical",
     keywords: ["sunset", "저녁"],
@@ -132,6 +251,7 @@ export const STUDIO_GRADIENT_BACKGROUNDS: readonly StudioGradientBackground[] = 
     kind: "gradient",
     id: "g-night",
     label: "밤하늘",
+    labelKey: "studio.background.preset.g-night",
     stops: ["#05060f", "#1a2350", "#22305e"],
     direction: "vertical",
     keywords: ["night", "밤"],
@@ -140,6 +260,7 @@ export const STUDIO_GRADIENT_BACKGROUNDS: readonly StudioGradientBackground[] = 
     kind: "gradient",
     id: "g-aurora",
     label: "오로라",
+    labelKey: "studio.background.preset.g-aurora",
     stops: ["#0b2a3a", "#1d6b5c", "#49dba0"],
     direction: "vertical",
     keywords: ["aurora", "극광"],
@@ -148,6 +269,7 @@ export const STUDIO_GRADIENT_BACKGROUNDS: readonly StudioGradientBackground[] = 
     kind: "gradient",
     id: "g-ocean",
     label: "바다",
+    labelKey: "studio.background.preset.g-ocean",
     stops: ["#27c4d6", "#0a5a8a", "#0a3a6b"],
     direction: "vertical",
     keywords: ["ocean", "바다"],
@@ -156,6 +278,7 @@ export const STUDIO_GRADIENT_BACKGROUNDS: readonly StudioGradientBackground[] = 
     kind: "gradient",
     id: "g-forest",
     label: "숲",
+    labelKey: "studio.background.preset.g-forest",
     stops: ["#a9c95a", "#3d6b3a", "#163a26"],
     direction: "vertical",
     keywords: ["forest", "숲"],
@@ -164,6 +287,7 @@ export const STUDIO_GRADIENT_BACKGROUNDS: readonly StudioGradientBackground[] = 
     kind: "gradient",
     id: "g-neon",
     label: "네온",
+    labelKey: "studio.background.preset.g-neon",
     stops: ["#1a0533", "#ff2d95", "#00e5ff"],
     direction: "vertical",
     keywords: ["neon", "시티"],
@@ -172,6 +296,7 @@ export const STUDIO_GRADIENT_BACKGROUNDS: readonly StudioGradientBackground[] = 
     kind: "gradient",
     id: "g-peach",
     label: "피치 블렌드",
+    labelKey: "studio.background.preset.g-peach",
     stops: ["#ffe0c8", "#ffb3c1"],
     direction: "vertical",
     keywords: ["soft", "파스텔"],
@@ -180,6 +305,7 @@ export const STUDIO_GRADIENT_BACKGROUNDS: readonly StudioGradientBackground[] = 
     kind: "gradient",
     id: "g-mint",
     label: "민트 블렌드",
+    labelKey: "studio.background.preset.g-mint",
     stops: ["#d4f5ea", "#b8e0ff"],
     direction: "vertical",
     keywords: ["mint", "파스텔"],
@@ -188,6 +314,7 @@ export const STUDIO_GRADIENT_BACKGROUNDS: readonly StudioGradientBackground[] = 
     kind: "gradient",
     id: "g-warm-paper",
     label: "웜 페이퍼",
+    labelKey: "studio.background.preset.g-warm-paper",
     stops: ["#fff8ee", "#f0e0c8"],
     direction: "vertical",
     keywords: ["paper", "원고"],
@@ -196,6 +323,7 @@ export const STUDIO_GRADIENT_BACKGROUNDS: readonly StudioGradientBackground[] = 
     kind: "gradient",
     id: "g-ink-fade",
     label: "잉크 페이드",
+    labelKey: "studio.background.preset.g-ink-fade",
     stops: ["#1a1410", "#4a3c32"],
     direction: "vertical",
     keywords: ["ink", "dark"],
@@ -204,6 +332,7 @@ export const STUDIO_GRADIENT_BACKGROUNDS: readonly StudioGradientBackground[] = 
     kind: "gradient",
     id: "g-horizon",
     label: "수평선",
+    labelKey: "studio.background.preset.g-horizon",
     stops: ["#87ceeb", "#f5d6a8", "#c47b4a"],
     direction: "vertical",
     keywords: ["horizon", "풍경"],
@@ -212,6 +341,7 @@ export const STUDIO_GRADIENT_BACKGROUNDS: readonly StudioGradientBackground[] = 
     kind: "gradient",
     id: "g-side-warm",
     label: "가로 웜",
+    labelKey: "studio.background.preset.g-side-warm",
     stops: ["#ff9f68", "#ff6b9d"],
     direction: "horizontal",
     keywords: ["horizontal", "가로"],
@@ -220,6 +350,7 @@ export const STUDIO_GRADIENT_BACKGROUNDS: readonly StudioGradientBackground[] = 
     kind: "gradient",
     id: "g-side-cool",
     label: "가로 쿨",
+    labelKey: "studio.background.preset.g-side-cool",
     stops: ["#5b8def", "#a78bfa"],
     direction: "horizontal",
     keywords: ["horizontal", "cool"],
@@ -410,6 +541,7 @@ export const STUDIO_PATTERN_BACKGROUNDS: readonly StudioSvgBackground[] = Object
     kind: "pattern",
     id: "p-dots-warm",
     label: "도트 웜",
+    labelKey: "studio.background.preset.p-dots-warm",
     keywords: ["dots", "polka", "점"],
     buildSvg: (w, h) => patternDots(w, h, "#f7f1e6", "#c4a882", 20, 1.8),
   },
@@ -417,6 +549,7 @@ export const STUDIO_PATTERN_BACKGROUNDS: readonly StudioSvgBackground[] = Object
     kind: "pattern",
     id: "p-dots-dark",
     label: "도트 다크",
+    labelKey: "studio.background.preset.p-dots-dark",
     keywords: ["dots", "dark"],
     buildSvg: (w, h) => patternDots(w, h, "#1a1410", "#3d342c", 18, 1.5),
   },
@@ -424,6 +557,7 @@ export const STUDIO_PATTERN_BACKGROUNDS: readonly StudioSvgBackground[] = Object
     kind: "pattern",
     id: "p-stripes",
     label: "사선 스트라이프",
+    labelKey: "studio.background.preset.p-stripes",
     keywords: ["stripe", "줄무늬"],
     buildSvg: (w, h) => patternStripes(w, h, "#fff8f0", "#e8d5c0", 16),
   },
@@ -431,6 +565,7 @@ export const STUDIO_PATTERN_BACKGROUNDS: readonly StudioSvgBackground[] = Object
     kind: "pattern",
     id: "p-grid",
     label: "그리드",
+    labelKey: "studio.background.preset.p-grid",
     keywords: ["grid", "노트"],
     buildSvg: (w, h) => patternGrid(w, h, "#ffffff", "#d8d0c4", 28),
   },
@@ -438,6 +573,7 @@ export const STUDIO_PATTERN_BACKGROUNDS: readonly StudioSvgBackground[] = Object
     kind: "pattern",
     id: "p-checker",
     label: "체크",
+    labelKey: "studio.background.preset.p-checker",
     keywords: ["checker", "체크"],
     buildSvg: (w, h) => patternChecker(w, h, "#f4efe6", "#e2d6c4", 36),
   },
@@ -445,6 +581,7 @@ export const STUDIO_PATTERN_BACKGROUNDS: readonly StudioSvgBackground[] = Object
     kind: "pattern",
     id: "p-cross",
     label: "교차선",
+    labelKey: "studio.background.preset.p-cross",
     keywords: ["hatch", "교차"],
     buildSvg: (w, h) => patternCrosshatch(w, h, "#faf6f0", "#d0c4b4"),
   },
@@ -452,6 +589,7 @@ export const STUDIO_PATTERN_BACKGROUNDS: readonly StudioSvgBackground[] = Object
     kind: "pattern",
     id: "p-paper",
     label: "종이 결",
+    labelKey: "studio.background.preset.p-paper",
     keywords: ["paper", "grain", "질감"],
     buildSvg: (w, h) => patternPaperGrain(w, h),
   },
@@ -459,6 +597,7 @@ export const STUDIO_PATTERN_BACKGROUNDS: readonly StudioSvgBackground[] = Object
     kind: "pattern",
     id: "p-halftone",
     label: "하프톤",
+    labelKey: "studio.background.preset.p-halftone",
     keywords: ["halftone", "망점"],
     buildSvg: (w, h) => patternDots(w, h, "#f0ebe3", "#16100c", 12, 2.4),
   },
@@ -469,6 +608,7 @@ export const STUDIO_ATMOSPHERE_BACKGROUNDS: readonly StudioSvgBackground[] = Obj
     kind: "atmosphere",
     id: "a-soft-warm",
     label: "소프트 웜",
+    labelKey: "studio.background.preset.a-soft-warm",
     keywords: ["soft", "glow", "분위기"],
     buildSvg: (w, h) => atmosphereSoftGlow(w, h, "#2a1830", "#1a1018", "#ff8f6b"),
   },
@@ -476,6 +616,7 @@ export const STUDIO_ATMOSPHERE_BACKGROUNDS: readonly StudioSvgBackground[] = Obj
     kind: "atmosphere",
     id: "a-soft-cool",
     label: "소프트 쿨",
+    labelKey: "studio.background.preset.a-soft-cool",
     keywords: ["cool", "glow"],
     buildSvg: (w, h) => atmosphereSoftGlow(w, h, "#0f1c2e", "#0a1220", "#5ec8ff"),
   },
@@ -483,6 +624,7 @@ export const STUDIO_ATMOSPHERE_BACKGROUNDS: readonly StudioSvgBackground[] = Obj
     kind: "atmosphere",
     id: "a-vignette-paper",
     label: "비네트 페이퍼",
+    labelKey: "studio.background.preset.a-vignette-paper",
     keywords: ["vignette", "paper"],
     buildSvg: (w, h) => atmosphereVignette(w, h, "#f7f1e6"),
   },
@@ -490,6 +632,7 @@ export const STUDIO_ATMOSPHERE_BACKGROUNDS: readonly StudioSvgBackground[] = Obj
     kind: "atmosphere",
     id: "a-vignette-ink",
     label: "비네트 잉크",
+    labelKey: "studio.background.preset.a-vignette-ink",
     keywords: ["vignette", "dark"],
     buildSvg: (w, h) => atmosphereVignette(w, h, "#1a1410"),
   },
@@ -497,6 +640,7 @@ export const STUDIO_ATMOSPHERE_BACKGROUNDS: readonly StudioSvgBackground[] = Obj
     kind: "atmosphere",
     id: "a-bokeh",
     label: "보케",
+    labelKey: "studio.background.preset.a-bokeh",
     keywords: ["bokeh", "blur", "밤"],
     buildSvg: (w, h) => atmosphereBokeh(w, h),
   },
@@ -504,6 +648,7 @@ export const STUDIO_ATMOSPHERE_BACKGROUNDS: readonly StudioSvgBackground[] = Obj
     kind: "atmosphere",
     id: "a-mesh",
     label: "메시 그라데이션",
+    labelKey: "studio.background.preset.a-mesh",
     keywords: ["mesh", "abstract", "그라데이션"],
     buildSvg: (w, h) => atmosphereMesh(w, h),
   },
@@ -516,12 +661,13 @@ export const STUDIO_ATMOSPHERE_BACKGROUNDS: readonly StudioSvgBackground[] = Obj
 export const STUDIO_BACKGROUND_CATEGORY_CHIPS: readonly {
   id: StudioBackgroundCategory;
   label: string;
+  labelKey: string;
 }[] = [
-  { id: "all", label: "전체" },
-  { id: "solid", label: "단색" },
-  { id: "gradient", label: "그라데이션" },
-  { id: "pattern", label: "패턴" },
-  { id: "atmosphere", label: "분위기" },
+  { id: "all", label: "전체", labelKey: "studio.background.category.all" },
+  { id: "solid", label: "단색", labelKey: "studio.background.category.solid" },
+  { id: "gradient", label: "그라데이션", labelKey: "studio.background.category.gradient" },
+  { id: "pattern", label: "패턴", labelKey: "studio.background.category.pattern" },
+  { id: "atmosphere", label: "분위기", labelKey: "studio.background.category.atmosphere" },
 ];
 
 export function listStudioBackgroundPresets(

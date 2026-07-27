@@ -1,4 +1,3 @@
-import { calculateStudioCrc32 } from "./studio-crc32";
 import {
   STUDIO_CRC32_WORKER_PROTOCOL_VERSION,
   studioCrc32SuccessTransfers,
@@ -7,6 +6,7 @@ import {
   type StudioCrc32WorkerRunMessage,
   type StudioCrc32WorkerSuccessMessage,
 } from "./studio-crc32-worker-protocol";
+import { createStudioPersistentCrc32Executor } from "./studio-wasm-crc32-kernel";
 
 interface StudioCrc32WorkerScope {
   onmessage: ((event: MessageEvent<StudioCrc32WorkerRunMessage>) => void) | null;
@@ -14,6 +14,7 @@ interface StudioCrc32WorkerScope {
 }
 
 const workerScope = globalThis as unknown as StudioCrc32WorkerScope;
+const crc32Executor = createStudioPersistentCrc32Executor();
 
 workerScope.postMessage({
   type: "studio-crc32/ready",
@@ -44,7 +45,7 @@ workerScope.onmessage = (event) => {
       type: "studio-crc32/success",
       version: STUDIO_CRC32_WORKER_PROTOCOL_VERSION,
       requestId: message.requestId,
-      crc32: calculateStudioCrc32(message.data),
+      crc32: crc32Executor.calculate(message.data),
       data: message.data,
     };
     workerScope.postMessage(response, studioCrc32SuccessTransfers(response));

@@ -29,12 +29,14 @@ import {
 } from "./studio-live-collaboration-protocol";
 import { StudioLiveRoom, type StudioLiveRoomEvent } from "./studio-live-collaboration-room";
 import {
+  STUDIO_LIVE_SOCKET_RETRY_POLICY,
   StudioLiveSocketTransport,
   createStudioServerLiveTransportFactory,
   type StudioLiveSocketLike,
 } from "./studio-live-socket-transport";
 
 import type {
+  StudioLiveTransport,
   StudioLiveTransportContext,
   StudioLiveTransportControlEvent,
 } from "./studio-live-collaboration-transport";
@@ -267,6 +269,46 @@ afterEach(() => {
 });
 
 describe("StudioLiveSocketTransport", () => {
+  it("keeps reconnect attempts bounded for an explicitly configured server", () => {
+    expect(STUDIO_LIVE_SOCKET_RETRY_POLICY).toEqual({
+      reconnection: true,
+      reconnectionAttempts: 3,
+      reconnectionDelay: 1_000,
+      reconnectionDelayMax: 5_000,
+      randomizationFactor: 0.25,
+      timeout: 10_000,
+    });
+  });
+
+  it("uses the local collaboration factory without constructing a socket when disabled", async () => {
+    const connect = vi.fn(() => Promise.resolve());
+    const close = vi.fn();
+    const localTransport: StudioLiveTransport = {
+      mode: "local",
+      ready: true,
+      connect,
+      send: () => false,
+      subscribe: () => () => undefined,
+      close,
+    };
+    const localFactory = vi.fn(() => localTransport);
+    const socketFactory = vi.fn(() => new FakeSocket({ sessionToken: TOKEN }));
+    const factory = createStudioServerLiveTransportFactory(TOKEN, {
+      socketEndpoint: null,
+      createSocket: socketFactory,
+      createLocalTransport: localFactory,
+    });
+
+    const transport = factory(context());
+    expect(transport.mode).toBe("local");
+    expect(localFactory).toHaveBeenCalledWith(context());
+    expect(socketFactory).not.toHaveBeenCalled();
+    await transport.connect();
+    expect(connect).toHaveBeenCalledOnce();
+    transport.close();
+    expect(close).toHaveBeenCalledOnce();
+  });
+
   it("uses a same-origin websocket auth handshake and stays unready until join ACL succeeds", async () => {
     const socket = new FakeSocket({ sessionToken: "placeholder" });
     socket.holdEvents.add("studio:join");

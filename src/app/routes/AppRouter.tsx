@@ -6,6 +6,7 @@ import { useT } from "@/lib/i18n";
 import { lazyRetry } from "@/lib/lazy-retry";
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/src/components/error-boundary";
+import { loadStudioI18nDictionaries } from "@/src/domains/creator/studio-i18n-loader";
 
 function isStudioRoutePathname(pathname: string): boolean {
   return pathname === "/studio" || pathname.startsWith("/studio/");
@@ -174,7 +175,16 @@ const CreateChallengesPage = lazyRetry(
   () => import("@/src/domains/creator/CreateChallengesPage").then((m) => ({ default: m.CreateChallengesPage })),
   "CreateChallengesPage"
 );
-const StudioPage = lazyRetry(() => import("@/src/domains/creator/StudioPage").then((m) => ({ default: m.StudioPage })), "StudioPage");
+const StudioPage = lazyRetry(
+  async () => {
+    const [module] = await Promise.all([
+      import("@/src/domains/creator/StudioPage"),
+      loadStudioI18nDictionaries(),
+    ]);
+    return { default: module.StudioPage };
+  },
+  "StudioPage",
+);
 const StudioCrossOriginIsolationGate = lazyRetry(
   () => import("@/src/app/StudioCrossOriginIsolationGate").then((m) => ({
     default: m.StudioCrossOriginIsolationGate,
@@ -182,10 +192,13 @@ const StudioCrossOriginIsolationGate = lazyRetry(
   "StudioCrossOriginIsolationGate",
 );
 const StudioToolsCompanionPage = lazyRetry(
-  () =>
-    import("@/src/domains/creator/StudioToolsCompanionPage").then((m) => ({
-      default: m.StudioToolsCompanionPage,
-    })),
+  async () => {
+    const [module] = await Promise.all([
+      import("@/src/domains/creator/StudioToolsCompanionPage"),
+      loadStudioI18nDictionaries(),
+    ]);
+    return { default: module.StudioToolsCompanionPage };
+  },
   "StudioToolsCompanionPage"
 );
 const AccountPage = lazyRetry(() => import("@/src/domains/account/AccountPage").then((m) => ({ default: m.AccountPage })), "AccountPage");

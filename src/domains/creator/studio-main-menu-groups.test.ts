@@ -144,7 +144,12 @@ function buildMenu(stateOverrides: StateOverrides = {}) {
       ...stateOverrides.edit,
     },
   };
-  const groups = buildStudioMainMenuGroups({ state, editor, ui });
+  const groups = buildStudioMainMenuGroups({
+    state,
+    editor,
+    ui,
+    t: (key) => key,
+  });
   return { editor, groups, ui };
 }
 

@@ -277,12 +277,12 @@ const DICT: DictByLocale = {
     "route.design": "디자인 시스템",
     "route.sitemap": "사이트맵",
     "route.guide": "랭킹 산정 방식",
-    "route.settings": "설정",
-    "route.admin": "관리자 콘솔",
-    "route.terms": "이용약관",
-    "route.privacy": "개인정보처리방침",
-    "route.copyright": "저작권·콘텐츠 안내",
-    "route.contact": "광고·제휴 문의",
+  "route.settings": "설정",
+  "route.admin": "관리자 콘솔",
+  "route.terms": "이용약관",
+  "route.privacy": "개인정보처리방침",
+  "route.copyright": "저작권·콘텐츠 안내",
+  "route.contact": "광고·제휴 문의",
     "home.hero.eyebrow": "WEBTOON × WEBNOVEL",
     "home.hero.titleLine1": "흩어진 이야기를,",
     "home.hero.titleShimmer": "한 권의 색인",
@@ -306,6 +306,45 @@ const DICT: DictByLocale = {
     "route.play": "놀이터",
     "route.unknown": "페이지",
     "route.pencafeSuffix": "펜카페",
+
+    // 스튜디오 튜토리얼/도움말
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // 배경 패널
+
+
+
+    // 캔버스 설정 패널(가이드/그리드/규격)
+
+
+
+
+
+
+
+
+
+
 
     "auth.menu.triggerLabel": "계정 메뉴",
     "auth.menu.adminPanel": "관리자 콘솔",
@@ -831,6 +870,25 @@ const DICT: DictByLocale = {
     "route.play": "Arcade",
     "route.unknown": "Page",
     "route.pencafeSuffix": "fan cafe",
+
+    // Studio tutorials and help
+
+    // Background editor
+
+
+
+    // Canvas settings panel (guides/grid/webtoon guides)
+
+
+
+
+
+
+
+
+
+
+
 
     "auth.menu.triggerLabel": "Account menu",
     "auth.menu.adminPanel": "Admin console",
@@ -1585,6 +1643,29 @@ function resolveTranslation(
   }
 
   return DICT[FALLBACK_LANG][key] ?? key;
+}
+
+/**
+ * Registers a route-owned dictionary without forcing its strings into the
+ * application shell bundle. Route modules call this synchronously while their
+ * lazy chunk is evaluated, so the first committed render already sees the
+ * localized labels.
+ */
+export function registerI18nLocaleEntries(
+  locale: string,
+  entries: Readonly<Record<string, string>>,
+): void {
+  const normalized = normalizeLocaleCode(locale);
+  if (!normalized) return;
+
+  const target = DICT[normalized] ?? (DICT[normalized] = {});
+  let changed = false;
+  for (const [key, value] of Object.entries(entries)) {
+    if (target[key] === value) continue;
+    target[key] = value;
+    changed = true;
+  }
+  if (!changed) return;
 }
 
 type TranslationResolver = (key: string) => string;

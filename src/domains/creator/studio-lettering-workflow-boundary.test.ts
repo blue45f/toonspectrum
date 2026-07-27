@@ -11,11 +11,11 @@ describe("Studio lettering workflow boundary", () => {
     const page = read("./StudioPage.tsx");
     const help = read("./StudioShortcutsHelp.tsx");
 
-    expect(settings).toContain('{ id: "tool-lettering", label: "레터링(텍스트·말풍선)", defaultKeys: "T" }');
+    expect(settings).toContain('{ id: "tool-lettering", label: "레터링(텍스트·말풍선)", labelKey: "studio.settings.shortcut.toolLettering", defaultKeys: "T" }');
     expect(page).toContain('matchStudioShortcut(sc["tool-lettering"], e)');
     expect(page).toContain("void startEditText(selected.id)");
     expect(page).toContain("addBubble(lastLettering.variant, undefined, true)");
-    expect(help).toContain('keys: "T", label: "선택 대사 편집 · 최근 레터링 삽입"');
+    expect(help).toContain('keys: "T", labelKey: "studio.shortcuts.row.edit.text", actionId: "tool-lettering"');
   });
 
   it("starts inline editing from click insertion but leaves drag-and-drop placement uninterrupted", () => {
@@ -28,7 +28,7 @@ describe("Studio lettering workflow boundary", () => {
     expect(bubblePopover).toContain("writeStudioInsertDragPayload(event.dataTransfer");
     expect(bubblePopover).toContain('id="studio-bubble-placement-help"');
     expect(bubblePopover.indexOf('id="studio-bubble-placement-help"')).toBeLessThan(
-      bubblePopover.indexOf('role="menu" aria-label="말풍선 종류"')
+      bubblePopover.indexOf('role="menu" aria-label={localizeText(')
     );
     expect(bubblePopover.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(4);
     expect(rail).toContain('addBubble("speech", undefined, true)');
