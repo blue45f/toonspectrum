@@ -19,6 +19,21 @@ import {
   type StudioBg3dGlbValidationBudget,
 } from "./studio-bg3d-glb-validation";
 import { STUDIO_BG3D_MESHOPT_EXTENSION } from "./studio-bg3d-meshopt";
+import {
+  StudioBg3dObjPreflightWorkerClientError,
+  preflightStudioBg3dMtlBytesInWorker,
+  preflightStudioBg3dObjBytesInWorker,
+} from "./studio-bg3d-obj-preflight-worker-client";
+import {
+  STUDIO_BG3D_OBJ_PREFLIGHT_WORKER_BUDGETS,
+  STUDIO_BG3D_OBJ_PREFLIGHT_WORKER_PROTOCOL_VERSION,
+  type StudioBg3dObjPreflightWorkerFailureCode,
+  type StudioBg3dObjPreflightWorkerMtlEntry,
+  type StudioBg3dObjPreflightWorkerMtlRequest,
+  type StudioBg3dObjPreflightWorkerMtlResult,
+  type StudioBg3dObjPreflightWorkerObjRequest,
+  type StudioBg3dObjPreflightWorkerObjResult,
+} from "./studio-bg3d-obj-preflight-worker-protocol";
 import { hydrateStudioBg3dObjWorkerResult } from "./studio-bg3d-obj-three-hydrator";
 import {
   StudioBg3dObjWorkerClientError,
@@ -1189,188 +1204,92 @@ async function parseGltfImport(
   }
 }
 
-function countObjArguments(value: string, start: number): number {
-  let count = 0;
-  let insideToken = false;
-  for (let index = start; index < value.length; index += 1) {
-    const code = value.charCodeAt(index);
-    if (code === 0x23 && !insideToken) break;
-    const whitespace = code === 0x20 || code === 0x09 || code === 0x0d;
-    if (whitespace) {
-      insideToken = false;
-    } else if (!insideToken) {
-      insideToken = true;
-      count += 1;
-    }
-  }
-  return count;
-}
-
-/**
- * OBJLoader expands face references into non-indexed arrays. Bound both source declarations and
- * expanded references before the parser is allowed to allocate them.
- */
-function preflightObjText(text: string, signal?: AbortSignal): readonly string[] {
-  let sourceVertices = 0;
-  let sourceAttributeRecords = 0;
-  let expandedVertices = 0;
-  let triangles = 0;
-  let objectNodes = 0;
-  let materialSections = 0;
-  let materialLibraryDirectives = 0;
-  let offset = 0;
-  let lineNumber = 0;
-  const materialLibraries: string[] = [];
-  const seenMaterialLibraryReferences = new Set<string>();
-
-  while (offset <= text.length) {
-    if ((lineNumber & 0x3ff) === 0) throwIfAborted(signal);
-    const newline = text.indexOf("\n", offset);
-    const end = newline < 0 ? text.length : newline;
-    if (end - offset > 1024 * 1024) throw importError("parse-failed");
-    const line = text.slice(offset, end);
-    let directiveStart = 0;
-    while (directiveStart < line.length && /\s/u.test(line[directiveStart] ?? "")) directiveStart += 1;
-    if (directiveStart < line.length && line.charCodeAt(directiveStart) !== 0x23) {
-      let directiveEnd = directiveStart;
-      while (directiveEnd < line.length && !/\s/u.test(line[directiveEnd] ?? "")) directiveEnd += 1;
-      const directive = line.slice(directiveStart, directiveEnd).toLowerCase();
-      if (directive === "v" || directive === "vt" || directive === "vn") {
-        sourceAttributeRecords = safeAddCount(
-          sourceAttributeRecords,
-          1,
-          "vertex-budget-exceeded",
-        );
-        if (sourceAttributeRecords > STUDIO_BG3D_IMPORT_MAX_VERTICES) {
-          throw importError("vertex-budget-exceeded");
-        }
-        if (directive === "v") sourceVertices += 1;
-        if (sourceVertices > STUDIO_BG3D_IMPORT_MAX_VERTICES) {
-          throw importError("vertex-budget-exceeded");
-        }
-      } else if (directive === "f" || directive === "l" || directive === "p") {
-        const references = countObjArguments(line, directiveEnd);
-        // OBJLoader triangulates an n-gon as a fan and emits three non-indexed vertices for every
-        // resulting triangle. Counting only the source references substantially underestimates the
-        // allocation (for a large n-gon it is almost 3x) and lets the parser cross the vertex
-        // budget before the post-parse gate can run.
-        const expandedReferences = directive === "f"
-          ? safeMultiplyCount(Math.max(0, references - 2), 3, "vertex-budget-exceeded")
-          : references;
-        expandedVertices = safeAddCount(
-          expandedVertices,
-          expandedReferences,
-          "vertex-budget-exceeded",
-        );
-        if (expandedVertices > STUDIO_BG3D_IMPORT_MAX_VERTICES) {
-          throw importError("vertex-budget-exceeded");
-        }
-        if (directive === "f") {
-          const faceTriangles = Math.max(0, references - 2);
-          triangles = safeAddCount(triangles, faceTriangles, "triangle-budget-exceeded");
-          if (triangles > STUDIO_BG3D_IMPORT_MAX_TRIANGLES) {
-            throw importError("triangle-budget-exceeded");
-          }
-        }
-      } else if (directive === "o" || directive === "g") {
-        objectNodes = safeAddCount(objectNodes, 1, "node-budget-exceeded");
-        if (objectNodes > STUDIO_BG3D_IMPORT_MAX_NODES) {
-          throw importError("node-budget-exceeded");
-        }
-      } else if (directive === "usemtl") {
-        materialSections = safeAddCount(materialSections, 1, "mesh-budget-exceeded");
-        if (materialSections > STUDIO_BG3D_IMPORT_MAX_MESH_PRIMITIVES) {
-          throw importError("mesh-budget-exceeded");
-        }
-      } else if (directive === "mtllib") {
-        materialLibraryDirectives = safeAddCount(
-          materialLibraryDirectives,
-          1,
-          "material-budget-exceeded",
-        );
-        if (materialLibraryDirectives > STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_REFERENCE_DIRECTIVES) {
-          throw importError("material-budget-exceeded");
-        }
-        const reference = line.slice(directiveEnd).trim();
-        if (
-          !reference
-          || reference.length > 1_024
-          || SCHEME_PATTERN.test(reference)
-          || reference.startsWith("//")
-          || containsControlCharacter(reference)
-        ) throw importError("unsafe-resource-uri");
-        if (!seenMaterialLibraryReferences.has(reference)) {
-          seenMaterialLibraryReferences.add(reference);
-          materialLibraries.push(reference);
-          if (materialLibraries.length > STUDIO_BG3D_IMPORT_MAX_OBJ_MATERIAL_LIBRARIES) {
-            throw importError("material-budget-exceeded");
-          }
-        }
-      }
-    }
-    if (newline < 0) break;
-    offset = newline + 1;
-    lineNumber += 1;
-  }
-  return Object.freeze(materialLibraries);
-}
-
-interface ObjMtlPreflightBudget {
-  directives: number;
-  materials: number;
-  textureSlots: number;
-}
-
-function preflightObjMtlText(
-  text: string,
-  budget: ObjMtlPreflightBudget,
+async function preflightObjBytesForImport(
+  bytes: ArrayBuffer,
   signal?: AbortSignal,
-): void {
-  let offset = 0;
-  let lineNumber = 0;
-  while (offset <= text.length) {
-    if ((lineNumber & 0x3ff) === 0) throwIfAborted(signal);
-    const newline = text.indexOf("\n", offset);
-    const end = newline < 0 ? text.length : newline;
-    if (end - offset > 1024 * 1024) throw importError("parse-failed");
-    const line = text.slice(offset, end);
-    let directiveStart = 0;
-    while (directiveStart < line.length && /\s/u.test(line[directiveStart] ?? "")) directiveStart += 1;
-    if (directiveStart < line.length && line.charCodeAt(directiveStart) !== 0x23) {
-      let directiveEnd = directiveStart;
-      while (directiveEnd < line.length && !/\s/u.test(line[directiveEnd] ?? "")) directiveEnd += 1;
-      const directive = line.slice(directiveStart, directiveEnd).toLowerCase();
-      budget.directives = safeAddCount(budget.directives, 1, "material-budget-exceeded");
-      if (budget.directives > STUDIO_BG3D_IMPORT_MAX_OBJ_MTL_DIRECTIVES) {
-        throw importError("material-budget-exceeded");
-      }
-      if (directive === "newmtl") {
-        budget.materials = safeAddCount(budget.materials, 1, "material-budget-exceeded");
-        if (budget.materials > STUDIO_BG3D_IMPORT_MAX_EXPORT_MATERIALS) {
-          throw importError("material-budget-exceeded");
-        }
-      }
-      if (
-        directive.startsWith("map_")
-        || directive === "bump"
-        || directive === "decal"
-        || directive === "disp"
-        || directive === "norm"
-        || directive === "refl"
-      ) {
-        budget.textureSlots = safeAddCount(budget.textureSlots, 1, "material-budget-exceeded");
-        if (budget.textureSlots > STUDIO_BG3D_IMPORT_MAX_EXPORT_MATERIAL_SLOTS) {
-          throw importError("material-budget-exceeded");
-        }
-        const reference = line.slice(directiveEnd).trim();
-        if (SCHEME_PATTERN.test(reference) || reference.startsWith("//")) {
-          throw importError("unsafe-resource-uri");
-        }
-      }
+): Promise<StudioBg3dObjPreflightWorkerObjResult> {
+  try {
+    return await preflightStudioBg3dObjBytesInWorker(bytes, { signal });
+  } catch (error) {
+    if (!(error instanceof StudioBg3dObjPreflightWorkerClientError)) throw error;
+    if (
+      error.code !== "worker-unavailable"
+      || bytes.byteLength > STUDIO_BG3D_IMPORT_OBJ_MAIN_FALLBACK_MAX_BYTES
+    ) {
+      throw mapObjPreflightFailure(error.code);
     }
-    if (newline < 0) break;
-    offset = newline + 1;
-    lineNumber += 1;
+    const {
+      StudioBg3dObjPreflightWorkerRuntimeError,
+      preflightStudioBg3dObjWorkerRequest,
+    } = await import("./studio-bg3d-obj-preflight-worker-runtime");
+    const fallbackRequest: StudioBg3dObjPreflightWorkerObjRequest = {
+      version: STUDIO_BG3D_OBJ_PREFLIGHT_WORKER_PROTOCOL_VERSION,
+      kind: "preflight-obj",
+      requestId: 1,
+      generationId: 1,
+      sourceByteLength: bytes.byteLength,
+      bytes,
+      budgets: STUDIO_BG3D_OBJ_PREFLIGHT_WORKER_BUDGETS,
+    };
+    try {
+      const result = preflightStudioBg3dObjWorkerRequest(fallbackRequest);
+      if (result.kind !== "obj") throw importError("parse-failed");
+      throwIfAborted(signal);
+      return result;
+    } catch (fallbackError) {
+      if (fallbackError instanceof StudioBg3dObjPreflightWorkerRuntimeError) {
+        throw mapObjPreflightFailure(fallbackError.code);
+      }
+      throw fallbackError;
+    }
+  }
+}
+
+async function preflightMtlBytesForImport(
+  materialLibraries: readonly StudioBg3dObjPreflightWorkerMtlEntry[],
+  signal?: AbortSignal,
+): Promise<StudioBg3dObjPreflightWorkerMtlResult> {
+  try {
+    return await preflightStudioBg3dMtlBytesInWorker(materialLibraries, { signal });
+  } catch (error) {
+    if (!(error instanceof StudioBg3dObjPreflightWorkerClientError)) throw error;
+    const fallbackInputBytes = materialLibraries.reduce(
+      (total, entry) => safeAddCount(
+        total,
+        entry.sourceByteLength,
+        "material-budget-exceeded",
+      ),
+      0,
+    );
+    if (
+      error.code !== "worker-unavailable"
+      || fallbackInputBytes > STUDIO_BG3D_IMPORT_OBJ_MAIN_FALLBACK_MAX_BYTES
+    ) {
+      throw mapObjPreflightFailure(error.code);
+    }
+    const {
+      StudioBg3dObjPreflightWorkerRuntimeError,
+      preflightStudioBg3dObjWorkerRequest,
+    } = await import("./studio-bg3d-obj-preflight-worker-runtime");
+    const fallbackRequest: StudioBg3dObjPreflightWorkerMtlRequest = {
+      version: STUDIO_BG3D_OBJ_PREFLIGHT_WORKER_PROTOCOL_VERSION,
+      kind: "preflight-mtl",
+      requestId: 1,
+      generationId: 1,
+      materialLibraries,
+      budgets: STUDIO_BG3D_OBJ_PREFLIGHT_WORKER_BUDGETS,
+    };
+    try {
+      const result = preflightStudioBg3dObjWorkerRequest(fallbackRequest);
+      if (result.kind !== "mtl") throw importError("parse-failed");
+      throwIfAborted(signal);
+      return result;
+    } catch (fallbackError) {
+      if (fallbackError instanceof StudioBg3dObjPreflightWorkerRuntimeError) {
+        throw mapObjPreflightFailure(fallbackError.code);
+      }
+      throw fallbackError;
+    }
   }
 }
 
@@ -1379,9 +1298,10 @@ async function parseObjImport(
   resolver: LocalResourceResolver,
   signal?: AbortSignal,
 ): Promise<ParsedImport> {
-  const bytes = await readBytes(item.primary, signal);
-  const text = decodeUtf8(bytes, signal);
-  const materialLibraryReferences = preflightObjText(text, signal);
+  let bytes = await readBytes(item.primary, signal);
+  const objPreflight = await preflightObjBytesForImport(bytes, signal);
+  bytes = objPreflight.bytes;
+  const materialLibraryReferences = objPreflight.materialLibraryReferences;
   const materialResources: Array<{
     readonly path: string;
     readonly file: StudioBg3dImportFile;
@@ -1419,16 +1339,22 @@ async function parseObjImport(
     }
   }
 
-  const materialBudget: ObjMtlPreflightBudget = { directives: 0, materials: 0, textureSlots: 0 };
-  const materialLibraries: StudioBg3dObjWorkerMtlEntry[] = [];
+  let materialLibraries: StudioBg3dObjWorkerMtlEntry[] = [];
   for (const resource of materialResources.sort((left, right) => compareUtf8(left.path, right.path))) {
     const materialBytes = await readBytes(resource.file, signal);
-    preflightObjMtlText(decodeUtf8(materialBytes, signal), materialBudget, signal);
     materialLibraries.push({
       path: resource.path,
       sourceByteLength: materialBytes.byteLength,
       bytes: materialBytes,
     });
+  }
+  if (materialLibraries.length > 0) {
+    const materialPreflight = await preflightMtlBytesForImport(materialLibraries, signal);
+    materialLibraries = materialPreflight.materialLibraries.map((entry) => ({
+      path: entry.path,
+      sourceByteLength: entry.sourceByteLength,
+      bytes: entry.bytes,
+    }));
   }
 
   const resourcePaths = resolver.canonicalResourcePaths();
@@ -1527,6 +1453,25 @@ function mapObjWorkerFailure(
     || code === "material-budget-exceeded"
     || code === "mesh-budget-exceeded"
     || code === "missing-resource"
+    || code === "node-budget-exceeded"
+    || code === "triangle-budget-exceeded"
+    || code === "unsafe-resource-uri"
+    || code === "vertex-budget-exceeded"
+  ) return importError(code);
+  if (code === "parse-failed" || code === "protocol") return importError("parse-failed");
+  return importError("worker-required");
+}
+
+function mapObjPreflightFailure(
+  code:
+    | StudioBg3dObjPreflightWorkerFailureCode
+    | StudioBg3dObjPreflightWorkerClientError["code"],
+): StudioBg3dModelImportError {
+  if (code === "aborted") return importError("aborted");
+  if (code === "invalid-text") return importError("invalid-text");
+  if (
+    code === "material-budget-exceeded"
+    || code === "mesh-budget-exceeded"
     || code === "node-budget-exceeded"
     || code === "triangle-budget-exceeded"
     || code === "unsafe-resource-uri"

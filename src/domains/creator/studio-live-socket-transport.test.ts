@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  STUDIO_CRDT_BINARY_WIRE_VERSION,
+  STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT,
+  STUDIO_LIVE_CRDT_BINARY_SYNC_EVENT,
+  STUDIO_LIVE_CRDT_BINARY_UPDATE_EVENT,
+  STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT,
+} from "./studio-crdt-binary-wire";
 import { StudioCrdtOperationError } from "./studio-crdt-operation-error";
 import {
   encodeStudioCrdtStateVector,
@@ -32,6 +39,12 @@ import type {
   StudioLiveTransportControlEvent,
 } from "./studio-live-collaboration-transport";
 
+import {
+  decodeStudioCrdtBinaryEnvelope,
+  encodeStudioCrdtBinaryEnvelope,
+  fragmentStudioCrdtBinarySyncEnvelope,
+} from "@/lib/studio-crdt-binary-envelope";
+
 const NOW = 2_000_000;
 const TOKEN = "signed-session-token-value";
 const localParticipant: StudioLiveParticipant = {
@@ -63,11 +76,37 @@ function serverParticipant(
 
 const self = serverParticipant("connection-self", localParticipant.sessionId, "내 작업", "owner");
 const remote = serverParticipant("connection-remote", "remote-client-instance", "어시스턴트");
+const CRDT_WIRE_EPOCH = "00000000-0000-4000-8000-000000000101";
 
 function joinSuccess(overrides: Record<string, unknown> = {}) {
   return {
     ok: true,
     data: { self, participants: [self, remote], locks: [], ...overrides },
+  };
+}
+
+function binaryJoinSuccess(
+  selectionEpoch = CRDT_WIRE_EPOCH,
+  overrides: Record<string, unknown> = {}
+) {
+  return joinSuccess({
+    crdtWireFormats: ["binary-v1", "base64-v4"],
+    crdtWireSelectionEpoch: selectionEpoch,
+    ...overrides,
+  });
+}
+
+function binarySelectionSuccess(selectionEpoch = CRDT_WIRE_EPOCH) {
+  return {
+    ok: true,
+    data: {
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
+      workId: "work-1",
+      format: "binary-v1",
+      selectionEpoch,
+      selected: true,
+    },
   };
 }
 
@@ -3722,6 +3761,334 @@ describe("StudioLiveSocketTransport", () => {
       (transport as unknown as { sessionToken: string | null }).sessionToken
     ).toBeNull();
     expect(JSON.stringify(socket.emitted)).not.toContain(TOKEN);
+    transport.close();
+  });
+
+  it("stays unready until the advertised binary wire selection ACK is correlated", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = binaryJoinSuccess();
+    socket.holdEvents.add(STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT);
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+
+    const connecting = transport.connect();
+    expect(transport.ready).toBe(false);
+    expect(socket.emitted.slice(0, 2)).toEqual([
+      {
+        event: "studio:join",
+        payload: {
+          workId: "work-1",
+          clientInstanceId: localParticipant.sessionId,
+        },
+      },
+      {
+        event: STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT,
+        payload: {
+          protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+          wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
+          workId: "work-1",
+          format: "binary-v1",
+          selectionEpoch: CRDT_WIRE_EPOCH,
+        },
+      },
+    ]);
+
+    socket.reply(
+      STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT,
+      binarySelectionSuccess()
+    );
+    await connecting;
+    expect(transport.ready).toBe(true);
+    transport.close();
+  });
+
+  it("uses binary envelopes for authoritative sync and publication after selection", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = binaryJoinSuccess();
+    socket.ackResponses.set(
+      STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT,
+      binarySelectionSuccess()
+    );
+    const diff = Uint8Array.of(1, 2, 3, 4);
+    const fragments = fragmentStudioCrdtBinarySyncEnvelope(
+      encodeStudioCrdtBinaryEnvelope("sync-diff", diff)
+    );
+    const stateVectorBytes = Uint8Array.of(0);
+    socket.ackResponses.set(STUDIO_LIVE_CRDT_BINARY_SYNC_EVENT, {
+      ok: true,
+      data: {
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+        wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
+        workId: "work-1",
+        requestId: "request-binary",
+        transferId: "11111111-1111-4111-8111-111111111111",
+        fragments,
+        fragmentCount: fragments.length,
+        wireBytes: fragments.reduce(
+          (sum, fragment) => sum + fragment.byteLength,
+          0
+        ),
+        totalBytes: diff.byteLength,
+        serverStateVector: encodeStudioCrdtBinaryEnvelope(
+          "state-vector",
+          stateVectorBytes
+        ),
+        serverSequence: "12",
+      },
+    });
+    const updateId = "22222222-2222-4222-8222-222222222222";
+    socket.ackResponses.set(STUDIO_LIVE_CRDT_BINARY_UPDATE_EVENT, {
+      ok: true,
+      data: {
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+        wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
+        workId: "work-1",
+        updateId,
+        serverSequence: "13",
+        duplicate: false,
+      },
+    });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    await transport.connect();
+
+    await expect(transport.requestCrdtSync({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-1",
+      requestId: "request-binary",
+      stateVector: encodeStudioCrdtStateVector(stateVectorBytes),
+    })).resolves.toEqual(expect.objectContaining({
+      requestId: "request-binary",
+      chunks: encodeStudioCrdtSyncChunks(diff),
+      serverSequence: "12",
+    }));
+    const updateBytes = Uint8Array.of(9, 8, 7);
+    await expect(transport.publishCrdtUpdate({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-1",
+      updateId,
+      clientSequence: 1,
+      update: encodeStudioCrdtUpdate(updateBytes),
+    })).resolves.toEqual({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-1",
+      updateId,
+      serverSequence: "13",
+      serverStateVector: null,
+      duplicate: false,
+    });
+
+    const binarySync = socket.emitted.find(
+      ({ event }) => event === STUDIO_LIVE_CRDT_BINARY_SYNC_EVENT
+    );
+    const binaryUpdate = socket.emitted.find(
+      ({ event }) => event === STUDIO_LIVE_CRDT_BINARY_UPDATE_EVENT
+    );
+    expect(
+      decodeStudioCrdtBinaryEnvelope(
+        (binarySync?.payload as { stateVector: Uint8Array }).stateVector,
+        "state-vector"
+      ).bytes
+    ).toEqual(stateVectorBytes);
+    expect(
+      decodeStudioCrdtBinaryEnvelope(
+        (binaryUpdate?.payload as { update: Uint8Array }).update,
+        "update"
+      ).bytes
+    ).toEqual(updateBytes);
+    expect(
+      socket.emitted.some(
+        ({ event }) => event === "studio:crdt:sync" || event === "studio:crdt:update"
+      )
+    ).toBe(false);
+    transport.close();
+  });
+
+  it("deduplicates the same remote updateId across legacy and binary rollout events", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = binaryJoinSuccess();
+    socket.ackResponses.set(
+      STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT,
+      binarySelectionSuccess()
+    );
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const durable: StudioCrdtTransportMessage[] = [];
+    transport.subscribeCrdt((message) => durable.push(message));
+    await transport.connect();
+
+    const raw = Uint8Array.of(5, 6, 7);
+    const legacyFirst = {
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-1",
+      updateId: "33333333-3333-4333-8333-333333333333",
+      serverSequence: "20",
+      update: encodeStudioCrdtUpdate(raw),
+    };
+    const binaryFirst = {
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
+      workId: "work-1",
+      updateId: "44444444-4444-4444-8444-444444444444",
+      serverSequence: "21",
+      update: encodeStudioCrdtBinaryEnvelope("update", raw),
+    };
+    socket.serverEmit("studio:crdt:update", legacyFirst);
+    socket.serverEmit(STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT, {
+      ...binaryFirst,
+      updateId: legacyFirst.updateId,
+      serverSequence: legacyFirst.serverSequence,
+    });
+    socket.serverEmit(STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT, binaryFirst);
+    socket.serverEmit("studio:crdt:update", {
+      ...legacyFirst,
+      updateId: binaryFirst.updateId,
+      serverSequence: binaryFirst.serverSequence,
+    });
+
+    expect(durable).toHaveLength(2);
+    expect(durable.map((message) =>
+      message.type === "update" ? message.update.updateId : null
+    )).toEqual([legacyFirst.updateId, binaryFirst.updateId]);
+    transport.close();
+  });
+
+  it("reconnects with a new join when the select epoch acknowledgement is stale", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = binaryJoinSuccess();
+    socket.ackResponses.set(
+      STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT,
+      binarySelectionSuccess("00000000-0000-4000-8000-000000000999")
+    );
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+
+    const connecting = transport.connect();
+    expect(transport.ready).toBe(false);
+    socket.ackResponses.set(
+      STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT,
+      binarySelectionSuccess()
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    await connecting;
+
+    expect(
+      socket.emitted.filter(({ event }) => event === "studio:join")
+    ).toHaveLength(2);
+    expect(
+      socket.emitted.filter(
+        ({ event }) => event === STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT
+      )
+    ).toHaveLength(2);
+    expect(transport.ready).toBe(true);
+    transport.close();
+  });
+
+  it("reconnects instead of falling back when the select acknowledgement is lost", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = binaryJoinSuccess();
+    socket.holdEvents.add(STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT);
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+
+    const connecting = transport.connect();
+    socket.holdEvents.delete(STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT);
+    socket.ackResponses.set(
+      STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT,
+      binarySelectionSuccess()
+    );
+    await vi.advanceTimersByTimeAsync(8_000);
+    await vi.advanceTimersByTimeAsync(1);
+    await connecting;
+
+    expect(
+      socket.emitted.filter(({ event }) => event === "studio:join")
+    ).toHaveLength(2);
+    expect(transport.ready).toBe(true);
+    // The expired callback belongs to the abandoned generation and must not change readiness.
+    socket.reply(
+      STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT,
+      binarySelectionSuccess()
+    );
+    expect(transport.ready).toBe(true);
+    transport.close();
+  });
+
+  it("fails closed and reconnects when a fragmented binary sync response is damaged", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = binaryJoinSuccess();
+    socket.ackResponses.set(
+      STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT,
+      binarySelectionSuccess()
+    );
+    const diff = new Uint8Array(50_000);
+    diff[0] = 1;
+    diff[diff.length - 1] = 2;
+    const fragments = fragmentStudioCrdtBinarySyncEnvelope(
+      encodeStudioCrdtBinaryEnvelope("sync-diff", diff)
+    );
+    fragments.at(-1)![fragments.at(-1)!.length - 1] ^= 0xff;
+    socket.ackResponses.set(STUDIO_LIVE_CRDT_BINARY_SYNC_EVENT, {
+      ok: true,
+      data: {
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+        wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
+        workId: "work-1",
+        requestId: "damaged-sync",
+        transferId: "55555555-5555-4555-8555-555555555555",
+        fragments,
+        fragmentCount: fragments.length,
+        wireBytes: fragments.reduce(
+          (sum, fragment) => sum + fragment.byteLength,
+          0
+        ),
+        totalBytes: diff.byteLength,
+        serverStateVector: encodeStudioCrdtBinaryEnvelope(
+          "state-vector",
+          Uint8Array.of(0)
+        ),
+        serverSequence: "30",
+      },
+    });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    await transport.connect();
+
+    const failure = await transport.requestCrdtSync({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-1",
+      requestId: "damaged-sync",
+      stateVector: encodeStudioCrdtStateVector(Uint8Array.of(0)),
+    }).then(
+      () => null,
+      (error: unknown) => error
+    );
+    expect(failure).toMatchObject({
+      code: "connection_changed",
+      disposition: "retryable",
+      source: "connection",
+    });
+    expect(transport.ready).toBe(false);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(
+      socket.emitted.filter(({ event }) => event === "studio:join")
+    ).toHaveLength(2);
+    expect(transport.ready).toBe(true);
     transport.close();
   });
 

@@ -308,6 +308,54 @@ describe("StudioCrdtRoomBinding", () => {
     server.destroy();
   });
 
+  it("does not drain a restored Base64 outbox before the initial authoritative sync", async () => {
+    const server = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const source = new StudioCrdtDocument();
+    add(source, "restored-before-sync", 15);
+    const outbox = new MemoryOutbox();
+    const request: StudioCrdtUpdateRequest = {
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-a",
+      updateId: "00000000-0000-4000-8000-000000000015",
+      clientSequence: 1,
+      update: encodeStudioCrdtUpdate(source.encodeStateAsUpdate()),
+    };
+    await outbox.put("user-initial-sync", request);
+    const fake = new FakeRoom(server);
+    let releaseSync: () => void = () => undefined;
+    fake.nextSyncBarrier = new Promise<void>((resolve) => {
+      releaseSync = resolve;
+    });
+    const binding = new StudioCrdtRoomBinding({
+      document: client,
+      room: room(fake),
+      outbox,
+      recoveryVault: new MemoryRecoveryVault(),
+      outboxScope: "user-initial-sync",
+    });
+
+    const starting = binding.start();
+    await vi.waitFor(() => expect(fake.syncRequests).toBe(1));
+    binding.flush();
+    await Promise.resolve();
+    expect(fake.publications).toEqual([]);
+    expect(outbox.requests.get(`user-initial-sync:${request.updateId}`)?.update).toBe(
+      request.update
+    );
+
+    releaseSync();
+    await starting;
+    expect(fake.publications).toHaveLength(1);
+    expect(fake.publications[0]).toEqual(request);
+    expect(server.getStroke("restored-before-sync")).not.toBeNull();
+
+    binding.close();
+    source.destroy();
+    client.destroy();
+    server.destroy();
+  });
+
   it("flushes a sub-frame edit, waits for its authoritative ACK, then reconciles the final server frontier", async () => {
     const server = new StudioCrdtDocument();
     const client = new StudioCrdtDocument();

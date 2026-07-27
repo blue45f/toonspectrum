@@ -290,6 +290,7 @@ describe("studio live socket join acknowledgement", () => {
       "lockProtocolVersion",
       "lockRevisionVersion",
       "lockSnapshotRevision",
+      "crdtWireAdvertisement",
       "self",
       "participants",
       "locks",
@@ -300,6 +301,7 @@ describe("studio live socket join acknowledgement", () => {
     expect(parsed.lockProtocolVersion).toBe(1);
     expect(parsed.lockRevisionVersion).toBe(0);
     expect(parsed.lockSnapshotRevision).toBeNull();
+    expect(parsed.crdtWireAdvertisement).toBeNull();
     expect(parsed.participants).toHaveLength(2);
     expect(parsed.locks).toHaveLength(1);
     expect(parsed.voiceMembers).toHaveLength(1);
@@ -322,6 +324,47 @@ describe("studio live socket join acknowledgement", () => {
       ok: true,
       data: { self: participant(), participants: [participant()], locks: [], screenShares: {} },
     })).toBeNull();
+  });
+
+  it("parses the exact binary CRDT advertisement and rejects incomplete or stale epochs", () => {
+    const epoch = "00000000-0000-4000-8000-000000000101";
+    const binary = parseJoinAck({
+      ok: true,
+      data: {
+        self: participant(),
+        participants: [participant()],
+        locks: [],
+        crdtWireFormats: ["binary-v1", "base64-v4"],
+        crdtWireSelectionEpoch: epoch,
+      },
+    });
+    expect(binary && !("ok" in binary) ? binary.crdtWireAdvertisement : null).toEqual({
+      formats: ["binary-v1", "base64-v4"],
+      selectionEpoch: epoch,
+    });
+
+    for (const malformed of [
+      { crdtWireFormats: ["binary-v1", "base64-v4"] },
+      { crdtWireSelectionEpoch: epoch },
+      {
+        crdtWireFormats: ["base64-v4", "binary-v1"],
+        crdtWireSelectionEpoch: epoch,
+      },
+      {
+        crdtWireFormats: ["binary-v1", "base64-v4"],
+        crdtWireSelectionEpoch: "stale-epoch",
+      },
+    ]) {
+      expect(parseJoinAck({
+        ok: true,
+        data: {
+          self: participant(),
+          participants: [participant()],
+          locks: [],
+          ...malformed,
+        },
+      })).toBeNull();
+    }
   });
 
   it("negotiates lock protocol v2 while rejecting malformed capability values", () => {

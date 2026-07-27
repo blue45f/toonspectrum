@@ -105,6 +105,8 @@ export interface StudioCbzExportInput {
 export interface StudioCbzExportOptions {
   limits?: Partial<StudioCbzLimits>;
   signal?: AbortSignal;
+  /** CLI/headless export only; ignored by browser runtimes. */
+  allowLargeDirectArchiveCrcInHeadless?: boolean;
 }
 
 export interface StudioCbzImportOptions extends StudioCbzExportOptions {
@@ -1012,7 +1014,11 @@ export async function buildStudioCbzBytes(
   const prepared = await prepareCbz(input, options);
   const bytes = await buildStudioPackageArchiveBytes(
     prepared.entries,
-    { limits: writerLimits(resolveLimits(options.limits)) }
+    {
+      limits: writerLimits(resolveLimits(options.limits)),
+      signal: options.signal,
+      allowLargeDirectFallbackInHeadless: options.allowLargeDirectArchiveCrcInHeadless,
+    }
   );
   return { bytes, warnings: Object.freeze([...prepared.warnings]) };
 }
@@ -1025,6 +1031,8 @@ export async function buildStudioCbzBlob(
   const blob = await buildStudioPackageArchiveBlob(prepared.entries, {
     mimeType: STUDIO_CBZ_MIME,
     limits: writerLimits(resolveLimits(options.limits)),
+    signal: options.signal,
+    allowLargeDirectFallbackInHeadless: options.allowLargeDirectArchiveCrcInHeadless,
   });
   return { blob, warnings: Object.freeze([...prepared.warnings]) };
 }

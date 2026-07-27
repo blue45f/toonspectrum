@@ -18,6 +18,7 @@ import type { StudioBrushPreviewStyle } from "./studio-brush-visual";
 /** Canva/Express style “simple draw” kit — first tools a beginner sees. */
 export const STUDIO_BEGINNER_BRUSH_IDS = [
   "pen",
+  "gpen",
   "fineliner",
   "pencil",
   "ballpoint",
@@ -29,7 +30,6 @@ export const STUDIO_BEGINNER_BRUSH_IDS = [
 
 /** Picsart/Express expressive kit shown after expanding the tray. */
 export const STUDIO_EXPRESSIVE_BRUSH_IDS = [
-  "gpen",
   "liner",
   "calligraphy",
   "perfect-ink",

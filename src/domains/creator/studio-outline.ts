@@ -67,6 +67,12 @@ export const OUTLINE_OPACITY_RANGE = { min: 0, max: 100, step: 1 } as const;
 /** AA 페더 폭(px) — 총 링 바깥으로 이만큼 거리 램프 알파를 얹는다. 캐시 패딩에 포함된다. */
 export const OUTLINE_FEATHER_PX = 1;
 
+/**
+ * Tiny cached surfaces finish below one frame budget and avoid Worker startup/transfer overhead.
+ * Anything larger must use the persistent module Worker on the browser main thread.
+ */
+export const STUDIO_OUTLINE_SYNC_MAX_PIXELS = 64 * 1024;
+
 // 알파 임계 — 이 값 이상이면 "불투명"(원본 실루엣), 미만이면 테두리 후보(투명/반투명).
 const ALPHA_OPAQUE = 128;
 
@@ -75,6 +81,110 @@ const HEX6_RE = /^#[0-9a-f]{6}$/i;
 
 // 거리 변환에서 "불투명 픽셀 없음"을 뜻하는 큰 값(제곱 거리 단위).
 const FAR = 1e9;
+
+type StudioOutlineWorkerClientModule = typeof import("./studio-outline-worker-client");
+
+interface AsyncOutlineKonvaNode {
+  attrs?: Record<string, unknown>;
+  cache?(config?: { offset?: number }): unknown;
+  clearCache?(): unknown;
+  getLayer?(): { batchDraw?(): unknown } | null | undefined;
+  isDestroyed?(): boolean;
+}
+
+interface AsyncOutlineState {
+  readonly controller: AbortController;
+  readonly epoch: number;
+  readonly height: number;
+  readonly key: string;
+  readonly outline: Outline;
+  readonly width: number;
+  result?: Uint8ClampedArray;
+  status: "pending" | "ready" | "failed";
+}
+
+const asyncOutlineStates = new WeakMap<object, AsyncOutlineState>();
+const outlineImageIdentities = new WeakMap<object, number>();
+let nextOutlineImageIdentity = 1;
+let outlineWorkerClientPromise: Promise<StudioOutlineWorkerClientModule> | null = null;
+
+function loadStudioOutlineWorkerClient(): Promise<StudioOutlineWorkerClientModule> {
+  if (!outlineWorkerClientPromise) {
+    outlineWorkerClientPromise = import("./studio-outline-worker-client")
+      .catch((error) => {
+        outlineWorkerClientPromise = null;
+        throw error;
+      });
+  }
+  return outlineWorkerClientPromise;
+}
+
+function outlineImageIdentity(value: unknown): number {
+  if (
+    value === null
+    || (typeof value !== "object" && typeof value !== "function")
+  ) {
+    return 0;
+  }
+  const object = value as object;
+  const cached = outlineImageIdentities.get(object);
+  if (cached !== undefined) return cached;
+  const identity = nextOutlineImageIdentity++;
+  outlineImageIdentities.set(object, identity);
+  return identity;
+}
+
+function outlineFromAttrs(attrs: Record<string, unknown> | undefined): Outline {
+  return normalizeOutline({
+    color: typeof attrs?.outlineColor === "string" ? attrs.outlineColor : undefined,
+    width: typeof attrs?.outlineWidth === "number" ? attrs.outlineWidth : undefined,
+    opacity: typeof attrs?.outlineOpacity === "number" ? attrs.outlineOpacity : undefined,
+    secondColor: typeof attrs?.outlineSecondColor === "string"
+      ? attrs.outlineSecondColor
+      : undefined,
+    secondWidth: typeof attrs?.outlineSecondWidth === "number"
+      ? attrs.outlineSecondWidth
+      : undefined,
+  });
+}
+
+function asyncOutlineKey(
+  node: AsyncOutlineKonvaNode,
+  width: number,
+  height: number,
+  outline: Outline,
+): string {
+  const attrs = node.attrs;
+  return JSON.stringify([
+    typeof attrs?.outlineWorkerRevision === "string"
+      ? attrs.outlineWorkerRevision
+      : null,
+    outlineImageIdentity(attrs?.outlineWorkerMaskRevision),
+    outlineImageIdentity(attrs?.image),
+    width,
+    height,
+    outline.color,
+    outline.width,
+    outline.opacity,
+    outline.secondColor ?? null,
+    outline.secondWidth ?? null,
+  ]);
+}
+
+function isAsyncOutlineKonvaNode(
+  value: AsyncOutlineKonvaNode,
+): value is AsyncOutlineKonvaNode & Required<
+  Pick<AsyncOutlineKonvaNode, "cache" | "clearCache">
+> {
+  return typeof value.cache === "function" && typeof value.clearCache === "function";
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    error instanceof Error
+    && error.name === "AbortError"
+  );
+}
 
 // ---------------------------------------------------------------------------
 // 정규화·항등 판정
@@ -354,19 +464,121 @@ export const OUTLINE_PRESETS: OutlinePreset[] = [
  * Konva 필터 함수 — node(`this`).attrs에서 outlineColor·outlineWidth·outlineOpacity와
  * (이중 외곽선용) outlineSecondColor·outlineSecondWidth를 읽어 normalizeOutline로 안전 변환 후
  * applyOutline. 항등(총 두께0/opacity0)이거나 attrs가 비면 no-op.
+ *
+ * 브라우저 메인 스레드의 큰 Konva 캐시는 첫 패스에서 원본을 유지한 채 persistent module
+ * Worker로 EDT를 보낸다. 결과 epoch·소스/필터 revision이 여전히 최신일 때만 같은 offset 캐시를
+ * 다시 만들고, 두 번째 패스가 Worker 결과를 복사한다. 작은 캐시와 이미 Worker 안에서 실행되는
+ * 순수 필터 체인만 bounded 동기 경로를 사용한다.
  */
 export function outlineKonvaFilter(this: { attrs?: Record<string, unknown> }, imageData: StudioImageDataLike): void {
-  const attrs = this.attrs;
+  const node = this as AsyncOutlineKonvaNode;
+  const attrs = node.attrs;
   if (!attrs) return;
-  const o = normalizeOutline({
-    color: typeof attrs.outlineColor === "string" ? attrs.outlineColor : undefined,
-    width: typeof attrs.outlineWidth === "number" ? attrs.outlineWidth : undefined,
-    opacity: typeof attrs.outlineOpacity === "number" ? attrs.outlineOpacity : undefined,
-    secondColor: typeof attrs.outlineSecondColor === "string" ? attrs.outlineSecondColor : undefined,
-    secondWidth: typeof attrs.outlineSecondWidth === "number" ? attrs.outlineSecondWidth : undefined,
-  });
+  const o = outlineFromAttrs(attrs);
   if (isIdentityOutline(o)) return;
-  applyOutline(imageData, o);
+  const pixelCount = imageData.width * imageData.height;
+  if (
+    pixelCount <= STUDIO_OUTLINE_SYNC_MAX_PIXELS
+    // In the image-filter module Worker there is no DOM. Keep the pure synchronous EDT there:
+    // it is already off the main thread and spawning a nested Worker would only add latency.
+    || typeof document === "undefined"
+  ) {
+    applyOutline(imageData, o);
+    return;
+  }
+
+  // A non-Konva direct caller on the browser main thread has no safe asynchronous commit target.
+  // Large inputs therefore fail closed instead of silently falling back to the blocking EDT.
+  if (!isAsyncOutlineKonvaNode(node)) return;
+
+  const key = asyncOutlineKey(node, imageData.width, imageData.height, o);
+  const current = asyncOutlineStates.get(node);
+  if (
+    current?.key === key
+    && current.width === imageData.width
+    && current.height === imageData.height
+  ) {
+    if (
+      current.status === "ready"
+      && current.result?.byteLength === imageData.data.byteLength
+    ) {
+      imageData.data.set(current.result);
+    }
+    // pending: render the unoutlined cache until the Worker commits; failed: preserve the
+    // unoutlined source rather than retrying a known-bad large synchronous path every draw.
+    return;
+  }
+
+  current?.controller.abort();
+  const controller = new AbortController();
+  const epoch = (current?.epoch ?? 0) + 1;
+  const state: AsyncOutlineState = {
+    controller,
+    epoch,
+    height: imageData.height,
+    key,
+    outline: o,
+    status: "pending",
+    width: imageData.width,
+  };
+  asyncOutlineStates.set(node, state);
+
+  // Konva owns the cache ImageData. Transfer an isolated snapshot so neither postMessage nor the
+  // Worker can detach/mutate the in-progress cache surface.
+  const snapshot = {
+    data: new Uint8ClampedArray(imageData.data),
+    width: imageData.width,
+    height: imageData.height,
+  };
+  void loadStudioOutlineWorkerClient()
+    .then((module) => module.runStudioOutlineWorker(
+      { imageData: snapshot, outline: o },
+      { epoch, signal: controller.signal },
+    ))
+    .then((result) => {
+      const latest = asyncOutlineStates.get(node);
+      if (
+        latest !== state
+        || latest.key !== key
+        || latest.epoch !== result.epoch
+        || controller.signal.aborted
+        || result.imageData.width !== state.width
+        || result.imageData.height !== state.height
+        || result.imageData.data.byteLength !== state.width * state.height * 4
+      ) {
+        return;
+      }
+      const latestOutline = outlineFromAttrs(node.attrs);
+      if (
+        isIdentityOutline(latestOutline)
+        || asyncOutlineKey(node, state.width, state.height, latestOutline) !== key
+        || node.isDestroyed?.()
+      ) {
+        return;
+      }
+      state.result = result.imageData.data;
+      state.status = "ready";
+      try {
+        // Rebuild the same padded Konva cache. The second filter pass consumes `state.result`
+        // synchronously, so rotations, skew, transformer bounds and mask sampling remain byte-for-
+        // byte on the established cache({offset}) coordinate system.
+        node.clearCache();
+        node.cache({ offset: outlineCachePad(state.outline) });
+        node.getLayer?.()?.batchDraw?.();
+      } catch (error) {
+        state.status = "failed";
+        state.result = undefined;
+        console.error("[studio] outline Worker cache commit failed:", error);
+      }
+    })
+    .catch((error) => {
+      if (isAbortError(error)) return;
+      const latest = asyncOutlineStates.get(node);
+      if (latest !== state || latest.key !== key) return;
+      state.status = "failed";
+      state.result = undefined;
+      console.error("[studio] outline Worker failed; large synchronous EDT was skipped:", error);
+    });
 }
 
 // ---------------------------------------------------------------------------

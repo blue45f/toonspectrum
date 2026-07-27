@@ -204,6 +204,8 @@ export interface StudioBg3dProjectArchivePlan {
 export interface StudioProjectArchiveOptions {
   limits?: Partial<StudioProjectArchiveLimits>;
   onProgress?: (progress: StudioPackageArchiveProgress) => void;
+  /** CLI/headless export only; ignored by browser runtimes. */
+  allowLargeDirectArchiveCrcInHeadless?: boolean;
 }
 
 export interface StudioProjectArchiveManifestProject {
@@ -2270,6 +2272,7 @@ export async function buildStudioProjectArchive(
   try {
     blob = await buildStudioPackageArchiveBlob(entries, {
       mimeType: STUDIO_PROJECT_ARCHIVE_MIME,
+      allowLargeDirectFallbackInHeadless: options.allowLargeDirectArchiveCrcInHeadless,
       limits: {
         maxFiles: limits.maxAttachments + 2,
         maxEntryBytes: Math.max(limits.maxAttachmentBytes, limits.maxProjectBytes, limits.maxManifestBytes),

@@ -6,6 +6,8 @@
  * inputs, unsafe paths, ambiguous duplicate names, and browser-hostile package sizes.
  */
 
+import { createStudioCrc32WorkerSession } from "./studio-crc32-worker-client";
+
 const ZIP_LOCAL_FILE_HEADER_SIGNATURE = 0x04034b50;
 const ZIP_CENTRAL_DIRECTORY_SIGNATURE = 0x02014b50;
 const ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE = 0x06054b50;
@@ -65,6 +67,13 @@ export interface StudioPackageArchiveBuildOptions {
   onProgress?: (progress: StudioPackageArchiveProgress) => void;
   /** Blob output only. Use application/zip or a product-specific +zip media type. */
   mimeType?: string;
+  /** Cancels Blob reads between awaits and terminates an in-flight CRC Worker epoch. */
+  signal?: AbortSignal;
+  /**
+   * CLI/headless exporters may opt into direct CRC for large entries. This is ignored whenever a
+   * DOM is present, so browser exports still require the Worker above the 1 MiB direct budget.
+   */
+  allowLargeDirectFallbackInHeadless?: boolean;
 }
 
 export type StudioPackageArchiveErrorCode =
@@ -125,18 +134,6 @@ interface DosTimestamp {
 }
 
 const textEncoder = new TextEncoder();
-
-const crc32Table = (() => {
-  const table = new Uint32Array(256);
-  for (let index = 0; index < table.length; index += 1) {
-    let value = index;
-    for (let bit = 0; bit < 8; bit += 1) {
-      value = (value & 1) === 1 ? 0xedb8_8320 ^ (value >>> 1) : value >>> 1;
-    }
-    table[index] = value >>> 0;
-  }
-  return table;
-})();
 
 function archiveError(
   code: StudioPackageArchiveErrorCode,
@@ -309,7 +306,26 @@ function snapshotSource(source: unknown, path: string): StudioPackageArchiveSour
   throw archiveError("SOURCE_INVALID", "지원하지 않는 archive 파일 데이터입니다.", path);
 }
 
-async function readSource(source: StudioPackageArchiveSource, expectedSize: number, path: string) {
+function createAbortError(): Error {
+  if (typeof DOMException === "function") {
+    return new DOMException("archive 조립을 취소했습니다.", "AbortError");
+  }
+  const error = new Error("archive 조립을 취소했습니다.");
+  error.name = "AbortError";
+  return error;
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw createAbortError();
+}
+
+async function readSource(
+  source: StudioPackageArchiveSource,
+  expectedSize: number,
+  path: string,
+  signal?: AbortSignal,
+) {
+  throwIfAborted(signal);
   let bytes: Uint8Array;
   // snapshotSource already detached these mutable caller-owned inputs before the first await.
   // Reusing the private snapshot avoids one more full-file copy during CRC preparation.
@@ -323,6 +339,7 @@ async function readSource(source: StudioPackageArchiveSource, expectedSize: numb
       throw archiveError("SOURCE_INVALID", `Blob 데이터를 읽지 못했습니다${detail}`, path);
     }
   }
+  throwIfAborted(signal);
   if (bytes.byteLength !== expectedSize) {
     throw archiveError(
       "SOURCE_SIZE_MISMATCH",
@@ -331,14 +348,6 @@ async function readSource(source: StudioPackageArchiveSource, expectedSize: numb
     );
   }
   return bytes;
-}
-
-function calculateCrc32(bytes: Uint8Array): number {
-  let crc = 0xffff_ffff;
-  for (const byte of bytes) {
-    crc = (crc >>> 8) ^ (crc32Table[(crc ^ byte) & 0xff] ?? 0);
-  }
-  return (crc ^ 0xffff_ffff) >>> 0;
 }
 
 function assertZip32(value: number, label: string): void {
@@ -530,32 +539,42 @@ export async function buildStudioPackageArchiveBytes(
   entries: readonly StudioPackageArchiveEntry[],
   options: StudioPackageArchiveBuildOptions = {}
 ): Promise<Uint8Array> {
+  throwIfAborted(options.signal);
   const plan = planArchive(entries, options);
 
   const prepared: PreparedEntry[] = [];
   let processedBytes = 0;
-  for (let index = 0; index < plan.entries.length; index += 1) {
-    const entry = plan.entries[index];
-    if (!entry) throw archiveError("SOURCE_INVALID", "archive 파일 준비 상태가 올바르지 않습니다.");
-    const data = await readSource(entry.source, entry.size, entry.path);
-    processedBytes += data.byteLength;
-    prepared.push({
-      path: entry.path,
-      bytes: entry.bytes,
-      comparisonKey: entry.comparisonKey,
-      data,
-      crc32: calculateCrc32(data),
-      localHeaderOffset: entry.localHeaderOffset,
-    });
-    options.onProgress?.({
-      completedFiles: index + 1,
-      totalFiles: plan.entries.length,
-      processedBytes,
-      totalBytes: plan.totalBytes,
-      path: entry.path,
-    });
+  const crc32Session = createStudioCrc32WorkerSession({
+    allowLargeDirectFallbackInHeadless: options.allowLargeDirectFallbackInHeadless,
+  });
+  try {
+    for (let index = 0; index < plan.entries.length; index += 1) {
+      const entry = plan.entries[index];
+      if (!entry) throw archiveError("SOURCE_INVALID", "archive 파일 준비 상태가 올바르지 않습니다.");
+      const sourceData = await readSource(entry.source, entry.size, entry.path, options.signal);
+      const { crc32, data } = await crc32Session.run(sourceData, { signal: options.signal });
+      processedBytes += data.byteLength;
+      prepared.push({
+        path: entry.path,
+        bytes: entry.bytes,
+        comparisonKey: entry.comparisonKey,
+        data,
+        crc32,
+        localHeaderOffset: entry.localHeaderOffset,
+      });
+      options.onProgress?.({
+        completedFiles: index + 1,
+        totalFiles: plan.entries.length,
+        processedBytes,
+        totalBytes: plan.totalBytes,
+        path: entry.path,
+      });
+    }
+  } finally {
+    crc32Session.dispose();
   }
 
+  throwIfAborted(options.signal);
   let output: Uint8Array;
   try {
     output = new Uint8Array(plan.archiveBytes);
@@ -626,10 +645,21 @@ function buildCentralHeaderBytes(entry: BlobHeaderEntry, timestamp: DosTimestamp
   return output;
 }
 
-function sourceBlobPart(source: StudioPackageArchiveSource): Blob | ArrayBuffer {
+function sourceBlobPart(
+  source: StudioPackageArchiveSource,
+  returnedData: Uint8Array,
+): Blob | ArrayBuffer {
   if (source instanceof Blob) return source;
-  if (source instanceof Uint8Array) return source.buffer as ArrayBuffer;
-  return source;
+  const buffer = returnedData.buffer;
+  if (
+    buffer instanceof ArrayBuffer
+    && returnedData.byteOffset === 0
+    && returnedData.byteLength === buffer.byteLength
+  ) {
+    return buffer;
+  }
+  // Defensive only: the CRC client normally returns a dedicated transferable buffer.
+  return returnedData.slice().buffer as ArrayBuffer;
 }
 
 /**
@@ -641,35 +671,48 @@ export async function buildStudioPackageArchiveBlob(
   entries: readonly StudioPackageArchiveEntry[],
   options: StudioPackageArchiveBuildOptions = {}
 ): Promise<Blob> {
+  throwIfAborted(options.signal);
   const plan = planArchive(entries, options);
   const localParts: Array<Blob | ArrayBuffer> = [];
   const centralParts: Array<ArrayBuffer> = [];
   let processedBytes = 0;
-  for (let index = 0; index < plan.entries.length; index += 1) {
-    const entry = plan.entries[index];
-    if (!entry) throw archiveError("SOURCE_INVALID", "archive 파일 준비 상태가 올바르지 않습니다.");
-    const data = await readSource(entry.source, entry.size, entry.path);
-    const headerEntry: BlobHeaderEntry = {
-      path: entry.path,
-      bytes: entry.bytes,
-      comparisonKey: entry.comparisonKey,
-      size: entry.size,
-      crc32: calculateCrc32(data),
-      localHeaderOffset: entry.localHeaderOffset,
-    };
-    const localHeader = buildLocalHeaderBytes(headerEntry, plan.timestamp);
-    const centralHeader = buildCentralHeaderBytes(headerEntry, plan.timestamp);
-    localParts.push(localHeader.buffer as ArrayBuffer, sourceBlobPart(entry.source));
-    centralParts.push(centralHeader.buffer as ArrayBuffer);
-    processedBytes += data.byteLength;
-    options.onProgress?.({
-      completedFiles: index + 1,
-      totalFiles: plan.entries.length,
-      processedBytes,
-      totalBytes: plan.totalBytes,
-      path: entry.path,
-    });
+  const crc32Session = createStudioCrc32WorkerSession({
+    allowLargeDirectFallbackInHeadless: options.allowLargeDirectFallbackInHeadless,
+  });
+  try {
+    for (let index = 0; index < plan.entries.length; index += 1) {
+      const entry = plan.entries[index];
+      if (!entry) throw archiveError("SOURCE_INVALID", "archive 파일 준비 상태가 올바르지 않습니다.");
+      const sourceData = await readSource(entry.source, entry.size, entry.path, options.signal);
+      const { crc32, data } = await crc32Session.run(sourceData, { signal: options.signal });
+      const headerEntry: BlobHeaderEntry = {
+        path: entry.path,
+        bytes: entry.bytes,
+        comparisonKey: entry.comparisonKey,
+        size: entry.size,
+        crc32,
+        localHeaderOffset: entry.localHeaderOffset,
+      };
+      const localHeader = buildLocalHeaderBytes(headerEntry, plan.timestamp);
+      const centralHeader = buildCentralHeaderBytes(headerEntry, plan.timestamp);
+      localParts.push(
+        localHeader.buffer as ArrayBuffer,
+        sourceBlobPart(entry.source, data),
+      );
+      centralParts.push(centralHeader.buffer as ArrayBuffer);
+      processedBytes += data.byteLength;
+      options.onProgress?.({
+        completedFiles: index + 1,
+        totalFiles: plan.entries.length,
+        processedBytes,
+        totalBytes: plan.totalBytes,
+        path: entry.path,
+      });
+    }
+  } finally {
+    crc32Session.dispose();
   }
+  throwIfAborted(options.signal);
   const eocd = new Uint8Array(ZIP_EOCD_BYTES);
   const eocdEnd = writeEocd(
     eocd,

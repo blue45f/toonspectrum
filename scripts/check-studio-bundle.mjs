@@ -80,8 +80,12 @@ const budgets = {
   // 2026-07-26 캔버스 뷰포트 compiler boundary + 0%-기본 WebGPU cohort policy:
   // route 3,036,277/994,984 bytes 관측. entry/incremental/gzip 예산은 기존 상한 안이며,
   // raw의 0.04% 초과만 작은 코드젠 drift 여유와 함께 다시 잠근다.
-  studio: { raw: 3_045_000, gzip: 1_000_000 },
-  studioEntry: { raw: 1_284_000, gzip: 384_500 },
+  // 2026-07-27 전체 브러시 카탈로그 즐겨찾기·쓰기 실패 복구, 선화 EDT/색상범위 Worker
+  // admission control, OBJ/MTL preflight Worker, Studio 전용 COOP/COEP gate를 반영한 측정치는
+  // route raw 3,055,6xx, entry gzip 386,6xx bytes다. 무거운 처리기는 계속 dynamic Worker이고
+  // 정적 요청 수와 route gzip은 기존 상한 안이므로 관측치에 0.2% 미만의 여유만 재고정한다.
+  studio: { raw: 3_060_000, gzip: 1_000_000 },
+  studioEntry: { raw: 1_284_000, gzip: 389_000 },
   // 2026-07-23 저녁: roughjs 스케치 도형·polygon-clipping 패스 불리언 도입 — 두 라이브러리 본체는
   // 다이내믹 청크(예산 밖)이나 어댑터 공유 청크 +1로 정적 요청 149 관측. +1 여유로 재고정.
   // 2026-07-23 밤: perfect-freehand 벡터 펜(퍼펙트 잉크/마커) 어댑터 도입 — 라이브러리 본체는
@@ -93,7 +97,9 @@ const budgets = {
   // 2026-07-24 2D 코어 웨이브: app-shell 이후 raw 2375.5 KiB·정적 요청 154 관측. 청크+1·raw 상향 재고정.
   // 2026-07-26: Cloud storage adapter (Google Drive & OneDrive) integration added:
   // measured studioIncremental ~2469 KiB raw / 812.5 KiB gzip.
-  studioIncremental: { raw: 2_550_000, gzip: 840_000, chunks: 158 },
+  // 2026-07-27 위 Worker admission/prefs 경계 반영 후 raw 2,551,xxx bytes를 관측했다.
+  // gzip·request 한도는 유지하고 raw 코드젠 drift만 약 0.2% 허용한다.
+  studioIncremental: { raw: 2_556_000, gzip: 840_000, chunks: 158 },
   // Rapier deterministic compat is intentionally isolated in a user-triggered module Worker.
   // 2026-07-18 production output: 2,302,139 raw / 855,399 gzip. Keep ~2% version-drift headroom
   // without charging this optional engine to Studio or the 3D editor's initial graph.
@@ -106,7 +112,9 @@ const budgets = {
   // React Compiler memo-cache 코드젠과 명시적 패널 계약으로 activation closure가
   // 2,466,516/727,099 bytes, 43 requests로 이동했다. Three/R3F·패널은 여전히 Studio route와
   // 분리되고 optional runtime 경계도 불변이므로 관측치에 약 2% drift만 허용한다.
-  bg3dEditor: { raw: 2_516_000, gzip: 742_000, chunks: 43 },
+  // 2026-07-27 OBJ/MTL preflight Worker client의 취소·epoch·예산 경계 반영 후 gzip이 기존
+  // 상한을 수십 바이트 넘었다. raw·request 한도는 유지하고 gzip만 0.3% 미만 재고정한다.
+  bg3dEditor: { raw: 2_516_000, gzip: 744_000, chunks: 43 },
   // Durable recovery, integrity verification, PNG/contact-sheet/PSD clients, and ZIP packaging load
   // only after explicit batch export. 2026-07-20 OffscreenCanvas pass-PNG Worker client/protocol:
   // measured incremental closure 164,352 raw / 43,602 gzip; retain ~2% raw headroom.

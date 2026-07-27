@@ -81,13 +81,22 @@ describe("Studio live cluster adapter configuration", () => {
         STUDIO_LIVE_POSTGRES_URL: `  ${DIRECT_URL}  `,
         STUDIO_LIVE_POSTGRES_POOL_MAX: "6",
       })
-    ).toEqual({ mode: "postgres", connectionString: DIRECT_URL, poolMax: 6 });
+    ).toEqual({
+      mode: "postgres",
+      connectionString: DIRECT_URL,
+      poolMax: 6,
+      inlineBinaryPayloads: false,
+    });
     expect(
       resolveStudioLiveClusterAdapterConfig({
         STUDIO_LIVE_CLUSTER_ADAPTER: "postgres",
         STUDIO_LIVE_POSTGRES_URL: DIRECT_URL,
+        STUDIO_LIVE_POSTGRES_INLINE_BINARY_ENABLED: "true",
       })
-    ).toMatchObject({ poolMax: STUDIO_LIVE_POSTGRES_POOL_DEFAULT_MAX });
+    ).toMatchObject({
+      poolMax: STUDIO_LIVE_POSTGRES_POOL_DEFAULT_MAX,
+      inlineBinaryPayloads: true,
+    });
   });
 
   it("matches node-postgres' parser for the accepted authority and TLS contract", () => {
@@ -245,6 +254,14 @@ describe("Studio live cluster adapter configuration", () => {
         STUDIO_LIVE_POSTGRES_POOL_MAX: "unbounded",
       },
       /must be an integer/u,
+    ],
+    [
+      {
+        STUDIO_LIVE_CLUSTER_ADAPTER: "postgres",
+        STUDIO_LIVE_POSTGRES_URL: DIRECT_URL,
+        STUDIO_LIVE_POSTGRES_INLINE_BINARY_ENABLED: "TRUE",
+      },
+      /must be true or false/u,
     ],
   ])("rejects unsafe cluster configuration %#", (source, expected) => {
     expect(() => resolveStudioLiveClusterAdapterConfig(source)).toThrow(expected);
@@ -674,6 +691,7 @@ describe("Studio live PostgreSQL IoAdapter lifecycle", () => {
         STUDIO_LIVE_CLUSTER_ADAPTER: "postgres",
         STUDIO_LIVE_POSTGRES_URL: DIRECT_URL,
         STUDIO_LIVE_POSTGRES_POOL_MAX: "4",
+        STUDIO_LIVE_POSTGRES_INLINE_BINARY_ENABLED: "true",
       },
       {
         createPool,
@@ -697,6 +715,7 @@ describe("Studio live PostgreSQL IoAdapter lifecycle", () => {
     expect(receivedTransportOptions).toMatchObject({
       channelPrefix: STUDIO_LIVE_POSTGRES_CHANNEL_PREFIX,
       tableName: STUDIO_LIVE_POSTGRES_ATTACHMENT_TABLE,
+      inlineBinaryPayloads: true,
     });
     receivedTransportOptions?.errorHandler(
       Object.assign(new Error(`${DIRECT_URL} password=secret`), { code: DIRECT_URL }),

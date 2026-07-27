@@ -40,6 +40,7 @@ export type StudioLiveClusterAdapterConfig =
       mode: "postgres";
       connectionString: string;
       poolMax: number;
+      inlineBinaryPayloads: boolean;
     };
 
 export interface StudioLivePostgresIoAdapterDependencies {
@@ -70,6 +71,15 @@ function parsePoolMaximum(value: string | undefined): number {
     );
   }
   return parsed;
+}
+
+function parseInlineBinaryPayloadOptIn(value: string | undefined): boolean {
+  const normalized = value?.trim();
+  if (normalized == null || normalized === "" || normalized === "false") return false;
+  if (normalized === "true") return true;
+  throw new Error(
+    "STUDIO_LIVE_POSTGRES_INLINE_BINARY_ENABLED must be true or false"
+  );
 }
 
 function isLoopbackPostgresHost(host: string): boolean {
@@ -164,6 +174,9 @@ export function resolveStudioLiveClusterAdapterConfig(
       source.NODE_ENV
     ),
     poolMax: parsePoolMaximum(source.STUDIO_LIVE_POSTGRES_POOL_MAX),
+    inlineBinaryPayloads: parseInlineBinaryPayloadOptIn(
+      source.STUDIO_LIVE_POSTGRES_INLINE_BINARY_ENABLED
+    ),
   };
 }
 
@@ -823,6 +836,7 @@ export async function createStudioLivePostgresIoAdapter(
     )(pool, {
       channelPrefix: STUDIO_LIVE_POSTGRES_CHANNEL_PREFIX,
       tableName: STUDIO_LIVE_POSTGRES_ATTACHMENT_TABLE,
+      inlineBinaryPayloads: config.inlineBinaryPayloads,
       errorHandler: (error, source) => {
         logger.error(
           {
@@ -871,7 +885,11 @@ export async function createStudioLivePostgresIoAdapter(
     );
   }
   logger.log(
-    { poolMax: config.poolMax, channelPrefix: STUDIO_LIVE_POSTGRES_CHANNEL_PREFIX },
+    {
+      poolMax: config.poolMax,
+      channelPrefix: STUDIO_LIVE_POSTGRES_CHANNEL_PREFIX,
+      inlineBinaryPayloads: config.inlineBinaryPayloads,
+    },
     "studio live PostgreSQL Socket.IO adapter LISTEN channels are ready"
   );
   return new StudioLivePostgresIoAdapter(

@@ -191,6 +191,7 @@ export class StudioCrdtRoomBinding {
   private lastAckServerSequence: string | null = null;
   private recoveryState: StudioCrdtRecoveryRequiredState | null = null;
   private recoveryTransition = false;
+  private authoritativeSyncReady = false;
   private started = false;
   private closed = false;
 
@@ -216,6 +217,7 @@ export class StudioCrdtRoomBinding {
     if (this.started) return this.syncNow();
     if (!this.room.ready) throw new Error("실시간 작업실 연결이 준비되지 않았습니다.");
     this.started = true;
+    this.authoritativeSyncReady = this.room.mode !== "server";
     if (this.canEdit && this.outboxScope) await this.restoreOutbox();
     if (this.closed) return;
     if (this.recoveryState) {
@@ -395,6 +397,7 @@ export class StudioCrdtRoomBinding {
     if (this.backgroundSyncTimer !== null) this.cancelTimeout(this.backgroundSyncTimer);
     this.backgroundSyncTimer = null;
     this.pending.clear();
+    this.authoritativeSyncReady = false;
     this.emitStatus({ state: "idle", message: "실시간 원고 동기화를 종료했습니다." });
   }
 
@@ -414,6 +417,11 @@ export class StudioCrdtRoomBinding {
     if (response) {
       this.document.applySyncResponse(response);
       this.advanceAuthoritativeSequenceAfterSync(response.serverSequence);
+      if (this.room.mode === "server") {
+        // The authoritative response has been validated and applied. Only from this point may a
+        // restored/local frontier publish; enqueueUpdate can start its drain synchronously.
+        this.authoritativeSyncReady = true;
+      }
       const serverVector = decodeStudioCrdtStateVector(response.serverStateVector);
       const localVector = this.document.encodeStateVector();
       // Pending operations already represent the client's unsent frontier. Adding a second
@@ -421,6 +429,11 @@ export class StudioCrdtRoomBinding {
       if (this.canEdit && this.pending.size === 0 && !sameBytes(serverVector, localVector)) {
         const missingOnServer = this.document.encodeStateAsUpdate(serverVector);
         if (missingOnServer.byteLength > EMPTY_UPDATE_BYTE_LENGTH) this.enqueueUpdate(missingOnServer);
+      }
+    }
+    if (this.room.mode === "server") {
+      if (!response) {
+        throw new Error("서버가 권위 CRDT 동기화 응답을 반환하지 않았습니다.");
       }
     }
     if (this.syncRetryTimer !== null) this.cancelTimeout(this.syncRetryTimer);
@@ -623,6 +636,13 @@ export class StudioCrdtRoomBinding {
 
   private async runDrain(): Promise<void> {
     if (this.recoveryState) return;
+    if (this.room.mode === "server" && !this.authoritativeSyncReady) {
+      for (const pending of this.pending.values()) {
+        if (this.closed) return;
+        await this.ensurePendingPersistence(pending);
+      }
+      return;
+    }
     if (!this.room.ready) {
       for (const pending of this.pending.values()) {
         if (this.closed) return;
@@ -752,12 +772,15 @@ export class StudioCrdtRoomBinding {
   }
 
   private onRoomEvent(event: StudioLiveRoomEvent): void {
+    if (event.type !== "transport-status" || this.closed || this.recoveryState) return;
     if (
-      event.type !== "transport-status" ||
-      event.status.state !== "ready" ||
-      this.closed ||
-      this.recoveryState
-    ) return;
+      this.room.mode === "server" &&
+      (event.status.state === "connecting" ||
+        event.status.state === "disconnected")
+    ) {
+      this.authoritativeSyncReady = false;
+    }
+    if (event.status.state !== "ready") return;
     void this.syncNow().catch((error) => {
       this.emitStatus({
         state: "retrying",

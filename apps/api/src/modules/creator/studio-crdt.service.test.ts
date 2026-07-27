@@ -40,6 +40,7 @@ import {
   StudioCrdtUpdateIdConflictError,
   chunkStudioCrdtSyncDiff,
   encodeStudioCrdtServerStateVector,
+  encodeStudioCrdtServerStateVectorBytes,
 } from "./studio-crdt.service";
 
 import type { StudioCrdtClusterLoadRepository } from "./studio-crdt-cluster-load.repository";
@@ -809,6 +810,130 @@ function applySync(
 }
 
 describe("StudioCrdtService", () => {
+  it("keeps raw binary apply/sync semantics identical to the legacy Base64 wrappers", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const originalUpdate = toUint8Array(yUpdate("binary", "1"));
+
+    const binaryResult = await current.applyUpdateBytes({
+      workId: "work-binary",
+      updateId: "00000000-0000-4000-8000-000000000601",
+      actorUserId: "editor",
+      data: originalUpdate,
+    });
+    const legacyRetry = await current.applyUpdate({
+      workId: "work-binary",
+      updateId: "00000000-0000-4000-8000-000000000601",
+      actorUserId: "editor",
+      data: fromUint8Array(originalUpdate),
+    });
+
+    expect(binaryResult).toMatchObject({
+      duplicate: false,
+      updateId: "00000000-0000-4000-8000-000000000601",
+      serverSequence: "1",
+    });
+    expect(legacyRetry).toMatchObject({
+      duplicate: true,
+      updateId: binaryResult.updateId,
+      serverSequence: binaryResult.serverSequence,
+    });
+    expect(toUint8Array(legacyRetry.update)).toEqual(binaryResult.update);
+    expect(toUint8Array(legacyRetry.serverStateVector)).toEqual(
+      binaryResult.serverStateVector
+    );
+
+    const binarySync = await current.syncBytes("work-binary");
+    const legacySync = await current.sync("work-binary");
+    expect(binarySync.update).toEqual(syncBytes(legacySync));
+    expect(binarySync.serverStateVector).toEqual(
+      toUint8Array(legacySync.serverStateVector)
+    );
+    expect(binarySync).toMatchObject({
+      totalBytes: legacySync.totalBytes,
+      serverSequence: legacySync.serverSequence,
+    });
+  });
+
+  it("owns raw binary inputs before asynchronous persistence and accepts Buffer byte views", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    let releaseAppend: (() => void) | undefined;
+    let markAppendStarted: (() => void) | undefined;
+    const appendStarted = new Promise<void>((resolve) => {
+      markAppendStarted = resolve;
+    });
+    repository.beforeAppend = () => {
+      markAppendStarted?.();
+      return new Promise<void>((resolve) => {
+        releaseAppend = resolve;
+      });
+    };
+    const current = service(repository);
+    const update = toUint8Array(yUpdate("owned", "yes"));
+    const expected = Uint8Array.from(update);
+    const pending = current.applyUpdateBytes({
+      workId: "work-owned-binary",
+      updateId: "00000000-0000-4000-8000-000000000602",
+      actorUserId: "editor",
+      data: update,
+    });
+    await appendStarted;
+    update.fill(0);
+    releaseAppend?.();
+    await expect(pending).resolves.toMatchObject({ duplicate: false, serverSequence: "1" });
+    expect(repository.updates.get("work-owned-binary")?.[0]?.payload).toEqual(expected);
+
+    repository.beforeAppend = null;
+    await expect(
+      current.applyUpdateBytes({
+        workId: "work-owned-binary",
+        updateId: "00000000-0000-4000-8000-000000000603",
+        actorUserId: "editor",
+        data: Buffer.from(toUint8Array(yUpdate("buffer", "accepted"))),
+      })
+    ).resolves.toMatchObject({ duplicate: false, serverSequence: "2" });
+  });
+
+  it("fails closed on empty or oversized raw updates and state vectors", async () => {
+    const current = service(new MemoryStudioCrdtRepository());
+    const baseInput = {
+      workId: "work-binary-invalid",
+      updateId: "00000000-0000-4000-8000-000000000604",
+      actorUserId: "editor",
+    };
+
+    await expect(
+      current.applyUpdateBytes({ ...baseInput, data: new Uint8Array() })
+    ).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    await expect(
+      current.applyUpdateBytes({
+        ...baseInput,
+        data: new Uint8Array(STUDIO_CRDT_UPDATE_MAX_BYTES + 1),
+      })
+    ).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    await expect(current.syncBytes("work-binary-invalid", new Uint8Array()))
+      .rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    await expect(
+      current.syncBytes(
+        "work-binary-invalid",
+        new Uint8Array(256 * 1_024 + 1)
+      )
+    ).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+  });
+
+  it("returns an owned raw state vector within the configured byte budget", () => {
+    const doc = new Y.Doc();
+    doc.getMap<string>("root").set("stroke", "1");
+    const expected = Y.encodeStateVector(doc);
+    const encoded = encodeStudioCrdtServerStateVectorBytes(doc);
+
+    expect(encoded).toEqual(expected);
+    expect(() =>
+      encodeStudioCrdtServerStateVectorBytes(doc, expected.byteLength - 1)
+    ).toThrow(StudioCrdtStorageCorruptionError);
+    doc.destroy();
+  });
+
   it("strictly rejects malformed base64, malformed Yjs updates, and non-UUID ids", async () => {
     const current = service(new MemoryStudioCrdtRepository());
     await expect(current.sync("work-1", "not-base64")).rejects.toBeInstanceOf(

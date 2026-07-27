@@ -18,6 +18,7 @@ type CapturedImageProps = {
   filters?: unknown[];
   image?: CanvasImageSource;
   onDragEnd?: (event: DragEndEventStub) => void;
+  outlineWorkerRevision?: string;
   x?: number;
 };
 
@@ -265,6 +266,7 @@ describe("StudioKonvaImageNode image lifecycle", () => {
     expect(konvaCapture.node.clearCache).toHaveBeenCalled();
     expect(filterCapture.build).toHaveBeenCalledTimes(1);
     expect(latestImageProps().filters).toEqual([filterCapture.filter]);
+    expect(latestImageProps().outlineWorkerRevision).toBeTypeOf("string");
 
     view.rerender(
       <StudioKonvaImageNode
@@ -292,6 +294,7 @@ describe("StudioKonvaImageNode image lifecycle", () => {
     );
     expect(konvaCapture.node.clearCache.mock.calls.length).toBeGreaterThan(clearCount);
     expect(latestImageProps().filters).toEqual([]);
+    expect(latestImageProps().outlineWorkerRevision).toBeUndefined();
   });
 
 });

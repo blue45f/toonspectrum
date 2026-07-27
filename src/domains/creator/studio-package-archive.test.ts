@@ -218,6 +218,32 @@ describe("studio-package-archive ZIP32 writer", () => {
     expect(parseStoredZip(new Uint8Array(await blob.arrayBuffer())).entryCount).toBe(1);
   });
 
+  it("honors a pre-aborted build without reading or hashing archive sources", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const blob = new Blob([Uint8Array.of(1, 2, 3)]);
+    const read = vi.spyOn(blob, "arrayBuffer");
+
+    await expect(
+      buildStudioPackageArchiveBlob(
+        [{ path: "cancelled.bin", data: blob }],
+        { signal: controller.signal },
+      ),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("fails closed for a large Blob build when no Worker runtime is available", async () => {
+    const data = new Uint8Array(1024 * 1024 + 1);
+
+    await expect(
+      buildStudioPackageArchiveBlob([{ path: "large.bin", data }]),
+    ).rejects.toThrow(
+      "편집 화면 멈춤을 막기 위해 메인 스레드에서 계산하지 않습니다",
+    );
+    expect(data.byteLength).toBe(1024 * 1024 + 1);
+  });
+
   it("writes a valid empty ZIP32 archive", async () => {
     const bytes = await buildStudioPackageArchiveBytes([]);
     expect(bytes).toHaveLength(22);

@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 
+import { encode } from "@msgpack/msgpack";
 import { Server } from "socket.io";
 import { describe, expect, it, vi } from "vitest";
 
@@ -39,8 +40,12 @@ function pubSub(
   pool: Pool,
   overrides: {
     payloadThreshold?: number;
+    inlineBinaryPayloads?: boolean;
     queryTimeoutMs?: number;
     reconnectDelayMs?: number;
+    errorHandler?: (error: unknown, source: string) => void;
+    isFromSelf?: (message: unknown) => boolean;
+    onMessage?: (message: unknown) => void;
   } = {}
 ) {
   return new LifecycleSafePostgresPubSub(
@@ -48,14 +53,15 @@ function pubSub(
     {
       channelPrefix: CHANNEL_PREFIX,
       tableName: TABLE_NAME,
+      inlineBinaryPayloads: overrides.inlineBinaryPayloads ?? true,
       payloadThreshold: overrides.payloadThreshold ?? 8_000,
       cleanupIntervalMs: 60_000,
       queryTimeoutMs: overrides.queryTimeoutMs ?? 100,
       reconnectDelayMs: overrides.reconnectDelayMs ?? 1,
-      errorHandler: vi.fn(),
+      errorHandler: overrides.errorHandler ?? vi.fn(),
     },
-    () => false,
-    () => undefined
+    overrides.isFromSelf ?? (() => false),
+    overrides.onMessage ?? (() => undefined)
   );
 }
 
@@ -255,6 +261,265 @@ describe("Lifecycle-safe Studio PostgreSQL PubSub", () => {
       type: 3,
       uid: "node-a",
     });
+    await transport.close();
+  });
+
+  it("inlines a small binary envelope without attachment I/O and restores exact bytes", async () => {
+    const client = clientHarness();
+    const onMessage = vi.fn();
+    const errorHandler = vi.fn();
+    const poolQuery = vi.fn(async () => ({ rows: [], rowCount: 1 }));
+    const pool = {
+      connect: vi.fn(async () => client.client),
+      query: poolQuery,
+    } as unknown as Pool;
+    const transport = pubSub(pool, { errorHandler, onMessage });
+    await transport.start(STUDIO_LIVE_REQUIRED_NAMESPACES);
+    const update = Uint8Array.from([0, 1, 2, 127, 128, 254, 255]);
+    const message = {
+      nsp: "/studio-live",
+      type: 3,
+      uid: "node-a",
+      update,
+    };
+
+    await transport.publish(message);
+
+    expect(
+      poolQuery.mock.calls.some(([config]) => config.text.startsWith("INSERT"))
+    ).toBe(false);
+    const notify = poolQuery.mock.calls.find(([config]) =>
+      config.text.includes("pg_notify")
+    )?.[0];
+    const channel = String(notify?.values?.[0]);
+    const payload = String(notify?.values?.[1]);
+    expect(JSON.parse(payload)).toEqual({
+      inlinePayload: expect.any(String),
+      nsp: "/studio-live",
+      type: 3,
+      uid: "node-a",
+    });
+
+    client.events.emit("notification", { channel, payload });
+    await waitFor(() => onMessage.mock.calls.length === 1);
+
+    const received = onMessage.mock.calls[0]?.[0] as {
+      nsp: string;
+      type: number;
+      uid: string;
+      update: Uint8Array;
+    };
+    expect(received).toMatchObject({
+      nsp: "/studio-live",
+      type: 3,
+      uid: "node-a",
+    });
+    expect(Array.from(received.update)).toEqual(Array.from(update));
+    expect(errorHandler).not.toHaveBeenCalled();
+    expect(
+      poolQuery.mock.calls.some(([config]) => config.text.startsWith("SELECT \"payload\""))
+    ).toBe(false);
+    await transport.close();
+  });
+
+  it("rejects malformed, non-canonical, tampered, and ambiguous inline headers", async () => {
+    const client = clientHarness();
+    const onMessage = vi.fn();
+    const errorHandler = vi.fn();
+    const poolQuery = vi.fn(async () => ({ rows: [], rowCount: 1 }));
+    const pool = {
+      connect: vi.fn(async () => client.client),
+      query: poolQuery,
+    } as unknown as Pool;
+    const transport = pubSub(pool, { errorHandler, onMessage });
+    await transport.start(STUDIO_LIVE_REQUIRED_NAMESPACES);
+    const channel = `${CHANNEL_PREFIX}#/studio-live`;
+    const encoded = Buffer.from(
+      encode({
+        nsp: "/studio-live",
+        type: 3,
+        uid: "decoded-node",
+        update: Uint8Array.from([1, 2, 3]),
+      })
+    ).toString("base64");
+    const payloads = [
+      JSON.stringify({
+        nsp: "/studio-live",
+        uid: "outer-node",
+        type: 3,
+        inlinePayload: "not*base64",
+      }),
+      JSON.stringify({
+        nsp: "/studio-live",
+        uid: "outer-node",
+        type: 3,
+        inlinePayload: "AB==",
+      }),
+      JSON.stringify({
+        nsp: "/studio-live",
+        uid: "outer-node",
+        type: 3,
+        inlinePayload: encoded,
+      }),
+      JSON.stringify({
+        type: 3,
+        nsp: "/studio-live",
+        uid: "decoded-node",
+        inlinePayload: encoded,
+      }),
+      JSON.stringify({
+        nsp: "/studio-live",
+        uid: "decoded-node",
+        type: 3,
+        inlinePayload: encoded,
+        attachmentId: "42",
+      }),
+    ];
+
+    for (const [index, payload] of payloads.entries()) {
+      client.events.emit("notification", { channel, payload });
+      await waitFor(() => errorHandler.mock.calls.length === index + 1);
+    }
+
+    expect(onMessage).not.toHaveBeenCalled();
+    expect(errorHandler.mock.calls.map(([, source]) => source)).toEqual([
+      "notification",
+      "notification",
+      "notification",
+      "notification",
+      "notification",
+    ]);
+    expect(
+      poolQuery.mock.calls.some(([config]) => config.text.startsWith("SELECT \"payload\""))
+    ).toBe(false);
+    await transport.close();
+  });
+
+  it("rejects an inline header at the configured size boundary", async () => {
+    const client = clientHarness();
+    const onMessage = vi.fn();
+    const errorHandler = vi.fn();
+    const decoded = {
+      nsp: "/studio-live",
+      type: 3,
+      uid: "node-a",
+      update: Uint8Array.from([7, 8, 9]),
+    };
+    const inlinePayload = Buffer.from(encode(decoded)).toString("base64");
+    const payload = JSON.stringify({
+      nsp: decoded.nsp,
+      uid: decoded.uid,
+      type: decoded.type,
+      inlinePayload,
+    });
+    const pool = {
+      connect: vi.fn(async () => client.client),
+      query: vi.fn(async () => ({ rows: [], rowCount: 1 })),
+    } as unknown as Pool;
+    const transport = pubSub(pool, {
+      errorHandler,
+      onMessage,
+      payloadThreshold: Buffer.byteLength(payload, "utf8"),
+    });
+    await transport.start(STUDIO_LIVE_REQUIRED_NAMESPACES);
+
+    client.events.emit("notification", {
+      channel: `${CHANNEL_PREFIX}#/studio-live`,
+      payload,
+    });
+    await waitFor(() => errorHandler.mock.calls.length === 1);
+
+    expect(onMessage).not.toHaveBeenCalled();
+    expect(errorHandler.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ message: expect.stringMatching(/payload threshold/u) })
+    );
+    await transport.close();
+  });
+
+  it("falls back to attachment storage when a binary inline header reaches the threshold", async () => {
+    const client = clientHarness();
+    const poolQuery = vi.fn(async (config: { text: string; values?: unknown[] }) => {
+      if (config.text.startsWith("INSERT")) return { rows: [{ id: "binary-43" }], rowCount: 1 };
+      return { rows: [], rowCount: 1 };
+    });
+    const pool = {
+      connect: vi.fn(async () => client.client),
+      query: poolQuery,
+    } as unknown as Pool;
+    const message = {
+      nsp: "/studio-live",
+      type: 3,
+      uid: "node-a",
+      update: Uint8Array.from([0, 1, 2, 3, 4, 5]),
+    };
+    const encoded = encode(message);
+    const inlineHeader = JSON.stringify({
+      nsp: message.nsp,
+      uid: message.uid,
+      type: message.type,
+      inlinePayload: Buffer.from(encoded).toString("base64"),
+    });
+    const transport = pubSub(pool, {
+      payloadThreshold: Buffer.byteLength(inlineHeader, "utf8"),
+    });
+    await transport.start(STUDIO_LIVE_REQUIRED_NAMESPACES);
+
+    await transport.publish(message);
+
+    const insert = poolQuery.mock.calls.find(([config]) =>
+      config.text.startsWith("INSERT")
+    )?.[0];
+    expect(insert?.values?.[0]).toEqual(encoded);
+    const notify = poolQuery.mock.calls.find(([config]) =>
+      config.text.includes("pg_notify")
+    )?.[0];
+    expect(JSON.parse(String(notify?.values?.[1]))).toEqual({
+      attachmentId: "binary-43",
+      nsp: "/studio-live",
+      type: 3,
+      uid: "node-a",
+    });
+    await transport.close();
+  });
+
+  it("rejects attachment payloads whose decoded metadata differs from the header", async () => {
+    const client = clientHarness();
+    const onMessage = vi.fn();
+    const errorHandler = vi.fn();
+    const encoded = encode({
+      nsp: "/studio-live",
+      type: 3,
+      uid: "decoded-node",
+      update: Uint8Array.from([1, 2, 3]),
+    });
+    const poolQuery = vi.fn(async (config: { text: string }) => {
+      if (config.text.startsWith("SELECT \"payload\"")) {
+        return { rows: [{ payload: encoded }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 1 };
+    });
+    const pool = {
+      connect: vi.fn(async () => client.client),
+      query: poolQuery,
+    } as unknown as Pool;
+    const transport = pubSub(pool, { errorHandler, onMessage });
+    await transport.start(STUDIO_LIVE_REQUIRED_NAMESPACES);
+
+    client.events.emit("notification", {
+      channel: `${CHANNEL_PREFIX}#/studio-live`,
+      payload: JSON.stringify({
+        nsp: "/studio-live",
+        uid: "outer-node",
+        type: 3,
+        attachmentId: "42",
+      }),
+    });
+    await waitFor(() => errorHandler.mock.calls.length === 1);
+
+    expect(onMessage).not.toHaveBeenCalled();
+    expect(errorHandler.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ message: expect.stringMatching(/metadata/u) })
+    );
     await transport.close();
   });
 

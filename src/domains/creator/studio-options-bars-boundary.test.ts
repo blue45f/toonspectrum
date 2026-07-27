@@ -160,7 +160,7 @@ describe("Studio options-bars module boundary", () => {
       "setSecondaryColor(color);",
       "disarmAllPixelTools();",
       "patchEl(selected.id, { locked: !selected.locked });",
-      "saveStudioProDrawPrefs(studioProDrawStorage(), next);",
+      "commitProDrawPrefsMutation(",
     ]) {
       expect(page.source).toContain(contract);
     }

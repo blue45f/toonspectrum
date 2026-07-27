@@ -232,6 +232,8 @@ export interface StudioBg3dShotBatchBuildOptions {
   readonly manifest?: StudioBg3dShotBatchManifestContext;
   readonly layeredPsds?: readonly StudioBg3dShotBatchLayeredPsd[];
   readonly contactSheets?: readonly StudioBg3dShotBatchContactSheet[];
+  /** CLI/test-only escape hatch; browser runtimes still require the large-entry CRC Worker. */
+  readonly allowLargeDirectArchiveCrcInHeadless?: boolean;
 }
 
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._~-]{0,79}$/u;
@@ -1540,6 +1542,8 @@ export async function buildStudioBg3dShotBatchArchive(
     })),
   ], {
     mimeType: "application/zip",
+    allowLargeDirectFallbackInHeadless: options.allowLargeDirectArchiveCrcInHeadless,
+    signal,
     limits: {
       maxFiles: STUDIO_BG3D_SHOT_BATCH_MAX_ARCHIVE_ARTIFACTS + 1,
       maxEntryBytes: STUDIO_BG3D_SHOT_PSD_MAX_OUTPUT_BYTES,

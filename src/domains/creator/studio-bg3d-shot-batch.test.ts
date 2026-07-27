@@ -525,6 +525,7 @@ describe("Studio BG3D shot batch archive", () => {
       wasReduced: true,
       png: new Blob([pngHeader(1_920, 1_080)], { type: "image/png" }),
     }], {
+      allowLargeDirectArchiveCrcInHeadless: true,
       manifest: {
         shots: [{ id: "shot-a", name: "첫 컷" }],
         requestedPasses: ["beauty"],
@@ -576,6 +577,7 @@ describe("Studio BG3D shot batch archive", () => {
       { ...image("shot-a", "첫 컷"), pass: "lt-composite" },
       { ...image("shot-b", "둘째 컷"), pass: "lt-composite" },
     ], {
+      allowLargeDirectArchiveCrcInHeadless: true,
       contactSheets: [{
         sheetNumber: 1,
         fileName: "contact-sheet-001.png",

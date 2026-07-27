@@ -108,6 +108,8 @@ export interface StudioOpenRasterExportInput {
 export interface StudioOpenRasterExportOptions {
   limits?: Partial<StudioOpenRasterLimits>;
   signal?: AbortSignal;
+  /** CLI/headless export only; ignored by browser runtimes. */
+  allowLargeDirectArchiveCrcInHeadless?: boolean;
 }
 
 export interface StudioOpenRasterImportOptions extends StudioOpenRasterExportOptions {
@@ -890,6 +892,8 @@ export async function buildStudioOpenRasterBytes(
   const prepared = await prepareOpenRaster(input, options);
   const limits = resolveLimits(options.limits);
   const bytes = await buildStudioPackageArchiveBytes(prepared.entries, {
+    signal: options.signal,
+    allowLargeDirectFallbackInHeadless: options.allowLargeDirectArchiveCrcInHeadless,
     limits: {
       maxFiles: limits.maxLayers + 4,
       maxEntryBytes: Math.max(
@@ -913,6 +917,8 @@ export async function buildStudioOpenRasterBlob(
   const limits = resolveLimits(options.limits);
   const blob = await buildStudioPackageArchiveBlob(prepared.entries, {
     mimeType: STUDIO_OPENRASTER_MIME,
+    signal: options.signal,
+    allowLargeDirectFallbackInHeadless: options.allowLargeDirectArchiveCrcInHeadless,
     limits: {
       maxFiles: limits.maxLayers + 4,
       maxEntryBytes: Math.max(

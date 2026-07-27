@@ -11,7 +11,10 @@ import {
   WebSocketServer,
 } from "@nestjs/websockets";
 
-
+import {
+  encodeStudioCrdtBinaryEnvelope,
+  fragmentStudioCrdtBinarySyncEnvelope,
+} from "../../../../../lib/studio-crdt-binary-envelope";
 import { allowedCorsOrigins } from "../../config/cors";
 
 import { CreatorService } from "./creator.service";
@@ -50,11 +53,21 @@ import {
 } from "./studio-live-room-transition-coordinator";
 import { StudioLiveSocketAuthService } from "./studio-live-socket-auth.service";
 import {
+  STUDIO_CRDT_BINARY_WIRE_FORMAT,
+  STUDIO_CRDT_BINARY_WIRE_VERSION,
   STUDIO_CRDT_PROTOCOL_VERSION,
+  STUDIO_CRDT_SUPPORTED_WIRE_FORMATS,
+  STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT,
+  STUDIO_LIVE_CRDT_BINARY_SYNC_EVENT,
+  STUDIO_LIVE_CRDT_BINARY_UPDATE_EVENT,
+  STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT,
   STUDIO_LIVE_LOCK_PROTOCOL_VERSION,
   STUDIO_LIVE_LOCK_REVISION_VERSION,
   StudioLiveActiveScreenShareSchema,
   StudioLiveChatSchema,
+  StudioLiveCrdtBinarySelectSchema,
+  StudioLiveCrdtBinarySyncSchema,
+  StudioLiveCrdtBinaryUpdateSchema,
   StudioLiveCrdtSyncSchema,
   StudioLiveCrdtUpdateSchema,
   StudioLiveCursorSchema,
@@ -84,6 +97,13 @@ import type {
   StudioLiveActiveScreenShare,
   StudioLiveAuthPrincipal,
   StudioLiveChatInput,
+  StudioLiveCrdtBinaryRemoteUpdate,
+  StudioLiveCrdtBinarySelection,
+  StudioLiveCrdtBinarySelectInput,
+  StudioLiveCrdtBinarySyncInput,
+  StudioLiveCrdtBinarySyncResult,
+  StudioLiveCrdtBinaryUpdateAck,
+  StudioLiveCrdtBinaryUpdateInput,
   StudioLiveCrdtRemoteUpdate,
   StudioLiveCrdtSyncInput,
   StudioLiveCrdtSyncResult,
@@ -169,6 +189,7 @@ export { STUDIO_LIVE_RELAY_RPC_TIMEOUT_MS } from "./studio-live-inter-server-rel
 
 const STUDIO_LIVE_NAMESPACE = "/studio-live";
 const STUDIO_LIVE_ROOM_PREFIX = "studio-live:";
+const STUDIO_LIVE_CRDT_BINARY_ROOM_PREFIX = "studio-live-crdt-binary-v1:";
 const STUDIO_LIVE_ACCESS_RECHECK_MS = 15_000;
 const STUDIO_LIVE_ACCESS_CACHE_MS = 5_000;
 export const STUDIO_LIVE_ADAPTER_DISCOVERY_TIMEOUT_MS = 2_000;
@@ -199,6 +220,20 @@ interface StudioLiveParticipantInternal extends StudioLiveParticipant {
 interface StudioLiveVoiceMemberInternal extends StudioLiveVoiceMember {
   workId: string;
 }
+
+interface StudioLiveCrdtBinarySelectionState {
+  socket: StudioLiveSocket;
+  workId: string;
+  selectionEpoch: string;
+  selected: boolean;
+  pendingJoin: Promise<void> | null;
+  cleanup: Promise<void> | null;
+}
+
+type StudioLiveCrdtBinarySyncWireResult = Omit<
+  StudioLiveCrdtBinarySyncResult,
+  "diff"
+>;
 
 interface StudioLiveVoiceRelayDiscovery {
   sender: StudioLiveParticipant;
@@ -251,6 +286,10 @@ interface StudioLiveCandidateRelayAuthorization {
 
 function studioLiveRoom(workId: string): string {
   return `${STUDIO_LIVE_ROOM_PREFIX}${workId}`;
+}
+
+function studioLiveCrdtBinaryRoom(workId: string): string {
+  return `${STUDIO_LIVE_CRDT_BINARY_ROOM_PREFIX}${workId}`;
 }
 
 function publicParticipant(participant: StudioLiveParticipantInternal): StudioLiveParticipant {
@@ -402,6 +441,10 @@ export class StudioLiveGateway
   private readonly lockOperationTailByResource = new Map<string, Promise<void>>();
   private readonly rateLimits = new Map<string, Map<string, RateLimitBucket>>();
   private readonly crdtQuotaLimiter = new StudioLiveCrdtQuotaLimiter();
+  private readonly crdtBinarySelectionBySocket = new Map<
+    string,
+    StudioLiveCrdtBinarySelectionState
+  >();
   private readonly participantAuthorizationRechecks = new Map<
     string,
     StudioLiveParticipantAuthorizationRecheck
@@ -482,6 +525,7 @@ export class StudioLiveGateway
     this.lockOperationTailByResource.clear();
     this.rateLimits.clear();
     this.crdtQuotaLimiter.clear();
+    this.crdtBinarySelectionBySocket.clear();
     this.joinTransitions.clearAll();
     this.participantAuthorizationRechecks.clear();
     this.candidateRelayAuthorizations.clear();
@@ -512,6 +556,7 @@ export class StudioLiveGateway
   }
 
   handleDisconnect(client: StudioLiveSocket): void {
+    this.clearCrdtBinarySelectionBestEffort(client.id, client);
     this.socketAuthentication.clear(client);
     this.joinTransitions.invalidate(client.id);
     this.participantAuthorizationRechecks.delete(client.id);
@@ -649,6 +694,31 @@ export class StudioLiveGateway
       // This is the serialized commit boundary. A newer request may enqueue while an adapter leave
       // is pending, but it cannot execute until this transition leaves exactly one authoritative
       // room and participant behind.
+      if (!(await this.resetCrdtBinarySelectionForJoin(client))) {
+        if (joinedNewRoom) {
+          this.roomTransitions.leaveJoinedRoomBestEffort(client, nextRoom);
+        }
+        this.disconnectRoomIsolationFailure(client);
+        const currentParticipant = this.participantsBySocket.get(client.id);
+        if (currentParticipant) this.removeParticipant(client.id, "revoked");
+        return reply(
+          ack,
+          failure("not_joined", "바이너리 공동 편집 채널을 안전하게 전환하지 못했습니다.")
+        );
+      }
+      if (
+        !this.isCurrentJoinTransition(client, transitionSequence) ||
+        !this.isSocketPrincipalCurrent(client, principal, userId)
+      ) {
+        if (joinedNewRoom) {
+          await this.roomTransitions.rollbackEnteredRoom(
+            client,
+            nextRoom,
+            () => this.disconnectRoomIsolationFailure(client)
+          );
+        }
+        return reply(ack, failure("not_joined", "더 최신 작업실 참가 요청으로 대체되었습니다."));
+      }
       const existing = this.participantsBySocket.get(client.id);
       if (existing && existing.workId !== input.workId) {
         let leftPreviousRoomState = await this.roomTransitions.leavePreviousRoom({
@@ -761,12 +831,23 @@ export class StudioLiveGateway
         return reply(ack, failure("not_joined", "더 최신 작업실 상태로 대체되었습니다."));
       }
 
+      const crdtWireSelectionEpoch = crypto.randomUUID();
+      this.crdtBinarySelectionBySocket.set(client.id, {
+        socket: client,
+        workId: input.workId,
+        selectionEpoch: crdtWireSelectionEpoch,
+        selected: false,
+        pendingJoin: null,
+        cleanup: null,
+      });
       return reply(ack, {
         ok: true,
         data: {
           lockProtocolVersion: STUDIO_LIVE_LOCK_PROTOCOL_VERSION,
           lockRevisionVersion: STUDIO_LIVE_LOCK_REVISION_VERSION,
           lockSnapshotRevision: lockSnapshot.revision,
+          crdtWireFormats: STUDIO_CRDT_SUPPORTED_WIRE_FORMATS,
+          crdtWireSelectionEpoch,
           self: safeParticipant,
           participants,
           locks: lockSnapshot.locks,
@@ -844,6 +925,319 @@ export class StudioLiveGateway
     );
     if (!authorized) return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
     return reply(ack, { ok: true, data: { accepted: true } });
+  }
+
+  @SubscribeMessage(STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT)
+  async selectCrdtBinaryWire(
+    @ConnectedSocket() client: StudioLiveSocket,
+    @MessageBody() body: StudioLiveCrdtBinarySelectInput,
+    @Ack() ack?: StudioLiveAckCallback<StudioLiveCrdtBinarySelection>
+  ) {
+    const parsed = StudioLiveCrdtBinarySelectSchema.safeParse(body);
+    if (!parsed.success) {
+      return reply(ack, failure("invalid_payload", "CRDT 전송 형식 선택 정보가 올바르지 않습니다."));
+    }
+    const participant = this.currentJoinedCrdtParticipant(client, parsed.data.workId);
+    const selection = this.currentCrdtBinarySelection(
+      client,
+      parsed.data.workId,
+      parsed.data.selectionEpoch,
+      false
+    );
+    if (!participant || !selection) {
+      return reply(ack, failure("not_joined", "최신 작업실 참가 정보로 다시 연결해 주세요."));
+    }
+    const authorizedBefore = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      false,
+      true,
+      (current) => current
+    );
+    if (!authorizedBefore || authorizedBefore.value !== participant) {
+      await this.finishCrdtBinarySelectionCleanup(selection);
+      return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    }
+    if (!selection.selected) {
+      try {
+        selection.pendingJoin ??= Promise.resolve(
+          client.join(studioLiveCrdtBinaryRoom(parsed.data.workId))
+        );
+        await selection.pendingJoin;
+      } catch {
+        await this.finishCrdtBinarySelectionCleanup(selection);
+        return reply(
+          ack,
+          failure("temporarily_unavailable", "바이너리 공동 편집 채널에 연결하지 못했습니다.")
+        );
+      }
+      const currentSelection = this.currentCrdtBinarySelection(
+        client,
+        parsed.data.workId,
+        parsed.data.selectionEpoch,
+        false
+      );
+      const authorizedAfter = await this.runWithAuthorizedParticipant(
+        client,
+        parsed.data.workId,
+        false,
+        true,
+        (current) => current
+      );
+      if (
+        currentSelection !== selection ||
+        !authorizedAfter ||
+        authorizedAfter.value !== authorizedBefore.value
+      ) {
+        await this.finishCrdtBinarySelectionCleanup(selection);
+        return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+      }
+      selection.pendingJoin = null;
+      selection.selected = true;
+    }
+    return reply(ack, {
+      ok: true,
+      data: {
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+        wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
+        workId: parsed.data.workId,
+        format: STUDIO_CRDT_BINARY_WIRE_FORMAT,
+        selectionEpoch: selection.selectionEpoch,
+        selected: true,
+      },
+    });
+  }
+
+  @SubscribeMessage(STUDIO_LIVE_CRDT_BINARY_SYNC_EVENT)
+  async syncCrdtDocumentBinary(
+    @ConnectedSocket() client: StudioLiveSocket,
+    @MessageBody() body: StudioLiveCrdtBinarySyncInput,
+    @Ack() ack?: StudioLiveAckCallback<StudioLiveCrdtBinarySyncWireResult>
+  ) {
+    const parsed = StudioLiveCrdtBinarySyncSchema.safeParse(body);
+    if (!parsed.success) {
+      return reply(ack, failure("invalid_payload", "바이너리 CRDT 동기화 요청이 올바르지 않습니다."));
+    }
+    const quotaParticipant = this.currentJoinedCrdtParticipant(
+      client,
+      parsed.data.workId
+    );
+    const binarySelection = this.currentCrdtBinarySelection(
+      client,
+      parsed.data.workId,
+      undefined,
+      true
+    );
+    if (!quotaParticipant || !binarySelection) {
+      return reply(ack, failure("not_joined", "바이너리 공동 편집 채널을 다시 선택해 주세요."));
+    }
+    if (
+      !this.crdtQuotaLimiter.consumeSync({
+        userId: quotaParticipant.userId,
+        workId: parsed.data.workId,
+      })
+    ) {
+      return reply(ack, failure("rate_limited", "CRDT 전체 동기화 요청이 너무 많습니다."));
+    }
+    const authorizedBefore = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      false,
+      true,
+      (participant) => participant
+    );
+    if (
+      !authorizedBefore ||
+      authorizedBefore.value !== quotaParticipant ||
+      this.currentCrdtBinarySelection(
+        client,
+        parsed.data.workId,
+        undefined,
+        true
+      ) !== binarySelection
+    ) {
+      return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    }
+
+    let sync: Awaited<ReturnType<StudioCrdtService["syncBytes"]>>;
+    try {
+      sync = await this.studioCrdtService.syncBytes(
+        parsed.data.workId,
+        parsed.data.stateVector
+      );
+    } catch (error) {
+      const mappedFailure = mapStudioLiveCrdtFailure(error, parsed.data.workId, "sync");
+      if (mappedFailure.diagnostic) {
+        this.logger.error(mappedFailure.diagnostic, "studio CRDT operation failed");
+      }
+      return reply(ack, mappedFailure.response);
+    }
+    const authorizedAfter = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      false,
+      true,
+      (participant) => participant
+    );
+    if (
+      !authorizedAfter ||
+      authorizedAfter.value !== authorizedBefore.value ||
+      this.currentCrdtBinarySelection(
+        client,
+        parsed.data.workId,
+        undefined,
+        true
+      ) !== binarySelection
+    ) {
+      return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    }
+
+    try {
+      const diffEnvelope = encodeStudioCrdtBinaryEnvelope("sync-diff", sync.update);
+      const fragments = fragmentStudioCrdtBinarySyncEnvelope(diffEnvelope);
+      return reply(ack, {
+        ok: true,
+        data: {
+          protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+          wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
+          workId: parsed.data.workId,
+          requestId: parsed.data.requestId,
+          transferId: crypto.randomUUID(),
+          fragments,
+          fragmentCount: fragments.length,
+          wireBytes: diffEnvelope.byteLength,
+          totalBytes: sync.totalBytes,
+          serverStateVector: encodeStudioCrdtBinaryEnvelope(
+            "state-vector",
+            sync.serverStateVector
+          ),
+          serverSequence: sync.serverSequence,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        {
+          workId: parsed.data.workId,
+          error: error instanceof Error ? error.message : "unknown",
+        },
+        "studio CRDT binary sync encoding failed"
+      );
+      return reply(ack, failure("internal_error", "CRDT 동기화 응답을 구성하지 못했습니다."));
+    }
+  }
+
+  @SubscribeMessage(STUDIO_LIVE_CRDT_BINARY_UPDATE_EVENT)
+  async applyCrdtUpdateBinary(
+    @ConnectedSocket() client: StudioLiveSocket,
+    @MessageBody() body: StudioLiveCrdtBinaryUpdateInput,
+    @Ack() ack?: StudioLiveAckCallback<StudioLiveCrdtBinaryUpdateAck>
+  ) {
+    const parsed = StudioLiveCrdtBinaryUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return reply(ack, failure("invalid_payload", "바이너리 CRDT 편집 업데이트가 올바르지 않습니다."));
+    }
+    const quotaParticipant = this.currentJoinedCrdtParticipant(
+      client,
+      parsed.data.workId
+    );
+    const binarySelection = this.currentCrdtBinarySelection(
+      client,
+      parsed.data.workId,
+      undefined,
+      true
+    );
+    if (!quotaParticipant || !binarySelection) {
+      return reply(ack, failure("not_joined", "바이너리 공동 편집 채널을 다시 선택해 주세요."));
+    }
+    if (
+      !this.crdtQuotaLimiter.consumeUpdate(
+        { userId: quotaParticipant.userId, workId: parsed.data.workId },
+        parsed.data.update.byteLength
+      )
+    ) {
+      return reply(ack, failure("rate_limited", "CRDT 편집 업데이트 전송이 너무 빠릅니다."));
+    }
+    const authorizedBefore = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      false,
+      true,
+      (participant) => participant
+    );
+    if (
+      !authorizedBefore ||
+      authorizedBefore.value !== quotaParticipant ||
+      this.currentCrdtBinarySelection(
+        client,
+        parsed.data.workId,
+        undefined,
+        true
+      ) !== binarySelection
+    ) {
+      return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    }
+    if (!authorizedBefore.value.capabilities.edit) {
+      return reply(ack, failure("forbidden", "이 작품을 편집할 권한이 없습니다."));
+    }
+
+    let applied: Awaited<ReturnType<StudioCrdtService["applyUpdateBytes"]>>;
+    try {
+      applied = await this.studioCrdtService.applyUpdateBytes({
+        workId: parsed.data.workId,
+        updateId: parsed.data.updateId,
+        actorUserId: authorizedBefore.value.userId,
+        data: parsed.data.update,
+      });
+    } catch (error) {
+      const mappedFailure = mapStudioLiveCrdtFailure(error, parsed.data.workId, "update");
+      if (mappedFailure.diagnostic) {
+        this.logger.error(mappedFailure.diagnostic, "studio CRDT operation failed");
+      }
+      return reply(ack, mappedFailure.response);
+    }
+
+    const data: StudioLiveCrdtBinaryUpdateAck = {
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
+      workId: parsed.data.workId,
+      updateId: applied.updateId,
+      serverSequence: applied.serverSequence,
+      duplicate: applied.duplicate,
+    };
+    const response: StudioLiveAck<StudioLiveCrdtBinaryUpdateAck> = { ok: true, data };
+    reply(ack, response);
+    if (!applied.duplicate) {
+      const legacyRemote: StudioLiveCrdtRemoteUpdate = {
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+        workId: parsed.data.workId,
+        updateId: applied.updateId,
+        serverSequence: applied.serverSequence,
+        update: Buffer.from(applied.update).toString("base64"),
+      };
+      try {
+        client
+          .to(studioLiveRoom(parsed.data.workId))
+          .emit("studio:crdt:update", legacyRemote);
+      } catch (error) {
+        this.logCrdtBroadcastFailure(parsed.data.workId, applied.updateId, error, "legacy");
+      }
+      try {
+        const binaryRemote: StudioLiveCrdtBinaryRemoteUpdate = {
+          protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+          wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
+          workId: parsed.data.workId,
+          updateId: applied.updateId,
+          serverSequence: applied.serverSequence,
+          update: encodeStudioCrdtBinaryEnvelope("update", applied.update),
+        };
+        client
+          .to(studioLiveCrdtBinaryRoom(parsed.data.workId))
+          .emit(STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT, binaryRemote);
+      } catch (error) {
+        this.logCrdtBroadcastFailure(parsed.data.workId, applied.updateId, error, "binary");
+      }
+    }
+    return response;
   }
 
   @SubscribeMessage("studio:crdt:sync")
@@ -2838,10 +3232,133 @@ export class StudioLiveGateway
     return participant;
   }
 
+  private currentCrdtBinarySelection(
+    client: StudioLiveSocket,
+    workId: string,
+    selectionEpoch: string | undefined,
+    requireSelected: boolean
+  ): StudioLiveCrdtBinarySelectionState | null {
+    const selection = this.crdtBinarySelectionBySocket.get(client.id);
+    if (
+      !selection ||
+      selection.socket !== client ||
+      selection.workId !== workId ||
+      selection.cleanup ||
+      (selectionEpoch !== undefined && selection.selectionEpoch !== selectionEpoch) ||
+      (requireSelected && !selection.selected)
+    ) {
+      return null;
+    }
+    return selection;
+  }
+
+  /**
+   * Invalidates the capability synchronously, then waits for a racing adapter join before leaving
+   * the binary-only room. The ordering prevents a stale select from re-entering the room after a
+   * reconnect or work switch has already issued a fresh selection epoch.
+   */
+  private beginCrdtBinarySelectionCleanup(
+    selection: StudioLiveCrdtBinarySelectionState
+  ): Promise<void> {
+    if (this.crdtBinarySelectionBySocket.get(selection.socket.id) === selection) {
+      this.crdtBinarySelectionBySocket.delete(selection.socket.id);
+    }
+    if (selection.cleanup) return selection.cleanup;
+
+    const cleanup = (async () => {
+      if (selection.pendingJoin) {
+        try {
+          await selection.pendingJoin;
+        } catch {
+          // A rejected join cannot establish membership, but still attempt a defensive leave.
+        }
+      }
+      await selection.socket.leave(studioLiveCrdtBinaryRoom(selection.workId));
+    })();
+    selection.cleanup = cleanup;
+    return cleanup;
+  }
+
+  private async finishCrdtBinarySelectionCleanup(
+    selection: StudioLiveCrdtBinarySelectionState
+  ): Promise<void> {
+    try {
+      await this.beginCrdtBinarySelectionCleanup(selection);
+    } catch (error) {
+      this.logger.warn(
+        {
+          socketId: selection.socket.id,
+          workId: selection.workId,
+          error: error instanceof Error ? error.message : "unknown",
+        },
+        "studio CRDT binary room cleanup failed"
+      );
+    }
+  }
+
+  private async resetCrdtBinarySelectionForJoin(
+    client: StudioLiveSocket
+  ): Promise<boolean> {
+    const selection = this.crdtBinarySelectionBySocket.get(client.id);
+    if (!selection) return true;
+    try {
+      // Await even when Socket.IO reused the id: adapter membership is keyed by id, so the stale
+      // socket's pending join must settle and leave before this replacement receives a new epoch.
+      await this.beginCrdtBinarySelectionCleanup(selection);
+      return true;
+    } catch (error) {
+      this.logger.error(
+        {
+          socketId: client.id,
+          workId: selection.workId,
+          error: error instanceof Error ? error.message : "unknown",
+        },
+        "studio CRDT binary room transition failed"
+      );
+      return false;
+    }
+  }
+
+  private clearCrdtBinarySelectionBestEffort(
+    socketId: string,
+    expectedSocket?: StudioLiveSocket
+  ): void {
+    const selection = this.crdtBinarySelectionBySocket.get(socketId);
+    if (!selection || (expectedSocket && selection.socket !== expectedSocket)) return;
+    void this.beginCrdtBinarySelectionCleanup(selection).catch((error) => {
+      this.logger.warn(
+        {
+          socketId,
+          workId: selection.workId,
+          error: error instanceof Error ? error.message : "unknown",
+        },
+        "studio CRDT binary room cleanup failed"
+      );
+    });
+  }
+
+  private logCrdtBroadcastFailure(
+    workId: string,
+    updateId: string,
+    error: unknown,
+    wire: "legacy" | "binary"
+  ): void {
+    this.logger.error(
+      {
+        workId,
+        updateId,
+        wire,
+        error: error instanceof Error ? error.message : "unknown",
+      },
+      "studio CRDT update persisted but peer broadcast failed"
+    );
+  }
+
   private disconnectInvalidJoinSession(client: StudioLiveSocket): void {
     // A reconnect may reuse the Socket.IO id while speculative adapter cleanup is pending. Never
     // tear down that replacement socket or its participant when this join belongs to the old one.
     if (!this.isSocketCurrent(client)) {
+      this.clearCrdtBinarySelectionBestEffort(client.id, client);
       this.socketAuthentication.clear(client);
       client.disconnect(true);
       return;
@@ -2854,6 +3371,7 @@ export class StudioLiveGateway
     this.participantAuthorizationRechecks.delete(client.id);
     this.deleteCandidateRelayAuthorizationsForSocket(client.id);
     this.rateLimits.delete(client.id);
+    this.clearCrdtBinarySelectionBestEffort(client.id, client);
     this.socketAuthentication.clear(client);
     client.disconnect(true);
   }
@@ -2873,6 +3391,7 @@ export class StudioLiveGateway
   }
 
   private disconnectRoomIsolationFailure(client: StudioLiveSocket): void {
+    this.clearCrdtBinarySelectionBestEffort(client.id, client);
     this.socketAuthentication.clear(client);
     client.disconnect(true);
   }
@@ -3175,6 +3694,7 @@ export class StudioLiveGateway
     expectedParticipant: StudioLiveParticipantInternal
   ): void {
     if (this.participantsBySocket.get(socketId) !== expectedParticipant) return;
+    this.clearCrdtBinarySelectionBestEffort(socketId);
     this.emitCleanupNotificationBestEffort(socketId, "studio:access:revoked", {
       workId: expectedParticipant.workId,
       message: "로그인 세션이 만료되거나 해제되어 실시간 작업실 연결을 종료했습니다.",
@@ -3194,6 +3714,7 @@ export class StudioLiveGateway
   private revokeParticipant(socketId: string): void {
     const participant = this.participantsBySocket.get(socketId);
     if (!participant) return;
+    this.clearCrdtBinarySelectionBestEffort(socketId);
     this.emitCleanupNotificationBestEffort(socketId, "studio:access:revoked", {
       workId: participant.workId,
       message: "팀 권한이 변경되어 실시간 작업실 연결을 종료했습니다.",

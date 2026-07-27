@@ -51,15 +51,16 @@ ToonSpectrum는 콘텐츠를 호스팅하지 않습니다. 플랫폼 장벽 너�
 - **내 서재** `/library` — 관심/평가/완독 관리, **취향 분석**, 맞춤 추천, 컬렉션
 - **창작 스튜디오** `/studio` — 멀티페이지 컷·말풍선·표준 3D 파일/VRM·최대 64개 샷 보드와 컷별 LT Worker 합성 PNG 일괄 렌더·권한 검증형 IndexedDB 원자 복구·공개 manifest v3 Worker ZIP 패키징·
   시간대 무드 리그·가림 관계 인지 선화·의미 재질 분석·로컬 사진 포즈 스캔·시각적 관절/손목 IK·결정론적 물리 배치·분석적 IK·
-  벡터/래스터 소재·VRM `baseColor` 표면 직접 페인팅·UV 아일랜드 Worker precompute·
-  SHA-256 PNG 무결성 저장/재편집과 기기 간 portable archive·WebGPU dirty-rect 부분 업로드 준비 계층·
+  벡터/래스터 소재·기본 G펜과 영속 즐겨찾기를 포함한 214종 브러시 카탈로그·VRM `baseColor` 표면 직접 페인팅·UV 아일랜드 Worker precompute·
+  SHA-256 PNG 무결성 저장/재편집과 기기 간 portable archive·WebGPU dirty-rect 부분 업로드 준비 계층·Studio 전용 COOP/COEP 격리·
   AI 제작 보조·검토·
-  복구·Publish Package와 역할 기반 팀 초대·CRDT 동시 편집·화면 공유·단기 TURN 자격증명과
-  자동 ICE 재협상을 지원하는 최대 6인 P2P 음성 작업실·
+  복구·Publish Package와 역할 기반 팀 초대·CRC 검증 바이너리 CRDT 동시 편집·화면 공유·기본 비활성인 선택형
+  최대 6인 P2P 음성 작업실과 단기 TURN 자격증명·자동 ICE 재협상·
   공유 원본·revision 충돌 방지를 합친 모바일 대응 올인원
   제작실. 컷툰/업로드 작품 형식을 보존한 채 팀 작업 목록에서 바로 전환하며, 상세 벤치마크와 구현 현황은
   [`docs/studio-competitor-features.md`](docs/studio-competitor-features.md)와
-  [`docs/studio-3d-webtoon-tool-benchmark-2026-07-19.md`](docs/studio-3d-webtoon-tool-benchmark-2026-07-19.md) 참고
+  [`docs/studio-3d-webtoon-tool-benchmark-2026-07-19.md`](docs/studio-3d-webtoon-tool-benchmark-2026-07-19.md),
+  [2026-07-27 코드 기반 997행 갭 재감사](docs/studio-feature-gap-audit-2026-07-27.md) 참고
 - **⌘K 커맨드 팔레트** — 어디서든 통합 검색
 
 <br/>

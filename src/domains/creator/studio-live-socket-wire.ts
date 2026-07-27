@@ -1,4 +1,8 @@
 import {
+  parseStudioCrdtWireAdvertisement,
+  type StudioCrdtWireAdvertisement,
+} from "./studio-crdt-binary-wire";
+import {
   STUDIO_LIVE_LOCK_REVISION_VERSION,
   STUDIO_LIVE_SDP_MAX_LENGTH,
   studioLiveDisplayName,
@@ -57,6 +61,8 @@ export interface ServerJoinSnapshot {
   lockRevisionVersion: 0 | typeof STUDIO_LIVE_LOCK_REVISION_VERSION;
   /** Null only for a legacy snapshot that did not advertise lock revision support. */
   lockSnapshotRevision: StudioLiveLockRevision | null;
+  /** Null while a legacy gateway completes a rolling deploy. */
+  crdtWireAdvertisement: StudioCrdtWireAdvertisement | null;
   self: ServerParticipant;
   participants: ServerParticipant[];
   locks: ServerLock[];
@@ -265,6 +271,7 @@ export function parseJoinAck(value: unknown): ServerJoinSnapshot | ServerFailure
   const lockSnapshotRevision = revisionAware
     ? parseLockRevision(value.data.lockSnapshotRevision, { allowZero: true })
     : null;
+  const crdtWireAdvertisement = parseStudioCrdtWireAdvertisement(value.data);
   if (
     !self ||
     typeof lockProtocolVersion !== "number" ||
@@ -274,6 +281,7 @@ export function parseJoinAck(value: unknown): ServerJoinSnapshot | ServerFailure
     (revisionAware &&
       (lockRevisionVersion !== STUDIO_LIVE_LOCK_REVISION_VERSION ||
         lockSnapshotRevision === null)) ||
+    crdtWireAdvertisement === false ||
     !Array.isArray(value.data.participants) ||
     !Array.isArray(value.data.locks) ||
     (value.data.voiceMembers !== undefined && !Array.isArray(value.data.voiceMembers)) ||
@@ -338,6 +346,7 @@ export function parseJoinAck(value: unknown): ServerJoinSnapshot | ServerFailure
     lockProtocolVersion,
     lockRevisionVersion: revisionAware ? STUDIO_LIVE_LOCK_REVISION_VERSION : 0,
     lockSnapshotRevision,
+    crdtWireAdvertisement,
     self,
     participants: parsedParticipants,
     locks: parsedLocks,

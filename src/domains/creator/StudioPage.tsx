@@ -291,7 +291,6 @@ import {
 } from "./studio-chrome-ui";
 import { shouldOwnStudioCoalescedBatchDraft } from "./studio-coalesced-batch-mutation";
 import {
-  applyColorRangeMaskToSelection,
   COLOR_RANGE_FUZZINESS_DEFAULT,
   COLOR_RANGE_MAX_SAMPLES,
   type ColorRangeSample,
@@ -869,12 +868,7 @@ import { executeStudioPrimaryCanvasToolTransition } from "./studio-primary-canva
 import {
   applyBrushPresetWithLocks,
   cycleStudioStabilizerStrength,
-  loadStudioProDrawPrefs,
   rememberRecentBrushId,
-  saveStudioProDrawPrefs,
-  studioProDrawStorage,
-  toggleFavoriteBrushId,
-  type StudioProDrawPrefs,
 } from "./studio-pro-draw-prefs";
 import { computeStudioProductionInsights } from "./studio-production-insights";
 import { buildStudioProductionInsightsInput } from "./studio-production-projection";
@@ -1275,6 +1269,7 @@ import {
 } from "./StudioToolHint";
 import { useStudioBrushBaselineController } from "./useStudioBrushBaselineController";
 import { useStudioModalSheet } from "./useStudioModalSheet";
+import { useStudioProDrawPrefs } from "./useStudioProDrawPrefs";
 import { useStudioProjectArchiveOrchestration } from "./useStudioProjectArchiveOrchestration";
 import { useStudioRasterExportOrchestration } from "./useStudioRasterExportOrchestration";
 
@@ -5891,9 +5886,11 @@ function StudioCuttoonEditor() {
     )
   );
   /** Procreate size/opacity lock + Ibis recent/favorites for built-in brushes. */
-  const [proDrawPrefs, setProDrawPrefs] = useState<StudioProDrawPrefs>(() =>
-    loadStudioProDrawPrefs(studioProDrawStorage())
-  );
+  const {
+    proDrawPrefs,
+    commitProDrawPrefsMutation,
+    toggleProDrawFavorite,
+  } = useStudioProDrawPrefs();
   const [brushCatalogSession, setBrushCatalogSession] = useState<{
     placement: import("./StudioBrushLibrarySheet").StudioBrushCatalogPlacement;
     trigger: HTMLButtonElement;
@@ -6125,11 +6122,9 @@ function StudioCuttoonEditor() {
     } else {
       setBrushDynamics(normalizeStudioBrushDynamicsSettings());
     }
-    setProDrawPrefs((prev) => {
-      const next = rememberRecentBrushId(prev, selection.catalogId);
-      saveStudioProDrawPrefs(studioProDrawStorage(), next);
-      return next;
-    });
+    commitProDrawPrefsMutation(
+      (latest) => rememberRecentBrushId(latest, selection.catalogId)
+    );
     setBrushSlotsState((prev) => {
       const next = rememberStudioBrushSlot(prev, {
         brushId: applied.brushId,
@@ -6185,13 +6180,7 @@ function StudioCuttoonEditor() {
   }
 
   function toggleBuiltInBrushFavorite(brushId: string) {
-    setProDrawPrefs((previous) => {
-      const next = toggleFavoriteBrushId(previous, brushId);
-      saveStudioProDrawPrefs(studioProDrawStorage(), next);
-      const favorite = next.favoriteBrushIds.includes(brushId);
-      announceDrawingShortcut(favorite ? "즐겨찾기 추가" : "즐겨찾기 해제");
-      return next;
-    });
+    toggleProDrawFavorite(brushId, announceDrawingShortcut);
   }
 
   function toggleBuiltInBrushCatalog(
@@ -10431,6 +10420,7 @@ function StudioCuttoonEditor() {
   const [colorRangePreviewEnabled, setColorRangePreviewEnabled] = useState(false);
   const colorRangeRunIdRef = useRef(0);
   const colorRangeActiveRunIdRef = useRef<number | null>(null);
+  const colorRangeAbortRef = useRef<AbortController | null>(null);
   const [smudgeActive, setSmudgeActive] = useState(false);
   const [smudgeRadius, setSmudgeRadius] = useState(SMUDGE_RADIUS_DEFAULT);
   const [smudgeStrength, setSmudgeStrength] = useState(SMUDGE_STRENGTH_DEFAULT); // %
@@ -10654,6 +10644,8 @@ function StudioCuttoonEditor() {
       pixelWandActiveRunIdRef.current = null;
     }
     colorRangeRunIdRef.current += 1; // 색상 범위 스캔도 함께 무효화 — 샘플은 다른 이미지 기준이라 비운다.
+    colorRangeAbortRef.current?.abort();
+    colorRangeAbortRef.current = null;
     colorRangeActiveRunIdRef.current = null;
     setColorRangeSamples([]);
   }, [cancelLiquifyPointerSession, cancelPixelSelectionPointerSession, selectedImageElementId]);
@@ -15541,6 +15533,8 @@ const puppetWarpArmed =
     }
     if (colorRangeActiveRunIdRef.current !== null) {
       colorRangeRunIdRef.current += 1;
+      colorRangeAbortRef.current?.abort();
+      colorRangeAbortRef.current = null;
       colorRangeActiveRunIdRef.current = null;
       setPixelBusy(false);
     }
@@ -18625,19 +18619,15 @@ const puppetWarpArmed =
         } else if (drawingShortcut.type === "toggle-canvas-flip-h") {
           toggleHorizontalCanvasView();
         } else if (drawingShortcut.type === "toggle-size-lock") {
-          setProDrawPrefs((prev) => {
-            const next = { ...prev, sizeLocked: !prev.sizeLocked };
-            saveStudioProDrawPrefs(studioProDrawStorage(), next);
-            announceDrawingShortcut(next.sizeLocked ? "크기 잠금" : "크기 잠금 해제");
-            return next;
-          });
+          const { prefs: next } = commitProDrawPrefsMutation(
+            (latest) => ({ ...latest, sizeLocked: !latest.sizeLocked })
+          );
+          announceDrawingShortcut(next.sizeLocked ? "크기 잠금" : "크기 잠금 해제");
         } else if (drawingShortcut.type === "toggle-opacity-lock") {
-          setProDrawPrefs((prev) => {
-            const next = { ...prev, opacityLocked: !prev.opacityLocked };
-            saveStudioProDrawPrefs(studioProDrawStorage(), next);
-            announceDrawingShortcut(next.opacityLocked ? "불투명 잠금" : "불투명 잠금 해제");
-            return next;
-          });
+          const { prefs: next } = commitProDrawPrefsMutation(
+            (latest) => ({ ...latest, opacityLocked: !latest.opacityLocked })
+          );
+          announceDrawingShortcut(next.opacityLocked ? "불투명 잠금" : "불투명 잠금 해제");
         } else if (drawingShortcut.type === "adjust-width") {
           const currentDrawing = drawingShortcutStateRef.current;
           const nextWidth = adjustStudioBrushWidth(currentDrawing.strokeWidth, drawingShortcut.delta);
@@ -21219,30 +21209,51 @@ const puppetWarpArmed =
     if (pixelBusy || selected?.type !== "image" || colorRangeSamples.length === 0) return;
     const target = selected;
     const mutationTicket = captureStudioMutationTicket();
+    const selectionSnapshot = pixelSelRef.current;
+    const combineMode = pixelCombine;
+    const aspect = target.width > 0 ? target.height / target.width : 1;
+    colorRangeAbortRef.current?.abort();
+    const controller = new AbortController();
+    colorRangeAbortRef.current = controller;
     const runId = ++colorRangeRunIdRef.current;
     colorRangeActiveRunIdRef.current = runId;
     setPixelBusy(true);
     try {
-      const { colorRangeScanFromImage } = await import("./studio-color-range-browser");
-      const mask = await colorRangeScanFromImage(
+      const { colorRangeSelectionFromImage } = await import("./studio-color-range-browser");
+      const result = await colorRangeSelectionFromImage(
         target.src,
         colorRangeSamples,
         opts?.fuzziness ?? colorRangeFuzziness,
-        { flipX: target.flipped, flipY: target.flippedY }
+        {
+          flipX: target.flipped,
+          flipY: target.flippedY,
+          selection: selectionSnapshot,
+          combineMode,
+          aspect,
+          signal: controller.signal,
+        },
       );
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (runId !== colorRangeRunIdRef.current) return; // 그사이 요소가 바뀌었거나 새 스캔이 시작됨.
-      const aspect = target.width > 0 ? target.height / target.width : 1;
+      // The Worker applied combine/intersect against this exact snapshot. Never overwrite a
+      // selection edited through another input path while the asynchronous request was running.
+      if (pixelSelRef.current !== selectionSnapshot) return;
       commitPixelSelectionState(
-        (previous) => applyColorRangeMaskToSelection(previous, mask, pixelCombine, { aspect }),
+        result.selection,
         "magic-wand",
         opts?.coalesceKey
       );
     } catch (err) {
-      if (runId === colorRangeRunIdRef.current) {
+      if (
+        runId === colorRangeRunIdRef.current
+        && (err as { name?: string } | null)?.name !== "AbortError"
+      ) {
         setError(err instanceof Error ? err.message : "색상 범위 선택에 실패했어요.");
       }
     } finally {
+      if (colorRangeAbortRef.current === controller) {
+        colorRangeAbortRef.current = null;
+      }
       if (colorRangeActiveRunIdRef.current === runId) {
         colorRangeActiveRunIdRef.current = null;
       }
@@ -30320,12 +30331,10 @@ function clearSelectionForEdit() {
     toggleCanvasFlip: toggleHorizontalCanvasView,
     toggleFavoriteBrush: studioBrushCatalogHandlers.toggleFavorite,
     toggleOpacityLock: () => {
-      setProDrawPrefs((prev) => {
-        const next = { ...prev, opacityLocked: !prev.opacityLocked };
-        saveStudioProDrawPrefs(studioProDrawStorage(), next);
-        announceDrawingShortcut(next.opacityLocked ? "불투명 잠금" : "불투명 잠금 해제");
-        return next;
-      });
+      const { prefs: next } = commitProDrawPrefsMutation(
+        (latest) => ({ ...latest, opacityLocked: !latest.opacityLocked })
+      );
+      announceDrawingShortcut(next.opacityLocked ? "불투명 잠금" : "불투명 잠금 해제");
     },
     toggleQuickShape: () => {
       const next = !quickShapeActive;
@@ -30343,12 +30352,10 @@ function clearSelectionForEdit() {
       patchEl(selected.id, { locked: !selected.locked });
     },
     toggleSizeLock: () => {
-      setProDrawPrefs((prev) => {
-        const next = { ...prev, sizeLocked: !prev.sizeLocked };
-        saveStudioProDrawPrefs(studioProDrawStorage(), next);
-        announceDrawingShortcut(next.sizeLocked ? "크기 잠금" : "크기 잠금 해제");
-        return next;
-      });
+      const { prefs: next } = commitProDrawPrefsMutation(
+        (latest) => ({ ...latest, sizeLocked: !latest.sizeLocked })
+      );
+      announceDrawingShortcut(next.sizeLocked ? "크기 잠금" : "크기 잠금 해제");
     },
     toggleEraseToIntersection: () => {
       const next = !eraseToIntersection;

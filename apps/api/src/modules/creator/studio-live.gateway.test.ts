@@ -2,6 +2,11 @@ import { fromUint8Array } from "js-base64";
 import { describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 
+import {
+  STUDIO_CRDT_BINARY_SYNC_FRAGMENT_MAX_BYTES,
+  decodeStudioCrdtBinaryEnvelope,
+  encodeStudioCrdtBinaryEnvelope,
+} from "../../../../../lib/studio-crdt-binary-envelope";
 import { studioLiveLockResourcesConflict } from "../../../../../lib/studio-live-lock-resource";
 
 import {
@@ -37,6 +42,14 @@ import {
   isStudioLiveOriginAllowed,
   studioLiveAllowRequest,
 } from "./studio-live.gateway";
+import {
+  STUDIO_CRDT_BINARY_WIRE_FORMAT,
+  STUDIO_CRDT_BINARY_WIRE_VERSION,
+  STUDIO_CRDT_SUPPORTED_WIRE_FORMATS,
+  STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT,
+  StudioLiveCrdtBinaryRemoteUpdateSchema,
+  StudioLiveCrdtBinarySyncResultSchema,
+} from "./studio-live.protocol";
 
 import type { CreatorService } from "./creator.service";
 import type { StudioCrdtService } from "./studio-crdt.service";
@@ -399,6 +412,21 @@ function createHarness(
       serverStateVector: "AA==",
       serverSequence: "1",
     })),
+    syncBytes: vi.fn(async () => ({
+      update: Uint8Array.of(0),
+      totalBytes: 1,
+      serverStateVector: Uint8Array.of(0),
+      serverSequence: "0",
+    })),
+    applyUpdateBytes: vi.fn(
+      async (input: { updateId: string; data: Uint8Array }) => ({
+        duplicate: false,
+        updateId: input.updateId,
+        update: input.data,
+        serverStateVector: Uint8Array.of(0),
+        serverSequence: "1",
+      })
+    ),
   };
   const authenticate = vi.fn(authenticateSession);
   const revalidate = vi.fn(revalidateSession);
@@ -601,6 +629,67 @@ function crdtUpdateRequest(sequence = 1) {
     clientSequence: sequence,
     update: crdtUpdate(`stroke-${sequence}`, String(sequence)),
   };
+}
+
+function crdtBinaryStateVector(): Uint8Array {
+  const doc = new Y.Doc();
+  const stateVector = encodeStudioCrdtBinaryEnvelope(
+    "state-vector",
+    Y.encodeStateVector(doc)
+  );
+  doc.destroy();
+  return stateVector;
+}
+
+function crdtBinaryUpdate(key = "stroke", value = "1"): Uint8Array {
+  const doc = new Y.Doc();
+  doc.getMap<string>("canvas").set(key, value);
+  const update = encodeStudioCrdtBinaryEnvelope(
+    "update",
+    Y.encodeStateAsUpdate(doc)
+  );
+  doc.destroy();
+  return update;
+}
+
+function crdtBinaryUpdateRequest(sequence = 1, workId = "work-1") {
+  return {
+    protocolVersion: 4 as const,
+    wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
+    workId,
+    updateId: `00000000-0000-4000-8000-${sequence.toString().padStart(12, "0")}`,
+    clientSequence: sequence,
+    update: crdtBinaryUpdate(`binary-stroke-${sequence}`, String(sequence)),
+  };
+}
+
+function crdtWireSelectionEpoch(
+  joined: Awaited<ReturnType<typeof connectAndJoin>>
+): string {
+  if (!joined.ok || !joined.data.crdtWireSelectionEpoch) {
+    throw new Error("join did not advertise a CRDT wire selection epoch");
+  }
+  return joined.data.crdtWireSelectionEpoch;
+}
+
+async function selectBinaryCrdtWire(
+  harness: ReturnType<typeof createHarness>,
+  socket: FakeSocket,
+  selectionEpoch: string,
+  workId = "work-1",
+  ack?: (response: unknown) => void
+) {
+  return harness.gateway.selectCrdtBinaryWire(
+    socket as never,
+    {
+      protocolVersion: 4,
+      wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
+      workId,
+      format: STUDIO_CRDT_BINARY_WIRE_FORMAT,
+      selectionEpoch,
+    },
+    ack as never
+  );
 }
 
 function createTeamReadGate() {
@@ -5977,6 +6066,367 @@ describe("StudioLiveGateway", () => {
     expect(
       harness.emissions.some((emission) => emission.event === "studio:signal")
     ).toBe(false);
+  });
+
+  it("advertises a fresh binary CRDT capability epoch and clears it across rejoin and disconnect", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("binary-lifecycle-editor");
+    const firstJoin = await connectAndJoin(harness, socket);
+    if (!firstJoin.ok) throw new Error("initial join failed");
+    const firstEpoch = crdtWireSelectionEpoch(firstJoin);
+
+    expect(firstJoin.data.crdtWireFormats).toEqual(STUDIO_CRDT_SUPPORTED_WIRE_FORMATS);
+    await expect(
+      selectBinaryCrdtWire(harness, socket, firstEpoch)
+    ).resolves.toMatchObject({
+      ok: true,
+      data: {
+        format: STUDIO_CRDT_BINARY_WIRE_FORMAT,
+        selectionEpoch: firstEpoch,
+        selected: true,
+      },
+    });
+    expect(socket.joined).toContain("studio-live-crdt-binary-v1:work-1");
+
+    const secondJoin = await connectAndJoin(harness, socket);
+    const secondEpoch = crdtWireSelectionEpoch(secondJoin);
+    expect(secondEpoch).not.toBe(firstEpoch);
+    expect(socket.left).toContain("studio-live-crdt-binary-v1:work-1");
+    await expect(
+      selectBinaryCrdtWire(harness, socket, firstEpoch)
+    ).resolves.toMatchObject({ ok: false, code: "not_joined" });
+    await expect(
+      selectBinaryCrdtWire(harness, socket, secondEpoch)
+    ).resolves.toMatchObject({ ok: true });
+
+    const switchedJoin = await connectAndJoin(harness, socket, "work-2");
+    const switchedEpoch = crdtWireSelectionEpoch(switchedJoin);
+    expect(switchedEpoch).not.toBe(secondEpoch);
+    await expect(
+      selectBinaryCrdtWire(harness, socket, secondEpoch)
+    ).resolves.toMatchObject({ ok: false, code: "not_joined" });
+    await expect(
+      selectBinaryCrdtWire(
+        harness,
+        socket,
+        switchedEpoch,
+        "work-2"
+      )
+    ).resolves.toMatchObject({ ok: true });
+    expect(socket.joined).toContain("studio-live-crdt-binary-v1:work-2");
+
+    harness.gateway.handleDisconnect(socket as never);
+    await vi.waitFor(() => {
+      expect(socket.left).toContain("studio-live-crdt-binary-v1:work-1");
+      expect(socket.left).toContain("studio-live-crdt-binary-v1:work-2");
+      const internals = harness.gateway as unknown as {
+        crdtBinarySelectionBySocket: Map<string, unknown>;
+      };
+      expect(internals.crdtBinarySelectionBySocket.has(socket.id)).toBe(false);
+    });
+  });
+
+  it("ACKs binary CRDT selection only after the capability room join settles", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("binary-selection-editor");
+    const joined = await connectAndJoin(harness, socket);
+    const selectionEpoch = crdtWireSelectionEpoch(joined);
+    const originalJoin = socket.join.bind(socket);
+    let releaseBinaryJoin: (() => void) | undefined;
+    socket.join = vi.fn((room: string) => {
+      if (room !== "studio-live-crdt-binary-v1:work-1") return originalJoin(room);
+      return new Promise<void>((resolve) => {
+        releaseBinaryJoin = () => {
+          socket.joined.add(room);
+          resolve();
+        };
+      });
+    });
+    const acknowledgement = vi.fn();
+
+    const pending = selectBinaryCrdtWire(
+      harness,
+      socket,
+      selectionEpoch,
+      "work-1",
+      acknowledgement
+    );
+    await vi.waitFor(() => expect(releaseBinaryJoin).toBeTypeOf("function"));
+    expect(acknowledgement).not.toHaveBeenCalled();
+    expect(socket.joined).not.toContain("studio-live-crdt-binary-v1:work-1");
+
+    releaseBinaryJoin?.();
+    await expect(pending).resolves.toMatchObject({ ok: true });
+    expect(acknowledgement).toHaveBeenCalledOnce();
+    expect(socket.joined).toContain("studio-live-crdt-binary-v1:work-1");
+  });
+
+  it("waits for a racing binary room join to leave before completing a work switch", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("binary-selection-switch");
+    const joined = await connectAndJoin(harness, socket);
+    const originalJoin = socket.join.bind(socket);
+    let releaseBinaryJoin: (() => void) | undefined;
+    socket.join = vi.fn((room: string) => {
+      if (room !== "studio-live-crdt-binary-v1:work-1") return originalJoin(room);
+      return new Promise<void>((resolve) => {
+        releaseBinaryJoin = () => {
+          socket.joined.add(room);
+          resolve();
+        };
+      });
+    });
+    const selectionAck = vi.fn();
+    const pendingSelection = selectBinaryCrdtWire(
+      harness,
+      socket,
+      crdtWireSelectionEpoch(joined),
+      "work-1",
+      selectionAck
+    );
+    await vi.waitFor(() => expect(releaseBinaryJoin).toBeTypeOf("function"));
+
+    let switchSettled = false;
+    const pendingSwitch = connectAndJoin(harness, socket, "work-2").finally(() => {
+      switchSettled = true;
+    });
+    await vi.waitFor(() => {
+      const internals = harness.gateway as unknown as {
+        crdtBinarySelectionBySocket: Map<string, unknown>;
+      };
+      expect(internals.crdtBinarySelectionBySocket.has(socket.id)).toBe(false);
+    });
+    expect(switchSettled).toBe(false);
+    expect(selectionAck).not.toHaveBeenCalled();
+
+    releaseBinaryJoin?.();
+    await expect(pendingSelection).resolves.toMatchObject({
+      ok: false,
+      code: "not_joined",
+    });
+    const switched = await pendingSwitch;
+    expect(switched).toMatchObject({ ok: true });
+    expect(socket.left).toContain("studio-live-crdt-binary-v1:work-1");
+    expect(socket.joined).not.toContain("studio-live-crdt-binary-v1:work-1");
+  });
+
+  it("serves selected viewers a raw fragmented binary CRDT sync and rejects unselected peers", async () => {
+    const harness = createHarness(async (userId, workId) =>
+      teamSnapshot(userId, workId, { role: "viewer", edit: false })
+    );
+    const viewer = harness.socket("binary-sync-viewer");
+    const joined = await connectAndJoin(harness, viewer);
+    await selectBinaryCrdtWire(harness, viewer, crdtWireSelectionEpoch(joined));
+    const largeDiff = new Uint8Array(
+      STUDIO_CRDT_BINARY_SYNC_FRAGMENT_MAX_BYTES * 2 + 123
+    );
+    largeDiff.fill(7);
+    harness.crdtService.syncBytes.mockResolvedValueOnce({
+      update: largeDiff,
+      totalBytes: largeDiff.byteLength,
+      serverStateVector: Uint8Array.of(0),
+      serverSequence: "42",
+    });
+    const stateVector = crdtBinaryStateVector();
+
+    const response = await harness.gateway.syncCrdtDocumentBinary(
+      viewer as never,
+      {
+        protocolVersion: 4,
+        wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
+        workId: "work-1",
+        requestId: "binary-sync-request",
+        stateVector,
+      },
+      undefined
+    );
+    if (!response.ok) throw new Error(`binary sync failed: ${response.code}`);
+    const decoded = StudioLiveCrdtBinarySyncResultSchema.parse(response.data);
+    expect(decoded.diff).toEqual(largeDiff);
+    expect(decoded.serverStateVector).toEqual(Uint8Array.of(0));
+    expect(decoded.fragmentCount).toBe(3);
+    expect(
+      decoded.fragments.every(
+        (fragment) => fragment.byteLength <= STUDIO_CRDT_BINARY_SYNC_FRAGMENT_MAX_BYTES
+      )
+    ).toBe(true);
+    expect(harness.crdtService.syncBytes).toHaveBeenCalledWith(
+      "work-1",
+      decodeStudioCrdtBinaryEnvelope(stateVector, "state-vector").bytes
+    );
+
+    const unselected = harness.socket("binary-sync-unselected");
+    await connectAndJoin(harness, unselected);
+    await expect(
+      harness.gateway.syncCrdtDocumentBinary(
+        unselected as never,
+        {
+          protocolVersion: 4,
+          wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
+          workId: "work-1",
+          requestId: "binary-sync-unselected",
+          stateVector: crdtBinaryStateVector(),
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "not_joined" });
+    expect(harness.crdtService.syncBytes).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists and ACKs a binary CRDT update before non-duplicate rolling fan-out", async () => {
+    const harness = createHarness();
+    const editor = harness.socket("binary-update-editor");
+    const joined = await connectAndJoin(harness, editor);
+    await selectBinaryCrdtWire(harness, editor, crdtWireSelectionEpoch(joined));
+    const request = crdtBinaryUpdateRequest(2_001);
+    const rawUpdate = decodeStudioCrdtBinaryEnvelope(request.update, "update").bytes;
+    harness.crdtService.applyUpdateBytes.mockResolvedValueOnce({
+      duplicate: false,
+      updateId: request.updateId,
+      update: rawUpdate,
+      serverStateVector: Uint8Array.of(0),
+      serverSequence: "87",
+    });
+    const order: string[] = [];
+    const originalTo = editor.to;
+    editor.to = (room) => {
+      const target = originalTo(room);
+      return {
+        emit(event, payload) {
+          if (
+            event === "studio:crdt:update" ||
+            event === STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT
+          ) {
+            order.push(event);
+          }
+          target.emit(event, payload);
+        },
+      };
+    };
+
+    const response = await harness.gateway.applyCrdtUpdateBinary(
+      editor as never,
+      request,
+      () => order.push("ack")
+    );
+
+    expect(order).toEqual([
+      "ack",
+      "studio:crdt:update",
+      STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT,
+    ]);
+    expect(harness.crdtService.applyUpdateBytes).toHaveBeenCalledWith({
+      workId: "work-1",
+      updateId: request.updateId,
+      actorUserId: "binary-update-editor",
+      data: rawUpdate,
+    });
+    expect(response).toEqual({
+      ok: true,
+      data: {
+        protocolVersion: 4,
+        wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
+        workId: "work-1",
+        updateId: request.updateId,
+        serverSequence: "87",
+        duplicate: false,
+      },
+    });
+    expect(response).not.toHaveProperty("data.serverStateVector");
+    expect(harness.emissions).toContainEqual({
+      target: "from:binary-update-editor:studio-live:work-1",
+      event: "studio:crdt:update",
+      payload: {
+        protocolVersion: 4,
+        workId: "work-1",
+        updateId: request.updateId,
+        serverSequence: "87",
+        update: fromUint8Array(rawUpdate),
+      },
+    });
+    const binaryRemote = harness.emissions.find(
+      (emission) => emission.event === STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT
+    );
+    expect(binaryRemote?.target).toBe(
+      "from:binary-update-editor:studio-live-crdt-binary-v1:work-1"
+    );
+    const decodedRemote = StudioLiveCrdtBinaryRemoteUpdateSchema.parse(
+      binaryRemote?.payload
+    );
+    expect(decodedRemote.update).toEqual(rawUpdate);
+    expect(
+      harness.emissions.some(
+        (emission) =>
+          (emission.event === "studio:crdt:update" ||
+            emission.event === STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT) &&
+          emission.target === editor.id
+      )
+    ).toBe(false);
+
+    harness.emissions.splice(0);
+    const duplicate = crdtBinaryUpdateRequest(2_002);
+    harness.crdtService.applyUpdateBytes.mockResolvedValueOnce({
+      duplicate: true,
+      updateId: duplicate.updateId,
+      update: decodeStudioCrdtBinaryEnvelope(duplicate.update, "update").bytes,
+      serverStateVector: Uint8Array.of(0),
+      serverSequence: "87",
+    });
+    await expect(
+      harness.gateway.applyCrdtUpdateBinary(editor as never, duplicate, undefined)
+    ).resolves.toMatchObject({ ok: true, data: { duplicate: true } });
+    expect(
+      harness.emissions.some(
+        (emission) =>
+          emission.event === "studio:crdt:update" ||
+          emission.event === STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT
+      )
+    ).toBe(false);
+  });
+
+  it("denies binary writes to viewers and clears binary membership on ACL revocation", async () => {
+    let canView = true;
+    const harness = createHarness(async (userId, workId) =>
+      teamSnapshot(userId, workId, {
+        role: "viewer",
+        edit: false,
+        view: canView,
+      })
+    );
+    const viewer = harness.socket("binary-revoked-viewer");
+    const joined = await connectAndJoin(harness, viewer);
+    await selectBinaryCrdtWire(harness, viewer, crdtWireSelectionEpoch(joined));
+    await expect(
+      harness.gateway.applyCrdtUpdateBinary(
+        viewer as never,
+        crdtBinaryUpdateRequest(2_003),
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "forbidden" });
+    expect(harness.crdtService.applyUpdateBytes).not.toHaveBeenCalled();
+
+    canView = false;
+    await expect(
+      harness.gateway.syncCrdtDocumentBinary(
+        viewer as never,
+        {
+          protocolVersion: 4,
+          wireVersion: STUDIO_CRDT_BINARY_WIRE_VERSION,
+          workId: "work-1",
+          requestId: "binary-revoked-sync",
+          stateVector: crdtBinaryStateVector(),
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "not_joined" });
+    await vi.waitFor(() => {
+      expect(viewer.disconnected).toBe(true);
+      expect(viewer.left).toContain("studio-live-crdt-binary-v1:work-1");
+      const internals = harness.gateway as unknown as {
+        crdtBinarySelectionBySocket: Map<string, unknown>;
+      };
+      expect(internals.crdtBinarySelectionBySocket.has(viewer.id)).toBe(false);
+    });
   });
 
   it("allows a joined viewer to fetch an exact, chunked CRDT sync response", async () => {

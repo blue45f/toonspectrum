@@ -10,6 +10,8 @@ const DEFAULT_PAYLOAD_THRESHOLD_BYTES = 8_000;
 const DEFAULT_CLEANUP_INTERVAL_MS = 30_000;
 const DEFAULT_QUERY_TIMEOUT_MS = 5_000;
 const DEFAULT_RECONNECT_DELAY_MS = 1_000;
+const CANONICAL_BASE64_PATTERN =
+  /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
 
 type ErrorHandler = (error: unknown, source: string) => void;
 
@@ -18,6 +20,7 @@ interface ClusterEnvelope {
   readonly type: number;
   readonly uid?: string;
   readonly attachmentId?: string | number;
+  readonly inlinePayload?: string;
   readonly [key: string]: unknown;
 }
 
@@ -50,6 +53,11 @@ export interface StudioLivePostgresClusterTransportOptions {
   readonly channelPrefix: string;
   readonly tableName: string;
   readonly errorHandler: ErrorHandler;
+  /**
+   * Opt in only after every API node understands inlinePayload headers. Attachment-backed binary
+   * remains the rolling-deploy-safe default while a cluster can temporarily mix server versions.
+   */
+  readonly inlineBinaryPayloads?: boolean;
   readonly payloadThreshold?: number;
   readonly cleanupIntervalMs?: number;
   readonly queryTimeoutMs?: number;
@@ -97,8 +105,65 @@ function isClusterEnvelope(value: unknown): value is ClusterEnvelope {
     value != null &&
     typeof value === "object" &&
     typeof Reflect.get(value, "nsp") === "string" &&
-    typeof Reflect.get(value, "type") === "number"
+    typeof Reflect.get(value, "type") === "number" &&
+    (Reflect.get(value, "uid") === undefined ||
+      typeof Reflect.get(value, "uid") === "string")
   );
+}
+
+function hasOwn(value: object, key: PropertyKey): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function inlineNotificationHeader(
+  message: Pick<ClusterEnvelope, "nsp" | "type" | "uid">,
+  inlinePayload: string
+): string {
+  return JSON.stringify({
+    nsp: message.nsp,
+    uid: message.uid,
+    type: message.type,
+    inlinePayload,
+  });
+}
+
+function attachmentNotificationHeader(
+  message: Pick<ClusterEnvelope, "nsp" | "type" | "uid">,
+  attachmentId: string | number
+): string {
+  return JSON.stringify({
+    nsp: message.nsp,
+    uid: message.uid,
+    type: message.type,
+    attachmentId,
+  });
+}
+
+function decodeCanonicalBase64(value: string): Uint8Array {
+  if (!CANONICAL_BASE64_PATTERN.test(value)) {
+    throw new Error("Socket.IO inline notification payload was not canonical base64");
+  }
+  const decoded = Buffer.from(value, "base64");
+  if (decoded.toString("base64") !== value) {
+    throw new Error("Socket.IO inline notification payload was not canonical base64");
+  }
+  return decoded;
+}
+
+function assertMatchingEnvelopeMetadata(
+  header: ClusterEnvelope,
+  decoded: ClusterEnvelope,
+  source: "attachment" | "inline"
+): void {
+  if (
+    decoded.nsp !== header.nsp ||
+    decoded.type !== header.type ||
+    decoded.uid !== header.uid
+  ) {
+    throw new Error(
+      `Socket.IO ${source} notification metadata did not match its decoded cluster envelope`
+    );
+  }
 }
 
 function withTimeout<T>(operation: Promise<T>, timeoutMs: number, message: string): Promise<T> {
@@ -145,6 +210,7 @@ export class LifecycleSafePostgresPubSub {
         StudioLivePostgresClusterTransportOptions,
         | "channelPrefix"
         | "tableName"
+        | "inlineBinaryPayloads"
         | "payloadThreshold"
         | "cleanupIntervalMs"
         | "queryTimeoutMs"
@@ -369,23 +435,44 @@ export class LifecycleSafePostgresPubSub {
   }
 
   private async publishEnvelope(message: ClusterEnvelope): Promise<void> {
+    if (hasBinary(message)) {
+      const encoded = encode(message);
+      if (this.options.inlineBinaryPayloads) {
+        const inlinePayload = Buffer.from(encoded).toString("base64");
+        const inlineHeader = inlineNotificationHeader(message, inlinePayload);
+        if (
+          Buffer.byteLength(inlineHeader, "utf8") < this.options.payloadThreshold
+        ) {
+          await this.notify(message.nsp, inlineHeader);
+          return;
+        }
+      }
+      await this.publishAttachment(message, encoded);
+      return;
+    }
+
     const json = JSON.stringify(message);
-    if (hasBinary(message) || Buffer.byteLength(json, "utf8") >= this.options.payloadThreshold) {
-      const stored = await this.queryPool<{ id: string }>(
-        `INSERT INTO ${quoteIdentifier(this.options.tableName)} ("payload") VALUES ($1) RETURNING "id"`,
-        [encode(message)]
-      );
-      const attachmentId = stored.rows[0]?.id;
-      if (!attachmentId) throw new Error("Socket.IO attachment INSERT did not return an id");
-      await this.notify(message.nsp, JSON.stringify({
-        nsp: message.nsp,
-        uid: message.uid,
-        type: message.type,
-        attachmentId,
-      }));
+    if (Buffer.byteLength(json, "utf8") >= this.options.payloadThreshold) {
+      await this.publishAttachment(message, encode(message));
       return;
     }
     await this.notify(message.nsp, json);
+  }
+
+  private async publishAttachment(
+    message: ClusterEnvelope,
+    encoded: Uint8Array
+  ): Promise<void> {
+    const stored = await this.queryPool<{ id: string }>(
+      `INSERT INTO ${quoteIdentifier(this.options.tableName)} ("payload") VALUES ($1) RETURNING "id"`,
+      [encoded]
+    );
+    const attachmentId = stored.rows[0]?.id;
+    if (!attachmentId) throw new Error("Socket.IO attachment INSERT did not return an id");
+    await this.notify(
+      message.nsp,
+      attachmentNotificationHeader(message, attachmentId)
+    );
   }
 
   private async notify(namespace: string, payload: string): Promise<void> {
@@ -401,9 +488,50 @@ export class LifecycleSafePostgresPubSub {
   }): Promise<void> {
     if (!notification.payload || !this.channels.has(notification.channel)) return;
     const header: unknown = JSON.parse(notification.payload);
-    if (!isClusterEnvelope(header) || this.isFromSelf(header)) return;
-    let message = header;
-    if (header.attachmentId != null) {
+    if (!isClusterEnvelope(header)) return;
+
+    const hasInlinePayload = hasOwn(header, "inlinePayload");
+    const hasAttachmentId = hasOwn(header, "attachmentId");
+    if (hasInlinePayload && hasAttachmentId) {
+      throw new Error(
+        "Socket.IO notification cannot contain both inlinePayload and attachmentId"
+      );
+    }
+
+    let message: ClusterEnvelope = header;
+    if (hasInlinePayload) {
+      if (typeof header.inlinePayload !== "string") {
+        throw new Error("Socket.IO inline notification payload must be a string");
+      }
+      if (
+        Buffer.byteLength(notification.payload, "utf8") >=
+        this.options.payloadThreshold
+      ) {
+        throw new Error("Socket.IO inline notification exceeded the payload threshold");
+      }
+      const canonicalHeader = inlineNotificationHeader(header, header.inlinePayload);
+      if (notification.payload !== canonicalHeader) {
+        throw new Error("Socket.IO inline notification header was not canonical");
+      }
+      const decoded: unknown = decode(decodeCanonicalBase64(header.inlinePayload));
+      if (!isClusterEnvelope(decoded)) {
+        throw new Error("Socket.IO inline notification decoded to an invalid cluster envelope");
+      }
+      assertMatchingEnvelopeMetadata(header, decoded, "inline");
+      message = decoded;
+    } else if (hasAttachmentId) {
+      if (
+        (typeof header.attachmentId !== "string" &&
+          typeof header.attachmentId !== "number") ||
+        header.attachmentId === ""
+      ) {
+        throw new Error("Socket.IO attachment notification had an invalid attachment id");
+      }
+      const canonicalHeader = attachmentNotificationHeader(header, header.attachmentId);
+      if (notification.payload !== canonicalHeader) {
+        throw new Error("Socket.IO attachment notification header was not canonical");
+      }
+      if (this.isFromSelf(header)) return;
       const result = await this.queryPool<{ payload: Uint8Array }>(
         `SELECT "payload" FROM ${quoteIdentifier(this.options.tableName)} WHERE "id" = $1`,
         [header.attachmentId]
@@ -416,9 +544,10 @@ export class LifecycleSafePostgresPubSub {
       if (!isClusterEnvelope(decoded)) {
         throw new Error("Socket.IO attachment decoded to an invalid cluster envelope");
       }
+      assertMatchingEnvelopeMetadata(header, decoded, "attachment");
       message = decoded;
-      if (this.isFromSelf(message)) return;
     }
+    if (this.isFromSelf(message)) return;
     this.onMessage(message);
   }
 
@@ -485,6 +614,7 @@ export async function createLifecycleSafeStudioLivePostgresTransport(
     {
       channelPrefix: options.channelPrefix,
       tableName: options.tableName,
+      inlineBinaryPayloads: options.inlineBinaryPayloads ?? false,
       payloadThreshold: options.payloadThreshold ?? DEFAULT_PAYLOAD_THRESHOLD_BYTES,
       cleanupIntervalMs: options.cleanupIntervalMs ?? DEFAULT_CLEANUP_INTERVAL_MS,
       queryTimeoutMs: options.queryTimeoutMs ?? DEFAULT_QUERY_TIMEOUT_MS,

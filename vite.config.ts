@@ -2,7 +2,12 @@ import { fileURLToPath, URL } from "node:url";
 
 import babel from "@rolldown/plugin-babel";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
+
+import {
+  STUDIO_CROSS_ORIGIN_ISOLATION_HEADERS,
+  isStudioCrossOriginIsolationDocumentRequest,
+} from "./src/app/studio-cross-origin-isolation";
 
 const apiTarget = process.env.NEST_API_URL ?? "http://127.0.0.1:4001";
 const ENTRY_PRELOAD_EXCLUSIONS = [
@@ -143,8 +148,56 @@ function isStudioCoreIconModule(id: string) {
   return Boolean(moduleName && STUDIO_CORE_ICON_MODULES.has(moduleName));
 }
 
+function studioCrossOriginIsolationPlugin(): Plugin {
+  const applyHeaders = (
+    request: {
+      readonly url?: string;
+      readonly method?: string;
+      readonly headers: {
+        readonly accept?: string;
+        readonly "sec-fetch-dest"?: string;
+      };
+    },
+    response: { setHeader(name: string, value: string): void },
+  ) => {
+    if (
+      !isStudioCrossOriginIsolationDocumentRequest({
+        url: request.url,
+        method: request.method,
+        accept: request.headers.accept,
+        secFetchDest: request.headers["sec-fetch-dest"],
+      })
+    ) {
+      return;
+    }
+    for (const [name, value] of Object.entries(STUDIO_CROSS_ORIGIN_ISOLATION_HEADERS)) {
+      response.setHeader(name, value);
+    }
+  };
+
+  return {
+    name: "toonspectrum-studio-cross-origin-isolation",
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        applyHeaders(request, response);
+        next();
+      });
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use((request, response, next) => {
+        applyHeaders(request, response);
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), babel({ presets: [reactCompilerPreset()] })],
+  plugins: [
+    studioCrossOriginIsolationPlugin(),
+    react(),
+    babel({ presets: [reactCompilerPreset()] }),
+  ],
   // 정적 카탈로그 모드에선 lib/server/* (예: live.ts) 가 브라우저 번들로 끌려오며
   // 모듈 로드 시점에 process.env.* 를 읽어 "process is not defined" 백스크린을 유발한다.
   // 브라우저엔 서버 env 가 없으므로 빈 객체로 치환해 서버 기본값으로 폴백시키고,

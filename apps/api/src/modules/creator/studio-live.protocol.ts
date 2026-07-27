@@ -5,6 +5,15 @@ import {
   type VerifiedSessionToken,
 } from "../../../../../lib/server/session";
 import { isSessionAllowed } from "../../../../../lib/server/user-lifecycle";
+import {
+  STUDIO_CRDT_BINARY_HEADER_BYTES,
+  STUDIO_CRDT_BINARY_SYNC_MAX_BYTES,
+  STUDIO_CRDT_BINARY_SYNC_MAX_FRAGMENTS,
+  copyStudioCrdtBinaryBytes,
+  decodeStudioCrdtBinaryEnvelope,
+  reassembleStudioCrdtBinarySyncEnvelope,
+  type StudioCrdtBinaryEnvelopeKind,
+} from "../../../../../lib/studio-crdt-binary-envelope";
 
 import { STUDIO_CRDT_UPDATE_MAX_BYTES } from "./studio-crdt.repository";
 import { STUDIO_CRDT_STATE_VECTOR_MAX_BYTES } from "./studio-crdt.service";
@@ -68,9 +77,23 @@ export const STUDIO_LIVE_LOCK_REVISION_VERSION = 1 as const;
 // Rejecting v1-v3 prevents stale tabs from sharing a Yjs room whose page schema they cannot
 // interpret safely.
 export const STUDIO_CRDT_PROTOCOL_VERSION = 4 as const;
+export const STUDIO_CRDT_BINARY_WIRE_VERSION = 1 as const;
+export const STUDIO_CRDT_BINARY_WIRE_FORMAT = "binary-v1" as const;
+export const STUDIO_CRDT_LEGACY_WIRE_FORMAT = "base64-v4" as const;
+export const STUDIO_CRDT_SUPPORTED_WIRE_FORMATS = [
+  STUDIO_CRDT_BINARY_WIRE_FORMAT,
+  STUDIO_CRDT_LEGACY_WIRE_FORMAT,
+] as const;
+export const STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT = "studio:crdt:wire:select" as const;
+export const STUDIO_LIVE_CRDT_BINARY_SYNC_EVENT = "studio:crdt:sync:binary:v1" as const;
+export const STUDIO_LIVE_CRDT_BINARY_UPDATE_EVENT = "studio:crdt:update:binary:v1" as const;
+export const STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT = "studio:crdt:remote:binary:v1" as const;
 const StudioCrdtProtocolVersionSchema = z.literal(STUDIO_CRDT_PROTOCOL_VERSION);
+const StudioCrdtBinaryWireVersionSchema = z.literal(STUDIO_CRDT_BINARY_WIRE_VERSION);
+const StudioCrdtBinaryWireFormatSchema = z.literal(STUDIO_CRDT_BINARY_WIRE_FORMAT);
 const StudioCrdtRequestIdSchema = boundedIdentifier(160);
 const StudioCrdtUpdateIdSchema = z.uuid();
+export const StudioLiveCrdtWireSelectionEpochSchema = z.uuid();
 const STUDIO_CRDT_BASE64_PATTERN =
   /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
 
@@ -84,6 +107,22 @@ const encodedBase64 = (maximumDecodedBytes: number) =>
       (value) => Buffer.from(value, "base64").toString("base64") === value,
       "base64 must use its canonical encoding"
     );
+
+const decodedBinaryEnvelope = (kind: StudioCrdtBinaryEnvelopeKind) =>
+  z.unknown().transform((value, context): Uint8Array => {
+    try {
+      return decodeStudioCrdtBinaryEnvelope(value, kind).bytes;
+    } catch (error) {
+      context.addIssue({
+        code: "custom",
+        message:
+          error instanceof Error
+            ? error.message
+            : `invalid ${kind} CRDT binary envelope`,
+      });
+      return z.NEVER;
+    }
+  });
 
 export const StudioLiveJoinSchema = z
   .object({
@@ -471,6 +510,162 @@ export const StudioLiveCrdtUpdateSchema = z
   })
   .strict();
 
+const StudioCrdtServerSequenceSchema = z
+  .string()
+  .min(1)
+  .max(32)
+  .regex(/^(?:0|[1-9][0-9]*)$/u);
+
+export const StudioLiveCrdtBinarySelectSchema = z
+  .object({
+    protocolVersion: StudioCrdtProtocolVersionSchema,
+    wireVersion: StudioCrdtBinaryWireVersionSchema,
+    workId: WorkIdSchema,
+    format: StudioCrdtBinaryWireFormatSchema,
+    selectionEpoch: StudioLiveCrdtWireSelectionEpochSchema,
+  })
+  .strict();
+
+export const StudioLiveCrdtBinarySelectionSchema = z
+  .object({
+    protocolVersion: StudioCrdtProtocolVersionSchema,
+    wireVersion: StudioCrdtBinaryWireVersionSchema,
+    workId: WorkIdSchema,
+    format: StudioCrdtBinaryWireFormatSchema,
+    selectionEpoch: StudioLiveCrdtWireSelectionEpochSchema,
+    selected: z.literal(true),
+  })
+  .strict();
+
+export const StudioLiveCrdtBinarySyncSchema = z
+  .object({
+    protocolVersion: StudioCrdtProtocolVersionSchema,
+    wireVersion: StudioCrdtBinaryWireVersionSchema,
+    workId: WorkIdSchema,
+    requestId: StudioCrdtRequestIdSchema,
+    stateVector: decodedBinaryEnvelope("state-vector"),
+  })
+  .strict();
+
+export const StudioLiveCrdtBinaryUpdateSchema = z
+  .object({
+    protocolVersion: StudioCrdtProtocolVersionSchema,
+    wireVersion: StudioCrdtBinaryWireVersionSchema,
+    workId: WorkIdSchema,
+    updateId: StudioCrdtUpdateIdSchema,
+    clientSequence: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+    update: decodedBinaryEnvelope("update"),
+  })
+  .strict();
+
+export const StudioLiveCrdtBinarySyncResultSchema = z
+  .object({
+    protocolVersion: StudioCrdtProtocolVersionSchema,
+    wireVersion: StudioCrdtBinaryWireVersionSchema,
+    workId: WorkIdSchema,
+    requestId: StudioCrdtRequestIdSchema,
+    transferId: z.uuid(),
+    fragments: z.array(z.unknown()).min(1).max(STUDIO_CRDT_BINARY_SYNC_MAX_FRAGMENTS),
+    fragmentCount: z.number().int().min(1).max(STUDIO_CRDT_BINARY_SYNC_MAX_FRAGMENTS),
+    wireBytes: z
+      .number()
+      .int()
+      .min(STUDIO_CRDT_BINARY_HEADER_BYTES + 1)
+      .max(STUDIO_CRDT_BINARY_SYNC_MAX_BYTES + STUDIO_CRDT_BINARY_HEADER_BYTES),
+    totalBytes: z.number().int().min(1).max(STUDIO_CRDT_BINARY_SYNC_MAX_BYTES),
+    serverStateVector: z.unknown(),
+    serverSequence: StudioCrdtServerSequenceSchema,
+  })
+  .strict()
+  .transform((value, context) => {
+    if (value.fragmentCount !== value.fragments.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["fragmentCount"],
+        message: "CRDT sync fragment count does not match its outer metadata",
+      });
+      return z.NEVER;
+    }
+
+    let fragments: Uint8Array[];
+    let diff: Uint8Array;
+    try {
+      fragments = value.fragments.map((fragment) =>
+        copyStudioCrdtBinaryBytes(fragment)
+      );
+      const envelope = reassembleStudioCrdtBinarySyncEnvelope(
+        fragments,
+        value.wireBytes
+      );
+      diff = decodeStudioCrdtBinaryEnvelope(envelope, "sync-diff").bytes;
+    } catch (error) {
+      context.addIssue({
+        code: "custom",
+        path: ["fragments"],
+        message:
+          error instanceof Error
+            ? error.message
+            : "invalid fragmented CRDT sync envelope",
+      });
+      return z.NEVER;
+    }
+    if (diff.byteLength !== value.totalBytes) {
+      context.addIssue({
+        code: "custom",
+        path: ["totalBytes"],
+        message: "CRDT sync decoded bytes do not match their outer metadata",
+      });
+      return z.NEVER;
+    }
+
+    let serverStateVector: Uint8Array;
+    try {
+      serverStateVector = decodeStudioCrdtBinaryEnvelope(
+        value.serverStateVector,
+        "state-vector"
+      ).bytes;
+    } catch (error) {
+      context.addIssue({
+        code: "custom",
+        path: ["serverStateVector"],
+        message:
+          error instanceof Error
+            ? error.message
+            : "invalid CRDT server state-vector envelope",
+      });
+      return z.NEVER;
+    }
+
+    return {
+      ...value,
+      fragments,
+      diff,
+      serverStateVector,
+    };
+  });
+
+export const StudioLiveCrdtBinaryUpdateAckSchema = z
+  .object({
+    protocolVersion: StudioCrdtProtocolVersionSchema,
+    wireVersion: StudioCrdtBinaryWireVersionSchema,
+    workId: WorkIdSchema,
+    updateId: StudioCrdtUpdateIdSchema,
+    serverSequence: StudioCrdtServerSequenceSchema,
+    duplicate: z.boolean(),
+  })
+  .strict();
+
+export const StudioLiveCrdtBinaryRemoteUpdateSchema = z
+  .object({
+    protocolVersion: StudioCrdtProtocolVersionSchema,
+    wireVersion: StudioCrdtBinaryWireVersionSchema,
+    workId: WorkIdSchema,
+    updateId: StudioCrdtUpdateIdSchema,
+    serverSequence: StudioCrdtServerSequenceSchema,
+    update: decodedBinaryEnvelope("update"),
+  })
+  .strict();
+
 export type StudioLiveJoinInput = z.infer<typeof StudioLiveJoinSchema>;
 export type StudioLivePresenceInput = z.infer<typeof StudioLivePresenceSchema>;
 export type StudioLiveCursorInput = z.infer<typeof StudioLiveCursorSchema>;
@@ -501,6 +696,32 @@ export type StudioLiveInterServerRelayResponse = z.infer<
 >;
 export type StudioLiveCrdtSyncInput = z.infer<typeof StudioLiveCrdtSyncSchema>;
 export type StudioLiveCrdtUpdateInput = z.infer<typeof StudioLiveCrdtUpdateSchema>;
+export type StudioLiveCrdtBinarySelectInput = z.infer<
+  typeof StudioLiveCrdtBinarySelectSchema
+>;
+export type StudioLiveCrdtBinarySelection = z.infer<
+  typeof StudioLiveCrdtBinarySelectionSchema
+>;
+export type StudioLiveCrdtBinarySyncInput = z.infer<
+  typeof StudioLiveCrdtBinarySyncSchema
+>;
+export type StudioLiveCrdtBinaryUpdateInput = z.infer<
+  typeof StudioLiveCrdtBinaryUpdateSchema
+>;
+export type StudioLiveCrdtBinarySyncResult = z.infer<
+  typeof StudioLiveCrdtBinarySyncResultSchema
+>;
+export type StudioLiveCrdtBinaryUpdateAck = z.infer<
+  typeof StudioLiveCrdtBinaryUpdateAckSchema
+>;
+export type StudioLiveCrdtBinaryRemoteUpdate = z.infer<
+  typeof StudioLiveCrdtBinaryRemoteUpdateSchema
+>;
+export type StudioLiveCrdtWireFormat =
+  (typeof STUDIO_CRDT_SUPPORTED_WIRE_FORMATS)[number];
+export type StudioLiveCrdtWireSelectionEpoch = z.infer<
+  typeof StudioLiveCrdtWireSelectionEpochSchema
+>;
 
 export interface StudioLiveCrdtSyncResult {
   protocolVersion: typeof STUDIO_CRDT_PROTOCOL_VERSION;
@@ -649,6 +870,10 @@ export interface StudioLiveJoinResult {
   lockProtocolVersion: typeof STUDIO_LIVE_LOCK_PROTOCOL_VERSION;
   lockRevisionVersion: typeof STUDIO_LIVE_LOCK_REVISION_VERSION;
   lockSnapshotRevision: string;
+  /** Additive transport capability; absent while an older API node completes a rolling deploy. */
+  crdtWireFormats?: typeof STUDIO_CRDT_SUPPORTED_WIRE_FORMATS;
+  /** Echoed by the client when selecting a wire format so stale reconnect selections fail closed. */
+  crdtWireSelectionEpoch?: StudioLiveCrdtWireSelectionEpoch;
   self: StudioLiveParticipant;
   participants: StudioLiveParticipant[];
   locks: StudioLiveLock[];

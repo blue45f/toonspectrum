@@ -7,6 +7,25 @@ import { lazyRetry } from "@/lib/lazy-retry";
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/src/components/error-boundary";
 
+function isStudioRoutePathname(pathname: string): boolean {
+  return pathname === "/studio" || pathname.startsWith("/studio/");
+}
+
+function readInitialDocumentPathname(): string | null {
+  try {
+    return typeof globalThis.location?.pathname === "string"
+      ? globalThis.location.pathname
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+// AppRouter's module lifetime matches one browser document. Keep the delivery
+// path stable across SPA transitions: a Studio document can retain COOP even
+// when COEP is unavailable and `crossOriginIsolated` therefore stays false.
+const INITIAL_DOCUMENT_PATHNAME = readInitialDocumentPathname();
+
 // 정적 라우트의 브라우저 탭 제목. 동적 라우트(작가·펜카페)는 URL에서 유도하고,
 // /title/* 은 작품명이 필요하므로 TitleDetailPage가 useDocumentTitle로 직접 설정한다.
 const STATIC_TITLES: Record<string, string> = {
@@ -156,6 +175,12 @@ const CreateChallengesPage = lazyRetry(
   "CreateChallengesPage"
 );
 const StudioPage = lazyRetry(() => import("@/src/domains/creator/StudioPage").then((m) => ({ default: m.StudioPage })), "StudioPage");
+const StudioCrossOriginIsolationGate = lazyRetry(
+  () => import("@/src/app/StudioCrossOriginIsolationGate").then((m) => ({
+    default: m.StudioCrossOriginIsolationGate,
+  })),
+  "StudioCrossOriginIsolationGate",
+);
 const StudioToolsCompanionPage = lazyRetry(
   () =>
     import("@/src/domains/creator/StudioToolsCompanionPage").then((m) => ({
@@ -223,7 +248,10 @@ function RouteStage({ pathname, children }: { pathname: string; children: ReactN
 export function AppRouter() {
   const { pathname } = useLocation();
   useRouteTitle(pathname);
-  return (
+  const documentWasStudio = isStudioRoutePathname(
+    INITIAL_DOCUMENT_PATHNAME ?? pathname,
+  );
+  const routeTree = (
     <RouteStage pathname={pathname}>
       <ErrorBoundary resetKey={pathname}>
         <Suspense fallback={<RouteFallback />}>
@@ -280,5 +308,21 @@ export function AppRouter() {
         </Suspense>
       </ErrorBoundary>
     </RouteStage>
+  );
+  const needsIsolationGate =
+    isStudioRoutePathname(pathname)
+    || documentWasStudio
+    || globalThis.crossOriginIsolated === true;
+  if (!needsIsolationGate) return routeTree;
+  return (
+    <Suspense fallback={<RouteFallback />}>
+      <StudioCrossOriginIsolationGate
+        pathname={pathname}
+        documentWasStudio={documentWasStudio}
+        pending={<RouteFallback />}
+      >
+        {routeTree}
+      </StudioCrossOriginIsolationGate>
+    </Suspense>
   );
 }

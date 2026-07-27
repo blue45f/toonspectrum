@@ -94,6 +94,16 @@ describe("Studio OBJ Worker runtime", () => {
     }, request)).toBe(true);
   });
 
+  it("keeps Unicode-separated face references inside the canonical parser budget", async () => {
+    const request = requestFor(
+      "unicode-whitespace.obj",
+      triangleObj().replace("f 1 2 3", "f 1\u00a02\u202f3"),
+    );
+    const result = await parseStudioBg3dObjWorkerRequest(request);
+
+    expect(result.metrics).toMatchObject({ vertices: 3, triangles: 1 });
+  });
+
   it("resolves texture paths relative to their MTL and preserves bounded map options", async () => {
     const request = requestFor(
       "pkg/models/triangle.obj",

@@ -160,6 +160,13 @@ export interface StudioCrdtSyncResult {
   serverSequence: string;
 }
 
+export interface StudioCrdtBinarySyncResult {
+  update: Uint8Array;
+  totalBytes: number;
+  serverStateVector: Uint8Array;
+  serverSequence: string;
+}
+
 export interface StudioCrdtApplyUpdateInput {
   workId: string;
   updateId: string;
@@ -167,11 +174,26 @@ export interface StudioCrdtApplyUpdateInput {
   data: string;
 }
 
+export interface StudioCrdtApplyBinaryUpdateInput {
+  workId: string;
+  updateId: string;
+  actorUserId: string;
+  data: Uint8Array;
+}
+
 export interface StudioCrdtApplyUpdateResult {
   duplicate: boolean;
   updateId: string;
   update: string;
   serverStateVector: string;
+  serverSequence: string;
+}
+
+export interface StudioCrdtApplyBinaryUpdateResult {
+  duplicate: boolean;
+  updateId: string;
+  update: Uint8Array;
+  serverStateVector: Uint8Array;
   serverSequence: string;
 }
 
@@ -280,13 +302,37 @@ export function encodeStudioCrdtServerStateVector(
   doc: Y.Doc,
   maximumDecodedBytes = STUDIO_CRDT_STATE_VECTOR_MAX_BYTES
 ): string {
+  return fromUint8Array(
+    encodeStudioCrdtServerStateVectorBytes(doc, maximumDecodedBytes)
+  );
+}
+
+export function encodeStudioCrdtServerStateVectorBytes(
+  doc: Y.Doc,
+  maximumDecodedBytes = STUDIO_CRDT_STATE_VECTOR_MAX_BYTES
+): Uint8Array {
   const stateVector = Y.encodeStateVector(doc);
   if (stateVector.byteLength > maximumDecodedBytes) {
     throw new StudioCrdtStorageCorruptionError(
       "Stored CRDT state vector exceeds its byte budget"
     );
   }
-  return fromUint8Array(stateVector);
+  return stateVector;
+}
+
+function copyStudioCrdtBytes(
+  value: Uint8Array,
+  maximumBytes: number,
+  label: string
+): Uint8Array {
+  if (
+    !(value instanceof Uint8Array) ||
+    value.byteLength === 0 ||
+    value.byteLength > maximumBytes
+  ) {
+    throw new StudioCrdtInvalidPayloadError(`${label} exceeds its decoded byte budget`);
+  }
+  return Uint8Array.from(value);
 }
 
 function validateStoredUpdate(update: StudioCrdtUpdateRecord, workId: string): void {
@@ -444,6 +490,29 @@ export class StudioCrdtService implements OnModuleDestroy {
             STUDIO_CRDT_STATE_VECTOR_MAX_BYTES,
             "state vector"
           );
+    const sync = await this.syncBytes(workId, stateVector);
+    const chunks = chunkStudioCrdtSyncDiff(sync.update);
+    return {
+      chunks,
+      chunkCount: chunks.length,
+      totalBytes: sync.totalBytes,
+      serverStateVector: fromUint8Array(sync.serverStateVector),
+      serverSequence: sync.serverSequence,
+    };
+  }
+
+  async syncBytes(
+    workId: string,
+    stateVectorValue?: Uint8Array | null
+  ): Promise<StudioCrdtBinarySyncResult> {
+    const stateVector =
+      stateVectorValue == null
+        ? null
+        : copyStudioCrdtBytes(
+            stateVectorValue,
+            STUDIO_CRDT_STATE_VECTOR_MAX_BYTES,
+            "state vector"
+          );
     return this.withWorkLock(workId, async () => {
       const entry = await this.getCaughtUpDocument(workId);
       let diff: Uint8Array;
@@ -458,12 +527,10 @@ export class StudioCrdtService implements OnModuleDestroy {
         throw new StudioCrdtDocumentTooLargeError();
       }
       entry.lastAccessedAt = this.now().getTime();
-      const chunks = chunkStudioCrdtSyncDiff(diff);
       return {
-        chunks,
-        chunkCount: chunks.length,
+        update: diff,
         totalBytes: diff.byteLength,
-        serverStateVector: encodeStudioCrdtServerStateVector(
+        serverStateVector: encodeStudioCrdtServerStateVectorBytes(
           entry.doc,
           this.stateVectorMaxBytes
         ),
@@ -477,6 +544,30 @@ export class StudioCrdtService implements OnModuleDestroy {
       throw new StudioCrdtInvalidPayloadError("update id must be a UUID");
     }
     const update = decodeStudioCrdtBase64(input.data, STUDIO_CRDT_UPDATE_MAX_BYTES, "update");
+    const applied = await this.applyUpdateBytes({
+      workId: input.workId,
+      updateId: input.updateId,
+      actorUserId: input.actorUserId,
+      data: update,
+    });
+    return {
+      ...applied,
+      update: fromUint8Array(applied.update),
+      serverStateVector: fromUint8Array(applied.serverStateVector),
+    };
+  }
+
+  async applyUpdateBytes(
+    input: StudioCrdtApplyBinaryUpdateInput
+  ): Promise<StudioCrdtApplyBinaryUpdateResult> {
+    if (!UUID_PATTERN.test(input.updateId)) {
+      throw new StudioCrdtInvalidPayloadError("update id must be a UUID");
+    }
+    const update = copyStudioCrdtBytes(
+      input.data,
+      STUDIO_CRDT_UPDATE_MAX_BYTES,
+      "update"
+    );
     return this.withWorkLock(input.workId, async () => {
       const entry = await this.getCaughtUpDocument(input.workId);
       const persisted = await this.repository.appendUpdate(
@@ -515,8 +606,8 @@ export class StudioCrdtService implements OnModuleDestroy {
       return {
         duplicate: !persisted.inserted,
         updateId: persisted.receipt.updateId,
-        update: fromUint8Array(update),
-        serverStateVector: encodeStudioCrdtServerStateVector(
+        update,
+        serverStateVector: encodeStudioCrdtServerStateVectorBytes(
           entry.doc,
           this.stateVectorMaxBytes
         ),
@@ -717,7 +808,7 @@ export class StudioCrdtService implements OnModuleDestroy {
       if (Y.encodeStateAsUpdate(staged).byteLength > STUDIO_CRDT_SNAPSHOT_MAX_BYTES) {
         throw new StudioCrdtStorageCorruptionError("Stored CRDT document exceeds its byte budget");
       }
-      encodeStudioCrdtServerStateVector(staged, this.stateVectorMaxBytes);
+      encodeStudioCrdtServerStateVectorBytes(staged, this.stateVectorMaxBytes);
 
       const previous = entry.doc;
       entry.doc = staged;

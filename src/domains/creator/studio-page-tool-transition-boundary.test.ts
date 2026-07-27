@@ -59,6 +59,29 @@ describe("StudioPage tool transition boundary", () => {
     }
   });
 
+  it("runs Color Range selection as one abortable Worker-owned operation", () => {
+    const start = studioPageSource.indexOf(
+      "async function runColorRangeApply(",
+    );
+    const end = studioPageSource.indexOf(
+      "// ── 픽셀 선택 한정 조정 적용",
+      start,
+    );
+    const apply = studioPageSource.slice(start, end);
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    expect(apply).toContain("colorRangeAbortRef.current?.abort();");
+    expect(apply).toContain("const controller = new AbortController();");
+    expect(apply).toContain(
+      'await import("./studio-color-range-browser")',
+    );
+    expect(apply).toContain("colorRangeSelectionFromImage(");
+    expect(apply).toContain("signal: controller.signal");
+    expect(apply).toContain("pixelSelRef.current !== selectionSnapshot");
+    expect(apply).not.toContain("applyColorRangeMaskToSelection(");
+  });
+
   it("does not run cross-tool disarm side effects from the bubble-anchor state updater", () => {
     const start = studioPageSource.indexOf("function toggleBubbleAnchorPick()");
     const end = studioPageSource.indexOf("function detachBubbleAnchor()", start);

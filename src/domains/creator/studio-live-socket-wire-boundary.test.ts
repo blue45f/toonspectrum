@@ -29,6 +29,7 @@ describe("studio live socket wire ownership boundary", () => {
     const wire = moduleImports("./studio-live-socket-wire.ts");
 
     expect(wire.specifiers).toEqual([
+      "./studio-crdt-binary-wire",
       "./studio-live-collaboration-protocol",
       "@/lib/studio-live-lock-resource",
     ]);

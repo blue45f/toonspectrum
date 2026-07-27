@@ -51,6 +51,7 @@ describe("Studio live cluster environment validation", () => {
         STUDIO_LIVE_POSTGRES_URL:
           "postgresql://artist:secret@ep-direct.example.net/toonspectrum?sslmode=require",
         STUDIO_LIVE_POSTGRES_POOL_MAX: "4",
+        STUDIO_LIVE_POSTGRES_INLINE_BINARY_ENABLED: "false",
       },
       logger
     );
@@ -58,6 +59,7 @@ describe("Studio live cluster environment validation", () => {
     expect(result).toMatchObject({
       STUDIO_LIVE_CLUSTER_ADAPTER: "postgres",
       STUDIO_LIVE_POSTGRES_POOL_MAX: "4",
+      STUDIO_LIVE_POSTGRES_INLINE_BINARY_ENABLED: "false",
     });
     expect(logger.warn).not.toHaveBeenCalled();
     expect(
@@ -77,6 +79,22 @@ describe("Studio live cluster environment validation", () => {
           NODE_ENV: "test",
           STUDIO_LIVE_CLUSTER_ADAPTER: "redis",
           STUDIO_LIVE_POSTGRES_POOL_MAX: "1000",
+        },
+        logger
+      )
+    ).toBeNull();
+    expect(logger.warn).toHaveBeenCalledOnce();
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it("warns non-fatally for a non-canonical inline binary rollout switch", () => {
+    const logger = { warn: vi.fn(), error: vi.fn() };
+
+    expect(
+      validateEnv(
+        {
+          NODE_ENV: "test",
+          STUDIO_LIVE_POSTGRES_INLINE_BINARY_ENABLED: "TRUE",
         },
         logger
       )

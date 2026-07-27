@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 
+import { BRUSH_PRESETS } from "./studio-brush";
+import { STUDIO_BRUSH_PACK_CATALOG_IDS } from "./studio-brush-pack-id";
 import {
   applyBrushPresetWithLocks,
   cycleStudioStabilizerStrength,
   loadStudioProDrawPrefs,
+  mutateStudioProDrawPrefs,
   normalizeStudioProDrawPrefs,
   rememberRecentBrushId,
   saveStudioProDrawPrefs,
+  STUDIO_FAVORITE_BRUSH_LIMIT,
   toggleFavoriteBrushId,
 } from "./studio-pro-draw-prefs";
 
@@ -98,5 +102,129 @@ describe("studio pro draw prefs", () => {
       recentBrushIds: ["pen", "gpen"],
       favoriteBrushIds: ["marker"],
     });
+  });
+
+  it("keeps a large professional favorite collection instead of silently stopping at twelve", () => {
+    let prefs = normalizeStudioProDrawPrefs(null);
+    const brushIds = [
+      "pen",
+      "gpen",
+      "marker",
+      "watercolor",
+      "highlighter",
+      "pencil",
+      "airbrush",
+      "oil",
+      "pastel",
+      "charcoal",
+      "chalk",
+      "crayon",
+      "liner",
+    ];
+    for (const brushId of brushIds) prefs = toggleFavoriteBrushId(prefs, brushId);
+
+    expect(STUDIO_FAVORITE_BRUSH_LIMIT).toBeGreaterThanOrEqual(brushIds.length);
+    expect(prefs.favoriteBrushIds).toEqual(brushIds);
+  });
+
+  it("allows every currently selectable core and procedural brush to be favorited", () => {
+    let prefs = normalizeStudioProDrawPrefs(null);
+    const everyCatalogId = [
+      ...BRUSH_PRESETS.map((preset) => preset.id),
+      ...STUDIO_BRUSH_PACK_CATALOG_IDS,
+    ];
+    for (const brushId of everyCatalogId) {
+      prefs = toggleFavoriteBrushId(prefs, brushId);
+    }
+
+    expect(STUDIO_FAVORITE_BRUSH_LIMIT).toBe(everyCatalogId.length);
+    expect(prefs.favoriteBrushIds).toEqual(everyCatalogId);
+    expect(prefs.favoriteBrushIds).toContain("gpen");
+  });
+
+  it("merges a favorite intent with the latest storage snapshot from another Studio tab", () => {
+    const map = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => map.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        map.set(key, value);
+      },
+    };
+    saveStudioProDrawPrefs(storage, {
+      sizeLocked: true,
+      opacityLocked: false,
+      recentBrushIds: ["marker"],
+      favoriteBrushIds: ["watercolor"],
+    });
+
+    const staleTab = normalizeStudioProDrawPrefs({
+      sizeLocked: false,
+      opacityLocked: false,
+      recentBrushIds: ["pen"],
+      favoriteBrushIds: [],
+    });
+    const result = mutateStudioProDrawPrefs(
+      storage,
+      staleTab,
+      (latest) => toggleFavoriteBrushId(latest, "gpen")
+    );
+
+    expect(result.persisted).toBe(true);
+    expect(result.prefs).toEqual({
+      sizeLocked: true,
+      opacityLocked: false,
+      recentBrushIds: ["marker"],
+      favoriteBrushIds: ["watercolor", "gpen"],
+    });
+    expect(loadStudioProDrawPrefs(storage)).toEqual(result.prefs);
+  });
+
+  it("keeps an in-memory favorite when storage is unavailable", () => {
+    const current = normalizeStudioProDrawPrefs({
+      favoriteBrushIds: ["watercolor"],
+    });
+    const result = mutateStudioProDrawPrefs(
+      null,
+      current,
+      (latest) => toggleFavoriteBrushId(latest, "gpen")
+    );
+
+    expect(result.persisted).toBe(false);
+    expect(result.prefs.favoriteBrushIds).toEqual(["watercolor", "gpen"]);
+  });
+
+  it("does not resurrect stale storage after a write failure and retries the complete state", () => {
+    let failWrites = true;
+    const map = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => map.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        if (failWrites) throw new DOMException("quota exceeded", "QuotaExceededError");
+        map.set(key, value);
+      },
+    };
+    map.set(
+      "toonspectrum-studio-pro-draw-prefs:v1",
+      JSON.stringify(normalizeStudioProDrawPrefs({ favoriteBrushIds: ["watercolor"] })),
+    );
+
+    const failed = mutateStudioProDrawPrefs(
+      storage,
+      normalizeStudioProDrawPrefs(null),
+      (latest) => toggleFavoriteBrushId(latest, "gpen"),
+    );
+    expect(failed.persisted).toBe(false);
+    expect(failed.prefs.favoriteBrushIds).toEqual(["watercolor", "gpen"]);
+
+    failWrites = false;
+    const recovered = mutateStudioProDrawPrefs(
+      storage,
+      failed.prefs,
+      (latest) => rememberRecentBrushId(latest, "marker"),
+      { preferCurrent: true },
+    );
+    expect(recovered.persisted).toBe(true);
+    expect(recovered.prefs.favoriteBrushIds).toEqual(["watercolor", "gpen"]);
+    expect(loadStudioProDrawPrefs(storage)).toEqual(recovered.prefs);
   });
 });

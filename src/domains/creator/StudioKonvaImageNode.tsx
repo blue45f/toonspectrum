@@ -863,6 +863,10 @@ export function StudioKonvaImageNode({
   return (
     <KImage
       studioElementId={el.id}
+      // Large outline filters use this content/filter revision to reject stale Worker EDT
+      // results before rebuilding the padded Konva cache. It is runtime-only and never persisted.
+      outlineWorkerRevision={cachePad > 0 ? filterCacheKey : undefined}
+      outlineWorkerMaskRevision={cachePad > 0 ? activeFilterMask?.coverage : undefined}
       ref={(n) => {
         imageRef.current = n;
         innerRef(n);

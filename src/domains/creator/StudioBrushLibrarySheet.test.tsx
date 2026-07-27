@@ -215,9 +215,11 @@ describe("StudioBrushLibrarySheet", () => {
     expect(viewGrid()?.dataset.studioBrushView).toBe("text");
     expect(viewGrid()?.className).toContain("grid-cols-1");
     expect(container.querySelector("[data-studio-brush-preview]")).toBeNull();
-    expect(container.querySelectorAll('[data-studio-brush-text-row="true"]')).toHaveLength(8);
+    expect(container.querySelectorAll('[data-studio-brush-text-row="true"]')).toHaveLength(9);
     expect(screen.getByRole("button", { name: "펜(매끈) 선택" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "G펜(필압) 선택" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "펜(매끈) 즐겨찾기" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "G펜(필압) 즐겨찾기" })).toBeTruthy();
   });
 
   it("keeps full-catalog search and roving selection intact after a density change", () => {
@@ -278,7 +280,7 @@ describe("StudioBrushLibrarySheet", () => {
     expect(html).toMatch(/aria-label="전체 브러시 검색" aria-controls="[^"]+"/);
     expect(html).toContain('data-studio-brush-search-scope="all"');
     expect(html).toContain('role="status" aria-live="polite"');
-    expect(html).toContain("8/8개의 브러시가 표시됩니다.");
+    expect(html).toContain("9/9개의 브러시가 표시됩니다.");
   });
 
   it("searches the full brush catalog regardless of the currently selected category", () => {
@@ -444,14 +446,14 @@ describe("StudioBrushLibrarySheet", () => {
     const tileSelections = screen.getAllByRole("button", { name: /선택$/ });
     expect(tileSelections[5]!.tabIndex).toBe(0);
     fireEvent.keyDown(tileSelections[5]!, { key: "ArrowDown" });
-    expect(document.activeElement).toBe(tileSelections[5]);
+    expect(document.activeElement).toBe(tileSelections[8]);
 
     renderedColumns = "100px";
     fireEvent.click(screen.getByRole("button", { name: "이름 목록" }));
     const textSelections = screen.getAllByRole("button", { name: /선택$/ });
-    expect(textSelections[5]!.tabIndex).toBe(0);
-    fireEvent.keyDown(textSelections[5]!, { key: "ArrowUp" });
-    expect(document.activeElement).toBe(textSelections[4]);
+    expect(textSelections[8]!.tabIndex).toBe(0);
+    fireEvent.keyDown(textSelections[8]!, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(textSelections[7]);
   });
 
   it("keeps linear row edges and leaves focus in place when a vertical grid cell is missing", () => {
@@ -490,14 +492,14 @@ describe("StudioBrushLibrarySheet", () => {
 
     selections[0]!.focus();
     fireEvent.keyDown(selections[0]!, { key: "End" });
-    expect(document.activeElement).toBe(selections[7]);
-    fireEvent.keyDown(selections[7]!, { key: "ArrowRight" });
-    expect(document.activeElement).toBe(selections[7]);
-    fireEvent.keyDown(selections[7]!, { key: "ArrowDown" });
-    expect(document.activeElement).toBe(selections[7]);
-    fireEvent.keyDown(selections[7]!, { key: "ArrowUp" });
-    expect(document.activeElement).toBe(selections[4]);
-    fireEvent.keyDown(selections[4]!, { key: "Home" });
+    expect(document.activeElement).toBe(selections[8]);
+    fireEvent.keyDown(selections[8]!, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(selections[8]);
+    fireEvent.keyDown(selections[8]!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(selections[8]);
+    fireEvent.keyDown(selections[8]!, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(selections[5]);
+    fireEvent.keyDown(selections[5]!, { key: "Home" });
     expect(document.activeElement).toBe(selections[0]);
 
     selections[6]!.focus();

@@ -1,6 +1,22 @@
 import { io } from "socket.io-client";
 
 import {
+  createStudioCrdtBinarySelectionRequest,
+  createStudioCrdtBinarySyncRequest,
+  createStudioCrdtBinaryUpdateRequest,
+  parseStudioCrdtBinaryRemoteUpdate,
+  parseStudioCrdtBinarySelection,
+  parseStudioCrdtBinarySyncResponse,
+  parseStudioCrdtBinaryUpdateAck,
+  STUDIO_CRDT_BINARY_WIRE_FORMAT,
+  STUDIO_CRDT_LEGACY_WIRE_FORMAT,
+  STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT,
+  STUDIO_LIVE_CRDT_BINARY_SYNC_EVENT,
+  STUDIO_LIVE_CRDT_BINARY_UPDATE_EVENT,
+  STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT,
+  type StudioCrdtWireFormat,
+} from "./studio-crdt-binary-wire";
+import {
   createStudioCrdtPermanentError,
   createStudioCrdtRetryableError,
   createStudioCrdtServerAckError,
@@ -80,6 +96,7 @@ import { getRuntimeApiBase } from "@/src/infrastructure/runtime-api-base";
 const SOCKET_PATH = "/socket.io";
 const CONNECT_TIMEOUT_MS = 10_000;
 const CRDT_ACK_TIMEOUT_MS = 10_000;
+const CRDT_WIRE_SELECT_ACK_TIMEOUT_MS = 8_000;
 const LOCK_ACK_TIMEOUT_MS = 10_000;
 const VOICE_JOIN_ACK_TIMEOUT_MS = 10_000;
 const MAX_TOKEN_LENGTH = 8_192;
@@ -355,6 +372,9 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private connectTimeout: unknown = null;
   private joinRetryTimeout: unknown = null;
   private joinRetryAttempt = 0;
+  private selectedCrdtWireFormat: StudioCrdtWireFormat | null = null;
+  private crdtWireSelectionTimeout: unknown = null;
+  private crdtReconnectTimeout: unknown = null;
 
   constructor(
     context: StudioLiveTransportContext,
@@ -406,10 +426,16 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.socket.on("studio:comment:changed", this.onTeamCommentChanged);
     this.socket.on("studio:crdt:sync", this.onCrdtSync);
     this.socket.on("studio:crdt:update", this.onCrdtUpdate);
+    this.socket.on(STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT, this.onCrdtBinaryUpdate);
   }
 
   get ready(): boolean {
-    return !this.closed && this.joined && this.socket.connected;
+    return (
+      !this.closed &&
+      this.joined &&
+      this.selectedCrdtWireFormat !== null &&
+      this.socket.connected
+    );
   }
 
   connect(): Promise<void> {
@@ -464,10 +490,28 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         "client-validation"
       ));
     }
+    if (this.selectedCrdtWireFormat === STUDIO_CRDT_BINARY_WIRE_FORMAT) {
+      try {
+        return this.emitCrdtWithAck(
+          STUDIO_LIVE_CRDT_BINARY_SYNC_EVENT,
+          createStudioCrdtBinarySyncRequest(parsed),
+          parseStudioCrdtBinarySyncResponse,
+          "requestId",
+          true
+        );
+      } catch {
+        return Promise.reject(createStudioCrdtPermanentError(
+          "invalid_payload",
+          "CRDT 상태 벡터를 바이너리 전송 형식으로 구성하지 못했습니다.",
+          "client-validation"
+        ));
+      }
+    }
     return this.emitCrdtWithAck(
       "studio:crdt:sync",
       parsed,
-      parseStudioCrdtSyncResponse
+      parseStudioCrdtSyncResponse,
+      "requestId"
     );
   }
 
@@ -482,11 +526,31 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     }
     const pending = this.pendingCrdtPublishes.get(parsed.updateId);
     if (pending) return pending;
-    const operation = this.emitCrdtWithAck(
-      "studio:crdt:update",
-      parsed,
-      parseStudioCrdtUpdateAck
-    );
+    let operation: Promise<StudioCrdtUpdateAck>;
+    if (this.selectedCrdtWireFormat === STUDIO_CRDT_BINARY_WIRE_FORMAT) {
+      try {
+        operation = this.emitCrdtWithAck(
+          STUDIO_LIVE_CRDT_BINARY_UPDATE_EVENT,
+          createStudioCrdtBinaryUpdateRequest(parsed),
+          parseStudioCrdtBinaryUpdateAck,
+          "updateId",
+          true
+        );
+      } catch {
+        return Promise.reject(createStudioCrdtPermanentError(
+          "invalid_payload",
+          "CRDT 업데이트를 바이너리 전송 형식으로 구성하지 못했습니다.",
+          "client-validation"
+        ));
+      }
+    } else {
+      operation = this.emitCrdtWithAck(
+        "studio:crdt:update",
+        parsed,
+        parseStudioCrdtUpdateAck,
+        "updateId"
+      );
+    }
     this.pendingCrdtPublishes.set(parsed.updateId, operation);
     operation.then(
       (ack) => {
@@ -1133,6 +1197,9 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.closed = true;
     ++this.joinGeneration;
     this.joined = false;
+    this.selectedCrdtWireFormat = null;
+    this.clearCrdtWireSelectionTimeout();
+    this.clearCrdtReconnectTimeout();
     this.clearJoinRetry(true);
     this.clearConnectTimeout();
     this.rejectConnect?.(new Error("팀 공동작업 연결이 종료되었습니다."));
@@ -1161,6 +1228,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.socket.off("studio:comment:changed", this.onTeamCommentChanged);
     this.socket.off("studio:crdt:sync", this.onCrdtSync);
     this.socket.off("studio:crdt:update", this.onCrdtUpdate);
+    this.socket.off(STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT, this.onCrdtBinaryUpdate);
     this.rejectPendingCrdtOperations(createStudioCrdtRetryableError(
       "connection_closed",
       "팀 공동작업 연결이 종료되었습니다.",
@@ -1191,6 +1259,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
 
   private readonly onConnect = () => {
     if (!this.closed && !this.accessRevoked) {
+      this.clearCrdtReconnectTimeout();
       this.clearJoinRetry(true);
       this.beginJoin();
     }
@@ -1207,6 +1276,8 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       return;
     }
     this.joined = false;
+    this.selectedCrdtWireFormat = null;
+    this.clearCrdtWireSelectionTimeout();
     this.emitStatus({ state: "error", message, recoverable: true });
   };
 
@@ -1217,6 +1288,9 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     ++this.joinGeneration;
     this.accessRevoked = true;
     this.joined = false;
+    this.selectedCrdtWireFormat = null;
+    this.clearCrdtWireSelectionTimeout();
+    this.clearCrdtReconnectTimeout();
     this.clearJoinRetry(true);
     this.pendingInitialSnapshot = null;
     this.pendingPresenceByConnection.clear();
@@ -1256,6 +1330,8 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       sendLeave: false,
     });
     this.joined = false;
+    this.selectedCrdtWireFormat = null;
+    this.clearCrdtWireSelectionTimeout();
     this.clearJoinRetry(true);
     this.selfConnectionId = null;
     this.pendingInitialSnapshot = null;
@@ -1296,6 +1372,9 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     ++this.joinGeneration;
     this.accessRevoked = true;
     this.joined = false;
+    this.selectedCrdtWireFormat = null;
+    this.clearCrdtWireSelectionTimeout();
+    this.clearCrdtReconnectTimeout();
     this.clearJoinRetry(true);
     this.pendingInitialSnapshot = null;
     this.pendingPresenceByConnection.clear();
@@ -2306,8 +2385,29 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       expectedWorkId: this.context.workId,
     });
     if (!update || this.seenCrdtUpdateIds.has(update.updateId)) return;
-    this.rememberCrdtUpdateId(update.updateId);
     this.emitCrdt({ type: "update", update, senderSessionId: null });
+    this.rememberCrdtUpdateId(update.updateId);
+  };
+
+  private readonly onCrdtBinaryUpdate = (value: unknown) => {
+    if (
+      !this.ready ||
+      this.selectedCrdtWireFormat !== STUDIO_CRDT_BINARY_WIRE_FORMAT
+    ) {
+      return;
+    }
+    const update = parseStudioCrdtBinaryRemoteUpdate(value, {
+      expectedWorkId: this.context.workId,
+    });
+    if (!update) {
+      this.restartAfterCrdtWireFailure(
+        "손상된 바이너리 공동 편집 업데이트를 감지해 안전하게 다시 연결합니다."
+      );
+      return;
+    }
+    if (this.seenCrdtUpdateIds.has(update.updateId)) return;
+    this.emitCrdt({ type: "update", update, senderSessionId: null });
+    this.rememberCrdtUpdateId(update.updateId);
   };
 
   private beginJoin(): void {
@@ -2315,6 +2415,8 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.clearJoinRetry(false);
     const generation = ++this.joinGeneration;
     this.joined = false;
+    this.selectedCrdtWireFormat = null;
+    this.clearCrdtWireSelectionTimeout();
     this.pendingInitialSnapshot = null;
     this.pendingPresenceByConnection.clear();
     this.pendingScreenByConnection.clear();
@@ -2340,12 +2442,12 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
           this.failJoin(response.message, !isNonRecoverable(response.code), response.code);
           return;
         }
-        this.acceptJoin(response);
+        this.acceptJoin(response, generation);
       }
     );
   }
 
-  private acceptJoin(snapshot: ServerJoinSnapshot): void {
+  private acceptJoin(snapshot: ServerJoinSnapshot, generation: number): void {
     const reconciledSnapshot = this.reconcilePendingPresence(snapshot);
     const wasJoined = this.everJoined;
     if (
@@ -2374,13 +2476,26 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.lockRevisionVersion = reconciledSnapshot.lockRevisionVersion;
     this.selfConnectionId = reconciledSnapshot.self.connectionId;
     this.joined = true;
-    this.everJoined = true;
     this.pendingInitialSnapshot = reconciledSnapshot;
     // Stage the authoritative identity map immediately so an update arriving between join ACK and
     // the room's first heartbeat can still resolve lock owners and targeted connection ids.
     for (const participant of reconciledSnapshot.participants) {
       this.participants.set(participant.connectionId, participant);
     }
+    if (reconciledSnapshot.crdtWireAdvertisement) {
+      this.selectCrdtBinaryWire(
+        reconciledSnapshot.crdtWireAdvertisement.selectionEpoch,
+        generation,
+        wasJoined
+      );
+      return;
+    }
+    this.selectedCrdtWireFormat = STUDIO_CRDT_LEGACY_WIRE_FORMAT;
+    this.finishAcceptedJoin(wasJoined);
+  }
+
+  private finishAcceptedJoin(wasJoined: boolean): void {
+    this.everJoined = true;
     // A reconnect snapshot must be committed before ready is observable. If its bounded delta
     // history is unsafe, flushInitialSnapshot starts a new generation and no stale ready event is
     // allowed to escape after that nested connecting transition.
@@ -2392,6 +2507,61 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       state: "ready",
       message: wasJoined ? "팀 서버에 다시 연결되었습니다." : "팀 서버 연결이 준비되었습니다.",
       recoverable: true,
+    });
+  }
+
+  private selectCrdtBinaryWire(
+    selectionEpoch: string,
+    generation: number,
+    wasJoined: boolean
+  ): void {
+    this.clearCrdtWireSelectionTimeout();
+    const payload = createStudioCrdtBinarySelectionRequest(
+      this.context.workId,
+      selectionEpoch
+    );
+    this.crdtWireSelectionTimeout = this.scheduleTimeout(() => {
+      this.crdtWireSelectionTimeout = null;
+      if (
+        this.closed ||
+        generation !== this.joinGeneration ||
+        !this.socket.connected
+      ) {
+        return;
+      }
+      this.restartAfterCrdtWireFailure(
+        "바이너리 공동 편집 채널 선택 응답이 없어 안전하게 다시 연결합니다."
+      );
+    }, CRDT_WIRE_SELECT_ACK_TIMEOUT_MS);
+    this.socket.emit(STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT, payload, (value: unknown) => {
+      if (
+        this.closed ||
+        generation !== this.joinGeneration ||
+        !this.socket.connected
+      ) {
+        return;
+      }
+      this.clearCrdtWireSelectionTimeout();
+      const failure = parseFailure(value);
+      if (failure) {
+        this.restartAfterCrdtWireFailure(failure.message);
+        return;
+      }
+      const selected =
+        isRecord(value) && value.ok === true
+          ? parseStudioCrdtBinarySelection(value.data, {
+              workId: this.context.workId,
+              selectionEpoch,
+            })
+          : null;
+      if (!selected) {
+        this.restartAfterCrdtWireFailure(
+          "바이너리 공동 편집 채널 선택 정보가 현재 연결과 일치하지 않아 다시 연결합니다."
+        );
+        return;
+      }
+      this.selectedCrdtWireFormat = STUDIO_CRDT_BINARY_WIRE_FORMAT;
+      this.finishAcceptedJoin(wasJoined);
     });
   }
 
@@ -2457,6 +2627,8 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
 
   private failJoin(message: string, recoverable: boolean, code?: string): void {
     this.joined = false;
+    this.selectedCrdtWireFormat = null;
+    this.clearCrdtWireSelectionTimeout();
     this.pendingPresenceByConnection.clear();
     this.pendingScreenByConnection.clear();
     this.pendingVoiceByConnection.clear();
@@ -2472,6 +2644,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     }
     if (!recoverable || (code && isNonRecoverable(code))) {
       this.accessRevoked = true;
+      this.clearCrdtReconnectTimeout();
       this.clearLockRevisionState();
       this.scrubCredentials();
       this.socket.disconnect();
@@ -2503,6 +2676,9 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       ++this.joinGeneration;
       this.accessRevoked = true;
       this.joined = false;
+      this.selectedCrdtWireFormat = null;
+      this.clearCrdtWireSelectionTimeout();
+      this.clearCrdtReconnectTimeout();
       this.clearJoinRetry(true);
       this.pendingInitialSnapshot = null;
       this.pendingPresenceByConnection.clear();
@@ -2569,6 +2745,8 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.abandonPendingLockAcquisitionsForResync();
     ++this.joinGeneration;
     this.joined = false;
+    this.selectedCrdtWireFormat = null;
+    this.clearCrdtWireSelectionTimeout();
     this.pendingInitialSnapshot = null;
     this.pendingPresenceByConnection.clear();
     this.pendingScreenByConnection.clear();
@@ -3866,9 +4044,15 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   }
 
   private emitCrdtWithAck<T>(
-    event: "studio:crdt:sync" | "studio:crdt:update",
-    payload: StudioCrdtSyncRequest | StudioCrdtUpdateRequest,
-    parse: (value: unknown, options: { expectedWorkId: string }) => T | null
+    event:
+      | "studio:crdt:sync"
+      | "studio:crdt:update"
+      | typeof STUDIO_LIVE_CRDT_BINARY_SYNC_EVENT
+      | typeof STUDIO_LIVE_CRDT_BINARY_UPDATE_EVENT,
+    payload: unknown,
+    parse: (value: unknown, options: { expectedWorkId: string }) => T | null,
+    correlation: "requestId" | "updateId",
+    failClosed = false
   ): Promise<T> {
     if (!this.ready) {
       return Promise.reject(createStudioCrdtRetryableError(
@@ -3914,42 +4098,71 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         const failure = parseFailure(value);
         if (failure) {
           this.handleFailure(failure, "operation");
+          if (failClosed && failure.code === "not_joined") {
+            this.restartAfterCrdtWireFailure(failure.message);
+            reject(createStudioCrdtRetryableError(
+              "connection_changed",
+              failure.message,
+              "connection"
+            ));
+            return;
+          }
           reject(createStudioCrdtServerAckError(failure.code, failure.message));
           return;
         }
         if (!isRecord(value) || value.ok !== true) {
-          const error = createStudioCrdtPermanentError(
-            "invalid_response",
-            "팀 서버의 CRDT 응답을 확인하지 못했습니다.",
-            "server-response"
-          );
+          const error = failClosed
+            ? createStudioCrdtRetryableError(
+                "connection_changed",
+                "바이너리 CRDT 응답을 확인하지 못해 안전하게 다시 연결합니다.",
+                "connection"
+              )
+            : createStudioCrdtPermanentError(
+                "invalid_response",
+                "팀 서버의 CRDT 응답을 확인하지 못했습니다.",
+                "server-response"
+              );
           this.emitStatus({ state: "error", message: error.message, recoverable: true });
+          if (failClosed) this.restartAfterCrdtWireFailure(error.message);
           reject(error);
           return;
         }
         const parsed = parse(value.data, { expectedWorkId: this.context.workId });
         if (!parsed) {
-          const error = createStudioCrdtPermanentError(
-            "invalid_response",
-            "팀 서버의 CRDT 응답 형식이 올바르지 않습니다.",
-            "server-response"
-          );
+          const error = failClosed
+            ? createStudioCrdtRetryableError(
+                "connection_changed",
+                "바이너리 CRDT 응답이 손상되어 안전하게 다시 연결합니다.",
+                "connection"
+              )
+            : createStudioCrdtPermanentError(
+                "invalid_response",
+                "팀 서버의 CRDT 응답 형식이 올바르지 않습니다.",
+                "server-response"
+              );
           this.emitStatus({ state: "error", message: error.message, recoverable: true });
+          if (failClosed) this.restartAfterCrdtWireFailure(error.message);
           reject(error);
           return;
         }
-        const responseMatchesRequest = event === "studio:crdt:sync"
-          ? (parsed as unknown as StudioCrdtSyncResponse).requestId
-            === (payload as StudioCrdtSyncRequest).requestId
-          : (parsed as unknown as StudioCrdtUpdateAck).updateId
-            === (payload as StudioCrdtUpdateRequest).updateId;
+        const responseMatchesRequest =
+          isRecord(parsed) &&
+          isRecord(payload) &&
+          (parsed as Record<string, unknown>)[correlation] === payload[correlation];
         if (!responseMatchesRequest) {
-          const error = createStudioCrdtPermanentError(
-            "response_mismatch",
-            "팀 서버의 CRDT 응답 식별자가 요청과 일치하지 않습니다.",
-            "server-response"
-          );
+          const error = failClosed
+            ? createStudioCrdtRetryableError(
+                "connection_changed",
+                "바이너리 CRDT 응답 식별자가 일치하지 않아 안전하게 다시 연결합니다.",
+                "connection"
+              )
+            : createStudioCrdtPermanentError(
+                "response_mismatch",
+                "팀 서버의 CRDT 응답 식별자가 요청과 일치하지 않습니다.",
+                "server-response"
+              );
           this.emitStatus({ state: "error", message: error.message, recoverable: true });
+          if (failClosed) this.restartAfterCrdtWireFailure(error.message);
           reject(error);
           return;
         }
@@ -3976,12 +4189,56 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     if (typeof oldest === "string") this.seenCrdtUpdateIds.delete(oldest);
   }
 
+  private restartAfterCrdtWireFailure(message: string): void {
+    if (this.closed || this.accessRevoked) return;
+    this.clearCrdtWireSelectionTimeout();
+    this.clearCrdtReconnectTimeout();
+    ++this.joinGeneration;
+    this.joined = false;
+    this.selectedCrdtWireFormat = null;
+    this.selfConnectionId = null;
+    this.pendingInitialSnapshot = null;
+    this.pendingPresenceByConnection.clear();
+    this.pendingScreenByConnection.clear();
+    this.pendingVoiceByConnection.clear();
+    this.pendingLockDeltas.length = 0;
+    this.pendingLockDeltaOverflowed = false;
+    this.rejectPendingCrdtOperations(createStudioCrdtRetryableError(
+      "connection_changed",
+      message,
+      "connection"
+    ));
+    this.pendingCrdtPublishes.clear();
+    this.emitStatus({ state: "error", message, recoverable: true });
+    if (this.socket.connected) this.socket.disconnect();
+    this.crdtReconnectTimeout = this.scheduleTimeout(() => {
+      this.crdtReconnectTimeout = null;
+      if (this.closed || this.accessRevoked) return;
+      if (this.socket.connected) this.beginJoin();
+      else this.socket.connect();
+    }, 0);
+  }
+
   private rejectPendingCrdtOperations(error: StudioCrdtOperationError): void {
     for (const operation of this.pendingCrdtOperations) {
       this.cancelTimeout(operation.timeout);
       operation.reject(error);
     }
     this.pendingCrdtOperations.clear();
+  }
+
+  private clearCrdtWireSelectionTimeout(): void {
+    if (this.crdtWireSelectionTimeout !== null) {
+      this.cancelTimeout(this.crdtWireSelectionTimeout);
+    }
+    this.crdtWireSelectionTimeout = null;
+  }
+
+  private clearCrdtReconnectTimeout(): void {
+    if (this.crdtReconnectTimeout !== null) {
+      this.cancelTimeout(this.crdtReconnectTimeout);
+    }
+    this.crdtReconnectTimeout = null;
   }
 
   private emitStatus(status: StudioLiveTransportStatus): void {

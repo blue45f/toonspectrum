@@ -9,11 +9,22 @@
  */
 
 import { BRUSH_PRESETS } from "./studio-brush";
-import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
+import {
+  STUDIO_BRUSH_PACK_CATALOG_IDS,
+  isStudioBrushPackCatalogId,
+} from "./studio-brush-pack-id";
 
 export const STUDIO_PRO_DRAW_PREFS_KEY = "toonspectrum-studio-pro-draw-prefs:v1";
 export const STUDIO_RECENT_BRUSH_LIMIT = 6;
-export const STUDIO_FAVORITE_BRUSH_LIMIT = 12;
+/**
+ * A professional brush catalogue must not silently stop accepting favorites after a single
+ * compact shelf is full. The shelf still projects only the first few entries; persistence keeps
+ * the complete artist-curated collection. Deriving the bound from both append-only catalogues
+ * makes every currently selectable brush favoriteable without turning malformed storage into an
+ * unbounded list.
+ */
+export const STUDIO_FAVORITE_BRUSH_LIMIT =
+  BRUSH_PRESETS.length + STUDIO_BRUSH_PACK_CATALOG_IDS.length;
 
 export interface StudioProDrawPrefsStorage {
   getItem(key: string): string | null;
@@ -23,9 +34,9 @@ export interface StudioProDrawPrefsStorage {
 export interface StudioProDrawPrefs {
   sizeLocked: boolean;
   opacityLocked: boolean;
-  /** Built-in BRUSH_PRESETS ids, newest first. */
+  /** Core or procedural catalogue ids, newest first. */
   recentBrushIds: string[];
-  /** Built-in BRUSH_PRESETS ids, pin order. */
+  /** Core or procedural catalogue ids, artist-defined pin order. */
   favoriteBrushIds: string[];
 }
 
@@ -94,6 +105,49 @@ export function saveStudioProDrawPrefs(
   } catch {
     return false;
   }
+}
+
+export interface StudioProDrawPrefsMutationResult {
+  prefs: StudioProDrawPrefs;
+  persisted: boolean;
+}
+
+export interface StudioProDrawPrefsMutationOptions {
+  /**
+   * Preserve an in-memory snapshot whose previous write failed, while still retrying persistence.
+   * Without this fence, a readable-but-full storage area would resurrect its stale payload.
+   */
+  preferCurrent?: boolean;
+}
+
+/**
+ * Applies one preference intent against the freshest persisted snapshot.
+ *
+ * Studio may be open in a reference monitor, a pen display, and a mobile companion at once.
+ * Re-reading immediately before a normal mutation prevents a sequential stale-tab overwrite.
+ * The localStorage read/write pair is not a cross-document transaction, so simultaneous writers
+ * still follow the browser's last-writer-wins semantics.
+ */
+export function mutateStudioProDrawPrefs(
+  storage: StudioProDrawPrefsStorage | null | undefined,
+  current: StudioProDrawPrefs,
+  mutate: (latest: StudioProDrawPrefs) => StudioProDrawPrefs,
+  options: StudioProDrawPrefsMutationOptions = {},
+): StudioProDrawPrefsMutationResult {
+  let latest = normalizeStudioProDrawPrefs(current);
+  if (storage && options.preferCurrent !== true) {
+    try {
+      const raw = storage.getItem(STUDIO_PRO_DRAW_PREFS_KEY);
+      if (raw) latest = normalizeStudioProDrawPrefs(JSON.parse(raw));
+    } catch {
+      // Keep the in-memory snapshot usable when storage access or one legacy payload is broken.
+    }
+  }
+  const prefs = normalizeStudioProDrawPrefs(mutate(latest));
+  return {
+    prefs,
+    persisted: saveStudioProDrawPrefs(storage, prefs),
+  };
 }
 
 /** Procreate-style: switching brushes never overwrites the artist's active color. */

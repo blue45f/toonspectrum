@@ -15,6 +15,7 @@ describe("studio creative ux", () => {
     const beginner = listStudioBrushTrayItems("beginner");
     expect(beginner.map((item) => item.id)).toEqual([...STUDIO_BEGINNER_BRUSH_IDS]);
     expect(beginner.every((item) => item.category === "beginner")).toBe(true);
+    expect(beginner.slice(0, 2).map((item) => item.id)).toEqual(["pen", "gpen"]);
   });
 
   it("covers every BRUSH_PRESETS entry exactly once in the full tray", () => {
@@ -89,7 +90,7 @@ describe("studio creative ux", () => {
 
   it("uses the beginner kit when quick brush history is empty and respects zero limit", () => {
     expect(listStudioQuickBrushTrayItems().map((item) => item.id)).toEqual([
-      ...STUDIO_BEGINNER_BRUSH_IDS,
+      ...STUDIO_BEGINNER_BRUSH_IDS.slice(0, 8),
     ]);
     expect(listStudioQuickBrushTrayItems({ limit: 0 })).toEqual([]);
   });
@@ -108,7 +109,7 @@ describe("studio creative ux", () => {
       "heart-stamp",
       "hair-fiber",
       "pen",
-      "fineliner",
+      "gpen",
     ]);
     expect(quick.map((item) => item.quickSource)).toEqual([
       "favorite",

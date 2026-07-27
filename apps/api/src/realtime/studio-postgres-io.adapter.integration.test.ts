@@ -107,6 +107,7 @@ describeWithDirectPostgres("Studio live PostgreSQL adapter two-node integration"
         STUDIO_LIVE_CLUSTER_ADAPTER: "postgres",
         STUDIO_LIVE_POSTGRES_URL: INTEGRATION_URL,
         STUDIO_LIVE_POSTGRES_POOL_MAX: "2",
+        STUDIO_LIVE_POSTGRES_INLINE_BINARY_ENABLED: "true",
       },
       { logger: silentLogger() }
     );
@@ -117,6 +118,7 @@ describeWithDirectPostgres("Studio live PostgreSQL adapter two-node integration"
         STUDIO_LIVE_CLUSTER_ADAPTER: "postgres",
         STUDIO_LIVE_POSTGRES_URL: INTEGRATION_URL,
         STUDIO_LIVE_POSTGRES_POOL_MAX: "2",
+        STUDIO_LIVE_POSTGRES_INLINE_BINARY_ENABLED: "true",
       },
       { logger: silentLogger() }
     );
@@ -166,6 +168,19 @@ describeWithDirectPostgres("Studio live PostgreSQL adapter two-node integration"
     await expect(small).resolves.toEqual({ updateId: "small-update" });
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(smallCount).toBe(1);
+
+    const binaryUpdate = Uint8Array.from([0, 1, 2, 127, 128, 254, 255]);
+    const binary = waitForClientEvent<{ updateId: string; update: Uint8Array }>(
+      clientB,
+      "integration:binary"
+    );
+    namespaceA.to(ROOM).emit("integration:binary", {
+      updateId: "binary-update",
+      update: binaryUpdate,
+    });
+    const receivedBinary = await binary;
+    expect(receivedBinary.updateId).toBe("binary-update");
+    expect(Array.from(receivedBinary.update)).toEqual(Array.from(binaryUpdate));
 
     const largeUpdate = "A".repeat(64 * 1_024);
     const large = waitForClientEvent<{ updateId: string; update: string }>(
