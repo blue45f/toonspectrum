@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeStudioBrushColorDynamicsSettings,
   normalizeStudioBrushGrainSettings,
+  resolveNormalizedStudioBrushGrainAlphaMultiplier,
+  resolveNormalizedStudioBrushGrainAlphaMultiplierAt,
   resolveStudioBrushDabColor,
   resolveStudioBrushGrainAlphaMultiplier,
   studioBrushColorDynamicsIsActive,
@@ -108,5 +110,40 @@ describe("studio brush material dynamics", () => {
       y: 20,
       strokeSeed: 4,
     }, { amount: 0 })).toBe(1);
+  });
+
+  it("keeps the allocation-free grain renderer path exactly equal to the object API", () => {
+    for (const space of ["canvas-fixed", "stroke-fixed"] as const) {
+      const settings = normalizeStudioBrushGrainSettings({
+        space,
+        amount: 0.73,
+        scale: 7.1,
+        contrast: 0.56,
+        seed: 917,
+      });
+      for (const sample of [
+        { x: 0, y: 0, strokeOriginX: 0, strokeOriginY: 0, strokeSeed: 1 },
+        { x: 13.25, y: -8.75, strokeOriginX: 3, strokeOriginY: -2, strokeSeed: 991 },
+        { x: Number.NaN, y: Number.POSITIVE_INFINITY, strokeSeed: Number.NaN },
+      ]) {
+        expect(resolveNormalizedStudioBrushGrainAlphaMultiplierAt(
+          sample.x,
+          sample.y,
+          sample.strokeOriginX,
+          sample.strokeOriginY,
+          sample.strokeSeed,
+          settings
+        )).toBe(resolveNormalizedStudioBrushGrainAlphaMultiplier(sample, settings));
+      }
+    }
+    const disabled = normalizeStudioBrushGrainSettings({ amount: 0 });
+    expect(resolveNormalizedStudioBrushGrainAlphaMultiplierAt(
+      Number.NaN,
+      Number.NaN,
+      undefined,
+      undefined,
+      Number.NaN,
+      disabled
+    )).toBe(1);
   });
 });

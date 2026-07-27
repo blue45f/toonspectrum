@@ -501,6 +501,39 @@ describe("studio dynamic brush arc-length dab planner", () => {
     expect(settings).toEqual(before);
   });
 
+  it("resolves each uncapped station recipe once in the normalized renderer hot path", () => {
+    const settings = normalizeStudioBrushDynamicsSettings({
+      spacingRatio: null,
+      spacing: { base: 2.5, mappings: [] },
+      scatter: { base: 0, mappings: [] },
+      width: {
+        base: 12,
+        mappings: [{ source: "pressure", from: 0.6, to: 1.4 }],
+      },
+    });
+    const mapping = settings.width.mappings[0]!;
+    let sourceReads = 0;
+    Object.defineProperty(mapping, "source", {
+      configurable: true,
+      get() {
+        sourceReads += 1;
+        return "pressure";
+      },
+    });
+
+    const dabs = planNormalizedStudioDynamicBrushDabs({
+      points: [0, 0, 80, 0],
+      pressures: [0.25, 0.85],
+      baseWidth: 12,
+      baseOpacity: 0.8,
+      seed: 31,
+      maxDabs: 256,
+    }, settings);
+
+    expect(dabs.length).toBeGreaterThan(10);
+    expect(sourceReads).toBe(dabs.length);
+  });
+
   it("lets plan-level baseWidth and baseOpacity override persisted property bases", () => {
     const plan = planStudioDynamicBrush({
       points: [0, 0],

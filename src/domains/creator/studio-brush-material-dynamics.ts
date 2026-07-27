@@ -373,16 +373,38 @@ export function resolveNormalizedStudioBrushGrainAlphaMultiplier(
   sample: StudioBrushGrainSample,
   settings: NormalizedStudioBrushGrainSettings
 ): number {
+  return resolveNormalizedStudioBrushGrainAlphaMultiplierAt(
+    sample.x,
+    sample.y,
+    sample.strokeOriginX,
+    sample.strokeOriginY,
+    sample.strokeSeed,
+    settings
+  );
+}
+
+/**
+ * Allocation-free renderer path for high-density tip samples. The object-based public helper
+ * above delegates here so Canvas, SVG and collaboration replay retain one exact grain formula.
+ */
+export function resolveNormalizedStudioBrushGrainAlphaMultiplierAt(
+  sampleX: number,
+  sampleY: number,
+  strokeOriginX: number | undefined,
+  strokeOriginY: number | undefined,
+  strokeSeed: number,
+  settings: NormalizedStudioBrushGrainSettings
+): number {
   if (settings.amount <= 0) return 1;
-  const x = finiteNumber(sample.x, 0);
-  const y = finiteNumber(sample.y, 0);
+  const x = finiteNumber(sampleX, 0);
+  const y = finiteNumber(sampleY, 0);
   const anchorX = settings.space === "stroke-fixed"
-    ? finiteNumber(sample.strokeOriginX, 0)
+    ? finiteNumber(strokeOriginX, 0)
     : 0;
   const anchorY = settings.space === "stroke-fixed"
-    ? finiteNumber(sample.strokeOriginY, 0)
+    ? finiteNumber(strokeOriginY, 0)
     : 0;
-  const seed = (uint32(sample.strokeSeed, 1) ^ settings.seed ^ 0xb7e1_5163) >>> 0;
+  const seed = (uint32(strokeSeed, 1) ^ settings.seed ^ 0xb7e1_5163) >>> 0;
   const noise = valueNoise((x - anchorX) / settings.scale, (y - anchorY) / settings.scale, seed);
   const contrasted = clamp01((noise - 0.5) * (1 + settings.contrast * 4) + 0.5);
   return clamp01(1 - settings.amount * (1 - contrasted));

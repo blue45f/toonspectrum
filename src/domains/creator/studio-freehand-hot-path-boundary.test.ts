@@ -13,16 +13,27 @@ function functionBody(startNeedle: string, endNeedle: string): string {
 }
 
 describe("Studio freehand hot-path boundary", () => {
-  it("maps a complete browser sample batch from one layout and transform snapshot", () => {
+  it("rejects replay-only batches before mapping and shares one frame mapper for real work", () => {
     const consume = functionBody(
       "function consumeFreehandPointerBatch(",
       "function publishAuthoritativeFreehandSuffix("
     );
+    const replayExit = consume.indexOf(
+      "if (batch.authoritative.length === 0 && batch.predicted.length === 0) return false"
+    );
+    const mapper = consume.indexOf(
+      "stagePointerFrameMapperCacheRef.current?.mapperFor(stage)"
+    );
 
+    expect(replayExit).toBeGreaterThan(-1);
+    expect(mapper).toBeGreaterThan(replayExit);
     expect(consume).toContain("snapshotStudioStagePointerBatchMapper(stage)");
     expect(consume).toContain("coordinateMapper.pointFor(sample)");
     expect(consume).not.toContain("stage.setPointersPositions(sample)");
     expect(consume.match(/stage\.setPointersPositions\(pointerEvent\)/gu)).toHaveLength(1);
+    expect(consume.indexOf("shouldSynchronizeStudioStagePointerPosition(")).toBeLessThan(
+      consume.indexOf("stage.setPointersPositions(pointerEvent)")
+    );
   });
 
   it("owns a coalesced batch from the active mutable surface instead of the model flag", () => {
@@ -44,22 +55,48 @@ describe("Studio freehand hot-path boundary", () => {
     );
   });
 
-  it("processes authoritative ink before coalescing the contact cursor with the same mapper", () => {
+  it("proves useful ink before mapping and coalesces the contact cursor with the same mapper", () => {
     const transport = functionBody(
       "onAuthoritativeMove: (pointerEvent) => {",
       "onDiscard: () => {"
     );
+    const consumeIndex = transport.indexOf("consumeFreehandPointerBatch(");
+    const mapperIndex = transport.indexOf("pointerMapperCache.mapperFor(stage)");
+    const contactIndex = transport.indexOf(".pointFor(pointerEvent)");
     const cursorIndex = transport.indexOf(
       "updateBrushCursor(stage, pointerEvent, contactPoint, true)"
     );
-    const consumeIndex = transport.indexOf("consumeFreehandPointerBatch(");
 
+    expect(consumeIndex).toBeGreaterThan(-1);
+    expect(mapperIndex).toBeGreaterThan(consumeIndex);
+    expect(contactIndex).toBeGreaterThan(mapperIndex);
     expect(cursorIndex).toBeGreaterThan(-1);
-    expect(cursorIndex).toBeGreaterThan(consumeIndex);
-    expect(transport).toContain("{ coordinateMapper }");
+    expect(cursorIndex).toBeGreaterThan(contactIndex);
+    expect(transport).toContain("if (!consumeFreehandPointerBatch(");
     expect(transport).toContain("contactPoint, true");
     expect(transport).toContain("canCollectStudioPointerPredictionsForActiveTail(");
     expect(transport).toContain("predictedInkTailStateRef.current !== null");
+    expect(transport).toContain("noteQuickShapePointerMoved(contactPoint)");
+  });
+
+  it("returns from the duplicate Konva route before unrelated active-tool branches", () => {
+    const stageMove = functionBody(
+      "function onStageMove(",
+      "function appendFixedRateStrokeSamples("
+    );
+    const nativeOwnership = stageMove.indexOf("const nativeFreehandMoveOwnsStage =");
+    const earlyReturn = stageMove.indexOf("if (nativeFreehandMoveOwnsStage) return;");
+    const unrelatedBranch = stageMove.indexOf("if (advancedFillTapGestureRef.current)");
+
+    expect(nativeOwnership).toBeGreaterThan(-1);
+    expect(earlyReturn).toBeGreaterThan(nativeOwnership);
+    expect(unrelatedBranch).toBeGreaterThan(earlyReturn);
+    expect(stageMove).toContain("studioLiveRoomRef.current?.publishCursorWhenDue(() => {");
+    expect(stageMove.indexOf("pts.slice(-64)")).toBeGreaterThan(
+      stageMove.indexOf("publishCursorWhenDue(() => {")
+    );
+    expect(stageMove).toContain("if (colorWheelTimerRef.current && colorWheelPressRef.current)");
+    expect(stageMove).not.toContain("nativeFreehandMoveOwnsCursor");
   });
 
   it("skips raw pen coordinate mapping when prediction, cursor, and guide have no consumer", () => {

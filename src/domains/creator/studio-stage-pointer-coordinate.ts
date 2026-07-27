@@ -36,11 +36,34 @@ export interface StudioStagePointerFrameMapperCacheLease {
 }
 
 type StudioStageCoordinateSource = Pick<Konva.Stage, "getAbsoluteTransform" | "getContent">;
+type StudioStagePointerContent = Pick<HTMLElement, "contains">;
 
 function positiveFiniteScale(renderedSize: number, layoutSize: number): number {
   if (!(renderedSize > 0) || !(layoutSize > 0)) return 1;
   const scale = renderedSize / layoutSize;
   return Number.isFinite(scale) && scale > 0 ? scale : 1;
+}
+
+/**
+ * A native window-capture listener runs before Konva's listener on the Stage content. When the
+ * event is already routed through that content, Konva will synchronize its pointer bookkeeping
+ * later in the same DOM dispatch; doing it manually in the capture listener would force a second
+ * `getBoundingClientRect()` read for every high-rate pen sample.
+ *
+ * Pointer capture can still fail in an embedded host. Events then arrive from outside the Stage,
+ * so the native drawing path must retain the manual synchronization fallback.
+ */
+export function shouldSynchronizeStudioStagePointerPosition(
+  content: StudioStagePointerContent | null | undefined,
+  eventTarget: EventTarget | null
+): boolean {
+  if (!content || !eventTarget) return true;
+  if (eventTarget === (content as unknown as EventTarget)) return false;
+  try {
+    return !content.contains(eventTarget as Node);
+  } catch {
+    return true;
+  }
 }
 
 /**

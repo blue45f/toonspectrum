@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createStudioStagePointerFrameMapperCache,
+  shouldSynchronizeStudioStagePointerPosition,
   snapshotStudioStagePointerBatchMapper,
 } from "./studio-stage-pointer-coordinate";
 
@@ -65,6 +66,52 @@ describe("snapshotStudioStagePointerBatchMapper", () => {
 
     expect(mapper.pointFor({ clientX: Number.POSITIVE_INFINITY, clientY: 10 })).toBeNull();
     expect(mapper.pointFor({ clientX: 10, clientY: 10 })).toBeNull();
+  });
+});
+
+describe("shouldSynchronizeStudioStagePointerPosition", () => {
+  it("lets Konva own normal content-routed events without a duplicate layout read", () => {
+    const child = {} as Node;
+    const content = {
+      contains: vi.fn((candidate: Node | null) => candidate === child),
+    } as Pick<HTMLElement, "contains">;
+
+    expect(
+      shouldSynchronizeStudioStagePointerPosition(
+        content,
+        content as unknown as EventTarget
+      )
+    ).toBe(false);
+    expect(
+      shouldSynchronizeStudioStagePointerPosition(
+        content,
+        child as unknown as EventTarget
+      )
+    ).toBe(false);
+    expect(content.contains).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps manual synchronization when pointer capture did not route through the Stage", () => {
+    const outside = {} as EventTarget;
+    const content = {
+      contains: vi.fn(() => false),
+    } as Pick<HTMLElement, "contains">;
+
+    expect(shouldSynchronizeStudioStagePointerPosition(content, outside)).toBe(true);
+    expect(shouldSynchronizeStudioStagePointerPosition(null, outside)).toBe(true);
+    expect(shouldSynchronizeStudioStagePointerPosition(content, null)).toBe(true);
+  });
+
+  it("fails safe when a detached host throws while checking the event route", () => {
+    const content = {
+      contains: vi.fn(() => {
+        throw new Error("detached");
+      }),
+    } as Pick<HTMLElement, "contains">;
+
+    expect(
+      shouldSynchronizeStudioStagePointerPosition(content, {} as EventTarget)
+    ).toBe(true);
   });
 });
 

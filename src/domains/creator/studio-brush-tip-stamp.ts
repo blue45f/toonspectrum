@@ -68,6 +68,12 @@ export interface StudioBrushTipAlphaMap {
   shape: StudioBrushTipShapeId;
   softness: number;
   custom: boolean;
+  /**
+   * Stable content revision for immutable renderer maps. Maps without a revision are treated as
+   * editable external inputs and are resampled on every call; editors may increment this value
+   * after an in-place update to retain caching safely.
+   */
+  readonly revision?: string | number;
 }
 
 export interface StudioBrushTipStampSample {
@@ -86,6 +92,13 @@ export interface StudioBrushTipStampPlan {
   grid: number;
 }
 
+export type StudioBrushTipStampSampleVisitor = (
+  dx: number,
+  dy: number,
+  alpha: number,
+  radius: number
+) => void;
+
 const DEFAULT_TIP: NormalizedStudioBrushTipSettings = {
   shape: "round",
   softness: 0.35,
@@ -96,7 +109,29 @@ const DEFAULT_TIP: NormalizedStudioBrushTipSettings = {
 const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 const STUDIO_BRUSH_TIP_STAMP_ALPHA_THRESHOLD = 0.02;
 const tipAlphaMapCache = new Map<string, StudioBrushTipAlphaMap>();
-const tipStampSampleCountCache = new WeakMap<StudioBrushTipAlphaMap, Map<number, number>>();
+const normalizedTipSettingsCache = new Map<string, NormalizedStudioBrushTipSettings>();
+
+interface StudioBrushTipStampUnitSample {
+  readonly localX: number;
+  readonly localY: number;
+  readonly alpha: number;
+  readonly fallback?: true;
+}
+
+/**
+ * Alpha-map lookup coordinates only depend on the immutable map identity and stamp grid. Keeping
+ * this bounded by the alpha-map LRU avoids repeating the same bilinear 9×9 texture scan for every
+ * dab in an active stroke.
+ */
+interface StudioBrushTipStampUnitSampleCache {
+  readonly revision: string | number;
+  readonly samplesByGrid: Map<number, readonly StudioBrushTipStampUnitSample[]>;
+}
+
+const tipStampUnitSampleCache = new WeakMap<
+  StudioBrushTipAlphaMap,
+  StudioBrushTipStampUnitSampleCache
+>();
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -119,15 +154,22 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 function studioBrushTipAlphaMapCacheKey(value: unknown): string {
   const source = asRecord(value);
   if (!source) return "default";
-  const shape = typeof source.shape === "string" ? source.shape : "";
-  const softness = typeof source.softness === "number" ? source.softness : "";
-  const alphaMapSize = typeof source.alphaMapSize === "number" ? source.alphaMapSize : "";
+  const shape = typeof source.shape === "string" ? source.shape : null;
+  const softness = typeof source.softness === "number" && Number.isFinite(source.softness)
+    ? source.softness
+    : null;
+  const alphaMapSize = typeof source.alphaMapSize === "number" && Number.isFinite(source.alphaMapSize)
+    ? source.alphaMapSize
+    : null;
   const alphaMapBase64 = typeof source.alphaMapBase64 === "string"
     ? source.alphaMapBase64.length <= STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_SOURCE_MAX_CHARS
       ? source.alphaMapBase64
       : `oversized:${source.alphaMapBase64.length}`
-    : source.alphaMapBase64 === null ? "null" : "";
-  return `${shape}\u0000${softness}\u0000${alphaMapSize}\u0000${alphaMapBase64}`;
+    : null;
+  // Structured encoding keeps arbitrary imported strings (including NUL separators) from
+  // aliasing another document's normalized settings. Oversized payloads are intentionally keyed
+  // only by length because every such payload normalizes to the same absent alpha map.
+  return JSON.stringify([shape, softness, alphaMapSize, alphaMapBase64]);
 }
 
 function cachedStudioBrushTipAlphaMap(key: string): StudioBrushTipAlphaMap | null {
@@ -149,6 +191,26 @@ function cacheStudioBrushTipAlphaMap(
   }
   tipAlphaMapCache.set(key, map);
   return map;
+}
+
+function normalizedStudioBrushTipSettingsForStamp(
+  value: unknown
+): NormalizedStudioBrushTipSettings {
+  const key = studioBrushTipAlphaMapCacheKey(value);
+  const cached = normalizedTipSettingsCache.get(key);
+  if (cached) {
+    normalizedTipSettingsCache.delete(key);
+    normalizedTipSettingsCache.set(key, cached);
+    // `plan.tip` has historically been detached. Never expose the cached canonical object.
+    return { ...cached };
+  }
+  const normalized = normalizeStudioBrushTipSettings(value);
+  if (normalizedTipSettingsCache.size >= STUDIO_BRUSH_TIP_ALPHA_MAP_CACHE_LIMIT) {
+    const oldestKey = normalizedTipSettingsCache.keys().next().value;
+    if (oldestKey !== undefined) normalizedTipSettingsCache.delete(oldestKey);
+  }
+  normalizedTipSettingsCache.set(key, normalized);
+  return { ...normalized };
 }
 
 export function isStudioBrushTipShapeId(value: unknown): value is StudioBrushTipShapeId {
@@ -438,6 +500,7 @@ export function buildStudioBrushTipAlphaMap(value?: unknown): StudioBrushTipAlph
         shape: tip.shape,
         softness: tip.softness,
         custom: true,
+        revision: cacheKey,
       });
     }
   }
@@ -447,6 +510,7 @@ export function buildStudioBrushTipAlphaMap(value?: unknown): StudioBrushTipAlph
     shape: tip.shape,
     softness: tip.softness,
     custom: false,
+    revision: cacheKey,
   });
 }
 
@@ -485,6 +549,49 @@ function normalizedStudioBrushTipStampGrid(value: unknown): number {
   return grid % 2 === 0 ? grid + 1 : grid;
 }
 
+function studioBrushTipStampUnitSamples(
+  map: StudioBrushTipAlphaMap,
+  grid: number
+): readonly StudioBrushTipStampUnitSample[] {
+  const revision = map.revision;
+  const cacheEntry = revision === undefined ? undefined : tipStampUnitSampleCache.get(map);
+  const cached = (
+    cacheEntry
+    && Object.is(cacheEntry.revision, revision)
+  )
+    ? cacheEntry.samplesByGrid.get(grid)
+    : undefined;
+  if (cached) return cached;
+  const half = (grid - 1) / 2;
+  const samples: StudioBrushTipStampUnitSample[] = [];
+  for (let gy = -half; gy <= half; gy++) {
+    for (let gx = -half; gx <= half; gx++) {
+      const localX = half === 0 ? 0 : gx / half;
+      const localY = half === 0 ? 0 : gy / half;
+      const mapX = (localX * 0.5 + 0.5) * (map.size - 1);
+      const mapY = (localY * 0.5 + 0.5) * (map.size - 1);
+      const alpha = sampleStudioBrushTipAlphaMap(map, mapX, mapY);
+      if (alpha <= STUDIO_BRUSH_TIP_STAMP_ALPHA_THRESHOLD) continue;
+      samples.push({ localX, localY, alpha });
+    }
+  }
+  // Degenerate empty tip: keep a single centre dab so strokes never vanish.
+  if (samples.length === 0) {
+    samples.push({ localX: 0, localY: 0, alpha: 1, fallback: true });
+  }
+  if (revision !== undefined) {
+    const samplesByGrid = (
+      cacheEntry
+      && Object.is(cacheEntry.revision, revision)
+    )
+      ? cacheEntry.samplesByGrid
+      : new Map<number, readonly StudioBrushTipStampUnitSample[]>();
+    samplesByGrid.set(grid, samples);
+    tipStampUnitSampleCache.set(map, { revision, samplesByGrid });
+  }
+  return samples;
+}
+
 /** Counts alpha-tip render marks without allocating the stamp geometry used by each live dab. */
 export function countStudioBrushTipStampSamples(
   tipSettings?: unknown,
@@ -492,27 +599,56 @@ export function countStudioBrushTipStampSamples(
 ): number {
   const map = options?.alphaMap ?? buildStudioBrushTipAlphaMap(tipSettings);
   const grid = normalizedStudioBrushTipStampGrid(options?.grid);
-  const cached = tipStampSampleCountCache.get(map)?.get(grid);
-  if (cached !== undefined) return cached;
-  const half = (grid - 1) / 2;
-  let samples = 0;
-  for (let gy = -half; gy <= half; gy++) {
-    for (let gx = -half; gx <= half; gx++) {
-      const localX = half === 0 ? 0 : gx / half;
-      const localY = half === 0 ? 0 : gy / half;
-      const mapX = (localX * 0.5 + 0.5) * (map.size - 1);
-      const mapY = (localY * 0.5 + 0.5) * (map.size - 1);
-      if (
-        sampleStudioBrushTipAlphaMap(map, mapX, mapY)
-          > STUDIO_BRUSH_TIP_STAMP_ALPHA_THRESHOLD
-      ) samples += 1;
-    }
+  return studioBrushTipStampUnitSamples(map, grid).length;
+}
+
+function visitStudioBrushTipStampSamplesOnGrid(
+  dab: Pick<StudioDynamicBrushDab, "size" | "angle" | "roundness">,
+  map: StudioBrushTipAlphaMap,
+  oddGrid: number,
+  visit: StudioBrushTipStampSampleVisitor
+): number {
+  const half = (oddGrid - 1) / 2;
+  const radius = Math.max(0.25, finiteNumber(dab.size, 1) / 2);
+  const roundness = clamp(finiteNumber(dab.roundness, 1), 0.08, 1);
+  const angleRad = finiteNumber(dab.angle, 0) * Math.PI / 180;
+  const cos = Math.cos(angleRad);
+  const sin = Math.sin(angleRad);
+  const cell = radius / Math.max(1, half);
+  const unitSamples = studioBrushTipStampUnitSamples(map, oddGrid);
+  const sampleRadius = unitSamples.length === 1 && unitSamples[0]!.fallback
+    ? Math.max(0.25, radius * 0.35)
+    : Math.max(0.2, cell * 0.72);
+  for (const sample of unitSamples) {
+    // Apply elliptical roundness on the tip Y axis before rotation (matches canvas ellipse path).
+    const sx = sample.localX * radius;
+    const sy = sample.localY * radius * roundness;
+    visit(
+      sx * cos - sy * sin,
+      sx * sin + sy * cos,
+      sample.alpha,
+      sampleRadius
+    );
   }
-  const count = Math.max(1, samples);
-  const countsByGrid = tipStampSampleCountCache.get(map) ?? new Map<number, number>();
-  countsByGrid.set(grid, count);
-  tipStampSampleCountCache.set(map, countsByGrid);
-  return count;
+  return unitSamples.length;
+}
+
+/**
+ * Allocation-free renderer API for an already built alpha map. It emits the same primitive sample
+ * sequence as `planStudioBrushTipStamp` without allocating a plan, detached tip or sample objects.
+ */
+export function visitStudioBrushTipStampSamples(
+  dab: Pick<StudioDynamicBrushDab, "size" | "angle" | "roundness">,
+  map: StudioBrushTipAlphaMap,
+  visit: StudioBrushTipStampSampleVisitor,
+  options?: { grid?: number }
+): number {
+  return visitStudioBrushTipStampSamplesOnGrid(
+    dab,
+    map,
+    normalizedStudioBrushTipStampGrid(options?.grid),
+    visit
+  );
 }
 
 /**
@@ -524,49 +660,19 @@ export function planStudioBrushTipStamp(
   tipSettings?: unknown,
   options?: { grid?: number; alphaMap?: StudioBrushTipAlphaMap | null }
 ): StudioBrushTipStampPlan {
-  const tip = normalizeStudioBrushTipSettings(tipSettings);
+  const tip = normalizedStudioBrushTipSettingsForStamp(tipSettings);
   const map = options?.alphaMap ?? buildStudioBrushTipAlphaMap(tip);
   const oddGrid = normalizedStudioBrushTipStampGrid(options?.grid);
-  const half = (oddGrid - 1) / 2;
-  const radius = Math.max(0.25, finiteNumber(dab.size, 1) / 2);
-  const roundness = clamp(
-    finiteNumber(dab.roundness, 1),
-    0.08,
-    1
-  );
-  const angleRad = finiteNumber(dab.angle, 0) * Math.PI / 180;
-  const cos = Math.cos(angleRad);
-  const sin = Math.sin(angleRad);
-  const cell = radius / Math.max(1, half);
   const samples: StudioBrushTipStampSample[] = [];
 
-  for (let gy = -half; gy <= half; gy++) {
-    for (let gx = -half; gx <= half; gx++) {
-      const localX = half === 0 ? 0 : gx / half;
-      const localY = half === 0 ? 0 : gy / half;
-      // Map local tip coords [-1,1] onto alpha map pixels.
-      const mapX = (localX * 0.5 + 0.5) * (map.size - 1);
-      const mapY = (localY * 0.5 + 0.5) * (map.size - 1);
-      const alpha = sampleStudioBrushTipAlphaMap(map, mapX, mapY);
-      if (alpha <= STUDIO_BRUSH_TIP_STAMP_ALPHA_THRESHOLD) continue;
-      // Apply elliptical roundness on the tip Y axis before rotation (matches canvas ellipse path).
-      const sx = localX * radius;
-      const sy = localY * radius * roundness;
-      const dx = sx * cos - sy * sin;
-      const dy = sx * sin + sy * cos;
-      samples.push({
-        dx,
-        dy,
-        alpha,
-        radius: Math.max(0.2, cell * 0.72),
-      });
-    }
-  }
-
-  // Degenerate empty tip: keep a single centre dab so strokes never vanish.
-  if (samples.length === 0) {
-    samples.push({ dx: 0, dy: 0, alpha: 1, radius: Math.max(0.25, radius * 0.35) });
-  }
+  visitStudioBrushTipStampSamplesOnGrid(dab, map, oddGrid, (dx, dy, alpha, radius) => {
+    samples.push({
+      dx,
+      dy,
+      alpha,
+      radius,
+    });
+  });
 
   return {
     samples,

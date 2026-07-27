@@ -19,6 +19,7 @@ import {
   sampleStudioBrushTipProceduralAlpha,
   studioBrushTipAlphaMapToBase64,
   studioBrushTipUsesSolidEllipse,
+  visitStudioBrushTipStampSamples,
 } from "./studio-brush-tip-stamp";
 
 describe("studio brush tip alpha maps", () => {
@@ -198,6 +199,130 @@ describe("studio brush tip stamp planner", () => {
     const maxAbsDx = Math.max(...first.samples.map((sample) => Math.abs(sample.dx)));
     const maxAbsDy = Math.max(...first.samples.map((sample) => Math.abs(sample.dy)));
     expect(maxAbsDy).toBeGreaterThan(maxAbsDx);
+  });
+
+  it("emits the exact plan sequence through the allocation-free sample visitor", () => {
+    const size = 8;
+    const bytes = new Uint8Array(size * size);
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = index % 3 === 0 ? 255 : index % 5 === 0 ? 96 : 0;
+    }
+    const tip = {
+      shape: "grain" as const,
+      softness: 0.2,
+      alphaMapBase64: encodeStudioBrushTipAlphaMapBase64(bytes),
+      alphaMapSize: size,
+    };
+    const map = buildStudioBrushTipAlphaMap(tip);
+
+    for (const grid of [3, 5, 7]) {
+      for (const dab of [
+        { x: 10, y: 20, size: 5, angle: 0, roundness: 1, opacity: 1, flow: 1 },
+        { x: -4, y: 8, size: 19, angle: 37, roundness: 0.42, opacity: 0.7, flow: 0.8 },
+      ]) {
+        const plan = planStudioBrushTipStamp(dab, tip, { alphaMap: map, grid });
+        const visited: typeof plan.samples = [];
+        const count = visitStudioBrushTipStampSamples(
+          dab,
+          map,
+          (dx, dy, alpha, radius) => visited.push({ dx, dy, alpha, radius }),
+          { grid }
+        );
+        expect(count).toBe(plan.samples.length);
+        expect(visited).toEqual(plan.samples);
+      }
+    }
+  });
+
+  it("reuses an immutable alpha-grid template without rescanning texture pixels per dab", () => {
+    const size = 8;
+    let alphaReads = 0;
+    const alphas = new Proxy(
+      Array.from({ length: size * size }, (_, index) => (
+        index % size >= 2 && index % size <= 5 ? 0.8 : 0
+      )),
+      {
+        get(target, property, receiver) {
+          if (typeof property === "string" && /^\d+$/.test(property)) alphaReads += 1;
+          return Reflect.get(target, property, receiver);
+        },
+      }
+    ) as unknown as Float32Array;
+    const alphaMap = {
+      size,
+      alphas,
+      shape: "grain" as const,
+      softness: 0.2,
+      custom: true,
+      revision: "immutable-proxy-v1",
+    };
+    const dab = {
+      x: 12,
+      y: 18,
+      size: 20,
+      angle: 25,
+      roundness: 0.6,
+      opacity: 0.9,
+      flow: 0.7,
+    };
+    const tip = { shape: "grain" as const, softness: 0.2 };
+
+    const first = planStudioBrushTipStamp(dab, tip, { alphaMap, grid: 9 });
+    const firstPassReads = alphaReads;
+    const second = planStudioBrushTipStamp(dab, tip, { alphaMap, grid: 9 });
+
+    expect(firstPassReads).toBeGreaterThan(0);
+    expect(alphaReads).toBe(firstPassReads);
+    expect(second).toEqual(first);
+    second.tip.softness = 1;
+    expect(planStudioBrushTipStamp(dab, tip, { alphaMap, grid: 9 }).tip.softness).toBe(0.2);
+  });
+
+  it("resamples an editable alpha map after an in-place update", () => {
+    const alphaMap = {
+      size: 8,
+      alphas: new Float32Array(8 * 8),
+      shape: "hard" as const,
+      softness: 0,
+      custom: true,
+    };
+    const dab = {
+      x: 0,
+      y: 0,
+      size: 20,
+      angle: 0,
+      roundness: 1,
+      opacity: 1,
+      flow: 1,
+    };
+
+    expect(planStudioBrushTipStamp(dab, undefined, { alphaMap, grid: 9 }).samples).toHaveLength(1);
+    alphaMap.alphas.fill(1);
+    expect(planStudioBrushTipStamp(dab, undefined, { alphaMap, grid: 9 }).samples).toHaveLength(81);
+  });
+
+  it("keeps malformed raw settings with embedded separators from poisoning the tip cache", () => {
+    const dab = {
+      x: 0,
+      y: 0,
+      size: 20,
+      angle: 0,
+      roundness: 1,
+      opacity: 1,
+      flow: 1,
+    };
+    const invalidFirst = {
+      shape: "round\u00000",
+      alphaMapBase64: "x",
+    };
+    const validSecond = {
+      shape: "round",
+      softness: 0,
+      alphaMapBase64: "\u0000x",
+    };
+
+    expect(planStudioBrushTipStamp(dab, invalidFirst).tip.softness).toBe(0.35);
+    expect(planStudioBrushTipStamp(dab, validSecond).tip.softness).toBe(0);
   });
 
   it("places stamps on dynamics spacing stations and respects scatter seed", () => {

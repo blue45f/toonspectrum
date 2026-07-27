@@ -54,10 +54,10 @@ describe("Studio canvas cursor integration boundary", () => {
       "const pointerMapperCache = stagePointerFrameMapperCacheRef.current;",
     );
     const mapper = authoritativeMove.indexOf(
-      "const coordinateMapper = pointerMapperCache.mapperFor(stage);",
+      "pointerMapperCache.mapperFor(stage).pointFor(pointerEvent)",
     );
     const contactPoint = authoritativeMove.indexOf(
-      "const contactPoint = coordinateMapper.pointFor(pointerEvent);",
+      "const contactPoint = pointerMapperCache.mapperFor(stage).pointFor(pointerEvent);",
     );
     const consume = authoritativeMove.indexOf("consumeFreehandPointerBatch(");
     const cursor = authoritativeMove.indexOf(
@@ -73,13 +73,14 @@ describe("Studio canvas cursor integration boundary", () => {
       "brushId={drawMode === \"eraser\" ? \"eraser\" : brush}",
     );
     expect(snapshot).toBeGreaterThanOrEqual(0);
-    expect(mapper).toBeGreaterThan(snapshot);
-    expect(contactPoint).toBeGreaterThan(mapper);
-    expect(consume).toBeGreaterThan(contactPoint);
-    expect(cursor).toBeGreaterThan(consume);
-    expect(authoritativeMove).toContain("{ coordinateMapper }");
+    expect(consume).toBeGreaterThanOrEqual(0);
+    expect(snapshot).toBeGreaterThan(consume);
+    expect(mapper).toBeGreaterThanOrEqual(snapshot);
+    expect(contactPoint).toBe(mapper - "const contactPoint = ".length);
+    expect(cursor).toBeGreaterThan(mapper);
+    expect(authoritativeMove).toContain("if (!consumeFreehandPointerBatch(");
     expect(authoritativeMove.match(/pointerMapperCache\.mapperFor\(stage\)/gu)).toHaveLength(1);
-    expect(authoritativeMove.match(/coordinateMapper\.pointFor\(pointerEvent\)/gu)).toHaveLength(1);
+    expect(authoritativeMove.match(/\.pointFor\(pointerEvent\)/gu)).toHaveLength(1);
     expect(rawUpdate.match(/pointerMapperCache\.mapperFor\(stage\)/gu)).toHaveLength(1);
     expect(rawUpdate.match(/coordinateMapper\.pointFor\(pointerEvent\)/gu)).toHaveLength(1);
     expect(studioPageSource).toContain("acquireStudioStagePointerFrameMapperCache(");
@@ -107,7 +108,8 @@ describe("Studio canvas cursor integration boundary", () => {
       ),
     ).toHaveLength(2);
     expect(studioPageSource).toContain("drawBrushCursorLayer(deferToFrame);");
-    expect(studioPageSource).toContain("if (!nativeFreehandMoveOwnsCursor)");
+    expect(studioPageSource).toContain("if (nativeFreehandMoveOwnsStage) return;");
+    expect(studioPageSource).not.toContain("nativeFreehandMoveOwnsCursor");
     expect(studioPageSource).not.toContain("Hide the hover-only size preview");
   });
 

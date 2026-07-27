@@ -369,6 +369,7 @@ export function composeStudioBrushDualTipAlphaMap(
     shape: primaryMap.shape,
     softness: primaryMap.softness,
     custom: true,
+    revision: cacheKey,
   };
   if (dualTipAlphaMapCache.size >= STUDIO_BRUSH_DUAL_TIP_ALPHA_MAP_CACHE_LIMIT) {
     const oldestKey = dualTipAlphaMapCache.keys().next().value;

@@ -1463,7 +1463,8 @@ function sampleForStation(
 
 function settingsForPlan(
   input: Partial<StudioDynamicBrushPlanInput>,
-  normalizedSettings?: NormalizedStudioBrushDynamicsSettings
+  normalizedSettings?: NormalizedStudioBrushDynamicsSettings,
+  detachSettings = true
 ): NormalizedStudioBrushDynamicsSettings {
   const settings = normalizedSettings ?? normalizeStudioBrushDynamicsSettings(input.settings);
   const width = clamp(
@@ -1482,6 +1483,19 @@ function settingsForPlan(
   const scatter = settings.scatterRatio === null
     ? settings.scatter.base
     : clamp(width * settings.scatterRatio, settings.scatter.min, settings.scatter.max);
+  if (!detachSettings) {
+    // The normalized renderer helper returns only dabs and never exposes this plan-local value.
+    // Keep immutable nested settings by reference instead of cloning every mapping/tip/grain field
+    // on each active-draft frame.
+    return {
+      ...settings,
+      seed: uint32(input.seed, settings.seed),
+      width: { ...settings.width, base: width },
+      opacity: { ...settings.opacity, base: opacity },
+      spacing: { ...settings.spacing, base: spacing },
+      scatter: { ...settings.scatter, base: scatter },
+    };
+  }
   return {
     ...settings,
     seed: uint32(input.seed, settings.seed),
@@ -1506,9 +1520,10 @@ function settingsForPlan(
  */
 function planStudioDynamicBrushFromInput(
   input: Partial<StudioDynamicBrushPlanInput>,
-  normalizedSettings?: NormalizedStudioBrushDynamicsSettings
+  normalizedSettings?: NormalizedStudioBrushDynamicsSettings,
+  detachSettings = true
 ): StudioDynamicBrushPlan {
-  const settings = settingsForPlan(input, normalizedSettings);
+  const settings = settingsForPlan(input, normalizedSettings, detachSettings);
   const points = sanitizeStrokePoints(input.points);
   if (points.length === 0) {
     return { dabs: [], sourcePointCount: 0, totalLength: 0, capped: false, settings };
@@ -1521,19 +1536,34 @@ function planStudioDynamicBrushFromInput(
     STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE.min,
     STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE.max
   ));
-  const buildDistances = (fitWholePathToBudget: boolean): number[] => {
-    const planned = [0];
+  interface PlannedDynamicBrushStation {
+    readonly distance: number;
+    readonly station: StrokeStation;
+    readonly recipe: StudioBrushDynamicsRecipe;
+  }
+  const stationPlanAt = (distance: number, index: number): PlannedDynamicBrushStation => {
+    const station = stationAtDistance(points, cumulative, totalLength, distance);
+    const sample = normalizeStudioBrushDynamicsSample(
+      sampleForStation(station, index, input, settings),
+      settings
+    );
+    return {
+      distance,
+      station,
+      recipe: resolveNormalizedStudioBrushDynamics(sample, settings),
+    };
+  };
+  const buildStations = (fitWholePathToBudget: boolean): PlannedDynamicBrushStation[] => {
+    const planned = [stationPlanAt(0, 0)];
     if (points.length <= 1 || totalLength <= POINT_EPSILON) return planned;
 
     while (planned.length < maxDabs) {
-      const currentDistance = planned.at(-1)!;
-      const station = stationAtDistance(points, cumulative, totalLength, currentDistance);
-      const sample = normalizeStudioBrushDynamicsSample(
-        sampleForStation(station, planned.length - 1, input, settings),
-        settings
+      const current = planned.at(-1)!;
+      const currentDistance = current.distance;
+      const naturalSpacing = Math.max(
+        STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS.spacing.min,
+        current.recipe.spacing
       );
-      const recipe = resolveNormalizedStudioBrushDynamics(sample, settings);
-      const naturalSpacing = Math.max(STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS.spacing.min, recipe.spacing);
       // A capped stroke used to keep all natural dabs near the start and replace only the final one
       // with the endpoint, leaving a many-thousand-pixel hole. On the bounded second pass, reserve
       // enough progress for every remaining station (including the endpoint). Natural spacing still
@@ -1545,31 +1575,30 @@ function planStudioDynamicBrushFromInput(
         : 0;
       const nextDistance = currentDistance + Math.max(naturalSpacing, budgetSpacing);
       if (nextDistance >= totalLength - POINT_EPSILON) {
-        if (totalLength - currentDistance > POINT_EPSILON) planned.push(totalLength);
+        if (totalLength - currentDistance > POINT_EPSILON) {
+          planned.push(stationPlanAt(totalLength, planned.length));
+        }
         break;
       }
-      planned.push(nextDistance);
+      planned.push(stationPlanAt(nextDistance, planned.length));
     }
     return planned;
   };
 
-  const naturalDistances = buildDistances(false);
+  const naturalStations = buildStations(false);
   const capped = totalLength > POINT_EPSILON
-    && totalLength - naturalDistances.at(-1)! > POINT_EPSILON;
+    && totalLength - naturalStations.at(-1)!.distance > POINT_EPSILON;
   // Preserve byte-for-byte natural spacing for ordinary strokes. Only a plan proven to exceed the
   // cap pays for the bounded redistribution pass. A one-dab budget cannot retain both endpoints and
   // intentionally keeps the start, matching the public maxDabs=1 contract.
-  const distances = capped && maxDabs >= 2
-    ? buildDistances(true)
-    : naturalDistances;
+  const plannedStations = capped && maxDabs >= 2
+    ? buildStations(true)
+    : naturalStations;
 
   // Point taps and zero-length runs have no travel axis, so shared start/end taper would
   // incorrectly force the minimum tip size on the only dab.
   const applyStrokeTaper = totalLength > POINT_EPSILON;
-  const dabs = distances.map((distance, index): StudioDynamicBrushDab => {
-    const station = stationAtDistance(points, cumulative, totalLength, distance);
-    const sample = normalizeStudioBrushDynamicsSample(sampleForStation(station, index, input, settings), settings);
-    const recipe = resolveNormalizedStudioBrushDynamics(sample, settings);
+  const dabs = plannedStations.map(({ station, recipe }, index): StudioDynamicBrushDab => {
     const taper = applyStrokeTaper
       ? studioBrushTaperFactors(station.progress, settings.taper)
       : { size: 1, opacity: 1 };
@@ -1621,5 +1650,5 @@ export function planNormalizedStudioDynamicBrushDabs(
   input: Omit<Partial<StudioDynamicBrushPlanInput>, "settings"> | null | undefined,
   settings: NormalizedStudioBrushDynamicsSettings
 ): StudioDynamicBrushDab[] {
-  return planStudioDynamicBrushFromInput(input ?? {}, settings).dabs;
+  return planStudioDynamicBrushFromInput(input ?? {}, settings, false).dabs;
 }

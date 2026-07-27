@@ -40,7 +40,7 @@ import {
 } from "./studio-brush-dynamics";
 import {
   resolveNormalizedStudioBrushDabColor,
-  resolveNormalizedStudioBrushGrainAlphaMultiplier,
+  resolveNormalizedStudioBrushGrainAlphaMultiplierAt,
 } from "./studio-brush-material-dynamics";
 import {
   planStudioDynamicBrushRenderBudget,
@@ -63,8 +63,8 @@ import {
 } from "./studio-brush-tip-composition";
 import {
   buildStudioBrushTipAlphaMap,
-  planStudioBrushTipStamp,
   studioBrushTipUsesSolidEllipse,
+  visitStudioBrushTipStampSamples,
   type NormalizedStudioBrushTipSettings,
 } from "./studio-brush-tip-stamp";
 import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
@@ -897,15 +897,18 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                   for (const dabs of dabVariations) {
                     const strokeOriginX = dabs[0]?.sourceX ?? dabs[0]?.x ?? 0;
                     const strokeOriginY = dabs[0]?.sourceY ?? dabs[0]?.y ?? 0;
-                    const grainAt = (x: number, y: number) => (
-                      resolveNormalizedStudioBrushGrainAlphaMultiplier({
-                        x,
-                        y,
-                        strokeOriginX,
-                        strokeOriginY,
-                        strokeSeed: dynamicSeed,
-                      }, dynamics.grain)
-                    );
+                    const grainAt = dynamics.grain.amount <= 0
+                      ? () => 1
+                      : (x: number, y: number) => (
+                          resolveNormalizedStudioBrushGrainAlphaMultiplierAt(
+                            x,
+                            y,
+                            strokeOriginX,
+                            strokeOriginY,
+                            dynamicSeed,
+                            dynamics.grain
+                          )
+                        );
                     const renderTipDab = (
                       composedDab: StudioBrushComposableDab,
                       tip: NormalizedStudioBrushTipSettings,
@@ -939,23 +942,22 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       }
                       // PNG-alpha/procedural tip path. Grain is sampled in world coordinates after
                       // multi-tip transforms, so canvas-fixed and stroke-fixed remain distinguishable.
-                      const stamp = planStudioBrushTipStamp(composedDab, tip, {
-                        alphaMap: tipAlphaMap,
-                        grid: stampGrid,
-                      });
-                      for (const sample of stamp.samples) {
-                        const sampleX = composedDab.x + sample.dx;
-                        const sampleY = composedDab.y + sample.dy;
-                        context.save();
-                        context.globalAlpha = baseAlpha
-                          * sample.alpha
-                          * grainAt(sampleX, sampleY);
-                        context.beginPath();
-                        context.arc(sampleX, sampleY, sample.radius, 0, Math.PI * 2);
-                        context.fillStyle = dabColor;
-                        context.fill();
-                        context.restore();
-                      }
+                      context.fillStyle = dabColor;
+                      visitStudioBrushTipStampSamples(
+                        composedDab,
+                        tipAlphaMap,
+                        (dx, dy, alpha, radius) => {
+                          const sampleX = composedDab.x + dx;
+                          const sampleY = composedDab.y + dy;
+                          context.globalAlpha = baseAlpha
+                            * alpha
+                            * grainAt(sampleX, sampleY);
+                          context.beginPath();
+                          context.arc(sampleX, sampleY, radius, 0, Math.PI * 2);
+                          context.fill();
+                        },
+                        { grid: stampGrid }
+                      );
                     };
                     for (const dab of dabs) {
                       const dabColor = resolveNormalizedStudioBrushDabColor(

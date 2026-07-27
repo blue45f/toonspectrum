@@ -6,19 +6,21 @@ import {
   STUDIO_PUBLISH_PACKAGE_SCHEMA,
   STUDIO_PUBLISH_PACKAGE_VERSION,
   STUDIO_PUBLISH_PLATFORM_PRESETS,
-  finalizeStudioPublishPackageManifest,
   getStudioPublishPlatformPreset,
   normalizeStudioPublishPackageSettings,
-  parseStudioPublishPackageManifest,
   planStudioPublishCanvasSlices,
   planStudioPublishPackage,
   planStudioPublishThumbnailCrop,
   sanitizeStudioPublishFileStem,
-  serializeStudioPublishPackageManifest,
   serializeStudioPublishPackageSettings,
   type StudioPublishPackageDestination,
   type StudioPublishPackagePlanInput,
 } from "./studio-publish-package";
+import {
+  finalizeStudioPublishPackageManifest,
+  parseStudioPublishPackageManifest,
+  serializeStudioPublishPackageManifest,
+} from "./studio-publish-package-manifest-runtime";
 
 const SHA256 = "a".repeat(64);
 

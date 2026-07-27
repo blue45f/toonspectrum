@@ -901,13 +901,11 @@ import {
 } from "./studio-publish-compliance";
 import {
   DEFAULT_STUDIO_PUBLISH_PACKAGE_SETTINGS,
-  finalizeStudioPublishPackageManifest,
   getStudioPublishPlatformPreset,
   normalizeStudioPublishPackageSettings,
   planStudioPublishCanvasSlices,
   planStudioPublishPackage,
   sanitizeStudioPublishFileStem,
-  serializeStudioPublishPackageManifest,
   type StudioPublishPackageManifest,
   type StudioPublishPackagePlan,
   type StudioPublishPackageSettings,
@@ -1070,6 +1068,7 @@ import { SMUDGE_RADIUS_DEFAULT, SMUDGE_STRENGTH_DEFAULT } from "./studio-smudge"
 import { useStudioStableHandlers } from "./studio-stable-handlers";
 import {
   acquireStudioStagePointerFrameMapperCache,
+  shouldSynchronizeStudioStagePointerPosition,
   snapshotStudioStagePointerBatchMapper,
   type StudioStagePointerBatchMapper,
   type StudioStagePointerFrameMapperCache,
@@ -24598,19 +24597,30 @@ const puppetWarpArmed =
   }
 
   function onStageMove(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
+    const stagePointerEvent = e.evt as PointerEvent;
+    const stageActiveDrawing = drawingRef.current;
+    const nativeFreehandMoveOwnsStage = Boolean(
+      stageActiveDrawing
+      && (stageActiveDrawing.kind ?? "freehand") === "freehand"
+      && isStudioStrokePointerEvent(
+        requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession(),
+        stagePointerEvent
+      )
+    );
     // Figma-style multiplayer cursor publication must run before every tool-specific early return.
-    // StudioLiveRoom performs the 40ms wire throttle; this path never writes React state.
+    // Throttle before reading Stage coordinates or copying the recent stroke tail.
     if (!isExporting && canvasH > 0) {
-      const pointer = e.target.getStage()?.getRelativePointerPosition();
-      if (pointer) {
-        const activeDrawing = drawingRef.current;
+      studioLiveRoomRef.current?.publishCursorWhenDue(() => {
+        const pointer = e.target.getStage()?.getRelativePointerPosition();
+        if (!pointer) return null;
+        const activeDrawing = stageActiveDrawing;
         const isDrawing = Boolean(activeDrawing && (activeDrawing.kind ?? "freehand") === "freehand");
         const strokeColor = activeDrawing?.stroke ?? color;
         const strokeWidthVal = activeDrawing?.strokeWidth ?? strokeWidth;
         const strokeOpacity = activeDrawing?.opacity ?? 1;
         const pts = activeDrawing?.points;
 
-        studioLiveRoomRef.current?.publishCursor({
+        return {
           x: Math.max(0, Math.min(1, pointer.x / CANVAS_W)),
           y: Math.max(0, Math.min(1, pointer.y / canvasH)),
           pageId: activePage.id,
@@ -24620,8 +24630,8 @@ const puppetWarpArmed =
           strokeWidth: strokeWidthVal,
           strokeOpacity,
           points: isDrawing && pts && pts.length >= 2 ? pts.slice(-64) : undefined,
-        });
-      }
+        };
+      });
     }
     // Auto-color freehand scribble stroke — append document points while armed.
     const scribbleStroke = autoColorScribbleStrokeRef.current;
@@ -24658,6 +24668,8 @@ const puppetWarpArmed =
         }
       }
     }
+    // Window capture already consumed and previewed this active freehand delivery.
+    if (nativeFreehandMoveOwnsStage) return;
     if (advancedFillTapGestureRef.current) {
       const clientPoint = getClientPointFromKonvaEvent(e.evt);
       const pointerEvent = e.evt as PointerEvent;
@@ -25009,19 +25021,7 @@ const puppetWarpArmed =
       }
     } else if (tool === "draw" && isStudioBrushCursorMode(drawMode)) {
       const brushPointerEvent = e.evt as PointerEvent;
-      const brushPointerSession = requireStudioDrawingPointerTransport(
-        drawingPointerTransportRef
-      ).getSession();
-      const nativeFreehandMoveOwnsCursor = Boolean(
-        drawingRef.current
-        && (drawingRef.current.kind ?? "freehand") === "freehand"
-        && isStudioStrokePointerEvent(brushPointerSession, brushPointerEvent)
-      );
-      // The window capture listener has already painted the raw contact cursor for active
-      // freehand ink. Avoid redrawing the same cursor again when Konva bubbles that event.
-      if (!nativeFreehandMoveOwnsCursor) {
-        updateBrushCursor(e.target.getStage(), brushPointerEvent);
-      }
+      updateBrushCursor(e.target.getStage(), brushPointerEvent);
     }
     if (tool !== "draw" || !drawingRef.current) return;
     const pointerEvent = e.evt as PointerEvent;
@@ -25523,8 +25523,10 @@ const puppetWarpArmed =
       authoritativeSource: options.authoritativeSource,
     });
     requireStudioDrawingPointerTransport(drawingPointerTransportRef).replaceSession(batch.session);
+    // Exact duplicate hardware deliveries have no document or preview work.
+    if (batch.authoritative.length === 0 && batch.predicted.length === 0) return false;
     const sampleClock = drawingFixedRateSampleClockRef.current;
-    const sampleClockTransition = sampleClock
+    const sampleClockTransition = sampleClock && batch.authoritative.length > 0
       ? normalizeFixedRateStrokeSampleTimeStamps(
           sampleClock,
           batch.authoritative.map((sample) => (
@@ -25539,6 +25541,7 @@ const puppetWarpArmed =
     // One browser delivery shares one layout/Stage transform. Mapping the full coalesced and
     // predicted batch from one snapshot avoids a DOM read plus transform inversion per sample.
     const coordinateMapper = options.coordinateMapper
+      ?? stagePointerFrameMapperCacheRef.current?.mapperFor(stage)
       ?? snapshotStudioStagePointerBatchMapper(stage);
     const crdtSampleStart = Math.floor((drawingRef.current?.points.length ?? 0) / 2);
     const activeDrawing = drawingRef.current;
@@ -25600,7 +25603,9 @@ const puppetWarpArmed =
       }
       drawingImmediateBatchMutationRef.current = false;
 
-      const authoritativeDrawing = publishAuthoritativeFreehandSuffix(crdtSampleStart);
+      const authoritativeDrawing = batch.authoritative.length > 0
+        ? publishAuthoritativeFreehandSuffix(crdtSampleStart)
+        : drawingRef.current;
       const authoritativePointCount = Math.floor((authoritativeDrawing?.points.length ?? 0) / 2);
       const rawPreviewState = rawPenInkPreviewStateRef.current;
       const canonicalPredictionTail = predictedInkTailStateRef.current;
@@ -25724,9 +25729,15 @@ const puppetWarpArmed =
     } finally {
       drawingImmediateBatchMutationRef.current = false;
       drawingPredictionBatchMutationRef.current = false;
-      // Other Stage consumers (cursor, hit testing, collaboration) must observe the real latest
-      // pointer rather than a coalesced or future estimate after this handler returns.
-      stage.setPointersPositions(pointerEvent);
+      // Avoid a second Stage layout read unless the event route is outside Stage.
+      if (
+        shouldSynchronizeStudioStagePointerPosition(
+          stage.getContent(),
+          pointerEvent.target
+        )
+      ) {
+        stage.setPointersPositions(pointerEvent);
+      }
     }
     return true;
   }
@@ -25817,11 +25828,7 @@ const puppetWarpArmed =
       ) return;
       const stage = stageRef.current;
       if (!stage) return;
-      const pointerMapperCache = stagePointerFrameMapperCacheRef.current;
-      if (!pointerMapperCache) return;
-      const coordinateMapper = pointerMapperCache.mapperFor(stage);
-      const contactPoint = coordinateMapper.pointFor(pointerEvent);
-      consumeFreehandPointerBatch(
+      if (!consumeFreehandPointerBatch(
         stage,
         pointerEvent,
         canCollectStudioPointerPredictionsForActiveTail(
@@ -25829,8 +25836,11 @@ const puppetWarpArmed =
           session,
           predictedInkTailStateRef.current !== null
         ),
-        { coordinateMapper }
-      );
+      )) return;
+      const pointerMapperCache = stagePointerFrameMapperCacheRef.current;
+      if (!pointerMapperCache) return;
+      // Reuse the mapper acquired while consuming the batch.
+      const contactPoint = pointerMapperCache.mapperFor(stage).pointFor(pointerEvent);
       // Authoritative ink wins the native pointer task. The cursor keeps only the latest position
       // and paints once on the next frame, so a high-Hz pen cannot make a cosmetic layer delay ink.
       updateBrushCursor(stage, pointerEvent, contactPoint, true);
@@ -25839,10 +25849,7 @@ const puppetWarpArmed =
         contactPoint?.y ?? Number.NaN,
         true,
       );
-      if (drawMode === "pen") {
-        const point = stage.getRelativePointerPosition();
-        if (point) noteQuickShapePointerMoved(point);
-      }
+      if (drawMode === "pen" && contactPoint) noteQuickShapePointerMoved(contactPoint);
     },
     onRawPreviewMove: (pointerEvent) => {
       const session = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
@@ -28514,9 +28521,16 @@ function clearSelectionForEdit() {
       if (captured.length !== pages.length) {
         throw new Error("일부 페이지를 캡처하지 못해 패키지 생성을 중단했어요.");
       }
-      const { renderStudioPublishPackageImages } = await import(
-        "./studio-publish-package-renderer"
-      );
+      const [
+        { renderStudioPublishPackageImages },
+        {
+          finalizeStudioPublishPackageManifest,
+          serializeStudioPublishPackageManifest,
+        },
+      ] = await Promise.all([
+        import("./studio-publish-package-renderer"),
+        import("./studio-publish-package-manifest-runtime"),
+      ]);
       const sources = captured.map((canvas, index) => ({ id: pages[index].id, canvas }));
       const rendered = await renderStudioPublishPackageImages({
         settings: effectivePublishPackageSettings,
@@ -28818,7 +28832,13 @@ function clearSelectionForEdit() {
   async function downloadPublishPackageManifest() {
     if (!ensureSharedDocumentAvailableForExport()) return;
     if (!publishPackagePlan) return;
-    const { downloadBlob } = await import("./studio-export");
+    const [
+      { downloadBlob },
+      { serializeStudioPublishPackageManifest },
+    ] = await Promise.all([
+      import("./studio-export"),
+      import("./studio-publish-package-manifest-runtime"),
+    ]);
     downloadBlob(
       new Blob([serializeStudioPublishPackageManifest(publishPackagePlan.manifest)], {
         type: "application/json",

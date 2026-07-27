@@ -454,13 +454,28 @@ describe("StudioLiveRoom", () => {
     roomB.subscribe((event) => {
       if (event.type === "cursor") received.push(event);
     });
+    let lazyPayloadBuilds = 0;
+    expect(roomA.publishCursorWhenDue(() => {
+      lazyPayloadBuilds += 1;
+      return { x: 0.5, y: 0.5, pageId: "page-1", tool: "pen" };
+    })).toBe(false);
+    expect(lazyPayloadBuilds).toBe(0);
     await roomA.start();
     await roomB.start();
 
     expect(roomA.publishCursor({ x: 0, y: 1, pageId: "page-1", tool: "pen" })).toBe(true);
     expect(roomA.publishCursor({ x: 0.1, y: 0.9, pageId: "page-1", tool: "pen" })).toBe(false);
+    expect(roomA.publishCursorWhenDue(() => {
+      lazyPayloadBuilds += 1;
+      return { x: 0.1, y: 0.9, pageId: "page-1", tool: "pen" };
+    })).toBe(false);
+    expect(lazyPayloadBuilds).toBe(0);
     test.advance(40);
-    expect(roomA.publishCursor({ x: 0.1, y: 0.9, pageId: "page-1", tool: "pen" })).toBe(true);
+    expect(roomA.publishCursorWhenDue(() => {
+      lazyPayloadBuilds += 1;
+      return { x: 0.1, y: 0.9, pageId: "page-1", tool: "pen" };
+    })).toBe(true);
+    expect(lazyPayloadBuilds).toBe(1);
     expect(received).toHaveLength(2);
     expect(roomA.clearCursor()).toBe(true);
     expect(received.at(-1)).toEqual(

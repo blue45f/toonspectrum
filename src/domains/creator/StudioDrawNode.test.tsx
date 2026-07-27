@@ -20,11 +20,25 @@ class StampSceneContext {
   readonly arcs: string[] = [];
   readonly fills: Array<{ alpha: number; color: string }> = [];
   readonly transforms: string[] = [];
+  saveCount = 0;
+  restoreCount = 0;
+  fillStyleWrites = 0;
   globalAlpha = 1;
-  fillStyle: string | CanvasGradient | CanvasPattern = "";
+  private currentFillStyle: string | CanvasGradient | CanvasPattern = "";
 
-  save(): void {}
-  restore(): void {}
+  get fillStyle(): string | CanvasGradient | CanvasPattern {
+    return this.currentFillStyle;
+  }
+  set fillStyle(value: string | CanvasGradient | CanvasPattern) {
+    this.currentFillStyle = value;
+    this.fillStyleWrites += 1;
+  }
+  save(): void {
+    this.saveCount += 1;
+  }
+  restore(): void {
+    this.restoreCount += 1;
+  }
   beginPath(): void {}
   fill(): void {
     this.fills.push({ alpha: this.globalAlpha, color: String(this.fillStyle) });
@@ -709,6 +723,45 @@ describe("StudioDrawNode orchestration", () => {
     expect(new Set(layeredContext.fills.map((fill) => fill.color)).size).toBeGreaterThan(2);
     expect(new Set(layeredContext.fills.map((fill) => fill.alpha.toFixed(4))).size).toBeGreaterThan(5);
     expect(layeredContext.fills.every((fill) => fill.alpha >= 0 && fill.alpha <= 1)).toBe(true);
+  });
+
+  it("renders custom alpha tips without a Canvas save/restore pair for every sample", () => {
+    const alphaMapSize = 8;
+    const alphaBytes = new Uint8Array(alphaMapSize * alphaMapSize);
+    alphaBytes.fill(255);
+    const brushDynamics = normalizeStudioBrushDynamicsSettings({
+      tip: {
+        shape: "hard",
+        softness: 0,
+        alphaMapBase64: encodeStudioBrushTipAlphaMapBase64(alphaBytes),
+        alphaMapSize,
+      },
+      grain: { amount: 0 },
+      taper: { enabled: false },
+      spacingRatio: null,
+      spacing: { base: 12, mappings: [] },
+    });
+    render(<StudioDrawNode
+      el={drawEl({
+        id: "allocation-free-alpha-tip",
+        brush: "ink-particle",
+        mode: "pen",
+        points: [0, 0, 36, 0],
+        pressures: [0.7, 0.7],
+        brushDynamics,
+      })}
+    />);
+
+    const context = new StampSceneContext();
+    const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D
+    ) => void;
+    sceneFunc(context as unknown as CanvasRenderingContext2D);
+
+    expect(context.fills.length).toBeGreaterThan(10);
+    expect(context.saveCount).toBe(1);
+    expect(context.restoreCount).toBe(1);
+    expect(context.fillStyleWrites).toBeLessThan(context.fills.length);
   });
 
   it("keeps pathological live multi-tip kaleidoscope work inside the shared mark budget", () => {

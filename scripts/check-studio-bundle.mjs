@@ -255,6 +255,12 @@ if (!fs.existsSync(manifestPath)) {
       );
     }
 
+    checkDynamicBoundary(
+      "optional publish manifest verification runtime",
+      /src\/domains\/creator\/studio-publish-package-manifest-runtime\.ts/,
+      studioKeys,
+    );
+
     const eagerReleasePlanner = matchingEntries(
       studioKeys,
       /studio-release-schedule(?!-loader)/,

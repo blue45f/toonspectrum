@@ -506,6 +506,29 @@ export class StudioLiveRoom {
     return sent;
   }
 
+  /**
+   * Builds a high-frequency cursor payload only when the room can actually send it.
+   *
+   * Drawing callers otherwise pay for Stage coordinate lookup and a copied stroke-tail array on
+   * every 120–240 Hz pointer delivery even though the wire contract intentionally publishes at
+   * most once per cursor interval. Keep `publishCursor` eager so its validation semantics remain
+   * unchanged; this opt-in path is for latency-sensitive producers that can safely return no
+   * payload when their transient Stage state is unavailable.
+   */
+  publishCursorWhenDue(
+    createCursor: () => StudioLiveCursorPayload | null
+  ): boolean {
+    if (!this.ready) return false;
+    const now = this.now();
+    if (now - this.lastCursorSentAt < this.cursorIntervalMs) return false;
+    const cursor = createCursor();
+    if (!cursor) return false;
+    assertStudioLiveCursorPayload(cursor);
+    const sent = this.post("cursor:update", cursor, null, now);
+    if (sent) this.lastCursorSentAt = now;
+    return sent;
+  }
+
   /** Clears a remote pointer immediately; leave/page/visibility boundaries must not wait for TTL. */
   clearCursor(): boolean {
     if (!this.ready) return false;
