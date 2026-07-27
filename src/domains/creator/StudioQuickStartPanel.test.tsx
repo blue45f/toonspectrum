@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioQuickStartPanel } from "./StudioQuickStartPanel";
+
+import { useI18n } from "@/lib/i18n";
 
 vi.mock("./studio-creative-visuals", () => ({
   StudioStarterCardArt: ({ id }: { id: string }) => (
@@ -12,6 +14,10 @@ vi.mock("./studio-creative-visuals", () => ({
 }));
 
 afterEach(cleanup);
+
+beforeEach(() => {
+  useI18n.getState().setLang("ko");
+});
 
 function createHandlers() {
   return {

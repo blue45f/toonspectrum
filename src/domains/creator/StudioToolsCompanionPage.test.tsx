@@ -23,6 +23,8 @@ import {
 } from "./studio-tools-companion";
 import { StudioToolsCompanionPage } from "./StudioToolsCompanionPage";
 
+import { useI18n } from "@/lib/i18n";
+
 class FakeBroadcastChannel {
   static readonly instances: FakeBroadcastChannel[] = [];
 
@@ -289,6 +291,7 @@ function SessionSwitchHarness() {
 }
 
 beforeEach(() => {
+  useI18n.getState().setLang("ko");
   FakeBroadcastChannel.instances.length = 0;
   vi.stubGlobal("BroadcastChannel", FakeBroadcastChannel);
   vi.stubGlobal("Image", class {

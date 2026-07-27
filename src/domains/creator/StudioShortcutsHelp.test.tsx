@@ -1,10 +1,12 @@
 import { readFileSync } from "node:fs";
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { defaultStudioAppSettings } from "./studio-app-settings";
 import { StudioShortcutsHelp } from "./StudioShortcutsHelp";
+
+import { useI18n } from "@/lib/i18n";
 
 const { createPortalMock } = vi.hoisted(() => ({
   createPortalMock: vi.fn((children: unknown, _container: unknown) => children),
@@ -20,6 +22,10 @@ describe("StudioShortcutsHelp", () => {
   afterEach(() => {
     createPortalMock.mockClear();
     vi.unstubAllGlobals();
+  });
+
+  beforeEach(() => {
+    useI18n.getState().setLang("ko");
   });
 
   it("드로잉 단축키와 모달 단축키 경계를 함께 안내한다", () => {

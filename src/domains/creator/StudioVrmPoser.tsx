@@ -1935,6 +1935,29 @@ function StudioVrmTexturePaintInvalidateBridge({
   return null;
 }
 
+function StudioVrmViewportReadyFrame({
+  revision,
+}: {
+  readonly revision: string;
+}) {
+  const invalidate = useThree((state) => state.invalidate);
+
+  useLayoutEffect(() => {
+    invalidate();
+    let settledFrame: number | null = null;
+    const layoutFrame = requestAnimationFrame(() => {
+      invalidate();
+      settledFrame = requestAnimationFrame(() => invalidate());
+    });
+    return () => {
+      cancelAnimationFrame(layoutFrame);
+      if (settledFrame !== null) cancelAnimationFrame(settledFrame);
+    };
+  }, [invalidate, revision]);
+
+  return null;
+}
+
 function studioVrmTexturePaintHit(
   event: ThreeEvent<PointerEvent>,
 ): StudioVrmTexturePaintRayHit | null {
@@ -3092,6 +3115,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const [installedModelId, setInstalledModelId] = useState<string | null>(null);
   const activeModelIdRef = useRef(activeModelId);
   activeModelIdRef.current = activeModelId;
+  const modelLoadTargetIdRef = useRef<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
 
@@ -6129,8 +6153,17 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
         setLibraryError("이 장면이 사용하는 VRM 모델을 찾지 못했습니다. 프로젝트 모델 attachment를 먼저 복원해 주세요.");
         return;
       }
+      if (modelLoadTargetIdRef.current === targetEntry.id) return;
       loadModelRef.current(targetEntry);
     };
+
+    if (
+      pendingPoseDataRef.current === null
+      && activeModelIdRef.current === SAMPLE_VRM_ID
+      && modelLoadTargetIdRef.current === null
+    ) {
+      loadModelRef.current(SAMPLE_VRM_ENTRIES[0]);
+    }
 
     listVrmLibraryEntries()
       .then((entries) => {
@@ -6271,6 +6304,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       disposeVrm(vrmRef.current);
       vrmRef.current = null;
     }
+    modelLoadTargetIdRef.current = null;
     setInstalledModelId(null);
     setVrm(null);
   }
@@ -6283,6 +6317,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setModelName(nextModelName);
     setActiveModelId(nextModelId);
     setInstalledModelId(nextModelId);
+    modelLoadTargetIdRef.current = nextModelId;
     // 워드로브 실측 — 반드시 포즈 적용 전(정규화 rest)에 측정해 모델별 자동 핏의 기준으로 삼는다.
     setWardrobeMetrics(measureVrmWardrobeMetrics(nextVrm));
     setPropRigMetrics(measureVrmPropRigMetrics(nextVrm));
@@ -6388,11 +6423,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setStatus("loading");
     setError("");
     clearCurrentVrm();
+    modelLoadTargetIdRef.current = nextModelId;
     return requestId;
   }
 
   function handleLoadFailure(requestId: number, caughtError: unknown) {
     if (requestId !== loadRequestRef.current) return;
+    modelLoadTargetIdRef.current = null;
     setError(getVrmLoadErrorMessage(caughtError));
     setStatus("error");
   }
@@ -7758,7 +7795,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
           className={cx(
             "grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-1",
             texturePaintModeSelected
-              ? "grid-rows-[minmax(0,60dvh)_minmax(0,1fr)] sm:grid-rows-[minmax(0,58dvh)_minmax(0,1fr)]"
+              ? "grid-rows-[minmax(0,2fr)_minmax(0,3fr)] sm:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]"
               : "grid-rows-[minmax(0,36dvh)_minmax(0,1fr)] sm:grid-rows-[minmax(0,40dvh)_minmax(0,1fr)]",
           )}
         >
@@ -7831,6 +7868,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                   }}
                 >
                   <CaptureBridge onCaptureUpdate={onCaptureUpdate} />
+                  <StudioVrmViewportReadyFrame
+                    revision={`${installedModelId ?? "empty"}:${status}:${texturePaintModeSelected ? "surface" : "standard"}`}
+                  />
                   <StudioVrmTexturePaintInvalidateBridge
                     onReady={handleTexturePaintInvalidateReady}
                   />

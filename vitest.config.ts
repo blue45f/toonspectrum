@@ -34,6 +34,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    setupFiles: [path.resolve(root, "vitest.setup.ts")],
     testTimeout: 30000,
     hookTimeout: 30000,
     // Studio and Three.js test graphs are intentionally broad. Letting Vitest

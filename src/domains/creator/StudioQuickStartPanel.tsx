@@ -14,8 +14,18 @@ import {
 import { Suspense } from "react";
 
 import { buttonClass } from "@/components/ui/button-utils";
+import { useT } from "@/lib/i18n";
 import { lazyRetry } from "@/lib/lazy-retry";
 import { cn } from "@/lib/utils";
+
+function localizeText(
+  t: (key: string) => string,
+  fallback: string,
+  key: string,
+): string {
+  const translated = t(key);
+  return translated === key ? fallback : translated;
+}
 
 const StudioStarterCardArt = lazyRetry(
   () =>
@@ -52,6 +62,7 @@ export function StudioQuickStartPanel({
   onCollabFocus: () => void;
   onOpenTutorials: () => void;
 }) {
+  const t = useT();
   // Drawing-first tools only — Canva-style visual starter cards (no marketing copy).
   const steps: {
     id: "draw" | "smart-shape" | "brush-kit" | "template" | "collab-focus" | "character" | "background-3d" | "bubble";
@@ -62,57 +73,57 @@ export function StudioQuickStartPanel({
   }[] = [
     {
       id: "draw",
-      label: "펜으로 그리기",
-      hint: "바로 스케치 시작",
+      label: localizeText(t, "펜으로 그리기", "studio.quickStart.step.draw.label"),
+      hint: localizeText(t, "바로 스케치 시작", "studio.quickStart.step.draw.hint"),
       icon: Pencil,
       onClick: onStartDraw,
     },
     {
       id: "smart-shape",
-      label: "스마트 도형",
-      hint: "낙서 → 선·원·사각형",
+      label: localizeText(t, "스마트 도형", "studio.quickStart.step.smart-shape.label"),
+      hint: localizeText(t, "낙서 → 선·원·사각형", "studio.quickStart.step.smart-shape.hint"),
       icon: Shapes,
       onClick: onSmartShape,
     },
     {
       id: "brush-kit",
-      label: "브러시",
-      hint: "연필·마커·붓·형광펜",
+      label: localizeText(t, "브러시", "studio.quickStart.step.brush-kit.label"),
+      hint: localizeText(t, "연필·마커·붓·형광펜", "studio.quickStart.step.brush-kit.hint"),
       icon: Palette,
       onClick: onBrushKit,
     },
     {
       id: "template",
-      label: "컷 템플릿",
-      hint: "패널 레이아웃 배치",
+      label: localizeText(t, "컷 템플릿", "studio.quickStart.step.template.label"),
+      hint: localizeText(t, "패널 레이아웃 배치", "studio.quickStart.step.template.hint"),
       icon: LayoutTemplate,
       onClick: onOpenTemplate,
     },
     {
       id: "collab-focus",
-      label: "캔버스 넓히기",
-      hint: "패널 접고 집중 모드",
+      label: localizeText(t, "캔버스 넓히기", "studio.quickStart.step.collab-focus.label"),
+      hint: localizeText(t, "패널 접고 집중 모드", "studio.quickStart.step.collab-focus.hint"),
       icon: Maximize2,
       onClick: onCollabFocus,
     },
     {
       id: "character",
-      label: "캐릭터",
-      hint: "2D / 3D 포즈",
+      label: localizeText(t, "캐릭터", "studio.quickStart.step.character.label"),
+      hint: localizeText(t, "2D / 3D 포즈", "studio.quickStart.step.character.hint"),
       icon: Smile,
       onClick: onOpenCharacter,
     },
     {
       id: "background-3d",
-      label: "3D 배경",
-      hint: "장면 배치 · 물리 낙하",
+      label: localizeText(t, "3D 배경", "studio.quickStart.step.background3d.label"),
+      hint: localizeText(t, "장면 배치 · 물리 낙하", "studio.quickStart.step.background3d.hint"),
       icon: Boxes,
       onClick: onOpenBackground3d,
     },
     {
       id: "bubble",
-      label: "말풍선",
-      hint: "대사 넣기",
+      label: localizeText(t, "말풍선", "studio.quickStart.step.bubble.label"),
+      hint: localizeText(t, "대사 넣기", "studio.quickStart.step.bubble.hint"),
       icon: MessageCircle,
       onClick: onOpenBubble,
     },
@@ -128,17 +139,17 @@ export function StudioQuickStartPanel({
       >
         <div className="pointer-events-none flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-bold tracking-tight">도구 빠른 실행</p>
+            <p className="text-sm font-bold tracking-tight">{localizeText(t, "도구 빠른 실행", "studio.quickStart.title")}</p>
             <p className="mt-0.5 max-w-[40ch] text-[0.7rem] leading-snug text-fg-3">
-              4단계로 한 페이지를 조립하거나 아래에서 바로 도구를 고르세요.
+              {localizeText(t, "4단계로 한 페이지를 조립하거나 아래에서 바로 도구를 고르세요.", "studio.quickStart.subtitle")}
             </p>
           </div>
           <button
             type="button"
             onClick={onDismiss}
             className="pointer-events-auto grid size-11 shrink-0 place-items-center rounded-xl border border-line text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            aria-label="닫기"
-            title="닫기"
+            aria-label={localizeText(t, "닫기", "studio.quickStart.dismiss")}
+            title={localizeText(t, "닫기", "studio.quickStart.dismiss")}
           >
             <X size={15} aria-hidden />
           </button>
@@ -155,7 +166,7 @@ export function StudioQuickStartPanel({
             )}
           >
             <Sparkles size={15} aria-hidden />
-            빠른 웹툰 만들기
+            {localizeText(t, "빠른 웹툰 만들기", "studio.quickStart.quickComic")}
           </button>
           <button
             type="button"
@@ -167,7 +178,7 @@ export function StudioQuickStartPanel({
             )}
           >
             <LayoutTemplate size={15} aria-hidden />
-            예시 캔버스
+            {localizeText(t, "예시 캔버스", "studio.quickStart.exampleCanvas")}
           </button>
           <button
             type="button"
@@ -179,7 +190,7 @@ export function StudioQuickStartPanel({
             )}
           >
             <Pencil size={15} aria-hidden />
-            빈 캔버스에서 그리기
+            {localizeText(t, "빈 캔버스에서 그리기", "studio.quickStart.drawCanvas")}
           </button>
           <button
             type="button"
@@ -191,7 +202,7 @@ export function StudioQuickStartPanel({
             )}
           >
             <BookOpen size={15} aria-hidden />
-            기능 튜토리얼
+            {localizeText(t, "기능 튜토리얼", "studio.quickStart.tutorial")}
           </button>
         </div>
 

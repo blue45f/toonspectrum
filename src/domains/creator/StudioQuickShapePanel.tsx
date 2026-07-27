@@ -10,6 +10,7 @@ import { StudioToggleChip } from "./studio-panel-ui";
 
 import type { ReactElement } from "react";
 
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export type StudioQuickShapePanelProps = {
@@ -23,6 +24,11 @@ export type StudioQuickShapePanelProps = {
   className?: string;
 };
 
+function localizeText(t: (key: string) => string, fallback: string, key: string): string {
+  const translated = t(key);
+  return translated === key ? fallback : translated;
+}
+
 export function StudioQuickShapePanel({
   active,
   matchedKindLabel,
@@ -32,6 +38,7 @@ export function StudioQuickShapePanel({
 }: StudioQuickShapePanelProps): ReactElement {
   const highlight = studioSmartShapeMatchToGlyph(matchedKindLabel);
   const matched = Boolean(matchedKindLabel);
+  const t = useT();
 
   return (
     <div
@@ -68,19 +75,35 @@ export function StudioQuickShapePanel({
               {active ? <Wand2 className="size-4" strokeWidth={1.75} /> : <Shapes className="size-4" strokeWidth={1.75} />}
             </span>
             <div className="min-w-0 pt-0.5">
-              <p className="text-[0.78rem] font-semibold tracking-tight text-fg">스마트 도형</p>
+              <p className="text-[0.78rem] font-semibold tracking-tight text-fg">
+                {localizeText(t, "스마트 도형", "studio.quickShape.title")}
+              </p>
               <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">
                 {active
-                  ? "선·네모·원·삼각을 느긋하게 그어요. 손을 떼면 알아서 단정해집니다."
-                  : "끄적여도 괜찮아요. 켜 두면 손그림이 깔끔한 도형으로 다듬어집니다."}
+                  ? localizeText(
+                      t,
+                      "선·네모·원·삼각을 느긋하게 그어요. 손을 떼면 알아서 단정해집니다.",
+                      "studio.quickShape.description.active",
+                    )
+                  : localizeText(
+                      t,
+                      "끄적여도 괜찮아요. 켜 두면 손그림이 깔끔한 도형으로 다듬어집니다.",
+                      "studio.quickShape.description.inactive",
+                    )}
               </p>
             </div>
           </div>
           <StudioToggleChip
             active={active}
             onClick={onToggleActive}
-            title="펜으로 대충 그린 도형을 손을 떼는 순간 정확한 도형으로 스냅합니다. 그리는 중 잠시 멈춰도 미리보기가 뜹니다."
-            aria-label={active ? "스마트 도형 켜짐" : "스마트 도형 꺼짐"}
+            title={localizeText(
+              t,
+              "펜으로 대충 그린 도형을 손을 떼는 순간 정확한 도형으로 스냅합니다. 그리는 중 잠시 멈춰도 미리보기가 뜹니다",
+              "studio.quickShape.toggleHint",
+            )}
+            aria-label={active
+              ? localizeText(t, "스마트 도형 켜짐", "studio.quickShape.toggleAria.on")
+              : localizeText(t, "스마트 도형 꺼짐", "studio.quickShape.toggleAria.off")}
           >
             <span className="inline-flex items-center gap-1">
               <Sparkles className="size-3.5" aria-hidden />
@@ -115,11 +138,21 @@ export function StudioQuickShapePanel({
               {matched ? (
                 <p className="min-w-0">
                   <span className="font-semibold text-accent">{matchedKindLabel}</span>
-                  <span className="text-fg-2"> 느낌이 나요 · 손을 떼면 확정</span>
+                  <span className="text-fg-2">
+                    {localizeText(
+                      t,
+                      " 느낌이 나요 · 손을 떼면 확정",
+                      "studio.quickShape.matchedSuffix",
+                    )}
+                  </span>
                 </p>
               ) : (
                 <p className="min-w-0 text-fg-3">
-                  도형을 그리고 손을 떼거나, 끝에서 잠깐만 머물러 보세요
+                  {localizeText(
+                    t,
+                    "도형을 그리고 손을 떼거나, 끝에서 잠깐만 머물러 보세요",
+                    "studio.quickShape.emptyStatus",
+                  )}
                 </p>
               )}
             </div>
@@ -129,7 +162,7 @@ export function StudioQuickShapePanel({
                 onClick={onOpenTutorial}
                 className="w-full rounded-xl border border-line/50 bg-canvas/30 py-1.5 text-[0.65rem] font-medium text-fg-3 transition-colors hover:border-accent/30 hover:bg-raised/60 hover:text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
-                스마트 도형 튜토리얼 보기
+                {localizeText(t, "스마트 도형 튜토리얼 보기", "studio.quickShape.openTutorial")}
               </button>
             ) : null}
           </div>

@@ -10,9 +10,13 @@ import {
   type StudioShortcutActionId,
 } from "./studio-app-settings";
 
+import { useT } from "@/lib/i18n";
+
+
 interface ShortcutRow {
   keys: string;
-  label: string;
+  keysKey?: string;
+  labelKey: string;
   /** Single customizable action (replaces keys when remapped). */
   actionId?: StudioShortcutActionId;
   /** Multi-chord rows (e.g. brush smaller/larger). */
@@ -20,67 +24,95 @@ interface ShortcutRow {
 }
 
 interface ShortcutGroup {
-  title: string;
+  titleKey: string;
   rows: ShortcutRow[];
 }
 
 // 표시는 macOS ⌘ 기준 + Windows/Linux는 Ctrl로 읽으면 됨.
 const GROUPS: ShortcutGroup[] = [
   {
-    title: "드로잉",
+    titleKey: "studio.shortcuts.group.drawing",
     rows: [
-      { keys: "B", label: "펜으로 전환", actionId: "tool-pen" },
-      { keys: "E", label: "펜·지우개 전환", actionId: "tool-eraser" },
-      { keys: "N · ⇧N", label: "혼합(스머지) · 혼색 브러시", actionIds: ["tool-blend", "tool-wet-mix"] },
-      { keys: "O", label: "닷지/번/스펀지", actionId: "tool-dodge-burn" },
-      { keys: "[ · ]", label: "브러시 크기 ±1px", actionIds: ["brush-smaller", "brush-larger"] },
-      { keys: "⇧ [ · ⇧ ]", label: "브러시 크기 ±5px" },
-      { keys: "⌥ [ · ⌥ ]", label: "불투명도 ±5%" },
-      { keys: "1–6", label: "최근 브러시 슬롯 호출" },
-      { keys: "⇧ 1–6", label: "현재 브러시를 슬롯에 저장" },
-      { keys: "⇧ + 드래그", label: "자유선 → 0°/45°/90° 직선" },
-      { keys: "X", label: "주 색 ↔ 보조 색 교체", actionId: "swap-colors" },
+      { keys: "B", labelKey: "studio.shortcuts.row.drawing.pen", actionId: "tool-pen" },
+      { keys: "E", labelKey: "studio.shortcuts.row.drawing.eraser", actionId: "tool-eraser" },
+      {
+        keys: "N · ⇧N",
+        labelKey: "studio.shortcuts.row.drawing.blendWet",
+        actionIds: ["tool-blend", "tool-wet-mix"],
+      },
+      { keys: "O", labelKey: "studio.shortcuts.row.drawing.dodgeBurn", actionId: "tool-dodge-burn" },
+      {
+        keys: "[ · ]",
+        labelKey: "studio.shortcuts.row.drawing.brushSize",
+        actionIds: ["brush-smaller", "brush-larger"],
+      },
+      { keys: "⇧ [ · ⇧ ]", labelKey: "studio.shortcuts.row.drawing.brushSizeStep" },
+      { keys: "⌥ [ · ⌥ ]", labelKey: "studio.shortcuts.row.drawing.opacity" },
+      { keys: "1–6", labelKey: "studio.shortcuts.row.drawing.recentBrushSlots" },
+      { keys: "⇧ 1–6", labelKey: "studio.shortcuts.row.drawing.saveBrushSlot" },
+      {
+        keys: "⇧ + 드래그",
+        keysKey: "studio.shortcuts.keys.shiftDrag",
+        labelKey: "studio.shortcuts.row.drawing.straighten",
+      },
+      { keys: "X", labelKey: "studio.shortcuts.row.drawing.swapColors", actionId: "swap-colors" },
     ],
   },
   {
-    title: "편집",
+    titleKey: "studio.shortcuts.group.edit",
     rows: [
-      { keys: "T", label: "선택 대사 편집 · 최근 레터링 삽입", actionId: "tool-lettering" },
-      { keys: "⌘ Enter", label: "대사 입력 확정 · 일괄 말풍선 생성" },
-      { keys: "⌘Z", label: "실행취소", actionId: "undo" },
-      { keys: "⌘⇧Z · ⌘Y", label: "다시실행", actionId: "redo" },
-      { keys: "⌘X · ⌘C", label: "잘라내기 · 복사" },
-      { keys: "⌘V · ⌘⇧V", label: "붙여넣기 · 현재 위치에 붙여넣기" },
-      { keys: "⌘A", label: "모두 선택" },
-      { keys: "⌘D", label: "선택 해제", actionId: "deselect-pixels" },
-      { keys: "⌘⇧I", label: "픽셀 선택 반전", actionId: "invert-pixels" },
-      { keys: "Q", label: "퀵 마스크 켬 · 선택 영역으로 완료" },
-      { keys: "⌘J", label: "요소 복제" },
-      { keys: "G", label: "고급 채우기 켜기·끄기", actionId: "tool-fill" },
-      { keys: "Delete · ⌫", label: "픽셀 선택 삭제 · 없으면 요소 삭제" },
-      { keys: "Esc", label: "선택 해제" },
+      { keys: "T", labelKey: "studio.shortcuts.row.edit.text", actionId: "tool-lettering" },
+      { keys: "⌘ Enter", labelKey: "studio.shortcuts.row.edit.confirmBubble" },
+      { keys: "⌘Z", labelKey: "studio.shortcuts.row.edit.undo", actionId: "undo" },
+      { keys: "⌘⇧Z · ⌘Y", labelKey: "studio.shortcuts.row.edit.redo", actionId: "redo" },
+      { keys: "⌘X · ⌘C", labelKey: "studio.shortcuts.row.edit.cutCopy" },
+      { keys: "⌘V · ⌘⇧V", labelKey: "studio.shortcuts.row.edit.paste" },
+      { keys: "⌘A", labelKey: "studio.shortcuts.row.edit.selectAll" },
+      { keys: "⌘D", labelKey: "studio.shortcuts.row.edit.deselect", actionId: "deselect-pixels" },
+      { keys: "⌘⇧I", labelKey: "studio.shortcuts.row.edit.invert", actionId: "invert-pixels" },
+      { keys: "Q", labelKey: "studio.shortcuts.row.edit.quickMask" },
+      { keys: "⌘J", labelKey: "studio.shortcuts.row.edit.duplicate" },
+      { keys: "G", labelKey: "studio.shortcuts.row.edit.fill", actionId: "tool-fill" },
+      { keys: "Delete · ⌫", labelKey: "studio.shortcuts.row.edit.delete" },
+      { keys: "Esc", labelKey: "studio.shortcuts.row.edit.cancel" },
     ],
   },
   {
-    title: "정렬 · 레이어",
+    titleKey: "studio.shortcuts.group.layers",
     rows: [
-      { keys: "⌘] · ⌘⇧]", label: "한 단계 앞으로 · 맨 앞으로" },
-      { keys: "⌘[ · ⌘⇧[", label: "맨 뒤로 · 한 단계 뒤로" },
-      { keys: "방향키", label: "1px 이동" },
-      { keys: "⇧ + 방향키", label: "10px 이동" },
+      { keys: "⌘] · ⌘⇧]", labelKey: "studio.shortcuts.row.layers.forward" },
+      { keys: "⌘[ · ⌘⇧[", labelKey: "studio.shortcuts.row.layers.backward" },
+      {
+        keys: "방향키",
+        keysKey: "studio.shortcuts.keys.arrowKeys",
+        labelKey: "studio.shortcuts.row.layers.move1px",
+      },
+      {
+        keys: "⇧ + 방향키",
+        keysKey: "studio.shortcuts.keys.shiftArrowKeys",
+        labelKey: "studio.shortcuts.row.layers.move10px",
+      },
     ],
   },
   {
-    title: "보기",
+    titleKey: "studio.shortcuts.group.view",
     rows: [
-      { keys: "⌘ +", label: "확대" },
-      { keys: "⌘ −", label: "축소" },
-      { keys: "⌘ 0", label: "100%로 맞춤" },
-      { keys: "⌘ + 휠", label: "포인터 기준 확대/축소" },
-      { keys: "Space + 드래그", label: "화면 이동(팬)" },
-      { keys: "`", label: "캔버스만 / 도구 토글", actionId: "toggle-chrome" },
-      { keys: "H", label: "캔버스 좌우 반전 (보기)", actionId: "flip-canvas" },
-      { keys: "?", label: "단축키 도움말", actionId: "shortcuts-help" },
+      { keys: "⌘ +", labelKey: "studio.shortcuts.row.view.zoomIn" },
+      { keys: "⌘ −", labelKey: "studio.shortcuts.row.view.zoomOut" },
+      { keys: "⌘ 0", labelKey: "studio.shortcuts.row.view.zoomFit" },
+      {
+        keys: "⌘ + 휠",
+        keysKey: "studio.shortcuts.keys.commandWheel",
+        labelKey: "studio.shortcuts.row.view.zoomAtPointer",
+      },
+      {
+        keys: "Space + 드래그",
+        keysKey: "studio.shortcuts.keys.spaceDrag",
+        labelKey: "studio.shortcuts.row.view.pan",
+      },
+      { keys: "`", labelKey: "studio.shortcuts.row.view.toggleCanvas", actionId: "toggle-chrome" },
+      { keys: "H", labelKey: "studio.shortcuts.row.view.flipCanvas", actionId: "flip-canvas" },
+      { keys: "?", labelKey: "studio.shortcuts.row.view.help", actionId: "shortcuts-help" },
     ],
   },
 ];
@@ -125,6 +157,7 @@ export function StudioShortcutsHelp({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const closeFromEffect = useEffectEvent(onClose);
+  const t = useT();
 
   // 진짜 modal 계약: 포커스 진입·순환·복원, 배경 inert, 스크롤 잠금을 한 생명주기로 관리한다.
   useEffect(() => {
@@ -194,7 +227,7 @@ export function StudioShortcutsHelp({
       <button
         type="button"
         tabIndex={-1}
-        aria-label="단축키 도움말 닫기"
+        aria-label={t("studio.shortcuts.close")}
         className="absolute inset-0 cursor-default"
         onClick={onClose}
       />
@@ -208,12 +241,12 @@ export function StudioShortcutsHelp({
         tabIndex={-1}
       >
         <div className="mb-3 flex items-center justify-between">
-          <p id="studio-shortcuts-title" className="text-sm font-bold text-fg">키보드 단축키</p>
+          <p id="studio-shortcuts-title" className="text-sm font-bold text-fg">{t("studio.shortcuts.title")}</p>
           <button
             ref={closeButtonRef}
             type="button"
             onClick={onClose}
-            aria-label="닫기"
+            aria-label={t("common.close")}
             className="grid size-11 place-items-center rounded-xl border border-line text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:size-9"
           >
             <X size={14} />
@@ -221,14 +254,18 @@ export function StudioShortcutsHelp({
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           {GROUPS.map((g) => (
-            <div key={g.title}>
-              <p className="mb-1.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{g.title}</p>
+            <div key={g.titleKey}>
+              <p className="mb-1.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">
+                {t(g.titleKey)}
+              </p>
               <ul className="space-y-1">
                 {g.rows.map((r) => (
-                  <li key={r.label} className="flex items-center justify-between gap-3 text-xs text-fg-2">
-                    <span>{r.label}</span>
+                  <li key={r.labelKey} className="flex items-center justify-between gap-3 text-xs text-fg-2">
+                    <span>{t(r.labelKey)}</span>
                     <kbd className="shrink-0 rounded-md border border-line bg-card px-1.5 py-0.5 font-mono text-[0.66rem] text-fg-3">
-                      {displayKeysForRow(r, shortcuts)}
+                      {r.keysKey && !r.actionId && !r.actionIds
+                        ? t(r.keysKey)
+                        : displayKeysForRow(r, shortcuts)}
                     </kbd>
                   </li>
                 ))}
@@ -237,7 +274,7 @@ export function StudioShortcutsHelp({
           ))}
         </div>
         <p className="mt-3 text-[0.62rem] leading-relaxed text-fg-3">
-          Windows·Linux에서는 ⌘ 대신 Ctrl, ⌥ 대신 Alt를 사용하세요. 입력창·대화상자·검토 또는 협업 잠금 중에는 드로잉 단축키가 비활성화됩니다.
+          {t("studio.shortcuts.notice")}
         </p>
       </div>
     </div>

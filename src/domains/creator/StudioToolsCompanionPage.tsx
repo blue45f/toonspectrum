@@ -29,6 +29,7 @@ import {
 } from "react";
 import { useLocation } from "react-router-dom";
 
+
 import {
   StudioCompanionReferenceObjectUrlOwner,
   type StudioCompanionReferencePreviewFrame,
@@ -61,6 +62,7 @@ import {
   parseStudioCompanionSurface,
   StudioCompanionPresentationSafeGuard,
   StudioCompanionReferenceMessageGuard,
+  STUDIO_COMPANION_TOOL_LABEL_KEYS,
   STUDIO_COMPANION_TOOL_LABELS,
   STUDIO_COMPANION_TOOL_ORDER,
   studioCompanionPrimaryUrl,
@@ -87,6 +89,7 @@ import {
 import { useStudioCompanionWindowLayout } from "./use-studio-companion-window-layout";
 
 import { buttonClass } from "@/components/ui/button-utils";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const HEARTBEAT_INTERVAL_MS = 4_000;
@@ -114,6 +117,34 @@ type ScreenPlacementStatus = {
   kind: "requesting" | "unsupported" | "denied" | "timeout" | "no-secondary" | "failed" | "requested" | "restored" | "stale";
   text: string;
 };
+
+type StudioCompanionT = (key: string, fallback?: string) => string;
+
+function localizeText(t: StudioCompanionT | undefined, fallback: string, key: string): string {
+  if (!t) return fallback;
+  const translated = t(key);
+  return translated === key ? fallback : translated;
+}
+
+function interpolateText(
+  message: string,
+  values?: Record<string, string | number>,
+): string {
+  if (!values) return message;
+  return Object.entries(values).reduce(
+    (memo, [key, value]) => memo.replaceAll(`{${key}}`, String(value)),
+    message,
+  );
+}
+
+function tText(
+  t: StudioCompanionT | undefined,
+  fallback: string,
+  key: string,
+  values?: Record<string, string | number>,
+): string {
+  return interpolateText(localizeText(t, fallback, key), values);
+}
 
 type WindowWithScreenDetails = Window & {
   getScreenDetails?: () => Promise<{ screens: readonly unknown[]; currentScreen?: unknown }>;
@@ -247,6 +278,7 @@ function decodeStudioCompanionBlobImage(
 
 export function StudioToolsCompanionPage() {
   const location = useLocation();
+  const t = useT();
   const sessionId = parseStudioCompanionSessionId(location.search);
   const surface = parseStudioCompanionSurface(location.search);
   const effectiveSurface: StudioCompanionSurface = surface ?? "workspace";
@@ -291,7 +323,9 @@ export function StudioToolsCompanionPage() {
 
   const [connected, setConnected] = useState(false);
   const [targetPrimaryInstanceId, setTargetPrimaryInstanceId] = useState<string | null>(null);
-  const [primaryTitle, setPrimaryTitle] = useState("스튜디오");
+  const [primaryTitle, setPrimaryTitle] = useState(
+    localizeText(t, "스튜디오", "studio.toolsCompanion.title.default")
+  );
   const [activeTool, setActiveTool] = useState<StudioCompanionToolId>("select");
   const [density, setDensity] = useState<StudioCompanionDensity>("full");
   const [primaryCanvasOnly, setPrimaryCanvasOnly] = useState(false);
@@ -331,13 +365,21 @@ export function StudioToolsCompanionPage() {
     onRestored: () => {
       setScreenPlacementStatus({
         kind: "restored",
-        text: "이 역할에 저장된 창 위치와 크기를 복원했습니다.",
+        text: localizeText(
+          t,
+          "이 역할에 저장된 창 위치와 크기를 복원했습니다.",
+          "studio.toolsCompanion.screenPlacement.restored"
+        ),
       });
     },
     onTopologyStale: () => {
       setScreenPlacementStatus({
         kind: "stale",
-        text: "모니터 구성이 바뀌어 자동 복원을 멈췄습니다. 창을 원하는 곳으로 옮긴 뒤 ‘현재 위치 저장’을 눌러 주세요.",
+        text: localizeText(
+          t,
+          "모니터 구성이 바뀌어 자동 복원을 멈췄습니다. 창을 원하는 곳으로 옮긴 뒤 ‘현재 위치 저장’을 눌러 주세요.",
+          "studio.toolsCompanion.screenPlacement.stale"
+        ),
       });
     },
   });
@@ -358,7 +400,11 @@ export function StudioToolsCompanionPage() {
       channel.postMessage(msg);
       return true;
     } catch {
-      setLastError("채널 전송에 실패했습니다. 기본 스튜디오 탭이 같은 출처인지 확인하세요.");
+      setLastError(localizeText(
+        t,
+        "채널 전송에 실패했습니다. 기본 스튜디오 탭이 같은 출처인지 확인하세요.",
+        "studio.toolsCompanion.error.channelSend"
+      ));
       return false;
     }
   }
@@ -531,14 +577,25 @@ export function StudioToolsCompanionPage() {
   }, []);
 
   useEffect(() => {
-    document.title = `${effectiveSurface === "workspace"
-      ? "도구 창"
-      : effectiveSurface === "navigator"
-        ? "캔버스 내비게이터"
-        : effectiveSurface === "review"
-          ? "검수 콘솔"
-          : "레퍼런스 화면"} · ToonSpectrum Studio`;
-  }, [effectiveSurface]);
+    const surfaceTitle = localizeText(
+      t,
+      effectiveSurface === "workspace"
+        ? "도구 창"
+        : effectiveSurface === "navigator"
+          ? "캔버스 내비게이터"
+          : effectiveSurface === "review"
+            ? "검수 콘솔"
+            : "레퍼런스 화면",
+      effectiveSurface === "workspace"
+        ? "studio.toolsCompanion.surface.workspace"
+        : effectiveSurface === "navigator"
+          ? "studio.toolsCompanion.surface.navigator"
+          : effectiveSurface === "review"
+            ? "studio.toolsCompanion.surface.review"
+            : "studio.toolsCompanion.surface.reference"
+    );
+    document.title = `${surfaceTitle} · ToonSpectrum Studio`;
+  }, [effectiveSurface, t]);
 
   useEffect(() => {
     if (!presentationSafe) return;
@@ -637,7 +694,7 @@ export function StudioToolsCompanionPage() {
   useEffect(() => {
     setConnected(false);
     setTargetPrimaryInstanceId(null);
-    setPrimaryTitle("스튜디오");
+    setPrimaryTitle(localizeText(t, "스튜디오", "studio.toolsCompanion.title.default"));
     setActiveTool("select");
     setDensity("full");
     setLastError(null);
@@ -651,12 +708,20 @@ export function StudioToolsCompanionPage() {
 
     if (!sessionId) {
       companionInstanceIdRef.current = null;
-      setLastError("유효한 분리 세션이 없습니다. 기본 스튜디오에서 도구 창을 다시 열어 주세요.");
+      setLastError(localizeText(
+        t,
+        "유효한 분리 세션이 없습니다. 기본 스튜디오에서 도구 창을 다시 열어 주세요.",
+        "studio.toolsCompanion.error.invalidSession"
+      ));
       return;
     }
     if (!surface) {
       companionInstanceIdRef.current = null;
-      setLastError("유효한 컴패니언 보기 모드가 없습니다. 기본 스튜디오에서 창을 다시 열어 주세요.");
+      setLastError(localizeText(
+        t,
+        "유효한 컴패니언 보기 모드가 없습니다. 기본 스튜디오에서 창을 다시 열어 주세요.",
+        "studio.toolsCompanion.error.invalidSurface"
+      ));
       return;
     }
 
@@ -674,7 +739,11 @@ export function StudioToolsCompanionPage() {
     const channel = createStudioCompanionChannel(sessionId);
     channelRef.current = channel;
     if (!channel) {
-      setLastError("이 브라우저는 BroadcastChannel을 지원하지 않습니다.");
+      setLastError(localizeText(
+        t,
+        "이 브라우저는 BroadcastChannel을 지원하지 않습니다.",
+        "studio.toolsCompanion.error.unsupportedBroadcast"
+      ));
       return;
     }
 
@@ -786,7 +855,7 @@ export function StudioToolsCompanionPage() {
       lastPrimaryActivityAt = 0;
       setConnected(false);
       setTargetPrimaryInstanceId(null);
-      setPrimaryTitle("스튜디오");
+      setPrimaryTitle(localizeText(t, "스튜디오", "studio.toolsCompanion.title.default"));
       setActiveTool("select");
       setDensity("full");
       setPrimaryCanvasOnly(false);
@@ -974,7 +1043,9 @@ export function StudioToolsCompanionPage() {
         setActiveTool(msg.tool);
         setDensity(msg.density);
         setPrimaryCanvasOnly(msg.canvasOnly);
-        setPrimaryTitle(msg.title || "스튜디오");
+        setPrimaryTitle(
+          msg.title || localizeText(t, "스튜디오", "studio.toolsCompanion.title.default")
+        );
         return;
       }
       if (msg.type === "primary-reference-state") {
@@ -1150,6 +1221,7 @@ export function StudioToolsCompanionPage() {
     clearReviewState,
     sessionId,
     surface,
+    t,
   ]);
 
   function sendCommand(command: StudioCompanionCommandName) {
@@ -1178,12 +1250,23 @@ export function StudioToolsCompanionPage() {
   async function moveToAnotherScreen() {
     const placementEpoch = screenPlacementEpochRef.current + 1;
     screenPlacementEpochRef.current = placementEpoch;
-    setScreenPlacementStatus({ kind: "requesting", text: "연결된 화면을 확인하고 있습니다…" });
+    setScreenPlacementStatus({
+      kind: "requesting",
+      text: localizeText(
+        t,
+        "연결된 화면을 확인하고 있습니다…",
+        "studio.toolsCompanion.screenPlacement.requesting"
+      ),
+    });
     const screenWindow = window as WindowWithScreenDetails;
     if (typeof screenWindow.getScreenDetails !== "function") {
       setScreenPlacementStatus({
         kind: "unsupported",
-        text: "이 브라우저는 자동 창 배치를 지원하지 않습니다. 창 제목 표시줄을 끌어 직접 옮겨 주세요.",
+        text: localizeText(
+          t,
+          "이 브라우저는 자동 창 배치를 지원하지 않습니다. 창 제목 표시줄을 끌어 직접 옮겨 주세요.",
+          "studio.toolsCompanion.screenPlacement.unsupported"
+        ),
       });
       return;
     }
@@ -1206,7 +1289,11 @@ export function StudioToolsCompanionPage() {
       if (!placement) {
         setScreenPlacementStatus({
           kind: "no-secondary",
-          text: "사용 가능한 다른 화면을 찾지 못했습니다. 화면 연결 상태를 확인해 주세요.",
+          text: localizeText(
+            t,
+            "사용 가능한 다른 화면을 찾지 못했습니다. 화면 연결 상태를 확인해 주세요.",
+            "studio.toolsCompanion.screenPlacement.noSecondary"
+          ),
         });
         return;
       }
@@ -1220,7 +1307,11 @@ export function StudioToolsCompanionPage() {
       }
       setScreenPlacementStatus({
         kind: "requested",
-        text: "다른 화면으로 이동을 요청했습니다.",
+        text: localizeText(
+          t,
+          "다른 화면으로 이동을 요청했습니다.",
+          "studio.toolsCompanion.screenPlacement.requested"
+        ),
       });
     } catch (error) {
       if (screenPlacementEpochRef.current !== placementEpoch) return;
@@ -1230,16 +1321,28 @@ export function StudioToolsCompanionPage() {
         errorName === "NotAllowedError"
           ? {
               kind: "denied",
-              text: "창 관리 권한이 필요합니다. 주소창의 사이트 설정에서 권한을 허용하거나 직접 옮겨 주세요.",
+              text: localizeText(
+                t,
+                "창 관리 권한이 필요합니다. 주소창의 사이트 설정에서 권한을 허용하거나 직접 옮겨 주세요.",
+                "studio.toolsCompanion.screenPlacement.denied"
+              ),
             }
           : timedOut
             ? {
                 kind: "timeout",
-                text: "화면 정보를 받지 못했습니다. 다시 시도하거나 창 제목 표시줄을 끌어 옮겨 주세요.",
+                text: localizeText(
+                  t,
+                  "화면 정보를 받지 못했습니다. 다시 시도하거나 창 제목 표시줄을 끌어 옮겨 주세요.",
+                  "studio.toolsCompanion.screenPlacement.timeout"
+                ),
               }
             : {
                 kind: "failed",
-                text: "화면 이동을 요청하지 못했습니다. 창 제목 표시줄을 끌어 직접 옮겨 주세요.",
+                text: localizeText(
+                  t,
+                  "화면 이동을 요청하지 못했습니다. 창 제목 표시줄을 끌어 직접 옮겨 주세요.",
+                  "studio.toolsCompanion.screenPlacement.failed"
+                ),
               }
       );
     }
@@ -1289,7 +1392,8 @@ export function StudioToolsCompanionPage() {
     setMode("review");
     sendCommand("exit-canvas-only");
   }
-  const visiblePrimaryTitle = presentationSafe ? "스튜디오" : primaryTitle;
+  const titleStudio = localizeText(t, "스튜디오", "studio.toolsCompanion.title.studio");
+  const visiblePrimaryTitle = presentationSafe ? titleStudio : primaryTitle;
   const navigatorSurfaceActive = effectiveSurface === "navigator"
     || (effectiveSurface === "workspace" && mode === "navigator");
   const syncNavigatorDemand = useEffectEvent((active: boolean) => {
@@ -1304,18 +1408,34 @@ export function StudioToolsCompanionPage() {
     );
   }, [interactionReady, navigatorSurfaceActive, presentationSafe, projection]);
   const tabs: ReadonlyArray<{ id: CompanionMode; label: string; icon: typeof Palette }> = [
-    { id: "tools", label: "도구", icon: Palette },
-    { id: "navigator", label: "Navigator", icon: Map },
-    { id: "review", label: "검수", icon: ListChecks },
-    { id: "reference", label: "레퍼런스", icon: Images },
+    {
+      id: "tools",
+      label: localizeText(t, "도구", "studio.toolsCompanion.mode.tools"),
+      icon: Palette,
+    },
+    {
+      id: "navigator",
+      label: localizeText(t, "Navigator", "studio.toolsCompanion.mode.navigator"),
+      icon: Map,
+    },
+    {
+      id: "review",
+      label: localizeText(t, "검수", "studio.toolsCompanion.mode.review"),
+      icon: ListChecks,
+    },
+    {
+      id: "reference",
+      label: localizeText(t, "레퍼런스", "studio.toolsCompanion.mode.reference"),
+      icon: Images,
+    },
   ];
   const shellTitle = effectiveSurface === "workspace"
     ? visiblePrimaryTitle
     : effectiveSurface === "navigator"
-      ? "캔버스 내비게이터"
+      ? localizeText(t, "캔버스 내비게이터", "studio.toolsCompanion.surface.navigator")
       : effectiveSurface === "review"
-        ? "검수 콘솔"
-        : "레퍼런스 화면";
+        ? localizeText(t, "검수 콘솔", "studio.toolsCompanion.surface.review")
+        : localizeText(t, "레퍼런스 화면", "studio.toolsCompanion.surface.reference");
   const referenceConnectionStatus = connected
     ? "connected"
     : targetPrimaryInstanceId
@@ -1331,13 +1451,13 @@ export function StudioToolsCompanionPage() {
         : "persistent";
   const windowLayoutAutomationNote =
     companionWindowLayout.status === "permission-required"
-      ? "자동 복원을 허용하려면 상단의 ‘다른 화면으로 창 이동’을 한 번 눌러 창 관리 권한을 허용해 주세요."
+      ? t("studio.toolsCompanion.layoutSettings.permissionRequired")
       : companionWindowLayout.status === "permission-denied"
-        ? "창 관리 권한이 꺼져 있어 자동 복원할 수 없습니다. 브라우저 사이트 설정에서 권한을 켜거나 직접 옮겨 주세요."
+        ? t("studio.toolsCompanion.layoutSettings.permissionDenied")
         : companionWindowLayout.status === "stale-topology"
-          ? "저장 당시와 모니터 구성이 달라 임의의 화면으로 옮기지 않았습니다. 원하는 곳으로 옮긴 뒤 ‘현재 위치 저장’을 눌러 주세요."
+          ? t("studio.toolsCompanion.layoutSettings.staleTopology")
           : companionWindowLayout.status === "restore-failed"
-            ? "브라우저가 창 이동을 적용하지 않아 기존 저장 배치를 유지했습니다. 창을 직접 옮기면 실제 위치를 다시 기억합니다."
+            ? t("studio.toolsCompanion.layoutSettings.restoreFailed")
           : null;
   const windowLayoutSettings = (
     <>
@@ -1388,27 +1508,46 @@ export function StudioToolsCompanionPage() {
           </span>
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-[0.9rem] font-semibold tracking-tight">{shellTitle}</h1>
-            <p role="status" aria-live="polite" className="mt-0.5 truncate text-xs text-fg-2">
-              {interactionReady ? (
-                <span className="text-good">
-                  {presentationSafe
-                    ? "연결됨 · 발표 안전"
-                    : effectiveSurface === "workspace"
-                      ? `연결됨 · ${visiblePrimaryTitle}`
-                      : "연결됨 · 기본 스튜디오"}
-                </span>
-              ) : (
-                <span className="text-warn">연결 대기 · 기본 스튜디오를 확인하세요</span>
+          <p role="status" aria-live="polite" className="mt-0.5 truncate text-xs text-fg-2">
+            {interactionReady ? (
+              <span className="text-good">
+                {presentationSafe
+                  ? t("studio.toolsCompanion.status.connectedPresentationSafe")
+                  : effectiveSurface === "workspace"
+                    ? tText(
+                      t,
+                      "연결됨 · {primaryTitle}",
+                      "studio.toolsCompanion.status.connectedWithPrimary",
+                      { primaryTitle: visiblePrimaryTitle },
+                    )
+                    : t("studio.toolsCompanion.status.connectedStudio")
+                }
+              </span>
+            ) : (
+              <span className="text-warn">{t("studio.toolsCompanion.status.waiting")}</span>
+            )}
+            <span className="text-fg-3">
+              {tText(
+                t,
+                "· 밀도 {density}",
+                "studio.toolsCompanion.status.density",
+                { density },
               )}
-              <span className="text-fg-3"> · 밀도 {density}</span>
-            </p>
+            </span>
+          </p>
           </div>
           <button
             type="button"
             disabled={!sessionId}
-            aria-label={presentationSafe ? "발표 안전 끄기" : "발표 안전 켜기"}
+            aria-label={presentationSafe
+              ? t("studio.toolsCompanion.presentationSafe.toggleOff")
+              : t("studio.toolsCompanion.presentationSafe.toggleOn")
+            }
             aria-pressed={presentationSafe}
-            title={presentationSafe ? "발표 안전 끄기" : "발표 안전 켜기"}
+            title={presentationSafe
+              ? t("studio.toolsCompanion.presentationSafe.toggleOff")
+              : t("studio.toolsCompanion.presentationSafe.toggleOn")
+            }
             onClick={() => changePresentationSafe(!presentationSafe)}
             className={cn(
               "grid size-11 shrink-0 place-items-center rounded-xl border outline-none transition-colors motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-accent/35 disabled:opacity-45",
@@ -1425,8 +1564,11 @@ export function StudioToolsCompanionPage() {
             type="button"
             disabled={screenPlacementBusy}
             aria-busy={screenPlacementBusy}
-            aria-label={screenPlacementBusy ? "다른 화면을 확인하는 중" : "다른 화면으로 창 이동"}
-            title="다른 화면으로 창 이동"
+            aria-label={screenPlacementBusy
+              ? t("studio.toolsCompanion.layoutSettings.moveBusy")
+              : t("studio.toolsCompanion.layoutSettings.moveToAnotherScreen")
+            }
+            title={t("studio.toolsCompanion.layoutSettings.moveToAnotherScreen")}
             onClick={() => void moveToAnotherScreen()}
             className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-2 outline-none transition-colors motion-reduce:transition-none hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/35 disabled:cursor-wait disabled:opacity-60"
           >
@@ -1439,7 +1581,7 @@ export function StudioToolsCompanionPage() {
           <div
             role="tablist"
             className="mt-2 grid grid-cols-4 gap-1 rounded-xl border border-line bg-card p-1"
-            aria-label="컴패니언 모드"
+            aria-label={t("studio.toolsCompanion.modeTabAria")}
           >
             {tabs.map(({ id, label, icon: Icon }, index) => (
               <button
@@ -1510,16 +1652,21 @@ export function StudioToolsCompanionPage() {
             rel="noopener noreferrer"
             className={cn(buttonClass({ size: "sm", variant: "solid" }), "min-h-11 justify-start gap-2 no-underline")}
           >
-            <WandSparkles className="size-3.5" aria-hidden /> 스튜디오 다시 연결
+            <WandSparkles className="size-3.5" aria-hidden />
+            {t("studio.toolsCompanion.surfaceTools.reconnect")}
           </a>
         ) : null}
 
         {dedicatedLayout ? (
           <details className="group shrink-0 rounded-xl border border-line/70 bg-card/55 p-1.5">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-2.5 text-xs font-semibold text-fg-2 outline-none hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/35 [&::-webkit-details-marker]:hidden">
-              창 배치 설정
-              <span className="text-[0.64rem] font-medium text-fg-3 group-open:hidden">펼치기</span>
-              <span className="hidden text-[0.64rem] font-medium text-fg-3 group-open:inline">접기</span>
+              {t("studio.toolsCompanion.layoutSettings.title")}
+              <span className="text-[0.64rem] font-medium text-fg-3 group-open:hidden">
+                {t("studio.toolsCompanion.layoutSettings.expand")}
+              </span>
+              <span className="hidden text-[0.64rem] font-medium text-fg-3 group-open:inline">
+                {t("studio.toolsCompanion.layoutSettings.collapse")}
+              </span>
             </summary>
             <div className="space-y-1.5 pt-1.5">{windowLayoutSettings}</div>
           </details>
@@ -1533,8 +1680,10 @@ export function StudioToolsCompanionPage() {
             hidden={mode !== "tools"}
             className="space-y-4"
           >
-            <section aria-label="도구 팔레트" className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-fg-3">도구</p>
+            <section aria-label={t("studio.toolsCompanion.toolsTab")} className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-fg-3">
+                {t("studio.toolsCompanion.toolsTab")}
+              </p>
               <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
                 {STUDIO_COMPANION_TOOL_ORDER.map((tool) => {
                   const active = activeTool === tool;
@@ -1552,7 +1701,11 @@ export function StudioToolsCompanionPage() {
                           : "border-line/60 bg-card text-fg-2 hover:bg-raised"
                       )}
                     >
-                      {STUDIO_COMPANION_TOOL_LABELS[tool]}
+                      {localizeText(
+                        t,
+                        STUDIO_COMPANION_TOOL_LABELS[tool],
+                        STUDIO_COMPANION_TOOL_LABEL_KEYS[tool],
+                      )}
                     </button>
                   );
                 })}
@@ -1560,24 +1713,28 @@ export function StudioToolsCompanionPage() {
             </section>
 
             <section className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-fg-3">화면</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-fg-3">
+                {t("studio.toolsCompanion.surfaceTab")}
+              </p>
               <div className="flex flex-col gap-1.5">
                 <button
                   type="button"
                   disabled={!interactionReady}
                   onClick={() => sendCommand("focus-primary")}
-                  className={cn(buttonClass({ size: "sm", variant: "outline" }), "min-h-11 justify-start gap-2")}
-                >
-                  <Sparkles className="size-3.5" aria-hidden /> 기본 탭 앞으로
-                </button>
+                className={cn(buttonClass({ size: "sm", variant: "outline" }), "min-h-11 justify-start gap-2")}
+              >
+                <Sparkles className="size-3.5" aria-hidden />
+                {t("studio.toolsCompanion.surfaceTools.focusPrimary")}
+              </button>
                 <button
                   type="button"
                   disabled={!interactionReady}
                   onClick={() => sendCommand("toggle-canvas-only")}
-                  className={cn(buttonClass({ size: "sm", variant: "quiet" }), "min-h-11 justify-start gap-2")}
-                >
-                  <Layers className="size-3.5" aria-hidden /> 캔버스만 토글
-                </button>
+                className={cn(buttonClass({ size: "sm", variant: "quiet" }), "min-h-11 justify-start gap-2")}
+              >
+                <Layers className="size-3.5" aria-hidden />
+                {t("studio.toolsCompanion.surfaceTools.toggleCanvas")}
+              </button>
                 {!interactionReady && sessionId ? (
                   <a
                     href={studioCompanionPrimaryUrl(
@@ -1587,12 +1744,13 @@ export function StudioToolsCompanionPage() {
                     )}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={cn(buttonClass({ size: "sm", variant: "solid" }), "min-h-11 justify-start gap-2 no-underline")}
-                  >
-                    <WandSparkles className="size-3.5" aria-hidden /> 스튜디오 다시 연결
-                  </a>
-                ) : null}
-              </div>
+                  className={cn(buttonClass({ size: "sm", variant: "solid" }), "min-h-11 justify-start gap-2 no-underline")}
+                >
+                  <WandSparkles className="size-3.5" aria-hidden />
+                  {t("studio.toolsCompanion.surfaceTools.reconnect")}
+                </a>
+              ) : null}
+            </div>
             </section>
             <StudioCompanionWorkspacePresets
               disabled={!interactionReady}
@@ -1612,7 +1770,7 @@ export function StudioToolsCompanionPage() {
             role={effectiveSurface === "workspace" ? "tabpanel" : undefined}
             id="companion-mode-panel-navigator"
             aria-labelledby={effectiveSurface === "workspace" ? "companion-mode-tab-navigator" : undefined}
-            aria-label={effectiveSurface === "navigator" ? "캔버스 내비게이터" : undefined}
+              aria-label={effectiveSurface === "navigator" ? t("studio.toolsCompanion.navigatorAria") : undefined}
             hidden={effectiveSurface === "workspace" && mode !== "navigator"}
             className={cn(dedicatedLayout && "flex min-h-0 flex-1 flex-col")}
           >
@@ -1620,9 +1778,11 @@ export function StudioToolsCompanionPage() {
               <section className="grid min-h-64 flex-1 place-items-center rounded-xl border border-line bg-card px-5 text-center">
                 <div className="max-w-64">
                   <EyeOff className="mx-auto size-6 text-fg-3" aria-hidden />
-                  <h2 className="mt-3 text-sm font-semibold text-fg">Navigator 발표 안전 모드</h2>
+                  <h2 className="mt-3 text-sm font-semibold text-fg">
+                    {t("studio.toolsCompanion.presentationSafe.navigatorTitle")}
+                  </h2>
                   <p className="mt-1 text-xs leading-relaxed text-fg-3">
-                    캔버스 미리보기 전송을 멈추고 브라우저 메모리의 이미지 URL을 해제했습니다.
+                    {t("studio.toolsCompanion.presentationSafe.navigatorDescription")}
                   </p>
                 </div>
               </section>
@@ -1646,7 +1806,7 @@ export function StudioToolsCompanionPage() {
             role={effectiveSurface === "workspace" ? "tabpanel" : undefined}
             id="companion-mode-panel-review"
             aria-labelledby={effectiveSurface === "workspace" ? "companion-mode-tab-review" : undefined}
-            aria-label={effectiveSurface === "review" ? "검수 콘솔" : undefined}
+            aria-label={effectiveSurface === "review" ? t("studio.toolsCompanion.reviewAria") : undefined}
             hidden={effectiveSurface === "workspace" && mode !== "review"}
             className={cn(dedicatedLayout && "flex min-h-0 flex-1 flex-col")}
           >
@@ -1669,7 +1829,7 @@ export function StudioToolsCompanionPage() {
             role={effectiveSurface === "workspace" ? "tabpanel" : undefined}
             id="companion-mode-panel-reference"
             aria-labelledby={effectiveSurface === "workspace" ? "companion-mode-tab-reference" : undefined}
-            aria-label={effectiveSurface === "reference" ? "레퍼런스 화면" : undefined}
+            aria-label={effectiveSurface === "reference" ? t("studio.toolsCompanion.referenceAria") : undefined}
             className={dedicatedLayout
               ? "flex min-h-[29rem] flex-1 flex-col"
               : "min-h-0"}
@@ -1678,9 +1838,11 @@ export function StudioToolsCompanionPage() {
               <section className="grid min-h-64 flex-1 place-items-center rounded-xl border border-line bg-card px-5 text-center">
                 <div className="max-w-64">
                   <EyeOff className="mx-auto size-6 text-fg-3" aria-hidden />
-                  <h2 className="mt-3 text-sm font-semibold text-fg">발표 안전 모드</h2>
+                  <h2 className="mt-3 text-sm font-semibold text-fg">
+                    {t("studio.toolsCompanion.presentationSafe.referenceTitle")}
+                  </h2>
                   <p className="mt-1 text-xs leading-relaxed text-fg-3">
-                    레퍼런스 이미지와 최근 선택 색상을 숨기고 브라우저 메모리의 미리보기 URL도 해제했습니다.
+                    {t("studio.toolsCompanion.presentationSafe.referenceDescription")}
                   </p>
                 </div>
               </section>
@@ -1691,7 +1853,7 @@ export function StudioToolsCompanionPage() {
                     role="status"
                     className="grid min-h-64 flex-1 place-items-center rounded-xl border border-line bg-card text-xs text-fg-3"
                   >
-                    레퍼런스 도구를 불러오는 중…
+                    {t("studio.toolsCompanion.referenceLoading")}
                   </div>
                 )}
               >
@@ -1708,9 +1870,9 @@ export function StudioToolsCompanionPage() {
           </div>
         ) : null}
 
-        <p className={cn("text-xs leading-relaxed text-fg-3", dedicatedLayout && "shrink-0")}>
-          편집 문서는 기본 탭만 소유합니다. 이 창은 같은 브라우저의 BroadcastChannel로 압축 미리보기와 검수·레퍼런스 의도만 전달하므로 별도 서버 비용이 없습니다.
-        </p>
+          <p className={cn("text-xs leading-relaxed text-fg-3", dedicatedLayout && "shrink-0")}>
+            {t("studio.toolsCompanion.footer")}
+          </p>
       </main>
     </div>
   );
