@@ -907,7 +907,7 @@ function fdxPreviewText(value: string): string {
   return singleLine.length <= 160 ? singleLine : `${singleLine.slice(0, 157)}…`;
 }
 
-function _parseFdx(text: string): StudioDialogueInterchangeResult {
+function parseFdx(text: string): StudioDialogueInterchangeResult {
   const paragraphs = parseFdxParagraphs(text);
   const cues: StudioDialogueCue[] = [];
   const warnings: string[] = [];
@@ -958,6 +958,7 @@ function _parseFdx(text: string): StudioDialogueInterchangeResult {
       const explicitPage = FDX_PAGE_MARKER.exec(paragraph.text);
       if (explicitPage) {
         page = Number(explicitPage[1]);
+        sceneCount = page;
       } else {
         sceneCount += 1;
         page = sceneCount;
@@ -982,6 +983,7 @@ function _parseFdx(text: string): StudioDialogueInterchangeResult {
       const explicitPanel = FDX_PANEL_MARKER.exec(paragraph.text);
       if (explicitPanel) {
         panel = Number(explicitPanel[1]);
+        actionCount = 1;
       } else {
         if (actionCount > 0) panel += 1;
         actionCount += 1;
@@ -1181,6 +1183,7 @@ export function parseStudioDialogueInterchange(
     case "csv": return parseDelimited(text, ",");
     case "tsv": return parseDelimited(text, "\t");
     case "fountain": return parseFountain(text);
+    case "fdx": return parseFdx(text);
     case "srt": return parseTimedText(text, false);
     case "vtt": return parseTimedText(text, true);
     case "txt":
@@ -1251,6 +1254,53 @@ function serializeFountain(document: StudioDialogueInterchangeDocument): string 
   return lines.join("\n").replace(/\n{3,}/gu, "\n\n").trimEnd() + "\n";
 }
 
+function escapeFdxXml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
+function fdxParagraph(type: StudioDialogueFdxCoreParagraphType, value: string): string {
+  return `    <Paragraph Type="${type}"><Text>${escapeFdxXml(value)}</Text></Paragraph>\n`;
+}
+
+function serializeFdx(document: StudioDialogueInterchangeDocument): string {
+  const chunks: string[] = [];
+  let byteLength = 0;
+  const push = (value: string): void => {
+    byteLength += UTF8.encode(value).byteLength;
+    if (byteLength > STUDIO_DIALOGUE_INTERCHANGE_LIMITS.maxFileBytes) {
+      fail("FILE_TOO_LARGE", "FDX 출력이 8MB 안전 예산을 초과했습니다.");
+    }
+    chunks.push(value);
+  };
+  push('<?xml version="1.0" encoding="UTF-8" standalone="no" ?>\n');
+  push('<FinalDraft DocumentType="Script" Template="No" Version="1">\n');
+  push("  <Content>\n");
+  let page: number | undefined;
+  let panel: number | undefined;
+  for (const cue of document.cues) {
+    if (cue.page !== page) {
+      push(fdxParagraph("Scene Heading", `TOONSPECTRUM PAGE ${cue.page}`));
+      page = cue.page;
+      panel = undefined;
+    }
+    if (cue.panel != null && cue.panel !== panel) {
+      push(fdxParagraph("Action", `TOONSPECTRUM PANEL ${cue.panel}`));
+      panel = cue.panel;
+    }
+    push(fdxParagraph("Character", cue.speaker ?? "DIALOGUE"));
+    if (cue.note) push(fdxParagraph("Parenthetical", cue.note));
+    push(fdxParagraph("Dialogue", cue.text));
+  }
+  push("  </Content>\n");
+  push("</FinalDraft>\n");
+  return chunks.join("");
+}
+
 function formatTimestamp(milliseconds: number, vtt: boolean): string {
   const clamped = Math.max(0, Math.min(STUDIO_DIALOGUE_INTERCHANGE_LIMITS.maxTimestampMs, Math.round(milliseconds)));
   const hours = Math.floor(clamped / 3_600_000);
@@ -1319,6 +1369,26 @@ export function serializeStudioDialogueInterchange(
       warnings.push("Fountain 출력은 페이지·컷을 섹션/주석으로 보존하지만 캔버스 좌표는 포함하지 않습니다.");
       lossy = true;
       break;
+    case "fdx":
+      text = serializeFdx(document);
+      warnings.push(
+        "FDX 출력은 공개 정식 스키마가 아닌 FinalDraft/Content/Paragraph/Text 안전 부분집합입니다."
+      );
+      warnings.push(
+        "페이지·컷은 ToonSpectrum 전용 Scene Heading/Action marker로 보존하며 FDX 서식·좌표·제작 메타데이터는 포함하지 않습니다."
+      );
+      if (document.cues.some((cue) => !cue.speaker)) {
+        warnings.push("화자가 없는 cue는 FDX Character 값 DIALOGUE로 출력했습니다.");
+      }
+      if (
+        document.title
+        || document.language
+        || document.cues.some((cue) => cue.id || cue.startMs != null || cue.endMs != null)
+      ) {
+        warnings.push("FDX 안전 부분집합에는 제목·언어·cue ID·타임코드가 포함되지 않습니다.");
+      }
+      lossy = true;
+      break;
     case "srt":
     case "vtt": {
       const timed = serializeTimedText(document, format === "vtt");
@@ -1333,6 +1403,8 @@ export function serializeStudioDialogueInterchange(
   const extension = format === "markdown" ? ".md" : (`.${format}` as const);
   const mimeType = format === "json"
     ? "application/json;charset=utf-8"
+    : format === "fdx"
+      ? "application/xml;charset=utf-8"
     : format === "csv"
       ? "text/csv;charset=utf-8"
       : format === "vtt"
