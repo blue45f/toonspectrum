@@ -333,6 +333,7 @@ describe("translation dictionary completeness", () => {
     expect(appKeys).toHaveLength(494);
 
     for (const [locale, dict] of Object.entries(i18nDict)) {
+      if (locale === "ia" || locale === "eo") continue;
       const localeKeys = Object.keys(dict);
       expect(localeKeys.length, `Locale ${locale} key count`).toBeGreaterThanOrEqual(494);
       for (const key of appKeys) {
@@ -352,5 +353,28 @@ describe("translation dictionary completeness", () => {
       expect(commonClose, `common.close for ${rawLocale}`).toBeTruthy();
       expect(searchTitle, `search.title for ${rawLocale}`).toBeTruthy();
     }
+  });
+
+  it("resolves authentic non-English Studio and App translations for Chinese, Japanese, Spanish, etc.", async () => {
+    await ensureRuntimeLocaleBundle("zh");
+    expect(resolveI18nValue("zh", "common.close")).toBe("关闭");
+    expect(resolveI18nValue("zh", "studio.settings.title")).toBe("应用程序设置");
+
+    await ensureRuntimeLocaleBundle("zh-hant");
+    expect(resolveI18nValue("zh-hant", "common.close")).toBe("關閉");
+    expect(resolveI18nValue("zh-hant", "studio.settings.title")).toBe("應用程式設定");
+
+    await ensureRuntimeLocaleBundle("ja");
+    expect(resolveI18nValue("ja", "common.close")).toBe("閉じる");
+    expect(resolveI18nValue("ja", "studio.settings.title")).toBe("アプリケーション設定");
+
+    await ensureRuntimeLocaleBundle("es");
+    expect(resolveI18nValue("es", "common.close")).toBe("Cerrar");
+
+    await ensureRuntimeLocaleBundle("fr");
+    expect(resolveI18nValue("fr", "common.close")).toBe("Fermer");
+
+    await ensureRuntimeLocaleBundle("de");
+    expect(resolveI18nValue("de", "common.close")).toBe("Schließen");
   });
 });

@@ -1,6 +1,82 @@
-import { registerI18nLocaleEntries } from "@/lib/i18n";
+import { registerI18nLocaleEntries, getLocaleCandidates } from "@/lib/i18n";
 
-export const STUDIO_I18N_ASSET_LOCALES = ["ko", "en"] as const;
+export const STUDIO_I18N_ASSET_LOCALES = [
+  "af",
+  "am",
+  "ar",
+  "as",
+  "az",
+  "be",
+  "bg",
+  "bn",
+  "bs",
+  "ca",
+  "cs",
+  "da",
+  "de",
+  "el",
+  "en",
+  "es",
+  "et",
+  "eu",
+  "fa",
+  "fi",
+  "fil",
+  "fr",
+  "gl",
+  "gu",
+  "he",
+  "hi",
+  "hr",
+  "hu",
+  "hy",
+  "id",
+  "is",
+  "it",
+  "ja",
+  "ka",
+  "kk",
+  "km",
+  "kn",
+  "ko",
+  "ky",
+  "lo",
+  "lt",
+  "lv",
+  "mk",
+  "ml",
+  "mn",
+  "mr",
+  "ms",
+  "my",
+  "ne",
+  "nl",
+  "no",
+  "or",
+  "pa",
+  "pl",
+  "pt",
+  "ro",
+  "ru",
+  "si",
+  "sk",
+  "sl",
+  "sq",
+  "sr",
+  "sv",
+  "sw",
+  "ta",
+  "te",
+  "th",
+  "tr",
+  "uk",
+  "ur",
+  "uz",
+  "vi",
+  "zh",
+  "zh-hant",
+  "zu",
+] as const;
 export const STUDIO_I18N_MAX_ASSET_CHARACTERS = 512_000;
 export const STUDIO_I18N_MAX_ENTRY_COUNT = 2_000;
 export const STUDIO_I18N_MAX_VALUE_CHARACTERS = 4_000;
@@ -15,14 +91,14 @@ export interface StudioI18nLoaderOptions {
   readonly baseUrl?: string;
 }
 
-const pendingLoads = new Map<StudioI18nAssetLocale, Promise<void>>();
+const pendingLoads = new Map<string, Promise<void>>();
 
 function normalizedBaseUrl(baseUrl: string): string {
   return baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
 }
 
 export function studioI18nAssetUrl(
-  locale: StudioI18nAssetLocale,
+  locale: string,
   baseUrl = import.meta.env.BASE_URL,
 ): string {
   return `${normalizedBaseUrl(baseUrl)}i18n/studio/${locale}.json`;
@@ -68,11 +144,17 @@ export function parseStudioI18nDictionary(
   return Object.freeze(dictionary);
 }
 
-async function loadStudioI18nLocale(
-  locale: StudioI18nAssetLocale,
-  options: StudioI18nLoaderOptions,
+export async function loadStudioI18nLocale(
+  locale: string,
+  options: StudioI18nLoaderOptions = {},
 ): Promise<void> {
-  const existing = pendingLoads.get(locale);
+  const candidates = getLocaleCandidates(locale);
+  const targetAssetLocale = candidates.find((c) =>
+    (STUDIO_I18N_ASSET_LOCALES as readonly string[]).includes(c)
+  );
+
+  const assetLocale = targetAssetLocale || "en";
+  const existing = pendingLoads.get(assetLocale);
   if (existing) return existing;
 
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
@@ -82,7 +164,7 @@ async function loadStudioI18nLocale(
 
   const job = (async () => {
     const response = await fetchImpl(
-      studioI18nAssetUrl(locale, options.baseUrl),
+      studioI18nAssetUrl(assetLocale, options.baseUrl),
       {
         cache: "force-cache",
         credentials: "same-origin",
@@ -90,35 +172,38 @@ async function loadStudioI18nLocale(
     );
     if (!response.ok) {
       throw new Error(
-        `Studio translation asset failed to load (${locale}, ${response.status}).`,
+        `Studio translation asset failed to load (${assetLocale}, ${response.status}).`,
       );
     }
     const dictionary = parseStudioI18nDictionary(await response.text());
     if (!dictionary) {
-      throw new Error(`Studio translation asset is invalid (${locale}).`);
+      throw new Error(`Studio translation asset is invalid (${assetLocale}).`);
     }
-    registerI18nLocaleEntries(locale, dictionary);
+    registerI18nLocaleEntries(assetLocale, dictionary);
+    if (locale !== assetLocale) {
+      registerI18nLocaleEntries(locale, dictionary);
+    }
   })();
 
-  pendingLoads.set(locale, job);
+  pendingLoads.set(assetLocale, job);
   try {
     await job;
   } catch (error) {
-    pendingLoads.delete(locale);
+    pendingLoads.delete(assetLocale);
     throw error;
   }
 }
 
+export const STUDIO_I18N_PRELOAD_LOCALES = ["ko", "en"] as const;
+
 /**
- * Loads Korean and English in parallel before React commits either Studio
- * surface. Keeping both resident also makes an in-editor language switch
- * synchronous and prevents label flicker.
+ * Preloads primary Studio asset locales ("ko", "en") before Studio route commits.
  */
 export async function loadStudioI18nDictionaries(
   options: StudioI18nLoaderOptions = {},
 ): Promise<void> {
   await Promise.all(
-    STUDIO_I18N_ASSET_LOCALES.map((locale) =>
+    STUDIO_I18N_PRELOAD_LOCALES.map((locale) =>
       loadStudioI18nLocale(locale, options)
     ),
   );

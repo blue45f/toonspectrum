@@ -14,7 +14,7 @@ import {
   resolveI18nValue,
 } from "@/lib/i18n";
 
-function readAsset(locale: "ko" | "en"): string {
+function readAsset(locale: string): string {
   return readFileSync(
     path.resolve(
       process.cwd(),
