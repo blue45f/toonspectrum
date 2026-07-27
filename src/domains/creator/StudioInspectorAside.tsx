@@ -19,7 +19,6 @@ import {
   Italic,
   Loader2,
   PaintBucket,
-  Pipette,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -58,9 +57,9 @@ import {
   type DodgeBurnRange,
   type DodgeBurnSpongeMode,
 } from "./studio-dodge-burn";
-import { DRAW_COLOR_SWATCHES } from "./studio-draw-color-swatches";
 import { STUDIO_DRAW_SHAPE_PICKER_KINDS } from "./studio-draw-hud";
 import { STUDIO_BRUSH_OPACITY_RANGE, STUDIO_BRUSH_SIZE_RANGE } from "./studio-draw-ux";
+import { type StudioDrawingPaletteLayout } from "./studio-drawing-palettes";
 import { type DrawMode, type DrawShapeKind, type StudioMenu, type Tool } from "./studio-editor-tool-model";
 import { type StudioEffectFavoriteState, type StudioEffectId } from "./studio-effect-favorites";
 import { containingPanel, elBounds } from "./studio-element-geometry";
@@ -125,6 +124,7 @@ import {
   StudioColorPalettePanel,
   StudioCropPanel,
   StudioAutoColorHintsPanel,
+  StudioDrawingPaletteStack,
   StudioFloodFillPanel,
   StudioGradientEnginePanel,
   StudioFilterMaskPanel,
@@ -198,8 +198,10 @@ import { StudioInspectorDrawModeControls } from "./StudioInspectorDrawModeContro
 import { StudioInspectorFocusSpeedFrameControls } from "./StudioInspectorFocusSpeedFrameControls";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
 import {
+  StudioInspectorBrushCatalogButton,
   StudioInspectorCurrentBrushSummary,
   StudioInspectorDisabledReasons,
+  StudioInspectorDrawColorControls,
   StudioInspectorEmptySelection,
   StudioInspectorMutationLockNotice,
   StudioInspectorPageGradeSurface,
@@ -218,6 +220,10 @@ import type {
   StudioAdvancedRuler,
   StudioAdvancedRulerDocument,
 } from "./studio-advanced-ruler-document";
+import type {
+  StudioBrushDefaultRestoreDirection,
+  StudioBrushDefaultRestoreTransaction,
+} from "./studio-brush-default-restore";
 import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import type { StudioMobileSheet } from "./StudioMobileEditingDock";
 
@@ -235,6 +241,10 @@ export interface StudioInspectorAsideHandlers {
   alignSelected: (mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom" | "distributeH" | "distributeV") => void;
   announceDrawingShortcut: (message: string) => void;
   applyBgPreset: (p: BgPreset) => void;
+  applyBrushDefaultRestoreTransaction: (
+    transaction: StudioBrushDefaultRestoreTransaction,
+    direction: StudioBrushDefaultRestoreDirection,
+  ) => void;
   applyContentAwareFill: () => Promise<void>;
   extractPixelSelectionToLayer: (mode: "copy" | "cut") => Promise<void>;
   applyCropToSelectedImage: () => Promise<void>;
@@ -246,6 +256,7 @@ export interface StudioInspectorAsideHandlers {
   applyPuppetWarpToSelectedImage: () => Promise<void>;
   applySavedBrush: (saved: StudioSavedBrush) => void;
   assignElementToGroup: (elId: string, groupId: string | undefined) => void;
+  changeDrawingPaletteLayout: (next: StudioDrawingPaletteLayout) => void;
   changeInspectorLayout: (next: StudioInspectorLayout) => void;
   clearHealCloneSource: () => void;
   clearPolyLassoDraft: () => void;
@@ -276,6 +287,7 @@ export interface StudioInspectorAsideHandlers {
   onColorizeSelected: () => void;
   onMinimapClick: (e: React.MouseEvent<HTMLDivElement>) => void;
   onMinimapKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => void;
+  openBrushCatalog: (trigger: HTMLButtonElement) => void;
   openFeatureTutorial: (tutorialId?: string | null) => void;
   patchEl: (id: string, patch: Partial<El>) => void;
   patchPageGrade: (patch: Partial<PageGrade>) => void;
@@ -297,6 +309,7 @@ export interface StudioInspectorAsideHandlers {
   setBgGrad: (newGrad: string[] | null | ((prev: string[] | null) => string[] | null)) => void;
   setCanvasH: (newH: number | ((prev: number) => number)) => void;
   setDescription: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<string>>>[0]) => void;
+  setDrawingPaletteDragging: (dragging: boolean) => void;
   setIsometricAngleDegClamped: (next: number) => void;
   setIsometricCellSizeClamped: (next: number) => void;
   previewIsometricAngleDegClamped: (next: number) => void;
@@ -373,6 +386,8 @@ interface StudioInspectorAsideProps {
   description: string;
   drawMode: DrawMode;
   drawShape: DrawShapeKind;
+  drawingPaletteCancelEpoch: number;
+  drawingPaletteLayout: StudioDrawingPaletteLayout;
   effectFavoriteState: StudioEffectFavoriteState;
   effScale: number;
   elementById: Map<string, El>;
@@ -718,6 +733,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   description,
   drawMode,
   drawShape,
+  drawingPaletteCancelEpoch,
+  drawingPaletteLayout,
   effectFavoriteState,
   effScale,
   elementById,
@@ -1016,6 +1033,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     alignSelected,
     announceDrawingShortcut,
     applyBgPreset,
+    applyBrushDefaultRestoreTransaction,
     applyContentAwareFill,
     extractPixelSelectionToLayer,
     applyCropToSelectedImage,
@@ -1027,6 +1045,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     applyPuppetWarpToSelectedImage,
     applySavedBrush,
     assignElementToGroup,
+    changeDrawingPaletteLayout,
     changeInspectorLayout,
     clearHealCloneSource,
     clearPolyLassoDraft,
@@ -1057,6 +1076,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     onColorizeSelected,
     onMinimapClick,
     onMinimapKeyDown,
+    openBrushCatalog,
     openFeatureTutorial,
     patchEl,
     patchPageGrade,
@@ -1078,6 +1098,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     setBgGrad,
     setCanvasH,
     setDescription,
+    setDrawingPaletteDragging,
     setIsometricAngleDegClamped,
     setIsometricCellSizeClamped,
     previewIsometricAngleDegClamped,
@@ -1247,7 +1268,10 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             "lg:static lg:z-auto lg:max-h-none lg:min-h-0 lg:flex-none lg:self-stretch lg:overflow-y-auto lg:rounded-none lg:border lg:border-y-0 lg:border-r-0 lg:border-line lg:bg-panel/50 lg:p-2 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "props" ? "translate-y-0" : "translate-y-full",
             !visibleRightPanelOpen && "lg:hidden",
-            inspectorLayout.primary === "layers" && "overflow-hidden lg:overflow-hidden"
+            inspectorLayout.primary === "layers" && "overflow-hidden lg:overflow-hidden",
+            inspectorDrawing &&
+              inspectorLayout.primary === "properties" &&
+              "lg:overflow-hidden"
           )}
           style={
             isMobile
@@ -2954,8 +2978,30 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               role="tabpanel"
               aria-label="그리기 도구 설정"
               hidden={inspectorLayout.primary !== "properties"}
-              className="space-y-3 rounded-xl border border-line bg-panel/40 p-3"
+              className="min-h-0 lg:flex lg:flex-1 lg:flex-col"
             >
+              <Suspense
+                fallback={
+                  <StudioPanelLoading label="서브 도구와 도구 속성을 여는 중..." />
+                }
+              >
+                <StudioDrawingPaletteStack
+                  cancelEpoch={drawingPaletteCancelEpoch}
+                  layout={drawingPaletteLayout}
+                  mobileHeaderAction={
+                    isMobile ? (
+                      <StudioInspectorBrushCatalogButton
+                        onOpen={openBrushCatalog}
+                      />
+                    ) : undefined
+                  }
+                  mobilePrimaryPaletteId={
+                    isMobile ? "tool-properties" : undefined
+                  }
+                  onLayoutChange={changeDrawingPaletteLayout}
+                  onDraggingChange={setDrawingPaletteDragging}
+                  subTools={
+                  <>
               <StudioInspectorDrawModeControls
                 drawMode={drawMode}
                 onDrawModeChange={(next) => {
@@ -2982,6 +3028,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   strokeWidth={strokeWidth}
                   tipAngle={tipAngle}
                   tipRoundness={tipRoundness}
+                  onOpenBrushCatalog={openBrushCatalog}
                 />
               ) : null}
 
@@ -3022,7 +3069,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     aria-label="도형 채우기"
                     onClick={() => setShapeFill((v) => !v)}
                     className={cn(
-                      "grid size-9 place-items-center rounded-lg border transition-colors",
+                      "grid size-11 place-items-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:size-9",
                       drawShape === "line" || drawShape === "arrow"
                         ? "cursor-not-allowed border-line bg-card text-fg-3 opacity-50"
                         : shapeFill
@@ -3034,59 +3081,22 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   </button>
                 </div>
               )}
+                  </>
+                }
+                  toolProperties={
+                  <>
 
-              {/* 색상 선택 (지우개 아닐 때) */}
               {drawMode !== "eraser" && (
-                <div className="space-y-1.5 pt-1.5 border-t border-line/35">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[0.66rem] font-medium text-fg-3">색상</p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = !eyedropperActive;
-                        if (next) disarmAllPixelTools();
-                        setEyedropperActive(next);
-                      }}
-                      aria-pressed={eyedropperActive}
-                      title="스포이드 — 캔버스를 클릭해 그 지점의 색을 그대로 가져와요 (펜 도구 중엔 Alt+클릭으로도 가능)"
-                      className={cn(
-                        "grid size-5 place-items-center rounded border transition-colors",
-                        eyedropperActive ? "border-accent bg-accent/15 text-accent" : "border-line text-fg-3 hover:bg-raised"
-                      )}
-                    >
-                      <Pipette className="size-3" aria-hidden />
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {DRAW_COLOR_SWATCHES.map((swatch) => (
-                      <button
-                        key={swatch}
-                        type="button"
-                        onClick={() => setColor(swatch)}
-                        className={cn(
-                          "size-5 rounded border transition-transform hover:scale-110",
-                          color.toLowerCase() === swatch.toLowerCase() ? "ring-2 ring-accent ring-offset-1 ring-offset-panel" : "border-line/60"
-                        )}
-                        style={{ background: swatch }}
-                        title={swatch}
-                      />
-                    ))}
-                    {/* 커스텀 컬러 */}
-                    <label
-                      className="relative flex items-center justify-center cursor-pointer size-5 rounded border border-line shadow-sm overflow-hidden"
-                      title="사용자 정의 색상"
-                      style={{ background: color }}
-                    >
-                      <input
-                        type="color"
-                        value={color}
-                        onChange={(e) => setColor(e.target.value)}
-                        className="absolute inset-0 opacity-0 cursor-pointer size-full"
-                      />
-                      <span className="text-[8px] mix-blend-difference text-white font-bold select-none">C</span>
-                    </label>
-                  </div>
-                </div>
+                <StudioInspectorDrawColorControls
+                  color={color}
+                  eyedropperActive={eyedropperActive}
+                  onColorChange={setColor}
+                  onEyedropperToggle={() => {
+                    const next = !eyedropperActive;
+                    if (next) disarmAllPixelTools();
+                    setEyedropperActive(next);
+                  }}
+                />
               )}
 
               {/* 크기 슬라이더 */}
@@ -3116,7 +3126,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       type="range"
                       min={STUDIO_BRUSH_OPACITY_RANGE.min * 100}
                       max={STUDIO_BRUSH_OPACITY_RANGE.max * 100}
-                      step={5}
+                      step={1}
                       value={Math.round(brushOpacity * 100)}
                       onChange={(e) => setBrushOpacity(Number(e.target.value) / 100)}
                       className="w-24 accent-accent cursor-pointer"
@@ -3231,30 +3241,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       onTipAngleChange={setTipAngle}
                       tipRoundness={tipRoundness}
                       onTipRoundnessChange={setTipRoundness}
-                      onRestoreDefaults={(transaction, direction) => {
-                        const values =
-                          direction === "undo" ? transaction.before : transaction.after;
-                        setStrokeWidth(values.strokeWidth);
-                        setBrushOpacity(values.brushOpacity);
-                        setBrushDynamics(values.brushDynamics);
-                        setStampTuning(values.stampTuning);
-                        setStabilizer(values.stabilizer);
-                        setStabilizerMode(values.stabilizerMode);
-                        setPostCorrection(values.postCorrection);
-                        setPreserveCorners(values.preserveCorners);
-                        setPressureCurve(values.pressureCurve);
-                        setPressureMinSize?.(values.pressureMinSize);
-                        setUseVelocityPressure(values.useVelocityPressure);
-                        setVelocitySensitivity(values.velocitySensitivity);
-                        setTiltEnabled(values.tiltEnabled);
-                        setTipAngle(values.tipAngle);
-                        setTipRoundness(values.tipRoundness);
-                        announceDrawingShortcut(
-                          direction === "undo"
-                            ? "브러시 기본값 복원을 되돌렸어요."
-                            : `${transaction.changes.length}개 브러시 설정을 기본값으로 복원했어요.`,
-                        );
-                      }}
+                      onRestoreDefaults={applyBrushDefaultRestoreTransaction}
                     />
                   </Suspense>
                 ) : null}
@@ -3403,6 +3390,10 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   />
                 </Suspense>
               </div>
+                  </>
+                }
+                />
+              </Suspense>
             </div>
           )}
 

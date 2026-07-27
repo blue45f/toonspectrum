@@ -37,8 +37,18 @@ interface MockDockButtonProps {
   readonly label: string;
   readonly onClick?: () => void;
   readonly onFocus?: (event: import("react").FocusEvent<HTMLButtonElement>) => void;
+  readonly onPointerDown?: import("react").PointerEventHandler<HTMLButtonElement>;
+  readonly onPointerEnter?: import("react").PointerEventHandler<HTMLButtonElement>;
   readonly title?: string;
 }
+
+const mobileInspectorPreload = vi.hoisted(() => ({
+  drawingSurface: vi.fn(),
+}));
+
+vi.mock("./studio-inspector-aside-loader", () => ({
+  preloadStudioInspectorDrawingSurface: mobileInspectorPreload.drawingSurface,
+}));
 
 vi.mock("./studio-chrome-ui", () => ({
   StudioContextActionButton: ({ label, disabled, onClick, title }: MockDockButtonProps) => (
@@ -85,6 +95,9 @@ vi.mock("./studio-chrome-ui", () => ({
     label,
     disabled,
     onClick,
+    onFocus,
+    onPointerDown,
+    onPointerEnter,
     title,
   }: MockDockButtonProps) => (
     <button
@@ -95,6 +108,9 @@ vi.mock("./studio-chrome-ui", () => ({
       data-studio-mobile-comment-trigger={mobileCommentTrigger}
       disabled={disabled}
       onClick={onClick}
+      onFocus={onFocus}
+      onPointerDown={onPointerDown}
+      onPointerEnter={onPointerEnter}
       title={title}
     >
       {label}
@@ -129,6 +145,7 @@ function createHandlers(): StudioMobileEditingDockHandlers {
   return {
     activateCanvasTool: vi.fn(),
     applyBuiltInBrushPreset: vi.fn(),
+    applyBrushDefaultRestoreTransaction: vi.fn(),
     applyDynamicsPreset: vi.fn(),
     applySavedBrush: vi.fn(),
     dismissBrushManager: vi.fn(),
@@ -142,6 +159,7 @@ function createHandlers(): StudioMobileEditingDockHandlers {
     redo: vi.fn(),
     removeSelected: vi.fn(),
     reorder: vi.fn(),
+    restoreBrushDefaults: vi.fn(),
     toggleAdvancedFill: vi.fn(),
     toggleStudioCommentPinPlacement: vi.fn(),
     undo: vi.fn(),
@@ -167,6 +185,13 @@ function createProps(
     },
     brushCatalogItems: [],
     brushCatalogOpen: false,
+    brushDefaultRestore: {
+      sourceName: "G펜",
+      modifiedCount: 0,
+      loading: false,
+      available: true,
+      undoAvailable: false,
+    },
     brushDynamics: {} as NormalizedStudioBrushDynamicsSettings,
     brushManagerSheetRef: { current: null },
     brushOpacity: 1,
@@ -337,6 +362,76 @@ describe("StudioMobileEditingDock", () => {
     expect(within(dock).getByRole<HTMLButtonElement>("button", { name: "다시실행" }).disabled).toBe(true);
     expect(within(dock).getByRole("button", { name: "실행취소" }).getAttribute("data-hint-unavailable-reason")).toContain("문서 잠금");
     expect(within(dock).getByRole("button", { name: "다시실행" }).getAttribute("data-hint-unavailable-reason")).toContain("문서 잠금");
+  });
+
+  it("opens tool properties first from Work while drawing without a selection", () => {
+    const stableHandlers = createHandlers();
+    const view = render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          selected: null,
+          tool: "draw",
+          stableHandlers,
+        })}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "작업 공간 도구 펼치기" }),
+    );
+    const workspace = screen.getByRole("toolbar", { name: "작업 공간" });
+    fireEvent.click(within(workspace).getByRole("button", { name: "작업" }));
+    expect(stableHandlers.openInspectorRoute).toHaveBeenLastCalledWith(
+      { primary: "properties" },
+      "props",
+    );
+
+    vi.mocked(stableHandlers.openInspectorRoute).mockClear();
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          selected: null,
+          tool: "select",
+          stableHandlers,
+        })}
+      />,
+    );
+    fireEvent.click(
+      within(screen.getByRole("toolbar", { name: "작업 공간" })).getByRole(
+        "button",
+        { name: "작업" },
+      ),
+    );
+    expect(stableHandlers.openInspectorRoute).toHaveBeenLastCalledWith(
+      { primary: "layers" },
+      "props",
+    );
+  });
+
+  it("warms the inspector and drawing palettes from both mobile Work intent paths", () => {
+    mobileInspectorPreload.drawingSurface.mockClear();
+    render(<StudioMobileEditingDock {...createProps({ isMobile: true })} />);
+
+    const workspaceToggle = screen.getByRole("button", {
+      name: "작업 공간 도구 펼치기",
+    });
+    fireEvent.pointerEnter(workspaceToggle);
+    fireEvent.pointerDown(workspaceToggle);
+    fireEvent.focus(workspaceToggle);
+
+    expect(mobileInspectorPreload.drawingSurface).toHaveBeenCalledTimes(3);
+
+    fireEvent.click(workspaceToggle);
+    const workButton = within(
+      screen.getByRole("toolbar", { name: "작업 공간" }),
+    ).getByRole("button", { name: "작업" });
+    fireEvent.pointerEnter(workButton);
+    fireEvent.pointerDown(workButton);
+    fireEvent.focus(workButton);
+
+    expect(mobileInspectorPreload.drawingSurface).toHaveBeenCalledTimes(6);
   });
 
   it("signals horizontally hidden tools without overlaying the scroll lane", () => {
@@ -568,6 +663,182 @@ describe("StudioMobileEditingDock", () => {
     expect(stableHandlers.dismissBrushManager).toHaveBeenCalledOnce();
   });
 
+  it("uses one touch-safe selected-brush restore action for modified, loading, unavailable, and undo states", () => {
+    const stableHandlers = createHandlers();
+    const setBrushOpacity = vi.fn();
+    const setStrokeWidth = vi.fn();
+    const view = render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          mobileSheet: "draw",
+          brushDefaultRestore: {
+            sourceName: "내 G펜",
+            modifiedCount: 6,
+            loading: false,
+            available: true,
+            undoAvailable: false,
+          },
+          setBrushOpacity,
+          setStrokeWidth,
+          stableHandlers,
+        })}
+      />,
+    );
+
+    const drawSheet = screen.getByRole("dialog", { name: "브러시 설정" });
+    const restoreSurface = drawSheet.querySelector(
+      '[data-studio-mobile-brush-default-restore="true"]',
+    );
+    const modifiedRestore = within(drawSheet).getByRole<HTMLButtonElement>(
+      "button",
+      { name: "내 G펜 기본값으로 복원, 변경된 설정 6개" },
+    );
+    expect(restoreSurface?.getAttribute("data-studio-brush-preset-modified")).toBe(
+      "true",
+    );
+    expect(
+      restoreSurface?.getAttribute("data-studio-brush-preset-modified-count"),
+    ).toBe("6");
+    expect(modifiedRestore.className).toContain("min-h-11");
+    expect(modifiedRestore.textContent).toContain("기본값 복원");
+    expect(
+      within(drawSheet).getByRole<HTMLInputElement>("slider", {
+        name: "브러시 투명도 슬라이더",
+      }).step,
+    ).toBe("1");
+    expect(
+      within(drawSheet).getByRole<HTMLInputElement>("spinbutton", {
+        name: "브러시 투명도 숫자",
+      }).step,
+    ).toBe("1");
+    expect(within(drawSheet).queryByRole("button", {
+      name: "브러시 굵기 기본값으로 초기화",
+    })).toBeNull();
+    expect(within(drawSheet).queryByRole("button", {
+      name: "브러시 투명도 100퍼센트로 초기화",
+    })).toBeNull();
+
+    fireEvent.click(modifiedRestore);
+    expect(stableHandlers.restoreBrushDefaults).toHaveBeenCalledOnce();
+    expect(setStrokeWidth).not.toHaveBeenCalled();
+    expect(setBrushOpacity).not.toHaveBeenCalled();
+
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          mobileSheet: "draw",
+          brushDefaultRestore: {
+            sourceName: "내 G펜",
+            modifiedCount: 0,
+            loading: true,
+            available: false,
+            undoAvailable: false,
+          },
+          stableHandlers,
+        })}
+      />,
+    );
+    const loadingRestore = screen.getByRole<HTMLButtonElement>("button", {
+      name: "내 G펜 기본값을 불러오는 중",
+    });
+    expect(loadingRestore.disabled).toBe(true);
+    expect(loadingRestore.getAttribute("aria-busy")).toBe("true");
+    expect(loadingRestore.textContent).toContain("확인 중");
+
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          mobileSheet: "draw",
+          brushDefaultRestore: {
+            sourceName: "내 G펜",
+            modifiedCount: 0,
+            loading: false,
+            available: false,
+            undoAvailable: false,
+          },
+          stableHandlers,
+        })}
+      />,
+    );
+    const unavailableRestore = screen.getByRole<HTMLButtonElement>("button", {
+      name: "내 G펜 기본값 없음, 브러시를 다시 선택하세요",
+    });
+    expect(unavailableRestore.disabled).toBe(true);
+    expect(unavailableRestore.textContent).toContain("기준 없음");
+
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          mobileSheet: "draw",
+          brushDefaultRestore: {
+            sourceName: "내 G펜",
+            modifiedCount: 0,
+            loading: false,
+            available: true,
+            undoAvailable: true,
+          },
+          stableHandlers,
+        })}
+      />,
+    );
+    const undoRestore = screen.getByRole<HTMLButtonElement>("button", {
+      name: "내 G펜 기본값 복원 되돌리기",
+    });
+    expect(undoRestore.disabled).toBe(false);
+    expect(undoRestore.textContent).toContain("복원 되돌리기");
+    fireEvent.click(undoRestore);
+    expect(stableHandlers.restoreBrushDefaults).toHaveBeenCalledTimes(2);
+
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          mobileSheet: "draw",
+          brushDefaultRestore: {
+            sourceName: "내 G펜",
+            modifiedCount: 0,
+            loading: false,
+            available: true,
+            undoAvailable: false,
+          },
+          stableHandlers,
+        })}
+      />,
+    );
+    const cleanRestore = screen.getByRole<HTMLButtonElement>("button", {
+      name: "내 G펜 기본값, 변경된 설정 없음",
+    });
+    expect(cleanRestore.disabled).toBe(true);
+    expect(cleanRestore.textContent).toContain("기본값");
+
+    for (const drawMode of ["shape", "pixel", "eraser"] as const) {
+      view.rerender(
+        <StudioMobileEditingDock
+          {...createProps({
+            isMobile: true,
+            mobileSheet: "draw",
+            drawMode,
+            brushDefaultRestore: {
+              sourceName: "내 G펜",
+              modifiedCount: 6,
+              loading: false,
+              available: true,
+              undoAvailable: false,
+            },
+            stableHandlers,
+          })}
+        />,
+      );
+      expect(document.querySelector(
+        '[data-studio-mobile-brush-default-restore="true"]',
+      )).toBeNull();
+    }
+  });
+
   it("reserves a shrinkable mobile lane for brush chips beside the catalog exit", () => {
     render(
       <StudioMobileEditingDock
@@ -592,7 +863,7 @@ describe("StudioMobileEditingDock", () => {
     ).not.toBeNull();
   });
 
-  it("keeps launcher focus but suppresses the first rich hint after dismissing draw settings", () => {
+  it("keeps launcher focus but suppresses the first rich hint for any draw tool after dismissing settings", () => {
     const onFocusWithin = vi.fn();
     const setMobileSheet = vi.fn();
     const view = render(
@@ -621,9 +892,7 @@ describe("StudioMobileEditingDock", () => {
         />
       </div>,
     );
-    const launcher = screen.getByRole("button", {
-      name: "브러시 설정 (굵기·색·프리셋)",
-    });
+    const launcher = screen.getByRole("button", { name: "펜" });
     launcher.focus();
     expect(document.activeElement).toBe(launcher);
     expect(onFocusWithin).not.toHaveBeenCalled();

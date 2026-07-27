@@ -667,6 +667,7 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
       globalThis.fetch = mockFetch as unknown as typeof fetch;
 
       const resultPromise = generateScenarioScenes(CONFIGURED, "스토리", { signal: controller.signal });
+      await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
       const [, init] = mockFetch.mock.calls[0] as unknown as [string, RequestInit];
       expect(init.signal).toBe(controller.signal);
 

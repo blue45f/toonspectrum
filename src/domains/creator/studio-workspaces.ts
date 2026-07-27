@@ -1,4 +1,9 @@
 import {
+  DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
+  normalizeStudioDrawingPaletteLayout,
+  type StudioDrawingPaletteLayout,
+} from "./studio-drawing-palettes";
+import {
   DEFAULT_STUDIO_INSPECTOR_LAYOUT,
   STUDIO_INSPECTOR_LAYOUT_STORAGE_KEY,
   STUDIO_DOCUMENT_INSPECTOR_SECTIONS,
@@ -17,6 +22,20 @@ import {
   type StudioQuickActionsPreferences,
 } from "./studio-quick-actions";
 
+export {
+  DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
+  STUDIO_DRAWING_PALETTE_MAX_PERCENT,
+  STUDIO_DRAWING_PALETTE_MIN_PERCENT,
+  moveStudioDrawingPalette,
+  normalizeStudioDrawingPaletteLayout,
+  resizeStudioDrawingPalettes,
+  toggleStudioDrawingPalette,
+} from "./studio-drawing-palettes";
+export type {
+  StudioDrawingPaletteId,
+  StudioDrawingPaletteLayout,
+} from "./studio-drawing-palettes";
+
 /**
  * Studio workspace persistence intentionally contains UI layout only.
  *
@@ -25,8 +44,8 @@ import {
  * discarded before the value can be returned or saved again.
  */
 
-export const STUDIO_WORKSPACE_STATE_VERSION = 2 as const;
-export const STUDIO_WORKSPACE_PAYLOAD_VERSION = 2 as const;
+export const STUDIO_WORKSPACE_STATE_VERSION = 3 as const;
+export const STUDIO_WORKSPACE_PAYLOAD_VERSION = 3 as const;
 export const STUDIO_WORKSPACE_MAX_CUSTOM = 24;
 export const STUDIO_WORKSPACE_NAME_MAX_LENGTH = 48;
 export const STUDIO_WORKSPACE_RAW_MAX_BYTES = 64 * 1024;
@@ -88,6 +107,7 @@ export interface StudioWorkspaceDesktopLayout {
 export interface StudioWorkspaceLayout {
   readonly inspector: StudioInspectorLayout;
   readonly desktop: StudioWorkspaceDesktopLayout;
+  readonly drawingPalettes: StudioDrawingPaletteLayout;
   readonly quickActions: StudioQuickActionsPreferences;
 }
 
@@ -153,6 +173,7 @@ export interface StudioWorkspaceSaveResult {
 export type StudioWorkspaceLoadSource =
   | "current"
   | "legacy-v1"
+  | "legacy-v2"
   | "legacy-preferences"
   | "default";
 
@@ -249,6 +270,9 @@ function freezeLayout(layout: StudioWorkspaceLayout): StudioWorkspaceLayout {
       leftPanelWidth: STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.default,
       rightPanelWidth: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.default,
     }),
+    drawingPalettes: normalizeStudioDrawingPaletteLayout(
+      layout.drawingPalettes,
+    ),
     quickActions: freezeQuickActions(layout.quickActions),
   });
 }
@@ -296,6 +320,7 @@ function createBuiltinLayout(
       rightPanelWidth:
         desktop.rightPanelWidth ?? STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.default,
     },
+    drawingPalettes: DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
     quickActions: createQuickActions(actions),
   });
 }
@@ -513,11 +538,15 @@ function normalizeWorkspaceLayout(
     ? normalizeStudioInspectorLayout(value.inspector)
     : fallback.inspector;
   const desktop = normalizeDesktopLayout(value.desktop, fallback.desktop);
+  const drawingPalettes = normalizeStudioDrawingPaletteLayout(
+    value.drawingPalettes,
+    fallback.drawingPalettes,
+  );
   const quickActions = isExactQuickActions(value.quickActions)
     ? normalizeStudioQuickActionsPreferences(value.quickActions)
     : fallback.quickActions;
 
-  return freezeLayout({ inspector, desktop, quickActions });
+  return freezeLayout({ inspector, desktop, drawingPalettes, quickActions });
 }
 
 /** Creates a canonical immutable workspace layout from UI state. */
@@ -601,7 +630,9 @@ function normalizeDecodedStudioWorkspaceState(
 ): StudioWorkspaceState | null {
   if (
     !isRecord(decoded) ||
-    (decoded.version !== 1 && decoded.version !== STUDIO_WORKSPACE_STATE_VERSION)
+    (decoded.version !== 1 &&
+      decoded.version !== 2 &&
+      decoded.version !== STUDIO_WORKSPACE_STATE_VERSION)
   ) {
     return null;
   }
@@ -635,11 +666,11 @@ function normalizeDecodedStudioWorkspaceState(
 }
 
 /**
- * Strict state normalizer for untrusted storage and previous v1 payloads.
+ * Strict state normalizer for untrusted storage and previous workspace payloads.
  *
  * Unknown versions, malformed roots, cyclic values, and values over 64 KiB reset to defaults.
  * Known v1/v2 fields recover independently, while every unrecognized field is deliberately
- * omitted from the returned allowlisted object. V1 panel widths receive bounded v2 defaults.
+ * omitted from the returned allowlisted object. Missing palette state receives bounded v3 defaults.
  */
 export function normalizeStudioWorkspaceState(raw: unknown): StudioWorkspaceState {
   const ownerScope = isRecord(raw) ? STATE_OWNER_SCOPES.get(raw) : undefined;
@@ -689,7 +720,7 @@ function legacyV1StorageKey(userId: string | null | undefined): string {
 
 interface StudioWorkspaceEnvelope {
   readonly kind: typeof WORKSPACE_ENVELOPE_KIND;
-  readonly payloadVersion: 1 | typeof STUDIO_WORKSPACE_PAYLOAD_VERSION;
+  readonly payloadVersion: 1 | 2 | typeof STUDIO_WORKSPACE_PAYLOAD_VERSION;
   readonly ownerScope: string;
   readonly state: unknown;
 }
@@ -697,6 +728,10 @@ interface StudioWorkspaceEnvelope {
 interface DecodedWorkspaceEnvelope {
   readonly state: StudioWorkspaceState;
   readonly needsMigration: boolean;
+  readonly migrationSource: Extract<
+    StudioWorkspaceLoadSource,
+    "legacy-v1" | "legacy-v2"
+  > | null;
 }
 
 function decodeWorkspaceEnvelope(
@@ -706,15 +741,23 @@ function decodeWorkspaceEnvelope(
   const decoded = decodeBoundedRaw(raw);
   if (!isRecord(decoded)) return "invalid-payload";
 
-  // Bare v1 states are accepted only as a migration source. Stable storage always writes envelopes.
-  if (decoded.version === 1) {
+  // Bare prior-version states are accepted only as migration sources. Current storage always
+  // writes an owner-scoped envelope and verifies the exact serialized value.
+  if (decoded.version === 1 || decoded.version === 2) {
     const state = normalizeDecodedStudioWorkspaceState(decoded, expectedOwnerScope);
-    return state ? { state, needsMigration: true } : "invalid-payload";
+    return state
+      ? {
+          state,
+          needsMigration: true,
+          migrationSource: decoded.version === 1 ? "legacy-v1" : "legacy-v2",
+        }
+      : "invalid-payload";
   }
 
   if (
     decoded.kind !== WORKSPACE_ENVELOPE_KIND ||
     (decoded.payloadVersion !== 1 &&
+      decoded.payloadVersion !== 2 &&
       decoded.payloadVersion !== STUDIO_WORKSPACE_PAYLOAD_VERSION) ||
     typeof decoded.ownerScope !== "string"
   ) {
@@ -725,11 +768,17 @@ function decodeWorkspaceEnvelope(
   const state = normalizeDecodedStudioWorkspaceState(decoded.state, expectedOwnerScope);
   if (!state) return "invalid-payload";
   const stateVersion = isRecord(decoded.state) ? decoded.state.version : null;
+  const needsMigration =
+    decoded.payloadVersion !== STUDIO_WORKSPACE_PAYLOAD_VERSION ||
+    stateVersion !== STUDIO_WORKSPACE_STATE_VERSION;
   return {
     state,
-    needsMigration:
-      decoded.payloadVersion !== STUDIO_WORKSPACE_PAYLOAD_VERSION ||
-      stateVersion !== STUDIO_WORKSPACE_STATE_VERSION,
+    needsMigration,
+    migrationSource: needsMigration
+      ? decoded.payloadVersion === 2 || stateVersion === 2
+        ? "legacy-v2"
+        : "legacy-v1"
+      : null,
   };
 }
 
@@ -921,7 +970,7 @@ function persistMigratedWorkspace(
   );
 }
 
-/** Loads, owner-validates, and opportunistically migrates stable/v1/legacy preference payloads. */
+/** Loads, owner-validates, and opportunistically migrates stable/prior/legacy preference payloads. */
 export function loadStudioWorkspacePersistence(
   storage: StudioWorkspaceLoadStorage | null | undefined,
   userId: string | null | undefined
@@ -961,7 +1010,7 @@ export function loadStudioWorkspacePersistence(
       return loadResult(
         write.state,
         ownerScope,
-        "legacy-v1",
+        decoded.migrationSource ?? "legacy-v1",
         write.status,
         write.failure
       );
@@ -1267,6 +1316,7 @@ function applyWorkspaceLayout(
   return freezeLayout({
     inspector: workspaceLayout.inspector,
     desktop: workspaceLayout.desktop,
+    drawingPalettes: workspaceLayout.drawingPalettes,
     quickActions: applyQuickActions
       ? workspaceLayout.quickActions
       : liveLayout.quickActions,
@@ -1380,7 +1430,18 @@ export function areStudioWorkspaceLayoutsEqual(
     left.desktop.leftPanelOpen !== right.desktop.leftPanelOpen ||
     left.desktop.rightPanelOpen !== right.desktop.rightPanelOpen ||
     left.desktop.leftPanelWidth !== right.desktop.leftPanelWidth ||
-    left.desktop.rightPanelWidth !== right.desktop.rightPanelWidth
+    left.desktop.rightPanelWidth !== right.desktop.rightPanelWidth ||
+    left.drawingPalettes.order.some(
+      (id, index) => right.drawingPalettes.order[index] !== id
+    ) ||
+    left.drawingPalettes.collapsed["sub-tools"] !==
+      right.drawingPalettes.collapsed["sub-tools"] ||
+    left.drawingPalettes.collapsed["tool-properties"] !==
+      right.drawingPalettes.collapsed["tool-properties"] ||
+    left.drawingPalettes.sizes["sub-tools"] !==
+      right.drawingPalettes.sizes["sub-tools"] ||
+    left.drawingPalettes.sizes["tool-properties"] !==
+      right.drawingPalettes.sizes["tool-properties"]
   ) {
     return false;
   }
@@ -1445,6 +1506,7 @@ export function migrateLegacyStudioWorkspaceState(
           STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.maximum
         ),
       },
+      drawingPalettes: DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
       quickActions,
     }),
     customWorkspaces: [],

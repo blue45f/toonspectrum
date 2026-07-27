@@ -1,10 +1,13 @@
 import {
   ChevronDown,
   ChevronUp,
+  LayoutGrid,
   MousePointer2,
+  Pipette,
 } from "lucide-react";
 import { Suspense, type RefObject } from "react";
 
+import { DRAW_COLOR_SWATCHES } from "./studio-draw-color-swatches";
 import { StudioPageGradePanel } from "./studio-page-lazy-ui";
 import { StudioActiveBrushSummary } from "./StudioActiveBrushSummary";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
@@ -14,6 +17,7 @@ import type { PageGrade } from "./studio-page-grade";
 import type { StudioStabilizerMode } from "./studio-stroke-stabilizer";
 
 import { buttonClass } from "@/components/ui/button-utils";
+import { cn } from "@/lib/utils";
 
 export function StudioInspectorDisabledReasons({
   reasons,
@@ -48,6 +52,7 @@ export function StudioInspectorCurrentBrushSummary({
   strokeWidth,
   tipAngle,
   tipRoundness,
+  onOpenBrushCatalog,
 }: {
   brushId: string;
   brushName: string;
@@ -58,6 +63,7 @@ export function StudioInspectorCurrentBrushSummary({
   strokeWidth: number;
   tipAngle: number;
   tipRoundness: number;
+  onOpenBrushCatalog?: (trigger: HTMLButtonElement) => void;
 }) {
   return (
     <section
@@ -77,10 +83,123 @@ export function StudioInspectorCurrentBrushSummary({
         tipRoundness={tipRoundness}
         label="현재 기본 프리셋"
       />
-      <p className="px-1 text-[0.62rem] leading-relaxed text-fg-3">
-        기본 프리셋 변경은 캔버스 하단 브러시 도크에서 할 수 있어요.
-      </p>
+      <div className="flex items-center justify-between gap-2 px-1">
+        <p className="min-w-0 text-[0.62rem] leading-relaxed text-fg-3">
+          하단 빠른 바와 같은 브러시 목록을 사용합니다.
+        </p>
+        {onOpenBrushCatalog ? (
+          <button
+            type="button"
+            onClick={(event) => onOpenBrushCatalog(event.currentTarget)}
+            aria-haspopup="dialog"
+            className="hidden min-h-9 shrink-0 items-center gap-1 rounded-md border border-line bg-card px-2 text-[0.62rem] font-semibold text-fg-2 transition-colors hover:border-accent/40 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:inline-flex"
+          >
+            <LayoutGrid size={13} aria-hidden />
+            기본 브러시
+          </button>
+        ) : null}
+      </div>
     </section>
+  );
+}
+
+export function StudioInspectorBrushCatalogButton({
+  onOpen,
+}: {
+  onOpen: (trigger: HTMLButtonElement) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-haspopup="dialog"
+      onClick={(event) => onOpen(event.currentTarget)}
+      className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+    >
+      <LayoutGrid size={14} aria-hidden />
+      브러시 목록
+    </button>
+  );
+}
+
+export function StudioInspectorDrawColorControls({
+  color,
+  eyedropperActive,
+  onColorChange,
+  onEyedropperToggle,
+}: {
+  color: string;
+  eyedropperActive: boolean;
+  onColorChange: (color: string) => void;
+  onEyedropperToggle: () => void;
+}) {
+  return (
+    <div className="space-y-1.5 border-t border-line/35 pt-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[0.66rem] font-medium text-fg-3">색상</p>
+        <button
+          type="button"
+          onClick={onEyedropperToggle}
+          aria-pressed={eyedropperActive}
+          aria-label={
+            eyedropperActive
+              ? "스포이드 끄기"
+              : "스포이드로 캔버스 색상 선택"
+          }
+          title="스포이드 — 캔버스를 클릭해 그 지점의 색을 그대로 가져와요 (펜 도구 중엔 Alt+클릭으로도 가능)"
+          className={cn(
+            "grid size-11 place-items-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:size-5 lg:rounded",
+            eyedropperActive
+              ? "border-accent bg-accent/15 text-accent"
+              : "border-line text-fg-3 hover:bg-raised"
+          )}
+        >
+          <Pipette className="size-3" aria-hidden />
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {DRAW_COLOR_SWATCHES.map((swatch) => (
+          <button
+            key={swatch}
+            type="button"
+            onClick={() => onColorChange(swatch)}
+            aria-pressed={color.toLowerCase() === swatch.toLowerCase()}
+            className="group grid size-11 place-items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:size-5 lg:rounded"
+            title={swatch}
+            aria-label={`${swatch} 색상 선택`}
+          >
+            <span
+              aria-hidden
+              className={cn(
+                "block size-5 rounded border transition-transform group-hover:scale-110",
+                color.toLowerCase() === swatch.toLowerCase()
+                  ? "ring-2 ring-accent ring-offset-1 ring-offset-panel"
+                  : "border-line/60"
+              )}
+              style={{ background: swatch }}
+            />
+          </button>
+        ))}
+        <label
+          className="relative grid size-11 cursor-pointer place-items-center rounded-lg focus-within:ring-2 focus-within:ring-accent lg:size-5 lg:rounded"
+          title="사용자 정의 색상"
+        >
+          <input
+            type="color"
+            value={color}
+            onChange={(event) => onColorChange(event.target.value)}
+            className="absolute inset-0 size-full cursor-pointer opacity-0"
+            aria-label="사용자 정의 색상 선택"
+          />
+          <span
+            aria-hidden
+            className="grid size-5 select-none place-items-center overflow-hidden rounded border border-line text-[8px] font-bold text-white shadow-sm"
+            style={{ background: color }}
+          >
+            <span className="mix-blend-difference">C</span>
+          </span>
+        </label>
+      </div>
+    </div>
   );
 }
 

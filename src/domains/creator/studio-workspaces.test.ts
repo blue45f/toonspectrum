@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import {
+  DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
+  moveStudioDrawingPalette,
+  resizeStudioDrawingPalettes,
+  toggleStudioDrawingPalette,
+} from "./studio-drawing-palettes";
 import { STUDIO_INSPECTOR_LAYOUT_STORAGE_KEY } from "./studio-inspector-layout";
 import {
   QUICK_ACTION_SLOTS,
@@ -96,6 +102,21 @@ function withLeftPanelWidth(
   });
 }
 
+function withEditedDrawingPalettes(
+  layout: StudioWorkspaceLayout
+): StudioWorkspaceLayout {
+  const resized = resizeStudioDrawingPalettes(
+    layout.drawingPalettes,
+    "tool-properties",
+    73
+  );
+  const moved = moveStudioDrawingPalette(resized, "tool-properties", "up");
+  return normalizeStudioWorkspaceLayout({
+    ...layout,
+    drawingPalettes: toggleStudioDrawingPalette(moved, "sub-tools"),
+  });
+}
+
 describe("built-in Studio workspaces", () => {
   it("preserves the six classic presets and adds one immutable professional comic preset", () => {
     expect(STUDIO_CLASSIC_WORKSPACE_IDS).toEqual([
@@ -121,8 +142,15 @@ describe("built-in Studio workspaces", () => {
       expect(Object.isFrozen(workspace.layout)).toBe(true);
       expect(Object.isFrozen(workspace.layout.inspector)).toBe(true);
       expect(Object.isFrozen(workspace.layout.desktop)).toBe(true);
+      expect(Object.isFrozen(workspace.layout.drawingPalettes)).toBe(true);
+      expect(Object.isFrozen(workspace.layout.drawingPalettes.order)).toBe(true);
+      expect(Object.isFrozen(workspace.layout.drawingPalettes.collapsed)).toBe(true);
+      expect(Object.isFrozen(workspace.layout.drawingPalettes.sizes)).toBe(true);
       expect(Object.isFrozen(workspace.layout.quickActions.slots)).toBe(true);
       expect(Object.keys(workspace.layout.quickActions.slots)).toHaveLength(6);
+      expect(workspace.layout.drawingPalettes).toEqual(
+        DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT
+      );
       if (workspace.id !== "pro-comic") {
         expect(workspace.layout.desktop.leftPanelWidth).toBe(
           STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.default
@@ -150,6 +178,7 @@ describe("built-in Studio workspaces", () => {
           leftPanelWidth: 216,
           rightPanelWidth: 344,
         },
+        drawingPalettes: DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
         quickActions: {
           version: 1,
           slots: {
@@ -355,7 +384,7 @@ describe("Studio workspace owner-scoped persistence", () => {
     );
   });
 
-  it("round-trips a verified v2 envelope and isolates owners", () => {
+  it("round-trips a verified v3 envelope and isolates owners", () => {
     const storage = memoryStorage();
     const state = saveStudioWorkspace(DEFAULT_STUDIO_WORKSPACE_STATE, "내 작업공간");
     const saved = saveStudioWorkspaceState(storage, "owner-a", state);
@@ -527,7 +556,7 @@ describe("Studio workspace owner-scoped persistence", () => {
     });
   });
 
-  it("migrates a prior owner-scoped v1 key and deletes it only after verified v2 write", () => {
+  it("migrates a prior owner-scoped v1 key and deletes it only after verified v3 write", () => {
     const userId = "legacy-owner@example.com";
     const currentKey = studioWorkspaceStorageKey(userId);
     const legacyState = {
@@ -694,6 +723,57 @@ describe("Studio workspace owner-scoped persistence", () => {
       source: "default",
       status: "session-only",
       failure: "invalid-payload",
+    });
+  });
+
+  it("migrates a stable v2 envelope to v3 with safe drawing-palette defaults", () => {
+    const userId = "owner-v2";
+    const key = studioWorkspaceStorageKey(userId);
+    const {
+      drawingPalettes: _discardLiveDrawingPalettes,
+      ...legacyLiveLayout
+    } = DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout;
+    const storage = memoryStorage({
+      [key]: JSON.stringify({
+        kind: "toonspectrum.studio-workspaces",
+        payloadVersion: 2,
+        ownerScope: studioWorkspaceOwnerScope(userId),
+        state: {
+          ...DEFAULT_STUDIO_WORKSPACE_STATE,
+          version: 2,
+          liveLayout: legacyLiveLayout,
+          customWorkspaces: [
+            {
+              id: "legacy-custom",
+              name: "이전 작업공간",
+              layout: legacyLiveLayout,
+            },
+          ],
+        },
+      }),
+    });
+
+    const migrated = loadStudioWorkspacePersistence(storage, userId);
+    const rewritten = JSON.parse(storage.values.get(key) ?? "null") as {
+      payloadVersion?: unknown;
+      state?: { version?: unknown };
+    };
+
+    expect(migrated).toMatchObject({
+      source: "legacy-v2",
+      status: "persisted",
+      failure: null,
+    });
+    expect(migrated.state.version).toBe(STUDIO_WORKSPACE_STATE_VERSION);
+    expect(migrated.state.liveLayout.drawingPalettes).toEqual(
+      DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT
+    );
+    expect(migrated.state.customWorkspaces[0]?.layout.drawingPalettes).toEqual(
+      DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT
+    );
+    expect(rewritten).toMatchObject({
+      payloadVersion: STUDIO_WORKSPACE_PAYLOAD_VERSION,
+      state: { version: STUDIO_WORKSPACE_STATE_VERSION },
     });
   });
 });
@@ -915,7 +995,7 @@ describe("Studio custom workspace lifecycle", () => {
     }
   });
 
-  it("preserves owner provenance and the v2 envelope across duplicate and reorder saves", () => {
+  it("preserves owner provenance and the v3 envelope across duplicate and reorder saves", () => {
     const storage = memoryStorage();
     const ownerId = "workspace-manager-owner";
     const loaded = loadStudioWorkspacePersistence(storage, ownerId);
@@ -1017,6 +1097,56 @@ describe("workspace switching and dirty comparison", () => {
       DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout.inspector
     );
     expect(reloaded.liveLayout.quickActions.slots.north).toBe("delete");
+    expect(isStudioWorkspaceDirty(reloaded)).toBe(false);
+  });
+
+  it("includes drawing palette order, collapse, and sizes in save, switch, reload, and dirty state", () => {
+    const editedLayout = withEditedDrawingPalettes(
+      DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout
+    );
+    const edited = updateStudioWorkspaceLiveLayout(
+      DEFAULT_STUDIO_WORKSPACE_STATE,
+      editedLayout
+    );
+
+    expect(isStudioWorkspaceDirty(edited)).toBe(true);
+    expect(
+      areStudioWorkspaceLayoutsEqual(
+        edited.liveLayout,
+        DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout
+      )
+    ).toBe(false);
+
+    const saved = saveStudioWorkspace(edited, "팔레트 작업공간");
+    const customId = saved.activeWorkspaceId;
+    expect(resolveStudioWorkspace(saved, customId)?.layout.drawingPalettes).toEqual(
+      editedLayout.drawingPalettes
+    );
+    expect(isStudioWorkspaceDirty(saved)).toBe(false);
+
+    const switchedAway = switchStudioWorkspace(saved, "coloring");
+    const switchedBack = switchStudioWorkspace(switchedAway, customId);
+    expect(switchedBack.liveLayout.drawingPalettes).toEqual(
+      editedLayout.drawingPalettes
+    );
+    expect(isStudioWorkspaceDirty(switchedBack)).toBe(false);
+
+    const dirtyAgain = updateStudioWorkspaceLiveLayout(
+      switchedBack,
+      normalizeStudioWorkspaceLayout({
+        ...switchedBack.liveLayout,
+        drawingPalettes: resizeStudioDrawingPalettes(
+          switchedBack.liveLayout.drawingPalettes,
+          "sub-tools",
+          80
+        ),
+      })
+    );
+    const reloaded = reloadStudioWorkspace(dirtyAgain);
+    expect(isStudioWorkspaceDirty(dirtyAgain)).toBe(true);
+    expect(reloaded.liveLayout.drawingPalettes).toEqual(
+      editedLayout.drawingPalettes
+    );
     expect(isStudioWorkspaceDirty(reloaded)).toBe(false);
   });
 });

@@ -39,16 +39,6 @@ import {
   type DialogueTranslatableItem,
 } from "./studio-dialogue-translate";
 import {
-  buildPaletteSuggestPrompt,
-  parsePaletteSuggestResponse,
-  type PaletteSuggestion,
-} from "./studio-palette-suggest";
-import {
-  buildScenarioScenesPrompt,
-  parseScenarioScenesResponse,
-  type ScenarioScenesPlan,
-} from "./studio-scenario-scenes";
-import {
   completeStudioServerText,
   parseStudioServerAiFailoverMetadata,
   type StudioServerAiFailoverMetadata,
@@ -61,6 +51,8 @@ import {
   type StudioWriterRoomAiDraft,
 } from "./studio-writer-room-ai";
 
+import type { PaletteSuggestion } from "./studio-palette-suggest";
+import type { ScenarioScenesPlan } from "./studio-scenario-scenes";
 import type { StudioWriterRoomStage } from "./studio-writer-room";
 
 // ── 설정 저장 ──────────────────────────────────────────────────────────────
@@ -743,6 +735,13 @@ export async function generateScenarioScenes(
   if (!isStudioTextAiConfigured(settings, transport)) {
     return { ok: false, code: "not_configured", error: "서버 AI에 로그인하거나 설정에서 API 키를 등록하세요." };
   }
+  let scenarioCodec: typeof import("./studio-scenario-scenes");
+  try {
+    scenarioCodec = await import("./studio-scenario-scenes");
+  } catch (error) {
+    return { ok: false, code: "network_error", error: networkErrorMessage(error) };
+  }
+  const { buildScenarioScenesPrompt, parseScenarioScenesResponse } = scenarioCodec;
   const { system, user } = buildScenarioScenesPrompt(trimmed, opts.sceneCountHint, opts.characterContext);
   const result = await postTextCompletion(settings, {
     task: "scenario",
@@ -922,6 +921,13 @@ export async function suggestColorPalette(
   if (!isStudioTextAiConfigured(settings, transport)) {
     return { ok: false, code: "not_configured", error: "서버 AI에 로그인하거나 설정에서 API 키를 등록하세요." };
   }
+  let paletteCodec: typeof import("./studio-palette-suggest");
+  try {
+    paletteCodec = await import("./studio-palette-suggest");
+  } catch (error) {
+    return { ok: false, code: "network_error", error: networkErrorMessage(error) };
+  }
+  const { buildPaletteSuggestPrompt, parsePaletteSuggestResponse } = paletteCodec;
   const { system, user } = buildPaletteSuggestPrompt(trimmed);
   const result = await postTextCompletion(settings, {
     task: "palette",

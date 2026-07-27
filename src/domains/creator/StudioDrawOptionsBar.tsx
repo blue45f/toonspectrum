@@ -942,9 +942,8 @@ export function StudioDrawOptionsBar({
               aria-expanded={advancedOpen}
               aria-controls="studio-draw-advanced"
               onClick={() => setAdvancedOpen((v) => !v)}
-              aria-label={advancedOpen ? "도구 속성 접기" : "도구 속성 펼치기"}
+              aria-label={advancedOpen ? "빠른 세부 옵션 접기" : "빠른 세부 옵션 펼치기"}
               data-studio-draw-advanced-toggle="true"
-              data-studio-tool-property-entry="true"
               className={cn(
                 "flex h-8 min-w-8 items-center justify-center gap-1 rounded-lg border px-1.5",
                 STUDIO_EASE,
@@ -960,7 +959,7 @@ export function StudioDrawOptionsBar({
                 data-studio-tool-property-label="true"
                 className="hidden whitespace-nowrap text-[0.6rem] font-extrabold xl:inline"
               >
-                도구 속성
+                세부 옵션
               </span>
             </button>
           </StudioToolHintTarget> : null}

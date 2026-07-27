@@ -344,7 +344,6 @@ import {
   formatStudioCommunityAssetCredit,
 } from "./studio-community-asset-license";
 import { executeStudioCompanionToolCommand } from "./studio-companion-tool-command-executor";
-import { bakeContentAwareFillToCanvas } from "./studio-content-aware-fill";
 import {
   lintStudioContinuity,
   type StudioContinuityIssue,
@@ -695,6 +694,10 @@ import {
   shouldStartStudioMobileImmersive,
   studioMobileImmersiveSessionStorage,
 } from "./studio-mobile-immersive";
+import {
+  studioMobileSheetSizeStyle,
+  type StudioMobileSheetSnap,
+} from "./studio-mobile-sheet-snap";
 import {
   beginNodeDrag,
   decimateStrokeHandles,
@@ -1270,6 +1273,7 @@ import {
   StudioToolHintPreferencesProvider,
   StudioToolHintTarget,
 } from "./StudioToolHint";
+import { useStudioBrushBaselineController } from "./useStudioBrushBaselineController";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import type { StudioBackground3DInsertResult } from "./studio-3d-insert-contract";
@@ -1284,11 +1288,6 @@ import type {
 } from "./studio-auto-actions";
 import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 import type { StudioBg3dShotBatchRecoveryScope } from "./studio-bg3d-shot-batch-plan";
-import type {
-  StudioBrushBaseline,
-  StudioBrushBaselineInspection,
-  StudioBrushBaselineSelection,
-} from "./studio-brush-baseline-contract";
 import type {
   StudioBrushDefaultRestoreDirection,
   StudioBrushDefaultRestoreTransaction,
@@ -1319,6 +1318,7 @@ import type {
   StudioDraftCollaborationProvisionGate,
   StudioDraftCollaborationReadiness,
 } from "./studio-draft-collaboration";
+import type { StudioDrawingPaletteLayout } from "./studio-drawing-palettes";
 import type {
   DrawMode,
   DrawShapeKind,
@@ -1345,7 +1345,6 @@ import type {
   StudioLayerNavigatorItem,
 } from "./studio-layer-navigator";
 import type { StudioLiveRoom } from "./studio-live-collaboration-room";
-import type { StudioMobileSheetSnap } from "./studio-mobile-sheet-snap";
 import type { MotionCutImage } from "./studio-motion-export";
 import type { PageState } from "./studio-page-state";
 import type { PaletteSuggestion } from "./studio-palette-suggest";
@@ -1525,18 +1524,33 @@ function createStudioPixelEditCanvas(
 function StudioInspectorAsideFallback({
   isMobile,
   keyboardInset,
+  propsSheetRef,
+  snap,
   visible,
   width,
 }: {
   isMobile: boolean;
   keyboardInset: number;
+  propsSheetRef: import("react").RefObject<HTMLElement | null>;
+  snap: StudioMobileSheetSnap;
   visible: boolean;
   width: number;
 }) {
+  const safeKeyboardInset = Number.isFinite(keyboardInset)
+    ? Math.max(0, Math.round(keyboardInset))
+    : 0;
   return (
     <aside
+      ref={propsSheetRef}
+      role={isMobile ? "dialog" : undefined}
+      aria-modal={isMobile ? true : undefined}
       aria-busy="true"
       aria-label="속성 패널 불러오는 중"
+      data-studio-sheet-id="props"
+      data-studio-mobile-sheet={isMobile ? "true" : undefined}
+      data-studio-sheet-snap={isMobile ? snap : undefined}
+      data-popup-kind={isMobile ? "sheet" : undefined}
+      tabIndex={isMobile ? -1 : undefined}
       className={cn(
         "flex min-h-0 flex-col gap-3 overflow-hidden border-line bg-panel/50 p-3",
         "fixed inset-x-0 bottom-0 z-[60] rounded-t-3xl border shadow-2xl",
@@ -1544,7 +1558,10 @@ function StudioInspectorAsideFallback({
         !visible && "lg:hidden"
       )}
       style={isMobile
-        ? { bottom: Math.max(0, keyboardInset), height: "min(62dvh, 32rem)" }
+        ? {
+            bottom: safeKeyboardInset,
+            ...studioMobileSheetSizeStyle(snap, safeKeyboardInset),
+          }
         : { minWidth: 240, width }}
     >
       <div className="h-5 w-24 animate-pulse rounded bg-raised motion-reduce:animate-none" />
@@ -1745,6 +1762,18 @@ interface PendingBrushDelete {
   id: string;
   deleted: DeletedBrushRecord;
   expiresAt: number;
+}
+
+interface PendingStudioWorkspaceSync {
+  readonly ownerScope: string;
+  readonly storageKey: string;
+  readonly latestEventRaw: string | null;
+  readonly sequence: number;
+  /**
+   * Last owner-verified state known before the first queued external write.
+   * Later external events only replace the coalescing token, preserving one stable 3-way base.
+   */
+  readonly baseState: StudioWorkspaceState;
 }
 
 const STUDIO_INTERCHANGE_IMPORT_PLACEMENT_CHOICES = Object.freeze([
@@ -4441,6 +4470,20 @@ function StudioCuttoonEditor() {
   const [inspectorLayout, setInspectorLayout] = useState<StudioInspectorLayout>(() =>
     workspaceState.liveLayout.inspector
   );
+  const [drawingPaletteLayout, setDrawingPaletteLayout] =
+    useState<StudioDrawingPaletteLayout>(
+      () => workspaceState.liveLayout.drawingPalettes
+    );
+  const [drawingPaletteDragging, setDrawingPaletteDragging] = useState(false);
+  const drawingPaletteDraggingRef = useRef(false);
+  const [drawingPaletteCancelEpoch, setDrawingPaletteCancelEpoch] = useState(0);
+  const [pendingExternalWorkspaceSync, setPendingExternalWorkspaceSync] =
+    useState<PendingStudioWorkspaceSync | null>(null);
+  const pendingExternalWorkspaceSyncRef =
+    useRef<PendingStudioWorkspaceSync | null>(null);
+  const workspaceSyncBaseStateRef = useRef(workspacePersistence.state);
+  const workspaceSyncSequenceRef = useRef(0);
+  const [workspaceSyncRetryEpoch, setWorkspaceSyncRetryEpoch] = useState(0);
   // 모바일(<lg) 레이아웃: 양쪽 패널을 바텀시트로 띄워 캔버스를 화면 폭에 꽉 채운다.
   const isMobile = useIsMobile();
   const [mobileImmersiveEnabled, setMobileImmersiveEnabled] = useState(() =>
@@ -4757,6 +4800,7 @@ function StudioCuttoonEditor() {
             leftPanelWidth: leftResize.width,
             rightPanelWidth: rightResize.width,
           },
+          drawingPalettes: drawingPaletteLayout,
           quickActions: quickActionsPreferences,
         },
         workspaceState.liveLayout
@@ -4767,6 +4811,7 @@ function StudioCuttoonEditor() {
       rightPanelOpen,
       leftResize.width,
       rightResize.width,
+      drawingPaletteLayout,
       quickActionsPreferences,
       workspaceState.liveLayout,
     ]
@@ -4776,27 +4821,92 @@ function StudioCuttoonEditor() {
   workspacePersistenceRef.current = workspacePersistence;
   liveWorkspaceLayoutRef.current = liveWorkspaceLayout;
 
-  function applyStudioWorkspaceLayout(layout: StudioWorkspaceLayout) {
+  function replacePendingExternalWorkspaceSync(
+    next: PendingStudioWorkspaceSync | null
+  ) {
+    pendingExternalWorkspaceSyncRef.current = next;
+    setPendingExternalWorkspaceSync(next);
+  }
+
+  function changeDrawingPaletteDragging(next: boolean) {
+    drawingPaletteDraggingRef.current = next;
+    setDrawingPaletteDragging(next);
+  }
+
+  function cancelDrawingPaletteDrag() {
+    if (!drawingPaletteDraggingRef.current) return;
+    drawingPaletteDraggingRef.current = false;
+    setDrawingPaletteDragging(false);
+    setDrawingPaletteCancelEpoch((current) => current + 1);
+  }
+
+  function applyStudioWorkspaceLayout(
+    layout: StudioWorkspaceLayout,
+    source: StudioWorkspaceLayoutSource = "switch",
+    clearSyncNotice = true
+  ) {
+    cancelDrawingPaletteDrag();
     setInspectorLayout(layout.inspector);
     setLeftPanelOpen(layout.desktop.leftPanelOpen);
     setRightPanelOpenWithOverride(layout.desktop.rightPanelOpen);
     leftResizeSetWidthRef.current(layout.desktop.leftPanelWidth);
     rightResizeSetWidthRef.current(layout.desktop.rightPanelWidth);
+    setDrawingPaletteLayout(layout.drawingPalettes);
     setQuickActionsPreferences(layout.quickActions);
     setMobileSheet(null);
     setQuickActionsOpen(false);
-    closeStudioMenusForWorkspace("switch");
-    setWorkspaceSyncNotice(null);
+    closeStudioMenusForWorkspace(source);
+    if (clearSyncNotice) setWorkspaceSyncNotice(null);
     globalThis.requestAnimationFrame?.(() => propsSheetRef.current?.scrollTo({ top: 0 }));
   }
+  const applyStudioWorkspaceLayoutFromEffect = useEffectEvent(
+    applyStudioWorkspaceLayout
+  );
 
   function persistStudioWorkspaceState(nextState: StudioWorkspaceState): StudioWorkspaceSaveResult {
+    if (pendingExternalWorkspaceSyncRef.current) {
+      const ownerScope = currentWorkspaceOwnerScope;
+      const ownerChanged = workspacePersistence.ownerScope !== ownerScope;
+      setWorkspaceSyncNotice(
+        ownerChanged
+          ? "계정 전환 중이라 이전 작업공간 변경을 저장하지 않았어요."
+          : "다른 탭의 변경과 안전하게 합치는 동안 이 작업공간 변경은 현재 세션에 유지돼요."
+      );
+      const sessionState = ownerChanged ? workspacePersistence.state : nextState;
+      if (!ownerChanged) {
+        workspacePersistenceRef.current = {
+          ...workspacePersistenceRef.current,
+          state: sessionState,
+          status: "session-only",
+          failure: "verification-failed",
+        };
+        setWorkspacePersistence((current) =>
+          current.ownerScope === ownerScope
+            ? {
+                ...current,
+                state: sessionState,
+                status: "session-only",
+                failure: "verification-failed",
+              }
+            : current
+        );
+      }
+      return Object.freeze({
+        state: sessionState,
+        ownerScope,
+        status: "session-only",
+        failure: ownerChanged ? "owner-mismatch" : "verification-failed",
+      });
+    }
     const result = saveStudioWorkspaceState(
       studioWorkspaceStorage(),
       studioAuthUserId,
       nextState,
       { sourceOwnerScope: workspacePersistence.ownerScope }
     );
+    if (result.status === "persisted" && result.failure === null) {
+      workspaceSyncBaseStateRef.current = result.state;
+    }
     if (result.failure !== "owner-mismatch") setWorkspaceSyncNotice(null);
     setWorkspacePersistence((current) => {
       // 로그인 경계가 바뀐 렌더의 오래된 이벤트는 새 계정 작업공간에 섞지 않는다.
@@ -4817,26 +4927,256 @@ function StudioCuttoonEditor() {
   // guest 상태를 인증 계정 키로 저장하거나 반대 방향으로 덮어쓰는 것을 막는 핵심 경계다.
   useEffect(() => {
     if (workspacePersistence.ownerScope === currentWorkspaceOwnerScope) return;
+    const discardedPendingExternalSync = pendingExternalWorkspaceSync !== null;
+    replacePendingExternalWorkspaceSync(null);
     const nextPersistence = loadStudioWorkspacePersistence(
       studioWorkspaceStorage(),
       studioAuthUserId
     );
-    const layout = nextPersistence.state.liveLayout;
+    workspaceSyncBaseStateRef.current = nextPersistence.state;
     setWorkspacePersistence(nextPersistence);
-    setInspectorLayout(layout.inspector);
-    setLeftPanelOpen(layout.desktop.leftPanelOpen);
-    setRightPanelOpenWithOverride(layout.desktop.rightPanelOpen);
-    leftResizeSetWidthRef.current(layout.desktop.leftPanelWidth);
-    rightResizeSetWidthRef.current(layout.desktop.rightPanelWidth);
-    setQuickActionsPreferences(layout.quickActions);
-    setMobileSheet(null);
-    setQuickActionsOpen(false);
-    closeStudioMenusForWorkspace("owner-scope-change");
-    setWorkspaceSyncNotice(null);
+    applyStudioWorkspaceLayoutFromEffect(
+      nextPersistence.state.liveLayout,
+      "owner-scope-change",
+      false
+    );
+    setWorkspaceSyncNotice(
+      discardedPendingExternalSync
+        ? "계정이 바뀌어 이전 탭에서 보류한 작업공간 변경을 반영하지 않았어요."
+        : null
+    );
   }, [
     currentWorkspaceOwnerScope,
+    pendingExternalWorkspaceSync,
     studioAuthUserId,
     workspacePersistence.ownerScope,
+  ]);
+
+  // 패널·팔레트 드래그 또는 작업공간 편집과 겹친 외부 저장본은 상호작용이 끝난 다음
+  // base/local/external 3-way 병합으로 재생한다. 서로 다른 변경은 모두 보존하고 동일 경로
+  // 충돌만 현재 탭을 우선해, 외부 카탈로그와 현재 배치 어느 쪽도 통째로 덮지 않는다.
+  useEffect(() => {
+    if (
+      leftResize.dragging ||
+      rightResize.dragging ||
+      drawingPaletteDragging ||
+      !pendingExternalWorkspaceSync
+    ) {
+      return;
+    }
+    const pendingSync = pendingExternalWorkspaceSync;
+
+    const ownerScope = currentWorkspaceOwnerScope;
+    const storageKey = studioWorkspaceStorageKey(studioAuthUserId);
+    const currentPersistence = workspacePersistenceRef.current;
+    if (
+      pendingSync.ownerScope !== ownerScope ||
+      pendingSync.storageKey !== storageKey ||
+      currentPersistence.ownerScope !== ownerScope
+    ) {
+      replacePendingExternalWorkspaceSync(null);
+      setWorkspaceSyncNotice(
+        "계정이 바뀌어 이전 탭에서 보류한 작업공간 변경을 반영하지 않았어요."
+      );
+      return;
+    }
+    let cancelled = false;
+    let deferredWorkspaceMenu: HTMLElement | null = null;
+    let retryFrame: number | null = null;
+    const retryAfterWorkspaceMenu = () => {
+      if (retryFrame !== null) return;
+      retryFrame = globalThis.requestAnimationFrame(() => {
+        retryFrame = null;
+        setWorkspaceSyncRetryEpoch((current) => current + 1);
+      });
+    };
+    const deferWhileWorkspaceMenuOpen = () => {
+      const workspaceMenu = document.querySelector<HTMLElement>(
+        '[data-testid="studio-workspace-dialog"]:not([hidden])'
+      );
+      if (!workspaceMenu) return false;
+      setWorkspaceSyncNotice(
+        "작업공간 편집을 마치면 다른 탭의 변경과 자동으로 합칠게요."
+      );
+      if (deferredWorkspaceMenu !== workspaceMenu) {
+        deferredWorkspaceMenu?.removeEventListener(
+          "focusout",
+          retryAfterWorkspaceMenu
+        );
+        deferredWorkspaceMenu = workspaceMenu;
+        workspaceMenu.addEventListener("focusout", retryAfterWorkspaceMenu, {
+          once: true,
+        });
+      }
+      return true;
+    };
+    const cancelPendingMerge = () => {
+      cancelled = true;
+      deferredWorkspaceMenu?.removeEventListener(
+        "focusout",
+        retryAfterWorkspaceMenu
+      );
+      if (retryFrame !== null) globalThis.cancelAnimationFrame(retryFrame);
+    };
+    if (deferWhileWorkspaceMenuOpen()) {
+      return cancelPendingMerge;
+    }
+
+    const storage = studioWorkspaceStorage();
+    if (!storage) {
+      const localState = updateStudioWorkspaceLiveLayout(
+        currentPersistence.state,
+        liveWorkspaceLayoutRef.current
+      );
+      replacePendingExternalWorkspaceSync(null);
+      setWorkspacePersistence((current) =>
+        current.ownerScope === ownerScope
+          ? {
+              ...current,
+              state: localState,
+              status: "session-only",
+              failure: "storage-unavailable",
+            }
+          : current
+      );
+      setWorkspaceSyncNotice(
+        "저장소를 사용할 수 없어 현재 배치를 이 세션에 유지하고 있어요."
+      );
+      return;
+    }
+    const loaded = loadStudioWorkspacePersistence(storage, studioAuthUserId);
+    if (loaded.failure) {
+      const localState = updateStudioWorkspaceLiveLayout(
+        currentPersistence.state,
+        liveWorkspaceLayoutRef.current
+      );
+      replacePendingExternalWorkspaceSync(null);
+      setWorkspacePersistence((current) =>
+        current.ownerScope === ownerScope
+          ? {
+              ...current,
+              state: localState,
+              status: "session-only",
+              failure: loaded.failure,
+            }
+          : current
+      );
+      setWorkspaceSyncNotice(
+        "다른 탭의 작업공간을 확인하지 못해 현재 배치를 이 세션에 유지했어요."
+      );
+      return;
+    }
+    void import("./studio-workspace-three-way-merge")
+      .then(({ reconcileStudioWorkspacePendingSync }) => {
+        if (cancelled) return;
+        const latestPending = pendingExternalWorkspaceSyncRef.current;
+        if (
+          !latestPending ||
+          latestPending.sequence !== pendingSync.sequence ||
+          latestPending.ownerScope !== ownerScope ||
+          latestPending.storageKey !== storageKey
+        ) {
+          return;
+        }
+        if (deferWhileWorkspaceMenuOpen()) return;
+        const latestPersistence = workspacePersistenceRef.current;
+        if (latestPersistence.ownerScope !== ownerScope) {
+          replacePendingExternalWorkspaceSync(null);
+          return;
+        }
+        const reconciliation = reconcileStudioWorkspacePendingSync({
+          storage,
+          storageKey,
+          expectedRaw: latestPending.latestEventRaw,
+          userId: studioAuthUserId,
+          ownerScope,
+          base: pendingSync.baseState,
+          local: updateStudioWorkspaceLiveLayout(
+            latestPersistence.state,
+            liveWorkspaceLayoutRef.current
+          ),
+          external: loaded.state,
+        });
+        if (reconciliation.kind === "retry-latest-raw") {
+          const sequence = workspaceSyncSequenceRef.current + 1;
+          workspaceSyncSequenceRef.current = sequence;
+          replacePendingExternalWorkspaceSync({
+            ...latestPending,
+            latestEventRaw: reconciliation.latestRaw,
+            sequence,
+          });
+          return;
+        }
+        const { conflictPaths, result } = reconciliation;
+        if (cancelled) return;
+        if (result.status === "persisted" && result.failure === null) {
+          workspaceSyncBaseStateRef.current = result.state;
+        }
+        replacePendingExternalWorkspaceSync(null);
+        const mergedPersistence = {
+          ...loaded,
+          state: result.state,
+          status: result.status,
+          failure: result.failure,
+        };
+        workspacePersistenceRef.current = mergedPersistence;
+        setWorkspacePersistence(mergedPersistence);
+        applyStudioWorkspaceLayoutFromEffect(
+          result.state.liveLayout,
+          "external-sync",
+          false
+        );
+        setWorkspaceMenuEpoch((current) => current + 1);
+        setWorkspaceSyncNotice(
+          conflictPaths.length > 0
+            ? `다른 탭의 변경을 합쳤어요. 겹친 ${conflictPaths.length}개 설정은 현재 탭을 유지했습니다.`
+            : result.status === "persisted"
+              ? "다른 탭의 변경과 현재 배치를 안전하게 합쳤어요."
+              : "다른 탭의 변경을 합쳐 현재 세션에 유지했어요."
+        );
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const latestPending = pendingExternalWorkspaceSyncRef.current;
+        if (!latestPending || latestPending.sequence !== pendingSync.sequence) {
+          return;
+        }
+        const latestPersistence = workspacePersistenceRef.current;
+        const latestLocalState = updateStudioWorkspaceLiveLayout(
+          latestPersistence.state,
+          liveWorkspaceLayoutRef.current
+        );
+        replacePendingExternalWorkspaceSync(null);
+        workspacePersistenceRef.current = {
+          ...latestPersistence,
+          state: latestLocalState,
+          status: "session-only",
+          failure: "verification-failed",
+        };
+        setWorkspacePersistence((current) =>
+          current.ownerScope === ownerScope
+            ? {
+                ...current,
+                state: latestLocalState,
+                status: "session-only",
+                failure: "verification-failed",
+              }
+            : current
+        );
+        setWorkspaceSyncNotice(
+          "다른 탭의 변경을 합치지 못해 현재 배치를 이 세션에 유지했어요."
+        );
+      });
+    return cancelPendingMerge;
+  }, [
+    currentWorkspaceOwnerScope,
+    drawingPaletteDragging,
+    leftResize.dragging,
+    liveWorkspaceLayout,
+    pendingExternalWorkspaceSync,
+    rightResize.dragging,
+    studioAuthUserId,
+    workspaceSyncRetryEpoch,
   ]);
 
   // 활성 프리셋 스냅샷은 그대로 두고 liveLayout만 즉시 저장한다. 패널 폭은 pointerup까지
@@ -4844,7 +5184,8 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     const ownerScope = currentWorkspaceOwnerScope;
     if (workspacePersistence.ownerScope !== ownerScope) return;
-    if (leftResize.dragging || rightResize.dragging) return;
+    if (leftResize.dragging || rightResize.dragging || drawingPaletteDragging) return;
+    if (pendingExternalWorkspaceSync) return;
     const nextLayout = normalizeStudioWorkspaceLayout(
       {
         inspector: inspectorLayout,
@@ -4854,6 +5195,7 @@ function StudioCuttoonEditor() {
           leftPanelWidth: leftResize.width,
           rightPanelWidth: rightResize.width,
         },
+        drawingPalettes: drawingPaletteLayout,
         quickActions: quickActionsPreferences,
       },
       workspacePersistence.state.liveLayout
@@ -4875,6 +5217,9 @@ function StudioCuttoonEditor() {
       nextState,
       { sourceOwnerScope: ownerScope }
     );
+    if (result.status === "persisted" && result.failure === null) {
+      workspaceSyncBaseStateRef.current = result.state;
+    }
     setWorkspacePersistence((current) => {
       if (
         current.ownerScope !== ownerScope ||
@@ -4893,10 +5238,13 @@ function StudioCuttoonEditor() {
     if (result.failure !== "owner-mismatch") setWorkspaceSyncNotice(null);
   }, [
     currentWorkspaceOwnerScope,
+    drawingPaletteDragging,
+    drawingPaletteLayout,
     inspectorLayout,
     leftPanelOpen,
     leftResize.dragging,
     leftResize.width,
+    pendingExternalWorkspaceSync,
     quickActionsPreferences,
     rightPanelOpen,
     rightResize.dragging,
@@ -4918,52 +5266,26 @@ function StudioCuttoonEditor() {
       if (event.storageArea && event.storageArea !== storage) return;
       const currentPersistence = workspacePersistenceRef.current;
       if (currentPersistence.ownerScope !== ownerScope) return;
-      // 폭 드래그나 아직 반영 중인 로컬 변경을 다른 탭 이벤트가 조용히 덮어쓰지 않는다.
-      // 저장이 끝난 상태에서만 최신 외부 작업공간을 받아 양쪽 탭을 안전하게 맞춘다.
-      if (
-        !areStudioWorkspaceLayoutsEqual(
-          currentPersistence.state.liveLayout,
-          liveWorkspaceLayoutRef.current
-        )
-      ) {
+      const sequence = workspaceSyncSequenceRef.current + 1;
+      workspaceSyncSequenceRef.current = sequence;
+      const previousPending = pendingExternalWorkspaceSyncRef.current;
+      replacePendingExternalWorkspaceSync({
+        ownerScope,
+        storageKey,
+        latestEventRaw: event.newValue,
+        sequence,
+        baseState:
+          previousPending?.ownerScope === ownerScope &&
+          previousPending.storageKey === storageKey
+            ? previousPending.baseState
+            : workspaceSyncBaseStateRef.current,
+      });
+      if (drawingPaletteDraggingRef.current) {
         setWorkspaceSyncNotice(
-          "다른 탭의 작업공간 변경과 충돌해 현재 배치를 우선 유지했어요."
+          "팔레트 크기 조절 중이라 다른 탭의 작업공간 변경을 보류했어요."
         );
         return;
       }
-      const activeElement = document.activeElement;
-      if (
-        activeElement instanceof Element &&
-        activeElement.closest('[data-testid="studio-workspace-menu"]')
-      ) {
-        setWorkspaceSyncNotice(
-          "작업공간 이름 입력을 보호하기 위해 다른 탭의 변경을 반영하지 않았어요."
-        );
-        return;
-      }
-      const loaded = loadStudioWorkspacePersistence(storage, studioAuthUserId);
-      if (loaded.failure) {
-        setWorkspacePersistence((current) =>
-          current.ownerScope === ownerScope
-            ? { ...current, status: loaded.status, failure: loaded.failure }
-            : current
-        );
-        setWorkspaceSyncNotice("다른 탭의 작업공간을 확인하지 못했어요. 현재 배치를 유지합니다.");
-        return;
-      }
-      const layout = loaded.state.liveLayout;
-      setWorkspacePersistence(loaded);
-      setInspectorLayout(layout.inspector);
-      setLeftPanelOpen(layout.desktop.leftPanelOpen);
-      setRightPanelOpenWithOverride(layout.desktop.rightPanelOpen);
-      leftResizeSetWidthRef.current(layout.desktop.leftPanelWidth);
-      rightResizeSetWidthRef.current(layout.desktop.rightPanelWidth);
-      setQuickActionsPreferences(layout.quickActions);
-      setMobileSheet(null);
-      setQuickActionsOpen(false);
-      closeStudioMenusForWorkspace("external-sync");
-      setWorkspaceMenuEpoch((current) => current + 1);
-      setWorkspaceSyncNotice("다른 탭에서 저장한 작업공간을 반영했어요.");
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -5552,18 +5874,6 @@ function StudioCuttoonEditor() {
   const [savedBrushes, setSavedBrushes] = useState<StudioSavedBrush[]>(() =>
     listBrushes(browserBrushLibraryStorage())
   );
-  const [appliedSavedBrushId, setAppliedSavedBrushId] = useState<string | null>(null);
-  const [activeBrushBaseline, setActiveBrushBaseline] =
-    useState<StudioBrushBaseline | null>(null);
-  const [activeBrushBaselineInspection, setActiveBrushBaselineInspection] =
-    useState<StudioBrushBaselineInspection | null>(null);
-  const [brushDefaultRestoreLoading, setBrushDefaultRestoreLoading] = useState(true);
-  const [lastBrushDefaultRestore, setLastBrushDefaultRestore] = useState<Readonly<{
-    baselineKey: StudioBrushBaseline["identity"]["key"];
-    transaction: StudioBrushDefaultRestoreTransaction;
-  }> | null>(null);
-  const brushBaselineRequestRef = useRef(0);
-  const brushBaselineInspectionRequestRef = useRef(0);
   const [pendingBrushDeletes, setPendingBrushDeletes] = useState<PendingBrushDelete[]>([]);
   const [pausedBrushDeleteId, setPausedBrushDeleteId] = useState<string | null>(null);
   const brushUndoToastRef = useRef<HTMLDivElement>(null);
@@ -5644,164 +5954,23 @@ function StudioCuttoonEditor() {
     brushDynamics,
     stampTuning,
   };
-  const currentBrushSnapshotRef = useRef(currentBrushSnapshot);
-  currentBrushSnapshotRef.current = currentBrushSnapshot;
-  const appliedSavedBrush = appliedSavedBrushId
-    ? savedBrushes.find((savedBrush) => savedBrush.id === appliedSavedBrushId) ?? null
-    : null;
-  // CLIP STUDIO처럼 속성을 수정해도 선택한 사용자 브러시의 정체성은 유지한다. 완전히 같은지
-  // 여부는 별도의 modified 상태로 표현하고, 다른 브러시를 명시적으로 선택하거나 원본이
-  // 삭제됐을 때만 이 기준선을 버린다.
-  const activeSavedBrushId = appliedSavedBrush?.id ?? null;
-  useEffect(() => {
-    if (!appliedSavedBrushId || appliedSavedBrush) return;
-    setAppliedSavedBrushId(null);
-    invalidateStudioBrushBaseline();
-  }, [appliedSavedBrush, appliedSavedBrushId]);
-
-  function selectStudioBrushBaseline(selection: StudioBrushBaselineSelection) {
-    const requestId = brushBaselineRequestRef.current + 1;
-    brushBaselineRequestRef.current = requestId;
-    setLastBrushDefaultRestore(null);
-    setBrushDefaultRestoreLoading(true);
-    void import("./studio-brush-baseline-contract").then((contract) => {
-      if (brushBaselineRequestRef.current !== requestId) return;
-      const baseline = contract.createStudioBrushBaseline(selection);
-      setActiveBrushBaseline(baseline);
-      setActiveBrushBaselineInspection(null);
-      setBrushDefaultRestoreLoading(false);
-    }).catch(() => {
-      if (brushBaselineRequestRef.current !== requestId) return;
-      setActiveBrushBaseline(null);
-      setActiveBrushBaselineInspection(null);
-      setBrushDefaultRestoreLoading(false);
-    });
-  }
-
-  function selectStudioCatalogBrushBaseline(catalogId: string) {
-    const requestId = brushBaselineRequestRef.current + 1;
-    brushBaselineRequestRef.current = requestId;
-    setLastBrushDefaultRestore(null);
-    setBrushDefaultRestoreLoading(true);
-    void Promise.all([
-      import("./studio-brush-baseline-contract"),
-      materializeStudioBrushCatalogSelection(catalogId),
-    ]).then(([contract, selection]) => {
-      if (brushBaselineRequestRef.current !== requestId) return;
-      if (!selection) {
-        setActiveBrushBaseline(null);
-        setActiveBrushBaselineInspection(null);
-        setBrushDefaultRestoreLoading(false);
-        return;
-      }
-      setActiveBrushBaseline(contract.createStudioCatalogBrushBaseline(selection));
-      setActiveBrushBaselineInspection(null);
-      setBrushDefaultRestoreLoading(false);
-    }).catch(() => {
-      if (brushBaselineRequestRef.current !== requestId) return;
-      setActiveBrushBaseline(null);
-      setActiveBrushBaselineInspection(null);
-      setBrushDefaultRestoreLoading(false);
-    });
-  }
-
-  function invalidateStudioBrushBaseline() {
-    brushBaselineRequestRef.current += 1;
-    setLastBrushDefaultRestore(null);
-    setActiveBrushBaseline(null);
-    setActiveBrushBaselineInspection(null);
-    setBrushDefaultRestoreLoading(false);
-  }
-
-  useEffect(() => {
-    selectStudioCatalogBrushBaseline("pen");
-  }, []);
-
-  useEffect(() => {
-    const baseline = activeBrushBaseline;
-    if (baseline?.identity.kind !== "saved") return;
-    const requestId = brushBaselineRequestRef.current;
-    void import("./studio-brush-baseline-contract")
-      .then((contract) => {
-        if (brushBaselineRequestRef.current !== requestId) return;
-        const next = contract.transitionStudioBrushBaseline(baseline, {
-          type: "saved-library-reconciled",
-          brushes: savedBrushes,
-        });
-        if (next === baseline) return;
-        if (!next) {
-          invalidateStudioBrushBaseline();
-          return;
-        }
-        setActiveBrushBaseline(next);
-      })
-      .catch(() => {
-        // A failed optional contract chunk must not redefine or erase a valid in-memory baseline.
-      });
-  }, [activeBrushBaseline, savedBrushes]);
-
-  useEffect(() => {
-    const requestId = brushBaselineInspectionRequestRef.current + 1;
-    brushBaselineInspectionRequestRef.current = requestId;
-    if (!activeBrushBaseline) {
-      setActiveBrushBaselineInspection(null);
-      return;
-    }
-    void import("./studio-brush-baseline-contract")
-      .then((contract) => {
-        if (brushBaselineInspectionRequestRef.current !== requestId) return;
-        setActiveBrushBaselineInspection(
-          contract.inspectStudioBrushBaseline(
-            activeBrushBaseline,
-            currentBrushSnapshotRef.current,
-            {
-              preserveStrokeWidth: proDrawPrefs.sizeLocked,
-              preserveBrushOpacity: proDrawPrefs.opacityLocked,
-            },
-          ),
-        );
-      })
-      .catch(() => {
-        if (brushBaselineInspectionRequestRef.current === requestId) {
-          setActiveBrushBaselineInspection(null);
-        }
-      });
-    return () => {
-      if (brushBaselineInspectionRequestRef.current === requestId) {
-        brushBaselineInspectionRequestRef.current += 1;
-      }
-    };
-  }, [
-    activeBrushBaseline,
-    brush,
-    activeCatalogBrush.sourcePresetId,
-    strokeWidth,
-    brushOpacity,
-    stabilizer,
-    stabilizerMode,
-    postCorrection,
-    preserveCorners,
-    pressureCurve,
-    pressureMinSize,
-    useVelocityPressure,
-    velocitySensitivity,
-    tiltEnabled,
-    tipAngle,
-    tipRoundness,
-    brushDynamics,
-    stampTuning,
-    proDrawPrefs.sizeLocked,
-    proDrawPrefs.opacityLocked,
-  ]);
-
-  useEffect(() => {
-    if (activeBrushBaselineInspection?.status === "modified") {
-      setLastBrushDefaultRestore(null);
-    }
-  }, [activeBrushBaselineInspection]);
+  // CLIP STUDIO처럼 속성을 수정해도 선택한 사용자 브러시의 정체성은 유지한다.
+  // 비동기 기준선 선택·검사·복원 경쟁은 전용 컨트롤러가 소유하고, 이 편집기는 실제
+  // 브러시 상태에 트랜잭션을 적용하는 어댑터만 남긴다.
+  const brushBaselineController = useStudioBrushBaselineController({
+    currentSnapshot: currentBrushSnapshot,
+    savedBrushes,
+    fallbackSourceName: activeCatalogBrush.name,
+    preserveStrokeWidth: proDrawPrefs.sizeLocked,
+    preserveBrushOpacity: proDrawPrefs.opacityLocked,
+    materializeCatalogSelection: materializeStudioBrushCatalogSelection,
+    applyRestoreTransaction: applyBrushDefaultRestoreTransaction,
+    announce: announceDrawingShortcut,
+  });
+  const activeSavedBrushId = brushBaselineController.activeSavedBrushId;
 
   function applySavedBrush(saved: StudioSavedBrush) {
-    selectStudioBrushBaseline({ kind: "saved", brush: saved });
+    brushBaselineController.select({ kind: "saved", brush: saved });
     activatePrimaryCanvasTool("draw", "pen");
     setBrush(saved.brushId);
     setActiveCatalogBrush({
@@ -5828,14 +5997,12 @@ function StudioCuttoonEditor() {
     setTipAngle(saved.tipAngle);
     setTipRoundness(saved.tipRoundness);
     setBrushDynamics(normalizeStudioBrushDynamicsSettings(saved.brushDynamics));
-    setAppliedSavedBrushId(saved.id);
     const used = markBrushUsedWithResult(browserBrushLibraryStorage(), saved.id);
     if (used.status === "updated") {
       setSavedBrushes(used.brushes);
     } else if (used.status === "missing") {
       setSavedBrushes(used.brushes);
-      setAppliedSavedBrushId(null);
-      invalidateStudioBrushBaseline();
+      brushBaselineController.invalidate();
       announceDrawingShortcut("브러시는 적용했지만 다른 탭에서 삭제되어 저장 목록을 새로 맞췄어요.");
     } else if (used.status === "library-unreadable") {
       announceDrawingShortcut("브러시는 적용했지만 저장 데이터를 읽지 못해 최근 사용 기록은 남기지 못했어요.");
@@ -5857,8 +6024,7 @@ function StudioCuttoonEditor() {
       brushOpacity,
       color,
     });
-    setAppliedSavedBrushId(null);
-    selectStudioBrushBaseline({ kind: "catalog", selection });
+    brushBaselineController.select({ kind: "catalog", selection });
     activatePrimaryCanvasTool("draw", "pen");
     setBrush(applied.brushId);
     const extendedSource = selection.catalogId !== selection.runtimeBrushId;
@@ -5936,71 +6102,6 @@ function StudioCuttoonEditor() {
     );
   }
 
-  async function restoreActiveBrushDefaults() {
-    const baseline = activeBrushBaseline;
-    const requestId = brushBaselineRequestRef.current;
-    const lastRestore = lastBrushDefaultRestore;
-    const requestedUndo =
-      lastRestore !== null
-      && baseline !== null
-      && lastRestore.baselineKey === baseline.identity.key
-      && activeBrushBaselineInspection?.status === "clean";
-    if (!baseline || brushDefaultRestoreLoading) {
-      announceDrawingShortcut("브러시 기본값을 확인하는 중이에요.");
-      return;
-    }
-
-    setBrushDefaultRestoreLoading(true);
-    try {
-      const contract = await import("./studio-brush-baseline-contract");
-      if (brushBaselineRequestRef.current !== requestId) return;
-      const inspection = contract.inspectStudioBrushBaseline(
-        baseline,
-        currentBrushSnapshotRef.current,
-        {
-          preserveStrokeWidth: proDrawPrefs.sizeLocked,
-          preserveBrushOpacity: proDrawPrefs.opacityLocked,
-        },
-      );
-      if (requestedUndo && lastRestore) {
-        if (inspection.status === "clean") {
-          applyBrushDefaultRestoreTransaction(lastRestore.transaction, "undo");
-          setLastBrushDefaultRestore(null);
-          return;
-        }
-        setLastBrushDefaultRestore(null);
-        if (inspection.status === "invalid") {
-          invalidateStudioBrushBaseline();
-          announceDrawingShortcut("브러시가 바뀌어 복원 되돌리기를 취소했어요.");
-          return;
-        }
-        setActiveBrushBaselineInspection(inspection);
-        announceDrawingShortcut("브러시 설정이 바뀌어 이전 복원 되돌리기를 취소했어요.");
-        return;
-      }
-      if (inspection.status === "invalid") {
-        invalidateStudioBrushBaseline();
-        announceDrawingShortcut("브러시가 바뀌어 기본값을 다시 확인해야 해요.");
-        return;
-      }
-      if (inspection.status === "clean") {
-        announceDrawingShortcut(`${baseline.profile.sourceName} 브러시는 이미 기본값이에요.`);
-        return;
-      }
-      applyBrushDefaultRestoreTransaction(inspection.transaction, "redo");
-      setLastBrushDefaultRestore({
-        baselineKey: baseline.identity.key,
-        transaction: inspection.transaction,
-      });
-    } catch {
-      announceDrawingShortcut("브러시 기본값을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
-    } finally {
-      if (brushBaselineRequestRef.current === requestId) {
-        setBrushDefaultRestoreLoading(false);
-      }
-    }
-  }
-
   function toggleBuiltInBrushFavorite(brushId: string) {
     setProDrawPrefs((previous) => {
       const next = toggleFavoriteBrushId(previous, brushId);
@@ -6051,8 +6152,7 @@ function StudioCuttoonEditor() {
   }, [brushCatalogSession, drawMode, isMobile, mobileSheet, tool]);
 
   function applyBrushSlot(slot: StudioBrushSlot) {
-    setAppliedSavedBrushId(null);
-    selectStudioCatalogBrushBaseline(slot.sourcePresetId ?? slot.brushId);
+    brushBaselineController.selectCatalog(slot.sourcePresetId ?? slot.brushId);
     const preset = BRUSH_PRESETS.find((p) => p.id === slot.brushId);
     if (preset) {
       setBrush(preset.id);
@@ -21229,7 +21329,10 @@ const puppetWarpArmed =
     const sel = pixelSel;
     setPixelBusy(true);
     try {
-      const img = await loadStudioPixelEditImage(target.src);
+      const [{ bakeContentAwareFillToCanvas }, img] = await Promise.all([
+        import("./studio-content-aware-fill"),
+        loadStudioPixelEditImage(target.src),
+      ]);
       const w = img.naturalWidth || img.width;
       const h = img.naturalHeight || img.height;
       const maskPlan = buildSelectionMaskPlan(sel, w, h, {
@@ -29902,6 +30005,7 @@ function clearSelectionForEdit() {
     alignSelected,
     announceDrawingShortcut,
     applyBgPreset,
+    applyBrushDefaultRestoreTransaction,
     applyContentAwareFill,
     extractPixelSelectionToLayer,
     applyCropToSelectedImage,
@@ -29913,6 +30017,7 @@ function clearSelectionForEdit() {
     applyPuppetWarpToSelectedImage,
     applySavedBrush,
     assignElementToGroup,
+    changeDrawingPaletteLayout: setDrawingPaletteLayout,
     changeInspectorLayout,
     clearHealCloneSource,
     clearPolyLassoDraft,
@@ -29942,6 +30047,17 @@ function clearSelectionForEdit() {
     onColorizeSelected,
     onMinimapClick,
     onMinimapKeyDown,
+    openBrushCatalog: (trigger) => {
+      if (isMobile) {
+        setMobileSheet("draw");
+        studioBrushCatalogHandlers.toggle(
+          "mobile-sheet",
+          mobileBrushDockButtonRef.current ?? trigger
+        );
+        return;
+      }
+      studioBrushCatalogHandlers.toggle("desktop-dock", trigger);
+    },
     openFeatureTutorial,
     patchEl,
     patchPageGrade,
@@ -29963,6 +30079,7 @@ function clearSelectionForEdit() {
     setBgGrad,
     setCanvasH,
     setDescription,
+    setDrawingPaletteDragging: changeDrawingPaletteDragging,
     setIsometricAngleDegClamped,
     setIsometricCellSizeClamped,
     previewIsometricAngleDegClamped,
@@ -30234,9 +30351,10 @@ function clearSelectionForEdit() {
     toggleFavorite: toggleBuiltInBrushFavorite,
   });
 
-    const studioMobileEditingDockHandlers = useStudioStableHandlers<StudioMobileEditingDockHandlers>({
+  const studioMobileEditingDockHandlers = useStudioStableHandlers<StudioMobileEditingDockHandlers>({
       activateCanvasTool: activatePrimaryCanvasTool,
       applyBuiltInBrushPreset,
+      applyBrushDefaultRestoreTransaction,
       applyDynamicsPreset,
       applySavedBrush,
     dismissBrushManager: dismissBrushManagerToDraw,
@@ -30250,6 +30368,9 @@ function clearSelectionForEdit() {
     redo,
     removeSelected,
     reorder,
+    restoreBrushDefaults: () => {
+      void brushBaselineController.restoreDefaults();
+    },
     toggleAdvancedFill,
     toggleStudioCommentPinPlacement,
       undo,
@@ -30329,7 +30450,7 @@ function clearSelectionForEdit() {
     },
     reorderSelection: (direction) => reorder(direction),
     restoreBrushDefaults: () => {
-      void restoreActiveBrushDefaults();
+      void brushBaselineController.restoreDefaults();
     },
     selectBrushId: studioBrushCatalogHandlers.selectBrushId,
     setBrushOpacity,
@@ -30412,24 +30533,11 @@ function clearSelectionForEdit() {
       brushId: brush,
       brushCatalogOpen: brushCatalogSession?.placement === "desktop-dock",
       brushDefaultRestore: {
-        sourceName:
-          activeBrushBaseline?.profile.sourceName ?? activeCatalogBrush.name,
-        modifiedCount:
-          activeBrushBaselineInspection?.status === "modified"
-            ? activeBrushBaselineInspection.dirtyCount
-            : 0,
-        loading:
-          brushDefaultRestoreLoading
-          || Boolean(activeBrushBaseline && !activeBrushBaselineInspection),
-        available:
-          activeBrushBaseline !== null
-          && activeBrushBaselineInspection !== null
-          && activeBrushBaselineInspection.status !== "invalid",
-        undoAvailable:
-          lastBrushDefaultRestore !== null
-          && activeBrushBaseline !== null
-          && lastBrushDefaultRestore.baselineKey === activeBrushBaseline.identity.key
-          && activeBrushBaselineInspection?.status === "clean",
+        available: brushBaselineController.restoreState.available,
+        loading: brushBaselineController.restoreState.loading,
+        modifiedCount: brushBaselineController.restoreState.modifiedCount,
+        sourceName: brushBaselineController.restoreState.sourceName,
+        undoAvailable: brushBaselineController.restoreState.undoAvailable,
       },
       brushOpacity,
       brushSlots: brushSlotsState.slots,
@@ -30477,12 +30585,13 @@ function clearSelectionForEdit() {
     [
       activeCatalogBrush.id,
       activeCatalogBrush.name,
-      activeBrushBaseline,
-      activeBrushBaselineInspection,
       brush,
       brushCatalogSession?.placement,
-      brushDefaultRestoreLoading,
-      lastBrushDefaultRestore,
+      brushBaselineController.restoreState.available,
+      brushBaselineController.restoreState.loading,
+      brushBaselineController.restoreState.modifiedCount,
+      brushBaselineController.restoreState.sourceName,
+      brushBaselineController.restoreState.undoAvailable,
       brushOpacity,
       brushSlotsState.slots,
       canvasFlipH,
@@ -32018,6 +32127,8 @@ function clearSelectionForEdit() {
               <StudioInspectorAsideFallback
                 isMobile={isMobile}
                 keyboardInset={mobileKeyboardInset}
+                propsSheetRef={propsSheetRef}
+                snap={mobileInspectorSnap}
                 visible={visibleRightPanelOpen}
                 width={rightResize.width}
               />
@@ -32090,6 +32201,8 @@ function clearSelectionForEdit() {
           description={description}
           drawMode={drawMode}
           drawShape={drawShape}
+          drawingPaletteCancelEpoch={drawingPaletteCancelEpoch}
+          drawingPaletteLayout={drawingPaletteLayout}
           effectFavoriteState={effectFavoriteState}
           effScale={effScale}
           elementById={elementById}
@@ -32410,6 +32523,7 @@ function clearSelectionForEdit() {
           brush={brush}
           brushCatalogHandlers={studioBrushCatalogHandlers}
           brushCatalogOpen={brushCatalogSession?.placement === "mobile-sheet"}
+          brushDefaultRestore={brushBaselineController.restoreState}
           brushDynamics={brushDynamics}
           brushManagerSheetRef={brushManagerSheetRef}
           brushOpacity={brushOpacity}

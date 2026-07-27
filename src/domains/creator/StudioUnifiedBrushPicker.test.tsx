@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  StudioInspectorBrushCatalogButton,
+  StudioInspectorDrawColorControls,
+} from "./StudioInspectorUtilityPanels";
 import { StudioUnifiedBrushPicker } from "./StudioUnifiedBrushPicker";
 
 const pickerSource = readFileSync(new URL("./StudioUnifiedBrushPicker.tsx", import.meta.url), "utf8");
@@ -131,14 +135,38 @@ describe("StudioUnifiedBrushPicker", () => {
     expect(pickerSource).toContain("onToggleFavoriteBrush");
   });
 
-  it("keeps built-in quick discovery out of the desktop inspector", () => {
+  it("keeps one shared catalogue portal while the desktop sub-tool palette can open it", () => {
     expect(studioPageSource).not.toContain("<StudioUnifiedBrushPicker");
     expect(mobileDockSource.match(/<StudioUnifiedBrushPicker/g)).toHaveLength(1);
     expect(inspectorSource).not.toContain("<StudioUnifiedBrushPicker");
     expect(inspectorUtilitySource).toContain('data-studio-inspector-brush-summary="true"');
-    expect(inspectorUtilitySource).toContain("기본 프리셋 변경은 캔버스 하단 브러시 도크에서");
+    expect(inspectorUtilitySource).toContain("하단 빠른 바와 같은 브러시 목록을 사용합니다");
+    expect(inspectorUtilitySource).toContain("onOpenBrushCatalog");
+    expect(inspectorUtilitySource).toContain("기본 브러시");
     expect(studioPageSource).toContain("brushCatalogSession");
     expect(studioPageSource.match(/<StudioBrushCatalogPortal/g)).toHaveLength(1);
+  });
+
+  it("keeps extracted inspector colour controls explicit and touch friendly", () => {
+    const html = renderToStaticMarkup(
+      <>
+        <StudioInspectorBrushCatalogButton onOpen={vi.fn()} />
+        <StudioInspectorDrawColorControls
+          color="#16100c"
+          eyedropperActive={false}
+          onColorChange={vi.fn()}
+          onEyedropperToggle={vi.fn()}
+        />
+      </>,
+    );
+
+    expect(html).toContain("브러시 목록");
+    expect(html).toContain('aria-haspopup="dialog"');
+    expect(html).toContain('aria-label="스포이드로 캔버스 색상 선택"');
+    expect(html).toContain('aria-label="#16100c 색상 선택"');
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('aria-label="사용자 정의 색상 선택"');
+    expect(html.match(/size-11/g)?.length).toBeGreaterThan(10);
   });
 
   it("keeps the mobile catalogue open while settings inspect a non-drawing tool", () => {

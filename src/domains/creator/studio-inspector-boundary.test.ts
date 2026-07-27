@@ -88,6 +88,11 @@ describe("Studio inspector module boundary", () => {
     expect(page.valueImports).toContain("./studio-inspector-aside-loader");
     expect(page.dynamicImports).not.toContain("./StudioInspectorAside");
     expect(loader.dynamicImports).toEqual(["./StudioInspectorAside"]);
+    expect(loader.valueImports).toContain("./studio-page-lazy-ui");
+    expect(loader.source).toContain("preloadStudioInspectorDrawingSurface");
+    expect(loader.source).toMatch(
+      /preloadStudioInspectorDrawingSurface\(\): void \{\s*studioInspectorAsideLoader\.preload\(\);\s*preloadStudioDrawingPaletteStack\(\);\s*\}/u,
+    );
     expect(inspector.allImports).not.toContain("./StudioPage");
     expect(inspector.dynamicImports).not.toContain("./StudioPage");
     expect(registry.allImports).not.toContain("./StudioInspectorAside");

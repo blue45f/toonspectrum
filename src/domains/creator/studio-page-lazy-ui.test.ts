@@ -51,6 +51,7 @@ const REPRESENTATIVE_OPTIONAL_SURFACES = [
   "./StudioBrushStudio",
   "./StudioColorPalettePanel",
   "./StudioCommentsPanelSession",
+  "./StudioDrawingPaletteStack",
   "./StudioFilterDialog",
   "./StudioFloodFillPanel",
   "./StudioFrameAnimationPanel",
@@ -97,6 +98,56 @@ describe("StudioPage optional UI registry", () => {
     expect(registry).toContain("studioIntegrationsSettingsPanelPromise ??=");
     expect(registry).toContain("studioExportMenuPanelPromise ??=");
     expect(registry).toContain("studioColorPopoverPromise ??=");
+  });
+
+  it("keeps the mobile Inspector modal boundary active while its lazy chunk loads", () => {
+    const page = moduleEdges("./StudioPage.tsx").source;
+    const fallbackStart = page.indexOf("function StudioInspectorAsideFallback");
+    const fallbackEnd = page.indexOf("const LazyStudioMobileSheetHandle", fallbackStart);
+    const fallback = page.slice(fallbackStart, fallbackEnd);
+    const usageStart = page.indexOf("<StudioInspectorAsideFallback");
+    const usageEnd = page.indexOf("/>", usageStart);
+    const usage = page.slice(usageStart, usageEnd);
+
+    expect(fallbackStart).toBeGreaterThanOrEqual(0);
+    expect(fallbackEnd).toBeGreaterThan(fallbackStart);
+    expect(usageStart).toBeGreaterThanOrEqual(0);
+    expect(usageEnd).toBeGreaterThan(usageStart);
+    expect(fallback).toContain('propsSheetRef: import("react").RefObject<HTMLElement | null>');
+    expect(fallback).toContain("ref={propsSheetRef}");
+    expect(fallback).toContain('role={isMobile ? "dialog" : undefined}');
+    expect(fallback).toContain("aria-modal={isMobile ? true : undefined}");
+    expect(fallback).toContain("tabIndex={isMobile ? -1 : undefined}");
+    expect(fallback).toContain("studioMobileSheetSizeStyle(snap, safeKeyboardInset)");
+    expect(fallback).not.toContain('height: "min(62dvh, 32rem)"');
+    expect(usage).toContain("propsSheetRef={propsSheetRef}");
+    expect(usage).toContain("snap={mobileInspectorSnap}");
+  });
+
+  it("exposes an intent-preloadable drawing palette stack through one registry-owned lazyRetry boundary", () => {
+    const registry = moduleEdges("./studio-page-lazy-ui.ts");
+
+    expect(
+      registry.dynamicImports.filter(
+        (specifier) => specifier === "./StudioDrawingPaletteStack"
+      )
+    ).toEqual(["./StudioDrawingPaletteStack"]);
+    expect(registry.valueImports).not.toContain("./StudioDrawingPaletteStack");
+    expect(registry.source).toMatch(
+      /const studioDrawingPaletteStackLoader = createStudioIntentLazyLoader\(\(\) =>[\s\S]*?import\("\.\/StudioDrawingPaletteStack"\)[\s\S]*?default: mod\.StudioDrawingPaletteStack/u
+    );
+    expect(registry.source).toMatch(
+      /const StudioDrawingPaletteStack = lazyRetry\(\s*studioDrawingPaletteStackLoader\.load,\s*"StudioDrawingPaletteStack"\s*\)/u
+    );
+    expect(registry.source).toMatch(
+      /function preloadStudioDrawingPaletteStack\(\): void \{\s*studioDrawingPaletteStackLoader\.preload\(\);\s*\}/u
+    );
+    expect(registry.source).toMatch(
+      /export \{[\s\S]*?\bStudioDrawingPaletteStack,[\s\S]*?\}/u
+    );
+    expect(registry.source).toMatch(
+      /export \{[\s\S]*?\bpreloadStudioDrawingPaletteStack,[\s\S]*?\}/u
+    );
   });
 
   it("loads one comments session boundary without a nested panel waterfall", () => {

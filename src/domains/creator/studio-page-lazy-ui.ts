@@ -409,6 +409,18 @@ const StudioDrawOptionsBar = lazyRetry(
   () => import("./StudioDrawOptionsBar").then((mod) => ({ default: mod.StudioDrawOptionsBar })),
   "StudioDrawOptionsBar"
 );
+const studioDrawingPaletteStackLoader = createStudioIntentLazyLoader(() =>
+  import("./StudioDrawingPaletteStack").then((mod) => ({
+    default: mod.StudioDrawingPaletteStack,
+  }))
+);
+const StudioDrawingPaletteStack = lazyRetry(
+  studioDrawingPaletteStackLoader.load,
+  "StudioDrawingPaletteStack"
+);
+function preloadStudioDrawingPaletteStack(): void {
+  studioDrawingPaletteStackLoader.preload();
+}
 const StudioUnifiedBrushPicker = lazyRetry(
   () => import("./StudioUnifiedBrushPicker").then((mod) => ({ default: mod.StudioUnifiedBrushPicker })),
   "StudioUnifiedBrushPicker"
@@ -761,6 +773,7 @@ export {
   StudioDialogueSuggestPanel,
   StudioDialogueTranslatePanel,
   StudioDrawOptionsBar,
+  StudioDrawingPaletteStack,
   StudioElementsPanel,
   StudioEmeresLibraryPanel,
   StudioExportMenuPanel,
@@ -859,6 +872,7 @@ export {
   preloadStudioAssetMenuPanel,
   preloadStudioCommentsPanelSession,
   preloadStudioColorPopover,
+  preloadStudioDrawingPaletteStack,
   preloadStudioExportMenuPanel,
   preloadStudioIntegrationsSettingsPanel,
   preloadStudioPaletteLibraryPanel,

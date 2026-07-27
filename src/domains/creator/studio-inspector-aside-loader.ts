@@ -1,4 +1,5 @@
 import { createStudioIntentLazyLoader } from "./studio-intent-lazy-loader";
+import { preloadStudioDrawingPaletteStack } from "./studio-page-lazy-ui";
 
 import { lazyRetry } from "@/lib/lazy-retry";
 
@@ -21,4 +22,14 @@ export const LazyStudioInspectorAside = lazyRetry(
 /** Best-effort warm-up for a collapsed desktop rail or an unopened mobile properties sheet. */
 export function preloadStudioInspectorAside(): void {
   studioInspectorAsideLoader.preload();
+}
+
+/**
+ * Starts both mobile properties dependencies in the same interaction frame. The inspector can
+ * render without the drawing palettes, but warming both avoids a second chunk waterfall when the
+ * properties route reveals its workspace palette stack.
+ */
+export function preloadStudioInspectorDrawingSurface(): void {
+  studioInspectorAsideLoader.preload();
+  preloadStudioDrawingPaletteStack();
 }

@@ -167,6 +167,66 @@ describe("Studio mobile editing dock module boundary", () => {
     expect(page.source).toContain("ui={STUDIO_MOBILE_EDITING_DOCK_UI}");
   });
 
+  it("warms both lazy properties surfaces from every mobile Work intent path", () => {
+    const dock = moduleShape("./StudioMobileEditingDock.tsx");
+
+    expect(
+      dock.namedValueImports.get("preloadStudioInspectorDrawingSurface"),
+    ).toBe("./studio-inspector-aside-loader");
+    expect(
+      dock.source.match(
+        /onPointerEnter=\{preloadStudioInspectorDrawingSurface\}/gu,
+      ),
+    ).toHaveLength(2);
+    expect(
+      dock.source.match(
+        /onPointerDown=\{preloadStudioInspectorDrawingSurface\}/gu,
+      ),
+    ).toHaveLength(2);
+    expect(
+      dock.source.match(/onFocus=\{preloadStudioInspectorDrawingSurface\}/gu),
+    ).toHaveLength(2);
+    expect(dock.dynamicImports).toEqual([]);
+  });
+
+  it("routes mobile brush default restore through the page-owned baseline controller", () => {
+    const page = moduleShape("./StudioPage.tsx");
+    const dock = moduleShape("./StudioMobileEditingDock.tsx");
+
+    expect(page.source).toContain(
+      "brushDefaultRestore={brushBaselineController.restoreState}",
+    );
+    expect(page.source).toMatch(
+      /restoreBrushDefaults: \(\) => \{\s*void brushBaselineController\.restoreDefaults\(\);\s*\}/u,
+    );
+    expect(dock.source).toContain(
+      "brushDefaultRestore: StudioBrushDefaultRestoreViewState;",
+    );
+    expect(dock.source).toContain("restoreBrushDefaults: () => void;");
+    expect(dock.source).toContain(
+      "applyBrushDefaultRestoreTransaction: (",
+    );
+    expect(dock.source).toContain(
+      "onRestoreDefaults={applyBrushDefaultRestoreTransaction}",
+    );
+    expect(dock.source).not.toContain(
+      "onRestoreDefaults={(transaction, direction) =>",
+    );
+    expect(dock.source).not.toContain(
+      'setStrokeWidth(drawMode === "eraser" ? 18 : 4)',
+    );
+    expect(dock.source).not.toContain("setBrushOpacity(1)");
+    expect(dock.source).toContain(
+      'data-studio-mobile-brush-default-restore="true"',
+    );
+    expect(dock.source).toContain(
+      '"flex min-h-11 min-w-[7rem] shrink-0 items-center',
+    );
+    expect(page.source).toContain(
+      "applyBrushDefaultRestoreTransaction,",
+    );
+  });
+
   it("leaves modal, focus, and stable-handler lifecycle in StudioPage", () => {
     const page = moduleShape("./StudioPage.tsx");
     const dock = moduleShape("./StudioMobileEditingDock.tsx");

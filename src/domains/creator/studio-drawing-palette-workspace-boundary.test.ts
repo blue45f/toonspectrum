@@ -1,0 +1,463 @@
+import { readFileSync } from "node:fs";
+
+import { describe, expect, it } from "vitest";
+
+const pageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const inspectorSource = readFileSync(
+  new URL("./StudioInspectorAside.tsx", import.meta.url),
+  "utf8",
+);
+const stackSource = readFileSync(
+  new URL("./StudioDrawingPaletteStack.tsx", import.meta.url),
+  "utf8",
+);
+const lazyRegistrySource = readFileSync(
+  new URL("./studio-page-lazy-ui.ts", import.meta.url),
+  "utf8",
+);
+const workspaceSource = readFileSync(
+  new URL("./studio-workspaces.ts", import.meta.url),
+  "utf8",
+);
+const workspaceMergeSource = readFileSync(
+  new URL("./studio-workspace-three-way-merge.ts", import.meta.url),
+  "utf8",
+);
+const viteSource = readFileSync(
+  new URL("../../../vite.config.ts", import.meta.url),
+  "utf8",
+);
+
+function sourceBetween(
+  source: string,
+  startToken: string,
+  endToken: string,
+  label: string,
+): string {
+  const start = source.indexOf(startToken);
+  const end = source.indexOf(endToken, start + startToken.length);
+  if (start < 0 || end <= start) {
+    throw new Error(`Missing ${label} source boundary: ${startToken} -> ${endToken}`);
+  }
+  return source.slice(start, end);
+}
+
+describe("Studio drawing palette workspace integration boundary", () => {
+  it("co-locates palette persistence with the eager workspace chunk", () => {
+    const workspaceChunk = sourceBetween(
+      viteSource,
+      'id.endsWith("/src/domains/creator/studio-workspaces.ts")',
+      'return "studio-workspaces"',
+      "workspace manual chunk",
+    );
+
+    expect(workspaceChunk).toContain(
+      'id.endsWith("/src/domains/creator/studio-drawing-palettes.ts")',
+    );
+  });
+
+  it("owns drawing palettes in workspace v3 and initializes the live page model from them", () => {
+    const layoutContract = sourceBetween(
+      workspaceSource,
+      "export interface StudioWorkspaceLayout",
+      "export interface StudioDefaultWorkspace",
+      "workspace layout",
+    );
+    const frozenLayout = sourceBetween(
+      workspaceSource,
+      "function freezeLayout",
+      "function createQuickActions",
+      "workspace normalization",
+    );
+    const pageInitialization = sourceBetween(
+      pageSource,
+      "const [workspacePersistence, setWorkspacePersistence]",
+      "const [drawingPaletteDragging, setDrawingPaletteDragging]",
+      "page palette initialization",
+    );
+    const liveLayout = sourceBetween(
+      pageSource,
+      "const liveWorkspaceLayout = useMemo",
+      "const workspacePersistenceRef",
+      "page live workspace layout",
+    );
+
+    expect(workspaceSource).toContain(
+      "export const STUDIO_WORKSPACE_STATE_VERSION = 3 as const",
+    );
+    expect(workspaceSource).toContain(
+      "export const STUDIO_WORKSPACE_PAYLOAD_VERSION = 3 as const",
+    );
+    expect(layoutContract).toContain(
+      "readonly drawingPalettes: StudioDrawingPaletteLayout",
+    );
+    expect(frozenLayout).toContain(
+      "drawingPalettes: normalizeStudioDrawingPaletteLayout(",
+    );
+    expect(pageInitialization).toContain(
+      "useState<StudioDrawingPaletteLayout>",
+    );
+    expect(pageInitialization).toContain(
+      "() => workspaceState.liveLayout.drawingPalettes",
+    );
+    expect(liveLayout).toContain("drawingPalettes: drawingPaletteLayout");
+    expect(liveLayout).toContain("drawingPaletteLayout,");
+  });
+
+  it("persists only settled palette sizes and restores them across every workspace boundary", () => {
+    const paletteState = sourceBetween(
+      pageSource,
+      "const [drawingPaletteDragging, setDrawingPaletteDragging]",
+      "// 모바일(<lg) 레이아웃",
+      "page palette drag state",
+    );
+    const dragController = sourceBetween(
+      pageSource,
+      "function changeDrawingPaletteDragging",
+      "function applyStudioWorkspaceLayout",
+      "page palette drag controller",
+    );
+    const applyLayout = sourceBetween(
+      pageSource,
+      "function applyStudioWorkspaceLayout",
+      "function persistStudioWorkspaceState",
+      "workspace apply",
+    );
+    const ownerSync = sourceBetween(
+      pageSource,
+      "// 로그인/로그아웃으로 owner가 바뀌면",
+      "// 패널·팔레트 드래그 또는 작업공간 편집과 겹친 외부 저장본은",
+      "workspace owner sync",
+    );
+    const pendingReplay = sourceBetween(
+      pageSource,
+      "// 패널·팔레트 드래그 또는 작업공간 편집과 겹친 외부 저장본은",
+      "// 활성 프리셋 스냅샷은 그대로 두고",
+      "pending external workspace replay",
+    );
+    const autosave = sourceBetween(
+      pageSource,
+      "// 활성 프리셋 스냅샷은 그대로 두고",
+      "// 다른 탭에서 같은 계정의 작업공간을 저장하면",
+      "workspace autosave",
+    );
+    const externalSync = sourceBetween(
+      pageSource,
+      "// 다른 탭에서 같은 계정의 작업공간을 저장하면",
+      "// 재사용 클립 보관함",
+      "workspace external sync",
+    );
+
+    expect(paletteState).toContain(
+      "const drawingPaletteDraggingRef = useRef(false)",
+    );
+    expect(paletteState).toContain(
+      "const [drawingPaletteCancelEpoch, setDrawingPaletteCancelEpoch] = useState(0)",
+    );
+    expect(paletteState).toContain(
+      "const [pendingExternalWorkspaceSync, setPendingExternalWorkspaceSync]",
+    );
+    expect(pageSource).toContain("interface PendingStudioWorkspaceSync");
+    expect(pageSource).toContain("readonly ownerScope: string;");
+    expect(pageSource).toContain("readonly storageKey: string;");
+    expect(pageSource).toContain("readonly latestEventRaw: string | null;");
+    expect(pageSource).toContain("readonly sequence: number;");
+    expect(pageSource).toContain("readonly baseState: StudioWorkspaceState;");
+    expect(dragController).toContain(
+      "drawingPaletteDraggingRef.current = next",
+    );
+    expect(dragController).toContain("setDrawingPaletteDragging(next)");
+    expect(dragController).toContain(
+      "if (!drawingPaletteDraggingRef.current) return",
+    );
+    expect(dragController).toContain(
+      "drawingPaletteDraggingRef.current = false",
+    );
+    expect(dragController).toContain("setDrawingPaletteDragging(false)");
+    expect(dragController).toContain(
+      "setDrawingPaletteCancelEpoch((current) => current + 1)",
+    );
+    expect(applyLayout.indexOf("cancelDrawingPaletteDrag()")).toBeLessThan(
+      applyLayout.indexOf("setDrawingPaletteLayout(layout.drawingPalettes)"),
+    );
+    expect(applyLayout).toContain(
+      "setDrawingPaletteLayout(layout.drawingPalettes)",
+    );
+    expect(ownerSync.indexOf("replacePendingExternalWorkspaceSync(null)")).toBeLessThan(
+      ownerSync.indexOf("loadStudioWorkspacePersistence("),
+    );
+    expect(ownerSync).toContain(
+      "계정이 바뀌어 이전 탭에서 보류한 작업공간 변경을 반영하지 않았어요.",
+    );
+    expect(ownerSync).toContain(
+      'nextPersistence.state.liveLayout,\n      "owner-scope-change",\n      false',
+    );
+    expect(pendingReplay).toContain(
+      "drawingPaletteDragging ||\n      !pendingExternalWorkspaceSync",
+    );
+    expect(pendingReplay).toContain(
+      "replacePendingExternalWorkspaceSync(null)",
+    );
+    expect(pendingReplay).toContain(
+      "pendingSync.ownerScope !== ownerScope",
+    );
+    expect(pendingReplay).toContain(
+      "pendingSync.storageKey !== storageKey",
+    );
+    expect(pendingReplay).toContain(
+      "currentPersistence.ownerScope !== ownerScope",
+    );
+    expect(pendingReplay.indexOf("pendingSync.ownerScope !== ownerScope")).toBeLessThan(
+      pendingReplay.indexOf("loadStudioWorkspacePersistence(storage"),
+    );
+    expect(pendingReplay).toContain("leftResize.dragging ||");
+    expect(pendingReplay).toContain("rightResize.dragging ||");
+    expect(pendingReplay).toContain(
+      "'[data-testid=\"studio-workspace-dialog\"]:not([hidden])'",
+    );
+    expect(pendingReplay).toContain(
+      "const loaded = loadStudioWorkspacePersistence(storage, studioAuthUserId)",
+    );
+    expect(pendingReplay).toContain(
+      'void import("./studio-workspace-three-way-merge")',
+    );
+    expect(pendingReplay).toContain(
+      "reconcileStudioWorkspacePendingSync({",
+    );
+    expect(pendingReplay).toContain(
+      "expectedRaw: latestPending.latestEventRaw",
+    );
+    expect(pendingReplay).toContain(
+      'reconciliation.kind === "retry-latest-raw"',
+    );
+    expect(pendingReplay).toContain(
+      "latestPersistence.state,\n          liveWorkspaceLayoutRef.current",
+    );
+    expect(pendingReplay).toContain(
+      "const { conflictPaths, result } = reconciliation",
+    );
+    expect(pendingReplay).toContain(
+      "겹친 ${conflictPaths.length}개 설정은 현재 탭을 유지했습니다.",
+    );
+    expect(
+      pendingReplay.match(/deferWhileWorkspaceMenuOpen\(\)/g),
+    ).toHaveLength(2);
+    expect(
+      pendingReplay.lastIndexOf("if (deferWhileWorkspaceMenuOpen()) return"),
+    ).toBeLessThan(
+      pendingReplay.indexOf("reconcileStudioWorkspacePendingSync({"),
+    );
+    expect(pendingReplay).toContain(
+      "applyStudioWorkspaceLayoutFromEffect(\n          result.state.liveLayout,\n          \"external-sync\",\n          false",
+    );
+    expect(autosave).toContain(
+      "if (leftResize.dragging || rightResize.dragging || drawingPaletteDragging) return",
+    );
+    expect(autosave).toContain(
+      "if (pendingExternalWorkspaceSync) return",
+    );
+    expect(autosave).toContain("drawingPalettes: drawingPaletteLayout");
+    expect(autosave).toContain("drawingPaletteDragging,");
+    expect(autosave).toContain("drawingPaletteLayout,");
+    expect(autosave).toContain("pendingExternalWorkspaceSync,");
+    expect(externalSync).toContain(
+      "replacePendingExternalWorkspaceSync({",
+    );
+    expect(externalSync).toContain("ownerScope,");
+    expect(externalSync).toContain("storageKey,");
+    expect(externalSync).toContain("latestEventRaw: event.newValue,");
+    expect(externalSync).toContain("sequence,");
+    expect(externalSync).toContain("workspaceSyncBaseStateRef.current");
+    expect(
+      externalSync.indexOf("replacePendingExternalWorkspaceSync({"),
+    ).toBeLessThan(
+      externalSync.indexOf("if (drawingPaletteDraggingRef.current) {"),
+    );
+    expect(externalSync).toContain(
+      "팔레트 크기 조절 중이라 다른 탭의 작업공간 변경을 보류했어요.",
+    );
+    expect(externalSync).not.toContain(
+      "loadStudioWorkspacePersistence(storage",
+    );
+  });
+
+  it("keeps menu state session-atomic and writes only a three-way merged pending state", () => {
+    const persist = sourceBetween(
+      pageSource,
+      "function persistStudioWorkspaceState",
+      "// 로그인/로그아웃으로 owner가 바뀌면",
+      "direct workspace persistence",
+    );
+    const pendingReplay = sourceBetween(
+      pageSource,
+      "// 패널·팔레트 드래그 또는 작업공간 편집과 겹친 외부 저장본은",
+      "// 활성 프리셋 스냅샷은 그대로 두고",
+      "pending external workspace replay",
+    );
+    const autosave = sourceBetween(
+      pageSource,
+      "// 활성 프리셋 스냅샷은 그대로 두고",
+      "// 다른 탭에서 같은 계정의 작업공간을 저장하면",
+      "workspace autosave",
+    );
+    expect(autosave.indexOf("if (pendingExternalWorkspaceSync) return")).toBeLessThan(
+      autosave.indexOf("saveStudioWorkspaceState("),
+    );
+    expect(persist.indexOf("if (pendingExternalWorkspaceSyncRef.current) {")).toBeLessThan(
+      persist.indexOf("saveStudioWorkspaceState("),
+    );
+    const blockedDirectSave = sourceBetween(
+      persist,
+      "if (pendingExternalWorkspaceSyncRef.current) {",
+      "const result = saveStudioWorkspaceState(",
+      "pending direct workspace save",
+    );
+    expect(blockedDirectSave).toContain("state: sessionState");
+    expect(blockedDirectSave).toContain("setWorkspacePersistence((current)");
+    expect(blockedDirectSave).toContain('"session-only"');
+    expect(blockedDirectSave).toContain('"verification-failed"');
+    expect(blockedDirectSave).toContain("return Object.freeze({");
+    expect(
+      workspaceMergeSource.indexOf("const merged = mergeStudioWorkspaceStates("),
+    ).toBeLessThan(
+      workspaceMergeSource.indexOf(
+        "const result = saveStudioWorkspaceState(storage, userId, merged.state",
+      ),
+    );
+    expect(pendingReplay).not.toContain("saveStudioWorkspaceState(");
+    expect(pendingReplay).toContain("state: result.state");
+  });
+
+  it("keeps cancellation and lazy palette ownership controlled from Page through Aside", () => {
+    const pageHandlers = sourceBetween(
+      pageSource,
+      "const studioInspectorAsideHandlers",
+      "const studioCanvasViewportHandlers",
+      "page inspector handlers",
+    );
+    const pageAside = sourceBetween(
+      pageSource,
+      "<LazyStudioInspectorAside",
+      "stableHandlers={studioInspectorAsideHandlers}",
+      "page inspector props",
+    );
+    const inspectorLazyImport = sourceBetween(
+      inspectorSource,
+      "import {\n  StudioAdvancedRulerPanel",
+      '} from "./studio-page-lazy-ui";',
+      "inspector lazy registry import",
+    );
+    const inspectorDrawingSurface = sourceBetween(
+      inspectorSource,
+      '{inspectorContentMode === "drawing" && (',
+      'inspectorContentMode === "empty" &&',
+      "inspector drawing surface",
+    );
+
+    expect(pageHandlers).toContain(
+      "changeDrawingPaletteLayout: setDrawingPaletteLayout",
+    );
+    expect(pageHandlers).toContain(
+      "setDrawingPaletteDragging: changeDrawingPaletteDragging",
+    );
+    expect(pageHandlers).toContain('if (isMobile) {');
+    expect(pageHandlers).toContain('setMobileSheet("draw")');
+    expect(pageHandlers).toContain('"mobile-sheet",');
+    expect(pageHandlers).toContain(
+      'studioBrushCatalogHandlers.toggle("desktop-dock", trigger)',
+    );
+    expect(pageAside).toContain(
+      "drawingPaletteLayout={drawingPaletteLayout}",
+    );
+    expect(pageAside).toContain(
+      "drawingPaletteCancelEpoch={drawingPaletteCancelEpoch}",
+    );
+    expect(inspectorSource).toContain(
+      "drawingPaletteCancelEpoch: number;",
+    );
+    expect(inspectorSource).toContain("drawingPaletteCancelEpoch,");
+    expect(inspectorDrawingSurface).toContain("<StudioDrawingPaletteStack");
+    expect(inspectorDrawingSurface).toContain(
+      "cancelEpoch={drawingPaletteCancelEpoch}",
+    );
+    expect(inspectorDrawingSurface).toContain(
+      "layout={drawingPaletteLayout}",
+    );
+    expect(inspectorDrawingSurface).toContain(
+      "onLayoutChange={changeDrawingPaletteLayout}",
+    );
+    expect(inspectorDrawingSurface).toContain(
+      "onDraggingChange={setDrawingPaletteDragging}",
+    );
+    expect(inspectorDrawingSurface).toContain(
+      "onOpenBrushCatalog={openBrushCatalog}",
+    );
+    expect(inspectorDrawingSurface).toContain(
+      'mobilePrimaryPaletteId={\n                    isMobile ? "tool-properties" : undefined',
+    );
+    expect(inspectorDrawingSurface).toContain("mobileHeaderAction={");
+    expect(stackSource).toContain("readonly cancelEpoch?: number;");
+    expect(stackSource).toContain(
+      "const previousCancelEpochRef = useRef(cancelEpoch)",
+    );
+    expect(stackSource).toContain(
+      "activeDragCleanupRef.current?.();",
+    );
+    expect(inspectorLazyImport).toContain("StudioDrawingPaletteStack,");
+    expect(inspectorSource).not.toContain(
+      'from "./StudioDrawingPaletteStack"',
+    );
+    expect(pageSource).not.toContain(
+      'from "./StudioDrawingPaletteStack"',
+    );
+    expect(
+      lazyRegistrySource.match(
+        /import\("\.\/StudioDrawingPaletteStack"\)/gu,
+      ),
+    ).toHaveLength(1);
+    expect(lazyRegistrySource).toContain(
+      "const StudioDrawingPaletteStack = lazyRetry(",
+    );
+    expect(lazyRegistrySource).toContain("StudioDrawingPaletteStack,");
+  });
+
+  it("contains desktop drawing overflow at the palette shell and scrolls each open body", () => {
+    const inspectorShell = sourceBetween(
+      inspectorSource,
+      "<aside",
+      "style={",
+      "inspector shell",
+    );
+    const drawingSurface = sourceBetween(
+      inspectorSource,
+      '{inspectorContentMode === "drawing" && (',
+      "<StudioDrawingPaletteStack",
+      "inspector drawing panel",
+    );
+    const stackRoot = sourceBetween(
+      stackSource,
+      'data-studio-drawing-palette-stack="true"',
+      "{normalizedLayout.order.map",
+      "drawing palette stack root",
+    );
+    const paletteBody = sourceBetween(
+      stackSource,
+      'data-studio-drawing-palette-scroll="true"',
+      "{paletteBody(id, subTools, toolProperties)}",
+      "drawing palette scroll body",
+    );
+
+    expect(inspectorShell).toContain(
+      'inspectorDrawing &&\n              inspectorLayout.primary === "properties" &&\n              "lg:overflow-hidden"',
+    );
+    expect(drawingSurface).toContain(
+      'className="min-h-0 lg:flex lg:flex-1 lg:flex-col"',
+    );
+    expect(stackRoot).toContain(
+      '"lg:min-h-0 lg:flex-1 lg:gap-0 lg:overflow-hidden"',
+    );
+    expect(paletteBody).toContain(
+      "lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain",
+    );
+  });
+});

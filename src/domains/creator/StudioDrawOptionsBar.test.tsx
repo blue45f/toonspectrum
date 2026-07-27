@@ -132,7 +132,7 @@ describe("StudioDrawOptionsBar", () => {
     fireEvent.click(favorite);
     expect(onToggleFavoriteBrush).toHaveBeenCalledWith("heart-stamp");
 
-    fireEvent.click(screen.getByRole("button", { name: "도구 속성 펼치기" }));
+    fireEvent.click(screen.getByRole("button", { name: "빠른 세부 옵션 펼치기" }));
     const activeQuickBrush = screen.getByRole("option", {
       name: /즐겨찾기 브러시 하트 도장/,
     });
@@ -193,12 +193,12 @@ describe("StudioDrawOptionsBar", () => {
       defaultOpacity: 0.6,
     });
 
-    const toolProperties = screen.getByRole("button", { name: "도구 속성 펼치기" });
-    expect(toolProperties.getAttribute("data-studio-tool-property-entry")).toBe("true");
-    expect(toolProperties.textContent).toContain("도구 속성");
-    fireEvent.click(toolProperties);
+    const quickDetails = screen.getByRole("button", { name: "빠른 세부 옵션 펼치기" });
+    expect(quickDetails.getAttribute("data-studio-draw-advanced-toggle")).toBe("true");
+    expect(quickDetails.textContent).toContain("세부 옵션");
+    fireEvent.click(quickDetails);
     expect(
-      screen.getByRole("button", { name: "도구 속성 접기" }).getAttribute("aria-expanded")
+      screen.getByRole("button", { name: "빠른 세부 옵션 접기" }).getAttribute("aria-expanded")
     ).toBe("true");
   });
 
@@ -553,7 +553,7 @@ describe("StudioDrawOptionsBar", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "도구 속성 펼치기" }));
+    fireEvent.click(screen.getByRole("button", { name: "빠른 세부 옵션 펼치기" }));
 
     const sizeGroup = screen.getByRole("group", { name: "브러시 크기 프리셋" });
     const activeSize = within(sizeGroup).getByRole("button", {

@@ -17,6 +17,7 @@ import {
   Pencil,
   Plus,
   Redo2,
+  RotateCcw,
   Scissors,
   Shapes,
   SlidersHorizontal,
@@ -49,6 +50,7 @@ import {
   STUDIO_BRUSH_SIZE_RANGE,
 } from "./studio-draw-ux";
 import { elementLabel } from "./studio-element-label";
+import { preloadStudioInspectorDrawingSurface } from "./studio-inspector-aside-loader";
 import {
   studioMobileSheetSizeStyle,
   type StudioMobileSheetSnap,
@@ -63,6 +65,10 @@ import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
 import { StudioSavedBrushShelf } from "./StudioSavedBrushShelf";
 
 import type { BrushPreset } from "./studio-brush";
+import type {
+  StudioBrushDefaultRestoreDirection,
+  StudioBrushDefaultRestoreTransaction,
+} from "./studio-brush-default-restore";
 import type {
   NormalizedStudioBrushDynamicsSettings,
   StudioBrushDynamicsPresetId,
@@ -91,6 +97,7 @@ import type {
   StudioBrushCatalogCloseReason,
   StudioBrushCatalogPlacement,
 } from "./StudioBrushLibrarySheet";
+import type { StudioBrushDefaultRestoreViewState } from "./useStudioBrushBaselineController";
 
 import { cn } from "@/lib/utils";
 
@@ -310,6 +317,10 @@ export interface StudioMobileEditingDockHandlers {
     drawMode?: DrawMode
   ) => void;
   applyBuiltInBrushPreset: (preset: BrushPreset) => void;
+  applyBrushDefaultRestoreTransaction: (
+    transaction: StudioBrushDefaultRestoreTransaction,
+    direction: StudioBrushDefaultRestoreDirection,
+  ) => void;
   applyDynamicsPreset: (id: StudioBrushDynamicsPresetId, settings: NormalizedStudioBrushDynamicsSettings) => void;
   applySavedBrush: (saved: StudioSavedBrush) => void;
   dismissBrushManager: () => void;
@@ -326,6 +337,7 @@ export interface StudioMobileEditingDockHandlers {
   redo: () => void;
   removeSelected: () => void;
   reorder: (dir: "front" | "back" | "forward" | "backward") => void;
+  restoreBrushDefaults: () => void;
   toggleAdvancedFill: () => void;
   toggleStudioCommentPinPlacement: () => void;
   undo: () => void;
@@ -359,6 +371,7 @@ export interface StudioMobileEditingDockProps {
   brushCatalogHandlers: StudioBrushCatalogHandlers;
   brushCatalogItems?: readonly StudioBrushTrayItem[];
   brushCatalogOpen: boolean;
+  brushDefaultRestore: StudioBrushDefaultRestoreViewState;
   brushDynamics: NormalizedStudioBrushDynamicsSettings;
   brushManagerSheetRef: import("react").RefObject<HTMLDivElement | null>;
   brushOpacity: number;
@@ -451,6 +464,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   brushCatalogHandlers,
   brushCatalogItems,
   brushCatalogOpen,
+  brushDefaultRestore,
   brushDynamics,
   brushManagerSheetRef,
   brushOpacity,
@@ -539,6 +553,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   const {
     activateCanvasTool,
     applyBuiltInBrushPreset,
+    applyBrushDefaultRestoreTransaction,
     applyDynamicsPreset,
     applySavedBrush,
     dismissBrushManager,
@@ -552,6 +567,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     redo,
     removeSelected,
     reorder,
+    restoreBrushDefaults,
     toggleAdvancedFill,
     toggleStudioCommentPinPlacement,
     undo,
@@ -587,6 +603,31 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   const redoUnavailableTitle = collaborationDocumentLocked
     ? "공동 작업 문서 잠금을 해제한 뒤 편집 기록을 이동할 수 있어요."
     : "다시 적용할 편집 기록이 없어요.";
+  const brushDefaultRestoreModified = brushDefaultRestore.modifiedCount > 0;
+  const brushDefaultRestoreDisabled =
+    brushDefaultRestore.loading
+    || !brushDefaultRestore.available
+    || (!brushDefaultRestoreModified && !brushDefaultRestore.undoAvailable);
+  const brushDefaultRestoreDescriptionId =
+    `${scrollDescriptionId}-brush-default-restore`;
+  const brushDefaultRestoreDescription = brushDefaultRestore.loading
+    ? `${brushDefaultRestore.sourceName} 기본값을 확인하고 있어요.`
+    : !brushDefaultRestore.available
+      ? "브러시 목록에서 다시 선택하면 안전한 기본값 기준을 새로 불러옵니다."
+      : brushDefaultRestore.undoAvailable
+        ? "방금 적용한 전체 설정 복원을 한 번 되돌릴 수 있어요."
+        : brushDefaultRestoreModified
+          ? `굵기·불투명도·필압·보정·촉 중 ${brushDefaultRestore.modifiedCount}개 설정이 기본값과 달라요. 현재 색상은 유지됩니다.`
+          : "굵기·불투명도·필압·보정·촉이 이미 기본값이에요. 현재 색상은 유지됩니다.";
+  const brushDefaultRestoreLabel = brushDefaultRestore.loading
+    ? "확인 중"
+    : !brushDefaultRestore.available
+      ? "기준 없음"
+      : brushDefaultRestore.undoAvailable
+        ? "복원 되돌리기"
+        : brushDefaultRestoreModified
+          ? "기본값 복원"
+          : "기본값";
   const selectedSupportsContextFilter =
     marqueeIds.length === 0 &&
     selected !== null;
@@ -1053,7 +1094,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   <span>{drawMode === "eraser" ? "지우개 굵기" : "굵기"}</span>
                   <span className="tabular-nums text-fg-2">{strokeWidth}px</span>
                 </span>
-                <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_2.5rem] items-center gap-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-2">
                   <input
                     type="range"
                     min={STUDIO_BRUSH_SIZE_RANGE.min}
@@ -1084,14 +1125,6 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     }
                     className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setStrokeWidth(drawMode === "eraser" ? 18 : 4)}
-                    className="min-h-11 rounded-lg border border-line bg-card text-[0.65rem] font-semibold text-fg-3 hover:bg-raised"
-                    aria-label="브러시 굵기 기본값으로 초기화"
-                  >
-                    초기화
-                  </button>
                 </div>
               </div> : null}
               {drawMode !== "eraser" && (
@@ -1100,12 +1133,12 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     <span>투명도</span>
                     <span className="tabular-nums text-fg-2">{Math.round(brushOpacity * 100)}%</span>
                   </span>
-                  <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_2.5rem] items-center gap-2">
+                  <div className="grid grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-2">
                     <input
                       type="range"
                       min={STUDIO_BRUSH_OPACITY_RANGE.min * 100}
                       max={STUDIO_BRUSH_OPACITY_RANGE.max * 100}
-                      step={5}
+                      step={1}
                       value={Math.round(brushOpacity * 100)}
                       onChange={(e) => setBrushOpacity(Number(e.target.value) / 100)}
                       className="h-11 w-full accent-accent"
@@ -1117,7 +1150,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                       type="number"
                       min={STUDIO_BRUSH_OPACITY_RANGE.min * 100}
                       max={STUDIO_BRUSH_OPACITY_RANGE.max * 100}
-                      step={5}
+                      step={1}
                       inputMode="numeric"
                       value={Math.round(brushOpacity * 100)}
                       onChange={(event) =>
@@ -1133,18 +1166,93 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                       }
                       className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setBrushOpacity(1)}
-                      className="min-h-11 rounded-lg border border-line bg-card text-[0.65rem] font-semibold text-fg-3 hover:bg-raised"
-                      aria-label="브러시 투명도 100퍼센트로 초기화"
-                    >
-                      초기화
-                    </button>
                   </div>
                 </div>
               )}
             </div>
+
+            {drawMode === "pen" ? (
+              <div
+              className={cn(
+                "mt-2.5 rounded-xl border p-2.5",
+                brushDefaultRestoreModified
+                  ? "border-accent/45 bg-accent-soft/25"
+                  : "border-line/70 bg-card/55",
+              )}
+              data-studio-mobile-brush-default-restore="true"
+              data-studio-brush-preset-modified={
+                brushDefaultRestoreModified ? "true" : "false"
+              }
+              data-studio-brush-preset-modified-count={
+                brushDefaultRestore.modifiedCount
+              }
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[0.7rem] font-semibold text-fg-2">
+                    {brushDefaultRestore.sourceName} 기본값
+                  </p>
+                  <p
+                    id={brushDefaultRestoreDescriptionId}
+                    className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3"
+                  >
+                    {brushDefaultRestoreDescription}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={brushDefaultRestoreDisabled}
+                  aria-busy={brushDefaultRestore.loading}
+                  aria-describedby={brushDefaultRestoreDescriptionId}
+                  aria-label={
+                    brushDefaultRestore.loading
+                      ? `${brushDefaultRestore.sourceName} 기본값을 불러오는 중`
+                      : !brushDefaultRestore.available
+                        ? `${brushDefaultRestore.sourceName} 기본값 없음, 브러시를 다시 선택하세요`
+                        : brushDefaultRestore.undoAvailable
+                          ? `${brushDefaultRestore.sourceName} 기본값 복원 되돌리기`
+                          : brushDefaultRestoreModified
+                            ? `${brushDefaultRestore.sourceName} 기본값으로 복원, 변경된 설정 ${brushDefaultRestore.modifiedCount}개`
+                            : `${brushDefaultRestore.sourceName} 기본값, 변경된 설정 없음`
+                  }
+                  onClick={restoreBrushDefaults}
+                  className={cn(
+                    "flex min-h-11 min-w-[7rem] shrink-0 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-[0.68rem] font-bold",
+                    STUDIO_EASE,
+                    brushDefaultRestore.loading
+                      ? "cursor-wait border-line bg-card text-fg-3"
+                      : brushDefaultRestoreDisabled
+                        ? "cursor-not-allowed border-line bg-card text-fg-3 opacity-55"
+                        : brushDefaultRestoreModified
+                          ? "border-accent/55 bg-accent text-on-accent hover:bg-accent-2"
+                          : "border-line-strong bg-card text-fg-2 hover:bg-raised",
+                  )}
+                >
+                  {brushDefaultRestore.undoAvailable ? (
+                    <Undo2 size={15} aria-hidden />
+                  ) : (
+                    <RotateCcw
+                      size={15}
+                      className={cn(
+                        brushDefaultRestore.loading
+                          && "animate-spin motion-reduce:animate-none",
+                      )}
+                      aria-hidden
+                    />
+                  )}
+                  <span>{brushDefaultRestoreLabel}</span>
+                  {brushDefaultRestoreModified ? (
+                    <span
+                      aria-hidden
+                      className="grid min-w-4 place-items-center rounded-full bg-current/10 px-1 text-[0.56rem] tabular-nums"
+                    >
+                      {brushDefaultRestore.modifiedCount}
+                    </span>
+                  ) : null}
+                </button>
+              </div>
+              </div>
+            ) : null}
 
             {drawMode !== "shape" && drawMode !== "pixel" ? (
               <>
@@ -1189,25 +1297,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     onTipAngleChange={setTipAngle}
                     tipRoundness={tipRoundness}
                     onTipRoundnessChange={setTipRoundness}
-                    onRestoreDefaults={(transaction, direction) => {
-                      const values =
-                        direction === "undo" ? transaction.before : transaction.after;
-                      setStrokeWidth(values.strokeWidth);
-                      setBrushOpacity(values.brushOpacity);
-                      setBrushDynamics(values.brushDynamics);
-                      setStampTuning(values.stampTuning);
-                      setStabilizer(values.stabilizer);
-                      setStabilizerMode(values.stabilizerMode);
-                      setPostCorrection(values.postCorrection);
-                      setPreserveCorners(values.preserveCorners);
-                      setPressureCurve(values.pressureCurve);
-                      setPressureMinSize?.(values.pressureMinSize);
-                      setUseVelocityPressure(values.useVelocityPressure);
-                      setVelocitySensitivity(values.velocitySensitivity);
-                      setTiltEnabled(values.tiltEnabled);
-                      setTipAngle(values.tipAngle);
-                      setTipRoundness(values.tipRoundness);
-                    }}
+                    onRestoreDefaults={applyBrushDefaultRestoreTransaction}
                     onBeforeOpen={() => setQuickStartOpen(false)}
                   />
                 </Suspense>
@@ -1296,6 +1386,11 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             aria-label="스튜디오 모바일 도구막대"
             data-studio-mobile-editing-dock="true"
             data-studio-mobile-dock-expanded={workspaceDockExpanded ? "true" : "false"}
+            onFocusCapture={(event) => {
+              if (!suppressBrushHintOnReturnFocusRef.current) return;
+              suppressBrushHintOnReturnFocusRef.current = false;
+              event.stopPropagation();
+            }}
             className="fixed inset-x-0 bottom-0 z-[55] flex flex-col gap-1 border-t border-line bg-panel/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pl-[max(0.375rem,env(safe-area-inset-left))] pr-[max(0.375rem,env(safe-area-inset-right))] pt-1.5 backdrop-blur lg:hidden"
             style={{ bottom: safeMobileKeyboardInset }}
           >
@@ -1512,6 +1607,9 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 aria-label={workspaceDockExpanded ? "작업 공간 도구 접기" : "작업 공간 도구 펼치기"}
                 title={workspaceDockExpanded ? "작업 공간 도구 접기" : "댓글·페이지·레이어·줌 도구 펼치기"}
                 data-studio-mobile-workspace-toggle="true"
+                onFocus={preloadStudioInspectorDrawingSurface}
+                onPointerDown={preloadStudioInspectorDrawingSurface}
+                onPointerEnter={preloadStudioInspectorDrawingSurface}
                 onClick={() => setWorkspaceDockExpanded((expanded) => !expanded)}
                 className={cn(
                   "relative flex min-h-11 min-w-11 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-line/70 bg-raised/75 px-1 text-[0.6rem] font-bold leading-none text-fg-2",
@@ -1612,13 +1710,21 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   aria-label="작업"
                   active={mobileSheet === "props"}
                   aria-pressed={mobileSheet === "props"}
+                  onFocus={preloadStudioInspectorDrawingSurface}
+                  onPointerDown={preloadStudioInspectorDrawingSurface}
+                  onPointerEnter={preloadStudioInspectorDrawingSurface}
                   onClick={() => {
                     if (mobileSheet === "props") {
                       setMobileSheet(null);
                       return;
                     }
                     openInspectorRoute(
-                      { primary: selected ? "properties" : "layers" },
+                      {
+                        primary:
+                          selected || tool === "draw"
+                            ? "properties"
+                            : "layers",
+                      },
                       "props"
                     );
                   }}

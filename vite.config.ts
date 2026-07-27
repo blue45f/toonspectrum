@@ -172,6 +172,15 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks(id) {
           if (
+            id.endsWith("/src/domains/creator/studio-workspaces.ts")
+            || id.endsWith("/src/domains/creator/studio-drawing-palettes.ts")
+          ) {
+            // Drawing-palette layout is part of the synchronously restored workspace envelope.
+            // Co-locate both small models so Studio startup does not pay a separate shared-chunk
+            // request while the lazy palette stack can reuse the already-loaded workspace chunk.
+            return "studio-workspaces";
+          }
+          if (
             id.endsWith("/src/domains/creator/studio-selection-tools.ts")
             || id.endsWith("/src/domains/creator/studio-magic-wand.ts")
             || id.endsWith("/src/domains/creator/studio-alpha-lock.ts")

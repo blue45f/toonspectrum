@@ -6,6 +6,10 @@ const studioPageSource = readFileSync(
   new URL("./StudioPage.tsx", import.meta.url),
   "utf8",
 );
+const brushBaselineControllerSource = readFileSync(
+  new URL("./useStudioBrushBaselineController.ts", import.meta.url),
+  "utf8",
+);
 
 describe("StudioPage tool transition boundary", () => {
   it("clears every transient Inspector pointer owner through one central disarm", () => {
@@ -177,19 +181,43 @@ describe("StudioPage tool transition boundary", () => {
     }
   });
 
-  it("revalidates the live brush snapshot before applying a rendered one-step undo", () => {
-    const start = studioPageSource.indexOf("async function restoreActiveBrushDefaults()");
-    const end = studioPageSource.indexOf(
-      "function toggleBuiltInBrushFavorite(",
+  it("delegates brush baseline ownership while preserving fresh one-step undo validation", () => {
+    expect(studioPageSource).toContain(
+      'import { useStudioBrushBaselineController } from "./useStudioBrushBaselineController";',
+    );
+    expect(studioPageSource).toContain(
+      "const brushBaselineController = useStudioBrushBaselineController({",
+    );
+    expect(studioPageSource).toContain(
+      "void brushBaselineController.restoreDefaults();",
+    );
+    expect(studioPageSource).not.toContain(
+      'import("./studio-brush-baseline-contract")',
+    );
+    expect(
+      brushBaselineControllerSource.match(
+        /return import\("\.\/studio-brush-baseline-contract"\);/gu,
+      ),
+    ).toHaveLength(1);
+    expect(brushBaselineControllerSource).not.toContain('from "./StudioPage"');
+    expect(brushBaselineControllerSource).not.toContain('import("./StudioPage")');
+
+    const start = brushBaselineControllerSource.indexOf(
+      "async function restoreDefaults(): Promise<void>",
+    );
+    const end = brushBaselineControllerSource.indexOf(
+      "\n  return {",
       start,
     );
-    const restore = studioPageSource.slice(start, end);
+    const restore = brushBaselineControllerSource.slice(start, end);
     const freshInspection = restore.indexOf(
       "contract.inspectStudioBrushBaseline(",
     );
-    const undoBranch = restore.indexOf("if (requestedUndo && lastRestore)");
+    const undoBranch = restore.indexOf(
+      "if (requestedUndo && previousRestore)",
+    );
     const undoApply = restore.indexOf(
-      'applyBrushDefaultRestoreTransaction(lastRestore.transaction, "undo");',
+      'previousRestore.transaction,\n            "undo",',
     );
 
     expect(start).toBeGreaterThanOrEqual(0);
