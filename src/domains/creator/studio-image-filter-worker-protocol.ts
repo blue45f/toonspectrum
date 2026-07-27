@@ -18,10 +18,65 @@ export interface StudioImageFilterWorkerRunMessage {
   request: StudioImageFilterWorkerRunRequest;
 }
 
+/**
+ * Interactive filters keep one immutable source in the Worker and send only filter parameters
+ * after this message. `sourceGeneration` is session-local and must increase whenever either the
+ * source pixels or their caller-owned revision changes.
+ */
+export interface StudioImageFilterWorkerLoadSourceMessage {
+  type: "studio-image-filter/load-source";
+  version: typeof STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION;
+  sourceId: string;
+  sourceGeneration: number;
+  imageData: StudioImageDataLike;
+}
+
+export interface StudioImageFilterWorkerRunSourceMessage {
+  type: "studio-image-filter/run-source";
+  version: typeof STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION;
+  sourceId: string;
+  sourceGeneration: number;
+  requestId: number;
+  el: ImageFilterFields;
+}
+
+export type StudioImageFilterWorkerRequestMessage =
+  | StudioImageFilterWorkerRunMessage
+  | StudioImageFilterWorkerLoadSourceMessage
+  | StudioImageFilterWorkerRunSourceMessage;
+
 export interface StudioImageFilterWorkerSuccessMessage {
   type: "studio-image-filter/success";
   version: typeof STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION;
   imageData: StudioImageDataLike;
+}
+
+export interface StudioImageFilterWorkerSourceLoadedMessage {
+  type: "studio-image-filter/source-loaded";
+  version: typeof STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION;
+  sourceId: string;
+  sourceGeneration: number;
+}
+
+export interface StudioImageFilterWorkerSourceSuccessMessage {
+  type: "studio-image-filter/source-success";
+  version: typeof STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION;
+  sourceId: string;
+  sourceGeneration: number;
+  requestId: number;
+  imageData: StudioImageDataLike;
+}
+
+export interface StudioImageFilterWorkerSourceFailureMessage {
+  type: "studio-image-filter/source-failure";
+  version: typeof STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION;
+  sourceId: string;
+  sourceGeneration: number;
+  requestId?: number;
+  error: {
+    name: string;
+    message: string;
+  };
 }
 
 export interface StudioImageFilterWorkerReadyMessage {
@@ -41,7 +96,10 @@ export interface StudioImageFilterWorkerFailureMessage {
 export type StudioImageFilterWorkerResponseMessage =
   | StudioImageFilterWorkerReadyMessage
   | StudioImageFilterWorkerSuccessMessage
-  | StudioImageFilterWorkerFailureMessage;
+  | StudioImageFilterWorkerFailureMessage
+  | StudioImageFilterWorkerSourceLoadedMessage
+  | StudioImageFilterWorkerSourceSuccessMessage
+  | StudioImageFilterWorkerSourceFailureMessage;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -92,6 +150,18 @@ export function studioImageFilterRequestTransfers(message: StudioImageFilterWork
   return uniqueArrayBufferTransfers([message.request.imageData.data]);
 }
 
+export function studioImageFilterSourceLoadTransfers(
+  message: StudioImageFilterWorkerLoadSourceMessage,
+): Transferable[] {
+  return uniqueArrayBufferTransfers([message.imageData.data]);
+}
+
 export function studioImageFilterSuccessTransfers(message: StudioImageFilterWorkerSuccessMessage): Transferable[] {
+  return uniqueArrayBufferTransfers([message.imageData.data]);
+}
+
+export function studioImageFilterSourceSuccessTransfers(
+  message: StudioImageFilterWorkerSourceSuccessMessage,
+): Transferable[] {
   return uniqueArrayBufferTransfers([message.imageData.data]);
 }

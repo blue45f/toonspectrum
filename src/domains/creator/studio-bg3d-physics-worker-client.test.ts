@@ -6,9 +6,11 @@ import {
   type StudioBg3dPhysicsTimelineWorkerRunMessage,
 } from "./studio-bg3d-physics-timeline";
 import {
+  createStudioBg3dPhysicsTimelineWorkerSession,
   runStudioBg3dPhysicsTimeline,
   type StudioBg3dPhysicsTimelineWorkerLike,
 } from "./studio-bg3d-physics-worker-client";
+import background3dEditorSource from "./StudioBackground3D.tsx?raw";
 
 class FakeWorker implements StudioBg3dPhysicsTimelineWorkerLike {
   readonly messages: StudioBg3dPhysicsTimelineWorkerRunMessage[] = [];
@@ -266,5 +268,172 @@ describe("studio BG3D physics timeline Worker client", () => {
       workerFactory: () => worker,
     })).rejects.toMatchObject({ code: "worker-failed" });
     expect(worker.terminateCalls).toBe(1);
+  });
+});
+
+describe("studio BG3D persistent physics timeline Worker session", () => {
+  it("serializes requests and reuses one Worker after successful jobs", async () => {
+    const worker = new FakeWorker();
+    const workerFactory = vi.fn(() => worker);
+    const session = createStudioBg3dPhysicsTimelineWorkerSession({ workerFactory });
+
+    const first = session.run(input());
+    const second = session.run(input());
+    expect(workerFactory).toHaveBeenCalledOnce();
+    expect(worker.messages).toHaveLength(1);
+
+    const firstRequest = worker.messages[0];
+    worker.emitMessage(successFor(firstRequest));
+    await expect(first).resolves.toMatchObject({ nodeIds: ["ball"], frameCount: 61 });
+    expect(worker.messages).toHaveLength(2);
+    expect(worker.messages[1].requestId).not.toBe(firstRequest.requestId);
+    expect(workerFactory).toHaveBeenCalledOnce();
+    expect(worker.terminateCalls).toBe(0);
+
+    worker.emitMessage(successFor(worker.messages[1]));
+    await expect(second).resolves.toMatchObject({ nodeIds: ["ball"], frameCount: 61 });
+    expect(worker.terminateCalls).toBe(0);
+
+    session.dispose();
+    expect(session.disposed).toBe(true);
+    expect(worker.terminateCalls).toBe(1);
+    expect(worker.messageListeners.size).toBe(0);
+  });
+
+  it("removes an aborted queued job without interrupting the active Worker", async () => {
+    const worker = new FakeWorker();
+    const session = createStudioBg3dPhysicsTimelineWorkerSession({
+      workerFactory: () => worker,
+    });
+    const first = session.run(input());
+    const queuedAbort = new AbortController();
+    const second = session.run(input(), { signal: queuedAbort.signal });
+
+    expect(worker.messages).toHaveLength(1);
+    queuedAbort.abort();
+    await expect(second).rejects.toMatchObject({ code: "aborted", name: "AbortError" });
+    expect(worker.messages).toHaveLength(1);
+    expect(worker.terminateCalls).toBe(0);
+
+    worker.emitMessage(successFor(worker.messages[0]));
+    await expect(first).resolves.toMatchObject({ nodeIds: ["ball"] });
+    session.dispose();
+    expect(worker.terminateCalls).toBe(1);
+  });
+
+  it("rotates the Worker after an active abort and ignores the retired Worker's response", async () => {
+    const retiredWorker = new FakeWorker();
+    const replacementWorker = new FakeWorker();
+    const workers = [retiredWorker, replacementWorker];
+    const workerFactory = vi.fn(() => workers.shift() ?? null);
+    const session = createStudioBg3dPhysicsTimelineWorkerSession({ workerFactory });
+    const activeAbort = new AbortController();
+    const first = session.run(input(), { signal: activeAbort.signal });
+    const second = session.run(input());
+    const retiredRequest = retiredWorker.messages[0];
+
+    activeAbort.abort();
+    await expect(first).rejects.toMatchObject({ code: "aborted" });
+    expect(retiredWorker.terminateCalls).toBe(1);
+    expect(retiredWorker.messageListeners.size).toBe(0);
+    expect(replacementWorker.messages).toHaveLength(1);
+    expect(workerFactory).toHaveBeenCalledTimes(2);
+
+    retiredWorker.emitMessage(successFor(retiredRequest));
+    expect(replacementWorker.terminateCalls).toBe(0);
+    replacementWorker.emitMessage(successFor(replacementWorker.messages[0]));
+    await expect(second).resolves.toMatchObject({ nodeIds: ["ball"] });
+
+    session.dispose();
+    expect(replacementWorker.terminateCalls).toBe(1);
+  });
+
+  it("rotates a timed-out Worker before starting the next queued request", async () => {
+    vi.useFakeTimers();
+    const timedOutWorker = new FakeWorker();
+    const replacementWorker = new FakeWorker();
+    const workers = [timedOutWorker, replacementWorker];
+    const session = createStudioBg3dPhysicsTimelineWorkerSession({
+      workerFactory: () => workers.shift() ?? null,
+    });
+    const first = session.run(input(), { timeoutMs: 100 });
+    const firstOutcome = first.catch((error: unknown) => error);
+    const second = session.run(input());
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(await firstOutcome).toMatchObject({ code: "timeout" });
+    expect(timedOutWorker.terminateCalls).toBe(1);
+    expect(replacementWorker.messages).toHaveLength(1);
+
+    replacementWorker.emitMessage(successFor(replacementWorker.messages[0]));
+    await expect(second).resolves.toMatchObject({ nodeIds: ["ball"] });
+    session.dispose();
+  });
+
+  it("fails closed and rotates before continuing after a correlated protocol violation", async () => {
+    const malformedWorker = new FakeWorker();
+    const replacementWorker = new FakeWorker();
+    const workers = [malformedWorker, replacementWorker];
+    const session = createStudioBg3dPhysicsTimelineWorkerSession({
+      workerFactory: () => workers.shift() ?? null,
+    });
+    const first = session.run(input());
+    const second = session.run(input());
+
+    malformedWorker.emitMessage({ requestId: malformedWorker.messages[0].requestId });
+    await expect(first).rejects.toMatchObject({ code: "protocol" });
+    expect(malformedWorker.terminateCalls).toBe(1);
+    expect(replacementWorker.messages).toHaveLength(1);
+
+    replacementWorker.emitMessage(successFor(replacementWorker.messages[0]));
+    await expect(second).resolves.toMatchObject({ nodeIds: ["ball"] });
+    session.dispose();
+  });
+
+  it("dispose rejects active and queued jobs, terminates once, and stays fail-closed", async () => {
+    const worker = new FakeWorker();
+    const workerFactory = vi.fn(() => worker);
+    const session = createStudioBg3dPhysicsTimelineWorkerSession({ workerFactory });
+    const firstOutcome = session.run(input()).catch((error: unknown) => error);
+    const secondOutcome = session.run(input()).catch((error: unknown) => error);
+
+    session.dispose();
+
+    expect(await firstOutcome).toMatchObject({ code: "aborted", name: "AbortError" });
+    expect(await secondOutcome).toMatchObject({ code: "aborted", name: "AbortError" });
+    expect(worker.terminateCalls).toBe(1);
+    expect(worker.messageListeners.size).toBe(0);
+    await expect(session.run(input())).rejects.toMatchObject({ code: "aborted" });
+    expect(workerFactory).toHaveBeenCalledOnce();
+
+    session.dispose();
+    expect(worker.terminateCalls).toBe(1);
+  });
+
+  it("keeps the reusable session behind the physics bundle boundary and modal lifecycle", () => {
+    const dynamicImportIndex = background3dEditorSource.indexOf(
+      'await import("./studio-bg3d-physics-worker-client")',
+    );
+    const staleGuardIndex = background3dEditorSource.indexOf(
+      "abortController.signal.aborted || generation !== physicsGenerationRef.current",
+      dynamicImportIndex,
+    );
+    const sessionFactoryIndex = background3dEditorSource.indexOf(
+      "const workerSession = physicsWorkerSessionRef.current ??",
+      dynamicImportIndex,
+    );
+
+    expect(dynamicImportIndex).toBeGreaterThanOrEqual(0);
+    expect(staleGuardIndex).toBeGreaterThan(dynamicImportIndex);
+    expect(sessionFactoryIndex).toBeGreaterThan(staleGuardIndex);
+    expect(background3dEditorSource).toContain(
+      "physicsWorkerSessionRef.current = workerSession;",
+    );
+    expect(background3dEditorSource).toContain(
+      "physicsWorkerSessionRef.current?.dispose();",
+    );
+    expect(background3dEditorSource).toContain(
+      "physicsWorkerSessionRef.current = null;",
+    );
   });
 });

@@ -38,11 +38,27 @@ export interface StudioBg3dPhysicsTimelineWorkerLike {
 export type StudioBg3dPhysicsTimelineWorkerFactory =
   () => StudioBg3dPhysicsTimelineWorkerLike | null;
 
-export interface StudioBg3dPhysicsTimelineWorkerOptions {
+export interface StudioBg3dPhysicsTimelineWorkerRunOptions {
   readonly signal?: AbortSignal;
   readonly timeoutMs?: number;
+}
+
+export interface StudioBg3dPhysicsTimelineWorkerSessionOptions {
   /** Omitted creates a lazy Vite module Worker; injection keeps tests and non-browser hosts isolated. */
   readonly workerFactory?: StudioBg3dPhysicsTimelineWorkerFactory;
+}
+
+export interface StudioBg3dPhysicsTimelineWorkerOptions
+  extends StudioBg3dPhysicsTimelineWorkerRunOptions,
+  StudioBg3dPhysicsTimelineWorkerSessionOptions {}
+
+export interface StudioBg3dPhysicsTimelineWorkerSession {
+  readonly disposed: boolean;
+  run(
+    inputValue: StudioBg3dPhysicsTimelineInput | unknown,
+    options?: StudioBg3dPhysicsTimelineWorkerRunOptions,
+  ): Promise<StudioBg3dPhysicsTimelineResult>;
+  dispose(): void;
 }
 
 export type StudioBg3dPhysicsTimelineWorkerErrorCode =
@@ -118,108 +134,330 @@ function boundedTimeout(value: number | undefined): number {
   return Math.max(100, Math.min(120_000, Math.floor(value ?? 0)));
 }
 
-function runNormalizedTimeline(
-  input: NormalizedStudioBg3dPhysicsTimelineInput,
-  options: StudioBg3dPhysicsTimelineWorkerOptions,
-): Promise<StudioBg3dPhysicsTimelineResult> {
-  const signal = options.signal;
-  if (signal?.aborted) {
-    return Promise.reject(new StudioBg3dPhysicsTimelineWorkerError("aborted"));
+type TimelineWorkerJobState = "active" | "queued" | "settled";
+
+interface TimelineWorkerJob {
+  readonly input: NormalizedStudioBg3dPhysicsTimelineInput;
+  readonly signal: AbortSignal | undefined;
+  readonly timeoutMs: number;
+  readonly resolve: (result: StudioBg3dPhysicsTimelineResult) => void;
+  readonly reject: (error: StudioBg3dPhysicsTimelineWorkerError) => void;
+  readonly handleAbort: () => void;
+  state: TimelineWorkerJobState;
+  requestId: number | null;
+  timeout: ReturnType<typeof setTimeout> | null;
+}
+
+interface TimelineWorkerBinding {
+  readonly worker: StudioBg3dPhysicsTimelineWorkerLike;
+  readonly epoch: number;
+  readonly handleMessage: (event: WorkerMessageEventLike) => void;
+  readonly handleFailure: (event: WorkerErrorEventLike) => void;
+}
+
+class StudioBg3dPhysicsTimelineWorkerSessionImpl
+implements StudioBg3dPhysicsTimelineWorkerSession {
+  private readonly workerFactory: StudioBg3dPhysicsTimelineWorkerFactory;
+  private readonly queue: TimelineWorkerJob[] = [];
+  private workerBinding: TimelineWorkerBinding | null = null;
+  private activeJob: TimelineWorkerJob | null = null;
+  private workerEpoch = 0;
+  private pumping = false;
+  private isDisposed = false;
+
+  constructor(options: StudioBg3dPhysicsTimelineWorkerSessionOptions) {
+    this.workerFactory = options.workerFactory ?? createStudioBg3dPhysicsTimelineModuleWorker;
   }
 
-  const factory = options.workerFactory ?? createStudioBg3dPhysicsTimelineModuleWorker;
-  let worker: StudioBg3dPhysicsTimelineWorkerLike | null;
-  try {
-    worker = factory();
-  } catch {
-    return Promise.reject(new StudioBg3dPhysicsTimelineWorkerError("worker-failed"));
+  get disposed(): boolean {
+    return this.isDisposed;
   }
-  if (!worker) return Promise.reject(new StudioBg3dPhysicsTimelineWorkerError("worker-failed"));
 
-  const requestId = allocateRequestId();
-  const request: StudioBg3dPhysicsTimelineWorkerRunMessage = {
-    version: STUDIO_BG3D_PHYSICS_TIMELINE_PROTOCOL_VERSION,
-    kind: "run",
-    requestId,
-    input,
-  };
-
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-    const cleanup = () => {
-      if (timeout !== null) clearTimeout(timeout);
-      signal?.removeEventListener("abort", handleAbort);
-      worker.removeEventListener("message", handleMessage);
-      worker.removeEventListener("error", handleWorkerFailure);
-      worker.removeEventListener("messageerror", handleWorkerFailure);
-      worker.terminate();
-    };
-    const finish = (callback: () => void) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      callback();
-    };
-    const fail = (code: StudioBg3dPhysicsTimelineWorkerErrorCode) => {
-      finish(() => reject(new StudioBg3dPhysicsTimelineWorkerError(code)));
-    };
-    const handleAbort = () => fail("aborted");
-    function handleWorkerFailure(event: WorkerErrorEventLike): void {
-      event.preventDefault?.();
-      fail("worker-failed");
+  run(
+    inputValue: StudioBg3dPhysicsTimelineInput | unknown,
+    options: StudioBg3dPhysicsTimelineWorkerRunOptions = {},
+  ): Promise<StudioBg3dPhysicsTimelineResult> {
+    if (this.isDisposed || options.signal?.aborted) {
+      return Promise.reject(new StudioBg3dPhysicsTimelineWorkerError("aborted"));
     }
-    function handleMessage(event: WorkerMessageEventLike): void {
-      // A terminated/replaced Worker's late result must never settle a newer logical request.
-      if (!isResponseForRequest(event.data, requestId)) return;
-      if (!isStudioBg3dPhysicsTimelineWorkerResponseMessage(event.data)) {
-        fail("protocol");
-        return;
-      }
-      if (event.data.kind === "failure") {
-        fail(event.data.code);
-        return;
-      }
-      const result = resultFromResponse(event.data, input);
-      if (!result) {
-        fail("protocol");
-        return;
-      }
-      finish(() => resolve(result));
+    const input = normalizeStudioBg3dPhysicsTimelineInput(inputValue);
+    if (!input) {
+      return Promise.reject(new StudioBg3dPhysicsTimelineWorkerError("invalid-request"));
     }
 
-    worker.addEventListener("message", handleMessage);
-    worker.addEventListener("error", handleWorkerFailure);
-    worker.addEventListener("messageerror", handleWorkerFailure);
-    signal?.addEventListener("abort", handleAbort, { once: true });
-    if (signal?.aborted) {
-      handleAbort();
+    return new Promise((resolve, reject) => {
+      const handleAbort = () => this.abortJob(job);
+      const job: TimelineWorkerJob = {
+        input,
+        signal: options.signal,
+        timeoutMs: boundedTimeout(options.timeoutMs),
+        resolve,
+        reject,
+        handleAbort,
+        state: "queued",
+        requestId: null,
+        timeout: null,
+      };
+      this.queue.push(job);
+      job.signal?.addEventListener("abort", handleAbort, { once: true });
+      if (job.signal?.aborted) {
+        this.abortJob(job);
+        return;
+      }
+      this.pump();
+    });
+  }
+
+  dispose(): void {
+    if (this.isDisposed) return;
+    this.isDisposed = true;
+
+    const activeJob = this.activeJob;
+    this.activeJob = null;
+    if (activeJob) {
+      this.settleJob(
+        activeJob,
+        null,
+        new StudioBg3dPhysicsTimelineWorkerError("aborted"),
+      );
+    }
+    for (const queuedJob of this.queue.splice(0)) {
+      this.settleJob(
+        queuedJob,
+        null,
+        new StudioBg3dPhysicsTimelineWorkerError("aborted"),
+      );
+    }
+    this.recycleWorker();
+  }
+
+  private pump(): void {
+    if (this.pumping || this.isDisposed || this.activeJob) return;
+    this.pumping = true;
+    try {
+      while (!this.isDisposed && !this.activeJob && this.queue.length > 0) {
+        const job = this.queue.shift();
+        if (!job || job.state !== "queued") continue;
+        if (job.signal?.aborted) {
+          this.settleJob(
+            job,
+            null,
+            new StudioBg3dPhysicsTimelineWorkerError("aborted"),
+          );
+          continue;
+        }
+
+        const binding = this.ensureWorker();
+        if (!binding) {
+          this.settleJob(
+            job,
+            null,
+            new StudioBg3dPhysicsTimelineWorkerError("worker-failed"),
+          );
+          continue;
+        }
+
+        const requestId = allocateRequestId();
+        const request: StudioBg3dPhysicsTimelineWorkerRunMessage = {
+          version: STUDIO_BG3D_PHYSICS_TIMELINE_PROTOCOL_VERSION,
+          kind: "run",
+          requestId,
+          input: job.input,
+        };
+        job.state = "active";
+        job.requestId = requestId;
+        this.activeJob = job;
+        job.timeout = setTimeout(
+          () => this.failActiveJob(job, "timeout", true),
+          job.timeoutMs,
+        );
+        try {
+          binding.worker.postMessage(request);
+        } catch {
+          this.failActiveJob(job, "worker-failed", true);
+        }
+      }
+    } finally {
+      this.pumping = false;
+    }
+  }
+
+  private ensureWorker(): TimelineWorkerBinding | null {
+    if (this.workerBinding) return this.workerBinding;
+
+    let worker: StudioBg3dPhysicsTimelineWorkerLike | null;
+    try {
+      worker = this.workerFactory();
+    } catch {
+      return null;
+    }
+    if (!worker) return null;
+
+    const epoch = this.workerEpoch + 1;
+    this.workerEpoch = epoch;
+    const handleMessage = (event: WorkerMessageEventLike) => {
+      this.handleWorkerMessage(epoch, event);
+    };
+    const handleFailure = (event: WorkerErrorEventLike) => {
+      this.handleWorkerFailure(epoch, event);
+    };
+    const binding: TimelineWorkerBinding = {
+      worker,
+      epoch,
+      handleMessage,
+      handleFailure,
+    };
+    try {
+      worker.addEventListener("message", handleMessage);
+      worker.addEventListener("error", handleFailure);
+      worker.addEventListener("messageerror", handleFailure);
+    } catch {
+      this.detachAndTerminateWorker(binding);
+      return null;
+    }
+    this.workerBinding = binding;
+    return binding;
+  }
+
+  private handleWorkerMessage(epoch: number, event: WorkerMessageEventLike): void {
+    if (this.workerBinding?.epoch !== epoch) return;
+    const job = this.activeJob;
+    const requestId = job?.requestId;
+    if (
+      !job || requestId === null || requestId === undefined ||
+      !isResponseForRequest(event.data, requestId)
+    ) return;
+    if (!isStudioBg3dPhysicsTimelineWorkerResponseMessage(event.data)) {
+      this.failActiveJob(job, "protocol", true);
       return;
     }
-    timeout = setTimeout(() => fail("timeout"), boundedTimeout(options.timeoutMs));
-    try {
-      worker.postMessage(request);
-    } catch {
-      fail("worker-failed");
+    if (event.data.kind === "failure") {
+      this.failActiveJob(job, event.data.code, true);
+      return;
     }
-  });
+    const result = resultFromResponse(event.data, job.input);
+    if (!result) {
+      this.failActiveJob(job, "protocol", true);
+      return;
+    }
+    this.finishActiveJob(job, result, null, false);
+  }
+
+  private handleWorkerFailure(epoch: number, event: WorkerErrorEventLike): void {
+    if (this.workerBinding?.epoch !== epoch) return;
+    event.preventDefault?.();
+    const job = this.activeJob;
+    if (!job) {
+      this.recycleWorker();
+      return;
+    }
+    this.failActiveJob(job, "worker-failed", true);
+  }
+
+  private abortJob(job: TimelineWorkerJob): void {
+    if (job.state === "settled") return;
+    if (job.state === "active") {
+      this.failActiveJob(job, "aborted", true);
+      return;
+    }
+    const index = this.queue.indexOf(job);
+    if (index >= 0) this.queue.splice(index, 1);
+    this.settleJob(
+      job,
+      null,
+      new StudioBg3dPhysicsTimelineWorkerError("aborted"),
+    );
+    this.pump();
+  }
+
+  private failActiveJob(
+    job: TimelineWorkerJob,
+    code: StudioBg3dPhysicsTimelineWorkerErrorCode,
+    recycleWorker: boolean,
+  ): void {
+    this.finishActiveJob(
+      job,
+      null,
+      new StudioBg3dPhysicsTimelineWorkerError(code),
+      recycleWorker,
+    );
+  }
+
+  private finishActiveJob(
+    job: TimelineWorkerJob,
+    result: StudioBg3dPhysicsTimelineResult | null,
+    error: StudioBg3dPhysicsTimelineWorkerError | null,
+    recycleWorker: boolean,
+  ): void {
+    if (this.activeJob !== job || job.state !== "active") return;
+    this.activeJob = null;
+    if (recycleWorker) this.recycleWorker();
+    this.settleJob(job, result, error);
+    this.pump();
+  }
+
+  private settleJob(
+    job: TimelineWorkerJob,
+    result: StudioBg3dPhysicsTimelineResult | null,
+    error: StudioBg3dPhysicsTimelineWorkerError | null,
+  ): void {
+    if (job.state === "settled") return;
+    job.state = "settled";
+    if (job.timeout !== null) {
+      clearTimeout(job.timeout);
+      job.timeout = null;
+    }
+    job.signal?.removeEventListener("abort", job.handleAbort);
+    if (error) {
+      job.reject(error);
+    } else if (result) {
+      job.resolve(result);
+    } else {
+      job.reject(new StudioBg3dPhysicsTimelineWorkerError("worker-failed"));
+    }
+  }
+
+  private recycleWorker(): void {
+    const binding = this.workerBinding;
+    this.workerBinding = null;
+    if (binding) this.detachAndTerminateWorker(binding);
+  }
+
+  private detachAndTerminateWorker(binding: TimelineWorkerBinding): void {
+    try {
+      binding.worker.removeEventListener("message", binding.handleMessage);
+      binding.worker.removeEventListener("error", binding.handleFailure);
+      binding.worker.removeEventListener("messageerror", binding.handleFailure);
+    } finally {
+      binding.worker.terminate();
+    }
+  }
 }
 
 /**
- * Runs a bounded deterministic physics bake off the main thread. A Worker is created lazily for
- * this job and always terminated on success, failure, timeout, or abort so stale WASM state cannot
- * cross timeline requests.
+ * Creates a serial physics timeline session. Successful jobs reuse the same Worker and its Rapier
+ * WASM initialization. Abort, timeout, protocol, and Worker failures rotate the Worker before the
+ * next queued job, and dispose terminates it permanently.
+ */
+export function createStudioBg3dPhysicsTimelineWorkerSession(
+  options: StudioBg3dPhysicsTimelineWorkerSessionOptions = {},
+): StudioBg3dPhysicsTimelineWorkerSession {
+  return new StudioBg3dPhysicsTimelineWorkerSessionImpl(options);
+}
+
+/**
+ * Runs one bounded deterministic physics bake off the main thread. This compatibility helper owns
+ * a short-lived session and still terminates its Worker after the job settles.
  */
 export function runStudioBg3dPhysicsTimeline(
   inputValue: StudioBg3dPhysicsTimelineInput | unknown,
   options: StudioBg3dPhysicsTimelineWorkerOptions = {},
 ): Promise<StudioBg3dPhysicsTimelineResult> {
-  if (options.signal?.aborted) {
-    return Promise.reject(new StudioBg3dPhysicsTimelineWorkerError("aborted"));
-  }
-  const input = normalizeStudioBg3dPhysicsTimelineInput(inputValue);
-  if (!input) {
-    return Promise.reject(new StudioBg3dPhysicsTimelineWorkerError("invalid-request"));
-  }
-  return runNormalizedTimeline(input, options);
+  const session = createStudioBg3dPhysicsTimelineWorkerSession({
+    workerFactory: options.workerFactory,
+  });
+  return session.run(inputValue, {
+    signal: options.signal,
+    timeoutMs: options.timeoutMs,
+  }).finally(() => session.dispose());
 }

@@ -1,15 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  createStudioImageFilterResidentWorkerSession,
   createStudioImageFilterWorkerSession,
   runStudioImageFilterWorker,
   type StudioImageFilterWorkerLike,
 } from "./studio-image-filter-worker-client";
 import {
+  studioImageFilterSourceSuccessTransfers,
   studioImageFilterSuccessTransfers,
+  type StudioImageFilterWorkerLoadSourceMessage,
+  type StudioImageFilterWorkerRequestMessage,
   type StudioImageFilterWorkerResponseMessage,
   type StudioImageFilterWorkerRunMessage,
   type StudioImageFilterWorkerRunRequest,
+  type StudioImageFilterWorkerRunSourceMessage,
+  type StudioImageFilterWorkerSourceSuccessMessage,
   type StudioImageFilterWorkerSuccessMessage,
 } from "./studio-image-filter-worker-protocol";
 import { applyImageFilters, buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "./studio-konva-filters";
@@ -163,6 +169,158 @@ class InvalidSuccessWorker extends HangingWorker {
         },
       } as MessageEvent<StudioImageFilterWorkerResponseMessage>);
     });
+  }
+}
+
+class ResidentApplyingWorker implements StudioImageFilterWorkerLike {
+  onmessage: StudioImageFilterWorkerLike["onmessage"] = null;
+  onerror: StudioImageFilterWorkerLike["onerror"] = null;
+  terminateCount = 0;
+  loadCount = 0;
+  runCount = 0;
+  readonly transfers: number[] = [];
+  readonly messages: StudioImageFilterWorkerRequestMessage[] = [];
+  private source: {
+    data: Uint8ClampedArray;
+    height: number;
+    sourceGeneration: number;
+    sourceId: string;
+    width: number;
+  } | null = null;
+
+  constructor() {
+    queueMicrotask(() => {
+      this.onmessage?.({
+        data: { type: "studio-image-filter/ready", version: 1 },
+      } as MessageEvent<StudioImageFilterWorkerResponseMessage>);
+    });
+  }
+
+  postMessage(message: StudioImageFilterWorkerRequestMessage, transfer: Transferable[]): void {
+    this.transfers.push(transfer.length);
+    const received = structuredClone(message, { transfer });
+    this.messages.push(received);
+    if (received.type === "studio-image-filter/load-source") {
+      this.loadCount++;
+      this.source = {
+        data: received.imageData.data,
+        height: received.imageData.height,
+        sourceGeneration: received.sourceGeneration,
+        sourceId: received.sourceId,
+        width: received.imageData.width,
+      };
+      queueMicrotask(() => {
+        this.onmessage?.({
+          data: {
+            type: "studio-image-filter/source-loaded",
+            version: 1,
+            sourceId: received.sourceId,
+            sourceGeneration: received.sourceGeneration,
+          },
+        } as MessageEvent<StudioImageFilterWorkerResponseMessage>);
+      });
+      return;
+    }
+    if (received.type !== "studio-image-filter/run-source") {
+      throw new Error(`Unexpected resident request: ${received.type}`);
+    }
+    this.runCount++;
+    const source = this.source;
+    queueMicrotask(() => {
+      if (
+        !source
+        || source.sourceId !== received.sourceId
+        || source.sourceGeneration !== received.sourceGeneration
+      ) {
+        this.onmessage?.({
+          data: {
+            type: "studio-image-filter/source-failure",
+            version: 1,
+            sourceId: received.sourceId,
+            sourceGeneration: received.sourceGeneration,
+            requestId: received.requestId,
+            error: { name: "Error", message: "source mismatch" },
+          },
+        } as MessageEvent<StudioImageFilterWorkerResponseMessage>);
+        return;
+      }
+      const imageData = {
+        data: new Uint8ClampedArray(source.data),
+        height: source.height,
+        width: source.width,
+      };
+      const { filters, attrs } = buildImageFilters(received.el, testRegistry);
+      applyImageFilters(imageData, filters, attrs);
+      const response: StudioImageFilterWorkerSourceSuccessMessage = {
+        type: "studio-image-filter/source-success",
+        version: 1,
+        sourceId: received.sourceId,
+        sourceGeneration: received.sourceGeneration,
+        requestId: received.requestId,
+        imageData,
+      };
+      const returned = structuredClone(response, {
+        transfer: studioImageFilterSourceSuccessTransfers(response),
+      });
+      this.onmessage?.({ data: returned } as MessageEvent<StudioImageFilterWorkerResponseMessage>);
+    });
+  }
+
+  terminate(): void {
+    this.terminateCount++;
+  }
+}
+
+class ManualResidentWorker implements StudioImageFilterWorkerLike {
+  onmessage: StudioImageFilterWorkerLike["onmessage"] = null;
+  onerror: StudioImageFilterWorkerLike["onerror"] = null;
+  terminateCount = 0;
+  readonly messages: StudioImageFilterWorkerRequestMessage[] = [];
+
+  constructor() {
+    queueMicrotask(() => {
+      this.onmessage?.({
+        data: { type: "studio-image-filter/ready", version: 1 },
+      } as MessageEvent<StudioImageFilterWorkerResponseMessage>);
+    });
+  }
+
+  postMessage(message: StudioImageFilterWorkerRequestMessage, _transfer: Transferable[]): void {
+    this.messages.push(message);
+  }
+
+  emitSourceLoaded(message: StudioImageFilterWorkerLoadSourceMessage): void {
+    this.onmessage?.({
+      data: {
+        type: "studio-image-filter/source-loaded",
+        version: 1,
+        sourceId: message.sourceId,
+        sourceGeneration: message.sourceGeneration,
+      },
+    } as MessageEvent<StudioImageFilterWorkerResponseMessage>);
+  }
+
+  emitSuccess(
+    message: StudioImageFilterWorkerRunSourceMessage,
+    overrides: Partial<Pick<
+      StudioImageFilterWorkerSourceSuccessMessage,
+      "requestId" | "sourceGeneration" | "sourceId"
+    >> = {},
+  ): void {
+    this.onmessage?.({
+      data: {
+        type: "studio-image-filter/source-success",
+        version: 1,
+        sourceId: overrides.sourceId ?? message.sourceId,
+        sourceGeneration: overrides.sourceGeneration ?? message.sourceGeneration,
+        requestId: overrides.requestId ?? message.requestId,
+        imageData: makeImageData(3, 2),
+      },
+    } as MessageEvent<StudioImageFilterWorkerResponseMessage>);
+  }
+
+  terminate(): void {
+    this.terminateCount++;
   }
 }
 
@@ -534,6 +692,230 @@ describe("createStudioImageFilterWorkerSession", () => {
 
     session.dispose();
     await expect(first).rejects.toThrow(/취소/);
+    expect(worker.terminateCount).toBe(1);
+  });
+});
+
+describe("createStudioImageFilterResidentWorkerSession", () => {
+  it("loads one immutable source and sends only filter parameters on later slider ticks", async () => {
+    const worker = new ResidentApplyingWorker();
+    const session = createStudioImageFilterResidentWorkerSession({
+      workerFactory: () => worker,
+    });
+    const source = makeImageData(3, 2);
+    const original = Array.from(source.data);
+    const firstEl: ImageFilterFields = { brightness: 0.1 };
+    const secondEl: ImageFilterFields = { brightness: 0.35, contrast: 12 };
+
+    const first = await session.run(
+      { imageData: source, el: firstEl },
+      { sourceRevision: 1 },
+    );
+    const second = await session.run(
+      { imageData: source, el: secondEl },
+      { sourceRevision: 1 },
+    );
+
+    expect(first.execution).toBe("worker");
+    expect(second.execution).toBe("worker");
+    expect(Array.from(first.imageData.data)).toEqual(Array.from(expectedPixels(firstEl)));
+    expect(Array.from(second.imageData.data)).toEqual(Array.from(expectedPixels(secondEl)));
+    expect(Array.from(source.data)).toEqual(original);
+    expect(source.data.byteLength).toBe(24);
+    expect(worker.loadCount).toBe(1);
+    expect(worker.runCount).toBe(2);
+    expect(worker.messages.map((message) => message.type)).toEqual([
+      "studio-image-filter/load-source",
+      "studio-image-filter/run-source",
+      "studio-image-filter/run-source",
+    ]);
+    expect(worker.transfers).toEqual([1, 0, 0]);
+
+    session.dispose();
+    expect(worker.terminateCount).toBe(1);
+  });
+
+  it("reloads on revision or pixel identity changes and never reuses the wrong resident pixels", async () => {
+    const worker = new ResidentApplyingWorker();
+    const session = createStudioImageFilterResidentWorkerSession({
+      workerFactory: () => worker,
+    });
+    const firstSource = makeImageData(3, 2);
+    const secondSource = makeImageData(3, 2);
+    secondSource.data.fill(0);
+    for (let index = 3; index < secondSource.data.length; index += 4) {
+      secondSource.data[index] = 255;
+    }
+    const el: ImageFilterFields = { invert: true };
+
+    await session.run({ imageData: firstSource, el }, { sourceRevision: "source-a" });
+    await session.run({ imageData: firstSource, el }, { sourceRevision: "source-b" });
+    const secondResult = await session.run(
+      { imageData: secondSource, el },
+      // Even an accidentally reused caller revision cannot alias another typed-array identity.
+      { sourceRevision: "source-b" },
+    );
+
+    const expected = {
+      data: new Uint8ClampedArray(secondSource.data),
+      height: secondSource.height,
+      width: secondSource.width,
+    };
+    const built = buildImageFilters(el, testRegistry);
+    applyImageFilters(expected, built.filters, built.attrs);
+
+    expect(worker.loadCount).toBe(3);
+    expect(
+      worker.messages
+        .filter((message): message is StudioImageFilterWorkerLoadSourceMessage =>
+          message.type === "studio-image-filter/load-source"
+        )
+        .map((message) => message.sourceGeneration)
+    ).toEqual([1, 2, 3]);
+    expect(Array.from(secondResult.imageData.data)).toEqual(Array.from(expected.data));
+    expect(Array.from(secondSource.data)).not.toEqual(Array.from(secondResult.imageData.data));
+
+    session.dispose();
+  });
+
+  it("rejects a stale generation response and terminates the contaminated Worker", async () => {
+    const worker = new ManualResidentWorker();
+    const session = createStudioImageFilterResidentWorkerSession({
+      workerFactory: () => worker,
+    });
+    const pending = session.run(requestFixture(), { sourceRevision: 1 });
+    await Promise.resolve();
+
+    const loadMessage = worker.messages[0];
+    expect(loadMessage?.type).toBe("studio-image-filter/load-source");
+    if (loadMessage?.type !== "studio-image-filter/load-source") {
+      throw new Error("resident load request expected");
+    }
+    worker.emitSourceLoaded(loadMessage);
+    const runMessage = worker.messages[1];
+    expect(runMessage?.type).toBe("studio-image-filter/run-source");
+    if (runMessage?.type !== "studio-image-filter/run-source") {
+      throw new Error("resident run request expected");
+    }
+    worker.emitSuccess(runMessage, {
+      sourceGeneration: runMessage.sourceGeneration + 1,
+    });
+
+    await expect(pending).rejects.toThrow(/오래되었거나 잘못된 필터 결과/);
+    expect(worker.terminateCount).toBe(1);
+  });
+
+  it("uses an isolated direct copy when Worker creation is unavailable", async () => {
+    const session = createStudioImageFilterResidentWorkerSession({
+      workerFactory: null,
+    });
+    const source = makeImageData(3, 2);
+    const original = Array.from(source.data);
+    const el: ImageFilterFields = { brightness: 0.2, contrast: 30 };
+
+    const output = await session.run(
+      { imageData: source, el },
+      { sourceRevision: "direct-source" },
+    );
+
+    expect(output.execution).toBe("direct");
+    expect(Array.from(output.imageData.data)).toEqual(Array.from(expectedPixels(el)));
+    expect(Array.from(source.data)).toEqual(original);
+    session.dispose();
+  });
+
+  it("keeps the loaded source after an aborted result and reuses it for the latest slider tick", async () => {
+    const worker = new ManualResidentWorker();
+    const session = createStudioImageFilterResidentWorkerSession({
+      workerFactory: () => worker,
+    });
+    const source = makeImageData(3, 2);
+    const controller = new AbortController();
+    const first = session.run(
+      { imageData: source, el: { brightness: 0.1 } },
+      { signal: controller.signal, sourceRevision: 1 },
+    );
+    await Promise.resolve();
+    const loadMessage = worker.messages[0];
+    if (loadMessage?.type !== "studio-image-filter/load-source") {
+      throw new Error("resident load request expected");
+    }
+    worker.emitSourceLoaded(loadMessage);
+    const firstRun = worker.messages[1];
+    if (firstRun?.type !== "studio-image-filter/run-source") {
+      throw new Error("first resident run request expected");
+    }
+    controller.abort();
+    await expect(first).rejects.toThrow(/취소/);
+
+    const latest = session.run(
+      { imageData: source, el: { brightness: 0.3 } },
+      { sourceRevision: 1 },
+    );
+    worker.emitSuccess(firstRun);
+    await Promise.resolve();
+    const secondRun = worker.messages[2];
+    expect(secondRun?.type).toBe("studio-image-filter/run-source");
+    expect(
+      worker.messages.filter((message) => message.type === "studio-image-filter/load-source")
+    ).toHaveLength(1);
+    if (secondRun?.type !== "studio-image-filter/run-source") {
+      throw new Error("second resident run request expected");
+    }
+    worker.emitSuccess(secondRun);
+
+    await expect(latest).resolves.toMatchObject({ execution: "worker" });
+    session.dispose();
+  });
+
+  it("reloads the source into a fresh Worker after an in-flight Worker failure", async () => {
+    const firstWorker = new ManualResidentWorker();
+    const replacement = { worker: null as ManualResidentWorker | null };
+    const factory = vi.fn()
+      .mockReturnValueOnce(firstWorker)
+      .mockImplementationOnce(() => {
+        replacement.worker = new ManualResidentWorker();
+        return replacement.worker;
+      });
+    const session = createStudioImageFilterResidentWorkerSession({
+      workerFactory: factory,
+    });
+    const request = requestFixture();
+    const first = session.run(request, { sourceRevision: 1 });
+    await Promise.resolve();
+    const firstLoad = firstWorker.messages[0];
+    if (firstLoad?.type !== "studio-image-filter/load-source") {
+      throw new Error("first resident load request expected");
+    }
+    firstWorker.emitSourceLoaded(firstLoad);
+    expect(firstWorker.messages[1]?.type).toBe("studio-image-filter/run-source");
+    firstWorker.onerror?.({ error: new Error("worker crashed"), preventDefault: vi.fn() });
+
+    await expect(first).rejects.toThrow("worker crashed");
+    const second = session.run(request, { sourceRevision: 1 });
+    await Promise.resolve();
+
+    expect(factory).toHaveBeenCalledTimes(2);
+    expect(firstWorker.terminateCount).toBe(1);
+    expect(replacement.worker?.messages[0]?.type).toBe("studio-image-filter/load-source");
+
+    session.dispose();
+    await expect(second).rejects.toThrow(/취소/);
+    expect(replacement.worker?.terminateCount).toBe(1);
+  });
+
+  it("disposal terminates the Worker, rejects pending work, and rejects future runs", async () => {
+    const worker = new ManualResidentWorker();
+    const session = createStudioImageFilterResidentWorkerSession({
+      workerFactory: () => worker,
+    });
+    const pending = session.run(requestFixture(), { sourceRevision: 1 });
+    await Promise.resolve();
+
+    session.dispose();
+
+    await expect(pending).rejects.toThrow(/취소/);
+    await expect(session.run(requestFixture(), { sourceRevision: 1 })).rejects.toThrow(/취소/);
     expect(worker.terminateCount).toBe(1);
   });
 });

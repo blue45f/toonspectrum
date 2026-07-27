@@ -6,9 +6,13 @@ import {
   STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION,
   assertStudioImageFilterImageData,
   studioImageFilterRequestTransfers,
+  studioImageFilterSourceLoadTransfers,
+  type StudioImageFilterWorkerLoadSourceMessage,
+  type StudioImageFilterWorkerRequestMessage,
   type StudioImageFilterWorkerResponseMessage,
   type StudioImageFilterWorkerRunMessage,
   type StudioImageFilterWorkerRunRequest,
+  type StudioImageFilterWorkerRunSourceMessage,
 } from "./studio-image-filter-worker-protocol";
 import { applyImageFilters, buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "./studio-konva-filters";
 
@@ -24,7 +28,7 @@ export interface StudioImageFilterWorkerLike {
         preventDefault?(): void;
       }) => void)
     | null;
-  postMessage(message: StudioImageFilterWorkerRunMessage, transfer: Transferable[]): void;
+  postMessage(message: StudioImageFilterWorkerRequestMessage, transfer: Transferable[]): void;
   terminate(): void;
 }
 
@@ -45,6 +49,26 @@ export interface StudioImageFilterWorkerSession {
   run(
     request: StudioImageFilterWorkerRunRequest,
     options?: Pick<StudioImageFilterWorkerClientOptions, "signal">,
+  ): Promise<StudioImageFilterWorkerClientResult>;
+  dispose(): void;
+}
+
+export type StudioImageFilterSourceRevision = string | number;
+
+export interface StudioImageFilterResidentWorkerRunOptions {
+  signal?: AbortSignal;
+  /**
+   * Caller-owned immutable source revision. Change it whenever pixels change. The client also
+   * checks typed-array identity and dimensions so an accidentally reused revision cannot bind a
+   * different source without reloading it.
+   */
+  sourceRevision: StudioImageFilterSourceRevision;
+}
+
+export interface StudioImageFilterResidentWorkerSession {
+  run(
+    request: StudioImageFilterWorkerRunRequest,
+    options: StudioImageFilterResidentWorkerRunOptions,
   ): Promise<StudioImageFilterWorkerClientResult>;
   dispose(): void;
 }
@@ -185,10 +209,12 @@ function runImageFilterDirect(
   return { execution: "direct", imageData: request.imageData };
 }
 
-function deserializeWorkerError(response: Extract<
-  StudioImageFilterWorkerResponseMessage,
-  { type: "studio-image-filter/failure" }
->): Error {
+function deserializeWorkerError(response: {
+  readonly error: {
+    readonly message: string;
+    readonly name: string;
+  };
+}): Error {
   const error = new Error(response.error.message);
   error.name = response.error.name || "Error";
   return error;
@@ -586,6 +612,483 @@ export function createStudioImageFilterWorkerSession(
             if (current !== task) queueMicrotask(pump);
           },
         } satisfies StudioImageFilterSessionTask;
+        task.signal?.addEventListener("abort", task.onAbort, { once: true });
+        queue.push(task);
+        pump();
+      });
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      closeWorker();
+      if (current) {
+        settle(current, () => current?.reject(createAbortError()));
+        current = null;
+      }
+      for (const task of queue.splice(0)) {
+        settle(task, () => task.reject(createAbortError()));
+      }
+    },
+  };
+}
+
+type StudioImageFilterResidentSessionTask = {
+  request: StudioImageFilterWorkerRunRequest;
+  sourceRevision: StudioImageFilterSourceRevision;
+  signal?: AbortSignal;
+  resolve(result: StudioImageFilterWorkerClientResult): void;
+  reject(error: unknown): void;
+  onAbort: () => void;
+  phase: "queued" | "loading-source" | "running";
+  requestId?: number;
+  sourceGeneration?: number;
+  settled: boolean;
+};
+
+interface StudioImageFilterResidentSourceIdentity {
+  readonly data: Uint8ClampedArray;
+  readonly height: number;
+  readonly revision: StudioImageFilterSourceRevision;
+  readonly sourceGeneration: number;
+  readonly width: number;
+}
+
+const STUDIO_IMAGE_FILTER_RESIDENT_SOURCE_ID = "studio-image-filter-resident-source";
+
+function assertStudioImageFilterSourceRevision(
+  revision: StudioImageFilterSourceRevision,
+): void {
+  if (
+    typeof revision === "number"
+    && Number.isSafeInteger(revision)
+    && revision >= 0
+  ) {
+    return;
+  }
+  if (
+    typeof revision === "string"
+    && revision.length > 0
+    && revision.length <= 512
+  ) {
+    return;
+  }
+  throw new TypeError("이미지 필터 상주 원본 revision 형식이 올바르지 않습니다.");
+}
+
+function residentSourceMatchesTask(
+  source: StudioImageFilterResidentSourceIdentity | null,
+  task: StudioImageFilterResidentSessionTask,
+): source is StudioImageFilterResidentSourceIdentity {
+  return !!source
+    && source.data === task.request.imageData.data
+    && source.width === task.request.imageData.width
+    && source.height === task.request.imageData.height
+    && Object.is(source.revision, task.sourceRevision);
+}
+
+/**
+ * Interactive, source-resident image-filter session.
+ *
+ * The main thread transfers one private source copy only when source identity changes. Every
+ * parameter-only slider tick then sends a small projected `ImageFilterFields` program. The Worker
+ * keeps the immutable source and returns a fresh result buffer, so sequential ticks never compound
+ * filters. A caller revision plus typed-array identity/dimensions guards against reusing pixels
+ * from another source; Worker generation/request correlation rejects stale responses fail-closed.
+ */
+export function createStudioImageFilterResidentWorkerSession(
+  options: Pick<StudioImageFilterWorkerClientOptions, "workerFactory"> = {},
+): StudioImageFilterResidentWorkerSession {
+  const factory = options.workerFactory === undefined
+    ? createStudioImageFilterModuleWorker
+    : options.workerFactory;
+  const queue: StudioImageFilterResidentSessionTask[] = [];
+  let current: StudioImageFilterResidentSessionTask | null = null;
+  let worker: StudioImageFilterWorkerLike | null = null;
+  let ready = false;
+  let directOnly = factory === null;
+  let disposed = false;
+  let readyTimer: ReturnType<typeof setTimeout> | null = null;
+  let runTimer: ReturnType<typeof setTimeout> | null = null;
+  let loadedSource: StudioImageFilterResidentSourceIdentity | null = null;
+  let loadingSource: StudioImageFilterResidentSourceIdentity | null = null;
+  let nextSourceGeneration = 0;
+  let nextRequestId = 0;
+
+  const clearTimers = () => {
+    if (readyTimer !== null) clearTimeout(readyTimer);
+    if (runTimer !== null) clearTimeout(runTimer);
+    readyTimer = null;
+    runTimer = null;
+  };
+
+  const detachAbort = (task: StudioImageFilterResidentSessionTask) => {
+    task.signal?.removeEventListener("abort", task.onAbort);
+  };
+
+  const settle = (
+    task: StudioImageFilterResidentSessionTask,
+    callback: () => void,
+  ) => {
+    if (task.settled) return;
+    task.settled = true;
+    detachAbort(task);
+    callback();
+  };
+
+  const closeWorker = () => {
+    clearTimers();
+    if (worker) {
+      worker.onmessage = null;
+      worker.onerror = null;
+      worker.terminate();
+    }
+    worker = null;
+    ready = false;
+    loadedSource = null;
+    loadingSource = null;
+  };
+
+  const completeCurrent = (
+    callback?: (task: StudioImageFilterResidentSessionTask) => void,
+  ) => {
+    const task = current;
+    if (!task) return;
+    if (runTimer !== null) clearTimeout(runTimer);
+    runTimer = null;
+    current = null;
+    callback?.(task);
+    queueMicrotask(pump);
+  };
+
+  const runCurrentDirect = () => {
+    completeCurrent((task) => {
+      if (task.settled) return;
+      try {
+        assertStudioImageFilterImageData(task.request.imageData);
+        const directRequest: StudioImageFilterWorkerRunRequest = {
+          imageData: {
+            data: new Uint8ClampedArray(task.request.imageData.data),
+            width: task.request.imageData.width,
+            height: task.request.imageData.height,
+          },
+          el: task.request.el,
+        };
+        const result = runImageFilterDirect(directRequest, task.signal);
+        settle(task, () => task.resolve(result));
+      } catch (error) {
+        settle(task, () => task.reject(error));
+      }
+    });
+  };
+
+  const switchToDirect = () => {
+    directOnly = true;
+    closeWorker();
+    if (current) runCurrentDirect();
+    else queueMicrotask(pump);
+  };
+
+  const rejectCurrentProtocol = (message: string) => {
+    closeWorker();
+    completeCurrent((task) => settle(task, () => task.reject(new Error(message))));
+  };
+
+  const armRunTimer = () => {
+    if (runTimer !== null) clearTimeout(runTimer);
+    runTimer = setTimeout(() => {
+      if (!current) return;
+      closeWorker();
+      completeCurrent((task) => settle(
+        task,
+        () => task.reject(new Error("이미지 필터 Worker 계산 시간이 초과되었습니다.")),
+      ));
+    }, 30_000);
+  };
+
+  const postCurrentRun = () => {
+    const task = current;
+    if (!task || !worker || !ready || task.settled) return;
+    if (!residentSourceMatchesTask(loadedSource, task)) {
+      rejectCurrentProtocol("이미지 필터 Worker 상주 원본 정체성이 일치하지 않습니다.");
+      return;
+    }
+    if (task.signal?.aborted) {
+      settle(task, () => task.reject(createAbortError()));
+      completeCurrent();
+      return;
+    }
+    const requestId = ++nextRequestId;
+    task.requestId = requestId;
+    task.sourceGeneration = loadedSource.sourceGeneration;
+    task.phase = "running";
+    const message: StudioImageFilterWorkerRunSourceMessage = {
+      type: "studio-image-filter/run-source",
+      version: STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION,
+      sourceId: STUDIO_IMAGE_FILTER_RESIDENT_SOURCE_ID,
+      sourceGeneration: loadedSource.sourceGeneration,
+      requestId,
+      el: task.request.el,
+    };
+    try {
+      armRunTimer();
+      worker.postMessage(message, []);
+    } catch {
+      if (runTimer !== null) clearTimeout(runTimer);
+      runTimer = null;
+      task.phase = "queued";
+      switchToDirect();
+    }
+  };
+
+  const ensureCurrentSource = () => {
+    const task = current;
+    if (!task || !worker || !ready || task.settled) return;
+    if (residentSourceMatchesTask(loadedSource, task)) {
+      postCurrentRun();
+      return;
+    }
+    try {
+      assertStudioImageFilterImageData(task.request.imageData);
+    } catch (error) {
+      completeCurrent((pending) => settle(pending, () => pending.reject(error)));
+      return;
+    }
+    const sourceGeneration = ++nextSourceGeneration;
+    const source: StudioImageFilterResidentSourceIdentity = {
+      data: task.request.imageData.data,
+      width: task.request.imageData.width,
+      height: task.request.imageData.height,
+      revision: task.sourceRevision,
+      sourceGeneration,
+    };
+    const message: StudioImageFilterWorkerLoadSourceMessage = {
+      type: "studio-image-filter/load-source",
+      version: STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION,
+      sourceId: STUDIO_IMAGE_FILTER_RESIDENT_SOURCE_ID,
+      sourceGeneration,
+      // The component retains its immutable snapshot for masks/GPU fallback. Transfer one private
+      // copy only on a source revision/identity change; parameter ticks do not allocate this copy.
+      imageData: {
+        data: new Uint8ClampedArray(task.request.imageData.data),
+        width: task.request.imageData.width,
+        height: task.request.imageData.height,
+      },
+    };
+    task.sourceGeneration = sourceGeneration;
+    task.phase = "loading-source";
+    loadingSource = source;
+    try {
+      armRunTimer();
+      worker.postMessage(message, studioImageFilterSourceLoadTransfers(message));
+    } catch {
+      if (runTimer !== null) clearTimeout(runTimer);
+      runTimer = null;
+      task.phase = "queued";
+      loadingSource = null;
+      switchToDirect();
+    }
+  };
+
+  const attachWorker = (nextWorker: StudioImageFilterWorkerLike) => {
+    worker = nextWorker;
+    ready = false;
+    loadedSource = null;
+    loadingSource = null;
+    worker.onmessage = (event) => {
+      const response = event.data;
+      if (
+        !response
+        || typeof response !== "object"
+        || response.version !== STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION
+      ) {
+        rejectCurrentProtocol("이미지 필터 Worker가 알 수 없는 응답을 반환했습니다.");
+        return;
+      }
+      if (response.type === "studio-image-filter/ready") {
+        if (ready) return;
+        if (readyTimer !== null) clearTimeout(readyTimer);
+        readyTimer = null;
+        ready = true;
+        ensureCurrentSource();
+        return;
+      }
+
+      const task = current;
+      if (!task || task.phase === "queued") {
+        rejectCurrentProtocol("이미지 필터 Worker가 준비 전에 결과를 반환했습니다.");
+        return;
+      }
+
+      if (response.type === "studio-image-filter/source-loaded") {
+        const expected = loadingSource;
+        if (
+          task.phase !== "loading-source"
+          || !expected
+          || response.sourceId !== STUDIO_IMAGE_FILTER_RESIDENT_SOURCE_ID
+          || response.sourceGeneration !== expected.sourceGeneration
+          || task.sourceGeneration !== response.sourceGeneration
+        ) {
+          rejectCurrentProtocol("이미지 필터 Worker가 오래되었거나 잘못된 원본 응답을 반환했습니다.");
+          return;
+        }
+        if (runTimer !== null) clearTimeout(runTimer);
+        runTimer = null;
+        loadedSource = expected;
+        loadingSource = null;
+        if (task.settled) {
+          completeCurrent();
+          return;
+        }
+        postCurrentRun();
+        return;
+      }
+
+      if (response.type === "studio-image-filter/source-failure") {
+        const sourceMatches =
+          response.sourceId === STUDIO_IMAGE_FILTER_RESIDENT_SOURCE_ID
+          && response.sourceGeneration === task.sourceGeneration;
+        const requestMatches = task.phase === "loading-source"
+          ? response.requestId === undefined
+          : response.requestId === task.requestId;
+        if (!sourceMatches || !requestMatches) {
+          rejectCurrentProtocol("이미지 필터 Worker가 오래되었거나 잘못된 실패 응답을 반환했습니다.");
+          return;
+        }
+        if (task.phase === "loading-source") {
+          loadedSource = null;
+          loadingSource = null;
+        }
+        completeCurrent((pending) => settle(
+          pending,
+          () => pending.reject(deserializeWorkerError(response)),
+        ));
+        return;
+      }
+
+      if (response.type !== "studio-image-filter/source-success") {
+        rejectCurrentProtocol("이미지 필터 Worker가 알 수 없는 응답을 반환했습니다.");
+        return;
+      }
+      if (
+        task.phase !== "running"
+        || response.sourceId !== STUDIO_IMAGE_FILTER_RESIDENT_SOURCE_ID
+        || response.sourceGeneration !== task.sourceGeneration
+        || response.requestId !== task.requestId
+        || !residentSourceMatchesTask(loadedSource, task)
+      ) {
+        rejectCurrentProtocol("이미지 필터 Worker가 오래되었거나 잘못된 필터 결과를 반환했습니다.");
+        return;
+      }
+      try {
+        assertStudioImageFilterImageData(response.imageData, "이미지 필터 Worker 결과");
+        if (
+          response.imageData.width !== task.request.imageData.width
+          || response.imageData.height !== task.request.imageData.height
+        ) {
+          throw new RangeError("이미지 필터 Worker 결과 크기가 상주 원본과 일치하지 않습니다.");
+        }
+      } catch (error) {
+        closeWorker();
+        completeCurrent((pending) => settle(pending, () => pending.reject(error)));
+        return;
+      }
+      completeCurrent((pending) => settle(
+        pending,
+        () => pending.resolve({ execution: "worker", imageData: response.imageData }),
+      ));
+    };
+    worker.onerror = (event) => {
+      event.preventDefault?.();
+      const task = current;
+      const wasPosted = task != null && task.phase !== "queued";
+      const error = event.error instanceof Error
+        ? event.error
+        : new Error(event.message || "이미지 필터 Worker 실행 중 오류가 발생했습니다.");
+      closeWorker();
+      if (!wasPosted) {
+        directOnly = true;
+        if (current) runCurrentDirect();
+        else queueMicrotask(pump);
+        return;
+      }
+      completeCurrent((pending) => settle(pending, () => pending.reject(error)));
+    };
+    readyTimer = setTimeout(switchToDirect, 3_000);
+  };
+
+  const ensureWorker = () => {
+    if (directOnly || worker || disposed || !factory) return;
+    try {
+      const nextWorker = factory();
+      if (!nextWorker) {
+        directOnly = true;
+        queueMicrotask(pump);
+        return;
+      }
+      attachWorker(nextWorker);
+    } catch {
+      directOnly = true;
+      queueMicrotask(pump);
+    }
+  };
+
+  function pump(): void {
+    if (disposed || current) return;
+    while (queue.length > 0) {
+      const task = queue.shift()!;
+      if (task.settled || task.signal?.aborted) {
+        settle(task, () => task.reject(createAbortError()));
+        continue;
+      }
+      current = task;
+      break;
+    }
+    if (!current) return;
+    if (directOnly) {
+      runCurrentDirect();
+      return;
+    }
+    ensureWorker();
+    if (ready) ensureCurrentSource();
+  }
+
+  return {
+    run(request, runOptions) {
+      if (disposed) return Promise.reject(createAbortError());
+      let residentRequest: StudioImageFilterWorkerRunRequest;
+      try {
+        throwIfAborted(runOptions.signal);
+        assertStudioImageFilterImageData(request.imageData);
+        assertStudioImageFilterSourceRevision(runOptions.sourceRevision);
+        residentRequest = {
+          imageData: {
+            data: request.imageData.data,
+            width: request.imageData.width,
+            height: request.imageData.height,
+          },
+          el: projectImageFilterFields(request.el),
+        };
+      } catch (error) {
+        return Promise.reject(error);
+      }
+      return new Promise((resolve, reject) => {
+        const task = {
+          request: residentRequest,
+          sourceRevision: runOptions.sourceRevision,
+          signal: runOptions.signal,
+          resolve,
+          reject,
+          phase: "queued",
+          settled: false,
+          onAbort: () => {
+            settle(task, () => reject(createAbortError()));
+            if (current === task && task.phase === "queued") {
+              completeCurrent();
+            } else if (current !== task) {
+              queueMicrotask(pump);
+            }
+          },
+        } satisfies StudioImageFilterResidentSessionTask;
         task.signal?.addEventListener("abort", task.onAbort, { once: true });
         queue.push(task);
         pump();

@@ -150,7 +150,7 @@ type StudioKonvaFiltersModule = typeof import("./studio-konva-filters");
 type StudioImageFilterWorkerClientModule = typeof import("./studio-image-filter-worker-client");
 type StudioGpuFilterApplyModule = typeof import("./studio-gpu-filter-apply");
 type StudioImageFilterWorkerSession = ReturnType<
-  StudioImageFilterWorkerClientModule["createStudioImageFilterWorkerSession"]
+  StudioImageFilterWorkerClientModule["createStudioImageFilterResidentWorkerSession"]
 >;
 type ImageFilterBuild = ReturnType<StudioKonvaFiltersModule["buildImageFilters"]>;
 const EMPTY_IMAGE_FILTER_BUILD: ImageFilterBuild = { filters: [], attrs: {}, cachePad: 0 };
@@ -183,6 +183,7 @@ interface WorkerFilteredCanvasState {
 interface WorkerSourcePixelsState {
   data: Uint8ClampedArray;
   height: number;
+  revision: number;
   source: CanvasImageSource;
   width: number;
 }
@@ -298,6 +299,7 @@ export function StudioKonvaImageNode({
   const imageRef = useRef<Konva.Image | null>(null);
   const filterWorkerSessionRef = useRef<StudioImageFilterWorkerSession | null>(null);
   const workerSourcePixelsRef = useRef<WorkerSourcePixelsState | null>(null);
+  const workerSourceRevisionRef = useRef(0);
   const workerResultCacheRef = useRef<WorkerResultCacheState | null>(null);
   // 최신 el을 담아두는 ref — 아래 Worker 필터 effect가 좌표 드래그 등 필터와 무관한 el 변경마다
   // 재실행되지 않도록(의존성은 filterCacheKey/width/height만) 최신 값만 읽어들이는 용도.
@@ -568,10 +570,12 @@ export function StudioKonvaImageNode({
       : undefined;
 
   // Interactive Worker path: debounce slider bursts, keep one Worker session alive, and cache the
-  // source RGBA snapshot so a parameter-only tick does not redraw/getImageData again. The request
-  // still gets a fresh transferable copy because postMessage detaches ownership by design.
+  // source RGBA snapshot. The resident session transfers one private source copy on revision
+  // changes; parameter-only ticks send only projected filter fields.
   useEffect(() => {
     if (!useWorkerFilterPath || !displayImg || !filterWorkerClient) {
+      filterWorkerSessionRef.current?.dispose();
+      filterWorkerSessionRef.current = null;
       setWorkerFilteredCanvas(undefined);
       setWorkerFallbackKey(undefined);
       workerSourcePixelsRef.current = null;
@@ -634,7 +638,13 @@ export function StudioKonvaImageNode({
           if (!sourceCtx) return;
           sourceCtx.drawImage(source, 0, 0, width, height);
           const captured = sourceCtx.getImageData(0, 0, width, height);
-          sourcePixels = { data: captured.data, height, source, width };
+          sourcePixels = {
+            data: captured.data,
+            height,
+            revision: ++workerSourceRevisionRef.current,
+            source,
+            width,
+          };
           workerSourcePixelsRef.current = sourcePixels;
         } catch (error) {
           console.error("[studio] image filter canvas preparation failed, using Konva fallback:", error);
@@ -687,22 +697,33 @@ export function StudioKonvaImageNode({
       const dispatchWorkerRequest = (): void => {
         controller = new AbortController();
         if (!filterWorkerSessionRef.current) {
-          const createSession = filterWorkerClient.createStudioImageFilterWorkerSession;
+          const createSession = filterWorkerClient.createStudioImageFilterResidentWorkerSession;
           if (typeof createSession === "function") {
             filterWorkerSessionRef.current = createSession();
           }
         }
         const request = {
           imageData: {
-            data: new Uint8ClampedArray(sourcePixels.data),
+            data: sourcePixels.data,
             width,
             height,
           },
           el: elRef.current,
         };
         const pending = filterWorkerSessionRef.current
-          ? filterWorkerSessionRef.current.run(request, { signal: controller.signal })
-          : filterWorkerClient.runStudioImageFilterWorker(request, { signal: controller.signal });
+          ? filterWorkerSessionRef.current.run(request, {
+              signal: controller.signal,
+              sourceRevision: sourcePixels.revision,
+            })
+          : filterWorkerClient.runStudioImageFilterWorker({
+              ...request,
+              // Compatibility fallback for an older/lazily mismatched client chunk: one-shot run
+              // still owns its transfer buffer and must not detach the cached immutable snapshot.
+              imageData: {
+                ...request.imageData,
+                data: new Uint8ClampedArray(sourcePixels.data),
+              },
+            }, { signal: controller.signal });
         pending
           .then((result) => {
             commitFilteredPixels(result.imageData);

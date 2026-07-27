@@ -11,6 +11,7 @@ interface WorkerRun {
   reject: (reason?: unknown) => void;
   request: { imageData: ImageData; el: ImageEl };
   signal?: AbortSignal;
+  sourceRevision?: string | number;
   resolve: (value: {
     execution: "worker";
     imageData: { data: Uint8ClampedArray; height: number; width: number };
@@ -23,14 +24,34 @@ const konvaCapture = vi.hoisted(() => ({
 
 const workerHarness = vi.hoisted(() => {
   const runs: WorkerRun[] = [];
+  const disposals: ReturnType<typeof vi.fn>[] = [];
+  const createSession = vi.fn(() => {
+    const dispose = vi.fn();
+    disposals.push(dispose);
+    return { dispose, run };
+  });
+  function run(
+    request: WorkerRun["request"],
+    options?: { signal?: AbortSignal; sourceRevision?: string | number },
+  ): Promise<Parameters<WorkerRun["resolve"]>[0]> {
+    return new Promise<Parameters<WorkerRun["resolve"]>[0]>((resolve, reject) => {
+      runs.push({
+        reject,
+        request,
+        resolve,
+        signal: options?.signal,
+        sourceRevision: options?.sourceRevision,
+      });
+    });
+  }
   return {
+    createSession,
+    disposals,
     runs,
     run: vi.fn((
       request: WorkerRun["request"],
-      options?: { signal?: AbortSignal },
-    ) => new Promise((resolve, reject) => {
-      runs.push({ reject, request, resolve, signal: options?.signal } as WorkerRun);
-    })),
+      options?: { signal?: AbortSignal; sourceRevision?: string | number },
+    ) => run(request, options)),
   };
 });
 
@@ -54,10 +75,8 @@ vi.mock("./studio-konva-filters", () => ({
 }));
 
 vi.mock("./studio-image-filter-worker-client", () => ({
-  createStudioImageFilterWorkerSession: () => ({
-    dispose: vi.fn(),
-    run: workerHarness.run,
-  }),
+  createStudioImageFilterResidentWorkerSession: workerHarness.createSession,
+  createStudioImageFilterWorkerSession: workerHarness.createSession,
   runStudioImageFilterWorker: workerHarness.run,
 }));
 
@@ -152,6 +171,8 @@ function resolveRun(run: WorkerRun): void {
 beforeEach(() => {
   vi.useFakeTimers();
   konvaCapture.current = null;
+  workerHarness.createSession.mockClear();
+  workerHarness.disposals.length = 0;
   workerHarness.runs.length = 0;
   workerHarness.run.mockClear();
   imageHarness.assigned.length = 0;
@@ -229,6 +250,8 @@ describe("StudioKonvaImageNode async identity", () => {
     await flushWorkerDebounce();
     expect(workerHarness.runs).toHaveLength(2);
     const currentRun = workerHarness.runs[1]!;
+    expect(currentRun.sourceRevision).not.toBe(staleRun.sourceRevision);
+    expect(currentRun.request.imageData.data).not.toBe(staleRun.request.imageData.data);
 
     await act(async () => resolveRun(staleRun));
     expect(konvaCapture.current?.image).toBe(second);
@@ -278,6 +301,26 @@ describe("StudioKonvaImageNode async identity", () => {
 
     expect(workerHarness.runs).toHaveLength(2);
     expect(canvasHarness.getImageDataCalls).toBe(1);
+    expect(workerHarness.runs[1]!.sourceRevision).toBe(workerHarness.runs[0]!.sourceRevision);
+    expect(workerHarness.runs[1]!.request.imageData.data)
+      .toBe(workerHarness.runs[0]!.request.imageData.data);
+  });
+
+  it("disposes resident pixels as soon as the Worker filter path becomes inactive", async () => {
+    const view = render(node(imageEl({ brightness: 0.2 })));
+    await load(imageHarness.assigned[0]!);
+    await flushWorkerDebounce();
+
+    expect(workerHarness.createSession).toHaveBeenCalledOnce();
+    expect(workerHarness.disposals).toHaveLength(1);
+    expect(workerHarness.disposals[0]).not.toHaveBeenCalled();
+    const activeRun = workerHarness.runs[0]!;
+
+    view.rerender(node(imageEl()));
+    await flush();
+
+    expect(activeRun.signal?.aborted).toBe(true);
+    expect(workerHarness.disposals[0]).toHaveBeenCalledOnce();
   });
 
   it("keeps only one full-page composite result and releases evicted and unmounted canvases", async () => {

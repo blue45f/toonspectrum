@@ -500,6 +500,9 @@ import type { StudioBg3dImportProgress } from "./studio-bg3d-model-import";
 import type { StudioBg3dModelThumbnailCaptureController } from "./studio-bg3d-model-thumbnail-capture";
 import type { StudioBg3dModelThumbnailThreeCaptureHandle } from "./studio-bg3d-model-thumbnail-three-capture";
 import type {
+  StudioBg3dPhysicsTimelineWorkerSession,
+} from "./studio-bg3d-physics-worker-client";
+import type {
   StudioBg3dShotBatchBuildOptions,
   StudioBg3dShotBatchContactSheet,
   StudioBg3dShotBatchContactSheetFallback,
@@ -2600,6 +2603,8 @@ export function StudioBackground3D({
         physicsAnimationFrameRef.current = null;
       }
       physicsSessionRef.current = null;
+      physicsWorkerSessionRef.current?.dispose();
+      physicsWorkerSessionRef.current = null;
       latestPhysicsSamplesRef.current = [];
       physicsPhaseRef.current = "idle";
     };
@@ -2854,6 +2859,7 @@ export function StudioBackground3D({
   const physicsLastFrameTimestampRef = useRef(0);
   const latestPhysicsSamplesRef = useRef<readonly StudioBg3dPhysicsTransformSample[]>([]);
   const physicsSessionRef = useRef<StudioBg3dPhysicsSession | null>(null);
+  const physicsWorkerSessionRef = useRef<StudioBg3dPhysicsTimelineWorkerSession | null>(null);
   const physicsRuntimeSourceRef = useRef({
     primitives,
     customModels,
@@ -8091,8 +8097,17 @@ export function StudioBackground3D({
 
     try {
       // Literal import keeps Rapier, its Worker, and WASM outside the 3D editor's initial chunk.
-      const { runStudioBg3dPhysicsTimeline } = await import("./studio-bg3d-physics-worker-client");
-      const timeline = await runStudioBg3dPhysicsTimeline({
+      const {
+        createStudioBg3dPhysicsTimelineWorkerSession,
+      } = await import("./studio-bg3d-physics-worker-client");
+      if (
+        abortController.signal.aborted || generation !== physicsGenerationRef.current ||
+        !componentActiveRef.current
+      ) return;
+      const workerSession = physicsWorkerSessionRef.current ??
+        createStudioBg3dPhysicsTimelineWorkerSession();
+      physicsWorkerSessionRef.current = workerSession;
+      const timeline = await workerSession.run({
         world: physicsJob.world,
         initialPoses: physicsJob.initialPoses,
         durationSeconds: physicsDurationSeconds,

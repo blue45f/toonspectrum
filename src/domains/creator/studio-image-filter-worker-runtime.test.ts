@@ -3,13 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyImageFilters, buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "./studio-konva-filters";
 
 import type {
+  StudioImageFilterWorkerRequestMessage,
   StudioImageFilterWorkerResponseMessage,
   StudioImageFilterWorkerRunMessage,
 } from "./studio-image-filter-worker-protocol";
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
 interface WorkerScopeHarness {
-  onmessage: ((event: MessageEvent<StudioImageFilterWorkerRunMessage>) => void) | null;
+  onmessage: ((event: MessageEvent<StudioImageFilterWorkerRequestMessage>) => void) | null;
   postMessage(message: StudioImageFilterWorkerResponseMessage, transfer: Transferable[]): void;
 }
 
@@ -157,6 +158,103 @@ describe("studio-image-filter.worker runtime", () => {
       type: "studio-image-filter/failure",
       version: 1,
       error: { name: "RangeError" },
+    });
+  });
+
+  it("keeps one immutable source resident across parameter-only filter runs", async () => {
+    const { messages, scope } = await loadWorkerHarness();
+    const source = patternedImageData();
+    const original = Array.from(source.data);
+    const firstEl: ImageFilterFields = { brightness: 0.15 };
+    const secondEl: ImageFilterFields = { invert: true, contrast: 20 };
+
+    scope.onmessage?.({
+      data: {
+        type: "studio-image-filter/load-source",
+        version: 1,
+        sourceId: "source-a",
+        sourceGeneration: 7,
+        imageData: source,
+      },
+    } as MessageEvent<StudioImageFilterWorkerRequestMessage>);
+    scope.onmessage?.({
+      data: {
+        type: "studio-image-filter/run-source",
+        version: 1,
+        sourceId: "source-a",
+        sourceGeneration: 7,
+        requestId: 11,
+        el: firstEl,
+      },
+    } as MessageEvent<StudioImageFilterWorkerRequestMessage>);
+    scope.onmessage?.({
+      data: {
+        type: "studio-image-filter/run-source",
+        version: 1,
+        sourceId: "source-a",
+        sourceGeneration: 7,
+        requestId: 12,
+        el: secondEl,
+      },
+    } as MessageEvent<StudioImageFilterWorkerRequestMessage>);
+
+    expect(messages[1]).toEqual({
+      type: "studio-image-filter/source-loaded",
+      version: 1,
+      sourceId: "source-a",
+      sourceGeneration: 7,
+    });
+    expect(messages[2]?.type).toBe("studio-image-filter/source-success");
+    expect(messages[3]?.type).toBe("studio-image-filter/source-success");
+    if (
+      messages[2]?.type !== "studio-image-filter/source-success"
+      || messages[3]?.type !== "studio-image-filter/source-success"
+    ) {
+      throw new Error("resident source success responses expected");
+    }
+    const firstExpected = patternedImageData();
+    const firstBuilt = buildImageFilters(firstEl, registry);
+    applyImageFilters(firstExpected, firstBuilt.filters, firstBuilt.attrs);
+    const secondExpected = patternedImageData();
+    const secondBuilt = buildImageFilters(secondEl, registry);
+    applyImageFilters(secondExpected, secondBuilt.filters, secondBuilt.attrs);
+
+    expect(messages[2].requestId).toBe(11);
+    expect(messages[3].requestId).toBe(12);
+    expect(Array.from(messages[2].imageData.data)).toEqual(Array.from(firstExpected.data));
+    expect(Array.from(messages[3].imageData.data)).toEqual(Array.from(secondExpected.data));
+    expect(Array.from(source.data)).toEqual(original);
+  });
+
+  it("fails closed when a run references a stale resident source generation", async () => {
+    const { messages, scope } = await loadWorkerHarness();
+    scope.onmessage?.({
+      data: {
+        type: "studio-image-filter/load-source",
+        version: 1,
+        sourceId: "source-a",
+        sourceGeneration: 4,
+        imageData: imageData(),
+      },
+    } as MessageEvent<StudioImageFilterWorkerRequestMessage>);
+    scope.onmessage?.({
+      data: {
+        type: "studio-image-filter/run-source",
+        version: 1,
+        sourceId: "source-a",
+        sourceGeneration: 3,
+        requestId: 99,
+        el: { brightness: 0.2 },
+      },
+    } as MessageEvent<StudioImageFilterWorkerRequestMessage>);
+
+    expect(messages[2]).toMatchObject({
+      type: "studio-image-filter/source-failure",
+      version: 1,
+      sourceId: "source-a",
+      sourceGeneration: 3,
+      requestId: 99,
+      error: { name: "Error", message: expect.stringMatching(/정체성/) },
     });
   });
 });
