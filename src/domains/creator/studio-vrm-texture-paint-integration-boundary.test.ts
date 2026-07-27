@@ -53,6 +53,46 @@ describe("Studio VRM texture-paint production integration boundary", () => {
     expect(panelSource).toContain("aria-invalid={!colorDraftIsValid}");
   });
 
+  it("eagerly prepares Lumi and re-invalidates the demand viewport after surface layout settles", () => {
+    const eagerLoad = requiredIndex(
+      poserSource,
+      "loadModelRef.current(SAMPLE_VRM_ENTRIES[0]);",
+    );
+    const libraryHydration = requiredIndex(
+      poserSource,
+      "listVrmLibraryEntries()",
+      eagerLoad,
+    );
+    const readyFrame = sourceBetween(
+      poserSource,
+      "function StudioVrmViewportReadyFrame(",
+      "function studioVrmTexturePaintHit(",
+    );
+
+    expect(eagerLoad).toBeLessThan(libraryHydration);
+    expect(poserSource).toContain(
+      "if (modelLoadTargetIdRef.current === targetEntry.id) return;",
+    );
+    expect(readyFrame).toContain("useLayoutEffect(() => {");
+    expect(readyFrame).toContain("settledFrame = requestAnimationFrame(() => invalidate())");
+    expect(poserSource).toContain(
+      'revision={`${installedModelId ?? "empty"}:${status}:${texturePaintModeSelected ? "surface" : "standard"}`}',
+    );
+  });
+
+  it("reserves most narrow-screen height for scrollable surface controls", () => {
+    expect(poserSource).toContain(
+      "grid-rows-[minmax(0,2fr)_minmax(0,3fr)] sm:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]",
+    );
+    expect(poserSource).not.toContain(
+      "grid-rows-[minmax(0,60dvh)_minmax(0,1fr)]",
+    );
+    expect(poserSource).toContain(
+      'id="vrm-panel-body" role="tabpanel"',
+    );
+    expect(poserSource).toContain("min-h-0 flex-1 space-y-5 overflow-y-auto");
+  });
+
   it("commits only explicit pointerup and rolls back cancellation, capture loss, blur, and unmount", () => {
     const down = poserSource.indexOf("const beginTexturePaint =");
     const move = poserSource.indexOf("const moveTexturePaint =", down);

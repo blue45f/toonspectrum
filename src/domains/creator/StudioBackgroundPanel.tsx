@@ -32,6 +32,7 @@ import {
 import { svgToDataUrl } from "./studio-characters";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export type StudioBackgroundEditorTab = "fill" | "size";
@@ -113,6 +114,7 @@ export function StudioBackgroundPanel({
   initialTab = "fill",
   className,
 }: StudioBackgroundPanelProps): ReactElement {
+  const t = useT();
   const [tab, setTab] = useState<StudioBackgroundEditorTab>(initialTab);
   const [category, setCategory] = useState<StudioBackgroundCategory>("solid");
   const [query, setQuery] = useState("");
@@ -125,6 +127,26 @@ export function StudioBackgroundPanel({
   const recentItems = recentIds
     .map((id) => findStudioBackgroundPreset(id))
     .filter((p): p is StudioBackgroundPreset => Boolean(p));
+
+  const quickColorChips = [
+    { color: "#ffffff", label: "White", labelKey: "studio.background.quickColor.white", id: "s-white" },
+    { color: "#f7f1e6", label: "Paper", labelKey: "studio.background.quickColor.paper", id: "s-paper" },
+    { color: "#1a1410", label: "Ink", labelKey: "studio.background.quickColor.ink", id: "s-ink" },
+    { color: "#c8e8ff", label: "Sky", labelKey: "studio.background.quickColor.sky", id: "s-sky" },
+  ] as const;
+
+  const sectionLoading = t("studio.background.sectionLoading");
+
+  function localizeChipLabel(chip: { id: string; label: string; labelKey: string }) {
+    const translated = t(chip.labelKey);
+    return translated === chip.labelKey ? chip.label : translated;
+  }
+
+  function localizePresetLabel(preset: StudioBackgroundPreset) {
+    const key = `studio.background.preset.${preset.id}`;
+    const translated = t(key);
+    return translated === key ? preset.label : translated;
+  }
 
   function pick(preset: StudioBackgroundPreset) {
     const next = pushStudioBackgroundRecent(globalThis.localStorage, preset.id);
@@ -144,18 +166,18 @@ export function StudioBackgroundPanel({
           {tab === "size" ? <Maximize2 size={16} aria-hidden /> : <Droplets size={16} aria-hidden />}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[0.75rem] font-bold text-fg">배경 편집기</p>
+          <p className="text-[0.75rem] font-bold text-fg">{t("studio.background.title")}</p>
           <p className="text-[0.62rem] leading-snug text-fg-3">
             {tab === "size"
-              ? "페이지 비율·높이를 바꿔 스토리·피드·웹툰 규격에 맞춰요."
-              : "단색·그라데이션·패턴·분위기로 페이지 바탕을 고르세요."}
+              ? t("studio.background.subtitleSize")
+              : t("studio.background.subtitleFill")}
           </p>
         </div>
         <span
           className="size-8 shrink-0 rounded-lg border border-line shadow-inner"
           style={{ background: currentFillCss(currentBg, currentBgGrad) }}
-          title="현재 배경"
-          aria-label="현재 배경 미리보기"
+          title={t("studio.background.currentBackground")}
+          aria-label={t("studio.background.currentBackgroundPreview")}
         />
       </div>
 
@@ -163,12 +185,24 @@ export function StudioBackgroundPanel({
       <div
         className="grid grid-cols-2 gap-1 rounded-xl border border-line bg-canvas/40 p-1"
         role="tablist"
-        aria-label="배경 편집 구역"
+        aria-label={t("studio.background.editorTabsAria")}
       >
         {(
           [
-            { id: "fill" as const, label: "채우기", Icon: Palette, title: "색·패턴·분위기" },
-            { id: "size" as const, label: "크기 · 비율", Icon: Maximize2, title: "캔버스 리사이저" },
+            {
+              id: "fill" as const,
+              label: t("studio.background.tab.fill"),
+              labelKey: "studio.background.tab.fill",
+              title: t("studio.background.tab.fillTitle"),
+              Icon: Palette,
+            },
+            {
+              id: "size" as const,
+              label: t("studio.background.tab.size"),
+              labelKey: "studio.background.tab.size",
+              title: t("studio.background.tab.sizeTitle"),
+              Icon: Maximize2,
+            },
           ] as const
         ).map(({ id, label, Icon, title }) => {
           const active = tab === id;
@@ -185,8 +219,8 @@ export function StudioBackgroundPanel({
                 STUDIO_EASE,
                 STUDIO_FOCUS_RING,
                 active
-                  ? "bg-accent text-on-accent shadow-sm"
-                  : "text-fg-3 hover:bg-raised hover:text-fg"
+                ? "bg-accent text-on-accent shadow-sm"
+                : "text-fg-3 hover:bg-raised hover:text-fg"
               )}
             >
               <Icon size={14} aria-hidden />
@@ -199,7 +233,7 @@ export function StudioBackgroundPanel({
       {tab === "size" ? (
         sizeSlot ?? (
           <div className="rounded-xl border border-dashed border-line px-3 py-6 text-center text-xs text-fg-3">
-            크기 조절 패널을 불러오는 중…
+            {sectionLoading}
           </div>
         )
       ) : (
@@ -207,7 +241,7 @@ export function StudioBackgroundPanel({
           {/* Custom + quick solids */}
           <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-line bg-card/80 p-2">
             <label className="flex items-center gap-1.5 text-[0.64rem] font-medium text-fg-2">
-              <span>내 색</span>
+              <span>{t("studio.background.customColor")}</span>
               <input
                 type="color"
                 value={
@@ -217,7 +251,7 @@ export function StudioBackgroundPanel({
                 }
                 onChange={(e) => setCustomColor(e.target.value)}
                 className="h-9 w-11 cursor-pointer rounded-lg border border-line bg-transparent"
-                aria-label="커스텀 배경색"
+                aria-label={t("studio.background.customColorInputAria")}
               />
             </label>
             <button
@@ -229,21 +263,14 @@ export function StudioBackgroundPanel({
                 STUDIO_FOCUS_RING
               )}
             >
-              적용
+              {t("studio.background.apply")}
             </button>
-            {(
-              [
-                { color: "#ffffff", label: "화이트", id: "s-white" },
-                { color: "#f7f1e6", label: "원고지", id: "s-paper" },
-                { color: "#1a1410", label: "잉크", id: "s-ink" },
-                { color: "#c8e8ff", label: "하늘", id: "s-sky" },
-              ] as const
-            ).map((chip) => (
+            {quickColorChips.map((chip) => (
               <button
                 key={chip.id}
                 type="button"
-                title={chip.label}
-                aria-label={`${chip.label} 배경`}
+                title={localizeChipLabel(chip)}
+                aria-label={`${localizeChipLabel(chip)} ${t("studio.background.quickColorSuffix")}`}
                 onClick={() => {
                   setCustomColor(chip.color);
                   onApply({ kind: "solid", color: chip.color, presetId: chip.id });
@@ -266,15 +293,15 @@ export function StudioBackgroundPanel({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="배경 검색 (노을, 도트, 보케…)"
+              placeholder={t("studio.background.searchPlaceholder")}
               className="min-h-10 w-full rounded-xl border border-line bg-card py-1.5 pl-9 pr-10 text-xs placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40"
-              aria-label="배경 검색"
+              aria-label={t("studio.background.searchAria")}
             />
             {query ? (
               <button
                 type="button"
                 onClick={() => setQuery("")}
-                aria-label="검색어 지우기"
+                aria-label={t("studio.background.searchClearAria")}
                 className="absolute right-0 top-1/2 grid size-10 -translate-y-1/2 place-items-center text-fg-3 hover:bg-raised"
               >
                 <X size={12} />
@@ -282,7 +309,7 @@ export function StudioBackgroundPanel({
             ) : null}
           </div>
 
-          <div className="flex flex-wrap gap-1" role="tablist" aria-label="배경 종류">
+          <div className="flex flex-wrap gap-1" role="tablist" aria-label={t("studio.background.categorySection")}>
             {STUDIO_BACKGROUND_CATEGORY_CHIPS.map((chip) => {
               const Icon = CATEGORY_ICONS[chip.id] ?? Layers;
               const active = category === chip.id;
@@ -300,10 +327,10 @@ export function StudioBackgroundPanel({
                     active
                       ? "border-accent bg-accent text-on-accent"
                       : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
-                  )}
+                )}
                 >
                   <Icon size={12} aria-hidden />
-                  {chip.label}
+                  {localizeChipLabel(chip)}
                 </button>
               );
             })}
@@ -311,22 +338,22 @@ export function StudioBackgroundPanel({
 
           {recentItems.length > 0 && !query ? (
             <>
-              <p className="text-[0.64rem] font-semibold text-fg-2">최근 쓴 배경</p>
+              <p className="text-[0.64rem] font-semibold text-fg-2">{t("studio.background.recent")}</p>
               <div className="grid grid-cols-4 gap-1.5">
                 {recentItems.slice(0, 8).map((preset) => (
                   <button
                     key={`recent-${preset.id}`}
                     type="button"
-                    title={preset.label}
+                    title={localizePresetLabel(preset)}
                     onClick={() => pick(preset)}
                     className={cn(
                       "flex flex-col gap-0.5 rounded-xl border border-line bg-card p-1",
                       STUDIO_FOCUS_RING,
                       "hover:border-accent/45"
-                    )}
-                  >
-                    <PreviewSwatch preset={preset} canvasW={canvasW} canvasH={canvasH} />
-                    <span className="truncate text-center text-[0.52rem] text-fg-3">{preset.label}</span>
+                  )}
+                >
+                  <PreviewSwatch preset={preset} canvasW={canvasW} canvasH={canvasH} />
+                    <span className="truncate text-center text-[0.52rem] text-fg-3">{localizePresetLabel(preset)}</span>
                   </button>
                 ))}
               </div>
@@ -334,15 +361,21 @@ export function StudioBackgroundPanel({
           ) : null}
 
           <p className="text-[0.64rem] font-semibold text-fg-2">
-            {STUDIO_BACKGROUND_CATEGORY_CHIPS.find((c) => c.id === category)?.label ?? "배경"}
+            {localizeChipLabel(
+              STUDIO_BACKGROUND_CATEGORY_CHIPS.find((c) => c.id === category) ?? {
+                id: "all",
+                label: "All",
+                labelKey: "studio.background.category.all",
+              }
+            )}
             <span className="ml-1 tabular-nums font-normal text-fg-3">({items.length})</span>
           </p>
 
           {items.length === 0 ? (
             <div className="flex h-28 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line px-3 text-center">
               <Sparkles size={16} className="text-fg-3" aria-hidden />
-              <p className="text-xs font-medium text-fg-2">검색 결과가 없어요</p>
-              <p className="text-[0.62rem] text-fg-3">다른 단어로 찾아보거나 분류를 「전체」로 바꿔 보세요.</p>
+              <p className="text-xs font-medium text-fg-2">{t("studio.background.empty.title")}</p>
+              <p className="text-[0.62rem] text-fg-3">{t("studio.background.empty.subtitle")}</p>
             </div>
           ) : (
             <div className="grid max-h-60 grid-cols-4 gap-1.5 overflow-y-auto pr-0.5">
@@ -350,7 +383,7 @@ export function StudioBackgroundPanel({
                 <button
                   key={preset.id}
                   type="button"
-                  title={preset.label}
+                  title={localizePresetLabel(preset)}
                   onClick={() => pick(preset)}
                   data-studio-bg-preset={preset.id}
                   className={cn(
@@ -362,7 +395,7 @@ export function StudioBackgroundPanel({
                 >
                   <PreviewSwatch preset={preset} canvasW={canvasW} canvasH={canvasH} />
                   <span className="truncate text-center text-[0.52rem] font-semibold text-fg-2">
-                    {preset.label}
+                    {localizePresetLabel(preset)}
                   </span>
                 </button>
               ))}

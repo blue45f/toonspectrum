@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BG_PRESETS } from "./studio-assets";
 import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
@@ -11,6 +11,8 @@ import {
 } from "./StudioInspectorCanvasControls";
 
 import type { MagicResizePreset, MagicResizeStrategy } from "./studio-magic-resize";
+
+import { useI18n } from "@/lib/i18n";
 
 const MAGIC_PRESET: MagicResizePreset = {
   id: "test-preset",
@@ -43,6 +45,10 @@ vi.mock("./StudioMagicResizePanel", () => ({
 
 afterEach(cleanup);
 
+beforeEach(() => {
+  useI18n.getState().setLang("ko");
+});
+
 function canvasProps(
   overrides: Partial<StudioInspectorCanvasControlsProps> = {}
 ): StudioInspectorCanvasControlsProps {
@@ -56,6 +62,7 @@ function canvasProps(
     masterEditMode: false,
     panelGutter: 24,
     showGrid: true,
+    showAlignmentGuides: true,
     showWebtoonGuides: false,
     snapEnabled: true,
     templateGutterAvailable: true,
@@ -80,6 +87,7 @@ function canvasProps(
     onPanelGutterChange: vi.fn(),
     onShowGridChange: vi.fn(),
     onShowWebtoonGuidesChange: vi.fn(),
+    onShowAlignmentGuidesChange: vi.fn(),
     onSnapEnabledChange: vi.fn(),
     onWarmWebtoonGuides: vi.fn(),
     onWebtoonThemeChange: vi.fn(),
@@ -127,8 +135,18 @@ describe("StudioInspectorCanvasControls", () => {
     });
     expect(props.onPanelGutterChange).toHaveBeenCalledWith(32);
 
-    fireEvent.click(screen.getByLabelText("정렬 가이드 (스냅)"));
+    const snapGuideCheckbox = screen.getByRole("checkbox", {
+      name: /오브젝트·격자 스냅/u,
+    });
+    const alignmentGuideCheckbox = screen.getByRole("checkbox", {
+      name: /정렬선 표시/u,
+    });
+
+    fireEvent.click(snapGuideCheckbox);
     expect(props.onSnapEnabledChange).toHaveBeenCalledWith(false);
+
+    fireEvent.click(alignmentGuideCheckbox);
+    expect(props.onShowAlignmentGuidesChange).toHaveBeenCalledWith(false);
 
     fireEvent.click(screen.getByLabelText("그리드 격자 표시"));
     expect(props.onShowGridChange).toHaveBeenCalledWith(false);

@@ -7,6 +7,15 @@ export const STUDIO_VIEW_ZOOM_MIN = 0.2;
 export const STUDIO_VIEW_ZOOM_MAX = 5;
 export const STUDIO_VIEW_ZOOM_STEP = 0.2;
 
+export type StudioCanvasWheelMode = "zoom" | "pan" | "brush-size";
+
+/** Quick canvas control intentionally alternates only between navigation modes. */
+export function toggleStudioCanvasWheelMode(
+  current: StudioCanvasWheelMode
+): Extract<StudioCanvasWheelMode, "zoom" | "pan"> {
+  return current === "pan" ? "zoom" : "pan";
+}
+
 /** View-only quarter-turn rotation. Positive angles follow Konva's clockwise screen rotation. */
 export type StudioViewRotation = 0 | 90 | 180 | 270;
 

@@ -13,6 +13,8 @@ import {
 } from "./studio-tools-companion";
 import { StudioToolsCompanionPage } from "./StudioToolsCompanionPage";
 
+import { useI18n } from "@/lib/i18n";
+
 const SESSION_ID = "multi-window-session-1234";
 
 class SharedBroadcastChannel {
@@ -79,6 +81,7 @@ const originalRevokeObjectUrl = Object.getOwnPropertyDescriptor(URL, "revokeObje
 let primaryRuntime: StudioCompanionPrimaryRuntime | null = null;
 
 beforeEach(() => {
+  useI18n.getState().setLang("ko");
   SharedBroadcastChannel.reset();
   vi.stubGlobal("BroadcastChannel", SharedBroadcastChannel);
   vi.stubGlobal("Image", class {

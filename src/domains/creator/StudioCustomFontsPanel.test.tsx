@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   addCustomFont,
@@ -12,6 +12,8 @@ import {
   type StudioFontSetLike,
 } from "./studio-custom-fonts";
 import { StudioCustomFontsPanel } from "./StudioCustomFontsPanel";
+
+import { useI18n } from "@/lib/i18n";
 
 type FakeFontFaceFactory = (family: string, source: string) => StudioFontFaceLike;
 
@@ -85,6 +87,10 @@ function importInput(): HTMLInputElement {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+});
+
+beforeEach(() => {
+  useI18n.getState().setLang("ko");
 });
 
 describe("StudioCustomFontsPanel", () => {

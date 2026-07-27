@@ -16,11 +16,27 @@ import {
   tutorialCompletionRatio,
   writeTutorialProgress,
   type StudioFeatureTutorial,
+  type StudioTutorialCategory,
   type StudioTutorialProgress,
   type StudioTutorialTryAction,
 } from "./studio-feature-tutorials";
 
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+
+function localizeText(_fallback: string, key: string, t: (key: string) => string): string {
+  const translated = t(key);
+  return translated === key ? _fallback : translated;
+}
+
+const STUDIO_CATEGORY_LABEL_KEYS: Record<StudioTutorialCategory, string> = {
+  drawing: "studio.tutorial.category.drawing",
+  adjustments: "studio.tutorial.category.adjustments",
+  dialogue: "studio.tutorial.category.dialogue",
+  composition: "studio.tutorial.category.composition",
+  threed: "studio.tutorial.category.threed",
+  aiExport: "studio.tutorial.category.aiExport",
+};
 
 export type StudioFeatureTutorialHubProps = {
   open: boolean;
@@ -52,6 +68,7 @@ export function StudioFeatureTutorialHub({
   const [progress, setProgress] = useState<StudioTutorialProgress>(() => readTutorialProgress());
   const [activeId, setActiveId] = useState(() => resolveInitialId(initialTutorialId, readTutorialProgress()));
   const [stepIndex, setStepIndex] = useState(0);
+  const t = useT();
 
   const active = STUDIO_FEATURE_TUTORIAL_BY_ID.get(activeId) ?? STUDIO_FEATURE_TUTORIALS[0]!;
   const steps = active.steps;
@@ -154,10 +171,14 @@ export function StudioFeatureTutorialHub({
               </span>
               <div className="min-w-0 pt-0.5">
                 <h2 id="studio-tutorial-title" className="text-[0.95rem] font-semibold tracking-tight text-fg">
-                  기능 튜토리얼
+                  {t("studio.hub.title")}
                 </h2>
                 <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-                  부담 없이 한 기능씩. {done}/{total}개 살펴봤어요.
+                  {localizeText(
+                    "부담 없이 한 기능씩. {done}/{total}개 살펴봤어요.",
+                    "studio.hub.subtitle",
+                    t,
+                  ).replace("{done}", done.toString()).replace("{total}", total.toString())}
                 </p>
                 <div
                   className="mt-2 h-1.5 w-40 max-w-full overflow-hidden rounded-full bg-canvas/70 ring-1 ring-line/40"
@@ -165,7 +186,7 @@ export function StudioFeatureTutorialHub({
                   aria-valuenow={done}
                   aria-valuemin={0}
                   aria-valuemax={total}
-                  aria-label="튜토리얼 진행"
+                  aria-label={t("studio.hub.progressAriaLabel")}
                 >
                   <div
                     className="h-full rounded-full bg-accent transition-[width] duration-200 ease-out"
@@ -179,7 +200,7 @@ export function StudioFeatureTutorialHub({
               type="button"
               onClick={onClose}
               className="grid size-9 shrink-0 place-items-center rounded-xl border border-line/60 bg-card/70 text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              aria-label="닫기"
+              aria-label={t("common.close")}
             >
               <X size={16} aria-hidden />
             </button>
@@ -189,14 +210,14 @@ export function StudioFeatureTutorialHub({
         {/* body: list + detail */}
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <nav
-            aria-label="기능 목록"
+            aria-label={t("studio.hub.listAriaLabel")}
             className="shrink-0 overflow-y-auto border-b border-line/45 md:w-[13.5rem] md:border-b-0 md:border-r md:border-line/45"
           >
             <div className="space-y-2.5 p-2.5">
               {groups.map((group) => (
                 <div key={group.category}>
                   <p className="mb-1 px-1.5 text-[0.6rem] font-semibold uppercase tracking-wider text-fg-3">
-                    {group.category}
+                    {t(STUDIO_CATEGORY_LABEL_KEYS[group.category] ?? group.category)}
                   </p>
                   <ul className="space-y-0.5">
                     {group.items.map((item) => {
@@ -225,11 +246,11 @@ export function StudioFeatureTutorialHub({
                             </span>
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-[0.72rem] font-semibold tracking-tight">
-                                {item.title}
+                                {localizeText(item.title, `studio.tutorial.${item.id}.title`, t)}
                               </span>
                             </span>
                             {isDone ? (
-                              <Check className="size-3.5 shrink-0 text-good" aria-label="완료" />
+                    <Check className="size-3.5 shrink-0 text-good" aria-label={t("studio.hub.completed")} />
                             ) : null}
                           </button>
                         </li>
@@ -245,26 +266,33 @@ export function StudioFeatureTutorialHub({
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-accent-soft/60 px-2 py-0.5 text-[0.6rem] font-semibold text-accent ring-1 ring-accent/20">
-                  {active.category}
+                {t(STUDIO_CATEGORY_LABEL_KEYS[active.category] ?? active.category)}
                 </span>
                 {completed ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-good/15 px-2 py-0.5 text-[0.6rem] font-semibold text-good ring-1 ring-good/25">
                     <Check className="size-3" aria-hidden />
-                    살펴봄
+                    {t("studio.hub.checked")}
                   </span>
                 ) : null}
               </div>
-              <h3 className="mt-2 text-base font-semibold tracking-tight text-fg">{active.title}</h3>
-              <p className="mt-1 text-[0.75rem] leading-relaxed text-fg-3">{active.summary}</p>
+              <h3 className="mt-2 text-base font-semibold tracking-tight text-fg">
+                {localizeText(active.title, `studio.tutorial.${active.id}.title`, t)}
+              </h3>
+              <p className="mt-1 text-[0.75rem] leading-relaxed text-fg-3">
+                {localizeText(active.summary, `studio.tutorial.${active.id}.summary`, t)}
+              </p>
 
               {/* step dots */}
-              <div className="mt-4 flex items-center gap-1.5" aria-label={`단계 ${stepIndex + 1} / ${steps.length}`}>
+              <div
+                className="mt-4 flex items-center gap-1.5"
+                aria-label={`${t("studio.hub.stepAriaPrefix")} ${stepIndex + 1} / ${steps.length}`}
+              >
                 {steps.map((_, i) => (
                   <button
                     key={i}
                     type="button"
                     onClick={() => setStepIndex(i)}
-                    aria-label={`${i + 1}단계`}
+                    aria-label={`${t("studio.hub.stepAriaPrefix")} ${i + 1}`}
                     aria-current={i === stepIndex ? "step" : undefined}
                     className={cn(
                       "h-1.5 rounded-full transition-[width,background] duration-200 ease-out",
@@ -281,12 +309,26 @@ export function StudioFeatureTutorialHub({
                 <p className="text-[0.62rem] font-semibold uppercase tracking-wider text-fg-3">
                   {stepIndex + 1} / {steps.length}
                 </p>
-                <h4 className="mt-1 text-[0.92rem] font-semibold tracking-tight text-fg">{step.title}</h4>
-                <p className="mt-1.5 text-[0.8rem] leading-relaxed text-fg-2">{step.body}</p>
+                <h4 className="mt-1 text-[0.92rem] font-semibold tracking-tight text-fg">
+                  {localizeText(
+                    step.title,
+                    `studio.tutorial.${active.id}.step.${stepIndex + 1}.title`,
+                    t,
+                  )}
+                </h4>
+                <p className="mt-1.5 text-[0.8rem] leading-relaxed text-fg-2">
+                  {localizeText(
+                    step.body,
+                    `studio.tutorial.${active.id}.step.${stepIndex + 1}.body`,
+                    t,
+                  )}
+                </p>
                 {step.tip ? (
                   <p className="mt-3 flex items-start gap-1.5 rounded-xl bg-accent-soft/35 px-2.5 py-2 text-[0.7rem] leading-snug text-fg-2 ring-1 ring-accent/15">
                     <Sparkles className="mt-0.5 size-3.5 shrink-0 text-accent" aria-hidden />
-                    <span>{step.tip}</span>
+                    <span>
+                      {localizeText(step.tip, `studio.tutorial.${active.id}.step.${stepIndex + 1}.tip`, t)}
+                    </span>
                   </p>
                 ) : null}
               </article>
@@ -305,7 +347,7 @@ export function StudioFeatureTutorialHub({
                 )}
               >
                 <ChevronLeft className="size-4" aria-hidden />
-                이전
+                {t("studio.hub.prev")}
               </button>
 
               <div className="flex flex-wrap items-center gap-1.5">
@@ -316,7 +358,8 @@ export function StudioFeatureTutorialHub({
                     className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-accent/40 bg-accent-soft/50 px-3 text-[0.75rem] font-semibold text-accent transition-colors hover:bg-accent-soft"
                   >
                     <Sparkles className="size-3.5" aria-hidden />
-                    {active.tryLabel ?? "따라 해보기"}
+                    {localizeText(active.tryLabel ?? "", `studio.tutorial.${active.id}.tryLabel`, t) ||
+                      t("studio.hub.tryLabelDefault")}
                   </button>
                 ) : null}
                 <button
@@ -324,7 +367,7 @@ export function StudioFeatureTutorialHub({
                   onClick={goNext}
                   className="inline-flex min-h-9 items-center gap-1 rounded-xl bg-accent px-3.5 text-[0.75rem] font-semibold text-on-accent transition-opacity hover:opacity-95"
                 >
-                  {isLastStep ? (completed ? "완료됨" : "완료로 표시") : "다음"}
+                  {isLastStep ? (completed ? t("studio.hub.completed") : t("studio.hub.markComplete")) : t("studio.hub.next")}
                   {!isLastStep ? <ChevronRight className="size-4" aria-hidden /> : null}
                 </button>
               </div>

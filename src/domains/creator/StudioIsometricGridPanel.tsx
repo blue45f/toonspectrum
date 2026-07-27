@@ -216,7 +216,7 @@ export function StudioIsometricGridPanel({
           disabled={disabled}
           onClick={onToggleActive}
           aria-label={`아이소메트릭 그리드 ${active ? "끄기" : "켜기"}`}
-          title={disabledReason ?? "펜·직선이 그리드 축(3방향) 방향으로 자동 정렬됩니다."}
+          title={disabledReason ?? "자유곡선에는 안내선만 표시하고, 직선 도구는 3방향 축에 맞춥니다."}
         >
           {active ? "켜짐" : "꺼짐"}
         </StudioToggleChip>

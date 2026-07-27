@@ -1,11 +1,17 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioCompanionNavigator } from "./StudioCompanionNavigator";
 
+import { useI18n } from "@/lib/i18n";
+
 afterEach(cleanup);
+
+beforeEach(() => {
+  useI18n.getState().setLang("ko");
+});
 
 describe("StudioCompanionNavigator", () => {
   it("renders the normalized viewport and sends click/drag navigation", () => {

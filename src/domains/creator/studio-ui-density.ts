@@ -113,13 +113,29 @@ export function studioUiDensityAllows(
 }
 
 /** Short UI chip label (Super Simple / Simple / Full). */
-export function studioUiDensityLabel(mode: StudioUiDensityMode): string {
+export function studioUiDensityLabel(
+  mode: StudioUiDensityMode,
+  t?: (key: string) => string
+): string {
+  if (t) {
+    if (mode === "simple") return t("studio.settings.uiDensityMode.simple");
+    if (mode === "focus") return t("studio.settings.uiDensityMode.focus");
+    return t("studio.settings.uiDensityMode.full");
+  }
   if (mode === "simple") return "심플";
   if (mode === "focus") return "슈퍼심플";
   return "전체";
 }
 
-export function studioUiDensityDescription(mode: StudioUiDensityMode): string {
+export function studioUiDensityDescription(
+  mode: StudioUiDensityMode,
+  t?: (key: string) => string
+): string {
+  if (t) {
+    if (mode === "simple") return t("studio.settings.uiDensityDescription.simple");
+    if (mode === "focus") return t("studio.settings.uiDensityDescription.focus");
+    return t("studio.settings.uiDensityDescription.full");
+  }
   if (mode === "simple") {
     return "심플 모드 — 핵심 도구와 기본 설정만 보여 입문·집중 작업에 맞춥니다.";
   }

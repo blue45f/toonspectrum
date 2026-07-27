@@ -31,6 +31,7 @@ import {
   listStudioShortcutConflicts,
   moveStudioRailTool,
   normalizeStudioShortcutChordKey,
+  studioShortcutActionLabel,
   showStudioRailTool,
   STUDIO_APP_SETTINGS_TABS,
   STUDIO_PIXEL_GRID_SIZE_OPTIONS,
@@ -59,6 +60,7 @@ import { StudioPressureCurveGraph } from "./StudioPressureCurveGraph";
 import { activateStudioModalSheet } from "./useStudioModalSheet";
 
 import { buttonClass } from "@/components/ui/button-utils";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export type StudioAppSettingsPanelProps = {
@@ -126,6 +128,7 @@ export function StudioAppSettingsPanel({
   onResetAll,
   onRetryPersistence,
 }: StudioAppSettingsPanelProps): ReactElement | null {
+  const t = useT();
   const titleId = useId();
   const [tab, setTab] = useState<StudioAppSettingsTab>(initialTab);
   const [recordingAction, setRecordingAction] = useState<StudioShortcutActionId | null>(null);
@@ -208,12 +211,14 @@ export function StudioAppSettingsPanel({
   const normalizedToolbarQuery = toolbarQuery.trim().normalize("NFKC").toLocaleLowerCase();
   const matchesToolbarQuery = (id: (typeof DEFAULT_STUDIO_RAIL_TOOL_ORDER)[number]) =>
     !normalizedToolbarQuery
-    || studioRailToolLabel(id).normalize("NFKC").toLocaleLowerCase().includes(normalizedToolbarQuery);
+    || studioRailToolLabel(id, t).normalize("NFKC").toLocaleLowerCase().includes(normalizedToolbarQuery);
   const visibleMatches = visible.filter(matchesToolbarQuery);
   const hiddenMatches = hidden.filter(matchesToolbarQuery);
   const shortcutConflicts = listStudioShortcutConflicts(settings.shortcuts);
   const shortcutConflictCount = shortcutConflicts.size;
-  const actionLabelById = new Map(STUDIO_SHORTCUT_ACTIONS.map((a) => [a.id, a.label]));
+  const actionLabelById = new Map(
+    STUDIO_SHORTCUT_ACTIONS.map((a) => [a.id, studioShortcutActionLabel(a.id, t)])
+  );
 
   const body = (
     <div
@@ -237,9 +242,9 @@ export function StudioAppSettingsPanel({
             <Settings2 className="size-4 text-accent" aria-hidden />
             <div>
               <h2 id={titleId} className="text-sm font-bold text-fg">
-                애플리케이션 설정
+                {t("studio.settings.title")}
               </h2>
-              <p className="text-[0.68rem] text-fg-3">툴바 · 단축키 · 마우스 · 터치 · 그리드 · 기타</p>
+              <p className="text-[0.68rem] text-fg-3">{t("studio.settings.subtitle")}</p>
             </div>
           </div>
           <button
@@ -249,7 +254,7 @@ export function StudioAppSettingsPanel({
               "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             )}
             onClick={onClose}
-            aria-label="설정 닫기"
+            aria-label={t("studio.settings.panelCloseAria")}
           >
             <X className="size-4" />
           </button>
@@ -258,7 +263,7 @@ export function StudioAppSettingsPanel({
         <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
           <nav
             className="flex shrink-0 gap-1 overflow-x-auto border-b border-line p-2 sm:w-36 sm:flex-col sm:overflow-y-auto sm:border-b-0 sm:border-r"
-            aria-label="설정 탭"
+            aria-label={t("studio.settings.toolbar.tabAria")}
           >
             {STUDIO_APP_SETTINGS_TABS.map((id) => (
               <button
@@ -273,7 +278,7 @@ export function StudioAppSettingsPanel({
                 )}
                 aria-current={tab === id ? "page" : undefined}
               >
-                {studioAppSettingsTabLabel(id)}
+                {studioAppSettingsTabLabel(id, t)}
               </button>
             ))}
           </nav>
@@ -281,13 +286,16 @@ export function StudioAppSettingsPanel({
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
             {tab === "general" ? (
               <>
-                <SectionLabel>레이아웃</SectionLabel>
-                <Row label="UI 밀도" hint="슈퍼심플 / 심플 / 전체 3단 레이아웃 모드">
+                <SectionLabel>{t("studio.settings.section.layout")}</SectionLabel>
+                <Row
+                  label={t("studio.settings.general.uiDensityLabel")}
+                  hint={t("studio.settings.general.uiDensityHint")}
+                >
                   <SelectChipGroup
                     value={settings.general.densityMode}
                     options={STUDIO_UI_DENSITY_MODES.map((m) => ({
                       id: m,
-                      label: studioUiDensityLabel(m),
+                      label: studioUiDensityLabel(m, t),
                     }))}
                     onChange={(densityMode: StudioUiDensityMode) =>
                       patch({ general: { ...settings.general, densityMode } })
@@ -295,17 +303,17 @@ export function StudioAppSettingsPanel({
                   />
                 </Row>
                 <p className="text-[0.68rem] text-fg-3">
-                  {studioUiDensityDescription(settings.general.densityMode)}
+                  {studioUiDensityDescription(settings.general.densityMode, t)}
                 </p>
                 <Row
-                  label="도구 도움말"
-                  hint="간단은 이름·설명만, 동작 미리보기는 애니메이션 코치까지 보여 줍니다"
+                  label={t("studio.settings.general.toolHintLabel")}
+                  hint={t("studio.settings.general.toolHintHint")}
                 >
                   <SelectChipGroup
                     value={settings.general.toolHintMode}
                     options={STUDIO_TOOL_HINT_MODES.map((mode) => ({
                       id: mode,
-                      label: studioToolHintModeLabel(mode),
+                      label: studioToolHintModeLabel(mode, t),
                     }))}
                     onChange={(toolHintMode) =>
                       patch({ general: { ...settings.general, toolHintMode } })
@@ -313,15 +321,15 @@ export function StudioAppSettingsPanel({
                   />
                 </Row>
                 <Row
-                  label="브러시 커서"
-                  hint="윤곽은 실제 브러시 크기를, 점은 중심만 표시합니다. 시스템은 십자 포인터만 사용합니다"
+                  label={t("studio.settings.general.brushCursorLabel")}
+                  hint={t("studio.settings.general.brushCursorHint")}
                 >
                   <SelectChipGroup
                     value={settings.general.brushCursorStyle}
                     options={[
-                      { id: "outline", label: "윤곽" },
-                      { id: "dot", label: "점" },
-                      { id: "none", label: "시스템" },
+                      { id: "outline", label: t("studio.settings.general.brushCursor.outline") },
+                      { id: "dot", label: t("studio.settings.general.brushCursor.dot") },
+                      { id: "none", label: t("studio.settings.general.brushCursor.none") },
                     ]}
                     onChange={(brushCursorStyle) =>
                       patch({ general: { ...settings.general, brushCursorStyle } })
@@ -329,8 +337,8 @@ export function StudioAppSettingsPanel({
                   />
                 </Row>
                 <Row
-                  label="필기 보조선"
-                  hint="입력 안정화가 펜을 따라오는 동안 실제 포인터와 잉크 끝점을 연결합니다"
+                  label={t("studio.settings.general.strokeGuideLabel")}
+                  hint={t("studio.settings.general.strokeGuideHint")}
                 >
                   <StudioToggleChip
                     active={settings.general.showStrokeGuide}
@@ -343,10 +351,12 @@ export function StudioAppSettingsPanel({
                       })
                     }
                   >
-                    {settings.general.showStrokeGuide ? "표시" : "숨김"}
+                    {settings.general.showStrokeGuide
+                      ? t("studio.settings.general.strokeGuide.visible")
+                      : t("studio.settings.general.strokeGuide.hidden")}
                   </StudioToggleChip>
                 </Row>
-                <Row label="레이어 비우기 확인">
+                <Row label={t("studio.settings.general.clearLayerConfirmLabel")}>
                   <StudioToggleChip
                     active={settings.general.confirmBeforeClearLayer}
                     onClick={() =>
@@ -358,7 +368,9 @@ export function StudioAppSettingsPanel({
                       })
                     }
                   >
-                    {settings.general.confirmBeforeClearLayer ? "확인" : "바로 실행"}
+                    {settings.general.confirmBeforeClearLayer
+                      ? t("studio.settings.general.confirmBeforeClear")
+                      : t("studio.settings.general.applyImmediately")}
                   </StudioToggleChip>
                 </Row>
               </>
@@ -366,18 +378,18 @@ export function StudioAppSettingsPanel({
 
             {tab === "shortcuts" ? (
               <>
-                <SectionLabel>키보드 단축키</SectionLabel>
+                <SectionLabel>{t("studio.settings.section.shortcuts")}</SectionLabel>
                 <p className="text-[0.68rem] leading-relaxed text-fg-3">
-                  행을 누른 뒤 원하는 키 조합을 입력하세요. Backspace로 해제, Esc로 녹화를 취소합니다.
-                  Mod는 macOS ⌘ / Windows Ctrl입니다.
+                  {t("studio.settings.shortcuts.recordingHint")}
                 </p>
                 {shortcutConflictCount > 0 ? (
                   <p
                     role="status"
                     className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[0.68rem] leading-relaxed text-amber-900 dark:text-amber-100"
                   >
-                    같은 키 조합이 {shortcutConflictCount}곳 이상에 중복 할당되어 있습니다. 아래 행의
-                    「충돌」표시를 확인하세요.
+                    {t("studio.settings.shortcuts.conflictHeader")
+                      .replace("{count}", String(shortcutConflictCount))
+                      .replace("{marker}", t("studio.settings.shortcuts.conflict"))}
                   </p>
                 ) : null}
                 <ul className="divide-y divide-line/60 rounded-xl border border-line">
@@ -400,9 +412,11 @@ export function StudioAppSettingsPanel({
                           {hasConflict ? (
                             <span
                               className="mt-0.5 block text-[0.62rem] font-medium text-amber-700 dark:text-amber-200"
-                              title={peerLabels ? `충돌: ${peerLabels}` : "단축키 충돌"}
+                              title={peerLabels
+                                ? t("studio.settings.shortcuts.conflictPeers").replace("{peers}", peerLabels)
+                                : t("studio.settings.shortcuts.noConflictHint")}
                             >
-                              충돌{peerLabels ? ` · ${peerLabels}` : ""}
+                              {t("studio.settings.shortcuts.conflict")} {peerLabels ? `· ${peerLabels}` : ""}
                             </span>
                           ) : null}
                         </span>
@@ -416,7 +430,7 @@ export function StudioAppSettingsPanel({
                           )}
                           onClick={() => setRecordingAction(recording ? null : action.id)}
                         >
-                          {recording ? "키 입력…" : formatStudioShortcutChord(chord)}
+                          {recording ? t("studio.settings.shortcuts.recordingState") : formatStudioShortcutChord(chord)}
                         </button>
                       </li>
                     );
@@ -437,55 +451,55 @@ export function StudioAppSettingsPanel({
                   }
                 >
                   <RotateCcw className="size-3.5" aria-hidden />
-                  단축키 기본값
+                  {t("studio.settings.shortcuts.reset")}
                 </button>
               </>
             ) : null}
 
             {tab === "mouse" ? (
               <>
-                <SectionLabel>마우스</SectionLabel>
-                <Row label="휠" hint="스크롤 시 동작">
+                <SectionLabel>{t("studio.settings.section.mouse")}</SectionLabel>
+                <Row label={t("studio.settings.mouse.wheelLabel")} hint={t("studio.settings.mouse.wheelHint")}>
                   <SelectChipGroup
                     value={settings.mouse.wheel}
                     options={[
-                      { id: "zoom", label: "줌" },
-                      { id: "pan", label: "팬" },
-                      { id: "brush-size", label: "브러시 크기" },
+                      { id: "zoom", label: t("studio.settings.mouse.wheel.zoom") },
+                      { id: "pan", label: t("studio.settings.mouse.wheel.pan") },
+                      { id: "brush-size", label: t("studio.settings.mouse.wheel.brushSize") },
                     ]}
                     onChange={(wheel) => patch({ mouse: { ...settings.mouse, wheel } })}
                   />
                 </Row>
-                <Row label="휠 방향 반전">
+                <Row label={t("studio.settings.mouse.reverseLabel")}>
                   <StudioToggleChip
                     active={settings.mouse.reverseWheel}
                     onClick={() =>
                       patch({ mouse: { ...settings.mouse, reverseWheel: !settings.mouse.reverseWheel } })
                     }
                   >
-                    {settings.mouse.reverseWheel ? "반전" : "기본"}
+                    {settings.mouse.reverseWheel ? t("studio.settings.state.enabled") : t("studio.settings.state.disabled")}
                   </StudioToggleChip>
                 </Row>
-                <Row label="가운데 버튼">
+                <Row label={t("studio.settings.mouse.middleButtonLabel")}>
                   <SelectChipGroup
                     value={settings.mouse.middleButton}
                     options={[
-                      { id: "pan", label: "팬" },
-                      { id: "zoom", label: "줌" },
-                      { id: "eyedropper", label: "스포이드" },
-                      { id: "none", label: "없음" },
+                      { id: "pan", label: t("studio.settings.mouse.middleButton.pan") },
+                      { id: "zoom", label: t("studio.settings.mouse.middleButton.zoom") },
+                      { id: "eyedropper", label: t("studio.settings.mouse.middleButton.eyedropper") },
+                      { id: "none", label: t("studio.settings.state.none") },
                     ]}
                     onChange={(middleButton) => patch({ mouse: { ...settings.mouse, middleButton } })}
                   />
                 </Row>
-                <Row label="오른쪽 버튼">
+                <Row label={t("studio.settings.mouse.rightButtonLabel")}>
                   <SelectChipGroup
                     value={settings.mouse.rightButton}
                     options={[
-                      { id: "context", label: "메뉴" },
-                      { id: "eyedropper", label: "스포이드" },
-                      { id: "pan", label: "팬" },
-                      { id: "none", label: "없음" },
+                      { id: "context", label: t("studio.settings.mouse.rightButton.context") },
+                      { id: "eyedropper", label: t("studio.settings.mouse.rightButton.eyedropper") },
+                      { id: "pan", label: t("studio.settings.mouse.rightButton.pan") },
+                      { id: "none", label: t("studio.settings.state.none") },
                     ]}
                     onChange={(rightButton) => patch({ mouse: { ...settings.mouse, rightButton } })}
                   />
@@ -495,58 +509,60 @@ export function StudioAppSettingsPanel({
 
             {tab === "touch" ? (
               <>
-                <SectionLabel>터치 · 펜</SectionLabel>
+                <SectionLabel>{t("studio.settings.section.touchPen")}</SectionLabel>
                 <p className="text-[0.68rem] leading-relaxed text-fg-3">
-                  Apple Pencil 등 펜을 쓸 때는 한 손가락 드래그를「없음」또는「팬」으로 두면 손바닥
-                  오입력을 줄일 수 있습니다. 손가락으로 그리려면「그리기」로 두세요.
+                  {t("studio.settings.touch.sectionHint")}
                 </p>
-                <Row label="한 손가락 드래그">
+                <Row label={t("studio.settings.touch.oneFingerDragLabel")}>
                   <SelectChipGroup
                     value={settings.touch.oneFingerDrag}
                     options={[
-                      { id: "draw", label: "그리기" },
-                      { id: "pan", label: "팬" },
-                      { id: "none", label: "없음" },
+                      { id: "draw", label: t("studio.settings.touch.oneFingerDrag.draw") },
+                      { id: "pan", label: t("studio.settings.touch.oneFingerDrag.pan") },
+                      { id: "none", label: t("studio.settings.state.none") },
                     ]}
                     onChange={(oneFingerDrag) => patch({ touch: { ...settings.touch, oneFingerDrag } })}
                   />
                 </Row>
-                <Row label="두 손가락">
+                <Row label={t("studio.settings.touch.twoFingerLabel")}>
                   <SelectChipGroup
                     value={settings.touch.twoFinger}
                     options={[
-                      { id: "pan-zoom", label: "팬·줌" },
-                      { id: "undo-redo", label: "실행취소·다시" },
+                      { id: "pan-zoom", label: t("studio.settings.touch.twoFinger.panZoom") },
+                      { id: "undo-redo", label: t("studio.settings.touch.twoFinger.undoRedo") },
                     ]}
                     onChange={(twoFinger) => patch({ touch: { ...settings.touch, twoFinger } })}
                   />
                 </Row>
-                <Row label="세 손가락 탭">
+                <Row label={t("studio.settings.touch.threeFingerLabel")}>
                   <SelectChipGroup
                     value={settings.touch.threeFinger}
                     options={[
-                      { id: "undo", label: "실행취소" },
-                      { id: "toggle-ui", label: "UI 토글" },
-                      { id: "none", label: "없음" },
+                      { id: "undo", label: t("studio.settings.touch.threeFinger.undo") },
+                      { id: "toggle-ui", label: t("studio.settings.touch.threeFinger.toggleUi") },
+                      { id: "none", label: t("studio.settings.state.none") },
                     ]}
                     onChange={(threeFinger) => patch({ touch: { ...settings.touch, threeFinger } })}
                   />
                 </Row>
-                <Row label="손바닥 거부" hint="펜 획 중 터치 입력을 무시합니다">
+                <Row
+                  label={t("studio.settings.touch.palmRejectionLabel")}
+                  hint={t("studio.settings.touch.palmRejectionHint")}
+                >
                   <StudioToggleChip
                     active={settings.touch.palmRejection}
                     onClick={() =>
                       patch({
-                        touch: { ...settings.touch, palmRejection: !settings.touch.palmRejection },
+                      touch: { ...settings.touch, palmRejection: !settings.touch.palmRejection },
                       })
                     }
                   >
-                    {settings.touch.palmRejection ? "켜짐" : "꺼짐"}
+                    {settings.touch.palmRejection ? t("studio.settings.state.on") : t("studio.settings.state.off")}
                   </StudioToggleChip>
                 </Row>
                 <Row
-                  label="도움말 길게 누르기"
-                  hint="도구를 실행하지 않고 Motion Coach를 여는 터치 대기 시간"
+                  label={t("studio.settings.touch.toolTipHoldLabel")}
+                  hint={t("studio.settings.touch.toolTipHoldHint")}
                 >
                   <label className="flex items-center gap-2 text-[0.7rem] text-fg-2">
                     <input
@@ -564,7 +580,7 @@ export function StudioAppSettingsPanel({
                         })
                       }
                       className="min-h-11 w-28 accent-accent sm:min-h-8 pointer-coarse:min-h-11"
-                      aria-label="도구 도움말 길게 누르기 시간"
+                      aria-label={t("studio.settings.touch.toolTipHoldAria")}
                     />
                     <output className="min-w-12 tabular-nums text-fg-3">
                       {settings.touch.toolHintHoldMs}ms
@@ -579,23 +595,23 @@ export function StudioAppSettingsPanel({
                 <div className="sticky -top-4 z-10 -mx-4 -mt-4 space-y-2 border-b border-line bg-panel/95 px-4 pb-3 pt-4 backdrop-blur-sm">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                      <SectionLabel>툴바 사용자 정의</SectionLabel>
+                      <SectionLabel>{t("studio.settings.section.toolbar")}</SectionLabel>
                       <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                        보이는 도구의 순서를 바꾸거나 숨길 수 있어요. 단축키는 숨겨도 그대로 동작합니다.
+                        {t("studio.settings.toolbar.searchLiveHint")}
                       </p>
                     </div>
                     <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] font-semibold tabular-nums text-fg-3">
-                      표시 {visible.length} · 숨김 {hidden.length}
+                      {`${t("studio.settings.toolbar.visibleLabel")} ${visible.length} · ${t("studio.settings.toolbar.hiddenLabel")} ${hidden.length}`}
                     </span>
                   </div>
                   <label className="relative block">
-                    <span className="sr-only">툴바 도구 검색</span>
+                    <span className="sr-only">{t("studio.settings.toolbar.searchAria")}</span>
                     <Search size={14} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" />
                     <input
                       type="search"
                       value={toolbarQuery}
                       onChange={(event) => setToolbarQuery(event.target.value.slice(0, 80))}
-                      placeholder="도구 이름 검색"
+                      placeholder={t("studio.settings.toolbar.searchPlaceholder")}
                       className="h-11 w-full rounded-xl border border-line bg-card pl-9 pr-3 text-xs text-fg outline-none transition-colors placeholder:text-fg-3 hover:border-line-strong focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:h-10 pointer-coarse:h-11 pointer-coarse:min-h-11"
                     />
                   </label>
@@ -603,7 +619,7 @@ export function StudioAppSettingsPanel({
                 <div className="grid min-h-0 gap-3 sm:grid-cols-2">
                   <section className="flex min-h-0 flex-col rounded-xl border border-line bg-card/20 p-2" aria-labelledby={`${titleId}-toolbar-visible`}>
                     <p id={`${titleId}-toolbar-visible`} className="mb-2 flex items-center justify-between gap-2 px-1 text-[0.66rem] font-semibold text-fg-3">
-                      <span>표시 중</span>
+                      <span>{t("studio.settings.toolbar.visibleLabel")}</span>
                       <span className="tabular-nums">{visibleMatches.length}</span>
                     </p>
                     <ul className="max-h-[min(26rem,50dvh)] space-y-1 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-gutter:stable]">
@@ -612,14 +628,14 @@ export function StudioAppSettingsPanel({
                           key={id}
                           className="group flex min-h-11 items-center gap-1 rounded-lg border border-transparent bg-card/70 px-2 py-1.5 text-xs text-fg transition-colors hover:border-line hover:bg-raised"
                         >
-                          <span className="min-w-0 flex-1 truncate">{studioRailToolLabel(id)}</span>
+                          <span className="min-w-0 flex-1 truncate">{studioRailToolLabel(id, t)}</span>
                           <button
                             type="button"
                             className={cn(
                               buttonClass({ size: "sm", variant: "quiet" }),
                               "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                             )}
-                            aria-label={`${studioRailToolLabel(id)} 위로`}
+                                aria-label={`${studioRailToolLabel(id, t)} ${t("studio.settings.toolbar.moveUp")}`}
                             disabled={visible.indexOf(id) === 0}
                             onClick={() =>
                               patch({
@@ -635,7 +651,7 @@ export function StudioAppSettingsPanel({
                               buttonClass({ size: "sm", variant: "quiet" }),
                               "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                             )}
-                            aria-label={`${studioRailToolLabel(id)} 아래로`}
+                                aria-label={`${studioRailToolLabel(id, t)} ${t("studio.settings.toolbar.moveDown")}`}
                             disabled={visible.indexOf(id) === visible.length - 1}
                             onClick={() =>
                               patch({
@@ -651,7 +667,7 @@ export function StudioAppSettingsPanel({
                               buttonClass({ size: "sm", variant: "quiet" }),
                               "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                             )}
-                            aria-label={`${studioRailToolLabel(id)} 숨기기`}
+                                aria-label={`${studioRailToolLabel(id, t)} ${t("studio.settings.toolbar.hide")}`}
                             disabled={visible.length <= 1}
                             onClick={() =>
                               patch({ toolbar: { visibleIds: hideStudioRailTool(visible, id) } })
@@ -663,19 +679,21 @@ export function StudioAppSettingsPanel({
                       ))}
                       {visibleMatches.length === 0 ? (
                         <li className="rounded-lg px-2 py-6 text-center text-[0.7rem] text-fg-3">
-                          표시 중인 도구에서 검색 결과가 없어요.
+                          {t("studio.settings.toolbar.visibleHint")}
                         </li>
                       ) : null}
                     </ul>
                   </section>
                   <section className="flex min-h-0 flex-col rounded-xl border border-line border-dashed bg-card/10 p-2" aria-labelledby={`${titleId}-toolbar-hidden`}>
                     <p id={`${titleId}-toolbar-hidden`} className="mb-2 flex items-center justify-between gap-2 px-1 text-[0.66rem] font-semibold text-fg-3">
-                      <span>숨김 · 더보기에서 사용</span>
+                      <span>{t("studio.settings.toolbar.hiddenLabel")}</span>
                       <span className="tabular-nums">{hiddenMatches.length}</span>
                     </p>
                     {hiddenMatches.length === 0 ? (
                       <p className="grid min-h-24 place-items-center px-2 py-5 text-center text-[0.68rem] leading-relaxed text-fg-3">
-                        {normalizedToolbarQuery ? "숨긴 도구에서 검색 결과가 없어요." : "숨긴 도구가 없어요."}
+                        {normalizedToolbarQuery
+                          ? t("studio.settings.toolbar.hiddenEmptyWithQuery")
+                          : t("studio.settings.toolbar.hiddenEmpty")}
                       </p>
                     ) : (
                       <ul className="max-h-[min(26rem,50dvh)] space-y-1 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-gutter:stable]">
@@ -684,14 +702,14 @@ export function StudioAppSettingsPanel({
                             key={id}
                             className="flex min-h-11 items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-fg-2 transition-colors hover:bg-raised"
                           >
-                            <span className="min-w-0 flex-1 truncate">{studioRailToolLabel(id)}</span>
+                            <span className="min-w-0 flex-1 truncate">{studioRailToolLabel(id, t)}</span>
                             <button
                               type="button"
                               className={cn(
                                 buttonClass({ size: "sm", variant: "quiet" }),
                                 "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                               )}
-                              aria-label={`${studioRailToolLabel(id)} 표시`}
+                              aria-label={`${studioRailToolLabel(id, t)} ${t("studio.settings.toolbar.show")}`}
                               onClick={() =>
                                 patch({ toolbar: { visibleIds: showStudioRailTool(visible, id) } })
                               }
@@ -705,19 +723,22 @@ export function StudioAppSettingsPanel({
                   </section>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-card/20 p-2.5">
-                  <p className="text-[0.68rem] text-fg-3">순서와 표시 상태는 즉시 적용됩니다.</p>
+                  <p className="text-[0.68rem] text-fg-3">
+                    {t("studio.settings.toolbar.moveApplyHint")}
+                  </p>
                   <button
                     type="button"
                     className={cn(
                       buttonClass({ size: "sm", variant: "quiet" }),
                       "min-h-11 sm:min-h-8 pointer-coarse:min-h-11"
                     )}
+                    aria-label={t("studio.settings.toolbar.resetAria")}
                     onClick={() =>
                       patch({ toolbar: { visibleIds: [...DEFAULT_STUDIO_RAIL_TOOL_ORDER] } })
                     }
                   >
                     <RotateCcw className="size-3.5" aria-hidden />
-                    툴바 기본값
+                    {t("studio.settings.toolbar.reset")}
                   </button>
                 </div>
               </>
@@ -725,8 +746,11 @@ export function StudioAppSettingsPanel({
 
             {tab === "grids" ? (
               <>
-                <SectionLabel>그리드</SectionLabel>
-                <Row label="캔버스 px 눈금자" hint="캔버스 위·왼쪽에 실제 문서 좌표 표시">
+                <SectionLabel>{t("studio.settings.section.grids")}</SectionLabel>
+                <Row
+                  label={t("studio.settings.grids.canvasRulerLabel")}
+                  hint={t("studio.settings.grids.canvasRulerHint")}
+                >
                   <StudioToggleChip
                     active={settings.grids.showCanvasRulers}
                     onClick={() =>
@@ -738,10 +762,13 @@ export function StudioAppSettingsPanel({
                       })
                     }
                   >
-                    {settings.grids.showCanvasRulers ? "켜짐" : "꺼짐"}
+                    {settings.grids.showCanvasRulers ? t("studio.settings.state.on") : t("studio.settings.state.off")}
                   </StudioToggleChip>
                 </Row>
-                <Row label="픽셀 격자 표시" hint="확대 시 정렬용 격자">
+                <Row
+                  label={t("studio.settings.grids.pixelGridLabel")}
+                  hint={t("studio.settings.grids.pixelGridHint")}
+                >
                   <StudioToggleChip
                     active={settings.grids.showPixelGrid}
                     onClick={() =>
@@ -750,10 +777,10 @@ export function StudioAppSettingsPanel({
                       })
                     }
                   >
-                    {settings.grids.showPixelGrid ? "켜짐" : "꺼짐"}
+                    {settings.grids.showPixelGrid ? t("studio.settings.state.on") : t("studio.settings.state.off")}
                   </StudioToggleChip>
                 </Row>
-                <Row label="격자 간격">
+                <Row label={t("studio.settings.grids.gridSizeLabel")}>
                   <select
                     value={settings.grids.pixelGridSize}
                     onChange={(e) =>
@@ -770,7 +797,10 @@ export function StudioAppSettingsPanel({
                     ))}
                   </select>
                 </Row>
-                <Row label="격자에 스냅" hint="배치·드래그 시 격자 정렬">
+                <Row
+                  label={t("studio.settings.grids.snapLabel")}
+                  hint={t("studio.settings.grids.snapHint")}
+                >
                   <StudioToggleChip
                     active={settings.grids.snapToPixelGrid}
                     onClick={() =>
@@ -782,10 +812,28 @@ export function StudioAppSettingsPanel({
                       })
                     }
                   >
-                    {settings.grids.snapToPixelGrid ? "켜짐" : "꺼짐"}
+                    {settings.grids.snapToPixelGrid ? t("studio.settings.state.on") : t("studio.settings.state.off")}
                   </StudioToggleChip>
                 </Row>
-                <Row label="드로잉 시 아이소메트릭 힌트">
+                <Row
+                  label={t("studio.settings.grids.alignGuideLabel")}
+                  hint={t("studio.settings.grids.alignGuideHint")}
+                >
+                  <StudioToggleChip
+                    active={settings.grids.showAlignmentGuides}
+                    onClick={() =>
+                      patch({
+                        grids: {
+                          ...settings.grids,
+                          showAlignmentGuides: !settings.grids.showAlignmentGuides,
+                        },
+                      })
+                    }
+                  >
+                    {settings.grids.showAlignmentGuides ? t("studio.settings.state.on") : t("studio.settings.state.off")}
+                  </StudioToggleChip>
+                </Row>
+                <Row label={t("studio.settings.grids.isometricLabel")}>
                   <StudioToggleChip
                     active={settings.grids.showIsometricOnDraw}
                     onClick={() =>
@@ -797,7 +845,7 @@ export function StudioAppSettingsPanel({
                       })
                     }
                   >
-                    {settings.grids.showIsometricOnDraw ? "켜짐" : "꺼짐"}
+                    {settings.grids.showIsometricOnDraw ? t("studio.settings.state.on") : t("studio.settings.state.off")}
                   </StudioToggleChip>
                 </Row>
               </>
@@ -805,7 +853,7 @@ export function StudioAppSettingsPanel({
 
             {tab === "other" ? (
               <>
-                <SectionLabel>필압 · 기타</SectionLabel>
+                <SectionLabel>{t("studio.settings.section.other")}</SectionLabel>
                 <div className="rounded-xl border border-line bg-card/40 p-3">
                   <StudioPressureCurveGraph
                     pressureCurve={settings.other.pressureCurve}
@@ -813,11 +861,12 @@ export function StudioAppSettingsPanel({
                       patch({ other: { ...settings.other, pressureCurve } })
                     }
                   />
-                  <p className="mt-2 text-[0.68rem] text-fg-3">
-                    값이 작을수록 약한 압력에도 두꺼워지고, 클수록 단단한 필압 느낌이 납니다.
-                  </p>
+                  <p className="mt-2 text-[0.68rem] text-fg-3">{t("studio.settings.other.pressureHint")}</p>
                 </div>
-                <Row label="모션 줄이기" hint="애니메이션·마칭앤츠 등 움직임 완화">
+                <Row
+                  label={t("studio.settings.other.motionReduceLabel")}
+                  hint={t("studio.settings.other.motionReduceHint")}
+                >
                   <StudioToggleChip
                     active={settings.other.reduceMotion}
                     onClick={() =>
@@ -826,13 +875,15 @@ export function StudioAppSettingsPanel({
                       })
                     }
                   >
-                    {settings.other.reduceMotion ? "켜짐" : "꺼짐"}
+                    {settings.other.reduceMotion ? t("studio.settings.state.on") : t("studio.settings.state.off")}
                   </StudioToggleChip>
                 </Row>
                 <div className="rounded-xl border border-bad/30 bg-bad/5 p-3">
-                  <p className="text-xs font-semibold text-fg">모든 설정 초기화</p>
+                  <p className="text-xs font-semibold text-fg">
+                    {t("studio.settings.other.resetSectionTitle")}
+                  </p>
                   <p className="mt-0.5 text-[0.68rem] text-fg-3">
-                    단축키·툴바·마우스·터치·그리드·필압을 기본값으로 되돌립니다.
+                    {t("studio.settings.other.resetHint")}
                   </p>
                   <button
                     type="button"
@@ -843,7 +894,7 @@ export function StudioAppSettingsPanel({
                     onClick={() => {
                       if (
                         globalThis.confirm?.(
-                          "애플리케이션 설정을 모두 기본값으로 되돌릴까요? 이 작업은 문서 내용에는 영향을 주지 않습니다."
+                          t("studio.settings.other.resetConfirm")
                         )
                       ) {
                         onResetAll();
@@ -851,7 +902,7 @@ export function StudioAppSettingsPanel({
                     }}
                   >
                     <RotateCcw className="size-3.5" aria-hidden />
-                    기본값으로 재설정
+                    {t("studio.settings.other.reset")}
                   </button>
                 </div>
               </>
@@ -866,19 +917,22 @@ export function StudioAppSettingsPanel({
                 role="alert"
                 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.68rem] leading-snug text-warning"
               >
-                <span>브라우저 저장소에 저장하지 못해 현재 세션에만 적용됩니다.</span>
+                <span>{t("studio.settings.other.persistenceSessionWarning")}</span>
                 {onRetryPersistence ? (
                   <button
                     type="button"
                     className="min-h-11 rounded-lg px-2 font-semibold underline decoration-warning/50 underline-offset-2 hover:bg-warning/10 sm:min-h-9 pointer-coarse:min-h-11"
+                    aria-label={t("studio.settings.other.persistenceRetry")}
                     onClick={onRetryPersistence}
                   >
-                    다시 저장
+                    {t("studio.settings.other.persistenceRetry")}
                   </button>
                 ) : null}
               </div>
             ) : (
-              <p className="text-[0.68rem] text-fg-3">변경 내용은 이 기기에 자동 저장됩니다.</p>
+              <p className="text-[0.68rem] text-fg-3">
+                {t("studio.settings.other.persistenceSaved")}
+              </p>
             )}
           </div>
           <button
@@ -889,7 +943,7 @@ export function StudioAppSettingsPanel({
             )}
             onClick={onClose}
           >
-            완료
+            {t("studio.settings.state.save")}
           </button>
         </footer>
       </div>

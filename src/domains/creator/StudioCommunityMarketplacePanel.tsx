@@ -54,12 +54,14 @@ import type {
 } from "@/lib/creator-marketplace-resource-contract";
 
 import { cx } from "@/lib/cx";
+import { useT } from "@/lib/i18n";
 import {
   deleteCreatorMarketplaceResource,
   listCreatorMarketplaceResources,
   listMyCreatorMarketplaceResources,
   publishCreatorMarketplaceResource,
 } from "@/src/infrastructure/creator-marketplace-client";
+
 
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-panel";
@@ -68,41 +70,148 @@ const CONTROL =
 const PRIMARY =
   `min-h-11 rounded-lg bg-accent px-3 text-[0.65rem] font-bold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45 ${FOCUS}`;
 
+type StudioCommunityT = (key: string, fallback?: string) => string;
 type CommunityView = "community" | "mine" | "share";
+
+function localizeText(t: StudioCommunityT, fallback: string, key: string): string {
+  return t(key) === key ? fallback : t(key);
+}
+
+function interpolateText(message: string, values?: Record<string, string | number>): string {
+  if (!values) return message;
+  return Object.entries(values).reduce(
+    (memo, [key, value]) => memo.replaceAll(`{${key}}`, String(value)),
+    message,
+  );
+}
+
+function tText(
+  t: StudioCommunityT,
+  fallback: string,
+  key: string,
+  values?: Record<string, string | number>,
+): string {
+  return interpolateText(localizeText(t, fallback, key), values);
+}
 
 const KIND_OPTIONS: readonly {
   id: CreatorMarketplaceResourceKind | "all";
-  label: string;
+  labelKey: string;
+  labelFallback: string;
   Icon: typeof Brush;
 }[] = [
-  { id: "all", label: "전체", Icon: PackageCheck },
-  { id: "asset", label: "에셋", Icon: BadgeCheck },
-  { id: "brush", label: "브러시", Icon: Brush },
-  { id: "filter", label: "필터", Icon: Filter },
-  { id: "palette", label: "팔레트", Icon: Palette },
-  { id: "template", label: "템플릿", Icon: LayoutTemplate },
-  { id: "3d-preset", label: "3D", Icon: Box },
+  {
+    id: "all",
+    labelKey: "studio.community.kind.all",
+    labelFallback: "전체",
+    Icon: PackageCheck,
+  },
+  {
+    id: "asset",
+    labelKey: "studio.community.kind.asset",
+    labelFallback: "에셋",
+    Icon: BadgeCheck,
+  },
+  {
+    id: "brush",
+    labelKey: "studio.community.kind.brush",
+    labelFallback: "브러시",
+    Icon: Brush,
+  },
+  {
+    id: "filter",
+    labelKey: "studio.community.kind.filter",
+    labelFallback: "필터",
+    Icon: Filter,
+  },
+  {
+    id: "palette",
+    labelKey: "studio.community.kind.palette",
+    labelFallback: "팔레트",
+    Icon: Palette,
+  },
+  {
+    id: "template",
+    labelKey: "studio.community.kind.template",
+    labelFallback: "템플릿",
+    Icon: LayoutTemplate,
+  },
+  {
+    id: "3d-preset",
+    labelKey: "studio.community.kind.threeDPreset",
+    labelFallback: "3D",
+    Icon: Box,
+  },
 ];
 
 const KIND_LABEL: Readonly<Record<CreatorMarketplaceResourceKind, string>> =
+  Object.freeze({
+    asset: "studio.community.kind.asset",
+    brush: "studio.community.kind.brush",
+    filter: "studio.community.kind.filter",
+    palette: "studio.community.kind.palette",
+    template: "studio.community.kind.template",
+    "3d-preset": "studio.community.kind.threeDPreset",
+  });
+const KIND_LABEL_FALLBACK: Readonly<Record<CreatorMarketplaceResourceKind, string>> =
   Object.freeze({
     asset: "에셋",
     brush: "브러시",
     filter: "필터",
     palette: "팔레트",
     template: "템플릿",
-    "3d-preset": "3D 프리셋",
+    "3d-preset": "3D",
   });
 
 const LICENSE_LABEL: Readonly<Record<CreatorMarketplaceResourceLicense, string>> =
   Object.freeze({
-    "toonspectrum-standard": "표준 사용권",
-    "cc0-1.0": "CC0",
-    "cc-by-4.0": "CC BY",
-    "cc-by-nc-4.0": "CC BY-NC",
+    "toonspectrum-standard": "studio.community.license.toonspectrumStandard",
+    "cc0-1.0": "studio.community.license.cc0",
+    "cc-by-4.0": "studio.community.license.ccBy4",
+    "cc-by-nc-4.0": "studio.community.license.ccByNc4",
+  });
+const LICENSE_LABEL_FALLBACK: Readonly<Record<CreatorMarketplaceResourceLicense, string>> =
+  Object.freeze({
+    "toonspectrum-standard": "표준 · 파일 재배포 금지",
+    "cc0-1.0": "CC0 · 제한 없이 허용",
+    "cc-by-4.0": "CC BY · 출처 표시",
+    "cc-by-nc-4.0": "CC BY-NC · 비상업",
   });
 
+const LICENSE_OPTIONS: readonly {
+  value: CreatorMarketplaceResourceLicense;
+  labelKey: string;
+  labelFallback: string;
+}[] = [
+  {
+    value: "toonspectrum-standard",
+    labelKey: "studio.community.license.toonspectrumStandard",
+    labelFallback: "표준 · 파일 재배포 금지",
+  },
+  {
+    value: "cc0-1.0",
+    labelKey: "studio.community.license.cc0",
+    labelFallback: "CC0 · 제한 없이 허용",
+  },
+  {
+    value: "cc-by-4.0",
+    labelKey: "studio.community.license.ccBy4",
+    labelFallback: "CC BY · 출처 표시",
+  },
+  {
+    value: "cc-by-nc-4.0",
+    labelKey: "studio.community.license.ccByNc4",
+    labelFallback: "CC BY-NC · 비상업",
+  },
+];
+
 const SHARE_KIND_LABEL: Readonly<Record<StudioCommunityShareCandidateKind, string>> =
+  Object.freeze({
+    brush: "studio.community.kind.brush",
+    filter: "studio.community.kind.filter",
+    palette: "studio.community.kind.palette",
+  });
+const SHARE_KIND_LABEL_FALLBACK: Readonly<Record<StudioCommunityShareCandidateKind, string>> =
   Object.freeze({
     brush: "브러시",
     filter: "필터",
@@ -146,6 +255,42 @@ function CommunityRecordCard({
   const selectedAsset = assetProjection.assets.find(
     (asset) => asset.id === selectedAssetId,
   ) ?? assetProjection.assets[0] ?? null;
+  const t = useT();
+  const installActionLabel = bundled
+    ? localizeText(
+      t,
+      "Studio 내장됨",
+      "studio.community.install.builtIn",
+    )
+    : installed
+      ? localizeText(
+        t,
+        "기기에서 제거",
+        "studio.community.install.remove",
+      )
+      : installState === "update"
+        ? localizeText(
+          t,
+          "업데이트 설치",
+          "studio.community.install.update",
+        )
+        : installState === "repair-required"
+          ? localizeText(
+            t,
+            "설치 복구",
+            "studio.community.install.repair",
+          )
+          : installBlocked
+            ? localizeText(
+              t,
+              "호환성 확인 필요",
+              "studio.community.install.compatibilityCheck",
+            )
+            : localizeText(
+              t,
+              "무료 설치",
+              "studio.community.install.free",
+            );
 
   function handleInstall() {
     if (projection.status !== "installable") return;
@@ -165,8 +310,18 @@ function CommunityRecordCard({
     const inserted = onUseAsset(createStudioOriginalFreeAssetRecord(selectedAsset));
     onStatus(
       inserted
-        ? `${selectedAsset.name}을(를) 현재 캔버스 위치에 삽입했습니다.`
-        : `${selectedAsset.name}을(를) 삽입하지 못했습니다. 캔버스 잠금과 저장 상태를 확인해주세요.`,
+        ? tText(
+          t,
+          `${selectedAsset.name}을(를) 현재 캔버스 위치에 삽입했습니다.`,
+          "studio.community.useAsset.success",
+          { resourceName: selectedAsset.name },
+        )
+        : tText(
+          t,
+          `${selectedAsset.name}을(를) 삽입하지 못했습니다. 캔버스 잠금과 저장 상태를 확인해주세요.`,
+          "studio.community.useAsset.failed",
+          { resourceName: selectedAsset.name },
+        ),
       !inserted,
     );
   }
@@ -187,17 +342,17 @@ function CommunityRecordCard({
           {record.kind === "3d-preset" ? <Box size={16} aria-hidden /> : null}
         </span>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1">
-            <h5 className="text-[0.7rem] font-black text-fg">{record.name}</h5>
-            <span className="rounded-full border border-good/30 bg-good/10 px-1.5 py-0.5 text-[0.52rem] font-black text-good">
-              FREE
-            </span>
-            <span className="rounded-full border border-line px-1.5 py-0.5 text-[0.52rem] font-semibold text-fg-3">
-              {KIND_LABEL[record.kind]}
-            </span>
+            <div className="flex flex-wrap items-center gap-1">
+              <h5 className="text-[0.7rem] font-black text-fg">{record.name}</h5>
+              <span className="rounded-full border border-good/30 bg-good/10 px-1.5 py-0.5 text-[0.52rem] font-black text-good">
+              {t("studio.community.record.free")}
+              </span>
+              <span className="rounded-full border border-line px-1.5 py-0.5 text-[0.52rem] font-semibold text-fg-3">
+              {localizeText(t, KIND_LABEL_FALLBACK[record.kind], KIND_LABEL[record.kind])}
+              </span>
             {record.containsAi ? (
               <span className="rounded-full border border-warn/30 bg-warn/10 px-1.5 py-0.5 text-[0.52rem] font-semibold text-warn">
-                AI 포함
+                {t("studio.community.tag.aiIncluded")}
               </span>
             ) : null}
           </div>
@@ -207,12 +362,17 @@ function CommunityRecordCard({
           </p>
         </div>
         {record.isOwner && onDelete ? (
-          deleteArmed ? (
-            <div
-              role="group"
-              aria-label={`${record.name} 공유 삭제 확인`}
-              className="flex shrink-0 gap-1"
-            >
+            deleteArmed ? (
+              <div
+                role="group"
+              aria-label={tText(
+                t,
+                `${record.name} 공유 삭제 확인`,
+                "studio.community.record.deleteConfirmAria",
+                { resourceName: record.name },
+              )}
+                className="flex shrink-0 gap-1"
+              >
               <button
                 type="button"
                 onClick={() => setDeleteArmed(false)}
@@ -221,7 +381,7 @@ function CommunityRecordCard({
                   FOCUS,
                 )}
               >
-                취소
+                {t("studio.community.action.cancel")}
               </button>
               <button
                 type="button"
@@ -233,20 +393,25 @@ function CommunityRecordCard({
                   "min-h-11 rounded-lg border border-bad/30 bg-bad/10 px-2 text-[0.56rem] font-bold text-bad hover:bg-bad/15",
                   FOCUS,
                 )}
-              >
-                삭제 확인
-              </button>
-            </div>
+                >
+                  {t("studio.community.action.deleteConfirm")}
+                </button>
+              </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => setDeleteArmed(true)}
-              aria-label={`${record.name} 공유 삭제`}
-              className={cx(
-                "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-bad/10 hover:text-bad",
-                FOCUS,
+              <button
+                type="button"
+                onClick={() => setDeleteArmed(true)}
+              aria-label={tText(
+                t,
+                `${record.name} 공유 삭제`,
+                "studio.community.record.deleteAria",
+                { resourceName: record.name },
               )}
-            >
+                className={cx(
+                  "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-bad/10 hover:text-bad",
+                  FOCUS,
+                )}
+              >
               <Trash2 size={15} aria-hidden />
             </button>
           )
@@ -259,10 +424,15 @@ function CommunityRecordCard({
       ) : null}
       <div className="mt-2 flex flex-wrap gap-1 text-[0.54rem]">
         <span className="rounded-md border border-line bg-panel px-1.5 py-1 text-fg-2">
-          {LICENSE_LABEL[record.license]}
+          {localizeText(t, LICENSE_LABEL_FALLBACK[record.license], LICENSE_LABEL[record.license])}
         </span>
         <span className="rounded-md border border-line bg-panel px-1.5 py-1 text-fg-3">
-          {record.entries.length}개 항목
+          {tText(
+            t,
+            "{count}개 항목",
+            "studio.community.record.entryCount",
+            { count: record.entries.length },
+          )}
         </span>
         {record.tags.slice(0, 3).map((tag) => (
           <span key={tag} className="rounded-md border border-line bg-panel px-1.5 py-1 text-fg-3">
@@ -272,12 +442,17 @@ function CommunityRecordCard({
       </div>
       {record.attributionText ? (
         <p className="mt-2 rounded-md border border-line bg-panel px-2 py-1.5 text-[0.55rem] leading-relaxed text-fg-3">
-          출처 표시: {record.attributionText}
+          {tText(
+            t,
+            "출처 표시: {value}",
+            "studio.community.record.attribution",
+            { value: record.attributionText },
+          )}
         </p>
       ) : null}
       {record.license === "cc-by-nc-4.0" ? (
         <p className="mt-2 rounded-md border border-warn/25 bg-warn/10 px-2 py-1.5 text-[0.55rem] font-semibold text-warn">
-          비상업용 라이선스입니다. 유료 연재·광고 작품에는 사용할 수 없습니다.
+          {t("studio.community.record.nonCommercialNotice")}
         </p>
       ) : null}
       {record.kind === "asset" && assetProjection.assets.length > 0 ? (
@@ -285,7 +460,12 @@ function CommunityRecordCard({
           <select
             value={selectedAsset?.id ?? ""}
             onChange={(event) => setSelectedAssetId(event.target.value)}
-            aria-label={`${record.name} 에셋 선택`}
+            aria-label={tText(
+              t,
+              "{resourceName} 에셋 선택",
+              "studio.community.record.selectAssetAria",
+              { resourceName: record.name },
+            )}
             className={CONTROL}
           >
             {assetProjection.assets.map((asset) => (
@@ -298,7 +478,7 @@ function CommunityRecordCard({
             disabled={!onUseAsset}
             className={PRIMARY}
           >
-            캔버스에 추가
+            {t("studio.community.record.addToCanvas")}
           </button>
         </div>
       ) : projection.status === "installable" ? (
@@ -313,17 +493,7 @@ function CommunityRecordCard({
               : PRIMARY,
           )}
         >
-          {bundled
-            ? "Studio 내장됨"
-            : installed
-              ? "기기에서 제거"
-              : installState === "update"
-                ? "업데이트 설치"
-                : installState === "repair-required"
-                  ? "설치 복구"
-                  : installBlocked
-                    ? "호환성 확인 필요"
-                    : "무료 설치"}
+          {installActionLabel}
         </button>
       ) : (
         <p className="mt-2 rounded-md border border-warn/25 bg-warn/10 px-2 py-1.5 text-[0.55rem] leading-relaxed text-warn">
@@ -341,6 +511,7 @@ function ShareResourceForm({
 }: {
   readonly onPublished: (record: CreatorMarketplaceResourceRecord) => void;
 }) {
+  const t = useT();
   const [refreshToken, setRefreshToken] = useState(0);
   const candidates = listStudioCommunityShareCandidates();
   const candidateKey = (candidate: StudioCommunityShareCandidate) =>
@@ -385,11 +556,22 @@ function ShareResourceForm({
         recognizableMarketplaceDerivative: !notMarketplaceDerivative,
       });
       const published = await publishCreatorMarketplaceResource(manifest);
-      setStatus({ message: `"${published.name}"을(를) 무료 공유 마켓에 게시했습니다.`, error: false });
+      setStatus({
+        message: tText(
+          t,
+          '"{resourceName}"을(를) 무료 공유 마켓에 게시했습니다.',
+          "studio.community.share.publishSuccess",
+          { resourceName: published.name },
+        ),
+        error: false,
+      });
       onPublished(published);
     } catch (caught) {
       setStatus({
-        message: errorText(caught, "공유 리소스를 게시하지 못했습니다."),
+        message: errorText(
+          caught,
+          t("studio.community.share.publishError"),
+        ),
         error: true,
       });
     } finally {
@@ -409,21 +591,23 @@ function ShareResourceForm({
         <select
           value={candidate ? candidateKey(candidate) : ""}
           onChange={(event) => setSelectedCandidateKey(event.target.value)}
-          aria-label="공유할 내 리소스"
+          aria-label={t("studio.community.share.selectCandidateAria")}
           className={CONTROL}
           disabled={!candidate}
         >
-          {candidates.length === 0 ? <option value="">공유 가능한 로컬 자료 없음</option> : null}
-          {candidates.map((item) => (
-            <option key={candidateKey(item)} value={candidateKey(item)}>
-              [{SHARE_KIND_LABEL[item.kind]}] {item.name}
-            </option>
-          ))}
+            {candidates.length === 0
+                ? <option value="">{t("studio.community.share.noCandidate")}</option>
+                : null}
+            {candidates.map((item) => (
+              <option key={candidateKey(item)} value={candidateKey(item)}>
+                [{localizeText(t, SHARE_KIND_LABEL_FALLBACK[item.kind], SHARE_KIND_LABEL[item.kind])}] {item.name}
+              </option>
+            ))}
         </select>
         <button
           type="button"
           onClick={() => setRefreshToken((value) => value + 1)}
-          aria-label="공유할 내 리소스 다시 읽기"
+          aria-label={t("studio.community.share.refreshCandidatesAria")}
           className={CONTROL}
           data-studio-share-refresh={refreshToken}
         >
@@ -433,8 +617,8 @@ function ShareResourceForm({
       <textarea
         value={description}
         onChange={(event) => setDescription(event.target.value.slice(0, 1_000))}
-        placeholder="이 리소스의 용도와 특징을 설명해주세요."
-        aria-label="공유 리소스 설명"
+        placeholder={t("studio.community.share.descriptionPlaceholder")}
+        aria-label={t("studio.community.share.descriptionAria")}
         rows={3}
         className={cx(
           "w-full resize-y rounded-lg border border-line bg-card px-2.5 py-2 text-[0.65rem] text-fg outline-none placeholder:text-fg-3 focus:border-accent",
@@ -447,19 +631,20 @@ function ShareResourceForm({
           onChange={(event) => setLicense(
             event.target.value as CreatorMarketplaceResourceLicense,
           )}
-          aria-label="공유 라이선스"
+          aria-label={t("studio.community.share.licenseAria")}
           className={CONTROL}
         >
-          <option value="toonspectrum-standard">표준 · 파일 재배포 금지</option>
-          <option value="cc0-1.0">CC0 · 제한 없이 허용</option>
-          <option value="cc-by-4.0">CC BY · 출처 표시</option>
-          <option value="cc-by-nc-4.0">CC BY-NC · 비상업</option>
+          {LICENSE_OPTIONS.map((licenseOption) => (
+            <option key={licenseOption.value} value={licenseOption.value}>
+              {localizeText(t, licenseOption.labelFallback, licenseOption.labelKey)}
+            </option>
+          ))}
         </select>
         <label className={cx(
           CONTROL,
           "flex cursor-pointer items-center justify-between gap-2",
         )}>
-          <span>AI 생성·보조 포함</span>
+          <span>{t("studio.community.share.aiIncludedLabel")}</span>
           <input
             type="checkbox"
             checked={containsAi}
@@ -472,8 +657,8 @@ function ShareResourceForm({
         <input
           value={attributionText}
           onChange={(event) => setAttributionText(event.target.value.slice(0, 240))}
-          placeholder="작품 또는 배포 시 표시할 출처 문구"
-          aria-label="출처 표시 문구"
+          placeholder={t("studio.community.share.attributionPlaceholder")}
+          aria-label={t("studio.community.share.attributionAria")}
           className={cx("w-full", CONTROL)}
         />
       ) : null}
@@ -487,8 +672,8 @@ function ShareResourceForm({
           onChange={(event) => setOwnsRights(event.target.checked)}
           className="mt-0.5 size-4 shrink-0 accent-accent"
         />
-        <span>제가 직접 제작했으며 게시·재배포할 권리를 보유합니다.</span>
-      </label>
+          <span>{t("studio.community.share.ownershipStatement")}</span>
+        </label>
       <label className={cx(
         CONTROL,
         "flex cursor-pointer items-start gap-2 py-2 leading-relaxed",
@@ -499,14 +684,14 @@ function ShareResourceForm({
           onChange={(event) => setNotMarketplaceDerivative(event.target.checked)}
           className="mt-0.5 size-4 shrink-0 accent-accent"
         />
-        <span>다른 마켓 상품을 복제하거나 알아보기 어렵게 변형한 자료가 아닙니다.</span>
-      </label>
-      <button type="submit" disabled={!ready} className={cx("w-full", PRIMARY)}>
-        {publishing
-          ? <LoaderCircle size={14} className="mr-1 inline animate-spin" aria-hidden />
-          : <Send size={14} className="mr-1 inline" aria-hidden />}
-        무료 공유 마켓에 게시
-      </button>
+          <span>{t("studio.community.share.derivativeStatement")}</span>
+        </label>
+        <button type="submit" disabled={!ready} className={cx("w-full", PRIMARY)}>
+          {publishing
+            ? <LoaderCircle size={14} className="mr-1 inline animate-spin" aria-hidden />
+            : <Send size={14} className="mr-1 inline" aria-hidden />}
+          {t("studio.community.share.submit")}
+        </button>
       {status ? (
         <p
           role={status.error ? "alert" : "status"}
@@ -547,6 +732,7 @@ export function StudioCommunityMarketplacePanel({
   const [status, setStatus] = useState<{ message: string; error: boolean } | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [refreshToken, setRefreshToken] = useState(0);
+  const t = useT();
 
   useEffect(() => {
     if (!open || view === "share") return;
@@ -571,13 +757,20 @@ export function StudioCommunityMarketplacePanel({
         setRecords([]);
         setNextCursor(null);
         setHasMore(false);
-        setError(errorText(caught, "온라인 공유 마켓을 불러오지 못했습니다."));
+        setError(
+          errorText(
+            caught,
+            view === "mine"
+              ? t("studio.community.error.loadMine")
+              : t("studio.community.error.loadCommunity"),
+          ),
+        );
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [kind, open, query, reloadToken, view]);
+  }, [kind, open, query, reloadToken, t, view]);
 
   async function loadMore() {
     if (!nextCursor || loadingMore || view === "share") return;
@@ -602,7 +795,7 @@ export function StudioCommunityMarketplacePanel({
       setNextCursor(page.nextCursor);
       setHasMore(page.hasMore);
     } catch (caught) {
-      setError(errorText(caught, "다음 공유 리소스를 불러오지 못했습니다."));
+      setError(errorText(caught, t("studio.community.error.loadMore")));
     } finally {
       setLoadingMore(false);
     }
@@ -613,10 +806,18 @@ export function StudioCommunityMarketplacePanel({
     try {
       await deleteCreatorMarketplaceResource(record.id);
       setRecords((current) => current.filter((item) => item.id !== record.id));
-      setStatus({ message: `"${record.name}" 공유를 삭제했습니다.`, error: false });
+      setStatus({
+        message: tText(
+          t,
+          `"${record.name}" 공유를 삭제했습니다.`,
+          "studio.community.record.deleteSuccess",
+          { resourceName: record.name },
+        ),
+        error: false,
+      });
     } catch (caught) {
       setStatus({
-        message: errorText(caught, "공유 리소스를 삭제하지 못했습니다."),
+        message: errorText(caught, t("studio.community.error.delete")),
         error: true,
       });
     }
@@ -629,7 +830,7 @@ export function StudioCommunityMarketplacePanel({
 
   return (
     <section
-      aria-label="온라인 Creator 공유 마켓"
+      aria-label={t("studio.community.panel.aria")}
       data-studio-community-marketplace
       className="mb-3 overflow-hidden rounded-lg border border-line bg-panel"
     >
@@ -646,9 +847,9 @@ export function StudioCommunityMarketplacePanel({
             <UserRound size={17} aria-hidden />
           </span>
           <span className="min-w-0 flex-1">
-            <strong className="block text-xs text-fg">온라인 Creator 공유</strong>
+            <strong className="block text-xs text-fg">{t("studio.community.panel.label")}</strong>
             <span className="mt-0.5 block truncate text-[0.58rem] text-fg-3">
-              공개 탐색 · 실제 설치 · 내 자료 게시
+              {t("studio.community.panel.subtitle")}
             </span>
           </span>
           <ChevronDown
@@ -660,11 +861,11 @@ export function StudioCommunityMarketplacePanel({
 
         {open ? (
           <div className="border-t border-line p-2.5">
-            <div role="tablist" aria-label="온라인 공유 보기" className="grid grid-cols-3 gap-1">
+            <div role="tablist" aria-label={t("studio.community.panel.tabAria")} className="grid grid-cols-3 gap-1">
               {([
-                ["community", "공개 마켓"],
-                ["mine", "내 공유"],
-                ["share", "자료 게시"],
+                ["community", t("studio.community.panel.tab.community")],
+                ["mine", t("studio.community.panel.tab.mine")],
+                ["share", t("studio.community.panel.tab.share")],
               ] as const).map(([id, label]) => (
                 <button
                   key={id}
@@ -714,7 +915,7 @@ export function StudioCommunityMarketplacePanel({
                 className="mt-2"
               >
                 <form onSubmit={applySearch} className="grid grid-cols-[minmax(0,1fr)_auto] gap-1.5">
-                  <label htmlFor={searchId} className="sr-only">온라인 공유 검색</label>
+                  <label htmlFor={searchId} className="sr-only">{t("studio.community.panel.searchAria")}</label>
                   <div className="relative">
                     <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" aria-hidden />
                     <input
@@ -722,7 +923,7 @@ export function StudioCommunityMarketplacePanel({
                       type="search"
                       value={queryDraft}
                       onChange={(event) => setQueryDraft(event.target.value.slice(0, 120))}
-                      placeholder="이름·설명·태그 검색"
+                      placeholder={t("studio.community.panel.searchPlaceholder")}
                       className={cx("w-full pl-9 pr-11", CONTROL)}
                     />
                     {queryDraft ? (
@@ -732,7 +933,7 @@ export function StudioCommunityMarketplacePanel({
                           setQueryDraft("");
                           setQuery("");
                         }}
-                        aria-label="온라인 공유 검색어 지우기"
+                        aria-label={t("studio.community.panel.searchClearAria")}
                         className={cx(
                           "absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-lg text-fg-3 hover:bg-raised",
                           FOCUS,
@@ -742,10 +943,10 @@ export function StudioCommunityMarketplacePanel({
                       </button>
                     ) : null}
                   </div>
-                  <button type="submit" className={PRIMARY}>검색</button>
+                  <button type="submit" className={PRIMARY}>{t("studio.community.panel.searchAction")}</button>
                 </form>
                 <div className="mt-2 flex gap-1 overflow-x-auto pb-1 [scrollbar-width:thin]">
-                  {KIND_OPTIONS.map(({ id, label, Icon }) => (
+                  {KIND_OPTIONS.map(({ id, labelKey, labelFallback, Icon }) => (
                     <button
                       key={id}
                       type="button"
@@ -760,16 +961,24 @@ export function StudioCommunityMarketplacePanel({
                       )}
                     >
                       <Icon size={12} aria-hidden />
-                      {label}
+                      {localizeText(t, labelFallback, labelKey)}
                     </button>
                   ))}
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2 text-[0.57rem] text-fg-3">
-                  <span>{loading ? "불러오는 중…" : `${records.length}개 표시`}</span>
+                  <span>{loading
+                    ? t("studio.community.panel.loading")
+                    : tText(
+                      t,
+                      `${records.length}개 표시`,
+                      "studio.community.panel.recordCount",
+                      { count: records.length },
+                    )}
+                  </span>
                   <button
                     type="button"
                     onClick={() => setReloadToken((value) => value + 1)}
-                    aria-label="온라인 공유 목록 새로고침"
+                    aria-label={t("studio.community.panel.reloadAria")}
                     className={cx("grid size-11 place-items-center rounded-lg hover:bg-raised", FOCUS)}
                   >
                     <RefreshCw size={14} className={loading ? "animate-spin" : ""} aria-hidden />
@@ -781,7 +990,7 @@ export function StudioCommunityMarketplacePanel({
                     <div className="min-w-0 flex-1">
                       <p className="text-[0.6rem] leading-relaxed">{error}</p>
                       {view === "mine" ? (
-                        <p className="mt-1 text-[0.55rem] text-fg-3">로그인이 필요한 보기일 수 있습니다.</p>
+                        <p className="mt-1 text-[0.55rem] text-fg-3">{t("studio.community.panel.loginHint")}</p>
                       ) : null}
                     </div>
                   </div>
@@ -803,7 +1012,7 @@ export function StudioCommunityMarketplacePanel({
                 </div>
                 {!loading && !error && records.length === 0 ? (
                   <p role="status" className="mt-2 rounded-lg border border-dashed border-line px-3 py-5 text-center text-xs text-fg-3">
-                    조건에 맞는 공유 리소스가 없습니다.
+                    {t("studio.community.panel.empty")}
                   </p>
                 ) : null}
                 {hasMore ? (
@@ -816,7 +1025,7 @@ export function StudioCommunityMarketplacePanel({
                     {loadingMore
                       ? <LoaderCircle size={14} className="mr-1 inline animate-spin" aria-hidden />
                       : null}
-                    더 불러오기
+                    {t("studio.community.panel.loadMore")}
                   </button>
                 ) : null}
               </div>

@@ -48,10 +48,16 @@ describe("StudioPage view integration contract", () => {
   });
 
   it("keeps the legacy canvas zoom cluster out of the full editor dock", () => {
-    expect(viewportSource).toMatch(
-      /absolute bottom-3 left-3[\s\S]*?canvasOnlyMode && "lg:flex"[\s\S]*?aria-label="실제 픽셀 100% 보기"/u,
+    expect(viewportSource).toContain(
+      '"absolute bottom-3 left-3 z-30 hidden items-center gap-0.5 rounded-full',
     );
+    expect(viewportSource).toContain('canvasOnlyMode && "lg:flex"');
     expect(viewportSource).not.toContain('"absolute bottom-3 left-3 z-30 hidden lg:flex');
+  });
+
+  it("keeps localized actual-pixel and input-mode controls in the canvas-only cluster", () => {
+    expect(viewportSource).toContain("<StudioViewInputModeControls");
+    expect(viewportSource).toContain('"studio.canvas.actualPixelAria"');
   });
 
   it("loads the optional view HUD only after a zoom or rotate intent", () => {

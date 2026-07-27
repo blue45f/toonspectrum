@@ -73,6 +73,18 @@ const STUDIO_COMPANION_VIEW_QUERY = "view";
 const STUDIO_COMPANION_SESSION_PATTERN = /^[A-Za-z0-9_-]{12,96}$/u;
 const STUDIO_COMPANION_SCOPE_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 
+type StudioCompanionI18n = (key: string) => string;
+
+function localizeCompanionText(
+  t: StudioCompanionI18n | undefined,
+  fallback: string,
+  key: string,
+): string {
+  if (!t) return fallback;
+  const value = t(key);
+  return value === key ? fallback : value;
+}
+
 export type StudioCompanionRole = "primary" | "companion";
 export const STUDIO_COMPANION_SURFACES = ["workspace", "navigator", "review", "reference"] as const;
 export type StudioCompanionSurface = (typeof STUDIO_COMPANION_SURFACES)[number];
@@ -319,6 +331,19 @@ export const STUDIO_COMPANION_TOOL_LABELS: Record<StudioCompanionToolId, string>
   ai: "AI 어시스트",
   "3d-character": "3D 캐릭터",
   "3d-bg": "3D 배경",
+};
+
+export const STUDIO_COMPANION_TOOL_LABEL_KEYS: Record<StudioCompanionToolId, string> = {
+  select: "studio.toolsCompanion.tool.select",
+  pen: "studio.toolsCompanion.tool.pen",
+  eraser: "studio.toolsCompanion.tool.eraser",
+  template: "studio.toolsCompanion.tool.template",
+  bubble: "studio.toolsCompanion.tool.bubble",
+  text: "studio.toolsCompanion.tool.text",
+  layers: "studio.toolsCompanion.tool.layers",
+  ai: "studio.toolsCompanion.tool.ai",
+  "3d-character": "studio.toolsCompanion.tool.threeDCharacter",
+  "3d-bg": "studio.toolsCompanion.tool.threeDBackground",
 };
 
 export const STUDIO_COMPANION_TOOL_ORDER: readonly StudioCompanionToolId[] = [
@@ -1868,6 +1893,7 @@ export function openReadyStudioToolsCompanionForMenu(input: {
   windowRef: StudioCompanionWindowRef;
   binding: StudioCompanionPrimaryBinding;
   announce: StudioCompanionAnnounce;
+  t?: StudioCompanionI18n;
 }): void {
   const surface = input.surface ?? "workspace";
   const cachedWindow = input.windowRef.current;
@@ -1886,16 +1912,32 @@ export function openReadyStudioToolsCompanionForMenu(input: {
     reusedExistingWindow ? cachedWindow : null
   );
   if (!companionWindow) {
-    input.announce("팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.");
+    input.announce(localizeCompanionText(
+      input.t,
+      "팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.",
+      "studio.toolsCompanion.open.popupBlocked"
+    ));
     return;
   }
   input.windowRef.current = companionWindow;
   input.announce(
     reusedExistingWindow
-      ? "도구 창을 앞으로 가져오도록 요청했어요 · 보이지 않으면 작업 표시줄에서 선택하세요"
+      ? localizeCompanionText(
+        input.t,
+        "도구 창을 앞으로 가져오도록 요청했어요 · 보이지 않으면 작업 표시줄에서 선택하세요",
+        "studio.toolsCompanion.open.focusForward",
+      )
       : cachedWindow
-        ? "도구 창을 복구해 다시 연결합니다 · 다른 모니터로 옮겨 쓰세요"
-        : "도구 창을 열었습니다 · 다른 모니터로 옮겨 쓰세요"
+        ? localizeCompanionText(
+          input.t,
+          "도구 창을 복구해 다시 연결합니다 · 다른 모니터로 옮겨 쓰세요",
+          "studio.toolsCompanion.open.restoreAndConnect",
+        )
+        : localizeCompanionText(
+          input.t,
+          "도구 창을 열었습니다 · 다른 모니터로 옮겨 쓰세요",
+          "studio.toolsCompanion.open.openedOnReservation",
+        )
   );
 }
 
@@ -1906,6 +1948,7 @@ export function completeReservedStudioToolsCompanionWindow(input: {
   reservation: Window;
   windowRef: StudioCompanionWindowRef;
   announce: StudioCompanionAnnounce;
+  t?: StudioCompanionI18n;
 }): void {
   if (input.windowRef.current !== input.reservation) {
     try {
@@ -1932,7 +1975,11 @@ export function completeReservedStudioToolsCompanionWindow(input: {
     } catch {
       // Ignore a reservation already closed by the browser.
     }
-    input.announce("도구 창을 열지 못했습니다. 다시 시도해 주세요.");
+    input.announce(localizeCompanionText(
+      input.t,
+      "도구 창을 열지 못했습니다. 다시 시도해 주세요.",
+      "studio.toolsCompanion.open.openFailed"
+    ));
     return;
   }
   try {
@@ -1940,7 +1987,11 @@ export function completeReservedStudioToolsCompanionWindow(input: {
   } catch {
     // A valid popup remains usable when focus() is denied.
   }
-  input.announce("도구 창을 열었습니다 · 다른 모니터로 옮겨 쓰세요");
+  input.announce(localizeCompanionText(
+    input.t,
+    "도구 창을 열었습니다 · 다른 모니터로 옮겨 쓰세요",
+    "studio.toolsCompanion.open.openedOnReservation"
+  ));
 }
 
 export type StudioCompanionChannel = {

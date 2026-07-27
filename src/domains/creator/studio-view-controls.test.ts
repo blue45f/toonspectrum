@@ -23,6 +23,7 @@ import {
   rotateStudioViewRight,
   stepStudioViewZoom,
   stepStudioViewWheelZoom,
+  toggleStudioCanvasWheelMode,
 } from "./studio-view-controls";
 
 describe("studio view shortcuts", () => {
@@ -61,6 +62,12 @@ describe("studio view shortcuts", () => {
 });
 
 describe("studio view zoom", () => {
+  it("toggles the quick wheel control between canvas zoom and scrolling", () => {
+    expect(toggleStudioCanvasWheelMode("zoom")).toBe("pan");
+    expect(toggleStudioCanvasWheelMode("pan")).toBe("zoom");
+    expect(toggleStudioCanvasWheelMode("brush-size")).toBe("pan");
+  });
+
   it("uses one bounded, 0.05-aligned step for menu and shortcuts", () => {
     expect(stepStudioViewZoom(1, 1)).toBe(1.2);
     expect(stepStudioViewZoom(1, -1)).toBe(0.8);

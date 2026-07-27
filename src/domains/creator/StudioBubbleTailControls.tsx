@@ -2,6 +2,8 @@ import { GitBranch, Plus, Spline, Trash2 } from "lucide-react";
 
 import type { BubbleTailDirection, BubbleTailSide, BubbleTailSpec } from "./studio-bubble-path";
 
+import { useT } from "@/lib/i18n";
+
 export interface StudioBubblePrimaryTailPatch {
   tail?: "left" | "right" | "none";
   tailDirection?: BubbleTailDirection;
@@ -36,10 +38,10 @@ function segmentClass(active: boolean): string {
   }`;
 }
 
-function bendLabel(value: number): string {
+function bendLabel(value: number, t: (key: string) => string): string {
   const percent = Math.round(Math.abs(value) * 100);
-  if (percent < 5) return "직선";
-  return `${value < 0 ? "왼쪽" : "오른쪽"} ${percent}%`;
+  if (percent < 5) return t("studio.bubbleTail.bendLabel.straight");
+  return `${value < 0 ? t("studio.bubbleTail.bendDirection.left") : t("studio.bubbleTail.bendDirection.right")} ${percent}%`;
 }
 
 function RangeRow({
@@ -107,7 +109,21 @@ export function StudioBubbleTailControls({
   onPatchPrimary,
   onChangeExtraTails,
 }: StudioBubbleTailControlsProps) {
+  const t = useT();
   const visible = tail !== "none";
+
+  const extraDirectionMap: Record<BubbleTailDirection, string> = {
+    top: t("studio.bubbleTail.directionLabelTop"),
+    bottom: t("studio.bubbleTail.directionLabelBottom"),
+    left: t("studio.bubbleTail.directionLabelLeft"),
+    right: t("studio.bubbleTail.directionLabelRight"),
+  };
+
+  const extraSideMap: Record<BubbleTailSide, string> = {
+    left: t("studio.bubbleTail.endAngleLeft"),
+    center: t("studio.bubbleTail.endAngleCenter"),
+    right: t("studio.bubbleTail.endAngleRight"),
+  };
 
   return (
     <section aria-labelledby="bubble-tail-heading" className="mt-3 space-y-3 border-t border-line/50 pt-3">
@@ -116,20 +132,20 @@ export function StudioBubbleTailControls({
           <Spline size={15} aria-hidden />
         </span>
         <div className="min-w-0">
-          <h3 id="bubble-tail-heading" className="text-sm font-bold text-fg">꼬리 디자인</h3>
+          <h3 id="bubble-tail-heading" className="text-sm font-bold text-fg">{t("studio.bubbleTail.title")}</h3>
           <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-            화자를 가리키는 방향과 밑동 너비·곡률을 따로 조절합니다.
+            {t("studio.bubbleTail.description")}
           </p>
         </div>
       </div>
 
       <fieldset>
-        <legend className="mb-1.5 text-xs font-semibold text-fg-2">화자 방향</legend>
+        <legend className="mb-1.5 text-xs font-semibold text-fg-2">{t("studio.bubbleTail.speakerDirection")}</legend>
         <div className="grid grid-cols-3 gap-1 rounded-xl border border-line bg-card p-1">
           {([
-            { value: "left", label: "왼쪽 화자" },
-            { value: "right", label: "오른쪽 화자" },
-            { value: "none", label: "꼬리 없음" },
+            { value: "left", label: t("studio.bubbleTail.directionLeft") },
+            { value: "right", label: t("studio.bubbleTail.directionRight") },
+            { value: "none", label: t("studio.bubbleTail.directionNone") },
           ] as const).map((option) => (
             <button
               key={option.value}
@@ -154,13 +170,13 @@ export function StudioBubbleTailControls({
       {visible ? (
         <>
           <fieldset>
-            <legend className="mb-1.5 text-xs font-semibold text-fg-2">말풍선 부착면</legend>
+            <legend className="mb-1.5 text-xs font-semibold text-fg-2">{t("studio.bubbleTail.attachmentSurface")}</legend>
             <div className="grid grid-cols-4 gap-1 rounded-xl border border-line bg-card p-1">
               {([
-                { value: "top", label: "위" },
-                { value: "bottom", label: "아래" },
-                { value: "left", label: "왼쪽" },
-                { value: "right", label: "오른쪽" },
+                { value: "top", label: t("studio.bubbleTail.surfaceLabelTop") },
+                { value: "bottom", label: t("studio.bubbleTail.surfaceLabelBottom") },
+                { value: "left", label: t("studio.bubbleTail.surfaceLabelLeft") },
+                { value: "right", label: t("studio.bubbleTail.surfaceLabelRight") },
               ] as const).map((option) => (
                 <button
                   key={option.value}
@@ -178,13 +194,17 @@ export function StudioBubbleTailControls({
 
           {anchored ? (
             <p className="rounded-lg border border-cool/30 bg-cool/10 px-3 py-2 text-[0.68rem] leading-relaxed text-cool">
-              자동 부착 중에는 면·위치·길이가 화자를 따라갑니다. 밑동 너비와 휘어짐은 계속 조절할 수 있어요.
+              {t("studio.bubbleTail.autoAttachHint")}
             </p>
           ) : null}
 
           <div className="space-y-1 rounded-xl border border-line bg-card/35 p-3">
             <RangeRow
-              label={direction === "left" || direction === "right" ? "부착 위치 · 세로" : "부착 위치 · 가로"}
+              label={
+                direction === "left" || direction === "right"
+                  ? t("studio.bubbleTail.attachmentPositionVertical")
+                  : t("studio.bubbleTail.attachmentPositionHorizontal")
+              }
               value={ratio}
               min={0.08}
               max={0.92}
@@ -194,7 +214,7 @@ export function StudioBubbleTailControls({
               onChange={(value) => onPatchPrimary({ tailXRatio: value })}
             />
             <RangeRow
-              label="꼬리 길이"
+              label={t("studio.bubbleTail.length")}
               value={length}
               min={8}
               max={120}
@@ -204,7 +224,7 @@ export function StudioBubbleTailControls({
               onChange={(value) => onPatchPrimary({ tailHeight: value })}
             />
             <RangeRow
-              label="밑동 너비"
+              label={t("studio.bubbleTail.baseWidth")}
               value={base}
               min={6}
               max={120}
@@ -213,12 +233,12 @@ export function StudioBubbleTailControls({
               onChange={(value) => onPatchPrimary({ tailBase: value })}
             />
             <RangeRow
-              label="꼬리 휘어짐"
+              label={t("studio.bubbleTail.bend")}
               value={bend}
               min={-1}
               max={1}
               step={0.05}
-              valueLabel={bendLabel(bend)}
+              valueLabel={bendLabel(bend, t)}
               onChange={(value) => onPatchPrimary({ tailBend: value })}
             />
           </div>
@@ -228,9 +248,9 @@ export function StudioBubbleTailControls({
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <p className="flex items-center gap-1.5 text-xs font-bold text-fg">
-                    <GitBranch size={13} aria-hidden /> 동시 대사 꼬리
+                    <GitBranch size={13} aria-hidden /> {t("studio.bubbleTail.multiTailTitle")}
                   </p>
-                  <p className="mt-0.5 text-[0.65rem] text-fg-3">한 말풍선을 최대 세 화자에게 연결합니다.</p>
+                  <p className="mt-0.5 text-[0.65rem] text-fg-3">{t("studio.bubbleTail.multiTailHint")}</p>
                 </div>
                 <button
                   type="button"
@@ -250,13 +270,13 @@ export function StudioBubbleTailControls({
                   }
                   className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  <Plus size={14} aria-hidden /> 추가
+                  <Plus size={14} aria-hidden /> {t("studio.bubbleTail.multiTailAdd")}
                 </button>
               </div>
 
             {extraTails.length === 0 ? (
               <p className="mt-2 rounded-lg border border-dashed border-line px-3 py-3 text-center text-[0.68rem] text-fg-3">
-                합창·동시 대사라면 꼬리를 더해 보세요.
+                {t("studio.bubbleTail.multiTailPlaceholder")}
               </p>
             ) : (
               <div className="mt-2 space-y-2">
@@ -266,27 +286,31 @@ export function StudioBubbleTailControls({
                       <span className="grid size-6 place-items-center rounded-full bg-accent-soft font-display text-[0.65rem] text-accent">
                         {index + 2}
                       </span>
-                      <span className="min-w-0 flex-1">추가 꼬리 {index + 1}</span>
-                      <span className="text-[0.65rem] font-normal text-fg-3 group-open:hidden">펼치기</span>
+                      <span className="min-w-0 flex-1">
+                        {t("studio.bubbleTail.multiTailIndex")} {index + 1}
+                      </span>
+                      <span className="text-[0.65rem] font-normal text-fg-3 group-open:hidden">
+                        {t("studio.bubbleTail.multiTailExpand")}
+                      </span>
                     </summary>
                     <div className="space-y-2 border-t border-line px-3 py-3">
                       <div className="flex min-h-11 items-center justify-between gap-3">
                         <p className="text-[0.68rem] leading-relaxed text-fg-3">
-                          말풍선 외곽에서 별도 화자를 향하는 꼬리입니다.
+                          {t("studio.bubbleTail.multiTailDescription")}
                         </p>
                         <button
                           type="button"
-                          aria-label={`추가 꼬리 ${index + 1} 제거`}
+                          aria-label={`${t("studio.bubbleTail.multiTailRemoveLabel")} ${index + 1}`}
                           onClick={() =>
                             onChangeExtraTails(extraTails.filter((_, tailIndex) => tailIndex !== index))
                           }
                           className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold text-fg-3 hover:bg-bad/10 hover:text-bad"
                         >
-                          <Trash2 size={14} aria-hidden /> 제거
+                          <Trash2 size={14} aria-hidden /> {t("studio.bubbleTail.multiTailRemove")}
                         </button>
                       </div>
                       <fieldset>
-                        <legend className="mb-1 text-[0.68rem] font-semibold text-fg-2">부착면</legend>
+                        <legend className="mb-1 text-[0.68rem] font-semibold text-fg-2">{t("studio.bubbleTail.multiTailAttach")}</legend>
                         <div className="grid grid-cols-4 gap-1 rounded-lg bg-card p-1">
                           {(["top", "bottom", "left", "right"] as const).map((value) => (
                             <button
@@ -296,13 +320,13 @@ export function StudioBubbleTailControls({
                               onClick={() => onChangeExtraTails(updateTail(extraTails, index, { direction: value }))}
                               className={segmentClass(extraTail.direction === value)}
                             >
-                              {{ top: "위", bottom: "아래", left: "왼쪽", right: "오른쪽" }[value]}
+                              {extraDirectionMap[value]}
                             </button>
                           ))}
                         </div>
                       </fieldset>
                       <fieldset>
-                        <legend className="mb-1 text-[0.68rem] font-semibold text-fg-2">끝 기울기</legend>
+                        <legend className="mb-1 text-[0.68rem] font-semibold text-fg-2">{t("studio.bubbleTail.endAngle")}</legend>
                         <div className="grid grid-cols-3 gap-1 rounded-lg bg-card p-1">
                           {(["left", "center", "right"] as const).map((value: BubbleTailSide) => (
                             <button
@@ -312,13 +336,13 @@ export function StudioBubbleTailControls({
                               onClick={() => onChangeExtraTails(updateTail(extraTails, index, { side: value }))}
                               className={segmentClass(extraTail.side === value)}
                             >
-                              {{ left: "왼쪽", center: "중앙", right: "오른쪽" }[value]}
+                              {extraSideMap[value]}
                             </button>
                           ))}
                         </div>
                       </fieldset>
                       <RangeRow
-                        label="부착 위치"
+                        label={t("studio.bubbleTail.attachmentPosition")}
                         value={extraTail.ratio}
                         min={0.08}
                         max={0.92}
@@ -327,7 +351,7 @@ export function StudioBubbleTailControls({
                         onChange={(value) => onChangeExtraTails(updateTail(extraTails, index, { ratio: value }))}
                       />
                       <RangeRow
-                        label="길이"
+                        label={t("studio.bubbleTail.length")}
                         value={extraTail.length}
                         min={4}
                         max={160}
@@ -336,7 +360,7 @@ export function StudioBubbleTailControls({
                         onChange={(value) => onChangeExtraTails(updateTail(extraTails, index, { length: value }))}
                       />
                       <RangeRow
-                        label="밑동 너비"
+                        label={t("studio.bubbleTail.baseWidth")}
                         value={extraTail.base}
                         min={4}
                         max={120}
@@ -345,12 +369,12 @@ export function StudioBubbleTailControls({
                         onChange={(value) => onChangeExtraTails(updateTail(extraTails, index, { base: value }))}
                       />
                       <RangeRow
-                        label="휘어짐"
+                        label={t("studio.bubbleTail.bend")}
                         value={extraTail.bend ?? 0}
                         min={-1}
                         max={1}
                         step={0.05}
-                        valueLabel={bendLabel(extraTail.bend ?? 0)}
+                        valueLabel={bendLabel(extraTail.bend ?? 0, t)}
                         onChange={(value) => onChangeExtraTails(updateTail(extraTails, index, { bend: value }))}
                       />
                     </div>
@@ -358,10 +382,10 @@ export function StudioBubbleTailControls({
                 ))}
               </div>
             )}
-            </div>
+          </div>
           ) : (
             <p className="rounded-lg border border-line bg-card/35 px-3 py-2 text-[0.68rem] leading-relaxed text-fg-3">
-              이어 말하기는 한 화자의 긴 대사를 위한 형태라 주 꼬리 하나만 사용합니다.
+              {t("studio.bubbleTail.continueSpeechSingleTail")}
             </p>
           )}
         </>

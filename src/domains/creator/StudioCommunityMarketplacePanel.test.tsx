@@ -1,9 +1,11 @@
 import { readFileSync } from "node:fs";
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { StudioCommunityMarketplacePanel } from "./StudioCommunityMarketplacePanel";
+
+import { useI18n } from "@/lib/i18n";
 
 const source = readFileSync(
   new URL("./StudioCommunityMarketplacePanel.tsx", import.meta.url),
@@ -15,6 +17,10 @@ const assetMenuSource = readFileSync(
 );
 
 describe("StudioCommunityMarketplacePanel", () => {
+  beforeEach(() => {
+    useI18n.getState().setLang("ko");
+  });
+
   it("collapsed 상태에서는 서버 요청 UI를 지연하고 온라인 경계를 정확히 설명한다", () => {
     const html = renderToStaticMarkup(<StudioCommunityMarketplacePanel />);
 
@@ -56,9 +62,9 @@ describe("StudioCommunityMarketplacePanel", () => {
   });
 
   it("권리·AI·라이선스 확인 없이 게시할 수 없고 가짜 성공을 표시하지 않는다", () => {
-    expect(source).toContain("제가 직접 제작했으며 게시·재배포할 권리를 보유합니다.");
-    expect(source).toContain("다른 마켓 상품을 복제하거나 알아보기 어렵게 변형한 자료가 아닙니다.");
-    expect(source).toContain("AI 생성·보조 포함");
+    expect(source).toContain("studio.community.share.ownershipStatement");
+    expect(source).toContain("studio.community.share.derivativeStatement");
+    expect(source).toContain("studio.community.share.aiIncludedLabel");
     expect(source).toContain("attributionRequired");
     expect(source).toContain("const ready = Boolean(candidate)");
     expect(source).toContain("await publishCreatorMarketplaceResource(manifest)");

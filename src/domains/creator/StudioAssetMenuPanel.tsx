@@ -57,6 +57,7 @@ import {
   creatorAssetLicenseOf,
 } from "@/lib/creator-asset-contract";
 import { cx } from "@/lib/cx";
+import { useT } from "@/lib/i18n";
 import { lazyRetry } from "@/lib/lazy-retry";
 
 export type StudioAssetTab = "mine" | "community";
@@ -71,6 +72,16 @@ const CONTROL_FOCUS_CLASS =
 const TOUCH_CONTROL_CLASS = `min-h-11 ${CONTROL_FOCUS_CLASS}`;
 const CARD_ACTION_CLASS =
   `flex min-h-11 w-full items-center justify-center gap-1 rounded-md px-1.5 text-[0.62rem] font-semibold transition-colors ${CONTROL_FOCUS_CLASS}`;
+
+function localizeText(
+  t: (key: string, params?: Record<string, string | number>) => string,
+  fallback: string,
+  key: string,
+  params?: Record<string, string | number>,
+): string {
+  const translated = t(key, params);
+  return translated === key ? fallback : translated;
+}
 
 const studioOriginalAssetMarketplaceLoader = createStudioIntentLazyLoader(() =>
   import("./StudioOriginalAssetMarketplacePanel").then((module) => ({
@@ -108,6 +119,8 @@ function preloadStudioAssetMarketplacePanels(): void {
 }
 
 function StudioAssetMarketplaceLoading() {
+  const t = useT();
+
   return (
     <div
       role="status"
@@ -116,7 +129,11 @@ function StudioAssetMarketplaceLoading() {
       className="mb-2 min-h-[9.75rem] rounded-lg border border-line bg-card/70 p-2"
     >
       <span className="sr-only">
-        커뮤니티 소재를 불러오는 중. 브러시, 필터, 템플릿과 에셋 마켓을 준비하고 있습니다.
+        {localizeText(
+          t,
+          "커뮤니티 소재를 불러오는 중. 브러시, 필터, 템플릿과 에셋 마켓을 준비하고 있습니다.",
+          "studio.assetMenu.loadingCommunityNotice"
+        )}
       </span>
       <div aria-hidden className="grid gap-2">
         {(["w-24", "w-32", "w-28"] as const).map((labelWidth, index) => (
@@ -250,7 +267,11 @@ function AssetFavoriteButton({
   onToggleFavorite: (id: StudioAssetFavoriteId) => void;
 }) {
   const favorite = isStudioAssetFavorite(favoriteState, favoriteId);
-  const label = `${assetName} 즐겨찾기${favorite ? "에서 제거" : "에 추가"}`;
+  const t = useT();
+  const favoriteAction = favorite
+    ? localizeText(t, "에서 제거", "studio.assetMenu.favoriteAction.remove")
+    : localizeText(t, "에 추가", "studio.assetMenu.favoriteAction.add");
+  const label = `${assetName} ${localizeText(t, "즐겨찾기", "studio.assetMenu.favoriteLabel")}${favoriteAction}`;
 
   return (
     <button
@@ -326,6 +347,7 @@ export function StudioAssetMenuPanel({
   onDeleteSharedAsset,
   onReportSharedAsset,
 }: StudioAssetMenuPanelProps) {
+  const t = useT();
   const [aiCreatorOpen, setAiCreatorOpen] = useState(false);
   const localFavoriteId = (asset: StudioAsset) => createStudioAssetFavoriteId("local", asset.id);
   const sharedFavoriteId = (asset: SharedAssetCatalogItem) => createStudioAssetFavoriteId("community", asset.id);
@@ -354,14 +376,14 @@ export function StudioAssetMenuPanel({
             type="button"
             onClick={() => setAssetTab("mine")}
             aria-pressed={assetTab === "mine"}
-            className={cx(
-              TOUCH_CONTROL_CLASS,
-              "rounded-md px-2 text-[0.65rem] font-semibold transition-colors",
-              assetTab === "mine" ? "bg-accent text-on-accent shadow-sm" : "text-fg-3 hover:bg-raised"
-            )}
-          >
-            내 에셋
-          </button>
+          className={cx(
+            TOUCH_CONTROL_CLASS,
+            "rounded-md px-2 text-[0.65rem] font-semibold transition-colors",
+            assetTab === "mine" ? "bg-accent text-on-accent shadow-sm" : "text-fg-3 hover:bg-raised"
+          )}
+        >
+            {localizeText(t, "내 에셋", "studio.assetMenu.tab.mine")}
+        </button>
           <button
             type="button"
             onClick={() => setAssetTab("community")}
@@ -375,7 +397,7 @@ export function StudioAssetMenuPanel({
               assetTab === "community" ? "bg-accent text-on-accent shadow-sm" : "text-fg-3 hover:bg-raised"
             )}
           >
-            <Globe size={13} aria-hidden /> 커뮤니티
+            <Globe size={13} aria-hidden /> {localizeText(t, "커뮤니티", "studio.assetMenu.tab.community")}
           </button>
         </div>
         {assetTab === "mine" && (
@@ -385,8 +407,14 @@ export function StudioAssetMenuPanel({
               "focus-within:outline-none focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-1 focus-within:ring-offset-panel"
             )}
           >
-            <ImagePlus size={14} aria-hidden /> 업로드
-            <input type="file" accept="image/*" className="sr-only" onChange={onUploadAsset} aria-label="이미지 에셋 업로드" />
+            <ImagePlus size={14} aria-hidden /> {localizeText(t, "업로드", "studio.assetMenu.upload")}
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={onUploadAsset}
+              aria-label={localizeText(t, "이미지 에셋 업로드", "studio.assetMenu.uploadAria")}
+            />
           </label>
         )}
       </div>
@@ -397,11 +425,19 @@ export function StudioAssetMenuPanel({
       >
         <div className="flex min-h-11 items-center gap-1.5 rounded-lg bg-panel/60 px-2">
           <Plus size={12} className="shrink-0 text-accent" aria-hidden />
-          <span><strong className="font-bold text-fg">클릭·탭</strong><br />선택 컷 또는 현재 화면</span>
+          <span>
+            <strong className="font-bold text-fg">{localizeText(t, "클릭·탭", "studio.assetMenu.helpTapTitle")}</strong>
+            <br />
+            {localizeText(t, "선택 컷 또는 현재 화면", "studio.assetMenu.helpTapDescription")}
+          </span>
         </div>
         <div className="flex min-h-11 items-center gap-1.5 rounded-lg bg-panel/60 px-2">
           <ImagePlus size={12} className="shrink-0 text-accent" aria-hidden />
-          <span><strong className="font-bold text-fg">끌어 놓기</strong><br />정확한 위치 · Esc 취소</span>
+          <span>
+            <strong className="font-bold text-fg">{localizeText(t, "끌어 놓기", "studio.assetMenu.helpDropTitle")}</strong>
+            <br />
+            {localizeText(t, "정확한 위치 · Esc 취소", "studio.assetMenu.helpDropDescription")}
+          </span>
         </div>
       </div>
 
@@ -412,7 +448,11 @@ export function StudioAssetMenuPanel({
             onClick={() => setAiCreatorOpen((current) => !current)}
             aria-expanded={aiCreatorOpen}
             aria-controls="studio-ai-asset-creator"
-            aria-label={`AI 에셋 생성 도구 ${aiCreatorOpen ? "닫기" : "열기"}`}
+            aria-label={
+              aiCreatorOpen
+                ? localizeText(t, "AI 에셋 생성 도구 닫기", "studio.assetMenu.aiCreatorToggleAriaClose")
+                : localizeText(t, "AI 에셋 생성 도구 열기", "studio.assetMenu.aiCreatorToggleAriaOpen")
+            }
             className={cx(
               TOUCH_CONTROL_CLASS,
               "flex w-full items-center gap-2 rounded-lg px-2 text-left transition-colors hover:bg-raised",
@@ -426,9 +466,13 @@ export function StudioAssetMenuPanel({
             )}
             <span className="min-w-0 flex-1">
               <strong className="block text-[0.65rem] font-bold text-fg-2">
-                {assetGenerating ? "AI 에셋 생성 중" : "AI 에셋 생성"}
+                {assetGenerating
+                  ? localizeText(t, "AI 에셋 생성 중", "studio.assetMenu.aiCreatorRunning")
+                  : localizeText(t, "AI 에셋 생성", "studio.assetMenu.aiCreatorIdle")}
               </strong>
-              <span className="block truncate text-[0.55rem] text-fg-3">설명으로 나만의 소재 만들기</span>
+              <span className="block truncate text-[0.55rem] text-fg-3">
+                {localizeText(t, "설명으로 나만의 소재 만들기", "studio.assetMenu.aiCreatorSubtext")}
+              </span>
             </span>
             <ChevronDown
               size={14}
@@ -443,8 +487,10 @@ export function StudioAssetMenuPanel({
           >
           {/* 생성형 AI 고지(정책 필수) — 결과물이 생성형 AI 산출물임을 항상 명시한다. */}
           <p className="mb-1.5 rounded-md border border-line bg-panel/60 px-2 py-1 text-[0.58rem] leading-relaxed text-fg-3">
-            생성형 AI(OpenAI)로 이미지를 만들어요. 결과물에는 <span className="font-semibold text-accent">AI</span> 배지가 표시되며,
-            타인의 저작물·실존 인물은 생성하지 않아요.
+            {localizeText(t, "생성형 AI(OpenAI)로 이미지를 만들어요.", "studio.assetMenu.aiDisclosureLine1")} <span className="font-semibold text-accent">AI</span>
+            {localizeText(t, "배지가 표시되며,", "studio.assetMenu.aiDisclosureLine2")}
+            <br />
+            {localizeText(t, "타인의 저작물·실존 인물은 생성하지 않아요.", "studio.assetMenu.aiDisclosureLine3")}
           </p>
           <textarea
             value={assetPrompt}
@@ -452,9 +498,9 @@ export function StudioAssetMenuPanel({
             onKeyDown={(event) => {
               if ((event.metaKey || event.ctrlKey) && event.key === "Enter") onGenerateAsset();
             }}
-            placeholder="예: 비 오는 골목 배경, 마법 소품, 놀란 표정 캐릭터"
+            placeholder={localizeText(t, "예: 비 오는 골목 배경, 마법 소품, 놀란 표정 캐릭터", "studio.assetMenu.promptPlaceholder")}
             rows={2}
-            aria-label="AI 에셋 설명"
+            aria-label={localizeText(t, "AI 에셋 설명", "studio.assetMenu.promptTextareaAria")}
             className={cx(
               "h-16 w-full resize-none rounded-md border border-line bg-panel px-2 py-2 text-[0.65rem] leading-snug text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent",
               CONTROL_FOCUS_CLASS
@@ -465,8 +511,8 @@ export function StudioAssetMenuPanel({
               type="text"
               value={assetPromptName}
               onChange={(event) => setAssetPromptName(event.target.value.slice(0, 60))}
-              placeholder="이름"
-              aria-label="생성할 에셋 이름"
+              placeholder={localizeText(t, "이름", "studio.assetMenu.promptNamePlaceholder")}
+              aria-label={localizeText(t, "생성할 에셋 이름", "studio.assetMenu.promptNameAria")}
               className={cx(
                 TOUCH_CONTROL_CLASS,
                 "min-w-0 rounded-md border border-line bg-panel px-2 text-[0.65rem] text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent"
@@ -477,45 +523,51 @@ export function StudioAssetMenuPanel({
               onClick={onGenerateAsset}
               disabled={!assetPrompt.trim() || assetGenerating}
               aria-busy={assetGenerating || undefined}
-              aria-label={assetGenerating ? "AI 에셋 생성 중" : "AI 에셋 생성"}
+              aria-label={
+                assetGenerating
+                  ? localizeText(t, "AI 에셋 생성 중", "studio.assetMenu.aiCreatorRunning")
+                  : localizeText(t, "AI 에셋 생성", "studio.assetMenu.aiCreatorIdle")
+              }
               className={cx(
                 TOUCH_CONTROL_CLASS,
                 "inline-flex items-center gap-1.5 rounded-md bg-accent px-3 text-[0.65rem] font-semibold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-55"
               )}
             >
               {assetGenerating ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Sparkles size={14} aria-hidden />}
-              {assetGenerating ? "생성 중" : "생성"}
+              {assetGenerating
+                ? localizeText(t, "생성 중", "studio.assetMenu.generateRunning")
+                : localizeText(t, "생성", "studio.assetMenu.generate")}
             </button>
           </div>
           <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-            <select
-              value={assetPromptSize}
-              onChange={(event) => setAssetPromptSize(event.target.value as GeneratedAssetSize)}
-              aria-label="생성 이미지 크기"
-              className={cx(
-                TOUCH_CONTROL_CLASS,
-                "rounded-md border border-line bg-panel px-2 text-[0.65rem] text-fg-2 outline-none focus:border-accent"
-              )}
-            >
-              <option value="1024x1024">정사각</option>
-              <option value="1536x1024">가로 배경</option>
-              <option value="1024x1536">세로 컷</option>
-            </select>
-            <select
-              value={assetPromptQuality}
-              onChange={(event) => setAssetPromptQuality(event.target.value as GeneratedAssetQuality)}
-              aria-label="생성 이미지 품질"
-              className={cx(
-                TOUCH_CONTROL_CLASS,
-                "rounded-md border border-line bg-panel px-2 text-[0.65rem] text-fg-2 outline-none focus:border-accent"
-              )}
-            >
-              <option value="low">빠르게</option>
-              <option value="medium">표준</option>
-              <option value="high">고품질</option>
-              <option value="auto">자동</option>
-            </select>
-          </div>
+              <select
+                value={assetPromptSize}
+                onChange={(event) => setAssetPromptSize(event.target.value as GeneratedAssetSize)}
+                aria-label={localizeText(t, "생성 이미지 크기", "studio.assetMenu.promptSizeAria")}
+                className={cx(
+                  TOUCH_CONTROL_CLASS,
+                  "rounded-md border border-line bg-panel px-2 text-[0.65rem] text-fg-2 outline-none focus:border-accent"
+                )}
+              >
+                <option value="1024x1024">{localizeText(t, "정사각", "studio.assetMenu.promptSizeSquare")}</option>
+                <option value="1536x1024">{localizeText(t, "가로 배경", "studio.assetMenu.promptSizeLandscape")}</option>
+                <option value="1024x1536">{localizeText(t, "세로 컷", "studio.assetMenu.promptSizePortrait")}</option>
+              </select>
+              <select
+                value={assetPromptQuality}
+                onChange={(event) => setAssetPromptQuality(event.target.value as GeneratedAssetQuality)}
+                aria-label={localizeText(t, "생성 이미지 품질", "studio.assetMenu.promptQualityAria")}
+                className={cx(
+                  TOUCH_CONTROL_CLASS,
+                  "rounded-md border border-line bg-panel px-2 text-[0.65rem] text-fg-2 outline-none focus:border-accent"
+                )}
+              >
+                <option value="low">{localizeText(t, "빠르게", "studio.assetMenu.promptQualityFast")}</option>
+                <option value="medium">{localizeText(t, "표준", "studio.assetMenu.promptQualityStandard")}</option>
+                <option value="high">{localizeText(t, "고품질", "studio.assetMenu.promptQualityHigh")}</option>
+                <option value="auto">{localizeText(t, "자동", "studio.assetMenu.promptQualityAuto")}</option>
+              </select>
+            </div>
           </div>
         </div>
       )}
@@ -535,13 +587,13 @@ export function StudioAssetMenuPanel({
           <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
           <input
             type="text"
-            placeholder="에셋 검색..."
+            placeholder={localizeText(t, "에셋 검색...", "studio.assetMenu.search.placeholder")}
             value={assetSearchQuery}
             onChange={(event) => setAssetSearchQuery(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && assetTab === "community") loadSharedAssets();
             }}
-            aria-label="에셋 검색"
+            aria-label={localizeText(t, "에셋 검색", "studio.assetMenu.search.aria")}
             className={cx(
               TOUCH_CONTROL_CLASS,
               "w-full rounded-lg border border-line bg-card pl-7 pr-11 text-[0.65rem] placeholder:text-fg-3 outline-none transition-colors focus:border-accent"
@@ -555,7 +607,7 @@ export function StudioAssetMenuPanel({
                 "absolute right-0 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-raised hover:text-fg-2",
                 CONTROL_FOCUS_CLASS
               )}
-              aria-label="에셋 검색어 지우기"
+              aria-label={localizeText(t, "에셋 검색어 지우기", "studio.assetMenu.search.clearAria")}
             >
               <X size={15} aria-hidden />
             </button>
@@ -564,22 +616,22 @@ export function StudioAssetMenuPanel({
         <select
           value={assetSortOrder}
           onChange={(event) => setAssetSortOrder(event.target.value as StudioAssetSortOrder)}
-          aria-label="에셋 정렬"
+          aria-label={localizeText(t, "에셋 정렬", "studio.assetMenu.sort.aria")}
           className={cx(
             TOUCH_CONTROL_CLASS,
             "w-full cursor-pointer rounded-lg border border-line bg-card px-2 text-[0.65rem] text-fg-2 outline-none transition-colors focus:border-accent"
           )}
         >
-          <option value="newest">최신순</option>
-          <option value="popular">인기순</option>
-          <option value="name">이름순</option>
-          <option value="size">크기순</option>
+          <option value="newest">{localizeText(t, "최신순", "studio.assetMenu.sort.newest")}</option>
+          <option value="popular">{localizeText(t, "인기순", "studio.assetMenu.sort.popular")}</option>
+          <option value="name">{localizeText(t, "이름순", "studio.assetMenu.sort.name")}</option>
+          <option value="size">{localizeText(t, "크기순", "studio.assetMenu.sort.size")}</option>
         </select>
         <button
           type="button"
           onClick={() => setFavoriteOnly((current) => !current)}
           aria-pressed={favoriteOnly}
-          aria-label="즐겨찾기만"
+          aria-label={localizeText(t, "즐겨찾기만", "studio.assetMenu.filter.favoritesOnly")}
           className={cx(
             TOUCH_CONTROL_CLASS,
             "inline-flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 text-[0.65rem] font-semibold transition-colors",
@@ -589,7 +641,7 @@ export function StudioAssetMenuPanel({
           )}
         >
           <Star size={14} className={favoriteOnly ? "fill-current" : undefined} aria-hidden />
-          즐겨찾기만
+          {localizeText(t, "즐겨찾기만", "studio.assetMenu.filter.favoritesOnly")}
         </button>
       </div>
 
@@ -601,7 +653,7 @@ export function StudioAssetMenuPanel({
           className={cx(TOUCH_CONTROL_CLASS, "mb-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card text-[0.65rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-55")}
         >
           {sharedLoading ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <Search size={13} aria-hidden />}
-          전체 카탈로그에서 검색·정렬
+          {localizeText(t, "전체 카탈로그에서 검색·정렬", "studio.assetMenu.search.refreshCommunity")}
         </button>
       )}
 
@@ -680,6 +732,7 @@ function LocalAssetGrid({
 > & {
   filteredAssets: StudioAsset[];
 }) {
+  const t = useT();
   const [openActionsId, setOpenActionsId] = useState<string | null>(null);
   const [shareAsset, setShareAsset] = useState<StudioAsset | null>(null);
 
@@ -708,9 +761,9 @@ function LocalAssetGrid({
         <span className="relative mb-2 grid size-11 place-items-center rounded-2xl border border-line bg-card text-fg-3 shadow-sm">
           <ImagePlus size={18} aria-hidden />
         </span>
-        <p className="relative text-xs font-semibold text-fg-2">업로드한 에셋이 없습니다</p>
+        <p className="relative text-xs font-semibold text-fg-2">{localizeText(t, "업로드한 에셋이 없습니다", "studio.assetMenu.emptyMyAssetsTitle")}</p>
         <p className="relative mt-1 max-w-[28ch] text-[0.6rem] leading-normal text-fg-3">
-          자주 쓰는 이미지를 올려 두면 컷에 바로 끌어다 쓸 수 있어요.
+          {localizeText(t, "자주 쓰는 이미지를 올려 두면 컷에 바로 끌어다 쓸 수 있어요.", "studio.assetMenu.emptyMyAssetsDescription")}
         </p>
       </div>
     );
@@ -768,8 +821,16 @@ function LocalAssetGrid({
                 backgroundSize: "10px 10px",
                 backgroundPosition: "0 0, 0 5px, 5px -5px, -5px 0",
               }}
-              title={`${asset.name} · 선택한 컷 또는 현재 보이는 위치에 추가`}
-              aria-label={`${asset.name} 선택한 컷 또는 현재 보이는 위치에 추가`}
+              title={`${asset.name} · ${localizeText(
+                t,
+                "선택한 컷 또는 현재 보이는 위치에 추가",
+                "studio.assetMenu.addToCurrentView"
+              )}`}
+              aria-label={`${asset.name} ${localizeText(
+                t,
+                "선택한 컷 또는 현재 보이는 위치에 추가",
+                "studio.assetMenu.addToCurrentView"
+              )}`}
             >
               <img
                 src={asset.dataUrl}
@@ -783,11 +844,12 @@ function LocalAssetGrid({
               )}
               {asset.kind === "bg3d" && (
                 <span className="pointer-events-none absolute left-1 top-1 inline-flex items-center gap-0.5 rounded-md border border-line/70 bg-panel/90 px-1 py-px text-[0.5rem] font-bold leading-none tracking-wide text-fg-2 shadow backdrop-blur-sm">
-                  <BadgeCheck size={8} className="text-good" aria-hidden /> 권리 인증
+                  <BadgeCheck size={8} className="text-good" aria-hidden />
+                  {localizeText(t, "권리 인증", "studio.assetMenu.rightsBadge")}
                 </span>
               )}
               <span className="pointer-events-none absolute bottom-1 right-1 inline-flex items-center gap-0.5 rounded-md border border-line/40 bg-panel/90 px-1.5 py-0.5 text-[0.55rem] font-semibold text-fg shadow-sm backdrop-blur-sm">
-                <Plus size={10} aria-hidden /> 추가
+                <Plus size={10} aria-hidden /> {localizeText(t, "추가", "studio.assetMenu.cardAction.add")}
               </span>
             </button>
 
@@ -818,15 +880,19 @@ function LocalAssetGrid({
                   className={cx(CARD_ACTION_CLASS, "mt-1 border border-line bg-panel text-fg-2 hover:bg-raised")}
                   aria-expanded={actionsOpen}
                   aria-controls={actionRegionId}
-                  aria-label={`${asset.name} 관리 작업 ${actionsOpen ? "닫기" : "열기"}`}
+                  aria-label={`${asset.name} ${localizeText(
+                    t,
+                    "관리 작업",
+                    "studio.assetMenu.manageActions"
+                  )} ${actionsOpen ? t("common.close") : t("common.open")}`}
                 >
-                  <MoreHorizontal size={15} aria-hidden /> 작업
+                  <MoreHorizontal size={15} aria-hidden /> {localizeText(t, "작업", "studio.assetMenu.actions")}
                 </button>
                 {actionsOpen && (
                   <div
                     id={actionRegionId}
                     role="group"
-                    aria-label={`${asset.name} 관리 작업`}
+                    aria-label={`${asset.name} ${localizeText(t, "관리 작업", "studio.assetMenu.manageActions")}`}
                     className="mt-1 space-y-1 border-t border-line/60 pt-1"
                   >
                     <button
@@ -837,9 +903,9 @@ function LocalAssetGrid({
                         setRenamingAssetName(asset.name);
                       }}
                       className={cx(CARD_ACTION_CLASS, "bg-panel text-fg-2 hover:bg-raised")}
-                      aria-label={`${asset.name} 이름 변경`}
+                      aria-label={`${asset.name} ${localizeText(t, "이름 변경", "studio.assetMenu.renameAsset")}`}
                     >
-                      <Pencil size={13} aria-hidden /> 이름
+                      <Pencil size={13} aria-hidden /> {localizeText(t, "이름", "studio.assetMenu.rename")}
                     </button>
                     <button
                       type="button"
@@ -853,14 +919,20 @@ function LocalAssetGrid({
                         CARD_ACTION_CLASS,
                         "bg-panel text-fg-2 hover:bg-raised disabled:cursor-not-allowed disabled:opacity-55"
                       )}
-                      aria-label={`${asset.name} 커뮤니티에 공유`}
+                      aria-label={`${asset.name} ${localizeText(
+                        t,
+                        "커뮤니티에 공유",
+                        "studio.assetMenu.shareCommunity"
+                      )}`}
                     >
                       {publishingId === asset.id ? (
                         <Loader2 size={13} className="animate-spin" aria-hidden />
                       ) : (
                         <Share2 size={13} aria-hidden />
                       )}
-                      {publishingId === asset.id ? "공유 중" : "공유"}
+                      {publishingId === asset.id
+                        ? localizeText(t, "공유 중", "studio.assetMenu.sharing")
+                        : localizeText(t, "공유", "studio.assetMenu.share")}
                     </button>
                     <button
                       type="button"
@@ -869,9 +941,9 @@ function LocalAssetGrid({
                         onDeleteAsset(asset.id);
                       }}
                       className={cx(CARD_ACTION_CLASS, "bg-bad/5 text-bad hover:bg-bad/10")}
-                      aria-label={`${asset.name} 삭제`}
+                      aria-label={`${asset.name} ${localizeText(t, "삭제", "studio.assetMenu.delete")}`}
                     >
-                      <Trash2 size={13} aria-hidden /> 삭제
+                      <Trash2 size={13} aria-hidden /> {localizeText(t, "삭제", "studio.assetMenu.delete")}
                     </button>
                   </div>
                 )}
@@ -911,6 +983,7 @@ function PublishAssetDialog({
   const [sourceReference, setSourceReference] = useState("");
   const [permissionEvidence, setPermissionEvidence] = useState("");
   const selectedLicense = creatorAssetLicenseOf(license);
+  const t = useT();
   const externalOrigin = publishOrigin === "cc0"
     || publishOrigin === "permissive"
     || publishOrigin === "explicit-permission";
@@ -929,7 +1002,12 @@ function PublishAssetDialog({
       className="fixed inset-0 z-[120] grid place-items-center bg-black/55 p-4"
       role="presentation"
     >
-      <button type="button" className="absolute inset-0 cursor-default" onClick={onClose} aria-label="공유 설정 닫기" />
+      <button
+        type="button"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+        aria-label={localizeText(t, "공유 설정 닫기", "studio.assetMenu.publishDialog.close")}
+      />
       <div
         role="dialog"
         aria-modal="true"
@@ -938,35 +1016,57 @@ function PublishAssetDialog({
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 id="publish-asset-title" className="text-sm font-bold text-fg">커뮤니티 사용권 설정</h3>
-            <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">{asset.name}을 다른 창작자가 재사용할 조건을 명확히 표시합니다.</p>
+            <h3 id="publish-asset-title" className="text-sm font-bold text-fg">
+              {localizeText(t, "커뮤니티 사용권 설정", "studio.assetMenu.publishDialog.title")}
+            </h3>
+            <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
+              {localizeText(
+                t,
+                "{assetName}의 조건을 다른 창작자가 재사용할 수 있도록 표시합니다.",
+                "studio.assetMenu.publishDialog.subtitle",
+                { assetName: asset.name }
+              )}
+            </p>
           </div>
-          <button type="button" onClick={onClose} className={cx("grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised", CONTROL_FOCUS_CLASS)} aria-label="공유 설정 닫기">
+          <button
+            type="button"
+            onClick={onClose}
+            className={cx("grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised", CONTROL_FOCUS_CLASS)}
+            aria-label={localizeText(t, "공유 설정 닫기", "studio.assetMenu.publishDialog.close")}
+          >
             <X size={17} aria-hidden />
           </button>
         </div>
 
         <label className="mt-3 block text-[0.65rem] font-semibold text-fg-2">
-          설명
+          {localizeText(t, "설명", "studio.assetMenu.publishDialog.descriptionLabel")}
           <textarea
             value={description}
             onChange={(event) => setDescription(event.target.value.slice(0, 500))}
             rows={3}
-            placeholder="사용하기 좋은 장면, 편집 팁, 포함 요소"
+            placeholder={localizeText(
+              t,
+              "사용하기 좋은 장면, 편집 팁, 포함 요소",
+              "studio.assetMenu.publishDialog.descriptionPlaceholder"
+            )}
             className="mt-1 w-full resize-none rounded-lg border border-line bg-card p-2 text-xs font-normal text-fg outline-none focus:border-accent"
           />
         </label>
         <label className="mt-2 block text-[0.65rem] font-semibold text-fg-2">
-          태그
+          {localizeText(t, "태그", "studio.assetMenu.publishDialog.tagsLabel")}
           <input
             value={tags}
             onChange={(event) => setTags(event.target.value.slice(0, 240))}
-            placeholder="배경, 골목, 야경 (쉼표로 구분)"
+            placeholder={localizeText(
+              t,
+              "배경, 골목, 야경 (쉼표로 구분)",
+              "studio.assetMenu.publishDialog.tagsPlaceholder"
+            )}
             className={cx(TOUCH_CONTROL_CLASS, "mt-1 w-full rounded-lg border border-line bg-card px-2 text-xs font-normal text-fg outline-none focus:border-accent")}
           />
         </label>
         <label className="mt-2 block text-[0.65rem] font-semibold text-fg-2">
-          사용권
+          {localizeText(t, "사용권", "studio.assetMenu.publishDialog.licenseLabel")}
           <select
             value={license}
             onChange={(event) => setLicense(event.target.value as StudioAssetShareOptions["license"])}
@@ -976,7 +1076,10 @@ function PublishAssetDialog({
           </select>
         </label>
         <p className="mt-1 rounded-lg bg-raised/70 px-2 py-1.5 text-[0.62rem] leading-relaxed text-fg-3">
-          {selectedLicense.description} · {selectedLicense.commercialUse ? "상업 사용 가능" : "비상업 전용"}
+          {selectedLicense.description} ·{" "}
+          {selectedLicense.commercialUse
+            ? localizeText(t, "상업 사용 가능", "studio.assetMenu.publishDialog.licenseCommercialUse")
+            : localizeText(t, "비상업 전용", "studio.assetMenu.publishDialog.licenseNonCommercial")}
           {selectedLicense.url && (
             <>
               {" · "}
@@ -986,39 +1089,47 @@ function PublishAssetDialog({
                 rel="noreferrer"
                 className="font-semibold text-accent underline underline-offset-2"
               >
-                사용권 원문
+                {localizeText(t, "사용권 원문", "studio.assetMenu.publishDialog.licenseOriginal")}
               </a>
             </>
           )}
         </p>
         {selectedLicense.attributionRequired && (
           <label className="mt-2 block text-[0.65rem] font-semibold text-fg-2">
-            표시할 저작자명
+            {localizeText(t, "표시할 저작자명", "studio.assetMenu.publishDialog.attributionLabel")}
             <input
               value={attributionText}
               onChange={(event) => setAttributionText(event.target.value.slice(0, 160))}
-              placeholder="비워 두면 계정 이름 사용"
+              placeholder={localizeText(
+                t,
+                "비워 두면 계정 이름 사용",
+                "studio.assetMenu.publishDialog.attributionPlaceholder"
+              )}
               className={cx(TOUCH_CONTROL_CLASS, "mt-1 w-full rounded-lg border border-line bg-card px-2 text-xs font-normal text-fg outline-none focus:border-accent")}
             />
           </label>
         )}
         <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-line bg-card px-3 text-xs text-fg-2">
           <input type="checkbox" checked={containsAi} onChange={(event) => setContainsAi(event.target.checked)} />
-          생성형 AI가 만든 이미지 또는 요소를 포함합니다.
+          {localizeText(t, "생성형 AI가 만든 이미지 또는 요소를 포함합니다.", "studio.assetMenu.publishDialog.containsAi")}
         </label>
 
         <div className="mt-3 rounded-lg border border-warn/30 bg-warn/5 p-3">
           <div className="flex items-start gap-2">
             <BadgeCheck size={15} className="mt-0.5 shrink-0 text-warn" aria-hidden />
             <div>
-              <p className="text-xs font-bold text-fg">공유 권리 사전 점검</p>
+              <p className="text-xs font-bold text-fg">{localizeText(t, "공유 권리 사전 점검", "studio.assetMenu.publishDialog.rightsCheckTitle")}</p>
               <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">
-                원본·CC0·재배포 허용 라이선스·명시적 허가만 통과합니다. 이 입력은 현재 로컬 정책 점검용이며 증빙 원문을 서버에 저장하지 않습니다.
+                {localizeText(
+                  t,
+                  "원본·CC0·재배포 허용 라이선스·명시적 허가만 통과합니다. 이 입력은 현재 로컬 정책 점검용이며 증빙 원문을 서버에 저장하지 않습니다.",
+                  "studio.assetMenu.publishDialog.rightsCheckDescription"
+                )}
               </p>
             </div>
           </div>
           <label className="mt-2 block text-[0.65rem] font-semibold text-fg-2">
-            자료 출처
+            {localizeText(t, "자료 출처", "studio.assetMenu.publishDialog.originLabel")}
             <select
               value={publishOrigin}
               onChange={(event) => setPublishOrigin(
@@ -1029,22 +1140,26 @@ function PublishAssetDialog({
                 "mt-1 w-full rounded-lg border border-line bg-card px-2 text-xs font-normal text-fg outline-none focus:border-accent"
               )}
             >
-              <option value="original-handmade">직접 만든 원본</option>
-              <option value="original-procedural">직접 만든 절차형 원본</option>
-              <option value="cc0">CC0 자료</option>
-              <option value="permissive">재배포 허용 퍼미시브 라이선스</option>
-              <option value="explicit-permission">권리자의 명시적 허가</option>
+              <option value="original-handmade">{localizeText(t, "직접 만든 원본", "studio.assetMenu.publishOrigin.originalHandmade")}</option>
+              <option value="original-procedural">{localizeText(t, "직접 만든 절차형 원본", "studio.assetMenu.publishOrigin.originalProcedural")}</option>
+              <option value="cc0">{localizeText(t, "CC0 자료", "studio.assetMenu.publishOrigin.cc0")}</option>
+              <option value="permissive">{localizeText(t, "재배포 허용 퍼미시브 라이선스", "studio.assetMenu.publishOrigin.permissive")}</option>
+              <option value="explicit-permission">{localizeText(t, "권리자의 명시적 허가", "studio.assetMenu.publishOrigin.explicitPermission")}</option>
             </select>
           </label>
           {externalOrigin ? (
             <>
               <label className="mt-2 block text-[0.65rem] font-semibold text-fg-2">
-                라이선스·출처 원문
+                {localizeText(t, "라이선스·출처 원문", "studio.assetMenu.publishDialog.originReferenceLabel")}
                 <input
                   type="text"
                   value={sourceReference}
                   onChange={(event) => setSourceReference(event.target.value.slice(0, 500))}
-                  placeholder="원문 URL 또는 출처 식별자"
+                  placeholder={localizeText(
+                    t,
+                    "원문 URL 또는 출처 식별자",
+                    "studio.assetMenu.publishDialog.originReferencePlaceholder"
+                  )}
                   className={cx(
                     TOUCH_CONTROL_CLASS,
                     "mt-1 w-full rounded-lg border border-line bg-card px-2 text-xs font-normal text-fg outline-none focus:border-accent"
@@ -1053,12 +1168,16 @@ function PublishAssetDialog({
               </label>
               {(publishOrigin === "permissive" || publishOrigin === "explicit-permission") ? (
                 <label className="mt-2 block text-[0.65rem] font-semibold text-fg-2">
-                  재배포 허가 근거
+                  {localizeText(t, "재배포 허가 근거", "studio.assetMenu.publishDialog.permissionEvidenceLabel")}
                   <input
                     type="text"
                     value={permissionEvidence}
                     onChange={(event) => setPermissionEvidence(event.target.value.slice(0, 500))}
-                    placeholder="원본 파일 재배포 허용 조항·허가 문구"
+                    placeholder={localizeText(
+                      t,
+                      "원본 파일 재배포 허용 조항·허가 문구",
+                      "studio.assetMenu.publishDialog.permissionEvidencePlaceholder"
+                    )}
                     className={cx(
                       TOUCH_CONTROL_CLASS,
                       "mt-1 w-full rounded-lg border border-line bg-card px-2 text-xs font-normal text-fg outline-none focus:border-accent"
@@ -1073,7 +1192,7 @@ function PublishAssetDialog({
                   checked={redistributionPermission}
                   onChange={(event) => setRedistributionPermission(event.target.checked)}
                 />
-                <span>라이선스 또는 권리자가 원본 파일의 재배포를 허용합니다.</span>
+                <span>{localizeText(t, "라이선스 또는 권리자가 원본 파일의 재배포를 허용합니다.", "studio.assetMenu.publishDialog.redistributionPermissionLabel")}</span>
               </label>
             </>
           ) : null}
@@ -1084,7 +1203,7 @@ function PublishAssetDialog({
               checked={containsThirdPartyContent}
               onChange={(event) => setContainsThirdPartyContent(event.target.checked)}
             />
-            <span>제3자가 만든 요소가 포함되어 있습니다.</span>
+            <span>{localizeText(t, "제3자가 만든 요소가 포함되어 있습니다.", "studio.assetMenu.publishDialog.thirdPartyContentLabel")}</span>
           </label>
           <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-card p-2.5 text-xs leading-relaxed text-fg-2">
             <input
@@ -1093,15 +1212,18 @@ function PublishAssetDialog({
               checked={marketplaceDerivativeFree}
               onChange={(event) => setMarketplaceDerivativeFree(event.target.checked)}
             />
-            <span>다른 에셋 마켓의 유·무료 상품을 복제하거나 알아볼 수 있게 변형한 자료가 아닙니다.</span>
+            <span>{localizeText(t, "다른 에셋 마켓의 유·무료 상품을 복제하거나 알아볼 수 있게 변형한 자료가 아닙니다.", "studio.assetMenu.publishDialog.marketplaceDerivativeLabel")}</span>
           </label>
         </div>
 
         <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-card p-3 text-xs leading-relaxed text-fg-2">
           <input className="mt-0.5" type="checkbox" checked={rightsConfirmed} onChange={(event) => setRightsConfirmed(event.target.checked)} />
-          <span>직접 제작했거나 이 조건으로 공유·재배포할 권한이 있으며, 타인의 권리를 침해하지 않음을 확인합니다.</span>
+          <span>{localizeText(t, "직접 제작했거나 이 조건으로 공유·재배포할 권한이 있으며, 타인의 권리를 침해하지 않음을 확인합니다.", "studio.assetMenu.publishDialog.rightsConfirmedLabel")}</span>
         </label>
-        <ul className="mt-2 grid gap-1" aria-label="공유 권리 검사 결과">
+        <ul
+          className="mt-2 grid gap-1"
+          aria-label={localizeText(t, "공유 권리 검사 결과", "studio.assetMenu.publishDialog.rightsChecklistAriaLabel")}
+        >
           {rightsDecision.checks.map((check) => (
             <li
               key={check.id}
@@ -1118,7 +1240,13 @@ function PublishAssetDialog({
           ))}
         </ul>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <button type="button" onClick={onClose} className={cx(TOUCH_CONTROL_CLASS, "rounded-lg border border-line bg-card text-xs font-semibold text-fg-2 hover:bg-raised")}>취소</button>
+          <button
+            type="button"
+            onClick={onClose}
+            className={cx(TOUCH_CONTROL_CLASS, "rounded-lg border border-line bg-card text-xs font-semibold text-fg-2 hover:bg-raised")}
+          >
+            {localizeText(t, "취소", "studio.assetMenu.cancel")}
+          </button>
           <button
             type="button"
             disabled={!rightsDecision.allowed || publishing}
@@ -1133,7 +1261,9 @@ function PublishAssetDialog({
             className={cx(TOUCH_CONTROL_CLASS, "inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent text-xs font-bold text-on-accent disabled:cursor-not-allowed disabled:opacity-50")}
           >
             {publishing ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Share2 size={14} aria-hidden />}
-            {publishing ? "검증·공유 중" : "조건에 동의하고 공유"}
+            {publishing
+              ? localizeText(t, "검증·공유 중", "studio.assetMenu.publishDialog.publishing")
+              : localizeText(t, "조건에 동의하고 공유", "studio.assetMenu.publishDialog.publishAction")}
           </button>
         </div>
       </div>
@@ -1154,6 +1284,7 @@ function RenameAssetInline({
   setRenamingAssetId: Dispatch<SetStateAction<string | null>>;
   handleRenameAsset: (id: string) => void;
 }) {
+  const t = useT();
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
       handleRenameAsset(asset.id);
@@ -1168,7 +1299,7 @@ function RenameAssetInline({
         type="text"
         value={renamingAssetName}
         onChange={(event) => setRenamingAssetName(event.target.value)}
-        aria-label={`${asset.name} 새 이름`}
+        aria-label={`${asset.name} ${localizeText(t, "새 이름", "studio.assetMenu.renameAssetNewName")}`}
         className={cx(
           TOUCH_CONTROL_CLASS,
           "w-full min-w-0 rounded-md border border-accent bg-panel px-2 text-[0.62rem] text-fg-1 outline-none"
@@ -1186,8 +1317,8 @@ function RenameAssetInline({
             "flex min-h-11 items-center justify-center rounded-md bg-accent text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-55",
             CONTROL_FOCUS_CLASS
           )}
-          title="이름 저장"
-          aria-label={`${asset.name} 이름 저장`}
+          title={localizeText(t, "이름 저장", "studio.assetMenu.renameAssetSave")}
+          aria-label={`${asset.name} ${localizeText(t, "이름 저장", "studio.assetMenu.renameAssetSave")}`}
         >
           <Check size={15} aria-hidden />
         </button>
@@ -1198,8 +1329,8 @@ function RenameAssetInline({
             "flex min-h-11 items-center justify-center rounded-md border border-line bg-panel text-fg-3 transition-colors hover:bg-raised",
             CONTROL_FOCUS_CLASS
           )}
-          title="이름 변경 취소"
-          aria-label={`${asset.name} 이름 변경 취소`}
+          title={localizeText(t, "이름 변경 취소", "studio.assetMenu.renameAssetCancel")}
+          aria-label={`${asset.name} ${localizeText(t, "이름 변경 취소", "studio.assetMenu.renameAssetCancel")}`}
         >
           <X size={15} aria-hidden />
         </button>
@@ -1234,6 +1365,7 @@ function SharedAssetGrid({
 }) {
   const [openActionsId, setOpenActionsId] = useState<string | null>(null);
   const [reportAsset, setReportAsset] = useState<SharedAssetCatalogItem | null>(null);
+  const t = useT();
 
   if (sharedLoading) {
     return (
@@ -1254,7 +1386,7 @@ function SharedAssetGrid({
             "mt-2 rounded-md border border-line px-3 text-[0.65rem] font-semibold text-fg-2 transition-colors hover:bg-raised"
           )}
         >
-          다시 시도
+          {localizeText(t, "다시 시도", "studio.assetMenu.retry")}
         </button>
       </div>
     );
@@ -1274,9 +1406,11 @@ function SharedAssetGrid({
             backgroundSize: "9px 9px",
           }}
         />
-        <p className="relative text-xs font-semibold text-fg-2">아직 공유된 에셋이 없어요</p>
+        <p className="relative text-xs font-semibold text-fg-2">
+          {localizeText(t, "아직 공유된 에셋이 없어요", "studio.assetMenu.emptySharedAssetsTitle")}
+        </p>
         <p className="relative mt-1 max-w-[28ch] text-[0.6rem] leading-normal text-fg-3">
-          내 에셋 탭에서 공유 버튼을 눌러 첫 에셋을 올려보세요.
+          {localizeText(t, "내 에셋 탭에서 공유 버튼을 눌러 첫 에셋을 올려보세요.", "studio.assetMenu.emptySharedAssetsDescription")}
         </p>
       </div>
     );
@@ -1330,8 +1464,16 @@ function SharedAssetGrid({
                 backgroundSize: "10px 10px",
                 backgroundPosition: "0 0, 0 5px, 5px -5px, -5px 0",
               }}
-              title={`${asset.name} · ${asset.author.name} · 선택한 컷 또는 현재 보이는 위치에 추가`}
-              aria-label={`${asset.name} 선택한 컷 또는 현재 보이는 위치에 추가`}
+              title={`${asset.name} · ${asset.author.name} · ${localizeText(
+                t,
+                "선택한 컷 또는 현재 보이는 위치에 추가",
+                "studio.assetMenu.addToCurrentView"
+              )}`}
+              aria-label={`${asset.name} ${localizeText(
+                t,
+                "선택한 컷 또는 현재 보이는 위치에 추가",
+                "studio.assetMenu.addToCurrentView"
+              )}`}
             >
               <img
                 src={asset.previewDataUrl}
@@ -1344,7 +1486,7 @@ function SharedAssetGrid({
                 </span>
               )}
               <span className="pointer-events-none absolute bottom-1 right-1 inline-flex items-center gap-0.5 rounded-md border border-line/40 bg-panel/90 px-1.5 py-0.5 text-[0.55rem] font-semibold text-fg shadow-sm backdrop-blur-sm">
-                <Plus size={10} aria-hidden /> 추가
+                <Plus size={10} aria-hidden /> {localizeText(t, "추가", "studio.assetMenu.cardAction.add")}
               </span>
             </button>
             <span className="mt-1 block w-full truncate text-center text-[0.6rem] font-medium text-fg-2" title={asset.name}>
@@ -1353,11 +1495,13 @@ function SharedAssetGrid({
             <span className="block w-full truncate text-center text-[0.55rem] text-fg-3">{asset.author.name}</span>
             <span className="mt-1 block truncate rounded bg-raised px-1 py-0.5 text-center text-[0.52rem] font-semibold text-fg-3" title={creatorAssetLicenseOf(asset.license).label}>
               {asset.licenseLabel ?? creatorAssetLicenseOf(asset.license).shortLabel}
-              {asset.commercialUse === false ? " · 비상업" : ""}
+              {asset.commercialUse === false ? ` · ${localizeText(t, "비상업", "studio.assetMenu.commerciality.nonCommercial")}` : ""}
             </span>
             {asset.isOwner && asset.moderationStatus && asset.moderationStatus !== "published" && (
               <span className="mt-1 text-center text-[0.52rem] font-semibold text-warn">
-                {asset.moderationStatus === "under_review" ? "검수 중" : "게시 거절"}
+                {asset.moderationStatus === "under_review"
+                  ? localizeText(t, "검수 중", "studio.assetMenu.moderationStatus.underReview")
+                  : localizeText(t, "게시 거절", "studio.assetMenu.moderationStatus.rejected")}
               </span>
             )}
             <button
@@ -1366,15 +1510,18 @@ function SharedAssetGrid({
               className={cx(CARD_ACTION_CLASS, "mt-1 border border-line bg-panel text-fg-2 hover:bg-raised")}
               aria-expanded={actionsOpen}
               aria-controls={actionRegionId}
-              aria-label={`${asset.name} ${asset.isOwner ? "공유 관리 작업" : "공유 작업"} ${actionsOpen ? "닫기" : "열기"}`}
+              aria-label={`${asset.name} ${asset.isOwner
+                ? localizeText(t, "공유 관리 작업", "studio.assetMenu.manageSharedActions")
+                : localizeText(t, "공유 작업", "studio.assetMenu.shareActions")
+              } ${actionsOpen ? t("common.close") : t("common.open")}`}
             >
-              <MoreHorizontal size={15} aria-hidden /> 작업
+              <MoreHorizontal size={15} aria-hidden /> {localizeText(t, "작업", "studio.assetMenu.actions")}
             </button>
             {actionsOpen && (
               <div
                 id={actionRegionId}
                 role="group"
-                aria-label={`${asset.name} 공유 작업`}
+                aria-label={`${asset.name} ${asset.isOwner ? localizeText(t, "공유 관리 작업", "studio.assetMenu.manageSharedActions") : localizeText(t, "공유 작업", "studio.assetMenu.shareActions")}`}
                 className="mt-1 border-t border-line/60 pt-1"
               >
                 {asset.isOwner ? (
@@ -1385,9 +1532,9 @@ function SharedAssetGrid({
                         onDeleteSharedAsset(asset.id);
                       }}
                       className={cx(CARD_ACTION_CLASS, "bg-bad/5 text-bad hover:bg-bad/10")}
-                      aria-label={`${asset.name} 커뮤니티 공유 취소`}
+                      aria-label={`${asset.name} ${localizeText(t, "공유 취소", "studio.assetMenu.deleteSharedAsset")}`}
                     >
-                      <Trash2 size={13} aria-hidden /> 공유 취소
+                      <Trash2 size={13} aria-hidden /> {localizeText(t, "공유 취소", "studio.assetMenu.deleteSharedAsset")}
                     </button>
                 ) : (
                     <button
@@ -1397,9 +1544,9 @@ function SharedAssetGrid({
                         setReportAsset(asset);
                       }}
                       className={cx(CARD_ACTION_CLASS, "bg-bad/5 text-bad hover:bg-bad/10")}
-                      aria-label={`${asset.name} 신고`}
+                      aria-label={`${asset.name} ${localizeText(t, "신고", "studio.assetMenu.report")}`}
                     >
-                      <Flag size={13} aria-hidden /> 신고
+                      <Flag size={13} aria-hidden /> {localizeText(t, "신고", "studio.assetMenu.report")}
                     </button>
                 )}
               </div>
@@ -1416,7 +1563,9 @@ function SharedAssetGrid({
           className={cx(TOUCH_CONTROL_CLASS, "mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card text-[0.65rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-55")}
         >
           {sharedLoadingMore && <Loader2 size={13} className="animate-spin" aria-hidden />}
-          {sharedLoadingMore ? "다음 에셋 불러오는 중" : "더 보기"}
+          {sharedLoadingMore
+            ? localizeText(t, "다음 에셋 불러오는 중", "studio.assetMenu.loadMore.loading")
+            : localizeText(t, "더 보기", "studio.assetMenu.loadMore")}
         </button>
       )}
     </>
@@ -1434,33 +1583,74 @@ function ReportAssetDialog({
 }) {
   const [reason, setReason] = useState<CreatorAssetReportReason>("copyright");
   const [details, setDetails] = useState("");
+  const t = useT();
   return (
     <div
       className="fixed inset-0 z-[120] grid place-items-center bg-black/55 p-4"
       role="presentation"
     >
-      <button type="button" className="absolute inset-0 cursor-default" onClick={onClose} aria-label="신고 닫기" />
+      <button
+        type="button"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+        aria-label={localizeText(t, "신고 닫기", "studio.assetMenu.reportDialog.close")}
+      />
       <div role="dialog" aria-modal="true" aria-labelledby="report-asset-title" className="relative w-full max-w-sm rounded-2xl border border-line bg-panel p-4 shadow-2xl">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h3 id="report-asset-title" className="text-sm font-bold text-fg">에셋 신고</h3>
-            <p className="mt-1 text-[0.65rem] text-fg-3">{asset.name}의 문제를 검수자에게 전달합니다.</p>
+            <h3 id="report-asset-title" className="text-sm font-bold text-fg">
+              {localizeText(t, "에셋 신고", "studio.assetMenu.reportDialog.title")}
+            </h3>
+            <p className="mt-1 text-[0.65rem] text-fg-3">
+              {localizeText(
+                t,
+                "{assetName}의 문제를 검수자에게 전달합니다.",
+                "studio.assetMenu.reportDialog.subtitle",
+                { assetName: asset.name }
+              )}
+            </p>
           </div>
-          <button type="button" onClick={onClose} className={cx("grid size-11 place-items-center rounded-lg text-fg-3 hover:bg-raised", CONTROL_FOCUS_CLASS)} aria-label="신고 닫기"><X size={17} aria-hidden /></button>
+          <button
+            type="button"
+            onClick={onClose}
+            className={cx("grid size-11 place-items-center rounded-lg text-fg-3 hover:bg-raised", CONTROL_FOCUS_CLASS)}
+            aria-label={localizeText(t, "신고 닫기", "studio.assetMenu.reportDialog.close")}
+          >
+            <X size={17} aria-hidden />
+          </button>
         </div>
         <label className="mt-3 block text-[0.65rem] font-semibold text-fg-2">
-          사유
+          {localizeText(t, "사유", "studio.assetMenu.reportDialog.reasonLabel")}
           <select value={reason} onChange={(event) => setReason(event.target.value as CreatorAssetReportReason)} className={cx(TOUCH_CONTROL_CLASS, "mt-1 w-full rounded-lg border border-line bg-card px-2 text-xs font-normal text-fg outline-none focus:border-accent")}>
             {CREATOR_ASSET_REPORT_REASONS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
           </select>
         </label>
         <label className="mt-2 block text-[0.65rem] font-semibold text-fg-2">
-          상세 설명
-          <textarea value={details} onChange={(event) => setDetails(event.target.value.slice(0, 500))} rows={4} placeholder="검수에 필요한 구체적인 내용을 적어 주세요." className="mt-1 w-full resize-none rounded-lg border border-line bg-card p-2 text-xs font-normal text-fg outline-none focus:border-accent" />
+          {localizeText(t, "상세 설명", "studio.assetMenu.reportDialog.detailsLabel")}
+          <textarea
+            value={details}
+            onChange={(event) => setDetails(event.target.value.slice(0, 500))}
+            rows={4}
+            placeholder={localizeText(t, "검수에 필요한 구체적인 내용을 적어 주세요.", "studio.assetMenu.reportDialog.detailsPlaceholder")}
+            className="mt-1 w-full resize-none rounded-lg border border-line bg-card p-2 text-xs font-normal text-fg outline-none focus:border-accent"
+          />
         </label>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <button type="button" onClick={onClose} className={cx(TOUCH_CONTROL_CLASS, "rounded-lg border border-line bg-card text-xs font-semibold text-fg-2 hover:bg-raised")}>취소</button>
-          <button type="button" onClick={() => onReport(reason, details)} className={cx(TOUCH_CONTROL_CLASS, "inline-flex items-center justify-center gap-1.5 rounded-lg bg-bad text-xs font-bold text-white")}><Flag size={14} aria-hidden /> 신고 제출</button>
+          <button
+            type="button"
+            onClick={onClose}
+            className={cx(TOUCH_CONTROL_CLASS, "rounded-lg border border-line bg-card text-xs font-semibold text-fg-2 hover:bg-raised")}
+          >
+            {localizeText(t, "취소", "studio.assetMenu.cancel")}
+          </button>
+          <button
+            type="button"
+            onClick={() => onReport(reason, details)}
+            className={cx(TOUCH_CONTROL_CLASS, "inline-flex items-center justify-center gap-1.5 rounded-lg bg-bad text-xs font-bold text-white")}
+          >
+            <Flag size={14} aria-hidden />
+            {localizeText(t, "신고 제출", "studio.assetMenu.reportSubmit")}
+          </button>
         </div>
       </div>
     </div>
@@ -1468,23 +1658,31 @@ function ReportAssetDialog({
 }
 
 function EmptySearchResult() {
+  const t = useT();
   return (
     <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
-      <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
-      <p className="mt-1 text-[0.6rem] leading-normal text-fg-3">다른 검색어로 찾아보세요.</p>
+      <p className="text-xs text-fg-3">{localizeText(t, "검색 결과가 없습니다.", "studio.assetMenu.emptySearchResultTitle")}</p>
+      <p className="mt-1 text-[0.6rem] leading-normal text-fg-3">
+        {localizeText(t, "다른 검색어로 찾아보세요.", "studio.assetMenu.emptySearchResultDescription")}
+      </p>
     </div>
   );
 }
 
 function EmptyFavoriteResult() {
+  const t = useT();
   return (
     <div
       role="status"
       className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center"
     >
       <Star size={18} className="text-fg-3" aria-hidden />
-      <p className="mt-2 text-xs font-semibold text-fg-2">조건에 맞는 즐겨찾기가 없습니다.</p>
-      <p className="mt-1 text-[0.6rem] leading-normal text-fg-3">별표를 추가하거나 검색 조건을 바꿔보세요.</p>
+      <p className="mt-2 text-xs font-semibold text-fg-2">
+        {localizeText(t, "조건에 맞는 즐겨찾기가 없습니다.", "studio.assetMenu.emptyFavoriteResultTitle")}
+      </p>
+      <p className="mt-1 text-[0.6rem] leading-normal text-fg-3">
+        {localizeText(t, "별표를 추가하거나 검색 조건을 바꿔보세요.", "studio.assetMenu.emptyFavoriteResultDescription")}
+      </p>
     </div>
   );
 }

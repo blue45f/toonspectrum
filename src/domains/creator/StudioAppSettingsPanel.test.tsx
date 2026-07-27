@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   defaultStudioAppSettings,
@@ -13,6 +13,8 @@ import {
   MIN_STUDIO_TOOL_HINT_TOUCH_HOLD_MS,
 } from "./studio-tool-hint-preferences";
 import { StudioAppSettingsPanel } from "./StudioAppSettingsPanel";
+
+import { useI18n } from "@/lib/i18n";
 
 const { createPortalMock } = vi.hoisted(() => ({
   createPortalMock: vi.fn((children: unknown, _container: unknown) => children),
@@ -64,6 +66,10 @@ function openingButtonTagByText(html: string, text: string): string {
 }
 
 describe("StudioAppSettingsPanel", () => {
+  beforeEach(() => {
+    useI18n.getState().setLang("ko");
+  });
+
   afterEach(() => {
     createPortalMock.mockClear();
     vi.unstubAllGlobals();

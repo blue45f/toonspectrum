@@ -1,4 +1,4 @@
-import { Clapperboard, Maximize2, Minimize2, Eraser, BookOpen, FlipHorizontal2, Grid3X3, ImagePlus, Lock, Minus, MousePointer2, PaintBucket, Pencil, PenTool, Plus, Sparkles, Square, Wind, Shapes, MessageSquare } from "lucide-react";
+import { Clapperboard, Maximize2, Minimize2, Eraser, BookOpen, FlipHorizontal2, Grid3X3, ImagePlus, Lock, Minus, Mouse, MousePointer2, PaintBucket, Pencil, PenTool, Plus, Sparkles, Square, Unlock, Wind, Shapes, MessageSquare } from "lucide-react";
 import { Fragment, Profiler, Suspense, memo, useEffect, useRef, type ReactNode, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { Stage, Layer, Rect, Group, Circle as KCircle, Transformer, Shape } from "react-konva/lib/ReactKonvaCore";
@@ -55,7 +55,7 @@ import { type SmartGuideOverlay } from "./studio-smart-guides";
 import { studioUiDensityDescription, studioUiDensityLabel, type StudioUiDensityMode } from "./studio-ui-density";
 import { materializeStudioAdvancedFillVectorTarget } from "./studio-vector-fill-reference";
 import { STUDIO_VIEW_ACTION_HINTS } from "./studio-view-action-hints";
-import { planStudioViewStageLayout, stepStudioViewZoom, type StudioViewRotation } from "./studio-view-controls";
+import { planStudioViewStageLayout, stepStudioViewZoom, toggleStudioCanvasWheelMode, type StudioViewRotation } from "./studio-view-controls";
 import { StudioViewToolsHud } from "./studio-view-tools-hud-loader";
 import { type StudioWorkAssetRenderPlaceholder } from "./studio-work-asset-render-projection";
 import { StudioBrushCursor } from "./StudioBrushCursor";
@@ -89,7 +89,17 @@ import type { StudioLivePressureStore } from "./StudioLiveInkHosts";
 import type { StudioWebGpuCanvasHandle } from "./StudioWebGpuCanvas";
 import type Konva from "konva";
 
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+
+function localizeText(
+  t: (key: string) => string,
+  fallback: string,
+  key: string,
+): string {
+  const translated = t(key);
+  return translated === key ? fallback : translated;
+}
 
 /** Generative-image disclosure rendered above every isolated Studio surface. */
 /**
@@ -98,6 +108,7 @@ import { cn } from "@/lib/utils";
  * a11y: role=dialog + aria-modal, Esc 닫기, 진입 시 기본(확인) 버튼 포커스, 스크림 클릭으로 닫기.
  */
 function AiAssetNotice({ onCancel, onAcknowledge }: { onCancel: () => void; onAcknowledge: () => void }) {
+  const t = useT();
   const confirmRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -138,20 +149,23 @@ function AiAssetNotice({ onCancel, onAcknowledge }: { onCancel: () => void; onAc
       >
         <div className="mb-2 flex items-center gap-2">
           <span className="grid size-8 place-items-center rounded-full bg-accent-soft text-accent">
-            <Sparkles size={16} aria-hidden />
+          <Sparkles size={16} aria-hidden />
           </span>
           <h2 id="ai-notice-title" className="text-base font-bold text-fg">
-            생성형 AI 이미지 안내
+            {localizeText(t, "생성형 AI 이미지 안내", "studio.aiNotice.title")}
           </h2>
         </div>
         <p className="text-sm leading-relaxed text-fg-2">
-          이 기능은 <span className="font-semibold text-accent">생성형 AI(OpenAI)</span>로 이미지를 만들어요. 만들어진
-          결과물에는 <span className="font-semibold">AI</span> 배지가 표시돼요.
+          {localizeText(
+            t,
+            "이 기능은 생성형 AI(OpenAI)로 이미지를 만들어요. 만들어진 결과물에는 AI 배지가 표시돼요.",
+            "studio.aiNotice.description"
+          )}
         </p>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-relaxed text-fg-3">
-          <li>타인의 저작물·캐릭터, 실존 인물의 얼굴은 생성하지 않아요.</li>
-          <li>AI 결과물은 부정확하거나 의도와 다를 수 있어요.</li>
-          <li>만든 이미지의 사용 책임은 본인에게 있어요.</li>
+          <li>{localizeText(t, "타인의 저작물·캐릭터, 실존 인물의 얼굴은 생성하지 않아요.", "studio.aiNotice.ruleCopyright")}</li>
+          <li>{localizeText(t, "AI 결과물은 부정확하거나 의도와 다를 수 있어요.", "studio.aiNotice.ruleAccuracy")}</li>
+          <li>{localizeText(t, "만든 이미지의 사용 책임은 본인에게 있어요.", "studio.aiNotice.ruleResponsibility")}</li>
         </ul>
         <div className="mt-4 flex justify-end gap-2">
           <button
@@ -159,7 +173,7 @@ function AiAssetNotice({ onCancel, onAcknowledge }: { onCancel: () => void; onAc
             onClick={onCancel}
             className="rounded-lg border border-line bg-card px-3 py-2 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised"
           >
-            취소
+            {localizeText(t, "취소", "studio.aiNotice.cancel")}
           </button>
           <button
             ref={confirmRef}
@@ -167,7 +181,7 @@ function AiAssetNotice({ onCancel, onAcknowledge }: { onCancel: () => void; onAc
             onClick={onAcknowledge}
             className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
           >
-            이해했어요, 생성하기
+            {localizeText(t, "이해했어요, 생성하기", "studio.aiNotice.confirm")}
           </button>
         </div>
       </div>
@@ -179,6 +193,81 @@ function AiAssetNotice({ onCancel, onAcknowledge }: { onCancel: () => void; onAc
   // 비교된다). 이 고지는 페이지 어디서 트리거되든 항상 최상단이어야 해서 격리 자체를 벗어난다.
   if (typeof document === "undefined") return null;
   return createPortal(notice, document.body);
+}
+
+function StudioViewInputModeControls({
+  compact = false,
+  wheelMode,
+  zoomLocked,
+  onToggleWheelMode,
+  onToggleZoomLock,
+}: {
+  compact?: boolean;
+  wheelMode: StudioAppSettings["mouse"]["wheel"];
+  zoomLocked: boolean;
+  onToggleWheelMode: () => void;
+  onToggleZoomLock: () => void;
+}) {
+  const t = useT();
+  const wheelScrollMode = wheelMode === "pan";
+  const wheelLabel = wheelScrollMode
+    ? localizeText(t, "휠: 캔버스 스크롤", "studio.canvas.wheelMode.pan")
+    : wheelMode === "brush-size"
+      ? localizeText(t, "휠: 브러시 크기", "studio.canvas.wheelMode.brushSize")
+      : localizeText(t, "휠: 캔버스 확대·축소", "studio.canvas.wheelMode.zoom");
+  const lockLabel = zoomLocked
+    ? localizeText(t, "캔버스 배율 잠금 해제", "studio.canvas.zoomLock.unlock")
+    : localizeText(t, "캔버스 배율 잠금", "studio.canvas.zoomLock.lock");
+
+  return (
+    <div
+      role="group"
+      aria-label={localizeText(t, "캔버스 보기 조작", "studio.canvas.viewInputControls")}
+      className={cn(
+        "inline-flex items-center gap-0.5",
+        compact ? "" : "rounded-full border border-line/60 bg-card/45 p-0.5",
+      )}
+    >
+      <button
+        type="button"
+        aria-pressed={wheelScrollMode}
+        aria-label={wheelLabel}
+        title={`${wheelLabel} · ${localizeText(t, "클릭해서 줌/스크롤 전환", "studio.canvas.wheelMode.toggleHint")}`}
+        onClick={onToggleWheelMode}
+        className={cn(
+          "inline-flex min-h-7 items-center justify-center gap-1 rounded-full px-2 text-[0.65rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+          wheelScrollMode
+            ? "bg-accent-soft text-accent"
+            : "text-fg-2 hover:bg-raised hover:text-fg",
+          compact && "size-7 px-0",
+        )}
+      >
+        <Mouse className="size-3.5" aria-hidden />
+        {!compact ? (
+          <span>{wheelScrollMode
+            ? localizeText(t, "스크롤", "studio.canvas.wheelMode.panShort")
+            : localizeText(t, "줌", "studio.canvas.wheelMode.zoomShort")}</span>
+        ) : null}
+      </button>
+      <button
+        type="button"
+        aria-pressed={zoomLocked}
+        aria-label={lockLabel}
+        title={lockLabel}
+        onClick={onToggleZoomLock}
+        className={cn(
+          "grid size-7 place-items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+          zoomLocked
+            ? "bg-warning-soft text-warning"
+            : "text-fg-2 hover:bg-raised hover:text-fg",
+        )}
+      >
+        {zoomLocked
+          ? <Lock className="size-3.5" aria-hidden />
+          : <Unlock className="size-3.5" aria-hidden />}
+      </button>
+    </div>
+  );
 }
 
 export interface StudioCanvasViewportHandlers {
@@ -572,6 +661,8 @@ export interface StudioCanvasViewportProps {
   workId: string | null;
   wrapRef: import("react").RefObject<HTMLDivElement | null>;
   zoom: number;
+  zoomLocked: boolean;
+  setZoomLocked: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   zoomHostRef: import("react").RefObject<HTMLDivElement | null>;
   stableHandlers: StudioCanvasViewportHandlers;
   setRightPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -860,6 +951,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   workId,
   wrapRef,
   zoom,
+  zoomLocked,
+  setZoomLocked,
   zoomHostRef,
   stableHandlers,
   setRightPanelOpen: _setRightPanelOpen,
@@ -1140,6 +1233,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   const viewportCursorClassName = studioCanvasViewportCursorClassName(canvasCursorInput);
   const canvasCursorClassName = studioCanvasCursorClassName(canvasCursorInput);
   const brushCursorStyle = appSettings.general.brushCursorStyle;
+  const t = useT();
   // 말풍선 병합 액션 게이트 — 다중 선택에 말풍선이 2개 이상 섞였을 때만 노출하고, 비활성
   // 사유(혼합 선택·개수 범위)는 bubbleMergeUnavailableReason으로 툴팁에 안내한다.
   const marqueeSelectedEls =
@@ -1153,11 +1247,27 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     : null;
   const zoomOutAtLimit = stepStudioViewZoom(zoom, -1) === zoom;
   const zoomInAtLimit = stepStudioViewZoom(zoom, 1) === zoom;
-  const viewBusyReason = viewTransformSuppressed
-    ? "내보내기·저장·타임랩스 캡처가 끝난 뒤 보기를 조절하세요."
+  const zoomLockedReason = zoomLocked
+    ? localizeText(t, "캔버스 배율 잠금을 먼저 해제하세요.", "studio.canvas.zoomLock.blocked")
     : undefined;
-  const zoomOutUnavailableReason = viewBusyReason ?? (zoomOutAtLimit ? "최소 축소 배율에 도달했습니다." : undefined);
-  const zoomInUnavailableReason = viewBusyReason ?? (zoomInAtLimit ? "최대 확대 배율에 도달했습니다." : undefined);
+  const viewBusyReason = viewTransformSuppressed
+    ? localizeText(t, "내보내기·저장·타임랩스 캡처가 끝난 뒤 보기를 조절하세요.", "studio.canvas.viewBusyHint")
+    : undefined;
+  const zoomOutUnavailableReason = viewBusyReason ?? zoomLockedReason ?? (zoomOutAtLimit
+    ? localizeText(t, "최소 축소 배율에 도달했습니다.", "studio.canvas.zoomOutLimitReached")
+    : undefined);
+  const zoomInUnavailableReason = viewBusyReason ?? zoomLockedReason ?? (zoomInAtLimit
+    ? localizeText(t, "최대 확대 배율에 도달했습니다.", "studio.canvas.zoomInLimitReached")
+    : undefined);
+  const toggleWheelCanvasMode = () => {
+    commitAppSettings({
+      ...appSettings,
+      mouse: {
+        ...appSettings.mouse,
+        wheel: toggleStudioCanvasWheelMode(appSettings.mouse.wheel),
+      },
+    });
+  };
   return (
         <div
           className={cn(
@@ -1208,6 +1318,12 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   : undefined
               }
             >
+              <StudioViewInputModeControls
+                wheelMode={appSettings.mouse.wheel}
+                zoomLocked={zoomLocked}
+                onToggleWheelMode={toggleWheelCanvasMode}
+                onToggleZoomLock={() => setZoomLocked((current) => !current)}
+              />
               <StudioHudPill>
                 <StudioToolHintTarget
                   hint={STUDIO_VIEW_ACTION_HINTS.zoomOut}
@@ -1218,12 +1334,12 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     type="button"
                     className={cn(
                       "grid size-7 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg",
-                      (viewTransformSuppressed || zoomOutAtLimit) && "cursor-not-allowed opacity-40"
+                      (viewTransformSuppressed || zoomLocked || zoomOutAtLimit) && "cursor-not-allowed opacity-40"
                     )}
                     aria-label="축소"
-                    aria-disabled={viewTransformSuppressed || zoomOutAtLimit ? true : undefined}
+                    aria-disabled={viewTransformSuppressed || zoomLocked || zoomOutAtLimit ? true : undefined}
                     onClick={() => {
-                      if (!viewTransformSuppressed && !zoomOutAtLimit) {
+                      if (!viewTransformSuppressed && !zoomLocked && !zoomOutAtLimit) {
                         setZoom((current) => stepStudioViewZoom(current, -1));
                       }
                     }}
@@ -1243,12 +1359,12 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     type="button"
                     className={cn(
                       "grid size-7 place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg",
-                      (viewTransformSuppressed || zoomInAtLimit) && "cursor-not-allowed opacity-40"
+                      (viewTransformSuppressed || zoomLocked || zoomInAtLimit) && "cursor-not-allowed opacity-40"
                     )}
                     aria-label="확대"
-                    aria-disabled={viewTransformSuppressed || zoomInAtLimit ? true : undefined}
+                    aria-disabled={viewTransformSuppressed || zoomLocked || zoomInAtLimit ? true : undefined}
                     onClick={() => {
-                      if (!viewTransformSuppressed && !zoomInAtLimit) {
+                      if (!viewTransformSuppressed && !zoomLocked && !zoomInAtLimit) {
                         setZoom((current) => stepStudioViewZoom(current, 1));
                       }
                     }}
@@ -1333,7 +1449,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 </Suspense>
               ) : null}
               {tool === "draw" && drawMode === "shape" && studioShapeFillHudLabel(shapeFill, drawShape) ? (
-                <StudioHudPill accent title="도형 채우기">
+                <StudioHudPill accent title={localizeText(t, "도형 채우기", "studio.canvas.shapeFill")}>
                   <PaintBucket size={12} strokeWidth={1.75} aria-hidden />
                 </StudioHudPill>
               ) : null}
@@ -1343,11 +1459,15 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 </StudioHudPill>
               ) : null}
               {tool === "draw" && quickShapeActive ? (
-                <StudioHudPill accent title="스마트 도형">
+                <StudioHudPill accent title={t("studio.quickShape.title")}>
                   <Sparkles size={12} strokeWidth={1.75} aria-hidden />
                 </StudioHudPill>
               ) : null}
-              <div className="flex items-center gap-px" role="group" aria-label="레이아웃 모드">
+              <div
+                className="flex items-center gap-px"
+                role="group"
+                aria-label={localizeText(t, "레이아웃 모드", "studio.canvas.layoutMode")}
+              >
                 {(
                   [
                     { mode: "focus" as const, Icon: Minimize2 },
@@ -1389,7 +1509,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     viewTransformSuppressed && "cursor-not-allowed opacity-40"
                   )}
                 >
-                  맞춤
+                  {localizeText(t, "맞춤", "studio.canvas.fit")}
                 </button>
               </StudioToolHintTarget>
               <button
@@ -1399,9 +1519,9 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   else enterCanvasOnlyMode();
                 }}
                 className="rounded-full px-1.5 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
-                title="` — 캔버스만 / 도구 토글"
+                title={localizeText(t, "` — 캔버스만 / 도구 토글", "studio.canvas.canvasOnlyModeTitle")}
               >
-                {canvasOnlyMode ? "도구" : "`"}
+                {canvasOnlyMode ? localizeText(t, "도구", "studio.canvas.canvasOnlyModeTool") : "`"}
               </button>
             </StudioStatusBar>
           ) : null}
@@ -1416,7 +1536,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
             tabIndex={0}
             role="group"
-            aria-label="작업 캔버스 — 포커스 후 방향키로 스크롤"
+            aria-label={localizeText(t, "작업 캔버스 — 포커스 후 방향키로 스크롤", "studio.canvas.canvasAriaLabel")}
             onMouseDown={onWrapMouseDown}
             onMouseMove={onWrapMouseMove}
             onMouseUp={onWrapMouseUp}
@@ -1457,8 +1577,10 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
           >
             <div className="inline-flex min-h-9 items-center gap-2 rounded-full border border-accent/60 bg-panel/95 px-3 text-[0.68rem] font-bold text-fg shadow-xl backdrop-blur-md">
               <ImagePlus size={14} className="text-accent" aria-hidden />
-              놓는 위치에 정확히 배치
-              <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.58rem] text-accent">복사</span>
+              {localizeText(t, "놓는 위치에 정확히 배치", "studio.canvas.dropPlaceHint")}
+              <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.58rem] text-accent">
+                {localizeText(t, "복사", "studio.canvas.copyBadge")}
+              </span>
             </div>
           </div>
           <div className="pointer-events-none sticky top-2 z-[56] flex h-0 items-start justify-end pr-2">
@@ -2825,7 +2947,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             {quickShapeActive && tool === "draw" && drawMode === "pen" && !drawingShortcutNotice ? (
               <span className="mx-3 inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-panel/95 px-3 py-1 text-center text-[0.68rem] font-semibold text-accent shadow-lg backdrop-blur">
                 <Shapes size={12} aria-hidden />
-                스마트 도형 · 선·원·네모 등을 그리고 손을 떼면 다듬어요 (잠시 멈추면 미리보기)
+                {localizeText(t, "스마트 도형 · 선·원·네모 등을 그리고 손을 떼면 다듬어요 (잠시 멈추면 미리보기)", "studio.quickShape.notice")}
               </span>
             ) : null}
           </div>
@@ -2842,9 +2964,9 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 ? { bottom: "calc(var(--studio-draw-options-height, 3.75rem) + 1.25rem)" }
                 : undefined
             }
-            aria-label="도구 빠른 실행"
+            aria-label={localizeText(t, "도구 빠른 실행", "studio.canvas.openQuickStart")}
             aria-expanded={showQuickStart}
-            title="도구 빠른 실행"
+            title={localizeText(t, "도구 빠른 실행", "studio.canvas.openQuickStart")}
           >
             ?
           </button>
@@ -2861,8 +2983,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 ? { bottom: "calc(var(--studio-draw-options-height, 3.75rem) + 1.25rem)" }
                 : undefined
             }
-            aria-label="단축키"
-            title="단축키"
+            aria-label={t("studio.shortcuts.row.view.help")}
+            title={t("studio.shortcuts.row.view.help")}
           >
             ⌨
           </button>
@@ -2879,9 +3001,9 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 ? { bottom: "calc(var(--studio-draw-options-height, 3.75rem) + 1.25rem)" }
                 : undefined
             }
-            aria-label="기능 튜토리얼"
+            aria-label={t("studio.mainMenu.item.view.feature-tutorials")}
             aria-expanded={tutorialHubOpen}
-            title="기능 튜토리얼"
+            title={t("studio.mainMenu.item.view.feature-tutorials")}
           >
             <BookOpen size={15} aria-hidden />
           </button>
@@ -2966,13 +3088,13 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   patchElCoalesced(frameAnimEl.id, { activeFrameId: frameId, src: frame.src }, `frame-nav-${frameAnimEl.id}`);
                 }}
                 onCaptureFrame={() => void captureAnimFrame(frameAnimEl.id)}
-                captureDisabledReason={
-                  frameAnimEl.rotation
-                    ? "회전이 0°인 셀만 프레임을 캡처할 수 있어요."
-                    : (frameAnimEl.frames?.length ?? 0) >= MAX_ANIM_FRAMES
-                      ? "프레임은 최대 60장까지 만들 수 있어요."
-                      : null
-                }
+                  captureDisabledReason={
+                    frameAnimEl.rotation
+                      ? localizeText(t, "회전이 0°인 셀만 프레임을 캡처할 수 있어요.", "studio.canvas.frameAnimationRotateOnly")
+                      : (frameAnimEl.frames?.length ?? 0) >= MAX_ANIM_FRAMES
+                        ? localizeText(t, "프레임은 최대 60장까지 만들 수 있어요.", "studio.canvas.frameAnimationFrameLimit")
+                        : null
+                  }
                 onRemoveAnimation={() => {
                   patchEl(frameAnimEl.id, { frames: undefined, frameFps: undefined, frameLoop: undefined, activeFrameId: undefined });
                   setFrameAnimOpen(false);
@@ -3152,6 +3274,13 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               canvasOnlyMode && "lg:flex"
             )}
           >
+            <StudioViewInputModeControls
+              compact
+              wheelMode={appSettings.mouse.wheel}
+              zoomLocked={zoomLocked}
+              onToggleWheelMode={toggleWheelCanvasMode}
+              onToggleZoomLock={() => setZoomLocked((current) => !current)}
+            />
             <StudioToolHintTarget
               hint={STUDIO_VIEW_ACTION_HINTS.zoomOut}
               unavailableReason={zoomOutUnavailableReason}
@@ -3160,36 +3289,36 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               <button
                 type="button"
                 onClick={() => {
-                  if (!viewTransformSuppressed && !zoomOutAtLimit) {
+                  if (!viewTransformSuppressed && !zoomLocked && !zoomOutAtLimit) {
                     setZoom((current) => stepStudioViewZoom(current, -1));
                   }
                 }}
-                aria-disabled={viewTransformSuppressed || zoomOutAtLimit ? true : undefined}
+                aria-disabled={viewTransformSuppressed || zoomLocked || zoomOutAtLimit ? true : undefined}
                 className={cn(
                   "grid size-7 place-items-center rounded-full text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-                  (viewTransformSuppressed || zoomOutAtLimit) && "cursor-not-allowed opacity-40"
+                  (viewTransformSuppressed || zoomLocked || zoomOutAtLimit) && "cursor-not-allowed opacity-40"
                 )}
-                aria-label="축소"
+                aria-label={t("studio.shortcuts.row.view.zoomOut")}
               >
                 <Minus className="size-3.5" aria-hidden />
               </button>
             </StudioToolHintTarget>
             <StudioToolHintTarget
               hint={STUDIO_VIEW_ACTION_HINTS.actualSize}
-              unavailableReason={viewBusyReason}
+              unavailableReason={viewBusyReason ?? zoomLockedReason}
               preferredSide="top"
             >
               <button
                 type="button"
                 onClick={() => {
-                  if (!viewTransformSuppressed) setActualPixelView();
+                  if (!viewTransformSuppressed && !zoomLocked) setActualPixelView();
                 }}
-                aria-disabled={viewTransformSuppressed ? true : undefined}
+                aria-disabled={viewTransformSuppressed || zoomLocked ? true : undefined}
                 className={cn(
                   "min-h-7 min-w-[3.25rem] rounded-full px-1 text-center text-xs font-semibold tabular-nums text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-                  viewTransformSuppressed && "cursor-not-allowed opacity-40"
+                  (viewTransformSuppressed || zoomLocked) && "cursor-not-allowed opacity-40"
                 )}
-                aria-label="실제 픽셀 100% 보기"
+                aria-label={localizeText(t, "실제 픽셀 100% 보기", "studio.canvas.actualPixelAria")}
               >
                 {Math.round(effScale * 100)}%
               </button>
@@ -3202,16 +3331,16 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               <button
                 type="button"
                 onClick={() => {
-                  if (!viewTransformSuppressed && !zoomInAtLimit) {
+                  if (!viewTransformSuppressed && !zoomLocked && !zoomInAtLimit) {
                     setZoom((current) => stepStudioViewZoom(current, 1));
                   }
                 }}
-                aria-disabled={viewTransformSuppressed || zoomInAtLimit ? true : undefined}
+                aria-disabled={viewTransformSuppressed || zoomLocked || zoomInAtLimit ? true : undefined}
                 className={cn(
                   "grid size-7 place-items-center rounded-full text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-                  (viewTransformSuppressed || zoomInAtLimit) && "cursor-not-allowed opacity-40"
+                  (viewTransformSuppressed || zoomLocked || zoomInAtLimit) && "cursor-not-allowed opacity-40"
                 )}
-                aria-label="확대"
+                aria-label={t("studio.shortcuts.row.view.zoomIn")}
               >
                 <Plus className="size-3.5" aria-hidden />
               </button>

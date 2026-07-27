@@ -8,9 +8,37 @@ import {
   type StudioCompanionReviewProjection,
 } from "./studio-companion-review-projection";
 
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 type ReviewSection = "layers" | "history" | "comments";
+
+type StudioReviewT = (key: string, fallback?: string) => string;
+
+function localizeText(t: StudioReviewT, fallback: string, key: string): string {
+  const translated = t(key);
+  return translated === key ? fallback : translated;
+}
+
+function interpolateText(
+  message: string,
+  values?: Record<string, string | number>,
+): string {
+  if (!values) return message;
+  return Object.entries(values).reduce(
+    (memo, [key, value]) => memo.replaceAll(`{${key}}`, String(value)),
+    message,
+  );
+}
+
+function tText(
+  t: StudioReviewT,
+  fallback: string,
+  key: string,
+  values?: Record<string, string | number>,
+): string {
+  return interpolateText(localizeText(t, fallback, key), values);
+}
 
 export interface StudioCompanionReviewConsoleProps {
   projection: StudioCompanionReviewProjection | null;
@@ -38,11 +66,12 @@ export function StudioCompanionReviewConsole({
 }: StudioCompanionReviewConsoleProps) {
   const [section, setSection] = useState<ReviewSection>("layers");
   const controlsReady = connected && projection !== null && !presentationSafe;
+  const t = useT();
 
   if (!projection) {
     return (
       <section
-        aria-label="검수 Console"
+        aria-label={t("studio.toolsCompanion.review.title")}
         className={cn(
           "grid min-h-72 place-items-center rounded-xl border border-line bg-card px-6 text-center",
           layout === "dedicated" && "min-h-80 flex-1"
@@ -50,9 +79,11 @@ export function StudioCompanionReviewConsole({
       >
         <span>
           <History className="mx-auto size-6 text-fg-3" aria-hidden />
-          <strong className="mt-3 block text-sm font-semibold text-fg-2">검수 정보를 기다리는 중</strong>
+          <strong className="mt-3 block text-sm font-semibold text-fg-2">
+            {t("studio.toolsCompanion.review.waitingData")}
+          </strong>
           <span className="mt-1 block text-xs leading-relaxed text-fg-3">
-            기본 스튜디오가 연결되면 레이어·히스토리·댓글 요약이 표시됩니다.
+            {t("studio.toolsCompanion.review.emptyStateHint")}
           </span>
         </span>
       </section>
@@ -86,33 +117,43 @@ export function StudioCompanionReviewConsole({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 id="companion-review-title" className="text-sm font-semibold text-fg">검수 Console</h2>
+          <h2 id="companion-review-title" className="text-sm font-semibold text-fg">
+            {t("studio.toolsCompanion.review.title")}
+          </h2>
           <p className="mt-0.5 truncate text-xs text-fg-3">
             {presentationSafe
-              ? "발표 안전 · 문서 정보 숨김"
-              : `${projection.pageLabel} · ${projection.selectionLabel ?? "선택 없음"}`}
+              ? t("studio.toolsCompanion.review.presentationSafeTitle")
+              : tText(
+                t,
+                `${projection.pageLabel} · ${projection.selectionLabel ?? "선택 없음"}`,
+                "studio.toolsCompanion.review.subtitle",
+                {
+                  pageLabel: projection.pageLabel,
+                  selectionLabel: projection.selectionLabel ?? t("studio.toolsCompanion.review.emptySelection"),
+                },
+              )}
           </p>
         </div>
       </div>
 
       {presentationSafe ? (
         <div role="status" className="rounded-xl border border-good/35 bg-good/10 px-3 py-2.5 text-xs leading-relaxed text-good">
-          발표 안전 모드입니다. 댓글 본문과 원격 실행 컨트롤을 숨겼습니다.
+          {t("studio.toolsCompanion.review.presentationSafeBanner")}
         </div>
       ) : (
         <div className="space-y-2 rounded-xl border border-line bg-card p-3">
           <div className="flex items-center justify-between gap-3">
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-fg-2">
-              <Brush className="size-3.5" aria-hidden /> 브러시 원격 제어
+              <Brush className="size-3.5" aria-hidden /> {t("studio.toolsCompanion.review.brushRemoteTitle")}
             </span>
             <span className="text-[0.65rem] tabular-nums text-fg-3">
               {projection.brush.size}px · {Math.round(projection.brush.opacity * 100)}%
             </span>
           </div>
           <label className="block text-[0.68rem] font-medium text-fg-3">
-            브러시
+            {t("studio.toolsCompanion.review.brushLabel")}
             <select
-              aria-label="원격 브러시"
+              aria-label={t("studio.toolsCompanion.review.brushSelectAria")}
               value={projection.brush.id}
               disabled={!controlsReady}
               onChange={(event) => onBrushPatch({ id: event.target.value })}
@@ -124,10 +165,12 @@ export function StudioCompanionReviewConsole({
             </select>
           </label>
           <label className="block text-[0.68rem] font-medium text-fg-3">
-            크기 {projection.brush.size}px
+            {tText(t, `크기 ${projection.brush.size}px`, "studio.toolsCompanion.review.brushSize", {
+              size: projection.brush.size,
+            })}
             <input
               type="range"
-              aria-label="원격 브러시 크기"
+              aria-label={t("studio.toolsCompanion.review.brushSizeAria")}
               min={STUDIO_COMPANION_BRUSH_SIZE_MIN}
               max={STUDIO_COMPANION_BRUSH_SIZE_MAX}
               value={projection.brush.size}
@@ -138,10 +181,15 @@ export function StudioCompanionReviewConsole({
           </label>
           <div className="grid grid-cols-[minmax(0,1fr)_3.25rem] items-end gap-3">
             <label className="block text-[0.68rem] font-medium text-fg-3">
-              불투명도 {Math.round(projection.brush.opacity * 100)}%
+              {tText(
+                t,
+                `불투명도 ${Math.round(projection.brush.opacity * 100)}%`,
+                "studio.toolsCompanion.review.brushOpacity",
+                { opacity: Math.round(projection.brush.opacity * 100) },
+              )}
               <input
                 type="range"
-                aria-label="원격 브러시 불투명도"
+                aria-label={t("studio.toolsCompanion.review.brushOpacityAria")}
                 min={0}
                 max={100}
                 value={Math.round(projection.brush.opacity * 100)}
@@ -150,11 +198,14 @@ export function StudioCompanionReviewConsole({
                 className="mt-1 h-11 w-full accent-accent disabled:opacity-50"
               />
             </label>
-            <label className="grid min-h-11 cursor-pointer place-items-center rounded-lg border border-line bg-raised" title="브러시 색상">
-              <span className="sr-only">원격 브러시 색상</span>
+            <label
+              className="grid min-h-11 cursor-pointer place-items-center rounded-lg border border-line bg-raised"
+              title={t("studio.toolsCompanion.review.brushColor")}
+            >
+              <span className="sr-only">{t("studio.toolsCompanion.review.brushColorAria")}</span>
               <input
                 type="color"
-                aria-label="원격 브러시 색상"
+                aria-label={t("studio.toolsCompanion.review.brushColorAria")}
                 value={projection.brush.color}
                 disabled={!controlsReady}
                 onChange={(event) => onBrushPatch({ color: event.target.value })}
@@ -165,11 +216,33 @@ export function StudioCompanionReviewConsole({
         </div>
       )}
 
-      <div className="flex rounded-xl border border-line bg-card p-1" role="tablist" aria-label="검수 정보">
+      <div
+        className="flex rounded-xl border border-line bg-card p-1"
+        role="tablist"
+        aria-label={t("studio.toolsCompanion.review.sectionTabs")}
+      >
         {([
-          ["layers", `레이어 ${projection.layers.length}`],
-          ["history", `기록 ${projection.history.length}`],
-          ["comments", `댓글 ${projection.comments.length}`],
+          [
+            "layers",
+            tText(t, `레이어 ${projection.layers.length}`, "studio.toolsCompanion.review.section.layers", {
+              count: projection.layers.length,
+            }),
+          ],
+          [
+            "history",
+            tText(t, `기록 ${projection.history.length}`, "studio.toolsCompanion.review.section.history", {
+              count: projection.history.length,
+            }),
+          ],
+          [
+            "comments",
+            tText(
+              t,
+              `댓글 ${projection.comments.length}`,
+              "studio.toolsCompanion.review.section.comments",
+              { count: projection.comments.length },
+            ),
+          ],
         ] as const).map(([id, label], index) => (
           <button
             key={id}
@@ -217,21 +290,31 @@ export function StudioCompanionReviewConsole({
             >
               {layer.visible ? <Eye className="size-3.5 shrink-0" aria-hidden /> : <EyeOff className="size-3.5 shrink-0" aria-hidden />}
               <span className="min-w-0 flex-1 truncate">
-                {presentationSafe ? `레이어 ${index + 1}` : layer.label}
+                {presentationSafe
+                  ? tText(t, `레이어 ${index + 1}`, "studio.toolsCompanion.review.layerItem", {
+                    index: index + 1,
+                  })
+                  : layer.label}
               </span>
               <span className="max-w-16 truncate text-[0.62rem] text-fg-3">
-                {presentationSafe ? "항목" : layer.kind}
+                {presentationSafe
+                  ? t("studio.toolsCompanion.review.layerKindFallback")
+                  : layer.kind}
               </span>
               {layer.selected && !presentationSafe ? <Check className="size-3.5 text-accent" aria-hidden /> : null}
             </button>
           ))}
           {projection.layers.length === 0 ? (
             <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs text-fg-3">
-              표시할 레이어가 없습니다.
+              {t("studio.toolsCompanion.review.noLayers")}
             </p>
           ) : null}
           {projection.truncated.layers > 0 ? (
-            <p className="py-1 text-center text-[0.65rem] text-fg-3">외 {projection.truncated.layers}개 레이어</p>
+            <p className="py-1 text-center text-[0.65rem] text-fg-3">
+              {tText(t, `외 ${projection.truncated.layers}개 레이어`, "studio.toolsCompanion.review.truncatedLayers", {
+                count: projection.truncated.layers,
+              })}
+            </p>
           ) : null}
       </div>
 
@@ -247,24 +330,24 @@ export function StudioCompanionReviewConsole({
         >
           {!presentationSafe ? (
             <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={!controlsReady || !projection.canUndo}
-                onClick={() => onHistory("undo")}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line bg-card text-xs font-semibold text-fg-2 outline-none hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/35 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                <Undo2 className="size-3.5" aria-hidden /> 실행 취소
-              </button>
-              <button
-                type="button"
-                disabled={!controlsReady || !projection.canRedo}
-                onClick={() => onHistory("redo")}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line bg-card text-xs font-semibold text-fg-2 outline-none hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/35 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                <Redo2 className="size-3.5" aria-hidden /> 다시 실행
-              </button>
-            </div>
-          ) : null}
+                <button
+                  type="button"
+                  disabled={!controlsReady || !projection.canUndo}
+                  onClick={() => onHistory("undo")}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line bg-card text-xs font-semibold text-fg-2 outline-none hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/35 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <Undo2 className="size-3.5" aria-hidden /> {t("studio.toolsCompanion.review.undo")}
+                </button>
+                <button
+                  type="button"
+                  disabled={!controlsReady || !projection.canRedo}
+                  onClick={() => onHistory("redo")}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line bg-card text-xs font-semibold text-fg-2 outline-none hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/35 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <Redo2 className="size-3.5" aria-hidden /> {t("studio.toolsCompanion.review.redo")}
+                </button>
+              </div>
+            ) : null}
           <ol className={cn(
             "space-y-1 overflow-y-auto",
             layout === "dedicated" ? "max-h-none min-h-0 flex-1" : "max-h-64"
@@ -276,15 +359,26 @@ export function StudioCompanionReviewConsole({
               )}>
                 <History className="size-3.5" aria-hidden />
                 <span className="flex-1">
-                  {presentationSafe ? `작업 기록 ${index + 1}` : entry.label}
+                  {presentationSafe
+                    ? tText(
+                      t,
+                      "작업 기록 {index}",
+                      "studio.toolsCompanion.review.historyItem",
+                      { index: index + 1 },
+                    )
+                    : entry.label}
                 </span>
-                {entry.current ? <span className="text-[0.62rem] font-semibold text-accent">현재</span> : null}
+                {entry.current ? (
+                  <span className="text-[0.62rem] font-semibold text-accent">
+                    {t("studio.toolsCompanion.review.current")}
+                  </span>
+                ) : null}
               </li>
             ))}
           </ol>
           {projection.history.length === 0 ? (
             <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs text-fg-3">
-              아직 작업 기록이 없습니다.
+              {t("studio.toolsCompanion.review.noHistory")}
             </p>
           ) : null}
       </div>
@@ -310,7 +404,12 @@ export function StudioCompanionReviewConsole({
               <MessageSquare className={cn("mt-0.5 size-3.5 shrink-0", comment.unread ? "text-accent" : "text-fg-3")} aria-hidden />
               <span className="min-w-0 flex-1">
                 {presentationSafe ? (
-                  <span className="block text-xs text-fg-3">검수 의견 {comment.resolved ? "완료" : "열림"}</span>
+                  <span className="block text-xs text-fg-3">
+                    {t("studio.toolsCompanion.review.commentStatusLabel")}
+                    {comment.resolved
+                      ? ` ${t("studio.toolsCompanion.review.commentState.resolved")}`
+                      : ` ${t("studio.toolsCompanion.review.commentState.open")}`}
+                  </span>
                 ) : (
                   <>
                     <span className="block truncate text-[0.68rem] font-semibold text-fg-2">{comment.author}</span>
@@ -321,10 +420,16 @@ export function StudioCompanionReviewConsole({
             </button>
           ))}
           {projection.comments.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs text-fg-3">표시할 댓글이 없습니다.</p>
+            <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-xs text-fg-3">
+              {t("studio.toolsCompanion.review.noComments")}
+            </p>
           ) : null}
           {projection.truncated.comments > 0 ? (
-            <p className="py-1 text-center text-[0.65rem] text-fg-3">외 {projection.truncated.comments}개 댓글</p>
+            <p className="py-1 text-center text-[0.65rem] text-fg-3">
+              {tText(t, `외 {count}개 댓글`, "studio.toolsCompanion.review.truncatedComments", {
+                count: projection.truncated.comments,
+              })}
+            </p>
           ) : null}
       </div>
     </section>

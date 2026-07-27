@@ -17,6 +17,8 @@ import { useStudioHistogramSource } from "./useStudioHistogramSource";
 import type { El, ImageEl } from "./studio-element-model";
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
+import { useT } from "@/lib/i18n";
+
 function createLookEffectId(lookId: string): StudioEffectId {
   return createStudioEffectId("look", lookId);
 }
@@ -574,11 +576,13 @@ function AdjustmentSection({
   title,
   defaultOpen = false,
   forceOpen = false,
+  loadingLabel,
   children,
 }: {
   title: string;
   defaultOpen?: boolean;
   forceOpen?: boolean;
+  loadingLabel: string;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen || forceOpen);
@@ -606,7 +610,7 @@ function AdjustmentSection({
         <Suspense
           fallback={
             <div className="mt-2 rounded-lg border border-line bg-card/70 px-3 py-2 text-xs text-fg-3">
-              {title} 패널을 여는 중...
+              {loadingLabel}
             </div>
           }
         >
@@ -632,9 +636,41 @@ export function StudioImageAdjustmentsPanel({
   // 히스토그램 원본 픽셀 — src 키 LRU 캐시라 선택/src 변경 시에만 디코드되고
   // 레벨·톤커브 두 패널이 같은 디코드 1회를 공유한다.
   const histogramSource = useStudioHistogramSource(selected.src);
+  const t = useT();
+  const sectionLoading = t("studio.imageAdjustments.sectionLoading");
+  const sectionTitle = {
+    lookPreset: t("studio.imageAdjustments.section.lookPreset"),
+    smartFilter: t("studio.imageAdjustments.section.smartFilter"),
+    photoToonFilter: t("studio.imageAdjustments.section.photoToonFilter"),
+    basicFilter: t("studio.imageAdjustments.section.basicFilter"),
+    level: t("studio.imageAdjustments.section.level"),
+    layerStyle: t("studio.imageAdjustments.section.layerStyle"),
+    toneCurve: t("studio.imageAdjustments.section.toneCurve"),
+    colorBalance: t("studio.imageAdjustments.section.colorBalance"),
+    channelMixer: t("studio.imageAdjustments.section.channelMixer"),
+    selectiveColor: t("studio.imageAdjustments.section.selectiveColor"),
+    vibrance: t("studio.imageAdjustments.section.vibrance"),
+    photoFilter: t("studio.imageAdjustments.section.photoFilter"),
+    colorToAlpha: t("studio.imageAdjustments.section.colorToAlpha"),
+    gradientMap: t("studio.imageAdjustments.section.gradientMap"),
+    autoAdjust: t("studio.imageAdjustments.section.autoAdjust"),
+    clarity: t("studio.imageAdjustments.section.clarity"),
+    shadowHighlight: t("studio.imageAdjustments.section.shadowHighlight"),
+    glow: t("studio.imageAdjustments.section.glow"),
+    outline: t("studio.imageAdjustments.section.outline"),
+    halftone: t("studio.imageAdjustments.section.halftone"),
+    grain: t("studio.imageAdjustments.section.grain"),
+    inkWash: t("studio.imageAdjustments.section.inkWash"),
+    blurFx: t("studio.imageAdjustments.section.blurFx"),
+    distort: t("studio.imageAdjustments.section.distort"),
+    stylize: t("studio.imageAdjustments.section.stylize"),
+    light: t("studio.imageAdjustments.section.light"),
+    detail: t("studio.imageAdjustments.section.detail"),
+    sketch: t("studio.imageAdjustments.section.sketch"),
+  };
   return (
     <>
-      <AdjustmentSection title="룩 프리셋" defaultOpen>
+      <AdjustmentSection title={sectionTitle.lookPreset} loadingLabel={sectionLoading} defaultOpen>
         <StudioLooksPanel
           onApplyLook={(look: StudioLook) => {
             onRememberEffectRecent(createLookEffectId(look.id));
@@ -651,28 +687,44 @@ export function StudioImageAdjustmentsPanel({
         />
       </AdjustmentSection>
 
-      <AdjustmentSection title="스마트 필터" defaultOpen>
+      <AdjustmentSection
+        title={sectionTitle.smartFilter}
+        loadingLabel={sectionLoading}
+        defaultOpen
+      >
         <StudioSmartFiltersPanel
           stack={selected.smartFilters}
           onChange={(smartFilters) => onPatch({ smartFilters } as Partial<El>)}
         />
       </AdjustmentSection>
 
-      <AdjustmentSection title="사진→웹툰 필터" defaultOpen>
+      <AdjustmentSection
+        title={sectionTitle.photoToonFilter}
+        loadingLabel={sectionLoading}
+        defaultOpen
+      >
         <StudioPhotoWebtoonPresetPanel
           onApplyPreset={(preset) => onPatch(applyPhotoWebtoonPreset(filterFields, preset.id) as Partial<El>)}
           onReset={() => onPatch(resetPhotoWebtoonPreset(filterFields) as Partial<El>)}
         />
       </AdjustmentSection>
 
-      <AdjustmentSection title="기본 필터" defaultOpen>
+      <AdjustmentSection
+        title={sectionTitle.basicFilter}
+        loadingLabel={sectionLoading}
+        defaultOpen
+      >
         <StudioImageFilterPanel
           values={selected}
           onPatch={(patch) => onPatch(patch as Partial<El>)}
         />
       </AdjustmentSection>
 
-      <AdjustmentSection title="레벨" defaultOpen>
+      <AdjustmentSection
+        title={sectionTitle.level}
+        loadingLabel={sectionLoading}
+        defaultOpen
+      >
         <StudioLevelsPanel
           histogramSource={histogramSource}
           value={normalizeLevels({
@@ -722,7 +774,11 @@ export function StudioImageAdjustmentsPanel({
         />
       </AdjustmentSection>
 
-      <AdjustmentSection title="레이어 스타일" defaultOpen>
+      <AdjustmentSection
+        title={sectionTitle.layerStyle}
+        loadingLabel={sectionLoading}
+        defaultOpen
+      >
         <StudioLayerStylePanel
           values={selected as LayerStylePatch}
           onPatch={(patch) => onPatch(patch as Partial<El>)}
@@ -732,7 +788,8 @@ export function StudioImageAdjustmentsPanel({
       </AdjustmentSection>
 
       <AdjustmentSection
-        title="톤 커브"
+        title={sectionTitle.toneCurve}
+        loadingLabel={sectionLoading}
         defaultOpen={hasAdjustmentValue(selected.curve) || hasAdjustmentValue(filterFields.curveCh)}
       >
         <StudioCurvePanel
@@ -754,87 +811,171 @@ export function StudioImageAdjustmentsPanel({
         />
       </AdjustmentSection>
 
-      <AdjustmentSection title="컬러 밸런스" forceOpen={hasAdjustmentValue(selected.colorBalance)}>
+      <AdjustmentSection
+        title={sectionTitle.colorBalance}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.colorBalance)}
+      >
         <StudioColorBalanceSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="채널 믹서" forceOpen={hasAdjustmentValue(selected.channelMixer)}>
+      <AdjustmentSection
+        title={sectionTitle.channelMixer}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.channelMixer)}
+      >
         <StudioChannelMixerSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="선택 색상" forceOpen={hasAdjustmentValue(selected.selectiveHsl)}>
+      <AdjustmentSection
+        title={sectionTitle.selectiveColor}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.selectiveHsl)}
+      >
         <StudioSelectiveHslSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="생동감" forceOpen={hasAdjustmentValue(selected.vibrance)}>
+      <AdjustmentSection
+        title={sectionTitle.vibrance}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.vibrance)}
+      >
         <StudioVibranceSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="포토 필터" forceOpen={hasAdjustmentValue(selected.photoFilter)}>
+      <AdjustmentSection
+        title={sectionTitle.photoFilter}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.photoFilter)}
+      >
         <StudioPhotoFilterSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="색상 투명화" forceOpen={hasAdjustmentValue(selected.colorToAlpha)}>
+      <AdjustmentSection
+        title={sectionTitle.colorToAlpha}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.colorToAlpha)}
+      >
         <StudioColorToAlphaSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="그라디언트 맵" forceOpen={hasAdjustmentValue(selected.gradientMap)}>
+      <AdjustmentSection
+        title={sectionTitle.gradientMap}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.gradientMap)}
+      >
         <StudioGradientMapSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="자동 보정" forceOpen={hasAdjustmentValue(selected.autoAdjust)}>
+      <AdjustmentSection
+        title={sectionTitle.autoAdjust}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.autoAdjust)}
+      >
         <StudioAutoAdjustSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="명료도" forceOpen={hasAdjustmentValue(selected.clarity)}>
+      <AdjustmentSection
+        title={sectionTitle.clarity}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.clarity)}
+      >
         <StudioClaritySection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="섀도우/하이라이트" forceOpen={hasAdjustmentValue(selected.shadowHighlight)}>
+      <AdjustmentSection
+        title={sectionTitle.shadowHighlight}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.shadowHighlight)}
+      >
         <StudioShadowHighlightSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="글로우" forceOpen={hasAdjustmentValue(selected.glow)}>
+      <AdjustmentSection
+        title={sectionTitle.glow}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.glow)}
+      >
         <StudioGlowSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="외곽선" forceOpen={hasAdjustmentValue(selected.outline)}>
+      <AdjustmentSection
+        title={sectionTitle.outline}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.outline)}
+      >
         <StudioOutlineSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="하프톤" forceOpen={hasAdjustmentValue(selected.halftone)}>
+      <AdjustmentSection
+        title={sectionTitle.halftone}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.halftone)}
+      >
         <StudioHalftoneSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="그레인" forceOpen={hasAdjustmentValue(selected.grain)}>
+      <AdjustmentSection
+        title={sectionTitle.grain}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.grain)}
+      >
         <StudioGrainSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="수묵/번짐 재질" forceOpen={hasAdjustmentValue(selected.inkWash)}>
+      <AdjustmentSection
+        title={sectionTitle.inkWash}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.inkWash)}
+      >
         <StudioInkWashSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="블러 FX" forceOpen={hasAdjustmentValue(selected.blurFx)}>
+      <AdjustmentSection
+        title={sectionTitle.blurFx}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.blurFx)}
+      >
         <StudioBlurSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="왜곡" forceOpen={hasAdjustmentValue(selected.distort)}>
+      <AdjustmentSection
+        title={sectionTitle.distort}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.distort)}
+      >
         <StudioDistortSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="스타일라이즈" forceOpen={hasAdjustmentValue(selected.stylize)}>
+      <AdjustmentSection
+        title={sectionTitle.stylize}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.stylize)}
+      >
         <StudioStylizeSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="조명" forceOpen={hasAdjustmentValue(selected.light)}>
+      <AdjustmentSection
+        title={sectionTitle.light}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.light)}
+      >
         <StudioLightSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="디테일" forceOpen={hasAdjustmentValue(selected.detail)}>
+      <AdjustmentSection
+        title={sectionTitle.detail}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.detail)}
+      >
         <StudioDetailSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
 
-      <AdjustmentSection title="스케치" forceOpen={hasAdjustmentValue(selected.sketch)}>
+      <AdjustmentSection
+        title={sectionTitle.sketch}
+        loadingLabel={sectionLoading}
+        forceOpen={hasAdjustmentValue(selected.sketch)}
+      >
         <StudioSketchSection selected={selected} onPatch={onPatch} />
       </AdjustmentSection>
     </>

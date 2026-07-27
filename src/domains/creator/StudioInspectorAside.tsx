@@ -595,6 +595,7 @@ interface StudioInspectorAsideProps {
   setSavedBrushes: import("react").Dispatch<import("react").SetStateAction<StudioSavedBrush[]>>;
   setShapeFill: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setSharedDocumentNotice: import("react").Dispatch<import("react").SetStateAction<string | null>>;
+  setShowAlignmentGuides: (visible: boolean) => void;
   setShowGrid: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setShowWebtoonGuides: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setSmudgeRadius: import("react").Dispatch<import("react").SetStateAction<number>>;
@@ -628,6 +629,7 @@ interface StudioInspectorAsideProps {
   setVelocitySensitivity: import("react").Dispatch<import("react").SetStateAction<number>>;
   setWandTolerance: import("react").Dispatch<import("react").SetStateAction<number>>;
   shapeFill: boolean;
+  showAlignmentGuides: boolean;
   showGrid: boolean;
   showWebtoonGuides: boolean;
   smudgeActive: boolean;
@@ -936,6 +938,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   setSavedBrushes,
   setShapeFill,
   setSharedDocumentNotice,
+  setShowAlignmentGuides,
   setShowGrid,
   setShowWebtoonGuides,
   setSmudgeRadius,
@@ -969,6 +972,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   setVelocitySensitivity,
   setWandTolerance,
   shapeFill,
+  showAlignmentGuides,
   showGrid,
   showWebtoonGuides,
   smudgeActive,
@@ -1350,6 +1354,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             magicResizeStrategy={magicResizeStrategy}
             masterEditMode={masterEditMode}
             panelGutter={panelGutter}
+            showAlignmentGuides={showAlignmentGuides}
             showGrid={showGrid}
             showWebtoonGuides={showWebtoonGuides}
             snapEnabled={snapEnabled}
@@ -1400,6 +1405,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 commit(nextElements);
               }
             })}
+            onShowAlignmentGuidesChange={withCanvasControlsGuard(setShowAlignmentGuides)}
             onShowGridChange={withCanvasControlsGuard(setShowGrid)}
             onShowWebtoonGuidesChange={withCanvasControlsGuard((visible: boolean) => {
               if (visible) ensureWebtoonGuidesLoaded();

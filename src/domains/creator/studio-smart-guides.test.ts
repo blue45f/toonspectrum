@@ -299,17 +299,17 @@ describe("stroke/shape object snap — point placement", () => {
     expect(snap.y).toBe(200);
   });
 
-  it("allows freehand mid samples (latch path) while still blocking eraser and rulers", () => {
+  it("never mutates freehand samples and still allows explicit shape endpoints", () => {
     expect(shouldApplyStrokeObjectSnap({
       snapEnabled: true,
       kind: "freehand",
       sampleIndex: 0,
-    })).toBe(true);
+    })).toBe(false);
     expect(shouldApplyStrokeObjectSnap({
       snapEnabled: true,
       kind: "freehand",
       sampleIndex: 3,
-    })).toBe(true);
+    })).toBe(false);
     expect(shouldApplyStrokeObjectSnap({
       snapEnabled: true,
       kind: "line",

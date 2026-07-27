@@ -30,7 +30,15 @@ export function normalizeStudioToolHintTouchHoldMs(value: unknown): number {
   ) * 20;
 }
 
-export function studioToolHintModeLabel(mode: StudioToolHintMode): string {
+export function studioToolHintModeLabel(
+  mode: StudioToolHintMode,
+  t?: (key: string) => string
+): string {
+  if (t) {
+    if (mode === "compact") return t("studio.settings.toolHintMode.compact");
+    if (mode === "rich") return t("studio.settings.toolHintMode.rich");
+    return t("studio.settings.toolHintMode.off");
+  }
   switch (mode) {
     case "compact":
       return "간단";

@@ -215,9 +215,9 @@ export interface PointObjectSnapResult {
  * Whether stroke/shape placement should consult object edges for this sample.
  *
  * - Eraser / directional rulers (perspective, isometric, advanced) stay out of the way.
- * - Freehand: every sample (origin + mid). Mid samples use axis latch
- *   (`planFreehandObjectSnapPoint`) so continuous nearest-edge chase cannot zigzag the stroke.
- * - Shape/line: every endpoint.
+ * - Freehand never snaps. Mutating sampled brush coordinates when a guide is acquired produces
+ *   visible corners and input latency; alignment guides are a placement aid, not a stroke ruler.
+ * - Shape/line endpoints may snap because they are explicit placement gestures.
  */
 export function shouldApplyStrokeObjectSnap(input: {
   readonly snapEnabled: boolean;
@@ -230,9 +230,9 @@ export function shouldApplyStrokeObjectSnap(input: {
   if (!input.snapEnabled) return false;
   if (input.mode === "eraser") return false;
   if (input.directionalRulerActive) return false;
-  // sampleIndex is reserved for callers that still branch UI hints; freehand mid is eligible.
+  if ((input.kind ?? "freehand") === "freehand") return false;
+  // sampleIndex is reserved for callers that branch UI hints or endpoint phases.
   void input.sampleIndex;
-  void input.kind;
   return true;
 }
 

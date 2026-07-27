@@ -6,6 +6,7 @@ import { type MagicResizePreset, type MagicResizeStrategy } from "./studio-magic
 import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioPercentGuideControls } from "./StudioPercentGuideControls";
 
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export interface StudioInspectorUserGuide {
@@ -19,6 +20,7 @@ export interface StudioInspectorCanvasControlsProps {
   readonly canvasHeight: number;
   readonly controlsDisabled: boolean;
   readonly gridSize: number;
+  readonly showAlignmentGuides: boolean;
   readonly hidden: boolean;
   readonly magicResizeStrategy: MagicResizeStrategy;
   readonly masterEditMode: boolean;
@@ -37,6 +39,7 @@ export interface StudioInspectorCanvasControlsProps {
   readonly onCanvasHeightDelta: (delta: number) => void;
   readonly onClearUserGuides: () => void;
   readonly onDeleteUserGuide: (id: string) => void;
+  readonly onShowAlignmentGuidesChange: (visible: boolean) => void;
   readonly onGradientChange: (gradient: string[]) => void;
   readonly onGridSizeChange: (size: number) => void;
   readonly onMagicResizeStrategyChange: (strategy: MagicResizeStrategy) => void;
@@ -50,10 +53,20 @@ export interface StudioInspectorCanvasControlsProps {
   readonly onWebtoonThemeChange: (theme: "classic" | "soft" | "vivid") => void;
 }
 
+function localizeText(
+  t: (key: string) => string,
+  fallback: string,
+  key: string,
+): string {
+  const translated = t(key);
+  return translated === key ? fallback : translated;
+}
+
 export function StudioInspectorCanvasControls({
   background,
   canvasHeight,
   controlsDisabled,
+  showAlignmentGuides,
   gridSize,
   hidden,
   magicResizeStrategy,
@@ -79,22 +92,28 @@ export function StudioInspectorCanvasControls({
   onMoveUserGuide,
   onOpenBackgroundEditor,
   onPanelGutterChange,
+  onShowAlignmentGuidesChange,
   onShowGridChange,
   onShowWebtoonGuidesChange,
   onSnapEnabledChange,
   onWarmWebtoonGuides,
   onWebtoonThemeChange,
 }: StudioInspectorCanvasControlsProps) {
+  const t = useT();
+  const fixedAmount = 240;
+  const guideAxisLabel = (type: StudioInspectorUserGuide["type"]) =>
+    localizeText(t, type === "v" ? "세로" : "가로", `studio.canvas.guideType.${type === "v" ? "vertical" : "horizontal"}`);
+
   return (
     <div
       role="tabpanel"
-      aria-label="캔버스 설정"
+      aria-label={localizeText(t, "캔버스 설정", "studio.canvas.aria")}
       hidden={hidden}
       className="rounded-xl border border-line bg-panel/40 p-3"
     >
-      <p className="mb-2 text-xs font-semibold text-fg-3">캔버스</p>
+      <p className="mb-2 text-xs font-semibold text-fg-3">{localizeText(t, "캔버스", "studio.canvas.section")}</p>
       <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-        배경색
+        {localizeText(t, "배경색", "studio.canvas.background")}
         <input
           type="color"
           value={background}
@@ -110,8 +129,8 @@ export function StudioInspectorCanvasControls({
             type="button"
             disabled={controlsDisabled}
             onClick={() => onApplyBackgroundPreset(preset)}
-            title={preset.label}
-            aria-label={`배경 ${preset.label}`}
+            title={localizeText(t, `배경 ${preset.label}`, "studio.canvas.backgroundPresetAria").replace("{label}", preset.label)}
+            aria-label={localizeText(t, `배경 ${preset.label}`, "studio.canvas.backgroundPresetAria").replace("{label}", preset.label)}
             className="h-6 w-6 rounded-md border border-line disabled:cursor-not-allowed disabled:opacity-50"
             style={{
               background: preset.grad
@@ -122,7 +141,7 @@ export function StudioInspectorCanvasControls({
         ))}
       </div>
       <div className="mt-2">
-        <p className="mb-1 text-[0.68rem] font-medium text-fg-3">그라디언트 배경</p>
+        <p className="mb-1 text-[0.68rem] font-medium text-fg-3">{localizeText(t, "그라디언트 배경", "studio.canvas.gradient")}</p>
         <div className="flex flex-wrap gap-1.5">
           {GRADIENT_PRESETS.map((preset) => {
             const [start, end] = gradientToBgGrad(preset);
@@ -133,7 +152,7 @@ export function StudioInspectorCanvasControls({
                 disabled={controlsDisabled}
                 onClick={() => onGradientChange(gradientToBgGrad(preset))}
                 title={preset.tip}
-                aria-label={`그라디언트 ${preset.label}`}
+                aria-label={localizeText(t, `그라디언트 ${preset.label}`, "studio.canvas.gradientPresetAria").replace("{label}", preset.label)}
                 className="h-6 w-6 rounded-md border border-line disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ background: `linear-gradient(${start}, ${end})` }}
               />
@@ -148,31 +167,31 @@ export function StudioInspectorCanvasControls({
         className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-accent/30 bg-accent-soft px-2 py-2 text-[0.7rem] font-bold text-accent hover:border-accent/50 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <Droplets size={13} aria-hidden />
-        배경 편집기 · 리사이저 열기
+        {localizeText(t, "배경 편집기 · 리사이저 열기", "studio.canvas.openBackgroundEditor")}
       </button>
       <div className="mt-3 flex items-center justify-between gap-2 text-sm text-fg-2">
-        <span>높이</span>
+        <span>{localizeText(t, "높이", "studio.canvas.height")}</span>
         <span className="flex items-center gap-1">
           <button
             type="button"
-            aria-label="높이 240px 줄이기"
+            aria-label={localizeText(t, "높이 240px 줄이기", "studio.canvas.heightDecrease").replace("{amount}", String(fixedAmount))}
             disabled={controlsDisabled}
-            onClick={() => onCanvasHeightDelta(-240)}
+            onClick={() => onCanvasHeightDelta(-fixedAmount)}
             className="rounded border border-line px-2 text-fg-2 hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
           >
             −
           </button>
           <span
             className="numeral w-12 text-center text-xs"
-            aria-label={`높이 ${canvasHeight}px`}
+            aria-label={localizeText(t, "높이 240px", "studio.canvas.heightValue").replace("{height}", String(canvasHeight))}
           >
             {canvasHeight}
           </span>
           <button
             type="button"
-            aria-label="높이 240px 늘리기"
+            aria-label={localizeText(t, "높이 240px 늘리기", "studio.canvas.heightIncrease").replace("{amount}", String(fixedAmount))}
             disabled={controlsDisabled}
-            onClick={() => onCanvasHeightDelta(240)}
+            onClick={() => onCanvasHeightDelta(fixedAmount)}
             className="rounded border border-line px-2 text-fg-2 hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
           >
             +
@@ -191,7 +210,7 @@ export function StudioInspectorCanvasControls({
         </div>
       )}
       <label className="mt-3 flex items-center justify-between gap-2 text-sm text-fg-2">
-        패널 여백 (Gutter)
+        {localizeText(t, "패널 여백 (Gutter)", "studio.canvas.panelGutter")}
         <span className="flex items-center gap-1.5">
           <input
             type="range"
@@ -208,17 +227,39 @@ export function StudioInspectorCanvasControls({
       </label>
       <div className="mt-3 space-y-2 border-t border-line/50 pt-2">
         <label className="flex items-center justify-between text-xs text-fg-2">
-          정렬 가이드 (스냅)
+          <span>
+            {localizeText(t, "정렬 가이드 (스냅)", "studio.canvas.snapGuide")}
+            <span aria-hidden className="ml-1.5 text-fg-3">
+              ({snapEnabled ? t("studio.settings.state.on") : t("studio.settings.state.off")})
+            </span>
+          </span>
           <input
             type="checkbox"
             checked={snapEnabled}
             onChange={(event) => onSnapEnabledChange(event.currentTarget.checked)}
             disabled={controlsDisabled}
+            aria-label={`${localizeText(t, "정렬 가이드 (스냅)", "studio.canvas.snapGuide")} (${snapEnabled ? t("studio.settings.state.on") : t("studio.settings.state.off")})`}
             className="size-3.5 accent-accent disabled:cursor-not-allowed disabled:opacity-60"
           />
         </label>
         <label className="flex items-center justify-between text-xs text-fg-2">
-          그리드 격자 표시
+          <span>
+            {localizeText(t, "정렬 가이드", "studio.settings.grids.alignGuideLabel")}
+            <span aria-hidden className="ml-1.5 text-fg-3">
+              ({showAlignmentGuides ? t("studio.settings.state.on") : t("studio.settings.state.off")})
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={showAlignmentGuides}
+            onChange={(event) => onShowAlignmentGuidesChange(event.currentTarget.checked)}
+            disabled={controlsDisabled}
+            aria-label={`${localizeText(t, "정렬 가이드", "studio.settings.grids.alignGuideLabel")} (${showAlignmentGuides ? t("studio.settings.state.on") : t("studio.settings.state.off")})`}
+            className="size-3.5 accent-accent disabled:cursor-not-allowed disabled:opacity-60"
+          />
+        </label>
+        <label className="flex items-center justify-between text-xs text-fg-2">
+          {localizeText(t, "그리드 격자 표시", "studio.canvas.showGrid")}
           <span className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -245,7 +286,7 @@ export function StudioInspectorCanvasControls({
         </label>
 
         <label className="flex items-center justify-between text-xs text-fg-2">
-          웹툰 규격 가이드
+          {localizeText(t, "웹툰 규격 가이드", "studio.canvas.webtoonGuide")}
           <input
             type="checkbox"
             checked={showWebtoonGuides}
@@ -265,16 +306,24 @@ export function StudioInspectorCanvasControls({
                     <>
                       <span className="font-semibold text-fg-2">{length.label}</span> · {length.tier}
                       <br />
-                      파란 점선 = 플랫폼 표준폭(네이버 690·카카오 720), 붉은 음영 = 세이프영역.
+                      {localizeText(
+                        t,
+                        "파란 점선 = 플랫폼 표준폭(네이버 690·카카오 720), 붉은 음영 = 세이프영역.",
+                        "studio.canvas.webtoonGuideLegend",
+                      )}
                     </>
                   );
                 })()
-              : "웹툰 규격 가이드를 여는 중..."}
+              : localizeText(
+                  t,
+                  "웹툰 규격 가이드를 여는 중...",
+                  "studio.canvas.webtoonGuideLoading",
+                )}
           </div>
         )}
 
         <div className="space-y-2 border-t border-line/35 pt-2">
-          <p className="text-[0.65rem] font-bold text-fg-2">스냅 가이드선</p>
+          <p className="text-[0.65rem] font-bold text-fg-2">{localizeText(t, "스냅 가이드선", "studio.canvas.snapGuideLines")}</p>
           <div className="flex gap-1.5">
             <button
               type="button"
@@ -282,7 +331,7 @@ export function StudioInspectorCanvasControls({
               onClick={() => onAddUserGuide("v")}
               className="flex-1 cursor-pointer rounded border border-line bg-card py-1 text-[0.68rem] font-semibold text-fg transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
             >
-              + 세로 가이드
+              {localizeText(t, "+ 세로 가이드", "studio.canvas.addVerticalGuide")}
             </button>
             <button
               type="button"
@@ -290,7 +339,7 @@ export function StudioInspectorCanvasControls({
               onClick={() => onAddUserGuide("h")}
               className="flex-1 cursor-pointer rounded border border-line bg-card py-1 text-[0.68rem] font-semibold text-fg transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
             >
-              + 가로 가이드
+              {localizeText(t, "+ 가로 가이드", "studio.canvas.addHorizontalGuide")}
             </button>
           </div>
 
@@ -308,7 +357,7 @@ export function StudioInspectorCanvasControls({
                   className="flex items-center justify-between gap-1.5 text-[0.65rem]"
                 >
                   <span className="font-medium text-fg-2">
-                    {guide.type === "v" ? "세로" : "가로"} #{index + 1} ({Math.round(guide.pos)}px)
+                    {`${guideAxisLabel(guide.type)} ${t("studio.canvas.guideLabel")} #${index + 1} (${Math.round(guide.pos)}px)`}
                   </span>
                   <div className="flex items-center gap-1">
                     <input
@@ -316,7 +365,7 @@ export function StudioInspectorCanvasControls({
                       min={0}
                       max={guide.type === "v" ? CANVAS_W : canvasHeight}
                       value={guide.pos}
-                      aria-label={`${guide.type === "v" ? "세로" : "가로"} 가이드 #${index + 1} 위치`}
+                      aria-label={`${guideAxisLabel(guide.type)} ${t("studio.canvas.guideLabel")} #${index + 1} ${t("studio.canvas.guidesPosition")}`}
                       onChange={(event) =>
                         onMoveUserGuide(guide.id, Number(event.currentTarget.value))
                       }
@@ -329,7 +378,7 @@ export function StudioInspectorCanvasControls({
                       onClick={() => onDeleteUserGuide(guide.id)}
                       className="ml-1 cursor-pointer text-[9px] text-bad hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      삭제
+                      {localizeText(t, "삭제", "studio.canvas.guidesDelete")}
                     </button>
                   </div>
                 </div>
@@ -340,7 +389,7 @@ export function StudioInspectorCanvasControls({
                 onClick={onClearUserGuides}
                 className="w-full cursor-pointer border-t border-line/30 pt-1 text-center text-[9px] text-bad-light hover:underline disabled:cursor-not-allowed disabled:opacity-50"
               >
-                모든 가이드 삭제
+                {localizeText(t, "모든 가이드 삭제", "studio.canvas.guidesDeleteAll")}
               </button>
             </div>
           )}
@@ -348,7 +397,7 @@ export function StudioInspectorCanvasControls({
       </div>
       <div className="mt-3 border-t border-line pt-3">
         <span className="mb-1.5 block text-[0.66rem] font-semibold text-fg-3">
-          만화/웹툰 연출 스타일
+          {localizeText(t, "만화/웹툰 연출 스타일", "studio.canvas.gutterStyle")}
         </span>
         <div className="grid grid-cols-3 gap-1 rounded-lg border border-line bg-card p-0.5">
           {(["classic", "soft", "vivid"] as const).map((style) => (
@@ -364,7 +413,11 @@ export function StudioInspectorCanvasControls({
                   : "text-fg-2 hover:bg-raised"
               )}
             >
-              {style === "classic" ? "출판만화" : style === "soft" ? "소프트" : "비비드"}
+              {style === "classic"
+                ? localizeText(t, "출판만화", "studio.canvas.webtoonTheme.classic")
+                : style === "soft"
+                  ? localizeText(t, "소프트", "studio.canvas.webtoonTheme.soft")
+                  : localizeText(t, "비비드", "studio.canvas.webtoonTheme.vivid")}
             </button>
           ))}
         </div>

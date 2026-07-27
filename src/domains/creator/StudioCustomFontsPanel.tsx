@@ -28,7 +28,30 @@ import {
 } from "./studio-custom-fonts";
 import { STUDIO_EASE, STUDIO_FOCUS_RING, StudioEmptyState, StudioSectionHeader } from "./studio-panel-ui";
 
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+
+function localizeText(
+  t: (key: string) => string,
+  fallback: string,
+  key: string,
+): string {
+  return t(key) === key ? fallback : t(key);
+}
+
+function interpolateText(message: string, values?: Record<string, string | number>): string {
+  if (!values) return message;
+  return Object.entries(values).reduce((memo, [key, value]) => memo.replaceAll(`{${key}}`, String(value)), message);
+}
+
+function tText(
+  t: (key: string) => string,
+  fallback: string,
+  key: string,
+  values?: Record<string, string | number>,
+): string {
+  return interpolateText(localizeText(t, fallback, key), values);
+}
 
 export interface StudioCustomFontsPanelProps {
   /** 보관 중인 사용자 글꼴 — StudioPage가 소유하는 단일 목록. */
@@ -57,6 +80,7 @@ export function StudioCustomFontsPanel({
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
+  const t = useT();
 
   const usedBytes = totalCustomFontBytes(fonts);
   const usedPercent = Math.min(100, Math.round((usedBytes / MAX_CUSTOM_FONT_TOTAL_BYTES) * 100));
@@ -73,9 +97,17 @@ export function StudioCustomFontsPanel({
       // 예산을 넘는 파일은 통째로 메모리에 올리기 전에 거절한다.
       if (file.size > MAX_CUSTOM_FONT_FILE_BYTES) {
         setError(
-          `글꼴 파일이 ${formatCustomFontBytes(file.size)}로 한 개당 `
-          + `${formatCustomFontBytes(MAX_CUSTOM_FONT_FILE_BYTES)} 한도를 넘었어요. `
-          + "필요한 굵기만 서브셋한 WOFF2로 변환해 주세요."
+          tText(
+            t,
+            `글꼴 파일이 ${formatCustomFontBytes(file.size)}로 한 개당 `
+            + `${formatCustomFontBytes(MAX_CUSTOM_FONT_FILE_BYTES)} 한도를 넘었어요. `
+            + "필요한 굵기만 서브셋한 WOFF2로 변환해 주세요.",
+            "studio.customFonts.fileTooLarge",
+            {
+              selectedFileSize: formatCustomFontBytes(file.size),
+              limitSize: formatCustomFontBytes(MAX_CUSTOM_FONT_FILE_BYTES),
+            },
+          ),
         );
         return;
       }
@@ -88,7 +120,7 @@ export function StudioCustomFontsPanel({
       const registered = await registerStudioCustomFont(
         result.font,
         fontSet === undefined ? browserFontSet() : fontSet,
-        createFontFace === undefined ? undefined : createFontFace
+        createFontFace === undefined ? undefined : createFontFace,
       );
       if (registered.status === "failed") {
         setError(registered.message);
@@ -97,11 +129,28 @@ export function StudioCustomFontsPanel({
       onFontsChange(result.fonts);
       setNotice(
         registered.status === "unsupported"
-          ? `“${result.font.family}” 글꼴을 담았어요. 이 브라우저는 미리보기를 지원하지 않아요.`
-          : `“${result.font.family}” 글꼴을 담았어요. (${formatCustomFontBytes(result.font.byteLength)})`
+          ? tText(
+            t,
+            `“${result.font.family}” 글꼴을 담았어요. 이 브라우저는 미리보기를 지원하지 않아요.`,
+            "studio.customFonts.noticeUnsupported",
+            { fontName: result.font.family },
+          )
+          : tText(
+            t,
+            `“${result.font.family}” 글꼴을 담았어요. (${formatCustomFontBytes(result.font.byteLength)})`,
+            "studio.customFonts.noticeUploaded",
+            {
+              fontName: result.font.family,
+              size: formatCustomFontBytes(result.font.byteLength),
+            },
+          ),
       );
     } catch {
-      setError("글꼴 파일을 읽지 못했어요. 파일이 손상됐는지 확인해주세요.");
+      setError(tText(
+        t,
+        "글꼴 파일을 읽지 못했어요. 파일이 손상됐는지 확인해주세요.",
+        "studio.customFonts.readFailed",
+      ));
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -116,10 +165,15 @@ export function StudioCustomFontsPanel({
   }
 
   return (
-    <section aria-label="내 글꼴" aria-busy={busy}>
+    <section aria-label={t("studio.customFonts.title")} aria-busy={busy}>
       <StudioSectionHeader
-        title="내 글꼴"
-        description={`보유한 ${CUSTOM_FONT_FORMAT_HELP} 파일을 담아 레터링·효과음에 씁니다.`}
+        title={t("studio.customFonts.title")}
+        description={tText(
+          t,
+          `보유한 ${CUSTOM_FONT_FORMAT_HELP} 파일을 담아 레터링·효과음에 씁니다.`,
+          "studio.customFonts.description",
+          { format: CUSTOM_FONT_FORMAT_HELP },
+        )}
       />
 
       <label
@@ -127,14 +181,15 @@ export function StudioCustomFontsPanel({
           "flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-[0.72rem] font-semibold text-fg-2",
           STUDIO_EASE,
           "hover:bg-raised focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent",
-          busy && "pointer-events-none cursor-wait opacity-55"
+          busy && "pointer-events-none cursor-wait opacity-55",
         )}
       >
-        <Upload size={14} aria-hidden /> {busy ? "확인 중…" : "파일에서 가져오기"}
+        <Upload size={14} aria-hidden />
+        {busy ? t("studio.customFonts.importing") : t("studio.customFonts.importButton")}
         <input
           type="file"
           accept={CUSTOM_FONT_ACCEPT}
-          aria-label="글꼴 파일 가져오기"
+          aria-label={t("studio.customFonts.importAria")}
           className="sr-only"
           disabled={busy}
           onChange={(event) => void handleImportFile(event)}
@@ -144,14 +199,29 @@ export function StudioCustomFontsPanel({
       <div className="mt-2">
         <div className="flex items-center justify-between gap-2 text-[0.72rem] text-fg-3">
           <span>
-            {formatCustomFontBytes(usedBytes)} / {formatCustomFontBytes(MAX_CUSTOM_FONT_TOTAL_BYTES)} 사용
+            {tText(
+              t,
+              `${formatCustomFontBytes(usedBytes)} / ${formatCustomFontBytes(MAX_CUSTOM_FONT_TOTAL_BYTES)} 사용`,
+              "studio.customFonts.usage",
+              {
+                used: formatCustomFontBytes(usedBytes),
+                max: formatCustomFontBytes(MAX_CUSTOM_FONT_TOTAL_BYTES),
+              },
+            )}
           </span>
-          <span className="tabular-nums">{fonts.length}/{MAX_CUSTOM_FONTS}개</span>
+          <span className="tabular-nums">
+            {tText(
+              t,
+              `${fonts.length}/${MAX_CUSTOM_FONTS}개`,
+              "studio.customFonts.storageCount",
+              { count: fonts.length, max: MAX_CUSTOM_FONTS },
+            )}
+          </span>
         </div>
         <div
           className="mt-1 h-1.5 overflow-hidden rounded-full bg-raised"
           role="progressbar"
-          aria-label="글꼴 보관함 사용량"
+          aria-label={t("studio.customFonts.storageAria")}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={usedPercent}
@@ -187,14 +257,24 @@ export function StudioCustomFontsPanel({
         <div className="mt-2">
           <StudioEmptyState
             icon={<Type size={18} aria-hidden />}
-            title="아직 담은 글꼴이 없어요"
-            description={`라이선스를 가진 ${CUSTOM_FONT_FORMAT_HELP} 파일을 담으면 대사·효과음에 바로 쓸 수 있어요.`}
+            title={t("studio.customFonts.emptyTitle")}
+            description={tText(
+              t,
+              `라이선스를 가진 ${CUSTOM_FONT_FORMAT_HELP} 파일을 담으면 대사·효과음에 바로 쓸 수 있어요.`,
+              "studio.customFonts.emptyDescription",
+              { format: CUSTOM_FONT_FORMAT_HELP },
+            )}
           />
         </div>
       ) : (
         <ul
           className="mt-2 max-h-72 space-y-1.5 overflow-y-auto pr-1"
-          aria-label={`담은 글꼴 ${fonts.length}개`}
+          aria-label={tText(
+            t,
+            `담은 글꼴 ${fonts.length}개`,
+            "studio.customFonts.listAria",
+            { count: fonts.length },
+          )}
         >
           {fonts.map((font) => (
             <li key={font.id} className="rounded-lg border border-line bg-card px-2 py-1.5">
@@ -208,7 +288,7 @@ export function StudioCustomFontsPanel({
                     {font.family}
                   </span>
                   <span className="block truncate text-[0.7rem] text-fg-3" title={font.fileName}>
-                    {font.fileName || "이름 없는 파일"} · {formatCustomFontBytes(font.byteLength)}
+                    {font.fileName || t("studio.customFonts.unknownFileName")} · {formatCustomFontBytes(font.byteLength)}
                   </span>
                 </span>
                 {onApplyFont && (
@@ -216,28 +296,30 @@ export function StudioCustomFontsPanel({
                     type="button"
                     onClick={() => onApplyFont(customFontCssValue(font))}
                     disabled={!canApplyFont || busy}
-                    aria-label={`${font.family} 글꼴 적용`}
-                    title={canApplyFont ? "선택한 텍스트에 적용" : "텍스트나 말풍선을 먼저 선택하세요"}
+                    aria-label={tText(t, `${font.family} 글꼴 적용`, "studio.customFonts.applyAria", { fontName: font.family })}
+                    title={canApplyFont
+                      ? t("studio.customFonts.applyToText")
+                      : t("studio.customFonts.selectTextFirst")}
                     className={cn(
                       "min-h-11 shrink-0 rounded-lg border border-line px-2.5 text-[0.72rem] font-semibold text-fg-2",
                       STUDIO_EASE,
                       STUDIO_FOCUS_RING,
-                      "hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-45"
+                      "hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-45",
                     )}
                   >
-                    적용
+                    {t("studio.customFonts.apply")}
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => handleDelete(font)}
                   disabled={busy}
-                  aria-label={`${font.family} 글꼴 삭제`}
-                  title="삭제"
+                  aria-label={tText(t, `${font.family} 글꼴 삭제`, "studio.customFonts.deleteAria", { fontName: font.family })}
+                  title={t("studio.customFonts.delete")}
                   className={cn(
                     "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3",
                     STUDIO_EASE,
-                    "hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-bad disabled:cursor-wait disabled:opacity-45"
+                    "hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-bad disabled:cursor-wait disabled:opacity-45",
                   )}
                 >
                   <X size={14} aria-hidden />

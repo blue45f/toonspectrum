@@ -7,7 +7,28 @@ import {
   type StudioCompanionNormalizedRect,
 } from "./studio-companion-review-projection";
 
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+
+type StudioCompanionNavigatorT = (key: string, fallback?: string) => string;
+
+function localizeText(t: StudioCompanionNavigatorT, fallback: string, key: string): string {
+  const translated = t(key);
+  return translated === key ? fallback : translated;
+}
+
+function tText(
+  t: StudioCompanionNavigatorT,
+  fallback: string,
+  key: string,
+  values?: Record<string, string | number>,
+): string {
+  if (!values) return localizeText(t, fallback, key);
+  return Object.entries(values).reduce(
+    (memo, [token, value]) => memo.replaceAll(`{${token}}`, String(value)),
+    localizeText(t, fallback, key),
+  );
+}
 
 export interface StudioCompanionNavigatorProps {
   imageUrl: string | null;
@@ -87,6 +108,7 @@ export function StudioCompanionNavigator({
 }: StudioCompanionNavigatorProps) {
   const activePointerRef = useRef<number | null>(null);
   const interactionReady = connected && imageUrl !== null && captureAllowed;
+  const t = useT();
   const currentCenter = {
     x: viewport.x + viewport.width / 2,
     y: viewport.y + viewport.height / 2,
@@ -151,22 +173,22 @@ export function StudioCompanionNavigator({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 id="companion-navigator-title" className="text-sm font-semibold text-fg">
-            캔버스 Navigator
+            {t("studio.toolsCompanion.navigator.title")}
           </h2>
           <p id="companion-navigator-help" className="mt-0.5 text-xs leading-relaxed text-fg-3">
-            미리보기를 누르거나 끌어 기본 탭의 보이는 위치를 옮깁니다. 방향키도 사용할 수 있어요.
+            {t("studio.toolsCompanion.navigator.description")}
           </p>
         </div>
         <span className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-full border border-line bg-card px-2 text-[0.65rem] font-semibold text-fg-2">
           <LocateFixed className="size-3" aria-hidden />
-          최대 2fps
+          {t("studio.toolsCompanion.navigator.maxFps")}
         </span>
       </div>
 
       <button
         type="button"
         disabled={!interactionReady}
-        aria-label="전체 캔버스 미리보기에서 보이는 위치 이동"
+        aria-label={t("studio.toolsCompanion.navigator.liveAria")}
         aria-describedby="companion-navigator-help"
         aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home"
         onPointerDown={handlePointerDown}
@@ -192,7 +214,7 @@ export function StudioCompanionNavigator({
           <>
             <img
               src={imageUrl}
-              alt="현재 페이지 전체 캔버스"
+              alt={t("studio.toolsCompanion.navigator.previewAlt")}
               draggable={false}
               className="pointer-events-none absolute inset-0 size-full object-contain"
             />
@@ -220,10 +242,12 @@ export function StudioCompanionNavigator({
               <ImageIcon className="size-5" aria-hidden />
             </span>
             <strong className="mt-3 text-xs font-semibold text-fg-2">
-              {connected ? "미리보기를 준비하고 있어요" : "기본 스튜디오 미연결"}
+              {connected
+                ? t("studio.toolsCompanion.navigator.readyTitle")
+                : t("studio.toolsCompanion.navigator.notConnected")}
             </strong>
             <span className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-              연결 후 안전한 WebP 전체 캔버스가 표시됩니다.
+              {t("studio.toolsCompanion.navigator.readySubtitle")}
             </span>
           </span>
         )}
@@ -232,12 +256,28 @@ export function StudioCompanionNavigator({
       <p role="status" aria-live="polite" className="flex min-h-6 items-center gap-2 text-xs text-fg-3">
         <Move className="size-3.5 shrink-0" aria-hidden />
         {!connected
-          ? "연결되면 위치 이동을 사용할 수 있습니다."
+          ? tText(
+            t,
+            "연결되면 위치 이동을 사용할 수 있습니다.",
+            "studio.toolsCompanion.navigator.disconnectedHint",
+          )
           : !captureAllowed
-            ? "획을 그리는 동안 캡처를 멈췄습니다. 획이 끝나면 갱신합니다."
+            ? tText(
+              t,
+              "획을 그리는 동안 캡처를 멈췄습니다. 획이 끝나면 갱신합니다.",
+              "studio.toolsCompanion.navigator.captureStoppedHint",
+            )
             : imageUrl
-              ? "주황색 상자가 기본 탭에서 현재 보이는 영역입니다."
-              : "변경된 캔버스를 압축하는 중입니다."}
+              ? tText(
+                t,
+                "주황색 상자가 기본 탭에서 현재 보이는 영역입니다.",
+                "studio.toolsCompanion.navigator.visibleViewportHint",
+              )
+              : tText(
+                t,
+                "변경된 캔버스를 압축하는 중입니다.",
+                "studio.toolsCompanion.navigator.compressionHint",
+              )}
       </p>
     </section>
   );
