@@ -32,6 +32,7 @@ import type {
 } from "./studio-main-menu-model";
 import type { StudioToolHintSpec } from "./studio-tool-hints";
 
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export type {
@@ -40,59 +41,74 @@ export type {
   StudioMainMenuProps,
 } from "./studio-main-menu-model";
 
+function localizeText(
+  t: (key: string) => string,
+  fallback: string,
+  key: string,
+): string {
+  const translated = t(key);
+  return translated === key ? fallback : translated;
+}
+
 type MenuCoords = { top: number; left: number; minWidth: number };
 type MenuOpenFocusIntent = "first" | "preserve";
 export type StudioMainMenuNavigationCommand = "first" | "last" | "next" | "previous";
 
-const MAIN_MENU_HINTS: Readonly<Record<string, StudioToolHintSpec>> = {
+type StudioMainMenuHintMeta = Omit<StudioToolHintSpec, "title" | "description" | "tip"> & {
+  titleKey: string;
+  descriptionKey: string;
+  tipKey?: string;
+};
+
+const MAIN_MENU_HINTS: Readonly<Record<string, StudioMainMenuHintMeta>> = {
   file: {
     id: "main-menu-file",
-    title: "파일",
-    description: "원고를 저장·가져오기하고 이미지, PSD, 프로젝트 백업과 게시 결과물로 내보냅니다.",
+    titleKey: "studio.mainMenu.hint.file.title",
+    descriptionKey: "studio.mainMenu.hint.file.description",
+    tipKey: "studio.mainMenu.hint.file.tip",
     preview: "file-workflow",
-    tip: "작업 중에는 임시저장을, 기기 이동 전에는 자산이 포함된 아카이브 백업을 사용하세요.",
   },
   edit: {
     id: "main-menu-edit",
-    title: "편집",
-    description: "실행취소, 클립보드, 픽셀 선택, 복제와 레이어 순서를 한곳에서 제어합니다.",
+    titleKey: "studio.mainMenu.hint.edit.title",
+    descriptionKey: "studio.mainMenu.hint.edit.description",
+    tipKey: "studio.mainMenu.hint.edit.tip",
     preview: "edit-workflow",
-    tip: "메뉴를 연 뒤 ↑·↓와 Home·End로 이동하고 Enter로 실행할 수 있어요.",
   },
   insert: {
     id: "main-menu-insert",
-    title: "삽입",
-    description: "템플릿, 말풍선, 텍스트, 이미지와 3D 캐릭터·배경을 현재 장면에 추가합니다.",
+    titleKey: "studio.mainMenu.hint.insert.title",
+    descriptionKey: "studio.mainMenu.hint.insert.description",
+    tipKey: "studio.mainMenu.hint.insert.tip",
     preview: "insert-content",
-    tip: "자주 쓰는 말풍선과 에셋은 넓은 화면의 바로가기에서도 즉시 열 수 있어요.",
   },
   view: {
     id: "main-menu-view",
-    title: "보기",
-    description: "확대·축소, 화면 맞춤, 반전, 원근 도우미와 패널 레이아웃을 바꿉니다.",
+    titleKey: "studio.mainMenu.hint.view.title",
+    descriptionKey: "studio.mainMenu.hint.view.description",
+    tipKey: "studio.mainMenu.hint.view.tip",
     preview: "view-workflow",
-    tip: "캔버스만 보기(`)로 전환하면 주변 패널을 숨기고 원고에 집중할 수 있어요.",
   },
   filter: {
     id: "main-menu-filter",
-    title: "필터",
-    description: "선택 이미지 또는 현재 보이는 페이지에 블러, 색조·채도·밝기, 명도·대비와 색상 커브를 적용합니다.",
+    titleKey: "studio.mainMenu.hint.filter.title",
+    descriptionKey: "studio.mainMenu.hint.filter.description",
+    tipKey: "studio.mainMenu.hint.filter.tip",
     preview: "filter",
-    tip: "원본을 보존하려면 스마트 필터 스택에서 효과 순서와 강도를 조절하세요.",
   },
   draw: {
     id: "main-menu-draw",
-    title: "그리기",
-    description: "펜, 지우개, 채우기, 스마트 도형과 배경·톤·팔레트 작업으로 바로 전환합니다.",
+    titleKey: "studio.mainMenu.hint.draw.title",
+    descriptionKey: "studio.mainMenu.hint.draw.description",
+    tipKey: "studio.mainMenu.hint.draw.tip",
     preview: "draw-workflow",
-    tip: "B·E·G 단축키로 펜, 지우개, 채우기를 작업 흐름 안에서 빠르게 바꿀 수 있어요.",
   },
   ai: {
     id: "main-menu-ai",
-    title: "AI",
-    description: "AI 어시스트, 스톡 이미지와 공급자 연동 설정을 열어 창작 보조 작업을 시작합니다.",
+    titleKey: "studio.mainMenu.hint.ai.title",
+    descriptionKey: "studio.mainMenu.hint.ai.description",
+    tipKey: "studio.mainMenu.hint.ai.tip",
     preview: "ai-assist",
-    tip: "생성 결과를 적용하기 전에 공급자와 작업 이력을 확인해 재현 가능한 원고를 유지하세요.",
   },
 };
 
@@ -104,12 +120,42 @@ const MAIN_MENU_ITEM_HINTS: Readonly<Record<StudioMainMenuHintKey, StudioToolHin
   "color-vision:tritanopia": STUDIO_COLOR_VISION_HINTS.tritanopia,
 };
 
-function resolveMainMenuHint(group: StudioMainMenuGroup): StudioToolHintSpec {
-  return MAIN_MENU_HINTS[group.id] ?? {
-    id: `main-menu-${group.id}`,
-    title: group.label,
-    description: `${group.label} 명령을 열어 현재 원고 작업에 적용합니다.`,
+function resolveMainMenuHint(
+  group: StudioMainMenuGroup,
+  t: (key: string) => string,
+): StudioToolHintSpec {
+  const hint = MAIN_MENU_HINTS[group.id];
+  if (!hint) {
+    return {
+      id: `main-menu-${group.id}`,
+      title: localizeText(t, group.label, `studio.mainMenu.group.${group.id}.label`),
+      description: localizeText(
+        t,
+        "",
+        `studio.mainMenu.item.${group.id}.fallbackDescription`,
+      ),
+    };
+  }
+  const localizedHint = {
+    ...hint,
+    title: localizeText(
+      t,
+      localizeText(t, group.label, `studio.mainMenu.group.${group.id}.label`),
+      hint.titleKey,
+    ),
+    description: localizeText(
+      t,
+      "",
+      hint.descriptionKey,
+    ),
+    ...(hint.tipKey
+      ? { tip: localizeText(t, "", hint.tipKey) }
+      : {}),
   };
+  // `hint` is a valid discriminated StudioToolHintSpec with only its localized
+  // copy fields replaced. TypeScript widens the preview/variant correlation
+  // when spreading the union, so restore that correlation at this boundary.
+  return localizedHint as StudioToolHintSpec;
 }
 
 /** Pure APG roving-index resolver; disabled commands remain discoverable by arrow navigation. */
@@ -157,13 +203,16 @@ function MenuDropdown({
   onOpen,
   onClose,
   barActive,
+  t,
 }: {
   group: StudioMainMenuGroup;
   open: boolean;
   onOpen: () => void;
   onClose: () => void;
   barActive: boolean;
+  t: (key: string) => string;
 }): ReactElement {
+  const unavailableReasonLabel = localizeText(t, "Unavailable condition", "studio.mainMenu.unavailableReason");
   const panelId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -324,11 +373,15 @@ function MenuDropdown({
               const hint = item.hint
                 ?? (item.hintKey ? MAIN_MENU_ITEM_HINTS[item.hintKey] : undefined)
                 ?? (item.unavailableReason
-                  ? {
-                      id: `main-menu-item-${group.id}-${item.id}`,
-                      title: item.label,
-                      description: "현재 상태에서 이 명령을 사용할 수 없는 이유를 확인하세요.",
-                    }
+                      ? {
+                        id: `main-menu-item-${group.id}-${item.id}`,
+                        title: item.label,
+                        description: localizeText(
+                          t,
+                        "Check why this item is unavailable in the current state.",
+                          "studio.mainMenu.itemUnavailableHint",
+                        ),
+                      }
                   : undefined);
               const unavailableReasonId = item.unavailableReason
                 ? `${panelId}-item-${itemIndex}-unavailable-reason`
@@ -395,7 +448,7 @@ function MenuDropdown({
                       data-studio-main-menu-unavailable-reason="true"
                       className="sr-only"
                     >
-                      사용 조건: {item.unavailableReason}
+                      {unavailableReasonLabel}: {item.unavailableReason}
                     </span>
                   ) : null}
                   {item.separatorAfter ? (
@@ -420,7 +473,7 @@ function MenuDropdown({
       }}
     >
       <StudioToolHintTarget
-        hint={barActive ? null : resolveMainMenuHint(group)}
+        hint={barActive ? null : resolveMainMenuHint(group, t)}
         preferredSide="bottom"
         className="shrink-0"
       >
@@ -484,12 +537,13 @@ function MenuDropdown({
 
 /** Application menu bar — top-bar menu section. */
 export function StudioMainMenu({ groups, className }: StudioMainMenuProps): ReactElement {
+  const t = useT();
   const [openId, setOpenId] = useState<string | null>(null);
   const barActive = openId !== null;
 
   return (
     <nav
-      aria-label="메인 메뉴"
+      aria-label={localizeText(t, "Main menu", "studio.mainMenu.aria")}
       data-studio-main-menu="true"
       data-studio-shortcut-boundary="true"
       className={cn("flex min-w-max shrink-0 flex-nowrap items-center gap-0.5", className)}
@@ -502,6 +556,7 @@ export function StudioMainMenu({ groups, className }: StudioMainMenuProps): Reac
           barActive={barActive}
           onOpen={() => setOpenId(group.id)}
           onClose={() => setOpenId((id) => (id === group.id ? null : id))}
+          t={t}
         />
       ))}
     </nav>

@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioMainMenu } from "./StudioMainMenu";
 import { StudioToolHintPreferencesProvider } from "./StudioToolHint";
 
 import type { StudioMainMenuGroup } from "./studio-main-menu-model";
+
+import { useI18n } from "@/lib/i18n";
 
 const GROUPS: readonly StudioMainMenuGroup[] = [
   {
@@ -25,6 +27,10 @@ const GROUPS: readonly StudioMainMenuGroup[] = [
     items: [{ id: "blur", label: "가우시안 블러", onSelect: vi.fn() }],
   },
 ];
+
+beforeEach(() => {
+  useI18n.getState().setLang("ko");
+});
 
 function renderMenu() {
   return render(
