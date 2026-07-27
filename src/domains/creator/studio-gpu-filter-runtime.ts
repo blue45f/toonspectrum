@@ -23,6 +23,12 @@ const USAGE_COPY_DST = 0x0008;
 const USAGE_UNIFORM = 0x0040;
 const USAGE_STORAGE = 0x0080;
 const MAP_MODE_READ = 0x0001;
+// Keep the hot interactive path allocation-free without letting a sequence of differently sized
+// documents retain unbounded GPU memory. A 4 MP page needs three 16 MiB buffers (ping, pong,
+// readback), so 96 MiB preserves the common full-page working set while larger documents simply
+// fall back to transient buffers.
+const STUDIO_GPU_FILTER_BUFFER_POOL_MAX_BYTES = 96 * 1024 * 1024;
+const STUDIO_GPU_FILTER_BUFFER_POOL_MAX_ENTRIES = 6;
 
 export interface StudioGpuFilterShaderSource {
   /** 파이프라인 캐시 키 — 같은 id 는 셰이더 모듈/파이프라인을 재사용한다. */
@@ -36,8 +42,10 @@ export interface StudioGpuFilterRuntime {
   /** true 면 이 런타임은 다시 쓸 수 없다 — 호출부는 즉시 CPU 로 폴백해야 한다. */
   readonly lost: boolean;
   getComputePipeline(shader: StudioGpuFilterShaderSource): GPUComputePipeline;
-  /** ping-pong 픽셀 버퍼(STORAGE|COPY_SRC|COPY_DST). */
-  createPixelBuffer(byteLength: number, label?: string): GPUBuffer;
+  /** ping-pong 픽셀 버퍼(STORAGE|COPY_SRC|COPY_DST) lease. */
+  acquirePixelBuffer(byteLength: number, label?: string): GPUBuffer;
+  /** A lease must be returned only after all submitted work that references it has completed. */
+  releasePixelBuffer(buffer: GPUBuffer, byteLength: number): void;
   createUniformBuffer(uniform: ArrayBuffer, label?: string): GPUBuffer;
   createLutBuffer(lut: Uint32Array, label?: string): GPUBuffer;
   uploadPixels(target: GPUBuffer, pixels: Uint8ClampedArray): void;
@@ -72,11 +80,29 @@ function safeDestroyDevice(device: GPUDevice | null): void {
   }
 }
 
+function safeDestroyBuffer(buffer: GPUBuffer | null): void {
+  try {
+    buffer?.destroy();
+  } catch {
+    // 이미 파기됐거나 lost 된 디바이스의 버퍼 — 폐기 경로에서는 무시.
+  }
+}
+
+interface PooledGpuBuffer {
+  readonly buffer: GPUBuffer;
+  readonly byteLength: number;
+  readonly kind: "pixel" | "readback";
+  lastUsed: number;
+}
+
 class StudioGpuFilterRuntimeImpl implements StudioGpuFilterRuntime {
   readonly device: GPUDevice;
   lost = false;
   private readonly modules = new Map<string, GPUShaderModule>();
   private readonly pipelines = new Map<string, GPUComputePipeline>();
+  private readonly pooledBuffers: PooledGpuBuffer[] = [];
+  private pooledBufferBytes = 0;
+  private poolClock = 0;
   private disposed = false;
 
   constructor(device: GPUDevice) {
@@ -87,6 +113,7 @@ class StudioGpuFilterRuntimeImpl implements StudioGpuFilterRuntime {
     this.lost = true;
     this.modules.clear();
     this.pipelines.clear();
+    this.destroyPooledBuffers();
   }
 
   getComputePipeline(shader: StudioGpuFilterShaderSource): GPUComputePipeline {
@@ -109,12 +136,83 @@ class StudioGpuFilterRuntimeImpl implements StudioGpuFilterRuntime {
     return pipeline;
   }
 
-  createPixelBuffer(byteLength: number, label?: string): GPUBuffer {
+  private takePooledBuffer(
+    kind: PooledGpuBuffer["kind"],
+    byteLength: number,
+  ): GPUBuffer | null {
+    const index = this.pooledBuffers.findIndex(
+      (entry) => entry.kind === kind && entry.byteLength === byteLength,
+    );
+    if (index < 0) return null;
+    const [entry] = this.pooledBuffers.splice(index, 1);
+    if (!entry) return null;
+    this.pooledBufferBytes -= entry.byteLength;
+    return entry.buffer;
+  }
+
+  private returnPooledBuffer(
+    kind: PooledGpuBuffer["kind"],
+    buffer: GPUBuffer,
+    byteLength: number,
+  ): void {
+    if (
+      this.disposed
+      || this.lost
+      || byteLength <= 0
+      || byteLength > STUDIO_GPU_FILTER_BUFFER_POOL_MAX_BYTES
+    ) {
+      safeDestroyBuffer(buffer);
+      return;
+    }
+
+    while (
+      this.pooledBuffers.length >= STUDIO_GPU_FILTER_BUFFER_POOL_MAX_ENTRIES
+      || this.pooledBufferBytes + byteLength > STUDIO_GPU_FILTER_BUFFER_POOL_MAX_BYTES
+    ) {
+      let oldestIndex = 0;
+      for (let index = 1; index < this.pooledBuffers.length; index += 1) {
+        if (this.pooledBuffers[index]!.lastUsed < this.pooledBuffers[oldestIndex]!.lastUsed) {
+          oldestIndex = index;
+        }
+      }
+      const [evicted] = this.pooledBuffers.splice(oldestIndex, 1);
+      if (!evicted) break;
+      this.pooledBufferBytes -= evicted.byteLength;
+      safeDestroyBuffer(evicted.buffer);
+    }
+
+    if (this.pooledBufferBytes + byteLength > STUDIO_GPU_FILTER_BUFFER_POOL_MAX_BYTES) {
+      safeDestroyBuffer(buffer);
+      return;
+    }
+    this.pooledBuffers.push({
+      buffer,
+      byteLength,
+      kind,
+      lastUsed: ++this.poolClock,
+    });
+    this.pooledBufferBytes += byteLength;
+  }
+
+  private destroyPooledBuffers(): void {
+    for (const entry of this.pooledBuffers.splice(0)) {
+      safeDestroyBuffer(entry.buffer);
+    }
+    this.pooledBufferBytes = 0;
+  }
+
+  acquirePixelBuffer(byteLength: number, label?: string): GPUBuffer {
+    const pooled = this.takePooledBuffer("pixel", byteLength);
+    if (pooled) return pooled;
     return this.device.createBuffer({
       label,
       size: byteLength,
       usage: USAGE_STORAGE | USAGE_COPY_SRC | USAGE_COPY_DST,
     });
+  }
+
+  releasePixelBuffer(buffer: GPUBuffer, byteLength: number): void {
+    this.returnPooledBuffer("pixel", buffer, byteLength);
   }
 
   createUniformBuffer(uniform: ArrayBuffer, label?: string): GPUBuffer {
@@ -143,11 +241,12 @@ class StudioGpuFilterRuntimeImpl implements StudioGpuFilterRuntime {
   }
 
   async readbackPixels(source: GPUBuffer, byteLength: number): Promise<Uint8ClampedArray> {
-    const staging = this.device.createBuffer({
+    const staging = this.takePooledBuffer("readback", byteLength) ?? this.device.createBuffer({
       label: "studio-gpu-filter/readback",
       size: byteLength,
       usage: USAGE_MAP_READ | USAGE_COPY_DST,
     });
+    let reusable = false;
     try {
       const encoder = this.device.createCommandEncoder({ label: "studio-gpu-filter/readback" });
       encoder.copyBufferToBuffer(source, 0, staging, 0, byteLength);
@@ -155,13 +254,11 @@ class StudioGpuFilterRuntimeImpl implements StudioGpuFilterRuntime {
       await staging.mapAsync(MAP_MODE_READ);
       const bytes = new Uint8ClampedArray(staging.getMappedRange().slice(0));
       staging.unmap();
+      reusable = true;
       return bytes;
     } finally {
-      try {
-        staging.destroy();
-      } catch {
-        // 폐기 경로 — lost 디바이스면 이미 해제됐다.
-      }
+      if (reusable) this.returnPooledBuffer("readback", staging, byteLength);
+      else safeDestroyBuffer(staging);
     }
   }
 

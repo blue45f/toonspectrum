@@ -206,7 +206,20 @@ export function planStudioGpuFilterChain(el: ImageFilterFields): StudioGpuFilter
 
 /** 통합 게이트용 — 이 보정 프로그램을 GPU 체인이 통째로 담당할 수 있는지. */
 export function isStudioGpuFilterChainEligible(el: ImageFilterFields): boolean {
-  return planStudioGpuFilterChain(el) !== null;
+  // Eligibility is queried immediately before apply by the interactive image node. Building the
+  // full plan here used to generate every 768-entry LUT twice per slider tick (once for this gate,
+  // once again inside applyGpuFilterChain). Keep the gate allocation-light and leave LUT packing
+  // to the actual execution path.
+  if (hasUnsupportedActiveFilters(el)) return false;
+  return (
+    isActiveNumber(el.brightness)
+    || isActiveNumber(el.contrast)
+    || isActiveNumber(el.saturation)
+    || isActiveNumber(el.hue)
+    || hasActiveLevelsFields(el)
+    || hasActiveCurveFields(el)
+    || hasActiveColorBalanceFields(el)
+  );
 }
 
 function isValidImageData(imageData: StudioImageDataLike): boolean {
@@ -237,8 +250,15 @@ export async function applyGpuFilterChain(
   const plan = planStudioGpuFilterChain(el);
   if (!plan) return null;
 
+  // acquireStudioGpuFilterRuntime({ gpu }) creates an isolated runtime for a harness/embedding
+  // override. apply owns that runtime because it is not exposed to the caller.
+  const ownsRuntime = options !== undefined && "gpu" in options;
   const runtime = await acquireStudioGpuFilterRuntime(options);
-  if (!runtime || runtime.lost) return null;
+  if (!runtime) return null;
+  if (runtime.lost) {
+    if (ownsRuntime) runtime.dispose();
+    return null;
+  }
 
   const pixelCount = imageData.width * imageData.height;
   const byteLength = pixelCount * 4;
@@ -250,10 +270,13 @@ export async function applyGpuFilterChain(
     || byteLength > limits.maxBufferSize
     || workgroupsY > limits.maxComputeWorkgroupsPerDimension
   ) {
+    if (ownsRuntime) runtime.dispose();
     return null;
   }
 
   const transientBuffers: GPUBuffer[] = [];
+  const pixelBuffers: GPUBuffer[] = [];
+  let recyclePixelBuffers = false;
   let pushedErrorScopes = 0;
   try {
     // 검증/OOM 오류는 예외를 던지지 않는다 — error scope 로 잡아 fail-closed(null) 한다.
@@ -263,18 +286,21 @@ export async function applyGpuFilterChain(
     runtime.device.pushErrorScope("validation");
     pushedErrorScopes += 1;
 
-    let current = runtime.createPixelBuffer(byteLength, "studio-gpu-filter/ping");
-    transientBuffers.push(current);
-    let other = runtime.createPixelBuffer(byteLength, "studio-gpu-filter/pong");
-    transientBuffers.push(other);
+    let current = runtime.acquirePixelBuffer(byteLength, "studio-gpu-filter/ping");
+    pixelBuffers.push(current);
+    let other = runtime.acquirePixelBuffer(byteLength, "studio-gpu-filter/pong");
+    pixelBuffers.push(other);
     runtime.uploadPixels(current, imageData.data);
 
     const encoder = runtime.device.createCommandEncoder({ label: "studio-gpu-filter/chain" });
     for (const step of plan) {
       const kernel = STUDIO_GPU_FILTER_KERNELS[step.kernelId];
-      patchStudioGpuFilterPixelCount(step.uniform, pixelCount);
+      // Plans and their LUTs are immutable/reusable. Only the image-size word is request-specific;
+      // patch a tiny uniform copy instead of contaminating a cached/shared plan.
+      const requestUniform = step.uniform.slice(0);
+      patchStudioGpuFilterPixelCount(requestUniform, pixelCount);
       const uniformBuffer = runtime.createUniformBuffer(
-        step.uniform,
+        requestUniform,
         `studio-gpu-filter/${step.kernelId}/params`,
       );
       transientBuffers.push(uniformBuffer);
@@ -317,6 +343,7 @@ export async function applyGpuFilterChain(
 
     const bytes = await runtime.readbackPixels(current, byteLength);
     if (bytes.length !== byteLength) return null;
+    recyclePixelBuffers = true;
     return { data: bytes, width: imageData.width, height: imageData.height };
   } catch {
     return null;
@@ -337,5 +364,16 @@ export async function applyGpuFilterChain(
         // destroy 는 제출된 작업이 끝난 뒤 내부적으로 해제된다 — 폐기 실패는 무시.
       }
     }
+    for (const buffer of pixelBuffers) {
+      if (recyclePixelBuffers) runtime.releasePixelBuffer(buffer, byteLength);
+      else {
+        try {
+          buffer.destroy();
+        } catch {
+          // 검증/OOM/lost 경로에서는 오염 가능성이 있는 lease를 절대 풀에 되돌리지 않는다.
+        }
+      }
+    }
+    if (ownsRuntime) runtime.dispose();
   }
 }

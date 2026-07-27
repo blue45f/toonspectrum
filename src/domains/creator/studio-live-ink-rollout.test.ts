@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  STUDIO_LIVE_INK_DEFAULT_ROLLOUT_PERCENT,
   STUDIO_LIVE_INK_ROLLOUT_BUCKET_STORAGE_KEY,
   resolveStudioLiveInkRollout,
   studioLiveInkRolloutInputFromGlobals,
@@ -55,7 +56,7 @@ describe("Studio live-ink progressive rollout", () => {
     );
   });
 
-  it("keeps the default and malformed configuration on Canvas2D without touching storage", () => {
+  it("uses the quality-first WebGPU default without touching storage", () => {
     const storage = memoryStorage();
     const getItem = vi.spyOn(storage, "getItem");
 
@@ -64,11 +65,18 @@ describe("Studio live-ink progressive rollout", () => {
       storage,
       random: fixedRandom(1),
     })).toEqual({
-      preference: "canvas2d",
-      reason: "rollout-disabled",
-      rolloutPercent: 0,
+      preference: "webgpu",
+      reason: "cohort-included",
+      rolloutPercent: STUDIO_LIVE_INK_DEFAULT_ROLLOUT_PERCENT,
       bucket: null,
     });
+    expect(getItem).not.toHaveBeenCalled();
+  });
+
+  it("keeps malformed explicit configuration fail-closed on Canvas2D", () => {
+    const storage = memoryStorage();
+    const getItem = vi.spyOn(storage, "getItem");
+
     expect(resolveStudioLiveInkRollout({
       backendPreference: "auto",
       rolloutPercent: "not-a-percent",
@@ -84,6 +92,17 @@ describe("Studio live-ink progressive rollout", () => {
       random: fixedRandom(1),
     }).preference).toBe("canvas2d");
     expect(getItem).not.toHaveBeenCalled();
+  });
+
+  it("falls back from the quality-first default when WebGPU is unavailable", () => {
+    expect(resolveStudioLiveInkRollout({
+      webgpuApiAvailable: false,
+    })).toEqual({
+      preference: "canvas2d",
+      reason: "webgpu-api-unavailable",
+      rolloutPercent: STUDIO_LIVE_INK_DEFAULT_ROLLOUT_PERCENT,
+      bucket: null,
+    });
   });
 
   it("preserves explicit force and emergency rollback controls", () => {

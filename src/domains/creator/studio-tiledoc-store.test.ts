@@ -311,6 +311,66 @@ describe("studio tiled document store — viewport queries", () => {
     expect(store.queryViewportTileIds({ x: 0, y: 0, width: 2048, height: 2048 }))
       .toEqual(["2:3"]);
   });
+
+  it("reuses an immutable viewport feed while the camera remains inside one tile span", () => {
+    const store = new StudioTiledDocumentStore(SMALL);
+    paintAllTiles(store, "layer-a", 1);
+
+    const first = store.queryViewport({ x: 1, y: 1, width: 62, height: 62 });
+    const second = store.queryViewport({ x: 2, y: 2, width: 60, height: 60 });
+
+    expect(second).toBe(first);
+    expect(store.viewportScopeId({ x: 1, y: 1, width: 62, height: 62 }))
+      .toBe(store.viewportScopeId({ x: 2, y: 2, width: 60, height: 60 }));
+    expect(store.viewportScopeId({ x: 64, y: 0, width: 64, height: 64 }))
+      .not.toBe(store.viewportScopeId({ x: 0, y: 0, width: 64, height: 64 }));
+    expect(store.viewportCacheStats()).toMatchObject({
+      compositeHits: 1,
+      geometryHits: 3,
+    });
+  });
+
+  it("reorders layers by reusing their cached tile feeds instead of rebuilding descriptors", () => {
+    const store = new StudioTiledDocumentStore(SMALL);
+    store.writeTile("layer-a", 0, 0, fillOpaque(10));
+    store.writeTile("layer-b", 0, 0, fillOpaque(20));
+    const rect = { x: 0, y: 0, width: 64, height: 64 };
+
+    const backToFront = store.queryViewport(rect, { layerIds: ["layer-a", "layer-b"] });
+    const frontToBack = store.queryViewport(rect, { layerIds: ["layer-b", "layer-a"] });
+
+    expect(backToFront.map((tile) => tile.layerId)).toEqual(["layer-a", "layer-b"]);
+    expect(frontToBack.map((tile) => tile.layerId)).toEqual(["layer-b", "layer-a"]);
+    expect(frontToBack[0]).toBe(backToFront[1]);
+    expect(frontToBack[1]).toBe(backToFront[0]);
+    expect(store.viewportCacheStats().layerHits).toBe(2);
+  });
+
+  it("rebuilds only the edited layer and preserves unchanged tile descriptor identities", () => {
+    const store = new StudioTiledDocumentStore(SMALL);
+    store.writeTile("ink", 0, 0, fillOpaque(10));
+    store.writeTile("ink", 1, 0, fillOpaque(11));
+    store.writeTile("color", 0, 0, fillOpaque(20));
+    store.writeTile("color", 1, 0, fillOpaque(21));
+    const rect = { x: 0, y: 0, width: 128, height: 64 };
+    const first = store.queryViewport(rect, { layerIds: ["ink", "color"] });
+    const firstByKey = new Map(first.map((tile) => [`${tile.layerId}/${tile.id}`, tile]));
+
+    store.writeTile("ink", 0, 0, fillOpaque(99));
+    const second = store.queryViewport(rect, { layerIds: ["ink", "color"] });
+    const secondByKey = new Map(second.map((tile) => [`${tile.layerId}/${tile.id}`, tile]));
+
+    expect(secondByKey.get("ink/0:0")).not.toBe(firstByKey.get("ink/0:0"));
+    expect(secondByKey.get("ink/0:0")?.contentRevision)
+      .toBeGreaterThan(firstByKey.get("ink/0:0")?.contentRevision ?? 0);
+    expect(secondByKey.get("ink/1:0")).toBe(firstByKey.get("ink/1:0"));
+    expect(secondByKey.get("color/0:0")).toBe(firstByKey.get("color/0:0"));
+    expect(secondByKey.get("color/1:0")).toBe(firstByKey.get("color/1:0"));
+    expect(store.viewportCacheStats()).toMatchObject({
+      descriptorReuses: 1,
+      layerHits: 1,
+    });
+  });
 });
 
 describe("studio tiled document store — residency and determinism", () => {

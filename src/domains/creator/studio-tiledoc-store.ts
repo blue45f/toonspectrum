@@ -29,6 +29,7 @@ import {
   resolveStudioTileDocTileSize,
   studioTileDocTileId,
   studioTileDocTileRect,
+  studioTileDocTileSpan,
   studioTileDocTilesForRect,
   type StudioTileDocRect,
 } from "./studio-tiledoc-geometry";
@@ -139,12 +140,42 @@ export interface StudioTileDocViewportTile {
   /** Tile rect clipped to the document extent. */
   readonly rect: StudioTileDocRect;
   readonly bufferId: number;
+  /**
+   * Monotonic content identity for this buffer. An in-place write keeps `bufferId` stable but
+   * advances this revision, allowing retained compositors to invalidate exactly one tile.
+   */
+  readonly contentRevision: number;
   readonly resident: boolean;
+}
+
+/**
+ * Detached, revision-fenced pixels for an asynchronous renderer or persistence consumer.
+ *
+ * `pixels` is a private copy: consumers may transfer or mutate it without reaching back into the
+ * copy-on-write store. The store returns `null` when the requested revision is stale or evicted,
+ * so a compositor can fail closed instead of uploading bytes under the wrong tile identity.
+ */
+export interface StudioTileDocBufferSnapshot {
+  readonly bufferId: number;
+  readonly contentRevision: number;
+  readonly byteLength: number;
+  readonly pixels: Uint8ClampedArray;
 }
 
 export interface StudioTileDocViewportOptions {
   /** Restrict and order the result by these layers. Default: all layers in insertion order. */
   readonly layerIds?: readonly string[];
+}
+
+export interface StudioTileDocViewportCacheStats {
+  /** Exact ordered viewport result reused without rebuilding or concatenating layer feeds. */
+  readonly compositeHits: number;
+  /** Per-layer viewport feeds reused across visibility/order changes. */
+  readonly layerHits: number;
+  /** Overlapping immutable tile descriptors reused while a changed layer feed was rebuilt. */
+  readonly descriptorReuses: number;
+  /** Tile-address geometry reused while the viewport stayed inside the same storage-tile span. */
+  readonly geometryHits: number;
 }
 
 export interface StudioTileDocResidencyDescriptor {
@@ -199,12 +230,36 @@ interface TileBuffer {
   readonly id: number;
   readonly byteLength: number;
   pixels: Uint8ClampedArray | null;
+  /** Advances after every accepted write, including in-place edits that keep this buffer id. */
+  contentRevision: number;
   /** Number of layer tile maps (current + snapshots) referencing this buffer. */
   refCount: number;
   lastUsed: number;
   blobKey: string | null;
   digest: string | null;
 }
+
+interface ViewportGeometryCache {
+  readonly key: string;
+  readonly addresses: ReturnType<typeof studioTileDocTilesForRect>;
+}
+
+interface LayerViewportCacheEntry {
+  readonly geometryKey: string;
+  readonly layerRevision: number;
+  readonly residencyEpoch: number;
+  readonly tiles: readonly StudioTileDocViewportTile[];
+}
+
+interface CompositeViewportCacheEntry {
+  readonly geometryKey: string;
+  readonly layerIds: readonly string[];
+  readonly layerRevisions: readonly number[];
+  readonly residencyEpoch: number;
+  readonly tiles: readonly StudioTileDocViewportTile[];
+}
+
+const EMPTY_VIEWPORT_TILES = Object.freeze([]) as readonly StudioTileDocViewportTile[];
 
 function isFullyTransparent(pixels: Uint8ClampedArray): boolean {
   for (let index = 3; index < pixels.length; index += 4) {
@@ -217,6 +272,30 @@ function positiveInteger(value: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback;
   const floored = Math.floor(value);
   return floored > 0 ? floored : fallback;
+}
+
+function sameStrings(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function sameNumbers(left: readonly number[], right: readonly number[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function sameViewportTile(
+  tile: StudioTileDocViewportTile,
+  layerId: string,
+  buffer: TileBuffer,
+  rect: StudioTileDocRect
+): boolean {
+  return tile.layerId === layerId
+    && tile.bufferId === buffer.id
+    && tile.contentRevision === buffer.contentRevision
+    && tile.resident === (buffer.pixels !== null)
+    && Object.is(tile.rect.x, rect.x)
+    && Object.is(tile.rect.y, rect.y)
+    && Object.is(tile.rect.width, rect.width)
+    && Object.is(tile.rect.height, rect.height);
 }
 
 export class StudioTiledDocumentStore {
@@ -232,9 +311,13 @@ export class StudioTiledDocumentStore {
   private readonly layers = new Map<string, StudioTileDocLayerTiles>();
   private readonly pool = new Map<number, TileBuffer>();
   private readonly snapshots = new Map<string, StudioTileDocSnapshot>();
+  /** One bounded viewport feed per layer; entries are replaced on pan/zoom, never accumulated. */
+  private readonly layerViewportCache = new Map<string, LayerViewportCacheEntry>();
+  private readonly layerRevisions = new Map<string, number>();
 
   private nextBufferId = 1;
   private nextSnapshotSequence = 1;
+  private nextContentRevision = 1;
   private accessSequence = 0;
   private residentBytesValue = 0;
   private retainedBytesValue = 0;
@@ -243,6 +326,13 @@ export class StudioTiledDocumentStore {
   private allocations = 0;
   private prunes = 0;
   private evictions = 0;
+  private residencyEpoch = 0;
+  private viewportGeometryCache: ViewportGeometryCache | null = null;
+  private compositeViewportCache: CompositeViewportCacheEntry | null = null;
+  private viewportCompositeHits = 0;
+  private viewportLayerHits = 0;
+  private viewportDescriptorReuses = 0;
+  private viewportGeometryHits = 0;
 
   public constructor(options: StudioTileDocStoreOptions) {
     this.tileSize = resolveStudioTileDocTileSize(options.tileSize);
@@ -271,6 +361,16 @@ export class StudioTiledDocumentStore {
       allocations: this.allocations,
       prunes: this.prunes,
       evictions: this.evictions,
+    });
+  }
+
+  /** Headless profiling counters for proving that presentation planning stays incremental. */
+  public viewportCacheStats(): StudioTileDocViewportCacheStats {
+    return Object.freeze({
+      compositeHits: this.viewportCompositeHits,
+      layerHits: this.viewportLayerHits,
+      descriptorReuses: this.viewportDescriptorReuses,
+      geometryHits: this.viewportGeometryHits,
     });
   }
 
@@ -338,6 +438,11 @@ export class StudioTiledDocumentStore {
       allocated,
       rect: rect ?? studioTileDocTileRect(column, row, this.tileSize),
     }));
+    buffer.contentRevision = this.nextContentRevision;
+    this.nextContentRevision = this.nextContentRevision >= Number.MAX_SAFE_INTEGER
+      ? 1
+      : this.nextContentRevision + 1;
+    this.bumpLayerRevision(layerId);
     // Content changed: any cached identity is stale until re-derived.
     buffer.digest = null;
     buffer.blobKey = null;
@@ -401,6 +506,7 @@ export class StudioTiledDocumentStore {
     if (!ref) return false;
     writable.tiles.delete(tileId);
     this.releaseBuffer(ref.bufferId);
+    this.bumpLayerRevision(layerId);
     return true;
   }
 
@@ -424,6 +530,9 @@ export class StudioTiledDocumentStore {
     if (!layer) return false;
     this.layers.delete(layerId);
     this.releaseLayerTiles(layer);
+    this.layerRevisions.delete(layerId);
+    this.layerViewportCache.delete(layerId);
+    this.compositeViewportCache = null;
     return true;
   }
 
@@ -463,7 +572,53 @@ export class StudioTiledDocumentStore {
     return pixels ? new Uint8ClampedArray(pixels) : null;
   }
 
+  /**
+   * Copies one buffer only when its exact content revision is still current.
+   *
+   * This is the safe handoff for asynchronous GPU/Worker consumers. A viewport descriptor can
+   * become stale before an upload begins; checking both identities closes that race without
+   * exposing a mutable store-owned array.
+   */
+  public copyBufferSnapshot(
+    bufferId: number,
+    contentRevision: number
+  ): StudioTileDocBufferSnapshot | null {
+    if (
+      !Number.isSafeInteger(bufferId)
+      || bufferId <= 0
+      || !Number.isSafeInteger(contentRevision)
+      || contentRevision < 0
+    ) {
+      return null;
+    }
+    const buffer = this.pool.get(bufferId);
+    if (
+      !buffer
+      || buffer.pixels === null
+      || buffer.contentRevision !== contentRevision
+    ) {
+      return null;
+    }
+    this.accessSequence += 1;
+    buffer.lastUsed = this.accessSequence;
+    return Object.freeze({
+      bufferId,
+      contentRevision,
+      byteLength: buffer.byteLength,
+      pixels: new Uint8ClampedArray(buffer.pixels),
+    });
+  }
+
   // ── viewport query ────────────────────────────────────────────────────────
+
+  /**
+   * Stable identity for the storage-tile span covered by a viewport. Pass this to
+   * `StudioTileDocCompositePlanner.scopeId`; sub-tile camera movement intentionally keeps it
+   * unchanged so retained tile stacks remain reusable.
+   */
+  public viewportScopeId(rect: StudioTileDocRect): string {
+    return `tiledoc-viewport:${this.viewportGeometry(rect).key}`;
+  }
 
   /**
    * Exactly the tiles a viewport rect needs, in a deterministic order
@@ -474,44 +629,39 @@ export class StudioTiledDocumentStore {
     rect: StudioTileDocRect,
     options: StudioTileDocViewportOptions = {}
   ): readonly StudioTileDocViewportTile[] {
-    const documentRect: StudioTileDocRect = {
-      x: 0,
-      y: 0,
-      width: this.documentWidth,
-      height: this.documentHeight,
-    };
-    const addresses = studioTileDocTilesForRect(rect, {
-      tileSize: this.tileSize,
-      bounds: { width: this.documentWidth, height: this.documentHeight },
-    });
-    if (addresses.length === 0) return Object.freeze([]);
-    const layerIds = options.layerIds ?? [...this.layers.keys()];
-    const tiles: StudioTileDocViewportTile[] = [];
-    for (const layerId of layerIds) {
-      const layer = this.layers.get(layerId);
-      if (!layer || layer.tiles.size === 0) continue;
-      for (const address of addresses) {
-        const ref = layer.tiles.get(address.id);
-        if (!ref) continue;
-        const clipped = intersectStudioTileDocRects(
-          studioTileDocTileRect(address.column, address.row, this.tileSize),
-          documentRect
-        );
-        /* c8 ignore next */
-        if (!clipped) continue;
-        const buffer = this.pool.get(ref.bufferId);
-        tiles.push(Object.freeze({
-          layerId,
-          id: address.id,
-          column: address.column,
-          row: address.row,
-          rect: clipped,
-          bufferId: ref.bufferId,
-          resident: buffer?.pixels !== null && buffer !== undefined,
-        }));
-      }
+    const geometry = this.viewportGeometry(rect);
+    if (geometry.addresses.length === 0) return EMPTY_VIEWPORT_TILES;
+    const layerIds = [...(options.layerIds ?? this.layers.keys())];
+    const layerRevisions = layerIds.map((layerId) => this.layerRevision(layerId));
+    const composite = this.compositeViewportCache;
+    if (
+      composite
+      && composite.geometryKey === geometry.key
+      && composite.residencyEpoch === this.residencyEpoch
+      && sameStrings(composite.layerIds, layerIds)
+      && sameNumbers(composite.layerRevisions, layerRevisions)
+    ) {
+      this.viewportCompositeHits += 1;
+      return composite.tiles;
     }
-    return Object.freeze(tiles);
+
+    const tiles: StudioTileDocViewportTile[] = [];
+    for (let index = 0; index < layerIds.length; index += 1) {
+      tiles.push(...this.queryLayerViewport(
+        layerIds[index]!,
+        layerRevisions[index]!,
+        geometry
+      ));
+    }
+    const result = Object.freeze(tiles);
+    this.compositeViewportCache = {
+      geometryKey: geometry.key,
+      layerIds: Object.freeze(layerIds),
+      layerRevisions: Object.freeze(layerRevisions),
+      residencyEpoch: this.residencyEpoch,
+      tiles: result,
+    };
+    return result;
   }
 
   /** Union of tile ids a viewport needs across the selected layers. */
@@ -558,6 +708,9 @@ export class StudioTiledDocumentStore {
       this.layers.set(layerId, layer);
     }
     for (const layer of previous) this.releaseLayerTiles(layer);
+    this.layerRevisions.clear();
+    for (const layerId of this.layers.keys()) this.layerRevisions.set(layerId, 1);
+    this.resetViewportCaches();
     return true;
   }
 
@@ -641,6 +794,7 @@ export class StudioTiledDocumentStore {
       freedBytes += buffer.byteLength;
       evicted.push(bufferId);
     }
+    if (evicted.length > 0) this.invalidateViewportResidency();
     return Object.freeze({
       evicted: Object.freeze(evicted),
       skipped: Object.freeze(skipped),
@@ -655,6 +809,7 @@ export class StudioTiledDocumentStore {
     this.residentBytesValue += buffer.byteLength;
     this.accessSequence += 1;
     buffer.lastUsed = this.accessSequence;
+    this.invalidateViewportResidency();
     return true;
   }
 
@@ -692,11 +847,124 @@ export class StudioTiledDocumentStore {
     this.layers.clear();
     this.snapshots.clear();
     this.pool.clear();
+    this.layerRevisions.clear();
+    this.resetViewportCaches();
     this.residentBytesValue = 0;
     this.retainedBytesValue = 0;
   }
 
   // ── internals ─────────────────────────────────────────────────────────────
+
+  private layerRevision(layerId: string): number {
+    return this.layerRevisions.get(layerId) ?? 0;
+  }
+
+  private bumpLayerRevision(layerId: string): void {
+    const previous = this.layerRevision(layerId);
+    this.layerRevisions.set(
+      layerId,
+      previous >= Number.MAX_SAFE_INTEGER ? 1 : previous + 1
+    );
+    // Keep the stale layer entry for descriptor-level reuse, but never reuse the ordered aggregate.
+    this.compositeViewportCache = null;
+  }
+
+  private viewportGeometry(rect: StudioTileDocRect): ViewportGeometryCache {
+    const geometryOptions = {
+      tileSize: this.tileSize,
+      bounds: { width: this.documentWidth, height: this.documentHeight },
+    } as const;
+    const span = studioTileDocTileSpan(rect, geometryOptions);
+    const key = span
+      ? `${span.firstColumn}:${span.firstRow}:${span.lastColumn}:${span.lastRow}`
+      : "empty";
+    if (this.viewportGeometryCache?.key === key) {
+      this.viewportGeometryHits += 1;
+      return this.viewportGeometryCache;
+    }
+    const addresses = studioTileDocTilesForRect(rect, geometryOptions);
+    const geometry = { key, addresses };
+    this.viewportGeometryCache = geometry;
+    return geometry;
+  }
+
+  private queryLayerViewport(
+    layerId: string,
+    layerRevision: number,
+    geometry: ViewportGeometryCache
+  ): readonly StudioTileDocViewportTile[] {
+    const cached = this.layerViewportCache.get(layerId);
+    if (
+      cached
+      && cached.geometryKey === geometry.key
+      && cached.layerRevision === layerRevision
+      && cached.residencyEpoch === this.residencyEpoch
+    ) {
+      this.viewportLayerHits += 1;
+      return cached.tiles;
+    }
+
+    const layer = this.layers.get(layerId);
+    const reusable = new Map((cached?.tiles ?? EMPTY_VIEWPORT_TILES).map((tile) => [tile.id, tile]));
+    const tiles: StudioTileDocViewportTile[] = [];
+    if (layer && layer.tiles.size > 0) {
+      const documentRect: StudioTileDocRect = {
+        x: 0,
+        y: 0,
+        width: this.documentWidth,
+        height: this.documentHeight,
+      };
+      for (const address of geometry.addresses) {
+        const ref = layer.tiles.get(address.id);
+        if (!ref) continue;
+        const buffer = this.pool.get(ref.bufferId);
+        if (!buffer) continue;
+        const clipped = intersectStudioTileDocRects(
+          studioTileDocTileRect(address.column, address.row, this.tileSize),
+          documentRect
+        );
+        /* c8 ignore next */
+        if (!clipped) continue;
+        const previous = reusable.get(address.id);
+        if (previous && sameViewportTile(previous, layerId, buffer, clipped)) {
+          this.viewportDescriptorReuses += 1;
+          tiles.push(previous);
+          continue;
+        }
+        tiles.push(Object.freeze({
+          layerId,
+          id: address.id,
+          column: address.column,
+          row: address.row,
+          rect: clipped,
+          bufferId: ref.bufferId,
+          contentRevision: buffer.contentRevision,
+          resident: buffer.pixels !== null,
+        }));
+      }
+    }
+    const result = tiles.length === 0 ? EMPTY_VIEWPORT_TILES : Object.freeze(tiles);
+    this.layerViewportCache.set(layerId, {
+      geometryKey: geometry.key,
+      layerRevision,
+      residencyEpoch: this.residencyEpoch,
+      tiles: result,
+    });
+    return result;
+  }
+
+  private invalidateViewportResidency(): void {
+    this.residencyEpoch = this.residencyEpoch >= Number.MAX_SAFE_INTEGER
+      ? 1
+      : this.residencyEpoch + 1;
+    this.compositeViewportCache = null;
+  }
+
+  private resetViewportCaches(): void {
+    this.viewportGeometryCache = null;
+    this.compositeViewportCache = null;
+    this.layerViewportCache.clear();
+  }
 
   private isTileInBounds(column: number, row: number): boolean {
     if (this.allowOutOfBounds) return Number.isSafeInteger(column) && Number.isSafeInteger(row);
@@ -731,6 +999,7 @@ export class StudioTiledDocumentStore {
       id: this.nextBufferId,
       byteLength: this.tileBytes,
       pixels: new Uint8ClampedArray(this.tileBytes),
+      contentRevision: 0,
       refCount: 0,
       lastUsed: this.accessSequence,
       blobKey: null,

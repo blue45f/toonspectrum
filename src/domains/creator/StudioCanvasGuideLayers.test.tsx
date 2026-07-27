@@ -109,6 +109,39 @@ function clearCapture(): void {
   for (const values of Object.values(capture)) values.length = 0;
 }
 
+type GridPathSegment = readonly [
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+];
+
+function executeCapturedGridScene(shapeProps: Record<string, unknown>) {
+  const segments: GridPathSegment[] = [];
+  let cursor: readonly [number, number] | null = null;
+  const context = {
+    beginPath: vi.fn(() => {
+      cursor = null;
+    }),
+    moveTo: vi.fn((x: number, y: number) => {
+      cursor = [x, y];
+    }),
+    lineTo: vi.fn((x: number, y: number) => {
+      if (!cursor) throw new Error("grid sceneFunc called lineTo before moveTo");
+      segments.push([cursor[0], cursor[1], x, y]);
+      cursor = [x, y];
+    }),
+    strokeShape: vi.fn(),
+  };
+  const shape = { role: "captured-grid-shape" };
+  const sceneFunc = shapeProps.sceneFunc as
+    | ((drawingContext: typeof context, targetShape: typeof shape) => void)
+    | undefined;
+  expect(sceneFunc).toBeTypeOf("function");
+  sceneFunc!(context, shape);
+  return { context, segments, shape };
+}
+
 beforeEach(clearCapture);
 
 afterEach(() => {
@@ -135,8 +168,21 @@ describe("StudioCanvasGuideUnderlay", () => {
 
     expect(safeAreaMargin).toHaveBeenCalledWith(100);
     expect(webtoonWidthGuides).toHaveBeenCalledWith(100);
-    expect(capture.shapes).toHaveLength(1);
-    expect(capture.shapes[0]?.listening).toBe(false);
+    expect(capture.shapes).toHaveLength(2);
+    expect(capture.shapes).toMatchObject([
+      {
+        listening: false,
+        perfectDrawEnabled: false,
+        stroke: "rgba(124, 92, 252, 0.24)",
+        strokeWidth: 0.5,
+      },
+      {
+        listening: false,
+        perfectDrawEnabled: false,
+        stroke: "rgba(124, 92, 252, 0.46)",
+        strokeWidth: 0.675,
+      },
+    ]);
     expect(capture.groups.map((group) => group.listening)).toEqual([false]);
     expect(capture.lines.map((line) => line.points)).toEqual([
       [20, 0, 20, 50],
@@ -146,6 +192,72 @@ describe("StudioCanvasGuideUnderlay", () => {
       { x: 92, width: 8, height: 50 },
     ]);
     expect(capture.lines.at(-1)).toMatchObject({ dash: [3, 3], strokeWidth: 0.5 });
+  });
+
+  it("executes separate minor/major paths and strokes each Shape on the five-cell cadence", () => {
+    render(
+      <StudioCanvasGuideUnderlay
+        canvasWidth={100}
+        canvasHeight={50}
+        effScale={1}
+        gridSize={10}
+        showGrid
+        showWebtoonGuides={false}
+        webtoonGuides={null}
+      />,
+    );
+
+    expect(capture.shapes).toHaveLength(2);
+    const minor = executeCapturedGridScene(capture.shapes[0]);
+    const major = executeCapturedGridScene(capture.shapes[1]);
+
+    expect(minor.context.beginPath).toHaveBeenCalledTimes(1);
+    expect(minor.context.strokeShape).toHaveBeenCalledOnce();
+    expect(minor.context.strokeShape).toHaveBeenCalledWith(minor.shape);
+    expect(minor.segments).toEqual([
+      [10, 0, 10, 50],
+      [20, 0, 20, 50],
+      [30, 0, 30, 50],
+      [40, 0, 40, 50],
+      [60, 0, 60, 50],
+      [70, 0, 70, 50],
+      [80, 0, 80, 50],
+      [90, 0, 90, 50],
+      [0, 10, 100, 10],
+      [0, 20, 100, 20],
+      [0, 30, 100, 30],
+      [0, 40, 100, 40],
+    ]);
+
+    expect(major.context.beginPath).toHaveBeenCalledTimes(1);
+    expect(major.context.strokeShape).toHaveBeenCalledOnce();
+    expect(major.context.strokeShape).toHaveBeenCalledWith(major.shape);
+    expect(major.segments).toEqual([
+      [0, 0, 0, 50],
+      [50, 0, 50, 50],
+      [100, 0, 100, 50],
+      [0, 0, 100, 0],
+      [0, 50, 100, 50],
+    ]);
+
+    const minorPathKeys = new Set(minor.segments.map((segment) => segment.join(",")));
+    expect(major.segments.every((segment) => !minorPathKeys.has(segment.join(",")))).toBe(true);
+  });
+
+  it("does not instantiate either grid Shape while pixel-grid display is disabled", () => {
+    render(
+      <StudioCanvasGuideUnderlay
+        canvasWidth={100}
+        canvasHeight={50}
+        effScale={1}
+        gridSize={10}
+        showGrid={false}
+        showWebtoonGuides={false}
+        webtoonGuides={null}
+      />,
+    );
+
+    expect(capture.shapes).toEqual([]);
   });
 });
 

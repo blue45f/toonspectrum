@@ -1358,43 +1358,68 @@ function cumulativeLengths(points: readonly SanitizedStrokePoint[]): Float64Arra
   return cumulative;
 }
 
-function stationAtDistance(
+/**
+ * Creates a forward-only arc-length sampler.
+ *
+ * Planned dab distances are strictly increasing. Binary-searching the whole source path for every
+ * dab made an active airbrush frame O(D log N) after already paying O(N) for cumulative lengths,
+ * and that cost grew perceptibly during long strokes. One segment cursor produces byte-identical
+ * interpolation in O(N + D). A defensive reset preserves deterministic behavior if a future caller
+ * ever supplies a regressing distance.
+ */
+function createStationAtDistanceSampler(
   points: readonly SanitizedStrokePoint[],
   cumulative: Float64Array,
-  totalLength: number,
-  rawDistance: number
-): StrokeStation {
-  if (points.length === 1 || totalLength <= POINT_EPSILON) {
-    return { ...points[0]!, direction: 0, progress: 0 };
-  }
-
-  const distance = clamp(rawDistance, 0, totalLength);
-  let upperIndex: number;
-  if (distance <= POINT_EPSILON) upperIndex = 1;
-  else if (totalLength - distance <= POINT_EPSILON) upperIndex = points.length - 1;
-  else {
-    let lowerBound = 1;
-    let upperBound = points.length - 1;
-    while (lowerBound < upperBound) {
-      const middle = Math.floor((lowerBound + upperBound) / 2);
-      if (cumulative[middle]! < distance) lowerBound = middle + 1;
-      else upperBound = middle;
+  totalLength: number
+): (rawDistance: number) => StrokeStation {
+  let upperIndex = 1;
+  let previousDistance = 0;
+  return (rawDistance: number): StrokeStation => {
+    if (points.length === 1 || totalLength <= POINT_EPSILON) {
+      return { ...points[0]!, direction: 0, progress: 0 };
     }
-    upperIndex = lowerBound;
-  }
 
-  const lowerIndex = upperIndex - 1;
-  const start = points[lowerIndex]!;
-  const end = points[upperIndex]!;
-  const segmentStart = cumulative[lowerIndex]!;
-  const segmentLength = cumulative[upperIndex]! - segmentStart;
-  const amount = segmentLength > POINT_EPSILON ? clamp01((distance - segmentStart) / segmentLength) : 0;
-  return {
-    x: distance <= POINT_EPSILON ? points[0]!.x : totalLength - distance <= POINT_EPSILON ? points.at(-1)!.x : start.x + (end.x - start.x) * amount,
-    y: distance <= POINT_EPSILON ? points[0]!.y : totalLength - distance <= POINT_EPSILON ? points.at(-1)!.y : start.y + (end.y - start.y) * amount,
-    sourceProgress: start.sourceProgress + (end.sourceProgress - start.sourceProgress) * amount,
-    direction: normalizeSignedDegrees(Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI),
-    progress: distance / totalLength,
+    const distance = clamp(rawDistance, 0, totalLength);
+    if (distance < previousDistance) upperIndex = 1;
+    previousDistance = distance;
+    if (distance <= POINT_EPSILON) {
+      upperIndex = 1;
+    } else if (totalLength - distance <= POINT_EPSILON) {
+      upperIndex = points.length - 1;
+    } else {
+      while (
+        upperIndex < points.length - 1
+        && cumulative[upperIndex]! < distance
+      ) {
+        upperIndex += 1;
+      }
+    }
+
+    const lowerIndex = upperIndex - 1;
+    const start = points[lowerIndex]!;
+    const end = points[upperIndex]!;
+    const segmentStart = cumulative[lowerIndex]!;
+    const segmentLength = cumulative[upperIndex]! - segmentStart;
+    const amount = segmentLength > POINT_EPSILON
+      ? clamp01((distance - segmentStart) / segmentLength)
+      : 0;
+    return {
+      x: distance <= POINT_EPSILON
+        ? points[0]!.x
+        : totalLength - distance <= POINT_EPSILON
+          ? points.at(-1)!.x
+          : start.x + (end.x - start.x) * amount,
+      y: distance <= POINT_EPSILON
+        ? points[0]!.y
+        : totalLength - distance <= POINT_EPSILON
+          ? points.at(-1)!.y
+          : start.y + (end.y - start.y) * amount,
+      sourceProgress: start.sourceProgress + (end.sourceProgress - start.sourceProgress) * amount,
+      direction: normalizeSignedDegrees(
+        Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI
+      ),
+      progress: distance / totalLength,
+    };
   };
 }
 
@@ -1541,19 +1566,27 @@ function planStudioDynamicBrushFromInput(
     readonly station: StrokeStation;
     readonly recipe: StudioBrushDynamicsRecipe;
   }
-  const stationPlanAt = (distance: number, index: number): PlannedDynamicBrushStation => {
-    const station = stationAtDistance(points, cumulative, totalLength, distance);
-    const sample = normalizeStudioBrushDynamicsSample(
-      sampleForStation(station, index, input, settings),
-      settings
-    );
-    return {
-      distance,
-      station,
-      recipe: resolveNormalizedStudioBrushDynamics(sample, settings),
-    };
-  };
   const buildStations = (fitWholePathToBudget: boolean): PlannedDynamicBrushStation[] => {
+    const stationAtDistance = createStationAtDistanceSampler(
+      points,
+      cumulative,
+      totalLength
+    );
+    const stationPlanAt = (
+      distance: number,
+      index: number
+    ): PlannedDynamicBrushStation => {
+      const station = stationAtDistance(distance);
+      const sample = normalizeStudioBrushDynamicsSample(
+        sampleForStation(station, index, input, settings),
+        settings
+      );
+      return {
+        distance,
+        station,
+        recipe: resolveNormalizedStudioBrushDynamics(sample, settings),
+      };
+    };
     const planned = [stationPlanAt(0, 0)];
     if (points.length <= 1 || totalLength <= POINT_EPSILON) return planned;
 

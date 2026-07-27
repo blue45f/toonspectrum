@@ -19,6 +19,11 @@ This avoids a full editor rewrite while improving the latency-sensitive path.
 | Canvas 2D presentation | Live ink, predicted ink, and stamp overlays request a desynchronized 2D context. | Older WebViews that reject the option fall back to an ordinary 2D context. |
 | Large/high-DPI displays | Transient Canvas/WebGPU live surfaces use native DPR until their backing store would exceed 16,777,216 pixels, then quantize down in 0.25 DPR steps. | Document coordinates, committed Konva content, saves, and exports are unchanged. Typical 1080p/2× and 430×932/3× surfaces stay native. |
 | WebGPU coalesced input | A compatible pinned GPU stroke clones its retained prefix once per browser delivery and mutates the private batch for all coalesced samples. | The asynchronous GPU recovery command never receives a mutable array. Fixed-rate input keeps its existing owned-array path and does not pay a redundant clone. |
+| WebGPU frame scheduling | Retained-tile rendering and presentation are submitted in queue order with one completion fence per visible frame instead of a CPU round-trip between the two submissions. | The final fence still gates the authoritative frame receipt; any submit error or device loss aborts the active tile epoch and falls back safely. |
+| GPU adapter policy | Studio requests the browser's high-performance WebGPU adapter for the quality-first drawing backend. | The browser may ignore the hint; adapter/device rejection and device loss keep the exact Canvas2D recovery surface available. |
+| High-precision ink | Retained WebGPU brush tiles accumulate into `rgba16float` textures, avoiding repeated 8-bit quantization across translucent dabs. | Presentation remains browser-native and the tile cache accounts for the full 8 bytes per pixel, so quality never bypasses residency budgets. |
+| Linear-light ink compositing | Brush sRGB is decoded once at the tile-upload boundary, premultiplied strokes blend in linear `rgba16float`, and the presentation shader unpremultiplies/encodes sRGB exactly once. | Reduces dark overlap seams and muddy translucent midtones while keeping eraser coverage and readback alpha contracts intact. |
+| Bounded presentation pipeline | Up to two submitted WebGPU presentations overlap CPU pointer planning; excess pointer frames coalesce to the newest request until one fence completes. | Removes the one-fence-per-input stall without building an unbounded GPU queue. Frame authority/readback receipts still publish only after real completion, and counts are isolated per device generation. |
 | Long-stroke correction Worker | Worker-worthy release correction uses a one-shot module Worker with `Float64Array` Transferables inside the existing 200ms deferred-commit window. | Only ordinary freehand strokes above the measured 2,048-point/32KiB/kernel-work thresholds leave the main thread. Request/generation IDs, abort, a 175ms editor deadline, hard byte budgets, stale-result rejection, and the unchanged authoritative stroke make failures lossless. |
 | WebGL2 compatibility boundary | A bounded shader/VAO/VBO renderer can draw a variable-width transient strip, recover from context loss, and fail closed to Canvas. | It is intentionally not the default: the current Canvas overlay appends O(1), while rebuilding and uploading a full strip is O(N) and does not yet match round-dab pixels. The boundary is ready for an instrumented compatibility canary only. |
 | Smart filters | 37 non-destructive filters run Worker-first with deterministic direct fallback. | Request validation, alpha preservation, direct/Worker parity, abort, and stale-result protection remain enforced. |
@@ -44,15 +49,15 @@ them.
 
 Primary reference: [GPUWeb specification — devices and device loss](https://gpuweb.github.io/gpuweb/).
 
-The live-ink default remains Canvas 2D until the GPU-owned chunk feed demonstrates a lower p95 on
-real Apple/Intel/AMD/NVIDIA/Adreno/Mali devices without growing recovery memory. `webgpu` remains an
-explicit rollout option during that evidence-gathering phase. Production canaries can instead keep
-the backend on `auto` and set `VITE_STUDIO_LIVE_INK_ROLLOUT_PERCENT`: the browser stores only one
-local 0–9999 percentile bucket (not a user/device identifier), admits the same cohort as the
-percentage grows, and fails closed when storage, Web Crypto, the WebGPU API, the adapter, the device,
-the stroke contract, or its first-frame receipt is unavailable. Missing or malformed percentages
-remain 0%. `VITE_STUDIO_LIVE_INK_KILL_SWITCH=on` dominates even an explicit `webgpu` build and is
-the immediate fleet-wide rollback path; `canvas2d` remains the explicit backend fallback.
+The quality-first live-ink default is WebGPU for every browser that exposes the API. This policy does
+not bypass the stroke-scoped adapter/device, brush-contract, source-journal, first-frame-receipt or
+device-loss gates: any failed gate keeps or returns the exact Canvas2D surface. Production can keep
+the backend on `auto` and set `VITE_STUDIO_LIVE_INK_ROLLOUT_PERCENT` to narrow the cohort; values
+between 0 and 100 use one local 0–9999 percentile bucket (not a user/device identifier) and admit the
+same cohort as the percentage grows. A missing percentage means 100%, while a malformed explicit
+percentage fails closed at 0%. `VITE_STUDIO_LIVE_INK_KILL_SWITCH=on` dominates even an explicit
+`webgpu` build and is the immediate fleet-wide rollback path; `canvas2d` remains the explicit backend
+fallback.
 
 The cohort calculation now uses the common Studio feature-rollout core. That core also provides
 versioned and expiring validated-remote policies, checksum-protected last-known-good recovery,

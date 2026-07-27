@@ -5,7 +5,10 @@
  * small kernels, generated clouds are seeded, and every operation preserves the input extent.
  */
 
-import type { StudioImageDataLike } from "./studio-filters";
+import {
+  withStudioFilterScratchBuffer,
+  type StudioImageDataLike,
+} from "./studio-filters";
 
 export type StudioExposureAdjustment = {
   /** Exposure value in stops. */
@@ -207,16 +210,23 @@ function horizontalBoxBlur(
 ): void {
   const diameter = radius * 2 + 1;
   for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const targetIndex = (y * width + x) * 4;
-      for (let channel = 0; channel < 3; channel += 1) {
-        let sum = 0;
-        for (let offset = -radius; offset <= radius; offset += 1) {
-          const sampleX = clamp(x + offset, 0, width - 1);
-          sum += source[(y * width + sampleX) * 4 + channel]!;
-        }
-        target[targetIndex + channel] = sum / diameter;
+    const rowStart = y * width * 4;
+    for (let channel = 0; channel < 3; channel += 1) {
+      let sum = source[rowStart + channel]! * (radius + 1);
+      for (let offset = 1; offset <= radius; offset += 1) {
+        sum += source[rowStart + Math.min(offset, width - 1) * 4 + channel]!;
       }
+      for (let x = 0; x < width; x += 1) {
+        const targetIndex = rowStart + x * 4;
+        target[targetIndex + channel] = sum / diameter;
+        const outgoingX = clamp(x - radius, 0, width - 1);
+        const incomingX = clamp(x + radius + 1, 0, width - 1);
+        sum += source[rowStart + incomingX * 4 + channel]!
+          - source[rowStart + outgoingX * 4 + channel]!;
+      }
+    }
+    for (let x = 0; x < width; x += 1) {
+      const targetIndex = rowStart + x * 4;
       target[targetIndex + 3] = source[targetIndex + 3]!;
     }
   }
@@ -236,27 +246,32 @@ export function applyStudioUnsharpMask(image: StudioImageDataLike, value: Studio
   const normalized = normalizeStudioUnsharpMask(value);
   if (normalized.amount === 0 || image.width === 0 || image.height === 0) return;
   const { data, width, height } = image;
-  const horizontal = new Uint8ClampedArray(data.length);
-  horizontalBoxBlur(data, horizontal, width, height, normalized.radius);
-  const diameter = normalized.radius * 2 + 1;
-  for (let y = 0; y < height; y += 1) {
+  withStudioFilterScratchBuffer(data.length, (horizontal) => {
+    horizontalBoxBlur(data, horizontal, width, height, normalized.radius);
+    const radius = normalized.radius;
+    const diameter = radius * 2 + 1;
     for (let x = 0; x < width; x += 1) {
-      const index = (y * width + x) * 4;
       for (let channel = 0; channel < 3; channel += 1) {
-        let sum = 0;
-        for (let offset = -normalized.radius; offset <= normalized.radius; offset += 1) {
-          const sampleY = clamp(y + offset, 0, height - 1);
-          sum += horizontal[(sampleY * width + x) * 4 + channel]!;
+        let sum = horizontal[x * 4 + channel]! * (radius + 1);
+        for (let offset = 1; offset <= radius; offset += 1) {
+          sum += horizontal[(Math.min(offset, height - 1) * width + x) * 4 + channel]!;
         }
-        const blurred = sum / diameter;
-        const delta = data[index + channel]! - blurred;
-        const gate = unsharpGate(Math.abs(delta), normalized.threshold);
-        if (gate > 0) {
-          data[index + channel] = data[index + channel]! + delta * normalized.amount * gate;
+        for (let y = 0; y < height; y += 1) {
+          const index = (y * width + x) * 4 + channel;
+          const blurred = sum / diameter;
+          const delta = data[index]! - blurred;
+          const gate = unsharpGate(Math.abs(delta), normalized.threshold);
+          if (gate > 0) {
+            data[index] = data[index]! + delta * normalized.amount * gate;
+          }
+          const outgoingY = clamp(y - radius, 0, height - 1);
+          const incomingY = clamp(y + radius + 1, 0, height - 1);
+          sum += horizontal[(incomingY * width + x) * 4 + channel]!
+            - horizontal[(outgoingY * width + x) * 4 + channel]!;
         }
       }
     }
-  }
+  });
 }
 
 function morphologyInitial(mode: StudioMorphology["mode"]): number {
@@ -271,44 +286,45 @@ export function applyStudioMorphology(image: StudioImageDataLike, value: StudioM
   const normalized = normalizeStudioMorphology(value);
   if (normalized.radius === 0 || image.width === 0 || image.height === 0) return;
   const { data, width, height } = image;
-  const horizontal = new Uint8ClampedArray(data.length);
-  // Morphology changes the full RGBA support, not only colour. Expanding a semi-transparent
-  // mask while preserving the old centre alpha leaves invisible RGB fringes; applying the same
-  // extrema operation to alpha keeps line-art/mask edges spatially coherent.
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const index = (y * width + x) * 4;
-      for (let channel = 0; channel < 4; channel += 1) {
-        let result = morphologyInitial(normalized.mode);
-        for (let offset = -normalized.radius; offset <= normalized.radius; offset += 1) {
-          const sampleX = clamp(x + offset, 0, width - 1);
-          result = morphologyNext(
-            normalized.mode,
-            result,
-            data[(y * width + sampleX) * 4 + channel]!,
-          );
+  withStudioFilterScratchBuffer(data.length, (horizontal) => {
+    // Morphology changes the full RGBA support, not only colour. Expanding a semi-transparent
+    // mask while preserving the old centre alpha leaves invisible RGB fringes; applying the same
+    // extrema operation to alpha keeps line-art/mask edges spatially coherent.
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const index = (y * width + x) * 4;
+        for (let channel = 0; channel < 4; channel += 1) {
+          let result = morphologyInitial(normalized.mode);
+          for (let offset = -normalized.radius; offset <= normalized.radius; offset += 1) {
+            const sampleX = clamp(x + offset, 0, width - 1);
+            result = morphologyNext(
+              normalized.mode,
+              result,
+              data[(y * width + sampleX) * 4 + channel]!,
+            );
+          }
+          horizontal[index + channel] = result;
         }
-        horizontal[index + channel] = result;
       }
     }
-  }
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const index = (y * width + x) * 4;
-      for (let channel = 0; channel < 4; channel += 1) {
-        let result = morphologyInitial(normalized.mode);
-        for (let offset = -normalized.radius; offset <= normalized.radius; offset += 1) {
-          const sampleY = clamp(y + offset, 0, height - 1);
-          result = morphologyNext(
-            normalized.mode,
-            result,
-            horizontal[(sampleY * width + x) * 4 + channel]!,
-          );
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const index = (y * width + x) * 4;
+        for (let channel = 0; channel < 4; channel += 1) {
+          let result = morphologyInitial(normalized.mode);
+          for (let offset = -normalized.radius; offset <= normalized.radius; offset += 1) {
+            const sampleY = clamp(y + offset, 0, height - 1);
+            result = morphologyNext(
+              normalized.mode,
+              result,
+              horizontal[(sampleY * width + x) * 4 + channel]!,
+            );
+          }
+          data[index + channel] = result;
         }
-        data[index + channel] = result;
       }
     }
-  }
+  });
 }
 
 function wrappedCoordinate(value: number, size: number): number {
@@ -319,56 +335,60 @@ export function applyStudioPixelOffset(image: StudioImageDataLike, value: Studio
   const normalized = normalizeStudioPixelOffset(value);
   if (isIdentityStudioPixelOffset(normalized)) return;
   const { data, width, height } = image;
-  const source = new Uint8ClampedArray(data);
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const targetIndex = (y * width + x) * 4;
-      let sourceX = x - normalized.x;
-      let sourceY = y - normalized.y;
-      if (normalized.edge === "wrap") {
-        sourceX = wrappedCoordinate(sourceX, width);
-        sourceY = wrappedCoordinate(sourceY, height);
-      } else if (normalized.edge === "clamp") {
-        sourceX = clamp(sourceX, 0, width - 1);
-        sourceY = clamp(sourceY, 0, height - 1);
-      } else if (sourceX < 0 || sourceX >= width || sourceY < 0 || sourceY >= height) {
-        data[targetIndex] = 0;
-        data[targetIndex + 1] = 0;
-        data[targetIndex + 2] = 0;
-        data[targetIndex + 3] = 0;
-        continue;
+  withStudioFilterScratchBuffer(data.length, (source) => {
+    source.set(data);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const targetIndex = (y * width + x) * 4;
+        let sourceX = x - normalized.x;
+        let sourceY = y - normalized.y;
+        if (normalized.edge === "wrap") {
+          sourceX = wrappedCoordinate(sourceX, width);
+          sourceY = wrappedCoordinate(sourceY, height);
+        } else if (normalized.edge === "clamp") {
+          sourceX = clamp(sourceX, 0, width - 1);
+          sourceY = clamp(sourceY, 0, height - 1);
+        } else if (sourceX < 0 || sourceX >= width || sourceY < 0 || sourceY >= height) {
+          data[targetIndex] = 0;
+          data[targetIndex + 1] = 0;
+          data[targetIndex + 2] = 0;
+          data[targetIndex + 3] = 0;
+          continue;
+        }
+        const sourceIndex = (sourceY * width + sourceX) * 4;
+        data[targetIndex] = source[sourceIndex]!;
+        data[targetIndex + 1] = source[sourceIndex + 1]!;
+        data[targetIndex + 2] = source[sourceIndex + 2]!;
+        data[targetIndex + 3] = source[sourceIndex + 3]!;
       }
-      const sourceIndex = (sourceY * width + sourceX) * 4;
-      data[targetIndex] = source[sourceIndex]!;
-      data[targetIndex + 1] = source[sourceIndex + 1]!;
-      data[targetIndex + 2] = source[sourceIndex + 2]!;
-      data[targetIndex + 3] = source[sourceIndex + 3]!;
     }
-  }
+  });
 }
 
 export function applyStudioConvolution(image: StudioImageDataLike, value: StudioConvolution): void {
   const normalized = normalizeStudioConvolution(value);
   if (isIdentityStudioConvolution(normalized)) return;
   const { data, width, height } = image;
-  const source = new Uint8ClampedArray(data);
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const targetIndex = (y * width + x) * 4;
-      for (let channel = 0; channel < 3; channel += 1) {
-        let sum = 0;
-        for (let kernelY = 0; kernelY < 3; kernelY += 1) {
-          const sourceY = clamp(y + kernelY - 1, 0, height - 1);
-          for (let kernelX = 0; kernelX < 3; kernelX += 1) {
-            const sourceX = clamp(x + kernelX - 1, 0, width - 1);
-            const sourceIndex = (sourceY * width + sourceX) * 4 + channel;
-            sum += source[sourceIndex]! * normalized.kernel[kernelY * 3 + kernelX]!;
+  withStudioFilterScratchBuffer(data.length, (source) => {
+    source.set(data);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const targetIndex = (y * width + x) * 4;
+        for (let channel = 0; channel < 3; channel += 1) {
+          let sum = 0;
+          for (let kernelY = 0; kernelY < 3; kernelY += 1) {
+            const sourceY = clamp(y + kernelY - 1, 0, height - 1);
+            for (let kernelX = 0; kernelX < 3; kernelX += 1) {
+              const sourceX = clamp(x + kernelX - 1, 0, width - 1);
+              const sourceIndex = (sourceY * width + sourceX) * 4 + channel;
+              sum += source[sourceIndex]! * normalized.kernel[kernelY * 3 + kernelX]!;
+            }
           }
+          data[targetIndex + channel] = sum / normalized.divisor + normalized.bias;
         }
-        data[targetIndex + channel] = sum / normalized.divisor + normalized.bias;
       }
     }
-  }
+  });
 }
 
 function hashNoise(x: number, y: number, seed: number): number {

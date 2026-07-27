@@ -15,6 +15,15 @@ export const STUDIO_LIVE_INK_ROLLOUT_BUCKET_COUNT =
   STUDIO_FEATURE_ROLLOUT_BUCKET_COUNT;
 export const STUDIO_LIVE_INK_ROLLOUT_BUCKET_STORAGE_KEY =
   "toonspectrum:studio:live-ink-rollout-bucket:v1";
+/**
+ * Quality-first engine policy.
+ *
+ * The WebGPU path still has stroke-scoped capability, exact-output, first-frame receipt and
+ * device-loss gates, so selecting it here never removes the Canvas2D recovery path. A missing
+ * deployment percentage now means “admit every capable browser” instead of silently disabling
+ * the already-bounded GPU engine. Malformed explicit values remain fail-closed at 0%.
+ */
+export const STUDIO_LIVE_INK_DEFAULT_ROLLOUT_PERCENT = 100;
 
 export interface StudioLiveInkRolloutStorage {
   getItem(key: string): string | null;
@@ -60,7 +69,9 @@ interface StudioLiveInkRolloutGlobals {
 }
 
 function parseRolloutPercent(value: unknown): number {
-  if (value === undefined || value === null || value === "") return 0;
+  if (value === undefined || value === null || value === "") {
+    return STUDIO_LIVE_INK_DEFAULT_ROLLOUT_PERCENT;
+  }
   if (typeof value !== "number" && typeof value !== "string") return 0;
   const parsed = typeof value === "number" ? value : Number(value.trim());
   if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) return 0;

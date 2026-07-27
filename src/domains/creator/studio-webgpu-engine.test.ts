@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { studioHighBitSrgbToLinear } from "./studio-highbit-transfer";
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
@@ -917,10 +918,12 @@ describe("StudioWebGpuEngine", () => {
       srcFactor: "one",
       dstFactor: "one-minus-src-alpha",
     });
+    expect(pipelineCalls[0]?.[0].fragment?.targets?.[0]?.format).toBe("rgba16float");
     expect(pipelineCalls[1]?.[0].fragment?.targets?.[0]?.blend?.color).toMatchObject({
       srcFactor: "zero",
       dstFactor: "one-minus-src-alpha",
     });
+    expect(pipelineCalls[1]?.[0].fragment?.targets?.[0]?.format).toBe("rgba16float");
     expect(pipelineCalls[2]?.[0]).toMatchObject({
       label: "Studio retained tile presentation pipeline",
       fragment: { targets: [{ format: "bgra8unorm" }] },
@@ -1034,10 +1037,43 @@ describe("StudioWebGpuEngine", () => {
       Number(instanceWrite![3]),
       Number(instanceWrite![4]) / Float32Array.BYTES_PER_ELEMENT
     );
-    // rgba alpha .5 × element opacity .4 = .2, packed as premultiplied source color.
+    // rgba alpha .5 × element opacity .4 = .2, packed as premultiplied linear-light color.
     expect(packed[7]).toBeCloseTo(0.2, 6);
-    expect(packed[4]).toBeCloseTo((100 / 255) * 0.2, 6);
+    expect(packed[4]).toBeCloseTo(studioHighBitSrgbToLinear(100 / 255) * 0.2, 6);
     expect(fake.draw).toHaveBeenCalled();
+    engine.dispose();
+  });
+
+  it("keeps retained tiles linear and converts straight RGB exactly once at presentation", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const fake = fakeGpuDevice(neverLost);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+    });
+
+    await engine.initialize();
+
+    const shaderSources = vi.mocked(fake.device.createShaderModule).mock.calls.map(
+      ([descriptor]) => String(descriptor.code)
+    );
+    const presentation = shaderSources.find((source) => (
+      source.includes("linear_premultiplied_to_srgb")
+    ));
+    expect(presentation).toContain("value.rgb / value.a");
+    expect(presentation).toContain("channel <= 0.0031308");
+    expect(presentation).toContain("encoded * value.a");
     engine.dispose();
   });
 
@@ -1045,7 +1081,7 @@ describe("StudioWebGpuEngine", () => {
     const firstLost = deferred<GPUDeviceLostInfo>();
     const firstSubmission = deferred<void>();
     const first = fakeGpuDevice(firstLost.promise, () => firstSubmission.promise);
-    const secondSubmissions = Array.from({ length: 3 }, () => deferred<void>());
+    const secondSubmissions = Array.from({ length: 2 }, () => deferred<void>());
     let secondSubmissionIndex = 0;
     const second = fakeGpuDevice(
       new Promise<GPUDeviceLostInfo>(() => undefined),
@@ -1085,20 +1121,22 @@ describe("StudioWebGpuEngine", () => {
 
     firstLost.resolve({ reason: "unknown", message: "hung submission" } as GPUDeviceLostInfo);
     await vi.waitFor(() => expect(adapter.requestDevice).toHaveBeenCalledTimes(2));
-    await vi.waitFor(() => expect(second.device.queue.submit).toHaveBeenCalledTimes(1));
+    // Tile rendering and presentation are submitted back-to-back, then share one completion fence.
+    await vi.waitFor(() => expect(second.device.queue.submit).toHaveBeenCalledTimes(2));
 
     // A late completion from the lost device must not clear the recovered device's flight lock.
     firstSubmission.resolve(undefined);
     await Promise.resolve();
     await Promise.resolve();
     engine.render(latestStrokes, "recover:latest");
-    expect(second.device.queue.submit).toHaveBeenCalledTimes(1);
+    // The recovered device can pipeline one newer presentation without waiting on its first fence.
+    expect(second.device.queue.submit).toHaveBeenCalledTimes(4);
 
     secondSubmissions[0]!.resolve(undefined);
-    await vi.waitFor(() => expect(second.device.queue.submit).toHaveBeenCalledTimes(2));
+    expect(onFrameReady).not.toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "recover:latest",
+    }));
     secondSubmissions[1]!.resolve(undefined);
-    await vi.waitFor(() => expect(second.device.queue.submit).toHaveBeenCalledTimes(3));
-    secondSubmissions[2]!.resolve(undefined);
 
     await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
       requestId: "recover:latest",
@@ -1183,7 +1221,7 @@ describe("StudioWebGpuEngine", () => {
 
   it("drops stale WebGPU queue receipts and authorizes only the latest request", async () => {
     const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
-    const submitted = Array.from({ length: 4 }, () => deferred<void>());
+    const submitted = Array.from({ length: 3 }, () => deferred<void>());
     let submissionIndex = 0;
     const fake = fakeGpuDevice(neverLost, () => submitted[submissionIndex++]!.promise);
     const context = {
@@ -1235,9 +1273,6 @@ describe("StudioWebGpuEngine", () => {
     await vi.waitFor(() => expect(fake.device.queue.onSubmittedWorkDone).toHaveBeenCalledTimes(3));
     expect(onFrameReady).not.toHaveBeenCalled();
     submitted[2]!.resolve(undefined);
-    await vi.waitFor(() => expect(fake.device.queue.onSubmittedWorkDone).toHaveBeenCalledTimes(4));
-    expect(onFrameReady).not.toHaveBeenCalled();
-    submitted[3]!.resolve(undefined);
     await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledTimes(1));
     expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
       requestId: "request:latest",
@@ -1252,6 +1287,74 @@ describe("StudioWebGpuEngine", () => {
       call[4] === suffix.dabs.length * STUDIO_GPU_DAB_INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT
     ))).toBe(true);
     expect(fake.texture.destroy).not.toHaveBeenCalled();
+  });
+
+  it("pipelines at most two GPU presentations and coalesces excess pointer frames to latest", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const submitted = Array.from({ length: 4 }, () => deferred<void>());
+    let submissionIndex = 0;
+    const fake = fakeGpuDevice(neverLost, () => submitted[submissionIndex++]!.promise);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const onFrameReady = vi.fn();
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+      onFrameReady,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    await engine.initialize();
+    submitted[0]!.resolve(undefined);
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "initial",
+    })));
+    onFrameReady.mockClear();
+    vi.mocked(fake.device.queue.submit).mockClear();
+
+    const first = stroke({ points: [5, 10, 20, 10], pressures: [0.5, 0.6] });
+    const second = stroke({
+      points: [5, 10, 20, 10, 30, 10],
+      pressures: [0.5, 0.6, 0.7],
+    });
+    const latest = stroke({
+      points: [5, 10, 20, 10, 30, 10, 45, 10],
+      pressures: [0.5, 0.6, 0.7, 0.9],
+    });
+    engine.render([first], "pipeline:first");
+    await vi.waitFor(() => expect(fake.device.queue.onSubmittedWorkDone).toHaveBeenCalledTimes(2));
+    engine.render([second], "pipeline:second");
+    await vi.waitFor(() => expect(fake.device.queue.onSubmittedWorkDone).toHaveBeenCalledTimes(3));
+    expect(fake.device.queue.submit).toHaveBeenCalledTimes(4);
+
+    engine.render([latest], "pipeline:latest");
+    await Promise.resolve();
+    await Promise.resolve();
+    // Two frames are already fenced, so the third request stays as one newest-only pending value.
+    expect(fake.device.queue.onSubmittedWorkDone).toHaveBeenCalledTimes(3);
+    expect(fake.device.queue.submit).toHaveBeenCalledTimes(4);
+
+    submitted[1]!.resolve(undefined);
+    await vi.waitFor(() => expect(fake.device.queue.onSubmittedWorkDone).toHaveBeenCalledTimes(4));
+    expect(fake.device.queue.submit).toHaveBeenCalledTimes(6);
+    expect(onFrameReady).not.toHaveBeenCalled();
+
+    submitted[2]!.resolve(undefined);
+    submitted[3]!.resolve(undefined);
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledTimes(1));
+    expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "pipeline:latest",
+      complete: true,
+    }));
+    engine.dispose();
   });
 
   it("loads a retained tile and writes only the exact suffix of one live stroke", async () => {
@@ -2354,7 +2457,7 @@ describe("StudioWebGpuEngine", () => {
     expect(fake.device.destroy).not.toHaveBeenCalled();
   });
 
-  it("coalesces concurrent initialization and lets the browser choose the power-aware adapter", async () => {
+  it("coalesces concurrent initialization and requests the quality-first GPU adapter", async () => {
     const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
     const requestedDevice = deferred<GPUDevice>();
     const fake = fakeGpuDevice(neverLost);
@@ -2381,7 +2484,9 @@ describe("StudioWebGpuEngine", () => {
 
     expect(second).toBe(first);
     expect(gpu.requestAdapter).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(gpu.requestAdapter).mock.calls[0]).toEqual([]);
+    expect(vi.mocked(gpu.requestAdapter).mock.calls[0]).toEqual([
+      { powerPreference: "high-performance" },
+    ]);
     await vi.waitFor(() => expect(adapter.requestDevice).toHaveBeenCalledTimes(1));
 
     requestedDevice.resolve(fake.device);

@@ -63,28 +63,57 @@ export function StudioCanvasGuideUnderlay({
   return (
     <>
       {showGrid && (
-        /* grid-v- grid-h- single-pass shape path */
-        <Shape
-          listening={false}
-          sceneFunc={(context, shape) => {
-            const numCols = Math.ceil(canvasWidth / gridSize);
-            const numRows = Math.ceil(canvasHeight / gridSize);
-            context.beginPath();
-            for (let index = 0; index <= numCols; index++) {
-              const x = index * gridSize;
-              context.moveTo(x, 0);
-              context.lineTo(x, canvasHeight);
-            }
-            for (let index = 0; index <= numRows; index++) {
-              const y = index * gridSize;
-              context.moveTo(0, y);
-              context.lineTo(canvasWidth, y);
-            }
-            context.strokeStyle = "rgba(124, 92, 252, 0.12)";
-            context.lineWidth = 1 / effScale;
-            context.strokeShape(shape);
-          }}
-        />
+        <>
+          {/* grid-v- grid-h- — deterministic minor/major grid paths */}
+          {/* Konva's strokeShape() resolves paint from Shape props. Keeping stroke only on the
+              raw context made the old grid silently transparent in the browser. */}
+          <Shape
+            listening={false}
+            perfectDrawEnabled={false}
+            stroke="rgba(124, 92, 252, 0.24)"
+            strokeWidth={1 / effScale}
+            sceneFunc={(context, shape) => {
+              const numCols = Math.ceil(canvasWidth / gridSize);
+              const numRows = Math.ceil(canvasHeight / gridSize);
+              context.beginPath();
+              for (let index = 0; index <= numCols; index++) {
+                if (index % 5 === 0) continue;
+                const x = index * gridSize;
+                context.moveTo(x, 0);
+                context.lineTo(x, canvasHeight);
+              }
+              for (let index = 0; index <= numRows; index++) {
+                if (index % 5 === 0) continue;
+                const y = index * gridSize;
+                context.moveTo(0, y);
+                context.lineTo(canvasWidth, y);
+              }
+              context.strokeShape(shape);
+            }}
+          />
+          <Shape
+            listening={false}
+            perfectDrawEnabled={false}
+            stroke="rgba(124, 92, 252, 0.46)"
+            strokeWidth={1.35 / effScale}
+            sceneFunc={(context, shape) => {
+              const numCols = Math.ceil(canvasWidth / gridSize);
+              const numRows = Math.ceil(canvasHeight / gridSize);
+              context.beginPath();
+              for (let index = 0; index <= numCols; index += 5) {
+                const x = index * gridSize;
+                context.moveTo(x, 0);
+                context.lineTo(x, canvasHeight);
+              }
+              for (let index = 0; index <= numRows; index += 5) {
+                const y = index * gridSize;
+                context.moveTo(0, y);
+                context.lineTo(canvasWidth, y);
+              }
+              context.strokeShape(shape);
+            }}
+          />
+        </>
       )}
       {safeArea && webtoonGuides ? (
         <Group listening={false}>

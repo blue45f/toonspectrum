@@ -124,13 +124,25 @@ export function flushStudioStrokeStabilizerEndpoint(
   };
 }
 
-const DEFAULT_FRAME_MS = 1000 / 60;
 /** Neutral starting estimate for common 120Hz pen hardware. It is replaced by the first valid dt. */
 export const STUDIO_POINTER_DEFAULT_SAMPLE_INTERVAL_MS = 1000 / 120;
 const MIN_SAMPLE_MS = 1;
 const MAX_SAMPLE_MS = 64;
 const ADAPTIVE_SLOW_SPEED = 0.08;
 const ADAPTIVE_FAST_SPEED = 1.8;
+/**
+ * Perceptual time-constant curve shared by non-causal brush families.
+ *
+ * The former `1 / (1 + strength * 1.4)` EMA reached a 241ms time constant (about 555ms to 90%) at
+ * strength 10, while causal pen/marker used a different fixed-rate cascade. This compact linear
+ * curve tracks the fixed-rate filter's quality-tuned response closely: approximately 13ms at
+ * strength 1 and 56ms at strength 10.
+ */
+export const STUDIO_STABILIZER_MIN_TIME_CONSTANT_MS = 8;
+export const STUDIO_STABILIZER_TIME_CONSTANT_PER_STRENGTH_MS = 4.8;
+/** Maximum steady-state spatial trail allowed by adaptive mode, in CSS pixels. */
+export const STUDIO_ADAPTIVE_STABILIZER_BASE_LAG_BUDGET_PX = 2;
+export const STUDIO_ADAPTIVE_STABILIZER_LAG_BUDGET_PER_STRENGTH_PX = 0.75;
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -377,9 +389,30 @@ function adaptiveStrength(strength: number, speed: number): number {
     0,
     1
   );
-  // Slow detail work receives a small stability boost. Fast flicks retain only 30% of the
-  // requested drag, avoiding the long rubber-band tail typical of a fixed EMA.
-  return clamp(strength * (1.15 - speedProgress * 0.85), 0, STABILIZER_MAX);
+  // Slow detail work receives a small stability boost. Fast flicks first retain at most 30% of the
+  // requested drag, then the screen-space budget below may reduce it further.
+  const velocityAdjustedStrength = clamp(
+    strength * (1.15 - speedProgress * 0.85),
+    0,
+    STABILIZER_MAX
+  );
+  if (speed <= Number.EPSILON) return velocityAdjustedStrength;
+
+  // A time-only smoothing curve still trails farther as the hand moves faster. Bound that trail in
+  // screen pixels so zoom, pointer report rate and canvas coordinates cannot turn correction into
+  // a long rubber-band tail. Slow detail work remains governed by the requested strength.
+  const spatialLagBudget =
+    STUDIO_ADAPTIVE_STABILIZER_BASE_LAG_BUDGET_PX
+    + strength * STUDIO_ADAPTIVE_STABILIZER_LAG_BUDGET_PER_STRENGTH_PX;
+  const maximumTimeConstantMs = spatialLagBudget / speed;
+  const lagBoundedStrength = (
+    maximumTimeConstantMs - STUDIO_STABILIZER_MIN_TIME_CONSTANT_MS
+  ) / STUDIO_STABILIZER_TIME_CONSTANT_PER_STRENGTH_MS;
+  return clamp(
+    Math.min(velocityAdjustedStrength, lagBoundedStrength),
+    0,
+    STABILIZER_MAX
+  );
 }
 
 function precisionPoint(
@@ -413,10 +446,10 @@ function timeNormalizedEmaPoint(
   elapsedMs: number
 ): readonly [number, number] {
   if (strength <= 0) return [rawX, rawY];
-  const referenceAlpha = 1 / (1 + strength * 1.4);
-  const referenceDecay = 1 - referenceAlpha;
-  const decay = Math.pow(referenceDecay, elapsedMs / DEFAULT_FRAME_MS);
-  const timeConstantMs = -DEFAULT_FRAME_MS / Math.log(referenceDecay);
+  const timeConstantMs =
+    STUDIO_STABILIZER_MIN_TIME_CONSTANT_MS
+    + strength * STUDIO_STABILIZER_TIME_CONSTANT_PER_STRENGTH_MS;
+  const decay = Math.exp(-elapsedMs / timeConstantMs);
   // 샘플 사이 원시 포인터가 직선으로 이동했다고 보고 1차 저역통과 필터의 해를 정확히 적분한다.
   // 단순히 현재 점에 dt 보정 alpha를 곱하면 zero-order hold가 되어 선형 스트로크가 60/120/240Hz
   // 에서 서로 다른 지연을 만든다. rampGain은 그 구간의 입력 이동량을 연속시간으로 반영한다.

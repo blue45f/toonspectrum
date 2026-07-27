@@ -176,10 +176,10 @@ describe("runtime translation bundles", () => {
       .spyOn(globalThis, "fetch")
       .mockImplementation((url) => Promise.resolve(mockTranslationResponseForRequest(url.toString())));
 
-    await ensureRuntimeLocaleBundle("fr");
+    await ensureRuntimeLocaleBundle("eo");
 
     expect(fetchSpy).toHaveBeenCalled();
-    expect(resolveI18nValue("fr", "app.name")).toBe("ToonSpectrum-translated");
+    expect(resolveI18nValue("eo", "app.name")).toBe("ToonSpectrum-translated");
 
     fetchSpy.mockRestore();
   });
@@ -214,10 +214,10 @@ describe("runtime translation bundles", () => {
       .spyOn(globalThis, "fetch")
       .mockImplementation((url) => Promise.resolve(mockTranslationResponseForRequest(url.toString())));
 
-    await ensureRuntimeLocaleBundle("zh-Hant-TW");
+    await ensureRuntimeLocaleBundle("eo-EO");
 
     expect(fetchSpy).toHaveBeenCalled();
-    expect(resolveI18nValue("zh-Hant-TW", "search.title")).toBe(
+    expect(resolveI18nValue("eo-EO", "search.title")).toBe(
       `${i18nDict.en["search.title"]}-translated`
     );
 
@@ -232,7 +232,7 @@ describe("runtime translation bundles", () => {
         const target = langpair.split("|")[1] ?? "";
         calls.push(langpair);
 
-        if (target !== "de-XX") {
+        if (target !== "xx-YY") {
           const source = parsed.searchParams.get("q") ?? "";
           return Promise.resolve(
             new Response(
@@ -260,22 +260,22 @@ describe("runtime translation bundles", () => {
       );
     });
 
-    await ensureRuntimeLocaleBundle("de-XX");
+    await ensureRuntimeLocaleBundle("xx-YY");
 
-    expect(calls.some((value) => value.includes("|de-XX"))).toBe(true);
-    expect(calls.some((value) => value.includes("|de"))).toBe(true);
-    expect(resolveI18nValue("de-XX", "app.name")).toBe("ToonSpectrum-base-lang");
+    expect(calls.some((value) => value.includes("|xx-YY"))).toBe(true);
+    expect(calls.some((value) => value.includes("|xx"))).toBe(true);
+    expect(resolveI18nValue("xx-YY", "app.name")).toBe("ToonSpectrum-base-lang");
 
     fetchSpy.mockRestore();
   });
 
   it("uses cached runtime translation bundle without calling translator", async () => {
     return withLocalStorage(async () => {
-      const cacheKey = "toonspectrum-i18n-runtime:v1:es";
+      const cacheKey = "toonspectrum-i18n-runtime:v1:ia";
       localStorage.setItem(
         cacheKey,
         JSON.stringify(
-          makeCachedLocalePayload("es", {
+          makeCachedLocalePayload("ia", {
             "app.name": "ToonSpectrum Cached",
             "common.loading": "Cargando cached",
           })
@@ -291,11 +291,11 @@ describe("runtime translation bundles", () => {
         )
       );
 
-      await ensureRuntimeLocaleBundle("es");
+      await ensureRuntimeLocaleBundle("ia");
 
       expect(fetchSpy).not.toHaveBeenCalled();
-      expect(resolveI18nValue("es", "app.name")).toBe("ToonSpectrum Cached");
-      expect(resolveI18nValue("es", "common.loading")).toBe("Cargando cached");
+      expect(resolveI18nValue("ia", "app.name")).toBe("ToonSpectrum Cached");
+      expect(resolveI18nValue("ia", "common.loading")).toBe("Cargando cached");
 
       fetchSpy.mockRestore();
     });
@@ -326,5 +326,31 @@ describe("translation dictionary completeness", () => {
     const missing = [...usedKeys].filter((key) => !sourceKeys.has(key)).sort();
 
     expect(missing).toEqual([]);
+  });
+
+  it("covers all registered world base locales in DICT with 1,737 App & Studio keys each", () => {
+    const baseKeys = Object.keys(i18nDict.en);
+    expect(baseKeys).toHaveLength(1_737);
+
+    for (const [locale, dict] of Object.entries(i18nDict)) {
+      const localeKeys = Object.keys(dict);
+      expect(localeKeys, `Locale ${locale} key count`).toHaveLength(1_737);
+      for (const key of baseKeys) {
+        expect(dict[key], `Key ${key} in ${locale}`).toBeDefined();
+        expect(typeof dict[key], `Key ${key} type in ${locale}`).toBe("string");
+      }
+    }
+  });
+
+  it("resolves valid translations for every Google Play country/locale in the world", () => {
+    for (const rawLocale of GOOGLE_PLAY_LOCALE_LIST) {
+      const appName = resolveI18nValue(rawLocale, "app.name");
+      const commonClose = resolveI18nValue(rawLocale, "common.close");
+      const searchTitle = resolveI18nValue(rawLocale, "search.title");
+
+      expect(appName, `app.name for ${rawLocale}`).toBeTruthy();
+      expect(commonClose, `common.close for ${rawLocale}`).toBeTruthy();
+      expect(searchTitle, `search.title for ${rawLocale}`).toBeTruthy();
+    }
   });
 });

@@ -325,7 +325,11 @@ export function sampleStudioBrushTipProceduralAlpha(
     case "soft": {
       if (radius >= 1) return 0;
       const core = Math.pow(1 - radius, 1.4 + soft * 2.2);
-      return clamp01(core * (0.55 + (1 - soft) * 0.45));
+      // Softness controls the radial falloff, not the paint valve. Attenuating the centre as well
+      // made opacity and flow get multiplied by a hidden 0.55..1 factor, so an artist-visible 70%
+      // airbrush could deposit only ~5.5% alpha on its strongest pixel. Keep the centre normalized
+      // to one and let the serialized opacity/flow channels remain the single density controls.
+      return clamp01(core);
     }
     case "hard": {
       if (radius >= 1) return 0;
@@ -412,11 +416,23 @@ function buildProceduralAlphaMap(
 ): Float32Array {
   const alphas = new Float32Array(size * size);
   const centre = (size - 1) / 2;
+  let peak = 0;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const nx = centre === 0 ? 0 : (x - centre) / centre;
       const ny = centre === 0 ? 0 : (y - centre) / centre;
-      alphas[y * size + x] = sampleStudioBrushTipProceduralAlpha(shape, nx, ny, softness);
+      const alpha = sampleStudioBrushTipProceduralAlpha(shape, nx, ny, softness);
+      alphas[y * size + x] = alpha;
+      if (alpha > peak) peak = alpha;
+    }
+  }
+  // Most canonical maps use an even resolution, so no texel sits exactly at (0, 0). Normalize the
+  // sampled soft map back to its analytic unit-energy centre; otherwise changing 23→24 texels (or
+  // importing the same brush on another grid) silently changes the strongest paint deposit.
+  if (shape === "soft" && peak > 0 && peak < 1) {
+    const scale = 1 / peak;
+    for (let index = 0; index < alphas.length; index++) {
+      alphas[index] = clamp01(alphas[index]! * scale);
     }
   }
   return alphas;

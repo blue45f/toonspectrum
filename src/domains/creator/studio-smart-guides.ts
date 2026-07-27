@@ -75,6 +75,24 @@ export interface SmartGuideOverlay {
   spacings: SpacingIndicator[];
 }
 
+/**
+ * Non-destructive smart-guide preview.
+ *
+ * `actualBox` is the element's untouched drag position. `previewBox` is a ghost-only target made
+ * from the suggested deltas, and `overlay` contains the lines/spacing badges for that target.
+ * Consumers may therefore show alignment candidates while positional snapping is disabled.
+ */
+export interface SmartGuideOverlayPreview {
+  readonly actualBox: GuideBox;
+  readonly previewBox: GuideBox;
+  readonly suggestedDelta: {
+    readonly x: number;
+    readonly y: number;
+  };
+  readonly hasSuggestion: boolean;
+  readonly overlay: SmartGuideOverlay;
+}
+
 // ---------------------------------------------------------------------------
 // 상수
 // ---------------------------------------------------------------------------
@@ -646,6 +664,59 @@ export function buildSmartGuideOverlay(
   if (spacingY) spacings.push(spacingY);
 
   return segments.length === 0 && spacings.length === 0 ? EMPTY_SMART_GUIDE_OVERLAY : { segments, spacings };
+}
+
+function validPreviewCandidate(
+  value: AxisSnapCandidate | null
+): value is AxisSnapCandidate {
+  return value !== null
+    && Number.isFinite(value.delta)
+    && Number.isFinite(value.dist)
+    && value.dist >= 0
+    && Math.abs(value.dist - Math.abs(value.delta)) <= EXACT_EPS
+    && (
+      value.kind === "edge"
+      || value.kind === "center"
+      || value.kind === "spacing"
+    );
+}
+
+/**
+ * Builds guide visuals at a suggested alignment target without applying that target to the
+ * element. This is the bridge for `정렬선 표시 ON + 스냅 OFF`: callers keep rendering/storing the
+ * actual box, and may draw `previewBox` as a ghost plus `overlay` as candidate lines.
+ *
+ * The legacy `computeSmartSnap` and `buildSmartGuideOverlay` contracts are untouched. Passing no
+ * candidates returns a detached copy of the actual box and the shared empty overlay. Invalid
+ * boxes fail closed as null; malformed candidates are ignored axis-by-axis.
+ */
+export function buildSmartGuideOverlayPreview(
+  actual: GuideBox,
+  others: readonly GuideBox[],
+  suggested: SmartSnapResult,
+  options: { epsilon?: number } = {}
+): SmartGuideOverlayPreview | null {
+  if (!isValidBox(actual)) return null;
+  const xCandidate = validPreviewCandidate(suggested.x) ? suggested.x : null;
+  const yCandidate = validPreviewCandidate(suggested.y) ? suggested.y : null;
+  const deltaX = xCandidate?.delta ?? 0;
+  const deltaY = yCandidate?.delta ?? 0;
+  const actualBox = { ...actual };
+  const previewBox = {
+    ...actual,
+    x: actual.x + deltaX,
+    y: actual.y + deltaY,
+  };
+  const hasSuggestion = xCandidate !== null || yCandidate !== null;
+  return {
+    actualBox,
+    previewBox,
+    suggestedDelta: { x: deltaX, y: deltaY },
+    hasSuggestion,
+    overlay: hasSuggestion
+      ? buildSmartGuideOverlay(previewBox, others, options)
+      : EMPTY_SMART_GUIDE_OVERLAY,
+  };
 }
 
 // ---------------------------------------------------------------------------

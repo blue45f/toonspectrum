@@ -32,7 +32,9 @@ describe("header width budget", () => {
 
   it("keeps EN nav labels within the measured width budget", () => {
     const i18n = read("lib/i18n.ts");
-    const en = i18n.slice(i18n.indexOf("en: {"));
+    const enStart = i18n.indexOf("  en: {");
+    const enEnd = i18n.indexOf("\n  },", enStart);
+    const en = i18n.slice(enStart, enEnd);
     const labels = [
       ...en.matchAll(
         /"nav\.(?:home|ranking|calendar|recommend|explore|reviews|community|insights|create)": "([^"]+)"/g

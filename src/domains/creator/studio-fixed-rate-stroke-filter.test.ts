@@ -86,7 +86,7 @@ describe("fixed-rate stroke filter parameters", () => {
     });
   });
 
-  it("clamps strength and preserves the 20..80 response endpoints", () => {
+  it("clamps strength, preserves the 20..80 stage response, and enforces the quality alpha floor", () => {
     expect(resolveFixedRateStrokeFilterParameters(-10)).toMatchObject({
       strength: 0,
       normalizedStrength: 0,
@@ -102,8 +102,27 @@ describe("fixed-rate stroke filter parameters", () => {
       normalizedStrength: 1,
       response: 80,
       stageCount: 20,
-      alpha: 0.19999999999999996,
+      alpha: 0.55,
     });
+  });
+
+  it("keeps the strength curve monotonic while capping its 90% response at 125ms", () => {
+    const responseTimes = Array.from({ length: 11 }, (_, strength) => {
+      const started = createFixedRateStrokeFilter({ x: 0, y: 0, timeStamp: 0 }, strength);
+      let state = append(started.state, [{ x: 100, y: 0, timeStamp: 0.1 }]).state;
+      let elapsedMs = 0;
+      while (state.lastOutput.x < 90 && elapsedMs < 1_000) {
+        elapsedMs += FIXED_RATE_STROKE_FILTER_TICK_MS;
+        state = advance(state, elapsedMs).state;
+      }
+      return elapsedMs;
+    });
+
+    expect(responseTimes).toEqual([20, 30, 40, 55, 75, 85, 95, 105, 110, 120, 125]);
+    expect(responseTimes.every((time, index) => (
+      index === 0 || time >= responseTimes[index - 1]!
+    ))).toBe(true);
+    expect(responseTimes.at(-1)).toBeLessThanOrEqual(125);
   });
 
   it("uses the public cascade loop's ceiling for fractional stage counts", () => {
@@ -560,15 +579,15 @@ describe("representative stroke fixtures", () => {
         },
       ]);
     expect(fixturePoint(result.finished.endpoint)).toEqual({
-      tick: 33,
-      x: 99.90245,
-      y: -11.490376,
-      pressure: 0.248936,
-      tiltX: 9.162081,
-      tiltY: 9.808172,
+      tick: 34,
+      x: 100,
+      y: -11.5,
+      pressure: 0.248289,
+      tiltX: 9.125,
+      tiltY: 9.8125,
     });
-    expect(result.finished.releaseDrainTicks).toBe(17);
-    expect(round(result.state.lastStagePositionDelta)).toBe(0.160761);
+    expect(result.finished.releaseDrainTicks).toBe(18);
+    expect(result.state.lastStagePositionDelta).toBe(0);
   });
 
   it("locks a sharp-turn response without allowing future samples to rewrite its prefix", () => {
@@ -632,18 +651,18 @@ describe("representative stroke fixtures", () => {
         },
       ]);
     expect(fixturePoint(finished.endpoint)).toEqual({
-      tick: 31,
-      x: 79.995314,
-      y: 79.553883,
+      tick: 32,
+      x: 80,
+      y: 80,
       pressure: 0.500489,
       tiltX: 0,
       tiltY: 0,
     });
-    expect(finished.releaseDrainTicks).toBe(15);
-    expect(round(finished.state.lastStagePositionDelta)).toBe(0.676204);
+    expect(finished.releaseDrainTicks).toBe(16);
+    expect(finished.state.lastStagePositionDelta).toBe(0);
   });
 
-  it("drains one held release endpoint until total stage |dx| + |dy| is at most one", () => {
+  it("drains one held release endpoint and pins every channel to the exact final sample", () => {
     const started = createFixedRateStrokeFilter({
       x: 0,
       y: 0,
@@ -672,8 +691,21 @@ describe("representative stroke fixtures", () => {
     expect(finished.releaseDrainTicks).toBeGreaterThan(0);
     expect(finished.state.lastStagePositionDelta)
       .toBeLessThanOrEqual(FIXED_RATE_STROKE_RELEASE_POSITION_EPSILON);
-    expect(finished.endpoint.x).toBeLessThan(100);
-    expect(finished.endpoint.y).toBeLessThan(40);
+    expect(finished.endpoint).toMatchObject({
+      x: 100,
+      y: 40,
+      pressure: finished.state.heldSample.pressure,
+      tiltX: 20,
+      tiltY: -12,
+      sourceTimeStamp: 6,
+    });
+    expect(finished.state.stages.every((stage) => (
+      stage.x === finished.state.heldSample.x
+      && stage.y === finished.state.heldSample.y
+      && stage.pressure === finished.state.heldSample.pressure
+      && stage.tiltX === finished.state.heldSample.tiltX
+      && stage.tiltY === finished.state.heldSample.tiltY
+    ))).toBe(true);
     expect(finished.emitted.slice(-finished.releaseDrainTicks).every((sample) => (
       sample.sourceTimeStamp === 6
     ))).toBe(true);
@@ -682,15 +714,15 @@ describe("representative stroke fixtures", () => {
       lastStagePositionDelta: round(finished.state.lastStagePositionDelta),
       endpoint: fixturePoint(finished.endpoint),
     }).toEqual({
-      releaseDrainTicks: 20,
-      lastStagePositionDelta: 0.179842,
+      releaseDrainTicks: 21,
+      lastStagePositionDelta: 0,
       endpoint: {
-        tick: 21,
-        x: 99.914361,
-        y: 39.965744,
-        pressure: 0.799096,
-        tiltX: 19.982872,
-        tiltY: -11.989723,
+        tick: 22,
+        x: 100,
+        y: 40,
+        pressure: 0.799609,
+        tiltX: 20,
+        tiltY: -12,
       },
     });
   });

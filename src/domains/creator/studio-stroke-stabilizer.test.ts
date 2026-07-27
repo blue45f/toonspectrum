@@ -7,7 +7,11 @@ import {
   flushStudioStrokeStabilizerEndpoint,
   normalizeStudioStabilizerMode,
   sampleStudioPointerVelocity,
+  STUDIO_ADAPTIVE_STABILIZER_BASE_LAG_BUDGET_PX,
+  STUDIO_ADAPTIVE_STABILIZER_LAG_BUDGET_PER_STRENGTH_PX,
   STUDIO_POINTER_DEFAULT_SAMPLE_INTERVAL_MS,
+  STUDIO_STABILIZER_MIN_TIME_CONSTANT_MS,
+  STUDIO_STABILIZER_TIME_CONSTANT_PER_STRENGTH_MS,
   stabilizeStudioStrokeSample,
 } from "./studio-stroke-stabilizer";
 
@@ -38,9 +42,33 @@ describe("studio stroke stabilizer", () => {
       estimatedMs: 55,
     });
     expect(describeStudioStabilizerLatency("standard", 10)).toMatchObject({
-      label: "약 535ms",
-      estimatedMs: 535,
+      label: "약 125ms",
+      estimatedMs: 125,
     });
+  });
+
+  it("uses the same bounded latency class for G-pen, highlighter, and material-brush EMA paths", () => {
+    const strength = 10;
+    const timeConstantMs =
+      STUDIO_STABILIZER_MIN_TIME_CONSTANT_MS
+      + strength * STUDIO_STABILIZER_TIME_CONSTANT_PER_STRENGTH_MS;
+    expect(timeConstantMs).toBe(56);
+    // A first-order filter reaches 90% after ln(10) time constants. Keep the non-causal brush path
+    // in the same professional-response class as the fixed-rate strength-10 ceiling (125ms).
+    expect(timeConstantMs * Math.log(10)).toBeLessThan(130);
+
+    let state = createStudioStrokeStabilizerState({ x: 0, y: 0, timeStamp: 0 });
+    let outputX = 0;
+    for (let timeStamp = 5; timeStamp <= 1_000; timeStamp += 5) {
+      const result = stabilizeStudioStrokeSample(
+        state,
+        { x: timeStamp, y: 0, timeStamp },
+        { strength, mode: "standard" }
+      );
+      state = result.state;
+      outputX = result.point[0];
+    }
+    expect(1_000 - outputX).toBeCloseTo(timeConstantMs, 5);
   });
 
   it("uses honest categorical latency copy for adaptive and precision modes", () => {
@@ -215,6 +243,35 @@ describe("studio stroke stabilizer", () => {
     expect(slow.effectiveStrength).toBeGreaterThan(8);
     expect(fast.effectiveStrength).toBeLessThan(8);
     expect(fast.point[0] / 64).toBeGreaterThan(slow.point[0]);
+  });
+
+  it("bounds adaptive steady-state trail in CSS pixels at ordinary and fast drawing speeds", () => {
+    const strength = 8;
+    const lagBudget =
+      STUDIO_ADAPTIVE_STABILIZER_BASE_LAG_BUDGET_PX
+      + strength * STUDIO_ADAPTIVE_STABILIZER_LAG_BUDGET_PER_STRENGTH_PX;
+
+    const followConstantVelocity = (speed: number) => {
+      const stepMs = 5;
+      let state = createStudioStrokeStabilizerState({ x: 0, y: 0, timeStamp: 0 });
+      let outputX = 0;
+      for (let timeStamp = stepMs; timeStamp <= 1_000; timeStamp += stepMs) {
+        const result = stabilizeStudioStrokeSample(
+          state,
+          { x: speed * timeStamp, y: 0, timeStamp },
+          { strength, mode: "adaptive", coordinateScale: 1 }
+        );
+        state = result.state;
+        outputX = result.point[0];
+      }
+      return speed * 1_000 - outputX;
+    };
+
+    for (const speed of [0.25, 0.5, 1, 2]) {
+      const lag = followConstantVelocity(speed);
+      expect(lag, `${speed}px/ms adaptive trail`).toBeGreaterThanOrEqual(0);
+      expect(lag, `${speed}px/ms adaptive trail`).toBeLessThanOrEqual(lagBudget + 0.05);
+    }
   });
 
   it("normalizes adaptive speed and precision radius to CSS pixels across zoom levels", () => {

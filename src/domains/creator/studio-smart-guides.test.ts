@@ -7,6 +7,7 @@ import {
   SMART_SNAP_THRESHOLD,
   buildPointObjectSnapOverlay,
   buildSmartGuideOverlay,
+  buildSmartGuideOverlayPreview,
   computeSmartSnap,
   planFreehandObjectSnapPoint,
   shouldApplyStrokeObjectSnap,
@@ -272,6 +273,112 @@ describe("스냅 → 오버레이 연동(통합 시나리오)", () => {
     const moved = { ...moving, x: moving.x + (snap.x?.delta ?? 0) };
     const overlay = buildSmartGuideOverlay(moved, others, { epsilon: SMART_GUIDE_EPSILON });
     expect(overlay.segments).toEqual([{ axis: "v", pos: 100, from: 0, to: 240, kind: "edge" }]);
+  });
+});
+
+describe("buildSmartGuideOverlayPreview — 스냅 OFF 비파괴 정렬선", () => {
+  it("실제 박스를 바꾸지 않고 제안 위치의 ghost box와 정렬선을 만든다", () => {
+    const actual = Object.freeze(box("m", 103, 200, 50, 40));
+    const others = [box("a", 0, 0, 100, 50)];
+    const suggested = computeSmartSnap(actual, others);
+    const preview = buildSmartGuideOverlayPreview(actual, others, suggested);
+
+    expect(actual).toEqual(box("m", 103, 200, 50, 40));
+    expect(preview).not.toBeNull();
+    expect(preview?.actualBox).toEqual(actual);
+    expect(preview?.actualBox).not.toBe(actual);
+    expect(preview?.previewBox).toEqual(box("m", 100, 200, 50, 40));
+    expect(preview?.suggestedDelta).toEqual({ x: -3, y: 0 });
+    expect(preview?.hasSuggestion).toBe(true);
+    expect(preview?.overlay.segments).toEqual([
+      { axis: "v", pos: 100, from: 0, to: 240, kind: "edge" },
+    ]);
+  });
+
+  it("기존 수동 delta 적용 파이프라인과 같은 preview overlay를 낸다", () => {
+    const actual = box("m", 103, 200, 50, 40);
+    const others = [box("a", 0, 0, 100, 50)];
+    const suggested = computeSmartSnap(actual, others);
+    const manualBox = {
+      ...actual,
+      x: actual.x + (suggested.x?.delta ?? 0),
+      y: actual.y + (suggested.y?.delta ?? 0),
+    };
+    const preview = buildSmartGuideOverlayPreview(actual, others, suggested);
+
+    expect(preview?.previewBox).toEqual(manualBox);
+    expect(preview?.overlay).toEqual(buildSmartGuideOverlay(manualBox, others));
+  });
+
+  it("균등 간격 후보도 실제 x를 유지하면서 ghost 간격 배지로 변환한다", () => {
+    const actual = box("m", 157, 10, 80, 50);
+    const others = [
+      box("l", 0, 0, 100, 100),
+      box("r", 300, 0, 100, 100),
+    ];
+    const suggested = computeSmartSnap(actual, others);
+    const preview = buildSmartGuideOverlayPreview(actual, others, suggested);
+
+    expect(actual.x).toBe(157);
+    expect(preview?.actualBox.x).toBe(157);
+    expect(preview?.previewBox.x).toBe(160);
+    expect(preview?.overlay.spacings).toEqual([
+      {
+        axis: "x",
+        gap: 60,
+        at: 35,
+        spans: [
+          { from: 100, to: 160 },
+          { from: 240, to: 300 },
+        ],
+      },
+    ]);
+  });
+
+  it("delta 0인 이미 정렬된 후보도 표시 대상으로 유지한다", () => {
+    const actual = box("m", 100, 200, 50, 40);
+    const others = [box("a", 0, 0, 100, 50)];
+    const suggested = computeSmartSnap(actual, others);
+    const preview = buildSmartGuideOverlayPreview(actual, others, suggested);
+
+    expect(suggested.x).toEqual({ delta: 0, dist: 0, kind: "edge" });
+    expect(preview?.hasSuggestion).toBe(true);
+    expect(preview?.suggestedDelta.x).toBe(0);
+    expect(preview?.overlay.segments.some(
+      (segment) => segment.axis === "v" && segment.pos === 100
+    )).toBe(true);
+  });
+
+  it("후보가 없으면 분리된 실제/preview box와 공용 빈 overlay를 반환한다", () => {
+    const actual = box("m", 400, 400, 50, 50);
+    const suggested = computeSmartSnap(actual, [box("a", 0, 0, 100, 50)]);
+    const preview = buildSmartGuideOverlayPreview(actual, [], suggested);
+
+    expect(preview?.actualBox).toEqual(actual);
+    expect(preview?.previewBox).toEqual(actual);
+    expect(preview?.actualBox).not.toBe(actual);
+    expect(preview?.previewBox).not.toBe(actual);
+    expect(preview?.hasSuggestion).toBe(false);
+    expect(preview?.suggestedDelta).toEqual({ x: 0, y: 0 });
+    expect(preview?.overlay).toBe(EMPTY_SMART_GUIDE_OVERLAY);
+  });
+
+  it("오염된 후보는 축별로 무시하고 비정상 실제 박스는 fail-closed한다", () => {
+    const actual = box("m", 103, 203, 50, 40);
+    const others = [box("a", 0, 0, 100, 200)];
+    const preview = buildSmartGuideOverlayPreview(actual, others, {
+      x: { delta: Number.NaN, dist: 3, kind: "edge" },
+      y: { delta: -3, dist: 3, kind: "edge" },
+    });
+
+    expect(preview?.previewBox).toEqual(box("m", 103, 200, 50, 40));
+    expect(preview?.suggestedDelta).toEqual({ x: 0, y: -3 });
+    expect(preview?.overlay.segments.every((segment) => segment.axis === "h")).toBe(true);
+    expect(buildSmartGuideOverlayPreview(
+      box("bad", Number.NaN, 0, 10, 10),
+      others,
+      { x: null, y: null }
+    )).toBeNull();
   });
 });
 

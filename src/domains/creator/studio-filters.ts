@@ -8,6 +8,86 @@
 // ImageData 호환 최소 형태(테스트에서 가짜 객체 사용 가능).
 export type StudioImageDataLike = { data: Uint8ClampedArray; width: number; height: number };
 
+// Interactive page-composite previews repeatedly run neighborhood filters over the same
+// dimensions. Retain a small exact-size CPU scratch working set so slider ticks do not allocate
+// and collect another full-frame typed array per filter. Leases are synchronous and re-entrant:
+// nested filter execution receives another entry instead of aliasing an in-use buffer.
+const STUDIO_FILTER_SCRATCH_POOL_MAX_BYTES = 128 * 1024 * 1024;
+const STUDIO_FILTER_SCRATCH_POOL_MAX_ENTRIES = 4;
+
+interface StudioFilterScratchEntry {
+  readonly data: Uint8ClampedArray;
+  inUse: boolean;
+  lastUsed: number;
+}
+
+const studioFilterScratchPool: StudioFilterScratchEntry[] = [];
+let studioFilterScratchPoolBytes = 0;
+let studioFilterScratchClock = 0;
+
+function evictStudioFilterScratch(byteLength: number): void {
+  while (
+    studioFilterScratchPool.length >= STUDIO_FILTER_SCRATCH_POOL_MAX_ENTRIES
+    || studioFilterScratchPoolBytes + byteLength > STUDIO_FILTER_SCRATCH_POOL_MAX_BYTES
+  ) {
+    let oldestIndex = -1;
+    for (let index = 0; index < studioFilterScratchPool.length; index += 1) {
+      const candidate = studioFilterScratchPool[index]!;
+      if (candidate.inUse) continue;
+      if (
+        oldestIndex < 0
+        || candidate.lastUsed < studioFilterScratchPool[oldestIndex]!.lastUsed
+      ) {
+        oldestIndex = index;
+      }
+    }
+    if (oldestIndex < 0) return;
+    const [evicted] = studioFilterScratchPool.splice(oldestIndex, 1);
+    if (evicted) studioFilterScratchPoolBytes -= evicted.data.byteLength;
+  }
+}
+
+/**
+ * Borrows an exact-size Uint8ClampedArray for one synchronous filter pass.
+ * Buffers larger than the bounded pool are intentionally transient.
+ */
+export function withStudioFilterScratchBuffer<T>(
+  byteLength: number,
+  run: (scratch: Uint8ClampedArray) => T,
+): T {
+  if (!Number.isSafeInteger(byteLength) || byteLength < 0) {
+    throw new RangeError("필터 스크래치 버퍼 크기가 올바르지 않습니다.");
+  }
+  let entry = studioFilterScratchPool.find(
+    (candidate) => !candidate.inUse && candidate.data.byteLength === byteLength,
+  );
+  if (!entry && byteLength <= STUDIO_FILTER_SCRATCH_POOL_MAX_BYTES) {
+    evictStudioFilterScratch(byteLength);
+    if (
+      studioFilterScratchPool.length < STUDIO_FILTER_SCRATCH_POOL_MAX_ENTRIES
+      && studioFilterScratchPoolBytes + byteLength <= STUDIO_FILTER_SCRATCH_POOL_MAX_BYTES
+    ) {
+      entry = {
+        data: new Uint8ClampedArray(byteLength),
+        inUse: false,
+        lastUsed: 0,
+      };
+      studioFilterScratchPool.push(entry);
+      studioFilterScratchPoolBytes += byteLength;
+    }
+  }
+  const scratch = entry?.data ?? new Uint8ClampedArray(byteLength);
+  if (entry) entry.inUse = true;
+  try {
+    return run(scratch);
+  } finally {
+    if (entry) {
+      entry.inUse = false;
+      entry.lastUsed = ++studioFilterScratchClock;
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 색 유틸
 // ---------------------------------------------------------------------------
@@ -60,21 +140,23 @@ export function applySharpen(img: StudioImageDataLike, amount: number): void {
   const { data, width, height } = img;
   if (width < 3 || height < 3) return;
 
-  const src = new Uint8ClampedArray(data);
-  const center = 1 + 4 * a;
-  const rowStride = width * 4;
+  withStudioFilterScratchBuffer(data.length, (src) => {
+    src.set(data);
+    const center = 1 + 4 * a;
+    const rowStride = width * 4;
 
-  for (let y = 1; y < height - 1; y++) {
-    let i = (y * width + 1) * 4;
-    for (let x = 1; x < width - 1; x++, i += 4) {
-      // r/g/b만 보정, 알파(+3)는 건드리지 않는다.
-      data[i] = src[i]! * center - a * (src[i - 4]! + src[i + 4]! + src[i - rowStride]! + src[i + rowStride]!);
-      data[i + 1] =
-        src[i + 1]! * center - a * (src[i - 3]! + src[i + 5]! + src[i + 1 - rowStride]! + src[i + 1 + rowStride]!);
-      data[i + 2] =
-        src[i + 2]! * center - a * (src[i - 2]! + src[i + 6]! + src[i + 2 - rowStride]! + src[i + 2 + rowStride]!);
+    for (let y = 1; y < height - 1; y++) {
+      let i = (y * width + 1) * 4;
+      for (let x = 1; x < width - 1; x++, i += 4) {
+        // r/g/b만 보정, 알파(+3)는 건드리지 않는다.
+        data[i] = src[i]! * center - a * (src[i - 4]! + src[i + 4]! + src[i - rowStride]! + src[i + rowStride]!);
+        data[i + 1] =
+          src[i + 1]! * center - a * (src[i - 3]! + src[i + 5]! + src[i + 1 - rowStride]! + src[i + 1 + rowStride]!);
+        data[i + 2] =
+          src[i + 2]! * center - a * (src[i - 2]! + src[i + 6]! + src[i + 2 - rowStride]! + src[i + 2 + rowStride]!);
+      }
     }
-  }
+  });
 }
 
 /**

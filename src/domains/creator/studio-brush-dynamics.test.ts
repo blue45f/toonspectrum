@@ -19,7 +19,10 @@ import {
   type StudioBrushDynamicsSettings,
   type StudioDynamicBrushPlan,
 } from "./studio-brush-dynamics";
-import { buildStudioBrushTipAlphaMap } from "./studio-brush-tip-stamp";
+import {
+  buildStudioBrushTipAlphaMap,
+  sampleStudioBrushTipProceduralAlpha,
+} from "./studio-brush-tip-stamp";
 
 function expectFiniteRecipe(recipe: StudioBrushDynamicsRecipe): void {
   for (const value of Object.values(recipe)) expect(Number.isFinite(value)).toBe(true);
@@ -424,14 +427,15 @@ describe("studio brush dynamics settings safety", () => {
 
     const centreTipAlpha = Math.max(...buildStudioBrushTipAlphaMap(settings.tip).alphas);
     // These are the built-in toolbar opacities for airbrush, soft-brush and spray. Include the
-    // procedural soft-tip alpha so this contract measures the pixel artists actually see.
+    // procedural soft-tip alpha so this contract measures the pixel artists actually see. The
+    // normalized soft centre must clear a useful first-contact floor without becoming marker-dense.
     for (const toolOpacity of [0.7, 0.55, 0.55]) {
       const effectiveTapAlpha = tap.dabs[0]!.opacity
         * tap.dabs[0]!.flow
         * toolOpacity
         * centreTipAlpha;
-      expect(effectiveTapAlpha).toBeGreaterThanOrEqual(0.04);
-      expect(effectiveTapAlpha).toBeLessThan(0.07);
+      expect(effectiveTapAlpha).toBeGreaterThanOrEqual(0.085);
+      expect(effectiveTapAlpha).toBeLessThan(0.12);
     }
 
     const stroke = planStudioDynamicBrush({
@@ -456,6 +460,33 @@ describe("studio brush dynamics settings safety", () => {
     const sampledAlpha = Array.from({ length: 33 }, (_, index) => compositeAlphaAt(index * 6.25, 0));
     expect(Math.max(...sampledAlpha)).toBeGreaterThan(0.12);
     expect(Math.max(...sampledAlpha)).toBeLessThan(0.65);
+
+    // Measure a conservative continuous-tip composite at every interior deposited dab. This locks
+    // the practical accumulation range rather than accepting a visible tap that becomes a patchy
+    // long stroke.
+    const accumulatedAtInteriorDabCentres = stroke.dabs.slice(5, -5).map((centreDab) => {
+      let remaining = 1;
+      for (const dab of stroke.dabs) {
+        const radius = dab.size / 2;
+        const distance = Math.hypot(dab.x - centreDab.x, dab.y - centreDab.y);
+        if (distance > radius) continue;
+        const tipAlpha = sampleStudioBrushTipProceduralAlpha(
+          "soft",
+          distance / radius,
+          0,
+          settings.tip.softness
+        );
+        remaining *= 1 - dab.opacity * dab.flow * 0.7 * tipAlpha;
+      }
+      return 1 - remaining;
+    });
+    const meanAccumulatedAlpha = accumulatedAtInteriorDabCentres.reduce(
+      (total, alpha) => total + alpha,
+      0
+    ) / accumulatedAtInteriorDabCentres.length;
+    expect(Math.min(...accumulatedAtInteriorDabCentres)).toBeGreaterThanOrEqual(0.1);
+    expect(meanAccumulatedAlpha).toBeGreaterThanOrEqual(0.14);
+    expect(meanAccumulatedAlpha).toBeLessThanOrEqual(0.22);
   });
 
   it("keeps exported defaults detached from runtime normalization", () => {

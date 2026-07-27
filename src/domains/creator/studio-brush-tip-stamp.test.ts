@@ -151,6 +151,32 @@ describe("studio brush tip alpha maps", () => {
       .toBeLessThan(sampleStudioBrushTipProceduralAlpha("hard", 0.2, 0, 0));
   });
 
+  it("keeps a soft tip's centre at full energy while softness changes only radial falloff", () => {
+    for (const softness of [0, 0.25, 0.5, 0.75, 1]) {
+      expect(sampleStudioBrushTipProceduralAlpha("soft", 0, 0, softness)).toBe(1);
+      // Even-sized maps do not contain the analytic centre texel; their sampled peak is normalized
+      // so map resolution cannot make the same airbrush unexpectedly fainter.
+      expect(Math.max(...buildStudioBrushTipAlphaMap({
+        shape: "soft",
+        softness,
+        alphaMapSize: 24,
+      }).alphas)).toBe(1);
+    }
+    const nearEdgeAtHarderSetting = sampleStudioBrushTipProceduralAlpha(
+      "soft",
+      0.72,
+      0,
+      0
+    );
+    const nearEdgeAtSofterSetting = sampleStudioBrushTipProceduralAlpha(
+      "soft",
+      0.72,
+      0,
+      1
+    );
+    expect(nearEdgeAtSofterSetting).toBeLessThan(nearEdgeAtHarderSetting);
+  });
+
   it("ships visually distinct texture signatures for every bundled tip", () => {
     const signatures = new Set(
       ["round", "soft", "hard", "flake", "grain", "bristle", "sponge", "sumi", "halftone", "star"]

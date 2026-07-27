@@ -178,8 +178,15 @@ export const STUDIO_GPU_MAX_READBACK_SNAPSHOT_BYTES = 128 * 1024 * 1024;
 export const STUDIO_GPU_MAX_READBACK_SNAPSHOT_PIXELS = 2 * STUDIO_GPU_MAX_READBACK_PIXELS;
 /** Two immutable surfaces are sufficient for one authority frame plus copy-on-write. */
 export const STUDIO_GPU_MAX_READBACK_SNAPSHOTS = 2;
+/** Overlap CPU pointer planning with one submitted GPU frame without allowing unbounded queue lag. */
+export const STUDIO_GPU_MAX_PRESENTATIONS_IN_FLIGHT = 2;
 const DEFAULT_MAX_TEXTURE_DIMENSION = 8_192;
-const STUDIO_GPU_TILE_TEXTURE_FORMAT = "rgba8unorm" as const;
+/**
+ * Keep live/retained brush accumulation in a high-precision linear-capable surface. Repeated
+ * translucent dabs otherwise quantize at every blend into 8-bit storage, which produces visible
+ * banding and density drift long before the final presentation/export conversion.
+ */
+const STUDIO_GPU_TILE_TEXTURE_FORMAT = "rgba16float" as const;
 const PRESENTATION_VERTEX_FLOATS = 4;
 const PRESENTATION_VERTEX_BYTES = PRESENTATION_VERTEX_FLOATS * Float32Array.BYTES_PER_ELEMENT;
 let studioGpuEngineInstanceSequence = 0;
@@ -245,6 +252,25 @@ const STUDIO_GPU_TILE_PRESENTATION_SHADER = /* wgsl */ `
   @group(0) @binding(0) var tile_sampler: sampler;
   @group(0) @binding(1) var tile_texture: texture_2d<f32>;
 
+  fn linear_to_srgb_channel(value: f32) -> f32 {
+    let channel = clamp(value, 0.0, 1.0);
+    let nonlinear = 1.055 * pow(channel, 1.0 / 2.4) - 0.055;
+    return select(nonlinear, channel * 12.92, channel <= 0.0031308);
+  }
+
+  fn linear_premultiplied_to_srgb(value: vec4<f32>) -> vec4<f32> {
+    if (value.a <= 0.0) {
+      return vec4<f32>(0.0);
+    }
+    let straight = clamp(value.rgb / value.a, vec3<f32>(0.0), vec3<f32>(1.0));
+    let encoded = vec3<f32>(
+      linear_to_srgb_channel(straight.r),
+      linear_to_srgb_channel(straight.g),
+      linear_to_srgb_channel(straight.b)
+    );
+    return vec4<f32>(encoded * value.a, value.a);
+  }
+
   @vertex
   fn vs_main(
     @location(0) position: vec2<f32>,
@@ -258,7 +284,12 @@ const STUDIO_GPU_TILE_PRESENTATION_SHADER = /* wgsl */ `
 
   @fragment
   fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(tile_texture, tile_sampler, input.uv);
+    // Retained rgba16float tiles accumulate premultiplied *linear-light* RGB. Convert exactly once
+    // at the presentation edge; unpremultiplying first avoids applying the nonlinear transfer
+    // function to coverage/alpha and preserves correct antialiasing under bilinear tile sampling.
+    return linear_premultiplied_to_srgb(
+      textureSample(tile_texture, tile_sampler, input.uv)
+    );
   }
 `;
 
@@ -633,6 +664,11 @@ export class StudioWebGpuEngine {
   } | null = null;
   private webGpuRenderInFlight = false;
   private webGpuRenderFlightId = 0;
+  /**
+   * Track completion capacity per device: a hung lost-device queue must never block a recovered
+   * adapter, and weak keys must not retain retired devices.
+   */
+  private readonly webGpuPresentationsInFlight = new WeakMap<GPUDevice, number>();
   private pendingWebGpuRender: {
     readonly strokes: readonly StudioGpuStroke[];
     readonly requestId: string;
@@ -1046,10 +1082,13 @@ export class StudioWebGpuEngine {
       this.presentationSampler
     ) {
       const request = { strokes: strokeSnapshot, requestId, frameGeneration };
-      if (this.webGpuRenderInFlight) {
+      if (
+        this.webGpuRenderInFlight
+        || this.currentWebGpuPresentationsInFlight() >= STUDIO_GPU_MAX_PRESENTATIONS_IN_FLIGHT
+      ) {
         // Pointer input can outrun GPU completion. Keep only the newest request while allowing the
-        // submitted prefix frame to finish into its retained textures; cancelling here would
-        // destroy those textures and restart allocation on every pointermove.
+        // bounded submitted prefix to finish into retained textures; cancelling here would destroy
+        // those textures and restart allocation on every pointermove.
         this.pendingWebGpuRender = request;
       } else {
         this.startWebGpuRender(request);
@@ -1563,10 +1602,10 @@ export class StudioWebGpuEngine {
     let device: GPUDevice | null = null;
     let context: GPUCanvasContext | null = null;
     try {
-      // Let the browser choose its default adapter. The compositor is already viewport-bounded,
-      // while forcing a discrete GPU can cost battery/thermals and make device loss more likely on
-      // portable systems. Browsers may still select the high-performance adapter when appropriate.
-      const adapter = await gpu.requestAdapter();
+      // Studio's quality-first mode prefers the highest-performance adapter. Browsers retain final
+      // authority over the choice and can ignore this hint, while the existing device-loss and
+      // Canvas2D recovery path keeps a rejected/disappearing discrete adapter non-destructive.
+      const adapter = await gpu.requestAdapter({ powerPreference: "high-performance" });
       if (!adapter || this.disposed || generation !== this.lifecycleGeneration) return false;
       device = await adapter.requestDevice();
       if (this.disposed || generation !== this.lifecycleGeneration) {
@@ -2017,29 +2056,7 @@ export class StudioWebGpuEngine {
       // has already started rendering. Only the current flight owns the shared pending slot/lock.
       if (flightId !== this.webGpuRenderFlightId) return;
       this.webGpuRenderInFlight = false;
-      const pending = this.pendingWebGpuRender;
-      this.pendingWebGpuRender = null;
-      if (!pending || this.disposed) return;
-      if (
-        pending.frameGeneration !== this.frameGeneration
-        || pending.requestId !== this.lastRequestId
-      ) {
-        return;
-      }
-      if (
-        this.backend === "webgpu"
-        && this.device
-        && this.context
-        && this.normalPipeline
-        && this.erasePipeline
-        && this.presentationPipeline
-        && this.presentationSampler
-      ) {
-        this.startWebGpuRender(pending);
-        return;
-      }
-      this.cancelActiveTileFrame();
-      this.renderCanvas2d(pending.strokes, pending.requestId, pending.frameGeneration);
+      this.drainPendingWebGpuRender();
     };
     void this.renderWebGpu(
       request.strokes,
@@ -2052,6 +2069,57 @@ export class StudioWebGpuEngine {
     this.webGpuRenderFlightId += 1;
     this.webGpuRenderInFlight = false;
     this.pendingWebGpuRender = null;
+  }
+
+  private currentWebGpuPresentationsInFlight(): number {
+    const device = this.device;
+    return device ? this.webGpuPresentationsInFlight.get(device) ?? 0 : 0;
+  }
+
+  private incrementWebGpuPresentation(device: GPUDevice): void {
+    this.webGpuPresentationsInFlight.set(
+      device,
+      (this.webGpuPresentationsInFlight.get(device) ?? 0) + 1
+    );
+  }
+
+  private decrementWebGpuPresentation(device: GPUDevice): void {
+    const next = Math.max(0, (this.webGpuPresentationsInFlight.get(device) ?? 0) - 1);
+    this.webGpuPresentationsInFlight.set(device, next);
+    if (this.device === device) this.drainPendingWebGpuRender();
+  }
+
+  private drainPendingWebGpuRender(): void {
+    if (
+      this.disposed
+      || this.webGpuRenderInFlight
+      || this.currentWebGpuPresentationsInFlight() >= STUDIO_GPU_MAX_PRESENTATIONS_IN_FLIGHT
+    ) {
+      return;
+    }
+    const pending = this.pendingWebGpuRender;
+    this.pendingWebGpuRender = null;
+    if (!pending) return;
+    if (
+      pending.frameGeneration !== this.frameGeneration
+      || pending.requestId !== this.lastRequestId
+    ) {
+      return;
+    }
+    if (
+      this.backend === "webgpu"
+      && this.device
+      && this.context
+      && this.normalPipeline
+      && this.erasePipeline
+      && this.presentationPipeline
+      && this.presentationSampler
+    ) {
+      this.startWebGpuRender(pending);
+      return;
+    }
+    this.cancelActiveTileFrame();
+    this.renderCanvas2d(pending.strokes, pending.requestId, pending.frameGeneration);
   }
 
   private async renderWebGpu(
@@ -2082,7 +2150,6 @@ export class StudioWebGpuEngine {
     let runtime: StudioGpuTileRuntime<GPUTexture> | null = null;
     let token: StudioGpuTileFrameToken | null = null;
     let presentationSnapshot: StudioGpuFrameSnapshot | null = null;
-    let snapshotPublished = false;
     try {
       // A capped tile enlarged beyond its native physical density is visibly softer than Konva.
       // Do not bless that degraded surface: the invalidation already makes the authoritative
@@ -2158,9 +2225,12 @@ export class StudioWebGpuEngine {
           pass.end();
         }
         device.queue.submit([encoder.finish()]);
-        await this.submittedWork(device);
       }
 
+      // WebGPU guarantees queue submission order. Committing the CPU-side tile revision after the
+      // render submission is accepted lets the following presentation submission sample those
+      // textures without an intermediate `onSubmittedWorkDone()` round-trip. The single fence after
+      // presentation still gates the frame receipt; device loss destroys this runtime generation.
       if (!this.isUsableWebGpuFrame(device, runtime, token)) {
         runtime.abortFrame(token);
         return;
@@ -2230,22 +2300,28 @@ export class StudioWebGpuEngine {
         );
       }
       device.queue.submit([encoder.finish()]);
-      await this.submittedWork(device);
-
+      const completion = this.submittedWork(device);
       const released = runtime.releaseFrame(token);
       if (this.activeTileFrame?.token === token) this.activeTileFrame = null;
-      if (
-        !released
-        || !this.isCurrentWebGpuFrame(device, runtime, token, requestId, frameGeneration, false)
-      ) {
-        return;
-      }
-      this.recordRenderedTileFrame(strokes, resolved.dabCount);
-      const receipt = this.createFrameReceipt(strokes, requestId);
-      if (this.publishAuthorityFrame(receipt, presentationSnapshot)) {
-        snapshotPublished = true;
-        this.options.onFrameReady?.(receipt);
-      }
+      if (!released) throw new Error("Studio WebGPU tile frame release failed");
+
+      // The queue owns immutable copies of both staging buffers at this point and submissions are
+      // strictly ordered. Release the CPU tile pin immediately, then let one newer pointer frame
+      // overlap this fence. Authority is still published only after `completion` resolves.
+      const submittedSnapshot = presentationSnapshot;
+      presentationSnapshot = null;
+      this.incrementWebGpuPresentation(device);
+      void this.settleSubmittedWebGpuFrame({
+        completion,
+        device,
+        runtime,
+        token,
+        strokes,
+        requestId,
+        frameGeneration,
+        submittedDabCount: resolved.dabCount,
+        snapshot: submittedSnapshot,
+      });
     } catch {
       if (runtime && token) runtime.abortFrame(token);
       if (this.activeTileFrame?.token === token) this.activeTileFrame = null;
@@ -2262,9 +2338,55 @@ export class StudioWebGpuEngine {
         this.render(strokes, requestId);
       }
     } finally {
-      if (presentationSnapshot && !snapshotPublished) {
-        this.retireFrameSnapshot(presentationSnapshot);
+      if (presentationSnapshot) this.retireFrameSnapshot(presentationSnapshot);
+    }
+  }
+
+  private async settleSubmittedWebGpuFrame(input: {
+    readonly completion: Promise<void>;
+    readonly device: GPUDevice;
+    readonly runtime: StudioGpuTileRuntime<GPUTexture>;
+    readonly token: StudioGpuTileFrameToken;
+    readonly strokes: readonly StudioGpuStroke[];
+    readonly requestId: string;
+    readonly frameGeneration: number;
+    readonly submittedDabCount: number;
+    readonly snapshot: StudioGpuFrameSnapshot | null;
+  }): Promise<void> {
+    let snapshotHandled = false;
+    try {
+      await input.completion;
+      if (!this.isCurrentWebGpuFrame(
+        input.device,
+        input.runtime,
+        input.token,
+        input.requestId,
+        input.frameGeneration,
+        false
+      )) {
+        return;
       }
+      this.recordRenderedTileFrame(input.strokes, input.submittedDabCount);
+      const receipt = this.createFrameReceipt(input.strokes, input.requestId);
+      const frame = this.publishAuthorityFrame(receipt, input.snapshot);
+      snapshotHandled = input.snapshot !== null;
+      if (frame) this.options.onFrameReady?.(receipt);
+    } catch {
+      // A rejected completion fence has the same visible-safety policy as a synchronous
+      // validation/context failure, but only while this exact request and device still own output.
+      if (
+        !this.disposed
+        && input.frameGeneration === this.frameGeneration
+        && input.requestId === this.lastRequestId
+        && this.device === input.device
+        && this.backend === "webgpu"
+      ) {
+        this.activateCanvas2d();
+        this.render(input.strokes, input.requestId);
+      }
+    } finally {
+      if (input.snapshot && !snapshotHandled) this.retireFrameSnapshot(input.snapshot);
+      this.decrementWebGpuPresentation(input.device);
     }
   }
 

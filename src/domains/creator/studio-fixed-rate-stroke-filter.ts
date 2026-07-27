@@ -22,7 +22,16 @@ const MIN_NORMALIZED_STRENGTH = 0.01;
 const MIN_RESPONSE = 20;
 const RESPONSE_RANGE = 60;
 const RESPONSE_STAGE_WIDTH = 4;
-const MAX_ALPHA_COMPLEMENT = 0.95;
+/**
+ * Never let the per-stage response fall below 0.55.
+ *
+ * The original traced cascade coupled a twenty-stage strength-10 filter with alpha 0.2. Its 90%
+ * step response was roughly 535ms: useful as a forensic compatibility fixture, but far beyond a
+ * professional inking latency budget and the main reason a high correction value felt as though
+ * the pen were attached by a rubber band. More strength still adds stages (therefore removes more
+ * high-frequency jitter), while this floor caps the slowest 90% response at roughly 125ms.
+ */
+const MAX_ALPHA_COMPLEMENT = 0.45;
 
 export interface FixedRateStrokeRawSample {
   readonly x: number;
@@ -475,6 +484,45 @@ function releaseChannelsAreMoving(state: FixedRateStrokeFilterState): boolean {
     || state.lastStageTiltDelta > FIXED_RATE_STROKE_RELEASE_TILT_EPSILON;
 }
 
+/**
+ * Seals the last sub-pixel remainder at one final logical tick.
+ *
+ * Stopping only when stage velocity falls below an epsilon does not imply that the visible output
+ * equals the pointer endpoint. The old release path could therefore persist a slightly shortened
+ * line and a stale pressure/tilt sample. Pinning every stage after the bounded drain preserves the
+ * exact endpoint without revising an emitted prefix, keeps timestamps on the 5ms grid and makes a
+ * deterministic replay independent from renderer-specific line caps.
+ */
+function pinReleaseEndpoint(
+  state: FixedRateStrokeFilterState
+): {
+  readonly state: FixedRateStrokeFilterState;
+  readonly emitted: FixedRateStrokeFilteredSample;
+} {
+  const endpointStage = stageFromSample(state.heldSample);
+  const emitted = filteredSample(
+    endpointStage,
+    logicalTickTime(state),
+    state.heldSample.timeStamp,
+    state.nextLogicalTick
+  );
+  return {
+    state: {
+      ...state,
+      nextLogicalTick: state.nextLogicalTick + 1,
+      stages: Array.from(
+        { length: state.stages.length },
+        () => ({ ...endpointStage })
+      ),
+      lastOutput: emitted,
+      lastStagePositionDelta: 0,
+      lastStagePressureDelta: 0,
+      lastStageTiltDelta: 0,
+    },
+    emitted,
+  };
+}
+
 function releaseFilter(
   initialState: FixedRateStrokeFilterState,
   sample?: FixedRateStrokeRawSample
@@ -498,6 +546,12 @@ function releaseFilter(
       releaseChannelsAreMoving(state) &&
       releaseDrainTicks < FIXED_RATE_STROKE_RELEASE_MAX_TICKS
     );
+  }
+  if (channelsNeedDrain(state)) {
+    const pinned = pinReleaseEndpoint(state);
+    state = pinned.state;
+    emitted.push(pinned.emitted);
+    releaseDrainTicks += 1;
   }
 
   state = { ...state, closed: true };

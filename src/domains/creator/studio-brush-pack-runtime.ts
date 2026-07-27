@@ -18,11 +18,26 @@ import {
   type StudioBrushPackRuntimeBrushId,
 } from "./studio-brush-pack-index";
 import {
+  buildStudioBrushTipAlphaMap,
   encodeStudioBrushTipAlphaMapBase64,
+  isStudioBrushTipShapeId,
   normalizeStudioBrushTipSettings,
+  STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE_RANGE,
   type NormalizedStudioBrushTipSettings,
+  type StudioBrushTipSettings,
   type StudioBrushTipShapeId,
 } from "./studio-brush-tip-stamp";
+import {
+  renderStudioDualBrushTip,
+  STUDIO_DUAL_TIP_CONTRACT_VERSION,
+  type StudioDualTipCombineMode,
+  type StudioDualTipDynamics,
+  type StudioDualTipJitter,
+  type StudioDualTipOutputSurface,
+  type StudioDualTipResult,
+  type StudioDualTipStrokeSample,
+  type StudioDualTipTransform,
+} from "./studio-dual-brush-tip-engine";
 
 import type { StudioBrushCatalogSelection } from "./studio-brush-selection";
 import type { StudioBrushTipLayerSettings } from "./studio-brush-tip-composition";
@@ -77,14 +92,280 @@ export interface StudioBrushPackSelection extends StudioBrushCatalogSelection {
   catalogId: StudioBrushPackCatalogId;
   runtimeBrushId: StudioBrushPackRuntimeBrushId;
   brushDynamics: NormalizedStudioBrushDynamicsSettings;
+  /**
+   * Optional next-generation dual-tip execution descriptor. Missing means the established
+   * single-tip/legacy dual-brush renderer remains the sole authority.
+   */
+  dualTip?: NormalizedStudioBrushPackDualTipDescriptor;
   mediaGroup: StudioBrushMediaGroup;
   previewStyle: StudioBrushPreviewStyle;
   shortName: string;
   hint: string;
 }
 
+/**
+ * Serializable brush-pack adapter for the independent CPU dual-tip oracle. Descriptor presence
+ * opts into the new path; absence is deliberately not normalized to an enabled default.
+ */
+export interface StudioBrushPackDualTipDescriptor {
+  readonly contractVersion?: typeof STUDIO_DUAL_TIP_CONTRACT_VERSION;
+  readonly secondaryTip?: StudioBrushTipSettings | null;
+  readonly combineMode?: StudioDualTipCombineMode;
+  readonly primaryTransform?: StudioDualTipTransform;
+  readonly secondaryTransform?: StudioDualTipTransform;
+  readonly dynamics?: StudioDualTipDynamics;
+  readonly jitter?: StudioDualTipJitter;
+}
+
+export interface NormalizedStudioBrushPackDualTipDescriptor {
+  readonly contractVersion: typeof STUDIO_DUAL_TIP_CONTRACT_VERSION;
+  readonly secondaryTip: NormalizedStudioBrushTipSettings;
+  readonly combineMode: StudioDualTipCombineMode;
+  readonly primaryTransform: Required<StudioDualTipTransform>;
+  readonly secondaryTransform: Required<StudioDualTipTransform>;
+  readonly dynamics: Required<StudioDualTipDynamics>;
+  readonly jitter: Required<StudioDualTipJitter>;
+}
+
+export interface StudioBrushPackDualTipRenderInput {
+  readonly samples: readonly StudioDualTipStrokeSample[];
+  /** Defaults to the selection's normalized brush width. */
+  readonly diameter?: number;
+  /** Defaults to the normalized pack spacing ratio. */
+  readonly spacingRatio?: number;
+  /** Defaults to the normalized pack seed. */
+  readonly seed?: number;
+  /** Defaults to the catalogue opacity. */
+  readonly opacity?: number;
+  readonly linearColor?: readonly [number, number, number];
+  readonly output: StudioDualTipOutputSurface;
+  readonly workBudget?: number;
+}
+
 const CUSTOM_MOTIF_SET: ReadonlySet<string> = new Set(STUDIO_BRUSH_PACK_CUSTOM_TIP_MOTIFS);
 const CUSTOM_TIP_SIZE = 24;
+const DUAL_TIP_COMBINE_MODES: readonly StudioDualTipCombineMode[] = [
+  "multiply",
+  "min",
+  "max",
+  "add",
+  "subtract",
+  "intersect",
+];
+
+function dualTipRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null
+      ? value as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function dualTipOwn(
+  source: Record<string, unknown>,
+  key: string
+): unknown {
+  return Object.prototype.hasOwnProperty.call(source, key) ? source[key] : undefined;
+}
+
+function dualTipFinite(
+  source: Record<string, unknown>,
+  key: string,
+  fallback: number,
+  minimum: number,
+  maximum: number
+): number | null {
+  const candidate = dualTipOwn(source, key);
+  if (candidate === undefined) return fallback;
+  return typeof candidate === "number"
+    && Number.isFinite(candidate)
+    && candidate >= minimum
+    && candidate <= maximum
+    ? candidate
+    : null;
+}
+
+function normalizeBrushPackDualTipTransform(
+  value: unknown,
+  secondary: boolean
+): Required<StudioDualTipTransform> | null {
+  const source = value === undefined ? {} : dualTipRecord(value);
+  if (!source) return null;
+  const rotationDegrees = dualTipFinite(source, "rotationDegrees", 0, -360_000, 360_000);
+  const scaleX = dualTipFinite(source, "scaleX", 1, 1 / 64, 64);
+  const scaleY = dualTipFinite(source, "scaleY", 1, 1 / 64, 64);
+  const offsetX = dualTipFinite(source, "offsetX", 0, -8, 8);
+  const offsetY = dualTipFinite(source, "offsetY", 0, -8, 8);
+  if (
+    rotationDegrees === null
+    || scaleX === null
+    || scaleY === null
+    || offsetX === null
+    || offsetY === null
+    || (!secondary && (offsetX !== 0 || offsetY !== 0))
+  ) return null;
+  return { rotationDegrees, scaleX, scaleY, offsetX, offsetY };
+}
+
+function normalizeBrushPackDualTipDynamics(
+  value: unknown
+): Required<StudioDualTipDynamics> | null {
+  const source = value === undefined ? {} : dualTipRecord(value);
+  if (!source) return null;
+  const pressureSizeGain = dualTipFinite(source, "pressureSizeGain", 0, -1, 1);
+  const pressureOpacityGain = dualTipFinite(source, "pressureOpacityGain", 0, 0, 1);
+  const tiltStretchGain = dualTipFinite(source, "tiltStretchGain", 0, 0, 4);
+  const tiltRotationGain = dualTipFinite(source, "tiltRotationGain", 0, 0, 1);
+  const velocitySizeGain = dualTipFinite(source, "velocitySizeGain", 0, 0, 1);
+  const velocityOpacityGain = dualTipFinite(source, "velocityOpacityGain", 0, 0, 1);
+  const referenceVelocity = dualTipFinite(
+    source,
+    "referenceVelocity",
+    1_000,
+    Number.EPSILON,
+    1_000_000_000
+  );
+  if (
+    pressureSizeGain === null
+    || pressureOpacityGain === null
+    || tiltStretchGain === null
+    || tiltRotationGain === null
+    || velocitySizeGain === null
+    || velocityOpacityGain === null
+    || referenceVelocity === null
+  ) return null;
+  return {
+    pressureSizeGain,
+    pressureOpacityGain,
+    tiltStretchGain,
+    tiltRotationGain,
+    velocitySizeGain,
+    velocityOpacityGain,
+    referenceVelocity,
+  };
+}
+
+function normalizeBrushPackDualTipJitter(
+  value: unknown
+): Required<StudioDualTipJitter> | null {
+  const source = value === undefined ? {} : dualTipRecord(value);
+  if (!source) return null;
+  const position = dualTipFinite(source, "position", 0, 0, 4);
+  const rotationDegrees = dualTipFinite(source, "rotationDegrees", 0, 0, 360);
+  const scale = dualTipFinite(source, "scale", 0, 0, 0.95);
+  const opacity = dualTipFinite(source, "opacity", 0, 0, 1);
+  if (
+    position === null
+    || rotationDegrees === null
+    || scale === null
+    || opacity === null
+  ) return null;
+  return { position, rotationDegrees, scale, opacity };
+}
+
+function normalizeBrushPackDualTipSecondaryTip(
+  value: unknown,
+  fallbackValue: unknown
+): NormalizedStudioBrushTipSettings | null {
+  if (value === undefined || value === null) {
+    return normalizeStudioBrushTipSettings(fallbackValue);
+  }
+  const source = dualTipRecord(value);
+  if (!source) return null;
+  const shape = dualTipOwn(source, "shape");
+  const softness = dualTipOwn(source, "softness");
+  const alphaMapSize = dualTipOwn(source, "alphaMapSize");
+  const alphaMapBase64 = dualTipOwn(source, "alphaMapBase64");
+  if (shape !== undefined && !isStudioBrushTipShapeId(shape)) return null;
+  if (
+    softness !== undefined
+    && (
+      typeof softness !== "number"
+      || !Number.isFinite(softness)
+      || softness < 0
+      || softness > 1
+    )
+  ) return null;
+  if (
+    alphaMapSize !== undefined
+    && (
+      !Number.isInteger(alphaMapSize)
+      || (alphaMapSize as number) < STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE_RANGE.min
+      || (alphaMapSize as number) > STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE_RANGE.max
+    )
+  ) return null;
+  if (
+    alphaMapBase64 !== undefined
+    && alphaMapBase64 !== null
+    && (typeof alphaMapBase64 !== "string" || alphaMapBase64.length === 0)
+  ) return null;
+  const normalized = normalizeStudioBrushTipSettings(source);
+  if (typeof alphaMapBase64 === "string" && normalized.alphaMapBase64 === null) return null;
+  return normalized;
+}
+
+/**
+ * Strict optional boundary: absent/null means no new engine path, while a present descriptor
+ * either becomes one canonical JSON-safe value or fails closed as null.
+ */
+export function normalizeStudioBrushPackDualTipDescriptor(
+  value: unknown,
+  fallbackSecondaryTipValue?: unknown
+): NormalizedStudioBrushPackDualTipDescriptor | null {
+  if (value === undefined || value === null) return null;
+  const source = dualTipRecord(value);
+  if (!source) return null;
+  const contractVersion = dualTipOwn(source, "contractVersion")
+    ?? STUDIO_DUAL_TIP_CONTRACT_VERSION;
+  const combineMode = dualTipOwn(source, "combineMode") ?? "multiply";
+  if (
+    contractVersion !== STUDIO_DUAL_TIP_CONTRACT_VERSION
+    || typeof combineMode !== "string"
+    || !DUAL_TIP_COMBINE_MODES.includes(combineMode as StudioDualTipCombineMode)
+  ) return null;
+  const secondaryTip = normalizeBrushPackDualTipSecondaryTip(
+    dualTipOwn(source, "secondaryTip"),
+    fallbackSecondaryTipValue
+  );
+  const primaryTransform = normalizeBrushPackDualTipTransform(
+    dualTipOwn(source, "primaryTransform"),
+    false
+  );
+  const secondaryTransform = normalizeBrushPackDualTipTransform(
+    dualTipOwn(source, "secondaryTransform"),
+    true
+  );
+  const dynamics = normalizeBrushPackDualTipDynamics(dualTipOwn(source, "dynamics"));
+  const jitter = normalizeBrushPackDualTipJitter(dualTipOwn(source, "jitter"));
+  if (!secondaryTip || !primaryTransform || !secondaryTransform || !dynamics || !jitter) {
+    return null;
+  }
+  return {
+    contractVersion: STUDIO_DUAL_TIP_CONTRACT_VERSION,
+    secondaryTip,
+    combineMode: combineMode as StudioDualTipCombineMode,
+    primaryTransform,
+    secondaryTransform,
+    dynamics,
+    jitter,
+  };
+}
+
+/** Canonical persistence/collaboration form; invalid and absent descriptors return null. */
+export function serializeStudioBrushPackDualTipDescriptorCanonical(
+  value: unknown,
+  fallbackSecondaryTipValue?: unknown
+): string | null {
+  const normalized = normalizeStudioBrushPackDualTipDescriptor(
+    value,
+    fallbackSecondaryTipValue
+  );
+  return normalized ? JSON.stringify(normalized) : null;
+}
 
 /**
  * Compact per-brush physics row. Values are intentionally renderer-neutral:
@@ -1267,13 +1548,22 @@ export function materializeStudioBrushPackDynamics(
  * Materialize the serializable selection contract consumed by StudioPage. The catalogue id/name
  * remain available for UI history while runtimeBrushId + brushDynamics are sufficient to replay.
  */
-export function materializeStudioBrushPackSelection(
-  value: unknown
+function materializeStudioBrushPackSelectionInternal(
+  value: unknown,
+  dualTipValue: unknown,
+  dualTipRequested: boolean
 ): StudioBrushPackSelection | null {
   const descriptor = studioBrushPackDescriptorById(value);
   if (!descriptor) return null;
   const brushDynamics = materializeStudioBrushPackDynamics(descriptor.catalogId);
   if (!brushDynamics) return null;
+  const dualTip = dualTipRequested
+    ? normalizeStudioBrushPackDualTipDescriptor(
+      dualTipValue,
+      brushDynamics.dualBrush?.tip ?? brushDynamics.tip
+    )
+    : null;
+  if (dualTipRequested && !dualTip) return null;
   return {
     catalogId: descriptor.catalogId,
     catalogName: descriptor.catalogName,
@@ -1281,6 +1571,7 @@ export function materializeStudioBrushPackSelection(
     defaultOpacity: descriptor.defaultOpacity,
     runtimeBrushId: descriptor.runtimeBrushId,
     brushDynamics,
+    ...(dualTip ? { dualTip } : {}),
     mediaGroup: descriptor.mediaGroup,
     previewStyle: descriptor.previewStyle,
     shortName: descriptor.shortName,
@@ -1288,11 +1579,39 @@ export function materializeStudioBrushPackSelection(
   };
 }
 
+/** Legacy materialization entry point. Its one-argument callback behavior remains unchanged. */
+export function materializeStudioBrushPackSelection(
+  value: unknown
+): StudioBrushPackSelection | null {
+  return materializeStudioBrushPackSelectionInternal(value, undefined, false);
+}
+
+/** Explicit opt-in materialization boundary for the next-generation dual-tip descriptor. */
+export function materializeStudioBrushPackSelectionWithDualTip(
+  value: unknown,
+  dualTipValue: unknown
+): StudioBrushPackSelection | null {
+  return materializeStudioBrushPackSelectionInternal(value, dualTipValue, true);
+}
+
 /** Stable cache/collaboration key for a fully materialized library behavior. */
-export function studioBrushPackRuntimeSignature(value: unknown): string | null {
+export function studioBrushPackRuntimeSignature(
+  value: unknown
+): string | null {
   const selection = materializeStudioBrushPackSelection(value);
   if (!selection) return null;
   return `${selection.runtimeBrushId}:${serializeStudioBrushDynamicsSettingsCanonical(selection.brushDynamics)}`;
+}
+
+/** Dual-tip-aware signature without changing the callback arity/semantics of the legacy helper. */
+export function studioBrushPackRuntimeSignatureWithDualTip(
+  value: unknown,
+  dualTipValue: unknown
+): string | null {
+  const selection = materializeStudioBrushPackSelectionWithDualTip(value, dualTipValue);
+  if (!selection?.dualTip) return null;
+  const legacy = `${selection.runtimeBrushId}:${serializeStudioBrushDynamicsSettingsCanonical(selection.brushDynamics)}`;
+  return `${legacy}:dual-tip:${JSON.stringify(selection.dualTip)}`;
 }
 
 /** Eager materialization is intentionally opt-in; the library loader may call this after import. */
@@ -1300,4 +1619,94 @@ export function materializeAllStudioBrushPackSelections(): readonly StudioBrushP
   return STUDIO_BRUSH_PACK_DESCRIPTORS.map((descriptor) =>
     materializeStudioBrushPackSelection(descriptor.catalogId)!
   );
+}
+
+function invalidStudioBrushPackDualTipResult(): StudioDualTipResult {
+  return {
+    ok: false,
+    error: {
+      code: "invalid-request",
+      stage: "validation",
+    },
+  };
+}
+
+/**
+ * Optional bridge into the authoritative dual-tip CPU oracle.
+ *
+ * A null return is a deliberate single-tip pass-through signal: callers must continue through
+ * their established renderer unchanged. A present but malformed descriptor returns a fail-closed
+ * validation error, while oracle work/stamp budget failures are forwarded without partial output.
+ */
+export function renderStudioBrushPackDualTipIfConfigured(
+  selection: StudioBrushPackSelection,
+  input: StudioBrushPackDualTipRenderInput
+): StudioDualTipResult | null {
+  const selectionSource = dualTipRecord(selection);
+  if (!selectionSource) return invalidStudioBrushPackDualTipResult();
+  if (
+    !Object.prototype.hasOwnProperty.call(selectionSource, "dualTip")
+    || selectionSource.dualTip === undefined
+    || selectionSource.dualTip === null
+  ) {
+    return null;
+  }
+  const inputSource = dualTipRecord(input);
+  if (!inputSource) return invalidStudioBrushPackDualTipResult();
+  const brushDynamics = normalizeStudioBrushDynamicsSettings(
+    dualTipOwn(selectionSource, "brushDynamics")
+  );
+  const descriptor = normalizeStudioBrushPackDualTipDescriptor(
+    selectionSource.dualTip,
+    brushDynamics.dualBrush?.tip ?? brushDynamics.tip
+  );
+  if (!descriptor) return invalidStudioBrushPackDualTipResult();
+
+  const primaryMap = buildStudioBrushTipAlphaMap(brushDynamics.tip);
+  const secondaryMap = buildStudioBrushTipAlphaMap(descriptor.secondaryTip);
+  const diameterValue = dualTipOwn(inputSource, "diameter");
+  const diameter = diameterValue === undefined
+    ? brushDynamics.width.base
+    : diameterValue as number;
+  const spacingRatioValue = dualTipOwn(inputSource, "spacingRatio");
+  const spacingRatio = spacingRatioValue === undefined
+    ? brushDynamics.spacingRatio
+      ?? brushDynamics.spacing.base / Math.max(0.1, diameter)
+    : spacingRatioValue as number;
+  const seedValue = dualTipOwn(inputSource, "seed");
+  const selectionOpacity = dualTipOwn(selectionSource, "defaultOpacity");
+  const opacityValue = dualTipOwn(inputSource, "opacity");
+
+  return renderStudioDualBrushTip({
+    contractVersion: descriptor.contractVersion,
+    primary: {
+      width: primaryMap.size,
+      height: primaryMap.size,
+      alpha: Array.from(primaryMap.alphas),
+    },
+    secondary: {
+      width: secondaryMap.size,
+      height: secondaryMap.size,
+      alpha: Array.from(secondaryMap.alphas),
+    },
+    samples: dualTipOwn(inputSource, "samples") as readonly StudioDualTipStrokeSample[],
+    combineMode: descriptor.combineMode,
+    diameter,
+    spacingRatio,
+    seed: (seedValue === undefined ? brushDynamics.seed : seedValue) as number,
+    opacity: (
+      opacityValue === undefined
+        ? selectionOpacity
+        : opacityValue
+    ) as number | undefined,
+    linearColor: dualTipOwn(inputSource, "linearColor") as
+      | readonly [number, number, number]
+      | undefined,
+    primaryTransform: descriptor.primaryTransform,
+    secondaryTransform: descriptor.secondaryTransform,
+    dynamics: descriptor.dynamics,
+    jitter: descriptor.jitter,
+    output: dualTipOwn(inputSource, "output") as StudioDualTipOutputSurface,
+    workBudget: dualTipOwn(inputSource, "workBudget") as number | undefined,
+  });
 }

@@ -158,24 +158,27 @@ describe("procedural brush pack runtime", () => {
   it("audits neutral-pressure first marks without flattening intentionally transparent media", () => {
     const intentionallyLight = new Set([
       "marker-colorless-blender",
-      "cloud-soft",
       "cloud-billow-soft",
-      "airbrush-grand-soft",
-      "mist-soft",
       "watercolor-flat-wash",
       "bleeding-stain",
       "cotton-fiber",
       "watercolor-edge-stain",
-      "bokeh-scatter",
       "transparent-flat",
-      "watercolor-wet-bleed",
       "cloud-cirrus-stream",
       "fur-undercoat-soft",
       "smoke-wisp-layered",
       "watercolor-backrun-ring",
       "watercolor-wet-wash",
     ]);
+    const visibilityCorrectedSoftMedia = new Set([
+      "airbrush-grand-soft",
+      "bokeh-scatter",
+      "cloud-soft",
+      "mist-soft",
+      "watercolor-wet-bleed",
+    ]);
     const observedLight = new Set<string>();
+    const visibleCoverageById = new Map<string, number>();
 
     for (const selection of materializeAllStudioBrushPackSelections()) {
       const tap = planNormalizedStudioDynamicBrushDabs({
@@ -195,6 +198,7 @@ describe("procedural brush pack runtime", () => {
         0
       );
       const visibleCoverage = dab.opacity * dab.flow * tipAlpha;
+      visibleCoverageById.set(selection.catalogId, visibleCoverage);
       if (visibleCoverage < 0.08) observedLight.add(selection.catalogId);
 
       expect(tipAlpha, `${selection.catalogId}: stamp alpha has no visible core`).toBeGreaterThan(0.45);
@@ -208,6 +212,15 @@ describe("procedural brush pack runtime", () => {
     // These named media deliberately build pigment gradually. Keeping the list exact ensures a
     // future opaque ink/marker cannot silently join it through compounded opacity or low flow.
     expect(observedLight).toEqual(intentionallyLight);
+    // Soft-tip centre normalization lifts formerly near-invisible media above the first-contact
+    // floor, but their authored opacity/flow still keeps them safely below opaque marker density.
+    for (const catalogId of visibilityCorrectedSoftMedia) {
+      const visibleCoverage = visibleCoverageById.get(catalogId)!;
+      expect(visibleCoverage, `${catalogId}: corrected soft tip is still too faint`)
+        .toBeGreaterThanOrEqual(0.08);
+      expect(visibleCoverage, `${catalogId}: corrected soft tip lost gradual build-up`)
+        .toBeLessThanOrEqual(0.16);
+    }
   });
 
   it("materializes bounded phase-two colour, grain-space and multi-tip contracts", () => {

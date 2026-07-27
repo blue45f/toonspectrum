@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { studioHighBitSrgbToLinear } from "./studio-highbit-transfer";
 import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
 import {
   planStudioGpuDabs,
@@ -156,6 +157,9 @@ describe("studio WebGPU tile compositor planning", () => {
     expect(packed[1]).toBeCloseTo(1 - ((1_200 - 1_022) / 516) * 2);
     expect(packed[2]).toBeGreaterThan(0);
     expect(packed[7]).toBeCloseTo(0.8);
+    expect(packed[4]).toBeCloseTo(studioHighBitSrgbToLinear(1) * 0.8);
+    expect(packed[5]).toBeCloseTo(studioHighBitSrgbToLinear(0x33 / 255) * 0.8);
+    expect(packed[6]).toBeCloseTo(studioHighBitSrgbToLinear(0x66 / 255) * 0.8);
     // The tile fixture's descriptor is 516 physical px over a 516-unit render rect, so one
     // physical texel is exactly one logical unit -- the quad radius packed at slot 2 must exceed
     // the analytic (nominal) radius recovered from slot 8's ratio by exactly that one-texel margin.
@@ -187,6 +191,7 @@ describe("studio WebGPU tile compositor planning", () => {
       .find(({ tile: candidate, mode }) => candidate.id === tile().id && mode === "append");
     expect(update?.strokeExtension).toBeDefined();
     const current = advanced.strokes[0]!;
+    let observedPreviousRevisionToken: string | undefined;
     const resolved = resolveStudioGpuTileTasks(
       [task(current, {
         mode: "append",
@@ -198,10 +203,22 @@ describe("studio WebGPU tile compositor planning", () => {
       [current],
       planStudioGpuDabsInRect,
       100_000,
-      planStudioGpuStrokeExtensionInRect
+      (candidate, previousPointCount, clipRect, maximumDabs, previousRevisionToken) => {
+        observedPreviousRevisionToken = previousRevisionToken;
+        return planStudioGpuStrokeExtensionInRect(
+          candidate,
+          previousPointCount,
+          clipRect,
+          maximumDabs,
+          previousRevisionToken
+        );
+      }
     );
 
     expect(resolved).not.toBeNull();
+    expect(observedPreviousRevisionToken).toBe(
+      baseline[0]![STUDIO_GPU_STROKE_FEED_REVISION]!.token
+    );
     expect(resolved!.tasks[0]!.plan).toEqual(planStudioGpuStrokeExtensionInRect(
       current,
       1,

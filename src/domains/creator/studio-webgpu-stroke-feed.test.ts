@@ -18,9 +18,12 @@ import {
   advanceStudioGpuStrokeFeedCompact,
   createStudioGpuStrokeFeedBaseline,
   createStudioGpuStrokeFeedCompactBaseline,
+  isTrustedStudioGpuStrokeFeedDabExtensionReceipt,
   materializeStudioGpuStrokeFeedStroke,
   materializeStudioGpuStrokeFeedStrokes,
   planStudioGpuPinnedStrokeFeedUpdate,
+  studioGpuStrokeFeedDabExtensionReceipt,
+  studioGpuStrokeFeedDabExtensionReceiptBatch,
   studioGpuStrokeFeedRevisionAtPointCount,
   studioGpuStrokeFeedSuffixFromPointCount,
   STUDIO_GPU_STROKE_FEED_MAX_ADVANCE_POINTS,
@@ -1096,5 +1099,105 @@ describe("Studio WebGPU append-only stroke feed", () => {
       points: [2, 3, 8, 4, 13, 9],
       pressures: [0.5, 0.65, 0.9],
     });
+  });
+
+  it("mints a zero-copy dab receipt from the retained endpoint and immutable revision chunks", () => {
+    const baseline = createStudioGpuStrokeFeedCompactBaseline([stroke()], "dab-receipt")!;
+    const first = advanceStudioGpuStrokeFeedCompact(baseline, {
+      strokeIndex: 0,
+      previousPointCount: 1,
+      previousRevisionToken: baseline[0]![STUDIO_GPU_STROKE_FEED_REVISION]!.token,
+      suffixPoints: [8, 4, 13, 9],
+      suffixPressures: [0.65, 0.9],
+    });
+    expect(first.status).toBe("appended");
+    const second = advanceStudioGpuStrokeFeedCompact(first.strokes, {
+      strokeIndex: 0,
+      previousPointCount: 3,
+      previousRevisionToken: first.strokes[0]![STUDIO_GPU_STROKE_FEED_REVISION]!.token,
+      suffixPoints: [18, 11],
+      suffixPressures: [0.75],
+    });
+    expect(second.status).toBe("appended");
+
+    const latest = second.strokes[0]![STUDIO_GPU_STROKE_FEED_REVISION]!;
+    const firstChild = latest.parent!;
+    const receipt = studioGpuStrokeFeedDabExtensionReceipt(second.strokes[0]!, 1);
+    expect(receipt).toMatchObject({
+      lineage: latest.lineage,
+      previousPointCount: 1,
+      pointCount: 4,
+      suffixPointCount: 3,
+      previousX: 2,
+      previousY: 3,
+      previousPressure: 0.5,
+      toRevisionToken: latest.token,
+    });
+    expect(isTrustedStudioGpuStrokeFeedDabExtensionReceipt(receipt)).toBe(true);
+    expect(Object.isFrozen(receipt)).toBe(true);
+    expect(Object.isFrozen(receipt?.suffixRevisions)).toBe(true);
+    expect(receipt?.suffixRevisions).toEqual([firstChild, latest]);
+    expect(receipt?.suffixRevisions[0]?.suffixPoints).toBe(firstChild.suffixPoints);
+    expect(receipt?.suffixRevisions[1]?.suffixPoints).toBe(latest.suffixPoints);
+    expect(studioGpuStrokeFeedDabExtensionReceipt(second.strokes[0]!, 1)).toBe(receipt);
+    expect(isTrustedStudioGpuStrokeFeedDabExtensionReceipt({
+      ...receipt,
+    })).toBe(false);
+  });
+
+  it("fails dab receipts closed for stale count, style/provenance, and CPU admission overflow", () => {
+    const baseline = createStudioGpuStrokeFeedCompactBaseline([stroke()], "dab-receipt-reject")!;
+    const advanced = advanceStudioGpuStrokeFeedCompact(baseline, {
+      strokeIndex: 0,
+      previousPointCount: 1,
+      previousRevisionToken: baseline[0]![STUDIO_GPU_STROKE_FEED_REVISION]!.token,
+      suffixPoints: [8, 4, 13, 9],
+      suffixPressures: [0.65, 0.9],
+    });
+    const candidate = advanced.strokes[0]!;
+
+    expect(studioGpuStrokeFeedDabExtensionReceipt(candidate, 0)).toBeNull();
+    expect(studioGpuStrokeFeedDabExtensionReceipt(candidate, 2)).toBeNull();
+    expect(studioGpuStrokeFeedDabExtensionReceipt(candidate, 3)).toBeNull();
+    expect(studioGpuStrokeFeedDabExtensionReceipt(candidate, 1, 1)).toBeNull();
+    expect(studioGpuStrokeFeedDabExtensionReceipt({
+      ...candidate,
+      color: "#ffffff",
+    }, 1)).toBeNull();
+  });
+
+  it("proves a symmetry receipt group atomically and rejects torn pressure/style/budget members", () => {
+    const leftBaseline = createStudioGpuStrokeFeedCompactBaseline([
+      stroke({ id: "left", points: [10, 10], pressures: [0.5] }),
+    ], "dab-group-left")!;
+    const rightBaseline = createStudioGpuStrokeFeedCompactBaseline([
+      stroke({ id: "right", points: [90, 10], pressures: [0.5] }),
+    ], "dab-group-right")!;
+    const advanceOne = (
+      baseline: readonly StudioGpuStroke[],
+      suffixPoints: readonly number[],
+      pressure: number
+    ) => advanceStudioGpuStrokeFeedCompact(baseline, {
+      strokeIndex: 0,
+      previousPointCount: 1,
+      previousRevisionToken: baseline[0]![STUDIO_GPU_STROKE_FEED_REVISION]!.token,
+      suffixPoints,
+      suffixPressures: [pressure],
+    }).strokes[0]!;
+
+    const left = advanceOne(leftBaseline, [20, 20], 0.8);
+    const right = advanceOne(rightBaseline, [80, 20], 0.8);
+    const tornPressure = advanceOne(rightBaseline, [80, 20], 0.7);
+    const tornStyleBaseline = createStudioGpuStrokeFeedCompactBaseline([
+      stroke({ id: "style", points: [90, 10], pressures: [0.5], size: 12 }),
+    ], "dab-group-style")!;
+    const tornStyle = advanceOne(tornStyleBaseline, [80, 20], 0.8);
+
+    const group = studioGpuStrokeFeedDabExtensionReceiptBatch([left, right], 1);
+    expect(group).toHaveLength(2);
+    expect(Object.isFrozen(group)).toBe(true);
+    expect(studioGpuStrokeFeedDabExtensionReceiptBatch([left, tornPressure], 1)).toBeNull();
+    expect(studioGpuStrokeFeedDabExtensionReceiptBatch([left, tornStyle], 1)).toBeNull();
+    expect(studioGpuStrokeFeedDabExtensionReceiptBatch([left, right], 1, 1)).toBeNull();
   });
 });

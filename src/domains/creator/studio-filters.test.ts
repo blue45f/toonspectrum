@@ -18,6 +18,7 @@ import {
   normalizePageGrade,
   pageGradeToCssFilter,
   vignetteCss,
+  withStudioFilterScratchBuffer,
   type ImageFilterPatch,
   type PageGrade,
   type StudioImageDataLike,
@@ -45,6 +46,29 @@ function makeGray(width: number, height: number, grays: number[], alpha = 255): 
 function pixelAt(img: StudioImageDataLike, index: number): number[] {
   return Array.from(img.data.slice(index * 4, index * 4 + 4));
 }
+
+describe("filter scratch working set", () => {
+  it("reuses sequential exact-size leases without aliasing nested filter execution", () => {
+    let first: Uint8ClampedArray | null = null;
+    withStudioFilterScratchBuffer(64, (outer) => {
+      first = outer;
+      outer.fill(17);
+      withStudioFilterScratchBuffer(64, (nested) => {
+        expect(nested).not.toBe(outer);
+        nested.fill(99);
+      });
+      expect(Array.from(outer)).toEqual(Array.from({ length: 64 }, () => 17));
+    });
+    withStudioFilterScratchBuffer(64, (next) => {
+      expect(next).toBe(first);
+    });
+  });
+
+  it("rejects malformed byte lengths before allocating", () => {
+    expect(() => withStudioFilterScratchBuffer(Number.NaN, () => undefined)).toThrow(RangeError);
+    expect(() => withStudioFilterScratchBuffer(-1, () => undefined)).toThrow(RangeError);
+  });
+});
 
 describe("hexToRgb", () => {
   it("parses #rgb shorthand by doubling digits", () => {

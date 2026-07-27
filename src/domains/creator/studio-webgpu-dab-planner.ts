@@ -19,13 +19,13 @@ import {
   type StudioGpuStroke,
 } from "./studio-webgpu-stroke";
 import {
+  isTrustedStudioGpuStrokeFeedDabExtensionReceipt,
   isTrustedStudioGpuStrokeFeedRevision,
   isTrustedStudioGpuStrokeFeedStroke,
   materializeStudioGpuStrokeFeedStroke,
   sameStudioGpuStrokeFeedStyle,
+  studioGpuStrokeFeedDabExtensionReceipt,
   studioGpuStrokeFeedPointCount,
-  studioGpuStrokeFeedRevisionAtPointCount,
-  studioGpuStrokeFeedSuffixFromPointCount,
 } from "./studio-webgpu-stroke-feed";
 
 import type {
@@ -34,6 +34,7 @@ import type {
   StudioGpuDab,
   StudioGpuDabRenderUpdate,
 } from "./studio-webgpu-dab-plan-contract";
+import type { StudioGpuStrokeFeedDabExtensionReceipt } from "./studio-webgpu-stroke-feed";
 import type { StudioGpuRect } from "./studio-webgpu-tile-plan";
 
 export const STUDIO_GPU_MAX_DABS = 100_000;
@@ -171,6 +172,165 @@ function clipStudioGpuSegment(
   return {
     valid: true,
     interval: [clamp(minimumAmount, 0, 1), clamp(maximumAmount, 0, 1)],
+  };
+}
+
+function singleCompositeBatches(
+  dabs: readonly StudioGpuDab[],
+  composite: StudioGpuComposite
+): StudioGpuBatch[] {
+  return dabs.length === 0
+    ? []
+    : [{ composite, firstInstance: 0, instanceCount: dabs.length }];
+}
+
+/**
+ * Consumes a trusted legacy/V1 feed suffix directly from immutable revision chunks.
+ *
+ * This deliberately mirrors the frozen per-source-segment planner below: the previous endpoint
+ * and pressure come from the retained revision, zero-length pressure changes still advance that
+ * state, and no bridge/full source array is allocated.
+ */
+function planStudioGpuFeedStrokeExtensionInternal(
+  stroke: StudioGpuStroke,
+  receipt: StudioGpuStrokeFeedDabExtensionReceipt,
+  clipRect: StudioGpuRect | null,
+  maximumDabs: number
+): PlannedStudioGpuDabs {
+  const latest = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
+  if (
+    !isValidStudioGpuStroke(stroke)
+    || !isTrustedStudioGpuStrokeFeedDabExtensionReceipt(receipt)
+    || !isTrustedStudioGpuStrokeFeedRevision(latest)
+    || receipt.lineage !== latest.lineage
+    || receipt.toRevisionToken !== latest.token
+    || receipt.pointCount !== latest.pointCount
+    || receipt.styleSignature !== latest.styleSignature
+    || !Number.isSafeInteger(maximumDabs)
+    || maximumDabs < 0
+    || (clipRect !== null && !validClipRect(clipRect))
+    || studioInkUsesResidualDabSpacing(stroke.pressureModel)
+  ) {
+    return { dabs: [], batches: [], complete: false };
+  }
+
+  const parsedColor = parseStudioGpuColor(stroke.color);
+  if (!parsedColor) return { dabs: [], batches: [], complete: false };
+  const [red, green, blue, colorAlpha] = parsedColor;
+  const composite: StudioGpuComposite = stroke.composite === "erase" ? "erase" : "normal";
+  const alpha = (stroke.opacity ?? 1) * (composite === "erase" ? 1 : colorAlpha);
+  if (alpha <= 0) return { dabs: [], batches: [], complete: true };
+
+  const dabs: StudioGpuDab[] = [];
+  let previousX = receipt.previousX;
+  let previousY = receipt.previousY;
+  let previousPressure = receipt.previousPressure;
+  let consumedPointCount = 0;
+
+  for (const revision of receipt.suffixRevisions) {
+    const chunkPointCount = revision.suffixPressures.length;
+    for (let index = 0; index < chunkPointCount; index += 1) {
+      const nextX = revision.suffixPoints[index * 2]!;
+      const nextY = revision.suffixPoints[index * 2 + 1]!;
+      const nextPressure = resolveStudioInkPressure(
+        revision.suffixPressures[index],
+        stroke.pressureModel
+      );
+      const dx = nextX - previousX;
+      const dy = nextY - previousY;
+      const distance = Math.hypot(dx, dy);
+      if (![dx, dy, distance].every(Number.isFinite)) {
+        return { dabs: [], batches: [], complete: false };
+      }
+
+      if (distance > 1e-6) {
+        const spacing = Math.max(
+          0.5,
+          Math.min(
+            studioGpuPressureRadius(stroke.size, previousPressure, stroke.pressureModel),
+            studioGpuPressureRadius(stroke.size, nextPressure, stroke.pressureModel)
+          ) * 0.45
+        );
+        const steps = Math.max(1, Math.ceil(distance / spacing));
+        if (!Number.isFinite(spacing) || !Number.isFinite(steps)) {
+          return { dabs: [], batches: [], complete: false };
+        }
+
+        let firstStep = 1;
+        let lastStep = steps;
+        if (clipRect !== null) {
+          if (!Number.isSafeInteger(steps)) {
+            return { dabs: [], batches: [], complete: false };
+          }
+          const maximumRadius = Math.max(
+            studioGpuPressureRadius(stroke.size, previousPressure, stroke.pressureModel),
+            studioGpuPressureRadius(stroke.size, nextPressure, stroke.pressureModel)
+          );
+          const clipped = clipStudioGpuSegment(
+            previousX,
+            previousY,
+            dx,
+            dy,
+            maximumRadius,
+            clipRect
+          );
+          if (!clipped.valid) return { dabs: [], batches: [], complete: false };
+          if (clipped.interval) {
+            const [minimumAmount, maximumAmount] = clipped.interval;
+            firstStep = Math.max(1, Math.floor(minimumAmount * steps) - 1);
+            lastStep = Math.min(steps, Math.ceil(maximumAmount * steps) + 1);
+          } else {
+            firstStep = 1;
+            lastStep = 0;
+          }
+        }
+
+        for (let step = firstStep; step <= lastStep; step += 1) {
+          const amount = step / steps;
+          const x = previousX + dx * amount;
+          const y = previousY + dy * amount;
+          const pressure = previousPressure + (nextPressure - previousPressure) * amount;
+          const radius = studioGpuPressureRadius(stroke.size, pressure, stroke.pressureModel);
+          if (clipRect !== null && !dabIntersectsRect(x, y, radius, clipRect)) continue;
+          if (dabs.length >= maximumDabs) {
+            return {
+              dabs,
+              batches: singleCompositeBatches(dabs, composite),
+              complete: false,
+            };
+          }
+          dabs.push({
+            x,
+            y,
+            radius,
+            red,
+            green,
+            blue,
+            alpha,
+            composite,
+          });
+        }
+      }
+
+      previousX = nextX;
+      previousY = nextY;
+      previousPressure = nextPressure;
+      consumedPointCount += 1;
+    }
+  }
+
+  if (
+    consumedPointCount !== receipt.suffixPointCount
+    || !Object.is(previousX, latest.lastX)
+    || !Object.is(previousY, latest.lastY)
+    || !Object.is(previousPressure, latest.lastPressure)
+  ) {
+    return { dabs: [], batches: [], complete: false };
+  }
+  return {
+    dabs,
+    batches: singleCompositeBatches(dabs, composite),
+    complete: true,
   };
 }
 
@@ -395,7 +555,8 @@ function planStudioGpuResidualStrokeExtensionInternal(
   stroke: StudioGpuStroke,
   previousPointCount: number,
   clipRect: StudioGpuRect | null,
-  maximumDabs: number
+  maximumDabs: number,
+  expectedPreviousRevisionToken?: string
 ): PlannedStudioGpuDabs {
   const pointCount = studioGpuStrokeFeedPointCount(stroke);
   if (
@@ -411,6 +572,7 @@ function planStudioGpuResidualStrokeExtensionInternal(
   ) {
     return { dabs: [], batches: [], complete: false };
   }
+  const pressureModel = stroke.pressureModel;
   const parsedColor = parseStudioGpuColor(stroke.color);
   if (!parsedColor) return { dabs: [], batches: [], complete: false };
   const [red, green, blue, colorAlpha] = parsedColor;
@@ -418,17 +580,23 @@ function planStudioGpuResidualStrokeExtensionInternal(
   const alpha = (stroke.opacity ?? 1) * (composite === "erase" ? 1 : colorAlpha);
   if (alpha <= 0) return { dabs: [], batches: [], complete: true };
 
-  const cached = studioGpuStrokeFeedRevisionAtPointCount(stroke, previousPointCount);
   const trustedFeed = isTrustedStudioGpuStrokeFeedStroke(stroke)
     && isTrustedStudioGpuStrokeFeedRevision(stroke[STUDIO_GPU_STROKE_FEED_REVISION]);
-  const feedSuffix = trustedFeed
-    ? studioGpuStrokeFeedSuffixFromPointCount(stroke, previousPointCount)
+  const receipt = trustedFeed
+    ? studioGpuStrokeFeedDabExtensionReceipt(stroke, previousPointCount)
     : null;
-  if (trustedFeed && !feedSuffix) {
+  if (
+    trustedFeed
+    && (
+      !receipt
+      || (expectedPreviousRevisionToken !== undefined
+        && receipt.fromRevisionToken !== expectedPreviousRevisionToken)
+    )
+  ) {
     return { dabs: [], batches: [], complete: false };
   }
-  let state = cached?.residualInkState;
-  let totalDabCount = cached?.residualDabCount;
+  let state = receipt?.residualInkState;
+  let totalDabCount = receipt?.residualDabCount;
   if (!state || totalDabCount === undefined) {
     if (trustedFeed) return { dabs: [], batches: [], complete: false };
     const started = startStudioResidualInk(
@@ -439,7 +607,7 @@ function planStudioGpuResidualStrokeExtensionInternal(
         sourceIndex: 0,
       },
       stroke.size,
-      stroke.pressureModel,
+      pressureModel,
       STUDIO_GPU_MAX_DABS
     );
     if (!started.complete) return { dabs: [], batches: [], complete: false };
@@ -455,7 +623,7 @@ function planStudioGpuResidualStrokeExtensionInternal(
           sourceIndex,
         },
         stroke.size,
-        stroke.pressureModel,
+        pressureModel,
         STUDIO_GPU_MAX_DABS - totalDabCount
       );
       if (!advanced.complete) return { dabs: [], batches: [], complete: false };
@@ -463,37 +631,35 @@ function planStudioGpuResidualStrokeExtensionInternal(
       totalDabCount += advanced.dabs.length;
     }
   }
-
-  // 예산 초과로 조기 반환할 때도 dabs/batches 쌍은 legacy 플래너(planStudioGpuDabsInternal)와
-  // 동일 계약을 유지한다 — 이미 쌓인 dabs 만큼은 항상 유효한 batch 로 커밋해 반환한다. 현재
-  // 두 호출부 모두 complete=false 면 결과 전체를 버리므로 지금 당장 관측되는 차이는 없지만,
-  // 부분 결과를 살리려는 향후 호출부가 비어 있는 batches 를 만나 픽셀을 조용히 누락시키는
-  // 함정을 없앤다.
-  const batchesFor = (list: readonly StudioGpuDab[]) =>
-    list.length === 0 ? [] : [{ composite, firstInstance: 0, instanceCount: list.length }];
+  let activeState = state;
+  let activeDabCount = totalDabCount;
 
   const dabs: StudioGpuDab[] = [];
-  for (let sourceIndex = previousPointCount; sourceIndex < pointCount; sourceIndex += 1) {
-    const localSourceIndex = trustedFeed ? sourceIndex - previousPointCount + 1 : sourceIndex;
-    const source = feedSuffix ?? stroke;
+  let sourceIndex = previousPointCount;
+  const advanceSource = (
+    x: number,
+    y: number,
+    pressure: number,
+    currentSourceIndex: number
+  ): boolean => {
     const advanced = advanceStudioResidualInk(
-      state,
+      activeState,
       {
-        x: source.points[localSourceIndex * 2]!,
-        y: source.points[localSourceIndex * 2 + 1]!,
-        pressure: pointPressure(source, localSourceIndex),
-        sourceIndex,
+        x,
+        y,
+        pressure,
+        sourceIndex: currentSourceIndex,
       },
       stroke.size,
-      stroke.pressureModel,
-      STUDIO_GPU_MAX_DABS - totalDabCount
+      pressureModel,
+      STUDIO_GPU_MAX_DABS - activeDabCount
     );
-    if (!advanced.complete) return { dabs, batches: batchesFor(dabs), complete: false };
-    state = advanced.state;
-    totalDabCount += advanced.dabs.length;
+    if (!advanced.complete) return false;
+    activeState = advanced.state;
+    activeDabCount += advanced.dabs.length;
     for (const dab of advanced.dabs) {
       if (clipRect !== null && !dabIntersectsRect(dab.x, dab.y, dab.radius, clipRect)) continue;
-      if (dabs.length >= maximumDabs) return { dabs, batches: batchesFor(dabs), complete: false };
+      if (dabs.length >= maximumDabs) return false;
       dabs.push({
         x: dab.x,
         y: dab.y,
@@ -505,8 +671,64 @@ function planStudioGpuResidualStrokeExtensionInternal(
         composite,
       });
     }
+    return true;
+  };
+
+  if (receipt) {
+    for (const revision of receipt.suffixRevisions) {
+      for (let index = 0; index < revision.suffixPressures.length; index += 1) {
+        if (!advanceSource(
+          revision.suffixPoints[index * 2]!,
+          revision.suffixPoints[index * 2 + 1]!,
+          revision.suffixPressures[index]!,
+          sourceIndex
+        )) {
+          return {
+            dabs,
+            batches: singleCompositeBatches(dabs, composite),
+            complete: false,
+          };
+        }
+        sourceIndex += 1;
+      }
+    }
+    const latest = stroke[STUDIO_GPU_STROKE_FEED_REVISION]!;
+    const expectedState = latest.residualInkState;
+    if (
+      sourceIndex !== receipt.pointCount
+      || activeDabCount !== latest.residualDabCount
+      || !expectedState
+      || !Object.is(activeState.previousX, expectedState.previousX)
+      || !Object.is(activeState.previousY, expectedState.previousY)
+      || !Object.is(activeState.previousPressure, expectedState.previousPressure)
+      || !Object.is(activeState.lastDabX, expectedState.lastDabX)
+      || !Object.is(activeState.lastDabY, expectedState.lastDabY)
+      || !Object.is(activeState.distanceRemainder, expectedState.distanceRemainder)
+      || !Object.is(activeState.spacingPhase, expectedState.spacingPhase)
+    ) {
+      return { dabs: [], batches: [], complete: false };
+    }
+  } else {
+    for (; sourceIndex < pointCount; sourceIndex += 1) {
+      if (!advanceSource(
+        stroke.points[sourceIndex * 2]!,
+        stroke.points[sourceIndex * 2 + 1]!,
+        pointPressure(stroke, sourceIndex),
+        sourceIndex
+      )) {
+        return {
+          dabs,
+          batches: singleCompositeBatches(dabs, composite),
+          complete: false,
+        };
+      }
+    }
   }
-  return { dabs, batches: batchesFor(dabs), complete: true };
+  return {
+    dabs,
+    batches: singleCompositeBatches(dabs, composite),
+    complete: true,
+  };
 }
 
 /** CPU planning is shared by Canvas2D and non-tiled callers with identical geometry and ordering. */
@@ -539,7 +761,8 @@ export function planStudioGpuStrokeExtensionInRect(
   stroke: StudioGpuStroke,
   previousPointCount: number,
   clipRect: StudioGpuRect,
-  maximumDabs = STUDIO_GPU_MAX_DABS
+  maximumDabs = STUDIO_GPU_MAX_DABS,
+  expectedPreviousRevisionToken?: string
 ): PlannedStudioGpuDabs {
   const pointCount = studioGpuStrokeFeedPointCount(stroke);
   if (
@@ -554,16 +777,21 @@ export function planStudioGpuStrokeExtensionInRect(
       stroke,
       previousPointCount,
       clipRect,
-      maximumDabs
+      maximumDabs,
+      expectedPreviousRevisionToken
     );
   }
-  const feedSuffix = studioGpuStrokeFeedSuffixFromPointCount(stroke, previousPointCount);
-  if (feedSuffix) {
-    return planStudioGpuDabsInternal([feedSuffix], {
-      clipRect,
-      maximumDabs,
-      includeInitialDab: false,
-    });
+  const trustedFeed = isTrustedStudioGpuStrokeFeedStroke(stroke)
+    && isTrustedStudioGpuStrokeFeedRevision(stroke[STUDIO_GPU_STROKE_FEED_REVISION]);
+  if (trustedFeed) {
+    const receipt = studioGpuStrokeFeedDabExtensionReceipt(stroke, previousPointCount);
+    return receipt
+      && (
+        expectedPreviousRevisionToken === undefined
+        || receipt.fromRevisionToken === expectedPreviousRevisionToken
+      )
+      ? planStudioGpuFeedStrokeExtensionInternal(stroke, receipt, clipRect, maximumDabs)
+      : { dabs: [], batches: [], complete: false };
   }
   const suffixStart = previousPointCount - 1;
   const suffixPointCount = pointCount - suffixStart;
@@ -728,11 +956,16 @@ export function planStudioGpuDabUpdate(
     && isStrictPointPrefix(previousTerminal, nextTerminal)
   ) {
     if (studioInkUsesResidualDabSpacing(nextTerminal.pressureModel)) {
+      const previousFeed = previousTerminal[STUDIO_GPU_STROKE_FEED_REVISION];
       const residualSuffix = planStudioGpuResidualStrokeExtensionInternal(
         nextTerminal,
         studioGpuStrokeFeedPointCount(previousTerminal),
         null,
-        STUDIO_GPU_MAX_DABS
+        STUDIO_GPU_MAX_DABS,
+        isTrustedStudioGpuStrokeFeedStroke(previousTerminal)
+          && isTrustedStudioGpuStrokeFeedRevision(previousFeed)
+          ? previousFeed.token
+          : undefined
       );
       if (!residualSuffix.complete) {
         return { mode: "rebuild", ...planStudioGpuDabs(nextOrdered) };
@@ -746,24 +979,49 @@ export function planStudioGpuDabUpdate(
       };
     }
     const previousPointCount = studioGpuStrokeFeedPointCount(previousTerminal);
-    const feedSuffix = studioGpuStrokeFeedSuffixFromPointCount(
-      nextTerminal,
-      previousPointCount
-    );
-    const suffixStart = previousPointCount - 1;
-    const suffixPointCount = studioGpuStrokeFeedPointCount(nextTerminal) - suffixStart;
-    const suffix: StudioGpuStroke = feedSuffix ?? {
-      ...nextTerminal,
-      points: nextTerminal.points.slice(suffixStart * 2),
-      pressures: Array.from(
-        { length: suffixPointCount },
-        (_, index) => pointPressure(nextTerminal, suffixStart + index)
-      ),
-    };
+    const previousFeed = previousTerminal[STUDIO_GPU_STROKE_FEED_REVISION];
+    const nextFeed = nextTerminal[STUDIO_GPU_STROKE_FEED_REVISION];
+    const trustedFeedExtension = isTrustedStudioGpuStrokeFeedStroke(previousTerminal)
+      && isTrustedStudioGpuStrokeFeedStroke(nextTerminal)
+      && isTrustedStudioGpuStrokeFeedRevision(previousFeed)
+      && isTrustedStudioGpuStrokeFeedRevision(nextFeed);
+    const feedReceipt = trustedFeedExtension
+      ? studioGpuStrokeFeedDabExtensionReceipt(nextTerminal, previousPointCount)
+      : null;
+    if (
+      trustedFeedExtension
+      && (!feedReceipt || feedReceipt.fromRevisionToken !== previousFeed.token)
+    ) {
+      return { mode: "rebuild", ...planStudioGpuDabs(nextOrdered) };
+    }
+    let suffixPlan: PlannedStudioGpuDabs;
+    if (feedReceipt) {
+      suffixPlan = planStudioGpuFeedStrokeExtensionInternal(
+        nextTerminal,
+        feedReceipt,
+        null,
+        STUDIO_GPU_MAX_DABS
+      );
+    } else {
+      const suffixStart = previousPointCount - 1;
+      const suffixPointCount = studioGpuStrokeFeedPointCount(nextTerminal) - suffixStart;
+      const suffix: StudioGpuStroke = {
+        ...nextTerminal,
+        points: nextTerminal.points.slice(suffixStart * 2),
+        pressures: Array.from(
+          { length: suffixPointCount },
+          (_, index) => pointPressure(nextTerminal, suffixStart + index)
+        ),
+      };
+      suffixPlan = withoutInitialDab(planStudioGpuDabs([suffix]));
+    }
+    if (!suffixPlan.complete) {
+      return { mode: "rebuild", ...planStudioGpuDabs(nextOrdered) };
+    }
     return {
       mode: "append",
       ...concatenateStudioGpuDabPlans([
-        withoutInitialDab(planStudioGpuDabs([suffix])),
+        suffixPlan,
         planStudioGpuDabs(nextOrdered.slice(previousOrdered.length)),
       ]),
     };

@@ -125,6 +125,30 @@ function setYjsClientId(document: StudioCrdtDocument, clientId: number): void {
 }
 
 describe("StudioCrdtDocument", () => {
+  it("does not read detached Yjs stroke types before attaching them to the document", () => {
+    const warningSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const document = new StudioCrdtDocument();
+
+    document.beginStroke({
+      ...stroke("attached-stream", "page-a", []),
+      payload: payload([], {
+        pressures: undefined,
+        extensions: { pressureModel: "linear-residual-v2" },
+      }),
+    });
+    document.appendStrokeSamples("attached-stream", {
+      points: [0, 0, 4, 2, 8, 4],
+      pressures: [0.25, 0.5, 0.75],
+    });
+    document.finalizeStroke("attached-stream");
+
+    expect(warningSpy).not.toHaveBeenCalledWith(
+      "Invalid access: Add Yjs type to a document before reading data."
+    );
+    warningSpy.mockRestore();
+    document.destroy();
+  });
+
   it("uses full fallback pressure for sparse residual V2 payloads", () => {
     const document = new StudioCrdtDocument();
     const record = document.addStroke({

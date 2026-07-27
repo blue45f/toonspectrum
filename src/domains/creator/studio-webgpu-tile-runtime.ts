@@ -672,8 +672,10 @@ export class StudioGpuTileRuntime<Resource> {
 
   /**
    * Call only after every operation was resolved to its exact stroke snapshot, every dab plan was
-   * complete (including the frame-wide visible-task safety cap), and all task submissions finished
-   * successfully.
+   * complete (including the frame-wide visible-task safety cap), and the render submission was
+   * accepted by the GPU queue. WebGPU queue submissions execute in order, so a presentation
+   * submission may sample these textures without a CPU-side `onSubmittedWorkDone()` fence between
+   * the two submissions. Device loss still invalidates the entire cache generation synchronously.
    * Any missing/incomplete task must use abortFrame so partially-written textures cannot survive.
    */
   public completeFrame(token: StudioGpuTileFrameToken): StudioGpuTileCompositeFrame<Resource> | null {

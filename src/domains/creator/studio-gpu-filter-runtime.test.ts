@@ -11,6 +11,7 @@ interface FakeDeviceHarness {
   readonly device: GPUDevice;
   readonly createShaderModule: ReturnType<typeof vi.fn>;
   readonly createComputePipeline: ReturnType<typeof vi.fn>;
+  readonly createBuffer: ReturnType<typeof vi.fn>;
   readonly destroy: ReturnType<typeof vi.fn>;
   resolveLost(): void;
 }
@@ -27,17 +28,18 @@ function createFakeDevice(): FakeDeviceHarness {
     label: descriptor.label,
     getBindGroupLayout: vi.fn(() => ({})),
   }));
+  const createBuffer = vi.fn((descriptor: { size: number }) => ({
+    size: descriptor.size,
+    destroy: vi.fn(),
+    mapAsync: vi.fn(async () => undefined),
+    getMappedRange: vi.fn(() => new ArrayBuffer(descriptor.size)),
+    unmap: vi.fn(),
+  }));
   const destroy = vi.fn();
   const device = {
     createShaderModule,
     createComputePipeline,
-    createBuffer: vi.fn((descriptor: { size: number }) => ({
-      size: descriptor.size,
-      destroy: vi.fn(),
-      mapAsync: vi.fn(async () => undefined),
-      getMappedRange: vi.fn(() => new ArrayBuffer(descriptor.size)),
-      unmap: vi.fn(),
-    })),
+    createBuffer,
     createCommandEncoder: vi.fn(() => ({
       copyBufferToBuffer: vi.fn(),
       finish: vi.fn(() => ({})),
@@ -51,7 +53,14 @@ function createFakeDevice(): FakeDeviceHarness {
       maxComputeWorkgroupsPerDimension: 65_535,
     },
   } as unknown as GPUDevice;
-  return { device, createShaderModule, createComputePipeline, destroy, resolveLost: resolveLost! };
+  return {
+    device,
+    createShaderModule,
+    createComputePipeline,
+    createBuffer,
+    destroy,
+    resolveLost: resolveLost!,
+  };
 }
 
 function fakeGpuFor(device: GPUDevice): GPU {
@@ -122,6 +131,25 @@ describe("studio-gpu-filter-runtime: 파이프라인 캐시", () => {
     runtime!.getComputePipeline(STUDIO_GPU_FILTER_KERNELS.hsl);
     runtime!.getComputePipeline(STUDIO_GPU_FILTER_KERNELS.hsl);
     expect(harness.createComputePipeline).toHaveBeenCalledTimes(2);
+    runtime!.dispose();
+  });
+
+  it("reuses exact-size pixel and readback buffers across interactive filter ticks", async () => {
+    const harness = createFakeDevice();
+    const runtime = await acquireStudioGpuFilterRuntime({ gpu: fakeGpuFor(harness.device) });
+    expect(runtime).not.toBeNull();
+
+    const firstPixel = runtime!.acquirePixelBuffer(4_096, "first");
+    runtime!.releasePixelBuffer(firstPixel, 4_096);
+    const secondPixel = runtime!.acquirePixelBuffer(4_096, "second");
+    expect(secondPixel).toBe(firstPixel);
+
+    await runtime!.readbackPixels(secondPixel, 4_096);
+    await runtime!.readbackPixels(secondPixel, 4_096);
+    // One storage buffer + one staging buffer. The second acquisition/readback reuses both.
+    expect(harness.createBuffer).toHaveBeenCalledTimes(2);
+
+    runtime!.releasePixelBuffer(secondPixel, 4_096);
     runtime!.dispose();
   });
 });

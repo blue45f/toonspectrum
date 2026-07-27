@@ -3465,7 +3465,9 @@ export class StudioCrdtDocument {
     setPayloadMetadata(record, input.payload);
     const samples = normalizedSamples(input.payload, true);
     for (const key of SAMPLE_ARRAY_KEYS) record.set(key, createSampleArray(samples[key]));
-    this.registerRecord(input.id, record);
+    // Do not inspect/register this preliminary Y.Map yet. `strokes.set` integrates it and the
+    // root observer registers every nested sample array without triggering Yjs detached-read
+    // warnings.
     return record;
   }
 
@@ -3475,7 +3477,8 @@ export class StudioCrdtDocument {
     entry.set("pageId", input.pageId);
     entry.set("layerId", input.layerId);
     entry.set("active", true);
-    this.registerOrderEntry(entry);
+    // Registration reads the entry ID, so defer it until `order.push/insert` has integrated the
+    // preliminary map and the order observer can register it safely.
     return entry;
   }
 

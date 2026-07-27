@@ -31,6 +31,52 @@ function grayscale(values: readonly number[], alpha = 173) {
   return image(values.length, 1, values.map((value) => [value, value, value, alpha]));
 }
 
+function referenceUnsharp(
+  source: ReturnType<typeof image>,
+  value: { amount: number; radius: number; threshold: number },
+): void {
+  const { data, width, height } = source;
+  const horizontal = new Uint8ClampedArray(data.length);
+  const diameter = value.radius * 2 + 1;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = (y * width + x) * 4;
+      for (let channel = 0; channel < 3; channel += 1) {
+        let sum = 0;
+        for (let offset = -value.radius; offset <= value.radius; offset += 1) {
+          const sampleX = Math.min(width - 1, Math.max(0, x + offset));
+          sum += data[(y * width + sampleX) * 4 + channel]!;
+        }
+        horizontal[index + channel] = sum / diameter;
+      }
+      horizontal[index + 3] = data[index + 3]!;
+    }
+  }
+  const gate = (deltaAbs: number): number => {
+    if (value.threshold <= 0) return 1;
+    const t = (deltaAbs - value.threshold) / value.threshold;
+    const bounded = t <= 0 ? 0 : t >= 1 ? 1 : t;
+    return bounded * bounded * (3 - 2 * bounded);
+  };
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = (y * width + x) * 4;
+      for (let channel = 0; channel < 3; channel += 1) {
+        let sum = 0;
+        for (let offset = -value.radius; offset <= value.radius; offset += 1) {
+          const sampleY = Math.min(height - 1, Math.max(0, y + offset));
+          sum += horizontal[(sampleY * width + x) * 4 + channel]!;
+        }
+        const delta = data[index + channel]! - sum / diameter;
+        const strength = gate(Math.abs(delta));
+        if (strength > 0) {
+          data[index + channel] = data[index + channel]! + delta * value.amount * strength;
+        }
+      }
+    }
+  }
+}
+
 describe("studio advanced pixel filter normalization", () => {
   it("clamps hostile parameters to the bounded Worker contract", () => {
     expect(normalizeStudioExposureAdjustment({ exposure: 99, gamma: 0, offset: -4 })).toEqual({
@@ -82,6 +128,26 @@ describe("studio advanced pixel filters", () => {
     const thresholded = grayscale([80, 100, 180, 200, 220]);
     applyStudioUnsharpMask(thresholded, { amount: 1, radius: 1, threshold: 255 });
     expect(Array.from(thresholded.data)).toEqual(before);
+  });
+
+  it("keeps optimized sliding-window unsharp bit-identical to the clamped reference", () => {
+    for (const [width, height] of [[1, 1], [2, 5], [7, 2], [9, 6]] as const) {
+      const pixels = Array.from({ length: width * height }, (_, index) => [
+        (index * 71 + width * 13) % 256,
+        (index * 37 + height * 29) % 256,
+        (index * 113 + 17) % 256,
+        (index * 19 + 101) % 256,
+      ] as [number, number, number, number]);
+      for (const radius of [1, 3, 5]) {
+        const optimized = image(width, height, pixels);
+        const expected = image(width, height, pixels);
+        const params = { amount: 1.35, radius, threshold: 23 };
+        applyStudioUnsharpMask(optimized, params);
+        referenceUnsharp(expected, params);
+        expect(Array.from(optimized.data), `${width}x${height}, radius=${radius}`)
+          .toEqual(Array.from(expected.data));
+      }
+    }
   });
 
   it("dilate and erode expand RGBA extrema, including mask alpha", () => {

@@ -1,3 +1,4 @@
+import { studioHighBitSrgbToLinear } from "./studio-highbit-transfer";
 import { studioGpuStrokeFeedPointCount } from "./studio-webgpu-stroke-feed";
 import {
   fingerprintStudioGpuStroke,
@@ -70,7 +71,8 @@ export type StudioGpuStrokeExtensionDabPlanner = (
   stroke: StudioGpuStroke,
   previousPointCount: number,
   clipRect: StudioGpuRect,
-  maximumDabs: number
+  maximumDabs: number,
+  expectedPreviousRevisionToken?: string
 ) => PlannedStudioGpuDabs;
 
 export interface StudioGpuTilePresentationDraw<Resource> {
@@ -226,7 +228,8 @@ export function resolveStudioGpuTileTasks<Resource>(
         exact,
         previous.pointCount,
         clipRect,
-        maximumDabs - dabCount
+        maximumDabs - dabCount,
+        previous.feedRevisionToken
       );
     } else {
       const exactStrokes: StudioGpuStroke[] = [];
@@ -262,12 +265,41 @@ export function packStudioGpuTileDabs(
   const packed = scratch !== undefined && scratch.length >= requiredFloats
     ? scratch.subarray(0, requiredFloats)
     : new Float32Array(requiredFloats);
+  // Dabs are ordered in contiguous stroke batches, so a single-entry cache removes three
+  // piecewise transfer-function evaluations from virtually every repeated dab. Keep the analytic
+  // dab contract renderer-neutral/sRGB; only the WebGPU retained surface stores linear light.
+  let cachedRed = Number.NaN;
+  let cachedGreen = Number.NaN;
+  let cachedBlue = Number.NaN;
+  let linearRed = 0;
+  let linearGreen = 0;
+  let linearBlue = 0;
   for (const resolved of tasks.tasks) {
     const { descriptor } = resolved.task;
     for (let index = 0; index < resolved.plan.dabs.length; index += 1) {
       const dab = resolved.plan.dabs[index]!;
+      if (
+        dab.red !== cachedRed
+        || dab.green !== cachedGreen
+        || dab.blue !== cachedBlue
+      ) {
+        cachedRed = dab.red;
+        cachedGreen = dab.green;
+        cachedBlue = dab.blue;
+        linearRed = studioHighBitSrgbToLinear(dab.red);
+        linearGreen = studioHighBitSrgbToLinear(dab.green);
+        linearBlue = studioHighBitSrgbToLinear(dab.blue);
+      }
       const outputOffset = (resolved.firstInstance + index) * STUDIO_GPU_DAB_INSTANCE_FLOATS;
-      writePackedTileDab(packed, outputOffset, dab, descriptor);
+      writePackedTileDab(
+        packed,
+        outputOffset,
+        dab,
+        descriptor,
+        linearRed,
+        linearGreen,
+        linearBlue
+      );
     }
   }
   return packed;
@@ -277,7 +309,10 @@ function writePackedTileDab(
   target: Float32Array,
   offset: number,
   dab: StudioGpuDab,
-  descriptor: StudioGpuTileRenderTask<unknown>["descriptor"]
+  descriptor: StudioGpuTileRenderTask<unknown>["descriptor"],
+  linearRed: number,
+  linearGreen: number,
+  linearBlue: number
 ): void {
   const alpha = clamp(dab.alpha, 0, 1);
   const nominalRadius = Math.max(0, dab.radius);
@@ -293,9 +328,9 @@ function writePackedTileDab(
   target[offset + 1] = 1 - ((dab.y - descriptor.renderY) / descriptor.renderHeight) * 2;
   target[offset + 2] = (quadRadius / descriptor.renderWidth) * 2;
   target[offset + 3] = (quadRadius / descriptor.renderHeight) * 2;
-  target[offset + 4] = dab.red * alpha;
-  target[offset + 5] = dab.green * alpha;
-  target[offset + 6] = dab.blue * alpha;
+  target[offset + 4] = linearRed * alpha;
+  target[offset + 5] = linearGreen * alpha;
+  target[offset + 6] = linearBlue * alpha;
   target[offset + 7] = alpha;
   target[offset + 8] = nominalRadiusRatio;
 }
