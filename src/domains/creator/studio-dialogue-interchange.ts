@@ -26,6 +26,13 @@ export const STUDIO_DIALOGUE_INTERCHANGE_LIMITS = Object.freeze({
   maxCsvColumns: 32,
   maxCsvCellCodeUnits: 32_000,
   maxTimestampMs: 7 * 24 * 60 * 60 * 1_000,
+  maxFdxXmlElements: 100_000,
+  maxFdxXmlDepth: 32,
+  maxFdxXmlAttributes: 100_000,
+  maxFdxXmlAttributesPerElement: 32,
+  maxFdxParagraphs: 60_000,
+  maxFdxTextFragments: 200_000,
+  maxFdxLossPreviewItems: 2_000,
 });
 
 export type StudioDialogueInterchangeFormat =
@@ -35,6 +42,7 @@ export type StudioDialogueInterchangeFormat =
   | "tsv"
   | "json"
   | "fountain"
+  | "fdx"
   | "srt"
   | "vtt";
 
@@ -61,6 +69,7 @@ export interface StudioDialogueInterchangeResult {
   readonly document: StudioDialogueInterchangeDocument;
   readonly warnings: readonly string[];
   readonly lossy: boolean;
+  readonly lossPreview?: StudioDialogueFdxLossPreview;
 }
 
 export interface StudioDialogueSerializedFile {
@@ -69,6 +78,35 @@ export interface StudioDialogueSerializedFile {
   readonly mimeType: string;
   readonly warnings: readonly string[];
   readonly lossy: boolean;
+}
+
+export type StudioDialogueFdxCoreParagraphType =
+  | "Scene Heading"
+  | "Action"
+  | "Character"
+  | "Parenthetical"
+  | "Dialogue";
+
+export interface StudioDialogueFdxLossPreviewItem {
+  readonly sourceIndex: number;
+  readonly sourceType: string;
+  readonly preview: string;
+  readonly disposition: "mapped" | "context-only" | "dropped";
+  readonly page?: number;
+  readonly panel?: number;
+  readonly cueIndex?: number;
+  readonly detail: string;
+}
+
+export interface StudioDialogueFdxLossPreview {
+  readonly sourceFormat: "fdx";
+  readonly sourceParagraphs: number;
+  readonly emittedCues: number;
+  readonly mappedElements: number;
+  readonly contextOnlyElements: number;
+  readonly droppedElements: number;
+  readonly truncated: boolean;
+  readonly items: readonly StudioDialogueFdxLossPreviewItem[];
 }
 
 export type StudioDialogueImportMatchMode = "auto" | "id" | "page-order" | "document-order";
@@ -90,6 +128,7 @@ export class StudioDialogueInterchangeError extends Error {
       | "INVALID_FORMAT"
       | "INVALID_CUE"
       | "TOO_MANY_CUES"
+      | "XML_BUDGET_EXCEEDED"
       | "UNSUPPORTED_VERSION",
     message: string
   ) {
@@ -457,6 +496,628 @@ function parseFountain(text: string): StudioDialogueInterchangeResult {
   return { document: { cues }, warnings, lossy: true };
 }
 
+interface ParsedFdxParagraph {
+  readonly sourceIndex: number;
+  readonly type: string;
+  readonly text: string;
+}
+
+interface MutableFdxParagraph {
+  sourceIndex: number;
+  type: string;
+  textParts: string[];
+  textCodeUnits: number;
+}
+
+interface FdxXmlFrame {
+  readonly name: string;
+  readonly recognized: boolean;
+  readonly capturesText: boolean;
+  readonly paragraph?: MutableFdxParagraph;
+}
+
+interface ParsedFdxXmlTag {
+  readonly name: string;
+  readonly attributes: ReadonlyMap<string, string>;
+  readonly closing: boolean;
+  readonly selfClosing: boolean;
+}
+
+interface MutableFdxLossPreview {
+  mappedElements: number;
+  contextOnlyElements: number;
+  droppedElements: number;
+  truncated: boolean;
+  items: StudioDialogueFdxLossPreviewItem[];
+}
+
+const FDX_XML_NAME = /^[A-Za-z_][A-Za-z0-9_.:-]*/u;
+const FDX_PAGE_MARKER = /^TOONSPECTRUM PAGE ([1-9]\d{0,6})$/u;
+const FDX_PANEL_MARKER = /^TOONSPECTRUM PANEL ([1-9]\d{0,6})$/u;
+const FDX_CORE_PARAGRAPH_TYPES = new Set<StudioDialogueFdxCoreParagraphType>([
+  "Scene Heading",
+  "Action",
+  "Character",
+  "Parenthetical",
+  "Dialogue",
+]);
+
+function isValidXmlCodePoint(value: number): boolean {
+  return Number.isSafeInteger(value) && (
+    value === 9
+    || value === 10
+    || value === 13
+    || (value >= 32 && value <= 0xd7ff)
+    || (value >= 0xe000 && value <= 0xfffd)
+    || (value >= 0x10000 && value <= 0x10ffff)
+  );
+}
+
+function assertSafeXmlCharacters(value: string): void {
+  for (let offset = 0; offset < value.length; offset += 1) {
+    const codePoint = value.codePointAt(offset);
+    if (codePoint == null || !isValidXmlCodePoint(codePoint)) {
+      fail("INVALID_FORMAT", "FDX XML에 허용되지 않는 제어 문자 또는 잘못된 Unicode가 있습니다.");
+    }
+    if (codePoint > 0xffff) offset += 1;
+  }
+}
+
+function decodeFdxXmlText(value: string): string {
+  const entityPattern = /&(?:amp|lt|gt|quot|apos|#\d+|#x[\da-fA-F]+);/gu;
+  const withoutKnownEntities = value.replaceAll(entityPattern, "");
+  if (withoutKnownEntities.includes("&")) {
+    return fail("INVALID_FORMAT", "FDX XML에 선언되지 않았거나 잘못된 entity가 있습니다.");
+  }
+  return value.replaceAll(entityPattern, (entity) => {
+    if (entity === "&amp;") return "&";
+    if (entity === "&lt;") return "<";
+    if (entity === "&gt;") return ">";
+    if (entity === "&quot;") return '"';
+    if (entity === "&apos;") return "'";
+    const hexadecimal = entity.startsWith("&#x");
+    const numeric = Number.parseInt(
+      entity.slice(hexadecimal ? 3 : 2, -1),
+      hexadecimal ? 16 : 10
+    );
+    if (!isValidXmlCodePoint(numeric)) {
+      return fail("INVALID_FORMAT", "FDX XML의 숫자 문자 entity가 올바르지 않습니다.");
+    }
+    return String.fromCodePoint(numeric);
+  });
+}
+
+function findFdxXmlTagEnd(xml: string, start: number): number {
+  let quote: '"' | "'" | undefined;
+  for (let index = start + 1; index < xml.length; index += 1) {
+    const character = xml[index];
+    if (quote) {
+      if (character === quote) quote = undefined;
+      continue;
+    }
+    if (character === '"' || character === "'") quote = character;
+    else if (character === ">") return index;
+    else if (character === "<") break;
+  }
+  return fail("INVALID_FORMAT", "FDX XML 태그가 닫히지 않았습니다.");
+}
+
+function parseFdxXmlTag(source: string): ParsedFdxXmlTag {
+  let offset = 0;
+  while (/\s/u.test(source[offset] ?? "")) offset += 1;
+  const closing = source[offset] === "/";
+  if (closing) {
+    offset += 1;
+    while (/\s/u.test(source[offset] ?? "")) offset += 1;
+  }
+  const nameMatch = FDX_XML_NAME.exec(source.slice(offset));
+  const name = nameMatch?.[0];
+  if (!name) return fail("INVALID_FORMAT", "FDX XML 요소 이름이 올바르지 않습니다.");
+  offset += name.length;
+
+  const attributes = new Map<string, string>();
+  let selfClosing = false;
+  while (offset < source.length) {
+    while (/\s/u.test(source[offset] ?? "")) offset += 1;
+    if (offset >= source.length) break;
+    if (source[offset] === "/") {
+      if (closing || source.slice(offset + 1).trim()) {
+        return fail("INVALID_FORMAT", "FDX XML self-closing 태그 문법이 올바르지 않습니다.");
+      }
+      selfClosing = true;
+      break;
+    }
+    if (closing) {
+      return fail("INVALID_FORMAT", "FDX XML 닫는 태그에는 attribute를 사용할 수 없습니다.");
+    }
+    const attributeMatch = FDX_XML_NAME.exec(source.slice(offset));
+    const attributeName = attributeMatch?.[0];
+    if (!attributeName) {
+      return fail("INVALID_FORMAT", "FDX XML attribute 이름이 올바르지 않습니다.");
+    }
+    if (attributes.has(attributeName)) {
+      return fail("INVALID_FORMAT", "FDX XML에 중복 attribute가 있습니다.");
+    }
+    offset += attributeName.length;
+    while (/\s/u.test(source[offset] ?? "")) offset += 1;
+    if (source[offset] !== "=") {
+      return fail("INVALID_FORMAT", "FDX XML attribute에 등호가 없습니다.");
+    }
+    offset += 1;
+    while (/\s/u.test(source[offset] ?? "")) offset += 1;
+    const quote = source[offset];
+    if (quote !== '"' && quote !== "'") {
+      return fail("INVALID_FORMAT", "FDX XML attribute 값은 따옴표로 감싸야 합니다.");
+    }
+    const end = source.indexOf(quote, offset + 1);
+    if (end < 0) return fail("INVALID_FORMAT", "FDX XML attribute 값이 닫히지 않았습니다.");
+    const value = decodeFdxXmlText(source.slice(offset + 1, end));
+    attributes.set(attributeName, value);
+    if (attributes.size > STUDIO_DIALOGUE_INTERCHANGE_LIMITS.maxFdxXmlAttributesPerElement) {
+      return fail(
+        "XML_BUDGET_EXCEEDED",
+        "FDX XML 요소 하나의 attribute 수가 안전 예산을 초과했습니다."
+      );
+    }
+    offset = end + 1;
+  }
+  return { name, attributes, closing, selfClosing };
+}
+
+function appendFdxText(
+  frame: FdxXmlFrame | undefined,
+  value: string,
+  state: { textFragments: number }
+): void {
+  if (!value) return;
+  const decoded = decodeFdxXmlText(value);
+  if (!decoded) return;
+  if (!frame?.capturesText || !frame.paragraph) {
+    if (frame?.name === "Paragraph" && decoded.trim()) {
+      fail("INVALID_FORMAT", "FDX Paragraph 본문은 Text 요소 안에 있어야 합니다.");
+    }
+    return;
+  }
+  state.textFragments += 1;
+  if (state.textFragments > STUDIO_DIALOGUE_INTERCHANGE_LIMITS.maxFdxTextFragments) {
+    fail("XML_BUDGET_EXCEEDED", "FDX Text fragment 수가 안전 예산을 초과했습니다.");
+  }
+  frame.paragraph.textCodeUnits += decoded.length;
+  if (frame.paragraph.textCodeUnits > STUDIO_DIALOGUE_INTERCHANGE_LIMITS.maxCueCodeUnits) {
+    fail("XML_BUDGET_EXCEEDED", "FDX Paragraph 본문이 안전 길이 예산을 초과했습니다.");
+  }
+  frame.paragraph.textParts.push(decoded);
+}
+
+function finalizeFdxParagraph(
+  paragraph: MutableFdxParagraph,
+  paragraphs: ParsedFdxParagraph[]
+): void {
+  const text = paragraph.textParts.join("").replace(/\r\n?/gu, "\n").trim();
+  if (FDX_CORE_PARAGRAPH_TYPES.has(paragraph.type as StudioDialogueFdxCoreParagraphType) && !text) {
+    fail("INVALID_CUE", `FDX ${paragraph.type} Paragraph가 비어 있습니다.`);
+  }
+  paragraphs.push({
+    sourceIndex: paragraph.sourceIndex,
+    type: paragraph.type,
+    text,
+  });
+}
+
+function parseFdxParagraphs(xml: string): readonly ParsedFdxParagraph[] {
+  assertSafeXmlCharacters(xml);
+  if (/<!\s*(?:DOCTYPE|ENTITY)/iu.test(xml)) {
+    return fail("INVALID_FORMAT", "FDX XML의 DTD 및 사용자 정의 entity는 지원하지 않습니다.");
+  }
+  const stack: FdxXmlFrame[] = [];
+  const paragraphs: ParsedFdxParagraph[] = [];
+  const textState = { textFragments: 0 };
+  let elementCount = 0;
+  let attributeCount = 0;
+  let rootSeen = false;
+  let rootClosed = false;
+  let contentCount = 0;
+  let sawNonWhitespaceBeforeDeclaration = false;
+
+  const closeFrame = (expectedName: string): void => {
+    const frame = stack.pop();
+    if (!frame || frame.name !== expectedName) {
+      fail("INVALID_FORMAT", "FDX XML 요소의 닫는 순서가 올바르지 않습니다.");
+    }
+    if (frame.paragraph) finalizeFdxParagraph(frame.paragraph, paragraphs);
+    if (frame.name === "FinalDraft") rootClosed = true;
+  };
+
+  let offset = 0;
+  while (offset < xml.length) {
+    const tagStart = xml.indexOf("<", offset);
+    if (tagStart < 0) {
+      const trailing = xml.slice(offset);
+      appendFdxText(stack.at(-1), trailing, textState);
+      if (rootClosed && trailing.trim()) {
+        fail("INVALID_FORMAT", "FDX XML 루트 뒤에 텍스트가 있습니다.");
+      }
+      break;
+    }
+    const rawText = xml.slice(offset, tagStart);
+    appendFdxText(stack.at(-1), rawText, textState);
+    if (!rootSeen && rawText.trim()) sawNonWhitespaceBeforeDeclaration = true;
+
+    if (xml.startsWith("<!--", tagStart)) {
+      const end = xml.indexOf("-->", tagStart + 4);
+      if (end < 0 || xml.slice(tagStart + 4, end).includes("--")) {
+        fail("INVALID_FORMAT", "FDX XML 주석이 올바르게 닫히지 않았습니다.");
+      }
+      offset = end + 3;
+      continue;
+    }
+    if (xml.startsWith("<![CDATA[", tagStart)) {
+      const end = xml.indexOf("]]>", tagStart + 9);
+      if (end < 0) fail("INVALID_FORMAT", "FDX XML CDATA가 닫히지 않았습니다.");
+      const frame = stack.at(-1);
+      const cdata = xml.slice(tagStart + 9, end);
+      if (frame?.capturesText && frame.paragraph) {
+        textState.textFragments += 1;
+        if (textState.textFragments > STUDIO_DIALOGUE_INTERCHANGE_LIMITS.maxFdxTextFragments) {
+          fail("XML_BUDGET_EXCEEDED", "FDX Text fragment 수가 안전 예산을 초과했습니다.");
+        }
+        frame.paragraph.textCodeUnits += cdata.length;
+        if (frame.paragraph.textCodeUnits > STUDIO_DIALOGUE_INTERCHANGE_LIMITS.maxCueCodeUnits) {
+          fail("XML_BUDGET_EXCEEDED", "FDX Paragraph 본문이 안전 길이 예산을 초과했습니다.");
+        }
+        frame.paragraph.textParts.push(cdata);
+      } else if (frame?.name === "Paragraph" && cdata.trim()) {
+        fail("INVALID_FORMAT", "FDX Paragraph CDATA는 Text 요소 안에 있어야 합니다.");
+      }
+      offset = end + 3;
+      continue;
+    }
+    if (xml.startsWith("<?", tagStart)) {
+      const end = xml.indexOf("?>", tagStart + 2);
+      if (
+        end < 0
+        || rootSeen
+        || sawNonWhitespaceBeforeDeclaration
+        || !/^<\?xml(?:\s|$)/u.test(xml.slice(tagStart, end + 2))
+      ) {
+        fail("INVALID_FORMAT", "FDX XML 선언 위치 또는 형식이 올바르지 않습니다.");
+      }
+      sawNonWhitespaceBeforeDeclaration = true;
+      offset = end + 2;
+      continue;
+    }
+    if (xml.startsWith("<!", tagStart)) {
+      fail("INVALID_FORMAT", "FDX XML의 선언 확장은 지원하지 않습니다.");
+    }
+
+    const tagEnd = findFdxXmlTagEnd(xml, tagStart);
+    const tag = parseFdxXmlTag(xml.slice(tagStart + 1, tagEnd));
+    attributeCount += tag.attributes.size;
+    if (attributeCount > STUDIO_DIALOGUE_INTERCHANGE_LIMITS.maxFdxXmlAttributes) {
+      fail("XML_BUDGET_EXCEEDED", "FDX XML attribute 총수가 안전 예산을 초과했습니다.");
+    }
+
+    if (tag.closing) {
+      if (tag.selfClosing) fail("INVALID_FORMAT", "FDX XML 닫는 태그는 self-closing일 수 없습니다.");
+      closeFrame(tag.name);
+      offset = tagEnd + 1;
+      continue;
+    }
+    if (rootClosed) fail("INVALID_FORMAT", "FDX XML에는 루트 요소가 하나만 있어야 합니다.");
+    elementCount += 1;
+    if (elementCount > STUDIO_DIALOGUE_INTERCHANGE_LIMITS.maxFdxXmlElements) {
+      fail("XML_BUDGET_EXCEEDED", "FDX XML 요소 수가 안전 예산을 초과했습니다.");
+    }
+    if (stack.length + 1 > STUDIO_DIALOGUE_INTERCHANGE_LIMITS.maxFdxXmlDepth) {
+      fail("XML_BUDGET_EXCEEDED", "FDX XML 중첩 깊이가 안전 예산을 초과했습니다.");
+    }
+
+    const parent = stack.at(-1);
+    if (!parent) {
+      if (rootSeen || tag.name !== "FinalDraft") {
+        fail("INVALID_FORMAT", "FDX XML 루트는 FinalDraft여야 합니다.");
+      }
+      if (
+        tag.attributes.has("DocumentType")
+        && tag.attributes.get("DocumentType") !== "Script"
+      ) {
+        fail("INVALID_FORMAT", "FDX DocumentType은 Script여야 합니다.");
+      }
+      rootSeen = true;
+    }
+
+    const recognizedContent = tag.name === "Content"
+      && parent?.name === "FinalDraft"
+      && parent.recognized;
+    if (recognizedContent) {
+      contentCount += 1;
+      if (contentCount > 1) fail("INVALID_FORMAT", "FDX Content 요소가 중복되었습니다.");
+    }
+    const recognizedDualDialogue = tag.name === "DualDialogue"
+      && parent?.name === "Content"
+      && parent.recognized;
+    const recognizedParagraph = tag.name === "Paragraph"
+      && (
+        (parent?.name === "Content" && parent.recognized)
+        || (parent?.name === "DualDialogue" && parent.recognized)
+      );
+    const recognizedText = tag.name === "Text"
+      && parent?.name === "Paragraph"
+      && parent.recognized
+      && Boolean(parent.paragraph);
+    if (parent?.capturesText) {
+      fail("INVALID_FORMAT", "지원하는 FDX Text 요소 안에는 다른 XML 요소를 둘 수 없습니다.");
+    }
+
+    let paragraph: MutableFdxParagraph | undefined;
+    if (recognizedParagraph) {
+      if (paragraphs.length >= STUDIO_DIALOGUE_INTERCHANGE_LIMITS.maxFdxParagraphs) {
+        fail("XML_BUDGET_EXCEEDED", "FDX Paragraph 수가 안전 예산을 초과했습니다.");
+      }
+      const type = tag.attributes.get("Type");
+      if (!type || type.length > 200 || type.includes("\0")) {
+        fail("INVALID_FORMAT", "FDX Paragraph Type이 없거나 올바르지 않습니다.");
+      }
+      paragraph = {
+        sourceIndex: paragraphs.length,
+        type,
+        textParts: [],
+        textCodeUnits: 0,
+      };
+    }
+    const frame: FdxXmlFrame = {
+      name: tag.name,
+      recognized: tag.name === "FinalDraft"
+        ? !parent
+        : recognizedContent || recognizedDualDialogue || recognizedParagraph || recognizedText,
+      capturesText: recognizedText,
+      ...(paragraph ? { paragraph } : {}),
+      ...(recognizedText && parent?.paragraph ? { paragraph: parent.paragraph } : {}),
+    };
+    stack.push(frame);
+    if (tag.selfClosing) closeFrame(tag.name);
+    offset = tagEnd + 1;
+  }
+
+  if (stack.length > 0 || !rootSeen || !rootClosed || contentCount !== 1) {
+    fail("INVALID_FORMAT", "FDX XML의 FinalDraft/Content 구조가 완전하지 않습니다.");
+  }
+  if (paragraphs.length === 0) {
+    fail("INVALID_FORMAT", "FDX Content에서 Paragraph를 찾지 못했습니다.");
+  }
+  return Object.freeze(paragraphs);
+}
+
+function addFdxLossPreview(
+  preview: MutableFdxLossPreview,
+  item: StudioDialogueFdxLossPreviewItem
+): void {
+  if (item.disposition === "mapped") preview.mappedElements += 1;
+  else if (item.disposition === "context-only") preview.contextOnlyElements += 1;
+  else preview.droppedElements += 1;
+  if (preview.items.length < STUDIO_DIALOGUE_INTERCHANGE_LIMITS.maxFdxLossPreviewItems) {
+    preview.items.push(Object.freeze(item));
+  } else {
+    preview.truncated = true;
+  }
+}
+
+function fdxPreviewText(value: string): string {
+  const singleLine = value.replace(/\s+/gu, " ").trim();
+  return singleLine.length <= 160 ? singleLine : `${singleLine.slice(0, 157)}…`;
+}
+
+function _parseFdx(text: string): StudioDialogueInterchangeResult {
+  const paragraphs = parseFdxParagraphs(text);
+  const cues: StudioDialogueCue[] = [];
+  const warnings: string[] = [];
+  const preview: MutableFdxLossPreview = {
+    mappedElements: 0,
+    contextOnlyElements: 0,
+    droppedElements: 0,
+    truncated: false,
+    items: [],
+  };
+  let page = 1;
+  let panel = 1;
+  let sceneCount = 0;
+  let actionCount = 0;
+  let pendingCharacter: ParsedFdxParagraph | undefined;
+  let pendingParentheticals: ParsedFdxParagraph[] = [];
+
+  const dropPending = (detail: string): void => {
+    if (pendingCharacter) {
+      addFdxLossPreview(preview, {
+        sourceIndex: pendingCharacter.sourceIndex,
+        sourceType: pendingCharacter.type,
+        preview: fdxPreviewText(pendingCharacter.text),
+        disposition: "dropped",
+        page,
+        panel,
+        detail,
+      });
+    }
+    for (const parenthetical of pendingParentheticals) {
+      addFdxLossPreview(preview, {
+        sourceIndex: parenthetical.sourceIndex,
+        sourceType: parenthetical.type,
+        preview: fdxPreviewText(parenthetical.text),
+        disposition: "dropped",
+        page,
+        panel,
+        detail,
+      });
+    }
+    pendingCharacter = undefined;
+    pendingParentheticals = [];
+  };
+
+  for (const paragraph of paragraphs) {
+    if (paragraph.type === "Scene Heading") {
+      dropPending("뒤따르는 Dialogue가 없어 cue로 매핑하지 못했습니다.");
+      const explicitPage = FDX_PAGE_MARKER.exec(paragraph.text);
+      if (explicitPage) {
+        page = Number(explicitPage[1]);
+      } else {
+        sceneCount += 1;
+        page = sceneCount;
+      }
+      panel = 1;
+      actionCount = 0;
+      addFdxLossPreview(preview, {
+        sourceIndex: paragraph.sourceIndex,
+        sourceType: paragraph.type,
+        preview: fdxPreviewText(paragraph.text),
+        disposition: "context-only",
+        page,
+        panel,
+        detail: explicitPage
+          ? "ToonSpectrum 페이지 marker로 복원했습니다."
+          : "장면 순서를 1-based 페이지로 매핑했으며 장면 제목 본문은 cue에 저장하지 않습니다.",
+      });
+      continue;
+    }
+    if (paragraph.type === "Action") {
+      dropPending("Action이 시작되어 미완성 화자 블록을 cue로 매핑하지 못했습니다.");
+      const explicitPanel = FDX_PANEL_MARKER.exec(paragraph.text);
+      if (explicitPanel) {
+        panel = Number(explicitPanel[1]);
+      } else {
+        if (actionCount > 0) panel += 1;
+        actionCount += 1;
+      }
+      addFdxLossPreview(preview, {
+        sourceIndex: paragraph.sourceIndex,
+        sourceType: paragraph.type,
+        preview: fdxPreviewText(paragraph.text),
+        disposition: "context-only",
+        page,
+        panel,
+        detail: explicitPanel
+          ? "ToonSpectrum 컷 marker로 복원했습니다."
+          : "Action 순서를 현재 장면의 1-based 컷으로 매핑했으며 본문은 cue에 저장하지 않습니다.",
+      });
+      continue;
+    }
+    if (paragraph.type === "Character") {
+      dropPending("새 Character가 시작되어 앞선 미완성 화자 블록을 매핑하지 못했습니다.");
+      if (paragraph.text.length > STUDIO_DIALOGUE_INTERCHANGE_LIMITS.maxSpeakerCodeUnits) {
+        fail("INVALID_CUE", "FDX Character가 화자 길이 예산을 초과했습니다.");
+      }
+      pendingCharacter = paragraph;
+      continue;
+    }
+    if (paragraph.type === "Parenthetical") {
+      if (!pendingCharacter) {
+        fail("INVALID_CUE", "FDX Parenthetical 앞에 Character가 없습니다.");
+      }
+      pendingParentheticals.push(paragraph);
+      const noteLength = pendingParentheticals.reduce((total, item) => total + item.text.length, 0)
+        + Math.max(0, pendingParentheticals.length - 1);
+      if (noteLength > STUDIO_DIALOGUE_INTERCHANGE_LIMITS.maxNoteCodeUnits) {
+        fail("INVALID_CUE", "FDX Parenthetical 합계가 cue 메모 길이 예산을 초과했습니다.");
+      }
+      continue;
+    }
+    if (paragraph.type === "Dialogue") {
+      if (!pendingCharacter) {
+        fail("INVALID_CUE", "FDX Dialogue 앞에 Character가 없습니다.");
+      }
+      if (cues.length >= STUDIO_DIALOGUE_INTERCHANGE_LIMITS.maxCues) {
+        fail("TOO_MANY_CUES", "한 파일에서 가져올 수 있는 대사는 최대 20,000개입니다.");
+      }
+      const cueIndex = cues.length;
+      const note = pendingParentheticals.map((item) => item.text).join("\n") || undefined;
+      cues.push(normalizeCue({
+        page,
+        panel,
+        speaker: pendingCharacter.text,
+        text: paragraph.text,
+        note,
+      }, cueIndex));
+      addFdxLossPreview(preview, {
+        sourceIndex: pendingCharacter.sourceIndex,
+        sourceType: pendingCharacter.type,
+        preview: fdxPreviewText(pendingCharacter.text),
+        disposition: "mapped",
+        page,
+        panel,
+        cueIndex,
+        detail: "Character를 cue 화자로 매핑했습니다.",
+      });
+      for (const parenthetical of pendingParentheticals) {
+        addFdxLossPreview(preview, {
+          sourceIndex: parenthetical.sourceIndex,
+          sourceType: parenthetical.type,
+          preview: fdxPreviewText(parenthetical.text),
+          disposition: "mapped",
+          page,
+          panel,
+          cueIndex,
+          detail: "Parenthetical을 cue 메모로 매핑했습니다.",
+        });
+      }
+      addFdxLossPreview(preview, {
+        sourceIndex: paragraph.sourceIndex,
+        sourceType: paragraph.type,
+        preview: fdxPreviewText(paragraph.text),
+        disposition: "mapped",
+        page,
+        panel,
+        cueIndex,
+        detail: "Dialogue를 cue 본문으로 매핑했습니다.",
+      });
+      pendingCharacter = undefined;
+      pendingParentheticals = [];
+      continue;
+    }
+
+    dropPending("지원하지 않는 Paragraph가 화자 블록을 중단했습니다.");
+    addFdxLossPreview(preview, {
+      sourceIndex: paragraph.sourceIndex,
+      sourceType: paragraph.type,
+      preview: fdxPreviewText(paragraph.text),
+      disposition: "dropped",
+      page,
+      panel,
+      detail: "현재 안전 부분집합에서 지원하지 않는 FDX Paragraph Type입니다.",
+    });
+  }
+  dropPending("파일 끝까지 뒤따르는 Dialogue가 없어 cue로 매핑하지 못했습니다.");
+  if (cues.length === 0) fail("INVALID_FORMAT", "FDX 파일에서 Character/Dialogue 대사 블록을 찾지 못했습니다.");
+
+  warnings.push(
+    "FDX는 공개 정식 스키마가 아닌 FinalDraft/Content/Paragraph/Text 안전 부분집합으로 처리합니다."
+  );
+  warnings.push(
+    "장면 제목은 페이지, Action 순서는 컷, Character/Dialogue/Parenthetical은 화자·본문·메모로 매핑합니다."
+  );
+  if (preview.contextOnlyElements > 0) {
+    warnings.push("장면 제목과 Action 본문은 위치 문맥으로만 사용되며 loss preview에서 확인할 수 있습니다.");
+  }
+  if (preview.droppedElements > 0) {
+    warnings.push(`${preview.droppedElements}개 FDX 요소를 지원 범위 밖 또는 미완성 블록으로 제외했습니다.`);
+  }
+  if (preview.truncated) {
+    warnings.push("FDX loss preview 상세 목록은 안전한 최대 항목 수에서 잘렸습니다.");
+  }
+  return {
+    document: { cues },
+    warnings: Object.freeze(warnings),
+    lossy: true,
+    lossPreview: Object.freeze({
+      sourceFormat: "fdx",
+      sourceParagraphs: paragraphs.length,
+      emittedCues: cues.length,
+      mappedElements: preview.mappedElements,
+      contextOnlyElements: preview.contextOnlyElements,
+      droppedElements: preview.droppedElements,
+      truncated: preview.truncated,
+      items: Object.freeze(preview.items),
+    }),
+  };
+}
+
 function parseTimestamp(value: string, vtt: boolean): number | undefined {
   const normalized = value.trim().replace(",", ".");
   const match = /^(?:(\d{1,3}):)?(\d{2}):(\d{2})\.(\d{3})$/u.exec(normalized);
@@ -524,6 +1185,7 @@ export function parseStudioDialogueInterchange(
     case "vtt": return parseTimedText(text, true);
     case "txt":
     case "markdown": return parseColonScript(text);
+    default: return parseColonScript(text);
   }
 }
 
@@ -625,7 +1287,7 @@ export function serializeStudioDialogueInterchange(
   input: StudioDialogueInterchangeDocument
 ): StudioDialogueSerializedFile {
   const document = normalizeDocument(input);
-  let text: string;
+  let text = "";
   let lossy = false;
   const warnings: string[] = [];
   switch (format) {
