@@ -613,12 +613,61 @@ describe("reorderLayerSelection", () => {
     expect(hasContiguousLayerGroups(next)).toBe(true);
   });
 
+  it("moves complete selected units one step without splitting groups", () => {
+    const input = makeItems([
+      "back",
+      { id: "g1", groupId: "g" },
+      { id: "g2", groupId: "g" },
+      "middle",
+      "front",
+    ]);
+
+    expect(ids(reorderLayerSelection(input, ["g1"], "forward"))).toEqual([
+      "back",
+      "middle",
+      "g1",
+      "g2",
+      "front",
+    ]);
+    expect(ids(reorderLayerSelection(input, ["g2"], "backward"))).toEqual([
+      "g1",
+      "g2",
+      "back",
+      "middle",
+      "front",
+    ]);
+    expect(hasContiguousLayerGroups(
+      reorderLayerSelection(input, ["g1"], "forward"),
+    )).toBe(true);
+  });
+
+  it("moves scattered selected units one visual step while preserving their order", () => {
+    const input = makeItems(["a", "gap-1", "b", "gap-2", "front"]);
+
+    expect(ids(reorderLayerSelection(input, ["a", "b"], "forward"))).toEqual([
+      "gap-1",
+      "a",
+      "gap-2",
+      "b",
+      "front",
+    ]);
+    expect(ids(reorderLayerSelection(input, ["gap-1", "gap-2"], "backward"))).toEqual([
+      "gap-1",
+      "a",
+      "gap-2",
+      "b",
+      "front",
+    ]);
+  });
+
   it("preserves the original reference for empty and already terminal selections", () => {
     const input = makeItems(["back", "front"]);
 
     expect(reorderLayerSelection(input, [], "front")).toBe(input);
     expect(reorderLayerSelection(input, ["front"], "front")).toBe(input);
     expect(reorderLayerSelection(input, ["back", "front"], "back")).toBe(input);
+    expect(reorderLayerSelection(input, ["front"], "forward")).toBe(input);
+    expect(reorderLayerSelection(input, ["back"], "backward")).toBe(input);
   });
 });
 

@@ -69,6 +69,10 @@ import { cn } from "@/lib/utils";
 
 const REVIEW_LOCK_REASON = "현재 작업면의 검토 잠금을 먼저 해제하세요.";
 const IMAGE_EDIT_LOCK_REASON = "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요.";
+const RASTER_RETOUCH_AUTO_TARGET_GUIDANCE =
+  "이미지 레이어를 선택하지 않아도 현재 페이지 합성본을 자동 준비해 새 래스터 레이어에서 시작합니다.";
+const RASTER_RETOUCH_AUTO_TARGET_UNAVAILABLE_REASON =
+  "편집 가능한 이미지가 없고 현재 페이지 합성본을 자동 준비할 그리기 내용도 없습니다.";
 const STUDIO_CANVAS_IMAGE_ACCEPT =
   "image/*,.bmp,.dib,.tga,.icb,.vda,.vst,.ppm,.pam,.qoi,.tif,.tiff";
 const STUDIO_RAIL_MORE_GAP_PX = 4;
@@ -153,8 +157,10 @@ export interface StudioLeftToolRailHandlers {
 
 interface StudioLeftToolRailProps {
   activeSurfaceReviewLocked: boolean;
-  /** 픽셀 도구 대상 자동 확보 가능(선택된 편집 가능 이미지 또는 페이지에 단 한 장) — 무장 버튼 활성 판정. */
+  /** 선택한 편집 가능 이미지가 필요한 픽셀 변형·프레임 애니메이션의 활성 판정. */
   pixelToolTargetAvailable: boolean;
+  /** 선택 이미지 또는 현재 페이지 합성본을 자동 준비할 수 있는 래스터 리터치 도구 활성 판정. */
+  rasterRetouchTargetAvailable: boolean;
   advancedFillActive: boolean;
   advancedFillUnsupportedReason: string | null;
   appSettings: StudioAppSettings;
@@ -213,6 +219,7 @@ interface StudioLeftToolRailProps {
 export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   activeSurfaceReviewLocked,
   pixelToolTargetAvailable,
+  rasterRetouchTargetAvailable,
   advancedFillActive,
   advancedFillUnsupportedReason,
   appSettings,
@@ -313,6 +320,24 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     || dodgeBurnActive
     || liquifyActive;
   const drawToolTemporarilyOverridden = eyedropperActive || commentPinArmed;
+  const selectedImageLocked =
+    selected?.type === "image" && selectedImageMutationLocked;
+  const rasterRetouchCanStart =
+    rasterRetouchTargetAvailable
+    && !activeSurfaceReviewLocked
+    && !selectedImageLocked;
+  const rasterRetouchDescription = (base: string): string =>
+    selected?.type === "image"
+      ? base
+      : `${base} ${RASTER_RETOUCH_AUTO_TARGET_GUIDANCE}`;
+  const rasterRetouchUnavailableReason = (active: boolean): string | undefined => {
+    if (active) return undefined;
+    if (activeSurfaceReviewLocked) return REVIEW_LOCK_REASON;
+    if (selectedImageLocked) return IMAGE_EDIT_LOCK_REASON;
+    return rasterRetouchTargetAvailable
+      ? undefined
+      : RASTER_RETOUCH_AUTO_TARGET_UNAVAILABLE_REASON;
+  };
   const railMoreDialogRef = useRef<HTMLDivElement>(null);
   const [railMorePosition, setRailMorePosition] = useState<PositionedStudioRailMore>({
     left: 56,
@@ -609,16 +634,12 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             <StudioRailToolButton
               icon={Crop}
               label="자르기 (C)"
-              description="선택한 이미지의 가장자리와 모서리를 끌어 필요한 영역만 남깁니다. 적용 전까지 원본은 바뀌지 않아요."
+              description={rasterRetouchDescription(
+                "가장자리와 모서리를 끌어 필요한 영역만 남깁니다. 적용 전까지 원본은 바뀌지 않아요."
+              )}
               active={cropActive}
-              disabled={!pixelToolTargetAvailable}
-              unavailableReason={
-                selected?.type !== "image"
-                  ? "자를 이미지 레이어를 먼저 고르세요."
-                  : selectedImageMutationLocked
-                    ? IMAGE_EDIT_LOCK_REASON
-                    : undefined
-              }
+              disabled={!cropActive && !rasterRetouchCanStart}
+              unavailableReason={rasterRetouchUnavailableReason(cropActive)}
               onClick={openSelectedLayerCrop}
             />
             ) : null}
@@ -678,18 +699,10 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             <StudioRailToolButton
               icon={Wind}
               label="혼합 (스머지) (N)"
-              description="이미지 픽셀을 문질러 색을 섞습니다."
+              description={rasterRetouchDescription("이미지 픽셀을 문질러 색을 섞습니다.")}
               active={smudgeActive}
-              disabled={!smudgeActive && !pixelToolTargetAvailable}
-              unavailableReason={
-                smudgeActive
-                  ? undefined
-                  : selected?.type !== "image"
-                  ? "색을 섞을 이미지 레이어를 먼저 고르세요."
-                  : selectedImageMutationLocked
-                    ? IMAGE_EDIT_LOCK_REASON
-                    : undefined
-              }
+              disabled={!smudgeActive && !rasterRetouchCanStart}
+              unavailableReason={rasterRetouchUnavailableReason(smudgeActive)}
               onClick={toggleSmudgeTool}
             />
             ) : null}
@@ -697,18 +710,12 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             <StudioRailToolButton
               icon={Droplets}
               label="혼색 브러시 (Shift+N)"
-              description="바닥색을 묻혀 섞어가며 안료를 얹는 CSP식 색혼합 브러시입니다."
+              description={rasterRetouchDescription(
+                "바닥색을 묻혀 섞어가며 안료를 얹는 CSP식 색혼합 브러시입니다."
+              )}
               active={wetMixActive}
-              disabled={!wetMixActive && !pixelToolTargetAvailable}
-              unavailableReason={
-                wetMixActive
-                  ? undefined
-                  : selected?.type !== "image"
-                  ? "칠할 이미지 레이어를 먼저 고르세요."
-                  : selectedImageMutationLocked
-                    ? IMAGE_EDIT_LOCK_REASON
-                    : undefined
-              }
+              disabled={!wetMixActive && !rasterRetouchCanStart}
+              unavailableReason={rasterRetouchUnavailableReason(wetMixActive)}
               onClick={toggleWetMixTool}
             />
             ) : null}
@@ -716,18 +723,12 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             <StudioRailToolButton
               icon={Sun}
               label="닷지/번 (O)"
-              description="어둡거나 밝은 영역을 브러시로 밝히거나 태우고, 스펀지로 채도를 조절합니다."
+              description={rasterRetouchDescription(
+                "어둡거나 밝은 영역을 브러시로 밝히거나 태우고, 스펀지로 채도를 조절합니다."
+              )}
               active={dodgeBurnActive}
-              disabled={!dodgeBurnActive && !pixelToolTargetAvailable}
-              unavailableReason={
-                dodgeBurnActive
-                  ? undefined
-                  : selected?.type !== "image"
-                  ? "보정할 이미지 레이어를 먼저 고르세요."
-                  : selectedImageMutationLocked
-                    ? IMAGE_EDIT_LOCK_REASON
-                    : undefined
-              }
+              disabled={!dodgeBurnActive && !rasterRetouchCanStart}
+              unavailableReason={rasterRetouchUnavailableReason(dodgeBurnActive)}
               onClick={toggleDodgeBurnTool}
             />
             ) : null}
@@ -735,18 +736,10 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             <StudioRailToolButton
               icon={Move}
               label="리퀴파이 (J)"
-              description="이미지 위를 밀어 국소 왜곡합니다."
+              description={rasterRetouchDescription("이미지 위를 밀어 국소 왜곡합니다.")}
               active={liquifyActive}
-              disabled={!liquifyActive && !pixelToolTargetAvailable}
-              unavailableReason={
-                liquifyActive
-                  ? undefined
-                  : selected?.type !== "image"
-                  ? "왜곡할 이미지 레이어를 먼저 고르세요."
-                  : selectedImageMutationLocked
-                    ? IMAGE_EDIT_LOCK_REASON
-                    : undefined
-              }
+              disabled={!liquifyActive && !rasterRetouchCanStart}
+              unavailableReason={rasterRetouchUnavailableReason(liquifyActive)}
               onClick={toggleLiquifyTool}
             />
             ) : null}

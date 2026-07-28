@@ -15,6 +15,10 @@ import {
   lowerStudioCanonicalBrushPlanToWebGpuDabs,
 } from "./studio-canonical-brush-webgpu-lowering";
 import {
+  isStudioEngineVNextBrushProviderGpuPresentation,
+  STUDIO_ENGINE_VNEXT_BRUSH_PROVIDER_GPU_BOUNDARY_VERSION,
+} from "./studio-engine-vnext-brush-provider-gpu-boundary";
+import {
   adaptLoweredStudioCanonicalBrushWebGpuDabs,
   fingerprintStudioEngineWebGpuBrushPlan,
   STUDIO_ENGINE_WEBGPU_BRUSH_COLOR_MODEL,
@@ -39,6 +43,11 @@ import type {
   StudioEngineTileCommitResult,
   StudioEngineTileDirtyRect,
 } from "./studio-engine-tile-authority";
+import type {
+  StudioEngineVNextBrushProviderGpuBoundaryResult,
+  StudioEngineVNextBrushProviderGpuExecutionBoundary,
+  StudioEngineVNextBrushProviderGpuRequest,
+} from "./studio-engine-vnext-brush-provider-gpu-boundary";
 import type {
   StudioEngineWebGpuBrushExecutionRejection,
   StudioEngineWebGpuBrushExecutionResult,
@@ -77,6 +86,11 @@ export interface StudioEngineFutureBrushControllerOptions {
   readonly resizeEpoch: number;
   readonly deviceEpoch: number;
   readonly webGpu: StudioEngineFutureBrushGpuBoundary;
+  /**
+   * Optional exact specialist bridge. It is consulted only when the analytic lowerer explicitly
+   * reports `lowering-required`; absence retains the original fail-closed rejection.
+   */
+  readonly specialistGpu?: StudioEngineVNextBrushProviderGpuExecutionBoundary;
   readonly tileAuthority: StudioEngineFutureBrushTileBoundary;
   readonly initialCommandSequence?: number;
   readonly initialGpuRequestSequence?: number;
@@ -225,6 +239,7 @@ interface PendingJob {
   readonly commandSequence: number;
   canceled: boolean;
   stage: JobStage;
+  specialistAbort: AbortController | null;
 }
 
 interface CachedReceipt {
@@ -476,6 +491,9 @@ export class StudioEngineFutureBrushController {
   private readonly resizeEpoch: number;
   private readonly deviceEpoch: number;
   private readonly webGpu: StudioEngineFutureBrushGpuBoundary;
+  private readonly specialistGpu:
+    | StudioEngineVNextBrushProviderGpuExecutionBoundary
+    | null;
   private readonly tileAuthority: StudioEngineFutureBrushTileBoundary;
   private readonly maximumDabs: number | undefined;
   private readonly lower: NonNullable<StudioEngineFutureBrushControllerOptions["lower"]>;
@@ -505,6 +523,13 @@ export class StudioEngineFutureBrushController {
       )
       || !options.webGpu
       || typeof options.webGpu.execute !== "function"
+      || (
+        options.specialistGpu !== undefined
+        && (
+          !options.specialistGpu
+          || typeof options.specialistGpu.execute !== "function"
+        )
+      )
       || !options.tileAuthority
       || typeof options.tileAuthority.commit !== "function"
       || (options.lower !== undefined && typeof options.lower !== "function")
@@ -517,6 +542,7 @@ export class StudioEngineFutureBrushController {
     this.resizeEpoch = options.resizeEpoch;
     this.deviceEpoch = options.deviceEpoch;
     this.webGpu = options.webGpu;
+    this.specialistGpu = options.specialistGpu ?? null;
     this.tileAuthority = options.tileAuthority;
     this.maximumDabs = options.maximumDabs;
     this.lower = options.lower ?? lowerStudioCanonicalBrushPlanToWebGpuDabs;
@@ -532,6 +558,7 @@ export class StudioEngineFutureBrushController {
       commandSequence: normalized.value.plan.commandSequence,
       canceled: false,
       stage: "queued",
+      specialistAbort: null,
     };
     this.register(job);
     const run = this.tail.then(
@@ -560,7 +587,10 @@ export class StudioEngineFutureBrushController {
     if ([...jobs].some((job) => job.stage === "tile")) {
       return Object.freeze({ status: "too-late", commandSequence });
     }
-    for (const job of jobs) job.canceled = true;
+    for (const job of jobs) {
+      job.canceled = true;
+      job.specialistAbort?.abort(new Error("Specialist GPU request cancelled."));
+    }
     return Object.freeze({ status: "canceled", commandSequence });
   }
 
@@ -570,8 +600,19 @@ export class StudioEngineFutureBrushController {
     this.deviceLost = true;
     for (const jobs of this.pending.values()) {
       for (const job of jobs) {
-        if (job.stage !== "tile" && job.stage !== "done") job.canceled = true;
+        if (job.stage !== "tile" && job.stage !== "done") {
+          job.canceled = true;
+          job.specialistAbort?.abort(new Error("Specialist GPU device lost."));
+        }
       }
+    }
+    try {
+      const notification = this.specialistGpu?.notifyDeviceLoss?.(
+        "future-brush-controller-device-lost",
+      );
+      if (notification) void Promise.resolve(notification).catch(() => undefined);
+    } catch {
+      // The specialist provider is already terminal.
     }
   }
 
@@ -580,7 +621,10 @@ export class StudioEngineFutureBrushController {
     this.disposed = true;
     for (const jobs of this.pending.values()) {
       for (const job of jobs) {
-        if (job.stage !== "done") job.canceled = true;
+        if (job.stage !== "done") {
+          job.canceled = true;
+          job.specialistAbort?.abort(new Error("Specialist GPU boundary disposed."));
+        }
       }
     }
     this.receipts = new Map();
@@ -588,6 +632,12 @@ export class StudioEngineFutureBrushController {
       this.webGpu.dispose?.();
     } catch {
       // The provider boundary is already terminal.
+    }
+    try {
+      const disposal = this.specialistGpu?.dispose?.();
+      if (disposal) void Promise.resolve(disposal).catch(() => undefined);
+    } catch {
+      // The specialist provider boundary is already terminal.
     }
     try {
       this.tileAuthority.dispose?.();
@@ -626,56 +676,123 @@ export class StudioEngineFutureBrushController {
     } catch {
       return reject("lowering-rejected");
     }
-    if (lowering.status === "lowering-required") {
-      return reject("specialist-lowering-required", {
-        specialistRequirements: Object.freeze([...lowering.requirements]),
-      });
-    }
     if (lowering.status === "rejected") return reject("lowering-rejected");
 
-    let adapted: StudioEngineWebGpuBrushPlanAdaptationResult;
-    try {
-      adapted = this.adapt(input.mode, lowering, this.maximumDabs);
-    } catch {
-      return reject("unsupported-webgpu-plan");
-    }
-    if (adapted.status === "lowering-required") {
-      return reject("specialist-lowering-required", {
-        specialistRequirements: Object.freeze([...adapted.requirements]),
-      });
-    }
-    if (adapted.status !== "ready") return reject("unsupported-webgpu-plan");
-    if (this.lastGpuRequestSequence >= Number.MAX_SAFE_INTEGER) {
-      return reject("request-sequence-exhausted");
-    }
-    const requestSequence = this.lastGpuRequestSequence + 1;
-    this.lastGpuRequestSequence = requestSequence;
-    const frame: StudioEngineWebGpuBrushFrame = Object.freeze({
-      requestSequence,
-      resizeEpoch: input.resizeEpoch,
-      rasterRect: input.rasterRect,
-      update: adapted.plan,
-    });
-
-    job.stage = "gpu";
     let gpuResult: StudioEngineWebGpuBrushExecutionResult;
-    try {
-      gpuResult = await this.webGpu.execute(frame);
-    } catch {
-      return reject("gpu-rejected");
-    }
-    if (this.disposed) return reject("disposed");
-    if (this.deviceLost) return reject("device-lost");
-    if (job.canceled) return reject("canceled");
-    if (gpuResult.status === "rejected") {
-      if (gpuResult.reason === "device-lost") this.deviceLost = true;
-      return reject(
-        gpuResult.reason === "device-lost" ? "device-lost" : "gpu-rejected",
-        { gpuReason: gpuResult.reason },
-      );
-    }
-    if (!gpuReceiptMatches(gpuResult, frame, input.deviceEpoch)) {
-      return reject("gpu-receipt-mismatch");
+    if (lowering.status === "lowering-required") {
+      if (!this.specialistGpu) {
+        return reject("specialist-lowering-required", {
+          specialistRequirements: Object.freeze([...lowering.requirements]),
+        });
+      }
+      if (this.lastGpuRequestSequence >= Number.MAX_SAFE_INTEGER) {
+        return reject("request-sequence-exhausted");
+      }
+      const requestSequence = this.lastGpuRequestSequence + 1;
+      this.lastGpuRequestSequence = requestSequence;
+      const specialistRequest = Object.freeze({
+        kind: "studio-engine-vnext-brush-provider-gpu/request",
+        version: STUDIO_ENGINE_VNEXT_BRUSH_PROVIDER_GPU_BOUNDARY_VERSION,
+        requestSequence,
+        sessionEpoch: input.plan.sessionEpoch,
+        strokeEpoch: input.plan.strokeEpoch,
+        deviceEpoch: input.deviceEpoch,
+        resizeEpoch: input.resizeEpoch,
+        mode: input.mode,
+        rasterRect: input.rasterRect,
+        strokeId: input.plan.strokeId,
+        canonicalPlanHash: input.canonicalPlanHash,
+        requirements: Object.freeze([...lowering.requirements]),
+        canonicalPlan: input.plan,
+      } satisfies StudioEngineVNextBrushProviderGpuRequest);
+      const abortController = new AbortController();
+      job.specialistAbort = abortController;
+      job.stage = "gpu";
+      let specialistResult: StudioEngineVNextBrushProviderGpuBoundaryResult;
+      try {
+        specialistResult = await this.specialistGpu.execute(
+          specialistRequest,
+          abortController.signal,
+        );
+      } catch {
+        if (this.disposed) return reject("disposed");
+        if (this.deviceLost) return reject("device-lost");
+        if (job.canceled) return reject("canceled");
+        return reject("gpu-rejected");
+      } finally {
+        job.specialistAbort = null;
+      }
+      if (this.disposed) return reject("disposed");
+      if (this.deviceLost) return reject("device-lost");
+      if (job.canceled) return reject("canceled");
+      if (specialistResult.status === "rejected") {
+        if (specialistResult.reason === "device-lost") {
+          this.notifyDeviceLost();
+          return reject("device-lost");
+        }
+        if (specialistResult.reason === "cancelled") return reject("canceled");
+        if (
+          specialistResult.reason === "provider-proof-mismatch"
+          || specialistResult.reason === "invalid-provider-output"
+        ) {
+          return reject("gpu-receipt-mismatch");
+        }
+        return reject("gpu-rejected");
+      }
+      if (!isStudioEngineVNextBrushProviderGpuPresentation(
+        specialistResult,
+        specialistRequest,
+      )) {
+        return reject("gpu-receipt-mismatch");
+      }
+      gpuResult = Object.freeze({
+        status: "presented",
+        receipt: specialistResult.receipt,
+      });
+    } else {
+      let adapted: StudioEngineWebGpuBrushPlanAdaptationResult;
+      try {
+        adapted = this.adapt(input.mode, lowering, this.maximumDabs);
+      } catch {
+        return reject("unsupported-webgpu-plan");
+      }
+      if (adapted.status === "lowering-required") {
+        return reject("specialist-lowering-required", {
+          specialistRequirements: Object.freeze([...adapted.requirements]),
+        });
+      }
+      if (adapted.status !== "ready") return reject("unsupported-webgpu-plan");
+      if (this.lastGpuRequestSequence >= Number.MAX_SAFE_INTEGER) {
+        return reject("request-sequence-exhausted");
+      }
+      const requestSequence = this.lastGpuRequestSequence + 1;
+      this.lastGpuRequestSequence = requestSequence;
+      const frame: StudioEngineWebGpuBrushFrame = Object.freeze({
+        requestSequence,
+        resizeEpoch: input.resizeEpoch,
+        rasterRect: input.rasterRect,
+        update: adapted.plan,
+      });
+
+      job.stage = "gpu";
+      try {
+        gpuResult = await this.webGpu.execute(frame);
+      } catch {
+        return reject("gpu-rejected");
+      }
+      if (this.disposed) return reject("disposed");
+      if (this.deviceLost) return reject("device-lost");
+      if (job.canceled) return reject("canceled");
+      if (gpuResult.status === "rejected") {
+        if (gpuResult.reason === "device-lost") this.deviceLost = true;
+        return reject(
+          gpuResult.reason === "device-lost" ? "device-lost" : "gpu-rejected",
+          { gpuReason: gpuResult.reason },
+        );
+      }
+      if (!gpuReceiptMatches(gpuResult, frame, input.deviceEpoch)) {
+        return reject("gpu-receipt-mismatch");
+      }
     }
 
     job.stage = "tile";

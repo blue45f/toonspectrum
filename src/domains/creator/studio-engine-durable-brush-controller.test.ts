@@ -22,6 +22,17 @@ import {
   type StudioEngineTileStorageTransport,
 } from "./studio-engine-tile-storage-bridge";
 import {
+  createStudioEngineVNextBrushProviderGpuCompletion,
+  StudioEngineVNextBrushProviderGpuBoundaryAdapter,
+  type StudioEngineVNextBrushProviderGpuExecutionBoundary,
+} from "./studio-engine-vnext-brush-provider-gpu-boundary";
+import {
+  StudioEngineVNextBrushProviderRouter,
+  type StudioEngineVNextBrushProviderCapability,
+  type StudioEngineVNextBrushProviderDescriptor,
+  type StudioEngineVNextBrushProviderExecution,
+} from "./studio-engine-vnext-brush-provider-router";
+import {
   fingerprintStudioEngineWebGpuBrushPlan,
   STUDIO_ENGINE_WEBGPU_BRUSH_COLOR_MODEL,
   STUDIO_ENGINE_WEBGPU_BRUSH_INPUT_COLOR_ENCODING,
@@ -60,7 +71,23 @@ function curve() {
   return { minimum: 1, maximum: 1, exponent: 1 };
 }
 
-function canonicalPlan(commandSequence = 1): Record<string, unknown> {
+function proceduralGrain() {
+  return {
+    kind: "procedural-noise",
+    assetId: null,
+    contentHash: null,
+    space: "document",
+    scale: 1,
+    depth: 0.5,
+    contrast: 1,
+    seed: 17,
+  };
+}
+
+function canonicalPlan(
+  commandSequence = 1,
+  options: Readonly<{ grain?: unknown }> = {},
+): Record<string, unknown> {
   return {
     kind: "studio-canonical-brush-plan",
     version: 1,
@@ -107,7 +134,7 @@ function canonicalPlan(commandSequence = 1): Record<string, unknown> {
         opacity: curve(),
         flow: curve(),
       },
-      grain: null,
+      grain: options.grain ?? null,
       wetMedia: null,
     },
     source: {
@@ -314,6 +341,7 @@ function controller(options: {
   readonly storage?: StudioEngineDurableBrushStorageBoundary;
   readonly transport?: StudioEngineTileStorageTransport;
   readonly gpu?: StudioEngineFutureBrushGpuBoundary;
+  readonly specialistGpu?: StudioEngineVNextBrushProviderGpuExecutionBoundary;
   readonly events?: string[];
 }) {
   const events = options.events ?? [];
@@ -337,10 +365,65 @@ function controller(options: {
     resizeEpoch: 3,
     deviceEpoch: 5,
     webGpu: gpu,
+    ...(options.specialistGpu
+      ? { specialistGpu: options.specialistGpu }
+      : {}),
     tileAuthority: actor,
     storage,
   });
   return { target, actor, storage, transport, gpu, events };
+}
+
+const DURABLE_GRAIN_CAPABILITIES = [
+  "tip:analytic",
+  "grain:procedural",
+  "media:dry",
+  "color:linear-srgb",
+  "porter-duff:source-over",
+  "blend:normal",
+  "intent:professional",
+] as const satisfies readonly StudioEngineVNextBrushProviderCapability[];
+
+function durableSpecialistBoundary(events: string[]) {
+  const descriptor: StudioEngineVNextBrushProviderDescriptor = Object.freeze({
+    id: "durable-grain-provider",
+    version: 4,
+    priority: 100,
+    capabilities: DURABLE_GRAIN_CAPABILITIES,
+  });
+  const execute = vi.fn((
+    execution: StudioEngineVNextBrushProviderExecution,
+  ) => {
+    events.push(`specialist-gpu:${execution.canonicalPlan.commandSequence}`);
+    return createStudioEngineVNextBrushProviderGpuCompletion(
+      descriptor,
+      execution,
+      {
+        executionDigest: `durable:gpu:${execution.globalRequestSequence}`,
+        width: 8,
+        height: 8,
+        loweringVersion: 11,
+        dabCount: 2,
+        batchCount: 1,
+        batchOrder: [execution.canonicalPlan.composite.porterDuff],
+      },
+    );
+  });
+  const router = new StudioEngineVNextBrushProviderRouter({
+    sessionEpoch: 7,
+    deviceEpoch: 5,
+    resizeEpoch: 3,
+    providers: [{
+      descriptor,
+      execute,
+      notifyDeviceLoss: vi.fn(),
+      dispose: vi.fn(),
+    }],
+  });
+  return {
+    boundary: new StudioEngineVNextBrushProviderGpuBoundaryAdapter(router),
+    execute,
+  };
 }
 
 describe("StudioEngineDurableBrushController", () => {
@@ -412,6 +495,49 @@ describe("StudioEngineDurableBrushController", () => {
       "provider:1",
       "storage:1",
     ]);
+  });
+
+  it("durably commits specialist GPU completion before tile/storage and caches duplicates", async () => {
+    const events: string[] = [];
+    const specialist = durableSpecialistBoundary(events);
+    const analyticExecute = vi.fn();
+    const fixture = controller({
+      events,
+      specialistGpu: specialist.boundary,
+      gpu: { execute: analyticExecute },
+    });
+    const input = submission(1, {
+      brushPlan: canonicalPlan(1, { grain: proceduralGrain() }),
+    });
+
+    const first = await fixture.target.submit(input);
+    const duplicate = await fixture.target.submit(input);
+
+    expect(first.status).toBe("committed");
+    expect(duplicate.status).toBe("duplicate");
+    if (first.status === "rejected" || duplicate.status === "rejected") return;
+    expect(events).toEqual([
+      "specialist-gpu:1",
+      "provider:1",
+      "storage:1",
+    ]);
+    expect(analyticExecute).not.toHaveBeenCalled();
+    expect(specialist.execute).toHaveBeenCalledTimes(1);
+    expect(duplicate.receipt).toBe(first.receipt);
+    expect(first.receipt).toMatchObject({
+      gpu: {
+        requestSequence: 1,
+        planFingerprint: expect.stringMatching(
+          /^vnext-provider:durable-grain-provider@4:/u,
+        ),
+      },
+      authority: { commandSequence: 1 },
+      storage: {
+        state: "opfs-v2-atomic-commit-acknowledged",
+        commandSequence: 1,
+      },
+      storageDurability: "opfs-v2-durable",
+    });
   });
 
   it("rejects a same-sequence conflict and a sequence gap before durability advances", async () => {

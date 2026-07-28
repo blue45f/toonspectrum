@@ -168,6 +168,7 @@ import { summarizeStudioRasterPreparationSources } from "./studio-raster-edit-pr
 import {
   resolveStudioRasterToolAvailability,
   type StudioRasterToolAvailabilityContext,
+  type StudioRasterToolId,
 } from "./studio-raster-tool-availability";
 import {
   DEFAULT_STUDIO_SKETCH_STYLE,
@@ -277,7 +278,7 @@ export interface StudioInspectorAsideHandlers {
   clearHealCloneSource: () => void;
   clearPolyLassoDraft: () => void;
   commit: (nextElements: El[], extraPatch?: Partial<Omit<PageState, "id" | "elements">>, targetPageId?: string) => boolean;
-  createEditableRasterCopyForInspector: () => Promise<void>;
+  createEditableRasterCopyForInspector: (resumeToolId?: StudioRasterToolId) => Promise<void>;
   deleteFilterMask: () => void;
   deleteLayerMask: () => void;
   detachBubbleAnchor: () => void;
@@ -1331,6 +1332,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
       case "retouch":
         return [
           rasterAvailability("pixel-marquee", pixelBusy),
+          rasterAvailability("smudge", smudgeBusy),
+          rasterAvailability("dodge-burn", dodgeBurnBusy),
+          rasterAvailability("wet-mix", wetMixBusy),
           rasterAvailability("liquify", liquifyBusy),
           rasterAvailability("heal", healCloneBusy),
         ];
@@ -1400,7 +1404,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
         return;
       case "create-editable-raster-copy":
       case "create-selected-static-copy":
-        void createEditableRasterCopyForInspector();
+        void createEditableRasterCopyForInspector(request.toolId);
         return;
       case "add-or-import-content":
         openImagePastePicker();
@@ -3004,6 +3008,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           />
                           <StudioRasterToolRecoveryPanel
                             entries={[
+                              rasterAvailability("smudge", smudgeBusy),
+                              rasterAvailability("dodge-burn", dodgeBurnBusy),
+                              rasterAvailability("wet-mix", wetMixBusy),
                               rasterAvailability("liquify", liquifyBusy),
                               rasterAvailability("heal", healCloneBusy),
                             ]}
@@ -3757,6 +3764,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   />
                   <StudioRasterToolRecoveryPanel
                     entries={[
+                      rasterAvailability("smudge", smudgeBusy),
+                      rasterAvailability("dodge-burn", dodgeBurnBusy),
+                      rasterAvailability("wet-mix", wetMixBusy),
                       rasterAvailability("liquify", liquifyBusy),
                       rasterAvailability("heal", healCloneBusy),
                     ]}

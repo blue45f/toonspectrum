@@ -200,7 +200,8 @@ export function resolveStudioEditAvailability(
       !hasAnySelection ||
       (input.hasPixelSelection && (input.pixelBusy || input.selectedContentMutationLocked)),
     duplicateDisabled: input.mutationLocked || !input.hasElementSelection,
-    reorderDisabled: input.mutationLocked || !input.hasSingleElementSelection,
+    // 그룹/다중 선택도 PPT/Figma처럼 하나의 z-order 단위로 이동할 수 있다.
+    reorderDisabled: input.mutationLocked || !input.hasElementSelection,
     // Align with openSelectedLayerCrop → ensurePixelToolTarget and the rail Crop button.
     // Requiring selectedImage alone made Edit → 레이어 자르기 a silent dead control when the
     // page had exactly one editable image (keyboard C and the rail still worked).

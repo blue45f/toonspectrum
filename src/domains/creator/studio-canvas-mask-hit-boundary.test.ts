@@ -1,0 +1,126 @@
+import { readFileSync } from "node:fs";
+
+import { describe, expect, it } from "vitest";
+
+const viewportSource = readFileSync(
+  new URL("./StudioCanvasViewport.tsx", import.meta.url),
+  "utf8",
+);
+
+function sourceBetween(startToken: string, endToken: string): string {
+  const start = viewportSource.indexOf(startToken);
+  const end = viewportSource.indexOf(endToken, start + startToken.length);
+  expect(start).toBeGreaterThanOrEqual(0);
+  expect(end).toBeGreaterThan(start);
+  return viewportSource.slice(start, end);
+}
+
+describe("Studio canvas mask hit isolation boundary", () => {
+  it("wraps every render-as-mask clone in a non-listening Konva ancestor", () => {
+    const renderElement = sourceBetween(
+      "const renderEl = (el: El",
+      "// 문서 마스터 밑그림",
+    );
+
+    expect(renderElement).toContain("const isNonInteractiveRender =");
+    expect(renderElement).toContain(
+      "opts.asMask === true || isAdvancedFillVirtualPreview",
+    );
+    expect(renderElement).toContain("const wrapRenderInteraction =");
+    expect(renderElement).toMatch(
+      /isNonInteractiveRender\s*\?\s*\(\s*<Group[\s\S]*?listening=\{false\}/u,
+    );
+    expect(renderElement).toContain(
+      "return wrapRenderInteraction(clippedNode)",
+    );
+    expect(renderElement).toContain(
+      'if (el.type === "frame") {\n                  return wrapRenderInteraction(',
+    );
+    expect(renderElement).toContain("!isNonInteractiveRender &&");
+    expect(renderElement).toContain(
+      "const onSelect = isNonInteractiveRender",
+    );
+    expect(renderElement).toContain(
+      "const setRef = isNonInteractiveRender",
+    );
+  });
+
+  it("does not create the select-only draw hit Shape for a mask clone", () => {
+    const drawBranch = sourceBetween(
+      'if (el.type === "draw") {',
+      'if (el.type === "text")',
+    );
+
+    expect(drawBranch).toContain("<StudioDrawNode el={liveEl} />");
+    expect(drawBranch).toContain(
+      '{tool === "select" && !isNonInteractiveRender ? (',
+    );
+    expect(drawBranch).toContain("hitFunc={(context, shape) => {");
+    expect(drawBranch).toContain("listening");
+    expect(drawBranch).toContain("onMouseDown={onSelect}");
+    expect(drawBranch).toContain("onTap={onSelect}");
+    expect(drawBranch).not.toContain('{tool === "select" ? (');
+  });
+
+  it("marks every duplicate mask source non-interactive while leaving authored content interactive", () => {
+    const composite = sourceBetween(
+      "const masterUnderlay =",
+      "return (\n                  <>",
+    );
+    const maskCloneCalls =
+      composite.match(/renderEl\([^)]*,\s*\{\s*asMask:\s*true\s*\}\)/gu) ?? [];
+
+    expect(maskCloneCalls).toHaveLength(4);
+    expect(composite).toContain(
+      "renderEl(mel, mIdx, { asMask: true })",
+    );
+    expect(composite).toContain(
+      "renderEl(pel, pIdx, { asMask: true })",
+    );
+    expect(composite).toContain(
+      "renderEl(maskEl, idx, { asMask: true })",
+    );
+    expect(composite).toContain(
+      "renderEl(base, idx - 1, { asMask: true })",
+    );
+    expect(composite).toContain("const content = renderEl(el, idx, opts)");
+    expect(composite).toContain(
+      'renderWithOwnMask({ compositeOverride: "source-in" })',
+    );
+  });
+});
+
+describe("Studio canvas selection interaction guards", () => {
+  it("keeps 44px resize hit targets on wide coarse-pointer devices", () => {
+    expect(viewportSource).toContain(
+      'import { useMediaQuery } from "@/components/use-media-query"',
+    );
+    expect(viewportSource).toContain(
+      'const hasCoarsePointer = useMediaQuery("(pointer: coarse)")',
+    );
+    const resizeProxy = sourceBetween(
+      "<StudioGroupUniformResizeProxy",
+      "/>\n              ) : null}",
+    );
+    expect(resizeProxy).toContain("mobile={isMobile}");
+    expect(resizeProxy).toContain("coarse={hasCoarsePointer}");
+  });
+
+  it("disables alignment for both fully and partially locked selections", () => {
+    const selectionGuards = sourceBetween(
+      "const selectionLockedCount =",
+      "const multiSelectionVisibleBounds =",
+    );
+
+    expect(selectionGuards).toContain(
+      "isEffectivelyLocked(element, groups)",
+    );
+    expect(selectionGuards).toContain("selectionLockedCount > 0");
+    expect(selectionGuards).toContain(
+      "잠긴 객체가 포함되어 있어 정렬·분배할 수 없어요. 선택 항목의 잠금을 모두 해제하세요.",
+    );
+    expect(selectionGuards.indexOf("selectionLockedCount > 0")).toBeLessThan(
+      selectionGuards.indexOf("topLevelSelectedGroupIds.size > 0"),
+    );
+  });
+});

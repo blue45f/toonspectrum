@@ -24,6 +24,7 @@ interface MockRailButtonProps {
   readonly id?: string;
   readonly label: string;
   readonly onClick?: () => void;
+  readonly unavailableReason?: string;
 }
 
 vi.mock("./studio-chrome-ui", () => ({
@@ -40,6 +41,7 @@ vi.mock("./studio-chrome-ui", () => ({
     id,
     label,
     onClick,
+    unavailableReason,
   }: MockRailButtonProps) => (
     <button
       id={id}
@@ -52,6 +54,7 @@ vi.mock("./studio-chrome-ui", () => ({
       data-hint-description={description}
       data-hint-preview={hintPreview}
       data-hint-preview-variant={hintPreviewVariant}
+      data-unavailable-reason={unavailableReason}
       disabled={disabled}
       onClick={onClick}
     >
@@ -129,6 +132,7 @@ function createProps(overrides: Partial<RailProps> = {}): RailProps {
   return {
     activeSurfaceReviewLocked: false,
     pixelToolTargetAvailable: true,
+    rasterRetouchTargetAvailable: true,
     advancedFillActive: false,
     advancedFillUnsupportedReason: null,
     appSettings: defaultStudioAppSettings(),
@@ -275,6 +279,109 @@ describe("StudioLeftToolRail", () => {
 
     fireEvent.click(fill);
     expect(props.stableHandlers.toggleAdvancedFill).toHaveBeenCalledOnce();
+  });
+
+  it("enables page-raster retouch while keeping transform and frame animation image-only", () => {
+    const props = createProps({
+      pixelSel: USABLE_SELECTION,
+      pixelToolTargetAvailable: false,
+      rasterRetouchTargetAvailable: true,
+      selected: null,
+    });
+    render(<StudioLeftToolRail {...props} />);
+
+    for (const name of [
+      "자르기 (C)",
+      "혼합 (스머지) (N)",
+      "혼색 브러시 (Shift+N)",
+      "닷지/번 (O)",
+      "리퀴파이 (J)",
+    ]) {
+      const button = screen.getByRole<HTMLButtonElement>("button", { name });
+      expect(button.disabled).toBe(false);
+      expect(button.getAttribute("data-hint-description")).toContain(
+        "현재 페이지 합성본을 자동 준비",
+      );
+    }
+
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "변형 (⇧T)" }).disabled)
+      .toBe(true);
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "프레임 애니메이션" }).disabled)
+      .toBe(true);
+  });
+
+  it("disables only inactive raster-retouch tools when neither image nor page target is available", () => {
+    render(<StudioLeftToolRail {...createProps({
+      pixelToolTargetAvailable: false,
+      rasterRetouchTargetAvailable: false,
+      selected: null,
+    })} />);
+
+    for (const name of [
+      "자르기 (C)",
+      "혼합 (스머지) (N)",
+      "혼색 브러시 (Shift+N)",
+      "닷지/번 (O)",
+      "리퀴파이 (J)",
+    ]) {
+      const button = screen.getByRole<HTMLButtonElement>("button", { name });
+      expect(button.disabled).toBe(true);
+      expect(button.getAttribute("data-unavailable-reason")).toContain(
+        "현재 페이지 합성본을 자동 준비",
+      );
+    }
+  });
+
+  it("always leaves an armed raster-retouch tool clickable for a direct exit", () => {
+    const cases: ReadonlyArray<{
+      readonly name: string;
+      readonly overrides: Partial<RailProps>;
+      readonly handler: (props: RailProps) => ReturnType<typeof vi.fn>;
+    }> = [
+      {
+        name: "자르기 (C)",
+        overrides: { cropActive: true },
+        handler: (props) => props.stableHandlers.openSelectedLayerCrop as ReturnType<typeof vi.fn>,
+      },
+      {
+        name: "혼합 (스머지) (N)",
+        overrides: { smudgeActive: true },
+        handler: (props) => props.stableHandlers.toggleSmudgeTool as ReturnType<typeof vi.fn>,
+      },
+      {
+        name: "혼색 브러시 (Shift+N)",
+        overrides: { wetMixActive: true },
+        handler: (props) => props.stableHandlers.toggleWetMixTool as ReturnType<typeof vi.fn>,
+      },
+      {
+        name: "닷지/번 (O)",
+        overrides: { dodgeBurnActive: true },
+        handler: (props) => props.stableHandlers.toggleDodgeBurnTool as ReturnType<typeof vi.fn>,
+      },
+      {
+        name: "리퀴파이 (J)",
+        overrides: { liquifyActive: true },
+        handler: (props) => props.stableHandlers.toggleLiquifyTool as ReturnType<typeof vi.fn>,
+      },
+    ];
+
+    for (const testCase of cases) {
+      const props = createProps({
+        activeSurfaceReviewLocked: true,
+        pixelToolTargetAvailable: false,
+        rasterRetouchTargetAvailable: false,
+        ...testCase.overrides,
+      });
+      const view = render(<StudioLeftToolRail {...props} />);
+      const button = screen.getByRole<HTMLButtonElement>("button", {
+        name: testCase.name,
+      });
+      expect(button.disabled).toBe(false);
+      expect(button.getAttribute("data-unavailable-reason")).toBeNull();
+      fireEvent.click(button);
+      expect(testCase.handler(props)).toHaveBeenCalledOnce();
+      view.unmount();
+    }
   });
 
   it("shows one primary pointer tool while selection and draw subtools are armed", () => {

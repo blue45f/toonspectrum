@@ -102,7 +102,9 @@ describe("StudioCanvasStatusRail", () => {
     expect(screen.queryByRole("button", { name: "선택 요소 가로 균등 분배" })).toBeNull();
 
     rerender(<StudioCanvasStatusRail {...props} selectionCount={2} />);
-    expect(screen.getByRole("button", { name: "선택 요소 그룹화" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "선택 요소 그룹화" }).getAttribute("aria-keyshortcuts")
+    ).toBe("Control+G Meta+G");
     expect(screen.queryByRole("button", { name: "선택 요소 가로 균등 분배" })).toBeNull();
 
     rerender(<StudioCanvasStatusRail {...props} selectionCount={3} />);
@@ -150,7 +152,13 @@ describe("StudioCanvasStatusRail", () => {
 
     expect(screen.queryByRole("button", { name: "선택 요소 그룹화" })).toBeNull();
     expect(screen.getByText("주인공")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "선택 그룹 해제" }));
+    expect(screen.getByRole("button", { name: "선택 그룹 왼쪽 정렬" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "선택 요소 가로 균등 분배" })).toBeNull();
+    const ungroupButton = screen.getByRole("button", { name: "선택 그룹 해제" });
+    expect(ungroupButton.getAttribute("aria-keyshortcuts")).toBe(
+      "Shift+Control+G Shift+Meta+G"
+    );
+    fireEvent.click(ungroupButton);
     fireEvent.click(screen.getByRole("button", { name: "선택 잠금 해제" }));
 
     expect(props.onUngroupSelection).toHaveBeenCalledOnce();
@@ -173,6 +181,106 @@ describe("StudioCanvasStatusRail", () => {
       ?.parentElement;
     expect(actionStrip?.className).toContain("overflow-x-auto");
     expect(container.querySelector("[data-studio-canvas-status-rail]")).toBeTruthy();
+  });
+
+  it("keeps the current group internal-edit mode visible without an object selection", () => {
+    const { container } = render(
+      <StudioCanvasStatusRail
+        {...createProps({
+          selectionCount: 0,
+          activeGroupName: "주인공 연출 그룹",
+        })}
+      />
+    );
+
+    const status = screen.getByRole("status", {
+      name: "주인공 연출 그룹 내부 편집 중. Esc로 그룹 전체 선택",
+    });
+    expect(status.getAttribute("aria-live")).toBe("polite");
+    expect(status.getAttribute("aria-atomic")).toBe("true");
+    expect(status.textContent).toContain("주인공 연출 그룹");
+    expect(status.textContent).toContain("내부 편집");
+    expect(status.textContent).toContain("Esc로 그룹 전체 선택");
+    expect(container.querySelector("[data-studio-group-internal-edit-status]")).toBe(status);
+    expect(screen.queryByRole("button", { name: "선택 요소 그룹화" })).toBeNull();
+  });
+
+  it("contains long group names responsively and preserves selection actions", () => {
+    const props = createProps({
+      selectionCount: 2,
+      activeGroupName:
+        "아주 긴 주인공과 배경 및 전경 연출을 함께 관리하는 그룹 이름",
+    });
+    render(<StudioCanvasStatusRail {...props} />);
+
+    const status = screen.getByRole("status", { name: /아주 긴 주인공.*내부 편집 중/ });
+    const groupName = screen.getByText(
+      "아주 긴 주인공과 배경 및 전경 연출을 함께 관리하는 그룹 이름"
+    );
+    expect(status.className).toContain("flex-wrap");
+    expect(groupName.className).toContain("truncate");
+    expect(groupName.className).toContain("max-w-[min(12rem,58vw)]");
+
+    fireEvent.click(screen.getByRole("button", { name: "선택 요소 그룹화" }));
+    expect(props.onGroupSelection).toHaveBeenCalledOnce();
+  });
+
+  it("does not announce an empty active group name", () => {
+    render(
+      <StudioCanvasStatusRail
+        {...createProps({
+          activeGroupName: "   ",
+        })}
+      />
+    );
+
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("keeps selection actions at 44px on coarse pointers and exposes unavailable reasons", () => {
+    const props = createProps({
+      selectionCount: 3,
+      groupSelectionDisabledReason: "기존 그룹을 먼저 해제하세요.",
+      alignmentSelectionDisabledReason: "여러 그룹은 그룹별로 정렬하세요.",
+    });
+    render(<StudioCanvasStatusRail {...props} />);
+
+    const group = screen.getByRole("button", { name: "선택 요소 그룹화" });
+    const align = screen.getByRole("button", { name: "선택 요소 왼쪽 정렬" });
+    const lock = screen.getByRole("button", { name: "선택 잠금" });
+
+    for (const button of [group, align, lock]) {
+      expect(button.className).toContain("pointer-coarse:min-h-11");
+      expect(button.className).toContain("pointer-coarse:min-w-11");
+    }
+    expect((group as HTMLButtonElement).disabled).toBe(true);
+    expect((align as HTMLButtonElement).disabled).toBe(true);
+    expect((lock as HTMLButtonElement).disabled).toBe(false);
+    expect(
+      (screen.getByRole("button", {
+        name: "선택 요소 맨 앞으로",
+      }) as HTMLButtonElement).disabled
+    ).toBe(false);
+    fireEvent.click(group);
+    fireEvent.click(align);
+    expect(props.onGroupSelection).not.toHaveBeenCalled();
+    expect(props.onAlignSelection).not.toHaveBeenCalled();
+  });
+
+  it("gates group-wide mutations without disabling unrelated alignment reasons", () => {
+    const props = createProps({
+      selectionCount: 2,
+      selectionGroupName: "잠긴 원고 그룹",
+      layoutSelectionDisabledReason: "검토 잠금을 먼저 해제하세요.",
+    });
+    render(<StudioCanvasStatusRail {...props} />);
+
+    const ungroup = screen.getByRole("button", { name: "선택 그룹 해제" });
+    const front = screen.getByRole("button", { name: "선택 요소 맨 앞으로" });
+    const align = screen.getByRole("button", { name: "선택 그룹 왼쪽 정렬" });
+    expect((ungroup as HTMLButtonElement).disabled).toBe(true);
+    expect((front as HTMLButtonElement).disabled).toBe(true);
+    expect((align as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("exposes the bubble-merge action only when armed and gates it on the reason", () => {

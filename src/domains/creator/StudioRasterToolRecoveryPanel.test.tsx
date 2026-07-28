@@ -57,9 +57,9 @@ describe("StudioRasterToolRecoveryPanel", () => {
 
   it("deduplicates one shared recovery action across related retouch tools", () => {
     const onRecover = vi.fn();
-    const entries = ["pixel-marquee", "liquify", "heal"].map((toolId) =>
+    const entries = ["pixel-marquee", "crop", "heal"].map((toolId) =>
       resolveStudioRasterToolAvailability(
-        toolId as "pixel-marquee" | "liquify" | "heal",
+        toolId as "pixel-marquee" | "crop" | "heal",
         {
           selectedType: "draw",
           visibleVectorDrawCount: 1,
@@ -77,6 +77,32 @@ describe("StudioRasterToolRecoveryPanel", () => {
     expect(buttons[0]!.textContent).toContain("3개 도구용");
     fireEvent.click(buttons[0]!);
     expect(onRecover).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps auto-prepared retouch actions individually addressable", () => {
+    const onRecover = vi.fn();
+    const entries = ["smudge", "dodge-burn", "wet-mix", "liquify"].map((toolId) =>
+      resolveStudioRasterToolAvailability(
+        toolId as "smudge" | "dodge-burn" | "wet-mix" | "liquify",
+        {
+          selectedType: "draw",
+          visibleVectorDrawCount: 1,
+          exactRenderableVisibleCount: 1,
+        },
+      ),
+    );
+
+    render(<StudioRasterToolRecoveryPanel entries={entries} onRecover={onRecover} />);
+
+    const buttons = screen.getAllByRole("button", {
+      name: "페이지 합성본 준비 후 실행",
+    });
+    expect(buttons).toHaveLength(entries.length);
+    fireEvent.click(buttons[2]!);
+    expect(onRecover).toHaveBeenCalledWith({
+      toolId: "wet-mix",
+      action: entries[2]!.entry.action,
+    });
   });
 
   it("keeps a blocked filter reason and recovery action available to assistive technology", () => {

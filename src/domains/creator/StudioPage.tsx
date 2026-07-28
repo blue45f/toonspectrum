@@ -509,11 +509,18 @@ import {
   type SharedGutterSegment,
 } from "./studio-frame-folder";
 import {
+  expandSelectionIdsToGroupUnits,
+  planAtomicSelectionTranslation,
   planGroupClickSelection,
   planGroupEnter,
   planGroupEscape,
+  selectionShapeForIds,
   type GroupSelectionState,
 } from "./studio-group-selection";
+import {
+  planStudioGroupUniformResize,
+  type StudioGroupUniformResizeBounds,
+} from "./studio-group-uniform-resize";
 import {
   computeHealCloneSourceOffset,
   healCloneSourcePoint,
@@ -607,6 +614,7 @@ import {
   setItemGroup,
   ungroupItems,
   type LayerGroup,
+  type LayerItemReorderDirection,
 } from "./studio-layers";
 import { type StudioLiquifyMode } from "./studio-liquify-contract";
 import {
@@ -965,6 +973,7 @@ import {
   projectStudioRasterOverlayElements,
   resolveStudioRasterHandoffProjection,
 } from "./studio-raster-publication-projection";
+import { resolveStudioRasterToolResumePlan } from "./studio-raster-tool-resume-plan";
 import { studioRasterVisibleDocumentRectFromViewport } from "./studio-raster-visible-rect";
 import {
   createStudioRawPenInkPreviewState,
@@ -1053,6 +1062,7 @@ import {
   SMART_SNAP_THRESHOLD,
   buildPointObjectSnapOverlay,
   buildSmartGuideOverlay,
+  buildSmartGuideOverlayPreview,
   computeSmartSnap,
   planFreehandObjectSnapPoint,
   shouldApplyStrokeObjectSnap,
@@ -1370,6 +1380,7 @@ import type {
   StudioEditableRasterCopyPlan,
 } from "./studio-raster-edit-preparation";
 import type { StudioRasterServerAuthoritySnapshot } from "./studio-raster-server-authority";
+import type { StudioRasterToolId } from "./studio-raster-tool-availability";
 import type { StudioReleaseSchedule } from "./studio-release-schedule";
 import type { SceneTemplate } from "./studio-scene-templates";
 import type { SfxPreset } from "./studio-sfx-presets";
@@ -2634,8 +2645,43 @@ function StudioCuttoonEditor() {
       endLiveResourceEdit();
     }
   }
+  function canvasInteractionUnitIds(elementId: string): string[] {
+    if (marqueeIds.length > 1 && marqueeIds.includes(elementId)) {
+      return marqueeIds.filter((id) => elementById.has(id));
+    }
+    const expanded = expandSelectionIdsToGroupUnits(
+      elements,
+      groups,
+      [elementId],
+      activeGroupIdRef.current
+    );
+    return expanded.length > 0 ? expanded : [elementId];
+  }
   function nodeInteractionBegin(elementId: string): boolean {
-    return beginLiveResourceEdit([elementId]);
+    const unitIds = canvasInteractionUnitIds(elementId);
+    const lockedMember = unitIds
+      .map((id) => elementById.get(id))
+      .find((element): element is El =>
+        Boolean(element && isEffectivelyLocked(element, groups))
+      );
+    if (lockedMember) {
+      setError(
+        unitIds.length > 1
+          ? "잠긴 멤버가 포함된 그룹이에요. 그룹 잠금을 해제한 뒤 전체를 이동하세요."
+          : "잠긴 요소예요. 잠금을 해제한 뒤 이동하세요."
+      );
+      return false;
+    }
+    return beginLiveResourceEdit(unitIds);
+  }
+  function endCanvasNodeInteraction() {
+    // 자식 onDragEnd가 Stage onDragEnd보다 먼저 버블된다. 그룹 preview가 살아 있는 동안에는
+    // 전체 선택 lease를 유지하고, Stage가 원자 commit을 마친 뒤 한 번만 해제한다.
+    if (groupDragRef.current) return;
+    endLiveResourceEdit();
+  }
+  function isCanvasGroupDragActive(elementId: string): boolean {
+    return groupDragRef.current?.selectedIds.includes(elementId) === true;
   }
   function startMacroRecord() {
     // Timestamp is taken inside startStudioMacroRecording (default now) to keep this handler render-pure.
@@ -5505,6 +5551,13 @@ function StudioCuttoonEditor() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // PPT식 드래그 다중선택 — 빈 영역에서 사각형을 끌어 겹치는 요소를 한꺼번에 선택.
   const [marqueeIds, setMarqueeIds] = useState<string[]>([]);
+  // Konva 노드의 native mouse/pointer event는 메모된 Viewport를 거쳐 stable handler로
+  // 전달된다. 연속 클릭·Shift 토글이 같은 브라우저 task에 들어오면 렌더 클로저보다 이
+  // 권위 ref가 먼저 갱신되어야 PPT식 선택 단위가 직전 선택을 잃지 않는다.
+  const selectedIdRef = useRef<string | null>(null);
+  const marqueeIdsRef = useRef<string[]>([]);
+  selectedIdRef.current = selectedId;
+  marqueeIdsRef.current = marqueeIds;
   // 그룹 진입(PPT/Figma "그룹 안으로 들어가기") — 더블클릭으로 한 그룹의 내부 편집 모드에 들어가면
   // 그 그룹 자식만 개별 선택되고, Escape/빈 영역 클릭/다른 그룹 선택으로 빠져나온다. 진입 상태는
   // 이산적 클릭에서만 바뀌므로 상태로 두되, 이벤트 핸들러가 같은 렌더 안에서 최신값을 읽도록 ref로
@@ -5518,7 +5571,34 @@ function StudioCuttoonEditor() {
   const marqueeRectNodeRef = useRef<Konva.Rect>(null);
   const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
   // 다중선택 그룹 이동 — 끄는 노드의 시작·직전 위치로 나머지 선택 노드에 이동량을 함께 적용.
-  const groupDragRef = useRef<{ id: string; x0: number; y0: number; lastX: number; lastY: number } | null>(null);
+  const groupDragRef = useRef<{
+    id: string;
+    x0: number;
+    y0: number;
+    lastX: number;
+    lastY: number;
+    selectedIds: string[];
+  } | null>(null);
+  // draw 요소는 문서 좌표를 points에 보관하고 Konva wrapper x/y는 라이브 그룹 이동 preview에만
+  // 사용한다. 성공 커밋 직후 새 elements가 렌더되기 전에는 wrapper를 먼저 0으로 돌리면 화면이
+  // 한 프레임 되감기므로, 커밋한 draw ID와 이전 배열 참조를 보관했다가 다음 layout에서 수렴시킨다.
+  const pendingCommittedGroupDrawResetRef = useRef<{
+    drawIds: string[];
+    sourceElements: El[];
+    pageId: string;
+    masterEditMode: boolean;
+  } | null>(null);
+  // 그룹/다중 선택 리사이즈는 child Transformer를 직접 건드리지 않는다. 시작 시점의 선택,
+  // 문서 스코프, 요소 참조를 캡처하고 전용 proxy가 끝날 때 모두 그대로인 경우에만 affine
+  // 결과를 한 번 커밋한다. 팀 동기화나 다른 입력이 중간에 요소를 바꾸면 전체를 fail-close한다.
+  const groupResizeRef = useRef<{
+    selectedIds: string[];
+    sourceBounds: StudioGroupUniformResizeBounds;
+    sourceElements: El[];
+    pageId: string;
+    masterEditMode: boolean;
+    mutationTicket: StudioEditorMutationTicket;
+  } | null>(null);
   // 단일 선택이 생기면 마퀴 다중선택은 해제(상호 배타).
   useEffect(() => {
     if (selectedId) setMarqueeIds([]);
@@ -5546,34 +5626,209 @@ function StudioCuttoonEditor() {
     activeGroupIdRef.current = null;
     setActiveGroupId(null);
   }, [activePage.id, masterEditMode, pagesHi]);
+  // Transformer pointer capture 중에 레이어 패널·단축키·원격 동기화가 선택 스코프를 바꾸면
+  // transformEnd의 오래된 snapshot을 적용하지 않는다. proxy도 같은 변경으로 unmount/disable되지만
+  // Page에서 lease를 먼저 닫아 브라우저 이벤트 순서와 무관하게 안전 경계를 보장한다.
+  useEffect(() => {
+    const session = groupResizeRef.current;
+    if (!session) return;
+    const currentIds = marqueeIdsRef.current;
+    const currentIdSet = new Set(currentIds);
+    const selectionStillMatches =
+      selectedIdRef.current === null &&
+      currentIds.length === session.selectedIds.length &&
+      currentIdSet.size === currentIds.length &&
+      session.selectedIds.every((id) => currentIdSet.has(id));
+    if (
+      selectionStillMatches &&
+      activePage.id === session.pageId &&
+      masterEditMode === session.masterEditMode
+    ) {
+      return;
+    }
+    groupResizeRef.current = null;
+    endLiveResourceEdit();
+  }, [activePage.id, masterEditMode, marqueeIds, selectedId]);
   // 그룹 선택 상태 3종을 한 번에 적용하는 어댑터. ref를 동기로 갱신해 같은 렌더 안에서 연달아
   // 발생하는 포인터 이벤트(예: 더블클릭의 2연속 mousedown)도 최신 진입 상태를 읽게 한다.
   function applyGroupSelectionState(next: GroupSelectionState) {
     activeGroupIdRef.current = next.activeGroupId;
+    selectedIdRef.current = next.selectedId;
+    marqueeIdsRef.current = next.marqueeIds;
     setActiveGroupId(next.activeGroupId);
     setSelectedId(next.selectedId);
     setMarqueeIds(next.marqueeIds);
+  }
+  function currentCanvasSelectionIds(): string[] {
+    if (marqueeIdsRef.current.length > 0) return [...marqueeIdsRef.current];
+    return selectedIdRef.current ? [selectedIdRef.current] : [];
+  }
+  function clearCanvasSelection() {
+    applyGroupSelectionState({
+      selectedId: null,
+      marqueeIds: [],
+      activeGroupId: null,
+    });
   }
   // 캔버스에서 요소를 클릭/더블클릭했을 때 "그룹 = 하나의 단위"로 선택을 확장한다(PPT/Figma 동작).
   // 순수 로직은 studio-group-selection 이 계산하고 여기서는 상태 적용만 한다.
   function selectElementFromCanvas(
     elementId: string,
-    evt?: Konva.KonvaEventObject<MouseEvent | TouchEvent>
+    evt?: Konva.KonvaEventObject<MouseEvent | TouchEvent>,
+    forceGroupEnter = false
   ) {
     const nativeEvent = evt?.evt as (MouseEvent & Partial<TouchEvent>) | undefined;
     const additive = nativeEvent?.shiftKey === true;
-    // MouseEvent.detail 은 연속 클릭 횟수(더블클릭이면 2). 터치(onTap)는 detail 이 없어 항상 1.
-    const clickCount = typeof nativeEvent?.detail === "number" ? nativeEvent.detail : 1;
     const current: GroupSelectionState = {
-      selectedId,
-      marqueeIds,
+      selectedId: selectedIdRef.current,
+      marqueeIds: marqueeIdsRef.current,
       activeGroupId: activeGroupIdRef.current,
     };
     const next =
-      clickCount >= 2 && !additive
+      forceGroupEnter && !additive
         ? planGroupEnter({ items: elements, groups, clickedId: elementId })
         : planGroupClickSelection({ items: elements, groups, clickedId: elementId, current, additive });
     applyGroupSelectionState(next);
+    if (
+      forceGroupEnter &&
+      next.activeGroupId &&
+      next.activeGroupId !== current.activeGroupId
+    ) {
+      announceDrawingShortcut("그룹 내부 편집 · Esc로 그룹 전체 선택");
+    }
+  }
+  function finitePositiveGroupResizeBounds(
+    bounds: StudioGroupUniformResizeBounds
+  ): boolean {
+    return (
+      Number.isFinite(bounds.x) &&
+      Number.isFinite(bounds.y) &&
+      Number.isFinite(bounds.width) &&
+      Number.isFinite(bounds.height) &&
+      bounds.width > 0 &&
+      bounds.height > 0
+    );
+  }
+  function beginCanvasSelectionResize(
+    sourceBounds: StudioGroupUniformResizeBounds
+  ): boolean {
+    if (groupResizeRef.current || groupDragRef.current) return false;
+    const selectedIds = [...marqueeIdsRef.current];
+    const uniqueIds = new Set(selectedIds);
+    const currentElements = activeElementsRef.current;
+    const currentById = new Map(
+      currentElements.map((element) => [element.id, element])
+    );
+    if (
+      selectedIds.length < 2 ||
+      uniqueIds.size !== selectedIds.length ||
+      !finitePositiveGroupResizeBounds(sourceBounds) ||
+      activeSurfaceReviewLockedRef.current ||
+      selectedIds.some((id) => !currentById.has(id)) ||
+      selectedIds.some((id) => {
+        const element = currentById.get(id);
+        return Boolean(
+          element && isEffectivelyLocked(element, activeGroupsRef.current)
+        );
+      })
+    ) {
+      setError(
+        activeSurfaceReviewLockedRef.current
+          ? collaborationAccessRef.current.locked
+            ? collaborationLockMessage()
+            : "이 작업면은 검토 잠금 상태예요. 잠금을 해제한 뒤 크기를 조절하세요."
+          : "그룹 크기를 조절할 수 없어요. 선택과 잠금 상태를 확인하세요."
+      );
+      return false;
+    }
+    if (!beginLiveResourceEdit(selectedIds, "transform")) return false;
+    groupResizeRef.current = {
+      selectedIds,
+      sourceBounds: { ...sourceBounds },
+      sourceElements: selectedIds.map((id) => currentById.get(id)!),
+      pageId: currentPageIdRef.current,
+      masterEditMode: masterEditModeRef.current,
+      mutationTicket: captureStudioMutationTicket(),
+    };
+    setError(null);
+    return true;
+  }
+  function cancelCanvasSelectionResize() {
+    if (!groupResizeRef.current) return;
+    groupResizeRef.current = null;
+    endLiveResourceEdit();
+  }
+  function commitCanvasSelectionResize(
+    targetBounds: StudioGroupUniformResizeBounds
+  ) {
+    const session = groupResizeRef.current;
+    groupResizeRef.current = null;
+    if (!session) return;
+    try {
+      const currentIds = marqueeIdsRef.current;
+      const currentIdSet = new Set(currentIds);
+      const currentElements = activeElementsRef.current;
+      const currentById = new Map(
+        currentElements.map((element) => [element.id, element])
+      );
+      const selectionStillMatches =
+        currentIds.length === session.selectedIds.length &&
+        currentIdSet.size === currentIds.length &&
+        session.selectedIds.every((id) => currentIdSet.has(id));
+      const sourceStillMatches = session.sourceElements.every(
+        (element) => currentById.get(element.id) === element
+      );
+      if (
+        !finitePositiveGroupResizeBounds(targetBounds) ||
+        !selectionStillMatches ||
+        !sourceStillMatches ||
+        currentPageIdRef.current !== session.pageId ||
+        masterEditModeRef.current !== session.masterEditMode ||
+        activeSurfaceReviewLockedRef.current ||
+        !canApplyStudioMutation(session.mutationTicket)
+      ) {
+        setError(
+          "그룹 크기 조절 중 선택이나 문서가 바뀌어 안전하게 취소했어요."
+        );
+        return;
+      }
+
+      const next = planStudioGroupUniformResize({
+        items: currentElements,
+        selectedIds: session.selectedIds,
+        sourceBounds: session.sourceBounds,
+        targetBounds,
+        isLocked: (element) =>
+          isEffectivelyLocked(element, activeGroupsRef.current),
+      });
+      const nextById = new Map(next.map((element) => [element.id, element]));
+      const changed = session.selectedIds.some(
+        (id) => nextById.get(id) !== currentById.get(id)
+      );
+      if (!changed) {
+        const boundsChanged =
+          Math.abs(targetBounds.x - session.sourceBounds.x) > 1e-7 ||
+          Math.abs(targetBounds.y - session.sourceBounds.y) > 1e-7 ||
+          Math.abs(targetBounds.width - session.sourceBounds.width) > 1e-7 ||
+          Math.abs(targetBounds.height - session.sourceBounds.height) > 1e-7;
+        if (boundsChanged) {
+          setError(
+            "선택 안에 크기를 조절할 수 없는 요소가 있어 그룹 전체를 변경하지 않았어요."
+          );
+        }
+        return;
+      }
+      if (commit(next)) {
+        const percent = Math.max(
+          1,
+          Math.round((targetBounds.width / session.sourceBounds.width) * 100)
+        );
+        setError(null);
+        announceDrawingShortcut(`그룹 크기 조절 · ${percent}%`);
+      }
+    } finally {
+      endLiveResourceEdit();
+    }
   }
   // 필터 클립보드 — "필터 복사"로 담아 다른 요소에 "붙여넣기"(웹툰 컷 간 룩 통일용).
   const [filterClipboard, setFilterClipboard] = useState<Partial<ImageFilterFields> | null>(null);
@@ -8794,6 +9049,38 @@ function StudioCuttoonEditor() {
   function setElementNodeRef(elId: string, node: Konva.Node | null) {
     nodeRefsRef.current[elId] = node;
   }
+  useLayoutEffect(() => {
+    const pending = pendingCommittedGroupDrawResetRef.current;
+    if (!pending) return;
+    if (
+      activePage.id !== pending.pageId ||
+      masterEditMode !== pending.masterEditMode
+    ) {
+      pendingCommittedGroupDrawResetRef.current = null;
+      return;
+    }
+    // commit()을 호출한 이벤트의 기존 렌더에서는 아직 points가 이동 전이다. 새 elements 배열이
+    // 도착한 layout에서만 wrapper preview를 제거해야 화면이 되감기지 않고 모델과 정확히 합쳐진다.
+    if (elements === pending.sourceElements) return;
+    pendingCommittedGroupDrawResetRef.current = null;
+    const currentById = new Map(elements.map((element) => [element.id, element]));
+    const dirtyLayers = new Set<Konva.Layer>();
+    for (const id of pending.drawIds) {
+      if (currentById.get(id)?.type !== "draw") continue;
+      const node = nodeRefsRef.current[id];
+      if (!node || (node.x() === 0 && node.y() === 0)) continue;
+      node.position({ x: 0, y: 0 });
+      const layer = node.getLayer();
+      if (layer) dirtyLayers.add(layer);
+    }
+    for (const layer of dirtyLayers) layer.batchDraw();
+  }, [activePage.id, elements, masterEditMode]);
+  useLayoutEffect(
+    () => () => {
+      pendingCommittedGroupDrawResetRef.current = null;
+    },
+    []
+  );
   const drawingRef = useRef<DrawEl | null>(null);
   const drawingStabilizerRef = useRef<StudioStrokeStabilizerState | null>(null);
   const drawingFixedRateFilterRef = useRef<FixedRateStrokeFilterState | null>(null);
@@ -11029,6 +11316,9 @@ function StudioCuttoonEditor() {
   // ── 이미지 크롭 도구 — studio-crop 통합 상태 ──
   // cropRect(정규화 0..1)가 null 이 아니면 크롭 모드. 크롭 rect 는 이미지 요소 1개에 귀속된다.
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
+  // 페이지 합성본을 만든 같은 명령에서 크롭을 이어갈 때 selectedId 전환 effect가 방금 만든
+  // 초기 cropRect를 지우지 않도록, 정확한 새 소유자 한 번만 통과시키는 토큰이다.
+  const cropAutoTargetRef = useRef<string | null>(null);
   // 퍼펫 워프 — 핀 배열은 이미지 요소 1개에 귀속되지만 crop과 동일하게 elId를 별도로 추적하지
   // 않는다(적용 시점의 selected를 그대로 대상으로 삼는다).
   const [puppetWarpActive, setPuppetWarpActive] = useState(false);
@@ -11466,14 +11756,15 @@ function StudioCuttoonEditor() {
   }, [selectedId]);
   // 선택 요소가 바뀌면 크롭 모드·진행 중 드래그·busy 를 해제한다(크롭 rect 는 이미지 1개 귀속).
   useEffect(() => {
-    void selectedId; // "바뀌면 초기화"를 위해 의존성으로 구독.
+    const keepAutoTargetCrop = cropAutoTargetRef.current === selectedId;
+    cropAutoTargetRef.current = null;
     cropDragRef.current = null;
     pendingCropRectRef.current = null;
     if (cropRafRef.current !== null) {
       globalThis.cancelAnimationFrame(cropRafRef.current);
       cropRafRef.current = null;
     }
-    setCropRect(null);
+    if (!keepAutoTargetCrop) setCropRect(null);
     setCropBusy(false);
   }, [selectedId]);
   // 색상 휠(롱프레스 팝업 원형 퀵픽) — 10번째 armed 상태. center 는 뷰포트 clientX/clientY
@@ -15004,18 +15295,17 @@ const puppetWarpArmed =
     if (activeSurfaceReviewLocked || tool !== "select") {
       tr.nodes([]);
     } else if (marqueeIds.length > 0) {
-      const nodes = marqueeIds
-        .filter((id) => {
-          const element = lookup.get(id);
-          return element ? !isEffectivelyLocked(element, groups) : false;
-        })
-        .map((id) => nodeRefsRef.current[id])
-        .filter((n): n is Konva.Node => !!n);
-      tr.nodes(nodes);
+      // 다중/그룹 Transformer를 각 child에 직접 붙이면 draw는 남고 좌표형 요소만 변형되며,
+      // child별 undo·CRDT commit까지 발생한다. 따라서 단일 객체 Transformer는 계속 비워 두고,
+      // 별도 group proxy가 전체 affine을 한 스냅샷으로 굽는 권위 경로만 사용한다.
+      tr.nodes([]);
     } else {
       const selectedElement = selectedId ? lookup.get(selectedId) : undefined;
       const selLocked = selectedElement ? isEffectivelyLocked(selectedElement, groups) : false;
-      const node = selectedId && !selLocked ? nodeRefsRef.current[selectedId] : null;
+      const node =
+        selectedId && !selLocked && selectedElement?.type !== "draw"
+          ? nodeRefsRef.current[selectedId]
+          : null;
       tr.nodes(node ? [node] : []);
     }
     tr.getLayer()?.batchDraw();
@@ -15824,6 +16114,19 @@ const puppetWarpArmed =
   function patchEl(id: string, patch: Partial<El>): boolean {
     const target = elementById.get(id);
     if (!target) return false;
+    // 다중선택 드래그는 Stage의 onStageDragEnd가 모든 unlocked 멤버를 한 스냅샷으로 커밋한다.
+    // Konva 자식 노드의 onDragEnd도 먼저 버블되며 {x,y}를 patch하면 같은 제스처가 undo 두 칸이
+    // 되는 데다, anchor만 먼저 저장된 중간 상태가 CRDT에 노출된다. 활성 anchor의 위치 전용 patch는
+    // 성공으로 소비하고 최종 원자 커밋에 맡긴다. transform(width/height/rotation 포함)은 별도 동작.
+    const activeGroupDrag = groupDragRef.current;
+    const patchKeys = Object.keys(patch);
+    if (
+      activeGroupDrag?.id === id &&
+      patchKeys.length > 0 &&
+      patchKeys.every((key) => key === "x" || key === "y")
+    ) {
+      return true;
+    }
     if (isEffectivelyLocked(target, groups) && !isLayerMetadataPatch(patch)) return false;
     const workAssetReason = studioWorkAssetSourceReplacementReason(
       target,
@@ -16572,28 +16875,58 @@ const puppetWarpArmed =
   }
   // ── 레이어 그룹(폴더) ─────────────────────────────────────────────────────
   // 그룹 목록·요소 groupId를 한 번에 커밋(원자적). seedElId가 있으면 새 그룹에 그 요소를 넣는다.
-  function addLayerGroup(seedElId?: string) {
+  function addLayerGroup(seedElId?: string): boolean {
+    const seed = seedElId ? elementById.get(seedElId) : undefined;
+    if (seed?.groupId) {
+      const message =
+        "기존 그룹의 자식은 다시 그룹화하지 않아요. 먼저 그룹을 해제하거나 다른 요소를 함께 선택하세요.";
+      setError(message);
+      announceDrawingShortcut(message);
+      return false;
+    }
     const g = createLayerGroup(uid(), `그룹 ${groups.length + 1}`);
     const nextElements = seedElId ? (groupItems(elements, [seedElId], g.id) as El[]) : elements;
     updateActivePage({ groups: [...groups, g], elements: nextElements });
+    if (seedElId) {
+      applyGroupSelectionState({
+        ...selectionShapeForIds([seedElId]),
+        activeGroupId: null,
+      });
+    }
+    return true;
   }
-  function groupSelectedElements() {
-    if (marqueeIds.length < 2) return;
-    const memberIds = [...marqueeIds];
+  function groupSelectedElements(): boolean {
+    const memberIds = [...marqueeIdsRef.current];
+    if (memberIds.length < 2) return false;
+    const alreadyGrouped = memberIds
+      .map((id) => elementById.get(id))
+      .some((element) => element?.groupId);
+    if (alreadyGrouped) {
+      // 현재 레이어 그룹은 중첩 구조가 아니라 평면 메타데이터다. 기존 그룹 멤버를 다시
+      // Cmd/Ctrl+G 하면 이전 그룹을 비워 둔 채 새 groupId로 덮어쓸 수 있으므로, PPT의
+      // "이미 그룹인 선택은 다시 묶지 않음"처럼 명시적으로 fail-close한다.
+      setError("기존 그룹이 포함된 선택이에요. 먼저 그룹을 해제한 뒤 다시 그룹화해 주세요.");
+      announceDrawingShortcut("기존 그룹을 먼저 해제한 뒤 다시 그룹화해 주세요");
+      return false;
+    }
     const groupId = uid();
     const g = createLayerGroup(groupId, `그룹 ${groups.length + 1}`);
     const nextElements = groupItems(elements, memberIds, groupId) as El[];
     updateActivePage({ groups: [...groups, g], elements: nextElements });
-    setSelectedId(null);
     // PPT/Figma처럼 그룹 생성 직후 새 그룹을 그대로 선택한다. 이어서 이동·복제·잠금을
     // 실행하려는 사용자가 캔버스에서 다시 그룹을 찾아 클릭할 필요가 없어야 한다.
-    setMarqueeIds(memberIds);
-    activeGroupIdRef.current = null;
-    setActiveGroupId(null);
+    applyGroupSelectionState({
+      selectedId: null,
+      marqueeIds: memberIds,
+      activeGroupId: null,
+    });
+    announceDrawingShortcut(`요소 ${memberIds.length}개 그룹화`);
+    return true;
   }
   function completeSelectedGroupId(): string | null {
-    if (marqueeIds.length < 2) return null;
-    const selectedIds = new Set(marqueeIds);
+    const currentSelectionIds = currentCanvasSelectionIds();
+    if (currentSelectionIds.length === 0) return null;
+    const selectedIds = new Set(currentSelectionIds);
     const selectedElements = elements.filter((element) => selectedIds.has(element.id));
     const groupIds = new Set(
       selectedElements
@@ -16602,30 +16935,62 @@ const puppetWarpArmed =
     );
     if (groupIds.size !== 1) return null;
     const groupId = [...groupIds][0]!;
+    if (!groups.some((group) => group.id === groupId)) return null;
+    // 그룹 내부 편집 중에는 모든 자식이 선택되어도 최상위 그룹 하나로 되돌리지 않는다.
+    // 그래야 정렬·잠금·해제 같은 자식 대상 명령이 PPT/Figma의 그룹 진입 상태를 유지한다.
+    if (activeGroupIdRef.current === groupId) return null;
     const memberIds = elements
       .filter((element) => element.groupId === groupId)
       .map((element) => element.id);
     return (
+      selectedElements.length === selectedIds.size &&
       memberIds.length === selectedElements.length &&
       memberIds.every((id) => selectedIds.has(id))
     )
       ? groupId
       : null;
   }
-  function ungroupSelectedElements() {
+  function ungroupSelectedElements(): boolean {
     const groupId = completeSelectedGroupId();
-    if (!groupId) return;
+    if (!groupId) {
+      const message =
+        "그룹 전체가 선택된 경우에만 해제할 수 있어요. 그룹을 한 번 클릭해 전체를 선택하세요.";
+      setError(message);
+      announceDrawingShortcut(message);
+      return false;
+    }
+    const selectedIds = currentCanvasSelectionIds();
     updateActivePage({
       elements: ungroupItems(elements, groupId) as El[],
       groups: groups.filter((group) => group.id !== groupId),
     });
     // 요소 선택은 유지한다. PPT/Figma처럼 그룹 해제 직후에도 이동·정렬·재그룹화가
     // 이어져야 하며, 캔버스를 다시 드래그해 대상을 찾게 만들지 않는다.
-    setSelectedId(null);
-    setMarqueeIds((current) => current.filter((id) => elementById.has(id)));
+    applyGroupSelectionState({
+      ...selectionShapeForIds(selectedIds.filter((id) => elementById.has(id))),
+      activeGroupId: null,
+    });
+    announceDrawingShortcut("그룹 해제 완료");
+    return true;
+  }
+  function enterCompleteSelectedGroup(): boolean {
+    const groupId = completeSelectedGroupId();
+    if (!groupId) return false;
+    const firstMember = elements.find((element) => element.groupId === groupId);
+    if (!firstMember) return false;
+    applyGroupSelectionState(
+      planGroupEnter({
+        items: elements,
+        groups,
+        clickedId: firstMember.id,
+      })
+    );
+    announceDrawingShortcut("그룹 내부 편집 · Esc로 그룹 전체 선택");
+    return true;
   }
   function toggleSelectedElementsLocked() {
-    const selectedIds = new Set(marqueeIds);
+    const currentSelectionIds = currentCanvasSelectionIds();
+    const selectedIds = new Set(currentSelectionIds);
     if (selectedIds.size === 0) return;
     const selectedElements = elements.filter((element) => selectedIds.has(element.id));
     if (selectedElements.length === 0) return;
@@ -16650,11 +17015,12 @@ const puppetWarpArmed =
       });
       return;
     }
-    patchLayerItems(marqueeIds, () => ({ locked: nextLocked }));
+    patchLayerItems(currentSelectionIds, () => ({ locked: nextLocked }));
   }
-  function reorderSelectedElements(direction: "front" | "back") {
-    if (marqueeIds.length === 0) return;
-    const next = reorderLayerSelection(elements, marqueeIds, direction) as El[];
+  function reorderSelectedElements(direction: LayerItemReorderDirection) {
+    const currentSelectionIds = currentCanvasSelectionIds();
+    if (currentSelectionIds.length === 0) return;
+    const next = reorderLayerSelection(elements, currentSelectionIds, direction) as El[];
     if (next === elements) return;
     commit(next);
   }
@@ -16664,6 +17030,10 @@ const puppetWarpArmed =
       elements: ungroupItems(elements, groupId) as El[],
       groups: groups.filter((g) => g.id !== groupId),
     });
+    if (activeGroupIdRef.current === groupId) {
+      activeGroupIdRef.current = null;
+      setActiveGroupId(null);
+    }
   }
   // 요소를 그룹에 넣기/빼기(연속성 유지). groupId=undefined면 그룹에서 제거.
   function assignElementToGroup(elId: string, groupId: string | undefined) {
@@ -16673,18 +17043,12 @@ const puppetWarpArmed =
   function selectLayersFromNavigator(ids: readonly string[]) {
     const validIds = [...new Set(ids)].filter((id) => elementById.has(id)).slice(0, 500);
     setTool("select");
-    if (validIds.length === 0) {
-      setSelectedId(null);
-      setMarqueeIds([]);
-      return;
-    }
-    if (validIds.length === 1) {
-      setMarqueeIds([]);
-      setSelectedId(validIds[0] ?? null);
-      return;
-    }
-    setSelectedId(null);
-    setMarqueeIds(validIds);
+    // 레이어 패널 선택은 명시적인 최상위 선택이다. 캔버스에서 다른 그룹 내부에 들어간
+    // activeGroupId를 남기면 이후 클릭이 유령 그룹의 자식 선택 규칙을 계속 사용한다.
+    applyGroupSelectionState({
+      ...selectionShapeForIds(validIds),
+      activeGroupId: null,
+    });
   }
 
   function patchLayerItems(
@@ -16951,14 +17315,38 @@ const puppetWarpArmed =
       return;
     }
     switch (action.type) {
+      case "group-selection":
+        groupSelectedElements();
+        return;
+      case "ungroup-selection":
+        ungroupSelectedElements();
+        return;
       case "create-group": {
         if (masterEditMode) return;
-        const group = createLayerGroup(uid(), `그룹 ${groups.length + 1}`);
         const seedIds = [...new Set(action.seedIds)].filter((id) => elementById.has(id));
+        if (
+          seedIds.some((id) => {
+            const element = elementById.get(id);
+            return element?.groupId !== undefined;
+          })
+        ) {
+          const message =
+            "기존 그룹이 포함된 선택이에요. 먼저 그룹을 해제한 뒤 새 그룹을 만들어 주세요.";
+          setError(message);
+          announceDrawingShortcut(message);
+          return;
+        }
+        const group = createLayerGroup(uid(), `그룹 ${groups.length + 1}`);
         updateActivePage({
           groups: [...groups, group],
           elements: seedIds.length > 0 ? (groupItems(elements, seedIds, group.id) as El[]) : elements,
         });
+        if (seedIds.length > 0) {
+          applyGroupSelectionState({
+            ...selectionShapeForIds(seedIds),
+            activeGroupId: null,
+          });
+        }
         return;
       }
       case "create-frame-folder": {
@@ -17886,6 +18274,16 @@ const puppetWarpArmed =
       }
     );
     if (!committed) return false;
+    if (
+      activeGroupIdRef.current &&
+      groupsEmptiedByRemoval.has(activeGroupIdRef.current)
+    ) {
+      // 마지막 자식을 삭제해 그룹 메타데이터까지 정리한 경우 그룹 진입 상태도 같은
+      // 트랜잭션 결과에 맞춰 해제한다. 존재하지 않는 그룹의 자식 선택 규칙이 남으면
+      // 다음 클릭이 "유령 그룹" 내부 선택처럼 동작한다.
+      activeGroupIdRef.current = null;
+      setActiveGroupId(null);
+    }
     if (selectedId && idSet.has(selectedId)) setSelectedId(null);
     setMarqueeIds((current) => current.filter((id) => !idSet.has(id)));
     return true;
@@ -17987,14 +18385,17 @@ const puppetWarpArmed =
   }
   function nudgeSelected(dx: number, dy: number) {
     if (marqueeIds.length > 0) {
-      const mv = new Set(marqueeIds);
-      const next = elements.map((e) =>
-        !(mv.has(e.id) && !isEffectivelyLocked(e, groups))
-          ? e
-          : e.type === "draw"
-            ? ({ ...e, points: e.points.map((v, i) => v + (i % 2 === 0 ? dx : dy)) } as El)
-            : ({ ...e, x: (e as { x: number }).x + dx, y: (e as { y: number }).y + dy } as El)
-      );
+      const next = planAtomicSelectionTranslation({
+        items: elements,
+        selectedIds: marqueeIds,
+        deltaX: dx,
+        deltaY: dy,
+        isLocked: (element) => isEffectivelyLocked(element, groups),
+      });
+      if (!next.some((element, index) => element !== elements[index])) {
+        setError("잠긴 멤버가 포함된 선택은 일부만 이동하지 않아요. 잠금을 먼저 해제하세요.");
+        return;
+      }
       commitCoalesced(next, "nudge-multi");
       return;
     }
@@ -18012,11 +18413,81 @@ const puppetWarpArmed =
   // 들어간 패널 중앙(없으면 캔버스 중앙)으로 가로/세로 정렬.
   // 선택 요소를 들어있는 패널(없으면 캔버스) 기준으로 정렬. 좌·가로중앙·우 / 상·세로중앙·하 / 다중 분배.
   function alignSelected(mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom" | "distributeH" | "distributeV") {
-    if (marqueeIds.length > 1) {
-      const selectedEls = elements.filter(
-        (el) => marqueeIds.includes(el.id) && !isEffectivelyLocked(el, groups)
+    const completeGroupId = completeSelectedGroupId();
+    if (completeGroupId && marqueeIds.length > 1) {
+      const selectedIds = new Set(marqueeIds);
+      const selectedEls = elements.filter((element) => selectedIds.has(element.id));
+      if (
+        selectedEls.length !== selectedIds.size ||
+        selectedEls.some((element) => isEffectivelyLocked(element, groups))
+      ) {
+        setError("그룹 전체를 정렬하려면 모든 멤버의 잠금을 먼저 해제하세요.");
+        return;
+      }
+      if (mode === "distributeH" || mode === "distributeV") {
+        setError("그룹 내부 분배는 더블클릭으로 그룹에 들어간 뒤 자식들을 선택해 사용하세요.");
+        return;
+      }
+      const box = unionBounds(selectedEls.map((element) => elBounds(element)));
+      const centerX = box.x + box.w / 2;
+      const centerY = box.y + box.h / 2;
+      const frame = elements.find(
+        (element): element is FrameEl =>
+          element.type === "frame" &&
+          !selectedIds.has(element.id) &&
+          !element.hidden &&
+          centerX >= element.x &&
+          centerX <= element.x + element.width &&
+          centerY >= element.y &&
+          centerY <= element.y + element.height
       );
+      const originX = frame?.x ?? 0;
+      const originY = frame?.y ?? 0;
+      const areaWidth = frame?.width ?? CANVAS_W;
+      const areaHeight = frame?.height ?? canvasH;
+      let deltaX = 0;
+      let deltaY = 0;
+      if (mode === "left") deltaX = originX - box.x;
+      else if (mode === "right") deltaX = originX + areaWidth - box.w - box.x;
+      else if (mode === "hcenter") deltaX = originX + (areaWidth - box.w) / 2 - box.x;
+      else if (mode === "top") deltaY = originY - box.y;
+      else if (mode === "bottom") deltaY = originY + areaHeight - box.h - box.y;
+      else if (mode === "vcenter") deltaY = originY + (areaHeight - box.h) / 2 - box.y;
+      if (deltaX === 0 && deltaY === 0) return;
+      const next = planAtomicSelectionTranslation({
+        items: elements,
+        selectedIds: marqueeIds,
+        deltaX,
+        deltaY,
+        isLocked: (element) => isEffectivelyLocked(element, groups),
+      });
+      if (next.some((element, index) => element !== elements[index])) commit(next);
+      return;
+    }
+    if (marqueeIds.length > 1) {
+      const selectedEls = elements.filter((el) => marqueeIds.includes(el.id));
       if (selectedEls.length === 0) return;
+      if (selectedEls.some((element) => isEffectivelyLocked(element, groups))) {
+        setError("잠긴 멤버가 포함된 선택은 일부만 정렬하지 않아요. 잠금을 먼저 해제하세요.");
+        return;
+      }
+      const topLevelGroupIds = new Set(
+        selectedEls
+          .map((element) => element.groupId)
+          .filter(
+            (groupId): groupId is string =>
+              Boolean(groupId) && groupId !== activeGroupIdRef.current
+          )
+      );
+      if (topLevelGroupIds.size > 0) {
+        // 여러 최상위 그룹(또는 그룹+일반 객체)을 자식 배열로 정렬/분배하면 각 그룹
+        // 내부 간격이 파괴된다. aggregate group-unit planner가 도입되기 전까지는
+        // 일부만 움직이는 것보다 명확히 차단하는 편이 데이터 보존에 안전하다.
+        setError(
+          "여러 그룹이 포함된 선택은 그룹 내부 배치를 보호하기 위해 정렬·분배하지 않아요. 그룹별로 선택해 정렬해 주세요."
+        );
+        return;
+      }
 
       const boundsList = selectedEls.map((el) => ({ el, b: elBounds(el) }));
 
@@ -18026,7 +18497,7 @@ const puppetWarpArmed =
         if (!deltas) return;
         const deltaById = new Map(selectedEls.map((el, index) => [el.id, deltas[index]!]));
         const next = elements.map((el) => {
-          if (!marqueeIds.includes(el.id) || isEffectivelyLocked(el, groups)) return el;
+          if (!marqueeIds.includes(el.id)) return el;
           const delta = deltaById.get(el.id);
           if (!delta || (delta.dx === 0 && delta.dy === 0)) return el;
           return el.type === "draw"
@@ -18045,7 +18516,7 @@ const puppetWarpArmed =
       const deltas = computeAlignDeltas(bounds, mode, box);
       const deltaById = new Map(selectedEls.map((el, index) => [el.id, deltas[index]!]));
       const next = elements.map((el) => {
-        if (!marqueeIds.includes(el.id) || isEffectivelyLocked(el, groups)) return el;
+        if (!marqueeIds.includes(el.id)) return el;
         const delta = deltaById.get(el.id);
         if (!delta || (delta.dx === 0 && delta.dy === 0)) return el;
         return el.type === "draw"
@@ -18083,6 +18554,10 @@ const puppetWarpArmed =
     }
   }
   function reorder(dir: "front" | "back" | "forward" | "backward") {
+    if (marqueeIds.length > 0) {
+      reorderSelectedElements(dir);
+      return;
+    }
     if (!selectedId) return;
     const next = reorderLayerItem(elements, selectedId, dir);
     if (next === elements) return;
@@ -19106,7 +19581,11 @@ const puppetWarpArmed =
         e.preventDefault();
         setShortcutsOpen((v) => !v);
       } else if (e.key === "Escape") {
-        if (hasActiveDrawingPointerSession()) {
+        if (groupResizeRef.current) {
+          e.preventDefault();
+          cancelCanvasSelectionResize();
+          announceDrawingShortcut("그룹 크기 조절을 취소했습니다");
+        } else if (hasActiveDrawingPointerSession()) {
           e.preventDefault();
           discardDrawingPointerSession();
           announceDrawingShortcut("진행 중인 획을 취소했습니다");
@@ -19188,14 +19667,25 @@ const puppetWarpArmed =
           clearPolyLassoDraft();
         } else if (activeGroupIdRef.current) {
           // 그룹 진입 중이면 Esc 는 한 단계 위로: 진입을 해제하고 그룹 전체를 다시 선택한다(Figma 관례).
+          e.preventDefault();
           const stepUp = planGroupEscape({
             items: elements,
-            current: { selectedId, marqueeIds, activeGroupId: activeGroupIdRef.current },
+            current: {
+              selectedId: selectedIdRef.current,
+              marqueeIds: marqueeIdsRef.current,
+              activeGroupId: activeGroupIdRef.current,
+            },
           });
-          if (stepUp) applyGroupSelectionState(stepUp);
+          if (stepUp) {
+            applyGroupSelectionState(stepUp);
+            announceDrawingShortcut("그룹 내부 편집 종료 · 그룹 전체 선택");
+          }
           else {
-            setSelectedId(null);
-            setMarqueeIds([]);
+            applyGroupSelectionState({
+              selectedId: null,
+              marqueeIds: [],
+              activeGroupId: null,
+            });
           }
         } else {
           setSelectedId(null);
@@ -19212,6 +19702,15 @@ const puppetWarpArmed =
       ) {
         e.preventDefault();
         finishPolyLassoSession();
+      } else if (
+        !mod &&
+        !e.altKey &&
+        !e.shiftKey &&
+        !e.repeat &&
+        e.key === "Enter" &&
+        !(e.target instanceof HTMLElement && e.target.closest("input, textarea, select, [contenteditable=true]"))
+      ) {
+        if (enterCompleteSelectedGroup()) e.preventDefault();
       } else if (mod && e.altKey && (e.key === "g" || e.key === "G" || e.key === "ㅎ")) {
         // Photoshop / ClipStudio / Figma: ⌥⌘G (Alt+Cmd+G / Alt+Ctrl+G) = 클리핑 마스크 토글
         e.preventDefault();
@@ -19228,20 +19727,14 @@ const puppetWarpArmed =
         // Figma/Illustrator/ClipStudio: ⌘G = 그룹 생성, ⇧⌘G = 그룹 해제
         e.preventDefault();
         if (e.shiftKey) {
-          const targetEl = selected || elements.find((el) => marqueeIds.includes(el.id));
-          if (targetEl?.groupId) {
-            deleteLayerGroup(targetEl.groupId);
-            announceDrawingShortcut("그룹 해제 완료");
-          } else {
-            announceDrawingShortcut("해제할 그룹이 없습니다");
-          }
+          ungroupSelectedElements();
         } else {
-          if (marqueeIds.length >= 2) {
+          if (marqueeIdsRef.current.length >= 2) {
             groupSelectedElements();
-            announceDrawingShortcut(`요소 ${marqueeIds.length}개 그룹화`);
-          } else if (selectedId) {
-            addLayerGroup(selectedId);
-            announceDrawingShortcut("그룹 생성 완료");
+          } else if (selectedIdRef.current) {
+            if (addLayerGroup(selectedIdRef.current)) {
+              announceDrawingShortcut("그룹 생성 완료");
+            }
           }
         }
       } else if ((selectedId || marqueeIds.length > 0) && e.key.startsWith("Arrow")) {
@@ -27157,6 +27650,10 @@ const puppetWarpArmed =
   function onStagePointerCancel(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     const pointerEvent = e.evt as PointerEvent;
     hideBrushCursor();
+    if (groupResizeRef.current) {
+      cancelCanvasSelectionResize();
+      return;
+    }
     if (liquifyHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     if (pixelSelectionHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     if (requireStudioDrawingPointerTransport(drawingPointerTransportRef).consumeHandledNativeEnd(pointerEvent)) return;
@@ -27208,6 +27705,17 @@ const puppetWarpArmed =
       }
       if (!outcome.gesture) advancedFillTapPayloadRef.current = null;
       return;
+    }
+    const groupDrag = groupDragRef.current;
+    if (groupDrag) {
+      groupDragRef.current = null;
+      const anchor = nodeRefsRef.current[groupDrag.id];
+      const deltaX = anchor ? anchor.x() - groupDrag.x0 : 0;
+      const deltaY = anchor ? anchor.y() - groupDrag.y0 : 0;
+      restoreGroupDragPreview(groupDrag, deltaX, deltaY);
+      applyGuides([], []);
+      applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
+      endLiveResourceEdit();
     }
   }
 
@@ -27498,14 +28006,22 @@ const puppetWarpArmed =
       marqueeStartRef.current = null;
       clearMarqueePreview();
       if (rect && rect.w > 3 && rect.h > 3) {
-        const ids = selectIdsByMarquee(
+        const hitIds = selectIdsByMarquee(
           elements,
           (el) => elBounds(el),
           rect,
           { include: (el) => !isEffectivelyHidden(el, groups) }
         );
-        setMarqueeIds(ids);
-        setSelectedId(null);
+        const ids = expandSelectionIdsToGroupUnits(
+          elements,
+          groups,
+          hitIds,
+          activeGroupIdRef.current
+        );
+        applyGroupSelectionState({
+          ...selectionShapeForIds(ids),
+          activeGroupId: activeGroupIdRef.current,
+        });
       }
       return;
     }
@@ -27723,6 +28239,75 @@ const puppetWarpArmed =
     }
   }
 
+  function restoreGroupDragPreview(
+    session: {
+      id: string;
+      x0: number;
+      y0: number;
+      selectedIds: string[];
+    },
+    deltaX: number,
+    deltaY: number
+  ) {
+    const anchor = nodeRefsRef.current[session.id];
+    if (!anchor) return;
+    anchor.position({ x: session.x0, y: session.y0 });
+    for (const id of session.selectedIds) {
+      if (id === session.id) continue;
+      const peer = nodeRefsRef.current[id];
+      if (peer) {
+        peer.x(peer.x() - deltaX);
+        peer.y(peer.y() - deltaY);
+      }
+    }
+    const layer = anchor.getLayer();
+    const selectionOverlay = layer?.findOne(".studio-group-selection-overlay");
+    if (selectionOverlay) {
+      selectionOverlay.position({ x: 0, y: 0 });
+    }
+    const resizeProxy = layer?.findOne(".studio-group-uniform-resize-proxy");
+    if (resizeProxy) {
+      resizeProxy.x(resizeProxy.x() - deltaX);
+      resizeProxy.y(resizeProxy.y() - deltaY);
+    }
+    layer?.batchDraw();
+  }
+
+  function liveCanvasElementRect(
+    element: El,
+    layer: Konva.Layer
+  ): { x: number; y: number; width: number; height: number } {
+    const fallback = elBounds(element);
+    const node = nodeRefsRef.current[element.id];
+    if (element.type === "draw") {
+      // draw wrapper에는 scene-less hit Shape가 있어 getClientRect가 원점(0,0)을 포함할 수 있다.
+      // 권위 points bounds에 wrapper의 imperative drag offset만 더해야 group snap union이 정확하다.
+      return {
+        x: fallback.x + (node?.x() ?? 0),
+        y: fallback.y + (node?.y() ?? 0),
+        width: fallback.w,
+        height: fallback.h,
+      };
+    }
+    if (node) {
+      const rect = node.getClientRect({ relativeTo: layer });
+      if (
+        Number.isFinite(rect.x) &&
+        Number.isFinite(rect.y) &&
+        Number.isFinite(rect.width) &&
+        Number.isFinite(rect.height)
+      ) {
+        return rect;
+      }
+    }
+    return {
+      x: fallback.x,
+      y: fallback.y,
+      width: fallback.w,
+      height: fallback.h,
+    };
+  }
+
   // 드래그 중 정렬 스냅: 요소의 좌/중앙/우(상/중앙/하) 가장자리를 캔버스·들어있는 패널의
   // 같은 기준선에 끌어붙이고, 맞은 기준선을 가이드로 그린다. (Stage로 버블된 단일 핸들러)
   function onStageDragMove(e: Konva.KonvaEventObject<DragEvent>) {
@@ -27733,43 +28318,163 @@ const puppetWarpArmed =
     const layer = node.getLayer();
     if (!layer) return;
 
-    // 다중선택 그룹 이동: 좌표형 멤버는 실시간으로 따라오고, points 기반 draw 멤버는
-    // 드래그 종료의 단일 문서 커밋에서 같은 델타를 적용한다. 잠긴 멤버는 항상 제외한다.
     const draggedId = studioElementIdOf(node);
-    if (draggedId && marqueeIds.length > 1 && marqueeIds.includes(draggedId)) {
+    let activeGroupDrag = groupDragRef.current;
+    const candidateGroupIds = draggedId
+      ? canvasInteractionUnitIds(draggedId)
+      : [];
+    const canStartGroupDrag =
+      draggedId !== null &&
+      candidateGroupIds.length > 1 &&
+      candidateGroupIds.includes(draggedId) &&
+      candidateGroupIds.every((id) => {
+        const element = elementById.get(id);
+        return Boolean(element && !isEffectivelyLocked(element, groups));
+      });
+
+    const translateGroupPreview = (
+      anchorId: string,
+      selectedIds: readonly string[],
+      deltaX: number,
+      deltaY: number
+    ) => {
+      if (deltaX === 0 && deltaY === 0) return;
+      for (const id of selectedIds) {
+        if (id === anchorId) continue;
+        const other = nodeRefsRef.current[id];
+        if (other) {
+          other.x(other.x() + deltaX);
+          other.y(other.y() + deltaY);
+        }
+      }
+      const selectionOverlay = layer.findOne(".studio-group-selection-overlay");
+      if (selectionOverlay) {
+        selectionOverlay.x(selectionOverlay.x() + deltaX);
+        selectionOverlay.y(selectionOverlay.y() + deltaY);
+      }
+      const resizeProxy = layer.findOne(".studio-group-uniform-resize-proxy");
+      if (resizeProxy) {
+        resizeProxy.x(resizeProxy.x() + deltaX);
+        resizeProxy.y(resizeProxy.y() + deltaY);
+      }
+    };
+
+    // 다중선택 그룹 이동: 좌표형과 draw wrapper, 전체 선택 경계를 함께 움직이고 문서에는
+    // Stage drag-end에서 한 스냅샷만 커밋한다. 첫 dragmove 전에도 클릭한 그룹 단위를 다시 해석해
+    // selection state 렌더 타이밍과 무관하게 전체 lease/preview를 동일한 멤버 집합으로 유지한다.
+    if (draggedId && canStartGroupDrag) {
       const draggedEl = elementById.get(draggedId);
-      if (draggedEl && draggedEl.type !== "draw" && !isEffectivelyLocked(draggedEl, groups)) {
-        const g = groupDragRef.current;
-        if (!g || g.id !== draggedId) {
-          groupDragRef.current = { id: draggedId, x0: node.x(), y0: node.y(), lastX: node.x(), lastY: node.y() };
+      if (draggedEl) {
+        if (!activeGroupDrag || activeGroupDrag.id !== draggedId) {
+          const x0 = draggedEl.type === "draw" ? 0 : draggedEl.x;
+          const y0 = draggedEl.type === "draw" ? 0 : draggedEl.y;
+          const currentX = node.x();
+          const currentY = node.y();
+          activeGroupDrag = {
+            id: draggedId,
+            x0,
+            y0,
+            lastX: currentX,
+            lastY: currentY,
+            selectedIds: [...candidateGroupIds],
+          };
+          groupDragRef.current = activeGroupDrag;
+          const initialDx = currentX - x0;
+          const initialDy = currentY - y0;
+          translateGroupPreview(
+            draggedId,
+            activeGroupDrag.selectedIds,
+            initialDx,
+            initialDy
+          );
         } else {
-          const ddx = node.x() - g.lastX;
-          const ddy = node.y() - g.lastY;
+          const ddx = node.x() - activeGroupDrag.lastX;
+          const ddy = node.y() - activeGroupDrag.lastY;
           if (ddx !== 0 || ddy !== 0) {
-            for (const id of marqueeIds) {
-              if (id === draggedId) continue;
-              const oel = elementById.get(id);
-              if (!oel || oel.type === "draw" || isEffectivelyLocked(oel, groups)) continue;
-              const other = nodeRefsRef.current[id];
-              if (other) {
-                other.x(other.x() + ddx);
-                other.y(other.y() + ddy);
-              }
-            }
-            g.lastX = node.x();
-            g.lastY = node.y();
+            translateGroupPreview(
+              draggedId,
+              activeGroupDrag.selectedIds,
+              ddx,
+              ddy
+            );
+            activeGroupDrag.lastX = node.x();
+            activeGroupDrag.lastY = node.y();
           }
         }
       }
     }
 
+    const liveSelectionRect = () => {
+      const selectedIds = activeGroupDrag?.selectedIds;
+      if (!selectedIds || selectedIds.length < 2) {
+        return node.getClientRect({ relativeTo: layer });
+      }
+      const rects = selectedIds
+        .map((id) => elementById.get(id))
+        .filter((candidate): candidate is El => Boolean(candidate))
+        .map((candidate) => liveCanvasElementRect(candidate, layer));
+      if (rects.length === 0) return node.getClientRect({ relativeTo: layer });
+      const left = Math.min(...rects.map((rect) => rect.x));
+      const top = Math.min(...rects.map((rect) => rect.y));
+      const right = Math.max(...rects.map((rect) => rect.x + rect.width));
+      const bottom = Math.max(...rects.map((rect) => rect.y + rect.height));
+      return { x: left, y: top, width: right - left, height: bottom - top };
+    };
+    const liveMovingSelectionIds = new Set(
+      activeGroupDrag?.selectedIds ?? (draggedId ? [draggedId] : [])
+    );
+
     if (!snapEnabled) {
       applyGuides([], []);
-      applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
+      // "정렬선 표시"와 "위치 스냅"은 서로 다른 설정이다. 스냅을 끈 상태에서도
+      // PPT/Figma처럼 가까운 엣지·중앙·균등 간격 후보를 ghost 위치로 계산해 선만 보여 준다.
+      // 실제 Konva node 좌표는 이 분기에서 절대 바꾸지 않는다.
+      if (showAlignmentGuides && draggedId) {
+        const previewBoxRect = liveSelectionRect();
+        const previewOthers: GuideBox[] = [];
+        for (const element of elements) {
+          if (
+            liveMovingSelectionIds.has(element.id) ||
+            isEffectivelyHidden(element, groups)
+          ) {
+            continue;
+          }
+          const rect = liveCanvasElementRect(element, layer);
+          previewOthers.push({
+            id: element.id,
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+          });
+        }
+        const movingBox: GuideBox = {
+          id:
+            activeGroupDrag?.selectedIds.length
+              ? `selection:${activeGroupDrag.selectedIds.join(",")}`
+              : draggedId,
+          x: previewBoxRect.x,
+          y: previewBoxRect.y,
+          width: previewBoxRect.width,
+          height: previewBoxRect.height,
+        };
+        const suggestion = computeSmartSnap(movingBox, previewOthers, {
+          threshold: SMART_SNAP_THRESHOLD / effScale,
+        });
+        const preview = buildSmartGuideOverlayPreview(
+          movingBox,
+          previewOthers,
+          suggestion,
+          { epsilon: SMART_GUIDE_EPSILON / effScale },
+        );
+        applySmartGuides(preview?.overlay ?? EMPTY_SMART_GUIDE_OVERLAY);
+      } else {
+        applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
+      }
       return;
     }
 
-    const box = node.getClientRect({ relativeTo: layer });
+    const box = liveSelectionRect();
     const snap = 8 / effScale; // 화면상 ~8px
 
     // 스냅 기준선: 캔버스 가장자리·중앙 + (있으면)들어있는 패널 가장자리·중앙
@@ -27842,21 +28547,33 @@ const puppetWarpArmed =
     // 축별로 캔버스/그리드 라인 스냅과 요소 스냅 중 더 가까운 쪽을 채택한다(동률이면 요소 우선).
     let smartOthers: GuideBox[] | null = null;
     if (draggedId) {
-      const groupDragging = marqueeIds.length > 1 && marqueeIds.includes(draggedId);
       smartOthers = [];
       for (const el of elements) {
-        if (el.id === draggedId || isEffectivelyHidden(el, groups)) continue;
-        if (groupDragging && marqueeIds.includes(el.id)) continue;
-        const otherNode = nodeRefsRef.current[el.id];
-        if (otherNode) {
-          const r = otherNode.getClientRect({ relativeTo: layer });
-          smartOthers.push({ id: el.id, x: r.x, y: r.y, width: r.width, height: r.height });
-        } else {
-          const r = elBounds(el);
-          smartOthers.push({ id: el.id, x: r.x, y: r.y, width: r.w, height: r.h });
+        if (
+          liveMovingSelectionIds.has(el.id) ||
+          isEffectivelyHidden(el, groups)
+        ) {
+          continue;
         }
+        const r = liveCanvasElementRect(el, layer);
+        smartOthers.push({
+          id: el.id,
+          x: r.x,
+          y: r.y,
+          width: r.width,
+          height: r.height,
+        });
       }
-      const movingBox: GuideBox = { id: draggedId, x: box.x, y: box.y, width: box.width, height: box.height };
+      const movingBox: GuideBox = {
+        id:
+          activeGroupDrag?.selectedIds.length
+            ? `selection:${activeGroupDrag.selectedIds.join(",")}`
+            : draggedId,
+        x: box.x,
+        y: box.y,
+        width: box.width,
+        height: box.height,
+      };
       const smart = computeSmartSnap(movingBox, smartOthers, { threshold: SMART_SNAP_THRESHOLD / effScale });
       if (smart.x && smart.x.dist <= bestX) {
         dx = smart.x.delta;
@@ -27869,10 +28586,29 @@ const puppetWarpArmed =
     }
     if (dx !== 0) node.x(node.x() + dx);
     if (dy !== 0) node.y(node.y() + dy);
+    if (activeGroupDrag && draggedId) {
+      translateGroupPreview(
+        draggedId,
+        activeGroupDrag.selectedIds,
+        dx,
+        dy
+      );
+      activeGroupDrag.lastX = node.x();
+      activeGroupDrag.lastY = node.y();
+    }
     // 스냅 확정 위치 기준으로 요소 정렬 선분·균등 간격 배지를 그린다(그리드/캔버스 스냅
     // 결과가 우연히 요소와 정렬된 경우도 함께 드러난다 — PPT 동작).
     if (smartOthers && draggedId && showAlignmentGuides) {
-      const movedBox: GuideBox = { id: draggedId, x: box.x + dx, y: box.y + dy, width: box.width, height: box.height };
+      const movedBox: GuideBox = {
+        id:
+          activeGroupDrag?.selectedIds.length
+            ? `selection:${activeGroupDrag.selectedIds.join(",")}`
+            : draggedId,
+        x: box.x + dx,
+        y: box.y + dy,
+        width: box.width,
+        height: box.height,
+      };
       applySmartGuides(buildSmartGuideOverlay(movedBox, smartOthers, { epsilon: SMART_GUIDE_EPSILON / effScale }));
     } else {
       applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
@@ -27885,36 +28621,84 @@ const puppetWarpArmed =
   function onStageDragEnd() {
     applyGuides([], []);
     applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
-    // 그룹 이동 확정: 끈 노드의 총 이동량(delta)을 선택된 좌표형 요소 모두에 한 번에 커밋.
+    // 그룹 이동 확정: child onDragEnd의 anchor patch는 patchEl에서 소비했고, 여기서 좌표형 요소와
+    // points 기반 draw를 같은 delta로 계산해 히스토리/CRDT에 정확히 한 번만 커밋한다.
     const g = groupDragRef.current;
     groupDragRef.current = null;
-    if (g && marqueeIds.length > 1) {
-      const dnode = nodeRefsRef.current[g.id];
-      if (dnode) {
-        const dx = dnode.x() - g.x0;
-        const dy = dnode.y() - g.y0;
-        if (dx !== 0 || dy !== 0) {
-          const mv = new Set(marqueeIds);
-          const next = elements.map((el) =>
-            !mv.has(el.id) || isEffectivelyLocked(el, groups)
-              ? el
-              : el.type === "draw"
-                ? ({
-                    ...el,
-                    points: el.points.map((value, index) =>
-                      value + (index % 2 === 0 ? dx : dy)
-                    ),
-                  } as El)
-                : ({
-                    ...el,
-                    x: (el as { x: number }).x + dx,
-                    y: (el as { y: number }).y + dy,
-                  } as El)
+    if (!g) return;
+    const dnode = nodeRefsRef.current[g.id];
+    let dx = 0;
+    let dy = 0;
+    let committed = false;
+    try {
+      if (dnode && g.selectedIds.length > 1) {
+        dx = dnode.x() - g.x0;
+        dy = dnode.y() - g.y0;
+        if (dx === 0 && dy === 0) {
+          committed = true;
+          return;
+        }
+        const next = planAtomicSelectionTranslation({
+          items: elements,
+          selectedIds: g.selectedIds,
+          deltaX: dx,
+          deltaY: dy,
+          isLocked: (element) => isEffectivelyLocked(element, groups),
+        });
+        const changed = next.some((element, index) => element !== elements[index]);
+        committed = changed && commit(next);
+        if (committed) {
+          const drawIds = g.selectedIds.filter(
+            (id) => elementById.get(id)?.type === "draw"
           );
-          commit(next);
+          if (drawIds.length > 0) {
+            pendingCommittedGroupDrawResetRef.current = {
+              drawIds,
+              sourceElements: elements,
+              pageId: currentPageIdRef.current,
+              masterEditMode: masterEditModeRef.current,
+            };
+          }
+        }
+        if (!changed) {
+          setError("그룹 전체를 이동할 수 없어요. 잠금 또는 지원하지 않는 멤버를 확인하세요.");
         }
       }
+    } finally {
+      if (!committed && dnode && (dx !== 0 || dy !== 0)) {
+        // 실패한 commit의 imperative preview가 화면에 남지 않게 원점으로 복구한다.
+        restoreGroupDragPreview(g, dx, dy);
+      }
+      // 성공 commit 뒤 selection overlay는 새 문서 bounds를 자식으로 다시 그리므로 부모 preview
+      // offset만 제거한다. resize proxy는 독립 absolute 노드라 이미 새 bounds 위치에 있다. 여기서
+      // 되돌리면 다음 React layout 전까지 이전 위치가 한 프레임 노출되므로 성공 경로에서는 유지한다.
+      const overlayLayer = dnode?.getLayer();
+      const selectionOverlay = overlayLayer?.findOne(
+        ".studio-group-selection-overlay"
+      );
+      if (selectionOverlay) {
+        selectionOverlay.position({ x: 0, y: 0 });
+      }
+      overlayLayer?.batchDraw();
+      endLiveResourceEdit();
     }
+  }
+
+  function startCanvasEditText(id: string) {
+    const element = elementById.get(id);
+    const knownGroup =
+      element?.groupId &&
+      groups.some((group) => group.id === element.groupId)
+        ? element.groupId
+        : null;
+    if (knownGroup && activeGroupIdRef.current !== knownGroup) {
+      applyGroupSelectionState(
+        planGroupEnter({ items: elements, groups, clickedId: id })
+      );
+      announceDrawingShortcut("그룹 내부 편집 · 다시 더블클릭하면 텍스트를 편집해요");
+      return;
+    }
+    void startEditText(id);
   }
 
   async function startEditText(id: string) {
@@ -28454,7 +29238,7 @@ function clearSelectionForEdit() {
     removeSelected();
   }
   function openSelectedLayerCrop() {
-    const target = ensurePixelToolTarget("레이어 자르기");
+    const target = ensureOrPrepareRasterRetouchTarget("crop", "레이어 자르기");
     if (!target) return;
     setTool("select");
     setEyedropperActive(false);
@@ -28801,13 +29585,53 @@ function clearSelectionForEdit() {
           (el) => el.type === "image" && !isEffectivelyHidden(el, groups) && !isEffectivelyLocked(el, groups)
         ).length === 1)
     );
+  const rasterRetouchTargetAvailable =
+    !activeSurfaceReviewLocked
+    && !studioFilterPreparationBusy
+    && (
+      pixelToolTargetAvailable
+      || (
+        selected?.type !== "image"
+        && elements.some(
+          (element) =>
+            !localHiddenElementIds.has(element.id)
+            && !isEffectivelyHidden(element, groups),
+        )
+      )
+    );
+  /**
+   * 리터치 도구의 한 번 클릭 진입 경계.
+   *
+   * 선택 이미지 또는 유일한 이미지가 있으면 기존 직접 편집 경로를 사용한다. 이미지가 없거나
+   * 여러 장이라 대상이 모호하지만 페이지에 표시 콘텐츠가 있으면, 현재 보이는 결과를 원본 보존
+   * 합성본으로 만든 뒤 같은 도구를 자동 재개한다. 빈 페이지/잠금은 기존 정확한 오류를 유지한다.
+   */
+  function ensureOrPrepareRasterRetouchTarget(
+    toolId: "crop" | "smudge" | "dodge-burn" | "wet-mix" | "liquify",
+    toolLabel: string,
+  ): ImageEl | null {
+    const directCandidates = elements.filter(
+      (element): element is ImageEl =>
+        element.type === "image"
+        && !isEffectivelyHidden(element, groups)
+        && !isEffectivelyLocked(element, groups),
+    );
+    if (selected?.type === "image" || directCandidates.length === 1) {
+      return ensurePixelToolTarget(toolLabel);
+    }
+    if (rasterRetouchTargetAvailable) {
+      void createEditableRasterCopyForInspector(toolId);
+      return null;
+    }
+    return ensurePixelToolTarget(toolLabel);
+  }
   function toggleSmudgeTool() {
     if (smudgeBusy) return;
     if (smudgeActive) {
       disarmAllPixelTools();
       return;
     }
-    if (!ensurePixelToolTarget("혼합(스머지)")) return;
+    if (!ensureOrPrepareRasterRetouchTarget("smudge", "혼합(스머지)")) return;
     disarmAllPixelTools();
     setTool("select");
     setSmudgeActive(true);
@@ -28819,7 +29643,7 @@ function clearSelectionForEdit() {
       disarmAllPixelTools();
       return;
     }
-    if (!ensurePixelToolTarget("리퀴파이")) return;
+    if (!ensureOrPrepareRasterRetouchTarget("liquify", "리퀴파이")) return;
     disarmAllPixelTools();
     setTool("select");
     setLiquifyActive(true);
@@ -28831,7 +29655,7 @@ function clearSelectionForEdit() {
       disarmAllPixelTools();
       return;
     }
-    if (!ensurePixelToolTarget("닷지/번")) return;
+    if (!ensureOrPrepareRasterRetouchTarget("dodge-burn", "닷지/번")) return;
     disarmAllPixelTools();
     setTool("select");
     setDodgeBurnActive(true);
@@ -28843,7 +29667,7 @@ function clearSelectionForEdit() {
       disarmAllPixelTools();
       return;
     }
-    if (!ensurePixelToolTarget("혼색 브러시")) return;
+    if (!ensureOrPrepareRasterRetouchTarget("wet-mix", "혼색 브러시")) return;
     disarmAllPixelTools();
     setTool("select");
     setWetMixActive(true);
@@ -29024,7 +29848,9 @@ function clearSelectionForEdit() {
     }
   }
 
-  async function createEditableRasterCopyForInspector() {
+  async function createEditableRasterCopyForInspector(
+    resumeToolId?: StudioRasterToolId,
+  ) {
     if (studioFilterPreparationBusy) {
       announceDrawingShortcut("편집용 래스터 복사본을 준비하고 있어요");
       return;
@@ -29074,6 +29900,14 @@ function clearSelectionForEdit() {
         rasterRuntime,
         "pixel-selection",
       );
+      if (!rasterRuntime.isStudioEditableRasterCopyPlanCurrent(
+        planned.plan,
+        latestContext.input,
+      )) {
+        throw new Error(
+          "편집용 래스터 복사본을 준비하는 동안 페이지가 바뀌었습니다. 최신 화면에서 다시 시도해 주세요.",
+        );
+      }
       const composite = {
         ...rasterRuntime.materializeStudioEditableRasterCopy({
           plan: planned.plan,
@@ -29097,13 +29931,86 @@ function clearSelectionForEdit() {
         !canApplyStudioMutation(mutationTicket)
       ) return;
       if (!commit(applied.elements, undefined, pageId)) return;
+      const resumePlan = resumeToolId
+        ? resolveStudioRasterToolResumePlan(resumeToolId)
+        : null;
+      if (resumePlan?.kind === "activate-selection") {
+        pixelSelectionAutoTargetRef.current = composite.id;
+      } else if (resumePlan?.kind === "start-crop") {
+        cropAutoTargetRef.current = composite.id;
+      }
       resetPixelSelectionHistoryState(composite.id, null);
       setMarqueeIds([]);
       setSelectedId(composite.id);
       setPixelForceCircle(false);
       setPixelTool(null);
       setError(null);
-      announceDrawingShortcut("원본은 숨겨 보존하고 편집용 래스터 복사본을 선택했어요");
+      if (!resumePlan) {
+        announceDrawingShortcut("원본은 숨겨 보존하고 편집용 래스터 복사본을 선택했어요");
+        return;
+      }
+      switch (resumePlan.kind) {
+        case "arm-retouch":
+          if (resumePlan.retouchTool === "smudge") setSmudgeActive(true);
+          else if (resumePlan.retouchTool === "dodge-burn") setDodgeBurnActive(true);
+          else if (resumePlan.retouchTool === "wet-mix") setWetMixActive(true);
+          else setLiquifyActive(true);
+          openInspectorRoute(
+            { primary: "properties", image: "retouch" },
+            isMobile ? "props" : null,
+          );
+          announceDrawingShortcut(
+            resumePlan.retouchTool === "smudge"
+              ? "페이지 합성본에서 혼합(스머지)을 시작해요"
+              : resumePlan.retouchTool === "dodge-burn"
+                ? "페이지 합성본에서 닷지/번을 시작해요"
+                : resumePlan.retouchTool === "wet-mix"
+                  ? "페이지 합성본에서 혼색 브러시를 시작해요"
+                  : "페이지 합성본에서 리퀴파이를 시작해요",
+          );
+          return;
+        case "start-crop":
+          setCropRect(initialCropRect());
+          openInspectorRoute(
+            resumePlan.inspectorRoute,
+            isMobile ? "props" : null,
+          );
+          announceDrawingShortcut("페이지 합성본의 자르기 경계를 조절하세요");
+          return;
+        case "activate-selection":
+          applyPixelSelectionActivation(resumePlan.selectionTool);
+          openInspectorRoute(
+            { primary: "properties", image: "retouch" },
+            isMobile ? "props" : null,
+          );
+          announceDrawingShortcut("페이지 합성본에서 픽셀 선택을 시작해요");
+          return;
+        case "open-inspector":
+          openInspectorRoute(
+            resumePlan.inspectorRoute,
+            isMobile ? "props" : null,
+          );
+          if (resumePlan.toolId === "heal") setHealCloneTool("heal");
+          else if (resumePlan.toolId === "clone-stamp") setHealCloneTool("clone");
+          else if (resumePlan.toolId === "history-brush") setHistoryPanelOpen(true);
+          announceDrawingShortcut(
+            resumePlan.nextRequirement === "make-pixel-selection"
+              ? "페이지 합성본에서 먼저 편집할 픽셀 영역을 선택하세요"
+              : resumePlan.nextRequirement === "pick-clone-source"
+                ? "Alt(Option)+클릭으로 복구·복제 소스를 먼저 지정하세요"
+                : resumePlan.nextRequirement === "pick-history-source"
+                  ? "작업 내역에서 히스토리 브러시 소스를 선택하세요"
+                  : resumePlan.nextRequirement === "move-puppet-pin"
+                    ? "퍼펫 핀을 놓고 움직여 변형을 시작하세요"
+                    : "마스크 패널에서 새 마스크 작업을 선택하세요",
+          );
+          return;
+        case "no-automatic-resume":
+          announceDrawingShortcut(
+            "편집용 래스터 복사본을 준비했어요. 적용할 세부 작업을 선택하세요",
+          );
+          return;
+      }
     } catch (preparationError) {
       if (controller.signal.aborted || runId !== studioFilterPreparationRunIdRef.current) return;
       setError(
@@ -29475,7 +30382,7 @@ function clearSelectionForEdit() {
       disabled.add("duplicate");
       disabled.add("delete");
     }
-    if (!selected || marqueeIds.length > 0) disabled.add("bring-front");
+    if (!selected && marqueeIds.length === 0) disabled.add("bring-front");
     if (activePageMutationLocked) {
       disabled.add("pen");
       disabled.add("eraser");
@@ -31654,6 +32561,9 @@ function clearSelectionForEdit() {
 
   const studioCanvasViewportHandlers = useStudioStableHandlers<StudioCanvasViewportHandlers>({
   addPage,
+  beginCanvasSelectionResize,
+  cancelCanvasSelectionResize,
+  commitCanvasSelectionResize,
   fitCanvasToWidth,
   onWebGpuFrameInvalid,
   onWebGpuFrameReady,
@@ -31661,6 +32571,7 @@ function clearSelectionForEdit() {
   onWebGpuBackendChange,
   setWebGpuCanvasHandle,
   setElementNodeRef,
+  isCanvasGroupDragActive,
   selectElementFromCanvas,
   commitTextTransformEnd,
     acknowledgeAiNotice,
@@ -31677,6 +32588,7 @@ function clearSelectionForEdit() {
     captureTimelineKeyframe,
     clearAdvancedFillTapGesture,
     clearAutosave,
+    clearCanvasSelection,
     commitAppSettings,
     retryAppSettingsPersistence: () => persistAppSettings(appSettingsRef.current),
     commitCoalesced,
@@ -31748,10 +32660,10 @@ function clearSelectionForEdit() {
     beginSharedGutterDrag,
     previewSharedGutterDrag,
     commitSharedGutterDrag,
-    endLiveResourceEdit,
+    endLiveResourceEdit: endCanvasNodeInteraction,
     nodeInteractionBegin,
     patchEl,
-    startEditText,
+    startEditText: startCanvasEditText,
     snapBoundFunc,
     designateHistoryBrushSource,
   });
@@ -32663,6 +33575,7 @@ function clearSelectionForEdit() {
         <StudioLeftToolRail
           activeSurfaceReviewLocked={activeSurfaceReviewLocked}
           pixelToolTargetAvailable={pixelToolTargetAvailable}
+          rasterRetouchTargetAvailable={rasterRetouchTargetAvailable}
           advancedFillActive={advancedFillActive}
           advancedFillUnsupportedReason={advancedFillUnsupportedReason}
           appSettings={appSettings}
@@ -33919,7 +34832,11 @@ function clearSelectionForEdit() {
         x={contextMenu.x}
         y={contextMenu.y}
         hasElement={contextMenu.elId !== null}
-        locked={contextMenuEl?.locked === true}
+        locked={
+          contextMenuEl
+            ? isEffectivelyLocked(contextMenuEl, groups)
+            : false
+        }
         onEditVrm={
           contextMenuEl?.type === "image" &&
           (contextMenuEl.vrmScene || parseStudio3dTool(contextMenuEl.src) === "vrm-poser")
@@ -33948,7 +34865,16 @@ function clearSelectionForEdit() {
         onReorder={reorder}
         onToggleLock={() => {
           if (contextMenuEl) {
-            patchEl(contextMenuEl.id, { locked: !contextMenuEl.locked });
+            const contextTargetSelected =
+              selectedIdRef.current === contextMenuEl.id ||
+              marqueeIdsRef.current.includes(contextMenuEl.id);
+            if (contextTargetSelected && completeSelectedGroupId()) {
+              toggleSelectedElementsLocked();
+            } else {
+              patchEl(contextMenuEl.id, {
+                locked: !isEffectivelyLocked(contextMenuEl, groups),
+              });
+            }
           }
         }}
         onDelete={removeSelected}

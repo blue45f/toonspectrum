@@ -1,0 +1,675 @@
+/**
+ * Atomic, model-aware uniform resize for a Studio group/multi-selection.
+ *
+ * This is deliberately narrower than a general affine transform:
+ * - positive, axis-aligned, uniform corner resize only;
+ * - no reflection, rotation, or non-uniform scale;
+ * - every selected member is validated and transformed before any result is exposed.
+ *
+ * A failure returns a fresh outer array containing the original element references. Callers can
+ * therefore detect an applied resize with the same reference comparison used by the group
+ * translation planner, while unsupported/invalid input can never tear a mixed group.
+ */
+import { BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT } from "./studio-bubble-text-fit";
+
+import type { BubbleTailSpec } from "./studio-bubble-path";
+import type { El } from "./studio-element-model";
+
+export interface StudioGroupUniformResizeBounds {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export type StudioGroupUniformResizeStrokeWidthPolicy = "preserve" | "scale";
+
+export interface StudioGroupUniformResizeInput {
+  readonly items: readonly El[];
+  readonly selectedIds: readonly string[];
+  readonly sourceBounds: StudioGroupUniformResizeBounds;
+  readonly targetBounds: StudioGroupUniformResizeBounds;
+  /** Must include both element-level and effective parent-group locks. */
+  readonly isLocked: (item: El) => boolean;
+  /**
+   * Object resizing normally preserves every authored draw/object stroke width. The explicit
+   * `scale` option scales those widths and draw sampling cadence without changing today's default
+   * semantics. Shadow, blur, filter, and other effect radii remain authored values under both
+   * policies until the editor exposes a separate "scale effects" contract.
+   */
+  readonly strokeWidthPolicy?: StudioGroupUniformResizeStrokeWidthPolicy;
+}
+
+const UNIFORM_SCALE_RELATIVE_EPSILON = 1e-6;
+const IDENTITY_RELATIVE_EPSILON = 1e-9;
+const DEFAULT_BUBBLE_FONT_SIZE = 24;
+const DEFAULT_BUBBLE_TAIL_HEIGHT = 30;
+
+function unchanged(items: readonly El[]): El[] {
+  return [...items];
+}
+
+function finite(value: number): boolean {
+  return Number.isFinite(value);
+}
+
+function finiteNonNegative(value: number): boolean {
+  return finite(value) && value >= 0;
+}
+
+function finitePositive(value: number): boolean {
+  return finite(value) && value > 0;
+}
+
+function finiteOptional(value: number | undefined): boolean {
+  return value === undefined || finite(value);
+}
+
+function finiteOptionalNonNegative(value: number | undefined): boolean {
+  return value === undefined || finiteNonNegative(value);
+}
+
+function finiteOptionalPositive(value: number | undefined): boolean {
+  return value === undefined || finitePositive(value);
+}
+
+function finiteEvenPoints(
+  points: readonly number[] | undefined,
+  minimumLength: number
+): points is readonly number[] {
+  return (
+    points !== undefined &&
+    points.length >= minimumLength &&
+    points.length % 2 === 0 &&
+    points.every(finite)
+  );
+}
+
+function validOptionalPoints(
+  points: readonly number[] | undefined,
+  minimumLength: number
+): boolean {
+  return points === undefined || finiteEvenPoints(points, minimumLength);
+}
+
+function validBounds(
+  bounds: StudioGroupUniformResizeBounds,
+  requirePositiveSize: boolean
+): boolean {
+  return (
+    finite(bounds.x) &&
+    finite(bounds.y) &&
+    (requirePositiveSize ? finitePositive(bounds.width) : finiteNonNegative(bounds.width)) &&
+    (requirePositiveSize ? finitePositive(bounds.height) : finiteNonNegative(bounds.height))
+  );
+}
+
+function nearlyEqual(a: number, b: number, relativeEpsilon: number): boolean {
+  return Math.abs(a - b) <= relativeEpsilon * Math.max(1, Math.abs(a), Math.abs(b));
+}
+
+function validBoxGeometry(item: {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}): boolean {
+  return (
+    finite(item.x) &&
+    finite(item.y) &&
+    finiteNonNegative(item.width) &&
+    finiteNonNegative(item.height)
+  );
+}
+
+function validExtraTail(tail: BubbleTailSpec): boolean {
+  return (
+    finite(tail.ratio) &&
+    finiteNonNegative(tail.length) &&
+    finiteNonNegative(tail.base) &&
+    finiteOptional(tail.bend)
+  );
+}
+
+function validDrawShapeParams(
+  shapeParams: Extract<El, { type: "draw" }>["shapeParams"]
+): boolean {
+  return (
+    shapeParams === undefined ||
+    (finitePositive(shapeParams.starPoints) &&
+      finiteNonNegative(shapeParams.starInnerRatio) &&
+      finitePositive(shapeParams.polygonSides) &&
+      finiteNonNegative(shapeParams.cornerRadius))
+  );
+}
+
+function validDrawSymmetry(
+  symmetry: Extract<El, { type: "draw" }>["symmetry"]
+): boolean {
+  return (
+    symmetry === undefined ||
+    (finite(symmetry.centerX) &&
+      finite(symmetry.centerY) &&
+      finiteOptionalNonNegative(symmetry.radialCount))
+  );
+}
+
+function scaleFinite(value: number, scale: number): number | null {
+  const next = value * scale;
+  return finite(next) ? next : null;
+}
+
+function scaleOptionalFinite(
+  value: number | undefined,
+  scale: number
+): number | undefined | null {
+  if (value === undefined) return undefined;
+  return scaleFinite(value, scale);
+}
+
+function scaleFiniteForStrokePolicy(
+  value: number,
+  scale: number,
+  policy: StudioGroupUniformResizeStrokeWidthPolicy
+): number | null {
+  return policy === "scale" ? scaleFinite(value, scale) : value;
+}
+
+function scaleOptionalFiniteForStrokePolicy(
+  value: number | undefined,
+  scale: number,
+  policy: StudioGroupUniformResizeStrokeWidthPolicy
+): number | undefined | null {
+  if (value === undefined) return undefined;
+  return scaleFiniteForStrokePolicy(value, scale, policy);
+}
+
+function transformPosition(
+  x: number,
+  y: number,
+  source: StudioGroupUniformResizeBounds,
+  target: StudioGroupUniformResizeBounds,
+  scale: number
+): { x: number; y: number } | null {
+  const nextX = target.x + (x - source.x) * scale;
+  const nextY = target.y + (y - source.y) * scale;
+  return finite(nextX) && finite(nextY) ? { x: nextX, y: nextY } : null;
+}
+
+function scalePointArray(points: readonly number[], scale: number): number[] | null {
+  const next = points.map((value) => value * scale);
+  return next.every(finite) ? next : null;
+}
+
+function transformDocumentPointArray(
+  points: readonly number[],
+  source: StudioGroupUniformResizeBounds,
+  target: StudioGroupUniformResizeBounds,
+  scale: number
+): number[] | null {
+  const next = points.map((value, index) =>
+    index % 2 === 0
+      ? target.x + (value - source.x) * scale
+      : target.y + (value - source.y) * scale
+  );
+  return next.every(finite) ? next : null;
+}
+
+function transformDrawSymmetry(
+  symmetry: Extract<El, { type: "draw" }>["symmetry"],
+  source: StudioGroupUniformResizeBounds,
+  target: StudioGroupUniformResizeBounds,
+  scale: number
+): Extract<El, { type: "draw" }>["symmetry"] | null {
+  if (symmetry === undefined) return undefined;
+  const center = transformPosition(
+    symmetry.centerX,
+    symmetry.centerY,
+    source,
+    target,
+    scale
+  );
+  return center
+    ? {
+        ...symmetry,
+        centerX: center.x,
+        centerY: center.y,
+      }
+    : null;
+}
+
+function scaleDrawShapeParams(
+  shapeParams: Extract<El, { type: "draw" }>["shapeParams"],
+  scale: number
+): Extract<El, { type: "draw" }>["shapeParams"] | null {
+  if (shapeParams === undefined) return undefined;
+  const cornerRadius = scaleFinite(shapeParams.cornerRadius, scale);
+  return cornerRadius === null
+    ? null
+    : {
+        ...shapeParams,
+        cornerRadius,
+      };
+}
+
+function transformElement(
+  item: El,
+  source: StudioGroupUniformResizeBounds,
+  target: StudioGroupUniformResizeBounds,
+  scale: number,
+  strokeWidthPolicy: StudioGroupUniformResizeStrokeWidthPolicy
+): El | null {
+  if (item.type === "draw") {
+    if (
+      !finiteEvenPoints(item.points, 2) ||
+      !finiteNonNegative(item.strokeWidth) ||
+      !finiteOptionalNonNegative(item.sampleSpacing) ||
+      !validDrawShapeParams(item.shapeParams) ||
+      !validDrawSymmetry(item.symmetry)
+    ) {
+      return null;
+    }
+    const points = transformDocumentPointArray(item.points, source, target, scale);
+    const strokeWidth = scaleFiniteForStrokePolicy(
+      item.strokeWidth,
+      scale,
+      strokeWidthPolicy
+    );
+    const sampleSpacing = scaleOptionalFiniteForStrokePolicy(
+      item.sampleSpacing,
+      scale,
+      strokeWidthPolicy
+    );
+    const shapeParams = scaleDrawShapeParams(item.shapeParams, scale);
+    const symmetry = transformDrawSymmetry(
+      item.symmetry,
+      source,
+      target,
+      scale
+    );
+    if (
+      !points ||
+      strokeWidth === null ||
+      sampleSpacing === null ||
+      shapeParams === null ||
+      symmetry === null
+    ) {
+      return null;
+    }
+    return {
+      ...item,
+      points,
+      strokeWidth,
+      ...(sampleSpacing !== undefined ? { sampleSpacing } : {}),
+      ...(shapeParams !== undefined ? { shapeParams } : {}),
+      ...(symmetry !== undefined ? { symmetry } : {}),
+    };
+  }
+
+  if (item.type === "image") {
+    if (
+      !validBoxGeometry(item) ||
+      !finite(item.rotation) ||
+      !finiteOptional(item.skewX) ||
+      !finiteOptional(item.skewY) ||
+      !finiteOptionalNonNegative(item.cornerRadius)
+    ) {
+      return null;
+    }
+    const position = transformPosition(item.x, item.y, source, target, scale);
+    const width = scaleFinite(item.width, scale);
+    const height = scaleFinite(item.height, scale);
+    const cornerRadius = scaleOptionalFinite(item.cornerRadius, scale);
+    if (
+      !position ||
+      width === null ||
+      height === null ||
+      cornerRadius === null
+    ) {
+      return null;
+    }
+    return {
+      ...item,
+      ...position,
+      width,
+      height,
+      ...(cornerRadius !== undefined ? { cornerRadius } : {}),
+    };
+  }
+
+  if (item.type === "text") {
+    if (
+      !finite(item.x) ||
+      !finite(item.y) ||
+      !finiteNonNegative(item.width) ||
+      !finitePositive(item.fontSize) ||
+      !finite(item.rotation) ||
+      !finiteOptional(item.skewX) ||
+      !finiteOptional(item.skewY) ||
+      !finiteOptional(item.letterSpacing) ||
+      !finiteOptionalPositive(item.lineHeight) ||
+      !finiteOptionalNonNegative(item.strokeWidth)
+    ) {
+      return null;
+    }
+    const position = transformPosition(item.x, item.y, source, target, scale);
+    const width = scaleFinite(item.width, scale);
+    const fontSize = scaleFinite(item.fontSize, scale);
+    const letterSpacing = scaleOptionalFinite(item.letterSpacing, scale);
+    const strokeWidth = scaleOptionalFiniteForStrokePolicy(
+      item.strokeWidth,
+      scale,
+      strokeWidthPolicy
+    );
+    if (
+      !position ||
+      width === null ||
+      fontSize === null ||
+      fontSize <= 0 ||
+      letterSpacing === null ||
+      strokeWidth === null
+    ) {
+      return null;
+    }
+    return {
+      ...item,
+      ...position,
+      width,
+      fontSize,
+      ...(letterSpacing !== undefined ? { letterSpacing } : {}),
+      ...(strokeWidth !== undefined ? { strokeWidth } : {}),
+    };
+  }
+
+  if (item.type === "sticker") {
+    if (
+      !finite(item.x) ||
+      !finite(item.y) ||
+      !finitePositive(item.fontSize) ||
+      !finite(item.rotation) ||
+      !finiteOptional(item.skewX) ||
+      !finiteOptional(item.skewY)
+    ) {
+      return null;
+    }
+    const position = transformPosition(item.x, item.y, source, target, scale);
+    const fontSize = scaleFinite(item.fontSize, scale);
+    if (!position || fontSize === null || fontSize <= 0) return null;
+    return { ...item, ...position, fontSize };
+  }
+
+  if (item.type === "bubble") {
+    if (
+      !validBoxGeometry(item) ||
+      !finite(item.rotation) ||
+      !validOptionalPoints(item.customShapePoints, 6) ||
+      !finiteOptionalNonNegative(item.tailHeight) ||
+      !finiteOptionalNonNegative(item.tailBase) ||
+      !finiteOptional(item.tailBend) ||
+      !finiteOptionalPositive(item.fontSize) ||
+      !finiteOptionalPositive(item.lineHeight) ||
+      !finiteOptionalPositive(item.autoShrinkMinFontSize) ||
+      !finiteOptionalNonNegative(item.strokeWidth) ||
+      (item.extraTails !== undefined && !item.extraTails.every(validExtraTail))
+    ) {
+      return null;
+    }
+    const position = transformPosition(item.x, item.y, source, target, scale);
+    const width = scaleFinite(item.width, scale);
+    const height = scaleFinite(item.height, scale);
+    const customShapePoints = item.customShapePoints
+      ? scalePointArray(item.customShapePoints, scale)
+      : undefined;
+    const changesScale = !nearlyEqual(
+      scale,
+      1,
+      IDENTITY_RELATIVE_EPSILON
+    );
+    const materializedFontSize =
+      item.fontSize ??
+      (changesScale ? DEFAULT_BUBBLE_FONT_SIZE : undefined);
+    const fontSize = scaleOptionalFinite(materializedFontSize, scale);
+    const materializedAutoShrinkMinFontSize =
+      item.autoShrinkMinFontSize ??
+      (changesScale && item.autoShrinkText
+        ? BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT
+        : undefined);
+    const autoShrinkMinFontSize = scaleOptionalFinite(
+      materializedAutoShrinkMinFontSize,
+      scale
+    );
+    const materializedTailHeight =
+      item.tailHeight ??
+      (changesScale &&
+      item.customShapePoints === undefined &&
+      item.tail !== "none"
+        ? DEFAULT_BUBBLE_TAIL_HEIGHT
+        : undefined);
+    const tailHeight = scaleOptionalFinite(materializedTailHeight, scale);
+    const tailBase = scaleOptionalFinite(item.tailBase, scale);
+    const strokeWidth = scaleOptionalFiniteForStrokePolicy(
+      item.strokeWidth,
+      scale,
+      strokeWidthPolicy
+    );
+    const extraTails = item.extraTails?.map((tail) => ({
+      ...tail,
+      length: tail.length * scale,
+      base: tail.base * scale,
+    }));
+    if (
+      !position ||
+      width === null ||
+      height === null ||
+      customShapePoints === null ||
+      fontSize === null ||
+      autoShrinkMinFontSize === null ||
+      tailHeight === null ||
+      tailBase === null ||
+      strokeWidth === null ||
+      (extraTails !== undefined &&
+        extraTails.some((tail) => !finite(tail.length) || !finite(tail.base)))
+    ) {
+      return null;
+    }
+    return {
+      ...item,
+      ...position,
+      width,
+      height,
+      ...(customShapePoints ? { customShapePoints } : {}),
+      ...(fontSize !== undefined ? { fontSize } : {}),
+      ...(autoShrinkMinFontSize !== undefined
+        ? { autoShrinkMinFontSize }
+        : {}),
+      ...(tailHeight !== undefined ? { tailHeight } : {}),
+      ...(tailBase !== undefined ? { tailBase } : {}),
+      ...(strokeWidth !== undefined ? { strokeWidth } : {}),
+      ...(extraTails ? { extraTails } : {}),
+    };
+  }
+
+  if (item.type === "frame") {
+    if (
+      !validBoxGeometry(item) ||
+      !validOptionalPoints(item.points, 6) ||
+      !finiteOptionalNonNegative(item.strokeWidth)
+    ) {
+      return null;
+    }
+    const position = transformPosition(item.x, item.y, source, target, scale);
+    const width = scaleFinite(item.width, scale);
+    const height = scaleFinite(item.height, scale);
+    const points = item.points ? scalePointArray(item.points, scale) : undefined;
+    const strokeWidth = scaleOptionalFiniteForStrokePolicy(
+      item.strokeWidth,
+      scale,
+      strokeWidthPolicy
+    );
+    if (
+      !position ||
+      width === null ||
+      height === null ||
+      points === null ||
+      strokeWidth === null
+    ) {
+      return null;
+    }
+    return {
+      ...item,
+      ...position,
+      width,
+      height,
+      ...(points ? { points } : {}),
+      ...(strokeWidth !== undefined ? { strokeWidth } : {}),
+    };
+  }
+
+  if (item.type === "focusLines") {
+    if (
+      !validBoxGeometry(item) ||
+      !finite(item.rotation) ||
+      !finiteNonNegative(item.innerRadius) ||
+      !finiteNonNegative(item.outerRadius) ||
+      !finiteNonNegative(item.strokeWidth) ||
+      !finiteNonNegative(item.noise)
+    ) {
+      return null;
+    }
+    const position = transformPosition(item.x, item.y, source, target, scale);
+    const width = scaleFinite(item.width, scale);
+    const height = scaleFinite(item.height, scale);
+    const innerRadius = scaleFinite(item.innerRadius, scale);
+    const outerRadius = scaleFinite(item.outerRadius, scale);
+    const strokeWidth = scaleFiniteForStrokePolicy(
+      item.strokeWidth,
+      scale,
+      strokeWidthPolicy
+    );
+    const noise = scaleFinite(item.noise, scale);
+    if (
+      !position ||
+      width === null ||
+      height === null ||
+      innerRadius === null ||
+      outerRadius === null ||
+      strokeWidth === null ||
+      noise === null
+    ) {
+      return null;
+    }
+    return {
+      ...item,
+      ...position,
+      width,
+      height,
+      innerRadius,
+      outerRadius,
+      strokeWidth,
+      noise,
+    };
+  }
+
+  if (item.type === "speedLines") {
+    if (
+      !validBoxGeometry(item) ||
+      !finite(item.rotation) ||
+      !finiteNonNegative(item.strokeWidth) ||
+      !finiteOptionalNonNegative(item.noise)
+    ) {
+      return null;
+    }
+    const position = transformPosition(item.x, item.y, source, target, scale);
+    const width = scaleFinite(item.width, scale);
+    const height = scaleFinite(item.height, scale);
+    const strokeWidth = scaleFiniteForStrokePolicy(
+      item.strokeWidth,
+      scale,
+      strokeWidthPolicy
+    );
+    const noise = scaleOptionalFinite(item.noise, scale);
+    if (
+      !position ||
+      width === null ||
+      height === null ||
+      strokeWidth === null ||
+      noise === null
+    ) {
+      return null;
+    }
+    return {
+      ...item,
+      ...position,
+      width,
+      height,
+      strokeWidth,
+      ...(noise !== undefined ? { noise } : {}),
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Plan one atomic positive uniform resize.
+ *
+ * The output always preserves document order. A successful plan replaces every selected element
+ * with a transformed immutable copy; every failure returns only the original element references.
+ */
+export function planStudioGroupUniformResize(
+  input: StudioGroupUniformResizeInput
+): El[] {
+  const strokeWidthPolicy = input.strokeWidthPolicy ?? "preserve";
+  if (strokeWidthPolicy !== "preserve" && strokeWidthPolicy !== "scale") {
+    return unchanged(input.items);
+  }
+  if (
+    !validBounds(input.sourceBounds, true) ||
+    !validBounds(input.targetBounds, true)
+  ) {
+    return unchanged(input.items);
+  }
+
+  const requestedIds = new Set(input.selectedIds);
+  if (requestedIds.size === 0) return unchanged(input.items);
+  const selectedItems = input.items.filter((item) => requestedIds.has(item.id));
+  if (selectedItems.length !== requestedIds.size) return unchanged(input.items);
+
+  try {
+    if (selectedItems.some(input.isLocked)) return unchanged(input.items);
+  } catch {
+    return unchanged(input.items);
+  }
+
+  const scaleX = input.targetBounds.width / input.sourceBounds.width;
+  const scaleY = input.targetBounds.height / input.sourceBounds.height;
+  if (!finitePositive(scaleX) || !finitePositive(scaleY)) {
+    return unchanged(input.items);
+  }
+  if (!nearlyEqual(scaleX, scaleY, UNIFORM_SCALE_RELATIVE_EPSILON)) {
+    return unchanged(input.items);
+  }
+  const scale = (scaleX + scaleY) / 2;
+  if (
+    nearlyEqual(scale, 1, IDENTITY_RELATIVE_EPSILON) &&
+    nearlyEqual(input.sourceBounds.x, input.targetBounds.x, IDENTITY_RELATIVE_EPSILON) &&
+    nearlyEqual(input.sourceBounds.y, input.targetBounds.y, IDENTITY_RELATIVE_EPSILON)
+  ) {
+    return unchanged(input.items);
+  }
+
+  const transformedById = new Map<string, El>();
+  for (const item of selectedItems) {
+    const transformed = transformElement(
+      item,
+      input.sourceBounds,
+      input.targetBounds,
+      scale,
+      strokeWidthPolicy
+    );
+    if (!transformed) return unchanged(input.items);
+    transformedById.set(item.id, transformed);
+  }
+
+  return input.items.map((item) => transformedById.get(item.id) ?? item);
+}

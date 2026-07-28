@@ -37,35 +37,66 @@ describe("Studio inspector raster recovery boundary", () => {
     const implementation = functionBody(pageSource, "createEditableRasterCopyForInspector");
 
     expect(implementation).toContain('"pixel-selection"');
+    expect(implementation).toContain("isStudioEditableRasterCopyPlanCurrent");
     expect(implementation).toContain("applyStudioEditableRasterCopy");
     expect(implementation).toContain("commit(applied.elements");
     expect(implementation).toContain("setSelectedId(composite.id)");
+    expect(implementation).toContain("resolveStudioRasterToolResumePlan");
+    expect(implementation).toContain('case "arm-retouch"');
+    expect(implementation).toContain('case "start-crop"');
+    expect(implementation).toContain('case "activate-selection"');
     expect(pageSource).toContain("createEditableRasterCopyForInspector,");
     expect(pageSource).toContain("studioFilterPreparationBusy={studioFilterPreparationBusy}");
     expect(pageSource).toContain("timelinePlaying={timelinePlaying}");
   });
 
   it.each([
-    ["toggleSmudgeTool", "smudgeActive", "혼합(스머지)"],
-    ["toggleLiquifyTool", "liquifyActive", "리퀴파이"],
-    ["toggleDodgeBurnTool", "dodgeBurnActive", "닷지/번"],
-    ["toggleWetMixTool", "wetMixActive", "혼색 브러시"],
+    ["toggleSmudgeTool", "smudgeActive", "smudge"],
+    ["toggleLiquifyTool", "liquifyActive", "liquify"],
+    ["toggleDodgeBurnTool", "dodgeBurnActive", "dodge-burn"],
+    ["toggleWetMixTool", "wetMixActive", "wet-mix"],
   ])(
     "lets %s exit before target validation when selection or lock state changed",
-    (name, activeState, label) => {
+    (name, activeState, toolId) => {
       const body = functionBody(pageSource, name);
       const activeCheck = body.indexOf(`if (${activeState})`);
-      const targetCheck = body.indexOf(`ensurePixelToolTarget("${label}")`);
+      const targetCheck = body.indexOf(
+        `ensureOrPrepareRasterRetouchTarget("${toolId}"`,
+      );
 
       expect(activeCheck).toBeGreaterThanOrEqual(0);
       expect(targetCheck).toBeGreaterThan(activeCheck);
     },
   );
 
+  it.each([
+    ["openSelectedLayerCrop", "crop"],
+    ["toggleSmudgeTool", "smudge"],
+    ["toggleLiquifyTool", "liquify"],
+    ["toggleDodgeBurnTool", "dodge-burn"],
+    ["toggleWetMixTool", "wet-mix"],
+  ])(
+    "lets %s auto-prepare a faithful page composite and resume %s",
+    (name, toolId) => {
+      const body = functionBody(pageSource, name);
+
+      expect(body).toContain(`ensureOrPrepareRasterRetouchTarget("${toolId}"`);
+    },
+  );
+
+  it("keeps image-only transform and frame animation off the page-composite shortcut", () => {
+    const transform = functionBody(pageSource, "openPixelSelectionTransform");
+    const frameAnimation = functionBody(pageSource, "openFrameAnimationForSelected");
+
+    expect(transform).toContain('ensurePixelToolTarget("내용 변형")');
+    expect(transform).not.toContain("ensureOrPrepareRasterRetouchTarget");
+    expect(frameAnimation).not.toContain("ensureOrPrepareRasterRetouchTarget");
+  });
+
   it("keeps active retouch buttons available as explicit exit controls", () => {
-    expect(railSource).toContain("disabled={!smudgeActive && !pixelToolTargetAvailable}");
-    expect(railSource).toContain("disabled={!wetMixActive && !pixelToolTargetAvailable}");
-    expect(railSource).toContain("disabled={!dodgeBurnActive && !pixelToolTargetAvailable}");
-    expect(railSource).toContain("disabled={!liquifyActive && !pixelToolTargetAvailable}");
+    expect(railSource).toContain("disabled={!smudgeActive && !rasterRetouchCanStart}");
+    expect(railSource).toContain("disabled={!wetMixActive && !rasterRetouchCanStart}");
+    expect(railSource).toContain("disabled={!dodgeBurnActive && !rasterRetouchCanStart}");
+    expect(railSource).toContain("disabled={!liquifyActive && !rasterRetouchCanStart}");
   });
 });

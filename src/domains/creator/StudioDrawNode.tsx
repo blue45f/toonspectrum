@@ -101,6 +101,7 @@ import {
   studioRoughSeedFromElementId,
   studioSketchStyleOfElement,
 } from "./studio-rough-shape";
+import { planStudioAngledNibStrokeLocalCoverage } from "./studio-stroke-local-coverage";
 import {
   isStudioBoundedFlowPaintModelCompatible,
   isStudioStrokePaintModelCompatible,
@@ -1171,35 +1172,32 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               legacyMinDistance: renderSampleDistance,
               legacyTension: 0,
             }).points;
+            const coveragePlan = planStudioAngledNibStrokeLocalCoverage(
+              smoothed,
+              aliasStrokeWidth,
+            );
             return (
               <Shape
                 key={index}
                 sceneFunc={(context, shape) => {
-                  if (smoothed.length < 2) return;
+                  if (coveragePlan.polygons.length === 0) return;
                   context.beginPath();
-                  const angle = -Math.PI / 6;
-                  const dx = (aliasStrokeWidth / 2) * Math.cos(angle);
-                  const dy = (aliasStrokeWidth / 2) * Math.sin(angle);
-
-                  if (smoothed.length === 2) {
-                    const x0 = smoothed[0]!;
-                    const y0 = smoothed[1]!;
-                    context.moveTo(x0 - dx, y0 - dy);
-                    context.lineTo(x0 + dx, y0 + dy);
-                  } else {
-                    for (let i = 0; i < smoothed.length - 2; i += 2) {
-                      const x0 = smoothed[i]!;
-                      const y0 = smoothed[i + 1]!;
-                      const x1 = smoothed[i + 2]!;
-                      const y1 = smoothed[i + 3]!;
-
-                      context.moveTo(x0 - dx, y0 - dy);
-                      context.lineTo(x0 + dx, y0 + dy);
-                      context.lineTo(x1 + dx, y1 + dy);
-                      context.lineTo(x1 - dx, y1 - dy);
-                      context.closePath();
+                  for (const polygon of coveragePlan.polygons) {
+                    context.moveTo(polygon.points[0]!, polygon.points[1]!);
+                    for (
+                      let coordinateIndex = 2;
+                      coordinateIndex < polygon.points.length;
+                      coordinateIndex += 2
+                    ) {
+                      context.lineTo(
+                        polygon.points[coordinateIndex]!,
+                        polygon.points[coordinateIndex + 1]!,
+                      );
                     }
+                    context.closePath();
                   }
+                  // All subpaths now have one winding, so non-zero fill is a monotonic union.
+                  // Konva applies the Shape opacity once to this complete stroke-local coverage.
                   context.fillStrokeShape(shape);
                 }}
                 fill={stroke}

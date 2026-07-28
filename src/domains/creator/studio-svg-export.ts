@@ -147,6 +147,7 @@ import {
   planStudioPixelPencilCells,
 } from "./studio-pixel-pencil";
 import { skewDegToKonva, type SkewFields } from "./studio-skew";
+import { planStudioAngledNibStrokeLocalCoverage } from "./studio-stroke-local-coverage";
 import {
   isStudioBoundedFlowPaintModelCompatible,
   isStudioStrokePaintModelCompatible,
@@ -1404,31 +1405,30 @@ function serializeFreehand(
   }
 
   if (brushFamily === "brush") {
-    // 붓 — 기울인 펜촉(-30°) 리본 쿼드 채움(캔버스 sceneFunc 포트).
+    // 붓 — Canvas와 같은 stroke-local non-zero coverage plan을 직렬화한다.
+    // 각 세그먼트의 winding을 하나로 정규화해야 역방향 재추적/자기교차가 이전 칠을
+    // 상쇄해 투명하게 만드는 SVG non-zero compound-path 취소를 막을 수 있다.
     const smoothed = resolveStudioFreehandRenderPath(points, {
       sampleSpacing: el.sampleSpacing,
       legacyMinDistance: renderSampleDistance,
       legacyTension: 0,
     }).points;
     if (smoothed.length < 2) return "";
-    const angle = -Math.PI / 6;
-    const dx = (aliasStrokeWidth / 2) * Math.cos(angle);
-    const dy = (aliasStrokeWidth / 2) * Math.sin(angle);
-    const sub: string[] = [];
-    if (smoothed.length === 2) {
-      sub.push(`M ${fmt(smoothed[0] - dx)} ${fmt(smoothed[1] - dy)} L ${fmt(smoothed[0] + dx)} ${fmt(smoothed[1] + dy)}`);
-    } else {
-      for (let i = 0; i < smoothed.length - 2; i += 2) {
-        const x0 = smoothed[i];
-        const y0 = smoothed[i + 1];
-        const x1 = smoothed[i + 2];
-        const y1 = smoothed[i + 3];
-        sub.push(
-          `M ${fmt(x0 - dx)} ${fmt(y0 - dy)} L ${fmt(x0 + dx)} ${fmt(y0 + dy)} L ${fmt(x1 + dx)} ${fmt(y1 + dy)} L ${fmt(x1 - dx)} ${fmt(y1 - dy)} Z`
-        );
-      }
-    }
-    return `<path d="${sub.join(" ")}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
+    const coveragePlan = planStudioAngledNibStrokeLocalCoverage(
+      smoothed,
+      aliasStrokeWidth,
+    );
+    if (coveragePlan.polygons.length === 0) return "";
+    const subpaths = coveragePlan.polygons.map((polygon) => (
+      `M ${fmt(polygon.points[0])} ${fmt(polygon.points[1])} ${Array.from(
+        { length: polygon.points.length / 2 - 1 },
+        (_, pointIndex) => {
+          const coordinateIndex = (pointIndex + 1) * 2;
+          return `L ${fmt(polygon.points[coordinateIndex])} ${fmt(polygon.points[coordinateIndex + 1])}`;
+        }
+      ).join(" ")} Z`
+    )).join(" ");
+    return `<path d="${subpaths}" fill="${escapeXml(stroke)}" fill-rule="nonzero"${opacityAttr} data-brush-engine="angled-nib-local-coverage"/>`;
   }
 
   if (brushFamily === "screentone") {

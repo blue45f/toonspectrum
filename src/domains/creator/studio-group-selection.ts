@@ -28,6 +28,22 @@ export interface GroupSelectionGroupLike {
   readonly id: string;
 }
 
+/**
+ * 그룹 드래그가 옮길 수 있는 요소의 최소 형태.
+ *
+ * 좌표형 요소(image/frame/text/bubble 등)는 x/y를, 선화(draw)는 문서 좌표 points를 가진다.
+ * 이 모듈은 Studio의 구체 El 유니언을 모르고도 두 저장 형태를 같은 원자적 이동 계획으로 묶는다.
+ */
+export interface GroupTranslationItemLike {
+  readonly id: string;
+  readonly type: string;
+  readonly x?: number;
+  readonly y?: number;
+  readonly width?: number;
+  readonly height?: number;
+  readonly points?: readonly number[];
+}
+
 // 캔버스 선택의 권위 상태 3종. selectedId/marqueeIds는 상호 배타(둘 중 하나만 비어 있지 않음).
 export interface GroupSelectionState {
   readonly selectedId: string | null;
@@ -73,6 +89,35 @@ export function groupMemberIds(
     if (item.groupId === groupId) out.push(item.id);
   }
   return out;
+}
+
+/**
+ * 마퀴·우클릭처럼 여러 hit id가 한 번에 들어오는 선택을 최상위 그룹 단위로 확장한다.
+ *
+ * 그룹 밖에서는 자식 하나만 닿아도 해당 그룹 전체를 선택하고, 그룹 내부 편집 중에는 그 그룹의
+ * 자식만 개별 선택으로 유지한다. 반환 순서는 언제나 문서 z-order이며 중복·유령 id는 제거한다.
+ */
+export function expandSelectionIdsToGroupUnits(
+  items: readonly GroupSelectionItemLike[],
+  groups: readonly GroupSelectionGroupLike[],
+  hitIds: readonly string[],
+  activeGroupId: string | null
+): string[] {
+  const hitSet = new Set(hitIds);
+  const knownGroupIds = new Set(groups.map((group) => group.id));
+  const expanded = new Set<string>();
+
+  for (const item of items) {
+    if (!hitSet.has(item.id)) continue;
+    const groupId = effectiveGroupId(item, knownGroupIds);
+    if (groupId && groupId !== activeGroupId) {
+      for (const memberId of groupMemberIds(items, groupId)) expanded.add(memberId);
+    } else {
+      expanded.add(item.id);
+    }
+  }
+
+  return orderIdsByItems(items, expanded);
 }
 
 // id 집합을 items의 z-order로 정렬(결정적 marqueeIds 유지용).
@@ -208,4 +253,278 @@ export function planGroupEscape(input: GroupEscapeInput): GroupSelectionState | 
   const members = groupMemberIds(input.items, activeGroupId);
   const shape = selectionShapeForIds(members);
   return { ...shape, activeGroupId: null };
+}
+
+export interface AtomicSelectionTranslationInput<T extends GroupTranslationItemLike> {
+  readonly items: readonly T[];
+  readonly selectedIds: readonly string[];
+  readonly deltaX: number;
+  readonly deltaY: number;
+  /** 요소 잠금과 상위 그룹 잠금을 모두 반영한 최종 잠금 판정. */
+  readonly isLocked: (item: T) => boolean;
+}
+
+/**
+ * 선택 단위의 드래그를 문서 스냅샷 한 장으로 계산한다.
+ *
+ * Konva 좌표형 노드는 드래그 중 화면에서 함께 움직이지만, 히스토리에는 이 함수의 결과만 한 번
+ * 커밋한다. draw는 노드 x/y가 아니라 points 자체를 이동한다. 잠긴 자식·유실 멤버·지원하지 않는
+ * 기하가 하나라도 있으면 전체를 fail-closed하며, 바뀌지 않은 요소 참조도 보존해 React/CRDT의
+ * 불필요한 후속 작업을 막는다.
+ */
+export function planAtomicSelectionTranslation<T extends GroupTranslationItemLike>(
+  input: AtomicSelectionTranslationInput<T>
+): T[] {
+  if (
+    input.selectedIds.length === 0 ||
+    !Number.isFinite(input.deltaX) ||
+    !Number.isFinite(input.deltaY)
+  ) {
+    return [...input.items];
+  }
+  const deltaX = input.deltaX;
+  const deltaY = input.deltaY;
+  if (deltaX === 0 && deltaY === 0) return [...input.items];
+
+  const selected = new Set(input.selectedIds);
+  const selectedItems = input.items.filter((item) => selected.has(item.id));
+  // 그룹은 한 객체처럼 움직인다. 멤버가 사라졌거나 잠겼거나 이동 가능한 문서 기하가 아니면
+  // 일부만 옮겨 그룹을 찢지 않고 전체 제스처를 fail-closed 한다.
+  if (
+    selectedItems.length !== selected.size ||
+    selectedItems.some(input.isLocked) ||
+    selectedItems.some((item) => {
+      if (item.type === "draw") {
+        return (
+          item.points === undefined ||
+          item.points.length < 2 ||
+          item.points.length % 2 !== 0 ||
+          !item.points.every(Number.isFinite)
+        );
+      }
+      return (
+        typeof item.x !== "number" ||
+        !Number.isFinite(item.x) ||
+        typeof item.y !== "number" ||
+        !Number.isFinite(item.y)
+      );
+    })
+  ) {
+    return [...input.items];
+  }
+
+  return input.items.map((item) => {
+    if (!selected.has(item.id)) return item;
+
+    if (item.type === "draw" && item.points) {
+      return {
+        ...item,
+        points: item.points.map((value, index) =>
+          value + (index % 2 === 0 ? deltaX : deltaY)
+        ),
+      } as T;
+    }
+
+    if (
+      typeof item.x === "number" &&
+      Number.isFinite(item.x) &&
+      typeof item.y === "number" &&
+      Number.isFinite(item.y)
+    ) {
+      return {
+        ...item,
+        x: item.x + deltaX,
+        y: item.y + deltaY,
+      } as T;
+    }
+
+    return item;
+  });
+}
+
+export interface GroupSelectionAffineBounds {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface AtomicSelectionAffineTransformInput<T extends GroupTranslationItemLike> {
+  readonly items: readonly T[];
+  readonly selectedIds: readonly string[];
+  /** 변형 전 혼합 선택 전체의 문서 좌표 합집합. 이 박스의 좌상단이 affine 기준점이다. */
+  readonly sourceBounds: GroupSelectionAffineBounds;
+  readonly translateX: number;
+  readonly translateY: number;
+  readonly scaleX: number;
+  readonly scaleY: number;
+  /** 요소 잠금과 상위 그룹 잠금을 모두 반영한 최종 잠금 판정. */
+  readonly isLocked: (item: T) => boolean;
+}
+
+export type AtomicSelectionAffineTransformNoopReason =
+  | "empty-selection"
+  | "missing-selection-member"
+  | "locked-selection-member"
+  | "invalid-transform"
+  | "invalid-source-bounds"
+  | "zero-size-source-bounds"
+  | "unsupported-member-geometry"
+  | "identity-transform";
+
+export type AtomicSelectionAffineTransformResult<T extends GroupTranslationItemLike> =
+  | {
+      readonly kind: "applied";
+      readonly items: T[];
+      /** 입력 순서가 아니라 문서 items 순서로 정규화된 선택 ID. */
+      readonly orderedSelectedIds: string[];
+    }
+  | {
+      readonly kind: "no-op";
+      readonly reason: AtomicSelectionAffineTransformNoopReason;
+      readonly items: T[];
+      /** 입력 순서가 아니라 문서 items 순서로 정규화된 선택 ID. */
+      readonly orderedSelectedIds: string[];
+    };
+
+function noOpAffineTransform<T extends GroupTranslationItemLike>(
+  input: AtomicSelectionAffineTransformInput<T>,
+  reason: AtomicSelectionAffineTransformNoopReason,
+  orderedSelectedIds: readonly string[]
+): AtomicSelectionAffineTransformResult<T> {
+  return {
+    kind: "no-op",
+    reason,
+    items: [...input.items],
+    orderedSelectedIds: [...orderedSelectedIds],
+  };
+}
+
+function hasFiniteDrawGeometry(item: GroupTranslationItemLike): boolean {
+  return (
+    item.type === "draw" &&
+    item.points !== undefined &&
+    item.points.length >= 2 &&
+    item.points.length % 2 === 0 &&
+    item.points.every(Number.isFinite)
+  );
+}
+
+function hasFiniteBoxGeometry(item: GroupTranslationItemLike): boolean {
+  return (
+    typeof item.x === "number" &&
+    Number.isFinite(item.x) &&
+    typeof item.y === "number" &&
+    Number.isFinite(item.y) &&
+    typeof item.width === "number" &&
+    Number.isFinite(item.width) &&
+    item.width >= 0 &&
+    typeof item.height === "number" &&
+    Number.isFinite(item.height) &&
+    item.height >= 0
+  );
+}
+
+/**
+ * PPT/Figma식 혼합 선택의 이동+배율 변형을 한 문서 스냅샷으로 계산한다.
+ *
+ * draw는 모든 문서 좌표 points를 직접 변환하고, 좌표형 객체는 두 모서리를 변환한 뒤 양수
+ * width/height의 정규 박스로 저장한다. 따라서 음수 배율도 선택 내 위치와 선화를 정확히 반전하며
+ * 객체 박스는 후속 레이아웃·hit-test가 다룰 수 있는 canonical 형태를 유지한다.
+ *
+ * 혼합 그룹은 부분 적용하지 않는다. 선택 ID가 사라졌거나, 멤버가 잠겼거나, 지원하지 않는 기하가
+ * 하나라도 있으면 전체가 no-op이다. 이 규약은 협업/undo에 반쯤 변형된 그룹이 노출되는 것을 막는다.
+ */
+export function planAtomicSelectionAffineTransform<T extends GroupTranslationItemLike>(
+  input: AtomicSelectionAffineTransformInput<T>
+): AtomicSelectionAffineTransformResult<T> {
+  const requestedIds = new Set(input.selectedIds);
+  const orderedSelectedItems = input.items.filter((item) => requestedIds.has(item.id));
+  const orderedSelectedIds = orderedSelectedItems.map((item) => item.id);
+
+  if (requestedIds.size === 0) {
+    return noOpAffineTransform(input, "empty-selection", orderedSelectedIds);
+  }
+  if (orderedSelectedIds.length !== requestedIds.size) {
+    return noOpAffineTransform(input, "missing-selection-member", orderedSelectedIds);
+  }
+  if (orderedSelectedItems.some(input.isLocked)) {
+    return noOpAffineTransform(input, "locked-selection-member", orderedSelectedIds);
+  }
+
+  const { sourceBounds } = input;
+  if (
+    !Number.isFinite(sourceBounds.x) ||
+    !Number.isFinite(sourceBounds.y) ||
+    !Number.isFinite(sourceBounds.width) ||
+    !Number.isFinite(sourceBounds.height) ||
+    sourceBounds.width < 0 ||
+    sourceBounds.height < 0
+  ) {
+    return noOpAffineTransform(input, "invalid-source-bounds", orderedSelectedIds);
+  }
+  if (
+    !Number.isFinite(input.translateX) ||
+    !Number.isFinite(input.translateY) ||
+    !Number.isFinite(input.scaleX) ||
+    !Number.isFinite(input.scaleY)
+  ) {
+    return noOpAffineTransform(input, "invalid-transform", orderedSelectedIds);
+  }
+  if (
+    (sourceBounds.width === 0 && input.scaleX !== 1) ||
+    (sourceBounds.height === 0 && input.scaleY !== 1)
+  ) {
+    return noOpAffineTransform(input, "zero-size-source-bounds", orderedSelectedIds);
+  }
+  if (
+    orderedSelectedItems.some(
+      (item) => !hasFiniteDrawGeometry(item) && !hasFiniteBoxGeometry(item)
+    )
+  ) {
+    return noOpAffineTransform(input, "unsupported-member-geometry", orderedSelectedIds);
+  }
+  if (
+    input.translateX === 0 &&
+    input.translateY === 0 &&
+    input.scaleX === 1 &&
+    input.scaleY === 1
+  ) {
+    return noOpAffineTransform(input, "identity-transform", orderedSelectedIds);
+  }
+
+  const transformX = (value: number) =>
+    sourceBounds.x + (value - sourceBounds.x) * input.scaleX + input.translateX;
+  const transformY = (value: number) =>
+    sourceBounds.y + (value - sourceBounds.y) * input.scaleY + input.translateY;
+
+  const transformedItems = input.items.map((item) => {
+    if (!requestedIds.has(item.id)) return item;
+    if (hasFiniteDrawGeometry(item)) {
+      return {
+        ...item,
+        points: item.points!.map((value, index) =>
+          index % 2 === 0 ? transformX(value) : transformY(value)
+        ),
+      } as T;
+    }
+
+    const transformedLeft = transformX(item.x!);
+    const transformedRight = transformX(item.x! + item.width!);
+    const transformedTop = transformY(item.y!);
+    const transformedBottom = transformY(item.y! + item.height!);
+    return {
+      ...item,
+      x: Math.min(transformedLeft, transformedRight),
+      y: Math.min(transformedTop, transformedBottom),
+      width: Math.abs(transformedRight - transformedLeft),
+      height: Math.abs(transformedBottom - transformedTop),
+    } as T;
+  });
+
+  return {
+    kind: "applied",
+    items: transformedItems,
+    orderedSelectedIds,
+  };
 }

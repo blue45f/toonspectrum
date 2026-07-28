@@ -156,17 +156,40 @@ function SelectionLayoutAction({
   label,
   onClick,
   className,
+  ariaKeyShortcuts,
+  disabled = false,
+  unavailableReason,
   children,
 }: {
   hint: SelectionLayoutHint;
   label: string;
   onClick: () => void;
   className: string;
+  ariaKeyShortcuts?: string;
+  disabled?: boolean;
+  unavailableReason?: string;
   children: ReactNode;
 }) {
   return (
-    <StudioToolHintTarget hint={hint} preferredSide="top">
-      <button type="button" onClick={onClick} className={className} aria-label={label}>
+    <StudioToolHintTarget
+      hint={hint}
+      disabled={disabled}
+      unavailableReason={unavailableReason}
+      preferredSide="top"
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className={cn(
+          className,
+          "max-lg:min-h-11 max-lg:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11",
+          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+          "disabled:cursor-not-allowed disabled:opacity-45"
+        )}
+        aria-label={label}
+        aria-keyshortcuts={ariaKeyShortcuts}
+      >
         {children}
       </button>
     </StudioToolHintTarget>
@@ -185,8 +208,14 @@ export interface StudioCanvasStatusRailProps {
   advancedFillBusy: boolean;
   advancedFillPreviewMessage: string | null;
   advancedFillActive: boolean;
+  /** 그룹 내부 편집 모드에서 지속적으로 표시할 현재 그룹 이름. */
+  activeGroupName?: string | null;
   selectionGroupName?: string | null;
   selectionLockState?: StudioCanvasSelectionLockState;
+  groupSelectionDisabledReason?: string | null;
+  lockSelectionDisabledReason?: string | null;
+  layoutSelectionDisabledReason?: string | null;
+  alignmentSelectionDisabledReason?: string | null;
   onDownloadAutosaveBackup: () => void;
   onRestoreAutosave: () => void | Promise<void>;
   onClearAutosave: () => void;
@@ -216,8 +245,13 @@ export function StudioCanvasStatusRail({
   advancedFillBusy,
   advancedFillPreviewMessage,
   advancedFillActive,
+  activeGroupName = null,
   selectionGroupName = null,
   selectionLockState = "unlocked",
+  groupSelectionDisabledReason = null,
+  lockSelectionDisabledReason = null,
+  layoutSelectionDisabledReason = null,
+  alignmentSelectionDisabledReason = null,
   onDownloadAutosaveBackup,
   onRestoreAutosave,
   onClearAutosave,
@@ -237,6 +271,7 @@ export function StudioCanvasStatusRail({
   onCancelAdvancedFillCalculation,
 }: StudioCanvasStatusRailProps) {
   const hasAdvancedFillPreview = advancedFillPreviewMessage !== null;
+  const normalizedActiveGroupName = activeGroupName?.trim() || null;
 
   return (
     <div
@@ -286,6 +321,34 @@ export function StudioCanvasStatusRail({
         </div>
       )}
 
+      {normalizedActiveGroupName ? (
+        <div
+          data-studio-group-internal-edit-status
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          aria-label={`${normalizedActiveGroupName} 내부 편집 중. Esc로 그룹 전체 선택`}
+          className="mb-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-cool/35 bg-cool/10 px-2.5 py-1.5 text-xs text-cool"
+        >
+          <span className="flex min-w-0 max-w-full items-center gap-1.5 font-semibold">
+            <span className="size-1.5 shrink-0 rounded-full bg-cool" aria-hidden />
+            <span className="min-w-0 max-w-[min(12rem,58vw)] truncate">
+              {normalizedActiveGroupName}
+            </span>
+            <span className="shrink-0 text-cool/60" aria-hidden>
+              ·
+            </span>
+            <span className="shrink-0">내부 편집</span>
+          </span>
+          <span className="ml-auto shrink-0 text-[0.68rem] font-medium text-fg-3">
+            <kbd className="mr-1 rounded border border-line bg-panel px-1.5 py-0.5 font-sans text-[0.62rem] font-bold text-fg-2">
+              Esc
+            </kbd>
+            로 그룹 전체 선택
+          </span>
+        </div>
+      ) : null}
+
       {selectionCount > 0 && (
         <div className="mb-2 flex min-w-0 items-center gap-2 rounded-xl border border-accent/40 bg-accent-soft/30 px-2.5 py-1.5 text-xs shadow-sm">
           <span className="flex shrink-0 items-center gap-1.5 font-semibold text-accent">
@@ -296,13 +359,20 @@ export function StudioCanvasStatusRail({
               </span>
             ) : null}
           </span>
-          <span className="hidden shrink-0 text-fg-3 xl:inline">방향키 이동 · 핸들 변형</span>
+          <span className="hidden shrink-0 text-fg-3 xl:inline">
+            {selectionGroupName
+              ? "드래그·방향키 전체 이동 · 더블클릭 내부 편집"
+              : "드래그·방향키 이동 · 정렬·분배"}
+          </span>
           <div className="ml-auto flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain pb-0.5 [scrollbar-width:thin]">
             {selectionGroupName && onUngroupSelection ? (
               <SelectionLayoutAction
                 hint={SELECTION_LAYOUT_HINTS.ungroup}
                 label="선택 그룹 해제"
                 onClick={onUngroupSelection}
+                ariaKeyShortcuts="Shift+Control+G Shift+Meta+G"
+                disabled={layoutSelectionDisabledReason !== null}
+                unavailableReason={layoutSelectionDisabledReason ?? undefined}
                 className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
               >
                 <FolderMinus size={13} aria-hidden />
@@ -313,6 +383,9 @@ export function StudioCanvasStatusRail({
                 hint={SELECTION_LAYOUT_HINTS.group}
                 label="선택 요소 그룹화"
                 onClick={onGroupSelection}
+                ariaKeyShortcuts="Control+G Meta+G"
+                disabled={groupSelectionDisabledReason !== null}
+                unavailableReason={groupSelectionDisabledReason ?? undefined}
                 className="flex cursor-pointer items-center gap-1 rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
               >
                 <FolderPlus size={13} aria-hidden />
@@ -334,6 +407,8 @@ export function StudioCanvasStatusRail({
                       : "선택 잠금"
                 }
                 onClick={onToggleSelectionLock}
+                disabled={lockSelectionDisabledReason !== null}
+                unavailableReason={lockSelectionDisabledReason ?? undefined}
                 className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
               >
                 {selectionLockState === "locked" ? (
@@ -375,6 +450,8 @@ export function StudioCanvasStatusRail({
                   hint={SELECTION_LAYOUT_HINTS.front}
                   label="선택 요소 맨 앞으로"
                   onClick={() => onReorderSelection("front")}
+                  disabled={layoutSelectionDisabledReason !== null}
+                  unavailableReason={layoutSelectionDisabledReason ?? undefined}
                   className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
                 >
                   <ArrowUpToLine size={13} aria-hidden />
@@ -383,6 +460,8 @@ export function StudioCanvasStatusRail({
                   hint={SELECTION_LAYOUT_HINTS.back}
                   label="선택 요소 맨 뒤로"
                   onClick={() => onReorderSelection("back")}
+                  disabled={layoutSelectionDisabledReason !== null}
+                  unavailableReason={layoutSelectionDisabledReason ?? undefined}
                   className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
                 >
                   <ArrowDownToLine size={13} aria-hidden />
@@ -399,8 +478,10 @@ export function StudioCanvasStatusRail({
                 <SelectionLayoutAction
                   key={mode}
                   hint={hint}
-                  label={label}
+                  label={selectionGroupName ? label.replace("선택 요소", "선택 그룹") : label}
                   onClick={() => onAlignSelection(mode)}
+                  disabled={alignmentSelectionDisabledReason !== null}
+                  unavailableReason={alignmentSelectionDisabledReason ?? undefined}
                   className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
                 >
                   <Icon size={13} aria-hidden />
@@ -416,15 +497,17 @@ export function StudioCanvasStatusRail({
                 <SelectionLayoutAction
                   key={mode}
                   hint={hint}
-                  label={label}
+                  label={selectionGroupName ? label.replace("선택 요소", "선택 그룹") : label}
                   onClick={() => onAlignSelection(mode)}
+                  disabled={alignmentSelectionDisabledReason !== null}
+                  unavailableReason={alignmentSelectionDisabledReason ?? undefined}
                   className="cursor-pointer rounded px-1.5 py-0.5 text-[0.66rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
                 >
                   {text}
                 </SelectionLayoutAction>
               ))}
             </div>
-            {selectionCount >= 3 && (
+            {selectionCount >= 3 && !selectionGroupName && (
               <div
                 className="inline-flex shrink-0 gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
                 role="group"
@@ -436,6 +519,8 @@ export function StudioCanvasStatusRail({
                     hint={hint}
                     label={label}
                     onClick={() => onAlignSelection(mode)}
+                    disabled={alignmentSelectionDisabledReason !== null}
+                    unavailableReason={alignmentSelectionDisabledReason ?? undefined}
                     className="cursor-pointer rounded px-1.5 py-0.5 text-[0.66rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
                   >
                     {text}

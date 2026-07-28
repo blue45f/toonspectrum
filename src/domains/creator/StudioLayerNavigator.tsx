@@ -80,6 +80,8 @@ import { cn } from "@/lib/utils";
 export type StudioLayerNavigatorItemFlag = "alphaLocked" | "fillReference" | "maskEnabled";
 
 export type StudioLayerNavigatorAction =
+  | { type: "group-selection" }
+  | { type: "ungroup-selection" }
   | { type: "create-group"; seedIds: readonly string[] }
   /**
    * CSP-class frame folder seed: bind selected layers under a contiguous group for a frame cut,
@@ -267,6 +269,18 @@ export function StudioLayerNavigator({
   const batchShowBlockedCount = batchSelectedIds.length - batchShowIds.length;
   const batchUnlockBlockedCount = batchSelectedIds.length - batchUnlockIds.length;
   const commonSelectedGroup = commonValue(batchSelectedItems.map((item) => item.groupId));
+  const selectionContainsGroupedItems = batchSelectedItems.some(
+    (item) => item.groupId !== undefined
+  );
+  const createGroupUnavailableReason = readOnly
+    ? "읽기 전용 작업공간에서는 그룹을 만들 수 없어요."
+    : groupingDisabled
+      ? "현재 작업면은 레이어 그룹을 지원하지 않아요."
+      : filterActive
+        ? "검색·필터를 지운 뒤 그룹을 만들 수 있어요."
+        : selectionContainsGroupedItems
+          ? "기존 그룹이 포함되어 있어요. 먼저 그룹을 해제해 주세요."
+          : undefined;
   const commonSelectedRole = commonValue(batchSelectedItems.map((item) => item.role));
   const commonSelectedColor = commonValue(batchSelectedItems.map((item) => item.color));
 
@@ -316,6 +330,9 @@ export function StudioLayerNavigator({
   const activeGroupItemIds = activeGroup
     ? displayItems.filter((item) => item.groupId === activeGroup.id).map((item) => item.id)
     : [];
+  const activeGroupAllSelected =
+    activeGroupItemIds.length > 0 &&
+    activeGroupItemIds.every((id) => selectedIdSet.has(id));
   const activeItemGroup = activeItem?.groupId
     ? (availableGroups.find((group) => group.id === activeItem.groupId) ?? null)
     : null;
@@ -522,6 +539,19 @@ export function StudioLayerNavigator({
 
   function handleTreeItemKeyDown(event: ReactKeyboardEvent<HTMLElement>, target: FocusTarget) {
     if (event.target !== event.currentTarget) return;
+    if (
+      (event.metaKey || event.ctrlKey) &&
+      !event.altKey &&
+      (event.code === "KeyG" || event.key.toLocaleLowerCase() === "g")
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.repeat) return;
+      onAction({
+        type: event.shiftKey ? "ungroup-selection" : "group-selection",
+      });
+      return;
+    }
     if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === "a") {
       event.preventDefault();
       event.stopPropagation();
@@ -759,16 +789,10 @@ export function StudioLayerNavigator({
           <button
             type="button"
             onClick={() => onAction({ type: "create-group", seedIds: [...selectedIds] })}
-            disabled={readOnly || groupingDisabled || filterActive}
+            disabled={createGroupUnavailableReason !== undefined}
             className={compactControl}
-            aria-label="새 레이어 그룹"
-            title={
-              groupingDisabled
-                ? "현재 작업면은 레이어 그룹을 지원하지 않아요"
-                : filterActive
-                  ? "검색·필터를 지운 뒤 그룹을 만들 수 있어요"
-                  : "선택 레이어로 새 그룹 만들기"
-            }
+            aria-label={`새 레이어 그룹${createGroupUnavailableReason ? `, 사용 불가: ${createGroupUnavailableReason}` : ""}`}
+            title={createGroupUnavailableReason ?? "선택 레이어로 새 그룹 만들기"}
           >
             <FolderPlus size={13} />
             <span className="hidden min-[390px]:inline">그룹</span>
@@ -1291,18 +1315,23 @@ export function StudioLayerNavigator({
                     aria-level={1}
                     aria-selected={allChildrenSelected}
                     aria-expanded={node.empty ? undefined : node.expanded}
-                    aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A"
+                    aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G"
                     aria-label={`${node.group.name}, 그룹, ${node.entries.length}개 레이어${groupStatus ? `, ${groupStatus}` : ""}`}
                     tabIndex={tabStopKey === key ? 0 : -1}
                     onFocus={() => setFocusedKey(key)}
                     onKeyDown={(event) => handleTreeItemKeyDown(event, target)}
                     onClick={(event) => {
                       if (isLayerRowControl(event.target) || node.empty) return;
-                      replaceWithGroupItems(
-                        displayItems
-                          .filter((item) => item.groupId === node.group.id)
-                          .map((item) => item.id)
-                      );
+                      const itemIds = displayItems
+                        .filter((item) => item.groupId === node.group.id)
+                        .map((item) => item.id);
+                      const additive =
+                        event.shiftKey ||
+                        event.metaKey ||
+                        event.ctrlKey ||
+                        mobileMultiSelect;
+                      if (additive) selectGroupItems(itemIds);
+                      else replaceWithGroupItems(itemIds);
                     }}
                     onDoubleClick={(event) => {
                       if (isLayerRowControl(event.target)) return;
@@ -1576,9 +1605,25 @@ export function StudioLayerNavigator({
               </label>
               <button
                 type="button"
-                disabled={readOnly || groupingDisabled || filterActive || batchSelectedIds.length === 0}
+                disabled={
+                  createGroupUnavailableReason !== undefined ||
+                  batchSelectedIds.length === 0
+                }
                 onClick={() => onAction({ type: "create-group", seedIds: batchSelectedIds })}
                 className={compactControl}
+                aria-label={`새 그룹으로 묶기${
+                  createGroupUnavailableReason
+                    ? `, 사용 불가: ${createGroupUnavailableReason}`
+                    : batchSelectedIds.length === 0
+                      ? ", 사용 불가: 먼저 레이어를 선택하세요."
+                      : ""
+                }`}
+                title={
+                  createGroupUnavailableReason ??
+                  (batchSelectedIds.length === 0
+                    ? "먼저 레이어를 선택하세요."
+                    : "선택 레이어를 새 그룹으로 묶기")
+                }
               >
                 <FolderPlus size={13} /> 새 그룹으로 묶기
               </button>
@@ -1824,8 +1869,19 @@ export function StudioLayerNavigator({
               <button type="button" disabled={readOnly} onClick={() => beginRename("group", activeGroup.id, activeGroup.name)} className={compactControl}>
                 <TypeIcon size={13} /> 이름 변경
               </button>
-              <button type="button" onClick={() => selectGroupItems(activeGroupItemIds)} className={compactControl}>
-                <ListChecks size={13} /> 모두 선택
+              <button
+                type="button"
+                onClick={() => selectGroupItems(activeGroupItemIds)}
+                aria-label={
+                  activeGroupAllSelected
+                    ? `${activeGroup.name} 그룹 선택 해제`
+                    : `${activeGroup.name} 그룹 모두 선택`
+                }
+                aria-pressed={activeGroupAllSelected}
+                className={compactControl}
+              >
+                <ListChecks size={13} />
+                {activeGroupAllSelected ? "그룹 선택 해제" : "모두 선택"}
               </button>
               <button type="button" disabled={readOnly} onClick={() => onAction({ type: "set-group-flag", groupId: activeGroup.id, flag: "hidden", value: !activeGroup.hidden })} className={compactControl}>
                 {activeGroup.hidden ? <Eye size={13} /> : <EyeOff size={13} />}

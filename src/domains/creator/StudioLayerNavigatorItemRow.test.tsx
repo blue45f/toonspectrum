@@ -307,4 +307,12 @@ describe("StudioLayerNavigatorItemRow", () => {
       "주인공 원화"
     );
   });
+
+  it("advertises every supported row navigation, selection, rename, menu, and grouping shortcut", () => {
+    renderRow(rowProps({ tabStop: true }));
+
+    expect(screen.getByRole("treeitem").getAttribute("aria-keyshortcuts")).toBe(
+      "ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G"
+    );
+  });
 });

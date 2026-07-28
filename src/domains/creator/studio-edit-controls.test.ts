@@ -100,6 +100,13 @@ describe("studio edit availability", () => {
     });
   });
 
+  it("keeps z-order commands available for a group or multi-selection", () => {
+    expect(resolveStudioEditAvailability({
+      ...editableSelection,
+      hasSingleElementSelection: false,
+    }).reorderDisabled).toBe(false);
+  });
+
   it("blocks read-only selection inspection while a transient capture owns the page history", () => {
     expect(resolveStudioEditAvailability({
       ...editableSelection,

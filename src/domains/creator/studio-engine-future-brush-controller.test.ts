@@ -10,6 +10,17 @@ import {
   type StudioEngineFutureBrushTileBoundary,
 } from "./studio-engine-future-brush-controller";
 import {
+  createStudioEngineVNextBrushProviderGpuCompletion,
+  StudioEngineVNextBrushProviderGpuBoundaryAdapter,
+  type StudioEngineVNextBrushProviderGpuExecutionBoundary,
+} from "./studio-engine-vnext-brush-provider-gpu-boundary";
+import {
+  StudioEngineVNextBrushProviderRouter,
+  type StudioEngineVNextBrushProviderCapability,
+  type StudioEngineVNextBrushProviderDescriptor,
+  type StudioEngineVNextBrushProviderExecution,
+} from "./studio-engine-vnext-brush-provider-router";
+import {
   adaptLoweredStudioCanonicalBrushWebGpuDabs,
   fingerprintStudioEngineWebGpuBrushPlan,
   STUDIO_ENGINE_WEBGPU_BRUSH_COLOR_MODEL,
@@ -32,6 +43,19 @@ import type {
 
 function curve() {
   return { minimum: 1, maximum: 1, exponent: 1 };
+}
+
+function proceduralGrain() {
+  return {
+    kind: "procedural-noise",
+    assetId: null,
+    contentHash: null,
+    space: "document",
+    scale: 1,
+    depth: 0.5,
+    contrast: 1,
+    seed: 1,
+  };
 }
 
 function canonicalPlan(
@@ -234,6 +258,7 @@ function committedTile(commandSequence: number): StudioEngineTileCommitResult {
 
 function controller(options: {
   readonly webGpu?: StudioEngineFutureBrushGpuBoundary;
+  readonly specialistGpu?: StudioEngineVNextBrushProviderGpuExecutionBoundary;
   readonly tileAuthority?: StudioEngineFutureBrushTileBoundary;
   readonly lower?: typeof lowerStudioCanonicalBrushPlanToWebGpuDabs;
 }) {
@@ -245,6 +270,7 @@ function controller(options: {
     webGpu: options.webGpu ?? {
       execute: (frame) => gpuPresented(frame),
     },
+    specialistGpu: options.specialistGpu,
     tileAuthority: options.tileAuthority ?? {
       commit: (input) => committedTile(
         (input.brushPlan as { commandSequence: number }).commandSequence,
@@ -260,6 +286,79 @@ function deferred<T>() {
     resolve = next;
   });
   return { promise, resolve };
+}
+
+const GRAIN_SPECIALIST_CAPABILITIES = [
+  "tip:analytic",
+  "grain:procedural",
+  "media:dry",
+  "color:linear-srgb",
+  "porter-duff:source-over",
+  "blend:normal",
+  "intent:professional",
+] as const satisfies readonly StudioEngineVNextBrushProviderCapability[];
+
+function specialistBoundary(options: Readonly<{
+  beforeComplete?: (
+    execution: StudioEngineVNextBrushProviderExecution,
+    signal: AbortSignal,
+  ) => Promise<void> | void;
+  forgeProof?: boolean;
+}> = {}) {
+  const descriptor: StudioEngineVNextBrushProviderDescriptor = Object.freeze({
+    id: "future-grain-provider",
+    version: 2,
+    priority: 100,
+    capabilities: GRAIN_SPECIALIST_CAPABILITIES,
+  });
+  const executions: StudioEngineVNextBrushProviderExecution[] = [];
+  const execute = vi.fn(async (
+    execution: StudioEngineVNextBrushProviderExecution,
+    signal: AbortSignal,
+  ) => {
+    executions.push(execution);
+    await options.beforeComplete?.(execution, signal);
+    const completed = createStudioEngineVNextBrushProviderGpuCompletion(
+      descriptor,
+      execution,
+      {
+        executionDigest: `future:gpu:${execution.globalRequestSequence}`,
+        width: 64,
+        height: 64,
+        loweringVersion: 9,
+        dabCount: 2,
+        batchCount: 1,
+        batchOrder: [execution.canonicalPlan.composite.porterDuff],
+      },
+    );
+    return options.forgeProof
+      ? {
+        ...completed,
+        proof: {
+          ...completed.proof,
+          providerLocalSequence: 999,
+        },
+      }
+      : completed;
+  });
+  const notifyDeviceLoss = vi.fn();
+  const router = new StudioEngineVNextBrushProviderRouter({
+    sessionEpoch: 7,
+    deviceEpoch: 5,
+    resizeEpoch: 3,
+    providers: [{
+      descriptor,
+      execute,
+      notifyDeviceLoss,
+      dispose: vi.fn(),
+    }],
+  });
+  return {
+    boundary: new StudioEngineVNextBrushProviderGpuBoundaryAdapter(router),
+    execute,
+    executions,
+    notifyDeviceLoss,
+  };
 }
 
 describe("StudioEngineFutureBrushController", () => {
@@ -528,16 +627,7 @@ describe("StudioEngineFutureBrushController", () => {
     }));
     const specialist = await target.submit(submission(1, {
       brushPlan: canonicalPlan(1, {
-        grain: {
-          kind: "procedural-noise",
-          assetId: null,
-          contentHash: null,
-          space: "document",
-          scale: 1,
-          depth: 0.5,
-          contrast: 1,
-          seed: 1,
-        },
+        grain: proceduralGrain(),
       }),
     }));
     const staleResize = await target.submit(submission(1, { resizeEpoch: 2 }));
@@ -585,5 +675,160 @@ describe("StudioEngineFutureBrushController", () => {
     expect(await second).toEqual({ status: "rejected", reason: "canceled" });
     expect(execute).toHaveBeenCalledTimes(1);
     expect(commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("interleaves analytic and specialist GPU sequences without approximation", async () => {
+    const events: string[] = [];
+    const specialist = specialistBoundary({
+      beforeComplete: () => {
+        events.push("specialist-gpu");
+      },
+    });
+    const analyticExecute = vi.fn((frame: StudioEngineWebGpuBrushFrame) => {
+      events.push(`analytic-gpu:${frame.requestSequence}`);
+      return gpuPresented(frame);
+    });
+    const tileCommit = vi.fn((input) => {
+      const sequence = (
+        input.brushPlan as { commandSequence: number }
+      ).commandSequence;
+      events.push(`tile:${sequence}`);
+      return committedTile(sequence);
+    });
+    const target = controller({
+      webGpu: { execute: analyticExecute },
+      specialistGpu: specialist.boundary,
+      tileAuthority: { commit: tileCommit },
+    });
+
+    const first = await target.submit(submission(1));
+    const second = await target.submit(submission(2, {
+      brushPlan: canonicalPlan(2, { grain: proceduralGrain() }),
+    }));
+    const third = await target.submit(submission(3));
+
+    expect([first.status, second.status, third.status]).toEqual([
+      "committed",
+      "committed",
+      "committed",
+    ]);
+    expect(events).toEqual([
+      "analytic-gpu:1",
+      "tile:1",
+      "specialist-gpu",
+      "tile:2",
+      "analytic-gpu:3",
+      "tile:3",
+    ]);
+    expect(analyticExecute).toHaveBeenCalledTimes(2);
+    expect(specialist.execute).toHaveBeenCalledTimes(1);
+    expect(specialist.executions[0]).toMatchObject({
+      globalRequestSequence: 1,
+      canonicalPlan: { commandSequence: 2, strokeId: "stroke-2" },
+    });
+    if (second.status !== "committed") throw new Error("Expected specialist commit");
+    expect(second.receipt.gpu).toMatchObject({
+      requestSequence: 2,
+      planFingerprint: expect.stringMatching(
+        /^vnext-provider:future-grain-provider@2:/u,
+      ),
+    });
+  });
+
+  it("rejects a forged specialist proof before tile authority", async () => {
+    const specialist = specialistBoundary({ forgeProof: true });
+    const tileCommit = vi.fn();
+    const analyticExecute = vi.fn();
+    const target = controller({
+      webGpu: { execute: analyticExecute },
+      specialistGpu: specialist.boundary,
+      tileAuthority: { commit: tileCommit },
+    });
+
+    const result = await target.submit(submission(1, {
+      brushPlan: canonicalPlan(1, { grain: proceduralGrain() }),
+    }));
+
+    expect(result).toEqual({
+      status: "rejected",
+      reason: "gpu-receipt-mismatch",
+    });
+    expect(analyticExecute).not.toHaveBeenCalled();
+    expect(tileCommit).not.toHaveBeenCalled();
+  });
+
+  it("aborts active specialist work on controller cancellation", async () => {
+    const started = deferred<void>();
+    let observedSignal: AbortSignal | null = null;
+    const specialist = specialistBoundary({
+      beforeComplete: (_execution, signal) => {
+        observedSignal = signal;
+        started.resolve(undefined);
+        return new Promise((_resolve, reject) => {
+          signal.addEventListener("abort", () => reject(signal.reason), {
+            once: true,
+          });
+        });
+      },
+    });
+    const tileCommit = vi.fn();
+    const target = controller({
+      specialistGpu: specialist.boundary,
+      tileAuthority: { commit: tileCommit },
+    });
+    const pending = target.submit(submission(1, {
+      brushPlan: canonicalPlan(1, { grain: proceduralGrain() }),
+    }));
+    await started.promise;
+
+    expect(target.cancel(1)).toEqual({ status: "canceled", commandSequence: 1 });
+
+    await expect(pending).resolves.toEqual({
+      status: "rejected",
+      reason: "canceled",
+    });
+    expect((observedSignal as AbortSignal | null)?.aborted).toBe(true);
+    expect(tileCommit).not.toHaveBeenCalled();
+  });
+
+  it("propagates terminal device loss through the specialist router", async () => {
+    const started = deferred<void>();
+    const specialist = specialistBoundary({
+      beforeComplete: (_execution, signal) => {
+        started.resolve(undefined);
+        return new Promise((_resolve, reject) => {
+          signal.addEventListener("abort", () => reject(signal.reason), {
+            once: true,
+          });
+        });
+      },
+    });
+    const tileCommit = vi.fn();
+    const target = controller({
+      specialistGpu: specialist.boundary,
+      tileAuthority: { commit: tileCommit },
+    });
+    const pending = target.submit(submission(1, {
+      brushPlan: canonicalPlan(1, { grain: proceduralGrain() }),
+    }));
+    await started.promise;
+
+    target.notifyDeviceLost();
+
+    await expect(pending).resolves.toEqual({
+      status: "rejected",
+      reason: "device-lost",
+    });
+    expect(specialist.notifyDeviceLoss).toHaveBeenCalledWith({
+      deviceEpoch: 6,
+      reason: "future-brush-controller-device-lost",
+    });
+    expect(tileCommit).not.toHaveBeenCalled();
+    await expect(target.submit(submission(1, {
+      brushPlan: canonicalPlan(1, { grain: proceduralGrain() }),
+    }))).resolves.toEqual({
+      status: "rejected",
+      reason: "device-lost",
+    });
   });
 });

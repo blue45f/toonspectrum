@@ -319,7 +319,7 @@ export type LayerItemReorderDirection = "front" | "back" | "forward" | "backward
 export function reorderLayerSelection<T extends LayerItemLike>(
   items: T[],
   selectedIds: readonly string[],
-  direction: "front" | "back"
+  direction: LayerItemReorderDirection
 ): T[] {
   const requestedIds = new Set(selectedIds);
   if (requestedIds.size === 0) return items;
@@ -334,12 +334,50 @@ export function reorderLayerSelection<T extends LayerItemLike>(
     (item.groupId !== undefined && selectedGroupIds.has(item.groupId));
   const selected = items.filter(isSelectedUnit);
   if (selected.length === 0 || selected.length === items.length) return items;
-  const unselected = items.filter((item) => !isSelectedUnit(item));
-  const next = direction === "front"
-    ? [...unselected, ...selected]
-    : [...selected, ...unselected];
 
-  return next.every((item, index) => item === items[index]) ? items : next;
+  if (direction === "front" || direction === "back") {
+    const unselected = items.filter((item) => !isSelectedUnit(item));
+    const next = direction === "front"
+      ? [...unselected, ...selected]
+      : [...selected, ...unselected];
+    return next.every((item, index) => item === items[index]) ? items : next;
+  }
+
+  // 한 단계 이동도 레이어 한 장씩 교환하지 않고 "시각적 단위"끼리 교환한다.
+  // 연속 그룹은 한 unit이고 무그룹 레이어는 각각 한 unit이다. 여러 선택 단위가 흩어져
+  // 있어도 PPT처럼 각각 한 칸만 이동하며 선택끼리의 상대 순서는 유지한다.
+  const units: T[][] = [];
+  for (let index = 0; index < items.length;) {
+    const item = items[index]!;
+    if (item.groupId === undefined) {
+      units.push([item]);
+      index += 1;
+      continue;
+    }
+    const run = groupRun(items, item.groupId);
+    if (!run.contiguous) return items;
+    units.push(items.slice(run.first, run.last + 1));
+    index = run.last + 1;
+  }
+  const unitSelected = (unit: readonly T[]) => unit.some(isSelectedUnit);
+  let changed = false;
+  if (direction === "forward") {
+    for (let index = units.length - 2; index >= 0; index -= 1) {
+      if (unitSelected(units[index]!) && !unitSelected(units[index + 1]!)) {
+        [units[index], units[index + 1]] = [units[index + 1]!, units[index]!];
+        changed = true;
+      }
+    }
+  } else {
+    for (let index = 1; index < units.length; index += 1) {
+      if (unitSelected(units[index]!) && !unitSelected(units[index - 1]!)) {
+        [units[index - 1], units[index]] = [units[index]!, units[index - 1]!];
+        changed = true;
+      }
+    }
+  }
+
+  return changed ? units.flat() : items;
 }
 
 /**

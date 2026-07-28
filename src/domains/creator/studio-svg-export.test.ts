@@ -90,6 +90,58 @@ function axisVector(angle: number): { x: number; y: number } {
   return { x: Math.cos(radians), y: Math.sin(radians) };
 }
 
+function angledNibExportPolygons(svg: string): number[][] {
+  const pathData = /<path d="([^"]+)"[^>]*data-brush-engine="angled-nib-local-coverage"/u
+    .exec(svg)?.[1];
+  if (!pathData) return [];
+  return Array.from(pathData.matchAll(/M (.*?) Z/gu), (subpathMatch) =>
+    subpathMatch[1]!
+      .replaceAll("L ", "")
+      .trim()
+      .split(/\s+/u)
+      .map(Number)
+  );
+}
+
+function polygonSignedArea(points: readonly number[]): number {
+  let twiceArea = 0;
+  for (let coordinateIndex = 0; coordinateIndex < points.length; coordinateIndex += 2) {
+    const nextCoordinateIndex = (coordinateIndex + 2) % points.length;
+    twiceArea +=
+      points[coordinateIndex]!
+      * points[nextCoordinateIndex + 1]!
+      - points[nextCoordinateIndex]!
+      * points[coordinateIndex + 1]!;
+  }
+  return twiceArea / 2;
+}
+
+function polygonWindingAt(
+  polygons: readonly (readonly number[])[],
+  x: number,
+  y: number,
+): number {
+  let winding = 0;
+  for (const polygon of polygons) {
+    for (let coordinateIndex = 0; coordinateIndex < polygon.length; coordinateIndex += 2) {
+      const nextCoordinateIndex = (coordinateIndex + 2) % polygon.length;
+      const startX = polygon[coordinateIndex]!;
+      const startY = polygon[coordinateIndex + 1]!;
+      const endX = polygon[nextCoordinateIndex]!;
+      const endY = polygon[nextCoordinateIndex + 1]!;
+      const side =
+        (endX - startX) * (y - startY)
+        - (x - startX) * (endY - startY);
+      if (startY <= y) {
+        if (endY > y && side > 0) winding += 1;
+      } else if (endY <= y && side < 0) {
+        winding -= 1;
+      }
+    }
+  }
+  return winding;
+}
+
 function textEl(over: Partial<Extract<SvgExportEl, { type: "text" }>> = {}): Extract<SvgExportEl, { type: "text" }> {
   return {
     id: "t1",
@@ -1236,6 +1288,53 @@ describe("도형 직렬화", () => {
     expect((first.svg.match(/ A /g) ?? []).length).toBe(4);
     expect(first.skipped).toEqual([]);
   });
+
+  it.each(["brush", "flat-brush"] as const)(
+    "%s — 역방향 재추적을 Canvas와 같은 양의 winding 단일 coverage로 내보낸다",
+    (brush) => {
+      const { svg, skipped } = exportPageToSvg(page([rectEl({
+        id: `${brush}-svg-retrace`,
+        kind: "freehand",
+        brush,
+        points: [0, 0, 24, 0, 0, 0, 24, 0],
+        pressures: [0.6, 0.6, 0.6, 0.6],
+        sampleSpacing: 1,
+        stroke: "#2f6fed",
+        strokeWidth: 10,
+        opacity: 0.6,
+      })]));
+      const polygons = angledNibExportPolygons(svg);
+
+      expect(skipped).toEqual([]);
+      expect(svg).toContain('fill-rule="nonzero"');
+      expect(svg.match(/data-brush-engine="angled-nib-local-coverage"/gu)).toHaveLength(1);
+      expect(svg.match(/opacity="0.6"/gu)).toHaveLength(1);
+      expect(polygons.length).toBeGreaterThanOrEqual(3);
+      expect(polygons.every((polygon) => polygonSignedArea(polygon) > 0)).toBe(true);
+      expect(polygonWindingAt(polygons, 12, 0)).toBeGreaterThan(0);
+    },
+  );
+
+  it.each(["brush", "flat-brush"] as const)(
+    "%s — 자기교차 후에도 교차부의 SVG non-zero coverage를 유지한다",
+    (brush) => {
+      const { svg } = exportPageToSvg(page([rectEl({
+        id: `${brush}-svg-self-cross`,
+        kind: "freehand",
+        brush,
+        points: [0, 0, 24, 24, 0, 24, 24, 0, 0, 0],
+        pressures: [0.7, 0.7, 0.7, 0.7, 0.7],
+        sampleSpacing: 1,
+        stroke: "#111111",
+        strokeWidth: 10,
+      })]));
+      const polygons = angledNibExportPolygons(svg);
+
+      expect(polygons.length).toBeGreaterThanOrEqual(4);
+      expect(polygons.every((polygon) => polygonSignedArea(polygon) > 0)).toBe(true);
+      expect(polygonWindingAt(polygons, 12, 12)).toBeGreaterThan(0);
+    },
+  );
 
   it("스크린톤 브러시 — 결정적 망점을 원(circle)으로 그대로 재현한다", () => {
     const tone = rectEl({ id: "st1", kind: "freehand", brush: "screentone", points: [0, 0, 40, 0], strokeWidth: 22 });

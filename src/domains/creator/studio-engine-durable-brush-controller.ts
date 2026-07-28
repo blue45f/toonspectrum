@@ -67,6 +67,7 @@ export interface StudioEngineDurableBrushControllerOptions {
   readonly resizeEpoch: number;
   readonly deviceEpoch: number;
   readonly webGpu: StudioEngineFutureBrushGpuBoundary;
+  readonly specialistGpu?: StudioEngineFutureBrushControllerOptions["specialistGpu"];
   readonly tileAuthority: StudioEngineDurableBrushAuthorityBoundary;
   readonly storage: StudioEngineDurableBrushStorageBoundary;
   readonly initialCommandSequence?: number;
@@ -533,6 +534,9 @@ export class StudioEngineDurableBrushController {
   private readonly sessionEpoch: number;
   private readonly strokeEpoch: number;
   private readonly webGpu: StudioEngineFutureBrushGpuBoundary;
+  private readonly specialistGpu:
+    | NonNullable<StudioEngineFutureBrushControllerOptions["specialistGpu"]>
+    | null;
   private readonly tileAuthority: StudioEngineDurableBrushAuthorityBoundary;
   private readonly storage: StudioEngineDurableBrushStorageBoundary;
   private readonly future: StudioEngineFutureBrushController;
@@ -561,6 +565,13 @@ export class StudioEngineDurableBrushController {
       )
       || !options.webGpu
       || typeof options.webGpu.execute !== "function"
+      || (
+        options.specialistGpu !== undefined
+        && (
+          !options.specialistGpu
+          || typeof options.specialistGpu.execute !== "function"
+        )
+      )
       || !options.tileAuthority
       || typeof options.tileAuthority.commit !== "function"
       || !options.storage
@@ -571,6 +582,7 @@ export class StudioEngineDurableBrushController {
     this.sessionEpoch = options.sessionEpoch;
     this.strokeEpoch = options.strokeEpoch;
     this.webGpu = options.webGpu;
+    this.specialistGpu = options.specialistGpu ?? null;
     this.tileAuthority = options.tileAuthority;
     this.storage = options.storage;
 
@@ -594,6 +606,19 @@ export class StudioEngineDurableBrushController {
       webGpu: {
         execute: (frame) => this.webGpu.execute(frame),
       },
+      ...(this.specialistGpu
+        ? {
+          specialistGpu: {
+            execute: (request, signal) => this.specialistGpu!.execute(
+              request,
+              signal,
+            ),
+            notifyDeviceLoss: (reason) => (
+              this.specialistGpu!.notifyDeviceLoss?.(reason)
+            ),
+          },
+        }
+        : {}),
       tileAuthority: {
         commit: (input) => boundary.commit(input),
       },
@@ -695,6 +720,11 @@ export class StudioEngineDurableBrushController {
         await this.tileAuthority.dispose?.();
       } catch {
         // Authority ownership is terminal.
+      }
+      try {
+        await this.specialistGpu?.dispose?.();
+      } catch {
+        // Specialist GPU ownership is terminal.
       }
       try {
         this.webGpu.dispose?.();

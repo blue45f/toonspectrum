@@ -41,6 +41,71 @@ function row(name: RegExp): HTMLElement {
 afterEach(cleanup);
 
 describe("StudioLayerNavigator selection interaction", () => {
+  it("routes standard group shortcuts from the shortcut-bounded layer tree", () => {
+    const actions: StudioLayerNavigatorAction[] = [];
+    render(
+      <StudioLayerNavigator
+        items={ITEMS}
+        groups={[]}
+        selectedIds={["middle", "front"]}
+        pageKey="page-shortcuts"
+        localHiddenIds={new Set()}
+        onToggleLocalHidden={() => {}}
+        onSelectionChange={() => {}}
+        onAction={(action) => actions.push(action)}
+      />
+    );
+
+    const target = row(/주인공 대사/);
+    fireEvent.keyDown(target, {
+      key: "g",
+      code: "KeyG",
+      ctrlKey: true,
+    });
+    fireEvent.keyDown(target, {
+      key: "G",
+      code: "KeyG",
+      metaKey: true,
+      shiftKey: true,
+    });
+
+    expect(actions).toEqual([
+      { type: "group-selection" },
+      { type: "ungroup-selection" },
+    ]);
+  });
+
+  it("disables direct regrouping when the selection already contains grouped layers", () => {
+    const group = createLayerGroup("existing", "기존 그룹");
+    render(
+      <StudioLayerNavigator
+        items={[
+          {
+            id: "grouped",
+            type: "draw",
+            label: "그룹 선화",
+            zIndex: 1,
+            groupId: group.id,
+          },
+          { id: "loose", type: "image", label: "일반 채색", zIndex: 0 },
+        ]}
+        groups={[group]}
+        selectedIds={["grouped", "loose"]}
+        pageKey="page-regroup"
+        localHiddenIds={new Set()}
+        onToggleLocalHidden={() => {}}
+        onSelectionChange={() => {}}
+        onAction={() => {}}
+      />
+    );
+
+    const create = screen.getByRole("button", {
+      name: /새 레이어 그룹, 사용 불가/,
+    });
+    expect((create as HTMLButtonElement).disabled).toBe(true);
+    expect(create.getAttribute("title")).toContain("먼저 그룹을 해제");
+  });
+
   it("selects a whole group from its row and exposes one-click group lock and collapse", () => {
     const initialGroup = createLayerGroup("character", "캐릭터");
     const groupedItems: StudioLayerNavigatorItem[] = [
@@ -88,6 +153,108 @@ describe("StudioLayerNavigator selection interaction", () => {
     fireEvent.click(screen.getByRole("button", { name: "캐릭터 그룹 접기" }));
     expect(screen.queryByRole("treeitem", { name: /선화/ })).toBeNull();
     expect(screen.getByRole("button", { name: "캐릭터 그룹 펼치기" })).toBeTruthy();
+  });
+
+  it("keeps group rows as atomic units for modifier and mobile multi-selection", () => {
+    const character = createLayerGroup("character", "캐릭터");
+    const background = createLayerGroup("background", "배경");
+    const groupedItems: StudioLayerNavigatorItem[] = [
+      { id: "ink", type: "draw", label: "선화", zIndex: 3, groupId: character.id },
+      { id: "color", type: "image", label: "채색", zIndex: 2, groupId: character.id },
+      { id: "sky", type: "image", label: "하늘", zIndex: 1, groupId: background.id },
+      { id: "ground", type: "image", label: "바닥", zIndex: 0, groupId: background.id },
+    ];
+
+    function GroupMultiHarness() {
+      const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
+      return (
+        <StudioLayerNavigator
+          items={groupedItems}
+          groups={[character, background]}
+          selectedIds={selectedIds}
+          pageKey="page-group-multi"
+          localHiddenIds={new Set()}
+          onToggleLocalHidden={() => {}}
+          onSelectionChange={setSelectedIds}
+          onAction={() => {}}
+        />
+      );
+    }
+
+    render(<GroupMultiHarness />);
+    const characterRow = row(/캐릭터, 그룹, 2개 레이어/);
+    const backgroundRow = row(/배경, 그룹, 2개 레이어/);
+
+    expect(characterRow.getAttribute("aria-keyshortcuts")).toContain("Control+G");
+    expect(characterRow.getAttribute("aria-keyshortcuts")).toContain("Shift+Meta+G");
+
+    fireEvent.click(characterRow);
+    expect(row(/선화/).getAttribute("aria-selected")).toBe("true");
+    expect(row(/채색/).getAttribute("aria-selected")).toBe("true");
+
+    fireEvent.click(backgroundRow, { ctrlKey: true });
+    expect(row(/선화/).getAttribute("aria-selected")).toBe("true");
+    expect(row(/채색/).getAttribute("aria-selected")).toBe("true");
+    expect(row(/하늘/).getAttribute("aria-selected")).toBe("true");
+    expect(row(/바닥/).getAttribute("aria-selected")).toBe("true");
+
+    fireEvent.click(characterRow, { shiftKey: true });
+    expect(row(/선화/).getAttribute("aria-selected")).toBe("false");
+    expect(row(/채색/).getAttribute("aria-selected")).toBe("false");
+    expect(row(/하늘/).getAttribute("aria-selected")).toBe("true");
+    expect(row(/바닥/).getAttribute("aria-selected")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: /다중 선택/ }));
+    fireEvent.click(characterRow);
+    expect(row(/선화/).getAttribute("aria-selected")).toBe("true");
+    expect(row(/채색/).getAttribute("aria-selected")).toBe("true");
+    expect(row(/하늘/).getAttribute("aria-selected")).toBe("true");
+    expect(row(/바닥/).getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("labels the group action toggle from its actual selection state", () => {
+    const group = createLayerGroup("character-action", "캐릭터 작업");
+    const groupedItems: StudioLayerNavigatorItem[] = [
+      { id: "action-ink", type: "draw", label: "작업 선화", zIndex: 1, groupId: group.id },
+      { id: "action-color", type: "image", label: "작업 채색", zIndex: 0, groupId: group.id },
+    ];
+
+    function GroupActionHarness() {
+      const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
+      return (
+        <StudioLayerNavigator
+          items={groupedItems}
+          groups={[group]}
+          selectedIds={selectedIds}
+          pageKey="page-group-action"
+          localHiddenIds={new Set()}
+          onToggleLocalHidden={() => {}}
+          onSelectionChange={setSelectedIds}
+          onAction={() => {}}
+        />
+      );
+    }
+
+    render(<GroupActionHarness />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "캐릭터 작업 그룹 작업" }),
+    );
+
+    const selectAll = screen.getByRole("button", {
+      name: "캐릭터 작업 그룹 모두 선택",
+    });
+    expect(selectAll.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(selectAll);
+
+    const clearGroupSelection = screen.getByRole("button", {
+      name: "캐릭터 작업 그룹 선택 해제",
+    });
+    expect(clearGroupSelection.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(clearGroupSelection);
+    expect(
+      screen.getByRole("button", { name: "캐릭터 작업 그룹 모두 선택" })
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
   });
 
   it("keeps click, modifier, range, and keyboard focus as distinct states", () => {

@@ -1,7 +1,7 @@
 import { Clapperboard, Maximize2, Minimize2, Eraser, BookOpen, FlipHorizontal2, Grid3X3, ImagePlus, Lock, Minus, Mouse, MousePointer2, PaintBucket, Pencil, PenTool, Plus, Sparkles, Square, Unlock, Wind, Shapes, MessageSquare } from "lucide-react";
 import { Fragment, Profiler, Suspense, memo, useEffect, useRef, type ReactNode, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
-import { Stage, Layer, Rect, Group, Circle as KCircle, Transformer, Shape } from "react-konva/lib/ReactKonvaCore";
+import { Stage, Layer, Rect, Group, Circle as KCircle, Transformer, Shape, Text } from "react-konva/lib/ReactKonvaCore";
 
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import { studioAdjustmentStackToFilterFields } from "./studio-adjustment-stack";
@@ -23,7 +23,7 @@ import { applyDialogueRubySpan, clearDialogueRubyRange } from "./studio-dialogue
 import { mergeDialogueWithNext, splitDialogueElement, transferDialogueElement } from "./studio-dialogue-structure";
 import { dialogueLocalesForPages, dialogueTranslationCoverage } from "./studio-dialogue-translate";
 import { studioDrawHudToolLabel, studioPressureCurveHudLabel, studioShapeFillHudLabel, studioShapeKindLabel, studioStabilizerHudLabel, studioSymmetryHudLabel } from "./studio-draw-hud";
-import { drawLiveFreehandDraftToContext } from "./studio-draw-rendering";
+import { drawLiveFreehandDraftToContext, getSymmetricPoints } from "./studio-draw-rendering";
 import { containingPanel, elBounds } from "./studio-element-geometry";
 import { elementLabel } from "./studio-element-label";
 import { type FilterMaskPaintMode } from "./studio-filter-mask";
@@ -53,6 +53,7 @@ import { STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED } from "./studio-raster-pub
 import { unionBounds } from "./studio-selection";
 import { type PixelSelection, type PolyLassoSession, type SelectionDragState, type SelectionFrame, type SelPoint } from "./studio-selection-tools";
 import { type SmartGuideOverlay } from "./studio-smart-guides";
+import { normalizeShapeParams } from "./studio-stroke-shapes";
 import { studioUiDensityDescription, studioUiDensityLabel, type StudioUiDensityMode } from "./studio-ui-density";
 import { materializeStudioAdvancedFillVectorTarget } from "./studio-vector-fill-reference";
 import { STUDIO_VIEW_ACTION_HINTS } from "./studio-view-action-hints";
@@ -65,6 +66,7 @@ import { StudioCanvasStatusRail } from "./StudioCanvasStatusRail";
 import { colorBlindFilterStyle, StudioColorBlindFilterDefs, type CvdMode } from "./StudioColorBlindPreview";
 import { StudioDraftPreviewLayers } from "./StudioDraftPreviewLayers";
 import { StudioDrawNode } from "./StudioDrawNode";
+import { StudioGroupUniformResizeProxy } from "./StudioGroupUniformResizeProxy";
 import { StudioKonvaBubbleNode } from "./StudioKonvaBubbleNode";
 import { StudioKonvaImageNode } from "./StudioKonvaImageNode";
 import { StudioFocusLinesNode, StudioFramePanel, StudioSpeedLinesNode, StudioWorkAssetPlaceholderNode } from "./StudioKonvaPrimitiveNodes";
@@ -81,6 +83,7 @@ import type { DrawMode, DrawShapeKind, StudioMenu, Tool } from "./studio-editor-
 import type { DrawEl, El, FrameEl, ImageEl } from "./studio-element-model";
 import type { StudioTutorialTryAction } from "./studio-feature-tutorials";
 import type { StudioFilterPreview } from "./studio-filter-menu";
+import type { StudioGroupUniformResizeBounds } from "./studio-group-uniform-resize";
 import type { StudioLiveRoom } from "./studio-live-collaboration-room";
 import type { PageState } from "./studio-page-state";
 import type { StudioGpuBackend, StudioGpuFrameReceipt } from "./studio-webgpu-frame-contract";
@@ -90,6 +93,7 @@ import type { StudioLivePressureStore } from "./StudioLiveInkHosts";
 import type { StudioWebGpuCanvasHandle } from "./StudioWebGpuCanvas";
 import type Konva from "konva";
 
+import { useMediaQuery } from "@/components/use-media-query";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -100,6 +104,28 @@ function localizeText(
 ): string {
   const translated = t(key);
   return translated === key ? fallback : translated;
+}
+
+function liveNodeDisplayBounds(
+  node: Konva.Node | null | undefined,
+  layer: Konva.Layer | null,
+  fallback: { x: number; y: number; w: number; h: number }
+): { x: number; y: number; w: number; h: number } {
+  if (!node || !layer) return fallback;
+  try {
+    const rect = node.getClientRect({ relativeTo: layer });
+    if (
+      Number.isFinite(rect.x) &&
+      Number.isFinite(rect.y) &&
+      Number.isFinite(rect.width) &&
+      Number.isFinite(rect.height)
+    ) {
+      return { x: rect.x, y: rect.y, w: rect.width, h: rect.height };
+    }
+  } catch {
+    // A node can detach between React render and Konva reconciliation. Document bounds stay safe.
+  }
+  return fallback;
 }
 
 /** Generative-image disclosure rendered above every isolated Studio surface. */
@@ -273,6 +299,13 @@ function StudioViewInputModeControls({
 
 export interface StudioCanvasViewportHandlers {
   addPage: () => void;
+  beginCanvasSelectionResize: (
+    sourceBounds: StudioGroupUniformResizeBounds
+  ) => boolean;
+  cancelCanvasSelectionResize: () => void;
+  commitCanvasSelectionResize: (
+    targetBounds: StudioGroupUniformResizeBounds
+  ) => void;
   fitCanvasToWidth: () => void;
   onWebGpuFrameInvalid: () => void;
   onWebGpuFrameReady: (receipt: StudioGpuFrameReceipt) => void;
@@ -280,9 +313,11 @@ export interface StudioCanvasViewportHandlers {
   onWebGpuBackendChange: (backend: StudioGpuBackend) => void;
   setWebGpuCanvasHandle: (handle: StudioWebGpuCanvasHandle | null) => void;
   setElementNodeRef: (elId: string, node: Konva.Node | null) => void;
+  isCanvasGroupDragActive: (elementId: string) => boolean;
   selectElementFromCanvas: (
     elementId: string,
-    evt?: Konva.KonvaEventObject<MouseEvent | TouchEvent>
+    evt?: Konva.KonvaEventObject<MouseEvent | TouchEvent>,
+    forceGroupEnter?: boolean
   ) => void;
   commitTextTransformEnd: (elId: string, fontSize: number, e: Konva.KonvaEventObject<Event>, opts: { minFontSize: number; patchWidth?: boolean }) => void;
   acknowledgeAiNotice: () => void;
@@ -301,6 +336,7 @@ export interface StudioCanvasViewportHandlers {
   captureTimelineKeyframe: (trackId: string, frameIndex: number) => Promise<void>;
   clearAdvancedFillTapGesture: () => void;
   clearAutosave: () => void;
+  clearCanvasSelection: () => void;
   commitAppSettings: (next: StudioAppSettings) => void;
   retryAppSettingsPersistence: () => void;
   commitCoalesced: (nextElements: El[], key: string) => void;
@@ -968,6 +1004,9 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
 }: StudioCanvasViewportProps) {
   const {
     addPage,
+    beginCanvasSelectionResize,
+    cancelCanvasSelectionResize,
+    commitCanvasSelectionResize,
     acknowledgeAiNotice,
     alignSelected,
     applyAdvancedFillPreview,
@@ -982,6 +1021,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     captureTimelineKeyframe,
     clearAdvancedFillTapGesture,
     clearAutosave,
+    clearCanvasSelection,
     commitAppSettings,
     retryAppSettingsPersistence,
     commitCoalesced,
@@ -1060,6 +1100,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     designateHistoryBrushSource,
     commitTextTransformEnd,
     setElementNodeRef,
+    isCanvasGroupDragActive,
     selectElementFromCanvas,
     setWebGpuCanvasHandle,
     onWebGpuBackendChange,
@@ -1245,41 +1286,133 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   const canvasCursorClassName = studioCanvasCursorClassName(canvasCursorInput);
   const brushCursorStyle = appSettings.general.brushCursorStyle;
   const t = useT();
+  const hasCoarsePointer = useMediaQuery("(pointer: coarse)");
   // 말풍선 병합 액션 게이트 — 다중 선택에 말풍선이 2개 이상 섞였을 때만 노출하고, 비활성
   // 사유(혼합 선택·개수 범위)는 bubbleMergeUnavailableReason으로 툴팁에 안내한다.
+  const canvasSelectionIds =
+    marqueeIds.length > 0 ? marqueeIds : selectedId ? [selectedId] : [];
+  const canvasSelectionEls = canvasSelectionIds
+    .map((id) => elementById.get(id))
+    .filter((element): element is El => element !== undefined);
+  const canvasSelectionIdSet = new Set(canvasSelectionEls.map((element) => element.id));
   const marqueeSelectedEls =
     marqueeIds.length >= BUBBLE_MERGE_MIN_COUNT
       ? marqueeIds.map((id) => elementById.get(id)).filter((el): el is El => el !== undefined)
       : [];
-  const marqueeSelectedIdSet = new Set(marqueeSelectedEls.map((element) => element.id));
   const selectedGroupIds = new Set(
-    marqueeSelectedEls
+    canvasSelectionEls
       .map((element) => element.groupId)
       .filter((groupId): groupId is string => groupId !== undefined)
   );
+  const activeCanvasGroup = activeGroupId
+    ? groups.find((group) => group.id === activeGroupId) ?? null
+    : null;
+  const activeCanvasGroupName = activeCanvasGroup
+    ? activeCanvasGroup.name.trim() || "이름 없는 그룹"
+    : null;
   const completeSelectionGroup =
     selectedGroupIds.size === 1
       ? groups.find((group) => {
           if (!selectedGroupIds.has(group.id)) return false;
+          // 그룹에 들어간 뒤에는 모든 자식이 선택되어도 최상위 그룹 하나로 표시하지
+          // 않는다. 내부 편집의 선택 경계·명령을 그대로 유지하는 PPT/Figma 동작이다.
+          if (activeGroupId === group.id) return false;
           const memberIds = elements
             .filter((element) => element.groupId === group.id)
             .map((element) => element.id);
           return (
             memberIds.length > 0 &&
-            memberIds.length === marqueeSelectedEls.length &&
-            memberIds.every((id) => marqueeSelectedIdSet.has(id))
+            memberIds.length === canvasSelectionEls.length &&
+            memberIds.every((id) => canvasSelectionIdSet.has(id))
           );
         }) ?? null
       : null;
-  const selectionLockedCount = marqueeSelectedEls.filter((element) =>
+  const selectionMutationDisabledReason =
+    collaborationDocumentLocked
+      ? collaborationLockMessage()
+      : activeSurfaceReviewLocked
+        ? "검토 잠금이 켜진 작업면이에요. 잠금을 해제한 뒤 선택을 편집하세요."
+        : null;
+  const selectionContainsExistingGroup = canvasSelectionEls.some(
+    (element) =>
+      element.groupId !== undefined &&
+      groups.some((group) => group.id === element.groupId)
+  );
+  const groupSelectionDisabledReason =
+    selectionMutationDisabledReason ??
+    (selectionContainsExistingGroup
+      ? "기존 그룹이 포함된 선택이에요. 먼저 그룹을 해제한 뒤 다시 그룹화하세요."
+      : null);
+  const selectionLockedCount = canvasSelectionEls.filter((element) =>
     isEffectivelyLocked(element, groups)
   ).length;
+  const topLevelSelectedGroupIds = new Set(
+    canvasSelectionEls
+      .map((element) => element.groupId)
+      .filter(
+        (groupId): groupId is string =>
+          groupId !== undefined &&
+          groupId !== activeGroupId &&
+          groups.some((group) => group.id === groupId)
+      )
+  );
+  const alignmentSelectionDisabledReason =
+    selectionMutationDisabledReason ??
+    (selectionLockedCount > 0
+      ? "잠긴 객체가 포함되어 있어 정렬·분배할 수 없어요. 선택 항목의 잠금을 모두 해제하세요."
+      : topLevelSelectedGroupIds.size > 0 && !completeSelectionGroup
+        ? "여러 그룹의 내부 배치를 보호하려고 정렬·분배를 잠갔어요. 그룹 하나씩 선택해 정렬하세요."
+        : null);
+  const multiSelectionVisibleBounds = marqueeIds.length > 1
+    ? canvasSelectionEls
+        .filter((element) => !isEffectivelyHidden(element, groups))
+        .map((element) =>
+          // draw의 select-only hit Shape는 scene geometry가 없어 Konva Group clientRect에
+          // 원점(0,0)을 끼워 넣을 수 있다. 그러면 그룹 union이 캔버스 좌상단까지 부풀고
+          // 이름 배지가 화면 밖으로 사라진다. 선화는 권위 points 기반 bounds를 사용한다.
+          element.type === "draw"
+            ? elBounds(element)
+            : liveNodeDisplayBounds(
+                nodeRefsRef.current[element.id],
+                mainLayerRef.current,
+                elBounds(element)
+              )
+        )
+    : [];
+  const multiSelectionBounds =
+    multiSelectionVisibleBounds.length > 0
+      ? unionBounds(multiSelectionVisibleBounds)
+      : null;
   const selectionLockState =
     selectionLockedCount === 0
       ? "unlocked"
-      : selectionLockedCount === marqueeSelectedEls.length
+      : selectionLockedCount === canvasSelectionEls.length
         ? "locked"
         : "mixed";
+  const groupResizeEnabled =
+    tool === "select" &&
+    !isExporting &&
+    !viewTransformSuppressed &&
+    !canvasInteractionBlocked &&
+    !hardCanvasInteractionBlock &&
+    !activeSurfaceReviewLocked &&
+    selectionMutationDisabledReason === null &&
+    marqueeIds.length > 1 &&
+    canvasSelectionEls.length === marqueeIds.length &&
+    selectionLockState === "unlocked" &&
+    multiSelectionBounds !== null &&
+    multiSelectionBounds.w > 0 &&
+    multiSelectionBounds.h > 0;
+  const groupMovementBlockedIds = new Set(
+    groups
+      .filter((group) =>
+        elements.some(
+          (element) =>
+            element.groupId === group.id && isEffectivelyLocked(element, groups)
+        )
+      )
+      .map((group) => group.id)
+  );
   const marqueeBubbleCount = marqueeSelectedEls.filter((el) => el.type === "bubble").length;
   const showBubbleMerge = marqueeBubbleCount >= BUBBLE_MERGE_MIN_COUNT;
   const bubbleMergeReason = showBubbleMerge
@@ -1308,6 +1441,36 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
       },
     });
   };
+  const enterGroupFromCanvasGesture = (
+    event: Konva.KonvaEventObject<MouseEvent | TouchEvent>
+  ) => {
+    if (
+      canvasInteractionBlocked ||
+      tool !== "select" ||
+      commentPinArmed ||
+      eyedropperActive ||
+      advancedFillArmed ||
+      pixelToolArmed ||
+      cropArmed ||
+      smudgeArmed ||
+      dodgeBurnArmed ||
+      wetMixArmed ||
+      liquifyArmed ||
+      panelSplitArmed ||
+      nodeEditArmed ||
+      healCloneArmed ||
+      layerMaskPaintArmed ||
+      filterMaskPaintArmed ||
+      quickMaskArmed ||
+      historyBrushArmed ||
+      bubbleShapeArmed ||
+      puppetWarpArmed
+    ) {
+      return;
+    }
+    const elementId = studioElementIdOf(event.target);
+    if (elementId) selectElementFromCanvas(elementId, event, true);
+  };
   return (
         <div
           className={cn(
@@ -1319,12 +1482,17 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
           data-studio-logical-w={CANVAS_W}
         >
           <StudioCanvasStatusRail
+            activeGroupName={activeCanvasGroupName}
             mobileImmersive={mobileImmersive}
             hasAutosave={hasAutosave}
             autosaveRestoreBlockedReason={autosaveRestoreBlockedReason}
-            selectionCount={marqueeIds.length}
+            selectionCount={canvasSelectionEls.length}
             selectionGroupName={completeSelectionGroup?.name ?? null}
             selectionLockState={selectionLockState}
+            groupSelectionDisabledReason={groupSelectionDisabledReason}
+            lockSelectionDisabledReason={selectionMutationDisabledReason}
+            layoutSelectionDisabledReason={selectionMutationDisabledReason}
+            alignmentSelectionDisabledReason={alignmentSelectionDisabledReason}
             advancedFillBusy={advancedFillBusy}
             advancedFillPreviewMessage={advancedFillPreview?.message ?? null}
             advancedFillActive={advancedFillActive}
@@ -1341,7 +1509,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             onMergeBubbles={mergeSelectedBubbles}
             onDuplicateSelection={duplicateSelected}
             onRemoveSelection={removeSelected}
-            onClearSelection={() => setMarqueeIds([])}
+            onClearSelection={clearCanvasSelection}
             onCancelAdvancedFillPreview={cancelAdvancedFillPreview}
             onApplyAdvancedFillPreview={applyAdvancedFillPreview}
             onCancelAdvancedFillCalculation={toggleAdvancedFill}
@@ -1820,6 +1988,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             onPointerMove={onStageMove}
             onPointerUp={onStageUp}
             onPointerCancel={onStagePointerCancel}
+            onDblClick={enterGroupFromCanvasGesture}
+            onDblTap={enterGroupFromCanvasGesture}
             onMouseLeave={() => {
               studioLiveRoomRef.current?.clearCursor();
               clearAdvancedFillTapGesture();
@@ -1845,8 +2015,10 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   const elId = studioElementIdOf(shape);
                   if (elId) {
                     clickedElId = elId;
-                    setSelectedId(elId);
                     setTool("select");
+                    // 우클릭도 일반 클릭과 같은 그룹 단위 선택 계약을 사용한다. 자식 하나로
+                    // selection state를 덮어쓰면 삭제·복제·정렬 메뉴가 그룹을 찢을 수 있다.
+                    selectElementFromCanvas(elId);
                   }
                 }
               }
@@ -1958,13 +2130,25 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 // opts.compositeOverride=알파 클리핑 자식의 "source-in" 합성.
                 const renderEl = (el: El, idx: number, opts: { asMask?: boolean; compositeOverride?: string } = {}) => {
                 const isAdvancedFillVirtualPreview = virtualFillPreviewTarget?.id === el.id;
+                const isNonInteractiveRender =
+                  opts.asMask === true || isAdvancedFillVirtualPreview;
                 const locked = isAdvancedFillVirtualPreview || isEffectivelyLocked(el, groups);
+                const isGroupDragMember =
+                  marqueeIds.length > 1 && marqueeIds.includes(el.id);
+                const topLevelGroupMovementBlocked =
+                  el.groupId !== undefined &&
+                  activeGroupId !== el.groupId &&
+                  groupMovementBlockedIds.has(el.groupId);
+                const selectedUnitMovementBlocked =
+                  isGroupDragMember && selectionLockState !== "unlocked";
                 // 픽셀 선택/크롭/패널 컷/노드 편집/문지르기/복구브러시 무장 중엔 요소 드래그를 잠근다 — 캔버스 드래그가 도구 조작으로 간다.
                 const draggable =
-                  !opts.asMask &&
+                  !isNonInteractiveRender &&
                   !activeSurfaceReviewLocked &&
                   tool === "select" &&
                   !locked &&
+                  !topLevelGroupMovementBlocked &&
+                  !selectedUnitMovementBlocked &&
                   !advancedFillArmed &&
                   !pixelToolArmed &&
                   !cropArmed &&
@@ -1984,7 +2168,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 // 잠긴 요소(이메레스 밑그림 등)도 선택 모드에선 클릭 선택 허용 — 삭제/잠금해제 가능하게.
                 // 이동·변형은 여전히 막힘(draggable=false·트랜스포머 미부착). 드로잉 모드(tool!=="select")엔 무영향.
                 // 무장 중 클릭 선택 전환도 잠근다 — 제스처 도중 대상 이미지가 바뀌면 선택 좌표계가 깨진다.
-                const onSelect = opts.asMask || isAdvancedFillVirtualPreview
+                const onSelect = isNonInteractiveRender
                   ? () => {}
                   : (evt?: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
                       if (
@@ -2013,7 +2197,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       // 가산, 더블클릭=그룹 진입(개별 자식 편집). 순수 로직은 selectElementFromCanvas가 위임.
                       selectElementFromCanvas(el.id, evt);
                     };
-                const setRef = opts.asMask || isAdvancedFillVirtualPreview
+                const setRef = isNonInteractiveRender
                   ? () => {}
                   : (n: Konva.Node | null) => {
                       setElementNodeRef(el.id, n);
@@ -2023,12 +2207,23 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 const clip = panelClip
                   ? { x: panelClip.x, y: panelClip.y, width: panelClip.width, height: panelClip.height }
                   : null;
+                const wrapRenderInteraction = (node: ReactNode) =>
+                  isNonInteractiveRender ? (
+                    <Group
+                      key={`${el.id}-non-interactive-render`}
+                      listening={false}
+                    >
+                      {node}
+                    </Group>
+                  ) : (
+                    node
+                  );
                 const wrapClip = (node: ReactNode) => {
                   const composite = (opts.compositeOverride ??
                     (el.blendMode || "source-over")) as NonNullable<
                     Konva.NodeConfig["globalCompositeOperation"]
                   >;
-                  return clip ? (
+                  const clippedNode = clip ? (
                     <Group key={el.id} clipX={clip.x} clipY={clip.y} clipWidth={clip.width} clipHeight={clip.height} globalCompositeOperation={composite}>
                       {node}
                     </Group>
@@ -2041,6 +2236,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       node
                     )
                   );
+                  return wrapRenderInteraction(clippedNode);
                 };
                 if (el.type === "image") {
                   const isAnimTarget = frameAnimOpen && el.id === frameAnimTargetId && el.frames && el.frames.length > 1;
@@ -2093,9 +2289,9 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   // isEligibleForPanelAutoFit 은 회전/기울임/다중 프레임 셀 애니메이션/noClip 을
                   // 걸러낸다 — 각 사유는 studio-panel-autofit.ts 의 isEligibleForPanelAutoFit
                   // docstring 참고.
-                  const isGroupDragMember = marqueeIds.length > 1 && marqueeIds.includes(el.id);
                   const autoFitFrames =
                     !isGroupDragMember &&
+                    !isCanvasGroupDragActive(el.id) &&
                     autoFitFrameCandidates.length > 0 &&
                     isEligibleForPanelAutoFit({
                       rotation: el.rotation,
@@ -2122,7 +2318,13 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                         draggable={draggable}
                         innerRef={setRef}
                         onSelect={onSelect}
-                        onChange={(patch) => patchEl(el.id, patch)}
+                        onChange={(patch) => {
+                          // 클릭 직후 시작된 그룹 드래그는 렌더 시점의 isGroupDragMember가
+                          // 아직 false일 수 있다. 이 런타임 가드가 이미지 노드의 drag-end
+                          // {x,y}/auto-fit 커밋 전체를 소비하고 Stage의 원자 그룹 커밋만 남긴다.
+                          if (isCanvasGroupDragActive(el.id)) return;
+                          patchEl(el.id, patch);
+                        }}
                         dragBoundFunc={snapBoundFunc}
                         autoFitFrames={autoFitFrames}
                         onInteractionBegin={() => nodeInteractionBegin(el.id)}
@@ -2133,7 +2335,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   );
                 }
                 if (el.type === "frame") {
-                  return (
+                  return wrapRenderInteraction(
                     <StudioFramePanel
                       key={el.id}
                       el={el}
@@ -2182,7 +2384,175 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   // "라이브 리셰이프"가 커밋될 최종 결과와 픽셀 단위로 동일하게 미리보기된다.
                   const liveEl =
                     nodeEditDraft?.elId === el.id ? { ...el, points: nodeEditDraft.points, pressures: nodeEditDraft.pressures } : el;
-                  return wrapClip(<StudioDrawNode key={el.id} el={liveEl} />);
+                  const hitPointVariations =
+                    tool === "select"
+                      ? getSymmetricPoints(liveEl.points, liveEl.symmetry)
+                      : [];
+                  const hitKind = liveEl.kind ?? "freehand";
+                  const hitShapeParams = normalizeShapeParams(liveEl.shapeParams);
+                  const hitStrokeWidth = Math.max(
+                    liveEl.mode === "eraser"
+                      ? liveEl.strokeWidth
+                      : studioBrushAliasEffectiveDiameter(
+                          liveEl.brush,
+                          liveEl.strokeWidth
+                        ),
+                    10 / Math.max(effScale, 0.001)
+                  );
+                  const hitClosedShape =
+                    hitKind === "rect" ||
+                    hitKind === "ellipse" ||
+                    hitKind === "star" ||
+                    hitKind === "triangle" ||
+                    hitKind === "polygon";
+                  return wrapClip(
+                    <Group
+                      key={el.id}
+                      studioElementId={el.id}
+                      ref={setRef}
+                      x={0}
+                      y={0}
+                      draggable={draggable}
+                      dragBoundFunc={snapBoundFunc}
+                      onMouseDown={onSelect}
+                      onTap={onSelect}
+                      onDragStart={(event) => {
+                        if (!nodeInteractionBegin(el.id)) event.target.stopDrag();
+                      }}
+                      onDragEnd={(event) => {
+                        try {
+                          // 다중선택은 Stage onDragEnd가 좌표형 자식과 함께 한 히스토리 스냅샷으로
+                          // 확정한다. 단일 선화만 끌었을 때는 wrapper 오프셋을 points에 직접 굽는다.
+                          if (
+                            isGroupDragMember ||
+                            isCanvasGroupDragActive(el.id)
+                          ) {
+                            return;
+                          }
+                          const deltaX = event.target.x();
+                          const deltaY = event.target.y();
+                          event.target.position({ x: 0, y: 0 });
+                          if (deltaX === 0 && deltaY === 0) return;
+                          patchEl(el.id, {
+                            points: liveEl.points.map((value, index) =>
+                              value + (index % 2 === 0 ? deltaX : deltaY)
+                            ),
+                          } as Partial<El>);
+                        } finally {
+                          endLiveResourceEdit();
+                        }
+                      }}
+                    >
+                      <StudioDrawNode el={liveEl} />
+                      {/* StudioDrawNode의 실제 페인트 노드는 드로잉 핫패스를 위해 listening=false다.
+                          선택 도구일 때만 이 scene-less hit shape가 실제 polyline/도형 경로를 화면
+                          10px 허용폭으로 포착한다. 긴 대각선의 빈 bbox는 hit가 아니며, 닫힌 도형도
+                          실제 fill이 있을 때만 내부를 잡는다. */}
+                      {tool === "select" && !isNonInteractiveRender ? (
+                        <Shape
+                          sceneFunc={() => undefined}
+                          hitFunc={(context, shape) => {
+                            for (const points of hitPointVariations) {
+                              if (points.length < 2) continue;
+                              if (points.length === 2) {
+                                // A tap is retained as a visible round/elliptic brush footprint.
+                                // A moveTo-only path has zero hit area, so give it a stroke-backed
+                                // disc whose screen tolerance matches the rest of the draw hit path.
+                                context.beginPath();
+                                context.arc(
+                                  points[0]!,
+                                  points[1]!,
+                                  Math.max(0.1, hitStrokeWidth / 4),
+                                  0,
+                                  Math.PI * 2
+                                );
+                                context.closePath();
+                                context.fillStrokeShape(shape);
+                                continue;
+                              }
+                              let minX = points[0]!;
+                              let minY = points[1]!;
+                              let maxX = minX;
+                              let maxY = minY;
+                              for (let pointIndex = 2; pointIndex < points.length; pointIndex += 2) {
+                                const x = points[pointIndex] ?? maxX;
+                                const y = points[pointIndex + 1] ?? maxY;
+                                minX = Math.min(minX, x);
+                                minY = Math.min(minY, y);
+                                maxX = Math.max(maxX, x);
+                                maxY = Math.max(maxY, y);
+                              }
+                              const width = Math.max(0.1, maxX - minX);
+                              const height = Math.max(0.1, maxY - minY);
+                              context.beginPath();
+                              if (hitKind === "rect") {
+                                context.rect(minX, minY, width, height);
+                                context.closePath();
+                              } else if (hitKind === "ellipse") {
+                                const radiusX = Math.max(0.1, width / 2);
+                                const radiusY = Math.max(0.1, height / 2);
+                                context.save();
+                                context.translate(minX + width / 2, minY + height / 2);
+                                context.scale(1, radiusY / radiusX);
+                                context.arc(0, 0, radiusX, 0, Math.PI * 2);
+                                context.restore();
+                                context.closePath();
+                              } else if (
+                                hitKind === "star" ||
+                                hitKind === "triangle" ||
+                                hitKind === "polygon"
+                              ) {
+                                const centerX = minX + width / 2;
+                                const centerY = minY + height / 2;
+                                const radius = Math.max(0.1, Math.min(width, height) / 2);
+                                const vertices =
+                                  hitKind === "triangle"
+                                    ? 3
+                                    : hitKind === "polygon"
+                                      ? hitShapeParams.polygonSides
+                                      : hitShapeParams.starPoints * 2;
+                                for (let vertex = 0; vertex < vertices; vertex += 1) {
+                                  const angle = -Math.PI / 2 + (vertex * Math.PI * 2) / vertices;
+                                  const vertexRadius =
+                                    hitKind === "star" && vertex % 2 === 1
+                                      ? radius * hitShapeParams.starInnerRatio
+                                      : radius;
+                                  const x = centerX + Math.cos(angle) * vertexRadius;
+                                  const y = centerY + Math.sin(angle) * vertexRadius;
+                                  if (vertex === 0) context.moveTo(x, y);
+                                  else context.lineTo(x, y);
+                                }
+                                context.closePath();
+                              } else {
+                                context.moveTo(points[0]!, points[1]!);
+                                for (
+                                  let pointIndex = 2;
+                                  pointIndex + 1 < points.length;
+                                  pointIndex += 2
+                                ) {
+                                  context.lineTo(
+                                    points[pointIndex]!,
+                                    points[pointIndex + 1]!
+                                  );
+                                }
+                              }
+                              context.fillStrokeShape(shape);
+                            }
+                          }}
+                          fill={
+                            hitClosedShape &&
+                            (liveEl.fill || liveEl.gradient || liveEl.pattern)
+                              ? "#000"
+                              : undefined
+                          }
+                          stroke="#000"
+                          strokeWidth={hitStrokeWidth}
+                          listening
+                          perfectDrawEnabled={false}
+                        />
+                      ) : null}
+                    </Group>
+                  );
                 }
                 if (el.type === "text")
                   return wrapClip(
@@ -2351,6 +2721,149 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   perfectDrawEnabled={false}
                 />
               )}
+              {/* 그룹 및 다중 선택은 구성 타입(draw + image/text 등)이 섞여도 하나의 union bounds를
+                  항상 보여준다. 아직 전용 affine proxy가 없는 혼합 선택에서도 PPT/Figma처럼 무엇이
+                  한 이동 단위인지 명확해야 한다. 잠금/혼합 상태는 amber 점선으로 즉시 구분하며
+                  listening=false라 선택·드래그 hit를 절대 가로채지 않는다. */}
+              {!isExporting &&
+                tool === "select" &&
+                !activeSurfaceReviewLocked &&
+                marqueeIds.length > 1 &&
+                multiSelectionBounds &&
+                multiSelectionBounds.w >= 0 &&
+                multiSelectionBounds.h >= 0 && (() => {
+                  const pad = 7 / Math.max(effScale, 0.001);
+                  const constrained = selectionLockState !== "unlocked";
+                  const label =
+                    completeSelectionGroup?.name?.trim() ||
+                    (completeSelectionGroup ? "그룹" : "다중 선택");
+                  const lockStateLabel =
+                    selectionLockState === "locked"
+                      ? "잠금"
+                      : selectionLockState === "mixed"
+                        ? "일부 잠금"
+                        : null;
+                  const badgeText = `${label} · ${canvasSelectionEls.length}개${
+                    lockStateLabel ? ` · ${lockStateLabel}` : ""
+                  }`;
+                  const badgeWidth = Math.min(
+                    180 / effScale,
+                    Math.max(62 / effScale, (badgeText.length * 7 + 18) / effScale)
+                  );
+                  const badgeHeight = 20 / effScale;
+                  const badgeInset = 2 / effScale;
+                  const preferredBadgeY =
+                    multiSelectionBounds.y - pad - badgeHeight - 4 / effScale;
+                  const badgeX = Math.min(
+                    Math.max(multiSelectionBounds.x - pad, badgeInset),
+                    Math.max(badgeInset, CANVAS_W - badgeWidth - badgeInset)
+                  );
+                  const badgeY =
+                    preferredBadgeY >= badgeInset
+                      ? preferredBadgeY
+                      : Math.min(
+                          canvasH - badgeHeight - badgeInset,
+                          multiSelectionBounds.y + pad + 4 / effScale
+                        );
+                  return (
+                    <Group
+                      name="studio-group-selection-overlay"
+                      listening={false}
+                      studioSelectionRole="group-bounds"
+                      studioGroupId={completeSelectionGroup?.id ?? ""}
+                      studioGroupLocked={completeSelectionGroup?.locked === true}
+                    >
+                      {/* 조절 가능한 선택은 전용 Transformer가 정확한 한 줄 경계와 핸들을 그린다.
+                          같은 위치에 padded overlay까지 겹치면 이중 점선으로 보여 상용 도구보다
+                          산만해진다. 잠금·일시 차단 상태에서만 이 fallback 경계를 사용한다. */}
+                      {!groupResizeEnabled ? (
+                        <Rect
+                          name="studio-group-selection-boundary"
+                          x={multiSelectionBounds.x - pad}
+                          y={multiSelectionBounds.y - pad}
+                          width={Math.max(
+                            pad * 2,
+                            multiSelectionBounds.w + pad * 2
+                          )}
+                          height={Math.max(
+                            pad * 2,
+                            multiSelectionBounds.h + pad * 2
+                          )}
+                          stroke={constrained ? "#b45309" : "#c2410c"}
+                          strokeWidth={(constrained ? 1.75 : 1.35) / effScale}
+                          dash={
+                            constrained
+                              ? [7 / effScale, 4 / effScale]
+                              : [2 / effScale, 3 / effScale]
+                          }
+                          cornerRadius={5 / effScale}
+                          shadowColor={constrained ? "#b45309" : "#c2410c"}
+                          shadowBlur={4 / effScale}
+                          shadowOpacity={0.22}
+                        />
+                      ) : null}
+                      <Group
+                        name="studio-group-selection-badge"
+                        x={badgeX}
+                        y={badgeY}
+                      >
+                        <Rect
+                          width={badgeWidth}
+                          height={badgeHeight}
+                          fill={constrained ? "#b45309" : "#c2410c"}
+                          cornerRadius={5 / effScale}
+                          shadowColor="#111827"
+                          shadowBlur={3 / effScale}
+                          shadowOpacity={0.24}
+                        />
+                        <Text
+                          text={badgeText}
+                          width={badgeWidth}
+                          height={badgeHeight}
+                          padding={5 / effScale}
+                          fontSize={10 / effScale}
+                          fontStyle="600"
+                          fill="#fffaf5"
+                          ellipsis
+                          wrap="none"
+                        />
+                      </Group>
+                      {constrained ? (
+                        <Rect
+                          name="studio-group-selection-lock-marker"
+                          x={multiSelectionBounds.x - pad}
+                          y={multiSelectionBounds.y - pad}
+                          width={10 / effScale}
+                          height={10 / effScale}
+                          offsetX={5 / effScale}
+                          offsetY={5 / effScale}
+                          rotation={45}
+                          fill="#b45309"
+                          stroke="#fff7ed"
+                          strokeWidth={1 / effScale}
+                          cornerRadius={1.5 / effScale}
+                        />
+                      ) : null}
+                    </Group>
+                  );
+                })()}
+              {marqueeIds.length > 1 && multiSelectionBounds ? (
+                <StudioGroupUniformResizeProxy
+                  bounds={{
+                    x: multiSelectionBounds.x,
+                    y: multiSelectionBounds.y,
+                    width: multiSelectionBounds.w,
+                    height: multiSelectionBounds.h,
+                  }}
+                  effScale={effScale}
+                  mobile={isMobile}
+                  coarse={hasCoarsePointer}
+                  enabled={groupResizeEnabled}
+                  onBegin={beginCanvasSelectionResize}
+                  onCommit={commitCanvasSelectionResize}
+                  onCancel={cancelCanvasSelectionResize}
+                />
+              ) : null}
               <Transformer
                 ref={trRef}
                 rotateEnabled
@@ -2402,13 +2915,15 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               {!isExporting && tool === "select" && !activeSurfaceReviewLocked && (() => {
                 const drawSelectionEls =
                   marqueeIds.length > 0
-                    ? elements.filter(
-                        (el): el is DrawEl & El =>
-                          el.type === "draw" &&
-                          marqueeIds.includes(el.id) &&
-                          !isEffectivelyLocked(el, groups) &&
-                          !isEffectivelyHidden(el, groups)
-                      )
+                    ? completeSelectionGroup
+                      ? []
+                      : elements.filter(
+                          (el): el is DrawEl & El =>
+                            el.type === "draw" &&
+                            marqueeIds.includes(el.id) &&
+                            !isEffectivelyLocked(el, groups) &&
+                            !isEffectivelyHidden(el, groups)
+                        )
                     : selected?.type === "draw" &&
                         !isEffectivelyLocked(selected, groups) &&
                         !isEffectivelyHidden(selected, groups)

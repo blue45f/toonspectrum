@@ -118,8 +118,8 @@ export function StudioRasterToolRecoveryPanel({
           const recovery = entry.entry.action;
           const policy = resolveStudioInspectorRasterToolPolicy(entry);
           const showRecovery =
-            !entry.entry.enabled &&
             recovery !== null &&
+            (!entry.entry.enabled || policy.state === "prepare-page-composite") &&
             sharedRecovery === null;
           const reasonId = `studio-raster-${entry.tool.id}-reason`;
           return (

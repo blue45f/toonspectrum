@@ -120,6 +120,29 @@ class CalligraphySceneContext {
   }
 }
 
+class AngledBrushSceneContext {
+  readonly polygons: number[][] = [];
+  fillCount = 0;
+  private activePolygon: number[] = [];
+
+  beginPath(): void {
+    this.activePolygon = [];
+  }
+  moveTo(x: number, y: number): void {
+    this.activePolygon = [x, y];
+  }
+  lineTo(x: number, y: number): void {
+    this.activePolygon.push(x, y);
+  }
+  closePath(): void {
+    this.polygons.push(this.activePolygon);
+    this.activePolygon = [];
+  }
+  fillStrokeShape(): void {
+    this.fillCount += 1;
+  }
+}
+
 const konvaCapture = vi.hoisted(() => ({
   nodes: [] as CapturedKonvaNode[],
 }));
@@ -537,6 +560,66 @@ describe("StudioDrawNode orchestration", () => {
     expect(context.arcs).toHaveLength(2);
     expect(context.fillCount).toBe(1);
   });
+
+  it.each(["brush", "flat-brush"] as const)(
+    "keeps %s retrace subpaths on one positive-winding source-over coverage fill",
+    (brush) => {
+      const renderCoverage = (activeDraft: boolean) => {
+        const view = render(
+          <StudioDrawNode
+            activeDraft={activeDraft}
+            el={drawEl({
+              brush,
+              mode: "pen",
+              points: [0, 0, 24, 0, 0, 0, 24, 0],
+              pressures: [0.6, 0.6, 0.6, 0.6],
+              sampleSpacing: 1,
+              strokeWidth: 10,
+              opacity: 0.6,
+            })}
+          />,
+        );
+        const shape = captured("Shape")[0]!;
+        const context = new AngledBrushSceneContext();
+        const sceneFunc = shape.props.sceneFunc as (
+          context: CanvasRenderingContext2D,
+          shape: unknown,
+        ) => void;
+        sceneFunc(
+          context as unknown as CanvasRenderingContext2D,
+          {} as never,
+        );
+        const result = {
+          composite: shape.props.globalCompositeOperation,
+          fillCount: context.fillCount,
+          opacity: shape.props.opacity,
+          polygons: context.polygons,
+        };
+        view.unmount();
+        konvaCapture.nodes.length = 0;
+        return result;
+      };
+      const live = renderCoverage(true);
+      const committed = renderCoverage(false);
+      const signedArea = (points: readonly number[]) => {
+        let twiceArea = 0;
+        for (let index = 0; index < points.length; index += 2) {
+          const next = (index + 2) % points.length;
+          twiceArea +=
+            points[index]! * points[next + 1]!
+            - points[next]! * points[index + 1]!;
+        }
+        return twiceArea / 2;
+      };
+
+      expect(live).toEqual(committed);
+      expect(committed.composite).toBe("source-over");
+      expect(committed.opacity).toBe(0.6);
+      expect(committed.fillCount).toBe(1);
+      expect(committed.polygons).toHaveLength(3);
+      expect(committed.polygons.every((polygon) => signedArea(polygon) > 0)).toBe(true);
+    },
+  );
 
   it("applies ink-wash spacing, pressure, and material scales to retained watercolor", () => {
     watercolorCapture.causalPlan.mockReturnValueOnce([

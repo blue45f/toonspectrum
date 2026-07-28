@@ -73,8 +73,6 @@ describe("Studio raster tool availability matrix", () => {
     "pixel-transform",
     "content-aware-fill",
     "crop",
-    "smudge",
-    "liquify",
     "heal",
     "clone-stamp",
     "history-brush",
@@ -94,6 +92,26 @@ describe("Studio raster tool availability matrix", () => {
       },
     });
   });
+
+  it.each(["smudge", "dodge-burn", "wet-mix", "liquify"] as const)(
+    "lets %s prepare and enter from faithful vector-only page content",
+    (tool) => {
+      const availability = resolveStudioRasterToolAvailability(tool, {
+        selectedType: "draw",
+        exactRenderableVisibleCount: 2,
+      });
+
+      expect(availability.entry).toMatchObject({
+        enabled: true,
+        mode: "auto-merged-copy",
+        action: {
+          id: "create-editable-raster-copy",
+          safety: "non-destructive-copy",
+        },
+      });
+      expect(availability.apply.enabled).toBe(true);
+    },
+  );
 
   it("does not flatten unsupported fidelity silently", () => {
     const gate = resolveStudioRasterToolAvailability("liquify", {
