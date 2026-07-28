@@ -10,6 +10,22 @@ permissions:
   contents: read
 
 jobs:
+  studio-p5-brush-real-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Verify real p5.brush Worker WebGL2 runtime
+        run: pnpm run verify:studio-p5-brush-real-runtime
+
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 25

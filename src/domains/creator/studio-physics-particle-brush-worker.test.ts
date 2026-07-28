@@ -20,6 +20,7 @@ import {
   snapshotStudioPhysicsParticleWorkerInboundMessage,
   snapshotStudioPhysicsParticleWorkerOutboundMessage,
   snapshotStudioPhysicsParticleWorkerRequest,
+  snapshotStudioPhysicsParticleWorkerRequestCooperatively,
   STUDIO_PHYSICS_PARTICLE_WORKER_PROTOCOL_VERSION,
   studioPhysicsParticleWireRequestToProviderRequest,
   studioPhysicsParticleWorkerRequestTransfers,
@@ -339,6 +340,28 @@ describe("Studio physics particle dedicated Worker boundary", () => {
     ).toBe(originalPath);
   });
 
+  it("keeps synchronous and cooperative non-append snapshots byte-exact", async () => {
+    const candidate = wireRequest({
+      flowField: {
+        width: 3,
+        height: 3,
+        originX: -5,
+        originY: -5,
+        cellSize: 5,
+        heights: new Float32Array([
+          0, 1, 2,
+          1, 2, 3,
+          2, 3, 4,
+        ]),
+      },
+    });
+    const synchronous = snapshotStudioPhysicsParticleWorkerRequest(candidate);
+    const cooperative =
+      await snapshotStudioPhysicsParticleWorkerRequestCooperatively(candidate);
+
+    expect(cooperative).toEqual(synchronous);
+  });
+
   it("rejects aggregate clone residency before touching append payload planes", () => {
     let payloadTouched = false;
     const hostilePrevious = {
@@ -435,6 +458,59 @@ describe("Studio physics particle dedicated Worker boundary", () => {
     });
     releasedClient.dispose();
   });
+
+  it.each([
+    ["external abort", "aborted"],
+    ["release", "aborted"],
+    ["epoch advance", "stale-epoch"],
+    ["dispose", "disposed"],
+  ] as const)(
+    "settles a pending non-append snapshot on %s without advancing fake timers",
+    async (transition, reason) => {
+      vi.useFakeTimers();
+      const clear = vi.spyOn(globalThis, "clearTimeout");
+      const samples = new Float32Array(50_000 * 6);
+      for (let index = 0; index < 50_000; index += 1) {
+        const offset = index * 6;
+        samples[offset] = index / 1_000;
+        samples[offset + 2] = 0.5;
+      }
+      const external = new AbortController();
+      let workerCreations = 0;
+      const client = createStudioPhysicsParticleWorkerClient({
+        currentEpoch: 1,
+        workerFactory: () => {
+          workerCreations += 1;
+          return new MemoryWorker();
+        },
+      });
+      try {
+        const pending = client.render(
+          wireRequest({ samples }),
+          external.signal,
+        );
+        expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+        if (transition === "external abort") external.abort();
+        else if (transition === "release") client.release();
+        else if (transition === "epoch advance") client.advanceEpoch(2);
+        else client.dispose();
+
+        await expect(pending).resolves.toMatchObject(
+          reason === "stale-epoch"
+            ? { status: "rejected", reason }
+            : { status: "worker-failed", reason },
+        );
+        expect(workerCreations).toBe(0);
+        expect(clear).toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+        expect(client.getDiagnostics().operationReserved).toBe(false);
+      } finally {
+        client.dispose();
+        clear.mockRestore();
+      }
+    },
+  );
 
   it("owns all input and output transfer buffers", async () => {
     const source = wireRequest();

@@ -387,11 +387,48 @@ function compareTiles(
   return left.tileY - right.tileY || left.tileX - right.tileX;
 }
 
+function smoothNoiseWeight(value: number): number {
+  // Cubic Hermite interpolation has zero slope at both lattice boundaries. Unlike a nearest-cell
+  // hash, crossing an 8 px paper cell therefore cannot create a visible square seam after the
+  // physical field is downsampled to the document surface.
+  return value * value * (3 - 2 * value);
+}
+
+function smoothPaperNoise(
+  x: number,
+  y: number,
+  cellWidth: number,
+  cellHeight: number,
+  seed: number,
+): number {
+  const latticeX = x / cellWidth;
+  const latticeY = y / cellHeight;
+  const x0 = Math.floor(latticeX);
+  const y0 = Math.floor(latticeY);
+  const tx = smoothNoiseWeight(latticeX - x0);
+  const ty = smoothNoiseWeight(latticeY - y0);
+  const top = hash2(x0, y0, seed)
+    + (hash2(x0 + 1, y0, seed) - hash2(x0, y0, seed)) * tx;
+  const bottom = hash2(x0, y0 + 1, seed)
+    + (hash2(x0 + 1, y0 + 1, seed) - hash2(x0, y0 + 1, seed)) * tx;
+  return top + (bottom - top) * ty;
+}
+
 function paperAt(field: StudioWetInkField, x: number, y: number): number {
   const { seed, paperRoughness } = field.config;
-  const cloud = hash2(Math.floor(x / 8), Math.floor(y / 8), seed + 17) - 0.5;
-  const fibre = hash2(x, Math.floor(y / 2), seed + 71) - 0.5;
-  return Math.fround(clamp01(0.5 + paperRoughness * (cloud * 0.68 + fibre * 0.32)));
+  // Three world-aligned bands model mould-made paper without exposing the square lattice:
+  // - cloud: broad uneven sizing;
+  // - tooth: the short-range granulating surface;
+  // - fibre: a lightly anisotropic horizontal pulp direction.
+  //
+  // The field is normally 4× document resolution, so these wavelengths become approximately
+  // 6 px, 2 px and 4.5×0.75 px in the final image. All bands are continuous at their boundaries.
+  const cloud = smoothPaperNoise(x, y, 24, 24, seed + 17) - 0.5;
+  const tooth = smoothPaperNoise(x, y, 7, 7, seed + 47) - 0.5;
+  const fibre = smoothPaperNoise(x, y, 18, 3, seed + 71) - 0.5;
+  return Math.fround(clamp01(
+    0.5 + paperRoughness * (cloud * 0.48 + tooth * 0.34 + fibre * 0.18),
+  ));
 }
 
 function tileDimensions(

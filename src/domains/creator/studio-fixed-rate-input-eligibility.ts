@@ -53,7 +53,11 @@ export function isStudioCausalInkInputEligible(
   if (input.drawMode !== "pen") return false;
 
   if (input.causalStampV2 === true) return true;
-  if (input.brushFamily === "pen" || input.brushFamily === "marker") return true;
+  if (
+    input.brushFamily === "pen"
+    || input.brushFamily === "marker"
+    || input.brushFamily === "gpen"
+  ) return true;
   return input.brushFamily === "watercolor" && input.causalWatercolorV2 === true;
 }
 

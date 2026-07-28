@@ -349,6 +349,19 @@ export type FxOilDab = {
   radiusY: number;
   angleRad: number;
   opacity: number;
+  /**
+   * Thin local-space ridges carried by the wet body. They are rendered in a second pass so later
+   * body dabs cannot erase the bristle direction established earlier in the stroke.
+   */
+  bristles: readonly FxOilBristle[];
+};
+
+export type FxOilBristle = {
+  /** Offset across the local minor axis, expressed as a fraction of radiusY. */
+  offsetRatio: number;
+  radiusXRatio: number;
+  radiusYRatio: number;
+  opacity: number;
 };
 
 export type FxOilPlanInput = {
@@ -367,7 +380,10 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
     clamp(finiteNumber(input.seed, DEFAULT_FX_BRUSH_SEED), FX_BRUSH_SEED_RANGE.min, FX_BRUSH_SEED_RANGE.max)
   );
   const maxDabs = Math.floor(clamp(finiteNumber(input.maxDabs, FX_BRUSH_DAB_CAP), 2, FX_BRUSH_DAB_CAP));
-  const spacing = Math.max(0.8, baseWidth * 0.22);
+  // A coarse 22%-of-diameter cadence exposed every individual ellipse along curves. Keep the
+  // deterministic dab model, but make the wet carrier dense enough to read as one continuous load
+  // of paint. Long strokes still remain bounded by sampleStations' whole-path redistribution.
+  const spacing = Math.max(0.55, baseWidth * 0.085);
   const stations = sampleStations(points, spacing, maxDabs);
   const dabs: FxOilDab[] = [];
 
@@ -377,27 +393,42 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
     const n1 = hash2(si, 5, seed);
     const n2 = hash2(si, 11, seed);
     const n3 = hash2(si, 19, seed);
-    // Heading from neighbors for elongated bristle
+    // Use a centred tangent where possible. The previous one-sided heading amplified pointer
+    // polygon corners and made the wet edge wobble even when the source curve was smooth.
     let ang = n1 * TAU;
-    if (si + 1 < stations.length) {
-      const nx = stations[si + 1]!.x - st.x;
-      const ny = stations[si + 1]!.y - st.y;
-      if (Math.hypot(nx, ny) > POINT_EPS) ang = Math.atan2(ny, nx) + (n1 - 0.5) * 0.45;
-    } else if (si > 0) {
-      const px = st.x - stations[si - 1]!.x;
-      const py = st.y - stations[si - 1]!.y;
-      if (Math.hypot(px, py) > POINT_EPS) ang = Math.atan2(py, px) + (n1 - 0.5) * 0.45;
+    const tangentStart = stations[Math.max(0, si - 1)]!;
+    const tangentEnd = stations[Math.min(stations.length - 1, si + 1)]!;
+    const tangentX = tangentEnd.x - tangentStart.x;
+    const tangentY = tangentEnd.y - tangentStart.y;
+    if (Math.hypot(tangentX, tangentY) > POINT_EPS) {
+      ang = Math.atan2(tangentY, tangentX) + (n1 - 0.5) * 0.08;
     }
-    const size = baseWidth * (0.55 + st.pressure * 0.55) * (0.75 + n2 * 0.45);
-    const rx = Math.max(0.4, size * 0.55);
-    const ry = Math.max(0.25, size * (0.22 + n3 * 0.18));
+    const size = baseWidth * (0.62 + st.pressure * 0.48) * (0.94 + n2 * 0.12);
+    const rx = Math.max(0.4, size * 0.58);
+    const ry = Math.max(0.25, size * (0.38 + n3 * 0.045));
+    const normalJitter = (n2 - 0.5) * baseWidth * 0.025;
+    const tap = stations.length === 1;
+    const bristles = [-0.72, -0.36, 0, 0.36, 0.72].map(
+      (offsetRatio, bristleIndex): FxOilBristle => {
+        const tooth = hash2(si, 31 + bristleIndex * 7, seed);
+        return {
+          offsetRatio,
+          radiusXRatio: 0.7 + tooth * 0.22,
+          radiusYRatio: 0.045 + tooth * 0.035,
+          opacity: 0.1 + tooth * 0.12,
+        };
+      }
+    );
     dabs.push({
-      x: st.x + (n2 - 0.5) * baseWidth * 0.12,
-      y: st.y + (n3 - 0.5) * baseWidth * 0.12,
+      x: st.x - Math.sin(ang) * normalJitter,
+      y: st.y + Math.cos(ang) * normalJitter,
       radiusX: rx,
       radiusY: ry,
       angleRad: ang,
-      opacity: clamp(0.55 + st.pressure * 0.35 + n2 * 0.1, 0.35, 0.98),
+      opacity: tap
+        ? clamp(0.62 + st.pressure * 0.28, 0.55, 0.92)
+        : clamp(0.22 + st.pressure * 0.24 + n2 * 0.04, 0.18, 0.52),
+      bristles,
     });
   }
   return dabs;

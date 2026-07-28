@@ -53,8 +53,15 @@ describe("Studio physics particle Worker architecture boundary", () => {
     expect(client).toContain("addAbortListenerSafely");
     expect(client).toContain("removeAbortListenerSafely");
     expect(client).toContain("#operationReserved = true");
+    expect(client).toContain("#snapshotController");
+    expect(client).toContain("#cancelSnapshotReservation");
     expect(protocol).toContain("maximumArtifactPlaneBytes");
     expect(protocol).toContain("maximumOutputBytes * 2");
+    expect(protocol).toContain(
+      "snapshotStudioPhysicsParticleWorkerBaseCooperatively",
+    );
+    expect(protocol).toContain("canonicalWireStationsCooperatively");
+    expect(protocol).toContain("clearTimeout(timer)");
   });
 
   it("does not pull canvas, DOM, React, or renderer engines into the boundary", async () => {

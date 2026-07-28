@@ -205,6 +205,7 @@ export class StudioPhysicsParticleWorkerClient {
   #nextRequestId = 1;
   #active: ActiveOperation | null = null;
   #operationReserved = false;
+  #snapshotController: AbortController | null = null;
   #lifecycleRevision = 0;
   #readyPromise: Promise<boolean> | null = null;
   #resolveReady: ((ready: boolean) => void) | null = null;
@@ -405,6 +406,12 @@ export class StudioPhysicsParticleWorkerClient {
     const value = this.#nextRequestId;
     this.#nextRequestId += 1;
     return value;
+  }
+
+  #cancelSnapshotReservation(): void {
+    const controller = this.#snapshotController;
+    this.#snapshotController = null;
+    controller?.abort();
   }
 
   #clearStartupTimer(): void {
@@ -728,15 +735,32 @@ export class StudioPhysicsParticleWorkerClient {
           "Physics particle Worker request was already cancelled",
         );
       }
+      const snapshotController = new AbortController();
+      const abortSnapshot = (): void => snapshotController.abort();
+      this.#snapshotController = snapshotController;
+      let snapshotAbortRegistered = false;
       let snapshot: Awaited<ReturnType<
         typeof snapshotStudioPhysicsParticleWorkerRequestCooperatively
       >>;
       try {
+        snapshotAbortRegistered = addAbortListenerSafely(
+          signalBridge,
+          abortSnapshot,
+        );
+        if (!snapshotAbortRegistered) return invalidRequest("invalid-request");
+        const registeredSignalState = abortSignalState(signalBridge);
+        if (
+          signalBridge?.initiallyAborted
+          || registeredSignalState === true
+        ) snapshotController.abort();
+        if (registeredSignalState === "invalid") {
+          return invalidRequest("invalid-request");
+        }
         snapshot =
           await snapshotStudioPhysicsParticleWorkerRequestCooperatively(
             candidate,
             {
-              signal: signalBridge?.target,
+              signal: snapshotController.signal,
               isCurrent: () => (
                 this.#phase !== "disposed"
                 && this.#lifecycleRevision === admittedLifecycleRevision
@@ -774,6 +798,13 @@ export class StudioPhysicsParticleWorkerClient {
           );
         }
         return invalidRequest("invalid-request");
+      } finally {
+        if (this.#snapshotController === snapshotController) {
+          this.#snapshotController = null;
+        }
+        if (snapshotAbortRegistered) {
+          removeAbortListenerSafely(signalBridge, abortSnapshot);
+        }
       }
       if (!snapshot.ok) return invalidRequest(snapshot.reason);
       const postSnapshotLifecycle = this.#provisionalLifecycleResult(
@@ -951,6 +982,7 @@ export class StudioPhysicsParticleWorkerClient {
 
   public release(): StudioPhysicsParticleWorkerBoundaryFailure {
     this.#lifecycleRevision += 1;
+    this.#cancelSnapshotReservation();
     this.#operationReserved = false;
     const active = this.#active;
     if (active !== null) {
@@ -984,6 +1016,7 @@ export class StudioPhysicsParticleWorkerClient {
     }
     const active = this.#active;
     this.#lifecycleRevision += 1;
+    this.#cancelSnapshotReservation();
     this.#operationReserved = false;
     this.#retireWorker();
     this.#currentEpoch = nextEpoch;
@@ -1012,6 +1045,7 @@ export class StudioPhysicsParticleWorkerClient {
     if (this.#phase === "disposed") return;
     this.#phase = "disposed";
     this.#lifecycleRevision += 1;
+    this.#cancelSnapshotReservation();
     const terminated = this.#terminateWorker();
     this.#clearStartupTimer();
     this.#resolveReady?.(false);

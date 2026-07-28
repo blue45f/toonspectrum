@@ -72,6 +72,10 @@ describe("Studio mobile immersive preference", () => {
     expect(studioMobileEditingDockSource).toContain('data-studio-canvas-transient="coach"');
     expect(studioPageSource).toContain("!hasAutosave &&");
     expect(studioPageSource).toContain("drawingShortcutNotice === null");
+    expect(studioPageSource).toContain('data-studio-mobile-canvas-workspace={isMobile ? "true" : undefined}');
+    expect(studioCanvasViewportSource).toContain(
+      'data-studio-mobile-dock-safe-area={isMobile ? "true" : undefined}',
+    );
     expect(studioGlobalsSource).toContain("--studio-canvas-bottom-inset");
   });
 
@@ -114,11 +118,23 @@ describe("Studio mobile immersive preference", () => {
     expect(studioGlobalsSource).toContain("outline-offset: -2px");
   });
 
-  it("reserves one dock row by default and floats the 44px immersive header over the canvas", () => {
+  it("overlays one dock row by default and keeps its final canvas pixels scroll-reachable", () => {
     expect(studioGlobalsSource).toContain("--studio-mobile-dock-compact-height: calc(3.5rem");
     expect(studioGlobalsSource).toContain("--studio-mobile-dock-expanded-height: calc(7rem");
     expect(studioGlobalsSource).toContain('data-studio-mobile-dock-expanded="false"');
-    expect(studioGlobalsSource).toContain("padding-bottom: var(--studio-mobile-dock-compact-height) !important");
+    expect(studioGlobalsSource).toContain('[data-studio-mobile-canvas-workspace="true"]');
+    expect(studioGlobalsSource).toContain("padding-bottom: 0 !important");
+    expect(studioGlobalsSource).toContain(
+      '[data-studio-canvas-viewport][data-studio-mobile-dock-safe-area="true"]',
+    );
+    expect(studioGlobalsSource).toContain(
+      "padding-bottom: var(--studio-canvas-bottom-inset)",
+    );
+    expect(studioGlobalsSource).toContain(
+      "scroll-padding-bottom: calc(var(--studio-canvas-bottom-inset) + 0.75rem)",
+    );
+    expect(studioGlobalsSource).toContain("min-height: 100svh");
+    expect(studioGlobalsSource).toContain("height: 100dvh");
     expect(studioGlobalsSource).toContain(
       '[data-studio-editor="true"][data-studio-mobile-immersive="true"]',
     );

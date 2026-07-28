@@ -316,13 +316,22 @@ describe("planStudioDrawPointerStart", () => {
     expect(unsupported.element.paintModel).toBeUndefined();
   });
 
-  it("captures a denser versioned source route for pressure outlines than broad material brushes", () => {
+  it("routes G-pen through the same zero-latency residual engine while retaining dense specialty sampling", () => {
     const gpen = planStudioDrawPointerStart(input({ brush: "gpen" }));
     const calligraphy = planStudioDrawPointerStart(input({ brush: "calligraphy" }));
     const highlighter = planStudioDrawPointerStart(input({ brush: "highlighter" }));
     const airbrush = planStudioDrawPointerStart(input({ brush: "airbrush" }));
 
-    expect(gpen.element.sampleSpacing).toBe(0.25);
+    expect(gpen.causalInputPlan).toEqual({
+      mode: "immediate",
+      sampleSpacing: 0,
+      usesFixedRateClock: false,
+      quantizeImmediately: true,
+    });
+    expect(gpen.element.sampleSpacing).toBe(0);
+    expect(gpen.element.pressureModel).toBe(
+      STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3
+    );
     expect(calligraphy.element.sampleSpacing).toBe(0.25);
     expect(highlighter.element.sampleSpacing).toBe(0.375);
     expect(airbrush.element.sampleSpacing).toBe(0.5);
@@ -380,6 +389,18 @@ describe("planStudioDrawPointerStart", () => {
     expect(plan.pressure).toBeLessThan(0.26);
     expect(plan.element.pressures?.[0]).toBeGreaterThanOrEqual(0.25);
     expect(plan.element.pressures?.[0]).toBeLessThan(0.26);
+  });
+
+  it("starts non-G-pen families from their distinct causal nominal pressure", () => {
+    const technical = planStudioDrawPointerStart(input({ brush: "fineliner" }));
+    const marker = planStudioDrawPointerStart(input({ brush: "marker" }));
+    const brushPen = planStudioDrawPointerStart(input({ brush: "perfect-ink" }));
+
+    expect(technical.pressure).toBeGreaterThan(marker.pressure);
+    expect(marker.pressure).toBeGreaterThan(brushPen.pressure);
+    expect(technical.element.pressures).toEqual([technical.pressure]);
+    expect(marker.element.pressures).toEqual([marker.pressure]);
+    expect(brushPen.element.pressures).toEqual([brushPen.pressure]);
   });
 
 });

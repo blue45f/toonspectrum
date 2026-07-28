@@ -58,17 +58,20 @@ import {
   DEFAULT_STUDIO_AI_IMAGE_SIZE,
   generateBackgroundImage,
   generateConsistentCharacterImage,
+  generateImageWithRoleReferences,
   generateScenarioScenes,
   generateStudioWriterRoomDraft,
   isStudioAiConfigured,
   isStudioTextAiConfigured,
   loadStudioAiSessionSettings,
   saveStudioAiSettings,
+  STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS,
   studioTextAiTransportForOperation,
   suggestColorPalette,
   suggestDialogueLines,
   translateDialogueBatch,
   type StudioAiImageSize,
+  type StudioAiResolvedImageReference,
   type StudioAiResult,
   type StudioAiSettings,
   type StudioTextAiProvenance,
@@ -78,6 +81,15 @@ import {
   captureStudioAiGeneratedAssetProvenance,
   finalizeStudioAiGeneratedAssetProvenance,
 } from "./studio-ai-generated-asset-model";
+import { resolveStudioAiImageReferences } from "./studio-ai-image-reference-resolution";
+import {
+  createEmptyStudioAiImageReferenceDocument,
+  type StudioAiImageReferenceDocument,
+} from "./studio-ai-image-reference-roles";
+import {
+  loadStudioAiImageReferenceDocument,
+  saveStudioAiImageReferenceDocument,
+} from "./studio-ai-image-reference-storage";
 import {
   createEmptyStudioAiProvenanceDocument,
   normalizeStudioAiProvenanceDocument,
@@ -177,7 +189,6 @@ import {
   pressureCurveValueForPreset,
   resolveBrushPressureSample,
   resolveBrushReleasePressureSample,
-  strokeRenderDistance,
   strokeSampleDistanceForScale,
   type BrushPreset,
 } from "./studio-brush";
@@ -412,6 +423,7 @@ import { planStudioDrawPointerStart } from "./studio-draw-pointer-start-plan";
 import {
   isDirectLiveDraftEl,
   isDirectLiveStampDraftEl,
+  resolveStudioLiveInkStrokeStyle,
   studioLiveBrushEffectiveDiameter,
   studioLiveBrushPressure,
   studioLiveBrushPressureSamples,
@@ -430,6 +442,7 @@ import {
   resolveStudioDrawingShortcut,
   shouldPreserveStudioTabNavigation,
 } from "./studio-drawing-shortcuts";
+import { disposeStudioDynamicCoverageCommittedCache } from "./studio-dynamic-brush-coverage-renderer";
 import {
   isStudioPasteScopeCurrent,
   resolveStudioEditAvailability,
@@ -538,6 +551,7 @@ import {
   HISTORY_BRUSH_OPACITY_DEFAULT,
   HISTORY_BRUSH_RADIUS_DEFAULT,
 } from "./studio-history-brush";
+import { resolveStudioHybridPressureSample } from "./studio-hybrid-pressure-profile";
 import { uid } from "./studio-id";
 import {
   cascadeCanvasPlacementAnchor,
@@ -1028,6 +1042,8 @@ import {
   resolvePixelSelectionAutoTarget,
   resolveSelectionCombineOverride,
   selectAllPixels,
+  selectionCombineModeForOperation,
+  selectionOperationBase,
   selectionBoundsNorm,
   SELECTION_BRUSH_RADIUS_DEFAULT,
   snapLassoPointToEdge,
@@ -1039,11 +1055,11 @@ import {
   type PixelSelectionAutoTargetResolution,
   type PolyLassoSession,
   type SelectionAdjustPlan,
-  type SelectionCombineMode,
   type SelectionContentTransform,
   type SelectionDragState,
   type SelectionFrame,
   type SelectionLuminanceField,
+  type SelectionOperationMode,
   type SelectionToolKind,
   type SelPoint,
 } from "./studio-selection-tools";
@@ -1096,12 +1112,14 @@ import {
 } from "./studio-stroke-shapes";
 import {
   createStudioPointerVelocityState,
+  createStudioStrokeStabilizerBridge,
   createStudioStrokeStabilizerState,
   flushStudioStrokeStabilizerEndpoint,
   sampleStudioPointerVelocity,
   stabilizeStudioStrokeSample,
   type StudioPointerVelocityState,
   type StudioStabilizerMode,
+  type StudioStrokeStabilizerBridge,
   type StudioStrokeStabilizerState,
 } from "./studio-stroke-stabilizer";
 import {
@@ -2101,6 +2119,10 @@ function studioAdvancedFillStorage(): Storage | null {
   }
 }
 
+function isStudioAiReferenceCompatibleAsset(asset: Pick<StudioAsset, "dataUrl">): boolean {
+  return /^data:image\/(?:png|jpeg|webp);base64,/iu.test(asset.dataUrl);
+}
+
 export function StudioPage() {
   const [params] = useSearchParams();
   const { data: session } = useSession();
@@ -2411,6 +2433,7 @@ function StudioCuttoonEditor() {
       controller.abort(new DOMException("래스터 편집 세션이 종료되었습니다.", "AbortError"));
     }
     studioRasterPublicationControllersRef.current.clear();
+    disposeStudioDynamicCoverageCommittedCache();
     studioWorkAssetAdmissionCoordinator.dispose();
     studioWorkAssetHydrator.dispose();
   }, [studioWorkAssetAdmissionCoordinator, studioWorkAssetHydrator]);
@@ -2798,6 +2821,26 @@ function StudioCuttoonEditor() {
   const workAuthScopeKey = workId ? studioAuthUserId : null;
   const autosaveKey = studioAutosaveKey({ userId: studioAuthUserId, workId, remixId });
   const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId, remixId });
+  const [scenarioImageReferenceDocument, setScenarioImageReferenceDocument] =
+    useState<StudioAiImageReferenceDocument>(() =>
+      workId
+        ? loadStudioAiImageReferenceDocument(studioWorkspaceStorage(), {
+            workId,
+            userScope: studioAuthUserId,
+          })
+        : createEmptyStudioAiImageReferenceDocument()
+    );
+  useEffect(() => {
+    if (!workId) return;
+    const persistenceTimer = window.setTimeout(() => {
+      saveStudioAiImageReferenceDocument(
+        studioWorkspaceStorage(),
+        { workId, userScope: studioAuthUserId },
+        scenarioImageReferenceDocument
+      );
+    }, 160);
+    return () => window.clearTimeout(persistenceTimer);
+  }, [scenarioImageReferenceDocument, studioAuthUserId, workId]);
   const loggedIn = Boolean(studioAuthUserId);
   const liveRoomQueryParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("room") : null;
   const [draftCollaboration, setDraftCollaboration] =
@@ -5875,7 +5918,7 @@ function StudioCuttoonEditor() {
     pointerId: number;
     tool: SelectionToolKind | "wand";
     forceCircle: boolean;
-    combine: SelectionCombineMode;
+    combine: SelectionOperationMode;
     start: { x: number; y: number };
     current: { x: number; y: number };
     shift: boolean;
@@ -6707,6 +6750,29 @@ function StudioCuttoonEditor() {
   const [sfxError, setSfxError] = useState<string | null>(null);
   const [assets, setAssets] = useState<StudioAsset[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(false);
+  const [assetsLoaded, setAssetsLoaded] = useState(false);
+  const scenarioImageReferenceAssets = useMemo(
+    () => assets.filter(isStudioAiReferenceCompatibleAsset),
+    [assets]
+  );
+  const scenarioImageReferenceAssetOptions = useMemo(
+    () =>
+      scenarioImageReferenceAssets.map((asset) => ({
+        id: asset.id,
+        name: asset.name,
+        thumbnailUrl: asset.dataUrl,
+        ...(asset.contentHash ? { sha256: asset.contentHash } : {}),
+      })),
+    [scenarioImageReferenceAssets]
+  );
+  const scenarioImageReferenceResolution = useMemo(
+    () =>
+      resolveStudioAiImageReferences(
+        scenarioImageReferenceDocument,
+        scenarioImageReferenceAssets
+      ),
+    [scenarioImageReferenceAssets, scenarioImageReferenceDocument]
+  );
   const [builtinRasterBusyId, setBuiltinRasterBusyId] = useState<string | null>(null);
   const [assetFavoriteWorkspace, setAssetFavoriteWorkspace] = useState<{
     userId: string | null;
@@ -9083,6 +9149,12 @@ function StudioCuttoonEditor() {
   );
   const drawingRef = useRef<DrawEl | null>(null);
   const drawingStabilizerRef = useRef<StudioStrokeStabilizerState | null>(null);
+  /**
+   * Mutable lazy-brush authority is isolated from the legacy pure state ref. Only real precision
+   * samples commit to it; native prediction samples call preview() and cannot advance the leash.
+   */
+  const drawingPrecisionStabilizerBridgeRef =
+    useRef<StudioStrokeStabilizerBridge | null>(null);
   const drawingFixedRateFilterRef = useRef<FixedRateStrokeFilterState | null>(null);
   const drawingInputSettingsRef = useRef<{
     version: 1;
@@ -9712,14 +9784,8 @@ function StudioCuttoonEditor() {
   const applySmartGuides = (next: SmartGuideOverlay) => {
     setSmartGuides((prev) => (smartGuideOverlaysEqual(prev, next) ? prev : next));
   };
-  const liveInkStyleFor = (el: DrawEl): StudioLiveInkStrokeStyle => ({
-    color: el.stroke,
-    strokeWidthDoc: studioLiveBrushEffectiveDiameter(el),
-    pressureModel: el.pressureModel,
-    paintModel: el.paintModel,
-    opacity: el.opacity ?? 1,
-    minDistanceDoc: el.sampleSpacing ?? strokeRenderDistance(el.sampleSpacing),
-  });
+  const liveInkStyleFor = (el: DrawEl): StudioLiveInkStrokeStyle =>
+    resolveStudioLiveInkStrokeStyle(el);
   const restoreCausalPostCorrectionTail = (el: DrawEl) => {
     const state = causalPostCorrectionStateRef.current;
     if (!state || state.phase !== "active") return;
@@ -10968,7 +11034,8 @@ function StudioCuttoonEditor() {
       cancelLiquifyPointerSession();
     };
   }, [cancelLiquifyPointerSession]);
-  const [pixelCombine, setPixelCombine] = useState<SelectionCombineMode>("add");
+  const [pixelCombine, setPixelCombine] =
+    useState<SelectionOperationMode>("replace");
   const [pixelBusy, setPixelBusy] = useState(false);
   // 브러시 선택 반경(캔버스 표시 px) — 드래그 시작 시 요소 폭으로 나눠 정규화 반경으로 넘긴다.
   const [pixelBrushRadius, setPixelBrushRadius] = useState(SELECTION_BRUSH_RADIUS_DEFAULT);
@@ -11014,6 +11081,7 @@ function StudioCuttoonEditor() {
     elId: string;
     frame: SelectionFrame;
     drag: SelectionDragState;
+    operation: SelectionOperationMode;
     pointerId: number;
     /** 자석 올가미 휘도장 스냅샷(드래그 시작 시점) — null 이면 일반 올가미와 동일하게 동작. */
     magneticField: SelectionLuminanceField | null;
@@ -11037,10 +11105,12 @@ function StudioCuttoonEditor() {
   // 다각형 올가미(클릭 꼭짓점) — 드래그 세션과 분리. ref 로 포인터 핸들러가 최신 세션을 읽고,
   // state 로 패널 상태 문구·오버레이를 갱신한다.
   const polyLassoSessionRef = useRef<PolyLassoSession | null>(null);
+  const polyLassoOperationRef = useRef<SelectionOperationMode>("replace");
   const [polyLassoSession, setPolyLassoSession] = useState<PolyLassoSession | null>(null);
   const [polyLassoHover, setPolyLassoHover] = useState<SelPoint | null>(null);
   const clearPolyLassoDraft = () => {
     polyLassoSessionRef.current = null;
+    polyLassoOperationRef.current = "replace";
     setPolyLassoSession(null);
     setPolyLassoHover(null);
   };
@@ -14386,6 +14456,7 @@ const puppetWarpArmed =
       console.error("Failed to load custom assets:", err);
       setAssets([]);
     } finally {
+      setAssetsLoaded(true);
       setAssetsLoading(false);
     }
   };
@@ -14844,6 +14915,9 @@ const puppetWarpArmed =
     if (scenarioAbortControllerRef.current === controller) scenarioAbortControllerRef.current = null;
   }
   useEffect(() => () => scenarioAbortControllerRef.current?.abort(), []);
+  useEffect(() => {
+    if (scenarioOpen) void loadAssetsList();
+  }, [scenarioOpen]);
   // 생성형 AI 최초 사용 고지의 "확인 후 실행할 동작" — acknowledgeAiNotice가 확인 시 이 ref를
   // 실행한다. 기존엔 onGenerateAsset()만 하드코딩돼 있었는데, AI 배경 생성/자동 채색도 같은 고지를
   // 타야 해서 일반화한다.
@@ -16233,11 +16307,17 @@ const puppetWarpArmed =
   /** 다각형 올가미 세션을 선택에 닫아 넣고 초안을 비운다. 점 <3 이면 폐기. */
   function finishPolyLassoSession() {
     const session = polyLassoSessionRef.current;
+    const operation = polyLassoOperationRef.current;
     if (!session) return;
     clearPolyLassoDraft();
     if (session.points.length < 3) return;
     commitPixelSelectionState(
-      (previous) => commitPolyLassoSession(previous, session) ?? previous,
+      (previous) => (
+        commitPolyLassoSession(
+          selectionOperationBase(previous, operation),
+          session,
+        ) ?? previous
+      ),
       "poly-lasso"
     );
   }
@@ -20528,6 +20608,7 @@ const puppetWarpArmed =
   // 장면 하나만 고치고 다시 그릴 수 있어 AI-first 경쟁 제품의 review loop를 안전하게 근사한다.
   async function executeGenerateScenario() {
     if (collaborationAccessRef.current.locked) return;
+    if (scenarioAbortControllerRef.current) return;
     const mutationTicket = captureStudioMutationTicket();
     if (masterEditMode) return; // 문서 마스터는 페이지별 canvasH/컷 배치 개념이 없어 대상 밖.
     const storyText = scenarioStoryText.trim();
@@ -20679,11 +20760,56 @@ const puppetWarpArmed =
     });
   }
 
+  function scenarioRoleReferencesForRequest(
+    previewCharacterDataUrl: string | null
+  ): readonly StudioAiResolvedImageReference[] {
+    if (scenarioImageReferenceResolution.references.length === 0) return [];
+    if (
+      scenarioImageReferenceResolution.hasCharacterReference
+      || !previewCharacterDataUrl
+    ) {
+      return scenarioImageReferenceResolution.references;
+    }
+    return [
+      {
+        referenceId: "scenario-preview-character-reference",
+        role: "character",
+        dataUrl: previewCharacterDataUrl,
+        label: "앞 장면 캐릭터 연속성",
+        guidance: "앞 장면의 인물 정체성만 유지합니다.",
+      },
+      ...scenarioImageReferenceResolution.references,
+    ];
+  }
+
   async function executeGenerateScenarioImages() {
     if (collaborationAccessRef.current.locked) return;
+    if (scenarioAbortControllerRef.current) return;
     const mutationTicket = captureStudioMutationTicket();
     const snapshot = scenarioResult;
     if (!snapshot || scenarioBusy || scenarioRegeneratingIndex !== null || !isStudioAiConfigured(aiSettings)) return;
+    if (
+      scenarioImageReferenceDocument.references.length > 0
+      && (!assetsLoaded || assetsLoading)
+    ) {
+      setScenarioError("AI 참조 에셋을 불러오는 중이에요. 잠시 뒤 다시 시도해 주세요.");
+      return;
+    }
+    if (
+      scenarioImageReferenceDocument.references.length
+      > STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxImages
+    ) {
+      setScenarioError(
+        `AI 이미지 참조는 최대 ${STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxImages}개까지 사용할 수 있어요. 참조 팩에서 일부를 제거해 주세요.`
+      );
+      return;
+    }
+    if (scenarioImageReferenceResolution.missing.length > 0) {
+      setScenarioError(
+        `연결된 AI 참조 에셋 ${scenarioImageReferenceResolution.missing.length}개를 찾을 수 없어요. 참조 팩에서 제거하거나 에셋을 다시 추가해 주세요.`
+      );
+      return;
+    }
     const targetIndexes = snapshot.items.flatMap((item, index) => (item.imageDataUrl ? [] : [index]));
     if (targetIndexes.length === 0) return;
 
@@ -20710,15 +20836,30 @@ const puppetWarpArmed =
           .join("\n\n");
         const provider = studioImageAiProviderContext(aiSettings);
         const requestProvenance = captureStudioAiGeneratedAssetProvenance(provider, "generated");
-        const usesReference = Boolean(referenceImageDataUrl);
-        const requestPrompt = usesReference
+        const roleReferences = scenarioRoleReferencesForRequest(referenceImageDataUrl);
+        const usesRoleReferences = roleReferences.length > 0;
+        const usesPreviewReference = Boolean(referenceImageDataUrl);
+        const hasCharacterAnchor =
+          scenarioImageReferenceResolution.hasCharacterReference || usesPreviewReference;
+        const usesReference = usesRoleReferences || usesPreviewReference;
+        const requestPrompt = hasCharacterAnchor
           ? reviewedImagePrompt
           : [snapshot.characterDescription, reviewedImagePrompt]
               .filter((value) => value.trim().length > 0)
               .join(", ");
+        const trackedReferenceAssetIds = [
+          ...scenarioImageReferenceResolution.trackingAssetIds,
+          ...(!scenarioImageReferenceResolution.hasCharacterReference && usesPreviewReference
+            ? ["scenario-preview-character-reference"]
+            : []),
+        ];
         const operationId = beginTrackedStudioAiOperation("scenario-image", {
           kind: "image",
-          task: usesReference ? "character-image" : "background-image",
+          task: usesReference
+            ? hasCharacterAnchor
+              ? "character-image"
+              : "image-edit"
+            : "background-image",
           provider: provider.provider,
           model: provider.model,
           transport: provider.transport,
@@ -20726,13 +20867,22 @@ const puppetWarpArmed =
           prompt: requestPrompt,
           target: { pageId: activePage.id },
           ...(usesReference
-            ? { references: [{ assetId: "scenario-preview-character-reference" }] }
+            ? {
+                references: trackedReferenceAssetIds.map((assetId) => ({ assetId })),
+              }
             : {
                 requestedSize: parseStudioAiRequestedSize(scenarioAspectToImageSize(panel.aspect)),
                 references: [],
               }),
         });
-        if (referenceImageDataUrl) {
+        if (usesRoleReferences) {
+          imageResult = await generateImageWithRoleReferences(
+            aiSettings,
+            roleReferences,
+            requestPrompt,
+            { signal: controller.signal }
+          );
+        } else if (referenceImageDataUrl) {
           imageResult = await generateConsistentCharacterImage(
             aiSettings,
             referenceImageDataUrl,
@@ -20793,10 +20943,33 @@ const puppetWarpArmed =
 
   async function executeRegenerateScenarioImage(index: number) {
     if (collaborationAccessRef.current.locked) return;
+    if (scenarioAbortControllerRef.current) return;
     const mutationTicket = captureStudioMutationTicket();
     const snapshot = scenarioResult;
     const panel = snapshot?.items[index];
     if (!snapshot || !panel || scenarioBusy || scenarioRegeneratingIndex !== null || !isStudioAiConfigured(aiSettings)) {
+      return;
+    }
+    if (
+      scenarioImageReferenceDocument.references.length > 0
+      && (!assetsLoaded || assetsLoading)
+    ) {
+      setScenarioError("AI 참조 에셋을 불러오는 중이에요. 잠시 뒤 다시 시도해 주세요.");
+      return;
+    }
+    if (
+      scenarioImageReferenceDocument.references.length
+      > STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxImages
+    ) {
+      setScenarioError(
+        `AI 이미지 참조는 최대 ${STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxImages}개까지 사용할 수 있어요. 참조 팩에서 일부를 제거해 주세요.`
+      );
+      return;
+    }
+    if (scenarioImageReferenceResolution.missing.length > 0) {
+      setScenarioError(
+        `연결된 AI 참조 에셋 ${scenarioImageReferenceResolution.missing.length}개를 찾을 수 없어요. 참조 팩에서 제거하거나 에셋을 다시 추가해 주세요.`
+      );
       return;
     }
     const controller = beginScenarioRequest();
@@ -20823,15 +20996,30 @@ const puppetWarpArmed =
       .join("\n\n");
     const provider = studioImageAiProviderContext(aiSettings);
     const requestProvenance = captureStudioAiGeneratedAssetProvenance(provider, "generated");
-    const usesReference = Boolean(referenceImageDataUrl);
-    const requestPrompt = usesReference
+    const roleReferences = scenarioRoleReferencesForRequest(referenceImageDataUrl);
+    const usesRoleReferences = roleReferences.length > 0;
+    const usesPreviewReference = Boolean(referenceImageDataUrl);
+    const hasCharacterAnchor =
+      scenarioImageReferenceResolution.hasCharacterReference || usesPreviewReference;
+    const usesReference = usesRoleReferences || usesPreviewReference;
+    const requestPrompt = hasCharacterAnchor
       ? reviewedImagePrompt
       : [snapshot.characterDescription, reviewedImagePrompt]
           .filter((value) => value.trim().length > 0)
           .join(", ");
+    const trackedReferenceAssetIds = [
+      ...scenarioImageReferenceResolution.trackingAssetIds,
+      ...(!scenarioImageReferenceResolution.hasCharacterReference && usesPreviewReference
+        ? ["scenario-preview-character-reference"]
+        : []),
+    ];
     const operationId = beginTrackedStudioAiOperation("scenario-image", {
       kind: "image",
-      task: usesReference ? "character-image" : "background-image",
+      task: usesReference
+        ? hasCharacterAnchor
+          ? "character-image"
+          : "image-edit"
+        : "background-image",
       provider: provider.provider,
       model: provider.model,
       transport: provider.transport,
@@ -20839,22 +21027,28 @@ const puppetWarpArmed =
       prompt: requestPrompt,
       target: { pageId: activePage.id },
       ...(usesReference
-        ? { references: [{ assetId: "scenario-preview-character-reference" }] }
+        ? {
+            references: trackedReferenceAssetIds.map((assetId) => ({ assetId })),
+          }
         : {
             requestedSize: parseStudioAiRequestedSize(scenarioAspectToImageSize(panel.aspect)),
             references: [],
           }),
     });
     try {
-      const imageResult = referenceImageDataUrl
-        ? await generateConsistentCharacterImage(aiSettings, referenceImageDataUrl, reviewedImagePrompt, {
+      const imageResult = usesRoleReferences
+        ? await generateImageWithRoleReferences(aiSettings, roleReferences, requestPrompt, {
             signal: controller.signal,
           })
-        : await generateBackgroundImage(
-            aiSettings,
-            requestPrompt,
-            { size: scenarioAspectToImageSize(panel.aspect), signal: controller.signal }
-          );
+        : referenceImageDataUrl
+          ? await generateConsistentCharacterImage(aiSettings, referenceImageDataUrl, reviewedImagePrompt, {
+              signal: controller.signal,
+            })
+          : await generateBackgroundImage(
+              aiSettings,
+              requestPrompt,
+              { size: scenarioAspectToImageSize(panel.aspect), signal: controller.signal }
+            );
       if (!canApplyStudioMutation(mutationTicket)) return;
       settleTrackedStudioAiOperation(operationId, imageResult, {
         aborted: !imageResult.ok && controller.signal.aborted,
@@ -22052,7 +22246,11 @@ const puppetWarpArmed =
       if (runId !== pixelWandRunIdRef.current) return; // 그사이 요소가 바뀌었거나 새 스캔이 시작됨.
       if (activePixelSelectionElementId() !== target.id) return;
       commitPixelSelectionState(
-        (previous) => applyMagicWandRegionToSelection(previous, region, pixelCombine),
+        (previous) => applyMagicWandRegionToSelection(
+          selectionOperationBase(previous, pixelCombine),
+          region,
+          selectionCombineModeForOperation(pixelCombine),
+        ),
         "magic-wand"
       );
     } catch (err) {
@@ -22089,8 +22287,12 @@ const puppetWarpArmed =
     if (pixelBusy || selected?.type !== "image" || colorRangeSamples.length === 0) return;
     const target = selected;
     const mutationTicket = captureStudioMutationTicket();
-    const selectionSnapshot = pixelSelRef.current;
-    const combineMode = pixelCombine;
+    const currentSelectionSnapshot = pixelSelRef.current;
+    const selectionSnapshot = selectionOperationBase(
+      currentSelectionSnapshot,
+      pixelCombine,
+    );
+    const combineMode = selectionCombineModeForOperation(pixelCombine);
     const aspect = target.width > 0 ? target.height / target.width : 1;
     colorRangeAbortRef.current?.abort();
     const controller = new AbortController();
@@ -22117,7 +22319,7 @@ const puppetWarpArmed =
       if (runId !== colorRangeRunIdRef.current) return; // 그사이 요소가 바뀌었거나 새 스캔이 시작됨.
       // The Worker applied combine/intersect against this exact snapshot. Never overwrite a
       // selection edited through another input path while the asynchronous request was running.
-      if (pixelSelRef.current !== selectionSnapshot) return;
+      if (pixelSelRef.current !== currentSelectionSnapshot) return;
       commitPixelSelectionState(
         result.selection,
         "magic-wand",
@@ -22521,7 +22723,7 @@ const puppetWarpArmed =
         (previous) => (
           releasePoint
             ? commitSelectionDragAtPoint(
-                previous,
+                selectionOperationBase(previous, session.operation),
                 session.drag,
                 releasePoint,
                 {
@@ -22531,7 +22733,10 @@ const puppetWarpArmed =
                   magneticField: session.magneticField,
                 },
               )
-            : commitSelectionDrag(previous, session.drag)
+            : commitSelectionDrag(
+                selectionOperationBase(previous, session.operation),
+                session.drag,
+              )
         ) ?? previous,
         session.drag.tool === "lasso"
           ? "free-lasso"
@@ -23844,6 +24049,8 @@ const puppetWarpArmed =
         drawingImmediateCausalInputRef.current = true;
         drawingFixedRateFilterRef.current = null;
         drawingStabilizerRef.current = null;
+        drawingPrecisionStabilizerBridgeRef.current?.reset();
+        drawingPrecisionStabilizerBridgeRef.current = null;
         drawingFixedRatePumpClockRef.current = null;
         drawingFixedRateSampleClockRef.current = null;
       },
@@ -23886,6 +24093,8 @@ const puppetWarpArmed =
     drawingCrdtStrokeActiveRef.current = false;
     drawingPredictionPreviewRef.current = false;
     drawingStabilizerRef.current = null;
+    drawingPrecisionStabilizerBridgeRef.current?.reset();
+    drawingPrecisionStabilizerBridgeRef.current = null;
     drawingFixedRateFilterRef.current = null;
     drawingImmediateCausalInputRef.current = false;
     drawingImmediateBatchMutationRef.current = false;
@@ -25003,7 +25212,11 @@ const puppetWarpArmed =
           return;
         }
         if (!existing) {
-          const next = beginPolyLassoSession(effectiveCombine, p);
+          polyLassoOperationRef.current = effectiveCombine;
+          const next = beginPolyLassoSession(
+            selectionCombineModeForOperation(effectiveCombine),
+            p,
+          );
           polyLassoSessionRef.current = next;
           setPolyLassoSession(next);
           setPolyLassoHover(null);
@@ -25019,7 +25232,7 @@ const puppetWarpArmed =
       const brushRadiusNorm = pixelBrushRadius / Math.max(1, pixelTarget.width);
       const drag = beginSelectionDrag(
         pixelTool,
-        effectiveCombine,
+        selectionCombineModeForOperation(effectiveCombine),
         canvasPointToNormalized(pos.x, pos.y, frame),
         brushRadiusNorm,
         { forceCircle: pixelForceCircle || (pixelTool === "ellipse" && e.evt.shiftKey) }
@@ -25031,6 +25244,7 @@ const puppetWarpArmed =
         elId: pixelTarget.id,
         frame,
         drag,
+        operation: effectiveCombine,
         pointerId,
         magneticField: currentMagneticLassoField(),
       };
@@ -25250,6 +25464,39 @@ const puppetWarpArmed =
               y: strokeOrigin.y,
               timeStamp: pointerSample.timeStamp,
             });
+      drawingPrecisionStabilizerBridgeRef.current?.reset();
+      drawingPrecisionStabilizerBridgeRef.current = null;
+      if (
+        drawingStabilizerRef.current
+        && drawingFixedRateFilterRef.current === null
+        && stabilizerMode === "precision"
+        && stabilizer > 0
+      ) {
+        const bridge = createStudioStrokeStabilizerBridge();
+        const first = bridge.commit(
+          {
+            x: strokeOrigin.x,
+            y: strokeOrigin.y,
+            timeStamp: pointerSample.timeStamp,
+            pointerType:
+              pointerSample.pointerType === "mouse"
+              || pointerSample.pointerType === "pen"
+              || pointerSample.pointerType === "touch"
+                ? pointerSample.pointerType
+                : "unknown",
+            pointerId: pointerSample.pointerId,
+          },
+          {
+            strength: stabilizer,
+            mode: "precision",
+            coordinateScale: effScale,
+            useLazyPrecision: true,
+            lazyPointerPolicy: "all",
+          }
+        );
+        drawingStabilizerRef.current = first.state;
+        drawingPrecisionStabilizerBridgeRef.current = bridge;
+      }
       drawingVelocityRef.current =
         drawMode === "shape" || drawMode === "pixel"
           ? null
@@ -26339,9 +26586,22 @@ const puppetWarpArmed =
     const previousVelocity = drawingVelocityRef.current ?? createStudioPointerVelocityState(timingSample);
     const velocitySample = sampleStudioPointerVelocity(previousVelocity, timingSample);
     drawingVelocityRef.current = velocitySample.state;
+    const hybridPressure = typeof pressureOverride === "number" || current.brush === "pen"
+      ? null
+      : resolveStudioHybridPressureSample(current.brush, {
+          pointerType: pointerSample.pointerType,
+          rawPressure: pointerSample.pressure,
+          distance: velocitySample.distance,
+          elapsedMs: velocitySample.elapsedMs,
+          pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
+          velocitySensitivityScale:
+            inputSettings?.velocitySensitivity ?? velocitySensitivity,
+          simulateVelocity:
+            inputSettings?.useVelocityPressure ?? useVelocityPressure,
+        });
     let pressure = typeof pressureOverride === "number" && Number.isFinite(pressureOverride)
       ? Math.min(1, Math.max(0, pressureOverride))
-      : resolveBrushPressureSample({
+      : hybridPressure?.pressure ?? resolveBrushPressureSample({
           pointerType: pointerSample.pointerType,
           rawPressure: pointerSample.pressure,
           distance: velocitySample.distance,
@@ -26407,6 +26667,8 @@ const puppetWarpArmed =
       // making the stroke run backwards. Recreate it lazily only if a later unconstrained move
       // resumes the freehand gesture.
       drawingStabilizerRef.current = transition.stabilizerState;
+      drawingPrecisionStabilizerBridgeRef.current?.reset();
+      drawingPrecisionStabilizerBridgeRef.current = null;
       // A replace-in-place Shift gesture cannot retain the old fixed-clock history. If the artist
       // releases Shift within the same contact, continue on the causal immediate path instead of
       // silently switching to the unrelated legacy stabilizer engine.
@@ -26500,22 +26762,93 @@ const puppetWarpArmed =
     // Pixel pencil is a raw grid tool: stabilizer strength must never bend or trail its cells.
     // `null` at pointerdown means intentionally disabled for pixel, not "lazy-create on move".
     if (drawMode !== "pixel" && !drawingImmediateCausalInputRef.current) {
+      const strokeStabilizerStrength = inputSettings?.stabilizer ?? stabilizer;
+      const strokeStabilizerMode = inputSettings?.stabilizerMode ?? stabilizerMode;
+      const strokeCoordinateScale = inputSettings?.coordinateScale ?? effScale;
       const liveStabilizerState = drawingStabilizerRef.current
         ?? createStudioStrokeStabilizerState({
           x: rawLastX,
           y: rawLastY,
           timeStamp: sampleTimeStamp,
         });
-      const stabilized = stabilizeStudioStrokeSample(
-        liveStabilizerState,
-        { x: targetX, y: targetY, timeStamp: sampleTimeStamp },
-        {
-          strength: inputSettings?.stabilizer ?? stabilizer,
-          mode: inputSettings?.stabilizerMode ?? stabilizerMode,
-          coordinateScale: inputSettings?.coordinateScale ?? effScale,
+      let stabilized: ReturnType<typeof stabilizeStudioStrokeSample>;
+      if (strokeStabilizerMode === "precision" && strokeStabilizerStrength > 0) {
+        const precisionBridgeOptions = {
+          strength: strokeStabilizerStrength,
+          mode: "precision" as const,
+          coordinateScale: strokeCoordinateScale,
+          useLazyPrecision: true,
+          lazyPointerPolicy: "all" as const,
+        };
+        const precisionPointerType =
+          pointerSample.pointerType === "mouse"
+          || pointerSample.pointerType === "pen"
+          || pointerSample.pointerType === "touch"
+            ? pointerSample.pointerType
+            : "unknown";
+        let precisionBridge = drawingPrecisionStabilizerBridgeRef.current;
+        if (!precisionBridge && !drawingPredictionPreviewRef.current) {
+          // Shift replacement deliberately resets the provider. If freehand resumes within the
+          // same contact, re-anchor once at the retained endpoint before committing actual input.
+          precisionBridge = createStudioStrokeStabilizerBridge();
+          const first = precisionBridge.commit(
+            {
+              x: rawLastX,
+              y: rawLastY,
+              timeStamp: liveStabilizerState.timeStamp,
+              pointerType: precisionPointerType,
+              pointerId: pointerSample.pointerId,
+            },
+            precisionBridgeOptions
+          );
+          drawingStabilizerRef.current = first.state;
+          drawingPrecisionStabilizerBridgeRef.current = precisionBridge;
         }
-      );
-      drawingStabilizerRef.current = stabilized.state;
+        stabilized = precisionBridge
+          ? drawingPredictionPreviewRef.current
+            ? precisionBridge.preview(
+                {
+                  x: targetX,
+                  y: targetY,
+                  timeStamp: sampleTimeStamp,
+                  pointerType: precisionPointerType,
+                  pointerId: pointerSample.pointerId,
+                },
+                precisionBridgeOptions
+              )
+            : precisionBridge.commit(
+                {
+                  x: targetX,
+                  y: targetY,
+                  timeStamp: sampleTimeStamp,
+                  pointerType: precisionPointerType,
+                  pointerId: pointerSample.pointerId,
+                },
+                precisionBridgeOptions
+              )
+          : stabilizeStudioStrokeSample(
+              liveStabilizerState,
+              { x: targetX, y: targetY, timeStamp: sampleTimeStamp },
+              {
+                strength: strokeStabilizerStrength,
+                mode: strokeStabilizerMode,
+                coordinateScale: strokeCoordinateScale,
+              }
+            );
+      } else {
+        stabilized = stabilizeStudioStrokeSample(
+          liveStabilizerState,
+          { x: targetX, y: targetY, timeStamp: sampleTimeStamp },
+          {
+            strength: strokeStabilizerStrength,
+            mode: strokeStabilizerMode,
+            coordinateScale: strokeCoordinateScale,
+          }
+        );
+      }
+      if (!drawingPredictionPreviewRef.current) {
+        drawingStabilizerRef.current = stabilized.state;
+      }
       [targetX, targetY] = stabilized.point;
     }
 
@@ -27343,8 +27676,10 @@ const puppetWarpArmed =
           appendFixedRateStrokeSamples(released.emitted, pointerEvent, 0);
         } else {
           const liveState = drawingStabilizerRef.current;
-          if (liveState) {
-            const flushed = flushStudioStrokeStabilizerEndpoint(liveState);
+          const flushed =
+            drawingPrecisionStabilizerBridgeRef.current?.flush()
+            ?? (liveState ? flushStudioStrokeStabilizerEndpoint(liveState) : null);
+          if (flushed) {
             drawingStabilizerRef.current = flushed.state;
             const current = drawingRef.current;
             const endpointPlan = planStudioPointerReleaseEndpoint({
@@ -29102,6 +29437,11 @@ const puppetWarpArmed =
         return;
       }
 
+      saveStudioAiImageReferenceDocument(
+        studioWorkspaceStorage(),
+        { workId: savedWorkId, userScope: saveAuthScopeKey },
+        scenarioImageReferenceDocument
+      );
       try {
         localStorage.removeItem(autosaveKey);
         localStorage.removeItem(studioLifecycleAutosaveSidecarKey(autosaveKey));
@@ -29428,7 +29768,11 @@ function clearSelectionForEdit() {
             pending.start.y,
             frame,
           );
-          const next = beginPolyLassoSession(pending.combine, first);
+          polyLassoOperationRef.current = pending.combine;
+          const next = beginPolyLassoSession(
+            selectionCombineModeForOperation(pending.combine),
+            first,
+          );
           polyLassoSessionRef.current = next;
           setPolyLassoSession(next);
           setPolyLassoHover(null);
@@ -29437,7 +29781,7 @@ function clearSelectionForEdit() {
           const radiusNorm = pixelBrushRadius / Math.max(1, composite.width);
           let drag = beginSelectionDrag(
             pending.tool,
-            pending.combine,
+            selectionCombineModeForOperation(pending.combine),
             canvasPointToNormalized(pending.start.x, pending.start.y, frame),
             radiusNorm,
             {
@@ -29457,7 +29801,10 @@ function clearSelectionForEdit() {
             },
           );
           if (pending.released) {
-            const selection = commitSelectionDrag(null, drag);
+            const selection = commitSelectionDrag(
+              selectionOperationBase(pixelSelRef.current, pending.combine),
+              drag,
+            );
             clearPendingPixelSelectionRasterGesture();
             commitPixelSelectionState(
               selection,
@@ -29473,6 +29820,7 @@ function clearSelectionForEdit() {
               elId: composite.id,
               frame,
               drag,
+              operation: pending.combine,
               pointerId: pending.pointerId,
               magneticField: null,
             };
@@ -33534,9 +33882,12 @@ function clearSelectionForEdit() {
       ) : null}
 
       <div
+        data-studio-mobile-canvas-workspace={isMobile ? "true" : undefined}
         className={cn(
-          // Edge-dock workspace: flush panels + canvas (no inter-column gaps).
-          "flex min-h-0 flex-1 flex-col gap-0 pb-[calc(7rem+env(safe-area-inset-bottom))] lg:flex-row lg:overflow-hidden lg:pb-0",
+          // Edge-dock workspace: the mobile dock overlays the scrollport instead of shrinking this
+          // flex lane. StudioCanvasViewport owns the matching scroll-safe inset, so the final canvas
+          // pixels remain reachable while the full dynamic viewport stays available for drawing.
+          "flex min-h-0 flex-1 flex-col gap-0 pb-0 lg:flex-row lg:overflow-hidden",
           canvasOnlyMode && "overflow-hidden",
           mobileImmersive && "overflow-hidden"
         )}
@@ -34652,6 +35003,12 @@ function clearSelectionForEdit() {
           scenarioApplyTarget={scenarioApplyTarget}
           scenarioBusy={scenarioBusy}
           scenarioError={scenarioError}
+          scenarioImageReferenceAssetOptions={scenarioImageReferenceAssetOptions}
+          scenarioImageReferenceDocument={scenarioImageReferenceDocument}
+          scenarioImageReferenceMissingCount={
+            assetsLoaded ? scenarioImageReferenceResolution.missing.length : 0
+          }
+          scenarioImageReferencesLoading={assetsLoading || (scenarioOpen && !assetsLoaded)}
           scenarioOpen={scenarioOpen}
           scenarioProgress={scenarioProgress}
           scenarioRegeneratingIndex={scenarioRegeneratingIndex}
@@ -34695,6 +35052,7 @@ function clearSelectionForEdit() {
           setQuickActionsPreferences={setQuickActionsPreferences}
           setReferencePanelOpen={setReferencePanelOpen}
           setScenarioOpen={setScenarioOpen}
+          setScenarioImageReferenceDocument={setScenarioImageReferenceDocument}
           setScenarioSceneCountHint={setScenarioSceneCountHint}
           setScenarioStoryText={setScenarioStoryText}
           setScrollPreviewOpen={setScrollPreviewOpen}

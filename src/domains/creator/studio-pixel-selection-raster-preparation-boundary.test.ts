@@ -131,7 +131,10 @@ describe("Studio pixel marquee vector-only raster preparation boundary", () => {
     expect(finish).toContain("pending.cancelled = cancelled");
     expect(prepare).toContain("beginSelectionDrag(");
     expect(prepare).toContain("updateSelectionDrag(");
-    expect(prepare).toContain("commitSelectionDrag(null, drag)");
+    expect(prepare).toMatch(
+      /commitSelectionDrag\(\s*selectionOperationBase\(pixelSelRef\.current, pending\.combine\),\s*drag,\s*\)/u,
+    );
+    expect(prepare).not.toContain("commitSelectionDrag(null, drag)");
     expect(prepare).toContain('pending.tool === "poly-lasso"');
     expect(prepare).toContain('pending.tool === "wand"');
     expect(prepare).toContain("pixelDragRef.current =");

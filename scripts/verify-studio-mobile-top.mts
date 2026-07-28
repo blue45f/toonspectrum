@@ -96,6 +96,7 @@ interface TopChromeRectIssue {
 
 interface TopChromeMetrics {
   viewportWidth: number;
+  viewportHeight: number;
   menubarVisible: boolean;
   menubarHeight: number;
   laneClippedPx: number;
@@ -111,6 +112,13 @@ interface TopChromeMetrics {
   safeAreaDeclared: boolean;
   canvasTop: number | null;
   canvasVisibleHeight: number | null;
+  canvasViewportTop: number | null;
+  canvasViewportBottom: number | null;
+  canvasViewportHeight: number | null;
+  canvasViewportPaddingBottom: number | null;
+  dockTop: number | null;
+  dockHeight: number | null;
+  dockSmallTargets: TopChromeRectIssue[];
 }
 
 interface MenuProbeResult {
@@ -121,6 +129,15 @@ interface MenuProbeResult {
   closed: boolean;
 }
 
+interface DockExpansionProbeResult {
+  opened: boolean;
+  canvasViewportHeight: number | null;
+  canvasViewportBottom: number | null;
+  canvasViewportPaddingBottom: number | null;
+  dockHeight: number | null;
+  smallTargets: TopChromeRectIssue[];
+}
+
 interface ModeRunResult {
   width: number;
   mode: ShellMode;
@@ -128,6 +145,7 @@ interface ModeRunResult {
   hardFailures: string[];
   warnings: string[];
   metrics: TopChromeMetrics;
+  expandedDock: DockExpansionProbeResult;
   menus: MenuProbeResult[];
   errCount: number;
   shot: string;
@@ -241,6 +259,12 @@ async function measureTopChrome(page: Page, mode: ShellMode): Promise<TopChromeM
     const statusRail = document.querySelector("[data-studio-global-status-rail]");
     const toolBelt = document.querySelector('[data-studio-tool-belt="true"]');
     const siteHeader = shellMode === "windowed" ? document.querySelector("body header") : null;
+    const canvasViewport = document.querySelector<HTMLElement>(
+      '[data-studio-canvas-viewport="true"]',
+    );
+    const mobileDock = document.querySelector<HTMLElement>(
+      '[data-studio-mobile-editing-dock="true"]',
+    );
 
     const containers: Element[] = [];
     for (const candidate of [siteHeader, menubar, statusRail, toolBelt]) {
@@ -378,6 +402,7 @@ async function measureTopChrome(page: Page, mode: ShellMode): Promise<TopChromeM
     // (pointer-coarse touch contract for the whole top chrome).
     const smallTargets: { label: string; detail: string }[] = [];
     const smallTargetWarnings: { label: string; detail: string }[] = [];
+    const dockSmallTargets: { label: string; detail: string }[] = [];
     const MIN = 43.5;
     for (const item of interactives) {
       const size = `${item.rect.width.toFixed(1)}×${item.rect.height.toFixed(1)}`;
@@ -385,6 +410,18 @@ async function measureTopChrome(page: Page, mode: ShellMode): Promise<TopChromeM
         const where = item.container === menubar ? "menubar" : "belt";
         if (item.rect.height < MIN || item.rect.width < MIN) {
           smallTargets.push({ label: describe(item.element), detail: `${where} target ${size}` });
+        }
+      }
+    }
+    if (mobileDock) {
+      for (const element of mobileDock.querySelectorAll(INTERACTIVE_SELECTOR)) {
+        if (!isVisible(element)) continue;
+        const rect = element.getBoundingClientRect();
+        if (rect.height < MIN || rect.width < MIN) {
+          dockSmallTargets.push({
+            label: describe(element),
+            detail: `mobile dock target ${rect.width.toFixed(1)}×${rect.height.toFixed(1)}`,
+          });
         }
       }
     }
@@ -485,9 +522,12 @@ async function measureTopChrome(page: Page, mode: ShellMode): Promise<TopChromeM
       canvasTop = rect.top;
       canvasVisibleHeight = Math.max(0, Math.min(rect.bottom, vh) - Math.max(rect.top, 0));
     }
+    const canvasViewportRect = canvasViewport?.getBoundingClientRect() ?? null;
+    const mobileDockRect = mobileDock?.getBoundingClientRect() ?? null;
 
     return {
       viewportWidth: vw,
+      viewportHeight: vh,
       menubarVisible,
       menubarHeight,
       laneClippedPx,
@@ -503,6 +543,15 @@ async function measureTopChrome(page: Page, mode: ShellMode): Promise<TopChromeM
       safeAreaDeclared,
       canvasTop,
       canvasVisibleHeight,
+      canvasViewportTop: canvasViewportRect?.top ?? null,
+      canvasViewportBottom: canvasViewportRect?.bottom ?? null,
+      canvasViewportHeight: canvasViewportRect?.height ?? null,
+      canvasViewportPaddingBottom: canvasViewport
+        ? Number.parseFloat(getComputedStyle(canvasViewport).paddingBottom)
+        : null,
+      dockTop: mobileDockRect?.top ?? null,
+      dockHeight: mobileDockRect?.height ?? null,
+      dockSmallTargets,
     };
   }, { shellMode: mode });
 }
@@ -620,6 +669,35 @@ async function runMode(
   const metrics = await measureTopChrome(page, mode);
   await page.screenshot({ path: shot, fullPage: false });
 
+  const expandedDock: DockExpansionProbeResult = {
+    opened: false,
+    canvasViewportHeight: null,
+    canvasViewportBottom: null,
+    canvasViewportPaddingBottom: null,
+    dockHeight: null,
+    smallTargets: [],
+  };
+  const workspaceToggle = page.locator(
+    '[data-studio-mobile-workspace-toggle="true"]',
+  ).first();
+  if (await workspaceToggle.count() > 0) {
+    await workspaceToggle.click();
+    await page
+      .locator(
+        '[data-studio-mobile-editing-dock="true"][data-studio-mobile-dock-expanded="true"]',
+      )
+      .waitFor({ state: "attached", timeout: 4000 });
+    const expandedMetrics = await measureTopChrome(page, mode);
+    expandedDock.opened = true;
+    expandedDock.canvasViewportHeight = expandedMetrics.canvasViewportHeight;
+    expandedDock.canvasViewportBottom = expandedMetrics.canvasViewportBottom;
+    expandedDock.canvasViewportPaddingBottom =
+      expandedMetrics.canvasViewportPaddingBottom;
+    expandedDock.dockHeight = expandedMetrics.dockHeight;
+    expandedDock.smallTargets = expandedMetrics.dockSmallTargets;
+    await workspaceToggle.click();
+  }
+
   const menus: MenuProbeResult[] = [];
   if (mode === "windowed") {
     // Workspace menu gate lives in the scrollable primary lane; reveal then activate.
@@ -711,6 +789,76 @@ async function runMode(
       );
     }
   }
+  if (
+    metrics.canvasViewportTop === null ||
+    metrics.canvasViewportBottom === null ||
+    metrics.canvasViewportHeight === null ||
+    metrics.canvasViewportPaddingBottom === null
+  ) {
+    hardFailures.push("canvas scroll viewport not found");
+  } else {
+    if (
+      mode === "immersive" &&
+      metrics.canvasViewportBottom < metrics.viewportHeight - 1
+    ) {
+      hardFailures.push(
+        `canvas viewport stops ${(
+          metrics.viewportHeight - metrics.canvasViewportBottom
+        ).toFixed(1)}px above the dynamic viewport bottom`,
+      );
+    }
+    if (
+      metrics.dockHeight !== null &&
+      metrics.canvasViewportPaddingBottom < metrics.dockHeight - 1
+    ) {
+      hardFailures.push(
+        `canvas dock-safe padding ${metrics.canvasViewportPaddingBottom.toFixed(1)}px ` +
+        `< dock height ${metrics.dockHeight.toFixed(1)}px`,
+      );
+    }
+  }
+  if (metrics.dockTop === null || metrics.dockHeight === null) {
+    hardFailures.push("mobile editing dock not found");
+  } else if (
+    mode === "immersive" &&
+    metrics.canvasViewportBottom !== null &&
+    metrics.canvasViewportBottom <= metrics.dockTop + 1
+  ) {
+    hardFailures.push("mobile dock still shrinks the canvas instead of overlaying its scrollport");
+  }
+  for (const issue of metrics.dockSmallTargets) {
+    hardFailures.push(`small dock target: ${issue.label} ${issue.detail}`);
+  }
+  if (!expandedDock.opened) {
+    hardFailures.push("expanded mobile workspace dock did not open");
+  } else {
+    if (
+      expandedDock.canvasViewportHeight === null ||
+      metrics.canvasViewportHeight === null ||
+      Math.abs(expandedDock.canvasViewportHeight - metrics.canvasViewportHeight) > 1
+    ) {
+      hardFailures.push("expanded mobile dock changes the canvas viewport height");
+    }
+    if (
+      mode === "immersive" &&
+      (
+        expandedDock.canvasViewportBottom === null ||
+        expandedDock.canvasViewportBottom < metrics.viewportHeight - 1
+      )
+    ) {
+      hardFailures.push("expanded mobile dock shrinks the dynamic canvas viewport");
+    }
+    if (
+      expandedDock.canvasViewportPaddingBottom === null ||
+      expandedDock.dockHeight === null ||
+      expandedDock.canvasViewportPaddingBottom < expandedDock.dockHeight - 1
+    ) {
+      hardFailures.push("expanded mobile dock is not covered by canvas scroll-safe padding");
+    }
+    for (const issue of expandedDock.smallTargets) {
+      hardFailures.push(`small expanded dock target: ${issue.label} ${issue.detail}`);
+    }
+  }
   for (const menu of menus) {
     if (!menu.opened) hardFailures.push(`menu ${menu.id} did not open`);
     else if (!menu.withinViewport) hardFailures.push(`menu ${menu.id} escapes the viewport`);
@@ -744,6 +892,11 @@ async function runMode(
     `clipped=${metrics.clipped.length} smallTargets=${metrics.smallTargets.length} ` +
     `safeArea=${metrics.safeAreaDeclared} canvasTop=${metrics.canvasTop?.toFixed(0) ?? "-"} ` +
     `canvasVisible=${metrics.canvasVisibleHeight?.toFixed(0) ?? "-"} ` +
+    `viewport=${metrics.canvasViewportHeight?.toFixed(0) ?? "-"} ` +
+    `dock=${metrics.dockHeight?.toFixed(0) ?? "-"} ` +
+    `dockPad=${metrics.canvasViewportPaddingBottom?.toFixed(0) ?? "-"} ` +
+    `expandedDock=${expandedDock.dockHeight?.toFixed(0) ?? "-"} ` +
+    `expandedPad=${expandedDock.canvasViewportPaddingBottom?.toFixed(0) ?? "-"} ` +
     `menus=${menus.map((menu) => `${menu.id}:${menu.opened && menu.withinViewport && menu.closed}`).join(",") || "-"} ` +
     `errs=${consoleErrors.length} ok=${ok}`,
   );
@@ -761,6 +914,7 @@ async function runMode(
     hardFailures,
     warnings,
     metrics,
+    expandedDock,
     menus,
     errCount: consoleErrors.length,
     shot,

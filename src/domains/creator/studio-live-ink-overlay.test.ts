@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { planStudioCausalInk } from "./studio-causal-ink";
+import {
+  resolveStudioCausalInkDrawContract,
+  resolveStudioLiveInkStrokeStyle,
+} from "./studio-draw-rendering";
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
@@ -12,6 +17,8 @@ import {
   type StudioLiveInkStrokeStyle,
   type StudioLiveInkSurface,
 } from "./studio-live-ink-overlay";
+
+import type { DrawEl } from "./studio-element-model";
 
 interface RecordedDab {
   readonly x: number;
@@ -112,6 +119,62 @@ afterEach(() => {
 });
 
 describe("StudioLiveInkOverlayRenderer", () => {
+  it("keeps a core G-pen first dab and settled footprint identical to its retained contract", () => {
+    const element: DrawEl = {
+      id: "gpen-contract",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      brush: "gpen",
+      points: [2, 3, 9, 7, 16, 5, 24, 11],
+      pressures: [0.18, 0.42, 0.9, 0.64],
+      stroke: "#251812",
+      strokeWidth: 18,
+      opacity: 0.72,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
+      sampleSpacing: 0,
+    };
+    const contract = resolveStudioCausalInkDrawContract(element);
+    const style = resolveStudioLiveInkStrokeStyle(element);
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+
+    expect(
+      renderer.begin(
+        style,
+        contract.points[0]!,
+        contract.points[1]!,
+        contract.pressures[0]!
+      )
+    ).toBe(true);
+    expect(recording.dabs[0]?.radius).toBeGreaterThan(0);
+    renderer.appendFrom(contract.points, contract.pressures);
+    renderer.end();
+
+    const expected = planStudioCausalInk({
+      points: contract.points,
+      pressures: contract.pressures,
+      minDistance: contract.minDistance,
+      size: contract.strokeWidth,
+      pressureModel: contract.pressureModel,
+    }).dabs.map((dab) => ({
+      x: rounded(dab.x),
+      y: rounded(dab.y),
+      radius: rounded(dab.radius),
+    }));
+    expect(recording.dabs).toEqual(expected);
+    recording.clearRect.mockClear();
+    expect(renderer.reauthorLastSettledFromDocumentPoints({
+      style,
+      points: contract.points,
+      pressures: contract.pressures,
+    })).toBe(true);
+    expect(recording.clearRect).not.toHaveBeenCalled();
+    expect(recording.dabs).toEqual(expected);
+  });
+
   it("does not authorize native geometry when a 2D context is unavailable", () => {
     const canvas = {
       width: 0,

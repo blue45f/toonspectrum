@@ -42,7 +42,7 @@ import {
   SELECTION_BRIGHTNESS_RANGE,
   SELECTION_BRUSH_RADIUS_DEFAULT,
   SELECTION_BRUSH_RADIUS_RANGE,
-  SELECTION_COMBINE_MODES,
+  SELECTION_OPERATION_MODES,
   SELECTION_EXPAND_DEFAULT,
   SELECTION_EXPAND_RANGE,
   SELECTION_FEATHER_RANGE,
@@ -53,7 +53,7 @@ import {
   planSelectionAdjust,
   type PixelSelection,
   type SelectionAdjustPlan,
-  type SelectionCombineMode,
+  type SelectionOperationMode,
   type SelectionContentTransform,
   type SelectionToolKind,
 } from "./studio-selection-tools";
@@ -90,10 +90,11 @@ const TOOL_PREVIEWS = {
 } satisfies Record<SelectionToolKind, StudioToolHintPreviewKind>;
 
 const COMBINE_PREVIEWS = {
+  replace: "selection-replace",
   add: "selection-add",
   subtract: "selection-subtract",
   intersect: "selection-intersect",
-} satisfies Record<SelectionCombineMode, StudioToolHintPreviewKind>;
+} satisfies Record<SelectionOperationMode, StudioToolHintPreviewKind>;
 
 const SELECTION_ACTION_HINTS = {
   selectAll: {
@@ -318,13 +319,13 @@ function colorRangeSampleHex(sample: ColorRangeSample): string {
 export type StudioSelectionToolsPanelProps = {
   selection: PixelSelection | null;
   activeTool: SelectionToolKind | null;
-  combineMode: SelectionCombineMode;
+  combineMode: SelectionOperationMode;
   brushRadius?: number;
   busy?: boolean;
   /** 다각형 올가미 진행 중 꼭짓점 수 — 상태 라인 표시용. */
   polyLassoPointCount?: number;
   onPickTool: (tool: SelectionToolKind | null) => void;
-  onCombineModeChange: (mode: SelectionCombineMode) => void;
+  onCombineModeChange: (mode: SelectionOperationMode) => void;
   onBrushRadiusChange?: (px: number) => void;
   onFeatherChange: (px: number) => void;
   onToggleInvert: () => void;
@@ -473,7 +474,7 @@ export function StudioSelectionToolsPanel({
   const colorRangePreviewDisabled =
     !colorRangePreviewEnabled && (busy || colorRangeSamples.length === 0);
   const combineLabel =
-    SELECTION_COMBINE_MODES.find((mode) => mode.id === combineMode)?.label ?? combineMode;
+    SELECTION_OPERATION_MODES.find((mode) => mode.id === combineMode)?.label ?? combineMode;
 
   const applyThenReset = (plan: SelectionAdjustPlan, reset: () => void) => {
     onApplyAdjust(plan);
@@ -597,10 +598,19 @@ export function StudioSelectionToolsPanel({
         </div>
       ) : null}
 
-      <div className="flex items-center justify-between gap-2 text-xs text-fg-2">
-        결합
-        <span className="flex items-center gap-1.5">
-          {SELECTION_COMBINE_MODES.map((mode) => (
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-medium text-fg-2">다음 선택</span>
+          <span className="text-[0.66rem] text-fg-3">
+            Shift 추가 · Alt 빼기
+          </span>
+        </div>
+        <div
+          className="grid grid-cols-2 gap-1 rounded-lg border border-line/45 bg-bg/35 p-1"
+          role="group"
+          aria-label="다음 선택 작업"
+        >
+          {SELECTION_OPERATION_MODES.map((mode) => (
             <StudioToolHintTarget
               key={mode.id}
               hint={{
@@ -608,30 +618,35 @@ export function StudioSelectionToolsPanel({
                 title: mode.label,
                 description: mode.tip,
                 preview: COMBINE_PREVIEWS[mode.id],
-                tip:
-                  mode.id === "add"
-                    ? "새 영역을 기존 선택에 더하려면 ‘합치기’ 결합 모드 버튼을 선택하세요."
-                    : mode.id === "subtract"
-                      ? "새 영역을 기존 선택에서 빼려면 ‘빼기’ 결합 모드 버튼을 선택하세요."
-                      : "겹친 픽셀만 남겨 정교한 마스크를 만들 때 유용해요.",
+                shortcut: mode.shortcut,
+                tip: mode.id === "replace"
+                  ? "보통은 새 선택을 사용하고, 그리는 동안 Shift/Alt로 일시 변경할 수 있어요."
+                  : mode.tip,
               }}
               disabled={busy}
               unavailableReason={busyUnavailableReason}
               preferredSide="left"
             >
-              <span className="inline-flex">
+              <span className="inline-flex min-w-0">
                 <StudioToggleChip
                   active={combineMode === mode.id}
                   disabled={busy}
                   onClick={() => onCombineModeChange(mode.id)}
                   aria-label={mode.label}
                 >
-                  {mode.label}
+                  <span className="inline-flex min-w-0 items-center gap-1">
+                    <span className="truncate">{mode.label}</span>
+                    {mode.shortcut ? (
+                      <span className="rounded bg-bg/70 px-1 font-mono text-[0.58rem] text-fg-3">
+                        {mode.shortcut}
+                      </span>
+                    ) : null}
+                  </span>
                 </StudioToggleChip>
               </span>
             </StudioToolHintTarget>
           ))}
-        </span>
+        </div>
       </div>
 
       <StudioSliderRow

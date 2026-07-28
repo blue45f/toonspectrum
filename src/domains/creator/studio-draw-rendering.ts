@@ -18,7 +18,10 @@ import {
 } from "./studio-brush-symmetry";
 import { planStudioCausalInk } from "./studio-causal-ink";
 import { fillStudioCausalInkDabs } from "./studio-causal-ink-canvas";
-import { studioInkFallbackPressure } from "./studio-ink-pressure-model";
+import {
+  studioInkFallbackPressure,
+  studioInkUsesPathResidualDabSpacing,
+} from "./studio-ink-pressure-model";
 import {
   fillStudioPixelPencilCells,
   isStudioPixelPencilRenderMode,
@@ -29,6 +32,7 @@ import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model"
 import type { StudioBrushSymmetrySpec } from "./studio-brush-symmetry";
 import type { DrawEl } from "./studio-element-model";
 import type { StudioInkPressureModel } from "./studio-ink-pressure-model";
+import type { StudioLiveInkStrokeStyle } from "./studio-live-ink-overlay";
 import type { StudioStrokePaintModel } from "./studio-stroke-paint-model";
 import type Konva from "konva";
 
@@ -78,6 +82,60 @@ export function studioLiveBrushPressureSamples(
     sourcePointCount,
     studioInkFallbackPressure(el.pressureModel)
   );
+}
+
+/**
+ * The complete canonical input consumed by both the immediate live surface and the retained
+ * renderer. Keeping this as one resolver is important for alias brushes: diameter and pressure
+ * curves must be applied exactly once, and an unsupported paint model must not silently change
+ * renderer selection at pointer-up.
+ */
+export interface StudioCausalInkDrawContract {
+  readonly points: readonly number[];
+  readonly pressures: readonly number[];
+  readonly strokeColor: string;
+  readonly strokeWidth: number;
+  readonly minDistance: number;
+  readonly pressureModel?: StudioInkPressureModel;
+  readonly paintModel?: StudioStrokePaintModel;
+  readonly opacity: number;
+  readonly composite: GlobalCompositeOperation;
+}
+
+export function resolveStudioCausalInkDrawContract(
+  el: DrawEl,
+  points: readonly number[] = el.points
+): StudioCausalInkDrawContract {
+  const eraser = el.mode === "eraser";
+  return {
+    points,
+    pressures: studioLiveBrushPressureSamples(el, Math.floor(points.length / 2)),
+    strokeColor: eraser ? "#16100c" : el.stroke,
+    strokeWidth: studioLiveBrushEffectiveDiameter(el),
+    // The retained causal renderer historically treats an omitted persisted spacing as zero.
+    // Use that exact value live so pointer-up cannot re-thin the same document route. A truly
+    // legacy stroke (neither field present) keeps its frozen 3px overlay thinning contract.
+    minDistance: el.sampleSpacing !== undefined || el.pressureModel !== undefined
+      ? el.sampleSpacing ?? 0
+      : strokeRenderDistance(undefined),
+    pressureModel: el.pressureModel,
+    paintModel: isStudioStrokePaintModelCompatible(el) ? el.paintModel : undefined,
+    opacity: Math.min(1, Math.max(0, el.opacity ?? 1)),
+    composite: eraser ? "destination-out" : "source-over",
+  };
+}
+
+/** Exact style projection consumed by the native live and prediction overlay surfaces. */
+export function resolveStudioLiveInkStrokeStyle(el: DrawEl): StudioLiveInkStrokeStyle {
+  const contract = resolveStudioCausalInkDrawContract(el);
+  return {
+    color: contract.strokeColor,
+    strokeWidthDoc: contract.strokeWidth,
+    pressureModel: contract.pressureModel,
+    paintModel: contract.paintModel,
+    opacity: contract.opacity,
+    minDistanceDoc: contract.minDistance,
+  };
 }
 
 export function getSymmetricPoints(
@@ -179,6 +237,23 @@ export function drawStudioCausalInkDabs(
   fillStudioCausalInkDabs(context, plan.dabs, strokeColor, paintModel);
 }
 
+/** Draws the already-resolved contract without reapplying alias or pressure transformations. */
+export function drawStudioCausalInkContract(
+  context: Konva.Context,
+  contract: StudioCausalInkDrawContract
+): void {
+  drawStudioCausalInkDabs(
+    context,
+    contract.points,
+    contract.pressures,
+    contract.strokeColor,
+    contract.strokeWidth,
+    contract.minDistance,
+    contract.pressureModel,
+    contract.paintModel
+  );
+}
+
 /**
  * 다이렉트 라이브 초안 대상인지 — StudioDrawNode 의 Default(pen/marker/eraser) 브랜치와 정확히
  * 같은 집합만 참이어야 미리보기가 커밋과 픽셀 단위로 일치한다. 지우개는 모든 브러시에서 Default
@@ -189,7 +264,10 @@ export function isDirectLiveDraftEl(el: DrawEl): boolean {
   if (el.mode === "eraser") return true;
   if (isStudioPixelPencilRenderMode(el.brush)) return true;
   const family = resolveStudioBrushRenderFamily(el.brush ?? "pen");
-  if (family !== "pen" && family !== "marker") return false;
+  const causalGpen =
+    family === "gpen"
+    && studioInkUsesPathResidualDabSpacing(el.pressureModel);
+  if (family !== "pen" && family !== "marker" && !causalGpen) return false;
   return resolveStudioBrushDynamicsPresetId(el.brush) === null;
 }
 
@@ -206,15 +284,15 @@ export function isDirectLiveStampDraftEl(el: DrawEl): boolean {
 /** 다이렉트 라이브 초안을 임페러티브로 그린다 — React 렌더 없이 Konva batchDraw 로만 갱신. */
 export function drawLiveFreehandDraftToContext(context: Konva.Context, el: DrawEl): void {
   const isEraser = el.mode === "eraser";
-  const strokeColor = isEraser ? "#16100c" : el.stroke;
-  const strokeWidth = studioLiveBrushEffectiveDiameter(el);
+  const contract = resolveStudioCausalInkDrawContract(el);
+  const strokeColor = contract.strokeColor;
+  const strokeWidth = contract.strokeWidth;
   const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
   const variations = getSymmetricPoints(el.points, el.symmetry);
-  const sourcePointCount = Math.floor(el.points.length / 2);
-  const livePressures = studioLiveBrushPressureSamples(el, sourcePointCount);
+  const livePressures = contract.pressures;
   context.save();
-  context.globalAlpha = Math.min(1, Math.max(0, el.opacity ?? 1));
-  context.globalCompositeOperation = isEraser ? "destination-out" : "source-over";
+  context.globalAlpha = contract.opacity;
+  context.globalCompositeOperation = contract.composite;
   for (const points of variations) {
     if (!isEraser && isStudioPixelPencilRenderMode(el.brush)) {
       const pixelPlan = planStudioPixelPencilCells({ points, strokeWidth });
@@ -224,16 +302,7 @@ export function drawLiveFreehandDraftToContext(context: Konva.Context, el: DrawE
       continue;
     }
     if ((el.sampleSpacing !== undefined || el.pressureModel !== undefined) && !el.fill) {
-      drawStudioCausalInkDabs(
-        context,
-        points,
-        livePressures,
-        strokeColor,
-        strokeWidth,
-        el.sampleSpacing ?? 0,
-        el.pressureModel,
-        isStudioStrokePaintModelCompatible(el) ? el.paintModel : undefined
-      );
+      drawStudioCausalInkContract(context, { ...contract, points });
       continue;
     }
     if (points.length === 2) {

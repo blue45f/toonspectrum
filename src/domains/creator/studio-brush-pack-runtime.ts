@@ -1,6 +1,7 @@
 import {
   normalizeStudioBrushDynamicsSettings,
   serializeStudioBrushDynamicsSettingsCanonical,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
   studioBrushDynamicsPresetSettings,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioBrushDynamicsMappingSettings,
@@ -1479,13 +1480,30 @@ export function materializeStudioBrushPackDynamics(
       : 0.72 + (index % 4) * 0.055;
   const settings: StudioBrushDynamicsSettings = {
     ...base,
+    ...(
+      descriptor.catalogId === "pencil-4b-rough"
+      || descriptor.catalogId === "g-pen-flex"
+        ? {
+            depositPipeline:
+              STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+          }
+        : {}
+    ),
     seed,
     fallbackPressure: 0.48 + (index % 5) * 0.025,
     maxSpeed: 1.2 + (index % 7) * 0.14,
     tip: materializeStudioBrushPackTipSettings(
-      motif,
+      // The causal G-pen's pressure/roundness channels already describe the nib silhouette. A
+      // round primitive keeps that same ellipse on the renderer's exact one-mark fast path.
+      descriptor.catalogId === "g-pen-flex" ? "round" : motif,
       index,
-      tuning?.tipSoftness ?? profileSoftness(descriptor, index)
+      // The 3% software feather previously expanded every G-pen dab into a 5×5 alpha lattice.
+      // Canvas already antialiases the primitive at the sub-pixel edge, so that lattice added
+      // pointer latency without a visible benefit and exhausted the live mark budget on ordinary
+      // curves. Persisted older snapshots retain their serialized hard-tip settings and pixels.
+      descriptor.catalogId === "g-pen-flex"
+        ? 0
+        : tuning?.tipSoftness ?? profileSoftness(descriptor, index)
     ),
     colorDynamics: colorDynamicsFor(descriptor, index),
     grain: grainFor(descriptor, index),

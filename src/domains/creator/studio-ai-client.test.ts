@@ -7,6 +7,7 @@ import {
   DEFAULT_STUDIO_AI_IMAGE_SIZE,
   generateBackgroundImage,
   generateConsistentCharacterImage,
+  generateImageWithRoleReferences,
   generateScenarioScenes,
   generateStudioWriterRoomDraft,
   isStudioAiConfigured,
@@ -14,6 +15,7 @@ import {
   loadStudioAiSessionSettings,
   saveStudioAiSettings,
   STUDIO_AI_DEFAULT_SETTINGS,
+  STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS,
   STUDIO_AI_SETTINGS_KEY,
   studioTextAiTransportForOperation,
   suggestColorPalette,
@@ -23,6 +25,7 @@ import {
   translateDialogueBatch,
   type StudioAiSettings,
   type StudioAiStorage,
+  type StudioAiResolvedImageReference,
 } from "./studio-ai-client";
 import { createEmptyStudioWriterRoomDocument } from "./studio-writer-room";
 
@@ -60,6 +63,29 @@ function createAbortAwareFetch() {
       init?.signal?.addEventListener("abort", rejectAsAborted, { once: true });
     })
   );
+}
+
+function bytesDataUrl(mimeType: string, bytes: readonly number[]): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return `data:${mimeType};base64,${btoa(binary)}`;
+}
+
+function pngDataUrl(marker = 0): string {
+  return bytesDataUrl("image/png", [
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, marker,
+  ]);
+}
+
+function jpegDataUrl(marker = 0): string {
+  return bytesDataUrl("image/jpeg", [0xff, 0xd8, marker, 0xff, 0xd9]);
+}
+
+function webpDataUrl(marker = 0): string {
+  return bytesDataUrl("image/webp", [
+    0x52, 0x49, 0x46, 0x46, 0x05, 0x00, 0x00, 0x00,
+    0x57, 0x45, 0x42, 0x50, marker,
+  ]);
 }
 
 describe("studio-ai-client settings storage", () => {
@@ -498,6 +524,516 @@ describe("studio-ai-client network calls (fetch mocked)", () => {
         code: "network_error",
         error: "요청이 취소되었습니다.",
       });
+    });
+  });
+
+  describe("generateImageWithRoleReferences", () => {
+    const scenePrompt = "비 오는 옥상에서 두 인물이 대치하는 장면";
+
+    it("uploads canonical Character → Method → Style image[] fields and includes isolated role contexts", async () => {
+      const mockFetch = vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ data: [{ b64_json: btoa("role-result") }] }),
+            { status: 200 },
+          ),
+      );
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const references: StudioAiResolvedImageReference[] = [
+        {
+          referenceId: "style-ink",
+          role: "style",
+          dataUrl: webpDataUrl(0x33),
+          guidance: "마른 붓 질감",
+        },
+        {
+          referenceId: "character-hero",
+          role: "character",
+          dataUrl: pngDataUrl(0x11),
+          guidance: "얼굴과 의상",
+        },
+        {
+          referenceId: "method-shot",
+          role: "method",
+          dataUrl: jpegDataUrl(0x22),
+          guidance: "로우 앵글과 삼각 구도",
+        },
+      ];
+      const result = await generateImageWithRoleReferences(
+        CONFIGURED,
+        references,
+        scenePrompt,
+      );
+
+      expect(result).toEqual({
+        ok: true,
+        data: {
+          dataUrl: `data:image/png;base64,${btoa("role-result")}`,
+        },
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const [url, init] = mockFetch.mock.calls[0] as unknown as [
+        string,
+        RequestInit,
+      ];
+      expect(url).toBe("https://api.example.com/v1/images/edits");
+      expect(init.headers).toEqual({ Authorization: "Bearer sk-test-key" });
+      expect(init.body).toBeInstanceOf(FormData);
+      const form = init.body as FormData;
+      expect(form.get("image")).toBeNull();
+      const images = form.getAll("image[]");
+      expect(images).toHaveLength(3);
+      expect(
+        images.map((image) => (image as File).name),
+      ).toEqual([
+        "01-character-1.png",
+        "02-method-1.jpg",
+        "03-style-1.webp",
+      ]);
+      expect(
+        await Promise.all(
+          images.map(async (image) =>
+            Array.from(new Uint8Array(await (image as Blob).arrayBuffer())).at(
+              -1,
+            ),
+          ),
+        ),
+      ).toEqual([0x11, 0xd9, 0x33]);
+
+      const prompt = form.get("prompt");
+      expect(typeof prompt).toBe("string");
+      const promptText = prompt as string;
+      expect(promptText).toContain(scenePrompt);
+      expect(promptText.indexOf(":character]")).toBeLessThan(
+        promptText.indexOf(":method]"),
+      );
+      expect(promptText.indexOf(":method]")).toBeLessThan(
+        promptText.indexOf(":style]"),
+      );
+      expect(promptText).toContain(
+        '"bindings":[{"image":1,"token":"character-1","role":"character"},{"image":2,"token":"method-1","role":"method"},{"image":3,"token":"style-1","role":"style"}]',
+      );
+      expect(promptText).toContain(
+        "Image 1 is bindings[0], Image 2 is bindings[1]",
+      );
+      expect(promptText).not.toContain("character-hero");
+      expect(form.get("model")).toBe(CONFIGURED.imageModel);
+      expect(form.get("n")).toBe("1");
+      expect(form.get("response_format")).toBe("b64_json");
+    });
+
+    it("keeps one-character behavior semantically compatible with the existing consistency prompt", async () => {
+      const mockFetch = vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ data: [{ b64_json: btoa("character-result") }] }),
+            { status: 200 },
+          ),
+      );
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      await generateImageWithRoleReferences(
+        CONFIGURED,
+        [
+          {
+            referenceId: "hero",
+            role: "character",
+            dataUrl: pngDataUrl(),
+          },
+        ],
+        scenePrompt,
+      );
+
+      const [, init] = mockFetch.mock.calls[0] as unknown as [
+        string,
+        RequestInit,
+      ];
+      const prompt = (init.body as FormData).get("prompt");
+      expect(prompt).toEqual(expect.any(String));
+      expect((prompt as string).startsWith(
+        `${buildCharacterConsistencyPrompt(scenePrompt)}\n\n`,
+      )).toBe(true);
+      expect(prompt as string).toContain(
+        "[TOONSPECTRUM_REFERENCE_CONTEXT_V1:character]",
+      );
+      expect((init.body as FormData).getAll("image[]")).toHaveLength(1);
+    });
+
+    it("orders valid identifiers by locale-independent code units", async () => {
+      const mockFetch = vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ data: [{ b64_json: btoa("ordered") }] }),
+            { status: 200 },
+          ),
+      );
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      await generateImageWithRoleReferences(
+        CONFIGURED,
+        [
+          {
+            referenceId: "Ai",
+            role: "style",
+            dataUrl: webpDataUrl(0x69),
+          },
+          {
+            referenceId: "AI",
+            role: "style",
+            dataUrl: webpDataUrl(0x41),
+          },
+        ],
+        scenePrompt,
+      );
+
+      const [, init] = mockFetch.mock.calls[0] as unknown as [
+        string,
+        RequestInit,
+      ];
+      const images = (init.body as FormData).getAll("image[]") as File[];
+      expect(
+        await Promise.all(
+          images.map(async (image) =>
+            new Uint8Array(await image.arrayBuffer()).at(-1),
+          ),
+        ),
+      ).toEqual([0x41, 0x69]);
+    });
+
+    it("validates only small signature slices instead of copying each full Blob", async () => {
+      const observedBlobReadSizes: number[] = [];
+      const originalArrayBuffer = Blob.prototype.arrayBuffer;
+      const arrayBufferSpy = vi
+        .spyOn(Blob.prototype, "arrayBuffer")
+        .mockImplementation(function (this: Blob) {
+          observedBlobReadSizes.push(this.size);
+          return originalArrayBuffer.call(this);
+        });
+      const mockFetch = vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ data: [{ b64_json: btoa("sliced") }] }),
+            { status: 200 },
+          ),
+      );
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      try {
+        await generateImageWithRoleReferences(
+          CONFIGURED,
+          [
+            {
+              referenceId: "hero",
+              role: "character",
+              dataUrl: pngDataUrl(),
+            },
+            {
+              referenceId: "shot",
+              role: "method",
+              dataUrl: jpegDataUrl(),
+            },
+            {
+              referenceId: "style",
+              role: "style",
+              dataUrl: webpDataUrl(),
+            },
+          ],
+          scenePrompt,
+        );
+      } finally {
+        arrayBufferSpy.mockRestore();
+      }
+
+      expect(observedBlobReadSizes).toEqual([8, 2, 2, 12]);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("normalizes exact duplicates without sending duplicate images", async () => {
+      const mockFetch = vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ data: [{ b64_json: btoa("deduplicated") }] }),
+            { status: 200 },
+          ),
+      );
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+      const reference = {
+        referenceId: "same",
+        role: "style" as const,
+        dataUrl: webpDataUrl(),
+        guidance: "수채화 번짐",
+      };
+
+      await generateImageWithRoleReferences(
+        CONFIGURED,
+        [reference, { ...reference }],
+        scenePrompt,
+      );
+
+      const [, init] = mockFetch.mock.calls[0] as unknown as [
+        string,
+        RequestInit,
+      ];
+      expect((init.body as FormData).getAll("image[]")).toHaveLength(1);
+    });
+
+    it("rejects conflicting duplicates, excess total/per-role counts, and over-budget prompts before fetch", async () => {
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+      const shared = {
+        referenceId: "same",
+        role: "style" as const,
+        dataUrl: webpDataUrl(),
+      };
+      const conflicting = await generateImageWithRoleReferences(
+        CONFIGURED,
+        [shared, { ...shared, dataUrl: webpDataUrl(1) }],
+        scenePrompt,
+      );
+      const tooMany = await generateImageWithRoleReferences(
+        CONFIGURED,
+        Array.from(
+          { length: STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxImages + 1 },
+          (_, index) => ({
+            referenceId: `reference-${index}`,
+            role: "style" as const,
+            dataUrl: webpDataUrl(index),
+          }),
+        ),
+        scenePrompt,
+      );
+      const tooManyInRole = await generateImageWithRoleReferences(
+        CONFIGURED,
+        Array.from({ length: 7 }, (_, index) => ({
+          referenceId: `style-${index}`,
+          role: "style" as const,
+          dataUrl: webpDataUrl(index),
+        })),
+        scenePrompt,
+      );
+      const overlongPrompt = await generateImageWithRoleReferences(
+        CONFIGURED,
+        [
+          {
+            referenceId: "style",
+            role: "style",
+            dataUrl: webpDataUrl(),
+          },
+        ],
+        "가".repeat(
+          STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxPromptCharacters,
+        ),
+      );
+      const hostileReference = {
+        referenceId: "hostile",
+        role: "style",
+      } as Record<string, unknown>;
+      Object.defineProperty(hostileReference, "dataUrl", {
+        enumerable: true,
+        get() {
+          throw new Error("must not escape the result contract");
+        },
+      });
+      const hostile = await generateImageWithRoleReferences(
+        CONFIGURED,
+        [hostileReference as unknown as StudioAiResolvedImageReference],
+        scenePrompt,
+      );
+
+      expect(conflicting).toMatchObject({
+        ok: false,
+        code: "invalid_input",
+      });
+      expect(tooMany).toMatchObject({
+        ok: false,
+        code: "invalid_input",
+      });
+      expect(tooManyInRole).toMatchObject({
+        ok: false,
+        code: "invalid_input",
+      });
+      expect(overlongPrompt).toMatchObject({
+        ok: false,
+        code: "invalid_input",
+      });
+      expect(hostile).toMatchObject({
+        ok: false,
+        code: "invalid_input",
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("rejects an oversized single reference before base64 decode or paid fetch", async () => {
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+      const decodedBytes =
+        STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxDecodedBytesPerImage + 1;
+      const payloadLength = Math.ceil(decodedBytes / 3) * 4;
+      const oversizedDataUrl =
+        `data:image/png;base64,${"A".repeat(payloadLength)}`;
+
+      const result = await generateImageWithRoleReferences(
+        CONFIGURED,
+        [
+          {
+            referenceId: "oversized",
+            role: "style",
+            dataUrl: oversizedDataUrl,
+          },
+        ],
+        scenePrompt,
+      );
+
+      expect(result).toMatchObject({
+        ok: false,
+        code: "invalid_input",
+        error: expect.stringContaining("한 장"),
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        "unsupported MIME",
+        "data:image/gif;base64,R0lGODlh",
+      ],
+      ["non-base64", "data:image/png,%89PNG"],
+      ["invalid base64", "data:image/png;base64,%%%="],
+      [
+        "signature mismatch",
+        bytesDataUrl("image/png", [0x47, 0x49, 0x46, 0x38]),
+      ],
+    ])("rejects %s reference data before fetch", async (_label, dataUrl) => {
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const result = await generateImageWithRoleReferences(
+        CONFIGURED,
+        [
+          {
+            referenceId: "invalid",
+            role: "style",
+            dataUrl,
+          },
+        ],
+        scenePrompt,
+      );
+
+      expect(result).toMatchObject({
+        ok: false,
+        code: "invalid_input",
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("preserves abort, network, HTTP, and parse contracts without automatic provider retries", async () => {
+      const reference = {
+        referenceId: "hero",
+        role: "character" as const,
+        dataUrl: pngDataUrl(),
+      };
+
+      const abortedController = new AbortController();
+      abortedController.abort();
+      const noFetch = vi.fn();
+      globalThis.fetch = noFetch as unknown as typeof fetch;
+      await expect(
+        generateImageWithRoleReferences(
+          CONFIGURED,
+          [reference],
+          scenePrompt,
+          { signal: abortedController.signal },
+        ),
+      ).resolves.toEqual({
+        ok: false,
+        code: "network_error",
+        error: "요청이 취소되었습니다.",
+      });
+      expect(noFetch).not.toHaveBeenCalled();
+
+      const offlineFetch = vi.fn(async () => {
+        throw new Error("offline");
+      });
+      globalThis.fetch = offlineFetch as unknown as typeof fetch;
+      await expect(
+        generateImageWithRoleReferences(CONFIGURED, [reference], scenePrompt),
+      ).resolves.toEqual({
+        ok: false,
+        code: "network_error",
+        error: "offline",
+      });
+      expect(offlineFetch).toHaveBeenCalledTimes(1);
+
+      const rejectedFetch = vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              error: { message: "multi-image unsupported" },
+            }),
+            { status: 400 },
+          ),
+      );
+      globalThis.fetch = rejectedFetch as unknown as typeof fetch;
+      const rejected = await generateImageWithRoleReferences(
+        CONFIGURED,
+        [reference],
+        scenePrompt,
+      );
+      expect(rejected).toMatchObject({
+        ok: false,
+        code: "http_error",
+        error: expect.stringContaining("multi-image unsupported"),
+      });
+      expect(rejectedFetch).toHaveBeenCalledTimes(1);
+
+      const parseFetch = vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ data: [{ url: "https://example.test/image" }] }),
+            { status: 200 },
+          ),
+      );
+      globalThis.fetch = parseFetch as unknown as typeof fetch;
+      await expect(
+        generateImageWithRoleReferences(CONFIGURED, [reference], scenePrompt),
+      ).resolves.toMatchObject({
+        ok: false,
+        code: "parse_error",
+      });
+      expect(parseFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("forwards an active abort signal to the single multipart request", async () => {
+      const controller = new AbortController();
+      const mockFetch = createAbortAwareFetch();
+      globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+      const resultPromise = generateImageWithRoleReferences(
+        CONFIGURED,
+        [
+          {
+            referenceId: "shot",
+            role: "method",
+            dataUrl: jpegDataUrl(),
+          },
+        ],
+        scenePrompt,
+        { signal: controller.signal },
+      );
+      await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+      const [, init] = mockFetch.mock.calls[0] as unknown as [
+        string,
+        RequestInit,
+      ];
+      expect(init.signal).toBe(controller.signal);
+      controller.abort();
+      await expect(resultPromise).resolves.toEqual({
+        ok: false,
+        code: "network_error",
+        error: "요청이 취소되었습니다.",
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
   });
 

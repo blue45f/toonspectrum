@@ -33,10 +33,12 @@ const REVIEWED_LICENSE_EXPRESSIONS = new Set([
   "BSD-3-Clause",
   "CC0-1.0",
   "ISC",
+  "LGPL-2.1",
   "LGPL-3.0-or-later",
   "MIT",
   "MPL-2.0",
   "Public Domain",
+  "SGI-B-2.0",
   "Unlicense",
 ]);
 
@@ -56,6 +58,7 @@ const HYBRID_PROVIDER_DEPENDENCIES = Object.freeze({
   harfbuzzjs: "1.4.0",
   "manifold-3d": "3.5.1",
   "onnxruntime-web": "1.27.0",
+  "p5.brush": "2.2.1",
   paper: "0.12.18",
   rbush: "4.0.1",
   "three-mesh-bvh": "0.9.13",
@@ -585,6 +588,11 @@ function validateRepositoryPolicy() {
   const requiredFragments = [
     "https://github.com/yisibl/resvg-js/tree/v2.6.2",
     "https://github.com/microsoft/onnxruntime/tree/v1.27.0",
+    "https://github.com/dulnan/lazy-brush",
+    "https://github.com/acamposuribe/p5.brush",
+    "https://github.com/processing/p5.js",
+    "https://github.com/brendankenny/libtess.js",
+    "does not statically import the resolved `p5` peer",
     "Comlink runtime embedded by `xatlasjs`",
     "pnpm run audit:licenses",
     "dist/legal/THIRD_PARTY_NOTICES.generated.md",

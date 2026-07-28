@@ -168,7 +168,6 @@ describe("procedural brush pack runtime", () => {
       "fur-undercoat-soft",
       "smoke-wisp-layered",
       "watercolor-backrun-ring",
-      "watercolor-wet-wash",
     ]);
     const visibilityCorrectedSoftMedia = new Set([
       "airbrush-grand-soft",
@@ -176,6 +175,7 @@ describe("procedural brush pack runtime", () => {
       "cloud-soft",
       "mist-soft",
       "watercolor-wet-bleed",
+      "watercolor-wet-wash",
     ]);
     const observedLight = new Set<string>();
     const visibleCoverageById = new Map<string, number>();
@@ -299,6 +299,11 @@ describe("procedural brush pack runtime", () => {
     });
     expect(dynamicsById("crayon-wax-bold").grain.space).toBe("stroke-fixed");
     expect(dynamicsById("oil-impasto-heavy").spacingRatio).toBeLessThan(0.06);
+    expect(dynamicsById("airbrush-grand-soft")).toMatchObject({
+      spacingRatio: 0.11,
+      scatterRatio: 0.025,
+      flow: { base: 0.34 },
+    });
 
     // Colour dynamics land on the colored pencil and the autumn leaf scatter.
     expect(dynamicsById("pencil-colored-soft").colorDynamics.hueJitter).toBeGreaterThan(0);

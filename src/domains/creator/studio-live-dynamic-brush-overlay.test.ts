@@ -4,6 +4,7 @@ import {
   normalizeStudioBrushDynamicsSettings,
   studioBrushDynamicsPresetSettings,
 } from "./studio-brush-dynamics";
+import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
 import {
   StudioLiveDynamicBrushOverlayRenderer,
   studioLiveDynamicBrushOverlaySupportsElement,
@@ -32,6 +33,7 @@ interface RecordingCanvas extends HTMLCanvasElement {
   readonly recordedMarks: RecordedEllipse[];
   readonly recordedComposites: RecordedComposite[];
   readonly clearCount: () => number;
+  readonly radialGradientCount: () => number;
 }
 
 function rounded(value: number): number {
@@ -42,6 +44,7 @@ function recordingCanvas(): RecordingCanvas {
   const recordedMarks: RecordedEllipse[] = [];
   const recordedComposites: RecordedComposite[] = [];
   let clears = 0;
+  let radialGradients = 0;
   let alpha = 1;
   let color = "#000000";
   let composite: GlobalCompositeOperation = "source-over";
@@ -59,6 +62,7 @@ function recordingCanvas(): RecordingCanvas {
     recordedMarks,
     recordedComposites,
     clearCount: () => clears,
+    radialGradientCount: () => radialGradients,
     getContext: () => context,
   } as unknown as RecordingCanvas;
 
@@ -82,6 +86,25 @@ function recordingCanvas(): RecordingCanvas {
     beginPath: () => {
       path = null;
     },
+    createRadialGradient: () => {
+      radialGradients += 1;
+      return {
+        addColorStop: () => undefined,
+      } as CanvasGradient;
+    },
+    arc: (
+      x: number,
+      y: number,
+      radius: number,
+    ) => {
+      path = {
+        x: rounded(x),
+        y: rounded(y),
+        radiusX: rounded(radius),
+        radiusY: rounded(radius),
+        angleRadians: 0,
+      };
+    },
     ellipse: (
       x: number,
       y: number,
@@ -97,6 +120,9 @@ function recordingCanvas(): RecordingCanvas {
         angleRadians: rounded(angleRadians),
       };
     },
+    translate: () => undefined,
+    rotate: () => undefined,
+    scale: () => undefined,
     fill: () => {
       if (!path) return;
       recordedMarks.push({
@@ -217,6 +243,106 @@ afterEach(() => {
 });
 
 describe("StudioLiveDynamicBrushOverlayRenderer", () => {
+  it.each(["pencil-4b-rough", "g-pen-flex"] as const)(
+    "keeps causal %s marks identical through live drawing, pointer-up and retained replay",
+    (catalogId) => {
+      const { activeCanvas, renderer, settledCanvas } = attachedRenderer();
+      const selection = materializeStudioBrushPackSelection(catalogId);
+      if (!selection) throw new Error(`missing ${catalogId} selection`);
+      const element = drawElement(
+        `causal-${catalogId}`,
+        [12, 30, 25, 31, 40, 35, 58, 43, 79, 50, 103, 47, 128, 37, 154, 25],
+        {
+          brush: selection.runtimeBrushId,
+          brushDynamics: selection.brushDynamics,
+          strokeWidth: selection.defaultWidth,
+          opacity: selection.defaultOpacity,
+        },
+      );
+
+      expect(renderer.begin(element).status).toBe("started");
+      const appended = renderer.appendFrom(element);
+      expect(appended.status === "fallback" ? appended.reason : appended.status)
+        .toBe("appended");
+      const liveMarks = structuredClone(activeCanvas.recordedMarks);
+      expect(liveMarks.length).toBeGreaterThan(4);
+
+      const sealed = renderer.end(element);
+      expect(sealed.status).toBe("settled");
+      if (sealed.status !== "settled") return;
+      expect(sealed.markCount).toBe(liveMarks.length);
+      expect(settledCanvas.recordedComposites).toEqual([{
+        opacity: element.opacity,
+        marks: liveMarks,
+      }]);
+
+      renderer.setSurface({ ...SURFACE, left: 2 });
+      expect(settledCanvas.recordedComposites).toEqual([{
+        opacity: element.opacity,
+        marks: liveMarks,
+      }]);
+    },
+  );
+
+  it("keeps a long causal G-pen on the append-only surface beyond the old 1,024-dab ceiling", () => {
+    const { activeCanvas, renderer } = attachedRenderer();
+    const selection = materializeStudioBrushPackSelection("g-pen-flex");
+    if (!selection) throw new Error("missing g-pen-flex selection");
+    const points = Array.from({ length: 1_300 }, (_, index) => [
+      8 + index * 1.4,
+      52 + Math.sin(index / 19) * 12,
+    ]).flat();
+    const element = drawElement("long-causal-gpen", points, {
+      brush: selection.runtimeBrushId,
+      brushDynamics: selection.brushDynamics,
+      strokeWidth: selection.defaultWidth,
+      opacity: selection.defaultOpacity,
+    });
+
+    expect(renderer.begin(element).status).toBe("started");
+    const appended = renderer.appendFrom(element);
+    expect(appended.status === "fallback" ? appended.reason : appended.status)
+      .toBe("appended");
+    expect(activeCanvas.recordedMarks.length).toBeGreaterThan(1_024);
+    expect(renderer.lastFallbackReason).toBeNull();
+  });
+
+  it("uses the same one-mark analytic soft tip during live drawing, seal and replay", () => {
+    const { activeCanvas, renderer, settledCanvas } = attachedRenderer();
+    const selection = materializeStudioBrushPackSelection("airbrush-grand-soft");
+    if (!selection) throw new Error("missing airbrush-grand-soft selection");
+    const element = drawElement(
+      "analytic-soft",
+      [10, 24, 28, 26, 48, 31, 70, 38],
+      {
+        brush: selection.runtimeBrushId,
+        brushDynamics: selection.brushDynamics,
+      },
+    );
+
+    const begun = renderer.begin(element);
+    expect(begun.status === "fallback" ? begun.reason : begun.status).toBe("started");
+    expect(renderer.appendFrom(element).status).toBe("appended");
+    expect(activeCanvas.radialGradientCount()).toBeGreaterThan(0);
+    const sealed = renderer.end(element);
+    expect(sealed.status).toBe("settled");
+    if (sealed.status !== "settled") return;
+    expect(sealed.markCount).toBe(sealed.dabCount);
+    expect(settledCanvas.recordedComposites).toHaveLength(1);
+    expect(settledCanvas.recordedComposites[0]!.marks).toHaveLength(
+      sealed.markCount,
+    );
+
+    const gradientCountBeforeReplay = activeCanvas.radialGradientCount();
+    renderer.setSurface({ ...SURFACE, left: 2 });
+    expect(activeCanvas.radialGradientCount()).toBeGreaterThan(
+      gradientCountBeforeReplay,
+    );
+    expect(settledCanvas.recordedComposites[0]!.marks).toHaveLength(
+      sealed.markCount,
+    );
+  });
+
   it("admits only the explicit bounded-flow dynamic freehand contract", () => {
     const supported = drawElement("supported", [10, 10]);
     expect(studioLiveDynamicBrushOverlaySupportsElement(supported)).toBe(true);

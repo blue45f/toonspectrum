@@ -78,7 +78,16 @@ describe("StudioPage tool transition boundary", () => {
     );
     expect(apply).toContain("colorRangeSelectionFromImage(");
     expect(apply).toContain("signal: controller.signal");
-    expect(apply).toContain("pixelSelRef.current !== selectionSnapshot");
+    expect(apply).toContain(
+      "const currentSelectionSnapshot = pixelSelRef.current;",
+    );
+    expect(apply).toContain("const selectionSnapshot = selectionOperationBase(");
+    expect(apply).toContain("currentSelectionSnapshot,");
+    expect(apply).toContain("selection: selectionSnapshot,");
+    expect(apply).toContain(
+      "pixelSelRef.current !== currentSelectionSnapshot",
+    );
+    expect(apply).not.toContain("pixelSelRef.current !== selectionSnapshot");
     expect(apply).not.toContain("applyColorRangeMaskToSelection(");
   });
 

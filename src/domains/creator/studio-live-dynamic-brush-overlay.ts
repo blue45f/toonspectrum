@@ -16,6 +16,8 @@ import {
   planNormalizedStudioDynamicBrushDabs,
   resolveStudioBrushDynamics,
   serializeStudioBrushDynamicsSettingsCanonical,
+  STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
   studioBrushDynamicsSeedFromKey,
   studioBrushTaperFactors,
   type NormalizedStudioBrushDynamicsSettings,
@@ -34,7 +36,14 @@ import {
   type StudioBrushSymmetryTransform,
 } from "./studio-brush-symmetry";
 import {
+  appendStudioCausalDynamicBrushDepositsV2,
+  beginStudioCausalDynamicBrushDepositV2,
+  planStudioCausalDynamicBrushDepositsV2,
+  type StudioCausalDynamicBrushDepositStateV2,
+} from "./studio-causal-dynamic-brush-deposit-v2";
+import {
   planStudioDynamicBrushCoverageMarks,
+  renderStudioDynamicBrushCoverageMark,
   type StudioDynamicBrushCoverageMark,
 } from "./studio-dynamic-brush-coverage-renderer";
 import {
@@ -47,9 +56,14 @@ import { isStudioBoundedFlowPaintModelCompatible } from "./studio-stroke-paint-m
 import type { DrawEl } from "./studio-element-model";
 import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
 
-const TAU = Math.PI * 2;
 const POINT_EPSILON = 1e-6;
-const MAX_LIVE_DABS = 1_024;
+/**
+ * The append-only overlay may retain the full supported causal dab range. The mark planner below
+ * remains the harder per-stroke work ceiling, so increasing this from the historical 1,024 avoids
+ * abandoning the O(suffix) live path during an ordinary long G-pen stroke without allowing
+ * unbounded paint work.
+ */
+const MAX_LIVE_DABS = STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE.max;
 const MAX_COORDINATE_ABS = 1_000_000_000;
 const ACTIVE_START_TAPER_REFERENCE_MIN_PX = 96;
 const ACTIVE_START_TAPER_WIDTH_FACTOR = 12;
@@ -145,6 +159,8 @@ interface DynamicStrokeSource {
 interface ActiveDynamicStroke {
   readonly style: DetachedDynamicStrokeStyle;
   readonly source: DynamicStrokeSource;
+  /** Present only for new authored causal-deposit-v2 snapshots. */
+  causalState?: StudioCausalDynamicBrushDepositStateV2;
   consumedSourcePoints: number;
   previousSample: DynamicSourceSample;
   totalDistance: number;
@@ -521,10 +537,32 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       twists: [],
     };
     appendSourceSample(source, first);
-    const initial = liveDabAt(style, first, 0, 0, 0, false);
+    const causalBegin = style.dynamics.depositPipeline
+      === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+      ? beginStudioCausalDynamicBrushDepositV2(
+          first,
+          style.dynamics,
+          MAX_LIVE_DABS,
+        )
+      : null;
+    if (causalBegin && !causalBegin.ok) {
+      return {
+        status: "fallback",
+        reason: causalBegin.reason === "dab-budget"
+          ? "dab-budget"
+          : "material-plan",
+      };
+    }
+    const initial = causalBegin?.ok
+      ? {
+          dab: causalBegin.dab,
+          spacing: causalBegin.state.lastSpacing,
+        }
+      : liveDabAt(style, first, 0, 0, 0, false);
     const active: ActiveDynamicStroke = {
       style,
       source,
+      ...(causalBegin?.ok ? { causalState: causalBegin.state } : {}),
       consumedSourcePoints: 1,
       previousSample: first,
       totalDistance: 0,
@@ -578,6 +616,9 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       || finiteCoordinate(element.points[previousIndex * 2 + 1]) !== active.previousSample.y
     ) {
       return this.failActive("source-prefix");
+    }
+    if (active.causalState) {
+      return this.appendCausalFrom(element, active, total);
     }
 
     const appendedDabs: StudioDynamicBrushDab[] = [];
@@ -771,10 +812,116 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     };
   }
 
+  private appendCausalFrom(
+    element: DrawEl,
+    active: ActiveDynamicStroke,
+    total: number,
+  ): StudioLiveDynamicBrushAppendResult {
+    const causalState = active.causalState;
+    if (!causalState) return this.failActive("material-plan");
+    const samples: DynamicSourceSample[] = [];
+    for (
+      let sourceIndex = active.consumedSourcePoints;
+      sourceIndex < total;
+      sourceIndex += 1
+    ) {
+      const next = sourceSampleAt(
+        element,
+        sourceIndex,
+        active.style.dynamics.fallbackPressure,
+      );
+      if (!next) return this.failActive("invalid-sample");
+      samples.push(next);
+      appendSourceSample(active.source, next);
+      active.consumedSourcePoints = sourceIndex + 1;
+    }
+    const planned = appendStudioCausalDynamicBrushDepositsV2(
+      causalState,
+      samples,
+      active.style.dynamics,
+    );
+    if (!planned.ok) {
+      return this.failActive(
+        planned.reason === "dab-budget"
+          ? "dab-budget"
+          : planned.reason === "invalid-input"
+            ? "invalid-sample"
+            : "material-plan",
+      );
+    }
+    active.causalState = planned.state;
+    active.previousSample = planned.state.previousSample;
+    active.totalDistance = planned.state.totalDistance;
+    active.distanceSinceLastDab = planned.state.distanceSinceLastDab;
+    active.nextDabIndex = planned.state.nextDabIndex;
+    active.lastSpacing = planned.state.lastSpacing;
+    active.transitionedFromTap = planned.state.transitionedFromTap;
+
+    let appendedDabs = planned.dabs;
+    let replacementMarks = 0;
+    if (planned.replaceInitialTap) {
+      this.clearActiveRect();
+      active.markCount = 0;
+      const [replacement, ...suffix] = planned.dabs;
+      if (!replacement) return this.failActive("material-plan");
+      const replacementResult = this.appendDabs(active, [replacement]);
+      if (replacementResult.status === "fallback") return replacementResult;
+      replacementMarks = replacementResult.appendedMarks;
+      appendedDabs = suffix;
+    }
+    const rendered = this.appendDabs(active, appendedDabs);
+    if (rendered.status === "fallback") return rendered;
+    return {
+      status: appendedDabs.length > 0 || replacementMarks > 0
+        ? "appended"
+        : "noop",
+      consumedSourcePoints: active.consumedSourcePoints,
+      appendedDabs: appendedDabs.length,
+      appendedMarks: rendered.appendedMarks,
+    };
+  }
+
   private exactPlan(
     style: DetachedDynamicStrokeStyle,
     source: DynamicStrokeSource,
   ): ExactDynamicPlan | null {
+    if (
+      style.dynamics.depositPipeline
+      === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+    ) {
+      const causal = planStudioCausalDynamicBrushDepositsV2({
+        points: source.points,
+        pressures: source.pressures,
+        tangentialPressures: source.tangentialPressures,
+        speeds: source.speeds,
+        tiltXs: source.tiltXs,
+        tiltYs: source.tiltYs,
+        twists: source.twists,
+        settings: style.dynamics,
+        maximumDabs: MAX_LIVE_DABS,
+      });
+      if (!causal.ok) return null;
+      const stampGrid = initialStampGrid(style);
+      const marks = planStudioDynamicBrushCoverageMarks({
+        dabVariations: studioDynamicBrushDabVariationsFromTransforms(
+          causal.dabs,
+          style.transforms,
+        ),
+        strokeOrigins: style.strokeOrigins,
+        dynamics: style.dynamics,
+        dynamicSeed: style.seed,
+        stroke: style.color,
+        stampGrid,
+        markBudget: STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
+      });
+      if (!marks.ok) return null;
+      return {
+        dabs: causal.dabs,
+        marks: marks.marks,
+        stampGrid,
+        dabCapped: false,
+      };
+    }
     const planInput = {
       points: source.points,
       pressures: source.pressures,
@@ -831,19 +978,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     if (!context) return false;
     try {
       for (const mark of marks) {
-        context.globalAlpha = mark.alpha;
-        context.fillStyle = mark.color;
-        context.beginPath();
-        context.ellipse(
-          mark.x,
-          mark.y,
-          mark.radiusX,
-          mark.radiusY,
-          mark.angleRadians,
-          0,
-          TAU,
-        );
-        context.fill();
+        renderStudioDynamicBrushCoverageMark(context, mark);
       }
       return true;
     } catch {

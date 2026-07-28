@@ -2458,12 +2458,25 @@ function SelectionCombinePreview({
   operation,
 }: {
   animate: boolean;
-  operation: "add" | "subtract" | "intersect";
+  operation: "replace" | "add" | "subtract" | "intersect";
 }): ReactElement {
   const secondX = animate ? "145" : "130";
   return (
     <>
-      <circle cx="88" cy="52" r="31" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />
+      <circle
+        cx="88"
+        cy="52"
+        r="31"
+        fill={operation === "replace" ? COLOR.canvas : COLOR.accentSoft}
+        stroke={operation === "replace" ? COLOR.fg3 : COLOR.accent}
+        strokeDasharray={operation === "replace" ? "4 4" : undefined}
+        strokeWidth="2"
+        opacity={operation === "replace" ? (animate ? ".22" : ".36") : "1"}
+      >
+        {operation === "replace" && animate ? (
+          <animate attributeName="opacity" dur="2.8s" values=".55;.12;.12;.55" keyTimes="0;.42;.72;1" repeatCount="indefinite" />
+        ) : null}
+      </circle>
       <circle cx={secondX} cy="52" r="31" fill={operation === "subtract" ? COLOR.canvas : COLOR.cool} fillOpacity={operation === "intersect" ? ".18" : ".32"} stroke={COLOR.fg2} strokeDasharray="5 4" strokeWidth="2">
         {animate ? <animate attributeName="cx" dur="2.8s" values="145;119;119;145" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
       </circle>
@@ -2475,7 +2488,11 @@ function SelectionCombinePreview({
       {operation === "subtract" ? (
         <path d="M107 29c17 9 27 21 27 23s-10 15-27 23c7-15 7-31 0-46Z" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeDasharray="3 3" />
       ) : null}
-      {operation === "add" ? (
+      {operation === "replace" ? (
+        <path d="M95 24l-8 8 8 8M87 32h19" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3">
+          {animate ? <animate attributeName="opacity" dur="1.3s" values=".35;1;.35" repeatCount="indefinite" /> : null}
+        </path>
+      ) : operation === "add" ? (
         <path d="M108 21v62M77 52h62" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="3" opacity={animate ? ".35" : ".9"}>
           {animate ? <animate attributeName="opacity" dur="1.3s" values=".3;1;.3" repeatCount="indefinite" /> : null}
         </path>
@@ -4705,6 +4722,8 @@ function renderPreview(
       return <PolygonLassoPreview animate={animate} />;
     case "selection-brush":
       return <SelectionBrushPreview animate={animate} />;
+    case "selection-replace":
+      return <SelectionCombinePreview animate={animate} operation="replace" />;
     case "selection-add":
       return <SelectionCombinePreview animate={animate} operation="add" />;
     case "selection-subtract":

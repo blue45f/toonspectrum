@@ -60,14 +60,43 @@ function assertSnapshotCurrent(
   }
 }
 
-function yieldToEventLoop(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+function yieldToEventLoop(
+  options: StudioPhysicsParticleWorkerSnapshotOptions,
+): Promise<void> {
+  assertSnapshotCurrent(options);
+  return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const finish = (cancelTimer: boolean): void => {
+      if (settled) return;
+      settled = true;
+      if (cancelTimer && timer !== null) clearTimeout(timer);
+      try {
+        options.signal?.removeEventListener("abort", onAbort);
+      } catch {
+        // The caller-visible snapshot state remains authoritative.
+      }
+      resolve();
+    };
+    const onAbort = (): void => finish(true);
+    timer = setTimeout(() => finish(false), 0);
+    try {
+      options.signal?.addEventListener("abort", onAbort, { once: true });
+    } catch (error) {
+      clearTimeout(timer);
+      settled = true;
+      reject(error);
+      return;
+    }
+    if (options.signal?.aborted || options.isCurrent?.() === false) finish(true);
+  });
 }
 
 async function copyFloat32Cooperatively(
   source: Float32Array,
   options: StudioPhysicsParticleWorkerSnapshotOptions,
-  predicate: (value: number) => boolean = Number.isFinite,
+  predicate: (value: number, index: number) => boolean =
+    (value) => Number.isFinite(value),
 ): Promise<Float32Array | null> {
   assertSnapshotCurrent(options);
   const output = new Float32Array(source.length);
@@ -76,11 +105,11 @@ async function copyFloat32Cooperatively(
     const end = Math.min(source.length, offset + chunkElements);
     for (let index = offset; index < end; index += 1) {
       const value = source[index];
-      if (!predicate(value)) return null;
+      if (!predicate(value, index)) return null;
       output[index] = value;
     }
     if (end < source.length) {
-      await yieldToEventLoop();
+      await yieldToEventLoop(options);
       assertSnapshotCurrent(options);
     }
   }
@@ -98,7 +127,7 @@ async function copyUint32Cooperatively(
     const end = Math.min(source.length, offset + chunkElements);
     output.set(source.subarray(offset, end), offset);
     if (end < source.length) {
-      await yieldToEventLoop();
+      await yieldToEventLoop(options);
       assertSnapshotCurrent(options);
     }
   }
@@ -493,6 +522,122 @@ function canonicalWireStations(
     }
   }
   return stations;
+}
+
+async function canonicalWireStationsCooperatively(
+  samples: Float32Array,
+  spawnSpacing: number,
+  options: StudioPhysicsParticleWorkerSnapshotOptions,
+): Promise<
+  | Readonly<{ ok: true; stations: Float32Array; totalLength: number }>
+  | Readonly<{ ok: false; reason: "invalid-request" | "budget-exceeded" }>
+> {
+  const stride = STUDIO_PHYSICS_PARTICLE_WORKER_SAMPLE_STRIDE;
+  const sampleCount = samples.length / stride;
+  const sampleChunk = Math.max(
+    1,
+    Math.floor(COOPERATIVE_COPY_BYTES / (stride * Float32Array.BYTES_PER_ELEMENT)),
+  );
+  const retainedOffsets = new Uint32Array(sampleCount);
+  let retainedCount = 0;
+  for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += 1) {
+    const offset = sampleIndex * stride;
+    const previousOffset = retainedCount > 0
+      ? retainedOffsets[retainedCount - 1]
+      : undefined;
+    if (
+      previousOffset !== undefined
+      && Math.hypot(
+        samples[offset] - samples[previousOffset],
+        samples[offset + 1] - samples[previousOffset + 1],
+      ) <= 1e-7
+    ) {
+      retainedOffsets[retainedCount - 1] = offset;
+    } else {
+      retainedOffsets[retainedCount] = offset;
+      retainedCount += 1;
+    }
+    if (
+      sampleIndex + 1 < sampleCount
+      && (sampleIndex + 1) % sampleChunk === 0
+    ) {
+      await yieldToEventLoop(options);
+      assertSnapshotCurrent(options);
+    }
+  }
+  if (retainedCount < 2) {
+    return Object.freeze({ ok: false, reason: "invalid-request" });
+  }
+
+  const cumulative = new Float64Array(retainedCount);
+  let totalLength = 0;
+  for (let index = 1; index < retainedCount; index += 1) {
+    const previous = retainedOffsets[index - 1];
+    const current = retainedOffsets[index];
+    totalLength += Math.hypot(
+      samples[current] - samples[previous],
+      samples[current + 1] - samples[previous + 1],
+    );
+    cumulative[index] = totalLength;
+    if (index + 1 < retainedCount && (index + 1) % sampleChunk === 0) {
+      await yieldToEventLoop(options);
+      assertSnapshotCurrent(options);
+    }
+  }
+  if (!Number.isFinite(totalLength) || totalLength <= 0) {
+    return Object.freeze({ ok: false, reason: "invalid-request" });
+  }
+  const spawnCount = Math.floor(
+    (totalLength + spawnSpacing * 1e-9) / spawnSpacing,
+  ) + 1;
+  if (
+    !positiveInteger(spawnCount)
+    || spawnCount > STUDIO_PHYSICS_PARTICLE_WORKER_LIMITS.maxSpawnStations
+  ) return Object.freeze({ ok: false, reason: "budget-exceeded" });
+
+  const stations = new Float32Array(spawnCount * 8);
+  const stationChunk = Math.max(
+    1,
+    Math.floor(COOPERATIVE_COPY_BYTES / (8 * Float32Array.BYTES_PER_ELEMENT)),
+  );
+  let segment = 0;
+  for (let spawn = 0; spawn < spawnCount; spawn += 1) {
+    const distance = Math.min(totalLength, spawn * spawnSpacing);
+    while (
+      segment + 1 < retainedCount - 1
+      && cumulative[segment + 1] < distance
+    ) segment += 1;
+    const start = retainedOffsets[segment];
+    const end = retainedOffsets[segment + 1];
+    const segmentLength = cumulative[segment + 1] - cumulative[segment];
+    const amount = segmentLength <= 1e-7
+      ? 0
+      : Math.min(
+        1,
+        Math.max(0, (distance - cumulative[segment]) / segmentLength),
+      );
+    const dx = samples[end] - samples[start];
+    const dy = samples[end + 1] - samples[start + 1];
+    const inverseLength = 1 / Math.max(1e-7, Math.hypot(dx, dy));
+    const stationOffset = spawn * 8;
+    stations[stationOffset] = Math.fround(samples[start] + dx * amount);
+    stations[stationOffset + 1] =
+      Math.fround(samples[start + 1] + dy * amount);
+    stations[stationOffset + 2] = Math.fround(dx * inverseLength);
+    stations[stationOffset + 3] = Math.fround(dy * inverseLength);
+    for (let channel = 2; channel < stride; channel += 1) {
+      stations[stationOffset + channel + 2] = Math.fround(
+        samples[start + channel]
+          + (samples[end + channel] - samples[start + channel]) * amount,
+      );
+    }
+    if (spawn + 1 < spawnCount && (spawn + 1) % stationChunk === 0) {
+      await yieldToEventLoop(options);
+      assertSnapshotCurrent(options);
+    }
+  }
+  assertSnapshotCurrent(options);
+  return Object.freeze({ ok: true, stations, totalLength });
 }
 
 function flowFieldFingerprint(
@@ -1382,6 +1527,65 @@ function copyFlowField(
   }
 }
 
+async function copyFlowFieldCooperatively(
+  value: unknown,
+  options: StudioPhysicsParticleWorkerSnapshotOptions,
+): Promise<StudioPhysicsParticleWorkerWireFlowField | null> {
+  assertSnapshotCurrent(options);
+  try {
+    if (
+      !plainRecord(value)
+      || !onlyKeys(
+        value,
+        ["width", "height", "originX", "originY", "cellSize", "heights"],
+      )
+    ) return null;
+    const width = value.width;
+    const height = value.height;
+    const originX = value.originX;
+    const originY = value.originY;
+    const cellSize = value.cellSize;
+    if (
+      !positiveInteger(width)
+      || !positiveInteger(height)
+      || width < 2
+      || height < 2
+      || !finite(originX)
+      || !finite(originY)
+      || !finite(cellSize)
+      || cellSize <= 0
+    ) return null;
+    const cellCount = width * height;
+    if (
+      !Number.isSafeInteger(cellCount)
+      || cellCount > STUDIO_PHYSICS_PARTICLE_WORKER_LIMITS.maxFlowCells
+    ) return null;
+    const source = value.heights;
+    if (
+      !(source instanceof Float32Array)
+      || !(source.buffer instanceof ArrayBuffer)
+      || source.length !== cellCount
+      || source.byteLength !== cellCount * Float32Array.BYTES_PER_ELEMENT
+    ) return null;
+    const heights = await copyFloat32Cooperatively(source, options);
+    if (!heights) return null;
+    assertSnapshotCurrent(options);
+    return Object.freeze({
+      width,
+      height,
+      originX,
+      originY,
+      cellSize,
+      heights,
+    });
+  } catch (error) {
+    if (error instanceof StudioPhysicsParticleWorkerSnapshotCancelled) {
+      throw error;
+    }
+    return null;
+  }
+}
+
 export function snapshotStudioPhysicsParticleWorkerRequest(
   value: unknown,
 ): StudioPhysicsParticleWorkerRequestSnapshot {
@@ -1605,6 +1809,176 @@ export function snapshotStudioPhysicsParticleWorkerRequest(
   });
 }
 
+async function snapshotStudioPhysicsParticleWorkerBaseCooperatively(
+  input: Readonly<{
+    requestEpoch: unknown;
+    recipe: unknown;
+    samples: unknown;
+    flowField: unknown;
+  }>,
+  options: StudioPhysicsParticleWorkerSnapshotOptions,
+): Promise<StudioPhysicsParticleWorkerRequestSnapshot> {
+  assertSnapshotCurrent(options);
+  const { requestEpoch, recipe: recipeInput, samples: samplesInput } = input;
+  if (
+    !positiveInteger(requestEpoch)
+    || !(samplesInput instanceof Float32Array)
+    || !(samplesInput.buffer instanceof ArrayBuffer)
+    || samplesInput.length
+      % STUDIO_PHYSICS_PARTICLE_WORKER_SAMPLE_STRIDE !== 0
+  ) return Object.freeze({ ok: false, reason: "invalid-request" });
+  const sampleCount = samplesInput.length
+    / STUDIO_PHYSICS_PARTICLE_WORKER_SAMPLE_STRIDE;
+  if (
+    sampleCount < 2
+    || sampleCount > STUDIO_PHYSICS_PARTICLE_WORKER_LIMITS.maxSamples
+  ) {
+    return Object.freeze({
+      ok: false,
+      reason: sampleCount > STUDIO_PHYSICS_PARTICLE_WORKER_LIMITS.maxSamples
+        ? "budget-exceeded"
+        : "invalid-request",
+    });
+  }
+
+  const recipe = snapshotRecipe(recipeInput);
+  if (!recipe) return Object.freeze({ ok: false, reason: "invalid-request" });
+  const samples = await copyFloat32Cooperatively(
+    samplesInput,
+    options,
+    (entry, index) => {
+      if (!Number.isFinite(entry)) return false;
+      const channel = index % STUDIO_PHYSICS_PARTICLE_WORKER_SAMPLE_STRIDE;
+      if (channel === 2 || channel === 3) return entry >= 0 && entry <= 1;
+      if (channel === 4 || channel === 5) return entry >= -1 && entry <= 1;
+      return true;
+    },
+  );
+  if (!samples) return Object.freeze({ ok: false, reason: "invalid-request" });
+  assertSnapshotCurrent(options);
+
+  let flowField: StudioPhysicsParticleWorkerWireFlowField | undefined;
+  if (input.flowField !== undefined) {
+    const copied = await copyFlowFieldCooperatively(input.flowField, options);
+    if (!copied) return Object.freeze({ ok: false, reason: "invalid-request" });
+    flowField = copied;
+  }
+  const stationSnapshot = await canonicalWireStationsCooperatively(
+    samples,
+    recipe.common.spawnSpacing,
+    options,
+  );
+  if (!stationSnapshot.ok) return stationSnapshot;
+  const { stations: canonicalStations } = stationSnapshot;
+  const spawnCount = canonicalStations.length / 8;
+  const steps = recipe.mode === "flow"
+    ? recipe.flow?.lifetimeSteps ?? 0
+    : recipe.mode === "orbital"
+      ? recipe.orbital?.steps ?? 0
+      : recipe.springNet?.steps ?? 0;
+  if (
+    !positiveInteger(steps)
+    || steps > STUDIO_PHYSICS_PARTICLE_WORKER_LIMITS.maxStepsPerSpawn
+  ) return Object.freeze({ ok: false, reason: "budget-exceeded" });
+  const pathPointCount = spawnCount * recipe.common.count * steps;
+  const edgeCount = springEdgeCount(recipe.common.count, recipe);
+  const connectorSegmentCount = spawnCount * edgeCount * steps;
+  const workUnits = pathPointCount + connectorSegmentCount;
+  const maximumOutputBytes = outputBytesFor(
+    spawnCount,
+    pathPointCount,
+    connectorSegmentCount,
+  );
+  if (
+    !Number.isSafeInteger(pathPointCount)
+    || pathPointCount > STUDIO_PHYSICS_PARTICLE_WORKER_LIMITS.maxPathPoints
+    || !Number.isSafeInteger(connectorSegmentCount)
+    || connectorSegmentCount
+      > STUDIO_PHYSICS_PARTICLE_WORKER_LIMITS.maxConnectorSegments
+    || !Number.isSafeInteger(workUnits)
+    || workUnits > STUDIO_PHYSICS_PARTICLE_WORKER_LIMITS.maxWorkUnits
+    || !Number.isSafeInteger(maximumOutputBytes)
+    || maximumOutputBytes
+      > STUDIO_PHYSICS_PARTICLE_WORKER_LIMITS.maxOutputBytes
+  ) return Object.freeze({ ok: false, reason: "budget-exceeded" });
+
+  const flowBytes = flowField?.heights.byteLength ?? 0;
+  const inputBytes = samples.byteLength + flowBytes;
+  const stationScratchBytes =
+    spawnCount * 8 * Float32Array.BYTES_PER_ELEMENT;
+  const sampleScratchBytes =
+    sampleCount * 7 * Float64Array.BYTES_PER_ELEMENT;
+  const stateScratchBytes = recipe.common.count
+      * 9
+      * Float64Array.BYTES_PER_ELEMENT
+    + edgeCount * Float64Array.BYTES_PER_ELEMENT;
+  const hashScratchBytes = Math.max(
+    flowBytes,
+    maximumArtifactPlaneBytes(
+      spawnCount,
+      pathPointCount,
+      connectorSegmentCount,
+    ),
+  );
+  const residentBytes = inputBytes * 2
+    + flowBytes
+    + maximumOutputBytes * 2
+    + stationScratchBytes
+    + sampleScratchBytes
+    + stateScratchBytes
+    + hashScratchBytes;
+  if (
+    !Number.isSafeInteger(inputBytes)
+    || inputBytes > STUDIO_PHYSICS_PARTICLE_WORKER_LIMITS.maxInputBytes
+    || !Number.isSafeInteger(residentBytes)
+    || residentBytes > STUDIO_PHYSICS_PARTICLE_WORKER_LIMITS.maxResidentBytes
+  ) return Object.freeze({ ok: false, reason: "budget-exceeded" });
+
+  const recipeFingerprint = normalizedRecipeFingerprint(recipe);
+  const strokeFingerprint = await hashBytesCooperatively(
+    canonicalStations,
+    options,
+  );
+  let flowFieldHash: `sha256:${string}` | null = null;
+  if (flowField) {
+    const heightsHash = await hashBytesCooperatively(flowField.heights, options);
+    flowFieldHash = hashText(JSON.stringify({
+      width: flowField.width,
+      height: flowField.height,
+      originX: flowField.originX,
+      originY: flowField.originY,
+      cellSize: flowField.cellSize,
+      heightsHash,
+    }));
+  }
+  assertSnapshotCurrent(options);
+  const replayFingerprint = replayFingerprintFor(
+    recipeFingerprint,
+    strokeFingerprint,
+    flowFieldHash,
+  );
+  return Object.freeze({
+    ok: true,
+    request: Object.freeze({
+      requestEpoch,
+      recipe,
+      samples,
+      ...(flowField ? { flowField } : {}),
+    }),
+    inputBytes,
+    maximumOutputBytes,
+    residentBytes,
+    workUnits,
+    spawnCount,
+    pathPointCount,
+    connectorSegmentCount,
+    recipeFingerprint,
+    strokeFingerprint,
+    flowFieldHash,
+    replayFingerprint,
+  });
+}
+
 export async function snapshotStudioPhysicsParticleWorkerRequestCooperatively(
   value: unknown,
   options: StudioPhysicsParticleWorkerSnapshotOptions = {},
@@ -1633,12 +2007,12 @@ export async function snapshotStudioPhysicsParticleWorkerRequestCooperatively(
     return Object.freeze({ ok: false, reason: "invalid-request" });
   }
   assertSnapshotCurrent(options);
-  const base = snapshotStudioPhysicsParticleWorkerRequest({
+  const base = await snapshotStudioPhysicsParticleWorkerBaseCooperatively({
     requestEpoch,
     recipe,
     samples,
-    ...(flowField === undefined ? {} : { flowField }),
-  });
+    flowField,
+  }, options);
   assertSnapshotCurrent(options);
   if (!base.ok || append === undefined) return base;
   if (!plainRecord(append) || !onlyKeys(append, ["previous"])) {

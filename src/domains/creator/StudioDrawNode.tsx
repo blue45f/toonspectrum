@@ -35,6 +35,7 @@ import {
   normalizeStudioBrushDynamicsSettings,
   planNormalizedStudioDynamicBrushDabs,
   resolveStudioBrushDynamicsPresetId,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
   studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsSeedFromKey,
 } from "./studio-brush-dynamics";
@@ -52,6 +53,7 @@ import {
   studioDynamicBrushDabVariationsFromTransforms,
 } from "./studio-brush-symmetry";
 import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
+import { planStudioCausalDynamicBrushDepositsV2 } from "./studio-causal-dynamic-brush-deposit-v2";
 import {
   DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
   planCausalWatercolorBrushDabs,
@@ -59,8 +61,9 @@ import {
 import {
   drawBounds,
   drawFreehandPenSegments,
-  drawStudioCausalInkDabs,
+  drawStudioCausalInkContract,
   getSymmetricPoints,
+  resolveStudioCausalInkDrawContract,
 } from "./studio-draw-rendering";
 import {
   planStudioDynamicBrushCoverageAndLegacyMarks,
@@ -76,7 +79,9 @@ import {
   planPastelBrushDabs,
 } from "./studio-fx-brush";
 import { konvaGradientProps } from "./studio-gradient-engine";
-import { studioInkFallbackPressure } from "./studio-ink-pressure-model";
+import {
+  studioInkUsesPathResidualDabSpacing,
+} from "./studio-ink-pressure-model";
 import {
   konvaPatternProps,
   loadPatternTileImage,
@@ -104,7 +109,6 @@ import {
 import { planStudioAngledNibStrokeLocalCoverage } from "./studio-stroke-local-coverage";
 import {
   isStudioBoundedFlowPaintModelCompatible,
-  isStudioStrokePaintModelCompatible,
 } from "./studio-stroke-paint-model";
 import {
   effectiveCornerRadius,
@@ -311,7 +315,12 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   // 연속 가변 폭 아웃라인 브러시 — perfect 잉크뿐 아니라 G펜 계열도 같은 곡선 스트로커를
   // 사용한다. 짧은 직선 캡슐을 겹치던 과거 G펜 경로와 달리 급커브·필압 전환이 하나의
   // 닫힌 윤곽으로 이어진다. 프로필이 있으면 스트로커를 지연 로드한다.
-  const perfectProfile = kind === "freehand" && el.mode !== "eraser"
+  const perfectProfile = kind === "freehand"
+    && el.mode !== "eraser"
+    && !(
+      resolveStudioBrushRenderFamily(el.brush ?? "pen") === "gpen"
+      && studioInkUsesPathResidualDabSpacing(el.pressureModel)
+    )
     ? resolveStudioPerfectFreehandProfile(el.brush)
     : null;
   const perfectStroker = useStudioPerfectFreehandStroker(perfectProfile !== null);
@@ -343,20 +352,46 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           baseOpacity: dynamics.opacity.base,
           seed,
         };
-        let baseDabs = planNormalizedStudioDynamicBrushDabs(
-          { ...dabPlanInput, maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS },
-          dynamics
-        );
+        const causalDepositPlan = dynamics.depositPipeline
+          === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+          ? planStudioCausalDynamicBrushDepositsV2({
+              points: el.points,
+              pressures: el.pressures,
+              tangentialPressures: el.tangentialPressures,
+              speeds: el.speeds,
+              tiltXs: el.tiltXs,
+              tiltYs: el.tiltYs,
+              twists: el.twists,
+              settings: dynamics,
+              maximumDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
+            })
+          : null;
+        const usesCausalDepositPlan = causalDepositPlan?.ok === true;
+        let baseDabs = usesCausalDepositPlan
+          ? [...causalDepositPlan.dabs]
+          : planNormalizedStudioDynamicBrushDabs(
+              { ...dabPlanInput, maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS },
+              dynamics
+            );
         const symmetryTransforms = studioBrushSymmetryTransforms(el.symmetry);
+        // Causal deposits deliberately freeze the live surface's material grid and work ceiling.
+        // Retained redraw must not silently upgrade to a denser committed grid after pointer-up,
+        // otherwise the same immutable dabs still produce different pixels during handoff.
+        const markBudget = usesCausalDepositPlan
+          ? STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET
+          : activeDraft
+            ? STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET
+            : STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET;
         const renderBudget = planStudioDynamicBrushRenderBudget({
           settings: dynamics,
-          dabCount: baseDabs.length,
+          dabCount: usesCausalDepositPlan ? 1 : baseDabs.length,
           symmetryCount: symmetryTransforms.length,
-          markBudget: activeDraft
-            ? STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET
-            : STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
+          markBudget,
         });
-        if (renderBudget.maxDabsPerVariation < baseDabs.length) {
+        if (
+          !usesCausalDepositPlan
+          && renderBudget.maxDabsPerVariation < baseDabs.length
+        ) {
           // The dynamics planner's bounded pass redistributes these stations across the whole
           // stroke, retaining both endpoints instead of truncating a dense prefix.
           baseDabs = planNormalizedStudioDynamicBrushDabs(
@@ -367,6 +402,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
         return {
           dynamics,
           seed,
+          markBudget,
           renderBudget,
           dabVariations: studioDynamicBrushDabVariationsFromTransforms(
             baseDabs,
@@ -382,9 +418,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
         dynamicSeed: dynamicBrushPlan.seed,
         stroke,
         stampGrid: dynamicBrushPlan.renderBudget.stampGrid,
-        markBudget: activeDraft
-          ? STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET
-          : STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
+        markBudget: dynamicBrushPlan.markBudget,
       })
     : null;
   const dynamicCoverageMarkPlan = dynamicCoverageAndLegacyMarkPlan?.coveragePlan ?? null;
@@ -877,7 +911,13 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                     const coverageResult = renderStudioDynamicBrushCoverage(
                       context,
                       dynamicCoverageMarkPlan.marks,
-                      { activeDraft, opacity }
+                      {
+                        activeDraft,
+                        opacity,
+                        ...(!activeDraft
+                          ? { committedCacheKey: el.id }
+                          : {}),
+                      },
                     );
                     if (
                       coverageResult.status === "rendered"
@@ -1539,9 +1579,10 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               <Shape
                 key={index}
                 sceneFunc={(context) => {
+                  context.save();
                   for (const dab of dabs) {
-                    context.save();
                     context.globalAlpha = Math.min(1, Math.max(0, dab.opacity * opacity));
+                    context.save();
                     context.translate(dab.x, dab.y);
                     context.rotate(dab.angleRad);
                     const rx = Math.max(0.25, dab.radiusX);
@@ -1553,6 +1594,37 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                     context.fill();
                     context.restore();
                   }
+                  // Preserve the directional bristle relief after the continuous carrier is laid
+                  // down. A multiply pass makes the texture visible even for opaque paint without
+                  // changing the persisted colour or introducing non-deterministic colour jitter.
+                  context.globalCompositeOperation = "multiply";
+                  for (const dab of dabs) {
+                    const rx = Math.max(0.25, dab.radiusX);
+                    const ry = Math.max(0.15, dab.radiusY);
+                    context.save();
+                    context.translate(dab.x, dab.y);
+                    context.rotate(dab.angleRad);
+                    context.fillStyle = stroke;
+                    for (const bristle of dab.bristles) {
+                      context.globalAlpha = Math.min(
+                        1,
+                        Math.max(0, dab.opacity * opacity * bristle.opacity),
+                      );
+                      context.beginPath();
+                      context.ellipse(
+                        0,
+                        ry * bristle.offsetRatio,
+                        rx * bristle.radiusXRatio,
+                        Math.max(0.12, ry * bristle.radiusYRatio),
+                        0,
+                        0,
+                        Math.PI * 2,
+                      );
+                      context.fill();
+                    }
+                    context.restore();
+                  }
+                  context.restore();
                 }}
                 globalCompositeOperation={composite}
                 listening={false}
@@ -1608,31 +1680,15 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           // 현재 색으로 채운다. 라이브 초안도 같은 경로를 지나므로 그리는 동안 채움이 미리 보인다.
           const freehandFill = el.mode !== "eraser" ? el.fill : undefined;
           if ((el.sampleSpacing !== undefined || el.pressureModel !== undefined) && !freehandFill) {
-            const causalPressures = el.mode === "eraser"
-              ? el.pressures
-              : mapStudioBrushAliasPressureSamples(
-                  brush,
-                  el.pressures,
-                  Math.floor(points.length / 2),
-                  studioInkFallbackPressure(el.pressureModel),
-                );
+            const causalContract = resolveStudioCausalInkDrawContract(el, points);
             return (
               <Shape
                 key={index}
                 sceneFunc={(context) => {
-                  drawStudioCausalInkDabs(
-                    context,
-                    points,
-                    causalPressures,
-                    stroke,
-                    aliasStrokeWidth,
-                    el.sampleSpacing ?? 0,
-                    el.pressureModel,
-                    isStudioStrokePaintModelCompatible(el) ? el.paintModel : undefined
-                  );
+                  drawStudioCausalInkContract(context, causalContract);
                 }}
-                opacity={opacity}
-                globalCompositeOperation={composite}
+                opacity={causalContract.opacity}
+                globalCompositeOperation={causalContract.composite}
                 listening={false}
                 perfectDrawEnabled={false}
                 shadowForStrokeEnabled={false}

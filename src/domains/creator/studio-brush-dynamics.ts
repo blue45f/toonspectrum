@@ -38,6 +38,10 @@ import {
 } from "./studio-brush-tip-stamp";
 
 export const STUDIO_BRUSH_DYNAMICS_SETTINGS_VERSION = 1 as const;
+export const STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2 =
+  "causal-deposit-v2" as const;
+export type StudioDynamicBrushDepositPipeline =
+  typeof STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2;
 
 export const STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS = {
   width: { min: 0.05, max: 4096 },
@@ -141,6 +145,11 @@ export interface NormalizedStudioBrushTaperSettings {
 /** JSON-persistable user settings. `size` is accepted as an alias for `width`. */
 export interface StudioBrushDynamicsSettings {
   version?: number;
+  /**
+   * Versioned authored-stroke deposit order. Omitted snapshots retain the historical whole-stroke
+   * progress/taper resampler and therefore preserve existing document pixels.
+   */
+  depositPipeline?: StudioDynamicBrushDepositPipeline;
   seed?: number;
   fallbackPressure?: number;
   /** CSS px/ms at which the normalized speed source reaches 1. */
@@ -231,6 +240,8 @@ export interface NormalizedStudioBrushDynamicsProperty {
 
 export interface NormalizedStudioBrushDynamicsSettings {
   version: typeof STUDIO_BRUSH_DYNAMICS_SETTINGS_VERSION;
+  /** Omitted for legacy snapshots so their canonical serialization remains byte-stable. */
+  depositPipeline?: StudioDynamicBrushDepositPipeline;
   seed: number;
   fallbackPressure: number;
   maxSpeed: number;
@@ -628,6 +639,9 @@ function cloneNormalizedSettings(
 ): NormalizedStudioBrushDynamicsSettings {
   return {
     version: STUDIO_BRUSH_DYNAMICS_SETTINGS_VERSION,
+    ...(settings.depositPipeline
+      ? { depositPipeline: settings.depositPipeline }
+      : {}),
     seed: settings.seed,
     fallbackPressure: settings.fallbackPressure,
     maxSpeed: settings.maxSpeed,
@@ -829,6 +843,9 @@ export function normalizeStudioBrushDynamicsSettings(value?: unknown): Normalize
   const dualBrush = normalizeStudioBrushDualBrushSettings(source.dualBrush, tip);
   return {
     version: STUDIO_BRUSH_DYNAMICS_SETTINGS_VERSION,
+    ...(source.depositPipeline === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+      ? { depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2 }
+      : {}),
     seed: uint32(source.seed, INTERNAL_DEFAULT_SETTINGS.seed),
     fallbackPressure: clamp01(finiteNumber(source.fallbackPressure, INTERNAL_DEFAULT_SETTINGS.fallbackPressure)),
     maxSpeed: clamp(finiteNumber(source.maxSpeed, INTERNAL_DEFAULT_SETTINGS.maxSpeed), 0.01, MAX_POINTER_SPEED),

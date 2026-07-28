@@ -182,6 +182,32 @@ describe("planOilBrushDabs", () => {
       expect(d.radiusY).toBeGreaterThan(0);
       expect(d.opacity).toBeGreaterThan(0);
       expect(Number.isFinite(d.angleRad)).toBe(true);
+      expect(d.bristles).toHaveLength(5);
+      for (const bristle of d.bristles) {
+        expect(Math.abs(bristle.offsetRatio)).toBeLessThanOrEqual(0.72);
+        expect(bristle.radiusXRatio).toBeGreaterThan(0.6);
+        expect(bristle.radiusYRatio).toBeGreaterThan(0);
+        expect(bristle.opacity).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("keeps the wet carrier dense and centre-stable enough to avoid visible bead scallops", () => {
+    const dabs = planOilBrushDabs({
+      points: [0, 0, 80, 40, 160, 10, 240, 60],
+      pressures: [0.45, 0.7, 0.55, 0.8],
+      baseWidth: 22,
+      seed: 91,
+    });
+
+    expect(dabs.length).toBeGreaterThan(100);
+    for (let index = 1; index < dabs.length; index += 1) {
+      const previous = dabs[index - 1]!;
+      const current = dabs[index]!;
+      const centreGap = Math.hypot(current.x - previous.x, current.y - previous.y);
+      expect(centreGap).toBeLessThanOrEqual(
+        Math.min(previous.radiusY, current.radiusY) * 0.62,
+      );
     }
   });
 

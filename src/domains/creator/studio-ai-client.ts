@@ -29,6 +29,13 @@
  */
 
 import {
+  STUDIO_AI_IMAGE_REFERENCE_LIMITS,
+  compileStudioAiImageReferencePromptContexts,
+  normalizeStudioAiImageReferences,
+  type StudioAiImageReference,
+  type StudioAiImageReferenceRole,
+} from "./studio-ai-image-reference-roles";
+import {
   buildDialogueSuggestPrompt,
   parseDialogueSuggestResponse,
   type DialogueSuggestionCandidate,
@@ -248,6 +255,26 @@ export const STUDIO_AI_IMAGE_SIZES: ReadonlyArray<{ value: StudioAiImageSize; la
 ];
 
 export const DEFAULT_STUDIO_AI_IMAGE_SIZE: StudioAiImageSize = "1024x1024";
+
+/** Browser-side admission limits applied before a paid multi-reference provider request starts. */
+export const STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS = Object.freeze({
+  /** OpenAI-compatible GPT Image Edits currently accepts at most 16 multipart image inputs. */
+  maxImages: 16,
+  /** GPT Image prompt limit; scene text and every compiled role context share this one budget. */
+  maxPromptCharacters: 32_000,
+  /** Bounds one synchronous base64 decode on memory-constrained mobile browsers. */
+  maxDecodedBytesPerImage: 12 * 1_024 * 1_024,
+  /** Decoded binary budget, not the larger base64/data-URL character count. */
+  maxTotalDecodedBytes: 50 * 1_024 * 1_024,
+});
+
+export interface StudioAiResolvedImageReference {
+  readonly referenceId: string;
+  readonly role: StudioAiImageReferenceRole;
+  readonly dataUrl: string;
+  readonly label?: string;
+  readonly guidance?: string;
+}
 
 // ── 내부 HTTP 헬퍼(테스트에서 fetch만 모킹하면 URL/헤더/바디를 전부 검증할 수 있다) ──────────
 
@@ -550,12 +577,302 @@ export function dataUrlToBlob(dataUrl: string): Blob {
   const mime = params[0] || "application/octet-stream";
   const isBase64 = params.slice(1).some((p) => p.trim().toLowerCase() === "base64");
   if (isBase64) {
-    const binary = atob(payload);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const bytesConstructor = (
+      Uint8Array as typeof Uint8Array & {
+        fromBase64?: (encoded: string) => Uint8Array;
+      }
+    );
+    const bytes = bytesConstructor.fromBase64
+      ? bytesConstructor.fromBase64(payload)
+      : (() => {
+          const binary = atob(payload);
+          const fallbackBytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i += 1) {
+            fallbackBytes[i] = binary.charCodeAt(i);
+          }
+          return fallbackBytes;
+        })();
     return new Blob([bytes], { type: mime });
   }
   return new Blob([decodeURIComponent(payload)], { type: mime });
+}
+
+const STUDIO_AI_REFERENCE_IMAGE_MIME_TYPES = Object.freeze([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+] as const);
+
+type StudioAiReferenceImageMimeType =
+  (typeof STUDIO_AI_REFERENCE_IMAGE_MIME_TYPES)[number];
+
+interface PreparedStudioAiRoleReference {
+  readonly reference: StudioAiImageReference;
+  readonly dataUrl: string;
+}
+
+interface StudioAiReferenceImageDataUrlMetadata {
+  readonly mimeType: StudioAiReferenceImageMimeType;
+  readonly decodedBytes: number;
+  readonly extension: "png" | "jpg" | "webp";
+}
+
+const STRICT_BASE64_PAYLOAD_PATTERN =
+  /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
+
+function compareCanonicalText(left: string, right: string): number {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
+function normalizeResolvedRoleReference(
+  value: StudioAiResolvedImageReference,
+): StudioAiImageReference | null {
+  const normalized = normalizeStudioAiImageReferences([
+    {
+      id: value.referenceId,
+      role: value.role,
+      assetId: value.referenceId,
+      label: value.label,
+      guidance: value.guidance,
+    },
+  ]);
+  return normalized.length === 1 ? normalized[0] ?? null : null;
+}
+
+function prepareStudioAiRoleReferences(
+  values: readonly StudioAiResolvedImageReference[],
+): StudioAiResult<readonly PreparedStudioAiRoleReference[]> {
+  if (values.length === 0) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: "역할이 지정된 기준 이미지를 한 개 이상 선택하세요.",
+    };
+  }
+  if (values.length > STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxImages) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: `기준 이미지는 최대 ${STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxImages}개까지 사용할 수 있습니다.`,
+    };
+  }
+
+  const candidates: PreparedStudioAiRoleReference[] = [];
+  for (const value of values) {
+    if (!value || typeof value !== "object" || typeof value.dataUrl !== "string") {
+      return {
+        ok: false,
+        code: "invalid_input",
+        error: "기준 이미지 정보가 올바르지 않습니다.",
+      };
+    }
+    const reference = normalizeResolvedRoleReference(value);
+    if (!reference || reference.id !== value.referenceId.trim()) {
+      return {
+        ok: false,
+        code: "invalid_input",
+        error: "기준 이미지의 ID 또는 역할이 올바르지 않습니다.",
+      };
+    }
+    candidates.push({ reference, dataUrl: value.dataUrl });
+  }
+
+  candidates.sort((left, right) =>
+    compareCanonicalText(left.reference.role, right.reference.role) ||
+    compareCanonicalText(left.reference.id, right.reference.id) ||
+    compareCanonicalText(left.reference.label ?? "", right.reference.label ?? "") ||
+    compareCanonicalText(
+      left.reference.guidance ?? "",
+      right.reference.guidance ?? "",
+    )
+  );
+  const prepared: PreparedStudioAiRoleReference[] = [];
+  const byId = new Map<string, PreparedStudioAiRoleReference>();
+  const seenDataUrlsByRole: Record<
+    StudioAiImageReferenceRole,
+    Set<string>
+  > = {
+    character: new Set(),
+    method: new Set(),
+    style: new Set(),
+  };
+  const perRole: Record<StudioAiImageReferenceRole, number> = {
+    character: 0,
+    method: 0,
+    style: 0,
+  };
+  for (const candidate of candidates) {
+    const previous = byId.get(candidate.reference.id);
+    if (previous) {
+      if (
+        previous.reference.role !== candidate.reference.role ||
+        previous.dataUrl !== candidate.dataUrl ||
+        previous.reference.label !== candidate.reference.label ||
+        previous.reference.guidance !== candidate.reference.guidance
+      ) {
+        return {
+          ok: false,
+          code: "invalid_input",
+          error: `중복된 기준 이미지 ID(${candidate.reference.id})의 내용이 서로 다릅니다.`,
+        };
+      }
+      continue;
+    }
+    const seenRoleDataUrls = seenDataUrlsByRole[candidate.reference.role];
+    if (seenRoleDataUrls.has(candidate.dataUrl)) continue;
+    if (
+      perRole[candidate.reference.role] >=
+      STUDIO_AI_IMAGE_REFERENCE_LIMITS.maxReferencesPerRole
+    ) {
+      return {
+        ok: false,
+        code: "invalid_input",
+        error: `한 역할에는 기준 이미지를 최대 ${STUDIO_AI_IMAGE_REFERENCE_LIMITS.maxReferencesPerRole}개까지 사용할 수 있습니다.`,
+      };
+    }
+    prepared.push(candidate);
+    byId.set(candidate.reference.id, candidate);
+    seenRoleDataUrls.add(candidate.dataUrl);
+    perRole[candidate.reference.role] += 1;
+  }
+  return { ok: true, data: prepared };
+}
+
+function inspectStudioAiReferenceImageDataUrl(
+  dataUrl: string,
+): StudioAiResult<StudioAiReferenceImageDataUrlMetadata> {
+  const commaIndex = dataUrl.indexOf(",");
+  if (
+    !dataUrl.startsWith("data:")
+    || commaIndex <= "data:".length
+    || commaIndex > 256
+  ) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: "기준 이미지는 PNG, JPEG 또는 WebP base64 data URL이어야 합니다.",
+    };
+  }
+  const headerParts = dataUrl
+    .slice("data:".length, commaIndex)
+    .split(";")
+    .map((part) => part.trim());
+  const mimeType = headerParts[0]?.toLowerCase();
+  if (
+    !STUDIO_AI_REFERENCE_IMAGE_MIME_TYPES.includes(
+      mimeType as StudioAiReferenceImageMimeType,
+    )
+  ) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: "기준 이미지는 PNG, JPEG 또는 WebP 형식만 사용할 수 있습니다.",
+    };
+  }
+  if (!headerParts.slice(1).some((part) => part.toLowerCase() === "base64")) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: "기준 이미지는 base64로 인코딩된 data URL이어야 합니다.",
+    };
+  }
+  const payload = dataUrl.slice(commaIndex + 1);
+  if (payload.length === 0 || payload.length % 4 !== 0) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: "기준 이미지의 base64 데이터가 올바르지 않습니다.",
+    };
+  }
+  const padding =
+    payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0;
+  const decodedBytes = (payload.length / 4) * 3 - padding;
+  if (!Number.isSafeInteger(decodedBytes) || decodedBytes <= 0) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: "기준 이미지의 디코딩 크기가 올바르지 않습니다.",
+    };
+  }
+  if (
+    decodedBytes >
+    STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxDecodedBytesPerImage
+  ) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: `기준 이미지 한 장의 디코딩 크기는 ${STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxDecodedBytesPerImage.toLocaleString()}바이트를 넘을 수 없습니다.`,
+    };
+  }
+  if (!STRICT_BASE64_PAYLOAD_PATTERN.test(payload)) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: "기준 이미지의 base64 데이터가 올바르지 않습니다.",
+    };
+  }
+  const canonicalMimeType = mimeType as StudioAiReferenceImageMimeType;
+  return {
+    ok: true,
+    data: {
+      mimeType: canonicalMimeType,
+      decodedBytes,
+      extension:
+        canonicalMimeType === "image/png"
+          ? "png"
+          : canonicalMimeType === "image/jpeg"
+            ? "jpg"
+            : "webp",
+    },
+  };
+}
+
+async function matchesStudioAiReferenceImageSignature(
+  blob: Blob,
+  mimeType: StudioAiReferenceImageMimeType,
+): Promise<boolean> {
+  if (mimeType === "image/png") {
+    const bytes = new Uint8Array(await blob.slice(0, 8).arrayBuffer());
+    return (
+      bytes.length >= 8 &&
+      bytes[0] === 0x89 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x4e &&
+      bytes[3] === 0x47 &&
+      bytes[4] === 0x0d &&
+      bytes[5] === 0x0a &&
+      bytes[6] === 0x1a &&
+      bytes[7] === 0x0a
+    );
+  }
+  if (mimeType === "image/jpeg") {
+    const [head, tail] = await Promise.all([
+      blob.slice(0, 2).arrayBuffer(),
+      blob.slice(Math.max(0, blob.size - 2), blob.size).arrayBuffer(),
+    ]);
+    const headBytes = new Uint8Array(head);
+    const tailBytes = new Uint8Array(tail);
+    return (
+      blob.size >= 4 &&
+      headBytes[0] === 0xff &&
+      headBytes[1] === 0xd8 &&
+      tailBytes[0] === 0xff &&
+      tailBytes[1] === 0xd9
+    );
+  }
+  const bytes = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
+  return (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  );
 }
 
 // ── 기능별 얇은 래퍼 ─────────────────────────────────────────────────────────
@@ -697,6 +1014,269 @@ export async function generateConsistentCharacterImage(
   const b64 = extractFirstB64Json(result.data);
   if (!b64) return { ok: false, code: "parse_error", error: "응답에서 이미지 데이터(b64_json)를 찾을 수 없습니다." };
   return { ok: true, data: { dataUrl: `data:image/png;base64,${b64}` } };
+}
+
+/**
+ * Character / Method(camera·composition·staging) / Style reference inputs are compiled into
+ * independent prompt scopes and uploaded in canonical role order as OpenAI-compatible `image[]`
+ * multipart fields. Admission is fail-closed and happens before the single paid request; provider
+ * rejection never triggers a hidden fallback or retry.
+ */
+export async function generateImageWithRoleReferences(
+  settings: StudioAiSettings,
+  references: readonly StudioAiResolvedImageReference[],
+  scenePrompt: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<StudioAiResult<{ dataUrl: string }>> {
+  if (typeof scenePrompt !== "string") {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: "새로 그리고 싶은 장면을 입력하세요.",
+    };
+  }
+  const trimmedScenePrompt = scenePrompt.trim();
+  if (!trimmedScenePrompt) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: "새로 그리고 싶은 장면을 입력하세요.",
+    };
+  }
+  if (!Array.isArray(references)) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: "기준 이미지 목록이 올바르지 않습니다.",
+    };
+  }
+  let preparedResult: StudioAiResult<
+    readonly PreparedStudioAiRoleReference[]
+  >;
+  try {
+    preparedResult = prepareStudioAiRoleReferences(references);
+  } catch {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: "기준 이미지 정보를 안전하게 읽지 못했습니다.",
+    };
+  }
+  if (!preparedResult.ok) return preparedResult;
+  if (!isStudioAiConfigured(settings)) {
+    return {
+      ok: false,
+      code: "not_configured",
+      error: "설정에서 API 키를 등록하세요.",
+    };
+  }
+  if (opts.signal?.aborted) {
+    return {
+      ok: false,
+      code: "network_error",
+      error: "요청이 취소되었습니다.",
+    };
+  }
+
+  const prepared = preparedResult.data;
+  const document = {
+    version: 1 as const,
+    references: prepared.map(({ reference }) => reference),
+  };
+  const contexts = compileStudioAiImageReferencePromptContexts(document);
+  const orderedBindings = [
+    ...contexts.character.bindings.map((binding) => ({
+      ...binding,
+      role: "character" as const,
+    })),
+    ...contexts.method.bindings.map((binding) => ({
+      ...binding,
+      role: "method" as const,
+    })),
+    ...contexts.style.bindings.map((binding) => ({
+      ...binding,
+      role: "style" as const,
+    })),
+  ];
+  const hasCharacterReference = contexts.character.bindings.length > 0;
+  const basePrompt = hasCharacterReference
+    ? buildCharacterConsistencyPrompt(trimmedScenePrompt)
+    : trimmedScenePrompt;
+  const attachmentBindingPrompt = [
+    "[TOONSPECTRUM_MULTIPART_IMAGE_BINDINGS_V1]",
+    JSON.stringify({
+      rule:
+        "Multipart image[] attachments and bindings use the same 1-based order; Image 1 is bindings[0], Image 2 is bindings[1], and so on.",
+      bindings: orderedBindings.map((binding, index) => ({
+        image: index + 1,
+        token: binding.token,
+        role: binding.role,
+      })),
+    }),
+    "[/TOONSPECTRUM_MULTIPART_IMAGE_BINDINGS_V1]",
+  ].join("\n");
+  const providerPrompt = [
+    basePrompt,
+    attachmentBindingPrompt,
+    contexts.combinedPrompt,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  if (
+    providerPrompt.length >
+    STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxPromptCharacters
+  ) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: `장면 프롬프트와 기준 이미지 지시문의 합계는 ${STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxPromptCharacters.toLocaleString()}자를 넘을 수 없습니다.`,
+    };
+  }
+
+  const preparedByReferenceId = new Map(
+    prepared.map((entry) => [entry.reference.id, entry] as const),
+  );
+  const inspected: Array<{
+    entry: PreparedStudioAiRoleReference;
+    metadata: StudioAiReferenceImageDataUrlMetadata;
+    filename: string;
+  }> = [];
+  let totalDecodedBytes = 0;
+
+  // Inspect every small header/length first. A request that exceeds the aggregate budget should
+  // fail before we synchronously decode even the first base64 payload.
+  for (const [index, binding] of orderedBindings.entries()) {
+    if (opts.signal?.aborted) {
+      return {
+        ok: false,
+        code: "network_error",
+        error: "요청이 취소되었습니다.",
+      };
+    }
+    const entry = preparedByReferenceId.get(binding.referenceId);
+    if (!entry) {
+      return {
+        ok: false,
+        code: "invalid_input",
+        error: "기준 이미지 binding을 해석하지 못했습니다.",
+      };
+    }
+    const metadata = inspectStudioAiReferenceImageDataUrl(entry.dataUrl);
+    if (!metadata.ok) return metadata;
+    totalDecodedBytes += metadata.data.decodedBytes;
+    if (
+      totalDecodedBytes >
+      STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxTotalDecodedBytes
+    ) {
+      return {
+        ok: false,
+        code: "invalid_input",
+        error: `기준 이미지의 전체 디코딩 크기는 ${STUDIO_AI_ROLE_REFERENCE_REQUEST_LIMITS.maxTotalDecodedBytes.toLocaleString()}바이트를 넘을 수 없습니다.`,
+      };
+    }
+    inspected.push({
+      entry,
+      metadata: metadata.data,
+      filename: `${String(index + 1).padStart(2, "0")}-${binding.token}.${metadata.data.extension}`,
+    });
+  }
+
+  const admitted: Array<{
+    blob: Blob;
+    filename: string;
+  }> = [];
+  for (const candidate of inspected) {
+    if (opts.signal?.aborted) {
+      return {
+        ok: false,
+        code: "network_error",
+        error: "요청이 취소되었습니다.",
+      };
+    }
+
+    let blob: Blob;
+    try {
+      blob = dataUrlToBlob(candidate.entry.dataUrl);
+      if (
+        blob.size !== candidate.metadata.decodedBytes ||
+        blob.type.toLowerCase() !== candidate.metadata.mimeType
+      ) {
+        return {
+          ok: false,
+          code: "invalid_input",
+          error: "기준 이미지의 형식 또는 디코딩 크기가 선언과 일치하지 않습니다.",
+        };
+      }
+      if (
+        !(await matchesStudioAiReferenceImageSignature(
+          blob,
+          candidate.metadata.mimeType,
+        ))
+      ) {
+        return {
+          ok: false,
+          code: "invalid_input",
+          error: "기준 이미지의 실제 파일 형식이 MIME 선언과 일치하지 않습니다.",
+        };
+      }
+      if (opts.signal?.aborted) {
+        return {
+          ok: false,
+          code: "network_error",
+          error: "요청이 취소되었습니다.",
+        };
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        code: opts.signal?.aborted ? "network_error" : "invalid_input",
+        error: opts.signal?.aborted
+          ? "요청이 취소되었습니다."
+          : error instanceof Error
+            ? error.message
+            : "기준 이미지를 읽지 못했습니다.",
+      };
+    }
+    admitted.push({
+      blob,
+      filename: candidate.filename,
+    });
+  }
+
+  if (opts.signal?.aborted) {
+    return {
+      ok: false,
+      code: "network_error",
+      error: "요청이 취소되었습니다.",
+    };
+  }
+  const form = new FormData();
+  for (const image of admitted) {
+    form.append("image[]", image.blob, image.filename);
+  }
+  form.set("prompt", providerPrompt);
+  form.set("model", settings.imageModel);
+  form.set("n", "1");
+  form.set("response_format", "b64_json");
+  const result = await postForm(
+    buildUrl(settings.baseUrl, settings.imageEditPath),
+    settings.apiKey,
+    form,
+    opts.signal,
+  );
+  if (!result.ok) return result;
+  const b64 = extractFirstB64Json(result.data);
+  if (!b64) {
+    return {
+      ok: false,
+      code: "parse_error",
+      error: "응답에서 이미지 데이터(b64_json)를 찾을 수 없습니다.",
+    };
+  }
+  return {
+    ok: true,
+    data: { dataUrl: `data:image/png;base64,${b64}` },
+  };
 }
 
 /** 콘티→그림 변환의 "장면 구성 제안" 시스템 프롬프트 — 완전한 이미지 생성이 아니라(기능 1과

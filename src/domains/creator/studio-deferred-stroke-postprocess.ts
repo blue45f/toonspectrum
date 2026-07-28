@@ -1,3 +1,4 @@
+import { STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2 } from "./studio-brush-dynamics";
 import { isStudioPixelPencilRenderMode } from "./studio-pixel-pencil";
 import {
   planStudioStrokePostprocess,
@@ -56,6 +57,8 @@ export function planStudioDeferredStrokePostprocess(
     || isStudioPixelPencilRenderMode(stroke.brush)
     || stroke.stampPipeline === "causal-walker-v2"
     || stroke.watercolorPipeline === "causal-walker-v2"
+    || stroke.brushDynamics?.depositPipeline
+      === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
   ) {
     return null;
   }

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  normalizeStudioBrushDynamicsSettings,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+} from "./studio-brush-dynamics";
+import {
   planStudioDeferredStrokePostprocess,
   replaceStudioPendingStrokePostprocess,
 } from "./studio-deferred-stroke-postprocess";
@@ -57,6 +61,14 @@ describe("planStudioDeferredStrokePostprocess", () => {
     ["pixel pencil", stroke({ brush: STUDIO_PIXEL_PENCIL_RENDER_MODE })],
     ["stamp walker", stroke({ stampPipeline: "causal-walker-v2" })],
     ["watercolor walker", stroke({ watercolorPipeline: "causal-walker-v2" })],
+    [
+      "causal dynamic deposit",
+      stroke({
+        brushDynamics: normalizeStudioBrushDynamicsSettings({
+          depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+        }),
+      }),
+    ],
   ])("keeps a %s out of the Worker boundary", (_label, candidate) => {
     expect(planStudioDeferredStrokePostprocess({
       stroke: candidate,

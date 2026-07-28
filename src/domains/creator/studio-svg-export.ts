@@ -1554,10 +1554,18 @@ function serializeFreehand(
       seed: fxBrushSeedFromKey(el.id),
       maxDabs: 512,
     });
-    const ellipses = dabs.map((dab) => (
+    const bodies = dabs.map((dab) => (
       `<ellipse cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" rx="${fmt(dab.radiusX)}" ry="${fmt(dab.radiusY)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(dab.opacity * strokeOpacity)}" transform="rotate(${fmt((dab.angleRad * 180) / Math.PI)} ${fmt(dab.x)} ${fmt(dab.y)})"/>`
     )).join("");
-    return `<g>${ellipses}</g>`;
+    const bristles = dabs.flatMap((dab) => dab.bristles.map((bristle) => {
+      const angleDegrees = (dab.angleRad * 180) / Math.PI;
+      const normalX = -Math.sin(dab.angleRad) * dab.radiusY * bristle.offsetRatio;
+      const normalY = Math.cos(dab.angleRad) * dab.radiusY * bristle.offsetRatio;
+      const x = dab.x + normalX;
+      const y = dab.y + normalY;
+      return `<ellipse cx="${fmt(x)}" cy="${fmt(y)}" rx="${fmt(dab.radiusX * bristle.radiusXRatio)}" ry="${fmt(Math.max(0.12, dab.radiusY * bristle.radiusYRatio))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(dab.opacity * strokeOpacity * bristle.opacity)}" transform="rotate(${fmt(angleDegrees)} ${fmt(x)} ${fmt(y)})"/>`;
+    })).join("");
+    return `<g>${bodies}<g style="mix-blend-mode:multiply">${bristles}</g></g>`;
   }
 
   if (brushFamily === "airbrush") {

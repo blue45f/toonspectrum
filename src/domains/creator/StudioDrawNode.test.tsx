@@ -537,6 +537,34 @@ describe("StudioDrawNode orchestration", () => {
     expect(new Set([gpen, mapping, kabura, liner]).size).toBe(4);
   });
 
+  it("renders newly authored G-pen through the causal residual dab path", () => {
+    render(
+      <StudioDrawNode
+        el={drawEl({
+          brush: "gpen",
+          mode: "pen",
+          points: [0, 24, 8, 8, 20, 2, 34, 8, 42, 24],
+          pressures: [0.2, 0.36, 0.7, 0.92, 0.74],
+          pressureModel: "linear-residual-path-v3",
+          sampleSpacing: 0,
+        })}
+      />,
+    );
+
+    expect(captured("Path")).toHaveLength(0);
+    const shapes = captured("Shape");
+    expect(shapes).toHaveLength(1);
+    const context = new AliasSceneContext();
+    const sceneFunc = shapes[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D
+    ) => void;
+    sceneFunc(context as unknown as CanvasRenderingContext2D);
+    expect(context.arcs.length).toBeGreaterThan(8);
+    expect(Math.max(...context.arcs.map((arc) => arc.radius))).toBeGreaterThan(
+      Math.min(...context.arcs.map((arc) => arc.radius)) * 2
+    );
+  });
+
   it("fills a multi-sample calligraphy stroke once instead of compounding round-cap opacity", () => {
     render(
       <StudioDrawNode

@@ -106,6 +106,10 @@ export type StudioScrollScenarioPreviewPanelStackProps = Pick<
   | "scenarioApplyTarget"
   | "scenarioBusy"
   | "scenarioError"
+  | "scenarioImageReferenceAssetOptions"
+  | "scenarioImageReferenceDocument"
+  | "scenarioImageReferenceMissingCount"
+  | "scenarioImageReferencesLoading"
   | "scenarioOpen"
   | "scenarioProgress"
   | "scenarioRegeneratingIndex"
@@ -115,6 +119,7 @@ export type StudioScrollScenarioPreviewPanelStackProps = Pick<
   | "scenarioStoryText"
   | "scrollPreviewOpen"
   | "setScenarioOpen"
+  | "setScenarioImageReferenceDocument"
   | "setScenarioSceneCountHint"
   | "setScenarioStoryText"
   | "setScrollPreviewOpen"
@@ -391,6 +396,10 @@ export const StudioScrollScenarioPreviewPanelStack = memo(function StudioScrollS
   scenarioApplyTarget,
   scenarioBusy,
   scenarioError,
+  scenarioImageReferenceAssetOptions,
+  scenarioImageReferenceDocument,
+  scenarioImageReferenceMissingCount,
+  scenarioImageReferencesLoading,
   scenarioOpen,
   scenarioProgress,
   scenarioRegeneratingIndex,
@@ -400,6 +409,7 @@ export const StudioScrollScenarioPreviewPanelStack = memo(function StudioScrollS
   scenarioStoryText,
   scrollPreviewOpen,
   setScenarioOpen,
+  setScenarioImageReferenceDocument,
   setScenarioSceneCountHint,
   setScenarioStoryText,
   setScrollPreviewOpen,
@@ -453,6 +463,11 @@ export const StudioScrollScenarioPreviewPanelStack = memo(function StudioScrollS
             stageLabel={scenarioStageLabel}
             progress={scenarioProgress}
             error={scenarioError}
+            imageReferenceAssetOptions={scenarioImageReferenceAssetOptions}
+            imageReferenceDocument={scenarioImageReferenceDocument}
+            imageReferenceMissingCount={scenarioImageReferenceMissingCount}
+            imageReferencesLoading={scenarioImageReferencesLoading}
+            onImageReferenceDocumentChange={setScenarioImageReferenceDocument}
             preview={scenarioResult?.items ?? null}
             textProvenance={scenarioResult?.textAiProvenance ?? null}
             onGenerate={onGenerateScenario}

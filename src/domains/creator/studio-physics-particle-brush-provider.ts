@@ -373,6 +373,7 @@ interface AbortSignalBridge {
 }
 
 type MaybePromise<T> = T | Promise<T>;
+type CooperativeYieldTask = () => Promise<void>;
 
 const COOPERATIVE_WORK_CHUNK = 131_072;
 const COOPERATIVE_COPY_BYTES = 1024 * 1024;
@@ -593,8 +594,52 @@ function addAbortListenerSafely(
   }
 }
 
-function yieldToEventLoop(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+function createCooperativeYieldScheduler(
+  signal: AbortSignal,
+): Readonly<{
+  yieldTask: CooperativeYieldTask;
+  dispose(): void;
+}> {
+  let pending:
+    | Readonly<{
+      timer: ReturnType<typeof setTimeout>;
+      resolve: () => void;
+    }>
+    | null = null;
+  let disposed = false;
+
+  const settlePending = (cancelTimer: boolean): void => {
+    const current = pending;
+    if (!current) return;
+    pending = null;
+    if (cancelTimer) clearTimeout(current.timer);
+    current.resolve();
+  };
+  const onAbort = (): void => settlePending(true);
+  signal.addEventListener("abort", onAbort);
+
+  return Object.freeze({
+    yieldTask: () => {
+      if (disposed || signal.aborted) return Promise.resolve();
+      if (pending !== null) {
+        throw new StudioPhysicsParticleBrushError(
+          "simulation-failed",
+          "Particle cooperative scheduler already has pending work.",
+        );
+      }
+      return new Promise<void>((resolve) => {
+        const timer = setTimeout(() => settlePending(false), 0);
+        pending = Object.freeze({ timer, resolve });
+        if (disposed || signal.aborted) settlePending(true);
+      });
+    },
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      signal.removeEventListener("abort", onAbort);
+      settlePending(true);
+    },
+  });
 }
 
 function f32(value: number): number {
@@ -967,6 +1012,7 @@ function preflightFlowField(
 async function prepareFlowField(
   preflight: FlowFieldPreflight | null,
   assertCurrent: () => void,
+  yieldTask: CooperativeYieldTask,
 ): Promise<PreparedFlowField | null> {
   if (!preflight) return null;
   const {
@@ -1001,7 +1047,7 @@ async function prepareFlowField(
       index + 1 < cellCount
       && (index + 1) % copyChunkElements === 0
     ) {
-      await yieldToEventLoop();
+      await yieldTask();
       assertCurrent();
     }
   }
@@ -1337,6 +1383,7 @@ function maximumArtifactPlaneBytes(
 async function cloneFloat32Array(
   source: Float32Array,
   assertCurrent: () => void,
+  yieldTask: CooperativeYieldTask,
 ): Promise<Float32Array> {
   assertCurrent();
   const clone = new Float32Array(source.length);
@@ -1345,7 +1392,7 @@ async function cloneFloat32Array(
     const end = Math.min(source.length, offset + chunkElements);
     clone.set(source.subarray(offset, end), offset);
     if (end < source.length) {
-      await yieldToEventLoop();
+      await yieldTask();
       assertCurrent();
     }
   }
@@ -1355,6 +1402,7 @@ async function cloneFloat32Array(
 async function cloneUint32Array(
   source: Uint32Array,
   assertCurrent: () => void,
+  yieldTask: CooperativeYieldTask,
 ): Promise<Uint32Array> {
   assertCurrent();
   const clone = new Uint32Array(source.length);
@@ -1363,7 +1411,7 @@ async function cloneUint32Array(
     const end = Math.min(source.length, offset + chunkElements);
     clone.set(source.subarray(offset, end), offset);
     if (end < source.length) {
-      await yieldToEventLoop();
+      await yieldTask();
       assertCurrent();
     }
   }
@@ -1373,46 +1421,71 @@ async function cloneUint32Array(
 async function clonePath(
   path: StudioPhysicsParticlePathArtifact,
   assertCurrent: () => void,
+  yieldTask: CooperativeYieldTask,
 ): Promise<StudioPhysicsParticlePathArtifact> {
   return Object.freeze({
-    positions: await cloneFloat32Array(path.positions, assertCurrent),
+    positions: await cloneFloat32Array(path.positions, assertCurrent, yieldTask),
     particleIndices: await cloneUint32Array(
       path.particleIndices,
       assertCurrent,
+      yieldTask,
     ),
-    spawnIndices: await cloneUint32Array(path.spawnIndices, assertCurrent),
-    stepIndices: await cloneUint32Array(path.stepIndices, assertCurrent),
+    spawnIndices: await cloneUint32Array(
+      path.spawnIndices,
+      assertCurrent,
+      yieldTask,
+    ),
+    stepIndices: await cloneUint32Array(
+      path.stepIndices,
+      assertCurrent,
+      yieldTask,
+    ),
   });
 }
 
 async function cloneDeposition(
   deposition: StudioPhysicsParticleDepositionArtifact,
   assertCurrent: () => void,
+  yieldTask: CooperativeYieldTask,
 ): Promise<StudioPhysicsParticleDepositionArtifact> {
   return Object.freeze({
-    positions: await cloneFloat32Array(deposition.positions, assertCurrent),
-    radius: await cloneFloat32Array(deposition.radius, assertCurrent),
-    alpha: await cloneFloat32Array(deposition.alpha, assertCurrent),
-    weight: await cloneFloat32Array(deposition.weight, assertCurrent),
-    glow: await cloneFloat32Array(deposition.glow, assertCurrent),
+    positions: await cloneFloat32Array(
+      deposition.positions,
+      assertCurrent,
+      yieldTask,
+    ),
+    radius: await cloneFloat32Array(deposition.radius, assertCurrent, yieldTask),
+    alpha: await cloneFloat32Array(deposition.alpha, assertCurrent, yieldTask),
+    weight: await cloneFloat32Array(deposition.weight, assertCurrent, yieldTask),
+    glow: await cloneFloat32Array(deposition.glow, assertCurrent, yieldTask),
   });
 }
 
 async function cloneConnectors(
   connectors: StudioPhysicsParticleConnectorArtifact | null,
   assertCurrent: () => void,
+  yieldTask: CooperativeYieldTask,
 ): Promise<StudioPhysicsParticleConnectorArtifact | null> {
   if (!connectors) return null;
   return Object.freeze({
-    segments: await cloneFloat32Array(connectors.segments, assertCurrent),
+    segments: await cloneFloat32Array(
+      connectors.segments,
+      assertCurrent,
+      yieldTask,
+    ),
     spawnIndices: await cloneUint32Array(
       connectors.spawnIndices,
       assertCurrent,
+      yieldTask,
     ),
-    stepIndices: await cloneUint32Array(connectors.stepIndices, assertCurrent),
-    alpha: await cloneFloat32Array(connectors.alpha, assertCurrent),
-    weight: await cloneFloat32Array(connectors.weight, assertCurrent),
-    glow: await cloneFloat32Array(connectors.glow, assertCurrent),
+    stepIndices: await cloneUint32Array(
+      connectors.stepIndices,
+      assertCurrent,
+      yieldTask,
+    ),
+    alpha: await cloneFloat32Array(connectors.alpha, assertCurrent, yieldTask),
+    weight: await cloneFloat32Array(connectors.weight, assertCurrent, yieldTask),
+    glow: await cloneFloat32Array(connectors.glow, assertCurrent, yieldTask),
   });
 }
 
@@ -1693,20 +1766,24 @@ function validatePreviousArtifactArrays(
 async function clonePreviousArtifact(
   preflight: PreviousArtifactPreflight,
   assertCurrent: () => void,
+  yieldTask: CooperativeYieldTask,
 ): Promise<StudioPhysicsParticleBrushArtifact> {
   const artifact = preflight.artifact;
   const emitterStations = await cloneFloat32Array(
     artifact.emitterStations,
     assertCurrent,
+    yieldTask,
   );
-  const path = await clonePath(artifact.path, assertCurrent);
+  const path = await clonePath(artifact.path, assertCurrent, yieldTask);
   const deposition = await cloneDeposition(
     artifact.deposition,
     assertCurrent,
+    yieldTask,
   );
   const connectors = await cloneConnectors(
     artifact.connectors,
     assertCurrent,
+    yieldTask,
   );
   const clone = Object.freeze({
     kind: artifact.kind,
@@ -1763,6 +1840,7 @@ function typedPrefixEqual(
 function prepareRequest(
   request: StudioPhysicsParticleBrushRequest,
   assertCurrent: () => void,
+  yieldTask: CooperativeYieldTask,
 ): MaybePromise<PreparedRequest> {
   assertCurrent();
   const recipe = normalizeRecipe(request.recipe);
@@ -1907,7 +1985,11 @@ function prepareRequest(
       if (!previousPreflight) {
         return finish(flowField, strokeFingerprint, null);
       }
-      return clonePreviousArtifact(previousPreflight, assertCurrent).then(
+      return clonePreviousArtifact(
+        previousPreflight,
+        assertCurrent,
+        yieldTask,
+      ).then(
         async (previous) => {
           const expectedPreviousStrokeHash =
             await typedArrayHashCooperatively(
@@ -1939,7 +2021,11 @@ function prepareRequest(
       : finishWithStroke(strokeHash);
   };
   if (!flowPreflight) return finishWithFlow(null);
-  return prepareFlowField(flowPreflight, assertCurrent).then(finishWithFlow);
+  return prepareFlowField(
+    flowPreflight,
+    assertCurrent,
+    yieldTask,
+  ).then(finishWithFlow);
 }
 
 function mix32(value: number): number {
@@ -2054,6 +2140,7 @@ async function copyTypedArrayIntoCooperatively<
   target: T,
   source: T,
   assertCurrent: () => void,
+  yieldTask: CooperativeYieldTask,
 ): Promise<void> {
   assertCurrent();
   const chunkElements = Math.max(
@@ -2064,7 +2151,7 @@ async function copyTypedArrayIntoCooperatively<
     const end = Math.min(source.length, offset + chunkElements);
     target.set(source.subarray(offset, end) as T, offset);
     if (end < source.length) {
-      await yieldToEventLoop();
+      await yieldTask();
       assertCurrent();
     }
   }
@@ -2074,82 +2161,98 @@ async function copyPreviousArrays(
   previous: StudioPhysicsParticleBrushArtifact,
   arrays: SimulationArrays,
   assertCurrent: () => void,
+  yieldTask: CooperativeYieldTask,
 ): Promise<void> {
   await copyTypedArrayIntoCooperatively(
     arrays.path.positions,
     previous.path.positions,
     assertCurrent,
+    yieldTask,
   );
   await copyTypedArrayIntoCooperatively(
     arrays.path.particleIndices,
     previous.path.particleIndices,
     assertCurrent,
+    yieldTask,
   );
   await copyTypedArrayIntoCooperatively(
     arrays.path.spawnIndices,
     previous.path.spawnIndices,
     assertCurrent,
+    yieldTask,
   );
   await copyTypedArrayIntoCooperatively(
     arrays.path.stepIndices,
     previous.path.stepIndices,
     assertCurrent,
+    yieldTask,
   );
   await copyTypedArrayIntoCooperatively(
     arrays.deposition.positions,
     previous.deposition.positions,
     assertCurrent,
+    yieldTask,
   );
   await copyTypedArrayIntoCooperatively(
     arrays.deposition.radius,
     previous.deposition.radius,
     assertCurrent,
+    yieldTask,
   );
   await copyTypedArrayIntoCooperatively(
     arrays.deposition.alpha,
     previous.deposition.alpha,
     assertCurrent,
+    yieldTask,
   );
   await copyTypedArrayIntoCooperatively(
     arrays.deposition.weight,
     previous.deposition.weight,
     assertCurrent,
+    yieldTask,
   );
   await copyTypedArrayIntoCooperatively(
     arrays.deposition.glow,
     previous.deposition.glow,
     assertCurrent,
+    yieldTask,
   );
   if (arrays.connectors && previous.connectors) {
     await copyTypedArrayIntoCooperatively(
       arrays.connectors.segments,
       previous.connectors.segments,
       assertCurrent,
+      yieldTask,
     );
     await copyTypedArrayIntoCooperatively(
       arrays.connectors.spawnIndices,
       previous.connectors.spawnIndices,
       assertCurrent,
+      yieldTask,
     );
     await copyTypedArrayIntoCooperatively(
       arrays.connectors.stepIndices,
       previous.connectors.stepIndices,
       assertCurrent,
+      yieldTask,
     );
     await copyTypedArrayIntoCooperatively(
       arrays.connectors.alpha,
       previous.connectors.alpha,
       assertCurrent,
+      yieldTask,
     );
     await copyTypedArrayIntoCooperatively(
       arrays.connectors.weight,
       previous.connectors.weight,
       assertCurrent,
+      yieldTask,
     );
     await copyTypedArrayIntoCooperatively(
       arrays.connectors.glow,
       previous.connectors.glow,
       assertCurrent,
+      yieldTask,
     );
   }
 }
@@ -2403,6 +2506,7 @@ function recordConnectors(
 async function simulatePrepared(
   prepared: PreparedRequest,
   assertCurrent: () => void,
+  yieldTask: CooperativeYieldTask,
 ): Promise<SimulationArrays> {
   assertCurrent();
   const arrays = allocateSimulationArrays(prepared);
@@ -2413,7 +2517,12 @@ async function simulatePrepared(
         "Previous particle artifact arrays do not match their declared shape.",
       );
     }
-    await copyPreviousArrays(prepared.previous, arrays, assertCurrent);
+    await copyPreviousArrays(
+      prepared.previous,
+      arrays,
+      assertCurrent,
+      yieldTask,
+    );
   }
   const recipe = prepared.recipe;
   const count = recipe.common.count;
@@ -2606,7 +2715,7 @@ async function simulatePrepared(
       workSinceYield += count + prepared.connectorEdges.length;
       if (workSinceYield >= COOPERATIVE_WORK_CHUNK) {
         workSinceYield = 0;
-        await yieldToEventLoop();
+        await yieldTask();
         assertCurrent();
       }
     }
@@ -2632,10 +2741,12 @@ async function buildArtifact(
   prepared: PreparedRequest,
   arrays: SimulationArrays,
   assertCurrent: () => void,
+  yieldTask: CooperativeYieldTask,
 ): Promise<StudioPhysicsParticleBrushArtifact> {
   const emitterStations = await cloneFloat32Array(
     prepared.stations,
     assertCurrent,
+    yieldTask,
   );
   const base = Object.freeze({
     kind: "studio-physics-particle-brush-artifact" as const,
@@ -2783,6 +2894,7 @@ export function createStudioPhysicsParticleBrushProvider(
       );
     }
     const controller = new AbortController();
+    const scheduler = createCooperativeYieldScheduler(controller.signal);
     const onAbort = (): void => controller.abort();
     let signalBridge: AbortSignalBridge | null = null;
     let listenerRegistered = false;
@@ -2818,7 +2930,11 @@ export function createStudioPhysicsParticleBrushProvider(
       const checkCurrent = (): void => {
         assertCurrent(admittedEpoch, controller);
       };
-      const preparation = prepareRequest(request, checkCurrent);
+      const preparation = prepareRequest(
+        request,
+        checkCurrent,
+        scheduler.yieldTask,
+      );
       const prepared = preparation instanceof Promise
         ? await preparation
         : preparation;
@@ -2830,9 +2946,15 @@ export function createStudioPhysicsParticleBrushProvider(
         const arrays = await simulatePrepared(
           prepared,
           checkCurrent,
+          scheduler.yieldTask,
         );
         checkCurrent();
-        artifact = await buildArtifact(prepared, arrays, checkCurrent);
+        artifact = await buildArtifact(
+          prepared,
+          arrays,
+          checkCurrent,
+          scheduler.yieldTask,
+        );
         checkCurrent();
       } catch (error) {
         const structured = error instanceof StudioPhysicsParticleBrushError
@@ -2867,6 +2989,7 @@ export function createStudioPhysicsParticleBrushProvider(
         null,
       );
     } finally {
+      scheduler.dispose();
       if (activeController === controller) activeController = null;
       active = false;
       if (listenerRegistered) {

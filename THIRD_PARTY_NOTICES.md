@@ -21,6 +21,10 @@ obscure, or claim ownership of these libraries.
 | `manifold-3d` | 3.5.1 | Apache-2.0 | <https://github.com/elalish/manifold> |
 | `xatlasjs` | 0.2.0 | MIT | <https://github.com/repalash/xatlas.js> |
 | Comlink runtime embedded by `xatlasjs` | bundled in `xatlasjs` 0.2.0 | Apache-2.0 | <https://github.com/GoogleChromeLabs/comlink> |
+| `lazy-brush` | 2.0.2 | MIT | <https://github.com/dulnan/lazy-brush> |
+| `p5.brush` standalone entry | 2.2.1 | MIT | <https://github.com/acamposuribe/p5.brush> |
+| `p5` peer resolution for `p5.brush` | 2.3.1 | LGPL-2.1 | <https://github.com/processing/p5.js> |
+| `libtess` dependency of the resolved `p5` peer | 1.2.2 | SGI-B-2.0 | <https://github.com/brendankenny/libtess.js> |
 
 Some npm archives do not contain a standalone `LICENSE` file even though their
 package metadata declares an SPDX license. In particular,
@@ -30,6 +34,14 @@ production inventory, collects the license texts that are present, adds the
 official ONNX Runtime MIT notice, includes the Apache-2.0 Comlink attribution
 shipped beside xatlas, and records the exact MPL-2.0 source location for the
 unmodified resvg executable.
+
+ToonSpectrum imports `p5.brush/standalone`; that entry is self-contained and
+does not statically import the resolved `p5` peer. The production dependency
+inventory nevertheless includes pnpm's automatically resolved `p5` peer and
+its `libtess` dependency, so their upstream LGPL-2.1 and SGI-B-2.0 notices
+remain in the generated artifact. This records dependency resolution without
+claiming that the `p5` application entry or `libtess` is bundled into the
+Studio standalone-brush chunk.
 
 Every production build writes the resulting user-accessible artifact to
 `dist/legal/THIRD_PARTY_NOTICES.generated.md`. Run `pnpm run audit:licenses`

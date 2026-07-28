@@ -7,10 +7,13 @@ import {
   drawBounds,
   drawFreehandPenSegments,
   drawLiveFreehandDraftToContext,
+  drawStudioCausalInkContract,
   drawStudioCausalInkDabs,
   getSymmetricPoints,
   isDirectLiveDraftEl,
   isDirectLiveStampDraftEl,
+  resolveStudioCausalInkDrawContract,
+  resolveStudioLiveInkStrokeStyle,
   studioLiveBrushEffectiveDiameter,
   studioLiveBrushPressure,
   studioLiveBrushPressureSamples,
@@ -548,6 +551,13 @@ describe("direct-live eligibility", () => {
     ["default freehand pen", drawEl(), true],
     ["explicit fineliner", drawEl({ brush: "fineliner", mode: "pen" }), true],
     ["marker", drawEl({ brush: "marker", mode: "pen" }), true],
+    ["causal G-pen", drawEl({
+      brush: "gpen",
+      mode: "pen",
+      pressureModel: "linear-residual-path-v3",
+      sampleSpacing: 0,
+    }), true],
+    ["legacy G-pen outline", drawEl({ brush: "gpen", mode: "pen" }), false],
     ["pixel pencil", drawEl({ brush: STUDIO_PIXEL_PENCIL_RENDER_MODE, mode: "pen" }), true],
     ["eraser ignores specialty family", drawEl({ brush: "watercolor", mode: "eraser" }), true],
     ["shape", drawEl({ kind: "rect", mode: "pen" }), false],
@@ -584,6 +594,69 @@ describe("direct-live eligibility", () => {
 });
 
 describe("live freehand Canvas2D fixtures", () => {
+  it("uses one causal G-pen contract for live, overlay, and retained rendering", () => {
+    const gpen = drawEl({
+      brush: "gpen",
+      mode: "pen",
+      points: [2, 3, 9, 7, 16, 5, 24, 11],
+      pressures: [0.18, 0.42, 0.9, 0.64],
+      stroke: "#251812",
+      strokeWidth: 18,
+      opacity: 0.72,
+      pressureModel: "linear-residual-path-v3",
+      sampleSpacing: 0,
+    });
+    const contract = resolveStudioCausalInkDrawContract(gpen);
+    const retained = new RecordingContext();
+    drawStudioCausalInkContract(asKonvaContext(retained), contract);
+    const live = new RecordingContext();
+    drawLiveFreehandDraftToContext(asKonvaContext(live), gpen);
+
+    expect(resolveStudioLiveInkStrokeStyle(gpen)).toEqual({
+      color: contract.strokeColor,
+      strokeWidthDoc: contract.strokeWidth,
+      pressureModel: contract.pressureModel,
+      paintModel: contract.paintModel,
+      opacity: contract.opacity,
+      minDistanceDoc: contract.minDistance,
+    });
+    expect(live.operations).toEqual([
+      "save",
+      `alpha:${contract.opacity}`,
+      `composite:${contract.composite}`,
+      ...retained.operations,
+      "restore",
+    ]);
+  });
+
+  it("paints a visible causal G-pen dab on the first contact sample", () => {
+    const gpen = drawEl({
+      brush: "gpen",
+      mode: "pen",
+      points: [4, 7],
+      pressures: undefined,
+      strokeWidth: 18,
+      pressureModel: "linear-residual-path-v3",
+      sampleSpacing: 0,
+    });
+    const context = new RecordingContext();
+    drawStudioCausalInkContract(
+      asKonvaContext(context),
+      resolveStudioCausalInkDrawContract(gpen)
+    );
+
+    const firstArc = context.operations.find((operation) => operation.startsWith("arc:"));
+    expect(firstArc).toBeDefined();
+    expect(Number(firstArc?.split(",")[2])).toBeGreaterThan(0);
+  });
+
+  it("keeps legacy overlay thinning while causal strokes share retained zero spacing", () => {
+    expect(resolveStudioLiveInkStrokeStyle(drawEl()).minDistanceDoc).toBe(3);
+    expect(resolveStudioLiveInkStrokeStyle(drawEl({
+      pressureModel: "linear-residual-path-v3",
+    })).minDistanceDoc).toBe(0);
+  });
+
   it("uses the same alias diameter and pressure mapping for live pen families", () => {
     const fineliner = drawEl({
       mode: "pen",

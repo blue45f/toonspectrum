@@ -55,8 +55,8 @@ describe("Studio AI generated asset fail-closed boundary", () => {
       ["executeAiBackgroundGenerate", "await generateBackgroundImage"],
       ["executeAiColorize", "await colorizeLineArt"],
       ["executeAiCharacterConsistency", "await generateConsistentCharacterImage"],
-      ["executeGenerateScenarioImages", "await generateConsistentCharacterImage"],
-      ["executeRegenerateScenarioImage", "await generateConsistentCharacterImage"],
+      ["executeGenerateScenarioImages", "await generateImageWithRoleReferences"],
+      ["executeRegenerateScenarioImage", "await generateImageWithRoleReferences"],
     ] as const) {
       expectInOrder(functionSource(functionName), [
         "captureStudioAiGeneratedAssetProvenance",
@@ -64,6 +64,27 @@ describe("Studio AI generated asset fail-closed boundary", () => {
       ]);
     }
     expect(source).not.toContain("currentImageAiProvenance");
+  });
+
+  it("fails closed before recording or paying for unresolved scenario references", () => {
+    for (const functionName of [
+      "executeGenerateScenarioImages",
+      "executeRegenerateScenarioImage",
+    ]) {
+      const value = functionSource(functionName);
+      expectInOrder(value, [
+        "scenarioImageReferenceResolution.missing.length > 0",
+        "return;",
+        "beginTrackedStudioAiOperation",
+        "await generateImageWithRoleReferences",
+      ]);
+      expect(value).toContain(
+        "scenarioImageReferenceResolution.trackingAssetIds"
+      );
+      expect(value).toContain(
+        "trackedReferenceAssetIds.map((assetId) => ({ assetId }))"
+      );
+    }
   });
 
   it("captures the character reference identity, source, and size before the notice gate", () => {

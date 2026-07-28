@@ -176,6 +176,38 @@ describe("fixed-clock input and deterministic replay", () => {
     expect(run(72)).toBe(run(72));
     expect(run(72)).not.toBe(run(73));
   });
+
+  it("keeps paper tooth continuous across the former 8-cell hash lattice", () => {
+    const target = field({
+      width: 128,
+      height: 96,
+      seed: 808,
+      paperRoughness: 1,
+    });
+    const boundaryDeltas: number[] = [];
+    const interiorDeltas: number[] = [];
+    for (let y = 2; y < 94; y += 1) {
+      for (let x = 1; x < 127; x += 1) {
+        const current = readStudioWetInkCell(target, x, y)!.paper;
+        const previous = readStudioWetInkCell(target, x - 1, y)!.paper;
+        (x % 8 === 0 ? boundaryDeltas : interiorDeltas).push(
+          Math.abs(current - previous),
+        );
+      }
+    }
+    const mean = (values: readonly number[]): number => (
+      values.reduce((sum, value) => sum + value, 0) / values.length
+    );
+
+    // A nearest-cell cloud made the old lattice boundary over 2.4× rougher than its interior and
+    // appeared as a 2 px checkerboard after the 4× field was downsampled. Paper variation remains,
+    // but the boundary is now statistically indistinguishable from any neighbouring cell.
+    expect(mean(boundaryDeltas) / mean(interiorDeltas)).toBeLessThan(1.35);
+    expect(Math.max(...boundaryDeltas)).toBeLessThan(0.15);
+    expect(new Set(
+      boundaryDeltas.map((value) => value.toFixed(5)),
+    ).size).toBeGreaterThan(16);
+  });
 });
 
 describe("tiled deposition, diffusion and drying", () => {

@@ -17,7 +17,15 @@ describe("Studio pixel-selection pointer lifecycle", () => {
     expect(pageSource).toContain("session.pointerId !== pointerId");
     expect(pageSource).toContain("if (!cancelled) {");
     expect(pageSource).toContain("commitSelectionDragAtPoint(");
-    expect(pageSource).toContain("commitSelectionDrag(previous, session.drag)");
+    expect(pageSource).toMatch(
+      /commitSelectionDragAtPoint\(\s*selectionOperationBase\(previous, session\.operation\),\s*session\.drag,/u,
+    );
+    expect(pageSource).toMatch(
+      /commitSelectionDrag\(\s*selectionOperationBase\(previous, session\.operation\),\s*session\.drag,/u,
+    );
+    expect(pageSource).not.toContain(
+      "commitSelectionDrag(previous, session.drag)",
+    );
     expect(pageSource).toContain('session.drag.tool === "lasso"');
     expect(pageSource).toContain("releasePixelSelectionPointerCapture(session)");
   });

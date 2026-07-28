@@ -47,4 +47,20 @@ describe("Studio mobile top browser harness boundary", () => {
     expect(harness).toContain('"/api/kmas/merge-on-access"');
     expect(harness).toContain('"/api/studio-ai/status"');
   });
+
+  it("measures the mobile dock as an overlay while preserving scroll-safe canvas content", () => {
+    expect(harness).toContain("canvasViewportPaddingBottom");
+    expect(harness).toContain("canvasViewportBottom < metrics.viewportHeight - 1");
+    expect(harness).toContain(
+      "mobile dock still shrinks the canvas instead of overlaying its scrollport",
+    );
+    expect(harness).toContain("metrics.canvasViewportPaddingBottom < metrics.dockHeight - 1");
+    expect(harness).toContain("dockSmallTargets");
+    expect(harness).toContain("small dock target:");
+    expect(harness).toContain("expanded mobile dock changes the canvas viewport height");
+    expect(harness).toContain(
+      "expanded mobile dock is not covered by canvas scroll-safe padding",
+    );
+    expect(harness).toContain("small expanded dock target:");
+  });
 });

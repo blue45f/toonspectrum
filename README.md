@@ -119,8 +119,12 @@ renderer-neutral canonical 모델을 권위로 두고, 아래 엔진을 교체 �
 | Raw WebGPU / WGSL | RGBA16F 브러시 타일, 레이어 합성, 필터, readback·device-loss replay의 기본 픽셀 권위 |
 | `canvaskit-wasm` (Skia) | 정밀 벡터·패스·텍스트·PDF/출판 렌더링 및 CPU/GPU 품질 기준 |
 | `pixi.js` | 별도 투명 surface의 GPU scene graph, z-order, 선택·hover·custom hit-area와 transform overlay |
-| `konva` + `react-konva` | 마이그레이션 중 성숙한 Transformer/텍스트/말풍선, 비교 oracle, 선택적 복구 provider — 브러시 픽셀 권위는 맡지 않음 |
-| `paper` + `polygon-clipping` | Bézier 교차·스무딩·부울·경로 기하 계산(화면 renderer가 아닌 lazy geometry provider) |
+| `konva` + `react-konva` | 오브젝트·텍스트·말풍선의 선택/변형/히트테스트 overlay — 문서나 브러시 픽셀 권위는 맡지 않음 |
+| `paper` + `polygon-clipping` | Bézier 교차·스무딩·단순화·부울·경로 기하 계산(화면 renderer가 아닌 동적 격리 vector geometry provider) |
+| `perfect-freehand` | 필압을 가진 centerline을 연속 잉크 outline으로 변환하는 실시간 geometry provider — 합성·질감·히스토리는 맡지 않음 |
+| `lazy-brush` | 정밀 모드에서만 선택하는 입력 leash/손떨림 보정 — 기본 펜 입력에는 지연을 추가하지 않으며 예측 포인트가 상태를 오염시키지 않음 |
+| `roughjs` | 문서에 저장한 seed로 결정적으로 재생하는 손그림 도형 renderer — 자유곡선 브러시 권위는 맡지 않음 |
+| `p5.brush` | 전용 Worker의 private OffscreenCanvas WebGL2에서 검증된 flow-field·hatch·mass만 처리하는 격리된 settled-only 예술 브러시 provider — image/custom tip은 실제 어댑터 검증 전까지 fail-closed |
 | `rbush` | 대형 2D 문서의 동적 공간 인덱스, point/area hit-test와 topmost 후보 탐색 |
 | `harfbuzzjs` | 한글·복합문자·세로쓰기·루비·OpenType/가변 글꼴의 renderer-neutral glyph shaping |
 | `@resvg/resvg-wasm` | 제한·정규화된 SVG 가져오기, 미리보기, 결정적 래스터/PNG 출력 |
@@ -132,7 +136,6 @@ renderer-neutral canonical 모델을 권위로 두고, 아래 엔진을 교체 �
 | `manifold-3d` | 위상적으로 안정적인 3D 부울·절단·단면·CAD형 메시 편집 |
 | `xatlasjs` | 단일 전용 Worker 안에서 직접 실행하는 자동 UV 언랩·패킹 WASM, 표면 페인팅/베이크용 atlas와 명시적 해제 |
 | `@dimforge/rapier3d-deterministic-compat` | 결정적 3D 물리·충돌·배경 이펙트 시뮬레이션 |
-| `roughjs` + `perfect-freehand` | 손그림 도형과 벡터 잉크 윤곽의 전문 보조 provider |
 | Studio hybrid textured-vector ink | 편집 가능한 centerline/outline과 R8 브러시 팁·종이 질감, 변형 후 결정적 재샘플링 |
 | Studio corrective-driver graph | 뼈 회전·표정·사용자 scalar를 다중 보정 변형에 연결하고 충돌·미리보기·결정적 bake 관리 |
 | Studio weighted-deformation oracle + Worker | point·curve·envelope를 정규화 거리 가중치로 혼합해 2D/3D 위치와 UV를 보존하며, 큰 작업은 transfer·취소·timeout·epoch를 갖춘 전용 Worker에서 fail-closed 실행 |
@@ -148,6 +151,8 @@ renderer-neutral canonical 모델을 권위로 두고, 아래 엔진을 교체 �
 새 후보는 라이선스·공급망, lazy/Worker 격리, 취소·예산·복구 receipt, 실제 브라우저 품질 게이트를
 통과한 뒤 같은 provider 계약 아래 승격합니다. Vello처럼 유망하지만 웹 지원이 alpha인 엔진은
 제품 권위를 주지 않고 실험실에서 비교하며, 더 나은 결과가 확인되면 기존 provider를 교체합니다.
+Signature Pad·Atrament·Croquis는 필기 품질 비교용 benchmark oracle일 뿐 런타임 의존성이 아니며,
+Fabric.js는 Konva와 장면 모델이 중복되어 제품 런타임 도입 대상에서 제외합니다.
 위 표는 provider의 계산·소유권 경계를 설명하며 곧바로 Studio UI 연결 완료를 뜻하지 않습니다.
 실제 기능 완료는 선택 UI부터 live/commit, Undo, 저장·재열기, 협업, 내보내기와 실브라우저 검증이
 한 수직 경로로 닫힌 경우에만 판정합니다.

@@ -12,6 +12,14 @@ import {
   FIXED_RATE_STROKE_FILTER_TICK_MS,
   resolveFixedRateStrokeFilterParameters,
 } from "./studio-fixed-rate-stroke-filter";
+import {
+  createStudioLazyBrushStabilizer,
+  normalizeStudioLazyBrushOptions,
+  shouldApplyStudioLazyBrush,
+  type StudioLazyBrushPointerPolicyInput,
+  type StudioLazyBrushPointerType,
+  type StudioLazyBrushStabilizer,
+} from "./studio-lazy-brush-stabilizer";
 
 export const STUDIO_STABILIZER_MODES = [
   {
@@ -88,6 +96,31 @@ export interface StudioStrokeStabilizerOptions {
   coordinateScale?: number;
 }
 
+/**
+ * Explicit opt-in for the stateful lazy-brush provider.
+ *
+ * `stabilizeStudioStrokeSample()` deliberately stays pure because StudioPage also calls it with
+ * speculative pointer predictions and then discards the returned state. A mutable dependency in
+ * that function would make previews alter the next real point. Consumers that can distinguish
+ * committed from predicted samples may use `StudioStrokeStabilizerBridge` instead.
+ */
+export interface StudioStrokeStabilizerBridgeOptions extends StudioStrokeStabilizerOptions {
+  /** Keep false/omitted to preserve the existing pure precision behavior. */
+  useLazyPrecision?: boolean;
+  /** Additional lazy-brush drag after the guide radius. */
+  lazyFriction?: number;
+  /**
+   * Precision mode is already an explicit artist choice, so the bridge enables all pointer types
+   * by default. A caller may still limit the provider to mouse/touch or pen explicitly.
+   */
+  lazyPointerPolicy?: StudioLazyBrushPointerPolicyInput;
+}
+
+export interface StudioStrokeStabilizerBridgeSample extends StudioStabilizerPointSample {
+  pointerType?: StudioLazyBrushPointerType;
+  pointerId?: number;
+}
+
 export interface StudioStrokeStabilizerResult {
   point: readonly [number, number];
   state: StudioStrokeStabilizerState;
@@ -95,6 +128,16 @@ export interface StudioStrokeStabilizerResult {
   effectiveStrength: number;
   /** 정규화된 입력 속도(px/ms). 표준·정밀 모드에서도 진단 일관성을 위해 반환한다. */
   speed: number;
+}
+
+export type StudioStrokeStabilizerProvider = "pure" | "lazy-brush";
+export type StudioStrokeStabilizerBridgePhase = "committed" | "preview" | "flushed";
+
+export interface StudioStrokeStabilizerBridgeResult extends StudioStrokeStabilizerResult {
+  /** False means the sample was rejected without changing the last committed provider state. */
+  accepted: boolean;
+  provider: StudioStrokeStabilizerProvider;
+  phase: StudioStrokeStabilizerBridgePhase;
 }
 
 /**
@@ -429,10 +472,14 @@ function precisionPoint(
   const distance = Math.hypot(dx, dy);
   // A small dead-zone behaves like a virtual guide string. It grows with strength but remains
   // bounded enough for a 1px sample stream to advance at ordinary inking speeds.
-  const radius = (1.5 + strength * 2.35) / coordinateScale;
+  const radius = precisionRadiusCssPx(strength) / coordinateScale;
   if (distance <= radius || distance <= Number.EPSILON) return [outputX, outputY];
   const travel = distance - radius;
   return [outputX + (dx / distance) * travel, outputY + (dy / distance) * travel];
+}
+
+function precisionRadiusCssPx(strength: number): number {
+  return strength <= 0 ? 0 : 1.5 + strength * 2.35;
 }
 
 function timeNormalizedEmaPoint(
@@ -524,4 +571,289 @@ export function stabilizeStudioStrokeSample(
     effectiveStrength,
     speed,
   };
+}
+
+function normalizeBridgePointerType(value: unknown): StudioLazyBrushPointerType {
+  return value === "mouse" || value === "pen" || value === "touch"
+    ? value
+    : "unknown";
+}
+
+function isFiniteBridgeSample(
+  sample: StudioStrokeStabilizerBridgeSample
+): boolean {
+  return Number.isFinite(sample.x) && Number.isFinite(sample.y);
+}
+
+function lazyProviderOptions(
+  options: StudioStrokeStabilizerBridgeOptions
+) {
+  const strength = clampStrength(options.strength);
+  return {
+    enabled: options.useLazyPrecision === true
+      && normalizeStudioStabilizerMode(options.mode) === "precision"
+      && strength > 0,
+    radiusCssPx: precisionRadiusCssPx(strength),
+    coordinateScale: safeCoordinateScale(options.coordinateScale),
+    friction: options.lazyFriction,
+    pointerPolicy: options.lazyPointerPolicy ?? "all",
+  } as const;
+}
+
+function bridgeResult(
+  result: StudioStrokeStabilizerResult,
+  input: {
+    accepted: boolean;
+    provider: StudioStrokeStabilizerProvider;
+    phase: StudioStrokeStabilizerBridgePhase;
+  }
+): StudioStrokeStabilizerBridgeResult {
+  return {
+    point: [result.point[0], result.point[1]],
+    state: { ...result.state },
+    effectiveStrength: result.effectiveStrength,
+    speed: result.speed,
+    accepted: input.accepted,
+    provider: input.provider,
+    phase: input.phase,
+  };
+}
+
+function previewLazyBrushPoint(
+  state: StudioStrokeStabilizerState,
+  sample: StudioStrokeStabilizerBridgeSample,
+  options: StudioStrokeStabilizerBridgeOptions
+): readonly [number, number] {
+  const normalized = normalizeStudioLazyBrushOptions(lazyProviderOptions(options));
+  const pointerType = normalizeBridgePointerType(sample.pointerType);
+  if (!shouldApplyStudioLazyBrush(pointerType, normalized)) {
+    return [sample.x, sample.y];
+  }
+
+  const dx = sample.x - state.outputX;
+  const dy = sample.y - state.outputY;
+  const distance = Math.hypot(dx, dy);
+  if (distance <= Number.EPSILON || normalized.radiusDocumentPx <= 0) {
+    return normalized.radiusDocumentPx <= 0
+      ? [sample.x, sample.y]
+      : [state.outputX, state.outputY];
+  }
+
+  // Match lazy-brush 2.x's tenth-pixel boundary. Previewing is analytic and never calls update()
+  // on the committed mutable provider, so a predicted pointer cannot change the next real point.
+  const crossesRadius =
+    Math.round((distance - normalized.radiusDocumentPx) * 10) / 10 > 0;
+  if (!crossesRadius) return [state.outputX, state.outputY];
+
+  const travel = distance - normalized.radiusDocumentPx;
+  const friction = normalized.friction;
+  const travelRatio = friction <= 0
+    ? 1
+    : 1 - Math.sqrt(1 - (1 - friction) ** 2);
+  return [
+    state.outputX + (dx / distance) * travel * travelRatio,
+    state.outputY + (dy / distance) * travel * travelRatio,
+  ];
+}
+
+/**
+ * Stateful provider boundary for consumers that distinguish committed pointer input from preview
+ * input. Existing call sites remain on the pure API until they opt in explicitly.
+ *
+ * - `commit()` is the only method that mutates lazy-brush.
+ * - `preview()` analytically evaluates one speculative point from the last committed snapshot.
+ * - `flush()` resolves the trailing guide to the actual raw pointer-up endpoint.
+ */
+export class StudioStrokeStabilizerBridge {
+  private readonly lazyBrush: StudioLazyBrushStabilizer =
+    createStudioLazyBrushStabilizer();
+  private committedState: StudioStrokeStabilizerState | null = null;
+
+  get initialized(): boolean {
+    return this.committedState !== null;
+  }
+
+  reset(): void {
+    this.lazyBrush.reset();
+    this.committedState = null;
+  }
+
+  commit(
+    sample: StudioStrokeStabilizerBridgeSample,
+    options: StudioStrokeStabilizerBridgeOptions
+  ): StudioStrokeStabilizerBridgeResult {
+    if (!isFiniteBridgeSample(sample)) {
+      return this.rejectedResult("committed");
+    }
+
+    const useLazyProvider =
+      options.useLazyPrecision === true
+      && normalizeStudioStabilizerMode(options.mode) === "precision";
+    if (!this.committedState) {
+      const state = createStudioStrokeStabilizerState(sample);
+      if (useLazyProvider) {
+        this.lazyBrush.begin(sample, lazyProviderOptions(options));
+      } else {
+        this.lazyBrush.reset();
+      }
+      this.committedState = state;
+      return bridgeResult({
+        point: [state.outputX, state.outputY],
+        state,
+        effectiveStrength: clampStrength(options.strength),
+        speed: 0,
+      }, {
+        accepted: true,
+        provider: useLazyProvider ? "lazy-brush" : "pure",
+        phase: "committed",
+      });
+    }
+
+    const pureResult = stabilizeStudioStrokeSample(
+      this.committedState,
+      sample,
+      options
+    );
+    if (!useLazyProvider) {
+      this.lazyBrush.reset();
+      this.committedState = pureResult.state;
+      return bridgeResult(pureResult, {
+        accepted: true,
+        provider: "pure",
+        phase: "committed",
+      });
+    }
+
+    if (!this.lazyBrush.initialized) {
+      this.lazyBrush.begin({
+        x: this.committedState.outputX,
+        y: this.committedState.outputY,
+        pointerType: sample.pointerType,
+        pointerId: sample.pointerId,
+      }, lazyProviderOptions(options));
+    }
+    const lazyResult = this.lazyBrush.update(sample, lazyProviderOptions(options));
+    if (!lazyResult.accepted) {
+      return this.rejectedResult("committed");
+    }
+
+    const state = lazyResult.firstPoint
+      ? createStudioStrokeStabilizerState(sample)
+      : {
+        ...pureResult.state,
+        outputX: lazyResult.point[0],
+        outputY: lazyResult.point[1],
+      };
+    this.committedState = state;
+    return bridgeResult({
+      ...pureResult,
+      point: [state.outputX, state.outputY],
+      state,
+    }, {
+      accepted: true,
+      provider: "lazy-brush",
+      phase: "committed",
+    });
+  }
+
+  preview(
+    sample: StudioStrokeStabilizerBridgeSample,
+    options: StudioStrokeStabilizerBridgeOptions
+  ): StudioStrokeStabilizerBridgeResult {
+    if (!isFiniteBridgeSample(sample)) {
+      return this.rejectedResult("preview");
+    }
+    if (!this.committedState) {
+      const state = createStudioStrokeStabilizerState(sample);
+      return bridgeResult({
+        point: [state.outputX, state.outputY],
+        state,
+        effectiveStrength: clampStrength(options.strength),
+        speed: 0,
+      }, {
+        accepted: true,
+        provider: options.useLazyPrecision === true
+          && normalizeStudioStabilizerMode(options.mode) === "precision"
+          ? "lazy-brush"
+          : "pure",
+        phase: "preview",
+      });
+    }
+
+    const pureResult = stabilizeStudioStrokeSample(
+      this.committedState,
+      sample,
+      options
+    );
+    const useLazyProvider =
+      options.useLazyPrecision === true
+      && normalizeStudioStabilizerMode(options.mode) === "precision";
+    if (!useLazyProvider) {
+      return bridgeResult(pureResult, {
+        accepted: true,
+        provider: "pure",
+        phase: "preview",
+      });
+    }
+
+    const point = previewLazyBrushPoint(this.committedState, sample, options);
+    return bridgeResult({
+      ...pureResult,
+      point,
+      state: {
+        ...pureResult.state,
+        outputX: point[0],
+        outputY: point[1],
+      },
+    }, {
+      accepted: true,
+      provider: "lazy-brush",
+      phase: "preview",
+    });
+  }
+
+  flush(): StudioStrokeStabilizerBridgeResult | null {
+    if (!this.committedState) return null;
+    const lazyResult = this.lazyBrush.flush();
+    const flushed = flushStudioStrokeStabilizerEndpoint(this.committedState);
+    const result = lazyResult?.accepted
+      ? {
+        ...flushed,
+        point: lazyResult.point,
+        state: {
+          ...flushed.state,
+          outputX: lazyResult.point[0],
+          outputY: lazyResult.point[1],
+        },
+      }
+      : flushed;
+    this.committedState = result.state;
+    return bridgeResult(result, {
+      accepted: true,
+      provider: lazyResult ? "lazy-brush" : "pure",
+      phase: "flushed",
+    });
+  }
+
+  private rejectedResult(
+    phase: StudioStrokeStabilizerBridgePhase
+  ): StudioStrokeStabilizerBridgeResult {
+    const state = this.committedState
+      ? { ...this.committedState }
+      : createStudioStrokeStabilizerState({ x: 0, y: 0, timeStamp: 0 });
+    return bridgeResult({
+      point: [state.outputX, state.outputY],
+      state,
+      effectiveStrength: 0,
+      speed: 0,
+    }, {
+      accepted: false,
+      provider: this.lazyBrush.initialized ? "lazy-brush" : "pure",
+      phase,
+    });
+  }
+}
+
+export function createStudioStrokeStabilizerBridge(): StudioStrokeStabilizerBridge {
+  return new StudioStrokeStabilizerBridge();
 }

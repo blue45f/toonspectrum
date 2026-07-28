@@ -91,8 +91,6 @@ describe("studio brush continuity audit", () => {
       "smoke-wisp-layered",
       "cloud-cirrus-stream",
       "watercolor-backrun-ring",
-      "bleeding-stain",
-      "cotton-fiber",
     ]);
     const visibilityCorrectedMedia = [
       "mist-soft",
@@ -101,6 +99,10 @@ describe("studio brush continuity audit", () => {
       "airbrush-grand-soft",
       "marker-colorless-blender",
       "cloud-billow-soft",
+      "bleeding-stain",
+      "cotton-fiber",
+      "watercolor-edge-stain",
+      "watercolor-dry-granule",
     ] as const;
     const candidateById = new Map(
       CATALOGUE_CANDIDATES.map((candidate) => [candidate.catalogId, candidate])

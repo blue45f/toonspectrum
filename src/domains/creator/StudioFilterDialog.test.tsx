@@ -1,8 +1,12 @@
-import { readFileSync } from "node:fs";
+// @vitest-environment jsdom
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { createRef } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { STUDIO_CREATOR_PACK_CATALOG } from "./studio-creator-pack-catalog";
 import {
@@ -12,9 +16,14 @@ import {
 import { StudioFilterDialog } from "./StudioFilterDialog";
 
 const filterDialogSource = readFileSync(
-  new URL("./StudioFilterDialog.tsx", import.meta.url),
+  resolve(process.cwd(), "src/domains/creator/StudioFilterDialog.tsx"),
   "utf8",
 );
+
+afterEach(() => {
+  cleanup();
+  window.localStorage.clear();
+});
 
 function renderMotionFilterDialog(
   mutationLocked = false,
@@ -37,6 +46,23 @@ function renderMotionFilterDialog(
       onClose={vi.fn()}
     />,
   );
+}
+
+function renderInteractiveMotionFilterDialog() {
+  const onApply = vi.fn();
+  render(
+    <StudioFilterDialog
+      activeKey="filter:motion-blur"
+      kind="motion-blur"
+      image={{}}
+      initialDraft={{ kind: "motion-blur", distance: 12, angle: -45 }}
+      rootRef={createRef<HTMLElement>()}
+      onPreview={vi.fn()}
+      onApply={onApply}
+      onClose={vi.fn()}
+    />,
+  );
+  return { onApply };
 }
 
 describe("StudioFilterDialog", () => {
@@ -284,5 +310,93 @@ describe("StudioFilterDialog", () => {
 
     expect(html).toContain(">모자이크 / 픽셀화</h2>");
     expect(html).toContain('value="24"');
+  });
+
+  it("opens a narrow-safe visual gallery and searches the applicable catalog", () => {
+    renderInteractiveMotionFilterDialog();
+
+    const gallery = screen.getByRole("region", { name: "필터 갤러리" });
+    const openButton = within(gallery).getByRole("button", {
+      name: /다른 필터 둘러보기/,
+    });
+    expect(openButton.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(openButton);
+    expect(openButton.getAttribute("aria-expanded")).toBe("true");
+    expect(within(gallery).getByText("36개 필터")).toBeTruthy();
+
+    fireEvent.change(within(gallery).getByRole("searchbox", { name: "필터 검색" }), {
+      target: { value: "CRT" },
+    });
+    expect(within(gallery).getByText("1개 필터")).toBeTruthy();
+    expect(
+      within(gallery).getByRole("button", { name: "스캔라인 (CRT) 필터 선택" }),
+    ).toBeTruthy();
+  });
+
+  it("filters by category and keeps every gallery control touch-safe", () => {
+    renderInteractiveMotionFilterDialog();
+    const gallery = screen.getByRole("region", { name: "필터 갤러리" });
+    fireEvent.click(
+      within(gallery).getByRole("button", { name: /다른 필터 둘러보기/ }),
+    );
+    fireEvent.click(within(gallery).getByRole("button", { name: "변형" }));
+
+    expect(within(gallery).getByText("7개 필터")).toBeTruthy();
+    expect(within(gallery).getAllByRole("button", { name: /필터 선택$/ }).length)
+      .toBeGreaterThan(0);
+    expect(filterDialogSource).toContain("min-h-11 w-full min-w-0");
+    expect(filterDialogSource).toContain("grid-cols-2");
+    expect(filterDialogSource).toContain("max-h-[min(44dvh,24rem)]");
+  });
+
+  it("persists filter favorites locally and restores the favorites view", () => {
+    const first = renderInteractiveMotionFilterDialog();
+    const firstGallery = screen.getByRole("region", { name: "필터 갤러리" });
+    fireEvent.click(
+      within(firstGallery).getByRole("button", { name: /다른 필터 둘러보기/ }),
+    );
+    fireEvent.click(
+      within(firstGallery).getByRole("button", { name: "글리치 즐겨찾기 추가" }),
+    );
+    expect(
+      within(firstGallery).getByRole("button", { name: "글리치 즐겨찾기 해제" }),
+    ).toBeTruthy();
+    expect(first.onApply).not.toHaveBeenCalled();
+
+    cleanup();
+    renderInteractiveMotionFilterDialog();
+    const secondGallery = screen.getByRole("region", { name: "필터 갤러리" });
+    fireEvent.click(
+      within(secondGallery).getByRole("button", { name: /다른 필터 둘러보기/ }),
+    );
+    fireEvent.click(within(secondGallery).getByRole("button", { name: "즐겨찾기" }));
+    expect(
+      within(secondGallery).getByRole("button", { name: "글리치 필터 선택" }),
+    ).toBeTruthy();
+  });
+
+  it("switches filter kinds in place, remembers recents, and preserves apply semantics", () => {
+    const { onApply } = renderInteractiveMotionFilterDialog();
+    const gallery = screen.getByRole("region", { name: "필터 갤러리" });
+    fireEvent.click(
+      within(gallery).getByRole("button", { name: /다른 필터 둘러보기/ }),
+    );
+    fireEvent.change(within(gallery).getByRole("searchbox", { name: "필터 검색" }), {
+      target: { value: "렌즈 플레어" },
+    });
+    fireEvent.click(
+      within(gallery).getByRole("button", { name: "렌즈 플레어 필터 선택" }),
+    );
+
+    expect(screen.getByRole("heading", { name: "렌즈 플레어" })).toBeTruthy();
+    expect(
+      within(gallery).getByRole("button", { name: /다른 필터 둘러보기/ })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
+
+    fireEvent.click(screen.getByRole("button", { name: "적용" }));
+    expect(onApply).toHaveBeenCalledTimes(1);
+    expect(onApply.mock.calls[0]?.[1]).toMatchObject({ kind: "lens-flare" });
   });
 });

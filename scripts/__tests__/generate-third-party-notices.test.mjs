@@ -82,6 +82,40 @@ describe("generated third-party notice inventory", () => {
     ).toThrow("Unreviewed production license expression");
   });
 
+  it("keeps the reviewed p5.brush standalone dependency licenses auditable", () => {
+    const inventory = parsePnpmLicenseInventory(
+      JSON.stringify({
+        MIT: [
+          {
+            name: "p5.brush",
+            versions: ["2.2.1"],
+            paths: ["/tmp/p5-brush"],
+          },
+        ],
+        "LGPL-2.1": [
+          {
+            name: "p5",
+            versions: ["2.3.1"],
+            paths: ["/tmp/p5"],
+          },
+        ],
+        "SGI-B-2.0": [
+          {
+            name: "libtess",
+            versions: ["1.2.2"],
+            paths: ["/tmp/libtess"],
+          },
+        ],
+      }),
+    );
+
+    expect(inventory.map(({ name, license }) => [name, license])).toEqual([
+      ["libtess", "SGI-B-2.0"],
+      ["p5", "LGPL-2.1"],
+      ["p5.brush", "MIT"],
+    ]);
+  });
+
   it("reconstructs a complete reviewed production graph from installed packages", () => {
     const inventory = readFilesystemLicenseInventory();
 

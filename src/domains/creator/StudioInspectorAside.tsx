@@ -190,8 +190,8 @@ import {
   type PolyLassoSession,
   type SelPoint,
   type SelectionAdjustPlan,
-  type SelectionCombineMode,
   type SelectionContentTransform,
+  type SelectionOperationMode,
   type SelectionToolKind,
 } from "./studio-selection-tools";
 import { normalizeSkewPatch } from "./studio-skew";
@@ -481,7 +481,7 @@ interface StudioInspectorAsideProps {
   perspectiveLockHorizon: boolean;
   pixelBrushRadius: number;
   pixelBusy: boolean;
-  pixelCombine: SelectionCombineMode;
+  pixelCombine: SelectionOperationMode;
   pixelForceCircle: boolean;
   pixelMagneticLasso: boolean;
   onTogglePixelMagneticLasso: () => void;
@@ -579,7 +579,9 @@ interface StudioInspectorAsideProps {
   setPanelSplitRatio: import("react").Dispatch<import("react").SetStateAction<number>>;
   setPerspectiveRulerActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPixelBrushRadius: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setPixelCombine: import("react").Dispatch<import("react").SetStateAction<SelectionCombineMode>>;
+  setPixelCombine: import("react").Dispatch<
+    import("react").SetStateAction<SelectionOperationMode>
+  >;
   setPixelForceCircle: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   commitPixelSelectionState: (update: PixelSelection | null | ((current: PixelSelection | null) => PixelSelection | null), operation: PixelSelectionHistoryOperation, coalesceKey?: string) => boolean;
   resetPixelSelectionState: (selection: PixelSelection | null) => void;

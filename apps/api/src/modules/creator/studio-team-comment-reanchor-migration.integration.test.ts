@@ -6,6 +6,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 const INTEGRATION_URL =
   process.env.STUDIO_TEAM_COMMENT_POSTGRES_INTEGRATION_URL?.trim() ||
   process.env.STUDIO_LIVE_POSTGRES_INTEGRATION_URL?.trim();
+if (process.env.CI && !INTEGRATION_URL) {
+  throw new Error(
+    "CI must provide STUDIO_TEAM_COMMENT_POSTGRES_INTEGRATION_URL or "
+      + "STUDIO_LIVE_POSTGRES_INTEGRATION_URL; team comment migration invariants cannot be skipped"
+  );
+}
 const describeWithDirectPostgres = INTEGRATION_URL ? describe : describe.skip;
 const MESSAGE_STATE_CONSTRAINT =
   "creator_work_team_comment_mutation_message_state_check";

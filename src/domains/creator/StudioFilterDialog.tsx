@@ -1,4 +1,12 @@
-import { RotateCcw, SlidersHorizontal, X } from "lucide-react";
+import {
+  ChevronDown,
+  Clock3,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  Star,
+  X,
+} from "lucide-react";
 import {
   useEffect,
   useEffectEvent,
@@ -12,6 +20,24 @@ import {
   browserStudioCreatorPackStorage,
   listStudioCreatorFilterPresets,
 } from "./studio-creator-filter-preset-reader";
+import {
+  createStudioEffectId,
+  isStudioEffectFavorite,
+  loadStudioEffectFavoriteState,
+  rememberStudioEffectRecent,
+  saveStudioEffectFavoriteState,
+  toggleStudioEffectFavorite,
+  type StudioEffectFavoriteState,
+} from "./studio-effect-favorites";
+import {
+  STUDIO_FILTER_DIALOG_CATALOG,
+  STUDIO_FILTER_GROUP_ORDER,
+  searchStudioFilterDialogCatalog,
+  studioFilterDialogPreviewStyle,
+  studioFilterGroupLabel,
+  type StudioFilterCatalogGroup,
+  type StudioFilterDialogCatalogEntry,
+} from "./studio-filter-catalog";
 import {
   STUDIO_FILTER_LABELS,
   cloneStudioFilterDraft,
@@ -40,6 +66,64 @@ import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
 
 type FilterPatch = Partial<ImageFilterFields>;
+
+type StudioFilterGalleryView =
+  | "all"
+  | "favorites"
+  | "recent"
+  | StudioFilterCatalogGroup;
+
+const STUDIO_FILTER_GALLERY_VIEWS: readonly {
+  id: StudioFilterGalleryView;
+  label: string;
+}[] = [
+  { id: "all", label: "전체" },
+  { id: "favorites", label: "즐겨찾기" },
+  { id: "recent", label: "최근" },
+  ...STUDIO_FILTER_GROUP_ORDER.map((group) => ({
+    id: group,
+    label: studioFilterGroupLabel(group),
+  })),
+];
+
+function browserEffectFavoriteStorage(): Storage | null {
+  try {
+    return typeof window !== "undefined" ? window.localStorage : null;
+  } catch {
+    return null;
+  }
+}
+
+function studioFilterEffectId(kind: StudioFilterKind) {
+  return createStudioEffectId("filter", kind);
+}
+
+function filterGalleryItems(
+  query: string,
+  view: StudioFilterGalleryView,
+  favoriteState: StudioEffectFavoriteState,
+): readonly StudioFilterDialogCatalogEntry[] {
+  const searched = searchStudioFilterDialogCatalog(query);
+  if (view === "all") return searched;
+  if (view === "favorites") {
+    return searched.filter((entry) =>
+      isStudioEffectFavorite(favoriteState, studioFilterEffectId(entry.kind)),
+    );
+  }
+  if (view === "recent") {
+    const recentOrder = new Map(
+      favoriteState.recent.map((effectId, index) => [effectId, index]),
+    );
+    return searched
+      .filter((entry) => recentOrder.has(studioFilterEffectId(entry.kind)))
+      .toSorted(
+        (left, right) =>
+          recentOrder.get(studioFilterEffectId(left.kind))! -
+          recentOrder.get(studioFilterEffectId(right.kind))!,
+      );
+  }
+  return searched.filter((entry) => entry.group === view);
+}
 
 interface StudioFilterDialogProps {
   activeKey: string;
@@ -253,18 +337,32 @@ export function StudioFilterDialog({
   const dialogRef = useRef<HTMLElement>(null);
   // 히스토그램 원본 — src 키 LRU 캐시(디코드는 다이얼로그 세션당 최대 1회).
   const histogramSource = useStudioHistogramSource(imageSrc);
+  const [activeKind, setActiveKind] = useState<StudioFilterKind>(kind);
   const [draft, setDraft] = useState<StudioFilterDraft>(() =>
     initialDraft && initialDraft.kind === kind
       ? cloneStudioFilterDraft(initialDraft)
       : createStudioFilterDraft(kind, image),
   );
   const [previewEnabled, setPreviewEnabled] = useState(true);
-  const [installedPackPresets] = useState(() =>
-    isStudioFilterPackKind(kind)
-      ? listStudioCreatorFilterPresets(
-        browserStudioCreatorPackStorage(),
-      ).filter((preset) => preset.engine === kind)
-      : [],
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryQuery, setGalleryQuery] = useState("");
+  const [galleryView, setGalleryView] = useState<StudioFilterGalleryView>("all");
+  const [effectFavoriteState, setEffectFavoriteState] = useState(() =>
+    rememberStudioEffectRecent(
+      loadStudioEffectFavoriteState(browserEffectFavoriteStorage()),
+      studioFilterEffectId(kind),
+    ),
+  );
+  const [installedCreatorPresets] = useState(() =>
+    listStudioCreatorFilterPresets(browserStudioCreatorPackStorage()),
+  );
+  const installedPackPresets = isStudioFilterPackKind(activeKind)
+    ? installedCreatorPresets.filter((preset) => preset.engine === activeKind)
+    : [];
+  const visibleGalleryItems = filterGalleryItems(
+    galleryQuery,
+    galleryView,
+    effectFavoriteState,
   );
   const reportPreview = useEffectEvent(onPreview);
 
@@ -282,10 +380,31 @@ export function StudioFilterDialog({
 
   useEffect(() => () => reportPreview(null), []);
 
-  const title = STUDIO_FILTER_LABELS[kind];
+  useEffect(() => {
+    saveStudioEffectFavoriteState(
+      browserEffectFavoriteStorage(),
+      effectFavoriteState,
+    );
+  }, [effectFavoriteState]);
+
+  const title = STUDIO_FILTER_LABELS[activeKind];
   const resetDraft = () => {
     if (applying) return;
-    setDraft(defaultDraft(kind));
+    setDraft(defaultDraft(activeKind));
+  };
+  const selectGalleryFilter = (nextKind: StudioFilterKind) => {
+    if (applying) return;
+    setActiveKind(nextKind);
+    setDraft(createStudioFilterDraft(nextKind, image));
+    setEffectFavoriteState((current) =>
+      rememberStudioEffectRecent(current, studioFilterEffectId(nextKind)),
+    );
+    setGalleryOpen(false);
+  };
+  const toggleGalleryFavorite = (nextKind: StudioFilterKind) => {
+    setEffectFavoriteState((current) =>
+      toggleStudioEffectFavorite(current, studioFilterEffectId(nextKind)),
+    );
   };
   const lockMessage =
     mutationLockReason ??
@@ -352,6 +471,173 @@ export function StudioFilterDialog({
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-width:thin]">
           <div className="space-y-4">
+            <section
+              aria-label="필터 갤러리"
+              className="min-w-0 overflow-hidden rounded-xl border border-line bg-card/45"
+            >
+              <button
+                type="button"
+                aria-expanded={galleryOpen}
+                aria-controls="studio-filter-gallery-content"
+                onClick={() => setGalleryOpen((open) => !open)}
+                className={cn(
+                  "flex min-h-11 w-full min-w-0 items-center gap-2 px-3 text-left text-xs font-semibold text-fg hover:bg-raised",
+                  STUDIO_EASE,
+                  STUDIO_FOCUS_RING,
+                )}
+              >
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
+                  <SlidersHorizontal size={15} aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">다른 필터 둘러보기</span>
+                  <span className="block truncate text-[0.62rem] font-normal text-fg-3">
+                    {STUDIO_FILTER_DIALOG_CATALOG.length}개 필터 · 검색, 미리보기, 즐겨찾기
+                  </span>
+                </span>
+                <ChevronDown
+                  size={17}
+                  aria-hidden
+                  className={cn(
+                    "shrink-0 transition-transform duration-150",
+                    galleryOpen && "rotate-180",
+                  )}
+                />
+              </button>
+
+              {galleryOpen ? (
+                <div
+                  id="studio-filter-gallery-content"
+                  className="min-w-0 space-y-2.5 border-t border-line p-2.5"
+                >
+                  <label className="relative block min-w-0">
+                    <span className="sr-only">필터 검색</span>
+                    <Search
+                      size={15}
+                      aria-hidden
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3"
+                    />
+                    <input
+                      type="search"
+                      value={galleryQuery}
+                      onChange={(event) => setGalleryQuery(event.target.value)}
+                      placeholder="이름·효과로 검색"
+                      autoComplete="off"
+                      className={cn(
+                        "min-h-11 w-full min-w-0 rounded-xl border border-line bg-panel pl-9 pr-3 text-xs text-fg outline-none placeholder:text-fg-3 hover:border-line-strong focus:border-accent",
+                        STUDIO_EASE,
+                        STUDIO_FOCUS_RING,
+                      )}
+                    />
+                  </label>
+
+                  <div
+                    role="group"
+                    aria-label="필터 분류"
+                    className="flex min-w-0 gap-1 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]"
+                  >
+                    {STUDIO_FILTER_GALLERY_VIEWS.map((view) => (
+                      <button
+                        key={view.id}
+                        type="button"
+                        aria-pressed={galleryView === view.id}
+                        onClick={() => setGalleryView(view.id)}
+                        className={cn(
+                          "inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl border px-3 text-[0.68rem] font-semibold",
+                          galleryView === view.id
+                            ? "border-accent/55 bg-accent-soft text-accent"
+                            : "border-line bg-panel text-fg-2 hover:border-line-strong hover:bg-raised",
+                          STUDIO_EASE,
+                          STUDIO_FOCUS_RING,
+                        )}
+                      >
+                        {view.id === "favorites" ? <Star size={12} aria-hidden /> : null}
+                        {view.id === "recent" ? <Clock3 size={12} aria-hidden /> : null}
+                        {view.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="text-[0.62rem] text-fg-3" aria-live="polite">
+                    {visibleGalleryItems.length}개 필터
+                  </p>
+
+                  {visibleGalleryItems.length > 0 ? (
+                    <div className="grid max-h-[min(44dvh,24rem)] min-w-0 grid-cols-2 gap-2 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin]">
+                      {visibleGalleryItems.map((entry) => {
+                        const selected = entry.kind === activeKind;
+                        const favorite = isStudioEffectFavorite(
+                          effectFavoriteState,
+                          studioFilterEffectId(entry.kind),
+                        );
+                        const entryTitle = STUDIO_FILTER_LABELS[entry.kind];
+                        return (
+                          <div
+                            key={entry.kind}
+                            className={cn(
+                              "relative min-w-0 overflow-hidden rounded-xl border bg-panel",
+                              selected
+                                ? "border-accent ring-1 ring-accent/35"
+                                : "border-line hover:border-line-strong",
+                              STUDIO_EASE,
+                            )}
+                          >
+                            <button
+                              type="button"
+                              aria-pressed={selected}
+                              aria-label={`${entryTitle} 필터 선택`}
+                              onClick={() => selectGalleryFilter(entry.kind)}
+                              className={cn(
+                                "block min-h-24 w-full min-w-0 p-1.5 text-left",
+                                STUDIO_FOCUS_RING,
+                              )}
+                            >
+                              <span
+                                aria-hidden
+                                className="relative block h-12 w-full overflow-hidden rounded-lg border border-white/10"
+                                style={studioFilterDialogPreviewStyle(entry)}
+                              >
+                                <span className="absolute inset-x-0 bottom-0 truncate bg-black/50 px-1.5 py-0.5 text-[0.55rem] font-semibold text-white">
+                                  {studioFilterGroupLabel(entry.group)}
+                                </span>
+                              </span>
+                              <span className="mt-1.5 block truncate pr-8 text-[0.68rem] font-bold text-fg">
+                                {entryTitle}
+                              </span>
+                              <span className="mt-0.5 block overflow-hidden text-[0.58rem] leading-tight text-fg-3 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+                                {entry.description}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              aria-pressed={favorite}
+                              aria-label={`${entryTitle} 즐겨찾기 ${favorite ? "해제" : "추가"}`}
+                              onClick={() => toggleGalleryFavorite(entry.kind)}
+                              className={cn(
+                                "absolute right-1 top-1 grid size-11 place-items-center rounded-lg border border-white/20 bg-black/55 text-white shadow-sm hover:bg-black/75",
+                                favorite && "text-[oklch(0.83_0.16_80)]",
+                                STUDIO_EASE,
+                                STUDIO_FOCUS_RING,
+                              )}
+                            >
+                              <Star size={15} fill={favorite ? "currentColor" : "none"} aria-hidden />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div
+                      role="status"
+                      className="grid min-h-24 place-items-center rounded-xl border border-dashed border-line px-3 text-center text-xs text-fg-3"
+                    >
+                      검색 또는 분류에 맞는 필터가 없습니다.
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </section>
+
             {targetKind === "page-composite" ? (
               <p
                 id={compositeNoticeId}

@@ -25,6 +25,10 @@ describe("studio fixed-rate input eligibility", () => {
       input: { ...FILTERED_PEN, brushFamily: "marker" },
     },
     {
+      name: "causal G-pen with a filtered stabilizer strength",
+      input: { ...FILTERED_PEN, brushFamily: "gpen" },
+    },
+    {
       name: "causal watercolor v2",
       input: {
         ...FILTERED_PEN,
@@ -74,6 +78,7 @@ describe("studio fixed-rate input eligibility", () => {
   it.each([
     { name: "pen", input: STANDARD_PEN },
     { name: "marker", input: { ...STANDARD_PEN, brushFamily: "marker" } },
+    { name: "G-pen", input: { ...STANDARD_PEN, brushFamily: "gpen" } },
     {
       name: "eraser",
       input: { ...STANDARD_PEN, drawMode: "eraser", brushFamily: "other" },

@@ -64,7 +64,9 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // 의도적 변경(2026-07-27): CSP pressure min size + brush-family input cadence remain pure
     // capture-time policy. The bounded-flow-v2 paint-model snapshot adds a small, explicit
     // capture contract, while renderer ownership still remains outside this pure planner.
-    expect(planner.source.split("\n").length).toBeLessThanOrEqual(290);
+    // 의도적 변경(2026-07-29): 비-G펜 계열별 하이브리드 필압의 첫 접촉 정책을 같은 순수
+    // capture planner에 고정한다. 라이브 append와 저장 replay가 동일한 명목 필압에서 시작한다.
+    expect(planner.source.split("\n").length).toBeLessThanOrEqual(310);
   });
 
   it("leaves gesture priority, leases, transport, CRDT publication, and live surfaces in the Page", () => {
@@ -100,7 +102,10 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // 의도적 변경(2026-07-24): CSP 스트로크/도형 객체 스냅 — stroke origin reauthor after plan (1_000 → 1_050).
     // 의도적 변경(2026-07-27): 벡터-only 문서의 첫 픽셀 선택 제스처를 합성 준비 동안
     // journal/replay하고 도구 전환 시 안전하게 취소하는 경계 추가(1_050 → 1_120).
-    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(1_120);
+    // 의도적 변경(2026-07-29): 시작 플랜의 계열별 필압 설정 전달을 명시(1_120 → 1_130).
+    // 의도적 변경(2026-07-29): 사용자 선택 precision 획의 mutable lazy-brush authority를
+    // pointerdown에서 한 번 만들고 실제 샘플에만 연결하는 수명주기 경계 추가(1_130 → 1_157).
+    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(1_160);
 
     expectTokenOrder(pointCommentHandler, [
       "if (pointCommentComposer) return true",

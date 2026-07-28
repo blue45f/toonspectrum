@@ -39,6 +39,15 @@ export type SelectionToolKind = "rect" | "ellipse" | "lasso" | "poly-lasso" | "b
 /** 서브패스 결합 모드 — 합치기(fill) / 빼기(erase) / 교집합(intersect). */
 export type SelectionCombineMode = "add" | "subtract" | "intersect";
 
+/**
+ * 사용자가 다음 선택 제스처에 기대하는 작업.
+ *
+ * `replace`는 저장되는 서브패스 모드가 아니다. 새 제스처를 빈 선택에 `add`로 적용하는 UI
+ * 의도다. 이를 SelectionSubpath.mode에 저장하지 않아 기존 문서·Worker·CRDT 스키마는 그대로
+ * 유지하면서도 Photoshop/CSP/Magma의 기본 "새 선택" 동작을 제공한다.
+ */
+export type SelectionOperationMode = "replace" | SelectionCombineMode;
+
 /** 폴리곤 서브패스 — rect/ellipse/lasso 가 수렴하는 형식(≥3점, 자동 닫힘). kind 없음 = 하위호환. */
 export type SelectionPolygonSubpath = { mode: SelectionCombineMode; kind?: never; points: SelPoint[] };
 
@@ -107,6 +116,53 @@ export const SELECTION_COMBINE_MODES: { id: SelectionCombineMode; label: string;
   { id: "subtract", label: "빼기", tip: "기존 선택 영역에서 새 영역을 뺍니다." },
   { id: "intersect", label: "교집합", tip: "기존 선택과 새 영역이 겹치는 부분만 남깁니다." },
 ];
+
+/** 다음 선택 제스처 작업 — 기본은 기존 영역을 교체하는 `replace`. */
+export const SELECTION_OPERATION_MODES: {
+  id: SelectionOperationMode;
+  label: string;
+  tip: string;
+  shortcut?: string;
+}[] = [
+  {
+    id: "replace",
+    label: "새 선택",
+    tip: "기존 선택을 지우고 새로 그린 영역으로 교체합니다.",
+  },
+  {
+    id: "add",
+    label: "추가",
+    tip: "기존 선택 영역에 새 영역을 더합니다.",
+    shortcut: "Shift",
+  },
+  {
+    id: "subtract",
+    label: "빼기",
+    tip: "기존 선택 영역에서 새 영역을 뺍니다.",
+    shortcut: "Alt/Option",
+  },
+  {
+    id: "intersect",
+    label: "교차",
+    tip: "기존 선택과 새 영역이 겹치는 부분만 남깁니다.",
+    shortcut: "Shift+Alt",
+  },
+];
+
+/** `replace`는 기존 선택을 버리고, 나머지는 기존 선택을 결합 기준으로 사용한다. */
+export function selectionOperationBase(
+  selection: PixelSelection | null,
+  operation: SelectionOperationMode
+): PixelSelection | null {
+  return operation === "replace" ? null : selection;
+}
+
+/** 저장 가능한 실제 서브패스 모드로 낮춘다. */
+export function selectionCombineModeForOperation(
+  operation: SelectionOperationMode
+): SelectionCombineMode {
+  return operation === "replace" ? "add" : operation;
+}
 
 /** 확장/축소 슬라이더 범위(정규화 단위 — 약 이미지 폭의 %). */
 export const SELECTION_EXPAND_RANGE = { min: 0.005, max: 0.08, step: 0.005 } as const;
@@ -956,10 +1012,10 @@ export type SelectionDragModifiers = {
  * 계속 updateSelectionDrag 의 정원/중심 제약에만 쓰인다 — 두 의미가 공존한다.
  */
 export function resolveSelectionCombineOverride(
-  base: SelectionCombineMode,
+  base: SelectionOperationMode,
   mods: { shift?: boolean; alt?: boolean },
   hasExistingSelection: boolean
-): SelectionCombineMode {
+): SelectionOperationMode {
   if (!hasExistingSelection) return base;
   if (mods.shift && mods.alt) return "intersect";
   if (mods.shift) return "add";

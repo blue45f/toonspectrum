@@ -67,6 +67,7 @@ export const STUDIO_TOOL_HINT_PREVIEW_VARIANTS = {
   lasso: [],
   "polygon-lasso": [],
   "selection-brush": [],
+  "selection-replace": [],
   "selection-add": [],
   "selection-subtract": [],
   "selection-intersect": [],

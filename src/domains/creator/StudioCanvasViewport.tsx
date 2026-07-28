@@ -1745,6 +1745,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             data-studio-canvas-viewport
             data-studio-viewport-cursor={viewportCursorClassName.replace("cursor-", "")}
             data-studio-draw-dock-safe-area={tool === "draw" && !canvasOnlyMode ? "true" : undefined}
+            data-studio-mobile-dock-safe-area={isMobile ? "true" : undefined}
             // 스크롤 뷰포트를 키보드 포커스 가능하게 해 방향키 스크롤 허용(WCAG scrollable-region) — focusable 은 의도적.
             // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
             tabIndex={0}

@@ -114,6 +114,9 @@ export type StudioBrushPackExpansionWaveId =
 export const STUDIO_BRUSH_PACK_VISIBILITY_TUNING_IDS = [
   "mist-soft",
   "bokeh-scatter",
+  "bleeding-stain",
+  "cotton-fiber",
+  "watercolor-flat-wash",
 ] as const satisfies readonly StudioBrushPackCatalogId[];
 
 type StudioBrushPackVisibilityTuningId =
@@ -163,6 +166,20 @@ const EXPANSION_TUNING: Readonly<
     // Preserve sparse light orbs while making a single pass legible on white paper.
     tipSoftness: 0.68,
     flow: { base: 0.38, mappings: [{ source: "pressure", from: 0.54, to: 1, curve: 0.96 }] },
+  },
+  "bleeding-stain": {
+    // Keep the irregular sponge edge, but move one wash pass clear of the near-white floor.
+    flow: { base: 0.34 },
+  },
+  "cotton-fiber": {
+    // Sparse fibres remain visible through the alpha map; lower grain dropout and measured flow
+    // prevent the useful strands from disappearing on white paper.
+    flow: { base: 0.38 },
+    grain: { space: "canvas-fixed", amount: 0.28, scale: 8.25, contrast: 0.38, seed: 0xebc6_79ee },
+  },
+  "watercolor-flat-wash": {
+    // A flat wash should read on the first pass while retaining a deliberately low opacity ceiling.
+    flow: { base: 0.28 },
   },
 
   // ── 연필/스케치 ─────────────────────────────────────────────────────────
@@ -324,7 +341,7 @@ const EXPANSION_TUNING: Readonly<
   "watercolor-edge-stain": {
     // Drying pool: high-contrast canvas-pinned blotches read as pigment edges.
     tipSoftness: 0.75,
-    flow: { base: 0.26, mappings: [{ source: "pressure", from: 0.45, to: 1 }] },
+    flow: { base: 0.36, mappings: [{ source: "pressure", from: 0.45, to: 1 }] },
     opacity: { jitter: { mode: "multiply", amount: 0.15 } },
     grain: { space: "canvas-fixed", amount: 0.34, scale: 14, contrast: 0.7, seed: 0x4b0a_1202 },
     scatter: { mappings: [{ source: "speed", from: 0.7, to: 1.3 }] },
@@ -374,10 +391,15 @@ const EXPANSION_TUNING: Readonly<
   "airbrush-grand-soft": {
     // Grand airbrush: size stays stable; pressure only meters the paint.
     tipSoftness: 0.82,
-    flow: { base: 0.52, mappings: [{ source: "pressure", from: 0.38, to: 1, curve: 0.85 }] },
+    // The compact catalogue formula produced a 39.55%-of-diameter cadence, exposing individual
+    // 64px nozzles as beads. An analytic soft falloff still needs dense stations to behave like a
+    // continuous spray envelope; flow is reduced so that density builds tone instead of instantly
+    // clipping to an opaque ribbon.
+    spacingRatio: 0.11,
+    flow: { base: 0.34, mappings: [{ source: "pressure", from: 0.38, to: 1, curve: 0.85 }] },
     width: { mappings: [{ source: "pressure", from: 0.85, to: 1.15 }], jitter: null },
     taper: { enabled: false },
-    scatterRatio: 0.12,
+    scatterRatio: 0.025,
   },
   "sponge-stipple-dab": {
     // Stipple: dabs separate into distinct sponge prints with rotational chaos.
@@ -657,8 +679,8 @@ const EXPANSION_TUNING: Readonly<
       jitter: { mode: "multiply", amount: 0.16 },
     },
     opacity: { jitter: { mode: "multiply", amount: 0.2 } },
-    flow: { base: 0.42, mappings: [{ source: "pressure", from: 0.42, to: 1 }] },
-    grain: { space: "canvas-fixed", amount: 0.62, scale: 4.8, contrast: 0.66, seed: 0x4b0a_2105 },
+    flow: { base: 0.52, mappings: [{ source: "pressure", from: 0.42, to: 1 }] },
+    grain: { space: "canvas-fixed", amount: 0.5, scale: 4.8, contrast: 0.66, seed: 0x4b0a_2105 },
     colorDynamics: { hueJitter: 2.5, saturationJitter: 0.025, valueJitter: 0.045 },
     dualBrush: {
       enabled: true,
@@ -693,7 +715,7 @@ const EXPANSION_TUNING: Readonly<
       mappings: [{ source: "pressure", from: 0.66, to: 1.55, curve: 0.9 }],
       jitter: { mode: "multiply", amount: 0.22 },
     },
-    flow: { base: 0.28, mappings: [{ source: "pressure", from: 0.3, to: 0.9 }] },
+    flow: { base: 0.32, mappings: [{ source: "pressure", from: 0.3, to: 0.9 }] },
     opacity: { jitter: { mode: "multiply", amount: 0.16 } },
     angle: { jitter: { mode: "add", amount: 140 } },
     grain: { space: "canvas-fixed", amount: 0.24, scale: 14, contrast: 0.5, seed: 0x4b0a_2107 },
@@ -716,7 +738,7 @@ const EXPANSION_TUNING: Readonly<
       jitter: { mode: "multiply", amount: 0.1 },
     },
     flow: {
-      base: 0.28,
+      base: 0.4,
       mappings: [
         { source: "pressure", from: 0.3, to: 1 },
         { source: "speed", from: 1.08, to: 0.62 },

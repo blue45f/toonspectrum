@@ -32,6 +32,7 @@ import {
   quantizeFixedRateStrokeSample,
   type FixedRateStrokeQuantizedSample,
 } from "./studio-fixed-rate-stroke-filter";
+import { resolveStudioHybridPressureSample } from "./studio-hybrid-pressure-profile";
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
@@ -145,9 +146,21 @@ export function planStudioDrawPointerStart(
   });
   const linearPressureEligible =
     drawMode === "eraser"
-    || (drawMode === "pen" && (brushFamily === "pen" || brushFamily === "marker"));
+    || (
+      drawMode === "pen"
+      && (
+        brushFamily === "pen"
+        || brushFamily === "marker"
+        || brushFamily === "gpen"
+      )
+    );
   const residualPressureEligible =
-    drawMode === "pen" && (brushFamily === "pen" || brushFamily === "marker");
+    drawMode === "pen"
+    && (
+      brushFamily === "pen"
+      || brushFamily === "marker"
+      || brushFamily === "gpen"
+    );
   const pressureModel = linearPressureEligible
     ? residualPressureEligible
       ? STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3
@@ -166,20 +179,32 @@ export function planStudioDrawPointerStart(
     && stampKind === null
     && !causalWatercolor
     && isStudioBoundedFlowSymmetryCompatible(symmetry);
-  const resolvedPressure = resolveBrushPressureSample({
-    pointerType: pointer.pointerType,
-    rawPressure: pointer.pressure,
-    distance: 0,
-    // The first sample has no velocity. Real pen pressure still takes precedence.
-    velocityFallbackEnabled: false,
-    velocitySensitivity: input.velocitySensitivity,
-    pressureCurve: input.pressureCurve,
-    // Residual pen/marker only: stamp/dynamics own independent min floors.
-    minSizeRatio: linearPressureEligible ? input.pressureMinSize : 0,
-    // Versioned linear ink treats the selected size as full-pressure diameter. Specialty and
-    // legacy engines retain their historical nominal-pressure contract.
-    fallbackPressure: pressureModel ? 1 : 0.5,
-  });
+  const hybridPressure = drawMode === "pen" && brush !== "pen"
+    ? resolveStudioHybridPressureSample(brush, {
+        pointerType: pointer.pointerType,
+        rawPressure: pointer.pressure,
+        distance: 0,
+        pressureCurve: input.pressureCurve,
+        velocitySensitivityScale: input.velocitySensitivity,
+        // The first sample is causal: mouse/touch uses the family nominal pressure and never
+        // looks ahead to a future point. Real stylus pressure still takes precedence.
+        simulateVelocity: false,
+      })
+    : null;
+  const resolvedPressure = hybridPressure?.pressure ?? resolveBrushPressureSample({
+      pointerType: pointer.pointerType,
+      rawPressure: pointer.pressure,
+      distance: 0,
+      // The first sample has no velocity. Real pen pressure still takes precedence.
+      velocityFallbackEnabled: false,
+      velocitySensitivity: input.velocitySensitivity,
+      pressureCurve: input.pressureCurve,
+      // Residual pen/marker only: stamp/dynamics own independent min floors.
+      minSizeRatio: linearPressureEligible ? input.pressureMinSize : 0,
+      // Versioned linear ink treats the selected size as full-pressure diameter. Specialty and
+      // legacy engines retain their historical nominal-pressure contract.
+      fallbackPressure: pressureModel ? 1 : 0.5,
+    });
   const stylus = normalizeCalligraphyStylusInput(pointer);
   const causalInitialSample = causalInputPlan.sampleSpacing === 0
     ? quantizeFixedRateStrokeSample({

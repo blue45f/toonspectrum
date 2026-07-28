@@ -1116,17 +1116,32 @@ body[data-studio-app="true"] .route-stage::before,
     --studio-canvas-bottom-inset: var(--studio-mobile-dock-expanded-height);
   }
 
-  /* 평소에는 한 행만 예약하고, 댓글·페이지·레이어·줌 행을 펼쳤을 때만 기존 높이를 쓴다.
-     :has() 미지원 브라우저는 안전한 기존 7rem 예약값으로 자연스럽게 폴백한다. */
+  /* 평소에는 한 행만 스크롤 안전 여백으로 쓰고, 댓글·페이지·레이어·줌 행을 펼쳤을
+     때만 두 행 높이를 쓴다. 도크는 캔버스 위에 떠 있으므로 flex 레이아웃 높이를
+     줄이지 않는다. :has() 미지원 브라우저는 안전한 7rem 기본값으로 폴백한다. */
   [data-studio-editor="true"]:has(
       [data-studio-mobile-editing-dock="true"][data-studio-mobile-dock-expanded="false"]
     ) {
     --studio-canvas-bottom-inset: var(--studio-mobile-dock-compact-height);
   }
 
-  [data-studio-editor="true"]
-    :has(> [data-studio-mobile-editing-dock="true"][data-studio-mobile-dock-expanded="false"]) {
-    padding-bottom: var(--studio-mobile-dock-compact-height) !important;
+  [data-studio-mobile-canvas-workspace="true"] {
+    padding-bottom: 0 !important;
+  }
+
+  /* The dock is an overlay, but the scroll plane still needs a real trailing spacer so the
+     last canvas pixels can be panned above either the compact or expanded thumb controls.
+     Keeping this on the scrollport (not its flex ancestors) recovers 168px at 320/390px while
+     preserving reachable content and keyboard scroll alignment. */
+  [data-studio-canvas-viewport][data-studio-mobile-dock-safe-area="true"] {
+    padding-bottom: var(--studio-canvas-bottom-inset);
+    scroll-padding-bottom: calc(var(--studio-canvas-bottom-inset) + 0.75rem);
+  }
+
+  [data-studio-editor="true"][data-studio-mobile-immersive="true"] {
+    min-height: 100svh;
+    height: 100dvh;
+    max-height: 100dvh;
   }
 
   [data-studio-mobile-dock-scroll="primary"] {

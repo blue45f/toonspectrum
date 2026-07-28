@@ -1,4 +1,6 @@
 /** Searchable metadata shared by the smart-filter catalog and Motion Coach hints. */
+import type { StudioFilterKind } from "./studio-filter-menu";
+
 export type StudioFilterCatalogGroup =
   | "blur"
   | "tone"
@@ -13,6 +15,46 @@ export type StudioFilterCatalogEntry = {
   description: string;
   group: StudioFilterCatalogGroup;
   keywords: readonly string[];
+};
+
+export type StudioFilterPreviewKind =
+  | "soft-blur"
+  | "motion"
+  | "radial"
+  | "tone"
+  | "spectrum"
+  | "curve"
+  | "mosaic"
+  | "channels"
+  | "glitch"
+  | "scanline"
+  | "vignette"
+  | "flare"
+  | "relief"
+  | "solarize"
+  | "threshold"
+  | "paint"
+  | "duotone"
+  | "noise"
+  | "warp"
+  | "grain"
+  | "dots"
+  | "glass"
+  | "edges"
+  | "normal"
+  | "rays";
+
+export type StudioFilterDialogCatalogEntry = StudioFilterCatalogEntry & {
+  /** Dialog kind that can be previewed and applied through StudioFilterDialog. */
+  kind: StudioFilterKind;
+  /** Original, deterministic CSS preview family. Never references a remote image or asset. */
+  preview: StudioFilterPreviewKind;
+};
+
+export type StudioFilterPreviewStyle = {
+  background: string;
+  backgroundSize?: string;
+  filter?: string;
 };
 
 export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
@@ -496,6 +538,250 @@ export function studioFilterGroupLabel(group: StudioFilterCatalogGroup): string 
   }
 }
 
+type StudioFilterDialogCatalogSource = {
+  kind: StudioFilterKind;
+  engine?: string;
+  preview: StudioFilterPreviewKind;
+  fallback?: Omit<StudioFilterCatalogEntry, "engine">;
+};
+
+const STUDIO_FILTER_DIALOG_CATALOG_SOURCES: readonly StudioFilterDialogCatalogSource[] = [
+  { kind: "gaussian-blur", engine: "gaussian-blur", preview: "soft-blur" },
+  { kind: "motion-blur", engine: "motion-blur", preview: "motion" },
+  { kind: "hue-saturation-brightness", engine: "hue-saturation", preview: "spectrum" },
+  { kind: "brightness-contrast", engine: "brightness-contrast", preview: "tone" },
+  { kind: "color-curves", engine: "curves", preview: "curve" },
+  { kind: "mosaic", engine: "pixelate", preview: "mosaic" },
+  { kind: "radial-blur", engine: "spin-blur", preview: "radial" },
+  { kind: "zoom-blur", engine: "zoom-blur", preview: "radial" },
+  {
+    kind: "chromatic-aberration",
+    engine: "chromatic-aberration",
+    preview: "channels",
+  },
+  {
+    kind: "glitch",
+    preview: "glitch",
+    fallback: {
+      title: "글리치",
+      description: "결정적인 가로 조각 이동과 RGB 분리로 디지털 오류 리듬을 만듭니다.",
+      group: "texture",
+      keywords: ["glitch", "rgb", "글리치", "디지털", "채널 분리"],
+    },
+  },
+  {
+    kind: "scanline",
+    preview: "scanline",
+    fallback: {
+      title: "스캔라인",
+      description: "주사선과 화면 명암을 더해 CRT·방송 화면 같은 질감을 만듭니다.",
+      group: "texture",
+      keywords: ["scanline", "crt", "스캔라인", "주사선", "방송"],
+    },
+  },
+  {
+    kind: "vignette",
+    preview: "vignette",
+    fallback: {
+      title: "비네트",
+      description: "중앙의 시선을 유지하면서 가장자리를 부드럽게 어둡게 만듭니다.",
+      group: "tone",
+      keywords: ["vignette", "비네트", "가장자리", "집중"],
+    },
+  },
+  {
+    kind: "lens-flare",
+    preview: "flare",
+    fallback: {
+      title: "렌즈 플레어",
+      description: "광원과 렌즈 반사를 더해 역광 장면의 빛 번짐을 표현합니다.",
+      group: "blur",
+      keywords: ["lens flare", "렌즈 플레어", "광원", "역광", "빛 번짐"],
+    },
+  },
+  { kind: "emboss", engine: "emboss", preview: "relief" },
+  { kind: "solarize", engine: "solarize", preview: "solarize" },
+  { kind: "threshold", engine: "ink-threshold", preview: "threshold" },
+  { kind: "oil-paint", engine: "oil-paint", preview: "paint" },
+  { kind: "surface-blur", engine: "surface-blur", preview: "soft-blur" },
+  {
+    kind: "duotone",
+    preview: "duotone",
+    fallback: {
+      title: "세피아 / 듀오톤",
+      description: "어두운 영역과 밝은 영역을 두 색으로 다시 매핑해 통일된 룩을 만듭니다.",
+      group: "color",
+      keywords: ["duotone", "sepia", "듀오톤", "세피아", "투톤"],
+    },
+  },
+  { kind: "noise-add", engine: "noise", preview: "noise" },
+  { kind: "wave-warp", engine: "wave-warp", preview: "warp" },
+  { kind: "ripple-warp", engine: "ripple-warp", preview: "radial" },
+  { kind: "fisheye", engine: "fisheye", preview: "warp" },
+  { kind: "twirl", engine: "twirl", preview: "radial" },
+  { kind: "pinch-bloat", engine: "pinch-bloat", preview: "warp" },
+  { kind: "lens-distortion", engine: "lens-distortion", preview: "warp" },
+  { kind: "film-grain-pro", engine: "film-grain-pro", preview: "grain" },
+  { kind: "salt-pepper", engine: "salt-pepper", preview: "noise" },
+  { kind: "rgb-noise", engine: "rgb-noise", preview: "channels" },
+  { kind: "perlin-texture", engine: "perlin-texture", preview: "grain" },
+  { kind: "pointillize", engine: "pointillize", preview: "dots" },
+  { kind: "stained-glass", engine: "stained-glass", preview: "glass" },
+  { kind: "poster-edges", engine: "poster-edges", preview: "edges" },
+  { kind: "photocopy", engine: "photocopy", preview: "threshold" },
+  { kind: "normal-map", engine: "normal-map", preview: "normal" },
+  { kind: "god-rays", engine: "god-rays", preview: "rays" },
+];
+
+/**
+ * Every filter exposed by the modal has searchable metadata and an original preview family.
+ * This is deliberately separate from the 64-engine smart-filter inventory: dialog aliases such
+ * as `mosaic -> pixelate` keep their persisted document kind while reusing engine metadata.
+ */
+export const STUDIO_FILTER_DIALOG_CATALOG: readonly StudioFilterDialogCatalogEntry[] =
+  Object.freeze(
+    STUDIO_FILTER_DIALOG_CATALOG_SOURCES.map((source) => {
+      const engine = source.engine ?? source.kind;
+      const shared = source.engine ? studioFilterCatalogEntry(source.engine) : null;
+      const metadata = shared ?? source.fallback;
+      if (!metadata) {
+        throw new Error(`Missing dialog filter catalog metadata: ${source.kind}`);
+      }
+      return Object.freeze({
+        ...metadata,
+        engine,
+        kind: source.kind,
+        preview: source.preview,
+      });
+    }),
+  );
+
+function studioFilterPreviewHue(kind: StudioFilterKind): number {
+  let hash = 0;
+  for (let index = 0; index < kind.length; index += 1) {
+    hash = (hash * 31 + kind.charCodeAt(index)) % 360;
+  }
+  return hash;
+}
+
+/**
+ * Small deterministic, copyright-free preview art. The gallery never downloads thumbnails and
+ * therefore remains available offline or when image/font CORS is unavailable.
+ */
+export function studioFilterDialogPreviewStyle(
+  entry: Pick<StudioFilterDialogCatalogEntry, "kind" | "preview">,
+): StudioFilterPreviewStyle {
+  const hue = studioFilterPreviewHue(entry.kind);
+  const accent = `hsl(${hue} 78% 58%)`;
+  const accentSoft = `hsl(${(hue + 52) % 360} 68% 70%)`;
+  const ink = "hsl(225 20% 12%)";
+  switch (entry.preview) {
+    case "soft-blur":
+      return {
+        background: `radial-gradient(circle at 28% 36%, ${accent} 0 12%, transparent 38%), radial-gradient(circle at 72% 62%, ${accentSoft} 0 10%, transparent 40%), ${ink}`,
+        filter: "blur(1.2px) saturate(1.08)",
+      };
+    case "motion":
+      return {
+        background: `repeating-linear-gradient(112deg, transparent 0 8%, ${accent} 10% 13%, transparent 18% 25%), linear-gradient(145deg, ${ink}, ${accentSoft})`,
+      };
+    case "radial":
+      return {
+        background: `repeating-conic-gradient(from 18deg at 50% 50%, ${accent} 0 3deg, transparent 5deg 15deg), radial-gradient(circle, ${accentSoft}, ${ink} 68%)`,
+      };
+    case "tone":
+      return {
+        background: `linear-gradient(120deg, hsl(${hue} 18% 8%) 0 34%, hsl(${hue} 28% 45%) 34% 66%, hsl(${hue} 42% 88%) 66%)`,
+      };
+    case "spectrum":
+      return {
+        background: "conic-gradient(from 30deg, #f45, #fc3, #4c8, #39e, #a5e, #f45)",
+      };
+    case "curve":
+      return {
+        background: `radial-gradient(ellipse at 24% 78%, transparent 0 22%, ${accent} 24% 27%, transparent 29%), linear-gradient(135deg, ${ink}, hsl(${hue} 20% 78%))`,
+      };
+    case "mosaic":
+      return {
+        background: `conic-gradient(from 90deg, ${accent} 25%, ${accentSoft} 0 50%, hsl(${hue} 28% 24%) 0 75%, hsl(${hue} 38% 82%) 0)`,
+        backgroundSize: "18px 18px",
+      };
+    case "channels":
+      return {
+        background: "radial-gradient(circle at 42% 50%, #f04 0 20%, transparent 22%), radial-gradient(circle at 50% 50%, #0ee 0 20%, transparent 22%), radial-gradient(circle at 58% 50%, #55f 0 20%, transparent 22%), #10131d",
+      };
+    case "glitch":
+      return {
+        background: `linear-gradient(174deg, transparent 0 26%, #f24 27% 34%, transparent 35% 48%, #2ef 49% 57%, transparent 58%), repeating-linear-gradient(0deg, ${ink} 0 7px, ${accent} 8px 11px)`,
+      };
+    case "scanline":
+      return {
+        background: `repeating-linear-gradient(0deg, transparent 0 4px, hsl(0 0% 0% / .58) 5px 7px), linear-gradient(125deg, ${accent}, ${ink})`,
+      };
+    case "vignette":
+      return {
+        background: `radial-gradient(ellipse at center, ${accentSoft} 0 24%, ${accent} 42%, ${ink} 82%)`,
+      };
+    case "flare":
+      return {
+        background: `radial-gradient(circle at 68% 28%, white 0 3%, ${accentSoft} 5%, transparent 18%), radial-gradient(circle at 38% 64%, ${accent} 0 6%, transparent 17%), linear-gradient(145deg, ${ink}, hsl(${hue} 36% 36%))`,
+      };
+    case "relief":
+      return {
+        background: `linear-gradient(135deg, hsl(${hue} 8% 82%), hsl(${hue} 8% 26%)), repeating-radial-gradient(circle at 35% 45%, transparent 0 8px, hsl(0 0% 100% / .38) 9px 11px, hsl(0 0% 0% / .35) 12px 14px)`,
+      };
+    case "solarize":
+      return {
+        background: `linear-gradient(100deg, ${accent} 0 25%, hsl(${(hue + 180) % 360} 84% 52%) 25% 50%, #f4f0d8 50% 75%, ${ink} 75%)`,
+      };
+    case "threshold":
+      return {
+        background: "radial-gradient(circle at 28% 38%, #fff 0 16%, #111 17% 29%, #fff 30% 42%, #111 43%)",
+      };
+    case "paint":
+      return {
+        background: `radial-gradient(ellipse at 24% 32%, ${accent} 0 12%, transparent 14%), radial-gradient(ellipse at 62% 58%, ${accentSoft} 0 18%, transparent 21%), repeating-linear-gradient(165deg, ${ink} 0 6px, hsl(${hue} 32% 40%) 7px 12px)`,
+        filter: "saturate(1.18)",
+      };
+    case "duotone":
+      return {
+        background: `linear-gradient(135deg, hsl(${hue} 62% 18%) 0 45%, hsl(${(hue + 62) % 360} 82% 72%) 46% 100%)`,
+      };
+    case "noise":
+    case "grain":
+      return {
+        background: `repeating-radial-gradient(circle at 30% 40%, ${accent} 0 1px, transparent 2px 5px), repeating-radial-gradient(circle at 70% 60%, ${accentSoft} 0 1px, transparent 2px 7px), ${ink}`,
+        backgroundSize: entry.preview === "grain" ? "13px 13px" : "9px 9px",
+      };
+    case "warp":
+      return {
+        background: `repeating-radial-gradient(ellipse at 50% 50%, ${accent} 0 5px, transparent 7px 15px), linear-gradient(135deg, ${ink}, ${accentSoft})`,
+      };
+    case "dots":
+      return {
+        background: `radial-gradient(circle, ${accent} 0 28%, transparent 30%), radial-gradient(circle, ${accentSoft} 0 24%, transparent 26%), ${ink}`,
+        backgroundSize: "14px 14px, 18px 18px",
+      };
+    case "glass":
+      return {
+        background: `conic-gradient(from 30deg at 30% 40%, ${accent}, ${ink}, ${accentSoft}, ${accent}), conic-gradient(from 210deg at 72% 62%, ${accentSoft}, ${ink}, ${accent})`,
+        backgroundSize: "52% 100%, 54% 100%",
+      };
+    case "edges":
+      return {
+        background: `repeating-linear-gradient(45deg, ${ink} 0 4px, ${accent} 5px 7px, hsl(${hue} 15% 86%) 8px 15px)`,
+      };
+    case "normal":
+      return {
+        background: "radial-gradient(circle at 38% 34%, #8ff 0 8%, transparent 26%), radial-gradient(circle at 62% 62%, #f8f 0 10%, transparent 30%), linear-gradient(135deg, #46e, #a4f)",
+      };
+    case "rays":
+      return {
+        background: `repeating-conic-gradient(from 210deg at 18% 20%, ${accentSoft} 0 5deg, transparent 7deg 19deg), linear-gradient(145deg, ${ink}, hsl(${hue} 38% 36%))`,
+      };
+  }
+}
+
 function normalizedSearchTerms(query: string): string[] {
   return query
     .trim()
@@ -515,6 +801,25 @@ export function searchStudioFilterCatalog(
     if (allowed && !allowed.has(entry.engine)) return false;
     if (terms.length === 0) return true;
     const haystack = [
+      entry.engine,
+      entry.title,
+      entry.description,
+      studioFilterGroupLabel(entry.group),
+      ...entry.keywords,
+    ].join(" ").toLocaleLowerCase("ko-KR");
+    return terms.every((term) => haystack.includes(term));
+  });
+}
+
+/** Search only the filters that can be opened and applied by StudioFilterDialog. */
+export function searchStudioFilterDialogCatalog(
+  query: string,
+): readonly StudioFilterDialogCatalogEntry[] {
+  const terms = normalizedSearchTerms(query);
+  if (terms.length === 0) return STUDIO_FILTER_DIALOG_CATALOG;
+  return STUDIO_FILTER_DIALOG_CATALOG.filter((entry) => {
+    const haystack = [
+      entry.kind,
       entry.engine,
       entry.title,
       entry.description,

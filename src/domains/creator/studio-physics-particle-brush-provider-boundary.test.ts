@@ -176,7 +176,9 @@ describe("Studio physics particle brush clean-room AST boundary", () => {
     expect(source).not.toContain("Array.from(input.heights)");
     expect(source).toContain("COOPERATIVE_WORK_CHUNK = 131_072");
     expect(source).toContain("workSinceYield >= COOPERATIVE_WORK_CHUNK");
-    expect(source).toContain("await yieldToEventLoop()");
+    expect(source).toContain("await yieldTask()");
+    expect(source).toContain("createCooperativeYieldScheduler");
+    expect(source).toContain("clearTimeout(current.timer)");
     expect(source).toContain("hashBytesCooperatively");
     expect(source).toContain('subtle.digest("SHA-256", source)');
   });

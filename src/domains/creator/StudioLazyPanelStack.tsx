@@ -40,6 +40,7 @@ import type {
   StudioVrmInsertHandler,
 } from "./studio-3d-insert-controller";
 import type { StudioAiSettings, StudioTextAiProvenance } from "./studio-ai-client";
+import type { StudioAiImageReferenceDocument } from "./studio-ai-image-reference-roles";
 import type { StudioAiProvenanceDocument } from "./studio-ai-provenance";
 import type {
   StudioAutoActionExecutionProgress,
@@ -100,6 +101,7 @@ import type {
   StudioWriterRoomStage,
 } from "./studio-writer-room";
 import type { StudioWriterRoomCanvasProjectionResult } from "./studio-writer-room-canvas-projection";
+import type { StudioAiImageReferenceAssetOption } from "./StudioAiImageReferencePackEditor";
 import type { StudioCommentsPanelSharedReplyController } from "./StudioCommentsPanel";
 import type {
   WorkDetail,
@@ -297,6 +299,10 @@ export interface StudioLazyPanelStackProps {
   scenarioApplyTarget: "current-page" | "new-page";
   scenarioBusy: boolean;
   scenarioError: string | null;
+  scenarioImageReferenceAssetOptions: readonly StudioAiImageReferenceAssetOption[];
+  scenarioImageReferenceDocument: StudioAiImageReferenceDocument;
+  scenarioImageReferenceMissingCount: number;
+  scenarioImageReferencesLoading: boolean;
   scenarioOpen: boolean;
   scenarioProgress: { done: number; total: number; } | null;
   scenarioRegeneratingIndex: number | null;
@@ -340,6 +346,9 @@ export interface StudioLazyPanelStackProps {
   setQuickActionsPreferences: Dispatch<SetStateAction<StudioQuickActionsPreferences>>;
   setReferencePanelOpen: Dispatch<SetStateAction<boolean>>;
   setScenarioOpen: Dispatch<SetStateAction<boolean>>;
+  setScenarioImageReferenceDocument: Dispatch<
+    SetStateAction<StudioAiImageReferenceDocument>
+  >;
   setScenarioSceneCountHint: Dispatch<SetStateAction<number | undefined>>;
   setScenarioStoryText: Dispatch<SetStateAction<string>>;
   setScrollPreviewOpen: Dispatch<SetStateAction<boolean>>;
@@ -465,6 +474,10 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   scenarioApplyTarget,
   scenarioBusy,
   scenarioError,
+  scenarioImageReferenceAssetOptions,
+  scenarioImageReferenceDocument,
+  scenarioImageReferenceMissingCount,
+  scenarioImageReferencesLoading,
   scenarioOpen,
   scenarioProgress,
   scenarioRegeneratingIndex,
@@ -508,6 +521,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   setQuickActionsPreferences,
   setReferencePanelOpen,
   setScenarioOpen,
+  setScenarioImageReferenceDocument,
   setScenarioSceneCountHint,
   setScenarioStoryText,
   setScrollPreviewOpen,
@@ -704,6 +718,10 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
         scenarioApplyTarget={scenarioApplyTarget}
         scenarioBusy={scenarioBusy}
         scenarioError={scenarioError}
+        scenarioImageReferenceAssetOptions={scenarioImageReferenceAssetOptions}
+        scenarioImageReferenceDocument={scenarioImageReferenceDocument}
+        scenarioImageReferenceMissingCount={scenarioImageReferenceMissingCount}
+        scenarioImageReferencesLoading={scenarioImageReferencesLoading}
         scenarioOpen={scenarioOpen}
         scenarioProgress={scenarioProgress}
         scenarioRegeneratingIndex={scenarioRegeneratingIndex}
@@ -713,6 +731,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
         scenarioStoryText={scenarioStoryText}
         scrollPreviewOpen={scrollPreviewOpen}
         setScenarioOpen={setScenarioOpen}
+        setScenarioImageReferenceDocument={setScenarioImageReferenceDocument}
         setScenarioSceneCountHint={setScenarioSceneCountHint}
         setScenarioStoryText={setScenarioStoryText}
         setScrollPreviewOpen={setScrollPreviewOpen}

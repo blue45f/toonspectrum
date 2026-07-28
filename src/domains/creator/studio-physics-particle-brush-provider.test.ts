@@ -855,4 +855,34 @@ describe("Studio physics particle brush CPU oracle", () => {
       sequence: 1,
     });
   });
+
+  it("cancels and settles a pending cooperative timer without advancing fake time", async () => {
+    vi.useFakeTimers();
+    const clear = vi.spyOn(globalThis, "clearTimeout");
+    try {
+      const provider = createStudioPhysicsParticleBrushProvider();
+      const pending = provider.render(request(cooperativeRecipe(), {
+        samples: [
+          { ...SPARSE_SAMPLES[0], x: 0 },
+          { ...SPARSE_SAMPLES[1], x: 200 },
+        ],
+      }));
+
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+      provider.dispose();
+      await expect(pending).rejects.toMatchObject({
+        code: "disposed",
+        receipt: { status: "fail-closed", failureCode: "disposed" },
+      });
+      expect(clear).toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(provider.snapshot()).toMatchObject({
+        state: "disposed",
+        active: false,
+      });
+    } finally {
+      clear.mockRestore();
+      vi.useRealTimers();
+    }
+  });
 });

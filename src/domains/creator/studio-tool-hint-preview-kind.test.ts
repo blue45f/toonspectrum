@@ -21,7 +21,9 @@ describe("Studio tool hint preview kind/variant contract", () => {
     ) as StudioToolHintPreviewKind[];
 
     expect(STUDIO_TOOL_HINT_PREVIEW_KINDS).toEqual(catalogKinds);
-    expect(STUDIO_TOOL_HINT_PREVIEW_KINDS).toHaveLength(120);
+    expect(STUDIO_TOOL_HINT_PREVIEW_KINDS).toHaveLength(121);
+    expect(STUDIO_TOOL_HINT_PREVIEW_KINDS).toContain("selection-replace");
+    expect(STUDIO_TOOL_HINT_PREVIEW_VARIANTS["selection-replace"]).toEqual([]);
     expect(new Set(STUDIO_TOOL_HINT_PREVIEW_KINDS).size).toBe(
       STUDIO_TOOL_HINT_PREVIEW_KINDS.length
     );

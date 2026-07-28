@@ -148,8 +148,8 @@ describe("StudioSelectionToolsPanel", () => {
 
     const buttonCount = html.match(/<button\b/gu)?.length ?? 0;
     const richHintTargetCount = html.match(/data-hint-id=/gu)?.length ?? 0;
-    // 의도적 변경(2026-07-24): 선택 픽셀 → 새 레이어 복사/오려내기 버튼 2개 추가(36 → 38).
-    expect(buttonCount).toBe(38);
+    // 의도적 변경(2026-07-29): 임시 modifier와 같은 "새 선택" 작업을 명시해 4상태 UI로 통일(38 → 39).
+    expect(buttonCount).toBe(39);
     expect(richHintTargetCount).toBe(buttonCount);
   });
 
@@ -252,8 +252,8 @@ describe("StudioSelectionToolsPanel", () => {
     expect(activeToolButton).not.toContain('disabled=""');
     expect(inactiveToolButton).toContain('disabled=""');
     expect(html).toContain("현재 선택 도구는 종료할 수 있습니다.");
-    expect(html.match(/data-hint-disabled="true"/gu)?.length).toBe(37);
-    expect(html.match(new RegExp(`data-unavailable-reason="${busyReason}"`, "gu"))?.length).toBe(37);
+    expect(html.match(/data-hint-disabled="true"/gu)?.length).toBe(38);
+    expect(html.match(new RegExp(`data-unavailable-reason="${busyReason}"`, "gu"))?.length).toBe(38);
     expect(disabledRangeCount).toBe(rangeCount);
     expect(html).toContain("pointer-coarse:min-h-11");
     expect(html).toContain("pointer-coarse:min-w-11");
@@ -280,7 +280,7 @@ describe("StudioSelectionToolsPanel — 색상 범위(Color Range)", () => {
     const html = renderPanel();
     expect(html).not.toContain("data-studio-color-range");
     expect(html).not.toContain("색상 범위");
-    expect(html.match(/<button\b/gu)?.length).toBe(38); // 기존 버튼 수 불변
+    expect(html.match(/<button\b/gu)?.length).toBe(39); // 색상 범위를 제외한 4상태 선택 작업 UI
   });
 
   it("renders sample chips, armed pick toggle, fuzziness slider, preview toggle, and apply", () => {
@@ -296,12 +296,12 @@ describe("StudioSelectionToolsPanel — 색상 범위(Color Range)", () => {
     expect(html).toContain('aria-label="색상 범위로 선택"');
     expect(html).toContain("허용량");
     expect(html).toContain(">72<"); // readout
-    expect(html).toContain("색상 범위로 선택 (합치기)"); // 결합 모드 라벨 반영
+    expect(html).toContain("색상 범위로 선택 (추가)"); // 선택 작업 라벨 반영
 
-    // 새 버튼도 전부 리치 힌트 타깃과 1:1 — 기존 36개 + 색상 범위 6개(지우기+칩2+추출+미리보기+적용).
+    // 모든 버튼은 리치 힌트 타깃과 1:1 — 기본 39개 + 색상 범위 6개(지우기+칩2+추출+미리보기+적용).
     const buttonCount = html.match(/<button\b/gu)?.length ?? 0;
     const hintTargetCount = html.match(/data-hint-id=/gu)?.length ?? 0;
-    expect(buttonCount).toBe(44); // 의도적 변경(2026-07-24): 새 레이어 복사/오려내기 2개 추가
+    expect(buttonCount).toBe(45);
     expect(hintTargetCount).toBe(buttonCount);
   });
 
@@ -333,9 +333,9 @@ describe("StudioSelectionToolsPanel — 색상 범위(Color Range)", () => {
   it("disables the whole section with the shared busy reason while pixel work runs", () => {
     const html = renderPanel({ ...colorRangeProps, busy: true });
     const busyReason = "다른 픽셀 작업을 적용하는 동안 기다려 주세요.";
-    // 활성 올가미 종료 1개만 열어 두고 나머지 43개를 같은 busy 사유로 잠근다.
-    expect(html.match(/data-hint-disabled="true"/gu)?.length).toBe(43);
-    expect(html.match(new RegExp(`data-unavailable-reason="${busyReason}"`, "gu"))?.length).toBe(43);
+    // 활성 올가미 종료 1개만 열어 두고 나머지 44개를 같은 busy 사유로 잠근다.
+    expect(html.match(/data-hint-disabled="true"/gu)?.length).toBe(44);
+    expect(html.match(new RegExp(`data-unavailable-reason="${busyReason}"`, "gu"))?.length).toBe(44);
   });
 
   it("keeps armed color-range toggles closable during a busy calculation", () => {

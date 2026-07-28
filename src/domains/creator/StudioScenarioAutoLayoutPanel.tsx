@@ -33,14 +33,20 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { SCENARIO_SCENE_COUNT_MAX, SCENARIO_SCENE_COUNT_MIN } from "./studio-scenario-scenes";
 import { SCENARIO_BEAT_LABELS, SCENARIO_BEAT_TYPES, type ScenarioBeatType } from "./studio-story-beats";
+import {
+  StudioAiImageReferencePackEditor,
+  STUDIO_AI_IMAGE_REFERENCE_PROVIDER_SAFE_MAX,
+  type StudioAiImageReferenceAssetOption,
+} from "./StudioAiImageReferencePackEditor";
 import { StudioContinuityMetadataEditor } from "./StudioContinuityMetadataEditor";
 
 import type { StudioTextAiProvenance } from "./studio-ai-client";
+import type { StudioAiImageReferenceDocument } from "./studio-ai-image-reference-roles";
 import type { ScenarioPreviewItem } from "./studio-scenario-layout";
 
 import { cn } from "@/lib/utils";
@@ -59,6 +65,11 @@ export interface StudioScenarioAutoLayoutPanelProps {
   textConfigured: boolean;
   /** 이미지 생성은 DeepSeek 텍스트 transport와 분리되어 BYOK 이미지 설정을 요구한다. */
   imageConfigured: boolean;
+  imageReferenceDocument: StudioAiImageReferenceDocument;
+  imageReferenceAssetOptions: readonly StudioAiImageReferenceAssetOption[];
+  imageReferencesLoading: boolean;
+  imageReferenceMissingCount: number;
+  onImageReferenceDocumentChange: (value: StudioAiImageReferenceDocument) => void;
   storyText: string;
   onStoryTextChange: (value: string) => void;
   /** 2~10 사이 유효 값이면 "정확히 N개"로 요청, undefined("자동")면 모델이 3~8개 사이로 판단. */
@@ -129,6 +140,11 @@ export function StudioScenarioAutoLayoutPanel({
   onClose,
   textConfigured,
   imageConfigured,
+  imageReferenceDocument,
+  imageReferenceAssetOptions,
+  imageReferencesLoading,
+  imageReferenceMissingCount,
+  onImageReferenceDocumentChange,
   storyText,
   onStoryTextChange,
   sceneCountHint,
@@ -163,6 +179,8 @@ export function StudioScenarioAutoLayoutPanel({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  const hasImageReferences = imageReferenceDocument.references.length > 0;
+  const [imageReferencesOpen, setImageReferencesOpen] = useState(hasImageReferences);
   if (!open) return null;
 
   const canGenerate = textConfigured && !busy && regeneratingIndex === null && storyText.trim().length > 0;
@@ -170,6 +188,14 @@ export function StudioScenarioAutoLayoutPanel({
   const generatingIndex = busy && progress ? progress.done : -1;
   const editingLocked = busy || regeneratingIndex !== null;
   const missingImageCount = preview?.filter((item) => !item.imageDataUrl).length ?? 0;
+  const imageReferencesBlocked =
+    hasImageReferences
+    && (
+      imageReferencesLoading
+      || imageReferenceMissingCount > 0
+      || imageReferenceDocument.references.length > STUDIO_AI_IMAGE_REFERENCE_PROVIDER_SAFE_MAX
+    );
+  const imageGenerationReady = imageConfigured && !imageReferencesBlocked;
 
   const modal = (
     <div
@@ -188,7 +214,7 @@ export function StudioScenarioAutoLayoutPanel({
             aria-label="닫기"
             title="닫기 (Esc)"
             onClick={onClose}
-            className="ml-auto grid size-8 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent"
+            className="ml-auto grid size-11 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent sm:size-8"
           >
             <X size={15} aria-hidden />
           </button>
@@ -218,6 +244,51 @@ export function StudioScenarioAutoLayoutPanel({
             <span>{storyText.length} / {STORY_TEXT_MAX}자</span>
           </div>
 
+          <details
+            open={imageReferencesOpen}
+            onToggle={(event) => setImageReferencesOpen(event.currentTarget.open)}
+            className="mt-3 min-w-0 overflow-hidden rounded-xl border border-line bg-card/55"
+          >
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 text-xs font-semibold text-fg-2 marker:hidden">
+              <ImagePlus size={14} className="shrink-0 text-accent" aria-hidden />
+              <span className="min-w-0 flex-1 truncate">AI 이미지 참조 팩</span>
+              <span className="shrink-0 rounded-full border border-line bg-panel px-2 py-0.5 text-[0.65rem] tabular-nums text-fg-3">
+                {imageReferenceDocument.references.length}개
+              </span>
+            </summary>
+            <div className="min-w-0 border-t border-line p-2.5">
+              <StudioAiImageReferencePackEditor
+                document={imageReferenceDocument}
+                assetOptions={imageReferenceAssetOptions}
+                loading={imageReferencesLoading}
+                disabled={editingLocked}
+                onChange={onImageReferenceDocumentChange}
+              />
+              {imageReferenceMissingCount > 0 ? (
+                <p
+                  role="alert"
+                  className="mt-2 rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-[0.7rem] leading-relaxed text-bad"
+                >
+                  연결된 참조 에셋 {imageReferenceMissingCount}개를 찾을 수 없습니다. 삭제된 참조를
+                  제거하거나 프로젝트 에셋을 다시 추가하면 이미지 생성을 계속할 수 있어요.
+                </p>
+              ) : null}
+              {imageReferenceDocument.references.length > STUDIO_AI_IMAGE_REFERENCE_PROVIDER_SAFE_MAX ? (
+                <p
+                  role="alert"
+                  className="mt-2 rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-[0.7rem] leading-relaxed text-bad"
+                >
+                  AI 이미지 참조는 최대 {STUDIO_AI_IMAGE_REFERENCE_PROVIDER_SAFE_MAX}개까지 사용할 수
+                  있습니다. 일부 참조를 제거한 뒤 생성해 주세요.
+                </p>
+              ) : null}
+              <p className="mt-2 text-[0.66rem] leading-relaxed text-fg-3">
+                PNG·JPEG·WebP 프로젝트 에셋만 표시합니다. 참조 메타데이터는 작품별로 저장하며
+                이미지 원본은 생성 요청 순간에만 읽습니다.
+              </p>
+            </div>
+          </details>
+
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-1.5 text-xs text-fg-2">
               장면 수
@@ -228,7 +299,7 @@ export function StudioScenarioAutoLayoutPanel({
                   onSceneCountHintChange(v === "" ? undefined : Number(v));
                 }}
                 disabled={editingLocked}
-                className="rounded-md border border-line bg-card px-2 py-1 text-xs text-fg outline-none focus:border-accent disabled:opacity-60"
+                className="min-h-11 rounded-md border border-line bg-card px-2 py-1 text-xs text-fg outline-none focus:border-accent disabled:opacity-60 sm:min-h-8"
               >
                 <option value="">자동(3~8개)</option>
                 {SCENE_COUNT_OPTIONS.map((n) => (
@@ -244,7 +315,7 @@ export function StudioScenarioAutoLayoutPanel({
                 type="button"
                 onClick={onGenerate}
                 disabled={!canGenerate}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-8"
               >
                 <Sparkles size={13} aria-hidden />
                 자동 생성
@@ -253,7 +324,7 @@ export function StudioScenarioAutoLayoutPanel({
               <button
                 type="button"
                 onClick={onCancel}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-3 py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-card px-3 py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised sm:min-h-8"
               >
                 취소
               </button>
@@ -300,9 +371,15 @@ export function StudioScenarioAutoLayoutPanel({
                     </div>
                   ) : null}
                 </div>
-                {!imageConfigured && (
+                {!imageGenerationReady && (
                   <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] text-fg-3">
-                    이미지 생성은 내 API 키 연동 필요
+                    {!imageConfigured
+                      ? "이미지 생성은 내 API 키 연동 필요"
+                      : imageReferencesLoading
+                        ? "참조 에셋 불러오는 중"
+                        : imageReferenceMissingCount > 0
+                          ? "누락된 참조 에셋 확인 필요"
+                          : "참조 수 제한 확인 필요"}
                   </span>
                 )}
               </div>
@@ -401,9 +478,15 @@ export function StudioScenarioAutoLayoutPanel({
                       <button
                         type="button"
                         onClick={() => onRegenerateScene(idx)}
-                        disabled={!imageConfigured || editingLocked || item.imagePrompt.trim().length === 0}
-                        title={!imageConfigured ? "AI 연동에서 이미지 API 키를 설정하세요" : undefined}
-                        className="inline-flex min-h-7 items-center gap-1 rounded-md border border-line bg-panel px-2 text-[0.65rem] font-semibold text-fg-2 hover:bg-raised disabled:cursor-not-allowed disabled:opacity-45"
+                        disabled={!imageGenerationReady || editingLocked || item.imagePrompt.trim().length === 0}
+                        title={
+                          !imageConfigured
+                            ? "AI 연동에서 이미지 API 키를 설정하세요"
+                            : imageReferencesBlocked
+                              ? "AI 참조 에셋을 모두 확인한 뒤 생성하세요"
+                              : undefined
+                        }
+                        className="inline-flex min-h-11 items-center gap-1 rounded-md border border-line bg-panel px-2 text-[0.65rem] font-semibold text-fg-2 hover:bg-raised disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-7"
                       >
                         {idx === regeneratingIndex ? (
                           <Loader2 size={11} className="animate-spin" aria-hidden />
@@ -416,7 +499,7 @@ export function StudioScenarioAutoLayoutPanel({
                         type="button"
                         onClick={() => onRemoveScene(idx)}
                         disabled={editingLocked || preview!.length <= 1}
-                        className="ml-auto inline-grid size-7 place-items-center rounded-md border border-line text-fg-3 hover:border-bad/50 hover:bg-bad/10 hover:text-bad disabled:cursor-not-allowed disabled:opacity-35"
+                        className="ml-auto inline-grid size-11 place-items-center rounded-md border border-line text-fg-3 hover:border-bad/50 hover:bg-bad/10 hover:text-bad disabled:cursor-not-allowed disabled:opacity-35 sm:size-7"
                         aria-label={`${idx + 1}번 장면 삭제`}
                         title={preview!.length <= 1 ? "장면은 하나 이상 필요해요" : "이 장면 삭제"}
                       >
@@ -436,7 +519,7 @@ export function StudioScenarioAutoLayoutPanel({
               type="button"
               onClick={onDiscard}
               disabled={editingLocked}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-3 py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-card px-3 py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-8"
             >
               <RotateCcw size={13} aria-hidden />
               다시 만들기
@@ -445,9 +528,15 @@ export function StudioScenarioAutoLayoutPanel({
               <button
                 type="button"
                 onClick={onGenerateImages}
-                disabled={!imageConfigured || editingLocked}
-                title={!imageConfigured ? "AI 연동에서 이미지 API 키를 설정하세요" : undefined}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft/30 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent-soft/50 disabled:cursor-not-allowed disabled:opacity-45"
+                disabled={!imageGenerationReady || editingLocked}
+                title={
+                  !imageConfigured
+                    ? "AI 연동에서 이미지 API 키를 설정하세요"
+                    : imageReferencesBlocked
+                      ? "AI 참조 에셋을 모두 확인한 뒤 생성하세요"
+                      : undefined
+                }
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft/30 px-3 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent-soft/50 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-8"
               >
                 <ImagePlus size={13} aria-hidden />
                 빈 장면 이미지 {missingImageCount}개 생성
@@ -461,7 +550,7 @@ export function StudioScenarioAutoLayoutPanel({
                   onApplyTargetChange(event.target.value === "new-page" ? "new-page" : "current-page")
                 }
                 disabled={editingLocked}
-                className="rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-fg outline-none focus:border-accent disabled:opacity-60"
+                className="min-h-11 rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-fg outline-none focus:border-accent disabled:opacity-60 sm:min-h-8"
               >
                 <option value="current-page">현재 페이지 아래</option>
                 <option value="new-page">다음 새 페이지</option>
@@ -472,7 +561,7 @@ export function StudioScenarioAutoLayoutPanel({
               onClick={onApply}
               disabled={editingLocked}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+                "inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-8"
               )}
             >
               {applyTarget === "new-page" ? "새 페이지로 적용" : "현재 페이지에 적용"}
