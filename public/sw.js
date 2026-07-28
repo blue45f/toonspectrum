@@ -1,5 +1,7 @@
  
-const CACHE_NAME = 'toonspectrum-pwa-v3'
+// v4 invalidates /assets/ responses cached before Studio Worker requests were
+// served with the COEP/CORP headers required by cross-origin-isolated pages.
+const CACHE_NAME = 'toonspectrum-pwa-v4'
 const COVER_CACHE_NAME = 'toonspectrum-covers-v1'
 const COVER_CACHE_LIMIT = 300
 

@@ -6,10 +6,16 @@
  * patchEl 히스토리 1건으로 커밋되는 일반 드래그 상호작용이라 onApply/onCancel/로컬 상태가
  * 필요 없다. 상위(StudioPage)가 소유하는 fully-controlled 프레젠테이션 컴포넌트.
  */
-import { Spline } from "lucide-react";
+import { Loader2, Spline } from "lucide-react";
 
 import { NODE_EDIT_TOOLS, type NodeEditTool } from "./studio-node-edit";
-import { StudioToggleChip } from "./studio-panel-ui";
+import {
+  PANEL_CHIP_CLASS,
+  PANEL_LABEL_ROW,
+  PANEL_RANGE_CLASS,
+  PANEL_READOUT_CLASS,
+  StudioToggleChip,
+} from "./studio-panel-ui";
 
 import type { ReactElement } from "react";
 
@@ -27,9 +33,17 @@ export type StudioNodeEditPanelProps = {
   /** "스무딩" 도구의 현재 강도(0..1) — 강도 슬라이더의 값이자, 다음 캔버스 드래그의 시작
    * 기준선이기도 하다(StudioPage 의 nodeSmoothStrength 상태를 그대로 반영). */
   smoothStrength: number;
+  /** Paper 벡터 엔진의 일회성 경로 정리 작업 진행 상태. */
+  refinementBusy?: boolean;
+  /** 경로 정리를 적용할 수 없는 이유. */
+  refinementUnavailableReason?: string | null;
   onToggle: () => void;
   onToolChange: (tool: NodeEditTool) => void;
   onSmoothStrengthChange: (strength: number) => void;
+  /** Paper 벡터 엔진으로 현재 경로를 단순화하거나 부드럽게 정리한다. */
+  onRefine?: (operation: "simplify" | "smooth") => void;
+  /** 진행 중인 경로 정리 요청을 취소한다. */
+  onCancelRefinement?: () => void;
 };
 
 export function StudioNodeEditPanel({
@@ -38,10 +52,20 @@ export function StudioNodeEditPanel({
   handleCount,
   widthModeSupported,
   smoothStrength,
+  refinementBusy = false,
+  refinementUnavailableReason = null,
   onToggle,
   onToolChange,
   onSmoothStrengthChange,
+  onRefine,
+  onCancelRefinement,
 }: StudioNodeEditPanelProps): ReactElement {
+  const refinementDisabled = refinementBusy || Boolean(refinementUnavailableReason);
+  const refinementStatus = refinementBusy
+    ? "경로를 정리하는 중..."
+    : refinementUnavailableReason
+      ?? "점을 줄여 경로를 가볍게 만들거나 곡선을 자연스럽게 다듬습니다.";
+
   return (
     <div className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5">
       {/* 헤더 + 모드 토글 */}
@@ -70,12 +94,12 @@ export function StudioNodeEditPanel({
                 return (
                   <span
                     key={t.id}
-                    aria-disabled={disabled}
-                    className={cn(disabled && "pointer-events-none opacity-40")}
+                    className={cn(disabled && "opacity-45")}
                   >
                     <StudioToggleChip
                       active={tool === t.id}
-                      onClick={disabled ? () => {} : () => onToolChange(t.id)}
+                      disabled={disabled}
+                      onClick={() => onToolChange(t.id)}
                       title={t.tip}
                     >
                       {t.label}
@@ -87,7 +111,7 @@ export function StudioNodeEditPanel({
           </div>
 
           {tool === "smooth" && (
-            <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+            <label className={PANEL_LABEL_ROW}>
               스무딩 강도
               <span className="flex items-center gap-1.5">
                 <input
@@ -97,10 +121,10 @@ export function StudioNodeEditPanel({
                   step={0.05}
                   value={smoothStrength}
                   onChange={(e) => onSmoothStrengthChange(Number(e.target.value))}
-                  className="w-24 accent-accent cursor-pointer"
+                  className={PANEL_RANGE_CLASS}
                   aria-label="스무딩 강도"
                 />
-                <span className="w-8 text-right text-[10px] tabular-nums text-fg-3">
+                <span className={PANEL_READOUT_CLASS}>
                   {smoothStrength.toFixed(2)}
                 </span>
               </span>
@@ -137,6 +161,59 @@ export function StudioNodeEditPanel({
           노드 편집을 시작하면 선 위에 조절 핸들이 나타납니다. 점을 옮기거나 굵기를 조절해 보세요.
         </p>
       )}
+
+      {onRefine ? (
+        <section
+          aria-label="경로 정리"
+          aria-busy={refinementBusy}
+          className="space-y-2 border-t border-line/70 pt-2"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <p className="flex items-center gap-1.5 text-[0.68rem] font-semibold uppercase tracking-wider text-fg-3">
+              {refinementBusy ? <Loader2 className="size-3 animate-spin text-accent" aria-hidden /> : null}
+              경로 정리
+            </p>
+            {refinementBusy && onCancelRefinement ? (
+              <button
+                type="button"
+                onClick={onCancelRefinement}
+                className={PANEL_CHIP_CLASS}
+                aria-label="경로 정리 취소"
+              >
+                취소
+              </button>
+            ) : null}
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              disabled={refinementDisabled}
+              onClick={() => onRefine("simplify")}
+              className={PANEL_CHIP_CLASS}
+              title={refinementUnavailableReason ?? "불필요한 점을 줄여 경로를 가볍게 만듭니다."}
+            >
+              단순화
+            </button>
+            <button
+              type="button"
+              disabled={refinementDisabled}
+              onClick={() => onRefine("smooth")}
+              className={PANEL_CHIP_CLASS}
+              title={refinementUnavailableReason ?? "경로의 꺾임을 자연스러운 곡선으로 다듬습니다."}
+            >
+              부드럽게
+            </button>
+          </div>
+          <p
+            className="text-[0.7rem] leading-relaxed text-fg-3"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {refinementStatus}
+          </p>
+        </section>
+      ) : null}
     </div>
   );
 }

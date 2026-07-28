@@ -33,6 +33,7 @@ export const STUDIO_PAPER_VECTOR_REFINEMENT_CAPABILITIES = Object.freeze([
   "execution:settled-only",
   "project:ephemeral-isolated",
   "output:serializable-svg-path-data",
+  "output:frozen-flattened-contours",
   "authority:none",
 ] as const);
 
@@ -109,6 +110,7 @@ export interface StudioPaperVectorRefinementReceipt {
     readonly outputPathDataCodeUnits: number;
     readonly outputCurveCount: number;
     readonly outputSubpathCount: number;
+    readonly outputFlattenedPointCount: number;
     readonly delegatedPathNumberCurveAndWorkBudgets: true;
   }>;
   readonly authority: Readonly<{
@@ -138,6 +140,10 @@ export interface StudioPaperVectorRefinementArtifact {
   readonly empty: boolean;
   readonly curveCount: number;
   readonly subpathCount: number;
+  readonly contours: readonly Readonly<{
+    readonly points: readonly number[];
+    readonly closed: boolean;
+  }>[];
   readonly receipt: StudioPaperVectorRefinementReceipt;
 }
 
@@ -422,6 +428,7 @@ function commandCapabilities(
     "execution:settled-only",
     "project:ephemeral-isolated",
     "output:serializable-svg-path-data",
+    "output:frozen-flattened-contours",
     "authority:none",
   ]);
 }
@@ -501,6 +508,11 @@ function outputFingerprintPayload(
     empty: artifact.empty,
     curveCount: artifact.curveCount,
     subpathCount: artifact.subpathCount,
+    contours: artifact.contours.map((contour) => ({
+      points: [...contour.points],
+      closed: contour.closed,
+    })),
+    flattenedPointCount: artifact.flattenedPointCount,
     packageName: artifact.provider.packageName,
     packageVersion: artifact.provider.packageVersion,
   };
@@ -534,6 +546,12 @@ function createArtifact(
     packageVersion: geometryArtifact.provider.packageVersion,
     boundary: "studio-engine-vector-geometry-provider",
   });
+  const contours = Object.freeze(
+    geometryArtifact.contours.map((contour) => Object.freeze({
+      points: Object.freeze([...contour.points]),
+      closed: contour.closed,
+    })),
+  );
   const receipt: StudioPaperVectorRefinementReceipt = Object.freeze({
     kind: "studio-paper-vector-refinement/receipt",
     version: STUDIO_PAPER_VECTOR_REFINEMENT_PROVIDER_VERSION,
@@ -558,6 +576,7 @@ function createArtifact(
       outputPathDataCodeUnits: geometryArtifact.pathData.length,
       outputCurveCount: geometryArtifact.curveCount,
       outputSubpathCount: geometryArtifact.subpathCount,
+      outputFlattenedPointCount: geometryArtifact.flattenedPointCount,
       delegatedPathNumberCurveAndWorkBudgets: true,
     }),
     authority: Object.freeze({
@@ -585,6 +604,7 @@ function createArtifact(
     empty: geometryArtifact.empty,
     curveCount: geometryArtifact.curveCount,
     subpathCount: geometryArtifact.subpathCount,
+    contours,
     receipt,
   });
 }

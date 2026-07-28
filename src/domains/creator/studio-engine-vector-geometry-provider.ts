@@ -11,6 +11,7 @@
 import type paper from "paper";
 
 export const STUDIO_ENGINE_VECTOR_GEOMETRY_PROVIDER_VERSION = 1 as const;
+export const STUDIO_ENGINE_VECTOR_GEOMETRY_FLATNESS = 0.25 as const;
 
 export const STUDIO_ENGINE_VECTOR_GEOMETRY_LIMITS = Object.freeze({
   maxPathDataCodeUnits: 1_048_576,
@@ -19,6 +20,7 @@ export const STUDIO_ENGINE_VECTOR_GEOMETRY_LIMITS = Object.freeze({
   maxInputNumbersPerPath: 262_144,
   maxInputCurvesPerPath: 32_768,
   maxOutputCurves: 65_536,
+  maxOutputFlattenedPoints: 262_144,
   maxOutputPathDataCodeUnits: 2_097_152,
   maxBooleanCurvePairWorkUnits: 4_000_000,
   maxCoordinateAbsolute: 1_000_000,
@@ -79,6 +81,12 @@ export interface StudioEngineVectorGeometryBounds {
   readonly height: number;
 }
 
+export interface StudioEngineVectorGeometryContour {
+  /** Flattened document-space point pairs: [x0, y0, x1, y1, ...]. */
+  readonly points: readonly number[];
+  readonly closed: boolean;
+}
+
 export interface StudioEngineVectorGeometryArtifact {
   readonly kind: "studio-engine-vector-geometry";
   readonly version: typeof STUDIO_ENGINE_VECTOR_GEOMETRY_PROVIDER_VERSION;
@@ -92,6 +100,12 @@ export interface StudioEngineVectorGeometryArtifact {
   readonly empty: boolean;
   readonly curveCount: number;
   readonly subpathCount: number;
+  /**
+   * Frozen, vendor-neutral contours sampled from the canonical Paper path with the provider's
+   * fixed flatness. These are suggestions only; no Paper object crosses this boundary.
+   */
+  readonly contours: readonly StudioEngineVectorGeometryContour[];
+  readonly flattenedPointCount: number;
   readonly provider: Readonly<{
     readonly packageName: "paper";
     readonly packageVersion: string;
@@ -132,6 +146,7 @@ export interface StudioEngineVectorGeometryProviderLimits {
   readonly maxInputNumbersPerPath?: number;
   readonly maxInputCurvesPerPath?: number;
   readonly maxOutputCurves?: number;
+  readonly maxOutputFlattenedPoints?: number;
   readonly maxOutputPathDataCodeUnits?: number;
   readonly maxBooleanCurvePairWorkUnits?: number;
   readonly maxCoordinateAbsolute?: number;
@@ -157,6 +172,7 @@ type PaperLibrary = typeof paper;
 type PaperScope = InstanceType<PaperLibrary["PaperScope"]>;
 type PaperProject = InstanceType<PaperLibrary["Project"]>;
 type PaperPathItem = InstanceType<PaperLibrary["PathItem"]>;
+type PaperPath = InstanceType<PaperLibrary["Path"]>;
 
 interface ResolvedLimits {
   readonly maxPathDataCodeUnits: number;
@@ -165,6 +181,7 @@ interface ResolvedLimits {
   readonly maxInputNumbersPerPath: number;
   readonly maxInputCurvesPerPath: number;
   readonly maxOutputCurves: number;
+  readonly maxOutputFlattenedPoints: number;
   readonly maxOutputPathDataCodeUnits: number;
   readonly maxBooleanCurvePairWorkUnits: number;
   readonly maxCoordinateAbsolute: number;
@@ -198,6 +215,14 @@ const PATH_TOKEN =
 const PATH_SEPARATOR = /^[\s,]*$/;
 const OUTPUT_DECIMAL_PLACES = 6;
 const OUTPUT_SCALE = 10 ** OUTPUT_DECIMAL_PLACES;
+// Paper's Path#flatten() creates a PathFlattener with maxRecursion=256. The
+// implementation halves the parameter span until it reaches 1 / 256, so a
+// single curve can otherwise allocate as many as 256 part records before the
+// provider gets a chance to inspect the resulting segments.
+const PAPER_FLATTEN_MAX_SUBDIVISION_DEPTH = 8;
+const PAPER_NUMERICAL_EPSILON = 1e-12;
+const PAPER_COLLINEAR_EPSILON = 1e-8;
+const PAPER_STRAIGHT_DISTANCE_EPSILON = 1e-7;
 const LIMIT_KEYS = [
   "maxPathDataCodeUnits",
   "maxTotalPathDataCodeUnits",
@@ -205,6 +230,7 @@ const LIMIT_KEYS = [
   "maxInputNumbersPerPath",
   "maxInputCurvesPerPath",
   "maxOutputCurves",
+  "maxOutputFlattenedPoints",
   "maxOutputPathDataCodeUnits",
   "maxBooleanCurvePairWorkUnits",
   "maxCoordinateAbsolute",
@@ -307,6 +333,11 @@ function resolveLimits(
       limits.maxOutputCurves,
       STUDIO_ENGINE_VECTOR_GEOMETRY_LIMITS.maxOutputCurves,
       "maxOutputCurves",
+    ),
+    maxOutputFlattenedPoints: positiveIntegerLimit(
+      limits.maxOutputFlattenedPoints,
+      STUDIO_ENGINE_VECTOR_GEOMETRY_LIMITS.maxOutputFlattenedPoints,
+      "maxOutputFlattenedPoints",
     ),
     maxOutputPathDataCodeUnits: positiveIntegerLimit(
       limits.maxOutputPathDataCodeUnits,
@@ -645,6 +676,318 @@ function paperSubpathCount(
   return 1;
 }
 
+function paperContourPaths(
+  scope: PaperScope,
+  path: PaperPathItem,
+): readonly PaperPath[] {
+  if (path instanceof scope.CompoundPath) {
+    const children: PaperPath[] = [];
+    for (const child of path.children) {
+      if (!(child instanceof scope.Path)) {
+        stop("invalid-provider-output", "Paper.js returned an invalid compound-path child");
+      }
+      children.push(child);
+    }
+    return children;
+  }
+  if (!(path instanceof scope.Path)) {
+    stop("invalid-provider-output", "Paper.js returned an unsupported path item");
+  }
+  return [path];
+}
+
+interface PaperFlatteningPreflightState {
+  readonly maxFlattenedPointCount: number;
+  readonly maxWorkUnits: number;
+  flattenedPointCount: number;
+  workUnits: number;
+}
+
+function isPaperZero(value: number): boolean {
+  return value >= -PAPER_NUMERICAL_EPSILON && value <= PAPER_NUMERICAL_EPSILON;
+}
+
+function arePaperVectorsCollinear(
+  leftX: number,
+  leftY: number,
+  rightX: number,
+  rightY: number,
+): boolean {
+  const cross = Math.abs(leftX * rightY - leftY * rightX);
+  const magnitudeProduct = Math.sqrt(
+    (leftX * leftX + leftY * leftY) * (rightX * rightX + rightY * rightY),
+  );
+  return cross <= magnitudeProduct * PAPER_COLLINEAR_EPSILON;
+}
+
+/**
+ * Mirrors the numeric predicates used by Paper's Curve.isStraight(values).
+ * Keeping this local avoids constructing Paper Curve/Point/Line objects during
+ * preflight while still allowing ordinary line-heavy documents through.
+ */
+function arePaperCurveValuesStraight(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+): boolean {
+  const handle1X = x1 - x0;
+  const handle1Y = y1 - y0;
+  const handle2X = x2 - x3;
+  const handle2Y = y2 - y3;
+  if (
+    isPaperZero(handle1X)
+    && isPaperZero(handle1Y)
+    && isPaperZero(handle2X)
+    && isPaperZero(handle2Y)
+  ) {
+    return true;
+  }
+
+  const chordX = x3 - x0;
+  const chordY = y3 - y0;
+  const chordSquared = chordX * chordX + chordY * chordY;
+  if (
+    isPaperZero(chordX)
+    && isPaperZero(chordY)
+  ) {
+    return false;
+  }
+  if (
+    !arePaperVectorsCollinear(chordX, chordY, handle1X, handle1Y)
+    || !arePaperVectorsCollinear(chordX, chordY, handle2X, handle2Y)
+  ) {
+    return false;
+  }
+
+  const chordLength = Math.sqrt(chordSquared);
+  const control1Distance = Math.abs(
+    chordX * (y1 - y0) - chordY * (x1 - x0),
+  ) / chordLength;
+  const control2Distance = Math.abs(
+    chordX * (y2 - y0) - chordY * (x2 - x0),
+  ) / chordLength;
+  if (
+    control1Distance >= PAPER_STRAIGHT_DISTANCE_EPSILON
+    || control2Distance >= PAPER_STRAIGHT_DISTANCE_EPSILON
+  ) {
+    return false;
+  }
+
+  const handle1Projection = (
+    chordX * handle1X + chordY * handle1Y
+  ) / chordSquared;
+  const handle2Projection = (
+    chordX * handle2X + chordY * handle2Y
+  ) / chordSquared;
+  return handle1Projection >= 0
+    && handle1Projection <= 1
+    && handle2Projection <= 0
+    && handle2Projection >= -1;
+}
+
+function arePaperCurveValuesFlatEnough(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+): boolean {
+  const firstX = 3 * x1 - 2 * x0 - x3;
+  const firstY = 3 * y1 - 2 * y0 - y3;
+  const secondX = 3 * x2 - 2 * x3 - x0;
+  const secondY = 3 * y2 - 2 * y3 - y0;
+  return (
+    Math.max(firstX * firstX, secondX * secondX)
+    + Math.max(firstY * firstY, secondY * secondY)
+  ) <= 16 * STUDIO_ENGINE_VECTOR_GEOMETRY_FLATNESS ** 2;
+}
+
+function preflightPaperCurveFlattening(
+  state: PaperFlatteningPreflightState,
+  closed: boolean,
+  contourPartCount: { value: number },
+  depth: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number,
+): void {
+  state.workUnits += 1;
+  if (state.workUnits > state.maxWorkUnits) {
+    stop("budget-exceeded", "Geometry flattening exceeds the preflight work budget");
+  }
+
+  if (
+    depth < PAPER_FLATTEN_MAX_SUBDIVISION_DEPTH
+    && !arePaperCurveValuesStraight(x0, y0, x1, y1, x2, y2, x3, y3)
+    && !arePaperCurveValuesFlatEnough(x0, y0, x1, y1, x2, y2, x3, y3)
+  ) {
+    const x4 = (x0 + x1) / 2;
+    const y4 = (y0 + y1) / 2;
+    const x5 = (x1 + x2) / 2;
+    const y5 = (y1 + y2) / 2;
+    const x6 = (x2 + x3) / 2;
+    const y6 = (y2 + y3) / 2;
+    const x7 = (x4 + x5) / 2;
+    const y7 = (y4 + y5) / 2;
+    const x8 = (x5 + x6) / 2;
+    const y8 = (y5 + y6) / 2;
+    const x9 = (x7 + x8) / 2;
+    const y9 = (y7 + y8) / 2;
+    preflightPaperCurveFlattening(
+      state,
+      closed,
+      contourPartCount,
+      depth + 1,
+      x0,
+      y0,
+      x4,
+      y4,
+      x7,
+      y7,
+      x9,
+      y9,
+    );
+    preflightPaperCurveFlattening(
+      state,
+      closed,
+      contourPartCount,
+      depth + 1,
+      x9,
+      y9,
+      x8,
+      y8,
+      x6,
+      y6,
+      x3,
+      y3,
+    );
+    return;
+  }
+
+  const chordX = x3 - x0;
+  const chordY = y3 - y0;
+  // PathFlattener omits zero-distance terminal parts.
+  if (Math.sqrt(chordX * chordX + chordY * chordY) <= 0) return;
+
+  state.flattenedPointCount += contourPartCount.value === 0 && !closed ? 2 : 1;
+  contourPartCount.value += 1;
+  if (state.flattenedPointCount > state.maxFlattenedPointCount) {
+    stop("budget-exceeded", "Geometry result exceeds the flattened-point budget");
+  }
+}
+
+function assertPaperFlatteningBudget(
+  contourPaths: readonly PaperPath[],
+  limits: ResolvedLimits,
+): void {
+  let curveCount = 0;
+  for (const contourPath of contourPaths) {
+    curveCount += contourPath.curves.length;
+  }
+  // A fully subdivided binary curve visits roughly twice as many recursion
+  // nodes as it emits parts. Curve-count headroom preserves large straight
+  // paths, while the point-related headroom bounds pathological recursion
+  // before Paper allocates PathFlattener part objects and replacement Segments.
+  const maxWorkUnits = Math.min(
+    Number.MAX_SAFE_INTEGER,
+    curveCount * 4 + limits.maxOutputFlattenedPoints * 4,
+  );
+  const state: PaperFlatteningPreflightState = {
+    maxFlattenedPointCount: limits.maxOutputFlattenedPoints,
+    maxWorkUnits,
+    flattenedPointCount: 0,
+    workUnits: 0,
+  };
+
+  for (const contourPath of contourPaths) {
+    const contourPartCount = { value: 0 };
+    for (const curve of contourPath.curves) {
+      const values = curve.values;
+      if (
+        values.length !== 8
+        || values.some((value) => !Number.isFinite(value))
+      ) {
+        stop("invalid-provider-output", "Paper.js returned invalid curve values");
+      }
+      preflightPaperCurveFlattening(
+        state,
+        contourPath.closed,
+        contourPartCount,
+        0,
+        values[0]!,
+        values[1]!,
+        values[2]!,
+        values[3]!,
+        values[4]!,
+        values[5]!,
+        values[6]!,
+        values[7]!,
+      );
+    }
+  }
+}
+
+function flattenPaperContours(
+  scope: PaperScope,
+  path: PaperPathItem,
+  limits: ResolvedLimits,
+): Readonly<{
+  contours: readonly StudioEngineVectorGeometryContour[];
+  flattenedPointCount: number;
+}> {
+  const contourPaths = paperContourPaths(scope, path);
+  // Path#flatten() eagerly allocates all recursive parts before it mutates the
+  // path. Simulate its bounded subdivision first so oversized output is rejected
+  // before any of those allocations or mutations occur.
+  assertPaperFlatteningBudget(contourPaths, limits);
+
+  const contours: StudioEngineVectorGeometryContour[] = [];
+  let flattenedPointCount = 0;
+  for (const contourPath of contourPaths) {
+    contourPath.flatten(STUDIO_ENGINE_VECTOR_GEOMETRY_FLATNESS);
+    const points: number[] = [];
+    for (const segment of contourPath.segments) {
+      flattenedPointCount += 1;
+      if (flattenedPointCount > limits.maxOutputFlattenedPoints) {
+        stop("budget-exceeded", "Geometry result exceeds the flattened-point budget");
+      }
+      const x = roundOutputNumber(segment.point.x);
+      const y = roundOutputNumber(segment.point.y);
+      if (
+        Math.abs(x) > limits.maxCoordinateAbsolute
+        || Math.abs(y) > limits.maxCoordinateAbsolute
+      ) {
+        stop("invalid-provider-output", "Paper.js returned an out-of-range flattened point");
+      }
+      points.push(x, y);
+    }
+    if (points.length === 0) {
+      stop("invalid-provider-output", "Paper.js returned an empty non-empty contour");
+    }
+    contours.push(Object.freeze({
+      points: Object.freeze(points),
+      closed: contourPath.closed,
+    }));
+  }
+  return Object.freeze({
+    contours: Object.freeze(contours),
+    flattenedPointCount,
+  });
+}
+
 function extractBounds(path: PaperPathItem): StudioEngineVectorGeometryBounds {
   const rectangle = path.bounds;
   const minX = roundOutputNumber(rectangle.x);
@@ -788,6 +1131,8 @@ function applyOperation(
         empty: true,
         curveCount: 0,
         subpathCount: 0,
+        contours: Object.freeze([]),
+        flattenedPointCount: 0,
         provider: providerReceipt,
       });
     }
@@ -804,15 +1149,20 @@ function applyOperation(
       if (curveCount > limits.maxOutputCurves) {
         stop("budget-exceeded", "Geometry result exceeds the output-curve budget");
       }
+      const bounds = extractBounds(canonicalPath);
+      const subpathCount = paperSubpathCount(scope, canonicalPath);
+      const flattened = flattenPaperContours(scope, canonicalPath, limits);
       const artifact = {
         kind: "studio-engine-vector-geometry",
         version: STUDIO_ENGINE_VECTOR_GEOMETRY_PROVIDER_VERSION,
         operation: request.operation,
         pathData: canonicalPathData,
-        bounds: extractBounds(canonicalPath),
+        bounds,
         empty: false,
         curveCount,
-        subpathCount: paperSubpathCount(scope, canonicalPath),
+        subpathCount,
+        contours: flattened.contours,
+        flattenedPointCount: flattened.flattenedPointCount,
         provider: providerReceipt,
       } as const satisfies StudioEngineVectorGeometryArtifact;
       return Object.freeze(artifact);

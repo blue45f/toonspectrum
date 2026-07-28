@@ -112,10 +112,38 @@ describe("Studio cross-origin isolation headers", () => {
       secFetchDest: "worker",
     })).toBe(true);
     expect(isStudioCrossOriginIsolationWorkerRequest({
+      url: "/src/domains/creator/studio-paper-vector-refinement.worker.ts?worker_file&type=module",
+      method: "GET",
+      accept: "*/*",
+      secFetchDest: "empty",
+    })).toBe(true);
+    expect(isStudioCrossOriginIsolationWorkerRequest({
+      url: "/src/domains/creator/studio-paper-vector-refinement.worker.ts?worker_file&type=module",
+      method: "GET",
+      accept: "*/*",
+    })).toBe(true);
+    expect(isStudioCrossOriginIsolationWorkerRequest({
       url: "/assets/studio-procedural-artistic-brush.worker-abc.js",
       method: "HEAD",
       accept: "*/*",
       secFetchDest: "worker",
+    })).toBe(true);
+    expect(isStudioCrossOriginIsolationWorkerRequest({
+      url: "/assets/studio-paper-vector-refinement.worker-Pqo-P6hQ.js",
+      method: "GET",
+      accept: "*/*",
+      secFetchDest: "empty",
+    })).toBe(true);
+    expect(isStudioCrossOriginIsolationWorkerRequest({
+      url: "/assets/studio-paper-vector-refinement.worker-Pqo-P6hQ.js",
+      method: "GET",
+      accept: "*/*",
+    })).toBe(true);
+    expect(isStudioCrossOriginIsolationWorkerRequest({
+      url: "/assets/studio-paper-vector-refinement.worker-Pqo-P6hQ.js?cache=immutable",
+      method: "HEAD",
+      accept: "text/javascript,*/*;q=0.8",
+      secFetchDest: "script",
     })).toBe(true);
     expect(isStudioCrossOriginIsolationWorkerRequest({
       url: "/assets/StudioPage.js",
@@ -130,6 +158,18 @@ describe("Studio cross-origin isolation headers", () => {
       secFetchDest: "worker",
     })).toBe(false);
   });
+
+  it.each(["document", "iframe"])(
+    "keeps a direct hashed Worker asset %s navigation outside Worker policy",
+    (secFetchDest) => {
+      expect(isStudioCrossOriginIsolationWorkerRequest({
+        url: "/assets/studio-paper-vector-refinement.worker-Pqo-P6hQ.js",
+        method: "GET",
+        accept: "text/html,application/xhtml+xml,*/*;q=0.8",
+        secFetchDest,
+      })).toBe(false);
+    },
+  );
 });
 
 describe("Studio SPA isolation entry guard", () => {

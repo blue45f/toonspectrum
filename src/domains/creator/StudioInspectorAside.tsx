@@ -594,6 +594,8 @@ interface StudioInspectorAsideProps {
   setExtendedBlendMode: import("react").Dispatch<import("react").SetStateAction<StudioExtendedBlendModeId>>;
   setExtendedBlendOpacity: import("react").Dispatch<import("react").SetStateAction<number>>;
   applyPathBooleanCombine: (op: StudioPathBooleanOp) => void;
+  applyPaperVectorRefinement: (operation: "simplify" | "smooth") => void;
+  cancelPaperVectorRefinement: () => void;
   enterQuickMask: () => void;
   commitQuickMask: () => void;
   exitQuickMask: () => void;
@@ -669,6 +671,8 @@ interface StudioInspectorAsideProps {
   extendedBlendUnavailableReason: string | null;
   pathBooleanBusy: boolean;
   pathBooleanUnavailableReason: string | null;
+  paperVectorRefinementBusy: boolean;
+  paperVectorRefinementUnavailableReason: string | null;
   dodgeBurnActive: boolean;
   dodgeBurnBusy: boolean;
   dodgeBurnExposure: number;
@@ -940,6 +944,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   setExtendedBlendMode,
   setExtendedBlendOpacity,
   applyPathBooleanCombine,
+  applyPaperVectorRefinement,
+  cancelPaperVectorRefinement,
   enterQuickMask,
   commitQuickMask,
   exitQuickMask,
@@ -1014,6 +1020,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   extendedBlendUnavailableReason,
   pathBooleanBusy,
   pathBooleanUnavailableReason,
+  paperVectorRefinementBusy,
+  paperVectorRefinementUnavailableReason,
   dodgeBurnActive,
   dodgeBurnBusy,
   dodgeBurnExposure,
@@ -1690,6 +1698,16 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   />
                 </div>
               ) : null}
+              {paperVectorRefinementBusy && inspectorInteractionPolicy.selection.disabled ? (
+                <button
+                  type="button"
+                  aria-label="잠긴 경로 정리 취소"
+                  onClick={cancelPaperVectorRefinement}
+                  className="mb-3 min-h-11 w-full rounded-lg border border-danger/35 bg-danger/10 px-3 py-2 text-xs font-semibold text-danger"
+                >
+                  경로 정리 취소
+                </button>
+              ) : null}
               <fieldset
                 disabled={inspectorInteractionPolicy.selection.disabled}
                 title={inspectorInteractionPolicy.selection.reason}
@@ -1814,6 +1832,10 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                         handleCount={nodeEditHandles.length}
                         widthModeSupported={isPressureWidthBrush(selected.brush, selected.mode)}
                         smoothStrength={nodeSmoothStrength}
+                        refinementBusy={paperVectorRefinementBusy}
+                        refinementUnavailableReason={
+                          paperVectorRefinementUnavailableReason
+                        }
                         onSmoothStrengthChange={setNodeSmoothStrength}
                         onToggle={() => {
                           if (nodeEditTool) {
@@ -1824,6 +1846,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           setNodeEditTool("move");
                         }}
                         onToolChange={(t) => setNodeEditTool(t)}
+                        onRefine={applyPaperVectorRefinement}
+                        onCancelRefinement={cancelPaperVectorRefinement}
                       />
                     </div>
                   )}

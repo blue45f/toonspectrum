@@ -830,6 +830,10 @@ import {
   type PanelSplitPreview,
 } from "./studio-panel-split";
 import {
+  refineStudioDrawElementWithPaper,
+  studioPaperVectorDocumentIneligibilityReason,
+} from "./studio-paper-vector-document-adapter";
+import {
   combineStudioShapes,
   drawElToStudioPathBooleanSpec,
   studioPathBooleanOpLabel,
@@ -1139,6 +1143,9 @@ import {
   studioUiDensityAllows,
   type StudioUiDensityMode,
 } from "./studio-ui-density";
+import {
+  studioVectorAsyncCommandStaleReason,
+} from "./studio-vector-async-command-guard";
 import {
   planStudioVectorEraseToIntersectionApply,
   STUDIO_ERASE_TO_INTERSECTION_LABEL,
@@ -2474,6 +2481,20 @@ function StudioCuttoonEditor() {
   const [extendedBlendOpacity, setExtendedBlendOpacity] = useState(1);
   // 벡터 패스 불리언(도형 결합) — 마퀴 2도형 선택 시 합치기/빼기/교차/제외.
   const [pathBooleanBusy, setPathBooleanBusy] = useState(false);
+  const pathBooleanRunIdRef = useRef(0);
+  const pathBooleanActiveRef = useRef(false);
+  // Paper.js 경로 정리는 Worker 안의 settled suggestion만 만들며, Studio 문서 권위는 이
+  // 컴포넌트가 보유한다. 페이지/Undo/선택이 바뀌면 run/epoch를 함께 전진시켜 늦은 결과를 폐기한다.
+  const [paperVectorRefinementBusy, setPaperVectorRefinementBusy] = useState(false);
+  const paperVectorRefinementRunIdRef = useRef(0);
+  const paperVectorRefinementActiveRef = useRef(false);
+  const paperVectorRefinementAbortRef = useRef<AbortController | null>(null);
+  const paperVectorRefinementRequestSequenceRef = useRef(0);
+  const paperVectorRefinementEngineEpochRef = useRef(1);
+  const paperVectorRefinementClientRef = useRef<{
+    advanceEngineEpoch(): number;
+    dispose(): void;
+  } | null>(null);
   function persistAppSettings(next: StudioAppSettings): boolean {
     const settingsSaved = saveStudioAppSettings(studioAppSettingsStorage(), next);
     const densitySaved = saveStudioUiDensityState(
@@ -3479,6 +3500,40 @@ function StudioCuttoonEditor() {
       },
     [pages, activePageIndex, currentPageId]
   );
+  useEffect(() => {
+    if (pathBooleanActiveRef.current) {
+      pathBooleanRunIdRef.current += 1;
+      pathBooleanActiveRef.current = false;
+      setPathBooleanBusy(false);
+    }
+    if (paperVectorRefinementActiveRef.current) {
+      paperVectorRefinementRunIdRef.current += 1;
+      paperVectorRefinementActiveRef.current = false;
+      paperVectorRefinementAbortRef.current?.abort();
+      paperVectorRefinementAbortRef.current = null;
+      const client = paperVectorRefinementClientRef.current;
+      if (client) {
+        paperVectorRefinementEngineEpochRef.current = client.advanceEngineEpoch();
+      } else {
+        paperVectorRefinementEngineEpochRef.current += 1;
+      }
+      setPaperVectorRefinementBusy(false);
+    }
+  // A history-array identity change is not itself an authority change. Autosave,
+  // reconciliation, and collaboration admission may replace that outer array
+  // while the active page/index/source objects are still authoritative. Treating
+  // it as a cancellation signal recycled the dedicated Worker during startup in
+  // production. Page/mode/index changes still cancel eagerly; same-index document
+  // edits are rejected after await by the mutation ticket and exact source identity.
+  }, [activePage.id, masterEditMode, pagesHi]);
+  useEffect(() => () => {
+    paperVectorRefinementRunIdRef.current += 1;
+    paperVectorRefinementActiveRef.current = false;
+    paperVectorRefinementAbortRef.current?.abort();
+    paperVectorRefinementAbortRef.current = null;
+    paperVectorRefinementClientRef.current?.dispose();
+    paperVectorRefinementClientRef.current = null;
+  }, []);
   // 신규 캔버스(작업ID/리믹스 없음)에서는 페이지 리뷰 잠금이 편집 차단에 개입하지 않도록 스코프를 분리한다.
   const reviewBoundPage = workId !== null || remixId !== null;
   const pageEditLocked = reviewBoundPage && isPageReviewLocked(activePage.review);
@@ -12464,7 +12519,32 @@ function StudioCuttoonEditor() {
           ? pendingStrokeCommitsRef.current.strokes.find((stroke) => stroke.id === selectedId)
           || null
           : null);
-
+  const paperVectorRefinementUnavailableReason = (() => {
+    if (selected?.type !== "draw") {
+      return "자유선 펜 획 하나를 선택하세요.";
+    }
+    if (elementById.get(selected.id) !== selected) {
+      return "획 저장이 끝난 뒤 경로를 정리할 수 있어요.";
+    }
+    if (activeSurfaceReviewLocked || (pageEditLocked && !masterEditMode)) {
+      return "작업면 잠금을 해제한 뒤 경로를 정리하세요.";
+    }
+    if (isEffectivelyLocked(selected, groups)) {
+      return "선택한 획이나 상위 그룹의 잠금을 해제하세요.";
+    }
+    const reason = studioPaperVectorDocumentIneligibilityReason(selected);
+    if (!reason) return null;
+    if ((selected.kind ?? "freehand") !== "freehand") {
+      return "자유선 펜 획만 경로 정리를 지원해요.";
+    }
+    if ((selected.mode ?? "pen") !== "pen") {
+      return "지우개 획은 경로 정리를 지원하지 않아요.";
+    }
+    if ((selected.symmetry?.type ?? "none") !== "none") {
+      return "대칭 브러시 결과를 먼저 확정한 뒤 경로를 정리하세요.";
+    }
+    return "이 브러시는 질감·스탬프 의미를 보존하기 위해 경로 정리를 제한해요.";
+  })();
   const selectedForInspector: El | null = useMemo(() => {
     if (selected === null || selected.type !== "draw") {
       return selected;
@@ -17336,8 +17416,193 @@ const puppetWarpArmed =
     }
   }
 
+  function cancelPaperVectorRefinement() {
+    const wasActive = paperVectorRefinementActiveRef.current;
+    paperVectorRefinementRunIdRef.current += 1;
+    paperVectorRefinementActiveRef.current = false;
+    paperVectorRefinementAbortRef.current?.abort();
+    paperVectorRefinementAbortRef.current = null;
+    const client = paperVectorRefinementClientRef.current;
+    if (client) {
+      paperVectorRefinementEngineEpochRef.current = client.advanceEngineEpoch();
+    } else {
+      paperVectorRefinementEngineEpochRef.current += 1;
+    }
+    setPaperVectorRefinementBusy(false);
+    if (wasActive) announceDrawingShortcut("경로 정리를 취소했어요.");
+  }
+
+  /**
+   * Paper는 Worker 안에서 정리된 경로 suggestion만 계산한다. 선택 획·페이지·Undo frontier와
+   * 잠금이 시작 시점과 정확히 같을 때에만 같은 ID의 DrawEl로 치환해 canonical commit 1회를
+   * 수행한다. 취소·페이지 전환·원격 변경 뒤 도착한 결과는 문서 권위를 얻지 못한다.
+   */
+  async function applyPaperVectorRefinement(
+    operation: "simplify" | "smooth"
+  ) {
+    if (paperVectorRefinementUnavailableReason) {
+      setError(paperVectorRefinementUnavailableReason);
+      return;
+    }
+    if (
+      selected?.type !== "draw"
+      || elementById.get(selected.id) !== selected
+      || paperVectorRefinementActiveRef.current
+    ) {
+      return;
+    }
+
+    const source = selected;
+    const runId = paperVectorRefinementRunIdRef.current + 1;
+    paperVectorRefinementRunIdRef.current = runId;
+    paperVectorRefinementActiveRef.current = true;
+    const controller = new AbortController();
+    paperVectorRefinementAbortRef.current = controller;
+    const mutationTicket = captureStudioMutationTicket();
+    const targetPageId = currentPageIdRef.current || activePage.id;
+    const targetMasterEditMode = masterEditModeRef.current;
+    const requestSequence =
+      paperVectorRefinementRequestSequenceRef.current + 1;
+    paperVectorRefinementRequestSequenceRef.current = requestSequence;
+    const engineEpoch = paperVectorRefinementEngineEpochRef.current;
+    const snapshot = {
+      runId,
+      pageId: targetPageId,
+      masterEditMode: targetMasterEditMode,
+      selectedIds: [source.id],
+      sourceElements: [source],
+    } as const;
+    setPaperVectorRefinementBusy(true);
+
+    try {
+      const {
+        getStudioPaperVectorRefinementWorkerClient,
+      } = await import("./studio-paper-vector-refinement-worker-client");
+      if (
+        controller.signal.aborted
+        || !paperVectorRefinementActiveRef.current
+        || paperVectorRefinementRunIdRef.current !== runId
+      ) {
+        return;
+      }
+      const client = getStudioPaperVectorRefinementWorkerClient({
+        engineEpoch,
+      });
+      paperVectorRefinementClientRef.current = client;
+      const provider = {
+        refine: (request: unknown) =>
+          client.refine(request, { signal: controller.signal }),
+      };
+      const result = await refineStudioDrawElementWithPaper({
+        element: source,
+        provider,
+        requestSequence,
+        engineEpoch,
+        refinement: operation === "simplify"
+          ? {
+              kind: "simplify",
+              tolerance: 0.25 + Math.min(1, Math.max(0, nodeSmoothStrength)) * 2.75,
+            }
+          : {
+              kind: "smooth",
+              smoothing: {
+                type: "catmull-rom",
+                factor: Math.min(1, Math.max(0, nodeSmoothStrength)),
+              },
+            },
+        signal: controller.signal,
+      });
+      if (
+        controller.signal.aborted
+        || !paperVectorRefinementActiveRef.current
+        || paperVectorRefinementRunIdRef.current !== runId
+      ) {
+        return;
+      }
+      if (!result.ok) {
+        if (
+          result.providerReason === "aborted"
+          || result.providerReason === "disposed"
+          || result.providerReason === "epoch-mismatch"
+        ) {
+          return;
+        }
+        console.warn(
+          `Paper vector refinement was rejected: ${JSON.stringify({
+            reason: result.reason,
+            providerReason: result.providerReason ?? null,
+            detail: result.detail,
+          })}`,
+        );
+        setError(
+          result.reason === "budget-exceeded"
+            ? "선택한 획이 너무 복잡해 안전한 경로 예산 안에서 정리하지 못했어요."
+            : result.reason === "ineligible-element"
+              ? "이 브러시는 질감과 획 의미를 보존하기 위해 경로 정리를 제한해요."
+              : "경로 정리 결과를 안전하게 검증하지 못했어요. 다시 시도해 주세요."
+        );
+        return;
+      }
+
+      const latestElements = activeElementsRef.current;
+      const staleReason = studioVectorAsyncCommandStaleReason(snapshot, {
+        runId: paperVectorRefinementRunIdRef.current,
+        pageId: currentPageIdRef.current || activePage.id,
+        masterEditMode: masterEditModeRef.current,
+        selectedIds: currentCanvasSelectionIds(),
+        elements: latestElements,
+        mutationAllowed: canApplyStudioMutation(mutationTicket),
+        reviewLocked: activeSurfaceReviewLockedRef.current,
+        isElementLocked: (element) =>
+          isEffectivelyLocked(element, activeGroupsRef.current),
+      });
+      if (staleReason) {
+        if (
+          staleReason !== "superseded"
+          && staleReason !== "document-changed"
+        ) {
+          setError(
+            staleReason === "locked"
+              ? "계산 중 획이나 작업면이 잠겨 경로 정리 결과를 적용하지 않았어요."
+              : "계산 중 페이지·선택 또는 획이 바뀌어 오래된 경로 정리 결과를 적용하지 않았어요."
+          );
+        }
+        return;
+      }
+
+      const nextElements = latestElements.map((element) =>
+        element === source ? result.replacement : element
+      );
+      const committed = commit(nextElements, undefined, targetPageId);
+      if (!committed) return;
+      selectedIdRef.current = source.id;
+      marqueeIdsRef.current = [];
+      setSelectedId(source.id);
+      setMarqueeIds([]);
+      setError(null);
+      announceDrawingShortcut(
+        operation === "simplify"
+          ? "경로의 불필요한 점을 정리했어요."
+          : "경로를 자연스러운 곡선으로 다듬었어요."
+      );
+    } catch (cause) {
+      if (!controller.signal.aborted) {
+        console.error("Failed to refine vector path with Paper worker:", cause);
+        setError("벡터 경로 엔진을 시작하지 못했어요. 다시 시도해 주세요.");
+      }
+    } finally {
+      if (paperVectorRefinementRunIdRef.current === runId) {
+        paperVectorRefinementActiveRef.current = false;
+        paperVectorRefinementAbortRef.current = null;
+        setPaperVectorRefinementBusy(false);
+      }
+    }
+  }
+
   // 벡터 패스 불리언 결합 — 마퀴로 고른 도형 2개를 합치기/빼기/교차/제외로 치환한다.
-  // 순수 벡터 커밋(단일 undo)이라 라이브 리소스 잠금은 불필요(alignSelected와 동일 계층).
+  // 계산은 lazy geometry 청크를 기다리므로 시작 시점의 render closure를 그대로 커밋하면 안 된다.
+  // 페이지/Undo/선택/원본/잠금이 하나라도 바뀐 결과는 authority 없는 suggestion으로 폐기하고,
+  // 최신 ref-backed surface가 정확히 같은 때에만 단일 undo commit으로 소비한다.
   async function applyPathBooleanCombine(op: StudioPathBooleanOp) {
     const selectionEls = marqueeIds
       .map((id) => elements.find((el) => el.id === id))
@@ -17355,7 +17620,21 @@ const puppetWarpArmed =
       setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 편집해 주세요.");
       return;
     }
-    if (pathBooleanBusy) return;
+    if (pathBooleanActiveRef.current) return;
+    const runId = pathBooleanRunIdRef.current + 1;
+    pathBooleanRunIdRef.current = runId;
+    pathBooleanActiveRef.current = true;
+    const mutationTicket = captureStudioMutationTicket();
+    const targetPageId = currentPageIdRef.current || activePage.id;
+    const targetMasterEditMode = masterEditModeRef.current;
+    const selectedIds = selectionEls.map((element) => element.id);
+    const snapshot = {
+      runId,
+      pageId: targetPageId,
+      masterEditMode: targetMasterEditMode,
+      selectedIds,
+      sourceElements: selectionEls,
+    } as const;
     setPathBooleanBusy(true);
     try {
       const indexed = selectionEls
@@ -17370,14 +17649,64 @@ const puppetWarpArmed =
         setError(result.reason);
         return;
       }
+
+      const latestElements = activeElementsRef.current;
+      const mutationAllowed = canApplyStudioMutation(mutationTicket);
+      const staleReason = studioVectorAsyncCommandStaleReason(snapshot, {
+        runId: pathBooleanRunIdRef.current,
+        pageId: currentPageIdRef.current || activePage.id,
+        masterEditMode: masterEditModeRef.current,
+        selectedIds: marqueeIdsRef.current,
+        elements: latestElements,
+        mutationAllowed,
+        reviewLocked: activeSurfaceReviewLockedRef.current,
+        isElementLocked: (element) =>
+          isEffectivelyLocked(element, activeGroupsRef.current),
+      });
+      if (staleReason) {
+        if (
+          staleReason !== "superseded"
+          && staleReason !== "document-changed"
+        ) {
+          setError(
+            staleReason === "locked"
+              ? "계산 중 페이지나 도형이 잠겨 결합 결과를 적용하지 않았어요."
+              : "계산 중 페이지·선택 또는 도형이 바뀌어 오래된 결합 결과를 적용하지 않았어요."
+          );
+        }
+        return;
+      }
+
+      const latestSelectionEls = selectedIds
+        .map((id) => latestElements.find((element) => element.id === id))
+        .filter((element): element is El => Boolean(element));
+      const latestGate = studioPathBooleanUnavailableReason(
+        latestSelectionEls
+      );
+      if (latestGate) {
+        setError(latestGate);
+        return;
+      }
       const pieceEls = result.output.pieces.map((piece) => ({
         ...studioPathBooleanPieceToDrawElSeed(piece, base),
         id: uid(),
         name: `도형 결합 ${studioPathBooleanOpLabel(op)}`,
       }) as El);
-      const kept = elements.filter((el) => el.id !== base.id && el.id !== top.id);
-      const insertAt = elements.slice(0, indexed[0]!.index).filter((el) => el.id !== top.id).length;
-      commit([...kept.slice(0, insertAt), ...pieceEls, ...kept.slice(insertAt)]);
+      const latestBaseIndex = latestElements.findIndex(
+        (element) => element.id === base.id
+      );
+      const kept = latestElements.filter(
+        (element) => element.id !== base.id && element.id !== top.id
+      );
+      const insertAt = latestElements
+        .slice(0, latestBaseIndex)
+        .filter((element) => element.id !== top.id).length;
+      const committed = commit(
+        [...kept.slice(0, insertAt), ...pieceEls, ...kept.slice(insertAt)],
+        undefined,
+        targetPageId
+      );
+      if (!committed) return;
       setSelectedId(pieceEls.length === 1 ? pieceEls[0]!.id : null);
       setMarqueeIds(pieceEls.length > 1 ? pieceEls.map((el) => el.id) : []);
       setError(null);
@@ -17385,7 +17714,10 @@ const puppetWarpArmed =
       console.error("Failed to apply path boolean combine:", err);
       setError("도형 결합에 실패했습니다.");
     } finally {
-      setPathBooleanBusy(false);
+      if (pathBooleanRunIdRef.current === runId) {
+        pathBooleanActiveRef.current = false;
+        setPathBooleanBusy(false);
+      }
     }
   }
 
@@ -34789,6 +35121,14 @@ function clearSelectionForEdit() {
             marqueeIds.map((id) => elementById.get(id)).filter((el): el is El => Boolean(el))
           )}
           applyPathBooleanCombine={(op) => void applyPathBooleanCombine(op)}
+          paperVectorRefinementBusy={paperVectorRefinementBusy}
+          paperVectorRefinementUnavailableReason={
+            paperVectorRefinementUnavailableReason
+          }
+          applyPaperVectorRefinement={(operation) => {
+            void applyPaperVectorRefinement(operation);
+          }}
+          cancelPaperVectorRefinement={cancelPaperVectorRefinement}
           dodgeBurnActive={dodgeBurnActive}
           dodgeBurnBusy={dodgeBurnBusy}
           dodgeBurnExposure={dodgeBurnExposure}

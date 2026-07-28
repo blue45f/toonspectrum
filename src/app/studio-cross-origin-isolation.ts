@@ -120,6 +120,26 @@ function pathnameFromRequestUrl(url: string | null | undefined): string | null {
   }
 }
 
+function isViteStudioWorkerAssetUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url, "http://vite.local");
+    if (
+      /(?:^|\/)assets\/studio-[^/]+\.worker-[A-Za-z0-9_-]+\.js$/.test(
+        parsed.pathname,
+      )
+    ) {
+      return true;
+    }
+    return (
+      /(?:^|\/)studio-[^/]+\.worker\.[cm]?[jt]sx?$/.test(parsed.pathname)
+      && parsed.searchParams.has("worker_file")
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Vite middleware admission. Only navigation-like GET/HEAD requests under the
  * Studio path receive document isolation headers; JS, images, API calls and the
@@ -158,7 +178,35 @@ export function isStudioCrossOriginIsolationWorkerRequest(
 ): boolean {
   const method = request.method?.toUpperCase() ?? "GET";
   if (method !== "GET" && method !== "HEAD") return false;
-  return request.secFetchDest?.trim().toLowerCase() === "worker";
+
+  const destination = request.secFetchDest?.trim().toLowerCase();
+  if (destination === "worker" || destination === "sharedworker") return true;
+
+  // A controlling service worker can re-fetch a Vite-built module Worker
+  // without forwarding the original Worker destination metadata, so the
+  // origin sees `Sec-Fetch-Dest: empty` (or no destination) with `Accept: */*`.
+  // Recognize Vite's immutable Worker asset naming contract so that response
+  // still receives COEP/CORP, while direct document navigations stay plain.
+  if (
+    destination === "document"
+    || destination === "frame"
+    || destination === "iframe"
+  ) {
+    return false;
+  }
+  if (!isViteStudioWorkerAssetUrl(request.url)) return false;
+  const accept = request.accept?.trim().toLowerCase();
+  if (
+    accept?.includes("text/html")
+    || accept?.includes("application/xhtml+xml")
+  ) {
+    return false;
+  }
+  return (
+    !accept
+    || accept.includes("*/*")
+    || accept.includes("javascript")
+  );
 }
 
 type StudioIsolationReloadDirection = "studio-entry" | "public-exit";

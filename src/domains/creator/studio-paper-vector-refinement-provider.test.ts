@@ -144,6 +144,7 @@ describe("StudioPaperVectorRefinementProvider", () => {
     })));
 
     expect(first.pathData).toBe(second.pathData);
+    expect(first.contours).toEqual(second.contours);
     expect(first.curveCount).toBeLessThan(12);
     expect(first.receipt.inputFingerprint).toBe(
       second.receipt.inputFingerprint,
@@ -177,6 +178,7 @@ describe("StudioPaperVectorRefinementProvider", () => {
         outputPathDataCodeUnits: first.pathData.length,
         outputCurveCount: first.curveCount,
         outputSubpathCount: 1,
+        outputFlattenedPointCount: first.contours[0]!.points.length / 2,
         delegatedPathNumberCurveAndWorkBudgets: true,
       },
       capabilitiesUsed: [
@@ -184,6 +186,7 @@ describe("StudioPaperVectorRefinementProvider", () => {
         "execution:settled-only",
         "project:ephemeral-isolated",
         "output:serializable-svg-path-data",
+        "output:frozen-flattened-contours",
         "authority:none",
       ],
       complete: true,
@@ -193,6 +196,9 @@ describe("StudioPaperVectorRefinementProvider", () => {
     expect(first.receipt.replayFingerprint).toMatch(/^sha256:[a-f0-9]{64}$/u);
     expect(Object.isFrozen(first)).toBe(true);
     expect(Object.isFrozen(first.bounds)).toBe(true);
+    expect(Object.isFrozen(first.contours)).toBe(true);
+    expect(Object.isFrozen(first.contours[0])).toBe(true);
+    expect(Object.isFrozen(first.contours[0]!.points)).toBe(true);
     expect(Object.isFrozen(first.receipt)).toBe(true);
     expect(JSON.parse(JSON.stringify(first))).toEqual(first);
     expect(JSON.stringify(first)).not.toMatch(
@@ -291,6 +297,7 @@ describe("StudioPaperVectorRefinementProvider", () => {
       empty: true,
       curveCount: 0,
       subpathCount: 0,
+      contours: [],
       bounds: {
         minX: 0,
         minY: 0,
@@ -300,6 +307,7 @@ describe("StudioPaperVectorRefinementProvider", () => {
         height: 0,
       },
     });
+    expect(result.receipt.budget.outputFlattenedPointCount).toBe(0);
     expect(result.receipt.outputFingerprint).toMatch(/^sha256:[a-f0-9]{64}$/u);
   });
 
@@ -331,6 +339,20 @@ describe("StudioPaperVectorRefinementProvider", () => {
       activeProjectCount: 0,
       completed: 0,
       rejected: 1,
+    });
+
+    const flattenedBudget = provider({
+      limits: {
+        maxOutputFlattenedPoints: 2,
+      },
+    });
+    await expect(flattenedBudget.refine(request({
+      kind: "smooth",
+      pathData: "M 0 0 L 10 20 L 20 -10 L 30 20 L 40 0",
+    }))).resolves.toMatchObject({
+      status: "rejected",
+      reason: "budget-exceeded",
+      consumed: false,
     });
   });
 

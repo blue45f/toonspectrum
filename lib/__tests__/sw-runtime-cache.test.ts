@@ -157,6 +157,7 @@ describe("service worker runtime caching", () => {
     expect(cacheName).toMatch(/^toonspectrum-pwa-v\d+$/);
     expect(cacheName).not.toBe("toonspectrum-pwa-v1");
     expect(cacheName).not.toBe("toonspectrum-pwa-v2");
+    expect(cacheName).not.toBe("toonspectrum-pwa-v3");
     expect(coverCacheName).toMatch(/^toonspectrum-covers-v\d+$/);
   });
 
@@ -175,7 +176,11 @@ describe("service worker runtime caching", () => {
 
   it("deletes previous-version caches on activate and claims clients", async () => {
     const worker = createWorker();
-    worker.seed("toonspectrum-pwa-v1", "/", new Response("old shell"));
+    worker.seed(
+      "toonspectrum-pwa-v3",
+      "/assets/studio-paper-vector-refinement.worker-old.js",
+      new Response("cached Worker without isolation headers"),
+    );
     worker.seed(cacheName, "/", new Response("current shell"));
 
     await worker.dispatchActivate();
