@@ -18,6 +18,14 @@ type DictByLocale = Record<string, Dict>;
 
 const DICT: DictByLocale = {
   ko: {
+    "apiError.loginRequired": "로그인이 필요해요.",
+    "apiError.adminRequired": "관리자 권한을 확인할 수 없습니다.",
+    "apiError.adminOnlyPage": "관리자 전용 페이지입니다.",
+    "apiError.notFound": "대상 대상을 찾을 수 없어요.",
+    "apiError.unsupportedType": "지원하지 않는 콘텐츠 타입이에요.",
+    "apiError.inactiveAccount": "비활성 계정은 관리자 권한을 사용할 수 없습니다.",
+    "apiError.settlementFailed": "정산 처리에 실패했습니다.",
+
     "error.reloading": "최신 버전으로 새로고침하는 중이에요…",
     "error.chunkRetryFailed": "새로고침을 한 번 시도했지만 문제가 이어지고 있어요. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
     "error.reloadButton": "새로고침",
@@ -610,6 +618,14 @@ const DICT: DictByLocale = {
     "authors.noName": "작가",
   },
   en: {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -1186,6 +1202,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ja": {
+    "apiError.loginRequired": "ログインが必要です。",
+    "apiError.adminRequired": "管理者権限を確認できませんでした。",
+    "apiError.adminOnlyPage": "管理者専用ページです。",
+    "apiError.notFound": "対象が見つかりませんでした。",
+    "apiError.unsupportedType": "サポートされていないコンテンツタイプです。",
+    "apiError.inactiveAccount": "非アクティブなアカウントは管理者機能を利用できません。",
+    "apiError.settlementFailed": "精算処理に失敗しました。",
+
     "error.reloading": "最新バージョンへ更新中…",
     "error.chunkRetryFailed": "再読み込みを行いましたが問題が解決しませんでした。ネットワーク接続をご確認の上、再試行してください。",
     "error.reloadButton": "再読み込み",
@@ -1727,6 +1751,14 @@ const DICT: DictByLocale = {
     "authors.desc": "作家を作品数順にランキングしたものです。著者をタップすると、タイトル、評価、ファン カフェが 1 か所に表示されます。",
   },
   "zh": {
+    "apiError.loginRequired": "需要先登录。",
+    "apiError.adminRequired": "无法验证管理员权限。",
+    "apiError.adminOnlyPage": "此页面仅限管理员访问。",
+    "apiError.notFound": "未找到目标项目。",
+    "apiError.unsupportedType": "不支持的内容类型。",
+    "apiError.inactiveAccount": "未激活的账号无法使用管理员权限。",
+    "apiError.settlementFailed": "结算处理失败。",
+
     "error.reloading": "正在刷新至最新版本…",
     "error.chunkRetryFailed": "已尝试刷新一次，但问题仍然存在。请检查网络连接后重试。",
     "error.reloadButton": "刷新页面",
@@ -2268,6 +2300,14 @@ const DICT: DictByLocale = {
     "authors.stats": "{total} 位作者中排名靠前的 {shown} 位作者",
   },
   "zh-hant": {
+    "apiError.loginRequired": "需要先登入。",
+    "apiError.adminRequired": "無法驗證管理員權限。",
+    "apiError.adminOnlyPage": "此頁面僅限管理員訪問。",
+    "apiError.notFound": "未找到目標項目。",
+    "apiError.unsupportedType": "不支援的內容類型。",
+    "apiError.inactiveAccount": "未啟用的帳號無法使用管理員權限。",
+    "apiError.settlementFailed": "結算處理失敗。",
+
     "error.reloading": "正在刷新至最新版本…",
     "error.chunkRetryFailed": "已嘗試刷新一次，但問題仍然存在。請檢查網路連線後重試。",
     "error.reloadButton": "重新載入",
@@ -2809,6 +2849,14 @@ const DICT: DictByLocale = {
     "authors.stats": "{total} 位作者中排名靠前的 {shown} 位作者",
   },
   "es": {
+    "apiError.loginRequired": "Se requiere iniciar sesión.",
+    "apiError.adminRequired": "No se pudieron verificar los permisos de administrador.",
+    "apiError.adminOnlyPage": "Esta página está restringida a administradores.",
+    "apiError.notFound": "No se pudo encontrar el elemento solicitado.",
+    "apiError.unsupportedType": "Tipo de contenido no compatible.",
+    "apiError.inactiveAccount": "Las cuentas inactivas no pueden utilizar funciones de administrador.",
+    "apiError.settlementFailed": "Error al procesar la liquidación.",
+
     "error.reloading": "Cargando la última versión…",
     "error.chunkRetryFailed": "Se ha intentado recargar, pero el problema persiste. Compruebe su conexión e inténtelo de nuevo.",
     "error.reloadButton": "Recargar página",
@@ -3350,6 +3398,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "fr": {
+    "apiError.loginRequired": "Connexion requise.",
+    "apiError.adminRequired": "Impossible de vérifier les autorisations d'administrateur.",
+    "apiError.adminOnlyPage": "Cette page est réservée aux administrateurs.",
+    "apiError.notFound": "L'élément demandé est introuvable.",
+    "apiError.unsupportedType": "Type de contenu non pris en charge.",
+    "apiError.inactiveAccount": "Les comptes inactifs ne peuvent pas utiliser les fonctions d'administrateur.",
+    "apiError.settlementFailed": "Échec du traitement du règlement.",
+
     "error.reloading": "Chargement de la dernière version…",
     "error.chunkRetryFailed": "La page a été rafraîchie, mais le problème persiste. Veuillez vérifier votre connexion et réessayer.",
     "error.reloadButton": "Rafraîchir la page",
@@ -3891,6 +3947,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "de": {
+    "apiError.loginRequired": "Anmeldung erforderlich.",
+    "apiError.adminRequired": "Administratorrechte konnten nicht verifiziert werden.",
+    "apiError.adminOnlyPage": "Diese Seite ist Administratoren vorbehalten.",
+    "apiError.notFound": "Das angeforderte Element konnte nicht gefunden werden.",
+    "apiError.unsupportedType": "Nicht unterstützter Inhaltstyp.",
+    "apiError.inactiveAccount": "Inaktive Konten können keine Administratorfunktionen nutzen.",
+    "apiError.settlementFailed": "Abrechnungsverarbeitung fehlgeschlagen.",
+
     "error.reloading": "Wird auf die neueste Version aktualisiert…",
     "error.chunkRetryFailed": "Aktualisierung versucht, aber das Problem besteht weiterhin. Bitte überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
     "error.reloadButton": "Seite neu laden",
@@ -4432,6 +4496,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "id": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -4955,6 +5027,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "vi": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -5478,6 +5558,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "th": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -6001,6 +6089,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ru": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -6524,6 +6620,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "pt": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -7047,6 +7151,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "it": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -7570,6 +7682,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ar": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -8093,6 +8213,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "hi": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -8616,6 +8744,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "tr": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -9139,6 +9275,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "nl": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -9662,6 +9806,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "pl": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -10185,6 +10337,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "sv": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -10708,6 +10868,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "fil": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -11231,6 +11399,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ms": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -11754,6 +11930,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "af": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -12277,6 +12461,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "am": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -12800,6 +12992,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "as": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -13323,6 +13523,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "az": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -13846,6 +14054,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "be": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -14369,6 +14585,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "bg": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -14892,6 +15116,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "bn": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -15415,6 +15647,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "bs": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -15938,6 +16178,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ca": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -16461,6 +16709,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "cs": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -16984,6 +17240,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "da": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -17507,6 +17771,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "el": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -18030,6 +18302,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "et": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -18553,6 +18833,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "eu": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -19076,6 +19364,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "fa": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -19599,6 +19895,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "fi": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -20122,6 +20426,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "gl": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -20645,6 +20957,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "gu": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -21168,6 +21488,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "he": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -21691,6 +22019,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "hr": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -22214,6 +22550,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "hu": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -22737,6 +23081,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "hy": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -23260,6 +23612,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "is": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -23783,6 +24143,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ka": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -24306,6 +24674,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "kk": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -24829,6 +25205,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "km": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -25352,6 +25736,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "kn": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -25875,6 +26267,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ky": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -26398,6 +26798,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "lo": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -26921,6 +27329,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "lt": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -27444,6 +27860,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "lv": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -27967,6 +28391,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "mk": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -28490,6 +28922,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ml": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -29013,6 +29453,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "mn": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -29536,6 +29984,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "mr": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -30059,6 +30515,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "my": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -30582,6 +31046,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ne": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -31105,6 +31577,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "no": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -31628,6 +32108,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "or": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -32151,6 +32639,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "pa": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -32674,6 +33170,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ro": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -33197,6 +33701,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "si": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -33720,6 +34232,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "sk": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -34243,6 +34763,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "sl": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -34766,6 +35294,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "sq": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -35289,6 +35825,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "sr": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -35812,6 +36356,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "sw": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -36335,6 +36887,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ta": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -36858,6 +37418,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "te": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -37381,6 +37949,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "uk": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -37904,6 +38480,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ur": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -38427,6 +39011,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "uz": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -38950,6 +39542,14 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "zu": {
+    "apiError.loginRequired": "Login is required.",
+    "apiError.adminRequired": "Admin permissions could not be verified.",
+    "apiError.adminOnlyPage": "This page is restricted to administrators.",
+    "apiError.notFound": "The requested item could not be found.",
+    "apiError.unsupportedType": "Unsupported content type.",
+    "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
+    "apiError.settlementFailed": "Settlement processing failed.",
+
     "error.reloading": "Reloading latest version…",
     "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
     "error.reloadButton": "Reload Page",
@@ -40099,6 +40699,10 @@ export const useI18n = create<I18nState>()(
     }
   )
 );
+
+export function getLang(): string {
+  return useI18n.getState().lang;
+}
 
 export function useT(): (key: string) => string {
   const lang = useI18n((s) => s.lang);

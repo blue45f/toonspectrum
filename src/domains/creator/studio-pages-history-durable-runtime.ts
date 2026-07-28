@@ -832,7 +832,7 @@ export class StudioPagesHistoryDurableRuntime
 
 export async function createDefaultStudioPagesHistoryDurableRuntime(
   options: CreateDefaultStudioPagesHistoryDurableRuntimeOptions,
-  scope: BrowserRecoveryScope = globalThis,
+  scope: BrowserRecoveryScope = globalThis as unknown as BrowserRecoveryScope,
 ): Promise<StudioPagesHistoryDurableRuntime> {
   const identity = recoveryIdentity(options.initialTarget);
   let selection: StudioOpfsFileSystemSelection | null = null;

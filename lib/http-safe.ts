@@ -1,3 +1,5 @@
+import { getLang, resolveI18nValue } from "./i18n";
+
 export async function safeParseJson<T = unknown>(response: Response): Promise<T | null> {
   try {
     const raw = await response.text();
@@ -8,35 +10,43 @@ export async function safeParseJson<T = unknown>(response: Response): Promise<T 
   }
 }
 
+const SERVER_ERROR_KEY_MAP: Record<string, string> = {
+  "로그인이 필요해요.": "apiError.loginRequired",
+  "관리자 권한을 확인할 수 없습니다.": "apiError.adminRequired",
+  "관리자 전용 페이지입니다.": "apiError.adminOnlyPage",
+  "지원하지 않는 콘텐츠 타입이에요.": "apiError.unsupportedType",
+  "비활성 계정은 관리자 권한을 사용할 수 없습니다.": "apiError.inactiveAccount",
+  "정산 처리에 실패했습니다.": "apiError.settlementFailed",
+};
+
 export function resolveApiError(payload: unknown, fallback: string): string {
-  if (!payload || typeof payload !== "object") {
-    return fallback;
+  let rawMsg = "";
+
+  if (payload && typeof payload === "object") {
+    const errorField = (payload as { error?: unknown }).error;
+    if (typeof errorField === "string" && errorField.trim().length > 0) {
+      rawMsg = errorField.trim();
+    } else {
+      const messageField = (payload as { message?: unknown }).message;
+      if (typeof messageField === "string" && messageField.trim().length > 0) {
+        rawMsg = messageField.trim();
+      } else if (Array.isArray(messageField)) {
+        const first = messageField
+          .map((item) => (typeof item === "string" ? item : ""))
+          .find((item) => item.trim().length > 0);
+        if (first) rawMsg = first.trim();
+      }
+    }
   }
 
-  const errorField = (payload as { error?: unknown }).error;
-  if (typeof errorField === "string" && errorField.trim().length > 0) {
-    return errorField;
+  const msgToTranslate = rawMsg || fallback;
+  const key = SERVER_ERROR_KEY_MAP[msgToTranslate];
+  if (key) {
+    const translated = resolveI18nValue(getLang(), key);
+    if (translated) return translated;
   }
 
-  const messageField = (payload as { message?: unknown }).message;
-  if (typeof messageField === "string" && messageField.trim().length > 0) {
-    return messageField;
-  }
-
-  const messageArray = (payload as { message?: unknown }).message;
-  if (Array.isArray(messageArray)) {
-    const first = messageArray
-      .map((item) => (typeof item === "string" ? item : ""))
-      .find((item) => item.trim().length > 0);
-    if (first) return first;
-  }
-
-  const candidate = errorField;
-  if (typeof candidate === "string" && candidate.trim().length > 0) {
-    return candidate;
-  }
-
-  return fallback;
+  return msgToTranslate;
 }
 
 export function ensureArray<T>(value: unknown): T[] {
