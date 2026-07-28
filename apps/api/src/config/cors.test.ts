@@ -4,7 +4,11 @@ import { Controller, Module, Post, type INestApplication } from "@nestjs/common"
 import { NestFactory } from "@nestjs/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { allowedCorsOrigins, configureCors } from "./cors";
+import {
+  PRODUCTION_CORS_ORIGINS,
+  allowedCorsOrigins,
+  configureCors,
+} from "./cors";
 
 import type { AddressInfo } from "node:net";
 
@@ -71,6 +75,45 @@ describe("API CORS", () => {
     await expect(response.json()).resolves.toEqual({ ok: true });
   });
 
+  it.each(PRODUCTION_CORS_ORIGINS)(
+    "새 운영 도메인 %s의 preflight와 실제 응답을 정확한 Origin으로 허용한다",
+    async (origin) => {
+      const preflight = await fetch(`${baseUrl}/api/cors-probe`, {
+        method: "OPTIONS",
+        headers: {
+          Origin: origin,
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "content-type",
+        },
+      });
+      expect(preflight.status).toBe(204);
+      expect(preflight.headers.get("access-control-allow-origin")).toBe(origin);
+      expect(preflight.headers.get("access-control-allow-credentials")).toBeNull();
+
+      const response = await fetch(`${baseUrl}/api/cors-probe`, {
+        method: "POST",
+        headers: { Origin: origin, "Content-Type": "application/json" },
+        body: "{}",
+      });
+      expect(response.status).toBe(201);
+      expect(response.headers.get("access-control-allow-origin")).toBe(origin);
+      expect(response.headers.get("access-control-allow-credentials")).toBeNull();
+    }
+  );
+
+  it("임의 Origin에는 CORS 허용 헤더나 credentials 헤더를 반환하지 않는다", async () => {
+    const response = await fetch(`${baseUrl}/api/cors-probe`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://evil.example",
+        "Access-Control-Request-Method": "POST",
+      },
+    });
+
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
+    expect(response.headers.get("access-control-allow-credentials")).toBeNull();
+  });
+
   it("운영에서는 임의 Origin과 localhost를 허용하지 않는다", () => {
     const origins = allowedCorsOrigins({
       NODE_ENV: "production",
@@ -78,6 +121,7 @@ describe("API CORS", () => {
     });
 
     expect(origins).toContain("https://preview.example.com");
+    expect(origins).toEqual(expect.arrayContaining([...PRODUCTION_CORS_ORIGINS]));
     expect(origins).not.toContain("http://localhost:5181");
     expect(origins).not.toContain("not-a-url");
   });

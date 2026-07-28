@@ -281,7 +281,6 @@ fn combine_masks(primary: f32, secondary: f32, family: u32) -> f32 {
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4f {
   let coordinate = vec2i(input.position.xy);
-  let primary = textureLoad(primary_layer, coordinate, 0);
   let primary_raw_mask = textureLoad(primary_raw_mask_layer, coordinate, 0).a;
   let secondary = textureLoad(secondary_layer, coordinate, 0).a;
   let combined_raw_mask = clamp(
@@ -293,20 +292,12 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
     0.0,
     1.0,
   );
-  let fallback_alpha = parameters.fallback_straight_color.a;
-  let paint_alpha_ratio = select(
-    fallback_alpha,
-    clamp(primary.a / max(primary_raw_mask, 1.0 / 65535.0), 0.0, 1.0),
-    primary_raw_mask > 1.0 / 65535.0,
-  );
-  let combined = combined_raw_mask * paint_alpha_ratio;
-  let recovered_straight = primary.rgb / max(primary.a, 1.0 / 65535.0);
-  let straight = select(
-    parameters.fallback_straight_color.rgb,
-    recovered_straight,
-    primary.a > 1.0 / 65535.0,
-  );
-  return vec4f(straight * combined, combined);
+  // Aggregate-mask v1 is preview-only. Do not infer paint alpha from already accumulated masks:
+  // overlapping depositions make that ratio non-invertible. Exact work uses the v2 deposition
+  // stream, which combines both tips before every authority blend.
+  let preview_paint_alpha = clamp(parameters.fallback_straight_color.a, 0.0, 1.0);
+  let combined = combined_raw_mask * preview_paint_alpha;
+  return vec4f(parameters.fallback_straight_color.rgb * combined, combined);
 }
 `;
 
@@ -333,10 +324,12 @@ export interface StudioDynamicDualTipWebGpuReceipt {
   readonly kind: "studio-dynamic-dual-tip-webgpu-receipt";
   readonly revision: typeof STUDIO_DYNAMIC_DUAL_TIP_WEBGPU_RUNTIME_REVISION;
   readonly backend: "webgpu";
-  readonly providerCapability: "dynamic-dual-tip-r8-v1";
+  readonly providerCapability: "dynamic-dual-tip-r8-aggregate-preview-v1";
   readonly textureFormat: typeof STUDIO_DYNAMIC_DUAL_TIP_WEBGPU_TEXTURE_FORMAT;
   readonly colorModel: "scene-linear-premultiplied";
-  readonly maskCombination: "independent-primary-raw-secondary-rgba16float-v1";
+  readonly maskCombination: "independent-primary-secondary-aggregate-preview-v1";
+  readonly fidelity: "aggregate-mask-preview-only";
+  readonly exactExecutionRoute: "webgpu-exact-packed-deposition-v2";
   readonly requestSequence: number;
   readonly deviceEpoch: number;
   readonly mode: "append" | "rebuild";
@@ -350,7 +343,7 @@ export interface StudioDynamicDualTipWebGpuReceipt {
   readonly assetBytes: number;
   readonly planFingerprint: string;
   readonly queueState: "completed";
-  readonly complete: true;
+  readonly complete: false;
 }
 
 export type StudioDynamicDualTipWebGpuExecutionResult =
@@ -571,7 +564,10 @@ function validPlan(
       plan.kind !== "studio-dynamic-dual-tip-plan"
       || plan.version !== STUDIO_DYNAMIC_DUAL_TIP_PLAN_VERSION
       || (plan.mode !== "append" && plan.mode !== "rebuild")
-      || plan.providerCapability !== "dynamic-dual-tip-r8-v1"
+      || plan.providerCapability !== "dynamic-dual-tip-r8-aggregate-preview-v1"
+      || plan.executionRoute !== "experimental-webgpu-aggregate-preview-v1"
+      || plan.exactExecutionRoute !== "webgpu-exact-packed-deposition-v2"
+      || plan.fidelity !== "aggregate-mask-preview-only"
       || plan.singleTipFallback !== "forbidden"
       || plan.textureFormat !== STUDIO_DYNAMIC_DUAL_TIP_WEBGPU_TEXTURE_FORMAT
       || plan.maskFormat !== "r8-unorm"
@@ -1363,10 +1359,12 @@ export class StudioDynamicDualTipWebGpuRuntime {
         kind: "studio-dynamic-dual-tip-webgpu-receipt",
         revision: STUDIO_DYNAMIC_DUAL_TIP_WEBGPU_RUNTIME_REVISION,
         backend: "webgpu",
-        providerCapability: "dynamic-dual-tip-r8-v1",
+        providerCapability: "dynamic-dual-tip-r8-aggregate-preview-v1",
         textureFormat: STUDIO_DYNAMIC_DUAL_TIP_WEBGPU_TEXTURE_FORMAT,
         colorModel: "scene-linear-premultiplied",
-        maskCombination: "independent-primary-raw-secondary-rgba16float-v1",
+        maskCombination: "independent-primary-secondary-aggregate-preview-v1",
+        fidelity: "aggregate-mask-preview-only",
+        exactExecutionRoute: "webgpu-exact-packed-deposition-v2",
         requestSequence: frame.requestSequence,
         deviceEpoch: this.#deviceEpoch,
         mode: frame.plan.mode,
@@ -1380,7 +1378,7 @@ export class StudioDynamicDualTipWebGpuRuntime {
         assetBytes: assets.reduce((total, asset) => total + asset.byteLength, 0),
         planFingerprint: frame.plan.fingerprint,
         queueState: "completed",
-        complete: true,
+        complete: false,
       });
       return Object.freeze({ status: "completed", receipt });
     } catch (error) {

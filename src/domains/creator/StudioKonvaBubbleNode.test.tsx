@@ -325,10 +325,14 @@ describe("StudioKonvaBubbleNode text and interaction", () => {
   });
 
   it("preserves auto-shrink, vertical formatting, and the shared padding geometry", () => {
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+    const context = {
       font: "",
       measureText: (value: string) => ({ width: value.length * 40 }),
-    } as unknown as CanvasRenderingContext2D);
+    } as unknown as CanvasRenderingContext2D;
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((
+      ((contextId: string) => contextId === "2d" ? context : null) as
+        typeof HTMLCanvasElement.prototype.getContext
+    ));
     const source = "가나다라마바사아자차카타파하";
     render(
       <StudioKonvaBubbleNode

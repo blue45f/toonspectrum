@@ -455,7 +455,6 @@ function rasterIndependentCpu(
   const authority = new Float32Array(WIDTH * HEIGHT * 4);
   for (const plan of plans) {
     if (plan.mode === "rebuild") authority.fill(0);
-    const primaryLayer = new Float32Array(authority.length);
     const primaryRawMaskLayer = new Float32Array(authority.length);
     const secondaryLayer = new Float32Array(authority.length);
     const primaryAsset = plan.primary.assets[plan.primary.tip.assetIndex]!;
@@ -479,14 +478,7 @@ function rasterIndependentCpu(
           );
           const hardnessEdge = Math.max(1 / 65_535, 1 - dab.tip.hardness);
           const coverage = smoothstep(0, hardnessEdge, sampled);
-          const alpha = clamp01(dab.color.components[3] * coverage);
           const offset = (y * WIDTH + x) * 4;
-          sourceOver(primaryLayer, offset, [
-            dab.color.components[0] * alpha,
-            dab.color.components[1] * alpha,
-            dab.color.components[2] * alpha,
-            alpha,
-          ]);
           sourceOver(primaryRawMaskLayer, offset, [
             coverage,
             coverage,
@@ -528,7 +520,6 @@ function rasterIndependentCpu(
     const porterDuff = plan.primary.batches[0]!.porterDuff;
     for (let pixel = 0; pixel < WIDTH * HEIGHT; pixel += 1) {
       const offset = pixel * 4;
-      const primaryAlpha = clamp01(primaryLayer[offset + 3]!);
       const primaryRawMask = clamp01(primaryRawMaskLayer[offset + 3]!);
       const secondaryAlpha = clamp01(secondaryLayer[offset + 3]!);
       const combinedRawMask = clamp01(combineMasks(
@@ -536,17 +527,12 @@ function rasterIndependentCpu(
         primaryRawMask,
         secondaryAlpha,
       ));
-      const paintAlphaRatio = primaryRawMask > 1 / 65_535
-        ? clamp01(primaryAlpha / primaryRawMask)
-        : fallback[3];
-      const combined = combinedRawMask * paintAlphaRatio;
-      const straight: readonly [number, number, number] = primaryAlpha > 1 / 65_535
-        ? [
-            primaryLayer[offset]! / primaryAlpha,
-            primaryLayer[offset + 1]! / primaryAlpha,
-            primaryLayer[offset + 2]! / primaryAlpha,
-          ]
-        : [fallback[0], fallback[1], fallback[2]];
+      const combined = combinedRawMask * fallback[3];
+      const straight: readonly [number, number, number] = [
+        fallback[0],
+        fallback[1],
+        fallback[2],
+      ];
       if (porterDuff === "destination-out") {
         const inverse = 1 - combined;
         authority[offset] = quantizeHalf(authority[offset]! * inverse);

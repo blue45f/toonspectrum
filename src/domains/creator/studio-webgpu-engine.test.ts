@@ -1658,7 +1658,7 @@ describe("StudioWebGpuEngine", () => {
     expect(fake.readbackBuffers.at(-1)?.unmap).toHaveBeenCalledTimes(1);
     expect(fake.readbackBuffers.at(-1)?.destroy).toHaveBeenCalledTimes(1);
 
-    const captureSubmission = deferred<void>();
+    const captureSubmission = deferred<undefined>();
     vi.mocked(fake.device.queue.onSubmittedWorkDone).mockImplementationOnce(
       () => captureSubmission.promise
     );
@@ -1828,7 +1828,7 @@ describe("StudioWebGpuEngine", () => {
     })));
     const receipt = onFrameReady.mock.calls.at(-1)![0];
     const snapshotTexture = fake.textures[0]!;
-    const readbackWork = deferred<void>();
+    const readbackWork = deferred<undefined>();
     vi.mocked(fake.device.queue.onSubmittedWorkDone).mockImplementationOnce(
       () => readbackWork.promise
     );
@@ -1948,7 +1948,7 @@ describe("StudioWebGpuEngine", () => {
     await engine.initialize();
     await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalled());
     const firstReceipt = onFrameReady.mock.calls.at(-1)![0];
-    const firstRead = deferred<void>();
+    const firstRead = deferred<undefined>();
     vi.mocked(fake.device.queue.onSubmittedWorkDone).mockImplementationOnce(
       () => firstRead.promise
     );
@@ -1963,7 +1963,7 @@ describe("StudioWebGpuEngine", () => {
       requestId: "budget:second",
     })));
     const secondReceipt = onFrameReady.mock.calls.at(-1)![0];
-    const secondRead = deferred<void>();
+    const secondRead = deferred<undefined>();
     vi.mocked(fake.device.queue.onSubmittedWorkDone).mockImplementationOnce(
       () => secondRead.promise
     );
@@ -2015,8 +2015,8 @@ describe("StudioWebGpuEngine", () => {
     await engine.initialize();
     await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalled());
     const receipt = onFrameReady.mock.calls.at(-1)![0];
-    const firstRead = deferred<void>();
-    const secondRead = deferred<void>();
+    const firstRead = deferred<undefined>();
+    const secondRead = deferred<undefined>();
     vi.mocked(fake.device.queue.onSubmittedWorkDone)
       .mockImplementationOnce(() => firstRead.promise)
       .mockImplementationOnce(() => secondRead.promise);
@@ -2066,7 +2066,7 @@ describe("StudioWebGpuEngine", () => {
     await engine.initialize();
     await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalled());
     const firstReceipt = onFrameReady.mock.calls.at(-1)![0];
-    const read = deferred<void>();
+    const read = deferred<undefined>();
     vi.mocked(fake.device.queue.onSubmittedWorkDone).mockImplementationOnce(() => read.promise);
     const capture = engine.captureFrame({ receipt: firstReceipt, area: { kind: "viewport" } });
     await vi.waitFor(() => expect(fake.readbackBuffers).toHaveLength(1));
@@ -2119,7 +2119,7 @@ describe("StudioWebGpuEngine", () => {
     await engine.initialize();
     await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalled());
     const receipt = onFrameReady.mock.calls.at(-1)![0];
-    const readbackSubmission = deferred<void>();
+    const readbackSubmission = deferred<undefined>();
     vi.mocked(fake.device.queue.onSubmittedWorkDone).mockImplementationOnce(
       () => readbackSubmission.promise
     );

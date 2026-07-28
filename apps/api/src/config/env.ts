@@ -18,6 +18,13 @@ const envSchema = z.object({
   NEST_API_PORT: z.string().regex(/^\d+$/, "NEST_API_PORT must be numeric").optional(),
   // 허용할 브라우저 Origin(쉼표 구분, 선택).
   API_CORS_ALLOWED_ORIGINS: z.string().optional(),
+  // 정본 웹/OG/OAuth 도메인. CANONICAL_HOST는 scheme 없는 hostname만 사용한다.
+  CANONICAL_HOST: z
+    .string()
+    .regex(/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/iu)
+    .optional(),
+  OAUTH_REDIRECT_BASE_URL: z.url().optional(),
+  WEB_APP_BASE_URL: z.url().optional(),
   // PostgreSQL(Neon) 연결 문자열. 미설정 시 로컬 docker 폴백(lib/db).
   DATABASE_URL: z.string().min(1).optional(),
   // 장기 실행 Nest API의 Socket.IO 다중 인스턴스 adapter. postgres 모드는 LISTEN 가능한

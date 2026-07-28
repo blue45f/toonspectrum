@@ -186,25 +186,26 @@ beforeEach(() => {
       public height: number,
     ) {}
   });
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(function (
-    this: HTMLCanvasElement,
-  ) {
-    return {
-      drawImage: vi.fn(),
-      getImageData: vi.fn(() => {
-        canvasHarness.getImageDataCalls += 1;
-        if (canvasHarness.getImageDataError) throw canvasHarness.getImageDataError;
-        return {
-          data: new Uint8ClampedArray(this.width * this.height * 4),
-          height: this.height,
-          width: this.width,
-        } as ImageData;
-      }),
-      putImageData: vi.fn(),
-      scale: vi.fn(),
-      translate: vi.fn(),
-    } as unknown as CanvasRenderingContext2D;
-  });
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((
+    function (this: HTMLCanvasElement, contextId: string) {
+      if (contextId !== "2d") return null;
+      return {
+        drawImage: vi.fn(),
+        getImageData: vi.fn(() => {
+          canvasHarness.getImageDataCalls += 1;
+          if (canvasHarness.getImageDataError) throw canvasHarness.getImageDataError;
+          return {
+            data: new Uint8ClampedArray(this.width * this.height * 4),
+            height: this.height,
+            width: this.width,
+          } as ImageData;
+        }),
+        putImageData: vi.fn(),
+        scale: vi.fn(),
+        translate: vi.fn(),
+      } as unknown as CanvasRenderingContext2D;
+    }
+  ) as typeof HTMLCanvasElement.prototype.getContext);
   vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
 

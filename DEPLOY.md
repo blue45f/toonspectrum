@@ -39,29 +39,41 @@ pnpm run verify
 3. 환경변수를 설정합니다.
    - `DATABASE_URL`: 동적 API가 사용할 PostgreSQL 연결 문자열.
    - `AUTH_STATE_SECRET`: OAuth state 서명 키. 상용은 고정값 필수.
-   - `OAUTH_REDIRECT_BASE_URL`: Vercel 공개 도메인.
-   - `WEB_APP_BASE_URL`: Vercel 공개 도메인.
+   - `CANONICAL_HOST=www.toonstudio.cloud`: OG/JSON-LD 정본 hostname.
+   - `API_CORS_ALLOWED_ORIGINS=https://www.toonstudio.cloud,https://toonstudio.cloud`: 운영 웹 origin exact allowlist.
+   - `OAUTH_REDIRECT_BASE_URL=https://www.toonstudio.cloud`: OAuth callback 기준 URL.
+   - `WEB_APP_BASE_URL=https://www.toonstudio.cloud`: 로그인 완료 후 복귀 URL.
+   - `WEBDEX_SITE_URL=https://www.toonstudio.cloud`: 알림·카탈로그 링크 기준 URL.
    - `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`: 선택.
    - `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET`: 선택.
    - `ADMIN_EMAILS`: 선택.
    - `CATALOG_INGEST_TRIGGER_TOKEN`: 원격 수동 ingest를 쓸 때만.
    - `CATALOG_INGEST_MODE=off`: 기본 권장.
 
-프론트가 상대경로 `/api/...`를 호출하므로 CORS 설정은 필요 없습니다. 같은 Vercel 도메인에서 정적 SPA와 서버리스 API가 함께 제공됩니다.
+프론트가 상대경로 `/api/...`를 호출하므로 일반 HTTP API는 같은 origin으로 동작합니다.
+`API_CORS_ALLOWED_ORIGINS`는 apex에서 정본으로 전환되는 도중의 preflight와, 별도 장기 실행
+Socket.IO 서버의 HTTP/WebSocket origin 검사를 동일하게 유지하기 위한 exact allowlist입니다.
+와일드카드나 임의 Vercel preview origin은 운영 기본값에 포함하지 않습니다.
 
 ## 3. OAuth 콜백
 
-프론트 도메인이 `https://toonspectrum.example.com`이라면 아래 값을 Vercel 환경변수와 각 OAuth 콘솔에 맞춥니다.
+운영 정본은 `https://www.toonstudio.cloud`입니다. 아래 값을 Vercel 환경변수와 각 OAuth
+콘솔에 동일하게 등록합니다.
 
 ```env
-OAUTH_REDIRECT_BASE_URL=https://toonspectrum.example.com
-WEB_APP_BASE_URL=https://toonspectrum.example.com
+OAUTH_REDIRECT_BASE_URL=https://www.toonstudio.cloud
+WEB_APP_BASE_URL=https://www.toonstudio.cloud
 ```
 
 콘솔 등록 URI:
 
-- Google: `https://toonspectrum.example.com/api/auth/oauth/google/callback`
-- Kakao: `https://toonspectrum.example.com/api/auth/oauth/kakao/callback`
+- Google: `https://www.toonstudio.cloud/api/auth/oauth/google/callback`
+- Kakao: `https://www.toonstudio.cloud/api/auth/oauth/kakao/callback`
+- Naver: `https://www.toonstudio.cloud/api/auth/oauth/naver/callback`
+
+Google Identity Services의 승인된 JavaScript origin에는
+`https://www.toonstudio.cloud`를 등록합니다. apex는 앱 실행 전에 정본으로 308
+리다이렉트하므로 OAuth 기준 URL은 www 하나로 유지합니다.
 
 키가 없으면 로그인 모달은 데모 폴백을 명확히 표시합니다.
 
@@ -95,13 +107,13 @@ Vercel serverless 진입점은 WebSocket 수명주기를 유지하지 않으며 
 
 ```env
 # Vite 빌드 시 공개되는 값 — 경로가 아닌 https origin
-VITE_STUDIO_LIVE_ORIGIN=https://realtime.toonspectrum.example
+VITE_STUDIO_LIVE_ORIGIN=https://realtime.toonstudio.cloud
 
 # 장기 실행 Nest 서버의 비공개 환경변수
 STUDIO_LIVE_CLUSTER_ADAPTER=postgres
 STUDIO_LIVE_POSTGRES_URL=postgresql://USER:PASSWORD@DIRECT_HOST/webdex?sslmode=verify-full&channel_binding=require
 STUDIO_LIVE_POSTGRES_POOL_MAX=2
-API_CORS_ALLOWED_ORIGINS=https://toonspectrum.example.com
+API_CORS_ALLOWED_ORIGINS=https://www.toonstudio.cloud,https://toonstudio.cloud
 
 # 검증된 원형 펜 래스터 CRDT 파일럿 — 프런트/서버를 같은 릴리스에서 함께 활성화
 VITE_STUDIO_RASTER_CRDT_AUTO_PUBLICATION=verified-renderer-handoff-v1

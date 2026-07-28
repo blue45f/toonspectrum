@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://toonspectrum.vercel.app/sitemap.xml
+Sitemap: https://www.toonstudio.cloud/sitemap.xml

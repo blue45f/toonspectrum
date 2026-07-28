@@ -174,8 +174,10 @@ function dualPlan(
     mode: "rebuild",
     strokeId: "dual-stroke",
     commandSequence: 1,
-    providerCapability: "dynamic-dual-tip-r8-v1",
-    executionRoute: "future-webgpu-dynamic-dual-tip-provider",
+    providerCapability: "dynamic-dual-tip-r8-aggregate-preview-v1",
+    executionRoute: "experimental-webgpu-aggregate-preview-v1",
+    exactExecutionRoute: "webgpu-exact-packed-deposition-v2",
+    fidelity: "aggregate-mask-preview-only",
     singleTipFallback: "forbidden",
     textureFormat: "rgba16float",
     maskFormat: "r8-unorm",
@@ -352,7 +354,7 @@ describe("dynamic dual-tip WebGPU specialist runtime", () => {
     ]);
   });
 
-  it("renders independent primary/secondary layers and the exact 8-family combine pass", async () => {
+  it("renders the explicitly approximate v1 aggregate preview for all 8 families", async () => {
     const harness = fakeGpu();
     const target = runtime(harness);
 
@@ -366,10 +368,12 @@ describe("dynamic dual-tip WebGPU specialist runtime", () => {
     if (result.status !== "completed") return;
     expect(result.receipt).toMatchObject({
       backend: "webgpu",
-      providerCapability: "dynamic-dual-tip-r8-v1",
+      providerCapability: "dynamic-dual-tip-r8-aggregate-preview-v1",
       textureFormat: "rgba16float",
       colorModel: "scene-linear-premultiplied",
-      maskCombination: "independent-primary-raw-secondary-rgba16float-v1",
+      maskCombination: "independent-primary-secondary-aggregate-preview-v1",
+      fidelity: "aggregate-mask-preview-only",
+      exactExecutionRoute: "webgpu-exact-packed-deposition-v2",
       blendFamily: "difference",
       primaryDabCount: 1,
       secondaryStationCount: 1,
@@ -377,7 +381,7 @@ describe("dynamic dual-tip WebGPU specialist runtime", () => {
       assetCount: 2,
       assetBytes: 10,
       queueState: "completed",
-      complete: true,
+      complete: false,
     });
     expect(harness.passes).toHaveLength(3);
     expect(harness.passes.map((pass) => pass.descriptor.label)).toEqual([
@@ -411,7 +415,8 @@ describe("dynamic dual-tip WebGPU specialist runtime", () => {
     expect(primaryShader).toContain("@location(1) raw_mask");
     expect(primaryShader).toContain("output.raw_mask = vec4f(raw_mask)");
     expect(shader).toContain("primary_raw_mask_layer");
-    expect(shader).toContain("paint_alpha_ratio");
+    expect(shader).toContain("preview_paint_alpha");
+    expect(shader).not.toContain("paint_alpha_ratio");
   });
 
   it("supports append/rebuild and destination-out without changing the two-mask schedule", async () => {

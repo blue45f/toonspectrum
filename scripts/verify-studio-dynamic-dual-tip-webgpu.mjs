@@ -136,13 +136,16 @@ function validateSuccess(result, diagnostics) {
       || evidence.receipts.some(
         (receipt) =>
           receipt.backend !== "webgpu"
-          || receipt.providerCapability !== "dynamic-dual-tip-r8-v1"
+          || receipt.providerCapability
+            !== "dynamic-dual-tip-r8-aggregate-preview-v1"
           || receipt.textureFormat !== "rgba16float"
           || receipt.colorModel !== "scene-linear-premultiplied"
           || receipt.maskCombination
-            !== "independent-primary-raw-secondary-rgba16float-v1"
+            !== "independent-primary-secondary-aggregate-preview-v1"
+          || receipt.fidelity !== "aggregate-mask-preview-only"
+          || receipt.exactExecutionRoute !== "webgpu-exact-packed-deposition-v2"
           || receipt.queueState !== "completed"
-          || receipt.complete !== true
+          || receipt.complete !== false
           || receipt.deviceEpoch !== 1,
       )
     ) failures.push(`${evidence.id}: specialist runtime receipt evidence invalid`);
@@ -383,7 +386,8 @@ async function main() {
         rgba16floatAlignedMapRead: true,
         independentAffineHalfFloatCpuOracle: true,
         independentPrimarySecondaryMasks: true,
-        exactEightBlendFamilies: true,
+        eightBlendFamilyAggregatePreviewCoverage: true,
+        exactPerDepositionComposition: false,
         secondarySpacingCountScatter: true,
         reflectedShearedAffineFootprints: true,
         sourceOverAndDestinationOut: true,

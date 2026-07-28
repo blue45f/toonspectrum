@@ -29,8 +29,9 @@ import type {
  * Provider-neutral clean-room dynamic dual-tip planner.
  *
  * This module models only publicly documented artist-facing controls. It does not parse or emit a
- * vendor preset format, and it deliberately does not approximate the result through the current
- * single-tip runtime. A future WebGPU provider must combine the two independently scheduled masks.
+ * vendor preset format. Version 1 preserves independently scheduled primary/secondary streams for
+ * an aggregate preview only; that representation cannot encode exact per-deposition pairing.
+ * Exact product rendering must use the versioned v2 deposition stream.
  */
 export const STUDIO_DYNAMIC_DUAL_TIP_PLAN_VERSION = 1 as const;
 export const STUDIO_DYNAMIC_DUAL_TIP_EXTENSION_VERSION = 1 as const;
@@ -153,8 +154,10 @@ export interface StudioDynamicDualTipPlan {
   readonly mode: "append" | "rebuild";
   readonly strokeId: string;
   readonly commandSequence: number;
-  readonly providerCapability: "dynamic-dual-tip-r8-v1";
-  readonly executionRoute: "future-webgpu-dynamic-dual-tip-provider";
+  readonly providerCapability: "dynamic-dual-tip-r8-aggregate-preview-v1";
+  readonly executionRoute: "experimental-webgpu-aggregate-preview-v1";
+  readonly exactExecutionRoute: "webgpu-exact-packed-deposition-v2";
+  readonly fidelity: "aggregate-mask-preview-only";
   readonly singleTipFallback: "forbidden";
   readonly textureFormat: "rgba16float";
   readonly maskFormat: "r8-unorm";
@@ -171,8 +174,10 @@ export interface StudioDynamicDualTipCapabilityReceipt {
   readonly version: typeof STUDIO_DYNAMIC_DUAL_TIP_CAPABILITY_RECEIPT_VERSION;
   readonly plannerVersion: typeof STUDIO_DYNAMIC_DUAL_TIP_PLAN_VERSION;
   readonly extensionVersion: typeof STUDIO_DYNAMIC_DUAL_TIP_EXTENSION_VERSION;
-  readonly providerCapability: "dynamic-dual-tip-r8-v1";
-  readonly executionRoute: "future-webgpu-dynamic-dual-tip-provider";
+  readonly providerCapability: "dynamic-dual-tip-r8-aggregate-preview-v1";
+  readonly executionRoute: "experimental-webgpu-aggregate-preview-v1";
+  readonly exactExecutionRoute: "webgpu-exact-packed-deposition-v2";
+  readonly fidelity: "aggregate-mask-preview-only";
   readonly singleTipFallback: "forbidden";
   readonly textureFormat: "rgba16float";
   readonly maskFormat: "r8-unorm";
@@ -186,7 +191,7 @@ export interface StudioDynamicDualTipCapabilityReceipt {
   readonly assetCount: number;
   readonly assetBytes: number;
   readonly fingerprint: `sha256:${string}`;
-  readonly complete: true;
+  readonly complete: false;
 }
 
 export type StudioDynamicDualTipUnsupportedReason =
@@ -1632,7 +1637,8 @@ function mapPrimaryUnsupported(
 /**
  * Builds a complete, immutable dynamic dual-tip plan. The current single-tip runtime is never
  * called: its plan is retained only as the primary event stream and mask description for the
- * future provider that will combine primary and secondary R8 coverage.
+ * aggregate-preview provider. Exact rendering requires a v2 stream that pairs both tips inside
+ * each logical deposition before authority compositing.
  */
 export async function buildStudioDynamicDualTipPlan(
   canonicalInput: unknown,
@@ -1770,8 +1776,10 @@ export async function buildStudioDynamicDualTipPlan(
     mode: options.mode,
     strokeId: primary.strokeId,
     commandSequence: primary.commandSequence,
-    providerCapability: "dynamic-dual-tip-r8-v1",
-    executionRoute: "future-webgpu-dynamic-dual-tip-provider",
+    providerCapability: "dynamic-dual-tip-r8-aggregate-preview-v1",
+    executionRoute: "experimental-webgpu-aggregate-preview-v1",
+    exactExecutionRoute: "webgpu-exact-packed-deposition-v2",
+    fidelity: "aggregate-mask-preview-only",
     singleTipFallback: "forbidden",
     textureFormat: "rgba16float",
     maskFormat: "r8-unorm",
@@ -1787,8 +1795,10 @@ export async function buildStudioDynamicDualTipPlan(
     version: STUDIO_DYNAMIC_DUAL_TIP_CAPABILITY_RECEIPT_VERSION,
     plannerVersion: STUDIO_DYNAMIC_DUAL_TIP_PLAN_VERSION,
     extensionVersion: STUDIO_DYNAMIC_DUAL_TIP_EXTENSION_VERSION,
-    providerCapability: "dynamic-dual-tip-r8-v1",
-    executionRoute: "future-webgpu-dynamic-dual-tip-provider",
+    providerCapability: "dynamic-dual-tip-r8-aggregate-preview-v1",
+    executionRoute: "experimental-webgpu-aggregate-preview-v1",
+    exactExecutionRoute: "webgpu-exact-packed-deposition-v2",
+    fidelity: "aggregate-mask-preview-only",
     singleTipFallback: "forbidden",
     textureFormat: "rgba16float",
     maskFormat: "r8-unorm",
@@ -1802,7 +1812,7 @@ export async function buildStudioDynamicDualTipPlan(
     assetCount: primary.assets.length + 1,
     assetBytes,
     fingerprint: planFingerprint,
-    complete: true,
+    complete: false,
   });
   return deepFreeze({ status: "ready", plan, receipt });
 }

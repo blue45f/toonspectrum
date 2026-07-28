@@ -6,6 +6,7 @@ packages:
 # 공급망 정책(minimumReleaseAge: 너무 최근 발행 패키지 거부)의 예외 목록.
 # pg 설치 시 따라온 transitive dep node-releases가 24h 미경과 발행이라 --frozen-lockfile에서
 # 거부됨 — caniuse/브라우저 데이터 패키지라 안전하게 제외(다른 워크스페이스와 동일 패턴).
+minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
   - node-releases
   - '@heejun/eslint-config@4.0.0'
@@ -27,6 +28,9 @@ allowBuilds:
   # image-js의 브라우저 분석 경로에는 선택적 네이티브 Node 캔버스가 필요하지 않다.
   # 품질/분석 Worker는 ImageData/TypedArray만 사용하므로 다운로드 빌드 스크립트를 실행하지 않는다.
   skia-canvas: false
+  # glTF-Transform의 브라우저 파이프라인은 WebCodecs/ImageBitmap/TypedArray를 사용한다.
+  # 선택적 Node 전용 sharp 바이너리는 Studio 런타임에 필요하지 않으므로 공급망 빌드를 실행하지 않는다.
+  sharp: false
   "@nestjs/core": true
   '@sentry/cli': true
   '@swc/core': true

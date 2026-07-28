@@ -1099,6 +1099,8 @@ describe("studio live protocol", () => {
 
   it("rejects a disallowed WebSocket upgrade origin instead of relying on CORS headers", () => {
     expect(isStudioLiveOriginAllowed(undefined)).toBe(true);
+    expect(isStudioLiveOriginAllowed("https://www.toonstudio.cloud")).toBe(true);
+    expect(isStudioLiveOriginAllowed("https://toonstudio.cloud")).toBe(true);
     expect(isStudioLiveOriginAllowed("https://evil.example")).toBe(false);
     let allowed: boolean | null = null;
     studioLiveAllowRequest(

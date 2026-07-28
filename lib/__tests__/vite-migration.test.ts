@@ -33,9 +33,9 @@ describe("vite migration", () => {
   });
 
   it("uses an explicitly injected runtime API origin", () => {
-    setRuntimeApiBase("https://toonspectrum.vercel.app/");
+    setRuntimeApiBase("https://www.toonstudio.cloud/");
 
-    expect(apiPath("/auth/providers")).toBe("https://toonspectrum.vercel.app/api/auth/providers");
+    expect(apiPath("/auth/providers")).toBe("https://www.toonstudio.cloud/api/auth/providers");
 
     setRuntimeApiBase("");
   });

@@ -1,7 +1,7 @@
 // 사업자 정보·법적 링크 단일 소스. 표기 항목은 이 파일에서 함께 갱신합니다.
 
 /** 운영 사이트 정본 origin. */
-export const SITE_URL = "https://toonspectrum.vercel.app" as const;
+export const SITE_URL = "https://www.toonstudio.cloud" as const;
 
 /** 통신판매·개인정보 관련 사업자 정보(전자상거래법/정보통신망법 표기 의무 항목). */
 export const BUSINESS_INFO = {

@@ -324,7 +324,7 @@ describe("rankingItemListJsonLd", () => {
       "@type": "ListItem",
       position: 1,
       name: ranked[0].title.title,
-      url: `https://toonspectrum.vercel.app/title/${encodeURIComponent(ranked[0].title.slug)}`,
+      url: `https://www.toonstudio.cloud/title/${encodeURIComponent(ranked[0].title.slug)}`,
     });
   });
 
@@ -332,7 +332,7 @@ describe("rankingItemListJsonLd", () => {
     const slug = "나 혼자만 레벨업";
     const ranked = rankBy([makeTitle({ id: "kr", slug })], "popular", { period: "all" });
     const url = rankingItemListJsonLd(ranked, "실시간 인기")?.itemListElement[0].url;
-    expect(url).toBe(`https://toonspectrum.vercel.app/title/${encodeURIComponent(slug)}`);
+    expect(url).toBe(`https://www.toonstudio.cloud/title/${encodeURIComponent(slug)}`);
     expect(url).not.toContain(" ");
     expect(rankingItemListJsonLd([], "실시간 인기")).toBeNull();
   });

@@ -2,6 +2,36 @@ import { describe, expect, it, vi } from "vitest";
 
 import { validateEnv } from "./env";
 
+describe("production domain environment validation", () => {
+  it("accepts the canonical Toon Studio host and OAuth/web origins", () => {
+    const logger = { warn: vi.fn(), error: vi.fn() };
+
+    expect(validateEnv({
+      NODE_ENV: "test",
+      CANONICAL_HOST: "www.toonstudio.cloud",
+      OAUTH_REDIRECT_BASE_URL: "https://www.toonstudio.cloud",
+      WEB_APP_BASE_URL: "https://www.toonstudio.cloud",
+      API_CORS_ALLOWED_ORIGINS:
+        "https://www.toonstudio.cloud,https://toonstudio.cloud",
+    }, logger)).toMatchObject({
+      CANONICAL_HOST: "www.toonstudio.cloud",
+      OAUTH_REDIRECT_BASE_URL: "https://www.toonstudio.cloud",
+      WEB_APP_BASE_URL: "https://www.toonstudio.cloud",
+    });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("warns non-fatally when CANONICAL_HOST contains a scheme or path", () => {
+    const logger = { warn: vi.fn(), error: vi.fn() };
+
+    expect(validateEnv({
+      NODE_ENV: "test",
+      CANONICAL_HOST: "https://www.toonstudio.cloud/path",
+    }, logger)).toBeNull();
+    expect(logger.warn).toHaveBeenCalledOnce();
+  });
+});
+
 describe("Studio AI quota environment validation", () => {
   it("accepts positive distributed quota overrides", () => {
     const logger = { warn: vi.fn(), error: vi.fn() };

@@ -107,6 +107,56 @@ ToonSpectrum는 콘텐츠를 호스팅하지 않습니다. 플랫폼 장벽 너�
 | `typescript` · `eslint` · `typescript-eslint` | 타입 검사·린트 |
 | `vitest` | 단위 테스트 |
 
+### Studio 하이브리드 엔진 정책
+
+Studio는 하나의 캔버스 라이브러리에 모든 책임을 몰지 않습니다. 문서·명령·히스토리·협업은
+renderer-neutral canonical 모델을 권위로 두고, 아래 엔진을 교체 가능한 provider로 조합합니다.
+번들 바이트와 정적 요청 수는 관찰 지표일 뿐 릴리스 차단 조건이 아니며, 픽셀 품질·입력 지연·색
+정확도·대형 문서 안정성·기능 확장성을 우선합니다.
+
+| 엔진 / 라이브러리 | Studio 역할 |
+| --- | --- |
+| Raw WebGPU / WGSL | RGBA16F 브러시 타일, 레이어 합성, 필터, readback·device-loss replay의 기본 픽셀 권위 |
+| `canvaskit-wasm` (Skia) | 정밀 벡터·패스·텍스트·PDF/출판 렌더링 및 CPU/GPU 품질 기준 |
+| `pixi.js` | 별도 투명 surface의 GPU scene graph, z-order, 선택·hover·custom hit-area와 transform overlay |
+| `konva` + `react-konva` | 마이그레이션 중 성숙한 Transformer/텍스트/말풍선, 비교 oracle, 선택적 복구 provider — 브러시 픽셀 권위는 맡지 않음 |
+| `paper` + `polygon-clipping` | Bézier 교차·스무딩·부울·경로 기하 계산(화면 renderer가 아닌 lazy geometry provider) |
+| `rbush` | 대형 2D 문서의 동적 공간 인덱스, point/area hit-test와 topmost 후보 탐색 |
+| `harfbuzzjs` | 한글·복합문자·세로쓰기·루비·OpenType/가변 글꼴의 renderer-neutral glyph shaping |
+| `@resvg/resvg-wasm` | 제한·정규화된 SVG 가져오기, 미리보기, 결정적 래스터/PNG 출력 |
+| `@techstark/opencv-js` | Worker 전용 선택 마스크, morphology, contour/edge, perspective, 영상 처리 provider |
+| `onnxruntime-web` | WebGPU/WASM 로컬 AI 추론 — 선택·세그멘테이션·포즈·채색/작화 보조의 서버비 절감 경로 |
+| Studio wet-ink binary codec | 물·이동 안료·젖음·고정 얼룩·종이 상태를 보존해 저장 후에도 동일한 물리 시뮬레이션을 재개 |
+| `three` + R3F/Drei + `three-mesh-bvh` | 3D 배경/캐릭터와 raycast·surface snap·라쏘·표면 페인팅 가속 |
+| `@gltf-transform/*` | GLB/glTF 읽기·정규화·확장·애니메이션·재질·압축·내보내기 파이프라인 |
+| `manifold-3d` | 위상적으로 안정적인 3D 부울·절단·단면·CAD형 메시 편집 |
+| `xatlasjs` | 단일 전용 Worker 안에서 직접 실행하는 자동 UV 언랩·패킹 WASM, 표면 페인팅/베이크용 atlas와 명시적 해제 |
+| `@dimforge/rapier3d-deterministic-compat` | 결정적 3D 물리·충돌·배경 이펙트 시뮬레이션 |
+| `roughjs` + `perfect-freehand` | 손그림 도형과 벡터 잉크 윤곽의 전문 보조 provider |
+| Studio hybrid textured-vector ink | 편집 가능한 centerline/outline과 R8 브러시 팁·종이 질감, 변형 후 결정적 재샘플링 |
+| Studio corrective-driver graph | 뼈 회전·표정·사용자 scalar를 다중 보정 변형에 연결하고 충돌·미리보기·결정적 bake 관리 |
+| Studio weighted-deformation oracle + Worker | point·curve·envelope를 정규화 거리 가중치로 혼합해 2D/3D 위치와 UV를 보존하며, 큰 작업은 transfer·취소·timeout·epoch를 갖춘 전용 Worker에서 fail-closed 실행 |
+| Studio live-surface effects | 같은 레이어/별도 height map의 서브픽셀 변위와 단일 방향·점 조명을 비파괴 recipe로 재생 |
+| Studio multi-light surface oracle + Worker | signed height·roughness·metalness·normal map에 방향·점·스폿 광원, 감쇠·Fresnel·에너지 분할 specular를 결정적으로 합성하고 전용 Worker에서 transfer·취소·timeout·epoch를 fail-closed 처리 |
+| Studio spectral pigment mixing | 400–700nm 반사율을 Kubelka–Munk K/S와 유한 두께 two-flux 층으로 혼합하고 CIE 관찰자 근사를 거쳐 scene-linear 색으로 변환 |
+| Studio signed impasto height | add·excavate·erase·flatten과 종이/팁 질감, 압력·속도, 보존형 plow를 signed height·색·roughness 채널에 결정적으로 기록 |
+| Studio individual-fiber bristle oracle + Worker | seeded 섬유별 강성·splay·bend·종이 접촉·안료 잔량·pickup을 고정 arc-length station으로 계산하고 append/rebuild를 동일 replay로 보존하며 전용 Worker 경계에서 입력·출력 소유권과 취소·복구를 강제 |
+| Studio out-of-core export | BigInt/decimal 좌표, lazy row/Morton 타일, exact halo crop, resume 무결성 재검증과 메모리 backpressure로 브라우저 캔버스·상주 메모리보다 큰 원고를 renderer/sink 독립적으로 출고 |
+| Studio physics-particle brush oracle + Worker | generic orbital·flow·spring-net 입자를 fixed arc/timestep으로 재생하고 flow field·smoothed chaos·pressure/speed/tilt expression과 exact append/rebuild를 보존하며 전용 Worker에서 모든 실패를 hard terminate·cold restart |
+| Studio procedural media-surface oracle + Worker | 독점 종이 스캔 없이 seeded relief·fiber·weave·pore를 생성하고 height·absorbency·grain·flow를 전역 좌표로 평가해 full-frame과 tile+halo 결과를 동일하게 유지하며 전용 Worker에서 typed-array transfer·취소·복구 |
+
+새 후보는 라이선스·공급망, lazy/Worker 격리, 취소·예산·복구 receipt, 실제 브라우저 품질 게이트를
+통과한 뒤 같은 provider 계약 아래 승격합니다. Vello처럼 유망하지만 웹 지원이 alpha인 엔진은
+제품 권위를 주지 않고 실험실에서 비교하며, 더 나은 결과가 확인되면 기존 provider를 교체합니다.
+위 표는 provider의 계산·소유권 경계를 설명하며 곧바로 Studio UI 연결 완료를 뜻하지 않습니다.
+실제 기능 완료는 선택 UI부터 live/commit, Undo, 저장·재열기, 협업, 내보내기와 실브라우저 검증이
+한 수직 경로로 닫힌 경우에만 판정합니다.
+상용 기능의 공식 근거, clean-room 독립 구현 경계, 현재 단계와 다음 승격 순서는
+[`docs/studio-commercial-clean-room-radar-2026-07-28.md`](docs/studio-commercial-clean-room-radar-2026-07-28.md)에서
+지속해서 관리합니다.
+이번 provider 파동에서 추가한 제3자 패키지의 정확한 버전·라이선스·원본 저장소는
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)에 별도로 기록합니다.
+
 > 참고: 클라이언트 검색은 입력마다 `/api/search` 네트워크 요청으로 동작합니다. `useDeferredValue`는 네트워크 호출을 디바운스하지 않으므로(메모리 내 파생 렌더만 지연) 검색/팔레트에는 적용하지 않습니다.
 
 ## 실데이터 수집과 스냅샷 갱신

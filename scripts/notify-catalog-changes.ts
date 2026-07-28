@@ -19,7 +19,7 @@ import { universeFor } from "../lib/title-universe";
 
 import type { Title } from "../lib/types";
 
-const SITE = process.env.WEBDEX_SITE_URL ?? "https://toonspectrum.vercel.app";
+const SITE = process.env.WEBDEX_SITE_URL ?? "https://www.toonstudio.cloud";
 const WEBHOOK = process.env.DISCORD_WEBHOOK_URL ?? "";
 const MAX_LIST = 15; // 임베드당 최대 표기 항목
 const PERSIMMON = 0xe8743b;

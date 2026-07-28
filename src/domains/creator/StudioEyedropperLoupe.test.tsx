@@ -49,7 +49,13 @@ beforeEach(() => {
     imageSmoothingEnabled: true,
     putImageData: vi.fn(),
   };
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((
+    ((contextId: string) => (
+      contextId === "2d"
+        ? context as unknown as CanvasRenderingContext2D
+        : null
+    )) as typeof HTMLCanvasElement.prototype.getContext
+  ));
 });
 
 afterEach(() => {

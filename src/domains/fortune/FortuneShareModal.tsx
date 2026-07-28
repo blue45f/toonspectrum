@@ -49,7 +49,7 @@ export function FortuneShareModal({
   const shareUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/fortune`
-      : "https://toonspectrum.vercel.app/fortune";
+      : "https://www.toonstudio.cloud/fortune";
 
   // Esc로 닫기 + 진입 시 포커스
   const dialogRef = useRef<HTMLDivElement>(null);

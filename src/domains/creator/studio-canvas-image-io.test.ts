@@ -78,6 +78,13 @@ function setDeviceMemory(value: number | undefined): void {
   });
 }
 
+function mockCanvas2dContext(context: CanvasRenderingContext2D | null) {
+  return vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((
+    ((contextId: string) => contextId === "2d" ? context : null) as
+      typeof HTMLCanvasElement.prototype.getContext
+  ));
+}
+
 const GIF_HEADER_89A = [0x47, 0x49, 0x46, 0x38, 0x39, 0x61];
 const GIF_LOGICAL_SCREEN = [0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00];
 const GIF_GRAPHIC_CONTROL = [0x21, 0xf9, 0x04, 0x00, 0x0a, 0x00, 0x00, 0x00];
@@ -188,7 +195,7 @@ describe("Studio canvas image file loading", () => {
       })),
       putImageData: vi.fn(),
     } as unknown as CanvasRenderingContext2D;
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(() => context);
+    mockCanvas2dContext(context);
     vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/webp;base64,cW9p");
 
     await expect(loadImageFileForCanvas(file)).resolves.toEqual({
@@ -250,14 +257,14 @@ describe("Studio canvas image file loading", () => {
 
 describe("Studio pixel edit browser adapters", () => {
   it("returns null when a 2D canvas context is unavailable", () => {
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(() => null);
+    mockCanvas2dContext(null);
 
     expect(createPixelEditCanvas(10.6, 0)).toBeNull();
   });
 
   it("rounds safe canvas dimensions and returns the acquired context", () => {
     const context = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(() => context);
+    mockCanvas2dContext(context);
 
     const result = createPixelEditCanvas(10.6, 0);
 

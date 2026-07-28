@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   combineStudioDualTipAlpha,
+  combineStudioDualTipExactCoverageV2,
+  compositeStudioDualTipExactDepositionV2,
+  compositeStudioDualTipExactSequenceV2,
   renderStudioDualBrushTip,
   STUDIO_DUAL_TIP_CONTRACT_VERSION,
   STUDIO_DUAL_TIP_PACKED_LAYOUT,
@@ -10,6 +13,7 @@ import {
   type StudioDualTipAlphaField,
   type StudioDualTipArtifact,
   type StudioDualTipCombineMode,
+  type StudioDualTipExactDepositionPixel,
   type StudioDualTipRequest,
 } from "./studio-dual-brush-tip-engine";
 
@@ -220,6 +224,152 @@ describe("studio dual-tip engine — independent alpha-combine oracle", () => {
       expect(blue).toBeLessThanOrEqual(alpha);
       if (alpha === 0) expect([red, green, blue]).toEqual([0, 0, 0]);
     }
+  });
+});
+
+describe("studio dual-tip engine — exact v2 logical-deposition oracle", () => {
+  it("locks the two-overlap regression at 0.0975 instead of the aggregate-mask 0.1425", () => {
+    const deposition: StudioDualTipExactDepositionPixel = {
+      primaryCoverage: 0.5,
+      secondaryCoverage: 0.5,
+      paintAlpha: 0.2,
+      linearColor: [1, 1, 1],
+      blendFamily: "multiply",
+      porterDuff: "source-over",
+    };
+
+    const exact = compositeStudioDualTipExactSequenceV2([deposition, deposition]);
+    expect(exact[3]).toBeCloseTo(0.0975, 7);
+
+    // The removed v1 approximation accumulated each mask first and then inferred paint alpha:
+    // primaryRaw=.75, effectivePrimary=.19, secondary=.75 => .75*.75*(.19/.75).
+    const forbiddenAggregateApproximation = 0.75 * 0.75 * (0.19 / 0.75);
+    expect(forbiddenAggregateApproximation).toBeCloseTo(0.1425, 12);
+    expect(exact[3]).not.toBeCloseTo(forbiddenAggregateApproximation, 5);
+  });
+
+  it("defines all eight dynamic families plus exact legacy soft-intersection replay", () => {
+    const cases = [
+      ["intersect", 0.32],
+      ["darken", 0.4],
+      ["lighten", 0.8],
+      ["multiply", 0.32],
+      ["screen", 0.88],
+      ["add", 1],
+      ["subtract", 0.4],
+      ["difference", 0.4],
+      ["soft-intersect", 0.2],
+    ] as const;
+
+    for (const [family, expected] of cases) {
+      expect(combineStudioDualTipExactCoverageV2(0.8, 0.4, family)).toBeCloseTo(
+        expected,
+        12,
+      );
+    }
+  });
+
+  it("applies source-over and destination-out in sequence with premultiplied linear RGBA", () => {
+    const painted = compositeStudioDualTipExactDepositionV2(
+      [0.1, 0.05, 0.025, 0.25],
+      {
+        primaryCoverage: 0.8,
+        secondaryCoverage: 0.5,
+        paintAlpha: 0.5,
+        linearColor: [0.9, 0.4, 0.2],
+        blendFamily: "darken",
+        porterDuff: "source-over",
+      },
+    );
+    expect(painted).toEqual([
+      Math.fround(0.9 * 0.25 + 0.1 * 0.75),
+      Math.fround(0.4 * 0.25 + 0.05 * 0.75),
+      Math.fround(0.2 * 0.25 + 0.025 * 0.75),
+      Math.fround(0.25 + 0.25 * 0.75),
+    ]);
+
+    const erased = compositeStudioDualTipExactDepositionV2(painted, {
+      primaryCoverage: 0.5,
+      secondaryCoverage: 0.5,
+      paintAlpha: 0.4,
+      linearColor: [1, 0, 1],
+      blendFamily: "lighten",
+      porterDuff: "destination-out",
+    });
+    const inverse = Math.fround(1 - Math.fround(0.5 * 0.4));
+    expect(erased).toEqual(painted.map((value) => Math.fround(value * inverse)));
+  });
+
+  it("matches an independent randomized scalar corpus for overlap, color and eraser order", () => {
+    let state = 0x6d2b_79f5;
+    const random = () => {
+      state = Math.imul(state ^ (state >>> 15), 1 | state);
+      state ^= state + Math.imul(state ^ (state >>> 7), 61 | state);
+      return ((state ^ (state >>> 14)) >>> 0) / 0x1_0000_0000;
+    };
+    const families = [
+      "intersect",
+      "darken",
+      "lighten",
+      "multiply",
+      "screen",
+      "add",
+      "subtract",
+      "difference",
+    ] as const;
+    const corpus: StudioDualTipExactDepositionPixel[] = Array.from(
+      { length: 512 },
+      (_, index) => ({
+        primaryCoverage: random(),
+        secondaryCoverage: random(),
+        paintAlpha: random(),
+        linearColor: [random(), random(), random()] as const,
+        blendFamily: families[index % families.length]!,
+        porterDuff: index % 11 === 0 ? "destination-out" : "source-over",
+      }),
+    );
+
+    let independent = [0, 0, 0, 0] as [number, number, number, number];
+    for (const deposition of corpus) {
+      const a = Math.min(1, Math.max(0, deposition.primaryCoverage));
+      const b = Math.min(1, Math.max(0, deposition.secondaryCoverage));
+      const family = deposition.blendFamily;
+      const combined = family === "intersect" || family === "multiply"
+        ? a * b
+        : family === "darken"
+          ? Math.min(a, b)
+          : family === "lighten"
+            ? Math.max(a, b)
+            : family === "screen"
+              ? 1 - (1 - a) * (1 - b)
+              : family === "add"
+                ? Math.min(1, a + b)
+                : family === "subtract"
+                  ? Math.max(0, a - b)
+                  : Math.abs(a - b);
+      const sourceAlpha = Math.fround(combined * deposition.paintAlpha);
+      const inverse = Math.fround(1 - sourceAlpha);
+      if (deposition.porterDuff === "destination-out") {
+        independent = independent.map(
+          (value) => Math.fround(value * inverse),
+        ) as [number, number, number, number];
+      } else {
+        independent = [
+          Math.fround(
+            deposition.linearColor[0] * sourceAlpha + independent[0] * inverse,
+          ),
+          Math.fround(
+            deposition.linearColor[1] * sourceAlpha + independent[1] * inverse,
+          ),
+          Math.fround(
+            deposition.linearColor[2] * sourceAlpha + independent[2] * inverse,
+          ),
+          Math.fround(sourceAlpha + independent[3] * inverse),
+        ];
+      }
+    }
+
+    expect(compositeStudioDualTipExactSequenceV2(corpus)).toEqual(independent);
   });
 });
 

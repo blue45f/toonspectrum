@@ -118,6 +118,26 @@ describe("api/og.js SSRF and SSR Meta Injection", () => {
     expect(res.setHeader).toHaveBeenCalledWith("Cache-Control", "public, max-age=300, s-maxage=86400");
   });
 
+  it("defaults OG fetches and generated URLs to the www toonstudio.cloud host", async () => {
+    vi.stubEnv("CANONICAL_HOST", "");
+    mockFetch.mockRejectedValue(new Error("expected metadata fallback"));
+    const req = {
+      query: { slug: "canonical-probe" },
+      headers: { "user-agent": "Twitterbot/1.0" },
+    };
+    const res = {
+      setHeader: vi.fn(),
+      status: vi.fn().mockReturnValue({ send: vi.fn() }),
+    };
+
+    await ogHandler(req, res);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://www.toonstudio.cloud/api/titles/canonical-probe",
+      expect.objectContaining({ headers: { Accept: "application/json" } })
+    );
+  });
+
   it("handles fetch failures gracefully by falling back to default template with no-store cache", async () => {
     const req = {
       query: { slug: "missing-webtoon" },

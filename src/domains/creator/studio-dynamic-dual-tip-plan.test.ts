@@ -387,8 +387,10 @@ describe("dynamic dual-tip provider-neutral planning", () => {
     expect(result.plan).toMatchObject({
       kind: "studio-dynamic-dual-tip-plan",
       version: 1,
-      providerCapability: "dynamic-dual-tip-r8-v1",
-      executionRoute: "future-webgpu-dynamic-dual-tip-provider",
+      providerCapability: "dynamic-dual-tip-r8-aggregate-preview-v1",
+      executionRoute: "experimental-webgpu-aggregate-preview-v1",
+      exactExecutionRoute: "webgpu-exact-packed-deposition-v2",
+      fidelity: "aggregate-mask-preview-only",
       singleTipFallback: "forbidden",
       textureFormat: "rgba16float",
       maskFormat: "r8-unorm",
@@ -410,14 +412,16 @@ describe("dynamic dual-tip provider-neutral planning", () => {
     expect(assetResolver.resolve.mock.calls.map(([request]) => request.assetId))
       .toEqual(["primary-r8", "secondary-r8"]);
     expect(result.receipt).toMatchObject({
-      providerCapability: "dynamic-dual-tip-r8-v1",
-      executionRoute: "future-webgpu-dynamic-dual-tip-provider",
+      providerCapability: "dynamic-dual-tip-r8-aggregate-preview-v1",
+      executionRoute: "experimental-webgpu-aggregate-preview-v1",
+      exactExecutionRoute: "webgpu-exact-packed-deposition-v2",
+      fidelity: "aggregate-mask-preview-only",
       singleTipFallback: "forbidden",
       primaryEventCount: result.plan.primary.dabs.length,
       secondaryStationCount: result.plan.secondaryStations.length,
       secondaryInstanceCount: result.plan.secondaryInstances.length,
       assetCount: 2,
-      complete: true,
+      complete: false,
     });
     expect(result.receipt.fingerprint).toBe(result.plan.fingerprint);
     expect(Object.isFrozen(result)).toBe(true);

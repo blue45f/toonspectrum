@@ -19,6 +19,46 @@ export type StudioDualTipCombineMode =
   | "subtract"
   | "intersect";
 
+/**
+ * Versioned exact-deposition blend families shared by the CPU oracle and the WebGPU v2 provider.
+ *
+ * `soft-intersect` is retained only so the legacy packed-command contract can be replayed without
+ * silently changing its Łukasiewicz intersection semantics. New dynamic dual-tip plans use the
+ * other eight artist-facing families.
+ */
+export type StudioDualTipExactBlendFamily =
+  | "intersect"
+  | "darken"
+  | "lighten"
+  | "multiply"
+  | "screen"
+  | "add"
+  | "subtract"
+  | "difference"
+  | "soft-intersect";
+
+export type StudioDualTipExactPorterDuff = "source-over" | "destination-out";
+
+export type StudioDualTipPremultipliedLinearRgba = readonly [
+  red: number,
+  green: number,
+  blue: number,
+  alpha: number,
+];
+
+export interface StudioDualTipExactDepositionPixel {
+  /** Coverage after the primary-tip sampler/transfer function, before paint alpha. */
+  readonly primaryCoverage: number;
+  /** Coverage after the secondary-tip sampler/transfer function, before paint alpha. */
+  readonly secondaryCoverage: number;
+  /** Fully resolved pressure × flow × opacity contribution for this logical deposition. */
+  readonly paintAlpha: number;
+  /** Straight scene-linear paint color. Alpha is carried by `paintAlpha`. */
+  readonly linearColor: readonly [red: number, green: number, blue: number];
+  readonly blendFamily: StudioDualTipExactBlendFamily;
+  readonly porterDuff: StudioDualTipExactPorterDuff;
+}
+
 export interface StudioDualTipAlphaField {
   readonly width: number;
   readonly height: number;
@@ -757,6 +797,82 @@ export function combineStudioDualTipAlpha(
   if (mode === "subtract") return Math.max(0, a - b);
   // Łukasiewicz t-norm: a strict soft intersection distinct from product and minimum.
   return Math.max(0, a + b - 1);
+}
+
+/**
+ * Exact v2 coverage combination. This function deliberately combines the two coverages belonging
+ * to one logical deposition before any canvas accumulation happens.
+ */
+export function combineStudioDualTipExactCoverageV2(
+  primary: number,
+  secondary: number,
+  family: StudioDualTipExactBlendFamily,
+): number {
+  const a = Math.min(1, Math.max(0, primary));
+  const b = Math.min(1, Math.max(0, secondary));
+  if (family === "intersect" || family === "multiply") return a * b;
+  if (family === "darken") return Math.min(a, b);
+  if (family === "lighten") return Math.max(a, b);
+  if (family === "screen") return 1 - (1 - a) * (1 - b);
+  if (family === "add") return Math.min(1, a + b);
+  if (family === "subtract") return Math.max(0, a - b);
+  if (family === "difference") return Math.abs(a - b);
+  return Math.max(0, a + b - 1);
+}
+
+/**
+ * CPU authority for one exact dual-tip deposition.
+ *
+ * The ordering is normative:
+ * 1. combine the two coverages for this deposition;
+ * 2. multiply by its resolved paint alpha;
+ * 3. produce premultiplied scene-linear RGBA;
+ * 4. source-over or destination-out the current authority pixel.
+ *
+ * Aggregating either tip mask before step 1 is not equivalent and must never be advertised as
+ * exact.
+ */
+export function compositeStudioDualTipExactDepositionV2(
+  destination: StudioDualTipPremultipliedLinearRgba,
+  deposition: StudioDualTipExactDepositionPixel,
+): StudioDualTipPremultipliedLinearRgba {
+  const combinedCoverage = combineStudioDualTipExactCoverageV2(
+    deposition.primaryCoverage,
+    deposition.secondaryCoverage,
+    deposition.blendFamily,
+  );
+  const paintAlpha = Math.min(1, Math.max(0, deposition.paintAlpha));
+  const sourceAlpha = Math.fround(combinedCoverage * paintAlpha);
+  const inverse = Math.fround(1 - sourceAlpha);
+  if (deposition.porterDuff === "destination-out") {
+    return Object.freeze([
+      Math.fround(destination[0] * inverse),
+      Math.fround(destination[1] * inverse),
+      Math.fround(destination[2] * inverse),
+      Math.fround(destination[3] * inverse),
+    ]);
+  }
+  return Object.freeze([
+    Math.fround(deposition.linearColor[0] * sourceAlpha + destination[0] * inverse),
+    Math.fround(deposition.linearColor[1] * sourceAlpha + destination[1] * inverse),
+    Math.fround(deposition.linearColor[2] * sourceAlpha + destination[2] * inverse),
+    Math.fround(sourceAlpha + destination[3] * inverse),
+  ]);
+}
+
+/**
+ * Deterministic randomized-corpus/parity helper. Callers can feed any generated deposition
+ * sequence; every item is applied in order through the same per-deposition CPU authority.
+ */
+export function compositeStudioDualTipExactSequenceV2(
+  depositions: readonly StudioDualTipExactDepositionPixel[],
+  initial: StudioDualTipPremultipliedLinearRgba = [0, 0, 0, 0],
+): StudioDualTipPremultipliedLinearRgba {
+  let authority = initial;
+  for (const deposition of depositions) {
+    authority = compositeStudioDualTipExactDepositionV2(authority, deposition);
+  }
+  return authority;
 }
 
 function rasterize(

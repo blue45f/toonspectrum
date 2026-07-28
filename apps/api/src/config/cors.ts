@@ -10,6 +10,18 @@ const LOCAL_CORS_ORIGINS = [
   "http://127.0.0.1:4001",
 ] as const;
 
+/**
+ * ToonSpectrum의 공개 웹 앱 Origin.
+ *
+ * `www`가 정본이고 apex는 Vercel에서 `www`로 리다이렉트하지만, 리다이렉트 전에
+ * preflight/Socket.IO upgrade를 시작한 기존 클라이언트도 안전하게 전환할 수 있도록 두
+ * Origin을 모두 정확히 허용한다. 와일드카드나 임의 Vercel preview Origin은 포함하지 않는다.
+ */
+export const PRODUCTION_CORS_ORIGINS = [
+  "https://www.toonstudio.cloud",
+  "https://toonstudio.cloud",
+] as const;
+
 export const API_CORS_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] as const;
 export const API_CORS_HEADERS = ["Content-Type", "x-user-id", "Idempotency-Key"] as const;
 
@@ -34,7 +46,7 @@ export function allowedCorsOrigins(env: NodeJS.ProcessEnv = process.env): string
     .map(normalizeOrigin)
     .filter((origin): origin is string => origin !== null);
   const local = env.NODE_ENV === "production" ? [] : LOCAL_CORS_ORIGINS;
-  return [...new Set([...local, ...configured])];
+  return [...new Set([...PRODUCTION_CORS_ORIGINS, ...local, ...configured])];
 }
 
 export function createCorsOptions(env: NodeJS.ProcessEnv = process.env): CorsOptions {

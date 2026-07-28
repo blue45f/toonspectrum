@@ -19,7 +19,7 @@ export const APP_ID = "toonspectrum";
  * 로컬 preview와 정식 배포를 구분할 수 없다. 자동·비필수 ping은 정확한 정식 origin에서만
  * 보내 개발 서버, 127.0.0.1, LAN preview, 테스트 및 Vercel preview의 잡음과 비용을 막는다.
  */
-export const VISIT_PING_PRODUCTION_ORIGIN = "https://toonspectrum.vercel.app";
+export const VISIT_PING_PRODUCTION_ORIGIN = "https://www.toonstudio.cloud";
 
 /** 하루 1회 핑을 디바운스하기 위한 localStorage 키(YYYY-MM-DD 저장). */
 const LAST_PING_KEY = "visits:last-ping";

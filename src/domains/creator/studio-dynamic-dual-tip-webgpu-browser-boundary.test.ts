@@ -61,7 +61,9 @@ describe("dynamic dual-tip actual Chromium WebGPU boundary", () => {
     expect(browserEntry).toContain("countJitter: 1");
     expect(browserEntry).toContain('scatterAxes: "both-axes"');
     expect(verifier).toContain("independent count/scatter/reflected affine evidence");
-    expect(verifier).toContain("exactEightBlendFamilies: true");
+    expect(verifier).toContain("eightBlendFamilyAggregatePreviewCoverage: true");
+    expect(verifier).toContain("exactPerDepositionComposition: false");
+    expect(verifier).not.toContain("exactEightBlendFamilies: true");
   });
 
   it("proves append/rebuild, destination-out, cache budgets and fail-closed hashes", () => {

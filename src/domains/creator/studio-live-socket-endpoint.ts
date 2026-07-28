@@ -1,4 +1,8 @@
 const STUDIO_LIVE_SOCKET_NAMESPACE = "/studio-live";
+const VERCEL_SERVERLESS_WEB_HOSTS = new Set([
+  "www.toonstudio.cloud",
+  "toonstudio.cloud",
+]);
 
 export interface StudioLiveSocketEndpointInput {
   explicitOrigin?: string | null;
@@ -40,7 +44,11 @@ function isVercelServerlessOrigin(value: string | null): boolean {
   if (!value) return false;
   try {
     const hostname = new URL(value).hostname.toLowerCase();
-    return hostname === "vercel.app" || hostname.endsWith(".vercel.app");
+    return (
+      hostname === "vercel.app"
+      || hostname.endsWith(".vercel.app")
+      || VERCEL_SERVERLESS_WEB_HOSTS.has(hostname)
+    );
   } catch {
     return false;
   }
@@ -80,8 +88,9 @@ export function resolveStudioLiveSocketEndpoint({
       return null;
     }
   }
-  // Vercel's serverless request lifecycle cannot own the long-running Nest
-  // Socket.IO gateway. A dedicated VITE_STUDIO_LIVE_ORIGIN is required there.
+  // Vercel's serverless request lifecycle cannot own the long-running Nest Socket.IO gateway.
+  // This includes the project's custom production domains. A dedicated
+  // VITE_STUDIO_LIVE_ORIGIN is required there.
   if (!explicitBase && isVercelServerlessOrigin(safeLocationOrigin)) return null;
 
   const configuredBase =

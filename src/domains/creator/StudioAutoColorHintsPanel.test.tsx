@@ -16,6 +16,13 @@ import {
 } from "./studio-auto-color-hints-summary";
 import { StudioAutoColorHintsPanel } from "./StudioAutoColorHintsPanel";
 
+function mockCanvas2dContext(context: CanvasRenderingContext2D | null) {
+  return vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((
+    ((contextId: string) => contextId === "2d" ? context : null) as
+      typeof HTMLCanvasElement.prototype.getContext
+  ));
+}
+
 afterEach(() => {
   cleanup();
 });
@@ -218,9 +225,9 @@ describe("StudioAutoColorHintsPanel module boundary", () => {
       fillRect: vi.fn(),
       fillStyle: "",
     };
-    const getContext = vi
-      .spyOn(HTMLCanvasElement.prototype, "getContext")
-      .mockReturnValue(fakeContext as unknown as CanvasRenderingContext2D);
+    const getContext = mockCanvas2dContext(
+      fakeContext as unknown as CanvasRenderingContext2D,
+    );
     const toDataURL = vi
       .spyOn(HTMLCanvasElement.prototype, "toDataURL")
       .mockReturnValue("data:image/png;base64,cW9p");
@@ -263,9 +270,9 @@ describe("StudioAutoColorHintsPanel module boundary", () => {
       fillRect: vi.fn(),
       fillStyle: "",
     };
-    const getContext = vi
-      .spyOn(HTMLCanvasElement.prototype, "getContext")
-      .mockReturnValue(fakeContext as unknown as CanvasRenderingContext2D);
+    const getContext = mockCanvas2dContext(
+      fakeContext as unknown as CanvasRenderingContext2D,
+    );
     const toDataURL = vi
       .spyOn(HTMLCanvasElement.prototype, "toDataURL")
       .mockReturnValue("data:image/png;base64,bmV3");

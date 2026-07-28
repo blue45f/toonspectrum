@@ -97,7 +97,7 @@ describe("buildWeeklyIcs", () => {
           uid: "a@toonspectrum",
           summary,
           description: "설명".repeat(45),
-          url: "https://toonspectrum.vercel.app/title/long",
+          url: "https://www.toonstudio.cloud/title/long",
           days: ["월"],
         },
       ],
@@ -144,7 +144,7 @@ describe("titleToWeeklyIcsEvent", () => {
     expect(event.uid).toBe("omniscient-reader@toonspectrum");
     expect(event.summary).toBe("전지적 독자 시점 새 회차");
     expect(event.days).toEqual(["수", "토"]);
-    expect(event.url).toBe("https://toonspectrum.vercel.app/title/omniscient-reader");
+    expect(event.url).toBe("https://www.toonstudio.cloud/title/omniscient-reader");
     expect(event.description).toContain("매주 수·토 연재");
     expect(event.description).toContain("네이버웹툰");
     expect(event.description).toContain("시리즈");

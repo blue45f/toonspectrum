@@ -28,7 +28,7 @@ const PRODID = "-//ToonSpectrum//Release Calendar//KO";
 const CRLF = "\r\n";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
-const SITE_BASE = "https://toonspectrum.vercel.app"; // 정규 호스트 — lib/ranking.ts JSON-LD와 동일 기준
+const SITE_BASE = "https://www.toonstudio.cloud"; // 정규 호스트 — ranking JSON-LD와 동일 기준
 
 // WEEK_DAYS 인덱스(0=월…6=일) → RFC 5545 BYDAY 코드
 const BYDAY = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"] as const;

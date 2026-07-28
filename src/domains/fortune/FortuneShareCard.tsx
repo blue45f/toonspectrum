@@ -173,7 +173,7 @@ export const FortuneShareCard = forwardRef<HTMLDivElement, FortuneShareCardProps
             }}
           >
             <span>{dateLabel}</span>
-            <span style={{ fontWeight: 700, color: accent }}>toonspectrum.vercel.app/fortune</span>
+            <span style={{ fontWeight: 700, color: accent }}>www.toonstudio.cloud/fortune</span>
           </div>
         </div>
       </div>

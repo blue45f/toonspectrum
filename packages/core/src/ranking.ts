@@ -1,3 +1,4 @@
+import { SITE_URL } from "./business";
 import { statsAreEstimated } from "./estimate";
 
 import type { Title, WorkType, PlatformId } from "./types";
@@ -493,7 +494,6 @@ export function rankBy(
   return limit ? out.slice(0, limit) : out;
 }
 
-const SITE_BASE = "https://toonspectrum.vercel.app";
 const RANKING_ITEMLIST_TOP = 20;
 
 export function rankingItemListJsonLd(items: RankedTitle[], axisLabel: string) {
@@ -506,7 +506,7 @@ export function rankingItemListJsonLd(items: RankedTitle[], axisLabel: string) {
       "@type": "ListItem",
       position: r.rank,
       name: r.title.title,
-      url: `${SITE_BASE}/title/${encodeURIComponent(r.title.slug)}`,
+      url: `${SITE_URL}/title/${encodeURIComponent(r.title.slug)}`,
     };
   }
   return {

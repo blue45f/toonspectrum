@@ -96,8 +96,18 @@ describe("Studio live Socket.IO endpoint resolver", () => {
     ).toBeNull();
     expect(
       resolveStudioLiveSocketEndpoint({
+        locationOrigin: "https://www.toonstudio.cloud",
+      })
+    ).toBeNull();
+    expect(
+      resolveStudioLiveSocketEndpoint({
+        locationOrigin: "https://toonstudio.cloud",
+      })
+    ).toBeNull();
+    expect(
+      resolveStudioLiveSocketEndpoint({
         explicitOrigin: "https://realtime.toonspectrum.example",
-        locationOrigin: "https://toonspectrum.vercel.app",
+        locationOrigin: "https://www.toonstudio.cloud",
       })
     ).toBe("https://realtime.toonspectrum.example/studio-live");
   });

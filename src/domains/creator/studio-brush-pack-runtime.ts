@@ -32,6 +32,7 @@ import {
   STUDIO_DUAL_TIP_CONTRACT_VERSION,
   type StudioDualTipCombineMode,
   type StudioDualTipDynamics,
+  type StudioDualTipAlphaField,
   type StudioDualTipJitter,
   type StudioDualTipOutputSurface,
   type StudioDualTipResult,
@@ -138,8 +139,28 @@ export interface StudioBrushPackDualTipRenderInput {
   /** Defaults to the catalogue opacity. */
   readonly opacity?: number;
   readonly linearColor?: readonly [number, number, number];
+  /**
+   * Authority operation for exact GPU/replay providers. The CPU artifact remains a premultiplied
+   * source/mask and the provider applies this operation when it reaches an existing authority.
+   */
+  readonly porterDuff?: "source-over" | "destination-out";
   readonly output: StudioDualTipOutputSurface;
   readonly workBudget?: number;
+}
+
+export interface StudioBrushPackDualTipR8Asset {
+  readonly assetId: string;
+  readonly width: number;
+  readonly height: number;
+  readonly channel: "alpha";
+  readonly bytes: Uint8Array;
+  readonly field: StudioDualTipAlphaField;
+}
+
+export interface StudioBrushPackDualTipR8Materialization {
+  readonly descriptor: NormalizedStudioBrushPackDualTipDescriptor;
+  readonly primary: StudioBrushPackDualTipR8Asset;
+  readonly secondary: StudioBrushPackDualTipR8Asset;
 }
 
 const CUSTOM_MOTIF_SET: ReadonlySet<string> = new Set(STUDIO_BRUSH_PACK_CUSTOM_TIP_MOTIFS);
@@ -1631,6 +1652,65 @@ function invalidStudioBrushPackDualTipResult(): StudioDualTipResult {
   };
 }
 
+function studioBrushPackTipMapToR8(
+  selection: StudioBrushPackSelection,
+  role: "primary" | "secondary",
+  tip: NormalizedStudioBrushTipSettings,
+): StudioBrushPackDualTipR8Asset {
+  const map = buildStudioBrushTipAlphaMap(tip);
+  const bytes = Uint8Array.from(
+    map.alphas,
+    (alpha) => Math.round(Math.min(1, Math.max(0, alpha)) * 255),
+  );
+  return Object.freeze({
+    assetId: `brush-pack:${selection.catalogId}:dual-tip:${role}`,
+    width: map.size,
+    height: map.size,
+    channel: "alpha" as const,
+    bytes,
+    field: Object.freeze({
+      width: map.size,
+      height: map.size,
+      alpha: Object.freeze(Array.from(bytes, (alpha) => alpha / 255)),
+    }),
+  });
+}
+
+/**
+ * One canonical R8 materialization shared by CPU authority, exact WebGPU and saved replay.
+ *
+ * Quantizing once at this boundary prevents the CPU oracle from sampling an f32 procedural map
+ * while WebGPU samples a different R8 representation.
+ */
+export function materializeStudioBrushPackDualTipR8(
+  selection: StudioBrushPackSelection,
+): StudioBrushPackDualTipR8Materialization | null {
+  const selectionSource = dualTipRecord(selection);
+  if (
+    !selectionSource
+    || !Object.prototype.hasOwnProperty.call(selectionSource, "dualTip")
+    || selectionSource.dualTip === undefined
+    || selectionSource.dualTip === null
+  ) return null;
+  const brushDynamics = normalizeStudioBrushDynamicsSettings(
+    dualTipOwn(selectionSource, "brushDynamics"),
+  );
+  const descriptor = normalizeStudioBrushPackDualTipDescriptor(
+    selectionSource.dualTip,
+    brushDynamics.dualBrush?.tip ?? brushDynamics.tip,
+  );
+  if (!descriptor) return null;
+  return Object.freeze({
+    descriptor,
+    primary: studioBrushPackTipMapToR8(selection, "primary", brushDynamics.tip),
+    secondary: studioBrushPackTipMapToR8(
+      selection,
+      "secondary",
+      descriptor.secondaryTip,
+    ),
+  });
+}
+
 /**
  * Optional bridge into the authoritative dual-tip CPU oracle.
  *
@@ -1656,14 +1736,9 @@ export function renderStudioBrushPackDualTipIfConfigured(
   const brushDynamics = normalizeStudioBrushDynamicsSettings(
     dualTipOwn(selectionSource, "brushDynamics")
   );
-  const descriptor = normalizeStudioBrushPackDualTipDescriptor(
-    selectionSource.dualTip,
-    brushDynamics.dualBrush?.tip ?? brushDynamics.tip
-  );
-  if (!descriptor) return invalidStudioBrushPackDualTipResult();
-
-  const primaryMap = buildStudioBrushTipAlphaMap(brushDynamics.tip);
-  const secondaryMap = buildStudioBrushTipAlphaMap(descriptor.secondaryTip);
+  const materialized = materializeStudioBrushPackDualTipR8(selection);
+  if (!materialized) return invalidStudioBrushPackDualTipResult();
+  const { descriptor, primary, secondary } = materialized;
   const diameterValue = dualTipOwn(inputSource, "diameter");
   const diameter = diameterValue === undefined
     ? brushDynamics.width.base
@@ -1679,16 +1754,8 @@ export function renderStudioBrushPackDualTipIfConfigured(
 
   return renderStudioDualBrushTip({
     contractVersion: descriptor.contractVersion,
-    primary: {
-      width: primaryMap.size,
-      height: primaryMap.size,
-      alpha: Array.from(primaryMap.alphas),
-    },
-    secondary: {
-      width: secondaryMap.size,
-      height: secondaryMap.size,
-      alpha: Array.from(secondaryMap.alphas),
-    },
+    primary: primary.field,
+    secondary: secondary.field,
     samples: dualTipOwn(inputSource, "samples") as readonly StudioDualTipStrokeSample[],
     combineMode: descriptor.combineMode,
     diameter,

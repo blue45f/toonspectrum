@@ -34,6 +34,13 @@ function raster(width: number, height: number, pixels: readonly number[]): Studi
   return { width, height, data: Uint8ClampedArray.from(pixels) };
 }
 
+function mockCanvas2dContext(context: CanvasRenderingContext2D | null) {
+  return vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((
+    ((contextId: string) => contextId === "2d" ? context : null) as
+      typeof HTMLCanvasElement.prototype.getContext
+  ));
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -190,10 +197,10 @@ describe("reference local raster decoder", () => {
     const getImageData = vi.fn(() => ({
       data: Uint8ClampedArray.from([255, 0, 0, 255, 0, 255, 0, 255]),
     }));
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(() => ({
+    mockCanvas2dContext({
       drawImage,
       getImageData,
-    }) as unknown as CanvasRenderingContext2D);
+    } as unknown as CanvasRenderingContext2D);
 
     const pending = loadStudioReferenceImageRaster("data:image/png;base64,AA==");
     expect(images).toHaveLength(1);

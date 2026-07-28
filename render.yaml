@@ -50,11 +50,16 @@ services:
       # 수동 크롤 트리거 토큰 — Render가 자동 생성(GitHub cron 시크릿과 동일 값으로 맞출 것).
       - key: CATALOG_INGEST_TRIGGER_TOKEN
         generateValue: true
-      # 아래 4개는 프론트(Vercel) 도메인 확정 후 그 값으로 설정. 단일 오리진 유지.
+      # 공개 웹 앱은 www를 정본으로 사용한다. apex는 308 리다이렉트되지만 리다이렉트 전
+      # preflight/Socket.IO upgrade를 위해 exact allowlist에 함께 둔다.
+      - key: API_CORS_ALLOWED_ORIGINS
+        value: https://www.toonstudio.cloud,https://toonstudio.cloud
+      - key: CANONICAL_HOST
+        value: www.toonstudio.cloud
       - key: OAUTH_REDIRECT_BASE_URL
-        sync: false
+        value: https://www.toonstudio.cloud
       - key: WEB_APP_BASE_URL
-        sync: false
+        value: https://www.toonstudio.cloud
       # Google 실연동: GIS(ID 토큰) 흐름이라 CLIENT ID 만 있으면 동작(시크릿 불필요).
       - key: GOOGLE_OAUTH_CLIENT_ID
         sync: false
