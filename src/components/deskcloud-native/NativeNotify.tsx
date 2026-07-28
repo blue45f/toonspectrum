@@ -17,6 +17,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { getAnonId, notifyConfig } from "./config";
 
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,7 @@ function relativeTime(iso: string): string {
 }
 
 export function NativeNotify() {
+  const t = useT();
   const config = useMemo(() => notifyConfig(), []);
   const client = useMemo(() => (config ? createNotifyClient(config) : null), [config]);
   const userId = useApp((s) => s.userId);
@@ -208,10 +210,10 @@ export function NativeNotify() {
 
             {phase === "error" && (
               <div className="px-4 py-10 text-center">
-                <p className="text-sm text-fg-2">알림을 불러오지 못했어요.</p>
+                <p className="text-sm text-fg-2">{t("notify.loadError")}</p>
                 <div className="mt-3">
                   <Button size="sm" onClick={load}>
-                    다시 시도
+                    {t("common.retry")}
                   </Button>
                 </div>
               </div>
@@ -222,7 +224,7 @@ export function NativeNotify() {
                 <span className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-raised text-fg-3">
                   <BellOff size={24} aria-hidden="true" />
                 </span>
-                <p className="text-sm text-fg-2">새 알림이 없어요.</p>
+                <p className="text-sm text-fg-2">{t("notify.empty")}</p>
               </div>
             )}
 
