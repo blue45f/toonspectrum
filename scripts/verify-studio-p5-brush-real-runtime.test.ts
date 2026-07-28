@@ -55,6 +55,12 @@ describe("Studio p5.brush permanent real-runtime gate", () => {
     expect(protocol).toContain('"flow-field"');
     expect(protocol).toContain('"hatch"');
     expect(protocol).toContain('"mass"');
+    expect(protocol).toContain('"watercolor-fill"');
+    expect(protocol).toContain('"flat-wash"');
+    expect(verifier).toContain(
+      'const EXPECTED_ADAPTER_VERSION = "2.2.1-adapter.3"',
+    );
+    expect(verifier).toContain("const EXPECTED_SURFACE_COUNT = 10");
     expect(verifier).toContain("MIN_PAINTED_PIXELS");
     expect(verifier).toContain("exactPixelReplay");
     expect(verifier).toContain("first?.pixelHash !== evidence.replay?.pixelHash");

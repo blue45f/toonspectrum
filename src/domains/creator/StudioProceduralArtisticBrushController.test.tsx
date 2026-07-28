@@ -75,7 +75,9 @@ describe("StudioProceduralArtisticBrushController", () => {
     ).toBeNull();
     const summary = screen.getByText("절차적 질감 생성기").closest("summary");
     expect(summary?.className).toContain("min-h-11");
-    expect(screen.getByText("유기적 선 · 방향성 해칭 · 목탄 매스")).toBeTruthy();
+    expect(
+      screen.getByText("흐름장 · 해칭 · 매스 · 수채 채움 · 플랫 워시"),
+    ).toBeTruthy();
     expect(screen.getByRole("status").textContent).toContain("확인 전");
   });
 
@@ -194,6 +196,81 @@ describe("StudioProceduralArtisticBrushController", () => {
       "해칭 질감을 새 레이어에 추가했습니다.",
     )).toBeTruthy();
   });
+
+  it.each([
+    {
+      technique: "watercolor-fill",
+      label: "수채 채움",
+      sliderValues: ["82", "-55", "0.63"],
+      expected: {
+        density: 82,
+        angle: -55,
+        weight: 2,
+        strength: 0.63,
+      },
+    },
+    {
+      technique: "flat-wash",
+      label: "플랫 워시",
+      sliderValues: ["0.46"],
+      expected: {
+        density: 60,
+        angle: 45,
+        weight: 2,
+        strength: 0.46,
+      },
+    },
+  ] as const)(
+    "passes one exact $technique settings snapshot to generation",
+    async ({ technique, label, sliderValues, expected }) => {
+      const generate =
+        vi.fn<StudioProceduralArtisticBrushControllerProps["generate"]>(
+          async () => ({
+            message: `${label} 레이어를 추가했습니다.`,
+          }),
+        );
+      render(
+        <StudioProceduralArtisticBrushController
+          {...props({ generate })}
+        />,
+      );
+      toggle(true);
+      await waitFor(() => {
+        expect(
+          (screen.getByRole("button", {
+            name: "질감 생성",
+          }) as HTMLButtonElement).disabled,
+        ).toBe(false);
+      });
+
+      const techniqueRadio = screen.getByRole("radio", { name: label });
+      fireEvent.click(techniqueRadio);
+      expect((techniqueRadio as HTMLInputElement).checked).toBe(true);
+      fireEvent.change(screen.getByLabelText("질감 색상 코드"), {
+        target: { value: "#8844aa" },
+      });
+      fireEvent.change(screen.getByLabelText("결정적 반복 시드"), {
+        target: { value: "99" },
+      });
+      const sliders = within(
+        screen.getByLabelText(`${label} 세부 설정`),
+      ).getAllByRole("slider");
+      expect(sliders).toHaveLength(sliderValues.length);
+      sliderValues.forEach((value, index) => {
+        fireEvent.change(sliders[index]!, { target: { value } });
+      });
+      fireEvent.click(screen.getByRole("button", { name: "질감 생성" }));
+
+      await waitFor(() => expect(generate).toHaveBeenCalledTimes(1));
+      expect(generate.mock.calls[0]?.[0]).toEqual({
+        technique,
+        color: "#8844aa",
+        ...expected,
+        seed: 99,
+      });
+      expect(Object.isFrozen(generate.mock.calls[0]?.[0])).toBe(true);
+    },
+  );
 
   it("keeps generation busy while cancellation settles and ignores stale success", async () => {
     const pending = deferred<{ message: string }>();

@@ -15,7 +15,13 @@ export const STUDIO_PROCEDURAL_ARTISTIC_BRUSH_WORKER_PROTOCOL_VERSION =
   1 as const;
 
 export const STUDIO_PROCEDURAL_ARTISTIC_BRUSH_WORKER_TECHNIQUES =
-  Object.freeze(["flow-field", "hatch", "mass"] as const);
+  Object.freeze([
+    "flow-field",
+    "hatch",
+    "mass",
+    "watercolor-fill",
+    "flat-wash",
+  ] as const);
 
 export type StudioProceduralArtisticBrushWorkerTechnique =
   (typeof STUDIO_PROCEDURAL_ARTISTIC_BRUSH_WORKER_TECHNIQUES)[number];
@@ -171,6 +177,18 @@ const RECEIPT_KEYS = Object.freeze([
 ]);
 const HASH_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]*$/u;
+const PRODUCT_COLOR_PATTERN = /^#[0-9a-f]{6}$/iu;
+const WATERCOLOR_FILL_PARAMETER_KEYS = Object.freeze([
+  "angle",
+  "color",
+  "density",
+  "opacity",
+  "strength",
+]);
+const FLAT_WASH_PARAMETER_KEYS = Object.freeze([
+  "color",
+  "opacity",
+]);
 const FAILURE_REASONS = new Set<StudioProceduralArtisticBrushFailureReason>([
   "invalid-options",
   "invalid-request",
@@ -325,6 +343,84 @@ function snapshotParameters(
   return Object.freeze(parameters);
 }
 
+function exactParameterKeys(
+  parameters: Readonly<
+    Record<string, StudioProceduralArtisticBrushParameter>
+  >,
+  expected: readonly string[],
+): boolean {
+  const keys = Object.keys(parameters);
+  return keys.length === expected.length
+    && expected.every((key) => Object.hasOwn(parameters, key));
+}
+
+function validTechniqueParameters(
+  technique: StudioProceduralArtisticBrushWorkerTechnique,
+  parameters: Readonly<
+    Record<string, StudioProceduralArtisticBrushParameter>
+  >,
+): boolean {
+  if (technique === "watercolor-fill") {
+    return exactParameterKeys(
+      parameters,
+      WATERCOLOR_FILL_PARAMETER_KEYS,
+    )
+      && typeof parameters.color === "string"
+      && PRODUCT_COLOR_PATTERN.test(parameters.color)
+      && finite(parameters.angle)
+      && parameters.angle >= -Math.PI * 2
+      && parameters.angle <= Math.PI * 2
+      && finite(parameters.density)
+      && parameters.density >= 0
+      && parameters.density <= 1
+      && finite(parameters.opacity)
+      && parameters.opacity >= 0
+      && parameters.opacity <= 1
+      && finite(parameters.strength)
+      && parameters.strength >= 0
+      && parameters.strength <= 1;
+  }
+  if (technique === "flat-wash") {
+    return exactParameterKeys(parameters, FLAT_WASH_PARAMETER_KEYS)
+      && typeof parameters.color === "string"
+      && PRODUCT_COLOR_PATTERN.test(parameters.color)
+      && finite(parameters.opacity)
+      && parameters.opacity >= 0.01
+      && parameters.opacity <= 1;
+  }
+  return true;
+}
+
+function expectedFillPresetId(
+  technique: StudioProceduralArtisticBrushWorkerTechnique,
+): string | null {
+  switch (technique) {
+    case "watercolor-fill":
+      return "studio-procedural-watercolor-fill-v1";
+    case "flat-wash":
+      return "studio-procedural-flat-wash-v1";
+    default:
+      return null;
+  }
+}
+
+function techniqueCapability(
+  technique: StudioProceduralArtisticBrushWorkerTechnique,
+): StudioProceduralArtisticBrushReceipt["capabilitiesUsed"][number] {
+  switch (technique) {
+    case "flow-field":
+      return "procedural:flow-field";
+    case "hatch":
+      return "procedural:hatch";
+    case "mass":
+      return "procedural:mass";
+    case "watercolor-fill":
+      return "procedural:watercolor-fill";
+    case "flat-wash":
+      return "procedural:flat-wash";
+  }
+}
+
 function snapshotRequest(
   value: unknown,
 ): StudioProceduralArtisticBrushWorkerRequest | null {
@@ -373,9 +469,28 @@ function snapshotRequest(
       STUDIO_PROCEDURAL_ARTISTIC_BRUSH_LIMITS.maxPresetIdCodeUnits,
     )
   ) return null;
+  const normalizedTechnique =
+    technique as StudioProceduralArtisticBrushWorkerTechnique;
   const normalizedSamples = snapshotSamples(samples);
   const normalizedParameters = snapshotParameters(parameters);
-  if (!normalizedSamples || !normalizedParameters) return null;
+  const fillPresetId = expectedFillPresetId(normalizedTechnique);
+  if (
+    !normalizedSamples
+    || !normalizedParameters
+    || !validTechniqueParameters(
+      normalizedTechnique,
+      normalizedParameters,
+    )
+    || (
+      fillPresetId !== null
+      && presetId !== fillPresetId
+    )
+    || estimateStudioProceduralArtisticBrushRasterMemory(
+      width,
+      height,
+      normalizedTechnique,
+    ) === null
+  ) return null;
   return Object.freeze({
     kind: "studio-procedural-artistic-brush/request",
     version: STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PROVIDER_REVISION,
@@ -388,7 +503,7 @@ function snapshotRequest(
     height: height as number,
     pixelRatio,
     plan: Object.freeze({
-      technique: technique as StudioProceduralArtisticBrushWorkerTechnique,
+      technique: normalizedTechnique,
       presetId,
       samples: normalizedSamples,
       parameters: normalizedParameters,
@@ -448,6 +563,13 @@ function snapshotReceipt(
 ): StudioProceduralArtisticBrushReceipt | null {
   if (!exactKeys(value, RECEIPT_KEYS)) return null;
   const capabilitiesUsed = snapshotCapabilities(value.capabilitiesUsed);
+  const technique =
+    typeof value.technique === "string"
+    && STUDIO_PROCEDURAL_ARTISTIC_BRUSH_WORKER_TECHNIQUES.includes(
+      value.technique as StudioProceduralArtisticBrushWorkerTechnique,
+    )
+      ? value.technique as StudioProceduralArtisticBrushWorkerTechnique
+      : null;
   if (
     value.kind !== "studio-procedural-artistic-brush/receipt"
     || value.version !== STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PROVIDER_REVISION
@@ -458,10 +580,7 @@ function snapshotReceipt(
       STUDIO_PROCEDURAL_ARTISTIC_BRUSH_LIMITS.maxPresetIdCodeUnits,
     )
     || !uint32(value.seed)
-    || typeof value.technique !== "string"
-    || !STUDIO_PROCEDURAL_ARTISTIC_BRUSH_WORKER_TECHNIQUES.includes(
-      value.technique as StudioProceduralArtisticBrushWorkerTechnique,
-    )
+    || technique === null
     || !safeIdentifier(
       value.presetId,
       STUDIO_PROCEDURAL_ARTISTIC_BRUSH_LIMITS.maxPresetIdCodeUnits,
@@ -507,6 +626,11 @@ function snapshotReceipt(
     || value.authority.persistence !== false
     || value.authority.output !== "settled-raster-suggestion"
     || !capabilitiesUsed
+    || !capabilitiesUsed.includes(techniqueCapability(technique))
+    || (
+      expectedFillPresetId(technique) !== null
+      && value.presetId !== expectedFillPresetId(technique)
+    )
     || value.complete !== true
   ) return null;
   return Object.freeze({
@@ -516,8 +640,7 @@ function snapshotReceipt(
     engineEpoch: value.engineEpoch,
     strokeId: value.strokeId,
     seed: value.seed,
-    technique:
-      value.technique as StudioProceduralArtisticBrushWorkerTechnique,
+    technique,
     presetId: value.presetId,
     width: value.width,
     height: value.height,
@@ -567,11 +690,14 @@ function snapshotArtifact(
     || value.pixels.byteOffset !== 0
     || value.pixels.byteLength !== value.pixels.buffer.byteLength
   ) return null;
-  const expected = estimateStudioProceduralArtisticBrushRasterMemory(
-    value.width,
-    value.height,
-  );
   const receipt = snapshotReceipt(value.receipt);
+  const expected = receipt
+    ? estimateStudioProceduralArtisticBrushRasterMemory(
+        value.width,
+        value.height,
+        receipt.technique,
+      )
+    : null;
   if (
     !expected
     || value.pixels.byteLength !== expected.outputBytes

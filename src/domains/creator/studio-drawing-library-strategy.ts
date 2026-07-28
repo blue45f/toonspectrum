@@ -121,11 +121,12 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       decision: "isolated-settled-only-provider",
       runtimeInstallation: "installed-isolated-provider",
       maintenanceNote:
-        "Actively maintained specialist; the verified adapter currently exposes only flow fields, hatching and mass strokes.",
+        "Actively maintained specialist; verified adapter 2.2.1-adapter.3 exposes flow fields, hatching, mass strokes, watercolor fills and flat washes.",
       riskNotes: [
         "Runs only in a dedicated Worker on a private OffscreenCanvas WebGL2 surface.",
         "Live-stage execution is forbidden; only copied settled pixels and deterministic receipts cross the provider boundary.",
         "Image and custom tips remain fail-closed until their real adapter path passes the same browser quality gates.",
+        "Composited fills use a stricter eight-frame resident-memory admission budget.",
       ],
     }),
     strategy({

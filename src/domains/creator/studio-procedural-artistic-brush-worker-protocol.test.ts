@@ -57,6 +57,31 @@ function renderMessage(): StudioProceduralArtisticBrushWorkerRenderMessage {
   };
 }
 
+function watercolorFillRenderMessage(
+  height = 3_072,
+): StudioProceduralArtisticBrushWorkerRenderMessage {
+  return {
+    ...renderMessage(),
+    request: {
+      ...renderMessage().request,
+      width: 4_096,
+      height,
+      plan: {
+        technique: "watercolor-fill",
+        presetId: "studio-procedural-watercolor-fill-v1",
+        samples: renderMessage().request.plan.samples,
+        parameters: {
+          angle: 0.6109,
+          color: "#336699",
+          density: 0.64,
+          opacity: 0.72,
+          strength: 0.78,
+        },
+      },
+    },
+  };
+}
+
 function resultMessage(
   pixels = new Uint8ClampedArray(16).fill(127),
 ): StudioProceduralArtisticBrushWorkerResultMessage {
@@ -96,7 +121,7 @@ function resultMessage(
           replayFingerprint: HASH,
           adapter: {
             id: "p5-brush-standalone-worker",
-            version: "2.2.1-adapter.2",
+            version: "2.2.1-adapter.3",
             compatibility: "p5.brush/standalone",
           },
           execution: {
@@ -176,6 +201,93 @@ describe("Studio procedural artistic brush Worker protocol", () => {
     expect(
       snapshotStudioProceduralArtisticBrushWorkerRenderMessage(overBudget),
     ).toBeNull();
+  });
+
+  it("snapshots exact fill plans at the eight-frame admission boundary", () => {
+    const watercolor = watercolorFillRenderMessage();
+    const watercolorSnapshot =
+      snapshotStudioProceduralArtisticBrushWorkerRenderMessage(watercolor);
+    expect(watercolorSnapshot).toEqual(watercolor);
+    expect(watercolorSnapshot?.request.plan).toEqual({
+      technique: "watercolor-fill",
+      presetId: "studio-procedural-watercolor-fill-v1",
+      samples: watercolor.request.plan.samples,
+      parameters: {
+        angle: 0.6109,
+        color: "#336699",
+        density: 0.64,
+        opacity: 0.72,
+        strength: 0.78,
+      },
+    });
+
+    const flatWash = {
+      ...renderMessage(),
+      request: {
+        ...renderMessage().request,
+        width: 4_096,
+        height: 3_072,
+        plan: {
+          technique: "flat-wash",
+          presetId: "studio-procedural-flat-wash-v1",
+          samples: renderMessage().request.plan.samples,
+          parameters: {
+            color: "#336699",
+            opacity: 0.78,
+          },
+        },
+      },
+    };
+    expect(
+      snapshotStudioProceduralArtisticBrushWorkerRenderMessage(flatWash),
+    ).toMatchObject({
+      request: {
+        plan: {
+          technique: "flat-wash",
+          presetId: "studio-procedural-flat-wash-v1",
+        },
+      },
+    });
+
+    expect(
+      snapshotStudioProceduralArtisticBrushWorkerRenderMessage(
+        watercolorFillRenderMessage(3_073),
+      ),
+    ).toBeNull();
+  });
+
+  it("rejects non-canonical fill presets and loose parameter payloads", () => {
+    const valid = watercolorFillRenderMessage();
+    for (const plan of [
+      {
+        ...valid.request.plan,
+        presetId: "watercolor-fill-v1",
+      },
+      {
+        ...valid.request.plan,
+        parameters: {
+          ...valid.request.plan.parameters,
+          texture: 0.4,
+        },
+      },
+      {
+        ...valid.request.plan,
+        parameters: {
+          ...valid.request.plan.parameters,
+          strength: 1.01,
+        },
+      },
+    ]) {
+      expect(
+        snapshotStudioProceduralArtisticBrushWorkerRenderMessage({
+          ...valid,
+          request: {
+            ...valid.request,
+            plan,
+          },
+        }),
+      ).toBeNull();
+    }
   });
 
   it("validates and freezes the complete artifact receipt without copying pixels", () => {

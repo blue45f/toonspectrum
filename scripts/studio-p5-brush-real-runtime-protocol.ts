@@ -2,6 +2,8 @@ export const STUDIO_P5_BRUSH_REAL_RUNTIME_CASE_IDS = Object.freeze([
   "flow-field",
   "hatch",
   "mass",
+  "watercolor-fill",
+  "flat-wash",
 ] as const);
 
 export type StudioP5BrushRealRuntimeCaseId =

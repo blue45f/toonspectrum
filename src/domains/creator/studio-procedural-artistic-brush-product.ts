@@ -22,6 +22,16 @@ export const STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PRODUCT_LIMITS = Object.freeze({
     "data:image/png;base64,".length
     + Math.ceil((8 * 1_024 * 1_024) / 3) * 4,
 } as const);
+export const STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PRODUCT_TECHNIQUES =
+  Object.freeze([
+    "flow-field",
+    "hatch",
+    "mass",
+    "watercolor-fill",
+    "flat-wash",
+  ] as const);
+export const STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PRODUCT_ADAPTER_VERSION =
+  "2.2.1-adapter.3" as const;
 
 export interface StudioProceduralArtisticBrushProductGenerateOptions {
   readonly width: number;
@@ -82,7 +92,9 @@ const OPTION_KEYS = Object.freeze([
   "engineEpoch",
   "signal",
 ]);
-const TECHNIQUES = new Set(["flow-field", "hatch", "mass"]);
+const TECHNIQUES = new Set<string>(
+  STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PRODUCT_TECHNIQUES,
+);
 const COLOR_PATTERN = /^#[0-9a-f]{6}$/iu;
 
 function fail(
@@ -584,6 +596,8 @@ export async function generateStudioProceduralArtisticBrushProduct(
     || receipt.engineEpoch !== options.engineEpoch
     || receipt.seed !== settings.seed
     || receipt.technique !== settings.technique
+    || receipt.adapter.version
+      !== STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PRODUCT_ADAPTER_VERSION
   ) {
     fail(
       "integrity-failed",

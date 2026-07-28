@@ -64,6 +64,18 @@ describe("studio procedural artistic brush plan", () => {
       "절차적 매스",
       "목탄처럼 밀도와 농담이 있는 덩어리 질감 레이어",
     ],
+    [
+      "watercolor-fill",
+      "수채 채움",
+      "절차적 수채 채움",
+      "종이결과 가장자리 번짐이 살아 있는 결정적 수채 면 레이어",
+    ],
+    [
+      "flat-wash",
+      "플랫 워시",
+      "절차적 플랫 워시",
+      "균일한 투명도로 넓은 색면을 채우는 결정적 워시 레이어",
+    ],
   ] as const)(
     "creates a settled %s request with Korean display metadata",
     (technique, label, outputName, description) => {
@@ -136,6 +148,38 @@ describe("studio procedural artistic brush plan", () => {
       precision: 1,
       strength: 1,
     });
+
+    const watercolor = success({
+      technique: "watercolor-fill",
+      density: 64,
+      angle: 35,
+      strength: 0.78,
+    });
+    expect(watercolor.request.plan.parameters).toEqual({
+      angle: 0.6109,
+      color: "#336699",
+      density: 0.64,
+      opacity: 0.72,
+      strength: 0.78,
+    });
+
+    const flatWash = success({
+      technique: "flat-wash",
+      density: 100,
+      angle: 180,
+      weight: 32,
+      strength: 0,
+    });
+    expect(flatWash.request.plan.parameters).toEqual({
+      color: "#336699",
+      opacity: 0.01,
+    });
+    expect(flatWash.display.settingsSummary).toBe(
+      `불투명도 1% · 시드 ${0x1234_abcd}`,
+    );
+    expect(flatWash.display.settingsSummary).not.toMatch(
+      /밀도|방향|굵기/u,
+    );
   });
 
   it("generates deterministic seed-sensitive geometry within provider bounds", () => {
@@ -143,6 +187,8 @@ describe("studio procedural artistic brush plan", () => {
       "flow-field",
       "hatch",
       "mass",
+      "watercolor-fill",
+      "flat-wash",
     ] as const satisfies readonly StudioProceduralArtisticBrushPlanTechnique[]) {
       const first = success({ technique, seed: 91 });
       const replay = success({ technique, seed: 91 });
@@ -190,6 +236,37 @@ describe("studio procedural artistic brush plan", () => {
       expect(result).toMatchObject({
         ok: false,
         code: "dimension-budget-exceeded",
+      });
+    }
+  });
+
+  it("applies the eight-frame composited-fill admission boundary", () => {
+    for (const technique of [
+      "watercolor-fill",
+      "flat-wash",
+    ] as const) {
+      const accepted = success({
+        technique,
+        width: 4_096,
+        height: 3_072,
+      });
+      expect(accepted.request).toMatchObject({
+        width: 4_096,
+        height: 3_072,
+        plan: {
+          technique,
+          presetId:
+            `studio-procedural-${technique}-v1`,
+        },
+      });
+      expect(planStudioProceduralArtisticBrushRequest(input({
+        technique,
+        width: 4_096,
+        height: 3_073,
+      }))).toMatchObject({
+        ok: false,
+        code: "dimension-budget-exceeded",
+        path: "$.width",
       });
     }
   });
@@ -288,7 +365,11 @@ describe("studio procedural artistic brush plan", () => {
             ? "procedural:flow-field"
             : adapterInput.plan.technique === "hatch"
               ? "procedural:hatch"
-              : "procedural:mass",
+              : adapterInput.plan.technique === "mass"
+                ? "procedural:mass"
+                : adapterInput.plan.technique === "watercolor-fill"
+                  ? "procedural:watercolor-fill"
+                  : "procedural:flat-wash",
         ],
       }),
     };
@@ -316,6 +397,8 @@ describe("studio procedural artistic brush plan", () => {
       "flow-field",
       "hatch",
       "mass",
+      "watercolor-fill",
+      "flat-wash",
     ] as const) {
       const planned = success({
         technique,

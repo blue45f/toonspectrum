@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  STUDIO_P5_BRUSH_STANDALONE_ADAPTER_VERSION,
   STUDIO_P5_BRUSH_STANDALONE_CAPABILITIES,
   createStudioP5BrushStandaloneAdapterLoader,
   type StudioP5BrushStandaloneEnvironment,
@@ -30,6 +31,10 @@ interface FakeModule {
   readonly noField: ReturnType<typeof vi.fn>;
   readonly noWash: ReturnType<typeof vi.fn>;
   readonly noClip: ReturnType<typeof vi.fn>;
+  readonly fill: ReturnType<typeof vi.fn>;
+  readonly fillBleed: ReturnType<typeof vi.fn>;
+  readonly fillTexture: ReturnType<typeof vi.fn>;
+  readonly wash: ReturnType<typeof vi.fn>;
   readonly listFields: ReturnType<typeof vi.fn>;
   readonly field: ReturnType<typeof vi.fn>;
   readonly refreshField: ReturnType<typeof vi.fn>;
@@ -71,6 +76,10 @@ function fakeModule(): FakeModule {
     noField: call("noField"),
     noWash: call("noWash"),
     noClip: call("noClip"),
+    fill: call("fill"),
+    fillBleed: call("fillBleed"),
+    fillTexture: call("fillTexture"),
+    wash: call("wash"),
     listFields: vi.fn(() => ["waves", "seabed"]),
     field: call("field"),
     refreshField: call("refreshField"),
@@ -145,6 +154,10 @@ function request(
   technique: StudioProceduralArtisticBrushRequest["plan"]["technique"],
   overrides: Partial<StudioProceduralArtisticBrushRequest["plan"]> = {},
 ): StudioProceduralArtisticBrushRequest {
+  const presetId =
+    technique === "watercolor-fill" || technique === "flat-wash"
+      ? `studio-procedural-${technique}-v1`
+      : `preset-${technique}`;
   return {
     kind: "studio-procedural-artistic-brush/request",
     version: 1,
@@ -158,7 +171,7 @@ function request(
     pixelRatio: 1,
     plan: {
       technique,
-      presetId: `preset-${technique}`,
+      presetId,
       samples: [
         {
           x: 0,
@@ -208,11 +221,16 @@ function createHarness(runtime: FakeModule) {
 }
 
 describe("Studio p5.brush standalone concrete adapter", () => {
-  it("advertises only the three proven artistic techniques", async () => {
+  it("advertises the five proven artistic techniques at adapter revision 3", async () => {
+    expect(STUDIO_P5_BRUSH_STANDALONE_ADAPTER_VERSION).toBe(
+      "2.2.1-adapter.3",
+    );
     expect(STUDIO_P5_BRUSH_STANDALONE_CAPABILITIES).toEqual([
       "procedural:flow-field",
       "procedural:hatch",
       "procedural:mass",
+      "procedural:watercolor-fill",
+      "procedural:flat-wash",
       "execution:settled-only",
       "surface:offscreen-canvas",
       "gpu:webgl2",
@@ -227,6 +245,22 @@ describe("Studio p5.brush standalone concrete adapter", () => {
     expect(runtime?.descriptor.capabilities).not.toContain("tip:image");
     expect(runtime?.descriptor.capabilities).not.toContain("tip:custom");
   });
+
+  it.each(["fill", "fillBleed", "fillTexture", "wash"] as const)(
+    "fails closed when the standalone %s API is absent",
+    async (api) => {
+      const incomplete = {
+        ...fakeModule(),
+        [api]: undefined,
+      };
+      const load = createStudioP5BrushStandaloneAdapterLoader({
+        importStandalone: async () => incomplete,
+        environment: ENVIRONMENT,
+      });
+
+      await expect(load()).resolves.toBeNull();
+    },
+  );
 
   it("loads a Worker OffscreenCanvas, seeds, centers, flushes and vertically normalizes flow output", async () => {
     const runtime = fakeModule();
@@ -352,6 +386,44 @@ describe("Studio p5.brush standalone concrete adapter", () => {
     expect(target.gl.readbackDestinations).toHaveLength(0);
   });
 
+  it("enforces the eight-frame fill budget at the direct adapter boundary", async () => {
+    const runtime = fakeModule();
+    const target = fakeSurface(4_096, 3_073);
+    const load = createStudioP5BrushStandaloneAdapterLoader({
+      importStandalone: async () => runtime,
+      environment: ENVIRONMENT,
+    });
+    const adapter = await load();
+    if (!adapter) throw new Error("adapter creation failed");
+    const brushRequest = request("watercolor-fill", {
+      parameters: {
+        angle: 0,
+        color: "#315f8f",
+        density: 0.64,
+        opacity: 0.72,
+        strength: 0.34,
+      },
+    });
+
+    await expect(adapter.renderSettled({
+      requestSequence: brushRequest.requestSequence,
+      engineEpoch: brushRequest.engineEpoch,
+      strokeId: brushRequest.strokeId,
+      stage: "settled",
+      seed: brushRequest.seed,
+      width: 4_096,
+      height: 3_073,
+      pixelRatio: brushRequest.pixelRatio,
+      plan: brushRequest.plan,
+      surface: target.surface,
+    }, new AbortController().signal)).rejects.toThrow(
+      /bounded resident-memory budget/u,
+    );
+    expect(runtime.load).not.toHaveBeenCalled();
+    expect(target.gl.readPixels).not.toHaveBeenCalled();
+    expect(target.gl.readbackDestinations).toHaveLength(0);
+  });
+
   it("maps hatch and mass settings to their proven public APIs", async () => {
     const hatchRuntime = fakeModule();
     const hatchHarness = createHarness(hatchRuntime);
@@ -403,6 +475,87 @@ describe("Studio p5.brush standalone concrete adapter", () => {
       },
     );
     expect(massRuntime.polygon).toHaveBeenCalledTimes(2);
+  });
+
+  it("maps watercolor density, strength, radians and opacity to the official fill APIs", async () => {
+    const runtime = fakeModule();
+    const { provider } = createHarness(runtime);
+    const result = await provider.render(request("watercolor-fill", {
+      parameters: {
+        angle: Math.PI / 3,
+        color: "#315f8f",
+        density: 0.67,
+        opacity: 0.5,
+        strength: 0.42,
+      },
+    }));
+
+    expect(result.status).toBe("completed");
+    expect(runtime.fill).toHaveBeenCalledTimes(2);
+    expect(runtime.fill).toHaveBeenNthCalledWith(1, "#315f8f", 128);
+    expect(runtime.fill).toHaveBeenNthCalledWith(2, "#315f8f", 128);
+    expect(runtime.fillBleed).toHaveBeenCalledTimes(2);
+    expect(runtime.fillBleed).toHaveBeenNthCalledWith(
+      1,
+      0.42,
+      "out",
+      Math.PI / 3,
+    );
+    expect(runtime.fillTexture).toHaveBeenCalledTimes(2);
+    expect(runtime.fillTexture).toHaveBeenNthCalledWith(
+      1,
+      0.67,
+      0.4,
+      true,
+    );
+    expect(runtime.polygon).toHaveBeenCalledTimes(2);
+    expect(runtime.wash).not.toHaveBeenCalled();
+    expect(runtime.noStroke).toHaveBeenCalledTimes(6);
+    expect(runtime.noHatch).toHaveBeenCalledTimes(6);
+    expect(runtime.noMass).toHaveBeenCalledTimes(6);
+    expect(runtime.noWash).toHaveBeenCalledTimes(6);
+    expect(runtime.noField).toHaveBeenCalledTimes(6);
+    expect(runtime.noFill).toHaveBeenCalledTimes(4);
+    if (result.status === "completed") {
+      expect(result.artifact.receipt.capabilitiesUsed).toEqual([
+        "procedural:watercolor-fill",
+      ]);
+    }
+  });
+
+  it("maps flat wash color and opacity while seed remains request-owned", async () => {
+    const runtime = fakeModule();
+    const { provider } = createHarness(runtime);
+    const result = await provider.render(request("flat-wash", {
+      parameters: {
+        color: "#c46f3d",
+        opacity: 0.25,
+      },
+    }));
+
+    expect(result.status).toBe("completed");
+    expect(runtime.wash).toHaveBeenCalledTimes(2);
+    expect(runtime.wash).toHaveBeenNthCalledWith(1, "#c46f3d", 65);
+    expect(runtime.wash).toHaveBeenNthCalledWith(2, "#c46f3d", 65);
+    expect(runtime.fill).not.toHaveBeenCalled();
+    expect(runtime.polygon).toHaveBeenCalledTimes(2);
+    expect(
+      runtime.seed.mock.calls.filter(([seed]) => seed === 0x1234_abcd),
+    ).toHaveLength(2);
+    expect(
+      runtime.noiseSeed.mock.calls.filter(([seed]) => seed === 0x1234_abcd),
+    ).toHaveLength(2);
+    expect(runtime.noStroke).toHaveBeenCalledTimes(6);
+    expect(runtime.noFill).toHaveBeenCalledTimes(6);
+    expect(runtime.noHatch).toHaveBeenCalledTimes(6);
+    expect(runtime.noMass).toHaveBeenCalledTimes(6);
+    expect(runtime.noField).toHaveBeenCalledTimes(6);
+    expect(runtime.noWash).toHaveBeenCalledTimes(4);
+    if (result.status === "completed") {
+      expect(result.artifact.receipt.capabilitiesUsed).toEqual([
+        "procedural:flat-wash",
+      ]);
+    }
   });
 
   it("fails closed for image/custom tips and never invokes runtime drawing", async () => {

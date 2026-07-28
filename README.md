@@ -124,7 +124,7 @@ renderer-neutral canonical 모델을 권위로 두고, 아래 엔진을 교체 �
 | `perfect-freehand` | 필압을 가진 centerline을 연속 잉크 outline으로 변환하는 실시간 geometry provider — 합성·질감·히스토리는 맡지 않음 |
 | `lazy-brush` | 정밀 모드에서만 선택하는 입력 leash/손떨림 보정 — 기본 펜 입력에는 지연을 추가하지 않으며 예측 포인트가 상태를 오염시키지 않음 |
 | `roughjs` | 문서에 저장한 seed로 결정적으로 재생하는 손그림 도형 renderer — 자유곡선 브러시 권위는 맡지 않음 |
-| `p5.brush` | 전용 Worker의 private OffscreenCanvas WebGL2에서 검증된 flow-field·hatch·mass만 처리하는 격리된 settled-only 예술 브러시 provider — image/custom tip은 실제 어댑터 검증 전까지 fail-closed |
+| `p5.brush` | 검증된 `2.2.1-adapter.3` 어댑터가 전용 Worker의 private OffscreenCanvas WebGL2에서 flow-field·hatch·mass·수채 채움·플랫 워시를 처리하는 격리된 settled-only 예술 브러시 provider — 합성 채움은 별도 메모리 예산을 적용하고 image/custom tip은 실제 어댑터 검증 전까지 fail-closed |
 | `rbush` | 대형 2D 문서의 동적 공간 인덱스, point/area hit-test와 topmost 후보 탐색 |
 | `harfbuzzjs` | 한글·복합문자·세로쓰기·루비·OpenType/가변 글꼴의 renderer-neutral glyph shaping |
 | `@resvg/resvg-wasm` | 제한·정규화된 SVG 가져오기, 미리보기, 결정적 래스터/PNG 출력 |

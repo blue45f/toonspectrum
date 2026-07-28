@@ -2,6 +2,8 @@ export const STUDIO_P5_BRUSH_GOLDEN_TECHNIQUES = Object.freeze([
   "flow-field",
   "hatch",
   "mass",
+  "watercolor-fill",
+  "flat-wash",
 ] as const);
 
 export type StudioP5BrushGoldenTechnique =
@@ -96,6 +98,33 @@ export const STUDIO_P5_BRUSH_GOLDEN_QUALITY_POLICIES: Readonly<
     minimumBoundsOccupancy: 0.02,
     maximumBoundsOccupancy: 0.985,
     minimumNeighborLinkRatio: 0.2,
+  }),
+  "watercolor-fill": Object.freeze({
+    ...COMMON_POLICY,
+    technique: "watercolor-fill",
+    minimumPaintedPixels: 512,
+    minimumPaintedCoverage: 0.03,
+    maximumPaintedCoverage: 0.9,
+    minimumBoundsCanvasCoverage: 0.12,
+    minimumBoundsOccupancy: 0.02,
+    maximumBoundsOccupancy: 0.985,
+    minimumColorBucketCount: 3,
+    minimumNeighborLinkRatio: 0.2,
+    minimumTextureScore: 0.008,
+  }),
+  "flat-wash": Object.freeze({
+    ...COMMON_POLICY,
+    technique: "flat-wash",
+    minimumPaintedPixels: 512,
+    minimumPaintedCoverage: 0.03,
+    maximumPaintedCoverage: 0.85,
+    minimumBoundsCanvasCoverage: 0.12,
+    minimumBoundsOccupancy: 0.2,
+    maximumBoundsOccupancy: 1,
+    minimumColorBucketCount: 1,
+    minimumLuminanceStandardDeviation: 0,
+    minimumNeighborLinkRatio: 0.4,
+    minimumTextureScore: 0,
   }),
 });
 

@@ -47,6 +47,7 @@ describe("Studio p5.brush standalone adapter bundle boundary", () => {
   });
 
   it("keeps the runtime settled-only, Worker-isolated and non-authoritative", () => {
+    expect(source).toContain('"2.2.1-adapter.3"');
     expect(source).toContain('"execution:settled-only"');
     expect(source).toContain('"surface:offscreen-canvas"');
     expect(source).toContain('"gpu:webgl2"');
@@ -60,5 +61,18 @@ describe("Studio p5.brush standalone adapter bundle boundary", () => {
     expect(source).not.toContain("new Uint8Array(pixels)");
     expect(source).not.toContain('"tip:image"');
     expect(source).not.toContain('"tip:custom"');
+  });
+
+  it("requires the official standalone fill APIs and keeps their state isolated", () => {
+    expect(source).toContain('"fill"');
+    expect(source).toContain('"fillBleed"');
+    expect(source).toContain('"fillTexture"');
+    expect(source).toContain('"wash"');
+    expect(source).toContain("runtime.fillBleed(");
+    expect(source).toContain('"out"');
+    expect(source).toContain("runtime.fillTexture(");
+    expect(source).toContain("runtime.wash(");
+    expect(source).toContain("runtime.noWash();");
+    expect(source).toContain("runtime.noFill();");
   });
 });

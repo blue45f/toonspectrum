@@ -110,38 +110,64 @@ function planFor(
     [144, 48, 0.45],
   ] as const;
   const coordinates = technique === "flow-field" ? flow : polygon;
-  const parameters: StudioProceduralArtisticBrushRequest["plan"]["parameters"] =
-    technique === "flow-field"
-      ? {
-          brush: "HB",
-          color: "#173f5f",
-          curvature: 0.62,
-          field: "waves",
-          fieldTime: 2.5,
-          weight: 2.4,
-        }
-      : technique === "hatch"
-        ? {
-            angle: 32,
-            brush: "pen",
-            color: "#7b2f4f",
-            continuous: false,
-            distance: 5,
-            gradient: 0.12,
-            randomness: 0.08,
-            weight: 1.35,
-          }
-        : {
-            brush: "charcoal",
-            color: "#2b2118",
-            gradient: 0.16,
-            outline: false,
-            precision: 0.72,
-            strength: 0.86,
-          };
+  let parameters:
+    StudioProceduralArtisticBrushRequest["plan"]["parameters"];
+  switch (technique) {
+    case "flow-field":
+      parameters = {
+        brush: "HB",
+        color: "#173f5f",
+        curvature: 0.62,
+        field: "waves",
+        fieldTime: 2.5,
+        weight: 2.4,
+      };
+      break;
+    case "hatch":
+      parameters = {
+        angle: 32,
+        brush: "pen",
+        color: "#7b2f4f",
+        continuous: false,
+        distance: 5,
+        gradient: 0.12,
+        randomness: 0.08,
+        weight: 1.35,
+      };
+      break;
+    case "mass":
+      parameters = {
+        brush: "charcoal",
+        color: "#2b2118",
+        gradient: 0.16,
+        outline: false,
+        precision: 0.72,
+        strength: 0.86,
+      };
+      break;
+    case "watercolor-fill":
+      parameters = {
+        angle: Math.PI / 6,
+        color: "#315f8f",
+        density: 0.64,
+        opacity: 0.72,
+        strength: 0.34,
+      };
+      break;
+    case "flat-wash":
+      parameters = {
+        color: "#c46f3d",
+        opacity: 0.68,
+      };
+      break;
+  }
+  const presetId =
+    technique === "watercolor-fill" || technique === "flat-wash"
+      ? `studio-procedural-${technique}-v1`
+      : `real-runtime-${technique}`;
   return Object.freeze({
     technique,
-    presetId: `real-runtime-${technique}`,
+    presetId,
     samples: Object.freeze(
       coordinates.map(([x, y, pressure], index) => Object.freeze({
         x,

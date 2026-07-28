@@ -18,12 +18,14 @@ import {
 } from "./studio-procedural-artistic-brush-provider";
 
 export const STUDIO_P5_BRUSH_STANDALONE_ADAPTER_VERSION =
-  "2.2.1-adapter.2" as const;
+  "2.2.1-adapter.3" as const;
 
 export const STUDIO_P5_BRUSH_STANDALONE_CAPABILITIES = Object.freeze([
   "procedural:flow-field",
   "procedural:hatch",
   "procedural:mass",
+  "procedural:watercolor-fill",
+  "procedural:flat-wash",
   "execution:settled-only",
   "surface:offscreen-canvas",
   "gpu:webgl2",
@@ -51,6 +53,18 @@ interface P5BrushStandaloneModule {
   noField(): void;
   noWash(): void;
   noClip(): void;
+  fill(color: string, opacity?: number): void;
+  fillBleed(
+    strength: number,
+    direction?: "out" | "in",
+    angle?: number | null,
+  ): void;
+  fillTexture(
+    texture: number,
+    border: number,
+    scatter?: boolean,
+  ): void;
+  wash(color: string, opacity?: number): void;
   listFields(): string[];
   field(name: string): void;
   refreshField(time?: number): void;
@@ -136,6 +150,10 @@ const REQUIRED_FUNCTION_EXPORTS = [
   "noField",
   "noWash",
   "noClip",
+  "fill",
+  "fillBleed",
+  "fillTexture",
+  "wash",
   "listFields",
   "field",
   "refreshField",
@@ -288,6 +306,22 @@ function colorParameter(
     throw new TypeError("Unsupported artistic brush color.");
   }
   return candidate;
+}
+
+function opacityByteParameter(
+  parameters: Readonly<
+    Record<string, StudioProceduralArtisticBrushParameter>
+  >,
+  fallback: number,
+): number {
+  const normalized = numberParameter(
+    parameters,
+    "opacity",
+    fallback,
+    0,
+    1,
+  );
+  return Math.round(normalized * 254) + 1;
 }
 
 function assertAvailable(
@@ -450,6 +484,52 @@ function renderMass(
   return "procedural:mass";
 }
 
+function renderWatercolorFill(
+  runtime: P5BrushStandaloneModule,
+  input: StudioProceduralArtisticBrushAdapterInput,
+): StudioProceduralArtisticBrushCapability {
+  const parameters = input.plan.parameters;
+  runtime.noStroke();
+  runtime.noHatch();
+  runtime.noMass();
+  runtime.noWash();
+  runtime.noField();
+  runtime.fill(
+    colorParameter(parameters, "#2563eb"),
+    opacityByteParameter(parameters, 0.72),
+  );
+  runtime.fillBleed(
+    numberParameter(parameters, "strength", 0.3, 0, 1),
+    "out",
+    numberParameter(parameters, "angle", 0, -Math.PI * 2, Math.PI * 2),
+  );
+  runtime.fillTexture(
+    numberParameter(parameters, "density", 0.6, 0, 1),
+    0.4,
+    true,
+  );
+  runtime.polygon(polygonPoints(input));
+  return "procedural:watercolor-fill";
+}
+
+function renderFlatWash(
+  runtime: P5BrushStandaloneModule,
+  input: StudioProceduralArtisticBrushAdapterInput,
+): StudioProceduralArtisticBrushCapability {
+  const parameters = input.plan.parameters;
+  runtime.noStroke();
+  runtime.noFill();
+  runtime.noHatch();
+  runtime.noMass();
+  runtime.noField();
+  runtime.wash(
+    colorParameter(parameters, "#2563eb"),
+    opacityByteParameter(parameters, 0.72),
+  );
+  runtime.polygon(polygonPoints(input));
+  return "procedural:flat-wash";
+}
+
 function renderTechnique(
   runtime: P5BrushStandaloneModule,
   input: StudioProceduralArtisticBrushAdapterInput,
@@ -461,6 +541,10 @@ function renderTechnique(
       return renderHatch(runtime, input);
     case "mass":
       return renderMass(runtime, input);
+    case "watercolor-fill":
+      return renderWatercolorFill(runtime, input);
+    case "flat-wash":
+      return renderFlatWash(runtime, input);
     case "image-tip":
     case "custom-tip":
       throw new TypeError(
@@ -621,6 +705,7 @@ function createAdapter(
         estimateStudioProceduralArtisticBrushRasterMemory(
           input.width,
           input.height,
+          input.plan.technique,
         ) === null
       ) {
         throw new RangeError(

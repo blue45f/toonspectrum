@@ -27,7 +27,15 @@ const SCRATCH =
 const HARNESS_PATH = "/__studio_p5_brush_real_runtime__";
 const HARNESS_ENTRY = "/scripts/studio-p5-brush-real-runtime-browser.ts";
 const RESULT_TIMEOUT_MS = 120_000;
-const EXPECTED_CASE_IDS = ["flow-field", "hatch", "mass"];
+const EXPECTED_ADAPTER_VERSION = "2.2.1-adapter.3";
+const EXPECTED_CASE_IDS = [
+  "flow-field",
+  "hatch",
+  "mass",
+  "watercolor-fill",
+  "flat-wash",
+];
+const EXPECTED_SURFACE_COUNT = 10;
 const WIDTH = 160;
 const HEIGHT = 128;
 const EXPECTED_BYTES = WIDTH * HEIGHT * 4;
@@ -88,6 +96,11 @@ function validateSuccess(result, diagnostics) {
   if (result.backend !== "p5.brush/standalone-offscreen-webgl2") {
     failures.push(`unexpected backend: ${String(result.backend)}`);
   }
+  if (result.adapterVersion !== EXPECTED_ADAPTER_VERSION) {
+    failures.push(
+      `unexpected adapter version: ${String(result.adapterVersion)}`,
+    );
+  }
   if (
     result.capabilities?.worker !== true
     || result.capabilities?.dedicatedWorkerScope !== true
@@ -102,11 +115,14 @@ function validateSuccess(result, diagnostics) {
     JSON.stringify(result.cases?.map((entry) => entry.id))
       !== JSON.stringify(EXPECTED_CASE_IDS)
   ) {
-    failures.push("flow-field/hatch/mass real-runtime case coverage drifted");
+    failures.push("five-technique real-runtime case coverage drifted");
   }
-  if (result.surfaceCount !== EXPECTED_CASE_IDS.length * 2) {
+  if (EXPECTED_CASE_IDS.length * 2 !== EXPECTED_SURFACE_COUNT) {
+    failures.push("expected case count no longer matches the surface contract");
+  }
+  if (result.surfaceCount !== EXPECTED_SURFACE_COUNT) {
     failures.push(
-      `expected ${EXPECTED_CASE_IDS.length * 2} private surfaces, got `
+      `expected ${EXPECTED_SURFACE_COUNT} private surfaces, got `
       + String(result.surfaceCount),
     );
   }

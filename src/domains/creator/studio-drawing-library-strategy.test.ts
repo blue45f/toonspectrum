@@ -48,11 +48,18 @@ describe("studio drawing library strategy", () => {
       productLayer: "rough-shape-rendering",
       decision: "runtime-rough-shape-renderer",
     });
-    expect(resolveStudioDrawingLibraryStrategy("p5-brush")).toMatchObject({
+    const p5Brush = resolveStudioDrawingLibraryStrategy("p5-brush");
+    expect(p5Brush).toMatchObject({
       productLayer: "settled-procedural-raster",
       decision: "isolated-settled-only-provider",
       runtimeInstallation: "installed-isolated-provider",
     });
+    expect(p5Brush?.maintenanceNote).toContain("2.2.1-adapter.3");
+    expect(p5Brush?.maintenanceNote).toContain("watercolor fills");
+    expect(p5Brush?.maintenanceNote).toContain("flat washes");
+    expect(p5Brush?.riskNotes).toContain(
+      "Composited fills use a stricter eight-frame resident-memory admission budget.",
+    );
     expect(resolveStudioDrawingLibraryStrategy("konva")).toMatchObject({
       productLayer: "object-selection-overlay",
       decision: "runtime-object-selection-overlay",

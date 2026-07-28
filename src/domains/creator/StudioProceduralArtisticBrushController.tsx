@@ -312,7 +312,7 @@ export function StudioProceduralArtisticBrushController({
             절차적 질감 생성기
           </span>
           <span className="block truncate text-[0.6rem] text-fg-3">
-            유기적 선 · 방향성 해칭 · 목탄 매스
+            흐름장 · 해칭 · 매스 · 수채 채움 · 플랫 워시
           </span>
         </span>
         <span

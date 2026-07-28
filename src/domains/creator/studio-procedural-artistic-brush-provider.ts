@@ -22,6 +22,12 @@ export const STUDIO_PROCEDURAL_ARTISTIC_BRUSH_LIMITS = Object.freeze({
    * artifact may coexist while the untrusted adapter output is normalized.
    */
   residentRgbaFrames: 3,
+  /**
+   * p5.brush watercolor fills retain additional mask, mix, and compositor
+   * surfaces. Budget those techniques as eight full RGBA frames even though
+   * only the completed ownership buffer crosses this provider boundary.
+   */
+  compositedFillResidentRgbaFrames: 8,
   rgbaBytesPerPixel: 4,
   maxResidentBytes: 384 * 1024 * 1024,
   maxSamples: 131_072,
@@ -51,9 +57,23 @@ export interface StudioProceduralArtisticBrushRasterMemoryEstimate {
 export function estimateStudioProceduralArtisticBrushRasterMemory(
   width: unknown,
   height: unknown,
+  technique?: unknown,
 ): StudioProceduralArtisticBrushRasterMemoryEstimate | null {
+  const residentRgbaFrames =
+    technique === "watercolor-fill" || technique === "flat-wash"
+      ? STUDIO_PROCEDURAL_ARTISTIC_BRUSH_LIMITS
+        .compositedFillResidentRgbaFrames
+      : technique === undefined
+        || technique === "flow-field"
+        || technique === "hatch"
+        || technique === "mass"
+        || technique === "image-tip"
+        || technique === "custom-tip"
+        ? STUDIO_PROCEDURAL_ARTISTIC_BRUSH_LIMITS.residentRgbaFrames
+        : null;
   if (
-    typeof width !== "number"
+    residentRgbaFrames === null
+    || typeof width !== "number"
     || !Number.isSafeInteger(width)
     || width <= 0
     || typeof height !== "number"
@@ -67,7 +87,7 @@ export function estimateStudioProceduralArtisticBrushRasterMemory(
     pixelCount * STUDIO_PROCEDURAL_ARTISTIC_BRUSH_LIMITS.rgbaBytesPerPixel;
   const peakResidentBytes =
     outputBytes
-    * STUDIO_PROCEDURAL_ARTISTIC_BRUSH_LIMITS.residentRgbaFrames;
+    * residentRgbaFrames;
   if (
     !Number.isSafeInteger(pixelCount)
     || pixelCount > STUDIO_PROCEDURAL_ARTISTIC_BRUSH_LIMITS.maxPixels
@@ -91,6 +111,8 @@ export const STUDIO_PROCEDURAL_ARTISTIC_BRUSH_CAPABILITIES = Object.freeze([
   "procedural:flow-field",
   "procedural:hatch",
   "procedural:mass",
+  "procedural:watercolor-fill",
+  "procedural:flat-wash",
   "tip:image",
   "tip:custom",
   "execution:settled-only",
@@ -107,6 +129,8 @@ export type StudioProceduralArtisticBrushTechnique =
   | "flow-field"
   | "hatch"
   | "mass"
+  | "watercolor-fill"
+  | "flat-wash"
   | "image-tip"
   | "custom-tip";
 
@@ -380,10 +404,24 @@ const TECHNIQUES = new Set<StudioProceduralArtisticBrushTechnique>([
   "flow-field",
   "hatch",
   "mass",
+  "watercolor-fill",
+  "flat-wash",
   "image-tip",
   "custom-tip",
 ]);
 const SAFE_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]*$/u;
+const PRODUCT_COLOR = /^#[0-9a-f]{6}$/iu;
+const WATERCOLOR_FILL_PARAMETER_KEYS = Object.freeze([
+  "angle",
+  "color",
+  "density",
+  "opacity",
+  "strength",
+]);
+const FLAT_WASH_PARAMETER_KEYS = Object.freeze([
+  "color",
+  "opacity",
+]);
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -439,6 +477,10 @@ function techniqueCapability(
       return "procedural:hatch";
     case "mass":
       return "procedural:mass";
+    case "watercolor-fill":
+      return "procedural:watercolor-fill";
+    case "flat-wash":
+      return "procedural:flat-wash";
     case "image-tip":
       return "tip:image";
     case "custom-tip":
@@ -495,6 +537,67 @@ function normalizeParameters(
     }
   }
   return Object.freeze(output);
+}
+
+function exactParameterKeys(
+  parameters: Readonly<
+    Record<string, StudioProceduralArtisticBrushParameter>
+  >,
+  expected: readonly string[],
+): boolean {
+  const keys = Object.keys(parameters);
+  return keys.length === expected.length
+    && expected.every((key) => Object.hasOwn(parameters, key));
+}
+
+function validCompositedFillParameters(
+  technique: StudioProceduralArtisticBrushTechnique,
+  parameters: Readonly<
+    Record<string, StudioProceduralArtisticBrushParameter>
+  >,
+): boolean {
+  if (technique === "watercolor-fill") {
+    return exactParameterKeys(
+      parameters,
+      WATERCOLOR_FILL_PARAMETER_KEYS,
+    )
+      && typeof parameters.color === "string"
+      && PRODUCT_COLOR.test(parameters.color)
+      && isFiniteNumber(parameters.angle)
+      && parameters.angle >= -Math.PI * 2
+      && parameters.angle <= Math.PI * 2
+      && isFiniteNumber(parameters.density)
+      && parameters.density >= 0
+      && parameters.density <= 1
+      && isFiniteNumber(parameters.opacity)
+      && parameters.opacity >= 0
+      && parameters.opacity <= 1
+      && isFiniteNumber(parameters.strength)
+      && parameters.strength >= 0
+      && parameters.strength <= 1;
+  }
+  if (technique === "flat-wash") {
+    return exactParameterKeys(parameters, FLAT_WASH_PARAMETER_KEYS)
+      && typeof parameters.color === "string"
+      && PRODUCT_COLOR.test(parameters.color)
+      && isFiniteNumber(parameters.opacity)
+      && parameters.opacity >= 0.01
+      && parameters.opacity <= 1;
+  }
+  return true;
+}
+
+function expectedFillPresetId(
+  technique: StudioProceduralArtisticBrushTechnique,
+): string | null {
+  switch (technique) {
+    case "watercolor-fill":
+      return "studio-procedural-watercolor-fill-v1";
+    case "flat-wash":
+      return "studio-procedural-flat-wash-v1";
+    default:
+      return null;
+  }
 }
 
 function normalizeSamples(
@@ -653,6 +756,7 @@ function normalizeRequest(
 
   const normalizedTechnique =
     technique as StudioProceduralArtisticBrushTechnique;
+  const fillPresetId = expectedFillPresetId(normalizedTechnique);
   if (
     (normalizedTechnique === "image-tip" && tip?.kind !== "image")
     || (normalizedTechnique === "custom-tip" && tip?.kind !== "custom")
@@ -661,6 +765,16 @@ function normalizeRequest(
       && normalizedTechnique !== "custom-tip"
       && tip !== undefined
     )
+    || (
+      fillPresetId !== null
+      && presetId !== fillPresetId
+    )
+    || !validCompositedFillParameters(normalizedTechnique, parameters)
+    || estimateStudioProceduralArtisticBrushRasterMemory(
+      width,
+      height,
+      normalizedTechnique,
+    ) === null
   ) {
     return reject(
       "invalid-request",

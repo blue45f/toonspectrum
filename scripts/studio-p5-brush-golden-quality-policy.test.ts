@@ -239,6 +239,26 @@ describe("Studio p5.brush golden quality policy", () => {
     expect(wide.metrics?.scratchByteLength).toBe(8_192 * 3 + 512);
     expect(wide.metrics?.scratchByteLength).toBeLessThan(26_000);
     expect(Object.keys(STUDIO_P5_BRUSH_GOLDEN_QUALITY_POLICIES).sort())
-      .toEqual(["flow-field", "hatch", "mass"]);
+      .toEqual([
+        "flat-wash",
+        "flow-field",
+        "hatch",
+        "mass",
+        "watercolor-fill",
+      ]);
+  });
+
+  it("requires watercolor texture while admitting intentionally flat wash color", () => {
+    const watercolor =
+      STUDIO_P5_BRUSH_GOLDEN_QUALITY_POLICIES["watercolor-fill"];
+    const flatWash =
+      STUDIO_P5_BRUSH_GOLDEN_QUALITY_POLICIES["flat-wash"];
+
+    expect(watercolor.minimumTextureScore).toBeGreaterThan(0);
+    expect(watercolor.minimumColorBucketCount).toBeGreaterThan(1);
+    expect(flatWash.minimumTextureScore).toBe(0);
+    expect(flatWash.minimumLuminanceStandardDeviation).toBe(0);
+    expect(flatWash.minimumColorBucketCount).toBe(1);
+    expect(flatWash.minimumBoundsOccupancy).toBeGreaterThan(0);
   });
 });

@@ -7,8 +7,10 @@
  */
 import {
   Brush,
+  Droplets,
   Grid3X3,
   LoaderCircle,
+  PaintBucket,
   Palette,
   Sparkles,
   Square,
@@ -29,7 +31,7 @@ import { cn } from "@/lib/utils";
 
 export type StudioProceduralArtisticBrushUiTechnique = Extract<
   StudioProceduralArtisticBrushTechnique,
-  "flow-field" | "hatch" | "mass"
+  "flow-field" | "hatch" | "mass" | "watercolor-fill" | "flat-wash"
 >;
 
 export type StudioProceduralArtisticBrushCapabilityStatus =
@@ -40,13 +42,13 @@ export type StudioProceduralArtisticBrushCapabilityStatus =
 export interface StudioProceduralArtisticBrushPanelProps {
   readonly technique: StudioProceduralArtisticBrushUiTechnique;
   readonly color: string;
-  /** Product-facing density, normalized to 1..100 by the parent. */
+  /** Product-facing density or paper texture, normalized to 1..100. */
   readonly density: number;
-  /** Hatch direction in degrees. */
+  /** Hatch or watercolor bleed direction in degrees. */
   readonly angle: number;
-  /** Settled stroke or hatch line width in CSS pixels. */
+  /** Settled flow-field or hatch line width in CSS pixels. */
   readonly weight: number;
-  /** Technique intensity, normalized to 0..1. */
+  /** Technique intensity or flat-wash opacity, normalized to 0..1. */
   readonly strength: number;
   /** Deterministic signed 32-bit-compatible seed. */
   readonly seed: number;
@@ -93,6 +95,18 @@ const TECHNIQUES: readonly {
     description: "목탄처럼 밀도 있는 덩어리 질감 레이어를 만듭니다.",
     Icon: Brush,
   },
+  {
+    id: "watercolor-fill",
+    label: "수채 채움",
+    description: "종이결과 가장자리 번짐이 살아 있는 수채 면을 만듭니다.",
+    Icon: Droplets,
+  },
+  {
+    id: "flat-wash",
+    label: "플랫 워시",
+    description: "균일한 투명도의 넓은 색면 레이어를 만듭니다.",
+    Icon: PaintBucket,
+  },
 ] as const;
 
 const CONTROL_CLASS = cn(
@@ -127,6 +141,23 @@ function densityLabel(
       return "해칭 밀도";
     case "mass":
       return "입자 밀도";
+    case "watercolor-fill":
+      return "종이 질감";
+    case "flat-wash":
+      return "채움 밀도";
+  }
+}
+
+function strengthLabel(
+  technique: StudioProceduralArtisticBrushUiTechnique,
+): string {
+  switch (technique) {
+    case "watercolor-fill":
+      return "번짐 강도";
+    case "flat-wash":
+      return "불투명도";
+    default:
+      return "효과 강도";
   }
 }
 
@@ -201,38 +232,50 @@ export function StudioProceduralArtisticBrushPanel({
         <legend className="mb-1.5 text-[0.68rem] font-semibold text-fg-2">
           질감 기법
         </legend>
-        <div className="grid grid-cols-3 gap-1.5">
-          {TECHNIQUES.map(({ id, label, description, Icon }) => (
-            <label
-              key={id}
-              title={description}
-              className={cn(
-                "relative flex min-h-11 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border px-1.5 py-1.5 text-center transition-colors",
-                "has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent",
-                technique === id
-                  ? "border-accent/60 bg-accent-soft/55 text-fg"
-                  : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
-                controlsDisabled && "cursor-not-allowed opacity-45",
-              )}
-            >
-              <input
-                type="radio"
-                name={`${headingId}-technique`}
-                value={id}
-                checked={technique === id}
-                disabled={controlsDisabled}
-                className="sr-only"
-                onChange={() => onTechniqueChange(id)}
-              />
-              <span className="flex items-center gap-1 text-[0.68rem] font-semibold">
-                <Icon size={13} aria-hidden />
-                {label}
-              </span>
-              <span className="line-clamp-1 text-[0.56rem] text-fg-3">
-                {description}
-              </span>
-            </label>
-          ))}
+        <div
+          data-studio-procedural-artistic-brush-techniques="true"
+          className="grid grid-cols-2 gap-1.5"
+        >
+          {TECHNIQUES.map(({ id, label, description, Icon }) => {
+            const techniqueDescriptionId =
+              `${headingId}-${id}-description`;
+            return (
+              <label
+                key={id}
+                title={description}
+                className={cn(
+                  "relative flex min-h-11 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border px-1.5 py-1.5 text-center transition-colors",
+                  "has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent",
+                  technique === id
+                    ? "border-accent/60 bg-accent-soft/55 text-fg"
+                    : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
+                  controlsDisabled && "cursor-not-allowed opacity-45",
+                )}
+              >
+                <input
+                  type="radio"
+                  name={`${headingId}-technique`}
+                  value={id}
+                  checked={technique === id}
+                  disabled={controlsDisabled}
+                  aria-label={label}
+                  aria-describedby={techniqueDescriptionId}
+                  className="sr-only"
+                  onChange={() => onTechniqueChange(id)}
+                />
+                <span className="flex items-center gap-1 text-[0.68rem] font-semibold">
+                  <Icon size={13} aria-hidden />
+                  {label}
+                </span>
+                <span
+                  id={techniqueDescriptionId}
+                  className="line-clamp-1 text-[0.56rem] text-fg-3"
+                >
+                  {description}
+                </span>
+              </label>
+            );
+          })}
         </div>
       </fieldset>
 
@@ -293,20 +336,22 @@ export function StudioProceduralArtisticBrushPanel({
         aria-label={`${TECHNIQUES.find((entry) => entry.id === technique)?.label ?? "절차적"} 세부 설정`}
         className="space-y-2 rounded-lg border border-line/60 bg-card/45 p-2.5"
       >
-        <StudioSliderRow
-          label={densityLabel(technique)}
-          min={1}
-          max={100}
-          step={1}
-          value={density}
-          disabled={controlsDisabled}
-          onChange={onDensityChange}
-          readout={`${Math.round(density)}%`}
-        />
-
-        {technique === "hatch" ? (
+        {technique !== "flat-wash" ? (
           <StudioSliderRow
-            label="선 방향"
+            label={densityLabel(technique)}
+            min={1}
+            max={100}
+            step={1}
+            value={density}
+            disabled={controlsDisabled}
+            onChange={onDensityChange}
+            readout={`${Math.round(density)}%`}
+          />
+        ) : null}
+
+        {technique === "hatch" || technique === "watercolor-fill" ? (
+          <StudioSliderRow
+            label={technique === "hatch" ? "선 방향" : "번짐 방향"}
             min={-180}
             max={180}
             step={1}
@@ -317,7 +362,7 @@ export function StudioProceduralArtisticBrushPanel({
           />
         ) : null}
 
-        {technique !== "mass" ? (
+        {technique === "flow-field" || technique === "hatch" ? (
           <StudioSliderRow
             label="선 굵기"
             min={0.1}
@@ -332,8 +377,8 @@ export function StudioProceduralArtisticBrushPanel({
 
         {technique !== "hatch" ? (
           <StudioSliderRow
-            label="효과 강도"
-            min={0}
+            label={strengthLabel(technique)}
+            min={technique === "flat-wash" ? 0.01 : 0}
             max={1}
             step={0.01}
             value={strength}

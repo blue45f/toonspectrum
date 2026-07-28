@@ -18,6 +18,8 @@ import {
   type StudioProceduralArtisticBrushWorkerResultMessage,
 } from "./studio-procedural-artistic-brush-worker-protocol";
 
+import type { StudioProceduralArtisticBrushCapability } from "./studio-procedural-artistic-brush-provider";
+
 const HASH = `sha256:${"d".repeat(64)}` as const;
 
 function request(): StudioProceduralArtisticBrushWorkerRequest {
@@ -58,6 +60,43 @@ function request(): StudioProceduralArtisticBrushWorkerRequest {
   };
 }
 
+function watercolorFillRequest(): StudioProceduralArtisticBrushWorkerRequest {
+  return {
+    ...request(),
+    requestSequence: 4,
+    strokeId: "client-watercolor-fill",
+    plan: {
+      technique: "watercolor-fill",
+      presetId: "studio-procedural-watercolor-fill-v1",
+      samples: request().plan.samples,
+      parameters: {
+        angle: 0.6109,
+        color: "#336699",
+        density: 0.64,
+        opacity: 0.72,
+        strength: 0.78,
+      },
+    },
+  };
+}
+
+function flatWashRequest(): StudioProceduralArtisticBrushWorkerRequest {
+  return {
+    ...request(),
+    requestSequence: 5,
+    strokeId: "client-flat-wash",
+    plan: {
+      technique: "flat-wash",
+      presetId: "studio-procedural-flat-wash-v1",
+      samples: request().plan.samples,
+      parameters: {
+        color: "#336699",
+        opacity: 0.78,
+      },
+    },
+  };
+}
+
 function ready(): StudioProceduralArtisticBrushWorkerOutboundMessage {
   return {
     type: "studio-procedural-artistic-brush/ready",
@@ -79,6 +118,16 @@ function completed(
 ): StudioProceduralArtisticBrushWorkerResultMessage {
   const { request: active } = message;
   const pixels = new Uint8ClampedArray(16).fill(91);
+  const capability: StudioProceduralArtisticBrushCapability =
+    active.plan.technique === "flow-field"
+      ? "procedural:flow-field"
+      : active.plan.technique === "hatch"
+        ? "procedural:hatch"
+        : active.plan.technique === "mass"
+          ? "procedural:mass"
+          : active.plan.technique === "watercolor-fill"
+            ? "procedural:watercolor-fill"
+            : "procedural:flat-wash";
   return {
     type: "studio-procedural-artistic-brush/result",
     version: STUDIO_PROCEDURAL_ARTISTIC_BRUSH_WORKER_PROTOCOL_VERSION,
@@ -114,7 +163,7 @@ function completed(
           replayFingerprint: HASH,
           adapter: {
             id: "p5-brush-standalone-worker",
-            version: "2.2.1-adapter.2",
+            version: "2.2.1-adapter.3",
             compatibility: "p5.brush/standalone",
           },
           execution: {
@@ -131,7 +180,7 @@ function completed(
             persistence: false,
             output: "settled-raster-suggestion",
           },
-          capabilitiesUsed: ["procedural:mass"],
+          capabilitiesUsed: [capability],
           complete: true,
         },
       },
@@ -157,6 +206,8 @@ class MockWorker implements StudioProceduralArtisticBrushWorkerLike {
   public terminateCount = 0;
   public posted = 0;
   public transferredOutput = 0;
+  public lastPosted:
+    StudioProceduralArtisticBrushWorkerRenderMessage | null = null;
   public mode:
     | "success"
     | "hang"
@@ -172,6 +223,7 @@ class MockWorker implements StudioProceduralArtisticBrushWorkerLike {
     message: StudioProceduralArtisticBrushWorkerRenderMessage,
   ): void {
     this.posted += 1;
+    this.lastPosted = message;
     if (this.mode === "throw-post") {
       throw new DOMException("blocked", "DataCloneError");
     }
@@ -418,6 +470,39 @@ describe("renderStudioProceduralArtisticBrushInWorker", () => {
     expect(worker.posted).toBe(1);
     expect(worker.transferredOutput).toBe(1);
     expect(worker.terminateCount).toBe(1);
+  });
+
+  it("preserves declarative watercolor-fill and flat-wash plans end to end", async () => {
+    for (const expected of [
+      {
+        request: watercolorFillRequest(),
+        capability: "procedural:watercolor-fill",
+      },
+      {
+        request: flatWashRequest(),
+        capability: "procedural:flat-wash",
+      },
+    ] as const) {
+      const worker = new MockWorker();
+      const artifact = await renderStudioProceduralArtisticBrushInWorker(
+        expected.request,
+        { workerFactory: () => worker },
+      );
+
+      expect(worker.lastPosted?.request.plan).toEqual(
+        expected.request.plan,
+      );
+      expect(artifact.receipt).toMatchObject({
+        technique: expected.request.plan.technique,
+        presetId: expected.request.plan.presetId,
+        adapter: {
+          version: "2.2.1-adapter.3",
+        },
+        capabilitiesUsed: [expected.capability],
+      });
+      expect(worker.transferredOutput).toBe(1);
+      expect(worker.terminateCount).toBe(1);
+    }
   });
 
   it("has no main-thread fallback when Worker capability is unavailable", async () => {

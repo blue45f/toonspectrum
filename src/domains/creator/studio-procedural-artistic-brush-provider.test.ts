@@ -16,6 +16,27 @@ import {
 const ALL_CAPABILITIES =
   [...STUDIO_PROCEDURAL_ARTISTIC_BRUSH_CAPABILITIES];
 
+function techniqueCapability(
+  technique: StudioProceduralArtisticBrushRequest["plan"]["technique"],
+): StudioProceduralArtisticBrushCapability {
+  switch (technique) {
+    case "flow-field":
+      return "procedural:flow-field";
+    case "hatch":
+      return "procedural:hatch";
+    case "mass":
+      return "procedural:mass";
+    case "watercolor-fill":
+      return "procedural:watercolor-fill";
+    case "flat-wash":
+      return "procedural:flat-wash";
+    case "image-tip":
+      return "tip:image";
+    case "custom-tip":
+      return "tip:custom";
+  }
+}
+
 function request(
   overrides: Partial<StudioProceduralArtisticBrushRequest> = {},
 ): StudioProceduralArtisticBrushRequest {
@@ -61,6 +82,26 @@ function request(
   };
 }
 
+function watercolorFillRequest(
+  overrides: Partial<StudioProceduralArtisticBrushRequest> = {},
+): StudioProceduralArtisticBrushRequest {
+  return request({
+    plan: {
+      technique: "watercolor-fill",
+      presetId: "studio-procedural-watercolor-fill-v1",
+      samples: request().plan.samples,
+      parameters: {
+        angle: 0.6109,
+        color: "#336699",
+        density: 0.64,
+        opacity: 0.72,
+        strength: 0.78,
+      },
+    },
+    ...overrides,
+  });
+}
+
 function adapter(
   capabilities: readonly StudioProceduralArtisticBrushCapability[] =
     ALL_CAPABILITIES,
@@ -68,7 +109,7 @@ function adapter(
   return {
     descriptor: {
       id: "p5-brush-standalone-worker",
-      version: "2.2.1-adapter.1",
+      version: "2.2.1-adapter.3",
       compatibility: "p5.brush/standalone",
       executionStage: "settled-only",
       executionLocality: "dedicated-worker",
@@ -91,11 +132,7 @@ function adapter(
         executionStage: "settled",
         complete: true,
         pixels,
-        capabilitiesUsed: [
-          input.plan.technique === "flow-field"
-            ? "procedural:flow-field"
-            : "procedural:hatch",
-        ],
+        capabilitiesUsed: [techniqueCapability(input.plan.technique)],
       };
     }),
   };
@@ -125,6 +162,8 @@ describe("Studio procedural artistic brush provider boundary", () => {
       "procedural:flow-field",
       "procedural:hatch",
       "procedural:mass",
+      "procedural:watercolor-fill",
+      "procedural:flat-wash",
       "tip:image",
       "tip:custom",
       "execution:settled-only",
@@ -261,6 +300,7 @@ describe("Studio procedural artistic brush provider boundary", () => {
   it("fails a large raster at the peak-resident boundary before allocation", async () => {
     expect(STUDIO_PROCEDURAL_ARTISTIC_BRUSH_LIMITS).toMatchObject({
       residentRgbaFrames: 3,
+      compositedFillResidentRgbaFrames: 8,
       rgbaBytesPerPixel: 4,
       maxResidentBytes: 384 * 1024 * 1024,
     });
@@ -276,6 +316,34 @@ describe("Studio procedural artistic brush provider boundary", () => {
     });
     expect(
       estimateStudioProceduralArtisticBrushRasterMemory(8_192, 4_097),
+    ).toBeNull();
+    expect(
+      estimateStudioProceduralArtisticBrushRasterMemory(
+        4_096,
+        3_072,
+        "watercolor-fill",
+      ),
+    ).toEqual({
+      pixelCount: 12_582_912,
+      outputBytes: 50_331_648,
+      gpuDrawingBufferBytes: 50_331_648,
+      adapterReadbackBytes: 50_331_648,
+      artifactOwnershipBytes: 50_331_648,
+      peakResidentBytes: 402_653_184,
+    });
+    expect(
+      estimateStudioProceduralArtisticBrushRasterMemory(
+        4_096,
+        3_073,
+        "watercolor-fill",
+      ),
+    ).toBeNull();
+    expect(
+      estimateStudioProceduralArtisticBrushRasterMemory(
+        4_096,
+        3_073,
+        "flat-wash",
+      ),
     ).toBeNull();
 
     const loadAdapter = vi.fn(() => adapter());
@@ -298,6 +366,135 @@ describe("Studio procedural artistic brush provider boundary", () => {
     });
     expect(loadAdapter).not.toHaveBeenCalled();
     expect(createSurface).not.toHaveBeenCalled();
+  });
+
+  it("admits composited fills only within the eight-frame budget", async () => {
+    const loadAcceptedAdapter = vi.fn(() => null);
+    const accepted = createStudioProceduralArtisticBrushProvider({
+      engineEpoch: 7,
+      executionLocality: "dedicated-worker",
+      loadAdapter: loadAcceptedAdapter,
+      createSurface: surfaceFactory().createSurface,
+    });
+    if (accepted.status !== "ready") {
+      throw new Error("provider creation failed");
+    }
+    await expect(accepted.provider.render(watercolorFillRequest({
+      width: 4_096,
+      height: 3_072,
+    }))).resolves.toMatchObject({
+      status: "rejected",
+      reason: "runtime-unavailable",
+    });
+    expect(loadAcceptedAdapter).toHaveBeenCalledOnce();
+
+    const loadRejectedAdapter = vi.fn(() => adapter());
+    const rejected = createStudioProceduralArtisticBrushProvider({
+      engineEpoch: 7,
+      executionLocality: "dedicated-worker",
+      loadAdapter: loadRejectedAdapter,
+      createSurface: surfaceFactory().createSurface,
+    });
+    if (rejected.status !== "ready") {
+      throw new Error("provider creation failed");
+    }
+    await expect(rejected.provider.render(watercolorFillRequest({
+      width: 4_096,
+      height: 3_073,
+    }))).resolves.toMatchObject({
+      status: "rejected",
+      reason: "invalid-request",
+    });
+    expect(loadRejectedAdapter).not.toHaveBeenCalled();
+  });
+
+  it("requires exact bounded watercolor-fill and flat-wash plans", async () => {
+    const loadAdapter = vi.fn(() => adapter());
+    const creation = createStudioProceduralArtisticBrushProvider({
+      engineEpoch: 7,
+      executionLocality: "dedicated-worker",
+      loadAdapter,
+      createSurface: surfaceFactory().createSurface,
+    });
+    if (creation.status !== "ready") {
+      throw new Error("provider creation failed");
+    }
+
+    const validWatercolor = await creation.provider.render(
+      watercolorFillRequest(),
+    );
+    expect(validWatercolor).toMatchObject({
+      status: "completed",
+      artifact: {
+        receipt: {
+          technique: "watercolor-fill",
+          presetId: "studio-procedural-watercolor-fill-v1",
+          adapter: { version: "2.2.1-adapter.3" },
+          capabilitiesUsed: ["procedural:watercolor-fill"],
+        },
+      },
+    });
+    const validFlatWash = await creation.provider.render(request({
+      requestSequence: 2,
+      plan: {
+        technique: "flat-wash",
+        presetId: "studio-procedural-flat-wash-v1",
+        samples: request().plan.samples,
+        parameters: {
+          color: "#336699",
+          opacity: 0.78,
+        },
+      },
+    }));
+    expect(validFlatWash).toMatchObject({
+      status: "completed",
+      artifact: {
+        receipt: {
+          technique: "flat-wash",
+          presetId: "studio-procedural-flat-wash-v1",
+          capabilitiesUsed: ["procedural:flat-wash"],
+        },
+      },
+    });
+
+    for (const plan of [
+      {
+        ...watercolorFillRequest().plan,
+        parameters: {
+          ...watercolorFillRequest().plan.parameters,
+          extra: true,
+        },
+      },
+      {
+        ...watercolorFillRequest().plan,
+        parameters: {
+          ...watercolorFillRequest().plan.parameters,
+          density: 1.01,
+        },
+      },
+      {
+        ...watercolorFillRequest().plan,
+        presetId: "wrong-watercolor-fill",
+      },
+      {
+        technique: "flat-wash" as const,
+        presetId: "studio-procedural-flat-wash-v1",
+        samples: request().plan.samples,
+        parameters: {
+          color: "#336699",
+          opacity: 0,
+        },
+      },
+    ]) {
+      await expect(creation.provider.render(request({
+        requestSequence: 3,
+        plan,
+      }))).resolves.toMatchObject({
+        status: "rejected",
+        reason: "invalid-request",
+      });
+    }
+    expect(loadAdapter).toHaveBeenCalledOnce();
   });
 
   it("fails closed when the dynamic runtime is missing", async () => {

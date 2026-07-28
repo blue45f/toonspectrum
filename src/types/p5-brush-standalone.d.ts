@@ -24,6 +24,18 @@ declare module "p5.brush/standalone" {
   export function noField(): void;
   export function noWash(): void;
   export function noClip(): void;
+  export function fill(color: string, opacity?: number): void;
+  export function fillBleed(
+    strength: number,
+    direction?: "out" | "in",
+    angle?: number | null,
+  ): void;
+  export function fillTexture(
+    texture: number,
+    border: number,
+    scatter?: boolean,
+  ): void;
+  export function wash(color: string, opacity?: number): void;
 
   export function listFields(): string[];
   export function field(name: string): void;

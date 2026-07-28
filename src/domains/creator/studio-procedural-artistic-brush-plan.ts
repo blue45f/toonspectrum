@@ -22,7 +22,11 @@ import type {
 
 export type StudioProceduralArtisticBrushPlanTechnique = Extract<
   StudioProceduralArtisticBrushTechnique,
-  "flow-field" | "hatch" | "mass"
+  | "flow-field"
+  | "hatch"
+  | "mass"
+  | "watercolor-fill"
+  | "flat-wash"
 >;
 
 export const STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PLAN_LIMITS = Object.freeze({
@@ -39,6 +43,8 @@ export const STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PLAN_LIMITS = Object.freeze({
   maxStrength: 1,
   maxPixelRatio: 4,
   maxGeneratedSamples: 64,
+  minFlatWashOpacity: 0.01,
+  watercolorFillOpacity: 0.72,
   maxUint32: 0xffff_ffff,
 } as const);
 
@@ -72,6 +78,18 @@ Readonly<Record<
     outputName: "절차적 매스",
     description: "목탄처럼 밀도와 농담이 있는 덩어리 질감 레이어",
   }),
+  "watercolor-fill": Object.freeze({
+    technique: "watercolor-fill",
+    label: "수채 채움",
+    outputName: "절차적 수채 채움",
+    description: "종이결과 가장자리 번짐이 살아 있는 결정적 수채 면 레이어",
+  }),
+  "flat-wash": Object.freeze({
+    technique: "flat-wash",
+    label: "플랫 워시",
+    outputName: "절차적 플랫 워시",
+    description: "균일한 투명도로 넓은 색면을 채우는 결정적 워시 레이어",
+  }),
 });
 
 export interface StudioProceduralArtisticBrushPlanInput {
@@ -101,7 +119,7 @@ export interface StudioProceduralArtisticBrushPlanDisplay {
 
 /**
  * A planner success is narrower than the generic provider request: this
- * product path can only emit settled flow/hatch/mass plans.
+ * product path emits only settled, built-in procedural technique plans.
  */
 export type StudioProceduralArtisticBrushPlannedRequest = Omit<
   StudioProceduralArtisticBrushRequest,
@@ -183,6 +201,8 @@ const TECHNIQUES = new Set<StudioProceduralArtisticBrushPlanTechnique>([
   "flow-field",
   "hatch",
   "mass",
+  "watercolor-fill",
+  "flat-wash",
 ]);
 const COLOR_PATTERN = /^#[0-9a-f]{6}$/iu;
 const SAFE_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]*$/u;
@@ -455,6 +475,26 @@ function parametersFor(
         precision: roundCoordinate(0.35 + (density / 100) * 0.65),
         strength,
       });
+    case "watercolor-fill":
+      return Object.freeze({
+        angle: roundCoordinate(angle * Math.PI / 180),
+        color,
+        density: roundCoordinate(density / 100),
+        opacity:
+          STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PLAN_LIMITS
+            .watercolorFillOpacity,
+        strength,
+      });
+    case "flat-wash":
+      return Object.freeze({
+        color,
+        opacity: roundCoordinate(clamp(
+          strength,
+          STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PLAN_LIMITS
+            .minFlatWashOpacity,
+          1,
+        )),
+      });
   }
 }
 
@@ -473,6 +513,9 @@ function samplesFor(
       return boundaryPolygonSamples(width, height, seed);
     case "mass":
       return massSamples(width, height, density, strength, seed);
+    case "watercolor-fill":
+    case "flat-wash":
+      return boundaryPolygonSamples(width, height, seed);
   }
 }
 
@@ -497,6 +540,14 @@ function settingsSummary(
       return `밀도 ${Math.round(density)}% · 방향 ${Math.round(angle)}° · 굵기 ${weight.toFixed(1)}px · 시드 ${seed}`;
     case "mass":
       return `밀도 ${Math.round(density)}% · 강도 ${Math.round(strength * 100)}% · 시드 ${seed}`;
+    case "watercolor-fill":
+      return `종이 질감 ${Math.round(density)}% · 번짐 ${Math.round(strength * 100)}% · 방향 ${Math.round(angle)}° · 시드 ${seed}`;
+    case "flat-wash":
+      return `불투명도 ${Math.round(clamp(
+        strength,
+        STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PLAN_LIMITS.minFlatWashOpacity,
+        1,
+      ) * 100)}% · 시드 ${seed}`;
   }
 }
 
@@ -604,7 +655,11 @@ export function planStudioProceduralArtisticBrushRequest(
     || !Number.isSafeInteger(pixelCount)
     || pixelCount
       > STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PLAN_LIMITS.maxPixels
-    || estimateStudioProceduralArtisticBrushRasterMemory(width, height) === null
+    || estimateStudioProceduralArtisticBrushRasterMemory(
+      width,
+      height,
+      normalizedTechnique,
+    ) === null
   ) {
     return fail(
       "dimension-budget-exceeded",

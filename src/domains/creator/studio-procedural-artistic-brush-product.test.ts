@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PRODUCT_ADAPTER_VERSION,
+  STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PRODUCT_TECHNIQUES,
   StudioProceduralArtisticBrushProductError,
   generateStudioProceduralArtisticBrushProduct,
   probeStudioProceduralArtisticBrushProduct,
@@ -85,7 +87,7 @@ function receipt(
     replayFingerprint: `sha256:${"3".repeat(64)}`,
     adapter: {
       id: "p5-brush-standalone-worker",
-      version: "2.2.1-adapter.2",
+      version: "2.2.1-adapter.3",
       compatibility: "p5.brush/standalone",
     },
     execution: {
@@ -107,7 +109,11 @@ function receipt(
         ? "procedural:flow-field"
         : technique === "hatch"
           ? "procedural:hatch"
-          : "procedural:mass",
+          : technique === "mass"
+            ? "procedural:mass"
+            : technique === "watercolor-fill"
+              ? "procedural:watercolor-fill"
+              : "procedural:flat-wash",
     ],
     complete: true,
   };
@@ -216,6 +222,22 @@ afterEach(() => {
 });
 
 describe("studio procedural artistic brush product facade", () => {
+  it("pins the exact five product techniques and adapter contract", () => {
+    expect(STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PRODUCT_TECHNIQUES).toEqual([
+      "flow-field",
+      "hatch",
+      "mass",
+      "watercolor-fill",
+      "flat-wash",
+    ]);
+    expect(
+      Object.isFrozen(STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PRODUCT_TECHNIQUES),
+    ).toBe(true);
+    expect(STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PRODUCT_ADAPTER_VERSION).toBe(
+      "2.2.1-adapter.3",
+    );
+  });
+
   it("contains no static runtime import of planner, Worker client, or PNG bridge", () => {
     const source = readFileSync(
       new URL("./studio-procedural-artistic-brush-product.ts", import.meta.url),
@@ -364,6 +386,23 @@ describe("studio procedural artistic brush product facade", () => {
     expect(getter).not.toHaveBeenCalled();
   });
 
+  it("rejects provider-only techniques before rendering", async () => {
+    await expect(
+      generateStudioProceduralArtisticBrushProduct(
+        {
+          ...settings(),
+          technique: "image-tip",
+        } as unknown as StudioProceduralArtisticBrushSettings,
+        options(),
+      ),
+    ).rejects.toMatchObject({
+      reason: "invalid-input",
+      path: "$.settings.technique",
+    });
+    expect(runtimeMocks.render).not.toHaveBeenCalled();
+    expect(runtimeMocks.encode).not.toHaveBeenCalled();
+  });
+
   it("admits the exact 1024px product boundary before Worker execution", async () => {
     runtimeMocks.render.mockRejectedValue(new Error("boundary stop"));
     await expect(
@@ -385,6 +424,8 @@ describe("studio procedural artistic brush product facade", () => {
     ["flow-field", "흐름장"],
     ["hatch", "해칭"],
     ["mass", "매스"],
+    ["watercolor-fill", "수채 채움"],
+    ["flat-wash", "플랫 워시"],
   ] as const)(
     "returns a lossless PNG %s layer result with technique and seed metadata",
     async (technique, KoreanTechnique) => {
@@ -410,6 +451,9 @@ describe("studio procedural artistic brush product facade", () => {
       expect(result.name).toContain(KoreanTechnique);
       expect(result.name).toContain("시드 91");
       expect(result.message).toContain(result.name);
+      expect(result.receipt.adapter.version).toBe(
+        STUDIO_PROCEDURAL_ARTISTIC_BRUSH_PRODUCT_ADAPTER_VERSION,
+      );
       expect(Object.isFrozen(result)).toBe(true);
       expect(sourceSettings).toEqual(settingsBefore);
       expect(sourceOptions).toEqual(options({
@@ -505,6 +549,31 @@ describe("studio procedural artistic brush product facade", () => {
     });
     await expect(
       generateStudioProceduralArtisticBrushProduct(settings(), options()),
+    ).rejects.toMatchObject({
+      reason: "integrity-failed",
+    });
+  });
+
+  it("rejects a receipt from any non-product adapter version", async () => {
+    const sourceArtifact = artifact("watercolor-fill");
+    const incompatibleArtifact = {
+      ...sourceArtifact,
+      receipt: {
+        ...sourceArtifact.receipt,
+        adapter: {
+          ...sourceArtifact.receipt.adapter,
+          version: "2.2.1-adapter.2",
+        },
+      },
+    } satisfies StudioProceduralArtisticBrushArtifact;
+    runtimeMocks.render.mockResolvedValue(incompatibleArtifact);
+    runtimeMocks.encode.mockResolvedValue(completedPng(incompatibleArtifact));
+
+    await expect(
+      generateStudioProceduralArtisticBrushProduct(
+        settings({ technique: "watercolor-fill" }),
+        options(),
+      ),
     ).rejects.toMatchObject({
       reason: "integrity-failed",
     });
