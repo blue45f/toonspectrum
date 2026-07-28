@@ -13,6 +13,8 @@ import pg from "pg";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
+import { normalizePgConnectionStringForTls } from "./pg-connection.mjs";
+
 const ROOT = process.cwd();
 
 // 레포 루트 .env.local 로드(DATABASE_URL — Neon 또는 로컬 docker 폴백).
@@ -31,10 +33,8 @@ async function main() {
   if (!url) {
     throw new Error("DATABASE_URL environment variable is required.");
   }
-  const needsSsl = /neon\.tech|sslmode=require/i.test(url);
   const client = new pg.Client({
-    connectionString: url,
-    ...(needsSsl ? { ssl: { rejectUnauthorized: false } } : {}),
+    connectionString: normalizePgConnectionStringForTls(url),
   });
   await client.connect();
 

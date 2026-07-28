@@ -21,6 +21,8 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { constants as zlibConstants, gunzipSync, gzipSync } from "node:zlib";
 
+import { normalizePgConnectionStringForTls } from "./pg-connection.mjs";
+
 const execFileAsync = promisify(execFile);
 const ROOT = process.cwd();
 
@@ -172,10 +174,8 @@ async function ingestToDb(payload, titles) {
   if (!url) {
     throw new Error("DATABASE_URL environment variable is required.");
   }
-  const needsSsl = /neon\.tech|sslmode=require/i.test(url);
   const client = new pg.Client({
-    connectionString: url,
-    ...(needsSsl ? { ssl: { rejectUnauthorized: false } } : {}),
+    connectionString: normalizePgConnectionStringForTls(url),
   });
   await client.connect();
 

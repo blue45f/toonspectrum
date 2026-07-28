@@ -18,6 +18,8 @@ import {
 import type { INestApplicationContext } from "@nestjs/common";
 
 const DIRECT_URL = "postgresql://artist:secret@ep-direct.us-east-1.aws.neon.tech/toonspectrum?sslmode=require";
+const NORMALIZED_DIRECT_URL =
+  "postgresql://artist:secret@ep-direct.us-east-1.aws.neon.tech/toonspectrum?sslmode=verify-full";
 const VALID_ATTACHMENT_CATALOG = {
   attachmentTable: STUDIO_LIVE_POSTGRES_ATTACHMENT_TABLE,
   createdAtDefault: "now()",
@@ -83,7 +85,7 @@ describe("Studio live cluster adapter configuration", () => {
       })
     ).toEqual({
       mode: "postgres",
-      connectionString: DIRECT_URL,
+      connectionString: NORMALIZED_DIRECT_URL,
       poolMax: 6,
       inlineBinaryPayloads: false,
     });
@@ -707,7 +709,7 @@ describe("Studio live PostgreSQL IoAdapter lifecycle", () => {
     expect(adapter).toBeInstanceOf(StudioLivePostgresIoAdapter);
     expect(createPool).toHaveBeenCalledWith(
       expect.objectContaining({
-        connectionString: DIRECT_URL,
+        connectionString: NORMALIZED_DIRECT_URL,
         max: 4,
         connectionTimeoutMillis: 5_000,
       })

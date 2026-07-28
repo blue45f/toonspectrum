@@ -10,6 +10,8 @@ import {
   type QueryConfig,
 } from "pg";
 
+import { normalizePgConnectionStringForTls } from "../../../../lib/db/pg-connection";
+
 import {
   createLifecycleSafeStudioLivePostgresTransport,
   type StudioLivePostgresClusterTransport,
@@ -156,7 +158,7 @@ function parseDirectPostgresUrl(
       "STUDIO_LIVE_POSTGRES_URL must use sslmode=require, verify-ca, or verify-full; plaintext is allowed only for loopback development"
     );
   }
-  return connectionString;
+  return normalizePgConnectionStringForTls(connectionString);
 }
 
 export function resolveStudioLiveClusterAdapterConfig(

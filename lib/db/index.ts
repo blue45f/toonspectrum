@@ -1,15 +1,16 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
+import { normalizePgConnectionStringForTls } from "./pg-connection";
 import * as schema from "./schema";
 
 // PostgreSQL(Neon) — node-postgres 드라이버. 로컬 검증은 docker postgres(:55432), 운영/원격은 Neon.
-// DATABASE_URL 미설정 시 로컬 docker 컨테이너로 폴백(개발 편의). Neon은 sslmode=require.
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
+// pg v9의 sslmode=require 의미 변경에 기대지 않고 원격은 verify-full로 정규화한다.
+const rawConnectionString = process.env.DATABASE_URL;
+if (!rawConnectionString) {
   throw new Error("DATABASE_URL environment variable is required. Please define it in .env.local");
 }
-const needsSsl = /neon\.tech|sslmode=require/i.test(connectionString);
+const connectionString = normalizePgConnectionStringForTls(rawConnectionString);
 
 type EnvLike = Partial<Record<string, string | undefined>>;
 
@@ -45,7 +46,6 @@ export function resolvePgPoolOptions(env: EnvLike = process.env): {
 
 const pool = new Pool({
   connectionString,
-  ...(needsSsl ? { ssl: { rejectUnauthorized: false } } : {}),
   ...resolvePgPoolOptions(),
 });
 

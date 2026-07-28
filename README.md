@@ -177,7 +177,7 @@ pnpm dev:all
 
 ```bash
 # .env.local (gitignore됨): 앱 일반 쿼리는 pooler, realtime migration/adapter는 direct endpoint
-echo 'DATABASE_URL="postgresql://<user>:<pw>@<host>-pooler.<region>.aws.neon.tech/<db>?sslmode=require"' >> .env.local
+echo 'DATABASE_URL="postgresql://<user>:<pw>@<host>-pooler.<region>.aws.neon.tech/<db>?sslmode=verify-full"' >> .env.local
 echo 'STUDIO_LIVE_POSTGRES_URL="postgresql://<user>:<pw>@<direct-host>.<region>.aws.neon.tech/<db>?sslmode=verify-full"' >> .env.local
 set -a; source .env.local; set +a
 pnpm exec drizzle-kit push --force

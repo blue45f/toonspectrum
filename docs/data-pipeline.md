@@ -118,7 +118,7 @@ pnpm catalog:gen                 # apps/api/data/catalog.json.gz → public/data
 pnpm dev:all                     # 웹앱(:5173) + API(:4001) 동시 실행 → 화면에서 확인
 ```
 
-> 카탈로그 ingest 에는 DB가 필요 없습니다. `.env.local`의 `DATABASE_URL`(Neon, `sslmode=require`)은 리뷰·커뮤니티 등 동적 API와 ingest 실행 이력에만 쓰입니다. (`apps/api`는 `load-env`가 다른 import보다 먼저 `.env.local`을 로드.)
+> 카탈로그 ingest 에는 DB가 필요 없습니다. `.env.local`의 `DATABASE_URL`(Neon, `sslmode=verify-full`)은 리뷰·커뮤니티 등 동적 API와 ingest 실행 이력에만 쓰입니다. (`apps/api`는 `load-env`가 다른 import보다 먼저 `.env.local`을 로드.)
 
 ## 데이터 갱신 (정적 운영 + API 동기화)
 

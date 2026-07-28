@@ -25,7 +25,7 @@ services:
       # 자동 크롤은 끄고(off) 별도 cron/운영 절차에서 수동 트리거하는 것을 권장한다.
       - key: CATALOG_INGEST_MODE
         value: "off"
-      # Neon 연결 문자열(sslmode=require). 시크릿이라 대시보드에서 입력.
+      # Neon 연결 문자열(sslmode=verify-full). 시크릿이라 대시보드에서 입력.
       - key: DATABASE_URL
         sync: false
       # OAuth state 서명 키 — Render가 자동 생성.

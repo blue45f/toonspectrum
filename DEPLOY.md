@@ -111,7 +111,8 @@ STUDIO_RASTER_ASSET_ADMISSION=verified-renderer-handoff-v1
 먼저 `0009_socket_io_postgres_adapter.sql`을 적용해야 합니다. PostgreSQL 모드는 listener와
 publisher를 동시에 확보하기 때문에 풀 최솟값이 2이며, `pooler` 호스트나 PgBouncer transaction
 endpoint는 사용할 수 없습니다. 원격/운영 URL은 `sslmode=require`, `verify-ca`, `verify-full` 중
-하나를 명시해야 합니다. 인증서와 호스트 이름을 함께 검증하는 `verify-full`을 권장합니다. URL query는
+하나를 명시해야 하며 앞의 두 레거시 값도 현재의 인증서·호스트 검증 의미를 보존하도록
+`verify-full`로 정규화합니다. URL query는
 node-postgres 해석이 authority/credential/routing을 덮어쓰지 못하도록 소문자 `sslmode`와
 `channel_binding`만 각각 한 번 허용하며, 평문 연결은 production이 아닌 loopback 개발 DB에만
 허용됩니다. 부팅
