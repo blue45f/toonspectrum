@@ -32218,6 +32218,24 @@ function clearSelectionForEdit() {
 
   const studioInspectorAsideHandlers = useStudioStableHandlers<StudioInspectorAsideHandlers>({
     activatePixelSelectionToolFromInspector,
+    addProceduralArtisticBrushRaster: (
+      src,
+      width,
+      height,
+      name,
+      targetPageId,
+      targetMasterEditMode,
+    ) => {
+      if (
+        targetPageId !== activePage.id
+        || targetMasterEditMode !== masterEditModeRef.current
+        || collaborationDocumentLocked
+        || activeSurfaceReviewLocked
+      ) {
+        return false;
+      }
+      return addRenderedImage(src, width, height, undefined, false, { name });
+    },
     addAdvancedRuler,
     addBubbleShapePointFromInspector,
     addFilterMask,

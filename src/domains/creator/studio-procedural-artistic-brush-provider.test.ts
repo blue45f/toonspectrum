@@ -470,6 +470,53 @@ describe("Studio procedural artistic brush provider boundary", () => {
     });
   });
 
+  it("disposes an adapter that resolves after disposal starts", async () => {
+    let resolveAdapter:
+      | ((value: StudioProceduralArtisticBrushAdapter) => void)
+      | undefined;
+    const runtime = adapter();
+    runtime.dispose = vi.fn();
+    const loadAdapter = vi.fn(() => (
+      new Promise<StudioProceduralArtisticBrushAdapter>((resolve) => {
+        resolveAdapter = resolve;
+      })
+    ));
+    const creation = createStudioProceduralArtisticBrushProvider({
+      engineEpoch: 7,
+      executionLocality: "dedicated-worker",
+      loadAdapter,
+      createSurface: surfaceFactory().createSurface,
+    });
+    if (creation.status !== "ready") throw new Error("provider creation failed");
+
+    const render = creation.provider.render(request());
+    await vi.waitFor(() => expect(loadAdapter).toHaveBeenCalledOnce());
+    const disposal = creation.provider.dispose();
+    const concurrentDisposal = creation.provider.dispose();
+    expect(concurrentDisposal).toBe(disposal);
+    let concurrentDisposalSettled = false;
+    void concurrentDisposal.then(() => {
+      concurrentDisposalSettled = true;
+    });
+    await Promise.resolve();
+    expect(concurrentDisposalSettled).toBe(false);
+    resolveAdapter?.(runtime);
+
+    await Promise.all([disposal, concurrentDisposal]);
+    expect(concurrentDisposalSettled).toBe(true);
+    await expect(render).resolves.toMatchObject({
+      status: "rejected",
+      reason: "disposed",
+    });
+    expect(runtime.renderSettled).not.toHaveBeenCalled();
+    expect(runtime.dispose).toHaveBeenCalledOnce();
+    expect(creation.provider.snapshot()).toMatchObject({
+      phase: "disposed",
+      adapterLoaded: false,
+      active: false,
+    });
+  });
+
   it("rejects non-worker construction so the library cannot capture the main canvas", () => {
     expect(createStudioProceduralArtisticBrushProvider({
       engineEpoch: 7,

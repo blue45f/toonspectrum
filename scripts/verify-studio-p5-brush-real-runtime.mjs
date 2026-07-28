@@ -133,6 +133,15 @@ function validateSuccess(result, diagnostics) {
       failures.push(`${evidence.id}: execution receipt allowed a fallback`);
     }
     if (
+      evidence.quality?.ok !== true
+      || !evidence.quality.metrics
+      || evidence.quality.findings?.length !== 0
+    ) {
+      failures.push(
+        `${evidence.id}: golden structural quality policy failed`,
+      );
+    }
+    if (
       evidence.exactPixelReplay !== true
       || evidence.first?.pixelHash !== evidence.replay?.pixelHash
     ) {

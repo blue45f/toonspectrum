@@ -26,6 +26,8 @@ describe("StudioSelectOptionsBar", () => {
     expect(html).toContain('aria-label="삭제"');
     expect(html).toContain("studio-opt-cluster");
     expect(html.match(/data-studio-tool-hint-target="true"/g)).toHaveLength(5);
+    expect(html).toContain("size-11");
+    expect(html).toContain("sm:size-8");
     expect(html).not.toContain('title="복제"');
   });
 

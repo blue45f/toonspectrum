@@ -30,6 +30,24 @@ export interface StudioP5BrushRealRuntimeCaseEvidence {
   readonly first: StudioP5BrushRealRuntimePixelEvidence;
   readonly replay: StudioP5BrushRealRuntimePixelEvidence;
   readonly exactPixelReplay: boolean;
+  readonly quality: Readonly<{
+    readonly ok: boolean;
+    readonly findings: readonly Readonly<{
+      readonly code: string;
+      readonly message: string;
+    }>[];
+    readonly metrics: Readonly<{
+      readonly paintedCoverage: number;
+      readonly boundsCanvasCoverage: number;
+      readonly boundsOccupancy: number;
+      readonly colorBucketCount: number;
+      readonly luminanceStandardDeviation: number;
+      readonly neighborLinkRatio: number;
+      readonly edgeDensity: number;
+      readonly textureScore: number;
+      readonly scratchByteLength: number;
+    }> | null;
+  }>;
   readonly capability: `procedural:${StudioP5BrushRealRuntimeCaseId}`;
   readonly adapterId: "p5-brush-standalone-worker";
   readonly adapterCompatibility: "p5.brush/standalone";

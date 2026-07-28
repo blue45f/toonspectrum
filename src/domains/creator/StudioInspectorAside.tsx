@@ -220,6 +220,7 @@ import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
+import { StudioProceduralArtisticBrushInspectorSection } from "./StudioProceduralArtisticBrushInspectorSection";
 import { StudioQuickMaskPanel } from "./StudioQuickMaskPanel";
 import {
   StudioInspectorFilterLauncher,
@@ -248,6 +249,7 @@ export interface StudioInspectorAsideHandlers {
   activatePixelSelectionToolFromInspector: (
     kind: StudioInspectorPixelSelectionToolId,
   ) => void;
+  addProceduralArtisticBrushRaster: (src: string, width: number, height: number, name: string, targetPageId: string, targetMasterEditMode: boolean) => boolean;
   addAdvancedRuler: (type: StudioAdvancedRuler["type"]) => void;
   addBubbleShapePointFromInspector: () => void;
   addFilterMask: (fill: FilterMaskPaintMode) => void;
@@ -1056,6 +1058,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
 }: StudioInspectorAsideProps) {
   const {
     activatePixelSelectionToolFromInspector,
+    addProceduralArtisticBrushRaster,
     addAdvancedRuler,
     addBubbleShapePointFromInspector,
     addFilterMask,
@@ -3547,7 +3550,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     />
                   </Suspense>
                 ) : null}
-
+                {drawMode !== "shape" && drawMode !== "pixel" ? (
+                  <StudioProceduralArtisticBrushInspectorSection key={`${currentPageId}:${masterEditMode ? "master" : "page"}`} currentColor={color} canvasHeight={canvasH} pageId={currentPageId} masterEditMode={masterEditMode} disabled={collaborationDocumentLocked || activeSurfaceReviewLocked} disabledReason={collaborationDocumentLocked ? "협업 문서 잠금을 해제한 뒤 절차적 질감을 만들 수 있어요." : activeSurfaceReviewLocked ? "표면 리뷰를 마친 뒤 절차적 질감을 만들 수 있어요." : null} onInsert={addProceduralArtisticBrushRaster} />
+                ) : null}
                 {/* 대칭 그리기 자 (Symmetry Ruler) — RAW 픽셀 입력에는 적용하지 않는다. */}
                 {drawMode !== "pixel" ? (
                   <div className="pt-2.5 border-t border-line/35 space-y-2">

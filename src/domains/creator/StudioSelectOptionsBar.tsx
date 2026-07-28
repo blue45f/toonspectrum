@@ -87,8 +87,8 @@ function Action({
         aria-label={label}
         className={cn(
           showLabel
-            ? "inline-flex h-8 items-center gap-1.5 rounded-xl border px-2.5"
-            : "grid size-8 place-items-center rounded-xl border",
+            ? "inline-flex h-11 items-center gap-1.5 rounded-xl border px-2.5 sm:h-8"
+            : "grid size-11 place-items-center rounded-xl border sm:size-8",
           STUDIO_EASE,
           STUDIO_FOCUS_RING,
           danger

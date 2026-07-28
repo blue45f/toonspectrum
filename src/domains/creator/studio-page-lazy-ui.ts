@@ -506,6 +506,13 @@ const StudioBrushStudio = lazyRetry(
   () => loadStudioBrushStudio().then((mod) => ({ default: mod.StudioBrushStudio })),
   "StudioBrushStudio"
 );
+const StudioProceduralArtisticBrushController = lazyRetry(
+  () =>
+    import("./StudioProceduralArtisticBrushController").then((mod) => ({
+      default: mod.StudioProceduralArtisticBrushController,
+    })),
+  "StudioProceduralArtisticBrushController"
+);
 const QuickStartPanel = lazyRetry(
   () =>
     import("./StudioQuickStartPanel").then((module) => ({
@@ -785,6 +792,7 @@ export {
   StudioBrushCatalogPortal,
   StudioBrushLibraryPanel,
   StudioBrushStudio,
+  StudioProceduralArtisticBrushController,
   StudioBubbleAnchorPanel,
   StudioBubbleAutoShrinkPanel,
   StudioBubbleShapeOverlay,

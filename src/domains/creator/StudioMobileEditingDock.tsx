@@ -1079,7 +1079,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                       value={color}
                       onChange={(e) => setColor(e.target.value)}
                       aria-label="사용자 정의 브러시 색상"
-                      className="absolute inset-0 size-full cursor-pointer opacity-0"
+                      className="absolute inset-[-1px] h-[calc(100%+2px)] w-[calc(100%+2px)] cursor-pointer opacity-0"
                     />
                     <Palette size={14} className="text-white mix-blend-difference" aria-hidden />
                   </label>

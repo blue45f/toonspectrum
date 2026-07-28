@@ -858,6 +858,8 @@ export class StudioProceduralArtisticBrushProvider {
     | Promise<ResolvedAdapter | null>
     | null = null;
   #resolvedAdapter: ResolvedAdapter | null = null;
+  #adapterDisposal: Promise<void> | null = null;
+  #providerDisposal: Promise<void> | null = null;
   #loaderCalls = 0;
   #activeController: AbortController | null = null;
   #completed = 0;
@@ -881,6 +883,17 @@ export class StudioProceduralArtisticBrushProvider {
     return this.#phase === "disposed";
   }
 
+  #disposeAdapterOnce(adapter: ResolvedAdapter["adapter"]): Promise<void> {
+    if (this.#adapterDisposal) return this.#adapterDisposal;
+    this.#adapterDisposal = Promise.resolve()
+      .then(() => adapter.dispose?.())
+      .then(
+        () => undefined,
+        () => undefined,
+      );
+    return this.#adapterDisposal;
+  }
+
   async #resolveAdapter(): Promise<ResolvedAdapter | null> {
     if (this.#adapterResolution) return this.#adapterResolution;
     this.#loaderCalls += 1;
@@ -890,8 +903,12 @@ export class StudioProceduralArtisticBrushProvider {
       .catch(() => null);
     const resolved = await this.#adapterResolution;
     if (resolved) {
-      this.#resolvedAdapter = resolved;
-      if (this.#phase !== "disposed") this.#phase = "ready";
+      if (this.#phase === "disposed") {
+        await this.#disposeAdapterOnce(resolved.adapter);
+      } else {
+        this.#resolvedAdapter = resolved;
+        this.#phase = "ready";
+      }
     }
     return resolved;
   }
@@ -1150,18 +1167,18 @@ export class StudioProceduralArtisticBrushProvider {
     });
   }
 
-  async dispose(): Promise<void> {
-    if (this.#phase === "disposed") return;
+  dispose(): Promise<void> {
+    if (this.#providerDisposal) return this.#providerDisposal;
     this.#phase = "disposed";
     this.#activeController?.abort("provider-disposed");
-    const adapter = this.#resolvedAdapter?.adapter;
-    if (adapter?.dispose) {
-      try {
-        await adapter.dispose();
-      } catch {
-        // Provider disposal is idempotent and fail-closed.
-      }
-    }
+    const pendingAdapter = this.#adapterResolution;
+    this.#providerDisposal = (async () => {
+      const resolved =
+        this.#resolvedAdapter
+        ?? (pendingAdapter ? await pendingAdapter : null);
+      if (resolved) await this.#disposeAdapterOnce(resolved.adapter);
+    })();
+    return this.#providerDisposal;
   }
 }
 

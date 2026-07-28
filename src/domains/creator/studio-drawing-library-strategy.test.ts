@@ -80,6 +80,9 @@ describe("studio drawing library strategy", () => {
         canonicalAuthority: false,
       });
     }
+    expect(resolveStudioDrawingLibraryStrategy("croquis")?.packageName).toBe(
+      "croquis.js"
+    );
   });
 
   it("resolves by id, lists immutable layer snapshots and rejects unknown ids", () => {

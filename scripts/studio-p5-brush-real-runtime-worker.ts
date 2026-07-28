@@ -14,6 +14,10 @@ import {
 } from "../src/domains/creator/studio-procedural-artistic-brush-provider";
 
 import {
+  STUDIO_P5_BRUSH_GOLDEN_QUALITY_POLICIES,
+  evaluateStudioP5BrushGoldenQuality,
+} from "./studio-p5-brush-golden-quality-policy";
+import {
   STUDIO_P5_BRUSH_REAL_RUNTIME_CASE_IDS,
   type StudioP5BrushRealRuntimeCapabilities,
   type StudioP5BrushRealRuntimeCaseEvidence,
@@ -259,6 +263,33 @@ async function renderCase(
     );
   }
   const firstReceipt = first.artifact.receipt;
+  const quality = evaluateStudioP5BrushGoldenQuality(
+    STUDIO_P5_BRUSH_GOLDEN_QUALITY_POLICIES[technique],
+    {
+      rgba: first.artifact.pixels,
+      width: first.artifact.width,
+      height: first.artifact.height,
+    },
+    {
+      firstPixelHash: first.artifact.receipt.pixelHash,
+      replayPixelHash: replay.artifact.receipt.pixelHash,
+      // Cross-fresh-Worker determinism is checked by the outer Chromium gate.
+      // The per-Worker quality pass supplies its own primary hash here so the
+      // frame metrics and same-Worker replay are evaluated before pixels leave.
+      independentWorkerPixelHash: first.artifact.receipt.pixelHash,
+      exactPixelReplay: exactPixelsEqual(
+        first.artifact.pixels,
+        replay.artifact.pixels,
+      ),
+    },
+  );
+  if (!quality.ok) {
+    throw new Error(
+      `${technique} failed golden quality: ${
+        quality.findings.map(({ code }) => code).join(", ")
+      }`,
+    );
+  }
   return Object.freeze({
     id: technique,
     technique,
@@ -271,6 +302,24 @@ async function renderCase(
       first.artifact.pixels,
       replay.artifact.pixels,
     ),
+    quality: Object.freeze({
+      ok: quality.ok,
+      findings: quality.findings,
+      metrics: quality.metrics === null
+        ? null
+        : Object.freeze({
+            paintedCoverage: quality.metrics.paintedCoverage,
+            boundsCanvasCoverage: quality.metrics.boundsCanvasCoverage,
+            boundsOccupancy: quality.metrics.boundsOccupancy,
+            colorBucketCount: quality.metrics.colorBucketCount,
+            luminanceStandardDeviation:
+              quality.metrics.luminanceStandardDeviation,
+            neighborLinkRatio: quality.metrics.neighborLinkRatio,
+            edgeDensity: quality.metrics.edgeDensity,
+            textureScore: quality.metrics.textureScore,
+            scratchByteLength: quality.metrics.scratchByteLength,
+          }),
+    }),
     capability: `procedural:${technique}`,
     adapterId: firstReceipt.adapter.id as "p5-brush-standalone-worker",
     adapterCompatibility: firstReceipt.adapter.compatibility,

@@ -191,7 +191,7 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
     strategy({
       id: "croquis",
       displayName: "croquis.js",
-      packageName: "@disjukr/croquis-js",
+      packageName: "croquis.js",
       license: "MIT OR Apache-2.0",
       productLayer: "quality-benchmark",
       decision: "benchmark-oracle-only",

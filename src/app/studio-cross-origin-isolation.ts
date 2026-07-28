@@ -14,6 +14,16 @@ export const STUDIO_CROSS_ORIGIN_ISOLATION_HEADERS = Object.freeze({
     "camera=(self), microphone=(), geolocation=(), cross-origin-isolated=(self)",
 } as const);
 
+/**
+ * A dedicated Worker is its own embedder-policy context. The top-level Worker
+ * response must opt into the same COEP contract as the Studio document or
+ * Chromium blocks the module before its first statement executes.
+ */
+export const STUDIO_CROSS_ORIGIN_ISOLATION_WORKER_HEADERS = Object.freeze({
+  "Cross-Origin-Embedder-Policy": "credentialless",
+  "Cross-Origin-Resource-Policy": "same-origin",
+} as const);
+
 export const STUDIO_CROSS_ORIGIN_ISOLATION_RELOAD_HISTORY_KEY =
   "__toonspectrumStudioIsolationReloadV1";
 export const STUDIO_CROSS_ORIGIN_ISOLATION_RELOAD_SESSION_KEY =
@@ -141,6 +151,14 @@ export function isStudioCrossOriginIsolationDocumentRequest(
     || explicitlyAcceptsHtml
     || accept.includes("*/*")
   );
+}
+
+export function isStudioCrossOriginIsolationWorkerRequest(
+  request: StudioDocumentRequest,
+): boolean {
+  const method = request.method?.toUpperCase() ?? "GET";
+  if (method !== "GET" && method !== "HEAD") return false;
+  return request.secFetchDest?.trim().toLowerCase() === "worker";
 }
 
 type StudioIsolationReloadDirection = "studio-entry" | "public-exit";

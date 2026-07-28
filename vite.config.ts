@@ -6,7 +6,9 @@ import { defineConfig, type Plugin } from "vite";
 
 import {
   STUDIO_CROSS_ORIGIN_ISOLATION_HEADERS,
+  STUDIO_CROSS_ORIGIN_ISOLATION_WORKER_HEADERS,
   isStudioCrossOriginIsolationDocumentRequest,
+  isStudioCrossOriginIsolationWorkerRequest,
 } from "./src/app/studio-cross-origin-isolation";
 
 const apiTarget = process.env.NEST_API_URL ?? "http://127.0.0.1:4001";
@@ -160,6 +162,18 @@ function studioCrossOriginIsolationPlugin(): Plugin {
     },
     response: { setHeader(name: string, value: string): void },
   ) => {
+    if (isStudioCrossOriginIsolationWorkerRequest({
+      url: request.url,
+      method: request.method,
+      accept: request.headers.accept,
+      secFetchDest: request.headers["sec-fetch-dest"],
+    })) {
+      for (const [name, value] of Object.entries(
+        STUDIO_CROSS_ORIGIN_ISOLATION_WORKER_HEADERS,
+      )) {
+        response.setHeader(name, value);
+      }
+    }
     if (
       !isStudioCrossOriginIsolationDocumentRequest({
         url: request.url,

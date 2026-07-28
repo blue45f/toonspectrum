@@ -2,11 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   STUDIO_CROSS_ORIGIN_ISOLATION_HEADERS,
+  STUDIO_CROSS_ORIGIN_ISOLATION_WORKER_HEADERS,
   STUDIO_CROSS_ORIGIN_ISOLATION_RELOAD_HISTORY_KEY,
   STUDIO_CROSS_ORIGIN_ISOLATION_RELOAD_SESSION_KEY,
   diagnoseStudioCrossOriginIsolation,
   isStudioCrossOriginIsolationDocumentRequest,
   isStudioCrossOriginIsolationPath,
+  isStudioCrossOriginIsolationWorkerRequest,
   publishStudioCrossOriginIsolationDiagnostic,
   requestStudioCrossOriginIsolationReload,
 } from "./studio-cross-origin-isolation";
@@ -33,6 +35,10 @@ describe("Studio cross-origin isolation headers", () => {
       "Cross-Origin-Embedder-Policy": "credentialless",
       "Permissions-Policy":
         "camera=(self), microphone=(), geolocation=(), cross-origin-isolated=(self)",
+    });
+    expect(STUDIO_CROSS_ORIGIN_ISOLATION_WORKER_HEADERS).toEqual({
+      "Cross-Origin-Embedder-Policy": "credentialless",
+      "Cross-Origin-Resource-Policy": "same-origin",
     });
   });
 
@@ -95,6 +101,33 @@ describe("Studio cross-origin isolation headers", () => {
       url: "/create",
       method: "GET",
       accept: "text/html",
+    })).toBe(false);
+  });
+
+  it("opts dedicated Worker responses into COEP without classifying scripts as workers", () => {
+    expect(isStudioCrossOriginIsolationWorkerRequest({
+      url: "/src/domains/creator/studio-procedural-artistic-brush.worker.ts?worker_file&type=module",
+      method: "GET",
+      accept: "*/*",
+      secFetchDest: "worker",
+    })).toBe(true);
+    expect(isStudioCrossOriginIsolationWorkerRequest({
+      url: "/assets/studio-procedural-artistic-brush.worker-abc.js",
+      method: "HEAD",
+      accept: "*/*",
+      secFetchDest: "worker",
+    })).toBe(true);
+    expect(isStudioCrossOriginIsolationWorkerRequest({
+      url: "/assets/StudioPage.js",
+      method: "GET",
+      accept: "*/*",
+      secFetchDest: "script",
+    })).toBe(false);
+    expect(isStudioCrossOriginIsolationWorkerRequest({
+      url: "/assets/studio.worker.js",
+      method: "POST",
+      accept: "*/*",
+      secFetchDest: "worker",
     })).toBe(false);
   });
 });

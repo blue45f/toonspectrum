@@ -49,6 +49,7 @@ const REPRESENTATIVE_OPTIONAL_SURFACES = [
   "./StudioAiAssistHub",
   "./StudioAppSettingsPanel",
   "./StudioBrushStudio",
+  "./StudioProceduralArtisticBrushController",
   "./StudioColorPalettePanel",
   "./StudioCommentsPanelSession",
   "./StudioDrawingPaletteStack",
