@@ -19585,6 +19585,9 @@ const puppetWarpArmed =
           e.preventDefault();
           cancelCanvasSelectionResize();
           announceDrawingShortcut("그룹 크기 조절을 취소했습니다");
+        } else if (cancelCanvasGroupDrag()) {
+          e.preventDefault();
+          announceDrawingShortcut("그룹 이동을 취소했습니다");
         } else if (hasActiveDrawingPointerSession()) {
           e.preventDefault();
           discardDrawingPointerSession();
@@ -27706,17 +27709,7 @@ const puppetWarpArmed =
       if (!outcome.gesture) advancedFillTapPayloadRef.current = null;
       return;
     }
-    const groupDrag = groupDragRef.current;
-    if (groupDrag) {
-      groupDragRef.current = null;
-      const anchor = nodeRefsRef.current[groupDrag.id];
-      const deltaX = anchor ? anchor.x() - groupDrag.x0 : 0;
-      const deltaY = anchor ? anchor.y() - groupDrag.y0 : 0;
-      restoreGroupDragPreview(groupDrag, deltaX, deltaY);
-      applyGuides([], []);
-      applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
-      endLiveResourceEdit();
-    }
+    if (cancelCanvasGroupDrag()) return;
   }
 
   function onStageUp(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
@@ -28271,6 +28264,24 @@ const puppetWarpArmed =
       resizeProxy.y(resizeProxy.y() - deltaY);
     }
     layer?.batchDraw();
+  }
+
+  function cancelCanvasGroupDrag(): boolean {
+    const session = groupDragRef.current;
+    if (!session) return false;
+    const anchor = nodeRefsRef.current[session.id];
+    const deltaX = anchor ? anchor.x() - session.x0 : 0;
+    const deltaY = anchor ? anchor.y() - session.y0 : 0;
+    // Restore before invalidating/stopping the Konva drag. stopDrag() may synchronously emit the
+    // child and Stage dragend handlers; at the authoritative origin those handlers can only make
+    // a no-op patch, while the cleared session prevents the Stage from publishing a group commit.
+    restoreGroupDragPreview(session, deltaX, deltaY);
+    groupDragRef.current = null;
+    anchor?.stopDrag();
+    applyGuides([], []);
+    applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
+    endLiveResourceEdit();
+    return true;
   }
 
   function liveCanvasElementRect(

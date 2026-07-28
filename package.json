@@ -111,6 +111,7 @@
     "perfect-freehand": "^1.2.3",
     "pg": "^8.21.0",
     "pica": "^10.0.2",
+    "pixi.js": "^8.19.0",
     "polygon-clipping": "^0.15.7",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

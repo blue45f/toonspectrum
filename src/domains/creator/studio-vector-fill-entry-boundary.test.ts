@@ -83,14 +83,27 @@ describe("Studio vector line-art advanced fill entry boundary", () => {
     const paintProjection = viewportSource.slice(renderStart, renderEnd);
     const renderEl = viewportSource.slice(
       viewportSource.indexOf("const renderEl =", renderEnd),
-      viewportSource.indexOf("const panelClip =", renderEnd),
+      viewportSource.indexOf("// 문서 마스터 밑그림", renderEnd),
     );
 
     expect(previewSource).toContain("virtualTarget?: StudioAdvancedFillVirtualTarget");
     expect(paintProjection).toContain("materializeStudioAdvancedFillVectorTarget(");
     expect(paintProjection).toContain("canvasRenderElements.splice(insertionIndex, 0, virtualFillPreviewElement)");
     expect(renderEl).toContain("isAdvancedFillVirtualPreview");
-    expect(renderEl).toContain("opts.asMask || isAdvancedFillVirtualPreview");
+    expect(renderEl).toContain("const isNonInteractiveRender =");
+    expect(renderEl).toContain(
+      "opts.asMask === true || isAdvancedFillVirtualPreview",
+    );
+    expect(renderEl).not.toContain(
+      "opts.asMask || isAdvancedFillVirtualPreview",
+    );
+    expect(renderEl).toContain("const wrapRenderInteraction =");
+    expect(renderEl).toMatch(
+      /isNonInteractiveRender\s*\?\s*\(\s*<Group[\s\S]*?listening=\{false\}/u,
+    );
+    expect(renderEl).toContain(
+      '{tool === "select" && !isNonInteractiveRender ? (',
+    );
 
     expect(apply).toContain("planStudioAdvancedFillVectorTarget(vectorInput)");
     expect(apply).toContain("materializeStudioAdvancedFillVectorTarget(currentPlan.target, preview.resultSrc)");

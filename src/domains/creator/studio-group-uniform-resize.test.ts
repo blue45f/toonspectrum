@@ -458,16 +458,26 @@ describe("planStudioGroupUniformResize", () => {
     ).toBe(7);
   });
 
-  it("선택 ID가 유실되거나 멤버 하나라도 잠기면 전원을 원본 참조로 fail-closed한다", () => {
-    const free = image("free");
-    const locked = { ...text("locked"), locked: true } satisfies El;
+  it("선택 ID가 유실되거나 unlocked 그룹의 child 하나라도 잠기면 전원을 원본 참조로 fail-closed한다", () => {
+    const group = { id: "mixed-lock-group", locked: false };
+    const free = { ...image("free"), groupId: group.id } satisfies El;
+    const locked = {
+      ...text("locked"),
+      groupId: group.id,
+      locked: true,
+    } satisfies El;
     const items: El[] = [free, locked];
     const missing = plan(items, { selectedIds: ["free", "ghost"] });
-    const constrained = plan(items);
+    const constrained = plan(items, {
+      isLocked: (item) =>
+        item.locked === true || (item.groupId === group.id && group.locked),
+    });
 
     expect(missing).not.toBe(items);
     expect(missing[0]).toBe(free);
     expect(missing[1]).toBe(locked);
+    expect(constrained).not.toBe(items);
+    expect(constrained).toEqual(items);
     expect(constrained[0]).toBe(free);
     expect(constrained[1]).toBe(locked);
   });

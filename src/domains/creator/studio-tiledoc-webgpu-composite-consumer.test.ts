@@ -315,8 +315,8 @@ describe("studio tiledoc WebGPU composite planning", () => {
 
   it("packs unaligned RGBA rows into one reusable 256-byte-aligned staging view", () => {
     const rgba = new Uint8ClampedArray(3 * 2 * 4);
-    rgba.set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
-    rgba.set([13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], 12);
+    rgba.set([32, 16, 8, 64, 255, 128, 0, 255, 0, 0, 0, 0]);
+    rgba.set([64, 32, 16, 128, 128, 64, 32, 128, 1, 1, 1, 1], 12);
     const narrow = {
       ...source(0),
       pixelWidth: 3,
@@ -330,8 +330,83 @@ describe("studio tiledoc WebGPU composite planning", () => {
     expect(packed.bytes.buffer).toBe(scratch.buffer);
     expect(packed.bytesPerRow).toBe(256);
     expect(packed.rowsPerImage).toBe(2);
-    expect([...packed.bytes.subarray(0, 12)]).toEqual([...rgba.subarray(0, 12)]);
-    expect([...packed.bytes.subarray(256, 268)]).toEqual([...rgba.subarray(12, 24)]);
+    expect([...packed.bytes.subarray(0, 12)]).toEqual([
+      128, 64, 32, 64,
+      255, 128, 0, 255,
+      0, 0, 0, 0,
+    ]);
+    expect([...packed.bytes.subarray(256, 268)]).toEqual([
+      128, 64, 32, 128,
+      255, 128, 64, 128,
+      255, 255, 255, 1,
+    ]);
+    expect(packed.bytes.subarray(12, 256).every((value) => value === 0)).toBe(true);
+  });
+
+  it("preserves premultiplied colour across a long repeated coverage build and erasure", () => {
+    const dabAlpha = 0.035;
+    const straight = [184, 78, 219] as const;
+    const pixelCount = 512;
+    const rgba = new Uint8ClampedArray(pixelCount * 4);
+    let coverage = 0;
+
+    for (let index = 0; index < pixelCount; index += 1) {
+      coverage = dabAlpha + coverage * (1 - dabAlpha);
+      const alpha = Math.round(coverage * 255);
+      const offset = index * 4;
+      rgba[offset] = Math.round(straight[0] * alpha / 255);
+      rgba[offset + 1] = Math.round(straight[1] * alpha / 255);
+      rgba[offset + 2] = Math.round(straight[2] * alpha / 255);
+      rgba[offset + 3] = alpha;
+    }
+
+    // The last sample models destination-out applied to an already accumulated premultiplied
+    // pixel. RGB and alpha must retain the same factor so unpremultiplication cannot change colour.
+    const erasedOffset = (pixelCount - 1) * 4;
+    const eraseRetention = 0.37;
+    rgba[erasedOffset] = Math.round(rgba[erasedOffset]! * eraseRetention);
+    rgba[erasedOffset + 1] = Math.round(rgba[erasedOffset + 1]! * eraseRetention);
+    rgba[erasedOffset + 2] = Math.round(rgba[erasedOffset + 2]! * eraseRetention);
+    rgba[erasedOffset + 3] = Math.round(rgba[erasedOffset + 3]! * eraseRetention);
+
+    const packed = packStudioTileDocWebGpuUpload({
+      ...source(0),
+      pixelWidth: pixelCount,
+      pixelHeight: 1,
+      byteLength: rgba.byteLength,
+      rgba,
+    });
+
+    for (let index = 0; index < pixelCount; index += 1) {
+      const offset = index * 4;
+      const alpha = rgba[offset + 3]!;
+      expect(packed.bytes[offset + 3]).toBe(alpha);
+      for (let channel = 0; channel < 3; channel += 1) {
+        const reconstructedPremultiplied = Math.round(
+          packed.bytes[offset + channel]! * alpha / 255
+        );
+        expect(Math.abs(
+          reconstructedPremultiplied - rgba[offset + channel]!
+        )).toBeLessThanOrEqual(1);
+      }
+    }
+
+    // The old straight-RGBA assumption would have multiplied this low-flow prefix by alpha again.
+    const prefixAlpha = rgba[3]!;
+    const oldDoublePremultipliedRed = Math.round(rgba[0]! * prefixAlpha / 255);
+    const correctedPrefixRed = Math.round(packed.bytes[0]! * prefixAlpha / 255);
+    expect(oldDoublePremultipliedRed).toBeLessThan(rgba[0]! / 4);
+    expect(Math.abs(correctedPrefixRed - rgba[0]!)).toBeLessThanOrEqual(1);
+
+    const hiddenColour = new Uint8ClampedArray([127, 63, 31, 0]);
+    const fullyErased = packStudioTileDocWebGpuUpload({
+      ...source(0),
+      pixelWidth: 1,
+      pixelHeight: 1,
+      byteLength: hiddenColour.byteLength,
+      rgba: hiddenColour,
+    });
+    expect([...fullyErased.bytes.subarray(0, 4)]).toEqual([0, 0, 0, 0]);
   });
 });
 

@@ -131,6 +131,9 @@ interface DesktopEvidence {
   resizeUndoRestoredAllMembers: boolean;
   lockedGroupResizeHandleHidden: boolean;
   drawPreviewTransformNeutral: boolean;
+  escapeCancelledDragPreviewRestored: boolean;
+  escapeCancelledDragPersistedUnchanged: boolean;
+  escapeCancelledDragUndoStackUnchanged: boolean;
   lockedDragUnchanged: boolean;
   undoRestoredAllMembers: boolean;
   canvasClickSelectedWholeGroup: boolean;
@@ -1202,6 +1205,65 @@ async function waitForNeutralDrawPreviewTransform(
   throw new Error(`${description}; draw node transforms=${JSON.stringify(latest)}`);
 }
 
+async function fixtureKonvaTransformStates(
+  page: Page,
+  elementIds: readonly string[],
+): Promise<Record<string, KonvaElementTransformState[]>> {
+  const entries = await Promise.all(
+    elementIds.map(async (elementId) => [
+      elementId,
+      await konvaElementTransformStates(page, elementId),
+    ] as const),
+  );
+  return Object.fromEntries(entries);
+}
+
+function sameFixtureKonvaTransformStates(
+  left: Readonly<Record<string, readonly KonvaElementTransformState[]>>,
+  right: Readonly<Record<string, readonly KonvaElementTransformState[]>>,
+): boolean {
+  const leftIds = Object.keys(left).sort();
+  const rightIds = Object.keys(right).sort();
+  if (JSON.stringify(leftIds) !== JSON.stringify(rightIds)) return false;
+  return leftIds.every((elementId) => {
+    const leftNodes = left[elementId] ?? [];
+    const rightNodes = right[elementId] ?? [];
+    return leftNodes.length === rightNodes.length
+      && leftNodes.every((leftNode, index) => {
+        const rightNode = rightNodes[index];
+        return rightNode !== undefined
+          && leftNode.className === rightNode.className
+          && leftNode.name === rightNode.name
+          && leftNode.draggable === rightNode.draggable
+          && Math.abs(leftNode.x - rightNode.x) <= POSITION_TOLERANCE
+          && Math.abs(leftNode.y - rightNode.y) <= POSITION_TOLERANCE
+          && Math.abs(leftNode.scaleX - rightNode.scaleX) <= POSITION_TOLERANCE
+          && Math.abs(leftNode.scaleY - rightNode.scaleY) <= POSITION_TOLERANCE;
+      });
+  });
+}
+
+async function waitForFixtureKonvaTransformState(
+  page: Page,
+  elementIds: readonly string[],
+  expected: Readonly<Record<string, readonly KonvaElementTransformState[]>>,
+  relation: "equal" | "different",
+  description: string,
+  timeoutMs = 4_000,
+): Promise<void> {
+  const startedAt = Date.now();
+  let latest: Record<string, KonvaElementTransformState[]> = {};
+  while (Date.now() - startedAt < timeoutMs) {
+    latest = await fixtureKonvaTransformStates(page, elementIds);
+    const equal = sameFixtureKonvaTransformStates(expected, latest);
+    if ((relation === "equal" && equal) || (relation === "different" && !equal)) return;
+    await page.waitForTimeout(60);
+  }
+  throw new Error(
+    `${description}; expected=${JSON.stringify(expected)}, latest=${JSON.stringify(latest)}`,
+  );
+}
+
 async function dragFromTo(
   page: Page,
   from: ScreenPoint,
@@ -1447,6 +1509,59 @@ async function runDesktopGroupAudit(
       "successful group drag left an imperative draw preview transform behind",
     );
 
+    // Escape during a live group drag is a cancellation, not a selection-clear followed by a
+    // delayed mouseup commit. Assert both layers of the contract: Konva's imperative preview must
+    // return to the exact pre-drag transform while the pointer is still held, and releasing that
+    // pointer must not publish a new document snapshot. The following Undo then proves no hidden
+    // history entry was inserted by the cancelled gesture.
+    imageBounds = await findFixtureColorBounds(page, stage);
+    const beforeEscapeDragTransforms =
+      await fixtureKonvaTransformStates(page, fixtureIds);
+    invariant(
+      fixtureIds.every(
+        (id) => (beforeEscapeDragTransforms[id]?.length ?? 0) > 0,
+      ),
+      `could not capture every group member before the Escape drag: `
+        + JSON.stringify(beforeEscapeDragTransforms),
+    );
+    const escapeDragTarget = {
+      x: imageBounds.center.x + 52,
+      y: imageBounds.center.y + 30,
+    };
+    await assertCanvasPoint(page, imageBounds.center, "Escape drag start");
+    await assertCanvasPoint(page, escapeDragTarget, "Escape drag target");
+    await page.mouse.move(imageBounds.center.x, imageBounds.center.y);
+    await page.mouse.down();
+    await page.mouse.move(escapeDragTarget.x, escapeDragTarget.y, { steps: 14 });
+    await waitForFixtureKonvaTransformState(
+      page,
+      fixtureIds,
+      beforeEscapeDragTransforms,
+      "different",
+      "group drag never produced a live preview before Escape",
+    );
+    await page.keyboard.press("Escape");
+    await waitForFixtureKonvaTransformState(
+      page,
+      fixtureIds,
+      beforeEscapeDragTransforms,
+      "equal",
+      "Escape did not restore the complete group preview while the pointer was held",
+    );
+    const escapeCancelledDragPreviewRestored = true;
+    await page.mouse.up();
+    await page.mouse.move(4, 4);
+    await page.waitForTimeout(650);
+    const afterEscapeDrag = await readLatestSnapshot(page);
+    invariant(afterEscapeDrag, "autosave disappeared after the Escape-cancelled group drag");
+    const escapeCancelledDragPersistedUnchanged =
+      samePositions(moved, afterEscapeDrag, fixtureIds);
+    invariant(
+      escapeCancelledDragPersistedUnchanged,
+      "Escape-cancelled group drag changed persisted member coordinates after mouseup",
+    );
+    await waitForWholeGroupSelection(page, 3);
+
     // One Undo must restore every member while preserving the group relationship.
     const undo = await visible(page.getByRole("button", { name: "실행취소", exact: true }));
     invariant(!await undo.isDisabled(), "Undo is disabled after a group drag");
@@ -1459,6 +1574,7 @@ async function runDesktopGroupAudit(
         && samePositions(grouped, snapshot, fixtureIds),
     );
     const undoRestoredAllMembers = samePositions(grouped, undone, fixtureIds);
+    const escapeCancelledDragUndoStackUnchanged = undoRestoredAllMembers;
     await waitForNeutralDrawPreviewTransform(
       page,
       drawElement.id,
@@ -1699,6 +1815,9 @@ async function runDesktopGroupAudit(
         resizeUndoRestoredAllMembers,
         lockedGroupResizeHandleHidden,
         drawPreviewTransformNeutral,
+        escapeCancelledDragPreviewRestored,
+        escapeCancelledDragPersistedUnchanged,
+        escapeCancelledDragUndoStackUnchanged,
         lockedDragUnchanged,
         undoRestoredAllMembers,
         canvasClickSelectedWholeGroup,

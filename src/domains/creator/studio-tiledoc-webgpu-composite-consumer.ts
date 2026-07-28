@@ -1,8 +1,9 @@
 /**
  * High-precision WebGPU backend for `StudioTileDocWebGpuBridge`.
  *
- * Dirty layer stacks are uploaded as straight sRGB RGBA8, decoded to linear light by the source
- * texture format, and composited into retained premultiplied RGBA16F ping-pong tile textures.
+ * Dirty layer stacks arrive in the document store's premultiplied sRGB RGBA8 format. Upload packing
+ * restores straight sRGB while preserving alpha, the source texture decodes that colour to linear
+ * light, and the shader composites into retained premultiplied RGBA16F ping-pong tile textures.
  * Clean camera frames submit only the final presentation pass. No document/history authority
  * lives here; device loss or any rejected frame is recovered by invalidating the bridge planner.
  */
@@ -664,7 +665,21 @@ export interface StudioTileDocPackedUpload {
   readonly rowsPerImage: number;
 }
 
-/** Packs straight RGBA rows for queue.writeTexture without retaining another frame-sized copy. */
+function straightSrgbByte(premultiplied: number, alpha: number): number {
+  if (alpha <= 0) return 0;
+  if (alpha >= 255) return premultiplied;
+  return Math.min(255, Math.round(premultiplied * 255 / alpha));
+}
+
+/**
+ * Converts the store's premultiplied sRGB bytes to straight sRGB while packing aligned upload rows.
+ *
+ * `rgba8unorm-srgb` performs its transfer-function decode before the composite shader runs. Feeding
+ * it premultiplied bytes would therefore make the shader multiply colour by coverage a second time:
+ * a committed C·A pixel would become approximately C·A². Restoring straight colour before upload
+ * keeps live RGBA16F strokes and committed tile snapshots on the same source-over contract. Alpha is
+ * copied exactly, including destination-out results; fully erased pixels have hidden RGB cleared.
+ */
 export function packStudioTileDocWebGpuUpload(
   source: StudioTileDocWebGpuSourceSnapshot,
   scratch?: Uint8Array
@@ -678,10 +693,22 @@ export function packStudioTileDocWebGpuUpload(
   bytes.fill(0);
   for (let row = 0; row < source.pixelHeight; row += 1) {
     const sourceOffset = row * bytesPerRow;
-    bytes.set(
-      source.rgba.subarray(sourceOffset, sourceOffset + bytesPerRow),
-      row * uploadBytesPerRow
-    );
+    const uploadOffset = row * uploadBytesPerRow;
+    for (let column = 0; column < source.pixelWidth; column += 1) {
+      const sourcePixel = sourceOffset + column * 4;
+      const uploadPixel = uploadOffset + column * 4;
+      const alpha = source.rgba[sourcePixel + 3]!;
+      bytes[uploadPixel] = straightSrgbByte(source.rgba[sourcePixel]!, alpha);
+      bytes[uploadPixel + 1] = straightSrgbByte(
+        source.rgba[sourcePixel + 1]!,
+        alpha
+      );
+      bytes[uploadPixel + 2] = straightSrgbByte(
+        source.rgba[sourcePixel + 2]!,
+        alpha
+      );
+      bytes[uploadPixel + 3] = alpha;
+    }
   }
   return {
     bytes,

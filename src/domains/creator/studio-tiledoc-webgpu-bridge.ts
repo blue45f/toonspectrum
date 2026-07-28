@@ -48,8 +48,8 @@ export interface StudioTileDocWebGpuSourceSnapshot {
   readonly pixelHeight: number;
   readonly byteLength: number;
   /**
-   * Detached straight-RGBA bytes. The consumer may transfer this array; it never aliases store
-   * memory. Treat it as immutable until `present` settles.
+   * Detached `rgba8-premultiplied` store bytes. The consumer may transfer this array; it never
+   * aliases store memory. Treat it as immutable until `present` settles.
    */
   readonly rgba: Uint8ClampedArray;
 }

@@ -262,9 +262,9 @@ describe("planGroupEscape — 한 단계 위로", () => {
 
 describe("planAtomicSelectionTranslation — 그룹 드래그 원자 계획", () => {
   type Movable =
-    | { id: string; type: "image"; x: number; y: number; locked?: boolean }
-    | { id: string; type: "draw"; points: number[]; locked?: boolean }
-    | { id: string; type: "meta"; locked?: boolean };
+    | { id: string; type: "image"; x: number; y: number; locked?: boolean; groupId?: string }
+    | { id: string; type: "draw"; points: number[]; locked?: boolean; groupId?: string }
+    | { id: string; type: "meta"; locked?: boolean; groupId?: string };
 
   it("좌표형 요소와 선화를 같은 delta로 옮기고 선택 밖 참조를 보존한다", () => {
     const coordinate: Movable = { id: "image", type: "image", x: 10, y: 20 };
@@ -286,17 +286,34 @@ describe("planAtomicSelectionTranslation — 그룹 드래그 원자 계획", ()
     expect(next[2]).toBe(outside);
   });
 
-  it("잠긴 그룹/자식이 하나라도 있으면 일부만 옮기지 않고 전체를 fail-closed 한다", () => {
-    const locked: Movable = { id: "locked", type: "image", x: 2, y: 3, locked: true };
-    const free: Movable = { id: "free", type: "draw", points: [4, 5, 6, 7] };
+  it("그룹 메타가 unlocked여도 child 하나가 잠기면 일부만 옮기지 않고 전체를 fail-closed 한다", () => {
+    const group = { id: "mixed-lock-group", locked: false };
+    const locked: Movable = {
+      id: "locked",
+      type: "image",
+      x: 2,
+      y: 3,
+      locked: true,
+      groupId: group.id,
+    };
+    const free: Movable = {
+      id: "free",
+      type: "draw",
+      points: [4, 5, 6, 7],
+      groupId: group.id,
+    };
+    const items = [locked, free];
     const next = planAtomicSelectionTranslation({
-      items: [locked, free],
+      items,
       selectedIds: ["locked", "free"],
       deltaX: 10,
       deltaY: 20,
-      isLocked: (item) => item.locked === true,
+      isLocked: (item) =>
+        item.locked === true || (item.groupId === group.id && group.locked),
     });
 
+    expect(next).not.toBe(items);
+    expect(next).toEqual(items);
     expect(next[0]).toBe(locked);
     expect(next[1]).toBe(free);
   });
