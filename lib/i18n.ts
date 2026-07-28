@@ -18,6 +18,17 @@ type DictByLocale = Record<string, Dict>;
 
 const DICT: DictByLocale = {
   ko: {
+    "copyright.title": "저작권·콘텐츠 안내",
+    "copyright.section1.title": "콘텐츠 출처와 원칙",
+    "copyright.section1.body": "툰스펙트럼은 여러 국내 웹툰·웹소설 플랫폼의 공개 카탈로그에서 수집한 메타데이터(제목·작가·장르 등)를 정리해 보여주는 색인·발견 서비스입니다. 작품 본편(회차 이미지·텍스트)은 저장·재배포하지 않으며, 열람은 각 원 플랫폼으로의 링크를 통해서만 이루어집니다.",
+    "copyright.section2.title": "표지 이미지",
+    "copyright.section2.body": "표지는 작품 식별을 돕기 위한 썸네일로, 가능한 경우 원 플랫폼 표지를 출처 링크와 함께 인용·표시합니다. 권리자 요청이나 운영 정책에 따라 실제 표지 표시는 즉시 전체 비활성화할 수 있습니다.",
+    "copyright.section3.title": "지표의 정직성",
+    "copyright.section4.title": "권리 안내",
+    "copyright.section5.title": "권리 침해 신고 (Notice & Takedown)",
+    "copyright.section5.body": "게재된 메타데이터·표지가 귀하의 권리를 침해한다고 판단되시면 문의 게시판에 작품명·해당 URL·권리 근거를 함께 남겨 주세요.",
+    "copyright.leaveInquiry": "문의 남기기 →",
+
     // 앱 공통
     "app.name": "툰스펙트럼",
     "app.brandBeta": "베타 서비스 — 데이터·기능이 변경될 수 있습니다",
@@ -584,6 +595,17 @@ const DICT: DictByLocale = {
     "authors.noName": "작가",
   },
   en: {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -1134,6 +1156,36 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ja": {
+    "copyright.title": "著作権・コンテンツ案内",
+    "copyright.section1.title": "コンテンツの出所と原則",
+    "copyright.section1.body": "ToonSpectrumは、Webtoon・Web小説プラットフォームの公開カタログから収集したメタデータ（タイトル・作者・ジャンル等）をまとめて提供するインデックス・発見サービスです。作品本編は保存・再配布せず、閲覧は各公式プラットフォームへのリンク経由でのみ行われます。",
+    "copyright.section2.title": "表紙画像",
+    "copyright.section2.body": "表紙は作品識別用のサムネイルとして、可能な限り元プラットフォームの表紙を出典リンクと共に引用表示します。権利者様からの要請や運営方針に基づき、表紙表示は即座に無効化可能です。",
+    "copyright.section3.title": "指標の透明性",
+    "copyright.section4.title": "権利のご案内",
+    "copyright.section5.title": "権利侵害の通報 (Notice & Takedown)",
+    "copyright.section5.body": "掲載されているメタデータ・表紙が権利を侵害しているとお考えの場合は、お問い合わせフォームから作品名・該当URL・権利根拠をお送りください。",
+    "copyright.leaveInquiry": "お問い合わせ →",
+
+
+    "contact.title": "サイトお問い合わせ",
+    "contact.body": "サービス利用・アカウント・データ表示に関するお問い合わせを受け付けます。",
+    "contact.bizTitle": "提携・ビジネスのお問い合わせ",
+    "contact.bizBody": "広告、プラットフォーム連携、コンテンツ提携などのビジネス提案を受け付けます。",
+    "contact.bugTitle": "バグ・不具合報告",
+    "contact.bugBody": "エラー、画面の崩れ、データ表示の異常をご報告ください。",
+    "play.title": "プレイエリア · ToonSpectrum",
+    "play.subtitle": "Webtoonキャラクターで楽しむミニゲーム — カードバトル、ジャンケン、クイズなど。",
+    "play.loading": "ゲームを読み込み中…",
+    "play.share": "プレイエリアを共有",
+    "fortune.title": "今日のWebtoon占いの館 · ToonSpectrum",
+    "fortune.subtitle": "今日のあなたにピッタリなWebtoonキャラクターと運勢をチェック！",
+    "fortune.today": "今日の運勢",
+    "fortune.zodiac": "星座占い",
+    "fortune.saju": "四柱推命",
+    "fortune.compatibility": "相性診断",
+    "fortune.tarot": "今日のタロット",
+
     "lang.en": "英語",
     "common.backToHome": "ホームへ戻る",
     "common.open": "開く",
@@ -1630,6 +1682,36 @@ const DICT: DictByLocale = {
     "authors.desc": "作家を作品数順にランキングしたものです。著者をタップすると、タイトル、評価、ファン カフェが 1 か所に表示されます。",
   },
   "zh": {
+    "copyright.title": "版权与内容须知",
+    "copyright.section1.title": "内容来源与原则",
+    "copyright.section1.body": "ToonSpectrum 是一家整理并展示各大网络漫画/网络小说平台公开目录元数据（标题、作者、题材等）的索引与发现服务。本服务不存储或再分发作品正文内容，所有阅读均通过各原平台链接进行。",
+    "copyright.section2.title": "封面图像",
+    "copyright.section2.body": "封面用作识别作品的缩略图，在可能的情况下结合来源链接引用显示原平台封面。依据权利人要求或运营政策，实际封面显示可随时立即全量停用。",
+    "copyright.section3.title": "数据的真实性与透明度",
+    "copyright.section4.title": "权利声明",
+    "copyright.section5.title": "侵权通知与下架 (Notice & Takedown)",
+    "copyright.section5.body": "如果您认为展示的元数据或封面侵犯了您的权利，请在咨询页面提交作品名、相关 URL 及权利依据。",
+    "copyright.leaveInquiry": "提交咨询 →",
+
+
+    "contact.title": "网站咨询",
+    "contact.body": "提交关于服务使用、账号和数据显示的常规咨询。",
+    "contact.bizTitle": "商务合作咨询",
+    "contact.bizBody": "接收广告、平台接入、内容合作等商务提案。",
+    "contact.bugTitle": "提交 Bug 反馈",
+    "contact.bugBody": "反馈系统错误、页面错乱及数据异常。",
+    "play.title": "游乐场 · ToonSpectrum",
+    "play.subtitle": "网漫角色小游戏 — 卡牌对决、剪刀石头布、猜谜等。",
+    "play.loading": "正在加载游戏…",
+    "play.share": "分享游乐场",
+    "fortune.title": "今日网漫运势 · ToonSpectrum",
+    "fortune.subtitle": "看看今天与你最匹配的网络漫画角色和推荐运势吧。",
+    "fortune.today": "今日运势",
+    "fortune.zodiac": "星座运势",
+    "fortune.saju": "生辰八字",
+    "fortune.compatibility": "缘分契合度",
+    "fortune.tarot": "今日塔罗",
+
     "lang.ko": "韩语",
     "common.open": "打开",
     "common.backToTop": "返回顶部",
@@ -2126,6 +2208,36 @@ const DICT: DictByLocale = {
     "authors.stats": "{total} 位作者中排名靠前的 {shown} 位作者",
   },
   "zh-hant": {
+    "copyright.title": "版權與內容須知",
+    "copyright.section1.title": "內容來源與原則",
+    "copyright.section1.body": "ToonSpectrum 是一家整理並展示各大網絡漫畫/網絡小說平台公開目錄元數據（標題、作者、題材等）的索引與發現服務。本服務不儲存或再分發作品正文內容，所有閱讀均通過各原平台鏈接進行。",
+    "copyright.section2.title": "封面圖像",
+    "copyright.section2.body": "封面用作識別作品的縮圖，在可能的情況下結合來源鏈接引用顯示原平台封面。依據權利人要求或運營政策，實際封面顯示可隨時立即全量停用。",
+    "copyright.section3.title": "數據的真實性與透明度",
+    "copyright.section4.title": "權利聲明",
+    "copyright.section5.title": "侵權通知與下架 (Notice & Takedown)",
+    "copyright.section5.body": "如果您認為展示的元數據或封面侵犯了您的權利，請在諮詢頁面提交作品名、相關 URL 及權利依據。",
+    "copyright.leaveInquiry": "提交諮詢 →",
+
+
+    "contact.title": "網站諮詢",
+    "contact.body": "提交關於服務使用、帳號和數據顯示的常規諮詢。",
+    "contact.bizTitle": "商務合作諮詢",
+    "contact.bizBody": "接收廣告、平台接入、內容合作等商務提案。",
+    "contact.bugTitle": "提交 Bug 反饋",
+    "contact.bugBody": "反饋系統錯誤、頁面錯亂及數據異常。",
+    "play.title": "遊樂場 · ToonSpectrum",
+    "play.subtitle": "網漫角色小遊戲 — 卡牌對決、剪刀石頭布、猜謎等。",
+    "play.loading": "正在載入遊戲…",
+    "play.share": "分享遊樂場",
+    "fortune.title": "今日網漫運勢 · ToonSpectrum",
+    "fortune.subtitle": "看看今天與你最匹配的網絡漫畫角色和推薦運勢吧。",
+    "fortune.today": "今日運勢",
+    "fortune.zodiac": "星座運勢",
+    "fortune.saju": "生辰八字",
+    "fortune.compatibility": "緣分契合度",
+    "fortune.tarot": "今日塔羅",
+
     "common.open": "開啟",
     "app.loading": "載入中…",
     "lang.switch": "語言",
@@ -2622,6 +2734,36 @@ const DICT: DictByLocale = {
     "authors.stats": "{total} 位作者中排名靠前的 {shown} 位作者",
   },
   "es": {
+    "copyright.title": "Aviso de derechos de autor y contenido",
+    "copyright.section1.title": "Fuentes y principios de contenido",
+    "copyright.section1.body": "ToonSpectrum es un servicio de descubrimiento e índice que recopila metadatos públicos de plataformas de webtoons y novelas. No aloja ni redistribuye episodios; la lectura se realiza únicamente mediante enlaces oficiales.",
+    "copyright.section2.title": "Imágenes de portada",
+    "copyright.section2.body": "Las portadas sirven como miniaturas de identificación y citan las portadas de la plataforma original junto con los enlaces de origen. La visualización se puede desactivar de inmediato previa solicitud del titular de los derechos.",
+    "copyright.section3.title": "Transparencia de métricas",
+    "copyright.section4.title": "Aviso de derechos",
+    "copyright.section5.title": "Notificación de infracción y retirada",
+    "copyright.section5.body": "Si cree que los metadatos o las portadas violan sus derechos, envíe una consulta con el título, la URL y la prueba de propiedad.",
+    "copyright.leaveInquiry": "Enviar consulta →",
+
+
+    "contact.title": "Consulta general",
+    "contact.body": "Envíe consultas sobre el uso del servicio, cuentas y visualización de datos.",
+    "contact.bizTitle": "Consultas de negocios y alianzas",
+    "contact.bizBody": "Reciba propuestas comerciales que incluyan publicidad, integración de plataformas y alianzas de contenido.",
+    "contact.bugTitle": "Informe de errores",
+    "contact.bugBody": "Informe errores, fallos de interfaz o anomalías en la visualización de datos.",
+    "play.title": "Zona de juegos · ToonSpectrum",
+    "play.subtitle": "Minijuegos de personajes de Webtoon: batallas de cartas, piedra-papel-tijeras, trivia y más.",
+    "play.loading": "Cargando juego…",
+    "play.share": "Compartir juegos",
+    "fortune.title": "Horóscopo diario de Webtoon · ToonSpectrum",
+    "fortune.subtitle": "Descubre tu personaje de webtoon ideal y tu horóscopo para hoy.",
+    "fortune.today": "Horóscopo de hoy",
+    "fortune.zodiac": "Horóscopo del zodiaco",
+    "fortune.saju": "Los cuatro pilares",
+    "fortune.compatibility": "Compatibilidad de pareja",
+    "fortune.tarot": "Tarot del día",
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -3118,6 +3260,36 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "fr": {
+    "copyright.title": "Avis de droits d'auteur et de contenu",
+    "copyright.section1.title": "Sources de contenu et principes",
+    "copyright.section1.body": "ToonSpectrum est un service d'indexation et de découverte récapitulant les métadonnées publiques des plateformes de webtoons et romans. Il ne stocke ni ne redistribue aucun chapitre; la lecture se fait exclusivement via les liens officiels.",
+    "copyright.section2.title": "Images de couverture",
+    "copyright.section2.body": "Les couvertures servent de vignettes d'identification et citent les couvertures des plateformes d'origine avec leurs liens d'accès. L'affichage peut être désactivé immédiatement sur demande des ayants droit.",
+    "copyright.section3.title": "Transparence des métriques",
+    "copyright.section4.title": "Avis relatif aux droits",
+    "copyright.section5.title": "Notice d'atteinte aux droits et retrait",
+    "copyright.section5.body": "Si vous estimez que des métadonnées ou couvertures portent atteinte à vos droits, veuillez soumettre une demande indiquant le titre, l'URL et la preuve de propriété.",
+    "copyright.leaveInquiry": "Soumettre une demande →",
+
+
+    "contact.title": "Demande générale",
+    "contact.body": "Posez vos questions concernant l'utilisation du service, les comptes et l'affichage des données.",
+    "contact.bizTitle": "Demandes de partenariat et affaires",
+    "contact.bizBody": "Soumettez vos propositions commerciales incluant la publicité, l'intégration de plateformes et les partenariats de contenu.",
+    "contact.bugTitle": "Rapport de bogue",
+    "contact.bugBody": "Signalez des erreurs, des dysfonctionnements d'affichage ou des anomalies dans les données.",
+    "play.title": "Espace jeux · ToonSpectrum",
+    "play.subtitle": "Mini-jeux avec vos personnages de webtoons : duels de cartes, pierre-feuille-ciseaux, quiz et plus encore.",
+    "play.loading": "Chargement du jeu…",
+    "play.share": "Partager les jeux",
+    "fortune.title": "Horoscope quotidien Webtoon · ToonSpectrum",
+    "fortune.subtitle": "Découvrez votre personnage de webtoon idéal et votre horoscope du jour.",
+    "fortune.today": "Horoscope du jour",
+    "fortune.zodiac": "Horoscope du zodiaque",
+    "fortune.saju": "Les quatre piliers",
+    "fortune.compatibility": "Compatibilité amoureuse",
+    "fortune.tarot": "Tarot du jour",
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -3614,6 +3786,36 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "de": {
+    "copyright.title": "Urheberrechts- und Inhaltshinweis",
+    "copyright.section1.title": "Inhaltsquellen und Prinzipien",
+    "copyright.section1.body": "ToonSpectrum ist ein Index- und Entdeckungsdienst, der öffentliche Katalog-Metadaten von Webtoon- und Roman-Plattformen zusammenfasst. Es speichert oder verbreitet keine Kapitelinhalte; das Lesen erfolgt ausschließlich über offizielle Links.",
+    "copyright.section2.title": "Titelbilder",
+    "copyright.section2.body": "Cover-Bilder dienen als Identifikations-Thumbnails und zitieren nach Möglichkeit Original-Cover mit Quelllinks. Die Anzeige kann auf Anfrage von Rechteinhabern unverzüglich deaktiviert werden.",
+    "copyright.section3.title": "Transparenz der Kennzahlen",
+    "copyright.section4.title": "Rechtehinweis",
+    "copyright.section5.title": "Urheberrechtsverletzungsmeldung und Entfernung",
+    "copyright.section5.body": "Wenn Sie glauben, dass Metadaten oder Cover Ihre Rechte verletzen, senden Sie bitte eine Anfrage mit Titel, URL und Eigentumsnachweis.",
+    "copyright.leaveInquiry": "Anfrage senden →",
+
+
+    "contact.title": "Allgemeine Anfrage",
+    "contact.body": "Senden Sie Anfragen zu Dienstnutzung, Konten und Datenanzeigen.",
+    "contact.bizTitle": "Geschäftliche & Partnerschaftsanfragen",
+    "contact.bizBody": "Reichen Sie geschäftliche Angebote für Werbung, Plattformintegrationen und Inhalts-Partnerschaften ein.",
+    "contact.bugTitle": "Fehlermeldung",
+    "contact.bugBody": "Melden Sie Fehler, Layoutprobleme oder Datenanzeige-Anomalien.",
+    "play.title": "Spielbereich · ToonSpectrum",
+    "play.subtitle": "Webtoon-Minispiele — Kartenduelle, Schere-Stein-Papier, Quiz und mehr.",
+    "play.loading": "Spiel wird geladen…",
+    "play.share": "Spielbereich teilen",
+    "fortune.title": "Tägliches Webtoon-Horoskop · ToonSpectrum",
+    "fortune.subtitle": "Entdecken Sie Ihren passenden Webtoon-Charakter und Ihr Horoskop für heute.",
+    "fortune.today": "Tageshoroskop",
+    "fortune.zodiac": "Sternzeichen-Horoskop",
+    "fortune.saju": "Vier Säulen des Schicksals",
+    "fortune.compatibility": "Partnerschafts-Kompatibilität",
+    "fortune.tarot": "Tages-Tarot",
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -4110,6 +4312,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "id": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -4606,6 +4820,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "vi": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -5102,6 +5328,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "th": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -5598,6 +5836,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ru": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -6094,6 +6344,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "pt": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -6590,6 +6852,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "it": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -7086,6 +7360,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ar": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -7582,6 +7868,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "hi": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -8078,6 +8376,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "tr": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -8574,6 +8884,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "nl": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -9070,6 +9392,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "pl": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -9566,6 +9900,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "sv": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -10062,6 +10408,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "fil": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -10558,6 +10916,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ms": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -11054,6 +11424,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "af": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -11550,6 +11932,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "am": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -12046,6 +12440,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "as": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -12542,6 +12948,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "az": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -13038,6 +13456,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "be": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -13534,6 +13964,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "bg": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -14030,6 +14472,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "bn": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -14526,6 +14980,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "bs": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -15022,6 +15488,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ca": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -15518,6 +15996,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "cs": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -16014,6 +16504,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "da": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -16510,6 +17012,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "el": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -17006,6 +17520,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "et": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -17502,6 +18028,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "eu": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -17998,6 +18536,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "fa": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -18494,6 +19044,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "fi": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -18990,6 +19552,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "gl": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -19486,6 +20060,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "gu": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -19982,6 +20568,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "he": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -20478,6 +21076,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "hr": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -20974,6 +21584,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "hu": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -21470,6 +22092,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "hy": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -21966,6 +22600,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "is": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -22462,6 +23108,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ka": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -22958,6 +23616,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "kk": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -23454,6 +24124,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "km": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -23950,6 +24632,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "kn": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -24446,6 +25140,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ky": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -24942,6 +25648,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "lo": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -25438,6 +26156,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "lt": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -25934,6 +26664,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "lv": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -26430,6 +27172,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "mk": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -26926,6 +27680,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ml": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -27422,6 +28188,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "mn": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -27918,6 +28696,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "mr": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -28414,6 +29204,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "my": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -28910,6 +29712,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ne": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -29406,6 +30220,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "no": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -29902,6 +30728,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "or": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -30398,6 +31236,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "pa": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -30894,6 +31744,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ro": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -31390,6 +32252,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "si": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -31886,6 +32760,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "sk": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -32382,6 +33268,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "sl": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -32878,6 +33776,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "sq": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -33374,6 +34284,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "sr": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -33870,6 +34792,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "sw": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -34366,6 +35300,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ta": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -34862,6 +35808,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "te": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -35358,6 +36316,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "uk": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -35854,6 +36824,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "ur": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -36350,6 +37332,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "uz": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",
@@ -36846,6 +37840,18 @@ const DICT: DictByLocale = {
     "authors.noName": "Creator",
   },
   "zu": {
+    "copyright.title": "Copyright & Content Notice",
+    "copyright.section1.title": "Content Sources & Principles",
+    "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
+    "copyright.section2.title": "Cover Images",
+    "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
+    "copyright.section3.title": "Metrics & Transparency",
+    "copyright.section4.title": "Rights Notice",
+    "copyright.section5.title": "Copyright Infringement Notice & Takedown",
+    "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
+    "copyright.leaveInquiry": "Submit Inquiry →",
+
+
     "app.name": "ToonSpectrum",
     "app.brandBeta": "Beta service — data and features may change",
     "app.loading": "Loading",

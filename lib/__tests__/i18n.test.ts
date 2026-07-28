@@ -328,14 +328,14 @@ describe("translation dictionary completeness", () => {
     expect(missing).toEqual([]);
   });
 
-  it("covers all registered world base locales in DICT with at least 494 App keys each", () => {
+  it("covers all registered world base locales in DICT with at least 504 App keys each", () => {
     const appKeys = Object.keys(i18nDict.en).filter((k) => !k.startsWith("studio."));
-    expect(appKeys).toHaveLength(494);
+    expect(appKeys).toHaveLength(504);
 
     for (const [locale, dict] of Object.entries(i18nDict)) {
       if (locale === "ia" || locale === "eo") continue;
       const localeKeys = Object.keys(dict);
-      expect(localeKeys.length, `Locale ${locale} key count`).toBeGreaterThanOrEqual(494);
+      expect(localeKeys.length, `Locale ${locale} key count`).toBeGreaterThanOrEqual(504);
       for (const key of appKeys) {
         expect(dict[key], `Key ${key} in ${locale}`).toBeDefined();
         expect(typeof dict[key], `Key ${key} type in ${locale}`).toBe("string");
