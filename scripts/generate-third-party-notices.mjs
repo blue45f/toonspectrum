@@ -432,7 +432,13 @@ export function isRecoverablePnpmLicenseInventoryError(error) {
       : Buffer.isBuffer(error?.stderr)
         ? error.stderr.toString("utf8")
         : "";
-  return `${String(error?.message ?? "")}\n${stderr}`.includes(
+  const stdout =
+    typeof error?.stdout === "string"
+      ? error.stdout
+      : Buffer.isBuffer(error?.stdout)
+        ? error.stdout.toString("utf8")
+        : "";
+  return `${String(error?.message ?? "")}\n${stderr}\n${stdout}`.includes(
     "ERR_PNPM_MISSING_PACKAGE_INDEX_FILE",
   );
 }

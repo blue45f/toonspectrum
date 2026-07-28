@@ -23,8 +23,12 @@ describe("generated third-party notice inventory", () => {
   it("only treats pnpm's missing cached package index as recoverable", () => {
     expect(
       isRecoverablePnpmLicenseInventoryError({
-        stderr:
-          "ERR_PNPM_MISSING_PACKAGE_INDEX_FILE Failed to find package index",
+        stdout: JSON.stringify({
+          error: {
+            code: "ERR_PNPM_MISSING_PACKAGE_INDEX_FILE",
+            message: "Failed to find package index",
+          },
+        }),
       }),
     ).toBe(true);
     expect(
@@ -38,8 +42,13 @@ describe("generated third-party notice inventory", () => {
     const fallback = readResolvedLicenseInventory({
       runPnpmLicenseList: () => {
         throw Object.assign(new Error("pnpm failed"), {
-          stderr: Buffer.from(
-            "ERR_PNPM_MISSING_PACKAGE_INDEX_FILE missing package index",
+          stdout: Buffer.from(
+            JSON.stringify({
+              error: {
+                code: "ERR_PNPM_MISSING_PACKAGE_INDEX_FILE",
+                message: "missing package index",
+              },
+            }),
           ),
         });
       },
